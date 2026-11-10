@@ -141,7 +141,7 @@ function createStyles(colors: ThemeColors) {
     stripNameRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs },
     stripName: { fontSize: 16.5, fontWeight: '600', color: colors.textPrimary, flexShrink: 1 },
     stripValue: { fontSize: 17, fontWeight: '700', color: colors.textPrimary },
-    stripValueLabel: { fontSize: 11, fontWeight: '700', color: colors.textTertiary, marginLeft: 4 },
+    stripValueLabel: { fontSize: 12, fontWeight: '700', color: colors.textTertiary, marginLeft: 4 },
     oddsCaption: { fontSize: 12.5, color: colors.textTertiary, marginTop: 2 },
     stripTextGroup2: { flex: 1, fontSize: 15.5, fontWeight: '600', color: colors.textPrimary },
   });

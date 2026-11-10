@@ -2,6 +2,7 @@ import { AppState } from 'react-native';
 import type { VerdictAssumptions, VerdictFeedbackReason } from './verdictTrust';
 
 import { supabase } from './supabase';
+import type { SimRunResponse, SimStatusResponse, SimStrategy, SimWorldResponse, SimWorldsResponse } from './simPresentation';
 import type { CandidateCompare, MoveRange } from './startSitRange';
 import type { OpponentProfileResponse } from './opponentProfile';
 import { env } from './env';
@@ -84,7 +85,7 @@ const REQUEST_TIMEOUT_MS = 30_000;
 
 async function performRequest<T>(
   path: string,
-  init: { method?: 'GET' | 'POST' | 'PATCH' | 'DELETE'; jsonBody?: unknown; signal?: AbortSignal } | undefined,
+  init: { method?: 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE'; jsonBody?: unknown; signal?: AbortSignal } | undefined,
   accessToken: string,
 ): Promise<T> {
   const controller = new AbortController();
@@ -139,7 +140,7 @@ async function performRequest<T>(
 
 async function authorizedRequest<T>(
   path: string,
-  init?: { method?: 'GET' | 'POST' | 'PATCH' | 'DELETE'; jsonBody?: unknown; signal?: AbortSignal },
+  init?: { method?: 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE'; jsonBody?: unknown; signal?: AbortSignal },
 ): Promise<T> {
   const { data, error: sessionError } = await supabase.auth.getSession();
   if (sessionError || !data.session) {
@@ -3844,6 +3845,17 @@ export const api = {
     authorizedPost<GamesPickResponse>(`/v1/leagues/${encodeURIComponent(leagueId)}/games/pickem/pick`, body),
   getMyRoster: (leagueId: string) =>
     authorizedFetch<MyRosterResponse>(`/v1/leagues/${encodeURIComponent(leagueId)}/my-roster`),
+  // Fantasy Sim (Pro what-if season). UI only calls /v1/sim/*; see
+  // docs/fantasy-sim-api.md. Every route 404s until SIM_ENABLED is on.
+  getSimStatus: () => authorizedFetch<SimStatusResponse>('/v1/sim/status'),
+  listSimWorlds: () => authorizedFetch<SimWorldsResponse>('/v1/sim/worlds'),
+  createSimWorld: (body: { league_id: string; mode: 'remaining' | 'full'; roster_id?: string; strategy: SimStrategy }) =>
+    authorizedPost<SimWorldResponse>('/v1/sim/worlds', body),
+  updateSimStrategy: (worldId: string, strategy: SimStrategy) =>
+    authorizedRequest<SimWorldResponse>(`/v1/sim/worlds/${encodeURIComponent(worldId)}/strategy`, { method: 'PUT', jsonBody: { strategy } }),
+  runSimWorld: (worldId: string) => authorizedPost<SimRunResponse>(`/v1/sim/worlds/${encodeURIComponent(worldId)}/run`, {}),
+  getSimResult: (worldId: string) => authorizedFetch<SimRunResponse>(`/v1/sim/worlds/${encodeURIComponent(worldId)}/result`),
+  deleteSimWorld: (worldId: string) => authorizedDelete<{ ok: boolean }>(`/v1/sim/worlds/${encodeURIComponent(worldId)}`),
   getLeagueDraftCenter: (leagueId: string, options?: { lens?: ValuationLens }) => {
     const params = new URLSearchParams();
     if (options?.lens) params.set('lens', options.lens);

@@ -6,6 +6,7 @@ import AppText from './AppText';
 import PremiumLock from './PremiumLock';
 import { FREE_LEAGUE_CAP_MESSAGE } from '../lib/freeLeagueCap';
 import Button from './Button';
+import HelpLink from './HelpLink';
 import IconCircle from './IconCircle';
 import { useThemeMode } from '../context/ThemeModeContext';
 import { spacing, type ThemeColors } from '../theme';
@@ -45,6 +46,7 @@ export default function ErrorState({
       <AppText style={styles.title}>{title}</AppText>
       {message ? <AppText style={styles.message}>{message}</AppText> : null}
       {onRetry ? <Button label={retryLabel} onPress={onRetry} style={styles.button} /> : null}
+      <HelpLink context={{ topic: 'error_state', detail: message }} />
     </View>
   );
 }

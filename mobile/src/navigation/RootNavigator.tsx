@@ -6,6 +6,7 @@ import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { Ionicons } from '@expo/vector-icons';
 
 import type { CollegeProspect, DraftPickAsset, RankedPlayer } from '../lib/api';
+import HeaderBackdrop from '../components/HeaderBackdrop';
 import BrandMark from '../components/BrandMark';
 import GmOrb from '../components/GmOrb';
 import TradeOutcomePrompt from '../components/TradeOutcomePrompt';
@@ -48,6 +49,7 @@ import TeamsScreen from '../screens/TeamsScreen';
 import GamesScreen from '../screens/GamesScreen';
 import CommissionerScreen from '../screens/CommissionerScreen';
 import DraftCenterScreen from '../screens/DraftCenterScreen';
+import FantasySimScreen from '../screens/FantasySimScreen';
 import PickDetailScreen from '../screens/PickDetailScreen';
 import MyTeamScreen from '../screens/MyTeamScreen';
 import MatchupScreen from '../screens/MatchupScreen';
@@ -140,6 +142,7 @@ export type RootStackParamList = {
   Games: { leagueId: string; leagueName: string; tab?: 'sim' | 'pickem' };
   Commissioner: { leagueId: string; leagueName: string };
   DraftCenter: { leagueId: string; leagueName: string; tab?: 'overview' | 'picks' | 'scouting' };
+  FantasySim: { leagueId: string; leagueName: string };
   PickDetail: { pick: DraftPickAsset; leagueId: string; leagueName: string };
   MyTeam: { leagueId: string; leagueName: string };
   Matchup: { leagueId: string; leagueName: string };
@@ -191,6 +194,7 @@ const EspnDashboardScreen = withEspnGate(DashboardScreen);
 const EspnGamesScreen = withEspnGate(GamesScreen);
 const EspnCommissionerScreen = withEspnGate(CommissionerScreen);
 const EspnDraftCenterScreen = withEspnGate(DraftCenterScreen);
+const EspnFantasySimScreen = withEspnGate(FantasySimScreen);
 const EspnPickDetailScreen = withEspnGate(PickDetailScreen);
 const EspnMatchupScreen = withEspnGate(MatchupScreen);
 const EspnAlertsScreen = withEspnGate(AlertsScreen);
@@ -291,6 +295,9 @@ export default function RootNavigator() {
             // since a transparent header no longer reserves layout space.
             headerTransparent: true,
             headerStyle: { backgroundColor: 'transparent' },
+            // Blurred/opaque backdrop so scrolling content never shows
+            // through the title and header chips (see HeaderBackdrop).
+            headerBackground: () => <HeaderBackdrop />,
             headerTintColor: colors.textPrimary,
             headerShadowVisible: false,
             headerTitleAlign: 'center',
@@ -350,6 +357,7 @@ export default function RootNavigator() {
           <AppStack.Screen name="Games" component={EspnGamesScreen} />
           <AppStack.Screen name="Commissioner" component={EspnCommissionerScreen} />
           <AppStack.Screen name="DraftCenter" component={EspnDraftCenterScreen} />
+          <AppStack.Screen name="FantasySim" component={EspnFantasySimScreen} />
           <AppStack.Screen name="PickDetail" component={EspnPickDetailScreen} />
           <AppStack.Screen name="MyTeam" component={MyTeamScreen} />
           <AppStack.Screen name="Matchup" component={EspnMatchupScreen} />

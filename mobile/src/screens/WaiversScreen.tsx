@@ -708,7 +708,7 @@ function BestAvailableCard({
   const { colors, isDark } = useThemeMode();
   const styles = useMemo(() => createStyles(colors), [colors]);
   const prestige = positionRankPrestige(player.position_rank, isDark);
-  const visual = bestAvailableCardVisual(prestige.tier);
+  const visual = bestAvailableCardVisual(prestige.tier, player.position, player.position_rank);
   return (
     <AnimatedCard
       style={styles.bestAvailableCard}
@@ -718,7 +718,7 @@ function BestAvailableCard({
     >
       <View style={styles.bestAvailableTopRow}>
         {visual.prestigeLabel ? (
-          <AppText style={[styles.bestAvailablePrestigeLabel, { color: prestige.color ?? colors.textTertiary }]}>
+          <AppText style={[styles.bestAvailablePrestigeLabel, { color: prestige.color ?? colors.textTertiary }]} numberOfLines={1}>
             {visual.prestigeLabel}
           </AppText>
         ) : (
@@ -917,7 +917,7 @@ function createStyles(colors: ThemeColors) {
     minHeight: 14,
     marginBottom: spacing.xs,
   },
-  bestAvailablePrestigeLabel: { fontSize: 12, fontWeight: '800', textTransform: 'uppercase', letterSpacing: 0.5 },
+  bestAvailablePrestigeLabel: { fontSize: 12, fontWeight: '800', flexShrink: 1 },
   avatarWrap: { marginRight: spacing.md },
   bestAvailablePosBadgeWrap: { alignSelf: 'center', marginTop: spacing.xs },
   // The most visually dominant text on the card (UI_HIERARCHY_DIRECTIVE.md

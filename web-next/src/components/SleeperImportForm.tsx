@@ -1,5 +1,6 @@
 "use client";
 
+import { HelpLink } from "@/components/HelpLink";
 import { useState } from "react";
 
 import { api, type SaveLeagueResponse, type SleeperLeagueSummary } from "@/lib/api";
@@ -42,7 +43,7 @@ type LeaguePlatform = "sleeper" | "espn" | "fleaflicker" | "mfl";
 /** The two main platforms get cards (same treatment); the smaller ones are quiet links below. */
 const MAIN_PLATFORMS: { value: LeaguePlatform; label: string; monogram: string; blurb: string }[] = [
   { value: "sleeper", label: "Sleeper", monogram: "S", blurb: "Use your username" },
-  { value: "espn", label: "ESPN", monogram: "E", blurb: "League ID. Public or private" },
+  { value: "espn", label: "ESPN", monogram: "E", blurb: "League ID. Private leagues need 2 cookies" },
 ];
 const OTHER_PLATFORMS: { value: LeaguePlatform; label: string }[] = [
   { value: "fleaflicker", label: "Fleaflicker" },
@@ -357,6 +358,9 @@ function SleeperUsernameImport({
           matchups, and league settings to build recommendations.
         </p>
         <p className="m-0">
+          We never ask for your Sleeper password and never change your lineup. Read-only.
+        </p>
+        <p className="m-0">
           Don&apos;t have a Sleeper league yet?{" "}
           <a
             href="https://sleeper.com"
@@ -375,7 +379,7 @@ function SleeperUsernameImport({
         <Input
           value={username}
           onChange={(event) => setUsername(event.target.value)}
-          placeholder="Sleeper username"
+          placeholder="e.g. gridiron_gm"
         />
       </label>
       {connectError ? (
@@ -402,6 +406,7 @@ function SleeperUsernameImport({
             </p>
           ) : null}
           {connectError.offerSample && !sampleCtaBelow ? <SampleLeagueButton surface="connect_error" /> : null}
+          <HelpLink context={{ topic: "connect_error", platform: "sleeper", detail: connectError.message }} />
         </div>
       ) : message ? (
         <div role="alert" className="flex flex-col gap-1 text-xs" style={{ color: "var(--color-warning)" }}>

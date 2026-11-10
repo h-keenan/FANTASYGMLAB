@@ -39,7 +39,7 @@ export default function ValueStat({
 function createStyles(colors: ThemeColors) {
   return StyleSheet.create({
     wrap: { justifyContent: 'center' },
-    label: { fontSize: 11, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.6, color: colors.textTertiary },
+    label: { fontSize: 12, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.6, color: colors.textTertiary },
     valueLg: { fontSize: 25 },
     value: { fontSize: 16.5, fontWeight: '800', color: colors.textPrimary },
   });

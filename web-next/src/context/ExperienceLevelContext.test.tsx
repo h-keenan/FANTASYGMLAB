@@ -144,10 +144,16 @@ describe("experience level copy on Dashboard", () => {
     expect(screen.queryByText("Avg Age")).not.toBeInTheDocument();
   });
 
-  it.each([
-    ["advanced", "advanced" as const],
-    ["unset", null],
-  ])("renders today's terse copy for %s", async (_name, level) => {
+  it("gives an unset account beginner-lite: help shows, labels stay today's", async () => {
+    vi.mocked(api.getDevicePreferences).mockResolvedValue(preferences(null));
+    const { container } = render(withProvider(<DashboardContent leagueId="abc" leagueName="League" data={DASHBOARD} />));
+
+    await waitFor(() => expect(api.getDevicePreferences).toHaveBeenCalled());
+    expect(screen.getByText("Avg Age")).toBeInTheDocument();
+    expect(container.querySelector("[data-beginner-help]")).not.toBeNull();
+  });
+
+  it.each([["advanced", "advanced" as const]])("renders today's terse copy for %s", async (_name, level) => {
     vi.mocked(api.getDevicePreferences).mockResolvedValue(preferences(level));
     const { container } = render(withProvider(<DashboardContent leagueId="abc" leagueName="League" data={DASHBOARD} />));
 
@@ -172,8 +178,8 @@ describe("experience level copy on Trade Hub idea cards", () => {
     expect(screen.getByText(BEGINNER_HELP.ideaRealism)).toBeInTheDocument();
   });
 
-  it("keeps the terse card for an unset account", async () => {
-    vi.mocked(api.getDevicePreferences).mockResolvedValue(preferences(null));
+  it("keeps the terse card for an advanced account", async () => {
+    vi.mocked(api.getDevicePreferences).mockResolvedValue(preferences("advanced"));
     const { container } = render(withProvider(<TradeIdeaCardView idea={IDEA} leagueId="abc" />));
 
     await waitFor(() => expect(api.getDevicePreferences).toHaveBeenCalled());
@@ -184,7 +190,7 @@ describe("experience level copy on Trade Hub idea cards", () => {
 });
 
 describe("Account page Explanations setting", () => {
-  it("shows Veteran dynasty manager for an unset account and switches to New to dynasty, saving through /v1/preferences", async () => {
+  it("shows Not set (nothing selected) for an unset account and switches to New to dynasty, saving through /v1/preferences", async () => {
     vi.mocked(api.getDevicePreferences).mockResolvedValue(preferences(null));
     vi.mocked(api.setExperienceLevel).mockResolvedValue(preferences("beginner"));
     renderAccount();
@@ -192,7 +198,8 @@ describe("Account page Explanations setting", () => {
     await waitFor(() => expect(api.getDevicePreferences).toHaveBeenCalled());
     const advanced = screen.getByRole("radio", { name: /veteran dynasty manager/i });
     const beginner = screen.getByRole("radio", { name: /new to dynasty/i });
-    expect(advanced).toHaveAttribute("aria-checked", "true");
+    expect(screen.getByText(/Not set/)).toBeInTheDocument();
+    expect(advanced).toHaveAttribute("aria-checked", "false");
     expect(beginner).toHaveAttribute("aria-checked", "false");
 
     fireEvent.click(beginner);

@@ -1,11 +1,12 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { StyleSheet, View } from 'react-native';
 
 import AppText from './AppText';
 import PostureChip from './PostureChip';
 import ToneBadge from './ToneBadge';
 import type { TradePosture } from '../lib/api';
-import { colors, spacing } from '../theme';
+import { useThemeMode } from '../context/ThemeModeContext';
+import { spacing, type ThemeColors } from '../theme';
 
 export interface IdeaPostureFields {
   posture?: TradePosture | null;
@@ -18,9 +19,11 @@ export interface IdeaPostureFields {
  * The team posture a trade idea was graded and ranked under: the shared
  * PostureChip, the Analyzer's honest label when the idea is a trade-off, and the
  * one-line note (modules/trade_posture.py). Mirrors web-next's IdeaPosture; used by
- * Trade Hub / Finder cards and the Dashboard trade tile.
+ * Trade Hub / Finder cards and the Dashboard trade tile. Theme-aware.
  */
 export default function IdeaPosture({ idea }: { idea: IdeaPostureFields }) {
+  const { colors } = useThemeMode();
+  const styles = useMemo(() => createStyles(colors), [colors]);
   if (!idea.posture) return null;
   return (
     <View testID="idea-posture" style={styles.block}>
@@ -35,7 +38,9 @@ export default function IdeaPosture({ idea }: { idea: IdeaPostureFields }) {
   );
 }
 
-const styles = StyleSheet.create({
-  block: { gap: spacing.xs, alignItems: 'flex-start' },
-  note: { fontSize: 13.5, lineHeight: 19, color: colors.textSecondary },
-});
+function createStyles(colors: ThemeColors) {
+  return StyleSheet.create({
+    block: { gap: spacing.xs, alignItems: 'flex-start' },
+    note: { fontSize: 13.5, lineHeight: 19, color: colors.textSecondary },
+  });
+}

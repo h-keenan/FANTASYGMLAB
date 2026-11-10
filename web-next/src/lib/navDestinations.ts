@@ -141,6 +141,7 @@ export function useNavDestinations(
             { label: "Season Sim", path: tabPath("games", "sim"), subtitle: "Season simulator", keywords: ["simulator", "simulation", "playoff odds", "what if"] },
             { label: "Pick'em", path: tabPath("games", "pickem"), subtitle: "Weekly pick'em in your league", keywords: ["pickem", "picks", "weekly"] },
           ] },
+        { label: "Fantasy Sim", path: `/fantasy-sim/${encodeURIComponent(leagueId)}${query}`, subtitle: "Set a strategy and play out your season", glyph: "games", color: accent("Fantasy Sim"), pro: true },
         { label: "Commissioner", path: `/commissioner/${encodeURIComponent(leagueId)}${query}`, subtitle: "League integrity: lineups, tanking signals, trades", glyph: "commissioner" as const, color: accent("Commissioner"), pro: true },
       ]
     : [];
@@ -243,6 +244,7 @@ export const PAGE_TITLE_BY_SEGMENT: Record<string, string> = {
   "team-situation": "Team Situation",
   "gm-plan": "GM Plan",
   "draft-center": "Draft Center",
+  "fantasy-sim": "Fantasy Sim",
   "live-draft": "Live Draft",
   "league-recaps": "League Recaps",
   games: "Games",

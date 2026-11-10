@@ -14,9 +14,11 @@
  *   granular level alongside the original "beginner" — both get today's
  *   beginner copy; this only changed which accounts land on "beginner" vs
  *   the new value, never the copy itself or how it's gated.
- * - "advanced" and null (unanswered, skipped, or an account older than the
- *   question): today's terse copy, unchanged. `label()` returns the
+ * - "advanced": today's terse copy, unchanged. `label()` returns the
  *   caller's current label and `help()` returns null.
+ * - null (never answered, skipped, or the preference read failed): beginner-
+ *   lite. Short "?" help shows (`showsHelp`), but none of the relabels
+ *   (`isBeginner` stays false). Skipping must never read as "I know my stuff".
  *
  * Every explanation below describes what the engine actually computes. The
  * source is noted next to each entry; update the copy if that code changes.
@@ -212,8 +214,13 @@ const IMPACT_TAG_HELP_KEY: Record<string, BeginnerHelpKey> = {
 
 export interface ExperienceCopy {
   level: ExperienceLevelSetting;
+  /** Strictly a beginner answer (labels, goal lines). false for unanswered. */
   isBeginner: boolean;
-  /** The beginner explanation for `key`, or null for advanced/unset. */
+  /** Never answered (null). Beginner-lite: gets the short help, not the relabels. */
+  isUnanswered: boolean;
+  /** Whether short "?" explanations show: beginners AND unanswered accounts. */
+  showsHelp: boolean;
+  /** The beginner explanation for `key`, or null for advanced only. */
   help: (key: BeginnerHelpKey) => string | null;
   /** The beginner label for `key`, or `advancedLabel` (today's copy). */
   label: (key: BeginnerLabelKey, advancedLabel: string) => string;
@@ -227,10 +234,17 @@ export function experienceCopy(level: ExperienceLevelSetting): ExperienceCopy {
   // "new_to_fantasy" and "beginner" both get the beginner copy — see the
   // module doc comment above for why there are two beginner-ish levels.
   const isBeginner = level === "beginner" || level === "new_to_fantasy";
-  const help = (key: BeginnerHelpKey) => (isBeginner ? BEGINNER_HELP[key] : null);
+  // Unanswered (skipped, or the preference read failed) is NOT "advanced":
+  // it gets the short explanations (beginner-lite) until the user answers,
+  // but none of the relabels, so a skip never reads as "I know my stuff".
+  const isUnanswered = level === null;
+  const showsHelp = isBeginner || isUnanswered;
+  const help = (key: BeginnerHelpKey) => (showsHelp ? BEGINNER_HELP[key] : null);
   return {
     level,
     isBeginner,
+    isUnanswered,
+    showsHelp,
     help,
     label: (key, advancedLabel) => (isBeginner ? BEGINNER_LABELS[key] : advancedLabel),
     verdictHelp: (uiVerdict) => {

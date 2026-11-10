@@ -23,7 +23,6 @@ import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 
 import AppText from '../components/AppText';
 import Button from '../components/Button';
-import BrandMark from '../components/BrandMark';
 import GlassPanel from '../components/GlassPanel';
 import OnboardingAurora from '../components/OnboardingAurora';
 import type { ExperienceGoalValue, ExperienceLevelValue } from '../lib/api';
@@ -46,7 +45,7 @@ type ColorKey = 'accent' | 'premium' | 'success';
 // with web-next (public/onboarding/*.webp mirrors assets/onboarding/).
 // Keep this list, its order and its copy in lockstep with web-next's
 // onboardingFeatures.ts ONBOARDING_FEATURES. Signup flow is 3 steps
-// (coridian_, 2026-10-23: "10 is insane"): value -> connect -> level. The
+// (coridian_, 2026-10-23: "10 is insane"): level -> value (2026-11-10: level first, Connect info slide removed). The
 // value step auto-advances through VALUE_SLIDE_KEYS inside one step; the full
 // 8-screen list is only used by the replay tour (More > Replay the tour).
 const FEATURES = [
@@ -60,7 +59,7 @@ const FEATURES = [
   { key: 'waivers', title: 'Waivers', benefit: 'Priority Adds ranked for your roster. Pro adds FAAB bid ranges.', image: require('../../assets/onboarding/onboarding-waivers.webp') },
 ] as const;
 
-const STEP_KEYS = ['value', 'connect', 'level'] as const;
+const STEP_KEYS = ['level', 'value'] as const;
 type StepKey = (typeof STEP_KEYS)[number] | (typeof FEATURES)[number]['key'];
 const VALUE_SLIDE_KEYS = ['gameplan', 'tradehub', 'matchup', 'waivers'] as const;
 const VALUE_HEADLINE = 'Know your best move every week.';
@@ -228,7 +227,6 @@ export default function OnboardingScreen({ navigation, route }: Props) {
     const id = setInterval(() => setValueSlide((s) => (s + 1) % VALUE_SLIDES.length), VALUE_SLIDE_MS);
     return () => clearInterval(id);
   }, [valueAuto]);
-  const [saving, setSaving] = useState(false);
   // Replay (More > "Replay the tour"): feature slides only. No connect or
   // experience step, so no preference is written, no funnel events fire and
   // the onboarding-completed flag is never touched.
@@ -238,6 +236,7 @@ export default function OnboardingScreen({ navigation, route }: Props) {
   // A replay from More starts with the flag already true; only a real
   // first run gets the trial-offer step.
   const isFirstRun = onboardingComplete === false;
+  const isLevelStep = !isReplay && index === 0;
 
   // One step_viewed per step per session (deduped in the helper).
   useEffect(() => {
@@ -258,36 +257,37 @@ export default function OnboardingScreen({ navigation, route }: Props) {
       return;
     }
     trackOnboarding('skipped', { step: STEP_KEYS[index], step_index: index });
-    if (isFirstRun) {
-      navigation.navigate('Paywall', { fromOnboarding: 'skip' });
+    // Skipping the question is "decide later": go on to the value step with
+    // the level unanswered (beginner-lite help), never straight out.
+    if (isLevelStep) {
+      goTo(index + 1);
       return;
     }
+    // The trial offer now comes AFTER the first league connects (HomeScreen).
     completeOnboarding();
     if (navigation.canGoBack()) navigation.goBack();
   };
 
-  const onFinish = async () => {
+  // Saves the level (and optional goal) as soon as the first step is answered,
+  // so beginner help is live for the rest of onboarding.
+  const onLevelContinue = () => {
+    if (!level) return;
+    trackOnboarding('completed', { step: 'level', step_index: index, experience: experienceBucket(level) });
+    // Applies the beginner/advanced copy immediately and saves it to
+    // /v1/preferences in the background. Best-effort, same as web.
+    saveExperienceLevel(level);
+    if (goal) saveExperienceGoal(goal);
+    goTo(index + 1);
+  };
+
+  const onFinish = () => {
     if (isReplay) {
       if (navigation.canGoBack()) navigation.goBack();
       return;
     }
-    if (!level) return;
-    trackOnboarding('completed', { step: 'level', step_index: index, experience: experienceBucket(level) });
-    setSaving(true);
-    // Applies the beginner/advanced copy immediately and saves it to
-    // /v1/preferences in the background. Best-effort, same as web: a failed
-    // preference write never blocks onboarding.
-    saveExperienceLevel(level);
-    // Optional, so only saved when the user actually picked one. Also
-    // best-effort, same as the level write above.
-    if (goal) saveExperienceGoal(goal);
-    setSaving(false);
-    if (isFirstRun) {
-      navigation.navigate('Paywall', { fromOnboarding: 'getStarted' });
-      return;
-    }
+    // The trial offer now comes AFTER the first league connects (HomeScreen).
     completeOnboardingViaGetStarted();
-    if (navigation.canGoBack()) navigation.goBack();
+    if (!isFirstRun && navigation.canGoBack()) navigation.goBack();
   };
 
   const onMomentumScrollEnd = (e: NativeSyntheticEvent<NativeScrollEvent>) => {
@@ -365,23 +365,12 @@ export default function OnboardingScreen({ navigation, route }: Props) {
       );
     }
     switch (key) {
-      case 'connect':
-        return (
-          <>
-            <BrandMark width={112} style={styles.mark} />
-            <AppText style={styles.eyebrow}>One setup step</AppText>
-            <AppText style={styles.headlineSm}>
-              Connect <AppText style={styles.headlineAccent}>Sleeper or ESPN</AppText>
-            </AppText>
-            <AppText style={styles.body}>Every recommendation is built around your league.</AppText>
-          </>
-        );
       case 'level':
         return (
           <>
-            <AppText style={styles.eyebrow}>Last thing</AppText>
+            <AppText style={styles.eyebrow}>One quick question</AppText>
             <AppText style={styles.headlineSm}>
-              How much dynasty <AppText style={styles.headlineAccent}>experience</AppText> do you have?
+              How familiar are you with <AppText style={styles.headlineAccent}>fantasy football</AppText>?
             </AppText>
             <AppText style={styles.body}>
               Tunes how much explanation shows up alongside recommendations. Change it anytime in Settings.
@@ -436,20 +425,20 @@ export default function OnboardingScreen({ navigation, route }: Props) {
     }
   };
 
-  const primaryLabel = !isLast ? 'Next' : isFirstRun ? 'Continue' : 'Done';
-  const primaryDisabled = isLast && !isReplay && (!level || saving);
+  const primaryLabel = isReplay ? (isLast ? 'Done' : 'Next') : isLevelStep ? 'Continue' : isFirstRun ? 'Connect my league' : 'Done';
+  const primaryDisabled = isLevelStep && !level;
 
   return (
     <View style={styles.root}>
       <OnboardingAurora cyan={colors.accent} violet={colors.violet} />
       <View style={[styles.topRow, { paddingTop: insets.top + spacing.sm }]}>
-        <View style={styles.dotsRow}>
+        <View style={styles.dotsRow} accessible accessibilityLabel={`Step ${index + 1} of ${stepKeys.length}`}>
           {stepKeys.map((key, i) => (
             <ProgressDot key={key} active={i === index} color={colors.border} activeColor={colors.accent} />
           ))}
         </View>
-        <TouchableOpacity onPress={onSkip} hitSlop={12} accessibilityRole="button" accessibilityLabel="Skip tutorial">
-          <AppText style={styles.skipText}>Skip</AppText>
+        <TouchableOpacity onPress={onSkip} hitSlop={12} accessibilityRole="button" accessibilityLabel={isLevelStep ? 'Decide later' : 'Skip tutorial'}>
+          <AppText style={styles.skipText}>{isLevelStep ? 'Decide later' : 'Skip'}</AppText>
         </TouchableOpacity>
       </View>
 
@@ -489,9 +478,8 @@ export default function OnboardingScreen({ navigation, route }: Props) {
           ) : null}
           <Button
             label={primaryLabel}
-            onPress={() => (isLast ? void onFinish() : goTo(index + 1))}
+            onPress={() => (isLevelStep ? onLevelContinue() : isLast ? onFinish() : goTo(index + 1))}
             disabled={primaryDisabled}
-            loading={saving}
             style={styles.primaryButton}
           />
         </View>

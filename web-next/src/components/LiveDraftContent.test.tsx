@@ -272,7 +272,8 @@ describe("LiveDraftContent", () => {
         onRefresh={vi.fn()}
       />,
     );
-    expect(screen.queryByRole("combobox", { name: "" })).toBeInTheDocument(); // the rankings filter select only
+    expect(screen.getByRole("combobox", { name: "Position filter" })).toBeInTheDocument(); // the rankings filter select only
+    expect(screen.queryByRole("combobox", { name: "Draft" })).not.toBeInTheDocument();
 
     const onSelectDraft = vi.fn();
     rerender(
@@ -287,9 +288,8 @@ describe("LiveDraftContent", () => {
         onRefresh={vi.fn()}
       />,
     );
-    const selects = screen.getAllByRole("combobox");
-    expect(selects.length).toBe(2);
-    fireEvent.change(selects[0], { target: { value: "draft-2" } });
+    expect(screen.getAllByRole("combobox").length).toBe(2);
+    fireEvent.change(screen.getByRole("combobox", { name: "Draft" }), { target: { value: "draft-2" } });
     expect(onSelectDraft).toHaveBeenCalledWith("draft-2");
   });
 

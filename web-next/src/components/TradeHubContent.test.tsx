@@ -1,8 +1,19 @@
 import { fireEvent, render, screen } from "@testing-library/react";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 import { TradeHubContent } from "./TradeHubContent";
 import type { TradeAsset, TradeHubResponse, TradeIdea } from "@/lib/api";
+
+// Posture popover is what this file asserts; an unanswered account also gets
+// beginner-lite help buttons, so pin the account to advanced here.
+vi.mock("@/context/ExperienceLevelContext", async () => {
+  const actual = await vi.importActual<typeof import("@/context/ExperienceLevelContext")>("@/context/ExperienceLevelContext");
+  const { experienceCopy } = await import("@/lib/experienceCopy");
+  return {
+    ...actual,
+    useExperienceCopy: () => experienceCopy("advanced"),
+  };
+});
 
 function asset(overrides: Partial<TradeAsset>): TradeAsset {
   return {

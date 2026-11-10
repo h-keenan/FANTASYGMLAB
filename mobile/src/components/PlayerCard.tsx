@@ -113,7 +113,7 @@ export default function PlayerCard({
   const { colors, isDark } = useThemeMode();
   const styles = useMemo(() => createStyles(colors), [colors]);
   const prestige = positionRankPrestige(positionRank, isDark);
-  const visual = bestAvailableCardVisual(prestige.tier);
+  const visual = bestAvailableCardVisual(prestige.tier, position, positionRank);
 
   const flip = useSharedValue(0); // 0 = front resting, 1 = back resting
   const pressScale = useSharedValue(1);
@@ -180,7 +180,7 @@ export default function PlayerCard({
         <Animated.View style={[styles.face, frontAnimatedStyle]}>
           <View style={styles.topRow}>
             {visual.prestigeLabel ? (
-              <AppText style={[styles.prestigeLabel, { color: prestige.color ?? colors.textTertiary }]}>
+              <AppText style={[styles.prestigeLabel, { color: prestige.color ?? colors.textTertiary }]} numberOfLines={1}>
                 {visual.prestigeLabel}
               </AppText>
             ) : (
@@ -312,7 +312,7 @@ function createStyles(colors: ThemeColors) {
       minHeight: 14,
       marginBottom: spacing.xs,
     },
-    prestigeLabel: { fontSize: 12, fontWeight: '800', textTransform: 'uppercase', letterSpacing: 0.5 },
+    prestigeLabel: { fontSize: 12, fontWeight: '800', flexShrink: 1 },
     avatarWrap: { marginTop: spacing.xs },
     injuryDot: {
       position: 'absolute',
@@ -346,7 +346,7 @@ function createStyles(colors: ThemeColors) {
     },
     backStatsList: { alignSelf: 'stretch', marginTop: spacing.xs, gap: 3 },
     backStatRow: { flexDirection: 'row', alignItems: 'baseline', justifyContent: 'space-between', gap: spacing.xs },
-    backStatLabel: { fontSize: 11.5, fontWeight: '700', color: colors.textTertiary, textTransform: 'uppercase', letterSpacing: 0.3 },
+    backStatLabel: { fontSize: 12, fontWeight: '700', color: colors.textTertiary, textTransform: 'uppercase', letterSpacing: 0.3 },
     backStatValue: { fontSize: 12.5, fontWeight: '700', flexShrink: 1, textAlign: 'right' },
     backEmpty: { fontSize: 12, color: colors.textTertiary, marginTop: spacing.xs },
     detailButton: {

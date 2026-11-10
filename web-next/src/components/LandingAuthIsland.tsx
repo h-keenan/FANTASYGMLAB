@@ -234,11 +234,20 @@ export function LandingAuthIsland() {
     }
   }, [loading, session, checkingSavedLeagues]);
 
+  // Where to go once the trial offer (shown AFTER the league connects, so the
+  // user has seen their own team before being asked to pay) is dismissed.
+  const [pendingDestination, setPendingDestination] = useState<string | null>(null);
+
   const handleLeagueChosen = (leagueId: string, leagueName: string) => {
     // Dashboard for Sleeper, My Team for ESPN (no ESPN Dashboard yet).
     // A trade carried over from the public Trade Analyzer opens in this
     // league's analyzer; otherwise the usual league home.
-    router.push(pathAfterLeagueChosen(leagueId, leagueName));
+    const destination = pathAfterLeagueChosen(leagueId, leagueName);
+    if (!paywallSeen) {
+      setPendingDestination(destination);
+      return;
+    }
+    router.push(destination);
   };
 
   if (loading || checkingSavedLeagues) {
@@ -253,10 +262,21 @@ export function LandingAuthIsland() {
           setCarouselDone(true);
         }}
       />
-    ) : paywallSeen ? (
-      // Same glass stage as the carousel: one step at a time, no app chrome or
-      // footer links (coridian_, 2026-11-03: connect step looked like a plain
-      // page after the redesign). "Try a sample league" is the pinned action.
+    ) : pendingDestination && !paywallSeen ? (
+      // Trial offer moved here from before the connect step (coridian_
+      // approved 2026-11-10): activation first, purchase decision second.
+      <OnboardingShell>
+        <div className="onboarding-connect">
+          <OnboardingPaywall
+            onSkip={() => {
+              markOnboardingStepCompleted(userId, "paywall");
+              setPaywallDismissed(true);
+              router.push(pendingDestination);
+            }}
+          />
+        </div>
+      </OnboardingShell>
+    ) : (
       <OnboardingShell footer={<SampleLeagueButton surface="connect_step" />}>
         <div className="onboarding-connect" data-testid="connect-first-heading">
           {returnedFromCheckout ? (
@@ -271,17 +291,6 @@ export function LandingAuthIsland() {
             <p className="onboarding-body">Pick where your league lives. We read your real roster and build your first Today briefing.</p>
           </header>
           <SleeperImportForm sampleCtaBelow onLeagueChosen={handleLeagueChosen} />
-        </div>
-      </OnboardingShell>
-    ) : (
-      <OnboardingShell>
-        <div className="onboarding-connect">
-          <OnboardingPaywall
-            onSkip={() => {
-              markOnboardingStepCompleted(userId, "paywall");
-              setPaywallDismissed(true);
-            }}
-          />
         </div>
       </OnboardingShell>
     )

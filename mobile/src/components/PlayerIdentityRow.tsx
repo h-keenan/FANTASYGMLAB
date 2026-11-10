@@ -460,13 +460,13 @@ function createStyles(colors: ThemeColors) {
       justifyContent: 'center',
       marginRight: spacing.sm,
     },
-    slotText: { color: colors.badgeText, fontSize: 11, fontWeight: '700' },
+    slotText: { color: colors.badgeText, fontSize: 12, fontWeight: '700' },
     avatar: { marginRight: spacing.sm },
     body: { flex: 1, gap: 2 },
     nameRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
     name: { flex: 1, fontSize: 16, fontWeight: '700', color: colors.textPrimary },
     metaRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs, flexWrap: 'wrap' },
-    team: { fontSize: 12.5, color: colors.textSecondary },
+    team: { fontSize: 13.5, color: colors.textSecondary },
     // Same muted-fill/bright-text pairing as the "CURRENT" nav badge
     // (colors.accentMuted/accent) — a neutral, purely informational tone,
     // distinct from the injury pill's risk/watch colors and from
@@ -477,9 +477,9 @@ function createStyles(colors: ThemeColors) {
       paddingHorizontal: spacing.xs + 2,
       paddingVertical: 1,
     },
-    trendingPillText: { fontSize: 11.5, fontWeight: '700', color: colors.accent },
+    trendingPillText: { fontSize: 12, fontWeight: '700', color: colors.accent },
     label: { fontSize: 12, fontWeight: '800', color: colors.textSecondary, letterSpacing: 0.3 },
-    context: { fontSize: 12.5, color: colors.textTertiary },
+    context: { fontSize: 13, color: colors.textTertiary },
     // Colors (background/text) are applied inline per-row from
     // injuryTone/ruledOut — see the component body — since they vary per
     // player, not per theme, and this StyleSheet is memoized on colors
@@ -493,17 +493,17 @@ function createStyles(colors: ThemeColors) {
       paddingHorizontal: spacing.xs + 1,
       paddingVertical: 1,
     },
-    injuryText: { fontSize: 11.5, fontWeight: '800', letterSpacing: 0.3 },
+    injuryText: { fontSize: 13, fontWeight: '800', letterSpacing: 0.3 },
     chevron: { marginLeft: spacing.sm },
     trailingBlock: { alignItems: 'flex-end', marginLeft: spacing.sm },
     trailingValue: { fontSize: 16.5, fontWeight: '700', color: colors.textPrimary },
-    trailingCaption: { fontSize: 12, color: colors.textTertiary, marginTop: 1 },
+    trailingCaption: { fontSize: 13, color: colors.textTertiary, marginTop: 1 },
     // Deliberately smaller/quieter than trailingValue/trailingCaption above
     // — a supporting secondary figure (e.g. a projection next to a real
     // score), never a second equally-weighted metric on the row.
     secondaryTrailingRow: { flexDirection: 'row', alignItems: 'baseline', marginTop: 2 },
-    secondaryTrailingValue: { fontSize: 12.5, fontWeight: '600', color: colors.textSecondary },
-    secondaryTrailingCaption: { fontSize: 11, color: colors.textTertiary },
+    secondaryTrailingValue: { fontSize: 13.5, fontWeight: '600', color: colors.textSecondary },
+    secondaryTrailingCaption: { fontSize: 13, color: colors.textTertiary },
     // `layout="grid"` — unlike `layout="row"`'s `styles.row` (a bare flex
     // row — the caller's own container owns the grouped-table border/
     // background), this intentionally owns no border/background/padding

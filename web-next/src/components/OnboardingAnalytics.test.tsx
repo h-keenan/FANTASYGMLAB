@@ -26,32 +26,37 @@ describe("onboarding funnel analytics", () => {
     resetOnboardingAnalytics();
   });
 
-  it("fires step_viewed once per step, even after Back/Next revisits and re-renders", () => {
+  it("fires step_viewed once per step, even after Back/Next revisits and re-renders", async () => {
     const { rerender } = render(<OnboardingCarousel onDone={vi.fn()} />);
     rerender(<OnboardingCarousel onDone={vi.fn()} />);
-    fireEvent.click(screen.getByRole("button", { name: "Next" }));
-    fireEvent.click(screen.getByRole("button", { name: "Back" }));
-    fireEvent.click(screen.getByRole("button", { name: "Next" }));
+    fireEvent.click(screen.getByRole("button", { name: /veteran dynasty manager/i }));
+    fireEvent.click(screen.getByRole("button", { name: /^continue$/i }));
+    fireEvent.click(await screen.findByRole("button", { name: "Back" }));
+    fireEvent.click(screen.getByRole("button", { name: /^continue$/i }));
+    await screen.findByRole("button", { name: "Connect my league" });
     const viewed = calls().filter((c) => c.action === "step_viewed");
-    expect(viewed.map((c) => c.step)).toEqual(["value", "connect"]);
+    expect(viewed.map((c) => c.step)).toEqual(["level", "value"]);
     expect(viewed.map((c) => c.step_index)).toEqual([0, 1]);
     expect(calls().filter((c) => c.action === "back")).toHaveLength(1);
   });
 
-  it("tracks skipped with the current step", () => {
-    render(<OnboardingCarousel onDone={vi.fn()} />);
-    fireEvent.click(screen.getByRole("button", { name: "Skip" }));
-    expect(calls().find((c) => c.action === "skipped")).toMatchObject({ feature: "onboarding", step: "value", step_index: 0 });
+  it("tracks skipped with the current step, and Decide later moves on instead of leaving", () => {
+    const onDone = vi.fn();
+    render(<OnboardingCarousel onDone={onDone} />);
+    fireEvent.click(screen.getByRole("button", { name: "Decide later" }));
+    expect(calls().find((c) => c.action === "skipped")).toMatchObject({ feature: "onboarding", step: "level", step_index: 0 });
+    expect(onDone).not.toHaveBeenCalled();
+    expect(screen.getByRole("button", { name: "Connect my league" })).toBeInTheDocument();
   });
 
-  it("tracks experience_selected (new|expert) and completed with only allowlisted fixed props", () => {
+  it("tracks experience_selected (new|expert) and completed with only allowlisted fixed props", async () => {
     render(<OnboardingCarousel onDone={vi.fn()} />);
-    for (let i = 0; i < 2; i += 1) fireEvent.click(screen.getByRole("button", { name: "Next" }));
     fireEvent.click(screen.getByRole("button", { name: /veteran dynasty manager/i }));
     fireEvent.click(screen.getByRole("button", { name: /^continue$/i }));
+    await screen.findByRole("button", { name: "Connect my league" });
     const all = calls();
     expect(all.find((c) => c.action === "experience_selected")).toMatchObject({ experience: "expert" });
-    expect(all.find((c) => c.action === "completed")).toMatchObject({ experience: "expert", step: "level", step_index: 2 });
+    expect(all.find((c) => c.action === "completed")).toMatchObject({ experience: "expert", step: "level", step_index: 0 });
     for (const c of all) {
       expect(Object.keys(c).every((k) => ["feature", "action", "step", "step_index", "experience"].includes(k))).toBe(true);
     }
@@ -59,7 +64,6 @@ describe("onboarding funnel analytics", () => {
 
   it("buckets the new, more granular level as 'new' too", () => {
     render(<OnboardingCarousel onDone={vi.fn()} />);
-    for (let i = 0; i < 2; i += 1) fireEvent.click(screen.getByRole("button", { name: "Next" }));
     fireEvent.click(screen.getByRole("button", { name: /new to fantasy football/i }));
     expect(calls().find((c) => c.action === "experience_selected")).toMatchObject({ experience: "new" });
   });

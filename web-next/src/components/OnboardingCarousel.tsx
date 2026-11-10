@@ -9,7 +9,6 @@ import { usePortalRoot } from "@/components/OnboardingShell";
 import { Button } from "@/components/Button";
 import { PillRow } from "@/components/PillRow";
 import { useExperienceLevel } from "@/context/ExperienceLevelContext";
-import { BRAND_NAME } from "@/lib/brand";
 import { ONBOARDING_FEATURES, ONBOARDING_STEP_KEYS } from "@/lib/onboardingFeatures";
 import { OnboardingValueSlides } from "@/components/OnboardingValueSlides";
 import {
@@ -45,11 +44,14 @@ const GOAL_OPTIONS = (Object.keys(EXPERIENCE_GOAL_OPTIONS) as ExperienceGoal[]).
  * Signup onboarding carousel — Zach, 2026-10-18: "we need a more
  * onboarding. We need at least 3 pgs on sign up abt who we are and what we
  * solve and how it works and ask if the user is a beginner or advanced."
- * Cut from 10 steps to 3 on 2026-10-23 (coridian_: "10 is insane"):
- * (1) a value line over auto-advancing real screenshots (one step), (2)
- * Connect, (3) the experience picker. The full 8-screen feature tour lives
- * on in replay mode (Account > Replay the tour). Shown once, right after a
- * brand-new account's first sign-in, before OnboardingPaywall.
+ * Cut from 10 steps to 3 on 2026-10-23 (coridian_: "10 is insane"), then to
+ * 2 on 2026-11-10: (1) the experience picker FIRST (one tap, before any
+ * jargon; Skip means "decide later", never "veteran"), (2) a value line over
+ * auto-advancing real screenshots. The old Connect info slide is gone: the
+ * real connect form is the very next screen. The full 8-screen feature tour
+ * lives on in replay mode (Account > Replay the tour). Shown once, right
+ * after a brand-new account's first sign-in; the trial offer comes AFTER the
+ * league connects (LandingAuthIsland).
  *
  * The screenshots (public/onboarding/*.webp, mirrored in mobile/assets/
  * onboarding/) are captured from this app's real UI against a generic
@@ -84,10 +86,10 @@ export function OnboardingCarousel({ onDone, replay = false }: { onDone: () => v
   // Replay (Account > "Replay the tour"): all feature slides, nothing else.
   // No connect or experience step, so nothing is saved, no step_viewed/
   // completed events (the signup funnel stays clean) and onboarding-completed
-  // is untouched. Signup is 3 steps: value, connect, level.
-  const connectStep = replay ? -1 : 1;
-  const levelStep = replay ? -1 : 2;
-  const lastStep = replay ? featureCount - 1 : levelStep;
+  // is untouched. Signup is 2 steps: level, value.
+  const levelStep = replay ? -1 : 0;
+  const valueStep = replay ? -1 : 1;
+  const lastStep = replay ? featureCount - 1 : valueStep;
   const totalSteps = replay ? featureCount : ONBOARDING_STEP_KEYS.length;
 
   const stepName = (i: number): string => (replay ? ONBOARDING_FEATURES[i].key : ONBOARDING_STEP_KEYS[i]);
@@ -100,10 +102,11 @@ export function OnboardingCarousel({ onDone, replay = false }: { onDone: () => v
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [step]);
 
-  const finish = async () => {
+  // Saves the level (and optional goal) as soon as the first step is
+  // answered, so beginner help is live for the rest of onboarding.
+  const saveAnswers = async () => {
     if (!level) return;
     trackOnboarding("completed", { step: "level", step_index: levelStep, experience: experienceBucket(level) });
-    if (!replay) trackFeatureUse("onboarding_completed", { props: { experience: experienceBucket(level) } });
     setSaving(true);
     try {
       // Saved through ExperienceLevelContext so the answer takes effect
@@ -111,13 +114,10 @@ export function OnboardingCarousel({ onDone, replay = false }: { onDone: () => v
       // after the next page load.
       await saveExperienceLevel(level);
     } catch {
-      // Best-effort — a failed preference write should never block
-      // onboarding itself; the answer can be changed later on the Account
-      // page's Explanations setting.
+      // Best-effort: a failed preference write never blocks onboarding; the
+      // answer can be changed later on Account > Explanations.
     }
     if (goal) {
-      // Optional, so only saved when the user actually picked one. Also
-      // best-effort, same as the level write above.
       try {
         await saveExperienceGoal(goal);
       } catch {
@@ -125,6 +125,12 @@ export function OnboardingCarousel({ onDone, replay = false }: { onDone: () => v
       }
     }
     setSaving(false);
+    setDirection("next");
+    setStep(valueStep);
+  };
+
+  const finish = () => {
+    if (!replay) trackFeatureUse("onboarding_completed", { props: { experience: level ? experienceBucket(level) : undefined } });
     onDone();
   };
 
@@ -134,7 +140,11 @@ export function OnboardingCarousel({ onDone, replay = false }: { onDone: () => v
       return;
     }
     if (step === levelStep) {
-      void finish();
+      void saveAnswers();
+      return;
+    }
+    if (step === valueStep) {
+      finish();
       return;
     }
     setDirection("next");
@@ -151,6 +161,13 @@ export function OnboardingCarousel({ onDone, replay = false }: { onDone: () => v
       return;
     }
     trackOnboarding("skipped", { step: stepName(step), step_index: step });
+    // Skipping the question is "decide later": move on to the value step with
+    // the level unanswered (beginner-lite help), never straight out.
+    if (step === levelStep) {
+      setDirection("next");
+      setStep(valueStep);
+      return;
+    }
     onDone();
   };
   const pickLevel = (value: ExperienceLevel) => {
@@ -171,8 +188,8 @@ export function OnboardingCarousel({ onDone, replay = false }: { onDone: () => v
     const dx = clientX - start;
     // Mostly-vertical gestures are scrolls, never slide changes.
     if (startY !== null && Math.abs(clientY - startY) > Math.abs(dx)) return;
-    // The last step ends in an explicit choice, so a swipe never skips it.
-    if (dx <= -SWIPE_THRESHOLD_PX && step < lastStep) {
+    // The first step is an explicit choice, so a swipe never skips it.
+    if (dx <= -SWIPE_THRESHOLD_PX && step < lastStep && step !== levelStep) {
       setDirection("next");
       setStep(step + 1);
     }
@@ -180,7 +197,7 @@ export function OnboardingCarousel({ onDone, replay = false }: { onDone: () => v
   };
 
   const feature = replay ? ONBOARDING_FEATURES[step] : null;
-  const showValue = !replay && step === 0;
+  const showValue = !replay && step === valueStep;
 
   const nextFeature = replay && step + 1 < featureCount ? ONBOARDING_FEATURES[step + 1] : null;
 
@@ -200,13 +217,13 @@ export function OnboardingCarousel({ onDone, replay = false }: { onDone: () => v
         onTouchEnd={(e) => onTouchEnd(e.changedTouches[0]?.clientX ?? 0, e.changedTouches[0]?.clientY ?? 0)}
       >
         <div className="onboarding-topbar">
-          <div className="onboarding-dots">
+          <div className="onboarding-dots" role="img" aria-label={`Step ${step + 1} of ${totalSteps}`}>
             {Array.from({ length: totalSteps }).map((_, i) => (
-              <span key={i} className={`onboarding-dot${i === step ? " onboarding-dot--active" : ""}`} />
+              <span key={i} aria-hidden="true" className={`onboarding-dot${i === step ? " onboarding-dot--active" : ""}`} />
             ))}
           </div>
           <button type="button" onClick={skip} className="onboarding-skip">
-            Skip
+            {step === levelStep ? "Decide later" : "Skip"}
           </button>
         </div>
 
@@ -230,22 +247,11 @@ export function OnboardingCarousel({ onDone, replay = false }: { onDone: () => v
 
         {showValue ? <OnboardingValueSlides direction={direction} /> : null}
 
-        {step === connectStep ? (
-          <div key={step} className={`onboarding-hero onboarding-slide onboarding-slide--${direction}`}>
-            <Image src="/brand-mark-white.png" alt="" width={56} height={56} className="onboarding-mark" />
-            <span className="onboarding-eyebrow">One setup step</span>
-            <h1 className="onboarding-headline onboarding-headline--sm">
-              Connect <span className="onboarding-gradient">Sleeper or ESPN</span>
-            </h1>
-            <p className="onboarding-body">Every recommendation is built around your league.</p>
-          </div>
-        ) : null}
-
         {step === levelStep ? (
           <div className="onboarding-section onboarding-section--center">
-            <span className="onboarding-eyebrow">Last thing</span>
+            <span className="onboarding-eyebrow">One quick question</span>
             <h1 className="onboarding-headline onboarding-headline--sm">
-              How much dynasty <span className="onboarding-gradient">experience</span> do you have?
+              How familiar are you with <span className="onboarding-gradient">fantasy football</span>?
             </h1>
             <p className="onboarding-body onboarding-body--center">
               Tunes how much explanation shows up alongside recommendations. Change it anytime in Settings.
@@ -314,13 +320,7 @@ export function OnboardingCarousel({ onDone, replay = false }: { onDone: () => v
             className="flex-1"
             style={{ alignSelf: "auto" }}
           >
-            {replay && step === lastStep
-              ? "Done"
-              : step === levelStep
-                ? saving
-                  ? `Setting up ${BRAND_NAME}…`
-                  : "Continue"
-                : "Next"}
+            {replay ? (step === lastStep ? "Done" : "Next") : step === valueStep ? "Connect my league" : "Continue"}
           </Button>
         </div>
       </div>

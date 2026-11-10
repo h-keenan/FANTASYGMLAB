@@ -2,6 +2,11 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import React, { createContext, useContext, useEffect, useMemo, useRef, useState } from 'react';
 
 const KEY = 'fgl:onboarding-complete';
+// Armed when a genuine first run finishes; consumed once by HomeScreen right
+// after the first league connects, which is where the Pro trial offer is now
+// shown (it used to sit before connect). Persisted so an app kill between
+// onboarding and connect does not silently drop the offer.
+const TRIAL_OFFER_KEY = 'fgl:trial-offer-pending';
 
 interface OnboardingContextValue {
   /**
@@ -33,6 +38,13 @@ interface OnboardingContextValue {
    * a replay completed onboarding instead).
    */
   consumeFirstLeagueTeamStanceRouting: () => boolean;
+  /**
+   * One-shot consume (async, persisted): true the first time it is called
+   * after a genuine-first-run onboarding finished (Skip or Get Started);
+   * false afterwards. HomeScreen calls it once the first league is saved and
+   * then opens the Paywall as the trial offer.
+   */
+  consumeFirstLeagueTrialOffer: () => Promise<boolean>;
 }
 
 const OnboardingContext = createContext<OnboardingContextValue | undefined>(undefined);
@@ -75,6 +87,8 @@ export function OnboardingProvider({ children }: { children: React.ReactNode }) 
   }, []);
 
   const completeOnboarding = () => {
+    // Only a genuine first run arms the trial offer (a replay observes true).
+    if (onboardingComplete === false) AsyncStorage.setItem(TRIAL_OFFER_KEY, '1').catch(() => {});
     setOnboardingComplete(true);
     AsyncStorage.setItem(KEY, '1').catch(() => {});
   };
@@ -96,12 +110,24 @@ export function OnboardingProvider({ children }: { children: React.ReactNode }) 
     return true;
   };
 
+  const consumeFirstLeagueTrialOffer = async () => {
+    try {
+      const raw = await AsyncStorage.getItem(TRIAL_OFFER_KEY);
+      if (raw !== '1') return false;
+      await AsyncStorage.removeItem(TRIAL_OFFER_KEY);
+      return true;
+    } catch {
+      return false;
+    }
+  };
+
   const value = useMemo<OnboardingContextValue>(
     () => ({
       onboardingComplete,
       completeOnboarding,
       completeOnboardingViaGetStarted,
       consumeFirstLeagueTeamStanceRouting,
+      consumeFirstLeagueTrialOffer,
     }),
     [onboardingComplete],
   );

@@ -31,12 +31,23 @@ describe("experienceCopy", () => {
     expect(copy.label("averageAge", "Avg Age")).toBe("Average Age");
   });
 
-  it.each([
-    ["advanced", "advanced" as const],
-    ["unset (null)", null],
-  ])("keeps today's terse copy for %s", (_name, level) => {
+  it("treats unanswered (null) as beginner-lite: help yes, relabels no", () => {
+    const copy = experienceCopy(null);
+    expect(copy.isBeginner).toBe(false);
+    expect(copy.isUnanswered).toBe(true);
+    expect(copy.showsHelp).toBe(true);
+    for (const key of Object.keys(BEGINNER_HELP) as Array<keyof typeof BEGINNER_HELP>) {
+      expect(copy.help(key)).toBe(BEGINNER_HELP[key]);
+    }
+    for (const key of Object.keys(BEGINNER_LABELS) as Array<keyof typeof BEGINNER_LABELS>) {
+      expect(copy.label(key, "current label")).toBe("current label");
+    }
+  });
+
+  it.each([["advanced", "advanced" as const]])("keeps today's terse copy for %s", (_name, level) => {
     const copy = experienceCopy(level);
     expect(copy.isBeginner).toBe(false);
+    expect(copy.showsHelp).toBe(false);
     for (const key of Object.keys(BEGINNER_HELP) as Array<keyof typeof BEGINNER_HELP>) {
       expect(copy.help(key)).toBeNull();
     }

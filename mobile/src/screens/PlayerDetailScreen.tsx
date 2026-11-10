@@ -1808,8 +1808,8 @@ function createStyles(colors: ThemeColors) {
     paddingHorizontal: spacing.xs + 2,
     paddingVertical: 1,
   },
-  ageChipLabel: { fontSize: 11, fontWeight: '700', letterSpacing: 0.3 },
-  ageChipValue: { fontSize: 11, fontWeight: '800', letterSpacing: 0.3 },
+  ageChipLabel: { fontSize: 12, fontWeight: '700', letterSpacing: 0.3 },
+  ageChipValue: { fontSize: 12, fontWeight: '800', letterSpacing: 0.3 },
   trendText: { fontSize: 13.5, fontWeight: '600' },
   usageTrendBlock: { marginTop: spacing.sm, gap: spacing.xs },
   usageTrendChip: {
@@ -1947,7 +1947,7 @@ function createStyles(colors: ThemeColors) {
   // reads as a second competing number.
   scheduleProjectionCol: { width: 64, alignItems: 'flex-end', marginLeft: spacing.sm },
   scheduleProjectionLabel: {
-    fontSize: 11,
+    fontSize: 12,
     fontWeight: '700',
     color: colors.textTertiary,
     letterSpacing: 0.5,

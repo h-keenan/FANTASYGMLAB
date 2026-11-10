@@ -779,7 +779,7 @@ function createStyles(colors: ThemeColors) {
       gap: spacing.lg,
     },
     meter: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 6 },
-    meterLabel: { fontSize: 11, fontWeight: '700', color: colors.textTertiary, letterSpacing: 0.4 },
+    meterLabel: { fontSize: 12, fontWeight: '700', color: colors.textTertiary, letterSpacing: 0.4 },
     meterSegments: { flexDirection: 'row', gap: 3 },
     meterSegment: { width: 14, height: 4, borderRadius: 2 },
     meterValue: { fontSize: 12.5, fontWeight: '600', color: colors.textSecondary },

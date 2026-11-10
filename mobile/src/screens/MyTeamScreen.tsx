@@ -712,7 +712,7 @@ function createStyles(colors: ThemeColors) {
   },
   compactDivider: { borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border },
   compactIdentity: { flex: 1 },
-  valueLabel: { fontSize: 11, fontWeight: '700', color: colors.textTertiary, letterSpacing: 0.4 },
+  valueLabel: { fontSize: 12, fontWeight: '700', color: colors.textTertiary, letterSpacing: 0.4 },
   linkRowText: { fontSize: 14.5, fontWeight: '700', color: colors.accent },
   notice: { textAlign: 'center', color: colors.textSecondary, lineHeight: 20 },
   bestBallNote: { color: colors.textSecondary, lineHeight: 20, marginBottom: spacing.md },

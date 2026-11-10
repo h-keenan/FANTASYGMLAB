@@ -11,13 +11,14 @@ export const ONBOARDING_FEATURES = [
 ] as const;
 
 /**
- * Signup onboarding is 3 steps (coridian_, 2026-10-23: "10 is insane"):
- * value -> connect -> level. These are the funnel `step` ids; step_index is
- * the position here (0, 1, 2). Before this change the ids were the 8 feature
+ * Signup onboarding is 2 steps (coridian_, 2026-10-23: "10 is insane";
+ * 2026-11-10: level asked first, Connect info slide removed because the real
+ * connect form follows): level -> value. These are the funnel `step` ids;
+ * step_index is the position here (0, 1). Before the first change the ids were the 8 feature
  * keys (0-7), connect (8) and level (9). Keep in lockstep with mobile
  * OnboardingScreen.tsx.
  */
-export const ONBOARDING_STEP_KEYS = ["value", "connect", "level"] as const;
+export const ONBOARDING_STEP_KEYS = ["level", "value"] as const;
 export type OnboardingStepKey = (typeof ONBOARDING_STEP_KEYS)[number];
 
 /** Screenshots the value step auto-advances through (inside step 1; they are not separate steps). */

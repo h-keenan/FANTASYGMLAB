@@ -527,7 +527,7 @@ function createStyles(colors: ThemeColors) {
     paddingVertical: 3,
   },
   categoryBadgeText: {
-    fontSize: 11,
+    fontSize: 12,
     fontWeight: '700',
     letterSpacing: 0.5,
   },

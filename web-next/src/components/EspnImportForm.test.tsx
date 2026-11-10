@@ -74,7 +74,7 @@ describe("ESPN import in the Connect League flow", () => {
 
   it("defaults to Sleeper and switches to the ESPN form, which asks for no private-league cookies", () => {
     render(<SleeperImportForm onLeagueChosen={onLeagueChosen} />);
-    expect(screen.getByPlaceholderText("Sleeper username")).toBeInTheDocument();
+    expect(screen.getByPlaceholderText("e.g. gridiron_gm")).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("radio", { name: "ESPN" }));
     expect(screen.getByLabelText(/espn league id/i)).toBeInTheDocument();

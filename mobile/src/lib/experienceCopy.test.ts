@@ -26,8 +26,17 @@ test('new_to_fantasy gets the exact same beginner copy as beginner', () => {
   assert.equal(copy.label('averageAge', 'Avg Age'), BEGINNER_LABELS.averageAge);
 });
 
-test('advanced and unset keep today\'s copy exactly', () => {
-  for (const level of ['advanced', null] as const) {
+test('unanswered is beginner-lite: help shows, relabels do not', () => {
+  const copy = experienceCopy(null);
+  assert.equal(copy.isBeginner, false);
+  assert.equal(copy.isUnanswered, true);
+  assert.equal(copy.showsHelp, true);
+  assert.equal(copy.help('powerRank'), BEGINNER_HELP.powerRank);
+  assert.equal(copy.label('averageAge', 'Avg Age'), 'Avg Age');
+});
+
+test('advanced keeps today\'s copy exactly', () => {
+  for (const level of ['advanced'] as const) {
     const copy = experienceCopy(level);
     assert.equal(copy.isBeginner, false);
     assert.equal(copy.help('powerRank'), null);

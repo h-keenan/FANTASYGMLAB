@@ -677,7 +677,7 @@ export function WaiversContent({
               placeholder="Search free agents"
               className="filter-input px-3 py-2 text-sm flex-1 min-w-[10rem]"
             />
-            <select
+            <select aria-label="Position"
               value={position}
               onChange={(event) => setPosition(event.target.value)}
               className="filter-select px-3 py-2 text-sm"

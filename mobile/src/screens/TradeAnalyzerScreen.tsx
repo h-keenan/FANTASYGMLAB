@@ -923,7 +923,7 @@ function VerdictCard({
     >
       {isExtreme ? (
         <View style={[styles.extremeEyebrowRow, { backgroundColor: toneColor }]}>
-          <Ionicons name="alert-circle" size={13} color="#fff" />
+          <Ionicons name="alert-circle" size={13} color={colors.onAccent} />
           <AppText style={styles.extremeEyebrowText}>
             {verdict.tone === 'accept' ? 'Extremely Lopsided In Your Favor' : 'Extremely Lopsided Against You'}
           </AppText>
@@ -1286,7 +1286,7 @@ function createStyles(colors: ThemeColors) {
     borderRadius: radii.pill,
     marginBottom: spacing.sm,
   },
-  extremeEyebrowText: { fontSize: 12.5, fontWeight: '800', color: '#fff', textTransform: 'uppercase', letterSpacing: 0.3 },
+  extremeEyebrowText: { fontSize: 12.5, fontWeight: '800', color: colors.onAccent, textTransform: 'uppercase', letterSpacing: 0.3 },
   verdictHeaderRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   verdictBand: { fontSize: 19.5, fontWeight: '800', marginBottom: spacing.xs },
   verdictBandExtreme: { fontSize: 23 },

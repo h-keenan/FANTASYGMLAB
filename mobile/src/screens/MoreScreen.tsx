@@ -44,6 +44,7 @@ import ReferralCard from '../components/ReferralCard';
 import Toggle from '../components/Toggle';
 import GuestCreateAccountModal from '../components/GuestCreateAccountModal';
 import Input from '../components/Input';
+import HelpLink from '../components/HelpLink';
 import ModalFormCard, { ModalFormActions, ModalFormHint, ModalFormTitle } from '../components/ModalFormCard';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'More'>;
@@ -478,14 +479,14 @@ export default function MoreScreen({ navigation }: Props) {
             />
           ))}
         </View>
-        <AppText style={styles.groupCaption}>Explanations</AppText>
+        <AppText style={styles.groupCaption}>{experienceLevel === null ? 'Explanations · Not set' : 'Explanations'}</AppText>
         <View style={styles.optionRow}>
           {EXPERIENCE_OPTIONS.map((option) => (
             <OptionCard
               key={option.value}
               label={option.label}
               description={option.description}
-              active={(experienceLevel ?? 'advanced') === option.value}
+              active={experienceLevel === option.value}
               onPress={() => setExperienceLevel(option.value)}
             />
           ))}
@@ -695,6 +696,7 @@ export default function MoreScreen({ navigation }: Props) {
             }}
             showDivider
           />
+          <HelpLink context={{ topic: 'more' }} />
           <SettingsRow
             icon="apps-outline"
             iconColor={colors.accent}

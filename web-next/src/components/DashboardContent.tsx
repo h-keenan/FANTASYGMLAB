@@ -20,7 +20,7 @@ import { WatchListCard } from "@/components/WatchListCard";
 import { useSeasonOdds } from "@/components/DashboardOddsStrip";
 import { DashboardMore, DashboardNeedsAttention, DashboardTradesBlock } from "@/components/DashboardBlocks";
 import { useExperienceCopy, useExperienceLevel } from "@/context/ExperienceLevelContext";
-import { buildNeedsAttention, isTradeItem, weekRowsAfterAttention } from "@/lib/dashboardLayout";
+import { buildNeedsAttention, isTradeItem, itemsAfterAttention, weekRowsAfterAttention } from "@/lib/dashboardLayout";
 
 /**
  * Ports modules/dashboard_workflow.py's render_dashboard_workflow for
@@ -88,10 +88,12 @@ export function DashboardContent({
     data.trade_window,
     data.items.filter((item) => item.category === "top_priority"),
   );
-  const attentionItems = attention.flatMap((entry) => (entry.item ? [entry.item] : []));
   const nextMovesData: DashboardResponse = {
     ...data,
-    items: data.items.filter((item) => !tradeItems.includes(item) && !attentionItems.includes(item)),
+    items: itemsAfterAttention(
+      data.items.filter((item) => !tradeItems.includes(item)),
+      attention,
+    ),
     this_week: data.this_week ? { ...data.this_week, rows: weekRowsAfterAttention(data.this_week.rows, attention) } : data.this_week,
   };
   const deadlineInAttention = attention.some((entry) => entry.source === "deadline");

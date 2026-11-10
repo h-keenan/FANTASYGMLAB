@@ -3631,3 +3631,47 @@ main > header:has(> h1.sr-only:only-child) {
   clip-path: inset(50%);
   white-space: nowrap;
 }
+
+/* Light-theme calm pass (coridian_ 2026-11-10: "on light mode this dashboard
+   does not look good whatsoever"). Appended last so it wins over the token
+   blocks above without editing them (they are also touched by the theme
+   toggle work). Covers both the system light scheme and a manual
+   data-theme="light". Dark is untouched. Three fixes: no diagonal-stripe page
+   texture, no gold halos (a thin ring + one soft contact shadow instead), and
+   flatter card elevation. */
+@media (prefers-color-scheme: light) {
+  :root:not([data-theme="dark"]) {
+    --glass-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.9), 0 1px 2px rgba(15, 40, 60, 0.14), 0 4px 12px rgba(15, 40, 60, 0.1);
+    --shadow-card: 0 1px 2px rgba(15, 40, 60, 0.16), 0 3px 10px rgba(15, 40, 60, 0.08);
+    --color-premium-glow: rgba(190, 125, 0, 0.25);
+    --color-premium-glow-soft: rgba(190, 125, 0, 0.14);
+  }
+  :root:not([data-theme="dark"]) .app-background-field,
+  :root:not([data-theme="dark"]) .app-background-sweep {
+    display: none;
+  }
+  :root:not([data-theme="dark"]) .premium-glow-card {
+    box-shadow: 0 0 0 1px var(--color-premium-glow-soft), 0 2px 8px rgba(15, 40, 60, 0.1);
+  }
+  :root:not([data-theme="dark"]) .premium-glow {
+    animation: none;
+    box-shadow: 0 1px 3px rgba(15, 40, 60, 0.22);
+  }
+}
+:root[data-theme="light"] {
+  --glass-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.9), 0 1px 2px rgba(15, 40, 60, 0.14), 0 4px 12px rgba(15, 40, 60, 0.1);
+  --shadow-card: 0 1px 2px rgba(15, 40, 60, 0.16), 0 3px 10px rgba(15, 40, 60, 0.08);
+  --color-premium-glow: rgba(190, 125, 0, 0.25);
+  --color-premium-glow-soft: rgba(190, 125, 0, 0.14);
+}
+:root[data-theme="light"] .app-background-field,
+:root[data-theme="light"] .app-background-sweep {
+  display: none;
+}
+:root[data-theme="light"] .premium-glow-card {
+  box-shadow: 0 0 0 1px var(--color-premium-glow-soft), 0 2px 8px rgba(15, 40, 60, 0.1);
+}
+:root[data-theme="light"] .premium-glow {
+  animation: none;
+  box-shadow: 0 1px 3px rgba(15, 40, 60, 0.22);
+}

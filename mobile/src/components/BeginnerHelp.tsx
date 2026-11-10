@@ -25,7 +25,7 @@ export default function BeginnerHelp({
 }) {
   const copy = useExperienceCopy();
   const { colors } = useThemeMode();
-  const resolved = text !== undefined ? (copy.isBeginner ? text : null) : term ? copy.help(term) : null;
+  const resolved = text !== undefined ? (copy.showsHelp ? text : null) : term ? copy.help(term) : null;
   if (!resolved) return null;
   return (
     <AppText style={[typography.caption, { color: colors.textTertiary, lineHeight: 15 }, style]}>{resolved}</AppText>

@@ -277,7 +277,7 @@ function createStyles(colors: ThemeColors) {
       alignItems: 'center',
       minWidth: 56,
     },
-    oddsLabel: { fontSize: 11, fontWeight: '700', color: colors.textTertiary, letterSpacing: 0.4 },
+    oddsLabel: { fontSize: 12, fontWeight: '700', color: colors.textTertiary, letterSpacing: 0.4 },
     oddsValue: { fontSize: 16.5, fontWeight: '700' },
     error: { color: colors.danger, textAlign: 'center' },
   });

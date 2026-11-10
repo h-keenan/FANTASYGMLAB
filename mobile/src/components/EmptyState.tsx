@@ -4,6 +4,7 @@ import AppText from './AppText';
 import { Ionicons } from '@expo/vector-icons';
 
 import Button from './Button';
+import HelpLink from './HelpLink';
 import GlassCard from './GlassCard';
 import IconCircle from './IconCircle';
 import { useThemeMode } from '../context/ThemeModeContext';
@@ -25,6 +26,7 @@ export default function EmptyState({
   actionVariant,
   secondaryLabel,
   onPressSecondary,
+  helpTopic,
 }: {
   icon: IconName;
   title: string;
@@ -38,6 +40,8 @@ export default function EmptyState({
    * visually with the main CTA button above it. */
   secondaryLabel?: string;
   onPressSecondary?: () => void;
+  /** Adds the shared help link (for empties that may be a bug, not just "nothing yet"). */
+  helpTopic?: string;
 }) {
   const { colors } = useThemeMode();
   const styles = useMemo(() => createStyles(colors), [colors]);
@@ -55,6 +59,7 @@ export default function EmptyState({
             <AppText style={styles.secondaryLinkText}>{secondaryLabel}</AppText>
           </TouchableOpacity>
         ) : null}
+        {helpTopic ? <HelpLink context={{ topic: helpTopic }} style={{ alignSelf: 'flex-start' }} /> : null}
       </View>
     </GlassCard>
   );
