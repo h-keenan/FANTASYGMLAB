@@ -3912,6 +3912,17 @@ export const api = {
       `/v1/leagues/${encodeURIComponent(leagueId)}/players/search?${params.toString()}`,
     );
   },
+  // Exact id lookup over the same full pool (max 25 ids, request order, unknown
+  // ids omitted), for ids that arrive via deep links/prefills and may be ranked
+  // below the getLeagueRankings window. Same row shape as searchLeaguePlayers.
+  getLeaguePlayersByIds: (leagueId: string, ids: string[], options?: { lens?: ValuationLens }) => {
+    const params = new URLSearchParams();
+    params.set('ids', ids.join(','));
+    if (options?.lens) params.set('lens', options.lens);
+    return authorizedFetch<LeagueRankingsResponse>(
+      `/v1/leagues/${encodeURIComponent(leagueId)}/players/search?${params.toString()}`,
+    );
+  },
   getPlayerRankInLeague: (leagueId: string, playerId: string, options?: { lens?: ValuationLens }) => {
     const params = new URLSearchParams();
     if (options?.lens) params.set('lens', options.lens);

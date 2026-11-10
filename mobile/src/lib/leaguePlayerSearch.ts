@@ -17,6 +17,33 @@ export function mergeSearchMatches(pool: RankedPlayer[], extras: RankedPlayer[])
   return added.length === 0 ? pool : [...pool, ...added];
 }
 
+export const PLAYER_LOOKUP_MAX_IDS = 25;
+
+/** Players for `ids` that the loaded rankings `pool` does not already hold,
+ * resolved by exact id over the whole league pool (so a player ranked below
+ * the window still resolves from a URL/share link). Merge the result with
+ * mergeSearchMatches. Returns [] when nothing is missing or on failure. */
+export async function fetchMissingPlayersById(
+  leagueId: string,
+  lens: ValuationLens,
+  ids: readonly string[],
+  pool: readonly RankedPlayer[],
+): Promise<RankedPlayer[]> {
+  const have = new Set(pool.map((p) => p.player_id));
+  const missing = [...new Set(ids.filter((id) => id && !have.has(id)))];
+  if (!leagueId || missing.length === 0) return [];
+  const out: RankedPlayer[] = [];
+  for (let i = 0; i < missing.length; i += PLAYER_LOOKUP_MAX_IDS) {
+    try {
+      const res = await api.getLeaguePlayersByIds(leagueId, missing.slice(i, i + PLAYER_LOOKUP_MAX_IDS), { lens });
+      out.push(...res.players);
+    } catch {
+      // Fail open: the windowed pool still works.
+    }
+  }
+  return out;
+}
+
 /** Players matching `query` from the whole league pool, fetched server-side so
  * anyone ranked below the loaded rankings window is still searchable. Returns
  * [] for short queries and on failure (the windowed list keeps working).

@@ -59,3 +59,15 @@ def test_exact_beats_prefix_beats_value():
 def test_empty_query_and_empty_pool_return_nothing():
     assert player_search.search_ranked_players(_pool(), "  ", score_field="dynasty_score").empty
     assert player_search.search_ranked_players(pd.DataFrame(), "x", score_field="dynasty_score").empty
+
+
+def test_parse_player_ids_dedupes_in_order():
+    assert player_search.parse_player_ids(" 3, 1,3,,2 ") == ["3", "1", "2"]
+    assert player_search.parse_player_ids("") == []
+
+
+def test_select_by_ids_has_no_cutoff_keeps_request_order_and_skips_unknown():
+    out = player_search.select_ranked_players_by_ids(_pool(), ["3", "missing", "1"])
+    assert _names(out) == ["3", "1"]
+    assert _names(player_search.select_ranked_players_by_ids(_pool(), ["1", "2"], position="LB")) == ["2"]
+    assert player_search.select_ranked_players_by_ids(_pool(), []).empty

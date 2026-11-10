@@ -6,6 +6,7 @@ import { useEffect, useState } from "react";
 
 import { useAuth } from "@/context/AuthContext";
 import { api, type LeagueRankingsResponse } from "@/lib/api";
+import { fetchMissingPlayersById, mergeSearchMatches } from "@/lib/leaguePlayerSearch";
 import { PlayerCompareContent } from "@/components/PlayerCompareContent";
 import { EmptyState } from "@/components/EmptyState";
 import { ErrorState, reloadPage } from "@/components/ErrorState";
@@ -19,7 +20,9 @@ import { LoadingScreen } from "@/components/LoadingScreen";
  * how mobile's PlayerCompareScreen takes its base `player` object via route
  * params from wherever the user triggered "Compare" (currently any link
  * into this page), re-resolved here from the league's own rankings pool
- * rather than trusting an unverified object shape in the URL.
+ * rather than trusting an unverified object shape in the URL. Ids are
+ * resolved by exact lookup over the whole pool too, so a player ranked below
+ * the rankings window still opens.
  */
 export default function PlayerComparePage() {
   const params = useParams<{ leagueId: string }>();
@@ -46,8 +49,9 @@ export default function PlayerComparePage() {
 
     api
       .getLeagueRankings(leagueId)
-      .then((result) => {
-        if (!cancelled) setRankings(result);
+      .then(async (result) => {
+        const extras = await fetchMissingPlayersById(leagueId, "Dynasty", [playerAId, playerBId], result.players);
+        if (!cancelled) setRankings({ ...result, players: mergeSearchMatches(result.players, extras) });
       })
       .catch((err) => {
         if (!cancelled) setError(err instanceof Error ? err.message : "Could not load Player Compare.");
@@ -56,7 +60,7 @@ export default function PlayerComparePage() {
     return () => {
       cancelled = true;
     };
-  }, [authLoading, session, leagueId, playerAId, router]);
+  }, [authLoading, session, leagueId, playerAId, playerBId, router]);
 
   if (!playerAId) {
     return (
