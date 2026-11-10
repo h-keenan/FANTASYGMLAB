@@ -167,11 +167,13 @@ def _reset_sleeper_budget_for_tests():
     call counter; without a reset one test's successful fetch would be served
     as last-known data to a later test that expects a failure."""
 
-    from modules import sleeper_budget
+    from modules import sleeper_budget, sleeper_cache
 
     sleeper_budget.reset_for_tests()
+    sleeper_cache.reset_for_tests()
     yield
     sleeper_budget.reset_for_tests()
+    sleeper_cache.reset_for_tests()
 
 
 @pytest.fixture(autouse=True)
