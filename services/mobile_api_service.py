@@ -55,6 +55,7 @@ Deployment topology (Render):
   - GET  /v1/portfolio/exposure     — which players the caller owns across saved leagues, with concentration (Pro)
   - GET  /v1/leagues-glance        — compact per-league cards (record, top add, top trade, news count, top need), 3-min cache (Premium)
   - GET  /v1/leagues/{id}/trade-hub — real trade ideas for the caller's roster
+  - POST /v1/leagues/{id}/trade-analyzer/multi — 3-6 team trade, per-team verdicts + league summary (free, not metered; docs/multi-team-trade-api.md)
   - POST /v1/leagues/{id}/commissioner/veto-check — outrage read on a proposed trade, whole-roster (Pro)
   - GET  /v1/leagues/{id}/trade-target — 2-3 built offers to get a player off another roster (Pro)
   - GET  /v1/leagues/{id}/managers/tendencies — one-line, evidence-backed tendency per manager (Premium)
@@ -6506,6 +6507,220 @@ def _compute_trade_analyzer(
             )
             if note
         ),
+    }
+
+
+# ---------------------------------------------------------------------------
+# Multi-team (3 to 6 teams) Trade Analyzer. Contract: docs/multi-team-trade-api.md
+# ---------------------------------------------------------------------------
+# Capacity: one request runs the per-team Analyzer pipeline once per
+# participating team, so it is bounded four ways: team/asset caps (modules.
+# multi_team_trade), a per-user rate limit tighter than the general POST budget,
+# a Redis single-flight cache (identical concurrent / repeated requests share
+# one computation), and the "heavy" admission lane (modules.admission).
+MULTI_TEAM_RATE_LIMIT_MAX = int(os.environ.get("MULTI_TEAM_TRADE_RATE_MAX", "6"))
+MULTI_TEAM_RATE_LIMIT_WINDOW_SECONDS = int(os.environ.get("MULTI_TEAM_TRADE_RATE_WINDOW_SECONDS", "60"))
+MULTI_TEAM_CACHE_TTL_SECONDS = 30
+
+
+class TradeTransferRequest(BaseModel):
+    type: str  # "player" | "pick"
+    id: str  # player_id, or pick_id "{season}:{round}:{original_roster_id}"
+    from_roster_id: str
+    to_roster_id: str
+
+
+class MultiTeamTradeAnalyzerRequest(BaseModel):
+    transfers: list[TradeTransferRequest] = Field(default_factory=list, max_length=100)
+    # The seat the client is looking from; defaults to the caller's own roster.
+    perspective_roster_id: str = ""
+    strategy: str = trade_hub_engine.DEFAULT_ANALYZER_STRATEGY
+    lens: str = "Dynasty"
+
+
+def _multi_team_frame_hook(league_id: str, league: dict[str, Any], settings: dict[str, Any], user: dict[str, Any],
+                           score_field: str, lens: str) -> Callable[[pd.DataFrame, set[str]], pd.DataFrame]:
+    """Keeper surplus + IDP rows for every team's frame, computed once and
+    applied per team (the two-team path does the same on its one frame)."""
+
+    memo: dict[str, Any] = {}
+
+    def hook(frame: pd.DataFrame, transfer_ids: set[str]) -> pd.DataFrame:
+        if settings.get("_keeper_mode"):
+            if "keeper" not in memo:
+                try:
+                    current_picks, previous_picks = _keeper_draft_picks(league_id, league)
+                    memo["keeper"] = keepers_module.keeper_adjusted_values(
+                        valued=frame,
+                        score_field=score_field,
+                        num_teams=int(league.get("total_rosters") or (league.get("settings") or {}).get("num_teams") or 12),
+                        current_picks=current_picks,
+                        previous_picks=previous_picks,
+                        round_penalty=_stored_keeper_round_penalty(
+                            auth_supabase.get_supabase_config(), str(user.get("id") or ""),
+                            str(user.get("_access_token") or ""), league_id,
+                        ),
+                    )
+                except (model_status.KeeperPricingUnavailable, *model_status.LOOKUP_ERRORS):
+                    logger.warning("keeper values unavailable for multi-team trade (league=%s)", league_id, exc_info=True)
+                    memo["keeper"] = None
+            if memo["keeper"]:
+                frame = keepers_module.apply_keeper_values(frame, score_field, memo["keeper"])
+        if settings.get("idp_slots"):
+            if "idp" not in memo:
+                memo["idp"] = _league_idp_result(league_id, league)
+            idp_result = memo["idp"]
+            if idp_result and idp_result.get("idp"):
+                rostered = {
+                    str(pid) for r in (sleeper.get_rosters(league_id) or []) for pid in (r.get("players") or [])
+                }
+                frame = _with_idp_trade_rows(frame, idp_result, score_field, rostered | set(transfer_ids))
+        return frame
+
+    return hook
+
+
+def _compute_multi_team_trade(
+    body: MultiTeamTradeAnalyzerRequest,
+    league_id: str,
+    user: dict[str, Any],
+    my_roster: dict[str, Any],
+    pro: bool,
+) -> dict[str, Any]:
+    from modules import multi_team_trade_engine
+
+    league = sleeper.get_league(league_id)
+    if not league:
+        raise HTTPException(status_code=404, detail="League not found.")
+    settings = league_value_settings.detect_league_value_settings_from_payload(league)
+    score_field = league_value_settings.valuation_score_field(body.lens)
+    my_rid = str(my_roster.get("roster_id"))
+    lazy: dict[str, Any] = {}
+
+    def posture_override(roster: Mapping[str, Any]) -> dict[str, Any] | None:
+        # Only the caller's own seat has a declared Team Situation.
+        if str(roster.get("roster_id")) != my_rid:
+            return None
+        return _resolve_trade_posture(user, league_id, league, my_roster, lens=body.lens, client_strategy=body.strategy)
+
+    def untouchable_provider(rid: str) -> Callable[[], set[str] | None]:
+        if rid != my_rid:
+            return lambda: set()
+
+        def read() -> set[str] | None:
+            rows, error = _fetch_gm_target_rows(
+                auth_supabase.get_supabase_config(), str(user.get("id") or ""),
+                str(user.get("_access_token") or ""), league_id, select="player_id,untouchable",
+            )
+            if error:
+                return None
+            return {
+                gm_targets.normalize_player_id(r.get("player_id"))
+                for r in rows if r.get("player_id") and bool(r.get("untouchable"))
+            }
+
+        return read
+
+    def usage_provider(rvc: Any) -> Mapping[str, Mapping[str, Any]]:
+        if "stats" not in lazy:
+            try:
+                lazy["stats"] = sleeper.get_season_player_stats(
+                    season=sleeper.default_player_stats_season(), retain_weekly=True
+                )
+            except model_status.LOOKUP_ERRORS:
+                lazy["stats"] = {}
+        return _waiver_usage_guard(rvc, lazy["stats"], display=pro)
+
+    crowd = {}
+    if any(t.type.strip().lower() == "pick" for t in body.transfers) and college_scouting.class_strength_signal_enabled():
+        crowd = college_scouting.get_cached_crowd_class_strength_by_year(
+            auth_supabase.get_supabase_config(), str(user.get("_access_token") or "")
+        )
+    status = model_status.ok()
+    result = multi_team_trade_engine.analyze_multi_team_trade(
+        league_id=league_id,
+        transfers=[t.model_dump() for t in body.transfers],
+        lens=body.lens,
+        players_db_path=PLAYERS_DB_PATH,
+        perspective_roster_id=body.perspective_roster_id or my_rid,
+        frame_hook=_multi_team_frame_hook(league_id, league, settings, user, score_field, body.lens),
+        posture_override=posture_override,
+        untouchable_provider=untouchable_provider,
+        usage_provider=usage_provider,
+        crowd_class_strength_by_year=crowd,
+        include_veto=pro,
+        status=status,
+    )
+    if result.get("status") != "ok":
+        return {"ok": True, "reason": result.get("status"), "verdict": None, **result}
+    result["trade_window"] = league_calendar.trade_window(league)
+    return {"ok": True, "reason": "", **result}
+
+
+@app.post("/v1/leagues/{league_id}/trade-analyzer/multi")
+def post_trade_analyzer_multi(
+    body: MultiTeamTradeAnalyzerRequest,
+    league_id: str = Depends(resolve_league_path_id),
+    user: dict[str, Any] = Depends(require_user),
+) -> dict[str, Any]:
+    """Grade a 3-to-6-team trade for every team (modules.multi_team_trade_engine).
+
+    Additive sibling of POST .../trade-analyzer (which is unchanged). The trade
+    is a transfer matrix ``transfers[{type, id, from_roster_id, to_roster_id}]``;
+    each participating team is graded with the same Analyzer pipeline on what it
+    sends and receives, then a league-level summary names the most hurt team and
+    the best-to-worst spread.
+
+    Free and Pro: the analysis does NOT consume the free weekly trade-analysis
+    allowance. Per-team ``veto_risk`` is Pro (same gate as the commissioner veto
+    check); Free gets ``veto_risk: null`` and ``veto_locked: true``."""
+
+    if body.lens not in league_value_settings.VALUATION_LENS_TO_SCORE_FIELD:
+        raise HTTPException(
+            status_code=422,
+            detail="lens must be one of: " + ", ".join(league_value_settings.VALUATION_LENS_TO_SCORE_FIELD),
+        )
+    if not body.transfers:
+        raise HTTPException(status_code=422, detail="Provide at least one transfer.")
+    if external_leagues.is_external_league_key(league_id):
+        return {"ok": True, "verdict": None, "reason": "unsupported_platform"}
+    my_roster, reason = _resolve_my_roster(user, league_id)
+    if my_roster is None:
+        return {"ok": True, "verdict": None, "reason": reason}
+
+    user_id = str(user.get("id") or "")
+    if not os.environ.get("PYTEST_CURRENT_TEST") or os.environ.get("DYNASTYGM_FORCE_RATE_LIMIT"):
+        allowed, retry_after = _rate_limiter.hit(
+            f"multi_trade|{user_id}", MULTI_TEAM_RATE_LIMIT_MAX, MULTI_TEAM_RATE_LIMIT_WINDOW_SECONDS
+        )
+        if not allowed:
+            raise HTTPException(
+                status_code=429,
+                detail="Too many multi-team trade analyses. Please wait a moment and try again.",
+                headers={"Retry-After": str(int(retry_after) + 1)},
+            )
+    pro = _is_pro_caller(user)
+    signature = hashlib.sha256(
+        json.dumps(
+            [sorted((t.type, t.id, t.from_roster_id, t.to_roster_id) for t in body.transfers),
+             body.perspective_roster_id, body.lens, body.strategy],
+            sort_keys=True,
+        ).encode()
+    ).hexdigest()[:32]
+    cache_key = redis_cache.build_cache_key("multi_team_trade", league_id, user_id, str(int(pro)), signature)
+    result = redis_cache.redis_single_flight_cache(
+        cache_key=cache_key,
+        ttl_seconds=MULTI_TEAM_CACHE_TTL_SECONDS,
+        compute=lambda: _compute_multi_team_trade(body, league_id, user, my_roster, pro),
+        lock_timeout_seconds=30.0,
+    )
+    return {
+        **result,
+        # Not charged against FREE_WEEKLY_TRADE_EVAL_LIMIT (owner decision).
+        "counts_against_free_limit": False,
+        "is_premium": bool(pro),
+        "veto_locked": not pro,
+        "veto_upsell": None if pro else _COMMISSIONER_UPSELL,
     }
 
 
