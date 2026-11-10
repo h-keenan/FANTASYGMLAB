@@ -3259,6 +3259,40 @@ def test_player_search_endpoint_finds_low_ranked_player_outside_rankings_window(
     assert bad_limit.status_code == 422
 
 
+def test_player_search_available_only_excludes_rostered_players(monkeypatch):
+    """Waivers picker: free agents only, but ranks stay league-global."""
+
+    client = _client(monkeypatch)
+    auth_user_response = Mock(status_code=200)
+    auth_user_response.json.return_value = {"id": "user-123", "email": "gm@example.com"}
+    fake_league = {
+        "scoring_settings": {"rec": 1.0},
+        "settings": {"type": 2},
+        "roster_positions": ["QB", "RB", "RB", "WR", "WR", "WR", "TE", "FLEX", "BN"],
+        "total_rosters": 12,
+    }
+    frame = _fake_players_frame()
+    headers = {"Authorization": "Bearer good-token"}
+    ids = [str(pid) for pid in frame["player_id"]]
+    rosters = [{"roster_id": 1, "players": [ids[0]]}]
+    with patch("requests.get", return_value=auth_user_response):
+        with patch("modules.sleeper.get_league", return_value=fake_league):
+            with patch("modules.sleeper.get_rosters", return_value=rosters):
+                with patch("modules.rankings.load_players", return_value=frame):
+                    with patch(
+                        "modules.player_eligibility.filter_current_fantasy_players",
+                        side_effect=lambda df, **kwargs: df,
+                    ):
+                        everyone = client.get("/v1/leagues/abc/players/search?q=r", headers=headers).json()
+                        free = client.get("/v1/leagues/abc/players/search?q=r&available_only=true", headers=headers).json()
+
+    all_ids = {p["player_id"] for p in everyone["players"]}
+    free_ids = {p["player_id"] for p in free["players"]}
+    assert ids[0] in all_ids
+    assert ids[0] not in free_ids
+    assert free_ids == all_ids - {ids[0]}
+
+
 def test_rankings_endpoint_returns_404_for_missing_league(monkeypatch):
     client = _client(monkeypatch)
 

@@ -8,7 +8,6 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { useAuth } from "@/context/AuthContext";
 import { usePlayerQuickView } from "@/context/PlayerQuickViewContext";
-import { api, type RankedPlayer } from "@/lib/api";
 import { trackFeatureUse } from "@/lib/analytics";
 import { BRAND_NAME } from "@/lib/brand";
 import { NavDestinationGlyph } from "@/components/NavDestinationGlyph";
@@ -19,7 +18,7 @@ import { OPEN_SEARCH_EVENT } from "@/lib/orbSearch";
 import { useIsPro } from "@/lib/useIsPro";
 import { useSheetDragDismiss } from "@/lib/useSheetDragDismiss";
 import { SheetHandle } from "@/components/SheetHandle";
-import { PLAYER_SEARCH_MIN_CHARS, matchPlayersByName } from "@/lib/playerSearch";
+import { PLAYER_SEARCH_MAX_RESULTS, PLAYER_SEARCH_MIN_CHARS, useLeaguePlayerSearchState } from "@/lib/leaguePlayerSearch";
 import { PlayerNameText } from "@/components/PlayerNameText";
 
 /**
@@ -105,36 +104,17 @@ export function GmOrb() {
 
   const { openPlayer } = usePlayerQuickView();
   const [query, setQuery] = useState("");
-  const [playerPool, setPlayerPool] = useState<{ leagueId: string; players: RankedPlayer[] } | null>(null);
   const normalizedQuery = query.trim().toLowerCase();
+  // Server-side search over the whole league pool (not just the rankings window).
+  const playerSearch = useLeaguePlayerSearchState(leagueId ?? "", "Dynasty", query);
   const wantsPlayers = Boolean(leagueId) && normalizedQuery.length >= PLAYER_SEARCH_MIN_CHARS;
-  const poolReady = playerPool !== null && playerPool.leagueId === leagueId;
-  useEffect(() => {
-    if (!wantsPlayers || !leagueId || poolReady) return;
-    let cancelled = false;
-    api
-      .getLeagueRankings(leagueId)
-      .then((result) => {
-        if (!cancelled) setPlayerPool({ leagueId, players: result.players ?? [] });
-      })
-      .catch(() => {
-        // Search still works for destinations; players just don't match.
-        if (!cancelled) setPlayerPool({ leagueId, players: [] });
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [wantsPlayers, leagueId, poolReady]);
 
   const destinationResults = useMemo(() => {
     if (!normalizedQuery) return [];
     const searchable = [...(leagueId ? [...coreLeagueDestinations, ...gmToolsDestinations] : []), ...generalDestinations, ...accountDestinations];
     return searchNavDestinations(searchable, normalizedQuery);
   }, [normalizedQuery, leagueId, coreLeagueDestinations, gmToolsDestinations, generalDestinations, accountDestinations]);
-  const playerResults = useMemo(
-    () => (wantsPlayers && poolReady ? matchPlayersByName(playerPool.players, normalizedQuery) : []),
-    [wantsPlayers, poolReady, playerPool, normalizedQuery],
-  );
+  const playerResults = useMemo(() => playerSearch.players.slice(0, PLAYER_SEARCH_MAX_RESULTS), [playerSearch.players]);
 
   if (!session) return null;
   // Zach, 2026-10-19: "fix the bottom orb on onboard its covering" — "/"
@@ -291,7 +271,7 @@ export function GmOrb() {
                       </NavSection>
                     ) : null}
                   </>
-                ) : wantsPlayers && !poolReady ? (
+                ) : wantsPlayers && playerSearch.pending ? (
                   <p className="text-sm" style={{ color: "var(--color-text-muted)" }}>
                     Searching players…
                   </p>

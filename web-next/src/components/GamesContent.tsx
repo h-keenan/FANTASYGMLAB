@@ -2,7 +2,7 @@
 
 import { PageTitle } from "@/components/PageTitle";
 import { useRouter } from "next/navigation";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import type { GamesTab } from "@/lib/pageTabs";
 
 import { Button } from "@/components/Button";
@@ -41,7 +41,7 @@ import {
   withPick,
 } from "@/lib/gamesPresentation";
 import { formatRank, metricToneColor } from "@/lib/leagueRankingsPresentation";
-import { matchPlayersByName } from "@/lib/playerSearch";
+import { PLAYER_SEARCH_MAX_RESULTS, useLeaguePlayerSearch } from "@/lib/leaguePlayerSearch";
 
 /**
  * Games: the Season Simulator (the shared playoff-odds Monte Carlo, plus a
@@ -213,34 +213,19 @@ function SeasonSimPanel({ leagueId }: { leagueId: string }) {
 function WhatIfSection({ leagueId, data }: { leagueId: string; data: GamesSeasonSimResponse }) {
   const [drops, setDrops] = useState<string[]>([]);
   const [adds, setAdds] = useState<RankedPlayer[]>([]);
-  const [pool, setPool] = useState<RankedPlayer[] | null>(null);
   const [search, setSearch] = useState("");
   const [running, setRunning] = useState(false);
   const [result, setResult] = useState<GamesWhatIfResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const loadedPool = useRef(false);
 
   const rosterIds = useMemo(() => new Set(data.roster.map((p) => p.player_id)), [data.roster]);
 
-  const loadPool = useCallback(() => {
-    if (loadedPool.current) return;
-    loadedPool.current = true;
-    api
-      .getLeagueRankings(leagueId)
-      .then((response) => setPool(response.players ?? []))
-      .catch(() => {
-        loadedPool.current = false;
-      });
-  }, [leagueId]);
-
+  // Server-side search over the whole league pool, not the top-300 rankings window.
+  const searchMatches = useLeaguePlayerSearch(leagueId, "Dynasty", search);
   const matches = useMemo(() => {
-    if (!pool) return [];
     const taken = new Set(adds.map((p) => p.player_id));
-    return matchPlayersByName(
-      pool.filter((p) => !rosterIds.has(p.player_id) && !taken.has(p.player_id)),
-      search,
-    );
-  }, [pool, adds, rosterIds, search]);
+    return searchMatches.filter((p) => !rosterIds.has(p.player_id) && !taken.has(p.player_id)).slice(0, PLAYER_SEARCH_MAX_RESULTS);
+  }, [searchMatches, adds, rosterIds]);
 
   if (!data.is_premium) {
     return (
@@ -312,9 +297,7 @@ function WhatIfSection({ leagueId, data }: { leagueId: string; data: GamesSeason
               aria-label="Search players to add"
               placeholder="Search players to add"
               value={search}
-              onFocus={loadPool}
               onChange={(event) => {
-                loadPool();
                 setSearch(event.target.value);
               }}
             />

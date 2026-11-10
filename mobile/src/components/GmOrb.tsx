@@ -45,7 +45,7 @@ import { PRO, getEntitlementTier, isAtLeast } from '../lib/revenuecat';
 import { openStoreSubscriptionSettings } from '../lib/storeSubscriptions';
 import { ORB_SCRIM_BASE_HEIGHT, ORB_SIZE } from '../lib/orbLayout';
 import { useOrbHorizontalFraction } from '../lib/orbPosition';
-import { PLAYER_SEARCH_MIN_CHARS, matchPlayersByName } from '../lib/playerSearch';
+import { PLAYER_SEARCH_MAX_RESULTS, PLAYER_SEARCH_MIN_CHARS, useLeaguePlayerSearchState } from '../lib/leaguePlayerSearch';
 import { OPEN_ORB_SEARCH_EVENT } from '../lib/orbEvents';
 import { maskShowcaseFields } from '../lib/showcaseMode';
 import { supabase } from '../lib/supabase';
@@ -620,21 +620,16 @@ export default function GmOrb() {
     return searchOrbDestinations(searchableDestinations, normalizedQuery);
   }, [searchableDestinations, normalizedQuery]);
 
-  // Player names too (tap-depth audit #3): the same league-ranked pool the
-  // Players screen searches, fetched only once someone has typed a real
-  // query with a league open, then cached. Tapping a match opens that
+  // Player names too (tap-depth audit #3): searched server-side over the WHOLE
+  // league pool (not the top-300 window) once someone has typed a real query
+  // with the sheet open and a league selected. Tapping a match opens that
   // player's detail screen.
   const playerSearchEnabled =
     !isRestoring && open && Boolean(league?.leagueId) && normalizedQuery.length >= PLAYER_SEARCH_MIN_CHARS;
-  const playerPoolQuery = useQuery({
-    queryKey: queryKeys.leagueRankings(league?.leagueId ?? ''),
-    queryFn: () => api.getLeagueRankings(league!.leagueId, { limit: 300 }),
-    enabled: playerSearchEnabled,
-    staleTime: 10 * 60 * 1000,
-  });
+  const playerSearch = useLeaguePlayerSearchState(playerSearchEnabled ? (league?.leagueId ?? '') : '', 'Dynasty', searchQuery);
   const playerResults = useMemo(
-    () => (playerSearchEnabled ? matchPlayersByName(playerPoolQuery.data?.players ?? [], normalizedQuery) : []),
-    [playerSearchEnabled, playerPoolQuery.data, normalizedQuery],
+    () => (playerSearchEnabled ? playerSearch.players.slice(0, PLAYER_SEARCH_MAX_RESULTS) : []),
+    [playerSearchEnabled, playerSearch.players],
   );
 
   const sheetY = useSharedValue(400);
@@ -992,7 +987,7 @@ export default function GmOrb() {
                   </NavSection>
                 ) : null}
                 </>
-              ) : playerSearchEnabled && playerPoolQuery.isFetching ? (
+              ) : playerSearchEnabled && playerSearch.pending ? (
                 <AppText style={styles.sectionNote}>Searching players…</AppText>
               ) : (
                 <AppText style={styles.sectionNote}>

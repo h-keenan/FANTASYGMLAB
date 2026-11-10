@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { useHeaderHeight } from '@react-navigation/elements';
@@ -27,13 +27,13 @@ import {
   type RankedPlayer,
 } from '../lib/api';
 import { toUserErrorMessage } from '../lib/errorMessages';
+import { PLAYER_SEARCH_MAX_RESULTS, useLeaguePlayerSearch } from '../lib/leaguePlayerSearch';
 import {
   formatDelta,
   formatOdds,
   formatTitleOdds,
   gamesReasonAction,
   gamesReasonMessage,
-  matchPlayersByName,
   PICKEM_PHASE_LABEL,
   recordLabel,
   seedChangeLabel,
@@ -207,34 +207,21 @@ function SeasonSim({ leagueId, colors, styles, navigation }: Shared) {
 function WhatIf({ leagueId, data, colors, styles }: Shared & { data: GamesSeasonSimResponse }) {
   const [drops, setDrops] = useState<string[]>([]);
   const [adds, setAdds] = useState<RankedPlayer[]>([]);
-  const [pool, setPool] = useState<RankedPlayer[] | null>(null);
   const [search, setSearch] = useState('');
   const [running, setRunning] = useState(false);
   const [result, setResult] = useState<GamesWhatIfResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const loadedPool = useRef(false);
 
   const rosterIds = useMemo(() => new Set(data.roster.map((p) => p.player_id)), [data.roster]);
 
-  const loadPool = useCallback(() => {
-    if (loadedPool.current) return;
-    loadedPool.current = true;
-    api
-      .getLeagueRankings(leagueId)
-      .then((response) => setPool(response.players ?? []))
-      .catch(() => {
-        loadedPool.current = false;
-      });
-  }, [leagueId]);
-
+  // Server-side search over the whole league pool, not the top-300 rankings window.
+  const searchMatches = useLeaguePlayerSearch(leagueId, 'Dynasty', search);
   const matches = useMemo(() => {
-    if (!pool) return [];
     const taken = new Set(adds.map((p) => p.player_id));
-    return matchPlayersByName(
-      pool.filter((p) => !rosterIds.has(p.player_id) && !taken.has(p.player_id)),
-      search,
-    );
-  }, [pool, adds, rosterIds, search]);
+    return searchMatches
+      .filter((p) => !rosterIds.has(p.player_id) && !taken.has(p.player_id))
+      .slice(0, PLAYER_SEARCH_MAX_RESULTS);
+  }, [searchMatches, adds, rosterIds]);
 
   if (!data.is_premium) {
     return (
@@ -309,11 +296,7 @@ function WhatIf({ leagueId, data, colors, styles }: Shared & { data: GamesSeason
               accessibilityLabel="Search players to add"
               placeholder="Search players to add"
               value={search}
-              onFocus={loadPool}
-              onChangeText={(text) => {
-                loadPool();
-                setSearch(text);
-              }}
+              onChangeText={setSearch}
               autoCorrect={false}
             />
             {matches.map((player) => (

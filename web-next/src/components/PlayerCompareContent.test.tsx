@@ -13,6 +13,7 @@ vi.mock("@/lib/api", async () => {
       ...actual.api,
       getPlayerQuickView: vi.fn(),
       getPlayerWeeklyStats: vi.fn(),
+      searchLeaguePlayers: vi.fn(),
     },
   };
 });
@@ -76,7 +77,7 @@ describe("PlayerCompareContent", () => {
   });
 
   it("shows the base player and an opponent picker when no second player is chosen yet", () => {
-    render(<PlayerCompareContent leagueName="Dynasty Overlords" playerA={PLAYER_A} initialPlayerB={null} pool={POOL} />);
+    render(<PlayerCompareContent leagueId="L1" leagueName="Dynasty Overlords" playerA={PLAYER_A} initialPlayerB={null} pool={POOL} />);
 
     expect(screen.getByText("Player One")).toBeInTheDocument();
     expect(screen.getByText("Choose an opponent below.")).toBeInTheDocument();
@@ -84,8 +85,21 @@ describe("PlayerCompareContent", () => {
     expect(screen.getByText("Player Two")).toBeInTheDocument();
   });
 
+  it("finds a player outside the loaded pool through the server search", async () => {
+    const deep = player({ player_id: "p650", name: "Carson Beck", position: "QB", team: "ARI" });
+    vi.mocked(api.searchLeaguePlayers).mockResolvedValue({ ok: true, players: [PLAYER_A, deep] } as never);
+    render(<PlayerCompareContent leagueId="L1" leagueName="Dynasty Overlords" playerA={PLAYER_A} initialPlayerB={null} pool={POOL} />);
+
+    fireEvent.change(screen.getByPlaceholderText("Search for a player to compare..."), { target: { value: "beck" } });
+
+    expect(await screen.findByText("Carson Beck")).toBeInTheDocument();
+    expect(api.searchLeaguePlayers).toHaveBeenCalledWith("L1", "beck", "Dynasty");
+    // The base player is filtered out of the server results.
+    expect(screen.getAllByText("Player One")).toHaveLength(1);
+  });
+
   it("never offers the base player as their own opponent", () => {
-    render(<PlayerCompareContent leagueName="Dynasty Overlords" playerA={PLAYER_A} initialPlayerB={null} pool={POOL} />);
+    render(<PlayerCompareContent leagueId="L1" leagueName="Dynasty Overlords" playerA={PLAYER_A} initialPlayerB={null} pool={POOL} />);
 
     // "Player One" appears once, in the base player's own identity card —
     // never a second time inside the candidate list below it.
@@ -98,7 +112,7 @@ describe("PlayerCompareContent", () => {
     );
 
     render(
-      <PlayerCompareContent leagueName="Dynasty Overlords" playerA={PLAYER_A} initialPlayerB={PLAYER_B} pool={POOL} />,
+      <PlayerCompareContent leagueId="L1" leagueName="Dynasty Overlords" playerA={PLAYER_A} initialPlayerB={PLAYER_B} pool={POOL} />,
     );
 
     await waitFor(() => expect(screen.getByText("Market")).toBeInTheDocument());
@@ -115,7 +129,7 @@ describe("PlayerCompareContent", () => {
     vi.mocked(api.getPlayerQuickView).mockResolvedValue(quickViewResult(model({})));
 
     render(
-      <PlayerCompareContent leagueName="Dynasty Overlords" playerA={PLAYER_A} initialPlayerB={PLAYER_B} pool={POOL} />,
+      <PlayerCompareContent leagueId="L1" leagueName="Dynasty Overlords" playerA={PLAYER_A} initialPlayerB={PLAYER_B} pool={POOL} />,
     );
 
     await waitFor(() => expect(screen.getByText("1,500")).toBeInTheDocument());
@@ -127,7 +141,7 @@ describe("PlayerCompareContent", () => {
     vi.mocked(api.getPlayerQuickView).mockResolvedValue(quickViewResult(model({})));
 
     render(
-      <PlayerCompareContent leagueName="Dynasty Overlords" playerA={PLAYER_A} initialPlayerB={PLAYER_B} pool={POOL} />,
+      <PlayerCompareContent leagueId="L1" leagueName="Dynasty Overlords" playerA={PLAYER_A} initialPlayerB={PLAYER_B} pool={POOL} />,
     );
 
     await waitFor(() => expect(screen.getByText("Market")).toBeInTheDocument());
@@ -139,7 +153,7 @@ describe("PlayerCompareContent", () => {
   it("selects an opponent from the picker and fetches both quick-view models", async () => {
     vi.mocked(api.getPlayerQuickView).mockResolvedValue(quickViewResult(model({})));
 
-    render(<PlayerCompareContent leagueName="Dynasty Overlords" playerA={PLAYER_A} initialPlayerB={null} pool={POOL} />);
+    render(<PlayerCompareContent leagueId="L1" leagueName="Dynasty Overlords" playerA={PLAYER_A} initialPlayerB={null} pool={POOL} />);
 
     fireEvent.click(screen.getByRole("button", { name: /Player Two/ }));
 
@@ -151,7 +165,7 @@ describe("PlayerCompareContent", () => {
     vi.mocked(api.getPlayerQuickView).mockResolvedValue({ ok: true, stats: null, bio: null, model: null, reason: "not_found" });
 
     render(
-      <PlayerCompareContent leagueName="Dynasty Overlords" playerA={PLAYER_A} initialPlayerB={PLAYER_B} pool={POOL} />,
+      <PlayerCompareContent leagueId="L1" leagueName="Dynasty Overlords" playerA={PLAYER_A} initialPlayerB={PLAYER_B} pool={POOL} />,
     );
 
     await waitFor(() => expect(api.getPlayerQuickView).toHaveBeenCalled());
@@ -176,7 +190,7 @@ describe("PlayerCompareContent", () => {
     );
 
     render(
-      <PlayerCompareContent leagueName="Dynasty Overlords" playerA={PLAYER_A} initialPlayerB={PLAYER_B} pool={POOL} />,
+      <PlayerCompareContent leagueId="L1" leagueName="Dynasty Overlords" playerA={PLAYER_A} initialPlayerB={PLAYER_B} pool={POOL} />,
     );
 
     await waitFor(() => expect(api.getPlayerWeeklyStats).toHaveBeenCalledWith("p1"));
@@ -193,7 +207,7 @@ describe("PlayerCompareContent", () => {
     vi.mocked(api.getPlayerWeeklyStats).mockResolvedValue(weeklyStatsResult([]));
 
     render(
-      <PlayerCompareContent leagueName="Dynasty Overlords" playerA={PLAYER_A} initialPlayerB={PLAYER_B} pool={POOL} />,
+      <PlayerCompareContent leagueId="L1" leagueName="Dynasty Overlords" playerA={PLAYER_A} initialPlayerB={PLAYER_B} pool={POOL} />,
     );
 
     await waitFor(() => expect(api.getPlayerWeeklyStats).toHaveBeenCalled());

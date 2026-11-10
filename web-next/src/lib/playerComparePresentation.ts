@@ -253,13 +253,3 @@ export function defaultCompareCandidates(
     })
     .slice(0, limit);
 }
-
-/** Once the user actually types a name, search the FULL pool by name match
- * (unrestricted by position/score window) — only the default, pre-search
- * suggestion list above is scoped to the base player's own level, matching
- * mobile's filteredCandidates. */
-export function searchCompareCandidates(pool: RankedPlayer[], query: string, limit = 50): RankedPlayer[] {
-  const trimmed = query.trim().toLowerCase();
-  if (!trimmed) return [];
-  return pool.filter((p) => (p.name ?? "").toLowerCase().includes(trimmed)).slice(0, limit);
-}

@@ -103,23 +103,6 @@ export function recordLabel(record: { correct: number; graded: number } | undefi
   return `${record.correct}-${record.graded - record.correct}`;
 }
 
-/** Case-insensitive name match, best (prefix) hits first; min 2 characters. */
-export function matchPlayersByName<T extends { name: string | null }>(players: readonly T[], query: string, limit = 5): T[] {
-  const q = query.trim().toLowerCase();
-  if (q.length < 2) return [];
-  const starts: T[] = [];
-  const wordStarts: T[] = [];
-  const contains: T[] = [];
-  for (const player of players) {
-    const name = (player.name ?? '').toLowerCase();
-    if (!name) continue;
-    if (name.startsWith(q)) starts.push(player);
-    else if (name.split(/[\s.'-]+/).some((word) => word.startsWith(q))) wordStarts.push(player);
-    else if (name.includes(q)) contains.push(player);
-  }
-  return [...starts, ...wordStarts, ...contains].slice(0, limit);
-}
-
 // ---------------------------------------------------------------------------
 // Trade effect on odds (POST .../trade-odds-effect). Mirrored on web and mobile.
 // ---------------------------------------------------------------------------
