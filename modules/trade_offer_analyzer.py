@@ -871,8 +871,9 @@ def decide_offer_verdict(
     if not strategy_summary:
         strategy_summary = "Strategy fit is mixed for your current plan."
 
-    # receive_assets reserved for future concentration checks; silence unused lint.
-    _ = receive_assets
+    caution = trade_posture.young_core_for_picks_caution(posture, send_assets, receive_assets)
+    if caution:
+        risk_summary = f"{caution} {risk_summary}" if risk_summary and "close to neutral" not in risk_summary else caution
 
     return OfferVerdict(
         band=band,

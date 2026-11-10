@@ -29,8 +29,10 @@ reports that as a fact for the words around the verdict; it never changes it.
 
 from __future__ import annotations
 
+import re
+
 import math
-from typing import Any, Mapping
+from typing import Any, Mapping, Sequence
 
 from modules.team_eval import normalize_team_strategy, team_strategy_label
 from modules.trade_lineup_model import STATIC_VALUE_PER_POINT
@@ -528,3 +530,52 @@ def stamp_records(records: list[dict[str, Any]], posture: Mapping[str, Any] | No
             new["posture_alignment"] = alignment(pub, assessment)
         out.append(new)
     return out
+
+
+_YOUNG_CORE_MAX_AGE = 24
+_ROUND_RE = re.compile(r"round\s*(\d)", re.IGNORECASE)
+
+
+def _asset_score(asset: Mapping[str, Any]) -> float:
+    return _num(asset.get("score", asset.get("value_score")))
+
+
+def young_core_for_picks_caution(
+    posture: Mapping[str, Any] | None,
+    send_assets: Sequence[Mapping[str, Any]] | None,
+    receive_assets: Sequence[Mapping[str, Any]] | None,
+) -> str:
+    """Words only (never moves the score): a rebuilding team sending its best
+    young player out for picks that are all after round 1. A pile of 2nds can
+    out-add one young starter on the value chart while rarely producing one."""
+
+    key = normalize_team_strategy(str((posture or {}).get("key") or ""))
+    if key not in {"rebuild", "tank"}:
+        return ""
+    sent = [a for a in send_assets or () if isinstance(a, Mapping)]
+    got = [a for a in receive_assets or () if isinstance(a, Mapping)]
+    young = [
+        a
+        for a in sent
+        if a.get("asset_type") == "player"
+        and _num(a.get("age")) and 0 < _num(a.get("age")) <= _YOUNG_CORE_MAX_AGE
+    ]
+    picks = [a for a in got if a.get("asset_type") == "pick"]
+    if not young or not picks or not sent:
+        return ""
+    best_young = max(young, key=_asset_score)
+    if _asset_score(best_young) < max(_asset_score(a) for a in sent):
+        return ""
+    rounds = []
+    for pick in picks:
+        numeric = int(_num(pick.get("round")))
+        match = _ROUND_RE.search(str(pick.get("label") or pick.get("name") or ""))
+        rounds.append(numeric or (int(match.group(1)) if match else 0))
+    if not rounds or min(rounds) < 2:  # an unreadable label or any 1st: no caution
+        return ""
+    name = str(best_young.get("name") or best_young.get("label") or "A young starter")
+    return (
+        f"Rebuild caution: {name} (age {int(_num(best_young.get('age')))}) is a young core piece, and the picks coming "
+        "back are all 2nd round or later, which rarely turn into starters. The value adds up on paper; "
+        "the long-term fit may not."
+    )
