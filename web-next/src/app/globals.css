@@ -262,7 +262,7 @@
 }
 
 @media (prefers-color-scheme: light) {
-  :root {
+  :root:not([data-theme="dark"]) {
     --color-bg: #d9e3ea;
     --color-shell: #cbd8e1;
     --color-surface-primary: #f8fbfd;
@@ -351,6 +351,95 @@
     color-scheme: light;
   }
 }
+/* Manual Day override (Account > Theme); same rules as the media query above. */
+:root[data-theme="light"] {
+  --color-bg: #d9e3ea;
+  --color-shell: #cbd8e1;
+  --color-surface-primary: #f8fbfd;
+  --color-surface-secondary: #e9f0f5;
+  --color-surface-raised: #ffffff;
+  --color-surface-muted: #cddae4;
+  --color-text-primary: #101820;
+  --color-text-secondary: #34424d;
+  --color-text-muted: #4a5762;
+  --color-border: #8497a5;
+  --color-border-strong: #475765;
+
+  --color-accent: #005f70;
+  --color-accent-strong: #00505f;
+  --color-on-accent: #ffffff;
+  --color-accent-soft: rgba(0, 95, 112, 0.2);
+  --color-success: #066626;
+  --color-opportunity: #00645a;
+  --color-action: #7a5200;
+  --color-warning: #8f4200;
+  --color-danger: #ab0a1c;
+  --color-diagnostic: #4535c4;
+  --color-muted: rgba(16, 24, 32, 0.45);
+  --color-information: var(--color-accent);
+  --color-premium: var(--color-action);
+  --color-premium-fill: #f2a900;
+  --color-on-premium: #140e00;
+  --color-premium-glow: rgba(190, 125, 0, 0.8);
+  --color-premium-glow-soft: rgba(190, 125, 0, 0.42);
+  --color-experimental: var(--color-diagnostic);
+
+  --color-prestige-elite: #7d5b07;
+  --color-prestige-starter: #34404c;
+  --color-prestige-contributor: #48545f;
+  --color-prestige-development: #56626e;
+  --color-prestige-depth: #5c6874;
+  --color-prestige-replacement: #b0393d;
+
+  /* Player tier ladder — byte-for-byte port of mobile's TIER_COLOR_LIGHT. */
+  --color-tier-generational: #0c7d6e;
+  --color-tier-elite: #972697;
+  --color-tier-impact-starter: #ae3013;
+  --color-tier-starter: #5c701a;
+  --color-tier-contributor: #475569;
+  --color-tier-committee-role: #2b701a;
+  --color-tier-depth-developmental: #52525b;
+
+  --color-position-qb: #be123c;
+  --color-position-rb: #15803d;
+  --color-position-wr: #0369a1;
+  --color-position-te: #c2410c;
+  --color-position-k: #6d28d9;
+  --color-position-dst: #3f3f46;
+  --color-position-dl: #be185d;
+  --color-position-lb: #0f766e;
+  --color-position-db: #4338ca;
+  --color-position-flex: #3f3f46;
+
+  --color-success-soft: rgba(10, 150, 60, 0.22);
+  --color-opportunity-soft: rgba(0, 160, 145, 0.22);
+  --color-action-soft: rgba(240, 170, 0, 0.28);
+  --color-warning-soft: rgba(235, 110, 0, 0.22);
+  --color-danger-soft: rgba(225, 30, 50, 0.2);
+  --color-information-soft: rgba(0, 150, 175, 0.22);
+  --color-diagnostic-soft: rgba(90, 70, 240, 0.2);
+  --color-muted-soft: rgba(16, 24, 32, 0.1);
+
+  --focus-ring: 0 0 0 3px rgba(0, 95, 112, 0.5);
+  --shadow-surface-inset: inset 0 1px 0 rgba(255, 255, 255, 0.9);
+
+  /* Real elevation in light mode: dark's hard 3px offset reads as a
+     smudge on a pale page, so light uses a tight contact shadow plus a
+     soft ambient one, tinted to the page hue. */
+  --shadow-control: 0 1px 2px rgba(15, 40, 60, 0.28), 0 2px 6px rgba(15, 40, 60, 0.12);
+  --shadow-card: 0 1px 2px rgba(15, 40, 60, 0.24), 0 6px 18px rgba(15, 40, 60, 0.16);
+  --shadow-overlay: 0 12px 36px rgba(15, 40, 60, 0.34);
+  /* Tone chips: stronger fill plus a hairline ring so they separate from
+     the card the way dark's saturated tints do. */
+  --pill-active-bg: var(--color-accent);
+  --pill-active-fg: var(--color-on-accent);
+  --segmented-active-bg: var(--color-accent);
+  --segmented-active-fg: var(--color-on-accent);
+  --chip-fill-pct: 18%;
+  --chip-ring-pct: 40%;
+
+  color-scheme: light;
+}
 
 @theme inline {
   --color-bg: var(--color-bg);
@@ -414,7 +503,7 @@ body {
   --glass-input-border: rgba(255, 255, 255, 0.14);
 }
 @media (prefers-color-scheme: light) {
-  :root {
+  :root:not([data-theme="dark"]) {
     --glass-bg: linear-gradient(165deg, rgba(255, 255, 255, 0.96), rgba(240, 246, 250, 0.94));
     --glass-border: rgba(10, 30, 45, 0.3);
     --glass-shadow:
@@ -424,6 +513,17 @@ body {
     --glass-input-bg: rgba(255, 255, 255, 0.95);
     --glass-input-border: rgba(10, 30, 45, 0.38);
   }
+}
+/* Manual Day override (Account > Theme); same rules as the media query above. */
+:root[data-theme="light"] {
+  --glass-bg: linear-gradient(165deg, rgba(255, 255, 255, 0.96), rgba(240, 246, 250, 0.94));
+  --glass-border: rgba(10, 30, 45, 0.3);
+  --glass-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.9),
+    0 2px 4px rgba(15, 40, 60, 0.18),
+    0 14px 30px rgba(15, 40, 60, 0.2);
+  --glass-input-bg: rgba(255, 255, 255, 0.95);
+  --glass-input-border: rgba(10, 30, 45, 0.38);
 }
 /* Write backdrop-filter WITHOUT a hand-written -webkit- twin: with both, the
    production CSS optimizer kept only the -webkit- one, so Chrome/Firefox/
@@ -497,11 +597,17 @@ body {
   --color-surface-raised: rgba(61, 66, 72, 0.65);
 }
 @media (prefers-color-scheme: light) {
-  body {
+  :where(:root:not([data-theme="dark"])) body {
     --color-surface-primary: rgba(250, 252, 254, 0.94);
     --color-surface-secondary: rgba(233, 240, 245, 0.94);
     --color-surface-raised: rgba(255, 255, 255, 0.97);
   }
+}
+/* Manual Day override (Account > Theme); same rules as the media query above. */
+:where(:root[data-theme="light"]) body {
+  --color-surface-primary: rgba(250, 252, 254, 0.94);
+  --color-surface-secondary: rgba(233, 240, 245, 0.94);
+  --color-surface-raised: rgba(255, 255, 255, 0.97);
 }
 
 /* The actual frosted-glass blur, site-wide, with no per-component changes:
@@ -559,15 +665,25 @@ body {
   animation: onboarding-sweep 9s ease-in-out infinite;
 }
 @media (prefers-color-scheme: light) {
-  .app-background-field {
+  :where(:root:not([data-theme="dark"])) .app-background-field {
     opacity: 0.5;
     background:
       repeating-linear-gradient(112deg, rgba(16, 24, 32, 0.07) 0px, rgba(16, 24, 32, 0.07) 3px, transparent 3px, transparent 96px),
       repeating-linear-gradient(112deg, rgba(16, 24, 32, 0.025) 0px, rgba(16, 24, 32, 0.025) 1.5px, transparent 1.5px, transparent 24px);
   }
-  .app-background-sweep {
+  :where(:root:not([data-theme="dark"])) .app-background-sweep {
     background: linear-gradient(90deg, transparent, rgba(16, 24, 32, 0.04) 45%, rgba(16, 24, 32, 0.08) 50%, rgba(16, 24, 32, 0.04) 55%, transparent);
   }
+}
+/* Manual Day override (Account > Theme); same rules as the media query above. */
+:where(:root[data-theme="light"]) .app-background-field {
+  opacity: 0.5;
+  background:
+    repeating-linear-gradient(112deg, rgba(16, 24, 32, 0.07) 0px, rgba(16, 24, 32, 0.07) 3px, transparent 3px, transparent 96px),
+    repeating-linear-gradient(112deg, rgba(16, 24, 32, 0.025) 0px, rgba(16, 24, 32, 0.025) 1.5px, transparent 1.5px, transparent 24px);
+}
+:where(:root[data-theme="light"]) .app-background-sweep {
+  background: linear-gradient(90deg, transparent, rgba(16, 24, 32, 0.04) 45%, rgba(16, 24, 32, 0.08) 50%, rgba(16, 24, 32, 0.04) 55%, transparent);
 }
 
 /* Real FD brand mark (Zach, 2026-10-18 — finally unblocking the "FD
@@ -582,9 +698,13 @@ body {
   filter: invert(1);
 }
 @media (prefers-color-scheme: light) {
-  .brand-mark-icon {
+  :where(:root:not([data-theme="dark"])) .brand-mark-icon {
     filter: none;
   }
+}
+/* Manual Day override (Account > Theme); same rules as the media query above. */
+:where(:root[data-theme="light"]) .brand-mark-icon {
+  filter: none;
 }
 
 /* GM orb's "Where to go" bottom sheet — coridian_, 2026-10-18: "that
@@ -611,11 +731,17 @@ body {
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.2);
 }
 @media (prefers-color-scheme: light) {
-  .gm-orb-sheet {
+  :where(:root:not([data-theme="dark"])) .gm-orb-sheet {
     background: rgba(255, 255, 255, 0.72);
     border-top: 1px solid rgba(16, 24, 32, 0.1);
     box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.6);
   }
+}
+/* Manual Day override (Account > Theme); same rules as the media query above. */
+:where(:root[data-theme="light"]) .gm-orb-sheet {
+  background: rgba(255, 255, 255, 0.72);
+  border-top: 1px solid rgba(16, 24, 32, 0.1);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.6);
 }
 .gm-orb-sheet-field,
 .gm-orb-sheet-sweep {
@@ -640,15 +766,25 @@ body {
   animation: onboarding-sweep 9s ease-in-out infinite;
 }
 @media (prefers-color-scheme: light) {
-  .gm-orb-sheet-field {
+  :where(:root:not([data-theme="dark"])) .gm-orb-sheet-field {
     opacity: 0.5;
     background:
       repeating-linear-gradient(112deg, rgba(16, 24, 32, 0.07) 0px, rgba(16, 24, 32, 0.07) 3px, transparent 3px, transparent 96px),
       repeating-linear-gradient(112deg, rgba(16, 24, 32, 0.025) 0px, rgba(16, 24, 32, 0.025) 1.5px, transparent 1.5px, transparent 24px);
   }
-  .gm-orb-sheet-sweep {
+  :where(:root:not([data-theme="dark"])) .gm-orb-sheet-sweep {
     background: linear-gradient(90deg, transparent, rgba(16, 24, 32, 0.04) 45%, rgba(16, 24, 32, 0.08) 50%, rgba(16, 24, 32, 0.04) 55%, transparent);
   }
+}
+/* Manual Day override (Account > Theme); same rules as the media query above. */
+:where(:root[data-theme="light"]) .gm-orb-sheet-field {
+  opacity: 0.5;
+  background:
+    repeating-linear-gradient(112deg, rgba(16, 24, 32, 0.07) 0px, rgba(16, 24, 32, 0.07) 3px, transparent 3px, transparent 96px),
+    repeating-linear-gradient(112deg, rgba(16, 24, 32, 0.025) 0px, rgba(16, 24, 32, 0.025) 1.5px, transparent 1.5px, transparent 24px);
+}
+:where(:root[data-theme="light"]) .gm-orb-sheet-sweep {
+  background: linear-gradient(90deg, transparent, rgba(16, 24, 32, 0.04) 45%, rgba(16, 24, 32, 0.08) 50%, rgba(16, 24, 32, 0.04) 55%, transparent);
 }
 * {
   box-sizing: border-box;
@@ -1002,13 +1138,21 @@ a {
     var(--shadow-overlay);
 }
 @media (prefers-color-scheme: light) {
-  .pqv-modal {
+  :where(:root:not([data-theme="dark"])) .pqv-modal {
     background: linear-gradient(165deg, rgba(255, 255, 255, 0.85), rgba(245, 249, 251, 0.7));
     border-color: rgba(10, 30, 45, 0.1);
     box-shadow:
       inset 0 1px 0 rgba(255, 255, 255, 0.6),
       var(--shadow-overlay);
   }
+}
+/* Manual Day override (Account > Theme); same rules as the media query above. */
+:where(:root[data-theme="light"]) .pqv-modal {
+  background: linear-gradient(165deg, rgba(255, 255, 255, 0.85), rgba(245, 249, 251, 0.7));
+  border-color: rgba(10, 30, 45, 0.1);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.6),
+    var(--shadow-overlay);
 }
 /* coridian_, 2026-10-18: "Also need that moving background behind the
    pqv" — same field/sweep texture as the GM orb sheet, contained to this
@@ -1039,15 +1183,25 @@ a {
   animation: onboarding-sweep 9s ease-in-out infinite;
 }
 @media (prefers-color-scheme: light) {
-  .pqv-field {
+  :where(:root:not([data-theme="dark"])) .pqv-field {
     opacity: 0.5;
     background:
       repeating-linear-gradient(112deg, rgba(16, 24, 32, 0.07) 0px, rgba(16, 24, 32, 0.07) 3px, transparent 3px, transparent 96px),
       repeating-linear-gradient(112deg, rgba(16, 24, 32, 0.025) 0px, rgba(16, 24, 32, 0.025) 1.5px, transparent 1.5px, transparent 24px);
   }
-  .pqv-sweep {
+  :where(:root:not([data-theme="dark"])) .pqv-sweep {
     background: linear-gradient(90deg, transparent, rgba(16, 24, 32, 0.04) 45%, rgba(16, 24, 32, 0.08) 50%, rgba(16, 24, 32, 0.04) 55%, transparent);
   }
+}
+/* Manual Day override (Account > Theme); same rules as the media query above. */
+:where(:root[data-theme="light"]) .pqv-field {
+  opacity: 0.5;
+  background:
+    repeating-linear-gradient(112deg, rgba(16, 24, 32, 0.07) 0px, rgba(16, 24, 32, 0.07) 3px, transparent 3px, transparent 96px),
+    repeating-linear-gradient(112deg, rgba(16, 24, 32, 0.025) 0px, rgba(16, 24, 32, 0.025) 1.5px, transparent 1.5px, transparent 24px);
+}
+:where(:root[data-theme="light"]) .pqv-sweep {
+  background: linear-gradient(90deg, transparent, rgba(16, 24, 32, 0.04) 45%, rgba(16, 24, 32, 0.08) 50%, rgba(16, 24, 32, 0.04) 55%, transparent);
 }
 .pqv-scroll {
   position: relative;

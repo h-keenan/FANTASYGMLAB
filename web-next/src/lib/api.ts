@@ -4065,6 +4065,9 @@ export interface DevicePreferencesResponse {
   ok: boolean;
   ui_density: "guided" | "compact";
   theme_mode: "light" | "dark" | "auto";
+  /** False when the account never picked a theme (theme_mode is then the
+   * app's "dark" fallback, not a choice). */
+  theme_mode_set?: boolean;
   experience_level: "new_to_fantasy" | "beginner" | "advanced" | null;
   experience_goal: "win_now" | "rebuilding" | "exploring" | null;
   last_league: { league_id: string; league_name: string } | null;
@@ -4076,6 +4079,13 @@ export const api = {
   /** Cross-device account preferences (GET /v1/preferences). Read by
    * ExperienceLevelContext for `experience_level`. */
   getDevicePreferences: () => authorizedRequest<DevicePreferencesResponse>("/v1/preferences"),
+
+  /** Display density / theme from the Account page (partial update). */
+  updateDevicePreferences: (body: { ui_density?: "guided" | "compact"; theme_mode?: "light" | "dark" | "auto" }) =>
+    authorizedRequest<DevicePreferencesResponse>("/v1/preferences", {
+      method: "POST",
+      jsonBody: body,
+    }),
 
   /** Written by the signup onboarding carousel's last step and by the
    * Account page's Explanations setting. Read back through

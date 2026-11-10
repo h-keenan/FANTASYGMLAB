@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, within } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
 import { AccountContent } from "./AccountContent";
@@ -92,13 +92,21 @@ describe("AccountContent", () => {
     expect(onOpenBillingPortal).toHaveBeenCalledTimes(1);
   });
 
+  it("offers density, theme and college football settings like the app", () => {
+    renderContent({});
+    expect(screen.getByRole("radiogroup", { name: "Density" })).toBeInTheDocument();
+    expect(screen.getByRole("radio", { name: /Night/ })).toBeInTheDocument();
+    expect(screen.getByText("College football")).toBeInTheDocument();
+  });
+
   it("shows the Community Trade Feed opt-out toggle and calls onToggleCommunityOptOut with the flipped value", () => {
     const onToggleCommunityOptOut = vi.fn();
     renderContent({ communityOptedOut: false, onToggleCommunityOptOut });
 
     expect(screen.getByText("I don't want MY trades to appear in this feed")).toBeInTheDocument();
-    const toggles = screen.getAllByRole("switch");
-    const communityToggle = toggles[0];
+    const communityToggle = within(
+      screen.getByText("I don't want MY trades to appear in this feed").closest("div")!.parentElement as HTMLElement,
+    ).getByRole("switch");
     expect(communityToggle).toHaveAttribute("aria-checked", "false");
 
     fireEvent.click(communityToggle);

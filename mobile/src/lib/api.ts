@@ -2747,6 +2747,9 @@ export interface DevicePreferencesResponse {
   ok: boolean;
   ui_density: UiDensityValue;
   theme_mode: ThemeModeValue;
+  /** False when the account never picked a theme (theme_mode is then the
+   * "dark" fallback, not a choice). Web uses it; the app ignores it. */
+  theme_mode_set?: boolean;
   experience_level?: ExperienceLevelValue | null;
   experience_goal?: ExperienceGoalValue | null;
   last_league: { league_id: string; league_name: string } | null;

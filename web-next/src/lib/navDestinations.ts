@@ -1,4 +1,5 @@
 import type { NavGlyphName } from "@/components/NavDestinationGlyph";
+import type { CollegeInterest } from "@/lib/displayPreferences";
 import { accentVar as accent } from "@/lib/destinationAccent";
 
 export interface NavDestination {
@@ -44,7 +45,15 @@ export interface NavTab {
  * of each keeping its own copy (GmOrb used to be the only consumer; this
  * is that same data, pulled out so a second surface doesn't duplicate it).
  */
-export function useNavDestinations(leagueId: string | null, leagueName: string) {
+export function useNavDestinations(
+  leagueId: string | null,
+  leagueName: string,
+  // "off" (Account > College football) hides the menu entry; the page itself
+  // still works by URL. Matches the app, which only surfaces College
+  // Scouting once the user opts in. Callers pass the preference in, so this
+  // stays callable outside a React tree.
+  collegeInterest: CollegeInterest = "on",
+) {
   const query = leagueId ? `?name=${encodeURIComponent(leagueName)}` : "";
   const id = leagueId ? encodeURIComponent(leagueId) : "";
   // `?name=...&tab=x` — the tab param the page reads on load.
@@ -136,7 +145,7 @@ export function useNavDestinations(leagueId: string | null, leagueName: string) 
       ]
     : [];
 
-  const generalDestinations: NavDestination[] = [
+  const generalDestinations: NavDestination[] = ([
     { label: "Home", path: "/", subtitle: "Switch leagues and manage account", glyph: "home", color: "var(--color-accent)" },
     { label: "Portfolio", path: "/portfolio", subtitle: "Your standing across every saved league", glyph: "portfolio", color: accent("Portfolio"), pro: true },
     { label: "News", path: "/news", subtitle: "Latest NFL news and updates", glyph: "news", color: accent("News") },
@@ -153,7 +162,7 @@ export function useNavDestinations(leagueId: string | null, leagueName: string) 
       glyph: "community",
       color: accent("Community"),
     },
-  ];
+  ] as NavDestination[]).filter((destination) => collegeInterest !== "off" || destination.path !== "/college-scouting");
 
   // Account-wide chrome that used to be reachable only through the header
   // MENU (Account) or from inside an upsell card (Pro). Not league-scoped.

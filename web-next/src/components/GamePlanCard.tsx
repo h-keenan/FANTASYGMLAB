@@ -4,6 +4,7 @@ import Link from "next/link";
 
 import type { BriefingItem } from "@/lib/api";
 import { AccentCard } from "@/components/AccentCard";
+import { useDisplayPreferences } from "@/context/DisplayPreferencesContext";
 import { useExperienceCopy } from "@/context/ExperienceLevelContext";
 import { BriefingItemPlayers } from "@/components/BriefingItemPlayers";
 import {
@@ -45,6 +46,7 @@ export function GamePlanCard({
 }) {
   const internalRoute = GAME_PLAN_INTERNAL_ROUTES[item.destination] ?? "dashboard";
   const copy = useExperienceCopy();
+  const { showExplanations } = useDisplayPreferences();
   return (
     <AccentCard accent="var(--color-accent)">
       <span
@@ -58,17 +60,19 @@ export function GamePlanCard({
         {formatGamePlanCategory(item.category)}
       </span>
       <h3 style={{ font: "var(--font-card-title)" }}>{item.headline}</h3>
-      <p
-        className="text-sm"
-        style={{
-          color: "var(--color-text-secondary)",
-          ...(copy.isBeginner
-            ? {}
-            : { display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical" as const, overflow: "hidden" }),
-        }}
-      >
-        {item.reason}
-      </p>
+      {showExplanations ? (
+        <p
+          className="text-sm"
+          style={{
+            color: "var(--color-text-secondary)",
+            ...(copy.isBeginner
+              ? {}
+              : { display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical" as const, overflow: "hidden" }),
+          }}
+        >
+          {item.reason}
+        </p>
+      ) : null}
       <BriefingItemPlayers item={item} sourceLabel="GM Plan" />
       <Link
         href={gamePlanTileHref(internalRoute, leagueId, leagueName, resolveGamePlanTargetPlayerId(item))}
