@@ -4,6 +4,7 @@ import json
 import os
 import threading
 import time
+from datetime import date
 from functools import lru_cache
 from typing import Dict, Any, Iterable, List, Optional
 from urllib.parse import quote
@@ -535,6 +536,20 @@ def season_stats_cache_written_at(season: int | None = None) -> float | None:
         return None
 
 
+def _load_cached_season_stats(cache_path: str) -> Any:
+    """Never-fetching read: the on-disk aggregate, else the in-memory build kept
+    when the disk cache cannot be written (ephemeral/read-only prod FS)."""
+
+    if os.path.exists(cache_path):
+        try:
+            with open(cache_path, "r", encoding="utf-8") as handle:
+                return json.load(handle)
+        except Exception:
+            pass
+    entry = _season_stats_fallback_peek(cache_path)
+    return entry[1] if entry is not None else None
+
+
 def cached_season_player_weekly(player_id: str, season: int | None = None) -> List[Dict[str, Any]]:
     """Weekly rows already on disk for one player+season — never fetches.
 
@@ -550,13 +565,7 @@ def cached_season_player_weekly(player_id: str, season: int | None = None) -> Li
         return []
     selected = int(season or default_player_stats_season())
     cache_path = PLAYER_STATS_CACHE_TEMPLATE.format(season=selected)
-    if not os.path.exists(cache_path):
-        return []
-    try:
-        with open(cache_path, "r", encoding="utf-8") as handle:
-            cached = json.load(handle)
-    except Exception:
-        return []
+    cached = _load_cached_season_stats(cache_path)
     if not isinstance(cached, dict):
         return []
     record = cached.get(identifier)
@@ -570,23 +579,7 @@ def cached_season_player_weekly(player_id: str, season: int | None = None) -> Li
     return rows
 
 
-def cached_season_weekly_map(season: int | None = None) -> Dict[str, List[Dict[str, Any]]]:
-    """Every player's weekly rows already on disk for a season, in ONE read.
-
-    Same contract as ``cached_season_player_weekly`` (never fetches, empty when
-    the cache is missing/unreadable/has no weekly retention), for callers that
-    need many players at once and must not re-read the cache file per player.
-    """
-
-    selected = int(season or default_player_stats_season())
-    cache_path = PLAYER_STATS_CACHE_TEMPLATE.format(season=selected)
-    if not os.path.exists(cache_path):
-        return {}
-    try:
-        with open(cache_path, "r", encoding="utf-8") as handle:
-            cached = json.load(handle)
-    except Exception:
-        return {}
+def _weekly_map_from_aggregate(cached: Any) -> Dict[str, List[Dict[str, Any]]]:
     if not isinstance(cached, dict):
         return {}
     include_box = season_stats_cache_has_box_scores(cached)
@@ -602,7 +595,72 @@ def cached_season_weekly_map(season: int | None = None) -> Dict[str, List[Dict[s
     return out
 
 
+def cached_season_weekly_map(season: int | None = None) -> Dict[str, List[Dict[str, Any]]]:
+    """Every player's weekly rows already on disk for a season, in ONE read.
+
+    Same contract as ``cached_season_player_weekly`` (never fetches, empty when
+    the cache is missing/unreadable/has no weekly retention), for callers that
+    need many players at once and must not re-read the cache file per player.
+    """
+
+    selected = int(season or default_player_stats_season())
+    cache_path = PLAYER_STATS_CACHE_TEMPLATE.format(season=selected)
+    return _weekly_map_from_aggregate(_load_cached_season_stats(cache_path))
+
+
+def season_weekly_map(season: int | None = None) -> Dict[str, List[Dict[str, Any]]]:
+    """Like ``cached_season_weekly_map`` but self-heals a missing cache.
+
+    When nothing is cached (fresh/ephemeral deployment, evicted disk) it builds
+    the season aggregate once through ``get_season_player_stats`` - whose weekly
+    fetches are single-flight and shared cluster-wide - instead of returning
+    nothing. For on-demand features that would otherwise degrade (Weekly
+    Roundup); hot render paths that must never block keep using the cached_*
+    readers. Fail-neutral: ``{}`` when the build yields nothing.
+    """
+
+    selected = int(season or default_player_stats_season())
+    cached = cached_season_weekly_map(selected)
+    if cached:
+        return cached
+    try:
+        built = get_season_player_stats(selected, retain_weekly=True)
+    except Exception:
+        return {}
+    return _weekly_map_from_aggregate(built)
+
+
 _WEEKLY_STATS_FETCH_WORKERS = 6
+# Weekly stats payloads go through the cluster-wide single-flight cache
+# (modules.sleeper_cache) so concurrent cold builds - across threads and
+# workers, and when the on-disk aggregate is missing - share one upstream
+# call per (season, week). A completed week is effectively immutable apart
+# from the Tuesday stat-correction window; the in-progress week changes live.
+WEEKLY_STATS_COMPLETED_TTL_SECONDS = 12 * 60 * 60
+WEEKLY_STATS_PRIOR_SEASON_TTL_SECONDS = 7 * 24 * 60 * 60
+WEEKLY_STATS_CURRENT_WEEK_TTL_SECONDS = 5 * 60
+
+
+def weekly_stats_ttl(season: int, week: int, now: time.struct_time | None = None) -> int:
+    """Freshness window for one ``/stats/nfl/regular/{season}/{week}`` payload."""
+
+    current = now or time.localtime()
+    season_i, week_i = int(season), int(week)
+    active = default_player_stats_season(now) if now is not None else default_player_stats_season()
+    if season_i < active:
+        return WEEKLY_STATS_PRIOR_SEASON_TTL_SECONDS
+    if season_i > active:
+        return WEEKLY_STATS_CURRENT_WEEK_TTL_SECONDS
+    try:
+        from modules.trade_grade import estimate_nfl_week
+
+        nfl_week = estimate_nfl_week(date(current.tm_year, current.tm_mon, current.tm_mday))
+    except Exception:
+        nfl_week = 0
+    # Calendar estimate 0 = offseason (or post-season): every week is complete.
+    if nfl_week <= 0:
+        return WEEKLY_STATS_CURRENT_WEEK_TTL_SECONDS if current.tm_mon == 9 else WEEKLY_STATS_COMPLETED_TTL_SECONDS
+    return WEEKLY_STATS_COMPLETED_TTL_SECONDS if week_i < nfl_week else WEEKLY_STATS_CURRENT_WEEK_TTL_SECONDS
 
 
 def _fetch_weekly_stat_payloads(season: int, weeks: Iterable[int]) -> List[Any]:
@@ -621,8 +679,18 @@ def _fetch_weekly_stat_payloads(season: int, weeks: Iterable[int]) -> List[Any]:
 
     def _one(week: int) -> Any:
         url = f"{SLEEPER_BASE}/stats/nfl/regular/{season}/{week}"
+
+        def _fetch() -> Any:
+            try:
+                return _request_json("sleeper_player_stats_week", url, timeout=20)
+            except Exception:
+                return None
+
+        ttl = weekly_stats_ttl(season, week)
         try:
-            payload = _request_json("sleeper_player_stats_week", url, timeout=20)
+            payload = sleeper_cache.shared_json(
+                url, ttl=ttl, fetch=_fetch, large=True, store_ttl=max(ttl * 2, 6 * 3600), max_age_on_error=max(ttl * 2, 6 * 3600)
+            )
         except Exception:
             return None
         return payload if isinstance(payload, dict) else None
@@ -641,30 +709,51 @@ def _fetch_weekly_stat_payloads(season: int, weeks: Iterable[int]) -> List[Any]:
     return [(week, payload) for week, payload in zip(week_list, payloads) if payload is not None]
 
 
-def get_season_player_stats(
-    season: int | None = None,
-    *,
-    refresh: bool = False,
-    max_week: int = 18,
-    retain_weekly: bool | None = None,
-) -> Dict[str, Dict[str, Any]]:
-    """Load cached Sleeper weekly production and aggregate it into season totals.
+_SEASON_STATS_FALLBACK_MAX_ENTRIES = 3
+_SEASON_STATS_FALLBACK_MAX_AGE_SECONDS = 6 * 60 * 60
+_season_stats_fallback: Dict[str, tuple] = {}  # cache_path -> (built_at, aggregate, has_weekly)
+_season_stats_build_locks: Dict[str, threading.Lock] = {}
 
-    When rebuilding from the network, weekly observations are retained on each
-    player record under ``weekly`` (same provider calls as before, no extra
-    fetches) — including prior-season rebuilds. The self-hosted deployment has
-    abundant local disk, so there is no longer a storage-size reason to evict
-    prior-season weekly granularity; each season's aggregate (with its weekly
-    rows) is cached on disk at ``PLAYER_STATS_CACHE_TEMPLATE`` and only the
-    requested season is read into memory per call, so retaining history here
-    does not grow process memory over time.
-    """
-    _ensure_data_dir()
-    selected_season = int(season or default_player_stats_season())
-    cache_path = PLAYER_STATS_CACHE_TEMPLATE.format(season=selected_season)
-    keep_weekly = bool(retain_weekly) if retain_weekly is not None else True
 
-    if not refresh and os.path.exists(cache_path):
+def _season_stats_build_lock(cache_path: str) -> threading.Lock:
+    with _season_stats_memo_lock:
+        return _season_stats_build_locks.setdefault(cache_path, threading.Lock())
+
+
+def _season_stats_fallback_put(cache_path: str, aggregated: Dict[str, Dict[str, Any]], has_weekly: bool) -> None:
+    with _season_stats_memo_lock:
+        _season_stats_fallback[cache_path] = (time.time(), aggregated, bool(has_weekly))
+        while len(_season_stats_fallback) > _SEASON_STATS_FALLBACK_MAX_ENTRIES:
+            oldest = min(_season_stats_fallback, key=lambda k: _season_stats_fallback[k][0])
+            _season_stats_fallback.pop(oldest, None)
+
+
+def _season_stats_fallback_peek(cache_path: str) -> tuple | None:
+    with _season_stats_memo_lock:
+        entry = _season_stats_fallback.get(cache_path)
+        if entry is not None and time.time() - entry[0] > _SEASON_STATS_FALLBACK_MAX_AGE_SECONDS:
+            _season_stats_fallback.pop(cache_path, None)
+            return None
+        return entry
+
+
+def _season_stats_fallback_get(cache_path: str, selected_season: int, keep_weekly: bool) -> Dict[str, Dict[str, Any]] | None:
+    entry = _season_stats_fallback_peek(cache_path)
+    if entry is None:
+        return None
+    built_at, aggregated, has_weekly = entry
+    if time.time() - built_at >= _player_stats_cache_ttl(selected_season):
+        return None
+    if keep_weekly and not has_weekly:
+        return None
+    return aggregated
+
+
+def _read_fresh_season_stats(cache_path: str, selected_season: int, keep_weekly: bool) -> Dict[str, Dict[str, Any]] | None:
+    """Fresh aggregate from the on-disk cache (or, when the file is missing or
+    unwritable, the bounded in-memory fallback). ``None`` means rebuild."""
+
+    if os.path.exists(cache_path):
         try:
             cache_age = time.time() - os.path.getmtime(cache_path)
             if cache_age < _player_stats_cache_ttl(selected_season):
@@ -702,7 +791,52 @@ def get_season_player_stats(
                         return cached
         except Exception:
             pass
+    return _season_stats_fallback_get(cache_path, selected_season, keep_weekly)
 
+
+def get_season_player_stats(
+    season: int | None = None,
+    *,
+    refresh: bool = False,
+    max_week: int = 18,
+    retain_weekly: bool | None = None,
+) -> Dict[str, Dict[str, Any]]:
+    """Load cached Sleeper weekly production and aggregate it into season totals.
+
+    When rebuilding from the network, weekly observations are retained on each
+    player record under ``weekly`` (same provider calls as before, no extra
+    fetches) — including prior-season rebuilds. The self-hosted deployment has
+    abundant local disk, so there is no longer a storage-size reason to evict
+    prior-season weekly granularity; each season's aggregate (with its weekly
+    rows) is cached on disk at ``PLAYER_STATS_CACHE_TEMPLATE`` and only the
+    requested season is read into memory per call, so retaining history here
+    does not grow process memory over time.
+    """
+    _ensure_data_dir()
+    selected_season = int(season or default_player_stats_season())
+    cache_path = PLAYER_STATS_CACHE_TEMPLATE.format(season=selected_season)
+    keep_weekly = bool(retain_weekly) if retain_weekly is not None else True
+
+    if not refresh:
+        fresh = _read_fresh_season_stats(cache_path, selected_season, keep_weekly)
+        if fresh is not None:
+            return fresh
+
+    # Single flight per cache file within this process: concurrent cold callers
+    # wait for the one build instead of each fanning out 18 weekly fetches.
+    with _season_stats_build_lock(cache_path):
+        if not refresh:
+            fresh = _read_fresh_season_stats(cache_path, selected_season, keep_weekly)
+            if fresh is not None:
+                return fresh
+        return _rebuild_season_player_stats(
+            cache_path, selected_season, keep_weekly=keep_weekly, max_week=max_week
+        )
+
+
+def _rebuild_season_player_stats(
+    cache_path: str, selected_season: int, *, keep_weekly: bool, max_week: int
+) -> Dict[str, Dict[str, Any]]:
     weekly_payloads = _fetch_weekly_stat_payloads(selected_season, range(1, max(1, int(max_week)) + 1))
 
     if weekly_payloads:
@@ -712,15 +846,19 @@ def get_season_player_stats(
             retain_weekly=keep_weekly,
         )
         try:
-            with open(cache_path, "w", encoding="utf-8") as handle:
+            tmp_path = f"{cache_path}.{os.getpid()}.{threading.get_ident()}.tmp"
+            with open(tmp_path, "w", encoding="utf-8") as handle:
                 json.dump(aggregated, handle)
+            os.replace(tmp_path, cache_path)  # atomic: other workers never read a half-written file
             fresh_mtime_ns = os.stat(cache_path).st_mtime_ns
             with _season_stats_memo_lock:
                 _season_stats_memo[cache_path] = aggregated
                 _season_stats_memo_mtime_ns[cache_path] = fresh_mtime_ns
                 _season_stats_memo_has_weekly[cache_path] = keep_weekly
         except Exception:
-            pass
+            # Disk absent / read-only / full (ephemeral prod filesystems): keep the
+            # build in memory so the next callers neither refetch nor rebuild.
+            _season_stats_fallback_put(cache_path, aggregated, keep_weekly)
         return aggregated
 
     if os.path.exists(cache_path):

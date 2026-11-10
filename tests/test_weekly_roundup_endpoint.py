@@ -47,7 +47,7 @@ def _get(client, monkeypatch, *, entitlement, roster=({"roster_id": 1, "reserve"
     auth.json.return_value = {"id": "user-1", "email": "gm@example.com"}
     with patch("requests.get", return_value=auth), patch("modules.sleeper.get_league", return_value=league), patch(
         "modules.sleeper.get_matchups", side_effect=_matchups
-    ), patch("modules.sleeper.get_players", return_value=_players()), patch("modules.sleeper.cached_season_weekly_map", return_value={}):
+    ), patch("modules.sleeper.get_players", return_value=_players()), patch("modules.sleeper.season_weekly_map", return_value={}):
         return client.get(path, headers=AUTH)
 
 
