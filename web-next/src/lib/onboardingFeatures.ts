@@ -7,7 +7,7 @@ export const ONBOARDING_FEATURES = [
   { key: "pqv", title: "Player Quick View", benefit: "Value, usage, and fit for any player in one tap." },
   { key: "playoff", title: "Playoff Odds", benefit: "Simulated playoff odds for every team in your league." },
   { key: "tendencies", title: "Manager Tendencies", benefit: "Know how each manager trades before you pitch." },
-  { key: "waivers", title: "Waivers", benefit: "Priority Adds ranked for your roster, with FAAB ranges." },
+  { key: "waivers", title: "Waivers", benefit: "Priority Adds ranked for your roster. Pro adds FAAB bid ranges." },
 ] as const;
 
 /**

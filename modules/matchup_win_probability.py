@@ -37,8 +37,10 @@ started game contributed its partial points as if final, so two identical
 lineups read 0% five minutes after kickoff and 50% five minutes before.)
 
 Team totals are the independent sum (mean adds, variance adds), and
-P(my_total > opponent_total) is the standard closed-form normal-difference
-CDF.
+P(my_total > opponent_total) is the closed-form normal-difference CDF with
+the margin's SD widened by ``projection_calibration.WIN_PROB_SPREAD_MULTIPLIER``
+(the independent-starter sum is too narrow; every stated probability beyond
+40-60% was 10-20 points too extreme before it, see that module).
 
 Starters with no usable projection (team DEF/IDP, which
 player_projections.PROJECTABLE_POSITIONS excludes, or a skill-position
@@ -55,6 +57,8 @@ from __future__ import annotations
 import math
 from datetime import datetime, timedelta, timezone
 from typing import Any
+
+from modules import projection_calibration
 
 # Below this fraction of EITHER side's starters actually modeled (real
 # points once the game started, or a real "ok" weekly projection
@@ -228,7 +232,7 @@ def compute_live_win_probability(
         }
 
     diff_mean = my_mean - opponent_mean
-    diff_stdev = math.sqrt(my_variance + opponent_variance)
+    diff_stdev = projection_calibration.calibrated_margin_stdev(my_variance + opponent_variance)
     if diff_stdev <= 0:
         probability = 1.0 if diff_mean > 0 else (0.0 if diff_mean < 0 else 0.5)
     else:

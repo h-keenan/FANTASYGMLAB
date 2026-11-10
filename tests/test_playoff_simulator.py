@@ -75,10 +75,11 @@ def test_tiebreak_falls_back_to_real_points_for():
 
 
 def test_single_remaining_game_matches_hand_calculated_logistic_probability():
-    """Two teams, one game left, no fit data -> default slope=1.0 applies.
+    """Two teams, one game left, no fit data -> the pooled prior slope applies.
 
     power_scores chosen so the z-scored differential is exactly 2.0:
-    sigmoid(1.0 * 2.0) = 1 / (1 + e^-2) ~= 0.880797.
+    sigmoid(prior * 2.0), prior = sim.DEFAULT_SLOPE (0.45, see
+    modules.projection_calibration.PLAYOFF_SLOPE_PRIOR).
     """
 
     result = sim.simulate_playoff_odds(
@@ -97,8 +98,8 @@ def test_single_remaining_game_matches_hand_calculated_logistic_probability():
         rng=np.random.default_rng(42),
     )
     assert result["slope_fitted"] is False
-    assert result["slope"] == pytest.approx(1.0)
-    expected = 1.0 / (1.0 + np.exp(-2.0)) * 100.0
+    assert result["slope"] == pytest.approx(sim.DEFAULT_SLOPE)
+    expected = 1.0 / (1.0 + np.exp(-sim.DEFAULT_SLOPE * 2.0)) * 100.0
     assert result["teams"]["A"]["playoff_probability"] == pytest.approx(expected, abs=1.5)
     assert result["teams"]["B"]["playoff_probability"] == pytest.approx(100.0 - expected, abs=1.5)
 
@@ -194,7 +195,7 @@ def test_slope_fit_falls_back_to_default_with_too_few_games():
     assert n_games == 3
 
 
-def test_slope_fit_saturates_at_max_slope_for_perfectly_one_sided_results():
+def test_slope_fit_plain_mle_saturates_at_max_slope_for_perfectly_one_sided_results():
     # Every single game won by the favored side, with enough games played
     # (>= MIN_GAMES_TO_FIT) to trust a fit. This is a real, if extreme,
     # signal -- the Newton-Raphson loop's own clamp (MAX_FIT_SLOPE) is
@@ -204,10 +205,29 @@ def test_slope_fit_saturates_at_max_slope_for_perfectly_one_sided_results():
     slope, fitted, n_games = sim.fit_win_probability_slope(
         z_differentials=[1.0] * 15,
         outcomes=[1] * 15,
+        prior_games=0.0,
     )
     assert fitted is True
     assert n_games == 15
     assert slope == sim.MAX_FIT_SLOPE
+
+
+def test_slope_fit_with_the_prior_stays_between_the_prior_and_the_clamp_for_one_sided_results():
+    # The default fit is a MAP estimate: a perfectly one-sided sample pulls the
+    # slope up from the pooled prior, but the prior keeps it from the ceiling.
+    slope, fitted, _n = sim.fit_win_probability_slope(z_differentials=[1.0] * 15, outcomes=[1] * 15)
+    assert fitted is True
+    assert sim.DEFAULT_SLOPE < slope < sim.MAX_FIT_SLOPE
+
+
+def test_slope_fit_prior_dominates_few_games_and_data_dominates_many():
+    rng = np.random.default_rng(11)
+    z = rng.normal(scale=1.2, size=1200)
+    outcomes = (rng.random(size=1200) < 1.0 / (1.0 + np.exp(-1.3 * z))).astype(int)
+    few, _, _ = sim.fit_win_probability_slope(z[:14].tolist(), outcomes[:14].tolist())
+    many, _, _ = sim.fit_win_probability_slope(z.tolist(), outcomes.tolist(), max_slope=3.0)
+    assert abs(few - sim.DEFAULT_SLOPE) < 0.25
+    assert many == pytest.approx(1.3, abs=0.2)
 
 
 def test_slope_fit_one_sided_results_with_varied_margins_stays_well_inside_the_clamp():
@@ -229,7 +249,7 @@ def test_slope_fit_one_sided_results_with_varied_margins_stays_well_inside_the_c
     assert 0.0 < slope < sim.MAX_FIT_SLOPE
 
 
-def test_slope_fit_true_separation_by_power_score_sign_saturates_at_max_slope():
+def test_slope_fit_true_separation_by_power_score_sign_plain_mle_saturates_at_max_slope():
     # The scenario the product brief actually cares about: every completed
     # game this season went to whichever team had the higher power_score
     # (mixed favorites across different pairings, so z_differentials has
@@ -242,6 +262,7 @@ def test_slope_fit_true_separation_by_power_score_sign_saturates_at_max_slope():
     slope, fitted, n_games = sim.fit_win_probability_slope(
         z_differentials=z.tolist(),
         outcomes=outcomes.tolist(),
+        prior_games=0.0,
     )
     assert fitted is True
     assert n_games == 14

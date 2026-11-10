@@ -104,7 +104,16 @@ export function profilePatcher(
               ins = await insert(rest);
             }
           }
-          if (ins.status >= 400) return { ok: false, error: "Supabase entitlement profile create failed." };
+          if (ins.status >= 400) {
+            // The auth user no longer exists (self-service account deletion cancels the
+            // Stripe subscription first, so its `subscription.deleted` webhook arrives
+            // after the user is gone). Nothing to entitle: ack so Stripe stops retrying.
+            const insMsg = (await errorMessage(ins.clone())).toLowerCase();
+            if (ins.status === 409 || insMsg.includes("foreign key") || insMsg.includes("23503")) {
+              return { ok: true, error: "" };
+            }
+            return { ok: false, error: "Supabase entitlement profile create failed." };
+          }
         }
       }
     } catch { /* a non-JSON success body (older stubs) is treated as applied */ }
@@ -225,4 +234,13 @@ export function revenueCatStore(cfg: SupabaseConfig, fetchFn: FetchFn): BillingS
       ],
     }),
   };
+}
+
+/** Remove the auth user (cascades to every app table). 404 = already deleted, which is success (idempotent retry). */
+export async function deleteAuthUser(cfg: SupabaseConfig, fetchFn: FetchFn, userId: string): Promise<void> {
+  const res = await fetchFn(`${cfg.url}/auth/v1/admin/users/${encodeURIComponent(userId)}`, {
+    method: "DELETE",
+    headers: serviceHeaders(cfg),
+  });
+  if (res.status >= 400 && res.status !== 404) throw new HttpError(502, "Could not delete the account. Please try again.");
 }

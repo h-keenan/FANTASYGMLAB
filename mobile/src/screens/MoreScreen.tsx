@@ -391,7 +391,7 @@ export default function MoreScreen({ navigation }: Props) {
   const onDeleteAccount = () => {
     Alert.alert(
       'Delete account?',
-      'This permanently deletes your account and all data — saved leagues, GM Targets, trade history. This cannot be undone.',
+      'This permanently deletes your account and all data — saved leagues, GM Targets, trade history. Any web (Stripe) subscription is cancelled. A subscription bought through the App Store or Google Play must be cancelled in your store account. This cannot be undone.',
       [
         { text: 'Cancel', style: 'cancel' },
         {
@@ -402,7 +402,7 @@ export default function MoreScreen({ navigation }: Props) {
             const { error } = await deleteAccount();
             setDeleting(false);
             if (error) {
-              Alert.alert('Could not delete account', 'Please try again in a moment.');
+              Alert.alert('Could not delete account', error || 'Please try again in a moment.');
             }
             // On success there's nothing else to do here — clearing the
             // session flips RootNavigator back to the Auth stack on its own.

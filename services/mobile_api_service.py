@@ -157,6 +157,7 @@ from modules import (
     trade_eval_usage,
     account_store,
     app_config,
+    app_version_policy,
     auth_supabase,
     build_identity,
     canonical_player_ranking,
@@ -730,6 +731,17 @@ def _with_sleeper_as_of(fn):
         return result
 
     return wrapper
+
+
+@app.get("/v1/app-config")
+def get_app_config() -> JSONResponse:
+    """Public, anonymous client bootstrap config (no user data): the minimum
+    supported mobile app version per platform + store links. See
+    modules/app_version_policy.py. Short cache: ops can raise the floor quickly."""
+    return JSONResponse(
+        content=app_version_policy.build_app_config(),
+        headers={"Cache-Control": "public, max-age=60"},
+    )
 
 
 @app.get("/health")
@@ -5746,12 +5758,16 @@ def _lineup_hole_waiver_options(
 
 
 def _attach_projection_ppg(
-    valued: pd.DataFrame, pool: pd.DataFrame | None, player_ids: set[str], score_field: str
+    valued: pd.DataFrame,
+    pool: pd.DataFrame | None,
+    player_ids: set[str],
+    score_field: str,
+    lineup_settings: dict[str, Any] | None = None,
 ) -> tuple[pd.DataFrame, pd.DataFrame | None]:
     """Weekly projection baselines for the lineup model; shared with the Trade
     Hub / Finder gate (modules.trade_grade.attach_projection_baselines)."""
 
-    return trade_grade.attach_projection_baselines(valued, pool, player_ids, score_field)
+    return trade_grade.attach_projection_baselines(valued, pool, player_ids, score_field, lineup_settings=lineup_settings)
 
 
 _STANCE_UNSET: Any = object()
@@ -5948,6 +5964,7 @@ def post_trade_analyzer(
     # (modules.trade_eval_usage); web enforced it, this API did not. The
     # counter is server-side (Redis), not the user-writable user_settings.
     analyzer_user_id = str(user.get("id") or "")
+    quota_charged = False
     if not _manager_tendencies_gate(user):
         if not free_tier_ledger.consume_weekly_trade_eval(
             analyzer_user_id, trade_eval_usage.FREE_WEEKLY_TRADE_EVAL_LIMIT
@@ -5964,6 +5981,35 @@ def post_trade_analyzer(
                     "resets_at": free_tier_ledger.next_weekly_reset().isoformat(),
                 },
             }
+        quota_charged = True
+
+    # The allowance is spent only by a request that yields a verdict: an
+    # exception or any "no verdict" outcome (no player data, unresolved assets,
+    # fit unavailable, ...) refunds it, so a Free user is never charged for a
+    # failed analysis.
+    try:
+        result = _compute_trade_analyzer(
+            body, league_id, user, league, settings, my_roster, analyzer_user_id
+        )
+    except BaseException:
+        if quota_charged:
+            free_tier_ledger.refund_weekly_trade_eval(analyzer_user_id)
+        raise
+    if quota_charged and not (isinstance(result, dict) and result.get("verdict") is not None):
+        free_tier_ledger.refund_weekly_trade_eval(analyzer_user_id)
+    return result
+
+
+def _compute_trade_analyzer(
+    body: TradeAnalyzerRequest,
+    league_id: str,
+    user: dict[str, Any],
+    league: dict[str, Any],
+    settings: dict[str, Any],
+    my_roster: dict[str, Any],
+    analyzer_user_id: str,
+) -> dict[str, Any]:
+    """Everything after the quota check in post_trade_analyzer (see there)."""
 
     posture = _resolve_trade_posture(
         user, league_id, league, my_roster, lens=body.lens, client_strategy=body.strategy
@@ -6054,6 +6100,7 @@ def post_trade_analyzer(
             for pid in (roster.get("players") or [])
         },
         score_field,
+        lineup_settings=settings,
     )
     for code in model_status.frame_codes(valued):
         model_status.add(analyzer_status, code)
@@ -6070,15 +6117,22 @@ def post_trade_analyzer(
     model_status.merge_into(analyzer_status, analyzer_needs.status)
     my_team_needs = analyzer_needs.for_roster(my_roster.get("roster_id"))
 
+    unresolved_assets: list[str] = []
+
     def build_assets(player_ids: list[str]) -> list[dict[str, Any]]:
         wanted = {str(pid) for pid in player_ids if pid}
         if not wanted:
             return []
         rows = valued[valued["player_id"].astype(str).isin(wanted)]
+        # Requested players the valuation frame could not resolve are recorded,
+        # never silently dropped: a verdict on a partial package is not a verdict
+        # on the trade the user proposed.
+        unresolved_assets.extend(sorted(wanted - set(rows["player_id"].astype(str))))
         return [player_asset_from_mapping(row, score_field=score_field) for _, row in rows.iterrows()]
 
     send_pick_assets: list[dict[str, Any]] = []
     receive_pick_assets: list[dict[str, Any]] = []
+    resolved_pick_ids: set[str] = set()
     if body.send_pick_ids or body.receive_pick_ids:
         # Cached (30s live-time bucket) — the counter-package fallback
         # below can call this exact (league_id, lens) computation again
@@ -6108,10 +6162,11 @@ def post_trade_analyzer(
             }
 
             def resolve_picks(pick_ids: list[str]) -> list[dict[str, Any]]:
+                found = [pick_id for pick_id in pick_ids if pick_id in picks_by_id]
+                resolved_pick_ids.update(found)
                 return [
                     pick_asset_from_mapping(picks_by_id[pick_id], pick_score_multiplier=pick_score_multiplier)
-                    for pick_id in pick_ids
-                    if pick_id in picks_by_id
+                    for pick_id in found
                 ]
 
             send_pick_assets = resolve_picks(body.send_pick_ids)
@@ -6119,8 +6174,25 @@ def post_trade_analyzer(
 
     send_assets = build_assets(body.send_player_ids) + send_pick_assets
     receive_assets = build_assets(body.receive_player_ids) + receive_pick_assets
+    # Picks that did not resolve (stale ids, or no pick data for this league).
+    unresolved_assets.extend(
+        pick_id
+        for pick_id in dict.fromkeys([*body.send_pick_ids, *body.receive_pick_ids])
+        if pick_id and pick_id not in resolved_pick_ids
+    )
     if not send_assets and not receive_assets:
         return {"ok": True, "verdict": None, "reason": "assets_not_found"}
+    if unresolved_assets:
+        return {
+            "ok": True,
+            "verdict": None,
+            "reason": "assets_unresolved",
+            "assets": {
+                "requested": len({str(p) for p in [*body.send_player_ids, *body.receive_player_ids, *body.send_pick_ids, *body.receive_pick_ids] if p}),
+                "resolved": len(send_assets) + len(receive_assets),
+                "unresolved_ids": unresolved_assets,
+            },
+        }
 
     partner_assets: list[dict[str, Any]] = []
     if body.partner_roster_id:
@@ -8671,6 +8743,8 @@ def _weekly_projection_for_player(
     weekly_stats: dict[str, Any],
     defense_strength: dict[str, Any],
     team_qb_pass_attempts_by_team: dict[str, Any] | None = None,
+    scoring_settings: dict[str, Any] | None = None,
+    prior_weekly_by_player: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     """One player's per-game projection for one week, from data already
     fetched once by the caller (never re-reads the season stats cache file
@@ -8693,6 +8767,8 @@ def _weekly_projection_for_player(
         player_weekly_rows=weekly_rows or [],
         defense_strength=defense_strength,
         team_qb_pass_attempts_by_team=team_qb_pass_attempts_by_team,
+        scoring_settings=scoring_settings,
+        prior_weekly_rows=(prior_weekly_by_player or {}).get(str(player_id)),
     )
     summary = _projection_summary_dict(result)
     return _with_game_weather(summary, result)
@@ -8800,6 +8876,7 @@ def get_player_schedule(
                     weekly_stats=weekly_stats,
                     defense_strength=projection_defense_strength,
                     team_qb_pass_attempts_by_team=team_qb_pass_attempts,
+                    prior_weekly_by_player=player_projections.prior_season_weekly_map(season),
                 )
         except Exception:
             # Best-effort enrichment, same "fails soft" contract as every
@@ -8829,7 +8906,7 @@ EXTERNAL_API_KEY_ENV = "FANTASYDESK_EXTERNAL_API_KEY"
 # *field* change (adding/renaming/removing a key) is a separate, breaking-
 # vs-non-breaking concern this constant does not track — see
 # docs/external-api-contract.md's versioning policy for both.
-EXTERNAL_PROJECTIONS_MODEL_VERSION = "v1"
+EXTERNAL_PROJECTIONS_MODEL_VERSION = "v2"
 
 # Sleeper's own player_id already *is* this app's canonical player id (see
 # modules.player_identity.SUPPORTED_DIRECT_PLATFORMS) — this is reported so
@@ -13149,6 +13226,8 @@ def _weekly_lineup_inputs(
                 weekly_stats=projection_context.weekly_stats,
                 defense_strength=projection_context.defense_strength,
                 team_qb_pass_attempts_by_team=projection_context.team_qb_pass_attempts_by_team,
+            scoring_settings=projection_context.scoring_settings,
+            prior_weekly_by_player=projection_context.prior_weekly_by_player,
             )
         except Exception:
             projection = None
@@ -13299,7 +13378,9 @@ def get_league_my_team(
         settings,
         score_field,
         players_lookup=my_team_players_lookup,
-        projection_context=_build_projection_context(_league_current_lineup_week(league)),
+        projection_context=_build_projection_context(
+            _league_current_lineup_week(league), league.get("scoring_settings")
+        ),
         meta=lineup_meta,
         idp_result=idp_result,
     )
@@ -13546,7 +13627,7 @@ def get_league_guillotine(
         valued = league_value_settings.build_valued_players_frame_cached(
             league_id=league_id, lens=lens, players_db_path=PLAYERS_DB_PATH
         )
-        projection_context = _build_projection_context(week)
+        projection_context = _build_projection_context(week, league.get("scoring_settings"))
         if not valued.empty and projection_context is not None and all(rid in entries for rid in alive_ids):
             settings = league_value_settings.detect_league_value_settings_from_payload(league)
             score_field = league_value_settings.valuation_score_field(lens)
@@ -14131,6 +14212,8 @@ def _project_real_starter_row(
             weekly_stats=projection_context.weekly_stats,
             defense_strength=projection_context.defense_strength,
             team_qb_pass_attempts_by_team=projection_context.team_qb_pass_attempts_by_team,
+            scoring_settings=projection_context.scoring_settings,
+            prior_weekly_by_player=projection_context.prior_weekly_by_player,
         )
         if projection_context is not None
         else None
@@ -14162,6 +14245,12 @@ class _ProjectionContext:
     defense_strength: dict[str, Any]
     games: pd.DataFrame | None = None
     team_qb_pass_attempts_by_team: dict[str, Any] | None = None
+    # The league's Sleeper ``scoring_settings``: projections are converted to it
+    # at the source (modules.projection_calibration). None = PPR.
+    scoring_settings: dict[str, Any] | None = None
+    # Last season's weekly rows by player: seeds the estimator so week 1 has a
+    # projection (modules.projection_calibration.seed_with_prior_season).
+    prior_weekly_by_player: dict[str, Any] | None = None
 
 
 def _games_and_warm_weather() -> pd.DataFrame:
@@ -14173,7 +14262,9 @@ def _games_and_warm_weather() -> pd.DataFrame:
     return games
 
 
-def _build_projection_context(week: int) -> "_ProjectionContext | None":
+def _build_projection_context(
+    week: int, scoring_settings: dict[str, Any] | None = None
+) -> "_ProjectionContext | None":
     """The shared per-request projection inputs for one NFL week, or None
     when there's no week or anything fails to load (fails soft: callers
     fall back to the season-value lineup with no per-player projection)."""
@@ -14202,6 +14293,8 @@ def _build_projection_context(week: int) -> "_ProjectionContext | None":
             team_qb_pass_attempts_by_team=player_projections.team_qb_pass_attempts_by_week(
                 players_lookup, weekly_stats
             ),
+            scoring_settings=scoring_settings,
+            prior_weekly_by_player=player_projections.prior_season_weekly_map(season),
         )
     except Exception:
         return None
@@ -14391,6 +14484,8 @@ def _real_current_lineup(
                             weekly_stats=projection_context.weekly_stats,
                             defense_strength=projection_context.defense_strength,
                             team_qb_pass_attempts_by_team=projection_context.team_qb_pass_attempts_by_team,
+            scoring_settings=projection_context.scoring_settings,
+            prior_weekly_by_player=projection_context.prior_weekly_by_player,
                         )
                         if projection_context is not None
                         else None
@@ -15078,7 +15173,7 @@ def _build_matchup(
     # player's projection and bye status, even before Sleeper has locked
     # either side's real starters. Best-effort, same "fails soft" contract
     # as everywhere else in this file.
-    projection_context = _build_projection_context(current_week)
+    projection_context = _build_projection_context(current_week, league.get("scoring_settings"))
     idp_result = _league_idp_result(league_id, league) if settings.get("idp_slots") else None
 
     my_bench: list[dict[str, Any]] = []
@@ -15506,7 +15601,7 @@ def _waiver_roster_value_bundle(
     if "stale_free_agent" in pool.columns:
         pool = pool[~pool["stale_free_agent"].fillna(False).astype(bool)]
     pool = trade_hub_engine.apply_strategy_age_curve(pool, strategy, score_field)
-    valued_p, pool_p = _attach_projection_ppg(valued_s, pool, my_ids, score_field)
+    valued_p, pool_p = _attach_projection_ppg(valued_s, pool, my_ids, score_field, lineup_settings=settings)
     for code in model_status.frame_codes(valued_p):
         model_status.add(status, code)
     roster_df = valued_p[valued_p["player_id"].astype(str).isin(my_ids)].copy()

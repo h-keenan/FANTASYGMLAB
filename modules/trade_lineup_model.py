@@ -494,7 +494,11 @@ def profile_roster(df: pd.DataFrame, ctx: ModelContext, *, free_agent: bool = Fa
             obs = _num(row.get("ppg"))
             prior, _from_data = _value_curve_ppg(ctx.curves, pos, max(0.0, float(value)))
             if proj is not None:
-                ppg, basis = max(0.0, _league_scored(proj, row, pos, ctx.scoring)), "projection"
+                # ``proj_scoring_applied``: the baseline was already converted to
+                # this league's scoring at the source (player_projections), so it
+                # must not be converted a second time.
+                scored = proj if row.get("proj_scoring_applied") is True else _league_scored(proj, row, pos, ctx.scoring)
+                ppg, basis = max(0.0, scored), "projection"
             elif obs is not None and games >= params.min_games_for_observed:
                 obs = _league_scored(obs, row, pos, ctx.scoring)
                 ppg = max(0.0, (games * obs + params.prior_games * prior) / (games + params.prior_games))
@@ -638,6 +642,7 @@ def run_weeks(
     var_delta = 0.0
     scen_weeks = 0
     symdiff_weeks: dict[str, int] = {}
+    modal_starter_ids: list[list[str]] = []
     pos_delta_weeks: dict[str, list[float]] = {}
 
     def cands(players, week):
@@ -729,6 +734,8 @@ def run_weeks(
             res_a.open_slot_weeks[slot] = res_a.open_slot_weeks.get(slot, 0.0) + v
         for pos in SCORED_POSITIONS:
             pos_delta_weeks.setdefault(pos, []).append(bypos_a.get(pos, 0.0) - bypos_b.get(pos, 0.0))
+        if modal_b is not None:
+            modal_starter_ids.append([s[0] for s in modal_b])
         # Projection spread only for the players whose presence differs.
         if modal_b is not None and modal_a is not None:
             ids_b = {s[0] for s in modal_b}
@@ -744,7 +751,16 @@ def run_weeks(
     proj_var_persistent = sum(
         (params.baseline_error_share * sd_by_id.get(pid, 0.0) * n) ** 2 for pid, n in symdiff_weeks.items()
     )
+    # The team's own weekly-score variance: sum of its starters' projection
+    # variances (independent starters, as in modules.matchup_win_probability),
+    # averaged over the weeks. Drives trade_posture's win-per-point slope.
+    team_weekly_var = (
+        sum(sum(sd_by_id.get(pid, 0.0) ** 2 for pid in ids) for ids in modal_starter_ids) / len(modal_starter_ids)
+        if modal_starter_ids
+        else 0.0
+    )
     meta = {
+        "team_weekly_var": team_weekly_var,
         "avail_variance": var_delta,
         "proj_var_weekly": proj_var_weekly,
         "proj_var_persistent": proj_var_persistent,
@@ -953,6 +969,7 @@ def evaluate_trade(
         "weeks": {"first": weeks[0] if weeks else 0, "last": weeks[-1] if weeks else 0, "count": rem},
         "value_per_point": round(k, 2),
         "points": {
+            "team_weekly_sd": round(math.sqrt(meta["team_weekly_var"]), 2),
             "ros_before": round(b.expected, 1),
             "ros_after": round(a.expected, 1),
             "ros_delta": round(delta_pts, 1),

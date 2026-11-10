@@ -2945,6 +2945,110 @@ def test_trade_analyzer_reports_assets_not_found_for_an_unknown_pick_id(monkeypa
     assert body["reason"] == "assets_not_found"
 
 
+def _post_trade_analyzer_as_free_user(monkeypatch, payload, *, frame=None):
+    from modules import free_tier_ledger, redis_cache as real_redis_cache
+
+    class _LedgerWithoutRedis:
+        """Real redis_cache except get_redis_client, so only the ledger uses its in-process fallback."""
+
+        def __getattr__(self, name):
+            return getattr(real_redis_cache, name)
+
+        @staticmethod
+        def get_redis_client():
+            raise RuntimeError("no redis")
+
+    monkeypatch.setattr(free_tier_ledger, "redis_cache", _LedgerWithoutRedis())
+    client = _client(monkeypatch)
+    auth_user_response = Mock(status_code=200)
+    auth_user_response.json.return_value = {"id": "user-123", "email": "gm@example.com"}
+    profile_response = Mock(status_code=200)
+    profile_response.json.return_value = [{"entitlement": "free", "sleeper_username": "gm_dynasty"}]
+    my_roster_ids = [f"my{i}" for i in range(1, 10)] + ["my_bench_rb"]
+    with patch("requests.get", side_effect=[auth_user_response, profile_response]):
+        with patch("modules.sleeper_leagues.resolve_sleeper_user_id", return_value="sleeper-user-1"):
+            with patch(
+                "modules.sleeper.get_rosters",
+                return_value=[{"roster_id": 1, "owner_id": "sleeper-user-1", "players": my_roster_ids}],
+            ):
+                with patch("modules.sleeper.get_league", return_value=_TRADE_ANALYZER_LEAGUE):
+                    with patch(
+                        "modules.rankings.load_players",
+                        return_value=_fake_roster_frame() if frame is None else frame,
+                    ):
+                        with patch(
+                            "modules.player_eligibility.filter_current_fantasy_players",
+                            side_effect=lambda df, **kwargs: df,
+                        ):
+                            return client.post(
+                                "/v1/leagues/abc/trade-analyzer",
+                                json=payload,
+                                headers={"Authorization": "Bearer good-token"},
+                            )
+
+
+def _free_trade_evals_used():
+    from modules import free_tier_ledger
+
+    return free_tier_ledger._memory_counts.get(free_tier_ledger._key("evals", "user-123", free_tier_ledger._week()), 0)
+
+
+def test_trade_analyzer_refuses_a_verdict_on_a_partially_resolved_package(monkeypatch):
+    from modules import free_tier_ledger
+
+    free_tier_ledger._memory_counts.clear()
+    response = _post_trade_analyzer_as_free_user(
+        monkeypatch,
+        {
+            "send_player_ids": ["my_bench_rb"],
+            # target_rb resolves, ghost_player does not: a verdict on only the
+            # resolved half would grade a different trade than the one proposed.
+            "receive_player_ids": ["target_rb", "ghost_player"],
+            "strategy": "contender",
+        },
+    )
+    body = response.json()
+    assert response.status_code == 200
+    assert body["verdict"] is None
+    assert body["reason"] == "assets_unresolved"
+    assert body["assets"]["unresolved_ids"] == ["ghost_player"]
+    assert body["assets"]["requested"] == 3 and body["assets"]["resolved"] == 2
+    # No verdict was produced, so the Free allowance is not spent.
+    assert _free_trade_evals_used() == 0
+
+
+def test_trade_analyzer_charges_the_free_quota_only_for_a_real_verdict(monkeypatch):
+    from modules import free_tier_ledger
+
+    free_tier_ledger._memory_counts.clear()
+    ok = _post_trade_analyzer_as_free_user(
+        monkeypatch,
+        {"send_player_ids": ["my_bench_rb"], "receive_player_ids": ["target_rb"], "strategy": "contender"},
+    )
+    assert ok.json()["verdict"] is not None
+    assert _free_trade_evals_used() == 1
+
+
+def test_trade_analyzer_refunds_the_free_quota_when_compute_raises(monkeypatch):
+    from modules import free_tier_ledger
+
+    free_tier_ledger._memory_counts.clear()
+    monkeypatch.setattr(
+        "services.mobile_api_service.trade_analyzer_fit.evaluate_trade_analyzer_fit",
+        Mock(side_effect=RuntimeError("engine down")),
+    )
+    client_exc = None
+    try:
+        _post_trade_analyzer_as_free_user(
+            monkeypatch,
+            {"send_player_ids": ["my_bench_rb"], "receive_player_ids": ["target_rb"], "strategy": "contender"},
+        )
+    except RuntimeError as exc:  # TestClient re-raises server errors by default
+        client_exc = exc
+    assert client_exc is not None
+    assert _free_trade_evals_used() == 0
+
+
 def _fake_players_dataset():
     return {
         "1001": {
@@ -12754,7 +12858,7 @@ def test_my_team_weekly_lineup_flags_bye_and_out_players(monkeypatch):
                 response = client.get("/v1/leagues/abc/my-team", headers={"Authorization": "Bearer good-token"})
 
     body = response.json()
-    mock_context.assert_called_once_with(5)
+    mock_context.assert_called_once_with(5, {"rec": 1.0})
     assert body["week"] == 5
     assert body["lineup_basis"] == "weekly_projection"
     bench = {p["player_id"]: p for p in body["bench"]}
@@ -12773,7 +12877,7 @@ def test_my_team_offseason_keeps_the_season_value_lineup(monkeypatch):
             response = client.get("/v1/leagues/abc/my-team", headers={"Authorization": "Bearer good-token"})
 
     body = response.json()
-    mock_context.assert_called_once_with(0)
+    mock_context.assert_called_once_with(0, {"rec": 1.0})
     assert body["lineup_basis"] == "season_value"
     assert body["week"] is None
     assert body["open_slots"] == []
@@ -13242,10 +13346,13 @@ def test_matchup_response_carries_a_live_win_probability(monkeypatch):
     win_probability = body["win_probability"]
     assert win_probability["available"] is True
     # My side: Normal(20, 5^2) (not yet started). Opponent: fixed 10 (real,
-    # game over). diff_mean = 10, diff_stdev = 5 -> z = 2.0.
+    # game over). diff_mean = 10, diff_stdev = C * 5 -> z = 2.0 / C, C being the
+    # calibrated spread multiplier (modules.projection_calibration).
     import math
 
-    expected = 0.5 * (1.0 + math.erf(2.0 / math.sqrt(2.0)))
+    from modules.projection_calibration import WIN_PROB_SPREAD_MULTIPLIER
+
+    expected = 0.5 * (1.0 + math.erf(2.0 / WIN_PROB_SPREAD_MULTIPLIER / math.sqrt(2.0)))
     assert win_probability["probability"] == round(expected, 4)
     assert win_probability["my_projected_total"] == 20.0
     assert win_probability["opponent_projected_total"] == 10.0

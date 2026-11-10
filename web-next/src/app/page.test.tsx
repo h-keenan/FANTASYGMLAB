@@ -478,4 +478,13 @@ describe("LandingPage signed-in view", () => {
     await screen.findByText("SignInForm");
     expect(document.getElementById(LANDING_ROOT_ID)).not.toHaveAttribute("data-landing-signed-in");
   });
+
+  it("marks Pro-only features as Pro instead of presenting them as free", async () => {
+    mockAuth(null);
+    render(<LandingPage />);
+    await screen.findByText("SignInForm");
+    expect(screen.getByText(/Pro adds the full waiver board and FAAB bid ranges/)).toBeInTheDocument();
+    expect(screen.getByText(/Pro adds simulated playoff odds for every team/)).toBeInTheDocument();
+    expect(screen.getByTestId("landing-free-vs-pro")).toHaveTextContent(/Free includes/);
+  });
 });
