@@ -3,6 +3,7 @@ import { Suspense, type ReactNode } from "react";
 import "./globals.css";
 
 import { AuthProvider } from "@/context/AuthContext";
+import { DisplayPreferencesProvider } from "@/context/DisplayPreferencesContext";
 import { ExperienceLevelProvider } from "@/context/ExperienceLevelContext";
 import { PlayerQuickViewProvider } from "@/context/PlayerQuickViewContext";
 import { ValuationLensProvider } from "@/context/ValuationLensContext";
@@ -15,6 +16,7 @@ import { Header } from "@/components/Header";
 import { RouteAnalytics } from "@/components/RouteAnalytics";
 import { TradeOutcomePrompt } from "@/components/TradeOutcomePrompt";
 import { BRAND_NAME } from "@/lib/brand";
+import { THEME_BOOT_SCRIPT } from "@/lib/displayPreferences";
 import { OG_IMAGE } from "@/lib/seo/site";
 
 // Share previews (Discord, X, iMessage): a static 1200x630 branded card
@@ -49,7 +51,12 @@ export const metadata: Metadata = {
 
 export default function RootLayout({ children }: { children: ReactNode }) {
   return (
-    <html lang="en" className="h-full antialiased">
+    // suppressHydrationWarning: the boot script below may set data-theme on
+    // <html> (a forced Day/Night choice) before React hydrates.
+    <html lang="en" className="h-full antialiased" suppressHydrationWarning>
+      <head>
+        <script dangerouslySetInnerHTML={{ __html: THEME_BOOT_SCRIPT }} />
+      </head>
       <body className="min-h-full flex flex-col">
         {/* coridian_, 2026-10-18: "Add that moving background from signup
             to be throughout the app" — same animated texture the landing
@@ -61,6 +68,7 @@ export default function RootLayout({ children }: { children: ReactNode }) {
         <RouteAnalytics />
         <AuthProvider>
           <ExperienceLevelProvider>
+            <DisplayPreferencesProvider>
             <ValuationLensProvider>
               <PlayerQuickViewProvider>
                 {/* Desktop-width persistent left nav (coridian_, 2026-10-17:
@@ -97,6 +105,7 @@ export default function RootLayout({ children }: { children: ReactNode }) {
                 <PasswordRecoveryGate />
               </PlayerQuickViewProvider>
             </ValuationLensProvider>
+            </DisplayPreferencesProvider>
           </ExperienceLevelProvider>
         </AuthProvider>
       </body>

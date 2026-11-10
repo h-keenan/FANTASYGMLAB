@@ -7,6 +7,7 @@ import { useSearchParams } from "@/lib/useSearchParams";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { useAuth } from "@/context/AuthContext";
+import { useDisplayPreferences } from "@/context/DisplayPreferencesContext";
 import { usePlayerQuickView } from "@/context/PlayerQuickViewContext";
 import { trackFeatureUse } from "@/lib/analytics";
 import { BRAND_NAME } from "@/lib/brand";
@@ -80,12 +81,13 @@ export function GmOrb() {
     return () => document.removeEventListener("keydown", handleKeyDown);
   }, [open]);
   const { session } = useAuth();
+  const { collegeInterest } = useDisplayPreferences();
   const pathname = usePathname();
   const params = useParams<{ leagueId?: string }>();
   const searchParams = useSearchParams();
   const leagueId = params?.leagueId ? decodeURIComponent(params.leagueId) : null;
   const leagueName = searchParams.get("name") || leagueId || "";
-  const { coreLeagueDestinations, gmToolsDestinations, generalDestinations, accountDestinations } = useNavDestinations(leagueId, leagueName);
+  const { coreLeagueDestinations, gmToolsDestinations, generalDestinations, accountDestinations } = useNavDestinations(leagueId, leagueName, collegeInterest);
   // Gold "Pro" markers on paid rows, shown only once we know the plan is Free.
   const showProMarkers = useIsPro() === false;
   // Founder Analytics (coridian_, 2026-10-19: "just put it in the orb menu

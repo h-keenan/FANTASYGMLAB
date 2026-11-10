@@ -606,6 +606,16 @@ export default function MoreScreen({ navigation }: Props) {
                 label="College Scouting"
                 description="Grade incoming prospects and follow your own watchlist"
                 onPress={() => navigation.navigate('CollegeProspects')}
+                showDivider
+              />
+              {/* Web parity: Account has a College football on/off switch, so
+                  the app can turn it back off too (it could only opt in). */}
+              <SettingsRow
+                icon="eye-off-outline"
+                iconColor={colors.textSecondary}
+                label="Hide college scouting"
+                description="Remove College Scouting from this menu. You can turn it back on here."
+                onPress={() => respondToCollegeInterest(false)}
                 showDivider={false}
               />
             </AnimatedCard>

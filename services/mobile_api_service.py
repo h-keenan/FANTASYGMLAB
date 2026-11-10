@@ -10857,8 +10857,12 @@ def _device_preferences_from_settings(settings: dict[str, Any]) -> dict[str, Any
     density = str(settings.get("ui_density") or "guided")
     if density not in UI_DENSITY_VALUES:
         density = "guided"
-    theme_mode = str(settings.get("theme_mode") or "dark")
-    if theme_mode not in THEME_MODE_VALUES:
+    theme_mode = str(settings.get("theme_mode") or "")
+    # "dark" is the app's fallback, not a choice. Web's default is the
+    # visitor's system setting, so it needs to know whether the account has
+    # ever picked a mode before it adopts this value.
+    theme_mode_set = theme_mode in THEME_MODE_VALUES
+    if not theme_mode_set:
         theme_mode = "dark"
     last_league_id = str(settings.get("last_league_id") or "")
     last_league_name = str(settings.get("last_league_name") or "")
@@ -10871,6 +10875,7 @@ def _device_preferences_from_settings(settings: dict[str, Any]) -> dict[str, Any
     return {
         "ui_density": density,
         "theme_mode": theme_mode,
+        "theme_mode_set": theme_mode_set,
         "experience_level": experience_level,
         "experience_goal": experience_goal,
         "last_league": (

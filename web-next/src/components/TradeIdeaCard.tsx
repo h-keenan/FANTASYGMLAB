@@ -14,6 +14,7 @@ import { TeamAvatar } from "@/components/TeamAvatar";
 import { TradeCategoryGlyph } from "@/components/TradeCategoryGlyph";
 import { ConfidenceMeter } from "@/components/ConfidenceMeter";
 import { LEVEL_SEGMENTS, levelColor } from "@/lib/tradeHubPresentation";
+import { useDisplayPreferences } from "@/context/DisplayPreferencesContext";
 import { useExperienceCopy } from "@/context/ExperienceLevelContext";
 import { isCompletedShare } from "@/lib/shareImage";
 import { useShareImage } from "@/lib/useShareImage";
@@ -190,6 +191,7 @@ export function TradeIdeaCardView({
   const confidenceLvl = confidenceLevel(idea.confidence_label);
   const realismLvl = realismLevel(idea.market_realism_label);
   const copy = useExperienceCopy();
+  const { showExplanations } = useDisplayPreferences();
 
   const tags = ideaTags(idea);
   const reason = shortReason(idea.rationale);
@@ -268,7 +270,7 @@ export function TradeIdeaCardView({
           <ToneBadge label={idea.value_edge_band} color={fairnessBandColor(idea.value_edge_band)} />
         ) : null}
       </div>
-      {reason ? (
+      {showExplanations && reason ? (
         <p
           className="text-sm pl-3"
           style={{ color: "var(--color-text-secondary)", borderLeft: "2px solid var(--color-border-strong)" }}
@@ -334,7 +336,7 @@ export function TradeIdeaCardView({
 
       {expanded ? (
         <div className="flex flex-col gap-3 pt-2" style={{ borderTop: "var(--border-width-default) solid var(--color-border)" }}>
-          {moreReason ? (
+          {showExplanations && moreReason ? (
             <div className="flex flex-col gap-1">
               <span className="text-xs uppercase font-bold" style={{ color: "var(--color-information)" }}>
                 Why this works

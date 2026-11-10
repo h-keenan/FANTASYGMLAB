@@ -6,7 +6,10 @@ import { useState } from "react";
 import type { MeResponse, PushCategory, ReferralStatusResponse } from "@/lib/api";
 import { PillRow } from "@/components/PillRow";
 import { ReferralCard } from "@/components/ReferralCard";
+import { OptionRadioGroup } from "@/components/OptionRadioGroup";
+import { useDisplayPreferences } from "@/context/DisplayPreferencesContext";
 import { useExperienceLevel } from "@/context/ExperienceLevelContext";
+import { DENSITY_OPTIONS, THEME_OPTIONS } from "@/lib/displayPreferences";
 import {
   EXPERIENCE_GOAL_OPTIONS,
   EXPERIENCE_LEVEL_OPTIONS,
@@ -262,6 +265,36 @@ function GoalSetting() {
   );
 }
 
+/** Density (Guided/Compact), theme (Night/Day/Auto) and the college
+ * football switch. Same options and copy as the app's Account screen;
+ * density and theme sync through /v1/preferences, so a choice made in
+ * either place follows the account. College is per-browser, like the app. */
+function DisplaySettings() {
+  const { density, setDensity, themeMode, setThemeMode, collegeInterest, setCollegeInterest } = useDisplayPreferences();
+  return (
+    <>
+      <OptionRadioGroup id="account-density-label" label="Density" options={DENSITY_OPTIONS} value={density} onChange={setDensity} />
+      <OptionRadioGroup id="account-theme-label" label="Theme" options={THEME_OPTIONS} value={themeMode} onChange={setThemeMode} />
+      <div
+        className="flex items-center justify-between gap-3 p-3"
+        style={{ border: "var(--border-width-default) solid var(--color-border)" }}
+      >
+        <div className="flex flex-col gap-0.5">
+          <span className="text-sm font-semibold">College football</span>
+          <span className="text-xs" style={{ color: "var(--color-text-muted)" }}>
+            Show College Scouting in the menu
+          </span>
+        </div>
+        <Toggle
+          checked={collegeInterest === "on"}
+          stateLabel={collegeInterest === "on" ? "On" : "Off"}
+          onChange={(next) => setCollegeInterest(next ? "on" : "off")}
+        />
+      </div>
+    </>
+  );
+}
+
 function PreferencesSection({
   communityOptedOut,
   onToggleCommunityOptOut,
@@ -283,6 +316,8 @@ function PreferencesSection({
       <ExplanationsSetting />
 
       <GoalSetting />
+
+      <DisplaySettings />
 
       <div
         className="flex items-center justify-between gap-3 p-3"

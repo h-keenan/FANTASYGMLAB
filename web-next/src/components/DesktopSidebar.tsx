@@ -6,6 +6,7 @@ import { usePathname, useParams } from "next/navigation";
 import { useSearchParams } from "@/lib/useSearchParams";
 
 import { useAuth } from "@/context/AuthContext";
+import { useDisplayPreferences } from "@/context/DisplayPreferencesContext";
 import { NavProMarker } from "@/components/NavProMarker";
 import { NavDestinationGlyph } from "@/components/NavDestinationGlyph";
 import { useIsPro } from "@/lib/useIsPro";
@@ -24,12 +25,13 @@ import { FOUNDER_DESTINATION, isFounderSession, useNavDestinations, type NavDest
  */
 export function DesktopSidebar() {
   const { session } = useAuth();
+  const { collegeInterest } = useDisplayPreferences();
   const pathname = usePathname();
   const params = useParams<{ leagueId?: string }>();
   const searchParams = useSearchParams();
   const leagueId = params?.leagueId ? decodeURIComponent(params.leagueId) : null;
   const leagueName = searchParams.get("name") || leagueId || "";
-  const { coreLeagueDestinations, gmToolsDestinations, generalDestinations, accountDestinations } = useNavDestinations(leagueId, leagueName);
+  const { coreLeagueDestinations, gmToolsDestinations, generalDestinations, accountDestinations } = useNavDestinations(leagueId, leagueName, collegeInterest);
   const showProMarkers = useIsPro() === false;
 
   if (!session) return null;
