@@ -11437,7 +11437,10 @@ def get_league_dashboard(
     roster_df = valued[valued["player_id"].astype(str).isin(roster_player_ids)].copy()
     lineup_df = suggest_optimal_lineup(roster_df, settings, score_field=score_field)
     injury_context = trade_analyzer_fit.roster_injury_context(
-        roster_df, lineup_df, taxi_player_ids=my_roster.get("taxi")
+        roster_df,
+        lineup_df,
+        taxi_player_ids=my_roster.get("taxi"),
+        reserve_player_ids=my_roster.get("reserve"),
     )
 
     # Moved ahead of compose_next_move_briefing below (this used to run
@@ -12688,7 +12691,10 @@ def get_gm_plan(
         if not roster_df.empty:
             lineup_df = suggest_optimal_lineup(roster_df, settings, score_field=score_field)
             injury_context = trade_analyzer_fit.roster_injury_context(
-                roster_df, lineup_df, taxi_player_ids=my_roster.get("taxi")
+                roster_df,
+                lineup_df,
+                taxi_player_ids=my_roster.get("taxi"),
+                reserve_player_ids=my_roster.get("reserve"),
             )
 
     rankings_row: dict[str, Any] | None = None
@@ -15811,7 +15817,10 @@ def get_league_waivers(
     if not roster_df.empty:
         lineup_df = suggest_optimal_lineup(roster_df, settings, score_field=score_field)
         injury_context = trade_analyzer_fit.roster_injury_context(
-            roster_df, lineup_df, taxi_player_ids=my_roster.get("taxi")
+            roster_df,
+            lineup_df,
+            taxi_player_ids=my_roster.get("taxi"),
+            reserve_player_ids=my_roster.get("reserve"),
         )
         injury_positions = {
             str(pos).upper()

@@ -1095,7 +1095,12 @@ def build_league_summary(
 
     roster_df = valued[valued["player_id"].astype(str).isin(roster_player_ids)].copy()
     lineup_df = suggest_optimal_lineup(roster_df, settings, score_field=score_field)
-    injury_context = roster_injury_context(roster_df, lineup_df, taxi_player_ids=my_roster.get("taxi"))
+    injury_context = roster_injury_context(
+        roster_df,
+        lineup_df,
+        taxi_player_ids=my_roster.get("taxi"),
+        reserve_player_ids=my_roster.get("reserve"),
+    )
 
     # Moved ahead of compose_next_move_briefing below (this used to run
     # AFTER it, purely for this function's own power_rank/archetype return

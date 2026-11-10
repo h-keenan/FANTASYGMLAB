@@ -337,8 +337,14 @@ def roster_injury_context(
     roster_df: pd.DataFrame,
     lineup_df: pd.DataFrame | None = None,
     taxi_player_ids=None,
+    reserve_player_ids=None,
 ) -> dict:
-    return summarize_team_injuries(roster_df, lineup_df, taxi_player_ids=taxi_player_ids)
+    return summarize_team_injuries(
+        roster_df,
+        lineup_df,
+        taxi_player_ids=taxi_player_ids,
+        reserve_player_ids=reserve_player_ids,
+    )
 
 
 def build_team_needs_assessment(
