@@ -17,6 +17,8 @@ export type StatStripItem = {
   tone?: 'positive' | 'risk';
   /** 0..1 standing drawn as a thin meter under the value (see MetricCard `fill`). */
   fill?: number | null;
+  /** Short context under the value ("of 12 teams", "League avg 26.1"). */
+  note?: string | null;
   onPress?: () => void;
 };
 
@@ -40,6 +42,7 @@ export default function DashboardStatRow({ items, style }: { items: StatStripIte
             item.valueColor ?? (item.tone === 'positive' ? colors.successBright : item.tone === 'risk' ? colors.danger : undefined)
           }
           fill={item.fill}
+          note={item.note}
           onPress={item.onPress}
           centered
           style={styles.tile}

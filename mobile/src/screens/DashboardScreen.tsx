@@ -29,7 +29,9 @@ import TeamAvatar from '../components/TeamAvatar';
 import TeamHealthContextBlock, { hasHealthContext } from '../components/TeamHealthContextBlock';
 import GuillotineCard from '../components/GuillotineCard';
 import LeagueTypeControl from '../components/LeagueTypeControl';
+import TeamStatusHero from '../components/TeamStatusHero';
 import WeeklyMatchupCard from '../components/WeeklyMatchupCard';
+import { buildTeamStatusMatchup } from '../lib/teamStatus';
 import StorylineSummaryCard from '../components/StorylineSummaryCard';
 import WaiverSuggestionsStrip from '../components/WaiverSuggestionsStrip';
 import LeagueStandingStrips from '../components/LeagueStandingStrips';
@@ -446,6 +448,16 @@ export default function DashboardScreen({ route, navigation }: Props) {
         <AppText style={{ color: colors.textSecondary, fontSize: 12 }}>{dashboardData.platform_notice}</AppText>
       ) : null}
 
+      <TeamStatusHero
+        leagueId={leagueId}
+        leagueName={leagueName}
+        snapshot={teamSnapshot}
+        matchup={matchup}
+        rankings={teamRankings}
+        standingsAvailable={teamRankingsQuery.data?.standings_available}
+        onNavigate={navigate}
+      />
+
       <DashboardNeedsAttention entries={attention} leagueId={leagueId} leagueName={leagueName} onNavigate={navigate} />
 
       {/* Next moves: what is left of the week's plan once the trade idea (Trades
@@ -529,7 +541,7 @@ export default function DashboardScreen({ route, navigation }: Props) {
               </TouchableOpacity>
             }
           />
-          <DashboardTeamStats snapshot={teamSnapshot} leagueId={leagueId} leagueName={leagueName} onNavigate={navigate} />
+          <DashboardTeamStats snapshot={teamSnapshot} teams={teamRankings} leagueId={leagueId} leagueName={leagueName} onNavigate={navigate} />
         </View>
       ) : null}
 
@@ -597,7 +609,7 @@ export default function DashboardScreen({ route, navigation }: Props) {
             onPress={() => navigation.navigate('Recap', { leagueId, leagueName })}
           />
         ) : null}
-        {!guillotine && matchup ? (
+        {!guillotine && matchup && !buildTeamStatusMatchup(matchup) ? (
           <WeeklyMatchupCard
             matchup={matchup}
             onPress={() => navigation.navigate('Matchup', { leagueId, leagueName })}

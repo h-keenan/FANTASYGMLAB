@@ -61,12 +61,13 @@ describe("DashboardContent", () => {
     expect(screen.getByText("Trade for a top-12 RB before the deadline")).toBeInTheDocument();
 
     expect(screen.getByRole("heading", { name: "My Team" })).toBeInTheDocument();
-    // The stat strip appears once at the top and is not repeated in Team Snapshot.
+    // Record lives once, in the "Your team right now" hero, not repeated in the tiles.
+    expect(screen.getByRole("heading", { name: "Your team right now" })).toBeInTheDocument();
     expect(screen.getAllByText("Record")).toHaveLength(1);
     expect(screen.getAllByText("Power Rank")).toHaveLength(1);
     expect(screen.getByText("Starter Strength")).toBeInTheDocument();
     expect(screen.getByText("Bench Strength")).toBeInTheDocument();
-    expect(screen.getByText("Injuries")).toBeInTheDocument();
+    expect(screen.getByText("Injured starters")).toBeInTheDocument();
     expect(screen.getByText("7-6")).toBeInTheDocument();
     expect(screen.getByText("#2")).toBeInTheDocument(); // power rank
     expect(screen.getByText("T-1")).toBeInTheDocument(); // franchise rank, tied
