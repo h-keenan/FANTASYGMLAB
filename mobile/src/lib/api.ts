@@ -1925,6 +1925,7 @@ export type TradeAnalyzerReason =
   | 'no_player_data'
   | 'empty_roster'
   | 'assets_not_found'
+  | 'assets_unresolved'
   | 'fit_unavailable'
   | 'weekly_limit_reached';
 

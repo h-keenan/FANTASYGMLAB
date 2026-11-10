@@ -5958,6 +5958,7 @@ def post_trade_analyzer(
     # (modules.trade_eval_usage); web enforced it, this API did not. The
     # counter is server-side (Redis), not the user-writable user_settings.
     analyzer_user_id = str(user.get("id") or "")
+    quota_charged = False
     if not _manager_tendencies_gate(user):
         if not free_tier_ledger.consume_weekly_trade_eval(
             analyzer_user_id, trade_eval_usage.FREE_WEEKLY_TRADE_EVAL_LIMIT
@@ -5974,6 +5975,35 @@ def post_trade_analyzer(
                     "resets_at": free_tier_ledger.next_weekly_reset().isoformat(),
                 },
             }
+        quota_charged = True
+
+    # The allowance is spent only by a request that yields a verdict: an
+    # exception or any "no verdict" outcome (no player data, unresolved assets,
+    # fit unavailable, ...) refunds it, so a Free user is never charged for a
+    # failed analysis.
+    try:
+        result = _compute_trade_analyzer(
+            body, league_id, user, league, settings, my_roster, analyzer_user_id
+        )
+    except BaseException:
+        if quota_charged:
+            free_tier_ledger.refund_weekly_trade_eval(analyzer_user_id)
+        raise
+    if quota_charged and not (isinstance(result, dict) and result.get("verdict") is not None):
+        free_tier_ledger.refund_weekly_trade_eval(analyzer_user_id)
+    return result
+
+
+def _compute_trade_analyzer(
+    body: TradeAnalyzerRequest,
+    league_id: str,
+    user: dict[str, Any],
+    league: dict[str, Any],
+    settings: dict[str, Any],
+    my_roster: dict[str, Any],
+    analyzer_user_id: str,
+) -> dict[str, Any]:
+    """Everything after the quota check in post_trade_analyzer (see there)."""
 
     posture = _resolve_trade_posture(
         user, league_id, league, my_roster, lens=body.lens, client_strategy=body.strategy
@@ -6080,15 +6110,22 @@ def post_trade_analyzer(
     model_status.merge_into(analyzer_status, analyzer_needs.status)
     my_team_needs = analyzer_needs.for_roster(my_roster.get("roster_id"))
 
+    unresolved_assets: list[str] = []
+
     def build_assets(player_ids: list[str]) -> list[dict[str, Any]]:
         wanted = {str(pid) for pid in player_ids if pid}
         if not wanted:
             return []
         rows = valued[valued["player_id"].astype(str).isin(wanted)]
+        # Requested players the valuation frame could not resolve are recorded,
+        # never silently dropped: a verdict on a partial package is not a verdict
+        # on the trade the user proposed.
+        unresolved_assets.extend(sorted(wanted - set(rows["player_id"].astype(str))))
         return [player_asset_from_mapping(row, score_field=score_field) for _, row in rows.iterrows()]
 
     send_pick_assets: list[dict[str, Any]] = []
     receive_pick_assets: list[dict[str, Any]] = []
+    resolved_pick_ids: set[str] = set()
     if body.send_pick_ids or body.receive_pick_ids:
         # Cached (30s live-time bucket) — the counter-package fallback
         # below can call this exact (league_id, lens) computation again
@@ -6118,10 +6155,11 @@ def post_trade_analyzer(
             }
 
             def resolve_picks(pick_ids: list[str]) -> list[dict[str, Any]]:
+                found = [pick_id for pick_id in pick_ids if pick_id in picks_by_id]
+                resolved_pick_ids.update(found)
                 return [
                     pick_asset_from_mapping(picks_by_id[pick_id], pick_score_multiplier=pick_score_multiplier)
-                    for pick_id in pick_ids
-                    if pick_id in picks_by_id
+                    for pick_id in found
                 ]
 
             send_pick_assets = resolve_picks(body.send_pick_ids)
@@ -6129,8 +6167,25 @@ def post_trade_analyzer(
 
     send_assets = build_assets(body.send_player_ids) + send_pick_assets
     receive_assets = build_assets(body.receive_player_ids) + receive_pick_assets
+    # Picks that did not resolve (stale ids, or no pick data for this league).
+    unresolved_assets.extend(
+        pick_id
+        for pick_id in dict.fromkeys([*body.send_pick_ids, *body.receive_pick_ids])
+        if pick_id and pick_id not in resolved_pick_ids
+    )
     if not send_assets and not receive_assets:
         return {"ok": True, "verdict": None, "reason": "assets_not_found"}
+    if unresolved_assets:
+        return {
+            "ok": True,
+            "verdict": None,
+            "reason": "assets_unresolved",
+            "assets": {
+                "requested": len({str(p) for p in [*body.send_player_ids, *body.receive_player_ids, *body.send_pick_ids, *body.receive_pick_ids] if p}),
+                "resolved": len(send_assets) + len(receive_assets),
+                "unresolved_ids": unresolved_assets,
+            },
+        }
 
     partner_assets: list[dict[str, Any]] = []
     if body.partner_roster_id:
