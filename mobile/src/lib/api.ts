@@ -7,6 +7,7 @@ import type { OpponentProfileResponse } from './opponentProfile';
 import { env } from './env';
 import { maskShowcaseFields, setShowcaseModeEnabled, unmaskShowcaseFields } from './showcaseMode';
 import { withBackgroundRetry } from './backgroundRetry';
+import { parseRetryAfterSeconds, withServerBusyRetry } from './busyRetry';
 import { FREE_LEAGUE_CAP_MESSAGE, isFreeLeagueLockedBody } from './freeLeagueCap';
 import type { PercentileExplorerResponse } from './percentileExplorer';
 import type {
@@ -30,10 +31,16 @@ import type {
 
 export class ApiError extends Error {
   status: number;
+  /** Stable machine code from the server when present (e.g. "server_busy"). */
+  code?: string;
+  /** Seconds from a 429/503 Retry-After hint, when the server sent one. */
+  retryAfterSeconds?: number;
 
-  constructor(status: number, message: string) {
+  constructor(status: number, message: string, code?: string, retryAfterSeconds?: number) {
     super(message);
     this.status = status;
+    if (code) this.code = code;
+    if (retryAfterSeconds) this.retryAfterSeconds = retryAfterSeconds;
   }
 }
 
@@ -116,7 +123,11 @@ async function performRequest<T>(
       body && typeof body === 'object' && 'error' in body
         ? String((body as { error: unknown }).error)
         : `Request failed (${response.status}).`;
-    throw new ApiError(response.status, message);
+    const code =
+      body && typeof body === 'object' && typeof (body as { code?: unknown }).code === 'string'
+        ? (body as { code: string }).code
+        : undefined;
+    throw new ApiError(response.status, message, code, parseRetryAfterSeconds(response.headers.get('Retry-After')));
   }
 
   if (isFreeLeagueLockedBody(body)) {
@@ -138,7 +149,13 @@ async function authorizedRequest<T>(
 
   const backgroundSnapshot = backgroundTransitions;
   const body = await withBackgroundRetry(
-    () => performRequest<T>(path, init, accessToken),
+    // Server load shedding (503 server_busy + Retry-After): idempotent reads
+    // wait the hinted time and retry a couple of times before surfacing.
+    () =>
+      withServerBusyRetry(() => performRequest<T>(path, init, accessToken), {
+        canRetry: (init?.method ?? 'GET') === 'GET',
+        signal: init?.signal,
+      }),
     () => backgroundTransitions > backgroundSnapshot,
   );
 

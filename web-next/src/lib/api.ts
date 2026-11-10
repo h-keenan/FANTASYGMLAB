@@ -14,6 +14,7 @@ import type {
 import { FREE_LEAGUE_CAP_MESSAGE, isFreeLeagueLockedBody } from "./freeLeagueCap";
 import { isPrivacyMode, maskIfPrivate, unmaskOutgoing } from "./privacy";
 import { billingRequest, type BillingFunction } from "./billingClient";
+import { isServerBusyError, parseRetryAfterSeconds, withServerBusyRetry } from "./busyRetry";
 
 /**
  * Client for services/mobile_api_service.py. Mirrors mobile/src/lib/api.ts's
@@ -25,11 +26,14 @@ export class ApiError extends Error {
   status: number;
   /** Stable machine code from the server when present (e.g. "account_required"). */
   code?: string;
+  /** Seconds from a 429/503 Retry-After hint, when the server sent one. */
+  retryAfterSeconds?: number;
 
-  constructor(status: number, message: string, code?: string) {
+  constructor(status: number, message: string, code?: string, retryAfterSeconds?: number) {
     super(message);
     this.status = status;
     if (code) this.code = code;
+    if (retryAfterSeconds) this.retryAfterSeconds = retryAfterSeconds;
   }
 }
 
@@ -48,6 +52,26 @@ function reportApiFailure(status: number): void {
 }
 
 async function performRequest<T>(
+  path: string,
+  init: { method?: "GET" | "POST" | "PATCH" | "DELETE"; jsonBody?: unknown; signal?: AbortSignal } | undefined,
+  accessToken: string,
+): Promise<T> {
+  // Server load shedding (503 server_busy + Retry-After): idempotent reads
+  // wait the hinted time and retry a couple of times before surfacing.
+  try {
+    return await withServerBusyRetry(() => performRequestOnce<T>(path, init, accessToken), {
+      canRetry: (init?.method ?? "GET") === "GET",
+      signal: init?.signal,
+    });
+  } catch (error) {
+    // Busy responses are not reported per attempt (see performRequestOnce);
+    // report once, when the busy state outlasted the retries.
+    if (isServerBusyError(error)) reportApiFailure(503);
+    throw error;
+  }
+}
+
+async function performRequestOnce<T>(
   path: string,
   init: { method?: "GET" | "POST" | "PATCH" | "DELETE"; jsonBody?: unknown; signal?: AbortSignal } | undefined,
   accessToken: string,
@@ -94,8 +118,14 @@ async function performRequest<T>(
       body && typeof body === "object" && "detail" in body
         ? String((body as { detail?: unknown }).detail ?? "")
         : "";
-    reportApiFailure(response.status);
-    throw new ApiError(response.status, detail || `Request failed with status ${response.status}.`);
+    const code =
+      body && typeof body === "object" && typeof (body as { code?: unknown }).code === "string"
+        ? (body as { code: string }).code
+        : undefined;
+    const retryAfter = parseRetryAfterSeconds(response.headers.get("Retry-After"));
+    const apiError = new ApiError(response.status, detail || `Request failed with status ${response.status}.`, code, retryAfter);
+    if (!isServerBusyError(apiError)) reportApiFailure(response.status);
+    throw apiError;
   }
 
   if (isFreeLeagueLockedBody(body)) {
