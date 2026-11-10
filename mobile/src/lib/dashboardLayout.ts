@@ -178,9 +178,30 @@ export function buildNeedsAttention<T extends DashboardAttentionItem>(
 }
 
 /** Rows "This week" still shows once Needs attention has taken its own. */
-export function weekRowsAfterAttention<R extends DashboardNowRow>(rows: R[], attention: { source: string }[]): R[] {
+export function weekRowsAfterAttention<R extends DashboardNowRow & { headline?: string }>(
+  rows: R[],
+  attention: { source: string; headline?: string }[],
+): R[] {
   const lineupTaken = attention.some((entry) => entry.source === "lineup");
-  return rows.filter((row) => nextMoveRowFilter(row) && !(lineupTaken && row.key === "lineup"));
+  const taken = new Set(attention.map((entry) => normalizeAlertTitle(entry.headline)).filter(Boolean));
+  return rows.filter(
+    (row) => nextMoveRowFilter(row) && !(lineupTaken && row.key === "lineup") && !taken.has(normalizeAlertTitle(row.headline)),
+  );
+}
+
+/** Case/punctuation/"(+N more)"-insensitive alert title, so the same alert never shows in two modules. */
+export function normalizeAlertTitle(title: string | null | undefined): string {
+  return (title ?? "")
+    .toLowerCase()
+    .replace(/\(\+\d+ more\)/g, "")
+    .replace(/[^a-z0-9]+/g, " ")
+    .trim();
+}
+
+/** Items still worth listing once Needs attention has taken its own (same object or same normalized title). */
+export function itemsAfterAttention<T extends { headline: string }>(items: T[], attention: { item?: T; headline?: string }[]): T[] {
+  const taken = new Set(attention.map((entry) => normalizeAlertTitle(entry.headline)).filter(Boolean));
+  return items.filter((item) => !attention.some((entry) => entry.item === item) && !taken.has(normalizeAlertTitle(item.headline)));
 }
 
 /** The Dashboard's one-line trade pointer: a count and a link, never idea cards. */

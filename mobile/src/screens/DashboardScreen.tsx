@@ -65,6 +65,7 @@ import BrandHeaderBar from '../components/BrandHeaderBar';
 import DashboardGuessCard from '../components/DashboardGuessCard';
 import DashboardStatRow from '../components/DashboardStatRow';
 import ToneBadge from '../components/ToneBadge';
+import { trackUse } from '../lib/analytics';
 import { requestOrbSearch } from '../lib/orbEvents';
 import { WATCH_TAG_LABEL, watchSummary, watchTagKind, watchTitle } from '../lib/dashboardWatch';
 import BrandMark from '../components/BrandMark';
@@ -80,7 +81,7 @@ import { isInSeason } from '../lib/seasonPhase';
 import { useDensity } from '../context/DensityContext';
 import { useExperienceCopy, useExperienceLevel } from '../context/ExperienceLevelContext';
 import { DashboardMore, DashboardNeedsAttention, DashboardTeamStats, DashboardTradesBlock } from '../components/DashboardBlocks';
-import { buildNeedsAttention, isTradeItem, weekRowsAfterAttention } from '../lib/dashboardLayout';
+import { buildNeedsAttention, isTradeItem, itemsAfterAttention, weekRowsAfterAttention } from '../lib/dashboardLayout';
 import BeginnerHelp from '../components/BeginnerHelp';
 import { useThemeMode } from '../context/ThemeModeContext';
 import { LINK_HIT_SLOP, radii, spacing, type ThemeColors } from '../theme';
@@ -421,9 +422,9 @@ export default function DashboardScreen({ route, navigation }: Props) {
     dashboardData?.trade_window,
     grouped.topPriority,
   );
-  const attentionItems = attention.flatMap((entry) => (entry.item ? [entry.item] : []));
-  const nonTradeTopPriority = grouped.topPriority.filter(
-    (item) => !isTradeItem(item) && !attentionItems.includes(item),
+  const nonTradeTopPriority = itemsAfterAttention(
+    grouped.topPriority.filter((item) => !isTradeItem(item)),
+    attention,
   );
   const nextMovesThisWeek = dashboardData?.this_week
     ? { ...dashboardData.this_week, rows: weekRowsAfterAttention(dashboardData.this_week.rows, attention) }
@@ -498,7 +499,10 @@ export default function DashboardScreen({ route, navigation }: Props) {
         }
       />
 
-      {entitlement ? (
+      {entitlement && !entitlement.is_premium && entitlement.hidden_count > 0 ? (
+        // One compact line instead of the free-limit note plus a full locked card.
+        <MoreMovesRow hidden={entitlement.hidden_count} onUpgrade={() => navigate('Paywall')} />
+      ) : entitlement ? (
         <FreeLimitNote
           kind="window"
           noun="next moves"
@@ -507,15 +511,6 @@ export default function DashboardScreen({ route, navigation }: Props) {
           shown={entitlement.visible_count}
           isPremium={entitlement.is_premium}
         />
-      ) : null}
-
-      {entitlement && !entitlement.is_premium && entitlement.hidden_count > 0 ? (
-        <View style={styles.lockWrap}>
-          <PremiumLock
-            title="More next moves"
-            description={`See ${entitlement.hidden_count} more roster, trade, waiver, and health signal${entitlement.hidden_count === 1 ? '' : 's'} so you don't miss the next best move.`}
-          />
-        </View>
       ) : null}
 
       {dashboardData ? (
@@ -1245,7 +1240,6 @@ function createStyles(colors: ThemeColors) {
   quickActionsGrid: { marginBottom: 0 },
   standingStrips: { gap: spacing.md, marginTop: spacing.md },
   quickActionsSection: { marginTop: spacing.lg, marginBottom: spacing.md },
-  lockWrap: { marginTop: spacing.md, marginBottom: spacing.md },
   // Shared "grouped surface" wrapper for the Needs Attention / Opportunities
   // tiers — one AnimatedCard containing several InsightRows with internal
   // dividers, per Magna Carta §12, instead of a full card per item.
@@ -1315,4 +1309,37 @@ function createStyles(colors: ThemeColors) {
   emptyText: { fontSize: 15.5, color: colors.textSecondary, textAlign: 'center', lineHeight: 22 },
   notReadyText: { textAlign: 'center', color: colors.textSecondary, lineHeight: 20 },
   });
+}
+
+/** Free-tier upsell for withheld "next moves": a single tappable line, never a locked card. */
+function MoreMovesRow({ hidden, onUpgrade }: { hidden: number; onUpgrade: () => void }) {
+  const { colors } = useThemeMode();
+  useEffect(() => {
+    trackUse('more_next_moves', 'gate_seen', { tier: 'free' });
+  }, []);
+  return (
+    <TouchableOpacity
+      accessibilityRole="button"
+      accessibilityLabel={`${hidden} more move${hidden === 1 ? '' : 's'} on Pro. Upgrade`}
+      onPress={onUpgrade}
+      activeOpacity={0.8}
+      style={{
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        gap: spacing.sm,
+        minHeight: 44,
+        paddingHorizontal: spacing.md,
+        borderRadius: radii.md,
+        borderWidth: 1,
+        borderColor: colors.premium,
+        backgroundColor: colors.surface,
+      }}
+    >
+      <AppText style={{ color: colors.textPrimary, fontWeight: '700', flexShrink: 1 }}>
+        {hidden} more move{hidden === 1 ? '' : 's'} on Pro
+      </AppText>
+      <AppText style={{ color: colors.premium, fontWeight: '700' }}>Upgrade ›</AppText>
+    </TouchableOpacity>
+  );
 }

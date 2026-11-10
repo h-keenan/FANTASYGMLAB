@@ -106,7 +106,7 @@ describe("DashboardPage fetch order", () => {
     expect(screen.getByTestId("dashboard-content")).toBeInTheDocument();
   });
 
-  it("keeps the skeleton (no quiet flash) when the deferred first pass is empty", async () => {
+  it("paints an empty deferred first pass right away (trade row stays reserved)", async () => {
     mockLeagueType(2);
     const full = deferred<DashboardResponse>();
     const firstPass = { ...dashboard, quiet: true, items: [], trade_ideas_deferred: true } as unknown as DashboardResponse;
@@ -116,8 +116,8 @@ describe("DashboardPage fetch order", () => {
     renderWithLens(<DashboardPage />);
 
     await waitFor(() => expect(api.getDashboard).toHaveBeenCalledTimes(2));
-    expect(screen.queryByTestId("dashboard-content")).not.toBeInTheDocument();
-    await act(async () => full.resolve(dashboard));
     expect(await screen.findByTestId("dashboard-content")).toBeInTheDocument();
+    await act(async () => full.resolve(dashboard));
+    expect(screen.getByTestId("dashboard-content")).toBeInTheDocument();
   });
 });

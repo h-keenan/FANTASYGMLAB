@@ -9,6 +9,8 @@ import {
   buildNowChips,
   deadlineChip,
   isTradeItem,
+  itemsAfterAttention,
+  normalizeAlertTitle,
   nextMoveRowFilter,
   tradeIdeasLine,
   weekRowsAfterAttention,
@@ -89,4 +91,14 @@ test('trade ideas line is a count, never cards', () => {
   assert.equal(tradeIdeasLine(3, false, false), '3 trade ideas');
   assert.match(tradeIdeasLine(0, false, false), /No trade idea/);
   assert.match(tradeIdeasLine(2, true, false), /deadline has passed/);
+});
+
+test('the same alert never shows in Needs attention and This week', () => {
+  assert.equal(normalizeAlertTitle('Check Matchup: Darnell Washington is on a bye (+1 more)'), 'check matchup darnell washington is on a bye');
+  const attention = [{ headline: 'Check Matchup: Darnell Washington is on a bye (+1 more)' }];
+  const kept = itemsAfterAttention(
+    [{ headline: 'check matchup - darnell washington is on a BYE' }, { headline: 'Other' }],
+    attention,
+  );
+  assert.deepEqual(kept.map((i) => i.headline), ['Other']);
 });

@@ -72,7 +72,7 @@ describe("DashboardContent", () => {
     expect(screen.getByText("#2")).toBeInTheDocument(); // power rank
     expect(screen.getByText("T-1")).toBeInTheDocument(); // franchise rank, tied
 
-    expect(screen.getByText(/2 more moves available on Pro/)).toBeInTheDocument();
+    expect(screen.getByText(/2 more moves? on Pro/)).toBeInTheDocument();
   });
 
   // coridian_, 2026-10-18: "you can just put them all under watch... to
@@ -160,8 +160,8 @@ describe("DashboardContent", () => {
     ];
     expect(order.every((i) => i > -1)).toBe(true);
     expect([...order].sort((x, y) => x - y)).toEqual(order);
-    // Free caps are announced up front, from the server's number.
-    expect(screen.getByText("Free: showing 1 of 3 next moves")).toBeInTheDocument();
+    // Free caps are one compact upsell row (no separate free-limit note).
+    expect(screen.getByTestId("more-moves-upsell")).toBeInTheDocument();
   });
 
   it("shows the real trade deadline chip and trade ideas as one count line with a Trade Hub link", () => {

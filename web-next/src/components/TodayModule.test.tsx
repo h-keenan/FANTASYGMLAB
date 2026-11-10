@@ -67,7 +67,7 @@ describe("TodayModule", () => {
     const week: ThisWeek = { mode: "next_action", week: null, rows: [], next_action: { headline: "Connect a league", why: "Link Sleeper.", cta_label: "Connect a league", route: "connect_league" } };
     render(<TodayModule data={data({ this_week: week, items: [], entitlement: { is_premium: false, visible_count: 0, hidden_count: 2 } })} leagueId="a" leagueName="L" now={THURSDAY} />);
     expect(screen.getByRole("link", { name: "Connect a league" })).toHaveAttribute("href", "/connect-league");
-    expect(screen.getByText(/2 more moves available on Pro/)).toBeInTheDocument();
+    expect(screen.getByText(/2 more moves? on Pro/)).toBeInTheDocument();
   });
 
   it("reserves the trade row's space on the deferred first pass", () => {
@@ -85,6 +85,6 @@ describe("TodayModule", () => {
   it("never says nothing is urgent while moves are hidden behind Pro", () => {
     render(<TodayModule data={data({ items: [], this_week: null, entitlement: { is_premium: false, visible_count: 0, hidden_count: 1 } })} leagueId="a" leagueName="L" now={THURSDAY} />);
     expect(screen.queryByText("No urgent roster issues right now.")).toBeNull();
-    expect(screen.getByText(/1 more move available on Pro/)).toBeInTheDocument();
+    expect(screen.getByText(/1 more moves? on Pro/)).toBeInTheDocument();
   });
 });
