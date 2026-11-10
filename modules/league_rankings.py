@@ -527,6 +527,9 @@ _EMPTY_ROSTER_HEALTH_ROW: dict[str, Any] = {
     "injury_impact_flag": "Injury Data Unavailable",
     "injury_data_quality": "missing",
     "health_flag": "Stable",
+    "lineup_injury_loss_pct": 0.0,
+    "lineup_players_out": 0,
+    "injury_league_rank": 0,
     "key_injuries_summary": "",
     "top_injury_impact_summary": "",
     "top_injury_impact_players": [],
@@ -632,7 +635,12 @@ def build_roster_health_metrics_frame(
         bench_current_score = float(
             pd.to_numeric(lineup_df.loc[~starter_mask, "value_score"], errors="coerce").fillna(0).sum()
         )
-        injury_context = rankings.summarize_team_injuries(team_df, lineup_df)
+        injury_context = rankings.summarize_team_injuries(
+            team_df,
+            lineup_df,
+            taxi_player_ids=roster.get("taxi"),
+            reserve_player_ids=roster.get("reserve"),
+        )
         injured_count = int(injury_context.get("injured_roster") or 0)
         major_absences = int(injury_context.get("major_absences") or 0)
         injured_starters = int(injury_context.get("injured_starters") or 0)
@@ -700,6 +708,8 @@ def build_roster_health_metrics_frame(
                 "injury_data_quality": injury_data_quality,
                 "injury_data_note": injury_data_note,
                 "health_flag": health_flag,
+                "lineup_injury_loss_pct": float(injury_context.get("lineup_injury_loss_pct") or 0.0),
+                "lineup_players_out": int(injury_context.get("lineup_players_out") or 0),
                 "key_injuries_summary": key_injuries_summary,
                 "top_injury_impact_summary": top_injury_impact_summary,
                 "top_injury_impact_players": top_injury_impact_players,
@@ -709,7 +719,48 @@ def build_roster_health_metrics_frame(
             }
         )
 
-    return pd.DataFrame(roster_rows)
+    return apply_league_relative_injury_tiers(pd.DataFrame(roster_rows))
+
+
+# "Injury Crisis" is a relative call as well as an absolute one: when a whole
+# league is hurting (a bad injury week), the teams that are merely on par with
+# their league are "Injury Hit", not in crisis. Only the worst-hit fifth of
+# the league (at least one team) can hold the label.
+INJURY_CRISIS_LEAGUE_SHARE = 0.20
+
+
+def apply_league_relative_injury_tiers(frame: pd.DataFrame) -> pd.DataFrame:
+    """Adds ``injury_league_rank`` (1 = most lineup value lost to injury) and
+    demotes any absolute "Injury Crisis" that is not in the league's worst
+    ``INJURY_CRISIS_LEAGUE_SHARE`` to the next tier ("Injury Hit" /
+    "Significant Injury Impact"). Never promotes: absolute severity stays a
+    precondition for Crisis."""
+
+    if frame is None or frame.empty or "lineup_injury_loss_pct" not in frame.columns:
+        return frame
+    frame = frame.copy()
+    pct = pd.to_numeric(frame["lineup_injury_loss_pct"], errors="coerce").fillna(0.0)
+    frame["injury_league_rank"] = pct.rank(method="min", ascending=False).astype(int)
+    crisis_slots = max(1, int(round(len(frame) * INJURY_CRISIS_LEAGUE_SHARE)))
+    outside = frame["injury_league_rank"] > crisis_slots
+    for column, demoted in (
+        ("health_flag", "Injury Hit"),
+        ("injury_impact_flag", "Significant Injury Impact"),
+    ):
+        if column in frame.columns:
+            frame.loc[outside & (frame[column] == "Injury Crisis"), column] = demoted
+    if "injury_role_context" in frame.columns:
+        contexts = []
+        for context, is_outside in zip(frame["injury_role_context"], outside):
+            if is_outside and isinstance(context, dict):
+                context = dict(context)
+                if context.get("health_flag") == "Injury Crisis":
+                    context["health_flag"] = "Injury Hit"
+                if context.get("injury_impact_flag") == "Injury Crisis":
+                    context["injury_impact_flag"] = "Significant Injury Impact"
+            contexts.append(context)
+        frame["injury_role_context"] = contexts
+    return frame
 
 
 # Same real per-roster injury/lineup pass as build_roster_health_metrics_frame

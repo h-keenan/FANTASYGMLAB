@@ -2813,11 +2813,38 @@ def _row_get(row, key, default=None):
         return default
 
 
-def _injury_value_score(row) -> tuple[float, str]:
-    for field in ("market_score", "dynasty_score", "value_score", "score", "role_score", "value"):
+_INJURY_VALUE_FIELDS = ("market_score", "dynasty_score", "value_score", "score", "role_score", "value")
+
+
+def _injury_value_scale(players_df) -> float:
+    """Raw-score ceiling the injury model should normalize against.
+
+    Production valuation columns are 0..PRODUCTION_SCORE_CEILING (10,000);
+    the injury math (impact scores, replacement cover) is built on a 0..100
+    scale. It used to cap the raw value at 100 instead of rescaling it, so
+    every player worth more than 100/10,000 (i.e. every real starter) read as
+    a flat 100 and any roster with a few injured starters summed to "crisis".
+    A frame whose values never exceed 100 (small synthetic/legacy frames) is
+    already on the 0..100 scale.
+    """
+
+    try:
+        peak = 0.0
+        for field in _INJURY_VALUE_FIELDS:
+            if field in players_df.columns:
+                column = pd.to_numeric(players_df[field], errors="coerce")
+                if len(column):
+                    peak = max(peak, float(column.max(skipna=True) or 0.0))
+        return PRODUCTION_SCORE_CEILING if peak > 100.0 else 100.0
+    except Exception:
+        return PRODUCTION_SCORE_CEILING
+
+
+def _injury_value_score(row, scale: float = 100.0) -> tuple[float, str]:
+    for field in _INJURY_VALUE_FIELDS:
         value = _scalar_number(_row_get(row, field))
         if value == value and value > 0:
-            return min(100.0, float(value)), field
+            return min(100.0, float(value) * 100.0 / float(scale or 100.0)), field
     return 0.0, ""
 
 
@@ -2928,12 +2955,13 @@ def build_player_injury_index(
     if players_df is None or getattr(players_df, "empty", True):
         return index
     clock = time.time() if now is None else now
+    value_scale = _injury_value_scale(players_df)
     for mapping in frame_records(players_df):
         player_id = str(mapping.get("player_id") or "").strip()
         if not player_id:
             continue
         level = _injury_level_from_row(mapping)
-        player_value, value_field = _injury_value_score(mapping)
+        player_value, value_field = _injury_value_score(mapping, value_scale)
         opportunity = str(mapping.get("opportunity_label") or "").strip().lower()
         future_asset = _injury_future_asset_profile(mapping)
         weekly_role = _injury_weekly_role(mapping)
@@ -3009,6 +3037,169 @@ def _healthy_position_cover_from_index(
     return False
 
 
+# --- Team injury tiers -------------------------------------------------------
+# The tiers are scored against the lineup the injuries actually cost, not the
+# roster that happens to carry injured names: the share of the full-health
+# starting lineup's value that is unavailable AFTER the best healthy
+# replacement on the bench steps in (see _lineup_injury_loss). Taxi / IR-slot
+# players and depth that never start cost nothing; a starter with a healthy
+# same-position backup costs only the gap between them.
+#
+# Thresholds are percent of full-health lineup value. They were calibrated on
+# a sweep of real Sleeper leagues (see PR description): "Crisis" lands on the
+# worst few percent of rosters, and league-relative standing is applied on top
+# of it wherever a whole league is in view
+# (modules.league_rankings.apply_league_relative_injury_tiers).
+INJURY_CRISIS_LOSS_PCT = 28.0
+INJURY_HIT_LOSS_PCT = 14.0
+INJURY_WATCH_LOSS_PCT = 6.0
+# A lineup player counts as "out" for the tier when he is unavailable with at
+# least this probability (a flat Out/IR is 1.0, Doubtful 0.85, Questionable 0.15).
+INJURY_PLAYER_OUT_AVAILABILITY_LOSS = 0.5
+# Crisis needs this many lineup players out, so one superstar on IR with a
+# healthy bench is never a "crisis" by himself.
+INJURY_CRISIS_MIN_PLAYERS_OUT = 2
+# Value of the waiver-wire body that fills a slot when nobody on the roster can.
+INJURY_WAIVER_REPLACEMENT_VALUE = 5.0
+# One loss-percent point == this much of the legacy "injury_burden" scale
+# (Crisis 6 / Hit 3 on that scale: team archetypes and trade fit still read
+# burden thresholds of 3-4).
+INJURY_BURDEN_PER_LOSS_PCT = 0.25
+_INJURY_FLEX_POSITIONS = frozenset({"RB", "WR", "TE"})
+_INJURY_PERSISTENT_KINDS = frozenset({"reserve", "season_ending", "suspended", "inactive"})
+
+
+def _injury_availability_loss(record: dict[str, Any]) -> tuple[float, bool]:
+    """(share of next-game availability lost, long-term absence) for a record."""
+
+    cls = injury_status_table.classify(record.get("status"), record.get("injury_status"))
+    if cls.row.category == "healthy":
+        return 0.0, False
+    loss = 1.0 if cls.ruled_out else max(0.0, min(1.0, 1.0 - float(cls.p_play)))
+    long_term = cls.kind in {"reserve", "season_ending"} or (
+        cls.weeks_out is not None and float(cls.weeks_out) >= 4.0
+    )
+    if cls.kind not in _INJURY_PERSISTENT_KINDS:
+        # A game-day designation with an aging / stale update is decaying
+        # evidence; one that is simply untimed is not discounted.
+        if record.get("freshness_days") is not None:
+            loss *= float(record.get("freshness_multiplier") or 1.0)
+    return loss, long_term
+
+
+def _lineup_injury_loss(
+    records: list[dict[str, Any]],
+    starter_ids: set[str],
+    parked_ids: set[str],
+) -> dict[str, Any]:
+    """Value of the starting lineup lost to injury after replacement cover.
+
+    ``starter_ids`` is the full-health starting lineup (players the lineup
+    started plus anyone it benched only because he is ruled out).
+    ``parked_ids`` are players on taxi / the IR slot: they can never be the
+    replacement. Replacement is the best healthy non-starter at the same
+    position (a RB/WR/TE may be covered by any healthy RB/WR/TE bench body at
+    a flex discount), else a waiver-level body.
+    """
+
+    by_id = {str(r.get("player_id")): r for r in records}
+    starters = [by_id[pid] for pid in starter_ids if pid in by_id]
+    full_value = sum(float(r.get("player_value") or 0.0) for r in starters)
+    pool = [
+        r
+        for r in records
+        if str(r.get("player_id")) not in starter_ids
+        and str(r.get("player_id")) not in parked_ids
+        and _injury_availability_loss(r)[0] == 0.0
+    ]
+    pool.sort(key=lambda r: float(r.get("player_value") or 0.0), reverse=True)
+    used: set[str] = set()
+    entries: list[dict[str, Any]] = []
+    injured = []
+    for record in starters:
+        loss, long_term = _injury_availability_loss(record)
+        if loss > 0.0:
+            injured.append((float(record.get("player_value") or 0.0), record, loss, long_term))
+    injured.sort(key=lambda item: item[0], reverse=True)
+    for value, record, loss, long_term in injured:
+        position = str(record.get("position") or "").upper()
+        replacement = None
+        replacement_value = INJURY_WAIVER_REPLACEMENT_VALUE
+        for candidate in pool:
+            cid = str(candidate.get("player_id"))
+            if cid in used:
+                continue
+            cpos = str(candidate.get("position") or "").upper()
+            if cpos == position:
+                factor = 1.0
+            elif position in _INJURY_FLEX_POSITIONS and cpos in _INJURY_FLEX_POSITIONS:
+                factor = 0.85
+            else:
+                continue
+            candidate_value = float(candidate.get("player_value") or 0.0) * factor
+            if candidate_value > replacement_value:
+                replacement, replacement_value = candidate, candidate_value
+                if factor == 1.0:
+                    break
+        if replacement is not None and loss >= INJURY_PLAYER_OUT_AVAILABILITY_LOSS:
+            used.add(str(replacement.get("player_id")))
+        lost_value = loss * max(0.0, value - replacement_value)
+        entries.append(
+            {
+                "player_id": str(record.get("player_id") or ""),
+                "position": position,
+                "injury_level": str(record.get("injury_level") or ""),
+                "availability_loss": round(loss, 2),
+                "long_term": long_term,
+                "player_value": value,
+                "replacement_value": round(replacement_value, 1),
+                "lost_value": lost_value,
+                "player_out": loss >= INJURY_PLAYER_OUT_AVAILABILITY_LOSS,
+            }
+        )
+    lost = sum(item["lost_value"] for item in entries)
+    pct = (lost / full_value * 100.0) if full_value > 0 else 0.0
+    return {
+        "entries": entries,
+        "lost_value": lost,
+        "full_value": full_value,
+        "pct": max(0.0, min(100.0, pct)),
+        "players_out": sum(1 for item in entries if item["player_out"]),
+        "long_term_players": sum(1 for item in entries if item["long_term"] and item["player_out"]),
+    }
+
+
+def team_injury_tiers(
+    loss_pct: float,
+    players_out: int,
+    *,
+    major_starter_loss_pct: float = 0.0,
+) -> tuple[str, str]:
+    """(health_flag, lineup-based injury_impact_flag or "") from lineup loss.
+
+    The second value is "" unless a lineup-based impact tier applies; the
+    caller falls back to the value-weighted / data-quality tiers then.
+    """
+
+    crisis = loss_pct >= INJURY_CRISIS_LOSS_PCT and players_out >= INJURY_CRISIS_MIN_PLAYERS_OUT
+    if crisis:
+        return "Injury Crisis", "Injury Crisis"
+    hit = loss_pct >= INJURY_HIT_LOSS_PCT
+    if major_starter_loss_pct >= 4.0:
+        impact = "Major Starter Absence"
+    elif hit:
+        impact = "Significant Injury Impact"
+    elif players_out >= 1 and loss_pct >= INJURY_WATCH_LOSS_PCT:
+        impact = "Starter Availability Concern"
+    else:
+        impact = ""
+    if hit:
+        return "Injury Hit", impact
+    if loss_pct >= INJURY_WATCH_LOSS_PCT / 2.0:
+        return "Health Watch", impact
+    return "Stable", impact
+
+
 def _empty_team_injury_summary() -> Dict[str, Any]:
     return {
         "injured_roster": 0,
@@ -3041,6 +3232,10 @@ def _empty_team_injury_summary() -> Dict[str, Any]:
         "actionable_injury_players": [],
         "actionable_injury_summary": "",
         "health_flag": "Stable",
+        "lineup_injury_loss_pct": 0.0,
+        "lineup_injury_loss_value": 0.0,
+        "lineup_players_out": 0,
+        "long_term_lineup_absences": 0,
     }
 
 
@@ -3050,6 +3245,7 @@ def summarize_team_injuries(
     lineup_df: pd.DataFrame | None = None,
     player_injury_index: dict[str, dict[str, Any]] | None = None,
     taxi_player_ids: Sequence[object] | None = None,
+    reserve_player_ids: Sequence[object] | None = None,
 ) -> Dict[str, Any]:
     if roster_df is None or roster_df.empty:
         return _empty_team_injury_summary()
@@ -3065,6 +3261,11 @@ def summarize_team_injuries(
     # documents.
     taxi_ids = {str(player_id).strip() for player_id in (taxi_player_ids or ()) if str(player_id).strip()}
 
+    # Players parked on the IR slot (Sleeper's roster "reserve" list) are
+    # already handled by their manager and can never be a replacement.
+    reserve_ids = {
+        str(player_id).strip() for player_id in (reserve_player_ids or ()) if str(player_id).strip()
+    }
     index = player_injury_index or build_player_injury_index(roster_df)
     roster_ids: list[str] = []
     if "player_id" in roster_df.columns:
@@ -3151,8 +3352,12 @@ def summarize_team_injuries(
         else:
             relevance_multiplier, relevance_label = 0.65, "depth"
         future_asset = relevance_label == "future asset"
+        # A depth-chart "role" only makes a player a weekly asset while he is
+        # on the active roster: someone parked on taxi / the IR slot who would
+        # not have started anyway is not a weekly-lineup problem.
+        parked = player_id in taxi_ids or player_id in reserve_ids
         active_weekly_player = not future_asset and (
-            injured_starter or bool(record.get("weekly_role"))
+            injured_starter or (bool(record.get("weekly_role")) and not parked)
         )
         has_position_cover = _healthy_position_cover_from_index(
             records,
@@ -3196,6 +3401,14 @@ def summarize_team_injuries(
                 "impact_contribution": round(contribution, 1),
             }
         )
+    # A valuable non-taxi player hurt but off the lineup (bench / IR slot) is
+    # not a lineup problem, but is worth a "Health Watch" nudge.
+    injury_bench_asset_watch = any(
+        item["player_value_score"] >= 60.0
+        and item["injury_level"] in {"major", "moderate"}
+        and str(item["player_id"]) not in taxi_ids
+        for item in injury_impacts
+    )
     injury_impacts.sort(
         key=lambda item: (
             float(item.get("impact_contribution") or 0),
@@ -3305,14 +3518,26 @@ def summarize_team_injuries(
         for item in active_injury_impacts
         if item.get("injury_level") == "major"
     )
-    if active_injury_impact_score >= 150.0 or major_active_injured_starters >= 2:
-        injury_impact_flag = "Injury Crisis"
-    elif major_active_injured_starters >= 1:
-        injury_impact_flag = "Major Starter Absence"
-    elif active_injury_impact_score >= 70.0:
-        injury_impact_flag = "Significant Injury Impact"
-    elif active_injured_starters >= 1 and active_injury_impact_score >= 35.0:
-        injury_impact_flag = "Starter Availability Concern"
+    # Lineup-based severity: what the injuries cost the starting lineup after
+    # the bench covers, and how many lineup players are actually unavailable.
+    lineup_loss = _lineup_injury_loss(records, starter_ids, taxi_ids | reserve_ids)
+    lineup_loss_pct = float(lineup_loss["pct"])
+    lineup_full_value = float(lineup_loss["full_value"]) or 1.0
+    major_starter_loss_pct = max(
+        (
+            float(entry["lost_value"]) / lineup_full_value * 100.0
+            for entry in lineup_loss["entries"]
+            if entry["injury_level"] == "major" and entry["player_out"]
+        ),
+        default=0.0,
+    )
+    health_flag, lineup_impact_flag = team_injury_tiers(
+        lineup_loss_pct,
+        int(lineup_loss["players_out"]),
+        major_starter_loss_pct=major_starter_loss_pct,
+    )
+    if lineup_impact_flag:
+        injury_impact_flag = lineup_impact_flag
     elif future_injury_impact_score >= 35.0:
         injury_impact_flag = "Future Asset Health Watch"
     elif injury_impact_score >= 18.0:
@@ -3355,15 +3580,12 @@ def summarize_team_injuries(
         if item.get("name")
     )
 
-    injury_burden = float(injury_risk_total + (injured_starters * 1.5))
-    if injury_burden >= 6 or injured_starters >= 3:
-        health_flag = "Injury Crisis"
-    elif injury_burden >= 3 or injured_starters >= 2:
-        health_flag = "Injury Hit"
-    elif injury_burden > 0:
+    # Lineup-weighted burden (Crisis ~7 / Hit ~3.5 on this scale) instead of
+    # the old whole-roster tally of every tagged player, which a deep dynasty
+    # roster crossed with a couple of Questionable tags.
+    injury_burden = round(lineup_loss_pct * INJURY_BURDEN_PER_LOSS_PCT, 2)
+    if health_flag == "Stable" and injury_bench_asset_watch:
         health_flag = "Health Watch"
-    else:
-        health_flag = "Stable"
 
     return {
         "injured_roster": injured_roster,
@@ -3397,6 +3619,10 @@ def summarize_team_injuries(
         "actionable_injury_players": actionable_injury_players,
         "actionable_injury_summary": actionable_injury_summary,
         "health_flag": health_flag,
+        "lineup_injury_loss_pct": round(lineup_loss_pct, 2),
+        "lineup_injury_loss_value": round(float(lineup_loss["lost_value"]), 1),
+        "lineup_players_out": int(lineup_loss["players_out"]),
+        "long_term_lineup_absences": int(lineup_loss["long_term_players"]),
     }
 
 

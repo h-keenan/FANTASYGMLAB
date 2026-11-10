@@ -37,26 +37,49 @@ class TestInjuryImpact(unittest.TestCase):
 
 
     def test_current_moderate_star_starter_is_visible_but_not_a_crisis(self):
-        roster = pd.DataFrame(
-            [
+        # One starter in a real lineup, with a healthy WR on the bench to
+        # cover: the injury costs the gap between them, not the whole slot.
+        rows = [
+            {
+                "player_id": "star-questionable",
+                "name": "Star Starter",
+                "position": "WR",
+                "status": "Doubtful",
+                "injury_status": "day-to-day",
+                "market_score": 90,
+                "news_updated": time.time(),
+                "player_tier": "Star",
+            }
+        ]
+        for slot, position in enumerate(("QB", "RB", "RB", "WR", "TE")):
+            rows.append(
                 {
-                    "player_id": "star-questionable",
-                    "name": "Star Starter",
-                    "position": "WR",
-                    "status": "Doubtful",
-                    "injury_status": "day-to-day",
-                    "market_score": 90,
-                    "news_updated": time.time(),
-                    "player_tier": "Star",
+                    "player_id": f"healthy-{slot}",
+                    "name": f"Healthy {slot}",
+                    "position": position,
+                    "status": "Active",
+                    "injury_status": "",
+                    "market_score": 70,
                 }
-            ]
+            )
+        rows.append(
+            {
+                "player_id": "bench-wr",
+                "name": "Bench WR",
+                "position": "WR",
+                "status": "Active",
+                "injury_status": "",
+                "market_score": 55,
+            }
         )
+        roster = pd.DataFrame(rows)
         lineup = roster.copy()
-        lineup["suggested_starter"] = True
+        lineup["suggested_starter"] = roster["player_id"] != "bench-wr"
 
         summary = summarize_team_injuries(roster, lineup)
 
         self.assertEqual(summary["injury_impact_flag"], "Starter Availability Concern")
+        self.assertNotEqual(summary["health_flag"], "Injury Crisis")
         self.assertTrue(injury_ui.has_meaningful_team_injury_impact(summary))
         self.assertFalse(injury_ui.is_acute_injury_pressure(summary))
         self.assertEqual(
