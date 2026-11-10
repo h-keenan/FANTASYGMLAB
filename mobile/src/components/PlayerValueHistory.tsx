@@ -34,6 +34,6 @@ function createStyles(colors: ThemeColors) {
   return StyleSheet.create({
     wrap: { gap: spacing.xs },
     changes: { fontSize: 14, fontWeight: '700', color: colors.textPrimary },
-    caption: { fontSize: 11, color: colors.textTertiary },
+    caption: { fontSize: 12, color: colors.textTertiary },
   });
 }

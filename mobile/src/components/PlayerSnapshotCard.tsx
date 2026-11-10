@@ -109,6 +109,6 @@ function createStyles(colors: ThemeColors) {
     itemLabel: { fontSize: 12, color: colors.textSecondary },
     itemValue: { fontSize: 18, fontWeight: '800', marginTop: 2 },
     itemValueSupporting: { fontSize: 15.5, fontWeight: '700' },
-    itemDescriptor: { fontSize: 11, color: colors.textTertiary, marginTop: 1 },
+    itemDescriptor: { fontSize: 12, color: colors.textTertiary, marginTop: 1 },
   });
 }

@@ -269,7 +269,7 @@ function createStyles(colors: ThemeColors) {
       borderColor: colors.border,
     },
     metaPillText: { fontSize: 15, fontWeight: '600', color: colors.textSecondary },
-    metaPillDot: { fontSize: 11, color: colors.textTertiary },
+    metaPillDot: { fontSize: 12, color: colors.textTertiary },
     tilesRow: { flexDirection: 'row', gap: spacing.sm },
     tile: {
       flex: 1,
@@ -287,7 +287,7 @@ function createStyles(colors: ThemeColors) {
     tileValue: { fontSize: 23, fontWeight: '800', color: colors.textPrimary },
     tileValueEmpty: { color: colors.textTertiary },
     captionRow: { flexDirection: 'row', alignItems: 'center', gap: 2 },
-    tileCaption: { fontSize: 11.5, fontWeight: '700', letterSpacing: 0.8, color: colors.textTertiary },
+    tileCaption: { fontSize: 12, fontWeight: '700', letterSpacing: 0.8, color: colors.textTertiary },
     tileNote: { fontSize: 12, color: colors.textTertiary },
     tileDivider: { alignSelf: 'stretch', height: StyleSheet.hairlineWidth, marginHorizontal: spacing.sm, opacity: 0.6 },
     confidenceRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs, paddingHorizontal: 2 },

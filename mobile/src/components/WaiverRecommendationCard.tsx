@@ -124,7 +124,7 @@ const pillStyles = StyleSheet.create({
     paddingHorizontal: spacing.xs + 2,
     paddingVertical: 1,
   },
-  text: { fontSize: 11, fontWeight: '800', letterSpacing: 0.3, textTransform: 'uppercase' },
+  text: { fontSize: 12, fontWeight: '800', letterSpacing: 0.3, textTransform: 'uppercase' },
 });
 
 /** Up to two reason chips from real, already-computed signals only
@@ -358,7 +358,7 @@ function createStyles(colors: ThemeColors) {
     scoreBlock: { alignItems: 'flex-start', gap: 1 },
     scoreNumberPrimary: { fontSize: 23, fontWeight: '800', color: colors.accent },
     scoreNumberCompact: { fontSize: 17, fontWeight: '700', color: colors.accent },
-    scoreLabel: { fontSize: 11, fontWeight: '700', color: colors.textTertiary, letterSpacing: 0.5 },
+    scoreLabel: { fontSize: 12, fontWeight: '700', color: colors.textTertiary, letterSpacing: 0.5 },
     metricsDivider: { width: StyleSheet.hairlineWidth, alignSelf: 'stretch', backgroundColor: colors.border },
     breakdownRow: {
       flexDirection: 'row',

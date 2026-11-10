@@ -1,7 +1,14 @@
 import React from 'react';
 import { StyleSheet, Text, type TextProps } from 'react-native';
 
-import { MAX_FONT_SCALE } from '../theme';
+import { MAX_FONT_SCALE, typography } from '../theme';
+
+export type AppTextVariant = keyof typeof typography;
+
+interface AppTextProps extends TextProps {
+  /** Shared typography role (theme.ts `typography`); explicit style still wins. */
+  variant?: AppTextVariant;
+}
 
 /**
  * Drop-in replacement for RN's `Text` that renders in Inter — the brand
@@ -43,6 +50,7 @@ function interFamilyFor(style: TextProps['style']): string {
   return WEIGHT_TO_INTER_FAMILY[weight] ?? 'Inter_400Regular';
 }
 
-export default function AppText({ style, ...rest }: TextProps) {
-  return <Text maxFontSizeMultiplier={MAX_FONT_SCALE} {...rest} style={[{ fontFamily: interFamilyFor(style) }, style]} />;
+export default function AppText({ style, variant, ...rest }: AppTextProps) {
+  const merged = variant ? [typography[variant], style] : style;
+  return <Text maxFontSizeMultiplier={MAX_FONT_SCALE} {...rest} style={[{ fontFamily: interFamilyFor(merged) }, merged]} />;
 }

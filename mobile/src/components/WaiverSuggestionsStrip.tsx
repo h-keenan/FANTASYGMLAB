@@ -53,7 +53,7 @@ function WaiverSuggestionCard({ player, onPress }: { player: WaiverPriorityAdd; 
   const { colors, isDark } = useThemeMode();
   const styles = useMemo(() => createStyles(colors), [colors]);
   const prestige = positionRankPrestige(player.position_rank, isDark);
-  const visual = bestAvailableCardVisual(prestige.tier);
+  const visual = bestAvailableCardVisual(prestige.tier, player.position, player.position_rank);
   return (
     <AnimatedCard
       style={styles.suggestionCard}
@@ -63,7 +63,7 @@ function WaiverSuggestionCard({ player, onPress }: { player: WaiverPriorityAdd; 
     >
       <View style={styles.suggestionTopRow}>
         {visual.prestigeLabel ? (
-          <AppText style={[styles.suggestionPrestigeLabel, { color: prestige.color ?? colors.textTertiary }]}>
+          <AppText style={[styles.suggestionPrestigeLabel, { color: prestige.color ?? colors.textTertiary }]} numberOfLines={1}>
             {visual.prestigeLabel}
           </AppText>
         ) : (
@@ -103,7 +103,7 @@ function createStyles(colors: ThemeColors) {
       minHeight: 14,
       marginBottom: spacing.xs,
     },
-    suggestionPrestigeLabel: { fontSize: 12, fontWeight: '800', textTransform: 'uppercase', letterSpacing: 0.5 },
+    suggestionPrestigeLabel: { fontSize: 12, fontWeight: '800', flexShrink: 1 },
     suggestionAvatar: { marginTop: 2 },
     suggestionPosBadgeWrap: { alignSelf: 'center', marginTop: spacing.xs },
     suggestionName: { fontSize: 16.5, fontWeight: '800', color: colors.textPrimary, marginTop: spacing.xs },

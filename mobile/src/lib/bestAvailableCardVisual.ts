@@ -42,9 +42,20 @@ export interface BestAvailableCardVisual {
   glow: boolean;
 }
 
+/**
+ * Plain-language label for the prestige tier: "QB3 in league" when the
+ * position and rank are known, else "Top-5 at position". Never the medal
+ * word (GOLD/SILVER/BRONZE) — that read as unexplained jargon. The tier
+ * still drives color/glow.
+ */
 export function bestAvailableCardVisual(
   tier: PositionRankPrestigeTier | null | undefined,
+  position?: string | null,
+  positionRank?: number | null,
 ): BestAvailableCardVisual {
   if (!tier) return { prestigeLabel: null, glow: false };
-  return { prestigeLabel: tier.toUpperCase(), glow: true };
+  const pos = (position ?? '').trim().toUpperCase();
+  const hasRank = positionRank != null && Number.isFinite(positionRank) && positionRank >= 1;
+  const prestigeLabel = pos && hasRank ? `${pos}${Math.round(positionRank as number)} in league` : 'Top-5 at position';
+  return { prestigeLabel, glow: true };
 }

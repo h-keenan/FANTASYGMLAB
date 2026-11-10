@@ -793,13 +793,13 @@ function createStyles(colors: ThemeColors) {
     minWidth: 52,
   },
   rankLabel: {
-    fontSize: 11,
+    fontSize: 12,
     fontWeight: '700',
     color: colors.textTertiary,
     letterSpacing: 0.4,
   },
   rankValue: { fontSize: 16.5, fontWeight: '700' },
-  rankDetail: { fontSize: 11, fontWeight: '600', color: colors.textTertiary, marginTop: 1 },
+  rankDetail: { fontSize: 12, fontWeight: '600', color: colors.textTertiary, marginTop: 1 },
   // League #1 gets the same premium/gold hue as an award badge instead of
   // the standard accent — a leaderboard's top spot should read as "the"
   // rank at a glance, not just another pill in the same color scheme as

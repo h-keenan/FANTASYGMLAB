@@ -428,7 +428,7 @@ function createRowStyles(colors: ThemeColors) {
     metaRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs, marginBottom: spacing.xs },
     unreadDot: { width: 9, height: 9, borderRadius: 4.5, backgroundColor: colors.accent },
     relationshipPill: { borderRadius: radii.pill, paddingHorizontal: spacing.xs + 2, paddingVertical: 1 },
-    relationshipPillText: { fontSize: 11, fontWeight: '800', letterSpacing: 0.3 },
+    relationshipPillText: { fontSize: 12, fontWeight: '800', letterSpacing: 0.3 },
     metaSpacer: { flex: 1 },
     time: { fontSize: 12.5, color: colors.textTertiary },
     linkChevron: { marginLeft: spacing.xs },

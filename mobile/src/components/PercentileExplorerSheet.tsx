@@ -554,7 +554,7 @@ function createStyles(colors: ThemeColors) {
     facePicked: { borderWidth: 2, borderColor: colors.premium },
     badge: { borderWidth: 1, borderRadius: 999, paddingHorizontal: 6, backgroundColor: colors.surface },
     badgeText: { fontSize: 12, fontWeight: '700', color: colors.textSecondary },
-    tag: { fontSize: 10, fontWeight: '800', letterSpacing: 0.4, color: colors.accent, backgroundColor: colors.accentMuted, borderRadius: 999, paddingHorizontal: 5, overflow: 'hidden' },
+    tag: { fontSize: 12, fontWeight: '800', letterSpacing: 0.4, color: colors.accent, backgroundColor: colors.accentMuted, borderRadius: 999, paddingHorizontal: 5, overflow: 'hidden' },
     section: { gap: spacing.xs, marginBottom: spacing.md },
     sectionHead: { flexDirection: 'row', justifyContent: 'space-between', gap: spacing.sm },
     sectionTitle: { fontSize: 13.5, fontWeight: '700', color: colors.textSecondary },

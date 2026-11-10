@@ -1296,10 +1296,10 @@ function createStyles(colors: ThemeColors) {
     paddingVertical: spacing.xs,
   },
   meterRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs, marginTop: spacing.md },
-  meterLabel: { fontSize: 11, fontWeight: '700', color: colors.textTertiary, letterSpacing: 0.4 },
+  meterLabel: { fontSize: 12.5, fontWeight: '700', color: colors.textTertiary, letterSpacing: 0.4 },
   meterSegments: { flexDirection: 'row', gap: 3 },
   meterSegment: { width: 18, height: 5, borderRadius: radii.pill },
-  meterValue: { fontSize: 12.5, fontWeight: '600', color: colors.textSecondary },
+  meterValue: { fontSize: 13, fontWeight: '600', color: colors.textSecondary },
   destButton: { marginTop: spacing.md, borderColor: colors.accent, paddingVertical: spacing.sm },
   emptyCard: {
     alignItems: 'center',
