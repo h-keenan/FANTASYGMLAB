@@ -15,23 +15,53 @@ import dynamic from "next/dynamic";
 const EmbeddedCheckoutModal = dynamic(() => import("@/components/EmbeddedCheckoutModal").then((m) => m.EmbeddedCheckoutModal), {
   ssr: false,
 });
-import { FeatureIncludedGlyph, PlanTierGlyph } from "@/components/PremiumGlyph";
+import { PlanTierGlyph } from "@/components/PremiumGlyph";
 import { Button } from "@/components/Button";
-import { PremiumComparison } from "@/components/PremiumComparison";
+import { ComparisonDisclosure, PaywallLegalLinks, ProHighlights } from "@/components/PaywallParts";
+import { HelpLink } from "@/components/HelpLink";
+import { PillRow } from "@/components/PillRow";
+import { ToneBadge } from "@/components/ToneBadge";
+import { FALLBACK_PREMIUM_COMPARISON } from "@/lib/premiumComparison";
+import {
+  PAYWALL_CARD_NOTE,
+  PAYWALL_HERO_SUB,
+  PAYWALL_HERO_TITLE,
+  PAYWALL_TRIAL_REASSURANCE,
+  annualSavingsPercent,
+  parsePrice,
+} from "@/lib/paywallCopy";
 import type { PremiumComparisonRow } from "@/lib/premiumComparison";
+
+/** "$59.99" -> "$5.00" (the yearly price over 12 months), keeping the currency prefix. */
+function annualPerMonth(price: string): string | null {
+  const n = parsePrice(price);
+  if (n === null) return null;
+  const prefix = /^[^\d]*/.exec(price)?.[0].trim() ?? "";
+  return `${prefix}${(n / 12).toFixed(2)}`;
+}
 
 const TIER_LABELS: Record<BillingPlan["tier"], string> = {
   pro: "Pro",
   front_office: "Front Office",
 };
 
-export function PlanCard({
+/**
+ * One plan at a time: price, the per-month equivalent for yearly, a full-width
+ * CTA, and the trial/cancel reassurance. All billing logic (checkout start,
+ * guest gate, embedded modal) is unchanged from the old per-plan cards; only
+ * the layout changed. Benefits live once above (ProHighlights), never repeated
+ * per plan.
+ */
+export function PlanCheckout({
   plan,
+  monthlyPlan,
   returnTo,
   publishableKey,
   trialDays = 0,
 }: {
   plan: BillingPlan;
+  /** The same tier's monthly plan, for the per-month equivalent and savings. */
+  monthlyPlan?: BillingPlan | null;
   returnTo?: string;
   publishableKey: string;
   trialDays?: number;
@@ -47,9 +77,7 @@ export function PlanCard({
   // million redirectes" — mounts Stripe's own Checkout UI in place
   // (EmbeddedCheckoutModal) instead of leaving the app for
   // checkout.stripe.com. Stripe itself still navigates the page to
-  // return_url once payment completes (same destination `returnTo`
-  // already pointed the old hosted flow at) -- that's the one
-  // unavoidable navigation, not a redirect away and back.
+  // return_url once payment completes.
   const subscribe = async () => {
     setBusy(true);
     setError(null);
@@ -70,34 +98,28 @@ export function PlanCard({
     }
   };
 
+  const perMonth = plan.interval === "annual" ? annualPerMonth(plan.price) : null;
+  const savings = plan.interval === "annual" && monthlyPlan ? annualSavingsPercent(monthlyPlan.price, plan.price) : null;
+
   return (
-    <div
-      className="glass-surface p-4 flex flex-col gap-2 premium-glow-card"
-    >
-      <span
-        className="flex items-center gap-1.5 text-xs font-bold uppercase"
-        style={{ color: "var(--color-premium)" }}
-      >
-        <PlanTierGlyph name={plan.tier} />
-        {TIER_LABELS[plan.tier]} — {plan.label}
-      </span>
-      <span style={{ font: "var(--type-primary-metric)" }}>
-        {plan.price} <span className="text-sm font-normal">{plan.cadence}</span>
-      </span>
-      <ul className="flex flex-col gap-1.5">
-        {plan.features.map((feature) => (
-          <li
-            key={feature}
-            className="text-sm flex items-start gap-2"
-            style={{ color: "var(--color-text-secondary)" }}
-          >
-            <span style={{ color: "var(--color-success)", marginTop: "0.1rem", flexShrink: 0 }}>
-              <FeatureIncludedGlyph />
-            </span>
-            <span>{feature}</span>
-          </li>
-        ))}
-      </ul>
+    <div className="glass-surface p-4 flex flex-col gap-3 premium-glow-card" data-testid="plan-checkout">
+      <div className="flex items-start justify-between gap-2">
+        <span className="flex items-center gap-1.5 text-xs font-bold uppercase" style={{ color: "var(--color-premium)" }}>
+          <PlanTierGlyph name={plan.tier} />
+          {TIER_LABELS[plan.tier]} — {plan.label}
+        </span>
+        {savings ? <ToneBadge label={`Save ${savings}%`} color="var(--color-success)" /> : null}
+      </div>
+      <div className="flex flex-col">
+        <span style={{ font: "var(--type-primary-metric)" }}>
+          {plan.price} <span className="text-sm font-normal">{plan.cadence}</span>
+        </span>
+        {perMonth ? (
+          <span className="text-xs" style={{ color: "var(--color-text-muted)" }}>
+            About {perMonth}/month, billed yearly
+          </span>
+        ) : null}
+      </div>
       {error ? (
         <p role="alert" className="text-xs" style={{ color: "var(--color-danger)" }}>
           {error}
@@ -106,23 +128,35 @@ export function PlanCard({
       {isGuest || accountRequired ? (
         <TrialAccountGate onSignedIn={() => setAccountRequired(false)} />
       ) : (
-        <Button
-          variant="premium"
-          type="button"
-          onClick={subscribe}
-          loading={busy}
-        >
+        <Button variant="premium" type="button" onClick={subscribe} loading={busy} fullWidth>
           {busy ? "Starting checkout…" : trialDays > 0 ? trialCtaLabel(trialDays) : "Subscribe"}
         </Button>
       )}
-      {trialDays > 0 ? (
-        <p className="text-xs" style={{ color: "var(--color-text-muted)" }}>
-          {thenPriceLine(plan)}
-        </p>
-      ) : null}
+      <p className="text-xs text-center m-0" style={{ color: "var(--color-text-muted)" }}>
+        {trialDays > 0 ? `${thenPriceLine(plan)} ${PAYWALL_CARD_NOTE}` : PAYWALL_TRIAL_REASSURANCE}
+      </p>
       {clientSecret ? (
         <EmbeddedCheckoutModal clientSecret={clientSecret} publishableKey={publishableKey} onClose={() => setClientSecret(null)} />
       ) : null}
+    </div>
+  );
+}
+
+/** Monthly / Annual toggle for one tier, defaulting to annual (the better deal), with the saving on the tab. */
+function TierPlans({ plans, publishableKey, trialDays }: { plans: BillingPlan[]; publishableKey: string; trialDays: number }) {
+  const monthly = plans.find((p) => p.interval === "monthly") ?? null;
+  const annual = plans.find((p) => p.interval === "annual") ?? null;
+  const [interval, setInterval] = useState<string>(annual ? "annual" : plans[0].interval);
+  const active = plans.find((p) => p.interval === interval) ?? plans[0];
+  const savings = monthly && annual ? annualSavingsPercent(monthly.price, annual.price) : null;
+  const options = plans.map((p) => ({
+    value: p.interval,
+    label: p.interval === "annual" && savings ? `${p.label} · Save ${savings}%` : p.label,
+  }));
+  return (
+    <div className="flex flex-col gap-3">
+      {plans.length > 1 ? <PillRow ariaLabel="Billing period" options={options} active={active.interval} onSelect={setInterval} variant="fill" /> : null}
+      <PlanCheckout plan={active} monthlyPlan={monthly} publishableKey={publishableKey} trialDays={active.tier === "pro" ? trialDays : 0} />
     </div>
   );
 }
@@ -191,34 +225,40 @@ export function PremiumContent({
   useEffect(() => {
     trackFeatureUse("premium_viewed", { props: { tier: entitlement === "premium" ? "pro" : "free" } });
   }, [entitlement]);
+  const rows = comparison ?? FALLBACK_PREMIUM_COMPARISON;
+  const tiers = Array.from(new Set(plans.map((p) => p.tier)));
   return (
     <main className="flex-1 flex flex-col gap-6 px-4 py-6 max-w-3xl w-full mx-auto">
-      <header className="flex flex-col gap-1">
-        <span className="text-xs" style={{ color: "var(--color-text-muted)" }}>
+      <header className="flex flex-col gap-2">
+        <span className="text-xs font-bold uppercase" style={{ color: "var(--color-premium)", letterSpacing: "var(--letter-spacing-badge)" }}>
           Pro
         </span>
-        <h1 style={{ font: "var(--font-page-title)" }}>Unlock the full GM toolkit</h1>
+        <h1 style={{ font: "var(--font-page-title)" }}>{PAYWALL_HERO_TITLE}</h1>
+        <p className="text-base m-0" style={{ color: "var(--color-text-secondary)" }}>
+          {PAYWALL_HERO_SUB}
+        </p>
       </header>
 
       {entitlement === "premium" ? <ManageBilling trialEndsAt={trialEndsAt} /> : null}
 
-      <section className="flex flex-col gap-3" aria-labelledby="compare-heading">
-        <SectionHeading id="compare-heading">Free vs Pro</SectionHeading>
-        <div className="glass-surface p-4">
-          <PremiumComparison rows={comparison} />
-        </div>
+      <section className="flex flex-col gap-3" aria-labelledby="highlights-heading">
+        <SectionHeading id="highlights-heading">What Pro adds</SectionHeading>
+        <ProHighlights rows={rows} />
+        <ComparisonDisclosure rows={rows} />
       </section>
 
-      <section className="flex flex-col gap-3" aria-labelledby="plans-heading">
-        <SectionHeading id="plans-heading">
-          Plans
-        </SectionHeading>
-        <div className="grid gap-3 sm:grid-cols-3">
-          {plans.map((plan) => (
-            <PlanCard key={`${plan.tier}-${plan.interval}`} plan={plan} publishableKey={publishableKey} trialDays={plan.tier === "pro" ? trialDays : 0} />
+      {(
+        <section className="flex flex-col gap-3" aria-labelledby="plans-heading">
+          <SectionHeading id="plans-heading">Choose your plan</SectionHeading>
+          {tiers.map((tier) => (
+            <TierPlans key={tier} plans={plans.filter((p) => p.tier === tier)} publishableKey={publishableKey} trialDays={trialDays} />
           ))}
-        </div>
-      </section>
+          <PaywallLegalLinks />
+          <div className="flex justify-center">
+            <HelpLink context={{ topic: "premium_page" }} />
+          </div>
+        </section>
+      )}
     </main>
   );
 }

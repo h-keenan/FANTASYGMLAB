@@ -17,7 +17,9 @@ const EmbeddedCheckoutModal = dynamic(() => import("@/components/EmbeddedCheckou
   ssr: false,
 });
 import { Button } from "@/components/Button";
-import { PremiumComparison } from "@/components/PremiumComparison";
+import { ComparisonDisclosure, PaywallLegalLinks, ProHighlights } from "@/components/PaywallParts";
+import { ToneBadge } from "@/components/ToneBadge";
+import { PAYWALL_CARD_NOTE, PAYWALL_HERO_TITLE, annualSavingsPercent } from "@/lib/paywallCopy";
 import { FALLBACK_PREMIUM_COMPARISON, normalizePremiumComparison, type PremiumComparisonRow } from "@/lib/premiumComparison";
 
 // Zach: "have one product here and call it Get Started For Free with a few
@@ -29,7 +31,7 @@ import { FALLBACK_PREMIUM_COMPARISON, normalizePremiumComparison, type PremiumCo
 // saying what it costs after), just no card chrome or feature list. The
 // monthly-vs-annual choice still exists on /premium for anyone who wants
 // it later.
-function FreeTrialButton({ plan, publishableKey, trialDays }: { plan: BillingPlan; publishableKey: string; trialDays: number }) {
+function FreeTrialButton({ plan, publishableKey, trialDays, savings }: { plan: BillingPlan; publishableKey: string; trialDays: number; savings: number | null }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [clientSecret, setClientSecret] = useState<string | null>(null);
@@ -57,6 +59,11 @@ function FreeTrialButton({ plan, publishableKey, trialDays }: { plan: BillingPla
 
   return (
     <div className="flex flex-col gap-2">
+      {savings ? (
+        <div className="flex justify-center">
+          <ToneBadge label={`Annual plan: save ${savings}%`} color="var(--color-success)" />
+        </div>
+      ) : null}
       {error ? (
         <p role="alert" className="text-xs" style={{ color: "var(--color-danger)" }}>
           {error}
@@ -70,7 +77,7 @@ function FreeTrialButton({ plan, publishableKey, trialDays }: { plan: BillingPla
           type="button"
           onClick={subscribe}
           loading={busy}
-          style={{ alignSelf: "auto" }}
+          fullWidth
         >
           {busy ? "Starting…" : trialDays > 0 ? trialCtaLabel(trialDays) : "Subscribe"}
         </Button>
@@ -80,7 +87,7 @@ function FreeTrialButton({ plan, publishableKey, trialDays }: { plan: BillingPla
       </p>
       {trialDays > 0 ? (
         <p className="text-xs text-center" style={{ color: "var(--color-text-muted)" }}>
-          A card is required to start the trial. Skipping keeps the free plan, no card.
+          {PAYWALL_CARD_NOTE}
         </p>
       ) : null}
       {clientSecret ? (
@@ -150,15 +157,14 @@ export function OnboardingPaywall({ onSkip }: { onSkip: () => void }) {
   return (
     <div className="flex flex-col gap-4">
       <div className="flex flex-col gap-1 text-center">
-        <SectionHeading>{trialDays > 0 ? `Try Pro free for ${trialDays} days` : "Unlock the full GM toolkit"}</SectionHeading>
+        <SectionHeading>{trialDays > 0 ? `Try Pro free for ${trialDays} days` : PAYWALL_HERO_TITLE}</SectionHeading>
         <p className="text-sm" style={{ color: "var(--color-text-secondary)" }}>
-          Free keeps working. Pro removes the caps.
+          Your league is connected. Free keeps working; Pro removes the caps.
         </p>
       </div>
 
-      <div className="glass-surface p-3">
-        <PremiumComparison rows={comparison} />
-      </div>
+      <ProHighlights rows={comparison} />
+      <ComparisonDisclosure rows={comparison} />
 
       {error ? (
         <p role="alert" className="text-sm" style={{ color: "var(--color-danger)" }}>
@@ -169,7 +175,12 @@ export function OnboardingPaywall({ onSkip }: { onSkip: () => void }) {
           Loading plans…
         </p>
       ) : (
-        <FreeTrialButton plan={annualPlan} publishableKey={plans?.stripe_publishable_key ?? ""} trialDays={trialDays} />
+        <FreeTrialButton
+          plan={annualPlan}
+          publishableKey={plans?.stripe_publishable_key ?? ""}
+          trialDays={trialDays}
+          savings={annualSavingsPercent(plans?.plans.find((p) => p.interval === "monthly")?.price, annualPlan.price)}
+        />
       )}
 
       <button
@@ -183,6 +194,7 @@ export function OnboardingPaywall({ onSkip }: { onSkip: () => void }) {
       >
         Skip for now — continue free
       </button>
+      <PaywallLegalLinks />
       <HelpLink context={{ topic: "paywall" }} className="self-center" />
     </div>
   );
