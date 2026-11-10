@@ -25,7 +25,7 @@ export default function HelpLink({
       accessibilityRole="link"
       accessibilityLabel={label}
       hitSlop={LINK_HIT_SLOP}
-      onPress={() => void Linking.openURL(supportMailto(context)).catch(() => {})}
+      onPress={() => void Linking.openURL(supportMailto(context, 'app')).catch(() => {})}
       style={[styles.hit, style]}
     >
       <AppText style={[styles.text, { color: colors.textTertiary }]}>{label}</AppText>

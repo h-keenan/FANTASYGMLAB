@@ -20,7 +20,7 @@ export interface SupportContext {
   detail?: string | null;
 }
 
-export function supportMailto(ctx: SupportContext = {}, appVersion = "app"): string {
+export function supportMailto(ctx: SupportContext = {}, appVersion = "unknown"): string {
   const lines = [
     "",
     "",

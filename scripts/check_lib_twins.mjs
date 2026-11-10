@@ -53,6 +53,7 @@ export const MIRRORED = [
   "playerNameFixtures.ts",
   "premiumComparison.ts",
   "sleeperConnectErrors.ts",
+  "support.ts",
   "teamStatus.ts",
   "useDelayedFlag.ts",
   "valueHistoryPresentation.ts",

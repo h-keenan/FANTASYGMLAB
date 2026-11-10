@@ -16,7 +16,7 @@ export function HelpLink({
 }) {
   return (
     <a
-      href={supportMailto(context)}
+      href={supportMailto(context, "web")}
       className={`tap-link text-xs underline ${className ?? ""}`}
       style={{ color: "var(--color-text-muted)" }}
       data-testid="help-link"
