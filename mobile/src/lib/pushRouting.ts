@@ -6,6 +6,7 @@
  *  - league pushes: {league_id, league_name, category, player_id?, player_name?}
  *  - trade follow-up: {type: 'trade_outcome_followup', category:
  *    'trade_followup', outcome_id, league_id}
+ *  - weekly roundup: {league_id, league_name, category: 'weekly_roundup', week}
  */
 
 export interface PushNotificationData {
@@ -16,6 +17,7 @@ export interface PushNotificationData {
   outcome_id?: string;
   player_id?: string;
   player_name?: string;
+  week?: number | string;
 }
 
 export type PushTapTarget =
@@ -24,6 +26,7 @@ export type PushTapTarget =
   | { screen: 'Matchup'; leagueId: string; leagueName: string }
   | { screen: 'Waivers'; leagueId: string; leagueName: string }
   | { screen: 'Trades'; leagueId: string; leagueName: string }
+  | { screen: 'Recap'; leagueId: string; leagueName: string; initialTab: 'roundup'; week?: number }
   | { screen: 'TradeHistory' }
   | null;
 
@@ -51,6 +54,16 @@ export function resolvePushTapTarget(data: unknown): PushTapTarget {
   const category = str(payload.category);
   if (category === 'lineup_lock') return { screen: 'Matchup', leagueId, leagueName };
   if (category === 'trade_deadline') return { screen: 'Trades', leagueId, leagueName };
+  if (category === 'weekly_roundup') {
+    const week = Number(payload.week);
+    return {
+      screen: 'Recap',
+      leagueId,
+      leagueName,
+      initialTab: 'roundup',
+      ...(Number.isInteger(week) && week > 0 ? { week } : {}),
+    };
+  }
   if (category === 'waiver_reminder') return { screen: 'Waivers', leagueId, leagueName };
 
   const playerId = str(payload.player_id);

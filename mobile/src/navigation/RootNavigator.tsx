@@ -102,7 +102,7 @@ export type RootStackParamList = {
   /** "What FantasyDesk can do". League params only when a link carries one (else the last league). */
   Features: { leagueId?: string; leagueName?: string } | undefined;
   Waivers: { leagueId: string; leagueName: string; playerId?: string; tab?: 'recommended' | 'explore' | 'watchlist' };
-  Recap: { leagueId: string; leagueName: string };
+  Recap: { leagueId: string; leagueName: string; initialTab?: 'recap' | 'roundup'; week?: number };
   Dashboard: { leagueId: string; leagueName: string };
   // Single consolidated host for Trade Hub ("Hub"), Trade Finder
   // ("Finder"), and Trade Analyzer ("Analyzer") — see TradesScreen.

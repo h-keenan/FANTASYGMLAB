@@ -7,6 +7,7 @@ import { useEffect, useState } from "react";
 import { useAuth } from "@/context/AuthContext";
 import { api, type RecapResponse } from "@/lib/api";
 import { LeagueRecapsContent } from "@/components/LeagueRecapsContent";
+import { parseRecapsTab, parseRoundupWeek } from "@/lib/pageTabs";
 import { ErrorState, reloadPage } from "@/components/ErrorState";
 import { LoadingScreen } from "@/components/LoadingScreen";
 
@@ -56,5 +57,13 @@ export default function LeagueRecapsPage() {
     );
   }
 
-  return <LeagueRecapsContent leagueId={leagueId} leagueName={leagueName} initialRecap={recap} />;
+  return (
+    <LeagueRecapsContent
+      leagueId={leagueId}
+      leagueName={leagueName}
+      initialRecap={recap}
+      initialTab={parseRecapsTab(searchParams.get("tab"))}
+      initialWeek={parseRoundupWeek(searchParams.get("week"))}
+    />
+  );
 }

@@ -1563,6 +1563,8 @@ export interface AlertsResponse {
   ok: true;
   items: AlertItem[];
   reason: AlertsReason;
+  /** Weekly roundup pointer card; absent/null offseason or on older backends. */
+  roundup_notice?: RoundupNotice | null;
 }
 
 export type TeamStrategy =
@@ -2041,6 +2043,98 @@ export interface TradeOutcomeResultSummary {
   days_since_trade: number | null;
   production?: { net_points_ppr: number; avg_net_per_week: number; weeks_counted: number } | null;
   value?: { sent_delta_pct: number; received_delta_pct: number; net_delta_pct: number } | null;
+}
+
+
+/** Weekly Team Roundup (GET .../roundup): your lineup vs the hindsight-best
+ * one for a completed week. Twin of web-next/src/lib/api.ts (keep in sync).
+ * `predictability` comes from retroactive point-in-time projections; the
+ * response's `method` note says so and clients must show it. */
+export type RoundupPredictability = "foreseeable" | "coin_flip" | "unforeseeable";
+
+export interface RoundupPlayer {
+  player_id: string | null;
+  name: string;
+  position: string;
+  team: string;
+  points: number;
+}
+
+export interface RoundupProjection {
+  points: number;
+  sd: number;
+}
+
+export interface RoundupSwap {
+  slot: string;
+  started: RoundupPlayer;
+  benched: RoundupPlayer;
+  gain: number;
+  predictability: RoundupPredictability;
+  edge: number | null;
+  reason: string;
+  started_projection: RoundupProjection | null;
+  benched_projection: RoundupProjection | null;
+}
+
+export interface RoundupLineupSlot {
+  slot: string;
+  actual: RoundupPlayer;
+  optimal: RoundupPlayer;
+}
+
+export interface WeeklyRoundup {
+  week: number;
+  actual_points: number;
+  optimal_points: number;
+  left_on_bench: number;
+  foreseeable_points: number;
+  /** Empty for Free accounts. */
+  lineup: RoundupLineupSlot[];
+  /** Free accounts get only the biggest swap; `swaps_total` is the full count. */
+  swaps: RoundupSwap[];
+  swaps_total?: number;
+  unattributed_points: number;
+  takeaway: string;
+}
+
+export interface RoundupSeasonWeek {
+  week: number;
+  actual_points: number;
+  optimal_points: number;
+  left_on_bench: number;
+  foreseeable_points: number;
+}
+
+export interface RoundupSeasonTally {
+  weeks_reviewed: number;
+  total_left_on_bench: number;
+  avg_left_on_bench: number;
+  foreseeable_points: number;
+  foreseeable_share: number;
+  weeks: RoundupSeasonWeek[];
+  summary: string;
+}
+
+export interface RoundupResponse {
+  ok: boolean;
+  /** "" when ready; otherwise no_completed_week, no_matchup_data, unsupported_platform, or a roster-resolution reason. */
+  reason: string;
+  max_completed_week: number;
+  week: number;
+  roundup: WeeklyRoundup | null;
+  /** Pro only. */
+  season: RoundupSeasonTally | null;
+  method: string;
+  is_premium: boolean;
+  upsell: { title: string; body: string } | null;
+}
+
+/** In-app twin of the weekly roundup push, on the Alerts feed. */
+export interface RoundupNotice {
+  week: number;
+  title: string;
+  body: string;
 }
 
 /** One answered (non-pending) shared trade — powers the mobile Trade
@@ -2607,7 +2701,8 @@ export type PushCategory =
   | 'trade_followup'
   | 'lineup_lock'
   | 'waiver_reminder'
-  | 'trade_deadline';
+  | 'trade_deadline'
+  | 'weekly_roundup';
 
 export interface PushPreferencesResponse {
   ok: boolean;
@@ -3835,6 +3930,10 @@ export const api = {
       `/v1/leagues/${encodeURIComponent(leagueId)}/recap${query ? `?${query}` : ''}`,
     );
   },
+  getLeagueRoundup: (leagueId: string, options?: { week?: number }) =>
+    authorizedFetch<RoundupResponse>(
+      `/v1/leagues/${encodeURIComponent(leagueId)}/roundup${options?.week != null ? `?week=${options.week}` : ''}`,
+    ),
   // `deferTradeIdeas` is the progressive first call: same payload minus the
   // (expensive) Top Trade Opportunity tile. Follow it with the plain call.
   getLeagueDashboard: (leagueId: string, options?: { deferTradeIdeas?: boolean }) =>

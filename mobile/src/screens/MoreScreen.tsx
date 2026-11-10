@@ -98,6 +98,7 @@ const PUSH_CATEGORY_LABELS: Array<{ value: PushCategory; label: string; descript
   { value: 'lineup_lock', label: 'Lineup lock reminders', description: 'An empty slot or an injured starter shortly before kickoff' },
   { value: 'trade_deadline', label: 'Trade deadline', description: 'Two weeks out, one week out, and the deadline week itself' },
   { value: 'waiver_reminder', label: 'Waiver reminders', description: 'Before waivers process, only when you have a clear need' },
+  { value: 'weekly_roundup', label: 'Weekly roundup', description: 'Tuesday after games: what you left on the bench and whether you could have known' },
 ];
 
 export default function MoreScreen({ navigation }: Props) {

@@ -64,7 +64,7 @@ export const FEATURE_ITEMS: readonly FeatureItem[] = [
   { id: "commissioner", group: "league", name: "Commissioner", line: "League integrity, plus a trade veto calculator.", pro: true, segment: "commissioner", leagueScoped: true, glyph: "commissioner", color: accentVar("commissioner") },
   { id: "playoff-odds", group: "league", name: "Playoff Odds", line: "Every team's chance at the playoffs.", pro: true, segment: "league-rankings", leagueScoped: true, hash: "playoff-odds", glyph: "playoffOdds", color: accentVar("playoff-odds") },
   { id: "games", group: "league", name: "Games", line: "Season simulator and weekly pick'em.", segment: "games", leagueScoped: true, glyph: "games", color: accentVar("games") },
-  { id: "league-recaps", group: "league", name: "League Recaps", line: "Your league's weekly recap and stories.", segment: "league-recaps", leagueScoped: true, glyph: "leagueRecaps", color: accentVar("league-recaps") },
+  { id: "league-recaps", group: "league", name: "League Recaps", line: "Your league's weekly recap, stories, and your lineup roundup.", segment: "league-recaps", leagueScoped: true, glyph: "leagueRecaps", color: accentVar("league-recaps") },
 
   { id: "dashboard", group: "keepup", name: "Dashboard", line: "Your game plan and top moves for this week.", segment: "dashboard", leagueScoped: true, glyph: "dashboard", color: accentVar("dashboard") },
   { id: "alerts", group: "keepup", name: "Alerts", line: "Injuries, news and updates on your players.", segment: "alerts", leagueScoped: true, glyph: "alerts", color: accentVar("alerts") },

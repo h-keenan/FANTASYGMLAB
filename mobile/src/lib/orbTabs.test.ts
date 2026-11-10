@@ -15,7 +15,7 @@ const orb = read('components', 'GmOrb.tsx');
 // Screen file per parent route, and the tab values it accepts for each param.
 const SCREEN: Record<string, string> = {
   Trades: 'TradesScreen', Teams: 'TeamsScreen', DraftCenter: 'DraftCenterScreen',
-  GmPlan: 'GmPlanScreen', Waivers: 'WaiversScreen', Games: 'GamesScreen',
+  GmPlan: 'GmPlanScreen', Waivers: 'WaiversScreen', Games: 'GamesScreen', Recap: 'RecapScreen',
 };
 
 test('every tab opens a registered route, with a param the route accepts', () => {
@@ -45,6 +45,7 @@ const pages = [
   { label: 'Trade Hub', route: 'Trades', subtitle: 'Trade ideas, trade finder, and trade analyzer', needsLeague: true },
   { label: 'Draft Center', route: 'DraftCenter', subtitle: 'Picks, order, and draft tools', needsLeague: true, pro: true },
   { label: 'Games', route: 'Games', subtitle: "Season simulator and weekly pick'em", needsLeague: true },
+  { label: 'League Recaps', route: 'Recap', subtitle: 'Weekly league recap, stories, and your lineup roundup', needsLeague: true },
   { label: 'Portfolio', route: 'Portfolio', subtitle: 'Your standing across every saved league' },
 ];
 const labels = (q: string) => searchOrbDestinations(pages, q).map((h) => h.label);
@@ -53,6 +54,7 @@ test('search finds tabs by label and keyword, shown as "Page > Tab"', () => {
   assert.ok(labels('scouting').includes('Draft Center > Scouting'));
   assert.ok(labels('finder').includes('Trade Hub > Finder'));
   assert.ok(labels('pickem').includes("Games > Pick'em"));
+  assert.ok(labels('bench regret').includes('League Recaps > Roundup'));
   assert.ok(labels('playoff odds').includes('League Rankings > Playoff Odds'));
   assert.deepEqual(labels('draft center scouting'), ['Draft Center > Scouting']);
   assert.deepEqual(labels('  '), []);

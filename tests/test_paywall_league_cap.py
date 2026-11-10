@@ -34,6 +34,7 @@ GATED_ENDPOINTS = [
     ("GET", "/v1/leagues/{lid}/idp/values"),
     ("GET", "/v1/leagues/{lid}/players/p1/rank"),
     ("GET", "/v1/leagues/{lid}/recap"),
+    ("GET", "/v1/leagues/{lid}/roundup"),
     ("GET", "/v1/leagues/{lid}/history"),
     ("GET", "/v1/leagues/{lid}/storylines"),
     ("GET", "/v1/leagues/{lid}/managers/tendencies"),

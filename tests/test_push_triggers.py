@@ -550,11 +550,11 @@ def test_fetch_push_preferences_defaults_missing_categories_to_enabled():
         preferences = push_triggers.fetch_push_preferences(_config(), ["u1", "u2"])
     assert preferences["u1"] == {
         "top_priority": True, "watch": True, "recap": True, "injury": False,
-        "team_situation": True, "trade_followup": True, "lineup_lock": True, "waiver_reminder": True, "trade_deadline": True,
+        "team_situation": True, "trade_followup": True, "lineup_lock": True, "waiver_reminder": True, "trade_deadline": True, "weekly_roundup": True,
     }
     assert preferences["u2"] == {
         "top_priority": True, "watch": True, "recap": True, "injury": True,
-        "team_situation": True, "trade_followup": True, "lineup_lock": True, "waiver_reminder": True, "trade_deadline": True,
+        "team_situation": True, "trade_followup": True, "lineup_lock": True, "waiver_reminder": True, "trade_deadline": True, "weekly_roundup": True,
     }
 
 
@@ -1333,3 +1333,69 @@ def test_trade_deadline_push_dedups_per_tier_in_the_sweep_log():
     assert two["recommendation_id"] != one["recommendation_id"]
     again = push_triggers.trade_deadline_push_item(league_id="L1", league_name="x", league=_deadline_league(leg=9))
     assert again["recommendation_id"] == two["recommendation_id"]
+
+
+# --- weekly roundup -----------------------------------------------------------
+
+_TUE_10_ET = datetime(2026, 11, 10, 15, 0, tzinfo=timezone.utc)  # Tue 10:00 ET
+_TUE_8_ET = datetime(2026, 11, 10, 13, 0, tzinfo=timezone.utc)  # Tue 08:00 ET
+_FRI_NOON_ET = datetime(2026, 11, 13, 17, 0, tzinfo=timezone.utc)
+_ROUNDUP = {
+    "week": 9,
+    "swaps": [{"started": {"name": "Alpha", "points": 3.0}, "benched": {"name": "Beta", "points": 21.0}}],
+    "left_on_bench": 18.0,
+}
+
+
+def test_weekly_roundup_category_registered():
+    assert "weekly_roundup" in push_triggers.TOGGLEABLE_PUSH_CATEGORIES
+    assert "weekly_roundup" in push_triggers.PUSH_PRIORITY_ORDER
+    assert push_triggers.PUSH_TITLE_BY_CATEGORY["weekly_roundup"] == "Weekly Roundup"
+    prefs = {"u1": {"weekly_roundup": False}}
+    assert not push_triggers.push_item_allowed(prefs, user_id="u1", category="weekly_roundup")
+
+
+def test_roundup_window_is_tuesday_9am_et_through_thursday():
+    assert push_triggers.roundup_window_open(_TUE_10_ET)
+    assert not push_triggers.roundup_window_open(_TUE_8_ET)
+    assert not push_triggers.roundup_window_open(_FRI_NOON_ET)
+
+
+def _roundup_item(now=_TUE_10_ET, *, completed=(9, {}), sent=False, roundup=_ROUNDUP, league=None):
+    built = Mock(return_value={"roundup": roundup})
+    with patch("modules.weekly_roundup.completed_week", return_value=completed):
+        item = push_triggers.weekly_roundup_push_item(
+            league_id="L1",
+            league_name="Secret League",
+            league=league or {"status": "in_season"},
+            my_roster={"roster_id": 1},
+            now=now,
+            is_already_sent=lambda rid: sent,
+            build=built,
+        )
+    return item, built
+
+
+def test_weekly_roundup_push_item_content_dedup_and_privacy():
+    item, _ = _roundup_item()
+    assert item["recommendation_id"] == "weekly_roundup:L1:9"
+    assert item["week"] == 9
+    assert "left 18.0 pts on the bench" in item["headline"]
+    assert "Alpha (3.0) over Beta (21.0)" in item["headline"]
+    assert "Secret League" not in item["headline"]
+    title, body, data = push_triggers.build_batched_message([item])
+    assert title == "Weekly Roundup" and data["week"] == 9 and data["category"] == "weekly_roundup"
+
+
+def test_weekly_roundup_push_item_skips_when_not_due():
+    assert _roundup_item(_TUE_8_ET)[0] is None
+    assert _roundup_item(_FRI_NOON_ET)[0] is None
+    assert _roundup_item(completed=(0, {}))[0] is None
+    assert _roundup_item(league={"status": "complete"})[0] is None
+    assert _roundup_item(roundup=None)[0] is None
+
+
+def test_weekly_roundup_not_rebuilt_once_sent():
+    item, built = _roundup_item(sent=True)
+    assert item is None
+    built.assert_not_called()

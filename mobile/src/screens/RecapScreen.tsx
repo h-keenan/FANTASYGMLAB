@@ -17,6 +17,8 @@ import GmStanceHeaderButton from '../components/GmStanceHeaderButton';
 import LeagueSwitcherHeaderButton from '../components/LeagueSwitcherHeaderButton';
 import GridBackground from '../components/GridBackground';
 import IconCircle from '../components/IconCircle';
+import RoundupPanel from '../components/RoundupPanel';
+import SegmentedTabBar from '../components/SegmentedTabBar';
 import RecapSharePreviewModal from '../components/RecapSharePreviewModal';
 import RecapTradeDetailModal from '../components/RecapTradeDetailModal';
 import SkeletonBlock, { SkeletonRow } from '../components/SkeletonBlock';
@@ -125,7 +127,12 @@ export default function RecapScreen({ route, navigation }: Props) {
   const headerHeight = useHeaderHeight();
   const { colors } = useThemeMode();
   const styles = useMemo(() => createStyles(colors), [colors]);
-  const { leagueId, leagueName } = route.params;
+  const { leagueId, leagueName, initialTab, week: requestedRoundupWeek } = route.params;
+  const [tab, setTab] = useState<'recap' | 'roundup'>(initialTab ?? 'recap');
+  // Picked from the GM orb or a weekly-roundup push while Recaps is already open.
+  useEffect(() => {
+    if (initialTab) setTab(initialTab);
+  }, [initialTab]);
   const [selectedWeek, setSelectedWeek] = useState<number | null>(null);
   const [shareOpen, setShareOpen] = useState(false);
   const [tradeStory, setTradeStory] = useState<RecapStory | null>(null);
@@ -243,6 +250,34 @@ export default function RecapScreen({ route, navigation }: Props) {
     return undefined;
   };
 
+  const tabBar = (
+    <View style={styles.tabBarRow}>
+      <SegmentedTabBar
+        options={[
+          { key: 'recap', label: 'Recap' },
+          { key: 'roundup', label: 'Roundup' },
+        ]}
+        active={tab}
+        onChange={setTab}
+      />
+    </View>
+  );
+
+  if (tab === 'roundup') {
+    return (
+      <View style={[styles.root, { paddingTop: headerHeight }]}>
+        <GridBackground />
+        {tabBar}
+        <RoundupPanel
+          leagueId={leagueId}
+          leagueName={leagueName}
+          initialWeek={requestedRoundupWeek}
+          bottomInset={orbClearance}
+        />
+      </View>
+    );
+  }
+
   if (loading && !recap) {
     return <BrandedSpinner style={[styles.center, { paddingTop: headerHeight }]} />;
   }
@@ -276,6 +311,7 @@ export default function RecapScreen({ route, navigation }: Props) {
   if (notReady || !recap) {
     return (
       <View style={[styles.root, { paddingTop: headerHeight }]}>
+        {tabBar}
         {weekPicker}
         <EmptyState
           icon="newspaper-outline"
@@ -292,6 +328,7 @@ export default function RecapScreen({ route, navigation }: Props) {
   return (
     <View style={[styles.root, { paddingTop: headerHeight }]}>
       <GridBackground />
+      {tabBar}
       {weekPicker}
       {loading ? (
         // A week switch intentionally clears the prior week's recap rather
@@ -779,6 +816,7 @@ function createStyles(colors: ThemeColors) {
     paddingHorizontal: spacing.lg,
     paddingTop: spacing.sm,
   },
+  tabBarRow: { paddingHorizontal: spacing.lg, paddingTop: spacing.sm },
   weekPill: {
     paddingHorizontal: spacing.md,
     paddingVertical: 6,

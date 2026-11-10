@@ -142,4 +142,23 @@ describe("AlertsContent", () => {
       "/waivers/league-1?name=Dynasty%20Overlords",
     );
   });
+
+  it("links the weekly roundup pointer card to League Recaps > Roundup for that week", () => {
+    render(
+      <AlertsContent
+        leagueId="L 1"
+        leagueName="My League"
+        data={{ ...BASE_RESPONSE, roundup_notice: { week: 9, title: "Your week 9 roundup is ready", body: "See what you left on the bench." } }}
+      />,
+    );
+    expect(screen.getByText("Your week 9 roundup is ready")).toBeTruthy();
+    expect(screen.getByTestId("roundup-notice").getAttribute("href")).toBe(
+      "/league-recaps/L%201?name=My%20League&tab=roundup&week=9",
+    );
+  });
+
+  it("shows no roundup card when the feed has none", () => {
+    render(<AlertsContent leagueId="L1" leagueName="My League" data={BASE_RESPONSE} />);
+    expect(screen.queryByTestId("roundup-notice")).toBeNull();
+  });
 });

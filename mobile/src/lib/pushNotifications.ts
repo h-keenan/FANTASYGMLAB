@@ -143,6 +143,16 @@ function routeNotificationTap(data: unknown): void {
     return;
   }
 
+  if (target.screen === 'Recap') {
+    navigationRef.navigate('Recap', {
+      leagueId: target.leagueId,
+      leagueName: target.leagueName,
+      initialTab: target.initialTab,
+      ...(target.week ? { week: target.week } : {}),
+    });
+    return;
+  }
+
   if (target.screen === 'PlayerDetail') {
     // Same lean hand-built player pattern AlertsScreen/DashboardScreen use
     // for their own player taps - Player Detail fetches everything else

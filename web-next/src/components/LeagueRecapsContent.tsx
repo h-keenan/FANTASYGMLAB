@@ -42,6 +42,8 @@ import {
 } from "@/lib/leagueRecapsPresentation";
 import { PageTitle } from "@/components/PageTitle";
 import { PlayerNameText } from "@/components/PlayerNameText";
+import { LeagueRoundupTab } from "@/components/LeagueRoundupTab";
+import type { RecapsTab } from "@/lib/pageTabs";
 
 /**
  * Ports modules/league_recaps_ui.py + modules/league_history_ui.py for
@@ -75,9 +77,11 @@ import { PlayerNameText } from "@/components/PlayerNameText";
  * cards that were never categorized that way.
  */
 
-type MemoryView = "Recaps" | "History" | "Storylines";
+type MemoryView = "Recaps" | "History" | "Storylines" | "Roundup";
 
-const MEMORY_VIEWS: MemoryView[] = ["Recaps", "History", "Storylines"];
+const MEMORY_VIEWS: MemoryView[] = ["Recaps", "Roundup", "History", "Storylines"];
+
+const VIEW_BY_TAB: Record<RecapsTab, MemoryView> = { recaps: "Recaps", history: "History", storylines: "Storylines", roundup: "Roundup" };
 
 function RecapStoryCard({
   story,
@@ -1037,12 +1041,23 @@ export function LeagueRecapsContent({
   leagueId,
   leagueName,
   initialRecap,
+  initialTab,
+  initialWeek,
 }: {
   leagueId: string;
   leagueName: string;
   initialRecap: RecapResponse;
+  /** `?tab=` (GM orb search, push deep link). */
+  initialTab?: RecapsTab;
+  /** `?week=` for the Roundup tab. */
+  initialWeek?: number;
 }) {
-  const [view, setView] = useState<MemoryView>("Recaps");
+  const [view, setView] = useState<MemoryView>(initialTab ? VIEW_BY_TAB[initialTab] : "Recaps");
+  const [seenInitialTab, setSeenInitialTab] = useState(initialTab);
+  if (initialTab !== seenInitialTab) {
+    setSeenInitialTab(initialTab);
+    if (initialTab) setView(VIEW_BY_TAB[initialTab]);
+  }
   const [historyCache, setHistoryCache] = useState<Record<string, HistoryResponse>>({});
   const [historyFilter, setHistoryFilter] = useState<string>(FILTER_ALL);
   const [storylinesData, setStorylinesData] = useState<StorylinesResponse | null>(null);
@@ -1063,6 +1078,7 @@ export function LeagueRecapsContent({
         setCache={setHistoryCache}
       />
     );
+  else if (view === "Roundup") body = <LeagueRoundupTab leagueId={leagueId} initialWeek={initialWeek} />;
   else
     body = (
       <StorylinesTab

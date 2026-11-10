@@ -22,7 +22,9 @@ import {
   relativeTime,
   rosterRelationshipColorVar,
 } from "@/lib/alertsPresentation";
+import { trackUse } from "@/lib/analytics";
 import { PageTitle } from "@/components/PageTitle";
+import Link from "next/link";
 
 /**
  * Ports mobile's AlertsScreen.tsx (mobile/src/screens) for Revision 7 —
@@ -47,8 +49,8 @@ import { PageTitle } from "@/components/PageTitle";
  * route there via Next <Link>, same contract as GamePlanCard.tsx — there
  * is just no such field on this feed's items today.
  *
- * Also NOT ported: the recap-ready header card (mobile's RecapReadyCard) —
- * League Recaps has no Next.js page yet, nothing to link it to.
+ * The weekly-roundup pointer card (mobile's RecapReadyCard twin) links to
+ * League Recaps > Roundup. The recap-ready card itself is still not ported.
  */
 
 // coridian_: "you need to be able to click on the players (needs to be
@@ -283,6 +285,23 @@ export function AlertsContent({
       <header className="flex flex-col gap-1">
         <PageTitle page="Alerts" leagueName={leagueName} />
       </header>
+
+      {data.roundup_notice ? (
+        <Link
+          href={`/league-recaps/${encodeURIComponent(leagueId)}?name=${encodeURIComponent(leagueName)}&tab=roundup&week=${data.roundup_notice.week}`}
+          onClick={() => trackUse("weekly_roundup", "alert_card_tapped", { leagueId })}
+          data-testid="roundup-notice"
+        >
+          <AccentCard accent="var(--color-accent)" compact as="div">
+            <p className="text-sm font-bold" style={{ color: "var(--color-text-primary)" }}>
+              {data.roundup_notice.title}
+            </p>
+            <p className="text-xs" style={{ color: "var(--color-text-secondary)" }}>
+              {data.roundup_notice.body}
+            </p>
+          </AccentCard>
+        </Link>
+      ) : null}
 
       {groups.length === 0 ? (
         <EmptyState title="All quiet. No relevant news for your roster right now." />

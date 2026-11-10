@@ -208,7 +208,7 @@ function gmToolsDestinations(colors: ThemeColors): Destination[] {
       icon: 'newspaper-outline',
       needsLeague: true,
       color: accentColor(colors, 'League Recaps'),
-      subtitle: 'Weekly league recap and stories',
+      subtitle: 'Weekly league recap, stories, and your lineup roundup',
     },
     {
       label: 'Games',
