@@ -25,6 +25,16 @@ def _app(gate: dict) -> FastAPI:
             gate["running"] -= 1
         return {"ok": True}
 
+    @app.get("/v1/leagues/{lid}/my-team")
+    async def my_team(lid: str):
+        gate["light_running"] = gate.get("light_running", 0) + 1
+        gate["light_peak"] = max(gate.get("light_peak", 0), gate["light_running"])
+        try:
+            await asyncio.sleep(gate.get("light_hold", 0.1))
+        finally:
+            gate["light_running"] -= 1
+        return {"ok": True}
+
     @app.get("/v1/leagues/{lid}/users")
     async def users(lid: str):
         return {"ok": True}
@@ -142,3 +152,56 @@ def test_real_app_registers_the_gate_and_exposes_retry_after():
     from services import mobile_api_service as svc
 
     assert any(m.cls is AdmissionControlMiddleware for m in svc.app.user_middleware)
+
+
+def test_lane_classification():
+    for p in ("/v1/leagues/1/dashboard", "/v1/leagues/1/trade-hub", "/v1/leagues/1/trade-analyzer",
+              "/v1/leagues/1/matchup/what-if", "/v1/leagues/1/team-rankings", "/v1/leagues/1/games/season-sim"):
+        assert admission.lane_for(p) == "heavy", p
+    for p in ("/v1/leagues/1/my-team", "/v1/leagues/1/my-team-needs", "/v1/leagues/1/matchup",
+              "/v1/leagues/1/waivers", "/v1/leagues/1/playoff-odds", "/v1/leagues/1/rankings"):
+        assert admission.lane_for(p) == "light", p
+    for p in ("/health", "/v1/leagues/1/users", "/v1/leagues/1/trade-hub/abc/share-card.png", "/v1/me"):
+        assert admission.lane_for(p) is None, p
+
+
+def test_light_routes_are_not_shed_or_queued_behind_saturated_heavy_pool(monkeypatch):
+    monkeypatch.setenv("ADMISSION_MAX_INFLIGHT", "1")
+    monkeypatch.setenv("ADMISSION_MAX_QUEUE", "0")
+    monkeypatch.setenv("ADMISSION_LIGHT_MAX_INFLIGHT", "4")
+    app = _app({"hold": 0.4, "light_hold": 0.05})
+
+    async def go():
+        transport = httpx.ASGITransport(app=app)
+        async with httpx.AsyncClient(transport=transport, base_url="http://t") as c:
+            heavy = asyncio.create_task(c.get("/v1/leagues/L1/dashboard"))
+            await asyncio.sleep(0.05)
+            start = asyncio.get_running_loop().time()
+            light = await asyncio.gather(*[c.get("/v1/leagues/L1/my-team") for _ in range(3)])
+            light_elapsed = asyncio.get_running_loop().time() - start
+            shed_heavy = await c.get("/v1/leagues/L1/dashboard")
+            return light, light_elapsed, shed_heavy, await heavy
+
+    light, light_elapsed, shed_heavy, heavy = asyncio.run(go())
+    assert [r.status_code for r in light] == [200] * 3
+    assert light_elapsed < 0.3  # served immediately, not after the 0.4s heavy request
+    assert shed_heavy.status_code == 503
+    assert heavy.status_code == 200
+
+
+def test_heavy_work_does_not_consume_light_slots_and_light_pool_is_capped(monkeypatch):
+    monkeypatch.setenv("ADMISSION_MAX_INFLIGHT", "8")
+    monkeypatch.setenv("ADMISSION_LIGHT_MAX_INFLIGHT", "2")
+    monkeypatch.setenv("ADMISSION_LIGHT_MAX_QUEUE", "0")
+    gate = {"hold": 0.05, "light_hold": 0.2}
+    responses = _run(_app(gate), 5, path="/v1/leagues/L1/my-team")
+    assert sorted(r.status_code for r in responses) == [200, 200, 503, 503, 503]
+    assert gate["light_peak"] == 2
+    assert responses[0].headers.get("x-admission") in (None, "queue_full")
+
+
+def test_light_lane_can_be_disabled_independently(monkeypatch):
+    monkeypatch.setenv("ADMISSION_LIGHT_MAX_INFLIGHT", "0")
+    gate = {"light_hold": 0.05}
+    assert [r.status_code for r in _run(_app(gate), 6, path="/v1/leagues/L1/my-team")] == [200] * 6
+    assert gate["light_peak"] == 6
