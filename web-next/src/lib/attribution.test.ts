@@ -17,9 +17,20 @@ describe("parseAttribution", () => {
       utm_medium: "cpc",
       utm_campaign: "fall-26",
       click_id: "gclid",
+      click_id_value: "abc",
       ref: "ABC123",
       has_ref: true,
     });
+  });
+
+  it("keeps utm_content/utm_term and the case-sensitive click id value", () => {
+    const out = parseAttribution("?utm_content=Video-A&utm_term=dynasty+trade&fbclid=IwAR_Abc-12&gclid=", "", "x");
+    expect(out.utm_content).toBe("video-a");
+    expect(out.utm_term).toBe("dynastytrade");
+    expect(out.click_id).toBe("fbclid");
+    expect(out.click_id_value).toBe("IwAR_Abc-12");
+    expect(parseAttribution("?gclid=<b>EAIa", "", "x").click_id_value).toBe("bEAIa");
+    expect(parseAttribution("?gbraid=zzz", "", "x").click_id).toBe("gbraid");
   });
 
   it("drops junk characters and same-site referrers", () => {

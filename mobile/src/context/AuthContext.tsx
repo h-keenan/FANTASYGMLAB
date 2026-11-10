@@ -10,6 +10,9 @@ import React, {
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 import { api } from '../lib/api';
+import { hasAppleIdentity, requestAccountDeletion } from '../lib/accountDeletion';
+import { getAppleAuthorizationCodeForRevocation } from '../lib/appleAuth';
+import { env } from '../lib/env';
 import {
   didAuthenticatedUserChange,
   readStoredAuthScopeUserId,
@@ -268,14 +271,25 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         }
       },
       deleteAccount: async () => {
-        // public.delete_user() (docs/supabase_delete_account.sql) is
-        // security definer but auth.uid()-scoped inside the function body —
-        // this can only ever delete the caller's own row, regardless of
-        // that elevated privilege. Deleting auth.users cascades to every
-        // app table referencing it (profiles, gm_targets, saved_leagues,
-        // trade_outcomes, etc.) — no separate per-table cleanup needed.
-        const { error } = await supabase.rpc('delete_user');
-        if (error) return { error: error.message };
+        // The `delete-account` edge function (supabase/functions/delete-account)
+        // cancels any Stripe subscription FIRST, revokes Sign in with Apple
+        // (when configured server-side), then deletes auth.users, which
+        // cascades to every app table. If billing can't be cancelled it
+        // refuses and nothing is deleted. App Store / Play subscriptions are
+        // managed by the store and are not cancellable from here.
+        const { data } = await supabase.auth.getSession();
+        const accessToken = data.session?.access_token;
+        if (!accessToken) return { error: 'Sign in again to delete your account.' };
+        const { error } = await requestAccountDeletion({
+          supabaseUrl: env.supabaseUrl,
+          anonKey: env.supabaseAnonKey,
+          accessToken,
+          fetchFn: (url, init) => fetch(url, init),
+          getAppleAuthorizationCode: hasAppleIdentity(data.session?.user)
+            ? getAppleAuthorizationCodeForRevocation
+            : undefined,
+        });
+        if (error) return { error };
         // Same ordering/guarantee as signOut above: push-token unregister
         // first (needs the still-live session), then best-effort
         // sign-out/cache-teardown that always completes via `finally`.

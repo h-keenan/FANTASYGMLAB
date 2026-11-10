@@ -4,6 +4,7 @@ import type { Session } from "@supabase/supabase-js";
 import React, { createContext, useContext, useEffect, useMemo, useState } from "react";
 
 import { trackFeatureUse } from "@/lib/analytics";
+import { billingRequest } from "@/lib/billingClient";
 import {
   GUEST_DATA_NOT_MERGED_NOTICE,
   IDENTITY_EXISTS_NOTICE,
@@ -271,8 +272,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         await supabase.auth.signOut();
       },
       deleteAccount: async () => {
-        const { error } = await supabase.rpc("delete_user");
-        if (error) return { error: error.message };
+        // The delete-account edge function cancels any Stripe subscription
+        // FIRST, then deletes the user (supabase/functions/delete-account).
+        // If billing cannot be cancelled it refuses, so nobody is left
+        // deleted-but-still-billed.
+        const { data } = await supabase.auth.getSession();
+        const accessToken = data.session?.access_token;
+        if (!accessToken) return { error: "Sign in again to delete your account." };
+        try {
+          await billingRequest("delete-account", accessToken, { method: "POST", jsonBody: {}, backend: "supabase" });
+        } catch (e) {
+          return { error: e instanceof Error ? e.message : "Could not delete the account." };
+        }
         await supabase.auth.signOut();
         return { error: null };
       },

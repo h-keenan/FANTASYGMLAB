@@ -302,3 +302,27 @@ def consume_weekly_trade_eval(user_id: str, limit: int) -> bool:
             return False
         _memory_counts[key] = used + 1
         return True
+
+
+def refund_weekly_trade_eval(user_id: str) -> None:
+    """Give back one weekly evaluation consumed for a request that produced no verdict.
+
+    Mirrors `consume_weekly_trade_eval` (same key, Redis first then in-process
+    fallback), never goes below zero, and never raises.
+    """
+
+    uid = _text(user_id)
+    if not uid:
+        return
+    key = _key("evals", uid, _week())
+    try:
+        client = redis_cache.get_redis_client()
+        if int(client.decr(key)) < 0:
+            client.set(key, 0, ex=_WEEK_SECONDS)
+        return
+    except Exception:
+        pass
+    with _memory_lock:
+        used = _memory_counts.get(key, 0)
+        if used > 0:
+            _memory_counts[key] = used - 1

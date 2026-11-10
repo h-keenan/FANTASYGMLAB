@@ -4,7 +4,8 @@
  * keeps the FIRST touch in localStorage, and exposes it as a handful of
  * allowlisted analytics props (modules.launch_analytics.ALLOWED_PROP_KEYS)
  * plus a pending referral code to redeem when the visitor connects a league.
- * No third-party pixels, no raw URLs and no free text are ever sent.
+ * Also keeps utm_content/utm_term and the ad click id value (gclid, fbclid, ttclid, ...) so paid
+ * conversions can be tied back to the ad. No third-party pixels, no raw URLs and no free text are ever sent.
  */
 
 const ATTR_KEY = "fd_attribution_v1";
@@ -14,9 +15,14 @@ export interface Attribution {
   utm_source?: string;
   utm_medium?: string;
   utm_campaign?: string;
+  utm_content?: string;
+  utm_term?: string;
   referrer_host?: string;
   has_ref?: boolean;
+  /** Which ad network's click id was present ("gclid", "fbclid", ...). */
   click_id?: string;
+  /** The click id VALUE (case-sensitive, sanitized), needed to report conversions back to the ad network. */
+  click_id_value?: string;
 }
 
 const CLICK_ID_PARAMS: [string, string][] = [
@@ -25,7 +31,17 @@ const CLICK_ID_PARAMS: [string, string][] = [
   ["ttclid", "ttclid"],
   ["msclkid", "msclkid"],
   ["rdt_cid", "rdt"],
+  ["gbraid", "gbraid"],
+  ["wbraid", "wbraid"],
 ];
+
+/** Click ids are case-sensitive opaque tokens: keep case, strip anything outside [A-Za-z0-9_.-], cap length. */
+export function cleanClickIdValue(raw: string | null | undefined): string {
+  return String(raw ?? "")
+    .trim()
+    .replace(/[^A-Za-z0-9_.-]/g, "")
+    .slice(0, 200);
+}
 
 /** Lowercase, [a-z0-9_.-] only, max 40 chars; "" when nothing usable. */
 export function cleanToken(raw: string | null | undefined): string {
@@ -56,11 +72,17 @@ export function parseAttribution(search: string, referrer: string, ownHost: stri
   if (source) out.utm_source = source;
   if (medium) out.utm_medium = medium;
   if (campaign) out.utm_campaign = campaign;
+  const content = cleanToken(params.get("utm_content"));
+  const term = cleanToken(params.get("utm_term"));
+  if (content) out.utm_content = content;
+  if (term) out.utm_term = term;
   const host = referrerHost(referrer, ownHost);
   if (host) out.referrer_host = host;
   for (const [param, label] of CLICK_ID_PARAMS) {
-    if (params.get(param)) {
+    const value = cleanClickIdValue(params.get(param));
+    if (value) {
       out.click_id = label;
+      out.click_id_value = value;
       break;
     }
   }

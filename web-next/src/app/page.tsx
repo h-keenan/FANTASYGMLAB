@@ -53,14 +53,14 @@ const SHARE_HEADLINE = "Someone shared a FantasyDesk trade verdict. Get yours fo
 const STEPS = [
   { title: "Connect your league", body: "Use your Sleeper username, or a public ESPN, Fleaflicker or MFL league." },
   { title: "We read your roster", body: "Real player values, matched to your lineup, depth and what each manager needs." },
-  { title: "Get your next move", body: "A clear verdict on trades, waivers and your lineup, with the reasons why." },
+  { title: "Get your next move", body: "A clear verdict on trades, waivers and your lineup, with the reasons why. Full tools run on Sleeper leagues today." },
 ] as const;
 
 const FEATURES = [
   { title: "Trade verdicts that know your roster", body: "See if a trade helps your team before you send it, based on your needs and what your partner would accept." },
-  { title: "Waivers that fit your team", body: "Pickups ranked for your roster, with FAAB ranges, so you stop chasing names that do not help you." },
+  { title: "Waivers that fit your team", body: "Pickups ranked for your roster, so you stop chasing names that do not help you. Pro adds the full waiver board and FAAB bid ranges." },
   { title: "Start/sit with weather and matchup", body: "Lineup calls that account for the opponent and game-day weather, with win odds for your week." },
-  { title: "League intelligence", body: "See how each manager trades, who is contending, and simulated playoff odds for every team." },
+  { title: "League intelligence", body: "See how each manager trades and who is contending. Pro adds simulated playoff odds for every team." },
 ] as const;
 
 const FOOTER_LINKS = [
@@ -151,6 +151,11 @@ export default function LandingPage() {
                 </li>
               ))}
             </ul>
+            <p className="lp-body lp-pro-note" data-testid="landing-free-vs-pro">
+              Free includes dynasty rankings, the trade analyzer (with weekly limits) and a full sample league. Pro
+              unlocks the complete waiver board with FAAB ranges, playoff odds, Draft Center, Scouting, Live Draft and
+              every Trade Hub idea. Trade, waiver and Game Plan tools currently run on Sleeper leagues.
+            </p>
           </section>
 
           <LandingScreens />

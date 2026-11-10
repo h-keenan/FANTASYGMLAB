@@ -57,7 +57,7 @@ const FEATURES = [
   { key: 'pqv', title: 'Player Quick View', benefit: 'Value, usage, and fit for any player in one tap.', image: require('../../assets/onboarding/onboarding-pqv.webp') },
   { key: 'playoff', title: 'Playoff Odds', benefit: 'Simulated playoff odds for every team in your league.', image: require('../../assets/onboarding/onboarding-playoff.webp') },
   { key: 'tendencies', title: 'Manager Tendencies', benefit: 'Know how each manager trades before you pitch.', image: require('../../assets/onboarding/onboarding-tendencies.webp') },
-  { key: 'waivers', title: 'Waivers', benefit: 'Priority Adds ranked for your roster, with FAAB ranges.', image: require('../../assets/onboarding/onboarding-waivers.webp') },
+  { key: 'waivers', title: 'Waivers', benefit: 'Priority Adds ranked for your roster. Pro adds FAAB bid ranges.', image: require('../../assets/onboarding/onboarding-waivers.webp') },
 ] as const;
 
 const STEP_KEYS = ['value', 'connect', 'level'] as const;

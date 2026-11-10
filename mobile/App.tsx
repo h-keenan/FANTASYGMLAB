@@ -24,6 +24,9 @@ import { ValuationLensProvider } from './src/context/ValuationLensContext';
 import { ShowcaseModeProvider } from './src/context/ShowcaseModeContext';
 import { ThemeModeProvider, useThemeMode } from './src/context/ThemeModeContext';
 import RootNavigator from './src/navigation/RootNavigator';
+import AppErrorBoundary from './src/components/AppErrorBoundary';
+import UpdateRequiredGate from './src/components/UpdateRequiredGate';
+import { initErrorReporter } from './src/lib/errorReporter';
 import { configureRevenueCat } from './src/lib/revenuecat';
 import { initAds } from './src/lib/ads';
 import { startAnalytics } from './src/lib/analytics';
@@ -42,7 +45,23 @@ import {
 // fallback font and visibly reflows into Inter a moment later.
 void SplashScreen.preventAutoHideAsync();
 
+// Crash/error reporting (Sentry only when EXPO_PUBLIC_SENTRY_DSN is set).
+// Module scope so errors thrown during first render are already captured.
+initErrorReporter();
+
+/** Root: error boundary outermost (so a crashing provider still shows the
+ * recovery screen), version gate inside it (blocks before any app UI). */
 export default function App() {
+  return (
+    <AppErrorBoundary>
+      <UpdateRequiredGate>
+        <AppContent />
+      </UpdateRequiredGate>
+    </AppErrorBoundary>
+  );
+}
+
+function AppContent() {
   const [fontsLoaded] = useFonts({
     Inter_400Regular,
     Inter_500Medium,

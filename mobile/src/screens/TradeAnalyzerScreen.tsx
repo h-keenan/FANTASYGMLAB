@@ -156,6 +156,8 @@ const NOT_READY_MESSAGES: Record<string, string> = {
     "Link your Sleeper username on the web app first — the Trade Analyzer needs to know which roster is yours.",
   sleeper_user_not_found: "Couldn't find that Sleeper account. Double-check the linked username on the web app.",
   not_a_member_of_league: "You don't appear to own a team in this league.",
+  assets_unresolved:
+    'Some players or picks in this package could not be found, so no verdict was given (a verdict on part of a trade would be misleading). Remove them and try again.',
 };
 
 interface OtherTeam {
