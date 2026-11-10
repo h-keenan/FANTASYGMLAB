@@ -6864,6 +6864,24 @@ def _is_pro_caller(user: dict[str, Any]) -> bool:
     return _manager_tendencies_gate(user)
 
 
+# Fantasy Sim (docs/fantasy-sim-api.md): fully isolated under modules/sim, mounted
+# only when SIM_ENABLED is on (default off). The one place real code references it.
+if os.environ.get("SIM_ENABLED", "").strip().lower() in {"1", "true", "yes", "on"}:
+    from modules.sim import api as sim_api
+
+    sim_api.mount(
+        app,
+        sim_api.SimApiDeps(
+            require_user=require_user,
+            is_pro=_is_pro_caller,
+            sleeper_username=lambda user: _fetch_profile_fields(
+                auth_supabase.get_supabase_config(), str(user.get("id") or ""), str(user.get("_access_token") or "")
+            ).get("sleeper_username", ""),
+            supabase_config=auth_supabase.get_supabase_config,
+        ),
+    )
+
+
 def _role_change_notes(assets: list[dict[str, Any]]) -> list[str]:
     """Display-only role-change lines for the players in a package (Pro only;
     callers decide). Never feeds a score, verdict or ranking."""
