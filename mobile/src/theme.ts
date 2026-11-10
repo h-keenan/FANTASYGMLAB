@@ -125,6 +125,8 @@ const darkColors = {
   badgeBackground: 'rgba(103,232,249,0.14)',
   badgeText: '#9FF3FC',
   violet: '#8B93FF',
+  // web --color-opportunity (waivers / games accent); synced by webTokenSync.test.ts.
+  opportunity: '#14b8a6',
   // Color-system audit (2026-10-03): promoted out of GmOrb.tsx's
   // debugOverlayText, which hardcoded '#00FF88' with no light-mode
   // counterpart at all (the exact "rogue hardcoded color" failure mode this
@@ -214,6 +216,7 @@ const lightColors = {
   badgeBackground: 'rgba(0,95,112,0.18)',
   badgeText: '#005f70',
   violet: '#4535c4',
+  opportunity: '#00645a',
   // Color-system audit (2026-10-03): see darkColors.diagnosticText for why
   // this is its own token rather than `success`. Unlike every other pair in
   // this file, dark and light share one literal value on purpose: this text

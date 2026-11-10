@@ -1,4 +1,5 @@
 import type { NavGlyphName } from "@/components/NavDestinationGlyph";
+import { accentVar } from "@/lib/destinationAccent";
 
 /**
  * "What FantasyDesk can do": the one grouped list of everything a user can
@@ -42,33 +43,33 @@ export interface FeatureItem {
 }
 
 export const FEATURE_ITEMS: readonly FeatureItem[] = [
-  { id: "trade-analyzer", group: "trade", name: "Trade Analyzer", line: "Grade any deal against your lineup before you send it.", segment: "trade-analyzer", leagueScoped: true, glyph: "tradeAnalyzer", color: "var(--color-accent)" },
-  { id: "trade-hub", group: "trade", name: "Trade ideas", line: "Offers built for your roster and what each manager needs.", extra: "Free shows a few ideas; Pro shows them all.", segment: "trade-hub", leagueScoped: true, glyph: "tradeHub", color: "var(--color-accent)" },
-  { id: "trade-finder", group: "trade", name: "Trade Finder", line: "Shop your players and picks and see what partners could pay.", pro: true, segment: "trade-finder", leagueScoped: true, glyph: "tradeFinder", color: "var(--color-accent)" },
-  { id: "trade-history", group: "trade", name: "Trade History", line: "Trades you confirmed, and how they worked out.", segment: "trade-history", leagueScoped: false, glyph: "tradeHistory", color: "var(--color-diagnostic)" },
-  { id: "community", group: "trade", name: "Community", line: "Trades other users chose to share, anonymized.", segment: "community", leagueScoped: false, glyph: "community", color: "var(--color-premium)" },
+  { id: "trade-analyzer", group: "trade", name: "Trade Analyzer", line: "Grade any deal against your lineup before you send it.", segment: "trade-analyzer", leagueScoped: true, glyph: "tradeAnalyzer", color: accentVar("trade-analyzer") },
+  { id: "trade-hub", group: "trade", name: "Trade ideas", line: "Offers built for your roster and what each manager needs.", extra: "Free shows a few ideas; Pro shows them all.", segment: "trade-hub", leagueScoped: true, glyph: "tradeHub", color: accentVar("trade-hub") },
+  { id: "trade-finder", group: "trade", name: "Trade Finder", line: "Shop your players and picks and see what partners could pay.", pro: true, segment: "trade-finder", leagueScoped: true, glyph: "tradeFinder", color: accentVar("trade-finder") },
+  { id: "trade-history", group: "trade", name: "Trade History", line: "Trades you confirmed, and how they worked out.", segment: "trade-history", leagueScoped: false, glyph: "tradeHistory", color: accentVar("trade-history") },
+  { id: "community", group: "trade", name: "Community", line: "Trades other users chose to share, anonymized.", segment: "community", leagueScoped: false, glyph: "community", color: accentVar("community") },
 
-  { id: "my-team", group: "lineup", name: "My Team", line: "Your roster, lineup, strengths and needs.", segment: "my-team", leagueScoped: true, glyph: "myTeam", color: "var(--color-success)" },
-  { id: "matchup", group: "lineup", name: "Matchup", line: "This week's win odds and any swap worth making.", segment: "matchup", leagueScoped: true, glyph: "matchup", color: "var(--color-danger)" },
-  { id: "gm-plan", group: "lineup", name: "GM Plan", line: "Set rebuilding, competing or balanced and get a roadmap.", extra: "Pro adds focus areas.", segment: "gm-plan", leagueScoped: true, glyph: "gmPlan", color: "var(--color-success)" },
+  { id: "my-team", group: "lineup", name: "My Team", line: "Your roster, lineup, strengths and needs.", segment: "my-team", leagueScoped: true, glyph: "myTeam", color: accentVar("my-team") },
+  { id: "matchup", group: "lineup", name: "Matchup", line: "This week's win odds and any swap worth making.", segment: "matchup", leagueScoped: true, glyph: "matchup", color: accentVar("matchup") },
+  { id: "gm-plan", group: "lineup", name: "GM Plan", line: "Set rebuilding, competing or balanced and get a roadmap.", extra: "Pro adds focus areas.", segment: "gm-plan", leagueScoped: true, glyph: "gmPlan", color: accentVar("gm-plan") },
 
-  { id: "waivers", group: "pickup", name: "Waivers", line: "Ranked pickups for your roster, with FAAB bid guidance.", extra: "Pro adds the FAAB shortlist and usage stats.", segment: "waivers", leagueScoped: true, glyph: "waivers", color: "var(--color-opportunity)" },
-  { id: "draft-center", group: "pickup", name: "Draft Center", line: "Your picks, draft posture and college scouting in one place.", pro: true, segment: "draft-center", leagueScoped: true, glyph: "draftCenter", color: "var(--color-danger)" },
-  { id: "live-draft", group: "pickup", name: "Live Draft", line: "Pick recommendations while your Sleeper draft is running.", pro: true, segment: "live-draft", leagueScoped: true, glyph: "liveDraft", color: "var(--color-danger)" },
+  { id: "waivers", group: "pickup", name: "Waivers", line: "Ranked pickups for your roster, with FAAB bid guidance.", extra: "Pro adds the FAAB shortlist and usage stats.", segment: "waivers", leagueScoped: true, glyph: "waivers", color: accentVar("waivers") },
+  { id: "draft-center", group: "pickup", name: "Draft Center", line: "Your picks, draft posture and college scouting in one place.", pro: true, segment: "draft-center", leagueScoped: true, glyph: "draftCenter", color: accentVar("draft-center") },
+  { id: "live-draft", group: "pickup", name: "Live Draft", line: "Pick recommendations while your Sleeper draft is running.", pro: true, segment: "live-draft", leagueScoped: true, glyph: "liveDraft", color: accentVar("live-draft") },
 
-  { id: "players", group: "scout", name: "Players", line: "Search any player for value, stats, trends and news.", segment: "players", leagueScoped: true, glyph: "players", color: "var(--color-diagnostic)" },
-  { id: "college-scouting", group: "scout", name: "College Scouting", line: "Grade incoming prospects and keep a watchlist.", pro: true, segment: "college-scouting", leagueScoped: false, glyph: "collegeScouting", color: "var(--color-success)" },
-  { id: "league-rankings", group: "scout", name: "League Rankings", line: "Power rankings for every team in your league.", segment: "league-rankings", leagueScoped: true, glyph: "leagueRankings", color: "var(--color-premium)" },
+  { id: "players", group: "scout", name: "Players", line: "Search any player for value, stats, trends and news.", segment: "players", leagueScoped: true, glyph: "players", color: accentVar("players") },
+  { id: "college-scouting", group: "scout", name: "College Scouting", line: "Grade incoming prospects and keep a watchlist.", pro: true, segment: "college-scouting", leagueScoped: false, glyph: "collegeScouting", color: accentVar("college-scouting") },
+  { id: "league-rankings", group: "scout", name: "League Rankings", line: "Power rankings for every team in your league.", segment: "league-rankings", leagueScoped: true, glyph: "leagueRankings", color: accentVar("league-rankings") },
 
-  { id: "commissioner", group: "league", name: "Commissioner", line: "League integrity, plus a trade veto calculator.", pro: true, segment: "commissioner", leagueScoped: true, glyph: "commissioner", color: "var(--color-diagnostic)" },
-  { id: "playoff-odds", group: "league", name: "Playoff Odds", line: "Every team's chance at the playoffs.", pro: true, segment: "league-rankings", leagueScoped: true, hash: "playoff-odds", glyph: "playoffOdds", color: "var(--color-premium)" },
-  { id: "games", group: "league", name: "Games", line: "Season simulator and weekly pick'em.", segment: "games", leagueScoped: true, glyph: "games", color: "var(--color-opportunity)" },
-  { id: "league-recaps", group: "league", name: "League Recaps", line: "Your league's weekly recap and stories.", segment: "league-recaps", leagueScoped: true, glyph: "leagueRecaps", color: "var(--color-information)" },
+  { id: "commissioner", group: "league", name: "Commissioner", line: "League integrity, plus a trade veto calculator.", pro: true, segment: "commissioner", leagueScoped: true, glyph: "commissioner", color: accentVar("commissioner") },
+  { id: "playoff-odds", group: "league", name: "Playoff Odds", line: "Every team's chance at the playoffs.", pro: true, segment: "league-rankings", leagueScoped: true, hash: "playoff-odds", glyph: "playoffOdds", color: accentVar("playoff-odds") },
+  { id: "games", group: "league", name: "Games", line: "Season simulator and weekly pick'em.", segment: "games", leagueScoped: true, glyph: "games", color: accentVar("games") },
+  { id: "league-recaps", group: "league", name: "League Recaps", line: "Your league's weekly recap and stories.", segment: "league-recaps", leagueScoped: true, glyph: "leagueRecaps", color: accentVar("league-recaps") },
 
-  { id: "dashboard", group: "keepup", name: "Dashboard", line: "Your game plan and top moves for this week.", segment: "dashboard", leagueScoped: true, glyph: "dashboard", color: "var(--color-accent)" },
-  { id: "alerts", group: "keepup", name: "Alerts", line: "Injuries, news and updates on your players.", segment: "alerts", leagueScoped: true, glyph: "alerts", color: "var(--color-warning)" },
-  { id: "news", group: "keepup", name: "News", line: "The latest NFL news.", segment: "news", leagueScoped: false, glyph: "news", color: "var(--color-information)" },
-  { id: "portfolio", group: "keepup", name: "Portfolio", line: "Your standing across every saved league.", pro: true, segment: "portfolio", leagueScoped: false, glyph: "portfolio", color: "var(--color-premium)" },
+  { id: "dashboard", group: "keepup", name: "Dashboard", line: "Your game plan and top moves for this week.", segment: "dashboard", leagueScoped: true, glyph: "dashboard", color: accentVar("dashboard") },
+  { id: "alerts", group: "keepup", name: "Alerts", line: "Injuries, news and updates on your players.", segment: "alerts", leagueScoped: true, glyph: "alerts", color: accentVar("alerts") },
+  { id: "news", group: "keepup", name: "News", line: "The latest NFL news.", segment: "news", leagueScoped: false, glyph: "news", color: accentVar("news") },
+  { id: "portfolio", group: "keepup", name: "Portfolio", line: "Your standing across every saved league.", pro: true, segment: "portfolio", leagueScoped: false, glyph: "portfolio", color: accentVar("portfolio") },
 ];
 
 export interface FeatureLeague {

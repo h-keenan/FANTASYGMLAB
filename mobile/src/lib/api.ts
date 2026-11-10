@@ -2614,6 +2614,14 @@ export interface PushPreferencesResponse {
   categories: Record<PushCategory, boolean>;
 }
 
+/** GET/POST /v1/community/preferences. Same shape as web-next's
+ * CommunityPreferencesResponse: `opted_out` true means "keep MY trades out
+ * of the Community Trade Feed". */
+export interface CommunityPreferencesResponse {
+  ok: boolean;
+  opted_out: boolean;
+}
+
 export type UiDensityValue = 'guided' | 'compact';
 
 export type ThemeModeValue = 'light' | 'dark' | 'auto';
@@ -4046,6 +4054,18 @@ export const api = {
   unregisterPushToken: (expoPushToken: string) =>
     authorizedPost<PushMutationResponse>('/v1/push/unregister', {
       expo_push_token: expoPushToken,
+    }),
+  getCommunityPreferences: () => authorizedFetch<CommunityPreferencesResponse>('/v1/community/preferences'),
+  updateCommunityPreferences: (optedOut: boolean) =>
+    authorizedPost<CommunityPreferencesResponse>('/v1/community/preferences', { opted_out: optedOut }),
+  /** Same endpoint as web-next's api.removeSavedLeague. Works for any saved
+   * league regardless of plan (not Pro-gated, unlike Portfolio). */
+  removeSavedLeague: (leagueId: string) =>
+    authorizedDelete<{ ok: boolean; reason?: string }>(`/v1/leagues/${encodeURIComponent(leagueId)}/save`),
+  /** Same endpoint as web-next's api.linkSleeperUsername. */
+  linkSleeperUsername: (sleeperUsername: string) =>
+    authorizedPost<{ ok: boolean; sleeper_username?: string; reason?: string }>('/v1/me/link-sleeper', {
+      sleeper_username: sleeperUsername,
     }),
   sendTestPush: () => authorizedPost<PushMutationResponse>('/v1/push/test', {}),
   getPushPreferences: () => authorizedFetch<PushPreferencesResponse>('/v1/push/preferences'),

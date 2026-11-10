@@ -61,7 +61,7 @@ export function leagueSwitchDestination(
   if (isEspnLeagueId(target.leagueId) && !espnRouteSupported(current.name)) return home;
   const next: Record<string, unknown> = { ...params, ...target };
   for (const key of OLD_LEAGUE_PARAMS) delete next[key];
-  // ESPN leagues open Trades on Make a Trade only.
+  // ESPN leagues open Trades on Analyzer only.
   if (current.name === 'Trades' && isEspnLeagueId(target.leagueId)) next.initialTab = 'make';
   return { name: current.name, params: next };
 }

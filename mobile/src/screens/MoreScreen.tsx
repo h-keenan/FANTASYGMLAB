@@ -19,7 +19,10 @@ import { useHeaderHeight } from '@react-navigation/elements';
 
 import AnimatedCard from '../components/AnimatedCard';
 import IconCircle from '../components/IconCircle';
-import { api, type MeResponse, type PushCategory } from '../lib/api';
+import { api, ApiError, type MeResponse, type PushCategory } from '../lib/api';
+import { supabase } from '../lib/supabase';
+import { maskShowcaseFields } from '../lib/showcaseMode';
+import { describeSleeperConnectError } from '../lib/sleeperConnectErrors';
 import { openStoreSubscriptionSettings } from '../lib/storeSubscriptions';
 import { activeTrialEnd } from '../lib/revenuecat';
 import { trialEndLabel } from '../lib/freeTrial';
@@ -40,6 +43,8 @@ import { useShowcaseMode } from '../context/ShowcaseModeContext';
 import ReferralCard from '../components/ReferralCard';
 import Toggle from '../components/Toggle';
 import GuestCreateAccountModal from '../components/GuestCreateAccountModal';
+import Input from '../components/Input';
+import ModalFormCard, { ModalFormActions, ModalFormHint, ModalFormTitle } from '../components/ModalFormCard';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'More'>;
 type IconName = React.ComponentProps<typeof IconCircle>['name'];
@@ -138,6 +143,124 @@ export default function MoreScreen({ navigation }: Props) {
     };
   }, [isGuest]);
   const [deleting, setDeleting] = useState(false);
+
+  // Web Account parity: "Community Trade Feed" opt-out, same
+  // /v1/community/preferences endpoint and wording. Fails soft (row hidden)
+  // like the push categories above.
+  const [communityOptedOut, setCommunityOptedOut] = useState<boolean | null>(null);
+  const [togglingCommunity, setTogglingCommunity] = useState(false);
+  useEffect(() => {
+    if (isGuest) return;
+    let cancelled = false;
+    api
+      .getCommunityPreferences()
+      .then((result) => {
+        if (!cancelled && result.ok) setCommunityOptedOut(result.opted_out);
+      })
+      .catch(() => undefined);
+    return () => {
+      cancelled = true;
+    };
+  }, [isGuest]);
+  const onToggleCommunityOptOut = async (next: boolean) => {
+    setCommunityOptedOut(next);
+    setTogglingCommunity(true);
+    try {
+      await api.updateCommunityPreferences(next);
+    } catch {
+      // Revert so the switch never lies about the saved state.
+      setCommunityOptedOut(!next);
+    } finally {
+      setTogglingCommunity(false);
+    }
+  };
+
+  // Saved leagues + removal. Same saved_leagues read the Home/league-switcher
+  // use and the same DELETE /v1/leagues/{id}/save web uses, so a wrong
+  // league can be removed on any plan (Portfolio itself is Pro-only).
+  const [savedLeagues, setSavedLeagues] = useState<Array<{ id: string; league_id: string; league_name: string | null }>>([]);
+  const [removingLeagueId, setRemovingLeagueId] = useState<string | null>(null);
+  useEffect(() => {
+    let cancelled = false;
+    supabase
+      .from('saved_leagues')
+      .select('id, league_id, league_name')
+      .order('is_default', { ascending: false })
+      .then(({ data }) => {
+        if (!cancelled && data) setSavedLeagues(maskShowcaseFields(data as typeof savedLeagues));
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+  const onRemoveLeague = (league: { league_id: string; league_name: string | null }) => {
+    const name = league.league_name || league.league_id;
+    Alert.alert(
+      'Remove this league?',
+      `${name} will be removed from your saved leagues. You can add it again later.`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Remove',
+          style: 'destructive',
+          onPress: async () => {
+            setRemovingLeagueId(league.league_id);
+            try {
+              const result = await api.removeSavedLeague(league.league_id);
+              if (result.ok) {
+                setSavedLeagues((prev) => prev.filter((row) => row.league_id !== league.league_id));
+              } else {
+                Alert.alert('Could not remove league', 'Please try again in a moment.');
+              }
+            } catch {
+              Alert.alert('Could not remove league', 'Please try again in a moment.');
+            } finally {
+              setRemovingLeagueId(null);
+            }
+          },
+        },
+      ],
+    );
+  };
+
+  // Relink Sleeper username: same two calls as web's SleeperImportForm
+  // (lookupSleeperLeagues to verify the user and their leagues, then
+  // linkSleeperUsername), same error copy.
+  const [relinkOpen, setRelinkOpen] = useState(false);
+  const [relinkText, setRelinkText] = useState('');
+  const [relinkBusy, setRelinkBusy] = useState(false);
+  const [relinkError, setRelinkError] = useState<string | null>(null);
+  const onRelinkSleeper = async () => {
+    const clean = relinkText.trim();
+    if (!clean) return;
+    setRelinkBusy(true);
+    setRelinkError(null);
+    try {
+      const lookup = await api.lookupSleeperLeagues(clean);
+      if (!lookup.ok || lookup.leagues.length === 0) {
+        const described = describeSleeperConnectError({
+          status: lookup.ok ? 'no_leagues' : lookup.status,
+          username: clean,
+          serverMessage: lookup.message,
+        });
+        setRelinkError(`${described.message} ${described.hint}`.trim());
+        return;
+      }
+      const linked = await api.linkSleeperUsername(clean);
+      if (!linked.ok) {
+        setRelinkError('Could not update your Sleeper username right now. Please try again in a moment.');
+        return;
+      }
+      setMe((prev) => (prev ? { ...prev, sleeper_username: linked.sleeper_username ?? clean } : prev));
+      setRelinkOpen(false);
+    } catch (error) {
+      setRelinkError(
+        error instanceof ApiError ? error.message : describeSleeperConnectError({ status: 'network', username: clean }).message,
+      );
+    } finally {
+      setRelinkBusy(false);
+    }
+  };
   const [guestUpgradeOpen, setGuestUpgradeOpen] = useState(false);
   const { showcaseMode, setShowcaseMode } = useShowcaseMode();
   const { status: collegeInterestStatus, respond: respondToCollegeInterest } = useCollegeInterest();
@@ -247,14 +370,14 @@ export default function MoreScreen({ navigation }: Props) {
   const onOpenTeamStance = () => {
     const league = currentLeagueContext();
     if (!league) {
-      Alert.alert('Select a league first', 'Open a league from Home, then come back to set your Team Situation.');
+      Alert.alert('Select a league first', 'Open a league from Home, then come back to open your GM Plan.');
       return;
     }
     navigation.navigate('GmPlan', { ...league, initialTab: 'overview' });
   };
 
   // League-scoped entry points (Live Draft, Guess the Player leaderboard)
-  // resolve the league the user last opened, same as Team Situation above.
+  // resolve the league the user last opened, same as the GM Plan row above.
   const onOpenLeagueScreen = (screen: 'LiveDraft' | 'GuessThePlayerLeaderboard', purpose: string) => {
     const league = currentLeagueContext();
     if (!league) {
@@ -307,6 +430,19 @@ export default function MoreScreen({ navigation }: Props) {
               <SettingsRow
                 label="Sleeper username"
                 right={<AppText style={styles.identityValue}>{me ? me.sleeper_username || 'Not linked' : '—'}</AppText>}
+                showDivider
+              />
+              <SettingsRow
+                icon="person-outline"
+                iconColor={colors.accent}
+                label={me?.sleeper_username ? 'Change Sleeper username' : 'Link Sleeper username'}
+                description="Used to find your team in each league"
+                onPress={() => {
+                  setRelinkText(me?.sleeper_username ?? '');
+                  setRelinkError(null);
+                  setRelinkOpen(true);
+                }}
+                disabled={!me}
                 showDivider
               />
               <SettingsRow
@@ -376,15 +512,60 @@ export default function MoreScreen({ navigation }: Props) {
             />
           ))}
         </View>
+        {communityOptedOut !== null ? (
+          <>
+            <SettingsRow
+              label="Community Trade Feed"
+              description="I don't want MY trades to appear in this feed"
+              showDivider={false}
+              right={
+                <Toggle
+                  value={communityOptedOut}
+                  onValueChange={onToggleCommunityOptOut}
+                  disabled={togglingCommunity}
+                  tone="danger"
+                  label="Community Trade Feed opt-out"
+                />
+              }
+            />
+          </>
+        ) : null}
         </AnimatedCard>
+
+        {savedLeagues.length > 0 ? (
+          <>
+            <SectionHeading title="Saved leagues" topGap={16} />
+            <AnimatedCard style={styles.groupCard}>
+              {savedLeagues.map((league, index) => (
+                <SettingsRow
+                  key={league.id}
+                  icon="trophy-outline"
+                  iconColor={colors.accent}
+                  label={league.league_name || league.league_id}
+                  description="Not your league? Remove"
+                  onPress={() => onRemoveLeague(league)}
+                  disabled={removingLeagueId === league.league_id}
+                  right={
+                    removingLeagueId === league.league_id ? (
+                      <ActivityIndicator size="small" color={colors.textSecondary} />
+                    ) : (
+                      <IconCircle name="trash-outline" color={colors.textSecondary} />
+                    )
+                  }
+                  showDivider={index < savedLeagues.length - 1}
+                />
+              ))}
+            </AnimatedCard>
+          </>
+        ) : null}
 
         <SectionHeading title="Your Team" topGap={16} />
         <AnimatedCard style={styles.groupCard}>
           <SettingsRow
             icon="compass-outline"
             iconColor={colors.accent}
-            label="Team Situation"
-            description="Declare Rebuilding / Competing / Balanced and manage protected players"
+            label="GM Plan"
+            description="Your Team Situation (Rebuilding / Competing / Balanced), protected players and plan"
             onPress={onOpenTeamStance}
             showDivider
           />
@@ -602,6 +783,28 @@ export default function MoreScreen({ navigation }: Props) {
         </AnimatedCard>
       </ScrollView>
 
+      <ModalFormCard visible={relinkOpen} onClose={() => setRelinkOpen(false)}>
+        <ModalFormTitle>Sleeper username</ModalFormTitle>
+        <ModalFormHint>Use your Sleeper username, not your display name or email.</ModalFormHint>
+        <Input
+          value={relinkText}
+          onChangeText={setRelinkText}
+          placeholder="Sleeper username"
+          autoCapitalize="none"
+          autoCorrect={false}
+          autoFocus
+        />
+        {relinkError ? <AppText style={styles.relinkError}>{relinkError}</AppText> : null}
+        <ModalFormActions
+          onCancel={() => setRelinkOpen(false)}
+          cancelDisabled={relinkBusy}
+          confirmLabel="Save"
+          onConfirm={onRelinkSleeper}
+          confirmDisabled={!relinkText.trim()}
+          confirmLoading={relinkBusy}
+        />
+      </ModalFormCard>
+
       <GuestCreateAccountModal visible={guestUpgradeOpen} onClose={() => setGuestUpgradeOpen(false)} />
     </View>
   );
@@ -729,6 +932,7 @@ function createStyles(colors: ThemeColors) {
     // One grouped surface per section with hairline dividers between rows,
     // instead of a separately bordered/backgrounded row per item — Magna
     // Carta §12, same `groupCard` pattern MyTeamScreen/AlertsScreen use.
+    relinkError: { fontSize: 13.5, color: colors.danger, marginTop: spacing.sm, lineHeight: 18 },
     identityValue: { fontSize: 15.5, fontWeight: '600', color: colors.textPrimary, flexShrink: 1, textAlign: 'right' },
     groupCard: { padding: spacing.md, paddingVertical: 0 },
     // Web wraps Preferences in one glass card; the option tiles nest as glassInset.

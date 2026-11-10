@@ -4,7 +4,7 @@ import { PillRow } from "@/components/PillRow";
  * The Trade Hub / Trade Finder / Trade Analyzer tri-tab switcher — mirrors
  * app.py's TRADES_TAB_ROUTE_ORDER / TRADES_TAB_LABELS (the single segmented
  * control Streamlit shows above all three tabs, and mobile's
- * TradesScreen.tsx tab order: Trade Block / Search / Make a Trade). All
+ * TradesScreen.tsx tab labels: Hub / Finder / Analyzer, pinned by lib/tradesTabs.test.ts). All
  * three tabs now have a real Next.js page (Trade Finder joined Trade Hub
  * and Trade Analyzer in Revision 17) — none of them deep-link out to
  * Streamlit anymore.

@@ -15,6 +15,7 @@ import { api } from '../lib/api';
 import { FEATURE_GROUPS, FEATURE_ITEMS, featureTarget, type FeatureLeague } from '../lib/featureCatalog';
 import { useLastLeague } from '../lib/useLastLeague';
 import { useOrbClearance } from '../lib/orbLayout';
+import { accentColor } from '../lib/destinationAccent';
 import { queryKeys } from '../lib/queryKeys';
 import { getEntitlementTier, isAtLeast, PRO } from '../lib/revenuecat';
 import { spacing, type ThemeColors } from '../theme';
@@ -56,14 +57,6 @@ export default function FeaturesScreen({ navigation, route }: Props) {
   }, []);
   const showPro = planQuery.data?.user.profile_status === 'ok' && planQuery.data.user.entitlement !== 'premium' && !storeSubscriber;
 
-  const colorFor: Record<string, string> = {
-    accent: colors.accent,
-    danger: colors.danger,
-    success: colors.success,
-    violet: colors.violet,
-    premium: colors.premium,
-  };
-
   return (
     <View style={styles.root}>
       <GridBackground />
@@ -92,7 +85,7 @@ export default function FeaturesScreen({ navigation, route }: Props) {
                   }}
                   style={[styles.row, index > 0 && styles.rowDivider]}
                 >
-                  <IconCircle name={item.icon as IconName} color={colorFor[item.color]} style={styles.icon} />
+                  <IconCircle name={item.icon as IconName} color={accentColor(colors, item.id)} style={styles.icon} />
                   <View style={styles.rowText}>
                     <View style={styles.titleRow}>
                       <AppText style={styles.name}>{item.name}</AppText>

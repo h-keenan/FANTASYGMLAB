@@ -37,6 +37,7 @@ import { alertReadSync, currentAlertReadUserId } from '../lib/alertReads';
 import { api, type RankedPlayer } from '../lib/api';
 import { setLastLeague } from '../lib/lastLeague';
 import { isEspnLeagueId } from '../lib/leaguePlatform';
+import { accentColor } from '../lib/destinationAccent';
 import { queryKeys } from '../lib/queryKeys';
 import { searchOrbDestinations, type OrbSearchHit } from '../lib/orbTabs';
 import { getSeenTradeIdeaCount } from '../lib/tradeHubSeen';
@@ -60,14 +61,11 @@ interface Destination {
   route: string;
   icon: IconName;
   needsLeague?: boolean;
-  // Fixed app-wide semantic families, not one arbitrary hue per item:
-  // cyan (colors.accent) = core app/GM intelligence/active navigation,
-  // green (colors.success) = roster/waiver/positive-action,
-  // amber (colors.premium) = draft/trade-capital,
-  // purple (colors.violet) = secondary/analytical,
-  // red (colors.danger) = alerts only. Drives both the icon-circle tint AND
-  // the row's left rail (see NavRow) — one value, two places it shows up,
-  // never two independently-chosen colors for the same destination.
+  // The destination's semantic accent, from the one map shared with web's nav,
+  // sidebar and feature catalog (lib/destinationAccent.ts -> modules/
+  // destination_accents.py), never hand-picked per row. Drives both the
+  // icon-circle tint AND the row's left rail (see NavRow) — one value, two
+  // places it shows up.
   color: string;
   // One-line "what's here" — real interface copy describing the actual
   // screen, not a data claim. "Matchup" deliberately says "comparison," not
@@ -95,7 +93,7 @@ function coreLeagueDestinations(colors: ThemeColors): Destination[] {
       route: 'Dashboard',
       icon: 'flash-outline',
       needsLeague: true,
-      color: colors.accent,
+      color: accentColor(colors, 'Dashboard'),
       subtitle: 'Game plan, matchup, storylines and league context',
     },
     // Alerts was buried last in the list despite being time-sensitive —
@@ -105,7 +103,7 @@ function coreLeagueDestinations(colors: ThemeColors): Destination[] {
       route: 'Alerts',
       icon: 'notifications-outline',
       needsLeague: true,
-      color: colors.danger,
+      color: accentColor(colors, 'Alerts'),
       subtitle: 'Injuries, news, and important updates',
     },
     {
@@ -113,7 +111,7 @@ function coreLeagueDestinations(colors: ThemeColors): Destination[] {
       route: 'MyTeam',
       icon: 'shirt-outline',
       needsLeague: true,
-      color: colors.success,
+      color: accentColor(colors, 'My Team'),
       subtitle: 'Roster, lineup, and team analysis',
     },
     {
@@ -121,7 +119,7 @@ function coreLeagueDestinations(colors: ThemeColors): Destination[] {
       route: 'Matchup',
       icon: 'american-football-outline',
       needsLeague: true,
-      color: colors.success,
+      color: accentColor(colors, 'Matchup'),
       subtitle: "This week's matchup and comparison",
     },
     {
@@ -129,7 +127,7 @@ function coreLeagueDestinations(colors: ThemeColors): Destination[] {
       route: 'Waivers',
       icon: 'swap-horizontal-outline',
       needsLeague: true,
-      color: colors.success,
+      color: accentColor(colors, 'Waivers'),
       subtitle: 'Top adds, trends, and free agents',
     },
     {
@@ -137,7 +135,7 @@ function coreLeagueDestinations(colors: ThemeColors): Destination[] {
       route: 'Teams',
       icon: 'people-circle-outline',
       needsLeague: true,
-      color: colors.violet,
+      color: accentColor(colors, 'League Rankings'),
       subtitle: 'Power rankings and playoff odds',
     },
     {
@@ -145,7 +143,7 @@ function coreLeagueDestinations(colors: ThemeColors): Destination[] {
       route: 'Players',
       icon: 'people-outline',
       needsLeague: true,
-      color: colors.violet,
+      color: accentColor(colors, 'Players'),
       subtitle: 'Search, rankings, and player insights',
     },
   ];
@@ -162,7 +160,7 @@ function gmToolsDestinations(colors: ThemeColors): Destination[] {
       route: 'Trades',
       icon: 'shuffle-outline',
       needsLeague: true,
-      color: colors.premium,
+      color: accentColor(colors, 'Trade Hub'),
       subtitle: 'Trade ideas, trade finder, and trade analyzer',
     },
     // Season-arc complement to Dashboard's one-off "Next Move" tile: a
@@ -175,7 +173,7 @@ function gmToolsDestinations(colors: ThemeColors): Destination[] {
       route: 'GmPlan',
       icon: 'map-outline',
       needsLeague: true,
-      color: colors.premium,
+      color: accentColor(colors, 'GM Plan'),
       subtitle: 'Your roadmap, stance, and protected/watched players',
     },
     {
@@ -183,7 +181,7 @@ function gmToolsDestinations(colors: ThemeColors): Destination[] {
       route: 'DraftCenter',
       icon: 'albums-outline',
       needsLeague: true,
-      color: colors.premium,
+      color: accentColor(colors, 'Draft Center'),
       subtitle: 'Picks, order, and draft tools',
       pro: true,
     },
@@ -194,7 +192,7 @@ function gmToolsDestinations(colors: ThemeColors): Destination[] {
       route: 'LiveDraft',
       icon: 'timer-outline',
       needsLeague: true,
-      color: colors.premium,
+      color: accentColor(colors, 'Live Draft'),
       subtitle: 'Real-time draft room',
       pro: true,
     },
@@ -209,7 +207,7 @@ function gmToolsDestinations(colors: ThemeColors): Destination[] {
       route: 'Recap',
       icon: 'newspaper-outline',
       needsLeague: true,
-      color: colors.violet,
+      color: accentColor(colors, 'League Recaps'),
       subtitle: 'Weekly league recap and stories',
     },
     {
@@ -217,7 +215,7 @@ function gmToolsDestinations(colors: ThemeColors): Destination[] {
       route: 'Games',
       icon: 'dice-outline',
       needsLeague: true,
-      color: colors.violet,
+      color: accentColor(colors, 'Games'),
       subtitle: "Season simulator and weekly pick'em",
     },
     {
@@ -225,7 +223,7 @@ function gmToolsDestinations(colors: ThemeColors): Destination[] {
             route: 'Commissioner',
             icon: 'shield-checkmark-outline',
             needsLeague: true,
-            color: colors.violet,
+            color: accentColor(colors, 'Commissioner'),
             subtitle: 'League integrity: lineups, tanking signals, trades',
             pro: true,
           },
@@ -255,7 +253,7 @@ function generalDestinations(colors: ThemeColors, storeSubscriber = false, found
       label: 'Portfolio',
       route: 'Portfolio',
       icon: 'layers-outline',
-      color: colors.violet,
+      color: accentColor(colors, 'Portfolio'),
       subtitle: 'Your standing across every saved league',
       pro: true,
     },
@@ -270,7 +268,7 @@ function generalDestinations(colors: ThemeColors, storeSubscriber = false, found
           },
         ]
       : []),
-    { label: 'News', route: 'News', icon: 'globe-outline', color: colors.violet, subtitle: 'Latest NFL news and updates' },
+    { label: 'News', route: 'News', icon: 'globe-outline', color: accentColor(colors, 'News'), subtitle: 'Latest NFL news and updates' },
     // Both were reachable only through More (Trade History) or at the bottom
     // of Trade History (the shared-trades feed, 4 taps deep); web has them
     // as nav rows (UX audit 2026-11-03, parity).
@@ -278,14 +276,14 @@ function generalDestinations(colors: ThemeColors, storeSubscriber = false, found
       label: 'Trade History',
       route: 'TradeHistory',
       icon: 'time-outline',
-      color: colors.violet,
+      color: accentColor(colors, 'Trade History'),
       subtitle: "Trades you've confirmed, and how they worked out",
     },
     {
       label: 'Community',
       route: 'Community',
       icon: 'people-circle-outline',
-      color: colors.premium,
+      color: accentColor(colors, 'Community'),
       subtitle: 'Trades other users chose to share',
     },
     storeSubscriber

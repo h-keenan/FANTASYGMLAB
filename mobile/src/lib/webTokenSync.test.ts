@@ -53,6 +53,7 @@ const PAIRS: Array<[string, string]> = [
   ['textSecondary', 'color-text-secondary'],
   ['textTertiary', 'color-text-muted'],
   ['violet', 'color-diagnostic'],
+  ['opportunity', 'color-opportunity'],
 ];
 
 // backgroundElevated: web raised in dark; light raised is plain white, so the

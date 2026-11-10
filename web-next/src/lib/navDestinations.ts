@@ -1,4 +1,5 @@
 import type { NavGlyphName } from "@/components/NavDestinationGlyph";
+import { accentVar as accent } from "@/lib/destinationAccent";
 
 export interface NavDestination {
   label: string;
@@ -51,18 +52,18 @@ export function useNavDestinations(leagueId: string | null, leagueName: string) 
 
   const coreLeagueDestinations: NavDestination[] = leagueId
     ? [
-        { label: "Dashboard", path: `/dashboard/${encodeURIComponent(leagueId)}${query}`, subtitle: "Personalized insights and recommendations", glyph: "dashboard", color: "var(--color-accent)" },
-        { label: "Alerts", path: `/alerts/${encodeURIComponent(leagueId)}${query}`, subtitle: "Injuries, news, and important updates", glyph: "alerts", color: "var(--color-warning)" },
-        { label: "My Team", path: `/my-team/${encodeURIComponent(leagueId)}${query}`, subtitle: "Roster, lineup, and team analysis", glyph: "myTeam", color: "var(--color-success)" },
-        { label: "Matchup", path: `/matchup/${encodeURIComponent(leagueId)}${query}`, subtitle: "This week's matchup and comparison", glyph: "matchup", color: "var(--color-danger)" },
-        { label: "Waivers", path: `/waivers/${encodeURIComponent(leagueId)}${query}`, subtitle: "Top adds, trends, and free agents", glyph: "waivers", color: "var(--color-opportunity)",
+        { label: "Dashboard", path: `/dashboard/${encodeURIComponent(leagueId)}${query}`, subtitle: "Personalized insights and recommendations", glyph: "dashboard", color: accent("Dashboard") },
+        { label: "Alerts", path: `/alerts/${encodeURIComponent(leagueId)}${query}`, subtitle: "Injuries, news, and important updates", glyph: "alerts", color: accent("Alerts") },
+        { label: "My Team", path: `/my-team/${encodeURIComponent(leagueId)}${query}`, subtitle: "Roster, lineup, and team analysis", glyph: "myTeam", color: accent("My Team") },
+        { label: "Matchup", path: `/matchup/${encodeURIComponent(leagueId)}${query}`, subtitle: "This week's matchup and comparison", glyph: "matchup", color: accent("Matchup") },
+        { label: "Waivers", path: `/waivers/${encodeURIComponent(leagueId)}${query}`, subtitle: "Top adds, trends, and free agents", glyph: "waivers", color: accent("Waivers"),
           tabs: [
             { label: "Recommended", path: tabPath("waivers", "recommended"), subtitle: "Ranked pickups for your roster", keywords: ["adds", "faab", "pickups"] },
             { label: "Explore", path: tabPath("waivers", "explore"), subtitle: "Browse every free agent", keywords: ["free agents", "search"] },
             { label: "Watchlist", path: tabPath("waivers", "watchlist"), subtitle: "Free agents you are tracking", keywords: ["targets", "tracking"] },
           ] },
-        { label: "Players", path: `/players/${encodeURIComponent(leagueId)}${query}`, subtitle: "Search, rankings, and player insights", glyph: "players", color: "var(--color-diagnostic)" },
-        { label: "League Rankings", path: `/league-rankings/${encodeURIComponent(leagueId)}${query}`, subtitle: "Power rankings across the league", glyph: "leagueRankings", color: "var(--color-premium)",
+        { label: "Players", path: `/players/${encodeURIComponent(leagueId)}${query}`, subtitle: "Search, rankings, and player insights", glyph: "players", color: accent("Players") },
+        { label: "League Rankings", path: `/league-rankings/${encodeURIComponent(leagueId)}${query}`, subtitle: "Power rankings across the league", glyph: "leagueRankings", color: accent("League Rankings"),
           tabs: [
             { label: "Rankings", path: `/league-rankings/${id}${query}`, subtitle: "Power rankings across the league", keywords: ["power rankings", "teams"] },
             { label: "Playoff Odds", path: `/league-rankings/${id}${query}#playoff-odds`, subtitle: "Every team's chance at the playoffs", keywords: ["playoffs", "odds", "chance", "seeding"], pro: true },
@@ -70,7 +71,7 @@ export function useNavDestinations(leagueId: string | null, leagueName: string) 
         // Web had no nav row for this (it lived behind a button inside
         // League Rankings); the app already did. Same page, scrolled to the
         // section, so no new route.
-        { label: "Playoff Odds", path: `/league-rankings/${encodeURIComponent(leagueId)}${query}#playoff-odds`, subtitle: "Every team's chance at the playoffs", glyph: "playoffOdds", color: "var(--color-premium)", pro: true, anchor: true },
+        { label: "Playoff Odds", path: `/league-rankings/${encodeURIComponent(leagueId)}${query}#playoff-odds`, subtitle: "Every team's chance at the playoffs", glyph: "playoffOdds", color: accent("Playoff Odds"), pro: true, anchor: true },
       ]
     : [];
 
@@ -87,7 +88,7 @@ export function useNavDestinations(leagueId: string | null, leagueName: string) 
           path: `/trade-hub/${encodeURIComponent(leagueId)}${query}`,
           subtitle: "Trade ideas, trade finder, and trade analyzer",
           glyph: "tradeHub",
-          color: "var(--color-accent)",
+          color: accent("Trade Hub"),
           tabs: [
             { label: "Hub", path: `/trade-hub/${id}${query}`, subtitle: "Trade ideas built for your roster", keywords: ["trade ideas", "trade block", "offers"] },
             { label: "Finder", path: `/trade-finder/${id}${query}`, subtitle: "Shop a player or pick and see what partners pay", keywords: ["trade finder", "shop", "search", "partners"], pro: true },
@@ -107,7 +108,7 @@ export function useNavDestinations(leagueId: string | null, leagueName: string) 
           path: `/gm-plan/${encodeURIComponent(leagueId)}${query}`,
           subtitle: "Your roadmap, stance, and protected/watched players",
           glyph: "gmPlan",
-          color: "var(--color-success)",
+          color: accent("GM Plan"),
           tabs: [
             { label: "Overview", path: tabPath("gm-plan", "overview"), subtitle: "Stance, roadmap, and plan snapshot", keywords: ["stance", "roadmap", "rebuild", "compete"] },
             { label: "Trades", path: tabPath("gm-plan", "trades"), subtitle: "Trade moves your plan calls for", keywords: ["trade window"] },
@@ -115,29 +116,29 @@ export function useNavDestinations(leagueId: string | null, leagueName: string) 
             { label: "Watching", path: tabPath("gm-plan", "watching"), subtitle: "Players you are targeting", keywords: ["targets", "gm targets", "watchlist"] },
           ],
         },
-        { label: "Draft Center", path: `/draft-center/${encodeURIComponent(leagueId)}${query}`, subtitle: "Picks, order, and draft tools", glyph: "draftCenter", color: "var(--color-danger)", pro: true,
+        { label: "Draft Center", path: `/draft-center/${encodeURIComponent(leagueId)}${query}`, subtitle: "Picks, order, and draft tools", glyph: "draftCenter", color: accent("Draft Center"), pro: true,
           tabs: [
             { label: "Overview", path: tabPath("draft-center", "overview"), subtitle: "Draft posture and pick decisions", keywords: ["posture", "capital"] },
             { label: "Picks", path: tabPath("draft-center", "picks"), subtitle: "Every pick you own", keywords: ["draft picks", "order"] },
             { label: "Scouting", path: tabPath("draft-center", "scouting"), subtitle: "Grade incoming prospects", keywords: ["college", "prospects", "rookies"] },
           ] },
-        { label: "Live Draft", path: `/live-draft/${encodeURIComponent(leagueId)}${query}`, subtitle: "Real-time draft room", glyph: "liveDraft", color: "var(--color-danger)", pro: true },
-        { label: "League Recaps", path: `/league-recaps/${encodeURIComponent(leagueId)}${query}`, subtitle: "Weekly league recap and stories", glyph: "leagueRecaps", color: "var(--color-information)" },
-        { label: "Games", path: `/games/${encodeURIComponent(leagueId)}${query}`, subtitle: "Season simulator and weekly pick'em", glyph: "games", color: "var(--color-opportunity)",
+        { label: "Live Draft", path: `/live-draft/${encodeURIComponent(leagueId)}${query}`, subtitle: "Real-time draft room", glyph: "liveDraft", color: accent("Live Draft"), pro: true },
+        { label: "League Recaps", path: `/league-recaps/${encodeURIComponent(leagueId)}${query}`, subtitle: "Weekly league recap and stories", glyph: "leagueRecaps", color: accent("League Recaps") },
+        { label: "Games", path: `/games/${encodeURIComponent(leagueId)}${query}`, subtitle: "Season simulator and weekly pick'em", glyph: "games", color: accent("Games"),
           tabs: [
             { label: "Season Sim", path: tabPath("games", "sim"), subtitle: "Season simulator", keywords: ["simulator", "simulation", "playoff odds", "what if"] },
             { label: "Pick'em", path: tabPath("games", "pickem"), subtitle: "Weekly pick'em in your league", keywords: ["pickem", "picks", "weekly"] },
           ] },
-        { label: "Commissioner", path: `/commissioner/${encodeURIComponent(leagueId)}${query}`, subtitle: "League integrity: lineups, tanking signals, trades", glyph: "commissioner" as const, color: "var(--color-diagnostic)", pro: true },
+        { label: "Commissioner", path: `/commissioner/${encodeURIComponent(leagueId)}${query}`, subtitle: "League integrity: lineups, tanking signals, trades", glyph: "commissioner" as const, color: accent("Commissioner"), pro: true },
       ]
     : [];
 
   const generalDestinations: NavDestination[] = [
     { label: "Home", path: "/", subtitle: "Switch leagues and manage account", glyph: "home", color: "var(--color-accent)" },
-    { label: "Portfolio", path: "/portfolio", subtitle: "Your standing across every saved league", glyph: "portfolio", color: "var(--color-premium)", pro: true },
-    { label: "News", path: "/news", subtitle: "Latest NFL news and updates", glyph: "news", color: "var(--color-information)" },
-    { label: "Trade History", path: "/trade-history", subtitle: "Trades you've shared and confirmed", glyph: "tradeHistory", color: "var(--color-diagnostic)" },
-    { label: "College Scouting", path: "/college-scouting", subtitle: "Grade incoming prospects", glyph: "collegeScouting", color: "var(--color-success)", pro: true },
+    { label: "Portfolio", path: "/portfolio", subtitle: "Your standing across every saved league", glyph: "portfolio", color: accent("Portfolio"), pro: true },
+    { label: "News", path: "/news", subtitle: "Latest NFL news and updates", glyph: "news", color: accent("News") },
+    { label: "Trade History", path: "/trade-history", subtitle: "Trades you've shared and confirmed", glyph: "tradeHistory", color: accent("Trade History") },
+    { label: "College Scouting", path: "/college-scouting", subtitle: "Grade incoming prospects", glyph: "collegeScouting", color: accent("College Scouting"), pro: true },
     {
       // Social/community layer (docs/roadmap.md), coridian_ 2026-10-19 —
       // deliberately league-independent like Portfolio/Trade History/
@@ -147,7 +148,7 @@ export function useNavDestinations(leagueId: string | null, leagueName: string) 
       path: "/community",
       subtitle: "Craziest trades this week, anonymized",
       glyph: "community",
-      color: "var(--color-premium)",
+      color: accent("Community"),
     },
   ];
 
