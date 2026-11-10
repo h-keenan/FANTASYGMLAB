@@ -25,7 +25,7 @@ export type SampleTab = "dashboard" | "roster" | "game_plan" | "trade";
 export const SAMPLE_TABS: { value: SampleTab; label: string }[] = [
   { value: "dashboard", label: "Dashboard" },
   { value: "roster", label: "Roster" },
-  { value: "game_plan", label: "Game Plan" },
+  { value: "game_plan", label: "Today" },
   { value: "trade", label: "Trade" },
 ];
 

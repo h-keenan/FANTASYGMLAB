@@ -264,7 +264,7 @@ def test_fail_soft_retry_bounded():
     stall.note_retry(state)
     assert not stall.can_retry(state)
     title, body = stall.fail_soft_copy()
-    assert "Game Plan" in title
+    assert "Today" in title
     assert "Trade Hub" in body
 
 

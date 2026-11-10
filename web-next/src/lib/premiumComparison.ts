@@ -16,7 +16,7 @@ export interface PremiumComparisonRow {
 }
 
 export const FALLBACK_PREMIUM_COMPARISON: PremiumComparisonRow[] = [
-  { key: "next_moves", label: "Next Moves", free: "Top 4", pro: "Your full briefing" },
+  { key: "next_moves", label: "Today", free: "Top 4", pro: "Your full briefing" },
   { key: "trade_hub", label: "Trade Hub ideas", free: "First 2", pro: "Every idea" },
   { key: "gm_targets", label: "GM Targets", free: "3 players", pro: "50 players" },
   { key: "waivers", label: "Waiver board", free: "Priority Adds", pro: "Full board, stashes, FAAB" },

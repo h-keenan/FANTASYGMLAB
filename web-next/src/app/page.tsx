@@ -37,7 +37,7 @@ import { LANDING_PENDING_SCRIPT, LANDING_ROOT_ID } from "@/lib/landingPending";
  */
 const TITLE = "FantasyDesk: roster-aware dynasty trades, waivers and rankings";
 const DESCRIPTION =
-  "Roster-aware dynasty trades, waivers and a weekly Game Plan built from your real league. Try a full sample league with no account or card.";
+  "Roster-aware dynasty trades, waivers and a weekly game plan built from your real league. Try a full sample league with no account or card.";
 
 export const metadata: Metadata = {
   title: TITLE,
@@ -105,7 +105,7 @@ export default function LandingPage() {
               <span className="lp-share-only">{SHARE_HEADLINE}</span>
             </h1>
             <p className="lp-sub">
-              Roster-aware dynasty trades, waivers and a weekly Game Plan, built from your real league like a front
+              Roster-aware dynasty trades, waivers and a weekly game plan, built from your real league like a front
               office would.
             </p>
             <p className="lp-note">Dynasty = fantasy leagues where you keep your players year to year.</p>
@@ -155,7 +155,7 @@ export default function LandingPage() {
             <p className="lp-body lp-pro-note" data-testid="landing-free-vs-pro">
               Free includes dynasty rankings, the trade analyzer (with weekly limits) and a full sample league. Pro
               unlocks the complete waiver board with FAAB ranges, playoff odds, Draft Center, Scouting, Live Draft and
-              every Trade Hub idea. Trade, waiver and Game Plan tools currently run on Sleeper leagues.
+              every Trade Hub idea. Trade, waiver and Today tools currently run on Sleeper leagues.
             </p>
           </section>
 

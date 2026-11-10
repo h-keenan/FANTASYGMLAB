@@ -21,7 +21,7 @@ import { OG_IMAGE } from "@/lib/seo/site";
 
 // Share previews (Discord, X, iMessage): a static 1200x630 branded card
 // (public/og-image.png) with the large-image Twitter card; see OG_IMAGE.
-const DESCRIPTION = "Dynasty fantasy football GM assistant. Real recommendations across your Trade Hub, Waivers, and Game Plan — not raw data you have to interpret yourself.";
+const DESCRIPTION = "Dynasty fantasy football GM assistant. Real recommendations across your Trade Hub, Waivers, and Today — not raw data you have to interpret yourself.";
 
 export const metadata: Metadata = {
   title: BRAND_NAME,

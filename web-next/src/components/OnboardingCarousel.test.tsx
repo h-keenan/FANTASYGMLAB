@@ -71,7 +71,7 @@ describe("OnboardingCarousel", () => {
     // Step 2: one value line over a screenshot with its benefit.
     expect(await screen.findByRole("heading", { name: ONBOARDING_VALUE_HEADLINE })).toBeInTheDocument();
     expect(screen.getByText(ONBOARDING_FEATURES[0].benefit)).toBeInTheDocument();
-    expect(screen.getByRole("img", { name: /Game Plan screen/ })).toBeInTheDocument();
+    expect(screen.getByRole("img", { name: /Today screen/ })).toBeInTheDocument();
     expect(onDone).not.toHaveBeenCalled();
     fireEvent.click(screen.getByRole("button", { name: "Connect my league" }));
     expect(onDone).toHaveBeenCalledTimes(1);
@@ -145,7 +145,7 @@ describe("OnboardingCarousel value step previews", () => {
     try {
       render(<OnboardingCarousel onDone={vi.fn()} />);
       fireEvent.click(screen.getByRole("button", { name: "Decide later" }));
-      expect(screen.getByRole("img", { name: /Game Plan screen/ })).toBeInTheDocument();
+      expect(screen.getByRole("img", { name: /Today screen/ })).toBeInTheDocument();
       act(() => {
         vi.advanceTimersByTime(ONBOARDING_VALUE_SLIDE_MS + 50);
       });

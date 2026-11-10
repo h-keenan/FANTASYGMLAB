@@ -59,7 +59,7 @@ export const FALLBACK_PUBLIC_PLANS: BillingPlan[] = [
     price: "$3.99",
     cadence: "per month",
     features: [
-      "Your full Next Move briefing, not just the top 4",
+      "Your full Today briefing, not just the top 4",
       "League Pulse leaders — your league's top contender, rebuilder, draft capital, and most active manager",
       "The complete waiver board — stash candidates, watchlist depth, and a FAAB shortlist",
       "Every Trade Hub idea, not just the first 2",
@@ -74,7 +74,7 @@ export const FALLBACK_PUBLIC_PLANS: BillingPlan[] = [
     price: "$19.99",
     cadence: "per year",
     features: [
-      "Your full Next Move briefing, not just the top 4",
+      "Your full Today briefing, not just the top 4",
       "League Pulse leaders — your league's top contender, rebuilder, draft capital, and most active manager",
       "The complete waiver board — stash candidates, watchlist depth, and a FAAB shortlist",
       "Every Trade Hub idea, not just the first 2",
