@@ -215,14 +215,46 @@ def test_importing_the_engine_loads_no_real_module():
 # ---------------------------------------------------------------- 4. real state unchanged
 
 
-def _data_fingerprint() -> dict[str, str]:
-    out = {}
-    data = REPO / "data"
-    if data.exists():
-        for path in sorted(data.rglob("*")):
-            if path.is_file():
-                st = path.stat()
-                out[path.relative_to(REPO).as_posix()] = f"{st.st_size}:{st.st_mtime_ns}"
+_WRITE_EVENTS = {"os.remove", "os.rename", "os.rmdir", "os.mkdir", "shutil.copyfile", "shutil.move"}
+_audit_state = {"active": False, "writes": []}
+
+
+def _audit_hook(event, args):
+    """Record writes made by THIS process under data/. A before/after mtime
+    fingerprint of the shared data dir is racy under `pytest -n auto`, because
+    other xdist workers legitimately refresh data/ caches while this test runs.
+    Workers are separate processes, so an in-process audit hook sees only the
+    sim's own writes."""
+    if not _audit_state["active"]:
+        return
+    try:
+        if event == "open":
+            path, mode, flags = args[0], args[1], args[2]
+            writing = (isinstance(mode, str) and any(c in mode for c in "wax+")) or (
+                isinstance(flags, int) and flags & (os.O_WRONLY | os.O_RDWR | os.O_CREAT | os.O_APPEND | os.O_TRUNC)
+            )
+            if writing and path is not None:
+                _audit_state["writes"].append(os.fspath(path))
+        elif event in _WRITE_EVENTS:
+            _audit_state["writes"].extend(os.fspath(a) for a in args if isinstance(a, (str, bytes, os.PathLike)))
+    except Exception:
+        pass
+
+
+sys.addaudithook(_audit_hook)
+
+
+def _writes_under_data(writes) -> list[str]:
+    data_root = str((REPO / "data").resolve())
+    out = []
+    for w in writes:
+        w = w.decode() if isinstance(w, bytes) else str(w)
+        try:
+            resolved = str(Path(w).resolve())
+        except Exception:
+            continue
+        if resolved == data_root or resolved.startswith(data_root + os.sep):
+            out.append(resolved)
     return out
 
 
@@ -239,7 +271,7 @@ def test_sim_run_leaves_real_data_and_endpoints_untouched(tmp_path):
     real = TestClient(svc.app)
     endpoints = ["/health", "/v1/app-config"]
     before_json = {p: real.get(p).json() for p in endpoints}
-    before_files = _data_fingerprint()
+    _audit_state.update(active=True, writes=[])
     db = REPO / "data" / "players.db"
     db_hash = hashlib.sha256(db.read_bytes()).hexdigest() if db.exists() else ""
 
@@ -269,7 +301,8 @@ def test_sim_run_leaves_real_data_and_endpoints_untouched(tmp_path):
     assert client.post(f"/v1/sim/worlds/{wid}/run").json()["result"]["grade"]
 
     assert {p: real.get(p).json() for p in endpoints} == before_json
-    assert _data_fingerprint() == before_files
+    _audit_state["active"] = False
+    assert _writes_under_data(_audit_state["writes"]) == []
     if db.exists():
         assert hashlib.sha256(db.read_bytes()).hexdigest() == db_hash
 
