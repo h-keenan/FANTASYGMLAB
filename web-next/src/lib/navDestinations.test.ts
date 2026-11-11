@@ -2,13 +2,13 @@ import { existsSync, readFileSync } from "node:fs";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
 
-import { searchNavDestinations, useNavDestinations, type NavDestination } from "./navDestinations";
+import { PAGE_TITLE_BY_SEGMENT, searchNavDestinations, useNavDestinations, type NavDestination } from "./navDestinations";
 import { isGmPlanTab } from "@/components/GmPlanSections";
 import { parseDraftCenterTab } from "@/components/DraftCenterContent";
 import { parseGamesTab, parseRecapsTab, parseWaiverTab } from "@/lib/pageTabs";
 
 const APP_DIR = path.join(process.cwd(), "src", "app");
-const MOBILE_TABS = path.join(process.cwd(), "..", "mobile", "src", "lib", "orbTabs.ts");
+const MOBILE_CATALOG = path.join(process.cwd(), "..", "mobile", "src", "lib", "navCatalog.ts");
 
 function all() {
   // eslint-disable-next-line react-hooks/rules-of-hooks -- a plain function of its args, not stateful
@@ -58,14 +58,51 @@ describe("GM orb tab destinations", () => {
     expect(src).toContain('id="playoff-odds"');
   });
 
-  it("matches the mobile tab list (same pages and tab labels)", () => {
-    const src = readFileSync(MOBILE_TABS, "utf8");
-    for (const page of withTabs) {
-      for (const tab of page.tabs!) {
-        const quoted = tab.label.includes("'") ? `"${tab.label}"` : `'${tab.label}'`;
-        expect(src, `${page.label} > ${tab.label}`).toContain(`label: ${quoted}`);
-      }
+  it("shares one catalog byte-for-byte with the app", () => {
+    const web = readFileSync(path.join(process.cwd(), "src", "lib", "navCatalog.ts"), "utf8");
+    expect(readFileSync(MOBILE_CATALOG, "utf8")).toBe(web);
+  });
+});
+
+describe("one entry point per destination", () => {
+  it("has no duplicate paths or labels across the menu", () => {
+    const rows = all();
+    const labels = rows.map((d) => d.label);
+    expect(new Set(labels).size).toBe(labels.length);
+    const paths = rows.map((d) => d.path);
+    expect(new Set(paths).size).toBe(paths.length);
+  });
+
+  it("lists tab-only pages as tabs, not menu rows", () => {
+    const labels = all().map((d) => d.label);
+    for (const tabOnly of ["Trade History", "College Scouting", "Playoff Odds", "Trade Finder", "Trade Analyzer"]) {
+      expect(labels, tabOnly).not.toContain(tabOnly);
     }
+    expect(searchNavDestinations(all(), "trade history").map((d) => d.label)).toContain("Trade Hub > History");
+    expect(searchNavDestinations(all(), "college scouting").map((d) => d.label)).toContain("Draft Center > Scouting");
+  });
+
+  it("hides the College Scouting tab when the college preference is off", () => {
+    const nav = useNavDestinations("L 1", "My League", "off");
+    const draft = nav.gmToolsDestinations.find((d) => d.label === "Draft Center")!;
+    expect(draft.tabs!.map((t) => t.label)).toEqual(["Overview", "Picks"]);
+  });
+
+  it("Home is the league switcher and Account owns settings", () => {
+    const rows = all();
+    const home = rows.find((d) => d.label === "Home")!;
+    const account = rows.find((d) => d.label === "Account")!;
+    expect(home.subtitle).not.toMatch(/account/i);
+    expect(account.subtitle).toMatch(/settings/i);
+  });
+
+  it("titles every menu page and keeps retired routes titled", () => {
+    for (const row of all()) {
+      const segment = new URL(row.path, "https://x.test").pathname.split("/")[1];
+      if (!segment || segment === "premium") continue;
+      expect(PAGE_TITLE_BY_SEGMENT[segment], row.label).toBeTruthy();
+    }
+    expect(PAGE_TITLE_BY_SEGMENT["gm-targets"]).toBe("GM Plan");
   });
 });
 
@@ -93,11 +130,10 @@ describe("searchNavDestinations", () => {
     expect(labels("draft")).toEqual(expect.arrayContaining(["Draft Center", "Draft Center > Picks"]));
   });
 
-  it("prefers the page row over a duplicate tab to the same path", () => {
+  it("finds Trade History only as the Trade Hub tab", () => {
     const history = labels("history");
-    expect(history).toContain("Trade History");
-    expect(history).not.toContain("Trade Hub > History");
-    expect(labels("trade hub history")).toContain("Trade Hub > History");
+    expect(history).toContain("Trade Hub > History");
+    expect(history).not.toContain("Trade History");
   });
 
   it("inherits Pro from the page unless the tab overrides it", () => {

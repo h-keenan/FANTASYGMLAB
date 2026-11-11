@@ -105,7 +105,7 @@ function SidebarSection({
           // Strip the ?name=... query before comparing — pathname never
           // carries it, so an exact-string match would always miss.
           const destinationPath = destination.path.split(/[?#]/)[0];
-          const active = pathname === destinationPath && !destination.anchor;
+          const active = pathname === destinationPath;
           return (
             <Link
               key={destination.path}

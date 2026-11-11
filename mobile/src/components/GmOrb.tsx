@@ -39,7 +39,8 @@ import { setLastLeague } from '../lib/lastLeague';
 import { isEspnLeagueId } from '../lib/leaguePlatform';
 import { accentColor } from '../lib/destinationAccent';
 import { queryKeys } from '../lib/queryKeys';
-import { searchOrbDestinations, type OrbSearchHit } from '../lib/orbTabs';
+import { HOME_SUBTITLE, navPage, navPagesIn, type NavCatalogPage } from '../lib/navCatalog';
+import { ROUTE_BY_PAGE, searchOrbDestinations, type OrbSearchHit } from '../lib/orbTabs';
 import { getSeenTradeIdeaCount } from '../lib/tradeHubSeen';
 import { PRO, getEntitlementTier, isAtLeast } from '../lib/revenuecat';
 import { openStoreSubscriptionSettings } from '../lib/storeSubscriptions';
@@ -76,167 +77,48 @@ interface Destination {
   pro?: boolean;
 }
 
-// Split into two groups (was one flat 15-item list) so the sheet can render
-// LEAGUE and GM TOOLS as distinct labeled sections per coridian_'s "GM Tools
-// should plausibly be Trade Hub/Trade Finder/Trade Analyzer/Trade
-// Calculator/GM Targets/Draft Center" taxonomy, and per the redesign brief's
-// own written §4 INFORMATION ARCHITECTURE list, which places these two
-// groups in this exact order/membership. Every destination below is
-// unchanged from the prior single list — same routes, icons, colors,
-// subtitles, `needsLeague`.
+// One icon per catalog page (the pages themselves, their order, labels,
+// subtitles, Pro flags and group come from lib/navCatalog.ts, the list shared
+// byte-for-byte with web; the route per page is in lib/orbTabs.ts).
+const ICON_BY_PAGE: Record<string, IconName> = {
+  dashboard: 'flash-outline',
+  alerts: 'notifications-outline',
+  'my-team': 'shirt-outline',
+  matchup: 'american-football-outline',
+  waivers: 'swap-horizontal-outline',
+  'league-rankings': 'people-circle-outline',
+  players: 'people-outline',
+  'trade-hub': 'shuffle-outline',
+  'gm-plan': 'map-outline',
+  'draft-center': 'albums-outline',
+  'live-draft': 'timer-outline',
+  'league-recaps': 'newspaper-outline',
+  games: 'dice-outline',
+  'fantasy-sim': 'flask-outline',
+  commissioner: 'shield-checkmark-outline',
+  portfolio: 'layers-outline',
+  news: 'globe-outline',
+  community: 'people-circle-outline',
+};
+
+function destinationFor(colors: ThemeColors, page: NavCatalogPage): Destination {
+  return {
+    label: page.label,
+    route: ROUTE_BY_PAGE[page.key],
+    icon: ICON_BY_PAGE[page.key],
+    needsLeague: page.leagueScoped,
+    color: accentColor(colors, page.label),
+    subtitle: page.subtitle,
+    pro: page.pro,
+  };
+}
+
 function coreLeagueDestinations(colors: ThemeColors): Destination[] {
-  return [
-    {
-      // Named "Dashboard" everywhere else (web nav, this screen's own header,
-      // landing copy retired "Next Move"); org audit 2026-10.
-      label: 'Dashboard',
-      route: 'Dashboard',
-      icon: 'flash-outline',
-      needsLeague: true,
-      color: accentColor(colors, 'Dashboard'),
-      subtitle: 'Game plan, matchup, storylines and league context',
-    },
-    // Alerts was buried last in the list despite being time-sensitive —
-    // moved up next to the other "check this now" destinations.
-    {
-      label: 'Alerts',
-      route: 'Alerts',
-      icon: 'notifications-outline',
-      needsLeague: true,
-      color: accentColor(colors, 'Alerts'),
-      subtitle: 'Injuries, news, and important updates',
-    },
-    {
-      label: 'My Team',
-      route: 'MyTeam',
-      icon: 'shirt-outline',
-      needsLeague: true,
-      color: accentColor(colors, 'My Team'),
-      subtitle: 'Roster, lineup, and team analysis',
-    },
-    {
-      label: 'Matchup',
-      route: 'Matchup',
-      icon: 'american-football-outline',
-      needsLeague: true,
-      color: accentColor(colors, 'Matchup'),
-      subtitle: "This week's matchup and comparison",
-    },
-    {
-      label: 'Waivers',
-      route: 'Waivers',
-      icon: 'swap-horizontal-outline',
-      needsLeague: true,
-      color: accentColor(colors, 'Waivers'),
-      subtitle: 'Top adds, trends, and free agents',
-    },
-    {
-      label: 'League Rankings',
-      route: 'Teams',
-      icon: 'people-circle-outline',
-      needsLeague: true,
-      color: accentColor(colors, 'League Rankings'),
-      subtitle: 'Power rankings and playoff odds',
-    },
-    {
-      label: 'Players',
-      route: 'Players',
-      icon: 'people-outline',
-      needsLeague: true,
-      color: accentColor(colors, 'Players'),
-      subtitle: 'Search, rankings, and player insights',
-    },
-  ];
+  return navPagesIn('core').map((page) => destinationFor(colors, page));
 }
 
 function gmToolsDestinations(colors: ThemeColors): Destination[] {
-  return [
-    // Trade Hub / Trade Finder / Trade Analyzer consolidated into one
-    // Madden-style Trades entry point (coridian_-approved) — see
-    // TradesScreen. Trade Calculator stays separate for now (PR 2 folds it
-    // into Trade Analyzer as a quick-mode toggle).
-    {
-      label: 'Trade Hub',
-      route: 'Trades',
-      icon: 'shuffle-outline',
-      needsLeague: true,
-      color: accentColor(colors, 'Trade Hub'),
-      subtitle: 'Trade ideas, trade finder, and trade analyzer',
-    },
-    // Season-arc complement to Dashboard's one-off "Next Move" tile: a
-    // roadmap conditioned on the Team Situation stance declared just above,
-    // aggregating real signals (trade ideas, power/draft-capital rank,
-    // roster construction) rather than a one-off action. Placed right after
-    // Team Situation since it reads that declaration directly.
-    {
-      label: 'GM Plan',
-      route: 'GmPlan',
-      icon: 'map-outline',
-      needsLeague: true,
-      color: accentColor(colors, 'GM Plan'),
-      subtitle: 'Your roadmap, stance, and protected/watched players',
-    },
-    {
-      label: 'Draft Center',
-      route: 'DraftCenter',
-      icon: 'albums-outline',
-      needsLeague: true,
-      color: accentColor(colors, 'Draft Center'),
-      subtitle: 'Picks, order, and draft tools',
-      pro: true,
-    },
-    // Was only reachable via More -> Your Team; web-next lists it in GM Tools
-    // next to Draft Center (org audit 2026-10, parity).
-    {
-      label: 'Live Draft',
-      route: 'LiveDraft',
-      icon: 'timer-outline',
-      needsLeague: true,
-      color: accentColor(colors, 'Live Draft'),
-      subtitle: 'Real-time draft room',
-      pro: true,
-    },
-    // Trails GM Tools, not the League group — both the brief's own written
-    // §4 IA list and all three concept screenshots (Recap sits immediately
-    // after Draft Center, right before "SWITCH LEAGUE") show it here. An
-    // earlier pass (PR #740) had moved it to trail the League group instead;
-    // re-checking the concept images directly (not from memory) during the
-    // V2 restructure pass showed that was a mistake, so it's restored here.
-    {
-      label: 'League Recaps',
-      route: 'Recap',
-      icon: 'newspaper-outline',
-      needsLeague: true,
-      color: accentColor(colors, 'League Recaps'),
-      subtitle: 'Weekly league recap, stories, and your lineup roundup',
-    },
-    {
-      label: 'Games',
-      route: 'Games',
-      icon: 'dice-outline',
-      needsLeague: true,
-      color: accentColor(colors, 'Games'),
-      subtitle: "Season simulator and weekly pick'em",
-    },
-    {
-      label: 'Fantasy Sim',
-      route: 'FantasySim',
-      icon: 'flask-outline',
-      needsLeague: true,
-      color: accentColor(colors, 'Fantasy Sim'),
-      subtitle: 'Set a strategy and play out your season',
-      pro: true,
-    },
-    {
-            label: 'Commissioner',
-            route: 'Commissioner',
-            icon: 'shield-checkmark-outline',
-            needsLeague: true,
-            color: accentColor(colors, 'Commissioner'),
-            subtitle: 'League integrity: lineups, tanking signals, trades',
-            pro: true,
-          },
-  ];
+  return navPagesIn('tools').map((page) => destinationFor(colors, page));
 }
 
 // Not a stack route: the Premium row's subscriber variant opens the store's
@@ -250,22 +132,9 @@ const MANAGE_SUBSCRIPTION_ROUTE = '__manage_subscription__';
  * Paywall, unchanged, since the store page wouldn't show their plan. */
 function generalDestinations(colors: ThemeColors, storeSubscriber = false, founder = false): Destination[] {
   return [
-    { label: 'Home', route: 'Home', icon: 'home-outline', color: colors.accent, subtitle: 'Switch leagues and manage account' },
-    // Account-wide, not league-scoped — belongs here with Home/News/Premium,
-    // not nested inside coreLeagueDestinations' single-league context, since
-    // the entire point is standing/needs/opportunities ACROSS every saved
-    // league at once (coridian_-approved multi-league Portfolio view).
-    // Violet matches the "secondary/analytical" semantic family (see
-    // Destination.color comment above) — this is read-only cross-league
-    // analysis, not a GM tool or an alert.
-    {
-      label: 'Portfolio',
-      route: 'Portfolio',
-      icon: 'layers-outline',
-      color: accentColor(colors, 'Portfolio'),
-      subtitle: 'Your standing across every saved league',
-      pro: true,
-    },
+    // The league switcher; Account (below) owns settings.
+    { label: 'Home', route: 'Home', icon: 'home-outline', color: colors.accent, subtitle: HOME_SUBTITLE },
+    destinationFor(colors, navPage('portfolio')),
     ...(founder
       ? [
           {
@@ -277,24 +146,8 @@ function generalDestinations(colors: ThemeColors, storeSubscriber = false, found
           },
         ]
       : []),
-    { label: 'News', route: 'News', icon: 'globe-outline', color: accentColor(colors, 'News'), subtitle: 'Latest NFL news and updates' },
-    // Both were reachable only through More (Trade History) or at the bottom
-    // of Trade History (the shared-trades feed, 4 taps deep); web has them
-    // as nav rows (UX audit 2026-11-03, parity).
-    {
-      label: 'Trade History',
-      route: 'TradeHistory',
-      icon: 'time-outline',
-      color: accentColor(colors, 'Trade History'),
-      subtitle: "Trades you've confirmed, and how they worked out",
-    },
-    {
-      label: 'Community',
-      route: 'Community',
-      icon: 'people-circle-outline',
-      color: accentColor(colors, 'Community'),
-      subtitle: 'Trades other users chose to share',
-    },
+    destinationFor(colors, navPage('news')),
+    destinationFor(colors, navPage('community')),
     storeSubscriber
       ? {
           label: 'Manage subscription',

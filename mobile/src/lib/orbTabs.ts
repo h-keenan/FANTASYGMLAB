@@ -1,14 +1,17 @@
 /**
  * GM orb "Where to go" search: the tabs of the multi-tab screens, each its own
  * searchable destination ("Draft Center > Scouting") that opens that exact tab.
- * Web twin: the `tabs` of web-next/src/lib/navDestinations.ts (a web test pins
- * the labels; tabs open through `?tab=` there and route params here).
+ * Tab labels, subtitles, keywords and Pro flags come from lib/navCatalog.ts, the
+ * one list shared byte-for-byte with web (tabs open through `?tab=` there and
+ * route params here).
  *
  * Pure data + search, no react-native imports, so it runs under node:test.
  * `params` are the route params the screen reads for its tab (checked against
  * RootNavigator.tsx by orbTabs.test.ts). The normal (non-search) menu never
  * lists tabs.
  */
+import { NAV_PAGES } from './navCatalog.ts';
+
 export interface OrbTab {
   label: string;
   subtitle: string;
@@ -24,43 +27,87 @@ export interface OrbTab {
   pro?: boolean;
 }
 
-/** Keyed by the parent destination's route. */
-/* prettier-ignore */
-export const ORB_TABS: Readonly<Record<string, readonly OrbTab[]>> = {
-  Trades: [
-    { label: 'Hub', subtitle: 'Trade ideas built for your roster', keywords: ['trade ideas', 'trade block', 'offers'], params: { initialTab: 'block' } },
-    { label: 'Finder', subtitle: 'Shop a player or pick and see what partners pay', keywords: ['trade finder', 'shop', 'search', 'partners'], params: { initialTab: 'search' }, pro: true },
-    { label: 'Analyzer', subtitle: 'Grade any deal against your lineup', keywords: ['trade analyzer', 'calculator', 'make a trade', 'grade', 'evaluate'], params: { initialTab: 'make' } },
-    { label: 'History', subtitle: 'Trades you have shared and confirmed', keywords: ['trade history', 'past trades'], route: 'TradeHistory', needsLeague: false },
-  ],
-  Teams: [
-    { label: 'Rankings', subtitle: 'Power rankings across the league', keywords: ['power rankings', 'teams'], params: { initialTab: 'rankings' } },
-    { label: 'Playoff Odds', subtitle: "Every team's chance at the playoffs", keywords: ['playoffs', 'odds', 'chance', 'seeding'], params: { initialTab: 'playoff' }, pro: true },
-  ],
-  DraftCenter: [
-    { label: 'Overview', subtitle: 'Draft posture and pick decisions', keywords: ['posture', 'capital'], params: { tab: 'overview' } },
-    { label: 'Picks', subtitle: 'Every pick you own', keywords: ['draft picks', 'order'], params: { tab: 'picks' } },
-    { label: 'Scouting', subtitle: 'Grade incoming prospects', keywords: ['college', 'prospects', 'rookies'], params: { tab: 'scouting' } },
-  ],
-  GmPlan: [
-    { label: 'Overview', subtitle: 'Stance, roadmap, and plan snapshot', keywords: ['stance', 'roadmap', 'rebuild', 'compete'], params: { initialTab: 'overview' } },
-    { label: 'Trades', subtitle: 'Trade moves your plan calls for', keywords: ['trade window'], params: { initialTab: 'trades' } },
-    { label: 'Core', subtitle: 'Players your plan is built around', keywords: ['protected', 'keep'], params: { initialTab: 'core' } },
-    { label: 'Watching', subtitle: 'Players you are targeting', keywords: ['targets', 'gm targets', 'watchlist'], params: { initialTab: 'watching' } },
-  ],
-  Waivers: [
-    { label: 'Recommended', subtitle: 'Ranked pickups for your roster', keywords: ['adds', 'faab', 'pickups'], params: { tab: 'recommended' } },
-    { label: 'Explore', subtitle: 'Browse every free agent', keywords: ['free agents', 'search'], params: { tab: 'explore' } },
-    { label: 'Watchlist', subtitle: 'Free agents you are tracking', keywords: ['targets', 'tracking'], params: { tab: 'watchlist' } },
-  ],
-  Recap: [
-    { label: 'Roundup', subtitle: 'Your lineup vs the best possible one, and what you left on the bench', keywords: ['bench', 'optimal lineup', 'weekly roundup', 'bench regret', 'missed swaps'], params: { initialTab: 'roundup' } },
-  ],
-  Games: [
-    { label: 'Season Sim', subtitle: 'Season simulator', keywords: ['simulator', 'simulation', 'playoff odds', 'what if'], params: { tab: 'sim' } },
-    { label: "Pick'em", subtitle: "Weekly pick'em in your league", keywords: ['pickem', 'picks', 'weekly'], params: { tab: 'pickem' } },
-  ],
+/** The app route each catalog page (lib/navCatalog.ts, shared with web) opens. */
+export const ROUTE_BY_PAGE: Readonly<Record<string, string>> = {
+  dashboard: 'Dashboard',
+  alerts: 'Alerts',
+  'my-team': 'MyTeam',
+  matchup: 'Matchup',
+  waivers: 'Waivers',
+  'league-rankings': 'Teams',
+  players: 'Players',
+  'trade-hub': 'Trades',
+  'gm-plan': 'GmPlan',
+  'draft-center': 'DraftCenter',
+  'live-draft': 'LiveDraft',
+  'league-recaps': 'Recap',
+  games: 'Games',
+  'fantasy-sim': 'FantasySim',
+  commissioner: 'Commissioner',
+  portfolio: 'Portfolio',
+  news: 'News',
+  community: 'Community',
 };
+
+interface TabTarget {
+  params?: Record<string, string>;
+  route?: string;
+  needsLeague?: boolean;
+}
+
+/** Where each catalog tab opens in the app: route params the screen reads
+ * for its tab, or its own screen. Keyed by page key, then tab label. */
+/* prettier-ignore */
+const TAB_TARGETS: Readonly<Record<string, Readonly<Record<string, TabTarget>>>> = {
+  'trade-hub': {
+    Hub: { params: { initialTab: 'block' } },
+    Finder: { params: { initialTab: 'search' } },
+    Analyzer: { params: { initialTab: 'make' } },
+    History: { route: 'TradeHistory', needsLeague: false },
+  },
+  'league-rankings': {
+    Rankings: { params: { initialTab: 'rankings' } },
+    'Playoff Odds': { params: { initialTab: 'playoff' } },
+  },
+  'draft-center': {
+    Overview: { params: { tab: 'overview' } },
+    Picks: { params: { tab: 'picks' } },
+    Scouting: { params: { tab: 'scouting' } },
+  },
+  'gm-plan': {
+    Overview: { params: { initialTab: 'overview' } },
+    Trades: { params: { initialTab: 'trades' } },
+    Core: { params: { initialTab: 'core' } },
+    Watching: { params: { initialTab: 'watching' } },
+  },
+  waivers: {
+    Recommended: { params: { tab: 'recommended' } },
+    Explore: { params: { tab: 'explore' } },
+    Watchlist: { params: { tab: 'watchlist' } },
+  },
+  'league-recaps': { Roundup: { params: { initialTab: 'roundup' } } },
+  games: {
+    'Season Sim': { params: { tab: 'sim' } },
+    "Pick'em": { params: { tab: 'pickem' } },
+  },
+};
+
+/** Keyed by the parent destination's route; built from the shared catalog. */
+export const ORB_TABS: Readonly<Record<string, readonly OrbTab[]>> = Object.fromEntries(
+  NAV_PAGES.filter((page) => page.tabs?.length).map((page) => [
+    ROUTE_BY_PAGE[page.key],
+    page.tabs!.map((tab): OrbTab => {
+      const target = TAB_TARGETS[page.key]?.[tab.label] ?? {};
+      return {
+        label: tab.label,
+        subtitle: tab.subtitle,
+        keywords: tab.keywords ? [...tab.keywords] : undefined,
+        pro: tab.pro,
+        ...target,
+      };
+    }),
+  ]),
+);
 
 export interface OrbSearchable {
   label: string;

@@ -1,4 +1,6 @@
 // Run with: node --experimental-strip-types --test src/lib/featureCatalog.test.ts
+import { NAV_PAGES } from './navCatalog.ts';
+import { ROUTE_BY_PAGE } from './orbTabs.ts';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
@@ -32,18 +34,13 @@ test('items reuse the icon, accent color and Pro flag the GM orb gives the same 
     // Playoff Odds is a tab of League Rankings; the orb has one League Rankings row.
     if (item.id === 'playoff-odds') continue;
     if (item.route === 'CollegeProspects') continue; // not in the orb; icon matches More's College Scouting row
-    const at = orb.indexOf(`route: '${item.route}'`);
-    assert.ok(at > 0, `${item.route} in GmOrb`);
-    const rest = orb.slice(at);
-    const block = rest.slice(0, rest.search(/\n\s*\},?\n/));
-    assert.ok(block.includes(`icon: '${item.icon}'`), `${item.id} icon`);
-    // Orb rows color themselves from the shared accent map by label; the
-    // catalog item carries the same token for the same destination.
-    const label = [...orb.slice(0, at).matchAll(/label: '([^']+)'/g)].pop()![1];
-    assert.ok(block.includes(`color: accentColor(colors, '${label}')`), `${item.id} orb color uses the shared map`);
-    assert.equal(item.color, accentFor(label), `${item.id} color`);
+    const page = NAV_PAGES.find((p) => ROUTE_BY_PAGE[p.key] === item.route);
+    if (!page) continue; // Trade History is a Trade Hub tab, not a menu page
+    // The orb takes each page's icon from ICON_BY_PAGE and its color from the shared accent map by label.
+    assert.ok(orb.includes(`'${page.key}': '${item.icon}'`) || orb.includes(`  ${page.key}: '${item.icon}'`), `${item.id} icon`);
+    assert.equal(item.color, accentFor(page.label), `${item.id} color`);
     // Trades hosts three items; only Trade Finder is Pro and the orb row is not.
-    if (item.route !== 'Trades' && item.route !== 'Teams') assert.equal(block.includes('pro: true'), Boolean(item.pro), `${item.id} pro`);
+    if (item.route !== 'Trades' && item.route !== 'Teams') assert.equal(Boolean(page.pro), Boolean(item.pro), `${item.id} pro`);
   }
   assert.match(more, /icon="school-outline"[\s\S]{0,80}colors\.accent[\s\S]{0,80}label="College Scouting"/);
 });

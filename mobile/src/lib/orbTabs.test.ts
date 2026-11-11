@@ -5,7 +5,8 @@ import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-import { ORB_TABS, searchOrbDestinations } from './orbTabs.ts';
+import { ORB_TABS, ROUTE_BY_PAGE, searchOrbDestinations } from './orbTabs.ts';
+import { NAV_PAGES } from './navCatalog.ts';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const read = (...p: string[]) => readFileSync(join(here, '..', ...p), 'utf8');
@@ -20,7 +21,7 @@ const SCREEN: Record<string, string> = {
 
 test('every tab opens a registered route, with a param the route accepts', () => {
   for (const [parent, tabs] of Object.entries(ORB_TABS)) {
-    assert.ok(orb.includes(`route: '${parent}'`), `${parent} is a GM orb destination`);
+    assert.ok(Object.values(ROUTE_BY_PAGE).includes(parent), `${parent} is a GM orb destination`);
     const screen = read('screens', `${SCREEN[parent]}.tsx`);
     for (const tab of tabs) {
       const route = tab.route ?? parent;
@@ -85,4 +86,21 @@ test('Pro and needsLeague follow the page unless the tab overrides', () => {
 test('no league pages means no tab hits (callers pass only reachable pages)', () => {
   assert.deepEqual(labels('portfolio'), ['Portfolio']);
   assert.deepEqual(searchOrbDestinations([pages[5]], 'scouting'), []);
+});
+
+test('every catalog page has an app route registered in the navigator and an orb icon', () => {
+  for (const page of NAV_PAGES) {
+    const route = ROUTE_BY_PAGE[page.key];
+    assert.ok(route, `${page.key} has a route`);
+    assert.match(navigator, new RegExp(`AppStack\\.Screen\\s+name="${route}"`), `${page.key} -> ${route}`);
+    assert.ok(orb.includes(`'${page.key}':`) || orb.includes(`  ${page.key}:`), `${page.key} has an orb icon`);
+  }
+});
+
+test('Trade History, College Scouting and Playoff Odds are tabs, not menu pages', () => {
+  const labels = NAV_PAGES.map((p) => p.label);
+  for (const tabOnly of ['Trade History', 'College Scouting', 'Playoff Odds', 'Trade Finder', 'Trade Analyzer']) {
+    assert.ok(!labels.includes(tabOnly), tabOnly);
+  }
+  assert.ok(ORB_TABS.Trades.some((t) => t.label === 'History' && t.route === 'TradeHistory'));
 });
