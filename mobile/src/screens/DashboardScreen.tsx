@@ -238,10 +238,14 @@ export default function DashboardScreen({ route, navigation }: Props) {
   const guillotine = guillotineQuery.data?.is_guillotine ? guillotineQuery.data : null;
   // Backs the "new recap ready" module below — same ready/incomplete gate
   // AlertsScreen's own recap-ready card already uses.
+  // Below-the-fold reads (recap, waivers) wait for the Dashboard's first
+  // paint (cached or first pass) so they never compete with it for the
+  // server; web-next does the same with its season-simulation read.
+  const firstPaintDone = dashboardQuery.data !== undefined || dashboardQuery.isError;
   const recapQuery = useQuery({
     queryKey: queryKeys.recap(leagueId),
     queryFn: () => api.getLeagueRecap(leagueId),
-    enabled: !isRestoring,
+    enabled: !isRestoring && firstPaintDone,
   });
 
   // Waiver Suggestions (moved from the retired League Overview): the same
@@ -249,7 +253,7 @@ export default function DashboardScreen({ route, navigation }: Props) {
   const waiversQuery = useQuery({
     queryKey: queryKeys.waivers(leagueId),
     queryFn: () => api.getLeagueWaivers(leagueId),
-    enabled: !isRestoring,
+    enabled: !isRestoring && firstPaintDone,
   });
   const priorityAdds = waiversQuery.data?.priority_adds ?? [];
 

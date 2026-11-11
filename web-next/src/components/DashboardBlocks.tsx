@@ -1,5 +1,5 @@
 import Link from "next/link";
-import type { ReactNode } from "react";
+import { useState, type ReactNode } from "react";
 
 import type { BriefingItem, DashboardResponse } from "@/lib/api";
 import { AccentCard } from "@/components/AccentCard";
@@ -149,8 +149,11 @@ export function DashboardTradesBlock({
 
 /** Secondary modules, collapsed by default (native disclosure: no JS state). */
 export function DashboardMore({ children }: { children: ReactNode }) {
+  // Collapsed content is mounted on first open, so its self-fetching cards
+  // (daily games) cost nothing for the many visits that never expand it.
+  const [opened, setOpened] = useState(false);
   return (
-    <details className="glass-surface" data-testid="dashboard-more">
+    <details className="glass-surface" data-testid="dashboard-more" onToggle={(event) => event.currentTarget.open && setOpened(true)}>
       <summary
         className="flex items-center justify-between gap-3 px-4 text-sm font-bold uppercase cursor-pointer"
         style={{ minHeight: "var(--touch-target-min)", letterSpacing: "0.02em" }}
@@ -160,7 +163,7 @@ export function DashboardMore({ children }: { children: ReactNode }) {
           League activity, games, settings
         </span>
       </summary>
-      <div className="flex flex-col gap-5 px-4 pb-4 pt-2">{children}</div>
+      <div className="flex flex-col gap-5 px-4 pb-4 pt-2">{opened ? children : null}</div>
     </details>
   );
 }
