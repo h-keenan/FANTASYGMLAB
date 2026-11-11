@@ -50,6 +50,7 @@ export const MIRRORED = [
   "dropsPresentation.ts",
   "experienceCopy.ts",
   "formatPlayerName.ts",
+  "notificationControls.ts",
   "freeLeagueCap.ts",
   "glossary.ts",
   "paidPreviews.ts",
