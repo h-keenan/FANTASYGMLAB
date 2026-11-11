@@ -21,22 +21,33 @@ interface Props {
    * to avoid a screen <-> component circular import. */
   primaryAvatarId?: string;
   secondaryAvatarId?: string;
+  /** Resolves a roster id to a Sleeper avatar id, for the per-side headers of
+   * 3+ team trades (`story.sides`). */
+  avatarForRoster?: (rosterId?: string) => string | undefined;
 }
 
 /**
  * Read-only, historical trade detail — opened by tapping a "Notable trade"
  * recap card. Deliberately not the live Trade Analyzer (which grades a
  * hypothetical proposal): this just displays the full asset lists for a
- * trade that already happened, using the untruncated `left_assets` /
- * `right_assets` modules/league_recaps.py's `_trade_story` now includes
+ * trade that already happened, using the untruncated `sides` (all teams; `left_assets` /
+ * `right_assets` for older payloads) modules/league_recaps.py's `_trade_story` includes
  * (the card itself, and `players`, stay truncated to 2-per-side).
  */
-export default function RecapTradeDetailModal({ visible, onClose, story, primaryAvatarId, secondaryAvatarId }: Props) {
+export default function RecapTradeDetailModal({ visible, onClose, story, primaryAvatarId, secondaryAvatarId, avatarForRoster }: Props) {
   const { colors } = useThemeMode();
   const styles = useMemo(() => createStyles(colors), [colors]);
   if (!story) return null;
   const leftAssets = story.left_assets ?? [];
   const rightAssets = story.right_assets ?? [];
+  // Prefer the full per-team list (every side of a 3+ team trade); older
+  // payloads only carry left/right.
+  const sides = story.sides && story.sides.length > 0
+    ? story.sides
+    : [
+        { team_name: story.primary_team, roster_id: story.primary_roster_id, assets: leftAssets },
+        { team_name: story.secondary_team, roster_id: story.secondary_roster_id, assets: rightAssets },
+      ];
 
   return (
     <SheetModal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
@@ -52,11 +63,26 @@ export default function RecapTradeDetailModal({ visible, onClose, story, primary
           </View>
           {story.summary ? <AppText style={styles.summary}>{story.summary}</AppText> : null}
           <SheetScrollView style={styles.body} contentContainerStyle={styles.bodyContent}>
-            <TeamAssetColumn teamName={story.primary_team} avatarId={primaryAvatarId} assets={leftAssets} />
-            <View style={styles.divider}>
-              <Ionicons name="swap-horizontal" size={16} color={colors.textTertiary} />
-            </View>
-            <TeamAssetColumn teamName={story.secondary_team} avatarId={secondaryAvatarId} assets={rightAssets} />
+            {sides.map((side, index) => (
+              <React.Fragment key={`${side.roster_id || side.team_name}-${index}`}>
+                {index > 0 ? (
+                  <View style={styles.divider}>
+                    <Ionicons name="swap-horizontal" size={16} color={colors.textTertiary} />
+                  </View>
+                ) : null}
+                <TeamAssetColumn
+                  teamName={side.team_name}
+                  avatarId={
+                    sides.length === 2 && index === 0 && primaryAvatarId
+                      ? primaryAvatarId
+                      : sides.length === 2 && index === 1 && secondaryAvatarId
+                        ? secondaryAvatarId
+                        : avatarForRoster?.(side.roster_id)
+                  }
+                  assets={side.assets}
+                />
+              </React.Fragment>
+            ))}
             {story.editorial_label ? (
               <AppText style={styles.editorial}>{story.editorial_label}</AppText>
             ) : null}

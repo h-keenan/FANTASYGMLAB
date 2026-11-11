@@ -1512,13 +1512,12 @@ def _grade_for_side(
     current_week: int,
 ) -> dict[str, Any] | None:
     """The History tab's retrospective letter for this manager's side, or
-    None when it cannot be computed honestly (multi-team trade, startup-draft
-    picks, still too recent, or missing current values)."""
+    None when it cannot be computed honestly (startup-draft picks, still too recent, or missing current values)."""
 
     from modules import transaction_grades
 
     sides = [s for s in tx.get("sides") or [] if isinstance(s, Mapping)]
-    if len(sides) != 2 or roster_id not in {_int(s.get("roster_id")) for s in sides}:
+    if len(sides) < 2 or roster_id not in {_int(s.get("roster_id")) for s in sides}:
         return None
     graded_sides = []
     for side in sides:
@@ -1530,6 +1529,7 @@ def _grade_for_side(
                 "team_name": side.get("team_name"),
                 "roster_id": side.get("roster_id"),
                 "receives": received,
+                "sent": list(side.get("sent") or []),
             }
         )
     try:

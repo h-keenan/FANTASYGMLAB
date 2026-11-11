@@ -124,8 +124,8 @@ LIMITS = [
     "players who scored zero, but a late scratch can still look like a lineup mistake.",
     "Sleeper does not publish your league's draft-order rule, so context defaults to \"unknown\" unless you set it.",
     "Trade value uses current player values and the same round-level pick prices as the Trade Analyzer, not the "
-    "values at trade time or the exact draft slot. Three-team trades and trades with an unpriced asset are never "
-    "scored as lopsided.",
+    "values at trade time or the exact draft slot. Three-team trades are scored per team on what each side received versus sent; "
+    "trades with an unpriced asset are never scored as lopsided.",
     "Lineup history is read from each week's saved Sleeper matchup. Playoff weeks are excluded, so toilet-bowl "
     "and consolation brackets are never counted.",
     "Best-ball leagues have no manager-set lineups, so lineup signals are not shown for them.",
@@ -476,14 +476,17 @@ def trade_legs(
     values: Mapping[str, Mapping[str, Any]],
     pick_value: Callable[[Mapping[str, Any]], float | None] = _canonical_pick_value,
 ) -> list[dict[str, Any]]:
-    """Two-party trades with a value delta per side.
+    """Trades with a value delta per side (two teams or more).
 
     ``delta`` is value received minus value sent, in the same units as the
     trade engine's score ladder (modules.trade_value_bands). Draft picks are
     priced from the canonical pick table (one source, same as the Trade
-    Analyzer's pick prices). Three-way trades, trades whose picks cannot all be
-    matched to a side, and any trade with an unvalued asset are returned with
-    ``valued=False`` and are never scored for value.
+    Analyzer's pick prices). Each side is scored on exactly what it received
+    versus what it sent (players it dropped plus picks whose previous owner is
+    that roster), so three-way trades are scored per team. Trades whose picks
+    cannot all be matched to a side, and any trade with an unvalued asset, are
+    returned with ``valued=False`` and are never scored for value. Pair-based
+    collusion patterns still use two-team trades only.
     """
 
     out: list[dict[str, Any]] = []
@@ -501,7 +504,8 @@ def trade_legs(
             a for s in sides for a in (s.get("receives") or [])
             if isinstance(a, Mapping) and a.get("kind") == "pick"
         ]
-        valued = len(sides) == 2 and len(pick_assets) == len(raw_picks)
+        multi = len(sides) > 2
+        valued = len(sides) >= 2 and len(pick_assets) == len(raw_picks)
         legs: dict[int, dict[str, Any]] = {}
         for side, rid in zip(sides, roster_ids):
             got_assets = [a for a in side.get("receives") or [] if isinstance(a, Mapping)]
@@ -509,7 +513,13 @@ def trade_legs(
             sent_assets += [a for a in pick_assets if _int(a.get("from_roster_id")) == rid]
             got = [_asset_value(a, values, pick_value) for a in got_assets]
             sent = [_asset_value(a, values, pick_value) for a in sent_assets]
-            if any(v is None for v in got) or any(v is None for v in sent) or not got or not sent:
+            if any(v is None for v in got) or any(v is None for v in sent):
+                valued = False
+            elif multi:
+                # In an N-team trade a team can legally only send or only receive.
+                if not got and not sent:
+                    valued = False
+            elif not got or not sent:
                 valued = False
             legs[rid] = {
                 "received": sum(v for v in got if v is not None),
@@ -538,11 +548,14 @@ def _lopsided_losers(legs: Sequence[Mapping[str, Any]]) -> list[tuple[int, int, 
     for trade in legs:
         if not trade["valued"]:
             continue
-        a, b = trade["roster_ids"]
-        for loser, winner in ((a, b), (b, a)):
-            leg = trade["legs"][loser]
-            delta = leg["received"] - leg["sent"]
+        deltas = {
+            rid: trade["legs"][rid]["received"] - trade["legs"][rid]["sent"]
+            for rid in trade["roster_ids"]
+        }
+        for loser, delta in deltas.items():
             if trade_value_bands.band_for_score(delta).id in LOPSIDED_BAND_IDS:
+                # The winner is the team that gained the most from the trade.
+                winner = max((r for r in deltas if r != loser), key=lambda r: deltas[r])
                 result.append((loser, winner, delta, dict(trade)))
     return result
 
@@ -553,7 +566,7 @@ def lopsided_wins_between(legs: Sequence[Mapping[str, Any]], roster_a: Any, rost
     pair = {_int(roster_a), _int(roster_b)}
     wins = {str(_int(roster_a)): 0, str(_int(roster_b)): 0}
     for _loser, winner, _delta, trade in _lopsided_losers(legs):
-        if set(trade["roster_ids"]) == pair:
+        if len(trade["roster_ids"]) == 2 and set(trade["roster_ids"]) == pair:
             wins[str(winner)] += 1
     return wins
 
@@ -615,7 +628,7 @@ def collusion_pairs(legs: Sequence[Mapping[str, Any]], team_names: Mapping[str, 
         # Same direction: the same manager is the repeated winner.
         wins: dict[int, list[tuple[int, float, dict[str, Any]]]] = {a: [], b: []}
         for loser, winner, delta, trade in lopsided:
-            if {loser, winner} == {a, b}:
+            if len(trade["roster_ids"]) == 2 and {loser, winner} == {a, b}:
                 wins[winner].append((loser, delta, trade))
         beneficiary = max(wins, key=lambda r: len(wins[r]))
         count = len(wins[beneficiary])
@@ -879,8 +892,14 @@ def _roster_behaviour(
         label = trade_value_bands.band_for_score(delta).direction_label.replace("against you", "against them")
         bucket(loser)["lopsided"].append({
             "week": trade["week"],
-            "text": f"Week {trade['week']}: sent {', '.join(leg['sent_names'][:3])} to {team_names.get(str(winner), 'another team')} for "
-                    f"{', '.join(leg['received_names'][:3])} ({label}).",
+            "text": (
+                f"Week {trade['week']}: in a {len(trade['roster_ids'])}-team trade, sent "
+                f"{', '.join(leg['sent_names'][:3]) or 'nothing'} and received "
+                f"{', '.join(leg['received_names'][:3]) or 'nothing'} ({label})."
+                if len(trade["roster_ids"]) > 2
+                else f"Week {trade['week']}: sent {', '.join(leg['sent_names'][:3])} to {team_names.get(str(winner), 'another team')} for "
+                     f"{', '.join(leg['received_names'][:3])} ({label})."
+            ),
         })
     return notes
 

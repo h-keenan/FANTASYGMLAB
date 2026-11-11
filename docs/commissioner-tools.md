@@ -93,7 +93,7 @@ flagged card lists the evidence lines and "Could be innocent" explanations.
 ## Extras
 
 - Repeated trades worth a look (two managers, all trades between them; never
-  scored when a trade has an unpriced asset or three teams). Draft picks are
+  scored when a trade has an unpriced asset; three-team trades are valued per team but pair patterns count two-team trades only). Draft picks are
   priced from the one canonical pick table the Trade Analyzer and History
   grades share (`trade_ideas.canonical_pick_identity_value`, round-level, mid
   slot; a past trade's exact slot is unknown). Three patterns, each capped at

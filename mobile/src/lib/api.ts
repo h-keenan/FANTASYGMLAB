@@ -2186,6 +2186,12 @@ export interface RecapTradeAsset {
   round?: number;
 }
 
+export interface RecapTradeSide {
+  team_name: string;
+  roster_id: string;
+  assets: RecapTradeAsset[];
+}
+
 export interface RecapValueLens {
   lens: string;
   label: string;
@@ -2215,6 +2221,9 @@ export interface RecapStory {
   // trade detail view, plus the value-lens summary shown alongside it.
   left_assets?: RecapTradeAsset[];
   right_assets?: RecapTradeAsset[];
+  // Every participating team (3+ team trades carry all of them).
+  team_count?: number;
+  sides?: RecapTradeSide[];
   value_lenses?: RecapValueLens[];
   editorial_label?: string;
   historical_value_available?: boolean;

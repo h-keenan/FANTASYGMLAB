@@ -94,7 +94,9 @@ function RecapStoryCard({
 }) {
   const accent = recapCategoryColorVar(recapStoryCategory(story.story_type));
   const deepLinkLabel = historyDeepLinkLabel(story);
-  const identity = story.secondary_team
+  const identity = (story.sides?.length ?? 0) > 2
+    ? story.sides!.map((side) => side.team_name).join(" vs ")
+    : story.secondary_team
     ? story.primary_team
       ? `${story.primary_team} vs ${story.secondary_team}`
       : story.secondary_team
@@ -571,7 +573,8 @@ function HistoryGradeBlock({ grade }: { grade: HistoryTransaction["grade"] }) {
 }
 
 function HistoryItemCard({ transaction }: { transaction: HistoryTransaction }) {
-  const kicker = transaction.type === "trade" ? "Trade" : transaction.type === "waiver" ? "Waiver" : "Free agent";
+  const sideCount = (transaction.sides || []).length;
+  const kicker = transaction.type === "trade" ? (sideCount > 2 ? `${sideCount}-team trade` : "Trade") : transaction.type === "waiver" ? "Waiver" : "Free agent";
   const when = formatHistoryWhen(transaction.week, transaction.timestamp);
   const sides = transaction.sides || [];
   if (!sides.length) return null;
