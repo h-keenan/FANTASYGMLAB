@@ -6,6 +6,7 @@ import { useThemeMode } from '../context/ThemeModeContext';
 import { ordinal, percentileColor } from '../lib/percentile';
 import { COLLAPSE_AFTER, type StatRowModel } from '../lib/statRows';
 import { radii, spacing, type ThemeColors } from '../theme';
+import GlassCard from './GlassCard';
 
 export type ExploreHandler = (target: { key: string; label: string }) => void;
 
@@ -74,7 +75,7 @@ export function StatRowsCard({
   if (rows.length === 0 && !children) return null;
   const shown = expanded ? rows : rows.slice(0, collapseAfter);
   return (
-    <View style={styles.card}>
+    <GlassCard radius="md" style={styles.card}>
       <View style={styles.head}>
         <AppText style={styles.title}>{title.toUpperCase()}</AppText>
         {caption ? <AppText style={styles.caption}>{caption}</AppText> : null}
@@ -88,7 +89,7 @@ export function StatRowsCard({
           <AppText style={styles.more}>{expanded ? 'Show fewer' : `Show all ${rows.length}`}</AppText>
         </Pressable>
       ) : null}
-    </View>
+    </GlassCard>
   );
 }
 
@@ -102,11 +103,11 @@ export function HeadlineTiles({ rows, onExplore }: { rows: StatRowModel[]; onExp
       {rows.map((row) => {
         const tint = row.percentile != null ? percentileColor(Math.max(0, Math.min(100, row.percentile)), colors) : colors.textTertiary;
         const tile = (
-          <View style={styles.tile}>
+          <GlassCard radius="md" padding="sm" style={styles.tile}>
             <AppText style={styles.tileLabel} numberOfLines={2}>{row.label.toUpperCase()}</AppText>
             <AppText style={styles.tileValue}>{row.value}</AppText>
             {row.percentile != null ? <AppText style={[styles.tilePct, { color: tint }]}>{ordinal(row.percentile)} pct</AppText> : null}
-          </View>
+          </GlassCard>
         );
         return row.explorerKey && onExplore ? (
           <Pressable
@@ -129,11 +130,6 @@ export function HeadlineTiles({ rows, onExplore }: { rows: StatRowModel[]; onExp
 function createStyles(colors: ThemeColors) {
   return StyleSheet.create({
     card: {
-      padding: spacing.md,
-      borderRadius: radii.md,
-      borderWidth: StyleSheet.hairlineWidth * 1.5,
-      borderColor: colors.glassBorder,
-      backgroundColor: colors.glass,
       marginBottom: spacing.md,
     },
     head: { flexDirection: 'row', alignItems: 'baseline', justifyContent: 'space-between', marginBottom: spacing.xs },
@@ -154,11 +150,6 @@ function createStyles(colors: ThemeColors) {
     tileWrap: { flex: 1 },
     tile: {
       flex: 1,
-      padding: spacing.sm,
-      borderRadius: radii.md,
-      borderWidth: StyleSheet.hairlineWidth * 1.5,
-      borderColor: colors.glassBorder,
-      backgroundColor: colors.glass,
       gap: 2,
     },
     tileLabel: { fontSize: 12, fontWeight: '700', letterSpacing: 0.6, color: colors.textTertiary },

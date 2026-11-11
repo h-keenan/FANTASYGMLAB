@@ -4,7 +4,8 @@ import { Ionicons } from '@expo/vector-icons';
 
 import AppText from './AppText';
 import { useThemeMode } from '../context/ThemeModeContext';
-import { radii, spacing, type ThemeColors } from '../theme';
+import { spacing, type ThemeColors } from '../theme';
+import GlassCard from './GlassCard';
 
 export interface SnapshotItem {
   key: string;
@@ -47,7 +48,7 @@ export default function PlayerSnapshotCard({
     return colors.textPrimary;
   };
   return (
-    <View style={styles.card}>
+    <GlassCard radius="md" padding="lg">
       <View style={styles.headerRow}>
         <View style={styles.headerTitleRow}>
           <Ionicons name="flash-outline" size={15} color={colors.accent} style={styles.headerIcon} />
@@ -83,19 +84,12 @@ export default function PlayerSnapshotCard({
           </View>
         ))}
       </View>
-    </View>
+    </GlassCard>
   );
 }
 
 function createStyles(colors: ThemeColors) {
   return StyleSheet.create({
-    card: {
-      backgroundColor: colors.glass,
-      borderRadius: radii.md,
-      borderWidth: StyleSheet.hairlineWidth * 1.5,
-      borderColor: colors.glassBorder,
-      padding: spacing.lg,
-    },
     headerRow: { flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between' },
     headerTitleRow: { flexDirection: 'row', alignItems: 'center' },
     headerIcon: { marginRight: spacing.xs },

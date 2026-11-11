@@ -52,6 +52,7 @@ import { useThemeMode } from '../context/ThemeModeContext';
 import { LINK_HIT_SLOP, radii, spacing, type ThemeColors } from '../theme';
 import type { RootStackParamList } from '../navigation/RootNavigator';
 import { usePlayerQuickView } from '../context/PlayerQuickViewContext';
+import GlassCard from '../components/GlassCard';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'GmPlan'>;
 type IconName = React.ComponentProps<typeof Ionicons>['name'];
@@ -597,7 +598,7 @@ function SnapshotCell({
 }) {
   const percent = tile.fill === null ? null : Math.round(tile.fill * 100);
   return (
-    <View style={styles.cell}>
+    <GlassCard radius="md" style={styles.cell}>
       <View style={styles.cellBody}>
         <View style={styles.cellLabelRow}>
           <Ionicons name={TILE_ICON[tile.key]} size={13} color={colors.textTertiary} />
@@ -614,7 +615,7 @@ function SnapshotCell({
         ) : null}
       </View>
       {tile.key === 'odds' && percent !== null ? <CircularProgressRing percent={percent} size={44} strokeWidth={5} /> : null}
-    </View>
+    </GlassCard>
   );
 }
 
@@ -827,11 +828,6 @@ function createStyles(colors: ThemeColors) {
       flexDirection: 'row',
       alignItems: 'center',
       gap: spacing.sm,
-      padding: spacing.md,
-      borderRadius: radii.md,
-      borderWidth: StyleSheet.hairlineWidth * 1.5,
-      borderColor: colors.glassBorder,
-      backgroundColor: colors.glass,
     },
     cellBody: { flex: 1, gap: 4 },
     cellLabelRow: { flexDirection: 'row', alignItems: 'center', gap: 4 },
