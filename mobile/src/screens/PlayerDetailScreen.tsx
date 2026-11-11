@@ -69,6 +69,7 @@ import BeginnerHelp from '../components/BeginnerHelp';
 import { radii, spacing, type ThemeColors, scrim } from '../theme';
 import type { RootStackParamList } from '../navigation/RootNavigator';
 import { SheetModal, SheetScrollView, SwipeDismissCard } from '../components/SwipeDismissSheet';
+import GlassCard from '../components/GlassCard';
 
 export type DetailTab = 'stats' | 'trends' | 'schedule' | 'career' | 'model' | 'news';
 const TABS: Array<{ key: DetailTab; label: string }> = [
@@ -446,10 +447,10 @@ function BioSection({ bio }: { bio: QuickViewBio }) {
   if (rows.length === 0) return null;
 
   return (
-    <View style={[styles.card, styles.cardSpaced]}>
+    <GlassCard radius="md" padding="lg" style={[styles.cardSpaced]}>
       <SectionHeading title="Bio" icon="person-outline" />
       <StatGrid items={rows.map(([label, value]) => ({ label, value }))} />
-    </View>
+    </GlassCard>
   );
 }
 
@@ -466,7 +467,7 @@ function CareerSeasonCard({
   const styles = useMemo(() => createStyles(colors), [colors]);
   const label = `${season.season} ${season.current_season ? 'Regular Season (in progress)' : 'Regular Season'}`;
   return (
-    <View style={[styles.card, styles.cardSpaced]}>
+    <GlassCard radius="md" padding="lg" style={[styles.cardSpaced]}>
       <TouchableOpacity style={styles.seasonCardHeader} onPress={onToggle} activeOpacity={0.7}>
         <SectionHeading title={label} icon="calendar-outline" />
         <Ionicons name={expanded ? 'chevron-up' : 'chevron-down'} size={16} color={colors.textTertiary} />
@@ -478,7 +479,7 @@ function CareerSeasonCard({
           <AppText style={styles.notice}>No stats recorded for this season.</AppText>
         )
       ) : null}
-    </View>
+    </GlassCard>
   );
 }
 
@@ -672,18 +673,18 @@ function ScheduleSection({ playerId }: { playerId: string }) {
     // Row-shaped — matches ScheduleRow's own avatar-less row layout better
     // than a lone centered spinner over empty space.
     return (
-      <View style={styles.card}>
+      <GlassCard radius="md" padding="lg">
         {Array.from({ length: 5 }, (_, index) => (
           <SkeletonRow key={index} />
         ))}
-      </View>
+      </GlassCard>
     );
   }
   if (weeks.length === 0) {
     return <AppText style={styles.notice}>No schedule available for this player's team yet.</AppText>;
   }
   return (
-    <View style={styles.card}>
+    <GlassCard radius="md" padding="lg">
       <AppText style={styles.scheduleDisclaimer}>
         Real opponent, market lines, and opponent defense strength (from actual points allowed) —
         never used to adjust this player's value or rankings.
@@ -691,7 +692,7 @@ function ScheduleSection({ playerId }: { playerId: string }) {
       {weeks.map((week) => (
         <ScheduleRow key={week.week} week={week} />
       ))}
-    </View>
+    </GlassCard>
   );
 }
 
@@ -826,7 +827,7 @@ function InsightChipsRow({ model }: { model: QuickViewModel }) {
   }
   if (rows.length === 0) return null;
   return (
-    <View style={[styles.card, styles.cardSpaced]}>
+    <GlassCard radius="md" padding="lg" style={[styles.cardSpaced]}>
       {rows.map((row, index) => (
         <InsightRow
           key={row.key}
@@ -838,7 +839,7 @@ function InsightChipsRow({ model }: { model: QuickViewModel }) {
           last={index === rows.length - 1}
         />
       ))}
-    </View>
+    </GlassCard>
   );
 }
 
@@ -880,7 +881,7 @@ function ModelSection({ model }: { model: QuickViewModel }) {
   const trendColor = workloadTrendColor(colors)[trendKey] ?? colors.textSecondary;
   const trendDirection = workloadTrendDirection(trendKey);
   return (
-    <View style={styles.card}>
+    <GlassCard radius="md" padding="lg">
       <SectionHeading title="Model Breakdown" icon="analytics-outline" />
       {/* Market/Opportunity/Scarcity/Role/Durability — each a position
           percentile run through the same 0-99 curve and percentileColor
@@ -921,7 +922,7 @@ function ModelSection({ model }: { model: QuickViewModel }) {
           <AppText style={styles.usageTrendDetail}>{model.usage_trend.detail}</AppText>
         </View>
       ) : null}
-    </View>
+    </GlassCard>
   );
 }
 
@@ -1536,9 +1537,9 @@ export default function PlayerDetailScreen({ route, navigation }: Props) {
 
     if (activeTab === 'trends') {
       content.push(
-        <View key="trends-tab" style={styles.card}>
+        <GlassCard radius="md" padding="lg" key="trends-tab">
           <PlayerTrendsPanel playerId={player.player_id} yearsInLeague={bio?.years_in_league ?? null} />
-        </View>,
+        </GlassCard>,
       );
     }
 
@@ -1759,13 +1760,6 @@ function createStyles(colors: ThemeColors) {
     color: colors.premium,
     fontWeight: '700',
     marginBottom: 4,
-  },
-  card: {
-    backgroundColor: colors.glass,
-    borderRadius: radii.md,
-    borderWidth: StyleSheet.hairlineWidth * 1.5,
-    borderColor: colors.glassBorder,
-    padding: spacing.lg,
   },
   cardSpaced: { marginTop: spacing.lg },
   // Sticky segmented tab bar: an opaque fill (matching the page background)

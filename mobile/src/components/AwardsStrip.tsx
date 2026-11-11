@@ -7,6 +7,7 @@ import { useThemeMode } from '../context/ThemeModeContext';
 import type { PlayerAward } from '../lib/api';
 import { awardTierColor, radii, spacing, type ThemeColors, scrim } from '../theme';
 import { SheetModal, SheetScrollView, SwipeDismissCard } from './SwipeDismissSheet';
+import GlassCard from './GlassCard';
 
 // Tier -> color mapping (gold/silver/bronze, with a visible neutral-accent
 // fallback for untiered awards — modules/player_awards.py's tier=None case)
@@ -113,7 +114,7 @@ export default function AwardsStrip({ awards }: { awards: PlayerAward[] }) {
   if (awards.length === 0) return null;
 
   return (
-    <View style={styles.card}>
+    <GlassCard radius="md" padding="lg" style={styles.card}>
       <View style={styles.headerRow}>
         <View style={styles.headerTitleRow}>
           <Ionicons name="trophy-outline" size={15} color={colors.accent} style={styles.headerIcon} />
@@ -174,18 +175,13 @@ export default function AwardsStrip({ awards }: { awards: PlayerAward[] }) {
           </SwipeDismissCard>
         </Pressable>
       </SheetModal>
-    </View>
+    </GlassCard>
   );
 }
 
 function createStyles(colors: ThemeColors) {
   return StyleSheet.create({
     card: {
-      backgroundColor: colors.glass,
-      borderRadius: radii.md,
-      borderWidth: StyleSheet.hairlineWidth * 1.5,
-      borderColor: colors.glassBorder,
-      padding: spacing.lg,
       marginTop: spacing.lg,
     },
     headerRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: spacing.sm },

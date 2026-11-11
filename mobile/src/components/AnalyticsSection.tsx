@@ -4,7 +4,8 @@ import { Ionicons } from '@expo/vector-icons';
 
 import AppText from './AppText';
 import { useThemeMode } from '../context/ThemeModeContext';
-import { radii, spacing, type ThemeColors } from '../theme';
+import { spacing, type ThemeColors } from '../theme';
+import GlassCard from './GlassCard';
 
 type IoniconName = React.ComponentProps<typeof Ionicons>['name'];
 
@@ -31,7 +32,7 @@ export default function AnalyticsSection({
   const { colors } = useThemeMode();
   const styles = useMemo(() => createStyles(colors), [colors]);
   return (
-    <View style={styles.card}>
+    <GlassCard radius="md" style={styles.card}>
       <View style={styles.headerRow}>
         <View style={styles.headerTitleRow}>
           <Ionicons name={icon} size={14} color={colors.accent} style={styles.headerIcon} />
@@ -40,18 +41,13 @@ export default function AnalyticsSection({
         {footer ?? null}
       </View>
       <View>{children}</View>
-    </View>
+    </GlassCard>
   );
 }
 
 function createStyles(colors: ThemeColors) {
   return StyleSheet.create({
     card: {
-      backgroundColor: colors.glass,
-      borderRadius: radii.md,
-      borderWidth: StyleSheet.hairlineWidth * 1.5,
-      borderColor: colors.glassBorder,
-      padding: spacing.md,
       marginTop: spacing.sm,
     },
     headerRow: {

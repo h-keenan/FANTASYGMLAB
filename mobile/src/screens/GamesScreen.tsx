@@ -47,6 +47,7 @@ import { percentileColor } from '../lib/percentile';
 import { useScreenHeaderTitle } from '../lib/useScreenHeaderTitle';
 import type { RootStackParamList } from '../navigation/RootNavigator';
 import { radii, spacing, type ThemeColors } from '../theme';
+import GlassCard from '../components/GlassCard';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Games'>;
 type Tab = 'sim' | 'pickem';
@@ -150,7 +151,7 @@ function SeasonSim({ leagueId, colors, styles, navigation }: Shared) {
             : `${data.weeks_remaining ?? ''} weeks left, your real schedule and Roster Power.`
         }
       />
-      <View style={styles.card}>
+      <GlassCard radius="md" style={styles.card}>
         <View>
           <AppText style={[styles.bigOdds, { color: percentileColor(mine.playoff_probability, colors) }]}>
             {formatOdds(mine.playoff_probability)}
@@ -172,7 +173,7 @@ function SeasonSim({ leagueId, colors, styles, navigation }: Shared) {
           <AppText style={styles.muted}>Seed #{mine.median_seed}</AppText>
           {status ? <ToneBadge label={status} color={mine.clinched ? colors.success : colors.danger} /> : null}
         </View>
-      </View>
+      </GlassCard>
       {!titleAvailable ? (
         <AppText style={styles.muted}>{titleOddsUnavailableMessage(data.title_odds?.reason)}</AppText>
       ) : null}
@@ -180,7 +181,7 @@ function SeasonSim({ leagueId, colors, styles, navigation }: Shared) {
       <WhatIf leagueId={leagueId} data={data} colors={colors} styles={styles} navigation={navigation} />
 
       <SectionHeading title="Playoff odds" caption="Same simulation for every team." />
-      <View style={styles.card2}>
+      <GlassCard radius="md" style={styles.card2}>
         {data.teams.map((team, index) => (
           <View key={team.roster_id} style={[styles.teamRow, team.mine && styles.teamRowMine, index > 0 && styles.divider]}>
             <AppText style={styles.rank}>{index + 1}</AppText>
@@ -199,7 +200,7 @@ function SeasonSim({ leagueId, colors, styles, navigation }: Shared) {
             </AppText>
           </View>
         ))}
-      </View>
+      </GlassCard>
     </View>
   );
 }
@@ -257,7 +258,7 @@ function WhatIf({ leagueId, data, colors, styles }: Shared & { data: GamesSeason
   return (
     <View style={styles.section}>
       <SectionHeading title="What if" caption={`Pro. Up to ${MAX_PLAYERS} players on each side.`} />
-      <View style={styles.card2}>
+      <GlassCard radius="md" style={styles.card2}>
         <AppText style={styles.label}>DROP</AppText>
         {data.roster.map((player) => (
           <PlayerIdentityRow
@@ -274,8 +275,8 @@ function WhatIf({ leagueId, data, colors, styles }: Shared & { data: GamesSeason
             onPress={() => toggleDrop(player.player_id)}
           />
         ))}
-      </View>
-      <View style={styles.card2}>
+      </GlassCard>
+      <GlassCard radius="md" style={styles.card2}>
         <AppText style={styles.label}>ADD</AppText>
         {adds.map((player) => (
           <PlayerIdentityRow
@@ -317,7 +318,7 @@ function WhatIf({ leagueId, data, colors, styles }: Shared & { data: GamesSeason
             ))}
           </>
         ) : null}
-      </View>
+      </GlassCard>
       <Button
         label="Run what-if"
         onPress={run}
@@ -327,7 +328,7 @@ function WhatIf({ leagueId, data, colors, styles }: Shared & { data: GamesSeason
       {error ? <AppText style={styles.error}>{error}</AppText> : null}
       {result?.reason ? <ReasonText reason={result.reason} styles={styles} /> : null}
       {result && !result.reason && change && result.baseline && result.scenario ? (
-        <View style={styles.card2}>
+        <GlassCard radius="md" style={styles.card2}>
           <View style={styles.rowBetween}>
             <AppText style={styles.muted}>
               {formatOdds(result.baseline.playoff_probability)} {'->'}{' '}
@@ -345,7 +346,7 @@ function WhatIf({ leagueId, data, colors, styles }: Shared & { data: GamesSeason
               <AppText style={styles.factor}>{factor.detail}</AppText>
             </View>
           ))}
-        </View>
+        </GlassCard>
       ) : null}
     </View>
   );
@@ -442,7 +443,7 @@ function Pickem({ leagueId, colors, styles, navigation }: Shared) {
         <EmptyState icon="calendar-outline" title="No matchups this week" />
       ) : (
         data.matchups.map((matchup) => (
-          <View key={matchup.matchup_id} style={styles.card2}>
+          <GlassCard radius="md" key={matchup.matchup_id} style={styles.card2}>
             <View style={styles.pickRow}>
               {matchup.teams.map((team) => {
                 const picked = matchup.my_pick === team.roster_id;
@@ -473,7 +474,7 @@ function Pickem({ leagueId, colors, styles, navigation }: Shared) {
                 color={matchup.correct ? colors.success : colors.danger}
               />
             ) : null}
-          </View>
+          </GlassCard>
         ))
       )}
 
@@ -482,7 +483,7 @@ function Pickem({ leagueId, colors, styles, navigation }: Shared) {
         caption={data.leaderboard_scope === 'you' ? 'Showing your picks only.' : 'League members who made picks.'}
       />
       {data.leaderboard && data.leaderboard.length > 0 ? (
-        <View style={styles.card2}>
+        <GlassCard radius="md" style={styles.card2}>
           {data.leaderboard.map((row, i) => (
             <View key={row.roster_id} style={[styles.teamRow, row.mine && styles.teamRowMine, i > 0 && styles.divider]}>
               <AppText style={styles.rank}>{row.rank}</AppText>
@@ -498,7 +499,7 @@ function Pickem({ leagueId, colors, styles, navigation }: Shared) {
               </AppText>
             </View>
           ))}
-        </View>
+        </GlassCard>
       ) : (
         <EmptyState
           icon="trophy-outline"
@@ -520,18 +521,8 @@ function createStyles(colors: ThemeColors) {
       flexDirection: 'row',
       justifyContent: 'space-between',
       alignItems: 'center',
-      backgroundColor: colors.glass,
-      borderRadius: radii.md,
-      borderWidth: StyleSheet.hairlineWidth * 1.5,
-      borderColor: colors.glassBorder,
-      padding: spacing.md,
     },
     card2: {
-      backgroundColor: colors.glass,
-      borderRadius: radii.md,
-      borderWidth: StyleSheet.hairlineWidth * 1.5,
-      borderColor: colors.glassBorder,
-      padding: spacing.md,
       gap: spacing.sm,
     },
     bigOdds: { fontSize: 37, fontWeight: '800' },
