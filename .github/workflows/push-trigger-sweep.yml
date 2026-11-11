@@ -43,4 +43,12 @@ jobs:
         env:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          # Set the repo VARIABLE NOTIFICATION_EVENTS=1 only AFTER
+          # docs/supabase_notifications.sql has been applied by hand. Unset =
+          # events/receipts off, sweep behaves exactly as before.
+          NOTIFICATION_EVENTS: ${{ vars.NOTIFICATION_EVENTS }}
+          # Optional scale knobs (see docs/notifications.md).
+          PUSH_SWEEP_SHARDS: ${{ vars.PUSH_SWEEP_SHARDS }}
+          PUSH_SWEEP_SHARD_INDEX: ${{ vars.PUSH_SWEEP_SHARD_INDEX }}
+          PUSH_SWEEP_TIME_BUDGET_SECONDS: ${{ vars.PUSH_SWEEP_TIME_BUDGET_SECONDS }}
         run: python scripts/run_push_trigger_sweep.py

@@ -648,6 +648,7 @@ EXPORTABLE_USER_TABLES = (
     "decision_memory_events",
     "decision_memory_baselines",
     "notification_read_state",
+    "notification_events",
     "guess_the_player_streaks",
     "guess_the_player_name_match_streaks",
     "community_trade_reactions",

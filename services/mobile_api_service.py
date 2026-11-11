@@ -50,6 +50,8 @@ Deployment topology (Render):
   - POST /v1/push/register    — upsert the caller's Expo push token
   - POST /v1/push/unregister  — remove one of the caller's tokens (sign-out)
   - POST /v1/push/test        — send a test push to all of the caller's tokens
+  - GET/POST /v1/notifications/preferences — quiet hours, weekly cap, per-league mute, digest mode + category toggles
+  - POST /v1/notifications/opened — app reports a push tap (open metric)
   - GET  /v1/leagues/{id}/dashboard — the caller's "Next Move" briefing
   - GET  /v1/portfolio              — cross-league standing/needs/opportunities, one row per saved league (Premium)
   - GET  /v1/portfolio/exposure     — which players the caller owns across saved leagues, with concentration (Pro)
@@ -224,6 +226,8 @@ from modules import (
     playoff_simulator,
     premium,
     premium_benefits,
+    notification_events,
+    notification_prefs,
     push_tokens,
     push_triggers,
     rankings,
@@ -1438,6 +1442,7 @@ _EXPORTABLE_USER_TABLES = (
     "decision_memory_events",
     "decision_memory_baselines",
     "notification_read_state",
+    "notification_events",
     "guess_the_player_streaks",
     "guess_the_player_name_match_streaks",
     "community_trade_reactions",
@@ -11065,6 +11070,102 @@ def update_push_preference(
     if not ok:
         return {"ok": False, "categories": categories}
     return {"ok": True, "categories": categories}
+
+
+class UpdateNotificationPreferencesRequest(BaseModel):
+    # Partial update. `prefs` keys: quiet_hours_enabled, quiet_start, quiet_end,
+    # timezone, weekly_cap (null = default), digest_hour, critical_breaks_quiet,
+    # league_overrides {league_id: all|critical|mute}, category_modes
+    # {category: instant|digest}. `categories` is the legacy on/off map.
+    prefs: dict[str, Any] = {}
+    categories: dict[str, bool] = {}
+
+
+class NotificationOpenedRequest(BaseModel):
+    notification_id: str
+
+
+def _notification_preferences_response(settings: dict[str, Any], *, ok: bool) -> dict[str, Any]:
+    return {
+        "ok": ok,
+        "categories": _push_categories_from_settings(settings),
+        "prefs": notification_prefs.prefs_from_settings(
+            settings, valid_categories=push_triggers.TOGGLEABLE_PUSH_CATEGORIES
+        ),
+        "default_weekly_cap": push_triggers.load_weekly_push_cap(),
+        "cap_presets": list(notification_prefs.CAP_PRESETS),
+        "critical_categories": sorted(notification_prefs.CRITICAL_CATEGORIES),
+        "league_modes": list(notification_prefs.LEAGUE_MODES),
+    }
+
+
+@app.get("/v1/notifications/preferences")
+def get_notification_preferences(user: dict[str, Any] = Depends(require_user)) -> dict[str, Any]:
+    """Everything the notification settings UI edits: per-category toggles plus
+    quiet hours, weekly cap, per-league mute and digest mode (stored under
+    user_settings.settings.notification_prefs; the sweep reads it in the same
+    query as the toggles, no migration needed)."""
+
+    config = auth_supabase.get_supabase_config()
+    access_token = str(user.get("_access_token") or "")
+    user_id = str(user.get("id") or "")
+    settings, error = account_store.fetch_user_settings(config, access_token, user_id=user_id)
+    if error:
+        return _notification_preferences_response({}, ok=False)
+    return _notification_preferences_response(settings.get("settings") or {}, ok=True)
+
+
+@app.post("/v1/notifications/preferences")
+def update_notification_preferences(
+    body: UpdateNotificationPreferencesRequest,
+    user: dict[str, Any] = Depends(require_user),
+) -> dict[str, Any]:
+    valid_categories = push_triggers.TOGGLEABLE_PUSH_CATEGORIES
+    for category in body.categories:
+        if category not in valid_categories:
+            raise HTTPException(status_code=422, detail="category must be one of: " + ", ".join(valid_categories))
+    problem = notification_prefs.validate_patch(body.prefs, valid_categories=valid_categories)
+    if problem:
+        raise HTTPException(status_code=422, detail=problem)
+
+    config = auth_supabase.get_supabase_config()
+    access_token = str(user.get("_access_token") or "")
+    user_id = str(user.get("id") or "")
+    current, error = account_store.fetch_user_settings(config, access_token, user_id=user_id)
+    if error:
+        return _notification_preferences_response({}, ok=False)
+    settings = dict(current.get("settings") or {})
+    if body.categories:
+        categories = _push_categories_from_settings(settings)
+        categories.update(body.categories)
+        settings["push_categories"] = categories
+    if body.prefs:
+        settings[notification_prefs.SETTINGS_KEY] = notification_prefs.apply_patch(
+            notification_prefs.prefs_from_settings(settings, valid_categories=valid_categories),
+            body.prefs,
+            valid_categories=valid_categories,
+        )
+    payload = account_store.build_user_settings_payload(user_id=user_id, settings=settings)
+    ok, error = account_store.upsert_user_settings(config, access_token, payload)
+    return _notification_preferences_response(settings if ok else (current.get("settings") or {}), ok=ok)
+
+
+@app.post("/v1/notifications/opened")
+def record_notification_opened(
+    body: NotificationOpenedRequest,
+    user: dict[str, Any] = Depends(require_user),
+) -> dict[str, Any]:
+    """The app reports a push tap (open metric). Fire-and-forget: always ok,
+    a no-op until docs/supabase_notifications.sql is applied."""
+
+    config = auth_supabase.get_supabase_config()
+    notification_events.mark_opened(
+        config,
+        str(user.get("_access_token") or ""),
+        user_id=str(user.get("id") or ""),
+        batch_id=str(body.notification_id or ""),
+    )
+    return {"ok": True}
 
 
 UI_DENSITY_VALUES = {"guided", "compact"}

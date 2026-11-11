@@ -24,7 +24,13 @@ from modules import push_triggers
 def main() -> int:
     stats = push_triggers.run_push_trigger_sweep()
     trade_outcome_stats = push_triggers.run_trade_outcome_followup_sweep()
-    print(json.dumps({"briefing_sweep": stats, "trade_outcome_sweep": trade_outcome_stats}, indent=2))
+    receipt_stats = push_triggers.run_receipt_poll()
+    print(
+        json.dumps(
+            {"briefing_sweep": stats, "trade_outcome_sweep": trade_outcome_stats, "receipts": receipt_stats},
+            indent=2,
+        )
+    )
     return 0 if stats.get("configured") else 1
 
 

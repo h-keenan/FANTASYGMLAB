@@ -31,7 +31,11 @@ from typing import Any, Mapping
 import pandas as pd
 import requests
 
+import hashlib
+import time
+
 from modules import injury_status as injury_table
+from modules import notification_decider, notification_events, notification_prefs
 from modules import alert_presentation, app_config, dashboard_engine, faab, gm_targets, league_calendar, league_recaps, league_value_settings, nfl_schedule, player_eligibility, push_tokens, rankings, roster_value_model, sleeper, sleeper_leagues, team_stance, weekly_roundup
 
 
@@ -217,24 +221,26 @@ def fetch_sleeper_usernames(config: PushTriggerConfig, user_ids: list[str]) -> d
     return usernames
 
 
-def fetch_push_preferences(config: PushTriggerConfig, user_ids: list[str]) -> dict[str, dict[str, bool]] | None:
-    """user_id -> {category: enabled}, defaulting every category to True.
+def fetch_push_settings(
+    config: PushTriggerConfig, user_ids: list[str]
+) -> tuple[dict[str, dict[str, bool]], dict[str, dict[str, Any]]] | None:
+    """(category toggles, notification prefs) per user, from ONE user_settings read.
 
     Returns None when the read FAILED (transport/HTTP/parse error): callers
     must fail closed and send nothing rather than ignore opt-outs. A user with
-    no settings row is simply absent from the dict (default-open).
+    no settings row is simply absent from both dicts (default-open, default
+    prefs).
 
     Reuses modules.account_store's existing user_settings table (one JSONB
     `settings` blob per user, auth.uid()=user_id RLS — service-role bypasses
-    that here same as it does for push_tokens/profiles above) rather than a
-    new table: push category preferences are just another namespaced key
-    under the same per-user settings blob the mobile app already has a
-    working read/write path for (modules.account_store.fetch_user_settings /
-    upsert_user_settings), under the "push_categories" key.
+    that here same as it does for push_tokens/profiles above): category
+    toggles live under "push_categories", quiet hours / cap / per-league mute /
+    digest under "notification_prefs" (modules.notification_prefs). No new
+    table and no extra round trip.
     """
     ids = [uid for uid in (_safe_text(u) for u in user_ids) if uid]
     if not config.configured or not ids:
-        return {}
+        return {}, {}
     try:
         response = requests.get(
             f"{config.url}/rest/v1/{USER_SETTINGS_TABLE}",
@@ -253,7 +259,8 @@ def fetch_push_preferences(config: PushTriggerConfig, user_ids: list[str]) -> di
     if not isinstance(rows, list):
         return None
     preferences: dict[str, dict[str, bool]] = {}
-    for row in rows if isinstance(rows, list) else []:
+    notif_prefs: dict[str, dict[str, Any]] = {}
+    for row in rows:
         if not isinstance(row, Mapping):
             continue
         user_id = _safe_text(row.get("user_id"))
@@ -264,7 +271,17 @@ def fetch_push_preferences(config: PushTriggerConfig, user_ids: list[str]) -> di
         preferences[user_id] = {
             category: bool(categories.get(category, True)) for category in TOGGLEABLE_PUSH_CATEGORIES
         }
-    return preferences
+        notif_prefs[user_id] = notification_prefs.prefs_from_settings(
+            settings, valid_categories=TOGGLEABLE_PUSH_CATEGORIES
+        )
+    return preferences, notif_prefs
+
+
+def fetch_push_preferences(config: PushTriggerConfig, user_ids: list[str]) -> dict[str, dict[str, bool]] | None:
+    """user_id -> {category: enabled}, defaulting every category to True (None on read failure)."""
+
+    fetched = fetch_push_settings(config, user_ids)
+    return None if fetched is None else fetched[0]
 
 
 def push_item_allowed(preferences: dict[str, dict[str, bool]], *, user_id: str, category: str) -> bool:
@@ -577,18 +594,16 @@ def _priority(item: Mapping[str, Any]) -> int:
 def apply_weekly_cap(items: list[dict[str, Any]], *, sent_this_week: int, cap: int) -> list[dict[str, Any]]:
     """Items allowed to push given the user's rolling-7-day count.
 
-    One slot is reserved for time-critical categories (injury, lineup_lock):
-    other items stop at cap-1 sent, reserved ones at cap.
+    One slot is reserved for time-critical categories (injury, lineup_lock,
+    trade_deadline): other items stop at cap-1 sent, reserved ones at cap.
     """
 
-    if sent_this_week >= cap:
-        return []
-    if sent_this_week >= cap - 1:
-        return [item for item in items if item.get("category") in CAP_RESERVED_CATEGORIES]
-    return list(items)
+    return notification_decider.cap_filter(items, sent_this_week=sent_this_week, cap=cap)
 
 
-def build_batched_message(items: list[dict[str, Any]]) -> tuple[str, str, dict[str, Any]]:
+def build_batched_message(
+    items: list[dict[str, Any]], *, notification_id: str = ""
+) -> tuple[str, str, dict[str, Any]]:
     """One push for all of a user's pending items: highest priority leads, the
     rest are summarised ("+N more"). No league or team names in visible text
     (see INCLUDE_LEAGUE_NAMES_IN_PUSH_TEXT); league context rides in `data`.
@@ -614,6 +629,14 @@ def build_batched_message(items: list[dict[str, Any]]) -> tuple[str, str, dict[s
         data["player_name"] = lead.get("player_name", "")
     if len(ordered) > 1:
         data["count"] = len(ordered)
+    # Deep link to the exact screen of the LEAD item (Sleeper/ESPN have no
+    # write API, so the "action" is opening the decision). The mobile app
+    # routes from category + ids; `url` is the canonical web path.
+    url = notification_decider.deep_link_for(lead)
+    if url:
+        data["url"] = url
+    if notification_id:
+        data["notification_id"] = notification_id
     return title, body, data
 
 
@@ -668,8 +691,14 @@ def league_briefing_push_items(
     players_df: pd.DataFrame,
     score_field: str,
     untouchable_player_ids: tuple[str, ...] = (),
+    league: Mapping[str, Any] | None = None,
+    rosters: list[dict] | None = None,
 ) -> list[dict[str, Any]]:
     """The subset of one league's "Next Move" briefing worth pushing about.
+
+    `league` / `rosters` let the sweep pass the per-run cached league payload
+    and rosters (one fetch per league per run however many users share it);
+    omitted, they are fetched here.
 
     `untouchable_player_ids` is the caller's GM Targets untouchable list for
     this exact (user, league) — see fetch_gm_targets_untouchable_ids. This
@@ -682,11 +711,13 @@ def league_briefing_push_items(
     identical recommendation.
     """
 
-    league = sleeper.get_league(league_id)
+    if league is None:
+        league = sleeper.get_league(league_id)
     if not league:
         return []
     league_settings = league_value_settings.detect_league_value_settings_from_payload(league)
-    rosters = sleeper.get_rosters(league_id)
+    if rosters is None:
+        rosters = sleeper.get_rosters(league_id)
     my_roster = resolve_roster_for_sleeper_user(rosters, sleeper_user_id)
     if my_roster is None:
         return []
@@ -988,6 +1019,8 @@ def lineup_lock_push_items(
                     "category": "lineup_lock",
                     "headline": f"{name} is {status_raw} and still in your lineup. Kickoff is soon.",
                     "recommendation_id": f"lineup_lock:{league_id}:{week}:out:{pid}:{status_norm}",
+                    # Useless once the game has kicked off: never send stale.
+                    "expires_at": _parse_dt(game.get("kickoff_at")).isoformat(),
                 }
             )
     if bad_slots:
@@ -1003,6 +1036,7 @@ def lineup_lock_push_items(
                     "category": "lineup_lock",
                     "headline": f"You have {bad_slots} empty or invalid starter slot{plural}. Kickoff is soon.",
                     "recommendation_id": f"lineup_lock:{league_id}:{week}:slots:{day}",
+                    "expires_at": next_kickoff.isoformat(),
                 }
             )
     return items
@@ -1123,8 +1157,76 @@ def trade_deadline_push_item(
     }
 
 
+# --- sweep scheduling: sharding, fairness, time budget ----------------------
+DEFAULT_SWEEP_TIME_BUDGET_SECONDS = 1500  # leave headroom inside the 30 min cadence
+SWEEP_SLOT_SECONDS = 1800
+
+
+def load_sweep_shard(*, environ: dict | None = None, secrets: Any = None) -> tuple[int, int]:
+    """(shard_count, shard_index) from PUSH_SWEEP_SHARDS / PUSH_SWEEP_SHARD_INDEX.
+
+    Default 1/0 = one process handles every user (the historical behavior).
+    Run N workers with the same PUSH_SWEEP_SHARDS and distinct indexes to split
+    the user base; assignment is a stable hash of user_id so a user is always
+    handled by the same shard.
+    """
+
+    def _int(key: str, default: int) -> int:
+        try:
+            return int(str(app_config.config_value(key, environ=environ, secrets=secrets)).strip())
+        except (TypeError, ValueError):
+            return default
+
+    shards = _int("PUSH_SWEEP_SHARDS", 1)
+    index = _int("PUSH_SWEEP_SHARD_INDEX", 0)
+    if not 1 <= shards <= 64 or not 0 <= index < shards:
+        return 1, 0
+    return shards, index
+
+
+def load_sweep_time_budget(*, environ: dict | None = None, secrets: Any = None) -> float:
+    """Wall-clock seconds one sweep may spend walking users (0 disables)."""
+
+    raw = app_config.config_value("PUSH_SWEEP_TIME_BUDGET_SECONDS", environ=environ, secrets=secrets)
+    try:
+        value = float(str(raw).strip())
+    except (TypeError, ValueError):
+        return float(DEFAULT_SWEEP_TIME_BUDGET_SECONDS)
+    return value if value >= 0 else float(DEFAULT_SWEEP_TIME_BUDGET_SECONDS)
+
+
+def _hash_int(text: str) -> int:
+    return int(hashlib.sha1(text.encode("utf-8")).hexdigest()[:12], 16)
+
+
+def user_shard(user_id: str, shards: int) -> int:
+    return _hash_int(user_id) % shards if shards > 1 else 0
+
+
+def sweep_user_order(user_ids: list[str], now: datetime) -> list[str]:
+    """Pseudo-random per 30-minute slot, so when a time budget cuts a run short
+    the users left unvisited are different every run (nobody is starved)."""
+
+    slot = int(now.timestamp() // SWEEP_SLOT_SECONDS)
+    return sorted(user_ids, key=lambda uid: _hash_int(f"{slot}:{uid}"))
+
+
+def _local_hour(tz_name: str, now: datetime) -> int:
+    return now.astimezone(_resolve_tzinfo(tz_name)).hour
+
+
 def run_push_trigger_sweep(*, environ: dict | None = None, secrets: Any = None) -> dict[str, Any]:
     """One sweep: check every registered account's leagues, push what's new.
+
+    Pipeline per user: detectors build candidate items -> category toggles ->
+    dedupe against push_notification_log -> modules.notification_decider
+    (staleness, roster relevance, per-league mute, digest, quiet hours, cap)
+    -> one batched Expo push -> log (+ notification_events when enabled).
+
+    Scale: users can be sharded (PUSH_SWEEP_SHARDS/INDEX) and the run has a
+    wall-clock budget (PUSH_SWEEP_TIME_BUDGET_SECONDS); league payloads and
+    rosters are fetched once per league per run (through the shared Sleeper
+    cache) however many users share the league.
 
     Never raises — a bad league or account is logged into `errors` and
     skipped so one failure can't abort the whole sweep.
@@ -1132,6 +1234,10 @@ def run_push_trigger_sweep(*, environ: dict | None = None, secrets: Any = None) 
 
     config = load_push_trigger_config(environ=environ, secrets=secrets)
     weekly_cap = load_weekly_push_cap(environ=environ, secrets=secrets)
+    shards, shard_index = load_sweep_shard(environ=environ, secrets=secrets)
+    time_budget = load_sweep_time_budget(environ=environ, secrets=secrets)
+    events_on = notification_events.events_enabled(environ=environ, secrets=secrets)
+    started = time.monotonic()
     stats: dict[str, Any] = {
         "ok": True,
         "configured": config.configured,
@@ -1139,7 +1245,11 @@ def run_push_trigger_sweep(*, environ: dict | None = None, secrets: Any = None) 
         "leagues_checked": 0,
         "pushes_sent": 0,
         "held_quiet_hours": 0,
+        "held_digest": 0,
         "capped": 0,
+        "suppressed": {},
+        "skipped_budget": 0,
+        "shard": f"{shard_index}/{shards}",
         "errors": [],
     }
     if not config.configured:
@@ -1148,24 +1258,54 @@ def run_push_trigger_sweep(*, environ: dict | None = None, secrets: Any = None) 
         return stats
 
     recipients = fetch_push_recipients(config)
+    if shards > 1:
+        recipients = {uid: toks for uid, toks in recipients.items() if user_shard(uid, shards) == shard_index}
     if not recipients:
         return stats
 
     usernames = fetch_sleeper_usernames(config, list(recipients.keys()))
-    preferences = fetch_push_preferences(config, list(recipients.keys()))
-    if preferences is None:
+    fetched_settings = fetch_push_settings(config, list(recipients.keys()))
+    if fetched_settings is None:
         # Fail closed: without readable opt-outs, send nothing this run.
         stats["ok"] = False
         stats["errors"].append("Push preferences could not be read; sent nothing this run.")
         return stats
+    preferences, user_notification_prefs = fetched_settings
     timezones = fetch_push_timezones(config)
     gm_stance_leagues = fetch_gm_stance_leagues(config, list(recipients.keys()))
     gm_untouchable_ids = fetch_gm_targets_untouchable_ids(config, list(recipients.keys()))
     players_cache: dict[str, tuple[pd.DataFrame, str]] = {}
     games_holder: dict[str, pd.DataFrame | None] = {}
+    # Per-run league cache: friends share leagues, and every detector needs the
+    # same payload + rosters, so each is fetched once per league per run.
+    league_cache: dict[str, tuple[dict[str, Any], list[dict] | None, str]] = {}
 
-    for user_id, tokens in recipients.items():
+    def league_snapshot(league_id: str) -> tuple[dict[str, Any], list[dict] | None, str]:
+        if league_id not in league_cache:
+            payload: dict[str, Any] = {}
+            rosters: list[dict] | None = None
+            problems: list[str] = []
+            try:
+                payload = sleeper.get_league(league_id) or {}
+            except Exception as exc:
+                problems.append(f"league fetch failed ({exc})")
+            try:
+                rosters = sleeper.get_rosters(league_id)
+            except Exception as exc:
+                problems.append(f"roster fetch failed ({exc})")
+            league_cache[league_id] = (payload, rosters, "; ".join(problems))
+        return league_cache[league_id]
+
+    order = sweep_user_order(list(recipients.keys()), _utcnow())
+    for position, user_id in enumerate(order):
+        if time_budget and time.monotonic() - started > time_budget:
+            # Out of time: the rest are picked up by the next run (their items
+            # are re-derived, nothing was logged, so nothing is lost).
+            stats["skipped_budget"] = len(order) - position
+            break
+        tokens = recipients[user_id]
         stats["accounts_checked"] += 1
+        user_prefs = user_notification_prefs.get(user_id) or notification_prefs.default_prefs()
         sleeper_username = usernames.get(user_id, "")
         if not sleeper_username:
             continue
@@ -1184,9 +1324,13 @@ def run_push_trigger_sweep(*, environ: dict | None = None, secrets: Any = None) 
             continue
 
         candidates: list[dict[str, Any]] = []
+        roster_ids_by_league: dict[str, set[str]] = {}
         for league in leagues:
             league_id = _safe_text(league.get("league_id"))
             if not league_id:
+                continue
+            # A fully muted league needs no detector work at all.
+            if (user_prefs.get("league_overrides") or {}).get(league_id) == "mute":
                 continue
             # Each league is valued on ITS lens (redraft -> Non-Dynasty), the
             # same one server-side decision the app and web open on.
@@ -1197,6 +1341,9 @@ def run_push_trigger_sweep(*, environ: dict | None = None, secrets: Any = None) 
             if players_df.empty:
                 continue
             stats["leagues_checked"] += 1
+            league_payload, league_rosters, snapshot_problem = league_snapshot(league_id)
+            if snapshot_problem:
+                stats["errors"].append(f"{user_id}/{league_id}: {snapshot_problem}")
             try:
                 push_items = league_briefing_push_items(
                     league_id=league_id,
@@ -1206,42 +1353,42 @@ def run_push_trigger_sweep(*, environ: dict | None = None, secrets: Any = None) 
                     untouchable_player_ids=tuple(
                         sorted(gm_untouchable_ids.get(user_id, {}).get(league_id, ()))
                     ),
+                    league=league_payload,
+                    rosters=league_rosters,
                 )
             except Exception as exc:
                 stats["errors"].append(f"{user_id}/{league_id}: briefing failed ({exc})")
                 continue
+            league_name = _safe_text(league_payload.get("name"), "Your league")
+            my_roster = (
+                resolve_roster_for_sleeper_user(league_rosters, sleeper_user_id) if league_rosters is not None else None
+            )
 
-            league_payload: dict[str, Any] = {}
-            try:
-                league_payload = sleeper.get_league(league_id) or {}
-                if league_payload:
+            if league_payload:
+                try:
                     recap_item = recap_push_item(league_id, league_payload)
                     if recap_item:
                         push_items.append(recap_item)
-            except Exception as exc:
-                stats["errors"].append(f"{user_id}/{league_id}: recap check failed ({exc})")
+                except Exception as exc:
+                    stats["errors"].append(f"{user_id}/{league_id}: recap check failed ({exc})")
 
-            try:
-                rosters = sleeper.get_rosters(league_id)
-                my_roster = resolve_roster_for_sleeper_user(rosters, sleeper_user_id)
-                if my_roster is not None:
-                    roster_player_ids = {str(pid) for pid in (my_roster.get("players") or [])}
+            if my_roster is not None:
+                roster_player_ids = {str(pid) for pid in (my_roster.get("players") or [])}
+                roster_ids_by_league[league_id] = roster_player_ids
+                try:
                     push_items.extend(
                         injury_status_push_items(
                             league_id=league_id,
-                            league_name=_safe_text(league_payload.get("name"), "Your league"),
+                            league_name=league_name,
                             roster_player_ids=roster_player_ids,
                             players_df=players_df,
                         )
                     )
-            except Exception as exc:
-                stats["errors"].append(f"{user_id}/{league_id}: injury status check failed ({exc})")
+                except Exception as exc:
+                    stats["errors"].append(f"{user_id}/{league_id}: injury status check failed ({exc})")
 
             try:
-                rosters_for_reminders = sleeper.get_rosters(league_id)
-                reminder_roster = resolve_roster_for_sleeper_user(rosters_for_reminders, sleeper_user_id)
-                if reminder_roster is not None and league_payload:
-                    reminder_league_name = _safe_text(league_payload.get("name"), "Your league")
+                if my_roster is not None and league_payload:
                     now = _utcnow()
                     if league_calendar.is_in_season(league_payload) and push_item_allowed(
                         preferences, user_id=user_id, category="lineup_lock"
@@ -1254,9 +1401,9 @@ def run_push_trigger_sweep(*, environ: dict | None = None, secrets: Any = None) 
                         push_items.extend(
                             lineup_lock_push_items(
                                 league_id=league_id,
-                                league_name=reminder_league_name,
+                                league_name=league_name,
                                 league=league_payload,
-                                my_roster=reminder_roster,
+                                my_roster=my_roster,
                                 players_df=players_df,
                                 games=games_holder["games"],
                                 now=now,
@@ -1265,10 +1412,10 @@ def run_push_trigger_sweep(*, environ: dict | None = None, secrets: Any = None) 
                     if push_item_allowed(preferences, user_id=user_id, category="waiver_reminder"):
                         waiver_item = waiver_reminder_push_item(
                             league_id=league_id,
-                            league_name=reminder_league_name,
+                            league_name=league_name,
                             league=league_payload,
-                            my_roster=reminder_roster,
-                            rosters=rosters_for_reminders,
+                            my_roster=my_roster,
+                            rosters=league_rosters,
                             players_df=players_df,
                             score_field=score_field,
                             now=now,
@@ -1281,35 +1428,33 @@ def run_push_trigger_sweep(*, environ: dict | None = None, secrets: Any = None) 
             if league_payload:
                 deadline_item = trade_deadline_push_item(
                     league_id=league_id,
-                    league_name=_safe_text(league_payload.get("name"), "Your league"),
+                    league_name=league_name,
                     league=league_payload,
                 )
                 if deadline_item:
                     push_items.append(deadline_item)
 
-            if league_payload and roundup_enabled(preferences, user_id):
+            if league_payload and my_roster is not None and roundup_enabled(preferences, user_id):
                 try:
-                    roundup_roster = resolve_roster_for_sleeper_user(sleeper.get_rosters(league_id), sleeper_user_id)
-                    if roundup_roster is not None:
-                        roundup_item = weekly_roundup_push_item(
-                            league_id=league_id,
-                            league_name=_safe_text(league_payload.get("name"), "Your league"),
-                            league=league_payload,
-                            my_roster=roundup_roster,
-                            now=_utcnow(),
-                            is_already_sent=lambda rid, _uid=user_id: bool(
-                                already_notified_batch(config, user_id=_uid, recommendation_ids=[rid])
-                            ),
-                        )
-                        if roundup_item:
-                            push_items.append(roundup_item)
+                    roundup_item = weekly_roundup_push_item(
+                        league_id=league_id,
+                        league_name=league_name,
+                        league=league_payload,
+                        my_roster=my_roster,
+                        now=_utcnow(),
+                        is_already_sent=lambda rid, _uid=user_id: bool(
+                            already_notified_batch(config, user_id=_uid, recommendation_ids=[rid])
+                        ),
+                    )
+                    if roundup_item:
+                        push_items.append(roundup_item)
                 except Exception as exc:
                     stats["errors"].append(f"{user_id}/{league_id}: weekly roundup check failed ({exc})")
 
             try:
                 stance_item = gm_stance_reminder_push_item(
                     league_id=league_id,
-                    league_name=_safe_text(league_payload.get("name"), "Your league"),
+                    league_name=league_name,
                     leagues_with_stance=gm_stance_leagues.get(user_id, set()),
                 )
                 if stance_item:
@@ -1317,41 +1462,67 @@ def run_push_trigger_sweep(*, environ: dict | None = None, secrets: Any = None) 
             except Exception as exc:
                 stats["errors"].append(f"{user_id}/{league_id}: gm stance reminder check failed ({exc})")
 
-            push_items = [
-                item for item in push_items if push_item_allowed(preferences, user_id=user_id, category=item["category"])
-            ]
-
-            already_sent = already_notified_batch(
-                config,
-                user_id=user_id,
-                recommendation_ids=[item["recommendation_id"] for item in push_items],
-            )
             candidates.extend(
-                item for item in push_items if item["recommendation_id"] not in already_sent
+                item for item in push_items if push_item_allowed(preferences, user_id=user_id, category=item["category"])
             )
 
+        # ONE dedupe read per user (not one per league).
+        already_sent = already_notified_batch(
+            config,
+            user_id=user_id,
+            recommendation_ids=[item["recommendation_id"] for item in candidates],
+        )
+        candidates = [item for item in candidates if item["recommendation_id"] not in already_sent]
         if not candidates:
             continue
-        if is_quiet_hours(timezones.get(user_id, DEFAULT_TIMEZONE)):
-            # Held, not dropped: nothing is logged, so the next sweep after
-            # quiet hours re-derives these items and sends what is still live.
-            stats["held_quiet_hours"] += 1
+
+        now = _utcnow()
+        tz_name = user_prefs.get("timezone") or timezones.get(user_id, DEFAULT_TIMEZONE)
+        sent_count_holder: dict[str, int | None] = {}
+
+        def sent_this_week(_uid=user_id) -> int | None:
+            if "n" not in sent_count_holder:
+                sent_count_holder["n"] = count_recent_pushes(config, _uid)
+            return sent_count_holder["n"]
+
+        decision = notification_decider.decide(
+            candidates,
+            prefs=user_prefs,
+            now=now,
+            local_hour=_local_hour(tz_name, now),
+            sent_this_week_fn=sent_this_week,
+            default_cap=weekly_cap,
+            roster_ids_by_league=roster_ids_by_league,
+        )
+        for _item, reason in decision.suppressed:
+            stats["suppressed"][reason] = stats["suppressed"].get(reason, 0) + 1
+        if not decision.allowed:
+            if decision.held == "quiet_hours":
+                # Held, not dropped: nothing is logged, so the next sweep after
+                # quiet hours re-derives these items and sends what is still live.
+                stats["held_quiet_hours"] += 1
+            elif decision.held == "digest":
+                stats["held_digest"] += 1
+            elif decision.held == "capped":
+                stats["capped"] += 1
+            elif decision.held == "count_unavailable":
+                stats["errors"].append(f"{user_id}: weekly push count unavailable; held")
             continue
-        sent_this_week = count_recent_pushes(config, user_id)
-        if sent_this_week is None:
-            stats["errors"].append(f"{user_id}: weekly push count unavailable; held")
-            continue
-        allowed = apply_weekly_cap(candidates, sent_this_week=sent_this_week, cap=weekly_cap)
-        if not allowed:
-            stats["capped"] += 1
-            continue
-        title, body, notification_data = build_batched_message(allowed)
+
+        allowed = decision.allowed
+        for item in allowed:
+            item["deep_link"] = notification_decider.deep_link_for(item)
+        batch_id = notification_events.new_batch_id()
+        title, body, notification_data = build_batched_message(allowed, notification_id=batch_id)
         result = push_tokens.send_expo_push_notifications(
             tokens, title=title, body=body, data=notification_data
         )
         if result.get("invalid_tokens"):
             delete_invalid_push_tokens(config, list(result["invalid_tokens"]))
-        if result.get("ok"):
+        # Expo can accept the request yet reject every device ticket (all
+        # tokens dead): that is NOT a delivery, so it must not be dedup-logged.
+        accepted = int(result.get("sent") or 0) - len(result.get("ticket_errors") or [])
+        if result.get("ok") and accepted > 0:
             # Only dedup-log a delivered push: a transient Expo outage must
             # not permanently swallow these notifications.
             record_notifications(
@@ -1359,10 +1530,49 @@ def run_push_trigger_sweep(*, environ: dict | None = None, secrets: Any = None) 
                 user_id=user_id,
                 entries=[(item["recommendation_id"], item["league_id"]) for item in allowed],
             )
+            if events_on:
+                notification_events.record_batch(
+                    config,
+                    user_id=user_id,
+                    batch_id=batch_id,
+                    items=allowed,
+                    title=title,
+                    body=body,
+                    state="sent",
+                    tickets=result.get("ticket_ids") or [],
+                    now=now,
+                )
             stats["pushes_sent"] += 1
         else:
-            stats["errors"].append(f"{user_id}: {result.get('error')}")
+            error = str(result.get("error") or "") or "all devices rejected the push"
+            stats["errors"].append(f"{user_id}: {error}")
+            if events_on:
+                notification_events.record_batch(
+                    config,
+                    user_id=user_id,
+                    batch_id=batch_id,
+                    items=allowed,
+                    title=title,
+                    body=body,
+                    state="failed",
+                    error=error,
+                    now=now,
+                )
 
+    return stats
+
+
+def run_receipt_poll(*, environ: dict | None = None, secrets: Any = None) -> dict[str, Any]:
+    """Resolve Expo delivery receipts for recent pushes and prune dead tokens.
+    No-op unless notification_events is enabled and the table exists."""
+
+    config = load_push_trigger_config(environ=environ, secrets=secrets)
+    if not config.configured or not notification_events.events_enabled(environ=environ, secrets=secrets):
+        return {"enabled": False}
+    stats = notification_events.poll_receipts(
+        config, delete_tokens=lambda tokens: delete_invalid_push_tokens(config, tokens)
+    )
+    stats["enabled"] = True
     return stats
 
 
@@ -1447,12 +1657,13 @@ def run_trade_outcome_followup_sweep(*, environ: dict | None = None, secrets: An
         return stats
 
     recipients = fetch_push_recipients(config)
-    preferences = fetch_push_preferences(config, [_safe_text(r.get("user_id")) for r in pending])
-    if preferences is None:
+    fetched_settings = fetch_push_settings(config, [_safe_text(r.get("user_id")) for r in pending])
+    if fetched_settings is None:
         # Fail closed: nothing is sent or marked, the next run retries.
         stats["ok"] = False
         stats["errors"].append("Push preferences could not be read; sent nothing this run.")
         return stats
+    preferences, user_notification_prefs = fetched_settings
     timezones = fetch_push_timezones(config)
     sent_counts: dict[str, int | None] = {}
     for row in pending:
@@ -1469,19 +1680,29 @@ def run_trade_outcome_followup_sweep(*, environ: dict | None = None, secrets: An
             # Opted out: stop asking. The in-app pending prompt still covers it.
             mark_trade_outcome_followup_pushed(config, outcome_id=outcome_id)
             continue
-        if is_quiet_hours(timezones.get(user_id, DEFAULT_TIMEZONE)):
+        user_prefs = user_notification_prefs.get(user_id) or notification_prefs.default_prefs()
+        now = _utcnow()
+        tz_name = user_prefs.get("timezone") or timezones.get(user_id, DEFAULT_TIMEZONE)
+
+        def _count(_uid=user_id) -> int | None:
+            if _uid not in sent_counts:
+                sent_counts[_uid] = count_recent_pushes(config, _uid)
+            return sent_counts[_uid]
+
+        league_id = _safe_text(row.get("league_id"))
+        followup_item = {"category": "trade_followup", "league_id": league_id}
+        decision = notification_decider.decide(
+            [followup_item],
+            prefs=user_prefs,
+            now=now,
+            local_hour=_local_hour(tz_name, now),
+            sent_this_week_fn=_count,
+            default_cap=weekly_cap,
+        )
+        if not decision.allowed:
             stats["held"] += 1  # not marked: retried at the next sweep
             continue
-        if user_id not in sent_counts:
-            sent_counts[user_id] = count_recent_pushes(config, user_id)
-        sent_this_week = sent_counts[user_id]
-        if sent_this_week is None:
-            stats["held"] += 1
-            continue
-        item = {"category": "trade_followup"}
-        if not apply_weekly_cap([item], sent_this_week=sent_this_week, cap=weekly_cap):
-            stats["held"] += 1
-            continue
+        sent_this_week = _count() or 0
         league_id = _safe_text(row.get("league_id"))
         # Generic copy: the partner team name is not put in push text (no
         # server-side privacy flag exists; see INCLUDE_LEAGUE_NAMES_IN_PUSH_TEXT).
@@ -1495,14 +1716,17 @@ def run_trade_outcome_followup_sweep(*, environ: dict | None = None, secrets: An
                     "category": "trade_followup",
                     "outcome_id": outcome_id,
                     "league_id": league_id,
+                    "url": notification_decider.deep_link_for(followup_item),
                 },
             )
         except Exception as exc:
             stats["errors"].append(f"{user_id}: trade outcome push failed ({exc})")
+            continue  # not marked: a failed delivery is retried at the next sweep
+        accepted = int(result.get("sent") or 0) - len(result.get("ticket_errors") or [])
+        if result.get("invalid_tokens"):
+            delete_invalid_push_tokens(config, list(result["invalid_tokens"]))
+        if result.get("ok") and accepted > 0:
             mark_trade_outcome_followup_pushed(config, outcome_id=outcome_id)
-            continue
-        mark_trade_outcome_followup_pushed(config, outcome_id=outcome_id)
-        if result.get("ok"):
             stats["pushes_sent"] += 1
             sent_counts[user_id] = sent_this_week + 1
             record_notifications(
