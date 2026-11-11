@@ -73,7 +73,7 @@ looks for trades and how thin an edge it accepts.
 Options for building the setup UI.
 ```json
 {"ok": true, "reason": "", "is_premium": true, "upsell": null, "enabled": true,
- "engine_version": "sim-1.0.0", "modes": ["remaining", "full"], "max_worlds": 10,
+ "engine_version": "sim-1.1.0", "modes": ["remaining", "full"], "max_worlds": 10,
  "strategy_options": {"posture": {"values": [...], "default": "balanced"}, "trade_aggressiveness": {"min": 0, "max": 1, "default": 0.5}, ...},
  "personas": [{"id": "contender", "label": "Contender", "blurb": "..."}, ...]}
 ```
@@ -89,13 +89,15 @@ Body: `{"league_id": "123", "mode": "remaining", "roster_id": "", "strategy": {.
 ```json
 {"ok": true, "reason": "", "is_premium": true, "upsell": null,
  "world": {"id": "uuid", "source_league_id": "123", "league_name": "...", "mode": "remaining",
-           "seed": 4611686018427387, "engine_version": "sim-1.0.0", "status": "ready",
+           "seed": 4611686018427387, "engine_version": "sim-1.1.0", "status": "ready",
            "strategy": {...}, "grade_letter": null, "created_at": "...", "updated_at": "..."},
  "team": {"team_id": "3", "name": "My Team"},
- "notes": ["bye_weeks_not_modeled", "schedule_estimated_weeks:9,10"]}
+ "notes": ["schedule_estimated_weeks:9,10"]}
 ```
 `notes` are honest caveats about how the snapshot approximates the real league:
-`bye_weeks_not_modeled`, `def_idp_slots_not_modeled`, `offseason_full_season`,
+`bye_weeks_unavailable` (no complete NFL schedule on hand, so nobody is on bye;
+`bye_weeks_not_modeled` on worlds created before engine 1.1.0),
+`draft_picks_unavailable` (picks are not traded in this world), `def_idp_slots_not_modeled`, `offseason_full_season`,
 `schedule_estimated_weeks:<weeks>`, `projection_fallback_players:<n>`,
 `playoff_format_approximated:<why>`, `playoff_reseed_not_modeled`.
 
@@ -123,7 +125,7 @@ Deletes the world, snapshot and result.
 ## Result object
 ```jsonc
 {
-  "engine_version": "sim-1.0.0", "seed": 1234, "mode": "remaining", "start_week": 6,
+  "engine_version": "sim-1.1.0", "seed": 1234, "mode": "remaining", "start_week": 6,
   "strategy": {...},
   "standings": [  // final regular-season order (seed 1 first)
     {"team_id": "3", "name": "...", "owner": "...", "is_user": true, "persona_id": "you",
@@ -203,3 +205,23 @@ bye weeks, live weekly interaction, shareable seeds/leaderboards, UI.
 - At most 2 sim computations at once per worker (own semaphore, 503 beyond
   that); the real admission-control middleware is untouched.
 - Retention: `select public.sim_prune_old_worlds();` (90 days idle), manual.
+
+## Bye weeks and draft picks (engine 1.1.0)
+- **Byes.** The snapshot freezes each NFL team's bye week from the app's cached
+  nflverse schedule, read-only (`data/nfl_games.csv` is never refetched or
+  rewritten by the sim). A player on bye scores 0 and is excluded from that
+  week's lineup, so the best eligible bench player starts. A set-and-forget
+  lineup gets a one-week substitute and the starter returns afterwards. AI
+  waiver/trade valuation is season-long and does not look at byes. Teams with no
+  single clear bye week are left without one rather than guessed.
+- **Picks.** Each team's picks for the next two rookie drafts (rounds from the
+  league's `draft_rounds`, default 4) are tradable assets, with real traded
+  ownership from Sleeper. Pick assets appear in trade `gives`/`gets` as
+  `{"player_id": "pick:2027:1:3", "name": "2027 round 1 pick (via Team X)", "pos": "", "kind": "pick"}`.
+  Values come from `modules/sim/picks.py` (the sim's own scale: slot from the
+  original team's strength for the next draft, mid-round after that, discounted
+  per year). Rebuilders value picks above contenders. Picks have no on-field
+  effect in a one-season sim, so the grade does not score their future value; a
+  trade that moves one says so in its "decisions that mattered" text.
+- Older stored worlds keep their snapshot (no byes/picks) and replay unchanged
+  apart from the engine version.

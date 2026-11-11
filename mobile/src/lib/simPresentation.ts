@@ -76,6 +76,8 @@ export interface SimAsset {
   name?: string;
   pos?: string;
   label?: string;
+  /** "pick" for a draft pick (no position). */
+  kind?: string;
 }
 
 export interface SimStandingRow {
@@ -304,6 +306,8 @@ export function simReasonMessage(reason: string | undefined): string {
 
 const NOTE_COPY: Record<string, string> = {
   bye_weeks_not_modeled: "Bye weeks are not modeled.",
+  bye_weeks_unavailable: "Bye weeks could not be loaded, so no player is on bye.",
+  draft_picks_unavailable: "Draft picks are not part of trades in this simulation.",
   def_idp_slots_not_modeled: "Defense and IDP lineup slots are not modeled.",
   offseason_full_season: "It is the offseason, so the whole season is simulated.",
   playoff_reseed_not_modeled: "Playoff re-seeding between rounds is not modeled.",

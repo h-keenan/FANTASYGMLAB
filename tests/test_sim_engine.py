@@ -99,9 +99,13 @@ def test_every_player_has_one_owner_through_trades_and_waivers():
         if e["type"] == "trade":
             a, b = rosters[e["team"]], rosters[e["partner"]]
             for g in e["gives"]:
+                if g.get("kind") == "pick":
+                    continue  # picks are tracked in tests/test_sim_byes_picks.py
                 a.remove(g["player_id"])
                 b.add(g["player_id"])
             for g in e["gets"]:
+                if g.get("kind") == "pick":
+                    continue
                 b.remove(g["player_id"])
                 a.add(g["player_id"])
         elif e["type"] == "waiver":

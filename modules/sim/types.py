@@ -61,6 +61,41 @@ class SimPlayer:
         )
 
 
+PICK_PREFIX = "pick:"
+
+
+def is_pick_id(asset_id: str) -> bool:
+    """Draft picks trade alongside players; their ids never collide with a
+    player id because of this prefix."""
+
+    return asset_id.startswith(PICK_PREFIX)
+
+
+@dataclass(frozen=True)
+class SimPick:
+    """One future rookie-draft pick. ``orig`` is the team whose record sets the
+    slot; ``owner`` is who holds it now."""
+
+    season: int
+    round: int
+    orig: str
+    owner: str
+
+    @property
+    def pid(self) -> str:
+        return f"{PICK_PREFIX}{self.season}:{self.round}:{self.orig}"
+
+    def to_dict(self) -> dict[str, Any]:
+        return {"season": self.season, "round": self.round, "orig": self.orig, "owner": self.owner}
+
+    @classmethod
+    def from_dict(cls, raw: Mapping[str, Any]) -> "SimPick":
+        return cls(
+            season=int(raw["season"]), round=int(raw["round"]),
+            orig=str(raw["orig"]), owner=str(raw["owner"]),
+        )
+
+
 @dataclass(frozen=True)
 class SimTeam:
     tid: str
@@ -134,6 +169,12 @@ class LeagueSnapshot:
     mode: str = "remaining"
     # Honest caveats about how this snapshot approximates the real league.
     notes: tuple[str, ...] = ()
+    # NFL team code -> the regular-season week it has no game. A player whose
+    # team is missing here never goes on bye (snapshots from before bye weeks
+    # were modeled round-trip as empty).
+    bye_weeks: Mapping[str, int] = field(default_factory=dict)
+    # Future draft picks as tradable assets (empty = picks not modeled).
+    picks: tuple[SimPick, ...] = ()
 
     @property
     def user_team(self) -> SimTeam:
@@ -151,6 +192,8 @@ class LeagueSnapshot:
             "free_agents": list(self.free_agents),
             "schedule": [[list(pair) for pair in week] for week in self.schedule],
             "notes": list(self.notes),
+            "bye_weeks": {k: self.bye_weeks[k] for k in sorted(self.bye_weeks)},
+            "picks": [p.to_dict() for p in self.picks],
         }
 
     @classmethod
@@ -163,6 +206,8 @@ class LeagueSnapshot:
             free_agents=tuple(str(p) for p in raw.get("free_agents") or ()),
             schedule=tuple(tuple((str(a), str(b)) for a, b in week) for week in raw["schedule"]),
             notes=tuple(str(n) for n in raw.get("notes") or ()),
+            bye_weeks={str(k): int(v) for k, v in (raw.get("bye_weeks") or {}).items()},
+            picks=tuple(SimPick.from_dict(p) for p in raw.get("picks") or ()),
         )
         snapshot.validate()
         return snapshot
@@ -184,6 +229,13 @@ class LeagueSnapshot:
         for pid in self.free_agents:
             if pid not in self.players:
                 raise ValueError(f"free agent {pid} missing from snapshot")
+        seen_picks: set[str] = set()
+        for pick in self.picks:
+            if pick.owner not in tids or pick.orig not in tids:
+                raise ValueError("pick references an unknown team")
+            if pick.round < 1 or pick.pid in seen_picks:
+                raise ValueError("picks must be unique and have a positive round")
+            seen_picks.add(pick.pid)
 
 
 @dataclass(frozen=True)

@@ -98,6 +98,8 @@ def _evaluate_decisions(
             sent, got = user_gives(event)
             title = f"Week {event['week']} trade: sent {_names(sent)}, got {_names(got)}"
             detail = f"That deal {_verb(impact)} your season ({_impact_text(impact)})."
+            if any(asset.get("kind") == "pick" for asset in sent + got):
+                detail += " Draft picks have no on-field value this season, so their future worth is not scored."
             kind = "trade"
         else:
             drop = f", dropped {event['drop']['name']}" if event["drop"] else ""
