@@ -19,6 +19,7 @@ import { prospectFit, rankByFit, type ProspectFit, type ScoutingLens } from '../
 import { usePlayerListViewMode } from '../lib/viewModePreference';
 import { useThemeMode } from '../context/ThemeModeContext';
 import { radii, spacing, type ThemeColors } from '../theme';
+import ErrorState from './ErrorState';
 
 type FilterKey = 'all' | 'watchlist';
 type ScoutView = 'base' | 'league';
@@ -274,7 +275,7 @@ export default function CollegeScoutingPanel({
         />
         <ViewModeToggle value={viewMode} onChange={setViewMode} />
       </View>
-      {error ? <AppText style={styles.error}>{error}</AppText> : null}
+      {error ? <ErrorState compact title="Couldn't load prospects" message={error} onRetry={() => void load()} /> : null}
       {visible.length === 0 ? (
         <EmptyState
           icon={filter === 'watchlist' ? 'star-outline' : 'school-outline'}

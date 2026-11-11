@@ -32,6 +32,7 @@ import { useThemeMode } from '../context/ThemeModeContext';
 import { radii, spacing, type ThemeColors } from '../theme';
 import type { RootStackParamList } from '../navigation/RootNavigator';
 import { usePlayerQuickView } from '../context/PlayerQuickViewContext';
+import ErrorState from '../components/ErrorState';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'TeamRoster'>;
 
@@ -124,6 +125,7 @@ export default function TeamRosterScreen({ route, navigation }: Props) {
   const [leagueSize, setLeagueSize] = useState(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [reloadToken, setReloadToken] = useState(0);
 
   useScreenHeaderTitle(navigation, ownerName, leagueName);
 
@@ -144,6 +146,8 @@ export default function TeamRosterScreen({ route, navigation }: Props) {
       let cancelled = false;
 
       async function load() {
+        setError(null);
+        setLoading(true);
         try {
           const [rankingsResult, summariesById, teamRankingsResult] = await Promise.all([
             api.getLeagueRankings(leagueId, { limit: 300 }),
@@ -175,7 +179,7 @@ export default function TeamRosterScreen({ route, navigation }: Props) {
       return () => {
         cancelled = true;
       };
-    }, [leagueId, playerIds, rosterId]),
+    }, [leagueId, playerIds, rosterId, reloadToken]),
   );
 
   const sections = useMemo<RosterSection[]>(() => {
@@ -198,7 +202,7 @@ export default function TeamRosterScreen({ route, navigation }: Props) {
   if (error) {
     return (
       <View style={[styles.center, { paddingTop: headerHeight }]}>
-        <AppText style={styles.error}>{error}</AppText>
+        <ErrorState title="Couldn't load this roster" message={error} onRetry={() => setReloadToken((n) => n + 1)} />
       </View>
     );
   }

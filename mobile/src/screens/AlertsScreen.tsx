@@ -27,6 +27,7 @@ import { useThemeMode } from '../context/ThemeModeContext';
 import { radii, spacing, type ThemeColors } from '../theme';
 import type { RootStackParamList } from '../navigation/RootNavigator';
 import { usePlayerQuickView } from '../context/PlayerQuickViewContext';
+import ErrorState from '../components/ErrorState';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Alerts'>;
 type IconName = React.ComponentProps<typeof Ionicons>['name'];
@@ -254,7 +255,7 @@ export default function AlertsScreen({ route, navigation }: Props) {
         text={`Recent news about players on your roster in ${leagueName} — injury, role, transaction, and off-field signal only.`}
       />
 
-      {error ? <AppText style={styles.error}>{error}</AppText> : null}
+      {error ? <ErrorState compact title="Couldn't load alerts" message={error} onRetry={() => void load()} /> : null}
 
       <FlatList
         data={groupedAlerts}

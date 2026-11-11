@@ -244,7 +244,7 @@ function FailedLeaguesNote({
               className="text-xs font-bold whitespace-nowrap"
               style={{ color: "var(--color-accent)" }}
             >
-              Retry
+              Try again
             </button>
           ) : null}
           <button
@@ -408,7 +408,7 @@ export function PortfolioLeagueSkeleton({
         <p className="text-xs mt-3 flex items-center gap-2" style={{ color: "var(--color-text-muted)" }}>
           Taking longer than usual…
           <button type="button" className="tap-link font-bold" style={{ color: "var(--color-accent)" }} onClick={() => onRetry(league.league_id)}>
-            Retry
+            Try again
           </button>
         </p>
       ) : null}

@@ -21,6 +21,7 @@ import { useLastLeague } from '../lib/useLastLeague';
 import { useOrbClearance } from '../lib/orbLayout';
 import { useThemeMode } from '../context/ThemeModeContext';
 import { spacing, type ThemeColors } from '../theme';
+import ErrorState from '../components/ErrorState';
 
 // Semantic mapping matches AlertsScreen's (adjacent, roster-tied feed) exactly:
 // red = injury/risk, cyan = transaction/GM intelligence, green = role upside,
@@ -163,7 +164,7 @@ export default function NewsScreen({ route }: { route?: { params?: { playerId?: 
         }
       />
 
-      {error ? <AppText style={styles.error}>{error}</AppText> : null}
+      {error ? <ErrorState compact title="Couldn't load news" message={error} onRetry={() => void load()} /> : null}
 
       <SectionList
         sections={sections}

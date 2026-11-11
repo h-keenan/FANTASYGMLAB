@@ -18,6 +18,7 @@ import { queryKeys } from '../lib/queryKeys';
 import { radii, spacing, type ThemeColors } from '../theme';
 import type { RootStackParamList } from '../navigation/RootNavigator';
 import { usePlayerQuickView } from '../context/PlayerQuickViewContext';
+import ErrorState from './ErrorState';
 
 type SortKey = ExposureSortKey;
 
@@ -51,7 +52,7 @@ export default function PortfolioExposurePanel() {
   }, [exposureTier]);
 
   if (query.isError && !data) {
-    return <AppText style={styles.muted}>Could not load exposure. Try again in a moment.</AppText>;
+    return <ErrorState compact title="Couldn't load exposure" onRetry={() => void query.refetch()} />;
   }
   if (!data) {
     return (

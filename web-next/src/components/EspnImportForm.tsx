@@ -11,6 +11,7 @@ import { PremiumUpsellCard } from "@/components/PremiumUpsellCard";
 import { LEAGUE_CAP_UPSELL, saveFailureMessage } from "@/lib/leagueSave";
 import { Input, Select } from "@/components/Input";
 import { EspnLoginPanel, EspnLoginStatus } from "@/components/EspnLoginPanel";
+import { ErrorState } from "@/components/ErrorState";
 
 export type ImportPlatform = "espn" | "fleaflicker" | "mfl";
 
@@ -358,7 +359,7 @@ export function EspnImportForm({
           className="text-xs font-bold self-start"
           style={{ color: "var(--color-accent)" }}
         >
-          Retry
+          Try again
         </button>
       ) : null}
       <Button

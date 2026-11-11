@@ -6,6 +6,7 @@ import { useEffect, useState } from "react";
 import { api, type GuessThePlayerLeaderboardEntry, type GuessThePlayerLeaderboardResponse } from "@/lib/api";
 import { ToneBadge } from "@/components/ToneBadge";
 import { EmptyState } from "@/components/EmptyState";
+import { ErrorState } from "@/components/ErrorState";
 
 /**
  * League-scoped leaderboard across both Guess the Player mini-games' real,
@@ -70,6 +71,7 @@ function LeaderboardRow({ entry }: { entry: GuessThePlayerLeaderboardEntry }) {
 export function GuessThePlayerLeaderboardContent({ leagueId }: { leagueId: string }) {
   const [data, setData] = useState<GuessThePlayerLeaderboardResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [retryToken, setRetryToken] = useState(0);
   const [mode, setMode] = useState<Mode>("stat_line");
 
   useEffect(() => {
@@ -85,7 +87,7 @@ export function GuessThePlayerLeaderboardContent({ leagueId }: { leagueId: strin
     return () => {
       cancelled = true;
     };
-  }, [leagueId]);
+  }, [leagueId, retryToken]);
 
   if (!data && !error) {
     return (
@@ -99,11 +101,13 @@ export function GuessThePlayerLeaderboardContent({ leagueId }: { leagueId: strin
 
   if (error || !data) {
     return (
-      <main className="flex-1 flex items-center justify-center px-4 py-8">
-        <p role="alert" className="text-sm" style={{ color: "var(--color-danger)" }}>
-          {error || "Could not load the leaderboard."}
-        </p>
-      </main>
+      <ErrorState
+        message={error || "Could not load the leaderboard."}
+        onRetry={() => {
+          setError(null);
+          setRetryToken((n) => n + 1);
+        }}
+      />
     );
   }
 

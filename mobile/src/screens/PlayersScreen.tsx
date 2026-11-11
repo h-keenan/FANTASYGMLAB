@@ -42,6 +42,7 @@ import { useValuationLens } from '../context/ValuationLensContext';
 import { radii, spacing, type ThemeColors } from '../theme';
 import type { RootStackParamList } from '../navigation/RootNavigator';
 import { usePlayerQuickView } from '../context/PlayerQuickViewContext';
+import ErrorState from '../components/ErrorState';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Players'>;
 
@@ -283,6 +284,7 @@ export default function PlayersScreen({ route, navigation }: Props) {
   const [idp, setIdp] = useState<LeagueIdpValuesResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [reloadToken, setReloadToken] = useState(0);
   const { viewMode, setViewMode } = usePlayerListViewMode('players');
   const ownership = useRosterOwnership(leagueId);
 
@@ -303,6 +305,7 @@ export default function PlayersScreen({ route, navigation }: Props) {
   useEffect(() => {
     let cancelled = false;
     setLoading(true);
+    setError(null);
     (async () => {
       try {
         const result = await api.getLeagueRankings(leagueId, { lens, limit: 300 });
@@ -319,7 +322,7 @@ export default function PlayersScreen({ route, navigation }: Props) {
     return () => {
       cancelled = true;
     };
-  }, [leagueId, lens]);
+  }, [leagueId, lens, reloadToken]);
 
   // Defenders only form the pool under a DL/LB/DB chip, so offensive ranks
   // never mix with the model-value scale.
@@ -354,7 +357,7 @@ export default function PlayersScreen({ route, navigation }: Props) {
       <BrandHeaderBar leagueId={leagueId} leagueName={leagueName} />
       <ScreenInfoNote text="Ranked by value for this league's scoring, roster, and format settings. OVR percentiles a player against others at their position — tap any player for the full breakdown." />
 
-      {error ? <AppText style={styles.error}>{error}</AppText> : null}
+      {error ? <ErrorState compact title="Couldn't load players" message={error} onRetry={() => setReloadToken((n) => n + 1)} /> : null}
 
       <GlassCard style={styles.discoveryCard}>
         <Input

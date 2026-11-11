@@ -159,7 +159,7 @@ describe("ESPN import in the Connect League flow", () => {
     expect(api.saveLeague).not.toHaveBeenCalled();
   });
 
-  it("shows the friendly ESPN setting hint, a Retry button and emits espn_private", async () => {
+  it("shows the friendly ESPN setting hint, a Try again button and emits espn_private", async () => {
     vi.mocked(trackUse).mockClear();
     vi.mocked(api.previewEspnLeague).mockResolvedValue({ ok: false, reason: "private_league", message: "x" });
     openEspn();
@@ -170,18 +170,18 @@ describe("ESPN import in the Connect League flow", () => {
     expect(trackUse).toHaveBeenCalledWith("league_import", "failed", { props: { result: "espn_private" } });
     expect(JSON.stringify(vi.mocked(trackUse).mock.calls)).not.toContain("99887766");
 
-    fireEvent.click(screen.getByRole("button", { name: "Retry" }));
+    fireEvent.click(screen.getByRole("button", { name: "Try again" }));
     await waitFor(() => expect(api.previewEspnLeague).toHaveBeenCalledTimes(2));
   });
 
-  it("does not show the private hint or Retry for a wrong id or an outage", async () => {
+  it("does not show the private hint or Try again for a wrong id or an outage", async () => {
     vi.mocked(trackUse).mockClear();
     vi.mocked(api.previewEspnLeague).mockResolvedValueOnce({ ok: false, reason: "league_not_found", message: "Not found." });
     openEspn();
     fireEvent.change(screen.getByLabelText(/espn league id/i), { target: { value: "1" } });
     fireEvent.click(screen.getByRole("button", { name: /find my espn league/i }));
     await waitFor(() => expect(screen.getByRole("alert")).toHaveTextContent("Not found."));
-    expect(screen.queryByRole("button", { name: "Retry" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "Try again" })).toBeNull();
     expect(trackUse).toHaveBeenLastCalledWith("league_import", "failed", { props: { result: "espn_not_found" } });
 
     vi.mocked(api.previewEspnLeague).mockResolvedValueOnce({ ok: false, reason: "espn_unavailable", message: "Down." });

@@ -16,6 +16,7 @@ import { useOrbClearance } from '../lib/orbLayout';
 import { useThemeMode } from '../context/ThemeModeContext';
 import { spacing, type ThemeColors } from '../theme';
 import type { RootStackParamList } from '../navigation/RootNavigator';
+import ErrorState from '../components/ErrorState';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Community'>;
 
@@ -67,7 +68,7 @@ export default function CommunityScreen({ navigation }: Props) {
       >
         <ScreenInfoNote text="Trades other users chose to share from the Trade Analyzer. Names are never shown, only a display name they picked. You can share your own from a trade verdict, and delete it any time." />
         {failed ? (
-          <AppText style={styles.error}>Could not load the Community feed. Pull down to try again.</AppText>
+          <ErrorState compact title="Couldn't load the Community feed" onRetry={() => void load(false)} />
         ) : shared && shared.available ? (
           <SharedTradesFeed
             available={shared.available}

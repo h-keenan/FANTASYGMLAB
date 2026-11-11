@@ -40,12 +40,12 @@ describe("ReferralCard", () => {
     expect(screen.getByText("Loading your invite link…")).toBeInTheDocument();
   });
 
-  it("shows the error message and a Retry button that calls onRetry", () => {
+  it("shows the error message and a Try again button that calls onRetry", () => {
     const onRetry = vi.fn();
     render(<ReferralCard referral={null} error="Could not load your invite link." onRetry={onRetry} />);
 
     expect(screen.getByRole("alert")).toHaveTextContent("Could not load your invite link.");
-    fireEvent.click(screen.getByRole("button", { name: "Retry" }));
+    fireEvent.click(screen.getByRole("button", { name: "Try again" }));
     expect(onRetry).toHaveBeenCalledTimes(1);
   });
 
