@@ -20,6 +20,8 @@ TOKENS_TABLE = "push_tokens"
 VALID_PLATFORMS = ("ios", "android")
 EXPO_PUSH_API_URL = "https://exp.host/--/api/v2/push/send"
 EXPO_PUSH_CHUNK_SIZE = 100
+EXPO_RECEIPTS_API_URL = "https://exp.host/--/api/v2/push/getReceipts"
+EXPO_RECEIPTS_CHUNK_SIZE = 300
 
 
 def _safe_text(value: object, default: str = "") -> str:
@@ -170,6 +172,9 @@ def send_expo_push_notifications(
     sent = 0
     tickets: list[Any] = []
     invalid_tokens: list[str] = []
+    ticket_ids: list[dict[str, str]] = []  # [{token, id}] for receipt polling
+    ticket_errors: list[dict[str, str]] = []  # [{token, error}] immediate rejections
+    accepted = 0
     for chunk in _chunked(valid_tokens, EXPO_PUSH_CHUNK_SIZE):
         messages = [
             {"to": token, "title": title, "body": body, "data": dict(data or {})}
@@ -199,9 +204,60 @@ def send_expo_push_notifications(
             for token, ticket in zip(chunk, chunk_tickets):
                 if _ticket_is_device_not_registered(ticket):
                     invalid_tokens.append(token)
+                if isinstance(ticket, Mapping) and ticket.get("status") == "ok" and ticket.get("id"):
+                    ticket_ids.append({"token": token, "id": str(ticket["id"])})
+                    accepted += 1
+                elif isinstance(ticket, Mapping) and ticket.get("status") == "error":
+                    details = ticket.get("details") if isinstance(ticket.get("details"), Mapping) else {}
+                    ticket_errors.append({"token": token, "error": str(details.get("error") or ticket.get("message") or "error")})
+                else:
+                    accepted += 1
         sent += len(chunk)
 
-    return {"ok": True, "sent": sent, "tickets": tickets, "invalid_tokens": invalid_tokens, "error": ""}
+    return {
+        "ok": True,
+        "sent": sent,
+        "tickets": tickets,
+        "invalid_tokens": invalid_tokens,
+        "ticket_ids": ticket_ids,
+        "ticket_errors": ticket_errors,
+        "error": "",
+    }
+
+
+def get_expo_receipts(ticket_ids: Iterable[str], *, timeout: float = 20) -> dict[str, Any]:
+    """Fetch delivery receipts for earlier tickets.
+
+    Returns {"ok": bool, "receipts": {ticket_id: {"status", "error"?}}}. Never
+    raises. Expo only retains receipts ~24h, and a missing id simply means
+    "not ready / expired" (the caller leaves it for the next poll)."""
+
+    ids = [i for i in (_safe_text(t) for t in ticket_ids) if i]
+    receipts: dict[str, Any] = {}
+    for start in range(0, len(ids), EXPO_RECEIPTS_CHUNK_SIZE):
+        chunk = ids[start : start + EXPO_RECEIPTS_CHUNK_SIZE]
+        try:
+            response = requests.post(
+                EXPO_RECEIPTS_API_URL,
+                json={"ids": chunk},
+                headers={"Content-Type": "application/json", "Accept": "application/json"},
+                timeout=timeout,
+            )
+            if response.status_code >= 400:
+                return {"ok": bool(receipts), "receipts": receipts, "error": f"Expo receipts API returned {response.status_code}."}
+            payload = response.json()
+        except Exception as exc:
+            return {"ok": bool(receipts), "receipts": receipts, "error": f"Could not reach Expo receipts API: {exc}"}
+        data = payload.get("data") if isinstance(payload, Mapping) else None
+        if isinstance(data, Mapping):
+            for key, value in data.items():
+                if isinstance(value, Mapping):
+                    details = value.get("details") if isinstance(value.get("details"), Mapping) else {}
+                    receipts[str(key)] = {
+                        "status": str(value.get("status") or ""),
+                        "error": str(details.get("error") or value.get("message") or ""),
+                    }
+    return {"ok": True, "receipts": receipts, "error": ""}
 
 
 def _ticket_is_device_not_registered(ticket: Any) -> bool:

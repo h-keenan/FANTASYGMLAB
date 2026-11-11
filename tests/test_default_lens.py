@@ -50,7 +50,7 @@ def test_push_sweep_values_each_league_on_its_own_lens():
         "modules.push_triggers.load_weekly_push_cap", return_value=10
     ), patch("modules.push_triggers.fetch_push_recipients", return_value={"u1": ["tok"]}), patch(
         "modules.push_triggers.fetch_sleeper_usernames", return_value={"u1": "gm"}
-    ), patch("modules.push_triggers.fetch_push_preferences", return_value={}), patch(
+    ), patch("modules.push_triggers.fetch_push_settings", return_value=({}, {})), patch(
         "modules.push_triggers.fetch_push_timezones", return_value={}
     ), patch("modules.push_triggers.fetch_gm_stance_leagues", return_value={}), patch(
         "modules.push_triggers.fetch_gm_targets_untouchable_ids", return_value={}
