@@ -6,6 +6,7 @@ import { useEffect, useState } from "react";
 
 import { useAuth } from "@/context/AuthContext";
 import { useValuationLens } from "@/context/ValuationLensContext";
+import type { TeamStatusPrefetch } from "@/components/TeamStatusHero";
 import { api, type DashboardResponse, type LeagueTeamRankingsResponse } from "@/lib/api";
 import { DashboardContent } from "@/components/DashboardContent";
 import { ErrorState } from "@/components/ErrorState";
@@ -27,6 +28,7 @@ export default function DashboardPage() {
   // (it used to start only after the Dashboard rendered, a full round trip
   // later). Handed down as a promise so the tile renders whenever it lands.
   const [teamRankings, setTeamRankings] = useState<Promise<LeagueTeamRankingsResponse> | null>(null);
+  const [prefetch, setPrefetch] = useState<TeamStatusPrefetch | null>(null);
   const [error, setError] = useState<string | null>(null);
   // Bumped by the "Try again" button below — included in the fetch effect's
   // deps so a retry re-runs it without a full page reload (see
@@ -50,8 +52,16 @@ export default function DashboardPage() {
     });
     // Handed down right away so League Pulse can paint while the (slower)
     // Dashboard request is still running.
+    // The hero's two other reads leave in the same tick too, so the whole
+    // above-the-fold set is in flight at once instead of after the Dashboard.
+    const matchup = api.getLeagueMatchup(leagueId, lens);
+    const needs = api.getMyTeamNeeds(leagueId, lens);
+    matchup.catch(() => {});
+    needs.catch(() => {});
     void Promise.resolve().then(() => {
-      if (!cancelled) setTeamRankings(rankings);
+      if (cancelled) return;
+      setTeamRankings(rankings);
+      setPrefetch({ matchup, needs });
     });
     // Progressive load: the first call skips the trade-idea search so the
     // page paints sooner; the second (started only once the first lands, so
@@ -139,6 +149,7 @@ export default function DashboardPage() {
       leagueName={leagueName}
       data={data}
       teamRankings={teamRankings ?? undefined}
+      prefetch={prefetch ?? undefined}
       lens={lens}
       userId={session?.user?.id}
       accountCreatedAt={session?.user?.created_at}

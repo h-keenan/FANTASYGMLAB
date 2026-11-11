@@ -83,7 +83,7 @@ describe("TeamStatusHero on the Dashboard", () => {
     vi.spyOn(api, "getTeamRankings").mockResolvedValue(RANKINGS);
     vi.spyOn(api, "getGamesSeasonSim").mockRejectedValue(new Error("offseason"));
     render(<DashboardContent leagueId="abc" leagueName="L" data={DATA} />);
-    const hero = screen.getByTestId("team-status-hero");
+    const hero = await screen.findByTestId("team-status-hero");
     await waitFor(() => expect(within(hero).getByText("vs Rival FC")).toBeInTheDocument());
     expect(within(hero).getByText("Your win chance")).toBeInTheDocument();
     expect(within(hero).getByText("63%")).toBeInTheDocument();

@@ -13,7 +13,7 @@ import { GuessThePlayerNameMatchCard } from "@/components/GuessThePlayerNameMatc
 import { LeaguePulseCard } from "@/components/LeaguePulseCard";
 import { formatRank } from "@/components/SnapshotTile";
 import { StatStrip, type StatStripItem } from "@/components/StatStrip";
-import { TeamStatusHero, useTeamStatusData } from "@/components/TeamStatusHero";
+import { TeamStatusHero, useTeamStatusData, type TeamStatusPrefetch } from "@/components/TeamStatusHero";
 import { leagueAverageAge } from "@/lib/teamStatus";
 import { TodayModule } from "@/components/TodayModule";
 import { WatchListCard } from "@/components/WatchListCard";
@@ -48,6 +48,7 @@ export function DashboardContent({
   leagueName,
   data,
   teamRankings,
+  prefetch,
   userId,
   accountCreatedAt,
   sample,
@@ -61,6 +62,8 @@ export function DashboardContent({
   /** League Pulse's source, already in flight (the page starts it alongside
    * the Dashboard request). Omitted: the tile fetches it itself. */
   teamRankings?: Promise<LeagueTeamRankingsResponse>;
+  /** The hero's matchup / roster-needs reads, also started by the page. */
+  prefetch?: TeamStatusPrefetch;
   /** Signed-in user, for the first-run Start here card (omitted: no card). */
   userId?: string;
   accountCreatedAt?: string | null;
@@ -100,8 +103,11 @@ export function DashboardContent({
   // My Team: six equal tiles (the odds come from the season simulator; until
   // it has something real the two slots hold Starter / Bench Strength), the
   // rest behind "More team stats".
-  const { caption: oddsCaption, sim } = useSeasonOdds(leagueId, !sample);
-  const teamStatus = useTeamStatusData(leagueId, lens, !sample, teamRankings);
+  // The season simulation is the heaviest read on this page and only feeds one
+  // hero number, so it starts once the first pass has painted and the server
+  // is no longer busy with the trade-idea search.
+  const { caption: oddsCaption, sim } = useSeasonOdds(leagueId, !sample && !data.trade_ideas_deferred);
+  const teamStatus = useTeamStatusData(leagueId, lens, !sample, teamRankings, prefetch);
   const teams = teamStatus.rankings?.teams ?? null;
   const teamStats = snapshot
     ? buildTeamStats(snapshot, copy.label("averageAge", "Avg Age"), {

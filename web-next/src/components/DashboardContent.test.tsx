@@ -53,7 +53,7 @@ const FIXTURE: DashboardResponse = {
 };
 
 describe("DashboardContent", () => {
-  it("renders the league name, Game Plan cards, and Team Snapshot tiles from real fixture data", () => {
+  it("renders the league name, Game Plan cards, and Team Snapshot tiles from real fixture data", async () => {
     render(<DashboardContent leagueId="abc" leagueName="Dynasty Overlords" data={FIXTURE} />);
 
     expect(screen.getByRole("heading", { name: "Dynasty Overlords" })).toBeInTheDocument();
@@ -63,7 +63,7 @@ describe("DashboardContent", () => {
     expect(screen.getByRole("heading", { name: "My Team" })).toBeInTheDocument();
     // Record lives once, in the "Your team right now" hero, not repeated in the tiles.
     expect(screen.getByRole("heading", { name: "Your team right now" })).toBeInTheDocument();
-    expect(screen.getAllByText("Record")).toHaveLength(1);
+    expect(await screen.findAllByText("Record")).toHaveLength(1);
     expect(screen.getAllByText("Power Rank")).toHaveLength(1);
     expect(screen.getByText("Starter Strength")).toBeInTheDocument();
     expect(screen.getByText("Bench Strength")).toBeInTheDocument();

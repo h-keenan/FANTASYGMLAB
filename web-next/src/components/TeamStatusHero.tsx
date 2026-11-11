@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
+import { SkeletonCard } from "@/components/Skeleton";
 
 import { AccentCard } from "@/components/AccentCard";
 import { SectionHeading } from "@/components/SectionHeading";
@@ -25,22 +26,44 @@ const TONE_COLOR = {
 } as const;
 
 /** The three reads the hero needs beyond the Dashboard payload. Each failing just hides its row. */
-export function useTeamStatusData(leagueId: string, lens: string, enabled: boolean, teamRankings?: Promise<LeagueTeamRankingsResponse>) {
+export function useTeamStatusData(
+  leagueId: string,
+  lens: string,
+  enabled: boolean,
+  teamRankings?: Promise<LeagueTeamRankingsResponse>,
+  /** Requests the page already started (alongside the Dashboard call), so the
+   * hero does not wait a full Dashboard round trip before asking for them. */
+  prefetch?: TeamStatusPrefetch,
+) {
   const [matchup, setMatchup] = useState<MatchupResponse | null>(null);
   const [needs, setNeeds] = useState<MyTeamNeedsResponse | null>(null);
   const [rankings, setRankings] = useState<LeagueTeamRankingsResponse | null>(null);
+  // True once all three reads have landed or failed; until then the hero holds
+  // its place with a skeleton instead of popping in and pushing the page down.
+  const [settled, setSettled] = useState(!enabled);
   useEffect(() => {
     if (!enabled) return;
     let cancelled = false;
-    api.getLeagueMatchup(leagueId, lens).then((r) => !cancelled && setMatchup(r)).catch(() => {});
-    api.getMyTeamNeeds(leagueId, lens).then((r) => !cancelled && setNeeds(r)).catch(() => {});
-    (teamRankings ?? api.getTeamRankings(leagueId, lens)).then((r) => !cancelled && setRankings(r)).catch(() => {});
+    const matchupRequest = prefetch?.matchup ?? api.getLeagueMatchup(leagueId, lens);
+    const needsRequest = prefetch?.needs ?? api.getMyTeamNeeds(leagueId, lens);
+    const rankingsRequest = teamRankings ?? api.getTeamRankings(leagueId, lens);
+    const track = <T,>(request: Promise<T>, apply: (value: T) => void) =>
+      request
+        .then((value) => {
+          if (!cancelled) apply(value);
+        })
+        .catch(() => {});
+    void Promise.all([track(matchupRequest, setMatchup), track(needsRequest, setNeeds), track(rankingsRequest, setRankings)]).then(() => {
+      if (!cancelled) setSettled(true);
+    });
     return () => {
       cancelled = true;
     };
-  }, [leagueId, lens, enabled, teamRankings]);
-  return { matchup, needs, rankings };
+  }, [leagueId, lens, enabled, teamRankings, prefetch]);
+  return { matchup, needs, rankings, settled };
 }
+
+export type TeamStatusPrefetch = { matchup: Promise<MatchupResponse>; needs: Promise<MyTeamNeedsResponse> };
 
 function Fact({ label, value, tone = "neutral" }: { label: string; value: string; tone?: keyof typeof TONE_COLOR }) {
   return (
@@ -128,6 +151,16 @@ export function TeamStatusHero({
   });
   const positions = buildTeamStatusPositions(data.needs);
   const weakest = positions.find((row) => row.weakest);
+  if (!data.settled) {
+    return (
+      <section className="flex flex-col gap-3" aria-labelledby="team-status-heading" aria-busy="true" data-testid="team-status-hero-loading">
+        <SectionHeading id="team-status-heading" size="compact">
+          Your team right now
+        </SectionHeading>
+        <SkeletonCard lines={5} />
+      </section>
+    );
+  }
   if (!matchupLine && !lineup && !standing && positions.length === 0) return null;
 
   return (
