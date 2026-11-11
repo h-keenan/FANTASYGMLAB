@@ -35,6 +35,8 @@ import {
   simFormatRecord,
   simFormatSigned,
   simGate,
+  simUnavailableCopy,
+  type SimUnavailableCause,
   simGradeTone,
   simLevelLabel,
   simNoteMessages,
@@ -60,7 +62,7 @@ type Props = NativeStackScreenProps<RootStackParamList, 'FantasySim'>;
 
 type Phase =
   | { kind: 'loading' }
-  | { kind: 'unavailable' }
+  | { kind: 'unavailable'; cause: SimUnavailableCause }
   | { kind: 'premium'; upsell: SimUpsell | null }
   | { kind: 'setup' }
   | { kind: 'running' }
@@ -131,12 +133,12 @@ export default function FantasySimScreen({ route, navigation }: Props) {
         if (cancelled) return;
         const gate = simGate(status);
         if (gate.kind === 'premium') setPhase({ kind: 'premium', upsell: gate.upsell });
-        else if (gate.kind === 'unavailable') setPhase({ kind: 'unavailable' });
+        else if (gate.kind === 'unavailable') setPhase({ kind: 'unavailable', cause: gate.cause });
         else setPhase({ kind: 'setup' });
       })
       .catch((error) => {
         if (cancelled) return;
-        if (isSimOffError(error)) setPhase({ kind: 'unavailable' });
+        if (isSimOffError(error)) setPhase({ kind: 'unavailable', cause: 'off' });
         else setPhase({ kind: 'error', message: errorText(error, 'Could not load Fantasy Sim.') });
       });
     return () => {
@@ -305,12 +307,13 @@ export default function FantasySimScreen({ route, navigation }: Props) {
     );
   }
   if (phase.kind === 'unavailable') {
+    const copy = simUnavailableCopy(phase.cause);
     return (
       <View style={[styles.center, { paddingTop: headerHeight }]}>
         <EmptyState
           icon="flask-outline"
-          title="Fantasy Sim is coming soon"
-          subtitle="Pick a strategy, play out the season, and see how you would grade. It is not switched on yet. Check back soon."
+          title={copy.title}
+          subtitle={copy.subtitle}
         />
       </View>
     );

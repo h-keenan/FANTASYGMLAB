@@ -80,10 +80,10 @@ describe("FantasySimContent", () => {
     expect(await screen.findByText("Fantasy Sim is coming soon")).toBeInTheDocument();
   });
 
-  it("shows coming soon when storage is not applied yet", async () => {
+  it("says it is temporarily unavailable (not coming soon) when storage is not applied yet", async () => {
     vi.mocked(api.getSimStatus).mockResolvedValue({ ok: true, reason: "sim_storage_unavailable", is_premium: true });
     render(<FantasySimContent leagueId="9" leagueName="Test League" />);
-    expect(await screen.findByText("Fantasy Sim is coming soon")).toBeInTheDocument();
+    expect(await screen.findByText("Fantasy Sim is temporarily unavailable")).toBeInTheDocument();
   });
 
   it("shows an error with retry for a real failure", async () => {

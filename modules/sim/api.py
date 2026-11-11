@@ -126,6 +126,13 @@ def build_router(deps: SimApiDeps) -> APIRouter:
     def get_status(user: dict[str, Any] = Depends(deps.require_user)) -> dict[str, Any]:
         if not deps.is_pro(user):
             return _premium_required()
+        # Probe storage so the client can tell "tables missing / Supabase down"
+        # (sim_storage_unavailable) from a working sim, instead of opening the
+        # setup page and failing on the first run.
+        try:
+            store_for(user).list_worlds(str(user.get("id") or ""))
+        except SimStoreError:
+            return {**unavailable(), "enabled": True}
         return {
             **_reason(""),
             "enabled": True,
