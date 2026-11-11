@@ -22,6 +22,7 @@ import SkeletonBlock, { SkeletonRow } from '../components/SkeletonBlock';
 import ManagerTendenciesChips from '../components/ManagerTendenciesChips';
 import DeadlineCard from '../components/DeadlineCard';
 import TradeHubHoldCard from '../components/TradeHubHoldCard';
+import MultiTeamIdeasSection from '../components/MultiTeamIdeasSection';
 import TradeIdeaCard, { impactTagConfig, type ImpactTagKey } from '../components/TradeIdeaCard';
 import TradeSharePreviewModal from '../components/TradeSharePreviewModal';
 import TradeValueBar from '../components/TradeValueBar';
@@ -414,6 +415,7 @@ export default function TradeHubScreen({ leagueId, leagueName, navigation }: Pro
               onUpgrade={() => navigation.navigate('Paywall')}
             />
           )}
+          {isForYou ? <MultiTeamIdeasSection leagueId={leagueId} leagueName={leagueName} lens={lens} navigation={navigation} /> : null}
           <ValueSignalsCard leagueId={leagueId} leagueName={leagueName} />
           <ValuesCredit />
         </>

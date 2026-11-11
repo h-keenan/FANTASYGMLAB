@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Pressable, StyleSheet, TouchableOpacity, useWindowDimensions, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 
@@ -50,8 +50,10 @@ import {
   type MultiAsset,
   type MultiTeamResult,
   type MultiTeamTradeResponse,
+  type MultiTransfer,
   type SemanticTone,
 } from '../lib/multiTeamTrade';
+import { prefillToBuilder } from '../lib/multiTeamIdeas';
 import { useThemeMode } from '../context/ThemeModeContext';
 import { radii, scrim, spacing, type ThemeColors } from '../theme';
 
@@ -111,6 +113,7 @@ export default function MultiTeamTradePanel({
   rankings,
   picks,
   lens,
+  prefill,
 }: {
   leagueId: string;
   leagueName: string;
@@ -119,6 +122,8 @@ export default function MultiTeamTradePanel({
   rankings: RankedPlayer[];
   picks: DraftPickAsset[];
   lens: ValuationLens;
+  /** A trade to load and grade on open (a Trade Hub 3-team idea). The Analyzer regrades it: only ids travel. */
+  prefill?: MultiTransfer[];
 }) {
   const { colors } = useThemeMode();
   const styles = useMemo(() => createStyles(colors), [colors]);
@@ -128,8 +133,12 @@ export default function MultiTeamTradePanel({
   const toneColor = (tone: SemanticTone) =>
     tone === 'success' ? colors.success : tone === 'warning' ? colors.warning : tone === 'danger' ? colors.danger : colors.textSecondary;
 
-  const [participants, setParticipants] = useState<string[]>(() => (myRosterId ? [myRosterId] : []));
-  const [assets, setAssets] = useState<BuilderAsset[]>([]);
+  const [participants, setParticipants] = useState<string[]>(() =>
+    prefill?.length ? prefillToBuilder(prefill, myRosterId).participants : myRosterId ? [myRosterId] : [],
+  );
+  const [assets, setAssets] = useState<BuilderAsset[]>(() =>
+    prefill?.length ? (prefillToBuilder(prefill, myRosterId).assets as BuilderAsset[]) : [],
+  );
   const [picker, setPicker] = useState<Picker | null>(null);
   const [pending, setPending] = useState<BuilderAsset | null>(null);
   const [addingTeam, setAddingTeam] = useState(false);
@@ -228,6 +237,15 @@ export default function MultiTeamTradePanel({
       setAnalyzing(false);
     }
   };
+
+  // A prefilled trade is graded once on open, the same request a tap on Analyze makes.
+  const autoAnalyzed = useRef(false);
+  useEffect(() => {
+    if (!prefill?.length || autoAnalyzed.current) return;
+    autoAnalyzed.current = true;
+    void analyze();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const display = (asset: BuilderAsset): PresentationAsset => {
     if (asset.type === 'pick') {

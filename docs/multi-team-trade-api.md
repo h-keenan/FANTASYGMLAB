@@ -119,8 +119,82 @@ multi-team trades; veto risk is the current-trade read only.
 
 ## Not in this endpoint
 
-Counter-offer search and 3-team trade ideas (Phase 3), outcome recording, and
-the share card. The veto calculator's own request (`commissioner/veto-check`)
+Counter-offer search, outcome recording, and the share card (3-team ideas are
+the separate endpoint below). The veto calculator's own request (`commissioner/veto-check`)
 stays two-team; `trade_veto.assess` now accepts two or more sides (two-team
 output is byte-identical, covered by a regression test) and `assess_each`
 gives the per-team read used here.
+
+# 3-team trade ideas
+
+`GET /v1/leagues/{league_id}/trade-ideas/multi?lens=Dynasty` finds cyclic
+three-way deals for the caller in which EVERY team's own verdict is Fair or
+better (tone `accept` or `fair`). Code: `modules/multi_team_trade_finder.py`
+(search), `modules/multi_team_trade_engine.py` (`build_context` /
+`grade_transfers`, the per-team grading shared with the Analyzer),
+`services/mobile_api_service.py` (endpoint).
+
+## How the search works (no valuation of its own)
+
+- Needs and surplus come from `roster_value_model.league_needs` (the table Trade
+  Hub, Waivers and the Dashboard read). A position is a need at tier
+  primary/secondary; a player is sendable when the model lists him as surplus or
+  he is bench depth beyond the starters at a covered position. The caller's
+  untouchables are never sent.
+- Bounded and deterministic: top `MAX_PARTNERS` (5) partners by need/surplus fit
+  with the caller; per directed edge at most `EDGE_ASSETS` (3) players at a
+  position the receiver needs, carried as one or two assets per edge; both
+  orientations of each partner pair, pre-priced on neutral league value
+  (`PROXY_TOLERANCE`) only to order and prune; at most `PAIR_VERIFY_CAP` (3)
+  candidates per partner pair and `MAX_VERIFY` (12) in all go through the real
+  per-team engine, in a fixed order, until `MAX_IDEAS` (5) pass (at most 2 per
+  partner pair) or the time budget (12s) runs out. All ties break on ids, so the
+  same league state returns the same ideas in the same order; the time budget can
+  only shorten the list.
+- Counter variants: a candidate that fails only because one team is a notch short
+  (`counter`) gets one repair, a single extra spare piece from the team sending to
+  it (at most `MAX_VARIANTS` (2) per search, regraded for every team). Such an
+  idea has `variant: {edits: 1, note}`.
+- Players only in this version (no picks as search pieces); the Analyzer still
+  accepts picks when a manager edits an idea.
+
+## Response
+
+```
+ok, reason       // "" or no_fit | needs_unavailable | league_too_small | trade_deadline_passed | unavailable | ...
+ideas[]          // Pro only; best first (highest weakest-team score)
+  id, headline
+  teams[]        // the viewer first; same per-team fields as the Analyzer (sends, receives, verdict
+                 // {band, ui_verdict, confidence, rationale}, trade_score, market_delta, lineup_delta,
+                 // tone, color_token, outcome, posture, roster_overflow) plus why[] where the first
+                 // entry is {factor: "need", text} (the need the deal fills / the spare depth it sends)
+  flows[]        // transfers with team names
+  partners[], user {roster_id, trade_score, market_delta, lineup_delta, outcome}   // honest deltas
+  summary        // headline, balance, most_hurt_roster_id, best_off_roster_id, market_sum
+  variant        // null or {edits, note}
+  analyzer_request {transfers[], perspective_roster_id}   // exactly the POST .../trade-analyzer/multi body
+idea_count       // ideas found, for every tier
+locked           // true for Free when ideas exist (ideas is then [])
+upsell, is_premium, search {partners, candidates, verified, variants, truncated, reason, bar}, trade_window
+```
+
+## Free vs Pro and capacity
+
+- Ideas are Pro. Free gets `locked: true`, `idea_count` and an `upsell`, never any
+  idea detail. With no ideas nobody sees a lock.
+- One compute is shared by both tiers: a Redis single-flight cache keyed by league,
+  user, roster, lens and a 120s bucket (the Trade Hub TTL), with the tier filter
+  applied outside it.
+- `heavy` admission lane (503 `server_busy` + `Retry-After`); per-user rate limit
+  `MULTI_TEAM_IDEAS_RATE_MAX` (default 6 per `MULTI_TEAM_IDEAS_RATE_WINDOW_SECONDS`,
+  default 60) returns 429. After the league's trade deadline: empty with
+  `reason: trade_deadline_passed`.
+
+## Clients
+
+Trade Hub shows a "3-team ideas" section (web `MultiTeamIdeasSection`, app
+`MultiTeamIdeasSection`). "Open in Analyzer" opens the multi-team builder prefilled
+and grades it once: web `/trade-analyzer/{league}?multi=type~from~to~id,...`, app
+`Trades` route param `multiPrefill` (shared helpers in `lib/multiTeamIdeas.ts`).
+Only ids travel; the Analyzer regrades. "Share the pitch" uses the same pitch card
+as the Analyzer.

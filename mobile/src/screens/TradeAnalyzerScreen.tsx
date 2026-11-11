@@ -68,6 +68,8 @@ import { formatTradeGain } from '../lib/liveDraft';
 import { idpTradePoolPlayers, tradePositionOptions } from '../lib/idpPresentation';
 import { quickAddPlacement } from '../lib/tradeShortcuts';
 import { offerPrefillKey, resolvePrefill, type OfferPrefill } from '../lib/tradeOffer';
+import { prefillKey } from '../lib/multiTeamIdeas';
+import type { MultiTransfer } from '../lib/multiTeamTrade';
 import { useExperienceCopy } from '../context/ExperienceLevelContext';
 import BeginnerHelp from '../components/BeginnerHelp';
 import ValuesCredit from '../components/ValuesCredit';
@@ -93,6 +95,8 @@ interface Props {
   /** A built offer ("Build an offer"): loaded once into both sides so it can
    * be tweaked, regraded and shared. Ids not in this league are skipped. */
   offerPrefill?: OfferPrefill;
+  /** A 3-team trade (a Trade Hub idea): opens the Multi-team builder with it loaded and graded. */
+  multiPrefill?: MultiTransfer[];
 }
 type Side = 'send' | 'receive';
 type AssetType = 'players' | 'picks';
@@ -175,7 +179,7 @@ interface OtherTeam {
 
 const ALL_TEAMS_ID = '__all__';
 
-export default function TradeAnalyzerScreen({ leagueId, leagueName, navigation, quickAddPlayer, offerPrefill }: Props) {
+export default function TradeAnalyzerScreen({ leagueId, leagueName, navigation, quickAddPlayer, offerPrefill, multiPrefill }: Props) {
 
   const { colors } = useThemeMode();
   const styles = useMemo(() => createStyles(colors), [colors]);
@@ -188,7 +192,12 @@ export default function TradeAnalyzerScreen({ leagueId, leagueName, navigation, 
   const [myTeam, setMyTeam] = useState<{ name: string; avatarId: string | null }>({ name: 'Your team', avatarId: null });
   // Two teams (Full Analysis / Quick Compare) or a 3 to 6 team trade. Imported
   // (ESPN, MFL, ...) leagues only get the two team Analyzer.
-  const [multiMode, setMultiMode] = useState(false);
+  const [multiMode, setMultiMode] = useState(Boolean(multiPrefill?.length));
+  const multiPrefillKey = multiPrefill?.length ? prefillKey(multiPrefill) : '';
+  // A new idea opened while this tab is already mounted switches to Multi-team.
+  useEffect(() => {
+    if (multiPrefillKey) setMultiMode(true);
+  }, [multiPrefillKey]);
   const multiTeamAvailable = !isEspnLeagueId(leagueId);
   const [selectedTeamId, setSelectedTeamId] = useState<string>(ALL_TEAMS_ID);
   const [rankings, setRankings] = useState<RankedPlayer[]>([]);
@@ -248,6 +257,7 @@ export default function TradeAnalyzerScreen({ leagueId, leagueName, navigation, 
   prefillIdsRef.current = [
     quickAddPlayer?.player_id ?? '',
     ...(offerPrefill ? [...offerPrefill.send, ...offerPrefill.receive] : []),
+    ...(multiPrefill ?? []).filter((t) => t.type === 'player').map((t) => t.id),
   ].filter(Boolean);
 
   useEffect(() => {
@@ -785,6 +795,8 @@ export default function TradeAnalyzerScreen({ leagueId, leagueName, navigation, 
             />
           </View>
           <MultiTeamTradePanel
+            key={multiPrefillKey || 'builder'}
+            prefill={multiPrefill}
             leagueId={leagueId}
             leagueName={leagueName}
             myRosterId={myRosterId}

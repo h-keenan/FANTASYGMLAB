@@ -53,7 +53,7 @@ DEFAULT_LIGHT_MAX_WAIT_SECONDS = 10.0
 _HEAVY = re.compile(
     r"^/v1/leagues/[^/]+/(?:"
     r"dashboard|matchup/what-if|"
-    r"trade-hub(?:/.*)?|trade-finder|trade-target|trade-analyzer(?:/multi)?|all-trades|"
+    r"trade-hub(?:/.*)?|trade-ideas/multi|trade-finder|trade-target|trade-analyzer(?:/multi)?|all-trades|"
     r"team-rankings|team-profiles|gm-plan|"
     r"games/season-sim(?:/what-if)?|trade-odds-effect|"
     r"recap|history|storylines|managers/.*"

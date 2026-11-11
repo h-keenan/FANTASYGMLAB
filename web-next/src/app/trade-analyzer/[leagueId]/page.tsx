@@ -20,6 +20,7 @@ import { ErrorState, reloadPage } from "@/components/ErrorState";
 import { fetchMissingPlayersById, mergeSearchMatches } from "@/lib/leaguePlayerSearch";
 import { bridgeTradeFromSearch } from "@/lib/tradeBridge";
 import { offerPrefillFromSearch } from "@/lib/tradeOffer";
+import { decodePrefill } from "@/lib/multiTeamIdeas";
 import { LoadingScreen } from "@/components/LoadingScreen";
 
 interface LoadedData {
@@ -47,12 +48,17 @@ export default function TradeAnalyzerPage() {
   const bridgeTrade = bridgeTradeFromSearch(`a=${searchParams.get("a") ?? ""}&b=${searchParams.get("b") ?? ""}`);
   // "Build an offer" hand-off: ?send=&receive=&sendPicks=&receivePicks= (lib/tradeOffer.ts).
   const offerPrefill = offerPrefillFromSearch(searchParams);
+  // A Trade Hub 3-team idea: ?multi=type~from~to~id,... (lib/multiTeamIdeas.ts). Memoized on the raw
+  // string so the player-id list below stays stable.
+  const multiRaw = searchParams.get("multi") ?? "";
+  const multiPrefill = useMemo(() => decodePrefill(multiRaw), [multiRaw]);
   const { lens, lensReady } = useValuationLens(leagueId);
 
   const urlPlayerIdsKey = [
     quickAddPlayerId ?? "",
     ...(bridgeTrade ? [...bridgeTrade.a, ...bridgeTrade.b] : []),
     ...(offerPrefill ? [...offerPrefill.send, ...offerPrefill.receive] : []),
+    ...multiPrefill.filter((t) => t.type === "player").map((t) => t.id),
   ].join(",");
   const urlPlayerIds = useMemo(() => urlPlayerIdsKey.split(",").filter(Boolean), [urlPlayerIdsKey]);
 
@@ -139,6 +145,7 @@ export default function TradeAnalyzerPage() {
       quickAddPlayerId={quickAddPlayerId}
       bridgeTrade={bridgeTrade}
       offerPrefill={offerPrefill}
+      multiPrefill={multiPrefill}
           lens={lens}
     />
   );

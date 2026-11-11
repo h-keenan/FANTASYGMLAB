@@ -16,6 +16,7 @@ import { FREE_LEAGUE_CAP_MESSAGE, isFreeLeagueLockedBody } from "./freeLeagueCap
 import { isPrivacyMode, maskIfPrivate, unmaskOutgoing } from "./privacy";
 import { billingRequest, type BillingFunction } from "./billingClient";
 import type { MultiTeamTradeResponse, MultiTransfer } from "./multiTeamTrade";
+import type { MultiTeamIdeasResponse } from "./multiTeamIdeas";
 import { isServerBusyError, parseRetryAfterSeconds, withServerBusyRetry } from "./busyRetry";
 
 /**
@@ -4359,6 +4360,13 @@ export const api = {
   // strategy/lens default to the same "retool"/"Dynasty" GET .../trade-hub
   // itself defaults to. `ad_unlocks` is a mobile-only reward mechanic (see
   // that endpoint's docstring) — web always passes 0.
+  // 3-team trade ideas (Pro; Free gets a locked count). A GET, so a busy (503)
+  // answer is retried with the server's hint like every other read.
+  getMultiTeamTradeIdeas: (leagueId: string, lens: string = "Dynasty") =>
+    authorizedRequest<MultiTeamIdeasResponse>(
+      `/v1/leagues/${encodeURIComponent(leagueId)}/trade-ideas/multi?lens=${encodeURIComponent(lens)}`,
+    ),
+
   getTradeHub: (leagueId: string, strategy: string = "retool", lens: string = "Dynasty") =>
     authorizedRequest<TradeHubResponse>(
       `/v1/leagues/${encodeURIComponent(leagueId)}/trade-hub?strategy=${encodeURIComponent(strategy)}&lens=${encodeURIComponent(lens)}&ad_unlocks=0`,

@@ -6,6 +6,7 @@ import { AccentCard } from "@/components/AccentCard";
 import { Button } from "@/components/Button";
 import { ErrorState } from "@/components/ErrorState";
 import { PageTitle } from "@/components/PageTitle";
+import { PitchShareButton } from "@/components/MultiTeamPitchButton";
 import { PickGroupList } from "@/components/PickGroupList";
 import { PillRow } from "@/components/PillRow";
 import { PremiumUpsellCard } from "@/components/PremiumUpsellCard";
@@ -15,6 +16,7 @@ import { ToneBadge } from "@/components/ToneBadge";
 import { ExchangeSide, TradeAssetRow } from "@/components/TradeAssetExchange";
 import { TradesTabBar } from "@/components/TradesTabBar";
 import { ValuesCredit } from "@/components/ValuesCredit";
+import { prefillToBuilder } from "@/lib/multiTeamIdeas";
 import { api, type DraftPickAsset, type RankedPlayer, type TeamProfile, type TradeAsset } from "@/lib/api";
 import { trackUse } from "@/lib/analytics";
 import { isServerBusyError } from "@/lib/busyRetry";
@@ -27,7 +29,6 @@ import {
   assetsLine,
   buildMatrix,
   buildShareModel,
-  buildShareText,
   buildTransfers,
   builderIssue,
   flowReason,
@@ -49,14 +50,11 @@ import {
   type MultiAsset,
   type MultiTeamResult,
   type MultiTeamTradeResponse,
+  type MultiTransfer,
   type SemanticTone,
 } from "@/lib/multiTeamTrade";
-import { isCompletedShare } from "@/lib/shareImage";
-import { shareCardCacheKey } from "@/lib/shareCard/cacheKey";
-import { isPrivacyMode } from "@/lib/privacy";
 import { pickToTradeAsset, playerToTradeAsset } from "@/lib/tradeAnalyzerPresentation";
 import { useSheetDragDismiss } from "@/lib/useSheetDragDismiss";
-import { useShareImage } from "@/lib/useShareImage";
 
 /**
  * Multi-team (3 to 6 team) Trade Analyzer. Two separate surfaces:
@@ -278,27 +276,6 @@ function ResultsView({ response, leagueName, leagueId }: { response: MultiTeamTr
 /** The share surface: a pitch to the other managers, not the private read above. */
 function SharePitch({ response, leagueId, leagueName }: { response: MultiTeamTradeResponse; leagueId: string; leagueName: string }) {
   const model = useMemo(() => buildShareModel(response), [response]);
-  const text = useMemo(() => buildShareText(model, leagueName), [model, leagueName]);
-  const [copied, setCopied] = useState(false);
-  const share = useShareImage({
-    cacheKey: shareCardCacheKey({ multi: model, leagueName, privacy: isPrivacyMode() }),
-    build: async () => {
-      const { renderMultiTradeCardBlob } = await import("@/lib/shareCard/clientRender");
-      return renderMultiTradeCardBlob(model, leagueName);
-    },
-    filename: "fantasydesk-multi-team-trade.png",
-    text,
-    title: `${model.teams.length}-team trade`,
-    itemKind: "multi_team_trade",
-    leagueId,
-    onOutcome: (outcome) => {
-      if (isCompletedShare(outcome)) trackUse("trade_analyzer", "shared", { leagueId, props: { item_kind: "multi_team" } });
-      if (outcome === "copied" || outcome === "copied-image" || outcome === "saved-image") {
-        setCopied(true);
-        setTimeout(() => setCopied(false), 2000);
-      }
-    },
-  });
   return (
     <div className="glass-surface flex flex-col gap-3 p-4" data-testid="multi-team-share">
       <h3 className="text-base font-black">Pitch it to the other managers</h3>
@@ -314,16 +291,7 @@ function SharePitch({ response, leagueId, leagueName }: { response: MultiTeamTra
           </li>
         ))}
       </ul>
-      <div className="flex items-center gap-2">
-        <Button size="sm" onClick={share.onClick} disabled={share.busy}>
-          {copied ? "Copied!" : share.label("Share the pitch")}
-        </Button>
-        {share.status ? (
-          <span role="status" className="text-xs" style={{ color: "var(--color-text-muted)" }}>
-            {share.status}
-          </span>
-        ) : null}
-      </div>
+      <PitchShareButton response={response} leagueId={leagueId} leagueName={leagueName} />
     </div>
   );
 }
@@ -362,6 +330,7 @@ export function MultiTeamTradeContent({
   teamProfiles,
   lens,
   modeToggle,
+  prefill,
 }: {
   leagueId: string;
   leagueName: string;
@@ -373,9 +342,14 @@ export function MultiTeamTradeContent({
   lens: string;
   /** The Two teams / Multi-team toggle, rendered under the title. */
   modeToggle: React.ReactNode;
+  /** A trade to load into the builder and grade on open (a Trade Hub 3-team idea, `?multi=`). The
+   * Analyzer regrades it: only ids travel, never a value or verdict. */
+  prefill?: MultiTransfer[];
 }) {
-  const [participants, setParticipants] = useState<string[]>(() => (myRosterId ? [myRosterId] : []));
-  const [assets, setAssets] = useState<BuilderAsset[]>([]);
+  const [participants, setParticipants] = useState<string[]>(() =>
+    prefill?.length ? prefillToBuilder(prefill, myRosterId).participants : myRosterId ? [myRosterId] : [],
+  );
+  const [assets, setAssets] = useState<BuilderAsset[]>(() => (prefill?.length ? (prefillToBuilder(prefill, myRosterId).assets as BuilderAsset[]) : []));
   const [picker, setPicker] = useState<PickerState | null>(null);
   const [pending, setPending] = useState<BuilderAsset | null>(null);
   const [search, setSearch] = useState("");
@@ -506,6 +480,15 @@ export function MultiTeamTradeContent({
   };
 
   const matrix = useMemo(() => buildMatrix(ordered, assets), [ordered, assets]);
+
+  // A prefilled trade is graded once on open, the same request a tap on Analyze makes.
+  const autoAnalyzed = useRef(false);
+  useEffect(() => {
+    if (!prefill?.length || autoAnalyzed.current) return;
+    autoAnalyzed.current = true;
+    void analyze();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
   const { sheetRef, sheetStyle } = useSheetDragDismiss({ onDismiss: () => setPending(null), enabled: Boolean(pending) });
 
   useEffect(() => {
