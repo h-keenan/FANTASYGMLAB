@@ -5,7 +5,7 @@ from __future__ import annotations
 
 import numpy as np
 
-from modules.sim.types import LeagueSettings, LeagueSnapshot, SimPlayer, SimTeam
+from modules.sim.types import LeagueSettings, LeagueSnapshot, SimPick, SimPlayer, SimTeam
 
 _ROSTER_SHAPE = {"QB": 3, "RB": 7, "WR": 8, "TE": 3, "K": 1}
 _BASE_MEAN = {"QB": 19.0, "RB": 13.0, "WR": 12.5, "TE": 9.0, "K": 7.5}
@@ -40,6 +40,8 @@ def build_synthetic_snapshot(
     start_week: int = 1,
     slots: tuple[str, ...] = ("QB", "RB", "RB", "WR", "WR", "TE", "FLEX", "K"),
     playoff_teams: int = 6,
+    byes: bool = True,
+    pick_rounds: int = 3,
 ) -> LeagueSnapshot:
     rng = np.random.default_rng(seed)
     players: dict[str, SimPlayer] = {}
@@ -84,7 +86,17 @@ def build_synthetic_snapshot(
         slots=slots, start_week=start_week, regular_season_end=weeks, playoff_teams=playoff_teams,
         trade_deadline_week=max(start_week, int(weeks * 0.7)), league_name="Synthetic League", season="2026",
     )
+    # Byes spread over weeks 4-11 (two NFL teams per bye week), capped to the
+    # season so short synthetic seasons still have some.
+    last_bye = max(start_week, min(11, weeks - 1))
+    span = max(1, last_bye - 3)
+    bye_weeks = {t: 4 + (i // 2) % span for i, t in enumerate(NFL_TEAMS)} if byes else {}
+    picks = tuple(
+        SimPick(season=2027 + y, round=r, orig=tid, owner=tid)
+        for y in range(2) for r in range(1, pick_rounds + 1) for tid in tids
+    )
     return LeagueSnapshot(
         league_id="synthetic", settings=settings, teams=team_objs, players=players,
         free_agents=tuple(free_agents), schedule=schedule, mode="full",
+        bye_weeks=bye_weeks, picks=picks,
     )

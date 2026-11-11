@@ -26,8 +26,9 @@ from modules.sim.personas import (
     assign_personas,
     user_params,
 )
+from modules.sim.picks import FUTURE_SLOT_FRAC, pick_label, pick_market_value
 from modules.sim.rng import WorldRng
-from modules.sim.types import POSITIONS, LeagueSnapshot, Strategy
+from modules.sim.types import POSITIONS, LeagueSnapshot, Strategy, is_pick_id
 from modules.sim.version import ENGINE_VERSION
 
 NEED_K = 8.0  # value units per projected weekly lineup point
@@ -37,6 +38,7 @@ CANDIDATES_PER_SIDE = 4
 TEAM_CORRELATION = 0.15  # shared NFL-team factor in player score draws
 INJURY_RATE = {"QB": 0.02, "RB": 0.06, "WR": 0.045, "TE": 0.04, "K": 0.005}
 FORM_STEP = 0.03
+PICK_HORIZON_SLOPE = 0.8  # picks are future value: rebuilders pay up, contenders discount
 
 
 def _convex(worth: float) -> float:
@@ -119,6 +121,10 @@ class _World:
         self.form = [1.0] * len(players)
         self.out = [p.injury_weeks for p in players]
         self.mean_arr = np.array(self.mean0, dtype=float)
+        # Regular-season bye week per player (0 = none / unknown).
+        self.bye_arr = np.array(
+            [int(snapshot.bye_weeks.get(p.nfl_team, 0)) for p in players], dtype=int
+        )
 
         self.rosters: dict[str, list[str]] = {t.tid: list(t.roster) for t in self.teams}
         self.cap = {tid: len(r) for tid, r in self.rosters.items()}
@@ -134,6 +140,7 @@ class _World:
 
         self.personas, self.params = self._setup_managers()
         self.protected = set(strategy.protected_player_ids)
+        self._setup_picks()
 
         # user metrics
         self.user_pts_started = 0.0
@@ -175,6 +182,30 @@ class _World:
         self.avg_age = avg_age
         return personas, params
 
+    def _setup_picks(self) -> None:
+        """Pick ownership is world state that only trades change. Values are
+        fixed at setup from the original team's opening strength."""
+
+        picks = self.snap.picks
+        self.pick_owner: dict[str, str] = {p.pid: p.owner for p in picks}
+        first = min((p.season for p in picks), default=0)
+        n = len(self.tids)
+        self.pick_value: dict[str, float] = {}
+        self.pick_name: dict[str, str] = {}
+        for p in picks:
+            years_out = p.season - first
+            # power_pct: 1 = strongest, so the weakest team picks first.
+            frac = (self.power_pct[p.orig] if years_out == 0 else FUTURE_SLOT_FRAC)
+            self.pick_value[p.pid] = pick_market_value(p.round, frac, years_out, n)
+            via = "" if p.orig == p.owner else f" (via {self.teams[self.team_index[p.orig]].name})"
+            self.pick_name[p.pid] = pick_label(p.season, p.round) + via
+        self.team_picks_view = lambda tid: sorted(
+            pid for pid, owner in self.pick_owner.items() if owner == tid
+        )
+
+    def _pick_worth(self, params: TeamParams, pid: str) -> float:
+        return self.pick_value[pid] * (1.0 + PICK_HORIZON_SLOPE * (0.55 - params.horizon))
+
     # ---------------------------------------------------------------- helpers
 
     def proj(self, pid: str) -> float:
@@ -198,6 +229,8 @@ class _World:
         return pick_lineup(self.plan, self._lineup_entries(roster))[1]
 
     def worth(self, params: TeamParams, pid: str) -> float:
+        if is_pick_id(pid):
+            return self._pick_worth(params, pid)
         i = self.idx[pid]
         pos = self.pos[pid]
         horizon = params.horizon
@@ -292,7 +325,9 @@ class _World:
     ) -> float:
         params = self.params[tid]
         give_set = set(give)
-        new_roster = [p for p in self.rosters[tid] if p not in give_set] + list(get)
+        new_roster = [p for p in self.rosters[tid] if p not in give_set] + [
+            p for p in get if not is_pick_id(p)
+        ]
         dval = sum(_convex(self.worth(params, p)) for p in get) - sum(
             _convex(self.worth(params, p)) for p in give
         )
@@ -347,8 +382,12 @@ class _World:
                 continue
             pbase = self._lineup_total(self.rosters[partner])
             noise = self._accept_noise(week, partner)
-            mine = [p for p in self.rosters[tid] if p not in self.protected_for(tid) and self.pos[p] != "K"]
-            theirs = [p for p in self.rosters[partner] if p not in self.protected_for(partner) and self.pos[p] != "K"]
+            mine = [
+                p for p in self.rosters[tid] if p not in self.protected_for(tid) and self.pos[p] != "K"
+            ] + self.team_picks_view(tid)
+            theirs = [
+                p for p in self.rosters[partner] if p not in self.protected_for(partner) and self.pos[p] != "K"
+            ] + self.team_picks_view(partner)
             # What each side would happily send: assets the other values most
             # relative to how the sender values them.
             gives = sorted(
@@ -388,11 +427,17 @@ class _World:
     ) -> None:
         a, b = self.rosters[tid], self.rosters[partner]
         for p in give:
-            a.remove(p)
+            if is_pick_id(p):
+                self.pick_owner[p] = partner
+            else:
+                a.remove(p)
+                b.append(p)
         for p in get:
-            b.remove(p)
-        a.extend(get)
-        b.extend(give)
+            if is_pick_id(p):
+                self.pick_owner[p] = tid
+            else:
+                b.remove(p)
+                a.append(p)
         self.trades_made[tid] += 1
         self.trades_made[partner] += 1
         self._event(
@@ -423,6 +468,8 @@ class _World:
     # ----------------------------------------------------------------- weeks
 
     def _asset(self, pid: str) -> dict[str, Any]:
+        if is_pick_id(pid):
+            return {"player_id": pid, "name": self.pick_name[pid], "pos": "", "kind": "pick"}
         return {"player_id": pid, "name": self.name[pid], "pos": self.pos[pid]}
 
     def _event(self, week: int, kind: str, **fields: Any) -> None:
@@ -439,21 +486,34 @@ class _World:
         pts = np.maximum(pts, 0.0)
         out = np.array(self.out) > 0
         pts[out] = 0.0
+        pts[self.bye_arr == week] = 0.0  # a player on bye scores nothing
         return pts
 
-    def _lineup_for(self, tid: str) -> Assignment:
+    def _on_bye(self, pid: str, week: int) -> bool:
+        return int(self.bye_arr[self.idx[pid]]) == week
+
+    def _lineup_for(self, tid: str, week: int) -> Assignment:
+        """The lineup that actually plays ``week``: healthy players only, and
+        nobody on bye. A bye starter is replaced by the best eligible bench
+        player. A set-and-forget user keeps their standing lineup (injuries
+        still re-fill slots, as before); the bye substitute plays this week
+        only, so the starter returns afterwards."""
+
         roster = self.rosters[tid]
-        entries = [(self.proj(p), p, self.pos[p]) for p in roster if self.out[self.idx[p]] == 0]
+        healthy = [(self.proj(p), p, self.pos[p]) for p in roster if self.out[self.idx[p]] == 0]
+        available = [e for e in healthy if not self._on_bye(e[1], week)]
         if tid == self.user_tid and not self.strategy.lineup_auto_set:
-            self.user_assign = carry_lineup(self.plan, self.user_assign, entries)
-            return self.user_assign
-        assignment = pick_lineup(self.plan, entries)[0]
+            self.user_assign = carry_lineup(self.plan, self.user_assign, healthy)
+            if len(available) == len(healthy):
+                return self.user_assign
+            return carry_lineup(self.plan, self.user_assign, available)
+        assignment = pick_lineup(self.plan, available)[0]
         if tid == self.user_tid:
             self.user_assign = assignment
         return assignment
 
-    def _score_team(self, tid: str, pts: np.ndarray) -> float:
-        return sum(float(pts[self.idx[pid]]) for _, pid in self._lineup_for(tid) if pid)
+    def _score_team(self, tid: str, pts: np.ndarray, week: int) -> float:
+        return sum(float(pts[self.idx[pid]]) for _, pid in self._lineup_for(tid, week) if pid)
 
     def _optimal_actual(self, tid: str, pts: np.ndarray) -> float:
         entries = [
@@ -462,7 +522,7 @@ class _World:
         return pick_lineup(self.plan, entries)[1]
 
     def _play_week(self, week: int, pairs: tuple[tuple[str, str], ...], pts: np.ndarray) -> dict[str, Any]:
-        scores = {tid: self._score_team(tid, pts) for tid in self.tids}
+        scores = {tid: self._score_team(tid, pts, week) for tid in self.tids}
         games = []
         for home, away in pairs:
             hs, aws = scores[home], scores[away]
@@ -532,7 +592,7 @@ class _World:
                 if a is None or b is None:
                     nxt.append(a or b)
                     continue
-                sa, sb = self._score_team(a, pts), self._score_team(b, pts)
+                sa, sb = self._score_team(a, pts, week), self._score_team(b, pts, week)
                 winner = a if (sa > sb or (sa == sb and seeds.index(a) < seeds.index(b))) else b
                 games.append({"home": a, "away": b, "home_pts": round(sa, 1), "away_pts": round(sb, 1), "winner": winner})
                 nxt.append(winner)

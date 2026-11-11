@@ -44,7 +44,7 @@ FILE_REAL_MODULES = {
 EXTERNAL_IMPORTERS = {"services/mobile_api_service.py": {"modules.sim.api"}}
 PURE_ENGINE_FILES = [
     "engine.py", "analysis.py", "lineup.py", "personas.py", "rng.py", "types.py", "synthetic.py",
-    "store.py", "version.py", "__init__.py",
+    "store.py", "version.py", "__init__.py", "picks.py",
 ]
 
 

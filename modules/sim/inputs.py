@@ -17,6 +17,7 @@ Rules, enforced by tests/test_sim_isolation.py:
 
 from __future__ import annotations
 
+import csv
 import sqlite3
 from pathlib import Path
 from typing import Any, Mapping, Protocol
@@ -28,11 +29,22 @@ from modules.sim.types import (
     LeagueSettings,
     LeagueSnapshot,
     SimInputsError,
+    SimPick,
     SimPlayer,
     SimTeam,
 )
 
 PLAYERS_DB_DEFAULT = "data/players.db"
+# nflverse schedule cache the real app maintains. Read-only here: the sim never
+# calls modules.nfl_schedule.load_games (it can fetch and rewrite this file).
+GAMES_CSV_DEFAULT = "data/nfl_games.csv"
+# Relocated franchises; matches modules.nfl_schedule.TEAM_CODE_ALIASES so the
+# schedule's codes line up with the player table's.
+_TEAM_ALIASES = {"LA": "LAR", "OAK": "LV", "SD": "LAC", "STL": "LAR"}
+_MIN_SCHEDULED_TEAMS = 28  # a schedule missing most of the league is not usable
+_PICK_SEASONS_AHEAD = 2  # next two rookie drafts
+_DEFAULT_DRAFT_ROUNDS = 4
+_MAX_DRAFT_ROUNDS = 7
 MODES = ("remaining", "full")
 _SLOT_ALIASES = {"WRRB_FLEX": "FLEX", "WRRB": "FLEX"}
 _FA_POOL_BY_POS = {"QB": 20, "RB": 45, "WR": 55, "TE": 25, "K": 8}
@@ -80,11 +92,13 @@ class RealSimInputs:
         self,
         players_db_path: str = PLAYERS_DB_DEFAULT,
         *,
+        games_csv_path: str = GAMES_CSV_DEFAULT,
         sleeper_module: Any = None,
         projections_module: Any = None,
         playoff_module: Any = None,
     ) -> None:
         self.players_db_path = players_db_path
+        self.games_csv_path = games_csv_path
         self._sleeper = sleeper_module
         self._projections = projections_module
         self._playoff = playoff_module
@@ -126,7 +140,6 @@ class RealSimInputs:
         slots, ignored = normalize_slots(league.get("roster_positions"))
         if ignored:
             notes.append("def_idp_slots_not_modeled")
-        notes.append("bye_weeks_not_modeled")
 
         current_week = _int(settings_raw.get("leg"))
         playoff_start = _int(settings_raw.get("playoff_week_start"), 15) or 15
@@ -160,6 +173,13 @@ class RealSimInputs:
         if fallbacks:
             notes.append(f"projection_fallback_players:{fallbacks}")
 
+        bye_weeks = self._bye_weeks(_int(league.get("season")))
+        if not bye_weeks:
+            notes.append("bye_weeks_unavailable")
+        picks = self._draft_picks(sleeper, league_id, league, settings_raw, tids)
+        if not picks:
+            notes.append("draft_picks_unavailable")
+
         teams = []
         for roster in rosters:
             rid = str(roster.get("roster_id"))
@@ -184,7 +204,7 @@ class RealSimInputs:
                 league_name=str(league.get("name") or ""), season=str(league.get("season") or ""),
             ),
             teams=tuple(teams), players=players, free_agents=fa, schedule=schedule,
-            mode=effective_mode, notes=tuple(notes),
+            mode=effective_mode, notes=tuple(notes), bye_weeks=bye_weeks, picks=picks,
         )
         snapshot.validate()
         return snapshot
@@ -233,6 +253,79 @@ class RealSimInputs:
                 estimated.append(week)
             schedule.append(pairs)
         return tuple(schedule), estimated
+
+    def _bye_weeks(self, season: int) -> dict[str, int]:
+        """NFL team -> bye week from the cached nflverse schedule, read-only.
+
+        A team's bye is the one regular-season week (within the weeks the NFL
+        actually played that season) it has no game. Anything that does not look
+        like a complete schedule yields no byes at all rather than a guess.
+        """
+
+        path = Path(self.games_csv_path)
+        if not season or not path.exists():
+            return {}
+        weeks_played: dict[str, set[int]] = {}
+        league_weeks: set[int] = set()
+        try:
+            with path.open(newline="", encoding="utf-8") as handle:
+                for row in csv.DictReader(handle):
+                    if row.get("season") != str(season) or row.get("game_type") != "REG":
+                        continue
+                    week = _int(row.get("week"))
+                    if week <= 0:
+                        continue
+                    league_weeks.add(week)
+                    for col in ("home_team", "away_team"):
+                        team = (row.get(col) or "").strip().upper()
+                        if team:
+                            team = _TEAM_ALIASES.get(team, team)
+                            weeks_played.setdefault(team, set()).add(week)
+        except (OSError, csv.Error, UnicodeDecodeError):
+            return {}
+        if len(weeks_played) < _MIN_SCHEDULED_TEAMS or not league_weeks:
+            return {}
+        out: dict[str, int] = {}
+        for team, played in weeks_played.items():
+            missing = sorted(league_weeks - played)
+            if len(missing) == 1:  # exactly one open week; otherwise unknown
+                out[team] = missing[0]
+        for old, current in _TEAM_ALIASES.items():  # player table may use either code
+            if current in out:
+                out.setdefault(old, out[current])
+        return out
+
+    @staticmethod
+    def _draft_picks(sleeper, league_id, league, settings_raw, tids) -> tuple[SimPick, ...]:
+        """Every team's next-two-drafts picks with real (traded) ownership.
+        Sleeper lists only traded picks; everything else is held by the team it
+        belongs to. No league season means no pick years: no picks."""
+
+        season = _int(league.get("season"))
+        if not season:
+            return ()
+        rounds = _int(settings_raw.get("draft_rounds"), _DEFAULT_DRAFT_ROUNDS) or _DEFAULT_DRAFT_ROUNDS
+        rounds = max(1, min(rounds, _MAX_DRAFT_ROUNDS))
+        # In the pre-draft offseason the league's own season is still undrafted.
+        first = season if str(league.get("status") or "") == "pre_draft" else season + 1
+        years = range(first, first + _PICK_SEASONS_AHEAD)
+        owner: dict[tuple[int, int, str], str] = {}
+        try:
+            traded = sleeper.get_traded_picks(league_id) or []
+        except Exception:
+            traded = []
+        known = set(tids)
+        for entry in traded:
+            if not isinstance(entry, Mapping):
+                continue
+            key = (_int(entry.get("season")), _int(entry.get("round")), str(entry.get("roster_id")))
+            holder = str(entry.get("owner_id"))
+            if key[0] in years and 1 <= key[1] <= rounds and key[2] in known and holder in known:
+                owner[key] = holder
+        return tuple(
+            SimPick(season=y, round=r, orig=t, owner=owner.get((y, r, t), t))
+            for y in years for r in range(1, rounds + 1) for t in sorted(tids)
+        )
 
     def _read_players_table(self) -> list[dict[str, Any]]:
         path = Path(self.players_db_path)

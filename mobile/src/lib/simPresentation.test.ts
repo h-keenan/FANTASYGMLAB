@@ -120,3 +120,16 @@ test('world notes become plain caveats', () => {
   assert.equal(lines[1], 'The schedule for weeks 9,10 is estimated.');
   assert.equal(lines[2], '4 players use estimated scoring.');
 });
+
+test('new bye and pick caveats and pick assets read cleanly', () => {
+  const lines = simNoteMessages(['bye_weeks_unavailable', 'draft_picks_unavailable']);
+  assert.equal(lines[0], 'Bye weeks could not be loaded, so no player is on bye.');
+  assert.equal(lines[1], 'Draft picks are not part of trades in this simulation.');
+  const r = result({
+    events: [
+      { week: 8, seq: 1, type: 'trade', team: '1', partner: '2', involves_user: true, gives: [{ name: 'A', pos: 'RB' }], gets: [{ name: '2027 round 1 pick', pos: '', kind: 'pick' }] },
+    ],
+  });
+  const [row] = simTimeline(r.events, simTeamNames(r));
+  assert.equal(row.detail, 'Sent A (RB), got 2027 round 1 pick.');
+});
