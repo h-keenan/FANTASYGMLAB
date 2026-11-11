@@ -15,6 +15,7 @@ import type {
 import { FREE_LEAGUE_CAP_MESSAGE, isFreeLeagueLockedBody } from "./freeLeagueCap";
 import { isPrivacyMode, maskIfPrivate, unmaskOutgoing } from "./privacy";
 import { billingRequest, type BillingFunction } from "./billingClient";
+import type { MultiTeamTradeResponse, MultiTransfer } from "./multiTeamTrade";
 import { isServerBusyError, parseRetryAfterSeconds, withServerBusyRetry } from "./busyRetry";
 
 /**
@@ -54,14 +55,14 @@ function reportApiFailure(status: number): void {
 
 async function performRequest<T>(
   path: string,
-  init: { method?: "GET" | "POST" | "PUT" | "PATCH" | "DELETE"; jsonBody?: unknown; signal?: AbortSignal } | undefined,
+  init: { method?: "GET" | "POST" | "PUT" | "PATCH" | "DELETE"; jsonBody?: unknown; signal?: AbortSignal; idempotent?: boolean } | undefined,
   accessToken: string,
 ): Promise<T> {
   // Server load shedding (503 server_busy + Retry-After): idempotent reads
   // wait the hinted time and retry a couple of times before surfacing.
   try {
     return await withServerBusyRetry(() => performRequestOnce<T>(path, init, accessToken), {
-      canRetry: (init?.method ?? "GET") === "GET",
+      canRetry: (init?.method ?? "GET") === "GET" || init?.idempotent === true,
       signal: init?.signal,
     });
   } catch (error) {
@@ -74,7 +75,7 @@ async function performRequest<T>(
 
 async function performRequestOnce<T>(
   path: string,
-  init: { method?: "GET" | "POST" | "PUT" | "PATCH" | "DELETE"; jsonBody?: unknown; signal?: AbortSignal } | undefined,
+  init: { method?: "GET" | "POST" | "PUT" | "PATCH" | "DELETE"; jsonBody?: unknown; signal?: AbortSignal; idempotent?: boolean } | undefined,
   accessToken: string,
 ): Promise<T> {
   const controller = new AbortController();
@@ -138,7 +139,7 @@ async function performRequestOnce<T>(
 
 async function authorizedRequest<T>(
   path: string,
-  init?: { method?: "GET" | "POST" | "PUT" | "PATCH" | "DELETE"; jsonBody?: unknown; signal?: AbortSignal },
+  init?: { method?: "GET" | "POST" | "PUT" | "PATCH" | "DELETE"; jsonBody?: unknown; signal?: AbortSignal; idempotent?: boolean },
 ): Promise<T> {
   const { data } = await supabase.auth.getSession();
   const accessToken = data.session?.access_token;
@@ -4698,6 +4699,26 @@ export const api = {
           strategy: body.strategy ?? "retool",
           lens: body.lens ?? "Dynasty",
           partner_roster_id: body.partnerRosterId ?? "",
+        },
+      },
+    ),
+
+  // 3 to 6 team trade, graded for every team (docs/multi-team-trade-api.md).
+  // Not counted against the free weekly limit, so a busy (503) answer is
+  // safe to retry even though it is a POST.
+  postMultiTeamTradeAnalyzer: (
+    leagueId: string,
+    body: { transfers: MultiTransfer[]; perspectiveRosterId?: string; lens?: string },
+  ) =>
+    authorizedRequest<MultiTeamTradeResponse>(
+      `/v1/leagues/${encodeURIComponent(leagueId)}/trade-analyzer/multi`,
+      {
+        method: "POST",
+        idempotent: true,
+        jsonBody: {
+          transfers: body.transfers,
+          perspective_roster_id: body.perspectiveRosterId ?? "",
+          lens: body.lens ?? "Dynasty",
         },
       },
     ),

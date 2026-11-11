@@ -59,6 +59,8 @@ import { ShareToCommunityToggle } from "@/components/ShareToCommunityToggle";
 import { NextSteps } from "@/components/NextSteps";
 import { ValuesCredit } from "@/components/ValuesCredit";
 import { PageTitle } from "@/components/PageTitle";
+import { MultiTeamTradeContent, TradeModeToggle } from "@/components/MultiTeamTradeContent";
+import { isEspnLeagueId } from "@/lib/leaguePlatform";
 
 /**
  * Trade Analyzer (Revision 15) — the manual "evaluate an offer you
@@ -716,6 +718,10 @@ export function TradeAnalyzerContent({
   const [roleNotes, setRoleNotes] = useState<string[]>([]);
   const [assumptions, setAssumptions] = useState<VerdictAssumptions | null>(null);
   const [rosterOverflow, setRosterOverflow] = useState<RosterOverflow | null>(null);
+  // Two teams (this builder) or a 3 to 6 team trade (MultiTeamTradeContent).
+  // Imported (ESPN, MFL, ...) leagues only get the two team Analyzer.
+  const [tradeMode, setTradeMode] = useState<"two" | "multi">("two");
+  const multiTeamAvailable = !isEspnLeagueId(leagueId);
 
   const selectedPlayerIds = useMemo(
     () => new Set([...sendPlayers, ...receivePlayers].map((p) => p.player_id)),
@@ -949,6 +955,22 @@ export function TradeAnalyzerContent({
     );
   }
 
+  if (tradeMode === "multi" && multiTeamAvailable) {
+    return (
+      <MultiTeamTradeContent
+        leagueId={leagueId}
+        leagueName={leagueName}
+        myRosterId={myRosterId}
+        rankings={rankings}
+        picks={picks}
+        rosters={rosters}
+        teamProfiles={teamProfiles}
+        lens={lens}
+        modeToggle={<TradeModeToggle mode={tradeMode} onChange={setTradeMode} />}
+      />
+    );
+  }
+
   const sendAssets: TradeAsset[] = [...sendPlayers.map(playerToTradeAsset), ...sendPicks.map(pickToTradeAsset)];
   const receiveAssets: TradeAsset[] = [
     ...receivePlayers.map(playerToTradeAsset),
@@ -973,6 +995,7 @@ export function TradeAnalyzerContent({
       <TradesTabBar leagueId={leagueId} leagueName={leagueName} active="trade_analyzer" />
       <header className="flex flex-col gap-1">
         <PageTitle page="Trade Analyzer" leagueName={leagueName} />
+        {multiTeamAvailable ? <TradeModeToggle mode={tradeMode} onChange={setTradeMode} /> : null}
       </header>
 
       {bridgeMessage ? (
