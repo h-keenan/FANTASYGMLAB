@@ -270,16 +270,38 @@ export function simStrategyEqual(a: SimStrategy, b: SimStrategy): boolean {
 export type SimGate =
   | { kind: "ready" }
   | { kind: "premium"; upsell: SimUpsell | null }
-  | { kind: "unavailable" };
+  | { kind: "unavailable"; cause: SimUnavailableCause };
+
+/** Why the sim cannot open: its routes 404 ("off": SIM_ENABLED unset, or the
+ * API not restarted since it was set) or its storage answered
+ * sim_storage_unavailable ("storage": docs/supabase_sim.sql not applied, or
+ * Supabase unreachable). */
+export type SimUnavailableCause = "off" | "storage";
 
 /** What a /v1/sim response means for the page: show it, upsell, or hide. */
 export function simGate(body: (SimEnvelope & { enabled?: boolean }) | null | undefined): SimGate {
-  if (!body) return { kind: "unavailable" };
+  if (!body) return { kind: "unavailable", cause: "off" };
   if (body.reason === "premium_required" || body.is_premium === false) {
     return { kind: "premium", upsell: body.upsell ?? null };
   }
-  if (body.reason === "sim_storage_unavailable" || body.enabled === false) return { kind: "unavailable" };
+  if (body.reason === "sim_storage_unavailable") return { kind: "unavailable", cause: "storage" };
+  if (body.enabled === false) return { kind: "unavailable", cause: "off" };
   return { kind: "ready" };
+}
+
+/** Customer-safe copy for each unavailable cause, so "not switched on" and
+ * "temporarily unavailable" are never the same screen. */
+export function simUnavailableCopy(cause: SimUnavailableCause): { title: string; subtitle: string } {
+  if (cause === "storage") {
+    return {
+      title: "Fantasy Sim is temporarily unavailable",
+      subtitle: "It is switched on, but we cannot save simulations right now. Try again in a little while.",
+    };
+  }
+  return {
+    title: "Fantasy Sim is coming soon",
+    subtitle: "Pick a strategy, play out the season, and see how you would grade. It is not switched on yet. Check back soon.",
+  };
 }
 
 /** True when the sim is simply not switched on: its routes 404 until then. */

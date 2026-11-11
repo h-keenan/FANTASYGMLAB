@@ -30,6 +30,8 @@ import {
   simFormatRecord,
   simFormatSigned,
   simGate,
+  simUnavailableCopy,
+  type SimUnavailableCause,
   simGradeTone,
   simLevelLabel,
   simNoteMessages,
@@ -51,7 +53,7 @@ import {
 
 type Phase =
   | { kind: "loading" }
-  | { kind: "unavailable" }
+  | { kind: "unavailable"; cause: SimUnavailableCause }
   | { kind: "premium"; upsell: SimUpsell | null }
   | { kind: "setup" }
   | { kind: "running"; rerun: boolean }
@@ -505,12 +507,12 @@ export function FantasySimContent({ leagueId, leagueName }: { leagueId: string; 
         if (cancelled) return;
         const gate = simGate(status);
         if (gate.kind === "premium") setPhase({ kind: "premium", upsell: gate.upsell });
-        else if (gate.kind === "unavailable") setPhase({ kind: "unavailable" });
+        else if (gate.kind === "unavailable") setPhase({ kind: "unavailable", cause: gate.cause });
         else setPhase({ kind: "setup" });
       })
       .catch((error) => {
         if (cancelled) return;
-        if (isSimOffError(error)) setPhase({ kind: "unavailable" });
+        if (isSimOffError(error)) setPhase({ kind: "unavailable", cause: "off" });
         else setPhase({ kind: "error", message: errorText(error, "Could not load Fantasy Sim.") });
       });
     return () => {
@@ -656,10 +658,11 @@ export function FantasySimContent({ leagueId, leagueName }: { leagueId: string; 
     );
   }
   if (phase.kind === "unavailable") {
+    const copy = simUnavailableCopy(phase.cause);
     return (
       <main className="flex-1 flex flex-col gap-4 px-4 py-6 max-w-3xl w-full mx-auto">
         <PageTitle page="Fantasy Sim" />
-        <EmptyState title="Fantasy Sim is coming soon" subtitle="Pick a strategy, play out the season, and see how you would grade. It is not switched on yet. Check back soon." />
+        <EmptyState title={copy.title} subtitle={copy.subtitle} />
       </main>
     );
   }

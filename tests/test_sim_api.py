@@ -296,3 +296,12 @@ def test_supabase_backend_update_uses_patch_with_user_jwt(monkeypatch):
     assert seen["url"].endswith("/rest/v1/sim_worlds?user_id=eq.u1&id=eq.w")
     assert seen["json"] == {"status": "ready", "grade_letter": None}
     assert "user-jwt" in str(seen["headers"])
+
+
+def test_status_reports_unavailable_storage_for_pro_but_upsells_free():
+    app, _, _ = make_app(backend=InMemoryBackend(fail=True))
+    client = TestClient(app)
+    body = client.get("/v1/sim/status", headers=hdr()).json()
+    assert body["reason"] == "sim_storage_unavailable" and body["enabled"] is True
+    free = client.get("/v1/sim/status", headers=hdr("u3")).json()
+    assert free["reason"] == "premium_required"
