@@ -39,7 +39,7 @@ describe("nav Pro lock markers and account rows", () => {
     signIn("free");
     render(<DesktopSidebar />);
     await waitFor(() => expect(screen.getAllByTestId("nav-pro-marker").length).toBeGreaterThan(0));
-    for (const label of ["Draft Center", "Live Draft", "Commissioner", "Portfolio", "College Scouting", "Playoff Odds"]) {
+    for (const label of ["Draft Center", "Live Draft", "Commissioner", "Portfolio"]) {
       expect(screen.getByText(label).closest("a")?.querySelector("[data-testid='nav-pro-marker']")).not.toBeNull();
     }
     expect(screen.getByText("Trade Hub").closest("a")?.querySelector("[data-testid='nav-pro-marker']")).toBeNull();
@@ -54,10 +54,10 @@ describe("nav Pro lock markers and account rows", () => {
     expect(screen.getByRole("link", { name: "Account" })).toHaveAttribute("href", "/account");
   });
 
-  it("Playoff Odds links to the odds section and does not steal League Rankings' current highlight", () => {
+  it("has no separate rows for pages that are tabs (Playoff Odds, Trade History, College Scouting)", () => {
     signIn("premium");
     render(<DesktopSidebar />);
-    expect(screen.getByText("Playoff Odds").closest("a")).toHaveAttribute("href", "/league-rankings/L1?name=Test%20League#playoff-odds");
+    for (const label of ["Playoff Odds", "Trade History", "College Scouting"]) expect(screen.queryByText(label)).toBeNull();
   });
 
   it("the orb carries a visible GM label and the same Pro markers", async () => {

@@ -37,11 +37,12 @@ describe("feature catalog (What FantasyDesk can do)", () => {
     const rows = [...nav.coreLeagueDestinations, ...nav.gmToolsDestinations, ...nav.generalDestinations];
     let matched = 0;
     for (const item of FEATURE_ITEMS) {
+      if (item.hash) continue; // a section of a page that already has its row (Playoff Odds)
       const row = rows.find((r) => {
         const first = r.path.split("?")[0].split("#")[0].split("/")[1];
-        return first === item.segment && Boolean(r.anchor) === Boolean(item.hash);
+        return first === item.segment;
       });
-      if (!row) continue; // Trade Analyzer / Trade Finder have no nav row on purpose
+      if (!row) continue; // Trade Analyzer / Finder / History and College Scouting are tabs, not rows, on purpose
       matched += 1;
       expect(item.glyph, item.id).toBe(row.glyph);
       expect(item.color, item.id).toBe(row.color);

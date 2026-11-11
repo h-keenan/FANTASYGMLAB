@@ -1,6 +1,7 @@
 import type { NavGlyphName } from "@/components/NavDestinationGlyph";
 import type { CollegeInterest } from "@/lib/displayPreferences";
 import { accentVar as accent } from "@/lib/destinationAccent";
+import { HOME_SUBTITLE, NAV_PAGES, navPagesIn, type NavCatalogPage } from "@/lib/navCatalog";
 
 export interface NavDestination {
   label: string;
@@ -19,9 +20,6 @@ export interface NavDestination {
   /** Paid destination: the nav shows a gold "Pro" marker to anyone not on
    * Pro, so the lock is visible before the tap (UX audit 2026-11-03, 4.2). */
   pro?: boolean;
-  /** Same page as another row, scrolled to a section (a `#hash` path): it
-   * never takes the "current page" highlight from its parent row. */
-  anchor?: boolean;
   /** The page's own tabs/sections, each searchable in the GM orb as
    * "Page > Tab" (never rendered in the normal menu, which stays one row
    * per page). Each tab opens that exact tab. */
@@ -39,131 +37,93 @@ export interface NavTab {
   pro?: boolean;
 }
 
+const GLYPH_BY_PAGE: Record<string, NavGlyphName> = {
+  dashboard: "dashboard",
+  alerts: "alerts",
+  "my-team": "myTeam",
+  matchup: "matchup",
+  waivers: "waivers",
+  "league-rankings": "leagueRankings",
+  players: "players",
+  "trade-hub": "tradeHub",
+  "gm-plan": "gmPlan",
+  "draft-center": "draftCenter",
+  "live-draft": "liveDraft",
+  "league-recaps": "leagueRecaps",
+  games: "games",
+  "fantasy-sim": "games",
+  commissioner: "commissioner",
+  portfolio: "portfolio",
+  news: "news",
+  community: "community",
+};
+
+/** Where each tab opens on web: `?tab=` on the page, its own route, or a
+ * `#section`. Tabs not listed open `?tab=<lowercased label>`. */
+type TabPathContext = { id: string; query: string; tabPath: (segment: string, tab: string) => string };
+const TAB_PATHS: Record<string, Record<string, (c: TabPathContext) => string>> = {
+  "league-rankings": {
+    Rankings: ({ id, query }) => `/league-rankings/${id}${query}`,
+    "Playoff Odds": ({ id, query }) => `/league-rankings/${id}${query}#playoff-odds`,
+  },
+  "trade-hub": {
+    Hub: ({ id, query }) => `/trade-hub/${id}${query}`,
+    Finder: ({ id, query }) => `/trade-finder/${id}${query}`,
+    Analyzer: ({ id, query }) => `/trade-analyzer/${id}${query}`,
+    History: () => "/trade-history",
+  },
+  games: {
+    "Season Sim": ({ tabPath }) => tabPath("games", "sim"),
+    "Pick'em": ({ tabPath }) => tabPath("games", "pickem"),
+  },
+};
+
 /**
- * Shared source for every league-scoped + general nav destination —
- * GmOrb.tsx and DesktopSidebar.tsx both render from this one list instead
- * of each keeping its own copy (GmOrb used to be the only consumer; this
- * is that same data, pulled out so a second surface doesn't duplicate it).
+ * Every league-scoped + general nav destination, built from the one catalog
+ * shared with the app (lib/navCatalog.ts) plus this platform's paths, glyphs
+ * and accents. GmOrb.tsx and DesktopSidebar.tsx both render from this list.
  */
 export function useNavDestinations(
   leagueId: string | null,
   leagueName: string,
-  // "off" (Account > College football) hides the menu entry; the page itself
-  // still works by URL. Matches the app, which only surfaces College
-  // Scouting once the user opts in. Callers pass the preference in, so this
-  // stays callable outside a React tree.
+  // "off" (Account > College football) hides the College Scouting tab from
+  // the menu search; the page itself still works by URL. Matches the app,
+  // which only surfaces College Scouting once the user opts in. Callers pass
+  // the preference in, so this stays callable outside a React tree.
   collegeInterest: CollegeInterest = "on",
 ) {
   const query = leagueId ? `?name=${encodeURIComponent(leagueName)}` : "";
   const id = leagueId ? encodeURIComponent(leagueId) : "";
   // `?name=...&tab=x` — the tab param the page reads on load.
   const tabPath = (segment: string, tab: string) => `/${segment}/${id}${query}&tab=${tab}`;
+  const context: TabPathContext = { id, query, tabPath };
 
-  const coreLeagueDestinations: NavDestination[] = leagueId
-    ? [
-        { label: "Dashboard", path: `/dashboard/${encodeURIComponent(leagueId)}${query}`, subtitle: "Personalized insights and recommendations", glyph: "dashboard", color: accent("Dashboard") },
-        { label: "Alerts", path: `/alerts/${encodeURIComponent(leagueId)}${query}`, subtitle: "Injuries, news, and important updates", glyph: "alerts", color: accent("Alerts") },
-        { label: "My Team", path: `/my-team/${encodeURIComponent(leagueId)}${query}`, subtitle: "Roster, lineup, and team analysis", glyph: "myTeam", color: accent("My Team") },
-        { label: "Matchup", path: `/matchup/${encodeURIComponent(leagueId)}${query}`, subtitle: "This week's matchup and comparison", glyph: "matchup", color: accent("Matchup") },
-        { label: "Waivers", path: `/waivers/${encodeURIComponent(leagueId)}${query}`, subtitle: "Top adds, trends, and free agents", glyph: "waivers", color: accent("Waivers"),
-          tabs: [
-            { label: "Recommended", path: tabPath("waivers", "recommended"), subtitle: "Ranked pickups for your roster", keywords: ["adds", "faab", "pickups"] },
-            { label: "Explore", path: tabPath("waivers", "explore"), subtitle: "Browse every free agent", keywords: ["free agents", "search"] },
-            { label: "Watchlist", path: tabPath("waivers", "watchlist"), subtitle: "Free agents you are tracking", keywords: ["targets", "tracking"] },
-          ] },
-        { label: "Players", path: `/players/${encodeURIComponent(leagueId)}${query}`, subtitle: "Search, rankings, and player insights", glyph: "players", color: accent("Players") },
-        { label: "League Rankings", path: `/league-rankings/${encodeURIComponent(leagueId)}${query}`, subtitle: "Power rankings across the league", glyph: "leagueRankings", color: accent("League Rankings"),
-          tabs: [
-            { label: "Rankings", path: `/league-rankings/${id}${query}`, subtitle: "Power rankings across the league", keywords: ["power rankings", "teams"] },
-            { label: "Playoff Odds", path: `/league-rankings/${id}${query}#playoff-odds`, subtitle: "Every team's chance at the playoffs", keywords: ["playoffs", "odds", "chance", "seeding"], pro: true },
-          ] },
-        // Web had no nav row for this (it lived behind a button inside
-        // League Rankings); the app already did. Same page, scrolled to the
-        // section, so no new route.
-        { label: "Playoff Odds", path: `/league-rankings/${encodeURIComponent(leagueId)}${query}#playoff-odds`, subtitle: "Every team's chance at the playoffs", glyph: "playoffOdds", color: accent("Playoff Odds"), pro: true, anchor: true },
-      ]
-    : [];
+  const build = (page: NavCatalogPage): NavDestination => ({
+    label: page.label,
+    path: page.leagueScoped ? `/${page.key}/${id}${query}` : `/${page.key}`,
+    subtitle: page.subtitle,
+    glyph: GLYPH_BY_PAGE[page.key],
+    color: accent(page.label),
+    pro: page.pro,
+    tabs: page.tabs
+      ?.filter((tab) => !(collegeInterest === "off" && page.key === "draft-center" && tab.label === "Scouting"))
+      .map((tab) => ({
+        label: tab.label,
+        path: (TAB_PATHS[page.key]?.[tab.label] ?? (() => tabPath(page.key, tab.label.toLowerCase())))(context),
+        subtitle: tab.subtitle,
+        keywords: tab.keywords ? [...tab.keywords] : undefined,
+        pro: tab.pro,
+      })),
+  });
 
-  const gmToolsDestinations: NavDestination[] = leagueId
-    ? [
-        {
-          // Trade Finder and Trade Analyzer deliberately NOT listed as
-          // separate entries here — coridian_, 2026-10-17: "trade finder and
-          // trade analyzer are redundant because of the tabs on trade hub so
-          // we dont need those sidemenu/gm orb menus." Both are one tab-click
-          // away from this destination via TradesTabBar; their routes still
-          // exist, just without a dedicated nav entry.
-          label: "Trade Hub",
-          path: `/trade-hub/${encodeURIComponent(leagueId)}${query}`,
-          subtitle: "Trade ideas, trade finder, and trade analyzer",
-          glyph: "tradeHub",
-          color: accent("Trade Hub"),
-          tabs: [
-            { label: "Hub", path: `/trade-hub/${id}${query}`, subtitle: "Trade ideas built for your roster", keywords: ["trade ideas", "trade block", "offers"] },
-            { label: "Finder", path: `/trade-finder/${id}${query}`, subtitle: "Shop a player or pick and see what partners pay", keywords: ["trade finder", "shop", "search", "partners"], pro: true },
-            { label: "Analyzer", path: `/trade-analyzer/${id}${query}`, subtitle: "Grade any deal against your lineup", keywords: ["trade analyzer", "calculator", "make a trade", "grade", "evaluate"] },
-            { label: "History", path: "/trade-history", subtitle: "Trades you have shared and confirmed", keywords: ["trade history", "past trades"] },
-          ],
-        },
-        {
-          // Revision 20 (2026-10-18, coridian_: "What do you think about
-          // merging the team situation, GM targets and GM plan into one
-          // page?" / "yes I like it... same reasoning as killing the
-          // Explore grid today") — GM Targets and Team Situation no
-          // longer have their own nav entries; both are now always-visible
-          // sections on this same page. Their routes still exist as
-          // redirects for stale bookmarks/links.
-          label: "GM Plan",
-          path: `/gm-plan/${encodeURIComponent(leagueId)}${query}`,
-          subtitle: "Your roadmap, stance, and protected/watched players",
-          glyph: "gmPlan",
-          color: accent("GM Plan"),
-          tabs: [
-            { label: "Overview", path: tabPath("gm-plan", "overview"), subtitle: "Stance, roadmap, and plan snapshot", keywords: ["stance", "roadmap", "rebuild", "compete"] },
-            { label: "Trades", path: tabPath("gm-plan", "trades"), subtitle: "Trade moves your plan calls for", keywords: ["trade window"] },
-            { label: "Core", path: tabPath("gm-plan", "core"), subtitle: "Players your plan is built around", keywords: ["protected", "keep"] },
-            { label: "Watching", path: tabPath("gm-plan", "watching"), subtitle: "Players you are targeting", keywords: ["targets", "gm targets", "watchlist"] },
-          ],
-        },
-        { label: "Draft Center", path: `/draft-center/${encodeURIComponent(leagueId)}${query}`, subtitle: "Picks, order, and draft tools", glyph: "draftCenter", color: accent("Draft Center"), pro: true,
-          tabs: [
-            { label: "Overview", path: tabPath("draft-center", "overview"), subtitle: "Draft posture and pick decisions", keywords: ["posture", "capital"] },
-            { label: "Picks", path: tabPath("draft-center", "picks"), subtitle: "Every pick you own", keywords: ["draft picks", "order"] },
-            { label: "Scouting", path: tabPath("draft-center", "scouting"), subtitle: "Grade incoming prospects", keywords: ["college", "prospects", "rookies"] },
-          ] },
-        { label: "Live Draft", path: `/live-draft/${encodeURIComponent(leagueId)}${query}`, subtitle: "Real-time draft room", glyph: "liveDraft", color: accent("Live Draft"), pro: true },
-        { label: "League Recaps", path: `/league-recaps/${encodeURIComponent(leagueId)}${query}`, subtitle: "Weekly league recap, stories, and your lineup roundup", glyph: "leagueRecaps", color: accent("League Recaps"),
-          tabs: [
-            { label: "Roundup", path: tabPath("league-recaps", "roundup"), subtitle: "Your lineup vs the best possible one, and what you left on the bench", keywords: ["bench", "optimal lineup", "weekly roundup", "bench regret", "missed swaps"] },
-          ] },
-        { label: "Games", path: `/games/${encodeURIComponent(leagueId)}${query}`, subtitle: "Season simulator and weekly pick'em", glyph: "games", color: accent("Games"),
-          tabs: [
-            { label: "Season Sim", path: tabPath("games", "sim"), subtitle: "Season simulator", keywords: ["simulator", "simulation", "playoff odds", "what if"] },
-            { label: "Pick'em", path: tabPath("games", "pickem"), subtitle: "Weekly pick'em in your league", keywords: ["pickem", "picks", "weekly"] },
-          ] },
-        { label: "Fantasy Sim", path: `/fantasy-sim/${encodeURIComponent(leagueId)}${query}`, subtitle: "Set a strategy and play out your season", glyph: "games", color: accent("Fantasy Sim"), pro: true },
-        { label: "Commissioner", path: `/commissioner/${encodeURIComponent(leagueId)}${query}`, subtitle: "League integrity: lineups, tanking signals, trades", glyph: "commissioner" as const, color: accent("Commissioner"), pro: true },
-      ]
-    : [];
+  const coreLeagueDestinations: NavDestination[] = leagueId ? navPagesIn("core").map(build) : [];
+  const gmToolsDestinations: NavDestination[] = leagueId ? navPagesIn("tools").map(build) : [];
 
-  const generalDestinations: NavDestination[] = ([
-    { label: "Home", path: "/", subtitle: "Switch leagues and manage account", glyph: "home", color: "var(--color-accent)" },
-    { label: "Portfolio", path: "/portfolio", subtitle: "Your standing across every saved league", glyph: "portfolio", color: accent("Portfolio"), pro: true },
-    { label: "News", path: "/news", subtitle: "Latest NFL news and updates", glyph: "news", color: accent("News") },
-    { label: "Trade History", path: "/trade-history", subtitle: "Trades you've shared and confirmed", glyph: "tradeHistory", color: accent("Trade History") },
-    { label: "College Scouting", path: "/college-scouting", subtitle: "Grade incoming prospects", glyph: "collegeScouting", color: accent("College Scouting"), pro: true },
-    {
-      // Social/community layer (docs/roadmap.md), coridian_ 2026-10-19 —
-      // deliberately league-independent like Portfolio/Trade History/
-      // College Scouting above: the whole point is trades from OTHER
-      // users' leagues, never filtered to the one currently selected.
-      label: "Community",
-      path: "/community",
-      subtitle: "Craziest trades this week, anonymized",
-      glyph: "community",
-      color: accent("Community"),
-    },
-  ] as NavDestination[]).filter((destination) => collegeInterest !== "off" || destination.path !== "/college-scouting");
+  const generalDestinations: NavDestination[] = [
+    // The league switcher; Account (below) owns settings.
+    { label: "Home", path: "/", subtitle: HOME_SUBTITLE, glyph: "home", color: "var(--color-accent)" },
+    ...navPagesIn("general").map(build),
+  ];
 
   // Account-wide chrome that used to be reachable only through the header
   // MENU (Account) or from inside an upsell card (Pro). Not league-scoped.
@@ -184,8 +144,7 @@ export function searchNavDestinations(destinations: NavDestination[], rawQuery: 
     const hay = text.toLowerCase();
     return tokens.every((token) => hay.includes(token));
   };
-  // Anchor rows (the Playoff Odds menu row) are covered by their parent's tab.
-  const pages = destinations.filter((d) => !d.anchor);
+  const pages = destinations;
   const pagePaths = new Set(pages.filter((d) => matches(`${d.label} ${d.subtitle}`)).map((d) => d.path));
   const out: NavDestination[] = [];
   const seen = new Set<string>();
@@ -232,28 +191,11 @@ export function isFounderSession(
  * (Trade Finder/Trade Analyzer/Player Compare — reachable via Trade Hub's
  * own tabs, not a dedicated nav entry; Premium; Legal). */
 export const PAGE_TITLE_BY_SEGMENT: Record<string, string> = {
-  dashboard: "Dashboard",
-  alerts: "Alerts",
-  "my-team": "My Team",
-  matchup: "Matchup",
-  waivers: "Waivers",
-  players: "Players",
-  "league-rankings": "League Rankings",
-  "trade-hub": "Trade Hub",
-  "gm-targets": "GM Targets",
-  "team-situation": "Team Situation",
-  "gm-plan": "GM Plan",
-  "draft-center": "Draft Center",
-  "fantasy-sim": "Fantasy Sim",
-  "live-draft": "Live Draft",
-  "league-recaps": "League Recaps",
-  games: "Games",
-  commissioner: "Commissioner",
-  portfolio: "Portfolio",
-  news: "News",
+  ...Object.fromEntries(NAV_PAGES.map((page) => [page.key, page.label])),
+  // Routes that are real pages but not menu rows (reached as tabs of a menu
+  // page, or from a link): see navCatalog.ts for the tab homes.
   "trade-history": "Trade History",
   "college-scouting": "College Scouting",
-  community: "Community",
   "trade-analyzer": "Trade Analyzer",
   "trade-finder": "Trade Finder",
   "trade-offer": "Build an Offer",
@@ -263,4 +205,7 @@ export const PAGE_TITLE_BY_SEGMENT: Record<string, string> = {
   features: "Features",
   account: "Account",
   legal: "Legal",
+  // Retired pages that only redirect to GM Plan (old bookmarks/links).
+  "gm-targets": "GM Plan",
+  "team-situation": "GM Plan",
 };
