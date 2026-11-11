@@ -18,6 +18,10 @@ export interface PushNotificationData {
   player_id?: string;
   player_name?: string;
   week?: number | string;
+  /** Canonical web path of the exact screen (modules/notification_decider.py deep_link_for); routing here still uses category + ids. */
+  url?: string;
+  /** Batch id reported back via POST /v1/notifications/opened. */
+  notification_id?: string;
 }
 
 export type PushTapTarget =

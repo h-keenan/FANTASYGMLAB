@@ -2738,6 +2738,46 @@ export interface PushPreferencesResponse {
   categories: Record<PushCategory, boolean>;
 }
 
+/** GET/POST /v1/notifications/preferences (modules.notification_prefs):
+ * quiet hours, weekly cap, per-league mute and digest, on top of the
+ * per-category toggles above. */
+export type NotificationLeagueMode = 'all' | 'critical' | 'mute';
+export type NotificationDeliveryMode = 'instant' | 'digest';
+
+export interface NotificationPrefs {
+  quiet_hours_enabled: boolean;
+  quiet_start: number;
+  quiet_end: number;
+  timezone: string;
+  /** null = the server default */
+  weekly_cap: number | null;
+  league_overrides: Record<string, NotificationLeagueMode>;
+  category_modes: Partial<Record<PushCategory, NotificationDeliveryMode>>;
+  digest_hour: number;
+  critical_breaks_quiet: boolean;
+}
+
+export type NotificationPrefsPatch = Partial<Omit<NotificationPrefs, 'league_overrides' | 'category_modes'>> & {
+  league_overrides?: Record<string, NotificationLeagueMode>;
+  category_modes?: Partial<Record<PushCategory, NotificationDeliveryMode>>;
+};
+
+export interface NotificationCapPreset {
+  key: string;
+  label: string;
+  cap: number;
+}
+
+export interface NotificationPreferencesResponse {
+  ok: boolean;
+  categories: Record<PushCategory, boolean>;
+  prefs: NotificationPrefs;
+  default_weekly_cap: number;
+  cap_presets: NotificationCapPreset[];
+  critical_categories: PushCategory[];
+  league_modes: NotificationLeagueMode[];
+}
+
 /** GET/POST /v1/community/preferences. Same shape as web-next's
  * CommunityPreferencesResponse: `opted_out` true means "keep MY trades out
  * of the Community Trade Feed". */
@@ -4236,6 +4276,13 @@ export const api = {
   getPushPreferences: () => authorizedFetch<PushPreferencesResponse>('/v1/push/preferences'),
   updatePushPreference: (category: PushCategory, enabled: boolean) =>
     authorizedPost<PushPreferencesResponse>('/v1/push/preferences', { category, enabled }),
+  getNotificationPreferences: () =>
+    authorizedFetch<NotificationPreferencesResponse>('/v1/notifications/preferences'),
+  updateNotificationPreferences: (patch: NotificationPrefsPatch) =>
+    authorizedPost<NotificationPreferencesResponse>('/v1/notifications/preferences', { prefs: patch }),
+  /** Open metric for a tapped push (data.notification_id). Fire-and-forget. */
+  reportNotificationOpened: (notificationId: string) =>
+    authorizedPost<{ ok: boolean }>('/v1/notifications/opened', { notification_id: notificationId }),
   getDevicePreferences: () => authorizedFetch<DevicePreferencesResponse>('/v1/preferences'),
   /** Set by the onboarding carousel's last step, same call as web-next's
    * OnboardingCarousel (`api.setExperienceLevel`). */

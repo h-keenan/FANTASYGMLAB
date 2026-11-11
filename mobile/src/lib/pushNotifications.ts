@@ -190,8 +190,17 @@ function routeNotificationTap(data: unknown): void {
  * a routing failure should never crash the app, just leave the user on
  * whatever screen they were already on.
  */
+/** Open metric: fire-and-forget, never blocks or breaks routing. */
+function reportOpened(data: unknown): void {
+  const id = data && typeof data === 'object' ? (data as { notification_id?: unknown }).notification_id : undefined;
+  if (typeof id === 'string' && id) {
+    api.reportNotificationOpened(id).catch(() => {});
+  }
+}
+
 export function registerNotificationTapHandler(): () => void {
   const subscription = Notifications.addNotificationResponseReceivedListener((response) => {
+    reportOpened(response.notification.request.content.data);
     try {
       routeNotificationTap(response.notification.request.content.data);
     } catch (err) {
