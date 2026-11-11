@@ -135,24 +135,24 @@ def side_reasons(side: Mapping[str, Any]) -> list[str]:
     return out
 
 
-def assess(
-    sides: Sequence[Mapping[str, Any]],
-    *,
-    prior_lopsided_wins: Mapping[str, int] | None = None,
+def _pick_winner(loser: Mapping[str, Any], sides: Sequence[Mapping[str, Any]]) -> Mapping[str, Any]:
+    """The side that came out best among everyone but ``loser``. With two sides
+    this is just "the other one"."""
+
+    others = [s for s in sides if s is not loser]
+    if len(others) == 1:
+        return others[0]
+    return max(others, key=lambda s: (float(s["team_score"]), float(s["market_delta"])))
+
+
+def _assess_loser(
+    loser: Mapping[str, Any],
+    winner: Mapping[str, Any],
+    prior: Mapping[str, int],
 ) -> dict[str, Any]:
-    """Outrage score and band from two evaluated sides.
+    """Outrage read for one chosen "hurt" side against the side that gained
+    most. The two-team ``assess`` and the per-team N-team read share this."""
 
-    ``sides`` carry ``roster_id``, ``team_name``, ``market_delta``,
-    ``team_score``, ``points_per_week``, ``posture`` (strategy key),
-    ``posture_group`` (contender / retool / rebuild) and optionally
-    ``worst_position``. ``prior_lopsided_wins`` maps roster id to how many
-    earlier lopsided trades that roster won from this same partner."""
-
-    if len(sides) != 2:
-        raise ValueError("a veto check needs exactly two sides")
-    prior = {str(k): int(v) for k, v in (prior_lopsided_wins or {}).items()}
-    loser = min(sides, key=lambda s: (float(s["team_score"]), float(s["market_delta"])))
-    winner = next(s for s in sides if s is not loser)
     market_gap = _gap_norm(float(loser["market_delta"]))
     team_gap = _gap_norm(float(loser["team_score"]))
     explained = float(loser["team_score"]) >= -bands.EDGE
@@ -184,4 +184,46 @@ def assess(
         "reasons": reasons[:5],
         "history_points": round(history, 1),
         "limits": list(LIMITS),
+    }
+
+
+def assess(
+    sides: Sequence[Mapping[str, Any]],
+    *,
+    prior_lopsided_wins: Mapping[str, int] | None = None,
+) -> dict[str, Any]:
+    """Outrage score and band from two or more evaluated sides.
+
+    ``sides`` carry ``roster_id``, ``team_name``, ``market_delta``,
+    ``team_score``, ``points_per_week``, ``posture`` (strategy key),
+    ``posture_group`` (contender / retool / rebuild) and optionally
+    ``worst_position``. ``prior_lopsided_wins`` maps roster id to how many
+    earlier lopsided trades that roster won from this same partner.
+
+    The hurt side is the one with the lowest ``team_score``; the comparison
+    side is the one that gained most (for two sides, simply the other one, so
+    the two-team result is unchanged). The repeat-pattern history is pairwise,
+    so for three or more sides it only counts wins the caller supplies."""
+
+    if len(sides) < 2:
+        raise ValueError("a veto check needs at least two sides")
+    prior = {str(k): int(v) for k, v in (prior_lopsided_wins or {}).items()}
+    loser = min(sides, key=lambda s: (float(s["team_score"]), float(s["market_delta"])))
+    return _assess_loser(loser, _pick_winner(loser, sides), prior)
+
+
+def assess_each(
+    sides: Sequence[Mapping[str, Any]],
+    *,
+    prior_lopsided_wins: Mapping[str, int] | None = None,
+) -> dict[str, dict[str, Any]]:
+    """Per-team veto risk for an N-team trade: for every side, the outrage read
+    if THAT side were the one a commissioner is asked about. Keyed by roster id."""
+
+    if len(sides) < 2:
+        raise ValueError("a veto check needs at least two sides")
+    prior = {str(k): int(v) for k, v in (prior_lopsided_wins or {}).items()}
+    return {
+        str(side["roster_id"]): _assess_loser(side, _pick_winner(side, sides), prior)
+        for side in sides
     }
