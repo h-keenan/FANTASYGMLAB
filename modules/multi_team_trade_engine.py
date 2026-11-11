@@ -24,6 +24,7 @@ each team's veto risk. Counter-offer search is not part of this module.
 from __future__ import annotations
 
 import logging
+from dataclasses import dataclass, field
 from typing import Any, Callable, Mapping
 
 import pandas as pd
@@ -173,6 +174,89 @@ def analyze_multi_team_trade(
     if early:
         return _fail("invalid", early[0]["message"], errors=early)
 
+    ctx = build_context(
+        league_id=league_id, lens=lens, players_db_path=players_db_path,
+        perspective_roster_id=perspective_roster_id, load_picks=any(t.asset_type == mt.ASSET_PICK for t in parsed),
+        frame_hook=frame_hook, posture_override=posture_override, untouchable_provider=untouchable_provider,
+        usage_provider=usage_provider, crowd_class_strength_by_year=crowd_class_strength_by_year, status=status,
+    )
+    if isinstance(ctx, dict):
+        return ctx
+    return grade_transfers(
+        ctx, parsed, perspective_roster_id=perspective_roster_id, min_teams=min_teams, max_teams=max_teams,
+        include_veto=include_veto,
+    )
+
+
+@dataclass
+class TradeContext:
+    """Everything about a league that does not depend on which trade is graded.
+
+    Built once by ``build_context``; ``grade_transfers`` can then grade any number
+    of candidate trades against it (the 3-team idea finder grades dozens) without
+    refetching the league, valuing every player again, or re-deriving postures."""
+
+    league_id: str
+    lens: str
+    players_db_path: str
+    league: Mapping[str, Any]
+    settings: Mapping[str, Any]
+    rosters: list[Mapping[str, Any]]
+    by_rid: dict[str, Mapping[str, Any]]
+    valued: pd.DataFrame
+    score_field: str
+    names: dict[str, str]
+    rankings_frame: pd.DataFrame
+    pick_by_id: dict[str, Mapping[str, Any]]
+    window: Any
+    rostered_ids: set[str]
+    status: dict[str, Any]
+    frame_hook: FrameHook | None = None
+    posture_override: Callable[[Mapping[str, Any]], dict[str, Any] | None] | None = None
+    untouchable_provider: Callable[[str], Callable[[], set[str] | None]] | None = None
+    usage_provider: Callable[[Any], Mapping[str, Mapping[str, Any]]] | None = None
+    _postures: dict[str, dict[str, Any]] = field(default_factory=dict)
+    _needs: Any = None
+
+    def posture(self, rid: str) -> dict[str, Any]:
+        if rid not in self._postures:
+            override = self.posture_override(self.by_rid[rid]) if self.posture_override else None
+            self._postures[rid] = override or roster_posture(
+                league_id=self.league_id, roster=self.by_rid[rid], lens=self.lens,
+                players_db_path=self.players_db_path, rankings_frame=self.rankings_frame,
+            )
+        return self._postures[rid]
+
+    def needs(self) -> Any:
+        """One need / surplus model over the neutral league frame (as the Analyzer does)."""
+
+        if self._needs is None:
+            base_frame = self.frame_hook(self.valued, set()) if self.frame_hook else self.valued
+            self._needs = roster_value_model.league_needs(
+                valued=base_frame, rosters=self.rosters, league=self.league, settings=self.settings,
+                score_field=self.score_field, status=self.status,
+            )
+            model_status.merge_into(self.status, self._needs.status)
+        return self._needs
+
+
+def build_context(
+    *,
+    league_id: str,
+    lens: str,
+    players_db_path: str,
+    perspective_roster_id: str = "",
+    load_picks: bool = False,
+    frame_hook: FrameHook | None = None,
+    posture_override: Callable[[Mapping[str, Any]], dict[str, Any] | None] | None = None,
+    untouchable_provider: Callable[[str], Callable[[], set[str] | None]] | None = None,
+    usage_provider: Callable[[Any], Mapping[str, Mapping[str, Any]]] | None = None,
+    crowd_class_strength_by_year: Mapping[Any, Any] | None = None,
+    status: dict[str, Any] | None = None,
+) -> "TradeContext | dict[str, Any]":
+    """Load the league-level inputs; a ``_fail`` dict when the league is not ready."""
+
+    status = status if status is not None else model_status.ok()
     league = sleeper.get_league(league_id)
     if not league:
         return _fail("unavailable", "League not found.")
@@ -189,10 +273,9 @@ def analyze_multi_team_trade(
         return _fail("unavailable", "Player values are not ready yet.")
     score_field = league_value_settings.valuation_score_field(lens)
 
-    # Ownership (players from the rosters; picks from the league's pick table).
-    pick_transfers = [t for t in parsed if t.asset_type == mt.ASSET_PICK]
+    # Picks come from the league's pick table (only loaded when a trade names one).
     pick_by_id: dict[str, Mapping[str, Any]] = {}
-    if pick_transfers:
+    if load_picks:
         df_summary, _capital = league_rankings.build_league_summary_and_draft_capital_cached(
             league_id=league_id, lens=lens, players_db_path=players_db_path
         )
@@ -203,6 +286,38 @@ def analyze_multi_team_trade(
             **({"crowd_class_strength_by_year": crowd_class_strength_by_year} if crowd_class_strength_by_year else {}),
         )
         pick_by_id = {f"{p.get('season')}:{p.get('round')}:{p.get('original_roster_id')}": p for p in picks}
+    names = _team_names(league_id, sorted(by_rid))
+    rankings_frame = league_rankings.build_league_rankings_frame_cached(
+        league_id=league_id, lens=lens, players_db_path=players_db_path
+    )
+    return TradeContext(
+        league_id=league_id, lens=lens, players_db_path=players_db_path, league=league, settings=settings,
+        rosters=rosters, by_rid=by_rid, valued=valued, score_field=score_field, names=names,
+        rankings_frame=rankings_frame, pick_by_id=pick_by_id, window=trade_grade.season_window(settings),
+        rostered_ids={str(pid) for r in rosters for pid in (r.get("players") or []) if pid is not None},
+        status=status, frame_hook=frame_hook, posture_override=posture_override,
+        untouchable_provider=untouchable_provider, usage_provider=usage_provider,
+    )
+
+
+def grade_transfers(
+    ctx: TradeContext,
+    parsed: list[mt.Transfer],
+    *,
+    perspective_roster_id: str = "",
+    min_teams: int = mt.MIN_TEAMS,
+    max_teams: int = mt.MAX_TEAMS,
+    include_veto: bool = False,
+) -> dict[str, Any]:
+    """Validate ``parsed`` against the context's rosters / picks and grade it for every team."""
+
+    league, settings, rosters, by_rid = ctx.league, ctx.settings, ctx.rosters, ctx.by_rid
+    valued, score_field, names, pick_by_id = ctx.valued, ctx.score_field, ctx.names, ctx.pick_by_id
+    league_id, status, window = ctx.league_id, ctx.status, ctx.window
+    rostered_ids, frame_hook = ctx.rostered_ids, ctx.frame_hook
+    untouchable_provider, usage_provider = ctx.untouchable_provider, ctx.usage_provider
+    teams_in_trade = mt.participants(parsed)
+    pick_transfers = [t for t in parsed if t.asset_type == mt.ASSET_PICK]
     errors = mt.validate_transfers(
         parsed,
         roster_players={rid: r.get("players") or () for rid, r in by_rid.items()},
@@ -213,27 +328,9 @@ def analyze_multi_team_trade(
         return _fail("invalid", errors[0]["message"], errors=errors)
 
     transfer_player_ids = {t.asset_id for t in parsed if t.asset_type == mt.ASSET_PLAYER}
-    names = _team_names(league_id, teams_in_trade)
-    rankings_frame = league_rankings.build_league_rankings_frame_cached(
-        league_id=league_id, lens=lens, players_db_path=players_db_path
-    )
-    postures: dict[str, dict[str, Any]] = {}
-    for rid in teams_in_trade:
-        override = posture_override(by_rid[rid]) if posture_override else None
-        postures[rid] = override or roster_posture(
-            league_id=league_id, roster=by_rid[rid], lens=lens, players_db_path=players_db_path,
-            rankings_frame=rankings_frame,
-        )
+    postures = {rid: ctx.posture(rid) for rid in teams_in_trade}
     strategies = {rid: str(p.get("key") or "retool") for rid, p in postures.items()}
-
-    # One need / surplus model over the neutral league frame (as the Analyzer does).
-    base_frame = frame_hook(valued, transfer_player_ids) if frame_hook else valued
-    needs = roster_value_model.league_needs(
-        valued=base_frame, rosters=rosters, league=league, settings=settings, score_field=score_field, status=status,
-    )
-    model_status.merge_into(status, needs.status)
-    window = trade_grade.season_window(settings)
-    rostered_ids = {str(pid) for r in rosters for pid in (r.get("players") or []) if pid is not None}
+    needs = ctx.needs()
 
     team_rows: list[dict[str, Any]] = []
     for rid in teams_in_trade:

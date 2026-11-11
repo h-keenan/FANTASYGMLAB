@@ -15,6 +15,13 @@ vi.mock("@/context/ExperienceLevelContext", async () => {
   };
 });
 
+// The 3-team ideas section has its own tests; here only its placement matters.
+vi.mock("@/components/MultiTeamIdeasSection", () => ({
+  MultiTeamIdeasSection: ({ leagueId, lens }: { leagueId: string; lens: string }) => (
+    <div data-testid="multi-team-ideas-stub">{`${leagueId}:${lens}`}</div>
+  ),
+}));
+
 function asset(overrides: Partial<TradeAsset>): TradeAsset {
   return {
     asset_type: "player",
@@ -66,6 +73,14 @@ const RESPONSE: TradeHubResponse = {
 };
 
 describe("TradeHubContent", () => {
+  it("shows the 3-team ideas section for the league and lens, but not for imported leagues", () => {
+    const { unmount } = render(<TradeHubContent leagueId="123" leagueName="Dynasty Overlords" data={RESPONSE} lens="Rebuild" />);
+    expect(screen.getByTestId("multi-team-ideas-stub")).toHaveTextContent("123:Rebuild");
+    unmount();
+    render(<TradeHubContent leagueId="espn:99" leagueName="Imported" data={RESPONSE} />);
+    expect(screen.queryByTestId("multi-team-ideas-stub")).toBeNull();
+  });
+
   it("renders a trade idea card with partner, fairness pill, value edge, and give/get assets", () => {
     render(<TradeHubContent leagueId="123" leagueName="Dynasty Overlords" data={RESPONSE} />);
 

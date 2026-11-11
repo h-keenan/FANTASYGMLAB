@@ -34,6 +34,7 @@ export const IDENTICAL = [
   "injuryTone.generated.ts",
   "limitWall.ts",
   "matchupPlanner.ts",
+  "multiTeamIdeas.ts",
   "multiTeamTrade.ts",
   "opponentProfile.ts",
   "sampleLeague.ts",

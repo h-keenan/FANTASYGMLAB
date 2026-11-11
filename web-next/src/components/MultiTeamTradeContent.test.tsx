@@ -179,6 +179,33 @@ describe("MultiTeamTradeContent", () => {
     expect(await screen.findByTestId("multi-team-failure")).toHaveTextContent(/available for Sleeper leagues/);
   });
 
+  it("opens a 3-team idea prefilled and grades it once, without a tap on Analyze", async () => {
+    post.mockResolvedValue(OK);
+    const transfers = [
+      { type: "player" as const, id: "a", from_roster_id: "1", to_roster_id: "2" },
+      { type: "player" as const, id: "b", from_roster_id: "2", to_roster_id: "3" },
+      { type: "player" as const, id: "c", from_roster_id: "3", to_roster_id: "1" },
+    ];
+    render(
+      <MultiTeamTradeContent
+        leagueId="league-1"
+        leagueName="Dynasty Overlords"
+        myRosterId="1"
+        rankings={RANKINGS}
+        picks={[] as DraftPickAsset[]}
+        rosters={ROSTERS}
+        teamProfiles={PROFILES}
+        lens="Dynasty"
+        modeToggle={<TradeModeToggle mode="multi" onChange={() => {}} />}
+        prefill={transfers}
+      />,
+    );
+    expect(screen.getAllByTestId("team-panel")).toHaveLength(3);
+    await waitFor(() => expect(post).toHaveBeenCalledTimes(1));
+    expect(post.mock.calls[0][1]).toEqual({ transfers, perspectiveRosterId: "1", lens: "Dynasty" });
+    expect(await screen.findByTestId("most-hurt-banner")).toBeInTheDocument();
+  });
+
   it("removing a team drops the assets routed to it", () => {
     renderBuilder();
     buildThreeTeamTrade();

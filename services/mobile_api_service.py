@@ -55,6 +55,7 @@ Deployment topology (Render):
   - GET  /v1/portfolio/exposure     — which players the caller owns across saved leagues, with concentration (Pro)
   - GET  /v1/leagues-glance        — compact per-league cards (record, top add, top trade, news count, top need), 3-min cache (Premium)
   - GET  /v1/leagues/{id}/trade-hub — real trade ideas for the caller's roster
+  - GET  /v1/leagues/{id}/trade-ideas/multi — 3-team trade ideas, every team Fair or better (Pro; Free gets a locked count; docs/multi-team-trade-api.md)
   - POST /v1/leagues/{id}/trade-analyzer/multi — 3-6 team trade, per-team verdicts + league summary (free, not metered; docs/multi-team-trade-api.md)
   - POST /v1/leagues/{id}/commissioner/veto-check — outrage read on a proposed trade, whole-roster (Pro)
   - GET  /v1/leagues/{id}/trade-target — 2-3 built offers to get a player off another roster (Pro)
@@ -6580,20 +6581,22 @@ def _multi_team_frame_hook(league_id: str, league: dict[str, Any], settings: dic
     return hook
 
 
-def _compute_multi_team_trade(
-    body: MultiTeamTradeAnalyzerRequest,
+def _multi_team_engine_hooks(
     league_id: str,
+    league: dict[str, Any],
     user: dict[str, Any],
     my_roster: dict[str, Any],
+    *,
+    lens: str,
+    strategy: str,
     pro: bool,
 ) -> dict[str, Any]:
-    from modules import multi_team_trade_engine
+    """The per-request inputs the multi-team engine takes as hooks (keeper / IDP
+    frame rows, the caller's declared posture and untouchables, the usage guard);
+    shared by the 3-6 team Analyzer and the 3-team idea finder."""
 
-    league = sleeper.get_league(league_id)
-    if not league:
-        raise HTTPException(status_code=404, detail="League not found.")
     settings = league_value_settings.detect_league_value_settings_from_payload(league)
-    score_field = league_value_settings.valuation_score_field(body.lens)
+    score_field = league_value_settings.valuation_score_field(lens)
     my_rid = str(my_roster.get("roster_id"))
     lazy: dict[str, Any] = {}
 
@@ -6601,7 +6604,7 @@ def _compute_multi_team_trade(
         # Only the caller's own seat has a declared Team Situation.
         if str(roster.get("roster_id")) != my_rid:
             return None
-        return _resolve_trade_posture(user, league_id, league, my_roster, lens=body.lens, client_strategy=body.strategy)
+        return _resolve_trade_posture(user, league_id, league, my_roster, lens=lens, client_strategy=strategy)
 
     def untouchable_provider(rid: str) -> Callable[[], set[str] | None]:
         if rid != my_rid:
@@ -6631,6 +6634,27 @@ def _compute_multi_team_trade(
                 lazy["stats"] = {}
         return _waiver_usage_guard(rvc, lazy["stats"], display=pro)
 
+    return {
+        "frame_hook": _multi_team_frame_hook(league_id, league, settings, user, score_field, lens),
+        "posture_override": posture_override,
+        "untouchable_provider": untouchable_provider,
+        "usage_provider": usage_provider,
+    }
+
+
+def _compute_multi_team_trade(
+    body: MultiTeamTradeAnalyzerRequest,
+    league_id: str,
+    user: dict[str, Any],
+    my_roster: dict[str, Any],
+    pro: bool,
+) -> dict[str, Any]:
+    from modules import multi_team_trade_engine
+
+    league = sleeper.get_league(league_id)
+    if not league:
+        raise HTTPException(status_code=404, detail="League not found.")
+    my_rid = str(my_roster.get("roster_id"))
     crowd = {}
     if any(t.type.strip().lower() == "pick" for t in body.transfers) and college_scouting.class_strength_signal_enabled():
         crowd = college_scouting.get_cached_crowd_class_strength_by_year(
@@ -6643,13 +6667,12 @@ def _compute_multi_team_trade(
         lens=body.lens,
         players_db_path=PLAYERS_DB_PATH,
         perspective_roster_id=body.perspective_roster_id or my_rid,
-        frame_hook=_multi_team_frame_hook(league_id, league, settings, user, score_field, body.lens),
-        posture_override=posture_override,
-        untouchable_provider=untouchable_provider,
-        usage_provider=usage_provider,
         crowd_class_strength_by_year=crowd,
         include_veto=pro,
         status=status,
+        **_multi_team_engine_hooks(
+            league_id, league, user, my_roster, lens=body.lens, strategy=body.strategy, pro=pro
+        ),
     )
     if result.get("status") != "ok":
         return {"ok": True, "reason": result.get("status"), "verdict": None, **result}
@@ -6721,6 +6744,129 @@ def post_trade_analyzer_multi(
         "is_premium": bool(pro),
         "veto_locked": not pro,
         "veto_upsell": None if pro else _COMMISSIONER_UPSELL,
+    }
+
+
+# ---------------------------------------------------------------------------
+# 3-team trade ideas (Trade Hub). Contract: docs/multi-team-trade-api.md
+# ---------------------------------------------------------------------------
+# A Pro feature (Free sees a locked teaser with the count). The search is the
+# expensive part and is the same for every tier, so ONE single-flight Redis
+# entry per (league, user, lens) holds the full result and the tier filter is
+# applied outside it. Heavy admission lane + a per-user rate limit bound it.
+MULTI_TEAM_IDEAS_RATE_MAX = int(os.environ.get("MULTI_TEAM_IDEAS_RATE_MAX", "6"))
+MULTI_TEAM_IDEAS_RATE_WINDOW_SECONDS = int(os.environ.get("MULTI_TEAM_IDEAS_RATE_WINDOW_SECONDS", "60"))
+MULTI_TEAM_IDEAS_CACHE_TTL_SECONDS = trade_hub_engine.TRADE_HUB_IDEAS_TTL_SECONDS
+MULTI_TEAM_IDEAS_LOCK_TIMEOUT_SECONDS = 30.0
+_MULTI_TEAM_IDEAS_UPSELL = {
+    "title": "See 3-team trade ideas",
+    "body": (
+        "Pro finds three-way deals where your surplus fills one team's need, theirs fills another's, "
+        "and every team still comes out fair. Start your free trial to unlock them."
+    ),
+}
+
+
+def _compute_multi_team_ideas(
+    league_id: str, lens: str, user: dict[str, Any], my_roster: dict[str, Any], pro: bool
+) -> dict[str, Any]:
+    from modules import multi_team_trade_engine, multi_team_trade_finder
+
+    league = sleeper.get_league(league_id)
+    if not league:
+        raise HTTPException(status_code=404, detail="League not found.")
+    config = auth_supabase.get_supabase_config()
+    user_id = str(user.get("id") or "")
+    _targets, untouchables = _fetch_gm_target_player_ids(
+        config, user_id, str(user.get("_access_token") or ""), league_id
+    )
+    ctx = multi_team_trade_engine.build_context(
+        league_id=league_id, lens=lens, players_db_path=PLAYERS_DB_PATH,
+        perspective_roster_id=str(my_roster.get("roster_id")), status=model_status.ok(),
+        **_multi_team_engine_hooks(league_id, league, user, my_roster, lens=lens, strategy="", pro=pro),
+    )
+    if isinstance(ctx, dict):
+        return {"ok": True, "ideas": [], "reason": ctx.get("status") or "unavailable", "search": None}
+    result = multi_team_trade_finder.find_three_team_ideas(
+        ctx, str(my_roster.get("roster_id")), untouchable_ids={str(p) for p in untouchables}
+    )
+    return {
+        "ok": True,
+        "ideas": result["ideas"],
+        "reason": "" if result["ideas"] else str((result.get("search") or {}).get("reason") or "no_fit"),
+        "search": result["search"],
+    }
+
+
+@app.get("/v1/leagues/{league_id}/trade-ideas/multi")
+def get_multi_team_trade_ideas(
+    league_id: str = Depends(resolve_league_path_id),
+    lens: str = "Dynasty",
+    user: dict[str, Any] = Depends(require_user),
+) -> dict[str, Any]:
+    """3-team trade ideas for the caller (modules.multi_team_trade_finder).
+
+    Every idea is a cyclic three-way deal in which each team's OWN verdict (the
+    3-team Analyzer's per-team pipeline) is Fair or better. Pro gets the ideas;
+    Free gets ``locked: true`` and ``idea_count`` (a teaser, no assets). Each idea
+    carries ``analyzer_request`` so a client can open the multi-team Analyzer
+    prefilled with it."""
+
+    if lens not in league_value_settings.VALUATION_LENS_TO_SCORE_FIELD:
+        raise HTTPException(
+            status_code=422,
+            detail="lens must be one of: " + ", ".join(league_value_settings.VALUATION_LENS_TO_SCORE_FIELD),
+        )
+    if external_leagues.is_external_league_key(league_id):
+        return {"ok": True, "ideas": [], "reason": "unsupported_platform", "locked": False, "idea_count": 0}
+    my_roster, reason = _resolve_my_roster(user, league_id)
+    if my_roster is None:
+        return {"ok": True, "ideas": [], "reason": reason, "locked": False, "idea_count": 0}
+    league = sleeper.get_league(league_id)
+    if not league:
+        raise HTTPException(status_code=404, detail="League not found.")
+    trade_window = league_calendar.trade_window(league)
+    if trade_window["trade_deadline_passed"]:
+        return {
+            "ok": True, "ideas": [], "locked": False, "idea_count": 0,
+            "reason": league_calendar.TRADE_DEADLINE_PASSED_REASON,
+            "message": league_calendar.TRADE_DEADLINE_PASSED_MESSAGE,
+            "trade_window": trade_window,
+        }
+
+    user_id = str(user.get("id") or "")
+    if not os.environ.get("PYTEST_CURRENT_TEST") or os.environ.get("DYNASTYGM_FORCE_RATE_LIMIT"):
+        allowed, retry_after = _rate_limiter.hit(
+            f"multi_ideas|{user_id}", MULTI_TEAM_IDEAS_RATE_MAX, MULTI_TEAM_IDEAS_RATE_WINDOW_SECONDS
+        )
+        if not allowed:
+            raise HTTPException(
+                status_code=429,
+                detail="Too many 3-team idea searches. Please wait a moment and try again.",
+                headers={"Retry-After": str(int(retry_after) + 1)},
+            )
+    pro = _is_pro_caller(user)
+    bucket = int(time.time() // MULTI_TEAM_IDEAS_CACHE_TTL_SECONDS)
+    cache_key = redis_cache.build_cache_key(
+        "multi_team_ideas", league_id, user_id, str(my_roster.get("roster_id")), lens, str(bucket)
+    )
+    result = redis_cache.redis_single_flight_cache(
+        cache_key=cache_key,
+        ttl_seconds=MULTI_TEAM_IDEAS_CACHE_TTL_SECONDS,
+        compute=lambda: _compute_multi_team_ideas(league_id, lens, user, my_roster, True),
+        lock_timeout_seconds=MULTI_TEAM_IDEAS_LOCK_TIMEOUT_SECONDS,
+    )
+    ideas = list(result.get("ideas") or [])
+    return {
+        "ok": True,
+        "reason": result.get("reason") or "",
+        "ideas": ideas if pro else [],
+        "idea_count": len(ideas),
+        "locked": bool(ideas) and not pro,
+        "upsell": None if pro or not ideas else _MULTI_TEAM_IDEAS_UPSELL,
+        "is_premium": bool(pro),
+        "search": result.get("search"),
+        "trade_window": trade_window,
     }
 
 

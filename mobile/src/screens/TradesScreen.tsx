@@ -40,7 +40,7 @@ const TAB_OPTIONS = TRADES_TAB_OPTIONS;
  * calls up front, but switching tabs back and forth doesn't re-fetch either.
  */
 export default function TradesScreen({ route, navigation }: Props) {
-  const { leagueId, leagueName, initialTab, tradePlayer, offerPrefill } = route.params;
+  const { leagueId, leagueName, initialTab, tradePlayer, offerPrefill, multiPrefill } = route.params;
   const headerHeight = useHeaderHeight();
   const { colors } = useThemeMode();
   const styles = useMemo(() => createStyles(colors), [colors]);
@@ -121,6 +121,7 @@ export default function TradesScreen({ route, navigation }: Props) {
               navigation={navigation}
               quickAddPlayer={initialTab === 'make' ? tradePlayer : undefined}
               offerPrefill={initialTab === 'make' ? offerPrefill : undefined}
+              multiPrefill={initialTab === 'make' ? multiPrefill : undefined}
             />
           </View>
         ) : null}

@@ -62,6 +62,14 @@ export function paidPreview(key: string, leagueName?: string): PaidPreview | nul
         ],
         freeIncludes: "Free keeps one saved league.",
       };
+    case "3_team_ideas":
+      return {
+        bullets: [
+          "Three-way deals where your surplus fills one team's need and theirs fills another's",
+          "Every team still comes out Fair or better by its own verdict",
+          "Open any idea in the multi-team Analyzer or share the pitch",
+        ],
+      };
     case "exposure":
       return {
         bullets: ["Which players you own across every league", "How concentrated your portfolio is"],

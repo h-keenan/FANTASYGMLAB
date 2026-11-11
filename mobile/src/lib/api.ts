@@ -9,6 +9,7 @@ import { env } from './env';
 import { maskShowcaseFields, setShowcaseModeEnabled, unmaskShowcaseFields } from './showcaseMode';
 import { withBackgroundRetry } from './backgroundRetry';
 import type { MultiTeamTradeResponse, MultiTransfer } from './multiTeamTrade';
+import type { MultiTeamIdeasResponse } from './multiTeamIdeas';
 import { parseRetryAfterSeconds, withServerBusyRetry } from './busyRetry';
 import { FREE_LEAGUE_CAP_MESSAGE, isFreeLeagueLockedBody } from './freeLeagueCap';
 import type { PercentileExplorerResponse } from './percentileExplorer';
@@ -4294,6 +4295,11 @@ export const api = {
       lens: body.lens ?? 'Dynasty',
       partner_roster_id: body.partnerRosterId ?? '',
     }),
+  // 3-team trade ideas (Pro; Free gets a locked count).
+  getMultiTeamTradeIdeas: (leagueId: string, lens: ValuationLens = 'Dynasty') =>
+    authorizedRequest<MultiTeamIdeasResponse>(
+      `/v1/leagues/${encodeURIComponent(leagueId)}/trade-ideas/multi?lens=${encodeURIComponent(lens)}`,
+    ),
   // 3 to 6 team trade, graded for every team (docs/multi-team-trade-api.md).
   // Not counted against the free weekly limit, so a busy (503) answer is
   // safe to retry even though it is a POST.

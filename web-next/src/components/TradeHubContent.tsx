@@ -12,6 +12,8 @@ import { filterTradeIdeas } from "@/lib/tradeHubFilters";
 import { TradeHubHoldCard } from "@/components/TradeHubHoldCard";
 import { DeadlineCard } from "@/components/DeadlineCard";
 import { TradeIdeaCardView } from "@/components/TradeIdeaCard";
+import { MultiTeamIdeasSection } from "@/components/MultiTeamIdeasSection";
+import { isEspnLeagueId } from "@/lib/leaguePlatform";
 import { TradesTabBar } from "@/components/TradesTabBar";
 import { tradeHubReasonMessage } from "@/lib/tradeHubPresentation";
 import { ValueSignalsCard } from "@/components/ValueSignalsCard";
@@ -168,6 +170,8 @@ export function TradeHubContent({
           })}
         </div>
       )}
+
+      {isEspnLeagueId(leagueId) ? null : <MultiTeamIdeasSection leagueId={leagueId} leagueName={leagueName} lens={lens} />}
 
       {entitlement && entitlement.hidden_count > 0 ? (
         <div

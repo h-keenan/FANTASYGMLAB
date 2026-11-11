@@ -61,6 +61,7 @@ import { ValuesCredit } from "@/components/ValuesCredit";
 import { PageTitle } from "@/components/PageTitle";
 import { MultiTeamTradeContent, TradeModeToggle } from "@/components/MultiTeamTradeContent";
 import { isEspnLeagueId } from "@/lib/leaguePlatform";
+import type { MultiTransfer } from "@/lib/multiTeamTrade";
 
 /**
  * Trade Analyzer (Revision 15) — the manual "evaluate an offer you
@@ -656,6 +657,7 @@ export function TradeAnalyzerContent({
   bridgeTrade,
   lens = "Dynasty",
   offerPrefill,
+  multiPrefill,
 }: {
   leagueId: string;
   leagueName: string;
@@ -676,6 +678,8 @@ export function TradeAnalyzerContent({
   /** A built offer ("Build an offer", ?send=&receive=&sendPicks=&receivePicks=)
    * to load into the builder so it can be tweaked, regraded and shared. */
   offerPrefill?: OfferPrefill | null;
+  /** A 3-team trade (a Trade Hub idea, `?multi=`): opens the multi-team builder with it loaded and graded. */
+  multiPrefill?: MultiTransfer[] | null;
 }) {
   const reasonMessage = myRoster.reason ? tradeAnalyzerReasonMessage(myRoster.reason) : null;
   const myRosterId = String((myRoster.roster?.roster_id as string | number | undefined) ?? "");
@@ -720,7 +724,7 @@ export function TradeAnalyzerContent({
   const [rosterOverflow, setRosterOverflow] = useState<RosterOverflow | null>(null);
   // Two teams (this builder) or a 3 to 6 team trade (MultiTeamTradeContent).
   // Imported (ESPN, MFL, ...) leagues only get the two team Analyzer.
-  const [tradeMode, setTradeMode] = useState<"two" | "multi">("two");
+  const [tradeMode, setTradeMode] = useState<"two" | "multi">(multiPrefill?.length ? "multi" : "two");
   const multiTeamAvailable = !isEspnLeagueId(leagueId);
 
   const selectedPlayerIds = useMemo(
@@ -967,6 +971,7 @@ export function TradeAnalyzerContent({
         teamProfiles={teamProfiles}
         lens={lens}
         modeToggle={<TradeModeToggle mode={tradeMode} onChange={setTradeMode} />}
+        prefill={multiPrefill ?? undefined}
       />
     );
   }

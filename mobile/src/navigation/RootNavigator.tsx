@@ -45,6 +45,7 @@ import DashboardScreen from '../screens/DashboardScreen';
 import TradesScreen from '../screens/TradesScreen';
 import TradeOfferScreen from '../screens/TradeOfferScreen';
 import type { OfferPrefill } from '../lib/tradeOffer';
+import type { MultiTransfer } from '../lib/multiTeamTrade';
 import TeamsScreen from '../screens/TeamsScreen';
 import GamesScreen from '../screens/GamesScreen';
 import CommissionerScreen from '../screens/CommissionerScreen';
@@ -119,6 +120,8 @@ export type RootStackParamList = {
     tradePlayer?: RankedPlayer;
     // A built offer ("Build an offer") loaded into the Analyzer tab to tweak/share.
     offerPrefill?: OfferPrefill;
+    // A 3-team idea from Trade Hub, loaded into the Analyzer's Multi-team builder and graded.
+    multiPrefill?: MultiTransfer[];
   };
   // "Build an offer": 2-3 built packages to get a player off another team.
   TradeOffer: { leagueId: string; leagueName: string; playerId: string };
