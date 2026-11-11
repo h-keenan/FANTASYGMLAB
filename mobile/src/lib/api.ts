@@ -8,6 +8,7 @@ import type { OpponentProfileResponse } from './opponentProfile';
 import { env } from './env';
 import { maskShowcaseFields, setShowcaseModeEnabled, unmaskShowcaseFields } from './showcaseMode';
 import { withBackgroundRetry } from './backgroundRetry';
+import type { MultiTeamTradeResponse, MultiTransfer } from './multiTeamTrade';
 import { parseRetryAfterSeconds, withServerBusyRetry } from './busyRetry';
 import { FREE_LEAGUE_CAP_MESSAGE, isFreeLeagueLockedBody } from './freeLeagueCap';
 import type { PercentileExplorerResponse } from './percentileExplorer';
@@ -85,7 +86,7 @@ const REQUEST_TIMEOUT_MS = 30_000;
 
 async function performRequest<T>(
   path: string,
-  init: { method?: 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE'; jsonBody?: unknown; signal?: AbortSignal } | undefined,
+  init: { method?: 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE'; jsonBody?: unknown; signal?: AbortSignal; idempotent?: boolean } | undefined,
   accessToken: string,
 ): Promise<T> {
   const controller = new AbortController();
@@ -140,7 +141,7 @@ async function performRequest<T>(
 
 async function authorizedRequest<T>(
   path: string,
-  init?: { method?: 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE'; jsonBody?: unknown; signal?: AbortSignal },
+  init?: { method?: 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE'; jsonBody?: unknown; signal?: AbortSignal; idempotent?: boolean },
 ): Promise<T> {
   const { data, error: sessionError } = await supabase.auth.getSession();
   if (sessionError || !data.session) {
@@ -154,7 +155,7 @@ async function authorizedRequest<T>(
     // wait the hinted time and retry a couple of times before surfacing.
     () =>
       withServerBusyRetry(() => performRequest<T>(path, init, accessToken), {
-        canRetry: (init?.method ?? 'GET') === 'GET',
+        canRetry: (init?.method ?? 'GET') === 'GET' || init?.idempotent === true,
         signal: init?.signal,
       }),
     () => backgroundTransitions > backgroundSnapshot,
@@ -4283,6 +4284,22 @@ export const api = {
       strategy: body.strategy ?? 'retool',
       lens: body.lens ?? 'Dynasty',
       partner_roster_id: body.partnerRosterId ?? '',
+    }),
+  // 3 to 6 team trade, graded for every team (docs/multi-team-trade-api.md).
+  // Not counted against the free weekly limit, so a busy (503) answer is
+  // safe to retry even though it is a POST.
+  postMultiTeamTradeAnalyzer: (
+    leagueId: string,
+    body: { transfers: MultiTransfer[]; perspectiveRosterId?: string; lens?: ValuationLens },
+  ) =>
+    authorizedRequest<MultiTeamTradeResponse>(`/v1/leagues/${encodeURIComponent(leagueId)}/trade-analyzer/multi`, {
+      method: 'POST',
+      idempotent: true,
+      jsonBody: {
+        transfers: body.transfers,
+        perspective_roster_id: body.perspectiveRosterId ?? '',
+        lens: body.lens ?? 'Dynasty',
+      },
     }),
   getLeagueDraftPicks: (leagueId: string, options?: { lens?: ValuationLens }) => {
     const params = new URLSearchParams();

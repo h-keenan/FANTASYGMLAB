@@ -38,9 +38,10 @@ export function looksTechnical(message: string): boolean {
  * Player Compare's "No player selected to compare."). A page whose own
  * fetch effect has no retry token can pass `reloadPage`.
  */
-export function ErrorState({ message, onRetry }: { message: string; onRetry?: () => void }) {
+export function ErrorState({ message, onRetry, bare = false }: { message: string; onRetry?: () => void; /** Render as a section inside a page that already has its own <main>. */ bare?: boolean }) {
   const leagueLocked = message === FREE_LEAGUE_CAP_MESSAGE;
   const technical = looksTechnical(message);
+  const Wrapper = bare ? "section" : "main";
   // Team-visible error signal (route_error): only a coarse class derived from
   // the message, never the message itself. Rate limited in trackClientError.
   useEffect(() => {
@@ -57,7 +58,7 @@ export function ErrorState({ message, onRetry }: { message: string; onRetry?: ()
     );
   }
   return (
-    <main className="flex-1 flex flex-col justify-center px-4 py-8 max-w-3xl w-full mx-auto">
+    <Wrapper className={bare ? "flex flex-col" : "flex-1 flex flex-col justify-center px-4 py-8 max-w-3xl w-full mx-auto"}>
       <AccentCard accent="var(--color-danger)" as="div">
         <div className="flex items-start gap-3" data-testid="error-state">
           <StateIconRing accent="var(--color-danger)">
@@ -87,7 +88,7 @@ export function ErrorState({ message, onRetry }: { message: string; onRetry?: ()
           </div>
         </div>
       </AccentCard>
-    </main>
+    </Wrapper>
   );
 }
 

@@ -10,6 +10,7 @@ import {
   FlatList,
   KeyboardAvoidingView,
   Platform,
+  ScrollView,
   StyleSheet,
   TouchableOpacity,
   View,
@@ -39,6 +40,8 @@ import SegmentedTabBar from '../components/SegmentedTabBar';
 import MeterRow from '../components/ConfidenceMeter';
 import TeamAvatar from '../components/TeamAvatar';
 import ManagerTendenciesChips from '../components/ManagerTendenciesChips';
+import MultiTeamTradePanel from '../components/MultiTeamTradePanel';
+import { isEspnLeagueId } from '../lib/leaguePlatform';
 import TradeSharePreviewModal from '../components/TradeSharePreviewModal';
 import TradeOddsEffect from '../components/TradeOddsEffect';
 import TradeValueBar from '../components/TradeValueBar';
@@ -164,6 +167,8 @@ const NOT_READY_MESSAGES: Record<string, string> = {
 interface OtherTeam {
   rosterId: string;
   ownerName: string;
+  /** Team name for the multi-team builder (falls back to the owner). */
+  teamName: string;
   avatarId: string | null;
   playerIds: Set<string>;
 }
@@ -180,6 +185,11 @@ export default function TradeAnalyzerScreen({ leagueId, leagueName, navigation, 
   const [myRosterIds, setMyRosterIds] = useState<Set<string>>(new Set());
   const [myRosterId, setMyRosterId] = useState('');
   const [otherTeams, setOtherTeams] = useState<OtherTeam[]>([]);
+  const [myTeam, setMyTeam] = useState<{ name: string; avatarId: string | null }>({ name: 'Your team', avatarId: null });
+  // Two teams (Full Analysis / Quick Compare) or a 3 to 6 team trade. Imported
+  // (ESPN, MFL, ...) leagues only get the two team Analyzer.
+  const [multiMode, setMultiMode] = useState(false);
+  const multiTeamAvailable = !isEspnLeagueId(leagueId);
   const [selectedTeamId, setSelectedTeamId] = useState<string>(ALL_TEAMS_ID);
   const [rankings, setRankings] = useState<RankedPlayer[]>([]);
   const positionOptions = useMemo(() => tradePositionOptions(ALL_POSITION_OPTIONS, rankings), [rankings]);
@@ -286,12 +296,14 @@ export default function TradeAnalyzerScreen({ leagueId, leagueName, navigation, 
             return {
               rosterId,
               ownerName: usersById.get(ownerId) ?? 'Unclaimed team',
+              teamName: teamProfiles[rosterId]?.team_name || usersById.get(ownerId) || 'Unclaimed team',
               avatarId: teamProfiles[rosterId]?.avatar_id ?? null,
               playerIds: new Set(players.map(String)),
             };
           })
           .filter((team) => team.rosterId && team.rosterId !== myId);
         setOtherTeams(teams);
+        setMyTeam({ name: teamProfiles[myId]?.team_name || 'Your team', avatarId: teamProfiles[myId]?.avatar_id ?? null });
 
         const extras = await fetchMissingPlayersById(leagueId, lens, prefillIdsRef.current, rankingsResult.players);
         if (cancelled) return;
@@ -559,13 +571,17 @@ export default function TradeAnalyzerScreen({ leagueId, leagueName, navigation, 
       />
 
       <View style={styles.modeRow}>
-        <SegmentedTabBar<'full' | 'quick'>
+        <SegmentedTabBar<'full' | 'quick' | 'multi'>
           options={[
             { key: 'full', label: 'Full Analysis' },
             { key: 'quick', label: 'Quick Compare' },
+            ...(multiTeamAvailable ? [{ key: 'multi' as const, label: 'Multi-team' }] : []),
           ]}
-          active={quickMode ? 'quick' : 'full'}
-          onChange={(key) => setQuickMode(key === 'quick')}
+          active={multiMode ? 'multi' : quickMode ? 'quick' : 'full'}
+          onChange={(key) => {
+            setMultiMode(key === 'multi');
+            setQuickMode(key === 'quick');
+          }}
         />
       </View>
 
@@ -740,6 +756,48 @@ export default function TradeAnalyzerScreen({ leagueId, leagueName, navigation, 
       />
     </View>
   );
+
+  if (multiMode && multiTeamAvailable) {
+    const panelTeams = [
+      { rosterId: myRosterId, name: myTeam.name, avatarId: myTeam.avatarId, playerIds: myRosterIds },
+      ...otherTeams.map((team) => ({ rosterId: team.rosterId, name: team.teamName, avatarId: team.avatarId, playerIds: team.playerIds })),
+    ];
+    return (
+      <KeyboardAvoidingView style={styles.root} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+        <GridBackground />
+        <ScrollView
+          style={styles.container}
+          contentContainerStyle={[styles.resultsList, { paddingBottom: orbClearance }]}
+          keyboardShouldPersistTaps="handled"
+        >
+          <View style={styles.modeRow}>
+            <SegmentedTabBar<'full' | 'quick' | 'multi'>
+              options={[
+                { key: 'full', label: 'Full Analysis' },
+                { key: 'quick', label: 'Quick Compare' },
+                { key: 'multi', label: 'Multi-team' },
+              ]}
+              active="multi"
+              onChange={(key) => {
+                setMultiMode(key === 'multi');
+                setQuickMode(key === 'quick');
+              }}
+            />
+          </View>
+          <MultiTeamTradePanel
+            leagueId={leagueId}
+            leagueName={leagueName}
+            myRosterId={myRosterId}
+            teams={panelTeams}
+            rankings={rankings}
+            picks={allPicks}
+            lens={lens}
+          />
+          <ValuesCredit />
+        </ScrollView>
+      </KeyboardAvoidingView>
+    );
+  }
 
   return (
     <KeyboardAvoidingView

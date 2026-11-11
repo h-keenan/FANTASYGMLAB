@@ -15,6 +15,8 @@ import { valuationLensLabel } from "@/lib/valuationLens";
 import { buildAnalyzerIdea, buildPartnerPitch } from "./analyzerShare";
 import { STORY_SIZE, SHARE_FONT_FAMILY, ShareBackdrop, type ShareBrandAssets } from "./frame";
 import { TradeShareCard } from "./tradeCard";
+import { MultiTradeShareCard } from "./multiTradeCard";
+import type { ShareModel } from "@/lib/multiTeamTrade";
 
 export interface AnalyzerCardParams {
   sendAssets: TradeAsset[];
@@ -226,6 +228,22 @@ export async function svgToPngBlob(svg: string, width: number, height: number): 
   const bytes = new Uint8Array(binary.length);
   for (let i = 0; i < binary.length; i += 1) bytes[i] = binary.charCodeAt(i);
   return new Blob([bytes], { type: "image/png" });
+}
+
+/** The multi-team (3 to 6 team) pitch card as SVG text. No images are fetched:
+ * team marks are initials, so it never waits on the network. */
+export async function renderMultiTradeCardSvg(model: ShareModel, leagueName: string | null | undefined, assets: ShareStaticAssets): Promise<string> {
+  const satori = await loadSatori(assets.yoga);
+  const { width, height } = STORY_SIZE;
+  const backdrop = svgDataUri(await satori(<ShareBackdrop width={width} height={height} />, { width, height, fonts: assets.fonts }));
+  const brand: ShareBrandAssets = { lockup: assets.lockup, qr: assets.qr, backdrop };
+  return satori(<MultiTradeShareCard model={model} leagueName={leagueName} brand={brand} width={width} height={height} />, { width, height, fonts: assets.fonts });
+}
+
+export async function renderMultiTradeCardBlob(model: ShareModel, leagueName: string | null | undefined): Promise<Blob> {
+  const assets = await loadBrowserAssets();
+  const svg = await renderMultiTradeCardSvg(model, leagueName, assets);
+  return svgToPngBlob(svg, STORY_SIZE.width, STORY_SIZE.height);
 }
 
 /** The whole browser flow: assets -> Satori SVG -> PNG Blob. */
