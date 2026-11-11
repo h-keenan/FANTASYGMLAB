@@ -42,6 +42,7 @@ import { useThemeMode, type ThemeMode } from '../context/ThemeModeContext';
 import { useShowcaseMode } from '../context/ShowcaseModeContext';
 import ReferralCard from '../components/ReferralCard';
 import Toggle from '../components/Toggle';
+import NotificationControls from '../components/NotificationControls';
 import GuestCreateAccountModal from '../components/GuestCreateAccountModal';
 import Input from '../components/Input';
 import HelpLink from '../components/HelpLink';
@@ -676,6 +677,7 @@ export default function MoreScreen({ navigation }: Props) {
               ))
             : null}
         </AnimatedCard>
+        {pushCategories ? <NotificationControls savedLeagues={savedLeagues} /> : null}
 
         <SectionHeading title="About" topGap={16} />
         <AnimatedCard style={styles.groupCard}>

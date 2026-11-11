@@ -4,6 +4,7 @@ import { describe, expect, it, vi } from "vitest";
 import { AccountContent } from "./AccountContent";
 
 vi.mock("@/components/SavedLeaguesSection", () => ({ SavedLeaguesSection: () => null }));
+vi.mock("@/components/NotificationControls", () => ({ NotificationControls: () => null }));
 import type { MeResponse, PushCategory } from "@/lib/api";
 
 function user(overrides: Partial<MeResponse["user"]>): MeResponse["user"] {

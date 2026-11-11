@@ -3789,6 +3789,46 @@ export interface PushPreferencesResponse {
   categories: Record<PushCategory, boolean>;
 }
 
+/** GET/POST /v1/notifications/preferences (modules.notification_prefs):
+ * quiet hours, weekly cap, per-league mute and digest, on top of the
+ * per-category toggles above. */
+export type NotificationLeagueMode = "all" | "critical" | "mute";
+export type NotificationDeliveryMode = "instant" | "digest";
+
+export interface NotificationPrefs {
+  quiet_hours_enabled: boolean;
+  quiet_start: number;
+  quiet_end: number;
+  timezone: string;
+  /** null = the server default */
+  weekly_cap: number | null;
+  league_overrides: Record<string, NotificationLeagueMode>;
+  category_modes: Partial<Record<PushCategory, NotificationDeliveryMode>>;
+  digest_hour: number;
+  critical_breaks_quiet: boolean;
+}
+
+export type NotificationPrefsPatch = Partial<Omit<NotificationPrefs, "league_overrides" | "category_modes">> & {
+  league_overrides?: Record<string, NotificationLeagueMode>;
+  category_modes?: Partial<Record<PushCategory, NotificationDeliveryMode>>;
+};
+
+export interface NotificationCapPreset {
+  key: string;
+  label: string;
+  cap: number;
+}
+
+export interface NotificationPreferencesResponse {
+  ok: boolean;
+  categories: Record<PushCategory, boolean>;
+  prefs: NotificationPrefs;
+  default_weekly_cap: number;
+  cap_presets: NotificationCapPreset[];
+  critical_categories: PushCategory[];
+  league_modes: NotificationLeagueMode[];
+}
+
 /** Referral program (modules.referrals, GET /v1/referrals/my-code) — a
  * complete, already-built invite-code/reward system that until now was only
  * ever wired into the legacy Streamlit app. `comp_until` is an ISO
@@ -4822,6 +4862,15 @@ export const api = {
     authorizedRequest<PushPreferencesResponse>("/v1/push/preferences", {
       method: "POST",
       jsonBody: { category, enabled },
+    }),
+
+  // Notification controls: quiet hours, cap, per-league mute, digest.
+  getNotificationPreferences: () =>
+    authorizedRequest<NotificationPreferencesResponse>("/v1/notifications/preferences"),
+  updateNotificationPreferences: (patch: NotificationPrefsPatch) =>
+    authorizedRequest<NotificationPreferencesResponse>("/v1/notifications/preferences", {
+      method: "POST",
+      jsonBody: { prefs: patch },
     }),
 
   // Account page (2026-10-19) — the referral program's own invite

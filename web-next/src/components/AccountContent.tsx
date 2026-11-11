@@ -23,6 +23,7 @@ import { Button, ButtonLink } from "@/components/Button";
 import { OnboardingCarousel } from "@/components/OnboardingCarousel";
 import { trackOnboarding } from "@/lib/onboardingAnalytics";
 import { Toggle } from "@/components/Toggle";
+import { NotificationControls } from "@/components/NotificationControls";
 import { SavedLeaguesSection } from "@/components/SavedLeaguesSection";
 import { SleeperUsernameRelink } from "@/components/SleeperUsernameRelink";
 
@@ -378,6 +379,7 @@ function PreferencesSection({
               </div>
             ))}
           </div>
+          <NotificationControls />
         </div>
       ) : null}
     </section>
