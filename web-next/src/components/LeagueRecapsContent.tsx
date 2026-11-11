@@ -44,6 +44,7 @@ import { PageTitle } from "@/components/PageTitle";
 import { PlayerNameText } from "@/components/PlayerNameText";
 import { LeagueRoundupTab } from "@/components/LeagueRoundupTab";
 import type { RecapsTab } from "@/lib/pageTabs";
+import { ErrorState } from "@/components/ErrorState";
 
 /**
  * Ports modules/league_recaps_ui.py + modules/league_history_ui.py for
@@ -625,6 +626,7 @@ function HistoryTab({
   const [selectedSeasonLeagueId, setSelectedSeasonLeagueId] = useState<string>(leagueId);
   const [filter, setFilter] = useState<string>(initialFilter);
   const [error, setError] = useState<string | null>(null);
+  const [retryToken, setRetryToken] = useState(0);
 
   const data = cache[selectedSeasonLeagueId];
 
@@ -645,7 +647,7 @@ function HistoryTab({
       cancelled = true;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedSeasonLeagueId]);
+  }, [selectedSeasonLeagueId, retryToken]);
 
   if (!data && !error) {
     return (
@@ -656,9 +658,7 @@ function HistoryTab({
   }
   if (error) {
     return (
-      <p className="text-sm" role="alert" style={{ color: "var(--color-danger)" }}>
-        {error}
-      </p>
+      <ErrorState bare message={error} onRetry={() => { setError(null); setRetryToken((n) => n + 1); }} />
     );
   }
   if (!data) return null;
@@ -802,6 +802,7 @@ function StorylinesTab({
   onOpenHistory: (filter: string) => void;
 }) {
   const [error, setError] = useState<string | null>(null);
+  const [retryToken, setRetryToken] = useState(0);
 
   useEffect(() => {
     if (data) return;
@@ -818,7 +819,7 @@ function StorylinesTab({
       cancelled = true;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [leagueId, data]);
+  }, [leagueId, data, retryToken]);
 
   if (!data && !error) {
     return (
@@ -829,9 +830,7 @@ function StorylinesTab({
   }
   if (error) {
     return (
-      <p className="text-sm" role="alert" style={{ color: "var(--color-danger)" }}>
-        {error}
-      </p>
+      <ErrorState bare message={error} onRetry={() => { setError(null); setRetryToken((n) => n + 1); }} />
     );
   }
   if (!data) return null;

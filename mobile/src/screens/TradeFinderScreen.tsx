@@ -46,6 +46,7 @@ import { radii, spacing, type ThemeColors } from '../theme';
 import type { RootStackParamList } from '../navigation/RootNavigator';
 import { usePlayerQuickView } from '../context/PlayerQuickViewContext';
 import { valueEdgeBandColor } from '../lib/valueBandColor';
+import ErrorState from '../components/ErrorState';
 
 // Prop-driven now (TradesScreen owns the single `Trades` route and hosts
 // this screen as one of its tabs) — leagueId/leagueName/navigation arrive as
@@ -392,6 +393,9 @@ export default function TradeFinderScreen({ leagueId, leagueName, navigation, pr
   const [roster, setRoster] = useState<LineupPlayer[]>([]);
   const [loadingRoster, setLoadingRoster] = useState(true);
   const [rosterError, setRosterError] = useState<string | null>(null);
+  // Not a failure: Trade Finder is closed past the trade deadline.
+  const [rosterNotice, setRosterNotice] = useState<string | null>(null);
+  const [rosterReloadToken, setRosterReloadToken] = useState(0);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [ownedPicks, setOwnedPicks] = useState<DraftPickAsset[]>([]);
   const [selectedPickIds, setSelectedPickIds] = useState<Set<string>>(new Set());
@@ -407,6 +411,8 @@ export default function TradeFinderScreen({ leagueId, leagueName, navigation, pr
   useFocusEffect(
     useCallback(() => {
       let cancelled = false;
+      setRosterError(null);
+      setRosterNotice(null);
       (async () => {
         try {
           const result = await api.getLeagueMyTeam(leagueId, { lens });
@@ -416,7 +422,7 @@ export default function TradeFinderScreen({ leagueId, leagueName, navigation, pr
           } else if (result.trade_window?.trade_deadline_passed) {
             // Past the league's trade deadline Trade Finder stops searching
             // for in-season trades (GET .../my-team's additive trade_window).
-            setRosterError(result.trade_window.message || 'Trade deadline has passed; trades reopen after the season.');
+            setRosterNotice(result.trade_window.message || 'Trade deadline has passed; trades reopen after the season.');
           } else {
             setRoster([...result.starters, ...result.bench]);
             // Your own picks to offer — GET .../draft-picks already reflects
@@ -440,7 +446,7 @@ export default function TradeFinderScreen({ leagueId, leagueName, navigation, pr
       return () => {
         cancelled = true;
       };
-    }, [leagueId, lens]),
+    }, [leagueId, lens, rosterReloadToken]),
   );
 
   const toggle = (playerId: string) => {
@@ -512,10 +518,18 @@ export default function TradeFinderScreen({ leagueId, leagueName, navigation, pr
     return <BrandedSpinner style={[styles.center]} />;
   }
 
+  if (rosterNotice) {
+    return (
+      <View style={[styles.center]}>
+        <EmptyState icon="time-outline" title="Trade Finder is closed" subtitle={rosterNotice} />
+      </View>
+    );
+  }
+
   if (rosterError) {
     return (
       <View style={[styles.center]}>
-        <AppText style={styles.error}>{rosterError}</AppText>
+        <ErrorState title="Couldn't load your roster" message={rosterError} onRetry={() => setRosterReloadToken((n) => n + 1)} />
       </View>
     );
   }

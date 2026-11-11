@@ -295,6 +295,7 @@ export default function MatchupScreen({ route, navigation }: Props) {
             slot={planner.plan.slots[planner.sheet.index]?.slot ?? ''}
             onPick={planner.pick}
             onClose={planner.closeSheet}
+            onRetry={() => void planner.openSlot(planner.sheet!.index)}
           />
         ) : null}
         {bestBall ? (

@@ -21,6 +21,7 @@ import { useOrbClearance } from '../lib/orbLayout';
 import { useThemeMode } from '../context/ThemeModeContext';
 import { radii, spacing, type ThemeColors } from '../theme';
 import type { RootStackParamList } from '../navigation/RootNavigator';
+import ErrorState from '../components/ErrorState';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'TradeHistory'>;
 
@@ -133,7 +134,7 @@ export default function TradeHistoryScreen({ navigation }: Props) {
         }
         ListFooterComponent={
           <>
-            {error ? <AppText style={styles.error}>{error}</AppText> : null}
+            {error ? <ErrorState compact title="Couldn't load Trade History" message={error} onRetry={() => void load(false)} /> : null}
             <SharedTradesFeed
               available={shared.available}
               trades={shared.trades}

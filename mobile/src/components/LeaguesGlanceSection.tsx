@@ -29,6 +29,7 @@ import {
 import { useThemeMode } from '../context/ThemeModeContext';
 import { radii, spacing, type ThemeColors } from '../theme';
 import type { RootStackParamList } from '../navigation/RootNavigator';
+import ErrorState from './ErrorState';
 
 type Navigation = NativeStackNavigationProp<RootStackParamList>;
 
@@ -64,6 +65,7 @@ export default function LeaguesGlanceSection({
   const [data, setData] = useState<LeaguesGlanceResponse | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [retryToken, setRetryToken] = useState(0);
 
   useEffect(() => {
     if (state !== 'active') return;
@@ -84,7 +86,7 @@ export default function LeaguesGlanceSection({
     return () => {
       cancelled = true;
     };
-  }, [state, reloadToken]);
+  }, [state, reloadToken, retryToken]);
 
   const openModule = useCallback(
     (league: LeagueGlance, module: GlanceModule) => {
@@ -150,7 +152,7 @@ export default function LeaguesGlanceSection({
           <SkeletonCard styles={styles} />
         </View>
       ) : error && !data ? (
-        <AppText style={styles.errorText}>{`${error} Pull down to retry.`}</AppText>
+        <ErrorState compact title="Couldn't load your league overview" message={error} onRetry={() => setRetryToken((n) => n + 1)} />
       ) : (
         <>
           <View style={layout === 'grid' ? styles.grid : styles.stack} testID={`leagues-glance-${layout}`}>

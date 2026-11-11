@@ -59,6 +59,7 @@ import { leagueCapMessage } from '../lib/leagueCap';
 import Input from '../components/Input';
 import HelpLink from '../components/HelpLink';
 import ModalFormCard, { ModalFormActions, ModalFormHint, ModalFormTitle } from '../components/ModalFormCard';
+import ErrorState from '../components/ErrorState';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Home'>;
 
@@ -492,10 +493,10 @@ export default function HomeScreen({ navigation, route }: Props) {
             </GlassPanel>
 
             {meError ? (
-              <AppText style={styles.error}>Couldn't load your account: {meError}</AppText>
+              <ErrorState compact title="Couldn't load your account" message={meError} onRetry={() => void load()} />
             ) : null}
             {leaguesError ? (
-              <AppText style={styles.error}>Couldn't load your leagues: {leaguesError}</AppText>
+              <ErrorState compact title="Couldn't load your leagues" message={leaguesError} onRetry={() => void load()} />
             ) : null}
 
             <View style={styles.quickActions}>

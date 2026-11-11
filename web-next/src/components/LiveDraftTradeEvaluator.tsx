@@ -8,6 +8,7 @@ import { api, type LiveDraftPickOption, type LiveDraftPickRow } from "@/lib/api"
 import { ExchangeSide } from "@/components/TradeAssetExchange";
 import { fairnessBandColor, formatTradeGain } from "@/lib/tradeHubPresentation";
 import { liveDraftAssetToTradeAsset, liveDraftDraftedPlayerOptions } from "@/lib/liveDraftPresentation";
+import { ErrorState } from "@/components/ErrorState";
 
 /**
  * Hypothetical mid-draft Trade Evaluator — the last of the 4 deferred
@@ -135,6 +136,7 @@ export function LiveDraftTradeEvaluator({
   // react-hooks/set-state-in-effect rule flags that pattern; see
   // PlayerCompareContent.tsx's modelsLoadedFor for the same fix).
   const [pickOptionsLoadedFor, setPickOptionsLoadedFor] = useState<string | null>(null);
+  const [retryToken, setRetryToken] = useState(0);
 
   const [sendPickKeys, setSendPickKeys] = useState<Set<string>>(new Set());
   const [receivePickKeys, setReceivePickKeys] = useState<Set<string>>(new Set());
@@ -165,7 +167,7 @@ export function LiveDraftTradeEvaluator({
     return () => {
       cancelled = true;
     };
-  }, [open, leagueId, draftId]);
+  }, [open, leagueId, draftId, retryToken]);
 
   const loadingOptions = open && pickOptionsLoadedFor !== draftId;
 
@@ -254,9 +256,15 @@ export function LiveDraftTradeEvaluator({
             Loading remaining picks…
           </p>
         ) : optionsError ? (
-          <p role="alert" style={{ color: "var(--color-danger)" }}>
-            {optionsError}
-          </p>
+          <ErrorState
+            bare
+            message={optionsError}
+            onRetry={() => {
+              setOptionsError(null);
+              setPickOptionsLoadedFor(null);
+              setRetryToken((n) => n + 1);
+            }}
+          />
         ) : (
           <>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">

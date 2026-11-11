@@ -33,6 +33,7 @@ import { useScreenHeaderTitle } from '../lib/useScreenHeaderTitle';
 import { useThemeMode } from '../context/ThemeModeContext';
 import { radii, spacing, type ThemeColors } from '../theme';
 import type { RootStackParamList } from '../navigation/RootNavigator';
+import ErrorState from '../components/ErrorState';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Teams'>;
 type TeamsNavigation = NativeStackNavigationProp<RootStackParamList>;
@@ -443,7 +444,14 @@ function RankingsPanel({
   if (error) {
     return (
       <View style={styles.center}>
-        <AppText style={styles.error}>{error}</AppText>
+        <ErrorState
+          title="Couldn't load teams"
+          message={error}
+          onRetry={() => {
+            void teamProfilesQuery.refetch();
+            void rostersQuery.refetch();
+          }}
+        />
       </View>
     );
   }

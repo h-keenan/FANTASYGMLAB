@@ -468,7 +468,7 @@ describe("PortfolioContent", () => {
         onRetryLeague={onRetry}
       />,
     );
-    fireEvent.click(screen.getByRole("button", { name: "Retry" }));
+    fireEvent.click(screen.getByRole("button", { name: "Try again" }));
     expect(onRetry).toHaveBeenCalledWith("bad");
   });
 

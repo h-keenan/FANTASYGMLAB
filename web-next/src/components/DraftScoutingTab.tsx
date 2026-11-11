@@ -6,6 +6,7 @@ import { api, type CollegeProspectsResponse, type DraftPickAsset, type PositionN
 import { CollegeScoutingContent } from "@/components/CollegeScoutingContent";
 import { EmptyState } from "@/components/EmptyState";
 import { needPositionsFrom } from "@/lib/scoutingLens";
+import { ErrorState } from "@/components/ErrorState";
 
 /**
  * Draft Center's Scouting tab: the shared college prospect board, fetched the
@@ -23,6 +24,7 @@ export function DraftScoutingTab({
 }) {
   const [data, setData] = useState<CollegeProspectsResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [retryToken, setRetryToken] = useState(0);
 
   useEffect(() => {
     let cancelled = false;
@@ -37,14 +39,25 @@ export function DraftScoutingTab({
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [retryToken]);
 
   const lens = useMemo(
     () => (needGroups || myPicks.length > 0 ? { needPositions: needPositionsFrom(needGroups), myPicks } : null),
     [needGroups, myPicks],
   );
 
-  if (error) return <EmptyState title="Could not load College Scouting" subtitle={error} />;
+  if (error) {
+    return (
+      <ErrorState
+        bare
+        message={error}
+        onRetry={() => {
+          setError(null);
+          setRetryToken((n) => n + 1);
+        }}
+      />
+    );
+  }
   if (!data) return <EmptyState title="Loading prospects…" />;
   return <CollegeScoutingContent data={data} embedded lens={lens} />;
 }

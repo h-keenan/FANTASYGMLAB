@@ -113,7 +113,7 @@ describe("LeagueRoundupTab", () => {
   it("shows an error with retry when the request fails", async () => {
     mock.mockRejectedValueOnce(new Error("boom"));
     render(<LeagueRoundupTab leagueId="L1" />);
-    expect(await screen.findByText("Could not load your roundup")).toBeTruthy();
+    expect(await screen.findByText("boom")).toBeTruthy();
     mock.mockResolvedValue(response());
     fireEvent.click(screen.getByText("Try again"));
     expect(await screen.findByText("Week 3")).toBeTruthy();

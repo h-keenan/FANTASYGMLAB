@@ -5,6 +5,7 @@ import { useEffect, useState } from "react";
 import { AccentCard } from "@/components/AccentCard";
 import { ButtonLink } from "@/components/Button";
 import { EmptyState } from "@/components/EmptyState";
+import { ErrorState } from "@/components/ErrorState";
 import { PillRow, TabStack } from "@/components/PillRow";
 import { PositionBadge } from "@/components/PositionBadge";
 import { SectionHeading } from "@/components/SectionHeading";
@@ -61,12 +62,7 @@ export function LeagueRoundupTab({ leagueId, initialWeek }: { leagueId: string; 
 
   if (error && !data) {
     return (
-      <EmptyState
-        title="Could not load your roundup"
-        subtitle={error}
-        actionLabel="Try again"
-        onAction={() => setAttempt((n) => n + 1)}
-      />
+      <ErrorState bare message={error} onRetry={() => setAttempt((n) => n + 1)} />
     );
   }
   if (!data) {

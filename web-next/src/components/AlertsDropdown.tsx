@@ -12,6 +12,7 @@ import { alertsReasonMessage } from "@/lib/alertsPresentation";
 import { trackUse } from "@/lib/analytics";
 import { api, type AlertItem, type AlertsResponse } from "@/lib/api";
 import { useSheetDragDismiss } from "@/lib/useSheetDragDismiss";
+import { ErrorState } from "@/components/ErrorState";
 
 /**
  * The header bell. Tapping it opens a dropdown over the current page (a top
@@ -174,9 +175,7 @@ export function AlertsBell({
                   Loading…
                 </p>
               ) : failed ? (
-                <p className="text-sm py-4" style={{ color: "var(--color-danger)" }}>
-                  Could not load Alerts.
-                </p>
+                <ErrorState bare message="Could not load Alerts." onRetry={load} />
               ) : notice ? (
                 <p className="text-sm py-4" style={{ color: "var(--color-text-muted)" }}>
                   {notice}

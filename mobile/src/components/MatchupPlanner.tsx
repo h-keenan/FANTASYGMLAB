@@ -29,6 +29,7 @@ import {
 import { slotDisplayLabel } from '../lib/matchupPresentation';
 import { trackUse } from '../lib/analytics';
 import { radii, scrim, spacing, type ThemeColors } from '../theme';
+import ErrorState from './ErrorState';
 
 /**
  * Lineup swap planner for Matchup (same flow as web-next's MatchupPlanner).
@@ -221,11 +222,13 @@ export function SwapSheet({
   slot,
   onPick,
   onClose,
+  onRetry,
 }: {
   sheet: SheetState;
   slot: string;
   onPick: (candidate: MatchupWhatIfCandidate) => void;
   onClose: () => void;
+  onRetry?: () => void;
 }) {
   const { colors } = useThemeMode();
   const styles = useMemo(() => createStyles(colors), [colors]);
@@ -242,7 +245,7 @@ export function SwapSheet({
           </View>
           <SheetScrollView style={styles.sheetBody}>
             {sheet.error ? (
-              <AppText style={[styles.muted, { color: colors.danger }]}>{sheet.error}</AppText>
+              <ErrorState compact title="Couldn't load options" message={sheet.error} onRetry={onRetry} />
             ) : !sheet.data ? (
               <AppText style={styles.muted}>Loading…</AppText>
             ) : sheet.data.slot_locked ? (

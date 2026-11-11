@@ -34,6 +34,7 @@ import {
 } from '../lib/percentileExplorer';
 import { ordinal, percentileColor } from '../lib/percentile';
 import { radii, scrim, spacing, type ThemeColors } from '../theme';
+import ErrorState from './ErrorState';
 
 const LANE_STEP = 74;
 const BAR_AREA = 88;
@@ -72,6 +73,7 @@ export default function PercentileExplorerSheet({
   const [metric, setMetric] = useState({ key: statKey, label: statLabel });
   const [pool, setPool] = useState<'position' | 'all'>('position');
   const [state, setState] = useState<LoadState>({ status: 'loading' });
+  const [retryToken, setRetryToken] = useState(0);
   const [pickedId, setPickedId] = useState<string | null>(null);
   const [pins, setPins] = useState<string[]>([]);
   const [swapped, setSwapped] = useState(false);
@@ -104,7 +106,7 @@ export default function PercentileExplorerSheet({
     return () => {
       cancelled = true;
     };
-  }, [playerId, metric.key, pool]);
+  }, [playerId, metric.key, pool, retryToken]);
 
   useEffect(() => {
     if (!leagueId) return;
@@ -309,7 +311,7 @@ export default function PercentileExplorerSheet({
             />
 
             {view === 'loading' ? <View style={styles.skeleton} testID="pe-loading" /> : null}
-            {view === 'error' ? <EmptyState icon="cloud-offline-outline" title="Couldn't load this stat" subtitle="Try again in a moment." /> : null}
+            {view === 'error' ? <ErrorState compact title="Couldn't load this stat" onRetry={() => { setState({ status: 'loading' }); setRetryToken((n) => n + 1); }} /> : null}
             {view === 'insufficient_pool' || view === 'season_unavailable' || view === 'no_data' ? (
               <EmptyState icon="stats-chart-outline" {...explorerEmptyCopy(data?.reason ?? 'no_data', positionLabel)} />
             ) : null}
