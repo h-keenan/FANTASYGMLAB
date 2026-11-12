@@ -30,6 +30,8 @@ import {
   simLineupPayload,
   simNeedsDrop,
   simNewGameBlock,
+  simGameDeleteConfirm,
+  simGameDeleteFailure,
   simPickLabel,
   simPlayoffRoundLabel,
   simQueueReducer,
@@ -189,7 +191,19 @@ describe("stage, headings and rounds", () => {
   it("explains why a new game is blocked", () => {
     expect(simNewGameBlock(0, 1, false)).toBeNull();
     expect(simNewGameBlock(1, 1, false)).toContain("Free includes 1 saved game");
+    expect(simNewGameBlock(1, 1, false)).toContain("You have 1 of 1 saved game.");
+    expect(simNewGameBlock(3, 3, true)).toContain("You have 3 of 3 saved games");
     expect(simNewGameBlock(3, 3, true)).toContain("Delete one");
+  });
+
+  it("names a game in the delete confirm and classifies delete failures", () => {
+    const g = { settings: { regular_weeks: 14, teams: 12, scoring: "ppr" as const }, status: "complete" as const, current_week: 17, grade_letter: "B+" };
+    expect(simGameDeleteConfirm(g)).toContain("Finished · Grade B+");
+    expect(simGameDeleteConfirm(g)).toContain("cannot be undone");
+    expect(simGameDeleteFailure({ status: 404 })).toMatchObject({ remove: true });
+    expect(simGameDeleteFailure({ status: 409 })).toMatchObject({ remove: false, refresh: true });
+    expect(simGameDeleteFailure({ status: 503 }).message).toContain("busy");
+    expect(simGameDeleteFailure(new Error("boom"))).toMatchObject({ message: "boom", tone: "danger" });
   });
 });
 

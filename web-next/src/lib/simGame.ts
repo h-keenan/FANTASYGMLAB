@@ -1581,11 +1581,43 @@ export const SIM_DIFFICULTY_COPY: Record<SimDifficulty, { label: string; blurb: 
   hard: { label: "Hard", blurb: "Sharper AI managers: tighter trades and smarter waiver moves." },
 };
 
+/** "You have 3 of 3 saved games" (singular when the limit is 1). */
+export function simSavedGamesCount(gameCount: number, maxGames: number): string {
+  return `You have ${gameCount} of ${maxGames} saved game${maxGames === 1 ? "" : "s"}`;
+}
+
 /** Why the New game button is unavailable, or null when you can start one. */
 export function simNewGameBlock(gameCount: number, maxGames: number, isPremium: boolean | undefined): string | null {
   if (gameCount < maxGames) return null;
-  if (isPremium === false) return `Free includes ${maxGames} saved game. Delete it or go Pro for up to 3.`;
-  return `You have ${maxGames} saved games, the most allowed. Delete one to start another.`;
+  const count = simSavedGamesCount(gameCount, maxGames);
+  if (isPremium === false) return `${count}. Free includes ${maxGames} saved game. Delete it or go Pro for up to 3.`;
+  return `${count}, the most allowed. Delete one to start another.`;
+}
+
+/** Names a saved game in the delete confirm (the list has no team name): stage, grade, league shape. */
+export function simGameDeleteName(game: Pick<SimGameLite, "status" | "current_week" | "grade_letter" | "settings">): string {
+  const shape = simSettingsSummary(game.settings);
+  const line = simGameLiteLine(game);
+  return shape ? `${line} (${shape})` : line;
+}
+
+/** Inline confirm copy for deleting one saved game. */
+export function simGameDeleteConfirm(game: Pick<SimGameLite, "status" | "current_week" | "grade_letter" | "settings">): string {
+  return `Delete ${simGameDeleteName(game)}? This cannot be undone. The whole season and its grade are removed.`;
+}
+
+/**
+ * What to do when deleting a saved game from the list fails. 404 means it is
+ * already gone (drop it from the list); 409/503 are retryable; anything else
+ * shows the message. `refresh` asks the caller to reload the list.
+ */
+export function simGameDeleteFailure(error: unknown): { message: string; tone: "success" | "warning" | "danger"; remove: boolean; refresh: boolean } {
+  const e = (typeof error === "object" && error !== null ? error : {}) as { status?: number; code?: string; message?: string };
+  if (e.status === 404) return { message: "That game was already deleted.", tone: "warning", remove: true, refresh: true };
+  if (e.status === 409) return { message: "The game changed somewhere else. We reloaded your games. Try again.", tone: "warning", remove: false, refresh: true };
+  if (e.status === 503 || e.code === "server_busy") return { message: "The simulator is busy right now. Try again in a few seconds.", tone: "warning", remove: false, refresh: false };
+  const message = e.message && !/^Request failed with status/.test(e.message) ? e.message : "Could not delete the game. Try again.";
+  return { message, tone: "danger", remove: false, refresh: false };
 }
 
 /** One-line status for a saved game card. */
