@@ -34,10 +34,13 @@ and propagates.
 
 from __future__ import annotations
 
+import copy
 import logging
 import math
 from dataclasses import dataclass, field
 from typing import Any, Iterable, Mapping, Sequence
+
+import numpy as np
 
 import pandas as pd
 
@@ -302,14 +305,38 @@ class RosterValueContext:
     status: dict[str, Any] = field(default_factory=model_status.ok)
     all_players: pd.DataFrame | None = None
     wire_cache: dict[str, list[dict[str, Any]]] = field(default_factory=dict)
+    # (drop ids, add-row signatures) -> ``evaluate_swap`` result (see there).
+    swap_cache: dict[tuple, dict[str, Any]] = field(default_factory=dict, repr=False, compare=False)
+    # player_id -> first matching row of ``frame`` (built lazily by ``row``).
+    _row_index: dict[str, dict[str, Any]] | None = field(default=None, init=False, repr=False, compare=False)
 
     @property
     def weeks(self) -> int:
         return len(self.model_ctx.weeks)
 
     def row(self, player_id: str) -> dict[str, Any] | None:
-        match = self.frame[self.frame["player_id"].astype(str) == str(player_id)]
-        return frame_records(match)[0] if not match.empty else None
+        """The team frame's first row for ``player_id`` (a fresh dict each call).
+
+        The frame is fixed for the life of the context, so the rows are
+        extracted once into an id index instead of re-scanning (and
+        re-converting) the whole frame for every lookup: the drop engine asks
+        for the same few dozen rows thousands of times per trade-idea search.
+        """
+
+        index = self._row_index
+        if index is None:
+            index = {}
+            frame = self.frame
+            if frame is not None and not frame.empty and "player_id" in frame.columns:
+                ids = frame["player_id"]
+                present = ids.notna().tolist()
+                id_text = ids.astype(str).tolist()
+                for key, ok, record in zip(id_text, present, frame_records(frame)):
+                    if ok and key not in index:
+                        index[key] = record
+            self._row_index = index
+        record = index.get(str(player_id))
+        return dict(record) if record is not None else None
 
     def active_profiles(self) -> list[tlm.PlayerPoints]:
         return [self.profiles[p] for p in self.limits.active_ids if p in self.profiles]
@@ -370,9 +397,10 @@ def build_context(
     limits = roster_limits(league, my_roster)
     profiles = {p.player_id: p for p in tlm.profile_roster(roster_df, model_ctx)}
     healthy = healthy_equivalent_roster(roster_df, score_column=score_field, window=window)
+    healthy_cols = [c for c in ("player_id", score_field) if c in healthy.columns] if healthy.columns.is_unique else None
     healthy_value = {
         str(r["player_id"]): _num(r.get(score_field))
-        for r in frame_records(healthy)
+        for r in frame_records(healthy[healthy_cols] if healthy_cols is not None else healthy)
     }
     active = {pid for pid in limits.active_ids if pid in profiles}
     league_size = int(_num((league or {}).get("total_rosters"), 0)) or int(_num(settings.get("league_size"), 12)) or 12
@@ -404,6 +432,26 @@ def _asset(player_id: str, name: str, value: float) -> dict[str, Any]:
     return {"asset_type": "player", "player_id": player_id, "name": name, "score": value}
 
 
+_SWAP_CACHE_MAX = 4096
+_SIMPLE_CELL_TYPES = (str, int, float, bool, type(None), np.generic)
+
+
+def _swap_key(drop_ids: Sequence[str], add_rows: Sequence[Mapping[str, Any]]) -> tuple | None:
+    """Hashable identity of a swap's inputs, or None when a row holds anything
+    but plain scalars (then the swap is simply not memoized)."""
+
+    signatures = []
+    for row in add_rows:
+        items = []
+        # ``.items()`` serves dict rows and pandas Series rows (callers pass both).
+        for name, value in sorted(row.items(), key=lambda kv: str(kv[0])):
+            if not isinstance(value, _SIMPLE_CELL_TYPES):
+                return None
+            items.append((str(name), type(value).__name__, repr(value)))
+        signatures.append(tuple(items))
+    return (tuple(str(p) for p in drop_ids), tuple(signatures))
+
+
 def evaluate_swap(
     rvc: RosterValueContext,
     drop_ids: Sequence[str],
@@ -415,19 +463,45 @@ def evaluate_swap(
     model, the same posture weighting and the same value scale as the Trade
     Analyzer (``trade_lineup_model.evaluate_trade``). Values are healthy
     equivalents; the model prices an injury as missed weeks, so a stash is not
-    double-penalised."""
+    double-penalised.
 
+    The context's frame, profiles and model are fixed for its lifetime, so a
+    swap is a pure function of (drops, added rows): the drop board, the
+    per-add suggestions and the overflow planner ask for the same swap many
+    times, and the repeats are served from ``rvc.swap_cache`` (a private deep
+    copy each time, since callers decorate the result)."""
+
+    key = _swap_key(drop_ids, add_rows)
+    if key is not None:
+        hit = rvc.swap_cache.get(key)
+        if hit is not None:
+            return copy.deepcopy(hit)
+    result = _evaluate_swap_uncached(rvc, drop_ids, add_rows)
+    if key is not None and len(rvc.swap_cache) < _SWAP_CACHE_MAX:
+        rvc.swap_cache[key] = copy.deepcopy(result)
+    return result
+
+
+def _evaluate_swap_uncached(
+    rvc: RosterValueContext,
+    drop_ids: Sequence[str],
+    add_rows: Sequence[Mapping[str, Any]] = (),
+) -> dict[str, Any]:
     drop_set = {str(p) for p in drop_ids}
     before = rvc.frame
     keep = before[~before["player_id"].astype(str).isin(drop_set)]
     add_frame = pd.DataFrame(list(add_rows)) if add_rows else pd.DataFrame()
-    after = pd.concat([keep, add_frame], ignore_index=True) if not add_frame.empty else keep
+    after_profiles = tlm.profile_swap_after(before, drop_set, add_frame, rvc.model_ctx)
+    after = pd.concat([keep, add_frame], ignore_index=True) if (not add_frame.empty and after_profiles is None) else keep
     send = [
         _asset(pid, rvc.profiles[pid].name if pid in rvc.profiles else pid, rvc.healthy_value.get(pid, 0.0))
         for pid in drop_ids
     ]
     add_values = healthy_equivalent_roster(add_frame, score_column=rvc.score_field, window=rvc.window) if not add_frame.empty else add_frame
-    add_value_by_id = {str(r["player_id"]): _num(r.get(rvc.score_field)) for r in frame_records(add_values)}
+    value_columns = [c for c in ("player_id", rvc.score_field) if c in add_values.columns]
+    add_value_by_id = {
+        str(r["player_id"]): _num(r.get(rvc.score_field)) for r in frame_records(add_values[value_columns] if not add_values.empty else add_values)
+    }
     receive = [_asset(str(r["player_id"]), _text(r.get("name")), add_value_by_id.get(str(r["player_id"]), 0.0)) for r in add_rows]
     raw = sum(a["score"] for a in receive) - sum(a["score"] for a in send)
     result = tlm.evaluate_trade(
@@ -438,6 +512,7 @@ def evaluate_swap(
         receive_assets=receive,
         raw_value_delta=raw,
         asset_value=lambda a: float(a.get("score") or 0.0),
+        after_profiles=after_profiles,
     )
     result["raw_value_delta"] = round(raw)
     return result

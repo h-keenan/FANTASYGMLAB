@@ -275,7 +275,11 @@ def _active_rows(frame: pd.DataFrame, score_column: str, scoring: Mapping[str, f
     out: dict[str, list[tuple[float, float]]] = {pos: [] for pos in SCORED_POSITIONS}
     if frame is None or frame.empty or "ppg" not in frame.columns or score_column not in frame.columns:
         return out
-    for row in frame_records(frame):
+    # Only these columns are read (``_league_scored`` reads games_played and
+    # receptions): converting the full ~140-column league frame was the cost.
+    read = {"position", "games_played", "ppg", "receptions", score_column}
+    narrow = frame[[c for c in frame.columns if c in read]] if frame.columns.is_unique else frame
+    for row in frame_records(narrow):
         pos = _text(row.get("position")).upper()
         if pos not in out:
             continue
@@ -459,6 +463,14 @@ def _bye_for(ctx: ModelContext, team: str) -> int | None:
     return ctx.byes[code]
 
 
+# Every row field ``profile_roster`` reads (``ctx.score_column`` is added at call time).
+_PROFILE_ROW_COLUMNS = frozenset({
+    "player_id", "name", "position", "team", "status", "injury_status", "injury_body_part", "injury_notes",
+    "value_score", "dynasty_score", "proj_ppg", "proj_sd", "proj_scoring_applied", "games_played", "receptions",
+    "ppg", "age",
+})
+
+
 def profile_roster(df: pd.DataFrame, ctx: ModelContext, *, free_agent: bool = False) -> list[PlayerPoints]:
     """One ``PlayerPoints`` per row of a roster/pool frame."""
 
@@ -467,7 +479,12 @@ def profile_roster(df: pd.DataFrame, ctx: ModelContext, *, free_agent: bool = Fa
         return out
     params = ctx.params
     seen: set[str] = set()
-    for row in frame_records(df):
+    # Convert only the columns the profile reads (``_PROFILE_ROW_COLUMNS``): the
+    # player frames are ~140 columns wide and the full conversion was most of
+    # this function's cost. Columns the frame lacks are simply absent, as before.
+    wanted = _PROFILE_ROW_COLUMNS | {ctx.score_column}
+    narrow = df[[c for c in df.columns if c in wanted]] if df.columns.is_unique else df
+    for row in frame_records(narrow):
         pid = _text(row.get("player_id"))
         if not pid or pid in seen:
             continue
@@ -795,14 +812,83 @@ def _before_side(before_df: pd.DataFrame, ctx: ModelContext) -> tuple[list[Playe
     return profiles, aged
 
 
+def profile_swap_after(
+    before_df: pd.DataFrame,
+    drop_ids: Iterable[str],
+    add_frame: pd.DataFrame,
+    ctx: ModelContext,
+) -> list[PlayerPoints] | None:
+    """``profile_roster`` of ``before_df`` minus ``drop_ids`` plus ``add_frame``,
+    without re-profiling the rows that did not change.
+
+    ``profile_roster`` is a pure per-row function over a fixed set of fields
+    (``_PROFILE_ROW_COLUMNS``) plus first-occurrence dedupe by player id, so the
+    kept rows' profiles are exactly the memoized ``before`` profiles. The added
+    rows are profiled as they read in the concatenated frame (columns the roster
+    frame has but they lack are NaN). Returns None, and the caller profiles the
+    full concatenated frame, when concatenating could change how a *kept* row
+    reads: an added row brings a field the profile reads that the roster frame
+    lacks, or the shared field's dtype differs in a way that is not a plain
+    int/float widening. Fields the profile never reads are irrelevant.
+    """
+
+    if before_df is None or before_df.empty or not before_df.columns.is_unique or "player_id" not in before_df.columns:
+        return None
+    if not add_frame.empty:
+        read = _PROFILE_ROW_COLUMNS | {ctx.score_column}
+        before_dtypes = before_df.dtypes
+        for column in add_frame.columns:
+            if column not in read:
+                continue
+            if column not in before_df.columns:
+                return None
+            have, want = add_frame[column].dtype, before_dtypes[column]
+            if have == want:
+                continue
+            # int64 + float64 concatenates to float64: kept values are numerically
+            # unchanged and the model reads numbers through float(). Anything else
+            # (bool, object, strings, datetimes) could change how a kept row reads.
+            if all(pd.api.types.is_numeric_dtype(d) and not pd.api.types.is_bool_dtype(d) for d in (have, want)):
+                continue
+            return None
+    drop = {str(p) for p in drop_ids}
+    before, _aged_cache = _before_side(before_df, ctx)
+    out = [p for p in before if p.player_id not in drop]
+    if add_frame.empty:
+        return out
+    seen = {p.player_id for p in out}
+    tail = add_frame.reindex(columns=before_df.columns)
+    for p in profile_roster(tail, ctx):
+        if p.player_id not in seen:
+            seen.add(p.player_id)
+            out.append(p)
+    return out
+
+
+# (id(profile), years) -> (profile, aged copy). ``PlayerPoints`` is frozen and
+# the aging is a pure function of it, and every swap/trade built on one roster
+# ages the same few dozen profiles again for each future year; the profile is
+# held in the entry so its ``id`` cannot be reused while the entry lives.
+_AGED_CACHE: dict[tuple[int, int], tuple[PlayerPoints, PlayerPoints]] = {}
+_AGED_CACHE_MAX = 20000
+
+
 def _aged(p: PlayerPoints, years: int) -> PlayerPoints:
     if p.ppg is None or p.age is None:
         return p
+    key = (id(p), years)
+    hit = _AGED_CACHE.get(key)
+    if hit is not None and hit[0] is p:
+        return hit[1]
     now = age_multiplier(p.position, p.age)
     then = age_multiplier(p.position, p.age + years)
     factor = (then / now) if now > 0 else 1.0
-    return PlayerPoints(**{**p.__dict__, "ppg": p.ppg * factor, "sd": p.sd * factor, "age": p.age + years,
+    aged = PlayerPoints(**{**p.__dict__, "ppg": p.ppg * factor, "sd": p.sd * factor, "age": p.age + years,
                            "absence": None, "out_all": False, "bye_week": None})
+    if len(_AGED_CACHE) >= _AGED_CACHE_MAX:
+        _AGED_CACHE.clear()
+    _AGED_CACHE[key] = (p, aged)
+    return aged
 
 
 def _name_list(items: Sequence[str], limit: int = 2) -> str:
@@ -821,6 +907,7 @@ def evaluate_trade(
     consolidation_adjustment: float = 0.0,
     healthy_restore: float = 0.0,
     asset_value=lambda a: float(a.get("score") or a.get("value_score") or 0),
+    after_profiles: Sequence[PlayerPoints] | None = None,
 ) -> dict[str, Any]:
     """Expected lineup points before vs after, and the one combined score.
 
@@ -847,7 +934,12 @@ def evaluate_trade(
 
     ``healthy_restore``: the market lists a short-term-injured player at a
     risk-discounted value; his absence is priced here in points, so the
-    discount is added back (``asset_value`` must then return healthy values)."""
+    discount is added back (``asset_value`` must then return healthy values).
+
+    ``after_profiles``: the caller already holds ``profile_roster(after_df, ctx)``
+    (a swap that only removes rows from ``before_df`` and appends a few can reuse
+    the before profiles instead of re-profiling every kept row); ``after_df`` is
+    then not read."""
 
     params = ctx.params
     w_now, w_fut = POSTURE_WEIGHTS.get(ctx.strategy, POSTURE_WEIGHTS["retool"])
@@ -856,7 +948,7 @@ def evaluate_trade(
     k = ctx.value_per_point
 
     before, before_aged = _before_side(before_df, ctx)
-    after = profile_roster(after_df, ctx)
+    after = list(after_profiles) if after_profiles is not None else profile_roster(after_df, ctx)
     b, a, meta = run_weeks(before, after, ctx)
     b0, a0, _ = run_weeks(before, after, ctx, fill="market", ignore_availability=True)
 

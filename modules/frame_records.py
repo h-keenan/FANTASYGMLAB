@@ -21,17 +21,47 @@ from pandas.core.dtypes.cast import maybe_box_native
 _FAST_NUMPY_DTYPES = frozenset({"float64", "int64", "bool", "object"})
 
 
+def _classify_dtype(dtype: Any) -> str:
+    name = str(dtype)
+    if name == "object":
+        return "object"
+    return "fast" if (name in _FAST_NUMPY_DTYPES or name == "str") else "slow"
+
+
+# dtype -> "object" | "fast" | "slow". ``str(dtype)`` is surprisingly costly
+# (about 4 us) and a 140-column frame pays it per column per call; dtypes are
+# hashable and few, so classify each distinct dtype once.
+_DTYPE_KIND: dict[Any, str] = {}
+
+
 def _fast_dtype(dtype: Any) -> bool:
-    return str(dtype) in _FAST_NUMPY_DTYPES or str(dtype) == "str"
+    return _dtype_kind(dtype) != "slow"
+
+
+def _dtype_kind(dtype: Any) -> str:
+    try:
+        return _DTYPE_KIND[dtype]
+    except KeyError:
+        kind = _classify_dtype(dtype)
+        try:
+            _DTYPE_KIND[dtype] = kind
+        except TypeError:  # unhashable extension dtype: classify every time
+            pass
+        return kind
+    except TypeError:
+        return _classify_dtype(dtype)
 
 
 def frame_records(frame: pd.DataFrame | None) -> list[dict[Any, Any]]:
     if frame is None:
         return []
-    if frame.empty or not frame.columns.is_unique or not all(_fast_dtype(d) for d in frame.dtypes):
+    if frame.empty or not frame.columns.is_unique:
+        return frame.to_dict("records")
+    kinds = [_dtype_kind(d) for d in frame.dtypes.tolist()]
+    if "slow" in kinds:
         return frame.to_dict("records")
     columns = list(frame.columns)
-    object_positions = [i for i, dtype in enumerate(frame.dtypes) if str(dtype) == "object"]
+    object_positions = [i for i, kind in enumerate(kinds) if kind == "object"]
     rows = frame.to_numpy(dtype=object).tolist()
     if object_positions:
         for row in rows:

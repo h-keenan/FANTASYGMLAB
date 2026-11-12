@@ -296,6 +296,51 @@ def contains_phrase(text: str, phrase: str) -> bool:
     return _word_pattern(phrase).search(haystack) is not None
 
 
+# Small content-keyed memo of prepared phrase indexes: ``(items snapshot, prepared)``.
+# Keyed on the mapping's *contents* (not its identity), so a mutated or rebuilt
+# mapping can never see a stale entry; callers scan one fixed name index for
+# every article of a request, so the same snapshot is hit hundreds of times.
+_PHRASE_INDEX_CACHE: list[tuple[tuple, list[tuple[str, str, str]]]] = []
+_PHRASE_INDEX_CACHE_MAX = 6
+
+
+def _prepared_phrase_index(index: "Mapping[Any, Any]") -> list[tuple[str, str, str]]:
+    items = tuple(index.items())
+    for snapshot, prepared in _PHRASE_INDEX_CACHE:
+        if snapshot == items:
+            return prepared
+    prepared = []
+    for normalized_name, player_id in items:
+        normalized = str(normalized_name or "").strip()
+        pid = str(player_id or "").strip()
+        if normalized and pid:
+            prepared.append((normalized.lower().strip(), normalized, pid))
+    _PHRASE_INDEX_CACHE.append((items, prepared))
+    del _PHRASE_INDEX_CACHE[:-_PHRASE_INDEX_CACHE_MAX]
+    return prepared
+
+
+def phrase_index_matches(text: str, index: "Mapping[Any, Any]") -> list[tuple[str, str]]:
+    """``[(normalized_name, player_id), ...]`` for every index entry whose name
+    ``contains_phrase`` finds in ``text`` (index order; entries with an empty
+    name or id are skipped).
+
+    Identical to looping ``contains_phrase(text, name)`` over the index, but
+    the names are normalized once per distinct index and the cheap necessary
+    condition (the lowered name is a substring of the lowered text, true for
+    every branch of ``contains_phrase``) is tested inline first: an article
+    names a handful of players while the index holds every rostered name, so
+    almost every pair misses and need not pay a function call.
+    """
+
+    haystack = _lowered(text)
+    return [
+        (normalized, pid)
+        for needle, normalized, pid in _prepared_phrase_index(index)
+        if needle in haystack and contains_phrase(text, normalized)
+    ]
+
+
 @lru_cache(maxsize=4096)
 def _word_pattern(phrase: str) -> "re.Pattern[str]":
     return re.compile(rf"\b{re.escape(phrase)}\b")

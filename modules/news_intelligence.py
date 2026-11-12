@@ -626,12 +626,7 @@ def resolve_article_player_identity(
         return "", ""
 
     text = news_signal.article_text(item)
-    matches: list[tuple[str, str]] = []
-    for normalized_name, player_id in index.items():
-        normalized = str(normalized_name or "").strip()
-        pid = str(player_id or "").strip()
-        if normalized and pid and news_signal.contains_phrase(text, normalized):
-            matches.append((normalized, pid))
+    matches = news_signal.phrase_index_matches(text, index)
     unique_ids = {pid for _, pid in matches}
     if len(unique_ids) != 1:
         return "", ""
@@ -669,12 +664,7 @@ def resolve_article_player_identities(
         return []
 
     text = news_signal.article_text(item)
-    matches: list[tuple[str, str]] = []
-    for normalized_name, player_id in index.items():
-        normalized = str(normalized_name or "").strip()
-        pid = str(player_id or "").strip()
-        if normalized and pid and news_signal.contains_phrase(text, normalized):
-            matches.append((normalized, pid))
+    matches = news_signal.phrase_index_matches(text, index)
 
     order: list[str] = []
     representative: dict[str, str] = {}
