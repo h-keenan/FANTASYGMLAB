@@ -81,13 +81,13 @@ function createStyles(colors: ThemeColors) {
     box: { borderWidth: StyleSheet.hairlineWidth, borderColor: colors.border, borderRadius: 14 },
     row: { flexDirection: 'row' },
     head: { width: COL, alignItems: 'center', gap: 2, paddingVertical: spacing.xs, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border },
-    headName: { fontSize: 10, fontWeight: '700', color: colors.textTertiary, width: COL - 8, textAlign: 'center' },
+    headName: { fontSize: 12, fontWeight: '700', color: colors.textTertiary, width: COL - 8, textAlign: 'center' },
     round: { width: ROUND_W, alignItems: 'center', justifyContent: 'center' },
-    roundText: { fontSize: 10, fontWeight: '800', color: colors.textTertiary },
+    roundText: { fontSize: 12, fontWeight: '800', color: colors.textTertiary },
     cellWrap: { width: COL, padding: 2 },
     cell: { height: 44, borderRadius: 8, justifyContent: 'center', paddingHorizontal: 4 },
     empty: { alignItems: 'center', borderWidth: StyleSheet.hairlineWidth, borderColor: colors.border, borderStyle: 'dashed' },
-    cellName: { fontSize: 11, fontWeight: '700', color: colors.textPrimary },
-    cellMeta: { fontSize: 9, color: colors.textTertiary },
+    cellName: { fontSize: 12, fontWeight: '700', color: colors.textPrimary },
+    cellMeta: { fontSize: 12, color: colors.textTertiary },
   });
 }

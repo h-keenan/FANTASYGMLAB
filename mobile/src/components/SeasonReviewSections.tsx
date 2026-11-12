@@ -289,4 +289,3 @@ const styles = StyleSheet.create({
   leaderRow: { paddingVertical: spacing.xs },
   rankNum: { width: 16, fontSize: 12, fontWeight: '800' },
 });
-

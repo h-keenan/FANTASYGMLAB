@@ -2,8 +2,8 @@
  * Fantasy Sim: the GM Game. Shared types and pure presentation helpers for the
  * interactive, turn-based game (docs/fantasy-sim-api.md, "GM game" half;
  * design in docs/fantasy-sim-game-design.md). Web and mobile hold a
- * byte-identical copy of this file (scripts/check_lib_twins.mjs), so it has only
- * a sibling-lib import and no platform code: every screen renders from these shapes and
+ * byte-identical copy of this file (scripts/check_lib_twins.mjs), so it has no
+ * imports and no platform code: every screen renders from these shapes and
  * formatters and never restates a rule the backend already decided.
  *
  * Not to be confused with lib/simPresentation.ts, the Season Outlook
@@ -11,7 +11,7 @@
  * reads or writes real league data.
  */
 
-import { buildSimReviewSections, type ReviewGlyph, type ReviewSection } from "./simReview";
+import type { ReviewGlyph } from "./simReview";
 
 // ---------------------------------------------------------------------------
 // Envelope, gating and reasons
@@ -583,8 +583,6 @@ export interface SimGameResultView {
   standings: (SimStandingRow & { playoff_result?: string })[];
   decisions: SimGameDecision[];
   mine: (SimStandingRow & { playoff_result?: string }) | null;
-  /** The Season in Review sections (empty when the result predates them). */
-  sections: ReviewSection[];
 }
 
 export function simGradeSummaryText(summary: SimGameGrade["summary"]): string {
@@ -619,7 +617,6 @@ export function normalizeSimResult(raw: SimGameResult | null | undefined): SimGa
     standings,
     decisions: Array.isArray(raw?.decisions_that_mattered) ? raw.decisions_that_mattered.filter(Boolean) : [],
     mine: standings.find((row) => row.is_you) ?? null,
-    sections: buildSimReviewSections({ decisions: raw?.decisions_that_mattered, review: raw?.review, components: raw?.grade?.components }),
   };
 }
 

@@ -31,7 +31,7 @@ import {
   type SimGameResult,
   type SimWeekRecap,
 } from '../lib/simGame';
-import { buildReviewShareModel } from '../lib/simReview';
+import { buildReviewShareModel, buildSimReviewSections } from '../lib/simReview';
 import { spacing, type ThemeColors } from '../theme';
 
 /** One week's recap: the score lands first, then your starters, the league and what changed. */
@@ -258,6 +258,7 @@ export function SimFinalView({ ctx, onNewGame, onHub }: { ctx: SimCtx; onNewGame
   }
 
   const view = normalizeSimResult(result);
+  const sections = buildSimReviewSections({ decisions: view.decisions, review: result.review, components: result.grade?.components });
   const tone = simGradeTone(view.letter);
   const toneColor = simToneColor(tone, colors);
   const mine = view.mine;
@@ -268,7 +269,7 @@ export function SimFinalView({ ctx, onNewGame, onHub }: { ctx: SimCtx; onNewGame
     gradeTone: tone,
     headline: youWon ? `Champions! ${record}` : mine ? `${record}, ${simPlayoffResultLabel(mine.playoff_result)}` : 'Season complete',
     subline: view.championName && !youWon ? `${view.championName} won the title` : view.summaryText,
-    sections: view.sections,
+    sections: sections,
   });
   return (
     <View style={common.stack} testID="final-result">
@@ -302,7 +303,7 @@ export function SimFinalView({ ctx, onNewGame, onHub }: { ctx: SimCtx; onNewGame
         </View>
       </AccentCard>
 
-      <SeasonReviewSections sections={view.sections} />
+      <SeasonReviewSections sections={sections} />
 
       <View style={common.stack}>
         <SectionHeading title="Final standings" icon="analytics-outline" />
@@ -328,7 +329,7 @@ export function SimFinalView({ ctx, onNewGame, onHub }: { ctx: SimCtx; onNewGame
       <AppText style={common.muted}>
         A game, not a forecast. Season {game.settings.regular_weeks} weeks plus playoffs against AI managers; nothing here touches your real leagues.
       </AppText>
-      <SimReviewShareModal visible={sharing} onClose={() => setSharing(false)} model={shareModel} sections={view.sections} />
+      <SimReviewShareModal visible={sharing} onClose={() => setSharing(false)} model={shareModel} sections={sections} />
     </View>
   );
 }

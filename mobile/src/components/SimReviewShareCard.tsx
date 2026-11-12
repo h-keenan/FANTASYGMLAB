@@ -62,7 +62,7 @@ const styles = StyleSheet.create({
   subline: { fontSize: 12, color: colors.textSecondary },
   row: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, padding: spacing.sm, borderLeftWidth: 4, borderRadius: radii.md },
   rowText: { flex: 1, minWidth: 0 },
-  kind: { fontSize: 10, fontWeight: '800', letterSpacing: 0.8, textTransform: 'uppercase', color: colors.textTertiary },
+  kind: { fontSize: 12, fontWeight: '800', letterSpacing: 0.8, textTransform: 'uppercase', color: colors.textTertiary },
   rowTitle: { fontSize: 15, fontWeight: '800', color: colors.textPrimary },
   delta: { fontSize: 16, fontWeight: '900' },
   stats: { flexDirection: 'row', gap: spacing.xs },

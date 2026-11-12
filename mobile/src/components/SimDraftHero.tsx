@@ -28,7 +28,7 @@ export function SimDraftEmblem({ name, you = false }: { name: string; you?: bool
   const color = you ? colors.accent : colors.textSecondary;
   return (
     <View style={{ width: 24, height: 24, borderRadius: 12, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: color, backgroundColor: you ? colors.accentMuted : colors.glass }}>
-      <AppText style={{ fontSize: 10, fontWeight: '800', color }}>{simDraftTeamEmblem(name)}</AppText>
+      <AppText style={{ fontSize: 12, fontWeight: '800', color }}>{simDraftTeamEmblem(name)}</AppText>
     </View>
   );
 }
@@ -184,7 +184,7 @@ function createStyles(colors: ThemeColors) {
     strong: { fontSize: 13, fontWeight: '700', color: colors.textSecondary },
     muted: { fontSize: 12, color: colors.textTertiary },
     small: { flex: 1, fontSize: 13, color: colors.textSecondary },
-    kicker: { fontSize: 10, fontWeight: '800', letterSpacing: 0.8, textTransform: 'uppercase', color: colors.textTertiary },
+    kicker: { fontSize: 12, fontWeight: '800', letterSpacing: 0.8, textTransform: 'uppercase', color: colors.textTertiary },
     track: { height: 8, borderRadius: radii.pill, backgroundColor: colors.glass, overflow: 'hidden' },
     fill: { height: '100%', borderRadius: radii.pill, backgroundColor: colors.accent },
     etaRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
@@ -204,7 +204,7 @@ function createStyles(colors: ThemeColors) {
       borderBottomColor: colors.borderStrong,
     },
     chipName: { fontSize: 12, fontWeight: '700', color: colors.textPrimary },
-    chipMeta: { fontSize: 10, color: colors.textTertiary },
+    chipMeta: { fontSize: 12, color: colors.textTertiary },
     needs: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
     need: { flexDirection: 'row', alignItems: 'center', gap: 4 },
     dot: { width: 8, height: 8, borderRadius: 4 },

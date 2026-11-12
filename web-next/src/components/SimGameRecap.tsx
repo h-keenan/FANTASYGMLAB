@@ -14,7 +14,7 @@ import { SeasonReviewSections, ReviewDeltaText, ReviewGlyphChip } from "@/compon
 import { ReviewGlyphIcon } from "@/components/SimReviewGlyph";
 import { SimReviewShareButton } from "@/components/SimReviewShareButton";
 import { api } from "@/lib/api";
-import { buildReviewShareModel } from "@/lib/simReview";
+import { buildReviewShareModel, buildSimReviewSections } from "@/lib/simReview";
 import {
   simFmtPts,
   normalizeSimResult,
@@ -222,6 +222,7 @@ export function SimFinalView({ ctx, onNewGame, onHub }: { ctx: SimCtx; onNewGame
   if (!result) return <div className="flex flex-col gap-3" aria-busy="true"><SkeletonCard lines={4} /><SkeletonCard lines={6} /></div>;
 
   const view = normalizeSimResult(result);
+  const sections = buildSimReviewSections({ decisions: view.decisions, review: result.review, components: result.grade?.components });
   const tone = simGradeTone(view.letter);
   const mine = view.mine;
   const youWon = Boolean(view.championId && view.championId === mine?.team_id);
@@ -232,7 +233,7 @@ export function SimFinalView({ ctx, onNewGame, onHub }: { ctx: SimCtx; onNewGame
     gradeTone: tone,
     headline: youWon ? `Champions! ${record}` : mine ? `${record}, ${simPlayoffResultLabel(mine.playoff_result)}` : "Season complete",
     subline: view.championName && !youWon ? `${view.championName} won the title` : view.summaryText,
-    sections: view.sections,
+    sections: sections,
   });
   return (
     <div className="flex flex-col gap-3" data-testid="final-result">
@@ -259,11 +260,11 @@ export function SimFinalView({ ctx, onNewGame, onHub }: { ctx: SimCtx; onNewGame
         <div className="flex flex-wrap items-center gap-2">
           <Button onClick={onNewGame}>Play again</Button>
           <Button variant="secondary" onClick={onHub}>All games</Button>
-          <SimReviewShareButton model={shareModel} sections={view.sections} gameId={gameId} />
+          <SimReviewShareButton model={shareModel} sections={sections} gameId={gameId} />
         </div>
       </AccentCard>
 
-      <SeasonReviewSections sections={view.sections} />
+      <SeasonReviewSections sections={sections} />
 
       <section className="flex flex-col gap-2" aria-label="Final standings">
         <SectionHeading>
