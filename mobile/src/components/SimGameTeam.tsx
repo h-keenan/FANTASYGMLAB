@@ -7,11 +7,12 @@ import Button from './Button';
 import EmptyState from './EmptyState';
 import ErrorState from './ErrorState';
 import PositionBadge from './PositionBadge';
+import { ReviewGlyphChip } from './SeasonReviewSections';
 import SectionHeading from './SectionHeading';
 import SegmentedTabBar from './SegmentedTabBar';
 import { SkeletonCard } from './SkeletonBlock';
 import { SimPlayerBrowser } from './SimGamePlayers';
-import { SimPlayerChip, SimPlayerLine, SimSheet, SimStat, SimToneBadge, createSimStyles, type SimCtx } from './SimGameParts';
+import { SimPlayerChip, SimPlayerLine, SimSheet, SimStat, SimToneBadge, createSimStyles, simToneColor, type SimCtx } from './SimGameParts';
 import { useThemeMode } from '../context/ThemeModeContext';
 import { api } from '../lib/api';
 import {
@@ -21,6 +22,7 @@ import {
   simSlotRepeatsPosition,
   simLineupPayload,
   simMatchupLine,
+  simMatchupTone,
   simNeedsDrop,
   simPositionsFor,
   simSlotAccepts,
@@ -139,8 +141,11 @@ export function SimTeamTab({ ctx, onTrade }: { ctx: SimCtx; onTrade: () => void 
   return (
     <View style={common.stack}>
       {week ? (
-        <AccentCard accent={week.bye ? colors.warning : colors.danger}>
-          <AppText style={styles.kicker}>Week {week.week} matchup</AppText>
+        <AccentCard accent={simToneColor(simMatchupTone(week), colors)}>
+          <View style={common.row}>
+            <ReviewGlyphChip glyph="game" tone={simMatchupTone(week)} size={24} />
+            <AppText style={styles.kicker}>Week {week.week} matchup</AppText>
+          </View>
           <View style={common.rowBetween}>
             <View style={common.grow}>
               <AppText style={common.bodyStrong}>You</AppText>
@@ -154,15 +159,18 @@ export function SimTeamTab({ ctx, onTrade }: { ctx: SimCtx; onTrade: () => void 
               <AppText style={styles.projection}>{week.opponent ? simFmtPts(week.opponent_projection) : '-'}</AppText>
             </View>
           </View>
-          <AppText style={common.small}>{simMatchupLine(week)}</AppText>
+          <AppText style={[common.small, { color: simToneColor(simMatchupTone(week), colors), fontWeight: '600' }]}>{simMatchupLine(week)}</AppText>
         </AccentCard>
       ) : null}
 
       {overLimit ? (
         <AccentCard accent={colors.danger} compact>
-          <AppText style={common.bodyStrong} accessibilityRole="alert">
-            Roster over the limit: cut {game.pending?.cuts_needed} player{game.pending?.cuts_needed === 1 ? '' : 's'} from your bench before you advance.
-          </AppText>
+          <View style={common.row}>
+            <ReviewGlyphChip glyph="injury" tone="danger" size={24} />
+            <AppText style={[common.bodyStrong, common.grow]} accessibilityRole="alert">
+              Roster over the limit: cut {game.pending?.cuts_needed} player{game.pending?.cuts_needed === 1 ? '' : 's'} from your bench before you advance.
+            </AppText>
+          </View>
         </AccentCard>
       ) : null}
 
@@ -171,7 +179,10 @@ export function SimTeamTab({ ctx, onTrade }: { ctx: SimCtx; onTrade: () => void 
           {warnings.map((w, i) => (
             <View key={i} style={common.stack}>
               {w.player_id && playerById[w.player_id] ? <SimPlayerChip player={playerById[w.player_id]} /> : null}
-              <AppText style={common.small}>{simWarningText(w, w.player_id ? playerById[w.player_id]?.name : undefined)}</AppText>
+              <View style={common.row}>
+                <ReviewGlyphChip glyph="lineup" tone="warning" size={20} />
+                <AppText style={[common.small, common.grow, { color: colors.warning }]}>{simWarningText(w, w.player_id ? playerById[w.player_id]?.name : undefined)}</AppText>
+              </View>
             </View>
           ))}
         </AccentCard>
@@ -431,12 +442,15 @@ export function SimPlayersTab({
         <View style={common.stack}>
           <SectionHeading title="Queued claims" caption="Resolve at Advance, worst record first." />
           {claims.map((claim) => (
-            <AccentCard key={claim.id} accent={colors.accent} compact>
+            <AccentCard key={claim.id} accent={colors.success} compact>
               <View style={common.rowBetween}>
                 <View style={[common.stack, common.grow]}>
-                  <SimPlayerChip player={claim.add} />
-                  {claim.drop ? <AppText style={common.muted}>Drops {claim.drop.name} ({claim.drop.pos})</AppText> : null}
-                  {claim.start_slot ? <AppText style={common.muted}>Starts at {claim.start_slot}</AppText> : null}
+                  <View style={common.row}>
+                    <ReviewGlyphChip glyph="waiver" tone="success" size={24} />
+                    <SimPlayerChip player={claim.add} />
+                  </View>
+                  {claim.drop ? <AppText style={[common.muted, { color: colors.danger }]}>Drops {claim.drop.name} ({claim.drop.pos})</AppText> : null}
+                  {claim.start_slot ? <AppText style={[common.muted, { color: colors.success }]}>Starts at {claim.start_slot}</AppText> : null}
                 </View>
                 <Button size="sm" variant="ghost" label="Cancel" onPress={() => cancel(claim)} />
               </View>

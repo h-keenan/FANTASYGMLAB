@@ -7,7 +7,8 @@ import { Button } from "@/components/Button";
 import { EmptyState } from "@/components/EmptyState";
 import { PillRow } from "@/components/PillRow";
 import { SectionHeading } from "@/components/SectionHeading";
-import { SimPlayerLine, SimStat, SimToneBadge, simToneColor, type SimCtx } from "@/components/SimGameParts";
+import { ReviewGlyphChip } from "@/components/SeasonReviewSections";
+import { SimPlayerLine, SimSideLabel, SimStat, SimToneBadge, simToneColor, type SimCtx } from "@/components/SimGameParts";
 import { SkeletonCard, SkeletonRows } from "@/components/Skeleton";
 import { ToneBadge } from "@/components/ToneBadge";
 import { api } from "@/lib/api";
@@ -90,17 +91,20 @@ function Inbox({ ctx }: { ctx: SimCtx }) {
         <li key={item.id} className="enter-rise">
           <AccentCard accent="var(--color-premium)" as="div">
             <div className="flex items-center justify-between gap-2">
-              <span className="text-sm font-bold break-words min-w-0">{item.from.name}</span>
-              <ToneBadge label={`Expires week ${item.expires_week}`} color="var(--color-text-secondary)" size="xs" />
+              <span className="flex min-w-0 items-center gap-2">
+                <ReviewGlyphChip glyph="trade" tone="accent" size={28} />
+                <span className="text-sm font-bold break-words min-w-0">{item.from.name}</span>
+              </span>
+              <ToneBadge label={`Expires week ${item.expires_week}`} color="var(--color-warning)" size="xs" />
             </div>
             {item.message ? <p className="text-xs" style={{ color: "var(--color-text-secondary)" }}>{item.message}</p> : null}
             <div className="grid gap-2 md:grid-cols-2">
               <div>
-                <p className="text-xs uppercase font-extrabold" style={{ color: "var(--color-text-muted)", letterSpacing: "var(--letter-spacing-badge)" }}>You give</p>
+                <SimSideLabel side="give" />
                 <PlayerList players={item.you_give} />
               </div>
               <div>
-                <p className="text-xs uppercase font-extrabold" style={{ color: "var(--color-text-muted)", letterSpacing: "var(--letter-spacing-badge)" }}>You get</p>
+                <SimSideLabel side="get" />
                 <PlayerList players={item.you_get} />
               </div>
             </div>
@@ -121,7 +125,10 @@ function VerdictCard({ verdict, onSendCounter, busy }: { verdict: SimTradeVerdic
     <AccentCard accent={simToneColor(tone)} as="div" className="enter-pop" data-highlighted="">
       <div data-testid="trade-verdict" className="flex flex-col gap-2">
         <div className="flex items-center justify-between gap-2">
-          <p className="text-base font-extrabold">{simTradeDecisionLabel(verdict.decision)}</p>
+          <span className="flex min-w-0 items-center gap-2">
+            <ReviewGlyphChip glyph="trade" tone={tone} size={28} />
+            <p className="text-base font-extrabold">{simTradeDecisionLabel(verdict.decision)}</p>
+          </span>
           <SimToneBadge tone={tone} size="sm" label={verdict.decision} />
         </div>
         <p className="text-sm">{verdict.reason}</p>
@@ -134,10 +141,10 @@ function VerdictCard({ verdict, onSendCounter, busy }: { verdict: SimTradeVerdic
         ) : null}
         {verdict.decision === "counter" && verdict.counter ? (
           <div className="flex flex-col gap-1">
-            <p className="text-xs font-bold">Their counter</p>
+            <p className="text-xs font-bold" style={{ color: "var(--color-accent)" }}>Their counter</p>
             <div className="grid gap-2 md:grid-cols-2">
-              <div><p className="text-xs" style={{ color: "var(--color-text-muted)" }}>You give</p><PlayerList players={verdict.counter.give} /></div>
-              <div><p className="text-xs" style={{ color: "var(--color-text-muted)" }}>You get</p><PlayerList players={verdict.counter.get} /></div>
+              <div><SimSideLabel side="give" /><PlayerList players={verdict.counter.give} /></div>
+              <div><SimSideLabel side="get" /><PlayerList players={verdict.counter.get} /></div>
             </div>
             <Button size="sm" loading={busy} onClick={onSendCounter}>Take their counter</Button>
           </div>

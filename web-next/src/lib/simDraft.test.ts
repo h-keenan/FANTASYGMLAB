@@ -1,0 +1,74 @@
+import { describe, expect, it } from "vitest";
+
+import {
+  simDraftAdpDelta,
+  simDraftBestByPosition,
+  simDraftBoardGrid,
+  simDraftNeedPills,
+  simDraftNextPickLabel,
+  simDraftProgress,
+  simDraftRecentPicks,
+  simDraftRowChips,
+  simDraftTeamEmblem,
+} from "./simDraft";
+import type { SimDraftPick, SimGamePlayer } from "./simGame";
+
+const p = (id: string, pos: SimGamePlayer["pos"], over: Partial<SimGamePlayer> = {}): SimGamePlayer =>
+  ({ id, name: id, pos, team: "KC", age: 25, adp: 5, value: 1, projection: 1, floor: 0, ceiling: 2, status: "healthy", out_weeks: 0, bye_week: 9, ...over }) as SimGamePlayer;
+const pk = (no: number, round: number, team: string): SimDraftPick => ({ pick_no: no, round, team_id: team, player: p(`p${no}`, "RB"), adp: null, value_over_adp: null, auto: false });
+
+describe("simDraft helpers", () => {
+  it("computes round/pick progress", () => {
+    const pr = simDraftProgress({ pick_no: 16, total_picks: 168, status: "in_progress" }, 12);
+    expect(pr).toMatchObject({ round: 2, pickInRound: 4, totalRounds: 14, made: 15 });
+    expect(simDraftProgress({ pick_no: 169, total_picks: 168, status: "complete" }, 12).fraction).toBe(1);
+  });
+  it("orders recent picks newest first", () => {
+    expect(simDraftRecentPicks([pk(1, 1, "a"), pk(3, 1, "c"), pk(2, 1, "b")], 2).map((x) => x.pick_no)).toEqual([3, 2]);
+  });
+  it("builds team emblems", () => {
+    expect(simDraftTeamEmblem("Dynasty Dogs (you)")).toBe("DD");
+    expect(simDraftTeamEmblem("Rivals")).toBe("RI");
+    expect(simDraftTeamEmblem("")).toBe("?");
+  });
+  it("labels the countdown", () => {
+    const base = { status: "in_progress" as const, on_the_clock: { team_id: "1", name: "x", is_you: false }, picks_until_you: 4, your_pick_numbers: [3, 20], pick_no: 16 };
+    expect(simDraftNextPickLabel(base)).toEqual({ label: "4", detail: "picks until yours (#20)" });
+    expect(simDraftNextPickLabel({ ...base, on_the_clock: { team_id: "1", name: "x", is_you: true } }).label).toBe("Now");
+    expect(simDraftNextPickLabel({ ...base, status: "complete" }).label).toBe("Done");
+  });
+  it("picks best by position", () => {
+    const out = simDraftBestByPosition([p("a", "WR"), p("b", "RB"), p("c", "WR")], ["QB", "RB", "WR"]);
+    expect(out.map((x) => x.player?.id ?? null)).toEqual([null, "b", "a"]);
+  });
+  it("colors needs", () => {
+    const slots = ["QB", "RB", "RB", "WR", "FLEX"] as never;
+    const tones = Object.fromEntries(simDraftNeedPills([p("a", "RB")], slots).map((n) => [n.pos, n.tone]));
+    expect(tones).toMatchObject({ QB: "danger", RB: "warning", WR: "danger", TE: "muted" });
+  });
+  it("flags steals and reaches against the clock", () => {
+    expect(simDraftAdpDelta(10, 16)).toEqual({ delta: 6, label: "+6", tone: "success" });
+    expect(simDraftAdpDelta(40, 16)).toEqual({ delta: -24, label: "-24", tone: "danger" });
+    expect(simDraftAdpDelta(15, 16)).toBeNull();
+    expect(simDraftAdpDelta(null, 16)).toBeNull();
+  });
+  it("shows only informative chips", () => {
+    expect(simDraftRowChips(p("a", "RB"))).toEqual([]);
+    expect(simDraftRowChips(p("a", "RB", { status: "out", out_weeks: 3, bye_week: 4, age: 21 })).map((c) => c.key)).toEqual(["out", "bye", "rookie"]);
+  });
+  it("builds a rounds x teams grid keyed by team", () => {
+    const grid = simDraftBoardGrid(
+      {
+        total_picks: 4,
+        teams: [{ team_id: "a", name: "A", is_you: true }, { team_id: "b", name: "B", is_you: false }],
+        order: [{ pick_no: 1, round: 1, team_id: "a" }, { pick_no: 2, round: 1, team_id: "b" }, { pick_no: 3, round: 2, team_id: "b" }, { pick_no: 4, round: 2, team_id: "a" }],
+        picks: [pk(1, 1, "a"), pk(2, 1, "b")],
+      },
+      2,
+    );
+    expect(grid.teams.map((t) => t.team_id)).toEqual(["a", "b"]);
+    expect(grid.rows[1].map((c) => c.pickNo)).toEqual([4, 3]);
+    expect(grid.rows[0][0].pick?.pick_no).toBe(1);
+    expect(grid.rows[1][0].pick).toBeNull();
+  });
+});

@@ -16,6 +16,8 @@ import { buildAnalyzerIdea, buildPartnerPitch } from "./analyzerShare";
 import { STORY_SIZE, SHARE_FONT_FAMILY, ShareBackdrop, type ShareBrandAssets } from "./frame";
 import { TradeShareCard } from "./tradeCard";
 import { MultiTradeShareCard } from "./multiTradeCard";
+import { SeasonReviewShareCard } from "./seasonReviewCard";
+import type { ReviewShareModel } from "@/lib/simReview";
 import type { ShareModel } from "@/lib/multiTeamTrade";
 
 export interface AnalyzerCardParams {
@@ -243,6 +245,21 @@ export async function renderMultiTradeCardSvg(model: ShareModel, leagueName: str
 export async function renderMultiTradeCardBlob(model: ShareModel, leagueName: string | null | undefined): Promise<Blob> {
   const assets = await loadBrowserAssets();
   const svg = await renderMultiTradeCardSvg(model, leagueName, assets);
+  return svgToPngBlob(svg, STORY_SIZE.width, STORY_SIZE.height);
+}
+
+/** The Fantasy Sim Season in Review card as SVG text. No images are fetched. */
+export async function renderSeasonReviewCardSvg(model: ReviewShareModel, assets: ShareStaticAssets): Promise<string> {
+  const satori = await loadSatori(assets.yoga);
+  const { width, height } = STORY_SIZE;
+  const backdrop = svgDataUri(await satori(<ShareBackdrop width={width} height={height} />, { width, height, fonts: assets.fonts }));
+  const brand: ShareBrandAssets = { lockup: assets.lockup, qr: assets.qr, backdrop };
+  return satori(<SeasonReviewShareCard model={model} brand={brand} width={width} height={height} />, { width, height, fonts: assets.fonts });
+}
+
+export async function renderSeasonReviewCardBlob(model: ReviewShareModel): Promise<Blob> {
+  const assets = await loadBrowserAssets();
+  const svg = await renderSeasonReviewCardSvg(model, assets);
   return svgToPngBlob(svg, STORY_SIZE.width, STORY_SIZE.height);
 }
 

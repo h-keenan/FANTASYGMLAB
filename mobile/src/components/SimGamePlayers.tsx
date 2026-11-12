@@ -7,6 +7,7 @@ import EmptyState from './EmptyState';
 import Input from './Input';
 import PlayerAvatar from './PlayerAvatar';
 import PositionBadge from './PositionBadge';
+import { ReviewGlyphChip } from './SeasonReviewSections';
 import SectionHeading from './SectionHeading';
 import SegmentedTabBar from './SegmentedTabBar';
 import { SkeletonCard } from './SkeletonBlock';
@@ -306,10 +307,13 @@ export function SimPlayerSheet({ gameId, player, onClose, actions }: { gameId: s
             <View style={common.stack}>
               <SectionHeading title="News" />
               {detail.news!.map((n, i) => (
-                <AppText key={i} style={common.body}>
-                  <AppText style={common.muted}>Week {n.week} · </AppText>
-                  {n.text}
-                </AppText>
+                <View key={i} style={common.row}>
+                  <ReviewGlyphChip glyph="stats" tone="accent" size={22} />
+                  <AppText style={[common.body, common.grow]}>
+                    <AppText style={[common.muted, { color: colors.accent, fontWeight: '700' }]}>Week {n.week} · </AppText>
+                    {n.text}
+                  </AppText>
+                </View>
               ))}
             </View>
           ) : null}

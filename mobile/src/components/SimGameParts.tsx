@@ -275,6 +275,14 @@ export function SimPreviewBanner({ preview }: { preview: SimGamePreview | null |
   );
 }
 
+const NOTICE_ICON: Record<SimGameTone, React.ComponentProps<typeof Ionicons>['name']> = {
+  success: 'trending-up',
+  danger: 'medkit-outline',
+  warning: 'clipboard-outline',
+  accent: 'stats-chart-outline',
+  muted: 'stats-chart-outline',
+};
+
 /** A transient or blocking one-line message inside a game. */
 export function SimNotice({ message, tone = 'warning', onDismiss }: { message: string; tone?: SimGameTone; onDismiss?: () => void }) {
   const { colors } = useThemeMode();
@@ -283,6 +291,7 @@ export function SimNotice({ message, tone = 'warning', onDismiss }: { message: s
   return (
     <AccentCard accent={simToneColor(tone, colors)} compact>
       <View style={styles.noticeRow} accessibilityRole={tone === 'danger' ? 'alert' : undefined} accessibilityLiveRegion="polite">
+        <Ionicons name={NOTICE_ICON[tone]} size={18} color={simToneColor(tone, colors)} style={styles.noticeIcon} />
         <AppText style={styles.noticeText}>{message}</AppText>
         {onDismiss ? (
           <Pressable onPress={onDismiss} hitSlop={10} accessibilityRole="button" accessibilityLabel="Dismiss message">
@@ -291,6 +300,19 @@ export function SimNotice({ message, tone = 'warning', onDismiss }: { message: s
         ) : null}
       </View>
     </AccentCard>
+  );
+}
+
+/** "You give" / "You get" label: fixed semantic color (red out, green in) with a small swap glyph. */
+export function SimSideLabel({ side }: { side: 'give' | 'get' }) {
+  const { colors } = useThemeMode();
+  const styles = useMemo(() => createStyles(colors), [colors]);
+  const color = simToneColor(side === 'give' ? 'danger' : 'success', colors);
+  return (
+    <View style={styles.sideLabel}>
+      <Ionicons name="swap-horizontal" size={14} color={color} />
+      <AppText style={[styles.sideLabelText, { color }]}>{side === 'give' ? 'You give' : 'You get'}</AppText>
+    </View>
   );
 }
 
@@ -381,6 +403,9 @@ function createStyles(colors: ThemeColors) {
     },
     previewRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
     previewText: { flex: 1, minWidth: 0, fontSize: 13, color: colors.textSecondary },
+    noticeIcon: { width: 18, marginTop: 1 },
+    sideLabel: { flexDirection: 'row', alignItems: 'center', gap: 4 },
+    sideLabelText: { fontSize: 12.5, fontWeight: '800', letterSpacing: 0.8, textTransform: 'uppercase' },
     noticeRow: { flexDirection: 'row', alignItems: 'flex-start', gap: spacing.sm },
     noticeText: { flex: 1, minWidth: 0, fontSize: 14.5, lineHeight: 20, color: colors.textPrimary },
     noticeDismiss: { fontSize: 13, fontWeight: '700', color: colors.accent },

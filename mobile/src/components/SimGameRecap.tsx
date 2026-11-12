@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 
 import AccentCard from './AccentCard';
 import AppText from './AppText';
@@ -10,7 +11,8 @@ import SectionHeading from './SectionHeading';
 import { SkeletonCard } from './SkeletonBlock';
 import { SimStandingsList } from './SimGameLeague';
 import { SimPlayerChip, SimPlayerLine, SimPopIn, SimStat, SimToneBadge, createSimStyles, simToneColor, type SimCtx } from './SimGameParts';
-import ToneBadge from './ToneBadge';
+import { SeasonReviewSections, ReviewDeltaText, ReviewGlyphChip, REVIEW_ICON } from './SeasonReviewSections';
+import SimReviewShareModal from './SimReviewShareModal';
 import { useThemeMode } from '../context/ThemeModeContext';
 import { api } from '../lib/api';
 import {
@@ -19,6 +21,7 @@ import {
   simGameReasonMessage,
   simSlotRepeatsPosition,
   simGradeTone,
+  simPlayoffOutcomeTone,
   simPlayoffResultLabel,
   simPlayoffRoundLabel,
   simResultLabel,
@@ -28,6 +31,7 @@ import {
   type SimGameResult,
   type SimWeekRecap,
 } from '../lib/simGame';
+import { buildReviewShareModel } from '../lib/simReview';
 import { spacing, type ThemeColors } from '../theme';
 
 /** One week's recap: the score lands first, then your starters, the league and what changed. */
@@ -87,15 +91,18 @@ export function SimWeekRecapView({
           <AppText style={common.bodyStrong}>You had a bye this week.</AppText>
         )}
         {recap.season_complete ? (
-          <AppText style={common.bodyStrong} accessibilityLiveRegion="polite">
-            The season is over{recap.champion ? ` and ${names[recap.champion] ?? 'the champion'} won it all` : ''}.
-          </AppText>
+          <View style={common.row}>
+            <ReviewGlyphChip glyph="trophy" tone="success" size={24} />
+            <AppText style={[common.bodyStrong, common.grow, { color: colors.success }]} accessibilityLiveRegion="polite">
+              The season is over{recap.champion ? ` and ${names[recap.champion] ?? 'the champion'} won it all` : ''}.
+            </AppText>
+          </View>
         ) : null}
       </AccentCard>
 
       {game ? (
         <View>
-          <SectionHeading title="Your starters" />
+          <SectionHeading title="Your starters" icon={REVIEW_ICON.lineup} />
           {game.starters.map((s, i) => (
             <View key={`${s.slot}-${i}`} style={common.row}>
               <View style={common.slotCol}>
@@ -127,18 +134,24 @@ export function SimWeekRecapView({
           {recap.mvp ? (
             <View style={common.grow}>
               <AccentCard accent={colors.success} compact>
-                <AppText style={common.muted}>Week MVP</AppText>
+                <View style={common.row}>
+                  <ReviewGlyphChip glyph="boom" tone="success" size={22} />
+                  <AppText style={[common.small, { color: colors.success, fontWeight: '700' }]}>Week MVP</AppText>
+                </View>
                 <SimPlayerChip player={recap.mvp.player} />
-                <AppText style={common.small}>{simFmtPts(recap.mvp.pts)} pts</AppText>
+                <ReviewDeltaText text={`${simFmtPts(recap.mvp.pts)} pts`} tone="success" small />
               </AccentCard>
             </View>
           ) : null}
           {recap.bust ? (
             <View style={common.grow}>
               <AccentCard accent={colors.warning} compact>
-                <AppText style={common.muted}>Biggest bust</AppText>
+                <View style={common.row}>
+                  <ReviewGlyphChip glyph="bust" tone="warning" size={22} />
+                  <AppText style={[common.small, { color: colors.warning, fontWeight: '700' }]}>Biggest bust</AppText>
+                </View>
                 <SimPlayerChip player={recap.bust.player} />
-                <AppText style={common.small}>{simFmtPts(recap.bust.pts)} pts</AppText>
+                <ReviewDeltaText text={`${simFmtPts(recap.bust.pts)} pts`} tone="warning" small />
               </AccentCard>
             </View>
           ) : null}
@@ -147,14 +160,16 @@ export function SimWeekRecapView({
 
       {(recap.injuries ?? []).length > 0 ? (
         <View style={common.stack}>
-          <SectionHeading title="Injuries" />
+          <SectionHeading title="Injuries" icon={REVIEW_ICON.injury} />
           {recap.injuries!.map((inj, i) => (
             <AccentCard key={i} accent={inj.is_yours ? colors.danger : colors.borderStrong} compact>
               <SimPlayerChip player={{ ...inj.player, status: 'out', out_weeks: inj.weeks }} />
-              <AppText style={common.small}>
-                Out {inj.weeks} week{inj.weeks === 1 ? '' : 's'}
-                {inj.is_yours ? ' (your team)' : ''}.
-              </AppText>
+              <View style={common.row}>
+                <AppText style={[common.small, { color: colors.danger, fontWeight: '600' }]}>
+                  Out {inj.weeks} week{inj.weeks === 1 ? '' : 's'}
+                </AppText>
+                {inj.is_yours ? <SimToneBadge label="Your team" tone="danger" /> : null}
+              </View>
             </AccentCard>
           ))}
         </View>
@@ -162,15 +177,15 @@ export function SimWeekRecapView({
 
       {myWaivers.length > 0 ? (
         <View style={common.stack}>
-          <SectionHeading title="Your waiver claims" />
+          <SectionHeading title="Your waiver claims" icon={REVIEW_ICON.waiver} />
           {myWaivers.map((w, i) => (
             <AccentCard key={i} accent={w.ok ? colors.success : colors.danger} compact>
               <SimPlayerChip player={w.add} />
-              <AppText style={common.small}>
-                {w.ok ? 'Won' : 'Lost'}
-                {w.drop ? <AppText style={common.muted}>, dropping {w.drop.name}</AppText> : null}
-                {!w.ok && w.reason ? <AppText style={common.muted}> ({w.reason.replace(/_/g, ' ')})</AppText> : null}
-              </AppText>
+              <View style={common.wrapRow}>
+                <SimToneBadge label={w.ok ? 'Won' : 'Lost'} tone={w.ok ? 'success' : 'danger'} />
+                {w.drop ? <AppText style={[common.small, { color: colors.danger, fontWeight: '600' }]}>dropping {w.drop.name}</AppText> : null}
+                {!w.ok && w.reason ? <AppText style={common.muted}>({w.reason.replace(/_/g, ' ')})</AppText> : null}
+              </View>
             </AccentCard>
           ))}
         </View>
@@ -178,7 +193,7 @@ export function SimWeekRecapView({
 
       {(recap.standings ?? []).length > 0 ? (
         <View style={common.stack}>
-          <SectionHeading title="Standings" />
+          <SectionHeading title="Standings" icon={REVIEW_ICON.rank} />
           <SimStandingsList rows={recap.standings!} playoffTeams={ctx.game.settings.playoff_teams} />
         </View>
       ) : null}
@@ -198,6 +213,7 @@ export function SimFinalView({ ctx, onNewGame, onHub }: { ctx: SimCtx; onNewGame
   const [failed, setFailed] = useState(false);
   const [failMessage, setFailMessage] = useState('');
   const [attempt, setAttempt] = useState(0);
+  const [sharing, setSharing] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -245,21 +261,36 @@ export function SimFinalView({ ctx, onNewGame, onHub }: { ctx: SimCtx; onNewGame
   const tone = simGradeTone(view.letter);
   const toneColor = simToneColor(tone, colors);
   const mine = view.mine;
+  const youWon = Boolean(view.championId && view.championId === mine?.team_id);
+  const record = mine ? `${mine.wins}-${mine.losses}${mine.ties ? `-${mine.ties}` : ''}` : '';
+  const shareModel = buildReviewShareModel({
+    letter: view.letter,
+    gradeTone: tone,
+    headline: youWon ? `Champions! ${record}` : mine ? `${record}, ${simPlayoffResultLabel(mine.playoff_result)}` : 'Season complete',
+    subline: view.championName && !youWon ? `${view.championName} won the title` : view.summaryText,
+    sections: view.sections,
+  });
   return (
     <View style={common.stack} testID="final-result">
       <AccentCard accent={toneColor} glow>
-        <AppText style={styles.kicker}>Season complete</AppText>
+        <AppText style={styles.kicker}>Season in review</AppText>
         <SimPopIn style={common.row}>
           <AppText style={[styles.grade, { color: toneColor }]} accessibilityLabel={`Grade ${view.letter}`}>
             {view.letter || '-'}
           </AppText>
           <View style={common.grow}>
-            <AppText style={common.bodyStrong}>{mine ? `${mine.wins}-${mine.losses}${mine.ties ? `-${mine.ties}` : ''} · ${simPlayoffResultLabel(mine.playoff_result)}` : ''}</AppText>
+            <View style={common.wrapRow}>
+              {record ? <AppText style={common.title}>{record}</AppText> : null}
+              {mine ? <SimToneBadge label={simPlayoffResultLabel(mine.playoff_result)} tone={simPlayoffOutcomeTone(mine.playoff_result)} /> : null}
+            </View>
             {view.championName ? (
-              <AppText style={common.muted}>
-                Champion: {view.championName}
-                {view.championId && view.championId === mine?.team_id ? ' (you)' : ''}
-              </AppText>
+              <View style={common.row}>
+                <Ionicons name="trophy-outline" size={14} color={youWon ? colors.success : colors.textTertiary} />
+                <AppText style={common.muted}>
+                  Champion: {view.championName}
+                  {youWon ? ' (you)' : ''}
+                </AppText>
+              </View>
             ) : null}
           </View>
         </SimPopIn>
@@ -267,26 +298,16 @@ export function SimFinalView({ ctx, onNewGame, onHub }: { ctx: SimCtx; onNewGame
         <View style={common.wrapRow}>
           <Button label="Play again" onPress={onNewGame} />
           <Button label="All games" variant="secondary" onPress={onHub} />
+          <Button label="Share your season" variant="secondary" onPress={() => setSharing(true)} />
         </View>
       </AccentCard>
 
-      {view.decisions.length > 0 ? (
-        <View style={common.stack}>
-          <SectionHeading title="Decisions that mattered" caption="The moves that moved your season most, from replaying it without them." />
-          {view.decisions.map((d, i) => (
-            <AccentCard key={i} accent={colors.accent} compact>
-              {d.kind ? <ToneBadge label={String(d.kind).replace(/_/g, ' ')} color={colors.accent} size="xs" /> : null}
-              {d.title ? <AppText style={common.bodyStrong}>{String(d.title)}</AppText> : null}
-              {d.detail ? <AppText style={common.small}>{String(d.detail)}</AppText> : null}
-            </AccentCard>
-          ))}
-        </View>
-      ) : null}
+      <SeasonReviewSections sections={view.sections} />
 
       <View style={common.stack}>
-        <SectionHeading title="Final standings" />
+        <SectionHeading title="Final standings" icon="analytics-outline" />
         {view.standings.map((row, i) => (
-          <AccentCard key={row.team_id} accent={row.is_you ? colors.accent : colors.borderStrong} compact>
+          <AccentCard key={row.team_id} accent={row.is_you ? colors.accent : simToneColor(simPlayoffOutcomeTone(row.playoff_result), colors)} compact>
             <View style={common.rowBetween}>
               <AppText style={[common.body, common.grow]}>
                 {i + 1}. {row.name}
@@ -297,15 +318,17 @@ export function SimFinalView({ ctx, onNewGame, onHub }: { ctx: SimCtx; onNewGame
                 {row.ties ? `-${row.ties}` : ''}
               </AppText>
             </View>
-            <AppText style={common.small}>
-              {simPlayoffResultLabel(row.playoff_result)} · {simFmtPts(row.pf)} PF
-            </AppText>
+            <View style={common.rowBetween}>
+              <SimToneBadge label={simPlayoffResultLabel(row.playoff_result)} tone={simPlayoffOutcomeTone(row.playoff_result)} />
+              <AppText style={common.small}>{simFmtPts(row.pf)} PF</AppText>
+            </View>
           </AccentCard>
         ))}
       </View>
       <AppText style={common.muted}>
         A game, not a forecast. Season {game.settings.regular_weeks} weeks plus playoffs against AI managers; nothing here touches your real leagues.
       </AppText>
+      <SimReviewShareModal visible={sharing} onClose={() => setSharing(false)} model={shareModel} sections={view.sections} />
     </View>
   );
 }
