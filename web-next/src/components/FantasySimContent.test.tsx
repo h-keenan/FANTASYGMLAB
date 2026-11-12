@@ -69,21 +69,21 @@ describe("FantasySimContent", () => {
   });
 
   it("shows the Pro upsell when the server says premium_required", async () => {
-    vi.mocked(api.getSimStatus).mockResolvedValue({ ok: true, reason: "premium_required", is_premium: false, upsell: { title: "Unlock Fantasy Sim", body: "Pro only." } });
+    vi.mocked(api.getSimStatus).mockResolvedValue({ ok: true, reason: "premium_required", is_premium: false, upsell: { title: "Unlock Season Outlook", body: "Pro only." } });
     render(<FantasySimContent leagueId="9" leagueName="Test League" />);
-    expect(await screen.findByText("Unlock Fantasy Sim")).toBeInTheDocument();
+    expect(await screen.findByText("Unlock Season Outlook")).toBeInTheDocument();
   });
 
   it("shows a coming-soon state when the sim routes 404", async () => {
     vi.mocked(api.getSimStatus).mockRejectedValue(new ApiError(404, "Not found"));
     render(<FantasySimContent leagueId="9" leagueName="Test League" />);
-    expect(await screen.findByText("Fantasy Sim is coming soon")).toBeInTheDocument();
+    expect(await screen.findByText("Season outlook is coming soon")).toBeInTheDocument();
   });
 
   it("says it is temporarily unavailable (not coming soon) when storage is not applied yet", async () => {
     vi.mocked(api.getSimStatus).mockResolvedValue({ ok: true, reason: "sim_storage_unavailable", is_premium: true });
     render(<FantasySimContent leagueId="9" leagueName="Test League" />);
-    expect(await screen.findByText("Fantasy Sim is temporarily unavailable")).toBeInTheDocument();
+    expect(await screen.findByText("Season outlook is temporarily unavailable")).toBeInTheDocument();
   });
 
   it("shows an error with retry for a real failure", async () => {
