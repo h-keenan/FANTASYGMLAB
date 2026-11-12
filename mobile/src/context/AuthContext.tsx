@@ -10,9 +10,6 @@ import React, {
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 import { api } from '../lib/api';
-import { hasAppleIdentity, requestAccountDeletion } from '../lib/accountDeletion';
-import { getAppleAuthorizationCodeForRevocation } from '../lib/appleAuth';
-import { env } from '../lib/env';
 import {
   didAuthenticatedUserChange,
   readStoredAuthScopeUserId,
@@ -77,6 +74,9 @@ interface AuthContextValue {
 }
 
 const AuthContext = createContext<AuthContextValue | undefined>(undefined);
+
+export const ACCOUNT_DELETION_SUPPORT_MESSAGE =
+  'Self-service account deletion is temporarily unavailable. Email support@fantasydesk.app and we will delete your account and cancel any subscription.';
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [session, setSession] = useState<Session | null>(null);
@@ -271,39 +271,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         }
       },
       deleteAccount: async () => {
-        // The `delete-account` edge function (supabase/functions/delete-account)
-        // cancels any Stripe subscription FIRST, revokes Sign in with Apple
-        // (when configured server-side), then deletes auth.users, which
-        // cascades to every app table. If billing can't be cancelled it
-        // refuses and nothing is deleted. App Store / Play subscriptions are
-        // managed by the store and are not cancellable from here.
-        const { data } = await supabase.auth.getSession();
-        const accessToken = data.session?.access_token;
-        if (!accessToken) return { error: 'Sign in again to delete your account.' };
-        const { error } = await requestAccountDeletion({
-          supabaseUrl: env.supabaseUrl,
-          anonKey: env.supabaseAnonKey,
-          accessToken,
-          fetchFn: (url, init) => fetch(url, init),
-          getAppleAuthorizationCode: hasAppleIdentity(data.session?.user)
-            ? getAppleAuthorizationCodeForRevocation
-            : undefined,
-        });
-        if (error) return { error };
-        // Same ordering/guarantee as signOut above: push-token unregister
-        // first (needs the still-live session), then best-effort
-        // sign-out/cache-teardown that always completes via `finally`.
-        await unregisterCurrentPushToken();
-        try {
-          await supabase.auth.signOut();
-          await signOutRevenueCatUser();
-        } finally {
-          await clearAuthenticatedQueryCache();
-          lastHandledUserIdRef.current = null;
-          setCurrentAuthScopeUserId(null);
-          await writeStoredAuthScopeUserId(AsyncStorage, null);
-        }
-        return { error: null };
+        // TEMPORARY: the delete-account edge function (cancels Stripe, then
+        // deletes) is reverted, and the bare delete_user RPC would delete a
+        // user who is still billed. Self-service deletion is disabled until
+        // the function is redeployed; MoreScreen points users at support.
+        return { error: ACCOUNT_DELETION_SUPPORT_MESSAGE };
       },
     }),
     [session, loading],

@@ -17,15 +17,15 @@ import { LoadingScreen } from "@/components/LoadingScreen";
  * opens), Community Trade Feed opt-out + push notification category
  * toggles (both backed by the existing user_settings-keyed endpoints — no
  * new preference invented here), and account actions (sign out, GDPR data
- * export, delete account via the same `delete_user` Supabase RPC mobile's
- * MoreScreen already calls).
+ * export, delete account is a contact-support link while self-service deletion
+ * is temporarily disabled).
  *
  * No `[leagueId]` segment — same single-page shape as Premium/Portfolio,
  * since an account applies across every league, not one.
  */
 export default function AccountPage() {
   const router = useRouter();
-  const { session, loading: authLoading, signOut, deleteAccount } = useAuth();
+  const { session, loading: authLoading, signOut } = useAuth();
 
   const [me, setMe] = useState<MeResponse | null>(null);
   const [communityOptedOut, setCommunityOptedOut] = useState(false);
@@ -127,12 +127,6 @@ export default function AccountPage() {
     URL.revokeObjectURL(url);
   }, []);
 
-  const handleDeleteAccount = useCallback(async () => {
-    const { error: deleteError } = await deleteAccount();
-    if (deleteError) throw new Error(deleteError);
-    router.replace("/");
-  }, [deleteAccount, router]);
-
   const handleSignOut = useCallback(() => {
     void signOut().then(() => router.replace("/"));
   }, [signOut, router]);
@@ -165,7 +159,6 @@ export default function AccountPage() {
       onRetryReferral={handleRetryReferral}
       onOpenBillingPortal={handleOpenBillingPortal}
       onExportData={handleExportData}
-      onDeleteAccount={handleDeleteAccount}
       onSignOut={handleSignOut}
     />
   );
