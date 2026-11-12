@@ -44,6 +44,7 @@ export const ROUTE_BY_PAGE: Readonly<Record<string, string>> = {
   games: 'Games',
   commissioner: 'Commissioner',
   portfolio: 'Portfolio',
+  'gm-game': 'GmGame',
   news: 'News',
   community: 'Community',
 };
