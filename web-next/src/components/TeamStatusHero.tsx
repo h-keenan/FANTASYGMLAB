@@ -83,8 +83,8 @@ function RowLink({ href, label, children }: { href: string; label: string; child
     <Link
       href={href}
       aria-label={label}
-      className="flex items-center gap-2 py-2.5"
-      style={{ minHeight: 44, color: "inherit", textDecoration: "none", borderTop: "1px solid var(--color-border)" }}
+      className="flex items-center gap-2 py-2.5 border-t first:border-t-0"
+      style={{ minHeight: 44, color: "inherit", textDecoration: "none", borderTopColor: "var(--color-border)" }}
     >
       <span className="min-w-0 flex-1 flex flex-col gap-1">{children}</span>
       <span aria-hidden="true" style={{ color: "var(--color-accent)" }}>

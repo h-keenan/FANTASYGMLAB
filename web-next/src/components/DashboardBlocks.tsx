@@ -54,7 +54,7 @@ export function DashboardNeedsAttention({
                 className="flex items-center gap-2 py-2.5"
                 style={{ minHeight: 44, color: "inherit", textDecoration: "none" }}
               >
-                <span className="shrink-0 w-[5.5rem]">
+                <span className="shrink-0 min-w-[5.5rem]">
                   <ToneBadge label={entry.badge} color="var(--color-danger)" />
                 </span>
                 <span className="min-w-0 flex-1 flex flex-col">

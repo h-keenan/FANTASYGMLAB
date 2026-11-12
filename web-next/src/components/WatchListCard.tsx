@@ -50,7 +50,7 @@ export function WatchListCard({
         const rowStyle = index > 0 ? { borderTop: "var(--border-width-default) solid var(--color-border)" } : undefined;
         const body = (
           <>
-            <span className="shrink-0 w-[5.5rem]">
+            <span className="shrink-0 min-w-[5.5rem]">
               <ToneBadge label={tag.label} color={tag.color} />
             </span>
             {playerId ? (
