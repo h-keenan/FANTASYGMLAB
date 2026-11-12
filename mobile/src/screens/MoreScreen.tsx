@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
+  Linking,
   Pressable,
   ScrollView,
   Share,
@@ -46,6 +47,7 @@ import NotificationControls from '../components/NotificationControls';
 import GuestCreateAccountModal from '../components/GuestCreateAccountModal';
 import Input from '../components/Input';
 import HelpLink from '../components/HelpLink';
+import { supportMailto } from '../lib/support';
 import ModalFormCard, { ModalFormActions, ModalFormHint, ModalFormTitle } from '../components/ModalFormCard';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'More'>;
@@ -390,24 +392,18 @@ export default function MoreScreen({ navigation }: Props) {
     navigation.navigate(screen, league);
   };
 
+  // TEMPORARY: self-service deletion is disabled (delete-account edge
+  // function reverted); route the user to support instead.
   const onDeleteAccount = () => {
     Alert.alert(
-      'Delete account?',
-      'This permanently deletes your account and all data — saved leagues, GM Targets, trade history. Any web (Stripe) subscription is cancelled. A subscription bought through the App Store or Google Play must be cancelled in your store account. This cannot be undone.',
+      'Delete account',
+      'Self-service account deletion is temporarily unavailable. Email support@fantasydesk.app and we will delete your account and all data, and cancel any web subscription. A subscription bought through the App Store or Google Play must be cancelled in your store account.',
       [
-        { text: 'Cancel', style: 'cancel' },
+        { text: 'Close', style: 'cancel' },
         {
-          text: 'Delete',
-          style: 'destructive',
-          onPress: async () => {
-            setDeleting(true);
-            const { error } = await deleteAccount();
-            setDeleting(false);
-            if (error) {
-              Alert.alert('Could not delete account', error || 'Please try again in a moment.');
-            }
-            // On success there's nothing else to do here — clearing the
-            // session flips RootNavigator back to the Auth stack on its own.
+          text: 'Email support',
+          onPress: () => {
+            void Linking.openURL(supportMailto({ topic: 'delete_account' })).catch(() => {});
           },
         },
       ],

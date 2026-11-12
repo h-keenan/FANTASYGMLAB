@@ -44,7 +44,6 @@ function renderContent(overrides: Partial<Parameters<typeof AccountContent>[0]> 
     onRetryReferral: vi.fn(),
     onOpenBillingPortal: vi.fn().mockResolvedValue(undefined),
     onExportData: vi.fn().mockResolvedValue(undefined),
-    onDeleteAccount: vi.fn().mockResolvedValue(undefined),
     onSignOut: vi.fn(),
     ...overrides,
   };
@@ -153,21 +152,12 @@ describe("AccountContent", () => {
     expect(onSignOut).toHaveBeenCalledTimes(1);
   });
 
-  it("requires a second confirm click before calling onDeleteAccount, and Cancel backs out without calling it", () => {
-    const onDeleteAccount = vi.fn().mockResolvedValue(undefined);
-    renderContent({ onDeleteAccount });
+  it("offers a contact-support link instead of a delete button while self-service deletion is disabled", () => {
+    renderContent();
 
-    fireEvent.click(screen.getByRole("button", { name: "Delete account" }));
-    expect(onDeleteAccount).not.toHaveBeenCalled();
-    expect(screen.getByRole("button", { name: "Confirm delete" })).toBeInTheDocument();
-
-    fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
     expect(screen.queryByRole("button", { name: "Confirm delete" })).not.toBeInTheDocument();
-    expect(onDeleteAccount).not.toHaveBeenCalled();
-
-    fireEvent.click(screen.getByRole("button", { name: "Delete account" }));
-    fireEvent.click(screen.getByRole("button", { name: "Confirm delete" }));
-    expect(onDeleteAccount).toHaveBeenCalledTimes(1);
+    const link = screen.getByRole("link", { name: "Contact support to delete your account" });
+    expect(link.getAttribute("href")).toMatch(/^mailto:support@fantasydesk\.app/);
   });
 });
 

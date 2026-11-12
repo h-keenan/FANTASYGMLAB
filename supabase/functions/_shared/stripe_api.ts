@@ -32,17 +32,10 @@ export function encodeForm(params: Json, prefix = ""): string[] {
   return out;
 }
 
-/** Carries the HTTP status + Stripe error code so callers can treat e.g. 404 resource_missing as "already gone". */
-export class StripeHttpError extends Error {
-  constructor(readonly path: string, readonly status: number, readonly stripeCode: string) {
-    super(`Stripe ${path} failed (${status})`);
-  }
-}
-
 export async function stripeRequest(
   fetchFn: FetchFn,
   secretKey: string,
-  method: "GET" | "POST" | "DELETE",
+  method: "GET" | "POST",
   path: string,
   params: Json = {},
   idempotencyKey = "",
@@ -51,13 +44,13 @@ export async function stripeRequest(
   const headers: Record<string, string> = { Authorization: `Bearer ${secretKey}` };
   if (method === "POST") headers["Content-Type"] = "application/x-www-form-urlencoded";
   if (idempotencyKey) headers["Idempotency-Key"] = idempotencyKey;
-  const url = method !== "POST" && body ? `${STRIPE_API}${path}?${body}` : `${STRIPE_API}${path}`;
+  const url = method === "GET" && body ? `${STRIPE_API}${path}?${body}` : `${STRIPE_API}${path}`;
   const res = await fetchFn(url, { method, headers, body: method === "POST" ? body : undefined });
   const data = await res.json().catch(() => ({}));
   if (res.status >= 400) {
     // Log the Stripe error type server-side only; never echo Stripe text to clients.
     console.error("stripe api error", path, res.status, isObj(data) && isObj(data.error) ? st(data.error.type) : "");
-    throw new StripeHttpError(path, res.status, isObj(data) && isObj(data.error) ? st(data.error.code) : "");
+    throw new Error(`Stripe ${path} failed (${res.status})`);
   }
   return isObj(data) ? data : {};
 }

@@ -4,7 +4,6 @@ import type { Session } from "@supabase/supabase-js";
 import React, { createContext, useContext, useEffect, useMemo, useState } from "react";
 
 import { trackFeatureUse } from "@/lib/analytics";
-import { billingRequest } from "@/lib/billingClient";
 import {
   GUEST_DATA_NOT_MERGED_NOTICE,
   IDENTITY_EXISTS_NOTICE,
@@ -102,6 +101,9 @@ interface AuthContextValue {
 }
 
 const AuthContext = createContext<AuthContextValue | undefined>(undefined);
+
+export const ACCOUNT_DELETION_SUPPORT_MESSAGE =
+  "Self-service account deletion is temporarily unavailable. Email support@fantasydesk.app and we will delete your account and cancel any subscription.";
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [session, setSession] = useState<Session | null>(null);
@@ -272,20 +274,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         await supabase.auth.signOut();
       },
       deleteAccount: async () => {
-        // The delete-account edge function cancels any Stripe subscription
-        // FIRST, then deletes the user (supabase/functions/delete-account).
-        // If billing cannot be cancelled it refuses, so nobody is left
-        // deleted-but-still-billed.
-        const { data } = await supabase.auth.getSession();
-        const accessToken = data.session?.access_token;
-        if (!accessToken) return { error: "Sign in again to delete your account." };
-        try {
-          await billingRequest("delete-account", accessToken, { method: "POST", jsonBody: {}, backend: "supabase" });
-        } catch (e) {
-          return { error: e instanceof Error ? e.message : "Could not delete the account." };
-        }
-        await supabase.auth.signOut();
-        return { error: null };
+        // TEMPORARY: the delete-account edge function (cancels Stripe, then
+        // deletes) is reverted, and the bare delete_user RPC would delete a
+        // user who is still billed. Self-service deletion is disabled until
+        // the function is redeployed; the UI points users at support.
+        return { error: ACCOUNT_DELETION_SUPPORT_MESSAGE };
       },
       resetPassword: async (email) => {
         const { error } = await supabase.auth.resetPasswordForEmail(email);

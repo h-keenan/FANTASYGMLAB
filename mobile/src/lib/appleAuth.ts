@@ -51,19 +51,3 @@ export async function signInWithApple(opts: { linkGuest?: boolean } = {}): Promi
     return { error: err instanceof Error ? err.message : 'Apple sign-in failed.' };
   }
 }
-
-/**
- * Fresh single-use authorizationCode for Sign in with Apple token revocation
- * at account deletion (Apple App Review Guideline 5.1.1(v)). Apple codes expire
- * in minutes, so this re-prompts the user. Returns null if unavailable/cancelled;
- * deletion still proceeds (the server just skips revocation).
- */
-export async function getAppleAuthorizationCodeForRevocation(): Promise<string | null> {
-  if (!(await isAppleAuthAvailable())) return null;
-  try {
-    const credential = await AppleAuthentication.signInAsync({ requestedScopes: [] });
-    return credential.authorizationCode ?? null;
-  } catch {
-    return null;
-  }
-}

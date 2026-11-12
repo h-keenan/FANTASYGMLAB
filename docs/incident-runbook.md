@@ -91,10 +91,10 @@ After rotating Stripe, send a test event and confirm a `billing_webhook_events` 
 
 ## Data requests
 
-* Delete: in-app, More, Account, Delete account (`delete-account` edge function,
-  `docs/account-deletion.md`). It cancels Stripe subscriptions first, revokes Sign in with
-  Apple when configured, then deletes the Supabase user and cascades app tables. If Stripe
-  cancel fails, nothing is deleted. App Store / Play subscriptions are cancelled by the user in the store.
+* Delete: self-service is temporarily disabled (the `delete-account` edge function is
+  reverted, see `docs/account-deletion.md`). The in-app Delete account entry points users to
+  `support@fantasydesk.app`. Cancel any Stripe subscription in Stripe first, then delete the
+  Supabase user (cascades app tables). App Store / Play subscriptions are cancelled by the user in the store.
 * Export: `GET /v1/me/export` (in-app, More, Account).
 * Contact: `support@fantasydesk.app` must have a working mailbox (MX records) before
   the address is shown to users. Verify with `dig MX fantasydesk.app`.
