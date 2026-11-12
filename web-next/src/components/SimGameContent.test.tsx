@@ -106,6 +106,45 @@ describe("SimGameContent", () => {
     expect(screen.getByTestId("sim-preview-line")).toHaveTextContent("3 weeks left");
   });
 
+  it("limit reached: names the count, offers Manage, and deleting from the hub frees New game immediately", async () => {
+    const g2 = { ...lite(game({ id: "g2" })), status: "complete" as const, grade_letter: "B+" };
+    mocked.getSimGameOptions.mockResolvedValue(options({ max_games: 2 }));
+    mocked.listSimGames.mockResolvedValue({ ok: true, reason: "", games: [lite(game()), g2] });
+    mocked.deleteSimGame.mockResolvedValue({ ok: true, reason: "" });
+    render(<SimGameContent />);
+    expect(await screen.findByTestId("new-game-block")).toHaveTextContent("You have 2 of 2 saved games");
+    expect(screen.getByRole("button", { name: "Manage games / delete one" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "New game" })).toBeDisabled();
+    fireEvent.click(screen.getByRole("button", { name: /Delete game: Finished/ }));
+    expect(screen.getByRole("alert")).toHaveTextContent(/Finished · Grade B\+.*cannot be undone/);
+    mocked.listSimGames.mockResolvedValue({ ok: true, reason: "", games: [lite(game())] });
+    fireEvent.click(screen.getByRole("button", { name: "Delete game" }));
+    await waitFor(() => expect(mocked.deleteSimGame).toHaveBeenCalledWith("g2"));
+    await waitFor(() => expect(screen.queryByTestId("new-game-block")).toBeNull());
+    expect(screen.getByRole("button", { name: "New game" })).toBeEnabled();
+    expect(screen.queryByRole("button", { name: /Delete game: Finished/ })).toBeNull();
+  });
+
+  it("a 503 on hub delete keeps the game and shows a busy notice", async () => {
+    mocked.listSimGames.mockResolvedValue({ ok: true, reason: "", games: [lite(game())] });
+    mocked.deleteSimGame.mockRejectedValue(Object.assign(new Error("busy"), { status: 503 }));
+    render(<SimGameContent />);
+    fireEvent.click(await screen.findByRole("button", { name: /Delete game: Week/ }));
+    fireEvent.click(screen.getByRole("button", { name: "Delete game" }));
+    expect(await screen.findByText(/simulator is busy/)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Open game/ })).toBeInTheDocument();
+  });
+
+  it("a 404 on hub delete drops the already-gone game", async () => {
+    mocked.listSimGames.mockResolvedValue({ ok: true, reason: "", games: [lite(game())] });
+    mocked.deleteSimGame.mockRejectedValue(Object.assign(new Error("nf"), { status: 404 }));
+    render(<SimGameContent />);
+    fireEvent.click(await screen.findByRole("button", { name: /Delete game: Week/ }));
+    mocked.listSimGames.mockResolvedValue({ ok: true, reason: "", games: [] });
+    fireEvent.click(screen.getByRole("button", { name: "Delete game" }));
+    expect(await screen.findByText("No games yet")).toBeInTheDocument();
+  });
+
   it("Free past week 3: Advance becomes Go Pro, never calls the API, and reads still render", async () => {
     mocked.getSimGameOptions.mockResolvedValue(options({ is_premium: false, max_games: 1, preview: { weeks_left: 0, paywall_week: 4, paywalled: true } }));
     mocked.listSimGames.mockResolvedValue({ ok: true, reason: "", games: [lite(game())] });
