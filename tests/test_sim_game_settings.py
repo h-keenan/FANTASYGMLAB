@@ -544,3 +544,31 @@ def test_league_start_validates_input_and_is_unavailable_without_the_door():
     client2, _ = make_app(PoolOnly())
     assert client2.get("/v1/sim/games/options", headers=H).json()["start_modes"][1]["available"] is False
     assert client2.post("/v1/sim/games", json={"start": "league", "league_id": "L"}, headers=H).json()["reason"] == "league_unavailable"
+
+
+def test_a_defense_and_superflex_game_on_the_real_pool_completes():
+    """Structural check on whatever data/players.db + data/nfl_games.csv hold
+    (read only, projections stubbed): 32 estimated defenses, a superflex lineup,
+    a full draft and a season to a champion."""
+
+    from pathlib import Path
+
+    root = Path(__file__).resolve().parents[1]
+    db, games = root / "data" / "players.db", root / "data" / "nfl_games.csv"
+    if not db.exists() or not games.exists():
+        pytest.skip("no players.db / nfl_games.csv in this checkout")
+
+    class Projections:
+        def baseline_weekly_points(self, rows, *, scoring_settings=None):
+            return {}
+
+    settings = GameSettings.parse({"user_slot": 6, "superflex": True, "include_def": True, "te_premium": 0.5, "teams": 14})
+    pool = RealSimInputs(str(db), games_csv_path=str(games), projections_module=Projections(), sleeper_module=object(),
+                         playoff_module=object()).player_pool(settings.scoring_settings)
+    assert "def_estimated_from_points_allowed" in pool.notes
+    snap = build_snapshot(pool.rows, pool.bye_weeks, settings, 3, scoring_model=MODEL)
+    state, em = play_draft(snap, 3)
+    assert all(len(r) == settings.rounds for r in state.rosters.values())
+    while state.status != "complete":
+        advance(em, snap, state, 3)
+    assert state.champion in snap.tids
