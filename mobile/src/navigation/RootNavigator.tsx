@@ -1,5 +1,5 @@
-import React, { useRef, useState } from 'react';
-import { TouchableOpacity, View } from 'react-native';
+import React, { useEffect, useRef, useState } from 'react';
+import { InteractionManager, TouchableOpacity, View } from 'react-native';
 import AppBackground from '../components/AppBackground';
 import { DarkTheme, DefaultTheme, NavigationContainer, type Theme } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
@@ -18,54 +18,77 @@ import { useAuth } from '../context/AuthContext';
 import { useOnboarding } from '../context/OnboardingContext';
 import { useThemeMode } from '../context/ThemeModeContext';
 import LoginScreen from '../screens/LoginScreen';
-import OnboardingScreen from '../screens/OnboardingScreen';
 import HomeScreen from '../screens/HomeScreen';
 import { createLegacyRedirectScreen } from '../components/LegacyRouteRedirect';
-import TeamRosterScreen from '../screens/TeamRosterScreen';
-import PaywallScreen from '../screens/PaywallScreen';
-import TrialLapsedScreen from '../screens/TrialLapsedScreen';
-import NewsScreen from '../screens/NewsScreen';
-import DesignScreen from '../screens/DesignScreen';
-import SampleLeagueScreen from '../screens/SampleLeagueScreen';
-import MoreScreen from '../screens/MoreScreen';
-import LegalPageScreen from '../screens/LegalPageScreen';
-import HowWeEvaluateScreen from '../screens/HowWeEvaluateScreen';
-import PlayersScreen from '../screens/PlayersScreen';
 import { PlayerQuickViewProvider } from '../context/PlayerQuickViewContext';
-import PlayerDetailScreen from '../screens/PlayerDetailScreen';
-import PlayerCompareScreen from '../screens/PlayerCompareScreen';
-import WaiversScreen from '../screens/WaiversScreen';
-import RecapScreen from '../screens/RecapScreen';
-import AlertsScreen from '../screens/AlertsScreen';
-import GmPlanScreen from '../screens/GmPlanScreen';
-import TradeHistoryScreen from '../screens/TradeHistoryScreen';
-import CommunityScreen from '../screens/CommunityScreen';
-import FeaturesScreen from '../screens/FeaturesScreen';
-import DashboardScreen from '../screens/DashboardScreen';
-import TradesScreen from '../screens/TradesScreen';
-import TradeOfferScreen from '../screens/TradeOfferScreen';
 import type { OfferPrefill } from '../lib/tradeOffer';
 import type { MultiTransfer } from '../lib/multiTeamTrade';
-import TeamsScreen from '../screens/TeamsScreen';
-import GamesScreen from '../screens/GamesScreen';
-import CommissionerScreen from '../screens/CommissionerScreen';
-import DraftCenterScreen from '../screens/DraftCenterScreen';
-import FantasySimScreen from '../screens/FantasySimScreen';
-import PickDetailScreen from '../screens/PickDetailScreen';
-import MyTeamScreen from '../screens/MyTeamScreen';
-import MatchupScreen from '../screens/MatchupScreen';
 import LoadingScreen from '../screens/LoadingScreen';
-import CollegeProspectsScreen from '../screens/CollegeProspectsScreen';
-import ProspectScoutingDetailScreen from '../screens/ProspectScoutingDetailScreen';
-import PortfolioScreen from '../screens/PortfolioScreen';
-import GmGameScreen from '../screens/GmGameScreen';
-import FounderAnalyticsScreen from '../screens/FounderAnalyticsScreen';
-import LiveDraftScreen from '../screens/LiveDraftScreen';
-import GuessThePlayerLeaderboardScreen from '../screens/GuessThePlayerLeaderboardScreen';
 import EspnUnavailableScreen from '../components/EspnUnavailableScreen';
 import { isEspnLeagueId } from '../lib/leaguePlatform';
 import { trackScreen } from '../lib/analytics';
 import { isLegacyRedirectRoute } from '../lib/homeRedirects';
+import { createLazyLoader, preloadInSequence, type LazyLoader } from '../lib/lazyModule';
+
+
+// Screens are required on first render instead of at launch: every static
+// `import` of a screen used to evaluate that screen and everything only it
+// imports before the first frame (Metro's inlineRequires is off), although a
+// session opens one or two of them. Home, Login and Loading stay eager (first
+// frame); the top destinations are warmed at idle time below (see
+// `preloadTopScreens`). See docs/performance-audit-client-2026-11.md.
+// eslint-disable-next-line @typescript-eslint/no-explicit-any -- screens take different param lists
+function lazyScreen(load: () => { default: React.ComponentType<any> }): React.ComponentType<any> & { loader: LazyLoader<React.ComponentType<any>> } {
+  const loader = createLazyLoader(() => load().default);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  function LazyScreen(props: any) {
+    const Screen = loader.get();
+    return <Screen {...props} />;
+  }
+  LazyScreen.loader = loader;
+  return LazyScreen;
+}
+
+/* eslint-disable @typescript-eslint/no-require-imports */
+const OnboardingScreen = lazyScreen(() => require('../screens/OnboardingScreen'));
+const TeamRosterScreen = lazyScreen(() => require('../screens/TeamRosterScreen'));
+const PaywallScreen = lazyScreen(() => require('../screens/PaywallScreen'));
+const TrialLapsedScreen = lazyScreen(() => require('../screens/TrialLapsedScreen'));
+const NewsScreen = lazyScreen(() => require('../screens/NewsScreen'));
+const DesignScreen = lazyScreen(() => require('../screens/DesignScreen'));
+const SampleLeagueScreen = lazyScreen(() => require('../screens/SampleLeagueScreen'));
+const MoreScreen = lazyScreen(() => require('../screens/MoreScreen'));
+const LegalPageScreen = lazyScreen(() => require('../screens/LegalPageScreen'));
+const HowWeEvaluateScreen = lazyScreen(() => require('../screens/HowWeEvaluateScreen'));
+const PlayersScreen = lazyScreen(() => require('../screens/PlayersScreen'));
+const PlayerDetailScreen = lazyScreen(() => require('../screens/PlayerDetailScreen'));
+const PlayerCompareScreen = lazyScreen(() => require('../screens/PlayerCompareScreen'));
+const WaiversScreen = lazyScreen(() => require('../screens/WaiversScreen'));
+const RecapScreen = lazyScreen(() => require('../screens/RecapScreen'));
+const AlertsScreen = lazyScreen(() => require('../screens/AlertsScreen'));
+const GmPlanScreen = lazyScreen(() => require('../screens/GmPlanScreen'));
+const TradeHistoryScreen = lazyScreen(() => require('../screens/TradeHistoryScreen'));
+const CommunityScreen = lazyScreen(() => require('../screens/CommunityScreen'));
+const FeaturesScreen = lazyScreen(() => require('../screens/FeaturesScreen'));
+const DashboardScreen = lazyScreen(() => require('../screens/DashboardScreen'));
+const TradesScreen = lazyScreen(() => require('../screens/TradesScreen'));
+const TradeOfferScreen = lazyScreen(() => require('../screens/TradeOfferScreen'));
+const TeamsScreen = lazyScreen(() => require('../screens/TeamsScreen'));
+const GamesScreen = lazyScreen(() => require('../screens/GamesScreen'));
+const CommissionerScreen = lazyScreen(() => require('../screens/CommissionerScreen'));
+const DraftCenterScreen = lazyScreen(() => require('../screens/DraftCenterScreen'));
+const FantasySimScreen = lazyScreen(() => require('../screens/FantasySimScreen'));
+const PickDetailScreen = lazyScreen(() => require('../screens/PickDetailScreen'));
+const MyTeamScreen = lazyScreen(() => require('../screens/MyTeamScreen'));
+const MatchupScreen = lazyScreen(() => require('../screens/MatchupScreen'));
+const CollegeProspectsScreen = lazyScreen(() => require('../screens/CollegeProspectsScreen'));
+const ProspectScoutingDetailScreen = lazyScreen(() => require('../screens/ProspectScoutingDetailScreen'));
+const PortfolioScreen = lazyScreen(() => require('../screens/PortfolioScreen'));
+const GmGameScreen = lazyScreen(() => require('../screens/GmGameScreen'));
+const FounderAnalyticsScreen = lazyScreen(() => require('../screens/FounderAnalyticsScreen'));
+const LiveDraftScreen = lazyScreen(() => require('../screens/LiveDraftScreen'));
+const GuessThePlayerLeaderboardScreen = lazyScreen(() => require('../screens/GuessThePlayerLeaderboardScreen'));
+/* eslint-enable @typescript-eslint/no-require-imports */
 
 export type RootStackParamList = {
   /** `openAddLeague`: opens Home's Add League sheet on arrival (the header
@@ -208,6 +231,14 @@ const EspnLiveDraftScreen = withEspnGate(LiveDraftScreen);
 const EspnGuessLeaderboardScreen = withEspnGate(GuessThePlayerLeaderboardScreen);
 const AuthStack = createNativeStackNavigator();
 
+// The destinations most sessions open first, warmed one per turn once the
+// first screen has settled so tapping them does not pay their module
+// evaluation. Everything else loads on first open.
+const TOP_SCREEN_LOADERS = [DashboardScreen, TradesScreen, PlayersScreen, GmPlanScreen, WaiversScreen].map(
+  (screen) => screen.loader,
+);
+const PRELOAD_GAP_MS = 150;
+
 export default function RootNavigator() {
   const { session, loading } = useAuth();
   const { onboardingComplete } = useOnboarding();
@@ -231,6 +262,15 @@ export default function RootNavigator() {
       if (name !== 'SampleLeague') trackScreen(name);
     }
   };
+
+  const signedIn = Boolean(session);
+  useEffect(() => {
+    if (!signedIn) return;
+    const task = InteractionManager.runAfterInteractions(() => {
+      preloadInSequence(TOP_SCREEN_LOADERS, (run) => setTimeout(run, PRELOAD_GAP_MS));
+    });
+    return () => task.cancel();
+  }, [signedIn]);
 
   const navigationTheme: Theme = {
     ...(isDark ? DarkTheme : DefaultTheme),

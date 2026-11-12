@@ -21,6 +21,10 @@ import {
   simGameLiteLine,
   simGamePaywalled,
   simGamePreviewLine,
+  simHeadshotId,
+  simPlayerInitials,
+  simPlayerSubline,
+  simSlotRepeatsPosition,
   simGameReasonMessage,
   simGameStage,
   simLineupPayload,
@@ -500,5 +504,33 @@ describe("league settings and start modes (setup)", () => {
       expect(simPlayoffResultLabel(k)).not.toMatch(/_/);
     }
     expect(simPlayoffResultLabel(undefined)).toBe("");
+  });
+});
+
+describe("player photo helpers", () => {
+  it("uses the payload headshot id, else a numeric Sleeper id, else nothing", () => {
+    expect(simHeadshotId({ id: "4046", headshot_id: "4046" })).toBe("4046");
+    expect(simHeadshotId({ id: "4046" })).toBe("4046");
+    expect(simHeadshotId({ id: "p0001", headshot_id: null })).toBeNull();
+    expect(simHeadshotId({ id: "DEF-NYG" })).toBeNull();
+    expect(simHeadshotId({ id: "4046", headshot_id: null })).toBeNull();
+  });
+  it("builds fallback initials, using the team code for a defense", () => {
+    expect(simPlayerInitials({ name: "Patrick Mahomes II", pos: "QB", team: "KC" })).toBe("PI");
+    expect(simPlayerInitials({ name: "Cher", pos: "WR", team: null })).toBe("C");
+    expect(simPlayerInitials({ name: "NYG D/ST", pos: "DEF", team: "NYG" })).toBe("NYG");
+    expect(simPlayerInitials({ name: "", pos: "WR", team: null })).toBe("");
+  });
+  it("builds a subline from a partial brief", () => {
+    expect(simPlayerSubline({ team: "KC" })).toBe("KC");
+    expect(simPlayerSubline({})).toBe("");
+  });
+});
+
+describe("lineup slot vs position chip", () => {
+  it("repeats only when the slot is the player's own position", () => {
+    expect(simSlotRepeatsPosition("RB", "RB")).toBe(true);
+    expect(simSlotRepeatsPosition("FLEX", "RB")).toBe(false);
+    expect(simSlotRepeatsPosition("SUPER_FLEX", "QB")).toBe(false);
   });
 });

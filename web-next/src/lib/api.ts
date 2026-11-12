@@ -21,6 +21,7 @@ import type { DirectionCheckinAction, DirectionCheckinResponse } from "./directi
 import type { MultiTeamTradeResponse, MultiTransfer } from "./multiTeamTrade";
 import type { MultiTeamIdeasResponse } from "./multiTeamIdeas";
 import { isServerBusyError, parseRetryAfterSeconds, withServerBusyRetry } from "./busyRetry";
+import { clearRequestCache, coalesceRead, isCacheablePath } from "./requestCache";
 
 /**
  * Client for services/mobile_api_service.py. Mirrors mobile/src/lib/api.ts's
@@ -150,7 +151,17 @@ async function authorizedRequest<T>(
   if (!accessToken) {
     throw new ApiError(401, "Not signed in.");
   }
-  return performRequest<T>(path, init, accessToken);
+  const method = init?.method ?? "GET";
+  if (method !== "GET") {
+    // A write may change what any read returns: never serve a reused read after one.
+    clearRequestCache();
+    return performRequest<T>(path, init, accessToken);
+  }
+  if (init?.signal) return performRequest<T>(path, init, accessToken);
+  // Same user + same privacy view + same path: one request, however many callers (see requestCache.ts).
+  return coalesceRead<T>(`${accessToken}|${isPrivacyMode() ? "p" : "-"}|${path}`, isCacheablePath(path), () =>
+    performRequest<T>(path, init, accessToken),
+  );
 }
 
 /** Stripe web-billing call (plans / checkout / portal): same session lookup as

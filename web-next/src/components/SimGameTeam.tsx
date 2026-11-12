@@ -10,13 +10,14 @@ import { PillRow } from "@/components/PillRow";
 import { PositionBadge } from "@/components/PositionBadge";
 import { SectionHeading } from "@/components/SectionHeading";
 import { SimPlayerBrowser } from "@/components/SimGamePlayers";
-import { SimPlayerLine, SimSheet, SimStat, SimToneBadge, type SimCtx } from "@/components/SimGameParts";
+import { SimPlayerChip, SimPlayerLine, SimSheet, SimStat, SimToneBadge, type SimCtx } from "@/components/SimGameParts";
 import { SkeletonCard } from "@/components/Skeleton";
 import { api } from "@/lib/api";
 import {
   simAssignSlot,
   simClaimPayload,
   simFmtPts,
+  simSlotRepeatsPosition,
   simLineupPayload,
   simMatchupLine,
   simNeedsDrop,
@@ -118,7 +119,7 @@ export function SimTeamTab({ ctx, onTrade }: { ctx: SimCtx; onTrade: () => void 
   const week = game.this_week;
   const overLimit = (game.pending?.cuts_needed ?? 0) > 0;
   const warnings = lineup.warnings ?? [];
-  const nameById = Object.fromEntries([...slots.map((s) => s.player), ...bench].filter(Boolean).map((p) => [p!.id, p!.name]));
+  const playerById = Object.fromEntries([...slots.map((s) => s.player), ...bench].filter(Boolean).map((p) => [p!.id, p!]));
   const candidates = pickSlot != null ? simSlotCandidates(slots[pickSlot].slot, slots, bench) : [];
 
   return (
@@ -155,7 +156,10 @@ export function SimTeamTab({ ctx, onTrade }: { ctx: SimCtx; onTrade: () => void 
         <AccentCard accent="var(--color-warning)" compact as="div">
           <ul className="flex flex-col gap-1" aria-label="Lineup warnings">
             {warnings.map((w, i) => (
-              <li key={i} className="text-xs">{simWarningText(w, w.player_id ? nameById[w.player_id] : undefined)}</li>
+              <li key={i} className="flex flex-col gap-1">
+                {w.player_id && playerById[w.player_id] ? <SimPlayerChip player={playerById[w.player_id]} /> : null}
+                <span className="text-xs">{simWarningText(w, w.player_id ? playerById[w.player_id]?.name : undefined)}</span>
+              </li>
             ))}
           </ul>
         </AccentCard>
@@ -182,6 +186,7 @@ export function SimTeamTab({ ctx, onTrade }: { ctx: SimCtx; onTrade: () => void 
               <div className="flex-1 min-w-0">
                 <SimPlayerLine
                   player={slot.player}
+                  hidePosition={simSlotRepeatsPosition(slot.slot, slot.player.pos)}
                   onOpen={ctx.openPlayer}
                   trailing={
                     <>
@@ -331,6 +336,7 @@ function ClaimSheet({
   return (
     <SimSheet title={`Claim ${player.name}`} onClose={onClose}>
       <p className="text-lg font-extrabold pr-10">Claim {player.name}</p>
+      <SimPlayerChip player={player} size={40} />
       <p className="text-xs pb-2" style={{ color: "var(--color-text-muted)" }}>
         Claims resolve when you advance, worst record first. Another team may get him first.
       </p>
@@ -345,6 +351,12 @@ function ClaimSheet({
               </option>
             ))}
           </Select>
+          {roster.find((p) => p.id === dropId) ? (
+            <span className="flex items-center gap-2 pt-1" data-testid="claim-drop-preview">
+              <span className="shrink-0 text-xs">Dropping</span>
+              <SimPlayerChip player={roster.find((p) => p.id === dropId)!} size={32} />
+            </span>
+          ) : null}
         </label>
         {eligibleSlots.length > 0 ? (
           <label className="flex flex-col gap-1 text-xs" style={{ color: "var(--color-text-muted)" }}>
@@ -446,10 +458,10 @@ export function SimPlayersTab({
           {claims.map((claim) => (
             <AccentCard key={claim.id} accent="var(--color-accent)" compact as="div">
               <div className="flex items-center justify-between gap-2">
-                <div className="min-w-0 text-sm">
-                  <strong>{claim.add.name}</strong>
-                  {claim.drop ? <span style={{ color: "var(--color-text-muted)" }}> for {claim.drop.name}</span> : null}
-                  {claim.start_slot ? <span style={{ color: "var(--color-text-muted)" }}> · starts at {claim.start_slot}</span> : null}
+                <div className="flex min-w-0 flex-col gap-1">
+                  <SimPlayerChip player={claim.add} />
+                  {claim.drop ? <span className="text-xs" style={{ color: "var(--color-text-muted)" }}>Drops {claim.drop.name} ({claim.drop.pos})</span> : null}
+                  {claim.start_slot ? <span className="text-xs" style={{ color: "var(--color-text-muted)" }}>Starts at {claim.start_slot}</span> : null}
                 </div>
                 <Button size="sm" variant="ghost" onClick={() => cancel(claim)}>Cancel</Button>
               </div>

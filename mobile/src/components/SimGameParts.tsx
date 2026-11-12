@@ -12,7 +12,10 @@ import ToneBadge from './ToneBadge';
 import { useThemeMode } from '../context/ThemeModeContext';
 import {
   simGamePreviewLine,
+  simHeadshotId,
+  simPlayerInitials,
   simPlayerSubline,
+  type SimPlayerRef,
   type SimGame,
   type SimGameEnvelope,
   type SimGamePlayer,
@@ -137,6 +140,50 @@ export function SimStat({ label, value, tone = 'muted' }: { label: string; value
 }
 
 /**
+ * The one identity block every game surface uses for a player, whether it is
+ * a full list row or a mention inside a card (injury, MVP, waiver result,
+ * feed move, draft pick, lineup alert): the shared Sleeper headshot with an
+ * initials fallback, name, position badge, team subline and the Out chip.
+ * `size` picks the avatar (40 in list rows, 32 inside cards); the box is
+ * fixed, so a photo that fails to load never shifts the row.
+ */
+export function SimPlayerChip({
+  player,
+  size = 32,
+  muted = false,
+  extra,
+  hidePosition = false,
+}: {
+  player: SimPlayerRef;
+  size?: number;
+  muted?: boolean;
+  extra?: ReactNode;
+  /** Drop the position chip when the row's slot label already says it. */
+  hidePosition?: boolean;
+}) {
+  const { colors } = useThemeMode();
+  const styles = useMemo(() => createStyles(colors), [colors]);
+  return (
+    <View style={[styles.identity, muted && styles.muted]}>
+      <PlayerAvatar playerId={simHeadshotId(player)} fallbackLabel={simPlayerInitials(player)} size={size} />
+      <View style={styles.identityText}>
+        <AppText style={styles.playerName} numberOfLines={2}>
+          {player.name}
+        </AppText>
+        <View style={styles.sublineRow}>
+          {hidePosition ? null : <PositionBadge position={player.pos} />}
+          <AppText style={styles.subline} numberOfLines={1}>
+            {simPlayerSubline(player)}
+          </AppText>
+          {player.status === 'out' ? <ToneBadge label="Out" color={colors.danger} size="xs" /> : null}
+        </View>
+        {extra ? <View style={styles.extra}>{extra}</View> : null}
+      </View>
+    </View>
+  );
+}
+
+/**
  * One player row for every game list (board, roster, waivers, trades,
  * search): the shared avatar and position badge, name, subline, with a
  * trailing slot. Sim players are not real-league players, so there is no
@@ -150,6 +197,7 @@ export function SimPlayerLine({
   muted = false,
   selected = false,
   extra,
+  hidePosition = false,
 }: {
   player: SimGamePlayer;
   trailing?: ReactNode;
@@ -157,28 +205,11 @@ export function SimPlayerLine({
   muted?: boolean;
   selected?: boolean;
   extra?: ReactNode;
+  hidePosition?: boolean;
 }) {
   const { colors } = useThemeMode();
   const styles = useMemo(() => createStyles(colors), [colors]);
-  const out = player.status === 'out';
-  const identity = (
-    <View style={[styles.identity, muted && styles.muted]}>
-      <PlayerAvatar playerId={player.id} size={40} />
-      <View style={styles.identityText}>
-        <AppText style={styles.playerName} numberOfLines={2}>
-          {player.name}
-        </AppText>
-        <View style={styles.sublineRow}>
-          <PositionBadge position={player.pos} />
-          <AppText style={styles.subline} numberOfLines={1}>
-            {simPlayerSubline(player)}
-          </AppText>
-          {out ? <ToneBadge label="Out" color={colors.danger} size="xs" /> : null}
-        </View>
-        {extra ? <View style={styles.extra}>{extra}</View> : null}
-      </View>
-    </View>
-  );
+  const identity = <SimPlayerChip player={player} size={40} muted={muted} extra={extra} hidePosition={hidePosition} />;
   return (
     <View style={[styles.line, selected && styles.lineSelected]}>
       {onOpen ? (
