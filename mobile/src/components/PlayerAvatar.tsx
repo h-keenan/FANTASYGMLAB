@@ -4,6 +4,7 @@ import { Image } from 'expo-image';
 import Animated, { Easing, useAnimatedStyle, useSharedValue, withRepeat, withTiming } from 'react-native-reanimated';
 
 import { useThemeMode } from '../context/ThemeModeContext';
+import AppText from './AppText';
 import type { ThemeColors } from '../theme';
 import { resolvePlayerTier, tierGlowIntensity, type TierGlowIntensity } from '../lib/playerTier';
 
@@ -59,6 +60,8 @@ interface PlayerAvatarProps {
   playerId: string | null | undefined;
   size?: number;
   tier?: string | null;
+  /** Initials (or a team code) shown in the ring when there is no photo to load. */
+  fallbackLabel?: string | null;
   style?: StyleProp<ViewStyle>;
   /**
    * Fires once this avatar has "settled" — the headshot finished loading,
@@ -88,10 +91,13 @@ interface PlayerAvatarProps {
  * list screen, so `expo-image`'s disk cache (persists across app restarts,
  * unlike RN's own `Image`) avoids re-fetching the same photo every time.
  */
-export default function PlayerAvatar({ playerId, size = 40, tier, style, onLoadSettle }: PlayerAvatarProps) {
+export default function PlayerAvatar({ playerId, size = 40, tier, fallbackLabel, style, onLoadSettle }: PlayerAvatarProps) {
   const { colors, isDark } = useThemeMode();
   const styles = useMemo(() => createStyles(colors), [colors]);
-  const [failed, setFailed] = useState(false);
+  // Keyed by id so a recycled list row that now shows another player retries
+  // its photo instead of inheriting the previous player's failure.
+  const [failedId, setFailedId] = useState<string | null>(null);
+  const failed = !!playerId && failedId === playerId;
   const dimension = { width: size, height: size, borderRadius: size / 2 };
   const ringColor = tier ? resolvePlayerTier(tier, isDark).color : colors.border;
   const ring = { borderWidth: tier ? 2 : StyleSheet.hairlineWidth, borderColor: ringColor };
@@ -112,7 +118,13 @@ export default function PlayerAvatar({ playerId, size = 40, tier, style, onLoadS
     return (
       <View style={[{ width: size, height: size }, style]}>
         {glowIntensity ? <PrestigeGlow size={size} color={ringColor} intensity={glowIntensity} /> : null}
-        <View style={[styles.fallback, dimension, ring]} />
+        <View style={[styles.fallback, dimension, ring]}>
+          {fallbackLabel && size >= 24 ? (
+            <AppText style={[styles.fallbackText, { fontSize: Math.max(9, Math.round(size * 0.34)) }]} numberOfLines={1} allowFontScaling={false}>
+              {fallbackLabel}
+            </AppText>
+          ) : null}
+        </View>
       </View>
     );
   }
@@ -139,7 +151,7 @@ export default function PlayerAvatar({ playerId, size = 40, tier, style, onLoadS
         contentPosition="top"
         onLoad={() => onLoadSettle?.()}
         onError={() => {
-          setFailed(true);
+          setFailedId(playerId ?? null);
           onLoadSettle?.();
         }}
       />
@@ -151,6 +163,13 @@ function createStyles(colors: ThemeColors) {
   return StyleSheet.create({
     fallback: {
       backgroundColor: colors.surfaceSolid,
+      alignItems: 'center',
+      justifyContent: 'center',
+      overflow: 'hidden',
+    },
+    fallbackText: {
+      color: colors.textTertiary,
+      fontWeight: '800',
     },
   });
 }

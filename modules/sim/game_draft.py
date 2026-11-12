@@ -21,7 +21,7 @@ import numpy as np
 from modules.sim.game_eval import Evaluator
 from modules.sim.game_setup import draft_order, pick_round
 from modules.sim.game_state import Emitter, GameState
-from modules.sim.game_types import SINGLETON_POSITIONS, GameError, GameSnapshot
+from modules.sim.game_types import SINGLETON_POSITIONS, GameError, GameSnapshot, headshot_id
 from modules.sim.rng import WorldRng
 from modules.sim.types import FLEX_ORDER, FLEX_SLOTS, GAME_POSITIONS, GAME_STRICT_SLOTS
 
@@ -298,12 +298,20 @@ def draft_recap(snap: GameSnapshot, state: GameState) -> dict[str, Any]:
         player = snap.players[p["pid"]]
         picks.append({
             "pick_no": p["n"] + 1, "round": p["round"], "team_id": p["team"], "player_id": p["pid"],
-            "name": player.name, "pos": player.pos, "adp": player.adp,
+            "headshot_id": headshot_id(p["pid"]), "name": player.name, "pos": player.pos, "adp": player.adp,
             "value_over_adp": round((p["n"] + 1) - player.adp, 1), "auto": p["auto"],
         })
     totals = {t.tid: ev.lineup_total(state.rosters[t.tid]) for t in snap.teams}
     depth = {t.tid: sum(snap.players[p].value for p in state.rosters[t.tid]) for t in snap.teams}
     ranked = sorted(snap.tids, key=lambda t: (-(totals[t] + 0.02 * depth[t]), t))
+    def with_player(pick: dict[str, Any] | None) -> dict[str, Any] | None:
+        # The UI reads ``pick.player`` (same brief shape as the recap's other player mentions).
+        if pick is None:
+            return None
+        p = snap.players[pick["player_id"]]
+        return {**pick, "player": {"id": pick["player_id"], "headshot_id": headshot_id(pick["player_id"]),
+                                   "name": p.name, "pos": p.pos, "team": p.nfl_team}}
+
     teams = []
     for rank, tid in enumerate(ranked):
         mine = [p for p in picks if p["team_id"] == tid]
@@ -311,8 +319,8 @@ def draft_recap(snap: GameSnapshot, state: GameState) -> dict[str, Any]:
             "team_id": tid, "name": snap.team(tid).name, "is_you": snap.team(tid).is_user,
             "grade": _letter(rank, len(ranked)), "rank": rank + 1,
             "starter_projection": round(totals[tid], 1),
-            "best_pick": max(mine, key=lambda x: (x["value_over_adp"], -x["pick_no"]), default=None),
-            "worst_pick": min(mine, key=lambda x: (x["value_over_adp"], x["pick_no"]), default=None),
+            "best_pick": with_player(max(mine, key=lambda x: (x["value_over_adp"], -x["pick_no"]), default=None)),
+            "worst_pick": with_player(min(mine, key=lambda x: (x["value_over_adp"], x["pick_no"]), default=None)),
         })
     you = snap.user_team.tid
     return {

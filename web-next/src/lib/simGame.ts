@@ -18,6 +18,8 @@ export type SimGameStatus = "drafting" | "in_season" | "playoffs" | "complete";
 export type SimGamePhase = "draft" | "regular_season" | "playoffs" | "complete";
 export type SimScoring = "ppr" | "half" | "std";
 export type SimDifficulty = "easy" | "normal" | "hard";
+export type SimTiebreaker = "points_for" | "head_to_head";
+export const SIM_TIEBREAKER_LABELS: Record<SimTiebreaker, string> = { points_for: "Points for", head_to_head: "Head-to-head" };
 export type SimPos = "QB" | "RB" | "WR" | "TE" | "K" | "DEF";
 export type SimSlot = "QB" | "RB" | "WR" | "TE" | "FLEX" | "REC_FLEX" | "SUPER_FLEX" | "K" | "DEF";
 /** League mode. Only redraft is playable today; dynasty is declared by the API (available: false). */
@@ -63,6 +65,8 @@ export interface SimPlayerOwner {
 
 export interface SimGamePlayer {
   id: string;
+  /** Sleeper player id to fetch a photo with; null for defenses and synthetic players. */
+  headshot_id?: string | null;
   name: string;
   pos: SimPos;
   /** NFL team. */
@@ -116,6 +120,8 @@ export interface SimGameSettings {
   include_def?: boolean;
   bench?: number;
   start?: SimStartKind;
+  /** Standings/seed tiebreak after record (older saves omit it and used head_to_head). */
+  tiebreaker?: SimTiebreaker;
 }
 
 export interface SimGameThisWeek {
@@ -194,6 +200,7 @@ export interface SimGameOptionsResponse extends SimGameEnvelope {
     auto_lineup: { default: boolean };
     /** Preset fantasy-style team names for a fresh league. */
     team_names?: { values: string[]; max_length: number };
+    tiebreaker?: { values: SimTiebreaker[]; default: SimTiebreaker };
   };
   /** Lineup rule the setup form mirrors to show roster size and draft rounds. */
   layout?: { base_slots: SimSlot[]; draft_spare_spots: number };
@@ -240,6 +247,7 @@ export interface SimGameCreateBody {
   include_k?: boolean;
   include_def?: boolean;
   bench?: number;
+  tiebreaker?: SimTiebreaker;
   mode?: SimMode;
   difficulty?: SimDifficulty;
   user_slot?: number | null;
@@ -513,7 +521,18 @@ export interface SimStandingRow {
   playoff_status?: string;
 }
 
+/** A player a feed row names (role: add / drop / give / get), enough for a photo row. */
+export interface SimTransactionPlayer {
+  role: "add" | "drop" | "give" | "get";
+  id: string;
+  headshot_id?: string | null;
+  name: string;
+  pos: SimPos;
+  team?: string | null;
+}
+
 export interface SimTransaction {
+  players?: SimTransactionPlayer[];
   week?: number;
   type?: string;
   kind?: string;
@@ -540,29 +559,87 @@ export interface SimLeagueResponse extends SimGameEnvelope {
   playoffs?: { seeds: unknown[]; rounds: unknown[]; champion: string | null } | null;
 }
 
+export interface SimGameGradeSummary {
+  record?: string;
+  finish?: number;
+  points_rank?: number;
+  playoff_result?: string;
+  lineup_efficiency?: number;
+  luck_wins?: number;
+  draft_grade?: string;
+}
+
 export interface SimGameGrade {
-  letter: string;
-  score: number;
+  letter?: string | null;
+  score?: number;
   grade_points?: number;
-  components?: Record<string, number>;
-  summary: string;
+  components?: { key?: string; label?: string; score?: number; weight?: number }[] | Record<string, number>;
+  /** The backend sends an object; older clients assumed a string. Never render it directly. */
+  summary?: SimGameGradeSummary | string | null;
 }
 
 export interface SimGameDecision {
   title?: string;
   kind?: string;
   detail?: string;
-  impact?: Record<string, number>;
+  impact?: Record<string, unknown>;
   [key: string]: unknown;
 }
 
 export interface SimGameResult {
-  champion: string | null;
-  final_standings: (SimStandingRow & { playoff_result?: string })[];
-  grade: SimGameGrade;
-  decisions_that_mattered: SimGameDecision[];
+  /** The backend sends {team_id, name}; null when nobody won (e.g. a game with no playoff). */
+  champion?: { team_id?: string; name?: string } | string | null;
+  final_standings?: (SimStandingRow & { playoff_result?: string })[] | null;
+  grade?: SimGameGrade | null;
+  decisions_that_mattered?: SimGameDecision[] | null;
   draft?: { grade?: string; picks_value?: unknown[] } | null;
   user?: Record<string, unknown> | null;
+}
+
+/** A render-safe view of a stored result: every field is present, every value is a primitive. */
+export interface SimGameResultView {
+  letter: string;
+  summaryText: string;
+  championId: string | null;
+  championName: string | null;
+  standings: (SimStandingRow & { playoff_result?: string })[];
+  decisions: SimGameDecision[];
+  mine: (SimStandingRow & { playoff_result?: string }) | null;
+}
+
+export function simGradeSummaryText(summary: SimGameGrade["summary"]): string {
+  if (typeof summary === "string") return summary;
+  if (!summary || typeof summary !== "object") return "";
+  const parts: string[] = [];
+  if (summary.record) parts.push(`Record ${summary.record}`);
+  if (typeof summary.finish === "number") parts.push(`finished ${summary.finish}${simOrdinalSuffix(summary.finish)}`);
+  if (typeof summary.points_rank === "number") parts.push(`${summary.points_rank}${simOrdinalSuffix(summary.points_rank)} in points`);
+  if (typeof summary.lineup_efficiency === "number") parts.push(`${Math.round(summary.lineup_efficiency * 100)}% lineup efficiency`);
+  if (summary.draft_grade) parts.push(`draft grade ${summary.draft_grade}`);
+  return parts.length ? `${parts.join(", ")}.` : "";
+}
+
+function simOrdinalSuffix(n: number): string {
+  const mod100 = n % 100;
+  if (mod100 >= 11 && mod100 <= 13) return "th";
+  return ({ 1: "st", 2: "nd", 3: "rd" } as Record<number, string>)[n % 10] ?? "th";
+}
+
+export function normalizeSimResult(raw: SimGameResult | null | undefined): SimGameResultView {
+  const standings = Array.isArray(raw?.final_standings) ? raw.final_standings.filter(Boolean) : [];
+  const champ = raw?.champion;
+  const championId = typeof champ === "string" ? champ : champ && typeof champ === "object" && champ.team_id != null ? String(champ.team_id) : null;
+  const named = championId ? standings.find((row) => String(row.team_id) === championId) : undefined;
+  const championName = champ && typeof champ === "object" && champ.name ? String(champ.name) : named?.name ?? null;
+  return {
+    letter: typeof raw?.grade?.letter === "string" ? raw.grade.letter : "",
+    summaryText: simGradeSummaryText(raw?.grade?.summary),
+    championId,
+    championName,
+    standings,
+    decisions: Array.isArray(raw?.decisions_that_mattered) ? raw.decisions_that_mattered.filter(Boolean) : [],
+    mine: standings.find((row) => row.is_you) ?? null,
+  };
 }
 
 export interface SimGameResultResponse extends SimGameEnvelope {
@@ -582,6 +659,7 @@ const REASON_COPY: Record<string, string> = {
   sim_storage_unavailable: "Saving games is temporarily unavailable. Try again in a little while.",
   players_unavailable: "The player pool could not be built right now. Try again in a moment.",
   game_limit_reached: "You have reached your limit of saved games. Delete one to start another.",
+  result_build_failed: "We could not grade this season. Your game is saved. Try again in a moment.",
   wrong_phase: "That is not available at this stage of the game.",
   not_your_turn: "It is not your turn to pick yet.",
   player_taken: "That player was just taken. Pick someone else.",
@@ -1147,11 +1225,38 @@ export function simFmtProjection(player: Pick<SimGamePlayer, "projection" | "flo
   return `${simFmtPts(player.projection)} (${simFmtPts(player.floor)}-${simFmtPts(player.ceiling)})`;
 }
 
+/** Anything a sim list can show a player row for: the full row or a brief ref. */
+export type SimPlayerRef = Pick<SimGamePlayer, "id" | "name" | "pos"> & Partial<Pick<SimGamePlayer, "headshot_id" | "team" | "age" | "bye_week" | "status" | "out_weeks">>;
+
+/** The id the shared avatar fetches a Sleeper photo with (null: show initials). */
+export function simHeadshotId(player: Pick<SimPlayerRef, "id" | "headshot_id">): string | null {
+  if (player.headshot_id) return player.headshot_id;
+  return player.headshot_id === undefined && /^\d+$/.test(player.id) ? player.id : null;
+}
+
+/** Initials for the avatar fallback: a defense shows its team code, a person first + last initial. */
+export function simPlayerInitials(player: Pick<SimPlayerRef, "name" | "pos" | "team">): string {
+  if (player.pos === "DEF") return (player.team ?? player.name).slice(0, 3).toUpperCase();
+  const words = player.name.replace(/[^A-Za-z\s'-]/g, " ").split(/\s+/).filter(Boolean);
+  if (words.length === 0) return "";
+  if (words.length === 1) return words[0][0].toUpperCase();
+  return (words[0][0] + words[words.length - 1][0]).toUpperCase();
+}
+
+/**
+ * A lineup row already shows its slot ("RB1"); the player's own position
+ * chip is only worth showing when it adds information (FLEX, SUPER_FLEX and
+ * other multi-position slots), not when it just repeats the slot's position.
+ */
+export function simSlotRepeatsPosition(slot: string, pos: string): boolean {
+  return slot.toUpperCase() === pos.toUpperCase();
+}
+
 /** NFL team + age subline for a player row. */
-export function simPlayerSubline(player: Pick<SimGamePlayer, "team" | "age" | "bye_week">): string {
+export function simPlayerSubline(player: Partial<Pick<SimGamePlayer, "team" | "age" | "bye_week">>): string {
   const parts: string[] = [];
   if (player.team) parts.push(player.team);
-  const age = simFmtAge(player.age);
+  const age = simFmtAge(player.age ?? null);
   if (age) parts.push(`Age ${age}`);
   if (player.bye_week) parts.push(`Bye ${player.bye_week}`);
   return parts.join(" · ");
@@ -1239,6 +1344,12 @@ export function simPlayoffResultLabel(result: string | undefined): string {
       return "Semifinals";
     case "quarterfinal":
       return "Quarterfinals";
+    case "lost_round_1":
+      return "Lost in round 1";
+    case "lost_round_2":
+      return "Lost in round 2";
+    case "lost_round_3":
+      return "Lost in round 3";
     case "missed":
     case "missed_playoffs":
       return "Missed playoffs";
@@ -1283,6 +1394,7 @@ export const SIM_SETUP_FALLBACK = {
   superflex: false,
   include_k: true,
   include_def: false,
+  tiebreaker: "points_for" as SimTiebreaker,
   bench: 8,
   draftSpareSpots: 2,
 };
@@ -1299,6 +1411,7 @@ export interface SimSetupState {
   superflex: boolean;
   includeK: boolean;
   includeDef: boolean;
+  tiebreaker: SimTiebreaker;
   bench: number;
   difficulty: SimDifficulty;
   slot: string;
@@ -1327,6 +1440,7 @@ export function simSetupDefaults(options: SimGameOptionsResponse | null | undefi
     superflex: o?.superflex?.default ?? SIM_SETUP_FALLBACK.superflex,
     includeK: o?.include_k?.default ?? SIM_SETUP_FALLBACK.include_k,
     includeDef: o?.include_def?.default ?? SIM_SETUP_FALLBACK.include_def,
+    tiebreaker: o?.tiebreaker?.default ?? SIM_SETUP_FALLBACK.tiebreaker,
     bench: o?.bench?.default ?? SIM_SETUP_FALLBACK.bench,
     difficulty: o?.difficulty.default ?? "normal",
     slot: "",
@@ -1339,7 +1453,7 @@ export function simSetupDefaults(options: SimGameOptionsResponse | null | undefi
 
 /** True when any "Advanced options" field differs from its default (so a collapsed section can say so). */
 export function simSetupAdvancedChanged(state: SimSetupState, defaults: SimSetupState): number {
-  const keys: (keyof SimSetupState)[] = ["scoring", "tePremium", "superflex", "includeK", "includeDef", "bench", "teams"];
+  const keys: (keyof SimSetupState)[] = ["scoring", "tePremium", "superflex", "includeK", "includeDef", "tiebreaker", "bench", "teams"];
   return keys.filter((key) => state[key] !== defaults[key]).length;
 }
 
@@ -1369,7 +1483,7 @@ export function simCleanTeamName(raw: string): string {
 
 /** The POST /v1/sim/games body for the form. "league" sends only what the league does not decide, and picks the team by roster_id. */
 export function simSetupBody(state: SimSetupState): SimGameCreateBody {
-  const common = { difficulty: state.difficulty, auto_lineup: state.auto };
+  const common = { difficulty: state.difficulty, auto_lineup: state.auto, tiebreaker: state.tiebreaker };
   if (state.start === "league") return { ...common, start: "league", league_id: state.leagueId, ...(state.rosterId ? { roster_id: state.rosterId } : {}) };
   const custom = simCleanTeamName(state.name);
   const nameField =
@@ -1448,6 +1562,7 @@ export function simSettingsSummary(settings: Partial<SimGameSettings> | undefine
   if (settings.superflex) parts.push("Superflex");
   if (settings.include_def) parts.push("DEF");
   if (settings.include_k === false) parts.push("No kickers");
+  if (settings.tiebreaker === "head_to_head") parts.push("Head-to-head tiebreak");
   if (settings.start === "league") parts.push("From your league");
   return parts.join(" · ");
 }

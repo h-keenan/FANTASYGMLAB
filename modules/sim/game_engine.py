@@ -31,7 +31,7 @@ from modules.sim.game_draft import draft_recap
 from modules.sim.game_eval import Evaluator, team_params
 from modules.sim.game_scoring import PlayerWeek, ScoringModel, get_model
 from modules.sim.game_state import Emitter, GameState
-from modules.sim.game_types import GameError, GameSnapshot, slot_positions
+from modules.sim.game_types import GameError, GameSnapshot, headshot_id, slot_positions
 from modules.sim.lineup import pick_lineup
 from modules.sim.rng import WorldRng
 
@@ -106,8 +106,13 @@ def _pct(rec: dict[str, float]) -> float:
 
 
 def rank_teams(snap: GameSnapshot, state: GameState) -> list[str]:
-    """Standings order: win pct, then head-to-head among the tied group, then
-    points for, then the game's fixed coin."""
+    """Standings order (and playoff seeding): win pct first, then the game's
+    ``tiebreaker``.
+
+    ``points_for`` (default, like Sleeper): points for, then head-to-head among
+    the tied group, then fewer points against, then the fixed coin.
+    ``head_to_head`` (what saves from before the setting use): head-to-head
+    among the tied group, then points for, then the coin."""
 
     pct = {t: round(_pct(state.stand[t]), 9) for t in snap.tids}
     groups: dict[float, list[str]] = {}
@@ -115,6 +120,8 @@ def rank_teams(snap: GameSnapshot, state: GameState) -> list[str]:
         groups.setdefault(pct[t], []).append(t)
 
     def h2h(t: str, group: list[str]) -> float:
+        if len(group) < 2:
+            return 0.0
         wins = games = 0.0
         for opp in group:
             if opp == t:
@@ -124,10 +131,15 @@ def rank_teams(snap: GameSnapshot, state: GameState) -> list[str]:
             games += w + l + ties
         return wins / games if games else 0.0
 
+    legacy = snap.settings.tiebreaker == "head_to_head"
     key = {}
     for group in groups.values():
         for t in group:
-            key[t] = (-pct[t], -(h2h(t, group) if len(group) > 1 else 0.0), -state.stand[t]["pf"], snap.team(t).coin)
+            rec = state.stand[t]
+            if legacy:
+                key[t] = (-pct[t], -h2h(t, group), -rec["pf"], snap.team(t).coin)
+            else:
+                key[t] = (-pct[t], -round(rec["pf"], 6), -h2h(t, group), round(rec["pa"], 6), snap.team(t).coin)
     return sorted(snap.tids, key=lambda t: key[t])
 
 
@@ -193,7 +205,7 @@ def _brief(snap: GameSnapshot, pid: str | None) -> dict[str, Any] | None:
     if not pid:
         return None
     p = snap.players[pid]
-    return {"id": pid, "name": p.name, "pos": p.pos, "team": p.nfl_team}
+    return {"id": pid, "headshot_id": headshot_id(pid), "name": p.name, "pos": p.pos, "team": p.nfl_team}
 
 
 def check_can_advance(snap: GameSnapshot, state: GameState) -> None:

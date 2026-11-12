@@ -20,6 +20,9 @@ TEAM_COUNTS = (8, 10, 12, 14)  # even: every team plays every week
 IMPORT_TEAM_COUNTS = (4, 6, 8, 10, 12, 14, 16)
 TE_PREMIUMS = (0.0, 0.5, 1.0)
 BENCH_RANGE = (4, 10)
+TIEBREAKERS = ("points_for", "head_to_head")  # standings/seed tiebreak after win pct
+DEFAULT_TIEBREAKER = "points_for"
+LEGACY_TIEBREAKER = "head_to_head"  # saves from before the setting existed
 DEFAULT_BENCH = 8
 DEFAULT_TEAMS = 12
 DEFAULT_SCORING = "half"
@@ -116,6 +119,18 @@ def _flag(raw: Mapping[str, Any], key: str, default: bool) -> bool:
     return value
 
 
+def headshot_id(pid: str) -> str | None:
+    """The Sleeper player id a photo can be fetched with, or None.
+
+    Real players carry their Sleeper id as the game id (all digits); a team
+    defense (``DEF-<TEAM>``) and the synthetic fixture players have no photo,
+    so the client shows its initials fallback instead of a broken image.
+    """
+
+    text = str(pid or "")
+    return text if text.isdigit() else None
+
+
 @dataclass(frozen=True)
 class GameSettings:
     teams: int = DEFAULT_TEAMS
@@ -140,6 +155,7 @@ class GameSettings:
     # A real league's full scoring blob (imports only); overrides the preset.
     custom_scoring: Mapping[str, float] | None = None
     rules: int = RULES_VERSION
+    tiebreaker: str = DEFAULT_TIEBREAKER
 
     @property
     def playoff_weeks(self) -> int:
@@ -206,6 +222,9 @@ class GameSettings:
         if isinstance(slot, bool) or not isinstance(slot, int) or not 1 <= slot <= teams:
             raise ValueError(f"user_slot must be between 1 and {teams}")
         auto = _flag(raw, "auto_lineup", False)
+        tiebreaker = raw.get("tiebreaker", DEFAULT_TIEBREAKER)
+        if tiebreaker not in TIEBREAKERS:
+            raise ValueError("tiebreaker must be one of: " + ", ".join(TIEBREAKERS))
         slots, limit, rounds = derive_layout(
             superflex=superflex, include_k=include_k, include_def=include_def, bench=bench
         )
@@ -213,7 +232,7 @@ class GameSettings:
             teams=teams, scoring=scoring, difficulty=difficulty, user_slot=slot, auto_lineup=auto,
             slots=slots, rounds=rounds, roster_limit=limit, playoff_teams=4 if teams <= 8 else 6,
             mode=mode, te_premium=float(te_premium), superflex=superflex, include_k=include_k,
-            include_def=include_def, bench=bench,
+            include_def=include_def, bench=bench, tiebreaker=tiebreaker,
         )
 
     def to_dict(self) -> dict[str, Any]:
@@ -225,7 +244,7 @@ class GameSettings:
             "playoff_weeks": self.playoff_weeks, "trade_deadline_week": self.trade_deadline_week,
             "mode": self.mode, "te_premium": self.te_premium, "superflex": self.superflex,
             "include_k": self.include_k, "include_def": self.include_def, "bench": self.bench,
-            "start": self.start, "rules": self.rules,
+            "start": self.start, "rules": self.rules, "tiebreaker": self.tiebreaker,
         }
         if self.custom_scoring:
             out["custom_scoring"] = {str(k): float(v) for k, v in self.custom_scoring.items()}
@@ -253,6 +272,8 @@ class GameSettings:
             bench=int(raw.get("bench", limit - len(slots))), start=str(raw.get("start") or START_FRESH),
             custom_scoring={str(k): float(v) for k, v in custom.items()} if custom else None,
             rules=int(raw.get("rules", 1)),
+            # Saves from before the setting ranked ties head-to-head first; keep that.
+            tiebreaker=str(raw.get("tiebreaker") or LEGACY_TIEBREAKER),
         )
 
 

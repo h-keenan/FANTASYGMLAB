@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import functools
 import json
+import logging
 import secrets
 import threading
 import time
@@ -43,12 +44,15 @@ from modules.sim.game_types import (
     DEFAULT_BENCH,
     DEFAULT_SCORING,
     DEFAULT_TEAMS,
+    DEFAULT_TIEBREAKER,
     DIFFICULTIES,
     DRAFT_SPARE_SPOTS,
     START_FRESH,
     START_KINDS,
     START_LEAGUE,
     TE_PREMIUMS,
+    TIEBREAKERS,
+    headshot_id,
     GAME_ENGINE_VERSION,
     MAX_GAMES_FREE,
     MAX_GAMES_PRO,
@@ -64,6 +68,8 @@ from modules.sim.personas import PERSONAS
 from modules.sim.rng import WorldRng
 from modules.sim.store import SimStoreError
 from modules.sim.types import GAME_POSITIONS, POSITIONS, SimInputsError
+
+_log = logging.getLogger(__name__)
 
 POOL_TTL_SECONDS = 1800
 _POOL_CACHE: dict[str, tuple[float, Any]] = {}
@@ -295,6 +301,7 @@ def add_routes(router: APIRouter, ctx: GameApiCtx) -> None:
                 "user_slot": {"min": 1, "max": max(TEAM_COUNTS), "default": None},
                 "auto_lineup": {"default": False},
                 "team_names": {"values": list(TEAM_NAMES), "max_length": USER_TEAM_NAME_MAX},
+                "tiebreaker": {"values": list(TIEBREAKERS), "default": DEFAULT_TIEBREAKER},
             },
             # Draft rounds are derived: roster size minus the spots left for the wire.
             "layout": {"base_slots": ["QB", "RB", "RB", "WR", "WR", "TE", "FLEX"], "draft_spare_spots": DRAFT_SPARE_SPOTS},
@@ -364,7 +371,7 @@ def add_routes(router: APIRouter, ctx: GameApiCtx) -> None:
             if not league_id or len(league_id) > 64:
                 raise ValueError("league_id is required.")
             # Size, scoring and lineup come from the league; only these two are the player's choice.
-            picked = GameSettings.parse({k: raw[k] for k in ("difficulty", "auto_lineup") if k in raw})
+            picked = GameSettings.parse({k: raw[k] for k in ("difficulty", "auto_lineup", "tiebreaker") if k in raw})
         else:
             if raw.get("user_slot") is None:
                 teams = raw.get("teams", DEFAULT_TEAMS)
@@ -385,7 +392,7 @@ def add_routes(router: APIRouter, ctx: GameApiCtx) -> None:
                 if start == START_LEAGUE:
                     imported = ctx.inputs.league_import(
                         league_id, username=ctx.sleeper_username(user), roster_id=roster_id)
-                    settings = league_settings(imported, difficulty=picked.difficulty, auto_lineup=picked.auto_lineup)
+                    settings = league_settings(imported, difficulty=picked.difficulty, auto_lineup=picked.auto_lineup, tiebreaker=picked.tiebreaker)
                     pool = _pool_for(ctx.inputs, settings.scoring_settings)
                     snap = build_league_snapshot(
                         pool.rows, pool.bye_weeks, imported, settings, seed, user_team_name=team_name,
@@ -758,10 +765,24 @@ def add_routes(router: APIRouter, ctx: GameApiCtx) -> None:
                     if not ok:
                         return busy()
                     events = store.load_events(uid, gid, 0)
-                    result = build_result(snap, int(row["seed"]), events, state)
-                store.save_result(uid, gid, result, result["grade"]["letter"])
+                    try:
+                        result = build_result(snap, int(row["seed"]), events, state)
+                        json.dumps(result, allow_nan=False)  # fail here, not inside the storage call
+                    except (SimStoreError, GameConflict):
+                        raise
+                    except Exception:  # noqa: BLE001 - reported with a specific reason below
+                        _log.exception("sim result build failed game=%s", gid)
+                        return {**_env(pro, state, "result_build_failed"),
+                                "message": "We could not grade this season. Your game is saved; try again shortly.",
+                                "game": game_json(row, snap, state, pro)}
+                try:
+                    store.save_result(uid, gid, result, (result.get("grade") or {}).get("letter"))
+                except SimStoreError:
+                    # The grade is computed; serve it now and recompute next time rather than fail.
+                    _log.warning("sim result could not be saved game=%s", gid, exc_info=True)
+            letter = (result.get("grade") or {}).get("letter")
             return {**_env(pro, state), "result": result, "game": game_json(
-                {**row, "grade_letter": result["grade"]["letter"]}, snap, state, pro)}
+                {**row, "grade_letter": letter}, snap, state, pro)}
 
 
 def add_preview_route(router: APIRouter, ctx: GameApiCtx) -> None:
@@ -802,8 +823,8 @@ def add_preview_route(router: APIRouter, ctx: GameApiCtx) -> None:
         return {
             "ok": True, "reason": "", "scoring": scoring, "total": len(rows), "page": page, "page_size": page_size,
             "players": [{
-                "id": p.pid, "name": p.name, "pos": p.pos, "team": p.nfl_team, "age": p.age,
-                "projection": p.mean, "floor": round(max(0.0, p.mean - 0.8 * p.sd), 1),
+                "id": p.pid, "headshot_id": headshot_id(p.pid), "name": p.name, "pos": p.pos, "team": p.nfl_team,
+                "age": p.age, "projection": p.mean, "floor": round(max(0.0, p.mean - 0.8 * p.sd), 1),
                 "ceiling": round(p.mean + 0.8 * p.sd, 1), "value": p.value, "adp": p.adp,
                 "bye_week": pool.bye_weeks.get(p.nfl_team) or None,
             } for p in chunk],

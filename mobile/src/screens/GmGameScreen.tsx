@@ -55,6 +55,8 @@ import {
   simWeekHeading,
   SIM_TE_PREMIUM_LABELS,
   type SimDifficulty,
+  type SimTiebreaker,
+  SIM_TIEBREAKER_LABELS,
   type SimDraftRecap,
   type SimGame,
   type SimGameCreateBody,
@@ -583,6 +585,15 @@ function SetupForm({
               <SetupToggle styles={styles} label="Superflex" note="A second quarterback can start in an extra flex slot." value={state.superflex} onChange={(v) => set('superflex', v)} />
               <SetupToggle styles={styles} label="Kicker" note="Start a K." value={state.includeK} onChange={(v) => set('includeK', v)} />
               <SetupToggle styles={styles} label="Defense (DEF)" note="Start a team defense (estimated from points allowed)." value={state.includeDef} onChange={(v) => set('includeDef', v)} />
+              <View style={styles.tight}>
+                <AppText style={styles.label}>Tiebreaker</AppText>
+                <SegmentedTabBar<string>
+                  options={(opts?.tiebreaker?.values ?? ['points_for', 'head_to_head']).map((v) => ({ key: v, label: SIM_TIEBREAKER_LABELS[v] }))}
+                  active={state.tiebreaker}
+                  onChange={(key) => set('tiebreaker', key as SimTiebreaker)}
+                />
+                <AppText style={styles.muted}>Breaks equal records in standings and playoff seeding.</AppText>
+              </View>
               <View style={styles.tight}>
                 <AppText style={styles.label}>Bench size</AppText>
                 <SegmentedTabBar<string>

@@ -8,7 +8,7 @@ import { EmptyState } from "@/components/EmptyState";
 import { PillRow } from "@/components/PillRow";
 import { SectionHeading } from "@/components/SectionHeading";
 import { SimPlayerBrowser } from "@/components/SimGamePlayers";
-import { SimPlayerLine, SimStat, SimToneBadge, useSimWide, type SimCtx } from "@/components/SimGameParts";
+import { SimPlayerChip, SimPlayerLine, SimStat, SimToneBadge, useSimWide, type SimCtx } from "@/components/SimGameParts";
 import { SkeletonCard } from "@/components/Skeleton";
 import { ToneBadge } from "@/components/ToneBadge";
 import { api } from "@/lib/api";
@@ -320,9 +320,7 @@ export function SimGameDraft({ ctx, onComplete }: { ctx: SimCtx; onComplete: (re
         <div className="flex items-center justify-between gap-2 enter-rise" data-testid="draft-hint">
           <div className="min-w-0">
             <p className="text-xs" style={{ color: "var(--color-text-muted)" }}>{hint.why}</p>
-            <p className="text-sm font-bold break-words">
-              {hint.player.name} <span style={{ color: "var(--color-text-muted)" }}>{hint.player.pos} · value {simFmtValue(hint.player.value)}</span>
-            </p>
+            <SimPlayerChip player={hint.player} extra={<span className="text-xs" style={{ color: "var(--color-text-muted)" }}>Value {simFmtValue(hint.player.value)}</span>} />
           </div>
           <Button size="sm" loading={busy === "pick"} onClick={() => pick(hint.player)}>
             Draft {hint.player.name.split(" ").slice(-1)[0]}
@@ -387,8 +385,18 @@ export function SimDraftRecapView({ recap, ctx, onStart }: { recap: SimDraftReca
             <span className="text-sm">Starters project {simFmtPts(mine.starter_projection)} a week.</span>
           </div>
         ) : null}
-        {nameOf(mine?.best_pick) ? <p className="text-sm">Best pick: <strong>{nameOf(mine?.best_pick)!.name}</strong></p> : null}
-        {nameOf(mine?.worst_pick) ? <p className="text-sm">Biggest reach: <strong>{nameOf(mine?.worst_pick)!.name}</strong></p> : null}
+        {nameOf(mine?.best_pick) ? (
+          <div className="flex flex-col gap-1">
+            <span className="text-xs" style={{ color: "var(--color-text-muted)" }}>Best pick</span>
+            <SimPlayerChip player={nameOf(mine?.best_pick)!} />
+          </div>
+        ) : null}
+        {nameOf(mine?.worst_pick) ? (
+          <div className="flex flex-col gap-1">
+            <span className="text-xs" style={{ color: "var(--color-text-muted)" }}>Biggest reach</span>
+            <SimPlayerChip player={nameOf(mine?.worst_pick)!} />
+          </div>
+        ) : null}
         <Button onClick={onStart}>Start the season</Button>
       </AccentCard>
       {teams.length > 0 ? (

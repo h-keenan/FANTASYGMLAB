@@ -11,7 +11,7 @@ import SectionHeading from './SectionHeading';
 import SegmentedTabBar from './SegmentedTabBar';
 import { SkeletonCard } from './SkeletonBlock';
 import { SimPlayerBrowser } from './SimGamePlayers';
-import { SimPlayerLine, SimPopIn, SimStat, SimToneBadge, createSimStyles, type SimCtx } from './SimGameParts';
+import { SimPlayerChip, SimPlayerLine, SimPopIn, SimStat, SimToneBadge, createSimStyles, type SimCtx } from './SimGameParts';
 import ToneBadge from './ToneBadge';
 import { useThemeMode } from '../context/ThemeModeContext';
 import { api } from '../lib/api';
@@ -321,9 +321,7 @@ export function SimGameDraft({ ctx, onComplete }: { ctx: SimCtx; onComplete: (re
             <View style={common.rowBetween} testID="draft-hint">
               <View style={common.grow}>
                 <AppText style={common.muted}>{hint.why}</AppText>
-                <AppText style={common.bodyStrong}>
-                  {hint.player.name} <AppText style={common.muted}>{hint.player.pos} · value {simFmtValue(hint.player.value)}</AppText>
-                </AppText>
+                <SimPlayerChip player={hint.player} extra={<AppText style={common.muted}>Value {simFmtValue(hint.player.value)}</AppText>} />
               </View>
               <Button size="sm" label={`Draft ${hint.player.name.split(' ').slice(-1)[0]}`} loading={busy === 'pick'} onPress={() => pick(hint.player)} />
             </View>
@@ -384,14 +382,16 @@ export function SimDraftRecapView({ recap, ctx, onStart }: { recap: SimDraftReca
           </View>
         ) : null}
         {nameOf(mine?.best_pick) ? (
-          <AppText style={common.body}>
-            Best pick: <AppText style={common.bodyStrong}>{nameOf(mine?.best_pick)!.name}</AppText>
-          </AppText>
+          <View style={common.stack}>
+            <AppText style={common.muted}>Best pick</AppText>
+            <SimPlayerChip player={nameOf(mine?.best_pick)!} />
+          </View>
         ) : null}
         {nameOf(mine?.worst_pick) ? (
-          <AppText style={common.body}>
-            Biggest reach: <AppText style={common.bodyStrong}>{nameOf(mine?.worst_pick)!.name}</AppText>
-          </AppText>
+          <View style={common.stack}>
+            <AppText style={common.muted}>Biggest reach</AppText>
+            <SimPlayerChip player={nameOf(mine?.worst_pick)!} />
+          </View>
         ) : null}
         <Button label="Start the season" onPress={onStart} />
       </AccentCard>

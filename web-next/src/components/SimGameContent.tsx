@@ -48,6 +48,8 @@ import {
   SIM_TEAM_NAME_MAX,
   SIM_TE_PREMIUM_LABELS,
   type SimDifficulty,
+  type SimTiebreaker,
+  SIM_TIEBREAKER_LABELS,
   type SimDraftRecap,
   type SimGame,
   type SimGameCreateBody,
@@ -538,6 +540,17 @@ function SetupForm({
             <SetupToggle label="Superflex" note="A second quarterback can start in an extra flex slot." checked={state.superflex} onChange={(v) => set("superflex", v)} />
             <SetupToggle label="Kicker" note="Start a K." checked={state.includeK} onChange={(v) => set("includeK", v)} />
             <SetupToggle label="Defense (DEF)" note="Start a team defense (estimated from points allowed)." checked={state.includeDef} onChange={(v) => set("includeDef", v)} />
+            <div className="flex flex-col gap-1">
+              <span className="text-sm font-semibold">Tiebreaker</span>
+              <PillRow
+                ariaLabel="Tiebreaker"
+                variant="fill"
+                options={(opts?.tiebreaker?.values ?? ["points_for", "head_to_head"]).map((v) => ({ label: SIM_TIEBREAKER_LABELS[v], value: v }))}
+                active={state.tiebreaker}
+                onSelect={(value) => set("tiebreaker", value as SimTiebreaker)}
+              />
+              <p className="text-xs" style={{ color: "var(--color-text-muted)" }}>Breaks equal records in standings and playoff seeding.</p>
+            </div>
             <div className="flex flex-col gap-1">
               <span className="text-sm font-semibold" id="sim-bench-label">Bench size</span>
               <PillRow

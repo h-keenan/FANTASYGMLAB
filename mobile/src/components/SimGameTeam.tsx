@@ -11,13 +11,14 @@ import SectionHeading from './SectionHeading';
 import SegmentedTabBar from './SegmentedTabBar';
 import { SkeletonCard } from './SkeletonBlock';
 import { SimPlayerBrowser } from './SimGamePlayers';
-import { SimPlayerLine, SimSheet, SimStat, SimToneBadge, createSimStyles, type SimCtx } from './SimGameParts';
+import { SimPlayerChip, SimPlayerLine, SimSheet, SimStat, SimToneBadge, createSimStyles, type SimCtx } from './SimGameParts';
 import { useThemeMode } from '../context/ThemeModeContext';
 import { api } from '../lib/api';
 import {
   simAssignSlot,
   simClaimPayload,
   simFmtPts,
+  simSlotRepeatsPosition,
   simLineupPayload,
   simMatchupLine,
   simNeedsDrop,
@@ -132,7 +133,7 @@ export function SimTeamTab({ ctx, onTrade }: { ctx: SimCtx; onTrade: () => void 
   const week = game.this_week;
   const overLimit = (game.pending?.cuts_needed ?? 0) > 0;
   const warnings = lineup.warnings ?? [];
-  const nameById = Object.fromEntries([...slots.map((s) => s.player), ...bench].filter(Boolean).map((p) => [p!.id, p!.name]));
+  const playerById = Object.fromEntries([...slots.map((s) => s.player), ...bench].filter(Boolean).map((p) => [p!.id, p!]));
   const candidates = pickSlot != null ? simSlotCandidates(slots[pickSlot].slot, slots, bench) : [];
 
   return (
@@ -168,9 +169,10 @@ export function SimTeamTab({ ctx, onTrade }: { ctx: SimCtx; onTrade: () => void 
       {warnings.length > 0 ? (
         <AccentCard accent={colors.warning} compact>
           {warnings.map((w, i) => (
-            <AppText key={i} style={common.small}>
-              {simWarningText(w, w.player_id ? nameById[w.player_id] : undefined)}
-            </AppText>
+            <View key={i} style={common.stack}>
+              {w.player_id && playerById[w.player_id] ? <SimPlayerChip player={playerById[w.player_id]} /> : null}
+              <AppText style={common.small}>{simWarningText(w, w.player_id ? playerById[w.player_id]?.name : undefined)}</AppText>
+            </View>
           ))}
         </AccentCard>
       ) : null}
@@ -190,6 +192,7 @@ export function SimTeamTab({ ctx, onTrade }: { ctx: SimCtx; onTrade: () => void 
               <View style={common.grow}>
                 <SimPlayerLine
                   player={slot.player}
+                  hidePosition={simSlotRepeatsPosition(slot.slot, slot.player.pos)}
                   onOpen={ctx.openPlayer}
                   trailing={
                     <>
@@ -324,6 +327,7 @@ function ClaimSheet({
 
   return (
     <SimSheet title={`Claim ${player.name}`} onClose={onClose}>
+      <SimPlayerChip player={player} size={40} />
       <AppText style={common.muted}>Claims resolve when you advance, worst record first. Another team may get him first.</AppText>
       <View style={common.stack}>
         <AppText style={common.bodyStrong}>{mustDrop ? 'Drop (your roster is full)' : 'Drop (optional)'}</AppText>
@@ -429,11 +433,11 @@ export function SimPlayersTab({
           {claims.map((claim) => (
             <AccentCard key={claim.id} accent={colors.accent} compact>
               <View style={common.rowBetween}>
-                <AppText style={[common.body, common.grow]}>
-                  <AppText style={common.bodyStrong}>{claim.add.name}</AppText>
-                  {claim.drop ? <AppText style={common.muted}> for {claim.drop.name}</AppText> : null}
-                  {claim.start_slot ? <AppText style={common.muted}> · starts at {claim.start_slot}</AppText> : null}
-                </AppText>
+                <View style={[common.stack, common.grow]}>
+                  <SimPlayerChip player={claim.add} />
+                  {claim.drop ? <AppText style={common.muted}>Drops {claim.drop.name} ({claim.drop.pos})</AppText> : null}
+                  {claim.start_slot ? <AppText style={common.muted}>Starts at {claim.start_slot}</AppText> : null}
+                </View>
                 <Button size="sm" variant="ghost" label="Cancel" onPress={() => cancel(claim)} />
               </View>
             </AccentCard>
