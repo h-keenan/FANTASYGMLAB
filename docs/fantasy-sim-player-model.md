@@ -64,6 +64,18 @@ only when the engine decides to reveal an event early; the model does not do new
 Speed: about 80 microseconds per player-week (pure Python + numpy scalars); a 12-team,
 200-player pool is about 0.3 s per simulated week.
 
+## 1b. How the GM game uses it
+
+`modules/sim/game_scoring.py` is the only door. The model is the **single source of truth for
+injuries**: `injury_incurred` maps to `newly_injured`, and "out N weeks" is read from the profile's
+availability mask (`calendar_weeks_out`, bye weeks inside the window counted, since the game counts
+calendar weeks). The game's own random 1-5 week draw now runs only for the labelled `FallbackModel`
+(replay safety for old saves). The game passes its own bye week into the model. Projections users see
+come from the public preseason mean and games played; `expected_points`, `season_multiplier`,
+archetype and event lists never reach a game module (a test scans for it). When a starting slot cannot
+be filled (injury, bye, lone kicker) the AI makes an emergency waiver claim. `tests/test_sim_game_player_model.py`
+plays a full game and checks scoring, injury coherence, resume == replay and no writes under `data/`.
+
 ## 2. What is modelled
 
 **Season story** (`season_level`, vectorised, one categorical draw per player):

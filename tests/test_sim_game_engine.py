@@ -658,13 +658,15 @@ def test_player_model_adapter_normalizes_a_real_model_shape(monkeypatch):
     @dataclasses.dataclass
     class Profile:
         boost: float
+        games_available_mask: tuple = (True,) * 17
+        unavailable_reason: tuple = ("",) * 17
 
     @dataclasses.dataclass
     class WeekResult:
         points: float
-        stat_line: dict
+        stats: dict
         active: bool
-        newly_injured: bool
+        injury_incurred: bool
 
     module = types.SimpleNamespace(
         MODEL_VERSION="9",
@@ -689,10 +691,11 @@ def test_player_model_adapter_normalizes_a_real_model_shape(monkeypatch):
 
 def test_a_game_runs_end_to_end_on_a_swapped_in_model(monkeypatch):
     module = types.SimpleNamespace(
-        draw_season_profile=lambda player, rng: float(rng.random()),
+        draw_season_profile=lambda player, rng: types.SimpleNamespace(
+            v=float(rng.random()), games_available_mask=(True,) * 17, unavailable_reason=("",) * 17),
         draw_week_points=lambda player, profile, week, rng, scoring: types.SimpleNamespace(
-            points=max(0.0, player["mean"] * (0.8 + 0.4 * profile) + float(rng.normal(0, 3))),
-            stat_line={"fantasy": 1.0}, active=True, newly_injured=float(rng.random()) < 0.03),
+            points=max(0.0, player["mean"] * (0.8 + 0.4 * profile.v) + float(rng.normal(0, 3))),
+            stats={"fantasy": 1.0}, active=True, injury_incurred=float(rng.random()) < 0.03),
     )
     adapter = game_scoring.PlayerModelAdapter(module)
     monkeypatch.setattr(game_scoring, "_load_real", lambda: adapter)

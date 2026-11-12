@@ -58,7 +58,9 @@ class ScoringSession:
 
     def _mapping(self, pid: str) -> dict[str, Any]:
         if pid not in self._maps:
-            self._maps[pid] = self.snap.players[pid].model_mapping()
+            m = self.snap.players[pid].model_mapping()
+            m["bye_week"] = self.snap.bye_of(pid)  # the game's schedule is the truth (0 = none)
+            self._maps[pid] = m
         return self._maps[pid]
 
     def profile(self, pid: str) -> Any:
@@ -70,6 +72,12 @@ class ScoringSession:
     def week(self, pid: str, week: int) -> PlayerWeek:
         rng = self.rng.stream(week, "gscore", self.snap.index[pid])
         return self.model.week(self._mapping(pid), self.profile(pid), week, rng, self.scoring)
+
+    def weeks_out(self, pid: str, week: int, res: PlayerWeek) -> int:
+        """Injury length: the player model's own decision when it gives one; the legacy
+        random draw only for the labelled FallbackModel (replay safety for old saves)."""
+
+        return res.out_weeks if res.out_weeks is not None else self.injury_weeks(pid, week)
 
     def injury_weeks(self, pid: str, week: int) -> int:
         rng = self.rng.stream(week, "ginjury", self.snap.index[pid])
@@ -228,12 +236,14 @@ def _resolve_waivers(em: Emitter, snap: GameSnapshot, state: GameState, seed: in
     claims: dict[str, list[dict[str, Any]]] = {t: [] for t in snap.tids}
     for c in state.claims:
         claims[c["team"]].append(dict(c))
-    for tid in snap.tids:
+    claimed = {c["add"] for cs in claims.values() for c in cs}
+    for tid in waiver_order(snap, state):
         if snap.team(tid).is_user:
             continue
-        c = ai_waiver_claim(ev, tid, week, seed)
+        c = ai_waiver_claim(ev, tid, week, seed, claimed)
         if c is not None:
             claims[tid].append(c)
+            claimed.add(c["add"])
     limit = snap.settings.roster_limit
     out = []
     for tid in waiver_order(snap, state):
@@ -447,7 +457,9 @@ def run_week(em: Emitter, snap: GameSnapshot, state: GameState, seed: int) -> di
             continue
         played[pid] = PlayerWeek(round(max(0.0, res.points), 2), res.stats, True, res.newly_injured)
         if res.newly_injured:
-            hurt.append([pid, session.injury_weeks(pid, W)])
+            weeks_out = session.weeks_out(pid, W, res)
+            if weeks_out > 0:  # hurt in the last game of the season: nothing left to miss
+                hurt.append([pid, weeks_out])
     pts = {pid: pw.points for pid, pw in played.items()}
     status_of = {pid: ev.status(pid, W) for pid in snap.pids}
     ros_before = {pid: ev.ros_mean(pid) for pid in state.rosters[user]}

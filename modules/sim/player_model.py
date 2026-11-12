@@ -332,7 +332,9 @@ def normalize_player(player: Mapping[str, Any]) -> dict[str, Any]:
     rookie = bool(rookie) if rookie is not None else bool(years is not None and years <= 0)
     team = str(player.get("team") or player.get("nfl_team") or "")
     bye = int(_f(player, "bye_week", default=0) or 0)
-    if not 1 <= bye <= SEASON_WEEKS:
+    if "bye_week" in player and player["bye_week"] is not None and bye == 0:
+        pass  # the caller says explicitly: no bye (unknown schedule); never invent one
+    elif not 1 <= bye <= SEASON_WEEKS:
         bye = default_bye_week(team) if team else 0
     return dict(
         pid=str(pid), pos=pos, age=_f(player, "age", default=26.0), rookie=rookie, team=team,
