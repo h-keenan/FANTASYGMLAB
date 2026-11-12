@@ -69,7 +69,7 @@ export function MultiTeamIdeasSection({ leagueId, leagueName, lens }: { leagueId
       <header className="flex flex-col gap-1">
         <h2 className="text-lg font-black m-0">3-team ideas</h2>
         <p className="text-sm m-0" style={{ color: "var(--color-text-secondary)" }}>
-          Three-way deals where your surplus fills one team&apos;s need, theirs fills another&apos;s, and every team still comes out fair.
+          Three-way deals where your surplus players and picks fill one team&apos;s need, theirs fills another&apos;s, and every team still comes out fair.
         </p>
       </header>
       <IdeasBody

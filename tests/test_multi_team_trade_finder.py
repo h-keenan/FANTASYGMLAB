@@ -180,6 +180,147 @@ def test_repair_adds_one_spare_piece_from_the_team_sending_to_the_short_team(ctx
     assert finder._repair(league_view, {"teams": [dict(short["teams"][1], tone="decline")]}, base) is None
 
 
+# --- draft picks as pieces ------------------------------------------------------
+
+GROUPS = {"1": "contender", "2": "rebuild", "3": "retool"}
+
+
+@pytest.fixture()
+def pick_ctx(league):
+    """The same league with the pick table loaded and postures pinned: 1 contends, 2 rebuilds, 3 retools."""
+
+    pl = league["players"]
+    for pid in BALANCED:
+        for col in ("dynasty_score", "value_score"):
+            pl.loc[pl["player_id"].astype(str) == pid, col] = 4000.0
+    built = engine.build_context(league_id="fixture-league", lens="Dynasty", players_db_path=":memory:", load_picks=True)
+    assert not isinstance(built, dict), built
+    fake_needs(built, NEEDS)
+    for rid in built.by_rid:
+        group = GROUPS.get(rid, "retool")
+        built._postures[rid] = {"key": group, "group": group, "label": group}
+    for pick in built.pick_by_id.values():
+        if str(pick["owner_roster_id"]) == "1":
+            pick["score"] = 4000  # a pick priced like the balanced players
+    return built
+
+
+def _pick_transfers(idea):
+    return [t for t in idea["analyzer_request"]["transfers"] if t["type"] == "pick"]
+
+
+def test_picks_flow_by_posture_contenders_send_and_rebuilders_want(pick_ctx):
+    view = finder._League(pick_ctx, "1", set())
+    sends = {rid: [a for a in assets if a.kind == "pick"] for rid, assets in view.sendable.items()}
+    assert sends["1"] and not sends["2"] and not sends["3"]  # only a contender spends picks
+    assert all(a.player_id in pick_ctx.pick_by_id and a.roster_id == "1" for a in sends["1"])
+    assert view.pick_want["2"] > view.pick_want["3"] > view.pick_want["1"] == 0.0
+    assert [a for a in view.edge("1", "2") if a.kind == "pick"]  # wanted by the rebuilder
+    assert not [a for a in view.edge("2", "1") if a.kind == "pick"]  # never sent by it
+    assert len([a for a in view.edge("1", "2") if a.kind == "pick"]) <= finder.EDGE_PICKS
+    # priced by the pick table the 2-team engine reads, not a number of the finder's own
+    pick = next(a for a in sends["1"])
+    assert pick.value == float(pick_ctx.pick_by_id[pick.player_id]["score"])
+
+
+def test_candidates_carry_picks_within_the_caps(pick_ctx):
+    view = finder._League(pick_ctx, "1", set())
+    cands = finder._candidates(view, ["2", "3"])
+    with_pick = [c for c in cands if any(t.asset_type == "pick" for t in c.transfers)]
+    assert with_pick
+    for c in cands:
+        picks = [t for t in c.transfers if t.asset_type == "pick"]
+        assert len(picks) <= finder.MAX_PICKS_PER_IDEA
+        assert len({(t.from_roster, t.to_roster) for t in picks}) == len(picks)  # at most one per edge
+        for t in picks:
+            assert str(pick_ctx.pick_by_id[t.asset_id]["owner_roster_id"]) == t.from_roster
+            assert view.group[t.from_roster] == "contender" and view.pick_want[t.to_roster] > 0
+
+
+def test_ideas_with_picks_pass_every_teams_own_verdict_and_explain_the_pick(pick_ctx):
+    out = finder.find_three_team_ideas(pick_ctx, "1")
+    assert out["search"]["picks_in_play"] > 0
+    pick_ideas = [i for i in out["ideas"] if _pick_transfers(i)]
+    assert pick_ideas, out["search"]
+    for idea in pick_ideas:
+        assert _says_yes(idea)
+        # the same grading the Analyzer's pipeline gives the same transfers
+        again = engine.grade_transfers(
+            pick_ctx, [mt.Transfer(t["type"], t["id"], t["from_roster_id"], t["to_roster_id"]) for t in idea["analyzer_request"]["transfers"]],
+            perspective_roster_id="1",
+        )
+        assert {t["roster_id"]: t["tone"] for t in again["teams"]} == {t["roster_id"]: t["tone"] for t in idea["teams"]}
+        for t in idea["teams"]:
+            gets = [a for a in t["receives"] if a["type"] == "pick"]
+            sent = [a for a in t["sends"] if a["type"] == "pick"]
+            need = t["why"][0]["text"]
+            if gets:
+                assert t["posture"]["group"] in ("rebuild", "retool") and "draft capital" in need
+            if sent:
+                assert t["posture"]["group"] == "contender" and "draft capital a contender can spend" in need
+        assert idea["veto"]["band"] in ("fair", "explainable")
+
+
+def test_players_only_when_no_pick_table_is_loaded(ctx):
+    out = _find(ctx)
+    assert out["search"]["picks_in_play"] == 0
+    assert not [i for i in out["ideas"] if _pick_transfers(i)]
+
+
+def test_a_deal_the_veto_read_flags_is_dropped_even_when_every_verdict_is_fair(pick_ctx):
+    assert _find(pick_ctx)["ideas"]
+    flagged = {"outrage": 80.0, "band": "outrage", "label": "x", "explained_by_roster": False, "hurt_roster_id": "2"}
+    with patch.object(engine.trade_veto, "assess", return_value=flagged):
+        out = _find(pick_ctx)
+    assert out["ideas"] == [] and out["search"]["vetoed"] > 0
+    explainable = dict(flagged, band="explainable", outrage=25.0)
+    with patch.object(engine.trade_veto, "assess", return_value=explainable):
+        assert _find(pick_ctx)["ideas"]
+
+
+def test_repair_may_add_a_pick_only_when_the_short_team_wants_draft_capital(pick_ctx):
+    view = finder._League(pick_ctx, "1", set())
+    base = (mt.Transfer("player", "F01-17", "1", "2"), mt.Transfer("player", "F02-14", "2", "3"),
+            mt.Transfer("player", "F03-10", "3", "1"))
+    short = {"teams": [
+        {"roster_id": "1", "tone": "accept", "market_delta": 400},
+        {"roster_id": "2", "tone": "counter", "market_delta": -4000},
+        {"roster_id": "3", "tone": "fair", "market_delta": 50},
+    ]}
+    fixed = finder._repair(view, short, base)
+    assert fixed is not None and fixed[-1].asset_type == "pick" and fixed[-1].to_roster == "2"
+    assert str(pick_ctx.pick_by_id[fixed[-1].asset_id]["owner_roster_id"]) == "1"
+    # a contender that is short does not get a pick it does not want; the repair stays a player
+    short_contender = {"teams": [
+        {"roster_id": "1", "tone": "counter", "market_delta": -4000},
+        {"roster_id": "2", "tone": "fair", "market_delta": 50},
+        {"roster_id": "3", "tone": "fair", "market_delta": 50},
+    ]}
+    fixed = finder._repair(view, short_contender, base)
+    assert fixed is None or fixed[-1].asset_type == "player"
+
+
+def test_endpoint_search_loads_picks_and_falls_back_to_players_when_the_pick_table_is_not_ready(monkeypatch):
+    import services.mobile_api_service as svc
+
+    built = []
+    sentinel = object()
+
+    def build_context(**kw):
+        built.append(kw.get("load_picks", False))
+        return {"status": "unavailable"} if kw.get("load_picks") else sentinel
+
+    monkeypatch.setattr(engine, "build_context", build_context)
+    monkeypatch.setattr(finder, "find_three_team_ideas", lambda ctx, rid, **k: {"ideas": [], "search": {"reason": "no_fit"}})
+    monkeypatch.setattr(sleeper, "get_league", lambda lid: {"league_id": lid})
+    monkeypatch.setattr(svc, "_fetch_gm_target_player_ids", lambda *a, **k: ([], []))
+    monkeypatch.setattr(svc, "_multi_team_engine_hooks", lambda *a, **k: {})
+    monkeypatch.setattr(svc.college_scouting, "class_strength_signal_enabled", lambda: False)
+    monkeypatch.setattr(svc.auth_supabase, "get_supabase_config", lambda: None)
+    out = svc._compute_multi_team_ideas("abc", "Dynasty", {"id": "u"}, {"roster_id": 1}, True)
+    assert built == [True, False] and out["reason"] == "no_fit"
+
+
 # --- API: Pro gate, caching, admission -----------------------------------------
 
 

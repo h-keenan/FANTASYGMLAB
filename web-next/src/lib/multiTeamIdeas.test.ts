@@ -129,4 +129,16 @@ describe("idea card model", () => {
     expect(response.teams?.every((t) => t.veto_risk === null)).toBe(true);
     expect(response.flows).toHaveLength(3);
   });
+
+  it("names a draft pick like any other piece and keeps its id in the Analyzer link", () => {
+    const pick = { type: "pick" as const, id: "2027:1:3", label: "2027 1st (Team C)", position: "", team: "", from_roster_id: "3", from_team_name: "C" };
+    const withPick = {
+      ...IDEA,
+      teams: IDEA.teams.map((t) => (t.roster_id === "1" ? { ...t, receives: [pick], why: [{ factor: "need", text: "Team A adds draft capital while rebuilding." }] } : t)),
+      veto: { band: "fair", label: "Fair" },
+    };
+    const lines = ideaTeamLines(withPick);
+    expect(lines[0]).toMatchObject({ gets: "2027 1st (Team C)", why: "Team A adds draft capital while rebuilding." });
+    expect(ideaAnalyzerQuery("L", withPick)).toContain("pick~3~1~2027:1:3");
+  });
 });

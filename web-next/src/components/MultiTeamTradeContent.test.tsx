@@ -206,6 +206,32 @@ describe("MultiTeamTradeContent", () => {
     expect(await screen.findByTestId("most-hurt-banner")).toBeInTheDocument();
   });
 
+  it("opens an idea that routes a draft pick and grades the pick id as sent", async () => {
+    post.mockResolvedValue(OK);
+    const pick = { pick_id: "2027:1:3", label: "2027 1st (Team 3)", owner_roster_id: "3", season: 2027, round: 1, score: 900 } as unknown as DraftPickAsset;
+    const transfers = [
+      { type: "player" as const, id: "a", from_roster_id: "1", to_roster_id: "2" },
+      { type: "player" as const, id: "b", from_roster_id: "2", to_roster_id: "3" },
+      { type: "pick" as const, id: "2027:1:3", from_roster_id: "3", to_roster_id: "1" },
+    ];
+    render(
+      <MultiTeamTradeContent
+        leagueId="league-1"
+        leagueName="Dynasty Overlords"
+        myRosterId="1"
+        rankings={RANKINGS}
+        picks={[pick]}
+        rosters={ROSTERS}
+        teamProfiles={PROFILES}
+        lens="Dynasty"
+        modeToggle={<TradeModeToggle mode="multi" onChange={() => {}} />}
+        prefill={transfers}
+      />,
+    );
+    await waitFor(() => expect(post).toHaveBeenCalledTimes(1));
+    expect(post.mock.calls[0][1]).toEqual({ transfers, perspectiveRosterId: "1", lens: "Dynasty" });
+  });
+
   it("removing a team drops the assets routed to it", () => {
     renderBuilder();
     buildThreeTeamTrade();

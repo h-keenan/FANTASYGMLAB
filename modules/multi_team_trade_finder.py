@@ -31,6 +31,21 @@ The search is bounded and deterministic:
    short gets one repair (a single extra asset from the team sending to it);
    at most ``MAX_VARIANTS`` repairs per search.
 
+Draft picks are pieces too (only when the context loaded the league's pick
+table, ``build_context(load_picks=True)``). A pick is priced by the SAME pick
+valuation the 2-team engine and the Analyzer use (``list_draft_pick_assets``,
+then each team's own posture multiplier inside ``grade_transfers``), and the
+search follows the same direction logic those engines apply to a team's posture:
+a *contender* spends picks (it prices them at a discount), a *rebuild* team
+(``rebuild`` / ``tank``) wants them most and a *retool* team wants them some;
+rebuild and retool teams never send picks. A pick is therefore a "need" only for
+a team whose posture wants capital, never a free filler. At most one pick per
+edge and ``MAX_PICKS_PER_IDEA`` per idea keep a deal about players first.
+
+Every passing idea is also run through the commissioner veto read
+(``trade_veto.assess``): an idea one team could be asked to be vetoed over
+(band lopsided / outrage) is dropped even when every verdict is "Fair".
+
 All sorts break ties on roster / player ids, so the same league state returns
 the same ideas in the same order (only the wall-clock budget can shorten the
 list, never reorder it).
@@ -49,7 +64,7 @@ import pandas as pd
 
 from modules import multi_team_trade as mt
 from modules import multi_team_trade_engine as engine
-from modules import roster_value_model, trade_value_bands as bands
+from modules import roster_value_model, trade_veto, trade_value_bands as bands
 
 logger = logging.getLogger("fantasygm.multi_team_trade_finder")
 
@@ -66,6 +81,13 @@ DEFAULT_TIME_BUDGET_SECONDS = 12.0
 PASS_TONES = frozenset({"accept", "fair"})
 NEED_TIERS = ("primary", "secondary")
 NEED_TIER_WEIGHT = {"primary": 2.0, "secondary": 1.0}
+PICK_POSITION = "PICK"
+# Posture group -> how much a team wants draft capital back (0 = never needs one).
+PICK_WANT_BY_GROUP = {"rebuild": 2.0, "retool": 1.0, "contender": 0.0}
+PICK_SENDER_GROUPS = frozenset({"contender"})
+EDGE_PICKS = 2  # picks offered per directed edge (at most one rides in any single option)
+MAX_PICKS_PER_IDEA = 2
+VETO_BLOCK_BANDS = frozenset({trade_veto.BAND_LOPSIDED, trade_veto.BAND_OUTRAGE})
 
 
 @dataclass(frozen=True)
@@ -75,6 +97,7 @@ class Asset:
     position: str
     value: float
     roster_id: str
+    kind: str = "player"  # "player" | "pick" (a pick's player_id is its pick_id)
 
 
 @dataclass(frozen=True)
@@ -125,6 +148,42 @@ class _League:
                 for p in positions if p.get("tier") in NEED_TIERS
             }
             self.sendable[rid] = self._sendable(rid, positions)
+        self.pick_want: dict[str, float] = {}
+        self.group: dict[str, str] = {}
+        self.picks: dict[str, Asset] = {}
+        if ctx.pick_by_id:
+            self._load_picks()
+
+    def _load_picks(self) -> None:
+        """Pick pieces: each roster's own picks (current owner, per the pick table), and how
+        much each team's posture wants draft capital back. Rebuild / retool never send one."""
+
+        for rid in self.need_pos:
+            group = str((self.ctx.posture(rid) or {}).get("group") or "retool")
+            self.group[rid] = group
+            self.pick_want[rid] = PICK_WANT_BY_GROUP.get(group, 0.0)
+        for pick_id, pick in sorted(self.ctx.pick_by_id.items()):
+            rid = str(pick.get("owner_roster_id"))
+            value = _num(pick.get("score"))
+            if rid not in self.need_pos or value < MIN_ASSET_VALUE:
+                continue
+            asset = Asset(pick_id, str(pick.get("label") or pick.get("name") or "Draft pick"), PICK_POSITION, value, rid, "pick")
+            self.picks[pick_id] = asset
+            if self.group[rid] in PICK_SENDER_GROUPS:
+                self.sendable[rid].append(asset)
+        for rid in self.sendable:
+            self.sendable[rid].sort(key=lambda a: (-a.value, a.player_id))
+
+    def want(self, rid: str, asset: Asset) -> float:
+        """How much ``rid`` wants this piece: the position need, or posture-driven pick demand."""
+
+        if asset.kind == "pick":
+            return self.pick_want.get(rid, 0.0)
+        return self.need_pos.get(rid, {}).get(asset.position, 0.0)
+
+    def label(self, asset_id: str) -> str:
+        found = self.rows.get(asset_id) or self.picks.get(asset_id)
+        return found.label if found else asset_id
 
     def _sendable(self, rid: str, positions: Sequence[Mapping[str, Any]]) -> list[Asset]:
         tier_by_pos = {str(p["position"]): str(p["tier"]) for p in positions}
@@ -153,17 +212,17 @@ class _League:
         """Up to ``EDGE_ASSETS`` of ``src``'s sendable players at a position ``dst`` needs."""
 
         want = self.need_pos.get(dst, {})
-        fits = [a for a in self.sendable.get(src, []) if a.position in want]
+        fits = [a for a in self.sendable.get(src, []) if a.kind == "player" and a.position in want]
         fits.sort(key=lambda a: (-want[a.position], -a.value, a.player_id))
-        return fits[:EDGE_ASSETS]
+        picks = [a for a in self.sendable.get(src, []) if a.kind == "pick" and self.want(dst, a) > 0]
+        return fits[:EDGE_ASSETS] + picks[:EDGE_PICKS]
 
     def pair_fit(self, partner: str) -> float:
         """How well ``partner`` fits the user: needs each side can fill for the other."""
 
         score = 0.0
         for src, dst in ((partner, self.user_rid), (self.user_rid, partner)):
-            want = self.need_pos.get(dst, {})
-            score += sum(want[a.position] for a in self.sendable.get(src, []) if a.position in want)
+            score += sum(self.want(dst, a) for a in self.sendable.get(src, []))
         return score
 
 
@@ -171,7 +230,7 @@ def _options(assets: Sequence[Asset]) -> list[tuple[Asset, ...]]:
     """What one edge can carry: any single asset or any pair of the edge's assets."""
 
     singles = [(a,) for a in assets]
-    pairs = list(itertools.combinations(assets, 2))
+    pairs = [c for c in itertools.combinations(assets, 2) if not (c[0].kind == "pick" and c[1].kind == "pick")]
     return singles + pairs
 
 
@@ -184,16 +243,18 @@ def _candidates(league: _League, partners: Sequence[str]) -> list[Candidate]:
             if not all(edges):
                 continue
             for combo in itertools.product(*edges):
+                if sum(a.kind == "pick" for edge in combo for a in edge) > MAX_PICKS_PER_IDEA:
+                    continue
                 sent = {cycle[i]: sum(a.value for a in combo[i]) for i in range(3)}
                 got = {cycle[(i + 1) % 3]: sum(a.value for a in combo[i]) for i in range(3)}
                 deltas = [got[r] - sent[r] for r in cycle]
                 if min(deltas) < -PROXY_TOLERANCE:
                     continue
                 fit = sum(
-                    league.need_pos[cycle[(i + 1) % 3]].get(a.position, 0.0) for i in range(3) for a in combo[i]
+                    league.want(cycle[(i + 1) % 3], a) for i in range(3) for a in combo[i]
                 )
                 transfers = tuple(
-                    mt.Transfer("player", a.player_id, cycle[i], cycle[(i + 1) % 3])
+                    mt.Transfer(a.kind, a.player_id, cycle[i], cycle[(i + 1) % 3])
                     for i in range(3) for a in combo[i]
                 )
                 out.append(Candidate(transfers, (p, q), fit, min(deltas)))
@@ -249,17 +310,41 @@ def _team_view(team: Mapping[str, Any], fit_text: str) -> dict[str, Any]:
     }
 
 
-def _fit_text(league: _League, rid: str, name: str, receives: Sequence[Mapping[str, Any]], sends: Sequence[Mapping[str, Any]]) -> str:
+_GROUP_VERB = {"rebuild": "rebuilding", "retool": "retooling"}
+
+
+def _fit_text(
+    league: _League, rid: str, name: str, receives: Sequence[Mapping[str, Any]], sends: Sequence[Mapping[str, Any]]
+) -> str:
     wanted = league.need_pos.get(rid, {})
-    fills = sorted({str(r.get("position")) for r in receives if r.get("position") in wanted})
-    spare = sorted({str(s.get("position")) for s in sends if s.get("position")})
-    if fills and spare:
-        return f"{name} fills a {'/'.join(fills)} need and sends spare {'/'.join(spare)} depth."
+    fills = sorted({str(r.get("position")) for r in receives if r.get("type") != "pick" and r.get("position") in wanted})
+    spare = sorted({str(s.get("position")) for s in sends if s.get("type") != "pick" and s.get("position")})
+    got_pick = any(r.get("type") == "pick" for r in receives) and league.pick_want.get(rid, 0.0) > 0
+    sent_pick = any(s.get("type") == "pick" for s in sends)
+    parts: list[str] = []
     if fills:
-        return f"{name} fills a {'/'.join(fills)} need."
+        parts.append(f"fills a {'/'.join(fills)} need")
+    if got_pick:
+        parts.append(f"adds draft capital while {_GROUP_VERB.get(league.group.get(rid, ''), 'building')}")
+    sends_bits: list[str] = []
     if spare:
-        return f"{name} sends spare {'/'.join(spare)} depth."
+        sends_bits.append(f"spare {'/'.join(spare)} depth")
+    if sent_pick:
+        sends_bits.append("draft capital a contender can spend")
+    if parts and sends_bits:
+        return f"{name} {' and '.join(parts)} and sends {' plus '.join(sends_bits)}."
+    if parts:
+        return f"{name} {' and '.join(parts)}."
+    if sends_bits:
+        return f"{name} sends {' plus '.join(sends_bits)}."
     return ""
+
+
+def _veto_view(graded: Mapping[str, Any]) -> dict[str, Any] | None:
+    veto = graded.get("veto_summary") or None
+    if not veto:
+        return None
+    return {k: veto.get(k) for k in ("band", "label", "outrage", "explained_by_roster", "hurt_roster_id")}
 
 
 def _idea(league: _League, graded: Mapping[str, Any], transfers: Sequence[mt.Transfer], *, edits: int, note: str) -> dict[str, Any]:
@@ -287,6 +372,7 @@ def _idea(league: _League, graded: Mapping[str, Any], transfers: Sequence[mt.Tra
             "outcome": me["outcome"],
         },
         "summary": {k: summary.get(k) for k in ("headline", "balance", "most_hurt_roster_id", "best_off_roster_id", "market_sum")},
+        "veto": _veto_view(graded),
         "variant": {"edits": edits, "note": note} if edits else None,
         "analyzer_request": {
             "transfers": [t.to_public() for t in transfers],
@@ -297,6 +383,12 @@ def _idea(league: _League, graded: Mapping[str, Any], transfers: Sequence[mt.Tra
 
 def _passes(graded: Mapping[str, Any]) -> bool:
     return graded.get("status") == "ok" and all(t.get("tone") in PASS_TONES for t in graded["teams"])
+
+
+def _vetoed(graded: Mapping[str, Any]) -> bool:
+    """True when the commissioner read (trade_veto.assess) would flag the deal for review."""
+
+    return str((graded.get("veto_summary") or {}).get("band") or "") in VETO_BLOCK_BANDS
 
 
 def _repair(league: _League, graded: Mapping[str, Any], base: Sequence[mt.Transfer]) -> tuple[mt.Transfer, ...] | None:
@@ -311,11 +403,15 @@ def _repair(league: _League, graded: Mapping[str, Any], base: Sequence[mt.Transf
     giver = next(t.from_roster for t in base if t.to_roster == hurt)
     used = {t.asset_id for t in base}
     keep = league.need_pos.get(giver, {})
-    pool = [a for a in league.sendable.get(giver, []) if a.player_id not in used and a.position not in keep]
+    pool = [
+        a for a in league.sendable.get(giver, [])
+        if a.player_id not in used and a.position not in keep
+        and (a.kind != "pick" or league.want(hurt, a) > 0)
+    ]
     if not pool:
         return None
     pick = min(pool, key=lambda a: (abs(a.value - gap), a.player_id))
-    return (*base, mt.Transfer("player", pick.player_id, giver, hurt))
+    return (*base, mt.Transfer(pick.kind, pick.player_id, giver, hurt))
 
 
 def find_three_team_ideas(
@@ -341,7 +437,7 @@ def find_three_team_ideas(
     if user not in ctx.by_rid or len(ctx.by_rid) < 3:
         return {"status": "ok", "ideas": [], "search": {"reason": "league_too_small", "partners": 0, "candidates": 0, "verified": 0, "truncated": False}}
     league = _League(ctx, user, set(untouchable_ids or ()))
-    search: dict[str, Any] = {"partners": 0, "candidates": 0, "verified": 0, "variants": 0, "truncated": False, "reason": ""}
+    search: dict[str, Any] = {"partners": 0, "candidates": 0, "verified": 0, "variants": 0, "vetoed": 0, "picks_in_play": 0, "truncated": False, "reason": ""}
     if user not in league.need_pos:
         search["reason"] = "needs_unavailable"
         return {"status": "ok", "ideas": [], "search": search}
@@ -352,6 +448,7 @@ def find_three_team_ideas(
     )
     partners = [rid for fit, rid in scored if fit > 0][:max_partners]
     search["partners"] = len(partners)
+    search["picks_in_play"] = sum(a.kind == "pick" for rid in partners + [user] for a in league.sendable.get(rid, []))
     cands = _candidates(league, partners) if len(partners) >= 2 else []
     search["candidates"] = len(cands)
     queue = _order(cands)[:max_verify]
@@ -362,7 +459,7 @@ def find_three_team_ideas(
 
     def grade(transfers: Sequence[mt.Transfer]) -> Mapping[str, Any]:
         search["verified"] += 1
-        return engine.grade_transfers(ctx, list(transfers), perspective_roster_id=user)
+        return engine.grade_transfers(ctx, list(transfers), perspective_roster_id=user, include_veto=True)
 
     for cand in queue:
         if len(ideas) >= max_ideas:
@@ -373,7 +470,9 @@ def find_three_team_ideas(
         if per_pair.get(cand.pair, 0) >= MAX_IDEAS_PER_PAIR:
             continue
         graded = grade(cand.transfers)
-        if _passes(graded):
+        if _passes(graded) and _vetoed(graded):
+            search["vetoed"] += 1
+        elif _passes(graded):
             iid = idea_id(cand.transfers)
             if iid not in seen:
                 seen.add(iid)
@@ -393,14 +492,16 @@ def find_three_team_ideas(
         graded = grade(repaired)
         search["variants"] += 1
         iid = idea_id(repaired)
-        if _passes(graded) and iid not in seen and per_pair.get(pair, 0) < MAX_IDEAS_PER_PAIR:
+        if _passes(graded) and _vetoed(graded):
+            search["vetoed"] += 1
+        elif _passes(graded) and iid not in seen and per_pair.get(pair, 0) < MAX_IDEAS_PER_PAIR:
             seen.add(iid)
             per_pair[pair] = per_pair.get(pair, 0) + 1
             extra = repaired[-1]
             ideas.append(_idea(
                 league, graded, repaired, edits=1,
                 note=f"One added piece ({ctx.names.get(extra.from_roster, extra.from_roster)} also sends "
-                     f"{league.rows[extra.asset_id].label}) brings every team to fair.",
+                     f"{league.label(extra.asset_id)}) brings every team to fair.",
             ))
 
     ideas.sort(key=lambda i: (
