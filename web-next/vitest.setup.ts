@@ -2,6 +2,8 @@ import "@testing-library/jest-dom/vitest";
 import { cleanup } from "@testing-library/react";
 import { afterEach } from "vitest";
 
+import { clearRequestCache } from "@/lib/requestCache";
+
 // Explicit unmount between tests: @testing-library/react's own auto-cleanup
 // only self-registers when `afterEach` is a global, which this project's
 // vitest config (no `test.globals: true`) doesn't provide — without this,
@@ -12,4 +14,7 @@ import { afterEach } from "vitest";
 // hadn't happened to collide yet).
 afterEach(() => {
   cleanup();
+  // Module-level read cache (lib/requestCache.ts): never let one test's fetch
+  // results answer the next test's identical request.
+  clearRequestCache();
 });
