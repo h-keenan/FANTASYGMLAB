@@ -40,12 +40,14 @@ from modules.sim.game_types import (
     DEFAULT_BENCH,
     DEFAULT_SCORING,
     DEFAULT_TEAMS,
+    DEFAULT_TIEBREAKER,
     DIFFICULTIES,
     DRAFT_SPARE_SPOTS,
     START_FRESH,
     START_KINDS,
     START_LEAGUE,
     TE_PREMIUMS,
+    TIEBREAKERS,
     headshot_id,
     GAME_ENGINE_VERSION,
     MAX_GAMES_FREE,
@@ -292,6 +294,7 @@ def add_routes(router: APIRouter, ctx: GameApiCtx) -> None:
                 "difficulty": {"values": list(DIFFICULTIES), "default": "normal"},
                 "user_slot": {"min": 1, "max": max(TEAM_COUNTS), "default": None},
                 "auto_lineup": {"default": False},
+                "tiebreaker": {"values": list(TIEBREAKERS), "default": DEFAULT_TIEBREAKER},
             },
             # Draft rounds are derived: roster size minus the spots left for the wire.
             "layout": {"base_slots": ["QB", "RB", "RB", "WR", "WR", "TE", "FLEX"], "draft_spare_spots": DRAFT_SPARE_SPOTS},
@@ -332,7 +335,7 @@ def add_routes(router: APIRouter, ctx: GameApiCtx) -> None:
             if not league_id or len(league_id) > 64:
                 raise ValueError("league_id is required.")
             # Size, scoring and lineup come from the league; only these two are the player's choice.
-            picked = GameSettings.parse({k: raw[k] for k in ("difficulty", "auto_lineup") if k in raw})
+            picked = GameSettings.parse({k: raw[k] for k in ("difficulty", "auto_lineup", "tiebreaker") if k in raw})
         else:
             if raw.get("user_slot") is None:
                 teams = raw.get("teams", DEFAULT_TEAMS)
@@ -353,7 +356,7 @@ def add_routes(router: APIRouter, ctx: GameApiCtx) -> None:
                 if start == START_LEAGUE:
                     imported = ctx.inputs.league_import(
                         league_id, username=ctx.sleeper_username(user), roster_id=roster_id)
-                    settings = league_settings(imported, difficulty=picked.difficulty, auto_lineup=picked.auto_lineup)
+                    settings = league_settings(imported, difficulty=picked.difficulty, auto_lineup=picked.auto_lineup, tiebreaker=picked.tiebreaker)
                     pool = _pool_for(ctx.inputs, settings.scoring_settings)
                     snap = build_league_snapshot(
                         pool.rows, pool.bye_weeks, imported, settings, seed, user_team_name=team_name,

@@ -283,8 +283,12 @@ tiebreakers, playoff seeding, waivers that resolve in priority order.
   Roster limit 16, 14 draft rounds. No DEF/IDP, no IR, no FAAB, no picks as
   assets (those are later phases).
 - Scoring presets: `ppr` (default), `half`, `std`.
-- Tiebreakers: win pct (tie = half), head-to-head among the tied group, points
-  for, then a fixed per-game coin.
+- Tiebreakers (standings and playoff seeding, one rule): win pct (tie = half),
+  then the game's `tiebreaker` setting. `points_for` (default, like Sleeper):
+  points for, head-to-head among the tied group, fewer points against, then a
+  fixed per-game coin. `head_to_head`: head-to-head among the tied group, points
+  for, then the coin. The rule is saved in the game's settings; saves from before
+  the setting existed load as `head_to_head`, so they replay unchanged.
 - Waivers: claims resolve at Advance, worst record first, AI claims in the same
   order, before that week's games. Cuts are immediate. Trades resolve
   instantly (see Trades). Trade deadline: week 10; none in the playoffs.
@@ -355,7 +359,7 @@ the client hides the rest behind a collapsed "Advanced options".
              "teams": {"values": [8, 10, 12, 14], "default": 12},
              "scoring": {"values": ["ppr", "half", "std"], "default": "half"},
              "te_premium": {"values": [0.0, 0.5, 1.0], "default": 0.0},
-             "superflex": {"default": false}, "include_k": {"default": true}, "include_def": {"default": false},
+             "superflex": {"default": false}, "include_k": {"default": true}, "include_def": {"default": false}, "tiebreaker": {"values": ["points_for", "head_to_head"], "default": "points_for"},
              "bench": {"min": 4, "max": 10, "default": 8},
              "difficulty": {"values": ["easy", "normal", "hard"], "default": "normal"},
              "user_slot": {"min": 1, "max": 14, "default": null},
@@ -376,7 +380,7 @@ and `snapshot` JSON, so there is no SQL migration for them.
 
 ### `POST /v1/sim/games`
 Body (all optional): `{"teams": 12, "scoring": "half", "te_premium": 0, "superflex": false, "include_k": true,
-"include_def": false, "bench": 8, "mode": "redraft", "difficulty": "normal", "user_slot": null, "auto_lineup": false,
+"include_def": false, "tiebreaker": "points_for", "bench": 8, "mode": "redraft", "difficulty": "normal", "user_slot": null, "auto_lineup": false,
 "team_name": "My Team"}`.
 Builds the frozen pool (projected in this league's scoring, TE premium included), the AI
 teams (names + personas), the schedule, byes, and runs AI picks until the user's

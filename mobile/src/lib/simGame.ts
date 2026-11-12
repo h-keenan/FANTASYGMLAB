@@ -18,6 +18,8 @@ export type SimGameStatus = "drafting" | "in_season" | "playoffs" | "complete";
 export type SimGamePhase = "draft" | "regular_season" | "playoffs" | "complete";
 export type SimScoring = "ppr" | "half" | "std";
 export type SimDifficulty = "easy" | "normal" | "hard";
+export type SimTiebreaker = "points_for" | "head_to_head";
+export const SIM_TIEBREAKER_LABELS: Record<SimTiebreaker, string> = { points_for: "Points for", head_to_head: "Head-to-head" };
 export type SimPos = "QB" | "RB" | "WR" | "TE" | "K" | "DEF";
 export type SimSlot = "QB" | "RB" | "WR" | "TE" | "FLEX" | "REC_FLEX" | "SUPER_FLEX" | "K" | "DEF";
 /** League mode. Only redraft is playable today; dynasty is declared by the API (available: false). */
@@ -118,6 +120,8 @@ export interface SimGameSettings {
   include_def?: boolean;
   bench?: number;
   start?: SimStartKind;
+  /** Standings/seed tiebreak after record (older saves omit it and used head_to_head). */
+  tiebreaker?: SimTiebreaker;
 }
 
 export interface SimGameThisWeek {
@@ -194,6 +198,7 @@ export interface SimGameOptionsResponse extends SimGameEnvelope {
     difficulty: { values: SimDifficulty[]; default: SimDifficulty };
     user_slot: { min: number; max: number; default: number | null };
     auto_lineup: { default: boolean };
+    tiebreaker?: { values: SimTiebreaker[]; default: SimTiebreaker };
   };
   /** Lineup rule the setup form mirrors to show roster size and draft rounds. */
   layout?: { base_slots: SimSlot[]; draft_spare_spots: number };
@@ -218,6 +223,7 @@ export interface SimGameCreateBody {
   include_k?: boolean;
   include_def?: boolean;
   bench?: number;
+  tiebreaker?: SimTiebreaker;
   mode?: SimMode;
   difficulty?: SimDifficulty;
   user_slot?: number | null;
@@ -1297,6 +1303,7 @@ export const SIM_SETUP_FALLBACK = {
   superflex: false,
   include_k: true,
   include_def: false,
+  tiebreaker: "points_for" as SimTiebreaker,
   bench: 8,
   draftSpareSpots: 2,
 };
@@ -1313,6 +1320,7 @@ export interface SimSetupState {
   superflex: boolean;
   includeK: boolean;
   includeDef: boolean;
+  tiebreaker: SimTiebreaker;
   bench: number;
   difficulty: SimDifficulty;
   slot: string;
@@ -1332,6 +1340,7 @@ export function simSetupDefaults(options: SimGameOptionsResponse | null | undefi
     superflex: o?.superflex?.default ?? SIM_SETUP_FALLBACK.superflex,
     includeK: o?.include_k?.default ?? SIM_SETUP_FALLBACK.include_k,
     includeDef: o?.include_def?.default ?? SIM_SETUP_FALLBACK.include_def,
+    tiebreaker: o?.tiebreaker?.default ?? SIM_SETUP_FALLBACK.tiebreaker,
     bench: o?.bench?.default ?? SIM_SETUP_FALLBACK.bench,
     difficulty: o?.difficulty.default ?? "normal",
     slot: "",
@@ -1342,7 +1351,7 @@ export function simSetupDefaults(options: SimGameOptionsResponse | null | undefi
 
 /** True when any "Advanced options" field differs from its default (so a collapsed section can say so). */
 export function simSetupAdvancedChanged(state: SimSetupState, defaults: SimSetupState): number {
-  const keys: (keyof SimSetupState)[] = ["scoring", "tePremium", "superflex", "includeK", "includeDef", "bench", "teams"];
+  const keys: (keyof SimSetupState)[] = ["scoring", "tePremium", "superflex", "includeK", "includeDef", "tiebreaker", "bench", "teams"];
   return keys.filter((key) => state[key] !== defaults[key]).length;
 }
 
@@ -1370,6 +1379,7 @@ export function simSetupBody(state: SimSetupState): SimGameCreateBody {
   const common = {
     difficulty: state.difficulty,
     auto_lineup: state.auto,
+    tiebreaker: state.tiebreaker,
     ...(state.name.trim() ? { team_name: state.name.trim() } : {}),
   };
   if (state.start === "league") return { ...common, start: "league", league_id: state.leagueId };
@@ -1408,6 +1418,7 @@ export function simSettingsSummary(settings: Partial<SimGameSettings> | undefine
   if (settings.superflex) parts.push("Superflex");
   if (settings.include_def) parts.push("DEF");
   if (settings.include_k === false) parts.push("No kickers");
+  if (settings.tiebreaker === "head_to_head") parts.push("Head-to-head tiebreak");
   if (settings.start === "league") parts.push("From your league");
   return parts.join(" · ");
 }
