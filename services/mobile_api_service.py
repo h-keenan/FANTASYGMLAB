@@ -12148,6 +12148,7 @@ def get_league_dashboard(
         auto_strategy_label=auto_strategy_label,
         season_progress=record_signal.season_progress_fraction(league),
         include_trade_and_waiver=not is_external,
+        include_bye_cover=True,
     )
 
     # Team Snapshot: record comes straight off the roster we already

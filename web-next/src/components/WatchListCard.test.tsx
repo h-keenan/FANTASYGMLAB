@@ -85,3 +85,37 @@ describe("WatchListCard", () => {
     expect(container).toBeEmptyDOMElement();
   });
 });
+
+describe("WatchListCard bye cover alert", () => {
+  const bye = item({
+    category: "watch",
+    headline: "Your WR1 (Wade WR) is on bye in Week 9",
+    reason: "Look at the waiver wire for a fill-in: Fits One, Fits Two. You have no other healthy WR to start.",
+    supporting_context: "Bye Week Cover",
+    route_player_id: "3",
+    route_player_name: "Wade WR",
+    route_player_position: "WR",
+    route_player_team: "AAA",
+    mentioned_players: [
+      { player_id: "10", name: "Fits One", position: "WR", team: "BBB", player_tier: "", injury_status: "" },
+      { player_id: "13", name: "Fits Two", position: "WR", team: "CCC", player_tier: "", injury_status: "" },
+    ],
+    presentation: { bye_cover: { week: 9, slot_label: "WR1" } },
+    recommendation_id: "bye-1",
+  });
+
+  it("tags the week, names the bye player and lists fill-ins with photos", () => {
+    render(<WatchListCard items={[bye]} leagueId="abc" leagueName="Revivalry" />);
+    expect(screen.getByText("Bye Wk 9")).toBeInTheDocument();
+    expect(screen.getByText("Wade WR")).toBeInTheDocument();
+    expect(screen.getByText(/WR1 on bye in Week 9\. Look at the waiver wire for a fill-in: Fits One, Fits Two\./)).toBeInTheDocument();
+    const strip = screen.getByTestId("bye-cover-fillins");
+    expect(strip).toHaveTextContent("Fits One");
+    expect(strip).toHaveTextContent("Fits Two");
+  });
+
+  it("links the waivers CTA to the best fill-in, not the rostered starter", () => {
+    render(<WatchListCard items={[bye]} leagueId="abc" leagueName="Revivalry" />);
+    expect(screen.getByRole("link", { name: /Open Waivers/ })).toHaveAttribute("href", "/waivers/abc?name=Revivalry&playerId=10");
+  });
+});

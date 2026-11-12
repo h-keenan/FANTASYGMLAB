@@ -57,7 +57,7 @@ from modules import (
     trade_hub_engine,
 )
 from modules.canonical_recommendation_narrative import build_waiver_narrative
-from modules import league_calendar, roster_value_model
+from modules import bye_cover, league_calendar, roster_value_model
 from modules.compact_fantasy_assets import compact_package
 from modules.league_value_settings import DEFAULT_LEAGUE_VALUE_SETTINGS
 from modules.league_display import _format_score
@@ -610,6 +610,7 @@ def compose_next_move_briefing(
     untouchable_player_ids: tuple[str, ...] = (),
     gm_target_player_ids: tuple[str, ...] = (),
     include_trade_and_waiver: bool = True,
+    include_bye_cover: bool = False,
 ) -> daily_gm_briefing.DailyGmBriefing:
     """The mobile "Next Move" briefing — same composition pipeline
     (organize_dashboard_items -> compose_daily_gm_briefing) app.py uses,
@@ -664,6 +665,13 @@ def compose_next_move_briefing(
     leagues: their snapshots can't tell a free agent from a player we failed to
     map, and Trade Hub needs Sleeper-only pick ownership, so no waiver or trade
     tile (and no waiver-driven news tile) is built rather than a guessed one.
+
+    `include_bye_cover=True` (the Dashboard only) adds the "Bye Week Cover"
+    watch tile from modules.bye_cover: a projected starter's upcoming NFL bye
+    that the bench does not already cover, with healthy free-agent fill-ins.
+    It needs the free-agent pool, so it is also skipped when
+    `include_trade_and_waiver` is False. Built outside the shared tile cache
+    because it depends on the calendar week.
     """
 
     if roster_df is None:
@@ -798,11 +806,28 @@ def compose_next_move_briefing(
         items.append(strategy_check_tile)
     items.extend(news_tiles)
 
+    bye_cover_tile = None
+    if include_bye_cover and include_trade_and_waiver:
+        try:
+            bye_cover_tile = bye_cover.build_bye_cover_tile(
+                league=league,
+                roster_df=roster_df,
+                lineup_df=lineup_df,
+                free_agents_df=players_df[~players_df["player_id"].astype(str).isin(all_rostered_player_ids)],
+                league_settings=league_settings,
+                score_field=score_field,
+            )
+        except Exception:
+            bye_cover_tile = None
+    if bye_cover_tile is not None:
+        items.append(bye_cover_tile)
+
     immediate_labels = frozenset(
         label
         for label, active in (
             ("Roster Pressure", bool(roster_pressure_tile.get("over_limit"))),
             ("Injury Alert", int(injury_display_context.get("injured_starters") or 0) > 0),
+            (bye_cover.LABEL, bye_cover_tile is not None and int(bye_cover_tile.get("weeks_away") or 0) <= 1),
         )
         if active
     )

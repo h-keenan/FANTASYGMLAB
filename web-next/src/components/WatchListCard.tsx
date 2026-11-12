@@ -7,7 +7,7 @@ import { PlayerAvatar } from "@/components/PlayerAvatar";
 import { PlayerInjuryBadge } from "@/components/PlayerInjuryBadge";
 import { PositionBadge } from "@/components/PositionBadge";
 import { ToneBadge } from "@/components/ToneBadge";
-import { watchSummary, watchTag, watchTitle } from "@/lib/dashboardPresentation";
+import { byeCover, watchSummary, watchTag, watchTitle } from "@/lib/dashboardPresentation";
 import {
   GAME_PLAN_INTERNAL_ROUTES,
   gamePlanTileHref,
@@ -18,7 +18,7 @@ import { PlayerNameText } from "@/components/PlayerNameText";
 
 /**
  * Watchlist & Alerts: every Game Plan item except Top Priority, as one
- * list. Each row is one tap target: a type tag (TRENDING / INJURY / WAIVER),
+ * list. Each row is one tap target: a type tag (TRENDING / INJURY / WAIVER / BYE),
  * the player (avatar, name, position/team chip), one clean sentence of why
  * (lib/dashboardPresentation.ts watchSummary: built from structured fields,
  * else the feed's first sentence; clamped to two lines) and a chevron. A row with no player drops the avatar slot and shows its headline as title.
@@ -45,6 +45,7 @@ export function WatchListCard({
         const team = item.route_player_team || mentioned?.team || "";
         const tier = item.route_player_tier || mentioned?.player_tier || "";
         const injury = item.route_player_injury_status || mentioned?.injury_status || "";
+        const bye = byeCover(item);
         const label = `${destinationCtaLabel(item.destination)}: ${item.headline}`;
         const rowStyle = index > 0 ? { borderTop: "var(--border-width-default) solid var(--color-border)" } : undefined;
         const body = (
@@ -82,6 +83,19 @@ export function WatchListCard({
               >
                 {watchSummary(item)}
               </span>
+              {bye && bye.suggestions.length > 0 ? (
+                <span className="flex flex-wrap items-center gap-x-3 gap-y-1" data-testid="bye-cover-fillins">
+                  {bye.suggestions.map((fa) => (
+                    <span key={fa.player_id} className="flex items-center gap-1.5 min-w-0">
+                      <PlayerAvatar playerId={fa.player_id} tier={fa.player_tier} size={24} />
+                      <span className="text-xs font-semibold" style={{ color: "var(--color-text-primary)" }}>
+                        {fa.name}
+                      </span>
+                      <PositionBadge position={fa.position} />
+                    </span>
+                  ))}
+                </span>
+              ) : null}
             </span>
             <span aria-hidden="true" className="shrink-0 text-lg" style={{ color: "var(--color-accent)" }}>
               ›
@@ -93,7 +107,13 @@ export function WatchListCard({
         return (
           <Link
             key={key}
-            href={gamePlanTileHref(internalRoute, leagueId, leagueName, resolveGamePlanTargetPlayerId(item))}
+            href={gamePlanTileHref(
+              internalRoute,
+              leagueId,
+              leagueName,
+              // Waivers highlights the player it is given: for a bye alert that is the best fill-in, not the rostered starter.
+              bye ? (bye.suggestions[0]?.player_id ?? "") : resolveGamePlanTargetPlayerId(item),
+            )}
             aria-label={label}
             className={className}
             style={rowStyle}
