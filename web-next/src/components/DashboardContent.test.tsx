@@ -1,8 +1,8 @@
 import { render, screen, within } from "@testing-library/react";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 import { DashboardContent } from "./DashboardContent";
-import type { DashboardResponse } from "@/lib/api";
+import { api, type DashboardResponse } from "@/lib/api";
 
 const FIXTURE: DashboardResponse = {
   ok: true,
@@ -243,5 +243,24 @@ describe("DashboardContent", () => {
   it("offers one shared glossary for the rank labels", () => {
     render(<DashboardContent leagueId="abc" leagueName="Dynasty Overlords" data={FIXTURE} />);
     expect(screen.getAllByRole("button", { name: /what do these mean/i })).toHaveLength(1);
+  });
+
+  it("shows the direction check-in the server asks for, on the real Dashboard only (not the sample preview)", async () => {
+    const spy = vi.spyOn(api, "getDirectionCheckin").mockResolvedValue({
+      ok: true, show: true, reason: "", moment: "midseason", moment_key: "2026:midseason", stance: "balanced", stance_label: "Balanced",
+      options: [{ value: "competing", label: "Competing" }], headline: "Midseason: still Balanced?", body: "Does Balanced still describe your team?",
+    });
+    try {
+      const { unmount } = render(<DashboardContent leagueId="abc" leagueName="Dynasty Overlords" data={FIXTURE} />);
+      expect(await screen.findByTestId("direction-checkin")).toHaveTextContent("Midseason: still Balanced?");
+      expect(spy).toHaveBeenCalledWith("abc");
+      unmount();
+      spy.mockClear();
+      render(<DashboardContent leagueId="abc" leagueName="Sample" data={FIXTURE} sample={{ onBlockedLink: () => {} }} />);
+      expect(spy).not.toHaveBeenCalled();
+      expect(screen.queryByTestId("direction-checkin")).not.toBeInTheDocument();
+    } finally {
+      spy.mockRestore();
+    }
   });
 });

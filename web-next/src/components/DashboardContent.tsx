@@ -5,6 +5,7 @@ import type { MouseEvent } from "react";
 import type { DashboardResponse, LeagueTeamRankingsResponse } from "@/lib/api";
 import { BeginnerHelp } from "@/components/BeginnerHelp";
 import { SinceLastVisitStrip } from "@/components/SinceLastVisitStrip";
+import { DirectionCheckinCard } from "@/components/DirectionCheckinCard";
 import { StartHereCard } from "@/components/StartHereCard";
 import { GuillotineCard, LeagueTypeControl, useGuillotineState } from "@/components/GuillotineCard";
 import { GlossaryNote } from "@/components/GlossaryNote";
@@ -154,6 +155,10 @@ export function DashboardContent({
       ) : null}
 
       <TeamStatusHero leagueId={leagueId} leagueName={leagueName} snapshot={snapshot} sim={sim} oddsCaption={oddsCaption} data={teamStatus} />
+
+      {/* A few times a season: does the declared direction still fit? Server-decided,
+          dismissible, once per moment (modules/direction_checkin.py). */}
+      {sample ? null : <DirectionCheckinCard leagueId={leagueId} />}
 
       <DashboardNeedsAttention entries={attention} leagueId={leagueId} leagueName={leagueName} />
 

@@ -29,6 +29,7 @@ import TeamAvatar from '../components/TeamAvatar';
 import TeamHealthContextBlock, { hasHealthContext } from '../components/TeamHealthContextBlock';
 import GuillotineCard from '../components/GuillotineCard';
 import LeagueTypeControl from '../components/LeagueTypeControl';
+import DirectionCheckinCard from '../components/DirectionCheckinCard';
 import TeamStatusHero from '../components/TeamStatusHero';
 import WeeklyMatchupCard from '../components/WeeklyMatchupCard';
 import { buildTeamStatusMatchup } from '../lib/teamStatus';
@@ -462,6 +463,10 @@ export default function DashboardScreen({ route, navigation }: Props) {
         standingsAvailable={teamRankingsQuery.data?.standings_available}
         onNavigate={navigate}
       />
+
+      {/* A few times a season: does the declared direction still fit? Server-decided,
+          dismissible, once per moment (modules/direction_checkin.py). Same slot on web. */}
+      <DirectionCheckinCard leagueId={leagueId} />
 
       <DashboardNeedsAttention entries={attention} leagueId={leagueId} leagueName={leagueName} onNavigate={navigate} />
 

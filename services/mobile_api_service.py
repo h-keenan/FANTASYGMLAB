@@ -266,7 +266,7 @@ from modules import public_dynasty_values
 from modules import model_status
 from modules import drop_candidates, roster_value_model
 from modules import usage_trends
-from modules import trade_cautions, trade_posture
+from modules import direction_checkin, trade_cautions, trade_posture
 from modules import external_news_contract
 from modules import external_interesting_trades, external_news_feed, news_identity, news_ingest
 from modules import start_sit_range
@@ -11745,6 +11745,116 @@ def set_team_stance(
         "stance": stance_key,
         "strategy": team_stance.team_strategy_for_stance(stance_key),
     }
+
+
+# Dashboard direction check-in (modules.direction_checkin): a few times a
+# season, ask whether the declared Team Situation still fits. The decider is
+# pure; this reads the league calendar, the stored stance and the stored
+# answers (user_settings.settings.direction_checkin: no migration), and the
+# answer itself goes through the normal POST .../team-stance. Fails soft: any
+# read problem means "do not ask".
+def _direction_checkin_response(
+    league_id: str, user: dict[str, Any], *, settings: dict[str, Any] | None = None
+) -> dict[str, Any]:
+    config = auth_supabase.get_supabase_config()
+    user_id = str(user.get("id") or "")
+    access_token = str(user.get("_access_token") or "")
+    quiet = {"ok": True, "show": False, "reason": direction_checkin.REASON_NOT_IN_SEASON}
+    if not user_id:
+        return quiet
+    try:
+        league = sleeper.get_league(league_id)
+        stance = _fetch_team_stance(config, user_id, access_token, league_id)
+        if settings is None:
+            fetched, error = account_store.fetch_user_settings(config, access_token, user_id=user_id)
+            if error:
+                return {**quiet, "reason": "unavailable"}
+            settings = dict(fetched.get("settings") or {})
+        league_settings = (league or {}).get("settings") if isinstance((league or {}).get("settings"), dict) else {}
+        decision = direction_checkin.decide(
+            league_status=(league or {}).get("status"),
+            season=(league or {}).get("season"),
+            week=league_calendar.current_league_week(league),
+            stance=stance,
+            handled=direction_checkin.handled_for_league(settings, league_id),
+            now=datetime.now(timezone.utc),
+            playoff_week_start=league_settings.get("playoff_week_start"),
+            trade_deadline=league_settings.get("trade_deadline"),
+        )
+    except Exception:
+        logger.warning("direction check-in unavailable (league=%s)", league_id, exc_info=True)
+        return {**quiet, "reason": "unavailable"}
+    if not decision.show:
+        return {"ok": True, "show": False, "reason": decision.reason}
+    label = team_stance.stance_label(stance)
+    return {
+        "ok": True,
+        "show": True,
+        "reason": "",
+        "moment": decision.moment,
+        "moment_key": decision.moment_key,
+        "moment_label": direction_checkin.MOMENT_LABELS[decision.moment],
+        "week": league_calendar.current_league_week(league),
+        "stance": stance,
+        "stance_label": label,
+        "options": [
+            {"value": option, "label": team_stance.STANCE_LABELS[option]}
+            for option in team_stance.STANCE_OPTIONS
+            if option != stance
+        ],
+        **direction_checkin.copy_for(decision.moment, label),
+    }
+
+
+@app.get("/v1/leagues/{league_id}/direction-checkin")
+def get_direction_checkin(
+    league_id: str = Depends(resolve_league_path_id), user: dict[str, Any] = Depends(require_user)
+) -> dict[str, Any]:
+    """Should the Dashboard ask whether the team's direction still fits? A
+    `show: true` body carries the words to render verbatim and the stance
+    options to switch to; `show: false` carries the reason."""
+
+    return _direction_checkin_response(league_id, user)
+
+
+class DirectionCheckinAnswer(BaseModel):
+    moment_key: str
+    # kept | changed | dismissed. "changed" is recorded after the client set the
+    # new direction through POST .../team-stance (the one place it is stored).
+    action: str
+
+
+@app.post("/v1/leagues/{league_id}/direction-checkin")
+def answer_direction_checkin(
+    body: DirectionCheckinAnswer,
+    # NOT resolved, like set_team_stance: a record keyed by (user, league_id).
+    league_id: str,
+    user: dict[str, Any] = Depends(require_user),
+) -> dict[str, Any]:
+    """Record an answer (any answer ends that moment for the season, a
+    dismissal included), then return the fresh decision (always `show: false`
+    for this moment)."""
+
+    problem = direction_checkin.validate_action(body.action, body.moment_key)
+    if problem:
+        raise HTTPException(status_code=422, detail=problem)
+    config = auth_supabase.get_supabase_config()
+    access_token = str(user.get("_access_token") or "")
+    user_id = str(user.get("id") or "")
+    if not user_id:
+        return {"ok": False, "show": False, "reason": "not_available"}
+    current, error = account_store.fetch_user_settings(config, access_token, user_id=user_id)
+    if error:
+        return {"ok": False, "show": False, "reason": "not_available"}
+    settings = direction_checkin.record_answer(
+        dict(current.get("settings") or {}), league_id, body.moment_key, body.action, datetime.now(timezone.utc)
+    )
+    ok, _error = account_store.upsert_user_settings(
+        config, access_token, account_store.build_user_settings_payload(user_id=user_id, settings=settings)
+    )
+    if not ok:
+        return {"ok": False, "show": False, "reason": "not_available"}
+    return _direction_checkin_response(league_id, user, settings=settings)
 
 
 def _project_briefing_item_payload(payload: dict[str, Any]) -> dict[str, Any]:
