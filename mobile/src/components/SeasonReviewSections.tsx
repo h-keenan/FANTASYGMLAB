@@ -61,8 +61,8 @@ const ROLE_BADGE: Record<string, { label: string; tone: ReviewTone }> = {
   bust: { label: 'Bust', tone: 'danger' },
 };
 
-function SimPlayerChip({ player, size }: { player: ReviewPlayer; size?: number }) {
-  return <BaseChip player={player as unknown as SimPlayerRef} size={size} />;
+function SimPlayerChip({ player, size, hidePosition }: { player: ReviewPlayer; size?: number; hidePosition?: boolean }) {
+  return <BaseChip player={player as unknown as SimPlayerRef} size={size} hidePosition={hidePosition} />;
 }
 
 export function ReviewGlyphChip({ glyph, tone, size = 28 }: { glyph: ReviewGlyph; tone: ReviewTone; size?: number }) {
@@ -102,7 +102,7 @@ export function ReviewCardView({ card }: { card: ReviewCard }) {
         </View>
       </View>
       {card.players.slice(0, 4).map((p, i) => {
-        const role = p.role ? ROLE_BADGE[p.role] : undefined;
+        const role = card.players.length > 1 && p.role ? ROLE_BADGE[p.role] : undefined;
         return (
           <View key={`${p.id}-${i}`} style={common.rowBetween}>
             <View style={common.grow}>
@@ -210,7 +210,7 @@ function LeaderGroup({ group }: { group: ReviewLeaderGroup }) {
         <View key={`${r.player.id}-${i}`} style={[common.row, i ? common.divider : null, styles.leaderRow]}>
           <AppText style={[styles.rankNum, { color: i === 0 ? colors.premium : colors.textTertiary }]}>{i + 1}</AppText>
           <View style={common.grow}>
-            <SimPlayerChip player={r.player} size={28} />
+            <SimPlayerChip player={r.player} size={28} hidePosition={Boolean(group.pos)} />
           </View>
           <View style={styles.end}>
             <AppText style={[common.bodyStrong, r.highlight ? { color: colors.accent } : null]}>{r.value}</AppText>

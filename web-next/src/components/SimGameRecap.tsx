@@ -267,7 +267,7 @@ export function SimFinalView({ ctx, onNewGame, onHub }: { ctx: SimCtx; onNewGame
       <SeasonReviewSections sections={sections} />
 
       <section className="flex flex-col gap-2" aria-label="Final standings">
-        <SectionHeading>
+        <SectionHeading size="compact">
           <span className="inline-flex items-center gap-2"><ReviewGlyphChip glyph="rank" tone="accent" size={24} />Final standings</span>
         </SectionHeading>
         <ol className="flex flex-col gap-2">

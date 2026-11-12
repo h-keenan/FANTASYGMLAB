@@ -30,8 +30,8 @@ import type {
  */
 
 /** A review player is the sim brief shape; `pos` is a plain string here so real-league data can feed it. */
-function SimPlayerChip({ player, size, className }: { player: ReviewPlayer; size?: number; className?: string }) {
-  return <BaseChip player={player as unknown as SimPlayerRef} size={size} className={className} />;
+function SimPlayerChip({ player, size, className, hidePosition }: { player: ReviewPlayer; size?: number; className?: string; hidePosition?: boolean }) {
+  return <BaseChip player={player as unknown as SimPlayerRef} size={size} className={className} hidePosition={hidePosition} />;
 }
 
 const ROLE_BADGE: Record<string, { label: string; tone: ReviewTone }> = {
@@ -68,8 +68,8 @@ export function ReviewDeltaText({ text, tone, size = "lg" }: { text: string; ton
   );
 }
 
-function PlayerLine({ player }: { player: ReviewPlayer }) {
-  const role = player.role ? ROLE_BADGE[player.role] : undefined;
+function PlayerLine({ player, showRole }: { player: ReviewPlayer; showRole: boolean }) {
+  const role = showRole && player.role ? ROLE_BADGE[player.role] : undefined;
   return (
     <div className="flex items-center justify-between gap-2 min-w-0">
       <SimPlayerChip player={player} className="min-w-0 flex-1" />
@@ -99,7 +99,7 @@ export function ReviewCardView({ card }: { card: ReviewCard }) {
       </div>
       {card.players.length > 0 ? (
         <div className="flex flex-col gap-1 py-1">
-          {card.players.slice(0, 4).map((p, i) => <PlayerLine key={`${p.id}-${i}`} player={p} />)}
+          {card.players.slice(0, 4).map((p, i) => <PlayerLine key={`${p.id}-${i}`} player={p} showRole={card.players.length > 1} />)}
         </div>
       ) : null}
       {card.detail ? <p className="text-xs" style={{ color: "var(--color-text-secondary)" }}>{card.detail}</p> : null}
@@ -165,7 +165,7 @@ function JourneyView({ points, teams }: { points: { label: string; rank: number;
   const last = points[points.length - 1];
   return (
     <div className="glass-surface flex flex-col gap-2 p-3" data-testid="review-journey">
-      <svg viewBox={`0 0 ${w} ${h}`} width="100%" role="img" aria-label={`Standings rank by week, best ${best}, worst ${worst}, finished ${last.rank}`} style={{ display: "block", aspectRatio: `${w} / ${h}` }}>
+      <svg viewBox={`0 0 ${w} ${h}`} width="100%" role="img" aria-label={`Standings rank by week, best ${best}, worst ${worst}, finished ${last.rank}`} style={{ display: "block", aspectRatio: `${w} / ${h}`, maxHeight: "9rem" }}>
         <line x1={pad} x2={w - pad} y1={y(1)} y2={y(1)} stroke="var(--color-border)" strokeDasharray="3 4" />
         <path d={path} fill="none" stroke="var(--color-accent)" strokeWidth="2.5" strokeLinejoin="round" strokeLinecap="round" />
         {points.map((p, i) => (
@@ -193,10 +193,10 @@ function LeaderGroup({ group }: { group: ReviewLeaderGroup }) {
       {group.rows.map((r, i) => (
         <div key={`${r.player.id}-${i}`} className="flex items-center gap-2" style={{ borderTop: i ? "var(--border-width-default) solid var(--color-border)" : undefined, paddingTop: i ? "0.25rem" : 0 }}>
           <span className="w-4 shrink-0 text-xs font-extrabold tabular-nums" style={{ color: i === 0 ? "var(--color-premium, var(--color-warning))" : "var(--color-text-muted)" }}>{i + 1}</span>
-          <SimPlayerChip player={r.player} size={28} className="min-w-0 flex-1" />
+          <SimPlayerChip player={r.player} size={28} className="min-w-0 flex-1" hidePosition={Boolean(group.pos)} />
           <div className="flex shrink-0 flex-col items-end leading-tight">
             <span className="text-sm font-extrabold tabular-nums" style={{ color: r.highlight ? "var(--color-accent)" : "var(--color-text-primary)" }}>{r.value}</span>
-            {r.sub ? <span className="text-xs max-w-[9rem] truncate" style={{ color: "var(--color-text-muted)" }}>{r.sub}</span> : null}
+            {r.sub ? <span className="text-xs max-w-[11rem] truncate" style={{ color: "var(--color-text-muted)" }}>{r.sub}</span> : null}
           </div>
         </div>
       ))}
@@ -231,7 +231,7 @@ function SectionBody({ section }: { section: ReviewSection }): ReactNode {
     case "journey":
       return <JourneyView points={section.points} teams={section.teams} />;
     case "leaders":
-      return <div className="grid grid-cols-1 gap-2 md:grid-cols-3">{section.groups.map((g, i) => <LeaderGroup key={`${g.title}-${i}`} group={g} />)}</div>;
+      return <div className="grid grid-cols-1 gap-2 md:grid-cols-2">{section.groups.map((g, i) => <LeaderGroup key={`${g.title}-${i}`} group={g} />)}</div>;
     case "games":
       return <div className="flex flex-col gap-2">{section.rows.map((r, i) => <GameRow key={i} row={r} />)}</div>;
   }
@@ -242,7 +242,7 @@ export function SeasonReviewSections({ sections }: { sections: readonly ReviewSe
     <>
       {sections.map((section) => (
         <section key={section.id} className="flex flex-col gap-2" aria-label={section.title} data-testid={`review-section-${section.id}`}>
-          <SectionHeading note={section.note}>
+          <SectionHeading note={section.note} size="compact">
             <span className="inline-flex items-center gap-2">
               <ReviewGlyphChip glyph={section.glyph} tone="accent" size={24} />
               {section.title}

@@ -207,7 +207,12 @@ export function reviewDecisionCard(raw: unknown, index: number): ReviewCard | nu
     delta = { text: `${wins > 0 ? "+" : wins < 0 ? "-" : ""}${reviewFmt(Math.abs(wins))} W · ${ppg >= 0 ? "+" : "-"}${reviewFmt(Math.abs(ppg))} PPG`, tone: reviewToneForSign(value ?? wins, 0.1) };
   }
   const tone: ReviewTone = kind === "lineup" ? "warning" : value == null ? "accent" : value >= 0.25 ? "success" : value <= -0.25 ? "danger" : "muted";
-  const outcome = str(impact?.playoff_result_with);
+  const outcomeRaw = str(impact?.playoff_result_with);
+  const outcomeLabel: Record<string, string> = {
+    champion: "Won the title", runner_up: "Runner-up", semifinal: "Semifinals", missed: "Missed playoffs",
+    lost_round_1: "Out in round 1", lost_round_2: "Out in round 2", lost_round_3: "Out in round 3",
+  };
+  const outcome = outcomeRaw ? outcomeLabel[outcomeRaw] ?? outcomeRaw.replace(/_/g, " ") : "";
   return {
     id: `decision-${index}`,
     glyph: AWARD_GLYPH[kind] ?? "trade",
@@ -217,7 +222,7 @@ export function reviewDecisionCard(raw: unknown, index: number): ReviewCard | nu
     players: players(d.players),
     delta,
     detail: str(d.detail),
-    chip: kind !== "lineup" && outcome ? { label: outcome.replace(/_/g, " "), tone: outcome === "champion" ? "success" : outcome === "missed" ? "danger" : "accent" } : null,
+    chip: kind !== "lineup" && outcome ? { label: outcome, tone: outcomeRaw === "champion" ? "success" : outcomeRaw === "missed" ? "danger" : "accent" } : null,
   };
 }
 
@@ -363,7 +368,7 @@ export function buildSimReviewSections(input: { decisions?: unknown; review?: un
   for (const g of arr(leaders?.league)) {
     const rows = arr(g.rows).map((r): ReviewLeaderRow | null => {
       const player = reviewPlayer(r.player);
-      return player ? { player, value: `${reviewFmt(num(r.pts) ?? 0)} pts`, sub: `${reviewFmt(num(r.ppg) ?? 0)} per game · ${str(r.team_name)}`, highlight: r.is_you === true } : null;
+      return player ? { player, value: `${reviewFmt(num(r.pts) ?? 0)} pts`, sub: `${reviewFmt(num(r.ppg) ?? 0)} ppg · ${str(r.team_name)}`, highlight: r.is_you === true } : null;
     }).filter(Boolean) as ReviewLeaderRow[];
     if (rows.length) groups.push({ title: str(g.pos), pos: str(g.pos), rows });
   }
