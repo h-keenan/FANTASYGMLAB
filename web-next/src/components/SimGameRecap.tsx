@@ -14,6 +14,8 @@ import { ToneBadge } from "@/components/ToneBadge";
 import { api } from "@/lib/api";
 import {
   simFmtPts,
+  normalizeSimResult,
+  simGameReasonMessage,
   simSlotRepeatsPosition,
   simGradeTone,
   simPlayoffResultLabel,
@@ -186,6 +188,7 @@ export function SimFinalView({ ctx, onNewGame, onHub }: { ctx: SimCtx; onNewGame
   const { gameId, game } = ctx;
   const [result, setResult] = useState<SimGameResult | null>(null);
   const [failed, setFailed] = useState(false);
+  const [failMessage, setFailMessage] = useState("");
   const [attempt, setAttempt] = useState(0);
 
   useEffect(() => {
@@ -195,7 +198,10 @@ export function SimFinalView({ ctx, onNewGame, onHub }: { ctx: SimCtx; onNewGame
       .then((body) => {
         if (cancelled) return;
         if (body.result) setResult(body.result);
-        else setFailed(true);
+        else {
+          setFailMessage(simGameReasonMessage(body.reason, body));
+          setFailed(true);
+        }
       })
       .catch(() => {
         if (!cancelled) setFailed(true);
@@ -206,37 +212,37 @@ export function SimFinalView({ ctx, onNewGame, onHub }: { ctx: SimCtx; onNewGame
   }, [gameId, attempt]);
 
   if (failed) {
-    return <EmptyState title="Could not load your final result" subtitle="Your season is saved. Try again in a moment." actionLabel="Try again" onAction={() => { setFailed(false); setAttempt((n) => n + 1); }} />;
+    return <EmptyState title="Could not load your final result" subtitle={failMessage || "Your season is saved. Try again in a moment."} actionLabel="Try again" onAction={() => { setFailed(false); setFailMessage(""); setAttempt((n) => n + 1); }} />;
   }
   if (!result) return <div className="flex flex-col gap-3" aria-busy="true"><SkeletonCard lines={4} /><SkeletonCard lines={6} /></div>;
 
-  const tone = simGradeTone(result.grade.letter);
-  const mine = result.final_standings.find((row) => row.is_you);
-  const champion = result.final_standings.find((row) => row.team_id === result.champion);
+  const view = normalizeSimResult(result);
+  const tone = simGradeTone(view.letter);
+  const mine = view.mine;
   return (
     <div className="flex flex-col gap-3" data-testid="final-result">
       <AccentCard accent={simToneColor(tone)} as="section" glow>
         <p className="text-xs uppercase font-extrabold" style={{ color: "var(--color-text-muted)", letterSpacing: "var(--letter-spacing-badge)" }}>Season complete</p>
         <div className="flex items-center gap-4 enter-pop">
-          <span className="text-6xl font-extrabold leading-none" style={{ color: simToneColor(tone) }} aria-label={`Grade ${result.grade.letter}`}>
-            {result.grade.letter}
+          <span className="text-6xl font-extrabold leading-none" style={{ color: simToneColor(tone) }} aria-label={`Grade ${view.letter}`}>
+            {view.letter || "-"}
           </span>
           <div className="flex min-w-0 flex-col gap-1">
             <p className="text-sm font-bold">{mine ? `${mine.wins}-${mine.losses}${mine.ties ? `-${mine.ties}` : ""} · ${simPlayoffResultLabel(mine.playoff_result)}` : ""}</p>
-            {champion ? <p className="text-xs" style={{ color: "var(--color-text-muted)" }}>Champion: {champion.name}{champion.is_you ? " (you)" : ""}</p> : null}
+            {view.championName ? <p className="text-xs" style={{ color: "var(--color-text-muted)" }}>Champion: {view.championName}{view.championId && view.championId === mine?.team_id ? " (you)" : ""}</p> : null}
           </div>
         </div>
-        <p className="text-sm">{result.grade.summary}</p>
+        {view.summaryText ? <p className="text-sm">{view.summaryText}</p> : null}
         <div className="flex flex-wrap gap-2">
           <Button onClick={onNewGame}>Play again</Button>
           <Button variant="secondary" onClick={onHub}>All games</Button>
         </div>
       </AccentCard>
 
-      {result.decisions_that_mattered.length > 0 ? (
+      {view.decisions.length > 0 ? (
         <section className="flex flex-col gap-2" aria-label="Decisions that mattered">
           <SectionHeading note="The moves that moved your season most, from replaying it without them.">Decisions that mattered</SectionHeading>
-          {result.decisions_that_mattered.map((d, i) => (
+          {view.decisions.map((d, i) => (
             <AccentCard key={i} accent="var(--color-accent)" compact as="div">
               {d.kind ? <ToneBadge label={String(d.kind).replace(/_/g, " ")} color="var(--color-accent)" size="xs" /> : null}
               {d.title ? <p className="text-sm font-bold">{String(d.title)}</p> : null}
@@ -249,7 +255,7 @@ export function SimFinalView({ ctx, onNewGame, onHub }: { ctx: SimCtx; onNewGame
       <section className="flex flex-col gap-2" aria-label="Final standings">
         <SectionHeading>Final standings</SectionHeading>
         <ol className="flex flex-col gap-2">
-          {result.final_standings.map((row, i) => (
+          {view.standings.map((row, i) => (
             <li key={row.team_id}>
               <AccentCard accent={row.is_you ? "var(--color-accent)" : "var(--color-border-strong)"} compact as="div">
                 <div className="flex items-center justify-between gap-2">

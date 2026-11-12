@@ -533,29 +533,87 @@ export interface SimLeagueResponse extends SimGameEnvelope {
   playoffs?: { seeds: unknown[]; rounds: unknown[]; champion: string | null } | null;
 }
 
+export interface SimGameGradeSummary {
+  record?: string;
+  finish?: number;
+  points_rank?: number;
+  playoff_result?: string;
+  lineup_efficiency?: number;
+  luck_wins?: number;
+  draft_grade?: string;
+}
+
 export interface SimGameGrade {
-  letter: string;
-  score: number;
+  letter?: string | null;
+  score?: number;
   grade_points?: number;
-  components?: Record<string, number>;
-  summary: string;
+  components?: { key?: string; label?: string; score?: number; weight?: number }[] | Record<string, number>;
+  /** The backend sends an object; older clients assumed a string. Never render it directly. */
+  summary?: SimGameGradeSummary | string | null;
 }
 
 export interface SimGameDecision {
   title?: string;
   kind?: string;
   detail?: string;
-  impact?: Record<string, number>;
+  impact?: Record<string, unknown>;
   [key: string]: unknown;
 }
 
 export interface SimGameResult {
-  champion: string | null;
-  final_standings: (SimStandingRow & { playoff_result?: string })[];
-  grade: SimGameGrade;
-  decisions_that_mattered: SimGameDecision[];
+  /** The backend sends {team_id, name}; null when nobody won (e.g. a game with no playoff). */
+  champion?: { team_id?: string; name?: string } | string | null;
+  final_standings?: (SimStandingRow & { playoff_result?: string })[] | null;
+  grade?: SimGameGrade | null;
+  decisions_that_mattered?: SimGameDecision[] | null;
   draft?: { grade?: string; picks_value?: unknown[] } | null;
   user?: Record<string, unknown> | null;
+}
+
+/** A render-safe view of a stored result: every field is present, every value is a primitive. */
+export interface SimGameResultView {
+  letter: string;
+  summaryText: string;
+  championId: string | null;
+  championName: string | null;
+  standings: (SimStandingRow & { playoff_result?: string })[];
+  decisions: SimGameDecision[];
+  mine: (SimStandingRow & { playoff_result?: string }) | null;
+}
+
+export function simGradeSummaryText(summary: SimGameGrade["summary"]): string {
+  if (typeof summary === "string") return summary;
+  if (!summary || typeof summary !== "object") return "";
+  const parts: string[] = [];
+  if (summary.record) parts.push(`Record ${summary.record}`);
+  if (typeof summary.finish === "number") parts.push(`finished ${summary.finish}${simOrdinalSuffix(summary.finish)}`);
+  if (typeof summary.points_rank === "number") parts.push(`${summary.points_rank}${simOrdinalSuffix(summary.points_rank)} in points`);
+  if (typeof summary.lineup_efficiency === "number") parts.push(`${Math.round(summary.lineup_efficiency * 100)}% lineup efficiency`);
+  if (summary.draft_grade) parts.push(`draft grade ${summary.draft_grade}`);
+  return parts.length ? `${parts.join(", ")}.` : "";
+}
+
+function simOrdinalSuffix(n: number): string {
+  const mod100 = n % 100;
+  if (mod100 >= 11 && mod100 <= 13) return "th";
+  return ({ 1: "st", 2: "nd", 3: "rd" } as Record<number, string>)[n % 10] ?? "th";
+}
+
+export function normalizeSimResult(raw: SimGameResult | null | undefined): SimGameResultView {
+  const standings = Array.isArray(raw?.final_standings) ? raw.final_standings.filter(Boolean) : [];
+  const champ = raw?.champion;
+  const championId = typeof champ === "string" ? champ : champ && typeof champ === "object" && champ.team_id != null ? String(champ.team_id) : null;
+  const named = championId ? standings.find((row) => String(row.team_id) === championId) : undefined;
+  const championName = champ && typeof champ === "object" && champ.name ? String(champ.name) : named?.name ?? null;
+  return {
+    letter: typeof raw?.grade?.letter === "string" ? raw.grade.letter : "",
+    summaryText: simGradeSummaryText(raw?.grade?.summary),
+    championId,
+    championName,
+    standings,
+    decisions: Array.isArray(raw?.decisions_that_mattered) ? raw.decisions_that_mattered.filter(Boolean) : [],
+    mine: standings.find((row) => row.is_you) ?? null,
+  };
 }
 
 export interface SimGameResultResponse extends SimGameEnvelope {
@@ -575,6 +633,7 @@ const REASON_COPY: Record<string, string> = {
   sim_storage_unavailable: "Saving games is temporarily unavailable. Try again in a little while.",
   players_unavailable: "The player pool could not be built right now. Try again in a moment.",
   game_limit_reached: "You have reached your limit of saved games. Delete one to start another.",
+  result_build_failed: "We could not grade this season. Your game is saved. Try again in a moment.",
   wrong_phase: "That is not available at this stage of the game.",
   not_your_turn: "It is not your turn to pick yet.",
   player_taken: "That player was just taken. Pick someone else.",
@@ -1259,6 +1318,12 @@ export function simPlayoffResultLabel(result: string | undefined): string {
       return "Semifinals";
     case "quarterfinal":
       return "Quarterfinals";
+    case "lost_round_1":
+      return "Lost in round 1";
+    case "lost_round_2":
+      return "Lost in round 2";
+    case "lost_round_3":
+      return "Lost in round 3";
     case "missed":
     case "missed_playoffs":
       return "Missed playoffs";

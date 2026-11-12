@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import functools
 import json
+import logging
 import secrets
 import threading
 import time
@@ -64,6 +65,8 @@ from modules.sim.personas import PERSONAS
 from modules.sim.rng import WorldRng
 from modules.sim.store import SimStoreError
 from modules.sim.types import GAME_POSITIONS, POSITIONS, SimInputsError
+
+_log = logging.getLogger(__name__)
 
 POOL_TTL_SECONDS = 1800
 _POOL_CACHE: dict[str, tuple[float, Any]] = {}
@@ -727,10 +730,24 @@ def add_routes(router: APIRouter, ctx: GameApiCtx) -> None:
                     if not ok:
                         return busy()
                     events = store.load_events(uid, gid, 0)
-                    result = build_result(snap, int(row["seed"]), events, state)
-                store.save_result(uid, gid, result, result["grade"]["letter"])
+                    try:
+                        result = build_result(snap, int(row["seed"]), events, state)
+                        json.dumps(result, allow_nan=False)  # fail here, not inside the storage call
+                    except (SimStoreError, GameConflict):
+                        raise
+                    except Exception:  # noqa: BLE001 - reported with a specific reason below
+                        _log.exception("sim result build failed game=%s", gid)
+                        return {**_env(pro, state, "result_build_failed"),
+                                "message": "We could not grade this season. Your game is saved; try again shortly.",
+                                "game": game_json(row, snap, state, pro)}
+                try:
+                    store.save_result(uid, gid, result, (result.get("grade") or {}).get("letter"))
+                except SimStoreError:
+                    # The grade is computed; serve it now and recompute next time rather than fail.
+                    _log.warning("sim result could not be saved game=%s", gid, exc_info=True)
+            letter = (result.get("grade") or {}).get("letter")
             return {**_env(pro, state), "result": result, "game": game_json(
-                {**row, "grade_letter": result["grade"]["letter"]}, snap, state, pro)}
+                {**row, "grade_letter": letter}, snap, state, pro)}
 
 
 def add_preview_route(router: APIRouter, ctx: GameApiCtx) -> None:
