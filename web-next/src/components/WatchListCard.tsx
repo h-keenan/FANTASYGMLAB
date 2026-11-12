@@ -21,8 +21,7 @@ import { PlayerNameText } from "@/components/PlayerNameText";
  * list. Each row is one tap target: a type tag (TRENDING / INJURY / WAIVER),
  * the player (avatar, name, position/team chip), one clean sentence of why
  * (lib/dashboardPresentation.ts watchSummary: built from structured fields,
- * else the feed's first sentence; clamped to two lines) and a chevron. Every
- * row has the same slots; a row with no player shows its headline as title.
+ * else the feed's first sentence; clamped to two lines) and a chevron. A row with no player drops the avatar slot and shows its headline as title.
  */
 export function WatchListCard({
   items,
@@ -50,15 +49,11 @@ export function WatchListCard({
         const rowStyle = index > 0 ? { borderTop: "var(--border-width-default) solid var(--color-border)" } : undefined;
         const body = (
           <>
-            <span className="shrink-0 min-w-[5.5rem]">
-              <ToneBadge label={tag.label} color={tag.color} />
-            </span>
             {playerId ? (
               <PlayerAvatar playerId={playerId} tier={tier} size={36} />
-            ) : (
-              <span aria-hidden="true" className="shrink-0" style={{ width: 36 }} />
-            )}
-            <span className="flex flex-col gap-0.5 min-w-0 flex-1">
+            ) : null}
+            <span className="flex flex-col items-start gap-1 min-w-0 flex-1">
+              <ToneBadge label={tag.label} color={tag.color} />
               <span className="flex flex-wrap items-center gap-x-2 gap-y-0.5 min-w-0">
                 {name ? (
                   <PlayerNameText name={name} threshold={Infinity} className="text-sm font-bold" style={{ color: "var(--color-text-primary)" }} />
@@ -76,7 +71,7 @@ export function WatchListCard({
                 <PlayerInjuryBadge status={injury} />
               </span>
               <span
-                className="text-xs min-w-0"
+                className="text-xs min-w-0 self-stretch"
                 style={{
                   color: "var(--color-text-secondary)",
                   display: "-webkit-box",

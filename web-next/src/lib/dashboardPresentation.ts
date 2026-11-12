@@ -19,12 +19,21 @@ export function usageTrendPct(item: BriefingItem): number | null {
   return Number.isFinite(value) ? value : null;
 }
 
+/**
+ * Which way a Value Trend item points. A usage-drop figure or words like
+ * losing/falling/down mean down; anything else that says "trending" is up.
+ */
+export function watchTrendDirection(item: BriefingItem): "up" | "down" {
+  if (usageTrendPct(item) !== null) return "down";
+  return /\b(down|losing|lost|falling|fall|dropping|drop|declin\w*|slipping|cooling)\b/i.test(item.headline ?? "") ? "down" : "up";
+}
+
 /** The TRENDING / INJURY / WAIVER tag for a non-top-priority briefing item. */
 export function watchTag(item: BriefingItem): WatchTag {
   const category = (item.category || "").toLowerCase();
   if (category === "waiver_opportunity") return { label: "Waiver", color: "var(--color-success)" };
   if (usageTrendPct(item) !== null || /trend/i.test(item.headline)) {
-    return { label: "Trending", color: "var(--color-danger)" };
+    return { label: "Trending", color: watchTrendDirection(item) === "up" ? "var(--text-positive)" : "var(--text-negative)" };
   }
   if (item.route_player_injury_status || /injur/i.test(`${item.headline} ${item.reason}`)) {
     return { label: "Injury", color: "var(--color-warning)" };

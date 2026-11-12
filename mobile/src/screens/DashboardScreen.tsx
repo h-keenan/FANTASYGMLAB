@@ -67,7 +67,7 @@ import DashboardStatRow from '../components/DashboardStatRow';
 import ToneBadge from '../components/ToneBadge';
 import { trackUse } from '../lib/analytics';
 import { requestOrbSearch } from '../lib/orbEvents';
-import { WATCH_TAG_LABEL, watchSummary, watchTagKind, watchTitle } from '../lib/dashboardWatch';
+import { WATCH_TAG_LABEL, watchSummary, watchTagKind, watchTitle, watchTrendDirection } from '../lib/dashboardWatch';
 import BrandMark from '../components/BrandMark';
 import { CONFIDENCE_LEVELS } from '../components/ConfidenceMeter';
 import { useOrbClearance } from '../lib/orbLayout';
@@ -1054,7 +1054,7 @@ function DashboardInsightRow({
   const { colors } = useThemeMode();
   const baseMeta = categoryMeta(colors)[item.category] ?? categoryMeta(colors).watch;
   const tagKind = watchTagKind(item);
-  const tagColor = tagKind === 'trending' ? colors.danger : tagKind === 'injury' ? colors.premium : tagKind === 'waiver' ? colors.success : baseMeta.color;
+  const tagColor = tagKind === 'trending' ? (watchTrendDirection(item) === 'up' ? colors.success : colors.danger) : tagKind === 'injury' ? colors.premium : tagKind === 'waiver' ? colors.success : baseMeta.color;
   const meta = { ...baseMeta, label: WATCH_TAG_LABEL[tagKind] ?? baseMeta.label, color: tagColor };
   const routeName = DESTINATION_ROUTE[item.destination];
   const onActionPress = routeName

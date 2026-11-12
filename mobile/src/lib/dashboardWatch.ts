@@ -30,6 +30,12 @@ export function watchTagKind(
   return 'other';
 }
 
+/** Which way a Value Trend item points: a usage drop or losing/falling words mean down. Mirrors web lib/dashboardPresentation.ts. */
+export function watchTrendDirection(item: Pick<DashboardItem, 'headline' | 'reason'> & { supporting_context?: string | null }): 'up' | 'down' {
+  if (usageTrendPct(item) !== null) return 'down';
+  return /\b(down|losing|lost|falling|fall|dropping|drop|declin\w*|slipping|cooling)\b/i.test(item.headline ?? '') ? 'down' : 'up';
+}
+
 export const WATCH_TAG_LABEL: Record<WatchTagKind, string | null> = {
   trending: 'Trending',
   injury: 'Injury',

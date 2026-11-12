@@ -2,7 +2,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
-import { firstSentence, usageTrendPct, watchSummary, watchTagKind, watchTitle } from './dashboardWatch.ts';
+import { firstSentence, usageTrendPct, watchSummary, watchTagKind, watchTitle, watchTrendDirection } from './dashboardWatch.ts';
 
 const base = { category: 'watch', headline: 'x', reason: '' } as const;
 
@@ -30,4 +30,10 @@ test('watch row sentences are clean and never raw feed text', () => {
   assert.equal(watchSummary({ reason: 'Usage down 24% (high confidence).' }), 'Usage is down 24% recently.');
   assert.equal(watchTitle({ headline: 'RB' }), 'RB room');
   assert.equal(watchTitle({ headline: 'Handcuff watch' }), 'Handcuff watch');
+});
+
+test('watchTrendDirection: up for "trending up", down for usage drops and losing words', () => {
+  assert.equal(watchTrendDirection({ headline: 'Taylor Exampleton is trending up', reason: 'Snap share is climbing.' }), 'up');
+  assert.equal(watchTrendDirection({ headline: 'Morgan Testwell is losing usage', reason: 'Usage down 31%.' }), 'down');
+  assert.equal(watchTrendDirection({ headline: 'Value is falling', reason: '' }), 'down');
 });
