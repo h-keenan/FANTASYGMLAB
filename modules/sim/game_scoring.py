@@ -34,7 +34,11 @@ class PlayerWeek:
     points: float
     stats: Mapping[str, float] = field(default_factory=dict)
     active: bool = True  # False: inactive / did not play (scores 0)
-    newly_injured: bool = False  # got hurt this week; the game decides how long
+    newly_injured: bool = False  # got hurt this week
+    # Calendar weeks he is then out (bye weeks inside the window included), as decided
+    # by the player model (0 = hurt but misses nothing, e.g. in the last week). None = the model
+    # gives no duration (FallbackModel only).
+    out_weeks: int | None = None
 
 
 class ScoringModel:
@@ -101,8 +105,26 @@ def _pick(result: Any, names: tuple[str, ...], default: Any) -> Any:
     return default
 
 
+def calendar_weeks_out(profile: Any, week: int) -> int:
+    """Calendar weeks a player hurt in ``week`` stays out, read from the model's own
+    availability mask: the run of unavailable weeks after ``week`` that contains
+    injury weeks (a bye inside the run counts, because the game counts calendar weeks)."""
+
+    mask = list(profile.games_available_mask)
+    reason = list(profile.unavailable_reason)
+    last = 0
+    w = week + 1
+    while w <= len(mask) and not mask[w - 1]:
+        if reason[w - 1] == "injury":
+            last = w - week
+        w += 1
+    return last
+
+
 class PlayerModelAdapter(ScoringModel):
-    """Wraps ``modules.sim.player_model`` (draw_season_profile / draw_week_points)."""
+    """Wraps ``modules.sim.player_model``. The model is the single source of truth for
+    injuries: ``injury_incurred`` -> ``newly_injured`` and the duration comes from the
+    profile's availability mask (``out_weeks``)."""
 
     def __init__(self, module: Any) -> None:
         self._m = module
@@ -113,12 +135,10 @@ class PlayerModelAdapter(ScoringModel):
 
     def week(self, player, profile, week, rng, scoring):
         result = self._m.draw_week_points(player, profile, week, rng, scoring)
-        stats = _to_stats(_pick(result, ("stat_line", "stats", "stat_lines"), None))
+        hurt = bool(result.injury_incurred)
         return PlayerWeek(
-            points=float(_pick(result, ("points", "fantasy_points", "pts"), 0.0) or 0.0),
-            stats=stats,
-            active=bool(_pick(result, ("active", "played"), True)),
-            newly_injured=bool(_pick(result, ("newly_injured", "injured"), False)),
+            points=float(result.points), stats=_to_stats(result.stats), active=bool(result.active),
+            newly_injured=hurt, out_weeks=calendar_weeks_out(profile, week) if hurt else 0,
         )
 
 

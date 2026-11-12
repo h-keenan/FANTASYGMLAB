@@ -15,7 +15,7 @@ from typing import Any, Iterable, Sequence
 
 from modules.sim.game_eval import NEED_K, USER_PARAMS, Evaluator, convex, team_params
 from modules.sim.game_state import GameState
-from modules.sim.game_types import GameSnapshot
+from modules.sim.game_types import GameSnapshot, slot_positions
 from modules.sim.lineup import pick_lineup
 from modules.sim.personas import PERSONAS, TeamParams
 from modules.sim.rng import WorldRng
@@ -76,16 +76,24 @@ def ai_lineup(ev: Evaluator, tid: str, week: int, seed: int) -> list[list]:
 # ------------------------------------------------------------------ waivers
 
 
-def ai_waiver_claim(ev: Evaluator, tid: str, week: int, seed: int) -> dict[str, Any] | None:
+def ai_waiver_claim(
+    ev: Evaluator, tid: str, week: int, seed: int, exclude: Iterable[str] = (),
+) -> dict[str, Any] | None:
     """At most one claim per AI team per week: the add/drop with the best mix of
     lineup gain and value gain, if it clears the persona's bar."""
 
     snap, state = ev.snap, ev.state
     params = team_params(snap, tid)
     r = WorldRng(seed).stream(week, "gwaiver", _idx(snap, tid))
-    if params.waiver_aggr <= 0 or r.random() > params.waiver_aggr:
-        return None
     roster = state.rosters[tid]
+    # A starting slot nobody healthy can fill (injuries, a bye, a lone kicker) is an
+    # emergency: no manager leaves it empty, so the random gate and the bar are waived.
+    vacant = sorted({
+        pos for slot, pid in ev.best_lineup(roster, week)[0] if not pid for pos in slot_positions(slot)
+    })
+    roll = r.random()
+    if not vacant and (params.waiver_aggr <= 0 or roll > params.waiver_aggr):
+        return None
     limit = snap.settings.roster_limit
     base_total = ev.lineup_total(roster)
     starters = {pid for _, pid in pick_lineup(ev.plan, ev.entries(roster, week, bye=False))[0] if pid}
@@ -99,10 +107,19 @@ def ai_waiver_claim(ev: Evaluator, tid: str, week: int, seed: int) -> dict[str, 
     if not drops:
         return None
     owned = state.owner_map()
+    taken = set(exclude)  # already claimed by someone ahead of this team in the order
     fas = sorted(
-        (p for p in snap.pids if p not in owned and state.out.get(p, 0) == 0),
+        (p for p in snap.pids if p not in owned and p not in taken and state.out.get(p, 0) == 0),
         key=lambda p: (-ev.worth(params, p), p),
     )[:8]
+    if vacant:
+        owned_now = set(owned)
+        fill = sorted(
+            (p for p in snap.pids if p not in owned_now and p not in taken and snap.players[p].pos in vacant
+             and state.out.get(p, 0) == 0 and not ev.on_bye(p, week)),
+            key=lambda p: (-ev.worth(params, p), p),
+        )[:3]
+        fas = fill or fas  # the vacancy is the whole point of this claim
     best: tuple[float, str, str | None] | None = None
     h = ev.horizon_now(params)
     for add in fas:
@@ -113,7 +130,7 @@ def ai_waiver_claim(ev: Evaluator, tid: str, week: int, seed: int) -> dict[str, 
             score = gain_pts * NEED_K * (0.4 + h) + 0.5 * gain_worth
             if best is None or (-score, add) < (-best[0], best[1]):
                 best = (score, add, drop)
-    if best is None or best[0] < 6.0 - 4.0 * params.waiver_aggr:
+    if best is None or (best[0] < 6.0 - 4.0 * params.waiver_aggr and not vacant):
         return None
     return {"team": tid, "add": best[1], "drop": best[2], "start_slot": None, "gain": round(best[0], 2)}
 
