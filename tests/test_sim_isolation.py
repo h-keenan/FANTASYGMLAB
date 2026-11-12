@@ -45,11 +45,12 @@ FILE_REAL_MODULES = {
 EXTERNAL_IMPORTERS = {"services/mobile_api_service.py": {"modules.sim.api"}}
 PURE_ENGINE_FILES = [
     "engine.py", "analysis.py", "lineup.py", "personas.py", "rng.py", "types.py", "synthetic.py",
-    "store.py", "version.py", "__init__.py", "picks.py",
+    "store.py", "version.py", "__init__.py", "picks.py", "player_model.py",
     # the interactive GM game (everything but its router is pure stdlib + numpy + modules.sim)
     "game_types.py", "game_scoring.py", "game_setup.py", "game_state.py", "game_eval.py", "game_draft.py",
     "game_ai.py", "game_actions.py", "game_engine.py", "game_result.py", "game_store.py", "game_view.py",
 ]
+CALIBRATION_DIR = SIM_DIR / "calibration"
 
 
 def _py_files(root: Path):
@@ -162,6 +163,26 @@ def test_sim_files_import_only_allowlisted_modules(path):
     assert not bad, f"{path.name} imports outside its allowlist: {bad}"
 
 
+def test_player_model_and_calibration_are_pure_engine_files():
+    """The player outcome model and its calibration harness import only stdlib, numpy
+    and modules.sim.* (no real module, no pandas, no network client)."""
+
+    for name in PURE_ENGINE_FILES:
+        assert (SIM_DIR / name).exists(), name
+    assert "player_model.py" in PURE_ENGINE_FILES
+    files = sorted(CALIBRATION_DIR.glob("*.py")) + [SIM_DIR / "player_model.py"]
+    assert {f.name for f in files} >= {"player_model.py", "dataset.py", "backtest.py", "fit.py"}
+    for path in files:
+        bad = []
+        for module, names, level in _imports(path):
+            root = module.split(".")[0]
+            if level or not (root in STDLIB or root in THIRD_PARTY or module.startswith("modules.sim")):
+                bad.append(module or f"relative:{names}")
+            if module == "modules":
+                bad.append(f"from modules import {names}")
+        assert not bad, f"{path.name}: {bad}"
+
+
 def test_only_adapter_files_touch_real_modules():
     touching = set()
     for path in SIM_DIR.glob("*.py"):
@@ -216,7 +237,8 @@ def test_importing_the_engine_loads_no_real_module():
     code = (
         f"import sys, json; sys.path.insert(0, {str(REPO)!r})\n"
         "import modules.sim.engine, modules.sim.analysis, modules.sim.store, modules.sim.synthetic\n"
-        + "".join(f"import modules.sim.{f[:-3]}\n" for f in PURE_ENGINE_FILES if f != "__init__.py") +
+        + "".join(f"import modules.sim.{f[:-3]}\n" for f in PURE_ENGINE_FILES if f != "__init__.py")
+        + "import modules.sim.calibration.dataset, modules.sim.calibration.backtest\n"
         "real = sorted(m for m in sys.modules if m.startswith('modules.') and not m.startswith('modules.sim'))\n"
         "print(json.dumps({'real': real, 'streamlit': 'streamlit' in sys.modules, 'pandas': 'pandas' in sys.modules}))\n"
     )
