@@ -465,16 +465,18 @@ def _percentile_from_values(values: pd.Series, positions: pd.Series) -> pd.Serie
     an ``object``-dtype Series of ``int | None``, aligned to `values`' index.
     """
 
-    pool_sizes = values.groupby(positions).transform(lambda s: int(s.notna().sum()))
+    # Vectorized: the group sizes come from a native groupby sum (not a Python
+    # lambda per group) and the rounding/clamping is done on arrays. ``np.rint``
+    # rounds half to even exactly like ``round()``, so results are identical.
+    pool_sizes = values.notna().groupby(positions).transform("sum")
     ranks = values.groupby(positions).rank(pct=True)
-    return pd.Series(
-        [
-            int(min(100, max(1, round(float(p) * 100)))) if not pd.isna(p) and n >= PERCENTILE_MIN_POOL else None
-            for p, n in zip(ranks, pool_sizes)
-        ],
-        index=values.index,
-        dtype=object,
-    )
+    pct = ranks.to_numpy(dtype="float64", na_value=np.nan)
+    sizes = pool_sizes.to_numpy(dtype="float64", na_value=np.nan)
+    keep = ~np.isnan(pct) & (sizes >= PERCENTILE_MIN_POOL)
+    scaled = np.clip(np.rint(np.where(keep, pct, 0.0) * 100.0), 1, 100).astype(np.int64)
+    out = np.full(len(values), None, dtype=object)
+    out[keep] = scaled[keep].tolist()
+    return pd.Series(out, index=values.index, dtype=object)
 
 
 def _coalesced_numeric_column(frame: pd.DataFrame, fields: Sequence[str]) -> pd.Series | None:

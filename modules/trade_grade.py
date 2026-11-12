@@ -84,6 +84,7 @@ import pandas as pd
 
 from modules import injury_status as injury_table
 from modules import model_status
+from modules.frame_records import frame_records
 from modules.player_state_authority import is_suspended
 from modules.rankings import (
     COMPOSITE_WEIGHT_OPPORTUNITY,
@@ -553,8 +554,10 @@ def healthy_equivalent_roster(
     flagged = pd.Series(mask, index=out.index)
     if score_column in out.columns:
         restored = []
-        for idx, row in out.loc[flagged].iterrows():
-            factor = healthy_restore_factor(row.to_dict(), score_column)
+        # One bulk conversion of the flagged rows instead of a Series per row
+        # (``iterrows`` + ``to_dict`` was most of this function's cost).
+        for row in frame_records(out.loc[flagged]):
+            factor = healthy_restore_factor(row, score_column)
             value = _number(row.get(score_column), 0.0)
             restored.append(value / factor if factor > 0 else value)
         out[score_column] = pd.to_numeric(out[score_column], errors="coerce").astype("float64")
