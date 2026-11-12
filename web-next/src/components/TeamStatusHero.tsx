@@ -157,7 +157,11 @@ export function TeamStatusHero({
         <SectionHeading id="team-status-heading" size="compact">
           Your team right now
         </SectionHeading>
-        <SkeletonCard lines={5} />
+        {/* Reserve the height a full in-season hero settles at (matchup, lineup,
+            standing and position rooms: ~324 px with its heading). A shorter
+            placeholder made everything below it jump ~136 px when the data
+            landed (dashboard CLS 0.11, measured). */}
+        <SkeletonCard lines={5} style={{ minHeight: 290 }} />
       </section>
     );
   }

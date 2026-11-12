@@ -103,6 +103,13 @@ export function PlayerAvatar({
       src={`${SLEEPER_HEADSHOT_BASE}/${playerId}.jpg`}
       alt=""
       title={title}
+      // Sleeper serves a ~350 px photo for every avatar (20-40 KB) even in a
+      // 24-34 px list row; a long ranked list used to start every one of
+      // them at once. Off-screen rows now wait until scrolled near, and
+      // decoding stays off the main thread. Size is fixed by `dimension`,
+      // so deferring the load shifts nothing.
+      loading="lazy"
+      decoding="async"
       style={{ ...dimension, ...glowStyle, border: `${borderWidth}px solid ${ringColor}`, objectFit: "cover", objectPosition: "top" }}
       className={`shrink-0${glowClassName}`}
       onError={() => setFailed(true)}
