@@ -18,7 +18,7 @@ vi.mock("@/lib/supabase", () => ({
 vi.mock("@/lib/api", async () => {
   const actual = await vi.importActual<typeof import("@/lib/api")>("@/lib/api");
   const names = [
-    "getSimGameOptions", "listSimGames", "createSimGame", "getSimGame", "deleteSimGame", "getSimDraft", "simDraftPick", "simDraftAuto",
+    "getSimGameOptions", "getSimLeagueTeams", "listSimGames", "createSimGame", "getSimGame", "deleteSimGame", "getSimDraft", "simDraftPick", "simDraftAuto",
     "putSimDraftQueue", "getSimGamePlayers", "getSimGamePlayer", "getSimGameTeam", "getSimHome", "getSimLineup", "putSimLineup", "autoSimLineup",
     "claimSimWaiver", "cancelSimWaiver", "cutSimPlayer", "previewSimTrade", "sendSimTrade", "getSimInbox", "respondSimInbox",
     "advanceSimGame", "revertSimWeek", "getSimLeague", "getSimGameResult",
@@ -181,6 +181,45 @@ describe("SimGameContent", () => {
     expect(screen.getByTestId("sim-preview-line")).toHaveTextContent("3 weeks left");
   });
 
+  it("limit reached: names the count, offers Manage, and deleting from the hub frees New game immediately", async () => {
+    const g2 = { ...lite(game({ id: "g2" })), status: "complete" as const, grade_letter: "B+" };
+    mocked.getSimGameOptions.mockResolvedValue(options({ max_games: 2 }));
+    mocked.listSimGames.mockResolvedValue({ ok: true, reason: "", games: [lite(game()), g2] });
+    mocked.deleteSimGame.mockResolvedValue({ ok: true, reason: "" });
+    render(<SimGameContent />);
+    expect(await screen.findByTestId("new-game-block")).toHaveTextContent("You have 2 of 2 saved games");
+    expect(screen.getByRole("button", { name: "Manage games / delete one" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "New game" })).toBeDisabled();
+    fireEvent.click(screen.getByRole("button", { name: /Delete game: Finished/ }));
+    expect(screen.getByRole("alert")).toHaveTextContent(/Finished · Grade B\+.*cannot be undone/);
+    mocked.listSimGames.mockResolvedValue({ ok: true, reason: "", games: [lite(game())] });
+    fireEvent.click(screen.getByRole("button", { name: "Delete game" }));
+    await waitFor(() => expect(mocked.deleteSimGame).toHaveBeenCalledWith("g2"));
+    await waitFor(() => expect(screen.queryByTestId("new-game-block")).toBeNull());
+    expect(screen.getByRole("button", { name: "New game" })).toBeEnabled();
+    expect(screen.queryByRole("button", { name: /Delete game: Finished/ })).toBeNull();
+  });
+
+  it("a 503 on hub delete keeps the game and shows a busy notice", async () => {
+    mocked.listSimGames.mockResolvedValue({ ok: true, reason: "", games: [lite(game())] });
+    mocked.deleteSimGame.mockRejectedValue(Object.assign(new Error("busy"), { status: 503 }));
+    render(<SimGameContent />);
+    fireEvent.click(await screen.findByRole("button", { name: /Delete game: Week/ }));
+    fireEvent.click(screen.getByRole("button", { name: "Delete game" }));
+    expect(await screen.findByText(/simulator is busy/)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Open game/ })).toBeInTheDocument();
+  });
+
+  it("a 404 on hub delete drops the already-gone game", async () => {
+    mocked.listSimGames.mockResolvedValue({ ok: true, reason: "", games: [lite(game())] });
+    mocked.deleteSimGame.mockRejectedValue(Object.assign(new Error("nf"), { status: 404 }));
+    render(<SimGameContent />);
+    fireEvent.click(await screen.findByRole("button", { name: /Delete game: Week/ }));
+    mocked.listSimGames.mockResolvedValue({ ok: true, reason: "", games: [] });
+    fireEvent.click(screen.getByRole("button", { name: "Delete game" }));
+    expect(await screen.findByText("No games yet")).toBeInTheDocument();
+  });
+
   it("Free past week 3: Advance becomes Go Pro, never calls the API, and reads still render", async () => {
     mocked.getSimGameOptions.mockResolvedValue(options({ is_premium: false, max_games: 1, preview: { weeks_left: 0, paywall_week: 4, paywalled: true } }));
     mocked.listSimGames.mockResolvedValue({ ok: true, reason: "", games: [lite(game())] });
@@ -289,6 +328,7 @@ describe("SimGameContent", () => {
           difficulty: { values: ["easy", "normal", "hard"], default: "normal" },
           user_slot: { min: 1, max: 14, default: null },
           auto_lineup: { default: false },
+          team_names: { values: ["Gridiron Ghosts", "Blitz Brigade"], max_length: 40 },
         },
         layout: { base_slots: ["QB", "RB", "RB", "WR", "WR", "TE", "FLEX"], draft_spare_spots: 2 },
         start_modes: [{ id: "fresh", available: true }, { id: "league", available: true }, { id: "season_start", available: false, reason: "no_roster_history" }],
@@ -310,7 +350,7 @@ describe("SimGameContent", () => {
       fireEvent.click(screen.getByRole("button", { name: "Start the draft" }));
       await waitFor(() => expect(mocked.createSimGame).toHaveBeenCalled());
       expect(mocked.createSimGame.mock.calls[0][0]).toEqual({
-        difficulty: "normal", auto_lineup: false, tiebreaker: "points_for", teams: 12, scoring: "half", te_premium: 0, superflex: false,
+        difficulty: "normal", auto_lineup: false, tiebreaker: "points_for", random_team_name: true, teams: 12, scoring: "half", te_premium: 0, superflex: false,
         include_k: true, include_def: false, bench: 8, mode: "redraft", user_slot: null,
       });
     });
@@ -338,12 +378,64 @@ describe("SimGameContent", () => {
       expect(screen.queryByRole("option", { name: "ESPN Thing" })).not.toBeInTheDocument();
       const submit = screen.getByRole("button", { name: "Start the season" });
       expect(submit).toBeDisabled();
+      mocked.getSimLeagueTeams.mockResolvedValue({
+        ok: true, reason: "", league_id: "111", you_roster_id: "2",
+        teams: [
+          { roster_id: "1", team_name: "Alpha Squad", owner_name: "bob", wins: 5, losses: 2, ties: 0, points_for: 700, rank: 1, is_you: false },
+          { roster_id: "2", team_name: "The Dude's Team \u{1F3C8}", owner_name: "dude", wins: 3, losses: 4, ties: 0, points_for: 600, rank: 4, is_you: true },
+        ],
+      });
       fireEvent.change(pick, { target: { value: "111" } });
+      const teamPick = (await screen.findByRole("combobox", { name: "Your team in this league" })) as HTMLSelectElement;
+      await waitFor(() => expect(teamPick.value).toBe("2"));
+      expect(screen.queryByRole("textbox", { name: /team name/i })).not.toBeInTheDocument();
       expect(submit).not.toBeDisabled();
       mocked.createSimGame.mockResolvedValue({ ok: true, reason: "premium_required", is_premium: true });
       fireEvent.click(submit);
       await waitFor(() => expect(mocked.createSimGame).toHaveBeenCalled());
-      expect(mocked.createSimGame.mock.calls[0][0]).toEqual({ difficulty: "normal", auto_lineup: false, tiebreaker: "points_for", start: "league", league_id: "111" });
+      expect(mocked.createSimGame.mock.calls[0][0]).toEqual({ difficulty: "normal", auto_lineup: false, tiebreaker: "points_for", start: "league", league_id: "111", roster_id: "2" });
+    });
+
+    it("start from a league: no auto-match means the player must pick a team; ESPN-style errors are explained", async () => {
+      await openSetup();
+      fireEvent.click(screen.getByRole("tab", { name: "My league" }));
+      const pick = await screen.findByRole("combobox", { name: "League to start from" });
+      await screen.findByRole("option", { name: "Dynasty Dogs" });
+      mocked.getSimLeagueTeams.mockResolvedValue({
+        ok: true, reason: "", league_id: "111", you_roster_id: null,
+        teams: [{ roster_id: "1", team_name: "Alpha Squad", owner_name: "bob", wins: 0, losses: 0, ties: 0, points_for: 0, rank: 1, is_you: false }],
+      });
+      fireEvent.change(pick, { target: { value: "111" } });
+      const teamPick = (await screen.findByRole("combobox", { name: "Your team in this league" })) as HTMLSelectElement;
+      await screen.findByRole("option", { name: /Alpha Squad/ });
+      expect(teamPick.value).toBe("");
+      expect(screen.getByRole("button", { name: "Start the season" })).toBeDisabled();
+      fireEvent.change(teamPick, { target: { value: "1" } });
+      expect(screen.getByRole("button", { name: "Start the season" })).not.toBeDisabled();
+    });
+
+    it("start from a league: a league the game cannot read shows why and blocks starting", async () => {
+      await openSetup();
+      fireEvent.click(screen.getByRole("tab", { name: "My league" }));
+      const pick = await screen.findByRole("combobox", { name: "League to start from" });
+      await screen.findByRole("option", { name: "Dynasty Dogs" });
+      mocked.getSimLeagueTeams.mockResolvedValue({ ok: true, reason: "league_platform_unsupported" });
+      fireEvent.change(pick, { target: { value: "111" } });
+      await screen.findByText("Only Sleeper leagues can start a game for now.");
+      expect(screen.getByRole("button", { name: "Start the season" })).toBeDisabled();
+    });
+
+    it("fresh league: team name is a preset picker with Random, Custom reveals a text input", async () => {
+      await openSetup();
+      const names = screen.getByRole("combobox", { name: "Your team name" });
+      expect(Array.from((names as HTMLSelectElement).options).map((o) => o.text)).toEqual(["Random", "Gridiron Ghosts", "Blitz Brigade", "Custom name..."]);
+      fireEvent.change(names, { target: { value: "__custom__" } });
+      fireEvent.change(screen.getByRole("textbox", { name: "Custom team name" }), { target: { value: "  O'Neil's  Crew \u{1F3C8} " } });
+      mocked.createSimGame.mockResolvedValue({ ok: true, reason: "premium_required", is_premium: true });
+      fireEvent.click(screen.getByRole("button", { name: "Start the draft" }));
+      await waitFor(() => expect(mocked.createSimGame).toHaveBeenCalled());
+      expect(mocked.createSimGame.mock.calls[0][0]).toMatchObject({ team_name: "O'Neil's Crew \u{1F3C8}" });
+      expect(mocked.createSimGame.mock.calls[0][0]).not.toHaveProperty("random_team_name");
     });
 
     it("hides the my-league choice when the server says it is unavailable", async () => {

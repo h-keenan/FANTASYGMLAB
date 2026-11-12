@@ -33,7 +33,10 @@ from modules.sim.game_engine import advance, finish_draft, start_from_league
 from modules.sim.game_eval import Evaluator
 from modules.sim.game_result import build_result
 from modules.sim.game_scoring import default_model
-from modules.sim.game_setup import build_league_snapshot, build_snapshot, finalize_pool, league_settings
+from modules.sim.game_setup import (
+    TEAM_NAMES, USER_TEAM_NAME_MAX, build_league_snapshot, build_snapshot, finalize_pool, league_settings,
+    pick_random_team_name,
+)
 from modules.sim.game_state import Emitter, GameState
 from modules.sim.game_store import GameConflict, GameStore, public_game_row
 from modules.sim.game_mode import mode_options
@@ -298,6 +301,7 @@ def add_routes(router: APIRouter, ctx: GameApiCtx) -> None:
                 "difficulty": {"values": list(DIFFICULTIES), "default": "normal"},
                 "user_slot": {"min": 1, "max": max(TEAM_COUNTS), "default": None},
                 "auto_lineup": {"default": False},
+                "team_names": {"values": list(TEAM_NAMES), "max_length": USER_TEAM_NAME_MAX},
                 "tiebreaker": {"values": list(TIEBREAKERS), "default": DEFAULT_TIEBREAKER},
             },
             # Draft rounds are derived: roster size minus the spots left for the wire.
@@ -318,6 +322,34 @@ def add_routes(router: APIRouter, ctx: GameApiCtx) -> None:
             ],
         }
 
+    # The real league's teams for the setup picker. Read-only, Sleeper only, and
+    # declared before ``/games/{game_id}`` so the literal path wins.
+    @router.get("/games/league-teams")
+    @guarded
+    def league_teams(league_id: str = "", user: dict[str, Any] = Depends(require_user)):
+        pro = ctx.is_pro(user)
+        lid = str(league_id or "").strip()
+        if not lid or len(lid) > 64:
+            raise ValueError("league_id is required.")
+        if not (hasattr(ctx.inputs, "league_teams") and ctx.sleeper_username is not None):
+            return _env(pro, None, "league_unavailable")
+        with ctx.compute() as ok:
+            if not ok:
+                return busy()
+            try:
+                found = ctx.inputs.league_teams(lid, username=ctx.sleeper_username(user))
+            except SimInputsError as exc:
+                return _env(pro, None, exc.code)
+        return {
+            **_env(pro, None), "league_id": found.league_id, "league_name": found.league_name, "season": found.season,
+            "you_roster_id": found.you_roster_id or None,
+            "teams": [{
+                "roster_id": t.roster_id, "team_name": t.team_name, "owner_name": t.owner_name,
+                "wins": t.wins, "losses": t.losses, "ties": t.ties, "points_for": t.points_for,
+                "rank": t.rank, "is_you": t.is_you,
+            } for t in found.teams],
+        }
+
     # ----------------------------------------------------------- create/list
 
     @router.post("/games")
@@ -326,8 +358,9 @@ def add_routes(router: APIRouter, ctx: GameApiCtx) -> None:
         pro = ctx.is_pro(user)
         uid = str(user.get("id") or "")
         raw = dict(body or {})
-        team_name = str(raw.pop("team_name", "") or "").strip()
-        if len(team_name) > 40:
+        team_name = " ".join(str(raw.pop("team_name", "") or "").split())
+        random_name = raw.pop("random_team_name", False) is True
+        if len(team_name) > USER_TEAM_NAME_MAX:
             raise ValueError("team_name must be at most 40 characters.")
         start = raw.pop("start", START_FRESH) or START_FRESH
         if start not in START_KINDS:
@@ -368,6 +401,8 @@ def add_routes(router: APIRouter, ctx: GameApiCtx) -> None:
                     )
                 else:
                     pool = _pool_for(ctx.inputs, settings.scoring_settings)
+                    if random_name and not team_name:
+                        team_name = pick_random_team_name(seed)
                     snap = build_snapshot(
                         pool.rows, pool.bye_weeks, settings, seed, user_team_name=team_name or "Your Team",
                         scoring_model=default_model().model_id, notes=pool.notes,
