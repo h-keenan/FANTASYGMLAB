@@ -422,4 +422,3 @@ all 16. cProfile inflates call-heavy functions (use the relative order, not the 
 | 406 | 3 | `evaluate_trade_analyzer_fit (modules/trade_analyzer_fit.py:495)` |
 | 370 | 1 | `build_drop_board (modules/drop_candidates.py:498)` |
 | 368 | 6 | `suggest_drop_for_add (modules/drop_candidates.py:353)` |
-
