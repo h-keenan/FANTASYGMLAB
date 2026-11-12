@@ -382,7 +382,7 @@ describe("league settings and start modes (setup)", () => {
     const d = simSetupDefaults(options);
     expect(d).toMatchObject({ start: "fresh", teams: 12, scoring: "half", tePremium: 0, superflex: false, includeK: true, includeDef: false, bench: 8 });
     expect(simSetupDefaults(null)).toMatchObject({ teams: 12, scoring: "half", bench: 8, includeK: true });
-    expect(simSetupBody(d)).toEqual({ difficulty: "normal", auto_lineup: false, teams: 12, scoring: "half", te_premium: 0, superflex: false, include_k: true, include_def: false, bench: 8, mode: "redraft", user_slot: null });
+    expect(simSetupBody(d)).toEqual({ difficulty: "normal", auto_lineup: false, tiebreaker: "points_for", teams: 12, scoring: "half", te_premium: 0, superflex: false, include_k: true, include_def: false, bench: 8, mode: "redraft", user_slot: null });
   });
 
   it("derives lineup, roster size and draft rounds exactly like the engine (same table as the backend test)", () => {
@@ -415,7 +415,7 @@ describe("league settings and start modes (setup)", () => {
     expect(simSetupBlock(d)).toMatch(/Pick one of your leagues/);
     const ready = { ...d, leagueId: "123", difficulty: "hard" as const, auto: true };
     expect(simSetupBlock(ready)).toBeNull();
-    expect(simSetupBody(ready)).toEqual({ difficulty: "hard", auto_lineup: true, start: "league", league_id: "123" });
+    expect(simSetupBody(ready)).toEqual({ difficulty: "hard", auto_lineup: true, tiebreaker: "points_for", start: "league", league_id: "123" });
     expect(simSetupSummary(ready)).toMatch(/nothing changes in your real league/);
     expect(simSetupBlock(simSetupDefaults(options))).toBeNull();
   });

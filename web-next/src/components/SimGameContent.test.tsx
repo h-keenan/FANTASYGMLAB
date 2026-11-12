@@ -234,7 +234,7 @@ describe("SimGameContent", () => {
       fireEvent.click(screen.getByRole("button", { name: "Start the draft" }));
       await waitFor(() => expect(mocked.createSimGame).toHaveBeenCalled());
       expect(mocked.createSimGame.mock.calls[0][0]).toEqual({
-        difficulty: "normal", auto_lineup: false, teams: 12, scoring: "half", te_premium: 0, superflex: false,
+        difficulty: "normal", auto_lineup: false, tiebreaker: "points_for", teams: 12, scoring: "half", te_premium: 0, superflex: false,
         include_k: true, include_def: false, bench: 8, mode: "redraft", user_slot: null,
       });
     });
@@ -267,7 +267,7 @@ describe("SimGameContent", () => {
       mocked.createSimGame.mockResolvedValue({ ok: true, reason: "premium_required", is_premium: true });
       fireEvent.click(submit);
       await waitFor(() => expect(mocked.createSimGame).toHaveBeenCalled());
-      expect(mocked.createSimGame.mock.calls[0][0]).toEqual({ difficulty: "normal", auto_lineup: false, start: "league", league_id: "111" });
+      expect(mocked.createSimGame.mock.calls[0][0]).toEqual({ difficulty: "normal", auto_lineup: false, tiebreaker: "points_for", start: "league", league_id: "111" });
     });
 
     it("hides the my-league choice when the server says it is unavailable", async () => {

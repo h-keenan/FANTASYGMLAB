@@ -106,8 +106,13 @@ def _pct(rec: dict[str, float]) -> float:
 
 
 def rank_teams(snap: GameSnapshot, state: GameState) -> list[str]:
-    """Standings order: win pct, then head-to-head among the tied group, then
-    points for, then the game's fixed coin."""
+    """Standings order (and playoff seeding): win pct first, then the game's
+    ``tiebreaker``.
+
+    ``points_for`` (default, like Sleeper): points for, then head-to-head among
+    the tied group, then fewer points against, then the fixed coin.
+    ``head_to_head`` (what saves from before the setting use): head-to-head
+    among the tied group, then points for, then the coin."""
 
     pct = {t: round(_pct(state.stand[t]), 9) for t in snap.tids}
     groups: dict[float, list[str]] = {}
@@ -115,6 +120,8 @@ def rank_teams(snap: GameSnapshot, state: GameState) -> list[str]:
         groups.setdefault(pct[t], []).append(t)
 
     def h2h(t: str, group: list[str]) -> float:
+        if len(group) < 2:
+            return 0.0
         wins = games = 0.0
         for opp in group:
             if opp == t:
@@ -124,10 +131,15 @@ def rank_teams(snap: GameSnapshot, state: GameState) -> list[str]:
             games += w + l + ties
         return wins / games if games else 0.0
 
+    legacy = snap.settings.tiebreaker == "head_to_head"
     key = {}
     for group in groups.values():
         for t in group:
-            key[t] = (-pct[t], -(h2h(t, group) if len(group) > 1 else 0.0), -state.stand[t]["pf"], snap.team(t).coin)
+            rec = state.stand[t]
+            if legacy:
+                key[t] = (-pct[t], -h2h(t, group), -rec["pf"], snap.team(t).coin)
+            else:
+                key[t] = (-pct[t], -round(rec["pf"], 6), -h2h(t, group), round(rec["pa"], 6), snap.team(t).coin)
     return sorted(snap.tids, key=lambda t: key[t])
 
 

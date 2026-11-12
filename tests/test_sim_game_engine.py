@@ -238,7 +238,7 @@ def test_eliminated_user_fast_forwards_the_rest_of_the_bracket():
 
 
 def test_standings_tiebreakers_head_to_head_then_points_then_coin():
-    snap = make_snapshot()
+    snap = make_snapshot(tiebreaker="head_to_head")
     state = GameState(snap)
     for t in snap.tids:
         state.stand[t] = {"w": 7, "l": 7, "t": 0, "pf": 1500.0, "pa": 1500.0}
@@ -267,6 +267,90 @@ def test_standings_tiebreakers_head_to_head_then_points_then_coin():
     state.h2h["8"] = {"7": [0, 1, 0], "9": [1, 0, 0]}
     state.h2h["9"] = {"7": [0, 1, 0], "8": [0, 1, 0]}
     assert rank_teams(snap, state)[:3] == ["7", "8", "9"]
+
+
+def _tied_state(snap, w=5, l=5):
+    state = GameState(snap)
+    for t in snap.tids:
+        state.stand[t] = {"w": w, "l": l, "t": 0, "pf": 1000.0 - int(t), "pa": 1000.0}
+    return state
+
+
+def test_default_tiebreaker_is_points_for_even_against_head_to_head():
+    # the owner's bug: equal records, more points for must rank higher
+    snap = make_snapshot()
+    assert snap.settings.tiebreaker == "points_for"
+    state = _tied_state(snap)
+    state.stand["6"].update(pf=863.0, pa=914.0)
+    state.stand["7"].update(pf=913.0, pa=938.0)
+    state.h2h["6"]["7"] = [1, 0, 0]  # 6 beat 7, but 7 has more points
+    state.h2h["7"]["6"] = [0, 1, 0]
+    order = rank_teams(snap, state)
+    assert order.index("7") < order.index("6")
+    legacy = make_snapshot(tiebreaker="head_to_head")
+    assert rank_teams(legacy, state).index("6") < rank_teams(legacy, state).index("7")
+
+
+def test_points_for_tie_falls_to_head_to_head_then_points_against_then_coin():
+    snap = make_snapshot()
+    state = _tied_state(snap)
+    for t in ("1", "2", "3", "4"):
+        state.stand[t]["pf"] = 2000.0
+    state.h2h["1"]["2"] = [0, 1, 0]
+    state.h2h["2"]["1"] = [1, 0, 0]
+    assert rank_teams(snap, state)[:2] == ["2", "1"] or rank_teams(snap, state).index("2") < rank_teams(snap, state).index("1")
+    # no head-to-head between 3 and 4: fewer points against wins
+    state.stand["3"]["pa"], state.stand["4"]["pa"] = 1200.0, 1100.0
+    order = rank_teams(snap, state)
+    assert order.index("4") < order.index("3")
+    # fully identical: the coin decides, deterministically
+    state.stand["3"]["pa"] = state.stand["4"]["pa"] = 1100.0
+    order = rank_teams(snap, state)
+    first = min(("3", "4"), key=lambda t: snap.team(t).coin)
+    assert order.index(first) < order.index("4" if first == "3" else "3")
+    assert rank_teams(snap, state) == order
+
+
+def test_multiway_tie_ranks_by_points_for():
+    snap = make_snapshot()
+    state = _tied_state(snap)
+    for t, pf in (("5", 1400.0), ("6", 1500.0), ("7", 1450.0)):
+        state.stand[t]["pf"] = pf
+        state.stand[t]["w"], state.stand[t]["l"] = 12, 2
+    # a head-to-head cycle must not matter under points_for
+    state.h2h["5"] = {"6": [1, 0, 0], "7": [0, 1, 0]}
+    state.h2h["6"] = {"5": [0, 1, 0], "7": [1, 0, 0]}
+    state.h2h["7"] = {"5": [1, 0, 0], "6": [0, 1, 0]}
+    assert rank_teams(snap, state)[:3] == ["6", "7", "5"]
+
+
+def test_tie_for_last_playoff_seed_goes_to_points_for():
+    snap = make_snapshot()
+    spots = snap.settings.playoff_teams
+    state = _tied_state(snap, 4, 10)
+    ranked = [str(i) for i in range(1, 7)]
+    for i, t in enumerate(ranked):
+        state.stand[t].update(w=10, l=4)  # six teams at 10-4
+        state.stand[t]["pf"] = 1500.0 + i
+    # the sixth-in-line has the *worst* head to head but the most points among the pool
+    for t in snap.tids[spots:]:
+        state.stand[t].update(w=10, l=4, pf=1900.0)  # bubble team ties the field at 10-4
+    state.h2h[snap.tids[spots]] = {"1": [1, 0, 0]}
+    state.h2h["1"] = {snap.tids[spots]: [0, 1, 0]}
+    seeds = rank_teams(snap, state)[:spots]
+    assert snap.tids[spots] in seeds  # highest pf takes a seed over teams that beat it
+    assert len(set(seeds)) == spots
+
+
+def test_tiebreaker_setting_saved_and_old_saves_keep_head_to_head():
+    s = GameSettings.parse({"tiebreaker": "head_to_head"})
+    assert GameSettings.from_dict(s.to_dict()).tiebreaker == "head_to_head"
+    assert GameSettings.parse({}).tiebreaker == "points_for"
+    raw = GameSettings.parse({}).to_dict()
+    raw.pop("tiebreaker")  # a save from before the setting existed
+    assert GameSettings.from_dict(raw).tiebreaker == "head_to_head"
+    with pytest.raises(ValueError):
+        GameSettings.parse({"tiebreaker": "coin"})
 
 
 def test_waiver_priority_is_worst_record_first():

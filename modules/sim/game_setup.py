@@ -216,7 +216,8 @@ def build_snapshot(
 
 
 def league_settings(
-    imported: LeagueImport, *, difficulty: str, auto_lineup: bool, regular_weeks: int = 14, trade_deadline_week: int = 10
+    imported: LeagueImport, *, difficulty: str, auto_lineup: bool, regular_weeks: int = 14, trade_deadline_week: int = 10,
+    tiebreaker: str = "points_for",
 ) -> GameSettings:
     """Game settings that mirror a real league: its size, lineup, scoring and
     playoff field, over a fresh 14-week season."""
@@ -232,7 +233,7 @@ def league_settings(
         te_premium=float(scoring.get("bonus_rec_te", 0.0) or 0.0),
         superflex="SUPER_FLEX" in imported.slots, include_k="K" in imported.slots,
         include_def="DEF" in imported.slots, bench=limit - len(imported.slots),
-        start=START_LEAGUE, custom_scoring=scoring,
+        start=START_LEAGUE, custom_scoring=scoring, tiebreaker=tiebreaker,
     )
 
 
