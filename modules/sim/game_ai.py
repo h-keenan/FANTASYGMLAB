@@ -15,7 +15,7 @@ from typing import Any, Iterable, Sequence
 
 from modules.sim.game_eval import NEED_K, USER_PARAMS, Evaluator, convex, team_params
 from modules.sim.game_state import GameState
-from modules.sim.game_types import GameSnapshot, slot_positions
+from modules.sim.game_types import NON_TRADABLE, SINGLETON_POSITIONS, GameSnapshot, slot_positions
 from modules.sim.lineup import pick_lineup
 from modules.sim.personas import PERSONAS, TeamParams
 from modules.sim.rng import WorldRng
@@ -30,7 +30,7 @@ FLOOR_BASE = 3.0  # linear worth an AI will give up before it refuses outright
 FLOOR_MAX = 10.0
 OFFER_USER_FLOOR = -2.0  # AI never proposes a deal the user is clearly robbed in
 
-PERSONA_PITCH = {
+PERSONA_PITCH = {  # original (dynasty-flavored) pitches; modes override via the policy
     "contender": "wants proven production for the title run",
     "rebuilder": "is selling vets for younger upside",
     "value_shark": "thinks this is a fair swap",
@@ -97,9 +97,9 @@ def ai_waiver_claim(
     limit = snap.settings.roster_limit
     base_total = ev.lineup_total(roster)
     starters = {pid for _, pid in pick_lineup(ev.plan, ev.entries(roster, week, bye=False))[0] if pid}
-    k_count = sum(1 for p in roster if snap.players[p].pos == "K")
+    kept = {pos: sum(1 for p in roster if snap.players[p].pos == pos) for pos in SINGLETON_POSITIONS}
     droppable = sorted(
-        (p for p in roster if p not in starters and not (snap.players[p].pos == "K" and k_count <= 1)),
+        (p for p in roster if p not in starters and not (snap.players[p].pos in kept and kept[snap.players[p].pos] <= 1)),
         key=lambda p: (ev.worth(params, p), p),
     )[:3]
     room = len(roster) < limit
@@ -243,6 +243,7 @@ class TradeDesk:
         snap, state, ev = self.snap, self.state, self.ev
         slots = snap.settings.slots
         starters = {pos: max(1, sum(1 for s in slots if s == pos)) for pos in ("QB", "RB", "WR", "TE")}
+        starters["QB"] += slots.count("SUPER_FLEX")  # a superflex league starts a second quarterback
 
         def quality(roster: Iterable[str], pos: str) -> float:
             vals = sorted((ev.ros_mean(p) for p in roster if snap.players[p].pos == pos), reverse=True)[: starters[pos]]
@@ -301,7 +302,7 @@ class TradeDesk:
         user = snap.user_team.tid
         options: list[tuple[float, str, tuple[str, ...], tuple[str, ...]]] = []
         extra = sorted(
-            (p for p in state.rosters[user] if p not in user_gives and snap.players[p].pos != "K"),
+            (p for p in state.rosters[user] if p not in user_gives and snap.players[p].pos not in NON_TRADABLE),
             key=lambda p: (-(ev.worth(self.params(ai), p) - ev.worth(USER_PARAMS, p)), p),
         )[:8]
         if len(user_gives) < MAX_TRADE_SIDE:
@@ -334,8 +335,8 @@ class TradeDesk:
             if not to_user and state.trades_made[partner] >= self.params(partner).max_trades:
                 continue
             pparams = self.params(partner)
-            mine = [p for p in state.rosters[proposer] if snap.players[p].pos != "K"]
-            theirs = [p for p in state.rosters[partner] if snap.players[p].pos != "K"]
+            mine = [p for p in state.rosters[proposer] if snap.players[p].pos not in NON_TRADABLE]
+            theirs = [p for p in state.rosters[partner] if snap.players[p].pos not in NON_TRADABLE]
             lens = USER_PARAMS if to_user else pparams
             gives = sorted(mine, key=lambda p: (-(ev.worth(lens, p) - ev.worth(params, p)), p))[:CANDIDATES_PER_SIDE]
             gets = sorted(theirs, key=lambda p: (-(ev.worth(params, p) - ev.worth(lens, p)), p))[:CANDIDATES_PER_SIDE]
@@ -363,7 +364,8 @@ class TradeDesk:
 
 def offer_message(snap: GameSnapshot, tid: str) -> str:
     persona = PERSONAS.get(snap.team(tid).persona_id)
-    return f"{snap.team(tid).name} {PERSONA_PITCH.get(persona.pid, 'sent you an offer') if persona else 'sent an offer'}."
+    pitches = snap.settings.policy.pitches or PERSONA_PITCH
+    return f"{snap.team(tid).name} {pitches.get(persona.pid, 'sent you an offer') if persona else 'sent an offer'}."
 
 
 def validate_offer(snap: GameSnapshot, state: GameState, partner: str, give: Sequence[str], get: Sequence[str]) -> None:
@@ -384,8 +386,8 @@ def validate_offer(snap: GameSnapshot, state: GameState, partner: str, give: Seq
         if pid not in state.rosters[partner]:
             raise ValueError("You can only ask for players on that team's roster.")
     for pid in [*give, *get]:
-        if snap.players[pid].pos == "K":
-            raise ValueError("Kickers cannot be traded.")
+        if snap.players[pid].pos in NON_TRADABLE:
+            raise ValueError("Kickers and defenses cannot be traded.")
 
 
 def offer_key(partner: str, give: Iterable[str], get: Iterable[str]) -> str:

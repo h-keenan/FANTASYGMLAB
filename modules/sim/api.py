@@ -147,7 +147,7 @@ def build_router(deps: SimApiDeps) -> APIRouter:
     # The interactive GM game (/v1/sim/games*, /v1/sim/preview/players).
     game_ctx = game_api.GameApiCtx(
         require_user=deps.require_user, is_pro=deps.is_pro, store_for=game_store_for,
-        inputs=inputs, compute=_compute_slot,
+        inputs=inputs, compute=_compute_slot, sleeper_username=deps.sleeper_username,
     )
     game_api.add_routes(router, game_ctx)
     game_api.add_preview_route(router, game_ctx)

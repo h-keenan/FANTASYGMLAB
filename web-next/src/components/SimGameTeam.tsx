@@ -20,6 +20,7 @@ import {
   simLineupPayload,
   simMatchupLine,
   simNeedsDrop,
+  simPositionsFor,
   simSlotAccepts,
   simSlotCandidates,
   simSlotLabels,
@@ -465,6 +466,7 @@ export function SimPlayersTab({
         key={mode}
         gameId={gameId}
         fixedStatus={mode === "waivers" ? "available" : undefined}
+        positions={simPositionsFor(game.settings.slots)}
         onOpen={ctx.openPlayer}
         actions={actions}
         refreshKey={ctx.tick}

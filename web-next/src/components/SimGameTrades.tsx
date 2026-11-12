@@ -15,6 +15,7 @@ import {
   SIM_TRADE_EMPTY,
   SIM_TRADE_MAX_PER_SIDE,
   simFmtPts,
+  simTradable,
   simTradeClosedReason,
   simTradeDecisionLabel,
   simTradeDecisionTone,
@@ -292,7 +293,7 @@ function Builder({ ctx, seed, onSeedUsed }: { ctx: SimCtx; seed: { partner: stri
         <>
           <section className="flex flex-col gap-1" aria-label="You give">
             <SectionHeading note={`Up to ${SIM_TRADE_MAX_PER_SIDE}. ${draft.give.length} selected.`}>You give</SectionHeading>
-            {mine.filter((p) => p.pos !== "K").map((p) => (
+            {mine.filter((p) => simTradable(p.pos)).map((p) => (
               <SimPlayerLine
                 key={p.id}
                 player={p}
@@ -310,7 +311,7 @@ function Builder({ ctx, seed, onSeedUsed }: { ctx: SimCtx; seed: { partner: stri
           </section>
           <section className="flex flex-col gap-1" aria-label="You get">
             <SectionHeading note={`${partner.name}'s roster. ${draft.get.length} selected.`}>You get</SectionHeading>
-            {partnerRoster.filter((p) => p.pos !== "K").map((p) => (
+            {partnerRoster.filter((p) => simTradable(p.pos)).map((p) => (
               <SimPlayerLine
                 key={p.id}
                 player={p}

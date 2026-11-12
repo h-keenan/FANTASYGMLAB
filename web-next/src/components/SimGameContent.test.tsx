@@ -7,6 +7,14 @@ import type { SimGame, SimGameOptionsResponse, SimGamePlayer, SimLineupResponse 
 
 vi.mock("next/navigation", () => ({ useRouter: () => ({ push: vi.fn() }) }));
 
+const savedLeagues = [
+  { league_id: "111", league_name: "Dynasty Dogs" },
+  { league_id: "espn:5:2026", league_name: "ESPN Thing" },
+];
+vi.mock("@/lib/supabase", () => ({
+  supabase: { from: () => ({ select: () => Promise.resolve({ data: savedLeagues, error: null }) }) },
+}));
+
 vi.mock("@/lib/api", async () => {
   const actual = await vi.importActual<typeof import("@/lib/api")>("@/lib/api");
   const names = [
@@ -188,5 +196,87 @@ describe("SimGameContent", () => {
     expect(mocked.simDraftPick).toHaveBeenCalledWith("g1", "10");
     fireEvent.click(screen.getByRole("button", { name: "Start the season" }));
     expect(await screen.findByTestId("game-heading")).toHaveTextContent("Week 1 of 14");
+  });
+
+  describe("new game setup", () => {
+    const setupOptions = () =>
+      options({
+        options: {
+          mode: { values: ["redraft"], default: "redraft" },
+          teams: { values: [8, 10, 12, 14], default: 12 },
+          scoring: { values: ["ppr", "half", "std"], default: "half" },
+          te_premium: { values: [0, 0.5, 1], default: 0 },
+          superflex: { default: false },
+          include_k: { default: true },
+          include_def: { default: false },
+          bench: { min: 4, max: 10, default: 8 },
+          difficulty: { values: ["easy", "normal", "hard"], default: "normal" },
+          user_slot: { min: 1, max: 14, default: null },
+          auto_lineup: { default: false },
+        },
+        layout: { base_slots: ["QB", "RB", "RB", "WR", "WR", "TE", "FLEX"], draft_spare_spots: 2 },
+        start_modes: [{ id: "fresh", available: true }, { id: "league", available: true }, { id: "season_start", available: false, reason: "no_roster_history" }],
+      });
+
+    async function openSetup() {
+      mocked.getSimGameOptions.mockResolvedValue(setupOptions());
+      mocked.listSimGames.mockResolvedValue({ ok: true, reason: "", games: [] });
+      render(<SimGameContent />);
+      fireEvent.click(await screen.findByRole("button", { name: "New game" }));
+      await screen.findByText("Quick start is 12 teams, half PPR and a standard lineup. You can change nothing after the game starts.");
+    }
+
+    it("quick start: advanced options start collapsed and the defaults are 12 teams, half PPR, standard lineup", async () => {
+      await openSetup();
+      expect(screen.getByTestId("sim-advanced")).not.toHaveAttribute("open");
+      expect(screen.getByTestId("sim-setup-summary")).toHaveTextContent("12 teams, 14-round snake draft. Starters: QB, RB, RB, WR, WR, TE, FLEX, K. Roster 16.");
+      mocked.createSimGame.mockResolvedValue({ ok: true, reason: "premium_required", is_premium: true });
+      fireEvent.click(screen.getByRole("button", { name: "Start the draft" }));
+      await waitFor(() => expect(mocked.createSimGame).toHaveBeenCalled());
+      expect(mocked.createSimGame.mock.calls[0][0]).toEqual({
+        difficulty: "normal", auto_lineup: false, teams: 12, scoring: "half", te_premium: 0, superflex: false,
+        include_k: true, include_def: false, bench: 8, mode: "redraft", user_slot: null,
+      });
+    });
+
+    it("advanced options change the league and the derived draft length", async () => {
+      await openSetup();
+      fireEvent.click(screen.getByRole("switch", { name: "Superflex" }));
+      fireEvent.click(screen.getByRole("switch", { name: "Defense (DEF)" }));
+      fireEvent.click(screen.getByRole("tab", { name: "14 teams" }));
+      fireEvent.click(screen.getByRole("tab", { name: "Standard" }));
+      expect(screen.getByTestId("sim-setup-summary")).toHaveTextContent("14 teams, 16-round snake draft. Starters: QB, RB, RB, WR, WR, TE, FLEX, SUPER_FLEX, K, DEF. Roster 18.");
+      expect(screen.getByText(/Advanced options \(4 changed\)/)).toBeInTheDocument();
+      mocked.createSimGame.mockResolvedValue({ ok: true, reason: "premium_required", is_premium: true });
+      fireEvent.click(screen.getByRole("button", { name: "Start the draft" }));
+      await waitFor(() => expect(mocked.createSimGame).toHaveBeenCalled());
+      expect(mocked.createSimGame.mock.calls[0][0]).toMatchObject({ teams: 14, scoring: "std", superflex: true, include_def: true, include_k: true });
+    });
+
+    it("start from one of my leagues: Sleeper leagues only, hides advanced options, sends league_id", async () => {
+      await openSetup();
+      fireEvent.click(screen.getByRole("tab", { name: "My league" }));
+      expect(screen.queryByTestId("sim-advanced")).not.toBeInTheDocument();
+      const pick = await screen.findByRole("combobox", { name: "League to start from" });
+      await screen.findByRole("option", { name: "Dynasty Dogs" });
+      expect(screen.queryByRole("option", { name: "ESPN Thing" })).not.toBeInTheDocument();
+      const submit = screen.getByRole("button", { name: "Start the season" });
+      expect(submit).toBeDisabled();
+      fireEvent.change(pick, { target: { value: "111" } });
+      expect(submit).not.toBeDisabled();
+      mocked.createSimGame.mockResolvedValue({ ok: true, reason: "premium_required", is_premium: true });
+      fireEvent.click(submit);
+      await waitFor(() => expect(mocked.createSimGame).toHaveBeenCalled());
+      expect(mocked.createSimGame.mock.calls[0][0]).toEqual({ difficulty: "normal", auto_lineup: false, start: "league", league_id: "111" });
+    });
+
+    it("hides the my-league choice when the server says it is unavailable", async () => {
+      mocked.getSimGameOptions.mockResolvedValue({ ...setupOptions(), start_modes: [{ id: "fresh", available: true }, { id: "league", available: false }] });
+      mocked.listSimGames.mockResolvedValue({ ok: true, reason: "", games: [] });
+      render(<SimGameContent />);
+      fireEvent.click(await screen.findByRole("button", { name: "New game" }));
+      await screen.findByText(/Quick start is/);
+      expect(screen.queryByRole("tab", { name: "My league" })).not.toBeInTheDocument();
+    });
   });
 });

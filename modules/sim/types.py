@@ -20,6 +20,11 @@ FLEX_SLOTS = {
 # narrower slot needs.
 FLEX_ORDER = ("REC_FLEX", "FLEX", "SUPER_FLEX")
 POSITIONS = ("QB", "RB", "WR", "TE", "K")
+# The interactive GM game also plays team defenses. The season simulator never
+# sees DEF (``inputs.normalize_slots`` keeps only STRICT_SLOTS), so these stay
+# separate from the tuples above.
+GAME_POSITIONS = POSITIONS + ("DEF",)
+GAME_STRICT_SLOTS = STRICT_SLOTS + ("DEF",)
 POSTURES = ("win_now", "balanced", "rebuild")
 
 

@@ -11,12 +11,13 @@ insert; a lost write race is a 409 the client retries.
 from __future__ import annotations
 
 import functools
+import json
 import secrets
 import threading
 import time
 import uuid
 from dataclasses import dataclass
-from typing import Any, Callable, ContextManager
+from typing import Any, Callable, ContextManager, Mapping
 
 from fastapi import APIRouter, Body, Depends, HTTPException
 from fastapi.responses import JSONResponse
@@ -26,15 +27,25 @@ from modules.sim import game_actions as act
 from modules.sim import game_draft as draft
 from modules.sim import game_view as view
 from modules.sim.game_ai import TradeDesk
-from modules.sim.game_engine import advance, finish_draft
+from modules.sim.game_engine import advance, finish_draft, start_from_league
 from modules.sim.game_eval import Evaluator
 from modules.sim.game_result import build_result
 from modules.sim.game_scoring import default_model
-from modules.sim.game_setup import build_snapshot, finalize_pool
+from modules.sim.game_setup import build_league_snapshot, build_snapshot, finalize_pool, league_settings
 from modules.sim.game_state import Emitter, GameState
 from modules.sim.game_store import GameConflict, GameStore, public_game_row
+from modules.sim.game_mode import mode_options
 from modules.sim.game_types import (
+    BENCH_RANGE,
+    DEFAULT_BENCH,
+    DEFAULT_SCORING,
+    DEFAULT_TEAMS,
     DIFFICULTIES,
+    DRAFT_SPARE_SPOTS,
+    START_FRESH,
+    START_KINDS,
+    START_LEAGUE,
+    TE_PREMIUMS,
     GAME_ENGINE_VERSION,
     MAX_GAMES_FREE,
     MAX_GAMES_PRO,
@@ -49,7 +60,7 @@ from modules.sim.game_types import (
 from modules.sim.personas import PERSONAS
 from modules.sim.rng import WorldRng
 from modules.sim.store import SimStoreError
-from modules.sim.types import SimInputsError
+from modules.sim.types import GAME_POSITIONS, POSITIONS, SimInputsError
 
 POOL_TTL_SECONDS = 1800
 _POOL_CACHE: dict[str, tuple[float, Any]] = {}
@@ -76,6 +87,7 @@ class GameApiCtx:
     store_for: Callable[[dict[str, Any]], GameStore]
     inputs: Any
     compute: Callable[[], ContextManager[bool]]  # bounded pool: yields False when full
+    sleeper_username: Callable[[dict[str, Any]], str] | None = None  # for "start from one of my leagues"
 
 
 class LineupSlotBody(BaseModel):
@@ -144,20 +156,28 @@ def _premium(state: GameState | None) -> dict[str, Any]:
     }
 
 
-def _pool_for(inputs: Any, scoring: str):
+POOL_CACHE_MAX = 24
+# Why "start of this season" rosters are not offered (see docs/fantasy-sim-api.md).
+SEASON_START_UNAVAILABLE = "no_roster_history"
+
+
+def _pool_for(inputs: Any, scoring: Mapping[str, float]):
     """The player pool is read once per scoring format per half hour; every new
     game freezes its own copy, so this cache never affects a saved game."""
 
+    key = json.dumps(sorted((str(k), float(v)) for k, v in scoring.items()))
     now = time.monotonic()
     with _POOL_LOCK:
-        hit = _POOL_CACHE.get(scoring)
+        hit = _POOL_CACHE.get(key)
         if hit and now - hit[0] < POOL_TTL_SECONDS:
             return hit[1]
     if not hasattr(inputs, "player_pool"):
         raise SimInputsError("players_unavailable")
-    pool = inputs.player_pool(SCORING_PRESETS[scoring])
+    pool = inputs.player_pool(dict(scoring))
     with _POOL_LOCK:
-        _POOL_CACHE[scoring] = (now, pool)
+        _POOL_CACHE[key] = (now, pool)
+        while len(_POOL_CACHE) > POOL_CACHE_MAX:
+            _POOL_CACHE.pop(min(_POOL_CACHE, key=lambda k: _POOL_CACHE[k][0]))
     return pool
 
 
@@ -235,6 +255,11 @@ def add_routes(router: APIRouter, ctx: GameApiCtx) -> None:
 
         if state.status != "drafting":
             return
+        if snap.start_rosters:  # an imported league never drafts: finish its interrupted start
+            em = Emitter(state, snap)
+            start_from_league(em, snap, state, seed)
+            commit(store, uid, game_id, snap, state, em, checkpoint=True)
+            return
         dctx = draft.DraftContext(snap, state)
         if dctx.on_clock() is not None and dctx.on_clock() != snap.user_team.tid:
             em = Emitter(state, snap)
@@ -252,19 +277,37 @@ def add_routes(router: APIRouter, ctx: GameApiCtx) -> None:
         return {
             **_env(pro, None), "engine_version": GAME_ENGINE_VERSION,
             "max_games": MAX_GAMES_PRO if pro else MAX_GAMES_FREE,
+            # Quick start = every default below; everything else is "Advanced options".
             "options": {
-                "teams": {"values": list(TEAM_COUNTS), "default": 12},
-                "scoring": {"values": list(SCORING_NAMES), "default": "ppr"},
+                "mode": {"values": [m["id"] for m in mode_options() if m["available"]], "default": "redraft",
+                         "modes": mode_options()},
+                "teams": {"values": list(TEAM_COUNTS), "default": DEFAULT_TEAMS},
+                "scoring": {"values": list(SCORING_NAMES), "default": DEFAULT_SCORING},
+                "te_premium": {"values": list(TE_PREMIUMS), "default": 0.0},
+                "superflex": {"default": False},
+                "include_k": {"default": True},
+                "include_def": {"default": False},
+                "bench": {"min": BENCH_RANGE[0], "max": BENCH_RANGE[1], "default": DEFAULT_BENCH},
                 "difficulty": {"values": list(DIFFICULTIES), "default": "normal"},
-                "user_slot": {"min": 1, "max": 12, "default": None},
+                "user_slot": {"min": 1, "max": max(TEAM_COUNTS), "default": None},
                 "auto_lineup": {"default": False},
             },
+            # Draft rounds are derived: roster size minus the spots left for the wire.
+            "layout": {"base_slots": ["QB", "RB", "RB", "WR", "WR", "TE", "FLEX"], "draft_spare_spots": DRAFT_SPARE_SPOTS},
+            "start_modes": [
+                {"id": START_FRESH, "available": True},
+                {"id": START_LEAGUE, "available": hasattr(ctx.inputs, "league_import") and ctx.sleeper_username is not None},
+                {"id": "season_start", "available": False, "reason": SEASON_START_UNAVAILABLE},
+            ],
             "season": {
                 "regular_weeks": s.regular_weeks, "playoff_weeks": s.playoff_weeks, "playoff_teams": s.playoff_teams,
                 "trade_deadline_week": s.trade_deadline_week, "roster_limit": s.roster_limit,
                 "draft_rounds": s.rounds, "slots": list(s.slots),
             },
-            "personas": [{"id": p.pid, "label": p.label, "blurb": p.blurb} for p in PERSONAS.values()],
+            "personas": [
+                {"id": p.pid, "label": p.label, "blurb": s.policy.blurbs.get(p.pid, p.blurb)}
+                for p in PERSONAS.values()
+            ],
         }
 
     # ----------------------------------------------------------- create/list
@@ -278,31 +321,59 @@ def add_routes(router: APIRouter, ctx: GameApiCtx) -> None:
         team_name = str(raw.pop("team_name", "") or "").strip()
         if len(team_name) > 40:
             raise ValueError("team_name must be at most 40 characters.")
+        start = raw.pop("start", START_FRESH) or START_FRESH
+        if start not in START_KINDS:
+            raise ValueError("start must be one of: " + ", ".join(START_KINDS))
+        league_id = str(raw.pop("league_id", "") or "").strip()
+        roster_id = str(raw.pop("roster_id", "") or "").strip()
         seed = secrets.randbits(62)
-        if raw.get("user_slot") is None:
-            teams = raw.get("teams", 12)
-            n = teams if isinstance(teams, int) and not isinstance(teams, bool) and teams in TEAM_COUNTS else 12
-            raw["user_slot"] = int(WorldRng(seed).stream(0, "gsetup", 7).integers(1, n + 1))
-        settings = GameSettings.parse(raw)
+        if start == START_LEAGUE:
+            if not league_id or len(league_id) > 64:
+                raise ValueError("league_id is required.")
+            # Size, scoring and lineup come from the league; only these two are the player's choice.
+            picked = GameSettings.parse({k: raw[k] for k in ("difficulty", "auto_lineup") if k in raw})
+        else:
+            if raw.get("user_slot") is None:
+                teams = raw.get("teams", DEFAULT_TEAMS)
+                n = teams if isinstance(teams, int) and not isinstance(teams, bool) and teams in TEAM_COUNTS else DEFAULT_TEAMS
+                raw["user_slot"] = int(WorldRng(seed).stream(0, "gsetup", 7).integers(1, n + 1))
+            settings = GameSettings.parse(raw)
         store = ctx.store_for(user)
         limit = MAX_GAMES_PRO if pro else MAX_GAMES_FREE
         if store.count_games(uid) >= limit:
             return {**_env(pro, None, "game_limit_reached", max_games=limit),
                     "upsell": None if pro else UPSELL_MORE_GAMES}
+        if start == START_LEAGUE and not (hasattr(ctx.inputs, "league_import") and ctx.sleeper_username is not None):
+            return _env(pro, None, "league_unavailable")
         with ctx.compute() as ok:
             if not ok:
                 return busy()
             try:
-                pool = _pool_for(ctx.inputs, settings.scoring)
+                if start == START_LEAGUE:
+                    imported = ctx.inputs.league_import(
+                        league_id, username=ctx.sleeper_username(user), roster_id=roster_id)
+                    settings = league_settings(imported, difficulty=picked.difficulty, auto_lineup=picked.auto_lineup)
+                    pool = _pool_for(ctx.inputs, settings.scoring_settings)
+                    snap = build_league_snapshot(
+                        pool.rows, pool.bye_weeks, imported, settings, seed, user_team_name=team_name,
+                        scoring_model=default_model().model_id, notes=pool.notes,
+                    )
+                else:
+                    pool = _pool_for(ctx.inputs, settings.scoring_settings)
+                    snap = build_snapshot(
+                        pool.rows, pool.bye_weeks, settings, seed, user_team_name=team_name or "Your Team",
+                        scoring_model=default_model().model_id, notes=pool.notes,
+                    )
             except SimInputsError as exc:
                 return _env(pro, None, exc.code)
-            snap = build_snapshot(
-                pool.rows, pool.bye_weeks, settings, seed, user_team_name=team_name or "Your Team",
-                scoring_model=default_model().model_id, notes=pool.notes,
-            )
         row = store.create_game(uid, snapshot=snap, seed=seed)
         state = GameState(snap)
         em = Emitter(state, snap)
+        if start == START_LEAGUE:
+            start_from_league(em, snap, state, seed)
+            commit(store, uid, row["id"], snap, state, em, checkpoint=True)
+            row = {**row, "status": state.status}
+            return {**_env(pro, state), "game": game_json(row, snap, state, pro)}
         dctx = draft.DraftContext(snap, state)
         draft.run_ai_picks(dctx, em, seed)
         commit(store, uid, row["id"], snap, state, em)
@@ -418,8 +489,8 @@ def add_routes(router: APIRouter, ctx: GameApiCtx) -> None:
         pro = ctx.is_pro(user)
         _, _, _, snap, state = load(user, _gid(game_id))
         pos = pos.upper()
-        if pos and pos not in ("QB", "RB", "WR", "TE", "K"):
-            raise ValueError("pos must be one of QB, RB, WR, TE, K.")
+        if pos and pos not in GAME_POSITIONS:
+            raise ValueError("pos must be one of QB, RB, WR, TE, K, DEF.")
         if status not in ("", "available", "rostered", "mine", "injured", "bye"):
             raise ValueError("status must be available, rostered, mine, injured or bye.")
         if sort not in view.SORTS:
@@ -669,7 +740,7 @@ def add_preview_route(router: APIRouter, ctx: GameApiCtx) -> None:
         if scoring not in SCORING_NAMES:
             raise HTTPException(status_code=422, detail="scoring must be one of: " + ", ".join(SCORING_NAMES))
         pos = pos.upper()
-        if pos and pos not in ("QB", "RB", "WR", "TE", "K"):
+        if pos and pos not in POSITIONS:
             raise HTTPException(status_code=422, detail="pos must be one of QB, RB, WR, TE, K.")
         if sort not in ("projection", "value", "adp", "age", "name"):
             raise HTTPException(status_code=422, detail="sort must be projection, value, adp, age or name.")
@@ -679,7 +750,7 @@ def add_preview_route(router: APIRouter, ctx: GameApiCtx) -> None:
                     status_code=503, headers={"Retry-After": "5"},
                     content={"ok": False, "code": "server_busy", "reason": "sim_busy", "error": "The simulator is busy."})
             try:
-                pool = _pool_for(ctx.inputs, scoring)
+                pool = _pool_for(ctx.inputs, SCORING_PRESETS[scoring])
                 players = finalize_pool(pool.rows, GameSettings.parse({"scoring": scoring}))
             except SimInputsError as exc:
                 return {"ok": True, "reason": exc.code, "players": [], "total": 0, "page": 1, "page_size": 0, "scoring": scoring}

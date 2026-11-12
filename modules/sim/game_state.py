@@ -133,6 +133,13 @@ def _draft_pick(state, snap, week, p):
         state.queue.remove(p["pid"])
 
 
+def _league_rosters(state, snap, week, p):
+    """A game imported from a real league starts from the snapshot's frozen
+    copy of every team's roster instead of a draft."""
+
+    state.rosters = {t.tid: list(snap.start_rosters.get(t.tid, ())) for t in snap.teams}
+
+
 def _draft_queue(state, snap, week, p):
     state.queue = [str(x) for x in p["pids"]]
 
@@ -291,6 +298,7 @@ def _week_advanced(state, snap, week, p):
 
 _HANDLERS = {
     "draft_pick": _draft_pick, "draft_queue": _draft_queue, "draft_complete": _draft_complete,
+    "league_rosters": _league_rosters, "league_start": _draft_complete,
     "lineup_set": _lineup_set, "waiver_claim": _waiver_claim, "waiver_cancel": _waiver_cancel,
     "waiver_result": _waiver_result, "cut": _cut, "drop": _cut, "trade": _trade,
     "trade_reject": _offer_key, "trade_counter": _offer_key, "inbox_offer": _inbox_offer,

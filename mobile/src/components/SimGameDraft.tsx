@@ -22,6 +22,7 @@ import {
   simFmtValue,
   simPickLabel,
   simQueueReducer,
+  simPositionsFor,
   simRosterNeeds,
   simValueOverAdpLabel,
   simValueOverAdpTone,
@@ -209,6 +210,7 @@ export function SimGameDraft({ ctx, onComplete }: { ctx: SimCtx; onComplete: (re
       gameId={gameId}
       fixedStatus="available"
       initial={{ sort: 'adp' }}
+      positions={simPositionsFor(game.settings.slots)}
       onOpen={ctx.openPlayer}
       actions={boardActions}
       refreshKey={ctx.tick}
@@ -247,7 +249,7 @@ export function SimGameDraft({ ctx, onComplete }: { ctx: SimCtx; onComplete: (re
     if (panel === 'roster') {
       return (
         <View style={common.stack}>
-          <SectionHeading title="Your roster" caption="Starters need QB, 2 RB, 2 WR, TE, a FLEX and K." />
+          <SectionHeading title="Your roster" caption={`Starters: ${game.settings.slots.join(', ')}.`} />
           <View style={styles.needs}>
             {needs.map((n) => (
               <View key={n.pos} style={styles.need}>

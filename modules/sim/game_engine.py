@@ -343,8 +343,12 @@ def generate_offers(em: Emitter, snap: GameSnapshot, state: GameState, seed: int
     return min(len(found), MAX_OFFERS_PER_WEEK)
 
 
-def finish_draft(em: Emitter, snap: GameSnapshot, state: GameState, seed: int) -> dict[str, Any]:
-    """Draft over: set every lineup, queue week-1 offers, start the season."""
+def finish_draft(
+    em: Emitter, snap: GameSnapshot, state: GameState, seed: int, *, closing: str = "draft_complete"
+) -> dict[str, Any]:
+    """Draft over: set every lineup, queue week-1 offers, start the season.
+    (``closing`` is the event that starts week 1: a league import closes with
+    ``league_start`` instead of ``draft_complete``; the fold treats both alike.)"""
 
     ev = Evaluator(snap, state)
     for tid in snap.tids:
@@ -352,8 +356,16 @@ def finish_draft(em: Emitter, snap: GameSnapshot, state: GameState, seed: int) -
         em.emit(1, "engine", "lineup_set", team=tid, slots=slots, auto=True)
     recap = draft_recap(snap, state)
     generate_offers(em, snap, state, seed, 1)
-    em.emit(1, "engine", "draft_complete", recap=recap)
+    em.emit(1, "engine", closing, recap=recap)
     return recap
+
+
+def start_from_league(em: Emitter, snap: GameSnapshot, state: GameState, seed: int) -> dict[str, Any]:
+    """Begin a game imported from a real league: load the frozen rosters, then
+    the same week-1 setup a finished draft gets."""
+
+    em.emit(0, "engine", "league_rosters")
+    return finish_draft(em, snap, state, seed, closing="league_start")
 
 
 def _team_score(lineup: Sequence[Sequence[Any]], pts: dict[str, float]) -> float:
@@ -546,7 +558,7 @@ def advance(em: Emitter, snap: GameSnapshot, state: GameState, seed: int) -> lis
 
 
 __all__ = [
-    "advance", "run_week", "finish_draft", "check_can_advance", "rank_teams", "standing_rows",
+    "advance", "run_week", "finish_draft", "start_from_league", "check_can_advance", "rank_teams", "standing_rows",
     "bracket_slots", "waiver_order", "user_alive", "session_for", "ScoringSession", "generate_offers",
     "fill_empty_slots",
 ]

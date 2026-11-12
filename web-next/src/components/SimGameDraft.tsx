@@ -19,6 +19,7 @@ import {
   simFmtValue,
   simPickLabel,
   simQueueReducer,
+  simPositionsFor,
   simRosterNeeds,
   simValueOverAdpLabel,
   simValueOverAdpTone,
@@ -200,6 +201,7 @@ export function SimGameDraft({ ctx, onComplete }: { ctx: SimCtx; onComplete: (re
       gameId={gameId}
       fixedStatus="available"
       initial={{ sort: "adp" }}
+      positions={simPositionsFor(game.settings.slots)}
       onOpen={ctx.openPlayer}
       actions={boardActions}
       refreshKey={ctx.tick}
@@ -248,8 +250,8 @@ export function SimGameDraft({ ctx, onComplete }: { ctx: SimCtx; onComplete: (re
     if (which === "roster") {
       return (
         <section className="flex flex-col gap-2" aria-label="Your roster">
-          <SectionHeading note="Starters need QB, 2 RB, 2 WR, TE, a FLEX and K.">Your roster</SectionHeading>
-          <ul className="grid grid-cols-5 gap-2" aria-label="Roster needs">
+          <SectionHeading note={`Starters: ${game.settings.slots.join(", ")}.`}>Your roster</SectionHeading>
+          <ul className="grid gap-2" style={{ gridTemplateColumns: `repeat(${needs.length}, minmax(0, 1fr))` }} aria-label="Roster needs">
             {needs.map((n) => (
               <li key={n.pos} className="glass-surface p-2 text-center">
                 <p className="text-xs font-bold">{n.pos}</p>

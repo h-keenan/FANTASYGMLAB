@@ -55,7 +55,7 @@ class ScoringModel:
 
 # ------------------------------------------------------------------ fallback
 
-_FALLBACK_INJURY_RATE = {"QB": 0.02, "RB": 0.06, "WR": 0.045, "TE": 0.04, "K": 0.005}
+_FALLBACK_INJURY_RATE = {"QB": 0.02, "RB": 0.06, "WR": 0.045, "TE": 0.04, "K": 0.005, "DEF": 0.0}
 
 
 @dataclass(frozen=True)
@@ -119,6 +119,8 @@ def calendar_weeks_out(profile: Any, week: int) -> int:
             last = w - week
         w += 1
     return last
+
+
 
 
 class PlayerModelAdapter(ScoringModel):

@@ -12,16 +12,21 @@ from typing import Any, Iterable, Mapping
 
 
 from modules.sim.game_types import (
+    FLEX_SHARE,
     POOL_CAPS,
+    SINGLETON_POSITIONS,
+    START_LEAGUE,
     GamePlayer,
     GameSettings,
     GameSnapshot,
     GameTeam,
+    LeagueImport,
+    scoring_label,
 )
 from modules.sim.personas import assign_personas
 from modules.sim.rng import WorldRng
 from modules.sim.synthetic import round_robin
-from modules.sim.types import POSITIONS, STRICT_SLOTS
+from modules.sim.types import GAME_POSITIONS, SimInputsError
 
 TEAM_NAMES = (
     "Gridiron Ghosts", "Blitz Brigade", "Red Zone Rascals", "Hail Mary Heroes", "Pocket Aces",
@@ -36,8 +41,6 @@ OWNER_NAMES = (
     "Sade Okafor", "Wes Holloway", "Mira Lindqvist", "Odell Grant", "Tessa Vance", "Rafael Quinn",
     "Noor Haddad", "Gus Palmer", "Yuki Tanaka", "Bea Mercer", "Idris Cole", "Frankie Doyle",
 )
-_FLEX_SHARE = {"RB": 0.40, "WR": 0.45, "TE": 0.15}
-_VORP_WEIGHT = 0.75
 SYNTHETIC_BYE_FIRST_WEEK = 5
 SYNTHETIC_BYE_LAST_WEEK = 14
 
@@ -50,41 +53,44 @@ def _num(value: Any, default: float = 0.0) -> float:
     return number if number == number else default
 
 
-def finalize_pool(rows: Iterable[Mapping[str, Any]], settings: GameSettings) -> dict[str, GamePlayer]:
+def finalize_pool(
+    rows: Iterable[Mapping[str, Any]], settings: GameSettings, keep: Iterable[str] = ()
+) -> dict[str, GamePlayer]:
     """Trim the raw rows to the fantasy-relevant pool and compute each player's
     one-season draft ``value`` (value over replacement blended with market) and
-    ``adp`` (rank by that value)."""
+    ``adp`` (rank by that value).
 
+    Only positions this league plays exist (no kickers without a K slot, no
+    defenses without a DEF slot). ``keep`` are ids that must stay even if the
+    position cap would trim them (an imported league's rostered players)."""
+
+    positions = settings.pool_positions
+    keep_ids = {str(k) for k in keep}
     best: dict[str, Mapping[str, Any]] = {}
     for row in rows:
         pid = str(row.get("pid") or "")
         pos = str(row.get("pos") or "").upper()
-        if not pid or pos not in POSITIONS or _num(row.get("mean")) <= 0:
+        if not pid or pos not in positions or _num(row.get("mean")) <= 0:
             continue
         if pid not in best:
             best[pid] = row
-    by_pos: dict[str, list[Mapping[str, Any]]] = {p: [] for p in POSITIONS}
+    by_pos: dict[str, list[Mapping[str, Any]]] = {p: [] for p in positions}
     for pid in sorted(best):
         by_pos[str(best[pid]["pos"]).upper()].append(best[pid])
     kept: list[Mapping[str, Any]] = []
     for pos, rs in by_pos.items():
         rs.sort(key=lambda r: (-_num(r.get("market")), -_num(r.get("mean")), str(r["pid"])))
         kept.extend(rs[: POOL_CAPS[pos]])
+        kept.extend(r for r in rs[POOL_CAPS[pos]:] if str(r["pid"]) in keep_ids)
 
-    strict = {pos: sum(1 for s in settings.slots if s == pos) for pos in STRICT_SLOTS}
-    flex_slots = sum(1 for s in settings.slots if s not in STRICT_SLOTS)
-    repl: dict[str, float] = {}
-    for pos in POSITIONS:
-        starters = settings.teams * (strict.get(pos, 0) + flex_slots * _FLEX_SHARE.get(pos, 0.0))
-        index = int(round(starters + settings.teams * (0.5 if pos == "K" else 1.0)))
-        means = sorted((_num(r["mean"]) for r in by_pos[pos]), reverse=True)
-        repl[pos] = means[min(index, len(means) - 1)] if means else 0.0
+    repl = replacement_levels(settings, by_pos)
     vor = {str(r["pid"]): max(0.0, _num(r["mean"]) - repl[str(r["pos"]).upper()]) for r in kept}
     max_vor = max(vor.values(), default=0.0) or 1.0
     max_market = max((_num(r.get("market")) for r in kept), default=0.0) or 1.0
+    weight = settings.policy.vorp_weight
     raw_value = {
-        str(r["pid"]): _VORP_WEIGHT * 100.0 * vor[str(r["pid"])] / max_vor
-        + (1.0 - _VORP_WEIGHT) * 100.0 * _num(r.get("market")) / max_market
+        str(r["pid"]): weight * 100.0 * vor[str(r["pid"])] / max_vor
+        + (1.0 - weight) * 100.0 * _num(r.get("market")) / max_market
         for r in kept
     }
     order = sorted(raw_value, key=lambda p: (-raw_value[p], p))
@@ -103,6 +109,23 @@ def finalize_pool(rows: Iterable[Mapping[str, Any]], settings: GameSettings) -> 
             extra={str(k): float(v) for k, v in (r.get("extra") or {}).items() if isinstance(v, (int, float))},
         )
     return players
+
+
+def replacement_levels(settings: GameSettings, by_pos: Mapping[str, list[Mapping[str, Any]]]) -> dict[str, float]:
+    """Weekly mean of the first player a team would not start, per position:
+    league-wide starters at the position (strict slots plus each flex slot's
+    expected share) plus one bench player per team (half for K and DEF)."""
+
+    out: dict[str, float] = {}
+    for pos in GAME_POSITIONS:
+        strict = sum(1 for s in settings.slots if s == pos)
+        flex = sum(FLEX_SHARE.get(s, {}).get(pos, 0.0) for s in settings.slots if s in FLEX_SHARE)
+        starters = settings.teams * (strict + flex)
+        buffer = settings.teams * (0.5 if pos in SINGLETON_POSITIONS else 1.0)
+        index = int(round(starters + buffer))
+        means = sorted((_num(r["mean"]) for r in by_pos.get(pos, ())), reverse=True)
+        out[pos] = means[min(index, len(means) - 1)] if means else 0.0
+    return out
 
 
 def synthetic_byes(nfl_teams: Iterable[str], regular_weeks: int, seed: int) -> dict[str, int]:
@@ -130,6 +153,14 @@ def resolve_byes(
     return {**synthetic, **usable} if usable else synthetic, ["byes_synthetic"]
 
 
+def require_pool(players: Mapping[str, GamePlayer], settings: GameSettings) -> None:
+    """Every team needs a kicker / defense to start if the league has the slot."""
+
+    for pos in SINGLETON_POSITIONS:
+        if pos in settings.slots and sum(1 for p in players.values() if p.pos == pos) < settings.teams:
+            raise SimInputsError(f"{pos.lower()}_unavailable")
+
+
 def build_snapshot(
     rows: Iterable[Mapping[str, Any]],
     bye_weeks: Mapping[str, int],
@@ -141,6 +172,7 @@ def build_snapshot(
     notes: Iterable[str] = (),
 ) -> GameSnapshot:
     players = finalize_pool(rows, settings)
+    require_pool(players, settings)
     if len(players) < settings.teams * settings.rounds:
         raise ValueError("player pool too small for this draft")
     byes, bye_notes = resolve_byes(players, bye_weeks, settings, seed)
@@ -183,6 +215,82 @@ def build_snapshot(
     )
 
 
+def league_settings(
+    imported: LeagueImport, *, difficulty: str, auto_lineup: bool, regular_weeks: int = 14, trade_deadline_week: int = 10
+) -> GameSettings:
+    """Game settings that mirror a real league: its size, lineup, scoring and
+    playoff field, over a fresh 14-week season."""
+
+    n = len(imported.teams)
+    user = next(i for i, t in enumerate(imported.teams) if t.is_user) + 1
+    limit = max(len(imported.slots) + imported.bench, max(len(t.roster) for t in imported.teams))
+    scoring = {str(k): float(v) for k, v in imported.scoring_settings.items()}
+    return GameSettings(
+        teams=n, scoring=scoring_label(scoring), difficulty=difficulty, user_slot=user, auto_lineup=auto_lineup,
+        slots=imported.slots, rounds=0, roster_limit=limit, regular_weeks=regular_weeks,
+        playoff_teams=max(2, min(imported.playoff_teams, n)), trade_deadline_week=trade_deadline_week,
+        te_premium=float(scoring.get("bonus_rec_te", 0.0) or 0.0),
+        superflex="SUPER_FLEX" in imported.slots, include_k="K" in imported.slots,
+        include_def="DEF" in imported.slots, bench=limit - len(imported.slots),
+        start=START_LEAGUE, custom_scoring=scoring,
+    )
+
+
+def build_league_snapshot(
+    rows: Iterable[Mapping[str, Any]],
+    bye_weeks: Mapping[str, int],
+    imported: LeagueImport,
+    settings: GameSettings,
+    seed: int,
+    *,
+    user_team_name: str = "",
+    scoring_model: str = "",
+    notes: Iterable[str] = (),
+) -> GameSnapshot:
+    """A game that starts in week 1 with a real league's rosters (frozen copy).
+    Rostered players the pool cannot project are dropped from their team and
+    counted in the notes; free agents are the rest of the pool."""
+
+    rostered = {p for t in imported.teams for p in t.roster}
+    players = finalize_pool(rows, settings, keep=rostered)
+    require_pool(players, settings)
+    dropped = sum(1 for p in rostered if p not in players)
+    byes, bye_notes = resolve_byes(players, bye_weeks, settings, seed)
+    rng = WorldRng(seed)
+    ai_ids = [t.tid for t in imported.teams if not t.is_user]
+    strength = rng.stream(0, "gsetup", 5).random(max(1, len(ai_ids)))
+    personas = assign_personas(
+        rng.stream(0, "persona", 1), ai_ids,
+        {tid: float(strength[i]) for i, tid in enumerate(ai_ids)}, {tid: 26.0 for tid in ai_ids},
+    )
+    coins = rng.stream(0, "gsetup", 4).permutation(len(imported.teams))
+    teams: list[GameTeam] = []
+    start_rosters: dict[str, tuple[str, ...]] = {}
+    for i, t in enumerate(imported.teams):
+        start_rosters[t.tid] = tuple(p for p in t.roster if p in players)
+        if t.is_user:
+            teams.append(GameTeam(
+                tid=t.tid, name=(user_team_name or t.name)[:40] or "Your Team", owner="You", is_user=True,
+                persona_id="you", draft_slot=i + 1, coin=int(coins[i]),
+            ))
+            continue
+        persona = personas[t.tid]
+        teams.append(GameTeam(
+            tid=t.tid, name=t.name[:40] or f"Team {t.tid}", owner=t.owner[:40], is_user=False,
+            persona_id=persona.pid, draft_slot=i + 1, coin=int(coins[i]),
+            horizon=persona.params.horizon, pos_bias=dict(persona.params.pos_bias),
+        ))
+    order = [imported.teams[int(i)].tid for i in rng.stream(0, "gsetup", 6).permutation(len(imported.teams))]
+    schedule = round_robin(order, settings.regular_weeks)
+    extra = list(notes) + list(imported.notes) + list(bye_notes)
+    if dropped:
+        extra.append(f"roster_players_not_projected:{dropped}")
+    return GameSnapshot(
+        settings=settings, teams=tuple(teams), players=players, bye_weeks=byes, schedule=schedule,
+        scoring_model=scoring_model, notes=tuple(extra), start_rosters=start_rosters,
+    )
+
+
 def draft_order(snapshot: GameSnapshot) -> list[str]:
     """Snake order: team id on the clock for each overall pick (0-based)."""
 
@@ -199,4 +307,4 @@ def pick_round(snapshot: GameSnapshot, pick_index: int) -> int:
     return pick_index // snapshot.settings.teams + 1
 
 
-__all__ = ["finalize_pool", "build_snapshot", "draft_order", "pick_round", "synthetic_byes", "resolve_byes"]
+__all__ = ["finalize_pool", "replacement_levels", "require_pool", "league_settings", "build_league_snapshot", "build_snapshot", "draft_order", "pick_round", "synthetic_byes", "resolve_byes"]

@@ -30,6 +30,16 @@ import {
   simSlotAccepts,
   simSlotCandidates,
   simSlotLabels,
+  simDeriveLayout,
+  simImportableLeagues,
+  simPositionsFor,
+  simSettingsSummary,
+  simSetupAdvancedChanged,
+  simSetupBlock,
+  simSetupBody,
+  simSetupDefaults,
+  simSetupSummary,
+  simTradable,
   simTradeClosedReason,
   simTradeKey,
   simTradePayload,
@@ -343,5 +353,104 @@ describe("trade builder", () => {
     expect(simTradeClosedReason({ can_trade: true, phase: "regular_season", trade_deadline_week: 10 })).toBeNull();
     expect(simTradeClosedReason({ can_trade: false, phase: "playoffs", trade_deadline_week: 10 })).toMatch(/playoffs/);
     expect(simTradeClosedReason({ can_trade: false, phase: "regular_season", trade_deadline_week: 10 })).toMatch(/deadline/);
+  });
+});
+
+
+describe("league settings and start modes (setup)", () => {
+  const options = {
+    options: {
+      teams: { values: [8, 10, 12, 14], default: 12 },
+      scoring: { values: ["ppr", "half", "std"], default: "half" },
+      te_premium: { values: [0, 0.5, 1], default: 0 },
+      superflex: { default: false },
+      include_k: { default: true },
+      include_def: { default: false },
+      bench: { min: 4, max: 10, default: 8 },
+      difficulty: { values: ["easy", "normal", "hard"], default: "normal" },
+      user_slot: { min: 1, max: 14, default: null },
+      auto_lineup: { default: false },
+    },
+    layout: { base_slots: ["QB", "RB", "RB", "WR", "WR", "TE", "FLEX"], draft_spare_spots: 2 },
+  } as unknown as Parameters<typeof simSetupDefaults>[0];
+
+  it("quick start is 12 teams, half PPR and the standard lineup", () => {
+    const d = simSetupDefaults(options);
+    expect(d).toMatchObject({ start: "fresh", teams: 12, scoring: "half", tePremium: 0, superflex: false, includeK: true, includeDef: false, bench: 8 });
+    expect(simSetupDefaults(null)).toMatchObject({ teams: 12, scoring: "half", bench: 8, includeK: true });
+    expect(simSetupBody(d)).toEqual({ difficulty: "normal", auto_lineup: false, teams: 12, scoring: "half", te_premium: 0, superflex: false, include_k: true, include_def: false, bench: 8, mode: "redraft", user_slot: null });
+  });
+
+  it("derives lineup, roster size and draft rounds exactly like the engine (same table as the backend test)", () => {
+    const table: [boolean, boolean, boolean, number, number, number, number][] = [
+      [false, true, false, 8, 8, 16, 14],
+      [true, true, false, 8, 9, 17, 15],
+      [true, false, true, 6, 9, 15, 13],
+      [false, false, false, 4, 7, 11, 9],
+      [true, true, true, 10, 10, 20, 18],
+    ];
+    for (const [superflex, includeK, includeDef, bench, slots, limit, rounds] of table) {
+      const got = simDeriveLayout({ superflex, includeK, includeDef, bench });
+      expect([got.slots.length, got.rosterLimit, got.rounds]).toEqual([slots, limit, rounds]);
+      expect([got.slots.includes("SUPER_FLEX"), got.slots.includes("K"), got.slots.includes("DEF")]).toEqual([superflex, includeK, includeDef]);
+    }
+    expect(simDeriveLayout(simSetupDefaults(null)).slots).toEqual(["QB", "RB", "RB", "WR", "WR", "TE", "FLEX", "K"]);
+  });
+
+  it("sends advanced options and counts what changed", () => {
+    const d = simSetupDefaults(options);
+    const s = { ...d, teams: 14, scoring: "std" as const, tePremium: 0.5, superflex: true, includeDef: true, bench: 6, slot: "3", name: " Mine " };
+    expect(simSetupBody(s)).toMatchObject({ teams: 14, scoring: "std", te_premium: 0.5, superflex: true, include_def: true, bench: 6, user_slot: 3, team_name: "Mine" });
+    expect(simSetupAdvancedChanged(s, d)).toBe(6);
+    expect(simSetupAdvancedChanged(d, d)).toBe(0);
+    expect(simSetupSummary(s, options?.layout)).toBe("14 teams, 14-round snake draft. Starters: QB, RB, RB, WR, WR, TE, FLEX, SUPER_FLEX, K, DEF. Roster 16.");
+  });
+
+  it("starting from a league sends only what the league does not decide, and needs a league", () => {
+    const d = { ...simSetupDefaults(options), start: "league" as const, teams: 8, name: "", leagueId: "" };
+    expect(simSetupBlock(d)).toMatch(/Pick one of your leagues/);
+    const ready = { ...d, leagueId: "123", difficulty: "hard" as const, auto: true };
+    expect(simSetupBlock(ready)).toBeNull();
+    expect(simSetupBody(ready)).toEqual({ difficulty: "hard", auto_lineup: true, start: "league", league_id: "123" });
+    expect(simSetupSummary(ready)).toMatch(/nothing changes in your real league/);
+    expect(simSetupBlock(simSetupDefaults(options))).toBeNull();
+  });
+
+  it("only offers Sleeper leagues (imported platforms carry a prefix)", () => {
+    const rows = [{ league_id: "111", league_name: "A" }, { league_id: "espn:5:2026", league_name: "B" }, { league_id: "mfl:1:2026", league_name: "C" }, { league_id: "", league_name: "D" }];
+    expect(simImportableLeagues(rows).map((r) => r.league_id)).toEqual(["111"]);
+    expect(simImportableLeagues(null)).toEqual([]);
+  });
+
+  it("knows superflex, rec flex, kickers and defenses", () => {
+    expect(simSlotAccepts("SUPER_FLEX", "QB")).toBe(true);
+    expect(simSlotAccepts("SUPER_FLEX", "K")).toBe(false);
+    expect(simSlotAccepts("FLEX", "QB")).toBe(false);
+    expect(simSlotAccepts("REC_FLEX", "WR")).toBe(true);
+    expect(simSlotAccepts("REC_FLEX", "RB")).toBe(false);
+    expect(simSlotAccepts("DEF", "DEF")).toBe(true);
+    expect(simSlotAccepts("K", "DEF")).toBe(false);
+    expect(simTradable("K")).toBe(false);
+    expect(simTradable("DEF")).toBe(false);
+    expect(simTradable("QB")).toBe(true);
+  });
+
+  it("filters positions and roster needs to what the league plays", () => {
+    const std = ["QB", "RB", "RB", "WR", "WR", "TE", "FLEX", "K"] as const;
+    expect(simPositionsFor([...std])).toEqual(["QB", "RB", "WR", "TE", "K"]);
+    expect(simPositionsFor([...std, "DEF"])).toEqual(["QB", "RB", "WR", "TE", "K", "DEF"]);
+    expect(simPositionsFor(["QB", "RB", "WR", "TE", "FLEX", "SUPER_FLEX"])).toEqual(["QB", "RB", "WR", "TE"]);
+    const needs = simRosterNeeds([player("1", "QB")], ["QB", "RB", "FLEX", "SUPER_FLEX", "DEF"]);
+    expect(needs.map((n) => n.pos)).toEqual(["QB", "RB", "WR", "TE", "DEF"]);
+    expect(needs.find((n) => n.pos === "QB")).toEqual({ pos: "QB", have: 1, starters: 1 });
+    expect(needs.find((n) => n.pos === "DEF")).toEqual({ pos: "DEF", have: 0, starters: 1 });
+  });
+
+  it("summarizes saved league settings and tolerates older saves", () => {
+    expect(simSettingsSummary({ teams: 14, scoring: "half", te_premium: 0.5, superflex: true, include_def: true, include_k: false, start: "league" })).toBe("14 teams · Half PPR · TE premium +0.5 · Superflex · DEF · No kickers · From your league");
+    expect(simSettingsSummary({ teams: 12, scoring: "ppr" })).toBe("12 teams · PPR");
+    expect(simSettingsSummary(undefined)).toBe("");
+    expect(simGameReasonMessage("team_not_found")).toMatch(/Sleeper username/);
+    expect(simGameReasonMessage("def_unavailable")).toMatch(/Advanced options/);
   });
 });

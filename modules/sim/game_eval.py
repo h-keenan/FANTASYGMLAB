@@ -14,7 +14,7 @@ from modules.sim.game_state import GameState
 from modules.sim.game_types import GameSnapshot, slot_positions
 from modules.sim.lineup import Assignment, SlotPlan, carry_lineup, pick_lineup
 from modules.sim.personas import PERSONAS, TeamParams
-from modules.sim.types import POSITIONS
+from modules.sim.types import GAME_POSITIONS
 
 PRIOR_GAMES = 5.0  # a projection counts as this many games of evidence
 NEED_K = 8.0  # value units per projected weekly lineup point
@@ -49,6 +49,7 @@ class Evaluator:
         self.snap = snapshot
         self.state = state
         self.plan = SlotPlan(snapshot.settings.slots)
+        self.policy = snapshot.settings.policy
         self._ros: dict[str, float] = {}
         self._ros_key = -1
         scale = getattr(snapshot, "_now_scale", None)
@@ -57,16 +58,24 @@ class Evaluator:
             object.__setattr__(snapshot, "_now_scale", scale)
         self.now_scale = scale
 
+    def base_value(self, pid: str) -> float:
+        """The long-run side of a player's worth: this season's settings-aware
+        value in redraft (rules 2), the dynasty market value in dynasty/legacy."""
+
+        p = self.snap.players[pid]
+        return p.value if self.policy.season_valuation else p.market
+
     def _compute_now_scale(self) -> dict[str, float]:
         scale: dict[str, float] = {}
-        for pos in POSITIONS:
+        base = (lambda p: p.value) if self.policy.season_valuation else (lambda p: p.market)
+        for pos in GAME_POSITIONS:
             rows = sorted(
                 (p for p in self.snap.players.values() if p.pos == pos and p.mean > 0),
-                key=lambda p: (-p.market, p.pid),
+                key=lambda p: (-base(p), p.pid),
             )[:24]
             if rows:
                 mean_mean = sum(p.mean for p in rows) / len(rows)
-                mean_market = sum(p.market for p in rows) / len(rows)
+                mean_market = sum(base(p) for p in rows) / len(rows)
                 scale[pos] = mean_market / mean_mean if mean_mean > 0 else 4.0
             else:
                 scale[pos] = 4.0
@@ -160,15 +169,18 @@ class Evaluator:
 
         regular = self.snap.settings.regular_weeks
         progress = min(1.0, max(0, self.state.week - 1) / max(1, regular))
-        return min(1.0, params.horizon + (1.0 - params.horizon) * 0.7 * progress)
+        return self.policy.horizon(min(1.0, params.horizon + (1.0 - params.horizon) * 0.7 * progress))
 
     def worth(self, params: TeamParams, pid: str) -> float:
         p = self.snap.players[pid]
         h = self.horizon_now(params)
         now = min(100.0, self.now_scale[p.pos] * self.ros_mean(pid))
         now *= 1.0 - min(self.state.out.get(pid, 0), 6) / 10.0
-        age_factor = max(0.4, 1.0 - (1.0 - h) * params.age_penalty * max(0.0, p.age - 26.0))
-        value = h * now + (1.0 - h) * p.market * age_factor
+        age_factor = (
+            1.0 if self.policy.season_valuation
+            else max(0.4, 1.0 - (1.0 - h) * params.age_penalty * max(0.0, p.age - 26.0))
+        )
+        value = h * now + (1.0 - h) * self.base_value(pid) * age_factor
         return value * (1.0 + params.pos_bias.get(p.pos, 0.0))
 
 

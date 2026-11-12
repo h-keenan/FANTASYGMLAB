@@ -5,7 +5,7 @@ from __future__ import annotations
 
 from typing import Callable, Iterable, Sequence
 
-from modules.sim.types import FLEX_ORDER, FLEX_SLOTS, STRICT_SLOTS
+from modules.sim.types import FLEX_ORDER, FLEX_SLOTS, GAME_STRICT_SLOTS as STRICT_SLOTS
 
 Entry = tuple[float, str, str]  # (score, pid, pos)
 Assignment = list[tuple[str, "str | None"]]  # (slot, pid or None)

@@ -17,7 +17,7 @@ from modules.sim import game_actions as act
 from modules.sim.analysis import CURVE_BASE, CURVE_SLOPE, PLAYOFF_LABEL, PLAYOFF_VALUE, letter_for
 from modules.sim.game_ai import TradeDesk
 from modules.sim.game_draft import DraftContext, draft_recap, run_ai_picks, set_queue, user_pick
-from modules.sim.game_engine import advance, finish_draft, standing_rows
+from modules.sim.game_engine import advance, finish_draft, standing_rows, start_from_league
 from modules.sim.game_eval import Evaluator
 from modules.sim.game_state import Emitter, GameState
 from modules.sim.game_types import GAME_ENGINE_VERSION, GameError, GameSnapshot
@@ -41,7 +41,10 @@ def replay_game(
     state = GameState(snap)
     em = Emitter(state, snap)
     ctx = DraftContext(snap, state)
-    run_ai_picks(ctx, em, seed)
+    if snap.start_rosters:
+        start_from_league(em, snap, state, seed)
+    else:
+        run_ai_picks(ctx, em, seed)
     claim_map: dict[str, str] = {}
     offer_by_orig: dict[str, tuple[str, tuple[str, ...], tuple[str, ...]]] = {}
     for ev in events:
@@ -306,7 +309,7 @@ def build_result(
     """The stored end-of-season result. ``explain`` runs the counterfactual
     replays (about one season-sim each)."""
 
-    draft = next((e["payload"]["recap"] for e in events if e["type"] == "draft_complete"), None)
+    draft = next((e["payload"]["recap"] for e in events if e["type"] in ("draft_complete", "league_start")), None)
     if draft is None:
         draft = _draft_from_state(snap, final)
     efficiency, worst = _efficiency(final)

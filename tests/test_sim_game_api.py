@@ -103,7 +103,7 @@ def test_options_work_for_free_callers():
     assert data["reason"] == "" and data["is_premium"] is False
     assert data["max_games"] == 1 and data["season"]["regular_weeks"] == 14
     assert data["preview"] == {"weeks_left": 3, "paywall_week": 4, "paywalled": False}
-    assert data["options"]["teams"]["values"] == [8, 10, 12]
+    assert data["options"]["teams"]["values"] == [8, 10, 12, 14]
 
 
 def test_create_game_starts_in_the_draft_with_the_user_on_the_clock():
