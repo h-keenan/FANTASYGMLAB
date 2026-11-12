@@ -3,41 +3,37 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 
 import {
-  DEFAULT_SIM_STRATEGY,
   isSimOffError,
-  simCompareHeadline,
-  simCompareRows,
+  simFactorImpact,
+  simFactorKindLabel,
+  simFactorsIntro,
+  simFinishRange,
+  simFormatPercent,
+  simFormatPointsSwing,
   simGate,
-  simGradeTone,
-  simLevelLabel,
+  simHeadline,
   simNoteMessages,
+  simOddsTone,
+  simOrdinal,
   simReasonMessage,
-  simRoundLabel,
-  simStrategyEqual,
-  simStrategySummary,
-  simTeamNames,
-  simTimeline,
-  type SimResult,
+  simScopeLine,
+  simWinsRange,
+  type SimForecast,
 } from './simPresentation.ts';
 
-function result(overrides: Partial<SimResult> & { wins?: number; letter?: string; playoff?: string }): SimResult {
-  const { wins = 8, letter = 'B', playoff = 'semifinal', ...rest } = overrides;
+function forecast(overrides: Partial<SimForecast> = {}): SimForecast {
   return {
-    engine_version: 'sim-1.0.0',
-    seed: 1,
-    mode: 'remaining',
-    strategy: DEFAULT_SIM_STRATEGY,
-    standings: [
-      { team_id: '1', name: 'Mine', is_user: true, wins, losses: 14 - wins, ties: 0, pf: 1500, pa: 1400, made_playoffs: true, playoff_result: playoff },
-      { team_id: '2', name: 'Theirs', is_user: false, wins: 7, losses: 7, ties: 0, pf: 1400, pa: 1450, made_playoffs: false, playoff_result: 'missed' },
-    ],
-    playoffs: [],
-    events: [],
-    personas: [],
-    user: { team_id: '1', wins, losses: 14 - wins, ties: 0, pf: 1500, pa: 1400, playoff_result: playoff, made_playoffs: true },
-    grade: { letter, score: 70, grade_points: letter === 'A' ? 95 : 80, components: [], summary: {} },
-    decisions_that_mattered: [],
-    ...rest,
+    samples: 80,
+    start_week: 10,
+    regular_season_end: 14,
+    weeks_remaining: 5,
+    team: { team_id: '1', name: 'Mine' },
+    current: { wins: 5, losses: 4, ties: 0 },
+    odds: { playoffs: 0.62, finals: 0.2, title: 0.09, playoff_spots: 6 },
+    record: { wins: 8.6, losses: 5.4, wins_low: 7, wins_high: 10, projected: '9-5', games: 14 },
+    finish: { median: 4, low: 2, high: 7, teams: 12, distribution: [] },
+    swing_factors: [],
+    ...overrides,
   };
 }
 
@@ -46,90 +42,78 @@ test('gate: Pro upsell, unavailable, and ready', () => {
     kind: 'premium',
     upsell: { title: 't', body: 'b' },
   });
-  assert.equal(simGate({ ok: true, reason: 'sim_storage_unavailable' }).kind, 'unavailable');
-  assert.equal(simGate({ ok: true, reason: '', is_premium: true, enabled: true }).kind, 'ready');
   assert.equal(simGate(null).kind, 'unavailable');
+  assert.equal(simGate({ ok: true, enabled: false }).kind, 'unavailable');
+  assert.equal(simGate({ ok: true, reason: '', is_premium: true }).kind, 'ready');
 });
 
-test('a 404 means the sim is off', () => {
+test('a 404 means the forecast is not switched on', () => {
   assert.equal(isSimOffError({ status: 404 }), true);
   assert.equal(isSimOffError({ status: 500 }), false);
-  assert.equal(isSimOffError(new Error('x')), false);
+  assert.equal(isSimOffError(null), false);
 });
 
-test('reason copy is plain and empty on success', () => {
+test('reason codes get customer-safe copy; success is empty', () => {
   assert.equal(simReasonMessage(''), '');
-  assert.match(simReasonMessage('world_limit_reached'), /Delete one/);
-  assert.match(simReasonMessage('totally_new_code'), /Try again/);
+  assert.match(simReasonMessage('season_complete'), /regular season is over/);
+  assert.match(simReasonMessage('who_knows'), /could not build/);
 });
 
-test('level labels and strategy summary', () => {
-  assert.equal(simLevelLabel(0), 'Off');
-  assert.equal(simLevelLabel(0.25), 'Low');
-  assert.equal(simLevelLabel(0.5), 'Medium');
-  assert.equal(simLevelLabel(0.75), 'High');
-  assert.equal(simLevelLabel(1), 'Max');
-  assert.equal(simStrategySummary({ ...DEFAULT_SIM_STRATEGY, protected_player_ids: ['a'] }), 'Balanced, trades medium, waivers medium, auto lineup, 1 protected');
+test('notes become plain caveats and unknown ones are dropped', () => {
+  assert.deepEqual(simNoteMessages(['bye_weeks_unavailable', 'schedule_estimated_weeks:9,10', 'mystery']), [
+    'Bye weeks could not be loaded, so no player is on bye.',
+    'The schedule for weeks 9,10 is estimated.',
+  ]);
 });
 
-test('strategy equality ignores protected order', () => {
-  const a = { ...DEFAULT_SIM_STRATEGY, protected_player_ids: ['1', '2'] };
-  assert.equal(simStrategyEqual(a, { ...a, protected_player_ids: ['2', '1'] }), true);
-  assert.equal(simStrategyEqual(a, { ...a, posture: 'rebuild' }), false);
+test('percent never shows a false 0% or 100%', () => {
+  assert.equal(simFormatPercent(0.004), '<1%');
+  assert.equal(simFormatPercent(0.996), '>99%');
+  assert.equal(simFormatPercent(0.62), '62%');
+  assert.equal(simFormatPercent(0), '0%');
+  assert.equal(simFormatPercent(undefined), '-');
 });
 
-test('grade tone is centred on a C', () => {
-  assert.equal(simGradeTone('A-'), 'success');
-  assert.equal(simGradeTone('B+'), 'accent');
-  assert.equal(simGradeTone('C'), 'warning');
-  assert.equal(simGradeTone('F'), 'danger');
+test('odds tone follows how comfortable the position is', () => {
+  assert.equal(simOddsTone(0.8), 'success');
+  assert.equal(simOddsTone(0.4), 'accent');
+  assert.equal(simOddsTone(0.2), 'warning');
+  assert.equal(simOddsTone(0.02), 'danger');
 });
 
-test('timeline names teams, filters to the user, and orders by week', () => {
-  const r = result({
-    events: [
-      { week: 9, seq: 2, type: 'waiver', team: '2', involves_user: false, add: { name: 'Zed', pos: 'WR' }, drop: null },
-      { week: 8, seq: 1, type: 'trade', team: '1', partner: '2', involves_user: true, gives: [{ name: 'A', pos: 'RB' }], gets: [{ name: 'B', pos: 'WR' }] },
-    ],
-  });
-  const names = simTeamNames(r);
-  const all = simTimeline(r.events, names);
-  assert.equal(all[0].title, 'Mine (you) traded with Theirs');
-  assert.equal(all[0].detail, 'Sent A (RB), got B (WR).');
-  assert.equal(all.length, 2);
-  assert.equal(simTimeline(r.events, names, { onlyUser: true }).length, 1);
+test('ordinals, ranges and swings read naturally', () => {
+  assert.deepEqual([1, 2, 3, 4, 11, 12, 13, 21, 22].map(simOrdinal), ['1st', '2nd', '3rd', '4th', '11th', '12th', '13th', '21st', '22nd']);
+  assert.equal(simFinishRange(forecast().finish), '2nd to 7th');
+  assert.equal(simFinishRange({ ...forecast().finish, low: 3, high: 3, median: 3 }), '3rd');
+  assert.equal(simWinsRange(forecast().record), '7 to 10 wins');
+  assert.equal(simWinsRange({ ...forecast().record, wins_low: 9, wins_high: 9 }), '9 wins');
+  assert.equal(simFormatPointsSwing(0.153), '+15 pts');
+  assert.equal(simFormatPointsSwing(-0.04), '-4 pts');
 });
 
-test('round labels count back from the final', () => {
-  assert.deepEqual([0, 1, 2].map((i) => simRoundLabel(i, 3)), ['Quarterfinals', 'Semifinals', 'Championship']);
+test('headline matches the playoff odds band', () => {
+  assert.match(simHeadline(forecast({ odds: { playoffs: 0.95, finals: 0.4, title: 0.2, playoff_spots: 6 } })), /near lock/);
+  assert.match(simHeadline(forecast()), /good shape.*62%/);
+  assert.match(simHeadline(forecast({ odds: { playoffs: 0.4, finals: 0.1, title: 0.04, playoff_spots: 6 } })), /coin flip/);
+  assert.match(simHeadline(forecast({ odds: { playoffs: 0.15, finals: 0.01, title: 0, playoff_spots: 6 } })), /outside looking in/);
+  assert.match(simHeadline(forecast({ odds: { playoffs: 0.02, finals: 0, title: 0, playoff_spots: 6 } })), /long shot/);
 });
 
-test('A/B compare reports direction and a headline', () => {
-  const before = result({ wins: 7, letter: 'C', playoff: 'missed' });
-  const after = result({ wins: 9, letter: 'A', playoff: 'champion' });
-  const rows = simCompareRows(before, after);
-  assert.equal(rows.find((r) => r.key === 'record')?.direction, 1);
-  assert.equal(rows.find((r) => r.key === 'playoffs')?.direction, 1);
-  assert.match(simCompareHeadline(before, after), /2 wins more.*deeper playoff run/);
-  assert.match(simCompareHeadline(before, before), /finished the same/);
+test('scope line always says as-of, current rosters and rest of season', () => {
+  const line = simScopeLine(forecast(), 'remaining', '2026-11-12T12:00:00+00:00');
+  assert.match(line, /As of Nov 1[12]/);
+  assert.match(line, /on current rosters, rest of season \(5 games left\)/);
+  assert.match(simScopeLine(forecast({ weeks_remaining: 1 })), /\(1 game left\)/);
+  assert.match(simScopeLine(forecast(), 'full'), /offseason/);
 });
 
-test('world notes become plain caveats', () => {
-  const lines = simNoteMessages(['bye_weeks_not_modeled', 'schedule_estimated_weeks:9,10', 'projection_fallback_players:4']);
-  assert.equal(lines[0], 'Bye weeks are not modeled.');
-  assert.equal(lines[1], 'The schedule for weeks 9,10 is estimated.');
-  assert.equal(lines[2], '4 players use estimated scoring.');
-});
-
-test('new bye and pick caveats and pick assets read cleanly', () => {
-  const lines = simNoteMessages(['bye_weeks_unavailable', 'draft_picks_unavailable']);
-  assert.equal(lines[0], 'Bye weeks could not be loaded, so no player is on bye.');
-  assert.equal(lines[1], 'Draft picks are not part of trades in this simulation.');
-  const r = result({
-    events: [
-      { week: 8, seq: 1, type: 'trade', team: '1', partner: '2', involves_user: true, gives: [{ name: 'A', pos: 'RB' }], gets: [{ name: '2027 round 1 pick', pos: '', kind: 'pick' }] },
-    ],
-  });
-  const [row] = simTimeline(r.events, simTeamNames(r));
-  assert.equal(row.detail, 'Sent A (RB), got 2027 round 1 pick.');
+test('swing factors: labels, impact and the empty-state intro', () => {
+  assert.equal(simFactorKindLabel('game'), 'Key game');
+  assert.equal(simFactorKindLabel('waiver'), 'Waiver wire');
+  assert.equal(simFactorKindLabel('trade'), 'Trade');
+  const game = { kind: 'game' as const, title: 't', detail: 'd', playoff_delta: 0.35, title_delta: 0.05 };
+  assert.equal(simFactorImpact(game), '+35 pts playoff odds, +5 pts title odds');
+  assert.equal(simFactorImpact({ ...game, title_delta: 0 }), '+35 pts playoff odds');
+  assert.match(simFactorsIntro([]), /Nothing stands out/);
+  assert.match(simFactorsIntro([game]), /move your odds most/);
 });

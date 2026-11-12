@@ -13,8 +13,10 @@ from __future__ import annotations
 import os
 import secrets
 import threading
+import time
 import uuid
 from contextlib import contextmanager
+from datetime import datetime, timezone
 from dataclasses import dataclass
 from typing import Any, Callable, Mapping
 
@@ -23,6 +25,7 @@ from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 
 from modules.sim.analysis import run_world
+from modules.sim.forecast import build_forecast
 from modules.sim import backend as sim_backend
 from modules.sim import game_api
 from modules.sim.game_store import GameStore
@@ -42,12 +45,16 @@ ENV_FLAG = "SIM_ENABLED"
 MAX_CONCURRENT_COMPUTE = 2
 _COMPUTE = threading.BoundedSemaphore(MAX_CONCURRENT_COMPUTE)
 _COMPUTE_WAIT_SECONDS = 3.0
+FORECAST_TTL_SECONDS = 600.0
+_FORECAST_CACHE_MAX = 64
+_FORECAST_CACHE: dict[tuple[str, str, str], tuple[float, dict[str, Any]]] = {}
+_FORECAST_LOCK = threading.Lock()
 
 UPSELL = {
-    "title": "Run a full season before it happens",
+    "title": "See your season forecast",
     "body": (
-        "Season outlook is a Pro feature in your GM Plan: set a strategy for your real team and "
-        "simulate the season against AI managers that trade and work the wire. "
+        "Season Outlook is a Pro feature in your GM Plan: one tap shows your playoff odds, projected "
+        "record and finish, title odds, and the moves and games that swing your season. "
         "Start your free trial to unlock it."
     ),
 }
@@ -151,6 +158,43 @@ def build_router(deps: SimApiDeps) -> APIRouter:
     )
     game_api.add_routes(router, game_ctx)
     game_api.add_preview_route(router, game_ctx)
+
+    @router.get("/forecast")
+    def get_forecast(league_id: str = "", roster_id: str = "", user: dict[str, Any] = Depends(deps.require_user)):
+        """One-tap rest-of-season forecast for a real league: no strategy, no setup, no storage.
+
+        Free callers get the standard ``premium_required`` envelope and no sim work runs."""
+
+        if not deps.is_pro(user):
+            return _premium_required()
+        league_id = league_id.strip()
+        if not league_id or len(league_id) > 64:
+            raise HTTPException(status_code=422, detail="league_id is required.")
+        cache_key = (str(user.get("id") or ""), league_id, roster_id)
+        now = time.monotonic()
+        with _FORECAST_LOCK:
+            hit = _FORECAST_CACHE.get(cache_key)
+        if hit and now - hit[0] < FORECAST_TTL_SECONDS:
+            return hit[1]
+        with _compute_slot() as acquired:
+            if not acquired:
+                return _busy()
+            try:
+                snapshot = inputs.league_snapshot(
+                    league_id, mode="remaining", username=deps.sleeper_username(user), roster_id=roster_id
+                )
+            except SimInputsError as exc:
+                return _reason(exc.code)
+            forecast = build_forecast(snapshot)
+        body = _reason(
+            "", forecast=forecast, notes=list(snapshot.notes), mode=snapshot.mode,
+            as_of=datetime.now(timezone.utc).isoformat(timespec="seconds"),
+        )
+        with _FORECAST_LOCK:
+            if len(_FORECAST_CACHE) >= _FORECAST_CACHE_MAX:
+                _FORECAST_CACHE.pop(min(_FORECAST_CACHE, key=lambda k: _FORECAST_CACHE[k][0]), None)
+            _FORECAST_CACHE[cache_key] = (now, body)
+        return body
 
     @router.get("/status")
     def get_status(user: dict[str, Any] = Depends(deps.require_user)) -> dict[str, Any]:

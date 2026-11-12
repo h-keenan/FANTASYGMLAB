@@ -79,7 +79,7 @@ export const NAV_PAGES: readonly NavCatalogPage[] = [
       { label: "Trades", subtitle: "Trade moves your plan calls for", keywords: ["trade window"] },
       { label: "Core", subtitle: "Players your plan is built around", keywords: ["protected", "keep"] },
       { label: "Watching", subtitle: "Players you are targeting", keywords: ["targets", "gm targets", "watchlist"] },
-      { label: "Season Outlook", subtitle: "Simulate the rest of your season", keywords: ["simulation", "simulate", "season sim", "fantasy sim", "what if", "strategy", "grade", "rest of season"], pro: true },
+      { label: "Season Outlook", subtitle: "Playoff odds and projected finish", keywords: ["forecast", "playoff odds", "championship odds", "title odds", "projection", "projected record", "simulation", "fantasy sim", "rest of season"], pro: true },
     ] },
   { key: "draft-center", label: "Draft Center", subtitle: "Picks, order, and draft tools", group: "tools", leagueScoped: true, pro: true,
     tabs: [

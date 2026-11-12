@@ -4,7 +4,7 @@ import type { TradeCaution } from './tradeCautions';
 
 import { supabase } from './supabase';
 import type * as SimGameTypes from './simGame';
-import type { SimRunResponse, SimStatusResponse, SimStrategy, SimWorldResponse, SimWorldsResponse } from './simPresentation';
+import type { SimForecastResponse } from './simPresentation';
 import type { CandidateCompare, MoveRange } from './startSitRange';
 import type { OpponentProfileResponse } from './opponentProfile';
 import { env } from './env';
@@ -3901,16 +3901,12 @@ export const api = {
     authorizedPost<GamesPickResponse>(`/v1/leagues/${encodeURIComponent(leagueId)}/games/pickem/pick`, body),
   getMyRoster: (leagueId: string) =>
     authorizedFetch<MyRosterResponse>(`/v1/leagues/${encodeURIComponent(leagueId)}/my-roster`),
-  // Fantasy Sim (Pro what-if season). UI only calls /v1/sim/*; see
-  // docs/fantasy-sim-api.md. Every route 404s until SIM_ENABLED is on.
-  getSimStatus: () => authorizedFetch<SimStatusResponse>('/v1/sim/status'),
-  listSimWorlds: () => authorizedFetch<SimWorldsResponse>('/v1/sim/worlds'),
-  createSimWorld: (body: { league_id: string; mode: 'remaining' | 'full'; roster_id?: string; strategy: SimStrategy }) =>
-    authorizedPost<SimWorldResponse>('/v1/sim/worlds', body),
-  updateSimStrategy: (worldId: string, strategy: SimStrategy) =>
-    authorizedRequest<SimWorldResponse>(`/v1/sim/worlds/${encodeURIComponent(worldId)}/strategy`, { method: 'PUT', jsonBody: { strategy } }),
-  runSimWorld: (worldId: string) => authorizedPost<SimRunResponse>(`/v1/sim/worlds/${encodeURIComponent(worldId)}/run`, {}),
-  getSimResult: (worldId: string) => authorizedFetch<SimRunResponse>(`/v1/sim/worlds/${encodeURIComponent(worldId)}/result`),
+  // Season Outlook (Pro one-tap forecast of a real league). UI only calls
+  // /v1/sim/forecast; see docs/fantasy-sim-api.md. 404s until SIM_ENABLED is on.
+  getSimForecast: (leagueId: string, rosterId?: string) =>
+    authorizedFetch<SimForecastResponse>(
+      `/v1/sim/forecast?league_id=${encodeURIComponent(leagueId)}${rosterId ? `&roster_id=${encodeURIComponent(rosterId)}` : ''}`,
+    ),
   // Fantasy Sim: the GM Game (standalone, turn-based). docs/fantasy-sim-api.md
   // "GM game". Mutating calls answer 200 `reason: "premium_required"` once the
   // free preview is used up; callers classify with simGameGate().
@@ -3959,7 +3955,6 @@ export const api = {
     authorizedRequest<SimGameTypes.SimGameResponse & { reverted?: number }>(`/v1/sim/games/${encodeURIComponent(gameId)}/revert-week`, { method: "POST", jsonBody: {} }),
   getSimLeague: (gameId: string) => authorizedRequest<SimGameTypes.SimLeagueResponse>(`/v1/sim/games/${encodeURIComponent(gameId)}/league`),
   getSimGameResult: (gameId: string) => authorizedRequest<SimGameTypes.SimGameResultResponse>(`/v1/sim/games/${encodeURIComponent(gameId)}/result`),
-  deleteSimWorld: (worldId: string) => authorizedDelete<{ ok: boolean }>(`/v1/sim/worlds/${encodeURIComponent(worldId)}`),
   getLeagueDraftCenter: (leagueId: string, options?: { lens?: ValuationLens }) => {
     const params = new URLSearchParams();
     if (options?.lens) params.set('lens', options.lens);

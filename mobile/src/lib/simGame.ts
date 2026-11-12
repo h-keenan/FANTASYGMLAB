@@ -6,8 +6,8 @@
  * imports and no platform code: every screen renders from these shapes and
  * formatters and never restates a rule the backend already decided.
  *
- * Not to be confused with lib/simPresentation.ts, the older auto-GM "Season
- * Outlook" (a what-if on a real league). The game is standalone: nothing here
+ * Not to be confused with lib/simPresentation.ts, the Season Outlook
+ * forecast (a one-tap read on a real league). The game is standalone: nothing here
  * reads or writes real league data.
  */
 
