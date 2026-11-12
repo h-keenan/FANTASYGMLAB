@@ -2,6 +2,9 @@ import { describe, expect, it } from "vitest";
 
 import {
   SIM_QUEUE_MAX,
+  normalizeSimResult,
+  simGradeSummaryText,
+  simPlayoffResultLabel,
   SIM_TRADE_EMPTY,
   simAdvanceBlockers,
   simAdvanceLabel,
@@ -452,5 +455,50 @@ describe("league settings and start modes (setup)", () => {
     expect(simSettingsSummary(undefined)).toBe("");
     expect(simGameReasonMessage("team_not_found")).toMatch(/Sleeper username/);
     expect(simGameReasonMessage("def_unavailable")).toMatch(/Advanced options/);
+  });
+
+  it("turns the backend's final result (object summary, object champion) into render-safe values", () => {
+    const row = (team_id: string, is_you: boolean, playoff_result: string) => ({
+      rank: 1, team_id, name: `Team ${team_id}`, is_you, wins: 9, losses: 5, ties: 0, pf: 1500.5, pa: 1400, playoff_result,
+    });
+    const view = normalizeSimResult({
+      champion: { team_id: "3", name: "Team 3" },
+      final_standings: [row("3", false, "champion"), row("1", true, "runner_up")],
+      grade: {
+        letter: "B+", score: 80, grade_points: 87,
+        components: [{ key: "record", label: "Record and seeding", score: 70, weight: 0.35 }],
+        summary: { record: "9-5", finish: 2, points_rank: 1, playoff_result: "runner_up", lineup_efficiency: 0.93, luck_wins: 0.4, draft_grade: "B" },
+      },
+      decisions_that_mattered: [],
+    });
+    expect(view.letter).toBe("B+");
+    expect(view.championId).toBe("3");
+    expect(view.championName).toBe("Team 3");
+    expect(view.mine?.team_id).toBe("1");
+    expect(typeof view.summaryText).toBe("string");
+    expect(view.summaryText).toBe("Record 9-5, finished 2nd, 1st in points, 93% lineup efficiency, draft grade B.");
+  });
+
+  it("tolerates a missing or partial result without throwing", () => {
+    for (const raw of [null, undefined, {}, { grade: null, champion: null, final_standings: null, decisions_that_mattered: null }]) {
+      const view = normalizeSimResult(raw as never);
+      expect(view.letter).toBe("");
+      expect(view.summaryText).toBe("");
+      expect(view.championName).toBeNull();
+      expect(view.standings).toEqual([]);
+      expect(view.decisions).toEqual([]);
+      expect(view.mine).toBeNull();
+    }
+    expect(simGradeSummaryText("Solid year.")).toBe("Solid year.");
+    expect(simGradeSummaryText({})).toBe("");
+    expect(simGradeSummaryText(null)).toBe("");
+    expect(normalizeSimResult({ champion: "7", final_standings: [{ team_id: "7", name: "Old", is_you: false } as never] }).championName).toBe("Old");
+  });
+
+  it("labels every playoff outcome the engine can store", () => {
+    for (const k of ["champion", "runner_up", "semifinal", "lost_round_1", "lost_round_2", "lost_round_3", "missed"]) {
+      expect(simPlayoffResultLabel(k)).not.toMatch(/_/);
+    }
+    expect(simPlayoffResultLabel(undefined)).toBe("");
   });
 });

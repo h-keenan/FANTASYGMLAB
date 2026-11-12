@@ -15,6 +15,8 @@ import { useThemeMode } from '../context/ThemeModeContext';
 import { api } from '../lib/api';
 import {
   simFmtPts,
+  normalizeSimResult,
+  simGameReasonMessage,
   simGradeTone,
   simPlayoffResultLabel,
   simPlayoffRoundLabel,
@@ -189,6 +191,7 @@ export function SimFinalView({ ctx, onNewGame, onHub }: { ctx: SimCtx; onNewGame
   const styles = useMemo(() => createStyles(colors), [colors]);
   const [result, setResult] = useState<SimGameResult | null>(null);
   const [failed, setFailed] = useState(false);
+  const [failMessage, setFailMessage] = useState('');
   const [attempt, setAttempt] = useState(0);
 
   useEffect(() => {
@@ -198,7 +201,10 @@ export function SimFinalView({ ctx, onNewGame, onHub }: { ctx: SimCtx; onNewGame
       .then((body) => {
         if (cancelled) return;
         if (body.result) setResult(body.result);
-        else setFailed(true);
+        else {
+          setFailMessage(simGameReasonMessage(body.reason, body));
+          setFailed(true);
+        }
       })
       .catch(() => {
         if (!cancelled) setFailed(true);
@@ -212,9 +218,10 @@ export function SimFinalView({ ctx, onNewGame, onHub }: { ctx: SimCtx; onNewGame
     return (
       <ErrorState
         title="Your final result did not load"
-        message="Your season is saved. Try again in a moment."
+        message={failMessage || 'Your season is saved. Try again in a moment.'}
         onRetry={() => {
           setFailed(false);
+          setFailMessage('');
           setAttempt((n) => n + 1);
         }}
       />
@@ -229,39 +236,39 @@ export function SimFinalView({ ctx, onNewGame, onHub }: { ctx: SimCtx; onNewGame
     );
   }
 
-  const tone = simGradeTone(result.grade.letter);
+  const view = normalizeSimResult(result);
+  const tone = simGradeTone(view.letter);
   const toneColor = simToneColor(tone, colors);
-  const mine = result.final_standings.find((row) => row.is_you);
-  const champion = result.final_standings.find((row) => row.team_id === result.champion);
+  const mine = view.mine;
   return (
     <View style={common.stack} testID="final-result">
       <AccentCard accent={toneColor} glow>
         <AppText style={styles.kicker}>Season complete</AppText>
         <SimPopIn style={common.row}>
-          <AppText style={[styles.grade, { color: toneColor }]} accessibilityLabel={`Grade ${result.grade.letter}`}>
-            {result.grade.letter}
+          <AppText style={[styles.grade, { color: toneColor }]} accessibilityLabel={`Grade ${view.letter}`}>
+            {view.letter || '-'}
           </AppText>
           <View style={common.grow}>
             <AppText style={common.bodyStrong}>{mine ? `${mine.wins}-${mine.losses}${mine.ties ? `-${mine.ties}` : ''} · ${simPlayoffResultLabel(mine.playoff_result)}` : ''}</AppText>
-            {champion ? (
+            {view.championName ? (
               <AppText style={common.muted}>
-                Champion: {champion.name}
-                {champion.is_you ? ' (you)' : ''}
+                Champion: {view.championName}
+                {view.championId && view.championId === mine?.team_id ? ' (you)' : ''}
               </AppText>
             ) : null}
           </View>
         </SimPopIn>
-        <AppText style={common.body}>{result.grade.summary}</AppText>
+        {view.summaryText ? <AppText style={common.body}>{view.summaryText}</AppText> : null}
         <View style={common.wrapRow}>
           <Button label="Play again" onPress={onNewGame} />
           <Button label="All games" variant="secondary" onPress={onHub} />
         </View>
       </AccentCard>
 
-      {result.decisions_that_mattered.length > 0 ? (
+      {view.decisions.length > 0 ? (
         <View style={common.stack}>
           <SectionHeading title="Decisions that mattered" caption="The moves that moved your season most, from replaying it without them." />
-          {result.decisions_that_mattered.map((d, i) => (
+          {view.decisions.map((d, i) => (
             <AccentCard key={i} accent={colors.accent} compact>
               {d.kind ? <ToneBadge label={String(d.kind).replace(/_/g, ' ')} color={colors.accent} size="xs" /> : null}
               {d.title ? <AppText style={common.bodyStrong}>{String(d.title)}</AppText> : null}
@@ -273,7 +280,7 @@ export function SimFinalView({ ctx, onNewGame, onHub }: { ctx: SimCtx; onNewGame
 
       <View style={common.stack}>
         <SectionHeading title="Final standings" />
-        {result.final_standings.map((row, i) => (
+        {view.standings.map((row, i) => (
           <AccentCard key={row.team_id} accent={row.is_you ? colors.accent : colors.borderStrong} compact>
             <View style={common.rowBetween}>
               <AppText style={[common.body, common.grow]}>
