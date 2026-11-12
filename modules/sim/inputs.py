@@ -22,7 +22,7 @@ import sqlite3
 from pathlib import Path
 from typing import Any, Mapping, Protocol
 
-from modules.sim.game_types import IMPORT_TEAM_COUNTS, ImportedTeam, LeagueImport
+from modules.sim.game_types import IMPORT_TEAM_COUNTS, ImportedTeam, LeagueImport, LeagueTeamChoice, LeagueTeams
 from modules.sim.synthetic import round_robin
 from modules.sim.types import (
     FLEX_SLOTS,
@@ -63,6 +63,8 @@ class SimInputs(Protocol):
     def player_pool(self, scoring_settings: Mapping[str, float]) -> "PlayerPool": ...
 
     def league_import(self, league_id: str, *, username: str = "", roster_id: str = "") -> LeagueImport: ...
+
+    def league_teams(self, league_id: str, *, username: str = "") -> LeagueTeams: ...
 
 
 # Numeric context columns handed to the GM game's player model, when present.
@@ -273,22 +275,51 @@ class RealSimInputs:
 
     # --------------------------------------------------------------- helpers
 
-    @staticmethod
     def _find_user_roster(
-        rosters: list[Mapping[str, Any]], profiles: Mapping[str, Mapping[str, Any]],
+        self, rosters: list[Mapping[str, Any]], profiles: Mapping[str, Mapping[str, Any]],
         username: str, roster_id: str,
     ) -> str:
+        """The account's roster. An explicit ``roster_id`` (the setup picker's
+        choice) always wins; otherwise the linked Sleeper username is matched
+        by username, then by Sleeper user id against each roster's owner and
+        co-owners, so a display-name/casing mismatch or a co-owned team still
+        resolves. Returns "" through ``team_not_found`` only when nothing fits."""
+
         if roster_id:
             for roster in rosters:
                 if str(roster.get("roster_id")) == str(roster_id):
                     return str(roster_id)
             raise SimInputsError("team_not_found")
-        wanted = (username or "").strip().casefold()
-        if wanted:
-            for rid, profile in profiles.items():
-                if str(profile.get("username") or "").casefold() == wanted:
-                    return str(rid)
+        found = self._match_user_roster(rosters, profiles, username)
+        if found:
+            return found
         raise SimInputsError("team_not_found")
+
+    def _match_user_roster(
+        self, rosters: list[Mapping[str, Any]], profiles: Mapping[str, Mapping[str, Any]], username: str,
+    ) -> str:
+        wanted = (username or "").strip().casefold().lstrip("@")
+        if not wanted:
+            return ""
+        for rid, profile in profiles.items():
+            if str(profile.get("username") or "").strip().casefold() == wanted:
+                return str(rid)
+        user_id = ""
+        getter = getattr(self._mods()[0], "get_user_id", None)
+        if callable(getter):
+            try:
+                user_id = str(getter(username.strip().lstrip("@")) or "")
+            except Exception:  # a lookup hiccup must not turn into a wrong team
+                user_id = ""
+        if user_id:
+            for roster in rosters:
+                owners = [str(roster.get("owner_id") or "")] + [str(c) for c in (roster.get("co_owners") or [])]
+                if user_id in owners:
+                    return str(roster.get("roster_id"))
+        for rid, profile in profiles.items():  # last resort: display name
+            if str(profile.get("owner_name") or "").strip().casefold() == wanted:
+                return str(rid)
+        return ""
 
     @staticmethod
     def _schedule(sleeper, league_id, tids, start_week, regular_end):
@@ -543,6 +574,42 @@ class RealSimInputs:
             league_id=str(league_id), league_name=str(league.get("name") or ""), season=str(league.get("season") or ""),
             teams=tuple(teams), slots=slots, bench=bench, scoring_settings=scoring,
             playoff_teams=_int(settings_raw.get("playoff_teams"), 6) or 6, notes=tuple(notes),
+        )
+
+    def league_teams(self, league_id: str, *, username: str = "") -> LeagueTeams:
+        """Read-only. The league's teams for the setup picker (name, owner,
+        record, rank) and which one is the account's, when it can be told."""
+
+        if ":" in str(league_id):
+            raise SimInputsError("league_platform_unsupported")
+        sleeper, _, _ = self._mods()
+        league = sleeper.get_league(league_id)
+        rosters = sleeper.get_rosters(league_id) or []
+        if not league or len(rosters) < 2:
+            raise SimInputsError("league_unavailable")
+        if len(rosters) not in IMPORT_TEAM_COUNTS:
+            raise SimInputsError("league_size_unsupported")
+        profiles = sleeper.get_league_roster_profiles(league_id) or {}
+        you = self._match_user_roster(rosters, profiles, username)
+        rows = []
+        for roster in rosters:
+            st = roster.get("settings") if isinstance(roster.get("settings"), dict) else {}
+            pf = _num(st.get("fpts")) + _num(st.get("fpts_decimal")) / 100.0
+            rows.append((roster, _int(st.get("wins")), _int(st.get("losses")), _int(st.get("ties")), pf))
+        ordered = sorted(rows, key=lambda r: (-(r[1] + 0.5 * r[3]), -r[4], str(r[0].get("roster_id"))))
+        rank = {str(r[0].get("roster_id")): i + 1 for i, r in enumerate(ordered)}
+        teams = []
+        for roster, w, l, t, pf in rows:
+            rid = str(roster.get("roster_id"))
+            profile = profiles.get(rid) or {}
+            teams.append(LeagueTeamChoice(
+                roster_id=rid, team_name=str(profile.get("team_name") or f"Team {rid}"),
+                owner_name=str(profile.get("owner_name") or ""), wins=w, losses=l, ties=t,
+                points_for=round(pf, 2), rank=rank[rid], is_you=rid == you,
+            ))
+        return LeagueTeams(
+            league_id=str(league_id), league_name=str(league.get("name") or ""), season=str(league.get("season") or ""),
+            teams=tuple(teams), you_roster_id=you,
         )
 
     @staticmethod

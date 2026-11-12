@@ -200,6 +200,8 @@ export interface SimGameOptionsResponse extends SimGameEnvelope {
     difficulty: { values: SimDifficulty[]; default: SimDifficulty };
     user_slot: { min: number; max: number; default: number | null };
     auto_lineup: { default: boolean };
+    /** Preset fantasy-style team names for a fresh league. */
+    team_names?: { values: string[]; max_length: number };
     tiebreaker?: { values: SimTiebreaker[]; default: SimTiebreaker };
   };
   /** Lineup rule the setup form mirrors to show roster size and draft rounds. */
@@ -217,6 +219,28 @@ export interface SimGameOptionsResponse extends SimGameEnvelope {
   personas?: SimGamePersona[];
 }
 
+/** One team of a real league, for the "which team is yours" picker. Always sent back by `roster_id`. */
+export interface SimImportTeam {
+  roster_id: string;
+  team_name: string;
+  owner_name: string;
+  wins: number;
+  losses: number;
+  ties: number;
+  points_for: number;
+  rank: number;
+  is_you: boolean;
+}
+
+export interface SimLeagueTeamsResponse extends SimGameEnvelope {
+  league_id?: string;
+  league_name?: string;
+  season?: string;
+  /** The account's own roster, or null when it could not be identified. */
+  you_roster_id?: string | null;
+  teams?: SimImportTeam[];
+}
+
 export interface SimGameCreateBody {
   teams?: number;
   scoring?: SimScoring;
@@ -231,6 +255,8 @@ export interface SimGameCreateBody {
   user_slot?: number | null;
   auto_lineup?: boolean;
   team_name?: string;
+  /** Fresh league: let the server pick a preset name. */
+  random_team_name?: boolean;
   /** "league": start from a real league's rosters (read-only). */
   start?: SimStartKind;
   league_id?: string;
@@ -651,7 +677,7 @@ const REASON_COPY: Record<string, string> = {
   not_complete: "The season is not over yet.",
   conflict: "The game changed somewhere else. We reloaded it. Try again.",
   sim_busy: "The simulator is busy right now. Try again in a few seconds.",
-  team_not_found: "We could not tell which team is yours in that league. Check your Sleeper username in Settings.",
+  team_not_found: "We could not tell which team is yours in that league. Pick it from the list.",
   league_unavailable: "That league could not be read right now. Try again in a moment.",
   league_platform_unsupported: "Only Sleeper leagues can start a game for now.",
   league_size_unsupported: "That league has a size the game cannot play (it needs an even number of teams, 4 to 16).",
@@ -1485,8 +1511,17 @@ export interface SimSetupState {
   difficulty: SimDifficulty;
   slot: string;
   auto: boolean;
+  /** Custom team name text (used when `nameChoice` is SIM_NAME_CUSTOM). */
   name: string;
+  /** Fresh league: SIM_NAME_RANDOM, SIM_NAME_CUSTOM, or a preset name. */
+  nameChoice: string;
+  /** Start-from-league: the roster picked from the league's teams. Never a typed name. */
+  rosterId: string;
 }
+
+export const SIM_NAME_RANDOM = "__random__";
+export const SIM_NAME_CUSTOM = "__custom__";
+export const SIM_TEAM_NAME_MAX = 40;
 
 /** Every field at its quick-start default (from the API's options when loaded). */
 export function simSetupDefaults(options: SimGameOptionsResponse | null | undefined): SimSetupState {
@@ -1506,6 +1541,8 @@ export function simSetupDefaults(options: SimGameOptionsResponse | null | undefi
     slot: "",
     auto: o?.auto_lineup.default ?? false,
     name: "",
+    nameChoice: SIM_NAME_RANDOM,
+    rosterId: "",
   };
 }
 
@@ -1534,17 +1571,27 @@ export function simDeriveLayout(
   return { slots, rosterLimit, rounds: rosterLimit - spare };
 }
 
-/** The POST /v1/sim/games body for the form. "league" sends only what the league does not decide. */
+/** The team name a fresh league sends: collapses runs of whitespace, keeps emoji and apostrophes, caps at the server limit. */
+export function simCleanTeamName(raw: string): string {
+  return Array.from(raw.split(/\s+/).filter(Boolean).join(" ")).slice(0, SIM_TEAM_NAME_MAX).join("");
+}
+
+/** The POST /v1/sim/games body for the form. "league" sends only what the league does not decide, and picks the team by roster_id. */
 export function simSetupBody(state: SimSetupState): SimGameCreateBody {
-  const common = {
-    difficulty: state.difficulty,
-    auto_lineup: state.auto,
-    tiebreaker: state.tiebreaker,
-    ...(state.name.trim() ? { team_name: state.name.trim() } : {}),
-  };
-  if (state.start === "league") return { ...common, start: "league", league_id: state.leagueId };
+  const common = { difficulty: state.difficulty, auto_lineup: state.auto, tiebreaker: state.tiebreaker };
+  if (state.start === "league") return { ...common, start: "league", league_id: state.leagueId, ...(state.rosterId ? { roster_id: state.rosterId } : {}) };
+  const custom = simCleanTeamName(state.name);
+  const nameField =
+    state.nameChoice === SIM_NAME_RANDOM
+      ? { random_team_name: true }
+      : state.nameChoice === SIM_NAME_CUSTOM
+        ? custom
+          ? { team_name: custom }
+          : {}
+        : { team_name: state.nameChoice };
   return {
     ...common,
+    ...nameField,
     teams: state.teams,
     scoring: state.scoring,
     te_premium: state.tePremium,
@@ -1559,8 +1606,40 @@ export function simSetupBody(state: SimSetupState): SimGameCreateBody {
 
 /** Why the form cannot be submitted, or null. */
 export function simSetupBlock(state: SimSetupState): string | null {
-  if (state.start === "league" && !state.leagueId) return "Pick one of your leagues to start from.";
+  if (state.start === "league") {
+    if (!state.leagueId) return "Pick one of your leagues to start from.";
+    if (!state.rosterId) return "Pick which team is yours.";
+    return null;
+  }
+  if (state.nameChoice === SIM_NAME_CUSTOM && !simCleanTeamName(state.name)) return "Type a team name, or pick one from the list.";
   return null;
+}
+
+/** The roster to preselect once a league's teams load: the account's own, else none (the player must choose). */
+export function simPreselectedRosterId(res: Pick<SimLeagueTeamsResponse, "you_roster_id" | "teams"> | null | undefined): string {
+  const teams = res?.teams ?? [];
+  const id = res?.you_roster_id ?? teams.find((t) => t.is_you)?.roster_id ?? "";
+  return id && teams.some((t) => t.roster_id === id) ? id : "";
+}
+
+/** One line for a league team in the picker: name, owner, record and rank. */
+export function simLeagueTeamLabel(team: SimImportTeam): string {
+  const record = simFmtRecord(team);
+  const bits = [team.team_name];
+  if (team.owner_name && team.owner_name !== team.team_name) bits.push(team.owner_name);
+  bits.push(record === "0-0" ? "no games yet" : record);
+  if (record !== "0-0" && team.rank) bits.push(`#${team.rank}`);
+  return bits.join(" · ");
+}
+
+/** Label for the preset-name picker entries. */
+export function simTeamNameChoices(options: SimGameOptionsResponse | null | undefined): { value: string; label: string }[] {
+  const presets = options?.options?.team_names?.values ?? [];
+  return [
+    { value: SIM_NAME_RANDOM, label: "Random" },
+    ...presets.map((name) => ({ value: name, label: name })),
+    { value: SIM_NAME_CUSTOM, label: "Custom name..." },
+  ];
 }
 
 /** Saved leagues the game can start from: Sleeper leagues only (imported platforms carry a prefix). */
@@ -1597,11 +1676,43 @@ export const SIM_DIFFICULTY_COPY: Record<SimDifficulty, { label: string; blurb: 
   hard: { label: "Hard", blurb: "Sharper AI managers: tighter trades and smarter waiver moves." },
 };
 
+/** "You have 3 of 3 saved games" (singular when the limit is 1). */
+export function simSavedGamesCount(gameCount: number, maxGames: number): string {
+  return `You have ${gameCount} of ${maxGames} saved game${maxGames === 1 ? "" : "s"}`;
+}
+
 /** Why the New game button is unavailable, or null when you can start one. */
 export function simNewGameBlock(gameCount: number, maxGames: number, isPremium: boolean | undefined): string | null {
   if (gameCount < maxGames) return null;
-  if (isPremium === false) return `Free includes ${maxGames} saved game. Delete it or go Pro for up to 3.`;
-  return `You have ${maxGames} saved games, the most allowed. Delete one to start another.`;
+  const count = simSavedGamesCount(gameCount, maxGames);
+  if (isPremium === false) return `${count}. Free includes ${maxGames} saved game. Delete it or go Pro for up to 3.`;
+  return `${count}, the most allowed. Delete one to start another.`;
+}
+
+/** Names a saved game in the delete confirm (the list has no team name): stage, grade, league shape. */
+export function simGameDeleteName(game: Pick<SimGameLite, "status" | "current_week" | "grade_letter" | "settings">): string {
+  const shape = simSettingsSummary(game.settings);
+  const line = simGameLiteLine(game);
+  return shape ? `${line} (${shape})` : line;
+}
+
+/** Inline confirm copy for deleting one saved game. */
+export function simGameDeleteConfirm(game: Pick<SimGameLite, "status" | "current_week" | "grade_letter" | "settings">): string {
+  return `Delete ${simGameDeleteName(game)}? This cannot be undone. The whole season and its grade are removed.`;
+}
+
+/**
+ * What to do when deleting a saved game from the list fails. 404 means it is
+ * already gone (drop it from the list); 409/503 are retryable; anything else
+ * shows the message. `refresh` asks the caller to reload the list.
+ */
+export function simGameDeleteFailure(error: unknown): { message: string; tone: "success" | "warning" | "danger"; remove: boolean; refresh: boolean } {
+  const e = (typeof error === "object" && error !== null ? error : {}) as { status?: number; code?: string; message?: string };
+  if (e.status === 404) return { message: "That game was already deleted.", tone: "warning", remove: true, refresh: true };
+  if (e.status === 409) return { message: "The game changed somewhere else. We reloaded your games. Try again.", tone: "warning", remove: false, refresh: true };
+  if (e.status === 503 || e.code === "server_busy") return { message: "The simulator is busy right now. Try again in a few seconds.", tone: "warning", remove: false, refresh: false };
+  const message = e.message && !/^Request failed with status/.test(e.message) ? e.message : "Could not delete the game. Try again.";
+  return { message, tone: "danger", remove: false, refresh: false };
 }
 
 /** One-line status for a saved game card. */

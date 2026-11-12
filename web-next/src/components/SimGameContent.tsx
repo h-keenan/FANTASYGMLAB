@@ -32,6 +32,9 @@ import {
   simFmtPts,
   simFmtRecord,
   simGameGate,
+  simLeagueTeamLabel,
+  simGameDeleteConfirm,
+  simGameDeleteFailure,
   simGameLiteLine,
   simGamePaywalled,
   simGameUnavailableCopy,
@@ -42,7 +45,10 @@ import {
   simSetupBody,
   simSetupDefaults,
   simSetupSummary,
+  simTeamNameChoices,
   simWeekHeading,
+  SIM_NAME_CUSTOM,
+  SIM_TEAM_NAME_MAX,
   SIM_TE_PREMIUM_LABELS,
   type SimDifficulty,
   type SimTiebreaker,
@@ -63,6 +69,7 @@ import {
 } from "@/lib/simGame";
 import { SIM_FLOW_INITIAL, SIM_TABS, simFlowReducer, simRecapsFromAdvance, type SimTab } from "@/lib/simGameFlow";
 import { useSimGameCall } from "@/lib/useSimGameCall";
+import { useSimLeagueTeams } from "@/lib/useSimLeagueTeams";
 import { useSimLeagueChoices } from "@/lib/useSimLeagueChoices";
 
 const UPSELL_FALLBACK = {
@@ -86,6 +93,9 @@ export function SimGameContent() {
   const [tradeSeed, setTradeSeed] = useState<{ partner: string; get: string } | null>(null);
   const [advancing, setAdvancing] = useState(false);
   const [creating, setCreating] = useState(false);
+  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [managing, setManaging] = useState(false);
 
   const notify = useCallback((message: string, tone: SimGameTone = "warning") => setNotice(message ? { message, tone } : null), []);
 
@@ -167,6 +177,41 @@ export function SimGameContent() {
       /* best effort */
     }
   }, []);
+
+  async function deleteSaved(id: string) {
+    setDeletingId(id);
+    let removed = false;
+    try {
+      const body = await api.deleteSimGame(id);
+      const gate = simGameGate(body);
+      if (gate.kind === "ready") {
+        removed = true;
+        notify("Game deleted.", "success");
+      } else if (gate.kind === "blocked") {
+        notify(gate.message, "warning");
+      } else if (gate.kind === "unavailable" && gate.cause === "busy") {
+        notify("The simulator is busy right now. Try again in a few seconds.", "warning");
+      } else {
+        notify("Could not delete the game. Try again.", "danger");
+      }
+    } catch (error) {
+      const failure = simGameDeleteFailure(error);
+      removed = failure.remove;
+      notify(failure.message, failure.tone);
+      if (failure.refresh) void refreshList();
+    }
+    setDeletingId(null);
+    setConfirmDeleteId(null);
+    if (removed) {
+      // Drop it right away so the count, the limit note and New game update with no reload.
+      setGames((prev) => {
+        const next = prev.filter((g) => g.id !== id);
+        if (next.length === 0) setManaging(false);
+        return next;
+      });
+      void refreshList();
+    }
+  }
 
   const openGame = useCallback(
     async (id: string) => {
@@ -332,29 +377,59 @@ export function SimGameContent() {
         </p>
         <div className="flex flex-wrap items-center gap-2">
           <Button disabled={Boolean(block)} onClick={() => dispatch({ type: "setup" })}>New game</Button>
-          {block ? (
-            <span className="text-xs" style={{ color: "var(--color-text-muted)" }} data-testid="new-game-block">{block}</span>
-          ) : null}
           {block && options?.is_premium === false ? <ButtonLink href="/premium" variant="premiumOutline" size="sm">Go Pro</ButtonLink> : null}
+          {block ? (
+            <Button variant="secondary" size="sm" onClick={() => { setManaging(true); document.getElementById("sim-saved-games")?.scrollIntoView?.({ behavior: "smooth", block: "start" }); }}>
+              Manage games / delete one
+            </Button>
+          ) : null}
         </div>
+        {block ? (
+          <p className="text-xs" style={{ color: "var(--color-text-muted)" }} data-testid="new-game-block">{block}</p>
+        ) : null}
       </AccentCard>
-      <section className="flex flex-col gap-2" aria-label="Your games">
-        <SectionHeading note={games.length ? undefined : "Your saved games show up here."}>Your games</SectionHeading>
+      <section id="sim-saved-games" className="flex flex-col gap-2" aria-label="Your games">
+        <SectionHeading note={games.length ? (managing ? "Tap the trash can on a game to delete it." : undefined) : "Your saved games show up here."}>Your games</SectionHeading>
         {games.length === 0 ? (
           <EmptyState title="No games yet" subtitle="Start a new game to draft your team." />
         ) : (
           games.map((g) => (
-            <button key={g.id} type="button" className="w-full text-left" onClick={() => void openGame(g.id)} aria-label={`Open game: ${simGameLiteLine(g)}`}>
-              <AccentCard accent={g.status === "complete" ? "var(--color-success)" : "var(--color-accent)"} compact as="div">
-                <div className="flex items-center justify-between gap-2">
-                  <span className="text-sm font-bold">{simGameLiteLine(g)}</span>
-                  {g.grade_letter ? <ToneBadge label={g.grade_letter} color={simToneColor(simGradeTone(g.grade_letter))} size="xs" /> : <span className="text-xs" style={{ color: "var(--color-accent)" }}>Continue</span>}
-                </div>
-                <p className="text-xs" style={{ color: "var(--color-text-muted)" }}>
-                  {simSettingsSummary(g.settings) || `${SIM_SCORING_LABELS[(g.settings.scoring ?? "ppr") as SimScoring]} · ${g.settings.teams ?? 12} teams`} · {SIM_DIFFICULTY_COPY[g.difficulty]?.label ?? g.difficulty}
-                </p>
-              </AccentCard>
-            </button>
+            <div key={g.id} className="flex flex-col gap-1.5">
+              <div className="flex items-stretch gap-2">
+                <button type="button" className="flex-1 min-w-0 text-left" onClick={() => void openGame(g.id)} aria-label={`Open game: ${simGameLiteLine(g)}`}>
+                  <AccentCard accent={g.status === "complete" ? "var(--color-success)" : "var(--color-accent)"} compact as="div">
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="text-sm font-bold">{simGameLiteLine(g)}</span>
+                      {g.grade_letter ? <ToneBadge label={g.grade_letter} color={simToneColor(simGradeTone(g.grade_letter))} size="xs" /> : <span className="text-xs" style={{ color: "var(--color-accent)" }}>Continue</span>}
+                    </div>
+                    <p className="text-xs" style={{ color: "var(--color-text-muted)" }}>
+                      {simSettingsSummary(g.settings) || `${SIM_SCORING_LABELS[(g.settings.scoring ?? "ppr") as SimScoring]} · ${g.settings.teams ?? 12} teams`} · {SIM_DIFFICULTY_COPY[g.difficulty]?.label ?? g.difficulty}
+                    </p>
+                  </AccentCard>
+                </button>
+                <button
+                  type="button"
+                  className="shrink-0 inline-flex items-center justify-center rounded-lg border min-w-[var(--touch-target-min)] min-h-[var(--touch-target-min)]"
+                  style={{ borderColor: "var(--color-danger)", color: "var(--color-danger)", background: "transparent" }}
+                  aria-label={`Delete game: ${simGameLiteLine(g)}`}
+                  disabled={deletingId !== null}
+                  onClick={() => setConfirmDeleteId(confirmDeleteId === g.id ? null : g.id)}
+                >
+                  <svg aria-hidden="true" width="18" height="18" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M2.5 4h11M6 4V2.5h4V4M4 4l.6 9h6.8L12 4M6.6 6.5v4M9.4 6.5v4" />
+                  </svg>
+                </button>
+              </div>
+              {confirmDeleteId === g.id ? (
+                <AccentCard accent="var(--color-danger)" compact as="div">
+                  <p className="text-sm" role="alert">{simGameDeleteConfirm(g)}</p>
+                  <div className="flex gap-2">
+                    <Button size="sm" variant="danger" loading={deletingId === g.id} onClick={() => void deleteSaved(g.id)}>Delete game</Button>
+                    <Button size="sm" variant="ghost" disabled={deletingId === g.id} onClick={() => setConfirmDeleteId(null)}>Keep it</Button>
+                  </div>
+                </AccentCard>
+              ) : null}
+            </div>
           ))
         )}
       </section>
@@ -401,12 +476,14 @@ function SetupForm({
   const defaults = useMemo(() => simSetupDefaults(options), [options]);
   const [state, setState] = useState<SimSetupState>(defaults);
   const set = <K extends keyof SimSetupState>(key: K, value: SimSetupState[K]) => setState((prev) => ({ ...prev, [key]: value }));
+  const league = state.start === "league";
   const leagueMode = options?.start_modes?.find((m) => m.id === "league");
   const canImport = leagueMode ? leagueMode.available : false;
   const leagues = useSimLeagueChoices(state.start === "league");
+  const leagueTeams = useSimLeagueTeams(league ? state.leagueId : "", (rosterId) => set("rosterId", rosterId));
+  const nameChoices = simTeamNameChoices(options);
   const changed = simSetupAdvancedChanged(state, defaults);
   const block = simSetupBlock(state);
-  const league = state.start === "league";
   return (
     <form
       className="flex flex-col gap-4"
@@ -431,7 +508,7 @@ function SetupForm({
       {league ? (
         <label className="flex flex-col gap-1 text-sm font-semibold">
           Start from
-          <Select value={state.leagueId} onChange={(event) => set("leagueId", event.target.value)} aria-label="League to start from" disabled={leagues === null}>
+          <Select value={state.leagueId} onChange={(event) => setState((prev) => ({ ...prev, leagueId: event.target.value, rosterId: "" }))} aria-label="League to start from" disabled={leagues === null}>
             <option value="">{leagues === null ? "Loading your leagues..." : leagues.length ? "Choose a league" : "No Sleeper leagues saved"}</option>
             {(leagues ?? []).map((row) => (
               <option key={row.league_id} value={row.league_id}>{row.league_name || row.league_id}</option>
@@ -439,10 +516,51 @@ function SetupForm({
           </Select>
         </label>
       ) : null}
-      <label className="flex flex-col gap-1 text-sm font-semibold">
-        Your team name
-        <Input value={state.name} maxLength={40} placeholder={league ? "Your team's real name" : "My Team"} onChange={(event) => set("name", event.target.value)} />
-      </label>
+      {league && state.leagueId ? (
+        <div className="flex flex-col gap-1" data-testid="sim-team-picker">
+          <label className="flex flex-col gap-1 text-sm font-semibold">
+            Your team
+            <Select
+              value={state.rosterId}
+              onChange={(event) => set("rosterId", event.target.value)}
+              aria-label="Your team in this league"
+              disabled={leagueTeams.status !== "ready"}
+            >
+              <option value="">
+                {leagueTeams.status === "loading" ? "Loading teams..." : leagueTeams.status === "error" ? "Teams unavailable" : "Choose your team"}
+              </option>
+              {leagueTeams.status === "ready"
+                ? leagueTeams.teams.map((team) => (
+                    <option key={team.roster_id} value={team.roster_id}>
+                      {simLeagueTeamLabel(team)}
+                      {team.is_you ? " (you)" : ""}
+                    </option>
+                  ))
+                : null}
+            </Select>
+          </label>
+          {leagueTeams.status === "error" ? (
+            <p className="text-xs" role="status" style={{ color: "var(--color-warning)" }}>{leagueTeams.message}</p>
+          ) : leagueTeams.status === "ready" && !leagueTeams.youRosterId ? (
+            <p className="text-xs" style={{ color: "var(--color-text-muted)" }}>We could not tell which team is yours from your Sleeper link. Pick it from the list.</p>
+          ) : null}
+        </div>
+      ) : null}
+      {!league ? (
+        <div className="flex flex-col gap-2">
+          <label className="flex flex-col gap-1 text-sm font-semibold">
+            Your team name
+            <Select value={state.nameChoice} onChange={(event) => set("nameChoice", event.target.value)} aria-label="Your team name">
+              {nameChoices.map((choice) => (
+                <option key={choice.value} value={choice.value}>{choice.label}</option>
+              ))}
+            </Select>
+          </label>
+          {state.nameChoice === SIM_NAME_CUSTOM ? (
+            <Input value={state.name} maxLength={SIM_TEAM_NAME_MAX} placeholder="My Team" aria-label="Custom team name" onChange={(event) => set("name", event.target.value)} />
+          ) : null}
+        </div>
+      ) : null}
       <div className="flex flex-col gap-1">
         <span className="text-sm font-semibold">Difficulty</span>
         <PillRow

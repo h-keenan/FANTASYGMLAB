@@ -12,7 +12,7 @@ import { runSimGameCall } from './simGameCall.ts';
 import { ROUTE_BY_PAGE } from './orbTabs.ts';
 import { NAV_PAGES } from './navCatalog.ts';
 import { paidPreview } from './paidPreviews.ts';
-import { simHeadshotId, simPlayerInitials, simSlotRepeatsPosition } from './simGame.ts';
+import { simGameDeleteConfirm, simGameDeleteFailure, simHeadshotId, simNewGameBlock, simPlayerInitials, simSlotRepeatsPosition } from './simGame.ts';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const read = (...p: string[]) => readFileSync(join(here, '..', ...p), 'utf8');
@@ -136,4 +136,13 @@ test('lineup rows drop the position chip only when the slot repeats it', () => {
   for (const file of ['SimGameTeam.tsx', 'SimGameRecap.tsx']) {
     assert.match(read('components', file), /hidePosition=\{simSlotRepeatsPosition\(/, file);
   }
+});
+
+test('saved-game delete: limit copy, confirm names the game, failures classified', () => {
+  assert.match(simNewGameBlock(3, 3, true) ?? '', /You have 3 of 3 saved games/);
+  const g = { settings: { regular_weeks: 14 }, status: 'complete' as const, current_week: 17, grade_letter: 'B+' };
+  assert.match(simGameDeleteConfirm(g), /Finished · Grade B\+.*cannot be undone/);
+  assert.equal(simGameDeleteFailure({ status: 404 }).remove, true);
+  assert.equal(simGameDeleteFailure({ status: 409 }).refresh, true);
+  assert.match(simGameDeleteFailure({ status: 503 }).message, /busy/);
 });
