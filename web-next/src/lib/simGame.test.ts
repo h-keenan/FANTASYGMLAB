@@ -8,6 +8,7 @@ import {
   simMarginLine,
   simRowEdge,
   simRowGap,
+  simShortName,
   simStandingsWindow,
   simStrengthNeedLine,
   simTrendText,
@@ -652,5 +653,14 @@ describe("home dashboard helpers", () => {
     expect(win.some((r) => r.is_you)).toBe(true);
     expect(win[win.length - 1].rank).toBe(12);
     expect(simStandingsWindow(rows.slice(0, 4), 6)).toHaveLength(4);
+  });
+});
+
+describe("simShortName", () => {
+  it("keeps short names whole and abbreviates long ones, keeping suffixes", () => {
+    expect(simShortName("Malik Ross")).toBe("Malik Ross");
+    expect(simShortName("Marvin Harrison Jr.", 15)).toBe("M. Harrison Jr.");
+    expect(simShortName("Christian McCaffrey", 15)).toBe("C. McCaffrey");
+    expect(simShortName("Cher", 2)).toBe("Cher");
   });
 });

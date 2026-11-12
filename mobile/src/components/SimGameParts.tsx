@@ -16,6 +16,7 @@ import { useThemeMode } from '../context/ThemeModeContext';
 import {
   simGamePreviewLine,
   simHeadshotId,
+  simShortName,
   simTrendText,
   simPlayerInitials,
   simPlayerSubline,
@@ -507,7 +508,10 @@ export function SimMiniPlayer({
   align = 'left',
   onOpen,
   size = 28,
+  wrap = false,
 }: {
+  /** Allow the name two lines (shortened only when very long) instead of one. */
+  wrap?: boolean;
   player: SimGamePlayer;
   align?: 'left' | 'right';
   onOpen?: (player: SimGamePlayer) => void;
@@ -521,8 +525,8 @@ export function SimMiniPlayer({
     <View style={[styles.mini, align === 'right' && styles.miniRight]}>
       <PlayerAvatar playerId={simHeadshotId(player)} fallbackLabel={simPlayerInitials(player)} size={size} />
       <View style={styles.miniText}>
-        <AppText style={[styles.miniName, align === 'right' && styles.miniNameRight, (hurt || bye) && { color: colors.textTertiary }, hurt && { textDecorationLine: 'line-through' }]} numberOfLines={1}>
-          {player.name}
+        <AppText style={[styles.miniName, align === 'right' && styles.miniNameRight, (hurt || bye) && { color: colors.textTertiary }, hurt && { textDecorationLine: 'line-through' }]} numberOfLines={wrap ? 2 : 1}>
+          {wrap ? simShortName(player.name, 19) : player.name}
         </AppText>
         {hurt ? (
           <ToneBadge label="Out" color={colors.danger} size="xs" />

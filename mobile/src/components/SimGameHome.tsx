@@ -221,19 +221,19 @@ function Side({ player, win, lose, align, ctx }: { player: SimGamePlayer | null;
   const { colors } = useThemeMode();
   const styles = useMemo(() => createStyles(colors), [colors]);
   const tint = win ? colors.success : lose ? colors.danger : colors.textSecondary;
+  const end = align === 'right';
   if (!player) {
     return (
-      <View style={styles.side}>
-        <AppText style={[styles.empty, align === 'right' && { textAlign: 'right' }]}>Empty</AppText>
+      <View style={[styles.side, end && styles.sideRight]}>
+        <AppText style={styles.empty}>Empty</AppText>
       </View>
     );
   }
+  // Projection above the name so the name keeps the whole cell width (two lines allowed).
   return (
-    <View style={[styles.side, align === 'right' && styles.sideRight, win && { backgroundColor: colors.successMuted }]}>
-      <View style={styles.sideName}>
-        <SimMiniPlayer player={player} align={align} onOpen={ctx.openPlayer} size={26} />
-      </View>
+    <View style={[styles.side, end && styles.sideRight, win && { backgroundColor: colors.successMuted }]}>
       <AppText style={[styles.sideProj, { color: player.status === 'healthy' ? tint : colors.textTertiary }]}>{simFmtPts(player.projection)}</AppText>
+      <SimMiniPlayer player={player} align={align} onOpen={ctx.openPlayer} size={24} wrap />
     </View>
   );
 }
@@ -293,10 +293,9 @@ function createStyles(colors: ThemeColors) {
     proj: { fontSize: 16, fontWeight: '800', color: colors.textPrimary },
     slotRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs, paddingVertical: spacing.xs, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.border },
     slotMid: { width: 50, alignItems: 'center' },
-    side: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: spacing.xs, minWidth: 0, borderRadius: radii.md, paddingHorizontal: 4, paddingVertical: 2 },
-    sideRight: { flexDirection: 'row-reverse' },
-    sideName: { flex: 1, minWidth: 0 },
-    sideProj: { fontSize: 12.5, fontWeight: '800' },
+    side: { flex: 1, alignItems: 'flex-start', gap: 2, minWidth: 0, borderRadius: radii.md, paddingHorizontal: 6, paddingVertical: 4 },
+    sideRight: { alignItems: 'flex-end' },
+    sideProj: { fontSize: 14, fontWeight: '800' },
     empty: { fontSize: 12.5, color: colors.textTertiary },
     thinTrack: { height: 6, borderRadius: radii.pill, overflow: 'hidden', backgroundColor: colors.glassInset },
     thinFill: { height: 6 },

@@ -195,7 +195,7 @@ function SimMatchupCard({ ctx, matchup, onTab }: { ctx: SimCtx; matchup: SimHome
           return (
             <li
               key={`${row.slot}-${index}`}
-              className="grid grid-cols-[1fr_auto_1fr] items-center gap-1.5 py-1.5"
+              className="grid grid-cols-[1fr_auto_1fr] items-center gap-1 py-1.5"
               style={{ borderTop: "var(--border-width-default) solid var(--color-border)" }}
             >
               <Side player={row.you} win={edge === "you"} lose={edge === "opp"} align="left" ctx={ctx} />
@@ -212,16 +212,18 @@ function SimMatchupCard({ ctx, matchup, onTab }: { ctx: SimCtx; matchup: SimHome
 
 function Side({ player, win, lose, align, ctx }: { player: SimGamePlayer | null; win: boolean; lose: boolean; align: "left" | "right"; ctx: SimCtx }) {
   const tint = win ? "var(--color-success)" : lose ? "var(--color-danger)" : "var(--color-text-secondary)";
+  const end = align === "right";
   if (!player) {
-    return <span className={`text-xs ${align === "right" ? "text-right" : ""}`} style={{ color: "var(--color-text-muted)" }}>Empty</span>;
+    return <span className={`text-xs ${end ? "text-right" : ""}`} style={{ color: "var(--color-text-muted)" }}>Empty</span>;
   }
+  // Projection on its own line above the name so the name keeps the full cell width (two lines allowed).
   return (
     <div
-      className={`flex min-w-0 items-center gap-1.5 px-1 py-0.5 ${align === "right" ? "flex-row-reverse" : ""}`}
+      className={`flex min-w-0 flex-col gap-0.5 px-1.5 py-1 ${end ? "items-end" : "items-start"}`}
       style={{ borderRadius: "var(--radius-card, 12px)", background: win ? "color-mix(in srgb, var(--color-success) 9%, transparent)" : undefined }}
     >
-      <div className="min-w-0 flex-1"><SimMiniPlayer player={player} align={align} onOpen={ctx.openPlayer} size={26} /></div>
-      <span className="shrink-0 text-xs font-extrabold tabular-nums" style={{ color: player.status === "healthy" ? tint : "var(--color-text-muted)" }}>{simFmtPts(player.projection)}</span>
+      <span className="text-sm font-extrabold tabular-nums leading-none" style={{ color: player.status === "healthy" ? tint : "var(--color-text-muted)" }}>{simFmtPts(player.projection)}</span>
+      <div className="w-full min-w-0"><SimMiniPlayer player={player} align={align} onOpen={ctx.openPlayer} size={24} wrap /></div>
     </div>
   );
 }

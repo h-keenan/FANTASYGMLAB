@@ -116,7 +116,7 @@ function TeamBody({ ctx, data, onTrade }: { ctx: SimCtx; data: SimTeamRosterResp
         {(data.positions ?? []).map((p) => (
           <View key={p.pos} style={styles.gridCell}>
             <AccentCard accent={simToneColor(simLevelTone(p.level), colors)} compact>
-              <View style={common.rowBetween}>
+              <View style={{ gap: 4, alignItems: 'flex-start' }}>
                 <PositionBadge position={p.pos} />
                 <AppText style={{ fontSize: 12.5, fontWeight: '800', color: simToneColor(simLevelTone(p.level), colors) }}>{simLevelLabel(p.level)}</AppText>
               </View>

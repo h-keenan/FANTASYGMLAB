@@ -1907,3 +1907,15 @@ export function simTeamRecordLine(record: Pick<SimTeamRecord, "wins" | "losses" 
 export function simByeCoverLine(alert: Pick<SimByeAlert, "week" | "covered" | "pos_label">): string {
   return alert.covered ? `${alert.pos_label} covered in Week ${alert.week}` : `${alert.pos_label} needs a fill-in for Week ${alert.week}`;
 }
+
+/**
+ * Fallback display name for tight phone layouts: "Elijah Stone Jr." becomes
+ * "E. Stone Jr." only when the full name is long; short names are kept whole.
+ */
+export function simShortName(name: string, maxLength = 17): string {
+  const words = name.trim().split(/\s+/).filter(Boolean);
+  if (name.length <= maxLength || words.length < 2) return name;
+  const suffix = /^(jr\.?|sr\.?|ii|iii|iv|v)$/i.test(words[words.length - 1]) && words.length > 2 ? ` ${words[words.length - 1]}` : "";
+  const last = suffix ? words[words.length - 2] : words[words.length - 1];
+  return `${words[0][0]}. ${last}${suffix}`;
+}
