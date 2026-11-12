@@ -471,6 +471,24 @@ export default function GmPlanScreen({ route, navigation }: Props) {
                 {otherRows.length > 0 ? rosterLine : null}
               </>
             ) : null}
+
+            <SectionHeading title="Season outlook" icon="flask-outline" />
+            <AnimatedCard style={styles.listCard}>
+              <TouchableOpacity
+                accessibilityRole="button"
+                accessibilityLabel="Simulate the rest of your season"
+                onPress={() => navigation.navigate('FantasySim', { leagueId, leagueName })}
+                style={styles.outlookRow}
+              >
+                <View style={styles.outlookText}>
+                  <AppText style={styles.outlookTitle}>Simulate the rest of your season</AppText>
+                  <AppText style={styles.outlookBody}>
+                    Set a strategy and see your projected grade and the decisions that mattered. Pro.
+                  </AppText>
+                </View>
+                <AppText style={styles.link}>Open</AppText>
+              </TouchableOpacity>
+            </AnimatedCard>
           </>
         ) : null}
 
@@ -792,6 +810,10 @@ function createStyles(colors: ThemeColors) {
     headline: { fontSize: 17, fontWeight: '700', color: colors.textPrimary, lineHeight: 23 },
     caption: { fontSize: 13.5, color: colors.textSecondary },
     link: { fontSize: 13.5, fontWeight: '700', color: colors.accent },
+    outlookRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, padding: spacing.md },
+    outlookText: { flex: 1, minWidth: 0, gap: 2 },
+    outlookTitle: { fontSize: 15, fontWeight: '700', color: colors.textPrimary },
+    outlookBody: { fontSize: 13, color: colors.textSecondary },
     situation: { gap: spacing.sm, marginBottom: spacing.lg },
     stanceRow: { flexDirection: 'row', gap: spacing.sm },
     stanceChip: {

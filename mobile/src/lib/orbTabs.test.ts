@@ -104,3 +104,10 @@ test('Trade History, College Scouting and Playoff Odds are tabs, not menu pages'
   }
   assert.ok(ORB_TABS.Trades.some((t) => t.label === 'History' && t.route === 'TradeHistory'));
 });
+
+test('the season simulation is a GM Plan tab, not its own orb destination', () => {
+  assert.ok(!('fantasy-sim' in ROUTE_BY_PAGE));
+  assert.ok(!NAV_PAGES.some((p) => p.key === 'fantasy-sim'));
+  const tab = ORB_TABS.GmPlan.find((t) => t.label === 'Season Outlook');
+  assert.equal(tab?.route, 'FantasySim');
+});

@@ -513,7 +513,7 @@ export function FantasySimContent({ leagueId, leagueName }: { leagueId: string; 
       .catch((error) => {
         if (cancelled) return;
         if (isSimOffError(error)) setPhase({ kind: "unavailable", cause: "off" });
-        else setPhase({ kind: "error", message: errorText(error, "Could not load Fantasy Sim.") });
+        else setPhase({ kind: "error", message: errorText(error, "Could not load your season outlook.") });
       });
     return () => {
       cancelled = true;
@@ -635,7 +635,7 @@ export function FantasySimContent({ leagueId, leagueName }: { leagueId: string; 
   if (phase.kind === "loading") {
     return (
       <main className="flex-1 flex flex-col gap-4 px-4 py-6 max-w-3xl w-full mx-auto">
-        <PageTitle page="Fantasy Sim" />
+        <PageTitle page="Season Outlook" />
         <ResultSkeleton />
       </main>
     );
@@ -649,11 +649,11 @@ export function FantasySimContent({ leagueId, leagueName }: { leagueId: string; 
   if (phase.kind === "premium") {
     return (
       <PremiumUpsellCard
-        kicker="Fantasy Sim"
+        kicker="Season outlook"
         leagueName={leagueName}
         upsell={phase.upsell}
         fallbackTitle="Play out your season before it happens"
-        fallbackBody="Fantasy Sim is a Pro feature: set a strategy for your team, simulate the rest of the season against AI managers, and see your grade and the decisions that mattered. Start your free trial to unlock it."
+        fallbackBody="Season outlook is a Pro feature in your GM Plan: set a strategy for your team, simulate the rest of your season against AI managers, and see your grade and the decisions that mattered. Start your free trial to unlock it."
       />
     );
   }
@@ -661,7 +661,7 @@ export function FantasySimContent({ leagueId, leagueName }: { leagueId: string; 
     const copy = simUnavailableCopy(phase.cause);
     return (
       <main className="flex-1 flex flex-col gap-4 px-4 py-6 max-w-3xl w-full mx-auto">
-        <PageTitle page="Fantasy Sim" />
+        <PageTitle page="Season Outlook" />
         <EmptyState title={copy.title} subtitle={copy.subtitle} />
       </main>
     );
@@ -672,7 +672,7 @@ export function FantasySimContent({ leagueId, leagueName }: { leagueId: string; 
 
   return (
     <main className="flex-1 flex flex-col gap-5 px-4 py-6 max-w-3xl w-full mx-auto">
-      <PageTitle page="Fantasy Sim" />
+      <PageTitle page="Season Outlook" />
       <SimBanner />
       {notice ? (
         <p role="alert" className="text-sm" style={{ color: "var(--color-warning)" }}>

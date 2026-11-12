@@ -8,6 +8,7 @@
 
 import type { TradeAsset, TradeIdea, TradeVerdict } from "@/lib/api";
 import type { TradePitch } from "@/lib/shareCard/tradeCard";
+import { cautionShareLine } from "@/lib/tradeCautions";
 
 export interface AnalyzerCardInput {
   /** What the user sends (the partner receives these). */
@@ -35,6 +36,7 @@ export function buildAnalyzerIdea(input: AnalyzerCardInput): TradeIdea {
     category: "",
     value_edge_band: verdict.band,
     impact_tag: "",
+    caution_tag: cautionShareLine(verdict),
     landed_gm_target_player_ids: [],
     send_score: sum(sendAssets),
     receive_score: sum(receiveAssets),

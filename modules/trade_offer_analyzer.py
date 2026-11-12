@@ -10,7 +10,7 @@ from dataclasses import dataclass, replace
 from html import escape
 from typing import Any, Callable, Mapping, Sequence
 
-from modules import brand_identity, trade_posture, trade_value_bands
+from modules import brand_identity, trade_cautions, trade_posture, trade_value_bands
 from modules.compact_fantasy_assets import compact_matchup_html
 from modules.trade_analyzer_fit import score_asset_value
 from modules.trade_visual_language import (
@@ -101,6 +101,9 @@ class OfferVerdict:
     # The score-ladder band. Always equal to `band` now that nothing relabels
     # the verdict after the score; kept for clients that already read it.
     score_band: str = ""
+    # Structured caution tags (modules.trade_cautions), e.g. the pick-glut
+    # tag. Additive; empty for most verdicts.
+    cautions: tuple[dict[str, Any], ...] = ()
 
     def to_public_dict(self) -> dict[str, Any]:
         return {
@@ -127,6 +130,7 @@ class OfferVerdict:
             "posture_note": self.posture_note,
             "posture_assessment": self.posture_assessment,
             "score_band": self.score_band or self.band,
+            "cautions": [dict(c) for c in self.cautions],
         }
 
     def with_alternate_packages(
@@ -709,8 +713,12 @@ def decide_offer_verdict(
     receive_assets: Sequence[Mapping[str, Any]] | None = None,
     partner_assets: Sequence[Mapping[str, Any]] | None = None,
     waiver_options: Mapping[str, Sequence[str]] | None = None,
+    pick_context: Mapping[str, Any] | None = None,
 ) -> OfferVerdict:
-    """Map fit-engine outputs into a restrained accept/decline/counter verdict."""
+    """Map fit-engine outputs into a restrained accept/decline/counter verdict.
+
+    ``pick_context`` (modules.trade_cautions.build_pick_context): the picks the
+    team already holds; enables the pick-glut caution. Absent = no caution."""
 
     fit = dict(fit or {})
     value_delta = int(fit.get("value_delta") or 0)
@@ -782,6 +790,15 @@ def decide_offer_verdict(
         band = VERDICT_FAIR
         ui = UI_VERDICT_FAIR
         tone = "fair"
+
+    # Caution tags (modules.trade_cautions): words plus, at most, a ONE-step
+    # softening of the top rung. The numbers and the score never change.
+    cautions, soften = trade_cautions.apply_cautions(
+        band,
+        trade_cautions.pick_glut(posture, send_assets, receive_assets, pick_context, posture_assessment),
+    )
+    if soften:
+        band, ui, tone = VERDICT_ACCEPT, UI_VERDICT_ACCEPT, "accept"
 
     lineup_warnings = tuple(dict(w) for w in (fit.get("lineup_warnings") or ()) if isinstance(w, Mapping))
     has_critical_hole = any(w.get("severity") == "critical" for w in lineup_warnings)
@@ -858,6 +875,10 @@ def decide_offer_verdict(
     # from (trade_score; the posture-adjusted value_delta when there is no
     # lineup model), never the raw asset delta (audit C1b).
     value_summary = _value_direction_label(trade_score)
+    if soften:
+        # "You win big on value" under a label that now reads ACCEPT would
+        # contradict it; say the ACCEPT rung's sentence (the number is intact).
+        value_summary = trade_value_bands.band_for_score(trade_value_bands.ACCEPT).direction_label
     if window_overrules or (
         posture_assessment
         and posture_assessment.get("adjustment", 0) < 0
@@ -898,6 +919,7 @@ def decide_offer_verdict(
         posture_note=str(fit.get("posture_note") or ""),
         posture_assessment=posture_assessment,
         score_band=band,
+        cautions=tuple(cautions),
     )
 
 

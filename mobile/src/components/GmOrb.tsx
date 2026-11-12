@@ -94,7 +94,6 @@ const ICON_BY_PAGE: Record<string, IconName> = {
   'live-draft': 'timer-outline',
   'league-recaps': 'newspaper-outline',
   games: 'dice-outline',
-  'fantasy-sim': 'flask-outline',
   commissioner: 'shield-checkmark-outline',
   portfolio: 'layers-outline',
   news: 'globe-outline',

@@ -79,6 +79,7 @@ export const NAV_PAGES: readonly NavCatalogPage[] = [
       { label: "Trades", subtitle: "Trade moves your plan calls for", keywords: ["trade window"] },
       { label: "Core", subtitle: "Players your plan is built around", keywords: ["protected", "keep"] },
       { label: "Watching", subtitle: "Players you are targeting", keywords: ["targets", "gm targets", "watchlist"] },
+      { label: "Season Outlook", subtitle: "Simulate the rest of your season", keywords: ["simulation", "simulate", "season sim", "fantasy sim", "what if", "strategy", "grade", "rest of season"], pro: true },
     ] },
   { key: "draft-center", label: "Draft Center", subtitle: "Picks, order, and draft tools", group: "tools", leagueScoped: true, pro: true,
     tabs: [
@@ -96,7 +97,6 @@ export const NAV_PAGES: readonly NavCatalogPage[] = [
       { label: "Season Sim", subtitle: "Season simulator", keywords: ["simulator", "simulation", "playoff odds", "what if"] },
       { label: "Pick'em", subtitle: "Weekly pick'em in your league", keywords: ["pickem", "picks", "weekly"] },
     ] },
-  { key: "fantasy-sim", label: "Fantasy Sim", subtitle: "Set a strategy and play out your season", group: "tools", leagueScoped: true, pro: true },
   { key: "commissioner", label: "Commissioner", subtitle: "League integrity: lineups, tanking signals, trades", group: "tools", leagueScoped: true, pro: true },
 
   { key: "portfolio", label: "Portfolio", subtitle: "Your standing across every saved league", group: "general", leagueScoped: false, pro: true },

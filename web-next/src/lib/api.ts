@@ -1,4 +1,5 @@
 import { env } from "./env";
+import type { TradeCaution } from "./tradeCautions";
 import type { VerdictAssumptions, VerdictFeedbackReason, VerdictReportContext } from "@/lib/verdictTrust";
 import { supabase } from "./supabase";
 import type { SimRunResponse, SimStatusResponse, SimStrategy, SimWorldResponse, SimWorldsResponse } from "./simPresentation";
@@ -1184,6 +1185,8 @@ export interface TradePackage {
  * `receive_score` are the real, untruncated per-side totals (added in
  * Revision 3 for this page's lean bar — see that endpoint's docstring). */
 export interface TradeIdea {
+  /** Share card only: a caution tag that travels with a softened verdict label. */
+  caution_tag?: string;
   /** Set when the idea would overfill the roster; its numbers already include the cuts. */
   roster_overflow?: RosterOverflow | null;
   partner_team_name: string;
@@ -3469,6 +3472,8 @@ export interface TradeVerdict {
   /** One sentence naming the posture and the trade-off ("You're a contender (#2 of 12, 4-2): this costs ~90 lineup points..."). */
   posture_note?: string;
   posture_assessment?: TradePostureAssessment | null;
+  /** Structured caution tags (modules/trade_cautions.py); numbers are never changed by one. */
+  cautions?: TradeCaution[];
 }
 
 /** modules/trade_lineup_model.py's `lineup_model` block, verbatim. Additive:

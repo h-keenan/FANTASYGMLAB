@@ -1,5 +1,5 @@
 /**
- * Fantasy Sim presentation: the pure copy and shaping both the web page and
+ * Season outlook simulation presentation: the pure copy and shaping both the web page and
  * the app screen render from. Web and mobile hold a byte-identical copy of
  * this file (scripts/check_lib_twins.mjs), so it has no imports.
  *
@@ -294,12 +294,12 @@ export function simGate(body: (SimEnvelope & { enabled?: boolean }) | null | und
 export function simUnavailableCopy(cause: SimUnavailableCause): { title: string; subtitle: string } {
   if (cause === "storage") {
     return {
-      title: "Fantasy Sim is temporarily unavailable",
+      title: "Season outlook is temporarily unavailable",
       subtitle: "It is switched on, but we cannot save simulations right now. Try again in a little while.",
     };
   }
   return {
-    title: "Fantasy Sim is coming soon",
+    title: "Season outlook is coming soon",
     subtitle: "Pick a strategy, play out the season, and see how you would grade. It is not switched on yet. Check back soon.",
   };
 }
@@ -317,7 +317,7 @@ const REASON_COPY: Record<string, string> = {
   invalid_mode: "That simulation length is not supported.",
   world_limit_reached: "You have reached the limit of saved simulations. Delete one to start another.",
   not_simulated: "This simulation has not been played yet.",
-  sim_storage_unavailable: "Fantasy Sim is not available yet.",
+  sim_storage_unavailable: "Season outlook is not available yet.",
 };
 
 /** Customer-safe copy for a `reason` code; empty for success. */

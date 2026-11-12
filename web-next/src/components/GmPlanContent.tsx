@@ -712,6 +712,28 @@ export function GmPlanContent({
               {otherRows.length > 0 ? rosterLine : null}
             </section>
           ) : null}
+
+          {leagueId ? (
+            <section className="flex flex-col gap-2">
+              <SectionHeading>Season outlook</SectionHeading>
+              <Link
+                href={`/fantasy-sim/${base}?${q}`}
+                className="glass-surface flex items-center justify-between gap-3 p-4"
+              >
+                <span className="flex flex-col gap-0.5">
+                  <span className="text-sm font-bold" style={{ color: "var(--color-text-primary)" }}>
+                    Simulate the rest of your season
+                  </span>
+                  <span className="text-xs" style={{ color: "var(--color-text-secondary)" }}>
+                    Set a strategy and see your projected grade and the decisions that mattered. Pro.
+                  </span>
+                </span>
+                <span className="text-xs font-bold" style={{ color: "var(--color-accent)" }}>
+                  Open
+                </span>
+              </Link>
+            </section>
+          ) : null}
         </>
       ) : null}
 

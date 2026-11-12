@@ -42,7 +42,7 @@ from modules import (
     trade_veto,
 )
 from modules import multi_team_trade as mt
-from modules import roster_value_model
+from modules import roster_value_model, trade_cautions
 from modules.trade_analyzer_assembly import pick_asset_from_mapping, player_asset_from_mapping
 from modules.trade_hub_engine import (
     apply_strategy_age_curve,
@@ -121,6 +121,8 @@ def _why(
     if overflow and overflow.get("need"):
         add("roster_fit", f"{name} would be over the roster limit by {overflow['need']} and has to cut to fit.")
     add("posture", verdict.get("posture_note"))
+    for caution in verdict.get("cautions") or ():
+        add("posture", f"{caution.get('tag')}. {caution.get('explanation')}")
     add("posture", verdict.get("strategy_summary"))
     add("risk", verdict.get("risk_summary"))
     return out
@@ -406,8 +408,15 @@ def grade_transfers(
         if not fit or not fit.get("available"):
             return _fail("unavailable", f"{names[rid]}'s side of the trade could not be graded.")
         model_status.merge_into(status, fit.get("model_status"))
+        pick_context = None
+        if pick_by_id and receive_assets and any(x.get("asset_type") == "pick" for x in receive_assets):
+            pick_context = trade_cautions.build_pick_context(
+                list(pick_by_id.values()), rid,
+                open_roster_spots=trade_cautions.open_roster_spots(league, by_rid[rid]),
+            )
         verdict = trade_offer_analyzer.decide_offer_verdict(
-            fit, send_assets=send_assets, receive_assets=receive_assets, partner_assets=[], waiver_options={}
+            fit, send_assets=send_assets, receive_assets=receive_assets, partner_assets=[], waiver_options={},
+            pick_context=pick_context,
         ).to_public_dict()
 
         lineup = verdict.get("lineup_model") or {}
