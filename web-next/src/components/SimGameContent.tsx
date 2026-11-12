@@ -31,6 +31,7 @@ import {
   simFmtPts,
   simFmtRecord,
   simGameGate,
+  simLeagueTeamLabel,
   simGameLiteLine,
   simGamePaywalled,
   simGameUnavailableCopy,
@@ -41,7 +42,10 @@ import {
   simSetupBody,
   simSetupDefaults,
   simSetupSummary,
+  simTeamNameChoices,
   simWeekHeading,
+  SIM_NAME_CUSTOM,
+  SIM_TEAM_NAME_MAX,
   SIM_TE_PREMIUM_LABELS,
   type SimDifficulty,
   type SimTiebreaker,
@@ -61,6 +65,7 @@ import {
 } from "@/lib/simGame";
 import { SIM_FLOW_INITIAL, SIM_TABS, simFlowReducer, simRecapsFromAdvance, type SimTab } from "@/lib/simGameFlow";
 import { useSimGameCall } from "@/lib/useSimGameCall";
+import { useSimLeagueTeams } from "@/lib/useSimLeagueTeams";
 import { useSimLeagueChoices } from "@/lib/useSimLeagueChoices";
 
 const UPSELL_FALLBACK = {
@@ -399,12 +404,14 @@ function SetupForm({
   const defaults = useMemo(() => simSetupDefaults(options), [options]);
   const [state, setState] = useState<SimSetupState>(defaults);
   const set = <K extends keyof SimSetupState>(key: K, value: SimSetupState[K]) => setState((prev) => ({ ...prev, [key]: value }));
+  const league = state.start === "league";
   const leagueMode = options?.start_modes?.find((m) => m.id === "league");
   const canImport = leagueMode ? leagueMode.available : false;
   const leagues = useSimLeagueChoices(state.start === "league");
+  const leagueTeams = useSimLeagueTeams(league ? state.leagueId : "", (rosterId) => set("rosterId", rosterId));
+  const nameChoices = simTeamNameChoices(options);
   const changed = simSetupAdvancedChanged(state, defaults);
   const block = simSetupBlock(state);
-  const league = state.start === "league";
   return (
     <form
       className="flex flex-col gap-4"
@@ -429,7 +436,7 @@ function SetupForm({
       {league ? (
         <label className="flex flex-col gap-1 text-sm font-semibold">
           Start from
-          <Select value={state.leagueId} onChange={(event) => set("leagueId", event.target.value)} aria-label="League to start from" disabled={leagues === null}>
+          <Select value={state.leagueId} onChange={(event) => setState((prev) => ({ ...prev, leagueId: event.target.value, rosterId: "" }))} aria-label="League to start from" disabled={leagues === null}>
             <option value="">{leagues === null ? "Loading your leagues..." : leagues.length ? "Choose a league" : "No Sleeper leagues saved"}</option>
             {(leagues ?? []).map((row) => (
               <option key={row.league_id} value={row.league_id}>{row.league_name || row.league_id}</option>
@@ -437,10 +444,51 @@ function SetupForm({
           </Select>
         </label>
       ) : null}
-      <label className="flex flex-col gap-1 text-sm font-semibold">
-        Your team name
-        <Input value={state.name} maxLength={40} placeholder={league ? "Your team's real name" : "My Team"} onChange={(event) => set("name", event.target.value)} />
-      </label>
+      {league && state.leagueId ? (
+        <div className="flex flex-col gap-1" data-testid="sim-team-picker">
+          <label className="flex flex-col gap-1 text-sm font-semibold">
+            Your team
+            <Select
+              value={state.rosterId}
+              onChange={(event) => set("rosterId", event.target.value)}
+              aria-label="Your team in this league"
+              disabled={leagueTeams.status !== "ready"}
+            >
+              <option value="">
+                {leagueTeams.status === "loading" ? "Loading teams..." : leagueTeams.status === "error" ? "Teams unavailable" : "Choose your team"}
+              </option>
+              {leagueTeams.status === "ready"
+                ? leagueTeams.teams.map((team) => (
+                    <option key={team.roster_id} value={team.roster_id}>
+                      {simLeagueTeamLabel(team)}
+                      {team.is_you ? " (you)" : ""}
+                    </option>
+                  ))
+                : null}
+            </Select>
+          </label>
+          {leagueTeams.status === "error" ? (
+            <p className="text-xs" role="status" style={{ color: "var(--color-warning)" }}>{leagueTeams.message}</p>
+          ) : leagueTeams.status === "ready" && !leagueTeams.youRosterId ? (
+            <p className="text-xs" style={{ color: "var(--color-text-muted)" }}>We could not tell which team is yours from your Sleeper link. Pick it from the list.</p>
+          ) : null}
+        </div>
+      ) : null}
+      {!league ? (
+        <div className="flex flex-col gap-2">
+          <label className="flex flex-col gap-1 text-sm font-semibold">
+            Your team name
+            <Select value={state.nameChoice} onChange={(event) => set("nameChoice", event.target.value)} aria-label="Your team name">
+              {nameChoices.map((choice) => (
+                <option key={choice.value} value={choice.value}>{choice.label}</option>
+              ))}
+            </Select>
+          </label>
+          {state.nameChoice === SIM_NAME_CUSTOM ? (
+            <Input value={state.name} maxLength={SIM_TEAM_NAME_MAX} placeholder="My Team" aria-label="Custom team name" onChange={(event) => set("name", event.target.value)} />
+          ) : null}
+        </div>
+      ) : null}
       <div className="flex flex-col gap-1">
         <span className="text-sm font-semibold">Difficulty</span>
         <PillRow

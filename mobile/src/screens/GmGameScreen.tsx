@@ -9,6 +9,7 @@ import Button from '../components/Button';
 import EmptyState from '../components/EmptyState';
 import ErrorState from '../components/ErrorState';
 import FadeInView from '../components/FadeInView';
+import FilterDropdownButton from '../components/FilterDropdownButton';
 import GridBackground from '../components/GridBackground';
 import Input from '../components/Input';
 import PremiumLock from '../components/PremiumLock';
@@ -46,6 +47,11 @@ import {
   simSetupBody,
   simSetupDefaults,
   simSetupSummary,
+  simTeamNameChoices,
+  simLeagueTeamLabel,
+  SIM_NAME_CUSTOM,
+  SIM_NAME_RANDOM,
+  SIM_TEAM_NAME_MAX,
   simWeekHeading,
   SIM_TE_PREMIUM_LABELS,
   type SimDifficulty,
@@ -66,6 +72,7 @@ import {
 } from '../lib/simGame';
 import { SIM_FLOW_INITIAL, SIM_TABS, simFlowReducer, simRecapsFromAdvance, type SimTab } from '../lib/simGameFlow';
 import { useSimGameRequest } from '../lib/useSimGameRequest';
+import { useSimLeagueTeams } from '../lib/useSimLeagueTeamPicker';
 import { useSimSavedLeagues } from '../lib/useSimSavedLeagues';
 import { spacing, type ThemeColors } from '../theme';
 import type { RootStackParamList } from '../navigation/RootNavigator';
@@ -458,10 +465,13 @@ function SetupForm({
   const [advancedOpen, setAdvancedOpen] = useState(false);
   const set = <K extends keyof SimSetupState>(key: K, value: SimSetupState[K]) => setState((prev) => ({ ...prev, [key]: value }));
   const canImport = options?.start_modes?.find((m) => m.id === 'league')?.available ?? false;
-  const leagues = useSimSavedLeagues(state.start === 'league');
+  const league = state.start === 'league';
+  const leagues = useSimSavedLeagues(league);
+  const leagueTeams = useSimLeagueTeams(league ? state.leagueId : '', (rosterId) => set('rosterId', rosterId));
+  const nameChoices = simTeamNameChoices(options);
+  const nameLabel = (value: string) => nameChoices.find((c) => c.value === value)?.label ?? 'Random';
   const changed = simSetupAdvancedChanged(state, defaults);
   const block = simSetupBlock(state);
-  const league = state.start === 'league';
   return (
     <View style={styles.stack}>
       <SectionHeading title="New game" caption="Quick start is 12 teams, half PPR and a standard lineup. You can change nothing after the game starts." />
@@ -486,15 +496,47 @@ function SetupForm({
               size="sm"
               variant={state.leagueId === row.league_id ? 'primary' : 'secondary'}
               label={row.league_name || row.league_id}
-              onPress={() => set('leagueId', row.league_id)}
+              onPress={() => setState((prev) => ({ ...prev, leagueId: row.league_id, rosterId: '' }))}
             />
           ))}
         </View>
       ) : null}
-      <View style={styles.tight}>
-        <AppText style={styles.label}>Your team name</AppText>
-        <Input value={state.name} maxLength={40} placeholder={league ? "Your team's real name" : 'My Team'} onChangeText={(v) => set('name', v)} accessibilityLabel="Your team name" />
-      </View>
+      {league && state.leagueId ? (
+        <View style={styles.tight}>
+          <AppText style={styles.label}>Your team</AppText>
+          {leagueTeams.status === 'loading' ? <AppText style={styles.muted}>Loading teams...</AppText> : null}
+          {leagueTeams.status === 'error' ? <AppText style={styles.muted}>{leagueTeams.message}</AppText> : null}
+          {leagueTeams.status === 'ready' && !leagueTeams.youRosterId ? (
+            <AppText style={styles.muted}>We could not tell which team is yours from your Sleeper link. Pick it from the list.</AppText>
+          ) : null}
+          {leagueTeams.status === 'ready'
+            ? leagueTeams.teams.map((team) => (
+                <Button
+                  key={team.roster_id}
+                  size="sm"
+                  variant={state.rosterId === team.roster_id ? 'primary' : 'secondary'}
+                  label={`${simLeagueTeamLabel(team)}${team.is_you ? ' (you)' : ''}`}
+                  onPress={() => set('rosterId', team.roster_id)}
+                />
+              ))
+            : null}
+        </View>
+      ) : null}
+      {!league ? (
+        <View style={styles.tight}>
+          <AppText style={styles.label}>Your team name</AppText>
+          <FilterDropdownButton<string>
+            label="Team name"
+            options={nameChoices.map((c) => c.label)}
+            value={nameLabel(state.nameChoice)}
+            allValue="Random"
+            onChange={(picked) => set('nameChoice', nameChoices.find((c) => c.label === picked)?.value ?? SIM_NAME_RANDOM)}
+          />
+          {state.nameChoice === SIM_NAME_CUSTOM ? (
+            <Input value={state.name} maxLength={SIM_TEAM_NAME_MAX} placeholder="My Team" onChangeText={(v) => set('name', v)} accessibilityLabel="Custom team name" />
+          ) : null}
+        </View>
+      ) : null}
       <View style={styles.tight}>
         <AppText style={styles.label}>Difficulty</AppText>
         <SegmentedTabBar<string>

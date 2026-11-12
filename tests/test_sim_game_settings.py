@@ -430,6 +430,17 @@ class Inputs:
             raise SimInputsError(self.error)
         return self.imported
 
+    def league_teams(self, league_id, *, username=""):
+        from modules.sim.game_types import LeagueTeamChoice, LeagueTeams
+        self.teams_args = (league_id, username)
+        if self.error:
+            raise SimInputsError(self.error)
+        teams = tuple(LeagueTeamChoice(
+            roster_id=t.tid, team_name=t.name, owner_name=t.owner, wins=1, losses=0, ties=0,
+            points_for=100.0, rank=i + 1, is_you=t.is_user) for i, t in enumerate(self.imported.teams))
+        you = next((t.roster_id for t in teams if t.is_you), "")
+        return LeagueTeams(league_id=league_id, league_name="My League", season="2026", teams=teams, you_roster_id=you)
+
 
 def make_app(inputs):
     backend = InMemoryBackend()
@@ -572,3 +583,145 @@ def test_a_defense_and_superflex_game_on_the_real_pool_completes():
     while state.status != "complete":
         advance(em, snap, state, 3)
     assert state.champion in snap.tids
+
+
+# ------------------------------------------------ team pickers (no typed names)
+
+TRICKY_NAMES = ["Team O'Brien", "The Big  Show", "Ballers \U0001F3C8\U0001F525", "\u00c9quipe Fant\u00f4me", "A&B \"Crew\" <3"]
+
+
+class PickerSleeper(FakeSleeper):
+    """Sleeper data whose team names are hostile to string matching, and whose
+    account link does not match any roster's username (display name / co-owner)."""
+
+    def __init__(self, names=None, owner_ids=None, co_owners=None, user_id="u-me", usernames=None):
+        names = names or TRICKY_NAMES
+        rosters = [{"roster_id": i + 1, "owner_id": (owner_ids or {}).get(i + 1, f"u{i + 1}"),
+                    "co_owners": (co_owners or {}).get(i + 1, []), "players": [f"p{i}"],
+                    "settings": {"wins": 5 - i % 5, "losses": i % 5, "ties": 0, "fpts": 900 - 10 * i, "fpts_decimal": 50}}
+                   for i in range(12)]
+        super().__init__(rosters=rosters)
+        self._names = names
+        self._user_id = user_id
+        self._usernames = usernames or {}
+
+    def get_user_id(self, username):
+        return self._user_id if username.casefold() == "meuser" else None
+
+    def get_league_roster_profiles(self, league_id):
+        return {str(r["roster_id"]): {
+            "team_name": self._names[(r["roster_id"] - 1) % len(self._names)] + ("" if r["roster_id"] <= len(self._names) else f" {r['roster_id']}"),
+            "owner_name": f"Owner {r['roster_id']}", "username": self._usernames.get(r["roster_id"], f"other{r['roster_id']}"),
+        } for r in self._rosters}
+
+
+def test_league_teams_lists_names_with_spaces_emoji_and_quotes_and_preselects_by_user_id():
+    sleeper = PickerSleeper(owner_ids={4: "u-me"})
+    res = real_inputs(sleeper).league_teams("L1", username="MeUser")  # no roster has username "meuser"
+    assert res.you_roster_id == "4" and [t.is_you for t in res.teams].count(True) == 1
+    assert [t.team_name for t in res.teams[:5]] == TRICKY_NAMES
+    assert [t.rank for t in res.teams if t.roster_id == "1"] == [1] and res.teams[0].points_for == 900.5
+    assert sleeper.calls == ["league"]  # read-only
+
+
+def test_league_teams_preselects_by_username_casefolded_or_co_owner_and_never_guesses():
+    assert real_inputs(PickerSleeper(usernames={7: "MeUser"})).league_teams("L1", username="meuser").you_roster_id == "7"
+    assert real_inputs(PickerSleeper(usernames={7: "meuser"})).league_teams("L1", username="@MeUser ").you_roster_id == "7"
+    assert real_inputs(PickerSleeper(co_owners={9: ["u-me"]})).league_teams("L1", username="meuser").you_roster_id == "9"
+    nobody = real_inputs(PickerSleeper()).league_teams("L1", username="stranger")
+    assert nobody.you_roster_id == "" and not any(t.is_you for t in nobody.teams)
+    assert real_inputs(PickerSleeper()).league_teams("L1", username="").you_roster_id == ""
+
+
+def test_league_teams_refuses_other_platforms_and_unreadable_leagues():
+    with pytest.raises(SimInputsError) as err:
+        real_inputs(PickerSleeper()).league_teams("espn:5:2026", username="x")
+    assert err.value.code == "league_platform_unsupported"
+    with pytest.raises(SimInputsError) as err:
+        real_inputs(FakeSleeper(league={})).league_teams("L1", username="x")
+    assert err.value.code == "league_unavailable"
+
+
+def test_league_import_picks_the_team_by_roster_id_whatever_its_name_looks_like():
+    sleeper = PickerSleeper()
+    for rid, name in enumerate(TRICKY_NAMES, start=1):
+        imp = real_inputs(sleeper).league_import("L1", username="", roster_id=str(rid))
+        mine = next(t for t in imp.teams if t.is_user)
+        assert mine.tid == str(rid) and mine.name == name
+    with pytest.raises(SimInputsError) as err:
+        real_inputs(sleeper).league_import("L1", username="", roster_id="99")
+    assert err.value.code == "team_not_found"
+    imp = real_inputs(PickerSleeper(owner_ids={4: "u-me"})).league_import("L1", username="MeUser")
+    assert next(t for t in imp.teams if t.is_user).tid == "4"
+
+
+def test_league_teams_endpoint_and_creating_by_roster_id():
+    from modules.sim import game_api
+    game_api.clear_pool_cache()
+    inputs = Inputs(imported_league())
+    client, _ = make_app(inputs)
+    res = client.get("/v1/sim/games/league-teams?league_id=L1", headers=H).json()
+    assert res["reason"] == "" and res["you_roster_id"] == "103" and len(res["teams"]) == 12
+    assert [t["roster_id"] for t in res["teams"] if t["is_you"]] == ["103"]
+    assert inputs.teams_args == ("L1", "turbo")
+    assert client.get("/v1/sim/games/league-teams", headers=H).status_code == 422
+    assert client.get("/v1/sim/games/league-teams?league_id=L1").status_code == 401
+    created = client.post("/v1/sim/games", json={"start": "league", "league_id": "L1", "roster_id": "105"}, headers=H).json()
+    assert inputs.import_args == ("L1", "turbo", "105") and created["reason"] == ""
+    broken = Inputs(imported_league(), error="league_platform_unsupported")
+    client2, _ = make_app(broken)
+    assert client2.get("/v1/sim/games/league-teams?league_id=espn:1:2026", headers=H).json()["reason"] == "league_platform_unsupported"
+
+
+def test_options_list_preset_team_names():
+    from modules.sim import game_api
+    game_api.clear_pool_cache()
+    client, _ = make_app(Inputs(imported_league()))
+    names = client.get("/v1/sim/games/options", headers=H).json()["options"]["team_names"]
+    assert names["max_length"] == 40 and len(names["values"]) >= 24 and len(set(names["values"])) == len(names["values"])
+    assert all(0 < len(n) <= 40 for n in names["values"])
+    banned = ("Cowboys", "Packers", "Chiefs", "Eagles", "Patriots", "49ers", "Steelers", "Giants", "Jets", "Bears")
+    assert not any(b.lower() in n.lower() for n in names["values"] for b in banned)
+
+
+@pytest.mark.parametrize("name", TRICKY_NAMES)
+def test_fresh_league_keeps_a_chosen_name_exactly_and_ai_teams_never_reuse_it(name):
+    from modules.sim import game_api
+    game_api.clear_pool_cache()
+    client, _ = make_app(Inputs(imported_league()))
+    res = client.post("/v1/sim/games", json={"team_name": name}, headers=H).json()
+    clean = " ".join(name.split())
+    assert res["game"]["you"]["name"] == clean
+    teams = res["draft"]["teams"]
+    assert sum(1 for t in teams if t["name"] == clean) == 1
+
+
+def test_random_team_name_is_a_preset_and_unique_among_teams():
+    from modules.sim import game_api
+    from modules.sim.game_setup import TEAM_NAMES
+    game_api.clear_pool_cache()
+    client, _ = make_app(Inputs(imported_league()))
+    for _ in range(4):
+        res = client.post("/v1/sim/games", json={"random_team_name": True}, headers=H).json()
+        me = res["game"]["you"]["name"]
+        assert me in TEAM_NAMES
+        assert [t["name"] for t in res["draft"]["teams"]].count(me) == 1
+        client.delete(f"/v1/sim/games/{res['game']['id']}", headers=H)
+
+
+def test_ai_names_skip_a_preset_the_player_picked_even_with_different_case_or_spacing():
+    from modules.sim.game_setup import TEAM_NAMES, build_snapshot
+    from modules.sim.game_types import GameSettings
+    settings = GameSettings.parse({"teams": 14, "user_slot": 1})
+    for seed in range(8):
+        for chosen in (TEAM_NAMES[0], "  " + TEAM_NAMES[3].upper().replace(" ", "  ")):
+            snap = build_snapshot(ROWS, BYES, settings, seed, user_team_name=chosen)
+            keys = [" ".join(t.name.split()).casefold() for t in snap.teams]
+            assert len(set(keys)) == len(keys)
+
+
+def test_too_long_team_name_is_rejected():
+    from modules.sim import game_api
+    game_api.clear_pool_cache()
+    client, _ = make_app(Inputs(imported_league()))
+    assert client.post("/v1/sim/games", json={"team_name": "x" * 41}, headers=H).status_code == 422
