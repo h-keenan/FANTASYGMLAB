@@ -6,10 +6,10 @@ import AppText from './AppText';
 import Button from './Button';
 import EmptyState from './EmptyState';
 import ErrorState from './ErrorState';
-import SectionHeading from './SectionHeading';
 import SegmentedTabBar from './SegmentedTabBar';
 import { SkeletonCard } from './SkeletonBlock';
-import { SimPlayerChip, SimToneBadge, createSimStyles, type SimCtx } from './SimGameParts';
+import SimGlyph from './SimGlyph';
+import { SimPlayerChip, SimSectionTitle, SimTeamLink, SimToneBadge, createSimStyles, type SimCtx } from './SimGameParts';
 import ToneBadge from './ToneBadge';
 import { useThemeMode } from '../context/ThemeModeContext';
 import { api } from '../lib/api';
@@ -36,11 +36,10 @@ export function SimStandingsList({ rows, playoffTeams }: { rows: SimStandingRow[
         <AccentCard key={row.team_id} accent={row.is_you ? colors.accent : index < (playoffTeams ?? 0) ? colors.success : colors.borderStrong} compact>
           <View style={common.rowBetween}>
             <View style={[common.row, common.grow]}>
-              <AppText style={common.bodyStrong}>{row.rank ?? index + 1}</AppText>
-              <AppText style={[common.body, common.grow]}>
-                {row.name}
-                {row.is_you ? ' (you)' : ''}
-              </AppText>
+              <AppText style={[common.bodyStrong, { color: index < (playoffTeams ?? 0) ? colors.success : colors.textTertiary }]}>{row.rank ?? index + 1}</AppText>
+              <View style={common.grow}>
+                <SimTeamLink teamId={row.team_id} name={row.name} isYou={row.is_you} size={28} />
+              </View>
             </View>
             <View style={common.row}>
               {simPlayoffStatusLabel(row.playoff_status) ? (
@@ -53,7 +52,7 @@ export function SimStandingsList({ rows, playoffTeams }: { rows: SimStandingRow[
             <AppText style={common.small}>
               {simFmtPts(row.pf)} PF · {simFmtPts(row.pa)} PA
             </AppText>
-            {row.streak ? <AppText style={common.small}>{row.streak}</AppText> : null}
+            {row.streak ? <AppText style={[common.small, { fontWeight: '800', color: row.streak.startsWith('W') ? colors.success : row.streak.startsWith('L') ? colors.danger : colors.textSecondary }]}>{row.streak}</AppText> : null}
           </View>
         </AccentCard>
       ))}
@@ -91,11 +90,10 @@ function Scoreboard({ game, schedule, names }: { game: SimCtx['game']; schedule:
             <AccentCard key={`${g.home}-${g.away}`} accent={mine ? colors.accent : colors.borderStrong} compact>
               {rows.map(([id, pts]) => (
                 <View key={id} style={[common.rowBetween, { opacity: g.winner && g.winner !== id ? 0.7 : 1 }]}>
-                  <AppText style={[g.winner === id ? common.bodyStrong : common.body, common.grow]}>
-                    {names[id] ?? 'Team'}
-                    {id === youId ? ' (you)' : ''}
-                  </AppText>
-                  <AppText style={g.winner === id ? common.bodyStrong : common.body}>{pts == null ? '-' : simFmtPts(pts)}</AppText>
+                  <View style={common.grow}>
+                    <SimTeamLink teamId={id} name={names[id] ?? 'Team'} isYou={id === youId} size={22} bold={g.winner === id} />
+                  </View>
+                  <AppText style={[g.winner === id ? common.bodyStrong : common.body, g.winner ? { color: g.winner === id ? colors.success : colors.danger } : null]}>{pts == null ? '-' : simFmtPts(pts)}</AppText>
                 </View>
               ))}
             </AccentCard>
@@ -163,22 +161,24 @@ export function SimLeagueTab({ ctx }: { ctx: SimCtx }) {
       />
       {view === 'standings' ? (
         <View style={common.stack}>
-          <SectionHeading title="Standings" caption={`Top ${game.settings.playoff_teams} make the playoffs. Ties break on head-to-head, then points.`} />
+          <SimSectionTitle glyph="standings" tone="success" title="Standings" caption={`Top ${game.settings.playoff_teams} make the playoffs. Ties break on ${game.settings.tiebreaker === 'head_to_head' ? 'head-to-head, then points' : 'points for, then head-to-head'}.`} />
           <SimStandingsList rows={league.standings ?? []} playoffTeams={game.settings.playoff_teams} />
         </View>
       ) : null}
       {view === 'scores' ? <Scoreboard game={game} schedule={league.schedule ?? []} names={names} /> : null}
       {view === 'feed' ? (
         <View style={common.stack}>
-          <SectionHeading title="Around the league" caption="AI trades and waiver moves, newest first." />
+          <SimSectionTitle glyph="league" title="Around the league" caption="AI trades and waiver moves, newest first." />
           {(league.transactions ?? []).length === 0 ? (
             <EmptyState icon="newspaper-outline" title="Quiet so far" subtitle="Moves show up here once the season gets going." />
           ) : (
             (league.transactions ?? []).map((tx, i) => (
               <AccentCard key={i} accent={colors.borderStrong} compact>
                 <View style={common.row}>
+                  {tx.team_id ? <SimTeamLink teamId={tx.team_id} name={names[tx.team_id] ?? 'Team'} size={24} hideName /> : null}
                   {tx.week != null ? <ToneBadge label={`Week ${tx.week}`} color={colors.textSecondary} size="xs" /> : null}
-                  <ToneBadge label={String(tx.type ?? tx.kind ?? 'move').replace(/_/g, ' ')} color={colors.premium} size="xs" />
+                  <SimGlyph name={tx.type === 'trade' ? 'trade' : tx.type === 'waiver' ? 'waiver' : 'alert'} color={tx.type === 'trade' ? colors.accent : tx.type === 'waiver' ? colors.success : colors.danger} size={13} />
+                  <ToneBadge label={String(tx.type ?? tx.kind ?? 'move').replace(/_/g, ' ')} color={tx.type === 'trade' ? colors.accent : tx.type === 'waiver' ? colors.success : colors.danger} size="xs" />
                 </View>
                 <AppText style={common.body}>{simTransactionText(tx)}</AppText>
                 {(tx.players ?? []).map((p) => (
@@ -194,16 +194,16 @@ export function SimLeagueTab({ ctx }: { ctx: SimCtx }) {
       ) : null}
       {view === 'teams' ? (
         <View style={common.stack}>
-          <SectionHeading title="Scouting report" caption="Power rank is roster strength right now." />
+          <SimSectionTitle glyph="team" title="Scouting report" caption="Power rank is roster strength right now. Tap a team to scout it." />
           {[...(league.teams ?? [])]
             .sort((a, b) => a.power_rank - b.power_rank)
             .map((team) => (
               <AccentCard key={team.team_id} accent={team.is_you ? colors.accent : colors.borderStrong} compact>
                 <View style={common.rowBetween}>
-                  <AppText style={[common.bodyStrong, common.grow]}>
-                    #{team.power_rank} {team.name}
-                    {team.is_you ? ' (you)' : ''}
-                  </AppText>
+                  <View style={[common.row, common.grow]}>
+                    <AppText style={[common.bodyStrong, { color: team.power_rank <= 3 ? colors.success : colors.textTertiary }]}>#{team.power_rank}</AppText>
+                    <SimTeamLink teamId={team.team_id} name={team.name} isYou={team.is_you} size={28} />
+                  </View>
                   <ToneBadge label={team.persona.label} color={colors.accent} size="xs" />
                 </View>
                 <AppText style={common.small}>{team.persona.blurb}</AppText>

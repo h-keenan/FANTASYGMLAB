@@ -3,7 +3,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { SimGameContent } from "./SimGameContent";
 import { api } from "@/lib/api";
-import type { SimGame, SimGameOptionsResponse, SimGamePlayer, SimLineupResponse } from "@/lib/simGame";
+import type { SimGame, SimGameOptionsResponse, SimGamePlayer, SimHomeResponse, SimLineupResponse, SimTeamRosterResponse } from "@/lib/simGame";
 
 vi.mock("next/navigation", () => ({ useRouter: () => ({ push: vi.fn() }) }));
 
@@ -19,7 +19,7 @@ vi.mock("@/lib/api", async () => {
   const actual = await vi.importActual<typeof import("@/lib/api")>("@/lib/api");
   const names = [
     "getSimGameOptions", "listSimGames", "createSimGame", "getSimGame", "deleteSimGame", "getSimDraft", "simDraftPick", "simDraftAuto",
-    "putSimDraftQueue", "getSimGamePlayers", "getSimGamePlayer", "getSimGameTeam", "getSimLineup", "putSimLineup", "autoSimLineup",
+    "putSimDraftQueue", "getSimGamePlayers", "getSimGamePlayer", "getSimGameTeam", "getSimHome", "getSimLineup", "putSimLineup", "autoSimLineup",
     "claimSimWaiver", "cancelSimWaiver", "cutSimPlayer", "previewSimTrade", "sendSimTrade", "getSimInbox", "respondSimInbox",
     "advanceSimGame", "revertSimWeek", "getSimLeague", "getSimGameResult",
   ];
@@ -58,10 +58,42 @@ const lineup: SimLineupResponse = {
   projected_total: 121.4, warnings: [], roster_size: 16, roster_limit: 16, opponent: null, locked: false,
 };
 
+const star = (id: string, pos: SimGamePlayer["pos"], name: string, over: Partial<SimGamePlayer> = {}) => ({ ...player(id, pos, name), ...over });
+
+const home: SimHomeResponse = {
+  ok: true, reason: "", week: 4, phase: "regular_season",
+  matchup: {
+    week: 4, bye: false, kind: "regular",
+    opponent: { team_id: "7", name: "Rivals", persona_id: "passive", record: { wins: 2, losses: 1, ties: 0, pf: 340, pa: 300, rank: 3 }, persona: { id: "passive", label: "Passive", blurb: "Rarely deals." } },
+    you_record: { wins: 2, losses: 1, ties: 0, pf: 361.4, pa: 330.2, rank: 4 },
+    you_projection: 121.4, opp_projection: 117.9, win_prob: 0.62,
+    rows: [
+      { slot: "QB", you: star("1", "QB", "Quinn Back"), opp: star("5", "QB", "Otis Opp") },
+      { slot: "RB", you: star("2", "RB", "Hurt Harry", { status: "out", projection: 0, out_weeks: 2 }), opp: star("6", "RB", "Ray Rival") },
+    ],
+    you_flagged: 1, opp_flagged: 0,
+  },
+  checklist: [
+    { id: "lineup", label: "Set your lineup", detail: "1 starter slot need attention (out, on bye or empty).", done: false, target: "team", severity: "danger" },
+    { id: "offers", label: "Answer trade offers", detail: "2 offers waiting in your inbox.", done: false, target: "trades", severity: "accent" },
+  ],
+  inbox: { count: 2, open: true, items: [] },
+  waiver_suggestions: [{ player: star("9", "RB", "Wally Wire"), gain_now: 7.5, gain_ros: 1, reasons: ["Covers Hurt Harry (out): +7.5 pts this week"], drop: null, covers: null, for_slot: "RB1" }],
+  bye_alerts: [{ week: 7, weeks_away: 3, slot: "WR", pos_label: "WR1", player: star("3", "WR", "Wes Receiver", { bye_week: 7 }), covered: false, covered_by: null, replacements: [star("11", "WR", "Fill Ford")], message: "Your WR1 Wes Receiver is on bye in Week 7. Look at the wire for a fill-in: Fill Ford." }],
+  injuries: [{ player: star("2", "RB", "Hurt Harry", { status: "out", out_weeks: 2 }), out_weeks: 2, starting: true, note: "Hurt in Week 3" }],
+  hot_cold: { hot: [{ player: star("1", "QB", "Quinn Back"), last_week: 30.2, delta: 9.1, avg: 22 }], cold: [], wire: [] },
+  standings: { rows: [{ rank: 1, team_id: "7", name: "Rivals", is_you: false, wins: 2, losses: 1, ties: 0, pf: 340, pa: 300, streak: "W2" }, { rank: 2, team_id: "3", name: "My Team", is_you: true, wins: 2, losses: 1, ties: 0, pf: 361.4, pa: 330.2, streak: "L1" }], playoff_spots: 6, games_left: 11, your_rank: 2, margin: 1, in_playoffs: true },
+  league: { recent: [], spotlight: null },
+};
+
 const premiumBody = { ok: true, reason: "premium_required", is_premium: false, upsell: { title: "Keep your season going", body: "Pro unlocks the rest of the season." }, preview: { weeks_left: 0, paywall_week: 4, paywalled: true } };
 
 function openFirstGame() {
   return screen.findByRole("button", { name: /Open game/ }).then((b) => fireEvent.click(b));
+}
+
+async function openTeamTab() {
+  fireEvent.click(await screen.findByRole("tab", { name: "Team" }));
 }
 
 describe("SimGameContent", () => {
@@ -70,7 +102,50 @@ describe("SimGameContent", () => {
     mocked.getSimGameOptions.mockResolvedValue(options());
     mocked.getSimGame.mockResolvedValue({ ok: true, reason: "", game: game() });
     mocked.getSimLineup.mockResolvedValue(lineup);
+    mocked.getSimHome.mockResolvedValue(home);
     mocked.getSimGamePlayers.mockResolvedValue({ ok: true, reason: "", items: [], total: 0, page: 1, page_size: 40 });
+  });
+
+  it("opens on Home: matchup head to head, checklist, bye cover, waiver targets and injuries", async () => {
+    mocked.listSimGames.mockResolvedValue({ ok: true, reason: "", games: [lite(game())] });
+    mocked.getSimInbox.mockResolvedValue({ ok: true, reason: "", items: [] });
+    mocked.getSimLeague.mockResolvedValue({ ok: true, reason: "", teams: [], standings: [] });
+    mocked.getSimGameTeam.mockResolvedValue({ ok: true, reason: "", players: [] });
+    render(<SimGameContent />);
+    await openFirstGame();
+    expect(await screen.findByTestId("sim-home")).toBeInTheDocument();
+    expect(screen.getByRole("tab", { name: "Home" })).toHaveAttribute("aria-selected", "true");
+    expect(screen.getByTestId("win-chance")).toHaveTextContent("62%");
+    expect(screen.getByRole("list", { name: "Lineups head to head" }).querySelectorAll("li")).toHaveLength(2);
+    expect(screen.getByText("Otis Opp")).toBeInTheDocument();
+    expect(screen.getByText("What to do this week")).toBeInTheDocument();
+    expect(screen.getByText("Set your lineup")).toBeInTheDocument();
+    expect(screen.getByTestId("bye-alert")).toHaveTextContent("Look at the wire for a fill-in: Fill Ford");
+    expect(screen.getByTestId("waiver-suggestion")).toHaveTextContent("Covers Hurt Harry (out)");
+    expect(screen.getByTestId("home-injury")).toHaveTextContent("Out 2 wk");
+    // a checklist row jumps to the tab that handles it
+    fireEvent.click(screen.getByRole("button", { name: /Answer trade offers/ }));
+    expect(await screen.findByRole("tab", { name: /Trades/ })).toHaveAttribute("aria-selected", "true");
+  });
+
+  it("tapping a team anywhere opens its scouting sheet with strengths and needs", async () => {
+    mocked.listSimGames.mockResolvedValue({ ok: true, reason: "", games: [lite(game())] });
+    const detail: SimTeamRosterResponse = {
+      ok: true, reason: "", team_id: "7", players: [star("5", "QB", "Otis Opp")],
+      team: { team_id: "7", name: "Rivals", is_you: false, persona: { id: "passive", label: "Passive", blurb: "Rarely deals." }, record: { wins: 2, losses: 1, ties: 0, pf: 340, pa: 300, rank: 3, streak: "W2", playoff_status: "in" }, power_rank: 4, avg_age: 25.1, roster_size: 16 },
+      lineup: [{ slot: "QB", player: star("5", "QB", "Otis Opp") }], projected_total: 117.9,
+      positions: [{ pos: "QB", rank: 1, teams: 12, level: "strength", depth: 1, starters: 1, strength: 20 }, { pos: "RB", rank: 11, teams: 12, level: "need", depth: 0, starters: 2, strength: 8 }],
+      strengths: ["QB"], needs: ["RB"], injuries: [], recent: [], next_game: null, trade: { open: true, reason: null },
+    };
+    mocked.getSimGameTeam.mockResolvedValue(detail);
+    render(<SimGameContent />);
+    await openFirstGame();
+    fireEvent.click((await screen.findAllByRole("button", { name: "Rivals. Open team" }))[0]);
+    const sheet = await screen.findByTestId("team-sheet-name");
+    expect(sheet).toHaveTextContent("Rivals");
+    expect(mocked.getSimGameTeam).toHaveBeenCalledWith("g1", "7");
+    expect(screen.getByText("Strong at QB. Needs RB.")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Trade with Rivals/ })).toBeEnabled();
   });
 
   it("shows coming-soon when the flag is off (404)", async () => {
@@ -114,6 +189,7 @@ describe("SimGameContent", () => {
     await openFirstGame();
     expect(await screen.findByRole("link", { name: "Go Pro to continue" })).toHaveAttribute("href", "/premium");
     expect(screen.queryByRole("button", { name: /Advance to week/ })).not.toBeInTheDocument();
+    await openTeamTab();
     expect(await screen.findByText("Quinn Back")).toBeInTheDocument();
     expect(screen.getByTestId("sim-preview-line")).toHaveTextContent("paused at week 4");
     expect(mocked.advanceSimGame).not.toHaveBeenCalled();
@@ -129,7 +205,7 @@ describe("SimGameContent", () => {
     fireEvent.click(await screen.findByRole("button", { name: "Advance to week 4" }));
     expect(await screen.findByTestId("sim-paywall")).toHaveTextContent("Pro unlocks the rest of the season.");
     expect(mocked.advanceSimGame).toHaveBeenCalledWith("g1", 3);
-    expect(screen.getByText("Quinn Back")).toBeInTheDocument();
+    expect(screen.getByTestId("sim-home")).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "Keep looking around" }));
     expect(screen.queryByTestId("sim-paywall")).not.toBeInTheDocument();
   });

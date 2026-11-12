@@ -382,6 +382,17 @@ export interface SimCutResponse extends SimGameEnvelope {
 export interface SimTeamRosterResponse extends SimGameEnvelope {
   team_id?: string;
   players?: SimGamePlayer[];
+  /** Scouting detail (GET /teams/{id}); absent on the plain roster payloads. */
+  team?: SimTeamProfile;
+  lineup?: SimLineupSlot[];
+  projected_total?: number;
+  positions?: SimPositionGrade[];
+  strengths?: SimPos[];
+  needs?: SimPos[];
+  injuries?: SimGamePlayer[];
+  recent?: SimTeamMove[];
+  next_game?: { week: number; opponent: SimTeamRef } | null;
+  trade?: { open: boolean; reason: string | null };
 }
 
 // ---------------------------------------------------------------------------
@@ -1516,4 +1527,272 @@ export function simGameLiteLine(game: Pick<SimGameLite, "status" | "current_week
   if (game.status === "playoffs") return `Playoffs · Week ${game.current_week}`;
   const total = game.settings.regular_weeks;
   return total ? `Week ${game.current_week} of ${total}` : `Week ${game.current_week}`;
+}
+
+// ---------------------------------------------------------------------------
+// Home dashboard and team scouting (GET /home, GET /teams/{id})
+
+export interface SimTeamRef {
+  team_id: string;
+  name: string;
+  persona_id?: string;
+  is_you?: boolean;
+}
+
+export interface SimTeamRecord {
+  wins: number;
+  losses: number;
+  ties: number;
+  pf: number;
+  pa: number;
+  rank: number;
+  streak?: string;
+  seed?: number | null;
+  playoff_status?: string;
+}
+
+export interface SimTeamProfile {
+  team_id: string;
+  name: string;
+  owner?: string;
+  is_you: boolean;
+  persona: SimGamePersona;
+  record: SimTeamRecord | null;
+  power_rank: number;
+  avg_age: number | null;
+  roster_size: number;
+}
+
+export type SimNeedLevel = "strength" | "ok" | "need";
+
+export interface SimPositionGrade {
+  pos: SimPos;
+  rank: number;
+  teams: number;
+  level: SimNeedLevel;
+  depth: number;
+  starters: number;
+  strength: number;
+}
+
+export interface SimTeamMove {
+  week: number;
+  type: string;
+  text: string;
+  players: SimTransactionPlayer[];
+}
+
+export interface SimHomeMatchupRow {
+  slot: SimSlot;
+  you: SimGamePlayer | null;
+  opp: SimGamePlayer | null;
+}
+
+export interface SimHomeMatchup {
+  week: number;
+  bye: boolean;
+  kind: "regular" | "playoff";
+  opponent: (SimTeamRef & { record: SimTeamRecord | null; persona: SimGamePersona }) | null;
+  you_record?: SimTeamRecord | null;
+  you_projection?: number;
+  opp_projection?: number;
+  /** Chance (0 to 1) you outscore the opponent, from the projection spread. */
+  win_prob?: number;
+  rows: SimHomeMatchupRow[];
+  you_flagged?: number;
+  opp_flagged?: number;
+}
+
+export type SimChecklistSeverity = "danger" | "warning" | "accent" | "ok";
+export type SimTabTarget = "home" | "team" | "players" | "trades" | "league" | "more";
+
+export interface SimChecklistItem {
+  id: "cuts" | "lineup" | "waivers" | "byes" | "offers" | string;
+  label: string;
+  detail: string;
+  done: boolean;
+  target: SimTabTarget;
+  severity: SimChecklistSeverity;
+}
+
+export interface SimHomeOffer {
+  id: string;
+  from: SimTeamRef;
+  you_give: SimGamePlayer[];
+  you_get: SimGamePlayer[];
+  expires_week: number;
+}
+
+export interface SimWaiverSuggestion {
+  player: SimGamePlayer;
+  gain_now: number;
+  gain_ros: number;
+  reasons: string[];
+  drop: SimGamePlayer | null;
+  covers: SimGamePlayer | null;
+  for_slot: string | null;
+}
+
+export interface SimByeAlert {
+  week: number;
+  weeks_away: number;
+  slot: SimSlot;
+  /** Your rank at the position, e.g. "WR1". */
+  pos_label: string;
+  player: SimGamePlayer;
+  covered: boolean;
+  covered_by: SimGamePlayer | null;
+  replacements: SimGamePlayer[];
+  message: string;
+}
+
+export interface SimHomeInjury {
+  player: SimGamePlayer;
+  out_weeks: number;
+  starting: boolean;
+  note: string;
+}
+
+export interface SimTrendRow {
+  player: SimGamePlayer;
+  last_week: number;
+  /** Last week's points minus the player's preseason projection. */
+  delta: number;
+  avg: number;
+}
+
+export interface SimHomeStandings {
+  rows: SimStandingRow[];
+  playoff_spots: number;
+  games_left: number;
+  your_rank: number | null;
+  /** Wins ahead of (positive) or behind (negative) the playoff cut line. */
+  margin: number | null;
+  in_playoffs: boolean;
+}
+
+export interface SimHomeSpotlight {
+  week: number;
+  text: string;
+  headline: string;
+  team_a: SimTeamRef;
+  team_b: SimTeamRef;
+  players: SimTransactionPlayer[];
+}
+
+export interface SimHomeResponse extends SimGameEnvelope {
+  week?: number;
+  phase?: "regular_season" | "playoffs";
+  matchup?: SimHomeMatchup | null;
+  checklist?: SimChecklistItem[];
+  inbox?: { count: number; open: boolean; items: SimHomeOffer[] };
+  waiver_suggestions?: SimWaiverSuggestion[];
+  bye_alerts?: SimByeAlert[];
+  injuries?: SimHomeInjury[];
+  hot_cold?: { hot: SimTrendRow[]; cold: SimTrendRow[]; wire: SimTrendRow[] };
+  standings?: SimHomeStandings;
+  league?: { recent: (SimTransaction & { team_id: string; text: string })[]; spotlight: SimHomeSpotlight | null };
+}
+
+/** Section glyph names shared by web (inline SVG) and the app (Ionicons map). */
+export type SimGlyphName =
+  | "matchup"
+  | "checklist"
+  | "waiver"
+  | "bye"
+  | "injury"
+  | "trade"
+  | "standings"
+  | "hot"
+  | "cold"
+  | "league"
+  | "team"
+  | "check"
+  | "alert"
+  | "spark";
+
+export function simWinChanceLabel(prob: number | null | undefined): string {
+  if (prob == null || Number.isNaN(prob)) return "-";
+  const pct = Math.round(prob * 100);
+  return `${Math.min(99, Math.max(1, pct))}%`;
+}
+
+export function simWinChanceTone(prob: number | null | undefined): SimGameTone {
+  if (prob == null) return "muted";
+  if (prob >= 0.55) return "success";
+  if (prob <= 0.45) return "danger";
+  return "warning";
+}
+
+/** Green up / red down trend text, e.g. "+6.1" with a matching arrow. */
+export function simTrendText(delta: number | null | undefined): { text: string; arrow: string; tone: SimGameTone } {
+  if (delta == null || Math.abs(delta) < 0.05) return { text: "0.0", arrow: "", tone: "muted" };
+  const up = delta > 0;
+  return { text: `${up ? "+" : "-"}${Math.abs(delta).toFixed(1)}`, arrow: up ? "\u25B2" : "\u25BC", tone: up ? "success" : "danger" };
+}
+
+export function simChecklistTone(severity: SimChecklistSeverity): SimGameTone {
+  return severity === "ok" ? "success" : severity;
+}
+
+export function simChecklistProgress(items: Pick<SimChecklistItem, "done">[] | undefined): { done: number; total: number } {
+  const list = items ?? [];
+  return { done: list.filter((i) => i.done).length, total: list.length };
+}
+
+export function simLevelTone(level: SimNeedLevel): SimGameTone {
+  return level === "strength" ? "success" : level === "need" ? "danger" : "muted";
+}
+
+export function simLevelLabel(level: SimNeedLevel): string {
+  return level === "strength" ? "Strength" : level === "need" ? "Need" : "Solid";
+}
+
+/** "Strong at RB, WR. Needs TE." (empty when nothing stands out). */
+export function simStrengthNeedLine(strengths: string[] | undefined, needs: string[] | undefined): string {
+  const parts: string[] = [];
+  if (strengths?.length) parts.push(`Strong at ${strengths.join(", ")}.`);
+  if (needs?.length) parts.push(`Needs ${needs.join(", ")}.`);
+  return parts.join(" ");
+}
+
+/** Which side a matchup row favors by projection ("even" within a point). */
+export function simRowEdge(row: Pick<SimHomeMatchupRow, "you" | "opp">): "you" | "opp" | "even" {
+  const diff = (row.you?.projection ?? 0) - (row.opp?.projection ?? 0);
+  return Math.abs(diff) < 1 ? "even" : diff > 0 ? "you" : "opp";
+}
+
+/** Projection gap to show between a pair of slot players, signed from your side. */
+export function simRowGap(row: Pick<SimHomeMatchupRow, "you" | "opp">): number {
+  return Math.round(((row.you?.projection ?? 0) - (row.opp?.projection ?? 0)) * 10) / 10;
+}
+
+/** The standings rows around you (and always the playoff line), trimmed to `size`. */
+export function simStandingsWindow(rows: SimStandingRow[], size = 6): SimStandingRow[] {
+  if (rows.length <= size) return rows;
+  const at = Math.max(0, rows.findIndex((r) => r.is_you));
+  let start = Math.max(0, at - Math.floor(size / 2));
+  start = Math.min(start, rows.length - size);
+  return rows.slice(start, start + size);
+}
+
+export function simMarginLine(standings: Pick<SimHomeStandings, "margin" | "in_playoffs" | "playoff_spots" | "games_left"> | undefined): string {
+  if (!standings || standings.margin == null) return "";
+  const m = standings.margin;
+  const wins = (n: number) => `${Math.abs(n) === 1 ? "1 win" : `${Math.abs(n)} wins`}`;
+  const left = standings.games_left === 1 ? "1 game left" : `${standings.games_left} games left`;
+  if (m === 0) return `Right on the cut line with ${left}.`;
+  return m > 0
+    ? `${wins(m)} clear of the cut line, ${left}.`
+    : `${wins(m)} behind the cut line, ${left}.`;
+}
+
+/** Record line for a team ref with a record, "5-2". */
+export function simTeamRecordLine(record: Pick<SimTeamRecord, "wins" | "losses" | "ties"> | null | undefined): string {
+  return record ? simFmtRecord(record) : "";
+}
+
+/** Bye-week cover line for a dashboard row. */
+export function simByeCoverLine(alert: Pick<SimByeAlert, "week" | "covered" | "pos_label">): string {
+  return alert.covered ? `${alert.pos_label} covered in Week ${alert.week}` : `${alert.pos_label} needs a fill-in for Week ${alert.week}`;
 }

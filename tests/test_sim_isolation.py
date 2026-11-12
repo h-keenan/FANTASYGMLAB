@@ -48,7 +48,7 @@ PURE_ENGINE_FILES = [
     "store.py", "version.py", "__init__.py", "picks.py", "player_model.py", "forecast.py",
     # the interactive GM game (everything but its router is pure stdlib + numpy + modules.sim)
     "game_types.py", "game_scoring.py", "game_setup.py", "game_state.py", "game_eval.py", "game_draft.py",
-    "game_ai.py", "game_actions.py", "game_engine.py", "game_result.py", "game_store.py", "game_view.py",
+    "game_ai.py", "game_actions.py", "game_engine.py", "game_result.py", "game_store.py", "game_view.py", "game_home.py",
 ]
 CALIBRATION_DIR = SIM_DIR / "calibration"
 

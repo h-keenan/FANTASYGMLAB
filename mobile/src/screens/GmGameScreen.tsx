@@ -17,8 +17,10 @@ import SegmentedTabBar from '../components/SegmentedTabBar';
 import { SkeletonCard } from '../components/SkeletonBlock';
 import { SimDraftRecapView, SimGameDraft } from '../components/SimGameDraft';
 import { SimLeagueTab } from '../components/SimGameLeague';
+import { SimHomeTab } from '../components/SimGameHome';
 import { SimPlayerSheet } from '../components/SimGamePlayers';
-import { SimNotice, SimPreviewBanner, createSimStyles, type SimCtx } from '../components/SimGameParts';
+import { SimNotice, SimPreviewBanner, SimTeamLink, SimTeamOpenContext, createSimStyles, type SimCtx } from '../components/SimGameParts';
+import { SimTeamSheet } from '../components/SimGameTeamSheet';
 import { SimFinalView, SimWeekRecapView } from '../components/SimGameRecap';
 import { SimPlayersTab, SimTeamTab } from '../components/SimGameTeam';
 import { SimTradesTab } from '../components/SimGameTrades';
@@ -100,6 +102,7 @@ export default function GmGameScreen({ navigation }: Props) {
   const [tick, setTick] = useState(0);
   const [attempt, setAttempt] = useState(0);
   const [sheetPlayer, setSheetPlayer] = useState<SimGamePlayer | null>(null);
+  const [sheetTeam, setSheetTeam] = useState<string | null>(null);
   const [draftRecap, setDraftRecap] = useState<{ recap: SimDraftRecap | null } | null>(null);
   const [claims, setClaims] = useState<SimWaiverClaim[]>([]);
   const [tradeSeed, setTradeSeed] = useState<{ partner: string; get: string } | null>(null);
@@ -263,6 +266,7 @@ export default function GmGameScreen({ navigation }: Props) {
             tick,
             bump: () => setTick((n) => n + 1),
             openPlayer: setSheetPlayer,
+            openTeam: setSheetTeam,
           }
         : null,
     [game, preview, call, setGame, reloadGame, notify, tick],
@@ -373,7 +377,21 @@ export default function GmGameScreen({ navigation }: Props) {
           void refreshList();
         }}
       />,
-      sheetPlayer ? <SimPlayerSheet gameId={game.id} player={sheetPlayer} onClose={() => setSheetPlayer(null)} /> : null,
+      <>
+        {sheetPlayer ? <SimPlayerSheet gameId={game.id} player={sheetPlayer} onClose={() => setSheetPlayer(null)} /> : null}
+        {sheetTeam ? (
+          <SimTeamSheet
+            ctx={ctx}
+            teamId={sheetTeam}
+            onClose={() => setSheetTeam(null)}
+            onTrade={(partner) => {
+              setSheetTeam(null);
+              setTradeSeed({ partner, get: '' });
+              dispatch({ type: 'tab', tab: 'trades' });
+            }}
+          />
+        ) : null}
+      </>,
     );
   }
 
@@ -671,6 +689,7 @@ function GameScreen({
   const inSeason = (stage === 'week' || stage === 'playoffs') && !draftRecap;
 
   return (
+    <SimTeamOpenContext.Provider value={ctx.openTeam}>
     <View style={styles.stack}>
       <View style={styles.rowBetween}>
         <View style={styles.grow}>
@@ -679,10 +698,13 @@ function GameScreen({
             {simWeekHeading(game)}
           </AppText>
           {youLine && stage !== 'draft' ? (
-            <AppText style={styles.muted}>
-              {youLine.name} · {simFmtRecord(youLine)}
-              {youLine.rank ? ` · #${youLine.rank}` : ''} · {simFmtPts(youLine.pf)} PF
-            </AppText>
+            <View style={styles.youRow}>
+              <SimTeamLink teamId={youLine.team_id} name={youLine.name} size={22} bold={false} />
+              <AppText style={styles.muted}>
+                {simFmtRecord(youLine)}
+                {youLine.rank ? ` · #${youLine.rank}` : ''} · {simFmtPts(youLine.pf)} PF
+              </AppText>
+            </View>
           ) : null}
         </View>
         {inSeason && !recap ? (
@@ -724,6 +746,7 @@ function GameScreen({
             onChange={onTab}
           />
           <FadeInView key={flow.tab}>
+            {flow.tab === 'home' ? <SimHomeTab ctx={ctx} setClaims={setClaims} onTab={onTab} /> : null}
             {flow.tab === 'team' ? <SimTeamTab ctx={ctx} onTrade={() => onTab('trades')} /> : null}
             {flow.tab === 'players' ? (
               <SimPlayersTab
@@ -743,6 +766,7 @@ function GameScreen({
         </>
       )}
     </View>
+    </SimTeamOpenContext.Provider>
   );
 }
 
@@ -829,6 +853,7 @@ function createStyles(colors: ThemeColors) {
     rowBetween: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: spacing.md },
     grow: { flex: 1, minWidth: 0 },
     back: { alignSelf: 'flex-start' },
+    youRow: { flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: 8 },
     start: { alignSelf: 'flex-start' },
     kicker: { fontSize: 12.5, fontWeight: '800', letterSpacing: 0.8, textTransform: 'uppercase', color: colors.textTertiary },
     heroTitle: { fontSize: 22, fontWeight: '800', color: colors.textPrimary },

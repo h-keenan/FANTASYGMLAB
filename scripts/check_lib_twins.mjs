@@ -40,6 +40,7 @@ export const IDENTICAL = [
   "navCatalog.ts",
   "opponentProfile.ts",
   "sampleLeague.ts",
+  "simCrest.ts",
   "simGame.ts",
   "simGameFlow.ts",
   "simPresentation.ts",

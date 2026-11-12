@@ -1,6 +1,18 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  simChecklistProgress,
+  simChecklistTone,
+  simLevelLabel,
+  simLevelTone,
+  simMarginLine,
+  simRowEdge,
+  simRowGap,
+  simStandingsWindow,
+  simStrengthNeedLine,
+  simTrendText,
+  simWinChanceLabel,
+  simWinChanceTone,
   SIM_QUEUE_MAX,
   normalizeSimResult,
   simGradeSummaryText,
@@ -532,5 +544,62 @@ describe("lineup slot vs position chip", () => {
     expect(simSlotRepeatsPosition("RB", "RB")).toBe(true);
     expect(simSlotRepeatsPosition("FLEX", "RB")).toBe(false);
     expect(simSlotRepeatsPosition("SUPER_FLEX", "QB")).toBe(false);
+  });
+});
+
+describe("home dashboard helpers", () => {
+  const row = (you: number | null, opp: number | null) => ({
+    you: you == null ? null : ({ projection: you } as SimGamePlayer),
+    opp: opp == null ? null : ({ projection: opp } as SimGamePlayer),
+  });
+
+  it("formats win chance and tone", () => {
+    expect(simWinChanceLabel(0.624)).toBe("62%");
+    expect(simWinChanceLabel(0.001)).toBe("1%");
+    expect(simWinChanceLabel(1)).toBe("99%");
+    expect(simWinChanceLabel(null)).toBe("-");
+    expect(simWinChanceTone(0.7)).toBe("success");
+    expect(simWinChanceTone(0.3)).toBe("danger");
+    expect(simWinChanceTone(0.5)).toBe("warning");
+  });
+
+  it("trend text is green up, red down", () => {
+    expect(simTrendText(6.14)).toEqual({ text: "+6.1", arrow: "▲", tone: "success" });
+    expect(simTrendText(-4)).toEqual({ text: "-4.0", arrow: "▼", tone: "danger" });
+    expect(simTrendText(0).tone).toBe("muted");
+  });
+
+  it("slot rows say who has the edge", () => {
+    expect(simRowEdge(row(20, 10))).toBe("you");
+    expect(simRowEdge(row(10, 20))).toBe("opp");
+    expect(simRowEdge(row(10, 10.4))).toBe("even");
+    expect(simRowEdge(row(null, 8))).toBe("opp");
+    expect(simRowGap(row(12.34, 10))).toBe(2.3);
+  });
+
+  it("counts checklist progress and maps severity to a tone", () => {
+    expect(simChecklistProgress([{ done: true }, { done: false }, { done: true }])).toEqual({ done: 2, total: 3 });
+    expect(simChecklistProgress(undefined)).toEqual({ done: 0, total: 0 });
+    expect(simChecklistTone("ok")).toBe("success");
+    expect(simChecklistTone("danger")).toBe("danger");
+  });
+
+  it("explains strengths, needs and the cut line", () => {
+    expect(simStrengthNeedLine(["RB", "WR"], ["TE"])).toBe("Strong at RB, WR. Needs TE.");
+    expect(simStrengthNeedLine([], [])).toBe("");
+    expect(simLevelTone("need")).toBe("danger");
+    expect(simLevelLabel("ok")).toBe("Solid");
+    expect(simMarginLine({ margin: 1, in_playoffs: true, playoff_spots: 6, games_left: 1 })).toBe("1 win clear of the cut line, 1 game left.");
+    expect(simMarginLine({ margin: -2, in_playoffs: false, playoff_spots: 6, games_left: 5 })).toBe("2 wins behind the cut line, 5 games left.");
+    expect(simMarginLine({ margin: null, in_playoffs: false, playoff_spots: 6, games_left: 5 })).toBe("");
+  });
+
+  it("windows the standings around you", () => {
+    const rows = Array.from({ length: 12 }, (_, i) => ({ rank: i + 1, team_id: String(i), name: `T${i}`, is_you: i === 9, wins: 0, losses: 0, ties: 0, pf: 0, pa: 0 }));
+    const win = simStandingsWindow(rows, 6);
+    expect(win).toHaveLength(6);
+    expect(win.some((r) => r.is_you)).toBe(true);
+    expect(win[win.length - 1].rank).toBe(12);
+    expect(simStandingsWindow(rows.slice(0, 4), 6)).toHaveLength(4);
   });
 });

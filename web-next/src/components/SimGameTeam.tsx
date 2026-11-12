@@ -8,9 +8,8 @@ import { EmptyState } from "@/components/EmptyState";
 import { Select } from "@/components/Input";
 import { PillRow } from "@/components/PillRow";
 import { PositionBadge } from "@/components/PositionBadge";
-import { SectionHeading } from "@/components/SectionHeading";
 import { SimPlayerBrowser } from "@/components/SimGamePlayers";
-import { SimPlayerChip, SimPlayerLine, SimSheet, SimStat, SimToneBadge, type SimCtx } from "@/components/SimGameParts";
+import { SimPlayerChip, SimPlayerLine, SimSectionTitle, SimSheet, SimStat, SimTeamLink, SimToneBadge, type SimCtx } from "@/components/SimGameParts";
 import { SkeletonCard } from "@/components/Skeleton";
 import { api } from "@/lib/api";
 import {
@@ -125,22 +124,19 @@ export function SimTeamTab({ ctx, onTrade }: { ctx: SimCtx; onTrade: () => void 
   return (
     <div className="flex flex-col gap-3">
       {week ? (
-        <AccentCard accent={week.bye ? "var(--color-warning)" : "var(--color-danger)"} as="section">
-          <p className="text-xs uppercase font-extrabold" style={{ color: "var(--color-text-muted)", letterSpacing: "var(--letter-spacing-badge)" }}>
-            Week {week.week} matchup
-          </p>
-          <div className="flex items-center justify-between gap-3">
-            <div className="flex min-w-0 flex-col">
-              <span className="text-sm font-bold break-words">You</span>
-              <span className="text-lg font-extrabold" data-testid="your-projection">{simFmtPts(week.your_projection)}</span>
-            </div>
-            <span className="text-xs font-bold" style={{ color: "var(--color-text-muted)" }}>vs</span>
-            <div className="flex min-w-0 flex-col items-end text-right">
-              <span className="text-sm font-bold break-words">{week.opponent?.name ?? "Bye week"}</span>
-              <span className="text-lg font-extrabold">{week.opponent ? simFmtPts(week.opponent_projection) : "-"}</span>
-            </div>
+        <AccentCard accent={week.bye ? "var(--color-warning)" : "var(--color-accent)"} compact as="section">
+          <div className="flex items-center justify-between gap-2">
+            <span className="flex min-w-0 items-center gap-2">
+              <span className="text-xs uppercase font-extrabold shrink-0" style={{ color: "var(--color-text-muted)", letterSpacing: "var(--letter-spacing-badge)" }}>Week {week.week}</span>
+              {week.opponent ? <SimTeamLink teamId={week.opponent.team_id} name={week.opponent.name} size={24} suffix={<span className="text-xs font-normal" style={{ color: "var(--color-text-muted)" }}>opponent</span>} /> : <span className="text-sm font-bold">Bye week</span>}
+            </span>
+            <span className="flex shrink-0 items-baseline gap-2 text-sm font-extrabold tabular-nums">
+              <span data-testid="your-projection" style={{ color: week.opponent && week.your_projection >= week.opponent_projection ? "var(--color-success)" : undefined }}>{simFmtPts(week.your_projection)}</span>
+              {week.opponent ? <span className="text-xs font-normal" style={{ color: "var(--color-text-muted)" }}>vs</span> : null}
+              {week.opponent ? <span style={{ color: week.opponent_projection > week.your_projection ? "var(--color-danger)" : undefined }}>{simFmtPts(week.opponent_projection)}</span> : null}
+            </span>
           </div>
-          <p className="text-xs" style={{ color: "var(--color-text-secondary)" }}>{simMatchupLine(week)}</p>
+          <p className="text-xs" style={{ color: "var(--color-text-secondary)" }}>{simMatchupLine(week)} The full head-to-head is on Home.</p>
         </AccentCard>
       ) : null}
 
@@ -167,7 +163,9 @@ export function SimTeamTab({ ctx, onTrade }: { ctx: SimCtx; onTrade: () => void 
 
       <div className="grid gap-4 lg:grid-cols-2 lg:items-start">
       <section className="flex flex-col gap-1" aria-label="Starting lineup">
-        <SectionHeading
+        <SimSectionTitle
+          glyph="team"
+          tone="accent"
           action={
             <Button size="sm" variant="secondary" loading={saving} onClick={auto}>
               Auto-set
@@ -176,7 +174,7 @@ export function SimTeamTab({ ctx, onTrade }: { ctx: SimCtx; onTrade: () => void 
           note={`Projected ${simFmtPts(lineup.projected_total)} points`}
         >
           Lineup
-        </SectionHeading>
+        </SimSectionTitle>
         {slots.map((slot, index) => (
           <div key={`${slot.slot}-${index}`} className="flex items-center gap-2" style={{ borderBottom: "var(--border-width-default) solid var(--color-border)" }}>
             <span className="w-12 shrink-0">
@@ -211,7 +209,7 @@ export function SimTeamTab({ ctx, onTrade }: { ctx: SimCtx; onTrade: () => void 
       </section>
 
       <section className="flex flex-col gap-1" aria-label="Bench">
-        <SectionHeading note={`${lineup.roster_size ?? 0} of ${lineup.roster_limit ?? 16} roster spots`}>Bench</SectionHeading>
+        <SimSectionTitle glyph="bye" tone="muted" note={`${lineup.roster_size ?? 0} of ${lineup.roster_limit ?? 16} roster spots`}>Bench</SimSectionTitle>
         {bench.length === 0 ? (
           <EmptyState title="Empty bench" subtitle="Add free agents from the Players tab." />
         ) : (
@@ -298,7 +296,7 @@ export function SimTeamTab({ ctx, onTrade }: { ctx: SimCtx; onTrade: () => void 
 }
 
 /** Add (with an optional drop and start slot) as a waiver claim. */
-function ClaimSheet({
+export function ClaimSheet({
   ctx,
   player,
   roster,
@@ -454,7 +452,7 @@ export function SimPlayersTab({
       />
       {mode === "waivers" && claims.length > 0 ? (
         <section className="flex flex-col gap-2" aria-label="Queued claims">
-          <SectionHeading note="Resolve at Advance, worst record first.">Queued claims</SectionHeading>
+          <SimSectionTitle glyph="waiver" tone="accent" note="Resolve at Advance, worst record first.">Queued claims</SimSectionTitle>
           {claims.map((claim) => (
             <AccentCard key={claim.id} accent="var(--color-accent)" compact as="div">
               <div className="flex items-center justify-between gap-2">

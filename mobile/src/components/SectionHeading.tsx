@@ -20,12 +20,15 @@ type IconName = React.ComponentProps<typeof Ionicons>['name'];
 export default function SectionHeading({
   title,
   icon,
+  iconColor,
   caption,
   right,
   topGap = 0,
 }: {
   title: string;
   icon?: IconName;
+  /** Tint for the icon (a semantic theme color); defaults to the accent. */
+  iconColor?: string;
   caption?: string | null;
   right?: React.ReactNode;
   topGap?: number;
@@ -35,7 +38,7 @@ export default function SectionHeading({
   return (
     <View style={[styles.wrap, { marginTop: topGap }]}>
       <View style={styles.row}>
-        {icon ? <Ionicons name={icon} size={16} color={colors.accent} style={styles.icon} /> : null}
+        {icon ? <Ionicons name={icon} size={16} color={iconColor ?? colors.accent} style={styles.icon} /> : null}
         <AppText style={styles.title} numberOfLines={1} accessibilityRole="header">
           {title}
         </AppText>
