@@ -1,5 +1,6 @@
 import { AppState } from 'react-native';
 import type { VerdictAssumptions, VerdictFeedbackReason } from './verdictTrust';
+import type { TradeCaution } from './tradeCautions';
 
 import { supabase } from './supabase';
 import type { SimRunResponse, SimStatusResponse, SimStrategy, SimWorldResponse, SimWorldsResponse } from './simPresentation';
@@ -1884,6 +1885,8 @@ export interface TradeVerdict {
   /** One sentence naming the posture and the trade-off ("You're a contender (#2 of 12, 4-2): this costs ~90 lineup points..."). */
   posture_note?: string;
   posture_assessment?: TradePostureAssessment | null;
+  /** Structured caution tags (modules/trade_cautions.py); numbers are never changed by one. */
+  cautions?: TradeCaution[];
   // Real counter packages (modules/trade_offer_analyzer.py), verbatim.
   alternate_packages?: TradeAlternatePackage[];
   // Outcome of the counter search; 'none' = nothing better exists.

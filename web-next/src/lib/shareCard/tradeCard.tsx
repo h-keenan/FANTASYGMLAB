@@ -274,6 +274,8 @@ function VerdictBlock({ idea, compact, includeWhy, why }: { idea: TradeIdea; com
   // when it favors you, red when it favors them.
   const balanceColor = gain > 0 ? T["--color-success"] : gain < 0 ? T["--color-danger"] : T["--color-text-secondary"];
   const lowConfidence = (idea.confidence_label || "").trim().toLowerCase() === "low";
+  // A softened label never travels without its reason; the numbers are untouched.
+  const cautionTag = (idea.caution_tag || "").trim();
   const hasWhy = includeWhy && Boolean(why);
   if (!compact) {
     // One verdict block: chip + confidence on the left, the Balance number
@@ -284,6 +286,7 @@ function VerdictBlock({ idea, compact, includeWhy, why }: { idea: TradeIdea; com
           <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-start", gap: 16 }}>
             {band ? <ShareChip label={band} color={bandColor} size={38} /> : null}
             <ConfidenceMeter label={idea.confidence_label} size={20} />
+            {cautionTag ? <div style={{ display: "block", fontSize: 22, fontWeight: 600, lineHeight: 1.2, color: T["--color-warning"] }}>{cautionTag}</div> : null}
           </div>
           <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 6 }}>
             <div style={{ ...eyebrowStyle(T["--color-text-muted"], 22), letterSpacing: "0.16em" }}>{TRADE_SHARE_COPY.balance}</div>
@@ -320,6 +323,7 @@ function VerdictBlock({ idea, compact, includeWhy, why }: { idea: TradeIdea; com
         <div style={{ display: "flex" }}>
           <ConfidenceMeter label={idea.confidence_label} size={16} />
         </div>
+        {cautionTag ? <div style={{ display: "block", fontSize: 14, fontWeight: 600, lineHeight: 1.2, color: T["--color-warning"] }}>{cautionTag}</div> : null}
       </div>
       {hasWhy ? (
         <>

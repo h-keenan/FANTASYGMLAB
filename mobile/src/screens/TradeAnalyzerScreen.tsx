@@ -1,6 +1,7 @@
 import { TRADE_SIDE_LABEL } from '../lib/tradeSideLabels';
 import ExchangeSide from '../components/ExchangeSide';
 import { dropRepeatedSentences, shortSummary } from '../lib/verdictText';
+import { cautionDetail, verdictCautions } from '../lib/tradeCautions';
 import NextSteps from '../components/NextSteps';
 import ShareToCommunityToggle from '../components/ShareToCommunityToggle';
 import type { SharedTradeAssetInput } from '../lib/sharedTrades';
@@ -1009,6 +1010,17 @@ function VerdictCard({
         </TouchableOpacity>
       </View>
       {verdict.posture ? <PostureChip posture={verdict.posture} /> : null}
+      {verdictCautions(verdict).map((caution) => (
+        <View
+          key={caution.code}
+          testID="verdict-caution"
+          accessibilityLabel={`Caution: ${caution.tag}`}
+          style={[styles.lineupWarning, { borderLeftColor: colors.warning }]}
+        >
+          <AppText style={styles.lineupWarningHeadline}>{caution.tag}</AppText>
+          <AppText style={styles.lineupWarningDetail}>{cautionDetail(caution, verdict.band)}</AppText>
+        </View>
+      ))}
       <BeginnerHelp text={copy.verdictHelp(verdict.ui_verdict)} style={styles.beginnerHelp} />
 
       {/* Quick visual: the same big color-coded value-change number the share
