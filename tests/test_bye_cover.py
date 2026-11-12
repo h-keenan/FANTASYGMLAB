@@ -126,3 +126,14 @@ def test_label_flows_through_the_briefing_pipeline():
     assert item.category == "watch"
     assert item.presentation["bye_cover"]["week"] == 9
     assert [p["name"] for p in item.mentioned_players] == ["Fits One", "Fits Two"]
+
+
+def test_starter_on_bye_next_week_alerts_as_urgent():
+    tile = _build(_roster(), league={**LEAGUE, "settings": {"leg": 8}})
+    assert tile["value"] == "Your WR1 (Wade WR) is on bye in Week 9"
+    assert tile["weeks_away"] == 1 and tile["tone"] == "risk"
+
+
+@pytest.mark.parametrize("settings", [{}, {"leg": 0}, {"leg": None}])
+def test_league_without_a_current_week_never_alerts(settings):
+    assert _build(_roster(), league={**LEAGUE, "settings": settings}) is None
