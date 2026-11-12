@@ -1,0 +1,202 @@
+"""Build a game's frozen snapshot: the player pool with draft values, the 12
+(or 8/10) teams with personas, the schedule, bye weeks.
+
+Pure and deterministic given ``(rows, bye_weeks, settings, seed)``. The rows
+come from an adapter (``inputs.player_pool`` for real data, ``synthetic`` for
+tests); nothing here reads real data.
+"""
+
+from __future__ import annotations
+
+from typing import Any, Iterable, Mapping
+
+
+from modules.sim.game_types import (
+    POOL_CAPS,
+    GamePlayer,
+    GameSettings,
+    GameSnapshot,
+    GameTeam,
+)
+from modules.sim.personas import assign_personas
+from modules.sim.rng import WorldRng
+from modules.sim.synthetic import round_robin
+from modules.sim.types import POSITIONS, STRICT_SLOTS
+
+TEAM_NAMES = (
+    "Gridiron Ghosts", "Blitz Brigade", "Red Zone Rascals", "Hail Mary Heroes", "Pocket Aces",
+    "Backfield Bandits", "Sunday Scaries", "Dynasty Dogs", "The Waiver Wolves", "Fourth & Long",
+    "Bye Week Bandits", "Trade Deadline Titans", "Flex Appeal", "Touchdown Tonic", "End Zone Elite",
+    "Playoff Pretenders", "The Auditors", "Sleeper Cell", "Bench Mob", "Late Round Legends",
+    "Snap Count Sharks", "Target Share Tigers", "Handcuff Heroes", "Boom or Bust",
+)
+OWNER_NAMES = (
+    "Dana Whitfield", "Marcus Bell", "Priya Nair", "Tomas Ortega", "Jules Archer", "Kenji Mori",
+    "Rhea Collins", "Dmitri Volkov", "Hannah Brooks", "Luis Navarro", "Ines Duarte", "Colm Brady",
+    "Sade Okafor", "Wes Holloway", "Mira Lindqvist", "Odell Grant", "Tessa Vance", "Rafael Quinn",
+    "Noor Haddad", "Gus Palmer", "Yuki Tanaka", "Bea Mercer", "Idris Cole", "Frankie Doyle",
+)
+_FLEX_SHARE = {"RB": 0.40, "WR": 0.45, "TE": 0.15}
+_VORP_WEIGHT = 0.75
+SYNTHETIC_BYE_FIRST_WEEK = 5
+SYNTHETIC_BYE_LAST_WEEK = 14
+
+
+def _num(value: Any, default: float = 0.0) -> float:
+    try:
+        number = float(value)
+    except (TypeError, ValueError):
+        return default
+    return number if number == number else default
+
+
+def finalize_pool(rows: Iterable[Mapping[str, Any]], settings: GameSettings) -> dict[str, GamePlayer]:
+    """Trim the raw rows to the fantasy-relevant pool and compute each player's
+    one-season draft ``value`` (value over replacement blended with market) and
+    ``adp`` (rank by that value)."""
+
+    best: dict[str, Mapping[str, Any]] = {}
+    for row in rows:
+        pid = str(row.get("pid") or "")
+        pos = str(row.get("pos") or "").upper()
+        if not pid or pos not in POSITIONS or _num(row.get("mean")) <= 0:
+            continue
+        if pid not in best:
+            best[pid] = row
+    by_pos: dict[str, list[Mapping[str, Any]]] = {p: [] for p in POSITIONS}
+    for pid in sorted(best):
+        by_pos[str(best[pid]["pos"]).upper()].append(best[pid])
+    kept: list[Mapping[str, Any]] = []
+    for pos, rs in by_pos.items():
+        rs.sort(key=lambda r: (-_num(r.get("market")), -_num(r.get("mean")), str(r["pid"])))
+        kept.extend(rs[: POOL_CAPS[pos]])
+
+    strict = {pos: sum(1 for s in settings.slots if s == pos) for pos in STRICT_SLOTS}
+    flex_slots = sum(1 for s in settings.slots if s not in STRICT_SLOTS)
+    repl: dict[str, float] = {}
+    for pos in POSITIONS:
+        starters = settings.teams * (strict.get(pos, 0) + flex_slots * _FLEX_SHARE.get(pos, 0.0))
+        index = int(round(starters + settings.teams * (0.5 if pos == "K" else 1.0)))
+        means = sorted((_num(r["mean"]) for r in by_pos[pos]), reverse=True)
+        repl[pos] = means[min(index, len(means) - 1)] if means else 0.0
+    vor = {str(r["pid"]): max(0.0, _num(r["mean"]) - repl[str(r["pos"]).upper()]) for r in kept}
+    max_vor = max(vor.values(), default=0.0) or 1.0
+    max_market = max((_num(r.get("market")) for r in kept), default=0.0) or 1.0
+    raw_value = {
+        str(r["pid"]): _VORP_WEIGHT * 100.0 * vor[str(r["pid"])] / max_vor
+        + (1.0 - _VORP_WEIGHT) * 100.0 * _num(r.get("market")) / max_market
+        for r in kept
+    }
+    order = sorted(raw_value, key=lambda p: (-raw_value[p], p))
+    adp = {pid: float(i + 1) for i, pid in enumerate(order)}
+    players: dict[str, GamePlayer] = {}
+    for r in kept:
+        pid = str(r["pid"])
+        mean = _num(r["mean"])
+        sd = _num(r.get("sd"))
+        players[pid] = GamePlayer(
+            pid=pid, name=str(r.get("name") or pid), pos=str(r["pos"]).upper(),
+            nfl_team=str(r.get("nfl_team") or "FA"), age=_num(r.get("age"), 26.0) or 26.0,
+            market=round(_num(r.get("market")), 2), mean=round(mean, 2),
+            sd=round(sd if sd > 0 else max(2.0, mean * 0.42), 2), adp=adp[pid],
+            value=round(raw_value[pid], 2), injury_weeks=int(_num(r.get("injury_weeks"))),
+            extra={str(k): float(v) for k, v in (r.get("extra") or {}).items() if isinstance(v, (int, float))},
+        )
+    return players
+
+
+def synthetic_byes(nfl_teams: Iterable[str], regular_weeks: int, seed: int) -> dict[str, int]:
+    """Deterministic, evenly spread byes (weeks 5-14) for when the real NFL
+    schedule is not on hand."""
+
+    teams = sorted(set(nfl_teams) - {"FA", ""})
+    order = WorldRng(seed).stream(0, "gsetup", 1).permutation(len(teams))
+    last = min(SYNTHETIC_BYE_LAST_WEEK, regular_weeks)
+    span = max(1, last - SYNTHETIC_BYE_FIRST_WEEK + 1)
+    return {teams[int(j)]: SYNTHETIC_BYE_FIRST_WEEK + (i % span) for i, j in enumerate(order)}
+
+
+def resolve_byes(
+    players: Mapping[str, GamePlayer], real: Mapping[str, int], settings: GameSettings, seed: int
+) -> tuple[dict[str, int], list[str]]:
+    """Real byes where the adapter had them; otherwise synthetic. Only byes
+    inside the regular season matter (the playoffs have none)."""
+
+    nfl = {p.nfl_team for p in players.values()} - {"FA", ""}
+    usable = {t: int(w) for t, w in real.items() if t in nfl and 1 <= int(w) <= settings.regular_weeks}
+    if len(usable) >= max(1, int(0.8 * len(nfl))):
+        return usable, []
+    synthetic = synthetic_byes(nfl, settings.regular_weeks, seed)
+    return {**synthetic, **usable} if usable else synthetic, ["byes_synthetic"]
+
+
+def build_snapshot(
+    rows: Iterable[Mapping[str, Any]],
+    bye_weeks: Mapping[str, int],
+    settings: GameSettings,
+    seed: int,
+    *,
+    user_team_name: str = "Your Team",
+    scoring_model: str = "",
+    notes: Iterable[str] = (),
+) -> GameSnapshot:
+    players = finalize_pool(rows, settings)
+    if len(players) < settings.teams * settings.rounds:
+        raise ValueError("player pool too small for this draft")
+    byes, bye_notes = resolve_byes(players, bye_weeks, settings, seed)
+    rng = WorldRng(seed)
+    n = settings.teams
+    ai_slots = [s for s in range(1, n + 1) if s != settings.user_slot]
+    name_pick = rng.stream(0, "gsetup", 2).permutation(len(TEAM_NAMES))
+    owner_pick = rng.stream(0, "gsetup", 3).permutation(len(OWNER_NAMES))
+    coins = rng.stream(0, "gsetup", 4).permutation(n)
+
+    ai_ids = [str(s) for s in ai_slots]
+    strength = rng.stream(0, "gsetup", 5).random(len(ai_ids))
+    personas = assign_personas(
+        rng.stream(0, "persona", 1), ai_ids,
+        {tid: float(strength[i]) for i, tid in enumerate(ai_ids)}, {tid: 26.0 for tid in ai_ids},
+    )
+    teams: list[GameTeam] = []
+    ai_seen = 0
+    for slot in range(1, n + 1):
+        tid = str(slot)
+        if slot == settings.user_slot:
+            teams.append(GameTeam(
+                tid=tid, name=user_team_name[:40] or "Your Team", owner="You", is_user=True,
+                persona_id="you", draft_slot=slot, coin=int(coins[slot - 1]),
+            ))
+            continue
+        persona = personas[tid]
+        teams.append(GameTeam(
+            tid=tid, name=TEAM_NAMES[int(name_pick[ai_seen % len(TEAM_NAMES)])],
+            owner=OWNER_NAMES[int(owner_pick[ai_seen % len(OWNER_NAMES)])], is_user=False,
+            persona_id=persona.pid, draft_slot=slot, coin=int(coins[slot - 1]),
+            horizon=persona.params.horizon, pos_bias=dict(persona.params.pos_bias),
+        ))
+        ai_seen += 1
+    order = [str(int(i) + 1) for i in rng.stream(0, "gsetup", 6).permutation(n)]
+    schedule = round_robin(order, settings.regular_weeks)
+    return GameSnapshot(
+        settings=settings, teams=tuple(teams), players=players, bye_weeks=byes, schedule=schedule,
+        scoring_model=scoring_model, notes=tuple(notes) + tuple(bye_notes),
+    )
+
+
+def draft_order(snapshot: GameSnapshot) -> list[str]:
+    """Snake order: team id on the clock for each overall pick (0-based)."""
+
+    s = snapshot.settings
+    by_slot = {t.draft_slot: t.tid for t in snapshot.teams}
+    out: list[str] = []
+    for rnd in range(1, s.rounds + 1):
+        slots = range(1, s.teams + 1) if rnd % 2 else range(s.teams, 0, -1)
+        out.extend(by_slot[slot] for slot in slots)
+    return out
+
+
+def pick_round(snapshot: GameSnapshot, pick_index: int) -> int:
+    return pick_index // snapshot.settings.teams + 1
+
+
+__all__ = ["finalize_pool", "build_snapshot", "draft_order", "pick_round", "synthetic_byes", "resolve_byes"]

@@ -14,6 +14,7 @@ import os
 import secrets
 import threading
 import uuid
+from contextlib import contextmanager
 from dataclasses import dataclass
 from typing import Any, Callable, Mapping
 
@@ -23,6 +24,8 @@ from pydantic import BaseModel
 
 from modules.sim.analysis import run_world
 from modules.sim import backend as sim_backend
+from modules.sim import game_api
+from modules.sim.game_store import GameStore
 from modules.sim.version import ENGINE_VERSION
 from modules.sim.inputs import MODES, RealSimInputs, SimInputs
 from modules.sim.personas import PERSONAS
@@ -48,6 +51,19 @@ UPSELL = {
         "Start your free trial to unlock it."
     ),
 }
+
+
+@contextmanager
+def _compute_slot():
+    """The sim's own bounded compute pool as a context manager: yields False
+    (caller answers 503 server_busy) when it stays full."""
+
+    acquired = _COMPUTE.acquire(timeout=_COMPUTE_WAIT_SECONDS)
+    try:
+        yield acquired
+    finally:
+        if acquired:
+            _COMPUTE.release()
 
 
 def sim_enabled(environ: Mapping[str, str] | None = None) -> bool:
@@ -121,6 +137,20 @@ def build_router(deps: SimApiDeps) -> APIRouter:
 
     def unavailable() -> dict[str, Any]:
         return _reason("sim_storage_unavailable")
+
+    def game_store_for(user: dict[str, Any]) -> GameStore:
+        if deps.backend_for is not None:
+            return GameStore(deps.backend_for(user))
+        config = deps.supabase_config() if deps.supabase_config else {}
+        return GameStore(sim_backend.backend_for(config, str(user.get("_access_token") or "")))
+
+    # The interactive GM game (/v1/sim/games*, /v1/sim/preview/players).
+    game_ctx = game_api.GameApiCtx(
+        require_user=deps.require_user, is_pro=deps.is_pro, store_for=game_store_for,
+        inputs=inputs, compute=_compute_slot,
+    )
+    game_api.add_routes(router, game_ctx)
+    game_api.add_preview_route(router, game_ctx)
 
     @router.get("/status")
     def get_status(user: dict[str, Any] = Depends(deps.require_user)) -> dict[str, Any]:

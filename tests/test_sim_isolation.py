@@ -34,6 +34,7 @@ STDLIB = set(sys.stdlib_module_names) | {"__future__"}
 THIRD_PARTY = {"numpy"}
 FILE_EXTRA_THIRD_PARTY = {
     "api.py": {"fastapi", "pydantic"},
+    "game_api.py": {"fastapi", "pydantic"},
     "backend.py": {"requests"},
 }
 FILE_REAL_MODULES = {
@@ -45,6 +46,9 @@ EXTERNAL_IMPORTERS = {"services/mobile_api_service.py": {"modules.sim.api"}}
 PURE_ENGINE_FILES = [
     "engine.py", "analysis.py", "lineup.py", "personas.py", "rng.py", "types.py", "synthetic.py",
     "store.py", "version.py", "__init__.py", "picks.py",
+    # the interactive GM game (everything but its router is pure stdlib + numpy + modules.sim)
+    "game_types.py", "game_scoring.py", "game_setup.py", "game_state.py", "game_eval.py", "game_draft.py",
+    "game_ai.py", "game_actions.py", "game_engine.py", "game_result.py", "game_store.py", "game_view.py",
 ]
 
 
@@ -185,15 +189,24 @@ def test_sim_never_uses_streamlit_or_the_players_loaders_or_write_modes():
 
 
 def test_sim_only_addresses_sim_tables():
-    from modules.sim import backend, store
+    from modules.sim import backend, game_store, store
 
-    tables = {store.WORLDS, store.SNAPSHOTS, store.RESULTS}
-    assert tables == {"sim_worlds", "sim_snapshots", "sim_results"}
-    assert backend.ALLOWED_TABLES == tables
-    sql = (REPO / "docs" / "supabase_sim.sql").read_text().lower()
-    assert set(re.findall(r"create table if not exists public\.(\w+)", sql)) == tables
-    # no foreign keys into real tables: every `references public.X` is a sim table
-    assert set(re.findall(r"references public\.(\w+)", sql)) <= tables
+    world_tables = {store.WORLDS, store.SNAPSHOTS, store.RESULTS}
+    game_tables = {game_store.GAMES, game_store.EVENTS, game_store.CHECKPOINTS}
+    assert world_tables == {"sim_worlds", "sim_snapshots", "sim_results"}
+    assert game_tables == {"sim_games", "sim_events", "sim_week_checkpoints"}
+    assert backend.ALLOWED_TABLES == world_tables | game_tables
+    for name, tables in (("supabase_sim.sql", world_tables), ("supabase_sim_game.sql", game_tables)):
+        sql = (REPO / "docs" / name).read_text().lower()
+        assert set(re.findall(r"create table if not exists public\.(\w+)", sql)) == tables
+        # no foreign keys into real tables: every `references public.X` is a sim table
+        assert set(re.findall(r"references public\.(\w+)", sql)) <= tables | world_tables | game_tables
+        assert set(re.findall(r"references (?!public\.)(\S+?)[ (]", sql)) <= {"auth.users"}
+    # every statement in the game SQL is re-runnable
+    game_sql = (REPO / "docs" / "supabase_sim_game.sql").read_text().lower()
+    assert "drop table" not in game_sql and "truncate" not in game_sql
+    for stmt in re.findall(r"create (?:table|index) (?!if not exists)(\S+)", game_sql):
+        pytest.fail(f"non-idempotent create: {stmt}")
 
 
 # ---------------------------------------------------------------- 3. engine purity
@@ -203,6 +216,7 @@ def test_importing_the_engine_loads_no_real_module():
     code = (
         f"import sys, json; sys.path.insert(0, {str(REPO)!r})\n"
         "import modules.sim.engine, modules.sim.analysis, modules.sim.store, modules.sim.synthetic\n"
+        + "".join(f"import modules.sim.{f[:-3]}\n" for f in PURE_ENGINE_FILES if f != "__init__.py") +
         "real = sorted(m for m in sys.modules if m.startswith('modules.') and not m.startswith('modules.sim'))\n"
         "print(json.dumps({'real': real, 'streamlit': 'streamlit' in sys.modules, 'pandas': 'pandas' in sys.modules}))\n"
     )
@@ -305,6 +319,83 @@ def test_sim_run_leaves_real_data_and_endpoints_untouched(tmp_path):
     assert _writes_under_data(_audit_state["writes"]) == []
     if db.exists():
         assert hashlib.sha256(db.read_bytes()).hexdigest() == db_hash
+
+
+def test_a_full_game_leaves_real_data_untouched_and_writes_only_sim_tables():
+    """Play a whole GM game through the API: nothing under data/ is written,
+    real endpoints are unchanged, and the only tables touched are sim_games,
+    sim_events and sim_week_checkpoints."""
+
+    from fastapi import FastAPI
+    from fastapi.testclient import TestClient
+
+    from modules.sim import api as sim_api
+    from modules.sim import game_api
+    from modules.sim.inputs import PlayerPool
+    from modules.sim.store import InMemoryBackend
+    from modules.sim.synthetic import build_synthetic_pool
+    from services import mobile_api_service as svc
+
+    rows, byes = build_synthetic_pool(7)
+
+    class Inputs:
+        def player_pool(self, scoring):
+            return PlayerPool(rows, byes)
+
+    real = TestClient(svc.app)
+    endpoints = ["/health", "/v1/app-config"]
+    before_json = {p: real.get(p).json() for p in endpoints}
+    db = REPO / "data" / "players.db"
+    db_hash = hashlib.sha256(db.read_bytes()).hexdigest() if db.exists() else ""
+    game_api.clear_pool_cache()
+    _audit_state.update(active=True, writes=[])
+
+    app = FastAPI()
+    backend = InMemoryBackend()
+    sim_api.mount(
+        app,
+        sim_api.SimApiDeps(
+            require_user=lambda: {"id": "u1"}, is_pro=lambda u: True, sleeper_username=lambda u: "",
+            backend_for=lambda u: backend, inputs=Inputs(),
+        ),
+        environ={"SIM_ENABLED": "1"},
+    )
+    client = TestClient(app)
+    gid = client.post("/v1/sim/games", json={"user_slot": 3}).json()["game"]["id"]
+    assert client.post(f"/v1/sim/games/{gid}/draft/auto").json()["completed"] is True
+    for _ in range(20):
+        if client.post(f"/v1/sim/games/{gid}/advance").json()["game"]["status"] == "complete":
+            break
+    assert client.get(f"/v1/sim/games/{gid}/result").json()["result"]["grade"]["letter"]
+    assert client.get("/v1/sim/preview/players").json()["total"] > 0
+
+    _audit_state["active"] = False
+    assert set(backend.tables) <= {"sim_games", "sim_events", "sim_week_checkpoints"}
+    assert {p: real.get(p).json() for p in endpoints} == before_json
+    assert _writes_under_data(_audit_state["writes"]) == []
+    if db.exists():
+        assert hashlib.sha256(db.read_bytes()).hexdigest() == db_hash
+    game_api.clear_pool_cache()
+
+
+def test_player_pool_adapter_reads_players_db_read_only():
+    db = REPO / "data" / "players.db"
+    if not db.exists():
+        pytest.skip("no players.db in this checkout")
+    from modules.sim.inputs import RealSimInputs
+
+    class Projections:
+        def baseline_weekly_points(self, rows, *, scoring_settings=None):
+            return {}
+
+    before = hashlib.sha256(db.read_bytes()).hexdigest()
+    before_files = sorted(p.name for p in db.parent.glob("players.db*"))
+    pool = RealSimInputs(str(db), projections_module=Projections(), sleeper_module=object(),
+                         playoff_module=object()).player_pool({"rec": 1.0})
+    assert len(pool.rows) > 300 and {r["pos"] for r in pool.rows} == {"QB", "RB", "WR", "TE", "K"}
+    assert all(r["mean"] > 0 and r["sd"] > 0 for r in pool.rows)
+    assert hashlib.sha256(db.read_bytes()).hexdigest() == before
+    assert sorted(p.name for p in db.parent.glob("players.db*")) == before_files
 
 
 def test_real_players_db_is_only_ever_read_through_a_readonly_connection():

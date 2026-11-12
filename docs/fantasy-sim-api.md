@@ -334,7 +334,10 @@ runs AI picks until the user's first turn. `user_slot` null = random (seeded).
 Returns `{"game": game, "draft": draft}` (see below). 422 on bad options.
 
 ### `GET /v1/sim/games` / `GET /v1/sim/games/{id}`
-`{"games": [game], "max_games": n}` / `{"game": game}`.
+`{"games": [game_lite], "max_games": n}` / `{"game": game}`. `game_lite` is the
+cheap list row: `{id, seed, engine_version, scoring_model, settings, status,
+current_week, difficulty, grade_letter, event_count, created_at, updated_at}`
+(no standings/roster; open one to get the full `game`).
 ```jsonc
 game = {
   "id": "uuid", "status": "drafting|in_season|playoffs|complete", "week": 4,   // week to be played next (0 while drafting)
@@ -369,7 +372,8 @@ When the last pick lands `completed: true`, the game moves to week 1 and
 value + need) until the draft ends; same response as the last pick.
 `PUT .../draft/queue` `{"player_ids": ["..."]}` (<= 30): saves your queue; used by
 auto-pick. (Extra endpoint; not in the design doc table.)
-Wrong phase -> `reason: "wrong_phase"`.
+Wrong phase -> `reason: "wrong_phase"`. Both calls also return `game` (the full game object). Retrying a pick that
+already landed answers `reason: "player_taken"`; reload the draft.
 
 ### Players
 `GET .../players?q=&pos=&status=&team=&sort=&page=&page_size=` -> `{"items": [player], "total", "page", "page_size"}`.
@@ -385,6 +389,7 @@ player = {"id": "9509", "name": "...", "pos": "RB", "team": "ATL" /* NFL */, "ag
 ```
 `projection` is this week's expected points (0 on bye / while out), blended with
 his results so far this season.
+`GET .../teams/{team_id}` -> `{"team_id", "players": [player]}` (any team's roster with projections; you need it to build offers; extra endpoint).
 `GET .../players/{pid}` -> `{"player": player, "weeks": [{"week": 4, "projection": 17.4, "floor", "ceiling", "bye": false, "out": false}], "history": [{"week": 1, "points": 18.2, "stats": {...}|null}], "news": [{"week": 3, "text": "..."}]}`. Unknown pid -> 404.
 
 ### Lineup
@@ -400,7 +405,10 @@ his results so far this season.
 Lineups persist week to week; a player who leaves the roster empties his slot.
 
 ### Waivers and cuts
-`POST .../waivers` `{"add": "pid", "drop": "pid"|null, "start_slot": "RB"|null}` queues a claim (422 if `add` is not a free agent or `drop` is not yours; `drop` may be omitted when there is roster room at resolution). `start_slot` puts him in that lineup slot if the claim wins. Returns `{"claim": {...}, "claims": [pending claims]}`. `DELETE .../waivers/{claim_id}` cancels one (extra endpoint).
+`POST .../waivers` `{"add": "pid", "drop": "pid"|null, "start_slot": "RB"|null}` queues a claim (422 if `add` is not a free agent or `drop` is not yours; `drop` may be omitted when there is roster room at resolution). `start_slot` puts him in that lineup slot if the claim wins. Returns `{"claim_id", "claim": {id, add: player, drop: player|null, start_slot}, "claims": [pending claims]}`. `DELETE .../waivers/{claim_id}` cancels one (extra endpoint) and returns `{"claims": [...]}`.
+At Advance each claim becomes `ok: true` or `ok: false` with `reason` `taken | drop_not_owned | roster_full` in the recap.
+A starter you cut/drop/trade leaves his slot empty; at Advance empty slots are auto-filled with the best healthy bench
+player of the right position (listed in the recap's `auto_filled_slots`), else they score 0.
 `POST .../cut` `{"player_id": "pid"}` cuts immediately -> `{"roster": [player]}`.
 
 ### Trades
@@ -427,7 +435,8 @@ AI managers send at most 1 offer each and 3 league-wide per week; unanswered
 offers expire on Advance. `POST .../inbox/{item}/respond` `{"action": "accept"|"decline"}` -> `{"ok", "executed": bool, "items": [...]}`; a stale offer answers `reason: "offer_invalid"`.
 
 ### Advance and revert
-`POST .../advance` (body optional `{"week": 4}`). Validates (roster size), resolves
+`POST .../advance` (body optional `{"week": 4}`; clients should always send the week they are advancing so a double tap
+cannot play two weeks). Validates (roster size), resolves
 the week (AI moves, lineups, waivers, scoring, injuries), writes the checkpoint,
 returns:
 ```jsonc
@@ -439,7 +448,9 @@ returns:
            "standings": [...top rows], "waivers": [{"team_id","name","add":player,"drop":player|null,"ok": true,"reason": ""}],
            "transactions": [...AI trades/drops this week], "injuries": [{"player", "weeks", "team_id", "is_yours"}],
            "mvp": {...}, "bust": {...}, "playoffs": null | {"seeds": [...], "bracket": [...]},
-           "season_complete": false, "next_week": 5},
+           "season_complete": false, "champion": null, "next_week": 5},
+ "also_played": [recap, ...],   // playoff weeks played in the same call once you are out of the bracket
+ "replayed": false,             // true when `week` was already played (stored recap returned, nothing written)
  "game": game}
 ```
 Idempotent per `(game, week)`: `week` lower than the game's current week returns
