@@ -31,7 +31,7 @@ from modules.sim.game_draft import draft_recap
 from modules.sim.game_eval import Evaluator, team_params
 from modules.sim.game_scoring import PlayerWeek, ScoringModel, get_model
 from modules.sim.game_state import Emitter, GameState
-from modules.sim.game_types import GameError, GameSnapshot, slot_positions
+from modules.sim.game_types import GameError, GameSnapshot, headshot_id, slot_positions
 from modules.sim.lineup import pick_lineup
 from modules.sim.rng import WorldRng
 
@@ -193,7 +193,7 @@ def _brief(snap: GameSnapshot, pid: str | None) -> dict[str, Any] | None:
     if not pid:
         return None
     p = snap.players[pid]
-    return {"id": pid, "name": p.name, "pos": p.pos, "team": p.nfl_team}
+    return {"id": pid, "headshot_id": headshot_id(pid), "name": p.name, "pos": p.pos, "team": p.nfl_team}
 
 
 def check_can_advance(snap: GameSnapshot, state: GameState) -> None:

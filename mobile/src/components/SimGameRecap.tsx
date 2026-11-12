@@ -9,12 +9,13 @@ import PositionBadge from './PositionBadge';
 import SectionHeading from './SectionHeading';
 import { SkeletonCard } from './SkeletonBlock';
 import { SimStandingsList } from './SimGameLeague';
-import { SimPlayerLine, SimPopIn, SimStat, SimToneBadge, createSimStyles, simToneColor, type SimCtx } from './SimGameParts';
+import { SimPlayerChip, SimPlayerLine, SimPopIn, SimStat, SimToneBadge, createSimStyles, simToneColor, type SimCtx } from './SimGameParts';
 import ToneBadge from './ToneBadge';
 import { useThemeMode } from '../context/ThemeModeContext';
 import { api } from '../lib/api';
 import {
   simFmtPts,
+  simSlotRepeatsPosition,
   simGradeTone,
   simPlayoffResultLabel,
   simPlayoffRoundLabel,
@@ -102,6 +103,7 @@ export function SimWeekRecapView({
                 {s.player ? (
                   <SimPlayerLine
                     player={s.player}
+                    hidePosition={simSlotRepeatsPosition(s.slot, s.player.pos)}
                     trailing={
                       <>
                         {s.flag ? <SimToneBadge label={s.flag === 'bye' ? 'Bye' : 'Out'} tone={s.flag === 'bye' ? 'warning' : 'danger'} /> : null}
@@ -124,7 +126,7 @@ export function SimWeekRecapView({
             <View style={common.grow}>
               <AccentCard accent={colors.success} compact>
                 <AppText style={common.muted}>Week MVP</AppText>
-                <AppText style={common.bodyStrong}>{recap.mvp.player.name}</AppText>
+                <SimPlayerChip player={recap.mvp.player} />
                 <AppText style={common.small}>{simFmtPts(recap.mvp.pts)} pts</AppText>
               </AccentCard>
             </View>
@@ -133,7 +135,7 @@ export function SimWeekRecapView({
             <View style={common.grow}>
               <AccentCard accent={colors.warning} compact>
                 <AppText style={common.muted}>Biggest bust</AppText>
-                <AppText style={common.bodyStrong}>{recap.bust.player.name}</AppText>
+                <SimPlayerChip player={recap.bust.player} />
                 <AppText style={common.small}>{simFmtPts(recap.bust.pts)} pts</AppText>
               </AccentCard>
             </View>
@@ -146,8 +148,9 @@ export function SimWeekRecapView({
           <SectionHeading title="Injuries" />
           {recap.injuries!.map((inj, i) => (
             <AccentCard key={i} accent={inj.is_yours ? colors.danger : colors.borderStrong} compact>
-              <AppText style={common.body}>
-                <AppText style={common.bodyStrong}>{inj.player.name}</AppText> is out {inj.weeks} week{inj.weeks === 1 ? '' : 's'}
+              <SimPlayerChip player={{ ...inj.player, status: 'out', out_weeks: inj.weeks }} />
+              <AppText style={common.small}>
+                Out {inj.weeks} week{inj.weeks === 1 ? '' : 's'}
                 {inj.is_yours ? ' (your team)' : ''}.
               </AppText>
             </AccentCard>
@@ -160,8 +163,10 @@ export function SimWeekRecapView({
           <SectionHeading title="Your waiver claims" />
           {myWaivers.map((w, i) => (
             <AccentCard key={i} accent={w.ok ? colors.success : colors.danger} compact>
-              <AppText style={common.body}>
-                {w.ok ? 'Won' : 'Lost'} <AppText style={common.bodyStrong}>{w.add.name}</AppText>
+              <SimPlayerChip player={w.add} />
+              <AppText style={common.small}>
+                {w.ok ? 'Won' : 'Lost'}
+                {w.drop ? <AppText style={common.muted}>, dropping {w.drop.name}</AppText> : null}
                 {!w.ok && w.reason ? <AppText style={common.muted}> ({w.reason.replace(/_/g, ' ')})</AppText> : null}
               </AppText>
             </AccentCard>

@@ -63,6 +63,8 @@ export interface SimPlayerOwner {
 
 export interface SimGamePlayer {
   id: string;
+  /** Sleeper player id to fetch a photo with; null for defenses and synthetic players. */
+  headshot_id?: string | null;
   name: string;
   pos: SimPos;
   /** NFL team. */
@@ -487,7 +489,18 @@ export interface SimStandingRow {
   playoff_status?: string;
 }
 
+/** A player a feed row names (role: add / drop / give / get), enough for a photo row. */
+export interface SimTransactionPlayer {
+  role: "add" | "drop" | "give" | "get";
+  id: string;
+  headshot_id?: string | null;
+  name: string;
+  pos: SimPos;
+  team?: string | null;
+}
+
 export interface SimTransaction {
+  players?: SimTransactionPlayer[];
   week?: number;
   type?: string;
   kind?: string;
@@ -1121,11 +1134,38 @@ export function simFmtProjection(player: Pick<SimGamePlayer, "projection" | "flo
   return `${simFmtPts(player.projection)} (${simFmtPts(player.floor)}-${simFmtPts(player.ceiling)})`;
 }
 
+/** Anything a sim list can show a player row for: the full row or a brief ref. */
+export type SimPlayerRef = Pick<SimGamePlayer, "id" | "name" | "pos"> & Partial<Pick<SimGamePlayer, "headshot_id" | "team" | "age" | "bye_week" | "status" | "out_weeks">>;
+
+/** The id the shared avatar fetches a Sleeper photo with (null: show initials). */
+export function simHeadshotId(player: Pick<SimPlayerRef, "id" | "headshot_id">): string | null {
+  if (player.headshot_id) return player.headshot_id;
+  return player.headshot_id === undefined && /^\d+$/.test(player.id) ? player.id : null;
+}
+
+/** Initials for the avatar fallback: a defense shows its team code, a person first + last initial. */
+export function simPlayerInitials(player: Pick<SimPlayerRef, "name" | "pos" | "team">): string {
+  if (player.pos === "DEF") return (player.team ?? player.name).slice(0, 3).toUpperCase();
+  const words = player.name.replace(/[^A-Za-z\s'-]/g, " ").split(/\s+/).filter(Boolean);
+  if (words.length === 0) return "";
+  if (words.length === 1) return words[0][0].toUpperCase();
+  return (words[0][0] + words[words.length - 1][0]).toUpperCase();
+}
+
+/**
+ * A lineup row already shows its slot ("RB1"); the player's own position
+ * chip is only worth showing when it adds information (FLEX, SUPER_FLEX and
+ * other multi-position slots), not when it just repeats the slot's position.
+ */
+export function simSlotRepeatsPosition(slot: string, pos: string): boolean {
+  return slot.toUpperCase() === pos.toUpperCase();
+}
+
 /** NFL team + age subline for a player row. */
-export function simPlayerSubline(player: Pick<SimGamePlayer, "team" | "age" | "bye_week">): string {
+export function simPlayerSubline(player: Partial<Pick<SimGamePlayer, "team" | "age" | "bye_week">>): string {
   const parts: string[] = [];
   if (player.team) parts.push(player.team);
-  const age = simFmtAge(player.age);
+  const age = simFmtAge(player.age ?? null);
   if (age) parts.push(`Age ${age}`);
   if (player.bye_week) parts.push(`Bye ${player.bye_week}`);
   return parts.join(" · ");

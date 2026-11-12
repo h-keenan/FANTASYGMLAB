@@ -13,7 +13,7 @@ from modules.sim.game_draft import DraftContext, best_for_user
 from modules.sim.game_engine import rank_teams, standing_rows
 from modules.sim.game_eval import Evaluator
 from modules.sim.game_state import GameState
-from modules.sim.game_types import PREVIEW_PAYWALL_WEEK, GameSnapshot
+from modules.sim.game_types import PREVIEW_PAYWALL_WEEK, GameSnapshot, headshot_id
 from modules.sim.personas import PERSONAS
 
 PAGE_MAX = 60
@@ -61,8 +61,8 @@ def player_row(
     games = state.games_played(pid)
     floor, ceiling = ev.band(pid)
     return {
-        "id": pid, "name": p.name, "pos": p.pos, "team": p.nfl_team, "age": p.age, "adp": p.adp,
-        "value": p.value, "projection": round(ev.proj(pid, w), 1), "ros_mean": round(ev.ros_mean(pid), 1),
+        "id": pid, "headshot_id": headshot_id(pid), "name": p.name, "pos": p.pos, "team": p.nfl_team,
+        "age": p.age, "adp": p.adp, "value": p.value, "projection": round(ev.proj(pid, w), 1), "ros_mean": round(ev.ros_mean(pid), 1),
         "floor": round(floor, 1), "ceiling": round(ceiling, 1), "status": ev.status(pid, w),
         "out_weeks": state.out.get(pid, 0), "bye_week": snap.bye_of(pid) or None,
         "owner": _owner(snap, state, owners, pid),
@@ -333,6 +333,23 @@ def _tx_text(snap: GameSnapshot, tx: Mapping[str, Any]) -> tuple[str, str]:
     return tx["team"], f"{team} dropped {name(tx['pid'])}"
 
 
+def _tx_players(snap: GameSnapshot, tx: Mapping[str, Any]) -> list[dict[str, Any]]:
+    """The players a feed row names, for photos: ``role`` is add/drop/give/get."""
+
+    roles: list[tuple[str, str | None]]
+    if tx["type"] == "trade":
+        roles = [("give", p) for p in tx["give"]] + [("get", p) for p in tx["get"]]
+    elif tx["type"] == "waiver":
+        roles = [("add", tx.get("add")), ("drop", tx.get("drop"))]
+    else:
+        roles = [("drop", tx.get("pid"))]
+    return [
+        {"role": role, "id": pid, "headshot_id": headshot_id(pid), "name": snap.players[pid].name,
+         "pos": snap.players[pid].pos, "team": snap.players[pid].nfl_team}
+        for role, pid in roles if pid and pid in snap.players
+    ]
+
+
 def league_view(snap: GameSnapshot, state: GameState) -> dict[str, Any]:
     ev = Evaluator(snap, state)
     S = snap.settings
@@ -366,7 +383,8 @@ def league_view(snap: GameSnapshot, state: GameState) -> dict[str, Any]:
     tx = []
     for item in state.transactions[-60:][::-1]:
         tid, text = _tx_text(snap, item)
-        tx.append({"week": item["week"], "type": item["type"], "team_id": tid, "text": text})
+        tx.append({"week": item["week"], "type": item["type"], "team_id": tid, "text": text,
+                   "players": _tx_players(snap, item)})
     return {"standings": standing_rows(snap, state), "schedule": schedule, "transactions": tx,
             "teams": teams, "playoffs": playoffs}
 

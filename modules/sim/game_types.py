@@ -116,6 +116,18 @@ def _flag(raw: Mapping[str, Any], key: str, default: bool) -> bool:
     return value
 
 
+def headshot_id(pid: str) -> str | None:
+    """The Sleeper player id a photo can be fetched with, or None.
+
+    Real players carry their Sleeper id as the game id (all digits); a team
+    defense (``DEF-<TEAM>``) and the synthetic fixture players have no photo,
+    so the client shows its initials fallback instead of a broken image.
+    """
+
+    text = str(pid or "")
+    return text if text.isdigit() else None
+
+
 @dataclass(frozen=True)
 class GameSettings:
     teams: int = DEFAULT_TEAMS

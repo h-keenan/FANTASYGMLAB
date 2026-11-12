@@ -456,6 +456,27 @@ def test_recap_has_a_box_score_and_league_views(season):
     assert [t["power_rank"] for t in league["teams"]] and sorted(t["power_rank"] for t in league["teams"]) == list(range(1, 13))
 
 
+def test_player_payloads_carry_a_photo_id_only_for_real_sleeper_ids(season):
+    from modules.sim.game_types import headshot_id
+
+    assert headshot_id("4046") == "4046" and headshot_id("DEF-NYG") is None and headshot_id("p0001") is None
+    assert headshot_id("") is None and headshot_id(None) is None  # type: ignore[arg-type]
+    client, _, gid = season
+    c2, _, _ = make_app()
+    gid2 = new_game(c2, user_slot=4)["game"]["id"]
+    recap = finish_draft(c2, gid2)["recap"]
+    best = recap["your_team"]["best_pick"]
+    assert best["player"]["id"] == best["player_id"] and "headshot_id" in best["player"] and best["player"]["name"] == best["name"]
+    page = client.get(f"/v1/sim/games/{gid}/players?page_size=5", headers=hdr()).json()
+    assert page["items"] and all("headshot_id" in p for p in page["items"])  # synthetic ids: present, null
+    res = advance(client, gid)
+    for inj in res["recap"]["injuries"]:
+        assert "headshot_id" in inj["player"]
+    league = client.get(f"/v1/sim/games/{gid}/league", headers=hdr()).json()
+    for tx in league["transactions"]:
+        assert tx["players"] and {"role", "id", "headshot_id", "name", "pos"} <= set(tx["players"][0])
+
+
 # ----------------------------------------------------------------- preview
 
 

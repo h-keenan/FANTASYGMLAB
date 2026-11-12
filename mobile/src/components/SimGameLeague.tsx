@@ -9,7 +9,7 @@ import ErrorState from './ErrorState';
 import SectionHeading from './SectionHeading';
 import SegmentedTabBar from './SegmentedTabBar';
 import { SkeletonCard } from './SkeletonBlock';
-import { SimToneBadge, createSimStyles, type SimCtx } from './SimGameParts';
+import { SimPlayerChip, SimToneBadge, createSimStyles, type SimCtx } from './SimGameParts';
 import ToneBadge from './ToneBadge';
 import { useThemeMode } from '../context/ThemeModeContext';
 import { api } from '../lib/api';
@@ -181,6 +181,12 @@ export function SimLeagueTab({ ctx }: { ctx: SimCtx }) {
                   <ToneBadge label={String(tx.type ?? tx.kind ?? 'move').replace(/_/g, ' ')} color={colors.premium} size="xs" />
                 </View>
                 <AppText style={common.body}>{simTransactionText(tx)}</AppText>
+                {(tx.players ?? []).map((p) => (
+                  <View key={`${p.role}-${p.id}`} style={common.row}>
+                    <ToneBadge label={p.role} color={p.role === 'add' || p.role === 'get' ? colors.success : colors.textTertiary} size="xs" />
+                    <SimPlayerChip player={p} size={28} />
+                  </View>
+                ))}
               </AccentCard>
             ))
           )}

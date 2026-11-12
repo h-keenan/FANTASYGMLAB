@@ -43,12 +43,18 @@ export function PlayerAvatar({
   playerId,
   tier,
   size = 32,
+  fallbackLabel,
 }: {
   playerId: string | null | undefined;
   tier?: string | null;
   size?: number;
+  /** Initials (or a team code) shown in the ring when there is no photo to load. */
+  fallbackLabel?: string | null;
 }) {
-  const [failed, setFailed] = useState(false);
+  // Keyed by id so a recycled row that now shows a different player retries
+  // its photo instead of inheriting the previous player's failure.
+  const [failedId, setFailedId] = useState<string | null>(null);
+  const failed = !!playerId && failedId === playerId;
   const tierIdentity = resolvePlayerTier(tier);
   const ringColor = `var(${tierIdentity.colorVar})`;
   const dimension = { width: size, height: size, borderRadius: "50%" };
@@ -87,13 +93,22 @@ export function PlayerAvatar({
         style={{
           ...dimension,
           ...glowStyle,
-          display: "inline-block",
+          display: "inline-flex",
+          alignItems: "center",
+          justifyContent: "center",
+          overflow: "hidden",
           border: `${borderWidth}px solid ${ringColor}`,
           background: "var(--color-surface-muted)",
+          color: "var(--color-text-muted)",
+          fontSize: Math.max(9, Math.round(size * 0.34)),
+          fontWeight: 800,
+          lineHeight: 1,
         }}
         title={title}
         aria-hidden
-      />
+      >
+        {fallbackLabel && size >= 24 ? fallbackLabel : null}
+      </span>
     );
   }
 
@@ -112,7 +127,7 @@ export function PlayerAvatar({
       decoding="async"
       style={{ ...dimension, ...glowStyle, border: `${borderWidth}px solid ${ringColor}`, objectFit: "cover", objectPosition: "top" }}
       className={`shrink-0${glowClassName}`}
-      onError={() => setFailed(true)}
+      onError={() => setFailedId(playerId ?? null)}
     />
   );
 }
