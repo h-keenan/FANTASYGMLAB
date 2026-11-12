@@ -23,6 +23,13 @@ const player = (over: Partial<TradeAsset>): TradeAsset => ({ asset_type: "player
 const pick = (over: Partial<TradeAsset> = {}): TradeAsset => ({ asset_type: "pick", label: "2028 Round 1", season: "2028", round: "1", score: 900, ...over });
 
 describe("buildAnalyzerIdea", () => {
+  it("carries the caution tag onto the card without touching the numbers", () => {
+    const cautioned = { ...verdict, value_delta: 1873, cautions: [{ code: "pick_glut", tag: "Trading proven value for picks you may not need", explanation: "x" }] } as TradeVerdict;
+    const idea = buildAnalyzerIdea({ sendAssets: [player({ score: 6037 })], receiveAssets: [player({ score: 3921 }), pick({ score: 4100 })], verdict: cautioned, partnerName: "Rival" });
+    expect(idea.caution_tag).toBe("Trading proven value for picks you may not need.");
+    expect(idea.trade_gain).toBe(1873);
+    expect(buildAnalyzerIdea({ sendAssets: [], receiveAssets: [], verdict, partnerName: "Rival" }).caution_tag).toBe("");
+  });
   it("fills the trade card from the on-screen analysis only", () => {
     const send = [player({ player_id: "1", score: 4400 }), pick()];
     const receive = [player({ player_id: "2", position: "WR", score: 3000 })];

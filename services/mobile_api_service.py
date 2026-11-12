@@ -266,7 +266,7 @@ from modules import public_dynasty_values
 from modules import model_status
 from modules import drop_candidates, roster_value_model
 from modules import usage_trends
-from modules import trade_posture
+from modules import trade_cautions, trade_posture
 from modules import external_news_contract
 from modules import external_interesting_trades, external_news_feed, news_identity, news_ingest
 from modules import start_sit_range
@@ -6236,6 +6236,10 @@ def _compute_trade_analyzer(
     send_pick_assets: list[dict[str, Any]] = []
     receive_pick_assets: list[dict[str, Any]] = []
     resolved_pick_ids: set[str] = set()
+    # Picks the user already holds (next two drafts) and roster room, for the
+    # pick-glut caution (modules.trade_cautions). Only built when the trade
+    # actually brings a pick back; the pick table is already loaded then.
+    pick_context: dict[str, Any] | None = None
     if body.send_pick_ids or body.receive_pick_ids:
         # Cached (30s live-time bucket) — the counter-package fallback
         # below can call this exact (league_id, lens) computation again
@@ -6263,6 +6267,15 @@ def _compute_trade_analyzer(
                 f"{pick.get('season')}:{pick.get('round')}:{pick.get('original_roster_id')}": pick
                 for pick in all_picks
             }
+            if body.receive_pick_ids:
+                try:
+                    pick_context = trade_cautions.build_pick_context(
+                        all_picks,
+                        my_roster.get("roster_id"),
+                        open_roster_spots=trade_cautions.open_roster_spots(league, my_roster),
+                    )
+                except Exception:
+                    logger.warning("pick-glut context unavailable (league=%s)", league_id, exc_info=True)
 
             def resolve_picks(pick_ids: list[str]) -> list[dict[str, Any]]:
                 found = [pick_id for pick_id in pick_ids if pick_id in picks_by_id]
@@ -6373,6 +6386,7 @@ def _compute_trade_analyzer(
         receive_assets=receive_assets,
         partner_assets=partner_assets,
         waiver_options=waiver_options,
+        pick_context=pick_context,
     )
 
     counter_search_status = ""
@@ -6438,6 +6452,7 @@ def _compute_trade_analyzer(
                     receive_assets=cand_receive,
                     partner_assets=partner_asset_pool,
                     waiver_options=waiver_options,
+                    pick_context=pick_context,
                 )
 
             alternate_packages = trade_offer_analyzer.build_counter_offer_packages(

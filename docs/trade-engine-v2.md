@@ -561,3 +561,17 @@ Rule now (`trade_ideas._iter_priced_send_packages`, `trade_target_offers.build_t
 Limits: the 4-asset cap and the 10-point lineup tolerance are judgment values, not calibrated;
 shortfall is an estimate (it excludes the lineup model); consolidation offers read as Long shot
 because partners genuinely dislike a pile of mid pieces for a cornerstone.
+
+## Caution tags (pick glut)
+
+`modules/trade_cautions.py` adds a structured `cautions` list to the Analyzer
+verdict (and each team in the multi-team Analyzer). It never changes a value
+number, the trade score, confidence or the counter search. The pick-glut tag
+("Trading proven value for picks you may not need") fires when a non-contender
+(retool / rebuild / tank) already holds 4+ premium-pick units (R1 = 1, R2 =
+0.5) in the next two drafts, the trade adds more, picks are 25%+ of the
+incoming value, real current value goes out (1,500+ value or 5+ lineup points;
+a sale of a player aged 28+ is exempt) and roster room cannot absorb the picks.
+It softens SMASH ACCEPT to ACCEPT, one step and nothing else. Trade Hub / Finder
+ideas are graded without pick context and are unchanged. Clients render the
+server wording via the `tradeCautions.ts` lib twin (web + mobile).

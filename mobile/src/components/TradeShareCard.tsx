@@ -13,6 +13,7 @@ import PositionBadge from './PositionBadge';
 import ShareCardChrome, { CARD_WIDTH, ShareConfidenceBars, ShareGlass } from './ShareCardChrome';
 import TeamAvatar from './TeamAvatar';
 import { buildPartnerPitch, type PitchAsset } from '../lib/tradePitch';
+import { cautionShareLine } from '../lib/tradeCautions';
 import { formatTradeGain } from '../lib/liveDraft';
 import { LOW_CONFIDENCE_NOTE, TRADE_SHARE_COPY, plainTradeWhy } from '../lib/tradeShareCopy';
 import { overallRatingColor } from '../lib/percentile';
@@ -295,6 +296,8 @@ const TradeShareCard = forwardRef<View, {
   const confidenceLabel = (verdict.confidence || '').trim();
   // Engine reasons rewritten to plain English, whole sentences only (never an ellipsis).
   const why = plainTradeWhy(verdict.rationale, partner);
+  // A softened label never travels without its reason; numbers are untouched.
+  const cautionLine = cautionShareLine(verdict);
   const tall = sendPlayers.length + sendPicks.length <= 1 && receivePlayers.length + receivePicks.length <= 1;
 
   return (
@@ -380,13 +383,14 @@ const TradeShareCard = forwardRef<View, {
             <AppText style={[styles.balanceValue, { color: balanceColor }]}>{formatTradeGain(gain)}</AppText>
           </View>
         </View>
-        {why || lowConfidence ? <View style={styles.verdictDivider} /> : null}
+        {why || lowConfidence || cautionLine ? <View style={styles.verdictDivider} /> : null}
         {why ? (
           <View style={styles.whyWrap}>
             <AppText style={styles.whyLabel}>WHY</AppText>
             <AppText style={styles.whyText}>{why}</AppText>
           </View>
         ) : null}
+        {cautionLine ? <AppText style={styles.lowNote}>{cautionLine}</AppText> : null}
         {lowConfidence ? <AppText style={styles.lowNote}>{LOW_CONFIDENCE_NOTE}</AppText> : null}
       </ShareGlass>
       )}

@@ -418,6 +418,30 @@ describe("TradeAnalyzerContent", () => {
     });
   }
 
+  it("shows the pick-glut caution tag with a softened label and the true value balance", async () => {
+    await analyzeWith({
+      band: "ACCEPT",
+      ui_verdict: "ACCEPT",
+      tone: "accept",
+      value_delta: 1873,
+      value_summary: "You win on value",
+      cautions: [
+        {
+          code: "pick_glut",
+          tag: "Trading proven value for picks you may not need",
+          explanation: "You already hold 5 first- and second-round picks in the next two drafts, so another pick adds less to your team than its listed value. The value balance is unchanged.",
+          softened: true,
+          softened_from: "SMASH ACCEPT",
+        },
+      ],
+    });
+    const caution = await screen.findByTestId("verdict-caution");
+    expect(caution).toHaveTextContent("Trading proven value for picks you may not need");
+    expect(caution).toHaveTextContent("from Smash Accept to Accept");
+    expect(screen.queryByText("SMASH ACCEPT")).not.toBeInTheDocument();
+    expect(screen.getAllByText(/1,873/).length).toBeGreaterThan(0);
+  });
+
   it("shows a concrete counter package with its one-line why", async () => {
     await analyzeWith({
       alternate_packages: [

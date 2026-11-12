@@ -12,6 +12,7 @@ import { radii, spacing, type ThemeColors, scrim } from '../theme';
 import TradeShareCard, { CARD_HEIGHT, CARD_WIDTH } from './TradeShareCard';
 import { SheetModal, SwipeDismissCard } from './SwipeDismissSheet';
 import { shareLink } from '../lib/shareLinks';
+import { cautionShareLine } from '../lib/tradeCautions';
 
 const PREVIEW_SCALE = 0.82;
 
@@ -154,6 +155,7 @@ export default function TradeSharePreviewModal({
       `You receive: ${receiveNames}`,
       '',
       verdict.rationale,
+      cautionShareLine(verdict),
       '',
       `Value: ${verdict.value_summary}`,
       `Roster fit: ${verdict.roster_summary}`,

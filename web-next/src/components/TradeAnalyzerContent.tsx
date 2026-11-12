@@ -25,6 +25,7 @@ import {
 } from "@/lib/api";
 import { trackUse } from "@/lib/analytics";
 import { isCompletedShare } from "@/lib/shareImage";
+import { cautionDetail, cautionShareLine, verdictCautions } from "@/lib/tradeCautions";
 import { useShareImage } from "@/lib/useShareImage";
 import { isPrivacyMode } from "@/lib/privacy";
 import { shareCardCacheKey } from "@/lib/shareCard/cacheKey";
@@ -280,7 +281,8 @@ function ShareVerdictButton({
   const text =
     `${title}: ${verdict.ui_verdict} (${verdict.band})\n` +
     `You send: ${label(sendAssets)}\nYou get: ${label(receiveAssets)}\n` +
-    `Balance: ${formatTradeGain(verdict.value_delta)}`;
+    `Balance: ${formatTradeGain(verdict.value_delta)}` +
+    (cautionShareLine(verdict) ? `\n${cautionShareLine(verdict)}` : "");
 
   // Branded PNG (QR + "For <partner>") drawn in the browser from the
   // analysis already on screen (no server call, no quota use). It is built
@@ -395,6 +397,22 @@ function VerdictCard({
         </span>
       ) : null}
       {verdict.posture ? <PostureChip posture={verdict.posture} leagueId={leagueId} /> : null}
+      {verdictCautions(verdict).map((caution) => (
+        <div
+          key={caution.code}
+          role="note"
+          data-testid="verdict-caution"
+          className="flex flex-col gap-0.5 p-3"
+          style={{ background: "var(--color-warning-soft)", borderLeft: "4px solid var(--color-warning)" }}
+        >
+          <span className="text-sm font-bold" style={{ color: "var(--color-text-primary)" }}>
+            {caution.tag}
+          </span>
+          <span className="text-xs" style={{ color: "var(--color-text-secondary)" }}>
+            {cautionDetail(caution, verdict.band)}
+          </span>
+        </div>
+      ))}
       <BeginnerHelp text={copy.verdictHelp(verdict.ui_verdict)} />
 
       {/* Trade zone: the actual give/receive matchup, visually separated
