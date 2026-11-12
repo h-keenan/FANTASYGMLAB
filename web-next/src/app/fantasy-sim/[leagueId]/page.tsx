@@ -27,6 +27,6 @@ export default function FantasySimPage() {
     trackFeatureUse("fantasy_sim_opened", { leagueId });
   }, [authLoading, session, leagueId, router]);
 
-  if (authLoading || !session) return <LoadingScreen status="Loading Fantasy Sim…" />;
+  if (authLoading || !session) return <LoadingScreen status="Loading your season outlook…" />;
   return <FantasySimContent leagueId={leagueId} leagueName={leagueName} />;
 }

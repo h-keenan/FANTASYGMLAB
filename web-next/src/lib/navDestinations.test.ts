@@ -51,6 +51,14 @@ describe("GM orb tab destinations", () => {
     }
   });
 
+  it("keeps the season simulation under GM Plan: no menu row, one searchable tab on its own route", () => {
+    expect(all().some((d) => d.path.startsWith("/fantasy-sim"))).toBe(false);
+    const plan = withTabs.find((d) => d.label === "GM Plan")!;
+    const outlook = plan.tabs!.find((t) => t.label === "Season Outlook")!;
+    expect(outlook.path).toBe("/fantasy-sim/L%201?name=My%20League");
+    expect(searchNavDestinations(all(), "fantasy sim").map((h) => h.label)).toContain("GM Plan > Season Outlook");
+  });
+
   it("opens Playoff Odds on the League Rankings playoff-odds section", () => {
     const rankings = withTabs.find((d) => d.label === "League Rankings")!;
     expect(rankings.tabs!.find((t) => t.label === "Playoff Odds")!.path).toBe("/league-rankings/L%201?name=My%20League#playoff-odds");

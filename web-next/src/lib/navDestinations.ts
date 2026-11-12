@@ -51,7 +51,6 @@ const GLYPH_BY_PAGE: Record<string, NavGlyphName> = {
   "live-draft": "liveDraft",
   "league-recaps": "leagueRecaps",
   games: "games",
-  "fantasy-sim": "games",
   commissioner: "commissioner",
   portfolio: "portfolio",
   news: "news",
@@ -71,6 +70,10 @@ const TAB_PATHS: Record<string, Record<string, (c: TabPathContext) => string>> =
     Finder: ({ id, query }) => `/trade-finder/${id}${query}`,
     Analyzer: ({ id, query }) => `/trade-analyzer/${id}${query}`,
     History: () => "/trade-history",
+  },
+  "gm-plan": {
+    // Its own route (the sim page), reached from GM Plan; no top-level menu row.
+    "Season Outlook": ({ id, query }) => `/fantasy-sim/${id}${query}`,
   },
   games: {
     "Season Sim": ({ tabPath }) => tabPath("games", "sim"),
@@ -194,6 +197,7 @@ export const PAGE_TITLE_BY_SEGMENT: Record<string, string> = {
   ...Object.fromEntries(NAV_PAGES.map((page) => [page.key, page.label])),
   // Routes that are real pages but not menu rows (reached as tabs of a menu
   // page, or from a link): see navCatalog.ts for the tab homes.
+  "fantasy-sim": "Season Outlook",
   "trade-history": "Trade History",
   "college-scouting": "College Scouting",
   "trade-analyzer": "Trade Analyzer",

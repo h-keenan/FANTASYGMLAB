@@ -43,7 +43,7 @@ _COMPUTE_WAIT_SECONDS = 3.0
 UPSELL = {
     "title": "Run a full season before it happens",
     "body": (
-        "Fantasy Sim is a Pro feature: set a strategy for your real team and "
+        "Season outlook is a Pro feature in your GM Plan: set a strategy for your real team and "
         "simulate the season against AI managers that trade and work the wire. "
         "Start your free trial to unlock it."
     ),

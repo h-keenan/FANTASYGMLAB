@@ -42,7 +42,6 @@ export const ROUTE_BY_PAGE: Readonly<Record<string, string>> = {
   'live-draft': 'LiveDraft',
   'league-recaps': 'Recap',
   games: 'Games',
-  'fantasy-sim': 'FantasySim',
   commissioner: 'Commissioner',
   portfolio: 'Portfolio',
   news: 'News',
@@ -79,6 +78,7 @@ const TAB_TARGETS: Readonly<Record<string, Readonly<Record<string, TabTarget>>>>
     Trades: { params: { initialTab: 'trades' } },
     Core: { params: { initialTab: 'core' } },
     Watching: { params: { initialTab: 'watching' } },
+    'Season Outlook': { route: 'FantasySim' },
   },
   waivers: {
     Recommended: { params: { tab: 'recommended' } },

@@ -88,7 +88,7 @@ export default function FantasySimScreen({ route, navigation }: Props) {
   const headerHeight = useHeaderHeight();
   const { colors } = useThemeMode();
   const styles = useMemo(() => createStyles(colors), [colors]);
-  useScreenHeaderTitle(navigation, 'Fantasy Sim', leagueName);
+  useScreenHeaderTitle(navigation, 'Season Outlook', leagueName);
 
   const toneColor = useCallback(
     (tone: SimTone) => ({ success: colors.success, accent: colors.accent, warning: colors.warning, danger: colors.danger })[tone],
@@ -139,7 +139,7 @@ export default function FantasySimScreen({ route, navigation }: Props) {
       .catch((error) => {
         if (cancelled) return;
         if (isSimOffError(error)) setPhase({ kind: 'unavailable', cause: 'off' });
-        else setPhase({ kind: 'error', message: errorText(error, 'Could not load Fantasy Sim.') });
+        else setPhase({ kind: 'error', message: errorText(error, 'Could not load your season outlook.') });
       });
     return () => {
       cancelled = true;
@@ -286,7 +286,7 @@ export default function FantasySimScreen({ route, navigation }: Props) {
   if (phase.kind === 'error') {
     return (
       <View style={[styles.center, { paddingTop: headerHeight }]}>
-        <ErrorState title="Couldn't load Fantasy Sim" message={phase.message} onRetry={() => {
+        <ErrorState title="Couldn't load your season outlook" message={phase.message} onRetry={() => {
             setPhase({ kind: 'loading' });
             setAttempt((n) => n + 1);
           }} />
@@ -301,7 +301,7 @@ export default function FantasySimScreen({ route, navigation }: Props) {
         title={phase.upsell?.title || 'Play out your season before it happens'}
         description={
           phase.upsell?.body ||
-          'Fantasy Sim is a Pro feature: set a strategy for your team, simulate the rest of the season against AI managers, and see your grade and the decisions that mattered. Start your free trial to unlock it.'
+          'Season outlook is a Pro feature in your GM Plan: set a strategy for your team, simulate the rest of your season against AI managers, and see your grade and the decisions that mattered. Start your free trial to unlock it.'
         }
       />,
     );
