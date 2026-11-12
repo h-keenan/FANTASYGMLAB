@@ -6766,7 +6766,7 @@ MULTI_TEAM_IDEAS_LOCK_TIMEOUT_SECONDS = 30.0
 _MULTI_TEAM_IDEAS_UPSELL = {
     "title": "See 3-team trade ideas",
     "body": (
-        "Pro finds three-way deals where your surplus fills one team's need, theirs fills another's, "
+        "Pro finds three-way deals where your surplus players and picks fill one team's need, theirs fills another's, "
         "and every team still comes out fair. Start your free trial to unlock them."
     ),
 }
@@ -6785,11 +6785,25 @@ def _compute_multi_team_ideas(
     _targets, untouchables = _fetch_gm_target_player_ids(
         config, user_id, str(user.get("_access_token") or ""), league_id
     )
+    # Picks are pieces too, priced by the same crowd-aware pick table the Analyzer
+    # regrades them with (so an idea's pick means the same thing when opened there).
+    crowd = {}
+    if college_scouting.class_strength_signal_enabled():
+        crowd = college_scouting.get_cached_crowd_class_strength_by_year(
+            auth_supabase.get_supabase_config(), str(user.get("_access_token") or "")
+        )
+    hooks = _multi_team_engine_hooks(league_id, league, user, my_roster, lens=lens, strategy="", pro=pro)
     ctx = multi_team_trade_engine.build_context(
         league_id=league_id, lens=lens, players_db_path=PLAYERS_DB_PATH,
         perspective_roster_id=str(my_roster.get("roster_id")), status=model_status.ok(),
-        **_multi_team_engine_hooks(league_id, league, user, my_roster, lens=lens, strategy="", pro=pro),
+        load_picks=True, crowd_class_strength_by_year=crowd, **hooks,
     )
+    if isinstance(ctx, dict):
+        # Pick data not ready: a players-only search is still a correct answer.
+        ctx = multi_team_trade_engine.build_context(
+            league_id=league_id, lens=lens, players_db_path=PLAYERS_DB_PATH,
+            perspective_roster_id=str(my_roster.get("roster_id")), status=model_status.ok(), **hooks,
+        )
     if isinstance(ctx, dict):
         return {"ok": True, "ideas": [], "reason": ctx.get("status") or "unavailable", "search": None}
     result = multi_team_trade_finder.find_three_team_ideas(

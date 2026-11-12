@@ -74,7 +74,7 @@ export default function MultiTeamIdeasSection({
     <View style={styles.root} testID="multi-team-ideas">
       <AppText style={styles.title}>3-team ideas</AppText>
       <AppText style={styles.secondary}>
-        Three-way deals where your surplus fills one team&apos;s need, theirs fills another&apos;s, and every team still comes out fair.
+        Three-way deals where your surplus players and picks fill one team&apos;s need, theirs fills another&apos;s, and every team still comes out fair.
       </AppText>
       {error ? (
         <ErrorState title="Couldn't load 3-team ideas" message={error} onRetry={() => setAttempt((n) => n + 1)} compact />

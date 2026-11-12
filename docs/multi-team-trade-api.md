@@ -155,8 +155,21 @@ better (tone `accept` or `fair`). Code: `modules/multi_team_trade_finder.py`
   (`counter`) gets one repair, a single extra spare piece from the team sending to
   it (at most `MAX_VARIANTS` (2) per search, regraded for every team). Such an
   idea has `variant: {edits: 1, note}`.
-- Players only in this version (no picks as search pieces); the Analyzer still
-  accepts picks when a manager edits an idea.
+- Draft picks are pieces too. They come from the same pick table and pricing the
+  2-team engine and the Analyzer use (`list_draft_pick_assets`, crowd class
+  strength included, then each team's own posture multiplier inside
+  `grade_transfers`), so an idea's pick means the same thing when opened in the
+  Analyzer. Posture drives direction: a contender spends picks; a rebuild / tank
+  team wants them most and a retool team wants them some; rebuild and retool
+  teams never send a pick. A pick is a "need" only for a team whose posture wants
+  capital. At most one pick per edge (`EDGE_PICKS` 2 offered) and
+  `MAX_PICKS_PER_IDEA` (2) per idea. If the pick table is not ready the search
+  falls back to players only. A pick in the `why[0]` need line reads like "adds
+  draft capital while rebuilding" / "draft capital a contender can spend".
+- Veto read: every passing idea is assessed with `trade_veto.assess`; one the
+  commissioner read bands `lopsided` or `outrage` is dropped even when every
+  verdict is Fair (counted in `search.vetoed`). The kept idea carries
+  `veto {band, label, outrage, explained_by_roster, hurt_roster_id}`.
 
 ## Response
 
@@ -171,11 +184,12 @@ ideas[]          // Pro only; best first (highest weakest-team score)
   flows[]        // transfers with team names
   partners[], user {roster_id, trade_score, market_delta, lineup_delta, outcome}   // honest deltas
   summary        // headline, balance, most_hurt_roster_id, best_off_roster_id, market_sum
+  veto           // {band, label, outrage, explained_by_roster, hurt_roster_id} (fair / explainable only)
   variant        // null or {edits, note}
   analyzer_request {transfers[], perspective_roster_id}   // exactly the POST .../trade-analyzer/multi body
 idea_count       // ideas found, for every tier
 locked           // true for Free when ideas exist (ideas is then [])
-upsell, is_premium, search {partners, candidates, verified, variants, truncated, reason, bar}, trade_window
+upsell, is_premium, search {partners, candidates, verified, variants, vetoed, picks_in_play, truncated, reason, bar}, trade_window
 ```
 
 ## Free vs Pro and capacity

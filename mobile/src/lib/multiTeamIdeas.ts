@@ -31,6 +31,8 @@ export interface MultiTeamIdea {
     outcome: string;
   };
   summary: Partial<NonNullable<MultiTeamTradeResponse["summary"]>> & { headline?: string };
+  /** The commissioner veto read on the whole deal (never lopsided / outrage for a returned idea). */
+  veto?: { band: string; label?: string; outrage?: number; explained_by_roster?: boolean; hurt_roster_id?: string } | null;
   /** Set when one added piece brought the last team to fair. */
   variant: { edits: number; note: string } | null;
   analyzer_request: { transfers: MultiTransfer[]; perspective_roster_id: string };
@@ -46,7 +48,15 @@ export interface MultiTeamIdeasResponse {
   locked: boolean;
   upsell?: { title?: string; body?: string } | null;
   is_premium?: boolean;
-  search?: { partners?: number; candidates?: number; verified?: number; truncated?: boolean; reason?: string } | null;
+  search?: {
+    partners?: number;
+    candidates?: number;
+    verified?: number;
+    vetoed?: number;
+    picks_in_play?: number;
+    truncated?: boolean;
+    reason?: string;
+  } | null;
 }
 
 export type IdeasSection =
