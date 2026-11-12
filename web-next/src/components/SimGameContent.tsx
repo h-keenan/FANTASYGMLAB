@@ -32,6 +32,8 @@ import {
   simFmtRecord,
   simGameGate,
   simLeagueTeamLabel,
+  simGameDeleteConfirm,
+  simGameDeleteFailure,
   simGameLiteLine,
   simGamePaywalled,
   simGameUnavailableCopy,
@@ -89,6 +91,9 @@ export function SimGameContent() {
   const [tradeSeed, setTradeSeed] = useState<{ partner: string; get: string } | null>(null);
   const [advancing, setAdvancing] = useState(false);
   const [creating, setCreating] = useState(false);
+  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [managing, setManaging] = useState(false);
 
   const notify = useCallback((message: string, tone: SimGameTone = "warning") => setNotice(message ? { message, tone } : null), []);
 
@@ -170,6 +175,41 @@ export function SimGameContent() {
       /* best effort */
     }
   }, []);
+
+  async function deleteSaved(id: string) {
+    setDeletingId(id);
+    let removed = false;
+    try {
+      const body = await api.deleteSimGame(id);
+      const gate = simGameGate(body);
+      if (gate.kind === "ready") {
+        removed = true;
+        notify("Game deleted.", "success");
+      } else if (gate.kind === "blocked") {
+        notify(gate.message, "warning");
+      } else if (gate.kind === "unavailable" && gate.cause === "busy") {
+        notify("The simulator is busy right now. Try again in a few seconds.", "warning");
+      } else {
+        notify("Could not delete the game. Try again.", "danger");
+      }
+    } catch (error) {
+      const failure = simGameDeleteFailure(error);
+      removed = failure.remove;
+      notify(failure.message, failure.tone);
+      if (failure.refresh) void refreshList();
+    }
+    setDeletingId(null);
+    setConfirmDeleteId(null);
+    if (removed) {
+      // Drop it right away so the count, the limit note and New game update with no reload.
+      setGames((prev) => {
+        const next = prev.filter((g) => g.id !== id);
+        if (next.length === 0) setManaging(false);
+        return next;
+      });
+      void refreshList();
+    }
+  }
 
   const openGame = useCallback(
     async (id: string) => {
@@ -335,29 +375,59 @@ export function SimGameContent() {
         </p>
         <div className="flex flex-wrap items-center gap-2">
           <Button disabled={Boolean(block)} onClick={() => dispatch({ type: "setup" })}>New game</Button>
-          {block ? (
-            <span className="text-xs" style={{ color: "var(--color-text-muted)" }} data-testid="new-game-block">{block}</span>
-          ) : null}
           {block && options?.is_premium === false ? <ButtonLink href="/premium" variant="premiumOutline" size="sm">Go Pro</ButtonLink> : null}
+          {block ? (
+            <Button variant="secondary" size="sm" onClick={() => { setManaging(true); document.getElementById("sim-saved-games")?.scrollIntoView?.({ behavior: "smooth", block: "start" }); }}>
+              Manage games / delete one
+            </Button>
+          ) : null}
         </div>
+        {block ? (
+          <p className="text-xs" style={{ color: "var(--color-text-muted)" }} data-testid="new-game-block">{block}</p>
+        ) : null}
       </AccentCard>
-      <section className="flex flex-col gap-2" aria-label="Your games">
-        <SectionHeading note={games.length ? undefined : "Your saved games show up here."}>Your games</SectionHeading>
+      <section id="sim-saved-games" className="flex flex-col gap-2" aria-label="Your games">
+        <SectionHeading note={games.length ? (managing ? "Tap the trash can on a game to delete it." : undefined) : "Your saved games show up here."}>Your games</SectionHeading>
         {games.length === 0 ? (
           <EmptyState title="No games yet" subtitle="Start a new game to draft your team." />
         ) : (
           games.map((g) => (
-            <button key={g.id} type="button" className="w-full text-left" onClick={() => void openGame(g.id)} aria-label={`Open game: ${simGameLiteLine(g)}`}>
-              <AccentCard accent={g.status === "complete" ? "var(--color-success)" : "var(--color-accent)"} compact as="div">
-                <div className="flex items-center justify-between gap-2">
-                  <span className="text-sm font-bold">{simGameLiteLine(g)}</span>
-                  {g.grade_letter ? <ToneBadge label={g.grade_letter} color="var(--color-success)" size="xs" /> : <span className="text-xs" style={{ color: "var(--color-accent)" }}>Continue</span>}
-                </div>
-                <p className="text-xs" style={{ color: "var(--color-text-muted)" }}>
-                  {simSettingsSummary(g.settings) || `${SIM_SCORING_LABELS[(g.settings.scoring ?? "ppr") as SimScoring]} · ${g.settings.teams ?? 12} teams`} · {SIM_DIFFICULTY_COPY[g.difficulty]?.label ?? g.difficulty}
-                </p>
-              </AccentCard>
-            </button>
+            <div key={g.id} className="flex flex-col gap-1.5">
+              <div className="flex items-stretch gap-2">
+                <button type="button" className="flex-1 min-w-0 text-left" onClick={() => void openGame(g.id)} aria-label={`Open game: ${simGameLiteLine(g)}`}>
+                  <AccentCard accent={g.status === "complete" ? "var(--color-success)" : "var(--color-accent)"} compact as="div">
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="text-sm font-bold">{simGameLiteLine(g)}</span>
+                      {g.grade_letter ? <ToneBadge label={g.grade_letter} color="var(--color-success)" size="xs" /> : <span className="text-xs" style={{ color: "var(--color-accent)" }}>Continue</span>}
+                    </div>
+                    <p className="text-xs" style={{ color: "var(--color-text-muted)" }}>
+                      {simSettingsSummary(g.settings) || `${SIM_SCORING_LABELS[(g.settings.scoring ?? "ppr") as SimScoring]} · ${g.settings.teams ?? 12} teams`} · {SIM_DIFFICULTY_COPY[g.difficulty]?.label ?? g.difficulty}
+                    </p>
+                  </AccentCard>
+                </button>
+                <button
+                  type="button"
+                  className="shrink-0 inline-flex items-center justify-center rounded-lg border min-w-[var(--touch-target-min)] min-h-[var(--touch-target-min)]"
+                  style={{ borderColor: "var(--color-danger)", color: "var(--color-danger)", background: "transparent" }}
+                  aria-label={`Delete game: ${simGameLiteLine(g)}`}
+                  disabled={deletingId !== null}
+                  onClick={() => setConfirmDeleteId(confirmDeleteId === g.id ? null : g.id)}
+                >
+                  <svg aria-hidden="true" width="18" height="18" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M2.5 4h11M6 4V2.5h4V4M4 4l.6 9h6.8L12 4M6.6 6.5v4M9.4 6.5v4" />
+                  </svg>
+                </button>
+              </div>
+              {confirmDeleteId === g.id ? (
+                <AccentCard accent="var(--color-danger)" compact as="div">
+                  <p className="text-sm" role="alert">{simGameDeleteConfirm(g)}</p>
+                  <div className="flex gap-2">
+                    <Button size="sm" variant="danger" loading={deletingId === g.id} onClick={() => void deleteSaved(g.id)}>Delete game</Button>
+                    <Button size="sm" variant="ghost" disabled={deletingId === g.id} onClick={() => setConfirmDeleteId(null)}>Keep it</Button>
+                  </div>
+                </AccentCard>
+              ) : null}
+            </div>
           ))
         )}
       </section>

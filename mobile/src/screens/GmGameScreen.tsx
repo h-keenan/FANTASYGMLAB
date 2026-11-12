@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useReducer, useState } from 'react';
-import { ScrollView, StyleSheet, View } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { useHeaderHeight } from '@react-navigation/elements';
 
@@ -37,6 +38,8 @@ import {
   simFmtPts,
   simFmtRecord,
   simGameGate,
+  simGameDeleteConfirm,
+  simGameDeleteFailure,
   simGameLiteLine,
   simGamePaywalled,
   simGameUnavailableCopy,
@@ -112,6 +115,9 @@ export default function GmGameScreen({ navigation }: Props) {
   const [tradeSeed, setTradeSeed] = useState<{ partner: string; get: string } | null>(null);
   const [advancing, setAdvancing] = useState(false);
   const [creating, setCreating] = useState(false);
+  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [managing, setManaging] = useState(false);
 
   const notify = useCallback((message: string, tone: SimGameTone = 'warning') => setNotice(message ? { message, tone } : null), []);
   const goPaywall = useCallback(() => navigation.navigate('Paywall'), [navigation]);
@@ -195,6 +201,41 @@ export default function GmGameScreen({ navigation }: Props) {
       /* best effort */
     }
   }, []);
+
+  async function deleteSaved(id: string) {
+    setDeletingId(id);
+    let removed = false;
+    try {
+      const body = await api.deleteSimGame(id);
+      const gate = simGameGate(body);
+      if (gate.kind === 'ready') {
+        removed = true;
+        notify('Game deleted.', 'success');
+      } else if (gate.kind === 'blocked') {
+        notify(gate.message, 'warning');
+      } else if (gate.kind === 'unavailable' && gate.cause === 'busy') {
+        notify('The simulator is busy right now. Try again in a few seconds.', 'warning');
+      } else {
+        notify('Could not delete the game. Try again.', 'danger');
+      }
+    } catch (error) {
+      const failure = simGameDeleteFailure(error);
+      removed = failure.remove;
+      notify(failure.message, failure.tone);
+      if (failure.refresh) void refreshList();
+    }
+    setDeletingId(null);
+    setConfirmDeleteId(null);
+    if (removed) {
+      // Drop it right away so the count, the limit note and New game update with no reload.
+      setGames((prev) => {
+        const next = prev.filter((g) => g.id !== id);
+        if (next.length === 0) setManaging(false);
+        return next;
+      });
+      void refreshList();
+    }
+  }
 
   const openGame = useCallback(
     async (id: string) => {
@@ -401,6 +442,7 @@ export default function GmGameScreen({ navigation }: Props) {
           <View style={styles.wrapRow}>
             <Button label="New game" disabled={Boolean(block)} onPress={() => dispatch({ type: 'setup' })} />
             {block && options?.is_premium === false ? <Button label="Go Pro" variant="premiumOutline" size="sm" onPress={goPaywall} /> : null}
+            {block ? <Button label="Manage games / delete one" variant="secondary" size="sm" onPress={() => setManaging(true)} /> : null}
           </View>
           {block ? (
             <AppText style={styles.muted} testID="new-game-block">
@@ -410,20 +452,45 @@ export default function GmGameScreen({ navigation }: Props) {
         </AccentCard>
       </FadeInView>
       <View style={styles.stack}>
-        <SectionHeading title="Your games" caption={games.length ? undefined : 'Your saved games show up here.'} />
+        <SectionHeading title="Your games" caption={games.length ? (managing ? 'Tap the trash can on a game to delete it.' : undefined) : 'Your saved games show up here.'} />
         {games.length === 0 ? (
           <EmptyState icon="american-football-outline" title="No games yet" subtitle="Start a new game to draft your team." />
         ) : (
           games.map((g) => (
-            <AccentCard key={g.id} accent={g.status === 'complete' ? colors.success : colors.accent} compact onPress={() => void openGame(g.id)}>
-              <View style={styles.rowBetween}>
-                <AppText style={[styles.bodyStrong, styles.grow]}>{simGameLiteLine(g)}</AppText>
-                {g.grade_letter ? <ToneBadge label={g.grade_letter} color={colors.success} size="xs" /> : <AppText style={styles.link}>Continue</AppText>}
+            <View key={g.id} style={styles.tight}>
+              <View style={styles.wrapRow}>
+                <View style={styles.grow}>
+                  <AccentCard accent={g.status === 'complete' ? colors.success : colors.accent} compact onPress={() => void openGame(g.id)}>
+                    <View style={styles.rowBetween}>
+                      <AppText style={[styles.bodyStrong, styles.grow]}>{simGameLiteLine(g)}</AppText>
+                      {g.grade_letter ? <ToneBadge label={g.grade_letter} color={colors.success} size="xs" /> : <AppText style={styles.link}>Continue</AppText>}
+                    </View>
+                    <AppText style={styles.muted}>
+                      {simSettingsSummary(g.settings) || `${SIM_SCORING_LABELS[(g.settings.scoring ?? 'ppr') as SimScoring]} · ${g.settings.teams ?? 12} teams`} · {SIM_DIFFICULTY_COPY[g.difficulty]?.label ?? g.difficulty}
+                    </AppText>
+                  </AccentCard>
+                </View>
+                <Pressable
+                  accessibilityRole="button"
+                  accessibilityLabel={`Delete game: ${simGameLiteLine(g)}`}
+                  disabled={deletingId !== null}
+                  onPress={() => setConfirmDeleteId(confirmDeleteId === g.id ? null : g.id)}
+                  hitSlop={6}
+                  style={styles.trash}
+                >
+                  <Ionicons name="trash-outline" size={20} color={colors.danger} />
+                </Pressable>
               </View>
-              <AppText style={styles.muted}>
-                {simSettingsSummary(g.settings) || `${SIM_SCORING_LABELS[(g.settings.scoring ?? 'ppr') as SimScoring]} · ${g.settings.teams ?? 12} teams`} · {SIM_DIFFICULTY_COPY[g.difficulty]?.label ?? g.difficulty}
-              </AppText>
-            </AccentCard>
+              {confirmDeleteId === g.id ? (
+                <AccentCard accent={colors.danger} compact>
+                  <AppText style={styles.body}>{simGameDeleteConfirm(g)}</AppText>
+                  <View style={styles.wrapRow}>
+                    <Button size="sm" variant="danger" label="Delete game" loading={deletingId === g.id} onPress={() => void deleteSaved(g.id)} />
+                    <Button size="sm" variant="ghost" label="Keep it" disabled={deletingId === g.id} onPress={() => setConfirmDeleteId(null)} />
+                  </View>
+                </AccentCard>
+              ) : null}
+            </View>
           ))
         )}
       </View>
@@ -870,6 +937,7 @@ function createStyles(colors: ThemeColors) {
     wrapRow: { flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: spacing.sm },
     rowBetween: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: spacing.md },
     grow: { flex: 1, minWidth: 0 },
+    trash: { width: 44, height: 44, borderRadius: 12, borderWidth: 1, borderColor: colors.danger, alignItems: 'center', justifyContent: 'center' },
     back: { alignSelf: 'flex-start' },
     start: { alignSelf: 'flex-start' },
     kicker: { fontSize: 12.5, fontWeight: '800', letterSpacing: 0.8, textTransform: 'uppercase', color: colors.textTertiary },
