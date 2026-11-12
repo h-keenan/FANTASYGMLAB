@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import type { BriefingItem } from "@/lib/api";
-import { firstSentence, watchSummary, watchTitle } from "@/lib/dashboardPresentation";
+import { firstSentence, watchSummary, watchTag, watchTitle } from "@/lib/dashboardPresentation";
 
 const base = {
   category: "watch",
@@ -42,5 +42,13 @@ describe("watch row sentences", () => {
   it("never titles a row with a bare position", () => {
     expect(watchTitle({ ...base, headline: "RB" })).toBe("RB room");
     expect(watchTitle({ ...base, headline: "Handcuff watch" })).toBe("Handcuff watch");
+  });
+});
+
+describe("watchTag trending direction", () => {
+  const base = { category: "value_trend", reason: "", supporting_context: "" } as unknown as BriefingItem;
+  it("colors trending up positive and usage drops negative", () => {
+    expect(watchTag({ ...base, headline: "Taylor is trending up" }).color).toBe("var(--text-positive)");
+    expect(watchTag({ ...base, headline: "Morgan is losing usage", reason: "Usage down 31%." }).color).toBe("var(--text-negative)");
   });
 });
