@@ -17,7 +17,7 @@ the older auto-GM API and no client calls them any more.
 
 ### `GET /v1/sim/forecast?league_id=<id>[&roster_id=<id>]`
 Pro-only (Free gets the usual `premium_required` envelope and no sim work runs).
-Snapshots the league, replays the rest of the season 80 times with the user on
+Snapshots the league, replays the rest of the season 48 to 80 times (fewer when many games remain) with the user on
 their current roster and an auto-set lineup (no user trades or waiver moves), and
 aggregates. Deterministic (fixed seeds); cached in-process for 10 minutes per
 user and league. Not-ready reasons: `league_unavailable`, `team_not_found`,

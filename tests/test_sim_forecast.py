@@ -126,3 +126,81 @@ def test_route_not_ready_reasons(client, league, reason):
 def test_route_requires_league_id(client):
     c, _ = client
     assert c.get("/v1/sim/forecast", headers={"Authorization": "u1"}).status_code == 422
+
+
+def test_single_flight_computes_once_for_concurrent_requests(client, monkeypatch):
+    import threading
+    import time
+
+    c, inputs = client
+    started = threading.Event()
+    release = threading.Event()
+    calls = []
+
+    def slow(snap):
+        calls.append(1)
+        started.set()
+        release.wait(5)
+        return build_forecast(snap, **SMALL)
+
+    monkeypatch.setattr(sim_api, "build_forecast", slow)
+    results = []
+
+    def hit():
+        results.append(c.get("/v1/sim/forecast?league_id=L1", headers={"Authorization": "u1"}).json())
+
+    first = threading.Thread(target=hit)
+    first.start()
+    assert started.wait(5)
+    others = [threading.Thread(target=hit) for _ in range(3)]
+    for t in others:
+        t.start()
+    time.sleep(0.3)  # followers are parked on the in-flight computation
+    release.set()
+    for t in [first, *others]:
+        t.join(10)
+    assert len(calls) == 1 and inputs.calls == 1
+    assert len(results) == 4 and all(r["reason"] == "" and r["forecast"] for r in results)
+    assert not sim_api._FLIGHTS
+
+
+def test_single_flight_is_per_user_and_league(client):
+    c, inputs = client
+    c.get("/v1/sim/forecast?league_id=L1", headers={"Authorization": "u1"})
+    c.get("/v1/sim/forecast?league_id=L2", headers={"Authorization": "u1"})
+    assert inputs.calls == 2
+
+
+def test_failed_compute_is_not_cached_and_clears_the_flight(client, monkeypatch):
+    c, inputs = client
+
+    def boom(snap):
+        raise RuntimeError("engine blew up")
+
+    monkeypatch.setattr(sim_api, "build_forecast", boom)
+    with pytest.raises(RuntimeError):
+        c.get("/v1/sim/forecast?league_id=L1", headers={"Authorization": "u1"})
+    assert not sim_api._FLIGHTS and not sim_api._FORECAST_CACHE
+    monkeypatch.setattr(sim_api, "build_forecast", lambda snap: build_forecast(snap, **SMALL))
+    assert c.get("/v1/sim/forecast?league_id=L1", headers={"Authorization": "u1"}).json()["forecast"]
+
+
+def test_full_compute_pool_answers_503_server_busy_and_is_not_cached(client, monkeypatch):
+    c, inputs = client
+    monkeypatch.setattr(sim_api, "_COMPUTE_WAIT_SECONDS", 0.05)
+    held = [sim_api._COMPUTE.acquire() for _ in range(sim_api.MAX_CONCURRENT_COMPUTE)]
+    try:
+        r = c.get("/v1/sim/forecast?league_id=L1", headers={"Authorization": "u1"})
+    finally:
+        for _ in held:
+            sim_api._COMPUTE.release()
+    assert r.status_code == 503 and r.json()["code"] == "server_busy" and r.headers["retry-after"] == "5"
+    assert inputs.calls == 0 and not sim_api._FORECAST_CACHE
+    assert c.get("/v1/sim/forecast?league_id=L1", headers={"Authorization": "u1"}).status_code == 200
+
+
+def test_sample_plan_shrinks_for_long_horizons_but_keeps_a_floor():
+    assert fc.sample_plan(5) == (fc.BASE_SAMPLES, fc.SCENARIO_SAMPLES)
+    mid, mid_s = fc.sample_plan(10)
+    assert fc.MIN_BASE_SAMPLES < mid < fc.BASE_SAMPLES and mid_s < fc.SCENARIO_SAMPLES
+    assert fc.sample_plan(14) == (fc.MIN_BASE_SAMPLES, fc.MIN_SCENARIO_SAMPLES) == fc.sample_plan(40)

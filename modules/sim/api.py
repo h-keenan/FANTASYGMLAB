@@ -60,6 +60,58 @@ UPSELL = {
 }
 
 
+class _Flight:
+    __slots__ = ("done", "result", "error")
+
+    def __init__(self) -> None:
+        self.done = threading.Event()
+        self.result: Any = None
+        self.error: BaseException | None = None
+
+
+_FLIGHTS: dict[tuple[str, str, str], _Flight] = {}
+FLIGHT_WAIT_SECONDS = 90.0
+
+
+def _single_flight(key: tuple[str, str, str], compute: Callable[[], Any]) -> Any:
+    """Cache + single-flight per key: concurrent callers (double tap, two tabs)
+    share one computation instead of each burning the CPU. Only a successful
+    forecast is cached; a busy or not-ready answer is shared with the callers
+    that were waiting on it but retried fresh afterwards."""
+
+    now = time.monotonic()
+    with _FORECAST_LOCK:
+        hit = _FORECAST_CACHE.get(key)
+        if hit and now - hit[0] < FORECAST_TTL_SECONDS:
+            return hit[1]
+        flight = _FLIGHTS.get(key)
+        leader = flight is None
+        if leader:
+            flight = _FLIGHTS[key] = _Flight()
+    if not leader:
+        if not flight.done.wait(FLIGHT_WAIT_SECONDS):
+            return _busy()
+        if flight.error is not None:
+            raise flight.error
+        return flight.result
+    try:
+        flight.result = compute()
+        body = flight.result
+        if isinstance(body, dict) and body.get("forecast"):
+            with _FORECAST_LOCK:
+                if len(_FORECAST_CACHE) >= _FORECAST_CACHE_MAX:
+                    _FORECAST_CACHE.pop(min(_FORECAST_CACHE, key=lambda k: _FORECAST_CACHE[k][0]), None)
+                _FORECAST_CACHE[key] = (time.monotonic(), body)
+        return flight.result
+    except BaseException as exc:
+        flight.error = exc
+        raise
+    finally:
+        with _FORECAST_LOCK:
+            _FLIGHTS.pop(key, None)
+        flight.done.set()
+
+
 @contextmanager
 def _compute_slot():
     """The sim's own bounded compute pool as a context manager: yields False
@@ -171,11 +223,9 @@ def build_router(deps: SimApiDeps) -> APIRouter:
         if not league_id or len(league_id) > 64:
             raise HTTPException(status_code=422, detail="league_id is required.")
         cache_key = (str(user.get("id") or ""), league_id, roster_id)
-        now = time.monotonic()
-        with _FORECAST_LOCK:
-            hit = _FORECAST_CACHE.get(cache_key)
-        if hit and now - hit[0] < FORECAST_TTL_SECONDS:
-            return hit[1]
+        return _single_flight(cache_key, lambda: _compute_forecast(league_id, roster_id, user))
+
+    def _compute_forecast(league_id: str, roster_id: str, user: dict[str, Any]):
         with _compute_slot() as acquired:
             if not acquired:
                 return _busy()
@@ -186,15 +236,10 @@ def build_router(deps: SimApiDeps) -> APIRouter:
             except SimInputsError as exc:
                 return _reason(exc.code)
             forecast = build_forecast(snapshot)
-        body = _reason(
+        return _reason(
             "", forecast=forecast, notes=list(snapshot.notes), mode=snapshot.mode,
             as_of=datetime.now(timezone.utc).isoformat(timespec="seconds"),
         )
-        with _FORECAST_LOCK:
-            if len(_FORECAST_CACHE) >= _FORECAST_CACHE_MAX:
-                _FORECAST_CACHE.pop(min(_FORECAST_CACHE, key=lambda k: _FORECAST_CACHE[k][0]), None)
-            _FORECAST_CACHE[cache_key] = (now, body)
-        return body
 
     @router.get("/status")
     def get_status(user: dict[str, Any] = Depends(deps.require_user)) -> dict[str, Any]:

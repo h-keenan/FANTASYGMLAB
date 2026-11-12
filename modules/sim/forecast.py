@@ -26,6 +26,22 @@ from modules.sim.types import LeagueSnapshot, Strategy
 
 BASE_SAMPLES = 80
 SCENARIO_SAMPLES = 30
+# Cost scales with weeks left, so long horizons (an offseason full-season
+# forecast, an early-season league) get fewer replays: a budget of simulated
+# weeks, clamped so the odds stay stable (playoff odds within about +-7 points at the 48-sample floor, tighter above it).
+BASE_WEEK_BUDGET = 560
+SCENARIO_WEEK_BUDGET = 210
+MIN_BASE_SAMPLES = 48
+MIN_SCENARIO_SAMPLES = 20
+
+
+def sample_plan(weeks: int) -> tuple[int, int]:
+    """(baseline replays, replays per what-if scenario) for a horizon of ``weeks`` games."""
+
+    weeks = max(1, weeks)
+    base = max(MIN_BASE_SAMPLES, min(BASE_SAMPLES, BASE_WEEK_BUDGET // weeks))
+    scenario = max(MIN_SCENARIO_SAMPLES, min(SCENARIO_SAMPLES, SCENARIO_WEEK_BUDGET // weeks))
+    return base, scenario
 MAX_FACTORS = 3
 GAME_LOOKAHEAD = 4
 MIN_BRANCH = 8  # samples needed on each side of a game before its swing is trusted
@@ -165,8 +181,14 @@ def _move_factor(
     }
 
 
-def build_forecast(snapshot: LeagueSnapshot, *, samples: int = BASE_SAMPLES, scenario_samples: int = SCENARIO_SAMPLES) -> dict[str, Any]:
+def build_forecast(
+    snapshot: LeagueSnapshot, *, samples: int | None = None, scenario_samples: int | None = None
+) -> dict[str, Any]:
     user = snapshot.user_team
+    horizon = max(1, min(len(snapshot.schedule), snapshot.settings.regular_season_end - snapshot.settings.start_week + 1))
+    planned_base, planned_scenario = sample_plan(horizon)
+    samples = planned_base if samples is None else samples
+    scenario_samples = planned_scenario if scenario_samples is None else scenario_samples
     outcomes = [simulate_season(snapshot, BASELINE, seed) for seed in range(1, samples + 1)]
     scores = [_score(o) for o in outcomes]
     n_teams = len(snapshot.teams)
