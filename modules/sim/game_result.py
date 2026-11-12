@@ -243,8 +243,8 @@ def _lineup_decisions(worst: list[dict[str, Any]], final: GameState, snap: GameS
             extra = f" ({bench[0]['player']['name']} scored {bench[0]['pts']} on your bench while {low['player']['name']} scored {low['pts']} in your lineup)"
         out.append({
             "kind": "lineup", "week": w["week"],
-            "title": f"Week {w['week']} lineup: {w['left']} points left on the bench",
-            "detail": f"A better lineup was worth {w['left']} more points that week{extra}.",
+            "title": f"Week {w['week']}: {w['left']} points sat on your bench",
+            "detail": f"In hindsight a different lineup was worth {w['left']} more points that week{extra}.",
             "impact": {"season_value": round(-min(1.0, w["left"] / 60.0), 2), "wins": 0.0,
                        "points_per_game": 0.0, "playoff_result_with": None, "playoff_result_without": None},
         })
