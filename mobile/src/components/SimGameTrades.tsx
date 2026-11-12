@@ -7,10 +7,11 @@ import Button from './Button';
 import EmptyState from './EmptyState';
 import ErrorState from './ErrorState';
 import FadeInView from './FadeInView';
+import { ReviewGlyphChip } from './SeasonReviewSections';
 import SectionHeading from './SectionHeading';
 import SegmentedTabBar from './SegmentedTabBar';
 import { SkeletonCard } from './SkeletonBlock';
-import { SimPlayerLine, SimPopIn, SimStat, SimToneBadge, createSimStyles, simToneColor, type SimCtx } from './SimGameParts';
+import { SimPlayerLine, SimPopIn, SimSideLabel, SimStat, SimToneBadge, createSimStyles, simToneColor, type SimCtx } from './SimGameParts';
 import ToneBadge from './ToneBadge';
 import { useThemeMode } from '../context/ThemeModeContext';
 import { api } from '../lib/api';
@@ -109,13 +110,16 @@ function Inbox({ ctx }: { ctx: SimCtx }) {
         <FadeInView key={item.id}>
           <AccentCard accent={colors.premium}>
             <View style={common.rowBetween}>
-              <AppText style={[common.bodyStrong, common.grow]}>{item.from.name}</AppText>
-              <ToneBadge label={`Expires week ${item.expires_week}`} color={colors.textSecondary} size="xs" />
+              <View style={[common.row, common.grow]}>
+                <ReviewGlyphChip glyph="trade" tone="accent" size={28} />
+                <AppText style={[common.bodyStrong, common.grow]}>{item.from.name}</AppText>
+              </View>
+              <ToneBadge label={`Expires week ${item.expires_week}`} color={colors.warning} size="xs" />
             </View>
             {item.message ? <AppText style={common.small}>{item.message}</AppText> : null}
-            <AppText style={styles.kicker}>You give</AppText>
+            <SimSideLabel side="give" />
             <PlayerList players={item.you_give} />
-            <AppText style={styles.kicker}>You get</AppText>
+            <SimSideLabel side="get" />
             <PlayerList players={item.you_get} />
             <View style={common.row}>
               <Button size="sm" label="Accept" loading={busyId === item.id} disabled={!ctx.game.can_trade} onPress={() => respond(item, 'accept')} />
@@ -138,7 +142,10 @@ function VerdictCard({ verdict, onSendCounter, busy }: { verdict: SimTradeVerdic
       <AccentCard accent={simToneColor(tone, colors)} glow>
         <View testID="trade-verdict" style={common.stack} accessibilityLiveRegion="polite">
           <View style={common.rowBetween}>
-            <AppText style={common.title}>{simTradeDecisionLabel(verdict.decision)}</AppText>
+            <View style={[common.row, common.grow]}>
+              <ReviewGlyphChip glyph="trade" tone={tone} size={28} />
+              <AppText style={common.title}>{simTradeDecisionLabel(verdict.decision)}</AppText>
+            </View>
             <SimToneBadge tone={tone} label={verdict.decision} />
           </View>
           <AppText style={common.body}>{verdict.reason}</AppText>
@@ -151,10 +158,10 @@ function VerdictCard({ verdict, onSendCounter, busy }: { verdict: SimTradeVerdic
           ) : null}
           {verdict.decision === 'counter' && verdict.counter ? (
             <View style={common.stack}>
-              <AppText style={common.bodyStrong}>Their counter</AppText>
-              <AppText style={styles.kicker}>You give</AppText>
+              <AppText style={[common.bodyStrong, { color: colors.accent }]}>Their counter</AppText>
+              <SimSideLabel side="give" />
               <PlayerList players={verdict.counter.give} />
-              <AppText style={styles.kicker}>You get</AppText>
+              <SimSideLabel side="get" />
               <PlayerList players={verdict.counter.get} />
               <Button size="sm" label="Take their counter" loading={busy} onPress={onSendCounter} />
             </View>

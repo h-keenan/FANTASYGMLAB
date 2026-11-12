@@ -7,6 +7,7 @@ import { EmptyState } from "@/components/EmptyState";
 import { Input, Select } from "@/components/Input";
 import { PillRow } from "@/components/PillRow";
 import { SectionHeading } from "@/components/SectionHeading";
+import { ReviewGlyphChip } from "@/components/SeasonReviewSections";
 import { SimPager, SimPlayerLine, SimSheet, SimStat, SimToneBadge, useSimDebounced } from "@/components/SimGameParts";
 import { SkeletonRows } from "@/components/Skeleton";
 import { PositionBadge } from "@/components/PositionBadge";
@@ -319,9 +320,12 @@ export function SimPlayerSheet({ gameId, player, onClose, actions }: { gameId: s
               <SectionHeading>News</SectionHeading>
               <ul className="flex flex-col gap-1.5">
                 {detail.news!.map((n, i) => (
-                  <li key={i} className="text-sm">
-                    <span className="text-xs" style={{ color: "var(--color-text-muted)" }}>Week {n.week} · </span>
-                    {n.text}
+                  <li key={i} className="flex items-start gap-2 text-sm">
+                    <ReviewGlyphChip glyph="stats" tone="accent" size={22} />
+                    <span className="flex-1 min-w-0">
+                      <span className="text-xs font-bold" style={{ color: "var(--color-accent)" }}>Week {n.week} · </span>
+                      {n.text}
+                    </span>
                   </li>
                 ))}
               </ul>

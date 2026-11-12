@@ -7,7 +7,8 @@ import { Button } from "@/components/Button";
 import { EmptyState } from "@/components/EmptyState";
 import { PillRow } from "@/components/PillRow";
 import { SectionHeading } from "@/components/SectionHeading";
-import { SimPlayerChip, SimToneBadge, type SimCtx } from "@/components/SimGameParts";
+import { ReviewGlyphChip } from "@/components/SeasonReviewSections";
+import { SimPlayerChip, SimToneBadge, simToneColor, type SimCtx } from "@/components/SimGameParts";
 import { SkeletonCard } from "@/components/Skeleton";
 import { ToneBadge } from "@/components/ToneBadge";
 import { api } from "@/lib/api";
@@ -16,6 +17,10 @@ import {
   simFmtRecord,
   simPlayoffRoundLabel,
   simPlayoffStatusLabel,
+  simPlayoffStatusTone,
+  simStreakTone,
+  simTransactionGlyph,
+  simTransactionRoleTone,
   simTeamNameMap,
   simTransactionText,
   type SimLeagueResponse,
@@ -41,14 +46,14 @@ export function SimStandingsList({ rows, regularWeeks, playoffTeams }: { rows: S
               </span>
               <span className="flex items-center gap-2 shrink-0">
                 {simPlayoffStatusLabel(row.playoff_status) ? (
-                  <SimToneBadge label={simPlayoffStatusLabel(row.playoff_status)} tone={row.playoff_status === "out" || row.playoff_status === "eliminated" ? "muted" : "success"} />
+                  <SimToneBadge label={simPlayoffStatusLabel(row.playoff_status)} tone={simPlayoffStatusTone(row.playoff_status)} />
                 ) : null}
                 <span className="text-sm font-bold">{simFmtRecord(row)}</span>
               </span>
             </div>
             <div className="flex items-center justify-between gap-2 text-xs" style={{ color: "var(--color-text-secondary)" }}>
               <span>{simFmtPts(row.pf)} PF · {simFmtPts(row.pa)} PA</span>
-              {row.streak ? <span>{row.streak}</span> : null}
+              {row.streak ? <span className="font-bold" style={{ color: simToneColor(simStreakTone(row.streak)) }}>{row.streak}</span> : null}
             </div>
           </AccentCard>
         </li>
@@ -75,16 +80,17 @@ function Scoreboard({ game, schedule, names }: { game: SimCtx["game"]; schedule:
       ) : (
         entry.games.map((g: SimRecapScore) => {
           const mine = g.home === youId || g.away === youId;
+          const mineTone = !mine || !g.winner ? "accent" : g.winner === youId ? "success" : "danger";
           const rows = [
             [g.home, g.home_pts],
             [g.away, g.away_pts],
           ] as const;
           return (
-            <AccentCard key={`${g.home}-${g.away}`} accent={mine ? "var(--color-accent)" : "var(--color-border-strong)"} compact as="div">
+            <AccentCard key={`${g.home}-${g.away}`} accent={mine ? simToneColor(mineTone) : "var(--color-border-strong)"} compact as="div">
               {rows.map(([id, pts]) => (
                 <div key={id} className="flex justify-between gap-2 text-sm" style={{ fontWeight: g.winner === id ? 800 : 500, opacity: g.winner && g.winner !== id ? 0.7 : 1 }}>
                   <span className="break-words min-w-0">{names[id] ?? "Team"}{id === youId ? " (you)" : ""}</span>
-                  <span>{pts == null ? "-" : simFmtPts(pts)}</span>
+                  <span className="tabular-nums" style={{ color: g.winner === id ? "var(--color-success)" : undefined }}>{pts == null ? "-" : simFmtPts(pts)}</span>
                 </div>
               ))}
             </AccentCard>
@@ -155,17 +161,18 @@ export function SimLeagueTab({ ctx }: { ctx: SimCtx }) {
             <EmptyState title="Quiet so far" subtitle="Moves show up here once the season gets going." />
           ) : (
             (league.transactions ?? []).map((tx, i) => (
-              <AccentCard key={i} accent="var(--color-border-strong)" compact as="div">
+              <AccentCard key={i} accent={simToneColor(simTransactionGlyph(tx).tone)} compact as="div">
                 <div className="flex items-center gap-2">
+                  <ReviewGlyphChip glyph={simTransactionGlyph(tx).glyph} tone={simTransactionGlyph(tx).tone} size={24} />
                   {tx.week != null ? <ToneBadge label={`Week ${tx.week}`} color="var(--color-text-secondary)" size="xs" /> : null}
-                  <ToneBadge label={String(tx.type ?? tx.kind ?? "move").replace(/_/g, " ")} color="var(--color-premium)" size="xs" />
+                  <ToneBadge label={String(tx.type ?? tx.kind ?? "move").replace(/_/g, " ")} color={simToneColor(simTransactionGlyph(tx).tone)} size="xs" />
                 </div>
                 <p className="text-sm">{simTransactionText(tx)}</p>
                 {(tx.players ?? []).length > 0 ? (
                   <ul className="flex flex-col gap-1" aria-label="Players in this move">
                     {tx.players!.map((p) => (
                       <li key={`${p.role}-${p.id}`} className="flex items-center gap-2">
-                        <span className="w-10 shrink-0"><ToneBadge label={p.role} color={p.role === "add" || p.role === "get" ? "var(--color-success)" : "var(--color-text-muted)"} size="xs" /></span>
+                        <span className="w-10 shrink-0"><ToneBadge label={p.role} color={simToneColor(simTransactionRoleTone(p.role))} size="xs" /></span>
                         <SimPlayerChip player={p} size={28} />
                       </li>
                     ))}

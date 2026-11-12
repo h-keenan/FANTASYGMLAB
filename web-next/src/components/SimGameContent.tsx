@@ -14,12 +14,13 @@ import { SectionHeading } from "@/components/SectionHeading";
 import { SimDraftRecapView, SimGameDraft } from "@/components/SimGameDraft";
 import { SimLeagueTab } from "@/components/SimGameLeague";
 import { SimPlayerSheet } from "@/components/SimGamePlayers";
-import { SimNotice, SimPreviewBanner, type SimCtx } from "@/components/SimGameParts";
+import { SimNotice, SimPreviewBanner, simToneColor, type SimCtx } from "@/components/SimGameParts";
 import { SimFinalView, SimWeekRecapView } from "@/components/SimGameRecap";
 import { SimPlayersTab, SimTeamTab } from "@/components/SimGameTeam";
 import { SimTradesTab } from "@/components/SimGameTrades";
 import { SkeletonCard } from "@/components/Skeleton";
 import { Toggle } from "@/components/Toggle";
+import { ReviewGlyphChip } from "@/components/SeasonReviewSections";
 import { ToneBadge } from "@/components/ToneBadge";
 import { api } from "@/lib/api";
 import {
@@ -64,6 +65,7 @@ import {
   type SimScoring,
   type SimSetupState,
   type SimWaiverClaim,
+  simGradeTone,
 } from "@/lib/simGame";
 import { SIM_FLOW_INITIAL, SIM_TABS, simFlowReducer, simRecapsFromAdvance, type SimTab } from "@/lib/simGameFlow";
 import { useSimGameCall } from "@/lib/useSimGameCall";
@@ -398,7 +400,7 @@ export function SimGameContent() {
                   <AccentCard accent={g.status === "complete" ? "var(--color-success)" : "var(--color-accent)"} compact as="div">
                     <div className="flex items-center justify-between gap-2">
                       <span className="text-sm font-bold">{simGameLiteLine(g)}</span>
-                      {g.grade_letter ? <ToneBadge label={g.grade_letter} color="var(--color-success)" size="xs" /> : <span className="text-xs" style={{ color: "var(--color-accent)" }}>Continue</span>}
+                      {g.grade_letter ? <ToneBadge label={g.grade_letter} color={simToneColor(simGradeTone(g.grade_letter))} size="xs" /> : <span className="text-xs" style={{ color: "var(--color-accent)" }}>Continue</span>}
                     </div>
                     <p className="text-xs" style={{ color: "var(--color-text-muted)" }}>
                       {simSettingsSummary(g.settings) || `${SIM_SCORING_LABELS[(g.settings.scoring ?? "ppr") as SimScoring]} · ${g.settings.teams ?? 12} teams`} · {SIM_DIFFICULTY_COPY[g.difficulty]?.label ?? g.difficulty}
@@ -848,11 +850,18 @@ function SimMoreTab({ ctx, onDeleted, onHub }: { ctx: SimCtx; onDeleted: () => v
 
       <SectionHeading>League rules</SectionHeading>
       <AccentCard accent="var(--color-border-strong)" compact as="div">
-        <ul className="flex flex-col gap-1 text-sm">
-          <li>{simSettingsSummary(s)} · {SIM_DIFFICULTY_COPY[s.difficulty].label}</li>
-          <li>Starters: {s.slots.join(", ")} · roster limit {s.roster_limit}</li>
-          <li>{s.regular_weeks}-week season, {s.playoff_teams}-team playoffs. Trade deadline: week {s.trade_deadline_week}.</li>
-          <li>Waiver claims resolve when you advance, worst record first.</li>
+        <ul className="flex flex-col gap-2 text-sm">
+          {([
+            ["stats", "accent", `${simSettingsSummary(s)} · ${SIM_DIFFICULTY_COPY[s.difficulty].label}`],
+            ["lineup", "success", `Starters: ${s.slots.join(", ")} · roster limit ${s.roster_limit}`],
+            ["trophy", "warning", `${s.regular_weeks}-week season, ${s.playoff_teams}-team playoffs. Trade deadline: week ${s.trade_deadline_week}.`],
+            ["waiver", "accent", "Waiver claims resolve when you advance, worst record first."],
+          ] as const).map(([glyph, tone, text]) => (
+            <li key={glyph} className="flex items-start gap-2">
+              <ReviewGlyphChip glyph={glyph} tone={tone} size={24} />
+              <span className="flex-1 min-w-0">{text}</span>
+            </li>
+          ))}
         </ul>
       </AccentCard>
 

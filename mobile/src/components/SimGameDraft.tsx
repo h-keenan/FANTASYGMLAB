@@ -10,7 +10,9 @@ import FadeInView from './FadeInView';
 import SectionHeading from './SectionHeading';
 import SegmentedTabBar from './SegmentedTabBar';
 import { SkeletonCard } from './SkeletonBlock';
-import { SimPlayerBrowser } from './SimGamePlayers';
+import { SimDraftBoard, SimDraftIconButton } from './SimDraftBoard';
+import { SimDraftGrid } from './SimDraftGrid';
+import { SimDraftHero } from './SimDraftHero';
 import { SimPlayerChip, SimPlayerLine, SimPopIn, SimStat, SimToneBadge, createSimStyles, type SimCtx } from './SimGameParts';
 import ToneBadge from './ToneBadge';
 import { useThemeMode } from '../context/ThemeModeContext';
@@ -34,7 +36,7 @@ import {
 } from '../lib/simGame';
 import { spacing, type ThemeColors } from '../theme';
 
-type Panel = 'board' | 'queue' | 'roster' | 'picks';
+type Panel = 'board' | 'grid' | 'queue' | 'roster' | 'picks';
 
 /**
  * The draft room: a big board of every undrafted player (search, position
@@ -190,31 +192,29 @@ export function SimGameDraft({ ctx, onComplete }: { ctx: SimCtx; onComplete: (re
   const boardActions = (player: SimGamePlayer) => {
     const inQueue = queue.ids.includes(player.id);
     return (
-      <View style={common.row}>
-        <Button
-          size="sm"
-          variant="secondary"
-          label={inQueue ? 'Queued' : 'Queue'}
+      <>
+        <SimDraftIconButton
+          icon={inQueue ? 'checkmark-done-outline' : 'add-circle-outline'}
+          label={inQueue ? `Remove ${player.name} from queue` : `Queue ${player.name}`}
+          active={inQueue}
           onPress={() => {
             setPlayers((prev) => ({ ...prev, [player.id]: player }));
             dispatchQueue({ type: inQueue ? 'remove' : 'add', id: player.id });
           }}
         />
-        {onClock ? <Button size="sm" label="Draft" loading={busy === 'pick'} onPress={() => pick(player)} /> : null}
-      </View>
+        {onClock ? <SimDraftIconButton icon="checkmark-circle" primary label={`Draft ${player.name}`} disabled={busy === 'pick'} onPress={() => pick(player)} /> : null}
+      </>
     );
   };
 
   const board = (
-    <SimPlayerBrowser
+    <SimDraftBoard
       gameId={gameId}
-      fixedStatus="available"
-      initial={{ sort: 'adp' }}
       positions={simPositionsFor(game.settings.slots)}
+      pickNo={draft.pick_no}
       onOpen={ctx.openPlayer}
       actions={boardActions}
       refreshKey={ctx.tick}
-      emptyTitle="No players left that match"
       onItems={(items) => setPlayers((prev) => ({ ...prev, ...Object.fromEntries(items.map((p) => [p.id, p])) }))}
     />
   );
@@ -234,10 +234,10 @@ export function SimGameDraft({ ctx, onComplete }: { ctx: SimCtx; onComplete: (re
                 onOpen={ctx.openPlayer}
                 trailing={
                   <View style={common.wrapRow}>
-                    <Button size="sm" variant="ghost" label="Up" disabled={index === 0} onPress={() => dispatchQueue({ type: 'move', id: player.id, delta: -1 })} />
-                    <Button size="sm" variant="ghost" label="Down" disabled={index === queued.length - 1} onPress={() => dispatchQueue({ type: 'move', id: player.id, delta: 1 })} />
-                    <Button size="sm" variant="ghost" label="Remove" onPress={() => dispatchQueue({ type: 'remove', id: player.id })} />
-                    {onClock ? <Button size="sm" label="Draft" loading={busy === 'pick'} onPress={() => pick(player)} /> : null}
+                    <SimDraftIconButton icon="chevron-up" label={`Move ${player.name} up`} disabled={index === 0} onPress={() => dispatchQueue({ type: 'move', id: player.id, delta: -1 })} />
+                    <SimDraftIconButton icon="chevron-down" label={`Move ${player.name} down`} disabled={index === queued.length - 1} onPress={() => dispatchQueue({ type: 'move', id: player.id, delta: 1 })} />
+                    <SimDraftIconButton icon="close" label={`Remove ${player.name}`} onPress={() => dispatchQueue({ type: 'remove', id: player.id })} />
+                    {onClock ? <SimDraftIconButton icon="checkmark-circle" primary label={`Draft ${player.name}`} disabled={busy === 'pick'} onPress={() => pick(player)} /> : null}
                   </View>
                 }
               />
@@ -310,12 +310,10 @@ export function SimGameDraft({ ctx, onComplete }: { ctx: SimCtx; onComplete: (re
             <AppText style={common.title} accessibilityLiveRegion="polite" testID="draft-clock">
               {simDraftClockLine(draft)}
             </AppText>
-            <AppText style={common.muted}>
-              Pick {Math.min(draft.pick_no, draft.total_picks)} of {draft.total_picks} · No clock, take your time.
-            </AppText>
           </View>
           {onClock ? <ToneBadge label="Your pick" color={colors.accent} /> : null}
         </View>
+        <SimDraftHero gameId={gameId} draft={draft} teams={game.settings.teams} slots={game.settings.slots} positions={simPositionsFor(game.settings.slots)} tick={ctx.tick} onOpen={ctx.openPlayer} />
         {onClock && hint ? (
           <FadeInView>
             <View style={common.rowBetween} testID="draft-hint">
@@ -349,15 +347,17 @@ export function SimGameDraft({ ctx, onComplete }: { ctx: SimCtx; onComplete: (re
       </AccentCard>
       <SegmentedTabBar<Panel>
         options={[
-          { key: 'board', label: 'Board' },
+          { key: 'board', label: 'Players' },
+          { key: 'grid', label: 'Board' },
           { key: 'queue', label: `Queue${queue.ids.length ? ` ${queue.ids.length}` : ''}` },
           { key: 'roster', label: 'Roster' },
           { key: 'picks', label: 'Picks' },
         ]}
         active={panel}
         onChange={setPanel}
+        scrollable
       />
-      {panel === 'board' ? board : side()}
+      {panel === 'board' ? board : panel === 'grid' ? <SimDraftGrid draft={draft} teams={game.settings.teams} onOpen={ctx.openPlayer} /> : side()}
     </View>
   );
 }
