@@ -30,6 +30,7 @@ import { fileURLToPath } from "node:url";
 export const IDENTICAL = [
   "busyRetry.ts",
   "destinationAccents.generated.ts",
+  "directionCheckin.ts",
   "freeLimits.ts",
   "injuryTone.generated.ts",
   "limitWall.ts",

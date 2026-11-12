@@ -9,6 +9,7 @@ import type { OpponentProfileResponse } from './opponentProfile';
 import { env } from './env';
 import { maskShowcaseFields, setShowcaseModeEnabled, unmaskShowcaseFields } from './showcaseMode';
 import { withBackgroundRetry } from './backgroundRetry';
+import type { DirectionCheckinAction, DirectionCheckinResponse } from './directionCheckin';
 import type { MultiTeamTradeResponse, MultiTransfer } from './multiTeamTrade';
 import type { MultiTeamIdeasResponse } from './multiTeamIdeas';
 import { parseRetryAfterSeconds, withServerBusyRetry } from './busyRetry';
@@ -4245,6 +4246,15 @@ export const api = {
     authorizedFetch<TeamStanceResponse>(`/v1/leagues/${encodeURIComponent(leagueId)}/team-stance`),
   setTeamStance: (leagueId: string, stance: TeamStance) =>
     authorizedPost<TeamStanceResponse>(`/v1/leagues/${encodeURIComponent(leagueId)}/team-stance`, { stance }),
+  // Dashboard direction check-in (modules/direction_checkin.py): whether to ask
+  // if the declared Team Situation still fits, and the record of the answer.
+  getDirectionCheckin: (leagueId: string) =>
+    authorizedFetch<DirectionCheckinResponse>(`/v1/leagues/${encodeURIComponent(leagueId)}/direction-checkin`),
+  answerDirectionCheckin: (leagueId: string, momentKey: string, action: DirectionCheckinAction) =>
+    authorizedPost<DirectionCheckinResponse>(`/v1/leagues/${encodeURIComponent(leagueId)}/direction-checkin`, {
+      moment_key: momentKey,
+      action,
+    }),
   getGmPlan: (leagueId: string, options?: { lens?: ValuationLens }) => {
     const params = new URLSearchParams();
     if (options?.lens) params.set('lens', options.lens);

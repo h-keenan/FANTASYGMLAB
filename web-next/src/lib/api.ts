@@ -16,6 +16,7 @@ import type {
 import { FREE_LEAGUE_CAP_MESSAGE, isFreeLeagueLockedBody } from "./freeLeagueCap";
 import { isPrivacyMode, maskIfPrivate, unmaskOutgoing } from "./privacy";
 import { billingRequest, type BillingFunction } from "./billingClient";
+import type { DirectionCheckinAction, DirectionCheckinResponse } from "./directionCheckin";
 import type { MultiTeamTradeResponse, MultiTransfer } from "./multiTeamTrade";
 import type { MultiTeamIdeasResponse } from "./multiTeamIdeas";
 import { isServerBusyError, parseRetryAfterSeconds, withServerBusyRetry } from "./busyRetry";
@@ -4605,6 +4606,15 @@ export const api = {
     authorizedRequest<TeamStanceResponse>(`/v1/leagues/${encodeURIComponent(leagueId)}/team-stance`, {
       method: "POST",
       jsonBody: { stance },
+    }),
+  // Dashboard direction check-in (modules/direction_checkin.py): whether to ask
+  // if the declared Team Situation still fits, and the record of the answer.
+  getDirectionCheckin: (leagueId: string) =>
+    authorizedRequest<DirectionCheckinResponse>(`/v1/leagues/${encodeURIComponent(leagueId)}/direction-checkin`),
+  answerDirectionCheckin: (leagueId: string, momentKey: string, action: DirectionCheckinAction) =>
+    authorizedRequest<DirectionCheckinResponse>(`/v1/leagues/${encodeURIComponent(leagueId)}/direction-checkin`, {
+      method: "POST",
+      jsonBody: { moment_key: momentKey, action },
     }),
 
   // Player Compare (Revision 12) — league-independent, same endpoint mobile's
