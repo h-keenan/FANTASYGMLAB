@@ -181,3 +181,112 @@ def test_gate_and_analyzer_attach_the_same_weekly_projection_baselines(monkeypat
     monkeypatch.setattr(player_projections, "baseline_weekly_points", lambda *a, **k: 1 / 0)
     same, _ = trade_grade.attach_projection_baselines(valued, pool, {"a"}, "dynasty_score")
     assert "proj_ppg" not in same.columns
+
+
+# ---------------------------------------------------------------------------
+# Hub / Finder grade with the Analyzer's pick context (modules.trade_cautions)
+#
+# Owner report: a Hub idea could say SMASH ACCEPT where the Analyzer says
+# ACCEPT, because only the Analyzer passed ``pick_context`` (the pick-glut
+# caution softens exactly that rung).
+
+from modules import trade_analyzer_fit, trade_cautions, trade_offer_analyzer as toa  # noqa: E402
+from tests import test_trade_cautions as tc  # noqa: E402
+
+
+def _glut_fit(*args, **kwargs):
+    return tc._fit()
+
+
+def _glut_idea():
+    return {"send_assets": list(tc.OWNER_SEND), "receive_assets": list(tc.OWNER_GET), "trade_gain": 1873}
+
+
+def _gate(pick_context=None):
+    my_team = pd.DataFrame([_player("a", "WR", value=50)])
+    gate = trade_ideas._UserSideAnalyzerGate(
+        my_team_df=my_team, all_players_df=my_team, strategy="rebuild", league_settings=SETTINGS,
+        score_field="dynasty_score", pick_context=pick_context,
+    )
+    gate._current_context = {"x": 1}
+    return gate
+
+
+def test_grade_trade_for_user_uses_the_pick_context_like_the_analyzer(monkeypatch):
+    monkeypatch.setattr(trade_analyzer_fit, "evaluate_trade_analyzer_fit", _glut_fit)
+    kwargs = dict(
+        my_team_df=None, all_players_df=None, send_assets=tc.OWNER_SEND, receive_assets=tc.OWNER_GET,
+        strategy="rebuild", lineup_settings=None, score_field="value_score",
+    )
+    _, bare = trade_grade.grade_trade_for_user(**kwargs)
+    _, with_ctx = trade_grade.grade_trade_for_user(**kwargs, pick_context=tc._held_five_firsts())
+    analyzer = tc._verdict()
+    assert bare.band == "SMASH ACCEPT"  # what Hub used to say
+    assert with_ctx.band == analyzer.band == "ACCEPT" and with_ctx.ui_verdict == analyzer.ui_verdict
+    assert [c["code"] for c in with_ctx.cautions] == ["pick_glut"]
+    # Words and a one-step softening only: the numbers are the Analyzer's, unchanged.
+    assert (with_ctx.value_delta, with_ctx.trade_score) == (bare.value_delta, bare.trade_score)
+
+
+def test_the_gate_stamps_the_same_verdict_the_analyzer_gives(monkeypatch):
+    monkeypatch.setattr(trade_analyzer_fit, "evaluate_trade_analyzer_fit", _glut_fit)
+    idea = _glut_idea()
+    assert _gate(tc._held_five_firsts()).passes(idea) is True
+    assert idea["analyzer_label"] == tc._verdict().band == "ACCEPT"
+    assert idea["analyzer_verdict"] == tc._verdict().ui_verdict
+    assert idea["analyzer_value_delta"] == tc._verdict().value_delta
+    # Without the context (the old behaviour) the same idea read SMASH ACCEPT.
+    old = _glut_idea()
+    _gate(None).passes(old)
+    assert old["analyzer_label"] == "SMASH ACCEPT"
+
+
+def test_the_gate_hands_its_pick_context_to_the_grader(monkeypatch):
+    seen = {}
+
+    def fake_grade(**kwargs):
+        seen.update(kwargs)
+        return None, None
+
+    monkeypatch.setattr(trade_grade, "grade_trade_for_user", fake_grade)
+    ctx = tc._held_five_firsts()
+    _gate(ctx).passes({"send_assets": [], "receive_assets": []})
+    assert seen["pick_context"] is ctx
+
+
+def test_hub_pick_context_is_the_analyzers_context_for_the_same_pick_table():
+    picks = {
+        1: [tc._pick(2027, 1), tc._pick(2027, 1, score=2500), tc._pick(2028, 1), {"asset_type": "player"}],
+        2: [tc._pick(2027, 1, owner="2"), tc._pick(2028, 2, owner="2")],
+    }
+    mine = {"roster_id": 1, "players": ["a", "b", "c", "d", "e", "f"], "reserve": [], "taxi": []}
+    overflow = {"league": {"roster_positions": ["SLOT"] * 10, "settings": {}}, "my_roster": mine}
+    got = trade_ideas.hub_pick_context(picks, 1, overflow)
+    flat = [p for rows in picks.values() for p in rows if p.get("asset_type") == "pick"]
+    expected = trade_cautions.build_pick_context(
+        flat, 1, open_roster_spots=trade_cautions.open_roster_spots(overflow["league"], mine)
+    )
+    assert got == expected and got["held_firsts"] == 3 and got["open_roster_spots"] == 4
+
+
+def test_hub_pick_context_with_unknown_room_or_no_picks():
+    picks = {1: [tc._pick(2027, 1)]}
+    # Unknown roster room never blocks the caution: the picks still count.
+    ctx = trade_ideas.hub_pick_context(picks, 1, None)
+    assert ctx["held_firsts"] == 1 and ctx["open_roster_spots"] is None
+    assert trade_ideas.hub_pick_context({}, 1, None) is None
+    assert trade_ideas.hub_pick_context({1: [{"asset_type": "player"}]}, 1, None) is None
+    # A broken overflow spec degrades to no context (logged), never an exception.
+    assert trade_ideas.hub_pick_context(picks, 1, {}) is None
+
+
+def test_the_hub_and_finder_builders_hand_the_gate_a_pick_context():
+    """Both gate constructors (build_trade_ideas and the target-player offers) pass the
+    pick context; a regression to the old no-context gate would fail here."""
+
+    import inspect
+
+    from modules import trade_target_offers
+
+    assert "pick_context=hub_pick_context(" in inspect.getsource(trade_ideas._build_trade_ideas_impl)
+    assert "pick_context=ti.hub_pick_context(" in inspect.getsource(trade_target_offers)

@@ -703,6 +703,7 @@ def grade_trade_for_user(
     waiver_df: pd.DataFrame | None = None,
     forced_drop_assets: list[dict] | None = None,
     team_needs: dict | None = None,
+    pick_context: Mapping[str, Any] | None = None,
 ):
     """The Trade Analyzer's own verdict for this package, from the user's side.
 
@@ -710,6 +711,11 @@ def grade_trade_for_user(
     decide_offer_verdict), so Trade Hub can drop ideas the Analyzer would
     not grade at least FAIR. Returns (fit, verdict); both are None when the
     fit cannot be computed.
+
+    ``pick_context`` (modules.trade_cautions.build_pick_context) is the picks
+    the team already holds. The Analyzer always passes it, so a caller that
+    leaves it out can grade SMASH ACCEPT where the Analyzer says ACCEPT (the
+    pick-glut caution softens exactly that rung): Hub and Finder pass it.
     """
 
     from modules import trade_analyzer_fit, trade_offer_analyzer
@@ -731,6 +737,6 @@ def grade_trade_for_user(
     if not fit or not fit.get("available"):
         return fit, None
     verdict = trade_offer_analyzer.decide_offer_verdict(
-        fit, send_assets=send_assets, receive_assets=receive_assets
+        fit, send_assets=send_assets, receive_assets=receive_assets, pick_context=pick_context
     )
     return fit, verdict

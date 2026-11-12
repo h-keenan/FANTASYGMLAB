@@ -52,7 +52,7 @@ from modules.player_state_authority import (
 from modules.waivers_logic import select_top_waiver_opportunity
 from modules.performance import debug_enabled, record_timing
 from modules import model_status, runtime_trace
-from modules import drop_candidates, trade_grade, trade_posture
+from modules import drop_candidates, trade_cautions, trade_grade, trade_posture
 from modules import team_stance as team_stance_module
 
 BASE_PICK_VALUES = {
@@ -4494,6 +4494,37 @@ def _hub_overflow_inputs(
     }
 
 
+def hub_pick_context(
+    roster_pick_assets: Mapping[Any, Sequence[Mapping[str, Any]]] | None,
+    my_roster_id: Any,
+    overflow: Mapping[str, Any] | None = None,
+) -> Dict[str, Any] | None:
+    """The Analyzer's pick context (``trade_cautions.build_pick_context``) for a
+    Hub / Finder gate: the same league pick table, and the open-roster-spot rule
+    read from the same roster limits the Hub's roster-full check uses
+    (``_hub_overflow_inputs``; None = room unknown, which never blocks the
+    caution). With it the Hub grades a package with the same pick-glut caution
+    as the Analyzer (it softens SMASH ACCEPT to ACCEPT). None when there are no
+    picks or they cannot be read."""
+
+    try:
+        picks = [
+            asset
+            for assets in (roster_pick_assets or {}).values()
+            for asset in assets
+            if asset.get("asset_type") == "pick"
+        ]
+        if not picks:
+            return None
+        open_spots = (
+            trade_cautions.open_roster_spots(overflow["league"], overflow["my_roster"]) if overflow is not None else None
+        )
+        return trade_cautions.build_pick_context(picks, my_roster_id, open_roster_spots=open_spots)
+    except Exception:
+        logger.warning("pick-glut context unavailable for the Hub gate", exc_info=True)
+        return None
+
+
 class _UserSideAnalyzerGate:
     """Trade Analyzer verdict for a Hub idea, from the user's side, cached per idea.
 
@@ -4507,12 +4538,14 @@ class _UserSideAnalyzerGate:
 
     def __init__(
         self, *, my_team_df, all_players_df, strategy, league_settings, score_field, waiver_df=None, overflow=None,
-        team_needs=None,
+        team_needs=None, pick_context=None,
     ):
         # ``overflow``: roster-limit inputs for the roster-full check (see
         # ``_hub_overflow_inputs``); None when the roster limit is unknown.
         self._overflow = overflow
         self._team_needs = team_needs
+        # ``pick_context``: see ``hub_pick_context`` (the Analyzer's own).
+        self._pick_context = pick_context
         self._waiver_df = waiver_df
         self._my_team_df = my_team_df
         self._all_players_df = all_players_df
@@ -4587,6 +4620,7 @@ class _UserSideAnalyzerGate:
             waiver_df=self._waiver_df,
             forced_drop_assets=(plan or {}).get("forced_assets") or None,
             team_needs=self._team_needs,
+            pick_context=self._pick_context,
         )
         if verdict is None:
             self._results[key] = True
@@ -5815,6 +5849,16 @@ def _build_trade_ideas_impl(
         if "player_id" in gate_players.columns and not my_team_df.empty
         else my_team_df
     )
+    gate_overflow = _hub_overflow_inputs(
+        league_settings=league_settings,
+        rosters=rosters,
+        roster_players_map=roster_players_map,
+        my_roster_id=my_roster_id,
+        untouchable_names=untouchable_names,
+        df_players=df_players,
+        league_id=league_id,
+        platform=str(getattr(platform_adapter, "platform", "") or ""),
+    )
     analyzer_gate = _UserSideAnalyzerGate(
         my_team_df=gate_team_df,
         all_players_df=gate_players,
@@ -5823,16 +5867,8 @@ def _build_trade_ideas_impl(
         score_field=score_field,
         waiver_df=gate_pool,
         team_needs=league_needs.for_roster(my_roster_key),
-        overflow=_hub_overflow_inputs(
-            league_settings=league_settings,
-            rosters=rosters,
-            roster_players_map=roster_players_map,
-            my_roster_id=my_roster_id,
-            untouchable_names=untouchable_names,
-            df_players=df_players,
-            league_id=league_id,
-            platform=str(getattr(platform_adapter, "platform", "") or ""),
-        ),
+        overflow=gate_overflow,
+        pick_context=hub_pick_context(roster_pick_assets, my_roster_id, gate_overflow),
     )
     selected: List[Dict[str, Any]] = []
     analyzer_rejected: List[Dict[str, Any]] = []

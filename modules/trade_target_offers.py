@@ -472,6 +472,16 @@ def build_target_offers(
         else my_team_df
     )
     strategy = ti.normalize_team_strategy(team_strategy or "retool")
+    overflow = ti._hub_overflow_inputs(
+        league_settings=league_settings,
+        rosters=rosters,
+        roster_players_map=roster_players_map,
+        my_roster_id=my_roster_id,
+        untouchable_names=list(untouchable_names),
+        df_players=df_players,
+        league_id=league_id,
+        platform=platform,
+    )
     gate = ti._UserSideAnalyzerGate(
         my_team_df=gate_team_df,
         all_players_df=gate_players,
@@ -480,16 +490,8 @@ def build_target_offers(
         score_field=score_field,
         waiver_df=gate_pool,
         team_needs=league_needs.for_roster(my_key),
-        overflow=ti._hub_overflow_inputs(
-            league_settings=league_settings,
-            rosters=rosters,
-            roster_players_map=roster_players_map,
-            my_roster_id=my_roster_id,
-            untouchable_names=list(untouchable_names),
-            df_players=df_players,
-            league_id=league_id,
-            platform=platform,
-        ),
+        overflow=overflow,
+        pick_context=ti.hub_pick_context(roster_pick_assets, my_roster_id, overflow),
     )
 
     def _triage(idea: dict[str, Any]) -> int:
