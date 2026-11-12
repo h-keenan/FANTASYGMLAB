@@ -738,3 +738,158 @@ def test_standing_rows_flag_playoff_status():
     assert [r["rank"] for r in rows] == list(range(1, 13))
     assert sum(r["playoff_status"] == "champion" for r in rows) == 1
     assert all(r["seed"] for r in rows[:0]) and {r["seed"] for r in rows if r["seed"]} == set(range(1, 7))
+
+
+# ------------------------------------------------------ JSON storage fidelity
+
+
+class JsonBackend(InMemoryBackend):
+    """Round-trips every stored value through JSON text, like PostgREST does."""
+
+    @staticmethod
+    def _rt(value):
+        import json
+
+        return json.loads(json.dumps(value))
+
+    def upsert(self, table, row, *, on_conflict):
+        return super().upsert(table, self._rt(dict(row)), on_conflict=on_conflict)
+
+    def insert_many(self, table, rows):
+        return super().insert_many(table, [self._rt(dict(r)) for r in rows])
+
+    def update(self, table, *, user_id, filters, values):
+        return super().update(table, user_id=user_id, filters=filters, values=self._rt(dict(values)))
+
+
+def test_snapshot_survives_json_storage_exactly():
+    import json
+
+    from modules.sim.game_types import GameSnapshot
+
+    snap = make_snapshot(11)
+    again = GameSnapshot.from_dict(json.loads(json.dumps(snap.to_dict())))
+    assert again.to_dict() == snap.to_dict()
+
+
+def test_resume_equals_replay_through_a_json_backend_and_continues_identically():
+    seed = 11
+    store = GameStore(JsonBackend())
+    snap = make_snapshot(seed)
+    gid = store.create_game("u", snapshot=snap, seed=seed)["id"]
+    snap = store.get_snapshot("u", gid)
+    state = GameState(snap)
+    em = Emitter(state, snap)
+    ctx = DraftContext(snap, state)
+    run_ai_picks(ctx, em, seed)
+    auto_for_user(ctx, em, seed)
+    finish_draft(em, snap, state, seed)
+    store.append_events("u", gid, em.events)
+    store.save_checkpoint("u", gid, state, state.week)
+    # play half the season, reloading from storage before EVERY advance (like the API does)
+    while state.week < 9:
+        state = store.load_state("u", gid, snap)
+        em = Emitter(state, snap)
+        advance(em, snap, state, seed)
+        store.append_events("u", gid, em.events)
+        store.save_checkpoint("u", gid, state, state.week)
+    reloaded = store.load_state("u", gid, snap)
+    full = store.load_state("u", gid, snap, use_checkpoint=False)
+    assert reloaded.digest() == full.digest() == state.digest()
+    # the uninterrupted in-memory season lands on the same final state as the reload-every-week one
+    while state.status != "complete":
+        state = store.load_state("u", gid, snap)
+        em = Emitter(state, snap)
+        advance(em, snap, state, seed)
+        store.append_events("u", gid, em.events)
+        store.save_checkpoint("u", gid, state, state.week)
+    straight = season(seed)[1]
+    assert store.load_state("u", gid, snap).digest() == straight.digest()
+
+
+def test_a_full_game_on_the_real_player_pool_snapshot_completes():
+    """Structural check against whatever data/players.db currently holds (read
+    only, projections stubbed so no caches are touched): the pool builds, the
+    draft fills every roster, and a season plays to a champion."""
+
+    from pathlib import Path
+
+    from modules.sim.inputs import RealSimInputs
+
+    db = Path(__file__).resolve().parents[1] / "data" / "players.db"
+    if not db.exists():
+        pytest.skip("no players.db in this checkout")
+
+    class Projections:
+        def baseline_weekly_points(self, rows, *, scoring_settings=None):
+            return {}
+
+    pool = RealSimInputs(str(db), projections_module=Projections(), sleeper_module=object(),
+                         playoff_module=object()).player_pool(GameSettings().scoring_settings)
+    snap = build_snapshot(pool.rows, pool.bye_weeks, GameSettings.parse({"user_slot": 6}), 3,
+                          scoring_model=game_scoring.default_model().model_id)
+    state = GameState(snap)
+    em = Emitter(state, snap)
+    ctx = DraftContext(snap, state)
+    run_ai_picks(ctx, em, 3)
+    auto_for_user(ctx, em, 3)
+    finish_draft(em, snap, state, 3)
+    assert all(len(r) == 14 for r in state.rosters.values())
+    while state.status != "complete":
+        advance(em, snap, state, 3)
+    assert state.champion in snap.tids and len(state.history) == 17
+
+
+def _play_as(seed: int, spam: bool) -> tuple[int, float]:
+    """A manager who sets the best lineup every week; with ``spam`` also takes the
+    single best AI-accepted 1-for-1 (by lineup gain) up to four times a week
+    before the deadline. Returns (wins, points for)."""
+
+    snap, state, em = drafted(seed, user_slot=(seed % 12) + 1)
+    user = snap.user_team.tid
+    while state.status != "complete":
+        if spam and state.status == "in_season" and state.week <= snap.settings.trade_deadline_week:
+            for _ in range(4):
+                ev = Evaluator(snap, state)
+                desk = TradeDesk(ev, seed)
+                base = ev.lineup_total(state.rosters[user])
+                mine = sorted((p for p in state.rosters[user] if snap.players[p].pos != "K"), key=ev.ros_mean)[:6]
+                best = None
+                for team in snap.tids:
+                    if team == user:
+                        continue
+                    theirs = sorted((p for p in state.rosters[team] if snap.players[p].pos != "K"),
+                                    key=lambda p: -ev.ros_mean(p))[:6]
+                    for give in mine:
+                        for get in theirs:
+                            if not desk.ai_accepts(team, [give], [get])[0]:
+                                continue
+                            new = [p for p in state.rosters[user] if p != give] + [get]
+                            gain = ev.lineup_total(new) - base
+                            if best is None or gain > best[0]:
+                                best = (gain, team, [give], [get])
+                if best is None or best[0] <= 0.2:
+                    break
+                try:
+                    act.send_trade(em, TradeDesk(Evaluator(snap, state), seed), best[1], best[2], best[3])
+                except (GameError, ValueError):
+                    break
+        act.auto_lineup(em)
+        advance(em, snap, state, seed)
+    summary = season_summary(snap, state)
+    return summary["wins"], summary["pf"]
+
+
+def test_a_trade_spammer_does_not_beat_a_balanced_manager_by_more_than_a_set_margin():
+    """Anti-exploit harness (the design doc's risk section, in miniature): same
+    seeds, same dice; hammering the AI with accepted trades must not be a
+    reliable edge over simply managing the lineup."""
+
+    balanced = [_play_as(seed, False) for seed in range(1, 6)]
+    spammer = [_play_as(seed, True) for seed in range(1, 6)]
+    pf_balanced = sum(pf for _, pf in balanced)
+    pf_spammer = sum(pf for _, pf in spammer)
+    wins_balanced = sum(w for w, _ in balanced)
+    wins_spammer = sum(w for w, _ in spammer)
+    assert pf_spammer <= pf_balanced * 1.04
+    assert wins_spammer - wins_balanced <= 5  # across 5 seasons: under a win per season

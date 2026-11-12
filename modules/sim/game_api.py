@@ -16,7 +16,7 @@ import threading
 import time
 import uuid
 from dataclasses import dataclass
-from typing import Any, Callable, ContextManager, Mapping
+from typing import Any, Callable, ContextManager
 
 from fastapi import APIRouter, Body, Depends, HTTPException
 from fastapi.responses import JSONResponse

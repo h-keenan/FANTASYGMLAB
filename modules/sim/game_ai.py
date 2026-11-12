@@ -11,15 +11,14 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from itertools import combinations
-from typing import Any, Iterable, Mapping, Sequence
+from typing import Any, Iterable, Sequence
 
 from modules.sim.game_eval import NEED_K, USER_PARAMS, Evaluator, convex, team_params
 from modules.sim.game_state import GameState
-from modules.sim.game_types import GameError, GameSnapshot
+from modules.sim.game_types import GameSnapshot
 from modules.sim.lineup import pick_lineup
 from modules.sim.personas import PERSONAS, TeamParams
 from modules.sim.rng import WorldRng
-from modules.sim.types import POSITIONS
 
 MAX_TRADE_SIDE = 3
 MAX_AI_TRADES_PER_WEEK = 3
@@ -391,5 +390,5 @@ def trade_window(snap: GameSnapshot, state: GameState) -> str | None:
 __all__ = [
     "Verdict", "TradeDesk", "ai_lineup", "ai_waiver_claim", "validate_offer", "offer_key",
     "trade_window", "offer_message", "MAX_TRADE_SIDE", "MAX_AI_TRADES_PER_WEEK", "MAX_OFFERS_PER_WEEK",
-    "AI_SEASON_TRADE_CAP", "PARTNERS_PER_SEARCH", "GameError",
+    "AI_SEASON_TRADE_CAP", "PARTNERS_PER_SEARCH",
 ]

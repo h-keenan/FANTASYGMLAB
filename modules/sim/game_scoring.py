@@ -21,7 +21,7 @@ from __future__ import annotations
 import dataclasses
 import importlib
 from dataclasses import dataclass, field
-from typing import Any, Callable, Mapping
+from typing import Any, Mapping
 
 FALLBACK_ID = "fallback-meansd-1"
 _REAL_MODULE = "modules.sim.player_model"

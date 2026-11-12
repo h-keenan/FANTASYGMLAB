@@ -15,10 +15,9 @@ Engine events: ``waiver_result``, ``trade`` (source ``ai_ai``), ``drop``,
 
 from __future__ import annotations
 
-import math
 from typing import Any, Sequence
 
-from modules.sim.game_actions import enforce_roster_cap, execute_trade
+from modules.sim.game_actions import execute_trade
 from modules.sim.game_ai import (
     MAX_AI_TRADES_PER_WEEK,
     MAX_OFFERS_PER_WEEK,
@@ -28,7 +27,7 @@ from modules.sim.game_ai import (
     ai_waiver_claim,
     offer_message,
 )
-from modules.sim.game_draft import DraftContext, draft_recap
+from modules.sim.game_draft import draft_recap
 from modules.sim.game_eval import Evaluator, team_params
 from modules.sim.game_scoring import PlayerWeek, ScoringModel, get_model
 from modules.sim.game_state import Emitter, GameState

@@ -469,3 +469,60 @@ of the week. No undo across an Advance. -> `{"game": game, "reverted": n}`.
 ### `GET /v1/sim/preview/players` (signed-out)
 No auth, no Pro check, no state. `?q=&pos=&sort=&page=&page_size=&scoring=ppr` ->
 `{"ok": true, "reason": "", "players": [player-lite], "total", "page", "page_size", "scoring"}` with projection, value, age, NFL team, bye. Cached pool; a plain 404 when the flag is off.
+
+## GM game: decisions, internals and ops
+
+Owner decisions this backend implements: 14-week regular season plus a real
+playoff bracket; real rules everywhere (slots, bench, byes, waivers, trades,
+standings, tiebreakers, seeding); standalone (no Sleeper league, whole NFL pool);
+solo against AI teams; 12-team snake startup draft; Pro with a free preview
+(draft + weeks 1-3, paywall from week 4, upgrade resumes the same save);
+risk-free (nothing real is ever touched) and instant (trades and cuts resolve
+immediately, a week advances in well under a second).
+
+Where this differs from or settles the design doc:
+- 14 draft rounds, 16-man rosters (so two free spots for waivers), 8 starter slots
+  (no DEF/IDP), kickers drafted only in the last three rounds.
+- Playoffs: 6 of 12 (4 of 8) with a fixed bracket (no reseed), seeds 1-2 bye.
+  Week 17 is the final. No consolation bracket.
+- Waiver priority is the standings (worst first), not rolling; user claims and AI
+  claims share it. A claim may start the player (`start_slot`).
+- Trade acceptance is `value gain + lineup need + persona noise > threshold`
+  (convex value, the same idea as the season engine), then a fair-floor check
+  so an AI never takes a lopsided loss. Noise is keyed by (seed, week, team),
+  never by the offer, so preview == send and re-asking changes nothing.
+- AI lineups are optimal by projection (bye/injured out); passive managers
+  sometimes carry last week's lineup over. Difficulty only moves AI parameters
+  (trade tolerance, waiver activity, lineup lag); the user's dice are identical.
+- Projections update during the season: a player's rest-of-season mean blends
+  his frozen projection with his actual results (5 games of prior weight), for
+  the AI and for the `projection` field alike. The hidden season profile (true
+  talent) never leaves the engine.
+
+Internals worth knowing:
+- State is a pure fold of `sim_events` (`modules/sim/game_state.py`); resume =
+  latest checkpoint + later events, replay = all events; both are tested to be
+  byte-identical, including through JSON storage. A week's outcome is a function
+  of `(seed, week, state)`; every draw is keyed by `(seed, week, stream, player or
+  team)`, so a counterfactual (the "decisions that mattered" replays, one user
+  trade/waiver removed) shares every unaffected die.
+- Writes are one insert of the whole command's events; `(game_id, seq)` is the
+  primary key, so a racing writer gets HTTP 409 `conflict` and nothing is lost.
+- `GET result` computes the grade and the counterfactual replays once (about 1-2
+  season-sims each, at most 6) under the sim's compute pool and stores them in
+  `sim_games.result`.
+- Weekly scoring goes through `modules/sim/game_scoring.py`. `player_model`
+  (`draw_season_profile` / `draw_week_points`) is used when `modules/sim/player_model.py`
+  exists, else a labelled mean/sd fallback. The model id is stored per game
+  (`scoring_model`), so swapping models never changes an existing save.
+
+Ops: apply `docs/supabase_sim_game.sql` by hand (idempotent); `select
+public.sim_prune_old_games();` deletes games idle 90 days (manual). Flag off
+(`SIM_ENABLED` unset) keeps every `/v1/sim/*` path a plain 404.
+
+Event log reference (type: actor): `draft_pick` (user|team), `draft_queue`,
+`draft_complete`, `lineup_set` (user|team|engine), `waiver_claim`, `waiver_cancel`,
+`waiver_result`, `cut` (user) / `drop` (team), `trade` (user|engine),
+`trade_reject`, `trade_counter`, `inbox_offer` (engine), `inbox_response`,
+`advance` (user marker), `week_scored`, `injury`, `playoff_seeded`,
+`season_complete`, `week_advanced` (carries the recap; closes a week).
