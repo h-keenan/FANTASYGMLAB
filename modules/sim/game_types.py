@@ -268,6 +268,31 @@ class ImportedTeam:
 
 
 @dataclass(frozen=True)
+class LeagueTeamChoice:
+    """One team of a real league as the setup picker shows it. Identified by
+    ``roster_id`` only; the name is display text, never a key."""
+
+    roster_id: str
+    team_name: str
+    owner_name: str
+    wins: int
+    losses: int
+    ties: int
+    points_for: float
+    rank: int  # 1 = best record (points for breaks ties)
+    is_you: bool
+
+
+@dataclass(frozen=True)
+class LeagueTeams:
+    league_id: str
+    league_name: str
+    season: str
+    teams: tuple[LeagueTeamChoice, ...]
+    you_roster_id: str  # "" when the account's team could not be identified
+
+
+@dataclass(frozen=True)
 class LeagueImport:
     """A real league's settings and current rosters, frozen. Everything the
     "start from one of my leagues" mode needs and nothing else; the game never
@@ -426,6 +451,6 @@ __all__ = [
     "TE_PREMIUMS", "BENCH_RANGE", "DEFAULT_BENCH", "DEFAULT_TEAMS", "DEFAULT_SCORING", "IMPORT_TEAM_COUNTS",
     "START_FRESH", "START_LEAGUE", "START_KINDS", "SINGLETON_POSITIONS", "NON_TRADABLE", "FLEX_SHARE",
     "DRAFT_SPARE_SPOTS", "derive_layout", "scoring_label", "GAME_POSITIONS", "GAME_STRICT_SLOTS",
-    "ImportedTeam", "LeagueImport", "GameError", "GameSettings", "GamePlayer", "GameTeam", "GameSnapshot", "slot_positions",
+    "ImportedTeam", "LeagueImport", "LeagueTeamChoice", "LeagueTeams", "GameError", "GameSettings", "GamePlayer", "GameTeam", "GameSnapshot", "slot_positions",
     "playoff_rounds", "POSITIONS", "STRICT_SLOTS", "FLEX_SLOTS",
 ]

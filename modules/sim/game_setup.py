@@ -34,7 +34,21 @@ TEAM_NAMES = (
     "Bye Week Bandits", "Trade Deadline Titans", "Flex Appeal", "Touchdown Tonic", "End Zone Elite",
     "Playoff Pretenders", "The Auditors", "Sleeper Cell", "Bench Mob", "Late Round Legends",
     "Snap Count Sharks", "Target Share Tigers", "Handcuff Heroes", "Boom or Bust",
+    "Waiver Wire Wizards", "Goal Line Gamblers", "Garbage Time Gods", "Draft Day Dreamers",
+    "Mud Dogs", "Prime Time Pythons", "Checkdown Charlies", "Two Minute Warning",
 )
+# Names the player can pick for a fresh league. AI teams never reuse the one chosen.
+USER_TEAM_NAME_MAX = 40
+
+
+def pick_random_team_name(seed: int) -> str:
+    """A preset name for "Random", stable for a game's seed."""
+
+    return TEAM_NAMES[int(WorldRng(seed).stream(0, "gsetup", 8).integers(0, len(TEAM_NAMES)))]
+
+
+def _name_key(name: str) -> str:
+    return " ".join(str(name).split()).casefold()
 OWNER_NAMES = (
     "Dana Whitfield", "Marcus Bell", "Priya Nair", "Tomas Ortega", "Jules Archer", "Kenji Mori",
     "Rhea Collins", "Dmitri Volkov", "Hannah Brooks", "Luis Navarro", "Ines Duarte", "Colm Brady",
@@ -191,6 +205,8 @@ def build_snapshot(
     )
     teams: list[GameTeam] = []
     ai_seen = 0
+    user_key = _name_key(user_team_name)
+    ai_names = [TEAM_NAMES[int(i)] for i in name_pick if _name_key(TEAM_NAMES[int(i)]) != user_key]
     for slot in range(1, n + 1):
         tid = str(slot)
         if slot == settings.user_slot:
@@ -201,7 +217,7 @@ def build_snapshot(
             continue
         persona = personas[tid]
         teams.append(GameTeam(
-            tid=tid, name=TEAM_NAMES[int(name_pick[ai_seen % len(TEAM_NAMES)])],
+            tid=tid, name=ai_names[ai_seen % len(ai_names)],
             owner=OWNER_NAMES[int(owner_pick[ai_seen % len(OWNER_NAMES)])], is_user=False,
             persona_id=persona.pid, draft_slot=slot, coin=int(coins[slot - 1]),
             horizon=persona.params.horizon, pos_bias=dict(persona.params.pos_bias),

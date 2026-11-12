@@ -4708,6 +4708,8 @@ export const api = {
   // "GM game". Mutating calls answer 200 `reason: "premium_required"` once the
   // free preview is used up; callers classify with simGameGate().
   getSimGameOptions: () => authorizedRequest<SimGameTypes.SimGameOptionsResponse>("/v1/sim/games/options"),
+  getSimLeagueTeams: (leagueId: string) =>
+    authorizedRequest<SimGameTypes.SimLeagueTeamsResponse>(`/v1/sim/games/league-teams?league_id=${encodeURIComponent(leagueId)}`),
   listSimGames: () => authorizedRequest<SimGameTypes.SimGameEnvelope & { games?: SimGameTypes.SimGameLite[]; max_games?: number }>("/v1/sim/games"),
   createSimGame: (body: SimGameTypes.SimGameCreateBody) =>
     authorizedRequest<SimGameTypes.SimGameResponse>("/v1/sim/games", { method: "POST", jsonBody: body }),

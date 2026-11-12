@@ -36,6 +36,11 @@ import {
   simSettingsSummary,
   simSetupAdvancedChanged,
   simSetupBlock,
+  simLeagueTeamLabel,
+  simPreselectedRosterId,
+  simTeamNameChoices,
+  SIM_NAME_CUSTOM,
+  SIM_NAME_RANDOM,
   simSetupBody,
   simSetupDefaults,
   simSetupSummary,
@@ -378,7 +383,7 @@ describe("league settings and start modes (setup)", () => {
     const d = simSetupDefaults(options);
     expect(d).toMatchObject({ start: "fresh", teams: 12, scoring: "half", tePremium: 0, superflex: false, includeK: true, includeDef: false, bench: 8 });
     expect(simSetupDefaults(null)).toMatchObject({ teams: 12, scoring: "half", bench: 8, includeK: true });
-    expect(simSetupBody(d)).toEqual({ difficulty: "normal", auto_lineup: false, teams: 12, scoring: "half", te_premium: 0, superflex: false, include_k: true, include_def: false, bench: 8, mode: "redraft", user_slot: null });
+    expect(simSetupBody(d)).toEqual({ difficulty: "normal", auto_lineup: false, random_team_name: true, teams: 12, scoring: "half", te_premium: 0, superflex: false, include_k: true, include_def: false, bench: 8, mode: "redraft", user_slot: null });
   });
 
   it("derives lineup, roster size and draft rounds exactly like the engine (same table as the backend test)", () => {
@@ -399,7 +404,7 @@ describe("league settings and start modes (setup)", () => {
 
   it("sends advanced options and counts what changed", () => {
     const d = simSetupDefaults(options);
-    const s = { ...d, teams: 14, scoring: "std" as const, tePremium: 0.5, superflex: true, includeDef: true, bench: 6, slot: "3", name: " Mine " };
+    const s = { ...d, teams: 14, scoring: "std" as const, tePremium: 0.5, superflex: true, includeDef: true, bench: 6, slot: "3", nameChoice: SIM_NAME_CUSTOM, name: " Mine " };
     expect(simSetupBody(s)).toMatchObject({ teams: 14, scoring: "std", te_premium: 0.5, superflex: true, include_def: true, bench: 6, user_slot: 3, team_name: "Mine" });
     expect(simSetupAdvancedChanged(s, d)).toBe(6);
     expect(simSetupAdvancedChanged(d, d)).toBe(0);
@@ -409,11 +414,43 @@ describe("league settings and start modes (setup)", () => {
   it("starting from a league sends only what the league does not decide, and needs a league", () => {
     const d = { ...simSetupDefaults(options), start: "league" as const, teams: 8, name: "", leagueId: "" };
     expect(simSetupBlock(d)).toMatch(/Pick one of your leagues/);
-    const ready = { ...d, leagueId: "123", difficulty: "hard" as const, auto: true };
+    const noTeam = { ...d, leagueId: "123", difficulty: "hard" as const, auto: true };
+    expect(simSetupBlock(noTeam)).toMatch(/Pick which team is yours/);
+    const ready = { ...noTeam, rosterId: "7", name: "typed name is ignored" };
     expect(simSetupBlock(ready)).toBeNull();
-    expect(simSetupBody(ready)).toEqual({ difficulty: "hard", auto_lineup: true, start: "league", league_id: "123" });
+    expect(simSetupBody(ready)).toEqual({ difficulty: "hard", auto_lineup: true, start: "league", league_id: "123", roster_id: "7" });
     expect(simSetupSummary(ready)).toMatch(/nothing changes in your real league/);
     expect(simSetupBlock(simSetupDefaults(options))).toBeNull();
+  });
+
+  it("fresh league names: random, a preset, or a custom name that keeps spaces, apostrophes and emoji", () => {
+    const d = simSetupDefaults(options);
+    expect(simSetupBody(d)).toMatchObject({ random_team_name: true });
+    expect(simSetupBody(d)).not.toHaveProperty("team_name");
+    expect(simSetupBody({ ...d, nameChoice: "Gridiron Ghosts" })).toMatchObject({ team_name: "Gridiron Ghosts" });
+    for (const name of ["Team O'Brien", "The  Big   Show", "Ballers \u{1F3C8}\u{1F525}", "\u00C9quipe Fant\u00F4me"]) {
+      const body = simSetupBody({ ...d, nameChoice: SIM_NAME_CUSTOM, name: `  ${name}  ` });
+      expect(body.team_name).toBe(name.split(/\s+/).join(" "));
+    }
+    const long = simSetupBody({ ...d, nameChoice: SIM_NAME_CUSTOM, name: "\u{1F3C8}".repeat(60) });
+    expect(Array.from(long.team_name ?? "")).toHaveLength(40);
+    expect(simSetupBlock({ ...d, nameChoice: SIM_NAME_CUSTOM, name: "   " })).toMatch(/Type a team name/);
+    expect(simSetupBlock({ ...d, nameChoice: SIM_NAME_CUSTOM, name: "Ok" })).toBeNull();
+  });
+
+  it("preselects the account's own team and labels league teams for the picker", () => {
+    const teams = [
+      { roster_id: "1", team_name: "Alpha Squad", owner_name: "bob", wins: 5, losses: 2, ties: 0, points_for: 700, rank: 1, is_you: false },
+      { roster_id: "2", team_name: "The Dude's Team \u{1F3C8}", owner_name: "dude", wins: 3, losses: 3, ties: 1, points_for: 600, rank: 4, is_you: true },
+    ];
+    expect(simPreselectedRosterId({ you_roster_id: "2", teams })).toBe("2");
+    expect(simPreselectedRosterId({ you_roster_id: null, teams })).toBe("2");
+    expect(simPreselectedRosterId({ you_roster_id: "9", teams })).toBe("");
+    expect(simPreselectedRosterId({ you_roster_id: null, teams: teams.map((t) => ({ ...t, is_you: false })) })).toBe("");
+    expect(simPreselectedRosterId(null)).toBe("");
+    expect(simLeagueTeamLabel(teams[1])).toBe("The Dude's Team \u{1F3C8} \u00B7 dude \u00B7 3-3-1 \u00B7 #4");
+    expect(simLeagueTeamLabel({ ...teams[0], wins: 0, losses: 0, rank: 1 })).toBe("Alpha Squad \u00B7 bob \u00B7 no games yet");
+    expect(simTeamNameChoices(null).map((c) => c.value)).toEqual([SIM_NAME_RANDOM, SIM_NAME_CUSTOM]);
   });
 
   it("only offers Sleeper leagues (imported platforms carry a prefix)", () => {
@@ -450,7 +487,7 @@ describe("league settings and start modes (setup)", () => {
     expect(simSettingsSummary({ teams: 14, scoring: "half", te_premium: 0.5, superflex: true, include_def: true, include_k: false, start: "league" })).toBe("14 teams · Half PPR · TE premium +0.5 · Superflex · DEF · No kickers · From your league");
     expect(simSettingsSummary({ teams: 12, scoring: "ppr" })).toBe("12 teams · PPR");
     expect(simSettingsSummary(undefined)).toBe("");
-    expect(simGameReasonMessage("team_not_found")).toMatch(/Sleeper username/);
+    expect(simGameReasonMessage("team_not_found")).toMatch(/Pick it from the list/);
     expect(simGameReasonMessage("def_unavailable")).toMatch(/Advanced options/);
   });
 });
