@@ -3071,6 +3071,16 @@ body:has(.fd-landing-dark) .brand-mark-icon {
   border-color: var(--color-accent);
 }
 
+/* Native <select> popups paint their own background (white on Windows/Chrome)
+   but inherit the select's light text in dark mode, leaving options unreadable.
+   Give every option the theme surface and text so any select, current or
+   future, is legible in both themes. */
+select option,
+select optgroup {
+  background-color: var(--color-surface-primary);
+  color: var(--color-text-primary);
+}
+
 /* Phone audit 2026-10: iOS Safari zooms the whole page when a focused text
    field is under 16px and never zooms back out. Keep every text-entry
    control at 16px on phone-width screens (desktop keeps the denser size). */
