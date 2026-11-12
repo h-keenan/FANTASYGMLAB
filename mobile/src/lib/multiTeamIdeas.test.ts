@@ -91,10 +91,14 @@ test('card lines list the viewer first with a signed value and the need reason',
 test('card lines name a draft pick like any other piece and keep its id in the prefill', () => {
   const pick = { type: 'pick' as const, id: '2027:1:3', label: '2027 1st (Team C)', position: '', team: '', from_roster_id: '3', from_team_name: 'C' };
   const withPick = {
-    ...IDEA,
-    teams: IDEA.teams.map((t) => (t.roster_id === '1' ? { ...t, receives: [pick], why: [{ factor: 'need', text: 'Team A adds draft capital while rebuilding.' }] } : t)),
+    ...(IDEA as unknown as Record<string, unknown>),
+    teams: [
+      team('1', 'Team A', { receives: [pick], why: [{ factor: 'need', text: 'Team A adds draft capital while rebuilding.' }] }),
+      team('2', 'Team B'),
+      team('3', 'Team C'),
+    ],
     veto: { band: 'fair', label: 'Fair' },
-  };
+  } as never;
   const lines = ideaTeamLines(withPick);
   assert.equal(lines[0].gets, '2027 1st (Team C)');
   assert.equal(lines[0].why, 'Team A adds draft capital while rebuilding.');
