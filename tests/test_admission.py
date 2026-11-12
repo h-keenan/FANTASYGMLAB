@@ -165,6 +165,26 @@ def test_lane_classification():
         assert admission.lane_for(p) is None, p
 
 
+def test_sim_forecast_is_in_the_heavy_lane_and_sheds_with_retry_after(monkeypatch):
+    assert admission.lane_for("/v1/sim/forecast") == "heavy"
+    assert admission.lane_for("/v1/sim/games") is None
+    monkeypatch.setenv("ADMISSION_MAX_INFLIGHT", "1")
+    monkeypatch.setenv("ADMISSION_MAX_QUEUE", "0")
+    app = FastAPI()
+    app.add_middleware(AdmissionControlMiddleware, enabled_in_tests=True)
+
+    @app.get("/v1/sim/forecast")
+    async def forecast():
+        await asyncio.sleep(0.2)
+        return {"ok": True}
+
+    responses = _run(app, 3, path="/v1/sim/forecast")
+    codes = sorted(r.status_code for r in responses)
+    assert codes == [200, 503, 503]
+    shed = next(r for r in responses if r.status_code == 503)
+    assert shed.json()["code"] == "server_busy" and int(shed.headers["retry-after"]) >= 2
+
+
 def test_light_routes_are_not_shed_or_queued_behind_saturated_heavy_pool(monkeypatch):
     monkeypatch.setenv("ADMISSION_MAX_INFLIGHT", "1")
     monkeypatch.setenv("ADMISSION_MAX_QUEUE", "0")

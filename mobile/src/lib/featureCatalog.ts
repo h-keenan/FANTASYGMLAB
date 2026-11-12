@@ -64,7 +64,7 @@ export const FEATURE_ITEMS: readonly FeatureItem[] = [
 
   { id: 'commissioner', group: 'league', name: 'Commissioner', line: 'League integrity, plus a trade veto calculator.', pro: true, route: 'Commissioner', leagueScoped: true, icon: 'shield-checkmark-outline', color: accentFor('commissioner') },
   { id: 'playoff-odds', group: 'league', name: 'Playoff Odds', line: "Every team's chance at the playoffs.", pro: true, route: 'Teams', tab: 'playoff', leagueScoped: true, icon: 'podium-outline', color: accentFor('playoff-odds') },
-  { id: 'fantasy-sim', group: 'league', name: 'Season Outlook', line: 'Simulate the rest of your season from your GM Plan.', pro: true, route: 'FantasySim', leagueScoped: true, icon: 'flask-outline', color: accentFor('fantasy-sim') },
+  { id: 'fantasy-sim', group: 'league', name: 'Season Outlook', line: 'Your playoff odds, projected finish and title odds, from your GM Plan.', pro: true, route: 'FantasySim', leagueScoped: true, icon: 'flask-outline', color: accentFor('fantasy-sim') },
   { id: 'games', group: 'league', name: 'Games', line: "Season simulator and weekly pick'em.", route: 'Games', leagueScoped: true, icon: 'dice-outline', color: accentFor('games') },
   { id: 'league-recaps', group: 'league', name: 'League Recaps', line: "Your league's weekly recap, stories, and your lineup roundup.", route: 'Recap', leagueScoped: true, icon: 'newspaper-outline', color: accentFor('league-recaps') },
 

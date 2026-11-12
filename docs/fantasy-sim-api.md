@@ -1,6 +1,6 @@
 # Fantasy Sim API (backend MVP)
 
-Status: backend only. Web/mobile UI is a follow-up. Off by default.
+Status: shipped behind `SIM_ENABLED`. Off by default.
 
 ## What it is
 Pick one of your real Sleeper leagues, set a strategy, and the sim plays out
@@ -8,6 +8,38 @@ the season against AI managers that trade and work the waiver wire, then grades
 you and explains the 3-4 decisions that mattered. Single season. No live weekly
 interaction: strategy in, result out. Shareable seeds are NOT exposed (the seed
 is in the data model and engine so it can be added later).
+
+## Season Outlook forecast (what the apps use)
+Season Outlook (GM Plan tab, web `/fantasy-sim/[leagueId]`, app `FantasySim`) is a
+one-tap forecast of the user's real league: no strategy, no setup, no storage.
+Hands-on play is the GM game (`/v1/sim/games*`); the world endpoints below are
+the older auto-GM API and no client calls them any more.
+
+### `GET /v1/sim/forecast?league_id=<id>[&roster_id=<id>]`
+Pro-only (Free gets the usual `premium_required` envelope and no sim work runs).
+Snapshots the league, replays the rest of the season 48 to 80 times (fewer when many games remain) with the user on
+their current roster and an auto-set lineup (no user trades or waiver moves), and
+aggregates. Deterministic (fixed seeds); cached in-process for 10 minutes per
+user and league. Not-ready reasons: `league_unavailable`, `team_not_found`,
+`season_complete`, `players_unavailable`. 503 `server_busy` when the compute pool is full.
+```jsonc
+{"ok": true, "reason": "", "is_premium": true, "upsell": null,
+ "mode": "remaining", "as_of": "2026-11-12T12:00:00+00:00", "notes": ["..."],
+ "forecast": {
+   "samples": 80, "start_week": 10, "regular_season_end": 14, "weeks_remaining": 5,
+   "team": {"team_id": "1", "name": "..."}, "current": {"wins": 5, "losses": 4, "ties": 0},
+   "odds": {"playoffs": 0.62, "finals": 0.2, "title": 0.09, "playoff_spots": 6},
+   "record": {"wins": 8.6, "losses": 5.4, "wins_low": 7, "wins_high": 10, "projected": "9-5", "games": 14},
+   "finish": {"median": 4, "low": 2, "high": 7, "teams": 12, "distribution": [{"finish": 1, "probability": 0.04}, ...]},
+   "swing_factors": [  // up to 3, biggest first
+     {"kind": "game|waiver|trade", "week": 11, "title": "...", "detail": "...",
+      "playoff_delta": 0.35, "title_delta": 0.05, "players": []}
+   ]}}
+```
+`low`/`high` are the 10th/90th percentiles. Swing factors come only from the sim
+engine: a key game is the playoff odds conditional on winning vs losing it; a
+waiver/trade factor replays the same seeds with the user's auto-GM switched on
+and is shown only when the paired gain clears a noise floor.
 
 ## Isolation (the hard rule)
 - Code lives in `modules/sim/`. Real code never depends on it; the only real

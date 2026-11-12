@@ -722,10 +722,10 @@ export function GmPlanContent({
               >
                 <span className="flex flex-col gap-0.5">
                   <span className="text-sm font-bold" style={{ color: "var(--color-text-primary)" }}>
-                    Simulate the rest of your season
+                    See your season forecast
                   </span>
                   <span className="text-xs" style={{ color: "var(--color-text-secondary)" }}>
-                    Set a strategy and see your projected grade and the decisions that mattered. Pro.
+                    One tap: playoff odds, projected record and finish, title odds and what swings them. Pro.
                   </span>
                 </span>
                 <span className="text-xs font-bold" style={{ color: "var(--color-accent)" }}>

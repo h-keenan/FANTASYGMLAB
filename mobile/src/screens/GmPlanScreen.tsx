@@ -476,14 +476,14 @@ export default function GmPlanScreen({ route, navigation }: Props) {
             <AnimatedCard style={styles.listCard}>
               <TouchableOpacity
                 accessibilityRole="button"
-                accessibilityLabel="Simulate the rest of your season"
+                accessibilityLabel="See your season forecast"
                 onPress={() => navigation.navigate('FantasySim', { leagueId, leagueName })}
                 style={styles.outlookRow}
               >
                 <View style={styles.outlookText}>
-                  <AppText style={styles.outlookTitle}>Simulate the rest of your season</AppText>
+                  <AppText style={styles.outlookTitle}>See your season forecast</AppText>
                   <AppText style={styles.outlookBody}>
-                    Set a strategy and see your projected grade and the decisions that mattered. Pro.
+                    One tap: playoff odds, projected record and finish, title odds and what swings them. Pro.
                   </AppText>
                 </View>
                 <AppText style={styles.link}>Open</AppText>

@@ -59,6 +59,9 @@ _HEAVY = re.compile(
     r"recap|history|storylines|managers/.*"
     r")/?$"
 )
+# Season Outlook forecast: ~140 engine replays of the rest of the season. Matched on
+# the path string only; admission never imports the sim package.
+_SIM_FORECAST = re.compile(r"^/v1/sim/forecast/?$")
 # Cheap once the shared (league, lens) frame / response caches are warm.
 _LIGHT = re.compile(
     r"^/v1/leagues/[^/]+/(?:"
@@ -70,6 +73,8 @@ _LIGHT = re.compile(
 def lane_for(path: str) -> str | None:
     """``"heavy"`` / ``"light"`` for gated paths, ``None`` for ungated ones."""
 
+    if _SIM_FORECAST.match(path):
+        return "heavy"
     if not path.startswith("/v1/leagues/") or path.endswith(".png"):
         return None
     if _HEAVY.match(path):
