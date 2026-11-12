@@ -134,5 +134,11 @@ def build_synthetic_pool(seed: int = 7) -> tuple[list[dict], dict[str, int]]:
                 "injury_weeks": 3 if rng.random() < 0.01 else 0,
                 "extra": {"prior_ppg": round(mean * float(rng.uniform(0.85, 1.15)), 2)},
             })
+    for i, team in enumerate(NFL32):  # one team defense per NFL team (drawn after the others)
+        mean = float(np.clip(rng.normal(7.5, 1.6), 3.0, 12.0))
+        rows.append({
+            "pid": f"DEF-{team}", "name": f"{team} D/ST", "pos": "DEF", "nfl_team": team, "age": 26.0,
+            "market": round(mean * 2.5, 2), "mean": round(mean, 2), "sd": 4.5, "injury_weeks": 0, "extra": {},
+        })
     byes = {team: 5 + (i // 3) % 10 for i, team in enumerate(NFL32)}
     return rows, byes

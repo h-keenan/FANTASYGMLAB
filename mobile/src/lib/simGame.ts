@@ -18,8 +18,12 @@ export type SimGameStatus = "drafting" | "in_season" | "playoffs" | "complete";
 export type SimGamePhase = "draft" | "regular_season" | "playoffs" | "complete";
 export type SimScoring = "ppr" | "half" | "std";
 export type SimDifficulty = "easy" | "normal" | "hard";
-export type SimPos = "QB" | "RB" | "WR" | "TE" | "K";
-export type SimSlot = "QB" | "RB" | "WR" | "TE" | "FLEX" | "K";
+export type SimPos = "QB" | "RB" | "WR" | "TE" | "K" | "DEF";
+export type SimSlot = "QB" | "RB" | "WR" | "TE" | "FLEX" | "REC_FLEX" | "SUPER_FLEX" | "K" | "DEF";
+/** League mode. Only redraft is playable today; dynasty is declared by the API (available: false). */
+export type SimMode = "redraft" | "dynasty";
+/** How a new game starts: a fresh draft, or a real league's rosters (read-only import). */
+export type SimStartKind = "fresh" | "league";
 
 export interface SimGameUpsell {
   title: string;
@@ -104,6 +108,14 @@ export interface SimGameSettings {
   slots: SimSlot[];
   user_slot: number;
   auto_lineup: boolean;
+  /** League shape (older saves omit these; use simSettingsView). */
+  mode?: SimMode;
+  te_premium?: number;
+  superflex?: boolean;
+  include_k?: boolean;
+  include_def?: boolean;
+  bench?: number;
+  start?: SimStartKind;
 }
 
 export interface SimGameThisWeek {
@@ -169,12 +181,21 @@ export interface SimGameOptionsResponse extends SimGameEnvelope {
   engine_version?: string;
   max_games?: number;
   options?: {
+    mode?: { values: SimMode[]; default: SimMode; modes?: { id: SimMode; label: string; available: boolean }[] };
     teams: { values: number[]; default: number };
     scoring: { values: SimScoring[]; default: SimScoring };
+    te_premium?: { values: number[]; default: number };
+    superflex?: { default: boolean };
+    include_k?: { default: boolean };
+    include_def?: { default: boolean };
+    bench?: { min: number; max: number; default: number };
     difficulty: { values: SimDifficulty[]; default: SimDifficulty };
     user_slot: { min: number; max: number; default: number | null };
     auto_lineup: { default: boolean };
   };
+  /** Lineup rule the setup form mirrors to show roster size and draft rounds. */
+  layout?: { base_slots: SimSlot[]; draft_spare_spots: number };
+  start_modes?: { id: string; available: boolean; reason?: string }[];
   season?: {
     regular_weeks: number;
     playoff_weeks: number;
@@ -190,10 +211,20 @@ export interface SimGameOptionsResponse extends SimGameEnvelope {
 export interface SimGameCreateBody {
   teams?: number;
   scoring?: SimScoring;
+  te_premium?: number;
+  superflex?: boolean;
+  include_k?: boolean;
+  include_def?: boolean;
+  bench?: number;
+  mode?: SimMode;
   difficulty?: SimDifficulty;
   user_slot?: number | null;
   auto_lineup?: boolean;
   team_name?: string;
+  /** "league": start from a real league's rosters (read-only). */
+  start?: SimStartKind;
+  league_id?: string;
+  roster_id?: string;
 }
 
 // ---------------------------------------------------------------------------
@@ -538,6 +569,14 @@ const REASON_COPY: Record<string, string> = {
   not_complete: "The season is not over yet.",
   conflict: "The game changed somewhere else. We reloaded it. Try again.",
   sim_busy: "The simulator is busy right now. Try again in a few seconds.",
+  team_not_found: "We could not tell which team is yours in that league. Check your Sleeper username in Settings.",
+  league_unavailable: "That league could not be read right now. Try again in a moment.",
+  league_platform_unsupported: "Only Sleeper leagues can start a game for now.",
+  league_size_unsupported: "That league has a size the game cannot play (it needs an even number of teams, 4 to 16).",
+  league_lineup_unsupported: "That league's lineup has nothing the game can play (it only models QB, RB, WR, TE, flex, K and DEF).",
+  league_scoring_unavailable: "That league's scoring could not be read.",
+  def_unavailable: "Team defenses are not available right now. Turn off DEF in Advanced options.",
+  k_unavailable: "Kickers are not available right now. Turn off K in Advanced options.",
 };
 
 /** User-facing sentence for a backend `reason` (empty string for success). */
@@ -689,7 +728,18 @@ export function simAdvanceLabel(game: Pick<SimGame, "phase" | "week" | "settings
 // Draft helpers
 
 export const SIM_QUEUE_MAX = 30;
-export const SIM_POSITIONS: SimPos[] = ["QB", "RB", "WR", "TE", "K"];
+export const SIM_POSITIONS: SimPos[] = ["QB", "RB", "WR", "TE", "K", "DEF"];
+
+/** Positions a league's player pool contains: no kickers without a K slot, no defenses without a DEF slot. */
+export function simPositionsFor(slots: SimSlot[] | undefined): SimPos[] {
+  const list = slots ?? [];
+  return SIM_POSITIONS.filter((pos) => (pos !== "K" && pos !== "DEF") || list.includes(pos));
+}
+
+/** Positions that are one-per-roster and never traded (kickers, defenses). */
+export function simTradable(pos: SimPos): boolean {
+  return pos !== "K" && pos !== "DEF";
+}
 
 export interface SimQueueState {
   ids: string[];
@@ -833,10 +883,10 @@ export function simDraftClockLine(draft: Pick<SimDraftState, "status" | "on_the_
 export function simRosterNeeds(roster: Pick<SimGamePlayer, "pos">[], slots: SimSlot[]): { pos: SimPos; have: number; starters: number }[] {
   const starters: Record<string, number> = {};
   for (const slot of slots) {
-    if (slot === "FLEX") continue;
+    if (SIM_FLEX_ELIGIBLE[slot]) continue;
     starters[slot] = (starters[slot] ?? 0) + 1;
   }
-  return SIM_POSITIONS.map((pos) => ({
+  return simPositionsFor(slots).map((pos) => ({
     pos,
     have: roster.filter((p) => p.pos === pos).length,
     starters: starters[pos] ?? 0,
@@ -860,11 +910,17 @@ export function simValueOverAdpTone(value: number | null | undefined): SimGameTo
 
 export type SimGameTone = "success" | "accent" | "warning" | "danger" | "muted";
 
-const FLEX_POSITIONS: SimPos[] = ["RB", "WR", "TE"];
+/** Positions each flex slot accepts (mirrors modules/sim/types.py FLEX_SLOTS). */
+const SIM_FLEX_ELIGIBLE: Partial<Record<SimSlot, SimPos[]>> = {
+  REC_FLEX: ["WR", "TE"],
+  FLEX: ["RB", "WR", "TE"],
+  SUPER_FLEX: ["QB", "RB", "WR", "TE"],
+};
 
 /** Can a player of `pos` start in `slot`? Mirrors the engine's slot rules. */
 export function simSlotAccepts(slot: SimSlot, pos: SimPos): boolean {
-  if (slot === "FLEX") return FLEX_POSITIONS.includes(pos);
+  const flex = SIM_FLEX_ELIGIBLE[slot];
+  if (flex) return flex.includes(pos);
   return slot === pos;
 }
 
@@ -1192,6 +1248,136 @@ export function simTeamNameMap(teams: { team_id: string; name: string }[] | unde
 // Setup copy
 
 export const SIM_SCORING_LABELS: Record<SimScoring, string> = { ppr: "PPR", half: "Half PPR", std: "Standard" };
+
+/** The quick-start defaults, used until the options response says otherwise (12 teams, half PPR, standard lineup). */
+export const SIM_SETUP_FALLBACK = {
+  teams: 12,
+  scoring: "half" as SimScoring,
+  te_premium: 0,
+  superflex: false,
+  include_k: true,
+  include_def: false,
+  bench: 8,
+  draftSpareSpots: 2,
+};
+
+export const SIM_TE_PREMIUM_LABELS: Record<number, string> = { 0: "Off", 0.5: "+0.5 per catch", 1: "+1 per catch" };
+
+export interface SimSetupState {
+  start: SimStartKind;
+  /** Chosen real league (start === "league"). */
+  leagueId: string;
+  teams: number;
+  scoring: SimScoring;
+  tePremium: number;
+  superflex: boolean;
+  includeK: boolean;
+  includeDef: boolean;
+  bench: number;
+  difficulty: SimDifficulty;
+  slot: string;
+  auto: boolean;
+  name: string;
+}
+
+/** Every field at its quick-start default (from the API's options when loaded). */
+export function simSetupDefaults(options: SimGameOptionsResponse | null | undefined): SimSetupState {
+  const o = options?.options;
+  return {
+    start: "fresh",
+    leagueId: "",
+    teams: o?.teams.default ?? SIM_SETUP_FALLBACK.teams,
+    scoring: o?.scoring.default ?? SIM_SETUP_FALLBACK.scoring,
+    tePremium: o?.te_premium?.default ?? SIM_SETUP_FALLBACK.te_premium,
+    superflex: o?.superflex?.default ?? SIM_SETUP_FALLBACK.superflex,
+    includeK: o?.include_k?.default ?? SIM_SETUP_FALLBACK.include_k,
+    includeDef: o?.include_def?.default ?? SIM_SETUP_FALLBACK.include_def,
+    bench: o?.bench?.default ?? SIM_SETUP_FALLBACK.bench,
+    difficulty: o?.difficulty.default ?? "normal",
+    slot: "",
+    auto: o?.auto_lineup.default ?? false,
+    name: "",
+  };
+}
+
+/** True when any "Advanced options" field differs from its default (so a collapsed section can say so). */
+export function simSetupAdvancedChanged(state: SimSetupState, defaults: SimSetupState): number {
+  const keys: (keyof SimSetupState)[] = ["scoring", "tePremium", "superflex", "includeK", "includeDef", "bench", "teams"];
+  return keys.filter((key) => state[key] !== defaults[key]).length;
+}
+
+/**
+ * Starting slots, roster size and draft rounds from the lineup toggles. Mirrors
+ * modules/sim/game_types.py derive_layout (tests pin both to the same table):
+ * QB, 2 RB, 2 WR, TE, FLEX, then SUPER_FLEX / K / DEF; roster = starters +
+ * bench; the draft leaves `spare` spots open for the wire.
+ */
+export function simDeriveLayout(
+  s: Pick<SimSetupState, "superflex" | "includeK" | "includeDef" | "bench">,
+  baseSlots: SimSlot[] = ["QB", "RB", "RB", "WR", "WR", "TE", "FLEX"],
+  spare: number = SIM_SETUP_FALLBACK.draftSpareSpots,
+): { slots: SimSlot[]; rosterLimit: number; rounds: number } {
+  const slots: SimSlot[] = [...baseSlots];
+  if (s.superflex) slots.push("SUPER_FLEX");
+  if (s.includeK) slots.push("K");
+  if (s.includeDef) slots.push("DEF");
+  const rosterLimit = slots.length + s.bench;
+  return { slots, rosterLimit, rounds: rosterLimit - spare };
+}
+
+/** The POST /v1/sim/games body for the form. "league" sends only what the league does not decide. */
+export function simSetupBody(state: SimSetupState): SimGameCreateBody {
+  const common = {
+    difficulty: state.difficulty,
+    auto_lineup: state.auto,
+    ...(state.name.trim() ? { team_name: state.name.trim() } : {}),
+  };
+  if (state.start === "league") return { ...common, start: "league", league_id: state.leagueId };
+  return {
+    ...common,
+    teams: state.teams,
+    scoring: state.scoring,
+    te_premium: state.tePremium,
+    superflex: state.superflex,
+    include_k: state.includeK,
+    include_def: state.includeDef,
+    bench: state.bench,
+    mode: "redraft",
+    user_slot: state.slot ? Number(state.slot) : null,
+  };
+}
+
+/** Why the form cannot be submitted, or null. */
+export function simSetupBlock(state: SimSetupState): string | null {
+  if (state.start === "league" && !state.leagueId) return "Pick one of your leagues to start from.";
+  return null;
+}
+
+/** Saved leagues the game can start from: Sleeper leagues only (imported platforms carry a prefix). */
+export function simImportableLeagues<T extends { league_id: string }>(rows: T[] | null | undefined): T[] {
+  return (rows ?? []).filter((row) => typeof row.league_id === "string" && row.league_id !== "" && !row.league_id.includes(":"));
+}
+
+/** Plain words for the saved league settings ("14 teams · Half PPR · TE premium · Superflex"). */
+export function simSettingsSummary(settings: Partial<SimGameSettings> | undefined): string {
+  if (!settings) return "";
+  const parts: string[] = [];
+  if (settings.teams) parts.push(`${settings.teams} teams`);
+  if (settings.scoring) parts.push(SIM_SCORING_LABELS[settings.scoring] ?? settings.scoring);
+  if (settings.te_premium) parts.push(`TE premium +${settings.te_premium}`);
+  if (settings.superflex) parts.push("Superflex");
+  if (settings.include_def) parts.push("DEF");
+  if (settings.include_k === false) parts.push("No kickers");
+  if (settings.start === "league") parts.push("From your league");
+  return parts.join(" · ");
+}
+
+/** What the setup tells the player about the league they are about to start. */
+export function simSetupSummary(state: SimSetupState, layoutHint?: SimGameOptionsResponse["layout"]): string {
+  if (state.start === "league") return "Your league's size, lineup, scoring and current rosters. A new 14-week season; nothing changes in your real league.";
+  const layout = simDeriveLayout(state, layoutHint?.base_slots, layoutHint?.draft_spare_spots);
+  return `${state.teams} teams, ${layout.rounds}-round snake draft. Starters: ${layout.slots.join(", ")}. Roster ${layout.rosterLimit}.`;
+}
 
 /** Difficulty only changes the AI managers; your own dice are identical at every level. */
 export const SIM_DIFFICULTY_COPY: Record<SimDifficulty, { label: string; blurb: string }> = {

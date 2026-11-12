@@ -55,8 +55,11 @@ export function SimPlayerBrowser({
   refreshKey = 0,
   onItems,
   emptyTitle = 'No players match',
+  positions = SIM_POSITIONS,
 }: {
   gameId: string;
+  /** Positions this league plays (no K / DEF chips when it has no such slot). */
+  positions?: SimPos[];
   /** Lock the status filter (the draft board is always free agents). */
   fixedStatus?: SimPlayerStatusFilter;
   initial?: Partial<SimPlayerFilter>;
@@ -117,7 +120,7 @@ export function SimPlayerBrowser({
       />
       <SegmentedTabBar<string>
         scrollable
-        options={[{ key: '', label: 'All' }, ...SIM_POSITIONS.map((pos) => ({ key: pos as string, label: pos }))]}
+        options={[{ key: '', label: 'All' }, ...positions.map((pos) => ({ key: pos as string, label: pos }))]}
         active={filter.pos}
         onChange={(key) => dispatch({ type: 'pos', value: key as SimPos | '' })}
       />

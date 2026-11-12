@@ -313,25 +313,61 @@ or other user's game / malformed id; 422 bad input `{"ok": false, "error"}`; 503
 ## Endpoints
 
 ### `GET /v1/sim/games/options`
-Works for Free callers (no `premium_required`). Setup form + limits.
+Works for Free callers (no `premium_required`). Setup form + limits. **Quick
+start** is every `default` below (12 teams, half-PPR, standard lineup, redraft);
+the client hides the rest behind a collapsed "Advanced options".
 ```json
 {"ok": true, "reason": "", "is_premium": false, "upsell": null, "preview": {"weeks_left": 3, "paywall_week": 4, "paywalled": false},
- "engine_version": "game-1.0.0", "max_games": 1,
- "options": {"teams": {"values": [8, 10, 12], "default": 12},
-             "scoring": {"values": ["ppr", "half", "std"], "default": "ppr"},
+ "engine_version": "game-1.1.0", "max_games": 1,
+ "options": {"mode": {"values": ["redraft"], "default": "redraft", "modes": [{"id": "redraft", "label": "Redraft", "available": true}, {"id": "dynasty", "label": "Dynasty", "available": false}]},
+             "teams": {"values": [8, 10, 12, 14], "default": 12},
+             "scoring": {"values": ["ppr", "half", "std"], "default": "half"},
+             "te_premium": {"values": [0.0, 0.5, 1.0], "default": 0.0},
+             "superflex": {"default": false}, "include_k": {"default": true}, "include_def": {"default": false},
+             "bench": {"min": 4, "max": 10, "default": 8},
              "difficulty": {"values": ["easy", "normal", "hard"], "default": "normal"},
-             "user_slot": {"min": 1, "max": 12, "default": null},
+             "user_slot": {"min": 1, "max": 14, "default": null},
              "auto_lineup": {"default": false}},
+ "layout": {"base_slots": ["QB","RB","RB","WR","WR","TE","FLEX"], "draft_spare_spots": 2},
+ "start_modes": [{"id": "fresh", "available": true}, {"id": "league", "available": true},
+                 {"id": "season_start", "available": false, "reason": "no_roster_history"}],
  "season": {"regular_weeks": 14, "playoff_weeks": 3, "playoff_teams": 6, "trade_deadline_week": 10,
             "roster_limit": 16, "draft_rounds": 14, "slots": ["QB","RB","RB","WR","WR","TE","FLEX","K"]},
  "personas": [{"id": "contender", "label": "...", "blurb": "..."}]}
 ```
+Lineup, roster size and draft rounds are **derived** from the toggles (the
+client mirrors `derive_layout`): starters = QB, 2 RB, 2 WR, TE, FLEX, plus
+SUPER_FLEX / K / DEF when on; roster = starters + `bench`; draft rounds =
+roster - 2 (the spots left for the wire). League sizes are even so every team
+plays every week. Settings are stored inside the existing `sim_games.settings`
+and `snapshot` JSON, so there is no SQL migration for them.
 
 ### `POST /v1/sim/games`
-Body (all optional): `{"teams": 12, "scoring": "ppr", "difficulty": "normal", "user_slot": null, "auto_lineup": false, "team_name": "My Team"}`.
-Builds the frozen pool, the AI teams (names + personas), the schedule, byes, and
-runs AI picks until the user's first turn. `user_slot` null = random (seeded).
-Returns `{"game": game, "draft": draft}` (see below). 422 on bad options.
+Body (all optional): `{"teams": 12, "scoring": "half", "te_premium": 0, "superflex": false, "include_k": true,
+"include_def": false, "bench": 8, "mode": "redraft", "difficulty": "normal", "user_slot": null, "auto_lineup": false,
+"team_name": "My Team"}`.
+Builds the frozen pool (projected in this league's scoring, TE premium included), the AI
+teams (names + personas), the schedule, byes, and runs AI picks until the user's
+first turn. `user_slot` null = random (seeded). Returns `{"game": game, "draft": draft}`
+(see below). 422 on bad options (odd league size, unknown mode, `dynasty` while unavailable, ...).
+
+**Start from one of my leagues**: `{"start": "league", "league_id": "...", "roster_id": "" , "difficulty": "normal",
+"auto_lineup": false, "team_name": ""}`. Reads (read-only, through `RealSimInputs.league_import`) the league's size,
+lineup, bench, scoring (full `scoring_settings`) and playoff field plus every team's current roster, freezes them into a
+new 14-week season starting in week 1 (no draft): returns `{"game": game}` with `status: "in_season"`. Everything
+else in the body (teams, scoring, ...) is ignored: the league decides. `roster_id` is only needed when the Sleeper
+username cannot identify the team. Extra `reason` codes: `team_not_found`, `league_unavailable`,
+`league_platform_unsupported` (ESPN/Fleaflicker/MFL ids), `league_size_unsupported` (odd or outside 4-16 teams), `league_lineup_unsupported`, `league_scoring_unavailable`,
+`def_unavailable` / `k_unavailable` (the league plays one but the pool has none). Rostered players the pool cannot
+project (IDP, retired, unmatched) are dropped from their team and counted in the game's notes. IR counts as
+roster, taxi does not, and `roster_limit` is raised to the largest roster so nothing has to be cut.
+
+**"Start of this season" rosters** (`start_modes[].id == "season_start"`) are reported unavailable
+(`no_roster_history`): we store no per-week roster snapshots, so there is nothing to start from.
+
+Team defenses (`DEF-<NFL team>`) are estimated from points allowed in the cached nflverse schedule
+(`def_estimated_from_points_allowed` in the notes); there is no real DEF projection source. K and DEF are
+singletons: drafted in the last 3 rounds, never traded.
 
 ### `GET /v1/sim/games` / `GET /v1/sim/games/{id}`
 `{"games": [game_lite], "max_games": n}` / `{"game": game}`. `game_lite` is the

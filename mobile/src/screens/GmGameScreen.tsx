@@ -40,7 +40,14 @@ import {
   simGamePaywalled,
   simGameUnavailableCopy,
   simNewGameBlock,
+  simSettingsSummary,
+  simSetupAdvancedChanged,
+  simSetupBlock,
+  simSetupBody,
+  simSetupDefaults,
+  simSetupSummary,
   simWeekHeading,
+  SIM_TE_PREMIUM_LABELS,
   type SimDifficulty,
   type SimDraftRecap,
   type SimGame,
@@ -52,10 +59,12 @@ import {
   type SimGamePreview,
   type SimGameTone,
   type SimScoring,
+  type SimSetupState,
   type SimWaiverClaim,
 } from '../lib/simGame';
 import { SIM_FLOW_INITIAL, SIM_TABS, simFlowReducer, simRecapsFromAdvance, type SimTab } from '../lib/simGameFlow';
 import { useSimGameRequest } from '../lib/useSimGameRequest';
+import { useSimSavedLeagues } from '../lib/useSimSavedLeagues';
 import { spacing, type ThemeColors } from '../theme';
 import type { RootStackParamList } from '../navigation/RootNavigator';
 
@@ -403,7 +412,7 @@ export default function GmGameScreen({ navigation }: Props) {
                 {g.grade_letter ? <ToneBadge label={g.grade_letter} color={colors.success} size="xs" /> : <AppText style={styles.link}>Continue</AppText>}
               </View>
               <AppText style={styles.muted}>
-                {SIM_SCORING_LABELS[(g.settings.scoring ?? 'ppr') as SimScoring]} · {g.settings.teams ?? 12} teams · {SIM_DIFFICULTY_COPY[g.difficulty]?.label ?? g.difficulty}
+                {simSettingsSummary(g.settings) || `${SIM_SCORING_LABELS[(g.settings.scoring ?? 'ppr') as SimScoring]} · ${g.settings.teams ?? 12} teams`} · {SIM_DIFFICULTY_COPY[g.difficulty]?.label ?? g.difficulty}
               </AppText>
             </AccentCard>
           ))
@@ -442,86 +451,152 @@ function SetupForm({
   const { colors } = useThemeMode();
   const styles = useMemo(() => createStyles(colors), [colors]);
   const opts = options?.options;
-  const [teams, setTeams] = useState<number>(opts?.teams.default ?? 12);
-  const [scoring, setScoring] = useState<SimScoring>(opts?.scoring.default ?? 'ppr');
-  const [difficulty, setDifficulty] = useState<SimDifficulty>(opts?.difficulty.default ?? 'normal');
-  const [slot, setSlot] = useState<string>('');
-  const [auto, setAuto] = useState<boolean>(opts?.auto_lineup.default ?? false);
-  const [name, setName] = useState('');
-  const season = options?.season;
+  const defaults = useMemo(() => simSetupDefaults(options), [options]);
+  const [state, setState] = useState<SimSetupState>(defaults);
+  const [advancedOpen, setAdvancedOpen] = useState(false);
+  const set = <K extends keyof SimSetupState>(key: K, value: SimSetupState[K]) => setState((prev) => ({ ...prev, [key]: value }));
+  const canImport = options?.start_modes?.find((m) => m.id === 'league')?.available ?? false;
+  const leagues = useSimSavedLeagues(state.start === 'league');
+  const changed = simSetupAdvancedChanged(state, defaults);
+  const block = simSetupBlock(state);
+  const league = state.start === 'league';
   return (
     <View style={styles.stack}>
-      <SectionHeading title="New game" caption="Pick your league. You can change nothing after the draft starts." />
+      <SectionHeading title="New game" caption="Quick start is 12 teams, half PPR and a standard lineup. You can change nothing after the game starts." />
+      {canImport ? (
+        <View style={styles.tight}>
+          <AppText style={styles.label}>How to start</AppText>
+          <SegmentedTabBar<string>
+            options={[{ key: 'fresh', label: 'Fresh league' }, { key: 'league', label: 'My league' }]}
+            active={state.start}
+            onChange={(key) => set('start', key as SimSetupState['start'])}
+          />
+        </View>
+      ) : null}
+      {league ? (
+        <View style={styles.tight}>
+          <AppText style={styles.label}>Start from</AppText>
+          {leagues === null ? <AppText style={styles.muted}>Loading your leagues...</AppText> : null}
+          {leagues !== null && leagues.length === 0 ? <AppText style={styles.muted}>No Sleeper leagues saved.</AppText> : null}
+          {(leagues ?? []).map((row) => (
+            <Button
+              key={row.league_id}
+              size="sm"
+              variant={state.leagueId === row.league_id ? 'primary' : 'secondary'}
+              label={row.league_name || row.league_id}
+              onPress={() => set('leagueId', row.league_id)}
+            />
+          ))}
+        </View>
+      ) : null}
       <View style={styles.tight}>
         <AppText style={styles.label}>Your team name</AppText>
-        <Input value={name} maxLength={40} placeholder="My Team" onChangeText={setName} accessibilityLabel="Your team name" />
-      </View>
-      <View style={styles.tight}>
-        <AppText style={styles.label}>League size</AppText>
-        <SegmentedTabBar<string>
-          options={(opts?.teams.values ?? [8, 10, 12]).map((n) => ({ key: String(n), label: `${n} teams` }))}
-          active={String(teams)}
-          onChange={(key) => {
-            setTeams(Number(key));
-            setSlot('');
-          }}
-        />
-      </View>
-      <View style={styles.tight}>
-        <AppText style={styles.label}>Scoring</AppText>
-        <SegmentedTabBar<string>
-          options={(opts?.scoring.values ?? ['ppr', 'half', 'std']).map((s) => ({ key: s, label: SIM_SCORING_LABELS[s] }))}
-          active={scoring}
-          onChange={(key) => setScoring(key as SimScoring)}
-        />
+        <Input value={state.name} maxLength={40} placeholder={league ? "Your team's real name" : 'My Team'} onChangeText={(v) => set('name', v)} accessibilityLabel="Your team name" />
       </View>
       <View style={styles.tight}>
         <AppText style={styles.label}>Difficulty</AppText>
         <SegmentedTabBar<string>
           options={(opts?.difficulty.values ?? ['easy', 'normal', 'hard']).map((d) => ({ key: d, label: SIM_DIFFICULTY_COPY[d].label }))}
-          active={difficulty}
-          onChange={(key) => setDifficulty(key as SimDifficulty)}
+          active={state.difficulty}
+          onChange={(key) => set('difficulty', key as SimDifficulty)}
         />
-        <AppText style={styles.muted}>{SIM_DIFFICULTY_COPY[difficulty].blurb} Your own scoring is the same at every level.</AppText>
+        <AppText style={styles.muted}>{SIM_DIFFICULTY_COPY[state.difficulty].blurb} Your own scoring is the same at every level.</AppText>
       </View>
-      <View style={styles.tight}>
-        <AppText style={styles.label}>Draft position</AppText>
-        <SegmentedTabBar<string>
-          scrollable
-          options={[{ key: '', label: 'Random' }, ...Array.from({ length: teams }, (_, i) => ({ key: String(i + 1), label: `Pick ${i + 1}` }))]}
-          active={slot}
-          onChange={setSlot}
-        />
-      </View>
-      <View style={styles.rowBetween}>
-        <View style={styles.grow}>
-          <AppText style={styles.label}>Auto-set my lineup</AppText>
-          <AppText style={styles.muted}>Starts your best healthy players each week. You can still change it.</AppText>
+      {!league ? (
+        <View style={styles.stack}>
+          <Button
+            variant="ghost"
+            size="sm"
+            label={`${advancedOpen ? 'Hide' : 'Show'} advanced options${changed ? ` (${changed} changed)` : ''}`}
+            onPress={() => setAdvancedOpen((open) => !open)}
+            style={styles.start}
+          />
+          {advancedOpen ? (
+            <View style={styles.stack}>
+              <View style={styles.tight}>
+                <AppText style={styles.label}>League size</AppText>
+                <SegmentedTabBar<string>
+                  options={(opts?.teams.values ?? [8, 10, 12, 14]).map((n) => ({ key: String(n), label: `${n} teams` }))}
+                  active={String(state.teams)}
+                  onChange={(key) => setState((prev) => ({ ...prev, teams: Number(key), slot: '' }))}
+                />
+                <AppText style={styles.muted}>You plus {state.teams - 1} AI managers.</AppText>
+              </View>
+              <View style={styles.tight}>
+                <AppText style={styles.label}>Scoring</AppText>
+                <SegmentedTabBar<string>
+                  options={(opts?.scoring.values ?? ['ppr', 'half', 'std']).map((s) => ({ key: s, label: SIM_SCORING_LABELS[s] }))}
+                  active={state.scoring}
+                  onChange={(key) => set('scoring', key as SimScoring)}
+                />
+              </View>
+              <View style={styles.tight}>
+                <AppText style={styles.label}>TE premium</AppText>
+                <SegmentedTabBar<string>
+                  options={(opts?.te_premium?.values ?? [0, 0.5, 1]).map((v) => ({ key: String(v), label: SIM_TE_PREMIUM_LABELS[v] ?? `+${v}` }))}
+                  active={String(state.tePremium)}
+                  onChange={(key) => set('tePremium', Number(key))}
+                />
+              </View>
+              <SetupToggle styles={styles} label="Superflex" note="A second quarterback can start in an extra flex slot." value={state.superflex} onChange={(v) => set('superflex', v)} />
+              <SetupToggle styles={styles} label="Kicker" note="Start a K." value={state.includeK} onChange={(v) => set('includeK', v)} />
+              <SetupToggle styles={styles} label="Defense (DEF)" note="Start a team defense (estimated from points allowed)." value={state.includeDef} onChange={(v) => set('includeDef', v)} />
+              <View style={styles.tight}>
+                <AppText style={styles.label}>Bench size</AppText>
+                <SegmentedTabBar<string>
+                  scrollable
+                  options={Array.from({ length: (opts?.bench?.max ?? 10) - (opts?.bench?.min ?? 4) + 1 }, (_, i) => String((opts?.bench?.min ?? 4) + i)).map((n) => ({ key: n, label: n }))}
+                  active={String(state.bench)}
+                  onChange={(key) => set('bench', Number(key))}
+                />
+              </View>
+              <View style={styles.tight}>
+                <AppText style={styles.label}>Draft position</AppText>
+                <SegmentedTabBar<string>
+                  scrollable
+                  options={[{ key: '', label: 'Random' }, ...Array.from({ length: state.teams }, (_, i) => ({ key: String(i + 1), label: `Pick ${i + 1}` }))]}
+                  active={state.slot}
+                  onChange={(key) => set('slot', key)}
+                />
+              </View>
+            </View>
+          ) : null}
         </View>
-        <Toggle value={auto} onValueChange={setAuto} label="Auto-set my lineup" />
-      </View>
-      {season ? (
-        <AppText style={styles.muted}>
-          {season.draft_rounds}-round snake draft, {season.regular_weeks}-week season, then {season.playoff_teams}-team playoffs. Starters: {season.slots.join(', ')}. Trade deadline week {season.trade_deadline_week}.
-        </AppText>
       ) : null}
+      <SetupToggle styles={styles} label="Auto-set my lineup" note="Starts your best healthy players each week. You can still change it." value={state.auto} onChange={(v) => set('auto', v)} />
+      <AppText style={styles.muted}>
+        {simSetupSummary(state, options?.layout)}
+        {options?.season ? ` ${options.season.regular_weeks}-week season, then ${options.season.playoff_teams}-team playoffs. Trade deadline week ${options.season.trade_deadline_week}.` : ''}
+      </AppText>
+      {block ? <AppText style={styles.muted}>{block}</AppText> : null}
       <View style={styles.wrapRow}>
-        <Button
-          label="Start the draft"
-          loading={creating}
-          onPress={() =>
-            onCreate({
-              teams,
-              scoring,
-              difficulty,
-              user_slot: slot ? Number(slot) : null,
-              auto_lineup: auto,
-              ...(name.trim() ? { team_name: name.trim() } : {}),
-            })
-          }
-        />
+        <Button label={league ? 'Start the season' : 'Start the draft'} loading={creating} disabled={Boolean(block)} onPress={() => onCreate(simSetupBody(state))} />
         <Button variant="ghost" label="Back" onPress={onBack} />
       </View>
+    </View>
+  );
+}
+
+function SetupToggle({
+  styles,
+  label,
+  note,
+  value,
+  onChange,
+}: {
+  styles: ReturnType<typeof createStyles>;
+  label: string;
+  note: string;
+  value: boolean;
+  onChange: (next: boolean) => void;
+}) {
+  return (
+    <View style={styles.rowBetween}>
+      <View style={styles.grow}>
+        <AppText style={styles.label}>{label}</AppText>
+        <AppText style={styles.muted}>{note}</AppText>
+      </View>
+      <Toggle value={value} onValueChange={onChange} label={label} />
     </View>
   );
 }
@@ -704,7 +779,7 @@ function SimMoreTab({ ctx, onDeleted, onHub }: { ctx: SimCtx; onDeleted: () => v
       <SectionHeading title="League rules" />
       <AccentCard accent={colors.borderStrong} compact>
         <AppText style={styles.body}>
-          {s.teams} teams · {SIM_SCORING_LABELS[s.scoring]} · {SIM_DIFFICULTY_COPY[s.difficulty].label}
+          {simSettingsSummary(s)} · {SIM_DIFFICULTY_COPY[s.difficulty].label}
         </AppText>
         <AppText style={styles.body}>
           Starters: {s.slots.join(', ')} · roster limit {s.roster_limit}

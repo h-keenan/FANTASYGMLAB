@@ -21,6 +21,7 @@ import {
   simLineupPayload,
   simMatchupLine,
   simNeedsDrop,
+  simPositionsFor,
   simSlotAccepts,
   simSlotCandidates,
   simSlotLabels,
@@ -444,7 +445,7 @@ export function SimPlayersTab({
           {game.pending?.claims} claim{game.pending?.claims === 1 ? ' is' : 's are'} already queued for this week.
         </AppText>
       ) : null}
-      <SimPlayerBrowser key={mode} gameId={gameId} fixedStatus={mode === 'waivers' ? 'available' : undefined} onOpen={ctx.openPlayer} actions={actions} refreshKey={ctx.tick} />
+      <SimPlayerBrowser key={mode} gameId={gameId} fixedStatus={mode === 'waivers' ? 'available' : undefined} positions={simPositionsFor(game.settings.slots)} onOpen={ctx.openPlayer} actions={actions} refreshKey={ctx.tick} />
       {claiming ? <ClaimSheet ctx={ctx} player={claiming} roster={roster} onClose={() => setClaiming(null)} onClaimed={setClaims} /> : null}
     </View>
   );

@@ -35,7 +35,14 @@ import {
   simGamePaywalled,
   simGameUnavailableCopy,
   simNewGameBlock,
+  simSettingsSummary,
+  simSetupAdvancedChanged,
+  simSetupBlock,
+  simSetupBody,
+  simSetupDefaults,
+  simSetupSummary,
   simWeekHeading,
+  SIM_TE_PREMIUM_LABELS,
   type SimDifficulty,
   type SimDraftRecap,
   type SimGame,
@@ -47,10 +54,12 @@ import {
   type SimGamePreview,
   type SimGameTone,
   type SimScoring,
+  type SimSetupState,
   type SimWaiverClaim,
 } from "@/lib/simGame";
 import { SIM_FLOW_INITIAL, SIM_TABS, simFlowReducer, simRecapsFromAdvance, type SimTab } from "@/lib/simGameFlow";
 import { useSimGameCall } from "@/lib/useSimGameCall";
+import { useSimLeagueChoices } from "@/lib/useSimLeagueChoices";
 
 const UPSELL_FALLBACK = {
   title: "Keep your season going with Pro",
@@ -338,7 +347,7 @@ export function SimGameContent() {
                   {g.grade_letter ? <ToneBadge label={g.grade_letter} color="var(--color-success)" size="xs" /> : <span className="text-xs" style={{ color: "var(--color-accent)" }}>Continue</span>}
                 </div>
                 <p className="text-xs" style={{ color: "var(--color-text-muted)" }}>
-                  {SIM_SCORING_LABELS[(g.settings.scoring ?? "ppr") as SimScoring]} · {g.settings.teams ?? 12} teams · {SIM_DIFFICULTY_COPY[g.difficulty]?.label ?? g.difficulty}
+                  {simSettingsSummary(g.settings) || `${SIM_SCORING_LABELS[(g.settings.scoring ?? "ppr") as SimScoring]} · ${g.settings.teams ?? 12} teams`} · {SIM_DIFFICULTY_COPY[g.difficulty]?.label ?? g.difficulty}
                 </p>
               </AccentCard>
             </button>
@@ -385,95 +394,154 @@ function SetupForm({
   onBack: () => void;
 }) {
   const opts = options?.options;
-  const [teams, setTeams] = useState<number>(opts?.teams.default ?? 12);
-  const [scoring, setScoring] = useState<SimScoring>(opts?.scoring.default ?? "ppr");
-  const [difficulty, setDifficulty] = useState<SimDifficulty>(opts?.difficulty.default ?? "normal");
-  const [slot, setSlot] = useState<string>("");
-  const [auto, setAuto] = useState<boolean>(opts?.auto_lineup.default ?? false);
-  const [name, setName] = useState("");
-  const season = options?.season;
+  const defaults = useMemo(() => simSetupDefaults(options), [options]);
+  const [state, setState] = useState<SimSetupState>(defaults);
+  const set = <K extends keyof SimSetupState>(key: K, value: SimSetupState[K]) => setState((prev) => ({ ...prev, [key]: value }));
+  const leagueMode = options?.start_modes?.find((m) => m.id === "league");
+  const canImport = leagueMode ? leagueMode.available : false;
+  const leagues = useSimLeagueChoices(state.start === "league");
+  const changed = simSetupAdvancedChanged(state, defaults);
+  const block = simSetupBlock(state);
+  const league = state.start === "league";
   return (
     <form
       className="flex flex-col gap-4"
       onSubmit={(event) => {
         event.preventDefault();
-        onCreate({
-          teams,
-          scoring,
-          difficulty,
-          user_slot: slot ? Number(slot) : null,
-          auto_lineup: auto,
-          ...(name.trim() ? { team_name: name.trim() } : {}),
-        });
+        if (!block) onCreate(simSetupBody(state));
       }}
     >
-      <SectionHeading note="Pick your league. You can change nothing after the draft starts.">New game</SectionHeading>
+      <SectionHeading note="Quick start is 12 teams, half PPR and a standard lineup. You can change nothing after the game starts.">New game</SectionHeading>
+      {canImport ? (
+        <div className="flex flex-col gap-1">
+          <span className="text-sm font-semibold">How to start</span>
+          <PillRow
+            ariaLabel="How to start"
+            variant="fill"
+            options={[{ label: "Fresh league", value: "fresh" }, { label: "My league", value: "league" }]}
+            active={state.start}
+            onSelect={(value) => set("start", value as SimSetupState["start"])}
+          />
+        </div>
+      ) : null}
+      {league ? (
+        <label className="flex flex-col gap-1 text-sm font-semibold">
+          Start from
+          <Select value={state.leagueId} onChange={(event) => set("leagueId", event.target.value)} aria-label="League to start from" disabled={leagues === null}>
+            <option value="">{leagues === null ? "Loading your leagues..." : leagues.length ? "Choose a league" : "No Sleeper leagues saved"}</option>
+            {(leagues ?? []).map((row) => (
+              <option key={row.league_id} value={row.league_id}>{row.league_name || row.league_id}</option>
+            ))}
+          </Select>
+        </label>
+      ) : null}
       <label className="flex flex-col gap-1 text-sm font-semibold">
         Your team name
-        <Input value={name} maxLength={40} placeholder="My Team" onChange={(event) => setName(event.target.value)} />
+        <Input value={state.name} maxLength={40} placeholder={league ? "Your team's real name" : "My Team"} onChange={(event) => set("name", event.target.value)} />
       </label>
-      <div className="flex flex-col gap-1">
-        <span className="text-sm font-semibold" id="sim-teams-label">League size</span>
-        <PillRow
-          ariaLabel="League size"
-          variant="fill"
-          options={(opts?.teams.values ?? [8, 10, 12]).map((n) => ({ label: `${n} teams`, value: String(n) }))}
-          active={String(teams)}
-          onSelect={(value) => {
-            setTeams(Number(value));
-            setSlot("");
-          }}
-        />
-      </div>
-      <div className="flex flex-col gap-1">
-        <span className="text-sm font-semibold">Scoring</span>
-        <PillRow
-          ariaLabel="Scoring"
-          variant="fill"
-          options={(opts?.scoring.values ?? ["ppr", "half", "std"]).map((s) => ({ label: SIM_SCORING_LABELS[s], value: s }))}
-          active={scoring}
-          onSelect={(value) => setScoring(value as SimScoring)}
-        />
-      </div>
       <div className="flex flex-col gap-1">
         <span className="text-sm font-semibold">Difficulty</span>
         <PillRow
           ariaLabel="Difficulty"
           variant="fill"
           options={(opts?.difficulty.values ?? ["easy", "normal", "hard"]).map((d) => ({ label: SIM_DIFFICULTY_COPY[d].label, value: d }))}
-          active={difficulty}
-          onSelect={(value) => setDifficulty(value as SimDifficulty)}
+          active={state.difficulty}
+          onSelect={(value) => set("difficulty", value as SimDifficulty)}
         />
-        <p className="text-xs" style={{ color: "var(--color-text-muted)" }}>{SIM_DIFFICULTY_COPY[difficulty].blurb} Your own scoring is the same at every level.</p>
+        <p className="text-xs" style={{ color: "var(--color-text-muted)" }}>{SIM_DIFFICULTY_COPY[state.difficulty].blurb} Your own scoring is the same at every level.</p>
       </div>
-      <label className="flex flex-col gap-1 text-sm font-semibold">
-        Draft position
-        <Select value={slot} onChange={(event) => setSlot(event.target.value)} aria-label="Draft position">
-          <option value="">Random</option>
-          {Array.from({ length: teams }, (_, i) => (
-            <option key={i + 1} value={String(i + 1)}>
-              Pick {i + 1}
-            </option>
-          ))}
-        </Select>
-      </label>
+      {!league ? (
+        <details className="flex flex-col gap-4" data-testid="sim-advanced">
+          <summary className="text-sm font-semibold cursor-pointer" style={{ minHeight: "var(--touch-target-min)" }}>
+            Advanced options{changed ? ` (${changed} changed)` : ""}
+          </summary>
+          <div className="flex flex-col gap-4 pt-2">
+            <div className="flex flex-col gap-1">
+              <span className="text-sm font-semibold">League size</span>
+              <PillRow
+                ariaLabel="League size"
+                variant="fill"
+                options={(opts?.teams.values ?? [8, 10, 12, 14]).map((n) => ({ label: `${n} teams`, value: String(n) }))}
+                active={String(state.teams)}
+                onSelect={(value) => setState((prev) => ({ ...prev, teams: Number(value), slot: "" }))}
+              />
+              <p className="text-xs" style={{ color: "var(--color-text-muted)" }}>You plus {state.teams - 1} AI managers.</p>
+            </div>
+            <div className="flex flex-col gap-1">
+              <span className="text-sm font-semibold">Scoring</span>
+              <PillRow
+                ariaLabel="Scoring"
+                variant="fill"
+                options={(opts?.scoring.values ?? ["ppr", "half", "std"]).map((s) => ({ label: SIM_SCORING_LABELS[s], value: s }))}
+                active={state.scoring}
+                onSelect={(value) => set("scoring", value as SimScoring)}
+              />
+            </div>
+            <div className="flex flex-col gap-1">
+              <span className="text-sm font-semibold">TE premium</span>
+              <PillRow
+                ariaLabel="TE premium"
+                variant="fill"
+                options={(opts?.te_premium?.values ?? [0, 0.5, 1]).map((v) => ({ label: SIM_TE_PREMIUM_LABELS[v] ?? `+${v}`, value: String(v) }))}
+                active={String(state.tePremium)}
+                onSelect={(value) => set("tePremium", Number(value))}
+              />
+            </div>
+            <SetupToggle label="Superflex" note="A second quarterback can start in an extra flex slot." checked={state.superflex} onChange={(v) => set("superflex", v)} />
+            <SetupToggle label="Kicker" note="Start a K." checked={state.includeK} onChange={(v) => set("includeK", v)} />
+            <SetupToggle label="Defense (DEF)" note="Start a team defense (estimated from points allowed)." checked={state.includeDef} onChange={(v) => set("includeDef", v)} />
+            <div className="flex flex-col gap-1">
+              <span className="text-sm font-semibold" id="sim-bench-label">Bench size</span>
+              <PillRow
+                ariaLabel="Bench size"
+                variant="scroll"
+                options={Array.from({ length: (opts?.bench?.max ?? 10) - (opts?.bench?.min ?? 4) + 1 }, (_, i) => String((opts?.bench?.min ?? 4) + i)).map((n) => ({ label: n, value: n }))}
+                active={String(state.bench)}
+                onSelect={(value) => set("bench", Number(value))}
+              />
+            </div>
+            <label className="flex flex-col gap-1 text-sm font-semibold">
+              Draft position
+              <Select value={state.slot} onChange={(event) => set("slot", event.target.value)} aria-label="Draft position">
+                <option value="">Random</option>
+                {Array.from({ length: state.teams }, (_, i) => (
+                  <option key={i + 1} value={String(i + 1)}>
+                    Pick {i + 1}
+                  </option>
+                ))}
+              </Select>
+            </label>
+          </div>
+        </details>
+      ) : null}
       <div className="flex items-center justify-between gap-3">
         <div className="flex flex-col">
           <span className="text-sm font-semibold">Auto-set my lineup</span>
           <span className="text-xs" style={{ color: "var(--color-text-muted)" }}>Starts your best healthy players each week. You can still change it.</span>
         </div>
-        <Toggle checked={auto} onChange={setAuto} label="Auto-set my lineup" />
+        <Toggle checked={state.auto} onChange={(v) => set("auto", v)} label="Auto-set my lineup" />
       </div>
-      {season ? (
-        <p className="text-xs" style={{ color: "var(--color-text-muted)" }}>
-          {season.draft_rounds}-round snake draft, {season.regular_weeks}-week season, then {season.playoff_teams}-team playoffs. Starters: {season.slots.join(", ")}. Trade deadline week {season.trade_deadline_week}.
-        </p>
-      ) : null}
+      <p className="text-xs" style={{ color: "var(--color-text-muted)" }} data-testid="sim-setup-summary">
+        {simSetupSummary(state, options?.layout)} {options?.season ? `${options.season.regular_weeks}-week season, then ${options.season.playoff_teams}-team playoffs. Trade deadline week ${options.season.trade_deadline_week}.` : ""}
+      </p>
+      {block ? <p className="text-xs" role="status" style={{ color: "var(--color-warning)" }}>{block}</p> : null}
       <div className="flex gap-2">
-        <Button type="submit" loading={creating}>Start the draft</Button>
+        <Button type="submit" loading={creating} disabled={Boolean(block)}>{league ? "Start the season" : "Start the draft"}</Button>
         <Button type="button" variant="ghost" onClick={onBack}>Back</Button>
       </div>
     </form>
+  );
+}
+
+function SetupToggle({ label, note, checked, onChange }: { label: string; note: string; checked: boolean; onChange: (next: boolean) => void }) {
+  return (
+    <div className="flex items-center justify-between gap-3">
+      <div className="flex flex-col">
+        <span className="text-sm font-semibold">{label}</span>
+        <span className="text-xs" style={{ color: "var(--color-text-muted)" }}>{note}</span>
+      </div>
+      <Toggle checked={checked} onChange={onChange} label={label} />
+    </div>
   );
 }
 
@@ -650,7 +718,7 @@ function SimMoreTab({ ctx, onDeleted, onHub }: { ctx: SimCtx; onDeleted: () => v
       <SectionHeading>League rules</SectionHeading>
       <AccentCard accent="var(--color-border-strong)" compact as="div">
         <ul className="flex flex-col gap-1 text-sm">
-          <li>{s.teams} teams · {SIM_SCORING_LABELS[s.scoring]} · {SIM_DIFFICULTY_COPY[s.difficulty].label}</li>
+          <li>{simSettingsSummary(s)} · {SIM_DIFFICULTY_COPY[s.difficulty].label}</li>
           <li>Starters: {s.slots.join(", ")} · roster limit {s.roster_limit}</li>
           <li>{s.regular_weeks}-week season, {s.playoff_teams}-team playoffs. Trade deadline: week {s.trade_deadline_week}.</li>
           <li>Waiver claims resolve when you advance, worst record first.</li>

@@ -21,15 +21,14 @@ import numpy as np
 from modules.sim.game_eval import Evaluator
 from modules.sim.game_setup import draft_order, pick_round
 from modules.sim.game_state import Emitter, GameState
-from modules.sim.game_types import GameError, GameSnapshot
+from modules.sim.game_types import SINGLETON_POSITIONS, GameError, GameSnapshot
 from modules.sim.rng import WorldRng
-from modules.sim.types import POSITIONS, STRICT_SLOTS
+from modules.sim.types import FLEX_ORDER, FLEX_SLOTS, GAME_POSITIONS, GAME_STRICT_SLOTS
 
 WINDOW = 40  # candidates considered per pick (by ADP)
-POSITION_CAP = {"QB": 3, "TE": 3, "K": 1, "RB": 9, "WR": 9}
-K_LAST_ROUNDS = 3  # kickers only in the final rounds
+POSITION_CAP = {"QB": 3, "TE": 3, "K": 1, "DEF": 1, "RB": 9, "WR": 9}
+K_LAST_ROUNDS = 3  # kickers and defenses only in the final rounds
 QUEUE_MAX = 30
-_FLEX_POS = ("RB", "WR", "TE")
 
 # persona -> (taste sigma, need weight, age preference, top-k, temperature)
 # age preference > 0 favors young players, < 0 favors vets.
@@ -80,22 +79,40 @@ class DraftContext:
         return {p["pid"] for p in self.state.picks}
 
     def counts(self, tid: str) -> dict[str, int]:
-        c = {p: 0 for p in POSITIONS}
+        c = {p: 0 for p in GAME_POSITIONS}
         for pid in self.state.rosters[tid]:
             c[self.snap.players[pid].pos] += 1
         return c
 
 
+def flex_shortage(slots: tuple[str, ...], counts: Mapping[str, int]) -> tuple[float, frozenset[str]]:
+    """How many flex slots the roster cannot yet fill from players beyond the
+    strict slots, and which positions could fill them. Narrowest flex first,
+    like the lineup does."""
+
+    surplus = {
+        pos: max(0, counts.get(pos, 0) - sum(1 for s in slots if s == pos)) for pos in GAME_POSITIONS
+    }
+    short = 0
+    eligible: set[str] = set()
+    for slot in sorted((s for s in slots if s in FLEX_SLOTS), key=FLEX_ORDER.index):
+        for pos in sorted(FLEX_SLOTS[slot], key=lambda p: -surplus[p]):
+            if surplus[pos] > 0:
+                surplus[pos] -= 1
+                break
+        else:
+            short += 1
+            eligible |= FLEX_SLOTS[slot]
+    return float(short), frozenset(eligible)
+
+
 def starter_shortage(slots: tuple[str, ...], counts: Mapping[str, int]) -> dict[str, float]:
     """How many starters at each position the roster still lacks. Flex slots
-    count against the RB/WR/TE surplus beyond the strict slots."""
+    count against the surplus beyond the strict slots."""
 
-    strict = {pos: sum(1 for s in slots if s == pos) for pos in STRICT_SLOTS}
-    flex = sum(1 for s in slots if s not in STRICT_SLOTS)
-    short = {pos: float(max(0, strict[pos] - counts.get(pos, 0))) for pos in POSITIONS}
-    surplus = sum(max(0, counts.get(pos, 0) - strict[pos]) for pos in _FLEX_POS)
-    flex_short = float(max(0, flex - surplus))
-    short["FLEX"] = flex_short
+    strict = {pos: sum(1 for s in slots if s == pos) for pos in GAME_STRICT_SLOTS}
+    short = {pos: float(max(0, strict.get(pos, 0) - counts.get(pos, 0))) for pos in GAME_POSITIONS}
+    short["FLEX"] = flex_shortage(slots, counts)[0]
     return short
 
 
@@ -104,16 +121,17 @@ def _forced_positions(slots, counts, picks_left) -> set[str] | None:
     total = sum(v for k, v in short.items())
     if total <= 0 or picks_left > total:
         return None
-    forced = {pos for pos in POSITIONS if short[pos] > 0}
+    forced = {pos for pos in GAME_POSITIONS if short[pos] > 0}
     if short["FLEX"] > 0:
-        forced |= set(_FLEX_POS)
+        forced |= flex_shortage(slots, counts)[1]
     return forced
 
 
 def _need_bonus(slots, counts, pos: str, rnd: int) -> float:
     strict = sum(1 for s in slots if s == pos)
     short = starter_shortage(slots, counts)
-    if pos in _FLEX_POS and short["FLEX"] > 0 and counts.get(pos, 0) >= strict:
+    flex_open, flex_pos = flex_shortage(slots, counts)
+    if pos in flex_pos and flex_open > 0 and counts.get(pos, 0) >= strict:
         frac = 0.5
     elif strict:
         frac = short[pos] / strict
@@ -141,9 +159,10 @@ def _candidates(ctx: DraftContext, tid: str, n: int) -> list[str]:
         pos = snap.players[pid].pos
         if forced is not None and pos not in forced:
             continue
-        if pos == "K" and (rnd < s.rounds - K_LAST_ROUNDS + 1 or counts["K"] >= 1):
+        if pos in SINGLETON_POSITIONS and (rnd < s.rounds - K_LAST_ROUNDS + 1 or counts[pos] >= 1):
             continue
-        if counts[pos] >= POSITION_CAP.get(pos, 99) and (forced is None or pos not in forced):
+        cap = POSITION_CAP.get(pos, 99) + (s.slots.count("SUPER_FLEX") if pos == "QB" else 0)
+        if counts[pos] >= cap and (forced is None or pos not in forced):
             continue
         out.append(pid)
         if len(out) >= WINDOW:

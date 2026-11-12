@@ -54,8 +54,11 @@ export function SimPlayerBrowser({
   showStatusFilter = true,
   onItems,
   emptyTitle = "No players match",
+  positions = SIM_POSITIONS,
 }: {
   gameId: string;
+  /** Positions this league plays (no K / DEF chips when it has no such slot). */
+  positions?: SimPos[];
   /** Lock the status filter (the draft board is always free agents). */
   fixedStatus?: SimPlayerStatusFilter;
   initial?: Partial<SimPlayerFilter>;
@@ -114,7 +117,7 @@ export function SimPlayerBrowser({
       <PillRow
         ariaLabel="Position filter"
         variant="scroll"
-        options={[{ label: "All", value: "" }, ...SIM_POSITIONS.map((pos) => ({ label: pos, value: pos }))]}
+        options={[{ label: "All", value: "" }, ...positions.map((pos) => ({ label: pos, value: pos }))]}
         active={filter.pos}
         onSelect={(value) => dispatch({ type: "pos", value: value as SimPos | "" })}
       />

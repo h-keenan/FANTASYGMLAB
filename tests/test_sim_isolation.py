@@ -414,7 +414,11 @@ def test_player_pool_adapter_reads_players_db_read_only():
     before_files = sorted(p.name for p in db.parent.glob("players.db*"))
     pool = RealSimInputs(str(db), projections_module=Projections(), sleeper_module=object(),
                          playoff_module=object()).player_pool({"rec": 1.0})
-    assert len(pool.rows) > 300 and {r["pos"] for r in pool.rows} == {"QB", "RB", "WR", "TE", "K"}
+    positions = {r["pos"] for r in pool.rows}
+    # Team defenses are estimated from the cached schedule (data/nfl_games.csv), present in CI, not everywhere.
+    assert len(pool.rows) > 300 and positions - {"DEF"} == {"QB", "RB", "WR", "TE", "K"}
+    defenses = [r for r in pool.rows if r["pos"] == "DEF"]
+    assert not defenses or (len(defenses) == 32 and all(r["pid"].startswith("DEF-") for r in defenses))
     assert all(r["mean"] > 0 and r["sd"] > 0 for r in pool.rows)
     assert hashlib.sha256(db.read_bytes()).hexdigest() == before
     assert sorted(p.name for p in db.parent.glob("players.db*")) == before_files

@@ -22,6 +22,7 @@ import sqlite3
 from pathlib import Path
 from typing import Any, Mapping, Protocol
 
+from modules.sim.game_types import IMPORT_TEAM_COUNTS, ImportedTeam, LeagueImport
 from modules.sim.synthetic import round_robin
 from modules.sim.types import (
     FLEX_SLOTS,
@@ -61,6 +62,8 @@ class SimInputs(Protocol):
 
     def player_pool(self, scoring_settings: Mapping[str, float]) -> "PlayerPool": ...
 
+    def league_import(self, league_id: str, *, username: str = "", roster_id: str = "") -> LeagueImport: ...
+
 
 # Numeric context columns handed to the GM game's player model, when present.
 _POOL_EXTRA_COLUMNS = (
@@ -68,6 +71,23 @@ _POOL_EXTRA_COLUMNS = (
     "snap_share", "target_share", "rush_share", "opportunity_share", "injury_risk_score",
 )
 _POOL_POSITIONS = ("QB", "RB", "WR", "TE", "K")
+DEF_PREFIX = "DEF-"  # game id of a team defense: DEF-<NFL team>
+_IMPORT_SLOT_ALIASES = {"WRRB_FLEX": "FLEX", "WRRB": "FLEX", "W/R/T": "FLEX", "W/R": "FLEX", "PK": "K", "DST": "DEF", "D/ST": "DEF"}
+_IMPORT_SLOTS = ("QB", "RB", "WR", "TE", "K", "DEF", "FLEX", "REC_FLEX", "SUPER_FLEX")
+_NFL_CODES = frozenset((
+    "ARI ATL BAL BUF CAR CHI CIN CLE DAL DEN DET GB HOU IND JAX KC LAC LAR LV MIA MIN NE NO NYG NYJ PHI PIT SEA SF TB TEN WAS"
+).split())
+# Team-defense estimate: fantasy points per game from points allowed. Each point
+# a defense allows below the league average is worth about a quarter point
+# (the scoring bands are ~0.43 per point; half-trusted because points allowed
+# is partly luck), around a 7-point average defense. A real DEF projection
+# source does not exist in our data, so this is labelled an estimate in the
+# pool notes. PA is regressed toward last season's by games played.
+_DEF_BASE_MEAN = 7.0
+_DEF_PA_SLOPE = 0.26
+_DEF_SD = 4.5
+_DEF_REGRESSION_GAMES = 8.0
+_DEF_MIN_TEAMS = 28
 
 
 class PlayerPool:
@@ -109,6 +129,24 @@ def normalize_slots(roster_positions: Any) -> tuple[tuple[str, ...], bool]:
         elif name not in ("BN", "IR", "TAXI"):
             ignored = True
     return (tuple(slots) or _DEFAULT_SLOTS), ignored
+
+
+def import_slots(roster_positions: Any) -> tuple[tuple[str, ...], int, bool]:
+    """Sleeper roster_positions -> (starting slots the game models, bench size,
+    ignored_some). IR and taxi spots are not bench; IDP slots are not modeled."""
+
+    slots: list[str] = []
+    bench = 0
+    ignored = False
+    for raw in roster_positions or []:
+        name = _IMPORT_SLOT_ALIASES.get(str(raw).upper(), str(raw).upper())
+        if name in _IMPORT_SLOTS:
+            slots.append(name)
+        elif name == "BN":
+            bench += 1
+        elif name not in ("IR", "TAXI"):
+            ignored = True
+    return tuple(slots), bench, ignored
 
 
 class RealSimInputs:
@@ -398,6 +436,8 @@ class RealSimInputs:
                 "injury_weeks": 4 if status in _OUT_STATUSES else 1 if status == "doubtful" else 0,
                 "extra": {c: _num(r.get(c)) for c in _POOL_EXTRA_COLUMNS if r.get(c) is not None},
             })
+        defenses = self._defense_rows()
+        out.extend(defenses)
         seasons = [int(_num(r.get("stats_season"))) for r in table if _num(r.get("stats_season")) > 0]
         byes: dict[str, int] = {}
         for season in sorted({max(seasons, default=0), max(seasons, default=0) + 1}, reverse=True):
@@ -405,7 +445,116 @@ class RealSimInputs:
             if byes:
                 break
         notes = (f"projection_fallback_players:{fallbacks}",) if fallbacks else ()
+        notes += ("def_estimated_from_points_allowed",) if defenses else ()
         return PlayerPool(out, byes, notes)
+
+    def _defense_rows(self) -> list[dict[str, Any]]:
+        """One team-defense row per NFL team, estimated from points allowed in
+        the cached nflverse schedule (read-only). Empty when the schedule does
+        not cover the league, which makes DEF leagues unavailable rather than
+        invented."""
+
+        by_season: dict[int, dict[str, list[float]]] = {}
+        path = Path(self.games_csv_path)
+        if not path.exists():
+            return []
+        try:
+            with path.open(newline="", encoding="utf-8") as handle:
+                for row in csv.DictReader(handle):
+                    if row.get("game_type") != "REG":
+                        continue
+                    season = _int(row.get("season"))
+                    if season <= 0 or not row.get("home_score") or not row.get("away_score"):
+                        continue
+                    home = _TEAM_ALIASES.get((row.get("home_team") or "").strip().upper(), (row.get("home_team") or "").strip().upper())
+                    away = _TEAM_ALIASES.get((row.get("away_team") or "").strip().upper(), (row.get("away_team") or "").strip().upper())
+                    hs, aws = _num(row.get("home_score")), _num(row.get("away_score"))
+                    for team, allowed in ((home, aws), (away, hs)):
+                        if team in _NFL_CODES:
+                            by_season.setdefault(season, {}).setdefault(team, []).append(allowed)
+        except (OSError, csv.Error, UnicodeDecodeError):
+            return []
+        usable = sorted(
+            (s for s, teams in by_season.items() if sum(1 for g in teams.values() if len(g) >= 3) >= _DEF_MIN_TEAMS),
+            reverse=True,
+        )
+        if not usable:
+            return []
+        cur = by_season[usable[0]]
+        prior = by_season.get(usable[0] - 1, {})
+        prior_avg = {t: sum(g) / len(g) for t, g in prior.items() if len(g) >= 8}
+        league_avg = sum(sum(g) for g in cur.values()) / max(1, sum(len(g) for g in cur.values()))
+        estimated: dict[str, float] = {}
+        for team in sorted(_NFL_CODES):
+            games = cur.get(team) or []
+            base = prior_avg.get(team, league_avg)
+            n = len(games)
+            estimated[team] = (sum(games) + _DEF_REGRESSION_GAMES * base) / (n + _DEF_REGRESSION_GAMES)
+        rows = []
+        for team, allowed in estimated.items():
+            mean = max(3.0, min(12.0, _DEF_BASE_MEAN + _DEF_PA_SLOPE * (league_avg - allowed)))
+            rows.append({
+                "pid": DEF_PREFIX + team, "name": f"{team} D/ST", "pos": "DEF", "nfl_team": team, "age": 26.0,
+                "market": round(mean * 2.5, 2), "mean": round(mean, 2), "sd": _DEF_SD, "injury_weeks": 0, "extra": {},
+            })
+        return rows
+
+    # ----------------------------------------------------------- league import
+
+    def league_import(self, league_id: str, *, username: str = "", roster_id: str = "") -> LeagueImport:
+        """Read-only. A real Sleeper league's size, lineup, scoring and current
+        rosters, frozen. The only thing the "start from one of my leagues" mode
+        takes from the league; nothing is ever written back."""
+
+        if ":" in str(league_id):  # ESPN / Fleaflicker / MFL ids carry a platform prefix
+            raise SimInputsError("league_platform_unsupported")
+        sleeper, _, _ = self._mods()
+        league = sleeper.get_league(league_id)
+        rosters = sleeper.get_rosters(league_id) or []
+        if not league or len(rosters) < 2:
+            raise SimInputsError("league_unavailable")
+        if len(rosters) not in IMPORT_TEAM_COUNTS:
+            raise SimInputsError("league_size_unsupported")
+        profiles = sleeper.get_league_roster_profiles(league_id) or {}
+        user_rid = self._find_user_roster(rosters, profiles, username, roster_id)
+        notes: list[str] = []
+        slots, bench, ignored = import_slots(league.get("roster_positions"))
+        if not slots:
+            raise SimInputsError("league_lineup_unsupported")
+        if ignored:
+            notes.append("idp_slots_not_modeled")
+        scoring = league.get("scoring_settings") if isinstance(league.get("scoring_settings"), dict) else {}
+        scoring = {k: float(v) for k, v in scoring.items() if isinstance(v, (int, float)) and not isinstance(v, bool)}
+        if not any(k in scoring for k in ("rec", "pass_td", "rush_td", "rec_td")):
+            raise SimInputsError("league_scoring_unavailable")
+        settings_raw = league.get("settings") if isinstance(league.get("settings"), dict) else {}
+        teams = []
+        for roster in rosters:
+            rid = str(roster.get("roster_id"))
+            profile = profiles.get(rid) or {}
+            taxi = {str(p) for p in (roster.get("taxi") or [])}
+            ids = [self._game_id(p) for p in (roster.get("players") or []) if str(p) not in taxi]
+            teams.append(ImportedTeam(
+                tid=rid, name=str(profile.get("team_name") or f"Team {rid}"),
+                owner=str(profile.get("owner_name") or ""), is_user=rid == user_rid,
+                roster=tuple(sorted(dict.fromkeys(p for p in ids if p))),
+            ))
+        return LeagueImport(
+            league_id=str(league_id), league_name=str(league.get("name") or ""), season=str(league.get("season") or ""),
+            teams=tuple(teams), slots=slots, bench=bench, scoring_settings=scoring,
+            playoff_teams=_int(settings_raw.get("playoff_teams"), 6) or 6, notes=tuple(notes),
+        )
+
+    @staticmethod
+    def _game_id(sleeper_id: Any) -> str:
+        """Sleeper keys a team defense by its NFL team code; the game uses
+        ``DEF-<TEAM>``. Players keep their Sleeper id."""
+
+        pid = str(sleeper_id)
+        code = _TEAM_ALIASES.get(pid.upper(), pid.upper())
+        if pid.isalpha() and pid.isupper() and code in _NFL_CODES:
+            return DEF_PREFIX + code
+        return pid
 
     def _read_pool_table(self) -> list[dict[str, Any]]:
         path = Path(self.players_db_path)

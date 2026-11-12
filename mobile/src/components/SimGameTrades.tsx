@@ -18,6 +18,7 @@ import {
   SIM_TRADE_EMPTY,
   SIM_TRADE_MAX_PER_SIDE,
   simFmtPts,
+  simTradable,
   simTradeClosedReason,
   simTradeDecisionLabel,
   simTradeDecisionTone,
@@ -319,7 +320,7 @@ function Builder({ ctx, seed, onSeedUsed }: { ctx: SimCtx; seed: { partner: stri
           <View>
             <SectionHeading title="You give" caption={`Up to ${SIM_TRADE_MAX_PER_SIDE}. ${draft.give.length} selected.`} />
             {mine
-              .filter((p) => p.pos !== 'K')
+              .filter((p) => simTradable(p.pos))
               .map((p) => (
                 <SimPlayerLine
                   key={p.id}
@@ -337,7 +338,7 @@ function Builder({ ctx, seed, onSeedUsed }: { ctx: SimCtx; seed: { partner: stri
           <View>
             <SectionHeading title="You get" caption={`${partner.name}'s roster. ${draft.get.length} selected.`} />
             {partnerRoster
-              .filter((p) => p.pos !== 'K')
+              .filter((p) => simTradable(p.pos))
               .map((p) => (
                 <SimPlayerLine
                   key={p.id}
