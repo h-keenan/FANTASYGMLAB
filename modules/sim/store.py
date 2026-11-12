@@ -40,6 +40,37 @@ class SimBackend(Protocol):
 
     def delete(self, table: str, *, user_id: str, filters: Mapping[str, str]) -> tuple[bool, str]: ...
 
+    def insert_many(self, table: str, rows: list[Mapping[str, Any]]) -> tuple[bool, str]:
+        """Insert-only (never overwrites). A duplicate primary key fails the whole
+        batch with the error string ``CONFLICT``: the optimistic-concurrency guard
+        for the append-only game event log."""
+        ...
+
+
+# Filter values are equality by default. A value like ``"gte.5"`` is a range
+# comparison (PostgREST syntax); used by the game event log (``seq >= n``).
+FILTER_OPS = ("gte.", "gt.", "lte.", "lt.")
+CONFLICT = "CONFLICT"
+
+
+def parse_filter(value: Any) -> tuple[str, str]:
+    text = str(value)
+    for op in FILTER_OPS:
+        if text.startswith(op):
+            return op[:-1], text[len(op):]
+    return "eq", text
+
+
+def _matches(row_value: Any, value: Any) -> bool:
+    op, raw = parse_filter(value)
+    if op == "eq":
+        return str(row_value) == raw
+    try:
+        left, right = float(row_value), float(raw)
+    except (TypeError, ValueError):
+        return False
+    return {"gte": left >= right, "gt": left > right, "lte": left <= right, "lt": left < right}[op]
+
 
 class InMemoryBackend:
     """Test/dev backend with the same contract as the Supabase one."""
@@ -53,10 +84,11 @@ class InMemoryBackend:
             return [], "Supabase tables are not set up yet."
         rows = [r for r in self.tables.get(table, []) if r.get("user_id") == user_id]
         for key, value in (filters or {}).items():
-            rows = [r for r in rows if str(r.get(key)) == value]
+            rows = [r for r in rows if _matches(r.get(key), value)]
         if order:
             name, _, direction = order.partition(".")
-            rows.sort(key=lambda r: str(r.get(name)), reverse=direction == "desc")
+            numeric = all(isinstance(r.get(name), (int, float)) for r in rows)
+            rows.sort(key=lambda r: r.get(name) if numeric else str(r.get(name)), reverse=direction == "desc")
         if limit:
             rows = rows[:limit]
         if columns != "*":
@@ -69,8 +101,9 @@ class InMemoryBackend:
             return False, "Supabase tables are not set up yet."
         rows = self.tables.setdefault(table, [])
         row = copy.deepcopy(dict(row))
+        cols = on_conflict.split(",")  # composite keys: "game_id,week"
         for i, existing in enumerate(rows):
-            if existing.get(on_conflict) == row.get(on_conflict):
+            if all(existing.get(c) == row.get(c) for c in cols):
                 rows[i] = {**existing, **row}
                 return True, ""
         rows.append(row)
@@ -80,7 +113,7 @@ class InMemoryBackend:
         if self.fail:
             return False, "Supabase tables are not set up yet."
         for row in self.tables.get(table, []):
-            if row.get("user_id") == user_id and all(str(row.get(k)) == v for k, v in filters.items()):
+            if row.get("user_id") == user_id and all(_matches(row.get(k), v) for k, v in filters.items()):
                 row.update(copy.deepcopy(dict(values)))
         return True, ""
 
@@ -90,8 +123,30 @@ class InMemoryBackend:
         rows = self.tables.get(table, [])
         self.tables[table] = [
             r for r in rows
-            if not (r.get("user_id") == user_id and all(str(r.get(k)) == v for k, v in filters.items()))
+            if not (r.get("user_id") == user_id and all(_matches(r.get(k), v) for k, v in filters.items()))
         ]
+        return True, ""
+
+    # Primary key of the tables insert_many is used on.
+    _PKS = {
+        "sim_events": ("game_id", "seq"), "sim_week_checkpoints": ("game_id", "week"),
+        "sim_games": ("id",),
+    }
+
+    def insert_many(self, table, rows):
+        if self.fail:
+            return False, "Supabase tables are not set up yet."
+        pk = self._PKS.get(table, ("id",))
+        existing = self.tables.setdefault(table, [])
+        taken = {tuple(r.get(k) for k in pk) for r in existing}
+        fresh = []
+        for row in rows:
+            key = tuple(row.get(k) for k in pk)
+            if key in taken:
+                return False, CONFLICT
+            taken.add(key)
+            fresh.append(copy.deepcopy(dict(row)))
+        existing.extend(fresh)
         return True, ""
 
 

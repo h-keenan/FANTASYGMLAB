@@ -20,6 +20,16 @@ SUBSYSTEMS = {
     "persona": 5,
     "schedule": 6,
     "form": 7,
+    # The interactive GM game (game_*.py). Same keyed-stream rule: the draws a
+    # decision can touch never shift draws it cannot.
+    "draft": 8,
+    "gprofile": 9,
+    "gscore": 10,
+    "ginjury": 11,
+    "gwaiver": 12,
+    "gtrade": 13,
+    "gsetup": 14,
+    "goffer": 15,
 }
 
 

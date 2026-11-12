@@ -59,6 +59,30 @@ class SimInputs(Protocol):
         self, league_id: str, *, mode: str = "remaining", username: str = "", roster_id: str = ""
     ) -> LeagueSnapshot: ...
 
+    def player_pool(self, scoring_settings: Mapping[str, float]) -> "PlayerPool": ...
+
+
+# Numeric context columns handed to the GM game's player model, when present.
+_POOL_EXTRA_COLUMNS = (
+    "ppg", "prior_ppg", "games_played", "prior_games_played", "years_exp", "depth_chart_order",
+    "snap_share", "target_share", "rush_share", "opportunity_share", "injury_risk_score",
+)
+_POOL_POSITIONS = ("QB", "RB", "WR", "TE", "K")
+
+
+class PlayerPool:
+    """The whole fantasy-relevant NFL player pool, frozen into plain rows.
+
+    ``rows`` are adapter rows for ``game_setup.build_snapshot``: pid, name, pos,
+    nfl_team, age, market (0-100), mean/sd (weekly points in the game's
+    scoring), injury_weeks, extra. ``bye_weeks`` maps NFL team to bye week.
+    """
+
+    def __init__(self, rows: list[dict[str, Any]], bye_weeks: Mapping[str, int], notes: tuple[str, ...] = ()) -> None:
+        self.rows = rows
+        self.bye_weeks = dict(bye_weeks)
+        self.notes = notes
+
 
 def _num(value: Any, default: float = 0.0) -> float:
     try:
@@ -326,6 +350,85 @@ class RealSimInputs:
             SimPick(season=y, round=r, orig=t, owner=owner.get((y, r, t), t))
             for y in years for r in range(1, rounds + 1) for t in sorted(tids)
         )
+
+    # ------------------------------------------------------------ game pool
+
+    def player_pool(self, scoring_settings: Mapping[str, float]) -> PlayerPool:
+        """Read-only. The standalone GM game's player pool: every active
+        QB/RB/WR/TE/K on an NFL roster, projected in ``scoring_settings``. No
+        league, no Sleeper: players.db (``mode=ro``) plus the projection
+        estimator and the cached NFL schedule."""
+
+        _, projections, _ = self._mods()
+        table = self._read_pool_table()
+        rows = [
+            r for r in table
+            if str(r.get("position") or "").upper() in _POOL_POSITIONS
+            and _num(r.get("active"), 1.0) > 0 and _num(r.get("is_current_fantasy_eligible"), 1.0) > 0
+            and str(r.get("team") or "").strip().upper() not in ("", "FA")
+        ]
+        if not rows:
+            raise SimInputsError("players_unavailable")
+        max_value = max((_num(r.get("value")) for r in rows), default=0.0) or 1.0
+        baseline: dict[str, Any] = {}
+        try:
+            baseline = projections.baseline_weekly_points(
+                [{"player_id": str(r["player_id"]), "position": str(r["position"]).upper()} for r in rows],
+                scoring_settings=dict(scoring_settings),
+            ) or {}
+        except Exception:
+            baseline = {}
+        out: list[dict[str, Any]] = []
+        fallbacks = 0
+        for r in rows:
+            pid = str(r["player_id"])
+            market = max(0.0, min(100.0, _num(r.get("value")) / max_value * 100.0))
+            projected = baseline.get(pid)
+            if projected and _num(projected.get("ppg")) > 0:
+                mean, sd = _num(projected["ppg"]), _num(projected.get("sd"))
+            else:
+                fallbacks += 1
+                mean = next((v for v in (_num(r.get("ppg")), _num(r.get("prior_ppg"))) if v > 0), max(1.0, market / 5.0))
+                sd = 0.0
+            status = str(r.get("injury_status") or "").strip().lower()
+            out.append({
+                "pid": pid, "name": str(r.get("name") or pid), "pos": str(r["position"]).upper(),
+                "nfl_team": str(r.get("team") or "").strip().upper(), "age": _num(r.get("age"), 26.0) or 26.0,
+                "market": round(market, 2), "mean": round(mean, 2), "sd": round(sd if sd > 0 else max(2.0, mean * 0.42), 2),
+                "injury_weeks": 4 if status in _OUT_STATUSES else 1 if status == "doubtful" else 0,
+                "extra": {c: _num(r.get(c)) for c in _POOL_EXTRA_COLUMNS if r.get(c) is not None},
+            })
+        seasons = [int(_num(r.get("stats_season"))) for r in table if _num(r.get("stats_season")) > 0]
+        byes: dict[str, int] = {}
+        for season in sorted({max(seasons, default=0), max(seasons, default=0) + 1}, reverse=True):
+            byes = self._bye_weeks(season) if season else {}
+            if byes:
+                break
+        notes = (f"projection_fallback_players:{fallbacks}",) if fallbacks else ()
+        return PlayerPool(out, byes, notes)
+
+    def _read_pool_table(self) -> list[dict[str, Any]]:
+        path = Path(self.players_db_path)
+        if not path.exists():
+            raise SimInputsError("players_unavailable")
+        try:
+            con = sqlite3.connect(f"file:{path.resolve()}?mode=ro", uri=True, timeout=5)
+        except sqlite3.Error as exc:
+            raise SimInputsError("players_unavailable", str(exc)) from exc
+        try:
+            con.row_factory = sqlite3.Row
+            have = {r[1] for r in con.execute("pragma table_info(players)")}
+            wanted = [
+                "player_id", "name", "position", "team", "age", "value", "injury_status", "active",
+                "is_current_fantasy_eligible", "stats_season", *_POOL_EXTRA_COLUMNS,
+            ]
+            cols = [c for c in dict.fromkeys(wanted) if c in have]
+            rows = con.execute(f"select {', '.join(cols)} from players").fetchall()
+        except sqlite3.Error as exc:
+            raise SimInputsError("players_unavailable", str(exc)) from exc
+        finally:
+            con.close()
+        return [dict(r) for r in rows]
 
     def _read_players_table(self) -> list[dict[str, Any]]:
         path = Path(self.players_db_path)

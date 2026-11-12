@@ -11,7 +11,10 @@ from __future__ import annotations
 
 from typing import Any, Mapping
 
-ALLOWED_TABLES = frozenset({"sim_worlds", "sim_snapshots", "sim_results"})
+ALLOWED_TABLES = frozenset({
+    "sim_worlds", "sim_snapshots", "sim_results",
+    "sim_games", "sim_events", "sim_week_checkpoints",
+})
 
 
 class SupabaseSimBackend:
@@ -28,7 +31,13 @@ class SupabaseSimBackend:
     def _filter_query(filters: Mapping[str, str] | None) -> str:
         from urllib.parse import quote
 
-        return "&".join(f"{quote(k, safe='')}=eq.{quote(str(v), safe='')}" for k, v in (filters or {}).items())
+        from modules.sim.store import parse_filter
+
+        parts = []
+        for key, value in (filters or {}).items():
+            op, raw = parse_filter(value)
+            parts.append(f"{quote(key, safe='')}={op}.{quote(raw, safe='')}")
+        return "&".join(parts)
 
     def select(self, table, *, user_id, filters=None, columns="*", order="", limit=0):
         from modules import account_store
@@ -73,6 +82,30 @@ class SupabaseSimBackend:
             return False, "Could not reach Supabase table storage."
         if response.status_code >= 400:
             return False, f"Supabase update failed ({response.status_code}). Is docs/supabase_sim.sql applied?"
+        return True, ""
+
+    def insert_many(self, table, rows):
+        import requests
+
+        from modules import auth_supabase
+        from modules.sim.store import CONFLICT
+
+        self._check(table)
+        if not auth_supabase.is_configured(self.config):
+            return False, "Accounts are not configured."
+        try:
+            response = requests.post(
+                auth_supabase.rest_api_url(self.config, table),
+                headers={**auth_supabase.auth_headers(self.config, self.access_token), "Prefer": "return=minimal"},
+                json=[dict(r) for r in rows],
+                timeout=20,
+            )
+        except Exception:
+            return False, "Could not reach Supabase table storage."
+        if response.status_code == 409:
+            return False, CONFLICT
+        if response.status_code >= 400:
+            return False, f"Supabase insert failed ({response.status_code}). Is docs/supabase_sim_game.sql applied?"
         return True, ""
 
     def delete(self, table, *, user_id, filters):

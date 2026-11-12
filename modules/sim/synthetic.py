@@ -100,3 +100,39 @@ def build_synthetic_snapshot(
         free_agents=tuple(free_agents), schedule=schedule, mode="full",
         bye_weeks=bye_weeks, picks=picks,
     )
+
+
+# ---------------------------------------------------------------- game pool
+
+NFL32 = [
+    "ARI", "ATL", "BAL", "BUF", "CAR", "CHI", "CIN", "CLE", "DAL", "DEN", "DET", "GB", "HOU", "IND", "JAX", "KC",
+    "LAC", "LAR", "LV", "MIA", "MIN", "NE", "NO", "NYG", "NYJ", "PHI", "PIT", "SEA", "SF", "TB", "TEN", "WAS",
+]
+_POOL_SHAPE = {  # position -> (count, top weekly mean, decay per rank, sd fraction)
+    "QB": (70, 23.0, 0.972, 0.40), "RB": (170, 20.0, 0.985, 0.50), "WR": (230, 19.0, 0.987, 0.50),
+    "TE": (95, 14.0, 0.975, 0.55), "K": (40, 9.0, 0.985, 0.45),
+}
+
+
+def build_synthetic_pool(seed: int = 7) -> tuple[list[dict], dict[str, int]]:
+    """A deterministic fake NFL player pool (raw adapter rows) plus real-looking
+    bye weeks, for tests and local dev. Mirrors ``RealSimInputs.player_pool``."""
+
+    rng = np.random.default_rng(seed)
+    rows: list[dict] = []
+    counter = 0
+    for pos, (count, top, decay, sd_frac) in _POOL_SHAPE.items():
+        for rank in range(count):
+            counter += 1
+            mean = max(1.5, top * decay ** rank * float(np.exp(rng.normal(0, 0.06))))
+            age = float(np.clip(rng.normal(26.0, 3.2), 21, 37))
+            market = float(np.clip(mean * _MARKET_PER_POINT[pos] * (1.0 + (27 - age) * 0.03) + rng.normal(0, 4), 0.5, 100))
+            rows.append({
+                "pid": f"g{counter:04d}", "name": f"{pos} Guy {counter}", "pos": pos,
+                "nfl_team": NFL32[counter % 32], "age": round(age, 1), "market": round(market, 2),
+                "mean": round(mean, 2), "sd": round(mean * sd_frac, 2),
+                "injury_weeks": 3 if rng.random() < 0.01 else 0,
+                "extra": {"prior_ppg": round(mean * float(rng.uniform(0.85, 1.15)), 2)},
+            })
+    byes = {team: 5 + (i // 3) % 10 for i, team in enumerate(NFL32)}
+    return rows, byes
