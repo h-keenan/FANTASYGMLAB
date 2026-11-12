@@ -5,6 +5,7 @@ from typing import Any, Callable
 
 import pandas as pd
 
+from modules.nfl_teams import NFL_TEAM_CODES, TEAM_CODE_ALIASES, canonical_team
 from modules.player_identity import (
     canonicalize_player_id,
     ensure_identity_columns,
@@ -14,21 +15,14 @@ from modules.player_identity import (
 )
 
 # Sleeper's team defenses use the team abbreviation as the player id.
-SLEEPER_DEF_IDS = frozenset(
-    {
-        "ARI", "ATL", "BAL", "BUF", "CAR", "CHI", "CIN", "CLE", "DAL", "DEN", "DET",
-        "GB", "HOU", "IND", "JAX", "KC", "LAC", "LAR", "LV", "MIA", "MIN", "NE",
-        "NO", "NYG", "NYJ", "PHI", "PIT", "SEA", "SF", "TB", "TEN", "WAS",
-    }
-)
-# ESPN team abbreviations that differ from Sleeper's.
-ESPN_TEAM_ALIASES = {"WSH": "WAS", "JAC": "JAX", "OAK": "LV", "SD": "LAC", "STL": "LAR", "LA": "LAR"}
+SLEEPER_DEF_IDS = NFL_TEAM_CODES
+# ESPN team abbreviations that differ from Sleeper's (single table: modules.nfl_teams).
+ESPN_TEAM_ALIASES = TEAM_CODE_ALIASES
 _DST_POSITIONS = {"D/ST", "DST", "DEF"}
 
 
 def normalize_espn_team(team: Any) -> str:
-    text = str(team or "").strip().upper()
-    return ESPN_TEAM_ALIASES.get(text, text)
+    return canonical_team(team)
 
 
 def _optional_bool(value: Any) -> bool | None:

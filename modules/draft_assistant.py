@@ -12,6 +12,7 @@ from modules.league_value_settings import _safe_positive_int
 from modules.platforms.sleeper import get_sleeper_adapter
 from modules.player_eligibility import filter_current_fantasy_players
 from modules.player_identity import ensure_identity_columns
+from modules.player_names import normalize_player_name as _canonical_player_name
 from modules.roster_needs import assessment_from_model, room_records
 
 
@@ -136,8 +137,7 @@ def draft_pick_player_id(pick: dict | None) -> str:
 
 
 def normalize_player_name(value: Any) -> str:
-    text = _safe_text(value).casefold()
-    return re.sub(r"[^a-z0-9]+", " ", text).strip()
+    return _canonical_player_name(_safe_text(value))
 
 
 def draft_pick_player_name(pick: dict | None) -> str:

@@ -2,11 +2,13 @@ import copy
 import functools
 import hashlib
 import json
+import logging
 import os
 import sqlite3
 import threading
 import time
 import unicodedata
+from datetime import date
 from collections import OrderedDict
 from functools import lru_cache
 from typing import Any, Dict, List, Sequence
@@ -24,14 +26,18 @@ from modules import sleeper as sleeper_module
 from modules.fantasycalc import FANTASYCALC_CACHE_PATH, get_dynasty_values
 from modules.frame_records import frame_records
 from modules.player_identity import ensure_identity_columns
+from modules import player_universe
+from modules.player_names import loose_name_key, player_name_key
 from modules.valuation_authority import (
     AUTHORITATIVE_COLUMN,
     MODEL_DERIVED,
     PROVIDER_BACKED,
+    RECONCILED_UNMODELED,
     SOURCE_COLUMN,
     STATUS_COLUMN,
     TRADE_ELIGIBLE_COLUMN,
     VALUATION_AUTHORITY_CONTRACT_VERSION,
+    annotate_valuation_authority,
 )
 from modules.player_eligibility import (
     PLAYER_ELIGIBILITY_CONTRACT_VERSION,
@@ -47,6 +53,8 @@ from modules.sleeper import (
     prior_season_stats_cache_available,
     season_stats_cache_has_weekly,
 )
+
+_LOG = logging.getLogger(__name__)
 
 FANTASY_POSITIONS = {"QB", "RB", "WR", "TE", "K"}
 UNRANKED_SEARCH_RANK = 9999999
@@ -974,28 +982,10 @@ def rank_to_value(search_rank) -> int:
     return 0
 
 
-_NAME_SUFFIX_TOKENS = frozenset({"jr", "sr", "ii", "iii", "iv", "v"})
-
-
 def _normalize_name(name: str) -> str:
-    """Market-matching key: accent-, punctuation- and generational-suffix-free.
+    """Market-matching key (delegates to the single normalizer in modules.player_names)."""
 
-    "Kenneth Walker III", "Kenneth Walker" and "Ken\u00e9th Walker, Jr." all
-    reduce to the same key so a provider listing without the suffix (or with a
-    different one) still matches the Sleeper row.
-    """
-
-    text = unicodedata.normalize("NFKD", str(name or ""))
-    text = "".join(ch for ch in text if not unicodedata.combining(ch)).lower()
-    tokens = [
-        "".join(ch for ch in token if ch.isalnum())
-        for token in text.replace(".", " ").replace(",", " ").split()
-    ]
-    tokens = [token for token in tokens if token]
-    # Keep a lone token even if it looks like a suffix ("V", "Jr").
-    while len(tokens) > 1 and tokens[-1] in _NAME_SUFFIX_TOKENS:
-        tokens.pop()
-    return "".join(tokens)
+    return player_name_key(name)
 
 
 # Rows persisted before ages became nullable carry 99 for "unknown".
@@ -3637,8 +3627,43 @@ def _prepare_fantasycalc_values() -> pd.DataFrame:
     return _normalize_fantasycalc_values(fc)
 
 
+def _clean_provider_id(series: pd.Series) -> pd.Series:
+    """Provider ids as stable strings ("7567", never "7567.0"/"nan")."""
+
+    def clean(value: Any) -> str:
+        if value is None:
+            return ""
+        try:
+            if pd.isna(value):
+                return ""
+        except (TypeError, ValueError):
+            pass
+        text = str(value).strip()
+        if text.endswith(".0") and text[:-2].isdigit():
+            text = text[:-2]
+        return "" if text.casefold() in {"nan", "none", "null"} else text
+
+    return series.map(clean)
+
+
+FANTASYCALC_NORMALIZED_COLUMNS = [
+    "fc_key",
+    "fantasycalc_value",
+    "fc_sleeper_id",
+    "fc_mfl_id",
+    "fc_key_unique",
+    "fc_loose_key",
+    "fc_position",
+]
+
+
 def _normalize_fantasycalc_values(fc: pd.DataFrame) -> pd.DataFrame:
-    """Normalize already-loaded FantasyCalc rows without provider access."""
+    """Normalize already-loaded FantasyCalc rows without provider access.
+
+    Rows keep their provider ids (``fc_sleeper_id`` / ``fc_mfl_id``) so the join
+    can be id-based; the name key is only a fallback and ``fc_key_unique`` says
+    whether it is unambiguous inside the provider list itself.
+    """
 
     if fc is None or fc.empty:
         return pd.DataFrame(columns=["fc_key", "fantasycalc_value"])
@@ -3647,34 +3672,116 @@ def _normalize_fantasycalc_values(fc: pd.DataFrame) -> pd.DataFrame:
     fc["name_key"] = fc["name"].map(_normalize_name)
     fc["position_key"] = fc["position"].astype(str).str.upper()
     fc["fc_key"] = fc["name_key"] + "|" + fc["position_key"]
+    fc["fc_loose_key"] = fc["name"].map(loose_name_key) + "|" + fc["position_key"]
     fc["fantasycalc_value"] = pd.to_numeric(fc["value"], errors="coerce").fillna(0)
+    for source, target in (("sleeper_id", "fc_sleeper_id"), ("mfl_id", "fc_mfl_id")):
+        fc[target] = _clean_provider_id(fc[source]) if source in fc.columns else ""
+    fc["fc_position"] = fc["position_key"]
     fc = fc[fc["fantasycalc_value"] > 0]
     if fc.empty:
         return pd.DataFrame(columns=["fc_key", "fantasycalc_value"])
 
     fc = fc.sort_values("fantasycalc_value", ascending=False)
-    return fc[["fc_key", "fantasycalc_value"]].drop_duplicates("fc_key")
+    fc["fc_key_unique"] = ~fc.duplicated("fc_key", keep=False)
+    return fc[FANTASYCALC_NORMALIZED_COLUMNS].reset_index(drop=True)
 
 
-# A veteran with no NFL team and no market listing is valued from Sleeper's
-# search_rank alone, which is a popularity signal (retirees keep searching
-# well). Cap the raw value so an unsigned retiree cannot look like a starter.
-TEAMLESS_VETERAN_VALUE_CAP = 1500.0
+def _fantasycalc_position_overrides(fc: pd.DataFrame) -> dict[str, str]:
+    """Sleeper id -> market position, for players the provider positions as a
+    fantasy position (WR/RB/QB/TE/K) even though Sleeper's primary position is
+    not one (e.g. Travis Hunter: Sleeper DB, FantasyCalc WR)."""
+
+    if fc is None or fc.empty or "fc_sleeper_id" not in fc.columns:
+        return {}
+    usable = fc[(fc["fc_sleeper_id"] != "") & fc["fc_position"].isin(FANTASY_POSITIONS)]
+    return dict(zip(usable["fc_sleeper_id"], usable["fc_position"]))
 
 
-def _cap_teamless_veteran_values(df: pd.DataFrame) -> pd.DataFrame:
-    team = df["team"] if "team" in df.columns else pd.Series("", index=df.index)
-    teamless = team.fillna("").astype(str).str.strip().eq("")
-    years_exp = pd.to_numeric(
-        df["years_exp"] if "years_exp" in df.columns else pd.Series(np.nan, index=df.index),
-        errors="coerce",
-    )
-    # Rookies/prospects (0 years) are legitimately teamless before the draft.
-    veteran = years_exp.fillna(0) >= 1
+def join_fantasycalc(df: pd.DataFrame, fc: pd.DataFrame) -> pd.DataFrame:
+    """Attach ``fantasycalc_value`` by provider id, with a guarded name fallback.
+
+    1. **Id join**: the provider's Sleeper id against ``player_id``. Authoritative.
+    2. **Name fallback**, only for provider rows that carry no usable id (an id-less
+       row, or an id absent from this pool) and only when the match is unambiguous:
+       the ``name|position`` key must be unique in the provider list AND among the
+       still-unmatched pool rows, and the pool row must not already have an id match.
+       Every fallback match is logged. A provider row whose id resolves to a pool
+       row is never name-matched onto a different (same-name) record.
+
+    Join accounting is left in ``df.attrs["fantasycalc_join"]``.
+    """
+
+    df = df.drop(columns=["fantasycalc_value"], errors="ignore")
+    if fc is None or fc.empty:
+        df["fantasycalc_value"] = 0.0
+        df.attrs["fantasycalc_join"] = {"by_id": 0, "by_name_fallback": 0, "fallback_players": []}
+        return df
+    ids = df["player_id"].fillna("").astype(str) if "player_id" in df.columns else pd.Series("", index=df.index)
+    values = pd.Series(np.nan, index=df.index, dtype=float)
+
+    has_ids = "fc_sleeper_id" in fc.columns
+    pool_ids = set(ids)
+    if has_ids:
+        by_id = (
+            fc[fc["fc_sleeper_id"] != ""]
+            .drop_duplicates("fc_sleeper_id")
+            .set_index("fc_sleeper_id")["fantasycalc_value"]
+        )
+        id_matched = ids.isin(by_id.index)
+        values[id_matched] = ids[id_matched].map(by_id).astype(float)
+        fallback_fc = fc[(fc["fc_sleeper_id"] == "") | ~fc["fc_sleeper_id"].isin(pool_ids)]
+    else:
+        id_matched = pd.Series(False, index=df.index)
+        fallback_fc = fc
+    fallback_fc = fallback_fc[fallback_fc["fc_key_unique"].fillna(True).astype(bool)] if "fc_key_unique" in fallback_fc.columns else fallback_fc
+    fallback_fc = fallback_fc.drop_duplicates("fc_key")
+
+    candidates = df.index[~id_matched]
+    cand_keys = df.loc[candidates, "name"].map(_normalize_name) + "|" + df.loc[candidates, "position"].astype(str).str.upper()
+    unique_in_pool = ~cand_keys.duplicated(keep=False)
+    by_name = fallback_fc.set_index("fc_key")["fantasycalc_value"]
+    name_hit = cand_keys.isin(by_name.index) & unique_in_pool
+    fallback_index = cand_keys.index[name_hit]
+    if len(fallback_index):
+        values[fallback_index] = cand_keys[name_hit].map(by_name).astype(float).to_numpy()
+    fallback_players = [str(df.at[i, "name"]) for i in fallback_index]
+    if fallback_players:
+        _LOG.info("fantasycalc name-fallback matches (%d): %s", len(fallback_players), ", ".join(fallback_players[:25]))
+    df["fantasycalc_value"] = pd.to_numeric(values, errors="coerce").fillna(0)
+    df.attrs["fantasycalc_join"] = {
+        "by_id": int(id_matched.sum()),
+        "by_name_fallback": len(fallback_players),
+        "fallback_players": fallback_players,
+    }
+    return df
+
+
+def _apply_lifecycle_valuation(df: pd.DataFrame, replacement_values: dict[str, float]) -> pd.DataFrame:
+    """Popularity (Sleeper ``search_rank``) is not evidence of a current NFL role.
+
+    Replaces the flat ``TEAMLESS_VETERAN_VALUE_CAP`` hack with rules driven by the
+    lifecycle state (modules.player_universe) and market evidence:
+
+    * ``retired_or_unknown`` with no market print: no current evidence of an NFL
+      career, so there is nothing to value (0, flagged unmodeled by the caller).
+    * ``free_agent`` / ``inactive`` with no market print: available to anyone, so
+      by definition not worth more than replacement level at his position.
+      The ceiling is the pool's own replacement value, not a magic constant.
+    * Team-held players (roster, reserve, practice squad) and anyone with a market
+      print are untouched.
+    """
+
+    state = df["lifecycle_state"]
     no_market = pd.to_numeric(df["fantasycalc_value"], errors="coerce").fillna(0) <= 0
-    mask = teamless & veteran & no_market
-    if mask.any():
-        df.loc[mask, "value"] = df.loc[mask, "value"].clip(upper=TEAMLESS_VETERAN_VALUE_CAP)
+    unknown = state.eq(player_universe.RETIRED_OR_UNKNOWN) & no_market
+    unheld = state.isin([player_universe.FREE_AGENT, player_universe.INACTIVE]) & no_market
+    for column in ("value", "market_score"):
+        df.loc[unknown, column] = 0.0
+    if unheld.any():
+        ceiling = df["position"].astype(str).str.upper().map(replacement_values)
+        for column in ("value", "market_score"):
+            capped = np.minimum(df.loc[unheld, column].astype(float), ceiling[unheld].fillna(np.inf))
+            df.loc[unheld, column] = capped
     return df
 
 
@@ -3693,13 +3800,8 @@ def _apply_market_valuation_context(
     df["position_key"] = df["position"].astype(str).str.upper()
     df["fc_key"] = df["name_key"] + "|" + df["position_key"]
 
-    fc = fantasycalc_values
-    if not fc.empty:
-        df = df.drop(columns=["fantasycalc_value"], errors="ignore").merge(fc, on="fc_key", how="left")
-    else:
-        df["fantasycalc_value"] = 0
-    df["fantasycalc_value"] = pd.to_numeric(df["fantasycalc_value"], errors="coerce").fillna(0)
-    df = _cap_teamless_veteran_values(df)
+    df = join_fantasycalc(df, fantasycalc_values)
+    df["lifecycle_state"] = player_universe.annotate_lifecycle(df)
 
     reference_fc = pd.Series(dtype=float)
     if reference_frame is not None and "fantasycalc_value" in reference_frame.columns:
@@ -3719,7 +3821,9 @@ def _apply_market_valuation_context(
         df["market_score"] = df["value"].astype(float)
         df["valuation_blend"] = "Sleeper rank + age/VORP/role"
 
-    market_context = df[["position", "market_score"]].copy()
+    market_context = df.loc[
+        player_universe.is_rankable(df["lifecycle_state"]), ["position", "market_score"]
+    ].copy()
     if reference_frame is not None and {"position", "market_score"}.issubset(reference_frame.columns):
         market_context = pd.concat(
             [reference_frame[["position", "market_score"]], market_context],
@@ -3742,6 +3846,7 @@ def _apply_market_valuation_context(
             else float(pos_values.iloc[min(max(replacement_rank - 1, 0), len(pos_values) - 1)])
         )
 
+    df = _apply_lifecycle_valuation(df, replacement_values)
     df["age_multiplier"] = age_multiplier_series(df["position"], df.get("age"))
     df["age_curve_score"] = (df["market_score"] * df["age_multiplier"]).clip(0, 12000)
     df["scarcity_score"] = df.apply(
@@ -4272,6 +4377,12 @@ def apply_valuation_model(df: pd.DataFrame) -> pd.DataFrame:
     df.loc[has_provider, SOURCE_COLUMN] = "fantasycalc_plus_canonical_model"
     df[AUTHORITATIVE_COLUMN] = True
     df[TRADE_ELIGIBLE_COLUMN] = True
+    # No current evidence of an NFL career and no market print: kept as a row (never
+    # deleted) but explicitly unmodeled, never valued from popularity.
+    no_evidence = df["lifecycle_state"].eq(player_universe.RETIRED_OR_UNKNOWN) & ~has_provider
+    if no_evidence.any():
+        df.loc[no_evidence, STATUS_COLUMN] = RECONCILED_UNMODELED
+        df = annotate_valuation_authority(df)
 
     cleanup_cols = ["search_rank_num", "name_key", "position_key", "fc_key", "fantasycalc_score"]
     return df.drop(columns=[col for col in cleanup_cols if col in df.columns])
@@ -4342,7 +4453,8 @@ def hydrate_reconciled_valuations_from_cache(
     )
     provider_keys = set(fc.get("fc_key", pd.Series(dtype=str)).astype(str))
     player_ids = candidates["player_id"].fillna("").astype(str)
-    provider_supported = candidate_keys.isin(provider_keys)
+    provider_ids = set(fc.get("fc_sleeper_id", pd.Series(dtype=str)).astype(str)) - {""}
+    provider_supported = candidate_keys.isin(provider_keys) | player_ids.isin(provider_ids)
     model_supported = player_ids.isin(set(current_stats) | set(prior_stats))
     locally_supported = provider_supported | model_supported
     # Rank-only identities are not enough to promote an actionable value here.
@@ -4386,9 +4498,15 @@ def hydrate_reconciled_valuations_from_cache(
     return pd.concat([unsupported, work], axis=0, sort=False).sort_index(kind="stable")
 
 
-def normalize_player_record(pid: str, p: Dict[str, Any]) -> Dict[str, Any]:
+def normalize_player_record(
+    pid: str,
+    p: Dict[str, Any],
+    *,
+    position_override: str | None = None,
+    as_of: date | None = None,
+) -> Dict[str, Any]:
     name = p.get("full_name") or p.get("name") or ""
-    position = (p.get("position") or "").upper()
+    position = (position_override or p.get("position") or "").upper()
     if position == "PK":
         position = "K"
     team = p.get("team") or ""
@@ -4407,6 +4525,9 @@ def normalize_player_record(pid: str, p: Dict[str, Any]) -> Dict[str, Any]:
         age = float(age) if age is not None else None
     except Exception:
         age = None
+    # Sleeper's ``age`` is frozen for non-active records; the birth date is not.
+    birth_date = p.get("birth_date") or ""
+    age = player_universe.resolve_age(birth_date, age, as_of=as_of)
 
     fantasy_positions = FANTASY_POSITIONS
 
@@ -4447,6 +4568,7 @@ def normalize_player_record(pid: str, p: Dict[str, Any]) -> Dict[str, Any]:
         "position": position,
         "team": team,
         "age": age,
+        "birth_date": birth_date,
         "value": base_value,
         "search_rank": p.get("search_rank"),
         "active": p.get("active"),
@@ -4483,8 +4605,14 @@ def build_players_table(db_path: str, refresh: bool = False) -> pd.DataFrame:
     )
     normalization_started = time.perf_counter()
     records = []
+    # Market positions for players Sleeper does not position as a fantasy position
+    # (Travis Hunter: Sleeper DB, FantasyCalc WR) so they are admitted and valued.
+    market_positions = _fantasycalc_position_overrides(_prepare_fantasycalc_values())
     for pid, p in players.items():
-        rec = normalize_player_record(pid, p)
+        override = None
+        if str(p.get("position") or "").upper() not in FANTASY_POSITIONS:
+            override = market_positions.get(str(pid))
+        rec = normalize_player_record(pid, p, position_override=override)
         if not rec["name"]:
             continue
         if rec["position"] not in FANTASY_POSITIONS:

@@ -11,7 +11,7 @@ from urllib.parse import quote
 
 import requests
 
-from modules import performance, sleeper_budget, sleeper_cache
+from modules import performance, season_clock, sleeper_budget, sleeper_cache
 from modules.file_lock import ExclusiveFileLock
 
 SLEEPER_BASE = "https://api.sleeper.app/v1"
@@ -233,11 +233,20 @@ def backfill_played_zero_points(cached: Dict[str, Any] | None) -> Dict[str, Any]
     return cached
 
 
-def default_player_stats_season(now: time.struct_time | None = None) -> int:
-    """Canonical active NFL stats season (Sep+ → calendar year, else prior year)."""
+def _struct_to_date(now: time.struct_time | None):
+    if now is None:
+        return None
+    return date(int(now.tm_year), int(now.tm_mon), int(now.tm_mday))
 
-    current = now or time.localtime()
-    return int(current.tm_year if current.tm_mon >= 9 else current.tm_year - 1)
+
+def default_player_stats_season(now: time.struct_time | None = None) -> int:
+    """Canonical active NFL stats season, from the single season clock.
+
+    ``now`` pins the deterministic calendar rule (tests); without it the answer
+    is Sleeper's ``/state/nfl`` via ``modules.season_clock`` with calendar fallback.
+    """
+
+    return season_clock.current_season(_struct_to_date(now))
 
 
 def prior_player_stats_season(now: time.struct_time | None = None) -> int:
@@ -247,13 +256,12 @@ def prior_player_stats_season(now: time.struct_time | None = None) -> int:
 
 
 def _player_stats_cache_ttl(season: int, now: time.struct_time | None = None) -> int:
-    current = now or time.localtime()
-    active = default_player_stats_season(current)
+    clock = season_clock.season_clock(_struct_to_date(now))
     season_i = int(season)
-    if season_i < active:
+    if season_i < clock.season:
         return PRIOR_PLAYER_STATS_CACHE_TTL_SECONDS
-    # Active season: short TTL once the NFL regular season calendar starts.
-    active_regular_season = season_i == int(current.tm_year) and current.tm_mon >= 9
+    # Active season: short TTL while the NFL regular season is being played.
+    active_regular_season = season_i == clock.season and clock.phase == season_clock.PHASE_REGULAR
     return PLAYER_STATS_CACHE_TTL_SECONDS if active_regular_season else COMPLETED_PLAYER_STATS_CACHE_TTL_SECONDS
 
 

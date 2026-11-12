@@ -445,7 +445,10 @@ def gen_arbitrage(ctx: Context) -> list[dict]:
 
 
 def upcoming_draft_year(today: date) -> int:
-    return today.year + 1 if today.month >= 5 else today.year
+    # One season clock (modules.season_clock) owns the draft-year rule.
+    from modules import season_clock
+
+    return season_clock.upcoming_draft_year(today)
 
 
 def gen_pick_for_player(ctx: Context) -> list[dict]:

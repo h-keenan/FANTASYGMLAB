@@ -61,8 +61,12 @@ _MIN_PLAYED_FOR_FIRST_WEEK = 200
 
 
 def default_season(now: Optional[time.struct_time] = None) -> int:
-    current = now or time.localtime()
-    return int(current.tm_year if current.tm_mon >= 9 else current.tm_year - 1)
+    from datetime import date
+
+    from modules import season_clock
+
+    today = date(now.tm_year, now.tm_mon, now.tm_mday) if now is not None else None
+    return int(season_clock.current_season(today))
 
 
 def _fetch(url: str) -> List[Dict[str, Any]]:

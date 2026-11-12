@@ -21,9 +21,10 @@ import re
 from collections import defaultdict
 from typing import Any, Mapping
 
+from modules.player_names import normalize_player_name
+
 GSIS_RE = re.compile(r"^00-\d{7}$")
 FLAG_ENV = "DYNASTYGM_NEWS_EVIDENCE_FETCH"
-_SUFFIX_RE = re.compile(r"\b(jr|sr|ii|iii|iv|v)$")
 _MISSING = {"", "nan", "none", "null", "na"}
 
 R_NOT_IN_DUMP = "player_not_in_sleeper_dump"
@@ -39,10 +40,9 @@ def enabled() -> bool:
 
 
 def normalize_name(name: Any) -> str:
-    text = str(name or "").casefold().replace(".", "").replace("'", "")
-    text = re.sub(r"[^a-z0-9 ]", " ", text)
-    text = re.sub(r"\s+", " ", text).strip()
-    return _SUFFIX_RE.sub("", text).strip()
+    """Delegates to the single normalizer in modules.player_names."""
+
+    return normalize_player_name(name)
 
 
 class GsisCrosswalk:

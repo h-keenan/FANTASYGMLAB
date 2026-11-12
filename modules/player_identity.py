@@ -5,6 +5,8 @@ from typing import Any
 
 import pandas as pd
 
+from modules.player_names import normalize_player_name as _canonical_player_name
+
 
 SUPPORTED_DIRECT_PLATFORMS = {"sleeper"}
 
@@ -29,22 +31,10 @@ def normalize_player_id(value: Any) -> str:
     return text
 
 
-_NAME_GENERATIONAL_SUFFIXES = {"jr", "sr", "ii", "iii", "iv", "v"}
-# Apostrophes and periods join the letters around them instead of splitting
-# a name into extra tokens, so "De'Von" / "DeVon" and "A.J." / "AJ" compare
-# equal. Hyphens and spaces still separate tokens.
-_NAME_JOINING_PUNCTUATION = re.compile(r"[\'\u2018\u2019\u02bc`.]")
-
-
 def normalize_player_name(name: Any) -> str:
-    if name is None:
-        return ""
-    text = _NAME_JOINING_PUNCTUATION.sub("", str(name).casefold().strip())
-    normalized = re.sub(r"[^a-z0-9]+", " ", text).strip()
-    tokens = normalized.split()
-    while tokens and tokens[-1] in _NAME_GENERATIONAL_SUFFIXES:
-        tokens.pop()
-    return " ".join(tokens)
+    """Delegates to the single normalizer in modules.player_names."""
+
+    return _canonical_player_name(name)
 
 
 def ensure_identity_columns(df_players: pd.DataFrame | None) -> pd.DataFrame:
