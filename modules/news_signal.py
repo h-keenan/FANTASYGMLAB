@@ -14,6 +14,8 @@ from dataclasses import asdict, dataclass
 from functools import lru_cache
 from typing import Any, Dict, Iterable, List, Mapping, Sequence
 
+from modules.player_names import GENERATIONAL_SUFFIXES, normalize_player_name as _canonical_player_name
+
 # --- Taxonomies ----------------------------------------------------------------
 
 EVENT_INJURY = "injury/status"
@@ -45,7 +47,7 @@ SPECULATION_PRIORITY_PENALTY = 40
 OFFICIAL_PRIORITY_BONUS = 12
 STRONG_PRIORITY_BONUS = 6
 
-NAME_SUFFIXES = frozenset({"jr", "sr", "ii", "iii", "iv", "v"})
+NAME_SUFFIXES = GENERATIONAL_SUFFIXES
 
 # Surnames that are also an NFL team's city/nickname — a bare last-name match
 # against one of these is unreliable regardless of roster-teammate collisions,
@@ -347,14 +349,9 @@ def _word_pattern(phrase: str) -> "re.Pattern[str]":
 
 
 def normalize_player_name(name: str) -> str:
-    """Lowercased full name without generational suffixes."""
+    """Lowercased full name without generational suffixes (single normalizer)."""
 
-    tokens = [
-        token
-        for token in re.findall(r"[a-z0-9']+", str(name or "").lower())
-        if token not in NAME_SUFFIXES
-    ]
-    return " ".join(tokens).strip()
+    return _canonical_player_name(name)
 
 
 def player_last_name(name: str) -> str:

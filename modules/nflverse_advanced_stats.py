@@ -37,6 +37,8 @@ import time
 from datetime import datetime, timezone
 from typing import Any, Mapping
 
+from modules.nfl_teams import TEAM_CODE_ALIASES, canonical_team
+
 SCHEMA_VERSION = 1
 SOURCE_NAME = "nflverse"
 LICENSE_NAME = "CC BY 4.0"
@@ -63,8 +65,8 @@ SKILL_POSITIONS = ("RB", "WR", "TE")
 RED_ZONE_YARDLINE = 20
 GOAL_LINE_YARDLINE = 5
 
-# nflverse team codes that differ from Sleeper's.
-TEAM_ALIASES = {"LA": "LAR", "OAK": "LV", "SD": "LAC", "STL": "LAR", "JAC": "JAX", "WSH": "WAS"}
+# nflverse team codes that differ from Sleeper's (single table: modules.nfl_teams).
+TEAM_ALIASES = TEAM_CODE_ALIASES
 
 # A refresh that parses to fewer than this many skill players for a season
 # already underway is a broken download, not a quiet week.
@@ -86,8 +88,7 @@ class AdvancedStatsError(RuntimeError):
 
 
 def normalize_team(team: Any) -> str:
-    code = str(team or "").strip().upper()
-    return TEAM_ALIASES.get(code, code)
+    return canonical_team(team)
 
 
 def _download(url: str, *, max_bytes: int, session: Any = None) -> bytes:

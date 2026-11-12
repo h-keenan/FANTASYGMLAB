@@ -13,6 +13,8 @@ import numpy as np
 import pandas as pd
 
 from modules import injury_status as injury_table
+from modules import player_universe as _universe
+from modules import season_clock as _season_clock
 from modules import trust_enforcement as _trust_enforcement
 from modules import trust_engine as _trust_engine
 from modules.trust_enforcement import EnforcementLevel, enforce_player_record
@@ -20,15 +22,7 @@ from modules.trust_engine import canonical_object_key
 
 
 FANTASY_POSITIONS = {"QB", "RB", "WR", "TE", "K"}
-INELIGIBLE_STATUS_TERMS = {
-    "retired",
-    "inactive",
-    "not active",
-    "historical",
-    "historical only",
-    "deceased",
-    "invalid",
-}
+INELIGIBLE_STATUS_TERMS = set(_universe.INELIGIBLE_STATUS_TERMS)
 CURRENT_STATUS_TERMS = {
     "active",
     "free agent",
@@ -57,17 +51,26 @@ CURRENT_STATUS_TERMS = {
 # "fall through instead of auto-disqualifying" intent silently never fires
 # for them (coridian_, 2026-10-19: "fix player identity joins... no
 # mismatched profiles" — this was one real cause).
-RESERVE_STATUS_TERMS = set(injury_table.terms_for_kinds(("reserve",)))
+RESERVE_STATUS_TERMS = set(_universe.RESERVE_STATUS_TERMS)
 # Sleeper reports some rostered injured players as `status: "Inactive"` with
 # `injury_status: "IR"` (and `active: true`). The injury designation is the
 # reserve signal; a bare Inactive with no injury status stays excluded.
-RESERVE_INJURY_STATUS_TERMS = RESERVE_STATUS_TERMS | {"out"}
-FREE_AGENT_TEAM_MARKERS = {"", "FA", "FREE AGENT", "FREE_AGENT", "NONE", "N/A", "NA"}
-NEWS_FRESHNESS_DAYS = 730
-UNSIGNED_VETERAN_NEWS_FRESHNESS_DAYS = 180
-VETERAN_UNSIGNED_MIN_EXPERIENCE = 10
-VETERAN_UNSIGNED_MIN_AGE = 35
-PLAYER_ELIGIBILITY_CONTRACT_VERSION = "active-fantasy-player-v2"
+RESERVE_INJURY_STATUS_TERMS = set(_universe.RESERVE_INJURY_STATUS_TERMS)
+FREE_AGENT_TEAM_MARKERS = set(_universe.FREE_AGENT_TEAM_MARKERS)
+NEWS_FRESHNESS_DAYS = _universe.NEWS_FRESHNESS_DAYS
+UNSIGNED_VETERAN_NEWS_FRESHNESS_DAYS = _universe.UNSIGNED_VETERAN_NEWS_FRESHNESS_DAYS
+VETERAN_UNSIGNED_MIN_EXPERIENCE = _universe.VETERAN_MIN_EXPERIENCE
+VETERAN_UNSIGNED_MIN_AGE = _universe.VETERAN_MIN_AGE
+# Transitional pool-membership policy. The old rule ("active and years_exp <= 1" is
+# permanent evidence) admitted every Sleeper-created UDFA/camp body as a current
+# rookie. The rookie signal now requires a club to hold the player (lifecycle
+# state), but this phase deletes nobody from the pool: rows that only used to
+# pass on the old rule stay members under their own reason code, are classified
+# retired_or_unknown by the lifecycle model and are not valued from popularity.
+# Flip to False in phase 2, once every surface asks a lifecycle predicate, to stop
+# admitting them at all.
+RETAIN_UNEVIDENCED_ROOKIE_RECORDS = True
+PLAYER_ELIGIBILITY_CONTRACT_VERSION = "active-fantasy-player-v3"
 TRUST_ANNOTATION_COLUMNS = {
     "is_current_fantasy_eligible",
     "player_eligibility_reason",
@@ -144,13 +147,7 @@ def _safe_number(value: Any, default: float | None = None) -> float | None:
     return number if pd.notna(number) else default
 
 
-def _news_timestamp_seconds(value: Any) -> float | None:
-    timestamp = _safe_number(value)
-    if timestamp is None or timestamp <= 0:
-        return None
-    if timestamp > 10_000_000_000:
-        timestamp /= 1000.0
-    return timestamp
+_news_timestamp_seconds = _universe.news_timestamp_seconds
 
 
 def _fantasy_positions(row: Mapping[str, Any]) -> set[str]:
@@ -237,7 +234,13 @@ def player_eligibility(
         return {"eligible": False, "reason": "retired_or_inactive_status", "current_signal": False}
 
     years_exp = _safe_number(row.get("years_exp"))
-    rookie = active is True and years_exp is not None and years_exp <= 1
+    season = _season_clock.current_season(now.astimezone(timezone.utc).date())
+    # A rookie is "current" because a club holds him (lifecycle state), not merely
+    # because Sleeper still marks a first/second-year record Active.
+    young_active = active is True and years_exp is not None and years_exp <= 1
+    rookie = young_active and _universe.is_team_held(
+        _universe.lifecycle_state(row, now=now, season=season)
+    )
 
     news_timestamp = _news_timestamp_seconds(row.get("news_updated"))
     recent_news = bool(
@@ -249,7 +252,7 @@ def player_eligibility(
     current_depth = bool(depth_position or depth_order > 0)
 
     stats_season = _safe_number(row.get("stats_season"))
-    current_stats = bool(stats_season and stats_season >= now.year - 1)
+    current_stats = bool(stats_season and stats_season >= season - 1)
     fantasycalc_value = _safe_number(row.get("fantasycalc_value"), 0) or 0
     current_market = fantasycalc_value > 0
     team = _safe_text(row.get("team")).strip().upper()
@@ -317,6 +320,9 @@ def player_eligibility(
         return {"eligible": True, "reason": reason, "current_signal": True}
     if status_is_current and current_signal:
         return {"eligible": True, "reason": "corroborated_current_status", "current_signal": True}
+
+    if RETAIN_UNEVIDENCED_ROOKIE_RECORDS and young_active:
+        return {"eligible": True, "reason": "retained_unevidenced_record", "current_signal": False}
 
     return {
         "eligible": False,
@@ -489,7 +495,9 @@ def _annotate_one_row(
 # above is monkeypatched in-process, and fails open.
 
 _ANNOTATION_INPUT_COLUMNS = tuple(
-    dict.fromkeys((*TRUST_PLAYER_INPUT_COLUMNS, "injury_status"))
+    # ``prior_season`` feeds the lifecycle evidence (player_universe.evidence) but is not
+    # part of the trust payload, so it joins the memo key only.
+    dict.fromkeys((*TRUST_PLAYER_INPUT_COLUMNS, "injury_status", "prior_season"))
 )
 _ANNOTATION_MEMO_MAX_ENTRIES = 16384
 _ANNOTATION_MEMO: OrderedDict[bytes, tuple[bool, str, str, str, str, str]] = OrderedDict()
@@ -554,6 +562,8 @@ def _behavior_ids() -> tuple[int, ...]:
             _safe_text,
             _optional_bool,
             _safe_number,
+            _universe.lifecycle_state,
+            _universe.evidence,
             _trust_enforcement.validate_player,
             _trust_enforcement._evidence,
             _trust_engine._validate,
@@ -584,6 +594,8 @@ def _constants_repr() -> str:
             VETERAN_UNSIGNED_MIN_EXPERIENCE,
             VETERAN_UNSIGNED_MIN_AGE,
             PLAYER_ELIGIBILITY_CONTRACT_VERSION,
+            RETAIN_UNEVIDENCED_ROOKIE_RECORDS,
+            _universe.RETIREMENT_AGE,
             TRUST_PLAYER_INPUT_COLUMNS,
         )
     )
@@ -591,7 +603,13 @@ def _constants_repr() -> str:
 
 def _code_version_digest() -> str:
     digest = hashlib.sha256()
-    for module_file in (__file__, _trust_enforcement.__file__, _trust_engine.__file__):
+    for module_file in (
+        __file__,
+        _trust_enforcement.__file__,
+        _trust_engine.__file__,
+        _universe.__file__,
+        _season_clock.__file__,
+    ):
         try:
             with open(module_file, "rb") as handle:
                 digest.update(handle.read())

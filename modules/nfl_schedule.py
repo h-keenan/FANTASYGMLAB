@@ -28,6 +28,7 @@ import pandas as pd
 import requests
 
 from modules import performance
+from modules.nfl_teams import TEAM_CODE_ALIASES  # noqa: F401  (re-exported)
 
 # nflverse's `gametime` column is published in US Eastern local time
 # (the stadium clock, not whatever timezone the server/user happens to be
@@ -47,12 +48,7 @@ GAMES_CACHE_TTL_SECONDS = 6 * 60 * 60
 # STL) are mapped to their current successor so a player's current team
 # code always resolves, even though nflverse keeps the old code on the
 # original historical games.
-TEAM_CODE_ALIASES = {
-    "LA": "LAR",
-    "OAK": "LV",
-    "SD": "LAC",
-    "STL": "LAR",
-}
+# The alias table itself lives in modules.nfl_teams (imported above).
 
 
 def _ensure_data_dir() -> None:

@@ -88,7 +88,7 @@ ERROR_MESSAGES = {
 FEATURE_SUPPORT = features_for(MFL_LABEL, espn_leagues.ESPN_FEATURE_SUPPORT, espn_leagues.ESPN_NOT_AVAILABLE_MESSAGE)
 
 # MFL team abbreviations that differ from Sleeper's (ESPN's aliases cover JAC, OAK, ...).
-_MFL_TEAM_ALIASES = {"GBP": "GB", "KCC": "KC", "NEP": "NE", "NOS": "NO", "SFO": "SF", "TBB": "TB", "LVR": "LV", "SDC": "LAC", "STL": "LAR"}
+_MFL_TEAM_ALIASES = {"GBP": "GB", "KCC": "KC", "NEP": "NE", "NOS": "NO", "SFO": "SF", "TBB": "TB", "LVR": "LV", "SDC": "LAC"}
 _FREE_AGENT_TEAMS = {"", "FA", "FA*", "FREE"}
 _POSITION = {
     "QB": "QB", "RB": "RB", "WR": "WR", "TE": "TE", "PK": "K", "DEF": "DEF",

@@ -231,15 +231,16 @@ def test_news_freshness_window_crossing_with_unchanged_fields():
     )
 
 
-def test_stats_season_year_uses_nows_own_year():
-    # Same UTC date, different calendar year in `now`'s own timezone.
+def test_stats_season_comes_from_the_season_clock_not_the_calendar_year():
+    # "Current stats" means this or last NFL season, where the season flips at
+    # kickoff (modules.season_clock), not on Jan 1 / calendar-year arithmetic.
     frame = _only_signal_row(stats_season=2025)
-    utc_new_year = datetime(2027, 1, 1, 1, 0, tzinfo=timezone.utc)
-    eastern_new_years_eve = datetime(2026, 12, 31, 21, 0, tzinfo=timezone(timedelta(hours=-5)))
-    first = _assert_parity(frame, now=utc_new_year)
-    second = _assert_parity(frame, now=eastern_new_years_eve)
-    assert bool(first["is_current_fantasy_eligible"].iloc[0]) != bool(
-        second["is_current_fantasy_eligible"].iloc[0]
+    new_year = _assert_parity(frame, now=datetime(2027, 1, 1, 1, 0, tzinfo=timezone.utc))
+    assert bool(new_year["is_current_fantasy_eligible"].iloc[0])  # 2026 season: 2025 is last season
+    eve_of_kickoff = _assert_parity(frame, now=datetime(2027, 9, 8, 12, 0, tzinfo=timezone.utc))
+    kickoff = _assert_parity(frame, now=datetime(2027, 9, 9, 12, 0, tzinfo=timezone.utc))
+    assert bool(eve_of_kickoff["is_current_fantasy_eligible"].iloc[0]) != bool(
+        kickoff["is_current_fantasy_eligible"].iloc[0]
     )
 
 

@@ -16,7 +16,7 @@ def _load_cache() -> pd.DataFrame:
         age = time.time() - os.path.getmtime(FANTASYCALC_CACHE_PATH)
         if age > FANTASYCALC_CACHE_TTL_SECONDS:
             return pd.DataFrame()
-        return pd.read_csv(FANTASYCALC_CACHE_PATH)
+        return pd.read_csv(FANTASYCALC_CACHE_PATH, dtype={"sleeper_id": str, "mfl_id": str})
     except Exception:
         return pd.DataFrame()
 
@@ -70,6 +70,9 @@ def get_dynasty_values(num_teams=12, num_qbs=1, ppr=1.0, use_cache=True) -> pd.D
                 "position": pos,
                 "team": team,
                 "value": value,
+                # Provider-side ids let consumers join on identity, not on a name.
+                "sleeper_id": player.get("sleeperId"),
+                "mfl_id": player.get("mflId"),
             }
         )
 

@@ -13,20 +13,28 @@ def test_name_key_strips_suffix_punctuation_accents():
     assert rankings._normalize_name("V") == "v"
 
 
-def test_teamless_veteran_value_capped_but_rookie_and_market_backed_kept():
+def test_lifecycle_valuation_replaces_the_teamless_cap():
+    from modules import player_universe as pu
+
     df = pd.DataFrame(
         {
-            "team": ["", "", "", "KC"],
-            "years_exp": [12, 0, 12, 12],
-            "fantasycalc_value": [0, 0, 500, 0],
-            "value": [7317.0, 7317.0, 7317.0, 7317.0],
+            "position": ["RB"] * 5,
+            "lifecycle_state": [
+                pu.RETIRED_OR_UNKNOWN,  # no evidence, no market: nothing to value
+                pu.FREE_AGENT,          # available to anyone: capped at replacement level
+                pu.FREE_AGENT,          # market-backed: untouched
+                pu.ACTIVE_ROSTERED,     # team-held: untouched
+                pu.RETIRED_OR_UNKNOWN,  # but a market print is evidence
+            ],
+            "fantasycalc_value": [0, 0, 500, 0, 500],
+            "value": [7317.0] * 5,
+            "market_score": [7317.0] * 5,
         }
     )
-    out = rankings._cap_teamless_veteran_values(df)
-    assert out.loc[0, "value"] == rankings.TEAMLESS_VETERAN_VALUE_CAP
-    assert out.loc[1, "value"] == 7317.0
-    assert out.loc[2, "value"] == 7317.0
-    assert out.loc[3, "value"] == 7317.0
+    out = rankings._apply_lifecycle_valuation(df, {"RB": 2000.0})
+    assert out["value"].tolist() == [0.0, 2000.0, 7317.0, 7317.0, 7317.0]
+    assert out["market_score"].tolist() == [0.0, 2000.0, 7317.0, 7317.0, 7317.0]
+    assert not hasattr(rankings, "TEAMLESS_VETERAN_VALUE_CAP")
 
 
 def test_injury_discount_is_age_aware():

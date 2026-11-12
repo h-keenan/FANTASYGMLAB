@@ -1,5 +1,11 @@
 """Opt-in deterministic data fixtures; no global production overrides."""
 
+import os
+
+# The season clock would otherwise call Sleeper's /state/nfl; tests use the
+# deterministic calendar rule (modules.season_clock.clock_from_calendar).
+os.environ.setdefault("FANTASYDESK_SEASON_CLOCK_OFFLINE", "1")
+
 from hashlib import sha256
 from contextlib import contextmanager
 from copy import deepcopy
