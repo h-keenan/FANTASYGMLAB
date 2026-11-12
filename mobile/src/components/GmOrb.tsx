@@ -96,6 +96,7 @@ const ICON_BY_PAGE: Record<string, IconName> = {
   games: 'dice-outline',
   commissioner: 'shield-checkmark-outline',
   portfolio: 'layers-outline',
+  'gm-game': 'game-controller-outline',
   news: 'globe-outline',
   community: 'people-circle-outline',
 };
@@ -134,6 +135,7 @@ function generalDestinations(colors: ThemeColors, storeSubscriber = false, found
     // The league switcher; Account (below) owns settings.
     { label: 'Home', route: 'Home', icon: 'home-outline', color: colors.accent, subtitle: HOME_SUBTITLE },
     destinationFor(colors, navPage('portfolio')),
+    destinationFor(colors, navPage('gm-game')),
     ...(founder
       ? [
           {

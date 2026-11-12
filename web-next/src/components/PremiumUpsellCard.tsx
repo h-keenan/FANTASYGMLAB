@@ -12,7 +12,7 @@ import type { PremiumUpsell } from "@/lib/api";
 import { paidPreview } from "@/lib/paidPreviews";
 
 // Kickers that are also a nav label: those pages get the page name as the H1.
-const NAV_PAGE_KICKERS = new Set(["Draft Center", "College Scouting", "Commissioner", "Live Draft", "Portfolio", "GM Plan", "Trade Finder"]);
+const NAV_PAGE_KICKERS = new Set(["Draft Center", "College Scouting", "Commissioner", "Live Draft", "Portfolio", "GM Plan", "Trade Finder", "Fantasy Sim"]);
 
 /**
  * The lock/upsell card every Premium-only page shows a Free caller instead

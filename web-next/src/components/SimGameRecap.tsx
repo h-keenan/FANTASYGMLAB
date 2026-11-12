@@ -1,0 +1,265 @@
+"use client";
+
+import { useEffect, useState } from "react";
+
+import { AccentCard } from "@/components/AccentCard";
+import { Button } from "@/components/Button";
+import { EmptyState } from "@/components/EmptyState";
+import { PositionBadge } from "@/components/PositionBadge";
+import { SectionHeading } from "@/components/SectionHeading";
+import { SimPlayerLine, SimStat, SimToneBadge, simToneColor, type SimCtx } from "@/components/SimGameParts";
+import { SimStandingsList } from "@/components/SimGameLeague";
+import { SkeletonCard } from "@/components/Skeleton";
+import { ToneBadge } from "@/components/ToneBadge";
+import { api } from "@/lib/api";
+import {
+  simFmtPts,
+  simGradeTone,
+  simPlayoffResultLabel,
+  simPlayoffRoundLabel,
+  simResultLabel,
+  simResultTone,
+  simSlotLabels,
+  simTeamNameMap,
+  type SimGameResult,
+  type SimWeekRecap,
+} from "@/lib/simGame";
+
+/** One week's recap: the score lands first, then your starters, the league and what changed. */
+export function SimWeekRecapView({
+  recap,
+  index,
+  total,
+  ctx,
+  onNext,
+  onClose,
+}: {
+  recap: SimWeekRecap;
+  index: number;
+  total: number;
+  ctx: SimCtx;
+  onNext: () => void;
+  onClose: () => void;
+}) {
+  const names = simTeamNameMap(ctx.game.you ? [{ team_id: ctx.game.you.team_id, name: ctx.game.you.name }] : []);
+  const game = recap.your_game;
+  const youId = ctx.game.you?.team_id;
+  const title = recap.kind === "playoff" ? `${simPlayoffRoundLabel(recap.week, ctx.game.settings)} recap` : `Week ${recap.week} recap`;
+  const slotLabels = game ? simSlotLabels(game.starters.map((s) => ({ slot: s.slot }))) : [];
+  const last = index + 1 >= total;
+  const tone = simResultTone(game?.result);
+  return (
+    <div className="flex flex-col gap-3" data-testid="week-recap">
+      <AccentCard accent={simToneColor(tone)} as="section" glow={game?.result === "win"}>
+        <p className="text-xs uppercase font-extrabold" style={{ color: "var(--color-text-muted)", letterSpacing: "var(--letter-spacing-badge)" }}>
+          {title}
+          {total > 1 ? ` · ${index + 1} of ${total}` : ""}
+        </p>
+        {game ? (
+          <div className="flex flex-col gap-2 enter-pop" key={recap.week}>
+            <div className="flex items-center justify-between gap-3">
+              <SimToneBadge label={simResultLabel(game.result)} tone={tone} size="sm" />
+              <span className="text-xs break-words min-w-0 text-right" style={{ color: "var(--color-text-muted)" }}>vs {game.opponent_name}</span>
+            </div>
+            <div className="flex items-baseline justify-center gap-3" aria-label={`You ${simFmtPts(game.your_pts)}, ${game.opponent_name} ${simFmtPts(game.opp_pts)}`}>
+              <span className="text-4xl font-extrabold" style={{ color: simToneColor(tone) }}>{simFmtPts(game.your_pts)}</span>
+              <span className="text-sm" style={{ color: "var(--color-text-muted)" }}>to</span>
+              <span className="text-3xl font-bold" style={{ color: "var(--color-text-secondary)" }}>{simFmtPts(game.opp_pts)}</span>
+            </div>
+            {game.optimal_pts != null ? (
+              <p className="text-xs text-center" style={{ color: "var(--color-text-muted)" }}>
+                Your best possible lineup scored {simFmtPts(game.optimal_pts)}
+                {game.efficiency != null ? ` (${Math.round(game.efficiency * 100)}% efficiency)` : ""}.
+              </p>
+            ) : null}
+          </div>
+        ) : (
+          <p className="text-base font-bold">You had a bye this week.</p>
+        )}
+        {recap.season_complete ? (
+          <p className="text-sm font-bold" role="status">
+            The season is over{recap.champion ? ` and ${names[recap.champion] ?? "the champion"} won it all` : ""}.
+          </p>
+        ) : null}
+      </AccentCard>
+
+      {game ? (
+        <section className="flex flex-col gap-1" aria-label="Your starters">
+          <SectionHeading>Your starters</SectionHeading>
+          {game.starters.map((s, i) => (
+            <div key={`${s.slot}-${i}`} className="flex items-center gap-2">
+              <span className="w-12 shrink-0">
+                <PositionBadge position={s.slot} label={slotLabels[i]} />
+              </span>
+              <div className="flex-1 min-w-0">
+                {s.player ? (
+                  <SimPlayerLine
+                    player={s.player}
+                    trailing={
+                      <>
+                        {s.flag ? <SimToneBadge label={s.flag === "bye" ? "Bye" : "Out"} tone={s.flag === "bye" ? "warning" : "danger"} /> : null}
+                        <SimStat label="Pts" value={simFmtPts(s.pts)} tone={s.pts >= s.player.projection ? "success" : "muted"} />
+                      </>
+                    }
+                  />
+                ) : (
+                  <p className="py-2 text-sm" style={{ color: "var(--color-warning)" }}>Empty slot (0 points)</p>
+                )}
+              </div>
+            </div>
+          ))}
+        </section>
+      ) : null}
+
+      {recap.mvp || recap.bust ? (
+        <div className="grid grid-cols-2 gap-2">
+          {recap.mvp ? (
+            <AccentCard accent="var(--color-success)" compact as="div">
+              <span className="text-xs" style={{ color: "var(--color-text-muted)" }}>Week MVP</span>
+              <span className="text-sm font-bold break-words">{recap.mvp.player.name}</span>
+              <span className="text-xs">{simFmtPts(recap.mvp.pts)} pts</span>
+            </AccentCard>
+          ) : null}
+          {recap.bust ? (
+            <AccentCard accent="var(--color-warning)" compact as="div">
+              <span className="text-xs" style={{ color: "var(--color-text-muted)" }}>Biggest bust</span>
+              <span className="text-sm font-bold break-words">{recap.bust.player.name}</span>
+              <span className="text-xs">{simFmtPts(recap.bust.pts)} pts</span>
+            </AccentCard>
+          ) : null}
+        </div>
+      ) : null}
+
+      {(recap.injuries ?? []).length > 0 ? (
+        <section className="flex flex-col gap-1" aria-label="Injuries">
+          <SectionHeading>Injuries</SectionHeading>
+          {recap.injuries!.map((inj, i) => (
+            <AccentCard key={i} accent={inj.is_yours ? "var(--color-danger)" : "var(--color-border-strong)"} compact as="div">
+              <p className="text-sm">
+                <strong>{inj.player.name}</strong> is out {inj.weeks} week{inj.weeks === 1 ? "" : "s"}
+                {inj.is_yours ? " (your team)" : ""}.
+              </p>
+            </AccentCard>
+          ))}
+        </section>
+      ) : null}
+
+      {(recap.waivers ?? []).filter((w) => w.team_id === youId).length > 0 ? (
+        <section className="flex flex-col gap-1" aria-label="Your waiver claims">
+          <SectionHeading>Your waiver claims</SectionHeading>
+          {recap.waivers!.filter((w) => w.team_id === youId).map((w, i) => (
+            <AccentCard key={i} accent={w.ok ? "var(--color-success)" : "var(--color-danger)"} compact as="div">
+              <p className="text-sm">
+                {w.ok ? "Won" : "Lost"} <strong>{w.add.name}</strong>
+                {!w.ok && w.reason ? <span style={{ color: "var(--color-text-muted)" }}> ({w.reason.replace(/_/g, " ")})</span> : null}
+              </p>
+            </AccentCard>
+          ))}
+        </section>
+      ) : null}
+
+      {(recap.standings ?? []).length > 0 ? (
+        <section className="flex flex-col gap-2" aria-label="Standings after this week">
+          <SectionHeading>Standings</SectionHeading>
+          <SimStandingsList rows={recap.standings!} playoffTeams={ctx.game.settings.playoff_teams} />
+        </section>
+      ) : null}
+
+      <div className="flex gap-2 sticky bottom-16 md:bottom-2">
+        {!last ? (
+          <Button fullWidth onClick={onNext}>Next round</Button>
+        ) : (
+          <Button fullWidth onClick={onClose}>{recap.season_complete ? "See your final grade" : "Back to your team"}</Button>
+        )}
+      </div>
+    </div>
+  );
+}
+
+/** Final screen: champion, record, grade and the decisions that mattered. */
+export function SimFinalView({ ctx, onNewGame, onHub }: { ctx: SimCtx; onNewGame: () => void; onHub: () => void }) {
+  const { gameId, game } = ctx;
+  const [result, setResult] = useState<SimGameResult | null>(null);
+  const [failed, setFailed] = useState(false);
+  const [attempt, setAttempt] = useState(0);
+
+  useEffect(() => {
+    let cancelled = false;
+    api
+      .getSimGameResult(gameId)
+      .then((body) => {
+        if (cancelled) return;
+        if (body.result) setResult(body.result);
+        else setFailed(true);
+      })
+      .catch(() => {
+        if (!cancelled) setFailed(true);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [gameId, attempt]);
+
+  if (failed) {
+    return <EmptyState title="Could not load your final result" subtitle="Your season is saved. Try again in a moment." actionLabel="Try again" onAction={() => { setFailed(false); setAttempt((n) => n + 1); }} />;
+  }
+  if (!result) return <div className="flex flex-col gap-3" aria-busy="true"><SkeletonCard lines={4} /><SkeletonCard lines={6} /></div>;
+
+  const tone = simGradeTone(result.grade.letter);
+  const mine = result.final_standings.find((row) => row.is_you);
+  const champion = result.final_standings.find((row) => row.team_id === result.champion);
+  return (
+    <div className="flex flex-col gap-3" data-testid="final-result">
+      <AccentCard accent={simToneColor(tone)} as="section" glow>
+        <p className="text-xs uppercase font-extrabold" style={{ color: "var(--color-text-muted)", letterSpacing: "var(--letter-spacing-badge)" }}>Season complete</p>
+        <div className="flex items-center gap-4 enter-pop">
+          <span className="text-6xl font-extrabold leading-none" style={{ color: simToneColor(tone) }} aria-label={`Grade ${result.grade.letter}`}>
+            {result.grade.letter}
+          </span>
+          <div className="flex min-w-0 flex-col gap-1">
+            <p className="text-sm font-bold">{mine ? `${mine.wins}-${mine.losses}${mine.ties ? `-${mine.ties}` : ""} · ${simPlayoffResultLabel(mine.playoff_result)}` : ""}</p>
+            {champion ? <p className="text-xs" style={{ color: "var(--color-text-muted)" }}>Champion: {champion.name}{champion.is_you ? " (you)" : ""}</p> : null}
+          </div>
+        </div>
+        <p className="text-sm">{result.grade.summary}</p>
+        <div className="flex flex-wrap gap-2">
+          <Button onClick={onNewGame}>Play again</Button>
+          <Button variant="secondary" onClick={onHub}>All games</Button>
+        </div>
+      </AccentCard>
+
+      {result.decisions_that_mattered.length > 0 ? (
+        <section className="flex flex-col gap-2" aria-label="Decisions that mattered">
+          <SectionHeading note="The moves that moved your season most, from replaying it without them.">Decisions that mattered</SectionHeading>
+          {result.decisions_that_mattered.map((d, i) => (
+            <AccentCard key={i} accent="var(--color-accent)" compact as="div">
+              {d.kind ? <ToneBadge label={String(d.kind).replace(/_/g, " ")} color="var(--color-accent)" size="xs" /> : null}
+              {d.title ? <p className="text-sm font-bold">{String(d.title)}</p> : null}
+              {d.detail ? <p className="text-xs" style={{ color: "var(--color-text-secondary)" }}>{String(d.detail)}</p> : null}
+            </AccentCard>
+          ))}
+        </section>
+      ) : null}
+
+      <section className="flex flex-col gap-2" aria-label="Final standings">
+        <SectionHeading>Final standings</SectionHeading>
+        <ol className="flex flex-col gap-2">
+          {result.final_standings.map((row, i) => (
+            <li key={row.team_id}>
+              <AccentCard accent={row.is_you ? "var(--color-accent)" : "var(--color-border-strong)"} compact as="div">
+                <div className="flex items-center justify-between gap-2">
+                  <span className="text-sm font-semibold break-words min-w-0">{i + 1}. {row.name}{row.is_you ? " (you)" : ""}</span>
+                  <span className="text-sm font-bold shrink-0">{row.wins}-{row.losses}{row.ties ? `-${row.ties}` : ""}</span>
+                </div>
+                <p className="text-xs" style={{ color: "var(--color-text-secondary)" }}>{simPlayoffResultLabel(row.playoff_result)} · {simFmtPts(row.pf)} PF</p>
+              </AccentCard>
+            </li>
+          ))}
+        </ol>
+      </section>
+      <p className="text-xs" style={{ color: "var(--color-text-muted)" }}>
+        A game, not a forecast. Season {game.settings.regular_weeks} weeks plus playoffs against AI managers; nothing here touches your real leagues.
+      </p>
+    </div>
+  );
+}

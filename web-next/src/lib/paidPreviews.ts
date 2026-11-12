@@ -62,6 +62,15 @@ export function paidPreview(key: string, leagueName?: string): PaidPreview | nul
         ],
         freeIncludes: "Free keeps one saved league.",
       };
+    case "fantasy_sim":
+      return {
+        bullets: [
+          "Keep playing past week 3: the full 14-week season, playoffs and a final grade",
+          "Up to 3 saved games, so you can try a different draft and strategy",
+          "A review of the decisions that mattered most",
+        ],
+        freeIncludes: "Free includes the whole draft and your first 3 weeks, and the same save picks up where you left off.",
+      };
     case "3_team_ideas":
       return {
         bullets: [

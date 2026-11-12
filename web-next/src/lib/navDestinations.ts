@@ -53,6 +53,7 @@ const GLYPH_BY_PAGE: Record<string, NavGlyphName> = {
   games: "games",
   commissioner: "commissioner",
   portfolio: "portfolio",
+  "gm-game": "games",
   news: "news",
   community: "community",
 };
