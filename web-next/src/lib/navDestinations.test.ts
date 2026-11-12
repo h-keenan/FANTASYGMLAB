@@ -157,4 +157,17 @@ describe("searchNavDestinations", () => {
     const noLeague = [...nav.generalDestinations, ...nav.accountDestinations];
     expect(labels("scouting", noLeague)).not.toContain("Draft Center > Scouting");
   });
+
+  it("Fantasy Sim (the GM game) is a standalone General row beside Portfolio, and Season Outlook is separate", () => {
+    const nav = useNavDestinations(null, "");
+    const general = nav.generalDestinations.map((d) => d.label);
+    expect(general.indexOf("Fantasy Sim")).toBe(general.indexOf("Portfolio") + 1);
+    const row = nav.generalDestinations.find((d) => d.label === "Fantasy Sim");
+    expect(row?.path).toBe("/gm-game");
+    expect(row?.pro).toBeFalsy();
+    expect(PAGE_TITLE_BY_SEGMENT["gm-game"]).toBe("Fantasy Sim");
+    expect(PAGE_TITLE_BY_SEGMENT["fantasy-sim"]).toBe("Season Outlook");
+    const league = useNavDestinations("L 1", "My League");
+    expect(league.gmToolsDestinations.some((d) => d.label === "Fantasy Sim" || d.label === "Season Outlook")).toBe(false);
+  });
 });

@@ -2,6 +2,7 @@ import { env } from "./env";
 import type { TradeCaution } from "./tradeCautions";
 import type { VerdictAssumptions, VerdictFeedbackReason, VerdictReportContext } from "@/lib/verdictTrust";
 import { supabase } from "./supabase";
+import type * as SimGameTypes from "./simGame";
 import type { SimRunResponse, SimStatusResponse, SimStrategy, SimWorldResponse, SimWorldsResponse } from "./simPresentation";
 import type { CandidateCompare, MoveRange } from "./startSitRange";
 import { trackClientError } from "./analytics";
@@ -4698,6 +4699,54 @@ export const api = {
   runSimWorld: (worldId: string) =>
     authorizedRequest<SimRunResponse>(`/v1/sim/worlds/${encodeURIComponent(worldId)}/run`, { method: "POST", jsonBody: {} }),
   getSimResult: (worldId: string) => authorizedRequest<SimRunResponse>(`/v1/sim/worlds/${encodeURIComponent(worldId)}/result`),
+  // Fantasy Sim: the GM Game (standalone, turn-based). docs/fantasy-sim-api.md
+  // "GM game". Mutating calls answer 200 `reason: "premium_required"` once the
+  // free preview is used up; callers classify with simGameGate().
+  getSimGameOptions: () => authorizedRequest<SimGameTypes.SimGameOptionsResponse>("/v1/sim/games/options"),
+  listSimGames: () => authorizedRequest<SimGameTypes.SimGameEnvelope & { games?: SimGameTypes.SimGameLite[]; max_games?: number }>("/v1/sim/games"),
+  createSimGame: (body: SimGameTypes.SimGameCreateBody) =>
+    authorizedRequest<SimGameTypes.SimGameResponse>("/v1/sim/games", { method: "POST", jsonBody: body }),
+  getSimGame: (gameId: string) => authorizedRequest<SimGameTypes.SimGameResponse>(`/v1/sim/games/${encodeURIComponent(gameId)}`),
+  deleteSimGame: (gameId: string) =>
+    authorizedRequest<SimGameTypes.SimGameEnvelope>(`/v1/sim/games/${encodeURIComponent(gameId)}`, { method: "DELETE" }),
+  getSimDraft: (gameId: string, query: string, signal?: AbortSignal) =>
+    authorizedRequest<SimGameTypes.SimDraftResponse>(`/v1/sim/games/${encodeURIComponent(gameId)}/draft?${query}`, { signal }),
+  simDraftPick: (gameId: string, playerId: string) =>
+    authorizedRequest<SimGameTypes.SimDraftPickResponse>(`/v1/sim/games/${encodeURIComponent(gameId)}/draft/pick`, { method: "POST", jsonBody: { player_id: playerId } }),
+  simDraftAuto: (gameId: string) =>
+    authorizedRequest<SimGameTypes.SimDraftPickResponse>(`/v1/sim/games/${encodeURIComponent(gameId)}/draft/auto`, { method: "POST", jsonBody: {} }),
+  putSimDraftQueue: (gameId: string, playerIds: string[]) =>
+    authorizedRequest<SimGameTypes.SimGameEnvelope & { queue?: string[] }>(`/v1/sim/games/${encodeURIComponent(gameId)}/draft/queue`, { method: "PUT", jsonBody: { player_ids: playerIds } }),
+  getSimGamePlayers: (gameId: string, query: string, signal?: AbortSignal) =>
+    authorizedRequest<SimGameTypes.SimGamePlayersResponse>(`/v1/sim/games/${encodeURIComponent(gameId)}/players?${query}`, { signal }),
+  getSimGamePlayer: (gameId: string, playerId: string) =>
+    authorizedRequest<SimGameTypes.SimPlayerDetailResponse>(`/v1/sim/games/${encodeURIComponent(gameId)}/players/${encodeURIComponent(playerId)}`),
+  getSimGameTeam: (gameId: string, teamId: string) =>
+    authorizedRequest<SimGameTypes.SimTeamRosterResponse>(`/v1/sim/games/${encodeURIComponent(gameId)}/teams/${encodeURIComponent(teamId)}`),
+  getSimLineup: (gameId: string) => authorizedRequest<SimGameTypes.SimLineupResponse>(`/v1/sim/games/${encodeURIComponent(gameId)}/lineup`),
+  putSimLineup: (gameId: string, body: { slots: { slot: SimGameTypes.SimSlot; player_id: string | null }[] }) =>
+    authorizedRequest<SimGameTypes.SimLineupResponse>(`/v1/sim/games/${encodeURIComponent(gameId)}/lineup`, { method: "PUT", jsonBody: body }),
+  autoSimLineup: (gameId: string) =>
+    authorizedRequest<SimGameTypes.SimLineupResponse>(`/v1/sim/games/${encodeURIComponent(gameId)}/lineup/auto`, { method: "POST", jsonBody: {} }),
+  claimSimWaiver: (gameId: string, body: { add: string; drop: string | null; start_slot: SimGameTypes.SimSlot | null }) =>
+    authorizedRequest<SimGameTypes.SimWaiverResponse>(`/v1/sim/games/${encodeURIComponent(gameId)}/waivers`, { method: "POST", jsonBody: body }),
+  cancelSimWaiver: (gameId: string, claimId: string) =>
+    authorizedRequest<SimGameTypes.SimWaiverResponse>(`/v1/sim/games/${encodeURIComponent(gameId)}/waivers/${encodeURIComponent(claimId)}`, { method: "DELETE" }),
+  cutSimPlayer: (gameId: string, playerId: string) =>
+    authorizedRequest<SimGameTypes.SimCutResponse>(`/v1/sim/games/${encodeURIComponent(gameId)}/cut`, { method: "POST", jsonBody: { player_id: playerId } }),
+  previewSimTrade: (gameId: string, body: { partner: string; give: string[]; get: string[] }) =>
+    authorizedRequest<SimGameTypes.SimTradeResponse>(`/v1/sim/games/${encodeURIComponent(gameId)}/trades/preview`, { method: "POST", jsonBody: body }),
+  sendSimTrade: (gameId: string, body: { partner: string; give: string[]; get: string[] }) =>
+    authorizedRequest<SimGameTypes.SimTradeResponse>(`/v1/sim/games/${encodeURIComponent(gameId)}/trades`, { method: "POST", jsonBody: body }),
+  getSimInbox: (gameId: string) => authorizedRequest<SimGameTypes.SimInboxResponse>(`/v1/sim/games/${encodeURIComponent(gameId)}/inbox`),
+  respondSimInbox: (gameId: string, itemId: string, action: "accept" | "decline") =>
+    authorizedRequest<SimGameTypes.SimInboxResponse>(`/v1/sim/games/${encodeURIComponent(gameId)}/inbox/${encodeURIComponent(itemId)}/respond`, { method: "POST", jsonBody: { action } }),
+  advanceSimGame: (gameId: string, week: number) =>
+    authorizedRequest<SimGameTypes.SimAdvanceResponse>(`/v1/sim/games/${encodeURIComponent(gameId)}/advance`, { method: "POST", jsonBody: { week } }),
+  revertSimWeek: (gameId: string) =>
+    authorizedRequest<SimGameTypes.SimGameResponse & { reverted?: number }>(`/v1/sim/games/${encodeURIComponent(gameId)}/revert-week`, { method: "POST", jsonBody: {} }),
+  getSimLeague: (gameId: string) => authorizedRequest<SimGameTypes.SimLeagueResponse>(`/v1/sim/games/${encodeURIComponent(gameId)}/league`),
+  getSimGameResult: (gameId: string) => authorizedRequest<SimGameTypes.SimGameResultResponse>(`/v1/sim/games/${encodeURIComponent(gameId)}/result`),
   deleteSimWorld: (worldId: string) =>
     authorizedRequest<{ ok: boolean }>(`/v1/sim/worlds/${encodeURIComponent(worldId)}`, { method: "DELETE" }),
 

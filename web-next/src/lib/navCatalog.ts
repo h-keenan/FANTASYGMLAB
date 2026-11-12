@@ -100,6 +100,7 @@ export const NAV_PAGES: readonly NavCatalogPage[] = [
   { key: "commissioner", label: "Commissioner", subtitle: "League integrity: lineups, tanking signals, trades", group: "tools", leagueScoped: true, pro: true },
 
   { key: "portfolio", label: "Portfolio", subtitle: "Your standing across every saved league", group: "general", leagueScoped: false, pro: true },
+  { key: "gm-game", label: "Fantasy Sim", subtitle: "Draft a team and play a full season as GM", group: "general", leagueScoped: false },
   { key: "news", label: "News", subtitle: "Latest NFL news and updates", group: "general", leagueScoped: false },
   { key: "community", label: "Community", subtitle: "Craziest trades this week, anonymized", group: "general", leagueScoped: false },
 ];

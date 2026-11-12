@@ -3346,6 +3346,31 @@ body:has(.fd-landing-dark) .brand-mark-icon {
   }
 }
 
+/* Short, purposeful entrance for content that just arrived or changed (game
+   recaps, a new pick, a verdict). Opacity/transform only. `.enter-rise-pop`
+   is the same with a slight scale for a result that should land. */
+@keyframes enter-rise {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: none; }
+}
+@keyframes enter-pop {
+  0% { opacity: 0; transform: scale(0.94); }
+  70% { opacity: 1; transform: scale(1.02); }
+  100% { opacity: 1; transform: none; }
+}
+.enter-rise {
+  animation: enter-rise 180ms ease-out both;
+}
+.enter-pop {
+  animation: enter-pop 260ms ease-out both;
+}
+@media (prefers-reduced-motion: reduce) {
+  .enter-rise,
+  .enter-pop {
+    animation: none;
+  }
+}
+
 /* Inline text links/buttons (View All, card CTAs) keep their text-sm look but
    get the 44px touch target. Use instead of per-link padding hacks. */
 .tap-link,
