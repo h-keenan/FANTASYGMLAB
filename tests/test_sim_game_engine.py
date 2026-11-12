@@ -486,7 +486,9 @@ def test_counterfactual_shares_all_dice_and_changes_only_what_the_decision_touch
         advance(em, snap, state, seed)
     alt = replay_game(snap, seed, em.events, veto=[claim_seq])
     # same seed => identical player performances in both worlds, regardless of rosters
-    assert alt.points == state.points
+    # (the alt world can end earlier, e.g. the claim was what got the user into the playoffs, so
+    # compare the weeks both worlds actually played)
+    assert alt.points == {pid: state.points[pid][: len(rows)] for pid, rows in alt.points.items()}
     assert alt.digest() != state.digest()
     assert fa not in alt.rosters[snap.user_team.tid] or fa in state.rosters[snap.user_team.tid]
 
