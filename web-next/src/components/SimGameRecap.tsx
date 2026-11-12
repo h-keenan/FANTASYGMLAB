@@ -7,13 +7,14 @@ import { Button } from "@/components/Button";
 import { EmptyState } from "@/components/EmptyState";
 import { PositionBadge } from "@/components/PositionBadge";
 import { SectionHeading } from "@/components/SectionHeading";
-import { SimPlayerLine, SimStat, SimToneBadge, simToneColor, type SimCtx } from "@/components/SimGameParts";
+import { SimPlayerChip, SimPlayerLine, SimStat, SimToneBadge, simToneColor, type SimCtx } from "@/components/SimGameParts";
 import { SimStandingsList } from "@/components/SimGameLeague";
 import { SkeletonCard } from "@/components/Skeleton";
 import { ToneBadge } from "@/components/ToneBadge";
 import { api } from "@/lib/api";
 import {
   simFmtPts,
+  simSlotRepeatsPosition,
   simGradeTone,
   simPlayoffResultLabel,
   simPlayoffRoundLabel,
@@ -95,6 +96,7 @@ export function SimWeekRecapView({
                 {s.player ? (
                   <SimPlayerLine
                     player={s.player}
+                    hidePosition={simSlotRepeatsPosition(s.slot, s.player.pos)}
                     trailing={
                       <>
                         {s.flag ? <SimToneBadge label={s.flag === "bye" ? "Bye" : "Out"} tone={s.flag === "bye" ? "warning" : "danger"} /> : null}
@@ -116,14 +118,14 @@ export function SimWeekRecapView({
           {recap.mvp ? (
             <AccentCard accent="var(--color-success)" compact as="div">
               <span className="text-xs" style={{ color: "var(--color-text-muted)" }}>Week MVP</span>
-              <span className="text-sm font-bold break-words">{recap.mvp.player.name}</span>
+              <SimPlayerChip player={recap.mvp.player} />
               <span className="text-xs">{simFmtPts(recap.mvp.pts)} pts</span>
             </AccentCard>
           ) : null}
           {recap.bust ? (
             <AccentCard accent="var(--color-warning)" compact as="div">
               <span className="text-xs" style={{ color: "var(--color-text-muted)" }}>Biggest bust</span>
-              <span className="text-sm font-bold break-words">{recap.bust.player.name}</span>
+              <SimPlayerChip player={recap.bust.player} />
               <span className="text-xs">{simFmtPts(recap.bust.pts)} pts</span>
             </AccentCard>
           ) : null}
@@ -135,8 +137,9 @@ export function SimWeekRecapView({
           <SectionHeading>Injuries</SectionHeading>
           {recap.injuries!.map((inj, i) => (
             <AccentCard key={i} accent={inj.is_yours ? "var(--color-danger)" : "var(--color-border-strong)"} compact as="div">
-              <p className="text-sm">
-                <strong>{inj.player.name}</strong> is out {inj.weeks} week{inj.weeks === 1 ? "" : "s"}
+              <SimPlayerChip player={{ ...inj.player, status: "out", out_weeks: inj.weeks }} />
+              <p className="text-xs" style={{ color: "var(--color-text-secondary)" }}>
+                Out {inj.weeks} week{inj.weeks === 1 ? "" : "s"}
                 {inj.is_yours ? " (your team)" : ""}.
               </p>
             </AccentCard>
@@ -149,8 +152,10 @@ export function SimWeekRecapView({
           <SectionHeading>Your waiver claims</SectionHeading>
           {recap.waivers!.filter((w) => w.team_id === youId).map((w, i) => (
             <AccentCard key={i} accent={w.ok ? "var(--color-success)" : "var(--color-danger)"} compact as="div">
-              <p className="text-sm">
-                {w.ok ? "Won" : "Lost"} <strong>{w.add.name}</strong>
+              <SimPlayerChip player={w.add} />
+              <p className="text-xs">
+                {w.ok ? "Won" : "Lost"}
+                {w.drop ? <span style={{ color: "var(--color-text-muted)" }}>, dropping {w.drop.name}</span> : null}
                 {!w.ok && w.reason ? <span style={{ color: "var(--color-text-muted)" }}> ({w.reason.replace(/_/g, " ")})</span> : null}
               </p>
             </AccentCard>

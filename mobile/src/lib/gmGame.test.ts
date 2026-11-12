@@ -12,6 +12,7 @@ import { runSimGameCall } from './simGameCall.ts';
 import { ROUTE_BY_PAGE } from './orbTabs.ts';
 import { NAV_PAGES } from './navCatalog.ts';
 import { paidPreview } from './paidPreviews.ts';
+import { simHeadshotId, simPlayerInitials, simSlotRepeatsPosition } from './simGame.ts';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const read = (...p: string[]) => readFileSync(join(here, '..', ...p), 'utf8');
@@ -109,4 +110,30 @@ test('the screens render from the shared gating helpers, not private copies', ()
   assert.match(screen, /disabled=\{Boolean\(block\)\}/);
   // Playoff rounds played in the same call (also_played) become extra recaps.
   assert.match(screen, /simRecapsFromAdvance\(res\.recap, res\.also_played\)/);
+});
+
+test('sim player photo helpers: Sleeper id or initials fallback', () => {
+  assert.equal(simHeadshotId({ id: '4046', headshot_id: '4046' }), '4046');
+  assert.equal(simHeadshotId({ id: '4046' }), '4046');
+  assert.equal(simHeadshotId({ id: 'p0001', headshot_id: null }), null);
+  assert.equal(simHeadshotId({ id: 'DEF-NYG' }), null);
+  assert.equal(simPlayerInitials({ name: 'Patrick Mahomes II', pos: 'QB', team: 'KC' }), 'PI');
+  assert.equal(simPlayerInitials({ name: 'NYG D/ST', pos: 'DEF', team: 'NYG' }), 'NYG');
+});
+
+test('every mobile sim list that names a player uses the shared chip or line', () => {
+  for (const file of ['SimGameRecap.tsx', 'SimGameTeam.tsx', 'SimGameDraft.tsx', 'SimGameLeague.tsx']) {
+    assert.match(read('components', file), /SimPlayerChip|SimPlayerLine/, file);
+  }
+  const parts = read('components', 'SimGameParts.tsx');
+  assert.match(parts, /simHeadshotId\(player\)/);
+  assert.doesNotMatch(parts, /PlayerAvatar playerId=\{player\.id\}/);
+});
+
+test('lineup rows drop the position chip only when the slot repeats it', () => {
+  assert.equal(simSlotRepeatsPosition('RB', 'RB'), true);
+  assert.equal(simSlotRepeatsPosition('FLEX', 'RB'), false);
+  for (const file of ['SimGameTeam.tsx', 'SimGameRecap.tsx']) {
+    assert.match(read('components', file), /hidePosition=\{simSlotRepeatsPosition\(/, file);
+  }
 });

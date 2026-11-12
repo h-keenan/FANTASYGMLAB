@@ -25,6 +25,7 @@ export function PlayerIdentity({
   muted = false,
   disableQuickView = false,
   avatarSize = 40,
+  fallbackLabel,
   leading,
   after,
   className = "min-w-0",
@@ -41,6 +42,8 @@ export function PlayerIdentity({
   muted?: boolean;
   disableQuickView?: boolean;
   avatarSize?: number;
+  /** Initials shown in the avatar ring when the player has no photo. */
+  fallbackLabel?: string | null;
   /** Node before the badge (e.g. an overall-rank number). */
   leading?: ReactNode;
   /** Extra line under the subline (e.g. a trending tag). */
@@ -54,7 +57,7 @@ export function PlayerIdentity({
     <>
       {leading}
       <PositionBadge position={position} />
-      <PlayerAvatar playerId={playerId ?? undefined} tier={tier ?? undefined} size={avatarSize} />
+      <PlayerAvatar playerId={playerId ?? undefined} tier={tier ?? undefined} size={avatarSize} fallbackLabel={fallbackLabel} />
       <div className="flex flex-col gap-0.5 min-w-0">
         <PlayerNameText
           name={name}

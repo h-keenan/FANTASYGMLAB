@@ -46,6 +46,7 @@ from modules.sim.game_types import (
     START_KINDS,
     START_LEAGUE,
     TE_PREMIUMS,
+    headshot_id,
     GAME_ENGINE_VERSION,
     MAX_GAMES_FREE,
     MAX_GAMES_PRO,
@@ -767,8 +768,8 @@ def add_preview_route(router: APIRouter, ctx: GameApiCtx) -> None:
         return {
             "ok": True, "reason": "", "scoring": scoring, "total": len(rows), "page": page, "page_size": page_size,
             "players": [{
-                "id": p.pid, "name": p.name, "pos": p.pos, "team": p.nfl_team, "age": p.age,
-                "projection": p.mean, "floor": round(max(0.0, p.mean - 0.8 * p.sd), 1),
+                "id": p.pid, "headshot_id": headshot_id(p.pid), "name": p.name, "pos": p.pos, "team": p.nfl_team,
+                "age": p.age, "projection": p.mean, "floor": round(max(0.0, p.mean - 0.8 * p.sd), 1),
                 "ceiling": round(p.mean + 0.8 * p.sd, 1), "value": p.value, "adp": p.adp,
                 "bye_week": pool.bye_weeks.get(p.nfl_team) or None,
             } for p in chunk],

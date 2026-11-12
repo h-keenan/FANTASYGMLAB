@@ -7,7 +7,7 @@ import { Button } from "@/components/Button";
 import { EmptyState } from "@/components/EmptyState";
 import { PillRow } from "@/components/PillRow";
 import { SectionHeading } from "@/components/SectionHeading";
-import { SimToneBadge, type SimCtx } from "@/components/SimGameParts";
+import { SimPlayerChip, SimToneBadge, type SimCtx } from "@/components/SimGameParts";
 import { SkeletonCard } from "@/components/Skeleton";
 import { ToneBadge } from "@/components/ToneBadge";
 import { api } from "@/lib/api";
@@ -161,6 +161,16 @@ export function SimLeagueTab({ ctx }: { ctx: SimCtx }) {
                   <ToneBadge label={String(tx.type ?? tx.kind ?? "move").replace(/_/g, " ")} color="var(--color-premium)" size="xs" />
                 </div>
                 <p className="text-sm">{simTransactionText(tx)}</p>
+                {(tx.players ?? []).length > 0 ? (
+                  <ul className="flex flex-col gap-1" aria-label="Players in this move">
+                    {tx.players!.map((p) => (
+                      <li key={`${p.role}-${p.id}`} className="flex items-center gap-2">
+                        <span className="w-10 shrink-0"><ToneBadge label={p.role} color={p.role === "add" || p.role === "get" ? "var(--color-success)" : "var(--color-text-muted)"} size="xs" /></span>
+                        <SimPlayerChip player={p} size={28} />
+                      </li>
+                    ))}
+                  </ul>
+                ) : null}
               </AccentCard>
             ))
           )}
