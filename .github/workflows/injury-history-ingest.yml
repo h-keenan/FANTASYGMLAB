@@ -1,0 +1,85 @@
+name: Injury History Ingest
+
+# Official nflverse weekly injury reports (practice + game-status designations,
+# CC BY 4.0) committed as data/injury_history/nflverse_reports_<season>.csv.gz.
+# The first run backfills every season from 2021 whose file is missing; after
+# that it refreshes the in-progress season and commits only when content changed
+# (deterministic gzip, so an unchanged download is an empty diff). See
+# docs/data-capture.md and modules/nflverse_injury_reports.py.
+#
+# The Sleeper-side history (change events + twice-weekly snapshots) is NOT here:
+# it is captured inside injury-status-sync.yml's every-30-minutes run.
+#
+# Schedule (UTC): Tue 15:30 (Monday Night Football report is final) and
+# Sat 15:30 (Friday's final designations are in). Off-season runs are no-ops.
+#
+# Required secrets: none beyond the built-in GITHUB_TOKEN (same push model as
+# advanced-stats-refresh.yml / players-db-refresh.yml: plain fast-forward push to
+# main, so `contents: write`). No new secrets or vars. To pause: disable this
+# workflow in the Actions tab.
+
+on:
+  schedule:
+    - cron: "30 15 * * 2"
+    - cron: "30 15 * * 6"
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: "Fetch + validate only; write and commit nothing"
+        required: false
+        type: boolean
+        default: false
+
+permissions:
+  contents: write
+  issues: write
+
+concurrency:
+  group: injury-history-ingest
+  cancel-in-progress: false
+
+jobs:
+  ingest:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+          cache: pip
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+      - name: Ingest nflverse injury reports
+        env:
+          GITHUB_PUSH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_REPO_SLUG: ${{ github.repository }}
+          INPUT_DRY_RUN: ${{ inputs.dry_run }}
+        run: |
+          args=""
+          [ "$INPUT_DRY_RUN" = "true" ] && args="--dry-run"
+          python scripts/ingest_nflverse_injuries.py $args
+      - name: Alert on ingest failure
+        if: failure() && github.event_name == 'schedule'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          title="Injury history ingest is failing"
+          body="Scheduled Injury History Ingest failed: ${RUN_URL} ($(date -u +%FT%TZ)). Committed injury report files are left untouched."
+          num=$(gh issue list --repo "$GITHUB_REPOSITORY" --state open --search "\"$title\" in:title" --json number --jq '.[0].number // empty')
+          if [ -n "$num" ]; then
+            gh issue comment "$num" --repo "$GITHUB_REPOSITORY" --body "$body"
+          else
+            gh issue create --repo "$GITHUB_REPOSITORY" --title "$title" --body "$body"
+          fi
+      - name: Close alert issue after recovery
+        if: success() && github.event_name == 'schedule'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          for num in $(gh issue list --repo "$GITHUB_REPOSITORY" --state open --search '"Injury history ingest is failing" in:title' --json number --jq '.[].number'); do
+            gh issue close "$num" --repo "$GITHUB_REPOSITORY" --comment "Ingest succeeded again: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+          done

@@ -1,0 +1,125 @@
+name: League Roster Snapshot
+
+# Weekly ids-only roster snapshots of every saved league (docs/data-capture.md,
+# modules/league_roster_snapshots.py), written to Supabase
+# (docs/supabase_league_roster_snapshots.sql). Same standalone "GitHub Actions
+# job with its own service-role access" shape as trade-outcome-result-sweep.yml
+# and player-rating-snapshot.yml.
+#
+# Schedule (UTC, GitHub cron can lag a few minutes; avoids the 0/6/12/18 UTC
+# players-db-refresh minute and the */30 sweeps):
+#   Wed 12:17  slot post_waivers  - after Sleeper's default waiver run (Wed ~3am ET)
+#   Sun 15:17  slot pre_kickoff   - lineups set, before the 1pm ET kickoff
+# The script picks the slot from the weekday (Sunday -> pre_kickoff), so a manual
+# run on any other day records post_waivers unless a slot is chosen.
+#
+# Required secrets (already used by the other Supabase sweeps):
+#   SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY
+# Optional repo VARIABLES (all have safe defaults; see docs/data-capture.md):
+#   ROSTER_SNAPSHOT_SHARDS            number of parallel shards (default 1, max 64)
+#   ROSTER_SNAPSHOT_TIME_BUDGET_SECONDS  per-shard wall budget (default 2400)
+#   ROSTER_SNAPSHOT_MAX_CALLS_PER_MINUTE  Sleeper call cap per shard (default 300)
+#   ROSTER_SNAPSHOT_RETENTION_SEASONS    seasons kept by the prune (default 3)
+#   ROSTER_SNAPSHOT_DISABLE=1            kill switch: the job exits 0 without work
+# Nothing runs until docs/supabase_league_roster_snapshots.sql has been applied by
+# hand: before that the table is missing, writes are rejected and the job fails
+# (and opens the alert issue) rather than silently doing nothing.
+
+on:
+  schedule:
+    - cron: "17 12 * * 3"
+    - cron: "17 15 * * 0"
+  workflow_dispatch:
+    inputs:
+      slot:
+        description: "Slot (blank = auto from weekday)"
+        required: false
+        type: choice
+        default: ""
+        options: ["", post_waivers, pre_kickoff]
+      dry_run:
+        description: "Read-only: fetch leagues + Sleeper, write nothing"
+        required: false
+        type: boolean
+        default: false
+      limit:
+        description: "Only the first N leagues per shard (testing)"
+        required: false
+        default: ""
+
+permissions:
+  contents: read
+  issues: write
+
+concurrency:
+  group: league-roster-snapshot
+  cancel-in-progress: false
+
+jobs:
+  plan:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      shards: ${{ steps.matrix.outputs.shards }}
+    steps:
+      - id: matrix
+        env:
+          SHARDS: ${{ vars.ROSTER_SNAPSHOT_SHARDS }}
+        run: |
+          n="${SHARDS:-1}"
+          case "$n" in ''|*[!0-9]*) n=1 ;; esac
+          if [ "$n" -lt 1 ] || [ "$n" -gt 64 ]; then n=1; fi
+          echo "shards=$(python3 -c "import json,sys; print(json.dumps(list(range(int(sys.argv[1])))))" "$n")" >> "$GITHUB_OUTPUT"
+
+  snapshot:
+    needs: plan
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: ${{ fromJSON(needs.plan.outputs.shards) }}
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+          cache: pip
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+      - name: Snapshot rosters
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          ROSTER_SNAPSHOT_SHARDS: ${{ vars.ROSTER_SNAPSHOT_SHARDS }}
+          ROSTER_SNAPSHOT_SHARD_INDEX: ${{ matrix.shard }}
+          ROSTER_SNAPSHOT_TIME_BUDGET_SECONDS: ${{ vars.ROSTER_SNAPSHOT_TIME_BUDGET_SECONDS }}
+          ROSTER_SNAPSHOT_MAX_CALLS_PER_MINUTE: ${{ vars.ROSTER_SNAPSHOT_MAX_CALLS_PER_MINUTE }}
+          ROSTER_SNAPSHOT_RETENTION_SEASONS: ${{ vars.ROSTER_SNAPSHOT_RETENTION_SEASONS }}
+          ROSTER_SNAPSHOT_DISABLE: ${{ vars.ROSTER_SNAPSHOT_DISABLE }}
+          INPUT_SLOT: ${{ inputs.slot }}
+          INPUT_DRY_RUN: ${{ inputs.dry_run }}
+          INPUT_LIMIT: ${{ inputs.limit }}
+          SHARD: ${{ matrix.shard }}
+        run: |
+          args=""
+          [ -n "$INPUT_SLOT" ] && args="$args --slot $INPUT_SLOT"
+          [ "$INPUT_DRY_RUN" = "true" ] && args="$args --dry-run"
+          case "$INPUT_LIMIT" in ''|*[!0-9]*) ;; *) args="$args --limit $INPUT_LIMIT" ;; esac
+          # Retention prune once per run (shard 0), real runs only.
+          [ "$SHARD" = "0" ] && [ "$INPUT_DRY_RUN" != "true" ] && args="$args --prune"
+          python scripts/run_league_roster_snapshot.py $args
+      - name: Alert on snapshot failure
+        if: failure() && github.event_name == 'schedule'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          title="League roster snapshot is failing"
+          body="Scheduled League Roster Snapshot failed: ${RUN_URL} ($(date -u +%FT%TZ)). Weekly roster history is not being captured for the affected shard. Check docs/data-capture.md (the SQL must be applied; ROSTER_SNAPSHOT_DISABLE=1 pauses it)."
+          num=$(gh issue list --repo "$GITHUB_REPOSITORY" --state open --search "\"$title\" in:title" --json number --jq '.[0].number // empty')
+          if [ -n "$num" ]; then
+            gh issue comment "$num" --repo "$GITHUB_REPOSITORY" --body "$body"
+          else
+            gh issue create --repo "$GITHUB_REPOSITORY" --title "$title" --body "$body"
+          fi
