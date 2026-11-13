@@ -12,6 +12,7 @@ import {
 } from "@/lib/api";
 import { trackUse } from "@/lib/analytics";
 import { Button } from "@/components/Button";
+import { ConfirmInPlace } from "@/components/ui/ConfirmInPlace";
 import { PlayerRow } from "@/components/PlayerRow";
 import { RangeCompare } from "@/components/RangeCompare";
 import { SheetHandle } from "@/components/SheetHandle";
@@ -377,9 +378,7 @@ export function PlannerBar({
   return (
     <div className="flex flex-col gap-2">
       <div className="flex items-center gap-2 flex-wrap">
-        <Button variant="secondary" size="sm" onClick={onReset} disabled={busy}>
-          Reset to suggested
-        </Button>
+        <ConfirmInPlace label="Reset to suggested" buttonVariant="secondary" size="sm" disabled={busy} onConfirm={onReset} />
         <a
           href={sleeperLeagueUrl(leagueId)}
           target="_blank"

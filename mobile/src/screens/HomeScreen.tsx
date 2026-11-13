@@ -1,3 +1,4 @@
+import ConfirmInPlace from '../components/ConfirmInPlace';
 import { funnelStepIndex } from '../lib/firstRunFlow';
 import { trackOnboarding, trackOnboardingStepViewed } from '../lib/onboardingAnalytics';
 import FreeLimitNote from '../components/FreeLimitNote';
@@ -470,9 +471,7 @@ export default function HomeScreen({ navigation, route }: Props) {
                     </AppText>
                   </View>
                 </View>
-                <TouchableOpacity accessibilityRole="button" onPress={() => void signOut()} hitSlop={8}>
-                  <AppText style={styles.signOut}>Sign out</AppText>
-                </TouchableOpacity>
+                <ConfirmInPlace label="Sign out" buttonVariant="ghost" size="sm" onConfirm={() => signOut()} />
               </View>
               {me ? (
                 <TouchableOpacity accessibilityRole="button"

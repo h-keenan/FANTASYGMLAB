@@ -267,6 +267,8 @@ describe("ESPN import in the Connect League flow", () => {
     openEspn();
     await waitFor(() => expect(screen.getByText(/espn login connected/i)).toBeInTheDocument());
     fireEvent.click(screen.getByRole("button", { name: "Remove" }));
+    expect(api.deleteEspnCredentials).not.toHaveBeenCalled(); // asks first, in place
+    fireEvent.click(screen.getByRole("button", { name: "Remove" }));
     await waitFor(() => expect(screen.queryByText(/espn login connected/i)).toBeNull());
     expect(api.deleteEspnCredentials).toHaveBeenCalled();
   });

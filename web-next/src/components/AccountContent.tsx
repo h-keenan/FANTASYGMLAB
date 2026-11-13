@@ -27,6 +27,7 @@ import { Toggle } from "@/components/Toggle";
 import { NotificationControls } from "@/components/NotificationControls";
 import { SavedLeaguesSection } from "@/components/SavedLeaguesSection";
 import { SleeperUsernameRelink } from "@/components/SleeperUsernameRelink";
+import { ConfirmInPlace } from "@/components/ui/ConfirmInPlace";
 
 /** Mirrors mobile/src/screens/MoreScreen.tsx's PUSH_CATEGORY_LABELS exactly
  * — same ten categories, same copy — so a user who's seen this in the app
@@ -435,9 +436,7 @@ function AccountActionsSection({
       >
         {busy ? "Preparing export…" : "Export my data"}
       </Button>
-      <Button variant="secondary" onClick={onSignOut}>
-        Sign out
-      </Button>
+      <ConfirmInPlace label="Sign out" buttonVariant="secondary" onConfirm={onSignOut} />
     </section>
   );
 }

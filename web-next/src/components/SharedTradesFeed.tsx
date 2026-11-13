@@ -5,6 +5,7 @@ import { useState } from "react";
 import { Button } from "@/components/Button";
 import { ExchangeSide } from "@/components/TradeAssetExchange";
 import { ToneBadge } from "@/components/ToneBadge";
+import { ConfirmInPlace } from "@/components/ui/ConfirmInPlace";
 import type { SharedCommunityTrade } from "@/lib/api";
 import {
   formatCommunityTradeDate,
@@ -19,7 +20,7 @@ function SharedTradeCard({
   onReport,
 }: {
   trade: SharedCommunityTrade;
-  onDelete: (id: string) => void;
+  onDelete: (id: string) => void | boolean | Promise<unknown>;
   onReport: (id: string) => void;
 }) {
   const date = formatCommunityTradeDate(trade.created_at);
@@ -48,9 +49,19 @@ function SharedTradeCard({
       </div>
       <div className="flex justify-end">
         {trade.mine ? (
-          <Button variant="ghost" size="sm" onClick={() => onDelete(trade.id)}>
-            Delete
-          </Button>
+          <ConfirmInPlace
+            variant="row"
+            mode="ask"
+            size="sm"
+            label="Delete"
+            prompt="Delete this shared trade?"
+            confirmLabel="Delete"
+            errorText="Could not delete it. Try again."
+            onConfirm={async () => {
+              const result = await onDelete(trade.id);
+              return result === false ? false : undefined;
+            }}
+          />
         ) : (
           <Button variant="ghost" size="sm" onClick={() => onReport(trade.id)}>
             Report
@@ -73,7 +84,7 @@ export function SharedTradesFeed({
 }: {
   available: boolean;
   trades: SharedCommunityTrade[];
-  onDelete: (id: string) => void | Promise<unknown>;
+  onDelete: (id: string) => void | boolean | Promise<unknown>;
   onReport: (id: string) => void | Promise<unknown>;
 }) {
   const [reported, setReported] = useState<Set<string>>(new Set());

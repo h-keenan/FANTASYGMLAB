@@ -4,6 +4,7 @@ import { useState } from "react";
 
 import { Button } from "@/components/Button";
 import { Input } from "@/components/Input";
+import { ConfirmInPlace } from "@/components/ui/ConfirmInPlace";
 import { api } from "@/lib/api";
 import { ESPN_COOKIE_STEPS, ESPN_LOGIN_WHY, espnCredentialFailureMessage } from "@/lib/leaguePlatform";
 
@@ -104,15 +105,20 @@ export function EspnLoginStatus({ saved, onRemoved }: { saved: boolean; onRemove
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   if (!saved) return null;
-  const remove = async () => {
+  const remove = async (): Promise<boolean> => {
     setBusy(true);
     setMessage(null);
     try {
       const result = await api.deleteEspnCredentials();
-      if (result?.ok) onRemoved();
-      else setMessage(espnCredentialFailureMessage(result));
+      if (result?.ok) {
+        onRemoved();
+        return true;
+      }
+      setMessage(espnCredentialFailureMessage(result));
+      return false;
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "Something went wrong.");
+      return false;
     } finally {
       setBusy(false);
     }
@@ -120,9 +126,19 @@ export function EspnLoginStatus({ saved, onRemoved }: { saved: boolean; onRemove
   return (
     <div className="flex flex-wrap items-center gap-2 text-xs" style={{ color: "var(--color-text-secondary)" }}>
       <span>ESPN login connected (private leagues can load).</span>
-      <button type="button" onClick={remove} disabled={busy} className="font-bold" style={{ color: "var(--color-accent)" }}>
-        {busy ? "Removing…" : "Remove"}
-      </button>
+      <ConfirmInPlace
+        plain
+        variant="row"
+        mode="ask"
+        label="Remove"
+        prompt="Remove your ESPN login?"
+        confirmLabel="Remove"
+        errorText="Could not remove it. Try again."
+        disabled={busy}
+        triggerClassName="font-bold"
+        triggerStyle={{ color: "var(--color-accent)", background: "none", border: 0, minHeight: "var(--touch-target-min)", padding: "0 var(--space-sm)", cursor: "pointer" }}
+        onConfirm={remove}
+      />
       {message ? (
         <span role="alert" style={{ color: "var(--color-warning)" }}>
           {message}

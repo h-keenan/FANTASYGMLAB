@@ -329,6 +329,8 @@ describe("PortfolioContent", () => {
     );
 
     fireEvent.click(screen.getByRole("button", { name: /remove/i }));
+    expect(api.removeSavedLeague).not.toHaveBeenCalled(); // asks first, in place
+    fireEvent.click(screen.getByRole("button", { name: "Remove" }));
 
     await waitFor(() => expect(api.removeSavedLeague).toHaveBeenCalledWith("league-2"));
     await waitFor(() => expect(screen.queryByText("Broken League")).not.toBeInTheDocument());
@@ -346,6 +348,8 @@ describe("PortfolioContent", () => {
     );
 
     fireEvent.click(screen.getByRole("button", { name: /remove/i }));
+    expect(api.removeSavedLeague).not.toHaveBeenCalled(); // asks first, in place
+    fireEvent.click(screen.getByRole("button", { name: "Remove" }));
 
     await waitFor(() => expect(api.removeSavedLeague).toHaveBeenCalledWith("league-2"));
     expect(screen.getByText("Broken League")).toBeInTheDocument();

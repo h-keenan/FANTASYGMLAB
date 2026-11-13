@@ -140,6 +140,8 @@ describe("CollegeScoutingContent", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "Edit your grade — Remove Me" }));
     fireEvent.click(screen.getByRole("button", { name: "Remove my report" }));
+    expect(api.deleteScoutingReport).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole("button", { name: "Remove" }));
 
     expect(api.deleteScoutingReport).toHaveBeenCalledWith("pr1");
   });

@@ -1,3 +1,4 @@
+import ConfirmInPlace from './ConfirmInPlace';
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Pressable, StyleSheet, TouchableOpacity, useWindowDimensions, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
@@ -348,7 +349,25 @@ export default function MultiTeamTradePanel({
                   setSearch('');
                 }}
               />
-              {!isMe ? <Button label="Remove" variant="ghost" size="sm" onPress={() => dropTeam(rosterId)} /> : null}
+              {!isMe ? (
+                // Dropping a team takes every asset routed to or from it, so it asks first (in place);
+                // an empty team is just removed.
+                assets.some((a) => a.fromRosterId === rosterId || a.toRosterId === rosterId) ? (
+                  <ConfirmInPlace
+                    variant="button"
+                    mode="ask"
+                    size="sm"
+                    label="Remove"
+                    ariaLabel={`Remove ${nameOf(rosterId)}`}
+                    prompt={`Remove ${nameOf(rosterId)} and its assets?`}
+                    confirmLabel="Remove"
+                    buttonVariant="ghost"
+                    onConfirm={() => dropTeam(rosterId)}
+                  />
+                ) : (
+                  <Button label="Remove" variant="ghost" size="sm" onPress={() => dropTeam(rosterId)} />
+                )
+              ) : null}
             </View>
             {sends.length ? (
               sends.map((asset, index) => (

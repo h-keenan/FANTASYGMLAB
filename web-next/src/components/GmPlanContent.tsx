@@ -9,6 +9,7 @@ import { ValueStat } from "@/components/ValueStat";
 import { SectionHeading } from "@/components/SectionHeading";
 import { InfoTip } from "@/components/InfoTip";
 import { useRouter } from "next/navigation";
+import { useUndoableRemoval } from "@/components/ui/UndoToast";
 import { useMemo, useState } from "react";
 import { GM_PLAN_TABS, type GmPlanTab, isGmPlanTab, PlanSnapshotGrid, TeamSituationCard } from "@/components/GmPlanSections";
 import { deadlineBanner, type PlanSnapshotTile } from "@/lib/gmPlanSnapshot";
@@ -515,13 +516,26 @@ export function GmPlanContent({
       });
   };
 
+  // Removing a target is trivial to put back, so it is instant with an Undo
+  // toast; the server call only runs once the undo window closes.
+  const { schedule: scheduleRemoval, toast: undoToast } = useUndoableRemoval<GmTarget>({
+    message: (row) => `Removed ${byId.get(row.player_id)?.name ?? "target"} from your targets.`,
+    commit: async (row) => {
+      if (!leagueId) return;
+      try {
+        await api.removeGmTarget(leagueId, row.player_id);
+      } catch {
+        setTrackedRows((prev) => (prev.some((r) => r.player_id === row.player_id) ? prev : [row, ...prev]));
+      }
+    },
+    restore: (row) => setTrackedRows((prev) => (prev.some((r) => r.player_id === row.player_id) ? prev : [row, ...prev])),
+  });
   const removeTarget = (playerId: string) => {
     if (!leagueId) return;
-    const previous = trackedRows;
-    setTrackedRows((prev) => prev.filter((row) => row.player_id !== playerId));
-    api.removeGmTarget(leagueId, playerId).catch(() => {
-      setTrackedRows(previous);
-    });
+    const row = trackedRows.find((r) => r.player_id === playerId);
+    if (!row) return;
+    setTrackedRows((prev) => prev.filter((r) => r.player_id !== playerId));
+    scheduleRemoval(row);
   };
 
   const noRoster = protectRows.length === 0;
@@ -825,6 +839,7 @@ export function GmPlanContent({
         </section>
       ) : null}
       <ValuesCredit />
+      {undoToast}
     </main>
   );
 }

@@ -1,5 +1,6 @@
 "use client";
 
+import { ConfirmInPlace } from "@/components/ui/ConfirmInPlace";
 import { useEffect, useMemo, useRef, useState } from "react";
 
 import { AccentCard } from "@/components/AccentCard";
@@ -542,9 +543,25 @@ export function MultiTeamTradeContent({
                     {sends.length ? "Edit assets" : "Add assets"}
                   </Button>
                   {!isMe ? (
-                    <Button size="sm" variant="ghost" onClick={() => dropTeam(rosterId)} aria-label={`Remove ${teamName(rosterId)}`}>
-                      Remove
-                    </Button>
+                    // Dropping a team takes every asset routed to or from it, so it asks first
+                    // (in place); an empty team is just removed.
+                    assets.some((a) => a.fromRosterId === rosterId || a.toRosterId === rosterId) ? (
+                      <ConfirmInPlace
+                        variant="row"
+                        mode="ask"
+                        size="sm"
+                        label="Remove"
+                        ariaLabel={`Remove ${teamName(rosterId)}`}
+                        prompt={`Remove ${teamName(rosterId)} and its assets?`}
+                        confirmLabel="Remove"
+                        buttonVariant="ghost"
+                        onConfirm={() => dropTeam(rosterId)}
+                      />
+                    ) : (
+                      <Button size="sm" variant="ghost" onClick={() => dropTeam(rosterId)} aria-label={`Remove ${teamName(rosterId)}`}>
+                        Remove
+                      </Button>
+                    )
                   ) : null}
                 </div>
               </div>

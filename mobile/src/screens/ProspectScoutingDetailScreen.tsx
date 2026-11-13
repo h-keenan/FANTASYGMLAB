@@ -1,3 +1,4 @@
+import ConfirmInPlace from '../components/ConfirmInPlace';
 import React, { useMemo, useState } from 'react';
 import { ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
@@ -77,22 +78,20 @@ export default function ProspectScoutingDetailScreen({ route, navigation }: Prop
     }
   };
 
-  const removeReport = async () => {
-    if (removing) return;
+  const removeReport = async (): Promise<boolean> => {
+    if (removing) return false;
     setRemoving(true);
     setError(null);
     try {
       const result = await api.deleteScoutingReport(prospect.id);
-      if (result.ok) {
-        setGrade(null);
-        setRoundProjection(null);
-        setNote('');
-        setSaved(false);
-      } else {
-        setError('Could not remove your grade. Try again in a moment.');
-      }
+      if (!result.ok) return false;
+      setGrade(null);
+      setRoundProjection(null);
+      setNote('');
+      setSaved(false);
+      return true;
     } catch {
-      setError('Could not remove your grade. Try again in a moment.');
+      return false;
     } finally {
       setRemoving(false);
     }
@@ -209,11 +208,15 @@ export default function ProspectScoutingDetailScreen({ route, navigation }: Prop
           />
 
           {hadReport ? (
-            <Button
+            <ConfirmInPlace
+              variant="row"
+              mode="ask"
               label="Remove my report"
-              variant="dangerOutline"
-              onPress={() => void removeReport()}
-              loading={removing}
+              prompt="Remove your report?"
+              confirmLabel="Remove"
+              errorText="Could not remove your grade. Try again in a moment."
+              disabled={removing}
+              onConfirm={removeReport}
               style={styles.removeButton}
             />
           ) : null}

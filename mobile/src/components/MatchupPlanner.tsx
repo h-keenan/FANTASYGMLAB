@@ -1,3 +1,4 @@
+import ConfirmInPlace from './ConfirmInPlace';
 import React, { useCallback, useMemo, useRef, useState } from 'react';
 import { Linking, Pressable, StyleSheet, TouchableOpacity, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
@@ -308,7 +309,7 @@ export function PlannerBar({
   return (
     <View style={styles.bar}>
       <View style={styles.barRow}>
-        <Button label="Reset to suggested" variant="secondary" onPress={onReset} disabled={busy} style={styles.barButton} />
+        <ConfirmInPlace label="Reset to suggested" buttonVariant="secondary" disabled={busy} onConfirm={onReset} style={styles.barButton} />
         <Button label="Done" variant="ghost" onPress={onDone} />
       </View>
       <TouchableOpacity

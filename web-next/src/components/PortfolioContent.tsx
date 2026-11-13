@@ -18,6 +18,7 @@ import { BriefingItemPlayers, briefingItemIsSinglePlayer } from "@/components/Br
 import { ButtonLink } from "@/components/Button";
 import { EmptyState } from "@/components/EmptyState";
 import { PillRow } from "@/components/PillRow";
+import { ConfirmInPlace } from "@/components/ui/ConfirmInPlace";
 import { PortfolioExposureView } from "@/components/PortfolioExposureView";
 import { PremiumUpsellCard } from "@/components/PremiumUpsellCard";
 import { SampleLeagueLink } from "@/components/SampleLeagueBanner";
@@ -224,7 +225,7 @@ function FailedLeaguesNote({
 }: {
   leagues: PortfolioFailedLeague[];
   busyLeagueId: string | null;
-  onRemove: (leagueId: string) => void;
+  onRemove: (leagueId: string) => Promise<boolean>;
   onRetry?: (leagueId: string) => void;
 }) {
   const plural = leagues.length === 1 ? "league" : "leagues";
@@ -247,15 +248,19 @@ function FailedLeaguesNote({
               Try again
             </button>
           ) : null}
-          <button
-            type="button"
-            onClick={() => onRemove(league.league_id)}
+          <ConfirmInPlace
+            plain
+            variant="row"
+            mode="ask"
+            label="Not your league? Remove"
+            prompt="Remove this league?"
+            confirmLabel="Remove"
             disabled={busyLeagueId === league.league_id}
-            className="text-xs font-bold whitespace-nowrap"
-            style={{ color: "var(--color-text-muted)" }}
-          >
-            {busyLeagueId === league.league_id ? "Removing…" : "Not your league? Remove"}
-          </button>
+            errorText="Could not remove it. Try again."
+            triggerClassName="text-xs font-bold whitespace-nowrap"
+            triggerStyle={{ color: "var(--color-text-muted)", background: "none", border: 0, minHeight: "var(--touch-target-min)", cursor: "pointer" }}
+            onConfirm={() => onRemove(league.league_id)}
+          />
         </div>
       ))}
     </div>
@@ -493,14 +498,15 @@ export function PortfolioContent({
     (league) => league.reason !== "empty_roster" && league.reason !== "espn_not_supported",
   );
 
-  const removeFailedLeague = (leagueId: string) => {
+  const removeFailedLeague = async (leagueId: string): Promise<boolean> => {
     setBusyLeagueId(leagueId);
-    api
-      .removeSavedLeague(leagueId)
-      .then((result) => {
-        if (result.ok) setRemovedIds((prev) => [...prev, leagueId]);
-      })
-      .finally(() => setBusyLeagueId(null));
+    try {
+      const result = await api.removeSavedLeague(leagueId);
+      if (result.ok) setRemovedIds((prev) => [...prev, leagueId]);
+      return Boolean(result.ok);
+    } finally {
+      setBusyLeagueId(null);
+    }
   };
 
   if (!data.is_premium) {
