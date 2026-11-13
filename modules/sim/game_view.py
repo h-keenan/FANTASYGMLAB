@@ -551,7 +551,8 @@ def _tx_text(snap: GameSnapshot, tx: Mapping[str, Any]) -> tuple[str, str]:
     team = snap.team(tx["team"]).name
     if kind == "waiver":
         drop = f", dropping {name(tx['drop'])}" if tx.get("drop") else ""
-        return tx["team"], f"{team} added {name(tx['add'])}{drop}"
+        why = {"bye": " to cover a bye", "injury": " to cover an injury", "depth": " for depth"}.get(str(tx.get("why") or ""), "")
+        return tx["team"], f"{team} added {name(tx['add'])}{why}{drop}"
     return tx["team"], f"{team} dropped {name(tx['pid'])}"
 
 
