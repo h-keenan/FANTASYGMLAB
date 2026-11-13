@@ -42,7 +42,15 @@ FILE_REAL_MODULES = {
     "backend.py": {"account_store", "auth_supabase"},
 }
 # The only files outside modules/sim that may mention modules.sim, and how.
-EXTERNAL_IMPORTERS = {"services/mobile_api_service.py": {"modules.sim.api"}}
+EXTERNAL_IMPORTERS = {
+    "services/mobile_api_service.py": {"modules.sim.api"},
+    # the latency benchmark drives the real router against the in-memory store (no network, no real data)
+    "scripts/bench_sim_game.py": {
+        "modules.sim.api", "modules.sim.game_state", "modules.sim.game_store", "modules.sim.inputs",
+        "modules.sim.store", "modules.sim.synthetic", "modules.sim.game_ai", "modules.sim.game_eval",
+        "modules.sim.game_home", "modules.sim.game_view",
+    },
+}
 PURE_ENGINE_FILES = [
     "engine.py", "analysis.py", "lineup.py", "personas.py", "rng.py", "types.py", "synthetic.py",
     "store.py", "version.py", "__init__.py", "picks.py", "player_model.py", "player_model_v1.py", "player_model_v2.py", "team_roles.py", "forecast.py",

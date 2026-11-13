@@ -247,23 +247,59 @@ def test_store_snapshot_round_trip_and_failed_snapshot_write_rolls_back():
     assert broken.tables["sim_worlds"] == []
 
 
-def test_supabase_backend_only_touches_sim_tables_as_the_user(monkeypatch):
-    from modules import account_store
-    from modules.sim.backend import SupabaseSimBackend
+class _FakeHttp:
+    """Stands in for the backend's keep-alive ``requests.Session``."""
 
-    calls = []
-    monkeypatch.setattr(account_store, "fetch_rows", lambda cfg, tok, table, **kw: calls.append(("select", table, tok, kw)) or ([], ""))
-    monkeypatch.setattr(account_store, "upsert_row", lambda cfg, tok, table, row, **kw: calls.append(("upsert", table, tok, kw)) or (True, ""))
-    monkeypatch.setattr(account_store, "delete_rows", lambda cfg, tok, table, **kw: calls.append(("delete", table, tok, kw)) or (True, ""))
-    backend = SupabaseSimBackend({"url": "https://x.supabase.co", "anon_key": "k"}, "user-jwt")
-    backend.select("sim_worlds", user_id="u1", filters={"id": "abc"}, columns="id", limit=3)
-    backend.upsert("sim_results", {"world_id": "w", "user_id": "u1", "payload": {}}, on_conflict="world_id")
-    backend.delete("sim_snapshots", user_id="u1", filters={"world_id": "w"})
-    assert [c[:3] for c in calls] == [
-        ("select", "sim_worlds", "user-jwt"), ("upsert", "sim_results", "user-jwt"), ("delete", "sim_snapshots", "user-jwt"),
-    ]
-    assert calls[0][3]["extra_query"] == "id=eq.abc&select=id&limit=3"
-    assert calls[2][3]["query"] == "user_id=eq.u1&world_id=eq.w"
+    class Resp:
+        def __init__(self, status=200, payload=None):
+            self.status_code, self._payload = status, payload if payload is not None else []
+
+        def json(self):
+            return self._payload
+
+    def __init__(self, status=200, payload=None):
+        self.calls = []
+        self.status, self.payload = status, payload
+
+    def _do(self, verb, url, headers=None, json=None, timeout=None):
+        self.calls.append({"verb": verb, "url": url, "headers": headers, "json": json})
+        return self.Resp(self.status, self.payload)
+
+    def get(self, url, **kw):
+        return self._do("get", url, **kw)
+
+    def post(self, url, **kw):
+        return self._do("post", url, **kw)
+
+    def patch(self, url, **kw):
+        return self._do("patch", url, **kw)
+
+    def delete(self, url, **kw):
+        return self._do("delete", url, **kw)
+
+
+def _http_backend(monkeypatch, **kw):
+    from modules.sim import backend as sim_backend_mod
+
+    fake = _FakeHttp(**kw)
+    monkeypatch.setattr(sim_backend_mod, "_SESSION", fake)
+    cfg = {"enabled": True, "url": "https://x.supabase.co", "anon_key": "sb_publishable_k"}
+    return sim_backend_mod.SupabaseSimBackend(cfg, "user-jwt"), fake
+
+
+def test_supabase_backend_only_touches_sim_tables_as_the_user(monkeypatch):
+    backend, http = _http_backend(monkeypatch, payload=[{"id": "abc"}])
+    rows, err = backend.select("sim_worlds", user_id="u1", filters={"id": "abc"}, columns="id", limit=3)
+    assert (rows, err) == ([{"id": "abc"}], "")
+    assert backend.upsert("sim_results", {"world_id": "w", "user_id": "u1", "payload": {}, "gone": None}, on_conflict="world_id") == (True, "")
+    assert backend.delete("sim_snapshots", user_id="u1", filters={"world_id": "w"}) == (True, "")
+    assert [c["verb"] for c in http.calls] == ["get", "post", "delete"]
+    assert http.calls[0]["url"].endswith("/rest/v1/sim_worlds?user_id=eq.u1&id=eq.abc&select=id&limit=3")
+    assert http.calls[1]["url"].endswith("/rest/v1/sim_results?on_conflict=world_id")
+    assert http.calls[1]["json"] == {"world_id": "w", "user_id": "u1", "payload": {}}  # None columns are not sent
+    assert http.calls[2]["url"].endswith("/rest/v1/sim_snapshots?user_id=eq.u1&world_id=eq.w")
+    assert all("user-jwt" in str(c["headers"]) for c in http.calls)
+    n = len(http.calls)
     for table in ("profiles", "saved_leagues", "gm_targets", "sim_worlds; drop table x"):
         with pytest.raises(ValueError):
             backend.select(table, user_id="u1")
@@ -273,29 +309,33 @@ def test_supabase_backend_only_touches_sim_tables_as_the_user(monkeypatch):
             backend.delete(table, user_id="u1", filters={})
         with pytest.raises(ValueError):
             backend.update(table, user_id="u1", filters={}, values={})
+    assert len(http.calls) == n  # nothing left the process for a non-sim table
+
+
+def test_supabase_backend_reports_failures_as_error_strings(monkeypatch):
+    backend, http = _http_backend(monkeypatch, status=404, payload={"message": "relation does not exist"})
+    rows, err = backend.select("sim_games", user_id="u1")
+    assert rows == [] and "not set up" in err
+    assert backend.upsert("sim_games", {"id": "x"}, on_conflict="id")[0] is False
+    assert backend.delete("sim_games", user_id="u1", filters={"id": "x"})[0] is False
 
 
 def test_supabase_backend_update_uses_patch_with_user_jwt(monkeypatch):
-    import requests
-
-    from modules.sim.backend import SupabaseSimBackend
-
-    seen = {}
-
-    class Resp:
-        status_code = 204
-
-    def fake_patch(url, headers=None, json=None, timeout=None):
-        seen.update(url=url, headers=headers, json=json)
-        return Resp()
-
-    monkeypatch.setattr(requests, "patch", fake_patch)
-    backend = SupabaseSimBackend({"enabled": True, "url": "https://x.supabase.co", "anon_key": "sb_publishable_k"}, "user-jwt")
+    backend, http = _http_backend(monkeypatch, status=204)
     ok, err = backend.update("sim_worlds", user_id="u1", filters={"id": "w"}, values={"status": "ready", "grade_letter": None})
     assert (ok, err) == (True, "")
-    assert seen["url"].endswith("/rest/v1/sim_worlds?user_id=eq.u1&id=eq.w")
-    assert seen["json"] == {"status": "ready", "grade_letter": None}
-    assert "user-jwt" in str(seen["headers"])
+    call = http.calls[0]
+    assert call["verb"] == "patch" and call["url"].endswith("/rest/v1/sim_worlds?user_id=eq.u1&id=eq.w")
+    assert call["json"] == {"status": "ready", "grade_letter": None}
+    assert "user-jwt" in str(call["headers"])
+
+
+def test_supabase_backend_reuses_one_keep_alive_session(monkeypatch):
+    from modules.sim import backend as sim_backend_mod
+
+    monkeypatch.setattr(sim_backend_mod, "_SESSION", None)
+    first = sim_backend_mod._session()
+    assert sim_backend_mod._session() is first and first.adapters["https://"].poolmanager is not None
 
 
 def test_status_reports_unavailable_storage_for_pro_but_upsells_free():

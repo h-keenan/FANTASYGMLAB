@@ -53,6 +53,8 @@ export interface SimGameEnvelope {
   is_premium?: boolean;
   upsell?: SimGameUpsell | null;
   preview?: SimGamePreview | null;
+  /** Small actions (claim, cancel, cut, lineup, trade, inbox) return the header slice they changed. */
+  delta?: SimGameDelta;
   /** On `game_limit_reached`. */
   max_games?: number;
   /** On `wrong_phase`. */
@@ -261,6 +263,37 @@ export interface SimGame {
   grade_letter: string | null;
   created_at: string;
   updated_at: string;
+}
+
+/** The slice of `SimGame` a small action can change, returned with the action's own response so the
+ *  header updates without refetching the whole game (see `simApplyDelta`). */
+export interface SimGameDelta {
+  status: SimGameStatus;
+  week: number;
+  pending: SimGamePending;
+  can_trade: boolean;
+}
+
+/** How long after an action's delta the screen skips its own full reload, and how long it then waits to confirm in the background. */
+export const SIM_DELTA_FRESH_MS = 2000;
+export const SIM_RECONCILE_MS = 1500;
+
+/** `game` with an action's delta applied. A delta from a different week or phase (the game moved on
+ *  underneath) is ignored: that case needs the full reload. Returns the same object when nothing changed. */
+export function simApplyDelta(game: SimGame, delta: SimGameDelta | null | undefined): SimGame {
+  if (!delta || delta.week !== game.week || delta.status !== game.status) return game;
+  const same = game.can_trade === delta.can_trade && JSON.stringify(game.pending) === JSON.stringify(delta.pending);
+  return same ? game : { ...game, pending: delta.pending, can_trade: delta.can_trade };
+}
+
+/** `items` without the one with `id` (optimistic cancel / decline); same array when it is not there. */
+export function simWithout<T extends { id: string }>(items: readonly T[], id: string): T[] {
+  return items.some((i) => i.id === id) ? items.filter((i) => i.id !== id) : (items as T[]);
+}
+
+/** A claim shown the instant the user taps Queue; the server's list replaces it when the call returns. */
+export function simOptimisticClaim(add: SimGamePlayer, drop: SimGamePlayer | null, startSlot: SimSlot | null): SimWaiverClaim {
+  return { id: `pending-${add.id}`, add, drop, start_slot: startSlot };
 }
 
 /** The small dynasty block every game payload carries. */

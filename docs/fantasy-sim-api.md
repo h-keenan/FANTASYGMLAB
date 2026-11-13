@@ -341,6 +341,11 @@ or other user's game / malformed id; 422 bad input `{"ok": false, "error"}`; 503
   season started, 3 during the draft.
 - HTTP 409 `{"ok": false, "reason": "conflict"}` when two writes raced on the
   same game; reload and retry. Writes are all-or-nothing.
+- Small mutating calls (lineup, lineup/auto, waivers, cut, roster/move, trades,
+  inbox respond) also return `"delta": {"status", "week", "pending", "can_trade"}`:
+  the slice of `game` they can change, so a client updates its header from the
+  action's own response instead of refetching `GET /games/{id}`. Same shapes as
+  `game.pending` / `game.can_trade`. Performance notes: `docs/performance-sim-game-2026-11.md`.
 - Ids: game id is a uuid (malformed -> 404); player ids are the strings in the
   player rows; team ids are `"1".."12"`.
 

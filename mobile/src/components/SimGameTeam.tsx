@@ -44,6 +44,8 @@ import {
   type SimPickAsset,
   type SimSlot,
   type SimWaiverClaim,
+  simOptimisticClaim,
+  simWithout,
 } from '../lib/simGame';
 import { positionColor, radii, spacing, type ThemeColors } from '../theme';
 
@@ -355,12 +357,17 @@ export function ClaimSheet({
   roster,
   onClose,
   onClaimed,
+  onQueued,
+  onFailed,
 }: {
   ctx: SimCtx;
   player: SimGamePlayer;
   roster: SimGamePlayer[];
   onClose: () => void;
   onClaimed: (claims: SimWaiverClaim[]) => void;
+  /** Optimistic: the claim is shown (and the sheet closes) before the server answers; `onFailed` takes it back. */
+  onQueued?: (claim: SimWaiverClaim) => void;
+  onFailed?: (addId: string) => void;
 }) {
   const { game } = ctx;
   const { colors } = useThemeMode();
@@ -375,13 +382,17 @@ export function ClaimSheet({
   async function submit() {
     if (!payload) return;
     setBusy(true);
+    onQueued?.(simOptimisticClaim(player, roster.find((p) => p.id === dropId) ?? null, (slot || null) as SimSlot | null));
+    if (onQueued) onClose();
     const body = await ctx.call(() => api.claimSimWaiver(ctx.gameId, payload));
     setBusy(false);
     if (body) {
       ctx.notify(`Claim queued for ${player.name}. It resolves when you advance the week.`, 'success');
       onClaimed(body.claims ?? []);
-      await ctx.reloadGame();
+      void ctx.reloadGame();
       onClose();
+    } else {
+      onFailed?.(player.id);
     }
   }
 
@@ -459,10 +470,14 @@ export function SimPlayersTab({
   }, [gameId, teamId, ctx.tick]);
 
   async function cancel(claim: SimWaiverClaim) {
+    const before = claims;
+    setClaims(simWithout(claims, claim.id));
     const body = await call(() => api.cancelSimWaiver(gameId, claim.id));
     if (body) {
       setClaims(body.claims ?? []);
-      await ctx.reloadGame();
+      void ctx.reloadGame();
+    } else {
+      setClaims(before);
     }
   }
 
@@ -513,7 +528,17 @@ export function SimPlayersTab({
         </AppText>
       ) : null}
       <SimPlayerBrowser key={mode} gameId={gameId} fixedStatus={mode === 'waivers' ? 'available' : undefined} positions={simFilterPositionsFor(game.settings.slots)} week={game.week} onOpen={ctx.openPlayer} actions={actions} refreshKey={ctx.tick} />
-      {claiming ? <ClaimSheet ctx={ctx} player={claiming} roster={roster} onClose={() => setClaiming(null)} onClaimed={setClaims} /> : null}
+      {claiming ? (
+        <ClaimSheet
+          ctx={ctx}
+          player={claiming}
+          roster={roster}
+          onClose={() => setClaiming(null)}
+          onClaimed={setClaims}
+          onQueued={(c) => setClaims([...claims.filter((x) => x.add.id !== c.add.id), c])}
+          onFailed={(addId) => setClaims(claims.filter((x) => x.add.id !== addId))}
+        />
+      ) : null}
     </View>
   );
 }

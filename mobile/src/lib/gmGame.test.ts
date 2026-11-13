@@ -12,7 +12,7 @@ import { runSimGameCall } from './simGameCall.ts';
 import { ROUTE_BY_PAGE } from './orbTabs.ts';
 import { NAV_PAGES } from './navCatalog.ts';
 import { paidPreview } from './paidPreviews.ts';
-import { simGameDeleteConfirm, simGameDeleteFailure, simHeadshotId, simNewGameBlock, simPlayerInitials, simSlotRepeatsPosition } from './simGame.ts';
+import { simApplyDelta, simOptimisticClaim, simWithout, simGameDeleteConfirm, simGameDeleteFailure, simHeadshotId, simNewGameBlock, simPlayerInitials, simSlotRepeatsPosition } from './simGame.ts';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const read = (...p: string[]) => readFileSync(join(here, '..', ...p), 'utf8');
@@ -147,4 +147,31 @@ test('saved-game delete: limit copy, confirm names the game, failures classified
   assert.equal(simGameDeleteFailure({ status: 404 }).remove, true);
   assert.equal(simGameDeleteFailure({ status: 409 }).refresh, true);
   assert.match(simGameDeleteFailure({ status: 503 }).message, /busy/);
+});
+
+test('a successful action hands its delta to the screen; a failed one does not', async () => {
+  const deltas: unknown[] = [];
+  const h = harness();
+  const handlers = { ...h.handlers, onDelta: (d: unknown) => deltas.push(d) };
+  const delta = { status: 'in_season', week: 4, can_trade: true, pending: { claims: 1 } };
+  const ok = await runSimGameCall(async () => ({ ok: true, delta }) as never, handlers);
+  assert.ok(ok);
+  assert.deepEqual(deltas, [delta]);
+  await runSimGameCall(async () => ({ ok: false, reason: 'premium_required', is_premium: false, delta }) as never, handlers);
+  assert.equal(deltas.length, 1);
+});
+
+test('deltas apply to the game header only for the same week and phase; optimistic helpers', () => {
+  const game = { id: 'g', status: 'in_season', week: 4, can_trade: true, pending: { claims: 0 } } as never;
+  const delta = { status: 'in_season', week: 4, can_trade: false, pending: { claims: 1 } } as never;
+  const next = simApplyDelta(game, delta) as { pending: { claims: number }; can_trade: boolean };
+  assert.equal(next.pending.claims, 1);
+  assert.equal(next.can_trade, false);
+  assert.equal(simApplyDelta(game, { ...(delta as object), week: 5 } as never), game);
+  assert.equal(simApplyDelta(game, undefined), game);
+  const items = [{ id: 'a' }, { id: 'b' }];
+  assert.deepEqual(simWithout(items, 'a'), [{ id: 'b' }]);
+  assert.equal(simWithout(items, 'zzz'), items);
+  const claim = simOptimisticClaim({ id: '1' } as never, null, null);
+  assert.equal(claim.id, 'pending-1');
 });

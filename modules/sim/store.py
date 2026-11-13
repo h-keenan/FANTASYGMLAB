@@ -9,6 +9,8 @@ tables not existing yet (docs/supabase_sim.sql is applied by hand), surfaces as
 from __future__ import annotations
 
 import copy
+import functools
+import threading
 import uuid
 from datetime import datetime, timezone
 from typing import Any, Mapping, Protocol
@@ -114,13 +116,26 @@ def _matches(row_value: Any, value: Any) -> bool:
     return {"gte": left >= right, "gt": left > right, "lte": left <= right, "lt": left < right}[op]
 
 
+def _locked(fn):
+    """Serialize a backend call: the game store issues independent calls in parallel threads."""
+
+    @functools.wraps(fn)
+    def wrapper(self, *args, **kwargs):
+        with self._lock:
+            return fn(self, *args, **kwargs)
+
+    return wrapper
+
+
 class InMemoryBackend:
     """Test/dev backend with the same contract as the Supabase one."""
 
     def __init__(self, *, fail: bool = False) -> None:
         self.tables: dict[str, list[dict[str, Any]]] = {}
         self.fail = fail
+        self._lock = threading.RLock()
 
+    @_locked
     def select(self, table, *, user_id, filters=None, columns="*", order="", limit=0):
         if self.fail:
             return [], "Supabase tables are not set up yet."
@@ -138,6 +153,7 @@ class InMemoryBackend:
             rows = [{k: v for k, v in r.items() if k in keep} for r in rows]
         return copy.deepcopy(rows), ""
 
+    @_locked
     def upsert(self, table, row, *, on_conflict):
         if self.fail:
             return False, "Supabase tables are not set up yet."
@@ -151,6 +167,7 @@ class InMemoryBackend:
         rows.append(row)
         return True, ""
 
+    @_locked
     def update(self, table, *, user_id, filters, values):
         if self.fail:
             return False, "Supabase tables are not set up yet."
@@ -159,6 +176,7 @@ class InMemoryBackend:
                 row.update(copy.deepcopy(dict(values)))
         return True, ""
 
+    @_locked
     def delete(self, table, *, user_id, filters):
         if self.fail:
             return False, "Supabase tables are not set up yet."
@@ -175,6 +193,7 @@ class InMemoryBackend:
         "sim_games": ("id",),
     }
 
+    @_locked
     def insert_many(self, table, rows):
         if self.fail:
             return False, "Supabase tables are not set up yet."

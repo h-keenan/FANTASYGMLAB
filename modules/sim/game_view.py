@@ -109,8 +109,12 @@ def pick_asset(snap: GameSnapshot, state: GameState, ev: Evaluator, pid: str) ->
 
 def value_ranks(snap: GameSnapshot) -> dict[str, int]:
     """1-based rank of every player by model value (best first), the basis of the board edge."""
-    ordered = sorted(snap.pids, key=lambda pid: (-snap.players[pid].value, pid))
-    return {pid: i + 1 for i, pid in enumerate(ordered)}
+    ranks = getattr(snap, "_value_ranks", None)
+    if ranks is None:  # a frozen snapshot's values never change: rank once per snapshot, not per page request
+        ordered = sorted(snap.pids, key=lambda pid: (-snap.players[pid].value, pid))
+        ranks = {pid: i + 1 for i, pid in enumerate(ordered)}
+        object.__setattr__(snap, "_value_ranks", ranks)
+    return ranks
 
 
 def adp_edge(adp: float | None, value_rank: int | None) -> float | None:
@@ -341,6 +345,31 @@ def dynasty_block(snap: GameSnapshot, state: GameState) -> dict[str, Any] | None
     }
 
 
+def pending_block(snap: GameSnapshot, state: GameState, ev: Evaluator | None = None) -> dict[str, Any]:
+    """The badge counts of the game header (claims, inbox, lineup warnings, roster size)."""
+
+    ev = ev or Evaluator(snap, state)
+    user = snap.user_team.tid
+    user_roster = state.rosters[user]
+    live = state.status in ("in_season", "playoffs")
+    return {
+        "claims": len(state.claims), "inbox": len(state.offers),
+        "lineup_warnings": len(lineup_warnings(ev, state.lineups[user], max(state.week, 1))) if live else 0,
+        "roster_size": len(user_roster), "roster_limit": snap.settings.roster_limit,
+        "cuts_needed": max(0, len(user_roster) - snap.settings.roster_limit),
+    }
+
+
+def game_delta(snap: GameSnapshot, state: GameState) -> dict[str, Any]:
+    """The slice of ``game`` a small action can change, returned with the action's own response so the
+    client updates its header without refetching the whole game."""
+
+    return {
+        "status": state.status, "week": state.week, "pending": pending_block(snap, state),
+        "can_trade": trade_window(snap, state) is None,
+    }
+
+
 def game_view(
     row: Mapping[str, Any], snap: GameSnapshot, state: GameState, *, is_pro: bool
 ) -> dict[str, Any]:
@@ -373,12 +402,7 @@ def game_view(
             "seed": me["seed"] if me else None,
         },
         "this_week": this_week,
-        "pending": {
-            "claims": len(state.claims), "inbox": len(state.offers),
-            "lineup_warnings": len(lineup_warnings(ev, state.lineups[user], week)) if state.status in ("in_season", "playoffs") else 0,
-            "roster_size": len(user_roster), "roster_limit": snap.settings.roster_limit,
-            "cuts_needed": max(0, len(user_roster) - snap.settings.roster_limit),
-        },
+        "pending": pending_block(snap, state, ev),
         "can_trade": trade_window(snap, state) is None,
         "trade_deadline_week": snap.settings.trade_deadline_week,
         "dynasty": dynasty_block(snap, state),
@@ -586,6 +610,6 @@ def players_for(snap: GameSnapshot, state: GameState, pids: Sequence[str]) -> li
 
 __all__ = [
     "preview_block", "paywalled", "player_row", "players_page", "player_detail", "lineup_view", "game_view",
-    "draft_view", "league_view", "pick_asset", "reserve_block", "dynasty_block", "team_roster", "inbox_view", "pending_claims", "players_for", "pick_row",
+    "draft_view", "league_view", "game_delta", "pending_block", "pick_asset", "reserve_block", "dynasty_block", "team_roster", "inbox_view", "pending_claims", "players_for", "pick_row",
     "SORTS", "PAGE_MAX", "rank_teams",
 ]

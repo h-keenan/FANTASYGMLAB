@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useReducer, useState } from "react";
+import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from "react";
 
 import { AccentCard } from "@/components/AccentCard";
 import { Button, ButtonLink } from "@/components/Button";
@@ -66,7 +66,11 @@ import {
   type SimDraftRecap,
   type SimGame,
   type SimGameCreateBody,
+  type SimGameDelta,
   type SimGameGate,
+  SIM_DELTA_FRESH_MS,
+  SIM_RECONCILE_MS,
+  simApplyDelta,
   type SimGameLite,
   type SimGameOptionsResponse,
   type SimGamePlayer,
@@ -131,7 +135,7 @@ export function SimGameContent() {
   );
 
   const gameId = flow.gameId;
-  const reloadGame = useCallback(async () => {
+  const fetchGame = useCallback(async () => {
     if (!gameId) return;
     try {
       const body = await api.getSimGame(gameId);
@@ -145,14 +149,35 @@ export function SimGameContent() {
     }
   }, [gameId]);
 
+  // A small action's own response already carries the header slice it changed (`delta`), so right after one
+  // the screen applies that and confirms with the server in the background instead of waiting on a second request.
+  const deltaAt = useRef(0);
+  const reconcileTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(() => () => {
+    if (reconcileTimer.current) clearTimeout(reconcileTimer.current);
+  }, []);
+  const onDelta = useCallback((delta: SimGameDelta) => {
+    deltaAt.current = Date.now();
+    setGameState((g) => (g ? simApplyDelta(g, delta) : g));
+  }, []);
+  const reloadGame = useCallback(async () => {
+    if (Date.now() - deltaAt.current < SIM_DELTA_FRESH_MS) {
+      if (reconcileTimer.current) clearTimeout(reconcileTimer.current);
+      reconcileTimer.current = setTimeout(() => void fetchGame(), SIM_RECONCILE_MS);
+      return;
+    }
+    await fetchGame();
+  }, [fetchGame]);
+
   const call = useSimGameCall(
     onGate,
     (message) => notify(message, "danger"),
     () => {
       notify("The game changed somewhere else. We reloaded it. Try again.", "warning");
-      void reloadGame();
+      void fetchGame();
       setTick((n) => n + 1);
     },
+    onDelta,
   );
 
   // Hub data: options (works for Free) and the saved games.
