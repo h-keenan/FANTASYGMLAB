@@ -453,7 +453,7 @@ function DraftInsightCard({ card, myRosterId }: { card: DraftCard; myRosterId: s
           items={rows}
           renderRow={(row) => (
             <StructuredRow
-              lead={<TeamAvatar avatarId={row.avatar_url ? row.avatar_url.split('/').pop() : null} name={row.team_name} size={36} />}
+              lead={<TeamAvatar avatarId={row.avatar_url} name={row.team_name} size={36} />}
               title={row.team_name}
               chip={{ label: row.strategy_display, color: signalColor[strategyTone(row.strategy)] }}
               pills={signalPills(row)}
