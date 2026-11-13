@@ -10,7 +10,7 @@ import { useShareImage } from "@/lib/useShareImage";
 /** Share the Season in Review card (rendered in the browser ahead of the tap, see useShareImage). */
 export function SimReviewShareButton({ model, sections, gameId }: { model: ReviewShareModel; sections: readonly ReviewSection[]; gameId: string }) {
   const text = useMemo(
-    () => [`${model.headline} Grade ${model.letter}.`, ...reviewShareLines(sections), "Play Fantasy Sim on FantasyDesk."].join("\n"),
+    () => [`${[model.headline, model.record].filter(Boolean).join(", ")}. Grade ${model.letter}.`, ...reviewShareLines(sections), "Play Fantasy Sim on FantasyDesk."].join("\n"),
     [model, sections],
   );
   const share = useShareImage({
