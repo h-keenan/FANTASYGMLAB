@@ -80,7 +80,7 @@ import {
   type SimTradeSeed,
 } from "@/lib/simGame";
 import { SIM_FLOW_INITIAL, SIM_TABS, simFlowReducer, simRecapsFromAdvance, type SimTab } from "@/lib/simGameFlow";
-import { useSimGameCall } from "@/lib/useSimGameCall";
+import { useSimDeltaReload, useSimGameCall } from "@/lib/useSimGameCall";
 import { useSimLeagueTeams } from "@/lib/useSimLeagueTeams";
 import { useSimLeagueChoices } from "@/lib/useSimLeagueChoices";
 
@@ -131,7 +131,7 @@ export function SimGameContent() {
   );
 
   const gameId = flow.gameId;
-  const reloadGame = useCallback(async () => {
+  const fetchGame = useCallback(async () => {
     if (!gameId) return;
     try {
       const body = await api.getSimGame(gameId);
@@ -145,14 +145,19 @@ export function SimGameContent() {
     }
   }, [gameId]);
 
+  // A small action's own response already carries the header slice it changed (`delta`), so right after one
+  // the screen applies that and confirms with the server in the background instead of waiting on a second request.
+  const { onDelta, reloadGame } = useSimDeltaReload(fetchGame, setGameState);
+
   const call = useSimGameCall(
     onGate,
     (message) => notify(message, "danger"),
     () => {
       notify("The game changed somewhere else. We reloaded it. Try again.", "warning");
-      void reloadGame();
+      void fetchGame();
       setTick((n) => n + 1);
     },
+    onDelta,
   );
 
   // Hub data: options (works for Free) and the saved games.

@@ -81,6 +81,9 @@ import {
   type SimGame,
   type SimGamePlayer,
   type SimLineupSlot,
+  simApplyDelta,
+  simOptimisticClaim,
+  simWithout,
 } from "./simGame";
 
 function player(id: string, pos: SimGamePlayer["pos"], projection = 10): SimGamePlayer {
@@ -734,5 +737,37 @@ describe("flex position filters", () => {
     expect(draft).toEqual({ partner: "7", give: ["m"], get: ["a"] });
     expect(simApplyTradeSeed(draft, { partner: "9", get: "z" })).toEqual({ partner: "9", give: ["m"], get: ["z"] });
     expect(simApplyTradeSeed({ partner: "7", give: ["x"], get: [] }, { partner: "", give: "y" }, 1).give).toEqual(["x"]);
+  });
+});
+
+describe("action deltas and optimistic updates", () => {
+  const delta = { status: "in_season" as const, week: 4, can_trade: false, pending: { claims: 1, inbox: 0, lineup_warnings: 0, roster_size: 16, roster_limit: 16, cuts_needed: 0 } };
+
+  it("applies the header slice an action returned", () => {
+    const next = simApplyDelta(game(), delta);
+    expect(next.pending?.claims).toBe(1);
+    expect(next.can_trade).toBe(false);
+    expect(next.id).toBe("g1");
+  });
+
+  it("keeps the same object when nothing changed and ignores a delta from another week or phase", () => {
+    const g = game({ pending: delta.pending, can_trade: false });
+    expect(simApplyDelta(g, delta)).toBe(g);
+    expect(simApplyDelta(game(), { ...delta, week: 5 }).pending?.claims).toBe(0);
+    expect(simApplyDelta(game(), { ...delta, status: "playoffs" }).pending?.claims).toBe(0);
+    expect(simApplyDelta(game(), undefined).pending?.claims).toBe(0);
+  });
+
+  it("removes an item optimistically and leaves the list alone when it is not there", () => {
+    const items = [{ id: "a" }, { id: "b" }];
+    expect(simWithout(items, "a")).toEqual([{ id: "b" }]);
+    expect(simWithout(items, "zzz")).toBe(items);
+  });
+
+  it("shows a queued claim before the server answers", () => {
+    const claim = simOptimisticClaim(player("1", "WR"), player("2", "RB"), "FLEX");
+    expect(claim).toMatchObject({ id: "pending-1", start_slot: "FLEX" });
+    expect(claim.add.id).toBe("1");
+    expect(claim.drop?.id).toBe("2");
   });
 });

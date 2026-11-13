@@ -552,13 +552,21 @@ class GameSnapshot:
 
     @property
     def user_team(self) -> GameTeam:
-        return next(t for t in self.teams if t.is_user)
+        team = getattr(self, "_user_team", None)
+        if team is None:
+            team = next(t for t in self.teams if t.is_user)
+            object.__setattr__(self, "_user_team", team)
+        return team
 
     def team(self, tid: str) -> GameTeam:
-        for t in self.teams:
-            if t.tid == tid:
-                return t
-        raise KeyError(tid)
+        index = getattr(self, "_team_index", None)
+        if index is None:  # frozen snapshot: index once, on the instance (not a field, never serialized)
+            index = {t.tid: t for t in self.teams}
+            object.__setattr__(self, "_team_index", index)
+        try:
+            return index[tid]
+        except KeyError:
+            raise KeyError(tid) from None
 
     @property
     def tids(self) -> list[str]:

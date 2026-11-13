@@ -15,6 +15,7 @@ from __future__ import annotations
 import copy
 import hashlib
 import json
+import marshal
 from typing import Any, Iterable, Mapping
 
 from modules.sim.game_types import GameSnapshot
@@ -22,6 +23,16 @@ from modules.sim.types import is_pick_id
 
 STATUSES = ("drafting", "in_season", "playoffs", "offseason", "complete")
 MAX_TRANSACTIONS = 200
+
+
+def _dup(value: Any) -> Any:
+    """An independent deep copy of plain data (dict/list/str/number/None). marshal round-trips it exactly,
+    several times faster than ``copy.deepcopy``; anything it cannot carry takes the general path."""
+
+    try:
+        return marshal.loads(marshal.dumps(value))
+    except ValueError:
+        return copy.deepcopy(value)
 
 
 class GameState:
@@ -122,14 +133,24 @@ class GameState:
     # --------------------------------------------------------------- (de)serialize
 
     def to_dict(self) -> dict[str, Any]:
-        return {k: copy.deepcopy(v) for k, v in self.__dict__.items()}
+        return _dup(self.__dict__)
+
+    def clone(self) -> "GameState":
+        """An independent copy, value-identical to ``to_dict`` + ``from_dict`` (the state is plain
+        data, so marshal round-trips it exactly, several times faster than ``deepcopy``). The
+        in-process state cache hands out one shared, never-mutated instance per game version;
+        every command works on its own clone."""
+
+        new = GameState.__new__(GameState)
+        new.__dict__.update(_dup(self.__dict__))
+        return new
 
     @classmethod
     def from_dict(cls, snapshot: GameSnapshot, raw: Mapping[str, Any]) -> "GameState":
         state = cls(snapshot)
         for key, value in raw.items():
             if key in state.__dict__:
-                setattr(state, key, copy.deepcopy(value))
+                setattr(state, key, _dup(value))
         return state
 
     def digest(self) -> str:

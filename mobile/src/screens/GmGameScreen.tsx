@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useReducer, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useReducer, useRef, useState } from 'react';
 import { ScrollView, StyleSheet, View } from 'react-native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { useHeaderHeight } from '@react-navigation/elements';
@@ -73,7 +73,11 @@ import {
   type SimDraftRecap,
   type SimGame,
   type SimGameCreateBody,
+  type SimGameDelta,
   type SimGameGate,
+  SIM_DELTA_FRESH_MS,
+  SIM_RECONCILE_MS,
+  simApplyDelta,
   type SimGameLite,
   type SimGameOptionsResponse,
   type SimGamePlayer,
@@ -145,7 +149,7 @@ export default function GmGameScreen({ navigation }: Props) {
   );
 
   const gameId = flow.gameId;
-  const reloadGame = useCallback(async () => {
+  const fetchGame = useCallback(async () => {
     if (!gameId) return;
     try {
       const body = await api.getSimGame(gameId);
@@ -159,15 +163,39 @@ export default function GmGameScreen({ navigation }: Props) {
     }
   }, [gameId]);
 
+  // A small action's own response already carries the header slice it changed (`delta`), so right after one
+  // the screen applies that and confirms with the server in the background instead of waiting on a second request.
+  const deltaAt = useRef(0);
+  const reconcileTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(
+    () => () => {
+      if (reconcileTimer.current) clearTimeout(reconcileTimer.current);
+    },
+    [],
+  );
+  const onDelta = useCallback((delta: SimGameDelta) => {
+    deltaAt.current = Date.now();
+    setGameState((g) => (g ? simApplyDelta(g, delta) : g));
+  }, []);
+  const reloadGame = useCallback(async () => {
+    if (Date.now() - deltaAt.current < SIM_DELTA_FRESH_MS) {
+      if (reconcileTimer.current) clearTimeout(reconcileTimer.current);
+      reconcileTimer.current = setTimeout(() => void fetchGame(), SIM_RECONCILE_MS);
+      return;
+    }
+    await fetchGame();
+  }, [fetchGame]);
+
   const call = useSimGameRequest(
     onGate,
     (message) => notify(message, 'danger'),
     () => {
       // 409: the game changed somewhere else. Reload it, then the user retries.
       notify('The game changed somewhere else. We reloaded it. Try again.', 'warning');
-      void reloadGame();
+      void fetchGame();
       setTick((n) => n + 1);
     },
+    onDelta,
   );
 
   // Hub data: options (works for Free) and the saved games.

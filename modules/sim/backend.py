@@ -9,6 +9,7 @@ without them.
 
 from __future__ import annotations
 
+import threading
 from typing import Any, Mapping
 
 ALLOWED_TABLES = frozenset({
@@ -27,6 +28,30 @@ def _pg_detail(response: Any) -> str:
     except Exception:  # noqa: BLE001
         return ""
     return f" pg={code}: {message}" if code or message else ""
+
+
+_SESSION: Any = None
+_SESSION_LOCK = threading.Lock()
+
+
+def _session() -> Any:
+    """One keep-alive HTTP session for every sim call in this process. ``requests.get/post`` opens a new
+    connection (TCP + TLS handshake) per call; a game action makes two to five calls, so reusing the pooled
+    connections to Supabase removes a handshake from each of them."""
+
+    global _SESSION
+    if _SESSION is None:
+        with _SESSION_LOCK:
+            if _SESSION is None:
+                import requests
+                from requests.adapters import HTTPAdapter
+
+                session = requests.Session()
+                adapter = HTTPAdapter(pool_connections=4, pool_maxsize=16)
+                session.mount("https://", adapter)
+                session.mount("http://", adapter)
+                _SESSION = session
+    return _SESSION
 
 
 class SupabaseSimBackend:
@@ -52,31 +77,56 @@ class SupabaseSimBackend:
         return "&".join(parts)
 
     def select(self, table, *, user_id, filters=None, columns="*", order="", limit=0):
-        from modules import account_store
+        from modules import account_store, auth_supabase
 
         self._check(table)
+        if not auth_supabase.is_configured(self.config):
+            return [], "Accounts are not configured."
         parts = [self._filter_query(filters)] if filters else []
         parts.append(f"select={columns}")
         if order:
             parts.append(f"order={order}")
         if limit:
             parts.append(f"limit={int(limit)}")
-        return account_store.fetch_rows(
-            self.config, self.access_token, table, user_id=user_id, extra_query="&".join(parts),
-            timing_label="sim_select",
-        )
+        query = f"user_id=eq.{account_store._safe_text(user_id)}&" + "&".join(parts)
+        try:
+            response = _session().get(
+                auth_supabase.rest_api_url(self.config, table, query),
+                headers=auth_supabase.auth_headers(self.config, self.access_token), timeout=15,
+            )
+        except Exception:
+            return [], "Could not reach Supabase table storage."
+        if response.status_code >= 400:
+            return [], account_store._safe_error(response, table=table)
+        try:
+            payload = response.json()
+        except Exception:
+            payload = []
+        if isinstance(payload, list):
+            return payload, ""
+        return ([payload] if isinstance(payload, dict) else []), ""
 
     def upsert(self, table, row, *, on_conflict):
-        from modules import account_store
+        from modules import account_store, auth_supabase
 
         self._check(table)
-        return account_store.upsert_row(
-            self.config, self.access_token, table, dict(row), on_conflict=on_conflict
-        )
+        if not auth_supabase.is_configured(self.config):
+            return False, "Accounts are not configured."
+        payload = {key: value for key, value in dict(row).items() if value not in (None,)}
+        try:
+            response = _session().post(
+                auth_supabase.rest_api_url(self.config, table, f"on_conflict={on_conflict}"),
+                headers={**auth_supabase.auth_headers(self.config, self.access_token),
+                         "Prefer": "resolution=merge-duplicates,return=minimal"},
+                json=payload, timeout=15,
+            )
+        except Exception:
+            return False, "Could not reach Supabase table storage."
+        if response.status_code >= 400:
+            return False, account_store._safe_error(response, table=table)
+        return True, ""
 
     def update(self, table, *, user_id, filters, values):
-        import requests
-
         from modules import auth_supabase
 
         self._check(table)
@@ -84,7 +134,7 @@ class SupabaseSimBackend:
             return False, "Accounts are not configured."
         query = f"user_id=eq.{user_id}&{self._filter_query(filters)}"
         try:
-            response = requests.patch(
+            response = _session().patch(
                 auth_supabase.rest_api_url(self.config, table, query),
                 headers={**auth_supabase.auth_headers(self.config, self.access_token), "Prefer": "return=minimal"},
                 json=dict(values),
@@ -97,8 +147,6 @@ class SupabaseSimBackend:
         return True, ""
 
     def insert_many(self, table, rows):
-        import requests
-
         from modules import auth_supabase
         from modules.sim.store import CONFLICT
 
@@ -106,7 +154,7 @@ class SupabaseSimBackend:
         if not auth_supabase.is_configured(self.config):
             return False, "Accounts are not configured."
         try:
-            response = requests.post(
+            response = _session().post(
                 auth_supabase.rest_api_url(self.config, table),
                 headers={**auth_supabase.auth_headers(self.config, self.access_token), "Prefer": "return=minimal"},
                 json=[dict(r) for r in rows],
@@ -123,13 +171,23 @@ class SupabaseSimBackend:
         return True, ""
 
     def delete(self, table, *, user_id, filters):
-        from modules import account_store
+        from modules import account_store, auth_supabase
 
         self._check(table)
+        if not auth_supabase.is_configured(self.config):
+            return False, "Accounts are not configured."
         query = f"user_id=eq.{user_id}&{self._filter_query(filters)}"
-        return account_store.delete_rows(
-            self.config, self.access_token, table, query=query, timing_label="sim_delete"
-        )
+        try:
+            response = _session().delete(
+                auth_supabase.rest_api_url(self.config, table, query),
+                headers={**auth_supabase.auth_headers(self.config, self.access_token), "Prefer": "return=minimal"},
+                timeout=8,
+            )
+        except Exception:
+            return False, "Could not reach Supabase table storage."
+        if response.status_code >= 400:
+            return False, account_store._safe_error(response, table=table)
+        return True, ""
 
 
 def backend_for(config: dict, access_token: str) -> Any:

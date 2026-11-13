@@ -7,7 +7,7 @@
  * the call really succeeded, else null after reporting the gate, so callers
  * just `if (!body) return`. Mirrors web-next/src/lib/useSimGameCall.ts.
  */
-import { simActionFailureMessage, simGameErrorGate, simGameGate, simIsTransientGate, type SimGameEnvelope, type SimGameGate } from './simGame.ts';
+import { simActionFailureMessage, simGameErrorGate, simGameGate, simIsTransientGate, type SimGameDelta, type SimGameEnvelope, type SimGameGate } from './simGame.ts';
 
 export const SIM_CALL_RETRY_MS = 700;
 
@@ -17,6 +17,8 @@ export interface SimGameCallHandlers {
   onConflict?: () => void;
   /** Test seam for the single automatic retry's delay. */
   retryMs?: number;
+  /** A successful action's `delta` (the header slice it changed), applied before the call returns. */
+  onDelta?: (delta: SimGameDelta) => void;
 }
 
 export async function runSimGameCall<T extends SimGameEnvelope>(fn: () => Promise<T>, handlers: SimGameCallHandlers): Promise<T | null> {
@@ -28,7 +30,10 @@ export async function runSimGameCall<T extends SimGameEnvelope>(fn: () => Promis
     try {
       body = await fn();
       gate = simGameGate(body);
-      if (gate.kind === 'ready') return body;
+      if (gate.kind === 'ready') {
+        if (body.delta) handlers.onDelta?.(body.delta);
+        return body;
+      }
     } catch (error) {
       gate = simGameErrorGate(error);
       if (!gate) {

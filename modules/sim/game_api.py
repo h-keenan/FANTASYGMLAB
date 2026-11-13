@@ -175,6 +175,19 @@ def default_start_year(today: Any = None) -> int:
     return d.year if d.month >= 3 else d.year - 1
 
 
+def _fast_json(payload: Any) -> Any:
+    """Serialize a plain-dict payload straight to JSON. Returning the dict would send it through
+    FastAPI's recursive ``jsonable_encoder`` first, which is a quarter of the time of a 25 KB reply;
+    the payloads here are already JSON types. Anything else still takes the framework's path."""
+
+    if type(payload) is not dict:
+        return payload
+    try:
+        return JSONResponse(content=payload)
+    except (TypeError, ValueError):
+        return payload
+
+
 def _gid(raw: str) -> str:
     try:
         return str(uuid.UUID(raw))
@@ -254,7 +267,7 @@ def add_routes(router: APIRouter, ctx: GameApiCtx) -> None:
         @functools.wraps(fn)
         def wrapper(*args: Any, **kwargs: Any) -> Any:
             try:
-                return fn(*args, **kwargs)
+                return _fast_json(fn(*args, **kwargs))
             except SimStoreError as exc:
                 return unavailable(exc)
             except GameConflict:
@@ -272,54 +285,64 @@ def add_routes(router: APIRouter, ctx: GameApiCtx) -> None:
 
     # ------------------------------------------------------------- helpers
 
-    def load(user: dict[str, Any], game_id: str):
+    def load(user: dict[str, Any], game_id: str, *, write: bool = False):
+        """Row (the version check), frozen snapshot and folded state. The state is a shared read-only
+        instance from the in-process cache; a caller that will change it passes ``write=True`` and gets
+        its own copy (published back by ``commit`` once the events are written)."""
+
         uid = str(user.get("id") or "")
         store = ctx.store_for(user)
         row = store.get_game(uid, game_id)
         if row is None:
             raise HTTPException(status_code=404, detail="Game not found.")
-        snap = store.get_snapshot(uid, game_id)
-        if snap is None:
+        snap, state = store.load_game(uid, game_id, row)
+        if snap is None or state is None:
             raise HTTPException(status_code=404, detail="Game not found.")
-        state = store.load_state(uid, game_id, snap)
+        if write:
+            state = state.clone()
         return store, uid, row, snap.season_view(state.view_no), state
 
     def commit(store: GameStore, uid: str, game_id: str, snap: GameSnapshot, state: GameState,
-               em: Emitter, *, checkpoint: bool = False) -> None:
-        store.append_events(uid, game_id, em.events)
-        try:
-            store.touch(uid, game_id, status=state.status, week=state.week, event_count=state.seq)
-        except SimStoreError:
-            # The events are the truth and are already saved: a stale list-view row must
-            # not fail the action (the client would think the pick was lost).
-            _log.warning("sim touch failed game=%s", game_id, exc_info=True)
-        if checkpoint:
-            try:
-                store.save_checkpoint(uid, game_id, state, (state.season_no - 1) * 100 + state.week)  # weeks restart each dynasty season
-            except SimStoreError:
-                pass  # the checkpoint is only a cache; events are the truth
+               em: Emitter, *, checkpoint: bool = False, defer: bool = False):
+        """Persist ``em.events``. With ``defer`` the bookkeeping writes overlap the caller's response
+        building and the caller must call ``.finish()`` on the returned handle before replying."""
+
+        week = (state.season_no - 1) * 100 + state.week if checkpoint else None  # weeks restart each dynasty season
+        pending = store.commit(
+            uid, game_id, state, em.events, checkpoint_week=week,
+            prev_checkpoint_week=store.cached_checkpoint_week(uid, game_id),
+        )
+        if defer:
+            return pending
+        pending.finish()
+        return None
 
     def game_json(row, snap, state, pro):
         return view.game_view(row, snap, state, is_pro=pro)
 
-    def heal_draft(store, uid, game_id, snap, state, seed) -> None:
+    def heal_draft(store, uid, game_id, snap, state, seed) -> GameState:
         """A draft left with an AI team on the clock (a create interrupted after
-        the game row was written) resumes on the next read."""
+        the game row was written) resumes on the next read. Returns the state to use: the
+        given (shared, read-only) one when nothing needed doing, else a healed copy."""
 
         if state.status != "drafting":
-            return
+            return state
         if snap.start_rosters:  # an imported league never drafts: finish its interrupted start
+            state = state.clone()
             em = Emitter(state, snap)
             start_from_league(em, snap, state, seed)
             commit(store, uid, game_id, snap, state, em, checkpoint=True)
-            return
+            return state
         dctx = draft.DraftContext(snap, state)
         if dctx.on_clock() is not None and dctx.on_clock() != snap.user_team.tid:
+            state = state.clone()
+            dctx = draft.DraftContext(snap, state)
             em = Emitter(state, snap)
             draft.run_ai_picks(dctx, em, seed)
             if state.pick_index >= dctx.total:
                 finish_draft(em, snap, state, seed)
             commit(store, uid, game_id, snap, state, em, checkpoint=state.status != "drafting")
+        return state
 
     # --------------------------------------------------------------- options
 
@@ -503,7 +526,7 @@ def add_routes(router: APIRouter, ctx: GameApiCtx) -> None:
         pro = ctx.is_pro(user)
         gid = _gid(game_id)
         store, uid, row, snap, state = load(user, gid)
-        heal_draft(store, uid, gid, snap, state, seedof(row, state))
+        state = heal_draft(store, uid, gid, snap, state, seedof(row, state))
         return {**_env(pro, state), "game": game_json(row, snap, state, pro)}
 
     @router.delete("/games/{game_id}")
@@ -525,7 +548,7 @@ def add_routes(router: APIRouter, ctx: GameApiCtx) -> None:
         gid = _gid(game_id)
         store, uid, row, snap, state = load(user, gid)
         seed = seedof(row, state)
-        heal_draft(store, uid, gid, snap, state, seed)
+        state = heal_draft(store, uid, gid, snap, state, seed)
         dctx = draft.DraftContext(snap, state)
         return {**_env(pro, state), **view.draft_view(snap, state, dctx, seed, page=page, page_size=page_size,
                                                       pos=pos.upper(), q=q)}
@@ -549,11 +572,11 @@ def add_routes(router: APIRouter, ctx: GameApiCtx) -> None:
         pro = ctx.is_pro(user)
         gid = _gid(game_id)
         with _lock_for(gid):
-            store, uid, row, snap, state = load(user, gid)
+            store, uid, row, snap, state = load(user, gid, write=True)
             if expect_pick_no is not None and state.status == "drafting" and expect_pick_no != state.pick_index + 1:
                 return _already_picked(state)
             seed = seedof(row, state)
-            heal_draft(store, uid, gid, snap, state, seed)
+            state = heal_draft(store, uid, gid, snap, state, seed)
             dctx = draft.DraftContext(snap, state)
             em = Emitter(state, snap)
             with ctx.compute() as ok:
@@ -563,9 +586,11 @@ def add_routes(router: APIRouter, ctx: GameApiCtx) -> None:
                 recap = None
                 if state.pick_index >= dctx.total and state.status == "drafting":
                     recap = finish_draft(em, snap, state, seed)
-            commit(store, uid, gid, snap, state, em, checkpoint=recap is not None)
+            pending = commit(store, uid, gid, snap, state, em, checkpoint=recap is not None, defer=True)
             row = {**row, "status": state.status}
-            return _finish_response(pro, row, snap, state, dctx, em, made, recap is not None, recap, seed)
+            out = _finish_response(pro, row, snap, state, dctx, em, made, recap is not None, recap, seed)
+            pending.finish()
+            return out
 
     @router.post("/games/{game_id}/draft/pick")
     @guarded
@@ -586,7 +611,7 @@ def add_routes(router: APIRouter, ctx: GameApiCtx) -> None:
         pro = ctx.is_pro(user)
         gid = _gid(game_id)
         with _lock_for(gid):
-            store, uid, row, snap, state = load(user, gid)
+            store, uid, row, snap, state = load(user, gid, write=True)
             if state.status != "drafting":
                 raise GameError("wrong_phase", "The draft is over.", phase=state.status)
             em = Emitter(state, snap)
@@ -661,13 +686,16 @@ def add_routes(router: APIRouter, ctx: GameApiCtx) -> None:
         pro = ctx.is_pro(user)
         gid = _gid(game_id)
         with _lock_for(gid):
-            store, uid, row, snap, state = load(user, gid)
+            store, uid, row, snap, state = load(user, gid, write=True)
             if view.paywalled(pro, state):
                 return _premium(state)
             em = Emitter(state, snap)
             extra = action(em, snap, state, row, seedof(row, state))
-            commit(store, uid, gid, snap, state, em, checkpoint=checkpoint)
-            return {**_env(pro, state), **(respond(snap, state) if respond else {}), **(extra or {})}
+            pending = commit(store, uid, gid, snap, state, em, checkpoint=checkpoint, defer=True)
+            out = {**_env(pro, state), **(respond(snap, state) if respond else {}), **(extra or {}),
+                   "delta": view.game_delta(snap, state)}
+            pending.finish()
+            return out
 
     def _lineup_resp(snap, state):
         return view.lineup_view(snap, state)
@@ -810,15 +838,18 @@ def add_routes(router: APIRouter, ctx: GameApiCtx) -> None:
                 raise GameError("week_mismatch", "That week has not started.", current_week=state.week)
             if view.paywalled(pro, state):
                 return _premium(state)
+            state = state.clone()
             em = Emitter(state, snap)
             with ctx.compute() as ok:
                 if not ok:
                     return busy()
                 recaps = advance(em, snap, state, seedof(row, state))
-            commit(store, uid, gid, snap, state, em, checkpoint=True)
+            pending = commit(store, uid, gid, snap, state, em, checkpoint=True, defer=True)
             snap = snap.season_view(state.view_no)  # the season may have ended into the offseason
-            return {**_env(pro, state), "recap": recaps[0], "also_played": recaps[1:], "replayed": False,
-                    "game": game_json({**row, "status": state.status}, snap, state, pro)}
+            out = {**_env(pro, state), "recap": recaps[0], "also_played": recaps[1:], "replayed": False,
+                   "game": game_json({**row, "status": state.status}, snap, state, pro)}
+            pending.finish()
+            return out
 
     @router.post("/games/{game_id}/revert-week")
     @guarded
@@ -882,7 +913,7 @@ def add_routes(router: APIRouter, ctx: GameApiCtx) -> None:
         pro = ctx.is_pro(user)
         gid = _gid(game_id)
         with _lock_for(gid):
-            store, uid, row, snap, state = load(user, gid)
+            store, uid, row, snap, state = load(user, gid, write=True)
             _require_offseason(state)
             em = Emitter(state, snap)
             with ctx.compute() as ok:
@@ -918,7 +949,7 @@ def add_routes(router: APIRouter, ctx: GameApiCtx) -> None:
         pro = ctx.is_pro(user)
         gid = _gid(game_id)
         with _lock_for(gid):
-            store, uid, row, snap, state = load(user, gid)
+            store, uid, row, snap, state = load(user, gid, write=True)
             _require_offseason(state)
             em = Emitter(state, snap)
             with ctx.compute() as ok:

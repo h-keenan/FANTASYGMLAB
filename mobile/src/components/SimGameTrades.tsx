@@ -51,6 +51,7 @@ import {
   type SimPickAsset,
   type SimTradeAsset,
   type SimTradeVerdict,
+  simWithout,
 } from '../lib/simGame';
 import type { ThemeColors } from '../theme';
 
@@ -115,13 +116,14 @@ function Inbox({ ctx }: { ctx: SimCtx }) {
 
   async function respond(item: SimInboxItem, action: 'accept' | 'decline') {
     setBusyId(item.id);
+    if (action === 'decline') setItems((prev) => (prev ? simWithout(prev, item.id) : prev)); // optimistic: a decline cannot fail the rules
     const body = await call(() => api.respondSimInbox(gameId, item.id, action));
     setBusyId(null);
     if (body) {
       setItems(body.items ?? []);
       ctx.notify(action === 'accept' && body.executed ? `Trade done with ${item.from.name}.` : `Declined ${item.from.name}'s offer.`, action === 'accept' ? 'success' : 'muted');
       ctx.bump();
-      await ctx.reloadGame();
+      void ctx.reloadGame();
     } else {
       // offer_invalid and friends: refresh the list so the stale card goes away.
       api
@@ -363,7 +365,7 @@ function Builder({ ctx, seed, onSeedUsed }: { ctx: SimCtx; seed: SimTradeSeed | 
       ctx.notify('Trade done. The players are on their new rosters.', 'success');
       dispatch({ type: 'clear' });
       ctx.bump();
-      await ctx.reloadGame();
+      void ctx.reloadGame();
     } else if (body.verdict) {
       setVerdictFor({ key, verdict: body.verdict });
     }
