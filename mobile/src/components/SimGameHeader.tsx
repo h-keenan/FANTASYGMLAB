@@ -34,6 +34,13 @@ export function SimGameHeader({ game, onHub, onTeam, onMore, bell }: { game: Sim
         {simCompactWeek(game)}
         {season ? <AppText style={styles.season} testID="dynasty-progress">{` ${season}`}</AppText> : null}
       </AppText>
+      {bell}
+      <Pressable onPress={requestOrbSearch} accessibilityRole="button" accessibilityLabel="Search players and pages" style={styles.icon}>
+        <Ionicons name="search-outline" size={20} color={colors.textSecondary} />
+      </Pressable>
+      <Pressable onPress={onMore} accessibilityRole="button" accessibilityLabel="Game menu: rules, reset week, delete" style={styles.icon}>
+        <Ionicons name="ellipsis-horizontal" size={20} color={colors.textSecondary} />
+      </Pressable>
       {showTeam && you ? (
         <Pressable
           onPress={() => you.team_id && onTeam(you.team_id)}
@@ -43,19 +50,10 @@ export function SimGameHeader({ game, onHub, onTeam, onMore, bell }: { game: Sim
           testID="sim-team-chip"
         >
           <SimCrest name={you.name} size={20} />
-          <AppText style={styles.chipName} numberOfLines={1}>{you.name}</AppText>
+          <AppText style={styles.chipName}>{you.name}</AppText>
           <AppText style={styles.chipRecord}>{simFmtRecord(you)}</AppText>
         </Pressable>
-      ) : (
-        <View style={styles.spacer} />
-      )}
-      {bell}
-      <Pressable onPress={requestOrbSearch} accessibilityRole="button" accessibilityLabel="Search players and pages" style={styles.icon}>
-        <Ionicons name="search-outline" size={20} color={colors.textSecondary} />
-      </Pressable>
-      <Pressable onPress={onMore} accessibilityRole="button" accessibilityLabel="Game menu: rules, reset week, delete" style={styles.icon}>
-        <Ionicons name="ellipsis-horizontal" size={20} color={colors.textSecondary} />
-      </Pressable>
+      ) : null}
     </View>
   );
 }
@@ -89,13 +87,14 @@ export function SimStatusChips({ game, onTab }: { game: SimGame; onTab: (tab: Si
 
 function createStyles(colors: ThemeColors) {
   return StyleSheet.create({
-    bar: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs, minHeight: 48 },
+    bar: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: spacing.xs, minHeight: 48 },
     icon: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center' },
-    week: { flexShrink: 0, fontSize: 14, fontWeight: '800', color: colors.textPrimary },
+    week: { flexGrow: 1, flexShrink: 1, fontSize: 14, fontWeight: '800', color: colors.textPrimary },
     season: { fontSize: 12, fontWeight: '700', color: colors.textTertiary },
     spacer: { flex: 1 },
     chip: {
-      flex: 1,
+      // Second row, full width: the team name never truncates (coridian_: no ellipsis on names).
+      width: '100%',
       minWidth: 0,
       minHeight: 44,
       flexDirection: 'row',

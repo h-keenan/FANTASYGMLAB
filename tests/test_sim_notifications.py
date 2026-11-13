@@ -83,6 +83,10 @@ def test_derivation_from_a_played_season_covers_offers_expiries_injuries_and_the
         by_kind.setdefault(item["kind"], []).append(item)
     assert len(by_kind["recap"]) >= 14
     assert by_kind["offer"], "AI offers reach the user"
+    # only proposals that actually reached the inbox, worded as what they offer for what they ask
+    inbox_ids = {e["payload"]["id"] for e in events if e["type"] == "inbox_offer"}
+    assert {i["target"]["offer_id"] for i in by_kind["offer"]} == inbox_ids
+    assert all(" offers " in i["headline"] and " for " in i["headline"] for i in by_kind["offer"])
     assert by_kind.get("offer_expired"), "unanswered offers expire at a week boundary"
     for item in by_kind.get("injury", []):
         pid = item["target"]["player_id"]

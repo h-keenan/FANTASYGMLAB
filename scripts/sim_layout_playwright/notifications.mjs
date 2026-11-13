@@ -11,7 +11,8 @@ const browser = await chromium.launch({ executablePath: process.env.HOME + "/Lib
 const session = { access_token: "a.b.c", refresh_token: "r", token_type: "bearer", expires_in: 99999, expires_at: Math.floor(Date.now() / 1000) + 99999, user: { id: "u1", aud: "authenticated", role: "authenticated", email: "t@example.com", app_metadata: {}, user_metadata: {}, created_at: "2026-01-01T00:00:00Z" } };
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const mock = createMock({ status: "in_season", week: 4, pro: true });
-const ctx = await browser.newContext({ viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true, deviceScaleFactor: 2 });
+const W = Number(process.env.W || 390);
+const ctx = await browser.newContext({ viewport: { width: W, height: 844 }, hasTouch: true, isMobile: true, deviceScaleFactor: 2 });
 await ctx.addInitScript(([s]) => { try { localStorage.setItem("fgl:theme-mode", "dark"); localStorage.setItem("sb-dummy-auth-token", JSON.stringify(s)); localStorage.setItem("fgl:onboarding-complete", "1"); } catch (e) {} }, [session]);
 await ctx.route("**/*", async (route) => {
   const u = new URL(route.request().url());
@@ -20,7 +21,7 @@ await ctx.route("**/*", async (route) => {
     if (route.request().method() === "OPTIONS") return route.fulfill({ status: 204, headers: cors });
     const raw = route.request().postData(); let json = null; try { json = raw ? JSON.parse(raw) : null; } catch {}
     if (u.pathname.endsWith("/notifications")) return route.fulfill({ status: 200, contentType: "application/json", headers: cors, body: JSON.stringify({ ok: true, reason: "", seq: 60, unread: 3, items: [
-  { id: "offer:60:0", seq: 60, week: 4, kind: "offer", icon: "trade", headline: "Red Zone Rats want Malik Ross +1", target: { screen: "trades" } },
+  { id: "offer:60:0", seq: 60, week: 4, kind: "offer", icon: "trade", headline: "Red Zone Rats offer Wade Hall for Malik Ross", target: { screen: "trades" } },
   { id: "injury:55:0", seq: 55, week: 4, kind: "injury", icon: "injury", headline: "Marcus Lane is out 3 weeks", target: { screen: "team" } },
   { id: "lineup:50:3", seq: 50, week: 4, kind: "lineup", icon: "alert", headline: "1 lineup issue: a bye, injured or empty starter", target: { screen: "team" } },
   { id: "recap:40:0", seq: 40, week: 3, kind: "recap", icon: "matchup", headline: "Week 3 recap is ready", target: { screen: "home" } },
@@ -33,7 +34,7 @@ await ctx.route("**/*", async (route) => {
       res.body.recap.scores = [[0, 1, 102, 95.2], [2, 3, 110.4, 101], [4, 5, 140.7, 68.9]].map(([a, b, x, y]) => ({ home: String(a + 1), away: String(b + 1), home_pts: x, away_pts: y, winner: String(x > y ? a + 1 : b + 1) }));
       res.body.recap.standings = names.map((n, i) => ({ rank: i + 1, team_id: String(i + 1), name: n, is_you: false, wins: 3, losses: 1, ties: 0, pf: 400, pa: 380 }));
     }
-    return route.fulfill({ status: res?.status ?? 200, contentType: "application/json", body: JSON.stringify(res?.body ?? {}), headers: cors });
+    return route.fulfill({ status: res?.status ?? 200, contentType: "application/json", body: JSON.stringify(res?.body ?? {}).split("Zach's Squad").join(process.env.TEAM || "Zach's Squad"), headers: cors });
   }
   if (u.hostname === "dummy.supabase.co") return route.fulfill({ status: 200, contentType: "application/json", body: "{}", headers: cors });
   return route.continue();
@@ -46,10 +47,12 @@ await page.goto(`${BASE}/gm-game`, { waitUntil: "domcontentloaded" });
 await page.addStyleTag({ content: "nextjs-portal,[data-nextjs-toast]{display:none!important}" }).catch(() => {});
 await sleep(12000);
 await page.getByRole("button", { name: "Open game" }).first().dispatchEvent("click"); await sleep(3000);
-await page.screenshot({ path: `${OUT}/notif-1-header.png` });
+await page.screenshot({ path: `${OUT}/notif-1-header-${W}.png` });
+const hdr = await page.evaluate(() => { const c = document.querySelector("[data-testid=sim-team-chip]"); const n = c && c.querySelector("span.break-words"); return n ? { text: n.textContent, truncated: n.scrollWidth > n.clientWidth + 1, scrollW: document.documentElement.scrollWidth } : null; });
+console.log("W", W, JSON.stringify(hdr));
 await page.getByTestId("sim-bell").first().dispatchEvent("click"); await sleep(1200);
-await page.screenshot({ path: `${OUT}/notif-2-sheet.png` });
+await page.screenshot({ path: `${OUT}/notif-2-sheet-${W}.png` });
 console.log("scrollWidth", await page.evaluate(() => document.documentElement.scrollWidth));
-await page.getByRole("button", { name: /Rats want Malik/ }).dispatchEvent("click"); await sleep(1200);
-await page.screenshot({ path: `${OUT}/notif-3-after-tap.png` });
+await page.getByRole("button", { name: /Rats offer Wade/ }).dispatchEvent("click"); await sleep(1200);
+await page.screenshot({ path: `${OUT}/notif-3-after-tap-${W}.png` });
 await browser.close();

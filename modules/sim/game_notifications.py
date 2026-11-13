@@ -60,7 +60,7 @@ def derive(
         seq, week, typ, p = int(ev["seq"]), int(ev["week"]), ev["type"], ev["payload"]
         if typ == "inbox_offer":
             offers[p["id"]] = {"seq": seq, "week": week, "team": p["team"], "expires": int(p.get("expires_week", week)), "p": p}
-            items.append(_item(seq, 0, week, "offer", "trade", f"{_team(snap, p['team'])} wants {_names(snap, p.get('get', []))}", "trades", offer_id=p["id"]))
+            items.append(_item(seq, 0, week, "offer", "trade", f"{_team(snap, p['team'])} offers {_names(snap, p.get('give', []))} for {_names(snap, p.get('get', []))}", "trades", offer_id=p["id"]))
         elif typ == "inbox_response":
             responded[p["id"]] = str(p.get("action", ""))
         elif typ == "trade" and p.get("source") != "ai_ai" and user in (p.get("team_a"), p.get("team_b")):
