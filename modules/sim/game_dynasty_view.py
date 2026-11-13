@@ -9,7 +9,7 @@ from __future__ import annotations
 from typing import Any
 
 from modules.sim.game_ai import trade_window
-from modules.sim.game_dynasty import dynasty_summary, rookies_available
+from modules.sim.game_dynasty import class_strength, dynasty_summary, rookies_available
 from modules.sim.game_eval import Evaluator
 from modules.sim.game_state import GameState
 from modules.sim.game_types import GameSnapshot
@@ -80,6 +80,9 @@ def offseason_view(snap: GameSnapshot, state: GameState, *, pos: str = "", limit
     return {
         "stage": stage, "year": off.get("year"), "season_no": state.season_no, "seasons": S.seasons,
         "next_year": off.get("year"), "last_season": last,
+        # The incoming class is simulated (names and talent generated, scaled to this league's pool).
+        "rookie_class": {"generated": True, "strength": class_strength(snap.root, state.view_no)[1],
+                         "size": len([1 for p in snap.players.values() if p.extra.get("draft_year") == float(off.get("year") or 0)])},
         "retired": retired, "movers": movers[:12], "your_picks_this_draft": [o for o in order if o["is_yours"]],
         "draft": {
             "round_count": S.rookie_rounds, "total": len(order), "pick_index": idx, "order": order,

@@ -135,7 +135,20 @@ class GameState:
     def digest(self) -> str:
         """Stable fingerprint for resume-vs-replay equality checks."""
 
-        blob = json.dumps(self.to_dict(), sort_keys=True, separators=(",", ":"), default=str)
+        raw = self.to_dict()
+        # Dynasty / reserve fields at their inert defaults are left out, so a game that never
+        # uses them fingerprints exactly as it did before they existed.
+        for key in ("ir", "taxi"):
+            if not any(raw[key].values()):
+                del raw[key]
+        for key in ("pick_owner", "created_picks", "spent_picks", "seasons", "rookie_log", "retired"):
+            if not raw[key]:
+                del raw[key]
+        if raw["season_no"] == 1:
+            del raw["season_no"]
+        if raw["offseason"] is None:
+            del raw["offseason"]
+        blob = json.dumps(raw, sort_keys=True, separators=(",", ":"), default=str)
         return hashlib.sha256(blob.encode()).hexdigest()
 
 

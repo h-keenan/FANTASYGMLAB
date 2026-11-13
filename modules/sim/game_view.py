@@ -70,7 +70,7 @@ def player_row(
         "out_weeks": state.out.get(pid, 0), "bye_week": snap.bye_of(pid) or None,
         "owner": _owner(snap, state, owners, pid), "kind": "player",
         "squad": state.where(owners[pid], pid) if pid in owners else None,
-        "taxi_eligible": taxi_ok(snap, pid), "rookie": bool(p.extra.get("is_rookie")),
+        "taxi_eligible": taxi_ok(snap, pid), "rookie": bool(p.extra.get("is_rookie")), "generated": bool(p.extra.get("draft_year")),
         "last_week": state.last_points(pid), "season_points": round(sum(games), 1), "games": len(games),
         "ppg": round(sum(games) / len(games), 1) if games else None,
     }

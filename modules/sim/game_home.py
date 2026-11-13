@@ -510,11 +510,50 @@ def _checklist(
             "severity": "warning" if uncovered else "ok",
             "detail": (uncovered[0]["message"] if uncovered else "Your bench covers every upcoming bye."),
         })
+    items.extend(_reserve_items(snap, state))
     if window is None:
         items.append({"id": "offers", "label": "Answer trade offers", "target": "trades", "done": inbox == 0,
                       "severity": "accent" if inbox else "ok",
                       "detail": (f"{inbox} offer{'s' if inbox != 1 else ''} waiting in your inbox." if inbox else "No offers waiting.")})
     return items
+
+
+def _reserve_items(snap: GameSnapshot, state: GameState) -> list[dict[str, Any]]:
+    """IR and taxi housekeeping for the checklist (nothing for a game without reserve squads)."""
+
+    S = snap.settings
+    if not S.reserves:
+        return []
+    user = snap.user_team.tid
+    items: list[dict[str, Any]] = []
+    healthy = [p for p in state.ir[user] if state.out.get(p, 0) <= 0 and p in snap.players]
+    if healthy:
+        items.append({"id": "ir_activate", "label": "Activate a healthy player from IR", "target": "team", "done": False,
+                      "severity": "warning",
+                      "detail": f"{snap.players[healthy[0]].name} is healthy and still on your IR."})
+    if S.ir_slots and len(state.ir[user]) < S.ir_slots:
+        hurt = sorted((p for p in state.rosters[user] if state.out.get(p, 0) >= 4), key=lambda p: (-state.out[p], p))
+        if hurt:
+            items.append({"id": "ir_stash", "label": "Free a roster spot with IR", "target": "team", "done": False,
+                          "severity": "accent",
+                          "detail": f"{snap.players[hurt[0]].name} is out {state.out[hurt[0]]} weeks; IR frees a spot."})
+    return items
+
+
+def _extras(snap: GameSnapshot, state: GameState, ev: Evaluator) -> dict[str, Any]:
+    out: dict[str, Any] = {}
+    user = snap.user_team.tid
+    if snap.settings.reserves:
+        out["reserves"] = {"ir_used": len(state.ir[user]), "ir_slots": snap.settings.ir_slots,
+                           "taxi_used": len(state.taxi[user]), "taxi_slots": snap.settings.taxi_slots}
+    if snap.settings.dynasty:
+        picks = sorted(state.picks_of(user))
+        out["dynasty"] = {
+            "season_no": state.season_no, "seasons": snap.settings.seasons,
+            "picks_held": len(picks), "picks_value": round(sum(ev.pick_value(p) for p in picks), 1),
+            "next_pick": min(picks, key=lambda p: (p.split(":")[1], int(p.split(":")[2]))) if picks else None,
+        }
+    return out
 
 
 def home_view(snap: GameSnapshot, state: GameState, seed: int) -> dict[str, Any]:
@@ -550,6 +589,7 @@ def home_view(snap: GameSnapshot, state: GameState, seed: int) -> dict[str, Any]
         "hot_cold": _hot_cold(snap, state, ev, week, free),
         "standings": _standings(snap, state, rows),
         "league": _league_moves(snap, state),
+        **_extras(snap, state, ev),
     }
 
 
