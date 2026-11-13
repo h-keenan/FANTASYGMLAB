@@ -106,6 +106,7 @@ export const MIRRORED = [
 export const DIVERGED = [
   // Platform glue that is meant to differ (storage, SDKs, env, gestures).
   "analytics.ts",
+  "useOverlay.ts", // platform hook over the shared overlayStack (web: useId + runtime; mobile: Modal registration)
   "api.ts", // types are hand-duplicated; see docs/web-mobile-lib-twins.md
   "env.ts",
   "errorReporter.ts",
