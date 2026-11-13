@@ -92,7 +92,7 @@ export const BEGINNER_HELP = {
   tradeHubIntro:
     "Each idea is a trade built for your roster with one specific partner. You send is what you give up and You get is what comes back.",
   tradeHubPosture:
-    "Posture is how you're building your team: competing now, building for later, or in between. Ideas weigh player age and draft picks to match, so values here can differ slightly from Waivers or the Dashboard. Change it under Team Situation.",
+    "Posture is how you're building your team: competing now, building for later, or in between. Ideas weigh player age and draft picks to match, so values here can differ slightly from Waivers or Today. Change it under Team Situation.",
   tradeHubHold:
     "Holding means making no trade. It is a real answer: a trade only helps if it clearly beats keeping your roster as it is.",
   ideaBalance:
@@ -183,7 +183,7 @@ export const EXPERIENCE_GOAL_OPTIONS = {
 export const PLAIN_COPY = {
   matchupRetryAction: "Try again",
   matchupSeasonSubtitle: "Check back when the season starts.",
-  matchupDashboardAction: "Open Dashboard",
+  matchupDashboardAction: "Open Today",
   matchupConnectAction: "Connect a league",
   gmPlanProTitle: "What Pro unlocks",
   gmPlanProBody:

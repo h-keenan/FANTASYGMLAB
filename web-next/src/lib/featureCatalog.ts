@@ -67,7 +67,7 @@ export const FEATURE_ITEMS: readonly FeatureItem[] = [
   { id: "games", group: "league", name: "Games", line: "Season simulator and weekly pick'em.", segment: "games", leagueScoped: true, glyph: "games", color: accentVar("games") },
   { id: "league-recaps", group: "league", name: "League Recaps", line: "Your league's weekly recap, stories, and your lineup roundup.", segment: "league-recaps", leagueScoped: true, glyph: "leagueRecaps", color: accentVar("league-recaps") },
 
-  { id: "dashboard", group: "keepup", name: "Dashboard", line: "Your game plan and top moves for this week.", segment: "dashboard", leagueScoped: true, glyph: "dashboard", color: accentVar("dashboard") },
+  { id: "dashboard", group: "keepup", name: "Today", line: "Your game plan and top moves for this week.", segment: "dashboard", leagueScoped: true, glyph: "dashboard", color: accentVar("dashboard") },
   { id: "alerts", group: "keepup", name: "Alerts", line: "Injuries, news and updates on your players.", segment: "alerts", leagueScoped: true, glyph: "alerts", color: accentVar("alerts") },
   { id: "news", group: "keepup", name: "News", line: "The latest NFL news.", segment: "news", leagueScoped: false, glyph: "news", color: accentVar("news") },
   { id: "portfolio", group: "keepup", name: "Portfolio", line: "Your standing across every saved league.", pro: true, segment: "portfolio", leagueScoped: false, glyph: "portfolio", color: accentVar("portfolio") },

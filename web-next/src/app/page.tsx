@@ -178,7 +178,7 @@ export default function LandingPage() {
                 and docs/platform-import-status.md: imported leagues get Dashboard,
                 Matchup, My Team, Trade Analyzer, Players and League Rankings. */}
             <p className="lp-note lp-marketing">
-              Works with Sleeper leagues, plus ESPN (private leagues need two ESPN cookies), and public Fleaflicker and MFL leagues (Dashboard, Matchup, My Team,
+              Works with Sleeper leagues, plus ESPN (private leagues need two ESPN cookies), and public Fleaflicker and MFL leagues (Today, Matchup, My Team,
               Trade Analyzer, Players and League Rankings).
             </p>
           </section>

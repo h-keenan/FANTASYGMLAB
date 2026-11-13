@@ -413,7 +413,7 @@ describe("MatchupContent", () => {
     render(<MatchupContent leagueName="My League" matchup={offseason} />);
     expect(screen.getByText("This league hasn't started a week yet.")).toBeInTheDocument();
     expect(screen.getByText("Check back when the season starts.")).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Open Dashboard" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Open Today" })).toBeInTheDocument();
   });
 
   it("uses Matchup's own copy for not_a_member_of_league instead of the shared link-account copy", () => {

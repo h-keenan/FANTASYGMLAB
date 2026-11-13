@@ -94,11 +94,11 @@ export default function DashboardPage() {
         setError(null);
         return loadFull().catch((err) => {
           // Keep an already-painted first pass if the follow-up fails.
-          if (!cancelled && !painted) setError(err instanceof Error ? err.message : "Could not load the Dashboard.");
+          if (!cancelled && !painted) setError(err instanceof Error ? err.message : "Could not load Today.");
         });
       })
       .catch((err) => {
-        if (!cancelled) setError(err instanceof Error ? err.message : "Could not load the Dashboard.");
+        if (!cancelled) setError(err instanceof Error ? err.message : "Could not load Today.");
       });
     return () => {
       cancelled = true;
@@ -106,7 +106,7 @@ export default function DashboardPage() {
   }, [authLoading, session, leagueId, lens, lensReady, router, retryToken]);
 
   if (authLoading) {
-    return <LoadingScreen status="Loading Dashboard…" />;
+    return <LoadingScreen status="Loading Today…" />;
   }
 
   if (!data && !error) {
@@ -134,7 +134,7 @@ export default function DashboardPage() {
   if (error || !data) {
     return (
       <ErrorState
-        message={error || "Could not load the Dashboard."}
+        message={error || "Could not load Today."}
         onRetry={() => {
           setError(null);
           setRetryToken((token) => token + 1);

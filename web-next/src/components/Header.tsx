@@ -18,6 +18,8 @@ import { PAGE_TITLE_BY_SEGMENT } from "@/lib/navDestinations";
 import { PAGE_INFO_SLOT_ID } from "@/components/PageTitle";
 import { ConfirmInPlace } from "@/components/ui/ConfirmInPlace";
 import { pathOwnsPhoneChrome } from "@/lib/bottomNav";
+import { ShellHeader } from "@/components/ShellHeader";
+import { useShellNav } from "@/lib/useShellNav";
 
 const LEGAL_LINKS: { pageKey: string; label: string }[] = [
   { pageKey: "about_disclaimer", label: "About / Disclaimer" },
@@ -418,10 +420,18 @@ export function Header() {
   const [menuOpen, setMenuOpen] = useState(false);
   // Pages with their own phone header + bottom bar (the Fantasy Sim game) hide this one below 768px.
   const ownChrome = Boolean(session) && pathOwnsPhoneChrome(pathname);
+  // Phone shell flag (Phase B): the standard ShellHeader replaces this row below 768px.
+  const { barVisible } = useShellNav();
 
   return (
+    <>
+    {barVisible ? (
+      <Suspense fallback={null}>
+        <ShellHeader leagueControls={<HeaderLeagueControls />} actions={<HeaderIconActions />} />
+      </Suspense>
+    ) : null}
     <header
-      className={`flex flex-col px-2 py-0.5 relative${ownChrome ? " max-md:hidden" : ""}`}
+      className={`flex flex-col px-2 py-0.5 relative${ownChrome || barVisible ? " max-md:hidden" : ""}`}
       style={{ borderBottom: "var(--border-width-default) solid var(--color-border)" }}
     >
       <div className="flex items-center justify-between gap-1">
@@ -545,5 +555,6 @@ export function Header() {
       </div>
       </div>
     </header>
+    </>
   );
 }

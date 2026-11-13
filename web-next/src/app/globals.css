@@ -4272,3 +4272,28 @@ body[data-sim-pqv] [data-sheet-hideable] {
 .sim-root {
   overflow-x: clip;
 }
+
+/* Phone shell header (ShellHeader): the one standard page header under the shell flag. */
+.shell-header {
+  position: sticky;
+  top: 0;
+  z-index: 30;
+  display: flex;
+  align-items: center;
+  gap: 0.375rem;
+  padding: 0 0.5rem;
+  min-height: 52px;
+  background: color-mix(in srgb, var(--color-bg) 93%, transparent);
+  -webkit-backdrop-filter: blur(18px) saturate(160%);
+  backdrop-filter: blur(18px) saturate(160%);
+  border-bottom: var(--border-width-default) solid var(--glass-border, var(--color-border));
+}
+.shell-header-back {
+  display: inline-flex;
+  min-width: var(--touch-target-min);
+  max-width: 7rem;
+  min-height: var(--touch-target-min);
+  align-items: center;
+  gap: 0.125rem;
+  color: var(--color-accent);
+}

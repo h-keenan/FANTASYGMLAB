@@ -77,7 +77,7 @@ const TAB_PATHS: Record<string, Record<string, (c: TabPathContext) => string>> =
     "Season Outlook": ({ id, query }) => `/fantasy-sim/${id}${query}`,
   },
   games: {
-    "Season Sim": ({ tabPath }) => tabPath("games", "sim"),
+    "Season Outlook": ({ tabPath }) => tabPath("games", "sim"),
     "Pick'em": ({ tabPath }) => tabPath("games", "pickem"),
   },
 };

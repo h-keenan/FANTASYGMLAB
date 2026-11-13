@@ -363,3 +363,15 @@ Phase A of `docs/mobile-ux-plan-2026-11.md`. In the game on phones (`/gm-game`, 
 Layout rule (immune to iOS Safari fixed-position drift): nothing here is `position: fixed` or JS-positioned. The game is a `min-height: 100dvh` flex column and the footer is a `position: sticky; bottom: 0` `.bottom-stack` at the end of it with `env(safe-area-inset-bottom)` padding. The orb is `position: absolute` inside that stack (`.game-orb-dock`), so it can never disagree with the pill.
 
 `BottomTabBar` (`components/ui/BottomTabBar.tsx`, lib twin `lib/bottomNav.ts`) is the 5-tab bar the site shell (Phase B) uses; it lives inside the same `.bottom-stack`. It is not used in the game.
+
+## Phone site shell (Phase B, flagged)
+
+Below 768px, for signed-in users with the flag on, the floating GM orb and the crowded header are replaced by:
+
+- `AppShellBar` (`components/AppShellBar.tsx`): in-flow sticky `.bottom-stack` at the end of the app column (no `position: fixed`, no JS placement, `env(safe-area-inset-bottom)`). Inside a league: Today / Team / Trades / League / More. Outside: Home / Portfolio / Fantasy Sim / News / More. More opens the full grouped menu from the shared `navCatalog.ts` (groups, glyphs, Pro markers).
+- `ShellActionSlot` (`<ShellAction>`): a page renders its primary action into the slot above the tab bar (page-aware action strip). Renders nothing where the slot is absent.
+- `ShellHeader`: one standard header: back labelled with the parent page ("< Players"), title, league chip, search, alerts bell (only exists inside a league). Search stays the orb sheet's search.
+- Fantasy Sim keeps its own header and game orb (`pathOwnsPhoneChrome`); the sign-in/onboarding root `/` keeps the orb where no bar can render.
+- Route to tab mapping lives in `lib/shellNav.ts` (`shellActiveTab`), covered by tests.
+
+Flag (`lib/shellNav.ts`, `lib/useShellNav.ts`): `NEXT_PUBLIC_BOTTOM_NAV` = `founder` (default: founder/owner account only), `on` (everyone), `off` (kill switch for everyone, nothing overrides it). `?nav=bottom` turns it on and `?nav=off` turns it off for that browser (remembered in localStorage `fgl:nav`). Naming: "Dashboard" is **Today** everywhere user-facing (route and code names keep `dashboard`); **Fantasy Sim** is the game; **Season Outlook** is the forecast (GM Plan and Games tab; "Season Sim" is a retired term).

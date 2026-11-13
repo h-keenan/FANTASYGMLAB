@@ -5,7 +5,9 @@ import { usePathname } from "next/navigation";
 
 import { useAuth } from "@/context/AuthContext";
 import { EspnUnavailableState } from "@/components/EspnUnavailableState";
+import { AppShellBar } from "@/components/AppShellBar";
 import { pathOwnsPhoneChrome } from "@/lib/bottomNav";
+import { useShellNav } from "@/lib/useShellNav";
 import { espnUnavailableLeagueId } from "@/lib/leaguePlatform";
 
 /**
@@ -30,8 +32,9 @@ export function AppContentShell({ children }: { children: ReactNode }) {
   const { session } = useAuth();
   const pathname = usePathname();
   const espnLeagueId = espnUnavailableLeagueId(pathname);
+  const { barVisible } = useShellNav();
   return (
-    <div className={`flex flex-col flex-1 ${session ? `md:pl-60 md:pb-0 ${pathOwnsPhoneChrome(pathname) ? "" : "pb-12"}` : ""}`}>
+    <div className={`flex flex-col flex-1 ${session ? `md:pl-60 md:pb-0 ${pathOwnsPhoneChrome(pathname) || barVisible ? "" : "pb-12"}` : ""}`}>
       {espnLeagueId ? (
         // EspnUnavailableState reads ?name= (useSearchParams), which Next
         // requires to sit under a Suspense boundary.
@@ -41,6 +44,10 @@ export function AppContentShell({ children }: { children: ReactNode }) {
       ) : (
         children
       )}
+      {/* Phone bottom bar (flag-gated): last child of the app column, sticky at its end. */}
+      <Suspense fallback={null}>
+        <AppShellBar />
+      </Suspense>
     </div>
   );
 }

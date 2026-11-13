@@ -144,7 +144,7 @@ describe("GamesContent season sim", () => {
     vi.mocked(api.getGamesSeasonSim).mockResolvedValue(sim({ reason: "offseason", my_team: null, teams: [] }));
     render(<GamesContent leagueId="9" leagueName="Test League" />);
     expect(await screen.findByText(/Opens once the regular season starts/)).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Back to Dashboard" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Back to Today" })).toBeInTheDocument();
   });
 });
 

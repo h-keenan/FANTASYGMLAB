@@ -4,12 +4,16 @@
  * checks it), and src/lib/terms.test.ts fails when a retired term shows up in
  * user-visible copy again.
  *
- * Canonical names are the ones the Dashboard and the nav already use
+ * Canonical names are the ones the Today page and the nav already use
  * (decided 2026-11-10, coridian_ "whatever's best"):
  *
- * - Today      The Dashboard briefing: what to do right now (top priority,
- *              then the next few moves). Was also called "Game Plan",
+ * - Today      The landing page: the briefing of what to do right now (top
+ *              priority, then the next few moves). Was called "Dashboard"
+ *              (route and code names keep that word), "Game Plan",
  *              "Today's Game Plan" and "Next Moves"; those are retired.
+ * - Fantasy Sim  The draft-a-team-and-play-a-season game (/gm-game).
+ * - Season Outlook  The playoff-odds and projected-finish forecast for a real
+ *              league (GM Plan tab, Games tab). "Season Sim" is retired.
  * - GM Plan    The Pro season roadmap page (where you stand, trade paths,
  *              roster construction). Never used for the Today briefing.
  * - Pro        The paid tier. "Premium" is retired from UI copy (it stays in
@@ -23,6 +27,8 @@
  */
 export const TERMS = {
   today: "Today",
+  fantasySim: "Fantasy Sim",
+  seasonOutlook: "Season Outlook",
   gmPlan: "GM Plan",
   pro: "Pro",
 } as const;
@@ -38,6 +44,7 @@ export const RETIRED_TERMS: RetiredTerm[] = [
   { pattern: /\bGame Plan\b/, use: TERMS.today },
   { pattern: /\bNext Moves?\b/, use: TERMS.today },
   { pattern: /\bPremium\b/, use: TERMS.pro },
+  { pattern: /\bSeason Sim\b/, use: TERMS.seasonOutlook },
 ];
 
 /** Phrases that contain a retired word legitimately (league settings, etc.). */
