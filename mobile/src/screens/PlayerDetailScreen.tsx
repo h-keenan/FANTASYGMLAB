@@ -1039,7 +1039,7 @@ export default function PlayerDetailScreen({ route, navigation }: Props) {
   useEffect(() => {
     let cancelled = false;
     api
-      .getPlayerNews(player.player_id)
+      .getPlayerNews(player.player_id, 5, { groupDuplicates: true })
       .then((result) => {
         if (!cancelled) setNewsItems(result.items);
       })

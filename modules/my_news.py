@@ -433,6 +433,12 @@ def filter_news_for_players(
                 relevance_reason = ", ".join(contexts)
                 break
 
+        if matched_player and news_signal.is_game_story(item):
+            # Team-level recaps/live blogs only count when the player is
+            # named in the headline-level fields, not buried in the body.
+            if not news_signal.item_names_player(item, matched_player):
+                matched_player = ""
+
         if matched_player and link and link not in seen_links:
             seen_links.add(link)
             item = dict(item)

@@ -139,7 +139,7 @@ export function TeamSituationCard({
           <p className="text-xs" style={{ color: "var(--color-text-muted)" }}>
             {selected.description}
           </p>
-          <BeginnerHelp term={selectedLook.help} />
+          <BeginnerHelp label="this look" term={selectedLook.help} />
         </div>
       ) : (
         <p className="text-xs" style={{ color: "var(--color-text-muted)" }}>

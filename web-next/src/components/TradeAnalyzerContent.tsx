@@ -413,7 +413,7 @@ function VerdictCard({
           </span>
         </div>
       ))}
-      <BeginnerHelp text={copy.verdictHelp(verdict.ui_verdict)} />
+      <BeginnerHelp label="this verdict" text={copy.verdictHelp(verdict.ui_verdict)} />
 
       {/* Trade zone: the actual give/receive matchup, visually separated
           from the analysis content below it via an elevated panel — the
@@ -468,7 +468,7 @@ function VerdictCard({
         {/* Single value bar — never duplicated alongside a second meter for
             the same number (PR #1057 removed Streamlit's own duplicate). */}
         <LeanBarMeter sendScore={sendTotal} receiveScore={receiveTotal} />
-        <BeginnerHelp term="analyzerValueBalance" />
+        <BeginnerHelp label="value balance" term="analyzerValueBalance" />
       </div>
 
       {verdict.lineup_model ? (
@@ -564,7 +564,7 @@ function VerdictCard({
         level={LEVEL_SEGMENTS[confidenceLvl]}
         color={levelColor(confidenceLvl)}
       />
-      <BeginnerHelp term="analyzerConfidence" />
+      <BeginnerHelp label="confidence" term="analyzerConfidence" />
 
       {verdict.risk_summary ? (
         <InsightRow color="var(--color-warning)" label="Risk" icon={<path d="M12 4l9 16H3L12 4zM12 10v4M12 17h.01" />}>

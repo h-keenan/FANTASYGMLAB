@@ -36,12 +36,15 @@ export function BeginnerHelp({
   text,
   lines,
   popover = false,
+  label,
   className = "",
 }: {
   term?: BeginnerHelpKey;
   text?: string | null;
   lines?: Array<string | null | undefined>;
   popover?: boolean;
+  /** REQUIRED name of what the "?" explains ("live scoring", "Value, Overall and Tier"). It is the button's accessible name ("About <label>"), and in inline mode it is also shown as visible text so the "?" is never an orphan circle. In `popover` mode place the component directly after the title it names (SectionHeading's `help` slot), never at a row's far edge. */
+  label: string;
   className?: string;
 }) {
   const copy = useExperienceCopy();
@@ -67,6 +70,11 @@ export function BeginnerHelp({
   }
   const body = (
     <>
+      {popover ? (
+        <button type="button" aria-label="Close explanation" onClick={() => setOpen(false)} className="float-right ml-2 font-bold" style={{ color: "var(--color-text-muted)" }}>
+          ×
+        </button>
+      ) : null}
       {resolvedLines.map((line, index) => (
         <p key={line} className={index > 0 ? "mt-1" : undefined}>
           {line}
@@ -92,24 +100,36 @@ export function BeginnerHelp({
     >
       <button
         type="button"
-        aria-label={open ? "Hide explanation" : "What does this mean?"}
+        aria-label={open ? `Hide explanation of ${label}` : `About ${label}`}
         aria-expanded={open}
         onClick={() => setOpen((v) => !v)}
-        className="inline-flex items-center justify-center font-bold shrink-0"
-        style={{
-          width: 20,
-          height: 20,
-          borderRadius: 9999,
-          border: "var(--border-width-default) solid var(--color-border)",
-          color: "var(--color-accent)",
-          lineHeight: 1,
-        }}
+        className="inline-flex items-center justify-center shrink-0"
+        // 44px hit area around the 20px glyph without growing the layout.
+        style={{ padding: 12, margin: -12 }}
       >
-        ?
+        <span
+          aria-hidden="true"
+          className="inline-flex items-center justify-center font-bold"
+          style={{
+            width: 20,
+            height: 20,
+            borderRadius: 9999,
+            border: "var(--border-width-default) solid var(--color-border)",
+            color: "var(--color-accent)",
+            lineHeight: 1,
+          }}
+        >
+          ?
+        </span>
       </button>
+      {!open && !popover ? (
+        <button type="button" tabIndex={-1} aria-hidden="true" onClick={() => setOpen(true)} className="font-semibold" style={{ color: "var(--color-text-muted)" }}>
+          {label}
+        </button>
+      ) : null}
       {open ? (
         popover ? (
-          <div className="glass-surface absolute right-0 top-full z-20 mt-2 w-72 max-w-[calc(100vw-2rem)] p-3" style={{ color: "var(--color-text-secondary)" }}>
+          <div role="dialog" aria-label={label} className="glass-surface z-20 p-3 max-sm:fixed max-sm:inset-x-3 max-sm:bottom-3 max-sm:w-auto sm:absolute sm:left-0 sm:top-full sm:mt-2 sm:w-72 sm:max-w-[calc(100vw-2rem)]" style={{ color: "var(--color-text-secondary)" }}>
             {body}
           </div>
         ) : (

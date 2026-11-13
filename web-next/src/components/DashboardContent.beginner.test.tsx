@@ -59,7 +59,7 @@ const FIXTURE: DashboardResponse = {
 };
 
 function expandHelp() {
-  for (const b of screen.queryAllByRole("button", { name: "What does this mean?" })) fireEvent.click(b);
+  for (const b of screen.queryAllByRole("button", { name: /^About / })) fireEvent.click(b);
 }
 
 describe("DashboardContent for a beginner", () => {

@@ -10,7 +10,10 @@ import { availabilityDetailParts, newsAgeLabel } from '../lib/playerAvailability
 import { radii, spacing, type ThemeColors } from '../theme';
 
 function metaLine(item: NewsItem): string {
-  return [item.source, newsAgeLabel(item.published_ts)].filter(Boolean).join(' · ');
+  const also = (item.also_reported_by ?? []).map((o) => o.source).filter(Boolean);
+  return [item.source, newsAgeLabel(item.published_ts), also.length ? `also ${also.join(', ')}` : null]
+    .filter(Boolean)
+    .join(' · ');
 }
 
 function Headline({ item }: { item: NewsItem }) {

@@ -9,7 +9,8 @@ import {
 } from "@/lib/playerAvailabilityPresentation";
 
 function SourceLine({ item }: { item: NewsItem }) {
-  const parts = [item.source, newsAgeLabel(item.published_ts)].filter(Boolean);
+  const also = (item.also_reported_by ?? []).map((o) => o.source).filter(Boolean);
+  const parts = [item.source, newsAgeLabel(item.published_ts), also.length ? `also ${also.join(", ")}` : null].filter(Boolean);
   return parts.length > 0 ? <span className="pqv-news-meta">{parts.join(" · ")}</span> : null;
 }
 

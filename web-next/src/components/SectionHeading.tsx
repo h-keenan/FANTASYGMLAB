@@ -20,6 +20,7 @@ export function SectionHeading({
   id,
   className = "flex flex-col gap-1",
   action,
+  help,
   size = "default",
 }: {
   children: ReactNode;
@@ -32,6 +33,8 @@ export function SectionHeading({
   className?: string;
   /** Right-aligned slot on the title row (e.g. a "View All" link). */
   action?: ReactNode;
+  /** Inline help (<BeginnerHelp popover label=...>) placed directly after the title it explains, never at the far edge. */
+  help?: ReactNode;
   /** "compact" uses the existing --font-size-section-title / --font-weight-title tokens (the Dashboard's calmer in-page headings; matches the app's 17px). */
   size?: "default" | "compact";
 }) {
@@ -44,17 +47,25 @@ export function SectionHeading({
       {children}
     </h2>
   );
+  const titled = help ? (
+    <div className="flex items-center gap-3 min-w-0">
+      {title}
+      {help}
+    </div>
+  ) : (
+    title
+  );
   if (action) {
     return (
       <div className="flex items-center justify-between gap-3">
-        {title}
+        {titled}
         {/* .section-heading-action gives a bare link/button here the 44px
             touch target (globals.css) without each caller adding padding. */}
         <div className="section-heading-action shrink-0">{action}</div>
       </div>
     );
   }
-  if (!kicker && !note) return title;
+  if (!kicker && !note) return titled;
   return (
     <div className={className}>
       {kicker ? (
@@ -65,7 +76,7 @@ export function SectionHeading({
           {kicker}
         </span>
       ) : null}
-      {title}
+      {titled}
       {note ? (
         <p className="text-xs" style={{ color: "var(--color-text-muted)" }}>
           {note}

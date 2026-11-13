@@ -136,7 +136,7 @@ export default function NewsScreen({ route }: { route?: { params?: { playerId?: 
   const load = useCallback(async () => {
     setError(null);
     try {
-      const result = playerId ? await api.getPlayerNews(playerId, 10) : await api.getNews(30);
+      const result = playerId ? await api.getPlayerNews(playerId, 10, { groupDuplicates: true }) : await api.getNews(30);
       setItems(result.items);
       setFeedStatus('status' in result ? result.status : undefined);
     } catch (err) {

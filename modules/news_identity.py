@@ -227,7 +227,7 @@ def article_names_player(
     player's team (else it is not attributed to either)."""
 
     text = news_signal.article_text(item)
-    if not news_signal.contains_phrase(text, player_name):
+    if not news_signal.item_names_player(item, player_name):
         return False
     if players_df is None or getattr(players_df, "empty", True) or "name" not in players_df.columns:
         return True

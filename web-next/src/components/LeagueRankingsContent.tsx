@@ -1,5 +1,6 @@
 "use client";
 
+import { BEGINNER_HELP } from "@/lib/experienceCopy";
 import { useState } from "react";
 
 import { AccentCard } from "@/components/AccentCard";
@@ -351,8 +352,7 @@ function PlayoffOddsSection({ leagueId, leagueName, myRosterId, myTeam }: { leag
         Playoff Odds
       </SectionHeading>
       <div className="flex flex-wrap gap-2">
-        <BeginnerHelp term="playoffOddsIntro" />
-        <BeginnerHelp term="playoffOddsTerms" />
+        <BeginnerHelp label="playoff odds" lines={[BEGINNER_HELP.playoffOddsIntro, BEGINNER_HELP.playoffOddsTerms]} />
       </div>
       {state === "idle" ? (
         <Button onClick={calculate} className="self-start">

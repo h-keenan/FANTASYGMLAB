@@ -44,7 +44,7 @@ export default function NewsPage() {
     let cancelled = false;
 
     const request: Promise<NewsResponse> = filter
-      ? api.getPlayerNews(filter.playerId, 10).then((result) => ({ ok: result.ok, items: result.items }))
+      ? api.getPlayerNews(filter.playerId, 10, { groupDuplicates: true }).then((result) => ({ ok: result.ok, items: result.items }))
       : api.getNews();
     request
       .then((result) => {

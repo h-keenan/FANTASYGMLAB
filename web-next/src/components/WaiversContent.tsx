@@ -241,7 +241,7 @@ function TopWaiverTargetCard({ player }: { player: WaiverPriorityAdd }) {
         </p>
       ) : null}
       {player.drop_suggestion ? <SuggestedDrop suggestion={player.drop_suggestion} /> : null}
-      <BeginnerHelp term="waiverValue" />
+      <BeginnerHelp label="waiver value" term="waiverValue" />
       <div className="flex items-center justify-between gap-3">
         {player.confidence_label ? (
           <ConfidenceMeter label="Confidence" value={player.confidence_label} color={confidenceColor(player.confidence_label)} />
@@ -250,7 +250,7 @@ function TopWaiverTargetCard({ player }: { player: WaiverPriorityAdd }) {
         )}
         <ViewDetailsButton player={player} />
       </div>
-      {player.confidence_label ? <BeginnerHelp term="waiverConfidence" /> : null}
+      {player.confidence_label ? <BeginnerHelp label="waiver confidence" term="waiverConfidence" /> : null}
     </article>
   );
 }
