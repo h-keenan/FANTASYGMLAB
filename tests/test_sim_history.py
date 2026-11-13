@@ -148,3 +148,21 @@ def test_history_is_memoized_per_save_version_and_refolds_after_any_write(monkey
     advance(client, gid)  # any write moves the version
     client.get(url, headers=hdr())
     assert len(reads) == 2
+
+
+def test_inbox_read_is_memoized_per_save_version_and_equals_the_uncached_view(monkeypatch):
+    from modules.sim import game_view
+
+    client, _, _ = make_app()
+    gid = new_game(client)["game"]["id"]
+    finish_draft(client, gid)
+    calls = []
+    real = game_view.inbox_view
+    monkeypatch.setattr(game_view, "inbox_view", lambda *a, **k: calls.append(1) or real(*a, **k))
+    url = f"/v1/sim/games/{gid}/inbox"
+    a = client.get(url, headers=hdr()).json()
+    b = client.get(url, headers=hdr()).json()
+    assert a == b and len(calls) == 1
+    advance(client, gid)
+    client.get(url, headers=hdr())
+    assert len(calls) == 2
