@@ -43,7 +43,7 @@ from typing import Any, Mapping
 
 import numpy as np
 
-MODEL_VERSION = "player-model-1"
+MODEL_VERSION = "player-model-2"
 SEASON_WEEKS = 17
 POSITIONS = ("QB", "RB", "WR", "TE", "K")
 POS_INDEX = {p: i for i, p in enumerate(POSITIONS)}
@@ -97,32 +97,42 @@ def draw_environment(rng: np.random.Generator, sd: float = ENV_SD) -> float:
 class SeasonParams:
     """Season-level story parameters (fitted on 2021-2023, validated on 2024-25)."""
 
-    b_solid: float = 1.0106        # solid-season mean as a share of the projection (RB/WR/TE)
-    b_solid_qb: float = 0.9059     # QBs: the preseason number overshoots more
+    b_solid: float = 1.05        # solid-season mean as a share of the projection (RB/WR/TE)
+    b_solid_qb: float = 0.8733     # QBs: the preseason number overshoots more
     b_solid_k: float = 0.93
-    b_tier: float = 0.0315          # solid-season share moves with log-tier (stars regress differently)
-    sigma0: float = 0.1033         # log-sd of a solid season at the reference tier
-    sigma_tier: float = 0.5646     # extra log-sd per unit of log-tier below the reference
-    qb_sig: float = 0.4         # QB season-level spread relative to skill players
-    pb0: float = -2.3304            # logit P(breakout)
-    pb_rook: float = 2.0
-    pb_age: float = 1.0         # per 4 years younger than 26
-    pb_tier: float = 0.4534        # per unit of log(proj / reference): deeper = more upside
-    pu0: float = -2.1728            # logit P(bust)
-    pu_rook: float = 1.4342
-    pu_age: float = 0.0         # per 4 years older than 27
-    pu_tier: float = 0.1979
-    ps0: float = -2.5            # logit P(slump); stars slump
-    ps_tier: float = 0.8
+    b_tier: float = 0.0784          # solid-season share moves with log-tier (stars regress differently)
+    sigma0: float = 0.0708         # log-sd of a solid season at the reference tier
+    sigma_tier: float = 0.6782     # extra log-sd per unit of log-tier below the reference
+    qb_sig: float = 0.2314         # QB season-level spread relative to skill players
+    pb0: float = -2.7566            # logit P(breakout)
+    pb_rook: float = 2.6637
+    pb_age: float = 0.5535         # per 4 years younger than 26
+    pb_tier: float = 0.8        # per unit of log(proj / reference): deeper = more upside
+    pu0: float = -1.5948            # logit P(bust)
+    pu_rook: float = 1.5
+    pu_age: float = 0.0158         # per 4 years older than 27
+    pu_tier: float = 0.1004
+    ps0: float = -2.0203            # logit P(slump); stars slump
+    ps_tier: float = 1.2
     pi0: float = -2.2            # logit P(injury_prone)
-    bust_mult: float = 0.7502
-    bust_sd: float = 0.35
-    gain_mean: float = 5.4713       # breakout: extra PPG on top of a solid season
+    bust_mult: float = 0.7645
+    bust_sd: float = 0.371
+    gain_mean: float = 3.1523       # breakout: extra PPG on top of a solid season
     gain_shape: float = 2.5
-    gain_tier: float = 0.1398       # breakout PPG gain scales with (projection / reference) ** gain_tier
-    gain_rook: float = 0.5
-    qb_gain: float = 0.2
-    te_gain: float = 0.472
+    gain_tier: float = 0.2711       # breakout PPG gain scales with (projection / reference) ** gain_tier
+    gain_rook: float = 1.1329
+    qb_gain: float = 0.2328
+    te_gain: float = 0.6098
+    # --- v2 additions (fitted with the rest; role collapse, QB bust, rookie and TE spread) ---
+    pc0: float = -4.1131           # logit P(role collapse): the season falls to a fraction of the projection
+    pc_tier: float = 1.1977         # per unit of log(ref / proj) below the reference: deeper = likelier to wash out
+    pc_rook: float = 0.076         # rookies wash out more often
+    collapse_mult: float = 0.3282  # median share of the projection kept in a collapsed season
+    collapse_sd: float = 0.2566
+    pu_qb: float = -0.1733           # QB bust-probability logit offset
+    qb_bust_mult: float = 0.7853  # QB bust depth (a bust QB is rarely a 25% drop)
+    sig_rook: float = 0.0        # solid-season log-sd inflation for rookies
+    te_sig: float = 1.0325          # solid-season log-sd multiplier for tight ends
 
 
 @dataclass(frozen=True)
@@ -136,6 +146,13 @@ class InSeasonParams:
     role_rate: float = 0.65              # expected role changes per season at the reference tier
     role_rate_deep: float = 0.5         # extra for deep (low-tier) players
     p_promotion: float = 0.35
+    role_star: float = 1.0137               # role-change rate falls by exp(-role_star * max(0, log(proj/ref))): stars keep their jobs
+    role_qb: float = 0.1                 # QBs rarely change roles mid-season (rate multiplier; 1-D fit to the real QB season SD)
+    # Share of an injured starter's PPG that his same-team, same-position backups absorb (QB, RB, WR, TE, K), measured
+    # on the real panel as backup uplift in weeks the starter missed over the starter's own PPG (2021-23: RB 0.36 / 0.22
+    # for the first / second backup, WR 0.20 / 0.09, TE 0.08-0.13; QB has too few cases, prior only). The values are
+    # scaled so the simulated panel reproduces those measured shares (``backtest.depth_cover_report``); spread 4 : 1.
+    absorb: tuple[float, float, float, float, float] = (0.6, 0.33, 0.23, 0.10, 0.0)
     promo_mult: tuple[float, float] = (1.2, 1.9)
     demo_mult: tuple[float, float] = (0.45, 0.85)
     vol_sd: float = 0.12                 # log-sd of the per-player volatility trait
@@ -218,6 +235,7 @@ class RoleChange:
     week: int            # first week of the new role
     kind: str            # "promotion" | "demotion"
     multiplier: float    # applied to the weekly mean from ``week`` on
+    end_week: int = 0    # last week of the role (0 = rest of the season); set for injury cover
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)
@@ -266,7 +284,7 @@ class SeasonProfile:
             games_available_mask=tuple(bool(x) for x in raw["games_available_mask"]),
             unavailable_reason=tuple(str(x) for x in raw["unavailable_reason"]),
             injury_events=tuple(InjuryEvent(int(e["week"]), int(e["weeks_out"]), str(e["kind"])) for e in raw["injury_events"]),
-            role_changes=tuple(RoleChange(int(e["week"]), str(e["kind"]), float(e["multiplier"])) for e in raw["role_changes"]),
+            role_changes=tuple(RoleChange(int(e["week"]), str(e["kind"]), float(e["multiplier"]), int(e.get("end_week", 0))) for e in raw["role_changes"]),
             form=tuple(float(x) for x in raw["form"]), slump_window=(int(sw[0]), int(sw[1])) if sw else None,
             rookie=bool(raw["rookie"]), style=tuple((str(k), float(v)) for k, v in raw["style"]),
             model_version=str(raw.get("model_version", MODEL_VERSION)),
@@ -419,7 +437,7 @@ def season_level(
     old = np.clip((age - 27.0) / 4.0, -1.5, 1.5)
     rk = rookie.astype(float)
     pb = _sigmoid(p.pb0 + p.pb_rook * rk + p.pb_age * young + p.pb_tier * tau - 1.1 * is_qb)
-    pu = _sigmoid(p.pu0 + p.pu_rook * rk + p.pu_age * old + p.pu_tier * tau)
+    pu = _sigmoid(p.pu0 + p.pu_rook * rk + p.pu_age * old + p.pu_tier * tau + p.pu_qb * is_qb)
     ps = _sigmoid(p.ps0 + p.ps_tier * np.clip(tau, -1.0, 1.0)) * (1.0 - rk)
     pi = _sigmoid(np.full_like(proj, p.pi0))
     probs = np.stack([pb, pu, ps, pi])
@@ -435,14 +453,23 @@ def season_level(
     arch = np.where(cat < cum[1], 2, arch)
     arch = np.where(cat < cum[0], 1, arch)
     b = np.where(is_qb, p.b_solid_qb, np.where(is_k, p.b_solid_k, p.b_solid)) + p.b_tier * np.clip(tau, -1.0, 1.0)
-    sig_mult = np.where(is_qb, p.qb_sig, 1.0)
+    sig_mult = np.where(is_qb, p.qb_sig, np.where(is_te, p.te_sig, 1.0)) * (1.0 + p.sig_rook * rk)
     sigma = (p.sigma0 + p.sigma_tier * np.maximum(0.0, -tau)) * sig_mult
     solid = proj * b * np.exp(sigma * u["z1"] - 0.5 * sigma**2)
     gain_scale = np.where(is_qb, p.qb_gain, np.where(is_te, p.te_gain, 1.0)) * np.where(rookie, p.gain_rook, 1.0)
     gain = p.gain_mean * gain_scale * np.exp(p.gain_tier * np.clip(tau, -2.0, 1.0)) * u["g"] / p.gain_shape
     breakout = proj * b + gain
-    bust = proj * p.bust_mult * np.exp(p.bust_sd * u["z2"] - 0.5 * p.bust_sd**2)
+    bust_mult = np.where(is_qb, p.qb_bust_mult, p.bust_mult)
+    bust = proj * bust_mult * np.exp(p.bust_sd * u["z2"] - 0.5 * p.bust_sd**2)
     mean = np.where(arch == 1, breakout, np.where(arch == 2, bust, solid))
+    # Role collapse: a heavy left tail (a depth chart loss, a lost job) that a lognormal around the
+    # projection cannot make. Only skill players with a real chance; a collapsed season is labelled a bust.
+    if "c2" in u and p.pc0 > -20.0:
+        pcol = _sigmoid(p.pc0 + p.pc_rook * rk + p.pc_tier * np.clip(-tau, -1.0, 2.0)) * (~is_qb) * (~is_k)
+        hit = (u["c2"] < pcol) & (arch != 1)
+        collapse = proj * b * p.collapse_mult * np.exp(p.collapse_sd * u["z2"] - 0.5 * p.collapse_sd**2)
+        mean = np.where(hit, collapse, mean)
+        arch = np.where(hit, 2, arch)
     return arch, np.maximum(mean, 0.05)
 
 
@@ -472,7 +499,7 @@ def _draw_season_profile(
     proj = n["ppg"]
     pos_idx = np.array([POS_INDEX[gpos]])
     u = {"cat": rng.random(1), "z1": rng.standard_normal(1), "z2": rng.standard_normal(1),
-         "g": rng.gamma(sp.gain_shape, 1.0, 1)}
+         "g": rng.gamma(sp.gain_shape, 1.0, 1), "c2": rng.random(1)}
     arch_i, mean = season_level(pos_idx, np.array([proj]), np.array([n["age"]]), np.array([n["rookie"]]), u, sp)
     archetype = ARCHETYPES[int(arch_i[0])]
     mean_ppg = float(mean[0]) * n["env"]
@@ -529,7 +556,9 @@ def _draw_season_profile(
     # (a starter ahead of them gets hurt or benched); stars mostly lose touches or share them.
     tau = math.log(max(proj, 0.3) / REF_PPG[gpos])
     deep = max(0.0, min(1.0, -tau / 1.2))
-    rate = ip.role_rate + ip.role_rate_deep * deep
+    rate = (ip.role_rate + ip.role_rate_deep * deep) * math.exp(-ip.role_star * max(0.0, tau))
+    if gpos == "QB":
+        rate *= ip.role_qb
     changes: list[RoleChange] = []
     for _ in range(int(rng.poisson(rate))):
         wk = int(rng.integers(3, 15))
@@ -564,6 +593,75 @@ def _draw_season_profile(
     )
 
 
+# --------------------------------------------------------------------------- depth-chart coupling
+
+
+def apply_depth_coupling(
+    players: Mapping[str, Mapping[str, Any]], profiles: Mapping[str, SeasonProfile],
+    absorb: float | None = None, depth: int = 2, ip: InSeasonParams | None = None,
+) -> dict[str, SeasonProfile]:
+    """Couple starters' injuries to their same-team, same-position backups.
+
+    The base model draws every player independently, so a starter's injury never helps his
+    backup. Here, for each team and position the players are ranked by preseason projection;
+    when a player misses games, the next ``depth`` players behind him absorb ``absorb`` of the
+    lost points (split 4 : 1) as a temporary promotion
+    (``RoleChange`` with an ``end_week``) covering exactly the games he is out. A backup's multiplier is capped at 6x. Pure and deterministic:
+    it adds no random draws (the injury events it reads are already in the profiles) and returns
+    new frozen profiles; profiles of players with no starter ahead of them are returned as is.
+    The engine decides when to call it (it needs every rostered NFL teammate's profile).
+    """
+
+    table = (ip or INSEASON).absorb
+    groups: dict[tuple[str, str], list[str]] = {}
+    for pid, pl in players.items():
+        if pid not in profiles:
+            continue
+        n = normalize_player(pl)
+        if n["pos"] in ("QB", "RB", "WR", "TE") and n["team"]:
+            groups.setdefault((n["team"], n["pos"]), []).append(pid)
+    extra: dict[str, list[RoleChange]] = {}
+    for (_team, _pos), pids in groups.items():
+        a = float(table[POS_INDEX[_pos]]) if absorb is None else float(absorb)
+        if a > 0.0:
+            pids.sort(key=lambda q: (-profiles[q].projection_mean_ppg, str(q)))
+            for i, starter in enumerate(pids):
+                sp_ = profiles[starter]
+                for ev in sp_.injury_events:
+                    # the games he misses after the injury game (byes inside the window do not count)
+                    out, w = [], ev.week + 1
+                    while w <= SEASON_WEEKS and len(out) < ev.weeks_out:
+                        if sp_.unavailable_reason[w - 1] == "injury":
+                            out.append(w)
+                        elif sp_.unavailable_reason[w - 1] != "bye":
+                            break
+                        w += 1
+                    if not out:
+                        continue
+                    backups = pids[i + 1:i + 1 + depth]
+                    wts = [0.25 ** k for k in range(len(backups))]
+                    tot = sum(wts) or 1.0
+                    for b, wgt in zip(backups, wts):
+                        bp = profiles[b]
+                        if bp.season_mean_ppg <= 0.0:
+                            continue
+                        lost = a * sp_.season_mean_ppg * (wgt / tot)
+                        mult = min(6.0, 1.0 + lost / bp.season_mean_ppg)
+                        if mult > 1.001:
+                            extra.setdefault(b, []).append(RoleChange(week=out[0], kind="promotion", multiplier=round(mult, 3), end_week=out[-1]))
+    out_profiles: dict[str, SeasonProfile] = {}
+    for pid, prof in profiles.items():
+        add = extra.get(pid)
+        if not add:
+            out_profiles[pid] = prof
+            continue
+        merged = tuple(sorted((*prof.role_changes, *add), key=lambda c: (c.week, c.end_week)))
+        d = prof.to_dict()
+        d["role_changes"] = [c.to_dict() for c in merged]
+        out_profiles[pid] = SeasonProfile.from_dict(d)
+    return out_profiles
+
+
 # --------------------------------------------------------------------------- weekly mean
 
 
@@ -578,7 +676,7 @@ def expected_week_points(player: Mapping[str, Any], profile: SeasonProfile, week
 def _week_mean(profile: SeasonProfile, week: int, ip: InSeasonParams) -> float:
     m = profile.season_mean_ppg * profile.form[week - 1]
     for rc in profile.role_changes:
-        if week >= rc.week:
+        if week >= rc.week and (not rc.end_week or week <= rc.end_week):
             m *= rc.multiplier
     if profile.rookie and week <= 4:
         m *= ip.rookie_ramp
@@ -807,7 +905,7 @@ def simulate_season(
 
 __all__ = [
     "ARCHETYPES", "ENV_SD", "InjuryEvent", "InSeasonParams", "MODEL_VERSION", "RoleChange", "SEASON_WEEKS", "SeasonParams",
-    "SeasonProfile", "WeekResult", "default_bye_week", "draw_season_profile", "draw_week_points",
+    "SeasonProfile", "WeekResult", "apply_depth_coupling", "default_bye_week", "draw_season_profile", "draw_week_points",
     "draw_environment", "expected_week_points", "normalize_player", "profile_rng", "score_stat_line", "simulate_season",
     "team_week_shock", "week_rng", "weights_for",
 ]

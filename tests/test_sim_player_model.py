@@ -296,3 +296,83 @@ def test_in_season_drift_is_neither_too_wild_nor_too_flat(replay):
     _rows, res = replay
     assert abs(res["half_split"]["sim_sd"] - res["half_split"]["real_sd"]) < 0.07
     assert abs(res["lag1"]["sim"] - res["lag1"]["real"]) < 0.06
+
+
+# ------------------------------------------------------------------ depth-chart coupling (starter injury -> backup role)
+
+
+def _team(pos="RB", ppgs=(15.0, 6.0, 2.0), team="KC"):
+    players, profs = {}, {}
+    for i, ppg in enumerate(ppgs):
+        pid = f"{pos}{i}"
+        players[pid] = _player(pos, ppg, player_id=pid, team=team)
+        profs[pid] = _no_events(pm.draw_season_profile(players[pid], pm.profile_rng(1, pid)), season_mean_ppg=ppg)
+    return players, profs
+
+
+def _hurt(profile, week=5, weeks_out=3):
+    d = profile.to_dict()
+    mask, reason = list(d["games_available_mask"]), list(d["unavailable_reason"])
+    for w in range(week + 1, week + 1 + weeks_out):
+        mask[w - 1], reason[w - 1] = False, "injury"
+    d.update(games_available_mask=mask, unavailable_reason=reason, injury_events=[{"week": week, "weeks_out": weeks_out, "kind": "multi"}])
+    return pm.SeasonProfile.from_dict(d)
+
+
+def test_starter_injury_promotes_the_backup_for_exactly_the_games_missed():
+    players, profs = _team()
+    profs["RB0"] = _hurt(profs["RB0"], week=5, weeks_out=3)
+    out = pm.apply_depth_coupling(players, profs)
+    assert out["RB0"] == profs["RB0"]
+    cover = out["RB1"].role_changes
+    assert len(cover) == 1 and (cover[0].week, cover[0].end_week) == (6, 8) and cover[0].multiplier > 1.0
+    before = [pm.expected_week_points(players["RB1"], profs["RB1"], w) for w in range(1, 18)]
+    after = [pm.expected_week_points(players["RB1"], out["RB1"], w) for w in range(1, 18)]
+    assert [round(a, 6) for a in after[:5]] == [round(b, 6) for b in before[:5]]          # before the injury: unchanged
+    assert all(a > b for a, b in zip(after[5:8], before[5:8]))                              # covered games: lifted
+    assert [round(a, 6) for a in after[8:]] == [round(b, 6) for b in before[8:]]            # starter back: unchanged
+    assert out["RB2"].role_changes and out["RB2"].role_changes[0].multiplier < cover[0].multiplier * 1.5
+    lift = after[5] - before[5]
+    assert 0.0 < lift <= pm.INSEASON.absorb[1] * profs["RB0"].season_mean_ppg   # never more than the absorbed share
+
+
+def test_coupling_is_pure_deterministic_and_scoped_to_team_and_position():
+    players, profs = _team()
+    profs["RB0"] = _hurt(profs["RB0"])
+    other_team, other_profs = _team(team="BUF")
+    wr, wr_profs = _team("WR", team="KC")
+    allp = {**players, **{f"b{k}": {**v, "player_id": f"b{k}"} for k, v in other_team.items()}, **wr}
+    allprof = {**profs, **{f"b{k}": v for k, v in other_profs.items()}, **wr_profs}
+    snapshot = dict(allprof)
+    a = pm.apply_depth_coupling(allp, allprof)
+    b = pm.apply_depth_coupling(allp, allprof)
+    assert a == b and allprof == snapshot                       # pure
+    assert a["RB1"].role_changes                                # same team and position: covered
+    for pid in ("bRB0", "bRB1", "bRB2", "WR0", "WR1", "WR2"):   # other team / other position: untouched
+        assert a[pid] == allprof[pid], pid
+    assert pm.apply_depth_coupling(allp, allprof, absorb=0.0) == allprof
+
+
+def test_role_change_end_week_round_trips_and_defaults_to_the_rest_of_the_season():
+    players, profs = _team()
+    profs["RB0"] = _hurt(profs["RB0"])
+    out = pm.apply_depth_coupling(players, profs)["RB1"]
+    assert pm.SeasonProfile.from_dict(out.to_dict()) == out
+    legacy = out.to_dict()
+    for rc in legacy["role_changes"]:
+        rc.pop("end_week", None)
+    assert pm.SeasonProfile.from_dict(legacy).role_changes[0].end_week == 0
+
+
+def test_season_spread_is_not_too_thin_and_qbs_are_not_too_loose_against_real_history(replay):
+    """The v1 weak spots (five-season in-sample variance ratio 0.78 overall / 0.56 rookies / 1.76 QB, now 0.90 / 0.70 / 1.28), guarded with margin
+    against the noisier half-panel replay."""
+
+    _rows, res = replay
+    sv = res["season_variance"]
+    assert sv["all"]["var_ratio"] > 0.74
+    assert sv["rookies"]["var_ratio"] > 0.50
+    assert sv["QB"]["var_ratio"] < 1.55
+    assert sv["proj < 8"]["var_ratio"] > 0.74
+    wr = res["finish"]["WR:top12"]
+    assert wr["real_top12"] - wr["sim_top12"] < 0.18   # five-season panel: v1 0.396 vs 0.521 real, v2 0.452; half-panel replay is noisy

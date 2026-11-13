@@ -410,13 +410,75 @@ export function reviewShareLines(sections: readonly ReviewSection[], max = 4): s
 // ---------------------------------------------------------------------------
 // Share card model (the same model feeds the web Satori card and the app's captured card)
 
+export type ReviewOutcome = "champion" | "runner_up" | "playoffs" | "missed" | "none";
+
+/** Which of the four headline results a playoff_result key means. */
+export function reviewOutcome(playoffResult: string | null | undefined, isChampion = false): ReviewOutcome {
+  if (isChampion || playoffResult === "champion") return "champion";
+  if (!playoffResult) return "none";
+  if (playoffResult === "runner_up") return "runner_up";
+  if (playoffResult === "missed") return "missed";
+  return "playoffs";
+}
+
+export const REVIEW_OUTCOME_TITLE: Record<ReviewOutcome, string> = {
+  champion: "League Champion",
+  runner_up: "Runner-up",
+  playoffs: "Made the playoffs",
+  missed: "Missed the playoffs",
+  none: "Season complete",
+};
+
+/** "A-" -> { base: "A", modifier: "-" }: the card draws the modifier as its own small glyph. */
+export function splitReviewGrade(letter: string | null | undefined): { base: string; modifier: "+" | "-" | "" } {
+  const text = (letter ?? "").trim().replace(/[\u2212\u2013\u2014]/g, "-");
+  const match = /^([A-Za-z])\s*([+-]?)/.exec(text);
+  if (!match) return { base: text ? text.slice(0, 1) : "-", modifier: "" };
+  return { base: match[1].toUpperCase(), modifier: match[2] as "+" | "-" | "" };
+}
+
+/** Facts from the backend grade summary object (record, finish, ranks); anything else is ignored. */
+export function reviewSummaryFacts(summary: unknown): { record: string; finish: number | null; pointsRank: number | null; efficiencyPct: number | null; draftGrade: string } {
+  const o = obj(summary);
+  return {
+    record: o ? str(o.record) : "",
+    finish: o ? num(o.finish) : null,
+    pointsRank: o ? num(o.points_rank) : null,
+    efficiencyPct: o && num(o.lineup_efficiency) != null ? Math.round((num(o.lineup_efficiency) as number) * 100) : null,
+    draftGrade: o ? str(o.draft_grade) : "",
+  };
+}
+
+/** The Sleeper headshot id the card fetches (null: draw initials). */
+export function reviewHeadshotId(p: Pick<ReviewPlayer, "id" | "headshot_id">): string | null {
+  if (p.headshot_id) return p.headshot_id;
+  return /^\d+$/.test(p.id) ? p.id : null;
+}
+
+export interface ReviewShareHighlight {
+  label: string;
+  text: string;
+  delta?: string;
+  tone: ReviewTone;
+  glyph: ReviewGlyph;
+  player: { name: string; pos: string; team: string; headshotId: string | null } | null;
+}
+
 export interface ReviewShareModel {
+  /** Header kicker, "Season in Review". */
   title: string;
   letter: string;
   gradeTone: ReviewTone;
+  teamName: string;
+  outcome: ReviewOutcome;
+  /** The outcome title: "League Champion", "Runner-up", ... */
   headline: string;
+  /** Record and finish, e.g. "7-6-1 · Finished 6th · 2nd in points". */
   subline: string;
-  highlights: { label: string; text: string; delta?: string; tone: ReviewTone }[];
+  record: string;
+  /** Extra true numbers under the subline: lineup efficiency, draft grade, who won the title. */
+  tags: string[];
+  highlights: ReviewShareHighlight[];
   stats: { label: string; value: string }[];
 }
 
@@ -424,7 +486,18 @@ export function buildReviewShareModel(input: {
   title?: string;
   letter: string;
   gradeTone: ReviewTone;
-  headline: string;
+  teamName?: string;
+  /** Raw playoff_result key from the standings row. */
+  playoffResult?: string | null;
+  isChampion?: boolean;
+  record?: string;
+  /** Regular-season finish when the grade summary has none. */
+  finish?: number | null;
+  /** Raw grade.summary (object from the backend). */
+  summary?: unknown;
+  championName?: string | null;
+  /** Overrides the outcome title / the record line. */
+  headline?: string;
   subline?: string;
   sections: readonly ReviewSection[];
 }): ReviewShareModel {
@@ -437,17 +510,40 @@ export function buildReviewShareModel(input: {
     if (s.kind === "cards" && s.id !== "decisions") {
       for (const c of s.cards) {
         if (highlights.length >= 4) break;
-        const who = c.players[0]?.name;
-        highlights.push({ label: c.label, text: who ?? c.headline, delta: c.delta?.text, tone: c.tone });
+        const p = c.players[0];
+        highlights.push({
+          label: c.label,
+          text: p?.name ?? c.headline,
+          delta: c.delta?.text,
+          tone: c.tone,
+          glyph: c.glyph,
+          player: p ? { name: p.name, pos: p.pos, team: p.team ?? "", headshotId: reviewHeadshotId(p) } : null,
+        });
       }
     }
   }
+  const outcome = reviewOutcome(input.playoffResult, input.isChampion);
+  const facts = reviewSummaryFacts(input.summary);
+  const record = input.record || facts.record;
+  const finish = facts.finish ?? input.finish ?? null;
+  const subline =
+    input.subline ??
+    [record, finish != null ? `Finished ${ordinal(finish)}` : "", facts.pointsRank != null ? `${ordinal(facts.pointsRank)} in points` : ""].filter(Boolean).join(" \u00b7 ");
+  const tags = [
+    facts.efficiencyPct != null ? `${facts.efficiencyPct}% lineup efficiency` : "",
+    facts.draftGrade ? `Draft grade ${facts.draftGrade}` : "",
+    outcome !== "champion" && input.championName ? `${input.championName} won the title` : "",
+  ].filter(Boolean);
   return {
     title: input.title ?? "Season in Review",
     letter: input.letter,
     gradeTone: input.gradeTone,
-    headline: input.headline,
-    subline: input.subline ?? "",
+    teamName: input.teamName ?? "",
+    outcome,
+    headline: input.headline ?? REVIEW_OUTCOME_TITLE[outcome],
+    subline,
+    record,
+    tags,
     highlights,
     stats,
   };

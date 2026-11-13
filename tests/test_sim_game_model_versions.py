@@ -1,0 +1,102 @@
+"""Saved games keep the player model they were created with.
+
+``player_model_v1.py`` is a frozen copy of player-model-1; a game stored with ``player_model-player-model-1``
+must replay and resume with exactly the same results after newer models ship."""
+
+from __future__ import annotations
+
+import hashlib
+from pathlib import Path
+
+from modules.sim import game_scoring, player_model, player_model_v1
+from tests.test_sim_game_engine import BYES, ROWS, InMemoryBackend
+from tests import test_sim_game_engine as eng
+
+V1_ID = "player_model-player-model-1"
+V2_ID = "player_model-player-model-2"
+# sha256 of modules/sim/player_model_v1.py as shipped in player-model-1 (origin/main before the v2 audit)
+V1_SHA256 = "c97d05e9a6875db3c9d03e7ff44b40dd9f8a02df64e2bd9e794cbf2658aa5f1e"
+# state digests after weeks 1..STOP_WEEK for seed 11 / user slot 4, produced by the player-model-1 code before v2 existed
+GOLDEN_V1_DIGESTS = {
+    2: "2a281ad6357e46320a06c82c912aa71e176033dc716c1c064bad42650069cd07",
+    3: "40c8e42e7c3a9c513ee4ff736e032fab046094175c0da9947038cdf04e590563",
+    4: "50401df981d8544ced75edbbec3ae7070f3adbb74736663113c7e28d910b341d",
+    5: "9a55e9134e3f6a84cf3ae283697cc0df56aa4c16cc75b329c2519f984930bedb",
+    6: "060894f427c11bf2089aec37a002351aca6a24c63053044c9d21d97fade52b87",
+}
+STOP_WEEK = 6
+
+
+def _play(model_id: str, seed: int = 11, stop_week: int = STOP_WEEK):
+    snap = eng.build_snapshot(ROWS, BYES, eng.GameSettings.parse({"user_slot": 4}), seed, scoring_model=model_id)
+    store = eng.GameStore(InMemoryBackend())
+    row = store.create_game("u", snapshot=snap, seed=seed)
+    gid = row["id"]
+    state = eng.GameState(snap)
+    em = eng.Emitter(state, snap)
+    ctx = eng.DraftContext(snap, state)
+    eng.run_ai_picks(ctx, em, seed)
+    eng.auto_for_user(ctx, em, seed)
+    eng.finish_draft(em, snap, state, seed)
+    store.append_events("u", gid, em.events)
+    store.save_checkpoint("u", gid, state, state.week)
+    digests = {}
+    while state.status != "complete" and state.week < stop_week:
+        em = eng.Emitter(state, snap)
+        eng.advance(em, snap, state, seed)
+        store.append_events("u", gid, em.events)
+        store.save_checkpoint("u", gid, state, state.week)
+        digests[state.week] = state.digest()
+    return store, gid, snap, state, digests
+
+
+def test_v1_module_is_a_frozen_copy():
+    path = Path(player_model_v1.__file__)
+    assert hashlib.sha256(path.read_bytes()).hexdigest() == V1_SHA256, "player_model_v1.py must never change"
+    assert player_model_v1.MODEL_VERSION == "player-model-1"
+    assert player_model.MODEL_VERSION == "player-model-2"
+
+
+def test_get_model_routes_each_id_to_its_own_module_and_new_games_use_the_latest():
+    assert game_scoring.get_model(V1_ID)._m is player_model_v1
+    assert game_scoring.get_model(V2_ID)._m is player_model
+    assert game_scoring.get_model(V1_ID).model_id == V1_ID and game_scoring.get_model(V2_ID).model_id == V2_ID
+    assert game_scoring.default_model().model_id == V2_ID
+    assert game_scoring.get_model(game_scoring.FALLBACK_ID).model_id == game_scoring.FALLBACK_ID
+    assert game_scoring.get_model("").model_id == game_scoring.FALLBACK_ID
+
+
+def test_unknown_model_ids_fall_back_to_the_default_with_a_note():
+    model, note = game_scoring.resolve_model("player_model-player-model-99")
+    assert model.model_id == V2_ID and note and "player_model-player-model-99" in note
+    for known in (V1_ID, V2_ID, game_scoring.FALLBACK_ID, None):
+        assert game_scoring.resolve_model(known)[1] is None
+
+
+def test_v1_and_v2_really_produce_different_seasons():
+    a = game_scoring.get_model(V1_ID).week
+    assert a is not game_scoring.get_model(V2_ID).week
+    p = {"player_id": "x", "pos": "WR", "age": 25.0, "team": "KC", "projection_mean_ppg": 12.0, "is_rookie": False}
+    m1, m2 = game_scoring.get_model(V1_ID), game_scoring.get_model(V2_ID)
+    r = lambda m: m.profile(p, player_model.profile_rng(3, "x")).season_mean_ppg  # noqa: E731
+    assert r(m1) != r(m2)
+
+
+def test_a_game_created_under_v1_replays_and_resumes_identically():
+    store, gid, snap, state, digests = _play(V1_ID)
+    assert snap.scoring_model == V1_ID
+    assert GOLDEN_V1_DIGESTS and digests == GOLDEN_V1_DIGESTS, "v1 game results changed"
+    resumed = store.load_state("u", gid, snap, use_checkpoint=True)
+    replayed = store.load_state("u", gid, snap, use_checkpoint=False)
+    assert resumed.digest() == replayed.digest() == state.digest() == GOLDEN_V1_DIGESTS[STOP_WEEK]
+    # continuing the reloaded game lands on the same season as one that never stopped
+    em = eng.Emitter(resumed, snap)
+    while resumed.status != "complete":
+        eng.advance(em, snap, resumed, 11)
+    _, _, _, full, _ = _play(V1_ID, stop_week=99)
+    assert resumed.digest() == full.digest()
+
+
+def test_v2_games_still_resume_equal_replay():
+    store, gid, snap, state, _ = _play(V2_ID)
+    assert store.load_state("u", gid, snap, use_checkpoint=True).digest() == store.load_state("u", gid, snap, use_checkpoint=False).digest() == state.digest()
