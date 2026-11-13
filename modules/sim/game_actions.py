@@ -26,6 +26,7 @@ from modules.sim.game_ai import (
 )
 from modules.sim.game_eval import Evaluator, team_params
 from modules.sim.game_state import Emitter, GameState
+from modules.sim.types import is_pick_id
 from modules.sim.game_types import NON_TRADABLE, GameError, GameSnapshot, slot_positions
 
 
@@ -359,7 +360,10 @@ def respond_offer(em: Emitter, desk: TradeDesk, offer_id: str, action: str) -> d
     if state.trades_made[ai] >= AI_SEASON_TRADE_CAP:
         raise GameError("partner_trade_limit", "That team has made all the trades it will this season.")
     ai_gives, ai_gets = offer["give"], offer["get"]  # from the AI's side
-    if not all(p in state.rosters[ai] for p in ai_gives) or not all(p in state.rosters[user] for p in ai_gets):
+    def owns(tid: str, pid: str) -> bool:
+        return state.pick_owner.get(pid) == tid if is_pick_id(pid) else state.where(tid, pid) is not None
+
+    if not all(owns(ai, p) for p in ai_gives) or not all(owns(user, p) for p in ai_gets):
         raise GameError("offer_invalid", "Those players have moved, so the offer is off.")
     em.emit(state.week, "user", "inbox_response", id=offer_id, action="accept")
     return execute_trade(em, ai, user, ai_gives, ai_gets, key="", source="ai_offer")
