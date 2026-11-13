@@ -204,3 +204,75 @@ Follow-ups (60+ call sites per the audit; each is a one-line wrap now that the c
 `ToneBadge` (`onWhy`), `ValueStat`, `SnapshotTile`, win probability and playoff odds on Matchup and
 Dashboard, FAAB on Waivers, trade balance and confidence on the verdict card, `projection` and `age`
 wherever they appear. The registry already has copy for all of them.
+
+## StructuredRow
+
+The replacement for delimiter-joined strings and generated sentences. One row is **crest/avatar + name
+(one line, truncated) + status chip + two or three metric pills + one short reason + chevron**, 64px
+tall at most, and tapping it opens a detail `Sheet`. Every part is its own field, so nothing repeats
+and nothing is parsed back out of text.
+
+```tsx
+import { StructuredRow, StructuredRowList } from "@/components/ui/StructuredRow";
+
+<StructuredRowList
+  items={rows}                       // top 3, then "See all (n)" expands the rest in place
+  renderRow={(row) => (
+    <StructuredRow
+      lead={<TeamAvatar avatarUrl={row.avatar_url} name={row.team_name} size={36} />}
+      title={row.team_name}
+      chip={{ label: row.strategy_display, color: "var(--color-warning)" }}
+      pills={signalPills(row)}       // "Picks #10", or "Draft #8" + "Future #6"
+      reason={row.reason_short}      // <= 60 characters
+      highlight={row.team_id === myRosterId}   // gold outline for the user's own team
+      detailTitle={row.team_name}
+      detail={<p>{row.reason_long}</p>}        // the long sentence lives only here
+    />
+  )}
+/>
+```
+
+Without `detail` or `onOpen` a row is a plain, non-tappable row with no chevron. The pure helpers
+(`signalPills`, `strategyTone`, `visibleSignalRows`, `seeAllLabel`, `cardRows`) are the lib twin
+`lib/draftSignals.ts`. Mobile: `StructuredRow` and `StructuredRowList` take the same props (`testID`
+instead of `testId`).
+
+### API: Draft Center card schema 2 (backend, web, mobile)
+
+`modules/draft_center_cards.py` used to return `items: ["Team | Retool | Draft #10 | Future #10 |
+sentence", ...]`. Cards now also carry `schema: 2` and `rows` with these fields:
+
+```json
+{ "team_id": "2", "team_name": "...", "avatar_url": null, "strategy": "retool", "strategy_display": "Retool",
+  "draft_rank": 10, "draft_rank_tied": false, "future_rank": 10, "future_rank_tied": false, "firsts": 0,
+  "reason_code": "too_few_picks", "reason_short": "Too few picks for a retool",
+  "reason_long": "Draft rank #10 leaves too little flexibility for a retool build.",
+  "evidence": [{ "key": "draft_rank", "label": "Draft capital rank", "value": "#10" }] }
+```
+
+- **The legacy `items` strings are still sent, unchanged, for one release.** The iOS build in App Store
+  review and older Android builds render them; a response without `rows` renders exactly as before.
+  Delete `items` (and `_draft_workspace_team_lines`) once those builds are gone.
+- `reason_long` is produced by the same function as the legacy string's sentence, so the two cannot
+  drift. `reason_short` never repeats the rank numbers that the pills already show.
+- `rows` keeps up to 6 teams per card (`CARD_ROW_POOL`); `items` stays at the top 3. Clients show 3 and
+  offer "See all (n)".
+- A team name that contains the old delimiter (`|`) is now safe, because nothing is split any more.
+- Tests: `tests/test_draft_center_ui.py` (fields, 60-character cap, legacy/row alignment, delimiter in a
+  name, partner cards) and `tests/test_mobile_api_service.py` (served schema).
+
+### Applied: Draft Center "League Draft Decision Signals" and "Draft Partner Discovery"
+
+| Before: one joined string per team | After: rows, top 3 + See all, own team outlined | After: tap a row |
+|---|---|---|
+| ![](ui-patterns/draft-1-signals-before.jpg) | ![](ui-patterns/draft-1-signals-after.jpg) | ![](ui-patterns/draft-2-detail-after.jpg) |
+
+Also fixed on the way: `TeamAvatar` built its initials from UTF-16 units, so a team name ending in an
+emoji produced half a surrogate pair (a broken glyph, and a server/client HTML mismatch that failed
+hydration). It now uses `lib/teamInitials.ts` (code points; lib twin), on web and mobile.
+
+Not done in this pass (the audit's full Draft Center redesign, section 6.4): merging the five cards into a
+Buyers / Sellers / Pivot / Pick-rich segmented control, deleting the all-caps label bars, merging Partner
+Discovery into the same control, and the detail sheet's "Open trade finder with this team" and "View team"
+actions (the Draft Center page does not have the league id wired into the card component yet). The rows
+and the API are the foundation for all of those.

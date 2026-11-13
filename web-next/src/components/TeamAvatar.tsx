@@ -2,6 +2,8 @@
 
 import { useState } from "react";
 
+import { teamInitials } from "@/lib/teamInitials";
+
 /**
  * Team/user profile picture — sibling to PlayerAvatar.tsx, same fallback
  * pattern (blank ringed circle on load failure or missing URL rather than a
@@ -25,8 +27,7 @@ export function TeamAvatar({
   ringColor?: string;
 }) {
   const [failed, setFailed] = useState(false);
-  const parts = (name ?? "").trim().split(/\s+/).filter(Boolean);
-  const initials = parts.length === 0 ? "" : (parts.length === 1 ? parts[0].slice(0, 2) : parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
+  const initials = teamInitials(name);
   const dimension = { width: size, height: size, borderRadius: "50%" };
 
   if (!avatarUrl || failed) {

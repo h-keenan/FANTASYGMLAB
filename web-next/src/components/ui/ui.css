@@ -368,3 +368,120 @@
     transform: none;
   }
 }
+
+/* ---------- StructuredRow ---------- */
+.ui-srow-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xs, 4px);
+}
+.ui-srow {
+  display: flex;
+  align-items: center;
+  gap: var(--space-md);
+  width: 100%;
+  min-height: var(--touch-target-min);
+  padding: var(--space-sm) var(--space-md);
+  border-radius: var(--radius-control);
+  border: var(--border-width-default) solid var(--color-border);
+  background: color-mix(in srgb, var(--color-surface-raised) 28%, transparent);
+  color: var(--color-text-primary);
+  font: inherit;
+  text-align: left;
+}
+.ui-srow-tap {
+  cursor: pointer;
+}
+.ui-srow-tap:hover,
+.ui-srow-tap:focus-visible {
+  border-color: var(--color-border-strong);
+}
+.ui-srow-tap:active {
+  opacity: 0.8;
+}
+.ui-srow-me {
+  border-color: var(--color-premium);
+  background: color-mix(in srgb, var(--color-premium) 8%, transparent);
+}
+.ui-srow-lead {
+  flex-shrink: 0;
+  display: inline-grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+}
+.ui-srow-main {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  flex: 1 1 auto;
+  min-width: 0;
+}
+.ui-srow-line {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  min-width: 0;
+}
+.ui-srow-title {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  font-size: 0.9rem;
+  font-weight: 800;
+}
+.ui-srow-pills {
+  display: inline-flex;
+  flex-shrink: 0;
+  gap: 4px;
+}
+.ui-srow-pill {
+  padding: 1px 7px;
+  border-radius: var(--radius-pill);
+  border: var(--border-width-default) solid var(--color-border);
+  font-size: 0.68rem;
+  font-weight: 800;
+  line-height: 1.45;
+  color: var(--color-text-secondary);
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+.ui-srow-chip {
+  flex-shrink: 0;
+  padding: 0 7px;
+  border-radius: var(--radius-pill);
+  border: var(--border-width-default) solid;
+  font-size: 0.66rem;
+  font-weight: 800;
+  line-height: 1.5;
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+}
+.ui-srow-reason {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  font-size: 0.74rem;
+  color: var(--color-text-muted);
+}
+.ui-srow-chevron {
+  flex-shrink: 0;
+  font-size: 1.3rem;
+  line-height: 1;
+  color: var(--color-text-muted);
+}
+.ui-srow-more {
+  align-self: flex-start;
+  min-height: var(--touch-target-min);
+  padding: 0 var(--space-sm);
+  background: none;
+  border: 0;
+  font-size: 0.8rem;
+  font-weight: 800;
+  color: var(--color-accent);
+  cursor: pointer;
+}

@@ -11932,6 +11932,14 @@ def test_draft_center_returns_league_wide_cards_and_resolved_posture(monkeypatch
         assert card["title"]
         assert card["tone"]
         assert isinstance(card["items"], list) and card["items"]
+        # Schema 2: structured rows ship beside the legacy strings (kept for
+        # one release for the iOS build in review and older Android builds).
+        assert card["schema"] == 2
+        assert len(card["rows"]) >= len(card["items"])
+        for row in card["rows"]:
+            assert row["team_id"] and row["team_name"]
+            assert len(row["reason_short"]) <= 60
+            assert " | " not in row["reason_short"]
 
     # Roster 1's Sleeper username resolves to its own roster, so posture
     # should be populated (real modules.draft_center_cards.draft_posture_profile

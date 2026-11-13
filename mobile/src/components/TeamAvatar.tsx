@@ -4,6 +4,7 @@ import { Image } from 'expo-image';
 
 import AppText from './AppText';
 import { useThemeMode } from '../context/ThemeModeContext';
+import { teamInitials } from '../lib/teamInitials';
 import type { ThemeColors } from '../theme';
 
 const SLEEPER_AVATAR_BASE = 'https://sleepercdn.com/avatars/thumbs';
@@ -32,7 +33,7 @@ export default function TeamAvatar({ avatarId, name, size = 36, style }: TeamAva
   const dimension = { width: size, height: size, borderRadius: size / 2 };
 
   if (!avatarId || failed) {
-    const text = initialsOf(name);
+    const text = teamInitials(name);
     return (
       <View style={[styles.fallback, dimension, style, text ? styles.fallbackCentered : null]}>
         {text ? <AppText style={{ fontSize: size * 0.38, fontWeight: '800', color: colors.textSecondary }}>{text}</AppText> : null}
@@ -50,12 +51,6 @@ export default function TeamAvatar({ avatarId, name, size = 36, style }: TeamAva
       onError={() => setFailed(true)}
     />
   );
-}
-
-function initialsOf(name: string | null | undefined): string {
-  const parts = (name ?? '').trim().split(/\s+/).filter(Boolean);
-  if (parts.length === 0) return '';
-  return (parts.length === 1 ? parts[0].slice(0, 2) : parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
 }
 
 function createStyles(colors: ThemeColors) {

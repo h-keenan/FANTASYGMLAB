@@ -1,3 +1,4 @@
+import type { DraftSignalRow } from "./draftSignals";
 import { env } from "./env";
 import type { TradeCaution } from "./tradeCautions";
 import type { VerdictAssumptions, VerdictFeedbackReason, VerdictReportContext } from "@/lib/verdictTrust";
@@ -3319,7 +3320,11 @@ export interface DraftCard {
   label: string;
   title: string;
   tone: string;
+  /** Legacy "Team | Strategy | Draft #n | ..." strings, kept for one release; new clients render `rows`. */
   items: string[];
+  /** Card schema 2: structured rows (see lib/draftSignals.ts). Absent on older responses. */
+  rows?: DraftSignalRow[];
+  schema?: number;
 }
 
 export interface DraftCenterResponse {

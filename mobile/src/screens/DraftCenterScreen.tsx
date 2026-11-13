@@ -1,3 +1,6 @@
+import StructuredRow, { StructuredRowList } from '../components/StructuredRow';
+import TeamAvatar from '../components/TeamAvatar';
+import { cardRows, signalPills, signalSpokenLabel, strategyTone } from '../lib/draftSignals';
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { ScrollView, StyleSheet, View } from 'react-native';
 import AppText from '../components/AppText';
@@ -342,12 +345,12 @@ export default function DraftCenterScreen({ route, navigation }: Props) {
           <>
             <SectionHeading title="League Draft Decision Signals" topGap={16} />
             {decisionCards.map((card) => (
-              <DraftInsightCard key={card.label} card={card} />
+              <DraftInsightCard key={card.label} card={card} myRosterId={myRosterId} />
             ))}
 
             <SectionHeading title="Draft Partner Discovery" topGap={16} />
             {partnerCards.map((card) => (
-              <DraftInsightCard key={card.label} card={card} />
+              <DraftInsightCard key={card.label} card={card} myRosterId={myRosterId} />
             ))}
           </>
         ) : null}
@@ -434,19 +437,51 @@ function CapitalCell({
  * AccentCard railed and badged in the tone's semantic color, items as icon
  * rows. Mirrors web-next's DraftCardSection (PR #1696).
  */
-function DraftInsightCard({ card }: { card: DraftCard }) {
+function DraftInsightCard({ card, myRosterId }: { card: DraftCard; myRosterId: string }) {
   const { colors } = useThemeMode();
   const styles = useMemo(() => createStyles(colors), [colors]);
   const toneColor = toneColorMap(colors)[card.tone] ?? colors.accent;
+  // Schema 2 responses carry structured rows; an older response still renders the legacy strings.
+  const rows = cardRows(card);
+  const signalColor = { success: colors.success, warning: colors.warning, accent: colors.accent, neutral: colors.textSecondary };
   return (
     <AccentCard accent={toneColor} style={styles.insightCard}>
       <ToneBadge label={card.label} color={toneColor} />
       <AppText style={styles.insightTitle}>{card.title}</AppText>
-      {card.items.map((item, index) => (
-        <IconRow key={`${card.label}-${index}`} icon="arrow" color={toneColor}>
-          {item}
-        </IconRow>
-      ))}
+      {rows ? (
+        <StructuredRowList
+          items={rows}
+          renderRow={(row) => (
+            <StructuredRow
+              lead={<TeamAvatar avatarId={row.avatar_url} name={row.team_name} size={36} />}
+              title={row.team_name}
+              chip={{ label: row.strategy_display, color: signalColor[strategyTone(row.strategy)] }}
+              pills={signalPills(row)}
+              reason={row.reason_short}
+              highlight={Boolean(myRosterId) && row.team_id === myRosterId}
+              spoken={signalSpokenLabel(row)}
+              detailTitle={row.team_name}
+              detail={
+                <>
+                  <AppText style={styles.signalReason}>{row.reason_long}</AppText>
+                  {row.evidence.map((entry) => (
+                    <View key={entry.key} style={styles.signalEvidence}>
+                      <AppText style={styles.signalEvidenceLabel}>{entry.label}</AppText>
+                      <AppText style={styles.signalEvidenceValue}>{entry.value}</AppText>
+                    </View>
+                  ))}
+                </>
+              }
+            />
+          )}
+        />
+      ) : (
+        card.items.map((item, index) => (
+          <IconRow key={`${card.label}-${index}`} icon="arrow" color={toneColor}>
+            {item}
+          </IconRow>
+        ))
+      )}
     </AccentCard>
   );
 }
@@ -465,6 +500,10 @@ function createStyles(colors: ThemeColors) {
     padding: spacing.xl,
   },
   notReadyText: { textAlign: 'center', color: colors.textSecondary, lineHeight: 20 },
+  signalReason: { fontSize: 15, lineHeight: 22, color: colors.textSecondary },
+  signalEvidence: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: spacing.md, minHeight: 40, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border },
+  signalEvidenceLabel: { fontSize: 14, color: colors.textTertiary },
+  signalEvidenceValue: { fontSize: 14, fontWeight: '800', color: colors.textPrimary },
   error: { color: colors.danger, textAlign: 'center' },
   notice: {
     fontSize: 14.5,
