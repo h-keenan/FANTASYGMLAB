@@ -22,14 +22,14 @@ import BrandedSpinner from '../components/BrandedSpinner';
 import { PlannerBar, SwapSheet, useLineupPlanner } from '../components/MatchupPlanner';
 import GuillotineCard from '../components/GuillotineCard';
 import GridBackground from '../components/GridBackground';
-import PlayerAvatar from '../components/PlayerAvatar';
-import PlayerNameText from '../components/PlayerNameText';
+import { ComparisonHeader, SlotList } from '../components/MatchupLineup';
+import { PlayerCard } from '../components/PlayerCardKit';
+import { playerCardFromStarter } from '../lib/playerCard';
 import PositionBadge from '../components/PositionBadge';
 import SectionHeading from '../components/SectionHeading';
 import SegmentedTabBar from '../components/SegmentedTabBar';
 import DashboardStatRow from '../components/DashboardStatRow';
 import TeamAvatar from '../components/TeamAvatar';
-import ToneBadge from '../components/ToneBadge';
 import RangeCompare from '../components/RangeCompare';
 import WeatherReasonChip from '../components/WeatherReasonChip';
 import { RANGE_CAPTION, leanLabel, rangeDisplayRows } from '../lib/startSitRange';
@@ -47,10 +47,7 @@ import {
   formatSeasonValue,
   formatSigned,
   hasKickedOff,
-  lineupTotals,
-  rowWinner,
   lineupComparisonRows,
-  lineupPlayerPoints,
   matchupActionLabel,
   matchupNextAction,
   matchupVerdict,
@@ -61,10 +58,11 @@ import {
   type LineupPlayer,
   type VerdictTone,
 } from '../lib/matchupPresentation';
+import { compareLineupSlots, type SlotSortMode } from '../lib/lineupSlots';
 import { emptySlotsOf, plannerBase, plannerOpponentPlayers, slotIndexFor, winPercent } from '../lib/matchupPlanner';
 import { useOrbClearance } from '../lib/orbLayout';
 import { queryKeys } from '../lib/queryKeys';
-import { dataAgeSeconds, freshnessLabel, nextPollDelayMs, projFinalLabel } from '../lib/liveScores';
+import { dataAgeSeconds, freshnessLabel, nextPollDelayMs } from '../lib/liveScores';
 import { useScreenHeaderTitle } from '../lib/useScreenHeaderTitle';
 import { toUserErrorMessage } from '../lib/errorMessages';
 import { useThemeMode } from '../context/ThemeModeContext';
@@ -345,6 +343,7 @@ export default function MatchupScreen({ route, navigation }: Props) {
           onPressPlayer={openPlayer}
           leagueId={leagueId}
           planner={planner}
+          ageSeconds={matchup.as_of_age_seconds != null ? dataAgeSeconds(matchup.as_of_age_seconds, matchupQuery.dataUpdatedAt, nowMs) : null}
         />
         {planner.sheet && planner.plan ? (
           <SwapSheet
@@ -360,7 +359,7 @@ export default function MatchupScreen({ route, navigation }: Props) {
           // scorers, so there is no suggested lineup or start/sit call.
           <AppText style={styles.bestBallNote}>{matchup.lineup_advice_message}</AppText>
         ) : (
-          <SuggestedMoves matchup={matchup} />
+          <SuggestedMoves matchup={matchup} leagueId={leagueId} leagueName={leagueName} />
         )}
         <NextSteps title="Fix a weak spot" steps={['waivers', 'trade-hub', 'my-team']} leagueId={leagueId} leagueName={leagueName} />
         <ValuesCredit />
@@ -533,116 +532,6 @@ function Insights({ matchup }: { matchup: MatchupResponse }) {
   );
 }
 
-type CellEmphasis = 'win' | 'lose' | 'even';
-
-function LineupCell({
-  player,
-  mine,
-  emphasis,
-  onPress,
-  onEdit,
-}: {
-  player: LineupPlayer | 'empty' | null;
-  mine: boolean;
-  emphasis: CellEmphasis;
-  onPress: (player: LineupPlayer) => void;
-  /** Planner mode: tapping the cell opens the swap sheet instead of Player Detail. */
-  onEdit?: () => void;
-}) {
-  const { colors } = useThemeMode();
-  const styles = useMemo(() => createStyles(colors), [colors]);
-  if (player === null) return <View style={styles.cell} />;
-  if (player === 'empty') {
-    return onEdit ? (
-      <TouchableOpacity style={[styles.cell, styles.cellCenter]} onPress={onEdit} accessibilityRole="button">
-        <AppText style={[styles.emptySlot, { color: colors.accent }]} numberOfLines={1}>
-          Empty, tap to fill
-        </AppText>
-      </TouchableOpacity>
-    ) : (
-      <View style={[styles.cell, styles.cellCenter, !mine && { alignItems: 'flex-end' }]}>
-        <AppText style={styles.emptySlot}>Empty slot</AppText>
-      </View>
-    );
-  }
-  const points = lineupPlayerPoints(player);
-  const valueText = points.value != null ? points.value.toFixed(1) : points.note === 'bye' ? null : '—';
-  const projFinal =
-    points.kind === 'pts' && player.game_status === 'in_progress' && 'projected_final' in player
-      ? projFinalLabel(player.projected_final)
-      : null;
-  const align = mine ? 'flex-start' : 'flex-end';
-  return (
-    <TouchableOpacity
-      style={[
-        styles.cell,
-        mine ? styles.cellRow : styles.cellRowReverse,
-        emphasis === 'win' && { backgroundColor: colors.accentMuted },
-      ]}
-      onPress={() => (onEdit ? onEdit() : onPress(player))}
-      accessibilityRole="button"
-      accessibilityLabel={onEdit ? `Swap ${player.name ?? 'player'}` : `${player.name ?? 'Player'}, ${player.team ?? 'free agent'}`}
-    >
-      <PlayerAvatar playerId={player.player_id} tier={player.tier} size={30} />
-      <View style={[styles.cellBody, { alignItems: align }]}>
-        <PlayerNameText
-          name={player.name || 'Unknown player'}
-          style={[styles.cellName, !mine && styles.textRight]}
-        />
-        <View style={[styles.cellMetaRow, !mine && { flexDirection: 'row-reverse' }]}>
-          {valueText ? (
-            <AppText
-              style={[
-                styles.cellPoints,
-                emphasis === 'win' && styles.cellPointsWin,
-                emphasis === 'lose' && styles.cellPointsLose,
-              ]}
-            >
-              {valueText}
-            </AppText>
-          ) : (
-            <ToneBadge label="Bye" color={colors.premium} />
-          )}
-          {projFinal ? <AppText style={styles.cellProjFinal}>{projFinal}</AppText> : null}
-          <AppText style={styles.cellTeam} numberOfLines={1}>
-            {player.team || 'FA'}
-            {player.injury_label ? ` · ${player.injury_label}` : ''}
-          </AppText>
-        </View>
-      </View>
-    </TouchableOpacity>
-  );
-}
-
-function TeamHeadCell({ side, mine }: { side: MatchupSide; mine: boolean }) {
-  const { colors } = useThemeMode();
-  const styles = useMemo(() => createStyles(colors), [colors]);
-  return (
-    <View style={[styles.teamHead, !mine && { flexDirection: 'row-reverse' }]}>
-      <TeamAvatar
-        avatarId={side.avatar_url}
-        name={side.team_name}
-        size={30}
-        style={StyleSheet.flatten([styles.scoreAvatar, { marginBottom: 0, borderColor: mine ? colors.accent : colors.borderStrong }])}
-      />
-      <View style={styles.teamHeadText}>
-        <AppText
-          style={[styles.teamHeader, { color: mine ? colors.accent : colors.textPrimary }, !mine && styles.textRight]}
-          numberOfLines={2}
-        >
-          {side.team_name || (mine ? 'You' : 'Opponent')}
-        </AppText>
-        <AppText style={[styles.cellTeam, !mine && styles.textRight]}>{recordLabel(side)}</AppText>
-      </View>
-    </View>
-  );
-}
-
-function emphasisFor(winner: ReturnType<typeof rowWinner>, side: 'mine' | 'opponent'): CellEmphasis {
-  if (winner == null || winner === 'tie') return 'even';
-  return winner === side ? 'win' : 'lose';
-}
-
 function LineupComparison({
   matchup,
   view,
@@ -650,6 +539,7 @@ function LineupComparison({
   onPressPlayer,
   leagueId,
   planner,
+  ageSeconds,
 }: {
   matchup: MatchupResponse;
   view: LineupView;
@@ -657,6 +547,7 @@ function LineupComparison({
   onPressPlayer: (player: LineupPlayer) => void;
   leagueId: string;
   planner: ReturnType<typeof useLineupPlanner>;
+  ageSeconds?: number | null;
 }) {
   const { colors } = useThemeMode();
   const styles = useMemo(() => createStyles(colors), [colors]);
@@ -666,7 +557,7 @@ function LineupComparison({
   const actual = view === 'actual';
   const plan = planner.plan;
   const canPlan = !bestBall && plannerBase(matchup, view) != null;
-  const rows = plan
+  const rows = useMemo(() => (plan
     ? lineupComparisonRows(
         plan.starters ?? [],
         plannerOpponentPlayers(matchup),
@@ -680,10 +571,9 @@ function LineupComparison({
         mine.real_empty_slots ?? [],
         opponent.real_empty_slots ?? [],
       )
-    : lineupComparisonRows(mine.starters, opponent.starters);
-  const totals = lineupTotals(rows);
-  const pointsOf = (cell: LineupPlayer | 'empty' | null) =>
-    cell && cell !== 'empty' ? lineupPlayerPoints(cell).value : null;
+    : lineupComparisonRows(mine.starters, opponent.starters)), [plan, actual, mine, opponent, matchup]);
+  const slots = useMemo(() => compareLineupSlots(rows), [rows]);
+  const [sort, setSort] = useState<SlotSortMode>('lineup');
   const caption =
     (plan
       ? 'Tap one of your players to see who could take the slot. A planner only: make the final change in Sleeper.'
@@ -693,8 +583,6 @@ function LineupComparison({
     (hasKickedOff(matchup)
       ? ' Started games show real points; the rest show projections.'
       : ' Numbers are this week’s projections.');
-  const evenMargin = Math.abs(totals.margin) < 0.05;
-  const marginColor = evenMargin ? colors.textTertiary : totals.margin > 0 ? colors.successBright : colors.danger;
 
   return (
     <AnimatedCard style={styles.card}>
@@ -736,62 +624,42 @@ function LineupComparison({
           {actual ? 'Sleeper hasn’t posted lineups for this week yet.' : 'No startable players on either roster right now.'}
         </AppText>
       ) : (
-        <View>
-          <View style={styles.teamHeaderRow}>
-            <TeamHeadCell side={mine} mine />
-            <View style={styles.slotCell} />
-            <TeamHeadCell side={opponent} mine={false} />
-          </View>
-          {rows.map((row, index) => {
-            const emptyOrdinal =
-              row.mine === 'empty'
-                ? rows.slice(0, index).filter((r) => r.slot === row.slot && r.mine === 'empty').length
-                : 0;
-            const editIndex = plan ? slotIndexFor(plan.slots, row.mine, row.slot, emptyOrdinal) : -1;
-            const myPts = pointsOf(row.mine);
-            const theirPts = pointsOf(row.opponent);
-            const winner = rowWinner(myPts, theirPts);
-            return (
-              <View key={`${row.slot}-${index}`} style={index > 0 ? styles.rowDivider : undefined}>
-                <View style={styles.tableRow}>
-                  <LineupCell
-                    player={row.mine}
-                    mine
-                    emphasis={emphasisFor(winner, 'mine')}
-                    onPress={onPressPlayer}
-                    onEdit={plan && editIndex >= 0 ? () => void planner.openSlot(editIndex) : undefined}
-                  />
-                  <View style={styles.slotCell}>
-                    <PositionBadge position={row.slot} />
-                  </View>
-                  <LineupCell
-                    player={row.opponent}
-                    mine={false}
-                    emphasis={emphasisFor(winner, 'opponent')}
-                    onPress={onPressPlayer}
-                  />
-                </View>
-              </View>
-            );
-          })}
-          <View style={styles.totalRow}>
-            <View style={styles.totalSide}>
-              <AppText style={styles.totalLabel}>Total</AppText>
-              <AppText style={styles.totalValue}>{totals.mine.toFixed(1)}</AppText>
-            </View>
-            <ToneBadge label={evenMargin ? 'Even' : formatSigned(totals.margin)} color={marginColor} />
-            <View style={[styles.totalSide, { justifyContent: 'flex-end' }]}>
-              <AppText style={styles.totalValue}>{totals.opponent.toFixed(1)}</AppText>
-              <AppText style={styles.totalLabel}>Total</AppText>
-            </View>
-          </View>
+        <View style={{ gap: spacing.md }}>
+          <ComparisonHeader
+            mine={mine}
+            opponent={opponent}
+            slots={slots}
+            odds={matchup.win_probability}
+            ageSeconds={ageSeconds}
+            live={matchup.game_state === 'live'}
+            sort={sort}
+            onSort={setSort}
+          />
+          <SlotList
+            slots={slots}
+            sort={sort}
+            onPressPlayer={onPressPlayer}
+            planEditIndex={
+              plan
+                ? (slot) => {
+                    const emptyOrdinal =
+                      slot.row.mine === 'empty'
+                        ? rows.slice(0, slot.index).filter((r) => r.slot === slot.slot && r.mine === 'empty').length
+                        : 0;
+                    const editIndex = slotIndexFor(plan.slots, slot.row.mine, slot.slot, emptyOrdinal);
+                    return editIndex >= 0 ? () => void planner.openSlot(editIndex) : undefined;
+                  }
+                : undefined
+            }
+          />
         </View>
       )}
     </AnimatedCard>
   );
 }
 
-function MoveCard({ move, slotLabel }: { move: MatchupSuggestedMove; slotLabel: string }) {
+function MoveCard({ move, slotLabel, leagueId, leagueName }: { move: MatchupSuggestedMove; slotLabel: string; leagueId: string; leagueName: string }) {
+  const { openPlayer: openQuickView } = usePlayerQuickView();
   const { colors } = useThemeMode();
   const styles = useMemo(() => createStyles(colors), [colors]);
   const tone = signedTone(move.gain);
@@ -800,19 +668,52 @@ function MoveCard({ move, slotLabel }: { move: MatchupSuggestedMove; slotLabel: 
   return (
     <View style={styles.moveCard}>
       <View style={styles.moveTop}>
-      <View style={styles.moveSlot}>
-        <PositionBadge position={move.slot} label={slotLabel} />
-      </View>
-      <PlayerAvatar playerId={move.start.player_id} tier={move.start.tier} size={40} />
       <View style={styles.moveBody}>
-        <AppText style={styles.moveTitle} numberOfLines={1}>
-          <AppText style={{ color: colors.successBright }}>Start </AppText>
-          {move.start.name || 'Unknown player'}
-        </AppText>
-        <AppText style={styles.moveSub} numberOfLines={1}>
-          {move.start.points != null ? `Proj ${move.start.points.toFixed(1)}` : move.start_note || 'No projection yet'}
-        </AppText>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.xs }}>
+          <PositionBadge position={move.slot} label={slotLabel} />
+          <AppText style={{ color: colors.successBright, fontSize: 12, fontWeight: '800', letterSpacing: 0.6 }}>START</AppText>
+        </View>
+        <PlayerCard
+          variant="compact"
+          model={playerCardFromStarter({
+            player_id: move.start.player_id,
+            name: move.start.name,
+            position: move.start.position,
+            team: move.start.team,
+            tier: move.start.tier,
+            injury_label: move.start.injury_label,
+            projection:
+              move.start.points != null
+                ? { status: 'ok', point_estimate: move.start.points }
+                : move.start.projection_status
+                  ? { status: move.start.projection_status, point_estimate: null }
+                  : null,
+          })}
+          stats={[{ label: 'Proj', value: move.start.points != null ? move.start.points.toFixed(1) : '—' }]}
+          onPress={() => {
+            if (!move.start.player_id) return;
+            openQuickView(
+              {
+                player_id: move.start.player_id,
+                name: move.start.name,
+                position: move.start.position,
+                team: move.start.team,
+                age: null,
+                status: null,
+                injury_status: null,
+                tier: move.start.tier,
+                score: null,
+                overall_rank: null,
+                position_rank: null,
+                rank_unavailable_reason: null,
+                opportunity_label: null,
+              },
+              { leagueId, leagueName },
+            );
+          }}
+        />
         <AppText style={styles.moveSub} numberOfLines={2}>
+          {move.start.points == null ? `${move.start_note || 'No projection yet'}. ` : ''}
           {moveOverLine(move)}
         </AppText>
         <WeatherReasonChip notes={move.weather_notes?.filter((note) => note.applied)} />
@@ -852,9 +753,10 @@ function MoveCard({ move, slotLabel }: { move: MatchupSuggestedMove; slotLabel: 
   );
 }
 
-function SuggestedMoves({ matchup }: { matchup: MatchupResponse }) {
+function SuggestedMoves({ matchup, leagueId, leagueName }: { matchup: MatchupResponse; leagueId: string; leagueName: string }) {
   const { colors } = useThemeMode();
   const styles = useMemo(() => createStyles(colors), [colors]);
+  const [open, setOpen] = useState(false);
   const [expanded, setExpanded] = useState(false);
   const moves = matchup.suggested_moves ?? null;
   const actualStarters = matchup.my_team?.real_starters ?? [];
@@ -867,13 +769,18 @@ function SuggestedMoves({ matchup }: { matchup: MatchupResponse }) {
         title="Suggested Moves"
         icon="swap-horizontal-outline"
         right={
-          hasMore ? (
-            <TouchableOpacity onPress={() => setExpanded((open) => !open)} accessibilityRole="button">
-              <AppText style={styles.viewAll}>{expanded ? 'Show fewer' : `View all (${moves!.length})`}</AppText>
-            </TouchableOpacity>
-          ) : undefined
+          <TouchableOpacity onPress={() => setOpen((value) => !value)} accessibilityRole="button" accessibilityState={{ expanded: open }}>
+            <AppText style={styles.viewAll}>{open ? 'Hide' : moves ? `Show (${moves.length})` : 'Show'}</AppText>
+          </TouchableOpacity>
         }
       />
+      {!open ? null : (
+        <>
+      {hasMore ? (
+        <TouchableOpacity onPress={() => setExpanded((value) => !value)} accessibilityRole="button" style={{ alignSelf: 'flex-start' }}>
+          <AppText style={styles.viewAll}>{expanded ? 'Show fewer' : `View all (${moves!.length})`}</AppText>
+        </TouchableOpacity>
+      ) : null}
       {moves === null ? (
         <AppText style={styles.emptyNote}>Suggested moves appear once Sleeper has your lineup for this week.</AppText>
       ) : moves.length === 0 ? (
@@ -885,6 +792,8 @@ function SuggestedMoves({ matchup }: { matchup: MatchupResponse }) {
               key={`${move.start.player_id}-${move.slot}`}
               move={move}
               slotLabel={moveSlotLabel(move, actualStarters)}
+              leagueId={leagueId}
+              leagueName={leagueName}
             />
           ))}
         </View>
@@ -894,6 +803,8 @@ function SuggestedMoves({ matchup }: { matchup: MatchupResponse }) {
         The suggested lineup ranks by this week’s projected points (season-long value only breaks ties or fills in where a projection is missing); gains are projected points. FantasyDesk can’t
         change your Sleeper lineup, so make any swap in Sleeper.
       </AppText>
+        </>
+      )}
     </AnimatedCard>
   );
 }

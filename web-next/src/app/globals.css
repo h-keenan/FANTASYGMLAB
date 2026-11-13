@@ -3808,6 +3808,93 @@ main > header:has(> h1.sr-only:only-child) {
   max-width: 42rem;
 }
 
+/* ---- Player card system (components/PlayerCardKit.tsx, docs/player-card.md) ----
+   A nested glass tile: same liquid-glass language as .glass-surface (input
+   glass fill + rim), a position-colored left accent, win/lose emphasis. */
+.player-card {
+  --pc-accent: var(--color-border-strong);
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+  padding: 10px 12px 10px 15px;
+  border-radius: var(--radius-md);
+  background: var(--glass-input-bg);
+  border: 1px solid var(--glass-input-border);
+  overflow: hidden;
+}
+.player-card::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 9px;
+  bottom: 9px;
+  width: 3px;
+  border-radius: 3px;
+  background: var(--pc-accent);
+}
+.player-card[data-emphasis="win"] {
+  background: color-mix(in srgb, var(--color-accent) 9%, var(--glass-input-bg));
+  border-color: color-mix(in srgb, var(--color-accent) 38%, var(--glass-input-border));
+}
+.player-card[data-emphasis="lose"] .player-card-points {
+  color: var(--color-text-muted);
+}
+.player-card[data-unavailable="true"] {
+  border-style: dashed;
+}
+.player-card-progress {
+  position: relative;
+  height: 3px;
+  border-radius: var(--radius-pill);
+  background: var(--color-border);
+  overflow: hidden;
+}
+.player-card-progress > span {
+  position: absolute;
+  inset: 0 auto 0 0;
+  border-radius: inherit;
+  background: var(--color-success);
+  transition: width 0.4s ease-out;
+}
+.player-card-progress[data-final="true"] > span {
+  background: var(--color-text-muted);
+}
+.player-card-pulse {
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  box-shadow: inset 0 0 0 2px var(--color-success);
+  opacity: 0;
+  animation: player-card-pulse 1.4s ease-out 1;
+}
+@keyframes player-card-pulse {
+  0% { opacity: 0.85; }
+  100% { opacity: 0; }
+}
+.tick-number {
+  transition: color 0.9s ease-out;
+}
+.tick-number[data-flash="up"] {
+  color: var(--color-success);
+  transition: none;
+}
+@media (prefers-reduced-motion: reduce) {
+  .player-card-progress > span { transition: none; }
+  .player-card-pulse { animation: none; opacity: 0; }
+}
+.slot-row {
+  border-radius: var(--radius-md);
+}
+.slot-row[data-decides="true"] {
+  background: color-mix(in srgb, var(--color-warning) 7%, transparent);
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--color-warning) 45%, transparent);
+  padding: 4px;
+  margin: -4px;
+}
+
 /* Shared trade piece picker (components/TradePickerSheet.tsx): the pqv sheet
    shell with a fixed-height column layout — header, chips, controls, one
    scrolling list, sticky footer. Bottom sheet on phones, centered dialog from
