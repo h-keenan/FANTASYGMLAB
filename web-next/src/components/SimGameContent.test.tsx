@@ -138,11 +138,11 @@ describe("SimGameContent", () => {
     mocked.listSimGames.mockResolvedValue({ ok: true, reason: "", games: [lite(game())] });
     mocked.getSimInbox.mockResolvedValue({ ok: true, reason: "", items: [] });
     mocked.getSimGameTeam.mockResolvedValue({ ok: true, reason: "", players: [] });
-    mocked.getSimLeague.mockResolvedValueOnce({ ok: true, reason: "wrong_phase", message: "Not available at this stage." }).mockResolvedValue({
+    mocked.getSimLeague.mockResolvedValue({ ok: true, reason: "", teams: [], standings: [] });
+    mocked.getSimLeagueRosters.mockResolvedValueOnce({ ok: true, reason: "wrong_phase", message: "Not available at this stage." }).mockResolvedValue({
       ok: true,
       reason: "",
-      standings: [],
-      teams: [{ team_id: "t2", name: "Rival Rovers", is_you: false, power_rank: 1, persona: { id: "p", label: "Fair", blurb: "b" } }],
+      teams: [{ team_id: "t2", name: "Rival Rovers", is_you: false, power_rank: 1, persona: { id: "p", label: "Fair", blurb: "b" }, record: null, avg_age: 25, roster_size: 0, positions: [], strengths: [], needs: [], surplus: [], top_assets: [], players: [] }],
     });
     render(<SimGameContent />);
     await openFirstGame();

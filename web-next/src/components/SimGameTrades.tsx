@@ -255,7 +255,7 @@ function Builder({ ctx, seed, onSeedUsed }: { ctx: SimCtx; seed: SimTradeSeed | 
   // Every partner's record, top assets, needs and depth from one request (the shared team card's data).
   const rosters = useSimLeagueRosters(gameId, ctx.tick, teamsAttempt);
   const teams = useMemo(() => (rosters.status === "ready" ? rosters.teams.filter((t) => !t.is_you) : null), [rosters]);
-  const teamsError = rosters.status === "error" ? "We could not load the other teams. Check your connection and try again." : null;
+  const teamsError = rosters.status === "error" ? (rosters.message ?? "We could not load the other teams. Check your connection and try again.") : null;
 
   useEffect(() => {
     if (!teamId) return;

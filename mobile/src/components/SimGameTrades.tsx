@@ -283,7 +283,7 @@ function Builder({ ctx, seed, onSeedUsed }: { ctx: SimCtx; seed: SimTradeSeed | 
   // Every partner's record, top assets, needs and depth from one request (the shared team card's data).
   const rosters = useSimLeagueRosters(gameId, ctx.tick, teamsAttempt);
   const teams = useMemo(() => (rosters.status === 'ready' ? rosters.teams.filter((t) => !t.is_you) : null), [rosters]);
-  const teamsFailed = rosters.status === 'error';
+  const teamsFailed = rosters.status === 'error' ? (rosters.message ?? 'Check your connection and try again.') : null;
 
   useEffect(() => {
     if (!teamId) return;
@@ -364,7 +364,7 @@ function Builder({ ctx, seed, onSeedUsed }: { ctx: SimCtx; seed: SimTradeSeed | 
     return <EmptyState icon="lock-closed-outline" title="Trades are closed" subtitle={closed} />;
   }
   if (teamsFailed) {
-    return <ErrorState title="Teams did not load" message="Check your connection and try again." onRetry={() => {
+    return <ErrorState title="Teams did not load" message={teamsFailed} onRetry={() => {
           setTeamsAttempt((n) => n + 1);
         }} />;
   }

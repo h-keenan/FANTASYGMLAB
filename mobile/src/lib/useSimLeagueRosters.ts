@@ -1,12 +1,12 @@
 import { useEffect, useState } from 'react';
 
 import { api } from './api';
-import type { SimLeagueRosterTeam } from './simGame';
+import { simGameReasonMessage, type SimLeagueRosterTeam } from './simGame';
 
 export type SimLeagueRostersState =
   | { status: 'loading' }
   | { status: 'ready'; teams: SimLeagueRosterTeam[] }
-  | { status: 'error' };
+  | { status: 'error'; message?: string };
 
 /**
  * Every team's roster from ONE request (GET /league/rosters): the League tab's Teams and Players views and the
@@ -22,7 +22,7 @@ export function useSimLeagueRosters(gameId: string, tick: number, attempt = 0, e
     api.getSimLeagueRosters(gameId).then(
       (body) => {
         if (cancelled) return;
-        setState({ key, value: body.reason || !body.teams ? { status: 'error' } : { status: 'ready', teams: body.teams } });
+        setState({ key, value: body.reason || !body.teams ? { status: 'error', message: body.reason ? body.message || simGameReasonMessage(body.reason, body) : undefined } : { status: 'ready', teams: body.teams } });
       },
       () => {
         if (!cancelled) setState({ key, value: { status: 'error' } });
