@@ -319,7 +319,7 @@ describe("picks in trades", () => {
   it("the builder's sheet has a Picks group on each side, grouped by year, and toggles pick ids", async () => {
     await openTrades();
     fireEvent.click(await screen.findByRole("tab", { name: "Make an offer" }));
-    fireEvent.click(await screen.findByRole("button", { name: "Trade with Rivals" }));
+    fireEvent.click(await screen.findByRole("button", { name: /Rivals.*Trade with this team/ }));
     // Your side: the sheet has a Picks tab beside the position-filtered players.
     fireEvent.click(await screen.findByRole("button", { name: /^You send/ }));
     let sheet = screen.getByRole("dialog");

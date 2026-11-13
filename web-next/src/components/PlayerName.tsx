@@ -67,10 +67,17 @@ export function PlayerName({
       className={`block min-w-0 max-w-full truncate ${className}`.trim()}
       style={style}
       title={label}
-      aria-label={label}
       data-player-name={short ? "short" : "full"}
     >
-      {short ? shortPlayerName(text) : text}
+      {short && shortPlayerName(text) !== text ? (
+        <>
+          {/* WCAG 2.5.3 Label in Name: sighted users see the short form, assistive tech reads the full name. */}
+          <span aria-hidden="true">{shortPlayerName(text)}</span>
+          <span className="sr-only">{text}</span>
+        </>
+      ) : (
+        text
+      )}
     </Tag>
   );
 }

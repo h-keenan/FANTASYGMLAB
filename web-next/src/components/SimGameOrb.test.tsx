@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, within } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
 import { SimGameOrb } from "./SimGameOrb";
@@ -8,7 +8,7 @@ const base = { tab: "home" as const, offseason: false, inbox: 0, onTab: vi.fn(),
 describe("SimGameOrb", () => {
   it("names the current page and shows the trade-offer badge", () => {
     render(<SimGameOrb {...base} tab="team" inbox={2} />);
-    expect(screen.getByRole("button", { name: "Game menu, Team. 2 trade offers waiting" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Team 2. Game menu, 2 trade offers waiting" })).toBeInTheDocument();
     expect(screen.getByTestId("sim-game-orb-badge")).toHaveTextContent("2");
   });
 
@@ -23,9 +23,9 @@ describe("SimGameOrb", () => {
     fireEvent.click(screen.getByTestId("sim-game-orb"));
     const nav = screen.getByRole("navigation", { name: "Game pages" });
     expect(nav).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /^League/ })).toHaveAttribute("aria-current", "page");
-    expect(screen.getByRole("button", { name: /^Home/ })).not.toHaveAttribute("aria-current");
-    fireEvent.click(screen.getByRole("button", { name: /^Trades/ }));
+    expect(within(nav).getByRole("button", { name: /^League/ })).toHaveAttribute("aria-current", "page");
+    expect(within(nav).getByRole("button", { name: /^Home/ })).not.toHaveAttribute("aria-current");
+    fireEvent.click(within(nav).getByRole("button", { name: /^Trades/ }));
     expect(onTab).toHaveBeenCalledWith("trades");
   });
 
@@ -46,7 +46,8 @@ describe("SimGameOrb", () => {
   it("drops Players in the offseason", () => {
     render(<SimGameOrb {...base} offseason />);
     fireEvent.click(screen.getByTestId("sim-game-orb"));
-    expect(screen.queryByRole("button", { name: /^Players/ })).toBeNull();
-    expect(screen.getByRole("button", { name: /^Offseason/ })).toBeInTheDocument();
+    const nav = screen.getByRole("navigation", { name: "Game pages" });
+    expect(within(nav).queryByRole("button", { name: /^Players/ })).toBeNull();
+    expect(within(nav).getByRole("button", { name: /^Offseason/ })).toBeInTheDocument();
   });
 });

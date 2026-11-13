@@ -30,9 +30,12 @@ describe("PlayerName", () => {
   it("switches to initial + surname when the full name overflows, keeping the full name accessible", () => {
     setWidths(160, 90);
     render(<PlayerName name="Saquon Barkley" />);
-    const el = screen.getByText("S. Barkley");
+    const short = screen.getByText("S. Barkley");
+    expect(short).toHaveAttribute("aria-hidden", "true");
+    const el = short.parentElement as HTMLElement;
     expect(el.getAttribute("title")).toBe("Saquon Barkley");
-    expect(el.getAttribute("aria-label")).toBe("Saquon Barkley");
+    // WCAG 2.5.3: sighted users see the short form, assistive tech reads the full name.
+    expect(screen.getByText("Saquon Barkley")).toHaveClass("sr-only");
     expect(el.className).toContain("truncate");
   });
 

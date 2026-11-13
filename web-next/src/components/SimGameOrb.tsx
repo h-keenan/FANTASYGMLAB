@@ -49,7 +49,7 @@ export function SimGameOrb({
       <div className="game-orb-dock" data-testid="sim-game-orb-dock">
         <button type="button" className="game-orb" onClick={() => setOpen(true)} aria-haspopup="dialog" aria-label={simOrbAriaLabel(currentTab.label, inbox)} data-testid="sim-game-orb">
           <Image src="/brand-mark.png" alt="" width={18} height={18} className="brand-mark-icon" style={{ objectFit: "contain" }} />
-          <span className="game-orb-label" aria-hidden="true">{currentTab.label}</span>
+          <span className="game-orb-label" aria-hidden="true">{currentTab.label}</span>{badge ? " " : null}
           {badge ? <span className="game-orb-badge" aria-hidden="true" data-testid="sim-game-orb-badge">{badge}</span> : null}
         </button>
       </div>

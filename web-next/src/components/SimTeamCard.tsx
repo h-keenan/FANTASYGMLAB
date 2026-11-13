@@ -85,10 +85,10 @@ export function SimTeamCard({
       className="block w-full text-left"
       style={{ minHeight: "var(--touch-target-min)" }}
       aria-pressed={selected || undefined}
-      aria-label={openLabel ?? `${team.name}. Open roster`}
       onClick={() => onOpen(team.team_id)}
     >
       {body}
+      <span className="sr-only">. {openLabel ?? "Open roster"}</span>
     </button>
   );
 }

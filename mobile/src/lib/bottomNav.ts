@@ -95,5 +95,7 @@ export function pathOwnsPhoneChrome(pathname: string | null | undefined): boolea
 /** Accessible name of the game orb: the page you are on, plus pending trade offers. */
 export function simOrbAriaLabel(currentLabel: string, inbox: number | null | undefined): string {
   const n = Math.floor(inbox ?? 0);
-  return n > 0 ? `Game menu, ${currentLabel}. ${n} trade offer${n === 1 ? "" : "s"} waiting` : `Game menu, ${currentLabel}`;
+  // Starts with what the orb shows (the page name, then the badge), matching web (WCAG 2.5.3 Label in Name).
+  const shown = n > 9 ? "9+" : String(n);
+  return n > 0 ? `${currentLabel} ${shown}. Game menu, ${n} trade offer${n === 1 ? "" : "s"} waiting` : `${currentLabel}. Game menu`;
 }
