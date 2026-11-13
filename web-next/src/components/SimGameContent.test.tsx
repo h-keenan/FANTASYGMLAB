@@ -417,10 +417,12 @@ describe("SimGameContent", () => {
       expect(mocked.createSimGame.mock.calls[0][0]).toMatchObject({ teams: 14, scoring: "std", superflex: true, include_def: true, include_k: true });
     });
 
-    it("start from one of my leagues: Sleeper leagues only, hides advanced options, sends league_id", async () => {
+    it("start from one of my leagues: Sleeper leagues only, hides the league-shape options, sends league_id", async () => {
       await openSetup();
       fireEvent.click(screen.getByRole("tab", { name: "My league" }));
-      expect(screen.queryByTestId("sim-advanced")).not.toBeInTheDocument();
+      // The league decides size, scoring and lineup; only the reserve squads stay in Advanced.
+      expect(screen.queryByRole("tablist", { name: "League size" })).not.toBeInTheDocument();
+      expect(screen.queryByRole("tablist", { name: "Scoring" })).not.toBeInTheDocument();
       const pick = await screen.findByRole("combobox", { name: "League to start from" });
       await screen.findByRole("option", { name: "Dynasty Dogs" });
       expect(screen.queryByRole("option", { name: "ESPN Thing" })).not.toBeInTheDocument();

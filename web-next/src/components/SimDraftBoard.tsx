@@ -8,6 +8,7 @@ import { PillRow } from "@/components/PillRow";
 import { PlayerAvatar } from "@/components/PlayerAvatar";
 import { PlayerNameText } from "@/components/PlayerNameText";
 import { PositionBadge } from "@/components/PositionBadge";
+import { SimGeneratedChip } from "@/components/SimGameDynastyParts";
 import { SimDraftGlyph } from "@/components/SimDraftGlyphs";
 import { SimPager, simToneColor, useSimDebounced, useSimWide } from "@/components/SimGameParts";
 import { SkeletonRows } from "@/components/Skeleton";
@@ -27,6 +28,7 @@ import {
   simHeadshotId,
   simPageCount,
   simPlayerInitials,
+  simPlayerIsGenerated,
   type SimGamePlayer,
   type SimPlayerSort,
   type SimPos,
@@ -51,10 +53,13 @@ export function SimDraftRow({
   player,
   onOpen,
   actions,
+  onGeneratedInfo,
 }: {
   player: SimGamePlayer;
   onOpen?: (player: SimGamePlayer) => void;
   actions?: ReactNode;
+  /** Opens the generated-class notice; shows a small chip on simulated rookies. */
+  onGeneratedInfo?: () => void;
 }) {
   const colorVar = positionColorVar(player.pos);
   const chips = simDraftRowChips(player);
@@ -125,6 +130,7 @@ export function SimDraftRow({
             <span aria-hidden="true" style={{ color: "var(--color-text-muted)" }}>-</span>
           )}
         </span>
+        {onGeneratedInfo && simPlayerIsGenerated(player) ? <span className="ml-auto"><SimGeneratedChip label="Generated" onInfo={onGeneratedInfo} inRow /></span> : null}
       </div>
     </div>
   );

@@ -14,6 +14,7 @@ import SegmentedTabBar from './SegmentedTabBar';
 import { SkeletonCard } from './SkeletonBlock';
 import SimCrest from './SimCrest';
 import SimGlyph from './SimGlyph';
+import { SimPickLine, useSimPicks } from './SimGameDynastyParts';
 import { SimPlayerChip, SimPlayerLine, SimPopIn, SimSideLabel, SimStat, SimTeamOpenContext, SimToneBadge, createSimStyles, simToneColor, type SimCtx } from './SimGameParts';
 import ToneBadge from './ToneBadge';
 import { useThemeMode } from '../context/ThemeModeContext';
@@ -21,9 +22,14 @@ import { api } from '../lib/api';
 import { SIM_ASSET_ALL, simFilterGroups, simGroupByPosition, simSideSummary, simTradeFit, type SimAssetGroup } from '../lib/simLayout';
 import {
   SIM_TRADE_EMPTY,
-  SIM_TRADE_MAX_PER_SIDE,
   simFmtPts,
+  simIsPick,
+  simPickGroups,
+  simPickChipText,
+  simPickLabelText,
+  simPicksOf,
   simPositionsFor,
+  simTradeMaxPerSide,
   simTradable,
   simTradeClosedReason,
   simTradeDecisionLabel,
@@ -35,6 +41,7 @@ import {
   type SimGamePlayer,
   type SimInboxItem,
   type SimLeagueTeam,
+  type SimTradeAsset,
   type SimTradeVerdict,
 } from '../lib/simGame';
 import type { ThemeColors } from '../theme';
@@ -52,17 +59,22 @@ function ScoutButton({ teamId, name }: { teamId: string; name: string }) {
   );
 }
 
-function PlayerList({ players }: { players: SimGamePlayer[] }) {
+/** Players and picks in an offer, counter or verdict: a pick renders as a pick row, never as a player. */
+function PlayerList({ players }: { players: SimTradeAsset[] }) {
   return (
     <View>
-      {players.map((p) => (
-        <View key={p.id} style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8, paddingVertical: 4 }}>
-          <View style={{ flex: 1, minWidth: 0 }}>
-            <SimPlayerChip player={p} size={28} quick />
+      {players.map((p) =>
+        simIsPick(p) ? (
+          <SimPickLine key={p.id} pick={p} />
+        ) : (
+          <View key={p.id} style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8, paddingVertical: 4 }}>
+            <View style={{ flex: 1, minWidth: 0 }}>
+              <SimPlayerChip player={p} size={28} quick />
+            </View>
+            <SimStat label="Proj" value={simFmtPts(p.projection)} />
           </View>
-          <SimStat label="Proj" value={simFmtPts(p.projection)} />
-        </View>
-      ))}
+        ),
+      )}
     </View>
   );
 }
@@ -143,7 +155,7 @@ function OfferCard({ item, defaultOpen, busy, canTrade, onRespond }: { item: Sim
   const [open, setOpen] = useState(defaultOpen);
   const give = simSideSummary(item.you_give);
   const get = simSideSummary(item.you_get);
-  const names = (list: SimGamePlayer[]) => list.map((p) => p.name.split(' ').slice(-1)[0]).join(', ');
+  const names = (list: SimTradeAsset[]) => list.map((p) => (simIsPick(p) ? simPickLabelText(p) : p.name.split(' ').slice(-1)[0])).join(', ');
   return (
     <FadeInView>
       <AccentCard accent={colors.premium} compact>
@@ -254,6 +266,8 @@ function Builder({ ctx, seed, onSeedUsed }: { ctx: SimCtx; seed: { partner: stri
   const [side, setSide] = useState<'give' | 'get'>(seed ? 'get' : 'give');
   const closed = simTradeClosedReason(game);
   const teamId = game.you?.team_id;
+  const maxPerSide = simTradeMaxPerSide(game.settings);
+  const picks = useSimPicks(ctx);
 
   useEffect(() => {
     let cancelled = false;
@@ -275,7 +289,7 @@ function Builder({ ctx, seed, onSeedUsed }: { ctx: SimCtx; seed: { partner: stri
     let cancelled = false;
     api
       .getSimGameTeam(gameId, teamId)
-      .then((b) => !cancelled && setMine(b.players ?? []))
+      .then((b) => !cancelled && setMine([...(b.players ?? []), ...(b.ir ?? []), ...(b.taxi ?? [])]))
       .catch(() => {});
     return () => {
       cancelled = true;
@@ -288,7 +302,7 @@ function Builder({ ctx, seed, onSeedUsed }: { ctx: SimCtx; seed: { partner: stri
     let cancelled = false;
     api
       .getSimGameTeam(gameId, partnerId)
-      .then((b) => !cancelled && setPartnerLoaded({ partner: partnerId, players: b.players ?? [] }))
+      .then((b) => !cancelled && setPartnerLoaded({ partner: partnerId, players: [...(b.players ?? []), ...(b.ir ?? []), ...(b.taxi ?? [])] }))
       .catch(() => {});
     return () => {
       cancelled = true;
@@ -300,9 +314,9 @@ function Builder({ ctx, seed, onSeedUsed }: { ctx: SimCtx; seed: { partner: stri
   useEffect(() => {
     if (!seed) return;
     dispatch({ type: 'partner', teamId: seed.partner });
-    if (seed.get) dispatch({ type: 'toggle', side: 'get', id: seed.get });
+    if (seed.get) dispatch({ type: 'toggle', side: 'get', id: seed.get, max: maxPerSide });
     onSeedUsed();
-  }, [seed, onSeedUsed]);
+  }, [seed, onSeedUsed, maxPerSide]);
 
   const key = simTradeKey(draft);
   const verdict = verdictFor && verdictFor.key === key ? verdictFor.verdict : null;
@@ -357,11 +371,16 @@ function Builder({ ctx, seed, onSeedUsed }: { ctx: SimCtx; seed: { partner: stri
   }
   if (!teams) return <SkeletonCard rows={4} />;
 
-  const giveSelected = mine.filter((p) => draft.give.includes(p.id));
-  const getSelected = partnerRoster.filter((p) => draft.get.includes(p.id));
-  const fit = simTradeFit(mine.length, game.settings.roster_limit, giveSelected.length, getSelected.length);
+  // Picks ride in the same id-based draft as players; they take no roster spot.
+  const myPicks = simPicksOf(picks, teamId);
+  const theirPicks = simPicksOf(picks, partner?.team_id);
+  const giveSelected: SimTradeAsset[] = [...mine, ...myPicks].filter((p) => draft.give.includes(p.id));
+  const getSelected: SimTradeAsset[] = [...partnerRoster, ...theirPicks].filter((p) => draft.get.includes(p.id));
+  const fit = simTradeFit(mine.length, game.settings.roster_limit, giveSelected.filter((p) => !simIsPick(p)).length, getSelected.filter((p) => !simIsPick(p)).length);
   const pool = side === 'give' ? mine : partnerRoster;
-  const groups = simGroupByPosition(pool.filter((p) => simTradable(p.pos)), simPositionsFor(game.settings.slots));
+  const groups: SimAssetGroup<SimTradeAsset>[] = simGroupByPosition(pool.filter((p) => simTradable(p.pos)), simPositionsFor(game.settings.slots));
+  const sidePicks = side === 'give' ? myPicks : theirPicks;
+  if (sidePicks.length > 0) groups.push({ key: 'PICK', label: 'Picks', kind: 'pick', items: sidePicks });
 
   return (
     <View style={common.stack}>
@@ -412,8 +431,8 @@ function Builder({ ctx, seed, onSeedUsed }: { ctx: SimCtx; seed: { partner: stri
       {partner ? (
         <>
           <View style={{ flexDirection: 'row', gap: 8 }} accessibilityLabel="Offer">
-            <SideSummary label="You send" tone="danger" active={side === 'give'} onSelect={() => setSide('give')} players={giveSelected} onRemove={(id) => dispatch({ type: 'toggle', side: 'give', id })} />
-            <SideSummary label="You receive" tone="success" active={side === 'get'} onSelect={() => setSide('get')} players={getSelected} onRemove={(id) => dispatch({ type: 'toggle', side: 'get', id })} />
+            <SideSummary label="You send" tone="danger" active={side === 'give'} onSelect={() => setSide('give')} assets={giveSelected} onRemove={(id) => dispatch({ type: 'toggle', side: 'give', id, max: maxPerSide })} />
+            <SideSummary label="You receive" tone="success" active={side === 'get'} onSelect={() => setSide('get')} assets={getSelected} onRemove={(id) => dispatch({ type: 'toggle', side: 'get', id, max: maxPerSide })} />
           </View>
           <AppText style={[common.muted, fit.over ? { color: colors.danger } : null]} testID="trade-fit">
             Your roster after: {fit.after}/{game.settings.roster_limit}
@@ -459,7 +478,9 @@ function Builder({ ctx, seed, onSeedUsed }: { ctx: SimCtx; seed: { partner: stri
           selected={side === 'give' ? draft.give : draft.get}
           verb={side === 'give' ? 'Give' : 'Get'}
           doneVerb={side === 'give' ? 'Giving' : 'Getting'}
-          onToggle={(id) => dispatch({ type: 'toggle', side, id })}
+          onToggle={(id) => dispatch({ type: 'toggle', side, id, max: maxPerSide })}
+          maxPerSide={maxPerSide}
+          draftYear={picks?.draft_year}
           onOpen={ctx.openPlayer}
         />
       ) : null}
@@ -468,10 +489,10 @@ function Builder({ ctx, seed, onSeedUsed }: { ctx: SimCtx; seed: { partner: stri
 }
 
 /** One side of the offer as a compact summary: count, total value and the chosen players (tap the x to remove). */
-function SideSummary({ label, tone, active, onSelect, players, onRemove }: { label: string; tone: 'danger' | 'success'; active: boolean; onSelect: () => void; players: SimGamePlayer[]; onRemove: (id: string) => void }) {
+function SideSummary({ label, tone, active, onSelect, assets, onRemove }: { label: string; tone: 'danger' | 'success'; active: boolean; onSelect: () => void; assets: SimTradeAsset[]; onRemove: (id: string) => void }) {
   const { colors } = useThemeMode();
   const common = useMemo(() => createSimStyles(colors), [colors]);
-  const sum = simSideSummary(players);
+  const sum = simSideSummary(assets);
   const color = simToneColor(tone, colors);
   return (
     <View
@@ -487,15 +508,23 @@ function SideSummary({ label, tone, active, onSelect, players, onRemove }: { lab
           {sum.count} <AppText style={common.muted}>· value {sum.value}</AppText>
         </AppText>
       </Pressable>
-      {players.length === 0 ? (
+      {assets.length === 0 ? (
         <AppText style={[common.muted, { fontStyle: 'italic' }]}>Tap to add</AppText>
       ) : (
-        players.map((p) => (
+        assets.map((p) => (
           <View key={p.id} style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
             <View style={{ flex: 1, minWidth: 0 }}>
-              <SimPlayerChip player={p} size={20} quick hidePosition />
+              {simIsPick(p) ? (
+                <View style={common.row} testID="pick-chip">
+                  <AppText style={[common.bodyStrong, common.grow]} numberOfLines={1} accessibilityLabel={simPickLabelText(p)}>
+                    {simPickChipText(p)}
+                  </AppText>
+                </View>
+              ) : (
+                <SimPlayerChip player={p} size={20} quick hidePosition />
+              )}
             </View>
-            <Pressable onPress={() => onRemove(p.id)} accessibilityRole="button" accessibilityLabel={`Remove ${p.name}`} hitSlop={8} style={{ minWidth: 28, minHeight: 44, alignItems: 'center', justifyContent: 'center' }}>
+            <Pressable onPress={() => onRemove(p.id)} accessibilityRole="button" accessibilityLabel={`Remove ${simIsPick(p) ? simPickLabelText(p) : p.name}`} hitSlop={8} style={{ minWidth: 44, minHeight: 44, alignItems: 'center', justifyContent: 'center' }}>
               <AppText style={{ fontSize: 16, fontWeight: '700', color: colors.textTertiary }}>×</AppText>
             </Pressable>
           </View>
@@ -508,10 +537,11 @@ function SideSummary({ label, tone, active, onSelect, players, onRemove }: { lab
 /**
  * The trade picker: position chips (plus any other group, e.g. a future
  * "Picks"), a search box and the roster in collapsible groups, not one flat
- * list. Groups are generic (kind: 'player' | 'pick'), so draft picks slot in
- * as another group without changing this component.
+ * list. Groups are generic (kind: 'player' | 'pick'): dynasty games add a
+ * Picks group per side, listed by year and round with each pick's value.
+ * A side stops at maxPerSide assets (players and picks together).
  */
-function AssetPicker({ label, groups, selected, verb, doneVerb, onToggle, onOpen }: { label: string; groups: SimAssetGroup<SimGamePlayer>[]; selected: string[]; verb: string; doneVerb: string; onToggle: (id: string) => void; onOpen: (p: SimGamePlayer) => void }) {
+function AssetPicker({ label, groups, selected, verb, doneVerb, maxPerSide, draftYear, onToggle, onOpen }: { label: string; groups: SimAssetGroup<SimTradeAsset>[]; selected: string[]; verb: string; doneVerb: string; maxPerSide: number; draftYear?: number | null; onToggle: (id: string) => void; onOpen: (p: SimGamePlayer) => void }) {
   const { colors } = useThemeMode();
   const common = useMemo(() => createSimStyles(colors), [colors]);
   const [filter, setFilter] = useState(SIM_ASSET_ALL);
@@ -519,13 +549,14 @@ function AssetPicker({ label, groups, selected, verb, doneVerb, onToggle, onOpen
   const [toggled, setToggled] = useState<Record<string, boolean>>({});
   const shown = simFilterGroups(groups, filter, search);
   const single = filter !== SIM_ASSET_ALL || search.trim() !== '';
+  const full = selected.length >= maxPerSide;
   return (
     <View style={common.stack} accessibilityLabel={label}>
-      <SectionHeading title={label} caption={`Up to ${SIM_TRADE_MAX_PER_SIDE}. ${selected.length} selected.`} />
+      <SectionHeading title={label} caption={`Up to ${maxPerSide}. ${selected.length} selected.`} />
       <SegmentedTabBar<string> scrollable options={[{ key: SIM_ASSET_ALL, label: 'All' }, ...groups.map((g) => ({ key: g.key, label: g.label }))]} active={filter} onChange={setFilter} />
       <Input value={search} onChangeText={setSearch} placeholder="Search players" accessibilityLabel="Search players" returnKeyType="search" autoCorrect={false} autoCapitalize="none" clearButtonMode="while-editing" />
       {shown.length === 0 ? (
-        <AppText style={common.muted}>{search ? 'No matching players.' : 'No tradable players here.'}</AppText>
+        <AppText style={common.muted}>{search ? 'No matching players or picks.' : 'No tradable players here.'}</AppText>
       ) : (
         shown.map((group, index) => {
           const open = toggled[group.key] ?? (single || index === 0);
@@ -548,8 +579,29 @@ function AssetPicker({ label, groups, selected, verb, doneVerb, onToggle, onOpen
               </Pressable>
               {open ? (
                 <View style={{ paddingHorizontal: 8, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.border }}>
-                  {group.items.map((p) => {
+                  {group.kind === 'pick'
+                    ? simPickGroups(group.items.filter(simIsPick)).map((year) => (
+                        <View key={year.season}>
+                          <AppText style={[common.small, common.bodyStrong, { paddingTop: 4 }]}>{year.season}</AppText>
+                          {year.rounds
+                            .flatMap((r) => r.picks)
+                            .map((pick) => {
+                              const on = selected.includes(pick.id);
+                              return (
+                                <SimPickLine
+                                  key={pick.id}
+                                  pick={pick}
+                                  selected={on}
+                                  draftYear={draftYear}
+                                  trailing={<Button size="sm" variant={on ? 'primary' : 'secondary'} label={on ? doneVerb : verb} disabled={!on && full} onPress={() => onToggle(pick.id)} />}
+                                />
+                              );
+                            })}
+                        </View>
+                      ))
+                    : group.items.map((p) => {
                     const on = selected.includes(p.id);
+                    if (simIsPick(p)) return null;
                     return (
                       <SimPlayerLine
                         key={p.id}
@@ -560,7 +612,7 @@ function AssetPicker({ label, groups, selected, verb, doneVerb, onToggle, onOpen
                         trailing={
                           <>
                             <SimStat label="Value" value={Math.round(p.value)} />
-                            <Button size="sm" variant={on ? 'primary' : 'secondary'} label={on ? doneVerb : verb} onPress={() => onToggle(p.id)} />
+                            <Button size="sm" variant={on ? 'primary' : 'secondary'} label={on ? doneVerb : verb} disabled={!on && full} onPress={() => onToggle(p.id)} />
                           </>
                         }
                       />

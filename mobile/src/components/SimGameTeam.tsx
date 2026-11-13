@@ -12,8 +12,10 @@ import SimGlyph from './SimGlyph';
 import { ReviewGlyphChip } from './SeasonReviewSections';
 import SegmentedTabBar from './SegmentedTabBar';
 import { SkeletonCard } from './SkeletonBlock';
+import { SimPickLine, SimPlayerChips, useSimPicks } from './SimGameDynastyParts';
 import { SimPlayerBrowser } from './SimGamePlayers';
-import { SimIconButton, SimPlayerChip, SimPlayerLine, SimSectionTitle, SimSheet, SimStat, SimTeamLink, SimToneBadge, createSimStyles, simToneColor, type SimCtx } from './SimGameParts';
+import { SimReserveButton, SimReserveGroups, SimReserveSheet } from './SimGameReserves';
+import { SimFold, SimIconButton, SimPlayerChip, SimPlayerLine, SimSectionTitle, SimSheet, SimStat, SimTeamLink, SimToneBadge, createSimStyles, simToneColor, type SimCtx } from './SimGameParts';
 import { useThemeMode } from '../context/ThemeModeContext';
 import { api } from '../lib/api';
 import {
@@ -27,13 +29,18 @@ import {
   simMatchupLine,
   simMatchupTone,
   simNeedsDrop,
+  simPicksOf,
+  simPicksSummaryLine,
+  simPickGroups,
   simPositionsFor,
+  simReservesOn,
   simSlotAccepts,
   simSlotCandidates,
   simSlotLabels,
   simWarningText,
   type SimGamePlayer,
   type SimLineupResponse,
+  type SimPickAsset,
   type SimSlot,
   type SimWaiverClaim,
 } from '../lib/simGame';
@@ -51,6 +58,8 @@ export function SimTeamTab({ ctx, onTrade }: { ctx: SimCtx; onTrade: () => void 
   const [cutting, setCutting] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [attempt, setAttempt] = useState(0);
+  const [moving, setMoving] = useState<SimGamePlayer | null>(null);
+  const picks = useSimPicks(ctx);
 
   useEffect(() => {
     let cancelled = false;
@@ -140,6 +149,9 @@ export function SimTeamTab({ ctx, onTrade }: { ctx: SimCtx; onTrade: () => void 
   const warnings = lineup.warnings ?? [];
   const playerById = Object.fromEntries([...slots.map((s) => s.player), ...bench].filter(Boolean).map((p) => [p!.id, p!]));
   const candidates = pickSlot != null ? simSlotCandidates(slots[pickSlot].slot, slots, bench) : [];
+  const reservesOn = simReservesOn(game.settings, lineup.reserves);
+  const reserveState = { reserves: lineup.reserves, rosterSize: lineup.roster_size, rosterLimit: lineup.roster_limit };
+  const myPicks = simPicksOf(picks, game.you?.team_id);
 
   return (
     <View style={common.stack}>
@@ -196,11 +208,11 @@ export function SimTeamTab({ ctx, onTrade }: { ctx: SimCtx; onTrade: () => void 
           right={
             <Pressable
               onPress={auto}
-              disabled={saving}
+              disabled={saving || lineup.locked}
               accessibilityRole="button"
               accessibilityLabel="Auto-set best lineup"
-              accessibilityState={{ disabled: saving, busy: saving }}
-              style={{ flexDirection: 'row', alignItems: 'center', gap: 6, minHeight: 36, paddingHorizontal: spacing.md, borderRadius: radii.pill, borderWidth: 1, borderColor: colors.borderStrong ?? colors.border, opacity: saving ? 0.6 : 1 }}
+              accessibilityState={{ disabled: saving || lineup.locked, busy: saving }}
+              style={{ flexDirection: 'row', alignItems: 'center', gap: 6, minHeight: 36, paddingHorizontal: spacing.md, borderRadius: radii.pill, borderWidth: 1, borderColor: colors.borderStrong ?? colors.border, opacity: saving || lineup.locked ? 0.6 : 1 }}
             >
               <SimGlyph name="spark" color={colors.accent} size={14} />
               <AppText style={{ fontSize: 12.5, fontWeight: '800', color: colors.textPrimary }}>{saving ? 'Setting...' : 'Auto-set'}</AppText>
@@ -208,7 +220,7 @@ export function SimTeamTab({ ctx, onTrade }: { ctx: SimCtx; onTrade: () => void 
           }
         />
         {slots.map((slot, index) => (
-          <LineupRow key={`${slot.slot}-${index}`} slotLabel={labels[index]} slot={slot.slot} player={slot.player} onOpen={ctx.openPlayer} onPick={() => setPickSlot(index)} />
+          <LineupRow key={`${slot.slot}-${index}`} slotLabel={labels[index]} slot={slot.slot} player={slot.player} locked={lineup.locked} onOpen={ctx.openPlayer} onPick={() => setPickSlot(index)} onMove={reservesOn && slot.player?.status === 'out' ? setMoving : undefined} />
         ))}
       </View>
 
@@ -223,6 +235,7 @@ export function SimTeamTab({ ctx, onTrade }: { ctx: SimCtx; onTrade: () => void 
               player={player}
               muted
               onOpen={ctx.openPlayer}
+              extra={<SimPlayerChips player={player} />}
               trailing={
                 cutting === player.id ? (
                   <>
@@ -232,6 +245,7 @@ export function SimTeamTab({ ctx, onTrade }: { ctx: SimCtx; onTrade: () => void 
                 ) : (
                   <>
                     <SimStat label="Proj" value={simFmtPts(player.projection)} />
+                    {reservesOn ? <SimReserveButton player={player} onOpen={setMoving} /> : null}
                     <Button size="sm" variant={overLimit ? 'dangerOutline' : 'ghost'} label="Cut" onPress={() => setCutting(player.id)} />
                   </>
                 )
@@ -240,7 +254,25 @@ export function SimTeamTab({ ctx, onTrade }: { ctx: SimCtx; onTrade: () => void 
           ))
         )}
         {game.can_trade ? <Button size="sm" variant="ghost" label="Shop a trade" onPress={onTrade} style={styles.shop} /> : null}
+        {reservesOn ? <SimReserveGroups ir={lineup.ir ?? []} taxi={lineup.taxi ?? []} state={reserveState} onOpen={setMoving} openPlayer={ctx.openPlayer} /> : null}
+        {game.settings.mode === 'dynasty' && picks ? <SimYourPicks picks={myPicks} draftYear={picks.draft_year} /> : null}
       </View>
+
+      {moving ? (
+        <SimReserveSheet
+          ctx={ctx}
+          player={moving}
+          state={reserveState}
+          onClose={() => setMoving(null)}
+          onMoved={(body, player, to) => {
+            setMoving(null);
+            setLineup(body);
+            ctx.notify(`${player.name} ${to === 'ir' ? 'is on IR' : to === 'taxi' ? 'is on the taxi squad' : 'is back on your roster'}.`, 'success');
+            ctx.bump();
+            void refreshGame();
+          }}
+        />
+      ) : null}
 
       {pickSlot != null ? (
         <SimSheet title={`Choose your ${labels[pickSlot]}`} onClose={() => setPickSlot(null)}>
@@ -285,6 +317,31 @@ export function SimTeamTab({ ctx, onTrade }: { ctx: SimCtx; onTrade: () => void 
         </SimSheet>
       ) : null}
     </View>
+  );
+}
+
+/** "Your picks": the shared fold (closed on phones), one summary line, then your picks by year and round. */
+export function SimYourPicks({ picks, draftYear }: { picks: SimPickAsset[]; draftYear?: number | null }) {
+  const { colors } = useThemeMode();
+  const common = useMemo(() => createSimStyles(colors), [colors]);
+  const groups = simPickGroups(picks);
+  return (
+    <SimFold id="team.picks" glyph="league" title="Your picks" summary={<AppText style={common.muted}>{simPicksSummaryLine(picks)}</AppText>} testID="your-picks">
+      {groups.length === 0 ? (
+        <AppText style={common.muted}>You hold no draft picks. Trade for some on the Trades tab.</AppText>
+      ) : (
+        groups.map((group) => (
+          <View key={group.season}>
+            <AppText style={[common.small, { fontWeight: '700', paddingTop: spacing.xs }]}>{group.season}</AppText>
+            {group.rounds
+              .flatMap((r) => r.picks)
+              .map((pick) => (
+                <SimPickLine key={pick.id} pick={pick} draftYear={draftYear} />
+              ))}
+          </View>
+        ))
+      )}
+    </SimFold>
   );
 }
 
@@ -474,7 +531,7 @@ function createStyles(colors: ThemeColors) {
  * Change / Fill control. The player's own position shows only where the slot
  * does not already say it (FLEX, SUPERFLEX), as a small dot + label in the subline.
  */
-function LineupRow({ slotLabel, slot, player, onOpen, onPick }: { slotLabel: string; slot: SimSlot; player: SimGamePlayer | null; onOpen: (p: SimGamePlayer) => void; onPick: () => void }) {
+function LineupRow({ slotLabel, slot, player, locked, onOpen, onPick, onMove }: { slotLabel: string; slot: SimSlot; player: SimGamePlayer | null; locked?: boolean; onOpen: (p: SimGamePlayer) => void; onPick: () => void; onMove?: (p: SimGamePlayer) => void }) {
   const { colors, isDark } = useThemeMode();
   const showPos = player ? !simSlotRepeatsPosition(slot, player.pos) : false;
   const posColor = player ? positionColor(player.pos, isDark, colors.textSecondary) : colors.textSecondary;
@@ -516,7 +573,8 @@ function LineupRow({ slotLabel, slot, player, onOpen, onPick }: { slotLabel: str
         <AppText style={{ flex: 1, fontSize: 13, color: colors.warning }}>Empty slot</AppText>
       )}
       <AppText style={{ width: 44, textAlign: 'right', fontSize: 14, fontWeight: '800', color: colors.textPrimary }}>{player ? simFmtPts(player.projection) : ''}</AppText>
-      <SimIconButton label={player ? `Change ${slotLabel}` : `Fill ${slotLabel}`} primary={!player} glyph={player ? 'trade' : 'check'} onPress={onPick} />
+      {onMove && player ? <SimReserveButton player={player} onOpen={onMove} /> : null}
+      <SimIconButton disabled={locked} label={player ? `Change ${slotLabel}` : `Fill ${slotLabel}`} primary={!player} glyph={player ? 'trade' : 'check'} onPress={onPick} />
     </View>
   );
 }

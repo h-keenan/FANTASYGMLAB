@@ -10,6 +10,7 @@ import PositionBadge from './PositionBadge';
 import SectionHeading from './SectionHeading';
 import SegmentedTabBar from './SegmentedTabBar';
 import { SkeletonCard } from './SkeletonBlock';
+import { SimDynastyResult } from './SimGameDynasty';
 import { SimStandingsList } from './SimGameLeague';
 import { SimPlayerChip, SimPlayerLine, SimPopIn, SimStat, SimToneBadge, createSimStyles, simToneColor, type SimCtx } from './SimGameParts';
 import { SeasonReviewSections, ReviewDeltaText, ReviewGlyphChip, REVIEW_ICON } from './SeasonReviewSections';
@@ -22,6 +23,7 @@ import {
   simGameReasonMessage,
   simSlotRepeatsPosition,
   simGradeTone,
+  simIsDynastyResult,
   simPlayoffOutcomeTone,
   simPlayoffResultLabel,
   simPlayoffRoundLabel,
@@ -200,7 +202,7 @@ export function SimWeekRecapView({
         </View>
       ) : null}
 
-      {!last ? <Button label="Next round" onPress={onNext} /> : <Button label={recap.season_complete ? 'See your final grade' : 'Back to your team'} onPress={onClose} />}
+      {!last ? <Button label="Next round" onPress={onNext} /> : <Button label={recap.season_complete ? (ctx.game.status === 'offseason' ? 'Go to the offseason' : ctx.game.settings.mode === 'dynasty' ? 'See your dynasty review' : 'See your final grade') : 'Back to your team'} onPress={onClose} />}
     </View>
   );
 }
@@ -261,7 +263,9 @@ export function SimFinalView({ ctx, onNewGame, onHub }: { ctx: SimCtx; onNewGame
   }
 
   const view = normalizeSimResult(result);
-  const sections = buildSimReviewSections({ decisions: view.decisions, review: result.review, components: result.grade?.components });
+  // A dynasty result has no grade and no review (both null): the summary stands in their place.
+  const dynasty = simIsDynastyResult(result);
+  const sections = dynasty ? [] : buildSimReviewSections({ decisions: view.decisions, review: result.review, components: result.grade?.components });
   const tone = simGradeTone(view.letter);
   const toneColor = simToneColor(tone, colors);
   const mine = view.mine;
@@ -281,6 +285,7 @@ export function SimFinalView({ ctx, onNewGame, onHub }: { ctx: SimCtx; onNewGame
   });
   return (
     <View style={common.stack} testID="final-result">
+      {dynasty ? <SimDynastyResult summary={result.dynasty} onNewGame={onNewGame} onHub={onHub} /> : (
       <AccentCard accent={toneColor} glow>
         <AppText style={styles.kicker}>Season in review</AppText>
         <SimPopIn style={common.row}>
@@ -310,9 +315,10 @@ export function SimFinalView({ ctx, onNewGame, onHub }: { ctx: SimCtx; onNewGame
           <Button label="Share your season" variant="secondary" onPress={() => setSharing(true)} />
         </View>
       </AccentCard>
+      )}
 
-      <SegmentedTabBar options={SIM_REVIEW_VIEWS.map((v) => ({ key: v.value, label: v.label, glyph: v.glyph }))} active={tab} onChange={setTab} />
-      {tab === 'standings' ? (
+      {dynasty ? null : <SegmentedTabBar options={SIM_REVIEW_VIEWS.map((v) => ({ key: v.value, label: v.label, glyph: v.glyph }))} active={tab} onChange={setTab} />}
+      {dynasty || tab === 'standings' ? (
         <View style={common.stack} accessibilityLabel="Final standings">
           <SectionHeading title="Final standings" icon="analytics-outline" />
           {view.standings.map((row, i) => (
@@ -337,7 +343,7 @@ export function SimFinalView({ ctx, onNewGame, onHub }: { ctx: SimCtx; onNewGame
       <AppText style={common.muted}>
         A game, not a forecast. Season {game.settings.regular_weeks} weeks plus playoffs against AI managers; nothing here touches your real leagues.
       </AppText>
-      <SimReviewShareModal visible={sharing} onClose={() => setSharing(false)} model={shareModel} sections={sections} />
+      {dynasty ? null : <SimReviewShareModal visible={sharing} onClose={() => setSharing(false)} model={shareModel} sections={sections} />}
     </View>
   );
 }
