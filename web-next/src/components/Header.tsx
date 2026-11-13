@@ -346,9 +346,10 @@ function HeaderPageTitle() {
   if (!title) return null;
   return (
     <span className="flex items-center shrink-0">
-      <span className="text-xs font-bold uppercase leading-tight whitespace-nowrap" style={{ color: "var(--color-text-muted)", letterSpacing: "0.03em" }}>
+      {/* The page's name is its h1 (some pages render only a header title; axe page-has-heading-one). */}
+      <h1 className="text-xs font-bold uppercase leading-tight whitespace-nowrap" style={{ color: "var(--color-text-muted)", letterSpacing: "0.03em" }}>
         {title}
-      </span>
+      </h1>
       {/* Pages portal their "?" explainer here (PageTitle `info`). */}
       <span id={PAGE_INFO_SLOT_ID} className="inline-flex" />
     </span>

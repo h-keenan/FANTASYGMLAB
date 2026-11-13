@@ -44,7 +44,7 @@ describe("league Teams view (shared team card)", () => {
     expect(cards[0]).toHaveTextContent("OVR 78");
     expect(cards[1]).toHaveTextContent("Bench Mob");
     expect(cards[1]).toHaveTextContent("OVR 91");
-    fireEvent.click(screen.getByRole("button", { name: "Bench Mob. Open roster" }));
+    fireEvent.click(screen.getByRole("button", { name: /Bench Mob.*Open roster/ }));
     expect(c.openTeam).toHaveBeenCalledWith("1");
   });
 
@@ -89,7 +89,7 @@ describe("league Players view (find a player, position by position)", () => {
     fireEvent.click(screen.getByRole("button", { name: "Owned by Goal Line Gamblers. Open team" }));
     expect(c.openTeam).toHaveBeenCalledWith("2");
     expect(c.openPlayer).not.toHaveBeenCalled();
-    fireEvent.click(screen.getByRole("button", { name: /Wes Wide, WR\. Open player details/ }));
+    fireEvent.click(screen.getByRole("button", { name: /Wes Wide.*Open player details/ }));
     expect(c.openPlayer).toHaveBeenCalledTimes(1);
     fireEvent.change(screen.getByLabelText("Find a player"), { target: { value: "zzz" } });
     expect(screen.getByText("No one matches")).toBeInTheDocument();

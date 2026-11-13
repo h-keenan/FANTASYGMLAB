@@ -250,7 +250,7 @@ function GateCard({ onCta }: { onCta: (cta: TradeCta) => void }) {
           <li key={feature.cta} className="flex gap-2 text-sm">
             <span
               className="mt-0.5 inline-flex h-5 shrink-0 items-center px-1.5 text-[0.65rem] font-bold uppercase"
-              style={{ background: "var(--color-accent-soft, var(--color-surface-muted))", color: "var(--color-accent)", borderRadius: "var(--radius-pill)" }}
+              style={{ background: "var(--color-accent-soft, var(--color-surface-muted))", color: "color-mix(in srgb, var(--color-accent) 75%, var(--color-text-primary))", borderRadius: "var(--radius-pill)" }}
             >
               Free account
             </span>

@@ -267,7 +267,7 @@ function RecommendedRow({ player, rank, showDivider }: { player: WaiverPriorityA
       type="button"
       onClick={() => openPlayer({ ...player, sourceLabel: "Waivers" })}
       aria-label={`Open ${player.name || "player"}`}
-      className="appearance-none bg-transparent border-0 p-0 m-0 text-left cursor-pointer w-full flex flex-col gap-1.5 py-2.5"
+      className="appearance-none bg-transparent border-0 p-0 m-0 text-left cursor-pointer w-full flex flex-col gap-1.5 py-2.5 min-h-[var(--touch-target-min)]"
     >
       {/* Name line first at full width so names never truncate; value, ring,
           bid and the chevron share the second line. */}

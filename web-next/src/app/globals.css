@@ -1115,6 +1115,7 @@ a {
    third copy. */
 .filter-input,
 .filter-select {
+  min-height: var(--touch-target-min);
   background: var(--color-surface-primary);
   border: var(--border-width-default) solid var(--color-border);
   color: var(--color-text-primary);

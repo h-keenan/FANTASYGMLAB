@@ -48,6 +48,8 @@ export function SimActionBar({ ctx, paywalled, advancing, onAdvance, onSimTo, on
     }
   };
   const reasonId = "sim-advance-reason";
+  // The accessible name starts with the visible text (WCAG 2.5.3), then adds the plain-language detail.
+  const advanceText = confirming ? "Advance anyway" : game.phase === "playoffs" ? "Play round" : `Advance ${state.label}`;
   return (
     <div className="sim-action-bar action-pill md:sticky md:inset-x-auto md:bottom-4 md:mx-auto md:flex md:w-full md:items-center md:justify-between md:gap-4 md:px-4 md:py-2" data-testid="sim-action-bar">
       {confirming && state.confirm && !paywalled ? (
@@ -91,8 +93,8 @@ export function SimActionBar({ ctx, paywalled, advancing, onAdvance, onSimTo, on
         {paywalled ? (
           <ButtonLink href="/premium" variant="premium" size="sm">Go Pro to continue</ButtonLink>
         ) : (
-          <Button className="min-w-0 max-md:w-full" loading={advancing} disabled={state.blocked} onClick={tapAdvance} aria-label={simAdvanceLabel(game)} aria-describedby={state.reason ? reasonId : undefined}>
-            {confirming ? "Advance anyway" : game.phase === "playoffs" ? "Play round" : `Advance ${state.label}`}
+          <Button className="min-w-0 max-md:w-full" loading={advancing} disabled={state.blocked} onClick={tapAdvance} aria-label={`${advanceText}. ${simAdvanceLabel(game)}`} aria-describedby={state.reason ? reasonId : undefined}>
+            {advanceText}
           </Button>
         )}
       </div>

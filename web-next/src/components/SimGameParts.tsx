@@ -206,13 +206,13 @@ export function SimPlayerChip({
       type="button"
       className="block min-w-0 text-left"
       style={{ minHeight: "var(--touch-target-min)" }}
-      aria-label={`${player.name}, ${player.pos}. Open player details`}
       onClick={(event) => {
         event.stopPropagation();
         handler(player as SimGamePlayer);
       }}
     >
       {body}
+      <span className="sr-only">. Open player details</span>
     </button>
   );
 }
@@ -268,7 +268,7 @@ export function SimPlayerLine({
       actions={trailing}
       selected={selected}
       onOpen={onOpen ? () => onOpen(player) : undefined}
-      openLabel={`${player.name}, ${player.pos}. Open player details`}
+      openLabel="Open player details"
     />
   );
 }
@@ -594,9 +594,9 @@ export function SimTeamLink({
       onClick={() => open(teamId)}
       className={`tap-link inline-flex min-w-0 ${layout} ${stacked ? "" : "text-left"} ${className}`}
       style={{ minHeight: "var(--touch-target-min)" }}
-      aria-label={`${name}${isYou ? " (you)" : ""}. Open team`}
     >
       {body}
+      <span className="sr-only">. Open team</span>
     </button>
   );
 }
@@ -739,8 +739,9 @@ export function SimMiniPlayer({
   );
   if (!onOpen) return <span className="block min-w-0">{body}</span>;
   return (
-    <button type="button" className="block w-full min-w-0 text-left" onClick={() => onOpen(player)} aria-label={`${player.name}, ${player.pos}. Open player details`}>
+    <button type="button" className="block w-full min-w-0 text-left" onClick={() => onOpen(player)}>
       {body}
+      <span className="sr-only">. Open player details</span>
     </button>
   );
 }

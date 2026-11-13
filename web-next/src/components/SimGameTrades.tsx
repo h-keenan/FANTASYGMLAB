@@ -159,7 +159,6 @@ function OfferCard({ item, index, count, defaultOpen, busy, canTrade, onRespond 
           className="flex w-full flex-col gap-1 text-left"
           style={{ minHeight: "var(--touch-target-min)" }}
           aria-expanded={open}
-          aria-label={`Offer from ${item.from.name}`}
           onClick={() => setOpen((v) => !v)}
         >
           <span className="flex items-center justify-between gap-2">
@@ -383,7 +382,7 @@ function Builder({ ctx, seed, onSeedUsed }: { ctx: SimCtx; seed: SimTradeSeed | 
           <ul className="flex flex-col gap-2" aria-label="Teams">
             {teamOptions.map((team) => (
               <li key={team.team_id}>
-                <SimTeamCard team={team} valueMode="trade" openLabel={`Trade with ${team.name}`} onOpen={(id) => dispatch({ type: "partner", teamId: id })} />
+                <SimTeamCard team={team} valueMode="trade" openLabel="Trade with this team" onOpen={(id) => dispatch({ type: "partner", teamId: id })} />
               </li>
             ))}
           </ul>

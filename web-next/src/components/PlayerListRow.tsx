@@ -88,11 +88,11 @@ function StatPill({ stat }: { stat: PlayerListStat }) {
   // explained on tap with the registry's OVR copy. Never a plain number pill.
   if (stat.rating != null) {
     return (
-      <TapForWhy metric="ovr" spoken={`Overall ${stat.rating}`}>
+      <TapForWhy metric="ovr" spoken={`OVR ${stat.rating}, overall rating`}>
         <span className="inline-flex items-center gap-1" data-stat={stat.key}>
-          <span className="text-[0.6875rem] font-bold uppercase" style={{ color: "var(--color-text-muted)", letterSpacing: "0.04em" }}>
+          <span className="text-[0.6875rem] font-bold uppercase" style={{ color: "var(--color-text-secondary)", letterSpacing: "0.04em" }}>
             {stat.label}
-          </span>
+          </span>{" "}
           <OvrGauge rating={stat.rating} size="sm" />
         </span>
       </TapForWhy>
@@ -104,9 +104,9 @@ function StatPill({ stat }: { stat: PlayerListStat }) {
       style={{ background: "var(--glass-input-bg)" }}
       data-stat={stat.key}
     >
-      <span className="text-[0.6875rem] font-bold uppercase" style={{ color: "var(--color-text-muted)", letterSpacing: "0.04em" }}>
+      <span className="text-[0.6875rem] font-bold uppercase" style={{ color: "var(--color-text-secondary)", letterSpacing: "0.04em" }}>
         {stat.label}
-      </span>
+      </span>{" "}
       <span className="text-xs font-bold" style={{ color: stat.tone ? TONE_COLOR[stat.tone] : "var(--color-text-primary)" }}>
         {stat.value}
       </span>
@@ -200,9 +200,9 @@ export function PlayerListRow({
     >
       <div className="flex items-center justify-between gap-1.5">
         {onOpen ? (
-          <button type="button" onClick={onOpen} className="flex min-w-0 flex-1 items-center text-left" style={{ minHeight: dims.minHeight }} aria-label={openLabel ?? `${name}${position ? `, ${position}` : ""}. Open player details`}>
+          <button type="button" onClick={onOpen} className="flex min-w-0 flex-1 items-center text-left" style={{ minHeight: dims.minHeight }}>
             {identity}
-          </button>
+          <span className="sr-only">. {openLabel ?? "Open player details"}</span></button>
         ) : (
           identity
         )}

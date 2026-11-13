@@ -85,7 +85,7 @@ export function SimDraftRow({
       done={drafted}
       onSimInfo={onGeneratedInfo && simPlayerIsGenerated(player) ? onGeneratedInfo : undefined}
       onOpen={onOpen ? () => onOpen(player) : undefined}
-      openLabel={`${player.name}, ${player.pos}. Open player details`}
+      openLabel="Open player details"
     />
   );
 }

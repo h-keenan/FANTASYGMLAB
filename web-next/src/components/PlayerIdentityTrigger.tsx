@@ -39,7 +39,7 @@ export function PlayerIdentityTrigger({
         event.stopPropagation();
         openPlayer(identity);
       }}
-      className={`appearance-none bg-transparent border-0 p-0 m-0 text-left cursor-pointer min-w-0 ${className}`.trim()}
+      className={`appearance-none bg-transparent border-0 p-0 m-0 text-left cursor-pointer min-w-0 min-h-[var(--touch-target-min)] ${className}`.trim()}
     >
       {children}
     </button>

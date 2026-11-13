@@ -67,7 +67,7 @@ export function EventTypePill({
       style={{
         borderRadius: "var(--radius-pill)",
         background: `color-mix(in srgb, ${color} var(--chip-fill-pct, 15%), transparent)`,
-        color,
+        color: `color-mix(in srgb, ${color} 80%, var(--color-text-primary))`,
         letterSpacing: "var(--letter-spacing-badge)",
       }}
     >
