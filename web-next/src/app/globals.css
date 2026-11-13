@@ -673,6 +673,15 @@ body {
   background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.05) 45%, rgba(255, 255, 255, 0.1) 50%, rgba(255, 255, 255, 0.05) 55%, transparent);
   animation: onboarding-sweep 9s ease-in-out infinite;
 }
+/* Perf audit 2026-11: the viewport-sized field animates background-position (a repaint every frame) and the beam moves
+   a 140%-tall layer; measured ~0.5 s of main-thread time per 5 s idle at 4x CPU throttle on a 390px phone. People who
+   ask for reduced motion (and low-power modes that set it) get the static texture, with no animation cost at all. */
+@media (prefers-reduced-motion: reduce) {
+  .app-background-field,
+  .app-background-sweep {
+    animation: none;
+  }
+}
 @media (prefers-color-scheme: light) {
   :where(:root:not([data-theme="dark"])) .app-background-field {
     opacity: 0.5;
