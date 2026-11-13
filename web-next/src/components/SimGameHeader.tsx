@@ -1,5 +1,6 @@
 "use client";
 
+import type { ReactNode } from "react";
 import { SimCrest } from "@/components/SimCrest";
 import { SimGlyph } from "@/components/SimGlyph";
 import { simStatusChips, simCompactSeason, simCompactWeek } from "@/lib/bottomNav";
@@ -18,7 +19,7 @@ const ICON_STYLE = { width: "var(--touch-target-min)", height: "var(--touch-targ
  * overflow menu (Rules, Reset week, Delete). Phones only (md:hidden); desktop
  * keeps its own header. Mobile twin: mobile/src/components/SimGameHeader.tsx.
  */
-export function SimGameHeader({ game, onHub, onTeam, onMore }: { game: SimGame; onHub: () => void; onTeam: (teamId: string) => void; onMore: () => void }) {
+export function SimGameHeader({ game, onHub, onTeam, onMore, bell }: { game: SimGame; onHub: () => void; onTeam: (teamId: string) => void; onMore: () => void; bell?: ReactNode }) {
   const you = game.you;
   const season = simCompactSeason(game.dynasty);
   const showTeam = Boolean(you) && game.phase !== "draft";
@@ -46,12 +47,13 @@ export function SimGameHeader({ game, onHub, onTeam, onMore }: { game: SimGame; 
           data-testid="sim-team-chip"
         >
           <SimCrest name={you.name} size={20} />
-          <span className="min-w-0 truncate text-xs font-bold">{you.name}</span>
+          <span className="min-w-0 flex-1 break-words text-xs font-bold">{you.name}</span>
           <span className="shrink-0 text-xs tabular-nums" style={{ color: "var(--color-text-muted)" }}>{simFmtRecord(you)}</span>
         </button>
       ) : (
         <span className="flex-1" />
       )}
+      {bell}
       <button type="button" className={ICON_BTN} style={ICON_STYLE} onClick={() => window.dispatchEvent(new Event(OPEN_SEARCH_EVENT))} aria-label="Search players and pages">
         <svg width={18} height={18} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
           <circle cx="11" cy="11" r="7" />

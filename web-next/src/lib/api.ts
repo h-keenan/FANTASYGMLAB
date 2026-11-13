@@ -1,4 +1,5 @@
 import type { DraftSignalRow } from "./draftSignals";
+import type { SimNotificationsResponse } from "@/lib/simNotifications";
 import { env } from "./env";
 import type { TradeCaution } from "./tradeCautions";
 import type { VerdictAssumptions, VerdictFeedbackReason, VerdictReportContext } from "@/lib/verdictTrust";
@@ -4798,6 +4799,8 @@ export const api = {
     authorizedRequest<SimGameTypes.SimTradeResponse>(`/v1/sim/games/${encodeURIComponent(gameId)}/trades/preview`, { method: "POST", jsonBody: body }),
   sendSimTrade: (gameId: string, body: { partner: string; give: string[]; get: string[] }) =>
     authorizedRequest<SimGameTypes.SimTradeResponse>(`/v1/sim/games/${encodeURIComponent(gameId)}/trades`, { method: "POST", jsonBody: body }),
+  getSimNotifications: (gameId: string, since: number) =>
+    authorizedRequest<SimNotificationsResponse>(`/v1/sim/games/${encodeURIComponent(gameId)}/notifications?since=${Math.max(0, Math.floor(since))}`),
   getSimInbox: (gameId: string) => authorizedRequest<SimGameTypes.SimInboxResponse>(`/v1/sim/games/${encodeURIComponent(gameId)}/inbox`),
   respondSimInbox: (gameId: string, itemId: string, action: "accept" | "decline") =>
     authorizedRequest<SimGameTypes.SimInboxResponse>(`/v1/sim/games/${encodeURIComponent(gameId)}/inbox/${encodeURIComponent(itemId)}/respond`, { method: "POST", jsonBody: { action } }),
