@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
 import AppText from '../components/AppText';
-import PlayerNameText from '../components/PlayerNameText';
+import PlayerName from '../components/PlayerName';
 import GlassCard from '../components/GlassCard';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { useHeaderHeight } from '@react-navigation/elements';
@@ -245,9 +245,7 @@ function OpponentChips({ label, players, onPick }: { label: string; players: Ran
           <Pressable key={p.player_id} style={styles.oppChip} onPress={() => onPick(p)} accessibilityRole="button" accessibilityLabel={`Compare with ${p.name}`}>
             <PlayerAvatar playerId={p.player_id} size={32} tier={p.tier} />
             <View>
-              <AppText style={styles.oppName} numberOfLines={1}>
-                {p.name}
-              </AppText>
+              <PlayerName name={p.name} style={styles.oppName} />
               <AppText style={styles.oppMeta}>
                 {p.position} · {p.score != null ? Math.round(p.score).toLocaleString() : '—'}
               </AppText>
@@ -281,13 +279,13 @@ function NarrativeCompareBlock({
     <View style={styles.narrativeGroup}>
       {narrative.a ? (
         <View style={styles.narrativeBlock}>
-          <PlayerNameText name={sideA.player.name ?? 'Player A'} style={styles.narrativeName} threshold={16} />
+          <PlayerName name={sideA.player.name ?? 'Player A'} style={styles.narrativeName} />
           <AppText style={styles.narrativeText}>{narrative.a}</AppText>
         </View>
       ) : null}
       {narrative.b ? (
         <View style={styles.narrativeBlock}>
-          <PlayerNameText name={sideB.player.name ?? 'Player B'} style={styles.narrativeName} threshold={16} />
+          <PlayerName name={sideB.player.name ?? 'Player B'} style={styles.narrativeName} />
           <AppText style={styles.narrativeText}>{narrative.b}</AppText>
         </View>
       ) : null}
@@ -474,13 +472,9 @@ export default function PlayerCompareScreen({ route, navigation }: Props) {
             {loadingCompare && !sides ? <BrandedSpinner style={styles.center} /> : null}
             <GlassCard style={styles.gridCard}>
               <View style={styles.row}>
-                <AppText style={styles.gridName} numberOfLines={1}>
-                  {playerA.name}
-                </AppText>
+                <PlayerName name={playerA.name} style={styles.gridName} />
                 <View style={styles.rowLabelSpacer} />
-                <AppText style={styles.gridName} numberOfLines={1}>
-                  {playerB.name}
-                </AppText>
+                <PlayerName name={playerB.name} style={styles.gridName} />
               </View>
               {headlineRows.map((row, index) => (
                 <HeadlineRowView key={row.label} row={row} isLast={index === headlineRows.length - 1 && headlineTextRows.length === 0} />

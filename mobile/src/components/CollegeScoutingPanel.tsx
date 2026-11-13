@@ -6,7 +6,7 @@ import { useFocusEffect } from '@react-navigation/native';
 import AppText from './AppText';
 import BrandedSpinner from './BrandedSpinner';
 import EmptyState from './EmptyState';
-import PlayerNameText from './PlayerNameText';
+import PlayerName from './PlayerName';
 import PositionBadge from './PositionBadge';
 import PremiumLock from './PremiumLock';
 import ScreenInfoNote from './ScreenInfoNote';
@@ -93,7 +93,7 @@ function ProspectRow({
             <Ionicons name={starIcon} size={17} color={starColor} />
           </TouchableOpacity>
         </View>
-        <PlayerNameText name={prospect.name} style={styles.gridName} />
+        <PlayerName name={prospect.name} style={styles.gridName} />
         <AppText style={styles.meta} numberOfLines={1}>
           {classLabel}
         </AppText>
@@ -120,7 +120,7 @@ function ProspectRow({
     >
       <PositionBadge position={prospect.position} />
       <View style={styles.identity}>
-        <PlayerNameText name={prospect.name} style={styles.name} threshold={22} />
+        <PlayerName name={prospect.name} style={styles.name} />
         <AppText style={styles.meta} numberOfLines={1}>
           {classLabel}
         </AppText>

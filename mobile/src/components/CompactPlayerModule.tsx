@@ -2,7 +2,7 @@ import React, { useMemo } from 'react';
 import { StyleProp, StyleSheet, TouchableOpacity, View, ViewStyle } from 'react-native';
 
 import AppText from './AppText';
-import PlayerNameText from './PlayerNameText';
+import PlayerName from './PlayerName';
 import PlayerAvatar from './PlayerAvatar';
 import PositionBadge from './PositionBadge';
 import { useThemeMode } from '../context/ThemeModeContext';
@@ -76,7 +76,7 @@ export default function CompactPlayerModule({
     >
       <PlayerAvatar playerId={playerId} size={34} tier={tier} style={styles.avatar} />
       <View style={styles.body}>
-        <PlayerNameText name={name ?? 'Unknown player'} style={styles.name} threshold={20} />
+        <PlayerName name={name ?? 'Unknown player'} style={styles.name} />
         <View style={styles.metaRow}>
           <PositionBadge position={position} size="sm" />
           {team ? (

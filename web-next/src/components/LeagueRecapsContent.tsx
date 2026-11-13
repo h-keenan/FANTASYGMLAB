@@ -42,7 +42,7 @@ import {
   recapStoryCategory,
 } from "@/lib/leagueRecapsPresentation";
 import { PageTitle } from "@/components/PageTitle";
-import { PlayerNameText } from "@/components/PlayerNameText";
+import { PlayerName } from "@/components/PlayerName";
 import { LeagueRoundupTab } from "@/components/LeagueRoundupTab";
 import type { RecapsTab } from "@/lib/pageTabs";
 import { ErrorState } from "@/components/ErrorState";
@@ -326,7 +326,7 @@ function AssetChip({ asset }: { asset: HistoryTransaction["draft_picks"][number]
         style={{ border: "var(--border-width-default) solid var(--color-border)" }}
       >
         <PositionBadge position={asset.position} />
-        <PlayerNameText name={asset.name} threshold={Infinity} className="max-w-[10rem]" style={{ color: asset.known ? "var(--color-text-primary)" : "var(--color-text-muted)" }} />
+        <PlayerName name={asset.name} className="max-w-[10rem]" style={{ color: asset.known ? "var(--color-text-primary)" : "var(--color-text-muted)" }} />
       </span>
     );
   }
@@ -338,7 +338,7 @@ function AssetChip({ asset }: { asset: HistoryTransaction["draft_picks"][number]
       >
         <PlayerAvatar playerId={asset.player_id} size={20} />
         <PositionBadge position={asset.position} />
-        <PlayerNameText name={asset.name} threshold={Infinity} className="max-w-[10rem]" style={{ color: asset.known ? "var(--color-text-primary)" : "var(--color-text-muted)" }} />
+        <PlayerName name={asset.name} className="max-w-[10rem]" style={{ color: asset.known ? "var(--color-text-primary)" : "var(--color-text-muted)" }} />
       </span>
     </PlayerIdentityTrigger>
   );
@@ -351,7 +351,7 @@ function TradePlayerRow({ asset }: { asset: HistoryTransaction["draft_picks"][nu
   const row = (
     <span className="flex items-center gap-2 min-w-0 w-full">
       {asset.player_id ? <PlayerAvatar playerId={asset.player_id} size={24} /> : <span style={{ width: 24 }} />}
-      <PlayerNameText name={asset.name} threshold={Infinity} className="text-sm font-bold" style={{ color: nameColor }} />
+      <PlayerName name={asset.name} className="text-sm font-bold" style={{ color: nameColor }} />
       {asset.team ? (
         <span className="text-xs font-normal shrink-0" style={{ color: "var(--color-text-muted)" }}>
           {asset.team}

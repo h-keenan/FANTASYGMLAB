@@ -5,7 +5,7 @@ import { StyleProp, StyleSheet, TouchableOpacity, View, ViewStyle } from 'react-
 import AppText from './AppText';
 import OverallRatingBadge from './OverallRatingBadge';
 import PlayerAvatar from './PlayerAvatar';
-import PlayerNameText from './PlayerNameText';
+import PlayerName from './PlayerName';
 import PositionBadge from './PositionBadge';
 import TierBadge from './TierBadge';
 import { useThemeMode } from '../context/ThemeModeContext';
@@ -268,7 +268,7 @@ export default function PlayerIdentityRow({
         <View style={styles.gridIdentityRow}>
           <PlayerAvatar playerId={playerId} size={34} tier={tier} style={styles.gridAvatar} />
           <View style={styles.gridBody}>
-            <PlayerNameText name={name ?? 'Unknown player'} style={styles.gridName} />
+            <PlayerName name={name ?? 'Unknown player'} style={styles.gridName} />
             <View style={styles.metaRow}>
               <PositionBadge position={position} />
               {team ? (
@@ -355,7 +355,7 @@ export default function PlayerIdentityRow({
       <PlayerAvatar playerId={playerId} size={38} tier={tier} style={styles.avatar} />
       <View style={styles.body}>
         <View style={styles.nameRow}>
-          {/* PlayerNameText (not a plain numberOfLines AppText) so a name
+          {/* PlayerName (not a plain numberOfLines AppText) so a name
            * that doesn't fit degrades to "F. Lastname" instead of a
            * mid-word ellipsis cut — coridian_, "Jauan Jenni…" on Trade Hub's
            * exchange columns, 2026-09-27. This is the one shared row used
@@ -366,7 +366,7 @@ export default function PlayerIdentityRow({
               {name ?? 'Unknown player'}
             </AppText>
           ) : (
-            <PlayerNameText name={name ?? 'Unknown player'} style={styles.name} />
+            <PlayerName name={name ?? 'Unknown player'} style={styles.name} />
           )}
         </View>
         <View style={styles.metaRow}>

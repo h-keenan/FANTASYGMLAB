@@ -6,7 +6,7 @@ import type { PlayerQuickViewIdentity } from "@/context/PlayerQuickViewContext";
 import { OvrGauge } from "@/components/OvrGauge";
 import { PlayerAvatar } from "@/components/PlayerAvatar";
 import { PlayerIdentityTrigger } from "@/components/PlayerIdentityTrigger";
-import { PlayerNameText } from "@/components/PlayerNameText";
+import { PlayerName } from "@/components/PlayerName";
 import { PositionBadge } from "@/components/PositionBadge";
 import { TickNumber } from "@/components/TickNumber";
 import { ToneBadge } from "@/components/ToneBadge";
@@ -153,9 +153,9 @@ function NameBlock({ model, size }: { model: PlayerCardModel; size: PlayerCardVa
   const line = [model.team].filter(Boolean).join(" · ");
   return (
     <span className="flex flex-col min-w-0 flex-1 gap-1">
-      <PlayerNameText
+      <PlayerName
         name={model.name}
-        threshold={Infinity}
+
         className={`${size === "compact" ? "text-sm" : "text-[13px]"} font-bold leading-tight w-full`}
         style={{ color: "var(--color-text-primary)" }}
       />
@@ -299,9 +299,9 @@ function MatchupCard({ model, identity, onEdit, editLabel, mirror = false, empha
             fallbackLabel={model.team}
           />
           <span className={`flex flex-col min-w-0 flex-1 gap-1${align}`}>
-            <PlayerNameText
+            <PlayerName
               name={model.name}
-              threshold={Infinity}
+
               className="text-[13px] font-bold leading-tight w-full"
               style={{ color: "var(--color-text-primary)" }}
             />

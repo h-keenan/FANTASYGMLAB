@@ -20,7 +20,7 @@ import { useIsPro } from "@/lib/useIsPro";
 import { useSheetDragDismiss } from "@/lib/useSheetDragDismiss";
 import { SheetHandle } from "@/components/SheetHandle";
 import { PLAYER_SEARCH_MAX_RESULTS, PLAYER_SEARCH_MIN_CHARS, useLeaguePlayerSearchState } from "@/lib/leaguePlayerSearch";
-import { PlayerNameText } from "@/components/PlayerNameText";
+import { PlayerName } from "@/components/PlayerName";
 
 /**
  * web-next's counterpart to mobile's GmOrb.tsx and the Streamlit web app's
@@ -264,7 +264,7 @@ export function GmOrb() {
                           >
                             <PositionBadge position={player.position} />
                             <span className="flex flex-col min-w-0">
-                              <PlayerNameText name={player.name} threshold={Infinity} className="text-sm font-bold" style={{ color: "var(--color-text-primary)" }} />
+                              <PlayerName name={player.name} className="text-sm font-bold" style={{ color: "var(--color-text-primary)" }} />
                               {player.team ? (
                                 <span className="text-xs" style={{ color: "var(--color-text-muted)" }}>
                                   {player.team}

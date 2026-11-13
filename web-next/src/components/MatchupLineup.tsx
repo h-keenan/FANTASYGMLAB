@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 
 import { EmptySlotCard, PlayerCard } from "@/components/PlayerCardKit";
 import { PlayerAvatar } from "@/components/PlayerAvatar";
+import { PlayerName } from "@/components/PlayerName";
 import { PlayerIdentityTrigger } from "@/components/PlayerIdentityTrigger";
 import { useIsPhone } from "@/components/useIsPhone";
 import {
@@ -272,9 +273,7 @@ function CompactSide({
     <>
       <PlayerAvatar playerId={card.playerId} tier={card.tier} size={36} fallbackLabel={card.team} />
       <span className={`flex flex-col min-w-0 flex-1 gap-0.5${mirror ? " items-end" : ""}`}>
-        <span className="text-[12px] font-bold leading-tight truncate w-full" style={{ color: "var(--color-text-primary)" }}>
-          {card.name}
-        </span>
+        <PlayerName name={card.name} className="text-[12px] font-bold leading-tight w-full" style={{ color: "var(--color-text-primary)" }} />
         <span className={`flex items-center gap-1 text-[10px] font-extrabold uppercase leading-none${mirror ? " flex-row-reverse" : ""}`} style={{ letterSpacing: "var(--letter-spacing-badge)" }}>
           {primary ? (
             <span className="inline-flex items-center" data-testid={`compact-status-${primary.kind}`} title={primary.label}>

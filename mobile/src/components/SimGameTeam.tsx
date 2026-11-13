@@ -3,6 +3,7 @@ import { Pressable, StyleSheet, View } from 'react-native';
 
 import AccentCard from './AccentCard';
 import AppText from './AppText';
+import PlayerName from './PlayerName';
 import Button from './Button';
 import EmptyState from './EmptyState';
 import ErrorState from './ErrorState';
@@ -553,9 +554,7 @@ function LineupRow({ slotLabel, slot, player, locked, onOpen, onPick, onMove }: 
         >
           <PlayerAvatar playerId={simHeadshotId(player)} fallbackLabel={simPlayerInitials(player)} size={32} />
           <View style={{ flex: 1, minWidth: 0 }}>
-            <AppText style={{ fontSize: 14, fontWeight: '800', color: player.status === 'healthy' ? colors.textPrimary : colors.textTertiary }} numberOfLines={1}>
-              {player.name}
-            </AppText>
+            <PlayerName name={player.name} style={{ fontSize: 14, fontWeight: '800', color: player.status === 'healthy' ? colors.textPrimary : colors.textTertiary }} />
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
               {showPos ? (
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 3 }} accessibilityLabel={player.pos}>

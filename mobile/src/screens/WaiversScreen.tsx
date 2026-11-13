@@ -11,7 +11,7 @@ import {
   View,
 } from 'react-native';
 import AppText from '../components/AppText';
-import PlayerNameText from '../components/PlayerNameText';
+import PlayerName from '../components/PlayerName';
 import { isEspnLeagueId } from '../lib/leaguePlatform';
 import { sleeperLeagueUrl } from '../lib/matchupPlanner';
 import GlassCard from '../components/GlassCard';
@@ -758,7 +758,7 @@ function BestAvailableCard({
       <View style={styles.bestAvailablePosBadgeWrap}>
         <PositionBadge position={position} size="sm" />
       </View>
-      <PlayerNameText name={player.name ?? 'Unknown'} style={styles.bestAvailableName} />
+      <PlayerName name={player.name ?? 'Unknown'} style={styles.bestAvailableName} />
       <View style={styles.bestAvailableFooterRow}>
         <AppText style={styles.bestAvailableScore}>{player.score != null ? Math.round(player.score) : '—'}</AppText>
         {note ? <AppText style={styles.bestAvailableCount}>{note}</AppText> : null}

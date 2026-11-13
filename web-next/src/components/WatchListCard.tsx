@@ -14,7 +14,7 @@ import {
   resolveGamePlanTargetPlayerId,
 } from "@/lib/gamePlanPresentation";
 import { destinationCtaLabel } from "@/lib/destinationLabels";
-import { PlayerNameText } from "@/components/PlayerNameText";
+import { PlayerName } from "@/components/PlayerName";
 
 /**
  * Watchlist & Alerts: every Game Plan item except Top Priority, as one
@@ -57,7 +57,7 @@ export function WatchListCard({
               <ToneBadge label={tag.label} color={tag.color} />
               <span className="flex flex-wrap items-center gap-x-2 gap-y-0.5 min-w-0">
                 {name ? (
-                  <PlayerNameText name={name} threshold={Infinity} className="text-sm font-bold" style={{ color: "var(--color-text-primary)" }} />
+                  <PlayerName name={name} className="text-sm font-bold" style={{ color: "var(--color-text-primary)" }} />
                 ) : (
                   <span className="text-sm font-bold break-words" style={{ color: "var(--color-text-primary)" }}>
                     {watchTitle(item)}

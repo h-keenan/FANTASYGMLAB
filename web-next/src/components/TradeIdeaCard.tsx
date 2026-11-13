@@ -31,7 +31,7 @@ import {
   tradeIdeaShareRecord,
   tradeIdeaShareText,
 } from "@/lib/tradeHubPresentation";
-import { PlayerNameText } from "@/components/PlayerNameText";
+import { PlayerName } from "@/components/PlayerName";
 
 /**
  * Shares the branded trade card PNG (app/share-card/trade, drawn by
@@ -246,7 +246,7 @@ export function TradeIdeaCardView({
                 style={{ border: "var(--border-width-default) solid var(--color-premium)", borderRadius: "var(--radius-pill)", color: "var(--color-text-primary)" }}
               >
                 <PlayerAvatar playerId={playerId} size={22} />
-                <PlayerNameText name={asset.name} className="max-w-[9rem]" />
+                <PlayerName name={asset.name} className="max-w-[9rem]" />
               </span>
             ) : null;
           })}

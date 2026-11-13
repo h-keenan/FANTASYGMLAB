@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Animated, StyleSheet, TouchableOpacity, View } from 'react-native';
 
 import AppText from './AppText';
+import PlayerName from './PlayerName';
 import { PlayerCard } from './PlayerCardKit';
 import PlayerAvatar from './PlayerAvatar';
 import PositionBadge from './PositionBadge';
@@ -181,9 +182,7 @@ function CompactSide({
       {pulseKey > 0 ? <PulseRing pulseKey={pulseKey} /> : null}
       <PlayerAvatar playerId={card.playerId} tier={card.tier} size={36} fallbackLabel={card.team} />
       <View style={[styles.flex, { alignItems: align, gap: 1 }]}>
-        <AppText style={[styles.sideName, mirror && { textAlign: 'right' }]} numberOfLines={1}>
-          {card.name}
-        </AppText>
+        <PlayerName name={card.name} style={[styles.sideName, mirror && { textAlign: 'right' }]} />
         <View style={[styles.statusRow, mirror && { flexDirection: 'row-reverse' }]}>
           {primary ? (
             <AppText

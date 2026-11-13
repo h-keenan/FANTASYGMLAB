@@ -14,7 +14,7 @@ import {
   valueEffectText,
   weakestSlotText,
 } from "@/lib/dropsPresentation";
-import { PlayerNameText } from "@/components/PlayerNameText";
+import { PlayerName } from "@/components/PlayerName";
 
 /**
  * Suggested drops (modules/drop_candidates.py), shared by the Waivers cards and
@@ -51,7 +51,7 @@ function DropPlayerLine({
             {lead}{" "}
           </span>
         ) : null}
-        <PlayerNameText name={player.name} threshold={Infinity} className="text-sm font-bold" style={{ color: "var(--color-text-primary)" }} />
+        <PlayerName name={player.name} className="text-sm font-bold" style={{ color: "var(--color-text-primary)" }} />
         <PositionBadge position={player.position} />
         <span className="text-xs font-semibold" style={{ color: "var(--color-text-muted)" }}>
           {[player.team, player.age ? Math.round(player.age) : null].filter(Boolean).join(" · ")}
@@ -150,7 +150,7 @@ function SwapTile({ side, player, name, playerId, position, team }: { side: "add
     >
       <ToneBadge label={label} color={color} size="xs" />
       <PlayerAvatar playerId={playerId} size={44} />
-      <PlayerNameText name={name} className="text-sm font-bold leading-tight w-full" style={{ color: "var(--color-text-primary)" }} />
+      <PlayerName name={name} className="text-sm font-bold leading-tight w-full" style={{ color: "var(--color-text-primary)" }} />
       <span className="flex items-center justify-center gap-1 flex-wrap">
         <PositionBadge position={position} />
         {team ? (
@@ -257,7 +257,7 @@ function SwapBody({ suggestion, drop, alternatives }: { suggestion: DropSuggesti
                 }}
               >
                 <PlayerAvatar playerId={alt.player_id} size={28} />
-                <PlayerNameText name={alt.name} className="text-xs font-bold max-w-[7.5rem]" style={{ color: "var(--color-text-primary)" }} />
+                <PlayerName name={alt.name} className="text-xs font-bold max-w-[7.5rem]" style={{ color: "var(--color-text-primary)" }} />
                 <PositionBadge position={alt.position} />
               </button>
             ))}

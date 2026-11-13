@@ -11,7 +11,7 @@
  * Two sizes: 1080x1350 (stories/posts) and 1200x630 (link unfurls).
  */
 
-import { abbreviatePlayerName, shouldAbbreviatePlayerName } from "@/lib/formatPlayerName";
+import { fitPlayerName } from "@/lib/playerNameDisplay";
 import type { TradeAsset, TradeIdea } from "@/lib/api";
 import { LOW_CONFIDENCE_USER_NOTE, fairnessBandColor, formatTradeGain } from "@/lib/tradeHubPresentation";
 
@@ -109,7 +109,7 @@ function AssetRow({ asset, side, size, headshot, compact, tall }: { asset: Trade
   // satori cannot measure text, so estimate how many characters fit (~0.58em
   // per bold glyph in ~380px) and show "F. Lastname" past that instead.
   const fullName = isPick ? pickTitle(asset) : asset.name || "Unknown player";
-  const nameText = !isPick && compact && shouldAbbreviatePlayerName(fullName, Math.floor(380 / (nameSize * 0.58))) ? abbreviatePlayerName(fullName) : fullName;
+  const nameText = !isPick && compact ? fitPlayerName(fullName, Math.floor(380 / (nameSize * 0.58))) : fullName;
   const ringSize = tall ? 84 : compact ? Math.round(size * 0.5) : size >= 130 ? 68 : size >= 112 ? 56 : 46;
   const frame = {
     display: "flex",

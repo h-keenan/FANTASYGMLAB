@@ -4,6 +4,7 @@ import { Ionicons } from '@expo/vector-icons';
 
 import AppText from './AppText';
 import PlayerAvatar from './PlayerAvatar';
+import PlayerName from './PlayerName';
 import PositionBadge from './PositionBadge';
 import ToneBadge from './ToneBadge';
 import { useThemeMode } from '../context/ThemeModeContext';
@@ -124,10 +125,7 @@ export default function PlayerListRow({
       </View>
       <View style={styles.nameCol}>
         <View style={styles.nameRow}>
-          {/* Seam: swap for the shared PlayerName short-name component when it lands. */}
-          <AppText style={[styles.name, name.length > PLAYER_LIST_LONG_NAME && { fontSize: 13 }]} numberOfLines={1}>
-            {name}
-          </AppText>
+          <PlayerName name={name} style={[styles.name, name.length > PLAYER_LIST_LONG_NAME && { fontSize: 13 }]} />
           {chip ? <ToneBadge label={chip.label.toUpperCase()} color={toneColor(chip.tone, colors, colors.textSecondary)} size="xs" /> : null}
         </View>
         {meta.length > 0 ? (
