@@ -145,6 +145,7 @@ from datetime import date, datetime, timedelta, timezone
 from typing import Any, Callable
 
 from fastapi import Depends, FastAPI, Header, HTTPException, Request, Response
+from fastapi.encoders import jsonable_encoder
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
@@ -213,6 +214,7 @@ from modules import (
     player_background_profile,
     player_eligibility,
     performance,
+    portfolio_cache,
     portfolio_exposure,
     pick_flow,
     player_history,
@@ -12423,8 +12425,16 @@ def _build_portfolio_row(
     sleeper_username: str,
     entitlement: str,
     row: dict[str, Any],
+    *,
+    inputs: tuple[str, tuple[str, ...], tuple[str, ...]] | None = None,
+    defer_signals: bool = False,
 ) -> dict[str, Any]:
     """One saved league's Portfolio row — runs on a worker thread.
+
+    `inputs` is the already-fetched `(team_stance, gm_target_ids,
+    gm_untouchable_ids)` (the cached wrapper reads them first to fingerprint
+    the row) so they are not fetched twice; `defer_signals` is the headline-first
+    mode of dashboard_engine.build_league_summary.
 
     Fans out the exact same three per-league calls the old sequential loop
     made (team_stance, GM Targets, dashboard_engine.build_league_summary) so
@@ -12462,16 +12472,12 @@ def _build_portfolio_row(
     row_sleeper_username = str(row.get("sleeper_username") or "") or sleeper_username
 
     try:
-        # The two Supabase reads are independent -- overlap them so a cold
-        # row pays one round trip instead of two back to back.
-        with concurrent.futures.ThreadPoolExecutor(
-            max_workers=1, thread_name_prefix="dgm-portfolio-gm-targets"
-        ) as side_executor:
-            gm_targets_future = side_executor.submit(
-                _fetch_gm_target_player_ids, config, user_id, access_token, league_id
+        if inputs is not None:
+            team_stance_value, gm_target_ids, gm_untouchable_ids = inputs
+        else:
+            team_stance_value, gm_target_ids, gm_untouchable_ids = _fetch_portfolio_row_inputs(
+                config, user_id, access_token, league_id
             )
-            team_stance_value = _fetch_team_stance(config, user_id, access_token, league_id)
-            gm_target_ids, gm_untouchable_ids = gm_targets_future.result()
         summary = dashboard_engine.build_league_summary(
             league_id=league_id,
             lens=lens,
@@ -12481,6 +12487,7 @@ def _build_portfolio_row(
             gm_target_player_ids=gm_target_ids,
             gm_untouchable_player_ids=gm_untouchable_ids,
             entitlement=entitlement,
+            **({"defer_signals": True} if defer_signals else {}),
         )
     except Exception:
         return {
@@ -12506,6 +12513,103 @@ def _build_portfolio_row(
         "league_id": league_id,
         "league_name": league_name,
         "summary": summary,
+    }
+
+
+def _fetch_portfolio_row_inputs(
+    config: dict, user_id: str, access_token: str, league_id: str
+) -> tuple[str, tuple[str, ...], tuple[str, ...]]:
+    """`(team_stance, gm_target_ids, gm_untouchable_ids)` for one league row.
+
+    The two Supabase reads are independent -- overlap them so a cold row pays
+    one round trip instead of two back to back."""
+
+    with concurrent.futures.ThreadPoolExecutor(
+        max_workers=1, thread_name_prefix="dgm-portfolio-gm-targets"
+    ) as side_executor:
+        gm_targets_future = side_executor.submit(
+            _fetch_gm_target_player_ids, config, user_id, access_token, league_id
+        )
+        team_stance_value = _fetch_team_stance(config, user_id, access_token, league_id)
+        gm_target_ids, gm_untouchable_ids = gm_targets_future.result()
+    return team_stance_value, gm_target_ids, gm_untouchable_ids
+
+
+def _build_portfolio_row_cached(
+    config: dict,
+    user_id: str,
+    access_token: str,
+    lens: str,
+    sleeper_username: str,
+    entitlement: str,
+    row: dict[str, Any],
+    *,
+    defer_signals: bool = False,
+) -> dict[str, Any]:
+    """`_build_portfolio_row` behind modules.portfolio_cache (stale-while-
+    revalidate rows keyed on a fingerprint of every per-user input).
+
+    Same result shape as `_build_portfolio_row`; a cached success carries its
+    finished, JSON-safe response row under `projected` (see
+    `_project_portfolio_league`). With `defer_signals` a cache miss builds only
+    the headline fields (never cached) and the result carries
+    `signals_pending=True`; a cache hit returns the complete row either way.
+    Never raises for a cache problem: Redis trouble means "build it".
+    """
+
+    league_id = saved_leagues.normalize_league_id(row.get("league_id"))
+    if not league_id or external_leagues.is_external_league_key(league_id):
+        return _build_portfolio_row(
+            config, user_id, access_token, lens, sleeper_username, entitlement, row, defer_signals=defer_signals
+        )
+    league_name = str(row.get("league_name") or "").strip() or league_id
+    row_sleeper_username = str(row.get("sleeper_username") or "") or sleeper_username
+    try:
+        inputs = _fetch_portfolio_row_inputs(config, user_id, access_token, league_id)
+        stance, target_ids, untouchable_ids = inputs
+        fingerprint = portfolio_cache.inputs_fingerprint(
+            entitlement, row_sleeper_username, stance, sorted(target_ids), sorted(untouchable_ids)
+        )
+        key = portfolio_cache.cache_key(user_id, league_id, lens, fingerprint)
+    except Exception:
+        return _build_portfolio_row(
+            config, user_id, access_token, lens, sleeper_username, entitlement, row, defer_signals=defer_signals
+        )
+
+    def _ok_from_cache(projected: dict[str, Any]) -> dict[str, Any]:
+        return {"status": "ok", "league_id": league_id, "league_name": league_name, "projected": projected}
+
+    if defer_signals:
+        cached = portfolio_cache.peek(key)
+        if cached is not None:
+            return _ok_from_cache(cached)
+        result = _build_portfolio_row(
+            config, user_id, access_token, lens, sleeper_username, entitlement, row,
+            inputs=inputs, defer_signals=True,
+        )
+        if result.get("status") == "ok":
+            result["signals_pending"] = True
+        return result
+
+    holder: dict[str, Any] = {}
+
+    def _build() -> dict[str, Any] | None:
+        result = _build_portfolio_row(
+            config, user_id, access_token, lens, sleeper_username, entitlement, row, inputs=inputs
+        )
+        holder["result"] = result
+        if result.get("status") != "ok":
+            return None
+        return jsonable_encoder(_project_portfolio_league(result))
+
+    projected, _source = portfolio_cache.get_row(key, _build)
+    if projected is not None:
+        return _ok_from_cache(projected)
+    return holder.get("result") or {
+        "status": "failed",
+        "league_id": league_id,
+        "league_name": league_name,
+        "reason": "unavailable",
     }
 
 
@@ -12590,6 +12694,8 @@ def _portfolio_context(lens: str, user: dict[str, Any]) -> tuple[dict[str, Any] 
 def _project_portfolio_league(result: dict[str, Any]) -> dict[str, Any]:
     """One successful `_build_portfolio_row` result -> its response row."""
 
+    if "projected" in result:  # already-finished row from modules.portfolio_cache
+        return result["projected"]
     summary = result["summary"]
     top_item = summary.get("top_item")
     # `top_items` is the same already-ranked/deduped signal list `top_item`
@@ -12673,6 +12779,7 @@ def get_portfolio_leagues(lens: str = "Dynasty", user: dict[str, Any] = Depends(
 def get_portfolio_league(
     league_id: str,
     lens: str = "Dynasty",
+    signals: str = "",
     user: dict[str, Any] = Depends(require_user),
 ) -> dict[str, Any]:
     """One saved league's Portfolio row — exactly the row GET /v1/portfolio
@@ -12683,7 +12790,14 @@ def get_portfolio_league(
     `league_id` must be one of the caller's own saved leagues (as listed by
     the index); anything else is a 404 rather than a summary for a league
     the caller never saved. Exactly one of `league` / `failed_league` is
-    set on a Premium response."""
+    set on a Premium response.
+
+    `signals=defer` is headline-first: when this league's finished row is not
+    cached it answers with just the headline fields (record, ranks, archetype,
+    top asset, health; `top_item`/`top_items` empty) and `signals_pending:
+    true`, in a fraction of the full cost; the client then asks again without
+    the parameter to fill the signals in. A cached row is returned complete
+    (no `signals_pending`) whatever the parameter."""
 
     early_response, context = _portfolio_context(lens, user)
     if early_response is not None:
@@ -12710,7 +12824,7 @@ def get_portfolio_league(
     executor = concurrent.futures.ThreadPoolExecutor(max_workers=1, thread_name_prefix="dgm-portfolio-league")
     try:
         future = executor.submit(
-            _build_portfolio_row,
+            functools.partial(_build_portfolio_row_cached, defer_signals=signals == "defer"),
             context["config"],
             context["user_id"],
             context["access_token"],
@@ -12738,7 +12852,7 @@ def get_portfolio_league(
             "league_name": result.get("league_name") or stub["league_name"],
             "reason": result.get("reason") or "unavailable",
         }
-    return {
+    response = {
         "ok": True,
         "is_premium": True,
         "lens": lens,
@@ -12746,6 +12860,9 @@ def get_portfolio_league(
         "failed_league": failed_league,
         "upsell": None,
     }
+    if result.get("signals_pending"):
+        response["signals_pending"] = True
+    return response
 
 
 _PORTFOLIO_EXPOSURE_UPSELL = {
@@ -12935,7 +13052,7 @@ def _get_portfolio_impl(lens: str, user: dict[str, Any]) -> dict[str, Any]:
     results: list[dict[str, Any]] = []
     if saved_rows:
         worker = functools.partial(
-            _build_portfolio_row, config, user_id, access_token, lens, sleeper_username, entitlement
+            _build_portfolio_row_cached, config, user_id, access_token, lens, sleeper_username, entitlement
         )
         max_workers = min(len(saved_rows), _PORTFOLIO_FANOUT_MAX_WORKERS)
         executor = concurrent.futures.ThreadPoolExecutor(

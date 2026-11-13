@@ -993,6 +993,7 @@ def build_league_summary(
     gm_target_player_ids: tuple[str, ...] = (),
     gm_untouchable_player_ids: tuple[str, ...] = (),
     entitlement: str = "free",
+    defer_signals: bool = False,
 ) -> dict[str, Any]:
     """One league's compact standing/record/rank/top-need-or-opportunity
     summary — a cross-league "Portfolio" row.
@@ -1023,6 +1024,15 @@ def build_league_summary(
     failure (Sleeper unreachable, a malformed league payload, etc.) raises,
     same as the engines it calls — a caller iterating many leagues should
     catch that per league and report it, not swallow it here.
+
+    `defer_signals=True` is the Portfolio "headline first" mode (Portfolio
+    perf audit, docs/performance-audit-portfolio-2026-11.md): it returns every
+    field EXCEPT the briefing-derived `top_item`/`top_items` (left None/[]),
+    skipping the trade-idea search, the team posture and the briefing compose
+    -- the bulk of a cold row's cost. Every field it does return is computed
+    by the identical code path as the full summary, so it is byte-identical
+    to the same fields of the full summary; the caller follows up with the
+    full call (which reuses every cache this one warmed) to fill the signals.
     """
 
     if not str(sleeper_username or "").strip():
@@ -1086,19 +1096,24 @@ def build_league_summary(
         all_rostered_player_ids.update(str(pid) for pid in (roster.get("players") or []))
 
     roster_id = my_roster.get("roster_id")
-    # Same posture every trade surface uses (declared Team Situation > auto
-    # classification > default); the rankings frame is the shared cached one.
-    posture = trade_hub_engine.roster_posture(
-        league_id=league_id,
-        roster=my_roster,
-        lens=lens,
-        players_db_path=players_db_path,
-        declared_stance=team_stance_value,
-    )
-    team_strategy = posture["key"]
-
+    posture = None
+    team_strategy = ""
     trade_idea_records = None
-    if league_calendar.trade_deadline_passed(league):
+    if not defer_signals:
+        # Same posture every trade surface uses (declared Team Situation > auto
+        # classification > default); the rankings frame is the shared cached one.
+        posture = trade_hub_engine.roster_posture(
+            league_id=league_id,
+            roster=my_roster,
+            lens=lens,
+            players_db_path=players_db_path,
+            declared_stance=team_stance_value,
+        )
+        team_strategy = posture["key"]
+
+    if defer_signals:
+        pass
+    elif league_calendar.trade_deadline_passed(league):
         # Past the trade deadline: no in-season trade tile (see
         # modules.league_calendar); [] keeps the briefing from regenerating.
         trade_idea_records = []
@@ -1170,28 +1185,30 @@ def build_league_summary(
             auto_strategy = _text(row.get("strategy"))
             auto_strategy_label = _text(row.get("strategy_label"))
 
-    briefing = compose_next_move_briefing(
-        league_id=league_id,
-        roster_id=str(roster_id or ""),
-        players_df=valued,
-        roster_player_ids=roster_player_ids,
-        all_rostered_player_ids=all_rostered_player_ids,
-        league_settings=settings,
-        score_field=score_field,
-        entitlement=entitlement,
-        rosters=rosters,
-        league=league,
-        team_strategy=team_strategy,
-        trade_idea_records=trade_idea_records,
-        roster_df=roster_df,
-        lineup_df=lineup_df,
-        injury_context=injury_context,
-        team_stance=team_stance_value,
-        roster_record=my_roster.get("settings"),
-        auto_strategy=auto_strategy,
-        auto_strategy_label=auto_strategy_label,
-        season_progress=record_signal.season_progress_fraction(league),
-    )
+    briefing = None
+    if not defer_signals:
+        briefing = compose_next_move_briefing(
+            league_id=league_id,
+            roster_id=str(roster_id or ""),
+            players_df=valued,
+            roster_player_ids=roster_player_ids,
+            all_rostered_player_ids=all_rostered_player_ids,
+            league_settings=settings,
+            score_field=score_field,
+            entitlement=entitlement,
+            rosters=rosters,
+            league=league,
+            team_strategy=team_strategy,
+            trade_idea_records=trade_idea_records,
+            roster_df=roster_df,
+            lineup_df=lineup_df,
+            injury_context=injury_context,
+            team_stance=team_stance_value,
+            roster_record=my_roster.get("settings"),
+            auto_strategy=auto_strategy,
+            auto_strategy_label=auto_strategy_label,
+            season_progress=record_signal.season_progress_fraction(league),
+        )
 
     injury_display_context = injury_ui.resolve_team_injury_context(injury_context)
     health_flag = (
@@ -1255,6 +1272,6 @@ def build_league_summary(
         # MAX_BRIEFING_ITEMS so a Portfolio card stays a quick glance, not a
         # second Dashboard. `top_item` stays exactly as it was (its own first
         # entry) for every existing caller.
-        "top_item": briefing.items[0].to_dict() if briefing.items else None,
-        "top_items": [item.to_dict() for item in briefing.items[:PORTFOLIO_MAX_SIGNALS]],
+        "top_item": briefing.items[0].to_dict() if briefing is not None and briefing.items else None,
+        "top_items": [item.to_dict() for item in briefing.items[:PORTFOLIO_MAX_SIGNALS]] if briefing is not None else [],
     }

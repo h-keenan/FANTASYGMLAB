@@ -92,3 +92,26 @@ test('composePortfolio: a Free index has nothing to load', () => {
   assert.equal(composed.rows.length, 0);
   assert.equal(composed.settled, true);
 });
+
+test('composePortfolio: a headline-first row is flagged and keeps the page unsettled until its signals land', () => {
+  const headline: PortfolioLeagueResponse = { ...ok(row('a', 'Alpha')), signals_pending: true };
+  const composed = composePortfolio(INDEX, {
+    a: { status: 'success', data: headline },
+    b: { status: 'success', data: ok(row('b', 'Bravo')) },
+    c: { status: 'success', data: ok(row('c', 'Charlie')) },
+  });
+  assert.equal(composed.signalsPendingCount, 1);
+  assert.equal(composed.settled, false);
+  const first = composed.rows[0];
+  assert.ok(first.kind === 'league' && first.signalsPending);
+  const second = composed.rows[1];
+  assert.ok(second.kind === 'league' && !second.signalsPending);
+
+  const done = composePortfolio(INDEX, {
+    a: { status: 'success', data: ok(row('a', 'Alpha')) },
+    b: { status: 'success', data: ok(row('b', 'Bravo')) },
+    c: { status: 'success', data: ok(row('c', 'Charlie')) },
+  });
+  assert.equal(done.signalsPendingCount, 0);
+  assert.equal(done.settled, true);
+});

@@ -185,6 +185,170 @@ async def run_conc(client, conc):
     return out
 
 
+PORTFOLIO_PROFILE = False
+REVISIT_AGE_SECONDS = 180
+PORTFOLIO_CLIENT_CONCURRENCY = 3  # web-next/src/lib/portfolioLoader.ts PORTFOLIO_LEAGUE_CONCURRENCY
+
+
+async def _portfolio_get(client, path, n):
+    t0, c0 = time.perf_counter(), time.process_time()
+    r = await client.get(path, headers={"Authorization": f"Bearer user-{n}.x.y"}, timeout=300)
+    return {"ms": (time.perf_counter() - t0) * 1000, "cpu_ms": (time.process_time() - c0) * 1000, "status": r.status_code, "bytes": len(r.content), "body": r.content}
+
+
+async def portfolio_visit(client, n, defer=True):
+    """One Portfolio page visit, driven exactly like the web/mobile clients: the
+    cheap index, then every league row with PORTFOLIO_CLIENT_CONCURRENCY
+    requests in flight, in saved order. With `defer` the per-league request is
+    headline-first (`signals=defer`); a response flagged `signals_pending` is
+    followed by a second, full request, queued behind every league's headline
+    (a server that predates the parameter just answers in full). Returns timings
+    (ms from navigation start), bytes, a canonical hash of the FINAL rows, and
+    process CPU for the whole visit."""
+
+    t0, c0 = time.perf_counter(), time.process_time()
+    calls0 = dict(UPSTREAM_CALLS)
+    idx = await _portfolio_get(client, "/v1/portfolio/leagues?lens=Dynasty", n)
+    t_index = (time.perf_counter() - t0) * 1000
+    index = json.loads(idx["body"])
+    ids = [x["league_id"] for x in index.get("saved_leagues", [])]
+    queue: asyncio.PriorityQueue = asyncio.PriorityQueue()
+    for pos, lid in enumerate(ids):
+        queue.put_nowait((0, pos, lid))
+    final: dict[str, dict] = {}
+    headline_at: dict[str, float] = {}
+    final_at: dict[str, float] = {}
+    req_ms: list[float] = []
+    nbytes = {"headline": 0, "full": 0}
+    remaining = len(ids)
+
+    async def worker():
+        nonlocal remaining
+        while remaining > 0:
+            try:
+                phase, pos, lid = await asyncio.wait_for(queue.get(), timeout=0.05)
+            except asyncio.TimeoutError:
+                continue
+            suffix = "&signals=defer" if (defer and phase == 0) else ""
+            res = await _portfolio_get(client, f"/v1/portfolio/leagues/{lid}?lens=Dynasty{suffix}", n)
+            req_ms.append(res["ms"])
+            now = (time.perf_counter() - t0) * 1000
+            body = json.loads(res["body"])
+            if phase == 0:
+                headline_at[lid] = now
+            if body.get("signals_pending") and phase == 0:
+                nbytes["headline"] += res["bytes"]
+                queue.put_nowait((1, pos, lid))
+                continue
+            nbytes["full"] += res["bytes"]
+            final[lid] = res
+            final_at[lid] = now
+            remaining -= 1
+
+    await asyncio.gather(*(worker() for _ in range(PORTFOLIO_CLIENT_CONCURRENCY)))
+    total_ms = (time.perf_counter() - t0) * 1000
+    composed = [json.loads(final[lid]["body"]) for lid in ids]
+    canon = json.dumps(_strip(composed), sort_keys=True, default=str)
+    hl = sorted(headline_at.values())
+    fin = sorted(final_at.values())
+    return {
+        "leagues": len(ids), "index_ms": round(t_index, 1), "index_bytes": idx["bytes"],
+        "first_card_ms": round(hl[0], 1) if hl else None,
+        "all_headlines_ms": round(hl[-1], 1) if hl else None,
+        "first_full_card_ms": round(fin[0], 1) if fin else None,
+        "all_cards_ms": round(total_ms, 1),
+        "req_ms_p50": round(statistics.median(req_ms), 1) if req_ms else None,
+        "req_ms_max": round(max(req_ms), 1) if req_ms else None,
+        "requests": len(req_ms),
+        "league_bytes_total": nbytes["headline"] + nbytes["full"],
+        "league_bytes_final_median": int(statistics.median(r["bytes"] for r in final.values())) if final else 0,
+        "cpu_ms": round((time.process_time() - c0) * 1000, 1),
+        "non200": sum(1 for r in final.values() if r["status"] != 200) + (idx["status"] != 200),
+        "upstream": {k: UPSTREAM_CALLS[k] - calls0[k] for k in UPSTREAM_CALLS},
+        "hash": hashlib.sha256(canon.encode()).hexdigest()[:16],
+        "_canon": canon,
+    }
+
+
+def age_caches(seconds: float) -> int:
+    """Simulate `seconds` passing for everything Portfolio caches in Redis: the 120 s
+    time-bucketed layers (valued frame, rankings, trade ideas, Sleeper reads...) are
+    dropped, finished Portfolio rows get their timestamp moved back. Saved-leagues,
+    profile and rollover entries are kept (they are re-read every visit either way)."""
+
+    import redis as _redis
+
+    client = _redis.Redis.from_url(os.environ["REDIS_URL"])
+    dropped = 0
+    for key in client.scan_iter("*"):
+        name = key.decode()
+        if "portfolio_row" in name and not name.startswith("lock:"):
+            envelope = json.loads(client.get(key))
+            envelope["ts"] -= seconds
+            client.set(key, json.dumps(envelope), ex=3600)
+        elif not name.startswith("lock:") and not any(t in name for t in ("saved_leagues", "profile_fields", "league_rollover", "team_stance", "gm_target")):
+            client.delete(key)
+            dropped += 1
+    return dropped
+
+
+async def run_portfolio(client, counts, reps, defer=True):
+    """Portfolio for a user with N leagues: cold visit (fresh user, process warm),
+    warm revisits, and the legacy single-shot GET /v1/portfolio."""
+
+    out = {}
+    # Process warm-up (imports, redis connect, shared player frames) on a throwaway user.
+    os.environ["LT_LEAGUES_PER_USER"] = "1"
+    await portfolio_visit(client, 4 * 650, defer)
+    if PORTFOLIO_PROFILE:
+        os.environ["LT_LEAGUES_PER_USER"] = "1"
+        pr = cProfile.Profile()
+        pr.enable()
+        await portfolio_visit(client, 4 * 660, defer)
+        pr.disable()
+        if PROF_DIR is not None:
+            pr.dump_stats(str(PROF_DIR / "portfolio_cold_1_league.prof"))
+        st = pstats.Stats(pr)
+        out["profile_cold_1_league"] = {"top_self": _rows(st, 25), "repo_cumulative": _cum_rows(st, 40)}
+        for r in out["profile_cold_1_league"]["repo_cumulative"]:
+            print(f"{r['cumtime_ms']:9.1f}ms cum {r['calls']:>6} {r['fn']}")
+    for count in counts:
+        os.environ["LT_LEAGUES_PER_USER"] = str(count)
+        base = 4 * (700 + 40 * count)
+        cold = await portfolio_visit(client, base, defer)
+        warm = [await portfolio_visit(client, base, defer) for _ in range(reps)]
+        age_caches(REVISIT_AGE_SECONDS)
+        await asyncio.sleep(0.3)
+        revisit = await portfolio_visit(client, base, defer)
+        revisit.pop("_canon")
+        await asyncio.sleep(3)  # let a stale-while-revalidate refresh finish before the next phase
+        calls0 = dict(UPSTREAM_CALLS)
+        legacy = await _portfolio_get(client, "/v1/portfolio?lens=Dynasty", base + 4 * 20)
+        legacy_calls = {k: UPSTREAM_CALLS[k] - calls0[k] for k in UPSTREAM_CALLS}
+        legacy_warm = await _portfolio_get(client, "/v1/portfolio?lens=Dynasty", base + 4 * 20)
+        canon = cold.pop("_canon")
+        for w in warm:
+            w.pop("_canon")
+        if BODIES_DIR is not None:
+            (BODIES_DIR / f"portfolio_{count}.cold.json").write_text(json.dumps(json.loads(canon), indent=1, sort_keys=True))
+        med = lambda key: round(statistics.median(w[key] for w in warm), 1)  # noqa: E731
+        out[str(count)] = {
+            "cold": cold,
+            "warm": {k: med(k) for k in ("index_ms", "first_card_ms", "all_headlines_ms", "all_cards_ms", "cpu_ms")},
+            "warm_hash": warm[-1]["hash"],
+            "revisit_after_expiry": revisit,
+            "legacy_cold_ms": round(legacy["ms"], 1), "legacy_cold_cpu_ms": round(legacy["cpu_ms"], 1),
+            "legacy_warm_ms": round(legacy_warm["ms"], 1), "legacy_bytes": legacy["bytes"],
+            "legacy_upstream": legacy_calls, "legacy_hash": body_hash(legacy["body"]),
+        }
+        c = cold
+        print(f"  {count:>2} leagues  cold: index {c['index_ms']:6.0f}ms first card {c['first_card_ms']:7.0f}ms headlines {c['all_headlines_ms']:7.0f}ms all {c['all_cards_ms']:7.0f}ms cpu {c['cpu_ms']:7.0f}ms"
+              f" | warm all {out[str(count)]['warm']['all_cards_ms']:7.0f}ms | legacy cold {legacy['ms']:7.0f}ms warm {legacy_warm['ms']:6.0f}ms"
+              f" | revisit@3min first {revisit['first_card_ms']:.0f}ms all {revisit['all_cards_ms']:.0f}ms cpu {revisit['cpu_ms']:.0f}ms"
+              f" | upstream {c['upstream']} {c['league_bytes_total']}B", flush=True)
+    return out
+
+
 def _rows(st, top):
     rows = sorted(st.stats.items(), key=lambda kv: kv[1][2], reverse=True)[:top]
     return [{"fn": f"{k[2]} ({Path(k[0]).name}:{k[1]})", "tottime_ms": round(v[2] * 1000, 1), "cumtime_ms": round(v[3] * 1000, 1), "calls": v[1]} for k, v in rows]
@@ -240,12 +404,15 @@ def main():
     ap.add_argument("--conc", type=int, default=8)
     ap.add_argument("--profile", action="store_true")
     ap.add_argument("--only", default="", help="skip phases: single,conc")
+    ap.add_argument("--portfolio", default="", help="comma-separated league counts (e.g. 1,5,12): run ONLY the Portfolio flow for users with that many leagues")
+    ap.add_argument("--portfolio-flow", default="defer", choices=["defer", "plain"], help="client flow for --portfolio: headline-first (default) or one full request per league")
     ap.add_argument("--endpoints", default="", help="comma-separated endpoint names to run (default all)")
     ap.add_argument("--bodies-dir", default="", help="write canonical (volatile-stripped) response bodies here for before/after diffing")
     ap.add_argument("--prof-dir", default="", help="with --profile: keep raw per-endpoint .prof files here (pstats/snakeviz)")
     ap.add_argument("--out", default="")
     a = ap.parse_args()
-    global BODIES_DIR, PROF_DIR
+    global BODIES_DIR, PROF_DIR, PORTFOLIO_PROFILE
+    PORTFOLIO_PROFILE = a.profile
     if a.prof_dir:
         PROF_DIR = Path(a.prof_dir)
         PROF_DIR.mkdir(parents=True, exist_ok=True)
@@ -253,6 +420,10 @@ def main():
         BODIES_DIR = Path(a.bodies_dir)
         BODIES_DIR.mkdir(parents=True, exist_ok=True)
     ENDPOINT_FILTER.update(x for x in a.endpoints.split(",") if x)
+    if a.portfolio:
+        # Portfolio flow: Sleeper 30-60 ms, Supabase ~30 ms per call, unless the caller overrode them.
+        os.environ.setdefault("LT_LATENCY_MS", "30,60")
+        os.environ.setdefault("LT_SUPABASE_LATENCY_MS", "30")
 
     guarded = [ROOT / "data" / n for n in ("players.db", "sleeper_players.json")]
     before_hash = {f: hashlib.sha256(f.read_bytes()).hexdigest() for f in guarded if f.exists()}
@@ -281,6 +452,10 @@ def main():
         async def go():
             result = {}
             async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url="http://bench") as c:
+                if a.portfolio:
+                    print("portfolio:", flush=True)
+                    result["portfolio"] = await run_portfolio(c, [int(x) for x in a.portfolio.split(",")], a.reps, a.portfolio_flow == "defer")
+                    return result
                 if "single" not in a.only:
                     print("single-user:", flush=True)
                     result["single"] = await run_single(c, a.reps)

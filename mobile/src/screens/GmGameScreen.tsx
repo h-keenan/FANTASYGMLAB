@@ -349,7 +349,7 @@ export default function GmGameScreen({ navigation }: Props) {
         {children}
       </ScrollView>
       {showBar && game && ctx ? (
-        <SimActionBar ctx={ctx} paywalled={simGamePaywalled(preview)} advancing={advancing} onAdvance={advance} onGoPro={goPaywall} />
+        <SimActionBar ctx={ctx} paywalled={simGamePaywalled(preview)} advancing={advancing} onAdvance={advance} onGoPro={goPaywall} onTab={(tab) => dispatch({ type: 'tab', tab })} />
       ) : null}
       {showOffBar && game && ctx ? <SimOffseasonBar ctx={ctx} /> : null}
       {sheet}
@@ -1036,7 +1036,7 @@ function SimMoreTab({ ctx, onDeleted, onHub }: { ctx: SimCtx; onDeleted: () => v
         <AppText style={styles.body}>
           {s.regular_weeks}-week season, {s.playoff_teams}-team playoffs. Trade deadline: week {s.trade_deadline_week}.
         </AppText>
-        <AppText style={styles.body}>Waiver claims resolve when you advance, worst record first.</AppText>
+        <AppText style={styles.body}>Waiver claims resolve when you advance, before games are scored, worst record first.</AppText>
       </AccentCard>
 
       <SectionHeading title="Game" />

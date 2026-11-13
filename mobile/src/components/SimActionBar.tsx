@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { ActivityIndicator, Pressable, StyleSheet, View } from 'react-native';
+import { ActivityIndicator, Alert, Pressable, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import AppText from './AppText';
@@ -10,7 +10,7 @@ import { useSimAutoSet } from './useSimAutoSet';
 import { useThemeMode } from '../context/ThemeModeContext';
 import { api } from '../lib/api';
 import { simAdvanceLabel } from '../lib/simGame';
-import { simAdvanceState } from '../lib/simLayout';
+import { simAdvanceState, simEmptySlotLabels } from '../lib/simLayout';
 import { ORB_SIZE } from '../lib/orbLayout';
 import { radii, spacing, type ThemeColors } from '../theme';
 
@@ -28,16 +28,16 @@ export function useSimActionBarBottom(): number {
 
 /**
  * The persistent bottom action bar for the in-season tabs (mirrors web-next's
- * SimActionBar): Advance week ("Week 4 -> 5", disabled with the reason when a
- * slot is empty or a cut is owed) and a secondary Auto-set pill. It floats
+ * SimActionBar): Advance week ("Week 4 -> 5", disabled only when a cut is owed;
+ * an empty slot warns and asks to confirm) and a secondary Auto-set pill. It floats
  * above the GM orb; the screen adds matching bottom padding.
  */
-export default function SimActionBar({ ctx, paywalled, advancing, onAdvance, onGoPro }: { ctx: SimCtx; paywalled: boolean; advancing: boolean; onAdvance: () => void; onGoPro: () => void }) {
+export default function SimActionBar({ ctx, paywalled, advancing, onAdvance, onGoPro, onTab }: { ctx: SimCtx; paywalled: boolean; advancing: boolean; onAdvance: () => void; onGoPro: () => void; onTab?: (tab: 'team' | 'players') => void }) {
   const { colors } = useThemeMode();
   const styles = useMemo(() => createStyles(colors), [colors]);
   const bottom = useSimActionBarBottom();
   const { gameId, game } = ctx;
-  const [emptySlots, setEmptySlots] = useState(0);
+  const [emptySlots, setEmptySlots] = useState<string[]>([]);
   const auto = useSimAutoSet(ctx);
 
   useEffect(() => {
@@ -45,7 +45,7 @@ export default function SimActionBar({ ctx, paywalled, advancing, onAdvance, onG
     api
       .getSimLineup(gameId)
       .then((body) => {
-        if (!cancelled) setEmptySlots((body.slots ?? []).filter((s) => !s.player).length);
+        if (!cancelled) setEmptySlots(simEmptySlotLabels(body.slots ?? []));
       })
       .catch(() => {});
     return () => {
@@ -54,8 +54,21 @@ export default function SimActionBar({ ctx, paywalled, advancing, onAdvance, onG
   }, [gameId, ctx.tick, game.week]);
 
   const state = simAdvanceState(game, emptySlots);
+  // An empty slot is a warning, not a block: confirm, with shortcuts to fix it first.
+  const tapAdvance = () => {
+    if (!state.confirm) {
+      onAdvance();
+      return;
+    }
+    Alert.alert('Empty starting slot', state.confirm, [
+      { text: 'Cancel', style: 'cancel' },
+      ...(onTab ? [{ text: 'Fill from bench', onPress: () => onTab('team') }, { text: 'Free agents', onPress: () => onTab('players') }] : []),
+      { text: 'Advance anyway', style: 'destructive' as const, onPress: onAdvance },
+    ]);
+  };
   return (
     <View style={[styles.bar, { bottom }]} testID="sim-action-bar">
+      {state.warning && !state.reason && !paywalled ? <AppText style={styles.reason}>{state.warning}</AppText> : null}
       {state.reason && !paywalled ? (
         <AppText style={styles.reason} accessibilityRole="alert">
           {state.reason}
@@ -81,7 +94,7 @@ export default function SimActionBar({ ctx, paywalled, advancing, onAdvance, onG
               label={game.phase === 'playoffs' ? 'Play round' : `Advance ${state.label}`}
               loading={advancing}
               disabled={state.blocked}
-              onPress={onAdvance}
+              onPress={tapAdvance}
             />
           )}
         </View>

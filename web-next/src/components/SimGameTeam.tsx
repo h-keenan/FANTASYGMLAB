@@ -358,7 +358,7 @@ export function ClaimSheet({
       <p className="text-lg font-extrabold pr-10">Claim {player.name}</p>
       <SimPlayerChip player={player} size={40} />
       <p className="text-xs pb-2" style={{ color: "var(--color-text-muted)" }}>
-        Claims resolve when you advance, worst record first. Another team may get him first.
+        Claims resolve when you advance, before games are scored, worst record first. A claimed player can start that same week. Another team may get him first.
       </p>
       <div className="flex flex-col gap-3">
         <label className="flex flex-col gap-1 text-xs" style={{ color: "var(--color-text-muted)" }}>
