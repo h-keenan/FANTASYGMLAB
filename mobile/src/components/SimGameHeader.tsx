@@ -19,7 +19,7 @@ import { radii, spacing, type ThemeColors } from '../theme';
  * the overflow menu (More: rules, reset week, delete). Mirrors web-next's
  * SimGameHeader; the text comes from the shared lib/bottomNav twin.
  */
-export function SimGameHeader({ game, onHub, onTeam, onMore }: { game: SimGame; onHub: () => void; onTeam: (teamId: string) => void; onMore: () => void }) {
+export function SimGameHeader({ game, onHub, onTeam, onMore, bell }: { game: SimGame; onHub: () => void; onTeam: (teamId: string) => void; onMore: () => void; bell?: React.ReactNode }) {
   const { colors } = useThemeMode();
   const styles = useMemo(() => createStyles(colors), [colors]);
   const you = game.you;
@@ -49,6 +49,7 @@ export function SimGameHeader({ game, onHub, onTeam, onMore }: { game: SimGame; 
       ) : (
         <View style={styles.spacer} />
       )}
+      {bell}
       <Pressable onPress={requestOrbSearch} accessibilityRole="button" accessibilityLabel="Search players and pages" style={styles.icon}>
         <Ionicons name="search-outline" size={20} color={colors.textSecondary} />
       </Pressable>

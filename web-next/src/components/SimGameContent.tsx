@@ -20,6 +20,7 @@ import { SimActionBar } from "@/components/SimActionBar";
 import { SimGameHeader, SimStatusChips } from "@/components/SimGameHeader";
 import { SimGameOrb } from "@/components/SimGameOrb";
 import { Sheet } from "@/components/ui/Sheet";
+import { SimNotificationBell, useSimNotifications } from "@/components/SimNotificationBell";
 import { SimOffseasonBar } from "@/components/SimOffseasonBar";
 import { ConfirmInPlace } from "@/components/ui/ConfirmInPlace";
 import { SimNotice, SimOpenPlayerContext, SimPreviewBanner, SimTeamLink, SimTeamOpenContext, simToneColor, type SimCtx } from "@/components/SimGameParts";
@@ -952,6 +953,7 @@ function GameScreen({
   onDeleted: () => void;
 }) {
   const paywalled = simGamePaywalled(preview);
+  const notif = useSimNotifications(ctx);
   const stage = flow.stage;
   const recap = flow.recaps[flow.recapIndex];
   const warnings = simAdvanceWarnings(game);
@@ -969,7 +971,7 @@ function GameScreen({
     {/* Phones: a 100dvh flex column. Compact header on top, content flex-1, and the action pill + bottom tab bar as an in-flow
         sticky footer (no position:fixed, no JS placement), so iOS Safari viewport quirks cannot float it. */}
     <div className={`flex flex-1 flex-col gap-3 max-md:gap-2 ${showBar || showOffBar ? "pb-3 max-md:pb-0" : "pb-6"} md:pb-3`}>
-      <SimGameHeader game={game} onHub={onHub} onTeam={(id) => ctx.openTeam(id)} onMore={() => setMoreOpen(true)} />
+      <SimGameHeader game={game} onHub={onHub} onTeam={(id) => ctx.openTeam(id)} onMore={() => setMoreOpen(true)} bell={<SimNotificationBell notif={notif} onOpenTab={onTab} />} />
       <div className="hidden items-center justify-between gap-2 md:flex">
         <div className="flex min-w-0 flex-col">
           <button type="button" className="tap-link text-xs font-bold self-start" style={{ color: "var(--color-accent)" }} onClick={onHub}>
@@ -986,6 +988,7 @@ function GameScreen({
             </div>
           ) : null}
         </div>
+        <SimNotificationBell notif={notif} onOpenTab={onTab} />
       </div>
 
       <SimPreviewBanner preview={preview} />

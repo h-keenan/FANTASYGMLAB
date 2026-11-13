@@ -19,6 +19,7 @@ import SectionHeading from '../components/SectionHeading';
 import SegmentedTabBar from '../components/SegmentedTabBar';
 import SimActionBar from '../components/SimActionBar';
 import { SimGameHeader, SimStatusChips } from '../components/SimGameHeader';
+import { SimNotificationBell, useSimNotifications } from '../components/SimNotificationBell';
 import SimGameOrb from '../components/SimGameOrb';
 import { SkeletonCard } from '../components/SkeletonBlock';
 import { SimDraftRecapView, SimGameDraft } from '../components/SimGameDraft';
@@ -1036,6 +1037,7 @@ function GameScreen({
   const { colors } = useThemeMode();
   const styles = useMemo(() => createStyles(colors), [colors]);
   const paywalled = simGamePaywalled(preview);
+  const notif = useSimNotifications(ctx);
   const stage = flow.stage;
   const recap = flow.recaps[flow.recapIndex];
   const inSeason = (stage === 'week' || stage === 'playoffs') && !draftRecap;
@@ -1044,7 +1046,7 @@ function GameScreen({
     <SimTeamOpenContext.Provider value={ctx.openTeam}>
     <SimOpenPlayerContext.Provider value={ctx.openPlayer}>
     <View style={styles.stack}>
-      <SimGameHeader game={game} onHub={onHub} onTeam={ctx.openTeam} onMore={() => onTab('more')} />
+      <SimGameHeader game={game} onHub={onHub} onTeam={ctx.openTeam} onMore={() => onTab('more')} bell={<SimNotificationBell notif={notif} onOpenTab={onTab} />} />
       {inSeason && !recap && !paywalled ? <SimStatusChips game={game} onTab={onTab} /> : null}
 
       <SimPreviewBanner preview={preview} />
