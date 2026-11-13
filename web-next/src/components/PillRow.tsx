@@ -1,5 +1,6 @@
 "use client";
 
+import { PulseOnIncrease } from "@/components/Motion";
 import Link from "next/link";
 import { useCallback, useEffect, useRef, useState, type KeyboardEvent, type ReactNode } from "react";
 
@@ -208,7 +209,7 @@ export function PillRow({
               style={{ minWidth: 16, height: 16, padding: "0 4px", borderRadius: "var(--radius-pill)", background: "var(--color-accent)", color: "var(--color-on-accent)" }}
               aria-label={`${option.count} new`}
             >
-              {option.count}
+              <PulseOnIncrease value={option.count}>{option.count}</PulseOnIncrease>
             </span>
           ) : null;
           // Phones stack the icon over the label so six tabs fit; from sm up they sit side by side.

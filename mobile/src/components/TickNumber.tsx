@@ -3,13 +3,12 @@ import { AccessibilityInfo, type StyleProp, type TextStyle } from 'react-native'
 
 import AppText from './AppText';
 import { useThemeMode } from '../context/ThemeModeContext';
+import { COUNT_MS as TICK_MS, FLASH_MS, flashDirection } from '../lib/motion';
 
-const TICK_MS = 450;
-const FLASH_MS = 1100;
 
 /**
  * A number that counts to its new value (about 450 ms, ease-out) and flashes
- * green when it goes up. Reduced motion: no counting, the value just changes
+ * green when it goes up and red when it goes down. Reduced motion: no counting, the value just changes
  * and the (non-moving) green flash remains. First render never animates.
  * Twin of web-next/src/components/TickNumber.tsx.
  */
@@ -27,7 +26,7 @@ export default function TickNumber({
   const { colors } = useThemeMode();
   const target = typeof value === 'number' && Number.isFinite(value) ? value : null;
   const [anim, setAnim] = useState<{ target: number; value: number } | null>(null);
-  const [flashing, setFlashing] = useState(false);
+  const [flashing, setFlashing] = useState<'up' | 'down' | null>(null);
   const previous = useRef<number | null>(target);
   const reduced = useRef(false);
 
@@ -51,9 +50,10 @@ export default function TickNumber({
       setAnim({ target, value: from + (target - from) * eased });
       if (t < 1) raf = requestAnimationFrame(step);
     };
-    if (target > from) {
-      setFlashing(true);
-      flashTimer = setTimeout(() => setFlashing(false), FLASH_MS);
+    const dir = flashDirection(from, target);
+    if (dir) {
+      setFlashing(dir);
+      flashTimer = setTimeout(() => setFlashing(null), FLASH_MS);
     }
     step();
     return () => {
@@ -66,7 +66,7 @@ export default function TickNumber({
   return (
     <AppText
       testID={testID}
-      style={[{ fontVariant: ['tabular-nums'] }, style, flashing && { color: colors.successBright }]}
+      style={[{ fontVariant: ['tabular-nums'] }, style, flashing === 'up' && { color: colors.successBright }, flashing === 'down' && { color: colors.danger }]}
     >
       {shown == null ? '—' : shown.toFixed(decimals)}
     </AppText>

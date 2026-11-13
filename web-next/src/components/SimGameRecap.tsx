@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 
 import { AccentCard } from "@/components/AccentCard";
+import { Confetti, CountUp } from "@/components/Motion";
 import { Button } from "@/components/Button";
 import { EmptyState } from "@/components/EmptyState";
 import { PositionBadge } from "@/components/PositionBadge";
@@ -73,7 +74,7 @@ export function SimWeekRecapView({
               <span className="text-xs break-words min-w-0 text-right" style={{ color: "var(--color-text-muted)" }}>vs {game.opponent_name}</span>
             </div>
             <div className="flex items-baseline justify-center gap-3" aria-label={`You ${simFmtPts(game.your_pts)}, ${game.opponent_name} ${simFmtPts(game.opp_pts)}`}>
-              <span className="text-4xl font-extrabold" style={{ color: simToneColor(tone) }}>{simFmtPts(game.your_pts)}</span>
+              <span className="text-4xl font-extrabold" style={{ color: simToneColor(tone) }}><CountUp value={game.your_pts} /></span>
               <span className="text-sm" style={{ color: "var(--color-text-muted)" }}>to</span>
               <span className="text-3xl font-bold" style={{ color: "var(--color-text-secondary)" }}>{simFmtPts(game.opp_pts)}</span>
             </div>
@@ -87,6 +88,7 @@ export function SimWeekRecapView({
         ) : (
           <p className="text-base font-bold">You had a bye this week.</p>
         )}
+        <Confetti wonTitle={recap.season_complete && recap.champion != null && recap.champion === youId} />
         {recap.season_complete ? (
           <p className="flex items-center gap-2 text-sm font-bold" role="status" style={{ color: "var(--color-success)" }}>
             <ReviewGlyphChip glyph="trophy" tone="success" size={24} />

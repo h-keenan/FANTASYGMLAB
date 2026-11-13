@@ -101,6 +101,31 @@ const pages: StoryPage[] = [
   (`SimRecapStory`: Result, Matchup breakdown, Injuries and lineup, Around the league, Next week; a
   "Full details" button opens the classic recap). Meant for the season recap, draft recap and offseason
   review next; those are not built yet.
+## Motion
+
+One motion vocabulary for web and app (coridian_: "I do like the animations, more of that wherever it's fitting"):
+pure tokens and rules in `lib/motion.ts` (byte-identical twin), web CSS variables + classes in `globals.css`
+("Motion library"), hooks in `lib/useMotion.ts`, components in `components/Motion.tsx` (app: `lib/useMotion.ts`,
+`components/Motion.tsx` on Animated/native driver).
+
+- **Durations**: `instant` 120, `fast` 180, `base` 240, `slow` 300ms (`MOTION_MS`, `--motion-*`). A count-up is the one
+  deliberate longer one (450ms). Easings: `--ease-out` (entrances), `--ease-in-out` (sweeps), `--ease-in` (exits).
+- **Rules**: opacity and transform only (the one exception is the hero OVR ring fill: a single custom property on md/lg
+  rings, never in lists); no layout shift (a block waits invisible but in place); nothing animates a list over 24
+  rows (`shouldAnimateList`, `MAX_ANIMATED_ROWS`); staggers add at most 240ms in total however many items
+  (`staggerDelay`); entrances play when a block scrolls into view (`useInView`, an IntersectionObserver that disconnects),
+  not all at page load.
+- **Reduced motion is one switch**: `useReducedMotion()` (web: `prefers-reduced-motion`, live; app: OS Reduce Motion,
+  live) plus a CSS `@media (prefers-reduced-motion: reduce)` block for every class. Under it nothing moves: content is
+  simply there, counts show their final value, the score flash stays as a shorter colour change, confetti is not rendered.
+- **Pieces**: `MotionIn` (entrance + stagger), `CountUp` (number counts up the first time it appears), `TickNumber`
+  (follows changes: green flash up, red down), `PulseOnIncrease` (badge/bell pulse when a count goes up),
+  `.motion-sweep` (advance-week light band across a block), `Confetti` (title only), `.enter-rise` / `.enter-pop` /
+  `.sim-row-drafted` (existing: results landing, a drafted/claimed row sliding away), skeleton shimmer, Tabs slide, toast.
+- **Where it is applied**: Scores cards (stagger, count-up, week sweep), recap hero score (count-up) and title confetti, trade
+  offers (capped stagger in, verdict pop), tab count badges (pulse), hero OVR rings (fill), TickNumber everywhere it is used.
+- **Adding motion**: use a class/hook above, never a new keyframe with its own duration; check the reduced-motion test
+  (`components/Motion.test.tsx`) still describes your component's behaviour, and keep it off long lists.
 
 ## ConfirmInPlace
 

@@ -2,18 +2,18 @@
 
 import { useEffect, useRef, useState, type CSSProperties } from "react";
 
+import { COUNT_MS as TICK_MS, FLASH_MS, flashDirection } from "@/lib/motion";
+
 function prefersReducedMotion(): boolean {
   return typeof window !== "undefined" && typeof window.matchMedia === "function"
     ? window.matchMedia("(prefers-reduced-motion: reduce)").matches
     : false;
 }
 
-const TICK_MS = 450;
-const FLASH_MS = 1100;
 
 /**
  * A number that counts to its new value (about 450 ms, ease-out) and flashes
- * green when it goes up. Reduced motion: no counting, the value just
+ * green when it goes up and red when it goes down. Reduced motion: no counting, the value just
  * changes and the (non-moving) green flash remains. First render never
  * animates. Twin of mobile/src/components/TickNumber.tsx.
  */
@@ -32,7 +32,7 @@ export function TickNumber({
 }) {
   const target = typeof value === "number" && Number.isFinite(value) ? value : null;
   const [anim, setAnim] = useState<{ target: number; value: number } | null>(null);
-  const [flashing, setFlashing] = useState(false);
+  const [flashing, setFlashing] = useState<"up" | "down" | null>(null);
   const previous = useRef<number | null>(target);
 
   useEffect(() => {
@@ -51,9 +51,10 @@ export function TickNumber({
       raf = requestAnimationFrame(step);
     };
     raf = requestAnimationFrame((now) => {
-      if (target > from) {
-        setFlashing(true);
-        flashTimer = setTimeout(() => setFlashing(false), FLASH_MS);
+      const dir = flashDirection(from, target);
+      if (dir) {
+        setFlashing(dir);
+        flashTimer = setTimeout(() => setFlashing(null), FLASH_MS);
       }
       step(now);
     });
@@ -69,7 +70,7 @@ export function TickNumber({
   return (
     <span
       data-testid={testId}
-      data-flash={flashing ? "up" : undefined}
+      data-flash={flashing ?? undefined}
       className={`tick-number tabular-nums${className ? ` ${className}` : ""}`}
       style={style}
     >
