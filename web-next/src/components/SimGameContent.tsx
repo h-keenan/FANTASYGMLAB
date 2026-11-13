@@ -66,11 +66,7 @@ import {
   type SimDraftRecap,
   type SimGame,
   type SimGameCreateBody,
-  type SimGameDelta,
   type SimGameGate,
-  SIM_DELTA_FRESH_MS,
-  SIM_RECONCILE_MS,
-  simApplyDelta,
   type SimGameLite,
   type SimGameOptionsResponse,
   type SimGamePlayer,
@@ -84,7 +80,7 @@ import {
   type SimTradeSeed,
 } from "@/lib/simGame";
 import { SIM_FLOW_INITIAL, SIM_TABS, simFlowReducer, simRecapsFromAdvance, type SimTab } from "@/lib/simGameFlow";
-import { useSimGameCall } from "@/lib/useSimGameCall";
+import { useSimDeltaReload, useSimGameCall } from "@/lib/useSimGameCall";
 import { useSimLeagueTeams } from "@/lib/useSimLeagueTeams";
 import { useSimLeagueChoices } from "@/lib/useSimLeagueChoices";
 
@@ -151,23 +147,7 @@ export function SimGameContent() {
 
   // A small action's own response already carries the header slice it changed (`delta`), so right after one
   // the screen applies that and confirms with the server in the background instead of waiting on a second request.
-  const deltaAt = useRef(0);
-  const reconcileTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  useEffect(() => () => {
-    if (reconcileTimer.current) clearTimeout(reconcileTimer.current);
-  }, []);
-  const onDelta = useCallback((delta: SimGameDelta) => {
-    deltaAt.current = Date.now();
-    setGameState((g) => (g ? simApplyDelta(g, delta) : g));
-  }, []);
-  const reloadGame = useCallback(async () => {
-    if (Date.now() - deltaAt.current < SIM_DELTA_FRESH_MS) {
-      if (reconcileTimer.current) clearTimeout(reconcileTimer.current);
-      reconcileTimer.current = setTimeout(() => void fetchGame(), SIM_RECONCILE_MS);
-      return;
-    }
-    await fetchGame();
-  }, [fetchGame]);
+  const { onDelta, reloadGame } = useSimDeltaReload(fetchGame, setGameState);
 
   const call = useSimGameCall(
     onGate,

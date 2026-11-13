@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef } from "react";
 
-import { simActionFailureMessage, simGameErrorGate, simGameGate, simIsTransientGate, type SimGameDelta, type SimGameEnvelope, type SimGameGate } from "@/lib/simGame";
+import { SIM_DELTA_FRESH_MS, SIM_RECONCILE_MS, simActionFailureMessage, simApplyDelta, simGameErrorGate, simGameGate, simIsTransientGate, type SimGame, type SimGameDelta, type SimGameEnvelope, type SimGameGate } from "@/lib/simGame";
 
 export const SIM_CALL_RETRY_MS = 700;
 
@@ -63,4 +63,29 @@ export function useSimGameCall(
     }
     return null;
   }, []);
+}
+
+/**
+ * A small action's own response carries the header slice it changed (`delta`): apply it, and right after one
+ * answer `reloadGame()` with a background confirm instead of a second awaited request.
+ */
+export function useSimDeltaReload(fetchGame: () => Promise<void>, setGame: (fn: (g: SimGame | null) => SimGame | null) => void) {
+  const state = useRef<{ at: number; timer: ReturnType<typeof setTimeout> | null }>({ at: 0, timer: null });
+  useEffect(() => () => {
+    if (state.current.timer) clearTimeout(state.current.timer);
+  }, []);
+  const onDelta = useCallback((delta: SimGameDelta) => {
+    state.current.at = Date.now();
+    setGame((g) => (g ? simApplyDelta(g, delta) : g));
+  }, [setGame]);
+  const reloadGame = useCallback(async () => {
+    const s = state.current;
+    if (Date.now() - s.at < SIM_DELTA_FRESH_MS) {
+      if (s.timer) clearTimeout(s.timer);
+      s.timer = setTimeout(() => void fetchGame(), SIM_RECONCILE_MS);
+      return;
+    }
+    await fetchGame();
+  }, [fetchGame]);
+  return { onDelta, reloadGame };
 }
