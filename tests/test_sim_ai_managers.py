@@ -6,6 +6,7 @@ from collections import Counter
 from dataclasses import replace
 
 from modules.sim import game_ai_depth as ad
+from modules.sim import game_scoring
 from modules.sim.calibration import ai_report, dataset, tail_report
 from modules.sim.game_engine import _post_trade_cover, advance, waiver_order
 from modules.sim.game_eval import Evaluator
@@ -70,11 +71,13 @@ def test_ai_v0_games_still_use_the_original_waiver_path(monkeypatch):
     assert not called
 
 
-def test_ai_v0_game_replays_identically_and_ai_v1_is_pinned():
+def test_ai_v0_game_replays_identically_and_ai_v1_is_pinned(monkeypatch):
     *_, digests0 = _play(V4_ID)
     assert digests0 == GOLDEN_AI0_V4_DIGESTS
+    # the ai_v 1 game on player-model-4 (a model id pins the player model; the AI generation is the settings)
+    monkeypatch.setattr(game_scoring, "default_model", lambda: game_scoring.get_model(V4_ID))
     snap, state, em = drafted(11)
-    assert snap.settings.ai_v == 1
+    assert snap.settings.ai_v == 1 and snap.scoring_model == V4_ID
     for _ in range(5):
         advance(em, snap, state, 11)
     assert state.digest() == GOLDEN_AI1_DIGESTS[6]

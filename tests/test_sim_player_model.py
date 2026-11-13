@@ -159,8 +159,8 @@ def test_weekly_mean_matches_the_target_in_the_leagues_own_scoring(pos, ppg, sco
     prof = _no_events(pm.draw_season_profile(_player(pos, ppg), pm.profile_rng(1, "p1")), season_mean_ppg=ppg)
     pts = []
     for s in range(900):
-        for w in (1, 2, 3):
-            pts.append(pm.draw_week_points(_player(pos, ppg), prof, w if w != prof.bye_week else 1, pm.week_rng(s, "m", w), scoring).points)
+        for w in (7, 8, 9):  # around the centre of the in-season path tilt (player-model-5), where the tilt is 1.0
+            pts.append(pm.draw_week_points(_player(pos, ppg), prof, w if w != prof.bye_week else 10, pm.week_rng(s, "m", w), scoring).points)
     assert np.mean(pts) == pytest.approx(ppg, rel=0.05)
 
 

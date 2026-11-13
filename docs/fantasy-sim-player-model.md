@@ -120,6 +120,17 @@ each game's role). The shown "This week" is the public expected value of the eng
 (real vs sim percentiles, max, share above 30/40/50 by position and depth slot, team scores, projection error); `backtest --model v3|v4` for season-level
 calibration. Before/after tables in `docs/audits/2026-11-sim-tail-realism.md`. Games on v1-v3 keep exactly their old behaviour.
 
+## 1e. player-model-5: the in-season path
+
+The player-model-4 expected weekly mean, relative to a player's season mean, fell from 1.00 in week 1 to about 0.92 by week 13 for starters
+(role changes are biased down at the top of the pool), while the real 2021-25 panel is flat: the weekly trend of points relative to the
+projection is -0.1% a week for elite players, -0.2% for starters, +0.3% flex, +1.7% depth (`modules/sim/calibration/path_fit.py`). A 12-team league's
+scoring fell about 15% from week 1 to week 13 in a whole-game sweep (`realism_sweep.py`). player-model-5 tilts weekly means by
+`1 + PATH_TILT[tier] x (week - 8)` (elite 0.5%, starter 0.5%, flex 0.1%, depth 0; centered, so season totals and every season-level calibration
+are unchanged: PIT KS 0.204 -> 0.204, 80% coverage 65.3% -> 65.2%, tier-hit MAE 0.032 -> 0.031, weekly CV ratios unchanged). Model-level slopes after:
+elite +0.1% / starter -0.4% a week (real -0.1% / -0.2%). Games created under player-model-4 keep it (`player_model_v4.py`, sha256 pinned, golden digests
+for a v4 game pinned). What remains of the in-season scoring decline is attrition (injuries and byes), which the real data has too.
+
 ## 2. What is modelled
 
 **Season story** (`season_level`, vectorised, one categorical draw per player):
