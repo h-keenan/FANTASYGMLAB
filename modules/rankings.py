@@ -4877,6 +4877,13 @@ def _load_players_without_snapshot(db_path: str) -> pd.DataFrame:
         kicker_mask = df["position"].astype(str).str.upper() == "K"
         kicker_ranks = pd.to_numeric(df.loc[kicker_mask, "search_rank"], errors="coerce")
         kicker_valid = kicker_mask & kicker_ranks.lt(UNRANKED_SEARCH_RANK)
+        if "lifecycle_state" in df.columns:
+            # The player universe deliberately zeroes value for names that are
+            # not rankable (retired_or_unknown, inactive, ...) while leaving a
+            # stale search_rank on them. Only a kicker the universe says can
+            # carry value counts as evidence of a stale kicker valuation;
+            # otherwise every load rebuilds the whole table from scratch.
+            kicker_valid &= player_universe.is_rankable(df["lifecycle_state"]).astype(bool)
         if kicker_valid.any():
             kicker_is_stale = (df.loc[kicker_valid, "value"].fillna(0) == 0).any()
 
