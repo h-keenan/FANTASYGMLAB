@@ -1,22 +1,29 @@
 "use client";
 
-import { useEffect, useRef, useState, useSyncExternalStore, type ReactNode } from "react";
+import { createContext, useContext, useEffect, useRef, useState, useSyncExternalStore, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 
 import { AccentCard } from "@/components/AccentCard";
 import { Button } from "@/components/Button";
+import { PlayerAvatar } from "@/components/PlayerAvatar";
 import { PlayerIdentity } from "@/components/PlayerRow";
 import { ReviewGlyphChip } from "@/components/SeasonReviewSections";
+import { SectionHeading } from "@/components/SectionHeading";
 import { SheetHandle } from "@/components/SheetHandle";
+import { SimCrest } from "@/components/SimCrest";
+import { SimGlyph } from "@/components/SimGlyph";
 import { ReviewGlyphIcon } from "@/components/SimReviewGlyph";
 import { ToneBadge } from "@/components/ToneBadge";
 import {
   simFmtPts,
+  simShortName,
+  simTrendText,
   simPlayerSubline,
   simGamePreviewLine,
   simNoticeGlyph,
   simHeadshotId,
   simPlayerInitials,
+  type SimGlyphName,
   type SimPlayerRef,
   type SimGame,
   type SimGameEnvelope,
@@ -72,6 +79,8 @@ export interface SimCtx {
   tick: number;
   bump: () => void;
   openPlayer: (player: SimGamePlayer) => void;
+  /** Open any team's scouting sheet (roster, record, strengths and needs). */
+  openTeam: (teamId: string) => void;
 }
 
 /** The shared status pill tinted from a presentation tone. */
@@ -314,5 +323,151 @@ export function SimPager({ page, pages, onPage }: { page: number; pages: number;
         Next
       </Button>
     </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Color and glyph building blocks shared by every game screen
+
+/** Opens the team scouting sheet. Provided once by the game screen; a team link outside it is plain text. */
+export const SimTeamOpenContext = createContext<((teamId: string) => void) | null>(null);
+
+/**
+ * A team's emblem and name as one tap target that opens its scouting sheet
+ * (roster, record, strengths and needs) from anywhere: standings, matchup,
+ * trade partner, league feed.
+ */
+export function SimTeamLink({
+  teamId,
+  name,
+  isYou = false,
+  size = 24,
+  suffix,
+  className = "",
+  bold = true,
+  hideName = false,
+  stacked = false,
+}: {
+  teamId: string | null | undefined;
+  name: string;
+  isYou?: boolean;
+  size?: number;
+  suffix?: ReactNode;
+  className?: string;
+  bold?: boolean;
+  /** Emblem only (the name is printed beside it); the tap target keeps the name for screen readers. */
+  hideName?: boolean;
+  /** Emblem above the name, centered (the matchup header). */
+  stacked?: boolean;
+}) {
+  const open = useContext(SimTeamOpenContext);
+  const body = (
+    <>
+      <SimCrest name={name} size={size} />
+      {hideName ? null : (
+        <span className={`min-w-0 break-words text-sm ${bold ? "font-bold" : "font-medium"}`}>
+          {name}
+          {isYou ? " (you)" : ""}
+        </span>
+      )}
+      {suffix}
+    </>
+  );
+  const layout = stacked ? "flex-col justify-center text-center gap-1" : "items-center gap-2";
+  if (!open || !teamId) return <span className={`inline-flex min-w-0 ${layout} ${className}`}>{body}</span>;
+  return (
+    <button
+      type="button"
+      onClick={() => open(teamId)}
+      className={`tap-link inline-flex min-w-0 ${layout} ${stacked ? "" : "text-left"} ${className}`}
+      style={{ minHeight: "var(--touch-target-min)" }}
+      aria-label={`${name}${isYou ? " (you)" : ""}. Open team`}
+    >
+      {body}
+    </button>
+  );
+}
+
+/** Section title with a tinted glyph, on the shared SectionHeading. */
+export function SimSectionTitle({
+  glyph,
+  tone = "accent",
+  children,
+  note,
+  action,
+  id,
+}: {
+  glyph: SimGlyphName;
+  tone?: SimGameTone;
+  children: ReactNode;
+  note?: string;
+  action?: ReactNode;
+  id?: string;
+}) {
+  const title = (
+    <span className="inline-flex items-center gap-2">
+      <span className="inline-flex" style={{ color: simToneColor(tone) }}>
+        <SimGlyph name={glyph} size={16} />
+      </span>
+      {children}
+    </span>
+  );
+  return (
+    <SectionHeading id={id} size="compact" action={action} note={note}>
+      {title}
+    </SectionHeading>
+  );
+}
+
+/** Green up / red down text for a points change. */
+export function SimTrend({ delta, suffix = "" }: { delta: number | null | undefined; suffix?: string }) {
+  const t = simTrendText(delta);
+  return (
+    <span className="inline-flex items-center gap-0.5 font-bold tabular-nums" style={{ color: simToneColor(t.tone) }} data-testid="sim-trend">
+      {t.arrow ? <span aria-hidden="true" style={{ fontSize: "0.65em" }}>{t.arrow}</span> : null}
+      {t.text}
+      {suffix}
+    </span>
+  );
+}
+
+/** A compact photo + name + status chip for dense two-column surfaces (matchup, cover lists). */
+export function SimMiniPlayer({
+  player,
+  align = "left",
+  extra,
+  onOpen,
+  size = 28,
+  wrap = false,
+}: {
+  /** Allow the name two lines (shortened only when very long) instead of truncating. */
+  wrap?: boolean;
+  player: SimGamePlayer;
+  align?: "left" | "right";
+  extra?: ReactNode;
+  onOpen?: (player: SimGamePlayer) => void;
+  size?: number;
+}) {
+  const hurt = player.status === "out";
+  const bye = player.status === "bye";
+  const body = (
+    <span className={`flex w-full min-w-0 items-center gap-2 ${align === "right" ? "flex-row-reverse text-right" : ""}`}>
+      <PlayerAvatar playerId={simHeadshotId(player)} fallbackLabel={simPlayerInitials(player)} size={size} />
+      <span className="flex min-w-0 flex-1 flex-col leading-tight">
+        <span className={`block text-xs font-bold ${wrap ? "line-clamp-2 break-words" : "truncate"}`} style={{ color: hurt || bye ? "var(--color-text-muted)" : undefined, textDecoration: hurt ? "line-through" : undefined }}>
+          {wrap ? simShortName(player.name, 19) : player.name}
+        </span>
+        <span className={`flex items-center gap-1 text-[0.6875rem] ${align === "right" ? "justify-end" : ""}`} style={{ color: "var(--color-text-muted)" }}>
+          {hurt ? <SimToneBadge label="Out" tone="danger" /> : bye ? <SimToneBadge label="Bye" tone="warning" /> : <span className="truncate">{player.team ?? "FA"}</span>}
+          {extra}
+        </span>
+      </span>
+    </span>
+  );
+  if (!onOpen) return <span className="block min-w-0">{body}</span>;
+  return (
+    <button type="button" className="block w-full min-w-0 text-left" onClick={() => onOpen(player)} aria-label={`${player.name}, ${player.pos}. Open player details`}>
+      {body}
+    </button>
   );
 }

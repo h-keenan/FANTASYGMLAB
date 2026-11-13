@@ -26,6 +26,7 @@ from pydantic import BaseModel, Field
 
 from modules.sim import game_actions as act
 from modules.sim import game_draft as draft
+from modules.sim import game_home as home
 from modules.sim import game_view as view
 from modules.sim.game_ai import TradeDesk
 from modules.sim.game_engine import advance, finish_draft, start_from_league
@@ -554,10 +555,21 @@ def add_routes(router: APIRouter, ctx: GameApiCtx) -> None:
     @guarded
     def get_team(game_id: str, team_id: str, user: dict[str, Any] = Depends(require_user)):
         pro = ctx.is_pro(user)
-        _, _, _, snap, state = load(user, _gid(game_id))
+        _, _, row, snap, state = load(user, _gid(game_id))
         if team_id not in snap.tids:
             raise HTTPException(status_code=404, detail="Team not found.")
-        return {**_env(pro, state), **view.team_roster(snap, state, team_id)}
+        return {**_env(pro, state), **home.team_detail(snap, state, team_id, int(row["seed"]))}
+
+    # ------------------------------------------------------------------ home
+
+    @router.get("/games/{game_id}/home")
+    @guarded
+    def get_home(game_id: str, user: dict[str, Any] = Depends(require_user)):
+        pro = ctx.is_pro(user)
+        _, _, row, snap, state = load(user, _gid(game_id))
+        if state.status not in ("in_season", "playoffs"):
+            return {**_env(pro, state, "wrong_phase"), "phase": "draft" if state.status == "drafting" else "complete"}
+        return {**_env(pro, state), **home.home_view(snap, state, int(row["seed"]))}
 
     # ---------------------------------------------------------------- lineup
 

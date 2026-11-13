@@ -8,11 +8,10 @@ import EmptyState from './EmptyState';
 import ErrorState from './ErrorState';
 import PositionBadge from './PositionBadge';
 import { ReviewGlyphChip } from './SeasonReviewSections';
-import SectionHeading from './SectionHeading';
 import SegmentedTabBar from './SegmentedTabBar';
 import { SkeletonCard } from './SkeletonBlock';
 import { SimPlayerBrowser } from './SimGamePlayers';
-import { SimPlayerChip, SimPlayerLine, SimSheet, SimStat, SimToneBadge, createSimStyles, simToneColor, type SimCtx } from './SimGameParts';
+import { SimPlayerChip, SimPlayerLine, SimSectionTitle, SimSheet, SimStat, SimTeamLink, SimToneBadge, createSimStyles, simToneColor, type SimCtx } from './SimGameParts';
 import { useThemeMode } from '../context/ThemeModeContext';
 import { api } from '../lib/api';
 import {
@@ -141,25 +140,22 @@ export function SimTeamTab({ ctx, onTrade }: { ctx: SimCtx; onTrade: () => void 
   return (
     <View style={common.stack}>
       {week ? (
-        <AccentCard accent={simToneColor(simMatchupTone(week), colors)}>
-          <View style={common.row}>
-            <ReviewGlyphChip glyph="game" tone={simMatchupTone(week)} size={24} />
-            <AppText style={styles.kicker}>Week {week.week} matchup</AppText>
-          </View>
+        <AccentCard accent={simToneColor(simMatchupTone(week), colors)} compact>
           <View style={common.rowBetween}>
-            <View style={common.grow}>
-              <AppText style={common.bodyStrong}>You</AppText>
-              <AppText style={styles.projection} testID="your-projection">
+            <View style={[common.row, common.grow]}>
+              <ReviewGlyphChip glyph="game" tone={simMatchupTone(week)} size={24} />
+              <AppText style={styles.kicker}>Week {week.week}</AppText>
+              {week.opponent ? <SimTeamLink teamId={week.opponent.team_id} name={week.opponent.name} size={24} /> : <AppText style={common.bodyStrong}>Bye week</AppText>}
+            </View>
+            <View style={common.row}>
+              <AppText style={[styles.projection, week.opponent && week.your_projection >= week.opponent_projection && { color: colors.success }]} testID="your-projection">
                 {simFmtPts(week.your_projection)}
               </AppText>
-            </View>
-            <AppText style={common.muted}>vs</AppText>
-            <View style={[common.grow, styles.right]}>
-              <AppText style={[common.bodyStrong, common.center]}>{week.opponent?.name ?? 'Bye week'}</AppText>
-              <AppText style={styles.projection}>{week.opponent ? simFmtPts(week.opponent_projection) : '-'}</AppText>
+              {week.opponent ? <AppText style={common.muted}>vs</AppText> : null}
+              {week.opponent ? <AppText style={[styles.projection, week.opponent_projection > week.your_projection && { color: colors.danger }]}>{simFmtPts(week.opponent_projection)}</AppText> : null}
             </View>
           </View>
-          <AppText style={[common.small, { color: simToneColor(simMatchupTone(week), colors), fontWeight: '600' }]}>{simMatchupLine(week)}</AppText>
+          <AppText style={[common.small, { color: simToneColor(simMatchupTone(week), colors), fontWeight: '600' }]}>{simMatchupLine(week)} The full head-to-head is on Home.</AppText>
         </AccentCard>
       ) : null}
 
@@ -189,7 +185,8 @@ export function SimTeamTab({ ctx, onTrade }: { ctx: SimCtx; onTrade: () => void 
       ) : null}
 
       <View>
-        <SectionHeading
+        <SimSectionTitle
+          glyph="team"
           title="Lineup"
           caption={`Projected ${simFmtPts(lineup.projected_total)} points`}
           right={<Button size="sm" variant="secondary" label="Auto-set" loading={saving} onPress={auto} />}
@@ -224,7 +221,7 @@ export function SimTeamTab({ ctx, onTrade }: { ctx: SimCtx; onTrade: () => void 
       </View>
 
       <View>
-        <SectionHeading title="Bench" caption={`${lineup.roster_size ?? 0} of ${lineup.roster_limit ?? 16} roster spots`} />
+        <SimSectionTitle glyph="bye" tone="muted" title="Bench" caption={`${lineup.roster_size ?? 0} of ${lineup.roster_limit ?? 16} roster spots`} />
         {bench.length === 0 ? (
           <EmptyState icon="albums-outline" title="Empty bench" subtitle="Add free agents from the Players tab." />
         ) : (
@@ -300,7 +297,7 @@ export function SimTeamTab({ ctx, onTrade }: { ctx: SimCtx; onTrade: () => void 
 }
 
 /** Add (with an optional drop and start slot) as a waiver claim. */
-function ClaimSheet({
+export function ClaimSheet({
   ctx,
   player,
   roster,
@@ -440,7 +437,7 @@ export function SimPlayersTab({
       />
       {mode === 'waivers' && claims.length > 0 ? (
         <View style={common.stack}>
-          <SectionHeading title="Queued claims" caption="Resolve at Advance, worst record first." />
+          <SimSectionTitle glyph="waiver" title="Queued claims" caption="Resolve at Advance, worst record first." />
           {claims.map((claim) => (
             <AccentCard key={claim.id} accent={colors.success} compact>
               <View style={common.rowBetween}>
@@ -472,7 +469,7 @@ export function SimPlayersTab({
 function createStyles(colors: ThemeColors) {
   return StyleSheet.create({
     kicker: { fontSize: 12.5, fontWeight: '800', letterSpacing: 0.8, textTransform: 'uppercase', color: colors.textTertiary },
-    projection: { fontSize: 24, fontWeight: '800', color: colors.textPrimary },
+    projection: { fontSize: 18, fontWeight: '800', color: colors.textPrimary },
     right: { alignItems: 'flex-end' },
     emptySlot: { paddingVertical: spacing.sm },
     shop: { alignSelf: 'flex-start' },

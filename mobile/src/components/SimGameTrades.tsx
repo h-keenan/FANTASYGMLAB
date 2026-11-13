@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useReducer, useState } from 'react';
+import React, { useContext, useEffect, useMemo, useReducer, useState } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 
 import AccentCard from './AccentCard';
@@ -11,7 +11,9 @@ import { ReviewGlyphChip } from './SeasonReviewSections';
 import SectionHeading from './SectionHeading';
 import SegmentedTabBar from './SegmentedTabBar';
 import { SkeletonCard } from './SkeletonBlock';
-import { SimPlayerLine, SimPopIn, SimSideLabel, SimStat, SimToneBadge, createSimStyles, simToneColor, type SimCtx } from './SimGameParts';
+import SimCrest from './SimCrest';
+import SimGlyph from './SimGlyph';
+import { SimPlayerLine, SimPopIn, SimSideLabel, SimStat, SimTeamLink, SimTeamOpenContext, SimToneBadge, createSimStyles, simToneColor, type SimCtx } from './SimGameParts';
 import ToneBadge from './ToneBadge';
 import { useThemeMode } from '../context/ThemeModeContext';
 import { api } from '../lib/api';
@@ -33,6 +35,19 @@ import {
   type SimTradeVerdict,
 } from '../lib/simGame';
 import type { ThemeColors } from '../theme';
+
+/** "Scout" button for the partner list: opens the team's scouting sheet without picking it as the partner. */
+function ScoutButton({ teamId, name }: { teamId: string; name: string }) {
+  const { colors } = useThemeMode();
+  const open = useContext(SimTeamOpenContext);
+  if (!open) return null;
+  return (
+    <Pressable onPress={() => open(teamId)} accessibilityRole="button" accessibilityLabel={`Scout ${name}`} style={{ minHeight: 44, flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+      <SimGlyph name="team" color={colors.accent} size={13} />
+      <AppText style={{ fontSize: 13, fontWeight: '800', color: colors.accent }}>Scout</AppText>
+    </Pressable>
+  );
+}
 
 function PlayerList({ players }: { players: SimGamePlayer[] }) {
   return (
@@ -110,9 +125,8 @@ function Inbox({ ctx }: { ctx: SimCtx }) {
         <FadeInView key={item.id}>
           <AccentCard accent={colors.premium}>
             <View style={common.rowBetween}>
-              <View style={[common.row, common.grow]}>
-                <ReviewGlyphChip glyph="trade" tone="accent" size={28} />
-                <AppText style={[common.bodyStrong, common.grow]}>{item.from.name}</AppText>
+              <View style={common.grow}>
+                <SimTeamLink teamId={item.from.team_id} name={item.from.name} size={28} />
               </View>
               <ToneBadge label={`Expires week ${item.expires_week}`} color={colors.warning} size="xs" />
             </View>
@@ -237,7 +251,7 @@ function Builder({ ctx, seed, onSeedUsed }: { ctx: SimCtx; seed: { partner: stri
   useEffect(() => {
     if (!seed) return;
     dispatch({ type: 'partner', teamId: seed.partner });
-    dispatch({ type: 'toggle', side: 'get', id: seed.get });
+    if (seed.get) dispatch({ type: 'toggle', side: 'get', id: seed.get });
     onSeedUsed();
   }, [seed, onSeedUsed]);
 
@@ -301,23 +315,29 @@ function Builder({ ctx, seed, onSeedUsed }: { ctx: SimCtx; seed: { partner: stri
       <View style={common.stack}>
         <SectionHeading title="Partner" caption="Tap a team to see its roster and how it likes to trade." />
         {visibleTeams.map((team) => (
-          <Pressable
-            key={team.team_id}
-            accessibilityRole="button"
-            accessibilityState={{ selected: draft.partner === team.team_id }}
-            onPress={() => {
-              dispatch({ type: 'partner', teamId: team.team_id });
-              setChangingPartner(false);
-            }}
-          >
-            <AccentCard accent={draft.partner === team.team_id ? colors.accent : colors.borderStrong} compact>
-              <View style={common.rowBetween}>
-                <AppText style={[common.bodyStrong, common.grow]}>{team.name}</AppText>
-                <ToneBadge label={team.persona.label} color={colors.accent} size="xs" />
-              </View>
-              {draft.partner === team.team_id ? <AppText style={common.small}>{team.persona.blurb}</AppText> : null}
-            </AccentCard>
-          </Pressable>
+          <AccentCard key={team.team_id} accent={draft.partner === team.team_id ? colors.accent : colors.borderStrong} compact>
+            <View style={common.rowBetween}>
+              <Pressable
+                style={[common.row, common.grow, { minHeight: 44 }]}
+                accessibilityRole="button"
+                accessibilityLabel={`Trade with ${team.name}`}
+                accessibilityState={{ selected: draft.partner === team.team_id }}
+                onPress={() => {
+                  dispatch({ type: 'partner', teamId: team.team_id });
+                  setChangingPartner(false);
+                }}
+              >
+                <SimCrest name={team.name} size={32} />
+                <View style={common.grow}>
+                  <AppText style={common.bodyStrong}>{team.name}</AppText>
+                  <AppText style={common.muted}>Power #{team.power_rank}</AppText>
+                </View>
+              </Pressable>
+              <ToneBadge label={team.persona.label} color={colors.accent} size="xs" />
+              <ScoutButton teamId={team.team_id} name={team.name} />
+            </View>
+            {draft.partner === team.team_id ? <AppText style={common.small}>{team.persona.blurb}</AppText> : null}
+          </AccentCard>
         ))}
         {partner && !changingPartner ? <Button size="sm" variant="ghost" label="Change partner" onPress={() => setChangingPartner(true)} style={{ alignSelf: 'flex-start' }} /> : null}
       </View>

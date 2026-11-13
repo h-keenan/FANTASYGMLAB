@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import React, { createContext, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { AccessibilityInfo, Animated, Pressable, StyleSheet, View, type StyleProp, type ViewStyle } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 
@@ -7,14 +7,20 @@ import AppText from './AppText';
 import Button from './Button';
 import PlayerAvatar from './PlayerAvatar';
 import PositionBadge from './PositionBadge';
+import SectionHeading from './SectionHeading';
+import SimCrest from './SimCrest';
+import { SIM_GLYPH_ICONS } from './SimGlyph';
 import { SheetModal, SheetScrollView, SwipeDismissCard } from './SwipeDismissSheet';
 import ToneBadge from './ToneBadge';
 import { useThemeMode } from '../context/ThemeModeContext';
 import {
   simGamePreviewLine,
   simHeadshotId,
+  simShortName,
+  simTrendText,
   simPlayerInitials,
   simPlayerSubline,
+  type SimGlyphName,
   type SimPlayerRef,
   type SimGame,
   type SimGameEnvelope,
@@ -53,6 +59,8 @@ export interface SimCtx {
   tick: number;
   bump: () => void;
   openPlayer: (player: SimGamePlayer) => void;
+  /** Open any team's scouting sheet (roster, record, strengths and needs). */
+  openTeam: (teamId: string) => void;
 }
 
 /** Shared status pill tinted from a presentation tone. */
@@ -409,7 +417,158 @@ function createStyles(colors: ThemeColors) {
     noticeRow: { flexDirection: 'row', alignItems: 'flex-start', gap: spacing.sm },
     noticeText: { flex: 1, minWidth: 0, fontSize: 14.5, lineHeight: 20, color: colors.textPrimary },
     noticeDismiss: { fontSize: 13, fontWeight: '700', color: colors.accent },
+    teamLink: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, flexShrink: 1, minWidth: 0 },
+    teamLinkStacked: { alignItems: 'center', justifyContent: 'center', gap: spacing.xs, flexShrink: 1, minWidth: 0 },
+    teamName: { fontSize: 15, fontWeight: '700', color: colors.textPrimary, flexShrink: 1 },
+    teamNameLight: { fontWeight: '500' },
+    teamNameStacked: { textAlign: 'center' },
+    mini: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs, minWidth: 0, flexShrink: 1 },
+    miniRight: { flexDirection: 'row-reverse' },
+    miniText: { flexShrink: 1, minWidth: 0, gap: 1 },
+    miniName: { fontSize: 13, fontWeight: '700', color: colors.textPrimary },
+    miniNameRight: { textAlign: 'right' },
+    miniSub: { fontSize: 12, color: colors.textTertiary },
+    miniPress: { minHeight: 32, justifyContent: 'center', flexShrink: 1, minWidth: 0 },
     pager: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: spacing.sm },
     pagerText: { fontSize: 13, color: colors.textTertiary },
   });
+}
+
+// ---------------------------------------------------------------------------
+// Color and glyph building blocks shared by every game screen (mirrors web)
+
+/** Opens the team scouting sheet. Provided once by the game screen; a team link outside it is plain text. */
+export const SimTeamOpenContext = createContext<((teamId: string) => void) | null>(null);
+
+/**
+ * A team's emblem and name as one tap target that opens its scouting sheet
+ * (roster, record, strengths and needs) from anywhere: standings, matchup,
+ * trade partner, league feed.
+ */
+export function SimTeamLink({
+  teamId,
+  name,
+  isYou = false,
+  size = 24,
+  suffix,
+  bold = true,
+  hideName = false,
+  stacked = false,
+}: {
+  teamId: string | null | undefined;
+  name: string;
+  isYou?: boolean;
+  size?: number;
+  suffix?: ReactNode;
+  bold?: boolean;
+  /** Emblem only (the name is printed beside it); the tap target keeps the name for screen readers. */
+  hideName?: boolean;
+  /** Emblem above the name, centered (the matchup header). */
+  stacked?: boolean;
+}) {
+  const { colors } = useThemeMode();
+  const styles = useMemo(() => createStyles(colors), [colors]);
+  const open = useContext(SimTeamOpenContext);
+  const body = (
+    <>
+      <SimCrest name={name} size={size} />
+      {hideName ? null : (
+        <AppText style={[styles.teamName, !bold && styles.teamNameLight, stacked && styles.teamNameStacked]} numberOfLines={2}>
+          {name}
+          {isYou ? ' (you)' : ''}
+        </AppText>
+      )}
+      {suffix}
+    </>
+  );
+  const layout = stacked ? styles.teamLinkStacked : styles.teamLink;
+  if (!open || !teamId) return <View style={layout}>{body}</View>;
+  return (
+    <Pressable
+      onPress={() => open(teamId)}
+      style={[layout, { minHeight: 44 }]}
+      accessibilityRole="button"
+      accessibilityLabel={`${name}${isYou ? ' (you)' : ''}. Open team`}
+    >
+      {body}
+    </Pressable>
+  );
+}
+
+/** Section title with a tinted glyph, on the shared SectionHeading. */
+export function SimSectionTitle({
+  glyph,
+  tone = 'accent',
+  title,
+  caption,
+  right,
+}: {
+  glyph: SimGlyphName;
+  tone?: SimGameTone;
+  title: string;
+  caption?: string | null;
+  right?: ReactNode;
+}) {
+  const { colors } = useThemeMode();
+  // SectionHeading takes an Ionicons name; the glyph map keeps web and app on the same names.
+  return <SectionHeading title={title} icon={SIM_GLYPH_ICONS[glyph]} iconColor={simToneColor(tone, colors)} caption={caption} right={right} />;
+}
+
+/** Green up / red down text for a points change. */
+export function SimTrend({ delta, suffix = '' }: { delta: number | null | undefined; suffix?: string }) {
+  const { colors } = useThemeMode();
+  const t = simTrendText(delta);
+  return (
+    <AppText style={{ fontSize: 13, fontWeight: '800', color: simToneColor(t.tone, colors) }} testID="sim-trend">
+      {t.arrow ? `${t.arrow} ` : ''}
+      {t.text}
+      {suffix}
+    </AppText>
+  );
+}
+
+/** A compact photo + name + status chip for dense two-column surfaces (matchup, cover lists). */
+export function SimMiniPlayer({
+  player,
+  align = 'left',
+  onOpen,
+  size = 28,
+  wrap = false,
+}: {
+  /** Allow the name two lines (shortened only when very long) instead of one. */
+  wrap?: boolean;
+  player: SimGamePlayer;
+  align?: 'left' | 'right';
+  onOpen?: (player: SimGamePlayer) => void;
+  size?: number;
+}) {
+  const { colors } = useThemeMode();
+  const styles = useMemo(() => createStyles(colors), [colors]);
+  const hurt = player.status === 'out';
+  const bye = player.status === 'bye';
+  const body = (
+    <View style={[styles.mini, align === 'right' && styles.miniRight]}>
+      <PlayerAvatar playerId={simHeadshotId(player)} fallbackLabel={simPlayerInitials(player)} size={size} />
+      <View style={styles.miniText}>
+        <AppText style={[styles.miniName, align === 'right' && styles.miniNameRight, (hurt || bye) && { color: colors.textTertiary }, hurt && { textDecorationLine: 'line-through' }]} numberOfLines={wrap ? 2 : 1}>
+          {wrap ? simShortName(player.name, 19) : player.name}
+        </AppText>
+        {hurt ? (
+          <ToneBadge label="Out" color={colors.danger} size="xs" />
+        ) : bye ? (
+          <ToneBadge label="Bye" color={colors.warning} size="xs" />
+        ) : (
+          <AppText style={[styles.miniSub, align === 'right' && styles.miniNameRight]} numberOfLines={1}>
+            {player.team ?? 'FA'}
+          </AppText>
+        )}
+      </View>
+    </View>
+  );
+  if (!onOpen) return body;
+  return (
+    <Pressable onPress={() => onOpen(player)} accessibilityRole="button" accessibilityLabel={`${player.name}, ${player.pos}. Open player details`} style={styles.miniPress}>
+      {body}
+    </Pressable>
+  );
 }

@@ -348,6 +348,21 @@ or other user's game / malformed id; 422 bad input `{"ok": false, "error"}`; 503
 
 ## Endpoints
 
+### `GET /v1/sim/games/{id}/home`
+Read-only dashboard for the Home tab (in-season and playoffs; `wrong_phase` during the draft and after the season).
+Keys: `matchup` (opponent with record/persona, `you_projection`, `opp_projection`, `win_prob`, slot-by-slot `rows`
+`{slot, you, opp}` with out/bye players flagged via `status`), `checklist` (set lineup, cuts, waivers, byes, offers; each
+with `done`, `severity`, `target` tab), `inbox` (count + up to 3 offers), `waiver_suggestions` (free agents that fix a
+hole or upgrade a starter, each with `gain_now`, `gain_ros`, `reasons`, optional `drop`/`covers`), `bye_alerts`
+(starters on bye in the next 3 weeks with `covered_by` bench cover or free-agent `replacements`), `injuries`,
+`hot_cold` (`hot`, `cold`, `wire`), `standings` (rows, cut line `margin`) and `league` (`recent` moves + a
+`spotlight` trade). Everything is derived from the frozen snapshot and state; nothing is written.
+
+### `GET /v1/sim/games/{id}/teams/{team_id}`
+Scouting view of any team (yours included): `players` (unchanged), plus `team` (record, persona, power rank),
+`lineup` and `projected_total` (an AI team's is the lineup its manager will start), `positions` (league rank and
+`strength`/`ok`/`need` level per position), `strengths`, `needs`, `injuries`, `recent` moves, `next_game`, `trade.open`.
+
 ### `GET /v1/sim/games/options`
 Works for Free callers (no `premium_required`). Setup form + limits. **Quick
 start** is every `default` below (12 teams, half-PPR, standard lineup, redraft);

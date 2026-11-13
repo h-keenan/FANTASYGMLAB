@@ -15,9 +15,10 @@ import {
   type SimWeekRecap,
 } from "./simGame";
 
-export type SimTab = "team" | "players" | "trades" | "league" | "more";
+export type SimTab = "home" | "team" | "players" | "trades" | "league" | "more";
 
 export const SIM_TABS: { value: SimTab; label: string }[] = [
+  { value: "home", label: "Home" },
   { value: "team", label: "Team" },
   { value: "players", label: "Players" },
   { value: "trades", label: "Trades" },
@@ -48,7 +49,7 @@ export const SIM_FLOW_INITIAL: SimFlowState = {
   message: "",
   gameId: null,
   stage: null,
-  tab: "team",
+  tab: "home",
   paywall: null,
   recaps: [],
   recapIndex: 0,
@@ -109,7 +110,7 @@ export function simFlowReducer(state: SimFlowState, action: SimFlowAction): SimF
         stage: simGameStage(action.game),
         recaps: action.recaps,
         recapIndex: 0,
-        tab: "team",
+        tab: "home",
         message: "",
       };
     case "recap_next":

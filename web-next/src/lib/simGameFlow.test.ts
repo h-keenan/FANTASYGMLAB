@@ -18,7 +18,7 @@ describe("simFlowReducer", () => {
   });
 
   it("opens a game onto the stage its status implies", () => {
-    expect(simFlowReducer(hub, { type: "open", game: game("drafting") })).toMatchObject({ view: "game", gameId: "g1", stage: "draft", tab: "team" });
+    expect(simFlowReducer(hub, { type: "open", game: game("drafting") })).toMatchObject({ view: "game", gameId: "g1", stage: "draft", tab: "home" });
     expect(simFlowReducer(hub, { type: "open", game: game("in_season") }).stage).toBe("week");
     expect(simFlowReducer(hub, { type: "open", game: game("complete") }).stage).toBe("final");
   });
@@ -59,11 +59,11 @@ describe("simFlowReducer", () => {
     expect(simFlowReducer(SIM_FLOW_INITIAL, { type: "error", message: "x" }).view).toBe("error");
   });
 
-  it("advance shows recaps, goes back to the Team tab, steps through and closes", () => {
+  it("advance shows recaps, goes back to Home, steps through and closes", () => {
     let s = simFlowReducer(hub, { type: "open", game: game("in_season") });
     s = simFlowReducer(s, { type: "tab", tab: "league" });
     s = simFlowReducer(s, { type: "advanced", recaps: [recap(15), recap(16), recap(17, true)], game: game("complete") });
-    expect(s).toMatchObject({ tab: "team", stage: "final", recapIndex: 0 });
+    expect(s).toMatchObject({ tab: "home", stage: "final", recapIndex: 0 });
     expect(s.recaps).toHaveLength(3);
     s = simFlowReducer(s, { type: "recap_next" });
     s = simFlowReducer(s, { type: "recap_next" });
@@ -76,7 +76,8 @@ describe("simFlowReducer", () => {
     expect(simFlowReducer(hub, { type: "setup" }).view).toBe("setup");
     const open = simFlowReducer(hub, { type: "open", game: game("in_season") });
     expect(simFlowReducer(open, { type: "deleted" })).toMatchObject({ view: "hub", gameId: null });
-    expect(simFlowReducer(open, { type: "tab", tab: "team" })).toBe(open);
+    expect(simFlowReducer(open, { type: "tab", tab: "home" })).toBe(open);
+    expect(simFlowReducer(open, { type: "tab", tab: "team" }).tab).toBe("team");
   });
 });
 

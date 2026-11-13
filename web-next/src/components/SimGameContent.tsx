@@ -13,8 +13,10 @@ import { PremiumUpsellCard } from "@/components/PremiumUpsellCard";
 import { SectionHeading } from "@/components/SectionHeading";
 import { SimDraftRecapView, SimGameDraft } from "@/components/SimGameDraft";
 import { SimLeagueTab } from "@/components/SimGameLeague";
+import { SimHomeTab } from "@/components/SimGameHome";
 import { SimPlayerSheet } from "@/components/SimGamePlayers";
-import { SimNotice, SimPreviewBanner, simToneColor, type SimCtx } from "@/components/SimGameParts";
+import { SimNotice, SimPreviewBanner, SimTeamLink, SimTeamOpenContext, simToneColor, type SimCtx } from "@/components/SimGameParts";
+import { SimTeamSheet } from "@/components/SimGameTeamSheet";
 import { SimFinalView, SimWeekRecapView } from "@/components/SimGameRecap";
 import { SimPlayersTab, SimTeamTab } from "@/components/SimGameTeam";
 import { SimTradesTab } from "@/components/SimGameTrades";
@@ -88,6 +90,7 @@ export function SimGameContent() {
   const [tick, setTick] = useState(0);
   const [attempt, setAttempt] = useState(0);
   const [sheetPlayer, setSheetPlayer] = useState<SimGamePlayer | null>(null);
+  const [sheetTeam, setSheetTeam] = useState<string | null>(null);
   const [draftRecap, setDraftRecap] = useState<{ recap: SimDraftRecap | null } | null>(null);
   const [claims, setClaims] = useState<SimWaiverClaim[]>([]);
   const [tradeSeed, setTradeSeed] = useState<{ partner: string; get: string } | null>(null);
@@ -286,6 +289,7 @@ export function SimGameContent() {
             tick,
             bump: () => setTick((n) => n + 1),
             openPlayer: setSheetPlayer,
+            openTeam: setSheetTeam,
           }
         : null,
     [game, preview, call, setGame, reloadGame, notify, tick],
@@ -358,6 +362,18 @@ export function SimGameContent() {
           onDeleted={() => { dispatch({ type: "deleted" }); setGameState(null); void refreshList(); }}
         />
         {sheetPlayer ? <SimPlayerSheet gameId={game.id} player={sheetPlayer} onClose={() => setSheetPlayer(null)} /> : null}
+        {sheetTeam ? (
+          <SimTeamSheet
+            ctx={ctx}
+            teamId={sheetTeam}
+            onClose={() => setSheetTeam(null)}
+            onTrade={(partner) => {
+              setSheetTeam(null);
+              setTradeSeed({ partner, get: "" });
+              dispatch({ type: "tab", tab: "trades" });
+            }}
+          />
+        ) : null}
       </Shell>
     );
   }
@@ -733,6 +749,7 @@ function GameScreen({
   const inSeason = (stage === "week" || stage === "playoffs") && !draftRecap;
 
   return (
+    <SimTeamOpenContext.Provider value={ctx.openTeam}>
     <div className="flex flex-col gap-3">
       <div className="flex items-center justify-between gap-2">
         <div className="flex min-w-0 flex-col">
@@ -741,9 +758,10 @@ function GameScreen({
           </button>
           <h2 className="text-lg font-extrabold break-words" data-testid="game-heading">{simWeekHeading(game)}</h2>
           {youLine && stage !== "draft" ? (
-            <p className="text-xs" style={{ color: "var(--color-text-muted)" }}>
-              {youLine.name} · {simFmtRecord(youLine)}{youLine.rank ? ` · #${youLine.rank}` : ""} · {simFmtPts(youLine.pf)} PF
-            </p>
+            <div className="flex flex-wrap items-center gap-x-2 text-xs" style={{ color: "var(--color-text-muted)" }}>
+              <SimTeamLink teamId={youLine.team_id} name={youLine.name} size={20} bold={false} />
+              <span>{simFmtRecord(youLine)}{youLine.rank ? ` · #${youLine.rank}` : ""} · {simFmtPts(youLine.pf)} PF</span>
+            </div>
           ) : null}
         </div>
         {inSeason && !recap ? (
@@ -787,6 +805,7 @@ function GameScreen({
             onSelect={(value) => onTab(value as SimTab)}
           />
           <div key={flow.tab} className="enter-rise">
+            {flow.tab === "home" ? <SimHomeTab ctx={ctx} setClaims={setClaims} onTab={onTab} /> : null}
             {flow.tab === "team" ? <SimTeamTab ctx={ctx} onTrade={() => onTab("trades")} /> : null}
             {flow.tab === "players" ? (
               <SimPlayersTab
@@ -806,6 +825,7 @@ function GameScreen({
         </>
       )}
     </div>
+    </SimTeamOpenContext.Provider>
   );
 }
 

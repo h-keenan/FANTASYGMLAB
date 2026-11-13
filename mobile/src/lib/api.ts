@@ -3935,6 +3935,7 @@ export const api = {
     authorizedRequest<SimGameTypes.SimPlayerDetailResponse>(`/v1/sim/games/${encodeURIComponent(gameId)}/players/${encodeURIComponent(playerId)}`),
   getSimGameTeam: (gameId: string, teamId: string) =>
     authorizedRequest<SimGameTypes.SimTeamRosterResponse>(`/v1/sim/games/${encodeURIComponent(gameId)}/teams/${encodeURIComponent(teamId)}`),
+  getSimHome: (gameId: string) => authorizedRequest<SimGameTypes.SimHomeResponse>(`/v1/sim/games/${encodeURIComponent(gameId)}/home`),
   getSimLineup: (gameId: string) => authorizedRequest<SimGameTypes.SimLineupResponse>(`/v1/sim/games/${encodeURIComponent(gameId)}/lineup`),
   putSimLineup: (gameId: string, body: { slots: { slot: SimGameTypes.SimSlot; player_id: string | null }[] }) =>
     authorizedRequest<SimGameTypes.SimLineupResponse>(`/v1/sim/games/${encodeURIComponent(gameId)}/lineup`, { method: "PUT", jsonBody: body }),

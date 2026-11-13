@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useReducer, useState } from "react";
+import { useContext, useEffect, useMemo, useReducer, useState } from "react";
 
 import { AccentCard } from "@/components/AccentCard";
 import { Button } from "@/components/Button";
@@ -8,7 +8,9 @@ import { EmptyState } from "@/components/EmptyState";
 import { PillRow } from "@/components/PillRow";
 import { SectionHeading } from "@/components/SectionHeading";
 import { ReviewGlyphChip } from "@/components/SeasonReviewSections";
-import { SimPlayerLine, SimSideLabel, SimStat, SimToneBadge, simToneColor, type SimCtx } from "@/components/SimGameParts";
+import { SimCrest } from "@/components/SimCrest";
+import { SimGlyph } from "@/components/SimGlyph";
+import { SimPlayerLine, SimSideLabel, SimStat, SimTeamLink, SimTeamOpenContext, SimToneBadge, simToneColor, type SimCtx } from "@/components/SimGameParts";
 import { SkeletonCard, SkeletonRows } from "@/components/Skeleton";
 import { ToneBadge } from "@/components/ToneBadge";
 import { api } from "@/lib/api";
@@ -30,6 +32,24 @@ import {
   type SimTradeDraft,
   type SimTradeVerdict,
 } from "@/lib/simGame";
+
+/** "Scout" button for the partner list: opens the team's scouting sheet without picking it as the partner. */
+function SimTeamScout({ teamId, name }: { teamId: string; name: string }) {
+  const open = useContext(SimTeamOpenContext);
+  if (!open) return null;
+  return (
+    <button
+      type="button"
+      className="tap-link inline-flex shrink-0 items-center gap-1 text-xs font-bold"
+      style={{ color: "var(--color-accent)", minHeight: "var(--touch-target-min)" }}
+      aria-label={`Scout ${name}`}
+      onClick={() => open(teamId)}
+    >
+      <SimGlyph name="team" size={13} />
+      Scout
+    </button>
+  );
+}
 
 function PlayerList({ players }: { players: SimGamePlayer[] }) {
   return (
@@ -91,10 +111,7 @@ function Inbox({ ctx }: { ctx: SimCtx }) {
         <li key={item.id} className="enter-rise">
           <AccentCard accent="var(--color-premium)" as="div">
             <div className="flex items-center justify-between gap-2">
-              <span className="flex min-w-0 items-center gap-2">
-                <ReviewGlyphChip glyph="trade" tone="accent" size={28} />
-                <span className="text-sm font-bold break-words min-w-0">{item.from.name}</span>
-              </span>
+              <SimTeamLink teamId={item.from.team_id} name={item.from.name} size={28} />
               <ToneBadge label={`Expires week ${item.expires_week}`} color="var(--color-warning)" size="xs" />
             </div>
             {item.message ? <p className="text-xs" style={{ color: "var(--color-text-secondary)" }}>{item.message}</p> : null}
@@ -209,7 +226,7 @@ function Builder({ ctx, seed, onSeedUsed }: { ctx: SimCtx; seed: { partner: stri
   useEffect(() => {
     if (!seed) return;
     dispatch({ type: "partner", teamId: seed.partner });
-    dispatch({ type: "toggle", side: "get", id: seed.get });
+    if (seed.get) dispatch({ type: "toggle", side: "get", id: seed.get });
     onSeedUsed();
   }, [seed, onSeedUsed]);
 
@@ -269,25 +286,32 @@ function Builder({ ctx, seed, onSeedUsed }: { ctx: SimCtx; seed: { partner: stri
         <ul className="flex flex-col gap-2">
           {visibleTeams.map((team) => (
             <li key={team.team_id}>
-              <button
-                type="button"
-                className="w-full text-left"
-                aria-pressed={draft.partner === team.team_id}
-                onClick={() => {
-                  dispatch({ type: "partner", teamId: team.team_id });
-                  setChangingPartner(false);
-                }}
-              >
-                <AccentCard accent={draft.partner === team.team_id ? "var(--color-accent)" : "var(--color-border-strong)"} compact as="div">
-                  <div className="flex items-center justify-between gap-2">
-                    <span className="text-sm font-bold break-words min-w-0">{team.name}</span>
-                    <ToneBadge label={team.persona.label} color="var(--color-accent)" size="xs" />
-                  </div>
-                  {draft.partner === team.team_id ? (
-                    <p className="text-xs" style={{ color: "var(--color-text-secondary)" }}>{team.persona.blurb}</p>
-                  ) : null}
-                </AccentCard>
-              </button>
+              <AccentCard accent={draft.partner === team.team_id ? "var(--color-accent)" : "var(--color-border-strong)"} compact as="div">
+                <div className="flex items-center justify-between gap-2">
+                  <button
+                    type="button"
+                    className="flex min-w-0 flex-1 items-center gap-2 text-left"
+                    style={{ minHeight: "var(--touch-target-min)" }}
+                    aria-pressed={draft.partner === team.team_id}
+                    aria-label={`Trade with ${team.name}`}
+                    onClick={() => {
+                      dispatch({ type: "partner", teamId: team.team_id });
+                      setChangingPartner(false);
+                    }}
+                  >
+                    <SimCrest name={team.name} size={32} />
+                    <span className="flex min-w-0 flex-col">
+                      <span className="text-sm font-bold break-words">{team.name}</span>
+                      <span className="text-xs" style={{ color: "var(--color-text-muted)" }}>Power #{team.power_rank}</span>
+                    </span>
+                  </button>
+                  <ToneBadge label={team.persona.label} color="var(--color-accent)" size="xs" />
+                  <SimTeamScout teamId={team.team_id} name={team.name} />
+                </div>
+                {draft.partner === team.team_id ? (
+                  <p className="text-xs" style={{ color: "var(--color-text-secondary)" }}>{team.persona.blurb}</p>
+                ) : null}
+              </AccentCard>
             </li>
           ))}
         </ul>
