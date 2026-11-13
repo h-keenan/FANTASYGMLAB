@@ -14,7 +14,7 @@ after #1816 (team roles), #1836 (player-model-4), #1843 (AI managers) and #1851 
 | --- | --- | --- | --- | --- |
 | 1 | High | `revert-week` left a checkpoint past the truncated event log: live state kept reverted actions, the log lost them, a cold replay raised "list.remove(x)" / "event log has a gap" | fuzzer seeds 100, 101 and 106 (3 of the first 8 games): resume != replay, one cold replay crashed | Fixed in #1859 (+ regression test that fails without the fix) |
 | 2 | Medium | Scoring fell through the season: team scores 112.9 (week 1) -> 96.9 (week 13) in a 12-team league (-15%). Model level: expected weekly mean relative to the season mean 1.00 -> 0.92 for starters; real panel is flat (-0.1% to -0.2% a week) | `realism_sweep seasons`, `path_fit`: model slopes -0.5% / -0.7% a week (elite / starter) vs real -0.1% / -0.2% | Fixed in #1861 (player-model-5, centered tilt, season totals and calibration unchanged) |
-| 3 | Medium | Payload and cold-start budget: `/league/rosters` 120-131 KB and `/picks` 63 KB per call; cold `/home` 61-112 ms, cold `/advance` about 570 ms on the in-memory store | `tests/test_sim_latency_probe.py` | Reported; no change (see below) |
+| 3 | Low | Payload and cold-start budget: `/league/rosters` 120-136 KB and `/picks` 63-104 KB uncompressed per call; cold `/home` 61-112 ms, cold `/advance` about 570 ms on the in-memory store. The service gzips responses over 1 KB (`GZipMiddleware`), so on the wire they are 13 KB and 4 KB; nothing to fix, worth watching | `tests/test_sim_latency_probe.py` | Reported, no change |
 | 4 | Low | `POST /sim-to` with an unknown `target` is accepted and behaves like "through the playoffs"; unbounded `weeks` | probe of 40 malformed requests: no 5xx, but this is the only silently-lenient one | Reported |
 | 5 | Low | `sim-to` stops with 0 weeks on any pending trade offer even with `auto_set` (needs `force_first`) | 5 of 6 games stopped at week 3 with `trade_offers`, repeated calls stop again until the offers expire | Reported (by design, worth a UI hint) |
 | 6 | Info | Dynasty aging looks too fast (RB 28-29: 0.62 vs real 0.72, WR 26-27: 0.80 vs 0.89, TE 26-27: 0.72 vs 0.93) but only on an unconditional sample; conditioned on still being in the draftable pool, as the real panel is, it matches (RB 28-29 0.80, WR 26-27 0.87, WR 28-29 0.83, TE 28-29 0.85) | `realism_sweep dynasty` | Not a bug: the real table is survivorship-conditioned |
@@ -22,7 +22,7 @@ after #1816 (team roles), #1836 (player-model-4), #1843 (AI managers) and #1851 
 | 9 | Low | A trade-block entry outlives the asset: put a player on the block, cut him, claim him again: he is back on the block (the block view filters by holdings, the state keeps the entry, by design) | scripted repro; the fuzzer's block invariants (view shows only held assets, AI items held by their team, size limit) hold in 36 games | Reported (a `block_set off` on cut/trade would fix it) |
 | 8 | Info | Harness caveat: scoring variants (half, std) show the same team score because the harness pool is PPR points; the product converts the pool to the league's scoring at the input door (`RealSimInputs.player_pool`), and the model solves its stat lines to the supplied mean (existing test) | `realism_sweep seasons` | Not a product issue |
 
-No crash, 5xx, illegal state, asset-conservation break, retry double-apply or dead end was found in 56 fuzzed games (tens of thousands of requests) once #1 was fixed.
+The two defects worth a PR (1, 2) are fixed; the rest is reported. No crash, 5xx, illegal state, asset-conservation break, retry double-apply or dead end was found in 56 fuzzed games (tens of thousands of requests) once #1 was fixed.
 
 ## 1. League shapes vs real fantasy (5 seeded games per shape, 16 for title odds; pool from the real 2025 panel, player-model-4)
 
@@ -89,9 +89,8 @@ None leaves the user unable to progress.
 | advance (cold) | 571 | | 14 KB |
 | lineup/auto | 99 | | 8 KB |
 
-At season 10 and 20 (#1851 probes): Home / League / Players payloads stay 19-27 KB / 16 KB, saved state 139 KB at season 20, cold replay of 11k events 0.12 s. Two payloads are worth slimming:
-`league/rosters` (120-131 KB: every roster row in full) and `picks` (63 KB). Neither is a latency problem on the server (28 ms warm) but both are heavy on a phone; a `fields` projection or an
-id-only roster with a shared player table would cut them by about 70%. Not changed here: the clients read these shapes, and a change belongs in a client-aware PR.
+At season 10 and 20 (#1851 probes): Home / League / Players payloads stay 19-27 KB / 16 KB, saved state 139 KB at season 20, cold replay of 11k events 0.12 s. Two payloads are large uncompressed:
+`league/rosters` (120-136 KB: every roster row in full) and `picks` (63-104 KB). The service gzips them (13 KB and 4 KB on the wire, measured with `gzip.compress`) and warm server time is 28 ms, so this is a watch item, not a defect; an id-only roster with a shared player table would shrink the parsed size if a phone ever struggles with it.
 
 ## 5. Exploit search
 
@@ -112,7 +111,7 @@ to farm. Pick hoarding: the pick ledger invariant held in every fuzzed dynasty g
 
 ## 6. Recommendations
 
-1. Slim `league/rosters` and `picks` (client-aware change).
+1. Watch `league/rosters` and `picks` parse cost on low-end phones (13 KB / 4 KB gzipped, 136 KB / 104 KB parsed).
 2. Validate `sim-to` target against `options` (422 on an unknown target) and cap `weeks`.
 3. Offer a one-line UI hint when `sim-to` stops on trade offers ("Respond, or Sim anyway").
 4. Measure the dynasty youth-and-picks strategy over 10-20 seasons against a balanced manager.
