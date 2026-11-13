@@ -16,7 +16,6 @@ import { NavProMarker } from "@/components/NavProMarker";
 import { PositionBadge } from "@/components/PositionBadge";
 import { FOUNDER_DESTINATION, isFounderSession, searchNavDestinations, useNavDestinations, type NavDestination } from "@/lib/navDestinations";
 import { OPEN_SEARCH_EVENT } from "@/lib/orbSearch";
-import { useOrbViewportStyle } from "@/lib/orbViewport";
 import { useIsPro } from "@/lib/useIsPro";
 import { useSheetDragDismiss } from "@/lib/useSheetDragDismiss";
 import { SheetHandle } from "@/components/SheetHandle";
@@ -81,9 +80,6 @@ export function GmOrb() {
     document.addEventListener("keydown", handleKeyDown);
     return () => document.removeEventListener("keydown", handleKeyDown);
   }, [open]);
-  // Visual-viewport placement (null until mounted / when unsupported, in
-  // which case the CSS fallback below applies). See lib/orbViewport.ts.
-  const orbViewportStyle = useOrbViewportStyle();
   const { session } = useAuth();
   const { collegeInterest } = useDisplayPreferences();
   const pathname = usePathname();
@@ -134,33 +130,34 @@ export function GmOrb() {
 
   return (
     <>
+      {/* The orb lives in a zero-height `position: sticky; bottom: 0` rail at
+          the end of <body>, NOT `position: fixed`. iOS Safari anchors fixed
+          elements to the layout viewport, which drifts from the visible one
+          (URL/bottom bar collapse, keyboard dismissal, rubber-banding) and
+          left the orb floating mid-screen (owner reports, 2026-11-11/12).
+          Sticky elements are positioned by the scroller itself, so they stay
+          glued to the visible bottom edge with no JS. #1791 tried to chase
+          the drift from window.visualViewport; that was removed because it
+          could disagree with the sticky/fixed elements it sat next to. The
+          rail's parent (body) has no overflow/transform, which sticky needs. */}
+      <div className="md:hidden" style={{ position: "sticky", bottom: 0, height: 0, zIndex: 40 }}>
       <button
         type="button"
         onClick={() => {
           setQuery("");
           setOpen(true);
-          // Every real open is its own meaningful interaction, not a
-          // reached-once-ever milestone -- no dedup (see
-          // lib/analytics.ts's trackFeatureUse doc).
           trackFeatureUse("gm_orb_opened", { leagueId: leagueId || undefined, dedupe: false });
         }}
         aria-label="Open GM menu"
         // coridian_, 2026-10-18: "Gm orb is still too high" — bottom-6
         // (24px) left too much empty space below it; bottom-3 (12px) sits
         // closer to the true bottom edge.
-        className="fixed left-1/2 flex items-center justify-center md:hidden"
+        className="absolute left-1/2 flex items-center justify-center"
         style={{
-          // coridian_: "GM orb bug when scrolling to the bottom of the
-          // screen" / "it starts to float". iOS Safari anchors `fixed` to
-          // the layout viewport, which drifts from the visible (visual)
-          // viewport while the URL/bottom bar collapses. translate3d +
-          // will-change (the earlier fix) did not change that anchor, so
-          // the orb is now positioned from window.visualViewport
-          // (lib/orbViewport.ts). The CSS below is the fallback for SSR /
-          // first paint / browsers without visualViewport, and is identical
-          // to the JS result when the two viewports agree.
+          // Bottom-center of the sticky rail above; clears the iOS home
+          // indicator via the safe-area inset.
           bottom: "max(12px, env(safe-area-inset-bottom, 0px))",
-          transform: "translate3d(-50%, 0, 0)",
+          transform: "translateX(-50%)",
           width: "3.25rem",
           height: "3.25rem",
           borderRadius: "50%",
@@ -168,8 +165,6 @@ export function GmOrb() {
           border: "1.5px solid var(--color-accent)",
           boxShadow: "var(--shadow-card)",
           zIndex: 40,
-          willChange: "transform",
-          ...orbViewportStyle,
         }}
       >
         {/* The actual brand mark, not a plain "GM" text label — mobile's own
@@ -186,6 +181,7 @@ export function GmOrb() {
           </span>
         </span>
       </button>
+      </div>
 
       {open ? (
         <div className="fixed inset-0" style={{ zIndex: 50 }}>

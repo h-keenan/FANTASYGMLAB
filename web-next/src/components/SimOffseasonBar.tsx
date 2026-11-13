@@ -67,7 +67,7 @@ export function SimOffseasonBar({ ctx }: { ctx: SimCtx }) {
 
   return (
     <div
-      className="fixed inset-x-0 bottom-0 z-30 md:sticky md:inset-x-auto"
+      className="sticky bottom-0 z-30 mt-auto -mx-4 -mb-[4.5rem] md:static md:mx-0 md:mb-0"
       style={{
         background: "color-mix(in srgb, var(--color-bg) 92%, transparent)",
         backdropFilter: "blur(10px)",
