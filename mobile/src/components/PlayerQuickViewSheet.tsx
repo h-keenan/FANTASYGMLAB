@@ -13,6 +13,7 @@ import PercentileExplorerSheet from './PercentileExplorerSheet';
 import PlayerHero from './PlayerHero';
 import PlayerLeagueActions from './PlayerLeagueActions';
 import { AvailabilityBlock, LatestNewsSection } from './PlayerQuickViewNews';
+import { pqvBioForContext, pqvRealWorld } from '../lib/pqvContext';
 import PlayerTrendsPanel from './PlayerTrendsPanel';
 import SectionHeading from './SectionHeading';
 import SkeletonBlock, { SkeletonChart } from './SkeletonBlock';
@@ -93,6 +94,9 @@ export default function PlayerQuickViewSheet({
   const { colors, isDark } = useThemeMode();
   const styles = useMemo(() => createStyles(colors), [colors]);
   const { openPlayer } = usePlayerQuickView();
+  // Fantasy Sim: the overlay marks the game's own world. No real news, real injury / availability notes or real bye here.
+  const isSim = simOverlay != null;
+  const realWorld = pqvRealWorld(isSim);
   const { player } = request;
   const [explorer, setExplorer] = useState<ExplorerTarget | null>(null);
   const scoped = leagueScopedIdentity(request);
@@ -123,10 +127,10 @@ export default function PlayerQuickViewSheet({
   const newsQuery = useQuery({
     queryKey: [...queryKeys.playerQuickView(player.player_id), 'news'],
     queryFn: () => api.getPlayerNews(player.player_id, 3, { groupDuplicates: true }),
-    enabled: detailQuery.isSuccess,
+    enabled: detailQuery.isSuccess && realWorld.fetchNews,
     staleTime: 2 * 60 * 1000,
   });
-  const newsLoading = detailQuery.isSuccess && newsQuery.isPending;
+  const newsLoading = detailQuery.isSuccess && realWorld.fetchNews && newsQuery.isPending;
 
   // "View on Waivers" only when this player really is on the league's waiver
   // list. Same query key/fn Dashboard uses, so the cache is shared.
@@ -177,7 +181,7 @@ export default function PlayerQuickViewSheet({
   const overallRating = player.overall_rating ?? stats?.overall_rating ?? resolved?.overall_rating ?? null;
   // The server's availability block wins; the row's raw status only drives
   // the chip (with a clean label) until it arrives.
-  const availability = resolved?.availability ?? null;
+  const availability = realWorld.showAvailability ? (resolved?.availability ?? null) : null;
   const injury = availability ? null : cleanInjuryLabel(player.injury_status);
   const target = fullProfileTarget(request, fallback);
   // League-less opens (News) borrow the last-used league for the trade
@@ -220,15 +224,16 @@ export default function PlayerQuickViewSheet({
     if (navigationRef.isReady()) navigationRef.navigate('PlayerDetail', target);
   };
 
-  const bioRows = bio
+  const shownBio = bio ? pqvBioForContext(bio, isSim) : null;
+  const bioRows = shownBio
     ? ([
-        ['Experience', bio.years_in_league],
-        ['Draft capital', bio.draft_capital],
-        ['College', bio.college],
-        ['Height', bio.height],
-        ['Weight', bio.weight],
-        ['Bye week', bio.bye_week],
-        ['Contract', bio.contract_status],
+        ['Experience', shownBio.years_in_league],
+        ['Draft capital', shownBio.draft_capital],
+        ['College', shownBio.college],
+        ['Height', shownBio.height],
+        ['Weight', shownBio.weight],
+        ['Bye week', shownBio.bye_week],
+        ['Contract', shownBio.contract_status],
       ] as const).filter(([, v]) => Boolean(v))
     : [];
 
@@ -274,8 +279,8 @@ export default function PlayerQuickViewSheet({
               score={player.score ?? resolved?.value_score ?? null}
               valueNote={request.valueNote ?? resolved?.value_note}
               valueLabel={request.valueLabel ?? null}
-              byeWeek={resolved?.bye_week ?? null}
-              onByeThisWeek={resolved?.on_bye_this_week ?? false}
+              byeWeek={realWorld.showBye ? (resolved?.bye_week ?? null) : null}
+              onByeThisWeek={realWorld.showBye ? (resolved?.on_bye_this_week ?? false) : false}
               unavailable={availability?.unavailable ?? false}
               rookie={rookieBadge(bio)}
               overallRating={overallRating}
@@ -325,7 +330,7 @@ export default function PlayerQuickViewSheet({
                 newsLoading={newsLoading}
               />
             ) : null}
-            {detail && remote ? (
+            {detail && remote && realWorld.showNews ? (
               <LatestNewsSection
                 items={newsQuery.data ? newsQuery.data.items : null}
                 loading={newsLoading}
