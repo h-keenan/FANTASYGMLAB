@@ -199,8 +199,8 @@ export function SimTeamTab({ ctx, onTrade }: { ctx: SimCtx; onTrade: () => void 
         </AccentCard>
       ) : null}
 
-      <div className="grid gap-4 lg:grid-cols-2 lg:items-start">
-      <section className="flex flex-col gap-1" aria-label="Starting lineup">
+      <div className="grid grid-cols-[minmax(0,1fr)] gap-4 lg:grid-cols-2 lg:items-start">
+      <section className="flex min-w-0 flex-col gap-1" aria-label="Starting lineup">
         <SimSectionTitle
           glyph="team"
           tone="accent"
@@ -219,7 +219,7 @@ export function SimTeamTab({ ctx, onTrade }: { ctx: SimCtx; onTrade: () => void 
         ))}
       </section>
 
-      <section className="flex flex-col gap-1" aria-label="Bench">
+      <section className="flex min-w-0 flex-col gap-1" aria-label="Bench">
         <SimSectionTitle glyph="bye" tone="muted" note={`${lineup.roster_size ?? 0} of ${lineup.roster_limit ?? 16} roster spots`}>Bench</SimSectionTitle>
         {bench.length === 0 ? (
           <EmptyState title="Empty bench" subtitle="Add free agents from the Players tab." />
