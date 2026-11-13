@@ -180,7 +180,7 @@ export function PillRow({
           const style = {
             // Icon tabs keep the full 44px touch target even in the sticky bar.
             minHeight: (sticky || slim) && !anyIcon ? "var(--segmented-height-compact)" : "var(--segmented-height)",
-            padding: equalFit ? "0 var(--space-xs)" : mode === "fill" ? "0 min(var(--segmented-padding-x), 0.5rem)" : "0 var(--segmented-padding-x)",
+            padding: slim ? "0 var(--space-sm)" : equalFit ? "0 var(--space-xs)" : mode === "fill" ? "0 min(var(--segmented-padding-x), 0.5rem)" : "0 var(--segmented-padding-x)",
             letterSpacing: "var(--letter-spacing-tight)",
             background: isActive && !slim ? "var(--segmented-active-bg, var(--color-information-soft))" : "transparent",
             color: isActive ? "var(--segmented-active-fg, var(--color-text-primary))" : "var(--color-text-secondary)",
