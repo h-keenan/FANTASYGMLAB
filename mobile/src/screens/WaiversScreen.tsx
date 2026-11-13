@@ -26,7 +26,8 @@ import EmptyState from '../components/EmptyState';
 import ErrorState from '../components/ErrorState';
 import { SkeletonRows } from '../components/SkeletonBlock';
 import EvaluationLensHeaderButton from '../components/EvaluationLensHeaderButton';
-import FilterDropdownButton from '../components/FilterDropdownButton';
+import FilterSheet from '../components/FilterSheet';
+import { singleValue, valuesFromSingles, type FilterGroup, type FilterValues } from '../lib/filterSheet';
 import GmStanceHeaderButton from '../components/GmStanceHeaderButton';
 import LeagueSwitcherHeaderButton from '../components/LeagueSwitcherHeaderButton';
 import BrandHeaderBar from '../components/BrandHeaderBar';
@@ -238,6 +239,20 @@ export default function WaiversScreen({ route, navigation }: Props) {
       .filter((p) => !query || (p.name ?? '').toLowerCase().includes(query));
   }, [freeAgents, idpAgents, idpTab, position, search, searchMatches]);
   const positionOptions = useMemo(() => withIdpPositionOptions(POSITIONS, idpAgents), [idpAgents]);
+  // The position dropdown is a one-group FilterSheet now (count badge, Apply with a live result count).
+  const freeAgentFilterGroups = useMemo<FilterGroup[]>(
+    () => [{ id: 'position', label: 'Position', anyValue: 'ALL', options: positionOptions.map((pos) => ({ value: pos, label: pos === 'ALL' ? 'Any' : pos })) }],
+    [positionOptions],
+  );
+  const freeAgentFilterValues = useMemo(() => valuesFromSingles(freeAgentFilterGroups, { position }), [freeAgentFilterGroups, position]);
+  const freeAgentResultCount = (draft: FilterValues): number | null => {
+    if (!freeAgents) return null;
+    const draftPosition = singleValue(freeAgentFilterGroups[0], draft);
+    const query = search.trim().toLowerCase();
+    return (isIdpPositionFilter(draftPosition) ? idpAgents : freeAgents)
+      .filter((p) => draftPosition === 'ALL' || p.position === draftPosition)
+      .filter((p) => !query || (p.name ?? '').toLowerCase().includes(query)).length;
+  };
 
   // Mirrors modules/waivers_ui.py's render_free_agent_summary_cards: prefer
   // non-stale players with a real score as the pool, falling back to the
@@ -545,7 +560,12 @@ export default function WaiversScreen({ route, navigation }: Props) {
                     autoCapitalize="none"
                   />
                   <View style={styles.filterRow}>
-                    <FilterDropdownButton label="Position" options={positionOptions} value={position} onChange={setPosition} />
+                    <FilterSheet
+                      groups={freeAgentFilterGroups}
+                      values={freeAgentFilterValues}
+                      resultCount={freeAgentResultCount}
+                      onApply={(next) => setPosition(singleValue(freeAgentFilterGroups[0], next))}
+                    />
                     <ViewModeToggle value={viewMode} onChange={setViewMode} />
                   </View>
                 </GlassCard>

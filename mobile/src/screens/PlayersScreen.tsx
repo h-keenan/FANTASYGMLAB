@@ -10,7 +10,8 @@ import { useHeaderHeight } from '@react-navigation/elements';
 
 import EmptyState from '../components/EmptyState';
 import BrandedSpinner from '../components/BrandedSpinner';
-import FilterDropdownButton from '../components/FilterDropdownButton';
+import FilterSheet from '../components/FilterSheet';
+import { singleValue, valuesFromSingles, type FilterGroup, type FilterValues } from '../lib/filterSheet';
 import GridBackground from '../components/GridBackground';
 import EvaluationLensHeaderButton from '../components/EvaluationLensHeaderButton';
 import GmStanceHeaderButton from '../components/GmStanceHeaderButton';
@@ -351,6 +352,35 @@ export default function PlayersScreen({ route, navigation }: Props) {
       .filter((p) => !query || (p.name ?? '').toLowerCase().includes(query));
   }, [players, searchMatches, idpPlayers, idpSelected, position, ageFilter, statusFilter, availabilityFilter, search]);
 
+  // One Filters button instead of four dropdown pills (FilterSheet, same groups as web).
+  const filterGroups = useMemo<FilterGroup[]>(
+    () => [
+      { id: 'position', label: 'Position', anyValue: 'ALL', options: positionOptions.map((pos) => ({ value: pos, label: pos === 'ALL' ? 'Any' : pos })) },
+      { id: 'age', label: 'Age', anyValue: 'ALL', options: AGE_FILTERS.map((option) => ({ value: option, label: option === 'ALL' ? 'Any age' : option })) },
+      { id: 'status', label: 'Status', anyValue: 'ALL', options: STATUS_FILTERS.map((option) => ({ value: option, label: option === 'ALL' ? 'Any status' : option })) },
+      { id: 'health', label: 'Health', anyValue: 'ALL', options: AVAILABILITY_FILTERS.map((option) => ({ value: option, label: option === 'ALL' ? 'Any health' : option })) },
+    ],
+    [positionOptions],
+  );
+  const filterValues = useMemo(
+    () => valuesFromSingles(filterGroups, { position, age: ageFilter, status: statusFilter, health: availabilityFilter }),
+    [filterGroups, position, ageFilter, statusFilter, availabilityFilter],
+  );
+  // How many players a draft selection would show, so Apply can say "Show 24 results".
+  const filterResultCount = (draft: FilterValues): number | null => {
+    const draftPosition = singleValue(filterGroups[0], draft);
+    const draftIdp = idpPlayers.length > 0 && isIdpPositionFilter(draftPosition);
+    const pool = draftIdp ? idpPlayers : players ? mergeSearchMatches(players, searchMatches) : players;
+    if (!pool) return null;
+    const query = search.trim().toLowerCase();
+    return pool
+      .filter((p) => draftPosition === 'ALL' || p.position === draftPosition)
+      .filter((p) => matchesAge(p.age, singleValue(filterGroups[1], draft) as AgeFilter))
+      .filter((p) => matchesStatus(p.status, singleValue(filterGroups[2], draft) as StatusFilter))
+      .filter((p) => matchesAvailability(p.injury_status, singleValue(filterGroups[3], draft) as AvailabilityFilter))
+      .filter((p) => !query || (p.name ?? '').toLowerCase().includes(query)).length;
+  };
+
   return (
     <View style={[styles.container, { paddingTop: headerHeight }]}>
       <GridBackground />
@@ -367,14 +397,16 @@ export default function PlayersScreen({ route, navigation }: Props) {
           autoCapitalize="none"
         />
         <View style={styles.filterRow}>
-          <FilterDropdownButton label="Position" options={positionOptions} value={position} onChange={setPosition} />
-          <FilterDropdownButton label="Age" options={AGE_FILTERS} value={ageFilter} onChange={setAgeFilter} />
-          <FilterDropdownButton label="Status" options={STATUS_FILTERS} value={statusFilter} onChange={setStatusFilter} />
-          <FilterDropdownButton
-            label="Availability"
-            options={AVAILABILITY_FILTERS}
-            value={availabilityFilter}
-            onChange={setAvailabilityFilter}
+          <FilterSheet
+            groups={filterGroups}
+            values={filterValues}
+            resultCount={filterResultCount}
+            onApply={(next) => {
+              setPosition(singleValue(filterGroups[0], next));
+              setAgeFilter(singleValue(filterGroups[1], next) as AgeFilter);
+              setStatusFilter(singleValue(filterGroups[2], next) as StatusFilter);
+              setAvailabilityFilter(singleValue(filterGroups[3], next) as AvailabilityFilter);
+            }}
           />
           <ViewModeToggle value={viewMode} onChange={setViewMode} />
         </View>

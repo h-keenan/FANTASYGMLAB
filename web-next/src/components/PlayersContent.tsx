@@ -18,6 +18,8 @@ import {
 import { OvrGauge } from "@/components/OvrGauge";
 import { PickRow, draftPickRowProps } from "@/components/PickRow";
 import { PillRow } from "@/components/PillRow";
+import { FilterSheet } from "@/components/ui/FilterSheet";
+import { singleValue, valuesFromSingles, type FilterGroup, type FilterValues } from "@/lib/filterSheet";
 import { groupPicksBySeason, visibleDraftPicks } from "@/lib/draftCenterPresentation";
 import { gamePlanTileHref } from "@/lib/gamePlanPresentation";
 import { waiverInjuryDisplay, formatWaiverScore } from "@/lib/waiversPresentation";
@@ -346,6 +348,36 @@ export function PlayersContent({
   );
   const visible = sorted.slice(0, PREVIEW_ROWS);
 
+  // One Filters button instead of five selects (FilterSheet): the same five
+  // facets, committed together with Apply.
+  const filterGroups = useMemo<FilterGroup[]>(
+    () => [
+      { id: "position", label: "Position", anyValue: "ALL", options: positionOptions.map((pos) => ({ value: pos, label: pos === "ALL" ? "Any" : pos })) },
+      { id: "age", label: "Age", anyValue: "ALL", options: PLAYERS_AGE_FILTERS.map((option) => ({ value: option, label: option === "ALL" ? "Any age" : option })) },
+      { id: "status", label: "Status", anyValue: "ALL", options: PLAYERS_STATUS_FILTERS.map((option) => ({ value: option, label: option === "ALL" ? "Any status" : option })) },
+      { id: "health", label: "Health", anyValue: "ALL", options: PLAYERS_AVAILABILITY_FILTERS.map((option) => ({ value: option, label: option === "ALL" ? "Any health" : option })) },
+      { id: "roster", label: "Roster", anyValue: "ALL", hidden: !rosterOwnershipKnown, options: PLAYERS_ROSTER_FILTERS.map((option) => ({ value: option, label: option === "ALL" ? "Any roster status" : option })) },
+    ],
+    [positionOptions, rosterOwnershipKnown],
+  );
+  const filterValues = useMemo(
+    () => valuesFromSingles(filterGroups, { position, age: ageFilter, status: statusFilter, health: availabilityFilter, roster: rosterFilter }),
+    [filterGroups, position, ageFilter, statusFilter, availabilityFilter, rosterFilter],
+  );
+  // How many players a draft selection would show, so Apply can say "Show 24 results".
+  const filterResultCount = (draft: FilterValues) => {
+    const draftPosition = singleValue(filterGroups[0], draft);
+    return filterPlayers(idpPlayers.length > 0 && isIdpPositionFilter(draftPosition) ? idpPlayers : offensePool, {
+      search,
+      position: draftPosition,
+      ageFilter: singleValue(filterGroups[1], draft) as PlayersAgeFilter,
+      statusFilter: singleValue(filterGroups[2], draft) as PlayersStatusFilter,
+      availabilityFilter: singleValue(filterGroups[3], draft) as PlayersAvailabilityFilter,
+      rosterFilter: singleValue(filterGroups[4], draft) as PlayersRosterFilter,
+      rosteredPlayerIds,
+    }).length;
+  };
+
   const pickSeasons = useMemo(() => groupPicksBySeason(visibleDraftPicks(picks, "league", "")), [picks]);
 
   return (
@@ -376,63 +408,20 @@ export function PlayersContent({
               placeholder="Search players"
               className="filter-input col-span-2 px-3 py-2 text-sm sm:flex-1 sm:min-w-[10rem]"
             />
-            <select aria-label="Position"
-              value={position}
-              onChange={(event) => setPosition(event.target.value)}
-              className="filter-select w-full px-3 py-2 text-sm sm:w-auto"
-            >
-              {positionOptions.map((pos) => (
-                <option key={pos} value={pos}>
-                  {pos}
-                </option>
-              ))}
-            </select>
-            <select aria-label="Age"
-              value={ageFilter}
-              onChange={(event) => setAgeFilter(event.target.value as PlayersAgeFilter)}
-              className="filter-select w-full px-3 py-2 text-sm sm:w-auto"
-            >
-              {PLAYERS_AGE_FILTERS.map((option) => (
-                <option key={option} value={option}>
-                  {option === "ALL" ? "Any age" : option}
-                </option>
-              ))}
-            </select>
-            <select aria-label="Status"
-              value={statusFilter}
-              onChange={(event) => setStatusFilter(event.target.value as PlayersStatusFilter)}
-              className="filter-select w-full px-3 py-2 text-sm sm:w-auto"
-            >
-              {PLAYERS_STATUS_FILTERS.map((option) => (
-                <option key={option} value={option}>
-                  {option === "ALL" ? "Any status" : option}
-                </option>
-              ))}
-            </select>
-            <select aria-label="Availability"
-              value={availabilityFilter}
-              onChange={(event) => setAvailabilityFilter(event.target.value as PlayersAvailabilityFilter)}
-              className="filter-select w-full px-3 py-2 text-sm sm:w-auto"
-            >
-              {PLAYERS_AVAILABILITY_FILTERS.map((option) => (
-                <option key={option} value={option}>
-                  {option === "ALL" ? "Any health" : option}
-                </option>
-              ))}
-            </select>
-            {rosterOwnershipKnown ? (
-              <select aria-label="Roster"
-                value={rosterFilter}
-                onChange={(event) => setRosterFilter(event.target.value as PlayersRosterFilter)}
-                className="filter-select col-span-2 w-full px-3 py-2 text-sm sm:col-span-1 sm:w-auto"
-              >
-                {PLAYERS_ROSTER_FILTERS.map((option) => (
-                  <option key={option} value={option}>
-                    {option === "ALL" ? "Any roster status" : option}
-                  </option>
-                ))}
-              </select>
-            ) : null}
+            <div className="col-span-2 sm:col-span-1">
+              <FilterSheet
+                groups={filterGroups}
+                values={filterValues}
+                resultCount={filterResultCount}
+                onApply={(next) => {
+                  setPosition(singleValue(filterGroups[0], next));
+                  setAgeFilter(singleValue(filterGroups[1], next) as PlayersAgeFilter);
+                  setStatusFilter(singleValue(filterGroups[2], next) as PlayersStatusFilter);
+                  setAvailabilityFilter(singleValue(filterGroups[3], next) as PlayersAvailabilityFilter);
+                  setRosterFilter(singleValue(filterGroups[4], next) as PlayersRosterFilter);
+                }}
+              />
+            </div>
           </div>
 
           {/* Madden-style stat sort (Revision 20): Sort By picks the column

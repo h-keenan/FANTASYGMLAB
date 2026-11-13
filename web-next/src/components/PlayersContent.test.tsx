@@ -19,6 +19,13 @@ function selectWithOption(optionText: string): HTMLElement {
   return match;
 }
 
+/** Opens the Filters sheet, taps the given chips (radio options) and commits with Apply. */
+function applyFilters(...chips: string[]) {
+  fireEvent.click(screen.getByRole("button", { name: /^Filters/ }));
+  for (const chip of chips) fireEvent.click(screen.getByRole("radio", { name: chip }));
+  fireEvent.click(screen.getByRole("button", { name: /^(Apply|Show \d+ results?)$/ }));
+}
+
 function pick(overrides: Partial<DraftPickAsset>): DraftPickAsset {
   return {
     pick_id: "2027:1:1",
@@ -90,9 +97,9 @@ describe("PlayersContent", () => {
   it("filters by position", () => {
     render(<PlayersContent leagueId="league1" leagueName="Dynasty Overlords" data={DATA} />);
 
-    const [positionSelect] = screen.getAllByRole("combobox");
-    fireEvent.change(positionSelect, { target: { value: "K" } });
+    applyFilters("K");
 
+    expect(screen.getByRole("button", { name: "Filters, 1 active" })).toBeInTheDocument();
     expect(screen.getByText("Gamma Kicker")).toBeInTheDocument();
     expect(screen.queryByText("Alpha Receiver")).not.toBeInTheDocument();
   });
@@ -166,7 +173,7 @@ describe("PlayersContent", () => {
     it("filters to rostered players using the union of every roster's players array", () => {
       render(<PlayersContent leagueId="league1" leagueName="Dynasty Overlords" data={DATA} rosters={ROSTERS} />);
 
-      fireEvent.change(selectWithOption("Rostered"), { target: { value: "Rostered" } });
+      applyFilters("Rostered");
 
       expect(screen.getByText("Alpha Receiver")).toBeInTheDocument();
       expect(screen.getByText("Beta Back")).toBeInTheDocument();
@@ -176,7 +183,7 @@ describe("PlayersContent", () => {
     it("filters to available (unrostered) players", () => {
       render(<PlayersContent leagueId="league1" leagueName="Dynasty Overlords" data={DATA} rosters={ROSTERS} />);
 
-      fireEvent.change(selectWithOption("Rostered"), { target: { value: "Available" } });
+      applyFilters("Available");
 
       expect(screen.queryByText("Alpha Receiver")).not.toBeInTheDocument();
       expect(screen.queryByText("Beta Back")).not.toBeInTheDocument();
@@ -304,8 +311,9 @@ describe("PlayersContent", () => {
           idp={{ ok: true, idp: false, players: [] }}
         />,
       );
-      const [positionSelect] = screen.getAllByRole("combobox");
-      expect(within(positionSelect).queryByText("DL")).not.toBeInTheDocument();
+      fireEvent.click(screen.getByRole("button", { name: /^Filters/ }));
+      expect(screen.queryByRole("radio", { name: "DL" })).not.toBeInTheDocument();
+      fireEvent.keyDown(screen.getByRole("dialog"), { key: "Escape" });
       expect(screen.queryByText("Edge Rusher")).not.toBeInTheDocument();
     });
 
@@ -313,8 +321,7 @@ describe("PlayersContent", () => {
       render(<PlayersContent leagueId="league1" leagueName="Dynasty Overlords" data={DATA} idp={IDP} />);
       expect(screen.queryByText("Edge Rusher")).not.toBeInTheDocument();
 
-      const [positionSelect] = screen.getAllByRole("combobox");
-      fireEvent.change(positionSelect, { target: { value: "DL" } });
+      applyFilters("DL");
 
       expect(screen.getByText("Edge Rusher")).toBeInTheDocument();
       expect(screen.queryByText("Thumper Backer")).not.toBeInTheDocument();
@@ -333,7 +340,9 @@ describe("PlayersContent", () => {
     const bar = search.parentElement as HTMLElement;
     expect(bar.className).toContain("grid-cols-2");
     expect(search.className).toContain("col-span-2");
-    for (const select of bar.querySelectorAll("select")) expect(select.className).toContain("w-full");
+    // The five facet selects are one Filters button now (FilterSheet).
+    expect(bar.querySelectorAll("select")).toHaveLength(0);
+    expect(within(bar).getByRole("button", { name: /^Filters/ })).toBeInTheDocument();
     // No nested `contents` wrapper / forced full-width stacking on rows.
     expect(container.querySelector(".contents")).toBeNull();
     expect(container.innerHTML).not.toContain("max-sm:w-full");
