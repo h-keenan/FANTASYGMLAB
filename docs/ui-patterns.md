@@ -314,7 +314,7 @@ const groups: FilterGroup[] = [
 
 ### Applied: Players and Waivers (web + mobile)
 
-- **Players:** the five selects (Position, Age, Status, Health, Roster) are one Filters button. Sort by
+- **Players:** the five selects become a one-tap position pill row plus one Filters button (age, status, health, roster). Sort by
   stays a select (it is a sort, not a filter). The live count uses the same filter function as the page
   (including the IDP pool switch), so Apply reads "Show 1 result".
 - **Waivers:** the All Free Agents position select is a one-group FilterSheet, so the same control, count
@@ -325,9 +325,9 @@ const groups: FilterGroup[] = [
 |---|---|---|---|
 | ![](ui-patterns/players-1-bar-before.jpg) | ![](ui-patterns/players-1-bar-after.jpg) | ![](ui-patterns/players-2-sheet-after.jpg) | ![](ui-patterns/players-3-applied-after.jpg) |
 
-Trade-off to know about: picking just a position used to be one tap on a native select; it is now three
-(Filters, chip, Apply), in exchange for one control, no five-row stack and a live result count. If that
-proves too slow, the follow-up is a position quick-pill row above the button that writes the same value.
+Position is the filter people use most, so it is not behind Apply: a pill row (All / QB / RB / WR / TE / K, plus the
+defender positions in IDP leagues) sits above the Filters button and applies on one tap. Filters keeps the rest
+(age, status, health, roster) with the count badge.
 
 ### Not done: TradePickerSheet extraction
 

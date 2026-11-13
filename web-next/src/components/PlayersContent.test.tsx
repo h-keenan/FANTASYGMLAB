@@ -97,9 +97,8 @@ describe("PlayersContent", () => {
   it("filters by position", () => {
     render(<PlayersContent leagueId="league1" leagueName="Dynasty Overlords" data={DATA} />);
 
-    applyFilters("K");
-
-    expect(screen.getByRole("button", { name: "Filters, 1 active" })).toBeInTheDocument();
+    // Position is a one-tap pill row, not part of the Filters sheet.
+    fireEvent.click(screen.getByRole("tab", { name: "K" }));
     expect(screen.getByText("Gamma Kicker")).toBeInTheDocument();
     expect(screen.queryByText("Alpha Receiver")).not.toBeInTheDocument();
   });
@@ -311,9 +310,7 @@ describe("PlayersContent", () => {
           idp={{ ok: true, idp: false, players: [] }}
         />,
       );
-      fireEvent.click(screen.getByRole("button", { name: /^Filters/ }));
-      expect(screen.queryByRole("radio", { name: "DL" })).not.toBeInTheDocument();
-      fireEvent.keyDown(screen.getByRole("dialog"), { key: "Escape" });
+      expect(screen.queryByRole("tab", { name: "DL" })).not.toBeInTheDocument();
       expect(screen.queryByText("Edge Rusher")).not.toBeInTheDocument();
     });
 
@@ -321,7 +318,7 @@ describe("PlayersContent", () => {
       render(<PlayersContent leagueId="league1" leagueName="Dynasty Overlords" data={DATA} idp={IDP} />);
       expect(screen.queryByText("Edge Rusher")).not.toBeInTheDocument();
 
-      applyFilters("DL");
+      fireEvent.click(screen.getByRole("tab", { name: "DL" }));
 
       expect(screen.getByText("Edge Rusher")).toBeInTheDocument();
       expect(screen.queryByText("Thumper Backer")).not.toBeInTheDocument();

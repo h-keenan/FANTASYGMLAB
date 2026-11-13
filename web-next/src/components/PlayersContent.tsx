@@ -352,7 +352,7 @@ export function PlayersContent({
   // facets, committed together with Apply.
   const filterGroups = useMemo<FilterGroup[]>(
     () => [
-      { id: "position", label: "Position", anyValue: "ALL", options: positionOptions.map((pos) => ({ value: pos, label: pos === "ALL" ? "Any" : pos })) },
+      { id: "position", label: "Position", anyValue: "ALL", hidden: true, options: positionOptions.map((pos) => ({ value: pos, label: pos === "ALL" ? "Any" : pos })) },
       { id: "age", label: "Age", anyValue: "ALL", options: PLAYERS_AGE_FILTERS.map((option) => ({ value: option, label: option === "ALL" ? "Any age" : option })) },
       { id: "status", label: "Status", anyValue: "ALL", options: PLAYERS_STATUS_FILTERS.map((option) => ({ value: option, label: option === "ALL" ? "Any status" : option })) },
       { id: "health", label: "Health", anyValue: "ALL", options: PLAYERS_AVAILABILITY_FILTERS.map((option) => ({ value: option, label: option === "ALL" ? "Any health" : option })) },
@@ -408,6 +408,17 @@ export function PlayersContent({
               placeholder="Search players"
               className="filter-input col-span-2 px-3 py-2 text-sm sm:flex-1 sm:min-w-[10rem]"
             />
+            {/* Position is the filter people use most, so it stays one tap: a pill row that
+                applies at once. Filters keeps everything else (age, status, health, roster). */}
+            <div className="col-span-2 sm:col-span-1 sm:order-first min-w-0">
+              <PillRow
+                variant="scroll"
+                ariaLabel="Position"
+                options={positionOptions.map((pos) => ({ label: pos === "ALL" ? "All" : pos, value: pos }))}
+                active={position}
+                onSelect={setPosition}
+              />
+            </div>
             <div className="col-span-2 sm:col-span-1">
               <FilterSheet
                 groups={filterGroups}

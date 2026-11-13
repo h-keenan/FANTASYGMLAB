@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { FlatList, StyleSheet, TouchableOpacity, View } from 'react-native';
+import { FlatList, ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
 import AppText from '../components/AppText';
 import GlassCard from '../components/GlassCard';
 import Input from '../components/Input';
@@ -355,7 +355,7 @@ export default function PlayersScreen({ route, navigation }: Props) {
   // One Filters button instead of four dropdown pills (FilterSheet, same groups as web).
   const filterGroups = useMemo<FilterGroup[]>(
     () => [
-      { id: 'position', label: 'Position', anyValue: 'ALL', options: positionOptions.map((pos) => ({ value: pos, label: pos === 'ALL' ? 'Any' : pos })) },
+      { id: 'position', label: 'Position', anyValue: 'ALL', hidden: true, options: positionOptions.map((pos) => ({ value: pos, label: pos === 'ALL' ? 'Any' : pos })) },
       { id: 'age', label: 'Age', anyValue: 'ALL', options: AGE_FILTERS.map((option) => ({ value: option, label: option === 'ALL' ? 'Any age' : option })) },
       { id: 'status', label: 'Status', anyValue: 'ALL', options: STATUS_FILTERS.map((option) => ({ value: option, label: option === 'ALL' ? 'Any status' : option })) },
       { id: 'health', label: 'Health', anyValue: 'ALL', options: AVAILABILITY_FILTERS.map((option) => ({ value: option, label: option === 'ALL' ? 'Any health' : option })) },
@@ -396,6 +396,20 @@ export default function PlayersScreen({ route, navigation }: Props) {
           onChangeText={setSearch}
           autoCapitalize="none"
         />
+        {/* Position is the most-used filter, so it stays one tap: pills that apply at once. */}
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.positionRow} accessibilityRole="tablist">
+          {positionOptions.map((pos) => (
+            <TouchableOpacity
+              key={pos}
+              accessibilityRole="tab"
+              accessibilityState={{ selected: position === pos }}
+              onPress={() => setPosition(pos)}
+              style={[styles.positionPill, position === pos && styles.positionPillOn]}
+            >
+              <AppText style={[styles.positionPillText, position === pos && { color: colors.accent }]}>{pos === 'ALL' ? 'All' : pos}</AppText>
+            </TouchableOpacity>
+          ))}
+        </ScrollView>
         <View style={styles.filterRow}>
           <FilterSheet
             groups={filterGroups}
@@ -491,6 +505,10 @@ function createStyles(colors: ThemeColors) {
     flexWrap: 'wrap',
     gap: spacing.xs,
   },
+  positionRow: { gap: spacing.xs, paddingVertical: 2 },
+  positionPill: { minHeight: 44, paddingHorizontal: spacing.lg, alignItems: 'center', justifyContent: 'center', borderRadius: radii.pill, borderWidth: 1, borderColor: colors.borderStrong },
+  positionPillOn: { borderColor: colors.accent, backgroundColor: colors.accentMuted },
+  positionPillText: { fontSize: 14, fontWeight: '700', color: colors.textPrimary },
   loading: { marginTop: spacing.xl },
   listContent: { paddingHorizontal: spacing.lg, paddingBottom: spacing.xl },
   playerRow: {
