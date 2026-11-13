@@ -102,6 +102,22 @@ export function tierOpportunityMismatchCaption(tier: string | null | undefined, 
   return `${tier} reflects value over the full season — this role read (${opportunityLabel}) is about right now, and can jump ahead of it fast (e.g. an injury-driven promotion).`;
 }
 
+/** The opportunity chip is a depth-chart role read (modules/rankings
+ * .opportunity_profile); the usage tile is the recent workload trend. A lead
+ * role with a confirmed usage drop reads as two opposing headline signals, so
+ * name the combination and say what each one measures. */
+export function opportunityUsageCaption(
+  opportunityLabel: string | null | undefined,
+  trend: { direction: "up" | "down"; trend_pct: number; confidence_label: string } | null | undefined,
+): string | null {
+  if (!opportunityLabel || !trend || trend.direction !== "down") return null;
+  if (opportunityLabel !== "Elite Opportunity" && opportunityLabel !== "Strong Opportunity") return null;
+  const highConfidence = trend.confidence_label.trim().toLowerCase().startsWith("high");
+  const pct = Math.abs(Math.round(trend.trend_pct));
+  if (!highConfidence && pct < 20) return null;
+  return `${opportunityLabel} is his depth-chart role; usage is down ${pct}% recently, so the role has not translated into recent workload.`;
+}
+
 /** Color family for the PQV usage-trend tile, by the trend's real
  * direction and severity. Rising usage is positive (green). A decline is
  * danger (red) when it is a confirmed read: high confidence, or a drop of

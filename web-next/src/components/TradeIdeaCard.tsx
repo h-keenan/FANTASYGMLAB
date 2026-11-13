@@ -1,3 +1,4 @@
+import { BEGINNER_HELP } from "@/lib/experienceCopy";
 import { AccentCard } from "@/components/AccentCard";
 import { ManagerTendenciesCard } from "@/components/ManagerTendenciesCard";
 import { useEffect, useRef, useState } from "react";
@@ -222,7 +223,7 @@ export function TradeIdeaCardView({
               {tag.label}
             </span>
           ))}
-          <BeginnerHelp text={copy.impactTagHelp(idea.impact_tag)} />
+          <BeginnerHelp label="this tag" text={copy.impactTagHelp(idea.impact_tag)} />
         </div>
       ) : null}
 
@@ -347,7 +348,7 @@ export function TradeIdeaCardView({
             </div>
           ) : null}
           <LeanBarMeter sendScore={idea.send_score} receiveScore={idea.receive_score} />
-          <BeginnerHelp term="ideaBalance" />
+          <BeginnerHelp label="balance" term="ideaBalance" />
           {leagueId ? (
             <TradeOddsEffect leagueId={leagueId} send={idea.package.send} receive={idea.package.receive} lens={lens} />
           ) : null}
@@ -365,8 +366,7 @@ export function TradeIdeaCardView({
               color={levelColor(realismLvl)}
             />
           </div>
-          <BeginnerHelp term="ideaConfidence" />
-          <BeginnerHelp term="ideaRealism" />
+          <BeginnerHelp label="confidence and realism" lines={[BEGINNER_HELP.ideaConfidence, BEGINNER_HELP.ideaRealism]} />
           <ReasoningTags tags={idea.reasoning_tags} />
         </div>
       ) : null}

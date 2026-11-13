@@ -363,6 +363,36 @@ def player_last_name(name: str) -> str:
     return last if len(last) >= 4 else ""
 
 
+_GAME_STORY_RE = re.compile(
+    r"\b(live updates?|live blog|live thread|game ?thread|play[- ]by[- ]play|score updates?|"
+    r"at halftime|halftime|final score|week \d+ (?:recap|preview|live)|game recap|"
+    r"(?:lead|leads|led|trail|trails|beat|beats|top|tops|defeat|defeats|edge|edges|rout|routs)\s+[A-Z][\w.' -]{2,25}?\s+\d{1,2}-\d{1,2}|"
+    r"\bvs\.?\s+[A-Z][\w.' -]{2,25}?,?\s+week \d+)",
+    re.IGNORECASE,
+)
+
+
+def is_game_story(item: Mapping[str, Any] | None) -> bool:
+    """A team-level game recap / live blog ("Commanders lead Giants 10-7 at
+    halftime"). These name many players in their body but are about none."""
+
+    return bool(_GAME_STORY_RE.search(str((item or {}).get("title") or "")))
+
+
+def item_names_player(item: Mapping[str, Any] | None, player_name: str) -> bool:
+    """Does this item concern the named player? The name must appear in the
+    headline-level fields (title/summary/description). A body-only mention
+    counts for ordinary stories but never for a game recap or live blog."""
+
+    payload = item or {}
+    lede = " ".join(str(payload.get(k) or "") for k in ("title", "summary", "description"))
+    if contains_phrase(lede, player_name):
+        return True
+    if is_game_story(payload):
+        return False
+    return contains_phrase(article_text(payload), player_name)
+
+
 def article_text(item: Mapping[str, Any] | None, *extra: str) -> str:
     payload = item or {}
     chunks: List[str] = []

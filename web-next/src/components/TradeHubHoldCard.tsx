@@ -98,7 +98,7 @@ export function TradeHubHoldCard({ hold }: { hold: TradeHubHold }) {
           );
         })}
       </ul>
-      <BeginnerHelp term="tradeHubHold" />
+      <BeginnerHelp label="holding" term="tradeHubHold" />
       {hold.ideas_optional ? (
         <p className="text-xs font-semibold" style={{ color: "var(--color-text-muted)" }}>
           Ideas below are optional.

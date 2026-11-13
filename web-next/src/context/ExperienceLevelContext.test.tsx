@@ -126,8 +126,8 @@ beforeEach(() => {
 });
 
 async function expandHelp() {
-  await screen.findAllByRole("button", { name: "What does this mean?" });
-  for (const b of screen.queryAllByRole("button", { name: "What does this mean?" })) fireEvent.click(b);
+  await screen.findAllByRole("button", { name: /^About / });
+  for (const b of screen.queryAllByRole("button", { name: /^About / })) fireEvent.click(b);
 }
 
 describe("experience level copy on Dashboard", () => {

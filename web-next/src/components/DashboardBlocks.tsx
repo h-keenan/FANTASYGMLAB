@@ -116,9 +116,9 @@ export function DashboardTradesBlock({
       <SectionHeading
         id="trades-heading"
         size="compact"
-        action={
+        help={
           isBeginner ? (
-            <BeginnerHelp popover text={`${TRADES_BLOCK_COPY.beginnerExplainer}${goalLine ? ` ${goalLine}` : ""}`} />
+            <BeginnerHelp popover label="trade ideas" text={`${TRADES_BLOCK_COPY.beginnerExplainer}${goalLine ? ` ${goalLine}` : ""}`} />
           ) : undefined
         }
       >

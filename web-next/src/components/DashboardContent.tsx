@@ -179,10 +179,10 @@ export function DashboardContent({
           <SectionHeading
             id="snapshot-heading"
             size="compact"
-            action={
-              <span className="inline-flex items-center gap-3">
+            help={
                 <BeginnerHelp
                   popover
+                  label="My Team stats"
                   lines={[
                     copy.help("dashboardSnapshot"),
                     copy.help("powerRank") ? `Power Rank: ${copy.help("powerRank")}` : null,
@@ -192,9 +192,8 @@ export function DashboardContent({
                     copy.help("benchStrength") ? `Bench Strength: ${copy.help("benchStrength")}` : null,
                   ]}
                 />
-                <ViewAllLink href={`/my-team/${encodeURIComponent(leagueId)}${query}`} label="Open My Team" label2="Open →" />
-              </span>
             }
+            action={<ViewAllLink href={`/my-team/${encodeURIComponent(leagueId)}${query}`} label="Open My Team" label2="Open →" />}
           >
             My Team
           </SectionHeading>

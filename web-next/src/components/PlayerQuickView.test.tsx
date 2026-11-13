@@ -489,7 +489,7 @@ describe("PlayerQuickView", () => {
       expect(section).toHaveTextContent("Item 3");
       expect(section).not.toHaveTextContent("Item 4");
       expect(screen.getByText("See all news").closest("a")).toHaveAttribute("href", "/news?player=p1&name=Player%20One");
-      expect(api.getPlayerNews).toHaveBeenCalledWith("p1", 3);
+      expect(api.getPlayerNews).toHaveBeenCalledWith("p1", 3, { groupDuplicates: true });
     });
 
     it("points See all news at the full profile's News tab when a league is known", async () => {

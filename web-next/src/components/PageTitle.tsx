@@ -34,7 +34,7 @@ export function PageTitle({ page, info }: { page: string; leagueName?: string; i
     <>
       <button
         type="button"
-        aria-label={open ? "Hide explanation" : "What does this mean?"}
+        aria-label={open ? `Hide explanation of ${page}` : `About ${page}`}
         aria-expanded={open}
         onClick={() => setOpen((v) => !v)}
         className="inline-flex items-center justify-center -mx-2"

@@ -133,7 +133,7 @@ describe("TradeHubContent", () => {
 
     // The sentence lives behind the "?" next to the page name, not in its own row.
     expect(screen.queryByText("You're in the hunt, so ideas favor players who help soon.")).not.toBeInTheDocument();
-    fireEvent.click(screen.getByRole("button", { name: "What does this mean?" }));
+    fireEvent.click(screen.getByRole("button", { name: /^About / }));
     expect(screen.getByText("You're in the hunt, so ideas favor players who help soon.")).toBeInTheDocument();
     expect(screen.queryByText(/Fringe Contender/)).not.toBeInTheDocument();
     expect(screen.queryByText(/What does this mean/)).not.toBeInTheDocument();

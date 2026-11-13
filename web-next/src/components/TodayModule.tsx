@@ -72,9 +72,9 @@ export function TodayModule({
       <SectionHeading
         id="game-plan-heading"
         size="compact"
+        help={<BeginnerHelp popover label="your game plan" term="dashboardGamePlan" />}
         action={
           <span className="inline-flex items-center gap-3">
-            <BeginnerHelp popover term="dashboardGamePlan" />
             <Link
               href={`/gm-plan/${encodeURIComponent(leagueId)}${query}`}
               aria-label="Open the full GM Plan"
@@ -149,7 +149,7 @@ export function TodayModule({
             }) || "No urgent roster issues right now."
           }
         >
-          {!data.reason ? <BeginnerHelp term="dashboardNothingUrgent" className="mt-1" /> : null}
+          {!data.reason ? <BeginnerHelp label="nothing urgent" term="dashboardNothingUrgent" className="mt-1" /> : null}
         </EmptyState>
       ) : null}
 

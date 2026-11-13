@@ -43,7 +43,7 @@ import {
   type QuickViewLeague,
   type QuickViewRequest,
 } from '../lib/playerQuickView';
-import { rankLine, rookieBadge, tierOpportunityMismatchCaption } from '../lib/playerQuickViewPresentation';
+import { rankLine, rookieBadge, tierOpportunityMismatchCaption, opportunityUsageCaption } from '../lib/playerQuickViewPresentation';
 import { queryKeys } from '../lib/queryKeys';
 import { isOnWaiverList } from '../lib/waiverHighlight';
 import { playerSubRatings } from '../lib/subRatings';
@@ -122,7 +122,7 @@ export default function PlayerQuickViewSheet({
   // (never competes with it) and never gates the sheet.
   const newsQuery = useQuery({
     queryKey: [...queryKeys.playerQuickView(player.player_id), 'news'],
-    queryFn: () => api.getPlayerNews(player.player_id, 3),
+    queryFn: () => api.getPlayerNews(player.player_id, 3, { groupDuplicates: true }),
     enabled: detailQuery.isSuccess,
     staleTime: 2 * 60 * 1000,
   });
@@ -234,6 +234,7 @@ export default function PlayerQuickViewSheet({
 
   const tierIdentity = resolvePlayerTier(scoped.tier, isDark);
   const mismatch = tierOpportunityMismatchCaption(scoped.tier, scoped.opportunityLabel);
+  const usageCaption = opportunityUsageCaption(scoped.opportunityLabel, model?.usage_trend ?? null);
   const ranks = rankLine(position, scoped.overallRank, scoped.positionRank);
   const subRatings = model ? playerSubRatings(model) : [];
   const hasSubRatings = subRatings.some((item) => item.rating != null);
@@ -301,6 +302,7 @@ export default function PlayerQuickViewSheet({
                 </View>
               ) : null}
               {mismatch ? <AppText style={styles.note}>{mismatch}</AppText> : null}
+              {usageCaption ? <AppText style={styles.note}>{usageCaption}</AppText> : null}
             </PlayerHero>
 
             {simOverlay}

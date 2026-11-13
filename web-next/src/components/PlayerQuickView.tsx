@@ -8,6 +8,7 @@ import { useEffect, useRef, useState, type ReactNode } from "react";
 import { api, type PlayerAward, type PlayerNewsResponse, type QuickViewResponse } from "@/lib/api";
 import type { PlayerQuickViewIdentity } from "@/context/PlayerQuickViewContext";
 import { BeginnerHelp } from "@/components/BeginnerHelp";
+import { BEGINNER_HELP } from "@/lib/experienceCopy";
 import { DecisionFitCard, PlayerHeroHeader } from "@/components/PlayerHeroHeader";
 import { PlayerUsageBlock } from "@/components/PlayerUsageBlock";
 import { SeasonStatsRows } from "@/components/SeasonStatsRows";
@@ -34,6 +35,7 @@ import {
   seasonStatGroups,
   statPercentileBand,
   tierOpportunityMismatchCaption,
+  opportunityUsageCaption,
 } from "@/lib/playerQuickViewPresentation";
 import { ValuesCredit } from "@/components/ValuesCredit";
 import { SkeletonBlock } from "@/components/Skeleton";
@@ -148,7 +150,7 @@ export function PlayerQuickView({
     if (!remote) return;
     let cancelled = false;
     api
-      .getPlayerNews(identity.player_id, 3)
+      .getPlayerNews(identity.player_id, 3, { groupDuplicates: true })
       .then((result) => {
         if (!cancelled && result.ok) setNews(result);
       })
@@ -289,11 +291,22 @@ export function PlayerQuickView({
         {tierOpportunityMismatchCaption(identity.tier, identity.opportunity_label) ? (
           <p className="pqv-tier-mismatch-note">{tierOpportunityMismatchCaption(identity.tier, identity.opportunity_label)}</p>
         ) : null}
+        {opportunityUsageCaption(identity.opportunity_label, model?.usage_trend ?? null) ? (
+          <p className="pqv-tier-mismatch-note">{opportunityUsageCaption(identity.opportunity_label, model?.usage_trend ?? null)}</p>
+        ) : null}
         {/* Beginner-only explanations of the hero's value/OVR/tier labels
             (lib/experienceCopy.ts) — renders nothing for advanced/unset. */}
-        {identity.score != null ? <BeginnerHelp term="playerValue" className="mt-1" /> : null}
-        {overallRating != null ? <BeginnerHelp term="overallRating" className="mt-1" /> : null}
-        {identity.tier ? <BeginnerHelp term="playerTier" className="mt-1" /> : null}
+        {/* One labeled "?" for every term that applies (was three unlabeled
+            circles when collapsed). */}
+        <BeginnerHelp
+          className="mt-1"
+          label="What do Value, Overall and Tier mean?"
+          lines={[
+            identity.score != null ? BEGINNER_HELP.playerValue : null,
+            overallRating != null ? BEGINNER_HELP.overallRating : null,
+            identity.tier ? BEGINNER_HELP.playerTier : null,
+          ]}
+        />
 
         {simOverlay}
 

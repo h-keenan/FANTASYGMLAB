@@ -1,5 +1,6 @@
 "use client";
 
+import { BEGINNER_HELP } from "@/lib/experienceCopy";
 import { RangeCompare } from "@/components/RangeCompare";
 import { RANGE_CAPTION, leanLabel, rangeDisplayRows } from "@/lib/startSitRange";
 import { useRouter } from "next/navigation";
@@ -95,10 +96,10 @@ function MatchupHeader({ week, live, leagueName }: { week: number | null; live: 
           <ToneBadge label="● Live" color="var(--color-success)" />
         </span>
       ) : null}
-      <span className="ml-auto">
-        <BeginnerHelp term="matchupIntro" />
-      </span>
-      <BeginnerHelp term="matchupWinProbability" />
+      <BeginnerHelp
+        label="this matchup page"
+        lines={[BEGINNER_HELP.matchupIntro, BEGINNER_HELP.matchupWinProbability]}
+      />
     </header>
   );
 }

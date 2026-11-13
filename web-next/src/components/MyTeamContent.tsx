@@ -1,3 +1,4 @@
+import { BEGINNER_HELP } from "@/lib/experienceCopy";
 import { GlossaryNote } from "@/components/GlossaryNote";
 import { PlayerIdentity } from "@/components/PlayerRow";
 import { ToneBadge } from "@/components/ToneBadge";
@@ -222,8 +223,7 @@ export function MyTeamContent({
       <header className="flex flex-col gap-1">
         <PageTitle page="My Team" leagueName={leagueName} />
         <div className="flex flex-wrap gap-2">
-          <BeginnerHelp term="myTeamIntro" />
-          <BeginnerHelp term="myTeamValueTiers" />
+          <BeginnerHelp label="My Team and value tiers" lines={[BEGINNER_HELP.myTeamIntro, BEGINNER_HELP.myTeamValueTiers]} />
         </div>
       </header>
 

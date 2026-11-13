@@ -5658,16 +5658,21 @@ def _group_syndicated_news(projected: list[dict[str, Any]]) -> list[dict[str, An
     """
 
     grouped: list[dict[str, Any]] = []
-    keys: list[tuple[str, frozenset, float]] = []
+    keys: list[tuple[str, frozenset, float, str]] = []
     for item in projected:
         title = item.get("title")
+        summary_norm = news_signal.normalize_title(item.get("summary")) if len(str(item.get("summary") or "")) >= 40 else ""
         norm = news_signal.normalize_title(title)
         tokens = news_signal.title_tokens(title)
         ts = float(item.get("published_ts") or 0)
         home: dict[str, Any] | None = None
         if norm:
-            for entry, (entry_norm, entry_tokens, entry_ts) in zip(grouped, keys):
-                same = norm == entry_norm
+            for entry, (entry_norm, entry_tokens, entry_ts, entry_summary) in zip(grouped, keys):
+                same = norm == entry_norm or (
+                    bool(summary_norm)
+                    and summary_norm == entry_summary
+                    and abs(ts - entry_ts) <= news_signal.NEAR_DUPLICATE_WINDOW_SECONDS
+                )
                 near = (
                     news_signal.tokens_near_duplicate(tokens, entry_tokens)
                     and abs(ts - entry_ts) <= news_signal.NEAR_DUPLICATE_WINDOW_SECONDS
@@ -5677,7 +5682,7 @@ def _group_syndicated_news(projected: list[dict[str, Any]]) -> list[dict[str, An
                     break
         if home is None:
             grouped.append(dict(item))
-            keys.append((norm, tokens, ts))
+            keys.append((norm, tokens, ts, summary_norm))
             continue
         also = home.setdefault("also_reported_by", [])
         source = item.get("source")
@@ -5741,7 +5746,7 @@ def get_player_news(
         item
         for item in enriched
         if item.get("signal_primary_event") in _ACTIONABLE_NEWS_EVENTS
-        and news_signal.contains_phrase(news_signal.article_text(item), player_name)
+        and news_identity.article_names_player(item, player_id, player_name, players_df)
     ]
     matches.sort(key=my_news.news_timestamp, reverse=True)
 
@@ -10123,7 +10128,7 @@ def _rating_history_corroborating_news(
             item
             for item in enriched
             if item.get("signal_primary_event") in _ACTIONABLE_NEWS_EVENTS
-            and news_signal.contains_phrase(news_signal.article_text(item), player_name)
+            and news_signal.item_names_player(item, player_name)
         ]
         groups = news_intelligence.group_player_events_by_identity(
             matches, player_id=str(player_id), player_name=player_name
