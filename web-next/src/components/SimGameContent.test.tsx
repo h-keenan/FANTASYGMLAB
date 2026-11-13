@@ -134,6 +134,25 @@ describe("SimGameContent", () => {
     expect(await screen.findByRole("tab", { name: /Trades/ })).toHaveAttribute("aria-selected", "true");
   });
 
+  it("Make an offer never shows an empty partner list: a failed or reasoned league load says why and retries", async () => {
+    mocked.listSimGames.mockResolvedValue({ ok: true, reason: "", games: [lite(game())] });
+    mocked.getSimInbox.mockResolvedValue({ ok: true, reason: "", items: [] });
+    mocked.getSimGameTeam.mockResolvedValue({ ok: true, reason: "", players: [] });
+    mocked.getSimLeague.mockResolvedValueOnce({ ok: true, reason: "wrong_phase", message: "Not available at this stage." }).mockResolvedValue({
+      ok: true,
+      reason: "",
+      standings: [],
+      teams: [{ team_id: "t2", name: "Rival Rovers", is_you: false, power_rank: 1, persona: { id: "p", label: "Fair", blurb: "b" } }],
+    });
+    render(<SimGameContent />);
+    await openFirstGame();
+    fireEvent.click(await screen.findByRole("tab", { name: /Trades/ }));
+    fireEvent.click(await screen.findByText(/Make an offer/));
+    expect(await screen.findByText("Not available at this stage.")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Try again" }));
+    expect(await screen.findByRole("button", { name: "Trade with Rival Rovers" })).toBeInTheDocument();
+  });
+
   it("Home's Auto-set best lineup names the swap and refreshes the matchup, then says when it is optimal", async () => {
     mocked.listSimGames.mockResolvedValue({ ok: true, reason: "", games: [lite(game())] });
     mocked.getSimInbox.mockResolvedValue({ ok: true, reason: "", items: [] });

@@ -91,6 +91,7 @@ export function SimTeamTab({ ctx, onTrade }: { ctx: SimCtx; onTrade: () => void 
     setSaving(false);
     if (body) {
       setLineup(body);
+      ctx.bump();
       await refreshGame();
     } else {
       setLineup(previous);
@@ -103,6 +104,7 @@ export function SimTeamTab({ ctx, onTrade }: { ctx: SimCtx; onTrade: () => void 
     setSaving(false);
     if (body) {
       setLineup(body);
+      ctx.bump();
       await refreshGame();
     }
   }

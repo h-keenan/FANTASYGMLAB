@@ -38,6 +38,7 @@ import {
   type SimHomeMatchup,
   type SimHomeResponse,
   type SimWaiverClaim,
+  simGameReasonMessage,
 } from "@/lib/simGame";
 import type { SimTab } from "@/lib/simGameFlow";
 import { SIM_HOME_VIEWS, type SimHomeView } from "@/lib/simLayout";
@@ -61,7 +62,7 @@ export function SimHomeTab({
 }) {
   const { gameId } = ctx;
   const [home, setHome] = useState<SimHomeResponse | null>(null);
-  const [failed, setFailed] = useState(false);
+  const [failed, setFailed] = useState<string | null>(null);
   const [attempt, setAttempt] = useState(0);
   const [claiming, setClaiming] = useState<{ player: SimGamePlayer; roster: SimGamePlayer[] } | null>(null);
   const teamId = ctx.game.you?.team_id;
@@ -74,14 +75,16 @@ export function SimHomeTab({
       .getSimHome(gameId)
       .then((body) => {
         if (cancelled) return;
-        if (body.reason) setFailed(true);
+        if (body.reason) setFailed(body.message || simGameReasonMessage(body.reason, body));
         else {
-          setFailed(false);
-          setHome(body);
+          setFailed(null);
+          // A card the server could not build comes back null with its name in `errors`: hide it, keep the page.
+          setHome({ ...body, standings: body.standings ?? undefined, league: body.league ?? undefined, hot_cold: body.hot_cold ?? undefined });
         }
       })
-      .catch(() => {
-        if (!cancelled) setFailed(true);
+      .catch((error: unknown) => {
+        const status = (error as { status?: number } | null)?.status ?? 0;
+        if (!cancelled) setFailed(status >= 500 ? "The server hit a problem building Home. Your other tabs still work. Try again in a moment." : "Check your connection and try again.");
       });
     return () => {
       cancelled = true;
@@ -110,7 +113,7 @@ export function SimHomeTab({
   }
 
   if (failed && !home) {
-    return <EmptyState title="Could not load your home screen" subtitle="Check your connection and try again." actionLabel="Try again" onAction={() => { setFailed(false); setAttempt((n) => n + 1); }} />;
+    return <EmptyState title="Could not load your home screen" subtitle={failed} actionLabel="Try again" onAction={() => { setFailed(null); setAttempt((n) => n + 1); }} />;
   }
   if (!home) {
     return (

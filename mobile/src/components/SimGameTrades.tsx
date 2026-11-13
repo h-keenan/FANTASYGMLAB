@@ -31,6 +31,7 @@ import {
   simPicksOf,
   simHeadshotId,
   simPositionsFor,
+  simGameReasonMessage,
   simTradeMaxPerSide,
   simTradable,
   simTradeClosedReason,
@@ -257,7 +258,7 @@ function Builder({ ctx, seed, onSeedUsed }: { ctx: SimCtx; seed: { partner: stri
   const common = useMemo(() => createSimStyles(colors), [colors]);
   const [draft, dispatch] = useReducer(simTradeReducer, SIM_TRADE_EMPTY);
   const [teams, setTeams] = useState<SimLeagueTeam[] | null>(null);
-  const [teamsFailed, setTeamsFailed] = useState(false);
+  const [teamsFailed, setTeamsFailed] = useState<string | null>(null);
   const [teamsAttempt, setTeamsAttempt] = useState(0);
   const [partnerLoaded, setPartnerLoaded] = useState<{ partner: string; players: SimGamePlayer[] } | null>(null);
   const [mine, setMine] = useState<SimGamePlayer[]>([]);
@@ -277,10 +278,15 @@ function Builder({ ctx, seed, onSeedUsed }: { ctx: SimCtx; seed: { partner: stri
     api
       .getSimLeague(gameId)
       .then((body) => {
-        if (!cancelled) setTeams((body.teams ?? []).filter((t) => !t.is_you));
+        if (cancelled) return;
+        if (body.reason) {
+          setTeamsFailed(body.message || simGameReasonMessage(body.reason, body));
+          return;
+        }
+        setTeams((body.teams ?? []).filter((t) => !t.is_you));
       })
       .catch(() => {
-        if (!cancelled) setTeamsFailed(true);
+        if (!cancelled) setTeamsFailed('Check your connection and try again.');
       });
     return () => {
       cancelled = true;
@@ -367,12 +373,13 @@ function Builder({ ctx, seed, onSeedUsed }: { ctx: SimCtx; seed: { partner: stri
     return <EmptyState icon="lock-closed-outline" title="Trades are closed" subtitle={closed} />;
   }
   if (teamsFailed) {
-    return <ErrorState title="Teams did not load" message="Check your connection and try again." onRetry={() => {
-          setTeamsFailed(false);
+    return <ErrorState title="Teams did not load" message={teamsFailed} onRetry={() => {
+          setTeamsFailed(null);
           setTeamsAttempt((n) => n + 1);
         }} />;
   }
   if (!teams) return <SkeletonCard rows={4} />;
+  if (teams.length === 0) return <EmptyState icon="people-outline" title="No teams to trade with" subtitle="This league has no other teams to trade with right now." />;
 
   // Picks ride in the same id-based draft as players; they take no roster spot.
   const myPicks = simPicksOf(picks, teamId);

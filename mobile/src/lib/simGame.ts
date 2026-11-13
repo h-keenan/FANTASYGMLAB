@@ -48,6 +48,8 @@ export interface SimGameEnvelope {
   error?: string;
   /** Plain sentence the engine wrote for a rule `reason` (not-ready states). */
   message?: string;
+  /** Coarse diagnostic code on sim_storage_unavailable (conflict, timeout, http_5xx, constraint, rls ...). */
+  detail?: string;
   is_premium?: boolean;
   upsell?: SimGameUpsell | null;
   preview?: SimGamePreview | null;
@@ -947,6 +949,17 @@ export function simGameErrorGate(error: unknown): SimGameGate | null {
   if (e.status === 409) return { kind: "conflict" };
   if (e.status === 503 || e.code === "server_busy") return { kind: "unavailable", cause: "busy" };
   return null;
+}
+
+/** A failed ACTION (pick, claim, trade) that is worth one automatic retry: storage hiccup or busy server, never "feature off". */
+export function simIsTransientGate(gate: SimGameGate | null): boolean {
+  return gate !== null && gate.kind === "unavailable" && gate.cause !== "off";
+}
+
+/** Inline copy for a failed action. The game stays on screen: only the initial load shows the full-page unavailable state. */
+export function simActionFailureMessage(body?: SimGameEnvelope | null): string {
+  const code = body?.detail ? ` (${body.detail})` : "";
+  return `Couldn't save that. Your game is safe. Try it again${code}.`;
 }
 
 export function simGameUnavailableCopy(cause: "off" | "storage" | "busy"): { title: string; subtitle: string } {
@@ -2259,6 +2272,8 @@ export interface SimHomeResponse extends SimGameEnvelope {
   reserves?: { ir_used: number; ir_slots: number; taxi_used: number; taxi_slots: number };
   /** Dynasty games only: where you are and what you hold. `next_pick` is a pick id "season:round:team". */
   dynasty?: { season_no: number; seasons: number; picks_held: number; picks_value: number; next_pick: string | null };
+  /** Cards the server could not build (card name to error class); the rest of the page is valid. */
+  errors?: Record<string, string>;
 }
 
 /** One plain line for the Home dynasty/IR strip, or null when the game has neither. */

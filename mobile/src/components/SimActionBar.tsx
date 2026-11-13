@@ -10,7 +10,7 @@ import { useSimAutoSet } from './useSimAutoSet';
 import { useThemeMode } from '../context/ThemeModeContext';
 import { api } from '../lib/api';
 import { simAdvanceLabel } from '../lib/simGame';
-import { simAdvanceState, simEmptySlotLabels } from '../lib/simLayout';
+import { simAdvanceState, simLineupIssues, type SimZeroStarter } from '../lib/simLayout';
 import { ORB_SIZE } from '../lib/orbLayout';
 import { radii, spacing, type ThemeColors } from '../theme';
 
@@ -37,7 +37,7 @@ export default function SimActionBar({ ctx, paywalled, advancing, onAdvance, onG
   const styles = useMemo(() => createStyles(colors), [colors]);
   const bottom = useSimActionBarBottom();
   const { gameId, game } = ctx;
-  const [emptySlots, setEmptySlots] = useState<string[]>([]);
+  const [issues, setIssues] = useState<{ empty: string[]; zero: SimZeroStarter[] }>({ empty: [], zero: [] });
   const auto = useSimAutoSet(ctx);
 
   useEffect(() => {
@@ -45,15 +45,15 @@ export default function SimActionBar({ ctx, paywalled, advancing, onAdvance, onG
     api
       .getSimLineup(gameId)
       .then((body) => {
-        if (!cancelled) setEmptySlots(simEmptySlotLabels(body.slots ?? []));
+        if (!cancelled) setIssues(simLineupIssues(body.slots ?? [], body.warnings ?? []));
       })
       .catch(() => {});
     return () => {
       cancelled = true;
     };
-  }, [gameId, ctx.tick, game.week]);
+  }, [gameId, ctx.tick, game]);
 
-  const state = simAdvanceState(game, emptySlots);
+  const state = simAdvanceState(game, issues.empty, issues.zero);
   // An empty slot is a warning, not a block: confirm, with shortcuts to fix it first.
   const tapAdvance = () => {
     if (!state.confirm) {
