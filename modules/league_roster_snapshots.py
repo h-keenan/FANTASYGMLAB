@@ -44,6 +44,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import sys
 import time
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
@@ -424,18 +425,33 @@ def resolve_season_start(rows: Iterable[Mapping[str, Any]], season: int) -> dict
 
 
 # --------------------------------------------------------------- I/O: reads
+_last_get_error = ""
+
+
+def last_get_error() -> str:
+    """Reason of the most recent failed Supabase read (status code or type only)."""
+
+    return _last_get_error
+
+
 def _get(config: SnapshotConfig, table: str, params: Mapping[str, str]) -> list[dict[str, Any]] | None:
+    global _last_get_error
+    _last_get_error = ""
     if not config.configured:
+        _last_get_error = "not_configured"
         return None
     try:
         response = requests.get(f"{config.url}/rest/v1/{table}", headers=_headers(config), params=dict(params), timeout=20)
-    except Exception:
+    except Exception as exc:  # noqa: BLE001
+        _last_get_error = f"{table}: {type(exc).__name__}"
         return None
     if response.status_code >= 400:
+        _last_get_error = f"{table}: HTTP {response.status_code}"
         return None
     try:
         rows = response.json()
-    except Exception:
+    except Exception:  # noqa: BLE001
+        _last_get_error = f"{table}: invalid_json"
         return None
     return [r for r in rows if isinstance(r, Mapping)] if isinstance(rows, list) else None
 
@@ -588,6 +604,53 @@ class CallThrottle:
         self._next = now + self.interval * calls
 
 
+# ------------------------------------------------------------ diagnostics
+SLEEPER_LEAGUE_URL = "https://api.sleeper.app/v1/league/{league_id}"
+
+# Reason codes. GONE ones mean the league legitimately no longer exists on
+# Sleeper: skipped with a reason, never counted as a failure or alert.
+REASON_NOT_FOUND = "league_not_found"
+REASON_SEASON_MISMATCH = "season_mismatch_previous_season_league"
+REASON_ROSTERS_EMPTY = "rosters_empty"
+REASON_SEASON_UNREADABLE = "league_season_unreadable"
+REASON_TRANSIENT = "sleeper_fetch_failed_transient"
+GONE_REASONS = frozenset({REASON_NOT_FOUND})
+
+
+def league_ref(league_id: str) -> str:
+    """Truncated league id for logs/summaries (enough to cross-reference, no
+    full id, never a username)."""
+
+    text = _text(league_id)
+    return text if len(text) <= 9 else f"{text[:6]}...{text[-3:]}"
+
+
+def classify_probe(status_code: int | None, body: Any) -> str:
+    """Why a league fetch came back empty, from one direct probe of
+    /league/{id}. Sleeper answers 200 with ``null`` (or 404) for a deleted or
+    never-existing league; 429/5xx/network are transient."""
+
+    if status_code is None:
+        return "sleeper_unreachable"
+    if status_code == 404 or (status_code == 200 and not body):
+        return REASON_NOT_FOUND
+    if status_code == 200:
+        return REASON_TRANSIENT  # exists now; the earlier empty read was a blip
+    return f"sleeper_http_{status_code}"
+
+
+def probe_league(league_id: str) -> str:
+    try:
+        response = requests.get(SLEEPER_LEAGUE_URL.format(league_id=league_id), timeout=8)
+    except Exception:  # noqa: BLE001
+        return classify_probe(None, None)
+    try:
+        body = response.json() if response.status_code == 200 else None
+    except Exception:  # noqa: BLE001
+        body = None
+    return classify_probe(response.status_code, body)
+
+
 # ------------------------------------------------------------------- sweep
 def run_sweep(
     *,
@@ -604,6 +667,7 @@ def run_sweep(
     include_picks: bool = True,
     do_prune: bool = False,
     sleep: Callable[[float], None] = time.sleep,
+    probe: Callable[[str], str] | None = None,
 ) -> dict[str, Any]:
     """One shard's snapshot run. Never raises; failures are in ``errors``.
 
@@ -621,7 +685,7 @@ def run_sweep(
     stats: dict[str, Any] = {
         "ok": True, "dry_run": dry_run, "configured": config.configured, "shard": f"{shard_index}/{shards}",
         "slot": None, "season": None, "week": None, "leagues_total": 0, "leagues_in_shard": 0,
-        "snapshotted": 0, "full_rows": 0, "unchanged_rows": 0, "already_done": 0, "skipped_stale": 0,
+        "snapshotted": 0, "full_rows": 0, "unchanged_rows": 0, "already_done": 0, "skipped_stale": 0, "skipped_gone": 0, "skipped_leagues": [],
         "failed": 0, "skipped_budget": 0, "circuit_open": False, "rows_written": 0, "errors": [],
     }
     if is_disabled(environ=environ, secrets=secrets):
@@ -654,7 +718,7 @@ def run_sweep(
     all_ids = list(league_ids) if league_ids is not None else fetch_saved_league_ids(config)
     if all_ids is None:
         stats["ok"] = False
-        stats["errors"].append("could not read saved leagues")
+        stats["errors"].append(f"could not read saved leagues ({last_get_error()})")
         return stats
     stats["leagues_total"] = len(all_ids)
     mine = shard_leagues(all_ids, shards, shard_index)
@@ -668,7 +732,7 @@ def run_sweep(
         fetched = fetch_recent_rows(config, order, now=now)
         if fetched is None:
             stats["ok"] = False
-            stats["errors"].append("could not read recent snapshots")
+            stats["errors"].append(f"could not read recent snapshots ({last_get_error()})")
             return stats
         recent = fetched
 
@@ -703,24 +767,36 @@ def run_sweep(
             stats["already_done"] += 1
             continue
         throttle.wait(3 if include_picks else 2)
+        reason = ""
+        document = None
+        league: Any = None
         try:
             league = sleeper_api.get_league(league_id)
             rosters = sleeper_api.get_rosters(league_id) if league else []
-            document = None
-            if league and rosters:
-                if include_picks:
-                    traded = sleeper_api.get_traded_picks(league_id)
-                else:
-                    traded = []
+            if not league:
+                reason = (probe or probe_league)(league_id)
+            elif not rosters:
+                reason = REASON_ROSTERS_EMPTY
+            else:
+                traded = sleeper_api.get_traded_picks(league_id) if include_picks else []
                 document = build_document(league, rosters, traded, include_picks=include_picks)
+                if document is None:
+                    reason = REASON_SEASON_UNREADABLE
         except Exception as exc:  # noqa: BLE001
-            stats["failed"] += 1
-            consecutive_failures += 1
-            stats["errors"].append(f"{league_id}: {type(exc).__name__}")
-            continue
+            reason = f"exception:{type(exc).__name__}"
+        ref = league_ref(league_id)
         if document is None:
+            if reason in GONE_REASONS:
+                # Deleted/never-existed league: a normal skip, not a failure,
+                # and it must not feed the circuit breaker or the alert.
+                stats["skipped_gone"] += 1
+                stats["skipped_leagues"].append({"league": ref, "reason": reason})
+                print(f"skip {ref}: {reason}", file=sys.stderr)
+                continue
             stats["failed"] += 1
             consecutive_failures += 1
+            stats["errors"].append(f"{ref}: {reason}")
+            print(f"fail {ref}: {reason}", file=sys.stderr)
             continue
         consecutive_failures = 0
         # A league id that Sleeper has rolled over to a newer season keeps
@@ -729,6 +805,9 @@ def run_sweep(
         # account to the new id.
         if clock.phase in ("regular", "post") and document["season"] < clock.season:
             stats["skipped_stale"] += 1
+            detail = f"{REASON_SEASON_MISMATCH}: league={document['season']} clock={clock.season}"
+            stats["skipped_leagues"].append({"league": ref, "reason": detail})
+            print(f"skip {ref}: {detail}", file=sys.stderr)
             continue
         row = plan_row(
             league_id=league_id, week=week, slot=slot, document=document,
