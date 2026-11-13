@@ -40,6 +40,7 @@ DEFAULT_TAXI_YEARS = 2  # rookies and second-year players (years of experience b
 DEFAULT_TAXI_SLOTS_DYNASTY = 4
 RESERVE_VERSION = 1
 AI_VERSION = 1  # 1: AI managers plan depth around byes and injuries, use the wire proactively (new games only)
+VIEWS_KEPT = 2  # dynasty_v 3: season pools kept in memory behind the latest
 TIEBREAKERS = ("points_for", "head_to_head")  # standings/seed tiebreak after win pct
 DEFAULT_TIEBREAKER = "points_for"
 LEGACY_TIEBREAKER = "head_to_head"  # saves from before the setting existed
@@ -207,6 +208,12 @@ class GameSettings:
     def rookie_curves(self) -> bool:
         """Generated rookies carry a scouting profile and a per-player development curve (dynasty_v 2+). Older dynasty saves keep the plain age curve."""
         return self.dynasty and self.dynasty_v >= 2
+
+    @property
+    def league_anchor(self) -> bool:
+        """Rookie classes and their market values are scaled to the league's own season-1 talent level, not to the aged pool of the moment
+        (dynasty_v 3+). Without it a long dynasty feeds back on itself: weaker veterans make weaker classes, which make weaker veterans."""
+        return self.dynasty and self.dynasty_v >= 3
 
     @property
     def multi_season(self) -> bool:
@@ -558,6 +565,9 @@ class GameSnapshot:
             object.__setattr__(root, "_views", views)
         if season not in views:
             views[season] = season_snapshot(root, season)
+            if root.settings.league_anchor:  # a 20-season game must not pin 20 pools: keep the latest few, rebuild older ones on demand
+                for old in [k for k in views if k < season - VIEWS_KEPT]:
+                    del views[old]
         return views[season]
 
     @property

@@ -133,6 +133,24 @@ export function SimDynastyResult({ summary, onNewGame, onHub }: { summary: SimDy
           </ol>
         )}
       </SimCollapse>
+      {view.history.champions.length > 0 ? (
+        <SimCollapse title="League history" summary={view.history.summary} testId="dynasty-history">
+          <ol className="flex flex-col gap-1 text-sm">
+            {view.history.champions.map((c) => (
+              <li key={c.key} style={{ fontWeight: c.you ? 800 : undefined }}>
+                {c.label}
+              </li>
+            ))}
+          </ol>
+          {view.history.leaders.length > 0 || view.history.records.length > 0 ? (
+            <ul className="flex flex-col gap-1 pt-2 text-xs" style={{ color: "var(--color-text-muted)" }}>
+              {[...view.history.leaders, ...view.history.records].map((line) => (
+                <li key={line}>{line}</li>
+              ))}
+            </ul>
+          ) : null}
+        </SimCollapse>
+      ) : null}
     </div>
   );
 }

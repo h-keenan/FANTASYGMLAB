@@ -91,6 +91,104 @@ def _market_at(pool: Sequence[Mapping[str, Any]], mean: float) -> float:
     return best["market"]
 
 
+def _anchor(root: GameSnapshot) -> dict[str, dict[str, Any]]:
+    """The season-1 veteran pool as plain rows: the fixed yardstick (rank-12 level and market by position) every later class is scaled to."""
+
+    rows = getattr(root, "_anchor_rows", None)
+    if rows is None:
+        rows = {pid: {"pid": pid, "pos": p.pos, "mean": p.mean, "market": p.market, "nfl_team": p.nfl_team} for pid, p in root.players.items()}
+        object.__setattr__(root, "_anchor_rows", rows)
+    return rows
+
+
+def _anchor_top(root: GameSnapshot) -> dict[str, float]:
+    tops = getattr(root, "_anchor_top", None)
+    if tops is None:
+        tops = {}
+        for r in _anchor(root).values():
+            tops[r["pos"]] = max(tops.get(r["pos"], 0.0), r["mean"])
+        tops = {k: v * 1.1 for k, v in tops.items()}
+        object.__setattr__(root, "_anchor_top", tops)
+    return tops
+
+
+LEVEL_RANKS = {"QB": 24, "RB": 36, "WR": 36, "TE": 24, "K": 18}
+SUPPLY_BAND = (0.85, 1.5)
+SUPPLY_GAIN = 1.6  # class strength follows (league level / current level) ** SUPPLY_GAIN
+
+
+def _level(rows, pos: str) -> float:
+    means = sorted((r["mean"] for r in rows if r["pos"] == pos), reverse=True)[: LEVEL_RANKS[pos]]
+    return sum(means) / len(means) if means else 0.0
+
+
+def _supply_response(base: GameSnapshot, vets: Mapping[str, Mapping[str, Any]]) -> dict[str, float]:
+    """dynasty_v 3: how strong this year's class is at each position relative to what the league needs. A position whose
+    veteran depth (the average of its top-N, N = what a league starts and streams) has slipped below the league's own
+    season-1 level draws a stronger class, one that has run ahead a weaker one. Draft classes follow scarcity the way real
+    ones do (rosters, scouting and draft capital all chase a thin position), and it is what keeps scoring from drifting
+    over twenty seasons. Bounded to [0.85, 1.5] so one bad year cannot make a super class."""
+
+    anchor = _anchor(base)
+    out = {}
+    for pos in LEVEL_RANKS:
+        a, c = _level(anchor.values(), pos), _level(vets.values(), pos)
+        if a > 0 and c > 0:
+            out[pos] = min(SUPPLY_BAND[1], max(SUPPLY_BAND[0], (a / c) ** SUPPLY_GAIN))
+    return out
+
+
+def _equilibrium_plan(base: GameSnapshot, vets: Mapping[str, Mapping[str, Any]], by_pos, gen, n: int) -> list[str]:
+    """dynasty_v 3: the positions of this year's class, in draft order, chosen to REFILL the pool to the league's own season-1
+    head count at every position (retirements and aging-out leave holes; the class fills exactly those, plus the usual class
+    size spread by the position shares, leaning toward the thinner positions). Quarterbacks go early or late, kickers last.
+    Without it kickers (never drafted) and then quarterbacks simply run out in a long dynasty and the league's scoring falls."""
+
+    anchor = _anchor(base)
+    skill = ("QB", "RB", "WR", "TE")
+    target = {p: sum(1 for r in anchor.values() if r["pos"] == p) for p in (*skill, "K")}
+    have = {p: sum(1 for r in vets.values() if r["pos"] == p) for p in target}
+    deficit = {p: max(0, target[p] - have[p]) for p in target}
+    counts = {p: deficit[p] for p in skill}
+    extra = max(0, n - sum(counts.values()))
+    weights = {p: POS_SHARE[p] * min(1.5, max(0.5, target[p] / max(1, have[p]))) for p in skill}
+    total_w = sum(weights.values()) or 1.0
+    shares = {p: extra * weights[p] / total_w for p in skill}
+    for p in skill:
+        counts[p] += int(shares[p])
+    left = extra - sum(int(shares[p]) for p in skill)
+    for p in sorted(skill, key=lambda q: (-(shares[q] - int(shares[q])), q))[:left]:
+        counts[p] += 1
+    size = sum(counts.values())
+    slots: list[str | None] = [None] * size
+    qbs = counts["QB"]
+    for q in range(qbs):
+        early = q == 0 and float(gen.random()) < 0.67
+        lo, hi = (0, min(QB_EARLY_SLOTS, size)) if early else (min(QB_EARLY_SLOTS, size - 1), min(24, size))  # a drafted QB is a real prospect, never a throw-in
+        for _ in range(size):
+            at = int(gen.integers(lo, hi))
+            if slots[at] is None:
+                slots[at] = "QB"
+                break
+    rest = {p: counts[p] for p in skill if p != "QB"}
+    for i in range(size):
+        if slots[i] is not None:
+            continue
+        tot = sum(rest.values())
+        draw = float(gen.random()) * tot
+        pick = next(p for p in sorted(rest) if rest[p] > 0)
+        for p in sorted(rest):
+            if rest[p] <= 0:
+                continue
+            draw -= rest[p]
+            pick = p
+            if draw <= 0:
+                break
+        rest[pick] -= 1
+        slots[i] = pick
+    return [p for p in slots if p] + ["K"] * deficit["K"]
+
+
 def rookie_class(
     base: GameSnapshot, vets: Mapping[str, Mapping[str, Any]], season: int
 ) -> list[dict[str, Any]]:
@@ -104,30 +202,44 @@ def rookie_class(
     gen = WorldRng(base.seed).stream(season, "grookie", 0)
     factor, _label = class_strength(base, season)
     by_pos: dict[str, list[Mapping[str, Any]]] = {}
-    for row in vets.values():
+    for row in (_anchor(base) if s.league_anchor else vets).values():
         by_pos.setdefault(row["pos"], []).append(row)
     for pos in by_pos:
         by_pos[pos].sort(key=lambda r: (-r["mean"], r["pid"]))
     positions = [p for p in POS_SHARE if p in by_pos]
     ref12 = {p: by_pos[p][min(11, len(by_pos[p]) - 1)]["mean"] for p in positions}
-    teams = sorted({r["nfl_team"] for rows in by_pos.values() for r in rows if r["nfl_team"] not in ("", "FA") and r["pos"] != "DEF"})
+    plan = _equilibrium_plan(base, vets, by_pos, gen, n) if s.league_anchor else None
+    supply = _supply_response(base, vets) if s.league_anchor else {}
+    if plan is not None:
+        n = len(plan)
+        if "K" in by_pos:
+            ref12["K"] = by_pos["K"][min(11, len(by_pos["K"]) - 1)]["mean"]
+    teams = sorted({r["nfl_team"] for r in vets.values() if r["nfl_team"] not in ("", "FA") and r["pos"] != "DEF"})
     used: set[str] = set()
     rows: list[dict[str, Any]] = []
     for j in range(1, n + 1):
-        w = {p: POS_SHARE[p] for p in positions}
-        if "QB" in w:
-            w["QB"] = QB_EARLY_PROB if j <= QB_EARLY_SLOTS else POS_SHARE["QB"] * 0.5
-        total = sum(w.values())
-        draw = float(gen.random()) * total
-        pos = positions[-1]
-        for p in positions:
-            draw -= w[p]
-            if draw <= 0:
-                pos = p
-                break
+        if plan is None:
+            w = {p: POS_SHARE[p] for p in positions}
+            if "QB" in w:
+                w["QB"] = QB_EARLY_PROB if j <= QB_EARLY_SLOTS else POS_SHARE["QB"] * 0.5
+            total = sum(w.values())
+            draw = float(gen.random()) * total
+            pos = positions[-1]
+            for p in positions:
+                draw -= w[p]
+                if draw <= 0:
+                    pos = p
+                    break
+        else:
+            pos = plan[j - 1]
         jitter = math.exp(JITTER_SIGMA * float(gen.standard_normal()))
-        mean = max(1.5, ref12[pos] * SLOT_TOP / (1.0 + (j / SLOT_HALF) ** SLOT_POWER) * factor * jitter)
-        boost = 1.05 + 0.25 * math.exp(-(j - 1) / 12.0)  # the dynasty market pays for draft capital and years
+        if pos == "K":  # kickers are not drafted on a slot curve: a class kicker is a random draw from the league's own kickers
+            ks = by_pos["K"]
+            mean = max(1.5, ks[int(gen.integers(0, len(ks)))]["mean"] * factor ** 0.5 * jitter)
+            boost = 1.0
+        else:
+            mean = max(1.5, ref12[pos] * SLOT_TOP / (1.0 + (j / SLOT_HALF) ** SLOT_POWER) * factor * jitter * supply.get(pos, 1.0))
+            boost = 1.05 + 0.25 * math.exp(-(j - 1) / 12.0)  # the dynasty market pays for draft capital and years
         market = max(1.0, min(97.0, _market_at(by_pos[pos], mean) * boost))
         while True:
             name = f"{FIRST[int(gen.integers(0, len(FIRST)))]} {LAST[int(gen.integers(0, len(LAST)))]}"
@@ -163,7 +275,11 @@ def season_snapshot(root: GameSnapshot, season: int) -> GameSnapshot:
         r = rng.stream(season - 1, "gage", aging.stable_key(pid))
         z, u = float(r.standard_normal()), float(r.random())
         own = scouting.step_ratio(p.extra, p.extra.get("years_exp", 0.0)) if root.settings.rookie_curves else None
-        age, mean, sd, market, retired = aging.progress(p.pos, p.age, p.mean, p.sd, p.market, z, u, mult=own)
+        age, mean, sd, market, retired = aging.progress(p.pos, p.age, p.mean, p.sd, p.market, z, u, mult=own, flat_k=root.settings.league_anchor)
+        if root.settings.league_anchor:  # nobody runs far past the best the league ever had: compress above it (no unbounded drift at the top)
+            top = _anchor_top(root).get(p.pos)
+            if top and mean > top:
+                mean = top * (mean / top) ** 0.5
         if retired:
             continue
         extra = {k: v for k, v in p.extra.items() if k not in ("is_rookie",)}
@@ -237,6 +353,33 @@ def season_archive(snap: GameSnapshot, state: GameState, champion: str = "") -> 
     }
 
 
+def league_history(snap: GameSnapshot, state: GameState) -> dict[str, Any]:
+    """The whole league's story across the seasons played (dynasty_v 3): every champion, who has won the most titles, and the
+    single-season records, all read from the per-season archives, so it costs a few KB however long the dynasty runs."""
+
+    champions, titles = [], {}
+    best_record = best_pf = None
+    for a in state.seasons:
+        champ = a.get("champion")
+        if champ:
+            champions.append({"season_no": a["season_no"], "year": a["year"], "team_id": champ["team_id"], "name": champ["name"], "is_you": bool(champ.get("is_you"))})
+            titles[champ["team_id"]] = titles.get(champ["team_id"], 0) + 1
+        for r in a.get("standings", ()):
+            rec = (r["wins"], -r["losses"], r["pf"])
+            if best_record is None or rec > best_record[0]:
+                best_record = (rec, {"year": a["year"], "team_id": r["team_id"], "name": r["name"], "record": f"{r['wins']}-{r['losses']}" + (f"-{r['ties']}" if r["ties"] else "")})
+            if best_pf is None or r["pf"] > best_pf[0]:
+                best_pf = (r["pf"], {"year": a["year"], "team_id": r["team_id"], "name": r["name"], "pf": r["pf"]})
+    names = {t.tid: t.name for t in snap.teams}
+    leaders = sorted(titles.items(), key=lambda kv: (-kv[1], kv[0]))[:5]
+    return {
+        "champions": champions,
+        "title_leaders": [{"team_id": t, "name": names.get(t, t), "titles": n, "is_you": t == snap.user_team.tid} for t, n in leaders],
+        "best_record": best_record[1] if best_record else None,
+        "most_points": best_pf[1] if best_pf else None,
+    }
+
+
 def dynasty_summary(snap: GameSnapshot, state: GameState) -> dict[str, Any]:
     """The multi-year view: titles, finish by year, totals."""
 
@@ -255,8 +398,10 @@ def dynasty_summary(snap: GameSnapshot, state: GameState) -> dict[str, Any]:
         "by_year": [{
             "season_no": a["season_no"], "year": a["year"], "rank": a["you"]["rank"], "record": f"{a['you']['wins']}-{a['you']['losses']}" + (f"-{a['you']['ties']}" if a["you"]["ties"] else ""),
             "pf": a["you"]["pf"], "playoff_result": a["you"]["playoff_result"], "champion": a["champion"], "avg_age": a["you"]["avg_age"],
-            "top_scorers": a["you"]["top_scorers"], "standings": a["standings"],
+            "top_scorers": a["you"]["top_scorers"],
+            **({} if snap.settings.league_anchor else {"standings": a["standings"]}),  # v3: the league view carries history; no per-year table
         } for a in seasons],
+        **({"history": league_history(snap, state)} if snap.settings.league_anchor else {}),
         "rookie_drafts": [{"year": d["year"], "picks": [x for x in d["picks"] if x["team"] == snap.user_team.tid]} for d in state.rookie_log],
         "picks_held": len(state.picks_of(snap.user_team.tid)),
     }

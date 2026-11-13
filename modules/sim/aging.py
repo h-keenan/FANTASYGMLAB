@@ -93,6 +93,7 @@ def retire_prob(pos: str, age: float, quality: float) -> float:
 
 def progress(
     pos: str, age: float, mean: float, sd: float, market: float, z: float, u_ret: float, mult: float | None = None,
+    flat_k: bool = False,
 ) -> tuple[float, float, float, float, bool]:
     """One offseason for one player. ``z`` is a standard normal and ``u_ret`` a
     uniform from the player's own stream. ``mult`` replaces the plain age curve for a
@@ -101,6 +102,8 @@ def progress(
 
     if mult is None:
         mult = age_mult(pos, age)
+        if flat_k and pos == "K":  # dynasty_v 3: kickers hold their level until their late decline (the plain curve compounds +2% a year)
+            mult = min(mult, 1.0)
     spread = 0.10 if pos != "K" else 0.06
     noise = math.exp(spread * z - 0.5 * spread * spread)
     new_mean = max(0.5, mean * mult * noise) if pos != "DEF" else mean

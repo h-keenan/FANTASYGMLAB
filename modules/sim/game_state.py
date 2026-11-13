@@ -457,7 +457,28 @@ def _season_started(state, snap, week, p):
     state.recaps = {}
     state.out = {pid: pl.injury_weeks for pid, pl in snap.players.items() if pl.injury_weeks > 0 and pid in state.owner_map()}
     state.offseason = None
+    if snap.settings.league_anchor:
+        _compact_old_seasons(state, snap)
     state.boundary_seq = state.seq + 1
+
+
+KEEP_DRAFT_YEARS = 4  # rookie drafts kept in full; older ones shrink to the user's own picks (long dynasties)
+
+
+def _compact_old_seasons(state, snap) -> None:
+    """dynasty_v 3: bound what a long game carries. Rookie drafts older than ``KEEP_DRAFT_YEARS`` keep only the user's picks, and
+    their spent-pick ledger rows (and the matching created ids) are dropped, so state size stops growing with the number of seasons
+    played. Per-season archives, the champions list and records are unaffected."""
+
+    cutoff = snap.settings.start_year + state.season_no - 1 - KEEP_DRAFT_YEARS
+    user = snap.user_team.tid
+    old = {s["pick"] for s in state.spent_picks if s["year"] < cutoff}
+    if old:
+        state.spent_picks = [s for s in state.spent_picks if s["pick"] not in old]
+        state.created_picks = [c for c in state.created_picks if c not in old]
+    state.rookie_log = [
+        e if e["year"] >= cutoff else {"year": e["year"], "picks": [x for x in e["picks"] if x["team"] == user]} for e in state.rookie_log
+    ]
 
 
 def _advance_requested(state, snap, week, p):
