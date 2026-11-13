@@ -19,3 +19,14 @@ describe("playerListRow", () => {
     expect(orderPlayerListStats([s("proj"), s("edge")]).map((x) => x?.key ?? null)).toEqual(["proj", null, null, "edge"]);
   });
 });
+
+describe("aligned columns", () => {
+  it("an aligned list reserves proj + metric + edge at a fixed width and gives an empty ADP slot no room", async () => {
+    const { PLAYER_LIST_ALIGNED_WIDTH, playerListSlotWidth, PLAYER_LIST_SLOT_WIDTH } = await import("./playerListRow");
+    expect(PLAYER_LIST_ALIGNED_WIDTH).toBe(PLAYER_LIST_SLOT_WIDTH.proj + PLAYER_LIST_SLOT_WIDTH.metric + PLAYER_LIST_SLOT_WIDTH.edge + 6);
+    expect(playerListSlotWidth(2, true)).toBe(0);
+    expect(playerListSlotWidth(2, false)).toBe(PLAYER_LIST_SLOT_WIDTH.adp);
+    expect(playerListSlotWidth(3, true)).toBe(PLAYER_LIST_SLOT_WIDTH.edge);
+    expect(playerListSlotWidth(0, true)).toBe(PLAYER_LIST_SLOT_WIDTH.proj);
+  });
+});

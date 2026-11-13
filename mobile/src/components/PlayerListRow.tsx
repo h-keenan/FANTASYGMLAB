@@ -15,8 +15,8 @@ import type { WhyMetricId } from '../lib/tapForWhyContent';
 import {
   PLAYER_LIST_DENSITY,
   PLAYER_LIST_LONG_NAME,
-  PLAYER_LIST_SLOT_WIDTH,
-  PLAYER_LIST_STAT_ORDER,
+  PLAYER_LIST_ALIGNED_WIDTH,
+  playerListSlotWidth,
   PLAYER_LIST_STAT_WIDTH,
   limitPlayerListTags,
   orderPlayerListStats,
@@ -57,6 +57,8 @@ export interface PlayerListRowProps {
   onSimInfo?: () => void;
   testID?: string;
   selected?: boolean;
+  /** Every row of this list shows the same stats: anchor the stat block left at a fixed width so columns line up even when only some rows have an EDGE. */
+  alignColumns?: boolean;
 }
 
 function toneColor(tone: ChipTone | undefined, colors: ThemeColors, fallback: string): string {
@@ -96,6 +98,7 @@ export default function PlayerListRow({
   onSimInfo,
   testID = 'player-list-row',
   selected = false,
+  alignColumns = false,
 }: PlayerListRowProps) {
   const { colors, isDark } = useThemeMode();
   const styles = useMemo(() => createStyles(colors), [colors]);
@@ -188,7 +191,7 @@ export default function PlayerListRow({
             ))}
             {moreTags > 0 ? <AppText style={styles.more}>+{moreTags}</AppText> : null}
           </View>
-          <View style={styles.stats} testID="list-stats">
+          <View style={[styles.stats, alignColumns && { justifyContent: 'flex-start', minWidth: PLAYER_LIST_ALIGNED_WIDTH }]} testID="list-stats">
             {slots.map((stat, i) =>
               stat ? (
                 <View key={stat.key} style={{ minWidth: PLAYER_LIST_STAT_WIDTH[stat.key] ?? 66, alignItems: 'flex-end' }}>
@@ -215,7 +218,7 @@ export default function PlayerListRow({
                   )}
                 </View>
               ) : (
-                <View key={`empty-${i}`} style={{ minWidth: PLAYER_LIST_SLOT_WIDTH[PLAYER_LIST_STAT_ORDER[i] ?? 'adp'] }} />
+                <View key={`empty-${i}`} style={{ minWidth: playerListSlotWidth(i, alignColumns) }} />
               ),
             )}
           </View>

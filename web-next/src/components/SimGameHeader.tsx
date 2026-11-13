@@ -8,8 +8,8 @@ import { OPEN_SEARCH_EVENT } from "@/lib/orbSearch";
 import { simFmtRecord, type SimGame } from "@/lib/simGame";
 import type { SimTab } from "@/lib/simGameFlow";
 
-const ICON_BTN = "inline-flex shrink-0 items-center justify-center";
-const ICON_STYLE = { width: "var(--touch-target-min)", height: "var(--touch-target-min)", color: "var(--color-text-secondary)" } as const;
+export const SIM_ICON_BTN = "inline-flex shrink-0 items-center justify-center";
+export const SIM_ICON_STYLE = { width: "var(--touch-target-min)", height: "var(--touch-target-min)", color: "var(--color-text-secondary)" } as const;
 
 /**
  * The phone game header: one line, replacing the app header, the "All games /
@@ -25,7 +25,7 @@ export function SimGameHeader({ game, onHub, onTeam, onMore, bell }: { game: Sim
   const showTeam = Boolean(you) && game.phase !== "draft";
   return (
     <header className="sim-game-header md:hidden" data-testid="sim-game-header">
-      <button type="button" className={ICON_BTN} style={ICON_STYLE} onClick={onHub} aria-label="Back to all games">
+      <button type="button" className={SIM_ICON_BTN} style={SIM_ICON_STYLE} onClick={onHub} aria-label="Back to all games">
         <svg width={20} height={20} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.2} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
           <path d="m15 18-6-6 6-6" />
         </svg>
@@ -54,13 +54,13 @@ export function SimGameHeader({ game, onHub, onTeam, onMore, bell }: { game: Sim
         <span className="flex-1" />
       )}
       {bell}
-      <button type="button" className={ICON_BTN} style={ICON_STYLE} onClick={() => window.dispatchEvent(new Event(OPEN_SEARCH_EVENT))} aria-label="Search players and pages">
+      <button type="button" className={SIM_ICON_BTN} style={SIM_ICON_STYLE} onClick={() => window.dispatchEvent(new Event(OPEN_SEARCH_EVENT))} aria-label="Search players and pages">
         <svg width={18} height={18} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
           <circle cx="11" cy="11" r="7" />
           <path d="m20 20-3.5-3.5" />
         </svg>
       </button>
-      <button type="button" className={ICON_BTN} style={ICON_STYLE} onClick={onMore} aria-haspopup="dialog" aria-label="Game menu: rules, reset week, delete">
+      <button type="button" className={SIM_ICON_BTN} style={SIM_ICON_STYLE} onClick={onMore} aria-haspopup="dialog" aria-label="Game menu: rules, reset week, delete">
         <svg width={18} height={18} viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
           <circle cx="5" cy="12" r="1.8" />
           <circle cx="12" cy="12" r="1.8" />

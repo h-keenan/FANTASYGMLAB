@@ -44,11 +44,21 @@ export interface PlayerListMetaPart {
 }
 
 /** Fixed pill widths (px), so PROJ / OVR / TRADE VALUE / ADP / EDGE line up row after row. */
-export const PLAYER_LIST_STAT_WIDTH: Record<string, number> = { proj: 66, ovr: 66, tval: 104, adp: 52, edge: 58 };
+export const PLAYER_LIST_STAT_WIDTH: Record<string, number> = { proj: 78, ovr: 66, tval: 112, adp: 56, edge: 70 };
 /** Column order. `metric` is the one 0-100 slot: the player's Overall (`ovr`) in lists, or `tval` (Trade value) on trade screens, never both. */
 export const PLAYER_LIST_STAT_ORDER = ["proj", "metric", "adp", "edge"] as const;
 /** Empty-slot widths by column (an empty `metric` slot reserves the Overall width). */
-export const PLAYER_LIST_SLOT_WIDTH: Record<(typeof PLAYER_LIST_STAT_ORDER)[number], number> = { proj: 66, metric: 66, adp: 52, edge: 58 };
+/**
+ * Aligned columns (lists where every row shows the same stats, so PROJ and OVR must line up row to row even when only some
+ * rows carry an EDGE): the block is left-anchored at a fixed width (proj + metric + edge) and an empty ADP slot takes no room.
+ */
+export const PLAYER_LIST_ALIGNED_WIDTH = 78 + 66 + 70 + 6;
+export function playerListSlotWidth(index: number, aligned: boolean): number {
+  const key = PLAYER_LIST_STAT_ORDER[index] ?? "adp";
+  return aligned && key === "adp" ? 0 : PLAYER_LIST_SLOT_WIDTH[key];
+}
+
+export const PLAYER_LIST_SLOT_WIDTH: Record<(typeof PLAYER_LIST_STAT_ORDER)[number], number> = { proj: 78, metric: 66, adp: 56, edge: 70 };
 
 /** At most `max` tags are shown; the rest collapse into a "+N". */
 export function limitPlayerListTags<T>(tags: T[], max = 2): { shown: T[]; extra: number } {
