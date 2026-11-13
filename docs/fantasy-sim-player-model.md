@@ -66,6 +66,16 @@ only when the engine decides to reveal an event early; the model does not do new
 Speed: about 80 microseconds per player-week (pure Python + numpy scalars); a 12-team,
 200-player pool is about 0.3 s per simulated week.
 
+## 1a. Versions and replay safety
+
+`modules/sim/player_model_v1.py` is a **frozen byte-for-byte copy** of player-model-1 (sha256 pinned in
+`tests/test_sim_game_model_versions.py`); never edit it. `modules/sim/player_model.py` is the current model (player-model-2).
+`game_scoring.get_model(model_id)` routes by the id a game stored: `player_model-player-model-1` -> v1, `-2` -> v2, the fallback id
+-> `FallbackModel`; an unknown id falls back to the newest model and `resolve_model` returns a note saying so. New games use the
+newest. A new generation = copy the then-current module to `player_model_vN.py`, register it in `_MODEL_MODULES`, add it to the
+pure-engine list in `tests/test_sim_isolation.py`, and add a golden-digest replay test. Evaluate the old model with
+`python -m modules.sim.calibration.backtest --model v1`.
+
 ## 1b. How the GM game uses it
 
 `modules/sim/game_scoring.py` is the only door. The model is the **single source of truth for
