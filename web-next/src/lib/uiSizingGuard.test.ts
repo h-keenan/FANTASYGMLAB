@@ -10,7 +10,7 @@ import { describe, expect, it } from "vitest";
  */
 const SRC = join(process.cwd(), "src");
 const TINY = /text-\[(?:0\.5rem|0\.5625rem|0\.625rem|9px|10px)\]/g; // 8-10px
-const BASELINE = 32; // measured 2026-11-13 after the PlayerListRow stat labels moved to 11px
+const BASELINE = 0; // every 8-10px literal was moved to 11px (0.6875rem) in audit 3: keep it at zero
 
 function walk(dir: string, out: string[] = []): string[] {
   for (const name of readdirSync(dir)) {

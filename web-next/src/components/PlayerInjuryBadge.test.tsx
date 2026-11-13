@@ -40,12 +40,12 @@ describe("PlayerInjuryBadge", () => {
     expect(within(badge).getByText("Q")).toHaveAttribute("aria-hidden", "true");
     expect(within(badge).getByText("Questionable")).toHaveClass("sr-only");
     expect(badge).toHaveClass("shrink-0");
-    expect(badge.style.color).toBe("var(--color-warning)");
+    expect(badge.style.color).toContain("var(--color-warning)");
   });
 
   it("uses the danger color for Out-caliber statuses", () => {
     render(<PlayerInjuryBadge status="Out" />);
-    expect(screen.getByTestId("player-injury-badge").style.color).toBe("var(--color-danger)");
+    expect(screen.getByTestId("player-injury-badge").style.color).toContain("var(--color-danger)");
   });
 });
 

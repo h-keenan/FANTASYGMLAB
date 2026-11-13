@@ -131,7 +131,7 @@ function SortedStatTile({
       : formatPlayersStatValue(stat);
   return (
     <div className="flex flex-col items-end gap-0.5">
-      <span className="text-[0.625rem] uppercase font-bold" style={{ color: "var(--color-text-muted)" }}>
+      <span className="text-[0.6875rem] uppercase font-bold" style={{ color: "var(--color-text-muted)" }}>
         {stat.label}
         {sortMode === "percentile" ? " pct" : ""}
       </span>

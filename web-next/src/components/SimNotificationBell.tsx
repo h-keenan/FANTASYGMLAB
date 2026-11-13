@@ -116,7 +116,7 @@ export function SimNotificationBell({ notif, onOpenTab }: { notif: ReturnType<ty
         {badge ? (
           <span className="absolute -right-1 -top-1" data-testid="sim-bell-badge">
             <PulseOnIncrease value={unread}>
-              <span className="inline-flex items-center justify-center text-[0.625rem] font-extrabold leading-none" style={{ minWidth: 18, height: 18, padding: "0 5px", borderRadius: "var(--radius-pill)", background: "var(--color-accent)", color: "var(--color-on-accent)" }}>
+              <span className="inline-flex items-center justify-center text-[0.6875rem] font-extrabold leading-none" style={{ minWidth: 18, height: 18, padding: "0 5px", borderRadius: "var(--radius-pill)", background: "var(--color-accent)", color: "var(--color-on-accent)" }}>
                 {badge}
               </span>
             </PulseOnIncrease>

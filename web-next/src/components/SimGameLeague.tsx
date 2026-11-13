@@ -7,7 +7,7 @@ import { Button } from "@/components/Button";
 import { EmptyState } from "@/components/EmptyState";
 import { PillRow } from "@/components/PillRow";
 import { ReviewGlyphChip } from "@/components/SeasonReviewSections";
-import { SimPlayerChip, SimSectionTitle, SimSeeAll, SimSheet, SimTeamLink, SimToneBadge, simToneColor, useSimWide, type SimCtx } from "@/components/SimGameParts";
+import { SimPlayerChip, SimSectionTitle, SimSeeAll, SimSheet, SimTeamLink, SimToneBadge, simToneColor, simToneInk, useSimWide, type SimCtx } from "@/components/SimGameParts";
 import { CountUp, MotionIn } from "@/components/Motion";
 import { SimCrest } from "@/components/SimCrest";
 import { SimLeaguePlayersView, SimLeagueTeamsView } from "@/components/SimLeagueWho";
@@ -52,9 +52,9 @@ export function SimStandingsList({ rows, regularWeeks, playoffTeams }: { rows: S
                 background: row.is_you ? "var(--color-accent-soft)" : undefined,
               }}
             >
-              <span className="text-xs font-extrabold tabular-nums" style={{ color: inPlayoffs ? "var(--color-success)" : "var(--color-text-muted)" }}>{row.rank ?? index + 1}</span>
+              <span className="text-xs font-extrabold tabular-nums" style={{ color: inPlayoffs ? "color-mix(in srgb, var(--color-success) 78%, var(--color-text-primary))" : "var(--color-text-secondary)" }}>{row.rank ?? index + 1}</span>
               <SimTeamLink teamId={row.team_id} name={row.name} isYou={row.is_you} size={22} bold={row.is_you} />
-              <span className="text-xs font-bold tabular-nums" style={{ color: simToneColor(simStreakTone(row.streak ?? "")) }} title={label || undefined}>{row.streak ?? ""}</span>
+              <span className="text-xs font-bold tabular-nums" style={{ color: simToneInk(simStreakTone(row.streak ?? "")) }} title={label || undefined}>{row.streak ?? ""}</span>
               <span className="w-12 text-right text-sm font-bold tabular-nums">{simFmtRecord(row)}</span>
             </li>
           );
@@ -81,7 +81,7 @@ export function SimStandingsList({ rows, regularWeeks, playoffTeams }: { rows: S
             </div>
             <div className="flex items-center justify-between gap-2 text-xs" style={{ color: "var(--color-text-secondary)" }}>
               <span>{simFmtPts(row.pf)} PF · {simFmtPts(row.pa)} PA</span>
-              {row.streak ? <span className="font-bold" style={{ color: simToneColor(simStreakTone(row.streak)) }}>{row.streak}</span> : null}
+              {row.streak ? <span className="font-bold" style={{ color: simToneInk(simStreakTone(row.streak)) }}>{row.streak}</span> : null}
             </div>
           </AccentCard>
         </li>
@@ -130,7 +130,7 @@ export function SimScoreCard({ g, names, youId, onOpen }: { g: SimRecapScore; na
           {team(left)}
           <span className="flex flex-col items-center gap-1">
             <span className="flex items-baseline gap-2">{score(left)}<span aria-hidden="true" style={{ color: "var(--color-text-muted)" }}>–</span>{score(right)}</span>
-            <span className="inline-flex items-center gap-1 text-[0.625rem] font-extrabold" style={{ color: status.tone === "success" ? "var(--color-success)" : "var(--color-text-muted)", letterSpacing: "var(--letter-spacing-badge)" }}>
+            <span className="inline-flex items-center gap-1 text-[0.6875rem] font-extrabold" style={{ color: status.tone === "success" ? "var(--color-success)" : "var(--color-text-muted)", letterSpacing: "var(--letter-spacing-badge)" }}>
               <span aria-hidden="true" style={{ width: 6, height: 6, borderRadius: "50%", background: "currentColor" }} />
               {status.label}
             </span>

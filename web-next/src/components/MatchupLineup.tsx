@@ -274,7 +274,7 @@ function CompactSide({
       <PlayerAvatar playerId={card.playerId} tier={card.tier} size={36} fallbackLabel={card.team} />
       <span className={`flex flex-col min-w-0 flex-1 gap-0.5${mirror ? " items-end" : ""}`}>
         <PlayerName name={card.name} className="text-[12px] font-bold leading-tight w-full" style={{ color: "var(--color-text-primary)" }} />
-        <span className={`flex items-center gap-1 text-[10px] font-extrabold uppercase leading-none${mirror ? " flex-row-reverse" : ""}`} style={{ letterSpacing: "var(--letter-spacing-badge)" }}>
+        <span className={`flex items-center gap-1 text-[0.6875rem] font-extrabold uppercase leading-none${mirror ? " flex-row-reverse" : ""}`} style={{ letterSpacing: "var(--letter-spacing-badge)" }}>
           {primary ? (
             <span className="inline-flex items-center" data-testid={`compact-status-${primary.kind}`} title={primary.label}>
               <StatusGlyph kind={primary.kind as GlyphKind} tone={primary.tone} />
@@ -297,7 +297,7 @@ function CompactSide({
           )}
           {card.projectedFinal != null ? (
             <span
-              className="text-[10px] font-bold tabular-nums"
+              className="text-[0.6875rem] font-bold tabular-nums"
               style={{ color: trend ? (trend.dir === "up" ? "var(--color-success)" : trend.dir === "down" ? "var(--color-danger)" : "var(--color-text-muted)") : "var(--color-text-secondary)" }}
               title="Projected final"
             >
@@ -305,7 +305,7 @@ function CompactSide({
               {card.projectedFinal.toFixed(1)}
             </span>
           ) : head.kind === "proj" ? (
-            <span className="text-[10px] font-bold uppercase" style={{ color: "var(--color-text-muted)" }}>proj</span>
+            <span className="text-[0.6875rem] font-bold uppercase" style={{ color: "var(--color-text-muted)" }}>proj</span>
           ) : null}
         </span>
       </span>
@@ -401,7 +401,7 @@ function PhoneLegend() {
     ["out", "danger", "Out"],
   ];
   return (
-    <p className="m-0 flex items-center gap-x-3 gap-y-1 flex-wrap text-[10px] font-bold uppercase" style={{ color: "var(--color-text-muted)", letterSpacing: "var(--letter-spacing-badge)" }} data-testid="slot-legend">
+    <p className="m-0 flex items-center gap-x-3 gap-y-1 flex-wrap text-[0.6875rem] font-bold uppercase" style={{ color: "var(--color-text-muted)", letterSpacing: "var(--letter-spacing-badge)" }} data-testid="slot-legend">
       {items.map(([kind, tone, label]) => (
         <span key={label} className="inline-flex items-center gap-1">
           <StatusGlyph kind={kind} tone={tone} />

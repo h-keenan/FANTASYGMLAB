@@ -80,7 +80,7 @@ function EfficiencyBars({ team }: { team: IntegrityTeam }) {
                   borderRadius: 2,
                 }}
               />
-              <span className="text-[0.625rem]" style={{ color: "var(--color-text-muted)" }}>
+              <span className="text-[0.6875rem]" style={{ color: "var(--color-text-muted)" }}>
                 {point.week}
               </span>
             </div>

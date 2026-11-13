@@ -150,8 +150,8 @@ export function SimTeamTab({ ctx, onTrade }: { ctx: SimCtx; onTrade: () => void 
     <div className="flex flex-col gap-3">
       {week ? (
         <AccentCard accent={simToneColor(simMatchupTone(week))} compact as="section">
-          <div className="flex items-center justify-between gap-2">
-            <span className="flex min-w-0 items-center gap-2">
+          <div className="flex flex-wrap items-center justify-between gap-x-2 gap-y-1">
+            <span className="flex min-w-0 flex-1 basis-40 items-center gap-2">
               <ReviewGlyphChip glyph="game" tone={simMatchupTone(week)} size={24} />
               <span className="text-xs uppercase font-extrabold shrink-0" style={{ color: "var(--color-text-muted)", letterSpacing: "var(--letter-spacing-badge)" }}>Week {week.week}</span>
               {week.opponent ? <SimTeamLink teamId={week.opponent.team_id} name={week.opponent.name} size={24} /> : <span className="text-sm font-bold">Bye week</span>}

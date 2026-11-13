@@ -10,7 +10,7 @@ export type PlayerListDensity = "comfortable" | "compact";
 /** Photo size and minimum tap height per density. `comfortable` is the default list row. */
 export const PLAYER_LIST_DENSITY: Record<PlayerListDensity, { avatar: number; minHeight: number }> = {
   comfortable: { avatar: 40, minHeight: 44 },
-  compact: { avatar: 32, minHeight: 36 },
+  compact: { avatar: 32, minHeight: 44 },
 };
 
 /**

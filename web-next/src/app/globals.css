@@ -1127,6 +1127,7 @@ a {
   align-items: center;
   justify-content: center;
   padding: var(--space-lg);
+  padding-bottom: calc(var(--space-lg) + var(--kb-inset, 0px)); /* the on-screen keyboard (OverlayRuntime sets --kb-inset) */
   z-index: var(--z-overlay-sheet, 70); /* one layer for every pop-up shell (lib/overlayStack.ts OVERLAY_Z); only the newest sheet is visible */
 }
 .pqv-backdrop[hidden] {
@@ -1873,7 +1874,7 @@ a {
   .pqv-modal {
     width: 100%;
     max-height: 92vh;
-    max-height: 92dvh;
+    max-height: calc(92dvh - var(--kb-inset, 0px));
     /* A bottom sheet is flush with the screen bottom: rounded on top only, and its own padding clears the home
        indicator, so no page shows under its lower corners. */
     border-radius: var(--radius-panel) var(--radius-panel) 0 0;
@@ -3942,8 +3943,8 @@ main > header:has(> h1.sr-only:only-child) {
 }
 @media (max-width: 480px) {
   .tps-modal {
-    height: 90dvh;
-    max-height: 90dvh;
+    height: calc(90dvh - var(--kb-inset, 0px));
+    max-height: calc(90dvh - var(--kb-inset, 0px));
   }
 }
 @keyframes tps-rise {

@@ -32,12 +32,13 @@ export function ToneBadge({
     <span
       data-testid={testId}
       title={title}
-      className={`${size === "xs" ? "px-1.5 text-[0.625rem] leading-4 inline-flex items-center" : "px-1.5 py-0.5 text-xs"} font-extrabold uppercase ${wrap ? "min-w-0 max-w-full break-words" : "whitespace-nowrap shrink-0"}`}
+      className={`${size === "xs" ? "px-1.5 text-[0.6875rem] leading-4 inline-flex items-center" : "px-1.5 py-0.5 text-xs"} font-extrabold uppercase ${wrap ? "min-w-0 max-w-full break-words" : "whitespace-nowrap shrink-0"}`}
       style={{
         borderRadius: "var(--radius-pill)",
         background: `color-mix(in srgb, ${color} var(--chip-fill-pct, 15%), transparent)`,
         boxShadow: `inset 0 0 0 1px color-mix(in srgb, ${color} var(--chip-ring-pct, 0%), transparent)`,
-        color,
+        // Ink: the tone mixed toward the primary text color so small tinted pills clear AA (4.5:1) in both themes.
+        color: `color-mix(in srgb, ${color} 80%, var(--color-text-primary))`,
         letterSpacing: "var(--letter-spacing-badge)",
       }}
     >
