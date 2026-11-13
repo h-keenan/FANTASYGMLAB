@@ -37,6 +37,7 @@ import {
   simTradeMaxPerSide,
   simTradable,
   simTradeClosedReason,
+  simCounterDeltaLine,
   simTradeDecisionLabel,
   simTradeDecisionTone,
   simTradeKey,
@@ -222,6 +223,10 @@ function VerdictCard({ verdict, onSendCounter, busy }: { verdict: SimTradeVerdic
         {verdict.decision === "counter" && verdict.counter ? (
           <div className="flex flex-col gap-1">
             <p className="text-xs font-bold" style={{ color: "var(--color-accent)" }}>Their counter</p>
+            {verdict.counter_note ? <p className="text-sm" data-testid="counter-note">{verdict.counter_note}</p> : null}
+            {simCounterDeltaLine(verdict.counter_delta) ? (
+              <p className="text-xs" style={{ color: "var(--color-text-muted)" }} data-testid="counter-delta">{simCounterDeltaLine(verdict.counter_delta)}</p>
+            ) : null}
             <div className="grid grid-cols-[minmax(0,1fr)] gap-2 md:grid-cols-2">
               <div><SimSideLabel side="give" /><PlayerList players={verdict.counter.give} /></div>
               <div><SimSideLabel side="get" /><PlayerList players={verdict.counter.get} /></div>

@@ -529,7 +529,7 @@ player of the right position (listed in the recap's `auto_filled_slots`), else t
 {"verdict": {"decision": "accept|counter|decline",
              "reason_code": "fits_need|wants_more_value|needs_position|fair_floor|roster_fit|...",
              "reason": "Needs a RB", "chips": ["needs RB"],
-             "counter": {"give": [player], "get": [player]} | null},   // set when decision = counter
+             "counter_note": "They want a TE: asking for Dalton Kincaid (TE).", "counter_delta": {"user_net_before": 5.2, "user_net_after": 1.0, "user_net_change": -4.2, "asked": ["pid"], "removed": [], "your_roster_after": 17, "their_roster_after": 18, "roster_limit": 18}, "counter": {"give": [player], "get": [player]} | null},   // set when decision = counter
  "executed": false, "trade": null}
 ```
 `preview` never changes anything. `trades` returns the same verdict (identical to
@@ -711,3 +711,20 @@ original pick owner; or `started` for an imported league), `entries` oldest firs
 assets, retired), `seasons` (games / points / ppg per season and per team held), `current_team`. Team: opening-draft class, rookie
 drafts by year, record by season (+ `champion`), `moves` newest first (trades, claims, cuts). Fetched when the History tab opens,
 not part of player detail, so detail stays small; the capped `state.transactions` list is not used.
+
+
+## Trade counters (invariants)
+
+A `counter` verdict (`modules/sim/game_ai.py`, `TradeDesk.build_counter`) changes exactly one asset of the offer (asks
+for one more of yours, or leaves one of theirs out) and always carries `counter_note` (what they want and why, e.g.
+"They want a TE: asking for X (TE).") and `counter_delta` (your net trade value before/after, both roster sizes after).
+Rules, pinned by `tests/test_sim_trade_counters.py`:
+
+- The stated reason matches what the counter did. `needs_position` is only claimed when the offer failed because of
+  lineup need (value alone would pass) and then the counter asks for that position; if it cannot, the reason is the
+  value shortfall it really was.
+- Roster-legal for both sides: a counter never takes either team over the roster limit (or fuller than it is now), so
+  there are no 4-for-1 roster dumps the AI would have to cut down.
+- The AI accepts its own counter; valuation of OUT/IR players is the same `worth()` on both sides.
+- Accept/decline of the offer itself is unchanged, and counters are never re-derived on replay (events record the
+  outcome), so no engine-version gate is needed.
