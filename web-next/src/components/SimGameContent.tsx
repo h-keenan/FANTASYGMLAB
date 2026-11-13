@@ -24,6 +24,7 @@ import { SimOffseasonBar } from "@/components/SimOffseasonBar";
 import { ConfirmInPlace } from "@/components/ui/ConfirmInPlace";
 import { SimNotice, SimOpenPlayerContext, SimPreviewBanner, SimTeamLink, SimTeamOpenContext, simToneColor, type SimCtx } from "@/components/SimGameParts";
 import { SimTeamSheet } from "@/components/SimGameTeamSheet";
+import { SimToResultView, SimToSheet, type SimToRequest } from "@/components/SimToControl";
 import { SimFinalView } from "@/components/SimGameRecap";
 import { SimWeekRecapStory } from "@/components/SimRecapStory";
 import { SimPlayersTab, SimTeamTab } from "@/components/SimGameTeam";
@@ -83,8 +84,10 @@ import {
   simGradeTone,
   simTradeSeedFor,
   type SimTradeSeed,
+  type SimToResponse,
 } from "@/lib/simGame";
 import { simScrollKey, simShouldScrollTop } from "@/lib/simScroll";
+import { simToProgressLabel } from "@/lib/simTo";
 import { SIM_FLOW_INITIAL, SIM_TABS, simFlowReducer, simRecapsFromAdvance, type SimTab } from "@/lib/simGameFlow";
 import { useSimDeltaReload, useSimGameCall } from "@/lib/useSimGameCall";
 import { useSimLeagueTeams } from "@/lib/useSimLeagueTeams";
@@ -111,6 +114,10 @@ export function SimGameContent() {
   const [claims, setClaims] = useState<SimWaiverClaim[]>([]);
   const [tradeSeed, setTradeSeed] = useState<SimTradeSeed | null>(null);
   const [advancing, setAdvancing] = useState(false);
+  const [simToOpen, setSimToOpen] = useState(false);
+  const [simToResult, setSimToResult] = useState<SimToResponse | null>(null);
+  const [simToRequest, setSimToRequest] = useState<SimToRequest | null>(null);
+  const [simToBusy, setSimToBusy] = useState<string | null>(null);
   const [creating, setCreating] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [managing, setManaging] = useState(false);
@@ -308,6 +315,49 @@ export function SimGameContent() {
     }
   }
 
+  async function runSimTo(request: SimToRequest) {
+    if (!game) return;
+    const blockers = simAdvanceBlockers(game, preview);
+    if (blockers.some((b) => b.code === "paywalled")) {
+      dispatch({ type: "gate", gate: { kind: "premium", upsell: null, preview } });
+      return;
+    }
+    setAdvancing(true);
+    setSimToRequest(request);
+    setSimToBusy(request.option.label);
+    setNotice(null);
+    const res = await call(() => api.simToGame(game.id, { target: request.option.id, weeks: request.option.weeks, auto_set: request.autoSet, force_first: request.forceFirst }));
+    setAdvancing(false);
+    setSimToBusy(null);
+    if (!res) return;
+    if (res.game) {
+      setGameState(res.game);
+      if (res.preview !== undefined) setPreview(res.preview ?? null);
+      if ((res.weeks_played ?? 0) > 0) {
+        setClaims([]);
+        dispatch({ type: "advanced", recaps: [], game: res.game });
+        setTick((n) => n + 1);
+        void refreshList();
+      }
+    }
+    setSimToResult(res);
+  }
+
+  async function undoSimTo(): Promise<boolean> {
+    const from = simToResult?.from_seq;
+    if (!game || from == null) return false;
+    const res = await call(() => api.undoSimTo(game.id, from));
+    if (!res?.game) return false;
+    setGameState(res.game);
+    setClaims([]);
+    dispatch({ type: "advanced", recaps: [], game: res.game });
+    setTick((n) => n + 1);
+    setSimToResult(null);
+    notify("Took the simulated weeks back.", "success");
+    void refreshList();
+    return true;
+  }
+
   const ctx: SimCtx | null = useMemo(
     () =>
       game
@@ -379,6 +429,16 @@ export function SimGameContent() {
           notice={notice}
           clearNotice={() => setNotice(null)}
           onAdvance={advance}
+          onSimTo={() => setSimToOpen(true)}
+          simToOpen={simToOpen}
+          onSimToClose={() => setSimToOpen(false)}
+          onRunSimTo={runSimTo}
+          simToResult={simToResult}
+          simToBusy={simToBusy}
+          onSimToDone={() => setSimToResult(null)}
+          onSimToForce={() => { if (simToRequest) { setSimToResult(null); void runSimTo({ ...simToRequest, forceFirst: true }); } }}
+          onSimToUndo={undoSimTo}
+          onSimToGoPro={() => dispatch({ type: "gate", gate: { kind: "premium", upsell: null, preview } })}
           onTab={(tab) => dispatch({ type: "tab", tab })}
           draftRecap={draftRecap}
           onDraftComplete={(recap) => setDraftRecap({ recap })}
@@ -833,6 +893,16 @@ function GameScreen({
   notice,
   clearNotice,
   onAdvance,
+  onSimTo,
+  simToOpen,
+  onSimToClose,
+  onRunSimTo,
+  simToResult,
+  simToBusy,
+  onSimToDone,
+  onSimToForce,
+  onSimToUndo,
+  onSimToGoPro,
   onTab,
   draftRecap,
   onDraftComplete,
@@ -856,6 +926,16 @@ function GameScreen({
   notice: { message: string; tone: SimGameTone } | null;
   clearNotice: () => void;
   onAdvance: () => void;
+  onSimTo: () => void;
+  simToOpen: boolean;
+  onSimToClose: () => void;
+  onRunSimTo: (request: SimToRequest) => void;
+  simToResult: SimToResponse | null;
+  simToBusy: string | null;
+  onSimToDone: () => void;
+  onSimToForce: () => void;
+  onSimToUndo: () => Promise<boolean>;
+  onSimToGoPro: () => void;
   onTab: (tab: SimTab) => void;
   draftRecap: { recap: SimDraftRecap | null } | null;
   onDraftComplete: (recap: SimDraftRecap | null) => void;
@@ -877,7 +957,7 @@ function GameScreen({
   const warnings = simAdvanceWarnings(game);
   const youLine = game.you;
   const inSeason = (stage === "week" || stage === "playoffs") && !draftRecap;
-  const showBar = inSeason && !recap;
+  const showBar = inSeason && !recap && !simToResult;
   const showOffBar = stage === "offseason" && !draftRecap && !recap;
   const [moreOpen, setMoreOpen] = useState(false);
   // Phones: the game orb (docked above the Advance pill) is the page navigator; the top PillRows render from md up.
@@ -924,6 +1004,8 @@ function GameScreen({
         <SimGameDraft ctx={ctx} onComplete={onDraftComplete} />
       ) : draftRecap ? (
         <SimDraftRecapView recap={draftRecap.recap} ctx={ctx} onStart={onStartSeason} />
+      ) : simToResult ? (
+        <SimToResultView result={simToResult} onClose={onSimToDone} onTab={(tab) => onTab(tab)} onForce={onSimToForce} onUndo={onSimToUndo} onGoPro={onSimToGoPro} />
       ) : recap ? (
         <SimWeekRecapStory recap={recap} index={flow.recapIndex} total={flow.recaps.length} ctx={ctx} onNext={onRecapNext} onClose={onRecapClose} onFixLineup={() => { onRecapClose(); onTab("team"); }} />
       ) : stage === "final" ? (
@@ -984,7 +1066,7 @@ function GameScreen({
       )}
       <div className="bottom-stack" data-testid="sim-bottom-stack">
         {showOffBar ? <SimOffseasonBar ctx={ctx} onTab={onTab} /> : null}
-        {showBar ? <SimActionBar ctx={ctx} paywalled={paywalled} advancing={advancing} onAdvance={onAdvance} onTab={onTab} /> : null}
+        {showBar ? <SimActionBar ctx={ctx} paywalled={paywalled} advancing={advancing} onAdvance={onAdvance} onSimTo={onSimTo} onTab={onTab} /> : null}
         {showOrb ? (
           <SimGameOrb
             tab={flow.tab}
@@ -996,6 +1078,13 @@ function GameScreen({
           />
         ) : null}
       </div>
+      <SimToSheet ctx={ctx} open={simToOpen} onClose={onSimToClose} onRun={onRunSimTo} />
+      {simToBusy ? (
+        <div className="fixed inset-x-0 bottom-24 z-40 mx-auto flex w-fit max-w-[90vw] items-center gap-2 glass-surface px-4 py-2 text-sm font-bold" role="status" aria-live="polite" data-testid="sim-to-progress">
+          <span className="inline-block h-3 w-3 animate-spin rounded-full border-2 border-current border-t-transparent" aria-hidden="true" />
+          {simToProgressLabel(simToBusy)}
+        </div>
+      ) : null}
       <Sheet open={moreOpen} onClose={() => setMoreOpen(false)} title="Game menu" description="Rules, reset the week, or leave this game.">
         <SimMoreTab ctx={ctx} onDeleted={() => { setMoreOpen(false); onDeleted(); }} onHub={() => { setMoreOpen(false); onHub(); }} />
       </Sheet>

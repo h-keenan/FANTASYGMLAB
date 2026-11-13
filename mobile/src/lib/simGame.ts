@@ -911,6 +911,73 @@ export interface SimAdvanceResponse extends SimGameEnvelope {
   game?: SimGame;
 }
 
+// ---------------------------------------------------------------------------
+// "Sim to..." (POST /sim-to): several weeks in one request
+
+export type SimToTarget = "weeks" | "trade_deadline" | "playoffs_start" | "season_end";
+
+export interface SimToOption {
+  id: SimToTarget;
+  label: string;
+  weeks?: number;
+}
+
+export type SimToStopCode = "roster_over_limit" | "starter_out" | "starter_bye" | "empty_slot" | "trade_offers" | "premium_required" | "time_budget";
+
+export interface SimToStop {
+  code: SimToStopCode;
+  week: number;
+  /** "Stopped at Week 7: your QB is out: Quinn Back (QB)." */
+  message: string;
+  /** Where the fix lives: the lineup (Team tab), the roster (cut), the trade inbox, or Pro. Null for a time pause. */
+  fix: "lineup" | "roster" | "inbox" | "premium" | null;
+  slot?: string;
+  player_id?: string;
+  count?: number;
+  cuts_needed?: number;
+}
+
+export interface SimToWeek {
+  week: number;
+  kind: "regular" | "playoff";
+  round?: number | null;
+  result: "w" | "l" | "t" | "bye" | null;
+  your_pts: number | null;
+  opp_pts: number | null;
+  opponent: string | null;
+  auto_filled: string[];
+}
+
+export interface SimToSummary {
+  weeks: SimToWeek[];
+  record: { before: string | null; after: string | null };
+  rank: { before: number | null; after: number | null };
+  pf: number;
+  injuries: { week: number; player: { id: string; name: string; pos: string }; weeks: number }[];
+  claims: { week: number; add?: { name: string } | null; drop?: { name: string } | null; ok?: boolean }[];
+  ai_trades: number;
+  standings: SimStandingRow[];
+  champion: string | null;
+  season_complete: boolean;
+}
+
+export interface SimToResponse extends SimGameEnvelope {
+  target?: SimToTarget;
+  weeks_played?: number;
+  stopped?: SimToStop | null;
+  /** The seq to pass to undo-sim to take the whole run back. */
+  from_seq?: number;
+  to_seq?: number;
+  summary?: SimToSummary | null;
+  /** The last week in full (the recap screen). */
+  recap?: SimWeekRecap | null;
+  game?: SimGame;
+}
+
+export interface SimToOptionsResponse extends SimGameEnvelope {
+  options?: SimToOption[];
+}
+
 export interface SimStandingRow {
   rank: number;
   team_id: string;

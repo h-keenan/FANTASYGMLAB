@@ -29,6 +29,7 @@ from modules.sim import game_dynasty as dyn
 from modules.sim import game_dynasty_view as dview
 from modules.sim import game_draft as draft
 from modules.sim import game_history as hist
+from modules.sim import game_simto as simto
 from modules.sim import game_home as home
 from modules.sim import game_view as view
 from modules.sim.game_ai import TradeDesk
@@ -159,6 +160,17 @@ class RespondBody(BaseModel):
 
 class AdvanceBody(BaseModel):
     week: int | None = None
+
+
+class SimToBody(BaseModel):
+    target: str = "weeks"
+    weeks: int = 1
+    auto_set: bool = False
+    force_first: bool = False
+
+
+class UndoSimBody(BaseModel):
+    from_seq: int
 
 
 def seedof(row: Mapping[str, Any], state: GameState) -> int:
@@ -872,6 +884,64 @@ def add_routes(router: APIRouter, ctx: GameApiCtx) -> None:
                    "game": game_json({**row, "status": state.status}, snap, state, pro)}
             pending.finish()
             return out
+
+    @router.get("/games/{game_id}/sim-to/options")
+    @guarded
+    def sim_to_options(game_id: str, user: dict[str, Any] = Depends(require_user)):
+        pro = ctx.is_pro(user)
+        _, _, _, snap, state = load(user, _gid(game_id))
+        return {**_env(pro, state), "options": simto.options_for(snap, state)}
+
+    @router.post("/games/{game_id}/sim-to")
+    @guarded
+    def post_sim_to(game_id: str, body: SimToBody, user: dict[str, Any] = Depends(require_user)):
+        """Play weeks in one request (see game_simto): the same Advance repeated, so the events are what that many
+        Advances would write, one commit, one response. Stops early with a reason when you have something to decide."""
+        pro = ctx.is_pro(user)
+        gid = _gid(game_id)
+        with _lock_for(gid):
+            store, uid, row, snap, state = load(user, gid)
+            if view.paywalled(pro, state):
+                return _premium(state)
+            state = state.clone()
+            em = Emitter(state, snap)
+            with ctx.compute() as ok:
+                if not ok:
+                    return busy()
+                result = simto.run(em, snap, state, seedof(row, state), target=body.target, weeks=body.weeks, auto_set=body.auto_set,
+                                   force_first=body.force_first, pro=pro, paywalled_fn=lambda s: view.paywalled(pro, s))
+            if result["weeks_played"] == 0 and not em.events:
+                return {**_env(pro, state), **{k: result[k] for k in ("target", "weeks_played", "stopped", "from_seq", "to_seq")},
+                        "summary": None, "recap": None, "game": game_json(row, snap, state, pro)}
+            pending = commit(store, uid, gid, snap, state, em, checkpoint=True, defer=True)
+            snap = snap.season_view(state.view_no)
+            out = {**_env(pro, state), **result, "game": game_json({**row, "status": state.status}, snap, state, pro)}
+            pending.finish()
+            return out
+
+    @router.post("/games/{game_id}/undo-sim")
+    @guarded
+    def undo_sim(game_id: str, body: UndoSimBody, user: dict[str, Any] = Depends(require_user)):
+        """Take back a 'Sim to...' (or any run of weeks): delete the events from ``from_seq``, which must be the start of an
+        Advance (an ``advance`` event) the game has already played, and replay the rest. Same mechanism as revert-week,
+        just back to an earlier week boundary."""
+        pro = ctx.is_pro(user)
+        gid = _gid(game_id)
+        with _lock_for(gid):
+            store, uid, row, snap, state = load(user, gid)
+            if state.status == "drafting":
+                raise GameError("wrong_phase", "Nothing to undo right now.", phase=state.status)
+            if not 0 < body.from_seq <= state.seq:
+                raise GameError("bad_seq", "That point is not in this game's history.")
+            first = store.load_events(uid, gid, body.from_seq)[:1]
+            if not first or first[0]["type"] not in ("advance", "lineup_set") or int(first[0]["seq"]) != body.from_seq:
+                raise GameError("bad_seq", "You can only go back to the start of a week you simulated.")
+            store.delete_checkpoints_after(uid, gid, body.from_seq)
+            store.delete_events_from(uid, gid, body.from_seq)
+            state = store.load_state(uid, gid, snap)
+            store.touch(uid, gid, status=state.status, week=state.week, event_count=state.seq)
+            snap = snap.season_view(state.view_no)
+            return {**_env(pro, state), "undone": True, "game": game_json({**row, "status": state.status}, snap, state, pro)}
 
     @router.post("/games/{game_id}/revert-week")
     @guarded

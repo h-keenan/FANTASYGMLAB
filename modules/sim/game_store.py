@@ -413,6 +413,12 @@ class GameStore:
         STATES.drop(game_id)
         self._delete(EVENTS, user_id, {"game_id": game_id, "seq": f"gte.{seq}"})
 
+    def delete_checkpoints_after(self, user_id: str, game_id: str, seq: int) -> None:
+        """Drop checkpoints taken after event ``seq`` (going back past them): a checkpoint must never describe events that no
+        longer exist."""
+        STATES.drop(game_id)
+        self._delete(CHECKPOINTS, user_id, {"game_id": game_id, "event_seq": f"gt.{seq}"})
+
     # ---------------------------------------------------------- checkpoints
 
     def save_checkpoint(self, user_id: str, game_id: str, state: GameState, week: int) -> None:
