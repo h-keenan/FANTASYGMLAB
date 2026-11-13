@@ -215,6 +215,22 @@ export function SlotRow({
   );
 }
 
+type GlyphKind = "live" | "upcoming" | "final" | "bye" | "out";
+
+/** Status as color AND shape (never color alone): live = filled dot, upcoming = hollow ring, final = check, bye = dash, out = x. */
+export function StatusGlyph({ kind, tone }: { kind: GlyphKind; tone: ChipTone }) {
+  const color = DOT_COLOR[tone];
+  return (
+    <svg width="10" height="10" viewBox="0 0 10 10" aria-hidden="true" style={{ color, flexShrink: 0 }} data-glyph={kind}>
+      {kind === "live" ? <circle cx="5" cy="5" r="3.2" fill="currentColor" className="motion-safe:animate-pulse" /> : null}
+      {kind === "upcoming" ? <circle cx="5" cy="5" r="3" fill="none" stroke="currentColor" strokeWidth="1.6" /> : null}
+      {kind === "final" ? <path d="M1.8 5.2 4.2 7.6 8.4 2.6" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" /> : null}
+      {kind === "bye" ? <path d="M2 5h6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" /> : null}
+      {kind === "out" ? <path d="M2.5 2.5l5 5M7.5 2.5l-5 5" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" /> : null}
+    </svg>
+  );
+}
+
 const DOT_COLOR: Record<ChipTone, string> = {
   success: "var(--color-success)",
   danger: "var(--color-danger)",
@@ -261,9 +277,9 @@ function CompactSide({
         </span>
         <span className={`flex items-center gap-1 text-[10px] font-extrabold uppercase leading-none${mirror ? " flex-row-reverse" : ""}`} style={{ letterSpacing: "var(--letter-spacing-badge)" }}>
           {primary ? (
-            <span className="inline-flex items-center gap-1" style={{ color: DOT_COLOR[primary.tone] }} data-testid={`compact-status-${primary.kind}`}>
-              <span aria-hidden="true" className="inline-block rounded-full" style={{ width: 6, height: 6, background: "currentColor" }} />
-              {primary.label}
+            <span className="inline-flex items-center" data-testid={`compact-status-${primary.kind}`} title={primary.label}>
+              <StatusGlyph kind={primary.kind as GlyphKind} tone={primary.tone} />
+              <span className="sr-only">{primary.label}</span>
             </span>
           ) : null}
           {flag ? <span style={{ color: DOT_COLOR[flag.tone] }}>{flag.kind === "doubtful" ? "D" : "Q"}</span> : null}
@@ -378,17 +394,18 @@ export function CompactSlotRow({
 }
 
 function PhoneLegend() {
-  const items: [string, string][] = [
-    ["Live", "var(--color-success)"],
-    ["Final", "var(--color-text-muted)"],
-    ["Upcoming", "var(--color-accent)"],
-    ["Bye / Out", "var(--color-warning)"],
+  const items: [GlyphKind, ChipTone, string][] = [
+    ["live", "success", "Live"],
+    ["upcoming", "accent", "Upcoming"],
+    ["final", "muted", "Final"],
+    ["bye", "warning", "Bye"],
+    ["out", "danger", "Out"],
   ];
   return (
     <p className="m-0 flex items-center gap-x-3 gap-y-1 flex-wrap text-[10px] font-bold uppercase" style={{ color: "var(--color-text-muted)", letterSpacing: "var(--letter-spacing-badge)" }} data-testid="slot-legend">
-      {items.map(([label, color]) => (
+      {items.map(([kind, tone, label]) => (
         <span key={label} className="inline-flex items-center gap-1">
-          <span aria-hidden="true" className="inline-block rounded-full" style={{ width: 6, height: 6, background: color }} />
+          <StatusGlyph kind={kind} tone={tone} />
           {label}
         </span>
       ))}
