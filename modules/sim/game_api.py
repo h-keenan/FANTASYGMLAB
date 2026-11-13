@@ -31,7 +31,8 @@ from modules.sim import game_view as view
 from modules.sim.game_ai import TradeDesk
 from modules.sim.game_engine import advance, finish_draft, start_from_league
 from modules.sim.game_eval import Evaluator
-from modules.sim.game_result import build_result
+from modules.sim.game_result import _draft_from_state, build_result
+from modules.sim.game_review import build_review
 from modules.sim.game_scoring import default_model
 from modules.sim.game_setup import (
     TEAM_NAMES, USER_TEAM_NAME_MAX, build_league_snapshot, build_snapshot, finalize_pool, league_settings,
@@ -792,6 +793,14 @@ def add_routes(router: APIRouter, ctx: GameApiCtx) -> None:
                 except SimStoreError:
                     # The grade is computed; serve it now and recompute next time rather than fail.
                     _log.warning("sim result could not be saved game=%s", gid, exc_info=True)
+            if "review" not in result:
+                # Stored before the Season in Review existed: add it now (read-only, no replays).
+                try:
+                    events = store.load_events(uid, gid, 0)
+                    result = {**result, "review": build_review(snap, events, state, _draft_for_review(snap, events, state))}
+                    store.save_result(uid, gid, result, (result.get("grade") or {}).get("letter"))
+                except Exception:  # noqa: BLE001 - the grade still ships without it
+                    _log.warning("sim review backfill failed game=%s", gid, exc_info=True)
             letter = (result.get("grade") or {}).get("letter")
             return {**_env(pro, state), "result": result, "game": game_json(
                 {**row, "grade_letter": letter}, snap, state, pro)}
@@ -844,3 +853,10 @@ def add_preview_route(router: APIRouter, ctx: GameApiCtx) -> None:
 
 
 __all__ = ["GameApiCtx", "add_routes", "add_preview_route", "clear_pool_cache", "UPSELL_GAME"]
+
+
+def _draft_for_review(snap, events, state):
+    """The draft recap the grade used (event payload when present, else rebuilt from state)."""
+
+    found = next((e["payload"]["recap"] for e in events if e["type"] in ("draft_complete", "league_start")), None)
+    return found if found is not None else _draft_from_state(snap, state)

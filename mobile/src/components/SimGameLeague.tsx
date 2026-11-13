@@ -8,8 +8,8 @@ import EmptyState from './EmptyState';
 import ErrorState from './ErrorState';
 import SegmentedTabBar from './SegmentedTabBar';
 import { SkeletonCard } from './SkeletonBlock';
-import SimGlyph from './SimGlyph';
-import { SimPlayerChip, SimSectionTitle, SimTeamLink, SimToneBadge, createSimStyles, type SimCtx } from './SimGameParts';
+import { ReviewGlyphChip } from './SeasonReviewSections';
+import { SimPlayerChip, SimSectionTitle, SimTeamLink, SimToneBadge, createSimStyles, simToneColor, type SimCtx } from './SimGameParts';
 import ToneBadge from './ToneBadge';
 import { useThemeMode } from '../context/ThemeModeContext';
 import { api } from '../lib/api';
@@ -18,6 +18,10 @@ import {
   simFmtRecord,
   simPlayoffRoundLabel,
   simPlayoffStatusLabel,
+  simPlayoffStatusTone,
+  simStreakTone,
+  simTransactionGlyph,
+  simTransactionRoleTone,
   simTeamNameMap,
   simTransactionText,
   type SimLeagueResponse,
@@ -43,7 +47,7 @@ export function SimStandingsList({ rows, playoffTeams }: { rows: SimStandingRow[
             </View>
             <View style={common.row}>
               {simPlayoffStatusLabel(row.playoff_status) ? (
-                <SimToneBadge label={simPlayoffStatusLabel(row.playoff_status)} tone={row.playoff_status === 'out' || row.playoff_status === 'eliminated' ? 'muted' : 'success'} />
+                <SimToneBadge label={simPlayoffStatusLabel(row.playoff_status)} tone={simPlayoffStatusTone(row.playoff_status)} />
               ) : null}
               <AppText style={common.bodyStrong}>{simFmtRecord(row)}</AppText>
             </View>
@@ -52,7 +56,7 @@ export function SimStandingsList({ rows, playoffTeams }: { rows: SimStandingRow[
             <AppText style={common.small}>
               {simFmtPts(row.pf)} PF · {simFmtPts(row.pa)} PA
             </AppText>
-            {row.streak ? <AppText style={[common.small, { fontWeight: '800', color: row.streak.startsWith('W') ? colors.success : row.streak.startsWith('L') ? colors.danger : colors.textSecondary }]}>{row.streak}</AppText> : null}
+            {row.streak ? <AppText style={[common.small, { color: simToneColor(simStreakTone(row.streak), colors), fontWeight: '700' }]}>{row.streak}</AppText> : null}
           </View>
         </AccentCard>
       ))}
@@ -82,12 +86,13 @@ function Scoreboard({ game, schedule, names }: { game: SimCtx['game']; schedule:
       ) : (
         entry.games.map((g: SimRecapScore) => {
           const mine = g.home === youId || g.away === youId;
+          const mineTone = !mine || !g.winner ? 'accent' : g.winner === youId ? 'success' : 'danger';
           const rows = [
             [g.home, g.home_pts],
             [g.away, g.away_pts],
           ] as const;
           return (
-            <AccentCard key={`${g.home}-${g.away}`} accent={mine ? colors.accent : colors.borderStrong} compact>
+            <AccentCard key={`${g.home}-${g.away}`} accent={mine ? simToneColor(mineTone, colors) : colors.borderStrong} compact>
               {rows.map(([id, pts]) => (
                 <View key={id} style={[common.rowBetween, { opacity: g.winner && g.winner !== id ? 0.7 : 1 }]}>
                   <View style={common.grow}>
@@ -173,17 +178,17 @@ export function SimLeagueTab({ ctx }: { ctx: SimCtx }) {
             <EmptyState icon="newspaper-outline" title="Quiet so far" subtitle="Moves show up here once the season gets going." />
           ) : (
             (league.transactions ?? []).map((tx, i) => (
-              <AccentCard key={i} accent={colors.borderStrong} compact>
+              <AccentCard key={i} accent={simToneColor(simTransactionGlyph(tx).tone, colors)} compact>
                 <View style={common.row}>
                   {tx.team_id ? <SimTeamLink teamId={tx.team_id} name={names[tx.team_id] ?? 'Team'} size={24} hideName /> : null}
+                  <ReviewGlyphChip glyph={simTransactionGlyph(tx).glyph} tone={simTransactionGlyph(tx).tone} size={24} />
                   {tx.week != null ? <ToneBadge label={`Week ${tx.week}`} color={colors.textSecondary} size="xs" /> : null}
-                  <SimGlyph name={tx.type === 'trade' ? 'trade' : tx.type === 'waiver' ? 'waiver' : 'alert'} color={tx.type === 'trade' ? colors.accent : tx.type === 'waiver' ? colors.success : colors.danger} size={13} />
-                  <ToneBadge label={String(tx.type ?? tx.kind ?? 'move').replace(/_/g, ' ')} color={tx.type === 'trade' ? colors.accent : tx.type === 'waiver' ? colors.success : colors.danger} size="xs" />
+                  <ToneBadge label={String(tx.type ?? tx.kind ?? 'move').replace(/_/g, ' ')} color={simToneColor(simTransactionGlyph(tx).tone, colors)} size="xs" />
                 </View>
                 <AppText style={common.body}>{simTransactionText(tx)}</AppText>
                 {(tx.players ?? []).map((p) => (
                   <View key={`${p.role}-${p.id}`} style={common.row}>
-                    <ToneBadge label={p.role} color={p.role === 'add' || p.role === 'get' ? colors.success : colors.textTertiary} size="xs" />
+                    <ToneBadge label={p.role} color={simToneColor(simTransactionRoleTone(p.role), colors)} size="xs" />
                     <SimPlayerChip player={p} size={28} />
                   </View>
                 ))}

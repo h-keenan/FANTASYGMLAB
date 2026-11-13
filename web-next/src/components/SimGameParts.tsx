@@ -7,10 +7,12 @@ import { AccentCard } from "@/components/AccentCard";
 import { Button } from "@/components/Button";
 import { PlayerAvatar } from "@/components/PlayerAvatar";
 import { PlayerIdentity } from "@/components/PlayerRow";
+import { ReviewGlyphChip } from "@/components/SeasonReviewSections";
 import { SectionHeading } from "@/components/SectionHeading";
 import { SheetHandle } from "@/components/SheetHandle";
 import { SimCrest } from "@/components/SimCrest";
 import { SimGlyph } from "@/components/SimGlyph";
+import { ReviewGlyphIcon } from "@/components/SimReviewGlyph";
 import { ToneBadge } from "@/components/ToneBadge";
 import {
   simFmtPts,
@@ -18,6 +20,7 @@ import {
   simTrendText,
   simPlayerSubline,
   simGamePreviewLine,
+  simNoticeGlyph,
   simHeadshotId,
   simPlayerInitials,
   type SimGlyphName,
@@ -281,6 +284,7 @@ export function SimNotice({ message, tone = "warning", onDismiss }: { message: s
   return (
     <AccentCard accent={simToneColor(tone)} compact as="div" className="enter-rise">
       <div className="flex items-start gap-2" role={tone === "danger" ? "alert" : "status"}>
+        <ReviewGlyphChip glyph={simNoticeGlyph(tone)} tone={tone} size={24} />
         <p className="text-sm flex-1 min-w-0">{message}</p>
         {onDismiss ? (
           <button type="button" className="tap-link text-xs font-bold" style={{ color: "var(--color-accent)" }} onClick={onDismiss}>
@@ -289,6 +293,18 @@ export function SimNotice({ message, tone = "warning", onDismiss }: { message: s
         ) : null}
       </div>
     </AccentCard>
+  );
+}
+
+/** "You give" / "You get" label: fixed semantic color (red out, green in) with a small swap glyph. */
+export function SimSideLabel({ side, note }: { side: "give" | "get"; note?: string }) {
+  const tone: SimGameTone = side === "give" ? "danger" : "success";
+  return (
+    <p className="flex items-center gap-1 text-xs uppercase font-extrabold" style={{ color: simToneColor(tone), letterSpacing: "var(--letter-spacing-badge)" }}>
+      <ReviewGlyphIcon glyph="trade" size={14} />
+      {side === "give" ? "You give" : "You get"}
+      {note ? <span className="normal-case font-medium" style={{ color: "var(--color-text-muted)" }}>{note}</span> : null}
+    </p>
   );
 }
 

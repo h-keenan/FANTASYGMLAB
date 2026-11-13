@@ -11,6 +11,8 @@
  * reads or writes real league data.
  */
 
+import type { ReviewGlyph } from "./simReview";
+
 // ---------------------------------------------------------------------------
 // Envelope, gating and reasons
 
@@ -605,6 +607,8 @@ export interface SimGameResult {
   decisions_that_mattered?: SimGameDecision[] | null;
   draft?: { grade?: string; picks_value?: unknown[] } | null;
   user?: Record<string, unknown> | null;
+  /** Season in Review payload (modules/sim/game_review.py); absent on results stored before it existed. */
+  review?: Record<string, unknown> | null;
 }
 
 /** A render-safe view of a stored result: every field is present, every value is a primitive. */
@@ -1344,6 +1348,25 @@ export function simPlayoffStatusLabel(status: string | undefined): string {
   }
 }
 
+/** Playoff outcome color: champion green, a deep run blue, early exit amber, missed red. */
+export function simPlayoffOutcomeTone(result: string | undefined): SimGameTone {
+  switch (result) {
+    case "champion":
+      return "success";
+    case "runner_up":
+    case "semifinal":
+      return "accent";
+    case "missed":
+      return "danger";
+    case "lost_round_1":
+    case "lost_round_2":
+    case "lost_round_3":
+      return "warning";
+    default:
+      return "muted";
+  }
+}
+
 export function simPlayoffResultLabel(result: string | undefined): string {
   switch (result) {
     case "champion":
@@ -1383,6 +1406,78 @@ export function simTransactionText(row: SimTransaction): string {
   if (typeof row.text === "string" && row.text) return row.text;
   const kind = row.type ?? row.kind ?? "move";
   return `${kind}`.replace(/_/g, " ");
+}
+
+/** Glyph + tone for a league transaction row: trade accent swap, waiver add green, drop red, injury red cross. */
+export function simTransactionGlyph(row: Pick<SimTransaction, "type" | "kind">): { glyph: ReviewGlyph; tone: SimGameTone } {
+  const kind = `${row.type ?? row.kind ?? ""}`.toLowerCase();
+  if (kind.includes("trade")) return { glyph: "trade", tone: "accent" };
+  if (kind.includes("injur")) return { glyph: "injury", tone: "danger" };
+  if (kind.includes("drop") || kind.includes("cut") || kind.includes("release")) return { glyph: "bust", tone: "danger" };
+  if (kind.includes("waiver") || kind.includes("add") || kind.includes("claim") || kind.includes("sign")) return { glyph: "waiver", tone: "success" };
+  return { glyph: "stats", tone: "muted" };
+}
+
+/** Tone for a player's role inside a transaction: what a team got/added is green, what it sent/dropped is red. */
+export function simTransactionRoleTone(role: string | undefined): SimGameTone {
+  switch (role) {
+    case "add":
+    case "get":
+      return "success";
+    case "drop":
+    case "give":
+      return "danger";
+    default:
+      return "muted";
+  }
+}
+
+/** Playoff-race chip color: in/clinched/bye green, out/eliminated red, anything else muted. */
+export function simPlayoffStatusTone(status: string | undefined): SimGameTone {
+  switch (status) {
+    case "in":
+    case "clinched":
+    case "bye":
+      return "success";
+    case "out":
+    case "eliminated":
+      return "danger";
+    case "bubble":
+      return "warning";
+    default:
+      return "muted";
+  }
+}
+
+/** Streak color from text like "W3" / "L2": wins green, losses red, anything else muted. */
+export function simStreakTone(streak: string | undefined | null): SimGameTone {
+  const first = (streak ?? "").trim().charAt(0).toUpperCase();
+  if (first === "W") return "success";
+  if (first === "L") return "danger";
+  return "muted";
+}
+
+/** Matchup card tone from the projection gap: favored green, behind red, toss-up or bye amber/accent. */
+export function simMatchupTone(week: SimGameThisWeek | null | undefined): SimGameTone {
+  if (!week) return "muted";
+  if (week.bye || !week.opponent) return "warning";
+  const diff = week.your_projection - week.opponent_projection;
+  if (Math.abs(diff) < 1) return "accent";
+  return diff > 0 ? "success" : "danger";
+}
+
+/** Glyph for a notice by tone (shared by every in-game message strip). */
+export function simNoticeGlyph(tone: SimGameTone): ReviewGlyph {
+  switch (tone) {
+    case "success":
+      return "boom";
+    case "danger":
+      return "injury";
+    case "warning":
+      return "lineup";
+    default:
+      return "stats";
+  }
 }
 
 /** Team id to display name from a league teams list. */

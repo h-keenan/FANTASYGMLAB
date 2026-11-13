@@ -7,7 +7,10 @@ import { Button } from "@/components/Button";
 import { EmptyState } from "@/components/EmptyState";
 import { PillRow } from "@/components/PillRow";
 import { SectionHeading } from "@/components/SectionHeading";
-import { SimPlayerBrowser } from "@/components/SimGamePlayers";
+import { SimDraftBoard } from "@/components/SimDraftBoard";
+import { SimDraftGlyph } from "@/components/SimDraftGlyphs";
+import { SimDraftGrid } from "@/components/SimDraftGrid";
+import { SimDraftHero } from "@/components/SimDraftHero";
 import { SimPlayerChip, SimPlayerLine, SimStat, SimToneBadge, useSimWide, type SimCtx } from "@/components/SimGameParts";
 import { SkeletonCard } from "@/components/Skeleton";
 import { ToneBadge } from "@/components/ToneBadge";
@@ -30,7 +33,7 @@ import {
   type SimGamePlayer,
 } from "@/lib/simGame";
 
-type Panel = "board" | "queue" | "roster" | "picks";
+type Panel = "board" | "grid" | "queue" | "roster" | "picks";
 
 /**
  * The draft room: a big board of every undrafted player (search, position
@@ -175,42 +178,42 @@ export function SimGameDraft({ ctx, onComplete }: { ctx: SimCtx; onComplete: (re
   const boardActions = (player: SimGamePlayer) => {
     const inQueue = queue.ids.includes(player.id);
     return (
-      <div className="flex items-center gap-1">
+      <>
         <Button
           size="sm"
-          variant="secondary"
+          variant={inQueue ? "primary" : "secondary"}
           aria-label={inQueue ? `Remove ${player.name} from queue` : `Queue ${player.name}`}
+          aria-pressed={inQueue}
           onClick={() => {
             setPlayers((prev) => ({ ...prev, [player.id]: player }));
             dispatchQueue({ type: inQueue ? "remove" : "add", id: player.id });
           }}
         >
-          {inQueue ? "Queued" : "Queue"}
+          <SimDraftGlyph name={inQueue ? "queued" : "queue"} />
         </Button>
         {onClock ? (
           <Button size="sm" loading={busy === "pick"} onClick={() => pick(player)} aria-label={`Draft ${player.name}`}>
-            Draft
+            <SimDraftGlyph name="draft" />
+            <span className="ml-1">Draft</span>
           </Button>
         ) : null}
-      </div>
+      </>
     );
   };
 
   const board = (
-    <SimPlayerBrowser
+    <SimDraftBoard
       gameId={gameId}
-      fixedStatus="available"
-      initial={{ sort: "adp" }}
       positions={simPositionsFor(game.settings.slots)}
+      pickNo={draft.pick_no}
       onOpen={ctx.openPlayer}
       actions={boardActions}
       refreshKey={ctx.tick}
-      emptyTitle="No players left that match"
       onItems={(items) => setPlayers((prev) => ({ ...prev, ...Object.fromEntries(items.map((p) => [p.id, p])) }))}
     />
   );
 
-  const side = (which: Exclude<Panel, "board">) => {
+  const side = (which: Exclude<Panel, "board" | "grid">) => {
     if (which === "queue") {
       return (
         <section className="flex flex-col gap-2" aria-label="Your queue">
@@ -226,17 +229,18 @@ export function SimGameDraft({ ctx, onComplete }: { ctx: SimCtx; onComplete: (re
                 trailing={
                   <div className="flex items-center gap-1">
                     <Button size="sm" variant="ghost" aria-label={`Move ${player.name} up`} disabled={index === 0} onClick={() => dispatchQueue({ type: "move", id: player.id, delta: -1 })}>
-                      Up
+                      <SimDraftGlyph name="up" />
                     </Button>
                     <Button size="sm" variant="ghost" aria-label={`Move ${player.name} down`} disabled={index === queued.length - 1} onClick={() => dispatchQueue({ type: "move", id: player.id, delta: 1 })}>
-                      Down
+                      <SimDraftGlyph name="down" />
                     </Button>
                     <Button size="sm" variant="ghost" aria-label={`Remove ${player.name}`} onClick={() => dispatchQueue({ type: "remove", id: player.id })}>
-                      Remove
+                      <SimDraftGlyph name="remove" />
                     </Button>
                     {onClock ? (
-                      <Button size="sm" loading={busy === "pick"} onClick={() => pick(player)}>
-                        Draft
+                      <Button size="sm" loading={busy === "pick"} onClick={() => pick(player)} aria-label={`Draft ${player.name}`}>
+                        <SimDraftGlyph name="draft" />
+                        <span className="ml-1">Draft</span>
                       </Button>
                     ) : null}
                   </div>
@@ -310,12 +314,10 @@ export function SimGameDraft({ ctx, onComplete }: { ctx: SimCtx; onComplete: (re
           <p className="text-base font-extrabold" aria-live="polite" data-testid="draft-clock">
             {simDraftClockLine(draft)}
           </p>
-          <p className="text-xs" style={{ color: "var(--color-text-muted)" }}>
-            Pick {Math.min(draft.pick_no, draft.total_picks)} of {draft.total_picks} · No clock, take your time.
-          </p>
         </div>
         {onClock ? <ToneBadge label="Your pick" color="var(--color-action)" /> : null}
       </div>
+      <SimDraftHero gameId={gameId} draft={draft} teams={game.settings.teams} slots={game.settings.slots} positions={simPositionsFor(game.settings.slots)} tick={ctx.tick} onOpen={ctx.openPlayer} />
       {onClock && hint ? (
         <div className="flex items-center justify-between gap-2 enter-rise" data-testid="draft-hint">
           <div className="min-w-0">
@@ -343,27 +345,31 @@ export function SimGameDraft({ ctx, onComplete }: { ctx: SimCtx; onComplete: (re
     </AccentCard>
   );
 
-  const sidePanel = (wide ? (panel === "board" ? "queue" : panel) : panel) as Panel;
+  const sidePanel = (wide ? (panel === "board" || panel === "grid" ? "queue" : panel) : panel) as Exclude<Panel, "board" | "grid">;
   const tabs = [
-    ...(wide ? [] : [{ label: "Board", value: "board" }]),
+    ...(wide ? [] : [{ label: "Players", value: "board" }]),
+    { label: "Board", value: "grid" },
     { label: `Queue${queue.ids.length ? ` ${queue.ids.length}` : ""}`, value: "queue" },
     { label: "Roster", value: "roster" },
     { label: "Picks", value: "picks" },
   ];
+  const activeTab = wide && panel === "board" ? "queue" : panel;
 
   return (
     <div className="flex flex-col gap-3">
       {header}
-      <PillRow ariaLabel="Draft panels" variant="fill" options={tabs} active={wide && panel === "board" ? "queue" : panel} onSelect={(value) => setPanel(value as Panel)} />
-      {wide ? (
+      <PillRow ariaLabel="Draft panels" variant="scroll" options={tabs} active={activeTab} onSelect={(value) => setPanel(value as Panel)} />
+      {panel === "grid" ? (
+        <SimDraftGrid draft={draft} teams={game.settings.teams} onOpen={ctx.openPlayer} />
+      ) : wide ? (
         <div className="grid gap-4" style={{ gridTemplateColumns: "minmax(0, 3fr) minmax(0, 2fr)" }}>
           <div>{board}</div>
-          <div>{side(sidePanel as Exclude<Panel, "board">)}</div>
+          <div>{side(sidePanel)}</div>
         </div>
       ) : panel === "board" ? (
         board
       ) : (
-        side(panel)
+        side(panel as Exclude<Panel, "board" | "grid">)
       )}
     </div>
   );

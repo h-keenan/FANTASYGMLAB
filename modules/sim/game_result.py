@@ -17,8 +17,9 @@ from modules.sim import game_actions as act
 from modules.sim.analysis import CURVE_BASE, CURVE_SLOPE, PLAYOFF_LABEL, PLAYOFF_VALUE, letter_for
 from modules.sim.game_ai import TradeDesk
 from modules.sim.game_draft import DraftContext, draft_recap, run_ai_picks, set_queue, user_pick
-from modules.sim.game_engine import advance, finish_draft, standing_rows, start_from_league
+from modules.sim.game_engine import _brief, advance, finish_draft, standing_rows, start_from_league
 from modules.sim.game_eval import Evaluator
+from modules.sim.game_review import build_review
 from modules.sim.game_state import Emitter, GameState
 from modules.sim.game_types import GAME_ENGINE_VERSION, GameError, GameSnapshot
 
@@ -228,7 +229,13 @@ def evaluate_decisions(
             drop = f", dropped {snap.players[p['drop']].name}" if p.get("drop") else ""
             title = f"Week {week} waiver: added {snap.players[p['add']].name}{drop}"
             detail = f"That pickup {_verb(impact['season_value'])} your season ({_impact_text(impact)})."
-        decisions.append({"kind": kind, "week": week, "title": title, "detail": detail, "impact": impact})
+        if kind == "trade":
+            players = [{**_brief(snap, i), "role": "get"} for i in got] + [{**_brief(snap, i), "role": "give"} for i in sent]
+        else:
+            players = [{**_brief(snap, p["add"]), "role": "add"}] + (
+                [{**_brief(snap, p["drop"]), "role": "drop"}] if p.get("drop") else [])
+        decisions.append({"kind": kind, "week": week, "title": title, "detail": detail, "impact": impact,
+                          "players": players})
     return decisions
 
 
@@ -244,8 +251,10 @@ def _lineup_decisions(worst: list[dict[str, Any]], final: GameState, snap: GameS
         extra = ""
         if bench and low:
             extra = f" ({bench[0]['player']['name']} scored {bench[0]['pts']} on your bench while {low['player']['name']} scored {low['pts']} in your lineup)"
+        players = ([{**_brief(snap, bench[0]["player"]["id"]), "role": "bench", "pts": bench[0]["pts"]}] if bench else []) + (
+            [{**_brief(snap, low["player"]["id"]), "role": "started", "pts": low["pts"]}] if low else [])
         out.append({
-            "kind": "lineup", "week": w["week"],
+            "kind": "lineup", "week": w["week"], "players": players,
             "title": f"Week {w['week']}: {w['left']} points sat on your bench",
             "detail": f"In hindsight a different lineup was worth {w['left']} more points that week{extra}.",
             "impact": {"season_value": round(-min(1.0, w["left"] / 60.0), 2), "wins": 0.0,
@@ -337,6 +346,7 @@ def build_result(
         "draft": {"grade": draft["your_team"]["grade"], "rank": draft["your_team"]["rank"],
                   "best_pick": draft["your_team"]["best_pick"], "worst_pick": draft["your_team"]["worst_pick"]},
         "weeks": weeks,
+        "review": build_review(snap, events, final, draft),
     }
 
 

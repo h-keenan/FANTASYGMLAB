@@ -9,7 +9,8 @@ import { Select } from "@/components/Input";
 import { PillRow } from "@/components/PillRow";
 import { PositionBadge } from "@/components/PositionBadge";
 import { SimPlayerBrowser } from "@/components/SimGamePlayers";
-import { SimPlayerChip, SimPlayerLine, SimSectionTitle, SimSheet, SimStat, SimTeamLink, SimToneBadge, type SimCtx } from "@/components/SimGameParts";
+import { SimPlayerChip, SimPlayerLine, SimSectionTitle, SimSheet, SimStat, SimTeamLink, SimToneBadge, simToneColor, type SimCtx } from "@/components/SimGameParts";
+import { ReviewGlyphChip } from "@/components/SeasonReviewSections";
 import { SkeletonCard } from "@/components/Skeleton";
 import { api } from "@/lib/api";
 import {
@@ -19,6 +20,7 @@ import {
   simSlotRepeatsPosition,
   simLineupPayload,
   simMatchupLine,
+  simMatchupTone,
   simNeedsDrop,
   simPositionsFor,
   simSlotAccepts,
@@ -124,11 +126,12 @@ export function SimTeamTab({ ctx, onTrade }: { ctx: SimCtx; onTrade: () => void 
   return (
     <div className="flex flex-col gap-3">
       {week ? (
-        <AccentCard accent={week.bye ? "var(--color-warning)" : "var(--color-accent)"} compact as="section">
+        <AccentCard accent={simToneColor(simMatchupTone(week))} compact as="section">
           <div className="flex items-center justify-between gap-2">
             <span className="flex min-w-0 items-center gap-2">
+              <ReviewGlyphChip glyph="game" tone={simMatchupTone(week)} size={24} />
               <span className="text-xs uppercase font-extrabold shrink-0" style={{ color: "var(--color-text-muted)", letterSpacing: "var(--letter-spacing-badge)" }}>Week {week.week}</span>
-              {week.opponent ? <SimTeamLink teamId={week.opponent.team_id} name={week.opponent.name} size={24} suffix={<span className="text-xs font-normal" style={{ color: "var(--color-text-muted)" }}>opponent</span>} /> : <span className="text-sm font-bold">Bye week</span>}
+              {week.opponent ? <SimTeamLink teamId={week.opponent.team_id} name={week.opponent.name} size={24} /> : <span className="text-sm font-bold">Bye week</span>}
             </span>
             <span className="flex shrink-0 items-baseline gap-2 text-sm font-extrabold tabular-nums">
               <span data-testid="your-projection" style={{ color: week.opponent && week.your_projection >= week.opponent_projection ? "var(--color-success)" : undefined }}>{simFmtPts(week.your_projection)}</span>
@@ -136,15 +139,18 @@ export function SimTeamTab({ ctx, onTrade }: { ctx: SimCtx; onTrade: () => void 
               {week.opponent ? <span style={{ color: week.opponent_projection > week.your_projection ? "var(--color-danger)" : undefined }}>{simFmtPts(week.opponent_projection)}</span> : null}
             </span>
           </div>
-          <p className="text-xs" style={{ color: "var(--color-text-secondary)" }}>{simMatchupLine(week)} The full head-to-head is on Home.</p>
+          <p className="text-xs font-semibold" style={{ color: simToneColor(simMatchupTone(week)) }}>{simMatchupLine(week)} The full head-to-head is on Home.</p>
         </AccentCard>
       ) : null}
 
       {overLimit ? (
         <AccentCard accent="var(--color-danger)" compact as="div">
-          <p className="text-sm font-bold" role="alert">
-            Roster over the limit: cut {game.pending?.cuts_needed} player{game.pending?.cuts_needed === 1 ? "" : "s"} from your bench before you advance.
-          </p>
+          <div className="flex items-start gap-2">
+            <ReviewGlyphChip glyph="injury" tone="danger" size={24} />
+            <p className="text-sm font-bold flex-1 min-w-0" role="alert">
+              Roster over the limit: cut {game.pending?.cuts_needed} player{game.pending?.cuts_needed === 1 ? "" : "s"} from your bench before you advance.
+            </p>
+          </div>
         </AccentCard>
       ) : null}
 
@@ -154,7 +160,10 @@ export function SimTeamTab({ ctx, onTrade }: { ctx: SimCtx; onTrade: () => void 
             {warnings.map((w, i) => (
               <li key={i} className="flex flex-col gap-1">
                 {w.player_id && playerById[w.player_id] ? <SimPlayerChip player={playerById[w.player_id]} /> : null}
-                <span className="text-xs">{simWarningText(w, w.player_id ? playerById[w.player_id]?.name : undefined)}</span>
+                <span className="flex items-start gap-2 text-xs">
+                  <ReviewGlyphChip glyph="lineup" tone="warning" size={20} />
+                  <span className="flex-1 min-w-0" style={{ color: "var(--color-warning)" }}>{simWarningText(w, w.player_id ? playerById[w.player_id]?.name : undefined)}</span>
+                </span>
               </li>
             ))}
           </ul>
@@ -351,7 +360,7 @@ export function ClaimSheet({
           </Select>
           {roster.find((p) => p.id === dropId) ? (
             <span className="flex items-center gap-2 pt-1" data-testid="claim-drop-preview">
-              <span className="shrink-0 text-xs">Dropping</span>
+              <span className="shrink-0 text-xs font-bold" style={{ color: "var(--color-danger)" }}>Dropping</span>
               <SimPlayerChip player={roster.find((p) => p.id === dropId)!} size={32} />
             </span>
           ) : null}
@@ -454,12 +463,15 @@ export function SimPlayersTab({
         <section className="flex flex-col gap-2" aria-label="Queued claims">
           <SimSectionTitle glyph="waiver" tone="accent" note="Resolve at Advance, worst record first.">Queued claims</SimSectionTitle>
           {claims.map((claim) => (
-            <AccentCard key={claim.id} accent="var(--color-accent)" compact as="div">
+            <AccentCard key={claim.id} accent="var(--color-success)" compact as="div">
               <div className="flex items-center justify-between gap-2">
                 <div className="flex min-w-0 flex-col gap-1">
-                  <SimPlayerChip player={claim.add} />
-                  {claim.drop ? <span className="text-xs" style={{ color: "var(--color-text-muted)" }}>Drops {claim.drop.name} ({claim.drop.pos})</span> : null}
-                  {claim.start_slot ? <span className="text-xs" style={{ color: "var(--color-text-muted)" }}>Starts at {claim.start_slot}</span> : null}
+                  <div className="flex items-center gap-2 min-w-0">
+                    <ReviewGlyphChip glyph="waiver" tone="success" size={24} />
+                    <SimPlayerChip player={claim.add} />
+                  </div>
+                  {claim.drop ? <span className="text-xs font-semibold" style={{ color: "var(--color-danger)" }}>Drops {claim.drop.name} ({claim.drop.pos})</span> : null}
+                  {claim.start_slot ? <span className="text-xs font-semibold" style={{ color: "var(--color-success)" }}>Starts at {claim.start_slot}</span> : null}
                 </div>
                 <Button size="sm" variant="ghost" onClick={() => cancel(claim)}>Cancel</Button>
               </div>

@@ -664,3 +664,34 @@ describe("simShortName", () => {
     expect(simShortName("Cher", 2)).toBe("Cher");
   });
 });
+
+import {
+  simMatchupTone,
+  simNoticeGlyph,
+  simPlayoffStatusTone,
+  simStreakTone,
+  simTransactionGlyph,
+  simTransactionRoleTone,
+} from "./simGame";
+
+describe("sim presentation helpers", () => {
+  it("maps transaction kinds to glyph and tone", () => {
+    expect(simTransactionGlyph({ type: "trade" })).toEqual({ glyph: "trade", tone: "accent" });
+    expect(simTransactionGlyph({ kind: "waiver_claim" })).toEqual({ glyph: "waiver", tone: "success" });
+    expect(simTransactionGlyph({ type: "drop" })).toEqual({ glyph: "bust", tone: "danger" });
+    expect(simTransactionGlyph({ type: "injury" })).toEqual({ glyph: "injury", tone: "danger" });
+    expect(simTransactionGlyph({})).toEqual({ glyph: "stats", tone: "muted" });
+  });
+  it("tones roles, playoff status, streaks and matchups", () => {
+    expect(simTransactionRoleTone("add")).toBe("success");
+    expect(simTransactionRoleTone("give")).toBe("danger");
+    expect(simPlayoffStatusTone("clinched")).toBe("success");
+    expect(simPlayoffStatusTone("eliminated")).toBe("danger");
+    expect(simPlayoffStatusTone(undefined)).toBe("muted");
+    expect(simStreakTone("W3")).toBe("success");
+    expect(simStreakTone("L1")).toBe("danger");
+    expect(simStreakTone("")).toBe("muted");
+    expect(simNoticeGlyph("danger")).toBe("injury");
+    expect(simMatchupTone(null)).toBe("muted");
+  });
+});
