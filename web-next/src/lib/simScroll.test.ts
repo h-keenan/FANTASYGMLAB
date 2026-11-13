@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { simScrollKey, simShouldScrollTop } from "./simScroll";
+import { simScrollKey, simShouldScrollTop, simTabAfterStageAction } from "./simScroll";
 
 describe("simScrollKey", () => {
   it("a page change scrolls to the top; the same page and the first render never do", () => {
@@ -13,5 +13,14 @@ describe("simScrollKey", () => {
     expect(simShouldScrollTop(week, week)).toBe(false);
     for (const next of [recap, nextRecap, tab, offseason]) expect(simShouldScrollTop(week, next)).toBe(true);
     expect(simShouldScrollTop(recap, nextRecap)).toBe(true);
+  });
+});
+
+describe("stage-advancing actions", () => {
+  it("land on the page that hosts the new stage, and a new offseason step scrolls to the top", () => {
+    for (const action of ["start_rookie_draft", "auto_draft", "start_season", "start_playoffs"] as const) expect(simTabAfterStageAction(action)).toBe("home");
+    const review = simScrollKey({ view: "game", stage: "offseason", tab: "home", status: "offseason", step: "review" });
+    const draft = simScrollKey({ view: "game", stage: "offseason", tab: "home", status: "offseason", step: "rookie_draft" });
+    expect(simShouldScrollTop(review, draft)).toBe(true);
   });
 });

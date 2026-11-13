@@ -361,7 +361,7 @@ export default function GmGameScreen({ navigation }: Props) {
   // A new page (tab, recap, draft -> season, offseason step) starts at the top, instantly.
   const scrollRef = useRef<ScrollView>(null);
   const lastScrollKey = useRef<string | null>(null);
-  const scrollKey = simScrollKey({ view: flow.view, stage: flow.stage, tab: flow.tab, recapIndex: flow.recapIndex, hasRecap: flow.recaps.length > 0, draftRecap: draftRecap !== null, week: game?.week ?? null, status: game?.status ?? null });
+  const scrollKey = simScrollKey({ view: flow.view, stage: flow.stage, tab: flow.tab, recapIndex: flow.recapIndex, hasRecap: flow.recaps.length > 0, draftRecap: draftRecap !== null, week: game?.week ?? null, status: game?.status ?? null, step: game?.dynasty?.stage ?? null });
   useLayoutEffect(() => {
     if (simShouldScrollTop(lastScrollKey.current, scrollKey)) scrollRef.current?.scrollTo({ y: 0, animated: false });
     lastScrollKey.current = scrollKey;
@@ -390,7 +390,7 @@ export default function GmGameScreen({ navigation }: Props) {
       {showBar && game && ctx ? (
         <SimActionBar ctx={ctx} paywalled={simGamePaywalled(preview)} advancing={advancing} onAdvance={advance} onGoPro={goPaywall} onTab={(tab) => dispatch({ type: 'tab', tab })} />
       ) : null}
-      {showOffBar && game && ctx ? <SimOffseasonBar ctx={ctx} /> : null}
+      {showOffBar && game && ctx ? <SimOffseasonBar ctx={ctx} onTab={(tab) => dispatch({ type: 'tab', tab })} /> : null}
       {sheet}
     </View>
   );

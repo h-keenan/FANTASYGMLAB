@@ -120,7 +120,7 @@ export function SimGameContent() {
   const stackedUnder = useMemo(() => Boolean(sheetPlayer) && typeof document !== "undefined" && document.querySelector("[data-sheet-hideable]") !== null, [sheetPlayer]);
 
   // A new page (tab, recap, draft -> season, offseason step) starts at the top, instantly.
-  const scrollKey = simScrollKey({ view: flow.view, stage: flow.stage, tab: flow.tab, recapIndex: flow.recapIndex, hasRecap: flow.recaps.length > 0, draftRecap: draftRecap !== null, week: game?.week ?? null, status: game?.status ?? null });
+  const scrollKey = simScrollKey({ view: flow.view, stage: flow.stage, tab: flow.tab, recapIndex: flow.recapIndex, hasRecap: flow.recaps.length > 0, draftRecap: draftRecap !== null, week: game?.week ?? null, status: game?.status ?? null, step: game?.dynasty?.stage ?? null });
   const lastScrollKey = useRef<string | null>(null);
   useLayoutEffect(() => {
     if (simShouldScrollTop(lastScrollKey.current, scrollKey)) window.scrollTo({ top: 0, left: 0, behavior: "instant" });
@@ -977,7 +977,7 @@ function GameScreen({
           </div>
         </>
       )}
-      {showOffBar ? <SimOffseasonBar ctx={ctx} /> : null}
+      {showOffBar ? <SimOffseasonBar ctx={ctx} onTab={onTab} /> : null}
       {showBar ? <SimActionBar ctx={ctx} paywalled={paywalled} advancing={advancing} onAdvance={onAdvance} onTab={onTab} /> : null}
     </div>
     </SimOpenPlayerContext.Provider>
