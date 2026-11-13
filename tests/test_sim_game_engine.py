@@ -552,6 +552,8 @@ def test_replay_game_from_user_commands_reproduces_the_state_exactly():
                 pass
         if state.status == "complete":
             break
+        while len(state.rosters[user]) > snap.settings.roster_limit:  # an accepted 2-for-1 can leave the user over the limit
+            act.cut_player(em, min(state.rosters[user], key=lambda p: (Evaluator(snap, state).ros_mean(p), p)))
         advance(em, snap, state, seed)
     assert any(e["type"] in ("trade_reject", "trade_counter", "trade") and e["actor"] == "user" for e in em.events)
     again = replay_game(snap, seed, em.events, strict=True)

@@ -224,6 +224,7 @@ def summarize(m: Meter) -> dict[str, Any]:
         "adds_per_team_season_p90": round(float(np.percentile(m.team_season_adds, 90)), 1) if m.team_season_adds else 0.0,
         "add_position_mix": {k: v for k, v in sorted(m.add_pos.items())},
         "roster_size_mean": round(float(np.mean(m.roster_sizes)), 2) if m.roster_sizes else 0.0,
+        "roster_size_max": int(max(m.roster_sizes)) if m.roster_sizes else 0,
         "pos_count_mean": {k: round(float(np.mean(v)), 2) for k, v in m.pos_counts.items()},
         "pos_count_max": {k: int(max(v)) for k, v in m.pos_counts.items() if v},
         "hoard_team_weeks": round(m.hoard / max(1, m.cover_den), 4),
