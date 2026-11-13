@@ -97,7 +97,7 @@ describe("league Players view (find a player, position by position)", () => {
 });
 
 describe("league Players view: On the block", () => {
-  const blocked = p("w9", "Vet Vince", "RB", 30, "1", { block: { by: "1", mine: false, looking_for: "WR", why: "Selling a veteran" } });
+  const blocked = p("w9", "RB", "Vet Vince", 30, "1", { block: { by: "1", mine: false, looking_for: "WR", why: "Selling a veteran" } });
   const withBlock = [
     team("1", "Bench Mob", 2, [p("q1", "QB", "Quinn Back", 90, "1", { overall: 91 }), blocked], { needs: ["TE"], block: { stance: "rebuilding", looking_for: "WR", items: [{ id: "w9", why: "Selling a veteran" }] } }),
     team("2", "Goal Line Gamblers", 1, [p("q2", "QB", "Quentin Arm", 70, "2", { overall: 78 })]),
