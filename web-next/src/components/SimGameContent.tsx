@@ -818,7 +818,7 @@ function GameScreen({
           </div>
         </>
       )}
-      {showBar ? <SimActionBar ctx={ctx} paywalled={paywalled} advancing={advancing} onAdvance={onAdvance} /> : null}
+      {showBar ? <SimActionBar ctx={ctx} paywalled={paywalled} advancing={advancing} onAdvance={onAdvance} onTab={onTab} /> : null}
     </div>
     </SimOpenPlayerContext.Provider>
     </SimTeamOpenContext.Provider>
@@ -871,7 +871,7 @@ function SimMoreTab({ ctx, onDeleted, onHub }: { ctx: SimCtx; onDeleted: () => v
             ["stats", "accent", `${simSettingsSummary(s)} · ${SIM_DIFFICULTY_COPY[s.difficulty].label}`],
             ["lineup", "success", `Starters: ${s.slots.join(", ")} · roster limit ${s.roster_limit}`],
             ["trophy", "warning", `${s.regular_weeks}-week season, ${s.playoff_teams}-team playoffs. Trade deadline: week ${s.trade_deadline_week}.`],
-            ["waiver", "accent", "Waiver claims resolve when you advance, worst record first."],
+            ["waiver", "accent", "Waiver claims resolve when you advance, before games are scored, worst record first."],
           ] as const).map(([glyph, tone, text]) => (
             <li key={glyph} className="flex items-start gap-2">
               <ReviewGlyphChip glyph={glyph} tone={tone} size={24} />

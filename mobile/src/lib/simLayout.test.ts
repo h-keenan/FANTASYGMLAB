@@ -6,6 +6,7 @@ import {
   SIM_ASSET_ALL,
   SIM_REVIEW_VIEWS,
   simAdvanceState,
+  simEmptySlotLabels,
   simAutoSetMessage,
   simFilterGroups,
   simGroupByPosition,
@@ -63,6 +64,10 @@ test('auto-set message and advance state', () => {
   const after = [{ slot: 'RB', player: a('3', 'Wally Wire') }];
   assert.equal(simAutoSetMessage(simLineupDiff(before, after, 100, 107.54)), 'Swapped Hurt Harry for Wally Wire, +7.5 proj');
   assert.equal(simAutoSetMessage(simLineupDiff(after, after, 1, 1)), 'Lineup is optimal');
-  assert.equal(simAdvanceState({ phase: 'regular_season', week: 4 }, 1).reason, 'Fill 1 empty slot');
+  const one = simAdvanceState({ phase: 'regular_season', week: 4 }, ['WR2']);
+  assert.equal(one.blocked, false);
+  assert.equal(one.reason, null);
+  assert.equal(one.confirm, 'WR2 is empty and will score 0 unless a healthy bench player fits. Advance anyway?');
+  assert.deepEqual(simEmptySlotLabels([{ slot: 'QB', player: {} }, { slot: 'WR', player: {} }, { slot: 'WR', player: null }]), ['WR2']);
   assert.equal(simAdvanceState({ phase: 'regular_season', week: 4, pending: { cuts_needed: 2 } }, 0).reason, 'Cut 2 players first');
 });

@@ -328,7 +328,7 @@ export function ClaimSheet({
   return (
     <SimSheet title={`Claim ${player.name}`} onClose={onClose}>
       <SimPlayerChip player={player} size={40} />
-      <AppText style={common.muted}>Claims resolve when you advance, worst record first. Another team may get him first.</AppText>
+      <AppText style={common.muted}>Claims resolve when you advance, before games are scored, worst record first. A claimed player can start that same week. Another team may get him first.</AppText>
       <View style={common.stack}>
         <AppText style={common.bodyStrong}>{mustDrop ? 'Drop (your roster is full)' : 'Drop (optional)'}</AppText>
         {!mustDrop ? (

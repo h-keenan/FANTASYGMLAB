@@ -176,21 +176,60 @@ export function simAutoSetMessage(diff: SimLineupDiff): string {
 export interface SimAdvanceState {
   /** "Wk 4 \u2192 5" or "Play round". */
   label: string;
+  /** True only for an illegal state (roster over the limit). Everything else is a warning. */
   blocked: boolean;
   /** Why Advance is disabled (null when it is not). */
   reason: string | null;
+  /** Soft warning shown above the bar; Advance stays enabled but asks to confirm. */
+  warning: string | null;
+  /** Confirm-dialog copy shown when the user taps Advance with a warning (null: advance straight away). */
+  confirm: string | null;
 }
 
-/** Whether the bar's Advance button is available, and the reason when it is not. */
+/**
+ * Labels for the empty starter slots ("WR2"): a position that appears more than
+ * once in the lineup is numbered so the user can tell which slot is empty.
+ */
+export function simEmptySlotLabels(slots: readonly { slot: string; player?: unknown | null }[]): string[] {
+  const total: Record<string, number> = {};
+  for (const s of slots) total[s.slot] = (total[s.slot] ?? 0) + 1;
+  const seen: Record<string, number> = {};
+  const out: string[] = [];
+  for (const s of slots) {
+    seen[s.slot] = (seen[s.slot] ?? 0) + 1;
+    if (!s.player) out.push(total[s.slot] > 1 ? `${s.slot}${seen[s.slot]}` : s.slot);
+  }
+  return out;
+}
+
+/**
+ * Whether the bar's Advance button is available. An empty starting slot is a
+ * warning, never a block: claims are resolved at the START of Advance (before
+ * lineups lock and games are scored) and the engine auto-fills empty slots from
+ * the healthy bench, so a user with no legal fill must still be able to move on
+ * (the slot scores 0). Only a roster over the limit blocks (cut is always possible).
+ * `empty` is the empty slot labels (or just a count).
+ */
 export function simAdvanceState(
   game: { phase?: string; week: number; pending?: { cuts_needed?: number } | null },
-  emptySlots: number,
+  empty: number | readonly string[],
 ): SimAdvanceState {
   const label = game.phase === "playoffs" ? "Play round" : `Wk ${game.week} \u2192 ${game.week + 1}`;
   const cuts = game.pending?.cuts_needed ?? 0;
-  if (cuts > 0) return { label, blocked: true, reason: `Cut ${cuts} player${cuts === 1 ? "" : "s"} first` };
-  if (emptySlots > 0) return { label, blocked: true, reason: `Fill ${emptySlots} empty slot${emptySlots === 1 ? "" : "s"}` };
-  return { label, blocked: false, reason: null };
+  if (cuts > 0) return { label, blocked: true, reason: `Cut ${cuts} player${cuts === 1 ? "" : "s"} first`, warning: null, confirm: null };
+  const names = typeof empty === "number" ? Array.from({ length: empty }, () => "A starting slot") : empty;
+  if (names.length > 0) {
+    const n = names.length;
+    const who = n === 1 ? `${names[0]} is` : `${names.join(", ")} are`;
+    return {
+      label,
+      blocked: false,
+      reason: null,
+      warning: `${n} empty slot${n === 1 ? "" : "s"}: ${n === 1 ? names[0] : names.join(", ")} will score 0. Claims process when you advance, before games are scored.`,
+      confirm: `${who} empty and will score 0 unless a healthy bench player fits. Advance anyway?`,
+    };
+  }
+  return { label, blocked: false, reason: null, warning: null, confirm: null };
 }
 
 /** Bottom clearance (rem) page content needs so the fixed bar and the floating GM orb never cover the last row. */

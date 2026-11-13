@@ -290,14 +290,19 @@ describe("SimGameContent", () => {
     expect(mocked.advanceSimGame).not.toHaveBeenCalled();
   });
 
-  it("the bottom bar keeps Advance reachable from every tab and disables it with a reason for an empty slot", async () => {
+  it("the bottom bar keeps Advance reachable from every tab and warns (not blocks) on an empty slot and confirms", async () => {
     mocked.listSimGames.mockResolvedValue({ ok: true, reason: "", games: [lite(game())] });
     mocked.getSimLineup.mockResolvedValue({ ...lineup, slots: [{ slot: "QB", player: player("1", "QB", "Quinn Back") }, { slot: "RB", player: null }] });
     render(<SimGameContent />);
     await openFirstGame();
     const bar = await screen.findByTestId("sim-action-bar");
-    expect(await screen.findByText("Fill 1 empty slot")).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Advance to week 5" })).toBeDisabled();
+    expect(await screen.findByTestId("sim-advance-warning")).toHaveTextContent("RB will score 0");
+    const advanceBtn = screen.getByRole("button", { name: "Advance to week 5" });
+    expect(advanceBtn).not.toBeDisabled();
+    fireEvent.click(advanceBtn);
+    expect(await screen.findByTestId("sim-advance-confirm")).toHaveTextContent("RB is empty and will score 0");
+    expect(mocked.advanceSimGame).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
     expect(bar).toHaveTextContent("Wk 4");
     await openTeamTab();
     expect(screen.getByTestId("sim-action-bar")).toBeInTheDocument();
