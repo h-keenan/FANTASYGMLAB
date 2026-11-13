@@ -31,6 +31,8 @@ export interface ComposedPortfolio {
   /** Saved-league order, for placing loaded cards and skeletons. */
   order: string[];
   pending: PortfolioSavedLeague[];
+  /** Leagues whose card has its headline but whose signals are still being computed. */
+  signalsPending: string[];
   settled: boolean;
 }
 
@@ -48,13 +50,14 @@ export function composePortfolio(
     ...(index.reason ? { reason: index.reason } : {}),
   };
   if (!index.is_premium) {
-    return { response: base, order: [], pending: [], settled: true };
+    return { response: base, order: [], pending: [], signalsPending: [], settled: true };
   }
 
   const leagues: PortfolioLeague[] = [];
   const failed: PortfolioFailedLeague[] = [];
   const pending: PortfolioSavedLeague[] = [];
   const order: string[] = [];
+  const signalsPending: string[] = [];
   for (const saved of index.saved_leagues ?? []) {
     order.push(saved.league_id);
     const state = states[saved.league_id];
@@ -64,6 +67,7 @@ export function composePortfolio(
     }
     if (state.status === "success" && state.data.league) {
       leagues.push(state.data.league);
+      if (state.data.signals_pending) signalsPending.push(saved.league_id);
       continue;
     }
     if (state.status === "success" && state.data.failed_league) {
@@ -79,6 +83,8 @@ export function composePortfolio(
     response: { ...base, leagues, failed_leagues: failed },
     order,
     pending,
-    settled: pending.length === 0,
+    signalsPending,
+    // Settled = every league has a row AND no card is still waiting on signals.
+    settled: pending.length === 0 && signalsPending.length === 0,
   };
 }

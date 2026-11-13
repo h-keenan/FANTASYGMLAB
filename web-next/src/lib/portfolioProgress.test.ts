@@ -99,4 +99,24 @@ describe("composePortfolio", () => {
     expect(composed.pending).toEqual([]);
     expect(composed.settled).toBe(true);
   });
+
+  it("flags a headline-first card and stays unsettled until its signals land", () => {
+    const headline: PortfolioLeagueResponse = { ...ok(row("a", "Alpha")), signals_pending: true };
+    const composed = composePortfolio(INDEX, {
+      a: { status: "success", data: headline },
+      b: { status: "success", data: ok(row("b", "Bravo")) },
+      c: { status: "success", data: ok(row("c", "Charlie")) },
+    });
+    expect(composed.signalsPending).toEqual(["a"]);
+    expect(composed.pending).toEqual([]);
+    expect(composed.settled).toBe(false);
+
+    const done = composePortfolio(INDEX, {
+      a: { status: "success", data: ok(row("a", "Alpha")) },
+      b: { status: "success", data: ok(row("b", "Bravo")) },
+      c: { status: "success", data: ok(row("c", "Charlie")) },
+    });
+    expect(done.signalsPending).toEqual([]);
+    expect(done.settled).toBe(true);
+  });
 });

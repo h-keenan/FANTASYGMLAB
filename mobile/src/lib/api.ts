@@ -3252,6 +3252,9 @@ export interface PortfolioLeagueResponse {
   league: PortfolioLeague | null;
   failed_league: PortfolioFailedLeague | null;
   upsell: PortfolioUpsell | null;
+  /** Headline-first answer (`deferSignals`): `league.top_item(s)` are empty
+   * because the signals are still being computed; absent on a complete row. */
+  signals_pending?: boolean;
 }
 
 export interface PresentationAsset {
@@ -4128,8 +4131,13 @@ export const api = {
     authorizedFetch<PortfolioIndexResponse>('/v1/portfolio/leagues', signal),
   /** Player exposure across saved leagues (Pro). */
   getPortfolioExposure: () => authorizedFetch<PortfolioExposureResponse>('/v1/portfolio/exposure'),
-  getPortfolioLeague: (leagueId: string, signal?: AbortSignal) =>
-    authorizedFetch<PortfolioLeagueResponse>(`/v1/portfolio/leagues/${encodeURIComponent(leagueId)}`, signal),
+  /** `deferSignals` asks for the headline-first row (no trade-idea search); the
+   * server answers complete anyway when the full row is already cached. */
+  getPortfolioLeague: (leagueId: string, signal?: AbortSignal, deferSignals = false) =>
+    authorizedFetch<PortfolioLeagueResponse>(
+      `/v1/portfolio/leagues/${encodeURIComponent(leagueId)}${deferSignals ? '?signals=defer' : ''}`,
+      signal,
+    ),
   /** "All leagues at a glance" cards for the My Leagues screen (Premium).
    * Server-cached per league for a few minutes (cache_ttl_seconds). */
   getLeaguesGlance: () => authorizedFetch<LeaguesGlanceResponse>('/v1/leagues-glance'),

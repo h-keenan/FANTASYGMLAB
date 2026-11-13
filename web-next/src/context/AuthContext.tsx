@@ -17,6 +17,7 @@ import {
   storeReturnPath,
   type GuestUpgradeFailure,
 } from "@/lib/guestUpgrade";
+import { clearPortfolioSnapshots } from "@/lib/portfolioSnapshot";
 import { supabase } from "@/lib/supabase";
 
 /** Current in-app location (path + query + hash) to come back to after auth. */
@@ -271,6 +272,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       },
       signOut: async () => {
         setRecoveryPending(false);
+        // The cached Portfolio is one person's leagues: gone with the session.
+        clearPortfolioSnapshots(safeLocalStorage());
         await supabase.auth.signOut();
       },
       deleteAccount: async () => {

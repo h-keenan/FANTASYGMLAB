@@ -25,7 +25,7 @@ export type PortfolioLeagueState =
   | { status: 'error' };
 
 export type PortfolioRow =
-  | { kind: 'league'; league: PortfolioLeague }
+  | { kind: 'league'; league: PortfolioLeague; signalsPending: boolean }
   | { kind: 'pending'; league: PortfolioSavedLeague };
 
 export interface ComposedPortfolio {
@@ -34,6 +34,9 @@ export interface ComposedPortfolio {
   leagues: PortfolioLeague[];
   failedLeagues: PortfolioFailedLeague[];
   pendingCount: number;
+  /** Rows that have their headline but whose signals are still being computed. */
+  signalsPendingCount: number;
+  /** Every league has a row AND no row is still waiting on signals. */
   settled: boolean;
 }
 
@@ -45,8 +48,9 @@ export function composePortfolio(
   const leagues: PortfolioLeague[] = [];
   const failedLeagues: PortfolioFailedLeague[] = [];
   let pendingCount = 0;
+  let signalsPendingCount = 0;
   if (!index.is_premium) {
-    return { rows, leagues, failedLeagues, pendingCount, settled: true };
+    return { rows, leagues, failedLeagues, pendingCount, signalsPendingCount, settled: true };
   }
   for (const saved of index.saved_leagues ?? []) {
     const state = states[saved.league_id];
@@ -56,7 +60,9 @@ export function composePortfolio(
       continue;
     }
     if (state.status === 'success' && state.data.league) {
-      rows.push({ kind: 'league', league: state.data.league });
+      const signalsPending = Boolean(state.data.signals_pending);
+      if (signalsPending) signalsPendingCount += 1;
+      rows.push({ kind: 'league', league: state.data.league, signalsPending });
       leagues.push(state.data.league);
       continue;
     }
@@ -69,5 +75,5 @@ export function composePortfolio(
     // load, never silently dropped.
     failedLeagues.push({ league_id: saved.league_id, league_name: saved.league_name, reason: 'unavailable' });
   }
-  return { rows, leagues, failedLeagues, pendingCount, settled: pendingCount === 0 };
+  return { rows, leagues, failedLeagues, pendingCount, signalsPendingCount, settled: pendingCount === 0 && signalsPendingCount === 0 };
 }

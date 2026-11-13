@@ -3,7 +3,7 @@
 import { PageTitle } from "@/components/PageTitle";
 import { GlossaryNote } from "@/components/GlossaryNote";
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { Fragment, useEffect, useRef, useState } from "react";
 
 import {
   api,
@@ -262,7 +262,7 @@ function FailedLeaguesNote({
   );
 }
 
-function PortfolioLeagueCard({ league }: { league: PortfolioLeague }) {
+function PortfolioLeagueCard({ league, signalsPending = false }: { league: PortfolioLeague; signalsPending?: boolean }) {
   // Same fallback as modules/portfolio_page.py / mobile's PortfolioScreen:
   // `top_items` is the already-ranked/deduped signal list, falling back to
   // a one-item list built from `top_item` for a cached/mocked response from
@@ -331,6 +331,13 @@ function PortfolioLeagueCard({ league }: { league: PortfolioLeague }) {
           {signals.map((item, index) => (
             <SignalRow key={item.recommendation_id || `${item.category}-${index}`} item={item} showDivider={index > 0} />
           ))}
+        </div>
+      ) : signalsPending ? (
+        // Headline-first row: the signals are still being computed server-side.
+        <div className="flex flex-col gap-2 mt-3" aria-busy="true" data-portfolio-signals-pending="">
+          <span className="sr-only">Loading signals…</span>
+          <SkeletonBlock width="85%" height={14} />
+          <SkeletonBlock width="65%" height={12} />
         </div>
       ) : (
         <p className="text-sm mt-2" style={{ color: "var(--color-text-muted)" }}>
@@ -457,15 +464,24 @@ export function PortfolioContent({
   data,
   order,
   pending = [],
+  signalsPending = [],
   onRetryLeague,
+  onNearEnd,
+  windowSize = Number.MAX_SAFE_INTEGER,
 }: {
   data: PortfolioResponse;
   /** Saved-league order (progressive loading); defaults to data.leagues' own order. */
   order?: string[];
   /** Saved leagues whose row hasn't arrived yet — rendered as skeleton cards in place. */
   pending?: PortfolioSavedLeague[];
+  /** Leagues whose card has its headline but not its signals yet. */
+  signalsPending?: string[];
   /** Re-queue one league whose row failed to load (inline Retry). */
   onRetryLeague?: (leagueId: string) => void;
+  /** The list's end came near the viewport: release more leagues for loading. */
+  onNearEnd?: () => void;
+  /** How many leagues (in saved order) the loader has released so far. */
+  windowSize?: number;
 }) {
   const [removedIds, setRemovedIds] = useState<string[]>([]);
   const [busyLeagueId, setBusyLeagueId] = useState<string | null>(null);
@@ -551,19 +567,48 @@ export function PortfolioContent({
       ) : data.leagues.length > 0 || pending.length > 0 ? (
         <div className="flex flex-col gap-4">
           <GlossaryNote terms={["rosterPower"]} label="What is Roster Power?" />
-          {cardSlots(data.leagues, pending, order).map((slot) =>
-            slot.kind === "league" ? (
-              <PortfolioLeagueCard key={slot.league.league_id} league={slot.league} />
-            ) : (
-              <PortfolioLeagueSkeleton key={slot.league.league_id} league={slot.league} onRetry={onRetryLeague} />
-            ),
-          )}
+          {cardSlots(data.leagues, pending, order).map((slot, position) => (
+            <Fragment key={slot.league.league_id}>
+              {/* The first league still waiting on the loader's window: scrolling
+                  it near the viewport releases the next few (lib/portfolioLoader). */}
+              {onNearEnd && position === windowSize ? <NearEndSentinel key={windowSize} onNearEnd={onNearEnd} /> : null}
+              {slot.kind === "league" ? (
+                <PortfolioLeagueCard league={slot.league} signalsPending={signalsPending.includes(slot.league.league_id)} />
+              ) : (
+                <PortfolioLeagueSkeleton league={slot.league} onRetry={onRetryLeague} />
+              )}
+            </Fragment>
+          ))}
         </div>
       ) : null}
         </>
       )}
     </main>
   );
+}
+
+/** Zero-height marker that calls `onNearEnd` once it comes within 600px of the
+ * viewport (re-armed by re-keying it each time more leagues are released), so
+ * leagues below the fold load as the list is scrolled to them, not before. */
+function NearEndSentinel({ onNearEnd }: { onNearEnd: () => void }) {
+  const ref = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const node = ref.current;
+    if (!node) return;
+    if (typeof IntersectionObserver === "undefined") {
+      onNearEnd();
+      return;
+    }
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries.some((entry) => entry.isIntersecting)) onNearEnd();
+      },
+      { rootMargin: "0px 0px 600px 0px" },
+    );
+    observer.observe(node);
+    return () => observer.disconnect();
+  }, [onNearEnd]);
+  return <div ref={ref} aria-hidden="true" data-portfolio-sentinel="" style={{ height: 0, marginTop: "-1rem" }} />;
 }
 
 type CardSlot = { kind: "league"; league: PortfolioLeague } | { kind: "pending"; league: PortfolioSavedLeague };
