@@ -701,3 +701,13 @@ power_rank, avg_age, roster_size, positions[], strengths[], needs[], surplus[], 
 everyone the team holds (roster, IR, taxi; `squad` says which) in the usual player-row shape, best value first. `surplus` is
 positions with two or more players beyond the starters, never a position of need. Wrong phase during the draft
 (`reason: "wrong_phase"`). `GET /teams/{id}` now also returns `ir` and `taxi`.
+
+## History (derived from the event log)
+
+`GET /v1/sim/games/{id}/players/{pid}/history` and `GET /v1/sim/games/{id}/teams/{team_id}/history` fold the stored events
+(`modules/sim/game_history.py`; pure, replay-safe, nothing stored, no model change). The game keeps no wall clock, so a "date" is
+`{season, year, week}`. Player: `origin` (drafted: round, overall pick, team, auto, `draft` = league | rookie, `class_year`, `via` =
+original pick owner; or `started` for an imported league), `entries` oldest first (claimed, dropped, cut, traded with both sides'
+assets, retired), `seasons` (games / points / ppg per season and per team held), `current_team`. Team: opening-draft class, rookie
+drafts by year, record by season (+ `champion`), `moves` newest first (trades, claims, cuts). Fetched when the History tab opens,
+not part of player detail, so detail stays small; the capped `state.transactions` list is not used.
