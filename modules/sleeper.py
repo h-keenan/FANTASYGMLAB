@@ -985,7 +985,7 @@ SLEEPER_REQUEST_RETRY_BACKOFF_SECONDS = float(
 _RETRYABLE_STATUS_CODES = frozenset({429, 500, 502, 503, 504})
 
 
-def _request_json(label: str, url: str, *, timeout: int = 5, max_retries: int | None = None, allow_defer: bool = True):
+def _request_json(label: str, url: str, *, timeout: int = 5, max_retries: int | None = None, allow_defer: bool = True, defer_max_age: float | None = None):
     """GET ``url`` as JSON, retrying transient failures with backoff.
 
     Return contract unchanged from before this fix: ``None`` on any failure
@@ -1008,6 +1008,9 @@ def _request_json(label: str, url: str, *, timeout: int = 5, max_retries: int | 
     # spending budget; background work with nothing cached just skips.
     if allow_defer and sleeper_budget.should_defer():
         known = sleeper_budget.last_known(url)
+        if known is not None and defer_max_age is not None and time.time() - known[1] > defer_max_age:
+            # Too old to serve even under pressure: spend the call.
+            return _request_json(label, url, timeout=timeout, max_retries=max_retries, allow_defer=False)
         sleeper_budget.note_deferred()
         if known is not None:
             sleeper_budget.note_stale_served(url, known[1])
@@ -1773,12 +1776,14 @@ def get_matchups(league_id: str, round_num: int) -> List[Dict[str, Any]]:
     url = _matchups_url(league_id, round_num)
     if url is None:
         return []
-    ttl = live_policy.matchups_ttl(int(round_num))
+    ttl = live_policy.matchups_ttl(int(round_num), league_id=league_id)
+    live = live_policy.live_nfl_week() == int(round_num)
     try:
         matchups = sleeper_cache.shared_json(
             url,
             ttl=ttl,
-            fetch=lambda: _request_json("sleeper_matchups", url, timeout=5, allow_defer=ttl != live_policy.LIVE_TTL_SECONDS),
+            fetch=lambda: _request_json("sleeper_matchups", url, timeout=5, allow_defer=(not live) or live_policy.is_severe_pressure(),
+                defer_max_age=live_policy.SEVERE_DEFER_MAX_AGE_SECONDS if live else None),
         )
         return matchups if isinstance(matchups, list) else []
     except Exception:

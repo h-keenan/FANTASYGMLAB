@@ -10,10 +10,11 @@ describe("liveScores", () => {
     expect(shouldPoll({ live: true, visible: false, online: true })).toBe(false);
     expect(shouldPoll({ live: true, visible: true, online: false })).toBe(false);
   });
-  it("clamps the server interval to 30-60s", () => {
+  it("clamps the server interval to 30-120s", () => {
     expect(nextPollDelayMs(10, 0, undefined, noJitter)).toBe(30_000);
     expect(nextPollDelayMs(30, 0, undefined, noJitter)).toBe(30_000);
-    expect(nextPollDelayMs(500, 0, undefined, noJitter)).toBe(60_000);
+    expect(nextPollDelayMs(75, 0, undefined, noJitter)).toBe(75_000);
+    expect(nextPollDelayMs(500, 0, undefined, noJitter)).toBe(120_000);
     expect(nextPollDelayMs(null, 0, undefined, noJitter)).toBe(30_000);
   });
   it("backs off exponentially on errors, capped, honoring Retry-After", () => {

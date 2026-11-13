@@ -36,13 +36,14 @@ scoring pipeline, which updates its own app from the same source).
 
 - Live window = any regular-season kickoff of the current NFL week from 20 min
   before kickoff until `GAME_IN_PROGRESS_WINDOW` (4.5 h) after.
-- Matchups TTL: `LIVE_TTL_SECONDS = 20` for the live week during the window,
+- Matchups TTL: adaptive (table below) for the live week during the window,
   `IDLE_TTL_SECONDS = 60` otherwise (and always for other weeks, so season scans
   stay cheap). One cache layer only (the per-process lru was removed): one
   upstream fetch per league per 20 s cluster-wide (Redis `SET NX` lock plus a
   per-process lock), regardless of users or workers.
-- Live reads are exempt from free-tier budget deferral (one fetch per league per
-  20 s is small); other Sleeper reads keep deferral.
+- Live reads are exempt from free-tier budget deferral below 90% pressure; at or
+  above it they defer to last-known data no older than 3 min (older: fetch
+  anyway). Other Sleeper reads keep unbounded deferral.
 - Derived values (win probability, projected finals, per-position edges) are pure
   arithmetic on the fetched points plus the already-cached valued frame and
   projections, recomputed each request. No stats fetch sits on the score path, so
@@ -84,3 +85,39 @@ rides on the 5-minute players cache, so an exit shows up with that lag; it is th
 one input not refreshed on the 20 s path. `modules/matchup_win_probability.py`
 uses the same figure for each starter's mean, so the win chance and the per
 starter number can never disagree.
+
+## Adaptive TTL and the budget ceiling
+
+At a fixed 20 s TTL each live league costs 3 Sleeper calls/min, so the ~1000/min
+budget saturates at ~333 concurrently watched leagues. The live TTL therefore
+scales with pressure (`sleeper_budget.calls_in_last_minute() / BUDGET_PER_MINUTE`,
+cluster-wide via Redis):
+
+| Pressure | Live TTL | Calls/min per league | Leagues that fit in 1000/min |
+|---|---|---|---|
+| < 40% | 20 s | 3.0 | ~330 |
+| 40-60% | 30 s | 2.0 | ~500 |
+| 60-80% | 45 s | 1.33 | ~750 |
+| 80-90% | 75 s | 0.8 | ~1250 |
+| >= 90% (severe) | 90 s, plus age-bounded (3 min) deferral for free tier | 0.67 | ~1500 |
+
+- Hysteresis: a tier is entered at its threshold and left only 5 points below it.
+- Each league's TTL has a deterministic +-15% jitter so leagues loaded together
+  do not expire together.
+- Only watched leagues get a live TTL: a league needs a request within the last
+  120 s, otherwise it gets the 60 s idle TTL. Nothing is ever refreshed in the
+  background; a fetch happens only because a request found the cache expired.
+- `poll_after_seconds` = max(30, current TTL), so clients never poll faster than
+  the server refreshes (client poll clamp is 30-120 s); `as_of` is the real fetch
+  time, so the "Updated Ns ago" label stays honest at any tier.
+- Beyond ~1500 simultaneously watched leagues the ceiling is real: TTL tops out at
+  90 s and the severe-pressure deferral keeps other reads alive, but calls would
+  exceed budget. That needs a second egress IP or a Sleeper allowance, not more
+  caching.
+
+Simulation (`tests/test_live_scores_adaptive.py`, 1000 live leagues x 4 users,
+5 minutes, 150 calls/min of unrelated Sleeper traffic): upstream calls per minute
+942 (cold start, users arriving), then 745, 620, 660, 743, each within budget with
+the baseline after the first minute; worst staleness 101 s (the 90 s tier with
+jitter), i.e. under heavy load the live screen degrades gracefully to about 100 s
+of server age plus the poll, instead of blowing the budget.

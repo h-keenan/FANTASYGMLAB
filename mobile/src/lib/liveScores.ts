@@ -8,7 +8,7 @@
  */
 
 export const MIN_POLL_SECONDS = 30;
-export const MAX_POLL_SECONDS = 60;
+export const MAX_POLL_SECONDS = 120;
 export const MAX_BACKOFF_SECONDS = 300;
 
 export interface PollPlan {
@@ -27,7 +27,7 @@ export function shouldPoll(plan: PollPlan): boolean {
 }
 
 /**
- * Delay before the next refresh: the server's interval clamped to 30-60 s;
+ * Delay before the next refresh: the server's interval clamped to 30-120 s (never faster than the server's adaptive TTL, which it reports);
  * after `failures` consecutive errors it doubles each time (capped at 5 min),
  * and never undercuts a server `Retry-After` (busyRetry.ts).
  */

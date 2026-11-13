@@ -85,7 +85,7 @@ def test_live_matchups_single_flight_one_upstream_call_per_interval():
 
 def test_live_refetches_after_ttl_and_exposes_fetched_at():
     lid = _id("L")
-    with patch.object(live_policy, "LIVE_TTL_SECONDS", 0.05), patch.object(live_policy, "live_nfl_week", return_value=3), patch(
+    with patch.object(live_policy, "current_live_ttl", return_value=0.05), patch.object(live_policy, "live_nfl_week", return_value=3), patch(
         "requests.get", side_effect=[_resp(10.0), _resp(22.0)]
     ) as get:
         assert sleeper.get_matchups(lid, 3)[0]["points"] == 10.0
@@ -98,7 +98,7 @@ def test_live_refetches_after_ttl_and_exposes_fetched_at():
 
 def test_idle_week_keeps_long_ttl():
     lid = _id("L")
-    with patch.object(live_policy, "LIVE_TTL_SECONDS", 0.05), patch.object(live_policy, "live_nfl_week", return_value=None), patch(
+    with patch.object(live_policy, "current_live_ttl", return_value=0.05), patch.object(live_policy, "live_nfl_week", return_value=None), patch(
         "requests.get", return_value=_resp(1.0)
     ) as get:
         sleeper.get_matchups(lid, 3)

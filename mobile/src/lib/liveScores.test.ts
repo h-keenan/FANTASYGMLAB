@@ -13,9 +13,10 @@ test('polls only when live, visible and online', () => {
   assert.equal(shouldPoll({ live: true, visible: true, online: false }), false);
 });
 
-test('clamps the server interval to 30-60s', () => {
+test('clamps the server interval to 30-120s', () => {
   assert.equal(nextPollDelayMs(10, 0, undefined, noJitter), 30_000);
-  assert.equal(nextPollDelayMs(500, 0, undefined, noJitter), 60_000);
+  assert.equal(nextPollDelayMs(75, 0, undefined, noJitter), 75_000);
+  assert.equal(nextPollDelayMs(500, 0, undefined, noJitter), 120_000);
   assert.equal(nextPollDelayMs(null, 0, undefined, noJitter), 30_000);
 });
 
