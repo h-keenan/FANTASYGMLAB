@@ -24,6 +24,7 @@ import { explorerStatKey } from "@/lib/percentileExplorer";
 import { CHART_HEIGHT } from "@/components/weeklyPointsChartHeight";
 import { useSheetDragDismiss } from "@/lib/useSheetDragDismiss";
 import { AvailabilityBlock, LatestNewsSection } from "@/components/PlayerQuickViewNews";
+import { pqvBioForContext, pqvRealWorld } from "@/lib/pqvContext";
 import { cleanInjuryLabel, playerProfileNewsHref } from "@/lib/playerAvailabilityPresentation";
 import { waiverInjuryDisplay } from "@/lib/waiversPresentation";
 import {
@@ -94,6 +95,11 @@ export function PlayerQuickView({
   /** false for a synthetic sim player with no real data behind the id: same layout, no remote fetches. */
   remote?: boolean;
 }) {
+  // Fantasy Sim (coridian_, 2026-11-13: "inside of Fantasy Sim there should not be real news in there whatsoever"): the sim
+  // overlay marks this as the game's own world. Real news, real injury / availability notes, the real depth-chart note and
+  // the real bye never show here; the sim's own status, news and outlook (simOverlay) are the only source.
+  const isSim = simOverlay != null;
+  const realWorld = pqvRealWorld(isSim);
   const pathname = usePathname();
   const dialogRef = useRef<HTMLDivElement | null>(null);
   const closeButtonRef = useRef<HTMLButtonElement | null>(null);
@@ -103,7 +109,7 @@ export function PlayerQuickView({
   // News loads lazily and independently: it never gates the sheet. null =
   // not loaded (or failed -> section renders nothing).
   const [news, setNews] = useState<PlayerNewsResponse | null>(null);
-  const [newsLoading, setNewsLoading] = useState(remote);
+  const [newsLoading, setNewsLoading] = useState(remote && realWorld.fetchNews);
 
   // Swipe-down-to-dismiss on touch devices: the shared sheet gesture (see
   // lib/useSheetDragDismiss.ts). Only closes when the body is scrolled to
@@ -147,7 +153,7 @@ export function PlayerQuickView({
   }, [identity.player_id, remote]);
 
   useEffect(() => {
-    if (!remote) return;
+    if (!remote || !realWorld.fetchNews) return;
     let cancelled = false;
     api
       .getPlayerNews(identity.player_id, 3, { groupDuplicates: true })
@@ -161,7 +167,7 @@ export function PlayerQuickView({
     return () => {
       cancelled = true;
     };
-  }, [identity.player_id, remote]);
+  }, [identity.player_id, remote, realWorld.fetchNews]);
 
   // Focus the close button on open, restore body scroll on close — the
   // minimal accessible-modal contract (focus moves into the dialog, page
@@ -205,7 +211,7 @@ export function PlayerQuickView({
   const resolved = detail?.identity ?? null;
   // The server's availability block (directory status) wins; the row's raw
   // status only drives the chip until it arrives, with a clean label.
-  const availability = resolved?.availability ?? null;
+  const availability = realWorld.showAvailability ? (resolved?.availability ?? null) : null;
   const injuryLabel = cleanInjuryLabel(identity.injury_status);
   const injury = {
     label: availability ? null : injuryLabel,
@@ -266,8 +272,8 @@ export function PlayerQuickView({
           valueLabel={identity.value_label ?? null}
           avatarId={remote ? identity.player_id : null}
           loadingIdentity={loading}
-          byeWeek={resolved?.bye_week ?? null}
-          onByeThisWeek={resolved?.on_bye_this_week ?? false}
+          byeWeek={realWorld.showBye ? (resolved?.bye_week ?? null) : null}
+          onByeThisWeek={realWorld.showBye ? (resolved?.on_bye_this_week ?? false) : false}
           unavailable={availability?.unavailable ?? false}
           overallRating={overallRating}
           overallRank={identity.overall_rank}
@@ -276,7 +282,7 @@ export function PlayerQuickView({
           usageLoading={loading}
           valueChart={<PlayerValueHistory playerId={identity.player_id} bare />}
           ovrChart={model ? <SubRatingRow model={model} bare /> : null}
-          depthChartNote={model?.depth_chart_note}
+          depthChartNote={realWorld.showDepthChartNote ? model?.depth_chart_note : null}
           rookie={rookieBadge(bio)}
         />
 
@@ -321,7 +327,7 @@ export function PlayerQuickView({
             newsLoading={newsLoading}
           />
         ) : null}
-        {!loadError && remote ? (
+        {!loadError && remote && realWorld.showNews ? (
           <LatestNewsSection
             items={news ? news.items : null}
             hideItem={availability ? news?.injury_item ?? null : null}
@@ -366,7 +372,7 @@ export function PlayerQuickView({
 
               {awards.length > 0 ? <AwardsStrip awards={awards} /> : null}
 
-              {bio ? <BioGrid bio={bio} /> : null}
+              {bio ? <BioGrid bio={pqvBioForContext(bio, isSim)} /> : null}
 
               {/* Value history and the Model radar used to be standalone sections
                   here (owner, 2026-10-18: Model at the bottom with the

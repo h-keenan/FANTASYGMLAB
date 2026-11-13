@@ -51,6 +51,7 @@ export const IDENTICAL = [
   "playerCard.ts",
   "playerListRow.ts",
   "playerNameDisplay.ts",
+  "pqvContext.ts",
   "sampleLeague.ts",
   "sessionTab.ts",
   "simCrest.ts",

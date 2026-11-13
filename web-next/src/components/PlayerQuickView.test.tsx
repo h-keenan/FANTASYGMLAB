@@ -404,6 +404,62 @@ describe("PlayerQuickView", () => {
     expect(link.closest("a")).toHaveAttribute("href", "/players/league-1/p1?name=My%20League");
   });
 
+  // coridian_, 2026-11-13: "inside of Fantasy Sim there should not be real news in there whatsoever."
+  describe("inside Fantasy Sim (simOverlay): no real-world news, injury notes, depth-chart note or bye", () => {
+    const realItem = {
+      title: "REAL HEADLINE Player One placed on injured reserve",
+      link: "https://example.com/ir",
+      source: "ESPN",
+      summary: "REAL SUMMARY out at least four games.",
+      published_ts: Date.now() / 1000 - 3 * 86400,
+      event_type: "injury/status",
+      speculative: false,
+    };
+    const realAvailability = {
+      status: "IR",
+      label: "Injured Reserve",
+      severity: "out" as const,
+      unavailable: true,
+      body_part: "Hamstring",
+      report: null,
+      return_note: "REAL return note",
+    };
+
+    it("never fetches or renders real news, availability, depth-chart note or real bye, but keeps the sim's own overlay", async () => {
+      vi.mocked(api.getPlayerQuickView).mockResolvedValue(
+        quickView({
+          identity: { player_id: "p1", name: "Player One", team: "HOU", position: "WR", age: 24, status: "Active", value_score: 1500, overall_rating: 72, value_note: "", bye_week: 8, on_bye_this_week: true, availability: realAvailability },
+          model: { ...quickView().model!, depth_chart_note: "REAL depth chart note: moved up 1 spot." },
+          bio: { ...quickView().bio!, bye_week: "Week 8 (real)", contract_status: "REAL contract through 2028" },
+        }),
+      );
+      vi.mocked(api.getPlayerAwards).mockResolvedValue(awardsResult());
+      vi.mocked(api.getPlayerNews).mockResolvedValue({ ok: true, items: [realItem], injury_item: realItem });
+
+      render(<PlayerQuickView identity={identity({ injury_status: "Out" })} onClose={vi.fn()} simOverlay={<p>Sim overlay: Out 2 weeks (sim world)</p>} />);
+
+      await waitFor(() => expect(screen.queryByText(/Loading player detail/)).not.toBeInTheDocument());
+      await screen.findByText("Sim overlay: Out 2 weeks (sim world)");
+      expect(api.getPlayerNews).not.toHaveBeenCalled();
+      for (const real of [/REAL HEADLINE/, /REAL SUMMARY/, /REAL depth chart/, /REAL return note/, /REAL contract/, /Week 8 \(real\)/, /Latest news/i, /No recent news/, /Latest injury report/, /Hamstring/, /Injured Reserve/]) {
+        expect(screen.queryByText(real)).not.toBeInTheDocument();
+      }
+      expect(screen.queryByTestId("pqv-news")).toBeNull();
+      expect(screen.queryByTestId("pqv-availability")).toBeNull();
+      expect(screen.queryByTestId("pqv-injury-news")).toBeNull();
+      expect(screen.queryByTestId("pqv-bye-pill")).toBeNull();
+      expect(screen.getByText("Health: Out")).toBeInTheDocument(); // the sim's own status still shows
+    });
+
+    it("the real Player Quick View (no overlay) is unchanged", async () => {
+      vi.mocked(api.getPlayerQuickView).mockResolvedValue(quickView());
+      vi.mocked(api.getPlayerAwards).mockResolvedValue(awardsResult());
+      vi.mocked(api.getPlayerNews).mockResolvedValue({ ok: true, items: [realItem], injury_item: null });
+      render(<PlayerQuickView identity={identity()} onClose={vi.fn()} />);
+      expect(await screen.findByTestId("pqv-news")).toHaveTextContent("REAL HEADLINE");
+    });
+  });
+
   describe("availability and latest news", () => {
     const irIdentity = {
       player_id: "p1",
