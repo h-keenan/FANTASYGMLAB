@@ -957,7 +957,8 @@ export function simIsTransientGate(gate: SimGameGate | null): boolean {
 }
 
 /** Inline copy for a failed action. The game stays on screen: only the initial load shows the full-page unavailable state. */
-export function simActionFailureMessage(body?: SimGameEnvelope | null): string {
+export function simActionFailureMessage(body?: SimGameEnvelope | null, gate?: SimGameGate | null): string {
+  if (gate && gate.kind === "unavailable" && gate.cause === "busy") return "The simulator is busy right now. Try again in a few seconds.";
   const code = body?.detail ? ` (${body.detail})` : "";
   return `Couldn't save that. Your game is safe. Try it again${code}.`;
 }

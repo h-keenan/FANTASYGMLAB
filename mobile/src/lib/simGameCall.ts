@@ -45,7 +45,7 @@ export async function runSimGameCall<T extends SimGameEnvelope>(fn: () => Promis
         await new Promise((resolve) => setTimeout(resolve, handlers.retryMs ?? SIM_CALL_RETRY_MS));
         continue;
       }
-      handlers.onError(simActionFailureMessage(body));
+      handlers.onError(simActionFailureMessage(body, gate));
       return null;
     }
     if (gate.kind === 'conflict') handlers.onConflict?.();

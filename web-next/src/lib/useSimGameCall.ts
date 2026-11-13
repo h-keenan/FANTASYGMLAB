@@ -44,7 +44,7 @@ export function useSimGameCall(onGate: (gate: SimGameGate) => void, onError: (me
           await new Promise((resolve) => setTimeout(resolve, SIM_CALL_RETRY_MS));
           continue;
         }
-        handlers.current.onError(simActionFailureMessage(body));
+        handlers.current.onError(simActionFailureMessage(body, gate));
         return null;
       }
       if (gate.kind === "conflict") handlers.current.onConflict?.();
