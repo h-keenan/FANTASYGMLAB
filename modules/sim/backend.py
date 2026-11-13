@@ -17,6 +17,18 @@ ALLOWED_TABLES = frozenset({
 })
 
 
+def _pg_detail(response: Any) -> str:
+    """`` pg=<SQLSTATE>: <message>`` from a PostgREST error body (no row data)."""
+
+    try:
+        body = response.json()
+        code = str(body.get("code") or "")
+        message = str(body.get("message") or "")[:200]
+    except Exception:  # noqa: BLE001
+        return ""
+    return f" pg={code}: {message}" if code or message else ""
+
+
 class SupabaseSimBackend:
     def __init__(self, config: dict, access_token: str) -> None:
         self.config = config
@@ -79,9 +91,9 @@ class SupabaseSimBackend:
                 timeout=15,
             )
         except Exception:
-            return False, "Could not reach Supabase table storage."
+            return False, "Could not reach Supabase table storage (timed out or network error)."
         if response.status_code >= 400:
-            return False, f"Supabase update failed ({response.status_code}). Is docs/supabase_sim.sql applied?"
+            return False, f"Supabase update failed ({response.status_code}).{_pg_detail(response)}"
         return True, ""
 
     def insert_many(self, table, rows):
@@ -100,12 +112,14 @@ class SupabaseSimBackend:
                 json=[dict(r) for r in rows],
                 timeout=20,
             )
+        except (ValueError, requests.exceptions.InvalidJSONError):
+            return False, "Supabase insert failed: payload is not valid JSON (NaN/inf or unserializable value)."
         except Exception:
-            return False, "Could not reach Supabase table storage."
+            return False, "Could not reach Supabase table storage (timed out or network error)."
         if response.status_code == 409:
             return False, CONFLICT
         if response.status_code >= 400:
-            return False, f"Supabase insert failed ({response.status_code}). Is docs/supabase_sim_game.sql applied?"
+            return False, f"Supabase insert failed ({response.status_code}).{_pg_detail(response)}"
         return True, ""
 
     def delete(self, table, *, user_id, filters):

@@ -232,8 +232,12 @@ def clear_pool_cache() -> None:
 def add_routes(router: APIRouter, ctx: GameApiCtx) -> None:
     require_user = ctx.require_user
 
-    def unavailable() -> dict[str, Any]:
-        return {"ok": True, "reason": "sim_storage_unavailable", "is_premium": True, "upsell": None, "preview": None}
+    def unavailable(exc: SimStoreError | None = None) -> dict[str, Any]:
+        out: dict[str, Any] = {"ok": True, "reason": "sim_storage_unavailable", "is_premium": True, "upsell": None, "preview": None}
+        if exc is not None:
+            out["detail"] = exc.code  # coarse code only; the full message is in the logs
+            _log.warning("sim storage unavailable (%s): %s", exc.code, exc)
+        return out
 
     def busy() -> JSONResponse:
         return JSONResponse(
@@ -250,8 +254,8 @@ def add_routes(router: APIRouter, ctx: GameApiCtx) -> None:
         def wrapper(*args: Any, **kwargs: Any) -> Any:
             try:
                 return fn(*args, **kwargs)
-            except SimStoreError:
-                return unavailable()
+            except SimStoreError as exc:
+                return unavailable(exc)
             except GameConflict:
                 return JSONResponse(status_code=409, content={
                     "ok": False, "reason": "conflict", "error": "The game changed in another request. Reload and retry."})
@@ -282,7 +286,12 @@ def add_routes(router: APIRouter, ctx: GameApiCtx) -> None:
     def commit(store: GameStore, uid: str, game_id: str, snap: GameSnapshot, state: GameState,
                em: Emitter, *, checkpoint: bool = False) -> None:
         store.append_events(uid, game_id, em.events)
-        store.touch(uid, game_id, status=state.status, week=state.week, event_count=state.seq)
+        try:
+            store.touch(uid, game_id, status=state.status, week=state.week, event_count=state.seq)
+        except SimStoreError:
+            # The events are the truth and are already saved: a stale list-view row must
+            # not fail the action (the client would think the pick was lost).
+            _log.warning("sim touch failed game=%s", game_id, exc_info=True)
         if checkpoint:
             try:
                 store.save_checkpoint(uid, game_id, state, (state.season_no - 1) * 100 + state.week)  # weeks restart each dynasty season
@@ -733,6 +742,8 @@ def add_routes(router: APIRouter, ctx: GameApiCtx) -> None:
             desk = TradeDesk(Evaluator(snap, state), seed)
             verdict, trade = act.send_trade(em, desk, body.partner, body.give, body.get)
             holder["verdict"], holder["trade"] = verdict, trade
+            if trade is not None:
+                _resume_rookie_draft(em, state, seed)
             return None
 
         def resp(snap, state):
@@ -746,6 +757,14 @@ def add_routes(router: APIRouter, ctx: GameApiCtx) -> None:
             }
 
         return _mutate(user, game_id, run, respond=resp)
+
+    def _resume_rookie_draft(em, state, seed) -> None:
+        """Picks change hands mid-draft: the order follows ownership, so if the pick on
+        the clock is now an AI team's, it (and any AI picks after it) resolve now."""
+
+        off = state.offseason
+        if state.status == "offseason" and off and off.get("stage") == "rookie_draft":
+            dyn.run_ai_rookie_picks(em, seed)
 
     # ----------------------------------------------------------------- inbox
 
@@ -763,6 +782,8 @@ def add_routes(router: APIRouter, ctx: GameApiCtx) -> None:
 
         def run(em, snap, state, row, seed):
             holder["trade"] = act.respond_offer(em, TradeDesk(Evaluator(snap, state), seed), item_id, body.action)
+            if holder["trade"] is not None:
+                _resume_rookie_draft(em, state, seed)
 
         def resp(snap, state):
             return {"executed": holder["trade"] is not None, "trade": holder["trade"],

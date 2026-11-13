@@ -11,6 +11,8 @@ injuries) and says which ones in ``reasons``; no single-rule shortcuts.
 
 from __future__ import annotations
 
+import logging
+
 import math
 from typing import Any, Mapping, Sequence
 
@@ -556,40 +558,62 @@ def _extras(snap: GameSnapshot, state: GameState, ev: Evaluator) -> dict[str, An
     return out
 
 
+_log = logging.getLogger(__name__)
+
+
 def home_view(snap: GameSnapshot, state: GameState, seed: int) -> dict[str, Any]:
+    """Every card is built on its own: one failing card is logged and marked in
+    ``errors`` (the client hides it) while the rest of the page still renders."""
+
+    errors: dict[str, str] = {}
+
+    def card(name: str, build: Any, fallback: Any) -> Any:
+        try:
+            return build()
+        except Exception as exc:  # noqa: BLE001 - isolate one card from the page
+            _log.exception("sim home card failed card=%s week=%s", name, state.week)
+            errors[name] = type(exc).__name__
+            return fallback
+
     ev = Evaluator(snap, state)
     user = snap.user_team.tid
     week = max(state.week, 1)
     rows = standing_rows(snap, state)
-    free = _free_agents(snap, state, ev, week)
-    warnings = lineup_warnings(ev, state.lineups[user], week)
-    suggestions = _waiver_suggestions(snap, state, ev, week, free)
-    alerts = bye_alerts(snap, state, ev, free)
+    free = card("free_agents", lambda: _free_agents(snap, state, ev, week), [])
+    warnings = card("lineup", lambda: lineup_warnings(ev, state.lineups[user], week), [])
+    suggestions = card("waiver_suggestions", lambda: _waiver_suggestions(snap, state, ev, week, free), [])
+    alerts = card("bye_alerts", lambda: bye_alerts(snap, state, ev, free), [])
     window = trade_window(snap, state)
     inbox = len(state.offers)
     cuts = max(0, len(state.rosters[user]) - snap.settings.roster_limit)
     owners = state.owner_map()
-    offers = []
-    for o in state.offers[:3]:
-        team = snap.team(o["team"])
-        offers.append({
-            "id": o["id"], "from": {"team_id": team.tid, "name": team.name, "persona_id": team.persona_id},
-            "you_give": [player_row(snap, state, ev, p, owners) for p in o["get"]],
-            "you_get": [player_row(snap, state, ev, p, owners) for p in o["give"]],
-            "expires_week": o["expires_week"],
-        })
+
+    def build_offers() -> list[dict[str, Any]]:
+        out = []
+        for o in state.offers[:3]:
+            team = snap.team(o["team"])
+            out.append({
+                "id": o["id"], "from": {"team_id": team.tid, "name": team.name, "persona_id": team.persona_id},
+                "you_give": [player_row(snap, state, ev, p, owners) for p in o["get"]],
+                "you_get": [player_row(snap, state, ev, p, owners) for p in o["give"]],
+                "expires_week": o["expires_week"],
+            })
+        return out
+
+    offers = card("inbox", build_offers, [])
     return {
         "week": state.week, "phase": "playoffs" if state.status == "playoffs" else "regular_season",
-        "matchup": _matchup(snap, state, ev, rows, seed),
-        "checklist": _checklist(snap, state, warnings, suggestions, alerts, inbox, cuts, window),
+        "matchup": card("matchup", lambda: _matchup(snap, state, ev, rows, seed), None),
+        "checklist": card("checklist", lambda: _checklist(snap, state, warnings, suggestions, alerts, inbox, cuts, window), []),
         "inbox": {"count": inbox, "open": window is None, "items": offers},
         "waiver_suggestions": suggestions,
         "bye_alerts": alerts,
-        "injuries": _injuries(snap, state, ev, week),
-        "hot_cold": _hot_cold(snap, state, ev, week, free),
-        "standings": _standings(snap, state, rows),
-        "league": _league_moves(snap, state),
-        **_extras(snap, state, ev),
+        "injuries": card("injuries", lambda: _injuries(snap, state, ev, week), []),
+        "hot_cold": card("hot_cold", lambda: _hot_cold(snap, state, ev, week, free), {}),
+        "standings": card("standings", lambda: _standings(snap, state, rows), None),
+        "league": card("league", lambda: _league_moves(snap, state), None),
+        **card("extras", lambda: _extras(snap, state, ev), {}),
+        "errors": errors,
     }
 
 

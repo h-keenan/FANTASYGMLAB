@@ -22,8 +22,50 @@ RESULTS = "sim_results"
 MAX_WORLDS_PER_USER = 10
 
 
+def classify_store_error(message: str) -> str:
+    """A short diagnostic code for a backend error string (no secrets, no row data).
+
+    Backends embed ``(<http status>)`` and ``pg=<SQLSTATE>`` in their messages."""
+
+    import re
+
+    text = str(message or "")
+    pg = re.search(r"pg=(\w+)", text)
+    status = re.search(r"\((\d{3})\)", text)
+    code = int(status.group(1)) if status else 0
+    if pg and pg.group(1) in ("23514", "22P02", "22003", "23502", "22P05"):
+        return "constraint"  # CHECK / type / NOT NULL rejection: our payload, not an outage
+    if code in (401, 403) or (pg and pg.group(1) == "42501"):
+        return "rls"
+    if code == 413:
+        return "payload_too_large"
+    if code in (408, 504) or (pg and pg.group(1) == "57014") or "timed out" in text.lower():
+        return "timeout"
+    if code >= 500:
+        return "http_5xx"
+    if "reach" in text.lower():
+        return "unreachable"
+    if "not valid json" in text.lower() or "serializ" in text.lower():
+        return "bad_payload"
+    if "gap" in text or "inconsistent" in text:
+        return "log_inconsistent"
+    if code >= 400:
+        return "http_4xx"
+    return "store_error"
+
+
+TRANSIENT_CODES = frozenset({"timeout", "http_5xx", "unreachable"})
+
+
 class SimStoreError(Exception):
-    """Storage is unreachable or the sim_* tables are not set up."""
+    """Storage is unreachable or the sim_* tables are not set up.
+
+    ``code`` is a coarse diagnostic (``classify_store_error``); ``str(exc)`` keeps
+    the backend message (SQLSTATE and HTTP status, never secrets)."""
+
+    def __init__(self, message: str = "", code: str | None = None) -> None:
+        super().__init__(message)
+        self.code = code or classify_store_error(message)
 
 
 class SimBackend(Protocol):
