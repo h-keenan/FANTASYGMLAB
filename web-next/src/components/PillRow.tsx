@@ -43,6 +43,7 @@ export function PillRow({
   sticky = false,
   slim = false,
   tabIdPrefix,
+  className: extraClass,
 }: {
   /** `icon` is an optional glyph slot rendered before the label (tab icons are added in this one place). */
   options: { label: string; value: string; href?: string; icon?: ReactNode; glyph?: TabIconName; count?: number }[];
@@ -60,6 +61,8 @@ export function PillRow({
   slim?: boolean;
   /** Gives every tab an id and aria-controls (`${prefix}-tab-${value}` / `${prefix}-panel-${value}`) so a tabpanel can point back. */
   tabIdPrefix?: string;
+  /** Extra classes on the root (e.g. `max-md:hidden` when a bottom bar replaces the strip on phones). */
+  className?: string;
 }) {
   const mode: PillRowVariant = variant ?? (fullWidth ? "fill" : "compact");
   const scrollerRef = useRef<HTMLDivElement>(null);
@@ -149,7 +152,7 @@ export function PillRow({
 
   return (
     <div
-      className={`${mode === "compact" ? "flex max-w-full self-start" : "flex w-full"}${sticky ? " sticky z-20" : ""}`}
+      className={`${mode === "compact" ? "flex max-w-full self-start" : "flex w-full"}${sticky ? " sticky z-20" : ""}${extraClass ? ` ${extraClass}` : ""}`}
       style={
         slim
           ? { borderBottom: "var(--border-width-default) solid var(--color-border)", background: "transparent", ...(sticky ? { top: 0 } : null) }

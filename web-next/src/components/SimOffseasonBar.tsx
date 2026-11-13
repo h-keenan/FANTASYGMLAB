@@ -12,8 +12,7 @@ import { simOffseasonCta, simOffseasonStageLabel, type SimOffseason, type SimOff
  * The one persistent primary action for every offseason tab (Offseason, Team,
  * Trades, League): Start rookie draft, Auto-draft the rest (asks first), then
  * "Finish cut-down" (disabled, with the reason) until the roster is legal and
- * Start season N. Fixed above the safe area on phones with a notch for the GM
- * orb, sticky on desktop, same frame as SimActionBar. It reads the offseason
+ * Start season N. A floating glass pill above the bottom tab bar on phones (no orb), sticky on desktop, same frame as SimActionBar. It reads the offseason
  * itself, so any tab can mount it. Mobile twin: mobile/src/components/SimOffseasonBar.tsx.
  */
 export function SimOffseasonBar({ ctx, onTab }: { ctx: SimCtx; onTab?: (tab: "home") => void }) {
@@ -69,13 +68,7 @@ export function SimOffseasonBar({ ctx, onTab }: { ctx: SimCtx; onTab?: (tab: "ho
 
   return (
     <div
-      className="sticky bottom-0 z-30 mt-auto -mx-4 -mb-[4.5rem] md:static md:mx-0 md:mb-0"
-      style={{
-        background: "color-mix(in srgb, var(--color-bg) 92%, transparent)",
-        backdropFilter: "blur(10px)",
-        borderTop: "var(--border-width-default) solid var(--color-border)",
-        paddingBottom: "env(safe-area-inset-bottom)",
-      }}
+      className="sim-action-bar action-pill md:sticky md:inset-x-auto md:bottom-4 md:mx-auto md:w-full"
       data-testid="sim-offseason-bar"
     >
       {off.stage === "rookie_draft" && confirmAuto ? (
@@ -92,11 +85,10 @@ export function SimOffseasonBar({ ctx, onTab }: { ctx: SimCtx; onTab?: (tab: "ho
       {cta.blocked ? (
         <p id={reasonId} className="px-4 pt-1.5 text-center text-xs font-bold" style={{ color: "var(--color-warning)" }} role="status">{cta.blocked}</p>
       ) : null}
-      <div className="mx-auto grid max-w-3xl grid-cols-[1fr_4.25rem_1.4fr] items-center gap-2 px-4 py-2 md:grid-cols-[1fr_auto]">
+      <div className="mx-auto grid max-w-3xl grid-cols-[1fr_1.4fr] items-center gap-2 p-1 md:grid-cols-[1fr_auto]">
         <span className="min-w-0 text-xs font-bold" style={{ color: "var(--color-text-muted)" }}>
           {simOffseasonStageLabel(off.stage)}
         </span>
-        <span aria-hidden="true" className="md:hidden" />
         <Button className={`whitespace-nowrap ${cta.blocked ? "ring-1 ring-[var(--color-border-strong)]" : ""}`} fullWidth loading={busy && !confirmAuto} disabled={Boolean(cta.blocked) || confirmAuto} onClick={press} aria-describedby={cta.blocked ? reasonId : undefined}>
           {cta.label}
         </Button>

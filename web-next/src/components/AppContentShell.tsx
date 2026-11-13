@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation";
 
 import { useAuth } from "@/context/AuthContext";
 import { EspnUnavailableState } from "@/components/EspnUnavailableState";
+import { pathOwnsPhoneChrome } from "@/lib/bottomNav";
 import { espnUnavailableLeagueId } from "@/lib/leaguePlatform";
 
 /**
@@ -30,7 +31,7 @@ export function AppContentShell({ children }: { children: ReactNode }) {
   const pathname = usePathname();
   const espnLeagueId = espnUnavailableLeagueId(pathname);
   return (
-    <div className={`flex flex-col flex-1 ${session ? "md:pl-60 pb-12 md:pb-0" : ""}`}>
+    <div className={`flex flex-col flex-1 ${session ? `md:pl-60 md:pb-0 ${pathOwnsPhoneChrome(pathname) ? "" : "pb-12"}` : ""}`}>
       {espnLeagueId ? (
         // EspnUnavailableState reads ?name= (useSearchParams), which Next
         // requires to sit under a Suspense boundary.
