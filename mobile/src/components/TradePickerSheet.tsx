@@ -24,6 +24,7 @@ import {
   selectedItems,
   sheetReducer,
   summarizeItems,
+  type SheetFilters,
   type SheetItem,
 } from '../lib/tradeSheetPicker';
 import { radii, scrim, spacing, type ThemeColors } from '../theme';
@@ -58,6 +59,8 @@ export default function TradePickerSheet<T = unknown>({
   onSearch,
   playersOnly = false,
   hideOnInfo = false,
+  mode = 'multi',
+  initialFilters,
 }: {
   title: string;
   subtitle?: string;
@@ -73,16 +76,21 @@ export default function TradePickerSheet<T = unknown>({
   playersOnly?: boolean;
   /** Hide this sheet while the info target presents (needed when it opens a sibling native modal). */
   hideOnInfo?: boolean;
+  /** 'single' is a pick-one flow (Player Compare): tapping a row chooses it and closes, no chips or footer. */
+  mode?: 'multi' | 'single';
+  /** Filters already in effect when the sheet opens (e.g. the same position as the player being compared). */
+  initialFilters?: SheetFilters;
 }) {
   const { colors } = useThemeMode();
   const styles = useMemo(() => createStyles(colors), [colors]);
   const reduceMotion = useReducedMotion();
   const [state, dispatch] = useReducer(sheetReducer, undefined, () => {
     const kinds = initialSelected.map((key) => items.find((i) => i.key === key)?.kind);
-    return initialSheetState(initialSelected, kinds.length > 0 && kinds.every((k) => k === 'pick') ? 'picks' : 'players');
+    return initialSheetState(initialSelected, kinds.length > 0 && kinds.every((k) => k === 'pick') ? 'picks' : 'players', initialFilters);
   });
   const [hidden, setHidden] = useState(false);
   const filtersOpen = state.draft !== null;
+  const single = mode === 'single';
 
   const visibleItems = useMemo(() => (playersOnly ? items.filter((i) => i.kind === 'player') : items), [items, playersOnly]);
   const hasPicks = !playersOnly && visibleItems.some((i) => i.kind === 'pick');
@@ -135,7 +143,7 @@ export default function TradePickerSheet<T = unknown>({
             </Pressable>
           </View>
 
-          {chosen.length > 0 ? (
+          {!single && chosen.length > 0 ? (
             <View style={styles.chips} accessibilityLabel="Selected">
               {chosen.map((item) => (
                 <Pressable key={item.key} style={styles.chip} onPress={() => dispatch({ type: 'remove', key: item.key })} accessibilityRole="button" accessibilityLabel={`Remove ${item.label}`}>
@@ -249,10 +257,10 @@ export default function TradePickerSheet<T = unknown>({
                       <Pressable
                         style={[styles.rowMain, blocked && { opacity: 0.45 }]}
                         disabled={blocked}
-                        onPress={() => dispatch({ type: 'toggle', key: item.key, max })}
+                        onPress={() => (single ? onApply([item.key]) : dispatch({ type: 'toggle', key: item.key, max }))}
                         accessibilityRole="button"
                         accessibilityState={{ selected: on, disabled: blocked }}
-                        accessibilityLabel={`${on ? 'Remove' : 'Add'} ${item.label}`}
+                        accessibilityLabel={single ? `Choose ${item.label}` : `${on ? 'Remove' : 'Add'} ${item.label}`}
                       >
                         <View style={styles.rowIdentity}>
                           {item.kind === 'player' ? (
@@ -269,7 +277,9 @@ export default function TradePickerSheet<T = unknown>({
                             <DraftPickAssetRow pickId={item.id} round={item.round} label={item.label} projectedRange={item.detail} trailingValue={value} showDivider={false} />
                           )}
                         </View>
-                        <View style={[styles.check, on && { backgroundColor: colors.accent, borderColor: colors.accent }]}>{on ? <Ionicons name="checkmark" size={14} color={colors.onAccent} /> : null}</View>
+                        {single ? null : (
+                          <View style={[styles.check, on && { backgroundColor: colors.accent, borderColor: colors.accent }]}>{on ? <Ionicons name="checkmark" size={14} color={colors.onAccent} /> : null}</View>
+                        )}
                       </Pressable>
                       {onInfo && item.kind === 'player' ? (
                         <Pressable
@@ -288,6 +298,7 @@ export default function TradePickerSheet<T = unknown>({
                   );
                 }}
               />
+              {single ? null : (
               <View style={styles.footer}>
                 <AppText style={styles.footerCount}>
                   {summary.count} selected
@@ -296,6 +307,7 @@ export default function TradePickerSheet<T = unknown>({
                 </AppText>
                 <Button label={applyLabel(state.selected, initialSelected)} onPress={() => onApply(state.selected)} style={styles.footerButton} />
               </View>
+              )}
             </>
           )}
         </SwipeDismissCard>

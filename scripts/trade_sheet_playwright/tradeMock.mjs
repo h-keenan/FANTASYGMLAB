@@ -45,6 +45,10 @@ export function createTradeMock() {
     if (path.endsWith("/team-profiles")) return ok({ ok: true, profiles });
     if (path.endsWith("/idp/values")) return ok({ ok: true, idp: false, players: [] });
     if (path.endsWith("/trade-analyzer") && method === "POST") return ok({ ok: true, verdict, reason: "" });
+    const pid = (path.match(/\/players\/([^/]+)\/(quick-view|weekly-stats|schedule)$/) || [])[1];
+    if (pid && path.endsWith("/quick-view")) { const n = Number(pid) % 17; return ok({ ok: true, stats: null, bio: null, reason: "", model: { market_score: 60 + n, opportunity_score: 50 + n * 2, scarcity_score: 55, role_score: 70 - n, age_score: 65, age_score_label: "Age Score", opportunity_confidence: 80, workload_trend: n % 2 ? "Rising" : "Steady", usage_trend: { arrow: n % 2 ? "▲" : "▶", trend_pct: n % 2 ? 8 : 0, confidence_label: "med" }, depth_chart_note: null, decision_fit_narrative: n % 3 ? "A steady starter with a safe floor for contenders." : null } }); }
+    if (pid && path.endsWith("/weekly-stats")) { const n = Number(pid) % 11; return ok({ ok: true, season: 2026, weeks: Array.from({ length: 9 }, (_, i) => ({ week: i + 1, fantasy_points_ppr: 8 + ((i * 7 + n * 3) % 17), snap_share: 0.7 })) }); }
+    if (pid && path.endsWith("/schedule")) { const n = Number(pid) % 5; const tiers = ["weak", "average", "tough", "weak", "average"]; return ok({ ok: true, team: "KC", season: 2026, weeks: Array.from({ length: 8 }, (_, i) => ({ week: 10 + i, opponent: "DAL", is_home: i % 2 === 0, spread_line: null, total_line: null, played: false, team_score: null, opponent_score: null, bye: false, opponent_defense_tier: tiers[(i + n) % 5], projection: { status: "ok", point_estimate: 11 + n + (i === 0 ? 1.5 : 0), low: 5, high: 20, confidence: "medium", opponent: "DAL" } })) }); }
     if (path.endsWith("/players/search")) return ok({ ok: true, players: players.filter((p) => !query.q || p.name.toLowerCase().includes(String(query.q).toLowerCase())).slice(0, 25) });
     return null;
   };

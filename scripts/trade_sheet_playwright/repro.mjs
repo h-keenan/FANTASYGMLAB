@@ -12,7 +12,7 @@ const browser = await chromium.launch({ executablePath: exe });
 const session = { access_token: "a.b.c", refresh_token: "r", token_type: "bearer", expires_in: 99999, expires_at: Math.floor(Date.now() / 1000) + 99999, user: { id: "u1", aud: "authenticated", role: "authenticated", email: "t@example.com", app_metadata: {}, user_metadata: {}, created_at: "2026-01-01T00:00:00Z" } };
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
-export async function openPage(w, h, { touch = true, theme = "dark", url } = {}) {
+export async function openPage(w, h, { touch = true, theme = "dark", url, ready = "text=You send" } = {}) {
   const mock = createTradeMock();
   const ctx = await browser.newContext({ viewport: { width: w, height: h }, hasTouch: touch, isMobile: touch && w < 600, deviceScaleFactor: 2 });
   await ctx.addInitScript(([t, s]) => { try { localStorage.setItem("fgl:theme-mode", t); localStorage.setItem("sb-dummy-auth-token", JSON.stringify(s)); localStorage.setItem("fgl:onboarding-complete", "1"); } catch (e) {} }, [theme, session]);
@@ -32,9 +32,9 @@ export async function openPage(w, h, { touch = true, theme = "dark", url } = {})
   page.errors = [];
   page.__touch = touch;
   page.on("pageerror", (e) => page.errors.push(e.message));
-  await page.goto(url ?? `http://localhost:3187/trade-analyzer/${LEAGUE}?name=Mock%20League`, { waitUntil: "domcontentloaded" });
+  await page.goto(url ?? `http://localhost:${process.env.PORT || 3187}/trade-analyzer/${LEAGUE}?name=Mock%20League`, { waitUntil: "domcontentloaded" });
   await page.addStyleTag({ content: "nextjs-portal,[data-nextjs-toast]{display:none!important}" }).catch(() => {});
-  await page.waitForSelector("text=You send", { timeout: 60000 });
+  await page.waitForSelector(ready, { timeout: 60000 });
   await sleep(1200);
   return { page, ctx, mock };
 }

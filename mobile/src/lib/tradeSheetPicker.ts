@@ -147,8 +147,8 @@ export type SheetAction =
   | { type: "remove"; key: string }
   | { type: "clearSelection" };
 
-export function initialSheetState(selected: string[] = [], tab: SheetTab = "players"): SheetState {
-  return { tab, query: "", filters: EMPTY_FILTERS, draft: null, selected: [...selected] };
+export function initialSheetState(selected: string[] = [], tab: SheetTab = "players", filters: SheetFilters = EMPTY_FILTERS): SheetState {
+  return { tab, query: "", filters: { positions: [...filters.positions], conditions: [...filters.conditions] }, draft: null, selected: [...selected] };
 }
 
 export function sheetReducer(state: SheetState, action: SheetAction): SheetState {

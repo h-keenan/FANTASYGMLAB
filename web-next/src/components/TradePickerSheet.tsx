@@ -23,6 +23,7 @@ import {
   selectedItems,
   sheetReducer,
   summarizeItems,
+  type SheetFilters,
   type SheetItem,
 } from "@/lib/tradeSheetPicker";
 
@@ -50,6 +51,8 @@ export function TradePickerSheet<T = unknown>({
   onClose,
   onInfo,
   onSearch,
+  mode = "multi",
+  initialFilters,
 }: {
   title: string;
   subtitle?: string;
@@ -63,14 +66,19 @@ export function TradePickerSheet<T = unknown>({
   onInfo?: (item: SheetItem<T>) => void;
   /** Called as the search text changes, so a caller can fetch matches outside its loaded window. */
   onSearch?: (query: string) => void;
+  /** "single" is a pick-one flow (Player Compare): tapping a row chooses it and closes, no chips or footer. */
+  mode?: "multi" | "single";
+  /** Filters already in effect when the sheet opens (e.g. the same position as the player being compared). */
+  initialFilters?: SheetFilters;
 }) {
-  const [state, dispatch] = useReducer(sheetReducer, undefined, () => initialSheetState(initialSelected, firstTab(items, initialSelected)));
+  const [state, dispatch] = useReducer(sheetReducer, undefined, () => initialSheetState(initialSelected, firstTab(items, initialSelected), initialFilters));
   const titleId = useId();
   const filterPanelId = useId();
   const filterButtonRef = useRef<HTMLButtonElement>(null);
   const panelRef = useRef<HTMLDivElement>(null);
   const { sheetRef, sheetStyle } = useSheetDragDismiss<HTMLDivElement>({ onDismiss: onClose });
   const filtersOpen = state.draft !== null;
+  const single = mode === "single";
 
   const hasPicks = useMemo(() => items.some((i) => i.kind === "pick"), [items]);
   const positions = useMemo(() => positionsFor(items), [items]);
@@ -167,7 +175,7 @@ export function TradePickerSheet<T = unknown>({
           </button>
         </header>
 
-        {chosen.length > 0 ? (
+        {!single && chosen.length > 0 ? (
           <ul className="tps-chips" aria-label="Selected">
             {chosen.map((item) => (
               <li key={item.key} className="tps-chip">
@@ -227,7 +235,8 @@ export function TradePickerSheet<T = unknown>({
               <button
                 type="button"
                 className="tap-link shrink-0 font-bold"
-                style={{ color: "var(--color-accent)" }}
+                style={{ color: "var(--color-accent)", minHeight: "var(--touch-target-min)" }}
+                aria-label="Clear filters"
                 onClick={() => {
                   dispatch({ type: "openFilters" });
                   dispatch({ type: "clearDraft" });
@@ -265,13 +274,15 @@ export function TradePickerSheet<T = unknown>({
                             className="tps-row-main"
                             aria-pressed={on}
                             disabled={blocked}
-                            aria-label={`${on ? "Remove" : "Add"} ${item.label}`}
-                            onClick={() => dispatch({ type: "toggle", key: item.key, max })}
+                            aria-label={single ? `Choose ${item.label}` : `${on ? "Remove" : "Add"} ${item.label}`}
+                            onClick={() => (single ? onApply([item.key]) : dispatch({ type: "toggle", key: item.key, max }))}
                           >
                             <SheetItemIdentity item={item} />
-                            <span className="tps-check" aria-hidden="true" data-on={on ? "true" : "false"}>
-                              {on ? "✓" : ""}
-                            </span>
+                            {single ? null : (
+                              <span className="tps-check" aria-hidden="true" data-on={on ? "true" : "false"}>
+                                {on ? "✓" : ""}
+                              </span>
+                            )}
                           </button>
                           {onInfo && item.kind === "player" ? (
                             <button type="button" className="tps-info" aria-label={`${item.label} player card`} onClick={() => onInfo(item)}>
@@ -316,7 +327,7 @@ export function TradePickerSheet<T = unknown>({
           ) : null}
         </div>
 
-        {!filtersOpen ? (
+        {!filtersOpen && !single ? (
           <footer className="tps-footer">
             <p className="text-xs tabular-nums shrink-0" style={{ color: "var(--color-text-secondary)" }} aria-live="polite">
               {summary.count} selected

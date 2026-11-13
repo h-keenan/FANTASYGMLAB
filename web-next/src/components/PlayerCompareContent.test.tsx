@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { PlayerCompareContent } from "./PlayerCompareContent";
@@ -13,6 +13,7 @@ vi.mock("@/lib/api", async () => {
       ...actual.api,
       getPlayerQuickView: vi.fn(),
       getPlayerWeeklyStats: vi.fn(),
+      getPlayerSchedule: vi.fn(),
       searchLeaguePlayers: vi.fn(),
     },
   };
@@ -74,36 +75,67 @@ describe("PlayerCompareContent", () => {
     // those tests see the same empty-weeks behavior they always have,
     // without each needing its own getPlayerWeeklyStats mock.
     vi.mocked(api.getPlayerWeeklyStats).mockResolvedValue(weeklyStatsResult([]));
+    vi.mocked(api.getPlayerSchedule).mockResolvedValue({ ok: true, team: "SF", weeks: [] });
+    window.localStorage.clear();
   });
 
-  it("shows the base player and an opponent picker when no second player is chosen yet", () => {
+  it("shows two big slots with Player A filled and a Choose a player slot, plus one-tap suggestions", () => {
     render(<PlayerCompareContent leagueId="L1" leagueName="Dynasty Overlords" playerA={PLAYER_A} initialPlayerB={null} pool={POOL} />);
 
-    expect(screen.getByText("Player One")).toBeInTheDocument();
-    expect(screen.getByText("Choose an opponent below.")).toBeInTheDocument();
-    expect(screen.getByPlaceholderText("Search for a player to compare...")).toBeInTheDocument();
-    expect(screen.getByText("Player Two")).toBeInTheDocument();
+    expect(within(screen.getByTestId("compare-slot-a")).getByText("Player One")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Player B: choose a player" })).toBeInTheDocument();
+    // Same-position, nearest-value suggestions as chips (never the base player).
+    const suggested = screen.getByRole("region", { name: "Suggested" });
+    expect(within(suggested).getByRole("button", { name: "Compare with Player Two" })).toBeInTheDocument();
+    expect(within(suggested).queryByText("Player One")).not.toBeInTheDocument();
+  });
+
+  it("a suggestion chip compares in one tap and is remembered as a recent opponent", async () => {
+    vi.mocked(api.getPlayerQuickView).mockResolvedValue(quickViewResult(model({})));
+    render(<PlayerCompareContent leagueId="L1" leagueName="Dynasty Overlords" playerA={PLAYER_A} initialPlayerB={null} pool={POOL} />);
+
+    fireEvent.click(screen.getByRole("button", { name: "Compare with Player Two" }));
+
+    expect(await screen.findByTestId("compare-grid")).toBeInTheDocument();
+    await waitFor(() => expect(api.getPlayerQuickView).toHaveBeenCalledWith("p2"));
+    expect(JSON.parse(window.localStorage.getItem("fgl:compare-recent:L1") ?? "[]")).toEqual(["p2"]);
+  });
+
+  it("opens the shared picker pre-filtered to the same position and chooses with one tap", async () => {
+    vi.mocked(api.getPlayerQuickView).mockResolvedValue(quickViewResult(model({})));
+    const qb = player({ player_id: "p9", name: "Qb Nine", position: "QB", score: 900 });
+    render(<PlayerCompareContent leagueId="L1" leagueName="Dynasty Overlords" playerA={PLAYER_A} initialPlayerB={null} pool={[...POOL, qb]} />);
+
+    fireEvent.click(screen.getByRole("button", { name: "Player B: choose a player" }));
+    const dialog = screen.getByRole("dialog");
+    expect(within(dialog).getByRole("button", { name: "Filters (1)" })).toBeInTheDocument();
+    // WR is pre-selected, so the QB is hidden until the filter is cleared.
+    expect(within(dialog).queryByRole("button", { name: "Choose Qb Nine" })).not.toBeInTheDocument();
+    fireEvent.click(within(dialog).getByRole("button", { name: "Clear filters" }));
+    expect(within(dialog).getByRole("button", { name: "Choose Qb Nine" })).toBeInTheDocument();
+    fireEvent.click(within(dialog).getByRole("button", { name: "Choose Qb Nine" }));
+
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    expect(await screen.findByTestId("compare-grid")).toBeInTheDocument();
+    expect(within(screen.getByTestId("compare-slot-b")).getByText("Qb Nine")).toBeInTheDocument();
   });
 
   it("finds a player outside the loaded pool through the server search", async () => {
-    const deep = player({ player_id: "p650", name: "Carson Beck", position: "QB", team: "ARI" });
-    vi.mocked(api.searchLeaguePlayers).mockResolvedValue({ ok: true, players: [PLAYER_A, deep] } as never);
+    const deep = player({ player_id: "p650", name: "Carson Beck", position: "WR", team: "ARI" });
+    vi.mocked(api.searchLeaguePlayers).mockResolvedValue({ ok: true, players: [deep] } as never);
     render(<PlayerCompareContent leagueId="L1" leagueName="Dynasty Overlords" playerA={PLAYER_A} initialPlayerB={null} pool={POOL} />);
 
-    fireEvent.change(screen.getByPlaceholderText("Search for a player to compare..."), { target: { value: "beck" } });
+    fireEvent.click(screen.getByRole("button", { name: "Player B: choose a player" }));
+    fireEvent.change(screen.getByRole("searchbox"), { target: { value: "beck" } });
 
-    expect(await screen.findByText("Carson Beck")).toBeInTheDocument();
+    expect(await screen.findByRole("button", { name: "Choose Carson Beck" })).toBeInTheDocument();
     expect(api.searchLeaguePlayers).toHaveBeenCalledWith("L1", "beck", "Dynasty");
-    // The base player is filtered out of the server results.
-    expect(screen.getAllByText("Player One")).toHaveLength(1);
   });
 
   it("never offers the base player as their own opponent", () => {
     render(<PlayerCompareContent leagueId="L1" leagueName="Dynasty Overlords" playerA={PLAYER_A} initialPlayerB={null} pool={POOL} />);
-
-    // "Player One" appears once, in the base player's own identity card —
-    // never a second time inside the candidate list below it.
-    expect(screen.getAllByText("Player One")).toHaveLength(1);
+    fireEvent.click(screen.getByRole("button", { name: "Player B: choose a player" }));
+    expect(screen.queryByRole("button", { name: "Choose Player One" })).not.toBeInTheDocument();
   });
 
   it("renders every row (identity + each stat row) on the same fixed 3-column grid, so values line up at the same x-position", async () => {
@@ -115,11 +147,13 @@ describe("PlayerCompareContent", () => {
       <PlayerCompareContent leagueId="L1" leagueName="Dynasty Overlords" playerA={PLAYER_A} initialPlayerB={PLAYER_B} pool={POOL} />,
     );
 
+    await waitFor(() => expect(screen.getByText("Value Score")).toBeInTheDocument());
+    fireEvent.click(screen.getByRole("button", { name: /More stats/ }));
     await waitFor(() => expect(screen.getByText("Market")).toBeInTheDocument());
 
     const gridRows = document.querySelectorAll("[data-compare-grid-row]");
-    // Identity row + 4 Value & Rank rows + 6 Model Breakdown rows.
-    expect(gridRows.length).toBeGreaterThanOrEqual(11);
+    // 6 headline rows + 6 Model Breakdown rows.
+    expect(gridRows.length).toBeGreaterThanOrEqual(12);
     gridRows.forEach((row) => {
       expect(row.className).toContain("grid-cols-[1fr_6.5rem_1fr]");
     });
@@ -132,33 +166,51 @@ describe("PlayerCompareContent", () => {
       <PlayerCompareContent leagueId="L1" leagueName="Dynasty Overlords" playerA={PLAYER_A} initialPlayerB={PLAYER_B} pool={POOL} />,
     );
 
-    await waitFor(() => expect(screen.getByText("1,500")).toBeInTheDocument());
-    // Player A's Value Score (1500) beats Player B's (1200).
+    await waitFor(() => expect(within(screen.getByTestId("compare-grid")).getByText("1,500")).toBeInTheDocument());
+    // Player A's Value Score (1500) beats Player B's (1200); the winner is marked in text, not color alone.
     expect(screen.getAllByText("Better:").length).toBeGreaterThan(0);
+    // Age is shown without a winner (which age is better depends on the league).
+    const ageRow = screen.getByText("Age").closest("[data-compare-grid-row]") as HTMLElement;
+    expect(within(ageRow).queryByText("Better:")).not.toBeInTheDocument();
   });
 
-  it("lets the user reset back to the opponent picker via Compare someone else", async () => {
+  it("shows PPG, next-game projection and the schedule outlook with the better side marked", async () => {
     vi.mocked(api.getPlayerQuickView).mockResolvedValue(quickViewResult(model({})));
-
-    render(
-      <PlayerCompareContent leagueId="L1" leagueName="Dynasty Overlords" playerA={PLAYER_A} initialPlayerB={PLAYER_B} pool={POOL} />,
+    vi.mocked(api.getPlayerWeeklyStats).mockImplementation((id: string) =>
+      Promise.resolve(weeklyStatsResult([{ week: 1, fantasy_points_ppr: id === "p1" ? 20 : 10, snap_share: 0.8 }])),
+    );
+    const week = (tier: "weak" | "tough", pts: number) =>
+      ({ week: 10, opponent: "DAL", is_home: true, spread_line: null, total_line: null, played: false, team_score: null, opponent_score: null, bye: false, opponent_defense_tier: tier, projection: { status: "ok", point_estimate: pts, low: 1, high: 30, confidence: "medium", opponent: "DAL" } }) as never;
+    vi.mocked(api.getPlayerSchedule).mockImplementation((id: string) =>
+      Promise.resolve({ ok: true, team: "SF", weeks: [week(id === "p1" ? "tough" : "weak", id === "p1" ? 11 : 14)] }),
     );
 
-    await waitFor(() => expect(screen.getByText("Market")).toBeInTheDocument());
-    fireEvent.click(screen.getByRole("button", { name: "Compare someone else" }));
+    render(<PlayerCompareContent leagueId="L1" leagueName="Dynasty Overlords" playerA={PLAYER_A} initialPlayerB={PLAYER_B} pool={POOL} />);
 
-    expect(screen.getByText("Choose an opponent below.")).toBeInTheDocument();
+    const grid = await screen.findByTestId("compare-grid");
+    await waitFor(() => expect(within(grid).getByText("20.0")).toBeInTheDocument());
+    expect(within(grid).getByText("14.0")).toBeInTheDocument();
+    expect(within(grid).getByText("1 soft")).toBeInTheDocument();
+    expect(within(grid).getByText("1 tough")).toBeInTheDocument();
   });
 
-  it("selects an opponent from the picker and fetches both quick-view models", async () => {
+  it("collapses the extra stats behind More stats", async () => {
     vi.mocked(api.getPlayerQuickView).mockResolvedValue(quickViewResult(model({})));
+    render(<PlayerCompareContent leagueId="L1" leagueName="Dynasty Overlords" playerA={PLAYER_A} initialPlayerB={PLAYER_B} pool={POOL} />);
+    await waitFor(() => expect(api.getPlayerQuickView).toHaveBeenCalled());
+    const toggle = await screen.findByRole("button", { name: /More stats/ });
+    expect(toggle).toHaveAttribute("aria-expanded", "false");
+    expect(screen.queryByText("Model Breakdown")).not.toBeInTheDocument();
+    fireEvent.click(toggle);
+    expect(await screen.findByText("Model Breakdown")).toBeInTheDocument();
+  });
 
-    render(<PlayerCompareContent leagueId="L1" leagueName="Dynasty Overlords" playerA={PLAYER_A} initialPlayerB={null} pool={POOL} />);
-
-    fireEvent.click(screen.getByRole("button", { name: /Player Two/ }));
-
-    await waitFor(() => expect(api.getPlayerQuickView).toHaveBeenCalledWith("p1"));
-    expect(api.getPlayerQuickView).toHaveBeenCalledWith("p2");
+  it("Change on a slot swaps that player", async () => {
+    vi.mocked(api.getPlayerQuickView).mockResolvedValue(quickViewResult(model({})));
+    render(<PlayerCompareContent leagueId="L1" leagueName="Dynasty Overlords" playerA={PLAYER_A} initialPlayerB={PLAYER_B} pool={POOL} />);
+    fireEvent.click(screen.getByRole("button", { name: "Player B: Player Two. Change player" }));
+    fireEvent.click(screen.getByRole("button", { name: "Choose Player Three" }));
+    expect(within(screen.getByTestId("compare-slot-b")).getByText("Player Three")).toBeInTheDocument();
   });
 
   it("omits the Model Breakdown section when neither side has model data", async () => {
@@ -169,9 +221,9 @@ describe("PlayerCompareContent", () => {
     );
 
     await waitFor(() => expect(api.getPlayerQuickView).toHaveBeenCalled());
-    expect(screen.queryByText("Model Breakdown")).not.toBeInTheDocument();
-    // Value & Rank always renders — it never depends on the quick-view fetch.
-    expect(screen.getByText("Value & Rank")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /More stats/ })).not.toBeInTheDocument();
+    // The headline grid always renders — it never depends on the quick-view fetch.
+    expect(screen.getByText("Value Score")).toBeInTheDocument();
   });
 
   it("fetches both sides' weekly stats and renders the Points By Week chart once either side has played weeks", async () => {
@@ -195,6 +247,7 @@ describe("PlayerCompareContent", () => {
 
     await waitFor(() => expect(api.getPlayerWeeklyStats).toHaveBeenCalledWith("p1"));
     expect(api.getPlayerWeeklyStats).toHaveBeenCalledWith("p2");
+    fireEvent.click(await screen.findByRole("button", { name: /More stats/ }));
     await waitFor(() => expect(screen.getByText("Points By Week")).toBeInTheDocument());
     // Both player-name labels render (one per panel), even though only
     // Player One actually has weeks to chart.
