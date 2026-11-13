@@ -64,9 +64,13 @@ def player_row(
     w = week if week is not None else max(state.week, 1)
     games = state.games_played(pid) if state.status != "offseason" else []
     floor, ceiling = ev.band(pid)
+    # With team roles (player-model-3+) the shown projection is the role-resolved mean for the next game he can
+    # play, so an injured starter shows what he does when back and only one backup shows the fill-in number.
+    projection = ev.next_proj(pid, w) if ev.roles_on else ev.proj(pid, w)
     return {
         "id": pid, "headshot_id": headshot_id(pid), "name": p.name, "pos": p.pos, "team": p.nfl_team,
-        "age": p.age, "adp": p.adp, "value": p.value, "projection": round(ev.proj(pid, w), 1), "ros_mean": round(ev.ros_mean(pid), 1),
+        "age": p.age, "adp": p.adp, "value": p.value, "projection": round(projection, 1), "ros_mean": round(ev.ros_mean(pid), 1),
+        "role": ev.role_info(pid, w),
         "floor": round(floor, 1), "ceiling": round(ceiling, 1), "status": ev.status(pid, w),
         "out_weeks": state.out.get(pid, 0), "bye_week": snap.bye_of(pid) or None,
         "owner": _owner(snap, state, owners, pid), "kind": "player",
@@ -164,7 +168,7 @@ def players_page(
             return (-(state.last_points(pid) or 0.0), pid)
         if sort == "season":
             return (-sum(state.games_played(pid)), pid)
-        return (-ev.proj(pid, w), -ev.ros_mean(pid), pid)
+        return (-(ev.next_proj(pid, w) if ev.roles_on else ev.proj(pid, w)), -ev.ros_mean(pid), pid)
 
     pids.sort(key=key)
     page_size = max(1, min(PAGE_MAX, page_size))

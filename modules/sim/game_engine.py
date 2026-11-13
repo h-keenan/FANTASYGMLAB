@@ -71,8 +71,13 @@ class ScoringSession:
             self._profiles[pid] = self.model.profile(self._mapping(pid), rng)
         return self._profiles[pid]
 
-    def week(self, pid: str, week: int) -> PlayerWeek:
+    def week(self, pid: str, week: int, role_mult: float | None = None) -> PlayerWeek:
+        """``role_mult``: the team-level role multiplier for this week (``Evaluator.role_mult``), passed only
+        for models that resolve team roles (player-model-3+); older models never see it."""
+
         rng = self.rng.stream(week, "gscore", self.snap.index[pid])
+        if role_mult is not None and self.model.team_roles:
+            return self.model.week(self._mapping(pid), self.profile(pid), week, rng, self.scoring, role_mult=role_mult)
         return self.model.week(self._mapping(pid), self.profile(pid), week, rng, self.scoring)
 
     def weeks_out(self, pid: str, week: int, res: PlayerWeek) -> int:
@@ -512,7 +517,7 @@ def run_week(em: Emitter, snap: GameSnapshot, state: GameState, seed: int) -> di
     for pid in snap.pids:
         if ev.status(pid, W) != "healthy":
             continue
-        res = session.week(pid, W)
+        res = session.week(pid, W, ev.role_mult(pid, W) if ev.roles_on else None)
         if not res.active:
             continue
         played[pid] = PlayerWeek(round(max(0.0, res.points), 2), res.stats, True, res.newly_injured)

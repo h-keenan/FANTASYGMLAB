@@ -76,6 +76,7 @@ from modules.sim.game_types import (
 from modules.sim.personas import PERSONAS
 from modules.sim.rng import WorldRng
 from modules.sim.store import SimStoreError
+from modules.sim.team_roles import week_one_roles
 from modules.sim.types import FLEX_SLOTS, GAME_POSITIONS, POSITIONS, SimInputsError
 
 _log = logging.getLogger(__name__)
@@ -999,6 +1000,14 @@ def add_routes(router: APIRouter, ctx: GameApiCtx) -> None:
                 {**row, "grade_letter": letter}, snap, state, pro)}
 
 
+def _role_json(players, role) -> dict[str, Any] | None:
+    if role is None or role.kind == "exempt":
+        return None
+    covering = players[role.covering].name if role.covering else None
+    label = {"fill_in": f"Starting while {covering} is out", "backup": "Backup"}.get(role.kind)
+    return {"kind": role.kind, "label": label, "covering": role.covering or None, "covering_name": covering}
+
+
 def add_preview_route(router: APIRouter, ctx: GameApiCtx) -> None:
     """Signed-out browse: projections only, no state, no storage."""
 
@@ -1026,8 +1035,11 @@ def add_preview_route(router: APIRouter, ctx: GameApiCtx) -> None:
                 return {"ok": True, "reason": exc.code, "players": [], "total": 0, "page": 1, "page_size": 0, "scoring": scoring}
         needle = q.strip().lower()
         rows = [p for p in players.values() if (not pos or p.pos == pos) and (not needle or needle in p.name.lower())]
+        # Team roles (what new games use): one fill-in per injured starter, other backups at their baseline.
+        roles = week_one_roles(players)
+        shown = {pid: round(p.mean * (r.mult if (r := roles.get(pid)) else 1.0), 1) for pid, p in players.items()}
         keys = {
-            "projection": lambda p: (-p.mean, p.pid), "value": lambda p: (-p.value, p.pid),
+            "projection": lambda p: (-shown[p.pid], p.pid), "value": lambda p: (-p.value, p.pid),
             "adp": lambda p: (p.adp, p.pid), "age": lambda p: (p.age, p.pid), "name": lambda p: (p.name.lower(), p.pid),
         }
         rows.sort(key=keys[sort])
@@ -1038,7 +1050,8 @@ def add_preview_route(router: APIRouter, ctx: GameApiCtx) -> None:
             "ok": True, "reason": "", "scoring": scoring, "total": len(rows), "page": page, "page_size": page_size,
             "players": [{
                 "id": p.pid, "headshot_id": headshot_id(p.pid), "name": p.name, "pos": p.pos, "team": p.nfl_team,
-                "age": p.age, "projection": p.mean, "floor": round(max(0.0, p.mean - 0.8 * p.sd), 1),
+                "age": p.age, "projection": shown[p.pid], "if_starts": p.mean,
+                "role": _role_json(players, roles.get(p.pid)), "floor": round(max(0.0, p.mean - 0.8 * p.sd), 1),
                 "ceiling": round(p.mean + 0.8 * p.sd, 1), "value": p.value, "adp": p.adp,
                 "bye_week": pool.bye_weeks.get(p.nfl_team) or None,
             } for p in chunk],

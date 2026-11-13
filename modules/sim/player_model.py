@@ -38,12 +38,16 @@ from __future__ import annotations
 
 import math
 import zlib
-from dataclasses import asdict, dataclass, field
+from dataclasses import asdict, dataclass, field, replace
 from typing import Any, Mapping
 
 import numpy as np
 
-MODEL_VERSION = "player-model-2"
+MODEL_VERSION = "player-model-3"
+# player-model-3 = player-model-2 (frozen in player_model_v2.py) + team-level role coupling. The weekly draws are
+# unchanged; the game engine resolves, per NFL team and position group and week, who actually plays which role
+# (``modules/sim/team_roles.py``) and hands the model a mean multiplier through ``with_role_multiplier``.
+TEAM_ROLES = True
 SEASON_WEEKS = 17
 POSITIONS = ("QB", "RB", "WR", "TE", "K")
 POS_INDEX = {p: i for i, p in enumerate(POSITIONS)}
@@ -662,6 +666,22 @@ def apply_depth_coupling(
     return out_profiles
 
 
+# --------------------------------------------------------------------------- team-level role
+
+ROLE_MULT_MAX = 20.0
+
+
+def with_role_multiplier(profile: SeasonProfile, week: int, mult: float) -> SeasonProfile:
+    """The profile for one week with a team-role multiplier on that week's mean (a one-week ``RoleChange``).
+    Adds no random draw. A multiplier of 1 returns the profile itself."""
+
+    m = min(ROLE_MULT_MAX, max(0.0, float(mult)))
+    if abs(m - 1.0) < 1e-9:
+        return profile
+    kind = "promotion" if m > 1.0 else "demotion"
+    return replace(profile, role_changes=(*profile.role_changes, RoleChange(week=int(week), kind=kind, multiplier=m, end_week=int(week))))
+
+
 # --------------------------------------------------------------------------- weekly mean
 
 
@@ -907,5 +927,5 @@ __all__ = [
     "ARCHETYPES", "ENV_SD", "InjuryEvent", "InSeasonParams", "MODEL_VERSION", "RoleChange", "SEASON_WEEKS", "SeasonParams",
     "SeasonProfile", "WeekResult", "apply_depth_coupling", "default_bye_week", "draw_season_profile", "draw_week_points",
     "draw_environment", "expected_week_points", "normalize_player", "profile_rng", "score_stat_line", "simulate_season",
-    "team_week_shock", "week_rng", "weights_for",
+    "team_week_shock", "week_rng", "weights_for", "TEAM_ROLES", "with_role_multiplier",
 ]

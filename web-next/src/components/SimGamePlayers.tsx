@@ -28,8 +28,11 @@ import {
   simFmtPts,
   simFmtValue,
   simHeadshotId,
+  simIfStartsHint,
+  simPlayerTags,
   simOwnerLabel,
   simOwnerTone,
+  simRoleBadge,
   simPageCount,
   simPlayerStatusLabel,
   type SimGamePlayer,
@@ -188,7 +191,7 @@ export function SimPlayerBrowser({
               player={player}
               week={week}
               onOpen={onOpen}
-              tags={player.owner ? [{ key: "owner", label: simOwnerLabel(player.owner), tone: simOwnerTone(player.owner) }] : undefined}
+              tags={simPlayerTags(player)}
               actions={actions ? actions(player) : null}
             />
           ))}
@@ -298,9 +301,13 @@ export function SimPlayerOverlay({ player, detail, actions }: { player: SimGameP
           <span className="flex items-center gap-1 mb-2">
             {status ? <SimToneBadge label={status.label} tone={status.tone} /> : null}
             {player.owner ? <SimToneBadge label={simOwnerLabel(player.owner)} tone={simOwnerTone(player.owner)} /> : null}
+            {simRoleBadge(player) ? <SimToneBadge label={simRoleBadge(player)!.label} tone={simRoleBadge(player)!.tone} /> : null}
           </span>
         </div>
         <StatGroup title="In this game" items={tiles} hideTitle />
+        {simIfStartsHint(player) ? (
+          <span className="text-xs" style={{ color: "var(--color-text-muted)" }} data-testid="sim-if-starts">{simIfStartsHint(player)}</span>
+        ) : null}
         {actions ? <div className="flex flex-wrap gap-2 pt-2">{actions}</div> : null}
       </section>
       {detail.failed ? (

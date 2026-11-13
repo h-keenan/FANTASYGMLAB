@@ -490,7 +490,12 @@ player = {"id": "9509", "name": "...", "pos": "RB", "team": "ATL" /* NFL */, "ag
           "last_week": 12.4, "season_points": 51.0, "games": 3, "ppg": 17.0}
 ```
 `projection` is this week's expected points (0 on bye / while out), blended with
-his results so far this season.
+his results so far this season. Games on `player-model-3` or later instead show the
+role-resolved expected points for the **next game he can play** (an injured starter shows
+his number for the week he returns) and add `"role": {"kind": "starter|fill_in|backup|bench|out",
+"label": "Starting while X is out" | "Filling in for X" | "Backup" | null, "covering", "covering_name",
+"if_starts": 13.5, "week": 4}`: one fill-in per injured starter, other backups near baseline
+(`docs/fantasy-sim-player-model.md` section 1c). Older saves omit `role`.
 `GET .../teams/{team_id}` -> `{"team_id", "players": [player]}` (any team's roster with projections; you need it to build offers; extra endpoint).
 `GET .../players/{pid}` -> `{"player": player, "weeks": [{"week": 4, "projection": 17.4, "floor", "ceiling", "bye": false, "out": false}], "history": [{"week": 1, "points": 18.2, "stats": {...}|null}], "news": [{"week": 3, "text": "..."}]}`. Unknown pid -> 404.
 
