@@ -66,14 +66,15 @@ for (const theme of ["dark"]) for (const [kind, name] of cast) {
   const page = await ctx.newPage();
   page.on("pageerror", (e) => console.log("PAGEERR", kind, e.message));
   try { await open(page, name); } catch (e) { console.log("OPENERR", kind, e.message.split("\n")[0]); }
-  // the sheet scrolls inside .pqv-scroll: one screenshot per screenful (top, then scrolled)
-  const full = await page.evaluate(() => { const el = document.querySelector(".pqv-scroll"); return el ? el.scrollHeight : 0; });
-  const view = await page.evaluate(() => { const el = document.querySelector(".pqv-scroll"); return el ? el.clientHeight : 0; });
-  for (let i = 0, y = 0; y < full && i < 8; i++, y += Math.max(300, view - 60)) {
-    await page.evaluate((top) => { const el = document.querySelector(".pqv-scroll"); if (el) el.scrollTop = top; }, y);
-    await sleep(500);
-    await page.screenshot({ path: `${OUT}/${kind}-${theme}-${w}-s${i}.png` });
+  // one screenshot per tab (the sheet scrolls inside .pqv-scroll)
+  for (const tab of ["Overview", "Outlook", "Stats", "Profile", "Scouting", "History"]) {
+    const t = page.getByRole("dialog").getByRole("tab", { name: tab, exact: true });
+    if (!(await t.count())) continue;
+    await t.click(); await sleep(1200);
+    await page.evaluate(() => { const el = document.querySelector(".pqv-scroll"); if (el) el.scrollTop = 0; });
+    await page.screenshot({ path: `${OUT}/${kind}-${theme}-${w}-${tab.toLowerCase()}.png` });
   }
+  const full = 0;
   console.log(kind, "scrollHeight", full);
   await ctx.close();
 }

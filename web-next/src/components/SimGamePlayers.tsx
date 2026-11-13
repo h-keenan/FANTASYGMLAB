@@ -3,7 +3,8 @@
 import { useEffect, useMemo, useReducer, useState, type ReactNode } from "react";
 
 import { simAsOfSeason } from "@/lib/simAsOf";
-import { PlayerQuickView, StatGroup } from "@/components/PlayerQuickView";
+import { PlayerQuickView, StatGroup, type SimPqvSections } from "@/components/PlayerQuickView";
+import { SimPlayerHistory } from "@/components/SimPlayerHistory";
 import { SimScoutingSections } from "@/components/SimScoutingSections";
 import { WeeklyPointsPanel } from "@/components/WeeklyPointsChartLazy";
 import type { PlayerQuickViewIdentity } from "@/context/PlayerQuickViewContext";
@@ -242,7 +243,7 @@ export function SimPlayerSheet({ gameId, player, onClose, actions, startYear }: 
     overall_rating: live.overall ?? null,
     ...(feed ? { score: feed.score, value_note: feed.valueNote, value_label: "Trade value", overall_rank: feed.overall_rank, position_rank: feed.position_rank } : {}),
   };
-  return <PlayerQuickView identity={identity} onClose={onClose} remote={Boolean(real)} asOfSeason={simAsOfSeason(startYear)} simOverlay={<SimPlayerOverlay player={live} detail={detail} actions={actions} />} />;
+  return <PlayerQuickView identity={identity} onClose={onClose} remote={Boolean(real)} asOfSeason={simAsOfSeason(startYear)} simSections={simPqvSections(gameId, live, detail, actions)} />;
 }
 
 interface SimPlayerDetailState {
@@ -271,17 +272,24 @@ function useSimPlayerDetail(gameId: string, playerId: string): SimPlayerDetailSt
 }
 
 /**
- * The sim-only sections of the player detail. Same section shell (`pqv-stat-season`), same stat
- * tiles (`StatGroup`) and the same weekly chart the real Player Quick View uses.
+ * The sim-only sections of the player detail, split by tab of the shared Player Quick View: Overview (this week, rest of
+ * season, owner, actions, game news), Outlook (this sim season's points and the rest-of-season band), Scouting
+ * (generated rookies) and History (draft slot, moves, seasons; derived from the event log). Same section shell
+ * (`pqv-stat-season`), same stat tiles (`StatGroup`) and the same weekly chart the real Player Quick View uses.
  */
-export function SimPlayerOverlay({ player, detail, actions }: { player: SimGamePlayer; detail: SimPlayerDetailState; actions?: ReactNode }) {
+export function simPqvSections(gameId: string, player: SimGamePlayer, detail: SimPlayerDetailState, actions?: ReactNode): SimPqvSections {
+  return {
+    overview: <SimOverviewSection player={player} detail={detail} actions={actions} />,
+    outlook: <SimOutlookSection player={player} detail={detail} />,
+    scouting: detail.data?.scouting ? <SimScoutingSections profile={detail.data.scouting} /> : undefined,
+    history: <SimPlayerHistory gameId={gameId} playerId={player.id} />,
+  };
+}
+
+function SimOverviewSection({ player, detail, actions }: { player: SimGamePlayer; detail: SimPlayerDetailState; actions?: ReactNode }) {
   const body = detail.data;
   const status = simPlayerStatusLabel(player);
   const ros = body?.ros ?? null;
-  const flat = body ? simProjectionIsFlat(body) : true;
-  const band = body ? simProjectionBand(body) : null;
-  const actual = body ? simActualPoints(body) : [];
-  const availability = ros ? simAvailabilityLine(ros) : null;
   const hero = simHeroFeed(player);
   const tiles = [
     { label: "This week", value: simFmtPts(player.projection), note: status ? status.label : `${simFmtPts(player.floor)}-${simFmtPts(player.ceiling)}`, percentile: null },
@@ -314,54 +322,57 @@ export function SimPlayerOverlay({ player, detail, actions }: { player: SimGameP
         ) : null}
         {actions ? <div className="flex flex-wrap gap-2 pt-2">{actions}</div> : null}
       </section>
-      {detail.failed ? (
-        <p className="pqv-status-text">Could not load the full outlook.</p>
-      ) : !body ? (
-        <SkeletonRows count={2} />
-      ) : (
-        <>
-          {body.scouting ? <SimScoutingSections profile={body.scouting} /> : null}
-          {actual.length > 0 || band || ros ? (
-            <section className="pqv-stat-season" data-testid="sim-weekly">
-              <h3>Week by Week · This sim season</h3>
-              {actual.length > 0 || band ? (
-                <WeeklyPointsPanel
-                  name={player.name}
-                  weeks={actual.map((a) => ({ week: a.week, fantasy_points_ppr: a.points, snap_share: null }))}
-                  season={0}
-                  projection={band}
-                  pointsLabel="pts"
-                  gradientId="sim-weekly-fill"
-                />
-              ) : null}
-              {flat && ros ? (
-                <p className="pqv-status-text" data-testid="sim-ros-line">
-                  <strong>{simRosLine(ros)}</strong>
-                  {availability ? <> &middot; {availability}</> : null}
-                </p>
-              ) : availability ? (
-                <p className="pqv-status-text">{availability}</p>
-              ) : null}
-            </section>
-          ) : null}
-          {(body.news ?? []).length > 0 ? (
-            <section className="pqv-stat-season">
-              <h3>Game news</h3>
-              <ul className="flex flex-col gap-1.5">
-                {body.news!.map((n, i) => (
-                  <li key={i} className="flex items-start gap-2 text-sm">
-                    <ReviewGlyphChip glyph="stats" tone="accent" size={22} />
-                    <span className="min-w-0 flex-1">
-                      <span className="text-xs font-bold" style={{ color: "var(--color-accent)" }}>Week {n.week} · </span>
-                      {n.text}
-                    </span>
-                  </li>
-                ))}
-              </ul>
-            </section>
-          ) : null}
-        </>
-      )}
+      {(body?.news ?? []).length > 0 ? (
+        <section className="pqv-stat-season">
+          <h3>Game news</h3>
+          <ul className="flex flex-col gap-1.5">
+            {body!.news!.map((n, i) => (
+              <li key={i} className="flex items-start gap-2 text-sm">
+                <ReviewGlyphChip glyph="stats" tone="accent" size={22} />
+                <span className="min-w-0 flex-1">
+                  <span className="text-xs font-bold" style={{ color: "var(--color-accent)" }}>Week {n.week} · </span>
+                  {n.text}
+                </span>
+              </li>
+            ))}
+          </ul>
+        </section>
+      ) : null}
     </div>
+  );
+}
+
+function SimOutlookSection({ player, detail }: { player: SimGamePlayer; detail: SimPlayerDetailState }) {
+  const body = detail.data;
+  if (detail.failed) return <p className="pqv-status-text">Could not load the full outlook.</p>;
+  if (!body) return <SkeletonRows count={2} />;
+  const ros = body.ros ?? null;
+  const flat = simProjectionIsFlat(body);
+  const band = simProjectionBand(body);
+  const actual = simActualPoints(body);
+  const availability = ros ? simAvailabilityLine(ros) : null;
+  if (!(actual.length > 0 || band || ros)) return <p className="pqv-status-text">No outlook yet.</p>;
+  return (
+    <section className="pqv-stat-season" data-testid="sim-weekly">
+      <h3>Week by Week · This sim season</h3>
+      {actual.length > 0 || band ? (
+        <WeeklyPointsPanel
+          name={player.name}
+          weeks={actual.map((a) => ({ week: a.week, fantasy_points_ppr: a.points, snap_share: null }))}
+          season={0}
+          projection={band}
+          pointsLabel="pts"
+          gradientId="sim-weekly-fill"
+        />
+      ) : null}
+      {flat && ros ? (
+        <p className="pqv-status-text" data-testid="sim-ros-line">
+          <strong>{simRosLine(ros)}</strong>
+          {availability ? <> &middot; {availability}</> : null}
+        </p>
+      ) : availability ? (
+        <p className="pqv-status-text">{availability}</p>
+      ) : null}
+    </section>
   );
 }

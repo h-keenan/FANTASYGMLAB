@@ -24,6 +24,7 @@ import { explorerStatKey } from "@/lib/percentileExplorer";
 import { CHART_HEIGHT } from "@/components/weeklyPointsChartHeight";
 import { useSheetDragDismiss } from "@/lib/useSheetDragDismiss";
 import { AvailabilityBlock, LatestNewsSection } from "@/components/PlayerQuickViewNews";
+import { Tabs } from "@/components/Tabs";
 import { pqvBioForContext, pqvRealWorld } from "@/lib/pqvContext";
 import { rowsAsOf, simAsOfSeason } from "@/lib/simAsOf";
 import { cleanInjuryLabel, playerProfileNewsHref } from "@/lib/playerAvailabilityPresentation";
@@ -79,11 +80,20 @@ const ModelRadarChart = dynamic(() => import("@/components/ModelRadarChart").the
  * pqv" — falling back to a blank ringed circle for a player with no photo
  * on file, same as every other avatar in the app.
  */
+/** The Fantasy Sim's own tab contents inside the Player Quick View (see `simSections`). */
+export interface SimPqvSections {
+  overview: ReactNode;
+  outlook?: ReactNode;
+  scouting?: ReactNode;
+  history?: ReactNode;
+}
+
 export function PlayerQuickView({
   identity,
   onClose,
   simOverlay,
   asOfSeason,
+  simSections,
   remote = true,
 }: {
   identity: PlayerQuickViewIdentity;
@@ -99,13 +109,19 @@ export function PlayerQuickView({
    * awards are cut to it; the in-progress real season, current usage / trend charts and value history never show.
    */
   asOfSeason?: number;
+  /**
+   * Fantasy Sim, split by tab (preferred over `simOverlay`): the game's own Overview, Outlook (week-by-week), Scouting
+   * (generated rookies) and History (draft slot, moves, seasons). Present = this is the sim's world, not the real one.
+   */
+  simSections?: SimPqvSections;
   /** false for a synthetic sim player with no real data behind the id: same layout, no remote fetches. */
   remote?: boolean;
 }) {
   // Fantasy Sim (coridian_, 2026-11-13: "inside of Fantasy Sim there should not be real news in there whatsoever"): the sim
   // overlay marks this as the game's own world. Real news, real injury / availability notes, the real depth-chart note and
   // the real bye never show here; the sim's own status, news and outlook (simOverlay) are the only source.
-  const isSim = simOverlay != null;
+  const sim: SimPqvSections | null = simSections ?? (simOverlay != null ? { overview: simOverlay } : null);
+  const isSim = sim != null;
   const realWorld = pqvRealWorld(isSim);
   const pathname = usePathname();
   const dialogRef = useRef<HTMLDivElement | null>(null);
@@ -229,6 +245,12 @@ export function PlayerQuickView({
   };
   const overallRating = identity.overall_rating ?? stats?.overall_rating ?? resolved?.overall_rating ?? null;
   const name = identity.name || resolved?.name || `Player ${identity.player_id}`;
+  // What a remote tab shows instead of its content while the detail loads or when it failed (null = show the content).
+  const bodyGate: ReactNode | null = loading ? (
+    <PqvBodySkeleton />
+  ) : !remote ? null : loadError ? (
+    <p className="pqv-status-text">Couldn&apos;t load this player&apos;s detail right now.</p>
+  ) : null;
 
   return (
     <div
@@ -329,74 +351,96 @@ export function PlayerQuickView({
           ]}
         />
 
-        {simOverlay}
-
-        {availability ? (
-          <AvailabilityBlock
-            availability={availability}
-            injuryItem={news?.injury_item ?? null}
-            newsLoading={newsLoading}
+        <ExplorerLeagueProvider leagueId={identity.leagueId}>
+          <Tabs
+            id="pqv"
+            ariaLabel="Player sections"
+            tabs={[
+              {
+                key: "overview",
+                label: "Overview",
+                render: () => (
+                  <>
+                    {sim?.overview ?? null}
+                    {availability ? <AvailabilityBlock availability={availability} injuryItem={news?.injury_item ?? null} newsLoading={newsLoading} /> : null}
+                    {!loadError && remote && realWorld.showNews ? (
+                      <LatestNewsSection
+                        items={news ? news.items : null}
+                        hideItem={availability ? news?.injury_item ?? null : null}
+                        loading={newsLoading}
+                        playerId={identity.player_id}
+                        name={name}
+                        seeAllHref={identity.leagueId ? playerProfileNewsHref(identity.leagueId, identity.player_id, identity.leagueName || "") : undefined}
+                      />
+                    ) : null}
+                    <div className="pqv-body">
+                      {bodyGate ?? (
+                        <>
+                          {model?.decision_fit_narrative ? <DecisionFitCard narrative={model.decision_fit_narrative} /> : null}
+                          <HeadlineTiles rows={headlineRows(stats ?? null, model?.usage_profile)} playerId={identity.player_id} />
+                        </>
+                      )}
+                    </div>
+                  </>
+                ),
+              },
+              ...(sim?.outlook || (remote && !isSim)
+                ? [
+                    {
+                      key: "outlook",
+                      label: "Outlook",
+                      render: () => (
+                        <div className="pqv-body">
+                          {sim?.outlook ?? null}
+                          {!isSim ? (bodyGate ?? <PlayerTrendsPanel playerId={identity.player_id} name={identity.name || "This player"} gradientId="pqv-weekly-fill" />) : null}
+                        </div>
+                      ),
+                    },
+                  ]
+                : []),
+              ...(remote
+                ? [
+                    {
+                      key: "stats",
+                      label: "Stats",
+                      render: () => (
+                        <div className="pqv-body">
+                          {bodyGate ?? (
+                            <>
+                              <PlayerUsageBlock profile={model?.usage_profile} position={stats?.position ?? identity.position} playerId={identity.player_id} />
+                              <SeasonStatsRows stats={stats ?? null} usageProfile={model?.usage_profile} playerId={identity.player_id} />
+                              {stats && stats.college.length > 0 ? (
+                                <section className="pqv-stat-season">
+                                  <h3>College</h3>
+                                  <StatGroup title="College Stats" items={stats.college} hideTitle />
+                                </section>
+                              ) : null}
+                            </>
+                          )}
+                        </div>
+                      ),
+                    },
+                    {
+                      key: "profile",
+                      label: "Profile",
+                      render: () => (
+                        <div className="pqv-body">
+                          {bodyGate ?? (
+                            <>
+                              {shownAwards.length > 0 ? <AwardsStrip awards={shownAwards} /> : null}
+                              {bio ? <BioGrid bio={pqvBioForContext(bio, isSim)} /> : null}
+                            </>
+                          )}
+                        </div>
+                      ),
+                    },
+                  ]
+                : []),
+              ...(sim?.scouting ? [{ key: "scouting", label: "Scouting", render: () => <>{sim.scouting}</> }] : []),
+              ...(sim?.history ? [{ key: "history", label: "History", render: () => <>{sim.history}</> }] : []),
+            ]}
           />
-        ) : null}
-        {!loadError && remote && realWorld.showNews ? (
-          <LatestNewsSection
-            items={news ? news.items : null}
-            hideItem={availability ? news?.injury_item ?? null : null}
-            loading={newsLoading}
-            playerId={identity.player_id}
-            name={name}
-            seeAllHref={
-              identity.leagueId
-                ? playerProfileNewsHref(identity.leagueId, identity.player_id, identity.leagueName || "")
-                : undefined
-            }
-          />
-        ) : null}
-
-        <div className="pqv-body">
-          {loading ? (
-            <PqvBodySkeleton />
-          ) : !remote ? null : loadError ? (
-            <p className="pqv-status-text">Couldn&apos;t load this player&apos;s detail right now.</p>
-          ) : (
-            <ExplorerLeagueProvider leagueId={identity.leagueId}>
-              {model?.decision_fit_narrative ? <DecisionFitCard narrative={model.decision_fit_narrative} /> : null}
-
-              <HeadlineTiles rows={headlineRows(stats ?? null, model?.usage_profile)} playerId={identity.player_id} />
-
-              {/* Real weekly game logs are current-season data: never inside the sim (it has its own week-by-week). */}
-              {isSim ? null : (
-                <PlayerTrendsPanel
-                  playerId={identity.player_id}
-                  name={identity.name || "This player"}
-                  gradientId="pqv-weekly-fill"
-                />
-              )}
-
-              <PlayerUsageBlock profile={model?.usage_profile} position={stats?.position ?? identity.position} playerId={identity.player_id} />
-
-              <SeasonStatsRows stats={stats ?? null} usageProfile={model?.usage_profile} playerId={identity.player_id} />
-
-              {stats && stats.college.length > 0 ? (
-                <section className="pqv-stat-season">
-                  <h3>College</h3>
-                  <StatGroup title="College Stats" items={stats.college} hideTitle />
-                </section>
-              ) : null}
-
-              {shownAwards.length > 0 ? <AwardsStrip awards={shownAwards} /> : null}
-
-              {bio ? <BioGrid bio={pqvBioForContext(bio, isSim)} /> : null}
-
-              {/* Value history and the Model radar used to be standalone sections
-                  here (owner, 2026-10-18: Model at the bottom with the
-                  multi-axis chart). Owner direction, 2026-11: every number
-                  opens its "why", so both now live behind a tap on the
-                  Value tile and the Player score (OVR) tile in the hero
-                  (PlayerHeroHeader valueChart / ovrChart, TapForWhy). */}
-            </ExplorerLeagueProvider>
-          )}
-        </div>
+        </ExplorerLeagueProvider>
 
         {identity.leagueId ? (
           <div className="pqv-actions">

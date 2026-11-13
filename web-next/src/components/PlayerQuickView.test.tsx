@@ -121,6 +121,7 @@ describe("PlayerQuickView", () => {
     vi.mocked(api.getPlayerQuickView).mockReset();
     vi.mocked(api.getPlayerAwards).mockReset();
     vi.mocked(api.getPlayerWeeklyStats).mockReset();
+    window.sessionStorage.clear(); // the last tab is remembered per session
     vi.mocked(api.getPlayerNews).mockReset();
     vi.mocked(api.getPlayerNews).mockResolvedValue({ ok: true, items: [], injury_item: null });
     // Benign default (no weeks played) so tests unrelated to the weekly
@@ -211,11 +212,15 @@ describe("PlayerQuickView", () => {
     fireEvent.click(screen.getByRole("button", { name: /^Why: Player score/ }));
     expect(await screen.findByText(/MKT 91, OPP 84, SCR 62, ROLE 73, DUR 58/)).toBeInTheDocument();
     fireEvent.keyDown(screen.getByRole("dialog", { name: "What OVR means" }), { key: "Escape" });
+    // The body is split into tabs: Overview (decision fit, above), Stats, Outlook and Profile (awards, bio).
+    expect(screen.getByRole("tab", { name: "Overview" })).toHaveAttribute("aria-selected", "true");
+    fireEvent.click(screen.getByRole("tab", { name: "Profile" }));
+    expect(screen.getByText(/Top-3 WR/)).toBeInTheDocument();
+    expect(screen.getByText("Ohio State")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("tab", { name: "Stats" }));
     expect(screen.getByText("Targets")).toBeInTheDocument();
     expect(screen.getByText("140")).toBeInTheDocument();
     expect(screen.getByText("88th")).toBeInTheDocument();
-    expect(screen.getByText(/Top-3 WR/)).toBeInTheDocument();
-    expect(screen.getByText("Ohio State")).toBeInTheDocument();
 
     // coridian_, 2026-10-18: "Starter and usage still need to be color
     // coordinated" — the tier chip matches the avatar's own prestige-ring
@@ -269,6 +274,7 @@ describe("PlayerQuickView", () => {
     vi.mocked(api.getPlayerWeeklyStats).mockReturnValue(new Promise(() => {}));
 
     const { container } = render(<PlayerQuickView identity={identity()} onClose={vi.fn()} />);
+    fireEvent.click(await screen.findByRole("tab", { name: "Outlook" }));
 
     await waitFor(() => expect(screen.queryByText(/Loading player detail/)).not.toBeInTheDocument());
 
@@ -291,6 +297,7 @@ describe("PlayerQuickView", () => {
     });
 
     render(<PlayerQuickView identity={identity()} onClose={vi.fn()} />);
+    fireEvent.click(await screen.findByRole("tab", { name: "Outlook" }));
 
     await waitFor(() => expect(api.getPlayerWeeklyStats).toHaveBeenCalledWith("p1", undefined));
     expect(await screen.findByText("Week by Week · 2026")).toBeInTheDocument();
@@ -311,6 +318,7 @@ describe("PlayerQuickView", () => {
     });
 
     render(<PlayerQuickView identity={identity()} onClose={vi.fn()} />);
+    fireEvent.click(await screen.findByRole("tab", { name: "Outlook" }));
 
     await waitFor(() => expect(screen.queryByText(/Loading player detail/)).not.toBeInTheDocument());
     expect(await screen.findByText("Week by Week · 2026")).toBeInTheDocument();
@@ -327,6 +335,7 @@ describe("PlayerQuickView", () => {
     });
 
     render(<PlayerQuickView identity={identity()} onClose={vi.fn()} />);
+    fireEvent.click(await screen.findByRole("tab", { name: "Outlook" }));
 
     await waitFor(() => expect(api.getPlayerWeeklyStats).toHaveBeenCalledWith("p1", undefined));
     expect(await screen.findByLabelText("Season")).toBeInTheDocument();
@@ -492,11 +501,13 @@ describe("PlayerQuickView", () => {
       render(<PlayerQuickView identity={identity()} onClose={vi.fn()} asOfSeason={2025} simOverlay={<p>Sim overlay</p>} />);
 
       await waitFor(() => expect(screen.queryByText(/Loading player detail/)).not.toBeInTheDocument());
+      fireEvent.click(screen.getByRole("tab", { name: "Stats" }));
       expect(screen.getAllByText(/2025 Regular Season/).length).toBeGreaterThan(0);
       expect(screen.getAllByText(/2024 Regular Season/).length).toBeGreaterThan(0);
       expect(screen.getAllByText("Targets").length).toBeGreaterThan(0);
       expect(screen.queryByText(/2026 Regular Season/)).toBeNull();
       expect(screen.queryByText("CURRENT-2026-TARGETS")).toBeNull();
+      fireEvent.click(screen.getByRole("tab", { name: "Profile" }));
       expect(screen.getByText(/AWARD-2025/)).toBeInTheDocument();
       expect(screen.queryByText(/AWARD-2026-CURRENT/)).toBeNull();
       expect(screen.queryByText(/AWARD-UNDATED/)).toBeNull(); // cannot be placed in time, never guessed
@@ -511,6 +522,7 @@ describe("PlayerQuickView", () => {
       vi.mocked(api.getPlayerAwards).mockResolvedValue(awardsResult());
       render(<PlayerQuickView identity={identity()} onClose={vi.fn()} />);
       await waitFor(() => expect(screen.queryByText(/Loading player detail/)).not.toBeInTheDocument());
+      fireEvent.click(screen.getByRole("tab", { name: "Stats" }));
       expect(screen.getAllByText(/2026 Regular Season/).length).toBeGreaterThan(0);
     });
   });

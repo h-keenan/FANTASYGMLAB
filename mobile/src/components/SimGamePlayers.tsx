@@ -6,7 +6,8 @@ import EmptyState from './EmptyState';
 import Input from './Input';
 import MetricCard from './MetricCard';
 import { simAsOfSeason } from '../lib/simAsOf';
-import PlayerQuickViewSheet, { Section as PqvSection } from './PlayerQuickViewSheet';
+import PlayerQuickViewSheet, { Section as PqvSection, type SimPqvSections } from './PlayerQuickViewSheet';
+import { SimPlayerHistory } from './SimPlayerHistory';
 import SimScoutingSections from './SimScoutingSections';
 import WeeklyPointsChart from './WeeklyPointsChart';
 import { ReviewGlyphChip } from './SeasonReviewSections';
@@ -229,7 +230,7 @@ export function SimPlayerSheet({ gameId, player, onClose, actions, startYear }: 
     valueNote: feed?.valueNote ?? null,
     valueLabel: feed ? 'Trade value' : null,
   };
-  return <PlayerQuickViewSheet request={request} onClose={onClose} remote={Boolean(real)} asOfSeason={simAsOfSeason(startYear)} simOverlay={<SimPlayerOverlay player={live} detail={detail} actions={actions} />} />;
+  return <PlayerQuickViewSheet request={request} onClose={onClose} remote={Boolean(real)} asOfSeason={simAsOfSeason(startYear)} simSections={simPqvSections(gameId, live, detail, actions)} />;
 }
 
 interface SimPlayerDetailState {
@@ -257,18 +258,26 @@ function useSimPlayerDetail(gameId: string, playerId: string): SimPlayerDetailSt
   return state.key === key ? state : { data: null, failed: false };
 }
 
-/** The sim-only sections of the player detail, in the quick view's own section shell, tiles and weekly chart. */
-export function SimPlayerOverlay({ player, detail, actions }: { player: SimGamePlayer; detail: SimPlayerDetailState; actions?: ReactNode }) {
+/**
+ * The sim-only sections of the player detail, split by tab of the shared Player Quick View: Overview, Outlook, Scouting
+ * (generated rookies) and History (derived from the event log), in the quick view's own section shell, tiles and chart.
+ */
+export function simPqvSections(gameId: string, player: SimGamePlayer, detail: SimPlayerDetailState, actions?: ReactNode): SimPqvSections {
+  return {
+    overview: <SimOverviewSection player={player} detail={detail} actions={actions} />,
+    outlook: <SimOutlookSection player={player} detail={detail} />,
+    scouting: detail.data?.scouting ? <SimScoutingSections profile={detail.data.scouting} /> : undefined,
+    history: <SimPlayerHistory gameId={gameId} playerId={player.id} />,
+  };
+}
+
+function SimOverviewSection({ player, detail, actions }: { player: SimGamePlayer; detail: SimPlayerDetailState; actions?: ReactNode }) {
   const { colors } = useThemeMode();
   const common = useMemo(() => createSimStyles(colors), [colors]);
   const styles = useMemo(() => createStyles(), []);
   const body = detail.data;
   const status = simPlayerStatusLabel(player);
   const ros = body?.ros ?? null;
-  const flat = body ? simProjectionIsFlat(body) : true;
-  const band = body ? simProjectionBand(body) : null;
-  const actual = body ? simActualPoints(body) : [];
-  const availability = ros ? simAvailabilityLine(ros) : null;
   const hero = simHeroFeed(player);
   return (
     <View style={styles.overlay} testID="sim-player-overlay">
@@ -299,45 +308,53 @@ export function SimPlayerOverlay({ player, detail, actions }: { player: SimGameP
         {simIfStartsHint(player) ? <AppText style={common.muted} testID="sim-if-starts">{simIfStartsHint(player)}</AppText> : null}
         {actions ? <View style={common.wrapRow}>{actions}</View> : null}
       </PqvSection>
-      {detail.failed ? (
-        <AppText style={common.small}>The full outlook is unavailable right now.</AppText>
-      ) : !body ? (
-        <SkeletonCard rows={2} />
-      ) : (
-        <>
-          {body.scouting ? <SimScoutingSections profile={body.scouting} /> : null}
-          {actual.length > 0 || band || ros ? (
-            <PqvSection title="Week by Week · This sim season">
-              {actual.length > 0 || band ? (
-                <WeeklyPointsChart weeks={actual.map((a) => ({ week: a.week, fantasy_points_ppr: a.points, snap_share: null }))} projection={band} pointsLabel="pts" />
-              ) : null}
-              {flat && ros ? (
-                <AppText style={common.small} testID="sim-ros-line">
-                  <AppText style={common.bodyStrong}>{simRosLine(ros)}</AppText>
-                  {availability ? ` · ${availability}` : ''}
+      {(body?.news ?? []).length > 0 ? (
+        <PqvSection title="Game news">
+          <View style={common.stack}>
+            {body!.news!.map((n, i) => (
+              <View key={i} style={common.row}>
+                <ReviewGlyphChip glyph="stats" tone="accent" size={22} />
+                <AppText style={[common.body, common.grow]}>
+                  <AppText style={[common.muted, { color: colors.accent, fontWeight: '700' }]}>Week {n.week} · </AppText>
+                  {n.text}
                 </AppText>
-              ) : availability ? (
-                <AppText style={common.small}>{availability}</AppText>
-              ) : null}
-            </PqvSection>
-          ) : null}
-          {(body.news ?? []).length > 0 ? (
-            <PqvSection title="Game news">
-              <View style={common.stack}>
-                {body.news!.map((n, i) => (
-                  <View key={i} style={common.row}>
-                    <ReviewGlyphChip glyph="stats" tone="accent" size={22} />
-                    <AppText style={[common.body, common.grow]}>
-                      <AppText style={[common.muted, { color: colors.accent, fontWeight: '700' }]}>Week {n.week} · </AppText>
-                      {n.text}
-                    </AppText>
-                  </View>
-                ))}
               </View>
-            </PqvSection>
-          ) : null}
-        </>
-      )}
+            ))}
+          </View>
+        </PqvSection>
+      ) : null}
+    </View>
+  );
+}
+
+function SimOutlookSection({ player, detail }: { player: SimGamePlayer; detail: SimPlayerDetailState }) {
+  const { colors } = useThemeMode();
+  const common = useMemo(() => createSimStyles(colors), [colors]);
+  const styles = useMemo(() => createStyles(), []);
+  const body = detail.data;
+  if (detail.failed) return <AppText style={common.small}>The full outlook is unavailable right now.</AppText>;
+  if (!body) return <SkeletonCard rows={2} />;
+  const ros = body.ros ?? null;
+  const flat = simProjectionIsFlat(body);
+  const band = simProjectionBand(body);
+  const actual = simActualPoints(body);
+  const availability = ros ? simAvailabilityLine(ros) : null;
+  if (!(actual.length > 0 || band || ros)) return <AppText style={common.small}>No outlook yet.</AppText>;
+  return (
+    <View style={styles.overlay}>
+      <PqvSection title="Week by Week · This sim season">
+        {actual.length > 0 || band ? (
+          <WeeklyPointsChart weeks={actual.map((a) => ({ week: a.week, fantasy_points_ppr: a.points, snap_share: null }))} projection={band} pointsLabel="pts" />
+        ) : null}
+        {flat && ros ? (
+          <AppText style={common.small} testID="sim-ros-line">
+            <AppText style={common.bodyStrong}>{simRosLine(ros)}</AppText>
+            {availability ? ` · ${availability}` : ''}
+          </AppText>
+        ) : availability ? (
+          <AppText style={common.small}>{availability}</AppText>
+        ) : null}
+      </PqvSection>
     </View>
   );
 }
