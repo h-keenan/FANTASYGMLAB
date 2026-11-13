@@ -4209,7 +4209,7 @@ body[data-sim-pqv] [data-sheet-hideable] {
   gap: 0.25rem;
   margin-inline: -1rem;
   padding: 0 0.5rem;
-  min-height: 52px;
+  min-height: var(--bar-header-height);
   background: color-mix(in srgb, var(--color-bg) 93%, transparent);
   -webkit-backdrop-filter: blur(18px) saturate(160%);
   backdrop-filter: blur(18px) saturate(160%);
