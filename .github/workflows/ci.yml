@@ -48,7 +48,7 @@ jobs:
       - name: Data files sanity (sleeper_players.json is a real player map)
         run: python scripts/check_data_integrity.py
       - name: Full test suite
-        run: python -m pytest -q -n auto
+        run: python -m pytest -q -n auto --dist worksteal
       - name: Tests must not dirty tracked data files
         run: python scripts/check_data_integrity.py --check-clean
       - name: Benchmark public player cache
