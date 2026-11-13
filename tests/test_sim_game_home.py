@@ -44,7 +44,13 @@ def test_home_matchup_lines_up_both_lineups_slot_by_slot():
     assert len(m["rows"]) == 8  # the default starting slots
     assert all(set(r) == {"slot", "you", "opp"} for r in m["rows"])
     assert 0.0 <= m["win_prob"] <= 1.0
-    assert m["you_projection"] == pytest.approx(sum(r["you"]["projection"] for r in m["rows"] if r["you"]), abs=0.2)
+    # The total is exactly the sum of the slot numbers on screen (each shown to a tenth), counting only what scores:
+    # an out / bye starter shows his when-back projection but counts 0, as the lineup warning says.
+    def counted(side):
+        return round(sum(r[side]["projection"] for r in m["rows"] if r[side] and r[side]["status"] == "healthy"), 1)
+
+    assert m["you_projection"] == counted("you")
+    assert m["opp_projection"] == counted("opp")
     # a projection edge raises the win chance
     lineup = client.get(f"/v1/sim/games/{gid}/lineup", headers=hdr()).json()
     assert lineup["opponent"]["team_id"] == m["opponent"]["team_id"]

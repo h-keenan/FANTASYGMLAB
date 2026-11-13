@@ -268,6 +268,13 @@ def _matchup(snap: GameSnapshot, state: GameState, ev: Evaluator, rows: Sequence
         })
     you_mu = ev.lineup_projection(mine, week)
     opp_mu = ev.lineup_projection(theirs, week)
+
+    def shown_total(lineup: Sequence[Sequence]) -> float:
+        """The displayed total: the sum of the per-slot numbers the user sees (each rounded to a tenth), counting
+        what scores this week (an out or bye starter counts 0). Summing the exact values and rounding once made
+        the total differ from the visible slots by a tenth or two (123.1 total over slots adding to 122.9)."""
+        return round(sum(round(ev.proj(row[1], week), 1) for row in lineup if row[1]), 1)
+
     prob = _win_prob(you_mu, _lineup_sd(snap, ev, mine, week), opp_mu, _lineup_sd(snap, ev, theirs, week))
     opp_row = next((r for r in rows if r["team_id"] == opp["team_id"]), None)
     you_row = next((r for r in rows if r["team_id"] == user), None)
@@ -277,7 +284,7 @@ def _matchup(snap: GameSnapshot, state: GameState, ev: Evaluator, rows: Sequence
         "opponent": {**_team_ref(snap, opp["team_id"]), "record": _record(opp_row) if opp_row else None,
                      "persona": _persona(snap, opp["persona_id"])},
         "you_record": _record(you_row) if you_row else None,
-        "you_projection": round(you_mu, 1), "opp_projection": round(opp_mu, 1),
+        "you_projection": shown_total(mine), "opp_projection": shown_total(theirs),
         "win_prob": round(prob, 3),
         "rows": slot_rows, "you_flagged": flagged("you"), "opp_flagged": flagged("opp"),
     }
