@@ -43,7 +43,8 @@ from typing import Any, Mapping
 
 import numpy as np
 
-MODEL_VERSION = "player-model-4"
+MODEL_VERSION = "player-model-5"
+# player-model-5 adds only the in-season path tilt (PATH_TILT below); everything else is player-model-4.
 # player-model-3 (frozen in player_model_v3.py) = player-model-2 + team-level role coupling (a multiplier on the hidden
 # season mean). player-model-4 fixes the unbounded tails that composition made (a 0.6 ppg depth WR filling in for a
 # star scored 72 in one game and was then "projected" 70):
@@ -57,6 +58,13 @@ MODEL_VERSION = "player-model-4"
 #   * the weekly game / efficiency / touchdown-luck draws are truncated at ``Z_TRUNC`` standard deviations.
 TEAM_ROLES = True
 ROLE_MODE = "additive"
+# player-model-5 (frozen predecessor: player_model_v4.py): the in-season path. A player's expected weekly mean relative to his season
+# mean used to fall from 1.00 in week 1 to about 0.92 by week 13 (role changes are biased down at the top of the pool) while the real
+# panel is flat (``modules/sim/calibration/path_fit.py``). Weekly means are tilted by ``1 + PATH_TILT[tier] x (week - 8)``: centered on
+# week 8, so season totals and every season-level calibration stay where they were.
+PATH_TILT = {"elite": 0.005, "starter": 0.005, "flex": 0.001, "depth": 0.0}
+PATH_CENTER = 8
+PATH_POS_SCALE = {"QB": 0.3, "K": 0.0, "DEF": 0.0}  # quarterbacks rarely change roles (the model's own role_qb), kickers and defenses never do
 SEASON_WEEKS = 17
 # Smooth ceilings (PPR points per game). Best real season PPG (8+ games) 2021-25: QB 26.7, RB 25.3, WR 25.8, TE 19.2, K 11.8;
 # best 6-game stretch: QB 31.6, RB 30.7, WR 31.4, TE 24.1, K 16.5. A mean can approach but never pass these.
@@ -749,6 +757,7 @@ def _week_mean(profile: SeasonProfile, week: int, ip: InSeasonParams) -> float:
     lc = math.log(cum)
     cum = math.exp(hi * math.tanh(lc / hi)) if lc > 0 else math.exp(lo * math.tanh(lc / lo))
     m *= cum
+    m *= 1.0 + PATH_TILT.get(profile.tier, 0.0) * PATH_POS_SCALE.get(profile.pos, 1.0) * (week - PATH_CENTER)
     if profile.rookie and week <= 4:
         m *= ip.rookie_ramp
     if week >= 2:
