@@ -51,6 +51,10 @@ export function TeamAvatar({
     <img
       src={avatarUrl}
       alt=""
+      // Same as PlayerAvatar: off-screen rows (a 12-team league list, trade partner cards) load when scrolled near, and
+      // decoding stays off the main thread. The box is fixed by `dimension`, so deferring shifts nothing.
+      loading="lazy"
+      decoding="async"
       style={{ ...dimension, border: `2px solid ${ringColor}`, objectFit: "cover" }}
       className="shrink-0"
       onError={() => setFailed(true)}
