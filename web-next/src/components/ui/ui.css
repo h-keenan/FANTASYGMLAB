@@ -202,7 +202,8 @@
   display: flex;
   align-items: center;
   gap: var(--space-sm);
-  min-width: max-content;
+  width: max-content;
+  max-width: min(24rem, calc(100vw - 16px));
   padding: 0 var(--space-sm) 0 var(--space-md);
   border: var(--border-width-default) solid var(--color-danger);
   border-radius: var(--radius-control);
@@ -213,7 +214,8 @@
 }
 .ui-confirm-parent .ui-confirm-panel {
   left: 0;
-  min-width: 0;
+  width: auto;
+  max-width: none;
 }
 .ui-confirm-text {
   flex: 1 1 auto;

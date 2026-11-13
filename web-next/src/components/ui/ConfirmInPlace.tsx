@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useId, useReducer, useRef, type CSSProperties, type ReactNode } from "react";
+import { useCallback, useEffect, useId, useLayoutEffect, useReducer, useRef, type CSSProperties, type ReactNode } from "react";
 
 import { Button, type ButtonVariant } from "@/components/Button";
 import {
@@ -102,6 +102,7 @@ export function ConfirmInPlace({
   const resolvedMode: ConfirmMode = variant === "icon" ? "ask" : (mode ?? (variant === "button" ? "tap-again" : "ask"));
   const [phase, dispatch] = useReducer(reduceConfirm, "idle");
   const rootRef = useRef<HTMLSpanElement>(null);
+  const panelRef = useRef<HTMLSpanElement>(null);
   const keepRef = useRef<HTMLButtonElement>(null);
   const wasArmed = useRef(false);
   const panelId = useId();
@@ -123,6 +124,25 @@ export function ConfirmInPlace({
     if (!open && wasArmed.current) rootRef.current?.querySelector<HTMLElement>("[data-confirm-trigger]")?.focus({ preventScroll: true });
     wasArmed.current = open;
   }, [open, resolvedMode]);
+
+  // "self" panels grow towards whichever side has room, so a control near a screen edge never pushes
+  // its question off-screen. ("parent" panels fill the row and need no measuring.)
+  useLayoutEffect(() => {
+    const panel = panelRef.current;
+    const root = rootRef.current;
+    if (!panel || !root || overlay !== "self") return;
+    const { left, right } = root.getBoundingClientRect();
+    const width = panel.offsetWidth;
+    const room = window.innerWidth - 8;
+    if (left + width <= room) {
+      panel.style.left = "0";
+      panel.style.right = "auto";
+    } else {
+      panel.style.right = "0";
+      panel.style.left = "auto";
+      if (right - width < 8) panel.style.transform = `translateX(${8 - (right - width)}px)`;
+    }
+  });
 
   // A press or focus outside cancels.
   useEffect(() => {
@@ -257,7 +277,7 @@ export function ConfirmInPlace({
         {trigger}
       </span>
       {showPanel ? (
-        <span id={panelId} role="group" aria-label={prompt} className="ui-confirm-panel" data-state={phase}>
+        <span ref={panelRef} id={panelId} role="group" aria-label={prompt} className="ui-confirm-panel" data-state={phase}>
           <span className="ui-confirm-text">{phase === "error" ? errorText : prompt}</span>
           <span className="ui-confirm-actions">
             <Button variant="danger" size="sm" loading={busy} onClick={() => void run()}>
