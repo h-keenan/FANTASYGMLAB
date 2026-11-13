@@ -81,9 +81,17 @@ export default function CommunityPage() {
     });
   }, []);
 
-  const handleDeleteShared = useCallback((id: string) => {
+  const handleDeleteShared = useCallback(async (id: string) => {
+    // Remove from the list only once the server confirms, so a failed delete
+    // surfaces as an error on the card instead of a trade that silently reappears.
+    try {
+      const result = await api.deleteSharedCommunityTrade(id);
+      if (!result?.ok) return false;
+    } catch {
+      return false;
+    }
     setShared((current) => ({ ...current, trades: current.trades.filter((trade) => trade.id !== id) }));
-    return api.deleteSharedCommunityTrade(id).catch(() => {});
+    return true;
   }, []);
 
   const handleReportShared = useCallback((id: string) => api.reportSharedCommunityTrade(id).catch(() => {}), []);

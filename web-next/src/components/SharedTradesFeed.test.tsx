@@ -56,6 +56,8 @@ describe("SharedTradesFeed", () => {
     render(<SharedTradesFeed available trades={[trade({ mine: true })]} onDelete={onDelete} onReport={vi.fn()} />);
     expect(screen.queryByRole("button", { name: "Report" })).toBeNull();
     fireEvent.click(screen.getByRole("button", { name: "Delete" }));
+    expect(onDelete).not.toHaveBeenCalled();
+    fireEvent.click(screen.getAllByRole("button", { name: "Delete" }).at(-1)!);
     expect(onDelete).toHaveBeenCalledWith("t1");
   });
 });

@@ -1,3 +1,4 @@
+import { useUndoableRemoval } from '../components/UndoToast';
 import type { TabIconName } from '../lib/tabIcons';
 import FreeLimitNote from '../components/FreeLimitNote';
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
@@ -213,13 +214,31 @@ export default function GmPlanScreen({ route, navigation }: Props) {
     [leagueId, targets],
   );
 
+  // Removing a target is trivial to put back, so it is instant with an Undo
+  // toast; the server call only runs once the undo window closes.
+  const restoreTarget = useCallback(
+    (row: GmTarget) => setTargets((prev) => (prev.some((t) => t.player_id === row.player_id) ? prev : [row, ...prev])),
+    [],
+  );
+  const { schedule: scheduleRemoval, toast: undoToast } = useUndoableRemoval<GmTarget>({
+    message: (row) => `Removed ${ranked.get(row.player_id)?.name ?? 'target'} from your targets.`,
+    commit: async (row) => {
+      try {
+        await api.removeGmTarget(leagueId, row.player_id);
+      } catch {
+        restoreTarget(row);
+      }
+    },
+    restore: restoreTarget,
+  });
   const onRemoveTarget = useCallback(
     (playerId: string) => {
-      const previous = targets;
+      const row = targets.find((t) => t.player_id === playerId);
+      if (!row) return;
       setTargets((prev) => prev.filter((t) => t.player_id !== playerId));
-      api.removeGmTarget(leagueId, playerId).catch(() => setTargets(previous));
+      scheduleRemoval(row);
     },
-    [leagueId, targets],
+    [targets, scheduleRemoval],
   );
 
   if (loading) {
@@ -602,6 +621,7 @@ export default function GmPlanScreen({ route, navigation }: Props) {
           </>
         ) : null}
       </ScrollView>
+      {undoToast}
     </View>
   );
 }

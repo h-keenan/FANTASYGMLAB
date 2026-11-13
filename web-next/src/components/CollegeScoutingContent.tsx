@@ -8,7 +8,7 @@ import { useMemo, useState, type ReactNode } from "react";
 import { api, type CollegeProspect, type CollegeProspectsResponse, MAX_GRADE, MAX_ROUND_PROJECTION, MIN_GRADE, MIN_ROUND_PROJECTION } from "@/lib/api";
 import { ConfidenceMeter } from "@/components/ConfidenceMeter";
 import { PillRow } from "@/components/PillRow";
-import { Button } from "@/components/Button";
+import { ConfirmInPlace } from "@/components/ui/ConfirmInPlace";
 import { ToneBadge } from "@/components/ToneBadge";
 import { prospectFit, rankByFit, type ScoutingLens } from "@/lib/scoutingLens";
 import { PositionBadge } from "@/components/PositionBadge";
@@ -83,7 +83,7 @@ function ProspectCard({
   onToggleWatchlist: () => void;
   onDraftChange: (next: ReportDraft) => void;
   onSubmit: () => void;
-  onRemove: () => void;
+  onRemove: () => Promise<boolean>;
 }) {
   const aggregate = prospect.aggregate;
   const hasReport = prospect.my_report != null;
@@ -233,9 +233,17 @@ function ProspectCard({
               {hasReport ? "Update grade" : "Submit grade"}
             </button>
             {hasReport ? (
-              <Button variant="dangerOutline" size="sm" onClick={onRemove} disabled={busy}>
-                Remove my report
-              </Button>
+              <ConfirmInPlace
+                variant="row"
+                mode="ask"
+                size="sm"
+                label="Remove my report"
+                prompt="Remove your report?"
+                confirmLabel="Remove"
+                errorText="Could not remove your grade. Try again in a moment."
+                disabled={busy}
+                onConfirm={onRemove}
+              />
             ) : null}
           </div>
         </div>
@@ -326,23 +334,20 @@ export function CollegeScoutingContent({
       .finally(() => setBusyId(null));
   };
 
-  const removeReport = (prospect: CollegeProspect) => {
+  const removeReport = async (prospect: CollegeProspect): Promise<boolean> => {
     setBusyId(prospect.id);
-    api
-      .deleteScoutingReport(prospect.id)
-      .then((result) => {
-        if (result.ok) {
-          setProspects((prev) => prev.map((row) => (row.id === prospect.id ? { ...row, my_report: null } : row)));
-          setDrafts((prev) => ({ ...prev, [prospect.id]: { grade: null, roundProjection: null, note: "" } }));
-          setFlashes((prev) => ({ ...prev, [prospect.id]: { tone: "success", message: "Removed your report." } }));
-        } else {
-          setFlashes((prev) => ({ ...prev, [prospect.id]: { tone: "error", message: "Could not remove your grade. Try again in a moment." } }));
-        }
-      })
-      .catch(() => {
-        setFlashes((prev) => ({ ...prev, [prospect.id]: { tone: "error", message: "Could not remove your grade. Try again in a moment." } }));
-      })
-      .finally(() => setBusyId(null));
+    try {
+      const result = await api.deleteScoutingReport(prospect.id);
+      if (!result.ok) return false;
+      setProspects((prev) => prev.map((row) => (row.id === prospect.id ? { ...row, my_report: null } : row)));
+      setDrafts((prev) => ({ ...prev, [prospect.id]: { grade: null, roundProjection: null, note: "" } }));
+      setFlashes((prev) => ({ ...prev, [prospect.id]: { tone: "success", message: "Removed your report." } }));
+      return true;
+    } catch {
+      return false;
+    } finally {
+      setBusyId(null);
+    }
   };
 
   return (

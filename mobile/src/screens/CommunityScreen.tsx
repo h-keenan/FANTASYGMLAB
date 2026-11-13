@@ -73,9 +73,16 @@ export default function CommunityScreen({ navigation }: Props) {
           <SharedTradesFeed
             available={shared.available}
             trades={shared.trades}
-            onDelete={(id) => {
+            onDelete={async (id) => {
+              // Remove from the list only once the server confirms, so a failed delete shows an error on the card.
+              try {
+                const result = await api.deleteSharedCommunityTrade(id);
+                if (!result?.ok) return false;
+              } catch {
+                return false;
+              }
               setShared((cur) => (cur ? { ...cur, trades: cur.trades.filter((t) => t.id !== id) } : cur));
-              void api.deleteSharedCommunityTrade(id).catch(() => {});
+              return true;
             }}
             onReport={(id) => void api.reportSharedCommunityTrade(id).catch(() => {})}
           />

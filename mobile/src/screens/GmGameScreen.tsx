@@ -1,12 +1,12 @@
 import React, { useCallback, useEffect, useMemo, useReducer, useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
+import { ScrollView, StyleSheet, View } from 'react-native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { useHeaderHeight } from '@react-navigation/elements';
 
 import AccentCard from '../components/AccentCard';
 import AppText from '../components/AppText';
 import Button from '../components/Button';
+import ConfirmInPlace from '../components/ConfirmInPlace';
 import EmptyState from '../components/EmptyState';
 import ErrorState from '../components/ErrorState';
 import FadeInView from '../components/FadeInView';
@@ -44,7 +44,6 @@ import {
   simFmtPts,
   simFmtRecord,
   simGameGate,
-  simGameDeleteConfirm,
   simGameDeleteFailure,
   simGameLiteLine,
   simGamePaywalled,
@@ -127,7 +126,6 @@ export default function GmGameScreen({ navigation }: Props) {
   const [tradeSeed, setTradeSeed] = useState<{ partner: string; get: string } | null>(null);
   const [advancing, setAdvancing] = useState(false);
   const [creating, setCreating] = useState(false);
-  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [managing, setManaging] = useState(false);
 
@@ -214,7 +212,7 @@ export default function GmGameScreen({ navigation }: Props) {
     }
   }, []);
 
-  async function deleteSaved(id: string) {
+  async function deleteSaved(id: string): Promise<boolean> {
     setDeletingId(id);
     let removed = false;
     try {
@@ -237,7 +235,6 @@ export default function GmGameScreen({ navigation }: Props) {
       if (failure.refresh) void refreshList();
     }
     setDeletingId(null);
-    setConfirmDeleteId(null);
     if (removed) {
       // Drop it right away so the count, the limit note and New game update with no reload.
       setGames((prev) => {
@@ -247,6 +244,7 @@ export default function GmGameScreen({ navigation }: Props) {
       });
       void refreshList();
     }
+    return removed;
   }
 
   const openGame = useCallback(
@@ -498,8 +496,16 @@ export default function GmGameScreen({ navigation }: Props) {
         ) : (
           games.map((g) => (
             <View key={g.id} style={styles.tight}>
-              <View style={styles.wrapRow}>
-                <View style={styles.grow}>
+              <ConfirmInPlace
+                variant="icon"
+                label={`Delete game: ${simGameLiteLine(g)}`}
+                prompt="Delete this game? It can't be undone."
+                confirmLabel="Delete"
+                keepLabel="Keep"
+                errorText="Could not delete it. Try again."
+                disabled={deletingId !== null}
+                onConfirm={() => deleteSaved(g.id)}
+                rowContent={
                   <AccentCard accent={g.status === 'complete' ? colors.success : colors.accent} compact onPress={() => void openGame(g.id)}>
                     <View style={styles.rowBetween}>
                       <AppText style={[styles.bodyStrong, styles.grow]}>{simGameLiteLine(g)}</AppText>
@@ -509,27 +515,8 @@ export default function GmGameScreen({ navigation }: Props) {
                       {simSettingsSummary(g.settings) || `${SIM_SCORING_LABELS[(g.settings.scoring ?? 'ppr') as SimScoring]} · ${g.settings.teams ?? 12} teams`} · {SIM_DIFFICULTY_COPY[g.difficulty]?.label ?? g.difficulty}
                     </AppText>
                   </AccentCard>
-                </View>
-                <Pressable
-                  accessibilityRole="button"
-                  accessibilityLabel={`Delete game: ${simGameLiteLine(g)}`}
-                  disabled={deletingId !== null}
-                  onPress={() => setConfirmDeleteId(confirmDeleteId === g.id ? null : g.id)}
-                  hitSlop={6}
-                  style={styles.trash}
-                >
-                  <Ionicons name="trash-outline" size={20} color={colors.danger} />
-                </Pressable>
-              </View>
-              {confirmDeleteId === g.id ? (
-                <AccentCard accent={colors.danger} compact>
-                  <AppText style={styles.body}>{simGameDeleteConfirm(g)}</AppText>
-                  <View style={styles.wrapRow}>
-                    <Button size="sm" variant="danger" label="Delete game" loading={deletingId === g.id} onPress={() => void deleteSaved(g.id)} />
-                    <Button size="sm" variant="ghost" label="Keep it" disabled={deletingId === g.id} onPress={() => setConfirmDeleteId(null)} />
-                  </View>
-                </AccentCard>
-              ) : null}
+                }
+              />
             </View>
           ))
         )}
@@ -988,26 +975,21 @@ function SimMoreTab({ ctx, onDeleted, onHub }: { ctx: SimCtx; onDeleted: () => v
   const { game, gameId, call } = ctx;
   const { colors } = useThemeMode();
   const styles = useMemo(() => createStyles(colors), [colors]);
-  const [confirm, setConfirm] = useState<'revert' | 'delete' | null>(null);
-  const [busy, setBusy] = useState(false);
   const s = game.settings;
 
-  async function revert() {
-    setBusy(true);
+  async function revert(): Promise<boolean> {
     const body = await call(() => api.revertSimWeek(gameId));
-    setBusy(false);
-    setConfirm(null);
-    if (body?.game) {
-      ctx.setGame(body.game);
-      ctx.bump();
-      ctx.notify(body.reverted ? "This week's decisions were reset." : 'Nothing to reset this week.', 'success');
-    }
+    if (!body?.game) return false;
+    ctx.setGame(body.game);
+    ctx.bump();
+    ctx.notify(body.reverted ? "This week's decisions were reset." : 'Nothing to reset this week.', 'success');
+    return true;
   }
-  async function remove() {
-    setBusy(true);
+  async function remove(): Promise<boolean> {
     const body = await call(() => api.deleteSimGame(gameId));
-    setBusy(false);
-    if (body) onDeleted();
+    if (!body) return false;
+    onDeleted();
+    return true;
   }
 
   return (
@@ -1015,14 +997,7 @@ function SimMoreTab({ ctx, onDeleted, onHub }: { ctx: SimCtx; onDeleted: () => v
       <SectionHeading title="This week" />
       <AccentCard accent={colors.warning} compact>
         <AppText style={styles.body}>Undo this week&apos;s lineup edits, claims, cuts and trades back to how the week started. You cannot undo a week you already advanced.</AppText>
-        {confirm === 'revert' ? (
-          <View style={styles.wrapRow}>
-            <Button size="sm" variant="danger" label="Reset this week" loading={busy} onPress={revert} />
-            <Button size="sm" variant="ghost" label="Cancel" onPress={() => setConfirm(null)} />
-          </View>
-        ) : (
-          <Button size="sm" variant="secondary" label="Reset this week" onPress={() => setConfirm('revert')} style={styles.start} />
-        )}
+        <ConfirmInPlace label="Reset this week" buttonVariant="secondary" size="sm" onConfirm={revert} style={styles.start} />
       </AccentCard>
 
       <SectionHeading title="League rules" />
@@ -1042,14 +1017,16 @@ function SimMoreTab({ ctx, onDeleted, onHub }: { ctx: SimCtx; onDeleted: () => v
       <SectionHeading title="Game" />
       <View style={styles.wrapRow}>
         <Button size="sm" variant="secondary" label="All games" onPress={onHub} />
-        {confirm === 'delete' ? (
-          <>
-            <Button size="sm" variant="danger" label="Delete this game" loading={busy} onPress={remove} />
-            <Button size="sm" variant="ghost" label="Keep it" onPress={() => setConfirm(null)} />
-          </>
-        ) : (
-          <Button size="sm" variant="dangerOutline" label="Delete game" onPress={() => setConfirm('delete')} />
-        )}
+        <ConfirmInPlace
+          variant="button"
+          mode="ask"
+          size="sm"
+          label="Delete game"
+          prompt="Delete this game?"
+          confirmLabel="Delete"
+          errorText="Could not delete it. Try again."
+          onConfirm={remove}
+        />
       </View>
     </View>
   );
@@ -1066,7 +1043,6 @@ function createStyles(colors: ThemeColors) {
     wrapRow: { flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: spacing.sm },
     rowBetween: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: spacing.md },
     grow: { flex: 1, minWidth: 0 },
-    trash: { width: 44, height: 44, borderRadius: 12, borderWidth: 1, borderColor: colors.danger, alignItems: 'center', justifyContent: 'center' },
     back: { alignSelf: 'flex-start' },
     youRow: { flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: 8 },
     start: { alignSelf: 'flex-start' },

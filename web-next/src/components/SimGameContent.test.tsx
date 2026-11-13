@@ -221,9 +221,10 @@ describe("SimGameContent", () => {
     expect(screen.getByRole("button", { name: "Manage games / delete one" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "New game" })).toBeDisabled();
     fireEvent.click(screen.getByRole("button", { name: /Delete game: Finished/ }));
-    expect(screen.getByRole("alert")).toHaveTextContent(/Finished · Grade B\+.*cannot be undone/);
+    expect(screen.getByRole("group", { name: /Delete this game\?.*can't be undone/ })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Keep" })).toHaveFocus();
     mocked.listSimGames.mockResolvedValue({ ok: true, reason: "", games: [lite(game())] });
-    fireEvent.click(screen.getByRole("button", { name: "Delete game" }));
+    fireEvent.click(screen.getByRole("button", { name: "Delete" }));
     await waitFor(() => expect(mocked.deleteSimGame).toHaveBeenCalledWith("g2"));
     await waitFor(() => expect(screen.queryByTestId("new-game-block")).toBeNull());
     expect(screen.getByRole("button", { name: "New game" })).toBeEnabled();
@@ -235,7 +236,7 @@ describe("SimGameContent", () => {
     mocked.deleteSimGame.mockRejectedValue(Object.assign(new Error("busy"), { status: 503 }));
     render(<SimGameContent />);
     fireEvent.click(await screen.findByRole("button", { name: /Delete game: Week/ }));
-    fireEvent.click(screen.getByRole("button", { name: "Delete game" }));
+    fireEvent.click(screen.getByRole("button", { name: "Delete" }));
     expect(await screen.findByText(/simulator is busy/)).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /Open game/ })).toBeInTheDocument();
   });
@@ -246,7 +247,7 @@ describe("SimGameContent", () => {
     render(<SimGameContent />);
     fireEvent.click(await screen.findByRole("button", { name: /Delete game: Week/ }));
     mocked.listSimGames.mockResolvedValue({ ok: true, reason: "", games: [] });
-    fireEvent.click(screen.getByRole("button", { name: "Delete game" }));
+    fireEvent.click(screen.getByRole("button", { name: "Delete" }));
     expect(await screen.findByText("No games yet")).toBeInTheDocument();
   });
 

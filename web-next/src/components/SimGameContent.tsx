@@ -18,6 +18,7 @@ import { SimHomeTab } from "@/components/SimGameHome";
 import { SimPlayerSheet } from "@/components/SimGamePlayers";
 import { SimActionBar } from "@/components/SimActionBar";
 import { SimOffseasonBar } from "@/components/SimOffseasonBar";
+import { ConfirmInPlace } from "@/components/ui/ConfirmInPlace";
 import { SimNotice, SimOpenPlayerContext, SimPreviewBanner, SimTeamLink, SimTeamOpenContext, simToneColor, type SimCtx } from "@/components/SimGameParts";
 import { SimTeamSheet } from "@/components/SimGameTeamSheet";
 import { SimFinalView, SimWeekRecapView } from "@/components/SimGameRecap";
@@ -38,7 +39,6 @@ import {
   simFmtRecord,
   simGameGate,
   simLeagueTeamLabel,
-  simGameDeleteConfirm,
   simGameDeleteFailure,
   simGameLiteLine,
   simGamePaywalled,
@@ -104,7 +104,6 @@ export function SimGameContent() {
   const [tradeSeed, setTradeSeed] = useState<{ partner: string; get: string } | null>(null);
   const [advancing, setAdvancing] = useState(false);
   const [creating, setCreating] = useState(false);
-  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [managing, setManaging] = useState(false);
 
@@ -189,7 +188,7 @@ export function SimGameContent() {
     }
   }, []);
 
-  async function deleteSaved(id: string) {
+  async function deleteSaved(id: string): Promise<boolean> {
     setDeletingId(id);
     let removed = false;
     try {
@@ -212,7 +211,6 @@ export function SimGameContent() {
       if (failure.refresh) void refreshList();
     }
     setDeletingId(null);
-    setConfirmDeleteId(null);
     if (removed) {
       // Drop it right away so the count, the limit note and New game update with no reload.
       setGames((prev) => {
@@ -222,6 +220,7 @@ export function SimGameContent() {
       });
       void refreshList();
     }
+    return removed;
   }
 
   const openGame = useCallback(
@@ -419,7 +418,7 @@ export function SimGameContent() {
         ) : (
           games.map((g) => (
             <div key={g.id} className="flex flex-col gap-1.5">
-              <div className="flex items-stretch gap-2">
+              <div className="relative flex items-stretch gap-2">
                 <button type="button" className="flex-1 min-w-0 text-left" onClick={() => void openGame(g.id)} aria-label={`Open game: ${simGameLiteLine(g)}`}>
                   <AccentCard accent={g.status === "complete" ? "var(--color-success)" : "var(--color-accent)"} compact as="div">
                     <div className="flex items-center justify-between gap-2">
@@ -431,28 +430,18 @@ export function SimGameContent() {
                     </p>
                   </AccentCard>
                 </button>
-                <button
-                  type="button"
-                  className="shrink-0 inline-flex items-center justify-center rounded-lg border min-w-[var(--touch-target-min)] min-h-[var(--touch-target-min)]"
-                  style={{ borderColor: "var(--color-danger)", color: "var(--color-danger)", background: "transparent" }}
-                  aria-label={`Delete game: ${simGameLiteLine(g)}`}
+                <ConfirmInPlace
+                  variant="icon"
+                  overlay="parent"
+                  label={`Delete game: ${simGameLiteLine(g)}`}
+                  prompt="Delete this game? It can't be undone."
+                  confirmLabel="Delete"
+                  keepLabel="Keep"
+                  errorText="Could not delete it. Try again."
                   disabled={deletingId !== null}
-                  onClick={() => setConfirmDeleteId(confirmDeleteId === g.id ? null : g.id)}
-                >
-                  <svg aria-hidden="true" width="18" height="18" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round">
-                    <path d="M2.5 4h11M6 4V2.5h4V4M4 4l.6 9h6.8L12 4M6.6 6.5v4M9.4 6.5v4" />
-                  </svg>
-                </button>
+                  onConfirm={() => deleteSaved(g.id)}
+                />
               </div>
-              {confirmDeleteId === g.id ? (
-                <AccentCard accent="var(--color-danger)" compact as="div">
-                  <p className="text-sm" role="alert">{simGameDeleteConfirm(g)}</p>
-                  <div className="flex gap-2">
-                    <Button size="sm" variant="danger" loading={deletingId === g.id} onClick={() => void deleteSaved(g.id)}>Delete game</Button>
-                    <Button size="sm" variant="ghost" disabled={deletingId === g.id} onClick={() => setConfirmDeleteId(null)}>Keep it</Button>
-                  </div>
-                </AccentCard>
-              ) : null}
             </div>
           ))
         )}
@@ -940,26 +929,21 @@ function GameScreen({
 
 function SimMoreTab({ ctx, onDeleted, onHub }: { ctx: SimCtx; onDeleted: () => void; onHub: () => void }) {
   const { game, gameId, call } = ctx;
-  const [confirm, setConfirm] = useState<"revert" | "delete" | null>(null);
-  const [busy, setBusy] = useState(false);
   const s = game.settings;
 
-  async function revert() {
-    setBusy(true);
+  async function revert(): Promise<boolean> {
     const body = await call(() => api.revertSimWeek(gameId));
-    setBusy(false);
-    setConfirm(null);
-    if (body?.game) {
-      ctx.setGame(body.game);
-      ctx.bump();
-      ctx.notify(body.reverted ? "This week's decisions were reset." : "Nothing to reset this week.", "success");
-    }
+    if (!body?.game) return false;
+    ctx.setGame(body.game);
+    ctx.bump();
+    ctx.notify(body.reverted ? "This week's decisions were reset." : "Nothing to reset this week.", "success");
+    return true;
   }
-  async function remove() {
-    setBusy(true);
+  async function remove(): Promise<boolean> {
     const body = await call(() => api.deleteSimGame(gameId));
-    setBusy(false);
-    if (body) onDeleted();
+    if (!body) return false;
+    onDeleted();
+    return true;
   }
 
   return (
@@ -967,14 +951,7 @@ function SimMoreTab({ ctx, onDeleted, onHub }: { ctx: SimCtx; onDeleted: () => v
       <SectionHeading>This week</SectionHeading>
       <AccentCard accent="var(--color-warning)" compact as="div">
         <p className="text-sm">Undo this week&apos;s lineup edits, claims, cuts and trades back to how the week started. You cannot undo a week you already advanced.</p>
-        {confirm === "revert" ? (
-          <div className="flex gap-2">
-            <Button size="sm" variant="danger" loading={busy} onClick={revert}>Reset this week</Button>
-            <Button size="sm" variant="ghost" onClick={() => setConfirm(null)}>Cancel</Button>
-          </div>
-        ) : (
-          <Button size="sm" variant="secondary" onClick={() => setConfirm("revert")}>Reset this week</Button>
-        )}
+        <ConfirmInPlace label="Reset this week" buttonVariant="secondary" size="sm" onConfirm={revert} />
       </AccentCard>
 
       <SectionHeading>League rules</SectionHeading>
@@ -997,14 +974,16 @@ function SimMoreTab({ ctx, onDeleted, onHub }: { ctx: SimCtx; onDeleted: () => v
       <SectionHeading>Game</SectionHeading>
       <div className="flex flex-wrap gap-2">
         <Button size="sm" variant="secondary" onClick={onHub}>All games</Button>
-        {confirm === "delete" ? (
-          <>
-            <Button size="sm" variant="danger" loading={busy} onClick={remove}>Delete this game</Button>
-            <Button size="sm" variant="ghost" onClick={() => setConfirm(null)}>Keep it</Button>
-          </>
-        ) : (
-          <Button size="sm" variant="dangerOutline" onClick={() => setConfirm("delete")}>Delete game</Button>
-        )}
+        <ConfirmInPlace
+          variant="button"
+          mode="ask"
+          size="sm"
+          label="Delete game"
+          prompt="Delete this game?"
+          confirmLabel="Delete"
+          errorText="Could not delete it. Try again."
+          onConfirm={remove}
+        />
       </div>
     </div>
   );

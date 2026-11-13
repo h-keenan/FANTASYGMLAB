@@ -30,6 +30,8 @@ import { fileURLToPath } from "node:url";
 export const IDENTICAL = [
   "simTradeSheet.ts",
   "tradeSheetPicker.ts",
+  "confirmInPlace.ts",
+  "sheetStack.ts",
   "busyRetry.ts",
   "destinationAccents.generated.ts",
   "directionCheckin.ts",

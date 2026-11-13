@@ -1,3 +1,4 @@
+import ConfirmInPlace from './ConfirmInPlace';
 import React, { useMemo, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 
@@ -30,7 +31,7 @@ export default function SharedTradesFeed({
 }: {
   available: boolean;
   trades: SharedCommunityTrade[];
-  onDelete: (id: string) => void;
+  onDelete: (id: string) => void | boolean | Promise<unknown>;
   onReport: (id: string) => void;
 }) {
   const { colors } = useThemeMode();
@@ -71,7 +72,18 @@ export default function SharedTradesFeed({
             </AppText>
           ))}
           {trade.mine ? (
-            <Button label="Delete" variant="ghost" onPress={() => onDelete(trade.id)} />
+            <ConfirmInPlace
+              variant="row"
+              mode="ask"
+              label="Delete"
+              prompt="Delete this shared trade?"
+              confirmLabel="Delete"
+              errorText="Could not delete it. Try again."
+              onConfirm={async () => {
+                const result = await onDelete(trade.id);
+                return result === false ? false : undefined;
+              }}
+            />
           ) : (
             <Button
               label="Report"

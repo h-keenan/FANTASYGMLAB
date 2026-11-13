@@ -1,0 +1,286 @@
+/* Shared UI primitives (Sheet, ConfirmInPlace, TapForWhy, StructuredRow,
+   FilterSheet). Liquid-glass surface and tokens only: nothing invented here.
+   Imported by the components themselves so it loads on demand. */
+
+/* ---------- Sheet ---------- */
+.ui-sheet-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 70; /* above the PQV modal (50) so a Sheet opened from it is visible */
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  background: var(--color-scrim);
+}
+.ui-sheet-backdrop[hidden] {
+  display: none;
+}
+.ui-sheet {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  max-height: 88dvh;
+  overflow: hidden;
+  outline: none;
+  background: linear-gradient(165deg, rgba(50, 54, 60, 0.72), rgba(24, 26, 30, 0.9));
+  backdrop-filter: blur(28px) saturate(180%);
+  -webkit-backdrop-filter: blur(28px) saturate(180%);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-bottom: 0;
+  border-radius: var(--radius-panel) var(--radius-panel) 0 0;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.25), var(--shadow-overlay);
+  animation: ui-sheet-rise 220ms cubic-bezier(0.2, 0.9, 0.3, 1);
+}
+@media (prefers-color-scheme: light) {
+  :where(:root:not([data-theme="dark"])) .ui-sheet {
+    background: linear-gradient(165deg, rgba(255, 255, 255, 0.92), rgba(245, 249, 251, 0.86));
+    border-color: rgba(10, 30, 45, 0.1);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.6), var(--shadow-overlay);
+  }
+}
+:where(:root[data-theme="light"]) .ui-sheet {
+  background: linear-gradient(165deg, rgba(255, 255, 255, 0.92), rgba(245, 249, 251, 0.86));
+  border-color: rgba(10, 30, 45, 0.1);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.6), var(--shadow-overlay);
+}
+.ui-sheet-header {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-md);
+  padding: var(--space-md) var(--space-lg) var(--space-sm);
+}
+.ui-sheet-title {
+  margin: 0;
+  font-size: 1.05rem;
+  font-weight: 800;
+  line-height: 1.25;
+  color: var(--color-text-primary);
+}
+.ui-sheet-desc {
+  margin: 2px 0 0;
+  font-size: 0.8rem;
+  color: var(--color-text-muted);
+}
+.ui-sheet-close {
+  flex-shrink: 0;
+  display: inline-grid;
+  place-items: center;
+  width: var(--touch-target-min);
+  height: var(--touch-target-min);
+  margin: -4px -8px 0 0;
+  border-radius: var(--radius-pill);
+  background: transparent;
+  border: 0;
+  color: var(--color-text-secondary);
+  font-size: 1.4rem;
+  line-height: 1;
+  cursor: pointer;
+}
+.ui-sheet-close:hover,
+.ui-sheet-close:focus-visible {
+  color: var(--color-text-primary);
+}
+.ui-sheet-body {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: var(--space-sm) var(--space-lg) var(--space-lg);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-md);
+}
+.ui-sheet-footer {
+  flex-shrink: 0;
+  padding: var(--space-md) var(--space-lg) calc(var(--space-md) + env(safe-area-inset-bottom, 0px));
+  border-top: var(--border-width-default) solid var(--color-border);
+  background: color-mix(in srgb, var(--color-surface-raised) 40%, transparent);
+}
+/* With no footer the body itself clears the home indicator. */
+.ui-sheet-body:last-child {
+  padding-bottom: calc(var(--space-lg) + env(safe-area-inset-bottom, 0px));
+}
+@media (min-width: 768px) {
+  .ui-sheet-backdrop {
+    align-items: center;
+    padding: var(--space-lg);
+  }
+  .ui-sheet {
+    border-bottom: 1px solid rgba(255, 255, 255, 0.14);
+    border-radius: var(--radius-panel);
+    animation-name: ui-sheet-pop;
+  }
+  .ui-sheet-md {
+    width: min(560px, 100%);
+  }
+  .ui-sheet-sm {
+    width: min(420px, 100%);
+  }
+  .ui-sheet-lg {
+    width: min(720px, 100%);
+  }
+  .ui-sheet-body:last-child {
+    padding-bottom: var(--space-lg);
+  }
+}
+@keyframes ui-sheet-rise {
+  from { transform: translateY(24px); opacity: 0; }
+  to { transform: translateY(0); opacity: 1; }
+}
+@keyframes ui-sheet-pop {
+  from { transform: scale(0.97); opacity: 0; }
+  to { transform: scale(1); opacity: 1; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .ui-sheet,
+  .ui-confirm-panel,
+  .ui-toast {
+    animation: none !important;
+  }
+  .ui-confirm-timer {
+    display: none;
+  }
+}
+
+/* ---------- ConfirmInPlace ---------- */
+.ui-confirm {
+  position: relative;
+  display: inline-flex;
+  align-items: stretch;
+  vertical-align: middle;
+}
+.ui-confirm-parent {
+  position: static;
+}
+.ui-confirm-trigger {
+  position: relative;
+  overflow: hidden;
+}
+.ui-confirm-sizer {
+  display: inline-grid;
+  justify-items: center;
+}
+.ui-confirm-timer {
+  position: absolute;
+  left: 0;
+  bottom: 0;
+  height: 3px;
+  width: 100%;
+  background: var(--color-danger);
+  transform-origin: left center;
+  animation-name: ui-confirm-drain;
+  animation-timing-function: linear;
+  animation-fill-mode: forwards;
+}
+@keyframes ui-confirm-drain {
+  from { transform: scaleX(1); }
+  to { transform: scaleX(0); }
+}
+.ui-confirm-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  min-width: var(--touch-target-min);
+  min-height: var(--touch-target-min);
+  border: var(--border-width-default) solid var(--color-danger);
+  border-radius: var(--radius-control);
+  cursor: pointer;
+}
+.ui-confirm-icon:disabled {
+  opacity: var(--opacity-disabled);
+  cursor: not-allowed;
+}
+/* The panel paints over the trigger (or the whole row) with the same box. */
+.ui-confirm-panel {
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  min-width: max-content;
+  padding: 0 var(--space-sm) 0 var(--space-md);
+  border: var(--border-width-default) solid var(--color-danger);
+  border-radius: var(--radius-control);
+  background: color-mix(in srgb, var(--color-danger) 14%, var(--color-surface-raised));
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  animation: ui-confirm-in 140ms ease-out;
+}
+.ui-confirm-parent .ui-confirm-panel {
+  left: 0;
+  min-width: 0;
+}
+.ui-confirm-text {
+  flex: 1 1 auto;
+  min-width: 0;
+  font-size: 0.8rem;
+  font-weight: 700;
+  line-height: 1.25;
+  color: var(--color-text-primary);
+}
+.ui-confirm-actions {
+  display: inline-flex;
+  flex-shrink: 0;
+  gap: var(--space-xs, 4px);
+  align-items: center;
+}
+.ui-confirm-keep {
+  min-height: var(--touch-target-min);
+  padding: 0 var(--space-md);
+  background: transparent;
+  border: 0;
+  font-size: 0.75rem;
+  font-weight: 800;
+  color: var(--color-text-secondary);
+  cursor: pointer;
+}
+.ui-confirm-keep:disabled {
+  opacity: var(--opacity-disabled);
+}
+@keyframes ui-confirm-in {
+  from { opacity: 0; transform: translateX(8px); }
+  to { opacity: 1; transform: translateX(0); }
+}
+
+/* ---------- UndoToast ---------- */
+.ui-toast {
+  position: fixed;
+  left: 50%;
+  bottom: calc(var(--space-lg) + env(safe-area-inset-bottom, 0px) + 56px);
+  transform: translateX(-50%);
+  z-index: 80;
+  display: flex;
+  align-items: center;
+  gap: var(--space-md);
+  max-width: min(420px, calc(100vw - 32px));
+  padding: var(--space-sm) var(--space-sm) var(--space-sm) var(--space-lg);
+  border-radius: var(--radius-control);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  background: linear-gradient(165deg, rgba(50, 54, 60, 0.9), rgba(24, 26, 30, 0.95));
+  box-shadow: var(--shadow-overlay);
+  color: var(--color-text-primary);
+  animation: ui-sheet-rise 200ms ease-out;
+}
+:where(:root[data-theme="light"]) .ui-toast {
+  background: rgba(255, 255, 255, 0.95);
+  border-color: rgba(10, 30, 45, 0.12);
+}
+.ui-toast-text {
+  font-size: 0.85rem;
+  font-weight: 600;
+}
+.ui-toast-undo {
+  min-height: var(--touch-target-min);
+  padding: 0 var(--space-md);
+  background: transparent;
+  border: 0;
+  font-weight: 800;
+  font-size: 0.85rem;
+  color: var(--color-accent);
+  cursor: pointer;
+}

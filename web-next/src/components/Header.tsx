@@ -16,6 +16,7 @@ import { VALUATION_LENS_OPTIONS, useValuationLens, type ValuationLens } from "@/
 import { swapLeagueIdInPath } from "@/lib/leagueSwitcher";
 import { PAGE_TITLE_BY_SEGMENT } from "@/lib/navDestinations";
 import { PAGE_INFO_SLOT_ID } from "@/components/PageTitle";
+import { ConfirmInPlace } from "@/components/ui/ConfirmInPlace";
 
 const LEGAL_LINKS: { pageKey: string; label: string }[] = [
   { pageKey: "about_disclaimer", label: "About / Disclaimer" },
@@ -517,18 +518,21 @@ export function Header() {
                   </Link>
                 ))}
                 {session ? (
-                  <button
-                    type="button"
-                    role="menuitem"
-                    onClick={() => {
+                  <ConfirmInPlace
+                    plain
+                    variant="row"
+                    mode="tap-again"
+                    label="Sign out"
+                    triggerRole="menuitem"
+                    triggerClassName="px-3 py-3 text-xs font-semibold text-left w-full"
+                    triggerStyle={{ color: "var(--color-danger)", borderTop: "var(--border-width-default) solid var(--color-border)", background: "transparent", cursor: "pointer" }}
+                    className="w-full"
+                    onConfirm={async () => {
+                      await signOut();
                       setMenuOpen(false);
-                      void signOut().then(() => router.replace("/"));
+                      router.replace("/");
                     }}
-                    className="px-3 py-3 text-xs font-semibold text-left"
-                    style={{ color: "var(--color-danger)", borderTop: "var(--border-width-default) solid var(--color-border)" }}
-                  >
-                    Sign out
-                  </button>
+                  />
                 ) : null}
               </div>
             </>

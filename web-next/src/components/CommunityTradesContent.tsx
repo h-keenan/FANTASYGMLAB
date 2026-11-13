@@ -163,7 +163,7 @@ export function CommunityTradesContent({
   shared?: {
     available: boolean;
     trades: SharedCommunityTrade[];
-    onDelete: (id: string) => void | Promise<unknown>;
+    onDelete: (id: string) => void | boolean | Promise<unknown>;
     onReport: (id: string) => void | Promise<unknown>;
   };
 }) {

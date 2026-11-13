@@ -1,3 +1,4 @@
+import ConfirmInPlace from './ConfirmInPlace';
 import React, { useMemo, useState } from 'react';
 import { ActivityIndicator, StyleSheet, TouchableOpacity, View } from 'react-native';
 
@@ -109,15 +110,20 @@ export function EspnLoginStatus({ saved, onRemoved }: { saved: boolean; onRemove
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   if (!saved) return null;
-  const remove = async () => {
+  const remove = async (): Promise<boolean> => {
     setBusy(true);
     setMessage(null);
     try {
       const result = await api.deleteEspnCredentials();
-      if (result?.ok) onRemoved();
-      else setMessage(espnCredentialFailureMessage(result));
+      if (result?.ok) {
+        onRemoved();
+        return true;
+      }
+      setMessage(espnCredentialFailureMessage(result));
+      return false;
     } catch (error) {
       setMessage(error instanceof ApiError ? error.message : 'Could not reach the FantasyDesk API.');
+      return false;
     } finally {
       setBusy(false);
     }
@@ -125,9 +131,16 @@ export function EspnLoginStatus({ saved, onRemoved }: { saved: boolean; onRemove
   return (
     <View style={styles.statusRow}>
       <AppText style={styles.hint}>ESPN login connected (private leagues can load).</AppText>
-      <TouchableOpacity onPress={() => void remove()} disabled={busy} accessibilityRole="button" accessibilityLabel="Remove ESPN login" hitSlop={8}>
-        <AppText style={styles.link}>{busy ? 'Removing…' : 'Remove'}</AppText>
-      </TouchableOpacity>
+      <ConfirmInPlace
+        variant="row"
+        mode="ask"
+        label="Remove ESPN login"
+        prompt="Remove your ESPN login?"
+        confirmLabel="Remove"
+        errorText="Could not remove it. Try again."
+        disabled={busy}
+        onConfirm={remove}
+      />
       {message ? <AppText style={styles.error}>{message}</AppText> : null}
     </View>
   );
