@@ -40,27 +40,24 @@ export function SimActionBar({ ctx, paywalled, advancing, onAdvance }: { ctx: Si
   const state = simAdvanceState(game, emptySlots);
   const reasonId = "sim-advance-reason";
   return (
-    <div
-      className="fixed inset-x-0 bottom-0 z-30 md:sticky md:inset-x-auto"
-      style={{
-        background: "color-mix(in srgb, var(--color-bg) 92%, transparent)",
-        backdropFilter: "blur(10px)",
-        borderTop: "var(--border-width-default) solid var(--color-border)",
-        paddingBottom: "env(safe-area-inset-bottom)",
-      }}
-      data-testid="sim-action-bar"
-    >
+    <div className="sim-action-bar fixed inset-x-0 bottom-0 z-30 md:sticky md:inset-x-auto md:bottom-4 md:mx-auto md:flex md:w-full md:items-center md:justify-between md:gap-4 md:px-4 md:py-2" data-testid="sim-action-bar">
       {state.reason && !paywalled ? (
-        <p id={reasonId} className="px-4 pt-1.5 text-center text-xs font-bold" style={{ color: "var(--color-warning)" }} role="status">
+        <p id={reasonId} className="px-4 pt-1.5 text-center text-xs font-bold md:flex-1 md:p-0 md:text-left md:text-sm" style={{ color: "var(--color-warning)" }} role="status">
           {state.reason}
         </p>
-      ) : null}
-      <div className="mx-auto grid max-w-3xl grid-cols-[1fr_4.25rem_1fr] items-center gap-2 px-4 py-2 md:grid-cols-[auto_1fr_auto]">
+      ) : (
+        <p className="hidden text-sm font-bold md:block md:flex-1" style={{ color: "var(--color-text-secondary)" }} data-testid="sim-action-bar-status">
+          Week {game.week}{game.phase !== "playoffs" && game.settings?.regular_weeks ? ` of ${game.settings.regular_weeks}` : ""}
+          <span aria-hidden="true"> &middot; </span>
+          <span style={{ color: auto.optimal ? "var(--color-success)" : undefined }}>{auto.optimal ? "Lineup optimal" : "Lineup can improve"}</span>
+        </p>
+      )}
+      <div className="mx-auto grid max-w-3xl grid-cols-[1fr_4.25rem_1fr] items-center gap-2 px-4 py-2 md:mx-0 md:flex md:max-w-none md:flex-none md:gap-2 md:p-0">
         <Button variant="secondary" size="sm" loading={auto.busy} disabled={auto.optimal || paywalled} onClick={auto.run} aria-label={auto.optimal ? "Lineup is optimal" : "Auto-set best lineup"}>
           <SimGlyph name={auto.optimal ? "check" : "spark"} size={16} />
           <span className="ml-1.5">{auto.optimal ? "Optimal" : "Auto-set"}</span>
         </Button>
-        <span aria-hidden="true" />
+        <span aria-hidden="true" className="md:hidden" />
         {paywalled ? (
           <ButtonLink href="/premium" variant="premium" size="sm">Go Pro to continue</ButtonLink>
         ) : (

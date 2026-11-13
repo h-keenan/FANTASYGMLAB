@@ -3710,3 +3710,51 @@ main > header:has(> h1.sr-only:only-child) {
   animation: none;
   box-shadow: 0 1px 3px rgba(15, 40, 60, 0.22);
 }
+
+/* Fantasy Sim persistent action bar (SimActionBar). Phones: full-width strip
+   above the safe area. md+: a floating glass bar inside the page column. */
+.sim-action-bar {
+  background: color-mix(in srgb, var(--color-bg) 92%, transparent);
+  backdrop-filter: blur(10px);
+  border-top: var(--border-width-default) solid var(--color-border);
+  padding-bottom: env(safe-area-inset-bottom);
+}
+@media (min-width: 768px) {
+  .sim-action-bar {
+    background: var(--glass-bg);
+    backdrop-filter: blur(28px) saturate(180%);
+    border: 1px solid var(--glass-border);
+    border-radius: var(--radius-panel);
+    box-shadow: var(--glass-shadow), 0 0 24px color-mix(in srgb, var(--color-accent) 14%, transparent);
+    padding-bottom: 0.5rem;
+  }
+}
+@media (prefers-reduced-motion: no-preference) {
+  .sim-action-bar { animation: sim-action-bar-in 260ms ease-out both; }
+}
+@keyframes sim-action-bar-in {
+  from { opacity: 0; transform: translateY(12px); }
+  to { opacity: 1; transform: none; }
+}
+
+/* Fantasy Sim desktop scaling. The game was tuned for phones; at laptop and
+   desktop widths avatars/crests read as thumbnails and type as fine print.
+   --sim-scale grows PlayerAvatar/SimCrest photos; zoom lifts type and row
+   heights together. Phones (< 1024px) are untouched. */
+@media (min-width: 1024px) {
+  .sim-root { --sim-scale: 1.35; zoom: 1.05; }
+}
+@media (min-width: 1440px) {
+  .sim-root { --sim-scale: 1.45; zoom: 1.14; }
+}
+/* Recap "Back to your team": a glass bar so it never reads as text overlapping the cards behind it. */
+@media (min-width: 768px) {
+  .sim-recap-cta {
+    background: var(--glass-bg);
+    backdrop-filter: blur(28px) saturate(180%);
+    border: 1px solid var(--glass-border);
+    border-radius: var(--radius-panel);
+    box-shadow: var(--glass-shadow);
+    padding: 0.5rem;
+  }
+}

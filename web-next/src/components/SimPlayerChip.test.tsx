@@ -20,8 +20,8 @@ describe("SimPlayerChip", () => {
     expect(container.querySelector("img")).toBeNull();
     const ring = container.querySelector("span[aria-hidden]") as HTMLElement;
     expect(ring.textContent).toBe("JS");
-    expect(ring.style.width).toBe("32px");
-    expect(ring.style.height).toBe("32px");
+    expect(ring.style.width).toBe("calc(32px * var(--sim-scale, 1))");
+    expect(ring.style.height).toBe("calc(32px * var(--sim-scale, 1))");
   });
 
   it("uses the team code for a defense", () => {
