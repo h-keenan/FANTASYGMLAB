@@ -1,14 +1,12 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState, type KeyboardEvent, type PointerEvent } from "react";
-import { createPortal } from "react-dom";
 
 import { useExplorerLeague } from "@/context/ExplorerLeagueContext";
 import { EmptyState } from "@/components/EmptyState";
 import { Input } from "@/components/Input";
 import { PillRow } from "@/components/PillRow";
 import { PlayerAvatar } from "@/components/PlayerAvatar";
-import { SheetHandle } from "@/components/SheetHandle";
 import { api } from "@/lib/api";
 import { trackUse } from "@/lib/analytics";
 import { abbreviatePlayerName } from "@/lib/formatPlayerName";
@@ -29,7 +27,7 @@ import {
   type PercentileExplorerResponse,
 } from "@/lib/percentileExplorer";
 import { ordinal, statPercentileBand } from "@/lib/playerQuickViewPresentation";
-import { useSheetDragDismiss } from "@/lib/useSheetDragDismiss";
+import { PopupShell } from "@/components/PopupShell";
 
 const LANE_STEP = 74;
 const BAR_H = 88;
@@ -108,9 +106,7 @@ export function PercentileExplorerSheet({
   const [focusPct, setFocusPct] = useState<number | null>(null);
   const [query, setQuery] = useState("");
   const [rosterIds, setRosterIds] = useState<Set<string>>(() => new Set());
-  const closeRef = useRef<HTMLButtonElement | null>(null);
   const scrubbing = useRef(false);
-  const { sheetRef, sheetStyle } = useSheetDragDismiss({ onDismiss: onClose });
 
   useEffect(() => {
     let cancelled = false;
@@ -152,7 +148,6 @@ export function PercentileExplorerSheet({
   }, [leagueId]);
 
   useEffect(() => {
-    closeRef.current?.focus();
     trackUse("percentile_explorer", "opened", { props: { item_kind: statKey } });
     // once per sheet mount
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -237,28 +232,7 @@ export function PercentileExplorerSheet({
   }
 
   const sheet = (
-    <div
-      className="pqv-backdrop pe-backdrop"
-      onMouseDown={(event) => {
-        if (event.target === event.currentTarget) onClose();
-      }}
-      onKeyDown={(event) => {
-        event.stopPropagation();
-        if (event.key === "Escape") onClose();
-      }}
-    >
-      <div
-        ref={sheetRef}
-        className="pqv-modal pe-sheet"
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="pe-title"
-        style={sheetStyle}
-      >
-        <SheetHandle />
-        <button ref={closeRef} type="button" className="pqv-close" aria-label="Close percentile explorer" onClick={onClose}>
-          ×
-        </button>
+    <PopupShell title="Percentile explorer" onClose={onClose} labelledBy="pe-title" closeLabel="Close percentile explorer" backdropClassName="pe-backdrop" modalClassName="pe-sheet" portal={false}>
         <div className="pe-body">
           <h3 id="pe-title" className="pe-title">
             {metric.label} Percentile Explorer
@@ -453,11 +427,10 @@ export function PercentileExplorerSheet({
             />
           </div>
         ) : null}
-      </div>
-    </div>
+    </PopupShell>
   );
 
-  return typeof document === "undefined" ? null : createPortal(sheet, document.body);
+  return sheet;
 }
 
 function PlayerList({

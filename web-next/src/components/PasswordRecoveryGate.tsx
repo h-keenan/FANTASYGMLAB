@@ -48,7 +48,7 @@ export function PasswordRecoveryGate() {
   return (
     <div
       className="fixed inset-0 flex items-center justify-center p-4"
-      style={{ background: "var(--color-scrim)", zIndex: 100 }}
+      style={{ background: "var(--color-scrim)", zIndex: "var(--z-overlay-dialog, 90)" }}
     >
       <div className="glass-surface flex w-full max-w-sm flex-col gap-4 p-6">
         <div className="flex flex-col gap-0.5">

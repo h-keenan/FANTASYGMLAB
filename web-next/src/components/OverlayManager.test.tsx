@@ -2,6 +2,7 @@ import { fireEvent, render, screen } from "@testing-library/react";
 import { useState } from "react";
 import { afterEach, describe, expect, it } from "vitest";
 
+import { PopupShell } from "@/components/PopupShell";
 import { SimSheet } from "@/components/SimGameParts";
 import { Sheet } from "@/components/ui/Sheet";
 import { overlayStack } from "@/lib/overlayStack";
@@ -57,5 +58,49 @@ describe("one pop-up at a time", () => {
   it("the first pop-up has no Back button", () => {
     render(<Flow />);
     expect(screen.queryByTestId("overlay-back")).toBeNull();
+  });
+});
+
+describe("PopupShell (hand-built pop-ups)", () => {
+  function Hand() {
+    const [a, setA] = useState(true);
+    const [b, setB] = useState(false);
+    return (
+      <>
+        {a ? (
+          <PopupShell title="Manager profile" onClose={() => setA(false)} ariaLabel="Manager profile" portal={false}>
+            <button onClick={() => setB(true)}>Open swap</button>
+            <input aria-label="note" />
+          </PopupShell>
+        ) : null}
+        {b ? (
+          <PopupShell title="Swap sheet" onClose={() => setB(false)} ariaLabel="Swap sheet" portal={false}>
+            <p>swap body</p>
+          </PopupShell>
+        ) : null}
+      </>
+    );
+  }
+
+  it("is replaced by the next pop-up (kept mounted, hidden) and returns on Back", () => {
+    render(<Hand />);
+    fireEvent.change(screen.getByLabelText("note"), { target: { value: "keep me" } });
+    fireEvent.click(screen.getByText("Open swap"));
+    expect((screen.getByLabelText("note").closest(".pqv-backdrop") as HTMLElement).hidden).toBe(true);
+    expect(screen.getByTestId("overlay-back")).toHaveTextContent("Back to Manager profile");
+    fireEvent.click(screen.getByTestId("overlay-back"));
+    expect((screen.getByLabelText("note") as HTMLInputElement).value).toBe("keep me");
+    expect((screen.getByLabelText("note").closest(".pqv-backdrop") as HTMLElement).hidden).toBe(false);
+  });
+
+  it("Escape is Back (newest only) and the X closes everything", () => {
+    render(<Hand />);
+    fireEvent.click(screen.getByText("Open swap"));
+    fireEvent.keyDown(screen.getByText("swap body"), { key: "Escape" });
+    expect(screen.queryByText("swap body")).toBeNull();
+    expect(screen.getByLabelText("note")).toBeInTheDocument();
+    fireEvent.click(screen.getByText("Open swap"));
+    fireEvent.click(screen.getAllByRole("button", { name: /^Close/ }).at(-1)!);
+    expect(overlayStack.size()).toBe(0);
   });
 });

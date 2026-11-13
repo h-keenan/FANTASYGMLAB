@@ -5,6 +5,8 @@ import { loadStripe, type Stripe } from "@stripe/stripe-js";
 import { EmbeddedCheckout, EmbeddedCheckoutProvider } from "@stripe/react-stripe-js";
 
 import { SheetHandle } from "@/components/SheetHandle";
+import { OverlayBack } from "@/components/OverlayBack";
+import { useOverlay } from "@/lib/useOverlay";
 import { useSheetDragDismiss } from "@/lib/useSheetDragDismiss";
 
 /**
@@ -51,20 +53,23 @@ export function EmbeddedCheckoutModal({
   // Swipe down (touch) and Esc close it like the X. Stripe's iframe keeps
   // its own touches, so the swipe starts from the header/handle area.
   const { sheetRef, sheetStyle } = useSheetDragDismiss({ onDismiss: onClose });
+  // One pop-up at a time (lib/overlayStack.ts): layering, scroll lock and browser back belong to the overlay runtime.
+  const overlay = useOverlay({ title: "Checkout", onClose });
   useEffect(() => {
     function handleKeyDown(event: KeyboardEvent) {
-      if (event.key === "Escape") onClose();
+      if (event.key === "Escape" && overlay.isTop) onClose();
     }
     document.addEventListener("keydown", handleKeyDown);
     return () => document.removeEventListener("keydown", handleKeyDown);
-  }, [onClose]);
+  }, [onClose, overlay.isTop]);
   return (
     <div
       // Bottom-aligned on phones, centered from sm up. Sized in dvh (not
       // vh, which on iOS Safari includes the area under the browser bar
       // and clipped the submit button) and padded for the home indicator.
       className="fixed inset-x-0 top-0 flex items-end justify-center sm:items-center sm:p-4"
-      style={{ background: "var(--color-scrim)", zIndex: 60, height: "100dvh" }}
+      style={{ background: "var(--color-scrim)", zIndex: overlay.zIndex, height: "100dvh" }}
+      hidden={overlay.hidden}
       onMouseDown={(event) => {
         if (event.target === event.currentTarget) onClose();
       }}
@@ -82,13 +87,14 @@ export function EmbeddedCheckoutModal({
         }}
       >
         <SheetHandle />
+        <OverlayBack overlay={overlay} />
         <div className="flex shrink-0 items-center justify-between px-4 pt-3 pb-2">
           <span className="text-xs font-bold uppercase" style={{ color: "var(--color-text-muted)" }}>
             Checkout
           </span>
           <button
             type="button"
-            onClick={onClose}
+            onClick={overlay.closeAll}
             aria-label="Close checkout"
             className="text-xl leading-none"
             style={{ color: "var(--color-text-muted)" }}

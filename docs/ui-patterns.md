@@ -408,11 +408,20 @@ renders `<OverlayBack overlay={overlay} />` at the top; wires the X and scrim to
 `overlay.back`; and focuses itself when `!overlay.hidden`. It must NOT lock body scroll, push history or set a
 z-index itself. Hand-rolled `.pqv-backdrop` shells keep their markup and only gain those lines.
 
-Migrated (web): `Sheet` (and everything built on it: TapForWhy, FilterSheet, StructuredRow, the game navigator),
-`PlayerQuickView` (so the sim player card, Real quick view), `SimSheet` (claim, team and every Fantasy Sim sheet),
-`TradePickerSheet`. Mobile: `Sheet`. Follow-up PR: `ManagerProfileSheet`, Matchup `SwapSheet`,
-`PercentileExplorerSheet`, `MultiTeamTradeContent` assign sheet, `AlertsDropdown` and GM orb sheets,
-`EmbeddedCheckoutModal`, real dialogs (password recovery, privacy), and the remaining mobile `SheetModal` users.
+Migrated (all of them): web `Sheet` (and everything built on it: TapForWhy, FilterSheet, StructuredRow, the game
+navigator), `PlayerQuickView`, `SimSheet` (claim, team and every Fantasy Sim sheet), `TradePickerSheet`, and through
+`PopupShell` (the shell for hand-built `.pqv-backdrop` pop-ups) `ManagerProfileSheet`, Matchup `SwapSheet`,
+`PercentileExplorerSheet` and the multi-team "Send to" sheet; `AlertsDropdown`, the GM orb menu and
+`EmbeddedCheckoutModal` call `useOverlay` directly. `PasswordRecoveryGate` is a blocking gate (not dismissible, so not on
+the stack) but takes its layer from `--z-overlay-dialog`. Mobile: `Sheet`, and every `SheetModal` registers itself
+(`lib/useOverlay.ts`), so all ~30 Modal-based pop-ups replace each other instead of fighting (RN cannot present two
+Modals reliably); `Sheet` also draws the Back row.
+
+Not overlays (left as they are): header and sidebar dropdown menus (`role="menu"`), the privacy-mode pill, the Beginner
+Help popover, in-picker filter panels and in-place confirms (`ConfirmInPlace`), toasts.
+
+New pop-ups: use `ui/Sheet`, or `PopupShell` for a hand-built layout. Never hand-roll a backdrop, set a z-index, lock
+body scroll or push history.
 
 Tests: `lib/overlayStack.test.ts`, `lib/overlayHistory.test.ts`, `components/OverlayManager.test.tsx` (replace, Back,
 selection survives, X), `components/OverlayRuntime.test.tsx` (the one scroll lock). Real-browser check:

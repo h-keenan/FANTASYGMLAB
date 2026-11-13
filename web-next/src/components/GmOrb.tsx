@@ -19,6 +19,7 @@ import { OPEN_SEARCH_EVENT } from "@/lib/orbSearch";
 import { pathOwnsPhoneChrome } from "@/lib/bottomNav";
 import { useShellNav } from "@/lib/useShellNav";
 import { useIsPro } from "@/lib/useIsPro";
+import { useOverlay } from "@/lib/useOverlay";
 import { useSheetDragDismiss } from "@/lib/useSheetDragDismiss";
 import { SheetHandle } from "@/components/SheetHandle";
 import { PLAYER_SEARCH_MAX_RESULTS, PLAYER_SEARCH_MIN_CHARS, useLeaguePlayerSearchState } from "@/lib/leaguePlayerSearch";
@@ -74,14 +75,16 @@ export function GmOrb() {
     }
   }, [open]);
   const { sheetRef, sheetStyle } = useSheetDragDismiss({ onDismiss: closeSheet, enabled: open });
+  // One pop-up at a time (lib/overlayStack.ts): scroll lock, history and layering belong to the overlay runtime.
+  const overlay = useOverlay({ title: "Menu", onClose: closeSheet, enabled: open });
   useEffect(() => {
     if (!open) return;
     function handleKeyDown(event: KeyboardEvent) {
-      if (event.key === "Escape") setOpen(false);
+      if (event.key === "Escape" && overlay.isTop) setOpen(false);
     }
     document.addEventListener("keydown", handleKeyDown);
     return () => document.removeEventListener("keydown", handleKeyDown);
-  }, [open]);
+  }, [open, overlay.isTop]);
   const { session } = useAuth();
   const { collegeInterest } = useDisplayPreferences();
   const pathname = usePathname();
@@ -196,7 +199,7 @@ export function GmOrb() {
       ) : null}
 
       {open ? (
-        <div className="fixed inset-0" style={{ zIndex: 50 }}>
+        <div className="fixed inset-0" style={{ zIndex: overlay.zIndex }} hidden={overlay.hidden}>
           <button
             type="button"
             aria-label="Close menu"
