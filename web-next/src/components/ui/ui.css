@@ -861,7 +861,7 @@
   flex-direction: column;
   justify-content: center;
   gap: var(--space-md);
-  padding: var(--space-md) var(--space-lg);
+  padding: var(--space-md) var(--space-lg) 10dvh;
   overflow: hidden;
   animation: ui-story-in-next 240ms cubic-bezier(0.2, 0.9, 0.3, 1);
 }

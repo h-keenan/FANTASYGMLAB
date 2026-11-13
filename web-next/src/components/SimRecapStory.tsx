@@ -147,7 +147,7 @@ export function SimWeekRecapStory({
       const hero = m.yours > 0 ? `${m.yours}` : m.items.length > 0 ? `${m.items.length} hurt` : `${facts.lineupWarnings}`;
       return (
         <>
-          <Hero value={hero} caption={m.yours > 0 ? `of your player${m.yours === 1 ? "" : "s"} got hurt` : m.items.length > 0 ? "injuries around the league" : "lineup issues to fix"} color={m.yours > 0 || facts.lineupWarnings > 0 ? "var(--color-danger)" : undefined} />
+          <Hero value={hero} caption={m.yours > 0 ? "of your players got hurt" : m.items.length > 0 ? "injuries around the league" : "lineup issues to fix"} color={m.yours > 0 || facts.lineupWarnings > 0 ? "var(--color-danger)" : undefined} />
           <ul className="flex flex-col gap-2">
             {m.items.map((inj, i) => (
               <li key={i} className="flex items-center justify-between gap-2">
