@@ -607,6 +607,105 @@ export interface SimScoutingProfile {
   development: SimDevelopmentCurve;
 }
 
+/** One move in a player's story (GET /players/{id}/history), oldest first. `week` 0 / `offseason` mark the drafts. */
+export interface SimHistoryTeamRef {
+  team_id: string | null;
+  team_name: string | null;
+}
+
+export interface SimHistoryAsset {
+  id: string;
+  name: string;
+  pos: string | null;
+  pick?: boolean;
+}
+
+export type SimHistoryKind = "started" | "drafted" | "claimed" | "dropped" | "cut" | "traded" | "retired";
+
+export interface SimHistoryEntry extends SimHistoryTeamRef {
+  kind: SimHistoryKind;
+  season: number;
+  year: number | null;
+  week: number;
+  offseason: boolean;
+  /** drafted: 1-based round and overall pick; `draft` says league (the opening draft) or rookie; `via` is the original pick owner. */
+  round?: number;
+  pick?: number;
+  auto?: boolean;
+  draft?: "league" | "rookie";
+  class_year?: number | null;
+  via?: SimHistoryTeamRef | null;
+  /** claimed: who was dropped to make room. */
+  dropped?: string | null;
+  reason?: string;
+  /** traded */
+  from_team?: SimHistoryTeamRef;
+  to_team?: SimHistoryTeamRef;
+  with_assets?: SimHistoryAsset[];
+  sent_assets?: SimHistoryAsset[];
+}
+
+export interface SimHistorySeasonTeam {
+  team_id: string;
+  team_name: string | null;
+  games: number;
+  points: number;
+  ppg: number;
+}
+
+export interface SimHistorySeason {
+  season: number;
+  year: number | null;
+  games: number;
+  points: number;
+  ppg: number | null;
+  teams: SimHistorySeasonTeam[];
+}
+
+export interface SimPlayerHistoryResponse extends SimGameEnvelope {
+  pid?: string;
+  name?: string;
+  origin?: SimHistoryEntry | null;
+  current_team?: SimHistoryTeamRef | null;
+  entries?: SimHistoryEntry[];
+  seasons?: SimHistorySeason[];
+}
+
+export interface SimTeamHistoryPick {
+  id: string;
+  name: string;
+  pos: string | null;
+  round: number;
+  pick: number;
+  auto: boolean;
+  via?: string | null;
+}
+
+export interface SimTeamHistoryMove {
+  kind: "trade" | "claim" | "cut" | "drop";
+  season: number;
+  year: number | null;
+  week: number;
+  offseason: boolean;
+  with_team?: SimHistoryTeamRef;
+  sent?: SimHistoryAsset[];
+  received?: SimHistoryAsset[];
+  added?: SimHistoryAsset;
+  dropped?: SimHistoryAsset | null;
+  player?: SimHistoryAsset;
+  reason?: string;
+}
+
+export interface SimTeamHistoryResponse extends SimGameEnvelope {
+  team_id?: string;
+  team_name?: string | null;
+  draft?: SimTeamHistoryPick[];
+  rookie_drafts?: { year: number | null; picks: SimTeamHistoryPick[] }[];
+  seasons?: { season: number; year: number | null; wins: number; losses: number; ties: number; pf: number; pa: number; champion: boolean }[];
+  /** Newest first. */
+  moves?: SimTeamHistoryMove[];
+}
+
 export interface SimPlayerDetailResponse extends SimGameEnvelope {
   /** Present for generated rookies only. */
   scouting?: SimScoutingProfile;

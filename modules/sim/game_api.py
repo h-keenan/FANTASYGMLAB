@@ -28,6 +28,7 @@ from modules.sim import game_actions as act
 from modules.sim import game_dynasty as dyn
 from modules.sim import game_dynasty_view as dview
 from modules.sim import game_draft as draft
+from modules.sim import game_history as hist
 from modules.sim import game_home as home
 from modules.sim import game_view as view
 from modules.sim.game_ai import TradeDesk
@@ -647,6 +648,26 @@ def add_routes(router: APIRouter, ctx: GameApiCtx) -> None:
         if pid not in snap.players:
             raise HTTPException(status_code=404, detail="Player not found.")
         return {**_env(pro, state), **view.player_detail(snap, state, pid)}
+
+    @router.get("/games/{game_id}/players/{pid}/history")
+    @guarded
+    def get_player_history(game_id: str, pid: str, user: dict[str, Any] = Depends(require_user)):
+        """Where a player came from and every move since, folded from the event log (fetched when the History tab opens)."""
+        pro = ctx.is_pro(user)
+        store, uid, _, snap, state = load(user, _gid(game_id))
+        root = snap.root
+        if not any(pid in root.season_view(n).players for n in range(1, max(1, int(root.settings.seasons)) + 1)):
+            raise HTTPException(status_code=404, detail="Player not found.")
+        return {**_env(pro, state), **hist.player_history(root, store.load_events(uid, _gid(game_id)), pid)}
+
+    @router.get("/games/{game_id}/teams/{team_id}/history")
+    @guarded
+    def get_team_history(game_id: str, team_id: str, user: dict[str, Any] = Depends(require_user)):
+        pro = ctx.is_pro(user)
+        store, uid, _, snap, state = load(user, _gid(game_id))
+        if team_id not in snap.tids:
+            raise HTTPException(status_code=404, detail="Team not found.")
+        return {**_env(pro, state), **hist.team_history(snap.root, store.load_events(uid, _gid(game_id)), team_id)}
 
     @router.get("/games/{game_id}/teams/{team_id}")
     @guarded

@@ -3971,6 +3971,10 @@ export const api = {
     authorizedRequest<SimGameTypes.SimGamePlayersResponse>(`/v1/sim/games/${encodeURIComponent(gameId)}/players?${query}`, { signal }),
   getSimGamePlayer: (gameId: string, playerId: string) =>
     authorizedRequest<SimGameTypes.SimPlayerDetailResponse>(`/v1/sim/games/${encodeURIComponent(gameId)}/players/${encodeURIComponent(playerId)}`),
+  getSimPlayerHistory: (gameId: string, playerId: string) =>
+    authorizedRequest<SimGameTypes.SimPlayerHistoryResponse>(`/v1/sim/games/${encodeURIComponent(gameId)}/players/${encodeURIComponent(playerId)}/history`),
+  getSimTeamHistory: (gameId: string, teamId: string) =>
+    authorizedRequest<SimGameTypes.SimTeamHistoryResponse>(`/v1/sim/games/${encodeURIComponent(gameId)}/teams/${encodeURIComponent(teamId)}/history`),
   getSimGameTeam: (gameId: string, teamId: string) =>
     authorizedRequest<SimGameTypes.SimTeamRosterResponse>(`/v1/sim/games/${encodeURIComponent(gameId)}/teams/${encodeURIComponent(teamId)}`),
   getSimHome: (gameId: string) => authorizedRequest<SimGameTypes.SimHomeResponse>(`/v1/sim/games/${encodeURIComponent(gameId)}/home`),
