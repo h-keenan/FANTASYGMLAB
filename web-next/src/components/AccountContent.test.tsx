@@ -148,7 +148,11 @@ describe("AccountContent", () => {
     const onSignOut = vi.fn();
     renderContent({ onSignOut });
 
-    fireEvent.click(screen.getByRole("button", { name: "Sign out" }));
+    // Sign out is a quick confirm: the first tap only arms it ("Tap again to confirm").
+    const button = screen.getByRole("button", { name: "Sign out" });
+    fireEvent.click(button);
+    expect(onSignOut).not.toHaveBeenCalled();
+    fireEvent.click(button);
     expect(onSignOut).toHaveBeenCalledTimes(1);
   });
 

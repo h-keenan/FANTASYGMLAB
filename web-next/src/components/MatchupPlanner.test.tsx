@@ -172,7 +172,10 @@ describe("Matchup lineup planner", () => {
     await screen.findByText("66%");
 
     post.mockResolvedValueOnce(whatIf(60));
-    fireEvent.click(screen.getByRole("button", { name: "Reset to suggested" }));
+    const reset = screen.getByRole("button", { name: "Reset to suggested" });
+    fireEvent.click(reset);
+    expect(post).toHaveBeenCalledTimes(3); // the first tap only arms it
+    fireEvent.click(reset);
     await waitFor(() => expect(post).toHaveBeenCalledTimes(4));
     expect(post.mock.calls[3][1].lineup).toEqual(post.mock.calls[0][1].lineup);
     expect(screen.getByRole("link", { name: "Open in Sleeper" }).getAttribute("href")).toBe(

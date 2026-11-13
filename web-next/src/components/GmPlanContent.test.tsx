@@ -1,5 +1,5 @@
-import { fireEvent, render, screen } from "@testing-library/react";
-import { describe, expect, it, vi } from "vitest";
+import { act, fireEvent, render, screen } from "@testing-library/react";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { GmPlanContent } from "./GmPlanContent";
 import type {
@@ -480,24 +480,55 @@ describe("GmPlanContent", () => {
       expect(screen.getByText(/Added from Player Quick View/)).toBeInTheDocument();
     });
 
-    it("calls removeGmTarget and optimistically removes the row when Remove is pressed", () => {
-      render(
-        <GmPlanContent
-          initialTab="watching"
-          leagueId="league-1"
-          leagueName="Dynasty Overlords"
-          data={BASE_RESPONSE}
-          teamStance={STANCE}
-          myTeam={MY_TEAM}
-          targets={[gmTarget({ player_id: "p9" })]}
-          rankings={{ ok: true, players: [rankedPlayer({ player_id: "p9", name: "Watched Player" })] }}
-        />,
-      );
+    describe("removing a target (instant, with an Undo toast)", () => {
+      const renderWatching = () =>
+        render(
+          <GmPlanContent
+            initialTab="watching"
+            leagueId="league-1"
+            leagueName="Dynasty Overlords"
+            data={BASE_RESPONSE}
+            teamStance={STANCE}
+            myTeam={MY_TEAM}
+            targets={[gmTarget({ player_id: "p9" })]}
+            rankings={{ ok: true, players: [rankedPlayer({ player_id: "p9", name: "Watched Player" })] }}
+          />,
+        );
 
-      fireEvent.click(screen.getByRole("button", { name: "Remove" }));
+      afterEach(() => {
+        vi.useRealTimers();
+      });
 
-      expect(api.removeGmTarget).toHaveBeenCalledWith("league-1", "p9");
-      expect(screen.queryByText("Watched Player")).not.toBeInTheDocument();
+      it("removes the row at once, shows Undo, and only calls removeGmTarget when the toast expires", () => {
+        vi.useFakeTimers();
+        vi.mocked(api.removeGmTarget).mockClear();
+        renderWatching();
+
+        fireEvent.click(screen.getByRole("button", { name: "Remove" }));
+
+        expect(screen.queryByText("Watched Player")).not.toBeInTheDocument();
+        expect(screen.getByRole("status")).toHaveTextContent(/Removed Watched Player/);
+        expect(api.removeGmTarget).not.toHaveBeenCalled();
+        act(() => {
+          vi.advanceTimersByTime(6000);
+        });
+        expect(api.removeGmTarget).toHaveBeenCalledWith("league-1", "p9");
+      });
+
+      it("Undo brings the row back and never calls the API", () => {
+        vi.useFakeTimers();
+        vi.mocked(api.removeGmTarget).mockClear();
+        renderWatching();
+
+        fireEvent.click(screen.getByRole("button", { name: "Remove" }));
+        fireEvent.click(screen.getByRole("button", { name: "Undo" }));
+        act(() => {
+          vi.advanceTimersByTime(10000);
+        });
+
+        expect(screen.getByText("Watched Player")).toBeInTheDocument();
+        expect(api.removeGmTarget).not.toHaveBeenCalled();
+      });
     });
 
     it("shows an empty-watchlist message when there's nothing to watch", () => {
