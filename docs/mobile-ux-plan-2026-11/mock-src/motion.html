@@ -1,0 +1,94 @@
+<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=390"><title>Motion catalog</title><style>
+:root{--bg:#000;--surface:#1f2226;--tx:#f7f8fa;--mut:#a8adb7;--bd:#2a2e35;--acc:#67e8f9;--acc2:#22d3ee;--ok:#22c55e;--warn:#f59e0b;--bad:#ef4444;--act:#facc15;--wr:#38bdf8;
+--dur-fast:150ms;--dur-base:240ms;--dur-slow:480ms;--dur-hero:900ms;--ease-out:cubic-bezier(.16,1,.3,1);--ease-std:cubic-bezier(.2,0,0,1);--ease-spring:cubic-bezier(.34,1.56,.64,1);--loop:3s}
+*{box-sizing:border-box;margin:0;padding:0}html,body{width:390px;height:420px;overflow:hidden;background:#000 radial-gradient(120% 60% at 50% -10%,rgba(103,232,249,.13),transparent 60%);color:var(--tx);font-family:system-ui,-apple-system,sans-serif;font-variant-numeric:tabular-nums}
+.demo{display:none;position:absolute;inset:0;padding:16px}.demo.on{display:block}
+.tag{position:absolute;left:16px;bottom:10px;right:16px;font-size:11px;color:var(--mut);font-weight:600;display:flex;gap:10px}.tag b{color:var(--acc)}
+.card{border-radius:20px;border:1px solid var(--bd);background:linear-gradient(180deg,rgba(40,44,50,.9),rgba(25,28,32,.9));padding:14px 16px}
+.kick{font-size:11px;font-weight:800;letter-spacing:.12em;text-transform:uppercase;color:var(--mut)}
+.pill{display:inline-flex;align-items:center;height:24px;padding:0 10px;border-radius:999px;font-size:11px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;white-space:nowrap}
+.ok{background:rgba(34,197,94,.15);color:var(--ok)}.bad{background:rgba(239,68,68,.18);color:#ff8a8a}.acc{background:rgba(103,232,249,.13);color:var(--acc)}
+.big{font-size:56px;font-weight:800;letter-spacing:-.03em}
+/* 2 verdict */
+#d-verdict .arc{stroke-dasharray:0 100;animation:sweep var(--loop) var(--ease-out) infinite}
+@keyframes sweep{0%{stroke-dasharray:0 100}35%,100%{stroke-dasharray:74 100}}
+#d-verdict .win{animation:pop var(--loop) var(--ease-spring) infinite;transform-origin:center}
+@keyframes pop{0%,22%{opacity:0;transform:scale(.6)}38%,100%{opacity:1;transform:scale(1)}}
+#d-verdict .pill{animation:rise var(--loop) var(--ease-out) infinite backwards}
+#d-verdict .pill:nth-child(2){animation-delay:80ms}#d-verdict .pill:nth-child(3){animation-delay:160ms}
+@keyframes rise{0%,36%{opacity:0;transform:translateY(10px)}52%,100%{opacity:1;transform:none}}
+/* 3 stagger */
+#d-stagger .card{margin-bottom:10px;animation:rise2 var(--loop) var(--ease-out) infinite backwards;height:62px}
+#d-stagger .card:nth-child(2){animation-delay:60ms}#d-stagger .card:nth-child(3){animation-delay:120ms}#d-stagger .card:nth-child(4){animation-delay:180ms}#d-stagger .card:nth-child(5){animation-delay:240ms}
+@keyframes rise2{0%{opacity:0;transform:translateY(24px)}22%,100%{opacity:1;transform:none}}
+/* 4 pick lands */
+#d-pick .slot{height:64px;border-radius:16px;border:2px dashed #4b5260;display:flex;align-items:center;padding:0 16px;color:var(--mut);font-weight:700;animation:slotflash var(--loop) infinite}
+@keyframes slotflash{0%,44%{border-color:#4b5260;background:transparent}48%{border-color:var(--ok);background:rgba(34,197,94,.25)}70%,100%{border-color:var(--ok);background:rgba(34,197,94,.08);border-style:solid}}
+#d-pick .chipx{position:absolute;left:16px;right:16px;top:38px;height:64px;border-radius:16px;background:#2b3138;border:1px solid var(--wr);display:flex;align-items:center;padding:0 16px;font-weight:800;animation:drop var(--loop) infinite}
+@keyframes drop{0%{transform:translateY(230px) scale(.95);opacity:0}12%{opacity:1}40%{transform:translateY(-4px) scale(1.04)}46%{transform:translateY(0) scale(1.05,.92)}54%,100%{transform:translateY(0) scale(1)}}
+/* 5 sweep */
+#d-sweep .sb{position:relative;overflow:hidden;border-radius:16px;background:#0f1a35;padding:16px;border-left:5px solid var(--act)}
+#d-sweep .sb:after{content:"";position:absolute;top:0;bottom:0;width:90px;left:-120px;background:linear-gradient(100deg,transparent,rgba(255,255,255,.35),transparent);animation:swp var(--loop) var(--ease-std) infinite}
+@keyframes swp{0%{left:-120px}35%,100%{left:420px}}
+#d-sweep .n{font-size:48px;font-weight:900;font-style:italic}
+/* 6 accepted */
+#d-accept .ring{width:96px;height:96px;border-radius:50%;background:var(--ok);display:grid;place-items:center;margin:40px auto 10px;animation:ringpop var(--loop) var(--ease-spring) infinite;position:relative}
+@keyframes ringpop{0%{transform:scale(0)}18%,100%{transform:scale(1)}}
+#d-accept .ring:before{content:"";position:absolute;inset:0;border-radius:50%;border:3px solid var(--ok);animation:rip var(--loop) ease-out infinite}
+@keyframes rip{0%,12%{transform:scale(1);opacity:.8}60%,100%{transform:scale(2.2);opacity:0}}
+#d-accept .ck{stroke-dasharray:40;animation:ck var(--loop) var(--ease-out) infinite}
+@keyframes ck{0%,14%{stroke-dashoffset:40}30%,100%{stroke-dashoffset:0}}
+.cf{position:absolute;width:8px;height:12px;top:120px;left:195px;opacity:0}
+/* 7 injury */
+#d-injury .t{height:72px;border-radius:16px;border:1.5px solid var(--bad);background:rgba(239,68,68,.16);display:flex;align-items:center;gap:12px;padding:0 16px;animation:ipulse 1.6s ease-in-out infinite}
+@keyframes ipulse{0%,100%{box-shadow:0 0 0 0 rgba(239,68,68,.45)}50%{box-shadow:0 0 0 10px rgba(239,68,68,0)}}
+/* 8 bye */
+#d-bye .seg{display:flex;gap:3px}#d-bye .seg i{flex:1;height:16px;border-radius:4px;background:#2a2e35;animation:segfill var(--loop) infinite backwards}
+@keyframes segfill{0%{background:#2a2e35}var(--p,20%){background:#2a2e35}100%{}}
+/* 9 tabs */
+#d-tabs .seg{position:relative;display:flex;border:1px solid var(--bd);border-radius:999px;background:rgba(31,34,38,.7);height:40px}
+#d-tabs .seg span{flex:1;display:grid;place-items:center;font-size:13px;font-weight:700;z-index:1}
+#d-tabs .ind{position:absolute;top:3px;bottom:3px;left:3px;width:calc(33.3% - 2px);border-radius:999px;background:rgba(103,232,249,.2);border:1px solid var(--acc);animation:ind 4.5s var(--ease-out) infinite}
+@keyframes ind{0%,25%{transform:translateX(0)}33%,58%{transform:translateX(100%)}66%,91%{transform:translateX(200%)}100%{transform:translateX(0)}}
+#d-tabs .pane{margin-top:14px;display:flex;overflow:hidden;border-radius:18px}#d-tabs .rail{display:flex;width:300%;animation:rail 4.5s var(--ease-out) infinite}
+#d-tabs .rail .card{width:33.333%;height:190px;border-radius:0}
+@keyframes rail{0%,25%{transform:translateX(0)}33%,58%{transform:translateX(-33.333%)}66%,91%{transform:translateX(-66.666%)}100%{transform:translateX(0)}}
+/* 10 pull */
+#d-pull .list{animation:pull 3s var(--ease-out) infinite}
+@keyframes pull{0%{transform:translateY(0)}25%,55%{transform:translateY(56px)}75%,100%{transform:translateY(0)}}
+#d-pull .sp{position:absolute;left:50%;top:22px;width:28px;height:28px;margin-left:-14px;border-radius:50%;border:3px solid var(--bd);border-top-color:var(--acc);animation:spin .7s linear infinite,spv 3s infinite}
+@keyframes spin{to{rotate:360deg}}@keyframes spv{0%{opacity:0;scale:.3}25%,55%{opacity:1;scale:1}70%,100%{opacity:0;scale:.3}}
+/* 11 skeleton */
+.sk{border-radius:10px;background:linear-gradient(90deg,#1f2226 0%,#2d3238 50%,#1f2226 100%);background-size:300% 100%;animation:sh 1.4s linear infinite}
+@keyframes sh{0%{background-position:100% 0}100%{background-position:-100% 0}}
+/* 12 title */
+#d-title .cup{font-size:80px;text-align:center;margin-top:50px;animation:cup 3s var(--ease-spring) infinite}
+@keyframes cup{0%{transform:scale(0) rotate(-20deg)}25%,100%{transform:scale(1) rotate(0)}}
+@media (prefers-reduced-motion:reduce){
+ *,*:before,*:after{animation-duration:.001ms!important;animation-iteration-count:1!important;animation-delay:0s!important;animation-fill-mode:forwards!important;transition:none!important}
+ .cf{display:none}.sk{background:#2d3238}
+}
+</style></head><body>
+<div class="demo" id="d-countup"><div class="kick">This week</div><div class="card" style="margin-top:10px;text-align:center;padding:30px 16px"><div class="big" id="cu">0.0</div><div style="margin-top:8px"><span class="pill ok" id="cuchip" style="opacity:0">Favored +3.5</span></div></div><div class="tag"><b>count-up</b> 900ms &middot; ease-out &middot; chip pops at 700ms</div></div>
+<div class="demo" id="d-verdict"><div class="card" style="text-align:center;padding:20px 16px"><div class="kick">Your verdict</div><svg width="220" height="124" viewBox="0 0 220 124"><path d="M20 110a90 90 0 0 1 180 0" fill="none" stroke="#2a2e35" stroke-width="14" stroke-linecap="round"/><path class="arc" d="M20 110a90 90 0 0 1 180 0" fill="none" stroke="var(--ok)" stroke-width="14" stroke-linecap="round" pathLength="100"/><text class="win" x="110" y="98" text-anchor="middle" font-size="44" font-weight="800" fill="#f7f8fa">WIN</text></svg><div style="display:flex;gap:6px;justify-content:center"><span class="pill ok">+130 value</span><span class="pill acc">Fills WR2</span><span class="pill ok">High conf.</span></div></div><div class="tag"><b>verdict reveal</b> arc 480ms &middot; word spring &middot; pills +80ms stagger</div></div>
+<div class="demo" id="d-stagger"><div class="card"><b>Top priority</b></div><div class="card"><b>Matchup</b></div><div class="card"><b>Waivers</b></div><div class="card"><b>Lineup lock</b></div><div class="card"><b>Deadline</b></div><div class="tag"><b>card stagger</b> 240ms rise 24px &middot; 60ms step &middot; max 5 cards</div></div>
+<div class="demo" id="d-pick"><div class="kick" style="margin-bottom:8px">Your roster</div><div class="slot">WR2 &middot; open</div><div class="chipx"><span style="color:var(--wr);margin-right:8px">WR</span> Jaxon Moore</div><div class="tag"><b>pick lands</b> rise 400ms &middot; 6% squash &middot; slot flashes green</div></div>
+<div class="demo" id="d-sweep"><div class="kick" style="margin-bottom:8px">Week 11 final</div><div class="sb"><div class="kick">You</div><div class="n" id="sw1">0.0</div><div class="kick" style="margin-top:8px">Rats</div><div class="n" style="color:#9fb0d8" id="sw2">0.0</div></div><div class="tag"><b>advance-week sweep</b> light bar 480ms &middot; scores tick 700ms</div></div>
+<div class="demo" id="d-accept"><div class="ring"><svg width="52" height="52" viewBox="0 0 24 24" fill="none" stroke="#052e16" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"><path class="ck" d="m5 12 5 5 9-10"/></svg></div><div style="text-align:center;font-size:20px;font-weight:800">Trade accepted</div><div class="tag"><b>celebration</b> ring spring 480ms &middot; ripple 900ms &middot; 14 confetti (decor only)</div></div>
+<div class="demo" id="d-injury"><div class="kick" style="margin-bottom:10px">Your starters</div><div class="t"><span style="font-size:24px;color:#ff8a8a">&#10005;</span><div><b>WR2 &middot; Out</b><div style="font-size:12px;color:var(--mut)">Tap to see the swap</div></div></div><div class="tag"><b>injury pulse</b> 1.6s &middot; only for Out &middot; stops after 3 loops in app</div></div>
+<div class="demo" id="d-bye"><div class="card"><div style="display:flex;justify-content:space-between;margin-bottom:10px"><b>Trade deadline</b><span class="pill bad" id="byep">14 days</span></div><div class="seg" id="byeseg"></div></div><div class="tag"><b>countdown</b> segments fill 60ms step &middot; amber at 5d &middot; red at 2d</div></div>
+<div class="demo" id="d-tabs"><div class="seg"><div class="ind"></div><span>Hub</span><span>Finder</span><span>Analyzer</span></div><div class="pane"><div class="rail"><div class="card"><b>Ideas</b></div><div class="card"><b>Partners</b></div><div class="card"><b>Grade a deal</b></div></div></div><div class="tag"><b>tab switch</b> 240ms ease-out &middot; indicator + content slide together</div></div>
+<div class="demo" id="d-pull"><div class="sp"></div><div class="list"><div class="kick" style="margin-bottom:8px">Waivers</div><div class="card" style="height:60px;margin-bottom:8px"></div><div class="card" style="height:60px;margin-bottom:8px"></div><div class="card" style="height:60px"></div></div><div class="tag"><b>pull to refresh</b> rubber-band 56px &middot; spinner scales in &middot; release 480ms</div></div>
+<div class="demo" id="d-skeleton"><div class="card"><div class="sk" style="height:14px;width:40%"></div><div class="sk" style="height:46px;width:60%;margin:12px 0"></div><div class="sk" style="height:10px;width:90%"></div></div><div class="card" style="margin-top:10px"><div class="sk" style="height:14px;width:30%"></div><div class="sk" style="height:10px;width:80%;margin-top:12px"></div><div class="sk" style="height:10px;width:55%;margin-top:8px"></div></div><div class="tag"><b>skeleton shimmer</b> 1.4s linear &middot; shapes match the final layout</div></div>
+<div class="demo" id="d-title"><div class="cup">&#127942;</div><div style="text-align:center;font-size:24px;font-weight:800;margin-top:10px">League champions</div><div class="tag"><b>title confetti</b> trophy spring &middot; 40 pieces &middot; 1.6s &middot; once per season</div></div>
+<script>
+const d=new URLSearchParams(location.search).get("d")||"countup";document.getElementById("d-"+d).classList.add("on");
+const rm=matchMedia("(prefers-reduced-motion: reduce)").matches;
+const ease=t=>1-Math.pow(1-t,4);
+function count(el,to,ms,dec,cb){if(rm){el.textContent=to.toFixed(dec);cb&&cb(1);return}const t0=performance.now();(function f(n){const t=Math.min(1,(n-t0)/ms);el.textContent=(to*ease(t)).toFixed(dec);cb&&cb(t);if(t<1)requestAnimationFrame(f)})(t0)}
+if(d==="countup"){const run=()=>{const c=document.getElementById("cuchip");c.style.transition="none";c.style.opacity=0;c.style.transform="scale(.6)";count(document.getElementById("cu"),121.4,900,1);setTimeout(()=>{c.style.transition="all 240ms cubic-bezier(.34,1.56,.64,1)";c.style.opacity=1;c.style.transform="scale(1)"},rm?0:700)};run();if(!rm)setInterval(run,3000)}
+if(d==="sweep"){const run=()=>{setTimeout(()=>{count(document.getElementById("sw1"),121.4,700,1);count(document.getElementById("sw2"),117.9,700,1)},150)};run();if(!rm)setInterval(run,3000)}
+if(d==="bye"){const s=document.getElementById("byeseg");for(let i=0;i<14;i++){const e=document.createElement("i");const c=i<9?"var(--acc2)":i<12?"var(--warn)":"var(--bad)";e.style.cssText="flex:1;height:16px;border-radius:4px;background:#2a2e35";s.appendChild(e)}
+ const run=()=>{[...s.children].forEach(e=>e.style.background="#2a2e35");let i=0;const iv=setInterval(()=>{if(i>=14){clearInterval(iv);return}s.children[i].style.background=i<9?"var(--acc2)":i<12?"var(--warn)":"var(--bad)";i++},rm?0:60);if(rm){[...s.children].forEach((e,k)=>e.style.background=k<9?"var(--acc2)":k<12?"var(--warn)":"var(--bad)")}};run();if(!rm)setInterval(run,3000)}
+if(d==="accept"||d==="title"){const cols=["#facc15","#22d3ee","#22c55e","#fb7185","#a78bfa"];const n=d==="title"?40:14;const run=()=>{document.querySelectorAll(".cf").forEach(e=>e.remove());if(rm)return;for(let i=0;i<n;i++){const e=document.createElement("i");e.className="cf";e.style.background=cols[i%5];e.style.top=d==="title"?"150px":"130px";document.getElementById("d-"+d).appendChild(e);const a=(Math.random()*Math.PI)+Math.PI,v=90+Math.random()*130;e.animate([{opacity:1,transform:"translate(0,0) rotate(0)"},{opacity:1,transform:`translate(${Math.cos(a)*v}px,${Math.sin(a)*v-20}px) rotate(200deg)`,offset:.45},{opacity:0,transform:`translate(${Math.cos(a)*v*1.3}px,${Math.sin(a)*v+220}px) rotate(520deg)`}],{duration:1600,delay:500+Math.random()*120,easing:"cubic-bezier(.2,.7,.4,1)",fill:"both"})}};run();setInterval(run,3000)}
+</script></body></html>
