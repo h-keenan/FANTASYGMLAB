@@ -199,7 +199,7 @@ export function OnboardingCarousel({ onDone, replay = false }: { onDone: () => v
 
   if (!portalRoot) return null;
   return createPortal(
-    <div className="onboarding-shell">
+    <div className="onboarding-shell" role="region" aria-label="Welcome tour">
       <div className="onboarding-aurora" aria-hidden="true" />
       <div className="onboarding-field" aria-hidden="true" />
       <div className="onboarding-sweep" aria-hidden="true" />

@@ -12,6 +12,7 @@ import { TradeHubContent } from "@/components/TradeHubContent";
 import { ErrorState, reloadPage } from "@/components/ErrorState";
 import { TradeHubSkeleton } from "@/components/TradeHubFilters";
 import { TradesTabBar } from "@/components/TradesTabBar";
+import { UNNAMED_LEAGUE } from "@/lib/leagueName";
 
 export default function TradeHubPage() {
   const params = useParams<{ leagueId: string }>();
@@ -20,7 +21,7 @@ export default function TradeHubPage() {
   const { session, loading: authLoading } = useAuth();
 
   const leagueId = decodeURIComponent(params.leagueId);
-  const leagueName = searchParams.get("name") || leagueId;
+  const leagueName = searchParams.get("name") || UNNAMED_LEAGUE;
   // Recommendation-compliance audit, Check 3 — a GM Plan/Dashboard trade
   // tile's CTA now threads the headline idea's receive-side player through
   // here (see gamePlanTileHref/resolveGamePlanTargetPlayerId) instead of

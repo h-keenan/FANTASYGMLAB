@@ -22,6 +22,7 @@ import {
 import { LiveDraftContent } from "@/components/LiveDraftContent";
 import { ErrorState, reloadPage } from "@/components/ErrorState";
 import { LoadingScreen } from "@/components/LoadingScreen";
+import { UNNAMED_LEAGUE } from "@/lib/leagueName";
 
 // Matches modules/live_draft.py's LIVE_DRAFT_POLL_INTERVAL_SECONDS (12s) —
 // the same cadence modules/live_draft_ui.py's Streamlit route already
@@ -37,7 +38,7 @@ export default function LiveDraftPage() {
   const { session, loading: authLoading } = useAuth();
 
   const leagueId = decodeURIComponent(params.leagueId);
-  const leagueName = searchParams.get("name") || leagueId;
+  const leagueName = searchParams.get("name") || UNNAMED_LEAGUE;
   const { lens } = useValuationLens(leagueId);
 
   const [discovery, setDiscovery] = useState<LiveDraftDiscoveryResponse | null>(null);

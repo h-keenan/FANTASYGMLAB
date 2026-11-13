@@ -110,7 +110,7 @@ export function LeagueSwitcherButton({
             itself now names the current league instead of a generic
             "Switch league" label — the league-name span this replaced was
             hidden below sm width anyway, so mobile never showed it at all. */}
-        <span className="truncate">{leagueName || "Switch league"}</span>
+        <span className="break-words">{leagueName || "Switch league"}</span>
         <span aria-hidden>▾</span>
       </button>
       {open ? (
@@ -242,23 +242,23 @@ export function LeagueLensPicker({ leagueId, leagueName, leagues }: { leagueId: 
   const current = VALUATION_LENS_OPTIONS.find((option) => option.value === lens);
   const done = () => setOpen(false);
   return (
-    <div className="relative min-w-0 flex-1 flex justify-end">
+    <div className="relative min-w-0 flex-[1_1_6rem] flex justify-end">
       <button
         type="button"
         onClick={() => setOpen((value) => !value)}
         aria-expanded={open}
         aria-haspopup="menu"
-        aria-label={`League and lens: ${leagueName || "Switch league"}, ${current?.label ?? "Dynasty"}`}
         className="inline-flex items-center gap-0.5 px-1.5 font-bold min-w-0 max-w-full min-h-[var(--touch-target-min)] text-left"
         style={{ color: "var(--color-text-secondary)", border: "var(--border-width-default) solid var(--color-border)" }}
       >
         {/* League over lens: one compact "League · Lens ▾" chip that still fits beside the page name. */}
         <span className="flex flex-col min-w-0 leading-tight" style={{ fontSize: "0.6875rem" }}>
           <span className="truncate">{leagueName || "Switch league"}</span>
-          <span className="truncate" style={{ color: "var(--color-premium)" }}>
+          <span className="break-words" style={{ color: "var(--color-premium)" }}>
             <span aria-hidden style={{ color: "var(--color-text-muted)" }}>· </span>
             {current?.label ?? "Dynasty"}
           </span>
+          <span className="sr-only">. Switch league and evaluation lens</span>
         </span>
         <span aria-hidden className="shrink-0 text-xs">▾</span>
       </button>
@@ -322,7 +322,7 @@ function HeaderLeagueControls() {
   if (!leagueId) return null;
 
   const resolvedName = nameParam || savedLeagues.find((row) => row.league_id === leagueId)?.league_name || null;
-  const leagueName = resolvedName || leagueId;
+  const leagueName = resolvedName || "Your league";
 
   return <LeagueLensPicker leagueId={leagueId} leagueName={leagueName} leagues={savedLeagues} />;
 }
@@ -345,9 +345,9 @@ function HeaderPageTitle() {
   const title = PAGE_TITLE_BY_SEGMENT[segment];
   if (!title) return null;
   return (
-    <span className="flex items-center shrink-0">
+    <span className="flex items-center min-w-0">
       {/* The page's name is its h1 (some pages render only a header title; axe page-has-heading-one). */}
-      <h1 className="text-xs font-bold uppercase leading-tight whitespace-nowrap" style={{ color: "var(--color-text-muted)", letterSpacing: "0.03em" }}>
+      <h1 className="text-xs font-bold uppercase leading-tight min-w-0 break-words" style={{ color: "var(--color-text-muted)", letterSpacing: "0.03em" }}>
         {title}
       </h1>
       {/* Pages portal their "?" explainer here (PageTitle `info`). */}
@@ -435,9 +435,9 @@ export function Header() {
       className={`flex flex-col px-2 py-0.5 relative${ownChrome || barVisible ? " max-md:hidden" : ""}`}
       style={{ borderBottom: "var(--border-width-default) solid var(--color-border)" }}
     >
-      <div className="flex items-center justify-between gap-1">
-      <div className="flex items-center shrink-0">
-        <Link href="/" className="flex items-center gap-2 p-2 -m-2 mr-0" aria-label={`${BRAND_NAME} home`}>
+      <div className="flex flex-wrap items-center justify-between gap-x-1">
+      <div className="flex items-center min-w-0">
+        <Link href="/" className="flex items-center gap-2 p-2 -m-2 mr-0 shrink-0" aria-label={`${BRAND_NAME} home`}>
           <Image src="/brand-mark.png" alt="" width={28} height={28} className="brand-mark-icon" style={{ objectFit: "contain" }} />
           <span className="hidden sm:inline text-sm font-extrabold uppercase" style={{ color: "var(--color-text-primary)", letterSpacing: "0.03em" }}>
             {BRAND_NAME}

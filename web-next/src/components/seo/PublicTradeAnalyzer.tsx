@@ -107,9 +107,9 @@ function SidePanel({
   return (
     <section className="glass-surface flex flex-col gap-3 p-4" aria-labelledby={`${uid}-title`}>
       <div className="flex items-baseline justify-between gap-2">
-        <h3 id={`${uid}-title`} style={{ font: "var(--type-section-title)" }}>
+        <h2 id={`${uid}-title`} style={{ font: "var(--type-section-title)" }}>
           {title}
-        </h3>
+        </h2>
         <span className="text-sm font-bold" style={{ fontVariantNumeric: "tabular-nums" }} aria-label={`${title} total value`}>
           {Math.round(total).toLocaleString()}
         </span>
@@ -239,22 +239,22 @@ const GATE_FEATURES: { cta: Exclude<TradeCta, "verdict" | "sample">; title: stri
 function GateCard({ onCta }: { onCta: (cta: TradeCta) => void }) {
   return (
     <section className="glass-surface flex flex-col gap-3 p-4" aria-labelledby="pta-gate-title" data-testid="trade-gate">
-      <h3 id="pta-gate-title" style={{ font: "var(--type-section-title)" }}>
+      <h2 id="pta-gate-title" style={{ font: "var(--type-section-title)" }}>
         This verdict is value-only. Get the roster-aware one.
-      </h3>
+      </h2>
       <p className="text-sm" style={{ color: "var(--color-text-secondary)" }}>
         Totals can&apos;t see your team. A free FantasyDesk account connects your Sleeper league and adds:
       </p>
       <ul className="flex flex-col gap-2">
         {GATE_FEATURES.map((feature) => (
-          <li key={feature.cta} className="flex gap-2 text-sm">
+          <li key={feature.cta} className="flex flex-wrap gap-x-2 gap-y-1 text-sm">
             <span
               className="mt-0.5 inline-flex h-5 shrink-0 items-center px-1.5 text-[0.65rem] font-bold uppercase"
               style={{ background: "var(--color-accent-soft, var(--color-surface-muted))", color: "color-mix(in srgb, var(--color-accent) 75%, var(--color-text-primary))", borderRadius: "var(--radius-pill)" }}
             >
               Free account
             </span>
-            <span>
+            <span className="min-w-0 flex-1 basis-40">
               <strong>{feature.title}.</strong>{" "}
               <span style={{ color: "var(--color-text-secondary)" }}>{feature.body}</span>
             </span>
@@ -320,9 +320,9 @@ function RosterTeaser({
   ];
   return (
     <section className="glass-surface flex flex-col gap-3 p-4" aria-labelledby="pta-teaser-title" data-testid="roster-teaser">
-      <h3 id="pta-teaser-title" style={{ font: "var(--type-section-title)" }}>
+      <h2 id="pta-teaser-title" style={{ font: "var(--type-section-title)" }}>
         Now see it on your roster
-      </h3>
+      </h2>
       <p className="text-sm" style={{ color: "var(--color-text-secondary)" }}>
         This verdict is value-only, so it cannot see your team. A free FantasyDesk account connects your Sleeper league
         and adds, for this exact trade:
@@ -541,9 +541,9 @@ export function PublicTradeAnalyzer() {
                   Value-only verdict
                 </p>
                 <div className="flex items-baseline justify-between gap-2">
-                  <h3 className="text-xl font-black" style={{ color: toneColor }}>
+                  <h2 className="text-xl font-black" style={{ color: toneColor }}>
                     {evaluation.headline}
-                  </h3>
+                  </h2>
                   <span className="text-lg font-black" style={{ color: toneColor, fontVariantNumeric: "tabular-nums" }}>
                     {formatTradeGain(evaluation.diff)}
                   </span>

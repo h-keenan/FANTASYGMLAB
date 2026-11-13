@@ -10,6 +10,7 @@ import { api, type LeagueTeamRankingsResponse } from "@/lib/api";
 import { LeagueRankingsContent } from "@/components/LeagueRankingsContent";
 import { ErrorState, reloadPage } from "@/components/ErrorState";
 import { LoadingScreen } from "@/components/LoadingScreen";
+import { UNNAMED_LEAGUE } from "@/lib/leagueName";
 
 export default function LeagueRankingsPage() {
   const params = useParams<{ leagueId: string }>();
@@ -18,7 +19,7 @@ export default function LeagueRankingsPage() {
   const { session, loading: authLoading } = useAuth();
 
   const leagueId = decodeURIComponent(params.leagueId);
-  const leagueName = searchParams.get("name") || leagueId;
+  const leagueName = searchParams.get("name") || UNNAMED_LEAGUE;
   const { lens, lensReady } = useValuationLens(leagueId);
 
   const [rankings, setRankings] = useState<LeagueTeamRankingsResponse | null>(null);

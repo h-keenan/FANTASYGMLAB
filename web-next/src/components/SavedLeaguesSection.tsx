@@ -71,12 +71,12 @@ export function SavedLeaguesSection() {
         {leagues.map((league) => (
           <li key={league.league_id} className="flex flex-col gap-2">
             <div className="flex items-center justify-between gap-3 text-sm">
-              <span className="font-semibold">{league.league_name || league.league_id}</span>
+              <span className="font-semibold min-w-0 break-words">{league.league_name || league.league_id}</span>
               {confirmingId === league.league_id ? null : (
                 <button
                   type="button"
                   onClick={() => setConfirmingId(league.league_id)}
-                  className="text-xs font-bold whitespace-nowrap"
+                  className="text-xs font-bold text-right min-h-[var(--touch-target-min)]"
                   style={{ color: "var(--color-text-muted)" }}
                 >
                   Not your league? Remove

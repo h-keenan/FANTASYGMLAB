@@ -111,7 +111,7 @@ export function RankingRow({
       <TeamAvatar avatarUrl={avatarUrl} size={32} ringColor={firstPlace ? "var(--color-premium)" : "var(--color-border)"} />
       <div className="flex-1 flex flex-col gap-0.5 min-w-0">
         <div className="flex items-center gap-2 flex-wrap">
-          <span className="text-sm font-bold break-words" style={{ color: "var(--color-text-primary)" }}>
+          <span className="text-sm font-bold [overflow-wrap:anywhere]" style={{ color: "var(--color-text-primary)" }}>
             {teamName}
           </span>
           {isCurrent ? <ToneBadge label="You" color={rankBadgeColor("positive")} /> : null}

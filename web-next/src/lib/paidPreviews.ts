@@ -17,7 +17,8 @@ export interface PaidPreview {
 
 /** Keys match PremiumUpsellCard's gate key (the kicker, snake-cased). */
 export function paidPreview(key: string, leagueName?: string): PaidPreview | null {
-  const league = leagueName?.trim() || "your league";
+  const trimmed = leagueName?.trim();
+  const league = trimmed && trimmed !== "Your league" ? trimmed : "your league";
   switch (key) {
     case "draft_center":
       return {

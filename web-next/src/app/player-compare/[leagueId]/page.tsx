@@ -11,6 +11,7 @@ import { PlayerCompareContent } from "@/components/PlayerCompareContent";
 import { EmptyState } from "@/components/EmptyState";
 import { ErrorState, reloadPage } from "@/components/ErrorState";
 import { LoadingScreen } from "@/components/LoadingScreen";
+import { UNNAMED_LEAGUE } from "@/lib/leagueName";
 
 /**
  * Route for Player Compare (Revision 12). Takes both player IDs as query
@@ -31,7 +32,7 @@ export default function PlayerComparePage() {
   const { session, loading: authLoading } = useAuth();
 
   const leagueId = decodeURIComponent(params.leagueId);
-  const leagueName = searchParams.get("name") || leagueId;
+  const leagueName = searchParams.get("name") || UNNAMED_LEAGUE;
   const playerAId = searchParams.get("a") || "";
   const playerBId = searchParams.get("b") || "";
 

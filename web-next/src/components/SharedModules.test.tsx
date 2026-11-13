@@ -32,7 +32,7 @@ describe("shared UI modules", () => {
   it("ValueStat puts the Value caption above the number", () => {
     render(<ValueStat value={1234} />);
     const stat = screen.getByTestId("value-stat");
-    expect(stat.firstElementChild?.textContent).toBe("Value");
+    expect(stat.firstElementChild?.textContent).toBe("Trade value");
     expect(stat.lastElementChild?.textContent).toBe("1,234");
   });
 

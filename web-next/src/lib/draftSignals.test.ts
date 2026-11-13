@@ -48,7 +48,7 @@ describe("draftSignals", () => {
     expect(seeAllLabel(3)).toBeNull();
   });
   it("speaks one line and falls back to legacy strings when rows are absent", () => {
-    expect(signalSpokenLabel(row())).toBe("Retooler, Retool, Picks #10, Too few picks for a retool");
+    expect(signalSpokenLabel(row())).toBe("Retooler, Picks #10, Retool, Too few picks for a retool");
     expect(cardRows({ rows: [] })).toBeNull();
     expect(cardRows({})).toBeNull();
     expect(cardRows({ rows: [row()] })).toHaveLength(1);

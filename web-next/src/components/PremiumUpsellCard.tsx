@@ -100,7 +100,7 @@ export function PremiumUpsellCard({
                   <span className="mt-0.5 shrink-0" style={{ color: "var(--color-premium)" }}>
                     <FeatureIncludedGlyph size={16} />
                   </span>
-                  <span className="min-w-0">{bullet}</span>
+                  <span className="min-w-0 break-words">{bullet}</span>
                 </li>
               ))}
             </ul>

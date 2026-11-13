@@ -257,7 +257,7 @@ function FailedLeaguesNote({
             confirmLabel="Remove"
             disabled={busyLeagueId === league.league_id}
             errorText="Could not remove it. Try again."
-            triggerClassName="text-xs font-bold whitespace-nowrap"
+            triggerClassName="text-xs font-bold text-right min-h-[var(--touch-target-min)]"
             triggerStyle={{ color: "var(--color-text-muted)", background: "none", border: 0, minHeight: "var(--touch-target-min)", cursor: "pointer" }}
             onConfirm={() => onRemove(league.league_id)}
           />
@@ -435,7 +435,7 @@ export function PortfolioLeagueSkeleton({
  * which is already its upgrade path past the one-league cap. */
 function AddLeagueLink() {
   return (
-    <Link href="/connect-league" className="self-start text-sm font-bold mt-1" style={{ color: "var(--color-accent)" }}>
+    <Link href="/connect-league" className="self-start inline-flex items-center min-h-[var(--touch-target-min)] text-sm font-bold mt-1" style={{ color: "var(--color-accent)" }}>
       + Add a league
     </Link>
   );

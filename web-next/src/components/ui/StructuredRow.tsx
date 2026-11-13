@@ -43,20 +43,20 @@ export type StructuredRowProps = {
  * Layout is fixed so lists scan: 36px lead, name and pills on the first line,
  * chip and reason on the second, 64px tall at most, 44px minimum tap target.
  */
-export function StructuredRow({ lead, title, chip, pills = [], reason, highlight = false, spoken, detailTitle, detail, onOpen, testId }: StructuredRowProps) {
+export function StructuredRow({ lead, title, chip, pills = [], reason, highlight = false, detailTitle, detail, onOpen, testId }: StructuredRowProps) {
   const [open, setOpen] = useState(false);
   const tappable = Boolean(detail || onOpen);
   const body = (
     <>
-      {lead ? <span className="ui-srow-lead">{lead}</span> : null}
+      {lead ? <span className="ui-srow-lead" aria-hidden="true">{lead}</span> : null}
       <span className="ui-srow-main">
         <span className="ui-srow-line">
-          <span className="ui-srow-title">{title}</span>
+          <span className="ui-srow-title">{title}</span>{" "}
           {pills.length ? (
             <span className="ui-srow-pills">
               {pills.map((pill) => (
                 <span key={pill.key} className="ui-srow-pill">
-                  {pill.label}
+                  {pill.label}{" "}
                 </span>
               ))}
             </span>
@@ -69,6 +69,7 @@ export function StructuredRow({ lead, title, chip, pills = [], reason, highlight
                 {chip.label}
               </span>
             ) : null}
+            {chip && reason ? " " : null}
             {reason ? <span className="ui-srow-reason">{reason}</span> : null}
           </span>
         ) : null}
@@ -88,7 +89,6 @@ export function StructuredRow({ lead, title, chip, pills = [], reason, highlight
           type="button"
           className={className}
           aria-haspopup={detail ? "dialog" : undefined}
-          aria-label={spoken}
           data-testid={testId}
           onClick={() => (onOpen ? onOpen() : setOpen(true))}
         >
@@ -129,12 +129,15 @@ export function StructuredRowList<T>({
   const shown = visibleSignalRows(items, expanded, top);
   const more = seeAllLabel(items.length, top);
   return (
-    <div className="ui-srow-list" role="list" aria-label={ariaLabel}>
-      {shown.map((item, index) => (
-        <div key={index} role="listitem">
-          {renderRow(item, index)}
-        </div>
-      ))}
+    <div className="ui-srow-list">
+      {/* The list holds only list items; the See all button sits beside it (axe aria-required-children). */}
+      <div className="ui-srow-list" role="list" aria-label={ariaLabel}>
+        {shown.map((item, index) => (
+          <div key={index} role="listitem">
+            {renderRow(item, index)}
+          </div>
+        ))}
+      </div>
       {more ? (
         <button type="button" className="ui-srow-more" aria-expanded={expanded} onClick={() => setExpanded((value) => !value)}>
           {expanded ? "Show less" : more}

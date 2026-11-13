@@ -15,6 +15,7 @@ import { shellActiveTab, shellTabs, SHELL_ACTION_SLOT_ID } from "@/lib/shellNav"
 import { useSearchParams } from "@/lib/useSearchParams";
 import { useShellNav } from "@/lib/useShellNav";
 import { useIsPro } from "@/lib/useIsPro";
+import { UNNAMED_LEAGUE } from "@/lib/leagueName";
 
 /**
  * Phase B phone shell: the site-wide bottom bar. League-aware: inside a league
@@ -39,7 +40,7 @@ function ShellBarInner() {
   const params = useParams<{ leagueId?: string }>();
   const searchParams = useSearchParams();
   const leagueId = params?.leagueId ? decodeURIComponent(params.leagueId) : null;
-  const leagueName = searchParams.get("name") || leagueId || "";
+  const leagueName = searchParams.get("name") || (leagueId ? UNNAMED_LEAGUE : "");
   const tabs = shellTabs({ leagueId, leagueName });
   const active = shellActiveTab(pathname, Boolean(leagueId));
   const [moreOpen, setMoreOpen] = useState(false);

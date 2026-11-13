@@ -12,6 +12,7 @@ import { DraftCenterContent, parseDraftCenterTab, type DraftCenterTab } from "@/
 import { PremiumUpsellCard } from "@/components/PremiumUpsellCard";
 import { ErrorState, reloadPage } from "@/components/ErrorState";
 import { LoadingScreen } from "@/components/LoadingScreen";
+import { UNNAMED_LEAGUE } from "@/lib/leagueName";
 
 export default function DraftCenterPage() {
   const params = useParams<{ leagueId: string }>();
@@ -20,7 +21,7 @@ export default function DraftCenterPage() {
   const { session, loading: authLoading } = useAuth();
 
   const leagueId = decodeURIComponent(params.leagueId);
-  const leagueName = searchParams.get("name") || leagueId;
+  const leagueName = searchParams.get("name") || UNNAMED_LEAGUE;
   const { lens, lensReady } = useValuationLens(leagueId);
 
   useEffect(() => {

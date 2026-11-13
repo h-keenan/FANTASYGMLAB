@@ -2387,6 +2387,7 @@ body:has(.fd-landing-dark) .brand-mark-icon {
 }
 .onboarding-skip {
   min-height: 2.75rem;
+  min-width: var(--touch-target-min);
   padding: 0 var(--space-sm);
 }
 .onboarding-preload {
@@ -2546,13 +2547,13 @@ body:has(.fd-landing-dark) .brand-mark-icon {
 }
 .onboarding-value-dots {
   display: flex;
-  gap: 2px;
+  gap: 0;
 }
-/* 24px hit area around a 7px visual dot. */
+/* 44px hit area around a 7px visual dot. */
 .onboarding-value-dot {
   position: relative;
-  width: 24px;
-  height: 24px;
+  width: var(--touch-target-min);
+  height: var(--touch-target-min);
   border: 0;
   background: transparent;
   cursor: pointer;
@@ -2560,7 +2561,7 @@ body:has(.fd-landing-dark) .brand-mark-icon {
 .onboarding-value-dot::after {
   content: "";
   position: absolute;
-  inset: 8.5px;
+  inset: calc((var(--touch-target-min) - 7px) / 2);
   border-radius: 999px;
   background: rgba(255, 255, 255, 0.28);
   transition: background 0.2s;

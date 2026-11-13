@@ -12,6 +12,7 @@ import { MyTeamContent } from "@/components/MyTeamContent";
 import { ErrorState, reloadPage } from "@/components/ErrorState";
 import { SkeletonBlock } from "@/components/Skeleton";
 import { PageTitle } from "@/components/PageTitle";
+import { UNNAMED_LEAGUE } from "@/lib/leagueName";
 
 /** Reserves the final page's block heights so the content doesn't jump. */
 function MyTeamSkeleton({ leagueName }: { leagueName: string }) {
@@ -38,7 +39,7 @@ export default function MyTeamPage() {
   const { session, loading: authLoading } = useAuth();
 
   const leagueId = decodeURIComponent(params.leagueId);
-  const leagueName = searchParams.get("name") || leagueId;
+  const leagueName = searchParams.get("name") || UNNAMED_LEAGUE;
   // Recommendation-compliance audit, Check 3 follow-up — My Team's own
   // injury-alert/value-trend GM Plan/Dashboard tiles already carry
   // route_player_id (see modules/dashboard_engine.py's build_injury_tile/
