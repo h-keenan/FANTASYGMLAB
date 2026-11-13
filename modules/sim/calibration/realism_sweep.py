@@ -3,6 +3,8 @@
     python -m modules.sim.calibration.realism_sweep seasons [--seeds 4] [--json out.json]   # redraft shapes: scoring, standings, parity, injuries, ADP
     python -m modules.sim.calibration.realism_sweep dynasty [--seeds 3]                        # rookies, aging, retirements, 5-season drift
     python -m modules.sim.calibration.realism_sweep real                                        # the real-data yardsticks these are compared with
+    python -m modules.sim.calibration.realism_sweep exploit [--seeds 3]                        # a greedy trader against the AI trade desk
+    (API latency and payload sizes live in tests/test_sim_latency_probe.py: they need the web framework)
 
 Pure stdlib + numpy + modules.sim. Never touches data/players.db.
 """
@@ -347,84 +349,6 @@ def dynasty(seeds: int, n_seasons: int = 5) -> dict[str, Any]:
     return out
 
 
-# ------------------------------------------------------------------------------------ latency
-
-
-def latency() -> dict[str, Any]:
-    """Wall time and payload size of the phone-facing endpoints through the real FastAPI app (in-memory store), cold (caches
-    dropped: what a first request after a deploy or an evicted game costs) and warm, at the start, mid-season and the first offseason."""
-
-    import time
-
-    from fastapi import FastAPI, Header, HTTPException
-    from fastapi.testclient import TestClient
-
-    from modules.sim import api as sim_api
-    from modules.sim import game_api
-    from modules.sim.game_store import SNAPSHOTS, STATES
-    from modules.sim.inputs import PlayerPool
-    from modules.sim.store import InMemoryBackend
-
-    rows, byes = tail_report.pool_from_panel(dataset.load_panel())
-
-    class PoolInputs:
-        def player_pool(self, scoring):
-            return PlayerPool(rows, byes)
-
-    backend = InMemoryBackend()
-
-    def require_user(authorization: str | None = Header(default=None)):
-        if not authorization:
-            raise HTTPException(status_code=401, detail="no")
-        return {"id": authorization, "_access_token": "tok"}
-
-    app = FastAPI()
-    sim_api.mount(app, sim_api.SimApiDeps(require_user=require_user, is_pro=lambda u: True, sleeper_username=lambda u: "",
-                                          backend_for=lambda u: backend, inputs=PoolInputs()), environ={"SIM_ENABLED": "1"})
-    client = TestClient(app)
-    h = {"Authorization": "pro"}
-    game_api.clear_pool_cache()
-    out: dict[str, Any] = {}
-    res = client.post("/v1/sim/games", json={"mode": "dynasty", "teams": 12, "seasons": 5, "rookie_rounds": 3, "user_slot": 4, "scoring": "ppr"}, headers=h)
-    gid = res.json()["game"]["id"]
-    base = f"/v1/sim/games/{gid}"
-
-    def timed(method, path, body=None):
-        t0 = time.perf_counter()
-        r = client.request(method, base + path, json=body, headers=h)
-        return round((time.perf_counter() - t0) * 1000, 1), len(r.content), r.status_code
-
-    def cold():
-        STATES.drop(gid)
-        SNAPSHOTS.drop(gid)
-
-    def probe(label):
-        user_team = client.get(base, headers=h).json()["game"]["settings"]["user_slot"]
-        reads = ["", "/home", "/lineup", "/league", "/league/rosters", "/players", "/players?pos=WR&sort=value&page=3", "/teams/2", "/inbox", "/picks", "/dynasty"]
-        table = {}
-        for path in reads:
-            cold()
-            c = timed("GET", path)
-            w = min(timed("GET", path)[0] for _ in range(3))
-            table[path or "/"] = {"cold_ms": c[0], "warm_ms": w, "bytes": c[1], "status": c[2]}
-        out[label] = table
-
-    client.post(base + "/draft/auto", headers=h)
-    probe("season1_week1")
-    for _ in range(7):
-        client.post(base + "/advance", headers=h)
-    probe("season1_week8")
-    writes = {}
-    for name, (method, path, body) in {"advance": ("POST", "/advance", None), "sim_to_4_weeks": ("POST", "/sim-to", {"target": "weeks", "weeks": 4, "auto_set": True}),
-                                       "lineup_auto": ("POST", "/lineup/auto", None)}.items():
-        cold()
-        writes[name] = timed(method, path, body)[:2]
-    out["writes_ms_bytes"] = writes
-    client.post(base + "/sim-to", json={"target": "season_end"}, headers=h)
-    probe("season1_offseason")
-    return out
-
-
 # ------------------------------------------------------------------------------------ exploits
 
 
@@ -510,7 +434,7 @@ def exploit_probe(seeds: int = 3, mode: str = "dynasty", objective: str = "asset
 
 def main(argv: list[str] | None = None) -> None:
     ap = argparse.ArgumentParser(description=__doc__)
-    ap.add_argument("cmd", choices=["seasons", "dynasty", "real", "exploit", "latency"])
+    ap.add_argument("cmd", choices=["seasons", "dynasty", "real", "exploit"])
     ap.add_argument("--seeds", type=int, default=3)
     ap.add_argument("--shapes", default="")
     ap.add_argument("--json", default="")
@@ -519,8 +443,6 @@ def main(argv: list[str] | None = None) -> None:
         res = real_yardsticks()
     elif args.cmd == "exploit":
         res = {f"{m}/{o}": exploit_probe(args.seeds, m, o) for m in ("redraft", "dynasty") for o in ("assets", "lineup")}
-    elif args.cmd == "latency":
-        res = latency()
     elif args.cmd == "seasons":
         res = seasons(args.seeds, [s for s in args.shapes.split(",") if s] or None)
     else:

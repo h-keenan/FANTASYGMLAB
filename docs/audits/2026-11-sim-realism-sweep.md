@@ -4,7 +4,7 @@ Scope (coridian_: "another whole batch of simulations ... audits or checks that 
 shapes against real fantasy football, a user-flow fuzzer, dead-end search, API latency and payload budgets, and an exploit search. Run on main
 after #1816 (team roles), #1836 (player-model-4), #1843 (AI managers) and #1851 (20-season dynasty). Harnesses are committed:
 
-- `python -m modules.sim.calibration.realism_sweep seasons|dynasty|real|exploit|latency` (this PR)
+- `python -m modules.sim.calibration.realism_sweep seasons|dynasty|real|exploit` and `python -m tests.test_sim_latency_probe` (this PR)
 - `python -m tests.test_sim_fuzz --seeds 40 --steps 400` (#1859)
 - `python -m modules.sim.calibration.path_fit` (#1861)
 
@@ -14,7 +14,7 @@ after #1816 (team roles), #1836 (player-model-4), #1843 (AI managers) and #1851 
 | --- | --- | --- | --- | --- |
 | 1 | High | `revert-week` left a checkpoint past the truncated event log: live state kept reverted actions, the log lost them, a cold replay raised "list.remove(x)" / "event log has a gap" | fuzzer seeds 100, 101 and 106 (3 of the first 8 games): resume != replay, one cold replay crashed | Fixed in #1859 (+ regression test that fails without the fix) |
 | 2 | Medium | Scoring fell through the season: team scores 112.9 (week 1) -> 96.9 (week 13) in a 12-team league (-15%). Model level: expected weekly mean relative to the season mean 1.00 -> 0.92 for starters; real panel is flat (-0.1% to -0.2% a week) | `realism_sweep seasons`, `path_fit`: model slopes -0.5% / -0.7% a week (elite / starter) vs real -0.1% / -0.2% | Fixed in #1861 (player-model-5, centered tilt, season totals and calibration unchanged) |
-| 3 | Medium | Payload and cold-start budget: `/league/rosters` 120-131 KB and `/picks` 63 KB per call; cold `/home` 61-112 ms, cold `/advance` about 570 ms on the in-memory store | `realism_sweep latency` | Reported; no change (see below) |
+| 3 | Medium | Payload and cold-start budget: `/league/rosters` 120-131 KB and `/picks` 63 KB per call; cold `/home` 61-112 ms, cold `/advance` about 570 ms on the in-memory store | `tests/test_sim_latency_probe.py` | Reported; no change (see below) |
 | 4 | Low | `POST /sim-to` with an unknown `target` is accepted and behaves like "through the playoffs"; unbounded `weeks` | probe of 40 malformed requests: no 5xx, but this is the only silently-lenient one | Reported |
 | 5 | Low | `sim-to` stops with 0 weeks on any pending trade offer even with `auto_set` (needs `force_first`) | 5 of 6 games stopped at week 3 with `trade_offers`, repeated calls stop again until the offers expire | Reported (by design, worth a UI hint) |
 | 6 | Info | Dynasty aging looks too fast (RB 28-29: 0.62 vs real 0.72, WR 26-27: 0.80 vs 0.89, TE 26-27: 0.72 vs 0.93) but only on an unconditional sample; conditioned on still being in the draftable pool, as the real panel is, it matches (RB 28-29 0.80, WR 26-27 0.87, WR 28-29 0.83, TE 28-29 0.85) | `realism_sweep dynasty` | Not a bug: the real table is survivorship-conditioned |
