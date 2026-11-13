@@ -31,6 +31,7 @@ from modules.sim import game_draft as draft
 from modules.sim import game_history as hist
 from modules.sim import game_simto as simto
 from modules.sim import game_home as home
+from modules.sim import game_notifications as notif
 from modules.sim import game_view as view
 from modules.sim.game_ai import TradeDesk
 from modules.sim.game_engine import advance, finish_draft, start_from_league
@@ -837,6 +838,17 @@ def add_routes(router: APIRouter, ctx: GameApiCtx) -> None:
         pro = ctx.is_pro(user)
         _, _, _, snap, state = load(user, _gid(game_id))
         return {**_env(pro, state), "items": view.inbox_view(snap, state)}
+
+    @router.get("/games/{game_id}/notifications")
+    @guarded
+    def get_notifications(game_id: str, since: int = 0, user: dict[str, Any] = Depends(require_user)):
+        """The bell: items derived from the recent event log (see game_notifications), newest first, capped."""
+
+        pro = ctx.is_pro(user)
+        gid = _gid(game_id)
+        store, uid, _, snap, state = load(user, gid)
+        events = store.load_events(uid, gid, max(0, int(state.seq) - notif.EVENT_WINDOW))
+        return {**_env(pro, state), **notif.derive(snap, state, events, max(0, int(since)))}
 
     @router.post("/games/{game_id}/inbox/{item_id}/respond")
     @guarded
