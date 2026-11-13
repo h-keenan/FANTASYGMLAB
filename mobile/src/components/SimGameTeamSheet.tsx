@@ -7,12 +7,15 @@ import Button from './Button';
 import ErrorState from './ErrorState';
 import PositionBadge from './PositionBadge';
 import SimCrest from './SimCrest';
+import { SimTeamHistory } from './SimTeamHistory';
 import { SkeletonCard } from './SkeletonBlock';
+import Tabs from './Tabs';
 import { SimPlayerChip, SimPlayerLine, SimSectionTitle, SimSheet, SimToneBadge, createSimStyles, simToneColor, type SimCtx } from './SimGameParts';
 import ToneBadge from './ToneBadge';
 import { useThemeMode } from '../context/ThemeModeContext';
 import { api } from '../lib/api';
-import { simGroupBenchByPosition, simRosterStats } from '../lib/simLeagueRosters';
+import { simListStats } from '../lib/simDraft';
+import { simGroupBenchByPosition } from '../lib/simLeagueRosters';
 import {
   simFmtPts,
   simFmtRecord,
@@ -98,6 +101,14 @@ function TeamBody({ ctx, data, onTrade }: { ctx: SimCtx; data: SimTeamRosterResp
           {team.owner ? <AppText style={common.muted}>Managed by {team.owner}</AppText> : null}
         </View>
       </View>
+      <Tabs
+        id="sim-team"
+        tabs={[
+          {
+            key: 'overview',
+            label: 'Overview',
+            render: () => (
+              <>
       <AppText style={common.small}>{team.persona.blurb}</AppText>
 
       <View style={styles.facts}>
@@ -131,6 +142,22 @@ function TeamBody({ ctx, data, onTrade }: { ctx: SimCtx; data: SimTeamRosterResp
         ))}
       </View>
 
+      {(data.injuries ?? []).length > 0 ? (
+        <View style={common.tight} accessibilityLabel="Injuries">
+          <SimSectionTitle glyph="injury" tone="danger" title="Injuries" />
+          {data.injuries!.map((p) => (
+            <SimPlayerLine key={p.id} player={p} onOpen={ctx.openPlayer} stats={simListStats(p, { adp: false })} trailing={<SimToneBadge label={`${p.out_weeks} wk`} tone="danger" />} />
+          ))}
+        </View>
+      ) : null}
+              </>
+            ),
+          },
+          {
+            key: 'roster',
+            label: 'Roster',
+            render: () => (
+              <>
       <View style={common.tight}>
         <SimSectionTitle glyph="team" title="Lineup" caption={`Projected ${simFmtPts(data.projected_total)} points this week`} />
         {lineup.map((slot, index) => (
@@ -144,7 +171,7 @@ function TeamBody({ ctx, data, onTrade }: { ctx: SimCtx; data: SimTeamRosterResp
                   player={slot.player}
                   hidePosition={simSlotRepeatsPosition(slot.slot, slot.player.pos)}
                   onOpen={ctx.openPlayer}
-                  stats={simRosterStats(slot.player)}
+                  stats={simListStats(slot.player, { adp: false })}
                 />
               ) : (
                 <AppText style={[common.muted, { paddingVertical: spacing.md }]}>Empty</AppText>
@@ -163,7 +190,7 @@ function TeamBody({ ctx, data, onTrade }: { ctx: SimCtx; data: SimTeamRosterResp
                 {group.pos} · {group.players.length}
               </AppText>
               {group.players.map((p) => (
-                <SimPlayerLine key={p.id} player={p} muted onOpen={ctx.openPlayer} stats={simRosterStats(p)} />
+                <SimPlayerLine key={p.id} player={p} muted onOpen={ctx.openPlayer} stats={simListStats(p, { adp: false })} />
               ))}
             </View>
           ))}
@@ -174,7 +201,7 @@ function TeamBody({ ctx, data, onTrade }: { ctx: SimCtx; data: SimTeamRosterResp
         <View style={common.tight} accessibilityLabel="Injured reserve">
           <SimSectionTitle glyph="injury" tone="danger" title="Injured reserve" caption="Not counted against the roster limit." />
           {data.ir!.map((p) => (
-            <SimPlayerLine key={p.id} player={p} onOpen={ctx.openPlayer} stats={simRosterStats(p)} />
+            <SimPlayerLine key={p.id} player={p} onOpen={ctx.openPlayer} stats={simListStats(p, { adp: false })} />
           ))}
         </View>
       ) : null}
@@ -183,11 +210,19 @@ function TeamBody({ ctx, data, onTrade }: { ctx: SimCtx; data: SimTeamRosterResp
         <View style={common.tight} accessibilityLabel="Taxi squad">
           <SimSectionTitle glyph="spark" title="Taxi squad" caption="Young players stashed off the active roster." />
           {data.taxi!.map((p) => (
-            <SimPlayerLine key={p.id} player={p} onOpen={ctx.openPlayer} stats={simRosterStats(p)} />
+            <SimPlayerLine key={p.id} player={p} onOpen={ctx.openPlayer} stats={simListStats(p, { adp: false })} />
           ))}
         </View>
       ) : null}
 
+              </>
+            ),
+          },
+          {
+            key: 'trades',
+            label: 'Trades',
+            render: () => (
+              <>
       {(data.recent ?? []).length > 0 ? (
         <View style={common.stack}>
           <SimSectionTitle glyph="trade" title="Recent moves" />
@@ -212,6 +247,12 @@ function TeamBody({ ctx, data, onTrade }: { ctx: SimCtx; data: SimTeamRosterResp
           {!data.trade?.open ? <AppText style={common.muted}>Trades are closed right now.</AppText> : null}
         </View>
       ) : null}
+              </>
+            ),
+          },
+          { key: 'history', label: 'History', render: () => <SimTeamHistory gameId={ctx.gameId} teamId={team.team_id} /> },
+        ]}
+      />
     </View>
   );
 }

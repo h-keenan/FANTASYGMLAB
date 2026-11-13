@@ -20,8 +20,8 @@ function team(id: string, name: string, power: number, players: SimGamePlayer[],
 }
 
 const teams = [
-  team("1", "Bench Mob", 2, [p("q1", "QB", "Quinn Back", 90, "1"), p("r1", "RB", "Ray Runner", 40, "1", { value: 0 })]),
-  team("2", "Goal Line Gamblers", 1, [p("q2", "QB", "Quentin Arm", 70, "2"), p("w1", "WR", "Wes Wide", 60, "2", { status: "out", out_weeks: 3, projection: 0 })]),
+  team("1", "Bench Mob", 2, [p("q1", "QB", "Quinn Back", 90, "1", { overall: 91 }), p("r1", "RB", "Ray Runner", 40, "1", { value: 0, overall: null })]),
+  team("2", "Goal Line Gamblers", 1, [p("q2", "QB", "Quentin Arm", 70, "2", { overall: 78 }), p("w1", "WR", "Wes Wide", 60, "2", { status: "out", out_weeks: 3, projection: 0 })]),
   team("3", "Me", 3, [p("t1", "TE", "Tom Tight", 50, "3")], { is_you: true }),
 ];
 const ready: SimLeagueRostersState = { status: "ready", teams };
@@ -41,9 +41,9 @@ describe("league Teams view (shared team card)", () => {
     expect(cards[0]).toHaveTextContent("Needs RB");
     expect(cards[0]).toHaveTextContent("Deep WR");
     expect(cards[0]).toHaveTextContent("Quentin Arm");
-    expect(cards[0]).toHaveTextContent("VAL 70");
+    expect(cards[0]).toHaveTextContent("OVR 78");
     expect(cards[1]).toHaveTextContent("Bench Mob");
-    expect(cards[1]).toHaveTextContent("VAL —"); // no market value is a dash, never 0
+    expect(cards[1]).toHaveTextContent("OVR 91");
     fireEvent.click(screen.getByRole("button", { name: "Bench Mob. Open roster" }));
     expect(c.openTeam).toHaveBeenCalledWith("1");
   });
@@ -59,15 +59,14 @@ describe("league Teams view (shared team card)", () => {
 });
 
 describe("league Players view (find a player, position by position)", () => {
-  it("lists rostered players best value first, each with its owner and labeled stats", () => {
+  it("lists rostered players best overall first, each with its owner and labeled stats", () => {
     render(<SimLeaguePlayersView ctx={ctx()} state={ready} onRetry={() => {}} />);
     const rows = screen.getAllByTestId("sim-player-line");
     expect(rows.map((r) => within(r).getByText(/Quinn Back|Quentin Arm|Wes Wide|Tom Tight|Ray Runner/).textContent)).toEqual(["Quinn Back", "Quentin Arm", "Wes Wide", "Tom Tight", "Ray Runner"]);
-    expect(rows[0]).toHaveTextContent("PROJ");
-    expect(rows[0]).toHaveTextContent("VAL");
+    expect(rows[0]).toHaveTextContent("Proj");
+    expect(rows[0]).toHaveTextContent("OVR");
     expect(rows[0]).toHaveTextContent("Bench Mob");
-    expect(rows[4]).toHaveTextContent("—"); // zero value shown as a dash
-    expect(rows[3]).toHaveTextContent("Your team");
+        expect(rows[3]).toHaveTextContent("Your team");
     expect(rows[2]).toHaveTextContent("OUT");
   });
 

@@ -401,7 +401,7 @@ function Builder({ ctx, seed, onSeedUsed }: { ctx: SimCtx; seed: SimTradeSeed | 
         <SectionHeading title="Partner" caption={partner ? undefined : 'Pick a team to trade with.'} />
         {partner ? (
           <>
-            <SimTeamCard team={partner} selected />
+            <SimTeamCard team={partner} selected valueMode="trade" />
             <View style={common.rowBetween}>
               <Button label="Change partner" variant="secondary" onPress={() => dispatch({ type: 'partner', teamId: '' })} />
               <ScoutButton teamId={partner.team_id} name={partner.name} />
@@ -410,7 +410,7 @@ function Builder({ ctx, seed, onSeedUsed }: { ctx: SimCtx; seed: SimTradeSeed | 
         ) : (
           <View style={common.stack} accessibilityLabel="Teams">
             {teamOptions.map((team) => (
-              <SimTeamCard key={team.team_id} team={team} openLabel={`Trade with ${team.name}`} onOpen={(id) => dispatch({ type: 'partner', teamId: id })} />
+              <SimTeamCard key={team.team_id} team={team} valueMode="trade" openLabel={`Trade with ${team.name}`} onOpen={(id) => dispatch({ type: 'partner', teamId: id })} />
             ))}
           </View>
         )}

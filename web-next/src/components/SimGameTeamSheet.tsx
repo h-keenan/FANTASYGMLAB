@@ -8,10 +8,13 @@ import { PositionBadge } from "@/components/PositionBadge";
 import { SimCrest } from "@/components/SimCrest";
 import { SimGlyph } from "@/components/SimGlyph";
 import { SimPlayerChip, SimPlayerLine, SimSectionTitle, SimSheet, SimToneBadge, simToneColor, type SimCtx } from "@/components/SimGameParts";
+import { SimTeamHistory } from "@/components/SimTeamHistory";
 import { SkeletonCard } from "@/components/Skeleton";
+import { Tabs } from "@/components/Tabs";
 import { ToneBadge } from "@/components/ToneBadge";
 import { api } from "@/lib/api";
-import { simGroupBenchByPosition, simRosterStats } from "@/lib/simLeagueRosters";
+import { simListStats } from "@/lib/simDraft";
+import { simGroupBenchByPosition } from "@/lib/simLeagueRosters";
 import {
   simFmtPts,
   simFmtRecord,
@@ -101,6 +104,15 @@ function TeamBody({ ctx, data, onTrade }: { ctx: SimCtx; data: SimTeamRosterResp
         </div>
       </header>
 
+      <Tabs
+        id="sim-team"
+        ariaLabel="Team sections"
+        tabs={[
+          {
+            key: "overview",
+            label: "Overview",
+            render: () => (
+              <>
       <p className="text-sm" style={{ color: "var(--color-text-secondary)" }}>{team.persona.blurb}</p>
 
       <div className="grid grid-cols-4 gap-2" aria-label="Season so far">
@@ -137,6 +149,22 @@ function TeamBody({ ctx, data, onTrade }: { ctx: SimCtx; data: SimTeamRosterResp
         </ul>
       </section>
 
+      {(data.injuries ?? []).length > 0 ? (
+        <section className="flex flex-col gap-1" aria-label="Injuries">
+          <SimSectionTitle glyph="injury" tone="danger">Injuries</SimSectionTitle>
+          {data.injuries!.map((p) => (
+            <SimPlayerLine key={p.id} player={p} onOpen={ctx.openPlayer} stats={simListStats(p, { adp: false })} trailing={<SimToneBadge label={`${p.out_weeks} wk`} tone="danger" />} />
+          ))}
+        </section>
+      ) : null}
+              </>
+            ),
+          },
+          {
+            key: "roster",
+            label: "Roster",
+            render: () => (
+              <>
       <section className="flex flex-col gap-1" aria-label="Lineup">
         <SimSectionTitle glyph="team" tone="accent" note={`Projected ${simFmtPts(data.projected_total)} points this week`}>Lineup</SimSectionTitle>
         {lineup.map((slot, index) => (
@@ -150,7 +178,7 @@ function TeamBody({ ctx, data, onTrade }: { ctx: SimCtx; data: SimTeamRosterResp
                   player={slot.player}
                   hidePosition={simSlotRepeatsPosition(slot.slot, slot.player.pos)}
                   onOpen={ctx.openPlayer}
-                  stats={simRosterStats(slot.player)}
+                  stats={simListStats(slot.player, { adp: false })}
                 />
               ) : (
                 <p className="py-3 text-xs" style={{ color: "var(--color-text-muted)" }}>Empty</p>
@@ -167,7 +195,7 @@ function TeamBody({ ctx, data, onTrade }: { ctx: SimCtx; data: SimTeamRosterResp
             <div key={group.pos} className="flex flex-col" role="group" aria-label={`${group.pos} bench`}>
               <p className="pt-1 text-xs font-extrabold" style={{ color: "var(--color-text-muted)" }}>{group.pos} · {group.players.length}</p>
               {group.players.map((p) => (
-                <SimPlayerLine key={p.id} player={p} muted onOpen={ctx.openPlayer} stats={simRosterStats(p)} />
+                <SimPlayerLine key={p.id} player={p} muted onOpen={ctx.openPlayer} stats={simListStats(p, { adp: false })} />
               ))}
             </div>
           ))}
@@ -178,7 +206,7 @@ function TeamBody({ ctx, data, onTrade }: { ctx: SimCtx; data: SimTeamRosterResp
         <section className="flex flex-col gap-1" aria-label="Injured reserve">
           <SimSectionTitle glyph="injury" tone="danger" note="Not counted against the roster limit.">Injured reserve</SimSectionTitle>
           {data.ir!.map((p) => (
-            <SimPlayerLine key={p.id} player={p} onOpen={ctx.openPlayer} stats={simRosterStats(p)} />
+            <SimPlayerLine key={p.id} player={p} onOpen={ctx.openPlayer} stats={simListStats(p, { adp: false })} />
           ))}
         </section>
       ) : null}
@@ -187,11 +215,19 @@ function TeamBody({ ctx, data, onTrade }: { ctx: SimCtx; data: SimTeamRosterResp
         <section className="flex flex-col gap-1" aria-label="Taxi squad">
           <SimSectionTitle glyph="spark" tone="accent" note="Young players stashed off the active roster.">Taxi squad</SimSectionTitle>
           {data.taxi!.map((p) => (
-            <SimPlayerLine key={p.id} player={p} onOpen={ctx.openPlayer} stats={simRosterStats(p)} />
+            <SimPlayerLine key={p.id} player={p} onOpen={ctx.openPlayer} stats={simListStats(p, { adp: false })} />
           ))}
         </section>
       ) : null}
 
+              </>
+            ),
+          },
+          {
+            key: "trades",
+            label: "Trades",
+            render: () => (
+              <>
       {(data.recent ?? []).length > 0 ? (
         <section className="flex flex-col gap-2" aria-label="Recent moves">
           <SimSectionTitle glyph="trade" tone="accent">Recent moves</SimSectionTitle>
@@ -220,6 +256,12 @@ function TeamBody({ ctx, data, onTrade }: { ctx: SimCtx; data: SimTeamRosterResp
           {!data.trade?.open ? <p className="text-xs" style={{ color: "var(--color-text-muted)" }}>Trades are closed right now.</p> : null}
         </div>
       ) : null}
+              </>
+            ),
+          },
+          { key: "history", label: "History", render: () => <SimTeamHistory gameId={ctx.gameId} teamId={team.team_id} /> },
+        ]}
+      />
     </div>
   );
 }

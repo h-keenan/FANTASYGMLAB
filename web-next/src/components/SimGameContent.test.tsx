@@ -21,7 +21,7 @@ vi.mock("@/lib/api", async () => {
     "getSimGameOptions", "getSimLeagueTeams", "listSimGames", "createSimGame", "getSimGame", "deleteSimGame", "getSimDraft", "simDraftPick", "simDraftAuto",
     "putSimDraftQueue", "getSimGamePlayers", "getSimGamePlayer", "getSimGameTeam", "getSimHome", "getSimLineup", "putSimLineup", "autoSimLineup",
     "claimSimWaiver", "cancelSimWaiver", "cutSimPlayer", "previewSimTrade", "sendSimTrade", "getSimInbox", "respondSimInbox",
-    "advanceSimGame", "revertSimWeek", "getSimLeague", "getSimLeagueRosters", "getSimGameResult",
+    "advanceSimGame", "revertSimWeek", "getSimLeague", "getSimLeagueRosters", "getSimTeamHistory", "getSimGameResult",
   ];
   return { ...actual, api: { ...actual.api, ...Object.fromEntries(names.map((n) => [n, vi.fn()])) } };
 });
@@ -98,6 +98,7 @@ async function openTeamTab() {
 
 describe("SimGameContent", () => {
   beforeEach(() => {
+    window.sessionStorage.clear();
     vi.resetAllMocks();
     mocked.getSimGameOptions.mockResolvedValue(options());
     mocked.getSimGame.mockResolvedValue({ ok: true, reason: "", game: game() });
@@ -194,6 +195,7 @@ describe("SimGameContent", () => {
     expect(sheet).toHaveTextContent("Rivals");
     expect(mocked.getSimGameTeam).toHaveBeenCalledWith("g1", "7");
     expect(screen.getByText("Strong at QB. Needs RB.")).toBeInTheDocument();
+    fireEvent.click(within(screen.getByRole("dialog")).getByRole("tab", { name: "Trades" }));
     expect(screen.getByRole("button", { name: /Make an offer to Rivals/ })).toBeEnabled();
   });
 
@@ -207,19 +209,34 @@ describe("SimGameContent", () => {
       lineup: [{ slot: "QB", player: star("5", "QB", "Otis Opp") }], projected_total: 117.9, positions: [], strengths: [], needs: [], injuries: [], recent: [], next_game: null, trade: { open: true, reason: null },
     };
     mocked.getSimGameTeam.mockResolvedValue(detail);
+    mocked.getSimTeamHistory.mockResolvedValue({
+      ok: true, reason: "", team_id: "7", team_name: "Rivals",
+      draft: [{ id: "5", name: "Otis Opp", pos: "QB", round: 1, pick: 3, auto: false }], rookie_drafts: [],
+      seasons: [{ season: 1, year: null, wins: 9, losses: 5, ties: 0, pf: 1500.5, pa: 1400.2, champion: true }],
+      moves: [{ kind: "claim", season: 1, year: null, week: 4, offseason: false, added: { id: "9", name: "Wally Wire", pos: "RB" }, dropped: { id: "12", name: "Hurt Harry", pos: "RB" } }],
+    });
     render(<SimGameContent />);
     await openFirstGame();
     fireEvent.click((await screen.findAllByRole("button", { name: "Rivals. Open team" }))[0]);
     await screen.findByTestId("team-sheet-name");
+    expect(screen.getByRole("tab", { name: "Overview" })).toHaveAttribute("aria-selected", "true");
+    expect(screen.queryByRole("region", { name: "Bench" })).toBeNull(); // lazy: the Roster tab has not been opened
+    fireEvent.click(within(screen.getByRole("dialog")).getByRole("tab", { name: "Roster" }));
     const lineup = screen.getByRole("region", { name: "Lineup" });
     expect(within(lineup).getByText("Otis Opp")).toBeInTheDocument();
-    expect(within(lineup).getByText("PROJ")).toBeInTheDocument();
+    expect(within(lineup).getByText("Proj")).toBeInTheDocument();
     const bench = screen.getByRole("region", { name: "Bench" });
     expect(within(bench).getByRole("group", { name: "RB bench" })).toHaveTextContent("Benny Bench");
     expect(within(bench).getByRole("group", { name: "WR bench" })).toHaveTextContent("Wide Wendy");
     expect(within(screen.getByRole("region", { name: "Injured reserve" })).getByText("Hurt Harry")).toBeInTheDocument();
     expect(within(screen.getByRole("region", { name: "Taxi squad" })).getByText("Rookie Ron")).toBeInTheDocument();
+    fireEvent.click(within(screen.getByRole("dialog")).getByRole("tab", { name: "Trades" }));
     expect(screen.getByRole("button", { name: "Make an offer to Rivals" })).toBeEnabled();
+    fireEvent.click(within(screen.getByRole("dialog")).getByRole("tab", { name: "History" }));
+    expect(await screen.findByRole("region", { name: "Record by season" })).toBeInTheDocument();
+    expect(mocked.getSimTeamHistory).toHaveBeenCalledWith("g1", "7");
+    expect(within(screen.getByRole("region", { name: "League draft class" })).getByText("Otis Opp")).toBeInTheDocument();
+    expect(within(screen.getByRole("region", { name: "Transactions" })).getByText("Claimed Wally Wire, dropped Hurt Harry")).toBeInTheDocument();
   });
 
   it("shows coming-soon when the flag is off (404)", async () => {

@@ -1,7 +1,6 @@
 // Shared (web + mobile twin): pure helpers for the Fantasy Sim "who has who" views. The League tab's Teams and
 // Players views and the trade partner list all read one GET /league/rosters payload, so these run on it client side.
 
-import type { PlayerListStat } from "./playerListRow";
 import type { SimGamePlayer, SimLeagueRosterTeam, SimPos } from "./simGame";
 
 export type SimTeamChipTone = "danger" | "success";
@@ -29,7 +28,11 @@ export function simTeamRecordLine(team: Pick<SimLeagueRosterTeam, "record" | "po
   return r.wins + r.losses + r.ties === 0 ? `${rec} · Power #${team.power_rank}` : `${rec} · #${r.rank} · ${r.pf.toFixed(1)} PF`;
 }
 
-/** The VAL pill text: a value of 0 means no market value in this league, shown as a dash (never a fake 0). */
+/** The trade-value number: a value of 0 means no market value in this league, shown as a dash (never a fake 0). */
+export function simOverallLabel(overall: number | null | undefined): string {
+  return overall != null && Number.isFinite(overall) ? String(Math.round(overall)) : "—";
+}
+
 export function simValueLabel(value: number | null | undefined): string {
   const rounded = value != null && Number.isFinite(value) ? Math.round(value) : 0;
   return rounded > 0 ? String(rounded) : "—";
@@ -42,7 +45,7 @@ export interface SimRosterEntry {
 
 export type SimRosterPosFilter = "ALL" | SimPos;
 
-/** Everyone on a roster, best value first, filtered by position and a name / NFL team search. */
+/** Everyone on a roster, best overall first, filtered by position and a name / NFL team search. */
 export function simRosterEntries(teams: readonly SimLeagueRosterTeam[], pos: SimRosterPosFilter, query: string): SimRosterEntry[] {
   const needle = query.trim().toLowerCase();
   const out: SimRosterEntry[] = [];
@@ -53,7 +56,7 @@ export function simRosterEntries(teams: readonly SimLeagueRosterTeam[], pos: Sim
       out.push({ player, team: { team_id: team.team_id, name: team.name, is_you: team.is_you } });
     }
   }
-  return out.sort((a, b) => b.player.value - a.player.value || (b.player.ros_mean ?? 0) - (a.player.ros_mean ?? 0) || a.player.name.localeCompare(b.player.name));
+  return out.sort((a, b) => (b.player.overall ?? 0) - (a.player.overall ?? 0) || b.player.value - a.player.value || (b.player.ros_mean ?? 0) - (a.player.ros_mean ?? 0) || a.player.name.localeCompare(b.player.name));
 }
 
 /** Positions present in the league's rosters, in the usual order, for the filter pills. */
@@ -79,12 +82,4 @@ export function simGroupBenchByPosition(bench: readonly SimGamePlayer[], order: 
   const rest = bench.filter((p) => !known.has(p.pos));
   if (rest.length) groups.push({ pos: "OTHER", players: rest });
   return groups;
-}
-
-/** The labeled pills of a roster row: this week's projection and the league value (a dash when there is none). */
-export function simRosterStats(player: Pick<SimGamePlayer, "projection" | "value" | "status">): PlayerListStat[] {
-  return [
-    { key: "proj", label: "PROJ", value: player.status === "out" ? "OUT" : Number.isFinite(player.projection) ? player.projection.toFixed(1) : "-", tone: player.status === "out" ? "danger" : undefined },
-    { key: "val", label: "VAL", value: simValueLabel(player.value), tone: player.value > 0 ? undefined : "muted" },
-  ];
 }
