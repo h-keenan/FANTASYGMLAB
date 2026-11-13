@@ -282,7 +282,7 @@ export function SimPlayerLine({
 
 /**
  * THE roster row (lineup starters, bench, IR, taxi): one component, one info set. Age, bye, injury chip,
- * labeled PROJ and VAL, tags and tap-to-open all come from SimPlayerLine + simListStats, so a starter shows
+ * labeled PROJ and OVR, tags and tap-to-open all come from SimPlayerLine + simListStats, so a starter shows
  * exactly what a bench player shows. `slot` adds the leading slot-label column (QB, RB1, FLEX ...); a
  * flex-type slot also keeps the player's own position pill, since the slot label no longer says it.
  */
