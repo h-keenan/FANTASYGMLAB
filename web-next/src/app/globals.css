@@ -4237,3 +4237,11 @@ body[data-sim-pqv] [data-sheet-hideable] {
     animation: none;
   }
 }
+
+/* Fantasy Sim must never widen the page: a too-wide row once made the document wider than the phone, so iOS
+   Safari zoomed out and the sticky bars/tab strip drifted. `clip` (unlike hidden) creates no scroll container,
+   so the sticky header, tabs and action bars inside keep working. Real fixes pin grid tracks (see
+   simNoHorizontalOverflow.test.ts); this is the backstop. */
+.sim-root {
+  overflow-x: clip;
+}
