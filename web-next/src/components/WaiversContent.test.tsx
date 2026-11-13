@@ -487,7 +487,9 @@ describe("WaiversContent", () => {
     const { unmount } = render(<WaiversContent leagueName="IDP" data={{ ...BASE_RESPONSE, idp_players: idp }} />);
     fireEvent.click(screen.getByRole("tab", { name: "Explore" }));
     expect(screen.queryByText("Free Edge")).not.toBeInTheDocument();
-    fireEvent.change(screen.getByRole("combobox"), { target: { value: "DL" } });
+    fireEvent.click(screen.getByRole("button", { name: /^Filters/ }));
+    fireEvent.click(screen.getByRole("radio", { name: "DL" }));
+    fireEvent.click(screen.getByRole("button", { name: /^(Apply|Show \d+ results?)$/ }));
     expect(screen.getByText("Free Edge")).toBeInTheDocument();
     unmount();
 

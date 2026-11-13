@@ -276,3 +276,66 @@ Buyers / Sellers / Pivot / Pick-rich segmented control, deleting the all-caps la
 Discovery into the same control, and the detail sheet's "Open trade finder with this team" and "View team"
 actions (the Draft Center page does not have the league id wired into the card component yet). The rows
 and the API are the foundation for all of those.
+
+## FilterSheet
+
+One **Filters** button (with a count badge) that opens a `Sheet` of grouped chips, committed with
+Apply. Replaces a row of native `<select>`s and pill rows. Active filters show as removable chips next
+to the button.
+
+```tsx
+import { FilterSheet } from "@/components/ui/FilterSheet";
+import { singleValue, valuesFromSingles, type FilterGroup } from "@/lib/filterSheet";
+
+const groups: FilterGroup[] = [
+  { id: "position", label: "Position", anyValue: "ALL", options: [{ value: "ALL", label: "Any" }, { value: "QB", label: "QB" }] },
+  { id: "tags", label: "Tags", multi: true, options: [...] },
+];
+
+<FilterSheet
+  groups={groups}
+  values={valuesFromSingles(groups, { position })}      // what the page is filtering by now
+  resultCount={(draft) => countMatches(draft)}          // optional: "Show 24 results" / "No results"
+  onApply={(next) => setPosition(singleValue(groups[0], next))}
+/>
+```
+
+- The sheet edits a **draft**. Nothing on the page changes until Apply, and closing (Escape, backdrop,
+  swipe) discards. Reset clears the draft. Apply is disabled when the draft would match nothing.
+- Single-select groups behave like radios (tap a chip to choose, tap it again or "Any" to clear);
+  multi-select groups toggle. A group can be `hidden` (for example Roster when ownership is unknown).
+- a11y: the sheet is a form (a `fieldset` and `legend` per group); single groups are `radiogroup` /
+  `radio` with `aria-checked`, multi groups are toggle buttons with `aria-pressed`; the trigger's
+  accessible name carries the count ("Filters, 2 active"); the footer count is a polite live region;
+  each active chip has its own "Remove Position filter: RB" button.
+- The model (`toggleFilterValue`, `activeFilterCount`, `activeFilterChips`, `applyButtonLabel`, ...) is the
+  lib twin `lib/filterSheet.ts`. Mobile: `<FilterSheet groups values onApply resultCount />` is the
+  multi-group version of `FilterDropdownButton` (which stays for one-group pills elsewhere).
+
+### Applied: Players and Waivers (web + mobile)
+
+- **Players:** the five selects become a one-tap position pill row plus one Filters button (age, status, health, roster). Sort by
+  stays a select (it is a sort, not a filter). The live count uses the same filter function as the page
+  (including the IDP pool switch), so Apply reads "Show 1 result".
+- **Waivers:** the All Free Agents position select is a one-group FilterSheet, so the same control, count
+  badge and chips appear everywhere. The Add / Stash / Watch pill row is a segmented control (4 options,
+  one level) and stays.
+
+| Before: five selects | After: one button | The sheet | Applied: badge and chips |
+|---|---|---|---|
+| ![](ui-patterns/players-1-bar-before.jpg) | ![](ui-patterns/players-1-bar-after.jpg) | ![](ui-patterns/players-2-sheet-after.jpg) | ![](ui-patterns/players-3-applied-after.jpg) |
+
+Position is the filter people use most, so it is not behind Apply: a pill row (All / QB / RB / WR / TE / K, plus the
+defender positions in IDP leagues) sits above the Filters button and applies on one tap. Filters keeps the rest
+(age, status, health, roster) with the count badge.
+
+### Not done: TradePickerSheet extraction
+
+The trade picker (`TradePickerSheet`, merged in #1801) already has the same panel: a Filters button with a
+count, position and condition chips, committed with Apply. It renders that panel **inline inside its own
+sheet**, on purpose, because opening a `FilterSheet` from there would hide the picker (sheets never stack).
+So the extraction is not "swap in the component"; it is a small follow-up that adds an `inline` rendering mode
+to `FilterSheet` (same groups, same draft model from `lib/filterSheet.ts`, panel instead of a sheet) and moves
+the picker onto it, then swaps the picker's shell for `Sheet`. The model already supports both groups
+(`position`, `condition`). Left for its own PR so the just-merged picker is not edited alongside this work.
+Other planned users: Trade Hub filters, News, Alerts, College Scouting, League Recaps, Live Draft.

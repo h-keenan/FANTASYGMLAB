@@ -16,6 +16,8 @@ import { HighlightTarget } from "@/components/HighlightTarget";
 import { InfoTip } from "@/components/InfoTip";
 import { OvrGauge } from "@/components/OvrGauge";
 import { PillRow } from "@/components/PillRow";
+import { FilterSheet } from "@/components/ui/FilterSheet";
+import { singleValue, valuesFromSingles, type FilterGroup, type FilterValues } from "@/lib/filterSheet";
 import { PlayerAvatar } from "@/components/PlayerAvatar";
 import { PlayerIdentityTrigger } from "@/components/PlayerIdentityTrigger";
 import { PlayerMetaLine } from "@/components/PlayerInjuryBadge";
@@ -460,6 +462,20 @@ export function WaiversContent({
       .filter((p) => !query || (p.name ?? "").toLowerCase().includes(query));
   }, [data.players, idpPlayers, position, search]);
 
+  // The position dropdown is a one-group FilterSheet now (count badge, Apply with a live result count).
+  const freeAgentFilterGroups = useMemo<FilterGroup[]>(
+    () => [{ id: "position", label: "Position", anyValue: "ALL", options: positionFilters.map((pos) => ({ value: pos, label: pos === "ALL" ? "Any" : pos })) }],
+    [positionFilters],
+  );
+  const freeAgentFilterValues = useMemo(() => valuesFromSingles(freeAgentFilterGroups, { position }), [freeAgentFilterGroups, position]);
+  const freeAgentResultCount = (draft: FilterValues) => {
+    const draftPosition = singleValue(freeAgentFilterGroups[0], draft);
+    const query = search.trim().toLowerCase();
+    return (isIdpPositionFilter(draftPosition) ? idpPlayers : data.players)
+      .filter((p) => draftPosition === "ALL" || p.position === draftPosition)
+      .filter((p) => !query || (p.name ?? "").toLowerCase().includes(query)).length;
+  };
+
   const visibleFreeAgents = useMemo(() => {
     const base = filteredFreeAgents.slice(0, FREE_AGENT_LIST_PREVIEW_ROWS);
     // A GM Plan tile's named player can be ranked below this list's preview
@@ -678,17 +694,12 @@ export function WaiversContent({
               placeholder="Search free agents"
               className="filter-input px-3 py-2 text-sm flex-1 min-w-[10rem]"
             />
-            <select aria-label="Position"
-              value={position}
-              onChange={(event) => setPosition(event.target.value)}
-              className="filter-select px-3 py-2 text-sm"
-            >
-              {positionFilters.map((pos) => (
-                <option key={pos} value={pos}>
-                  {pos}
-                </option>
-              ))}
-            </select>
+            <FilterSheet
+              groups={freeAgentFilterGroups}
+              values={freeAgentFilterValues}
+              resultCount={freeAgentResultCount}
+              onApply={(next) => setPosition(singleValue(freeAgentFilterGroups[0], next))}
+            />
           </div>
           {visibleFreeAgents.length === 0 ? (
             <EmptyState title="No free agents match." />
