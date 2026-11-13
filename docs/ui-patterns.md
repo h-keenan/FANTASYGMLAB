@@ -331,8 +331,11 @@ proves too slow, the follow-up is a position quick-pill row above the button tha
 
 ### Not done: TradePickerSheet extraction
 
-The trade picker (PR #1801, still open) has its own Filters panel (position and condition chips with
-Apply). Extracting it onto `FilterSheet` means touching a PR that has not merged, so it is a follow-up
-once #1801 lands: replace its inline filter panel with `FilterSheet` groups `position` and `condition`,
-and its shell with `Sheet`. Nothing in this PR blocks that; the group model already supports both.
+The trade picker (`TradePickerSheet`, merged in #1801) already has the same panel: a Filters button with a
+count, position and condition chips, committed with Apply. It renders that panel **inline inside its own
+sheet**, on purpose, because opening a `FilterSheet` from there would hide the picker (sheets never stack).
+So the extraction is not "swap in the component"; it is a small follow-up that adds an `inline` rendering mode
+to `FilterSheet` (same groups, same draft model from `lib/filterSheet.ts`, panel instead of a sheet) and moves
+the picker onto it, then swaps the picker's shell for `Sheet`. The model already supports both groups
+(`position`, `condition`). Left for its own PR so the just-merged picker is not edited alongside this work.
 Other planned users: Trade Hub filters, News, Alerts, College Scouting, League Recaps, Live Draft.
