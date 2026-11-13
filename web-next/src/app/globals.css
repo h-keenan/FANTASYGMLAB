@@ -3893,6 +3893,7 @@ main > header:has(> h1.sr-only:only-child) {
   box-shadow: 0 0 0 1px color-mix(in srgb, var(--color-warning) 45%, transparent);
   padding: 4px;
   margin: -4px;
+}
 
 /* Shared trade piece picker (components/TradePickerSheet.tsx): the pqv sheet
    shell with a fixed-height column layout — header, chips, controls, one
