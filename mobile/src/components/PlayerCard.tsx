@@ -15,7 +15,7 @@ import { Ionicons } from '@expo/vector-icons';
 import AppText from './AppText';
 import OverallRatingBadge from './OverallRatingBadge';
 import PlayerAvatar from './PlayerAvatar';
-import PlayerNameText from './PlayerNameText';
+import PlayerName from './PlayerName';
 import PositionBadge from './PositionBadge';
 import { useThemeMode } from '../context/ThemeModeContext';
 import { bestAvailableCardVisual } from '../lib/bestAvailableCardVisual';
@@ -195,12 +195,12 @@ export default function PlayerCard({
           <View style={styles.positionBadgeWrap}>
             <PositionBadge position={position} size="sm" />
           </View>
-          <PlayerNameText name={name ?? 'Unknown player'} style={styles.name} />
+          <PlayerName name={name ?? 'Unknown player'} style={styles.name} />
         </Animated.View>
 
         <Animated.View style={[styles.face, styles.backFace, backAnimatedStyle]}>
           <View style={styles.backHeaderRow}>
-            <PlayerNameText name={name ?? 'Unknown player'} style={styles.backName} />
+            <PlayerName name={name ?? 'Unknown player'} style={styles.backName} />
             <PositionBadge position={position} size="sm" />
           </View>
           {backNote ? (

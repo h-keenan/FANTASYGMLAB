@@ -1,5 +1,6 @@
 "use client";
 
+import { PlayerName } from "@/components/PlayerName";
 import { createContext, useContext, useEffect, useRef, useState, useSyncExternalStore, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 
@@ -20,7 +21,6 @@ import { ReviewGlyphIcon } from "@/components/SimReviewGlyph";
 import { ToneBadge } from "@/components/ToneBadge";
 import {
   simFmtPts,
-  simShortName,
   simTrendText,
   simPlayerSubline,
   simGamePreviewLine,
@@ -622,9 +622,8 @@ export function SimMiniPlayer({
   extra,
   onOpen,
   size = 28,
-  wrap = false,
 }: {
-  /** Allow the name two lines (shortened only when very long) instead of truncating. */
+  /** @deprecated Names never wrap: they shorten to "F. Lastname" when tight (PlayerName). */
   wrap?: boolean;
   player: SimGamePlayer;
   align?: "left" | "right";
@@ -638,9 +637,7 @@ export function SimMiniPlayer({
     <span className={`flex w-full min-w-0 items-center gap-2 ${align === "right" ? "flex-row-reverse text-right" : ""}`}>
       <PlayerAvatar playerId={simHeadshotId(player)} fallbackLabel={simPlayerInitials(player)} size={size} />
       <span className="flex min-w-0 flex-1 flex-col leading-tight">
-        <span className={`block text-xs font-bold ${wrap ? "line-clamp-2 break-words" : "truncate"}`} style={{ color: hurt || bye ? "var(--color-text-muted)" : undefined, textDecoration: hurt ? "line-through" : undefined }}>
-          {wrap ? simShortName(player.name, 19) : player.name}
-        </span>
+        <PlayerName name={player.name} className="text-xs font-bold" style={{ color: hurt || bye ? "var(--color-text-muted)" : undefined, textDecoration: hurt ? "line-through" : undefined }} />
         <span className={`flex items-center gap-1 text-[0.6875rem] ${align === "right" ? "justify-end" : ""}`} style={{ color: "var(--color-text-muted)" }}>
           {hurt ? <SimToneBadge label="Out" tone="danger" /> : bye ? <SimToneBadge label="Bye" tone="warning" /> : <span className="truncate">{player.team ?? "FA"}</span>}
           {extra}

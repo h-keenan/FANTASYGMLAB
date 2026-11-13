@@ -5,7 +5,7 @@ import AppText from './AppText';
 import type { PortfolioLeague, PortfolioTopAsset } from '../lib/api';
 import { colors, radii, spacing } from '../theme';
 import PlayerAvatar from './PlayerAvatar';
-import PlayerNameText from './PlayerNameText';
+import PlayerName from './PlayerName';
 import ShareCardChrome, { CARD_WIDTH } from './ShareCardChrome';
 
 const CARD_HEIGHT = 640;
@@ -164,7 +164,7 @@ const PortfolioShareCard = forwardRef<View, {
             />
             <View style={styles.standoutTextGroup}>
               <AppText style={styles.standoutLabel}>MOST VALUABLE ASSET</AppText>
-              <PlayerNameText name={standout.name ?? 'Unknown'} style={styles.standoutName} />
+              <PlayerName name={standout.name ?? 'Unknown'} style={styles.standoutName} />
             </View>
           </View>
         </>

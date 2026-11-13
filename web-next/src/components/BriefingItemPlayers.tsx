@@ -5,7 +5,7 @@ import { PlayerIdentityTrigger } from "@/components/PlayerIdentityTrigger";
 import { PlayerInjuryBadge } from "@/components/PlayerInjuryBadge";
 import { PositionBadge } from "@/components/PositionBadge";
 import { IdeaPosture } from "@/components/IdeaPosture";
-import { PlayerNameText } from "@/components/PlayerNameText";
+import { PlayerName } from "@/components/PlayerName";
 
 /**
  * The compact player-card visual for a BriefingItem — give/get trade
@@ -102,7 +102,7 @@ export function BriefingItemPlayers({ item, sourceLabel }: { item: BriefingItem;
             <PositionBadge position={item.route_player_position} />
           </span>
           <PlayerAvatar playerId={item.route_player_id} tier={item.route_player_tier} size={32} />
-          <PlayerNameText name={item.route_player_name} threshold={Infinity} className="max-w-[12rem]" style={{ color: "var(--color-text-muted)" }} />
+          <PlayerName name={item.route_player_name} className="max-w-[12rem]" style={{ color: "var(--color-text-muted)" }} />
           <PlayerInjuryBadge status={item.route_player_injury_status} />
           {item.route_player_team ? <span style={{ color: "var(--color-text-muted)" }}>· {item.route_player_team}</span> : null}
         </PlayerIdentityTrigger>
@@ -125,7 +125,7 @@ export function BriefingItemPlayers({ item, sourceLabel }: { item: BriefingItem;
             <PositionBadge position={player.position} />
           </span>
           <PlayerAvatar playerId={player.player_id} tier={player.player_tier} size={32} />
-          <PlayerNameText name={player.name} threshold={Infinity} className="max-w-[12rem]" style={{ color: "var(--color-text-muted)" }} />
+          <PlayerName name={player.name} className="max-w-[12rem]" style={{ color: "var(--color-text-muted)" }} />
           <PlayerInjuryBadge status={player.injury_status} />
           {player.team ? <span style={{ color: "var(--color-text-muted)" }}>· {player.team}</span> : null}
         </PlayerIdentityTrigger>

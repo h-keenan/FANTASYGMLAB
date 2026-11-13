@@ -3,7 +3,7 @@
 import type { CSSProperties, ReactNode } from "react";
 
 import { PlayerAvatar } from "@/components/PlayerAvatar";
-import { PlayerNameText } from "@/components/PlayerNameText";
+import { PlayerName } from "@/components/PlayerName";
 import { PositionBadge } from "@/components/PositionBadge";
 import { ToneBadge } from "@/components/ToneBadge";
 import type { ChipTone } from "@/lib/playerCard";
@@ -129,10 +129,8 @@ export function PlayerListRow({
       </span>
       <div className="flex min-w-0 flex-1 flex-col">
         <div className="flex min-w-0 items-center gap-1.5">
-          {/* Seam: swap for the shared <PlayerName/> short-name component when it lands. */}
-          <PlayerNameText
+          <PlayerName
             name={name}
-            threshold={Infinity}
             className={`min-w-0 truncate font-bold ${name.length > PLAYER_LIST_LONG_NAME ? "text-[0.8125rem]" : "text-sm"}`}
             style={{ color: "var(--color-text-primary)" }}
           />

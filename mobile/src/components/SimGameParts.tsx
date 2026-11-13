@@ -5,6 +5,7 @@ import { Ionicons } from '@expo/vector-icons';
 import AccentCard from './AccentCard';
 import PlayerListRow from './PlayerListRow';
 import AppText from './AppText';
+import PlayerName from './PlayerName';
 import Button from './Button';
 import Collapsible from './Collapsible';
 import SimGlyph from './SimGlyph';
@@ -21,7 +22,6 @@ import { useThemeMode } from '../context/ThemeModeContext';
 import {
   simGamePreviewLine,
   simHeadshotId,
-  simShortName,
   simTrendText,
   simPlayerInitials,
   simPlayerSubline,
@@ -189,9 +189,7 @@ export function SimPlayerChip({
     <View style={[styles.identity, muted && styles.muted]}>
       <PlayerAvatar playerId={simHeadshotId(player)} fallbackLabel={simPlayerInitials(player)} size={size} />
       <View style={styles.identityText}>
-        <AppText style={styles.playerName} numberOfLines={2}>
-          {player.name}
-        </AppText>
+        <PlayerName name={player.name} style={styles.playerName} />
         <View style={styles.sublineRow}>
           {hidePosition ? null : <PositionBadge position={player.pos} />}
           <AppText style={styles.subline} numberOfLines={1}>
@@ -626,9 +624,8 @@ export function SimMiniPlayer({
   align = 'left',
   onOpen,
   size = 28,
-  wrap = false,
 }: {
-  /** Allow the name two lines (shortened only when very long) instead of one. */
+  /** @deprecated Names never wrap: they shorten to "F. Lastname" when tight (PlayerName). */
   wrap?: boolean;
   player: SimGamePlayer;
   align?: 'left' | 'right';
@@ -643,9 +640,7 @@ export function SimMiniPlayer({
     <View style={[styles.mini, align === 'right' && styles.miniRight]}>
       <PlayerAvatar playerId={simHeadshotId(player)} fallbackLabel={simPlayerInitials(player)} size={size} />
       <View style={styles.miniText}>
-        <AppText style={[styles.miniName, align === 'right' && styles.miniNameRight, (hurt || bye) && { color: colors.textTertiary }, hurt && { textDecorationLine: 'line-through' }]} numberOfLines={wrap ? 2 : 1}>
-          {wrap ? simShortName(player.name, 19) : player.name}
-        </AppText>
+        <PlayerName name={player.name} style={[styles.miniName, align === 'right' && styles.miniNameRight, (hurt || bye) && { color: colors.textTertiary }, hurt && { textDecorationLine: 'line-through' }]} />
         {hurt ? (
           <ToneBadge label="Out" color={colors.danger} size="xs" />
         ) : bye ? (

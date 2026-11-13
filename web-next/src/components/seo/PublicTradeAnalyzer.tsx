@@ -24,7 +24,7 @@ import {
   type TradeSettings,
 } from "@/lib/seo/tradeAnalyzer";
 import { shareLinkWithUtm } from "@/lib/seo/tradeShare";
-import { PlayerNameText } from "@/components/PlayerNameText";
+import { PlayerName } from "@/components/PlayerName";
 
 const FEATURE = "public_trade_analyzer";
 
@@ -54,7 +54,7 @@ function PlayerLine({ player, settings }: { player: TradeBoardPlayer; settings: 
     <span className="flex min-w-0 flex-1 items-center gap-2">
       <PositionBadge position={player.pos} />
       <span className="min-w-0 flex-1">
-        <PlayerNameText name={player.name} threshold={Infinity} className="text-sm font-bold" />
+        <PlayerName name={player.name} className="text-sm font-bold" />
         <span className="block truncate text-xs" style={{ color: "var(--color-text-muted)" }}>
           {[player.team, player.age !== null ? `age ${player.age}` : null, player.inj].filter(Boolean).join(" · ")}
         </span>

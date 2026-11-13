@@ -8,7 +8,7 @@ import type { DraftPickAsset, RankedPlayer, TradeVerdict } from '../lib/api';
 import { colors, radii, spacing } from '../theme';
 import { confidenceLevelFor } from './ConfidenceMeter';
 import PlayerAvatar from './PlayerAvatar';
-import PlayerNameText from './PlayerNameText';
+import PlayerName from './PlayerName';
 import PositionBadge from './PositionBadge';
 import ShareCardChrome, { CARD_WIDTH, ShareConfidenceBars, ShareGlass } from './ShareCardChrome';
 import TeamAvatar from './TeamAvatar';
@@ -101,7 +101,7 @@ function AssetRow({
     return (
       <View style={[styles.assetRow, styles.assetTall, { backgroundColor: SIDE_TINT[side], borderColor: `${SIDE_COLOR[side]}59` }]}>
         <PlayerAvatar playerId={player.player_id} size={58} tier={player.tier} onLoadSettle={() => onAvatarSettle(trackKey)} />
-        <PlayerNameText name={player.name ?? 'Unknown'} style={styles.assetNameTall} />
+        <PlayerName name={player.name ?? 'Unknown'} style={styles.assetNameTall} />
         <View style={styles.assetMetaRow}>
           <PositionBadge position={player.position} />
           <AppText style={styles.assetMeta} numberOfLines={1}>
@@ -124,7 +124,7 @@ function AssetRow({
         onLoadSettle={() => onAvatarSettle(trackKey)}
       />
       <View style={styles.assetTextGroup}>
-        <PlayerNameText name={player.name ?? 'Unknown'} style={styles.assetName} />
+        <PlayerName name={player.name ?? 'Unknown'} style={styles.assetName} />
         <View style={styles.assetMetaRow}>
           <PositionBadge position={player.position} />
           <AppText style={styles.assetMeta} numberOfLines={1}>

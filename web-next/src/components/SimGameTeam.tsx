@@ -8,7 +8,7 @@ import { EmptyState } from "@/components/EmptyState";
 import { Select } from "@/components/Input";
 import { PillRow } from "@/components/PillRow";
 import { PlayerAvatar } from "@/components/PlayerAvatar";
-import { PlayerNameText } from "@/components/PlayerNameText";
+import { PlayerName } from "@/components/PlayerName";
 import { PositionBadge } from "@/components/PositionBadge";
 import { SimGlyph } from "@/components/SimGlyph";
 import { SimPlayerBrowser } from "@/components/SimGamePlayers";
@@ -535,7 +535,7 @@ function LineupRow({ slotLabel, slot, player, locked, onOpen, onPick, onMove }: 
         <button type="button" className="flex min-w-0 items-center gap-2 text-left" style={{ minHeight: 44 }} onClick={() => onOpen(player)} aria-label={`${player.name}, ${player.pos}. Open player details`}>
           <PlayerAvatar playerId={simHeadshotId(player)} size={32} fallbackLabel={simPlayerInitials(player)} />
           <span className="flex min-w-0 flex-col leading-tight">
-            <PlayerNameText name={player.name} threshold={Infinity} className="truncate text-sm font-bold" style={{ color: "var(--color-text-primary)" }} />
+            <PlayerName name={player.name} className="truncate text-sm font-bold" style={{ color: "var(--color-text-primary)" }} />
             <span className="flex min-w-0 items-center gap-1 text-xs" style={{ color: "var(--color-text-muted)" }}>
               {showPos ? <span aria-label={player.pos} className="inline-flex shrink-0 items-center gap-0.5 font-bold" style={{ color: posVar ? `var(${posVar})` : undefined }}><span aria-hidden="true" style={{ width: 6, height: 6, borderRadius: "50%", background: "currentColor" }} />{player.pos}</span> : null}
               <span className="truncate">{[player.team, player.status === "out" ? "Out" : player.status === "bye" ? "Bye" : null].filter(Boolean).join(" · ")}</span>

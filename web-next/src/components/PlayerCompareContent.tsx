@@ -35,7 +35,7 @@ import { conditionsFor } from "@/lib/tradeSheetPicker";
 import { mergeSearchMatches, useLeaguePlayerSearch } from "@/lib/leaguePlayerSearch";
 import { ValuesCredit } from "@/components/ValuesCredit";
 import { PageTitle } from "@/components/PageTitle";
-import { PlayerNameText } from "@/components/PlayerNameText";
+import { PlayerName } from "@/components/PlayerName";
 
 /**
  * Head-to-head Player Compare (Revision 12) — ports app.py's CURRENT,
@@ -207,7 +207,7 @@ function CompareSlot({
                 <OvrGauge rating={player.overall_rating ?? null} size="sm" />
               </span>
             </span>
-            <PlayerNameText name={player.name || "Unknown"} className="w-full text-base font-extrabold" style={{ color: "var(--color-text-primary)" }} />
+            <PlayerName name={player.name || "Unknown"} className="w-full text-base font-extrabold" style={{ color: "var(--color-text-primary)" }} />
             <span className="flex items-center gap-1.5">
               <PositionBadge position={player.position} />
               {player.team ? (
@@ -533,9 +533,9 @@ export function PlayerCompareContent({
             <section className="flex flex-col gap-2" aria-label="Head-to-head">
               <div className="glass-surface flex flex-col px-3 py-1" data-testid="compare-grid">
                 <div className={`${GRID_COLS} pt-2 text-center text-xs font-extrabold`} style={{ color: "var(--color-text-secondary)" }}>
-                  <span className="truncate">{playerA.name}</span>
+                  <PlayerName name={playerA.name} />
                   <span aria-hidden="true" />
-                  <span className="truncate">{playerB.name}</span>
+                  <PlayerName name={playerB.name} />
                 </div>
                 {headlineRows.map((row, index) => (
                   <CompareRowView key={row.label} row={row} isLast={index === headlineRows.length - 1 && headlineTextRows.length === 0} />

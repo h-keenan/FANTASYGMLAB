@@ -4,7 +4,7 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { PanResponder, StyleSheet, TouchableOpacity, View } from 'react-native';
 
 import AppText from './AppText';
-import PlayerNameText from './PlayerNameText';
+import PlayerName from './PlayerName';
 import EmptyState from './EmptyState';
 import Input from './Input';
 import PlayerAvatar from './PlayerAvatar';
@@ -264,7 +264,7 @@ export default function PercentileExplorerSheet({
           <PlayerAvatar playerId={player.player_id} size={32} />
           <View style={styles.rowId}>
             <View style={styles.rowNameLine}>
-              <PlayerNameText name={player.name} style={styles.rowName} threshold={18} />
+              <PlayerName name={player.name} style={styles.rowName} />
               {rosterIds.has(player.player_id) ? <AppText style={styles.tag}>MY ROSTER</AppText> : null}
               {isMe ? <AppText style={styles.tag}>YOU</AppText> : null}
             </View>

@@ -5,7 +5,7 @@ import { Ionicons } from '@expo/vector-icons';
 import AppText from './AppText';
 import OvrGauge from './OvrGauge';
 import PlayerAvatar from './PlayerAvatar';
-import PlayerNameText from './PlayerNameText';
+import PlayerName from './PlayerName';
 import PositionBadge from './PositionBadge';
 import TickNumber from './TickNumber';
 import ToneBadge from './ToneBadge';
@@ -136,7 +136,7 @@ function CompactCard({ model, onPress, stats = [], trailing }: PlayerCardProps) 
             fallbackLabel={model.team}
           />
           <View style={styles.flex}>
-            <PlayerNameText name={model.name} threshold={Infinity} style={styles.name} />
+            <PlayerName name={model.name} style={styles.name} />
             <View style={styles.chipRow}>
               <PositionBadge position={model.position} />
               {model.team ? <AppText style={styles.muted}>{model.team}</AppText> : null}
@@ -172,7 +172,7 @@ function TileCard({ model, onPress, stats = [], trailing }: PlayerCardProps) {
           />
           <OvrGauge rating={model.overallRating} size="md" reserveSpace />
         </View>
-        <PlayerNameText name={model.name} threshold={Infinity} style={styles.name} />
+        <PlayerName name={model.name} style={styles.name} />
         <View style={styles.chipRow}>
           <PositionBadge position={model.position} />
           <PlayerStatusChips model={model} />
@@ -265,7 +265,7 @@ function MatchupCard({ model, onPress, editing, mirror = false, emphasis = 'even
             fallbackLabel={model.team}
           />
           <View style={[styles.flex, { alignItems: align, gap: 3 }]}>
-            <PlayerNameText name={model.name} threshold={Infinity} style={[styles.name, mirror && styles.textRight]} />
+            <PlayerName name={model.name} style={[styles.name, mirror && styles.textRight]} />
             <View style={[styles.chipRow, mirror && { justifyContent: 'flex-end' }]}>
               {sideTag ? (
                 <ToneBadge size="xs" label={sideTag === 'you' ? 'YOU' : 'OPP'} color={sideTag === 'you' ? colors.accent : colors.textTertiary} />
