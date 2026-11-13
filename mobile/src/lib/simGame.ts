@@ -803,6 +803,31 @@ export interface SimTradeVerdict {
   reason: string;
   chips?: string[];
   counter?: { give: SimTradeAsset[]; get: SimTradeAsset[] } | null;
+  /** What the counter changed and why, labeled: "They want a TE: asking for X (TE)." */
+  counter_note?: string | null;
+  /** The value delta of the counter and both rosters' sizes after it. */
+  counter_delta?: SimCounterDelta | null;
+}
+
+export interface SimCounterDelta {
+  /** The user's net trade value (what you get minus what you give, 0-100 trade-value scale) before and after the counter. */
+  user_net_before: number;
+  user_net_after: number;
+  user_net_change: number;
+  asked: string[];
+  removed: string[];
+  your_roster_after: number;
+  their_roster_after: number;
+  roster_limit: number;
+}
+
+/** "Trade value for you: -4.2 (now +1.0 net, was +5.2). Rosters after: you 17/18, them 18/18." */
+export function simCounterDeltaLine(delta: SimCounterDelta | null | undefined): string | null {
+  if (!delta) return null;
+  const sign = (n: number) => `${n > 0 ? "+" : ""}${n.toFixed(1)}`;
+  const change = delta.user_net_change;
+  const head = `Trade value for you: ${change === 0 ? "no change" : sign(change)} (net ${sign(delta.user_net_before)} before, ${sign(delta.user_net_after)} now)`;
+  return `${head}. Rosters after: you ${delta.your_roster_after}/${delta.roster_limit}, them ${delta.their_roster_after}/${delta.roster_limit}.`;
 }
 
 export interface SimTradeResponse extends SimGameEnvelope {

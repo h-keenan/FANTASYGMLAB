@@ -39,6 +39,7 @@ import {
   simHeadshotId,
   simPlayerInitials,
   simPlayerSubline,
+  simCounterDeltaLine,
   simFilterPositionsFor,
   simPosMatches,
   simSlotRepeatsPosition,
@@ -769,5 +770,13 @@ describe("action deltas and optimistic updates", () => {
     expect(claim).toMatchObject({ id: "pending-1", start_slot: "FLEX" });
     expect(claim.add.id).toBe("1");
     expect(claim.drop?.id).toBe("2");
+  });
+});
+
+describe("simCounterDeltaLine", () => {
+  it("states the value change in labeled terms and both rosters after", () => {
+    const line = simCounterDeltaLine({ user_net_before: 5.2, user_net_after: 1, user_net_change: -4.2, asked: ["a"], removed: [], your_roster_after: 17, their_roster_after: 18, roster_limit: 18 });
+    expect(line).toBe("Trade value for you: -4.2 (net +5.2 before, +1.0 now). Rosters after: you 17/18, them 18/18.");
+    expect(simCounterDeltaLine(null)).toBeNull();
   });
 });

@@ -147,12 +147,27 @@ class Verdict:
     chips: list[str] = field(default_factory=list)
     counter: dict[str, list[str]] | None = None  # {"give": [...], "get": [...]} from the USER's side
     margin: float = 0.0  # how far above (+) / below (-) the AI's bar
+    # What the counter changed and why, in plain labeled terms ("They want a TE: asking for X"), plus the value delta.
+    counter_note: str | None = None
+    counter_delta: dict[str, Any] | None = None
 
     def to_dict(self) -> dict[str, Any]:
         return {
             "decision": self.decision, "reason_code": self.reason_code, "reason": self.reason,
             "chips": list(self.chips), "counter": self.counter,
+            "counter_note": self.counter_note, "counter_delta": self.counter_delta,
         }
+
+
+@dataclass
+class Counter:
+    give: tuple[str, ...]
+    get: tuple[str, ...]
+    code: str
+    reason: str
+    chips: list[str]
+    note: str
+    delta: dict[str, Any]
 
 
 class TradeDesk:
@@ -271,10 +286,44 @@ class TradeDesk:
 
     # ------------------------------------------------------------- verdicts
 
+    def roster_size_after(self, tid: str, give: Sequence[str], get: Sequence[str]) -> int:
+        """Roster spots ``tid`` uses after the swap, before any forced cut (picks never take a spot)."""
+
+        give_set = set(give)
+        kept = sum(1 for p in self.state.rosters[tid] if p not in give_set)
+        return kept + sum(1 for p in get if not is_pick_id(p))
+
+    def legal_for_counter(self, tid: str, give: Sequence[str], get: Sequence[str]) -> bool:
+        """A counter never forces ``tid`` over the roster limit: it ends within the limit, or no fuller than it is now
+        (a team already over is not made worse). The user can therefore never be pushed over without having chosen it,
+        and the AI is never asked to take a roster it would have to cut down."""
+
+        limit = self.snap.settings.roster_limit
+        after = self.roster_size_after(tid, give, get)
+        return after <= limit or after <= len(self.state.rosters[tid])
+
+    def failure_cause(self, ai: str, user_gives: Sequence[str], user_gets: Sequence[str]) -> tuple[str, str, list[str]]:
+        """Why the AI said no, from counterfactuals rather than the first matching label: if the value alone would
+        pass, the lineup need is what sank it (name the position it is short at); if the value alone fails, the
+        offer is simply short on value and that is what it says, however thin the AI is at some position."""
+
+        params = self.params(ai)
+        snap = self.snap
+        _, margin, dval, need, loss = self.ai_accepts(ai, user_gives, user_gets)
+        pos, ratio = self.need_position(ai)
+        incoming = {snap.players[p].pos for p in user_gives if not is_pick_id(p)}
+        if loss > floor_tolerance(params):
+            return "fair_floor", "They will not give up that much value in one deal.", ["too lopsided"]
+        value_alone_passes = (margin - need) >= 0
+        if value_alone_passes and need < 0:
+            if ratio < 0.92 and pos not in incoming:
+                return "needs_position", f"Needs a {pos}.", [f"needs {pos}"]
+            return "roster_fit", "This would leave a hole in their lineup.", ["hurts their lineup"]
+        return "wants_more_value", "They want more value back.", ["wants more value"]
+
     def verdict(self, ai: str, user_gives: Sequence[str], user_gets: Sequence[str]) -> Verdict:
         ok, margin, dval, need, loss = self.ai_accepts(ai, user_gives, user_gets)
         params = self.params(ai)
-        snap = self.snap
         if ok:
             fits = need >= max(2.0, 0.35 * abs(dval + need))
             return Verdict(
@@ -282,55 +331,102 @@ class TradeDesk:
                 "They like how this fits their roster." if fits else "They see this as a fair deal.",
                 chips=["fits their need"] if fits else ["fair value"], margin=margin,
             )
-        pos, ratio = self.need_position(ai)
-        incoming_positions = {snap.players[p].pos for p in user_gives if not is_pick_id(p)}
-        chips: list[str] = []
-        if loss > floor_tolerance(params):
-            code, reason = "fair_floor", "They will not give up that much value in one deal."
-            chips.append("too lopsided")
-        elif ratio < 0.92 and pos not in incoming_positions and need < 0:
-            code, reason = "needs_position", f"Needs a {pos}."
-            chips.append(f"needs {pos}")
-        elif need < -3.0:
-            code, reason = "roster_fit", "This would leave a hole in their lineup."
-            chips.append("hurts their lineup")
-        else:
-            code, reason = "wants_more_value", "They want more value back."
-            chips.append("wants more value")
-        counter = self.build_counter(ai, user_gives, user_gets)
+        code, reason, chips = self.failure_cause(ai, user_gives, user_gets)
+        counter = self.build_counter(ai, user_gives, user_gets, code)
         if counter is not None:
+            # The stated reason must match what the counter did: a "needs a TE" counter asks for a TE, otherwise
+            # the reason is restated as what it really was (value) and the note says what was asked and why.
+            if counter.code != code:
+                code, reason, chips = counter.code, counter.reason, counter.chips
             return Verdict(
-                "counter", code, reason + " They countered.", chips=chips, counter=counter, margin=margin
+                "counter", code, reason + " They countered.", chips=chips,
+                counter={"give": list(counter.give), "get": list(counter.get)}, margin=margin,
+                counter_note=counter.note, counter_delta=counter.delta,
             )
         return Verdict("decline", code, reason, chips=chips, margin=margin)
 
-    def build_counter(self, ai: str, user_gives: Sequence[str], user_gets: Sequence[str]) -> dict[str, list[str]] | None:
-        """The cheapest change, for the user, that the AI will accept: ask the
-        user for one more player, or take one of the asked players off the
-        table. Never the AI paying more."""
+    def build_counter(self, ai: str, user_gives: Sequence[str], user_gets: Sequence[str], code: str = "wants_more_value") -> "Counter | None":
+        """The cheapest change, for the user, that the AI will accept AND that both rosters can legally hold: ask for
+        one more of the user's assets, or take one of the asked players off the table. Never the AI paying more.
+
+        Multi-factor: candidates are ranked by what they cost the user (neutral lens), tie-broken by how much the AI
+        wants them (its horizon: age and injury, its lineup need), so a rebuilder asks for youth and a contender for
+        production. When the reason is a position need the counter must ask for that position (and when it cannot, it
+        is restated as the value shortfall it was, never left claiming a need it did not act on)."""
 
         snap, state, ev = self.snap, self.state, self.ev
         user = snap.user_team.tid
-        options: list[tuple[float, str, tuple[str, ...], tuple[str, ...]]] = []
-        extra = sorted(
-            (p for p in self.tradable(user) if p not in user_gives),
-            key=lambda p: (-(ev.worth(self.params(ai), p) - ev.worth(USER_PARAMS, p)), p),
-        )[:8]
+        params = self.params(ai)
+        need_pos: str | None = None
+        if code == "needs_position":
+            need_pos = self.need_position(ai)[0]
+        options: list[tuple[tuple, str, tuple[str, ...], tuple[str, ...], list[str], list[str], str]] = []
+
+        def consider(give: tuple[str, ...], get: tuple[str, ...], asked: list[str], removed: list[str], cost: float, tag: str) -> None:
+            if not (self.legal_for_counter(ai, get, give) and self.legal_for_counter(user, give, get)):
+                return
+            ok, margin, _, need, _ = self.ai_accepts(ai, give, get)
+            if not ok:
+                return
+            # Rank: user cost first, then the AI's own lineup fit (higher is better), then ids for determinism.
+            options.append(((round(cost, 6), -round(need, 6), tag), tag, give, get, asked, removed, tag))
+
+        pool = [p for p in self.tradable(user) if p not in user_gives]
+        extra = sorted(pool, key=lambda p: (-(ev.worth(params, p) - ev.worth(USER_PARAMS, p)), p))[:8]
+        if need_pos:
+            extra = sorted((p for p in pool if not is_pick_id(p) and snap.players[p].pos == need_pos),
+                           key=lambda p: (-ev.worth(params, p), p))[:8]
         if len(user_gives) < snap.settings.policy.max_trade_side:
             for p in extra:
-                give = tuple(user_gives) + (p,)
-                if self.ai_accepts(ai, give, user_gets)[0]:
-                    options.append((ev.worth(USER_PARAMS, p), "add:" + p, give, tuple(user_gets)))
-        if len(user_gets) > 1:
+                consider(tuple(user_gives) + (p,), tuple(user_gets), [p], [], ev.worth(USER_PARAMS, p), "add:" + p)
+        if len(user_gets) > 1 and not need_pos:
             for p in user_gets:
-                get = tuple(x for x in user_gets if x != p)
-                if self.ai_accepts(ai, user_gives, get)[0]:
-                    options.append((ev.worth(USER_PARAMS, p), "drop:" + p, tuple(user_gives), get))
+                consider(tuple(user_gives), tuple(x for x in user_gets if x != p), [], [p], ev.worth(USER_PARAMS, p), "drop:" + p)
         if not options:
+            if need_pos:  # could not fix the need the way the reason claims: fall back to an honest value counter
+                return self.build_counter(ai, user_gives, user_gets, "wants_more_value")
             return None
-        options.sort(key=lambda o: (o[0], o[1]))
-        _, _, give, get = options[0]
-        return {"give": list(give), "get": list(get)}
+        options.sort(key=lambda o: o[0])
+        _, _, give, get, asked, removed, _ = options[0]
+        return self._describe_counter(ai, code, user_gives, user_gets, give, get, asked, removed)
+
+    def _describe_counter(self, ai, code, old_give, old_get, give, get, asked, removed) -> "Counter":
+        snap, ev = self.snap, self.ev
+
+        def label(pid: str) -> str:
+            if is_pick_id(pid):
+                return ev.pick_name(pid)
+            p = snap.players[pid]
+            return f"{p.name} ({p.pos})"
+
+        def net(g: Sequence[str], r: Sequence[str]) -> float:  # the user's net trade value (neutral lens)
+            return sum(ev.worth(USER_PARAMS, p) for p in r) - sum(ev.worth(USER_PARAMS, p) for p in g)
+
+        pos = self.need_position(ai)[0]
+        if asked:
+            who = label(asked[0])
+            if code == "needs_position":
+                note = f"They want a {pos}: asking for {who}."
+            elif code == "roster_fit":
+                note = f"This leaves a hole in their lineup: asking for {who} to fill it."
+            elif code == "fair_floor":
+                note = f"They will not give up that much value: asking for {who} to even it out."
+            else:
+                note = f"They want more value: asking for {who} as well."
+        else:
+            who = label(removed[0])
+            note = f"They want to keep {who}: the counter leaves him out."
+        before, after = net(old_give, old_get), net(give, get)
+        delta = {
+            "user_net_before": round(before, 1), "user_net_after": round(after, 1), "user_net_change": round(after - before, 1),
+            "asked": list(asked), "removed": list(removed),
+            "your_roster_after": self.roster_size_after(snap.user_team.tid, give, get),
+            "their_roster_after": self.roster_size_after(ai, get, give),
+            "roster_limit": snap.settings.roster_limit,
+        }
+        chips = [f"needs {pos}"] if code == "needs_position" else ["wants more value"] if code == "wants_more_value" else ["hurts their lineup"] if code == "roster_fit" else ["too lopsided"]
+        reason = f"Needs a {pos}." if code == "needs_position" else "They want more value back." if code == "wants_more_value" else "This would leave a hole in their lineup." if code == "roster_fit" else "They will not give up that much value in one deal."
+        return Counter(give=tuple(give), get=tuple(get), code=code, reason=reason, chips=chips, note=note, delta=delta)
 
     # ------------------------------------------------------------- searching
 
