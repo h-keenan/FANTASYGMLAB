@@ -695,3 +695,13 @@ describe("sim presentation helpers", () => {
     expect(simMatchupTone(null)).toBe("muted");
   });
 });
+
+describe("simTradeReducer set (the sheet's Apply)", () => {
+  it("replaces a side with the selection, dedupes, and caps at the given max (3 redraft, 4 dynasty)", () => {
+    const base = { partner: "7", give: ["a"], get: ["z"] };
+    expect(simTradeReducer(base, { type: "set", side: "give", ids: ["a", "b", "b", "c", "d", "e"] }).give).toEqual(["a", "b", "c"]);
+    expect(simTradeReducer(base, { type: "set", side: "give", ids: ["a", "b", "c", "d", "e"], max: 4 }).give).toEqual(["a", "b", "c", "d"]);
+    expect(simTradeReducer(base, { type: "set", side: "get", ids: [] }).get).toEqual([]);
+    expect(simTradeReducer(base, { type: "set", side: "give", ids: ["pick:2027:1:3", "q"], max: 4 }).give).toEqual(["pick:2027:1:3", "q"]);
+  });
+});

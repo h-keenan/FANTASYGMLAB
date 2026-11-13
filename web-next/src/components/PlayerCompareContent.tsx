@@ -2,26 +2,38 @@
 
 import { useEffect, useMemo, useState } from "react";
 
-import { api, type QuickViewModel, type RankedPlayer, type WeeklyStatPoint } from "@/lib/api";
+import { TradePickerSheet } from "@/components/TradePickerSheet";
+import { PlayerAvatar } from "@/components/PlayerAvatar";
+import { usePlayerQuickView } from "@/context/PlayerQuickViewContext";
+
+import { api, type QuickViewModel, type RankedPlayer, type ScheduleWeek, type WeeklyStatPoint } from "@/lib/api";
 import { OvrGauge } from "@/components/OvrGauge";
-import { PlayerIdentityTrigger } from "@/components/PlayerIdentityTrigger";
 import { PositionBadge } from "@/components/PositionBadge";
 import { SectionHeading } from "@/components/SectionHeading";
 import { usePreloadWeeklyPointsChart, WeeklyPointsChart } from "@/components/WeeklyPointsChartLazy";
 import {
+  buildHeadlineRows,
+  buildHeadlineTextRows,
   buildModelRows,
   buildNarrativePair,
   buildTrendRows,
-  buildValueRows,
   compareRowWinner,
-  defaultCompareCandidates,
   hasAnyTextValue,
   hasAnyValue,
+  nextProjection,
+  ppgFromWeeks,
+  readRecentOpponents,
+  rememberOpponent,
+  scheduleOutlook,
+  suggestedOpponents,
+  type CompareExtras,
   type CompareRow,
   type CompareTextRow,
 } from "@/lib/playerComparePresentation";
+import { itemKey, type SheetItem } from "@/lib/tradeSheetPicker";
+import { conditionsFor } from "@/lib/tradeSheetPicker";
+import { mergeSearchMatches, useLeaguePlayerSearch } from "@/lib/leaguePlayerSearch";
 import { ValuesCredit } from "@/components/ValuesCredit";
-import { PLAYER_SEARCH_MIN_CHARS, useLeaguePlayerSearchState } from "@/lib/leaguePlayerSearch";
 import { PageTitle } from "@/components/PageTitle";
 import { PlayerNameText } from "@/components/PlayerNameText";
 
@@ -81,14 +93,15 @@ function CompareGridRow({
   );
 }
 
-function ValuePill({ value, format, wins }: { value: number | null; format: (v: number) => string; wins: boolean }) {
+/** The better side is marked green with a check; the other side is simply quieter gray (no red, no per-row noise). */
+function ValuePill({ value, format, wins, quiet }: { value: number | null; format: (v: number) => string; wins: boolean; quiet: boolean }) {
   return (
     <span
-      className="px-2 py-0.5 text-sm font-bold"
+      className="px-2 py-0.5 text-sm font-bold tabular-nums"
       style={
         wins
           ? { background: "var(--color-success-soft)", border: "var(--border-width-default) solid var(--color-success)", color: "var(--color-success)" }
-          : { color: "var(--color-text-primary)", border: "var(--border-width-default) solid transparent" }
+          : { color: quiet ? "var(--color-text-muted)" : "var(--color-text-primary)", border: "var(--border-width-default) solid transparent" }
       }
     >
       {wins ? (
@@ -107,16 +120,24 @@ function CompareRowView({ row, isLast }: { row: CompareRow; isLast: boolean }) {
   return (
     <CompareGridRow
       isLast={isLast}
-      left={<ValuePill value={row.a} format={row.format} wins={winner === "a"} />}
+      left={<ValuePill value={row.a} format={row.format} wins={winner === "a"} quiet={winner === "b"} />}
       center={row.label}
-      right={<ValuePill value={row.b} format={row.format} wins={winner === "b"} />}
+      right={<ValuePill value={row.b} format={row.format} wins={winner === "b"} quiet={winner === "a"} />}
     />
   );
 }
 
-function TextPill({ value }: { value: string | null }) {
+function TextPill({ value, wins, quiet }: { value: string | null; wins?: boolean; quiet?: boolean }) {
   return (
-    <span className="text-xs font-semibold text-center" style={{ color: "var(--color-text-primary)" }}>
+    <span
+      className="text-xs font-semibold text-center px-2 py-0.5"
+      style={
+        wins
+          ? { background: "var(--color-success-soft)", border: "var(--border-width-default) solid var(--color-success)", color: "var(--color-success)" }
+          : { color: quiet ? "var(--color-text-muted)" : "var(--color-text-primary)", border: "var(--border-width-default) solid transparent" }
+      }
+    >
+      {wins ? <span className="sr-only">Better: </span> : null}
       {value || "—"}
     </span>
   );
@@ -124,101 +145,153 @@ function TextPill({ value }: { value: string | null }) {
 
 function CompareTextRowView({ row, isLast }: { row: CompareTextRow; isLast: boolean }) {
   return (
-    <CompareGridRow isLast={isLast} left={<TextPill value={row.a} />} center={row.label} right={<TextPill value={row.b} />} />
+    <CompareGridRow
+      isLast={isLast}
+      left={<TextPill value={row.a} wins={row.winner === "a"} quiet={row.winner === "b"} />}
+      center={row.label}
+      right={<TextPill value={row.b} wins={row.winner === "b"} quiet={row.winner === "a"} />}
+    />
   );
 }
 
-function IdentityCard({ player }: { player: RankedPlayer }) {
-  return (
-    <PlayerIdentityTrigger
-      identity={{ ...player, sourceLabel: "Player Compare" }}
-      className="flex flex-col items-center gap-1 min-w-0 w-full"
-    >
-      <OvrGauge rating={player.overall_rating ?? null} size="md" />
-      <PlayerNameText name={player.name || "Unknown"} className="text-sm font-bold text-center w-full" style={{ color: "var(--color-text-primary)" }} />
-      <div className="flex items-center gap-1.5">
-        <PositionBadge position={player.position} />
-        {player.team ? (
-          <span className="text-xs" style={{ color: "var(--color-text-secondary)" }}>
-            {player.team}
-          </span>
-        ) : null}
-      </div>
-    </PlayerIdentityTrigger>
-  );
+
+function playerToSheetItem(player: RankedPlayer): SheetItem<RankedPlayer> {
+  return {
+    key: itemKey("player", player.player_id),
+    kind: "player",
+    id: player.player_id,
+    label: player.name ?? "Player",
+    position: player.position,
+    team: player.team,
+    age: player.age,
+    value: player.score,
+    conditions: conditionsFor({ injuryStatus: player.injury_status, status: player.status, age: player.age }),
+    photoId: player.player_id,
+    tier: player.tier,
+    injury: player.injury_status,
+    ref: player,
+  };
 }
 
-function OpponentPicker({
-  leagueId,
-  basePlayer,
-  pool,
-  onSelect,
+/**
+ * One of the two big slots: photo, value ring, name, position and team, and
+ * the value. The whole slot is one tap target that opens the picker; the
+ * small info button opens the player card. An empty slot invites a choice.
+ */
+function CompareSlot({
+  label,
+  player,
+  onChoose,
+  onInfo,
+  testId,
 }: {
-  leagueId: string;
-  basePlayer: RankedPlayer;
-  pool: RankedPlayer[];
-  onSelect: (player: RankedPlayer) => void;
+  label: string;
+  player: RankedPlayer | null;
+  onChoose: () => void;
+  onInfo?: () => void;
+  testId: string;
 }) {
-  const [search, setSearch] = useState("");
-  const candidatePool = useMemo(() => pool.filter((p) => p.player_id !== basePlayer.player_id), [pool, basePlayer.player_id]);
-  const suggestions = useMemo(() => defaultCompareCandidates(candidatePool, basePlayer), [candidatePool, basePlayer]);
-  // Typed searches go to the server so players below the loaded rankings window are found.
-  const { players: searchMatches, pending } = useLeaguePlayerSearchState(leagueId, "Dynasty", search);
-  const searching = search.trim().length >= PLAYER_SEARCH_MIN_CHARS;
-  const results = useMemo(
-    () => (searching ? searchMatches.filter((p) => p.player_id !== basePlayer.player_id) : suggestions),
-    [searching, searchMatches, suggestions, basePlayer.player_id],
-  );
-
   return (
-    <div className="flex flex-col gap-3">
-      <div className="glass-surface flex flex-col items-center gap-2 py-4">
-        <IdentityCard player={basePlayer} />
-        <span className="text-xs" style={{ color: "var(--color-text-muted)" }}>
-          Choose an opponent below.
-        </span>
-      </div>
-      <input
-        type="text"
-        value={search}
-        onChange={(event) => setSearch(event.target.value)}
-        placeholder="Search for a player to compare..."
-        className="px-3 py-2 text-sm"
-        style={{
-          background: "var(--color-surface)",
-          border: "var(--border-width-default) solid var(--color-border)",
-          color: "var(--color-text-primary)",
-        }}
-      />
-      <div className="glass-surface flex flex-col">
-        {results.length === 0 ? (
-          <p className="text-sm px-3 py-4" style={{ color: "var(--color-text-muted)" }}>
-            {searching && pending ? "Searching players…" : "No players match."}
-          </p>
-        ) : (
-          results.map((candidate) => (
-            <button
-              key={candidate.player_id}
-              type="button"
-              onClick={() => onSelect(candidate)}
-              className="flex items-center justify-between gap-3 px-3 py-2.5 text-left"
-              style={{ borderBottom: "var(--border-width-default) solid var(--color-border)" }}
-            >
-              <div className="flex items-center gap-2 min-w-0">
-                <PositionBadge position={candidate.position} />
-                <PlayerNameText name={candidate.name || "Unknown"} threshold={Infinity} className="text-sm font-bold" style={{ color: "var(--color-text-primary)" }} />
-                <span className="text-xs shrink-0" style={{ color: "var(--color-text-muted)" }}>
-                  {candidate.team || "—"}
+    <div className="glass-surface relative flex min-w-0 flex-col" data-testid={testId} style={player ? undefined : { borderStyle: "dashed", borderColor: "var(--color-border-strong)" }}>
+      <button
+        type="button"
+        onClick={onChoose}
+        className="flex min-h-[11rem] w-full min-w-0 flex-col items-center justify-center gap-2 px-3 py-4 text-center"
+        aria-label={player ? `${label}: ${player.name}. Change player` : `${label}: choose a player`}
+      >
+        {player ? (
+          <>
+            <span className="relative inline-flex">
+              <PlayerAvatar playerId={player.player_id} tier={player.tier} size={72} fallbackLabel={(player.name ?? "").split(" ").map((w) => w[0]).slice(0, 2).join("")} />
+              <span className="absolute -bottom-1 -right-3">
+                <OvrGauge rating={player.overall_rating ?? null} size="sm" />
+              </span>
+            </span>
+            <PlayerNameText name={player.name || "Unknown"} className="w-full text-base font-extrabold" style={{ color: "var(--color-text-primary)" }} />
+            <span className="flex items-center gap-1.5">
+              <PositionBadge position={player.position} />
+              {player.team ? (
+                <span className="text-xs" style={{ color: "var(--color-text-secondary)" }}>
+                  {player.team}
                 </span>
-              </div>
-              <span className="text-sm font-extrabold shrink-0" style={{ color: "var(--color-accent)" }}>
-                {candidate.score != null ? Math.round(candidate.score) : "—"}
+              ) : null}
+            </span>
+            <span className="text-xs" style={{ color: "var(--color-text-muted)" }}>
+              Value{" "}
+              <strong className="tabular-nums" style={{ color: "var(--color-accent)" }}>
+                {player.score != null ? Math.round(player.score).toLocaleString() : "—"}
+              </strong>
+            </span>
+            <span className="text-xs font-bold" style={{ color: "var(--color-accent)" }}>
+              Change
+            </span>
+          </>
+        ) : (
+          <>
+            <span
+              aria-hidden="true"
+              className="inline-flex items-center justify-center text-3xl font-light"
+              style={{ width: 72, height: 72, borderRadius: "50%", border: "2px dashed var(--color-border-strong)", color: "var(--color-accent)" }}
+            >
+              +
+            </span>
+            <span className="text-base font-extrabold" style={{ color: "var(--color-text-primary)" }}>
+              Choose a player
+            </span>
+            <span className="text-xs" style={{ color: "var(--color-text-muted)" }}>
+              Same position to start
+            </span>
+          </>
+        )}
+      </button>
+      {player && onInfo ? (
+        <button
+          type="button"
+          onClick={onInfo}
+          aria-label={`${player.name} player card`}
+          className="absolute right-1 top-1 inline-flex items-center justify-center"
+          style={{ width: "var(--touch-target-min)", height: "var(--touch-target-min)", color: "var(--color-text-muted)" }}
+        >
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true">
+            <circle cx="12" cy="12" r="9" />
+            <path d="M12 11v5M12 7.5h.01" />
+          </svg>
+        </button>
+      ) : null}
+    </div>
+  );
+}
+
+/** One-tap opponent chips: suggested (same position, nearby value) and recent. */
+function OpponentChips({ label, players, onPick }: { label: string; players: RankedPlayer[]; onPick: (player: RankedPlayer) => void }) {
+  if (players.length === 0) return null;
+  return (
+    <section className="flex flex-col gap-2" aria-label={label}>
+      <span className="text-xs font-extrabold uppercase" style={{ color: "var(--color-text-muted)", letterSpacing: "var(--letter-spacing-badge)" }}>
+        {label}
+      </span>
+      <ul className="flex flex-wrap gap-2">
+        {players.map((p) => (
+          <li key={p.player_id}>
+            <button
+              type="button"
+              onClick={() => onPick(p)}
+              className="glass-surface inline-flex items-center gap-2 py-1 pl-1 pr-3 text-left"
+              style={{ minHeight: "var(--touch-target-min)", borderRadius: "var(--radius-pill)" }}
+              aria-label={`Compare with ${p.name}`}
+            >
+              <PlayerAvatar playerId={p.player_id} tier={p.tier} size={32} fallbackLabel={(p.name ?? "").split(" ").map((w) => w[0]).slice(0, 2).join("")} />
+              <span className="flex flex-col leading-tight">
+                <span className="text-sm font-bold">{p.name}</span>
+                <span className="text-xs tabular-nums" style={{ color: "var(--color-text-muted)" }}>
+                  {p.position} · {p.score != null ? Math.round(p.score).toLocaleString() : "—"}
+                </span>
               </span>
             </button>
-          ))
-        )}
-      </div>
-    </div>
+          </li>
+        ))}
+      </ul>
+    </section>
   );
 }
 
@@ -263,10 +336,13 @@ function NarrativeBlock({
   );
 }
 
+
+const NO_EXTRAS: CompareExtras = { ppg: null, projection: null, schedule: null };
+
 export function PlayerCompareContent({
   leagueId,
   leagueName,
-  playerA,
+  playerA: initialPlayerA,
   initialPlayerB,
   pool,
 }: {
@@ -277,32 +353,33 @@ export function PlayerCompareContent({
   pool: RankedPlayer[];
 }) {
   usePreloadWeeklyPointsChart();
+  const { openPlayer } = usePlayerQuickView();
+  const [playerA, setPlayerA] = useState<RankedPlayer>(initialPlayerA);
   const [playerB, setPlayerB] = useState<RankedPlayer | null>(initialPlayerB);
+  const [picking, setPicking] = useState<"a" | "b" | null>(null);
+  const [pickSearch, setPickSearch] = useState("");
+  const [moreOpen, setMoreOpen] = useState(false);
+  const [recentIds, setRecentIds] = useState<string[]>([]);
   const [modelA, setModelA] = useState<QuickViewModel | null>(null);
   const [modelB, setModelB] = useState<QuickViewModel | null>(null);
-  // Which opponent's models modelA/modelB actually belong to — compared
-  // against playerB below to derive "still loading" without a second piece
-  // of state set synchronously at the top of the effect (React 19's
-  // react-hooks/set-state-in-effect rule flags that pattern; deriving it
-  // during render instead of storing it avoids the extra render it'd cause
-  // anyway).
+  // Which pair the models/weeks/schedules belong to, so "still loading" is derived at render time instead of
+  // by a synchronous setState at the top of an effect.
+  const pairKey = playerB ? `${playerA.player_id}|${playerB.player_id}` : null;
   const [modelsLoadedFor, setModelsLoadedFor] = useState<string | null>(null);
-
-  // Points By Week (Revision 14) — its own independent fetch/loaded-for pair,
-  // same shape as modelA/modelB/modelsLoadedFor above but kept separate:
-  // GET .../weekly-stats is a different endpoint than GET .../quick-view, and
-  // a slow chart fetch should never hold up Model Breakdown/Trends/Decision
-  // Fit rendering (or vice versa).
   const [weeksA, setWeeksA] = useState<WeeklyStatPoint[]>([]);
   const [weeksB, setWeeksB] = useState<WeeklyStatPoint[]>([]);
   const [weeklySeason, setWeeklySeason] = useState<number | null>(null);
   const [weeklyLoadedFor, setWeeklyLoadedFor] = useState<string | null>(null);
+  const [scheduleA, setScheduleA] = useState<ScheduleWeek[]>([]);
+  const [scheduleB, setScheduleB] = useState<ScheduleWeek[]>([]);
+  const [scheduleLoadedFor, setScheduleLoadedFor] = useState<string | null>(null);
 
-  // Stale modelA/modelB left over from a previous opponent are never
-  // rendered while playerB is null (valueRows/modelRows below only read
-  // them once playerB is set again), so there is nothing to reset here —
-  // just skip the fetch. The next opponent pick re-triggers this effect and
-  // overwrites both with fresh data before anything new is displayed.
+  // Recents live in localStorage, so read them after mount.
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setRecentIds(readRecentOpponents(leagueId));
+  }, [leagueId]);
+
   useEffect(() => {
     if (!playerB) return;
     let cancelled = false;
@@ -319,7 +396,7 @@ export function PlayerCompareContent({
         }
       })
       .finally(() => {
-        if (!cancelled) setModelsLoadedFor(playerB.player_id);
+        if (!cancelled) setModelsLoadedFor(`${playerA.player_id}|${playerB.player_id}`);
       });
     return () => {
       cancelled = true;
@@ -344,25 +421,86 @@ export function PlayerCompareContent({
         }
       })
       .finally(() => {
-        if (!cancelled) setWeeklyLoadedFor(playerB.player_id);
+        if (!cancelled) setWeeklyLoadedFor(`${playerA.player_id}|${playerB.player_id}`);
       });
     return () => {
       cancelled = true;
     };
   }, [playerA.player_id, playerB]);
 
-  const loadingModels = playerB !== null && modelsLoadedFor !== playerB.player_id;
+  useEffect(() => {
+    if (!playerB) return;
+    let cancelled = false;
+    Promise.all([api.getPlayerSchedule(playerA.player_id), api.getPlayerSchedule(playerB.player_id)])
+      .then(([a, b]) => {
+        if (cancelled) return;
+        setScheduleA(a.weeks ?? []);
+        setScheduleB(b.weeks ?? []);
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setScheduleA([]);
+          setScheduleB([]);
+        }
+      })
+      .finally(() => {
+        if (!cancelled) setScheduleLoadedFor(`${playerA.player_id}|${playerB.player_id}`);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [playerA.player_id, playerB]);
+
+  // Typed searches also ask the server, so players below the loaded rankings window are found.
+  const searchMatches = useLeaguePlayerSearch(leagueId, "Dynasty", picking ? pickSearch : "");
+  const searchPool = useMemo(() => mergeSearchMatches(pool, searchMatches), [pool, searchMatches]);
+  const sheetItems = useMemo(() => {
+    if (!picking) return [];
+    const skip = new Set(picking === "a" ? [playerB?.player_id] : [playerA.player_id]);
+    return searchPool.filter((p) => !skip.has(p.player_id)).map(playerToSheetItem);
+  }, [picking, searchPool, playerA.player_id, playerB]);
+  // Opens pre-filtered to the position of the player being compared against; one tap on Clear shows everyone.
+  const sheetPosition = (picking === "b" ? playerA.position : picking === "a" ? (playerB?.position ?? playerA.position) : null) ?? null;
+
+  const suggested = useMemo(
+    () => suggestedOpponents(pool, playerA, recentIds, 4),
+    [pool, playerA, recentIds],
+  );
+  const recent = useMemo(
+    () => recentIds.map((id) => pool.find((p) => p.player_id === id)).filter((p): p is RankedPlayer => Boolean(p) && p!.player_id !== playerA.player_id).slice(0, 4),
+    [recentIds, pool, playerA.player_id],
+  );
+
+  function choose(player: RankedPlayer) {
+    if (picking === "a") setPlayerA(player);
+    else setPlayerB(player);
+    setRecentIds(rememberOpponent(leagueId, player.player_id));
+    setPicking(null);
+  }
+
+  const loaded = (key: string | null, done: string | null) => key !== null && done === key;
+  const loadingModels = pairKey !== null && !loaded(pairKey, modelsLoadedFor);
+  const scheduleReady = loaded(pairKey, scheduleLoadedFor);
+  const weeklyReady = loaded(pairKey, weeklyLoadedFor);
+  const extrasA: CompareExtras = playerB
+    ? { ppg: weeklyReady ? ppgFromWeeks(weeksA) : null, projection: scheduleReady ? nextProjection(scheduleA) : null, schedule: scheduleReady ? scheduleOutlook(scheduleA) : null }
+    : NO_EXTRAS;
+  const extrasB: CompareExtras = playerB
+    ? { ppg: weeklyReady ? ppgFromWeeks(weeksB) : null, projection: scheduleReady ? nextProjection(scheduleB) : null, schedule: scheduleReady ? scheduleOutlook(scheduleB) : null }
+    : NO_EXTRAS;
   const showWeeklyPoints =
     playerB !== null &&
-    weeklyLoadedFor === playerB.player_id &&
+    weeklyReady &&
     weeklySeason !== null &&
     (weeksA.some((week) => week.fantasy_points_ppr != null) || weeksB.some((week) => week.fantasy_points_ppr != null));
-  const valueRows = playerB ? buildValueRows(playerA, playerB) : [];
+  const headlineRows = playerB ? buildHeadlineRows(playerA, playerB, extrasA, extrasB) : [];
+  const headlineTextRows = playerB ? buildHeadlineTextRows(modelA, modelB, extrasA, extrasB) : [];
   const modelRows = playerB ? buildModelRows(modelA, modelB) : [];
   const showModelRows = playerB !== null && hasAnyValue(modelRows);
-  const trendRows = playerB ? buildTrendRows(modelA, modelB) : [];
-  const showTrendRows = playerB !== null && hasAnyTextValue(trendRows);
+  const roleRows = playerB ? buildTrendRows(modelA, modelB).filter((row) => row.label === "Role Trend") : [];
+  const showRoleRows = playerB !== null && hasAnyTextValue(roleRows);
   const narrative = playerB ? buildNarrativePair(modelA, modelB) : null;
+  const hasMore = showModelRows || showRoleRows || Boolean(narrative) || showWeeklyPoints;
 
   return (
     <main className="page-shell">
@@ -370,89 +508,120 @@ export function PlayerCompareContent({
         <PageTitle page="Player Compare" leagueName={leagueName} />
       </header>
 
-      {!playerB ? (
-        <OpponentPicker leagueId={leagueId} basePlayer={playerA} pool={pool} onSelect={setPlayerB} />
-      ) : (
-        <div className="flex flex-col gap-5">
-          <button
-            type="button"
-            onClick={() => setPlayerB(null)}
-            className="self-start px-3 py-1.5 text-xs font-bold"
-            style={{ color: "var(--color-accent)", border: "var(--border-width-default) solid var(--color-border)" }}
-          >
-            Compare someone else
-          </button>
+      <div className="mx-auto flex w-full flex-col gap-4" style={{ maxWidth: "52rem" }}>
+        <section className="grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-2 sm:gap-3" aria-label="Players to compare">
+          <CompareSlot testId="compare-slot-a" label="Player A" player={playerA} onChoose={() => { setPickSearch(""); setPicking("a"); }} onInfo={() => openPlayer({ ...playerA, leagueId, leagueName, sourceLabel: "Player Compare" })} />
+          <span className="text-center font-extrabold" style={{ color: "var(--color-text-muted)", fontSize: "var(--font-size-badge)", letterSpacing: "var(--letter-spacing-badge)" }} aria-hidden="true">
+            VS
+          </span>
+          <CompareSlot testId="compare-slot-b" label="Player B" player={playerB} onChoose={() => { setPickSearch(""); setPicking("b"); }} onInfo={playerB ? () => openPlayer({ ...playerB, leagueId, leagueName, sourceLabel: "Player Compare" }) : undefined} />
+        </section>
 
-          <div
-            data-compare-grid-row=""
-            className={`${GRID_COLS} py-3`}
-            style={{ background: "var(--color-surface-secondary)", border: "var(--border-width-default) solid var(--color-border)" }}
-          >
-            <IdentityCard player={playerA} />
-            <span className="text-center font-extrabold" style={{ color: "var(--color-text-muted)", fontSize: "var(--font-size-badge)", letterSpacing: "var(--letter-spacing-badge)" }}>
-              VS
-            </span>
-            <IdentityCard player={playerB} />
-          </div>
+        {!playerB ? (
+          <>
+            <OpponentChips label="Suggested" players={suggested} onPick={(p) => choose({ ...p })} />
+            <OpponentChips label="Recent" players={recent} onPick={(p) => choose({ ...p })} />
+          </>
+        ) : (
+          <>
+            {loadingModels ? (
+              <p className="text-sm" style={{ color: "var(--color-text-muted)" }}>
+                Loading the full breakdown…
+              </p>
+            ) : null}
 
-          {loadingModels ? (
-            <p className="text-sm" style={{ color: "var(--color-text-muted)" }}>
-              Loading model breakdown…
-            </p>
-          ) : null}
-
-          <section className="flex flex-col gap-2">
-            <SectionHeading kicker="Head-to-Head" className="flex flex-col gap-0.5 mt-2">Value & Rank</SectionHeading>
-            <div className="glass-surface flex flex-col px-1">
-              {valueRows.map((row, index) => (
-                <CompareRowView key={row.label} row={row} isLast={index === valueRows.length - 1} />
-              ))}
-            </div>
-          </section>
-
-          {showModelRows ? (
-            <section className="flex flex-col gap-2">
-              <SectionHeading kicker="Head-to-Head" className="flex flex-col gap-0.5 mt-2">Model Breakdown</SectionHeading>
-              <div className="glass-surface flex flex-col px-1">
-                {modelRows.map((row, index) => (
-                  <CompareRowView key={row.label} row={row} isLast={index === modelRows.length - 1} />
+            <section className="flex flex-col gap-2" aria-label="Head-to-head">
+              <div className="glass-surface flex flex-col px-3 py-1" data-testid="compare-grid">
+                <div className={`${GRID_COLS} pt-2 text-center text-xs font-extrabold`} style={{ color: "var(--color-text-secondary)" }}>
+                  <span className="truncate">{playerA.name}</span>
+                  <span aria-hidden="true" />
+                  <span className="truncate">{playerB.name}</span>
+                </div>
+                {headlineRows.map((row, index) => (
+                  <CompareRowView key={row.label} row={row} isLast={index === headlineRows.length - 1 && headlineTextRows.length === 0} />
+                ))}
+                {headlineTextRows.map((row, index) => (
+                  <CompareTextRowView key={row.label} row={row} isLast={index === headlineTextRows.length - 1} />
                 ))}
               </div>
+              <p className="text-xs" style={{ color: "var(--color-text-muted)" }}>
+                Green marks the better side of each row.
+              </p>
             </section>
-          ) : null}
 
-          {showTrendRows ? (
-            <section className="flex flex-col gap-2">
-              <SectionHeading kicker="Head-to-Head" className="flex flex-col gap-0.5 mt-2">Trends</SectionHeading>
-              <div className="glass-surface flex flex-col px-1">
-                {trendRows.map((row, index) => (
-                  <CompareTextRowView key={row.label} row={row} isLast={index === trendRows.length - 1} />
-                ))}
-              </div>
-            </section>
-          ) : null}
+            {hasMore ? (
+              <section className="flex flex-col gap-3">
+                <button
+                  type="button"
+                  className="glass-surface flex w-full items-center justify-between px-3 text-left text-sm font-bold"
+                  style={{ minHeight: "var(--touch-target-min)" }}
+                  aria-expanded={moreOpen}
+                  aria-controls="compare-more"
+                  onClick={() => setMoreOpen((v) => !v)}
+                >
+                  More stats
+                  <span aria-hidden="true" style={{ color: "var(--color-text-muted)" }}>{moreOpen ? "−" : "+"}</span>
+                </button>
+                {moreOpen ? (
+                  <div id="compare-more" className="flex flex-col gap-4">
+                    {showModelRows ? (
+                      <section className="flex flex-col gap-2">
+                        <SectionHeading kicker="Head-to-Head" className="flex flex-col gap-0.5">Model Breakdown</SectionHeading>
+                        <div className="glass-surface flex flex-col px-3">
+                          {modelRows.map((row, index) => (
+                            <CompareRowView key={row.label} row={row} isLast={index === modelRows.length - 1} />
+                          ))}
+                        </div>
+                      </section>
+                    ) : null}
+                    {showRoleRows ? (
+                      <div className="glass-surface flex flex-col px-3">
+                        {roleRows.map((row, index) => (
+                          <CompareTextRowView key={row.label} row={row} isLast={index === roleRows.length - 1} />
+                        ))}
+                      </div>
+                    ) : null}
+                    {narrative ? (
+                      <section className="flex flex-col gap-2">
+                        <SectionHeading kicker="Head-to-Head" className="flex flex-col gap-0.5">Decision Fit</SectionHeading>
+                        <NarrativeBlock playerA={playerA} playerB={playerB} narrative={narrative} />
+                      </section>
+                    ) : null}
+                    {showWeeklyPoints ? (
+                      <section className="flex flex-col gap-2">
+                        <SectionHeading kicker="Head-to-Head" className="flex flex-col gap-0.5">Points By Week</SectionHeading>
+                        <WeeklyPointsChart playerAName={playerA.name || "Player A"} playerBName={playerB.name || "Player B"} weeksA={weeksA} weeksB={weeksB} season={weeklySeason as number} />
+                      </section>
+                    ) : null}
+                  </div>
+                ) : null}
+              </section>
+            ) : null}
 
-          {narrative ? (
-            <section className="flex flex-col gap-2">
-              <SectionHeading kicker="Head-to-Head" className="flex flex-col gap-0.5 mt-2">Decision Fit</SectionHeading>
-              <NarrativeBlock playerA={playerA} playerB={playerB} narrative={narrative} />
-            </section>
-          ) : null}
+            <OpponentChips label="Try another" players={suggested.slice(0, 4)} onPick={(p) => choose({ ...p })} />
+          </>
+        )}
+      </div>
 
-          {showWeeklyPoints ? (
-            <section className="flex flex-col gap-2">
-              <SectionHeading kicker="Head-to-Head" className="flex flex-col gap-0.5 mt-2">Points By Week</SectionHeading>
-              <WeeklyPointsChart
-                playerAName={playerA.name || "Player A"}
-                playerBName={playerB.name || "Player B"}
-                weeksA={weeksA}
-                weeksB={weeksB}
-                season={weeklySeason as number}
-              />
-            </section>
-          ) : null}
-        </div>
-      )}
+      {picking ? (
+        <TradePickerSheet
+          key={picking}
+          mode="single"
+          title={picking === "a" ? "Choose Player A" : "Choose a player to compare"}
+          subtitle={sheetPosition ? `${sheetPosition} shown first. Clear the filter to see everyone.` : undefined}
+          tone="neutral"
+          items={sheetItems}
+          initialSelected={[]}
+          initialFilters={{ positions: sheetPosition ? [sheetPosition.toUpperCase()] : [], conditions: [] }}
+          onApply={(keys) => {
+            const chosen = sheetItems.find((i) => i.key === keys[0]);
+            if (chosen) choose(chosen.ref as RankedPlayer);
+          }}
+          onClose={() => setPicking(null)}
+          onSearch={setPickSearch}
+          onInfo={(item) => openPlayer({ ...(item.ref as RankedPlayer), leagueId, leagueName, sourceLabel: "Player Compare" })}
+        />
+      ) : null}
       <ValuesCredit />
     </main>
   );

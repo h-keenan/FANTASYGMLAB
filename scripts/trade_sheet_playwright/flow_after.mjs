@@ -1,0 +1,14 @@
+import { openPage, tapAt } from "./repro.mjs";
+const OUT = process.argv[2] || "/private/tmp/claude-501/tsp-shots";
+const label = process.argv[3] || "after";
+const { page, ctx } = await openPage(390, 844);
+let taps = 0;
+const T = async (loc, why) => { taps++; await tapAt(page, loc); console.log(`tap ${taps}: ${why}`); };
+await page.screenshot({ path: `${OUT}/${label}-0-start-390.png` });
+await T(page.getByRole("button", { name: /^You receive/ }).first(), "open You receive");
+await page.screenshot({ path: `${OUT}/${label}-1-sheet-390.png` });
+await T(page.getByRole("button", { name: /^Add Jaxon Moore/ }).first(), "toggle row");
+await T(page.getByRole("button", { name: /^Add \d+ to trade|Add 1 to trade/ }).first(), "Add to trade");
+await page.screenshot({ path: `${OUT}/${label}-2-summary-390.png` });
+console.log("total taps (1 player)", taps, "errors", page.errors);
+await ctx.close(); process.exit(0);

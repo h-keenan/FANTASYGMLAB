@@ -8,12 +8,10 @@ import Button from './Button';
 import DraftPickAssetRow from './DraftPickAssetRow';
 import ErrorState from './ErrorState';
 import ExchangeSide from './ExchangeSide';
-import Input from './Input';
 import MultiTeamSharePreviewModal from './MultiTeamSharePreviewModal';
-import PickGroupList from './PickGroupList';
 import PlayerIdentityRow from './PlayerIdentityRow';
 import PremiumLock from './PremiumLock';
-import SegmentedTabBar from './SegmentedTabBar';
+import TradePickerSheet from './TradePickerSheet';
 import SkeletonBlock from './SkeletonBlock';
 import { SheetModal, SwipeDismissCard } from './SwipeDismissSheet';
 import TeamAvatar from './TeamAvatar';
@@ -54,6 +52,9 @@ import {
   type SemanticTone,
 } from '../lib/multiTeamTrade';
 import { prefillToBuilder } from '../lib/multiTeamIdeas';
+import { usePlayerQuickView } from '../context/PlayerQuickViewContext';
+import { pickToSheetItem, playerToSheetItem } from '../lib/tradeSheetItems';
+import { selectedItems, type SheetItem } from '../lib/tradeSheetPicker';
 import { useThemeMode } from '../context/ThemeModeContext';
 import { radii, scrim, spacing, type ThemeColors } from '../theme';
 
@@ -65,8 +66,6 @@ import { radii, scrim, spacing, type ThemeColors } from '../theme';
  * MultiTeamTradeShareCard). Reads POST .../trade-analyzer/multi; presentation
  * logic is lib/multiTeamTrade.ts, byte-identical to the web file.
  */
-
-const MAX_RESULTS = 40;
 
 export interface MultiPanelTeam {
   rosterId: string;
@@ -143,7 +142,7 @@ export default function MultiTeamTradePanel({
   const [pending, setPending] = useState<BuilderAsset | null>(null);
   const [addingTeam, setAddingTeam] = useState(false);
   const [search, setSearch] = useState('');
-  const [assetType, setAssetType] = useState<'players' | 'picks'>('players');
+  const { openPlayer: openQuickView } = usePlayerQuickView();
   const [analyzing, setAnalyzing] = useState(false);
   const [response, setResponse] = useState<MultiTeamTradeResponse | null>(null);
   const [failure, setFailure] = useState<string[] | null>(null);
@@ -159,25 +158,25 @@ export default function MultiTeamTradePanel({
   const pool = useMemo(() => mergeSearchMatches(rankings, searchMatches), [rankings, searchMatches]);
   const playerById = useMemo(() => new Map(pool.map((p) => [p.player_id, p])), [pool]);
   const pickById = useMemo(() => new Map(picks.map((p) => [p.pick_id, p])), [picks]);
-  const taken = useMemo(() => new Set(assets.map((a) => `${a.type}:${a.id}`)), [assets]);
 
-  const playerResults = useMemo(() => {
+  // Items for the open sheet: the picking team's players and picks, plus anything it already sends that sits
+  // outside the loaded pool, so applying never drops an asset.
+  const sheetItems = useMemo<SheetItem<RankedPlayer | DraftPickAsset>[]>(() => {
     if (!picker) return [];
     const owned = teamById.get(picker.from)?.playerIds ?? new Set<string>();
-    const query = search.trim().toLowerCase();
-    return pool
-      .filter((p) => owned.has(p.player_id) && !taken.has(`player:${p.player_id}`))
-      .filter((p) => !query || (p.name ?? '').toLowerCase().includes(query))
-      .slice(0, MAX_RESULTS);
-  }, [picker, pool, teamById, taken, search]);
-  const pickResults = useMemo(() => {
-    if (!picker) return [];
-    const query = search.trim().toLowerCase();
-    return picks
-      .filter((p) => p.owner_roster_id === picker.from && !taken.has(`pick:${p.pick_id}`))
-      .filter((p) => !query || (p.label ?? '').toLowerCase().includes(query))
-      .slice(0, MAX_RESULTS);
-  }, [picker, picks, taken, search]);
+    const sent = assets.filter((a) => a.fromRosterId === picker.from);
+    const players = new Map(pool.filter((p) => owned.has(p.player_id)).map((p) => [p.player_id, p]));
+    for (const a of sent) {
+      const player = a.type === 'player' ? playerById.get(a.id) : undefined;
+      if (player) players.set(player.player_id, player);
+    }
+    const pickMap = new Map(picks.filter((p) => p.owner_roster_id === picker.from).map((p) => [p.pick_id, p]));
+    for (const a of sent) {
+      const pick = a.type === 'pick' ? pickById.get(a.id) : undefined;
+      if (pick) pickMap.set(pick.pick_id, pick);
+    }
+    return [...[...players.values()].map(playerToSheetItem), ...[...pickMap.values()].map(pickToSheetItem)];
+  }, [picker, pool, teamById, picks, assets, playerById, pickById]);
 
   const issue = builderIssue(participants, assets);
   const matrix = useMemo(() => buildMatrix(ordered, assets), [ordered, assets]);
@@ -188,22 +187,33 @@ export default function MultiTeamTradePanel({
     setRequestError(null);
   };
 
-  const chooseAsset = (type: 'player' | 'pick', id: string) => {
+  /** The sheet's Apply: this team's sent assets become exactly the selection; kept ones keep their receiver. */
+  const applySheet = (keys: string[]) => {
     if (!picker) return;
-    const asset: BuilderAsset = { type, id, fromRosterId: picker.from, toRosterId: picker.to };
-    if (picker.to) {
-      setAssets((prev) => upsertAsset(prev, asset));
-      invalidate();
-    } else {
-      setPending(asset);
-    }
+    const from = picker.from;
+    const chosen = selectedItems(sheetItems, keys);
+    const next: BuilderAsset[] = chosen.map((item) => {
+      const type = item.kind;
+      const existing = assets.find((a) => a.fromRosterId === from && a.type === type && a.id === item.id);
+      return existing ?? { type, id: item.id, fromRosterId: from, toRosterId: picker.to };
+    });
+    setAssets((prev) => [...prev.filter((a) => a.fromRosterId !== from), ...next]);
+    invalidate();
+    setPicker(null);
+    // Anything new without a receiver goes through the "Send to" sheet, one asset at a time. iOS cannot present
+    // a modal while another is still dismissing, so wait for the picker to finish closing.
+    const unrouted = next.find((a) => !a.toRosterId);
+    if (unrouted) setTimeout(() => setPending(unrouted), 400);
   };
 
   const chooseDestination = (toRosterId: string) => {
     if (!pending) return;
-    setAssets((prev) => upsertAsset(prev, { ...pending, toRosterId }));
-    setPending(null);
+    const routed = { ...pending, toRosterId };
+    setAssets((prev) => upsertAsset(prev, routed));
     invalidate();
+    const nextUnrouted = assets.find((a) => a.fromRosterId === pending.fromRosterId && !a.toRosterId && !(a.type === pending.type && a.id === pending.id));
+    setPending(null);
+    if (nextUnrouted) setTimeout(() => setPending(nextUnrouted), 400);
   };
 
   const dropTeam = (rosterId: string) => {
@@ -330,11 +340,11 @@ export default function MultiTeamTradePanel({
                 {isMe ? '  YOU' : ''}
               </AppText>
               <Button
-                label={open ? 'Done' : 'Add asset'}
+                label={sends.length ? 'Edit assets' : 'Add assets'}
                 variant="secondary"
                 size="sm"
                 onPress={() => {
-                  setPicker(open ? null : { from: rosterId, to: '' });
+                  setPicker({ from: rosterId, to: '' });
                   setSearch('');
                 }}
               />
@@ -385,64 +395,6 @@ export default function MultiTeamTradePanel({
             ) : (
               <AppText style={styles.muted}>Sends nothing yet</AppText>
             )}
-            {open ? (
-              <View style={styles.pickerBox} testID="asset-picker">
-                <SegmentedTabBar<'players' | 'picks'>
-                  options={[
-                    { key: 'players', label: 'Players' },
-                    { key: 'picks', label: 'Picks' },
-                  ]}
-                  active={assetType}
-                  onChange={setAssetType}
-                />
-                <Input
-                  placeholder={`Search ${nameOf(rosterId)}'s ${assetType === 'picks' ? 'picks' : 'roster'}`}
-                  value={search}
-                  onChangeText={setSearch}
-                  autoCapitalize="none"
-                  accessibilityLabel={`Search ${nameOf(rosterId)}`}
-                />
-                {assetType === 'picks' ? (
-                  pickResults.length ? (
-                    <PickGroupList
-                      picks={pickResults}
-                      renderPick={(pick, isLast) => (
-                        <DraftPickAssetRow
-                          pickId={pick.pick_id}
-                          round={pick.round}
-                          label={pick.label}
-                          projectedRange={pick.projected_pick_range}
-                          pickTier={pick.pick_tier}
-                          trailingValue={pick.score != null ? String(Math.round(pick.score)) : '—'}
-                          showDivider={!isLast}
-                          onPress={() => chooseAsset('pick', pick.pick_id)}
-                        />
-                      )}
-                    />
-                  ) : (
-                    <AppText style={styles.muted}>{search ? 'No matching picks.' : 'No picks available.'}</AppText>
-                  )
-                ) : playerResults.length ? (
-                  playerResults.map((player, index) => (
-                    <PlayerIdentityRow
-                      key={player.player_id}
-                      playerId={player.player_id}
-                      name={player.name}
-                      position={player.position}
-                      team={player.team}
-                      tier={player.tier}
-                      overallRating={player.overall_rating}
-                      positionRank={player.position_rank}
-                      trailingValue={typeof player.score === 'number' ? String(Math.round(player.score)) : '—'}
-                      onPress={() => chooseAsset('player', player.player_id)}
-                      showDivider={index < playerResults.length - 1}
-                    />
-                  ))
-                ) : (
-                  <AppText style={styles.muted}>{search ? 'No matching players.' : 'No players to show.'}</AppText>
-                )}
-              </View>
-            ) : null}
           </View>
         );
       })}
@@ -527,6 +479,22 @@ export default function MultiTeamTradePanel({
         </View>
       ) : null}
       {renderResults()}
+
+      {picker ? (
+        <TradePickerSheet
+          key={`${picker.from}>${picker.to}`}
+          title={`${nameOf(picker.from)} sends`}
+          subtitle={picker.to ? `To ${nameOf(picker.to)}` : 'Choose who gets each asset next'}
+          tone="danger"
+          items={sheetItems}
+          initialSelected={assets.filter((a) => a.fromRosterId === picker.from).map((a) => `${a.type}:${a.id}`)}
+          onApply={applySheet}
+          onClose={() => setPicker(null)}
+          onSearch={setSearch}
+          hideOnInfo
+          onInfo={(item, restore) => openQuickView(item.ref as RankedPlayer, { leagueId, leagueName, sourceLabel: 'Trade Analyzer', onClosed: restore })}
+        />
+      ) : null}
 
       <SheetModal visible={Boolean(pending)} transparent animationType="fade" onRequestClose={() => setPending(null)}>
         <Pressable style={styles.backdrop} onPress={() => setPending(null)}>

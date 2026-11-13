@@ -1,4 +1,4 @@
-import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { TradeAnalyzerContent } from "./TradeAnalyzerContent";
@@ -144,6 +144,14 @@ function renderPage() {
   );
 }
 
+/** The sheet-picker flow: tap a side, tap the rows, then the sticky "Add N to trade" button. */
+function addVia(side: "You send" | "You receive", ...names: string[]) {
+  fireEvent.click(screen.getByRole("button", { name: new RegExp(`^${side}`) }));
+  const dialog = screen.getByRole("dialog");
+  for (const name of names) fireEvent.click(within(dialog).getByRole("button", { name: `Add ${name}` }));
+  fireEvent.click(within(dialog).getByRole("button", { name: /^(Add \d+ to trade|Update trade|Done)/ }));
+}
+
 describe("TradeAnalyzerContent", () => {
   it("shows the not-ready message instead of the builder when the roster can't be resolved", () => {
     render(
@@ -168,14 +176,42 @@ describe("TradeAnalyzerContent", () => {
     expect(screen.getByRole("tab", { name: "Analyzer", selected: true })).toBeInTheDocument();
   });
 
-  it("adds a player from the search results into the active side's panel", () => {
+  it("opens the sheet from a side, scoped to that side's pool, and adds the selection with one Apply", () => {
     renderPage();
 
-    // Default active side is "send"; the search pool is scoped to my own
-    // roster, so only "My RB" (on roster "1") is a candidate.
-    fireEvent.click(screen.getByText("My RB"));
+    fireEvent.click(screen.getByRole("button", { name: /^You send/ }));
+    const dialog = screen.getByRole("dialog");
+    // The send pool is my own roster only, so only "My RB" (on roster "1") is a candidate.
+    expect(within(dialog).getByRole("button", { name: "Add My RB" })).toBeInTheDocument();
+    expect(within(dialog).queryByRole("button", { name: "Add Their WR" })).not.toBeInTheDocument();
+    fireEvent.click(within(dialog).getByRole("button", { name: "Add My RB" }));
+    fireEvent.click(within(dialog).getByRole("button", { name: "Add 1 to trade" }));
 
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Remove My RB" })).toBeInTheDocument();
+  });
+
+  it("closing the sheet without Add discards the selection", () => {
+    renderPage();
+    fireEvent.click(screen.getByRole("button", { name: /^You send/ }));
+    fireEvent.click(screen.getByRole("button", { name: "Add My RB" }));
+    fireEvent.keyDown(screen.getByRole("dialog"), { key: "Escape" });
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Remove My RB" })).not.toBeInTheDocument();
+  });
+
+  it("opens the sheet from one tap anywhere on the empty side card (the old 'Tap to add' text did nothing)", () => {
+    renderPage();
+    fireEvent.click(screen.getByText("Add from your roster"));
+    expect(screen.getByRole("dialog")).toBeInTheDocument();
+  });
+
+  it("the receive sheet follows the Trading with partner", () => {
+    renderPage();
+    fireEvent.change(screen.getByLabelText("Trading with"), { target: { value: "2" } });
+    fireEvent.click(screen.getByRole("button", { name: /^You receive/ }));
+    expect(screen.getByRole("dialog")).toHaveTextContent("From Rival Team");
+    expect(screen.getByRole("button", { name: "Add Their WR" })).toBeInTheDocument();
   });
 
   it("shows the limit wall (not the generic error) when the Free weekly limit is hit", async () => {
@@ -186,9 +222,8 @@ describe("TradeAnalyzerContent", () => {
       limit: { limit: 3, window: "week", resets_at: "2026-11-02T00:00:00+00:00" },
     });
     renderPage();
-    fireEvent.click(screen.getByText("My RB"));
-    fireEvent.click(screen.getByRole("button", { name: /You receive/ }));
-    fireEvent.click(screen.getByText("Their WR"));
+    addVia("You send", "My RB");
+    addVia("You receive", "Their WR");
     await act(async () => {
       fireEvent.click(screen.getByRole("button", { name: /^Analyze Trade/ }));
     });
@@ -205,9 +240,8 @@ describe("TradeAnalyzerContent", () => {
       assumptions: { line: "Assumed: 1QB, PPR, Dynasty values, Retool posture.", items: [] },
     });
     renderPage();
-    fireEvent.click(screen.getByText("My RB"));
-    fireEvent.click(screen.getByRole("button", { name: /You receive/ }));
-    fireEvent.click(screen.getByText("Their WR"));
+    addVia("You send", "My RB");
+    addVia("You receive", "Their WR");
     await act(async () => {
       fireEvent.click(screen.getByRole("button", { name: /^Analyze Trade/ }));
     });
@@ -219,9 +253,8 @@ describe("TradeAnalyzerContent", () => {
     vi.mocked(api.postTradeAnalyzer).mockResolvedValue({ ok: true, verdict: VERDICT, reason: "" });
     renderPage();
 
-    fireEvent.click(screen.getByText("My RB"));
-    fireEvent.click(screen.getByRole("button", { name: /You receive/ }));
-    fireEvent.click(screen.getByText("Their WR"));
+    addVia("You send", "My RB");
+    addVia("You receive", "Their WR");
 
     await act(async () => {
       fireEvent.click(screen.getByRole("button", { name: /^Analyze Trade/ }));
@@ -279,9 +312,8 @@ describe("TradeAnalyzerContent", () => {
       reason: "",
     });
     renderPage();
-    fireEvent.click(screen.getByText("My RB"));
-    fireEvent.click(screen.getByRole("button", { name: /You receive/ }));
-    fireEvent.click(screen.getByText("Their WR"));
+    addVia("You send", "My RB");
+    addVia("You receive", "Their WR");
     await act(async () => {
       fireEvent.click(screen.getByRole("button", { name: /^Analyze Trade/ }));
     });
@@ -327,9 +359,8 @@ describe("TradeAnalyzerContent", () => {
       reason: "",
     });
     renderPage();
-    fireEvent.click(screen.getByText("My RB"));
-    fireEvent.click(screen.getByRole("button", { name: /You receive/ }));
-    fireEvent.click(screen.getByText("Their WR"));
+    addVia("You send", "My RB");
+    addVia("You receive", "Their WR");
     await act(async () => {
       fireEvent.click(screen.getByRole("button", { name: /^Analyze Trade/ }));
     });
@@ -387,9 +418,8 @@ describe("TradeAnalyzerContent", () => {
       reason: "",
     });
     renderPage();
-    fireEvent.click(screen.getByText("My RB"));
-    fireEvent.click(screen.getByRole("button", { name: /You receive/ }));
-    fireEvent.click(screen.getByText("Their WR"));
+    addVia("You send", "My RB");
+    addVia("You receive", "Their WR");
     await act(async () => {
       fireEvent.click(screen.getByRole("button", { name: /^Analyze Trade/ }));
     });
@@ -410,9 +440,8 @@ describe("TradeAnalyzerContent", () => {
       reason: "",
     } as never);
     renderPage();
-    fireEvent.click(screen.getByText("My RB"));
-    fireEvent.click(screen.getByRole("button", { name: /You receive/ }));
-    fireEvent.click(screen.getByText("Their WR"));
+    addVia("You send", "My RB");
+    addVia("You receive", "Their WR");
     await act(async () => {
       fireEvent.click(screen.getByRole("button", { name: /^Analyze Trade/ }));
     });
@@ -513,14 +542,9 @@ describe("TradeAnalyzerContent", () => {
       );
 
       expect(screen.getByRole("button", { name: "Remove Their WR" })).toBeInTheDocument();
-      // Then the builder flips to the still-empty "You send" side and
-      // focuses the search, so the next tap picks the counter-asset.
-      expect(screen.getByText("You send")).toHaveStyle({ color: "var(--color-accent)" });
-      expect(screen.getByPlaceholderText("Search your roster")).toHaveFocus();
-      // The owning team stays selected for when the user returns to
-      // "You receive" ("Rival Team · Rival Owner" is its pill label).
-      fireEvent.click(screen.getByText("You receive"));
-      expect(screen.getByPlaceholderText(/Search Rival Team/)).toBeInTheDocument();
+      // The owning team is preselected as the trading partner, and the empty send side is one tap away.
+      expect(screen.getByLabelText("Trading with")).toHaveValue("2");
+      expect(screen.getByText("Add from your roster")).toBeInTheDocument();
     });
 
     it("pre-populates You Send (not Receive) for a player already on the user's own roster", () => {
@@ -539,9 +563,8 @@ describe("TradeAnalyzerContent", () => {
 
       expect(screen.getByRole("button", { name: "Remove My RB" })).toBeInTheDocument();
       expect(screen.queryByRole("button", { name: "Remove Their WR" })).not.toBeInTheDocument();
-      // Flipped to the empty "You receive" side, searching every other team.
-      expect(screen.getByText("You receive")).toHaveStyle({ color: "var(--color-accent)" });
-      expect(screen.getByPlaceholderText("Search players to receive")).toHaveFocus();
+      // The empty receive side is one tap away, drawing from every other team.
+      expect(screen.getByText("Add from any team")).toBeInTheDocument();
     });
 
     it("fails open to the plain builder when the player id is missing/stale or on no roster in this league", () => {
@@ -604,8 +627,7 @@ describe("TradeAnalyzerContent", () => {
       expect(screen.getByRole("button", { name: "Remove My RB" })).toBeInTheDocument();
       expect(screen.getByRole("button", { name: "Remove Their WR" })).toBeInTheDocument();
       expect(screen.getByTestId("bridge-notice")).toHaveTextContent("Your public trade is loaded (2 players)");
-      fireEvent.click(screen.getByText("You receive"));
-      expect(screen.getByPlaceholderText(/Search Rival Team/)).toBeInTheDocument();
+      expect(screen.getByLabelText("Trading with")).toHaveValue("2");
     });
 
     it("flags players that are not on this league's rosters instead of forcing them in", () => {
@@ -615,7 +637,7 @@ describe("TradeAnalyzerContent", () => {
       expect(notice).toHaveTextContent("Their WR (not on your roster)");
       expect(notice).toHaveTextContent("not in this league's player pool");
       // Send side is the one still to fill.
-      expect(screen.getByText("You send")).toHaveStyle({ color: "var(--color-accent)" });
+      expect(screen.getByText("Add from your roster")).toBeInTheDocument();
     });
 
     it("shows no bridge notice for a plain visit", () => {
@@ -655,8 +677,10 @@ describe("TradeAnalyzerContent", () => {
       );
 
       // Default active side is "send" — switch asset type to Picks and add it.
-      fireEvent.click(screen.getByRole("tab", { name: "Picks" }));
-      fireEvent.click(screen.getByText("2027 Round 1"));
+      fireEvent.click(screen.getByRole("button", { name: /^You send/ }));
+      fireEvent.click(screen.getByRole("tab", { name: /Picks/ }));
+      fireEvent.click(screen.getByRole("button", { name: "Add 2027 Round 1" }));
+      fireEvent.click(screen.getByRole("button", { name: /^Add 1 to trade/ }));
       expect(screen.getByRole("button", { name: "Remove 2027 Round 1" })).toBeInTheDocument();
 
       await act(async () => {
@@ -688,10 +712,9 @@ describe("TradeAnalyzerContent", () => {
     async function analyze() {
       vi.mocked(api.postTradeAnalyzer).mockResolvedValue({ ok: true, verdict: VERDICT, reason: "" });
       renderPage();
-      fireEvent.click(screen.getByText("My RB"));
-      fireEvent.click(screen.getByRole("button", { name: /You receive/ }));
-      fireEvent.click(screen.getByText(/Rival Team/));
-      fireEvent.click(screen.getByText("Their WR"));
+      addVia("You send", "My RB");
+      fireEvent.change(screen.getByLabelText("Trading with"), { target: { value: "2" } });
+      addVia("You receive", "Their WR");
       await act(async () => {
         fireEvent.click(screen.getByRole("button", { name: /^Analyze Trade/ }));
       });

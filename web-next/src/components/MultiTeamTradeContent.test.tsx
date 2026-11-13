@@ -70,8 +70,11 @@ function addTeam(name: string) {
 
 function addAsset(teamName: string, assetName: string, destination: string) {
   const panel = screen.getAllByTestId("team-panel").find((p) => within(p).queryByText(teamName));
-  fireEvent.click(within(panel!).getByRole("button", { name: "Add asset" }));
-  fireEvent.click(screen.getByText(assetName));
+  fireEvent.click(within(panel!).getByRole("button", { name: /^(Add|Edit) assets$/ }));
+  const sheet = screen.getByRole("dialog");
+  fireEvent.click(within(sheet).getByRole("button", { name: `Add ${assetName}` }));
+  fireEvent.click(within(sheet).getByRole("button", { name: /^(Add \d+ to trade|Update trade)/ }));
+  // The new asset has no receiver yet, so the "Send to" sheet opens next.
   fireEvent.click(within(screen.getByRole("dialog")).getByRole("button", { name: destination }));
 }
 
