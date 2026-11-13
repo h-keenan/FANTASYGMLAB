@@ -40,13 +40,12 @@ describe("onboarding funnel analytics", () => {
     expect(calls().filter((c) => c.action === "back")).toHaveLength(1);
   });
 
-  it("tracks skipped with the current step, and Decide later moves on instead of leaving", () => {
+  it("tracks skipped with the current step, and Decide later leaves the intro in one tap", () => {
     const onDone = vi.fn();
     render(<OnboardingCarousel onDone={onDone} />);
     fireEvent.click(screen.getByRole("button", { name: "Decide later" }));
     expect(calls().find((c) => c.action === "skipped")).toMatchObject({ feature: "onboarding", step: "level", step_index: 0 });
-    expect(onDone).not.toHaveBeenCalled();
-    expect(screen.getByRole("button", { name: "Connect my league" })).toBeInTheDocument();
+    expect(onDone).toHaveBeenCalledTimes(1);
   });
 
   it("tracks experience_selected (new|expert) and completed with only allowlisted fixed props", async () => {

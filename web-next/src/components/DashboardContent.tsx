@@ -6,6 +6,7 @@ import type { DashboardResponse, LeagueTeamRankingsResponse } from "@/lib/api";
 import { BeginnerHelp } from "@/components/BeginnerHelp";
 import { SinceLastVisitStrip } from "@/components/SinceLastVisitStrip";
 import { DirectionCheckinCard } from "@/components/DirectionCheckinCard";
+import { FirstValueOfferCard } from "@/components/FirstValueOfferCard";
 import { StartHereCard } from "@/components/StartHereCard";
 import { GuillotineCard, LeagueTypeControl, useGuillotineState } from "@/components/GuillotineCard";
 import { GlossaryNote } from "@/components/GlossaryNote";
@@ -163,6 +164,10 @@ export function DashboardContent({
       <DashboardNeedsAttention entries={attention} leagueId={leagueId} leagueName={leagueName} />
 
       <TodayModule data={nextMovesData} leagueId={leagueId} leagueName={leagueName} hideEmpty={attention.length > 0} />
+
+      {/* First-run trial offer, after the person has seen their own Today
+          briefing (paywall-after-connect). Dismissible; nothing is gated. */}
+      {userId && !sample ? <FirstValueOfferCard userId={userId} isPremium={data.entitlement?.is_premium === true} /> : null}
 
       <DashboardTradesBlock
         data={data}

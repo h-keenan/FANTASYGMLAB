@@ -7,7 +7,6 @@ import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { useAuth } from "@/context/AuthContext";
 import { OnboardingCarousel } from "@/components/OnboardingCarousel";
 import { OnboardingShell } from "@/components/OnboardingShell";
-import { OnboardingPaywall } from "@/components/OnboardingPaywall";
 import { SampleLeagueButton } from "@/components/SampleLeagueBanner";
 import { SleeperImportForm } from "@/components/SleeperImportForm";
 import { SignInForm } from "@/components/SignInForm";
@@ -17,7 +16,9 @@ import { leagueHomePath } from "@/lib/leaguePlatform";
 import { analyzerBridgePath, bridgePickerPath, consumePendingBridge, pathAfterLeagueChosen } from "@/lib/tradeBridge";
 import { consumeProtectedReturnPath } from "@/lib/protectedRouteReturn";
 import { supabase } from "@/lib/supabase";
-import { hasCompletedOnboardingStep, markOnboardingStepCompleted } from "@/lib/onboardingProgress";
+import { hasCompletedOnboardingStep, markOnboardingStepCompleted, trialOfferState } from "@/lib/onboardingProgress";
+import { armTrialOffer, firstRunStage, funnelStepIndex } from "@/lib/firstRunFlow";
+import { trackOnboarding, trackOnboardingStepViewed } from "@/lib/onboardingAnalytics";
 import { maskSavedLeagueRows } from "@/lib/privacy";
 
 /**
@@ -64,20 +65,9 @@ export function LandingAuthIsland() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [accountReady, setAccountReady] = useState(false);
-  // Shown once per landing on this page — reset is irrelevant since this
-  // flow (accountReady with no saved leagues yet) only ever happens for an
-  // account that hasn't finished onboarding; once they have a saved league
-  // the returning-session effect above redirects them away before any of
-  // this renders again. Starts already-dismissed when returning from a
-  // completed checkout (?billing=success) — OnboardingPaywall's own
-  // checkout redirects back here, and showing the exact same trial offer
-  // again to someone who just subscribed would be absurd.
+  // Returning from a completed checkout (?billing=success): they already have
+  // Pro, so the intro is skipped and no trial offer is armed.
   const returnedFromCheckout = isBillingReturn(searchParams.get("billing"));
-  const [paywallDismissedState, setPaywallDismissed] = useState(() => returnedFromCheckout);
-  // Same reasoning as paywallDismissed just above (and the same session-
-  // only, not-persisted tradeoff that one already accepts) — the carousel
-  // sits before the paywall in this flow, so returning from a completed
-  // checkout means it was necessarily already seen or skipped this session.
   const [carouselDoneState, setCarouselDone] = useState(() => returnedFromCheckout);
   const [checkingSavedLeagues, setCheckingSavedLeagues] = useState(false);
   // UX audit 2026-10-27: a signed-in account with no saved league yet used to
@@ -85,7 +75,6 @@ export function LandingAuthIsland() {
   // completed/skipped on this browser for this account stay done.
   const userId = session?.user?.id ?? null;
   const carouselSeen = carouselDoneState || hasCompletedOnboardingStep(userId, "carousel");
-  const paywallSeen = paywallDismissedState || hasCompletedOnboardingStep(userId, "paywall");
   // Checkout completion is no longer recorded server-side as a client-visible
   // event (billing webhooks moved to Supabase edge functions), so the return
   // itself is counted: feature_use billing/checkout_return. Once per page load.
@@ -234,48 +223,41 @@ export function LandingAuthIsland() {
     }
   }, [loading, session, checkingSavedLeagues]);
 
-  // Where to go once the trial offer (shown AFTER the league connects, so the
-  // user has seen their own team before being asked to pay) is dismissed.
-  const [pendingDestination, setPendingDestination] = useState<string | null>(null);
-
   const handleLeagueChosen = (leagueId: string, leagueName: string) => {
     // Dashboard for Sleeper, My Team for ESPN (no ESPN Dashboard yet).
     // A trade carried over from the public Trade Analyzer opens in this
     // league's analyzer; otherwise the usual league home.
     const destination = pathAfterLeagueChosen(leagueId, leagueName);
-    if (!paywallSeen) {
-      setPendingDestination(destination);
-      return;
+    // Paywall AFTER connect AND after the first league view (owner decision
+    // 2026-11): no wall here. Arm the dismissible trial-offer card that the
+    // league's Today view shows (components/FirstValueOfferCard.tsx), once.
+    // Returning from a completed checkout means they already have Pro.
+    if (!returnedFromCheckout && armTrialOffer(trialOfferState(userId)) === "armed") {
+      markOnboardingStepCompleted(userId, "offer_armed");
     }
+    trackOnboarding("completed", { step: "connect", step_index: funnelStepIndex("connect") });
     router.push(destination);
   };
+
+  // Funnel: the connect step was shown (connect rate = connect step_viewed ->
+  // league_import_completed -> first_league_view).
+  const stage = firstRunStage({ signedIn: accountReady, introSeen: carouselSeen, leagueCount: 0 });
+  useEffect(() => {
+    if (stage === "connect") trackOnboardingStepViewed("connect", funnelStepIndex("connect"));
+  }, [stage]);
 
   if (loading || checkingSavedLeagues) {
     return <LandingAuthSlotPlaceholder />;
   }
 
-  return accountReady ? (
-    !carouselSeen ? (
+  return stage !== "sign_in" ? (
+    stage === "intro" ? (
       <OnboardingCarousel
         onDone={() => {
           markOnboardingStepCompleted(userId, "carousel");
           setCarouselDone(true);
         }}
       />
-    ) : pendingDestination && !paywallSeen ? (
-      // Trial offer moved here from before the connect step (coridian_
-      // approved 2026-11-10): activation first, purchase decision second.
-      <OnboardingShell>
-        <div className="onboarding-connect">
-          <OnboardingPaywall
-            onSkip={() => {
-              markOnboardingStepCompleted(userId, "paywall");
-              setPaywallDismissed(true);
-              router.push(pendingDestination);
-            }}
-          />
-        </div>
-      </OnboardingShell>
     ) : (
       <OnboardingShell footer={<SampleLeagueButton surface="connect_step" />}>
         <div className="onboarding-connect" data-testid="connect-first-heading">

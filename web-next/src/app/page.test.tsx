@@ -17,6 +17,7 @@ vi.mock("@/context/AuthContext", () => ({
 // real `fetch` during these component tests.
 vi.mock("@/lib/analytics", () => ({
   trackFeatureUse: vi.fn(),
+  trackUse: vi.fn(),
 }));
 
 vi.mock("@/lib/supabase", () => ({
@@ -47,9 +48,6 @@ vi.mock("@/components/SignInForm", () => ({
 }));
 vi.mock("@/components/OnboardingCarousel", () => ({
   OnboardingCarousel: () => <div>OnboardingCarousel</div>,
-}));
-vi.mock("@/components/OnboardingPaywall", () => ({
-  OnboardingPaywall: () => <div>OnboardingPaywall</div>,
 }));
 vi.mock("@/components/SleeperImportForm", () => ({
   SleeperImportForm: ({ onLeagueChosen }: { onLeagueChosen: (id: string, name: string) => void }) => (
@@ -391,24 +389,35 @@ describe("LandingPage onboarding progress persistence", () => {
     window.localStorage.clear();
   });
 
-  it("does not replay the carousel for a signed-in account that already finished it, and connects BEFORE the trial offer", async () => {
+  it("does not replay the carousel for a signed-in account that already finished it, and goes straight to connect", async () => {
     window.localStorage.setItem("fgl:onboarding:carousel:user-1", "1");
     mockAuth({ user: { id: "user-1" } });
     mockSavedLeagues({ data: [] });
     render(<LandingPage />);
     expect(await screen.findByText(/SleeperImportForm/)).toBeInTheDocument();
     expect(screen.queryByText("OnboardingCarousel")).toBeNull();
-    expect(screen.queryByText("OnboardingPaywall")).toBeNull();
   });
 
-  it("shows the trial offer after a league is chosen, then continues to that league on skip", async () => {
+  it("sends a chosen league straight to its view (no paywall wall) and arms the dismissible offer once", async () => {
     window.localStorage.setItem("fgl:onboarding:carousel:user-1", "1");
     mockAuth({ user: { id: "user-1" } });
     mockSavedLeagues({ data: [] });
     render(<LandingPage />);
     fireEvent.click(await screen.findByText("choose-league"));
-    expect(await screen.findByText("OnboardingPaywall")).toBeInTheDocument();
-    expect(mockPush).not.toHaveBeenCalled();
+    expect(mockPush).toHaveBeenCalledTimes(1);
+    expect(window.localStorage.getItem("fgl:onboarding:offer_armed:user-1")).toBe("1");
+    expect(window.localStorage.getItem("fgl:onboarding:paywall:user-1")).toBeNull();
+  });
+
+  it("does not re-arm an offer the person already dismissed", async () => {
+    window.localStorage.setItem("fgl:onboarding:carousel:user-1", "1");
+    window.localStorage.setItem("fgl:onboarding:paywall:user-1", "1");
+    mockAuth({ user: { id: "user-1" } });
+    mockSavedLeagues({ data: [] });
+    render(<LandingPage />);
+    fireEvent.click(await screen.findByText("choose-league"));
+    expect(mockPush).toHaveBeenCalledTimes(1);
+    expect(window.localStorage.getItem("fgl:onboarding:offer_armed:user-1")).toBeNull();
   });
 
   it("goes straight to league connect once carousel and trial offer were both done", async () => {

@@ -1,3 +1,4 @@
+import FirstValueOfferCard from '../components/FirstValueOfferCard';
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
 import AppText from '../components/AppText';
@@ -521,6 +522,10 @@ export default function DashboardScreen({ route, navigation }: Props) {
           isPremium={entitlement.is_premium}
         />
       ) : null}
+
+      {/* First-run trial offer, after the person has seen their own Today
+          briefing (paywall after connect). Dismissible; nothing is gated. */}
+      <FirstValueOfferCard isPremium={entitlement?.is_premium === true} />
 
       {dashboardData ? (
         <DashboardTradesBlock
