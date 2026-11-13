@@ -7,6 +7,7 @@ import type { SimCtx } from './SimGameParts';
 import { useSimActionBarBottom } from './SimActionBar';
 import { useThemeMode } from '../context/ThemeModeContext';
 import { api } from '../lib/api';
+import { simTabAfterStageAction, type SimStageAction } from '../lib/simScroll';
 import { simOffseasonCta, simOffseasonStageLabel, type SimOffseason, type SimOffseasonResponse } from '../lib/simGame';
 import { radii, spacing, type ThemeColors } from '../theme';
 
@@ -18,7 +19,7 @@ import { radii, spacing, type ThemeColors } from '../theme';
  * offseason itself so any tab can mount it, and floats above the GM orb like
  * SimActionBar (same height constant, the screen adds matching padding).
  */
-export default function SimOffseasonBar({ ctx }: { ctx: SimCtx }) {
+export default function SimOffseasonBar({ ctx, onTab }: { ctx: SimCtx; onTab?: (tab: 'home') => void }) {
   const { colors } = useThemeMode();
   const styles = useMemo(() => createStyles(colors), [colors]);
   const bottom = useSimActionBarBottom();
@@ -41,7 +42,7 @@ export default function SimOffseasonBar({ ctx }: { ctx: SimCtx }) {
   }, [gameId, ctx.tick]);
 
   const run = useCallback(
-    async (fn: () => Promise<SimOffseasonResponse>, message?: (body: SimOffseasonResponse) => string) => {
+    async (fn: () => Promise<SimOffseasonResponse>, message?: (body: SimOffseasonResponse) => string, action?: SimStageAction) => {
       setBusy(true);
       const body = await call(fn);
       setBusy(false);
@@ -49,11 +50,12 @@ export default function SimOffseasonBar({ ctx }: { ctx: SimCtx }) {
         if (body.offseason) setOff(body.offseason);
         if (body.game) ctx.setGame(body.game);
         ctx.bump();
+        if (action) onTab?.(simTabAfterStageAction(action));
         const text = message?.(body);
         if (text) ctx.notify(text, 'success');
       }
     },
-    [call, ctx],
+    [call, ctx, onTab],
   );
 
   if (!off) return null;
@@ -62,11 +64,11 @@ export default function SimOffseasonBar({ ctx }: { ctx: SimCtx }) {
   function press() {
     if (!off) return;
     if (off.stage === 'review') {
-      void run(() => api.startSimRookieDraft(gameId), (b) => ((b.made?.length ?? 0) > 0 ? `${b.made?.length} AI picks made. You are up.` : ''));
+      void run(() => api.startSimRookieDraft(gameId), (b) => ((b.made?.length ?? 0) > 0 ? `${b.made?.length} AI picks made. You are up.` : ''), 'start_rookie_draft');
     } else if (off.stage === 'rookie_draft') {
       setConfirmAuto(true);
     } else {
-      void run(async () => (await api.startSimSeason(gameId)) as SimOffseasonResponse, () => `Season ${off.season_no + 1} is on.`);
+      void run(async () => (await api.startSimSeason(gameId)) as SimOffseasonResponse, () => `Season ${off.season_no + 1} is on.`, 'start_season');
     }
   }
 
@@ -84,7 +86,7 @@ export default function SimOffseasonBar({ ctx }: { ctx: SimCtx }) {
               loading={busy}
               onPress={() => {
                 setConfirmAuto(false);
-                void run(() => api.autoSimRookieDraft(gameId), () => 'The rookie draft is done.');
+                void run(() => api.autoSimRookieDraft(gameId), () => 'The rookie draft is done.', 'auto_draft');
               }}
             />
             <Button size="sm" variant="ghost" label="Keep drafting" onPress={() => setConfirmAuto(false)} />

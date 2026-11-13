@@ -4,7 +4,7 @@ import assert from 'node:assert/strict';
 
 import { runSimGameCall } from './simGameCall.ts';
 import { simApplyTradeSeed, simTradeSeedFor } from './simGame.ts';
-import { simScrollKey, simShouldScrollTop } from './simScroll.ts';
+import { simScrollKey, simShouldScrollTop, simTabAfterStageAction } from './simScroll.ts';
 
 function handlers() {
   const log = { gates: [] as string[], errors: [] as string[] };
@@ -65,4 +65,11 @@ test('a page change scrolls to the top; the same page and the first render never
   assert.equal(simShouldScrollTop(week, week), false);
   for (const next of [recap, nextRecap, tab, offseason]) assert.equal(simShouldScrollTop(week, next), true);
   assert.equal(simShouldScrollTop(recap, nextRecap), true);
+});
+
+test('stage-advancing actions land on the page that hosts the new stage, and a new offseason step scrolls to the top', () => {
+  for (const action of ['start_rookie_draft', 'auto_draft', 'start_season', 'start_playoffs'] as const) assert.equal(simTabAfterStageAction(action), 'home');
+  const review = simScrollKey({ view: 'game', stage: 'offseason', tab: 'home', status: 'offseason', step: 'review' });
+  const draft = simScrollKey({ view: 'game', stage: 'offseason', tab: 'home', status: 'offseason', step: 'rookie_draft' });
+  assert.equal(simShouldScrollTop(review, draft), true);
 });

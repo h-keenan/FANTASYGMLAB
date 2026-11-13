@@ -5,6 +5,7 @@ import { useCallback, useEffect, useState } from "react";
 import { Button } from "@/components/Button";
 import type { SimCtx } from "@/components/SimGameParts";
 import { api } from "@/lib/api";
+import { simTabAfterStageAction, type SimStageAction } from "@/lib/simScroll";
 import { simOffseasonCta, simOffseasonStageLabel, type SimOffseason, type SimOffseasonResponse } from "@/lib/simGame";
 
 /**
@@ -15,7 +16,7 @@ import { simOffseasonCta, simOffseasonStageLabel, type SimOffseason, type SimOff
  * orb, sticky on desktop, same frame as SimActionBar. It reads the offseason
  * itself, so any tab can mount it. Mobile twin: mobile/src/components/SimOffseasonBar.tsx.
  */
-export function SimOffseasonBar({ ctx }: { ctx: SimCtx }) {
+export function SimOffseasonBar({ ctx, onTab }: { ctx: SimCtx; onTab?: (tab: "home") => void }) {
   const { gameId, call } = ctx;
   const [off, setOff] = useState<SimOffseason | null>(null);
   const [busy, setBusy] = useState(false);
@@ -35,7 +36,7 @@ export function SimOffseasonBar({ ctx }: { ctx: SimCtx }) {
   }, [gameId, ctx.tick]);
 
   const run = useCallback(
-    async (fn: () => Promise<SimOffseasonResponse>, message?: (body: SimOffseasonResponse) => string) => {
+    async (fn: () => Promise<SimOffseasonResponse>, message?: (body: SimOffseasonResponse) => string, action?: SimStageAction) => {
       setBusy(true);
       const body = await call(fn);
       setBusy(false);
@@ -43,11 +44,12 @@ export function SimOffseasonBar({ ctx }: { ctx: SimCtx }) {
         if (body.offseason) setOff(body.offseason);
         if (body.game) ctx.setGame(body.game);
         ctx.bump();
+        if (action) onTab?.(simTabAfterStageAction(action));
         const text = message?.(body);
         if (text) ctx.notify(text, "success");
       }
     },
-    [call, ctx],
+    [call, ctx, onTab],
   );
 
   if (!off) return null;
@@ -57,11 +59,11 @@ export function SimOffseasonBar({ ctx }: { ctx: SimCtx }) {
   function press() {
     if (!off) return;
     if (off.stage === "review") {
-      void run(() => api.startSimRookieDraft(gameId), (b) => ((b.made?.length ?? 0) > 0 ? `${b.made?.length} AI picks made. You are up.` : ""));
+      void run(() => api.startSimRookieDraft(gameId), (b) => ((b.made?.length ?? 0) > 0 ? `${b.made?.length} AI picks made. You are up.` : ""), "start_rookie_draft");
     } else if (off.stage === "rookie_draft") {
       setConfirmAuto(true);
     } else {
-      void run(async () => (await api.startSimSeason(gameId)) as SimOffseasonResponse, () => `Season ${off.season_no + 1} is on.`);
+      void run(async () => (await api.startSimSeason(gameId)) as SimOffseasonResponse, () => `Season ${off.season_no + 1} is on.`, "start_season");
     }
   }
 
@@ -80,7 +82,7 @@ export function SimOffseasonBar({ ctx }: { ctx: SimCtx }) {
         <div className="mx-auto flex max-w-3xl flex-col gap-2 px-4 pt-2">
           <p className="text-sm" role="alert">Auto-draft makes every one of your remaining picks for you, best available by your needs.</p>
           <div className="flex gap-2">
-            <Button size="sm" loading={busy} onClick={() => { setConfirmAuto(false); void run(() => api.autoSimRookieDraft(gameId), () => "The rookie draft is done."); }}>
+            <Button size="sm" loading={busy} onClick={() => { setConfirmAuto(false); void run(() => api.autoSimRookieDraft(gameId), () => "The rookie draft is done.", "auto_draft"); }}>
               Auto-draft the rest
             </Button>
             <Button size="sm" variant="ghost" onClick={() => setConfirmAuto(false)}>Keep drafting</Button>
