@@ -497,7 +497,9 @@ def make_client():
                            backend_for=lambda u: backend, inputs=PoolInputs()),
         environ={"SIM_ENABLED": "1"},
     )
-    return TestClient(app)
+    client = TestClient(app)
+    client.backend = backend
+    return client
 
 
 H = {"Authorization": "pro"}
@@ -570,7 +572,16 @@ def test_api_dynasty_end_to_end():
     assert dy["complete"] and dy["seasons_played"] == 3 and len(dy["by_year"]) == 3
     res = c.get(f"/v1/sim/games/{gid}/result", headers=H).json()
     assert res["result"]["dynasty"]["seasons_total"] == 3
-    # the saved game resumes identically from its event log
+    # the saved game resumes identically from its event log: checkpoint + tail == full replay
+    from modules.sim.game_store import GameStore
+
+    store = GameStore(c.backend)
+    snap = store.get_snapshot("pro", gid)
+    resumed = store.load_state("pro", gid, snap)
+    replayed = store.load_state("pro", gid, snap, use_checkpoint=False)
+    assert resumed.digest() == replayed.digest() and replayed.status == "complete" and replayed.season_no == 3
+    cp = store.latest_checkpoint("pro", gid)
+    assert cp["week"] >= 200  # the checkpoint key is season-aware (weeks restart every season)
     again = c.get(f"/v1/sim/games/{gid}", headers=H).json()["game"]
     assert again["status"] == "complete" and again["dynasty"]["titles"] == dy["titles"]
 
@@ -684,3 +695,26 @@ def test_real_adapter_reads_traded_picks_reserve_and_taxi_for_a_dynasty_import()
     owner = {(p.season, p.round, p.orig): p.owner for p in imp.picks}
     assert owner[(2027, 1, "4")] == "2" and owner[(2029, 2, "7")] == "1" and owner[(2027, 1, "5")] == "5"
     assert {p.season for p in imp.picks} == {2027, 2028, 2029} and len(imp.picks) == 3 * 3 * 12  # the 2031 pick is out of range
+
+
+def test_inbox_offers_can_carry_picks_and_be_accepted():
+    found = False
+    for seed in range(30, 60):
+        run = Run(seed=seed)
+        for _ in range(6):
+            offers = [o for o in run.state.offers if any(is_pick_id(p) for p in (*o["give"], *o["get"]))]
+            if offers:
+                break
+            run.em.snap = run.snap
+            advance(run.em, run.snap, run.state, run.sd)
+        if not offers:
+            continue
+        o = offers[0]
+        user = run.root.user_team.tid
+        desk = TradeDesk(Evaluator(run.snap, run.state), run.seed)
+        act.respond_offer(run.em, desk, o["id"], "accept")
+        assert all(run.state.pick_owner.get(p) == user for p in o["give"] if is_pick_id(p))
+        assert all(run.state.pick_owner.get(p) == o["team"] for p in o["get"] if is_pick_id(p))
+        found = True
+        break
+    assert found, "no AI offer with a pick appeared in 30 seeds"

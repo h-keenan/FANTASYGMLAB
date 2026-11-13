@@ -281,7 +281,7 @@ def add_routes(router: APIRouter, ctx: GameApiCtx) -> None:
         store.touch(uid, game_id, status=state.status, week=state.week, event_count=state.seq)
         if checkpoint:
             try:
-                store.save_checkpoint(uid, game_id, state, state.week)
+                store.save_checkpoint(uid, game_id, state, (state.season_no - 1) * 100 + state.week)  # weeks restart each dynasty season
             except SimStoreError:
                 pass  # the checkpoint is only a cache; events are the truth
 
