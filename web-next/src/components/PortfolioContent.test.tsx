@@ -479,4 +479,49 @@ describe("PortfolioContent", () => {
     expect(skeletons).toHaveLength(PORTFOLIO_SHELL_SKELETON_COUNT);
     skeletons.forEach((el) => expect((el as HTMLElement).style.minHeight).toBe(`${PORTFOLIO_CARD_MIN_HEIGHT}px`));
   });
+
+  it("holds a signals skeleton on a headline-first card instead of the empty-signals line", () => {
+    const headlineOnly = league({ top_item: null, top_items: [] });
+    const { container, rerender } = render(
+      <PortfolioContent data={{ ...BASE_RESPONSE, leagues: [headlineOnly] }} signalsPending={["league-1"]} />,
+    );
+    expect(screen.getByText(/The Contenders — Dynasty Overlords/)).toBeInTheDocument();
+    expect(container.querySelector("[data-portfolio-signals-pending]")).not.toBeNull();
+    expect(screen.queryByText("Open this league to see your Next Move.")).toBeNull();
+
+    rerender(<PortfolioContent data={{ ...BASE_RESPONSE, leagues: [headlineOnly] }} signalsPending={[]} />);
+    expect(container.querySelector("[data-portfolio-signals-pending]")).toBeNull();
+    expect(screen.getByText("Open this league to see your Next Move.")).toBeInTheDocument();
+  });
+
+  it("asks for more leagues only through the sentinel placed at the loader's window edge", () => {
+    const onNearEnd = vi.fn();
+    const saved = ["a", "b", "c", "d"].map((id) => ({ league_id: id, league_name: `League ${id}` }));
+    const { container } = render(
+      <PortfolioContent
+        data={{ ...BASE_RESPONSE, leagues: [league({ league_id: "a" })] }}
+        order={["a", "b", "c", "d"]}
+        pending={saved.slice(1)}
+        onNearEnd={onNearEnd}
+        windowSize={2}
+      />,
+    );
+    // No IntersectionObserver in jsdom: the sentinel falls back to releasing immediately.
+    expect(container.querySelectorAll("[data-portfolio-sentinel]")).toHaveLength(1);
+    expect(onNearEnd).toHaveBeenCalledTimes(1);
+    const cards = Array.from(container.querySelectorAll("[data-portfolio-card], [data-portfolio-skeleton], [data-portfolio-sentinel]"));
+    // card a, skeleton b, then the sentinel, then skeletons c and d.
+    expect(cards.map((node) => node.getAttribute("data-portfolio-sentinel") !== null ? "sentinel" : node.hasAttribute("data-portfolio-card") ? "card" : "skeleton")).toEqual([
+      "card",
+      "skeleton",
+      "sentinel",
+      "skeleton",
+      "skeleton",
+    ]);
+  });
+
+  it("renders no sentinel when nothing is waiting on the window", () => {
+    const { container } = render(<PortfolioContent data={BASE_RESPONSE} onNearEnd={vi.fn()} windowSize={6} />);
+    expect(container.querySelector("[data-portfolio-sentinel]")).toBeNull();
+  });
 });

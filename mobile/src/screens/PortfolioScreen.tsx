@@ -1,5 +1,5 @@
 import GlossaryNote from '../components/GlossaryNote';
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { FlatList, StyleSheet, TouchableOpacity, View } from 'react-native';
 import AppText from '../components/AppText';
 import ErrorState from '../components/ErrorState';
@@ -7,7 +7,7 @@ import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useHeaderHeight } from '@react-navigation/elements';
 import { Ionicons } from '@expo/vector-icons';
-import { useIsRestoring, useQueries, useQuery } from '@tanstack/react-query';
+import { useIsRestoring, useQuery, useQueryClient } from '@tanstack/react-query';
 
 import BrandedSpinner from '../components/BrandedSpinner';
 import FadeInView from '../components/FadeInView';
@@ -23,14 +23,23 @@ import PortfolioExposurePanel from '../components/PortfolioExposurePanel';
 import PortfolioSharePreviewModal from '../components/PortfolioSharePreviewModal';
 import SegmentedTabBar from '../components/SegmentedTabBar';
 import SkeletonBlock from '../components/SkeletonBlock';
-import { api, type DashboardItem, type PortfolioFailedLeague, type PortfolioLeague, type PortfolioSavedLeague } from '../lib/api';
+import {
+  api,
+  type DashboardItem,
+  type PortfolioFailedLeague,
+  type PortfolioLeague,
+  type PortfolioLeagueResponse,
+  type PortfolioSavedLeague,
+} from '../lib/api';
 import { portfolioMetadata, showSignalReason, type SignalPlayer } from '../lib/portfolioSignals';
 import { composePortfolio, type PortfolioLeagueState } from '../lib/portfolioProgress';
 import {
-  enabledLeagueIds,
+  PORTFOLIO_FRESH_MS,
   PORTFOLIO_ROW_MIN_HEIGHT,
   PORTFOLIO_SHELL_SKELETON_COUNT,
   PORTFOLIO_SPLASH_DELAY_MS,
+  startLeagueLoader,
+  type LeagueLoader,
 } from '../lib/portfolioLoader';
 import { useDelayedFlag } from '../lib/useDelayedFlag';
 
@@ -118,51 +127,70 @@ export default function PortfolioScreen() {
   });
   const index = indexQuery.data ?? null;
   const savedLeagues = index?.is_premium ? index.saved_leagues ?? [] : [];
-  // At most PORTFOLIO_LEAGUE_CONCURRENCY row queries run at once, in saved
-  // order: a row frees its slot once it has fetched this mount (success or
-  // error), or if it already holds fresh cached data. Passing React Query's
-  // `signal` cancels in-flight rows when the user leaves the screen.
-  const [doneIds, setDoneIds] = useState<Record<string, boolean>>({});
-  const allowed = enabledLeagueIds(
-    savedLeagues.map((league) => league.league_id),
-    doneIds,
-  );
-  const leagueQueries = useQueries({
-    queries: savedLeagues.map((league) => ({
-      queryKey: queryKeys.portfolioLeague(league.league_id),
-      queryFn: ({ signal }: { signal: AbortSignal }) => api.getPortfolioLeague(league.league_id, signal),
-      enabled: !isRestoring && allowed.has(league.league_id),
-    })),
-  });
-  const finishedKey = savedLeagues
-    .map((league, position) => {
-      const query = leagueQueries[position];
-      return query && (query.isFetchedAfterMount || (query.data !== undefined && !query.isStale)) ? league.league_id : '';
-    })
-    .join('|');
+  // Per-league rows come from lib/portfolioLoader.ts (bounded concurrency,
+  // headline first then signals, only the first screenful until the list
+  // scrolls). Stale-while-revalidate: a league whose last COMPLETE row is in
+  // the (persisted) query cache paints from it at once; a row younger than
+  // PORTFOLIO_FRESH_MS is left alone, an older one is revalidated in place and
+  // a failed revalidation never blanks it.
+  const queryClient = useQueryClient();
+  const [leagueStates, setLeagueStates] = useState<Record<string, PortfolioLeagueState>>({});
+  const loaderRef = useRef<LeagueLoader | null>(null);
+  const savedLeaguesKey = savedLeagues.map((league) => league.league_id).join('|');
   useEffect(() => {
-    const finished = finishedKey.split('|').filter(Boolean);
-    setDoneIds((prev) => {
-      if (finished.every((id) => prev[id])) return prev;
-      return { ...prev, ...Object.fromEntries(finished.map((id) => [id, true])) };
+    if (isRestoring || savedLeagues.length === 0) {
+      setLeagueStates({});
+      return;
+    }
+    const initial: Record<string, PortfolioLeagueState> = {};
+    const warm: string[] = [];
+    const skip: string[] = [];
+    for (const league of savedLeagues) {
+      const cached = queryClient.getQueryState<PortfolioLeagueResponse>(queryKeys.portfolioLeague(league.league_id));
+      if (cached?.data && cached.data.league && !cached.data.signals_pending) {
+        initial[league.league_id] = { status: 'success', data: cached.data };
+        (Date.now() - cached.dataUpdatedAt < PORTFOLIO_FRESH_MS ? skip : warm).push(league.league_id);
+      } else {
+        initial[league.league_id] = { status: 'pending' };
+      }
+    }
+    setLeagueStates(initial);
+    const loader = startLeagueLoader({
+      leagueIds: savedLeagues.map((league) => league.league_id),
+      warm,
+      skip,
+      load: (leagueId, signal, phase) => api.getPortfolioLeague(leagueId, signal, phase === 'headline'),
+      onState: (leagueId, state) => {
+        setLeagueStates((prev) => ({ ...prev, [leagueId]: state }));
+        if (state.status === 'success' && state.data.league && !state.data.signals_pending) {
+          queryClient.setQueryData(queryKeys.portfolioLeague(leagueId), state.data);
+        }
+      },
     });
-  }, [finishedKey]);
-  const retryLeague = useCallback(
-    (leagueId: string) => {
-      const position = savedLeagues.findIndex((league) => league.league_id === leagueId);
-      if (position >= 0) void leagueQueries[position]?.refetch();
-    },
+    loaderRef.current = loader;
+    return () => {
+      loader.abort();
+      loaderRef.current = null;
+    };
+    // savedLeagues is derived from the index; its ids are the real dependency.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [leagueQueries],
-  );
-  const leagueStates: Record<string, PortfolioLeagueState> = {};
-  savedLeagues.forEach((league, position) => {
-    const query = leagueQueries[position];
-    if (query?.data) leagueStates[league.league_id] = { status: 'success', data: query.data };
-    else if (query?.isError) leagueStates[league.league_id] = { status: 'error' };
-    else leagueStates[league.league_id] = { status: 'pending' };
-  });
+  }, [isRestoring, savedLeaguesKey, queryClient]);
+  const retryLeague = useCallback((leagueId: string) => loaderRef.current?.retry(leagueId), []);
+  const unlockMoreLeagues = useCallback(() => loaderRef.current?.unlock(), []);
+  const [shareRequested, setShareRequested] = useState(false);
+  const requestShare = useCallback(() => {
+    setShareRequested(true);
+    loaderRef.current?.unlockAll();
+  }, []);
+
   const composed = index ? composePortfolio(index, leagueStates) : null;
+  const composedSettled = composed?.settled ?? false;
+  useEffect(() => {
+    if (shareRequested && composedSettled) {
+      setShareRequested(false);
+      setShareOpen(true);
+    }
+  }, [shareRequested, composedSettled]);
   // No index at all yet (neither a persisted cache hit nor a prior in-memory
   // fetch) is the one case that still needs a blank-slate spinner — once
   // any data exists, it paints immediately and a failed background refetch
@@ -292,6 +320,8 @@ export default function PortfolioScreen() {
         contentContainerStyle={[styles.listContent, { paddingBottom: orbClearance }]}
         data={view === 'leagues' ? rows : []}
         keyExtractor={(item) => item.league.league_id}
+        onEndReached={unlockMoreLeagues}
+        onEndReachedThreshold={1.5}
         ListFooterComponent={view === 'exposure' ? <PortfolioExposurePanel /> : null}
         ListHeaderComponent={
           <View style={styles.infoNoteWrap}>
@@ -311,9 +341,11 @@ export default function PortfolioScreen() {
                   <SectionHeading title="Your leagues" caption="Standing, record, and top need per league." />
                 </View>
                 {/* Share waits for every row: a share card of a half-loaded
-                    portfolio would silently leave leagues out. */}
-                {composed.settled && composed.leagues.length > 0 ? (
-                  <TouchableOpacity style={styles.shareButton} onPress={() => setShareOpen(true)} hitSlop={8}>
+                    portfolio would silently leave leagues out. Tapping it
+                    releases the leagues below the fold and opens the preview
+                    as soon as they have all loaded. */}
+                {composed.leagues.length > 0 ? (
+                  <TouchableOpacity style={styles.shareButton} onPress={requestShare} hitSlop={8}>
                     <Ionicons name="share-outline" size={14} color={colors.textSecondary} />
                     <AppText style={styles.shareButtonText}>Share</AppText>
                   </TouchableOpacity>
@@ -341,6 +373,7 @@ export default function PortfolioScreen() {
           item.kind === 'league' ? (
             <PortfolioLeagueCard
               league={item.league}
+              signalsPending={item.signalsPending}
               isFirst={position === 0}
               isLast={position === rows.length - 1}
               colors={colors}
@@ -537,6 +570,7 @@ function PortfolioLeagueSkeleton({
 
 function PortfolioLeagueCard({
   league,
+  signalsPending,
   isFirst,
   isLast,
   colors,
@@ -545,6 +579,8 @@ function PortfolioLeagueCard({
   onPressPlayer,
 }: {
   league: PortfolioLeague;
+  /** Headline-first row: the signals are still being computed. */
+  signalsPending: boolean;
   isFirst: boolean;
   isLast: boolean;
   colors: ThemeColors;
@@ -598,6 +634,11 @@ function PortfolioLeagueCard({
                 onPressPlayer={(player) => onPressPlayer(league, player)}
               />
             ))}
+          </View>
+        ) : signalsPending ? (
+          <View style={styles.skeletonSignals} accessibilityLabel="Loading signals">
+            <SkeletonBlock width="85%" height={14} />
+            <SkeletonBlock width="65%" height={12} />
           </View>
         ) : (
           <AppText style={styles.emptySignals}>Open this league to see what to do today.</AppText>
