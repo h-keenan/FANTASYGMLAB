@@ -203,7 +203,7 @@ export function PillRow({
           };
           const countPill = option.count ? (
             <span
-              className={`inline-flex items-center justify-center text-[0.625rem] font-extrabold leading-none${
+              className={`inline-flex items-center justify-center text-[0.6875rem] font-extrabold leading-none${
                 option.icon || option.glyph ? " absolute right-1 top-1 sm:static" : ""
               }`}
               style={{ minWidth: 16, height: 16, padding: "0 4px", borderRadius: "var(--radius-pill)", background: "var(--color-accent)", color: "var(--color-on-accent)" }}

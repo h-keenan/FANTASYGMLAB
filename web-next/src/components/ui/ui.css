@@ -20,7 +20,8 @@
   display: flex;
   flex-direction: column;
   width: 100%;
-  max-height: 88dvh;
+  max-height: calc(88dvh - var(--kb-inset, 0px));
+  margin-bottom: var(--kb-inset, 0px); /* lifts the sheet above the on-screen keyboard (OverlayRuntime sets --kb-inset) */
   overflow: hidden;
   outline: none;
   /* Near-opaque: this sits over PQV and other dense screens, so text underneath must never bleed through. */

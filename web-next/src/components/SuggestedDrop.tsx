@@ -67,7 +67,7 @@ function DropPlayerLine({
       <span className="flex items-center gap-1.5 flex-wrap">
         <span className="sr-only">{effect}</span>
         {swap ? (
-          <span className="text-[0.625rem] uppercase font-bold" style={{ color: "var(--color-text-muted)" }}>
+          <span className="text-[0.6875rem] uppercase font-bold" style={{ color: "var(--color-text-muted)" }}>
             Whole swap
           </span>
         ) : null}
@@ -199,7 +199,7 @@ function SwapBody({ suggestion, drop, alternatives }: { suggestion: DropSuggesti
         <SwapTile side="drop" player={selected} name={selected.name} playerId={selected.player_id} position={selected.position} team={selected.team} />
       </div>
       <div className="flex items-center gap-1.5 flex-wrap" data-testid="swap-effect" aria-label={`Whole swap: ${effectSentence}`}>
-        <span className="text-[0.625rem] uppercase font-bold" style={{ color: "var(--color-text-muted)" }}>
+        <span className="text-[0.6875rem] uppercase font-bold" style={{ color: "var(--color-text-muted)" }}>
           Swap
         </span>
         {pills.map((pill) => (
@@ -237,7 +237,7 @@ function SwapBody({ suggestion, drop, alternatives }: { suggestion: DropSuggesti
       ) : null}
       {others.length > 0 ? (
         <div className="flex flex-col gap-1.5 pt-2" data-testid="swap-alternatives" style={{ borderTop: "var(--border-width-default) solid var(--color-border)" }}>
-          <span className="text-[0.625rem] uppercase font-bold" style={{ color: "var(--color-text-muted)" }}>
+          <span className="text-[0.6875rem] uppercase font-bold" style={{ color: "var(--color-text-muted)" }}>
             Or cut instead
           </span>
           <div className="flex gap-2 flex-wrap">

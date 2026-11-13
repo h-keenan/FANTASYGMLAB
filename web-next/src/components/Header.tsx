@@ -436,7 +436,7 @@ export function Header() {
     >
       <div className="flex items-center justify-between gap-1">
       <div className="flex items-center shrink-0">
-        <Link href="/" className="flex items-center gap-2 p-2 -m-2 mr-0">
+        <Link href="/" className="flex items-center gap-2 p-2 -m-2 mr-0" aria-label={`${BRAND_NAME} home`}>
           <Image src="/brand-mark.png" alt="" width={28} height={28} className="brand-mark-icon" style={{ objectFit: "contain" }} />
           <span className="hidden sm:inline text-sm font-extrabold uppercase" style={{ color: "var(--color-text-primary)", letterSpacing: "0.03em" }}>
             {BRAND_NAME}

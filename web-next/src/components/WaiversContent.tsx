@@ -121,7 +121,7 @@ function StatStrip({ items }: { items: { label: string; value: string }[] }) {
           <span className="text-base font-extrabold" style={{ color: "var(--color-text-primary)" }}>
             {item.value}
           </span>
-          <span className="text-[0.625rem] uppercase font-bold" style={{ color: "var(--color-text-muted)" }}>
+          <span className="text-[0.6875rem] uppercase font-bold" style={{ color: "var(--color-text-muted)" }}>
             {item.label}
           </span>
         </div>
@@ -174,7 +174,7 @@ function ValueWithRing({ player, big = false }: { player: WaiverPlayer; big?: bo
   return (
     <div className="flex items-center gap-2">
       <div className="flex flex-col items-start gap-0.5">
-        <span className="text-[0.625rem] uppercase font-bold" style={{ color: "var(--color-text-muted)" }}>
+        <span className="text-[0.6875rem] uppercase font-bold" style={{ color: "var(--color-text-muted)" }}>
           Value
         </span>
         <span

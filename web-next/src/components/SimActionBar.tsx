@@ -77,9 +77,9 @@ export function SimActionBar({ ctx, paywalled, advancing, onAdvance, onSimTo, on
           <span style={{ color: auto.optimal ? "var(--color-success)" : undefined }}>{auto.optimal ? "Lineup optimal" : "Lineup can improve"}</span>
         </p>
       )}
-      <div className={`mx-auto grid max-w-3xl ${onSimTo && !paywalled ? "grid-cols-[auto_1fr]" : "grid-cols-1"} items-center gap-2 p-1 md:mx-0 md:flex md:max-w-none md:flex-none md:gap-2 md:p-0`}>
+      <div className={`mx-auto grid max-w-3xl ${onSimTo && !paywalled ? "grid-cols-[auto_minmax(0,1fr)]" : "grid-cols-1"} items-center gap-2 p-1 md:mx-0 md:flex md:max-w-none md:flex-none md:gap-2 md:p-0`}>
         {onSimTo && !paywalled ? (
-          <Button variant="secondary" size="sm" className="whitespace-nowrap" disabled={advancing} onClick={onSimTo} aria-label="Sim to..." data-testid="sim-to-button">
+          <Button variant="secondary" size="sm" className="min-w-0" disabled={advancing} onClick={onSimTo} aria-label="Sim to..." data-testid="sim-to-button">
             <SimGlyph name="matchup" size={16} />
             <span className="ml-1.5">Sim to...</span>
           </Button>
@@ -91,7 +91,7 @@ export function SimActionBar({ ctx, paywalled, advancing, onAdvance, onSimTo, on
         {paywalled ? (
           <ButtonLink href="/premium" variant="premium" size="sm">Go Pro to continue</ButtonLink>
         ) : (
-          <Button className="whitespace-nowrap max-md:w-full" loading={advancing} disabled={state.blocked} onClick={tapAdvance} aria-label={simAdvanceLabel(game)} aria-describedby={state.reason ? reasonId : undefined}>
+          <Button className="min-w-0 max-md:w-full" loading={advancing} disabled={state.blocked} onClick={tapAdvance} aria-label={simAdvanceLabel(game)} aria-describedby={state.reason ? reasonId : undefined}>
             {confirming ? "Advance anyway" : game.phase === "playoffs" ? "Play round" : `Advance ${state.label}`}
           </Button>
         )}

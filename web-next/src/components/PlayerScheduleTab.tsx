@@ -93,7 +93,7 @@ function ScheduleRow({ week }: { week: ScheduleWeek }) {
       </div>
       {projection.value ? (
         <div className="flex flex-col items-end shrink-0">
-          <span className="text-[0.625rem] uppercase font-bold" style={{ color: "var(--color-text-muted)" }}>
+          <span className="text-[0.6875rem] uppercase font-bold" style={{ color: "var(--color-text-muted)" }}>
             Proj
           </span>
           <span className="text-sm font-extrabold" style={{ color: "var(--color-accent)" }}>

@@ -47,6 +47,11 @@ import { useSheetDragDismiss } from "@/lib/useSheetDragDismiss";
 import { simSeeAllLabel } from "@/lib/simLayout";
 
 /** Semantic color token for a presentation tone (never a raw hex). */
+/** Text version of a tone: the tone mixed toward the primary text color so small colored text clears AA on cards and tints. */
+export function simToneInk(tone: SimGameTone): string {
+  return `color-mix(in srgb, ${simToneColor(tone)} 78%, var(--color-text-primary))`;
+}
+
 export function simToneColor(tone: SimGameTone): string {
   switch (tone) {
     case "success":
@@ -200,6 +205,7 @@ export function SimPlayerChip({
     <button
       type="button"
       className="block min-w-0 text-left"
+      style={{ minHeight: "var(--touch-target-min)" }}
       aria-label={`${player.name}, ${player.pos}. Open player details`}
       onClick={(event) => {
         event.stopPropagation();

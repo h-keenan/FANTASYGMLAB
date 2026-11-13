@@ -190,7 +190,7 @@ function CompactCard({ model, identity, onEdit, editLabel, stats = [], trailing 
             <span className="text-sm font-extrabold tabular-nums" style={{ color: "var(--color-text-primary)" }}>
               {stat.value}
             </span>
-            <span className="text-[10px] uppercase" style={{ color: "var(--color-text-muted)", letterSpacing: "var(--letter-spacing-badge)" }}>
+            <span className="text-[0.6875rem] uppercase" style={{ color: "var(--color-text-muted)", letterSpacing: "var(--letter-spacing-badge)" }}>
               {stat.label}
             </span>
           </span>
@@ -226,7 +226,7 @@ function TileCard({ model, identity, onEdit, editLabel, stats = [], trailing }: 
               <span className="text-sm font-extrabold tabular-nums" style={{ color: "var(--color-text-primary)" }}>
                 {stat.value}
               </span>
-              <span className="text-[10px] uppercase" style={{ color: "var(--color-text-muted)", letterSpacing: "var(--letter-spacing-badge)" }}>
+              <span className="text-[0.6875rem] uppercase" style={{ color: "var(--color-text-muted)", letterSpacing: "var(--letter-spacing-badge)" }}>
                 {stat.label}
               </span>
             </span>
@@ -332,7 +332,7 @@ function MatchupCard({ model, identity, onEdit, editLabel, mirror = false, empha
               {unavailable ? "0.0" : "—"}
             </span>
           )}
-          <span className="text-[10px] uppercase font-bold" style={{ color: "var(--color-text-muted)", letterSpacing: "var(--letter-spacing-badge)" }}>
+          <span className="text-[0.6875rem] uppercase font-bold" style={{ color: "var(--color-text-muted)", letterSpacing: "var(--letter-spacing-badge)" }}>
             {head.kind === "pts" ? (model.gameStatus === "final" ? "Final pts" : "Pts") : head.kind === "proj" ? "Proj" : model.bye ? "Bye" : ""}
           </span>
           {model.projectedFinal != null ? (

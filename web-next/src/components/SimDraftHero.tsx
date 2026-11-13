@@ -29,7 +29,7 @@ export function SimDraftEmblem({ name, you = false }: { name: string; you?: bool
   return (
     <span
       aria-hidden="true"
-      className="inline-flex shrink-0 items-center justify-center text-[0.625rem] font-extrabold"
+      className="inline-flex shrink-0 items-center justify-center text-[0.6875rem] font-extrabold"
       style={{
         width: 24,
         height: 24,
@@ -144,7 +144,7 @@ export function SimDraftHero({
       </div>
 
       <div className="hidden flex-col gap-1 md:flex">
-        <span className="text-[0.625rem] font-extrabold uppercase" style={LABEL_STYLE}>Recent picks</span>
+        <span className="text-[0.6875rem] font-extrabold uppercase" style={LABEL_STYLE}>Recent picks</span>
         <ol className="flex gap-2 overflow-x-auto" style={{ minHeight: 44 }} aria-label="Recent picks">
           {recent.length === 0 ? (
             <li className="text-xs self-center" style={{ color: "var(--color-text-muted)" }}>No picks yet.</li>
@@ -166,7 +166,7 @@ export function SimDraftHero({
                   <SimDraftEmblem name={team?.name ?? "Team"} you={Boolean(team?.is_you)} />
                   <span className="flex flex-col leading-tight">
                     <span className="text-xs font-bold">{lastName(pk.player.name)}</span>
-                    <span className="text-[0.625rem]" style={{ color: "var(--color-text-muted)" }}>#{pk.pick_no} · {pk.player.pos}</span>
+                    <span className="text-[0.6875rem]" style={{ color: "var(--color-text-muted)" }}>#{pk.pick_no} · {pk.player.pos}</span>
                   </span>
                 </li>
               );
@@ -177,7 +177,7 @@ export function SimDraftHero({
 
       {!done ? (
         <div className="flex flex-col gap-1">
-          <span className="text-[0.625rem] font-extrabold uppercase" style={LABEL_STYLE}>Best available</span>
+          <span className="text-[0.6875rem] font-extrabold uppercase" style={LABEL_STYLE}>Best available</span>
           <ul className="flex gap-2 overflow-x-auto" style={{ minHeight: 44 }} aria-label="Best available by position">
             {strip.map(({ pos, player }) => (
               <li key={pos} className="shrink-0">
@@ -192,7 +192,7 @@ export function SimDraftHero({
                   <PositionBadge position={pos} />
                   <span className="flex flex-col leading-tight">
                     <span className="text-xs font-bold">{player ? lastName(player.name) : "-"}</span>
-                    <span className="text-[0.625rem]" style={{ color: "var(--color-text-muted)" }}>ADP {simFmtValue(player?.adp)}</span>
+                    <span className="text-[0.6875rem]" style={{ color: "var(--color-text-muted)" }}>ADP {simFmtValue(player?.adp)}</span>
                   </span>
                 </button>
               </li>
@@ -202,7 +202,7 @@ export function SimDraftHero({
       ) : null}
 
       <div className="flex flex-col gap-1">
-        <span className="text-[0.625rem] font-extrabold uppercase" style={LABEL_STYLE}>Your needs</span>
+        <span className="text-[0.6875rem] font-extrabold uppercase" style={LABEL_STYLE}>Your needs</span>
         <ul className="flex flex-wrap gap-1.5" aria-label="Roster needs">
           {needs.map((n) => (
             <li key={n.pos} className="flex items-center gap-1" title={n.starters === 0 ? `${n.pos}: no starter slot` : `${n.pos}: ${n.have} of ${n.starters} starters`}>

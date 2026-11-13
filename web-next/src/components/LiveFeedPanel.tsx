@@ -122,10 +122,10 @@ function FeedItem({ event, now, isNew }: { event: FeedEvent; now: number; isNew:
         </span>
       </span>
       <span className="flex flex-col items-end shrink-0 gap-0.5">
-        <span className="text-[10px]" style={{ color: "var(--color-text-muted)" }}>
+        <span className="text-[0.6875rem]" style={{ color: "var(--color-text-muted)" }}>
           {feedAgeLabel(event.at, now)}
         </span>
-        <span className="text-[10px] font-bold uppercase" style={{ color: event.side === "mine" ? "var(--color-accent)" : "var(--color-text-muted)" }}>
+        <span className="text-[0.6875rem] font-bold uppercase" style={{ color: event.side === "mine" ? "var(--color-accent)" : "var(--color-text-muted)" }}>
           {event.side === "mine" ? "You" : "Opp"}
         </span>
         {isNew ? <ToneBadge size="xs" label="NEW" color="var(--color-accent)" /> : null}
