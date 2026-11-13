@@ -268,7 +268,10 @@ describe("LandingPage welcome-page analytics", () => {
     render(<LandingPage />);
 
     expect(await screen.findByText("OnboardingCarousel")).toBeInTheDocument();
-    expect(trackFeatureUse).toHaveBeenCalledTimes(1);
+    // The carousel is shown as soon as the session is known (accountReady); `landing_viewed` fires later, when the
+    // saved-leagues check settles. The old assertion ran right after findByText and raced that async check: it passed
+    // on a fast machine and failed in CI. Wait for the event, then assert it fired exactly once.
+    await waitFor(() => expect(trackFeatureUse).toHaveBeenCalledTimes(1));
     expect(trackFeatureUse).toHaveBeenCalledWith("landing_viewed", { props: { source_surface: "landing_hero" } });
   });
 });
