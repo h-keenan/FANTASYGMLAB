@@ -134,6 +134,8 @@ def cut_player(em: Emitter, pid: str) -> None:
     _require_season(state, offseason_ok=True)
     user = snap.user_team.tid
     if state.where(user, pid) is None:
+        if pid in snap.players and pid not in state.owner_map():
+            return  # already released (a double tap, or a retry after a lost response): the cut is done
         raise ValueError("You can only cut players on your roster.")
     em.emit(state.week, "user", "cut", team=user, pid=pid, reason="cut")
 

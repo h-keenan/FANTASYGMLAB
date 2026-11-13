@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useReducer, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useLayoutEffect, useMemo, useReducer, useRef, useState } from 'react';
 import { ScrollView, StyleSheet, View } from 'react-native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { useHeaderHeight } from '@react-navigation/elements';
@@ -89,6 +89,7 @@ import {
   simTradeSeedFor,
   type SimTradeSeed,
 } from '../lib/simGame';
+import { simScrollKey, simShouldScrollTop } from '../lib/simScroll';
 import { SIM_FLOW_INITIAL, SIM_TABS, simFlowReducer, simRecapsFromAdvance, type SimTab } from '../lib/simGameFlow';
 import { useSimGameRequest } from '../lib/useSimGameRequest';
 import { useSimLeagueTeams } from '../lib/useSimLeagueTeamPicker';
@@ -357,6 +358,15 @@ export default function GmGameScreen({ navigation }: Props) {
     [game, preview, call, setGame, reloadGame, notify, tick],
   );
 
+  // A new page (tab, recap, draft -> season, offseason step) starts at the top, instantly.
+  const scrollRef = useRef<ScrollView>(null);
+  const lastScrollKey = useRef<string | null>(null);
+  const scrollKey = simScrollKey({ view: flow.view, stage: flow.stage, tab: flow.tab, recapIndex: flow.recapIndex, hasRecap: flow.recaps.length > 0, draftRecap: draftRecap !== null, week: game?.week ?? null, status: game?.status ?? null });
+  useLayoutEffect(() => {
+    if (simShouldScrollTop(lastScrollKey.current, scrollKey)) scrollRef.current?.scrollTo({ y: 0, animated: false });
+    lastScrollKey.current = scrollKey;
+  }, [scrollKey]);
+
   // The in-season tabs get a persistent bottom action bar (Advance week / Auto-set) above the orb.
   const barBottom = useSimActionBarBottom();
   const showBar =
@@ -367,6 +377,7 @@ export default function GmGameScreen({ navigation }: Props) {
     <View style={styles.root}>
       <GridBackground />
       <ScrollView
+        ref={scrollRef}
         style={styles.container}
         contentContainerStyle={[
           styles.content,

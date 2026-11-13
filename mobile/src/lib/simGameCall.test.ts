@@ -4,6 +4,7 @@ import assert from 'node:assert/strict';
 
 import { runSimGameCall } from './simGameCall.ts';
 import { simApplyTradeSeed, simTradeSeedFor } from './simGame.ts';
+import { simScrollKey, simShouldScrollTop } from './simScroll.ts';
 
 function handlers() {
   const log = { gates: [] as string[], errors: [] as string[] };
@@ -52,4 +53,16 @@ test('Add to trade seeds: mine go on the give side, an AI team\'s player picks t
   assert.deepEqual(simApplyTradeSeed(draft, { partner: '9', get: 'z' }), { partner: '9', give: ['m'], get: ['z'] });
   // sides cap
   assert.deepEqual(simApplyTradeSeed({ partner: '7', give: ['x'], get: [] }, { partner: '', give: 'y' }, 1).give, ['x']);
+});
+
+test('a page change scrolls to the top; the same page and the first render never do', () => {
+  const week = simScrollKey({ view: 'game', stage: 'week', tab: 'home', week: 4, status: 'in_season' });
+  const recap = simScrollKey({ view: 'game', stage: 'week', tab: 'home', week: 5, status: 'in_season', hasRecap: true, recapIndex: 0 });
+  const nextRecap = simScrollKey({ view: 'game', stage: 'week', tab: 'home', week: 5, status: 'in_season', hasRecap: true, recapIndex: 1 });
+  const tab = simScrollKey({ view: 'game', stage: 'week', tab: 'team', week: 5, status: 'in_season' });
+  const offseason = simScrollKey({ view: 'game', stage: 'offseason', tab: 'home', week: 14, status: 'offseason' });
+  assert.equal(simShouldScrollTop(null, week), false);
+  assert.equal(simShouldScrollTop(week, week), false);
+  for (const next of [recap, nextRecap, tab, offseason]) assert.equal(simShouldScrollTop(week, next), true);
+  assert.equal(simShouldScrollTop(recap, nextRecap), true);
 });
