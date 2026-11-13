@@ -313,29 +313,32 @@ describe("picks in trades", () => {
     expect(row).toHaveTextContent("Value");
   });
 
-  it("the builder has a Picks group on each side, grouped by year, and toggles pick ids", async () => {
+  it("the builder's sheet has a Picks group on each side, grouped by year, and toggles pick ids", async () => {
     await openTrades();
     fireEvent.click(await screen.findByRole("tab", { name: "Make an offer" }));
     fireEvent.click(await screen.findByRole("button", { name: "Trade with Rivals" }));
-    // Your side: the position-grouped picker has a Picks group beside QB.
-    const giveBox = await screen.findByRole("region", { name: "Your roster" });
-    fireEvent.click(within(giveBox).getByRole("tab", { name: "Picks" }));
-    const give = within(giveBox).getByRole("region", { name: "Picks group" });
-    expect(give).toHaveTextContent("2027");
-    expect(give).toHaveTextContent("2027 Round 1 (early)");
-    expect(give).toHaveTextContent("Value");
+    // Your side: the sheet has a Picks tab beside the position-filtered players.
+    fireEvent.click(await screen.findByRole("button", { name: /^You send/ }));
+    let sheet = screen.getByRole("dialog");
+    fireEvent.click(within(sheet).getByRole("tab", { name: /^Picks/ }));
+    expect(sheet).toHaveTextContent("2027 picks");
+    expect(within(sheet).getByRole("button", { name: "Add 2027 Round 1 (early)" })).toBeInTheDocument();
+    expect(sheet).toHaveTextContent("Value");
     mocked.previewSimTrade.mockResolvedValue({ ok: true, reason: "", verdict: { decision: "accept", reason: "Fair.", chips: [] } });
-    fireEvent.click(within(give).getByRole("button", { name: "Give 2027 Round 1 (early)" }));
+    fireEvent.click(within(sheet).getByRole("button", { name: "Add 2027 Round 1 (early)" }));
+    fireEvent.click(within(sheet).getByRole("button", { name: /^Add 1 to trade/ }));
     // Their side: picks grouped by year, earliest year first.
-    fireEvent.click(screen.getByRole("button", { name: /You receive/ }));
-    const getBox = await screen.findByRole("region", { name: "Rivals's roster" });
-    fireEvent.click(within(getBox).getByRole("tab", { name: "Picks" }));
-    const get = within(getBox).getByRole("region", { name: "Picks group" });
-    const text = get.textContent ?? "";
+    fireEvent.click(screen.getByRole("button", { name: /^You receive/ }));
+    sheet = screen.getByRole("dialog");
+    fireEvent.click(within(sheet).getByRole("tab", { name: /^Picks/ }));
+    const text = within(sheet).getByRole("list", { name: "Picks" }).textContent ?? "";
     expect(text.indexOf("2027 Round 2 (late)")).toBeLessThan(text.indexOf("2028 Round 2"));
-    fireEvent.click(within(get).getByRole("button", { name: "Get 2028 Round 2" }));
+    fireEvent.click(within(sheet).getByRole("button", { name: "Add 2028 Round 2" }));
+    fireEvent.click(within(sheet).getByRole("button", { name: /^Add 1 to trade/ }));
     await waitFor(() => expect(mocked.previewSimTrade).toHaveBeenCalledWith("g1", { partner: "7", give: ["pick:2027:1:3"], get: ["pick:2028:2:7"] }));
-    // Picks show in the offer summary as pick chips, and removing one clears it.
-    expect(screen.getAllByTestId("pick-chip")).toHaveLength(2);
+    // Picks show in the offer summary as chips, and removing one clears it.
+    expect(screen.getByRole("button", { name: "Remove 2027 Round 1 (early)" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Remove 2028 Round 2" })).toBeInTheDocument();
   });
+
 });

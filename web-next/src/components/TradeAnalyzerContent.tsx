@@ -10,7 +10,7 @@ import { Button } from "@/components/Button";
 import { LimitWall } from "@/components/LimitWall";
 import { useAuth } from "@/context/AuthContext";
 import { limitWallForReason, type LimitWallModel } from "@/lib/limitWall";
-import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { useMemo, useState, type ReactNode } from "react";
 import { ToneBadge } from "@/components/ToneBadge";
 import { TradeOddsEffect } from "@/components/TradeOddsEffect";
 
@@ -30,10 +30,12 @@ import { useShareImage } from "@/lib/useShareImage";
 import { isPrivacyMode } from "@/lib/privacy";
 import { shareCardCacheKey } from "@/lib/shareCard/cacheKey";
 import { BeginnerHelp } from "@/components/BeginnerHelp";
-import { ExchangeSide, TradeAssetRow } from "@/components/TradeAssetExchange";
+import { ExchangeSide } from "@/components/TradeAssetExchange";
+import { TradePickerSheet, TradeSideSummary } from "@/components/TradePickerSheet";
+import { usePlayerQuickView } from "@/context/PlayerQuickViewContext";
+import { Select } from "@/components/Input";
+import { selectedItems, type SheetItem } from "@/lib/tradeSheetPicker";
 import { LeanBarMeter } from "@/components/LeanBarMeter";
-import { PickGroupList } from "@/components/PickGroupList";
-import { PillRow } from "@/components/PillRow";
 import { TradesTabBar } from "@/components/TradesTabBar";
 import { ConfidenceMeter } from "@/components/ConfidenceMeter";
 import { PostureChip } from "@/components/PostureChip";
@@ -46,12 +48,12 @@ import {
   levelColor,
   tradeShareRecord,
 } from "@/lib/tradeHubPresentation";
-import { tradePositionOptions } from "@/lib/idpPresentation";
 import {
-  ALL_POSITION_OPTIONS,
   ALL_TEAMS_ID,
   analyzeFailureMessage,
+  pickToSheetItem,
   pickToTradeAsset,
+  playerToSheetItem,
   playerToTradeAsset,
   tradeAnalyzerReasonMessage,
 } from "@/lib/tradeAnalyzerPresentation";
@@ -73,11 +75,11 @@ import type { MultiTransfer } from "@/lib/multiTeamTrade";
  * Distinct from Trade Hub's auto-generated ideas (TradeHubContent.tsx,
  * Revision 3): here the user picks the exact players/picks on each side.
  *
- * The builder mechanics (single active side + one shared search list below
- * it, add-on-tap) follow mobile's TradeAnalyzerScreen.tsx rather than
- * Streamlit's two-simultaneous-column layout — same roster-browse/search
- * contract the task called out, just the simpler of the two reference
- * shapes. The verdict card below it instead follows the CURRENT, already
+ * The builder: tap "You send" or "You receive" and the shared piece-picker sheet (TradePickerSheet, also used by
+ * the multi-team builder and the Fantasy Sim trades builder) opens with that side's players and picks; Apply commits
+ * the whole selection at once and the page keeps only a compact summary per side. Before 2026-11 a side tap just
+ * flagged a hidden "active side" for a list far below the fold, which took several taps (see the repro in
+ * scripts/trade_sheet_playwright). The  * verdict card below it follows the CURRENT, already
  * width-fill-fixed / zone-separated Streamlit result card
  * (build_offer_result_card_html): the give/receive matchup reuses
  * TradeHubContent's exact `minmax(0,1fr)` grid (never shrink-to-fit, the
@@ -93,21 +95,15 @@ import type { MultiTransfer } from "@/lib/multiTeamTrade";
  * roster owns that player (myRosterIds / otherTeams, both already computed
  * below for the roster-browse search pool) and genuinely pre-populates the
  * builder — not just a highlight/scroll like Waivers' HighlightTarget: sets
- * activeSide + selectedTeamId and calls addPlayer's underlying state update
- * directly (not addPlayer() itself, since it reads the *current* activeSide
- * from a stale closure the same render tick activeSide is being set — see
- * the effect below). A player on the user's OWN roster sets activeSide to
- * "send" instead of "receive" (the only side that pool is drawn from) —
- * a deliberate, sensible deviation for that one edge case, not the literal
- * "always receive" reading. Fails open silently (plain Trade Analyzer view,
+ * selectedTeamId and the matching side's player list directly. A player on
+ * the user's OWN roster goes to "You send" instead of "You receive" — a
+ * deliberate, sensible deviation for that one edge case. Fails open silently (plain Trade Analyzer view,
  * no crash) when the id is missing, stale, or isn't on any roster in this
  * league — there is no toast/error state for "couldn't find that player".
  *
- * Tap-depth audit 2026-10, proposal 1: after a quick-add the builder flips
- * to the OTHER (still empty) side and focuses the search box, so the next
- * tap picks the counter-asset. The owning team stays selected for when the
- * user comes back to "You receive". Used by Players' "Add to Trade" and the
- * Player Quick View / Player Profile "Add to Trade" action.
+ * Used by Players' "Add to Trade" and the Player Quick View / Player
+ * Profile "Add to Trade" action; the owning team is preselected as the
+ * trade partner so the other side's sheet opens on the right roster.
  *
  * Revision 21 (coridian_, "add picks to all trade sections" audit): "Build
  * the counter" used to only ever appear/apply for a counter_action whose
@@ -122,8 +118,6 @@ import type { MultiTransfer } from "@/lib/multiTeamTrade";
  * applyCounterAction branches on asset_type to mutate sendPicks/
  * receivePicks instead of sendPlayers/receivePlayers when it's set.
  */
-
-const MAX_SEARCH_RESULTS = 40;
 
 interface OtherTeam {
   rosterId: string;
@@ -156,77 +150,6 @@ function TradeMatchup({ sendAssets, receiveAssets }: { sendAssets: TradeAsset[];
         FOR
       </div>
       <ExchangeSide label="You receive" dotColor="var(--color-success)" assets={receiveAssets} />
-    </div>
-  );
-}
-
-function TradeSidePanel({
-  label,
-  dotColor,
-  active,
-  players,
-  picks,
-  onSelect,
-  onRemovePlayer,
-  onRemovePick,
-}: {
-  label: string;
-  dotColor: string;
-  active: boolean;
-  players: RankedPlayer[];
-  picks: DraftPickAsset[];
-  onSelect: () => void;
-  onRemovePlayer: (playerId: string) => void;
-  onRemovePick: (pickId: string) => void;
-}) {
-  const hasAssets = players.length > 0 || picks.length > 0;
-  return (
-    <div
-      className="glass-surface flex flex-col gap-2 p-3 min-w-0"
-      style={active ? { borderColor: "var(--color-accent)" } : undefined}
-    >
-      <button type="button" onClick={onSelect} className="tap-link gap-1.5 self-start">
-        <span className="inline-block" style={{ width: 6, height: 6, borderRadius: "50%", background: dotColor }} />
-        <span
-          className="uppercase text-xs font-bold"
-          style={{
-            letterSpacing: "var(--letter-spacing-badge)",
-            color: active ? "var(--color-accent)" : "var(--color-text-muted)",
-          }}
-        >
-          {label}
-        </span>
-      </button>
-      {hasAssets ? (
-        <div className="flex flex-col divide-y" style={{ borderColor: "var(--color-border)" }}>
-          {players.map((player) => (
-            <button
-              key={`player-${player.player_id}`}
-              type="button"
-              onClick={() => onRemovePlayer(player.player_id)}
-              className="w-full text-left"
-              aria-label={`Remove ${player.name ?? "player"}`}
-            >
-              <TradeAssetRow asset={playerToTradeAsset(player)} disableQuickView />
-            </button>
-          ))}
-          {picks.map((pick) => (
-            <button
-              key={`pick-${pick.pick_id}`}
-              type="button"
-              onClick={() => onRemovePick(pick.pick_id)}
-              className="w-full text-left"
-              aria-label={`Remove ${pick.label ?? "pick"}`}
-            >
-              <TradeAssetRow asset={pickToTradeAsset(pick)} />
-            </button>
-          ))}
-        </div>
-      ) : (
-        <span className="text-xs italic" style={{ color: "var(--color-text-muted)" }}>
-          Tap to add
-        </span>
-      )}
     </div>
   );
 }
@@ -724,10 +647,10 @@ export function TradeAnalyzerContent({
   const [receivePlayers, setReceivePlayers] = useState<RankedPlayer[]>([]);
   const [sendPicks, setSendPicks] = useState<DraftPickAsset[]>([]);
   const [receivePicks, setReceivePicks] = useState<DraftPickAsset[]>([]);
-  const [activeSide, setActiveSide] = useState<"send" | "receive">("send");
-  const [assetType, setAssetType] = useState<"players" | "picks">("players");
-  const [positionFilter, setPositionFilter] = useState("ALL");
-  const [search, setSearch] = useState("");
+  // Which side's piece-picker sheet is open (tap a side to open it), and its search text for server-side matches.
+  const [sheetSide, setSheetSide] = useState<"send" | "receive" | null>(null);
+  const [sheetSearch, setSheetSearch] = useState("");
+  const { openPlayer } = usePlayerQuickView();
   const [selectedTeamId, setSelectedTeamId] = useState(ALL_TEAMS_ID);
   const [analyzing, setAnalyzing] = useState(false);
   const [verdict, setVerdict] = useState<TradeVerdict | null>(null);
@@ -745,63 +668,66 @@ export function TradeAnalyzerContent({
   const [tradeMode, setTradeMode] = useState<"two" | "multi">(multiPrefill?.length ? "multi" : "two");
   const multiTeamAvailable = !isEspnLeagueId(leagueId);
 
-  const selectedPlayerIds = useMemo(
-    () => new Set([...sendPlayers, ...receivePlayers].map((p) => p.player_id)),
-    [sendPlayers, receivePlayers],
-  );
-  const selectedPickIds = useMemo(
-    () => new Set([...sendPicks, ...receivePicks].map((p) => p.pick_id)),
-    [sendPicks, receivePicks],
-  );
   const hasAnyAssets = sendPlayers.length > 0 || receivePlayers.length > 0 || sendPicks.length > 0 || receivePicks.length > 0;
 
-  const positionOptions = useMemo(() => tradePositionOptions(ALL_POSITION_OPTIONS, rankings), [rankings]);
-
   // The rankings prop is the top-300 window; a rostered player ranked below it
-  // (rookie backup, etc.) must still be tradeable, so search also asks the server.
-  const searchMatches = useLeaguePlayerSearch(leagueId, lens, search);
-  const searchPool = useMemo(() => {
-    const pool = mergeSearchMatches(rankings, searchMatches);
-    if (activeSide === "send") return pool.filter((p) => myRosterIds.has(p.player_id));
-    if (selectedTeamId === ALL_TEAMS_ID) return pool.filter((p) => !myRosterIds.has(p.player_id));
-    const team = otherTeams.find((t) => t.rosterId === selectedTeamId);
-    return team ? pool.filter((p) => team.playerIds.has(p.player_id)) : [];
-  }, [rankings, searchMatches, myRosterIds, otherTeams, selectedTeamId, activeSide]);
+  // (rookie backup, etc.) must still be tradeable, so the sheet's search also asks the server.
+  const searchMatches = useLeaguePlayerSearch(leagueId, lens, sheetSearch);
+  const pool = useMemo(() => mergeSearchMatches(rankings, searchMatches), [rankings, searchMatches]);
 
-  const pickSearchPool = useMemo(() => {
-    if (activeSide === "send") return picks.filter((p) => p.owner_roster_id === myRosterId);
-    if (selectedTeamId === ALL_TEAMS_ID) return picks.filter((p) => p.owner_roster_id !== myRosterId);
-    return picks.filter((p) => p.owner_roster_id === selectedTeamId);
-  }, [picks, myRosterId, selectedTeamId, activeSide]);
+  // Items for the open sheet: the side's own pool (your roster, or the partner's / everyone else's), plus whatever
+  // that side already holds so applying never drops a prefilled asset that sits outside the pool.
+  const sheetItems = useMemo<SheetItem<RankedPlayer | DraftPickAsset>[]>(() => {
+    if (!sheetSide) return [];
+    const partner = otherTeams.find((t) => t.rosterId === selectedTeamId);
+    const players =
+      sheetSide === "send"
+        ? pool.filter((p) => myRosterIds.has(p.player_id))
+        : selectedTeamId === ALL_TEAMS_ID
+          ? pool.filter((p) => !myRosterIds.has(p.player_id))
+          : partner
+            ? pool.filter((p) => partner.playerIds.has(p.player_id))
+            : [];
+    const pickPool =
+      sheetSide === "send"
+        ? picks.filter((p) => p.owner_roster_id === myRosterId)
+        : selectedTeamId === ALL_TEAMS_ID
+          ? picks.filter((p) => p.owner_roster_id !== myRosterId)
+          : picks.filter((p) => p.owner_roster_id === selectedTeamId);
+    const held = sheetSide === "send" ? { players: sendPlayers, picks: sendPicks } : { players: receivePlayers, picks: receivePicks };
+    const playerItems = [...new Map([...players, ...held.players].map((p) => [p.player_id, p])).values()].map(playerToSheetItem);
+    const pickItems = [...new Map([...pickPool, ...held.picks].map((p) => [p.pick_id, p])).values()].map(pickToSheetItem);
+    return [...playerItems, ...pickItems];
+  }, [sheetSide, pool, picks, myRosterIds, myRosterId, otherTeams, selectedTeamId, sendPlayers, sendPicks, receivePlayers, receivePicks]);
 
-  const playerResults = useMemo(() => {
-    const query = search.trim().toLowerCase();
-    return searchPool
-      .filter((p) => !selectedPlayerIds.has(p.player_id))
-      .filter((p) => !query || (p.name ?? "").toLowerCase().includes(query))
-      .filter((p) => positionFilter === "ALL" || (p.position ?? "").toUpperCase() === positionFilter)
-      .slice(0, MAX_SEARCH_RESULTS);
-  }, [searchPool, selectedPlayerIds, search, positionFilter]);
-
-  const pickResults = useMemo(() => {
-    const query = search.trim().toLowerCase();
-    return pickSearchPool
-      .filter((p) => !selectedPickIds.has(p.pick_id))
-      .filter((p) => !query || (p.label ?? "").toLowerCase().includes(query))
-      .slice(0, MAX_SEARCH_RESULTS);
-  }, [pickSearchPool, selectedPickIds, search]);
-
-  function selectSide(side: "send" | "receive") {
-    setActiveSide(side);
-    setSearch("");
-    setPositionFilter("ALL");
+  function openSheet(side: "send" | "receive") {
+    setSheetSearch("");
+    setSheetSide(side);
   }
 
-  function addPlayer(player: RankedPlayer) {
-    if (activeSide === "send") setSendPlayers((prev) => [...prev, player]);
-    else setReceivePlayers((prev) => [...prev, player]);
+  /** The sheet's Apply: replace this side's players and picks with the selection in one step. */
+  function applySheet(keys: string[]) {
+    if (!sheetSide) return;
+    const chosen = selectedItems(sheetItems, keys);
+    const players = chosen.filter((i) => i.kind === "player").map((i) => i.ref as RankedPlayer);
+    const pickList = chosen.filter((i) => i.kind === "pick").map((i) => i.ref as DraftPickAsset);
+    if (sheetSide === "send") {
+      setSendPlayers(players);
+      setSendPicks(pickList);
+    } else {
+      setReceivePlayers(players);
+      setReceivePicks(pickList);
+    }
     setVerdict(null);
     setAnalyzeError(null);
+    setSheetSide(null);
+  }
+
+  function removeFromSide(side: "send" | "receive", key: string) {
+    const [kind, ...rest] = key.split(":");
+    const id = rest.join(":");
+    if (kind === "pick") removePick(side, id);
+    else removePlayer(side, id);
   }
 
   // Players' "Add to Trade" quick-add (Revision 20) — see this component's
@@ -812,36 +738,20 @@ export function TradeAnalyzerContent({
   // per id), not inside a useEffect: a setState called synchronously inside
   // an effect body trips react-hooks/set-state-in-effect, the same rule
   // PlayerCompareContent.tsx's modelsLoadedFor comment already documents
-  // working around elsewhere in this app. Deliberately does NOT call
-  // addPlayer(): addPlayer reads `activeSide` from this render's closure,
-  // and setActiveSide(...) a few lines below hasn't been committed yet this
-  // same render, so addPlayer would still see the OLD side and file the
-  // player on the wrong list.
+  // working around elsewhere in this app.
   const [appliedQuickAddPlayerId, setAppliedQuickAddPlayerId] = useState<string | null>(null);
-  const [quickAddFocusPending, setQuickAddFocusPending] = useState(false);
-  const searchInputRef = useRef<HTMLInputElement | null>(null);
-  // Focus is a DOM side effect, not state, so it runs after commit. The
-  // pending flag is cleared by the input's own onFocus handler.
-  useEffect(() => {
-    if (quickAddFocusPending) searchInputRef.current?.focus({ preventScroll: true });
-  }, [quickAddFocusPending]);
   if (quickAddPlayerId && quickAddPlayerId !== appliedQuickAddPlayerId) {
     setAppliedQuickAddPlayerId(quickAddPlayerId);
     const quickAddPlayer = rankings.find((p) => p.player_id === quickAddPlayerId);
     if (quickAddPlayer) {
       if (myRosterIds.has(quickAddPlayerId)) {
-        // On the user's own roster: "receive" (the only side the search
-        // pool ever draws from, see searchPool above) would be nonsensical.
-        setActiveSide("receive");
-        setQuickAddFocusPending(true);
+        // On the user's own roster: "receive" would be nonsensical.
         setSendPlayers((prev) =>
           prev.some((p) => p.player_id === quickAddPlayer.player_id) ? prev : [...prev, quickAddPlayer],
         );
       } else {
         const owner = otherTeams.find((team) => team.playerIds.has(quickAddPlayerId));
         if (owner) {
-          setActiveSide("send");
-          setQuickAddFocusPending(true);
           setSelectedTeamId(owner.rosterId);
           setReceivePlayers((prev) =>
             prev.some((p) => p.player_id === quickAddPlayer.player_id) ? prev : [...prev, quickAddPlayer],
@@ -864,8 +774,6 @@ export function TradeAnalyzerContent({
     setSendPlayers(resolution.send);
     setReceivePlayers(resolution.receive);
     if (resolution.partnerRosterId) setSelectedTeamId(resolution.partnerRosterId);
-    // Next thing to pick is whichever side is still empty.
-    setActiveSide(resolution.send.length === 0 ? "send" : "receive");
     setBridgeMessage(bridgeNotice(resolution));
   }
 
@@ -888,13 +796,6 @@ export function TradeAnalyzerContent({
     setReceivePicks(offerPrefill.receivePicks.map((id) => pickById.get(id)).filter((p): p is DraftPickAsset => Boolean(p)));
     const owner = otherTeams.find((team) => receiveList.some((p) => team.playerIds.has(p.player_id)));
     if (owner) setSelectedTeamId(owner.rosterId);
-  }
-
-  function addPick(pick: DraftPickAsset) {
-    if (activeSide === "send") setSendPicks((prev) => [...prev, pick]);
-    else setReceivePicks((prev) => [...prev, pick]);
-    setVerdict(null);
-    setAnalyzeError(null);
   }
 
   function removePlayer(side: "send" | "receive", playerId: string) {
@@ -1006,12 +907,6 @@ export function TradeAnalyzerContent({
     : "Analyze Trade";
 
   const activeTeamLabel = otherTeams.find((t) => t.rosterId === selectedTeamId)?.label ?? "team";
-  const searchPlaceholder =
-    activeSide === "send"
-      ? `Search your ${assetType === "picks" ? "picks" : "roster"}`
-      : selectedTeamId === ALL_TEAMS_ID
-        ? `Search ${assetType === "picks" ? "picks" : "players"} to receive`
-        : `Search ${activeTeamLabel}'s ${assetType === "picks" ? "picks" : "roster"}`;
 
   return (
     <main className="page-shell">
@@ -1027,28 +922,54 @@ export function TradeAnalyzerContent({
         </p>
       ) : null}
 
+      {otherTeams.length > 0 ? (
+        <label className="flex flex-col gap-1">
+          <span className="text-xs font-extrabold uppercase" style={{ color: "var(--color-text-muted)", letterSpacing: "var(--letter-spacing-badge)" }}>
+            Trading with
+          </span>
+          <Select
+            aria-label="Trading with"
+            value={selectedTeamId}
+            onChange={(event) => setSelectedTeamId(event.target.value)}
+          >
+            <option value={ALL_TEAMS_ID}>Any team</option>
+            {otherTeams.map((team) => (
+              <option key={team.rosterId} value={team.rosterId}>
+                {team.label}
+              </option>
+            ))}
+          </Select>
+        </label>
+      ) : null}
+
       <div className="grid grid-cols-1 sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)] gap-3 items-start">
-        <TradeSidePanel
+        <TradeSideSummary
+          testId="trade-side-send"
           label="You send"
-          dotColor="var(--color-danger)"
-          active={activeSide === "send"}
-          players={sendPlayers}
-          picks={sendPicks}
-          onSelect={() => selectSide("send")}
-          onRemovePlayer={(id) => removePlayer("send", id)}
-          onRemovePick={(id) => removePick("send", id)}
+          tone="danger"
+          items={[...sendPlayers.map(playerToSheetItem), ...sendPicks.map(pickToSheetItem)]}
+          onOpen={() => openSheet("send")}
+          onRemove={(key) => removeFromSide("send", key)}
+          hint="Add from your roster"
         />
-        <TradeSidePanel
+        <TradeSideSummary
+          testId="trade-side-receive"
           label="You receive"
-          dotColor="var(--color-success)"
-          active={activeSide === "receive"}
-          players={receivePlayers}
-          picks={receivePicks}
-          onSelect={() => selectSide("receive")}
-          onRemovePlayer={(id) => removePlayer("receive", id)}
-          onRemovePick={(id) => removePick("receive", id)}
+          tone="success"
+          items={[...receivePlayers.map(playerToSheetItem), ...receivePicks.map(pickToSheetItem)]}
+          onOpen={() => openSheet("receive")}
+          onRemove={(key) => removeFromSide("receive", key)}
+          hint={selectedTeamId === ALL_TEAMS_ID ? "Add from any team" : `Add from ${activeTeamLabel}`}
         />
       </div>
+
+      {selectedTeamId !== ALL_TEAMS_ID ? (
+        <ManagerTendenciesCard
+          leagueId={leagueId}
+          rosterId={selectedTeamId}
+          teamName={teamProfiles[selectedTeamId]?.team_name ?? undefined}
+        />
+      ) : null}
 
       <div className="flex flex-col gap-2">
         <Button onClick={analyze} disabled={!canAnalyze} loading={analyzing}>
@@ -1126,84 +1047,26 @@ export function TradeAnalyzerContent({
           When both sides are ready, tap Analyze Trade for the verdict.
         </p>
       ) : null}
-      <div className="flex flex-col gap-3">
-        <div className="flex flex-wrap gap-2 items-center">
-          <PillRow
-            options={[
-              { label: "Players", value: "players" },
-              { label: "Picks", value: "picks" },
-            ]}
-            active={assetType}
-            onSelect={(value) => setAssetType(value === "picks" ? "picks" : "players")}
-          />
-          {assetType === "players" ? (
-            <PillRow
-              options={positionOptions.map((position) => ({ label: position, value: position }))}
-              active={positionFilter}
-              onSelect={setPositionFilter}
-            />
-          ) : null}
-        </div>
-
-        {activeSide === "receive" && otherTeams.length > 0 ? (
-          <PillRow
-            options={[
-              { label: "All Teams", value: ALL_TEAMS_ID },
-              ...otherTeams.map((team) => ({ label: team.label, value: team.rosterId })),
-            ]}
-            active={selectedTeamId}
-            onSelect={setSelectedTeamId}
-          />
-        ) : null}
-
-        {selectedTeamId !== ALL_TEAMS_ID ? (
-          <ManagerTendenciesCard
-            leagueId={leagueId}
-            rosterId={selectedTeamId}
-            teamName={teamProfiles[selectedTeamId]?.team_name ?? undefined}
-          />
-        ) : null}
-
-        <input
-          ref={searchInputRef}
-          onFocus={() => setQuickAddFocusPending(false)}
-          type="text"
-          value={search}
-          onChange={(event) => setSearch(event.target.value)}
-          placeholder={searchPlaceholder}
-          className="glass-input w-full px-3 py-2 text-sm"
-          style={{ color: "var(--color-text-primary)" }}
+      {sheetSide ? (
+        <TradePickerSheet
+          key={sheetSide}
+          title={sheetSide === "send" ? "You send" : "You receive"}
+          subtitle={sheetSide === "send" ? "From your roster" : selectedTeamId === ALL_TEAMS_ID ? "From any team" : `From ${activeTeamLabel}`}
+          tone={sheetSide === "send" ? "danger" : "success"}
+          items={sheetItems}
+          initialSelected={[
+            ...(sheetSide === "send" ? sendPlayers : receivePlayers).map((p) => `player:${p.player_id}`),
+            ...(sheetSide === "send" ? sendPicks : receivePicks).map((p) => `pick:${p.pick_id}`),
+          ]}
+          onApply={applySheet}
+          onClose={() => setSheetSide(null)}
+          onSearch={setSheetSearch}
+          onInfo={(item) => {
+            const player = item.ref as RankedPlayer;
+            openPlayer({ ...player, leagueId, leagueName, sourceLabel: "Trade Analyzer" });
+          }}
         />
-
-        <div className="flex flex-col divide-y max-h-80 overflow-y-auto" style={{ borderColor: "var(--color-border)" }}>
-          {assetType === "picks" ? (
-            <PickGroupList
-              picks={pickResults}
-              emptyMessage={search ? "No matching picks." : "No picks available."}
-              renderPick={(pick) => (
-                <button type="button" className="w-full text-left" onClick={() => addPick(pick)}>
-                  <TradeAssetRow asset={pickToTradeAsset(pick)} />
-                </button>
-              )}
-            />
-          ) : playerResults.length === 0 ? (
-            <p className="text-sm py-2" style={{ color: "var(--color-text-muted)" }}>
-              {search ? "No matching players." : "Start typing to search, or browse the list above."}
-            </p>
-          ) : (
-            playerResults.map((player) => (
-              <button
-                key={player.player_id}
-                type="button"
-                className="w-full text-left"
-                onClick={() => addPlayer(player)}
-              >
-                <TradeAssetRow asset={playerToTradeAsset(player)} disableQuickView />
-              </button>
-            ))
-          )}
-        </div>
-      </div>
+      ) : null}
 
       <ValuesCredit />
     </main>

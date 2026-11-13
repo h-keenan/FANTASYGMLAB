@@ -28,6 +28,8 @@ import { fileURLToPath } from "node:url";
 
 // Byte-identical in both trees (generated files and imports-free pure modules).
 export const IDENTICAL = [
+  "simTradeSheet.ts",
+  "tradeSheetPicker.ts",
   "busyRetry.ts",
   "destinationAccents.generated.ts",
   "directionCheckin.ts",

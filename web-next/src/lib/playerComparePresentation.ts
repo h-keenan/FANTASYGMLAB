@@ -1,4 +1,4 @@
-import type { QuickViewModel, RankedPlayer, WeeklyStatPoint } from "./api";
+import type { QuickViewModel, RankedPlayer, ScheduleWeek, WeeklyStatPoint } from "./api";
 import { formatRank, formatScore } from "./leagueRankingsPresentation";
 
 /**
@@ -38,19 +38,23 @@ export interface CompareRow {
    * modules/player_compare.py's CompareRow.lower_is_better and mobile's
    * LOWER_IS_BETTER set. */
   lowerIsBetter?: boolean;
+  /** Shown side by side with no better side (age: which is better depends on the league). */
+  neutral?: boolean;
 }
 
 export interface CompareTextRow {
   label: string;
   a: string | null;
   b: string | null;
+  /** Set when the row has a real better side (the schedule row); plain text rows leave it unset. */
+  winner?: "a" | "b" | null;
 }
 
 /** Which side (if either) "wins" a numeric row — null/missing values and
  * exact ties never win, byte-for-byte port of player_compare.compare_row_html's
  * a_wins/b_wins and mobile's compareRowWinner. */
 export function compareRowWinner(row: CompareRow): "a" | "b" | null {
-  if (row.a === null || row.b === null || row.a === row.b) return null;
+  if (row.neutral || row.a === null || row.b === null || row.a === row.b) return null;
   const aWins = row.lowerIsBetter ? row.a < row.b : row.a > row.b;
   return aWins ? "a" : "b";
 }
@@ -252,4 +256,116 @@ export function defaultCompareCandidates(
       return dx - dy;
     })
     .slice(0, limit);
+}
+
+// ---------------------------------------------------------------------------
+// Compare page v2: the compact head-to-head grid, suggestions and recents.
+
+/** Points per game from the weekly PPR series (null before any game is played). */
+export function ppgFromWeeks(weeks: WeeklyStatPoint[]): number | null {
+  const summary = buildWeeklyPointsSummary(weeks);
+  return summary.games > 0 ? summary.average : null;
+}
+
+/** The next game's projected points: the first unplayed, non-bye week that carries a point estimate. */
+export function nextProjection(weeks: ScheduleWeek[]): number | null {
+  for (const week of weeks) {
+    if (week.played || week.bye) continue;
+    const estimate = week.projection?.point_estimate;
+    if (week.projection?.status === "ok" && estimate != null) return estimate;
+  }
+  return null;
+}
+
+export interface ScheduleOutlook {
+  /** Soft minus tough matchups over the next `games`; higher is the easier road. */
+  score: number;
+  text: string;
+}
+
+/** The next four games by opponent defense tier, e.g. "2 soft · 1 avg · 1 tough". Null when no tiers are known. */
+export function scheduleOutlook(weeks: ScheduleWeek[], games = 4): ScheduleOutlook | null {
+  const upcoming = weeks.filter((w) => !w.played && !w.bye).slice(0, games);
+  const tiers = upcoming.map((w) => w.opponent_defense_tier).filter((t): t is NonNullable<typeof t> => t != null);
+  if (tiers.length === 0) return null;
+  const count = (tier: string) => tiers.filter((t) => t === tier).length;
+  const parts = [
+    count("weak") ? `${count("weak")} soft` : "",
+    count("average") ? `${count("average")} avg` : "",
+    count("tough") ? `${count("tough")} tough` : "",
+  ].filter(Boolean);
+  return { score: count("weak") - count("tough"), text: parts.join(" · ") };
+}
+
+export interface CompareExtras {
+  ppg: number | null;
+  projection: number | null;
+  schedule: ScheduleOutlook | null;
+}
+
+const formatPoints = (value: number) => (Math.round(value * 10) / 10).toFixed(1);
+
+/** The headline rows of the compact grid: value, ranks, age, PPG and next-game projection (numeric, winner marked). */
+export function buildHeadlineRows(a: RankedPlayer, b: RankedPlayer, extrasA: CompareExtras, extrasB: CompareExtras): CompareRow[] {
+  const [value, overall, position, age] = buildValueRows(a, b);
+  return [
+    value,
+    overall,
+    position,
+    { ...age, neutral: true },
+    { label: "PPG", a: extrasA.ppg, b: extrasB.ppg, format: formatPoints },
+    { label: "Next game", a: extrasA.projection, b: extrasB.projection, format: formatPoints },
+  ];
+}
+
+/** Usage trend and the schedule outlook as text rows; only the schedule has a winner. */
+export function buildHeadlineTextRows(modelA: QuickViewModel | null, modelB: QuickViewModel | null, extrasA: CompareExtras, extrasB: CompareExtras): CompareTextRow[] {
+  const rows: CompareTextRow[] = [];
+  const usage = buildTrendRows(modelA, modelB).find((row) => row.label === "Usage Trend");
+  if (usage) rows.push({ label: "Trend", a: usage.a, b: usage.b });
+  if (extrasA.schedule || extrasB.schedule) {
+    const sa = extrasA.schedule?.score ?? null;
+    const sb = extrasB.schedule?.score ?? null;
+    rows.push({
+      label: "Next 4 games",
+      a: extrasA.schedule?.text ?? null,
+      b: extrasB.schedule?.text ?? null,
+      winner: sa === null || sb === null || sa === sb ? null : sa > sb ? "a" : "b",
+    });
+  }
+  return rows;
+}
+
+/** One-tap suggestions: same position, nearest value, never the base player or anyone already shown. */
+export function suggestedOpponents(pool: RankedPlayer[], base: RankedPlayer, exclude: string[] = [], limit = 4): RankedPlayer[] {
+  const skip = new Set([base.player_id, ...exclude]);
+  return defaultCompareCandidates(
+    pool.filter((p) => !skip.has(p.player_id)),
+    base,
+    limit,
+  );
+}
+
+const RECENT_KEY = "fgl:compare-recent";
+const RECENT_MAX = 6;
+
+/** Recently chosen opponents for a league (ids, newest first). Storage can be blocked; never throws. */
+export function readRecentOpponents(leagueId: string): string[] {
+  try {
+    const raw = window.localStorage.getItem(`${RECENT_KEY}:${leagueId}`);
+    const parsed: unknown = raw ? JSON.parse(raw) : [];
+    return Array.isArray(parsed) ? parsed.filter((id): id is string => typeof id === "string").slice(0, RECENT_MAX) : [];
+  } catch {
+    return [];
+  }
+}
+
+export function rememberOpponent(leagueId: string, playerId: string): string[] {
+  const next = [playerId, ...readRecentOpponents(leagueId).filter((id) => id !== playerId)].slice(0, RECENT_MAX);
+  try {
+    window.localStorage.setItem(`${RECENT_KEY}:${leagueId}`, JSON.stringify(next));
+  } catch {
+    // Private mode or blocked storage: recents just do not persist.
+  }
+  return next;
 }
