@@ -2,8 +2,8 @@
 // Mocks /v1/sim/games against `next dev -p 3187` (web-next/.env.local with dummy Supabase vars), opens a player
 // sheet on the draft board, and drags it with real CDP touch events: from the handle, from the header area, and a
 // short drag that must spring back. Prints PASS/FAIL per case and exits 1 on any failure.
-// Usage: CHROME_PATH=/path/to/chrome node sheet_drag.mjs
-import { chromium } from "playwright-core";
+// Usage: CHROME_PATH=/path/to/chrome node sheet_drag.mjs   (or: BROWSER=webkit node sheet_drag.mjs)
+import { chromium, webkit } from "playwright-core";
 import { createMock } from "./simmock.mjs";
 
 const session = {
@@ -11,10 +11,28 @@ const session = {
   user: { id: "u1", aud: "authenticated", role: "authenticated", email: "t@example.com", app_metadata: {}, user_metadata: {}, created_at: "2026-01-01T00:00:00Z" },
 };
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
-const browser = await chromium.launch({ executablePath: process.env.CHROME_PATH });
+// BROWSER=webkit runs Playwright's WebKit; it has no CDP, so touches are dispatched as real TouchEvents in the page.
+const isWebkit = process.env.BROWSER === "webkit";
+const browser = isWebkit ? await webkit.launch() : await chromium.launch({ executablePath: process.env.CHROME_PATH });
 let failed = 0;
 
-async function touchDrag(cdp, x, y0, y1, steps = 8, stepMs = 16) {
+async function touchDrag(cdp, x, y0, y1, steps = 8, stepMs = 16, page = null) {
+  if (isWebkit) {
+    await page.evaluate(async ({ x, y0, y1, steps, stepMs }) => {
+      const target = document.elementFromPoint(x, y0);
+      const mk = (type, y, list = true) => {
+        const t = new Touch({ identifier: 1, target, clientX: x, clientY: y, pageX: x, pageY: y });
+        return new TouchEvent(type, { bubbles: true, cancelable: true, touches: list ? [t] : [], targetTouches: list ? [t] : [], changedTouches: [t] });
+      };
+      target.dispatchEvent(mk("touchstart", y0));
+      for (let i = 1; i <= steps; i++) {
+        target.dispatchEvent(mk("touchmove", y0 + ((y1 - y0) * i) / steps));
+        await new Promise((r) => setTimeout(r, stepMs));
+      }
+      target.dispatchEvent(mk("touchend", y1, false));
+    }, { x, y0, y1, steps, stepMs });
+    return;
+  }
   await cdp.send("Input.dispatchTouchEvent", { type: "touchStart", touchPoints: [{ x, y: y0 }] });
   for (let i = 1; i <= steps; i++) {
     await cdp.send("Input.dispatchTouchEvent", { type: "touchMove", touchPoints: [{ x, y: y0 + ((y1 - y0) * i) / steps }] });
@@ -57,8 +75,8 @@ async function run(name, startSelector, distance, scenario = "draft") {
   await sleep(600);
   if (process.env.SHOT) await page.screenshot({ path: process.env.SHOT });
   const box = await page.locator(startSelector).first().boundingBox({ timeout: 5000 });
-  const cdp = await ctx.newCDPSession(page);
-  await touchDrag(cdp, box.x + box.width / 2, box.y + box.height / 2, box.y + box.height / 2 + distance);
+  const cdp = isWebkit ? null : await ctx.newCDPSession(page);
+  await touchDrag(cdp, box.x + box.width / 2, box.y + box.height / 2, box.y + box.height / 2 + distance, 8, 16, page);
   await sleep(700);
   const open = (await page.locator('[role="dialog"]').count()) > 0;
   const want = distance < 100 ? "open" : "closed";
