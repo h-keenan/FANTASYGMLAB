@@ -9,6 +9,9 @@ import {
   simEmptySlotLabels,
   simLineupIssues,
   simAutoSetMessage,
+  simScoreboardLabel,
+  simMatchupStatus,
+  simMatchupMargin,
   simFilterGroups,
   simGroupByPosition,
   simLineupDiff,
@@ -87,4 +90,27 @@ test('the advance bar warns only from the current lineup: filled WR2 is never em
   assert.equal(state.confirm, 'Jakobi Meyers (WR2) is out and will score 0 unless you swap him. Advance anyway?');
   const both = simAdvanceState({ week: 2 }, ['WR1'], [{ label: 'RB', name: 'A', reason: 'bye' }]);
   assert.match(both.confirm ?? '', /WR1 is empty .* A \(RB\) is on a bye and will score 0/);
+});
+
+test('auto-set never says optimal while a slot is empty or a starter is on a bye/out', () => {
+  const same = { swaps: [], gain: 0 };
+  assert.equal(simAutoSetMessage(same), 'Lineup is optimal');
+  assert.equal(simAutoSetMessage(same, { empty: [], zero: [] }), 'Lineup is optimal');
+  assert.match(simAutoSetMessage(same, { empty: ['QB'], zero: [] }), /^Nothing to swap\. No QB on your roster to start in QB\. Claim one from the Players tab\.$/);
+  assert.match(simAutoSetMessage(same, { empty: ['FLEX'], zero: [] }), /No RB, WR or TE on your roster/);
+  assert.match(simAutoSetMessage(same, { empty: [], zero: [{ label: 'WR1', name: 'C. Watson', reason: 'bye' }] }), /C\. Watson \(WR1\) is on a bye and no healthier player fits/);
+  const four = { swaps: [{ slot: 'RB', out: 'a', in: 'b' }, { slot: 'WR', out: 'c', in: 'd' }, { slot: 'TE', out: 'e', in: 'f' }, { slot: 'K', out: 'g', in: 'h' }], gain: 3.2 };
+  assert.equal(simAutoSetMessage(four, { empty: [], zero: [] }), 'Made 4 lineup swaps, +3.2 proj');
+  assert.match(simAutoSetMessage(four, { empty: ['QB'], zero: [] }), /^Made 4 lineup swaps, \+3\.2 proj\. No QB on your roster/);
+});
+
+test('scoreboard label never duplicates the week; matchup status and margin', () => {
+  assert.equal(simScoreboardLabel('Week 10', 10), 'Week 10');
+  assert.equal(simScoreboardLabel('Semifinal', 15), 'Semifinal · Week 15');
+  assert.deepEqual(simMatchupStatus({ home_pts: 68.9, away_pts: 140.7, winner: 'b' }), { key: 'final', label: 'FINAL', tone: 'success' });
+  assert.equal(simMatchupStatus({ home_pts: null, away_pts: null, winner: null }).key, 'upcoming');
+  const names = { a: 'Boom or Bust', b: 'Flex Appeal' };
+  assert.equal(simMatchupMargin({ home: 'a', away: 'b', home_pts: 68.9, away_pts: 140.7 }, names), 'Flex Appeal won by 71.8');
+  assert.equal(simMatchupMargin({ home: 'a', away: 'b', home_pts: 90, away_pts: 90 }, names), 'Tie');
+  assert.equal(simMatchupMargin({ home: 'a', away: 'b', home_pts: null, away_pts: null }, names), 'Not played yet');
 });

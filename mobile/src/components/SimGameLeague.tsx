@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { StyleSheet, View } from 'react-native';
+import { Pressable, StyleSheet, View } from 'react-native';
 
 import AccentCard from './AccentCard';
 import AppText from './AppText';
@@ -10,7 +10,7 @@ import SegmentedTabBar from './SegmentedTabBar';
 import { SimLeaguePlayersView, SimLeagueTeamsView } from './SimLeagueWho';
 import { SkeletonCard } from './SkeletonBlock';
 import { ReviewGlyphChip } from './SeasonReviewSections';
-import { SimPlayerChip, SimSectionTitle, SimSeeAll, SimTeamLink, SimToneBadge, createSimStyles, simToneColor, type SimCtx } from './SimGameParts';
+import { SimPlayerChip, SimSectionTitle, SimSeeAll, SimSheet, SimTeamLink, SimToneBadge, createSimStyles, simToneColor, type SimCtx } from './SimGameParts';
 import ToneBadge from './ToneBadge';
 import { useThemeMode } from '../context/ThemeModeContext';
 import { api } from '../lib/api';
@@ -29,7 +29,8 @@ import {
   type SimRecapScore,
   type SimStandingRow,
 } from '../lib/simGame';
-import { simPreview } from '../lib/simLayout';
+import SimCrest from './SimCrest';
+import { simMatchupMargin, simMatchupStatus, simPreview, simScoreboardLabel } from '../lib/simLayout';
 import { useSimLeagueRosters } from '../lib/useSimLeagueRosters';
 import { spacing } from '../theme';
 
@@ -69,47 +70,109 @@ export function SimStandingsList({ rows, playoffTeams }: { rows: SimStandingRow[
   );
 }
 
+/**
+ * One matchup as a centered module: crest + name on each side, the two scores big in the middle (winner
+ * emphasized, loser muted), a status dot + key (FINAL / UPCOMING) under them, my game highlighted. The
+ * whole card is pressable and opens the full matchup in a sheet. Web twin: web-next/src/components/SimGameLeague.tsx.
+ */
+export function SimScoreCard({ g, names, youId, onOpen }: { g: SimRecapScore; names: Record<string, string>; youId?: string; onOpen: () => void }) {
+  const { colors } = useThemeMode();
+  const mine = g.home === youId || g.away === youId;
+  const mineTone = !mine || !g.winner ? 'accent' : g.winner === youId ? 'success' : 'danger';
+  const status = simMatchupStatus(g);
+  const side = (id: string, pts: number | null) => ({ id, pts, won: g.winner === id, lost: Boolean(g.winner) && g.winner !== id });
+  const left = side(g.home, g.home_pts);
+  const right = side(g.away, g.away_pts);
+  const team = (t: ReturnType<typeof side>) => (
+    <View style={{ flex: 1, minWidth: 0, alignItems: 'center', gap: 4, opacity: t.lost ? 0.7 : 1 }}>
+      <SimCrest name={names[t.id] ?? 'Team'} size={36} />
+      <AppText numberOfLines={2} style={{ fontSize: 12, textAlign: 'center', fontWeight: t.won ? '800' : '600', color: colors.textPrimary }}>{names[t.id] ?? 'Team'}</AppText>
+      {t.id === youId ? <ToneBadge label="YOU" color={colors.accent} size="xs" /> : null}
+    </View>
+  );
+  const score = (t: ReturnType<typeof side>) => (
+    <AppText style={{ fontSize: 20, fontWeight: t.won ? '900' : '600', color: t.won ? colors.success : t.lost ? colors.textTertiary : colors.textPrimary }}>{t.pts == null ? '-' : simFmtPts(t.pts)}</AppText>
+  );
+  return (
+    <Pressable
+      onPress={onOpen}
+      accessibilityRole="button"
+      accessibilityLabel={`${names[g.home] ?? 'Team'} versus ${names[g.away] ?? 'Team'}. ${status.label}. Open matchup`}
+      testID="sim-score-card"
+    >
+      <AccentCard accent={mine ? simToneColor(mineTone, colors) : colors.borderStrong} compact>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm }}>
+          {team(left)}
+          <View style={{ width: 150, alignItems: 'center', gap: 4 }}>
+            <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: spacing.sm }}>
+              {score(left)}
+              <AppText style={{ color: colors.textTertiary }}>–</AppText>
+              {score(right)}
+            </View>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+              <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: status.tone === 'success' ? colors.success : colors.textTertiary }} />
+              <AppText style={{ fontSize: 12, fontWeight: '800', letterSpacing: 0.6, color: status.tone === 'success' ? colors.success : colors.textTertiary }}>{status.label}</AppText>
+            </View>
+          </View>
+          {team(right)}
+        </View>
+      </AccentCard>
+    </Pressable>
+  );
+}
+
+function SimMatchupSheet({ g, names, youId, week, label, onClose }: { g: SimRecapScore; names: Record<string, string>; youId?: string; week: number; label: string; onClose: () => void }) {
+  const { colors } = useThemeMode();
+  const common = useMemo(() => createSimStyles(colors), [colors]);
+  const status = simMatchupStatus(g);
+  const rows = [
+    [g.home, g.home_pts],
+    [g.away, g.away_pts],
+  ] as const;
+  return (
+    <SimSheet title={`${names[g.home] ?? 'Team'} vs ${names[g.away] ?? 'Team'}`} onClose={onClose}>
+      <AppText style={common.muted}>{`${label} · ${status.label}`}</AppText>
+      <View style={common.stack} testID="sim-matchup-sheet">
+        {rows.map(([id, pts]) => (
+          <View key={id} style={common.rowBetween}>
+            <View style={common.grow}>
+              <SimTeamLink teamId={id} name={names[id] ?? 'Team'} isYou={id === youId} size={32} bold={g.winner === id} />
+            </View>
+            <AppText style={{ fontSize: 22, fontWeight: g.winner === id ? '900' : '600', color: g.winner === id ? colors.success : colors.textPrimary }}>{pts == null ? '-' : simFmtPts(pts)}</AppText>
+          </View>
+        ))}
+        <AppText style={common.bodyStrong}>{simMatchupMargin(g, names)}</AppText>
+        <AppText style={common.muted}>{`Week ${week}. Tap a team for its scouting sheet.`}</AppText>
+      </View>
+    </SimSheet>
+  );
+}
+
 function Scoreboard({ game, schedule, names }: { game: SimCtx['game']; schedule: NonNullable<SimLeagueResponse['schedule']>; names: Record<string, string> }) {
   const { colors } = useThemeMode();
   const common = useMemo(() => createSimStyles(colors), [colors]);
   const played = schedule.filter((w) => w.games.some((g) => g.home_pts != null));
   const [week, setWeek] = useState<number>(() => (played.length ? played[played.length - 1].week : Math.max(1, game.week)));
+  const [open, setOpen] = useState<SimRecapScore | null>(null);
   const entry = schedule.find((w) => w.week === week);
-  const label = entry?.kind === 'playoff' ? simPlayoffRoundLabel(week, game.settings) : `Week ${week}`;
+  const roundLabel = entry?.kind === 'playoff' ? simPlayoffRoundLabel(week, game.settings) : `Week ${week}`;
+  const label = simScoreboardLabel(roundLabel, week);
   const youId = game.you?.team_id;
   return (
     <View style={common.stack}>
       <View style={common.rowBetween}>
         <Button size="sm" variant="secondary" label="Previous" disabled={week <= 1} onPress={() => setWeek((w) => w - 1)} />
         <AppText style={common.bodyStrong} accessibilityLiveRegion="polite">
-          {label === `Week ${week}` ? label : `${label} · Week ${week}`}
+          {label}
         </AppText>
         <Button size="sm" variant="secondary" label="Next" disabled={week >= schedule.length} onPress={() => setWeek((w) => w + 1)} />
       </View>
       {!entry || entry.games.length === 0 ? (
         <EmptyState icon="calendar-outline" title="No games" subtitle="Nothing is scheduled this week." />
       ) : (
-        entry.games.map((g: SimRecapScore) => {
-          const mine = g.home === youId || g.away === youId;
-          const mineTone = !mine || !g.winner ? 'accent' : g.winner === youId ? 'success' : 'danger';
-          const rows = [
-            [g.home, g.home_pts],
-            [g.away, g.away_pts],
-          ] as const;
-          return (
-            <AccentCard key={`${g.home}-${g.away}`} accent={mine ? simToneColor(mineTone, colors) : colors.borderStrong} compact>
-              {rows.map(([id, pts]) => (
-                <View key={id} style={[common.rowBetween, { opacity: g.winner && g.winner !== id ? 0.7 : 1 }]}>
-                  <View style={common.grow}>
-                    <SimTeamLink teamId={id} name={names[id] ?? 'Team'} isYou={id === youId} size={22} bold={g.winner === id} />
-                  </View>
-                  <AppText style={[g.winner === id ? common.bodyStrong : common.body, g.winner ? { color: g.winner === id ? colors.success : colors.danger } : null]}>{pts == null ? '-' : simFmtPts(pts)}</AppText>
-                </View>
-              ))}
-            </AccentCard>
-          );
-        })
+        entry.games.map((g: SimRecapScore) => <SimScoreCard key={`${g.home}-${g.away}`} g={g} names={names} youId={youId} onOpen={() => setOpen(g)} />)
       )}
+      {open ? <SimMatchupSheet g={open} names={names} youId={youId} week={week} label={label} onClose={() => setOpen(null)} /> : null}
     </View>
   );
 }

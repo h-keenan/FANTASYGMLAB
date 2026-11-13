@@ -159,15 +159,37 @@ export function simLineupDiff(before: readonly SimLineupDiffSlot[], after: reado
   return { swaps, gain };
 }
 
-/** The toast for an auto-set: names the swap, or says the lineup is already optimal. */
-export function simAutoSetMessage(diff: SimLineupDiff): string {
-  if (diff.swaps.length === 0) return "Lineup is optimal";
+/** The position a lineup slot label needs ("WR2" -> "WR", "FLEX" -> "RB, WR or TE"), for plain-words messages. */
+export function simSlotNeed(label: string): string {
+  const base = label.replace(/\d+$/, "");
+  if (base === "FLEX") return "RB, WR or TE";
+  if (base === "SUPERFLEX") return "QB, RB, WR or TE";
+  return base;
+}
+
+/**
+ * The toast for an auto-set. The swaps come first; then anything auto-set could NOT fix is said plainly
+ * (an empty slot means no eligible player is on the roster; a bye/out starter means nothing healthier fits),
+ * so "optimal" is only claimed for a lineup that has no empty slot and no bye/out starter.
+ */
+export function simAutoSetMessage(diff: SimLineupDiff, issues?: { empty: readonly string[]; zero: readonly SimZeroStarter[] }): string {
+  const empty = issues?.empty ?? [];
+  const zero = issues?.zero ?? [];
+  const unfixed = [
+    ...empty.map((label) => `No ${simSlotNeed(label)} on your roster to start in ${label}. Claim one from the Players tab.`),
+    ...zero.map((z) => `${z.name} (${z.label}) is ${z.reason === "bye" ? "on a bye" : "out"} and no healthier player fits.`),
+  ];
+  const tail = unfixed.length > 0 ? ` ${unfixed.join(" ")}` : "";
+  if (diff.swaps.length === 0) return unfixed.length > 0 ? `Nothing to swap.${tail}` : "Lineup is optimal";
   const gain = diff.gain != null && diff.gain > 0 ? `, +${diff.gain.toFixed(1)} proj` : "";
+  let head: string;
   if (diff.swaps.length === 1) {
     const [swap] = diff.swaps;
-    return swap.out && swap.in ? `Swapped ${swap.out} for ${swap.in}${gain}` : `Updated your ${swap.slot} slot${gain}`;
+    head = swap.out && swap.in ? `Swapped ${swap.out} for ${swap.in}${gain}` : `Updated your ${swap.slot} slot${gain}`;
+  } else {
+    head = `Made ${diff.swaps.length} lineup swaps${gain}`;
   }
-  return `Made ${diff.swaps.length} lineup swaps${gain}`;
+  return unfixed.length > 0 ? `${head}.${tail}` : head;
 }
 
 // ---------------------------------------------------------------------------
@@ -272,3 +294,29 @@ export function simAdvanceState(
 /** Bottom clearance (rem) page content needs so the fixed bar and the floating GM orb never cover the last row. */
 export const SIM_BOTTOM_CLEARANCE_BAR_REM = 8.5;
 export const SIM_BOTTOM_CLEARANCE_ORB_REM = 6;
+
+/** Header of the scoreboard pager: "Week 10", or "Semifinal · Week 15" in the playoffs (never "Week 10 · Week 10"). */
+export function simScoreboardLabel(roundLabel: string, week: number): string {
+  return roundLabel === `Week ${week}` ? roundLabel : `${roundLabel} · Week ${week}`;
+}
+
+export interface SimMatchupStatus {
+  key: "final" | "upcoming";
+  label: string;
+  tone: "success" | "muted";
+}
+
+/** The status key of a matchup card: FINAL once scored, UPCOMING before. */
+export function simMatchupStatus(game: { home_pts: number | null; away_pts: number | null; winner: string | null }): SimMatchupStatus {
+  const played = game.home_pts != null && game.away_pts != null;
+  return played ? { key: "final", label: "FINAL", tone: "success" } : { key: "upcoming", label: "UPCOMING", tone: "muted" };
+}
+
+/** Margin line for the matchup sheet: "Boom or Bust won by 12.4", "Tie", or "Not played yet". */
+export function simMatchupMargin(game: { home: string; away: string; home_pts: number | null; away_pts: number | null }, names: Record<string, string>): string {
+  if (game.home_pts == null || game.away_pts == null) return "Not played yet";
+  const diff = Math.round((game.home_pts - game.away_pts) * 10) / 10;
+  if (diff === 0) return "Tie";
+  const winner = diff > 0 ? game.home : game.away;
+  return `${names[winner] ?? "Team"} won by ${Math.abs(diff).toFixed(1)}`;
+}

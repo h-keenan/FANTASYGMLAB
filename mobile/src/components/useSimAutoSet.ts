@@ -3,7 +3,7 @@ import { useCallback, useState } from 'react';
 import type { SimCtx } from './SimGameParts';
 import { api } from '../lib/api';
 import type { SimLineupResponse } from '../lib/simGame';
-import { simAutoSetMessage, simLineupDiff } from '../lib/simLayout';
+import { simAutoSetMessage, simLineupDiff, simLineupIssues } from '../lib/simLayout';
 
 /**
  * Auto-set the best lineup (POST .../lineup/auto) and say what changed (mirrors
@@ -30,9 +30,12 @@ export function useSimAutoSet(ctx: SimCtx, onApplied?: (lineup: SimLineupRespons
     if (!body?.slots) return;
     const toSlots = (r: SimLineupResponse | null) => (r?.slots ?? []).map((s) => ({ slot: s.slot as string, player: s.player ? { id: s.player.id, name: s.player.name } : null }));
     const diff = simLineupDiff(toSlots(before), toSlots(body), before?.projected_total ?? null, body.projected_total ?? null);
-    notify(simAutoSetMessage(diff), diff.swaps.length ? 'success' : 'muted');
+    const issues = simLineupIssues(body.slots ?? [], body.warnings ?? []);
+    const unfixed = issues.empty.length + issues.zero.length > 0;
+    notify(simAutoSetMessage(diff, issues), diff.swaps.length && !unfixed ? 'success' : 'muted');
     if (diff.swaps.length === 0) {
-      setOptimalAtTick(ctx.tick);
+      // "Optimal" only when nothing is left unfixed (no empty slot, no bye/out starter).
+      if (!unfixed) setOptimalAtTick(ctx.tick);
       return;
     }
     onApplied?.(body);
