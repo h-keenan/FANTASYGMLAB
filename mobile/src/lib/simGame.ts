@@ -3015,6 +3015,35 @@ export function simReserveActions(player: SimGamePlayer, ctx: SimMoveContext): S
   ];
 }
 
+const RESERVE_SHORT_REASON: Record<string, string> = {
+  ir_full: "IR full",
+  ir_ineligible: "Not injured",
+  taxi_full: "Taxi full",
+  taxi_ineligible: "Not eligible",
+  roster_full: "Roster full",
+  reserves_unavailable: "Not available",
+};
+
+/** Button label for a move: a disabled move carries its reason ("Move to taxi · Taxi full") instead of a floating sentence. */
+export function simReserveButtonLabel(action: SimReserveAction): string {
+  if (action.check.ok || !action.check.reason) return action.label;
+  return `${action.label} \u00b7 ${RESERVE_SHORT_REASON[action.check.reason] ?? "Not available"}`;
+}
+
+/**
+ * The likely action when a move to the taxi squad is refused only because it is full: swap him with a
+ * taxi player (promote that one, then move him). Empty unless the refusal is exactly taxi_full.
+ */
+export function simTaxiSwapCandidates(
+  player: Pick<SimGamePlayer, "pos" | "taxi_eligible" | "squad">,
+  action: SimReserveAction,
+  taxi: readonly SimGamePlayer[],
+): SimGamePlayer[] {
+  if (action.to !== "taxi" || action.check.reason !== "taxi_full") return [];
+  if (squadOf(player) !== "roster" || !player.taxi_eligible || !simTradable(player.pos)) return [];
+  return [...taxi];
+}
+
 /** Why a move is not allowed, in plain words (the backend `message` wins when there is one). */
 export function simReserveReasonText(reason: string | null | undefined, message?: string | null): string {
   if (message) return message;

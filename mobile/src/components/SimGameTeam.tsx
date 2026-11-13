@@ -16,7 +16,7 @@ import { SkeletonCard } from './SkeletonBlock';
 import { SimPickLine, SimPlayerChips, useSimPicks } from './SimGameDynastyParts';
 import { SimPlayerBrowser } from './SimGamePlayers';
 import { SimReserveButton, SimReserveGroups, SimReserveSheet } from './SimGameReserves';
-import { SimFold, SimIconButton, SimPlayerChip, SimPlayerLine, SimSectionTitle, SimSheet, SimStat, SimTeamLink, SimToneBadge, createSimStyles, simToneColor, type SimCtx } from './SimGameParts';
+import { SimFold, SimIconButton, SimPlayerChip, SimPlayerLine, SimRosterLine, SimSectionTitle, SimSheet, SimStat, SimTeamLink, SimToneBadge, createSimStyles, simToneColor, type SimCtx } from './SimGameParts';
 import { useThemeMode } from '../context/ThemeModeContext';
 import { api } from '../lib/api';
 import {
@@ -232,7 +232,7 @@ export function SimTeamTab({ ctx, onTrade }: { ctx: SimCtx; onTrade: () => void 
           }
         />
         {slots.map((slot, index) => (
-          <LineupRow key={`${slot.slot}-${index}`} slotLabel={labels[index]} slot={slot.slot} player={slot.player} locked={lineup.locked} onOpen={ctx.openPlayer} onPick={() => setPickSlot(index)} onMove={reservesOn && slot.player?.status === 'out' ? setMoving : undefined} />
+          <LineupRow key={`${slot.slot}-${index}`} week={game.week} slotLabel={labels[index]} slot={slot.slot} player={slot.player} locked={lineup.locked} onOpen={ctx.openPlayer} onPick={() => setPickSlot(index)} onMove={reservesOn && slot.player?.status === 'out' ? setMoving : undefined} />
         ))}
       </View>
 
@@ -242,10 +242,10 @@ export function SimTeamTab({ ctx, onTrade }: { ctx: SimCtx; onTrade: () => void 
           <EmptyState icon="albums-outline" title="Empty bench" subtitle="Add free agents from the Players tab." />
         ) : (
           bench.map((player) => (
-            <SimPlayerLine
+            <SimRosterLine
               key={player.id}
               player={player}
-              muted
+              week={game.week}
               onOpen={ctx.openPlayer}
               extra={<SimPlayerChips player={player} />}
               trailing={
@@ -256,7 +256,6 @@ export function SimTeamTab({ ctx, onTrade }: { ctx: SimCtx; onTrade: () => void 
                   </>
                 ) : (
                   <>
-                    <SimStat label="Proj" value={simFmtPts(player.projection)} />
                     {reservesOn ? <SimReserveButton player={player} onOpen={setMoving} /> : null}
                     <Button size="sm" variant={overLimit ? 'dangerOutline' : 'ghost'} label="Cut" onPress={() => setCutting(player.id)} />
                   </>
@@ -275,6 +274,7 @@ export function SimTeamTab({ ctx, onTrade }: { ctx: SimCtx; onTrade: () => void 
           ctx={ctx}
           player={moving}
           state={reserveState}
+          taxi={lineup.taxi ?? []}
           onClose={() => setMoving(null)}
           onMoved={(body, player, to) => {
             setMoving(null);
@@ -292,14 +292,13 @@ export function SimTeamTab({ ctx, onTrade }: { ctx: SimCtx; onTrade: () => void 
             <AppText style={common.small}>No one on your roster fits this slot.</AppText>
           ) : (
             candidates.map(({ player, from }) => (
-              <SimPlayerLine
+              <SimRosterLine
                 key={player.id}
                 player={player}
-                selected={slots[pickSlot].player?.id === player.id}
+                week={game.week}
                 extra={from === 'slot' ? <SimToneBadge label="Starting elsewhere: swaps" tone="muted" /> : undefined}
                 trailing={
                   <>
-                    <SimStat label="Proj" value={simFmtPts(player.projection)} />
                     <Button
                       size="sm"
                       label="Start"
@@ -566,48 +565,32 @@ function createStyles(colors: ThemeColors) {
  * Change / Fill control. The player's own position shows only where the slot
  * does not already say it (FLEX, SUPERFLEX), as a small dot + label in the subline.
  */
-function LineupRow({ slotLabel, slot, player, locked, onOpen, onPick, onMove }: { slotLabel: string; slot: SimSlot; player: SimGamePlayer | null; locked?: boolean; onOpen: (p: SimGamePlayer) => void; onPick: () => void; onMove?: (p: SimGamePlayer) => void }) {
-  const { colors, isDark } = useThemeMode();
-  const showPos = player ? !simSlotRepeatsPosition(slot, player.pos) : false;
-  const posColor = player ? positionColor(player.pos, isDark, colors.textSecondary) : colors.textSecondary;
-  const sub = player ? [player.team, player.status === 'out' ? 'Out' : player.status === 'bye' ? 'Bye' : null].filter(Boolean).join(' · ') : '';
+function LineupRow({ slotLabel, slot, player, locked, week, onOpen, onPick, onMove }: { slotLabel: string; slot: SimSlot; player: SimGamePlayer | null; locked?: boolean; week?: number | null; onOpen: (p: SimGamePlayer) => void; onPick: () => void; onMove?: (p: SimGamePlayer) => void }) {
+  const { colors } = useThemeMode();
+  const swap = <SimIconButton disabled={locked} label={player ? `Change ${slotLabel}` : `Fill ${slotLabel}`} primary={!player} glyph={player ? 'trade' : 'check'} onPress={onPick} />;
+  if (player) {
+    return (
+      <SimRosterLine
+        player={player}
+        slot={{ slot, label: slotLabel }}
+        week={week}
+        onOpen={onOpen}
+        trailing={
+          <>
+            {onMove ? <SimReserveButton player={player} onOpen={onMove} /> : null}
+            {swap}
+          </>
+        }
+      />
+    );
+  }
   return (
-    <View
-      testID="lineup-row"
-      style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm, minHeight: 52, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border }}
-    >
+    <View testID="lineup-row" style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm, minHeight: 52, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border }}>
       <View style={{ width: 52, alignItems: 'center' }}>
         <PositionBadge position={slot} label={slotLabel} />
       </View>
-      {player ? (
-        <Pressable
-          onPress={() => onOpen(player)}
-          accessibilityRole="button"
-          accessibilityLabel={`${player.name}, ${player.pos}. Open player details`}
-          style={{ flex: 1, minWidth: 0, flexDirection: 'row', alignItems: 'center', gap: spacing.sm, minHeight: 44 }}
-        >
-          <PlayerAvatar playerId={simHeadshotId(player)} fallbackLabel={simPlayerInitials(player)} size={32} />
-          <View style={{ flex: 1, minWidth: 0 }}>
-            <PlayerName name={player.name} style={{ fontSize: 14, fontWeight: '800', color: player.status === 'healthy' ? colors.textPrimary : colors.textTertiary }} />
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
-              {showPos ? (
-                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 3 }} accessibilityLabel={player.pos}>
-                  <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: posColor }} />
-                  <AppText style={{ fontSize: 12, fontWeight: '800', color: posColor }}>{player.pos}</AppText>
-                </View>
-              ) : null}
-              <AppText style={{ flex: 1, fontSize: 12, color: colors.textTertiary }} numberOfLines={1}>
-                {sub}
-              </AppText>
-            </View>
-          </View>
-        </Pressable>
-      ) : (
-        <AppText style={{ flex: 1, fontSize: 13, color: colors.warning }}>Empty slot</AppText>
-      )}
-      <AppText style={{ width: 44, textAlign: 'right', fontSize: 14, fontWeight: '800', color: colors.textPrimary }}>{player ? simFmtPts(player.projection) : ''}</AppText>
-      {onMove && player ? <SimReserveButton player={player} onOpen={onMove} /> : null}
-      <SimIconButton disabled={locked} label={player ? `Change ${slotLabel}` : `Fill ${slotLabel}`} primary={!player} glyph={player ? 'trade' : 'check'} onPress={onPick} />
+      <AppText style={{ flex: 1, fontSize: 13, color: colors.warning }}>Empty slot</AppText>
+      {swap}
     </View>
   );
 }

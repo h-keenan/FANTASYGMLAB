@@ -11,13 +11,14 @@ import { PlayerAvatar } from "@/components/PlayerAvatar";
 import { PlayerListRow } from "@/components/PlayerListRow";
 import { PlayerIdentity } from "@/components/PlayerRow";
 import type { PlayerListStat, PlayerListTag } from "@/lib/playerListRow";
-import { simDraftMeta, simDraftRowChips } from "@/lib/simDraft";
+import { simDraftMeta, simDraftRowChips, simListStats } from "@/lib/simDraft";
 import { ReviewGlyphChip } from "@/components/SeasonReviewSections";
 import { SectionHeading } from "@/components/SectionHeading";
 import { SheetHandle } from "@/components/SheetHandle";
 import { SimCrest } from "@/components/SimCrest";
 import { SimGlyph } from "@/components/SimGlyph";
 import { ReviewGlyphIcon } from "@/components/SimReviewGlyph";
+import { PositionBadge } from "@/components/PositionBadge";
 import { ToneBadge } from "@/components/ToneBadge";
 import {
   simFmtPts,
@@ -27,7 +28,9 @@ import {
   simNoticeGlyph,
   simHeadshotId,
   simPlayerInitials,
+  simSlotRepeatsPosition,
   type SimGlyphName,
+  type SimSlot,
   type SimPlayerRef,
   type SimGame,
   type SimGameEnvelope,
@@ -255,6 +258,49 @@ export function SimPlayerLine({
       onOpen={onOpen ? () => onOpen(player) : undefined}
       openLabel={`${player.name}, ${player.pos}. Open player details`}
     />
+  );
+}
+
+/**
+ * THE roster row (lineup starters, bench, IR, taxi): one component, one info set. Age, bye, injury chip,
+ * labeled PROJ and OVR, tags and tap-to-open all come from SimPlayerLine + simListStats, so a starter shows
+ * exactly what a bench player shows. `slot` adds the leading slot-label column (QB, RB1, FLEX ...); a
+ * flex-type slot also keeps the player's own position pill, since the slot label no longer says it.
+ */
+export function SimRosterLine({
+  player,
+  slot,
+  trailing,
+  onOpen,
+  extra,
+  week = null,
+}: {
+  player: SimGamePlayer;
+  slot?: { slot: SimSlot; label: string };
+  trailing?: ReactNode;
+  onOpen?: (player: SimGamePlayer) => void;
+  extra?: ReactNode;
+  week?: number | null;
+}) {
+  const line = (
+    <SimPlayerLine
+      player={player}
+      week={week}
+      stats={simListStats(player, { adp: false })}
+      hidePosition={slot ? simSlotRepeatsPosition(slot.slot, player.pos) : false}
+      extra={extra}
+      trailing={trailing}
+      onOpen={onOpen}
+    />
+  );
+  if (!slot) return line;
+  return (
+    <div className="flex items-stretch" data-testid="lineup-row">
+      <span className="flex shrink-0 items-center justify-center" style={{ width: "3.25rem", borderBottom: "1px solid color-mix(in srgb, var(--color-border) 55%, transparent)" }}>
+        <PositionBadge position={slot.slot} label={slot.label} />
+      </span>
+      <div className="min-w-0 flex-1">{line}</div>
+    </div>
   );
 }
 

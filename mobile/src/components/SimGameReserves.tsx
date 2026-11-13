@@ -4,13 +4,15 @@ import { View } from 'react-native';
 import AppText from './AppText';
 import Button from './Button';
 import { SimCollapse, SimPlayerChips } from './SimGameDynastyParts';
-import { SimPlayerLine, SimSheet, SimStat, createSimStyles, type SimCtx } from './SimGameParts';
+import { SimIconButton, SimRosterLine, SimSheet, createSimStyles, type SimCtx } from './SimGameParts';
 import { useThemeMode } from '../context/ThemeModeContext';
 import { api } from '../lib/api';
 import {
   simFmtPts,
   simGameGate,
   simReserveActions,
+  simReserveButtonLabel,
+  simTaxiSwapCandidates,
   simReserveReasonText,
   simReserveUsedLine,
   type SimGamePlayer,
@@ -42,12 +44,15 @@ export function SimReserveSheet({
   ctx,
   player,
   state,
+  taxi = [],
   onClose,
   onMoved,
 }: {
   ctx: SimCtx;
   player: SimGamePlayer;
   state: SimReserveState;
+  /** Players on the taxi squad, for the "Taxi full - swap with..." shortcut. */
+  taxi?: SimGamePlayer[];
   onClose: () => void;
   onMoved: (body: SimLineupResponse, player: SimGamePlayer, to: SimReserveMoveTo) => void;
 }) {
@@ -56,6 +61,32 @@ export function SimReserveSheet({
   const [busy, setBusy] = useState<SimReserveMoveTo | null>(null);
   const [refusal, setRefusal] = useState<string | null>(null);
   const actions = simReserveActions(player, moveContext(state));
+
+  const [swapOpen, setSwapOpen] = useState(false);
+
+  async function swap(other: SimGamePlayer) {
+    // Promote the taxi player first (that frees the taxi slot), then move him in.
+    setBusy('taxi');
+    setRefusal(null);
+    try {
+      const freed = await api.moveSimPlayer(ctx.gameId, { player_id: other.id, to: 'roster' });
+      const gate = simGameGate(freed);
+      if (gate.kind === 'blocked') {
+        setRefusal(simReserveReasonText(gate.reason, freed.message));
+        return;
+      }
+      if (gate.kind !== 'ready') {
+        await ctx.call(async () => freed);
+        return;
+      }
+    } catch {
+      setRefusal('Could not swap. Try again.');
+      return;
+    } finally {
+      setBusy(null);
+    }
+    await go({ to: 'taxi', label: 'Move to taxi', check: { ok: true } });
+  }
 
   async function go(action: SimReserveAction) {
     setBusy(action.to);
@@ -92,36 +123,44 @@ export function SimReserveSheet({
         <SimPlayerChips player={player} />
       </View>
       <View style={common.stack}>
-        {actions.map((action) => (
-          <View key={action.to} style={common.tight}>
-            <Button
-              variant={action.check.ok ? 'primary' : 'secondary'}
-              disabled={!action.check.ok || busy !== null}
-              loading={busy === action.to}
-              label={action.label}
-              onPress={() => void go(action)}
-            />
-            {!action.check.ok && action.check.reason ? (
-              <AppText style={common.muted} testID={`reserve-hint-${action.to}`}>
-                {simReserveReasonText(action.check.reason)}
-              </AppText>
-            ) : null}
-          </View>
-        ))}
+        {actions.map((action) => {
+          const swaps = simTaxiSwapCandidates(player, action, taxi);
+          return (
+            <View key={action.to} style={common.tight}>
+              <Button
+                variant={action.check.ok ? 'primary' : 'secondary'}
+                disabled={!action.check.ok || busy !== null}
+                loading={busy === action.to}
+                label={simReserveButtonLabel(action)}
+                onPress={() => void go(action)}
+              />
+              {swaps.length > 0 ? (
+                <>
+                  <Button variant="ghost" disabled={busy !== null} label="Taxi full — swap with…" onPress={() => setSwapOpen((v) => !v)} />
+                  {swapOpen
+                    ? swaps.map((other) => (
+                        <Button key={other.id} size="sm" variant="secondary" disabled={busy !== null} label={`Swap with ${other.name}`} onPress={() => void swap(other)} />
+                      ))
+                    : null}
+                </>
+              ) : null}
+            </View>
+          );
+        })}
       </View>
       {refusal ? (
         <AppText style={[common.bodyStrong, { color: colors.warning }]} accessibilityRole="alert" testID="reserve-refusal">
           {refusal}
         </AppText>
       ) : null}
-      <Button variant="ghost" label="Close" onPress={onClose} />
     </SimSheet>
   );
 }
 
 /** The "Move" button for a roster row; opens the sheet through `onOpen`. */
 export function SimReserveButton({ player, onOpen }: { player: SimGamePlayer; onOpen: (player: SimGamePlayer) => void }) {
-  return <Button size="sm" variant="ghost" label="Move" onPress={() => onOpen(player)} />;
+  // A compact icon (not a text button) so the player's name keeps the row width.
+  return <SimIconButton label={`Move ${player.name} to IR, taxi or roster`} glyph="injury" onPress={() => onOpen(player)} />;
 }
 
 /**
@@ -168,10 +207,9 @@ export function SimReserveGroups({
             <AppText style={common.muted}>{g.empty}</AppText>
           ) : (
             g.players.map((player) => (
-              <SimPlayerLine
+              <SimRosterLine
                 key={player.id}
-                player={player}
-                muted
+                player={{ ...player, squad: g.kind }}
                 onOpen={openPlayer}
                 extra={<SimPlayerChips player={{ ...player, squad: g.kind }} />}
                 trailing={
@@ -182,7 +220,6 @@ export function SimReserveGroups({
                     </>
                   ) : (
                     <>
-                      <SimStat label="Proj" value={simFmtPts(player.projection)} />
                       <SimReserveButton player={{ ...player, squad: g.kind }} onOpen={onOpen} />
                       {onCut && onAskCut ? <Button size="sm" variant="ghost" label="Cut" onPress={() => onAskCut(player.id)} /> : null}
                     </>
