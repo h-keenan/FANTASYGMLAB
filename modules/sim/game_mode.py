@@ -107,9 +107,9 @@ POLICIES: dict[str, ModePolicy] = {
 # Saves created before modes existed (rules == 1).
 LEGACY_POLICY = replace(POLICIES["redraft"], vorp_weight=0.75, season_valuation=False, horizon_floor=0.0,
                         pitches={}, blurbs={})
-DYNASTY_VERSION = 2  # dynasty saves carry this in their settings ("dynasty_v"); 2 = rookie scouting profiles + development curves
-MAX_SEASONS = 5  # the initial dynasty cap
-SEASON_CHOICES = (3, 4, 5)
+DYNASTY_VERSION = 3  # dynasty saves carry this in their settings ("dynasty_v"); 2 = rookie scouting profiles + development curves; 3 = league-anchored talent equilibrium (long dynasties)
+MAX_SEASONS = 20  # the dynasty cap (was 5 until dynasty_v 3)
+SEASON_CHOICES = (3, 4, 5, 10, 15, 20)
 DEFAULT_SEASONS = 5
 PICK_YEARS = 3  # rookie drafts of picks held at any time
 ROOKIE_ROUNDS = (2, 3, 4, 5)

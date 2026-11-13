@@ -49,6 +49,8 @@ def pool_stats(snap, state) -> dict[str, Any]:
         group = sorted((p for p in pl if p.pos == pos), key=lambda p: (-p.mean, p.pid))
         n = len([s for s in snap.settings.slots if s == pos]) * teams
         out[f"{pos}_n"] = len(group)
+        means = [p.mean for p in group]
+        out[f"{pos}_bands"] = [round(float(np.mean(means[a:b])), 2) if means[a:b] else 0.0 for a, b in ((0, 12), (12, 24), (24, 36), (36, 60))]
         out[f"{pos}_top12_mean"] = round(float(np.mean([p.mean for p in group[:12]])), 2) if group else 0.0
         out[f"{pos}_rank24_mean"] = round(group[min(23, len(group) - 1)].mean, 2) if group else 0.0
         starters += group[: max(1, n)]
@@ -67,7 +69,33 @@ def pool_stats(snap, state) -> dict[str, Any]:
     return out
 
 
-def play(seed: int, seasons: int, model_id: str, rows, byes, teams: int = 12) -> dict[str, Any]:
+def cost_probe(root, snap, state, events) -> dict[str, Any]:
+    """What a phone pays at this point of a long game: payload sizes and build times of the main views, the size of the saved
+    state, and how long a cold replay of the whole event log takes."""
+
+    from modules.sim import game_dynasty_view as dview
+    from modules.sim import game_home, game_view
+    from modules.sim.game_state import fold
+
+    def timed(fn):
+        t0 = time.time()
+        out = fn()
+        return round((time.time() - t0) * 1000, 1), len(json.dumps(out, default=str))
+
+    probe: dict[str, Any] = {}
+    probe["home_ms_bytes"] = timed(lambda: game_home.home_view(snap, state, 1))
+    probe["league_ms_bytes"] = timed(lambda: game_view.league_view(snap, state))
+    probe["players_ms_bytes"] = timed(lambda: game_view.players_page(snap, state))
+    probe["summary_ms_bytes"] = timed(lambda: dview.summary_view(snap, state))
+    probe["state_bytes"] = len(json.dumps(state.to_dict(), default=str))
+    t0 = time.time()
+    fold(snap.root, events)
+    probe["replay_s"] = round(time.time() - t0, 2)
+    probe["events"] = len(events)
+    return probe
+
+
+def play(seed: int, seasons: int, model_id: str, rows, byes, teams: int = 12, probes: tuple[int, ...] = ()) -> dict[str, Any]:
     base = GameSettings.parse({"mode": "dynasty", "teams": teams, "user_slot": 3, "start_year": 2026, "seasons": 5, "rookie_rounds": 3, "scoring": "ppr"})
     settings = replace(base, seasons=seasons)
     root = build_snapshot(rows, byes, settings, seed, scoring_model=model_id)
@@ -90,7 +118,6 @@ def play(seed: int, seasons: int, model_id: str, rows, byes, teams: int = 12) ->
         wk_pts: list[float] = []
         adds = trades = 0
         ev0 = len(em.events)
-        tx0 = len(state.transactions)
         while state.status in ("in_season", "playoffs"):
             w = state.week
             advance(em, snap, state, sd)
@@ -117,8 +144,8 @@ def play(seed: int, seasons: int, model_id: str, rows, byes, teams: int = 12) ->
             "wk_max": round(float(max(wk_pts)), 1) if wk_pts else 0.0,
             "ai_roster_mean": round(sum(ro.values()) / n_ai, 2),
             "ai_pos_mean": {k: round(v / n_ai, 2) for k, v in sorted(ro.items())},
-            "waivers": sum(1 for t in state.transactions[tx0:] if t["type"] == "waiver"),
-            "trades": sum(1 for t in state.transactions[tx0:] if t["type"] == "trade"),
+            "waivers": sum(1 for e in em.events[ev0:] if e["type"] == "waiver_result" and e["payload"].get("ok") and e["actor"] != "user" and not snap.team(e["payload"]["team"]).is_user),
+            "trades": sum(1 for e in em.events[ev0:] if e["type"] == "trade" and e["payload"].get("source") == "ai_ai"),
             "t_view_s": round(t_view, 3), "t_play_s": round(t_play, 2),
             "events": len(em.events), "events_bytes": len(json.dumps(em.events[ev0:], default=str)),
         })
@@ -138,23 +165,33 @@ def play(seed: int, seasons: int, model_id: str, rows, byes, teams: int = 12) ->
             cut_player(em, min(state.rosters[user], key=lambda p: (ev.worth(USER_PARAMS, p), p)))
         dyn.start_next_season(em, sd)
         row["t_offseason_s"] = round(time.time() - t0, 2)
+        if probes and season_no in probes:
+            row["probe"] = cost_probe(root, snap, state, list(em.events))
         row["state_bytes"] = len(json.dumps(state.to_dict(), default=str))
         row["rss_mb"] = round(_rss_mb(), 1)
         per.append(row)
-    return {"seed": seed, "seasons": per, "wall_s": round(time.time() - t_game, 1)}
+    out = {"seed": seed, "seasons": per, "wall_s": round(time.time() - t_game, 1)}
+    if probes:  # a cold process rebuilding the last season's pool from the season-1 snapshot alone
+        cold = build_snapshot(rows, byes, settings, seed, scoring_model=model_id)
+        t0 = time.time()
+        cold.season_view(seasons)
+        out["cold_season_view_s"] = round(time.time() - t0, 2)
+    return out
 
 
 def main(argv: list[str] | None = None) -> None:
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument("--seeds", type=int, default=2)
     ap.add_argument("--seasons", type=int, default=20)
+    ap.add_argument("--probes", default="1,5,10,20", help="seasons at which to measure payload and replay cost ('' = none)")
     ap.add_argument("--json", default="")
     args = ap.parse_args(argv)
     from modules.sim import game_scoring
 
     model_id = game_scoring.default_model().model_id
     pool, byes = tail_report.pool_from_panel(dataset.load_panel())
-    res = {"model": model_id, "games": [play(s, args.seasons, model_id, pool, byes) for s in range(1, args.seeds + 1)]}
+    probes = tuple(int(x) for x in args.probes.split(",") if x)
+    res = {"model": model_id, "games": [play(s, args.seasons, model_id, pool, byes, probes=probes) for s in range(1, args.seeds + 1)]}
     text = json.dumps(res, indent=1)
     if args.json:
         open(args.json, "w").write(text)
