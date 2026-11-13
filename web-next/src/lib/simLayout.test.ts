@@ -60,7 +60,7 @@ describe("simLayout", () => {
     expect(simAutoSetMessage({ swaps: [{ slot: "QB", out: "A", in: "B" }, { slot: "RB", out: "C", in: "D" }], gain: null })).toBe("Made 2 lineup swaps");
   });
   it("explains why Advance is disabled", () => {
-    expect(simAdvanceState({ phase: "regular_season", week: 4 }, 0)).toEqual({ label: "Week 4 \u2192 5", blocked: false, reason: null });
+    expect(simAdvanceState({ phase: "regular_season", week: 4 }, 0)).toEqual({ label: "Wk 4 \u2192 5", blocked: false, reason: null });
     expect(simAdvanceState({ phase: "regular_season", week: 4 }, 1).reason).toBe("Fill 1 empty slot");
     expect(simAdvanceState({ phase: "regular_season", week: 4 }, 3).reason).toBe("Fill 3 empty slots");
     expect(simAdvanceState({ phase: "regular_season", week: 4, pending: { cuts_needed: 2 } }, 1).reason).toBe("Cut 2 players first");

@@ -64,7 +64,7 @@ export function SimActionBar({ ctx, paywalled, advancing, onAdvance }: { ctx: Si
         {paywalled ? (
           <ButtonLink href="/premium" variant="premium" size="sm">Go Pro to continue</ButtonLink>
         ) : (
-          <Button loading={advancing} disabled={state.blocked} onClick={onAdvance} aria-label={simAdvanceLabel(game)} aria-describedby={state.reason ? reasonId : undefined}>
+          <Button className="whitespace-nowrap" loading={advancing} disabled={state.blocked} onClick={onAdvance} aria-label={simAdvanceLabel(game)} aria-describedby={state.reason ? reasonId : undefined}>
             {game.phase === "playoffs" ? "Play round" : `Advance ${state.label}`}
           </Button>
         )}

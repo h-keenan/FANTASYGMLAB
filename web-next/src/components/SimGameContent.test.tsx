@@ -298,7 +298,7 @@ describe("SimGameContent", () => {
     const bar = await screen.findByTestId("sim-action-bar");
     expect(await screen.findByText("Fill 1 empty slot")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Advance to week 5" })).toBeDisabled();
-    expect(bar).toHaveTextContent("Week 4");
+    expect(bar).toHaveTextContent("Wk 4");
     await openTeamTab();
     expect(screen.getByTestId("sim-action-bar")).toBeInTheDocument();
   });

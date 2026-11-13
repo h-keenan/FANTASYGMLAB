@@ -97,7 +97,7 @@ export function PillRow({
   const mask = `linear-gradient(to right, ${fade.left ? "transparent 0, #000 var(--space-xl)" : "#000 0"}, ${
     fade.right ? "#000 calc(100% - var(--space-xl)), transparent 100%" : "#000 100%"
   })`;
-  const segment = mode === "fill" ? "flex-1 min-w-0" : mode === "scroll" ? "shrink-0" : "shrink-0";
+  const segment = mode === "fill" ? "flex-1 min-w-fit" : mode === "scroll" ? "shrink-0" : "shrink-0";
 
   return (
     <div
@@ -128,7 +128,7 @@ export function PillRow({
           const className = `${segment} flex items-center justify-center whitespace-nowrap text-center font-bold uppercase text-[length:var(--segmented-font-size)]`;
           const style = {
             minHeight: sticky ? "var(--segmented-height-compact)" : "var(--segmented-height)",
-            padding: "0 var(--segmented-padding-x)",
+            padding: mode === "fill" ? "0 min(var(--segmented-padding-x), 0.5rem)" : "0 var(--segmented-padding-x)",
             letterSpacing: "var(--letter-spacing-tight)",
             background: isActive ? "var(--segmented-active-bg, var(--color-information-soft))" : "transparent",
             color: isActive ? "var(--segmented-active-fg, var(--color-text-primary))" : "var(--color-text-secondary)",

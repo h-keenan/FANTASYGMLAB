@@ -172,7 +172,7 @@ export function simAutoSetMessage(diff: SimLineupDiff): string {
 // Always-reachable action bar
 
 export interface SimAdvanceState {
-  /** "Week 4 \u2192 5" or "Play round". */
+  /** "Wk 4 \u2192 5" or "Play round". */
   label: string;
   blocked: boolean;
   /** Why Advance is disabled (null when it is not). */
@@ -184,7 +184,7 @@ export function simAdvanceState(
   game: { phase?: string; week: number; pending?: { cuts_needed?: number } | null },
   emptySlots: number,
 ): SimAdvanceState {
-  const label = game.phase === "playoffs" ? "Play round" : `Week ${game.week} \u2192 ${game.week + 1}`;
+  const label = game.phase === "playoffs" ? "Play round" : `Wk ${game.week} \u2192 ${game.week + 1}`;
   const cuts = game.pending?.cuts_needed ?? 0;
   if (cuts > 0) return { label, blocked: true, reason: `Cut ${cuts} player${cuts === 1 ? "" : "s"} first` };
   if (emptySlots > 0) return { label, blocked: true, reason: `Fill ${emptySlots} empty slot${emptySlots === 1 ? "" : "s"}` };

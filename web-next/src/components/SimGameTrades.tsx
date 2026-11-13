@@ -11,7 +11,7 @@ import { SectionHeading } from "@/components/SectionHeading";
 import { ReviewGlyphChip } from "@/components/SeasonReviewSections";
 import { SimCrest } from "@/components/SimCrest";
 import { SimGlyph } from "@/components/SimGlyph";
-import { SimPlayerChip, SimPlayerLine, SimSideLabel, SimStat, SimTeamLink, SimTeamOpenContext, SimToneBadge, simToneColor, type SimCtx } from "@/components/SimGameParts";
+import { SimPlayerChip, SimPlayerLine, SimSideLabel, SimStat, SimTeamOpenContext, SimToneBadge, simToneColor, type SimCtx } from "@/components/SimGameParts";
 import { SkeletonCard, SkeletonRows } from "@/components/Skeleton";
 import { ToneBadge } from "@/components/ToneBadge";
 import { api } from "@/lib/api";
