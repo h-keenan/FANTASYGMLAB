@@ -733,7 +733,7 @@ Rules, pinned by `tests/test_sim_trade_counters.py`:
 
 `GET /v1/sim/games/{id}/sim-to/options` lists the milestones that make sense now (`weeks` 1 / 4, `trade_deadline`,
 `playoffs_start`, `season_end`). `POST /v1/sim/games/{id}/sim-to` `{target, weeks?, auto_set?, force_first?}` plays weeks in ONE request
-(`modules/sim/game_simto.py`): it is the same `advance` repeated on one Emitter, so the events, replayed state and digest equal that many
+(`modules/sim/game_simto.py`; `target` must be one of the listed milestones and `weeks` 1-30, else 422): it is the same `advance` repeated on one Emitter, so the events, replayed state and digest equal that many
 manual Advances (plus a `lineup_set` before each week when `auto_set`, exactly what Auto-set emits). Before each week it stops with
 `stopped: {code, week, message, fix}` for: roster over the limit (hard), a starter out / on a bye / an empty slot, trade offers expiring this
 week, the free-preview paywall; `force_first` plays past a soft stop for the first week ("Sim anyway"). A 25 s budget pauses with
@@ -743,10 +743,10 @@ back (deletes events and later checkpoints from `from_seq`, which must be an `ad
 
 ## Trade block (block_v 1+)
 
-Version gate: `settings.block_v` (1 on every new game, absent on older saves). Without it there is no block anywhere: the endpoints say
+Version gate: `settings.block_v` (2 on every new game, 1 on saves made before the block forgot assets, absent on older saves). Without it there is no block anywhere: the endpoints say
 `enabled: false`, offers are generated exactly as before, and no `block` key appears on any row, so an old save plays and fingerprints as
 it always did (the empty block is also left out of the state digest). The user's block is the `block_set` event
-(`{pid, on, looking_for}`) folded into `state.block`; blocked assets that leave the team drop off by themselves (derived from ownership).
+(`{pid, on, looking_for}`) folded into `state.block`; blocked assets that leave the team drop off by themselves (derived from ownership); from `block_v` 2 the fold also removes them from `state.block` (cut, traded, dropped, retired, spent pick), so an asset you get back is not on the block again (block_v 1 saves keep the derived-only behaviour).
 
 - `GET /games/{id}/block` -> `{enabled, mine: [{asset, looking_for, since_week}], league: [{team_id, name, stance, looking_for, needs, items: [{asset, why}]}], max_items, offers_from_block}`.
 - `PUT /games/{id}/block {asset_id, on, looking_for?}` puts a player or pick (dynasty) on / off your block (max 8; QB/RB/WR/TE hint; K/DEF cannot be traded).

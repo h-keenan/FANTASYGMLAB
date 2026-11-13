@@ -936,6 +936,10 @@ def add_routes(router: APIRouter, ctx: GameApiCtx) -> None:
     @router.post("/games/{game_id}/sim-to")
     @guarded
     def post_sim_to(game_id: str, body: SimToBody, user: dict[str, Any] = Depends(require_user)):
+        if body.target not in simto.TARGETS:
+            raise ValueError("target must be one of: " + ", ".join(simto.TARGETS) + ".")
+        if not 1 <= body.weeks <= simto.MAX_WEEKS:
+            raise ValueError(f"weeks must be between 1 and {simto.MAX_WEEKS}.")
         """Play weeks in one request (see game_simto): the same Advance repeated, so the events are what that many
         Advances would write, one commit, one response. Stops early with a reason when you have something to decide."""
         pro = ctx.is_pro(user)

@@ -251,10 +251,19 @@ def _waiver_cancel(state, snap, week, p):
     state.claims = [c for c in state.claims if c["id"] != p["id"]]
 
 
+def _unblock(state, snap, pids) -> None:
+    """block_v 2: assets that left the team come off the user's trade block (see ``GameSettings.block_forgets``)."""
+
+    if snap.settings.block_forgets and state.block:
+        for pid in pids:
+            state.block.pop(pid, None)
+
+
 def _waiver_result(state, snap, week, p):
     tid = p["team"]
     if p["ok"]:
         if p.get("drop"):
+            _unblock(state, snap, [p["drop"]])
             state.rosters[tid].remove(p["drop"])
             _remove_from_lineups(state, tid, [p["drop"]])
         state.rosters[tid].append(p["add"])
@@ -268,6 +277,7 @@ def _waiver_result(state, snap, week, p):
 
 
 def _cut(state, snap, week, p):
+    _unblock(state, snap, [p["pid"]])
     state._drop_everywhere(p["team"], p["pid"])
     _remove_from_lineups(state, p["team"], [p["pid"]])
     _tx(state, week, "drop", team=p["team"], pid=p["pid"], reason=p.get("reason", "cut"))
@@ -275,6 +285,7 @@ def _cut(state, snap, week, p):
 
 def _trade(state, snap, week, p):
     a, b = p["team_a"], p["team_b"]
+    _unblock(state, snap, [*p["give"], *p["get"]])
     for pid in p["give"]:
         if is_pick_id(pid):
             state.pick_owner[pid] = b
@@ -404,6 +415,7 @@ def _season_complete(state, snap, week, p):
     # ``state.view_no`` is the next season, so the pool is next year's aged players.
     state.seasons.append(copy.deepcopy(p["archive"]))
     gone = {str(x) for x in p.get("retired", ())}
+    _unblock(state, snap, gone)
     for tid in state.rosters:
         for squad in (state.rosters, state.ir, state.taxi):
             squad[tid] = [pid for pid in squad.get(tid, ()) if pid not in gone]
@@ -428,6 +440,7 @@ def _rookie_pick(state, snap, week, p):
     off = state.offseason
     pid_pick = p["pick"]
     owner = state.pick_owner.pop(pid_pick)
+    _unblock(state, snap, [pid_pick])
     state.rosters[p["team"]].append(p["pid"])
     entry = {"n": int(p["n"]), "round": int(p["round"]), "pick": pid_pick, "orig": p["orig"], "team": p["team"],
              "pid": p["pid"], "auto": bool(p.get("auto"))}

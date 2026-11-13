@@ -41,7 +41,7 @@ DEFAULT_TAXI_SLOTS_DYNASTY = 4
 RESERVE_VERSION = 1
 AI_VERSION = 1  # 1: AI managers plan depth around byes and injuries, use the wire proactively (new games only)
 VIEWS_KEPT = 2  # dynasty_v 3: season pools kept in memory behind the latest
-BLOCK_VERSION = 1  # 1 = the trade block: user block, AI blocks, block-aware offers (0 = a save from before it: nothing changes)
+BLOCK_VERSION = 2  # 1 = the trade block: user block, AI blocks, block-aware offers (0 = a save from before it: nothing changes); 2 = an asset leaving the team leaves the block for good
 TIEBREAKERS = ("points_for", "head_to_head")  # standings/seed tiebreak after win pct
 DEFAULT_TIEBREAKER = "points_for"
 LEGACY_TIEBREAKER = "head_to_head"  # saves from before the setting existed
@@ -221,6 +221,12 @@ class GameSettings:
         """Rookie classes and their market values are scaled to the league's own season-1 talent level, not to the aged pool of the moment
         (dynasty_v 3+). Without it a long dynasty feeds back on itself: weaker veterans make weaker classes, which make weaker veterans."""
         return self.dynasty and self.dynasty_v >= 3
+
+    @property
+    def block_forgets(self) -> bool:
+        """block_v 2+: an asset that leaves your team (cut, traded, dropped, retired, spent pick) is taken off the block in the state, so
+        getting him back does not put him on the block again. block_v 1 saves keep the derived-only behaviour they replay with."""
+        return self.block_v >= 2
 
     @property
     def multi_season(self) -> bool:
