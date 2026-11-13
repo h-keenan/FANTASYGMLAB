@@ -91,7 +91,7 @@ def offseason_view(snap: GameSnapshot, state: GameState, *, pos: str = "", limit
         },
         "roster": {"size": len(state.rosters[user]), "limit": S.roster_limit, "cuts_needed": over,
                    **reserve_block(snap, state, ev, user, owners, 1)},
-        "can_trade": trade_window(snap, state) is None and stage != "rookie_draft",
+        "can_trade": trade_window(snap, state) is None,
         "next": {"review": "start_rookie_draft", "rookie_draft": "finish_draft", "cutdown": "start_season"}.get(stage or ""),
         "picks_held": len(state.picks_of(user)),
     }

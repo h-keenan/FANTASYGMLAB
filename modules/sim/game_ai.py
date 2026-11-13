@@ -398,8 +398,10 @@ def validate_offer(snap: GameSnapshot, state: GameState, partner: str, give: Seq
                     raise ValueError("Draft picks cannot be traded in this league.")
                 if state.pick_owner.get(pid) != owner:
                     raise ValueError(f"You can only trade picks on {who} side that {'you' if label == 'give' else 'they'} own.")
-                if state.offseason and state.offseason.get("stage") == "rookie_draft" and pid.split(":")[1] == str(state.offseason["year"]):
-                    raise GameError("picks_locked", "That draft is under way: its picks cannot be traded.")
+                # Picks are tradable through the whole rookie draft (the draft order follows
+                # pick ownership); only a pick that has already been used is spent.
+                if state.offseason and any(m.get("pick") == pid for m in state.offseason.get("picks", ())):
+                    raise GameError("picks_locked", "That pick has already been used in the draft.")
             elif pid not in snap.players or state.where(owner, pid) is None:
                 raise ValueError(f"You can only {'give players on your roster' if label == 'give' else 'ask for players on that team' + chr(39) + 's roster'}.")
             elif snap.players[pid].pos in NON_TRADABLE:

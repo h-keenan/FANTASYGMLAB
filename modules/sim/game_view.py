@@ -389,7 +389,7 @@ def draft_view(
     }
     if full:
         draft["order"] = [{"pick_no": i + 1, "round": i // snap.settings.teams + 1, "team_id": t} for i, t in enumerate(ctx.order)]
-        draft["picks"] = [pick_row(snap, state, ev, owners, p) for p in state.picks]
+        draft["picks"] = [pick_row(snap, state, ev, owners, p) for p in state.picks if p["pid"] in snap.players]  # a later season's view omits retired players
         draft["teams"] = [
             {"team_id": t.tid, "name": t.name, "persona_id": t.persona_id, "is_you": t.is_user} for t in snap.teams
         ]
@@ -432,7 +432,16 @@ def _asset_name(snap: GameSnapshot, pid: str) -> str:
     if is_pick_id(pid):
         _, season, rnd, orig = pid.split(":", 3)
         return f"{season} round {rnd} pick ({snap.team(orig).name})"
-    return snap.players[pid].name
+    player = snap.players.get(pid)
+    if player is None:
+        # A past season's move can name someone the current season's view no longer
+        # carries (retired, or a rookie of an earlier class): look in the other views.
+        root = snap.root
+        for other in (root, *getattr(root, "_views", {}).values()):
+            player = other.players.get(pid)
+            if player is not None:
+                break
+    return player.name if player is not None else "a former player"
 
 
 def _tx_text(snap: GameSnapshot, tx: Mapping[str, Any]) -> tuple[str, str]:

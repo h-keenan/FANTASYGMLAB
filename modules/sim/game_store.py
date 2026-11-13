@@ -14,14 +14,16 @@ Tables: ``sim_games`` (the save: settings + frozen snapshot), ``sim_events``
 
 from __future__ import annotations
 
+import logging
 import threading
+import time
 import uuid
 from collections import OrderedDict
 from typing import Any, Mapping, Sequence
 
 from modules.sim.game_state import GameState, fold
 from modules.sim.game_types import GAME_ENGINE_VERSION, GameSnapshot
-from modules.sim.store import CONFLICT, SimBackend, SimStoreError, _now
+from modules.sim.store import CONFLICT, TRANSIENT_CODES, SimBackend, SimStoreError, _now
 
 GAMES = "sim_games"
 EVENTS = "sim_events"
@@ -34,6 +36,16 @@ LIST_COLUMNS = (
 CHECKPOINTS_KEPT = 2
 EVENT_PAGE = 1000
 _SNAPSHOT_CACHE_SIZE = 24
+# sim_games_status_check only allows these (docs/supabase_sim_game.sql). The fold's
+# own status ("offseason" between dynasty seasons) is richer; the column is only a
+# list-view cache, so anything else is stored as the closest allowed value.
+DB_STATUSES = frozenset({"drafting", "in_season", "playoffs", "complete"})
+_log = logging.getLogger(__name__)
+RETRY_DELAY = 0.3
+
+
+def db_status(status: str) -> str:
+    return status if status in DB_STATUSES else "in_season"
 
 
 class GameConflict(Exception):
@@ -150,7 +162,7 @@ class GameStore:
         """Denormalized list-view fields; events remain the source of truth."""
 
         self._update(GAMES, user_id, {"id": game_id}, {
-            "status": status, "current_week": week, "event_count": event_count, "updated_at": _now(),
+            "status": db_status(status), "current_week": week, "event_count": event_count, "updated_at": _now(),
         })
 
     def delete_game(self, user_id: str, game_id: str) -> None:
@@ -175,11 +187,38 @@ class GameStore:
             }
             for e in events
         ]
+        ok, error = self._insert_events(rows)
+        if ok:
+            return
+        if error == CONFLICT:
+            # A retry of a request whose first attempt actually landed (double tap,
+            # a timeout after commit) finds exactly our events: that is success.
+            if self._already_written(user_id, game_id, rows):
+                return
+            raise GameConflict()
+        _log.warning("sim event write failed game=%s events=%d: %s", game_id, len(rows), error)
+        raise SimStoreError(error or "event write failed")
+
+    def _insert_events(self, rows: list[dict[str, Any]]) -> tuple[bool, str]:
+        """One batched request (atomic: all rows or none), one retry on a transient failure."""
+
         ok, error = self.backend.insert_many(EVENTS, rows)
-        if not ok:
-            if error == CONFLICT:
-                raise GameConflict()
-            raise SimStoreError(error or "event write failed")
+        if ok or error == CONFLICT or SimStoreError(error or "").code not in TRANSIENT_CODES:
+            return ok, error
+        time.sleep(RETRY_DELAY)
+        ok, error = self.backend.insert_many(EVENTS, rows)
+        return ok, error
+
+    def _already_written(self, user_id: str, game_id: str, rows: list[dict[str, Any]]) -> bool:
+        try:
+            stored = self.load_events(user_id, game_id, rows[0]["seq"])
+        except SimStoreError:
+            return False
+        by_seq = {int(r["seq"]): r for r in stored}
+        return all(
+            (r["seq"] in by_seq) and by_seq[r["seq"]]["type"] == r["type"] and by_seq[r["seq"]]["payload"] == r["payload"]
+            for r in rows
+        )
 
     def load_events(self, user_id: str, game_id: str, from_seq: int = 0) -> list[dict[str, Any]]:
         out: list[dict[str, Any]] = []
