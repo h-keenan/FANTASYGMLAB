@@ -5,6 +5,7 @@ import AccentCard from './AccentCard';
 import AppText from './AppText';
 import Button from './Button';
 import ConfirmInPlace from './ConfirmInPlace';
+import ErrorState from './ErrorState';
 import { SkeletonCard } from './SkeletonBlock';
 import { SimStandingsList } from './SimGameLeague';
 import { SimSectionTitle, SimSheet, SimToneBadge, createSimStyles, simToneColor, type SimCtx } from './SimGameParts';
@@ -31,6 +32,7 @@ export function SimToSheet({ ctx, onClose, onRun }: { ctx: SimCtx; onClose: () =
   const [options, setOptions] = useState<SimToOption[] | null>(null);
   const [failed, setFailed] = useState(false);
   const [autoSet, setAutoSet] = useState(false);
+  const [attempt, setAttempt] = useState(0);
   useEffect(() => {
     let cancelled = false;
     api
@@ -46,13 +48,20 @@ export function SimToSheet({ ctx, onClose, onRun }: { ctx: SimCtx; onClose: () =
     return () => {
       cancelled = true;
     };
-  }, [ctx.gameId, ctx.game.week, ctx.tick]);
+  }, [ctx.gameId, ctx.game.week, ctx.tick, attempt]);
   return (
     <SimSheet title="Sim to..." onClose={onClose}>
       <View style={common.stack} testID="sim-to-sheet">
         <AppText style={common.small}>Play several weeks at once. It stops early when you have something to decide.</AppText>
         {failed ? (
-          <AppText style={common.bodyStrong}>Could not load the options. Try again in a moment.</AppText>
+          <ErrorState
+            title="Options did not load"
+            message="Check your connection and try again."
+            onRetry={() => {
+              setFailed(false);
+              setAttempt((n) => n + 1);
+            }}
+          />
         ) : !options ? (
           <SkeletonCard rows={3} />
         ) : options.length === 0 ? (
