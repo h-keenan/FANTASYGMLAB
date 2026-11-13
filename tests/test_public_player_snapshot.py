@@ -220,6 +220,48 @@ def test_real_public_player_snapshot_is_field_for_field_equivalent(tmp_path):
     )
 
 
+def _kicker_staleness_rebuilds(tmp_path, lifecycle_state):
+    import sqlite3
+
+    db_path = tmp_path / "players.db"
+    shutil.copyfile(Path("data/players.db"), db_path)
+    conn = sqlite3.connect(db_path)
+    try:
+        # Every ranked kicker gets a real value except one, which is zeroed and
+        # given the lifecycle state under test.
+        conn.execute(
+            "UPDATE players SET value = 100 WHERE position = 'K' AND search_rank < ?",
+            (rankings.UNRANKED_SEARCH_RANK,),
+        )
+        conn.execute(
+            "UPDATE players SET value = 0, lifecycle_state = ? WHERE player_id = ("
+            "SELECT player_id FROM players WHERE position = 'K' AND search_rank < ? LIMIT 1)",
+            (lifecycle_state, rankings.UNRANKED_SEARCH_RANK),
+        )
+        conn.commit()
+    finally:
+        conn.close()
+    with patch(
+        "modules.rankings.build_players_table",
+        side_effect=lambda *a, **k: pd.DataFrame(),
+    ) as rebuild:
+        try:
+            rankings._load_players_without_snapshot(str(db_path))
+        except Exception:
+            pass  # only whether the rebuild fallback fired matters here
+    return rebuild.called
+
+
+def test_zero_value_unrankable_kicker_does_not_force_full_rebuild(tmp_path):
+    # The player universe zeroes value for retired_or_unknown names but leaves
+    # their search_rank; that must not look like a stale kicker valuation.
+    assert not _kicker_staleness_rebuilds(tmp_path, "retired_or_unknown")
+
+
+def test_zero_value_rankable_kicker_still_forces_rebuild(tmp_path):
+    assert _kicker_staleness_rebuilds(tmp_path, "active_rostered")
+
+
 def test_missing_or_failed_snapshot_uses_existing_hydration_fallback(tmp_path):
     source = _hydrated_frame()
     # Under tmp_path, not the repo root: hydration writes a
