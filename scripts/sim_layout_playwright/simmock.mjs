@@ -43,7 +43,7 @@ export function createMock(opts = {}) {
   const teams = TEAMS.map((name, i) => ({ team_id: String(i + 1), name: i + 1 === 3 ? "Zach's Squad" : name, persona_id: PERSONAS[i % 7].id, is_you: i + 1 === 3 }));
   function order(i) { const round = Math.floor(i / 12); const idx = i % 12; return round % 2 === 0 ? idx + 1 : 12 - idx; }
   const owner = (p) => state.owner[p.id];
-  const row = (p) => ({ ...p, owner: owner(p) ? { type: owner(p) === you ? "you" : "ai", team_id: owner(p), name: teams[Number(owner(p)) - 1].name } : { type: "free_agent", team_id: null, name: null } });
+  const row = (p) => ({ ...p, ...(opts.synthetic ? { headshot_id: null } : {}), owner: owner(p) ? { type: owner(p) === you ? "you" : "ai", team_id: owner(p), name: teams[Number(owner(p)) - 1].name } : { type: "free_agent", team_id: null, name: null } });
   function assignRosters() {
     // after draft: snake assign the best 14*12 players
     const sorted = [...players];
