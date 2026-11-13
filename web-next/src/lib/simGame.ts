@@ -2929,6 +2929,15 @@ export interface SimDynastySummary {
   by_year: SimDynastyYear[];
   rookie_drafts?: { year: number; picks: unknown[] }[];
   picks_held: number;
+  /** Long dynasties (dynasty_v 3): the whole league's story, a few KB however many seasons were played. */
+  history?: SimDynastyHistory;
+}
+
+export interface SimDynastyHistory {
+  champions: { season_no: number; year: number; team_id: string; name: string; is_you: boolean }[];
+  title_leaders: { team_id: string; name: string; titles: number; is_you: boolean }[];
+  best_record: { year: number; team_id: string; name: string; record: string } | null;
+  most_points: { year: number; team_id: string; name: string; pf: number } | null;
 }
 
 export interface SimDynastyResponse extends SimGameEnvelope {
@@ -3314,6 +3323,29 @@ export interface SimDynastySummaryView {
   record: string;
   years: SimDynastyYearView[];
   seasonsLine: string;
+  history: SimDynastyHistoryView;
+}
+
+export interface SimDynastyHistoryView {
+  /** Newest first: "2031: Rivals" / "2030: My Team (you)". */
+  champions: { key: string; label: string; you: boolean }[];
+  /** "Rivals 4 titles" ... */
+  leaders: string[];
+  /** Single-season records, as display lines. */
+  records: string[];
+  summary: string;
+}
+
+/** The league-history block of a long dynasty, shaped for display; empty for saves that carry none. */
+export function simDynastyHistoryView(h: SimDynastyHistory | null | undefined): SimDynastyHistoryView {
+  const champions = [...(h?.champions ?? [])]
+    .sort((a, b) => b.season_no - a.season_no)
+    .map((c) => ({ key: `${c.season_no}`, label: `${c.year}: ${c.name}${c.is_you ? " (you)" : ""}`, you: Boolean(c.is_you) }));
+  const leaders = (h?.title_leaders ?? []).map((t) => `${t.name}${t.is_you ? " (you)" : ""} ${t.titles} title${t.titles === 1 ? "" : "s"}`);
+  const records: string[] = [];
+  if (h?.best_record) records.push(`Best record: ${h.best_record.name} ${h.best_record.record} (${h.best_record.year})`);
+  if (h?.most_points) records.push(`Most points: ${h.most_points.name} ${Math.round(h.most_points.pf)} (${h.most_points.year})`);
+  return { champions, leaders, records, summary: champions.length ? `${champions.length} champion${champions.length === 1 ? "" : "s"}` : "No champions yet" };
 }
 
 /** The dynasty result card, shaped: nothing crashes on a missing summary or empty year list. */
@@ -3329,6 +3361,7 @@ export function simDynastySummaryView(d: SimDynastySummary | null | undefined): 
     record: d ? `${d.wins}-${d.losses}` : "-",
     years,
     seasonsLine: d ? `${d.seasons_played} of ${d.seasons_total} seasons played` : "",
+    history: simDynastyHistoryView(d?.history),
   };
 }
 

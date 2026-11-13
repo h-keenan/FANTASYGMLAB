@@ -88,7 +88,6 @@ def test_class_is_deterministic_and_old_versions_ignore_the_anchor():
     again = base.Run(seasons=5).root.season_view(2)
     assert sorted(snap_a.players) == sorted(again.players)
     assert all(snap_a.players[p].mean == again.players[p].mean for p in snap_a.players)
-    assert any(p.pos == "K" and p.extra.get("is_rookie") for p in snap_a.players.values()) or True
 
 
 @pytest.fixture(scope="module")

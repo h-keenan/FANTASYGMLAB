@@ -113,7 +113,8 @@ def _anchor_top(root: GameSnapshot) -> dict[str, float]:
 
 
 LEVEL_RANKS = {"QB": 24, "RB": 36, "WR": 36, "TE": 24, "K": 18}
-SUPPLY_BAND = (0.85, 1.4)
+SUPPLY_BAND = (0.85, 1.5)
+SUPPLY_GAIN = 1.6  # class strength follows (league level / current level) ** SUPPLY_GAIN
 
 
 def _level(rows, pos: str) -> float:
@@ -126,14 +127,14 @@ def _supply_response(base: GameSnapshot, vets: Mapping[str, Mapping[str, Any]]) 
     veteran depth (the average of its top-N, N = what a league starts and streams) has slipped below the league's own
     season-1 level draws a stronger class, one that has run ahead a weaker one. Draft classes follow scarcity the way real
     ones do (rosters, scouting and draft capital all chase a thin position), and it is what keeps scoring from drifting
-    over twenty seasons. Bounded to [0.85, 1.4] so one bad year cannot make a super class."""
+    over twenty seasons. Bounded to [0.85, 1.5] so one bad year cannot make a super class."""
 
     anchor = _anchor(base)
     out = {}
     for pos in LEVEL_RANKS:
         a, c = _level(anchor.values(), pos), _level(vets.values(), pos)
         if a > 0 and c > 0:
-            out[pos] = min(SUPPLY_BAND[1], max(SUPPLY_BAND[0], a / c))
+            out[pos] = min(SUPPLY_BAND[1], max(SUPPLY_BAND[0], (a / c) ** SUPPLY_GAIN))
     return out
 
 

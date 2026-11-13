@@ -109,6 +109,16 @@ export function SimDynastyResult({ summary, onNewGame, onHub }: { summary: SimDy
       <SimCollapse title="Season by season" summary={view.years.length ? `${view.years.length} seasons` : 'No seasons yet'} defaultOpen testID="dynasty-years">
         {view.years.length === 0 ? <AppText style={common.muted}>No finished seasons to show.</AppText> : view.years.map((v) => <YearRow key={v.year} v={v} />)}
       </SimCollapse>
+      {view.history.champions.length > 0 ? (
+        <SimCollapse title="League history" summary={view.history.summary} testID="dynasty-history">
+          {view.history.champions.map((c) => (
+            <AppText key={c.key} style={c.you ? common.bodyStrong : common.body}>{c.label}</AppText>
+          ))}
+          {[...view.history.leaders, ...view.history.records].map((line) => (
+            <AppText key={line} style={common.muted}>{line}</AppText>
+          ))}
+        </SimCollapse>
+      ) : null}
     </View>
   );
 }
