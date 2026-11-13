@@ -842,3 +842,13 @@ This specification does not authorize:
 - visual changes without controlled desktop/mobile validation.
 
 Future implementation work must be scoped, tested, and reviewed independently.
+
+## Tabs (shared, web + mobile)
+
+`Tabs` (`web-next/src/components/Tabs.tsx`, `mobile/src/components/Tabs.tsx`) is the one component for a surface with more to
+say than one screen (player quick view, team sheet). It is built ON the existing tab control, not beside it: `PillRow` /
+`SegmentedTabBar` gained a `slim` look (no outer box, hairline under the strip, sliding underline) and `PillRow` a `tabIdPrefix`
+(tab id / `aria-controls`). `Tabs` adds lazy panels (`render()` only runs for the open tab), a tabpanel wired to its tab, a
+~160ms slide-in from the side you moved toward (opacity + transform only; off under `prefers-reduced-motion` / reduce-motion)
+and the last tab remembered per session under the surface `id` (`lib/sessionTab.ts` twin: web `sessionStorage`, mobile an
+in-memory map; blocked storage just forgets). Do not write a second tab bar; pass `tabs=[{key, label, glyph?, count?, render}]`.

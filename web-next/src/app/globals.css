@@ -4193,3 +4193,37 @@ body[data-sim-pqv] [data-sheet-hideable] {
 .sim-pct-fill--high {
   background: var(--color-success);
 }
+
+/* Shared Tabs (components/Tabs.tsx): the active panel slides in a short distance from the side of the tab that was
+   picked (~160ms, opacity + transform only, so layout never moves). Off under prefers-reduced-motion. */
+.tabs-panel[data-dir="1"] {
+  animation: tabs-slide-from-right 160ms ease-out;
+}
+.tabs-panel[data-dir="-1"] {
+  animation: tabs-slide-from-left 160ms ease-out;
+}
+@keyframes tabs-slide-from-right {
+  from {
+    opacity: 0;
+    transform: translateX(14px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+@keyframes tabs-slide-from-left {
+  from {
+    opacity: 0;
+    transform: translateX(-14px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .tabs-panel[data-dir] {
+    animation: none;
+  }
+}

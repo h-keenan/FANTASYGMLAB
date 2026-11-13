@@ -33,6 +33,7 @@ export default function SegmentedTabBar<T extends string>({
   active,
   onChange,
   scrollable = false,
+  slim = false,
 }: {
   options: Array<SegmentedTabOption<T>>;
   active: T;
@@ -40,6 +41,8 @@ export default function SegmentedTabBar<T extends string>({
   /** Many options: segments size to their label and the track scrolls sideways
    * (web's PillRow variant="scroll"). */
   scrollable?: boolean;
+  /** The sleek in-sheet look (shared Tabs): no outer box or pill, a hairline under the strip and a sliding underline. */
+  slim?: boolean;
 }) {
   const { colors } = useThemeMode();
   const styles = useMemo(() => createStyles(colors), [colors]);
@@ -70,15 +73,15 @@ export default function SegmentedTabBar<T extends string>({
   // Five or more tabs: tighter label + padding so the last one is never clipped at 390px.
   const dense = !scrollable && options.length >= 5;
   const body = (
-    <View style={[styles.track, scrollable && styles.trackScroll]} accessibilityRole="tablist">
-      {target ? <Animated.View pointerEvents="none" style={[styles.slider, { left: 0, transform: [{ translateX: slideX }], width: slideW }]} /> : null}
+    <View style={[styles.track, scrollable && styles.trackScroll, slim && styles.trackSlim]} accessibilityRole="tablist">
+      {target ? <Animated.View pointerEvents="none" style={[styles.slider, slim && styles.sliderSlim, { left: 0, transform: [{ translateX: slideX }], width: slideW }]} /> : null}
       {options.map((option) => {
         const isActive = option.key === active;
         const iconColor = isActive ? colors.accent : colors.textTertiary;
         return (
           <TouchableOpacity
             key={option.key}
-            style={[styles.segment, scrollable && styles.segmentScroll, dense && styles.segmentDense, isActive && !target && styles.segmentActive]}
+            style={[styles.segment, scrollable && styles.segmentScroll, dense && styles.segmentDense, isActive && !target && (slim ? styles.segmentActiveSlim : styles.segmentActive)]}
             onPress={() => onChange(option.key)}
             onLayout={onSegmentLayout(option.key)}
             activeOpacity={0.75}
@@ -137,6 +140,9 @@ function createStyles(colors: ThemeColors) {
       borderRadius: radii.pill,
     },
     trackScroll: { alignSelf: 'flex-start' },
+    trackSlim: { backgroundColor: 'transparent', borderWidth: 0, borderBottomWidth: StyleSheet.hairlineWidth, borderRadius: 0, padding: 0, gap: 0 },
+    sliderSlim: { top: undefined, bottom: 0, height: 2, borderRadius: 0, borderWidth: 0, backgroundColor: colors.accent },
+    segmentActiveSlim: { borderBottomWidth: 2, borderBottomColor: colors.accent },
     segmentScroll: { flex: 0, paddingHorizontal: 12 },
     segmentDense: { paddingHorizontal: 0 },
     slider: {

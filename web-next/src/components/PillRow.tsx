@@ -41,6 +41,8 @@ export function PillRow({
   variant,
   ariaLabel,
   sticky = false,
+  slim = false,
+  tabIdPrefix,
 }: {
   /** `icon` is an optional glyph slot rendered before the label (tab icons are added in this one place). */
   options: { label: string; value: string; href?: string; icon?: ReactNode; glyph?: TabIconName; count?: number }[];
@@ -51,6 +53,13 @@ export function PillRow({
   ariaLabel?: string;
   /** Pin the strip under the top of the viewport and use the compact height. For page-level tab bars. */
   sticky?: boolean;
+  /**
+   * The sleek in-sheet look (shared Tabs): no outer box, a hairline under the strip, the active tab marked by
+   * its text weight and the sliding underline only. Same control, same keys and indicator; just quieter chrome.
+   */
+  slim?: boolean;
+  /** Gives every tab an id and aria-controls (`${prefix}-tab-${value}` / `${prefix}-panel-${value}`) so a tabpanel can point back. */
+  tabIdPrefix?: string;
 }) {
   const mode: PillRowVariant = variant ?? (fullWidth ? "fill" : "compact");
   const scrollerRef = useRef<HTMLDivElement>(null);
@@ -141,11 +150,11 @@ export function PillRow({
   return (
     <div
       className={`${mode === "compact" ? "flex max-w-full self-start" : "flex w-full"}${sticky ? " sticky z-20" : ""}`}
-      style={{
-        border: "var(--border-width-default) solid var(--color-border)",
-        background: "var(--color-surface-muted)",
-        ...(sticky ? { top: 0 } : null),
-      }}
+      style={
+        slim
+          ? { borderBottom: "var(--border-width-default) solid var(--color-border)", background: "transparent", ...(sticky ? { top: 0 } : null) }
+          : { border: "var(--border-width-default) solid var(--color-border)", background: "var(--color-surface-muted)", ...(sticky ? { top: 0 } : null) }
+      }
     >
       <div
         ref={scrollerRef}
@@ -170,16 +179,18 @@ export function PillRow({
           }`;
           const style = {
             // Icon tabs keep the full 44px touch target even in the sticky bar.
-            minHeight: sticky && !anyIcon ? "var(--segmented-height-compact)" : "var(--segmented-height)",
+            minHeight: (sticky || slim) && !anyIcon ? "var(--segmented-height-compact)" : "var(--segmented-height)",
             padding: equalFit ? "0 var(--space-xs)" : mode === "fill" ? "0 min(var(--segmented-padding-x), 0.5rem)" : "0 var(--segmented-padding-x)",
             letterSpacing: "var(--letter-spacing-tight)",
-            background: isActive ? "var(--segmented-active-bg, var(--color-information-soft))" : "transparent",
+            background: isActive && !slim ? "var(--segmented-active-bg, var(--color-information-soft))" : "transparent",
             color: isActive ? "var(--segmented-active-fg, var(--color-text-primary))" : "var(--color-text-secondary)",
             // The sliding underline replaces the static one once measured.
             boxShadow: isActive && !indicator ? "inset 0 -2px 0 var(--color-information)" : "none",
-            borderLeft: index === 0 ? "none" : "var(--border-width-default) solid var(--color-border)",
+            borderLeft: index === 0 || slim ? "none" : "var(--border-width-default) solid var(--color-border)",
           } as const;
           const common = {
+            id: tabIdPrefix ? `${tabIdPrefix}-tab-${option.value}` : undefined,
+            "aria-controls": tabIdPrefix ? `${tabIdPrefix}-panel-${option.value}` : undefined,
             role: "tab" as const,
             "aria-selected": isActive,
             tabIndex: tabbable ? 0 : -1,
