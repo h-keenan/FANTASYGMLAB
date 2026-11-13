@@ -4,7 +4,6 @@ import { StyleSheet, View } from 'react-native';
 import AppText from './AppText';
 import Button from './Button';
 import type { SimCtx } from './SimGameParts';
-import { useSimActionBarBottom } from './SimActionBar';
 import { useThemeMode } from '../context/ThemeModeContext';
 import { api } from '../lib/api';
 import { simTabAfterStageAction, type SimStageAction } from '../lib/simScroll';
@@ -16,13 +15,12 @@ import { radii, spacing, type ThemeColors } from '../theme';
  * Trades, League), mirroring web-next's SimOffseasonBar: Start rookie draft,
  * Auto-draft the rest (asks first), "Finish cut-down" (disabled with the
  * reason) until the roster is legal, then Start season N. It reads the
- * offseason itself so any tab can mount it, and floats above the GM orb like
- * SimActionBar (same height constant, the screen adds matching padding).
+ * offseason itself so any tab can mount it. An in-flow glass pill like
+ * SimActionBar: the screen's bottom stack docks it with the game orb above it.
  */
 export default function SimOffseasonBar({ ctx, onTab }: { ctx: SimCtx; onTab?: (tab: 'home') => void }) {
   const { colors } = useThemeMode();
   const styles = useMemo(() => createStyles(colors), [colors]);
-  const bottom = useSimActionBarBottom();
   const { gameId, call } = ctx;
   const [off, setOff] = useState<SimOffseason | null>(null);
   const [busy, setBusy] = useState(false);
@@ -73,7 +71,7 @@ export default function SimOffseasonBar({ ctx, onTab }: { ctx: SimCtx; onTab?: (
   }
 
   return (
-    <View style={[styles.bar, { bottom }]} testID="sim-offseason-bar">
+    <View style={styles.bar} testID="sim-offseason-bar">
       {off.stage === 'rookie_draft' && confirmAuto ? (
         <View style={{ gap: spacing.sm }}>
           <AppText style={styles.confirm} accessibilityRole="alert">
@@ -113,9 +111,6 @@ export default function SimOffseasonBar({ ctx, onTab }: { ctx: SimCtx; onTab?: (
 function createStyles(colors: ThemeColors) {
   return StyleSheet.create({
     bar: {
-      position: 'absolute',
-      left: spacing.md,
-      right: spacing.md,
       paddingVertical: spacing.sm,
       paddingHorizontal: spacing.md,
       gap: spacing.xs,
@@ -123,7 +118,6 @@ function createStyles(colors: ThemeColors) {
       borderWidth: 1,
       borderColor: colors.border,
       backgroundColor: colors.backgroundElevated,
-      zIndex: 5,
     },
     row: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: spacing.md },
     step: { flex: 1, minWidth: 0, fontSize: 12.5, fontWeight: '700', color: colors.textTertiary },

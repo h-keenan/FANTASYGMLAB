@@ -7,7 +7,7 @@ import Button from './Button';
 import ErrorState from './ErrorState';
 import PositionBadge from './PositionBadge';
 import SimGlyph from './SimGlyph';
-import SegmentedTabBar from './SegmentedTabBar';
+import Collapsible from './Collapsible';
 import { SkeletonCard } from './SkeletonBlock';
 import {
   SimByeCard,
@@ -42,7 +42,6 @@ import {
   simGameReasonMessage,
 } from '../lib/simGame';
 import type { SimTab } from '../lib/simGameFlow';
-import { SIM_HOME_VIEWS, type SimHomeView } from '../lib/simLayout';
 import { radii, spacing, type ThemeColors } from '../theme';
 
 /**
@@ -61,7 +60,6 @@ export function SimHomeTab({ ctx, setClaims, onTab }: { ctx: SimCtx; setClaims: 
   const [attempt, setAttempt] = useState(0);
   const [claiming, setClaiming] = useState<{ player: SimGamePlayer; roster: SimGamePlayer[] } | null>(null);
   const teamId = ctx.game.you?.team_id;
-  const [view, setView] = useState<SimHomeView>('week');
 
   useEffect(() => {
     let cancelled = false;
@@ -121,31 +119,21 @@ export function SimHomeTab({ ctx, setClaims, onTab }: { ctx: SimCtx; setClaims: 
   if (!home) return <SkeletonCard rows={6} />;
 
   const names = Object.fromEntries((home.standings?.rows ?? []).map((r) => [r.team_id, r.name]));
-  const inboxCount = home.inbox?.count ?? 0;
   return (
     <View style={common.stack} testID="sim-home">
-      <SegmentedTabBar
-        options={SIM_HOME_VIEWS.map((v) => ({ key: v.value, label: v.value === 'week' && inboxCount > 0 ? `${v.label} · ${inboxCount}` : v.label, glyph: v.glyph }))}
-        active={view}
-        onChange={setView}
-      />
-      {view === 'week' ? (
-        <>
-          {home.matchup ? <SimMatchupCard ctx={ctx} matchup={home.matchup} onTab={onTab} /> : null}
-          <SimChecklistCard home={home} onTab={onTab} onAuto={home.matchup && !home.matchup.bye ? auto.run : undefined} autoBusy={auto.busy} optimal={auto.optimal} />
-          <SimReservesStrip home={home} onTab={onTab} />
-          <SimInboxCard ctx={ctx} inbox={home.inbox} onTab={onTab} />
-          <SimWaiverCard ctx={ctx} suggestions={home.waiver_suggestions ?? []} onClaim={claim} onTab={onTab} />
-          <SimByeCard ctx={ctx} alerts={home.bye_alerts ?? []} onTab={onTab} onClaim={claim} />
-          <SimInjuriesCard ctx={ctx} injuries={home.injuries ?? []} />
-        </>
-      ) : (
-        <>
-          <SimStandingsCard standings={home.standings} onTab={onTab} />
-          <SimHotColdCard ctx={ctx} hotCold={home.hot_cold} onClaim={claim} />
-          <SimLeagueMovesCard league={home.league} names={names} onTab={onTab} />
-        </>
-      )}
+      {home.matchup ? <SimMatchupCard ctx={ctx} matchup={home.matchup} onTab={onTab} /> : null}
+      <SimChecklistCard home={home} onTab={onTab} onAuto={home.matchup && !home.matchup.bye ? auto.run : undefined} autoBusy={auto.busy} optimal={auto.optimal} />
+      <SimReservesStrip home={home} onTab={onTab} />
+      <SimInboxCard ctx={ctx} inbox={home.inbox} onTab={onTab} />
+      <SimWaiverCard ctx={ctx} suggestions={home.waiver_suggestions ?? []} onClaim={claim} onTab={onTab} />
+      <SimByeCard ctx={ctx} alerts={home.bye_alerts ?? []} onTab={onTab} onClaim={claim} />
+      <SimInjuriesCard ctx={ctx} injuries={home.injuries ?? []} />
+      {/* One scroll: the old "This week | League" tabs are gone; the league cards sit in a collapsed section. */}
+      <Collapsible id="home.league" title="League" defaultOpen={false} testID="home-league-section" summary={<AppText style={common.muted}>Standings, hot and cold, moves</AppText>}>
+        <SimStandingsCard standings={home.standings} onTab={onTab} />
+        <SimHotColdCard ctx={ctx} hotCold={home.hot_cold} onClaim={claim} />
+        <SimLeagueMovesCard league={home.league} names={names} onTab={onTab} />
+      </Collapsible>
       {claiming ? (
         <ClaimSheet
           ctx={ctx}

@@ -1,44 +1,27 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { ActivityIndicator, Alert, Pressable, StyleSheet, View } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { Alert, StyleSheet, View } from 'react-native';
 
 import AppText from './AppText';
 import Button from './Button';
-import SimGlyph from './SimGlyph';
 import type { SimCtx } from './SimGameParts';
-import { useSimAutoSet } from './useSimAutoSet';
 import { useThemeMode } from '../context/ThemeModeContext';
 import { api } from '../lib/api';
 import { simAdvanceLabel } from '../lib/simGame';
 import { simAdvanceState, simLineupIssues, type SimZeroStarter } from '../lib/simLayout';
-import { ORB_SIZE } from '../lib/orbLayout';
 import { radii, spacing, type ThemeColors } from '../theme';
-
-/** Height of the bar's controls row (the reason line, when shown, adds ~20). */
-export const SIM_ACTION_BAR_HEIGHT = 60;
-
-/**
- * Bottom of the stack: where the bar sits, just above the floating GM orb
- * (which is anchored bottom-center at the safe-area bottom).
- */
-export function useSimActionBarBottom(): number {
-  const insets = useSafeAreaInsets();
-  return Math.max(insets.bottom, 0) + ORB_SIZE + spacing.sm;
-}
 
 /**
  * The persistent bottom action bar for the in-season tabs (mirrors web-next's
  * SimActionBar): Advance week ("Week 4 -> 5", disabled only when a cut is owed;
- * an empty slot warns and asks to confirm) and a secondary Auto-set pill. It floats
- * above the GM orb; the screen adds matching bottom padding.
+ * an empty slot warns and asks to confirm). ADVANCE ONLY: Auto-set lives on Home,
+ * "What to do this week". An in-flow glass pill: the screen's bottom stack docks
+ * it at the bottom with the game orb right above it, and pads the content to match.
  */
 export default function SimActionBar({ ctx, paywalled, advancing, onAdvance, onGoPro, onTab }: { ctx: SimCtx; paywalled: boolean; advancing: boolean; onAdvance: () => void; onGoPro: () => void; onTab?: (tab: 'team' | 'players') => void }) {
   const { colors } = useThemeMode();
   const styles = useMemo(() => createStyles(colors), [colors]);
-  const bottom = useSimActionBarBottom();
   const { gameId, game } = ctx;
   const [issues, setIssues] = useState<{ empty: string[]; zero: SimZeroStarter[] }>({ empty: [], zero: [] });
-  const auto = useSimAutoSet(ctx);
 
   useEffect(() => {
     let cancelled = false;
@@ -67,7 +50,7 @@ export default function SimActionBar({ ctx, paywalled, advancing, onAdvance, onG
     ]);
   };
   return (
-    <View style={[styles.bar, { bottom }]} testID="sim-action-bar">
+    <View style={styles.bar} testID="sim-action-bar">
       {state.warning && !state.reason && !paywalled ? <AppText style={styles.reason}>{state.warning}</AppText> : null}
       {state.reason && !paywalled ? (
         <AppText style={styles.reason} accessibilityRole="alert">
@@ -75,17 +58,6 @@ export default function SimActionBar({ ctx, paywalled, advancing, onAdvance, onG
         </AppText>
       ) : null}
       <View style={styles.row}>
-        <Pressable
-          onPress={auto.run}
-          disabled={auto.busy || auto.optimal || paywalled}
-          accessibilityRole="button"
-          accessibilityLabel={auto.optimal ? 'Lineup is optimal' : 'Auto-set best lineup'}
-          accessibilityState={{ disabled: auto.busy || auto.optimal || paywalled, busy: auto.busy }}
-          style={[styles.pill, (auto.optimal || paywalled) && styles.pillOff]}
-        >
-          {auto.busy ? <ActivityIndicator size="small" color={colors.textSecondary} /> : <SimGlyph name={auto.optimal ? 'check' : 'spark'} color={colors.textPrimary} size={16} />}
-          <AppText style={styles.pillLabel}>{auto.optimal ? 'Optimal' : 'Auto-set'}</AppText>
-        </Pressable>
         <View style={styles.advance}>
           {paywalled ? (
             <Button label="Go Pro to continue" variant="premium" size="sm" onPress={onGoPro} />
@@ -109,9 +81,6 @@ export default function SimActionBar({ ctx, paywalled, advancing, onAdvance, onG
 function createStyles(colors: ThemeColors) {
   return StyleSheet.create({
     bar: {
-      position: 'absolute',
-      left: spacing.md,
-      right: spacing.md,
       paddingVertical: spacing.sm,
       paddingHorizontal: spacing.md,
       gap: spacing.xs,
@@ -119,23 +88,10 @@ function createStyles(colors: ThemeColors) {
       borderWidth: 1,
       borderColor: colors.border,
       backgroundColor: colors.backgroundElevated,
-      zIndex: 5,
     },
-    row: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: spacing.md },
-    advance: { flex: 1, alignItems: 'flex-end' },
+    row: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: spacing.md },
+    advance: { flex: 1 },
     reason: { fontSize: 12, fontWeight: '700', color: colors.warning, textAlign: 'center' },
-    pill: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      gap: spacing.xs,
-      minHeight: 44,
-      paddingHorizontal: spacing.md,
-      borderRadius: radii.pill,
-      borderWidth: 1,
-      borderColor: colors.borderStrong ?? colors.border,
-    },
-    pillOff: { opacity: 0.6 },
-    pillLabel: { fontSize: 13, fontWeight: '700', color: colors.textPrimary },
     srOnly: { height: 0, width: 0, opacity: 0 },
   });
 }

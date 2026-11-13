@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useLayoutEffect, useMemo, useReducer, useRef, useState } from 'react';
 import { ScrollView, StyleSheet, View } from 'react-native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useHeaderHeight } from '@react-navigation/elements';
 
 import AccentCard from '../components/AccentCard';
@@ -16,7 +17,9 @@ import Input from '../components/Input';
 import PremiumLock from '../components/PremiumLock';
 import SectionHeading from '../components/SectionHeading';
 import SegmentedTabBar from '../components/SegmentedTabBar';
-import SimActionBar, { SIM_ACTION_BAR_HEIGHT, useSimActionBarBottom } from '../components/SimActionBar';
+import SimActionBar from '../components/SimActionBar';
+import { SimGameHeader, SimStatusChips } from '../components/SimGameHeader';
+import SimGameOrb from '../components/SimGameOrb';
 import { SkeletonCard } from '../components/SkeletonBlock';
 import { SimDraftRecapView, SimGameDraft } from '../components/SimGameDraft';
 import { SimLeagueTab } from '../components/SimGameLeague';
@@ -24,7 +27,7 @@ import SimOffseasonBar from '../components/SimOffseasonBar';
 import { SimGameOffseason } from '../components/SimGameOffseason';
 import { SimHomeTab } from '../components/SimGameHome';
 import { SimPlayerSheet } from '../components/SimGamePlayers';
-import { SimNotice, SimOpenPlayerContext, SimPreviewBanner, SimTeamLink, SimTeamOpenContext, createSimStyles, type SimCtx } from '../components/SimGameParts';
+import { SimNotice, SimOpenPlayerContext, SimPreviewBanner, SimTeamOpenContext, createSimStyles, type SimCtx } from '../components/SimGameParts';
 import { SimTeamSheet } from '../components/SimGameTeamSheet';
 import { SimFinalView, SimWeekRecapView } from '../components/SimGameRecap';
 import { SimPlayersTab, SimTeamTab } from '../components/SimGameTeam';
@@ -34,15 +37,12 @@ import ToneBadge from '../components/ToneBadge';
 import { useThemeMode } from '../context/ThemeModeContext';
 import { api } from '../lib/api';
 import { useOrbClearance } from '../lib/orbLayout';
+import { simGameChrome } from '../lib/simGameChrome';
 import {
   SIM_DIFFICULTY_COPY,
   SIM_SCORING_LABELS,
   simAdvanceBlockers,
   simAdvanceLabel,
-  simAdvanceWarnings,
-  simDynastyProgressLine,
-  simFmtPts,
-  simFmtRecord,
   simGameGate,
   simGameDeleteFailure,
   simGameLiteLine,
@@ -64,7 +64,6 @@ import {
   SIM_NAME_CUSTOM,
   SIM_NAME_RANDOM,
   SIM_TEAM_NAME_MAX,
-  simWeekHeading,
   SIM_TE_PREMIUM_LABELS,
   type SimDifficulty,
   type SimMode,
@@ -90,7 +89,7 @@ import {
   type SimTradeSeed,
 } from '../lib/simGame';
 import { simScrollKey, simShouldScrollTop } from '../lib/simScroll';
-import { SIM_FLOW_INITIAL, SIM_TABS, simFlowReducer, simRecapsFromAdvance, type SimTab } from '../lib/simGameFlow';
+import { SIM_FLOW_INITIAL, simFlowReducer, simRecapsFromAdvance, type SimTab } from '../lib/simGameFlow';
 import { useSimGameRequest } from '../lib/useSimGameRequest';
 import { useSimLeagueTeams } from '../lib/useSimLeagueTeamPicker';
 import { useSimSavedLeagues } from '../lib/useSimSavedLeagues';
@@ -368,11 +367,22 @@ export default function GmGameScreen({ navigation }: Props) {
   }, [scrollKey]);
 
   // The in-season tabs get a persistent bottom action bar (Advance week / Auto-set) above the orb.
-  const barBottom = useSimActionBarBottom();
+  const insets = useSafeAreaInsets();
+  const [stackHeight, setStackHeight] = useState(0);
   const showBar =
     flow.view === 'game' && Boolean(game) && (flow.stage === 'week' || flow.stage === 'playoffs') && !draftRecap && !flow.recaps[flow.recapIndex];
   const showOffBar = flow.view === 'game' && Boolean(game) && flow.stage === 'offseason' && !draftRecap && !flow.recaps[flow.recapIndex];
   const anyBar = showBar || showOffBar;
+  // The game draws its own orb above the Advance pill, so the global GM orb steps aside while it is up.
+  useEffect(() => {
+    simGameChrome.set(anyBar);
+    return () => simGameChrome.set(false);
+  }, [anyBar]);
+  const goHub = () => {
+    dispatch({ type: 'hub' });
+    setGameState(null);
+    void refreshList();
+  };
   const shell = (children: React.ReactNode, sheet?: React.ReactNode) => (
     <View style={styles.root}>
       <GridBackground />
@@ -381,16 +391,39 @@ export default function GmGameScreen({ navigation }: Props) {
         style={styles.container}
         contentContainerStyle={[
           styles.content,
-          { paddingBottom: anyBar ? Math.max(orbClearance, barBottom + SIM_ACTION_BAR_HEIGHT + spacing.xl) : orbClearance, paddingTop: headerHeight + spacing.sm },
+          { paddingBottom: anyBar ? stackHeight + spacing.xl : orbClearance, paddingTop: headerHeight + spacing.sm },
         ]}
         keyboardShouldPersistTaps="handled"
       >
         {children}
       </ScrollView>
-      {showBar && game && ctx ? (
-        <SimActionBar ctx={ctx} paywalled={simGamePaywalled(preview)} advancing={advancing} onAdvance={advance} onGoPro={goPaywall} onTab={(tab) => dispatch({ type: 'tab', tab })} />
+      {anyBar && game && ctx ? (
+        // Bottom stack: the orb docks right-aligned directly above the Advance pill; both are in flow
+        // inside one absolute container, so the orb can never overlap the pill (the content pads by its measured height).
+        <View
+          style={[styles.bottomStack, { paddingBottom: Math.max(insets.bottom, spacing.sm) }]}
+          pointerEvents="box-none"
+          onLayout={(e) => setStackHeight(Math.ceil(e.nativeEvent.layout.height))}
+          testID="sim-bottom-stack"
+        >
+          <View style={styles.orbDock} pointerEvents="box-none">
+            <SimGameOrb
+              tab={flow.tab}
+              offseason={showOffBar}
+              inbox={game.pending?.inbox ?? 0}
+              onTab={(tab) => dispatch({ type: 'tab', tab })}
+              onMore={() => dispatch({ type: 'tab', tab: 'more' })}
+              onHub={goHub}
+              onAppHome={() => navigation.navigate('Home')}
+            />
+          </View>
+          {showBar ? (
+            <SimActionBar ctx={ctx} paywalled={simGamePaywalled(preview)} advancing={advancing} onAdvance={advance} onGoPro={goPaywall} onTab={(tab) => dispatch({ type: 'tab', tab })} />
+          ) : (
+            <SimOffseasonBar ctx={ctx} onTab={(tab) => dispatch({ type: 'tab', tab })} />
+          )}
+        </View>
       ) : null}
-      {showOffBar && game && ctx ? <SimOffseasonBar ctx={ctx} onTab={(tab) => dispatch({ type: 'tab', tab })} /> : null}
       {sheet}
     </View>
   );
@@ -471,11 +504,7 @@ export default function GmGameScreen({ navigation }: Props) {
         onRecapNext={() => dispatch({ type: 'recap_next' })}
         onRecapClose={() => dispatch({ type: 'recap_close' })}
         onDismissPaywall={() => dispatch({ type: 'dismiss_paywall' })}
-        onHub={() => {
-          dispatch({ type: 'hub' });
-          setGameState(null);
-          void refreshList();
-        }}
+        onHub={goHub}
         onNewGame={() => {
           dispatch({ type: 'setup' });
           setGameState(null);
@@ -931,50 +960,18 @@ function GameScreen({
   const paywalled = simGamePaywalled(preview);
   const stage = flow.stage;
   const recap = flow.recaps[flow.recapIndex];
-  const warnings = simAdvanceWarnings(game);
-  const youLine = game.you;
   const inSeason = (stage === 'week' || stage === 'playoffs') && !draftRecap;
 
   return (
     <SimTeamOpenContext.Provider value={ctx.openTeam}>
     <SimOpenPlayerContext.Provider value={ctx.openPlayer}>
     <View style={styles.stack}>
-      <View style={styles.rowBetween}>
-        <View style={styles.grow}>
-          <Button variant="ghost" size="sm" label="All games" onPress={onHub} style={styles.back} />
-          <AppText style={styles.heading} testID="game-heading">
-            {simWeekHeading(game)}
-          </AppText>
-          {game.dynasty ? (
-            <AppText style={styles.muted} testID="dynasty-progress">
-              {simDynastyProgressLine(game.dynasty)}
-            </AppText>
-          ) : null}
-          {youLine && stage !== 'draft' ? (
-            <View style={styles.youRow}>
-              <SimTeamLink teamId={youLine.team_id} name={youLine.name} size={22} bold={false} />
-              <AppText style={styles.muted}>
-                {simFmtRecord(youLine)}
-                {youLine.rank ? ` · #${youLine.rank}` : ''} · {simFmtPts(youLine.pf)} PF
-              </AppText>
-            </View>
-          ) : null}
-        </View>
-      </View>
+      <SimGameHeader game={game} onHub={onHub} onTeam={ctx.openTeam} onMore={() => onTab('more')} />
+      {inSeason && !recap && !paywalled ? <SimStatusChips game={game} onTab={onTab} /> : null}
 
       <SimPreviewBanner preview={preview} />
       {flow.paywall ? <PaywallCard flow={flow} onDismiss={onDismissPaywall} /> : null}
       {notice ? <SimNotice message={notice.message} tone={notice.tone} onDismiss={clearNotice} /> : null}
-      {inSeason && !recap && !paywalled && warnings.length > 0 ? (
-        <View style={styles.tight}>
-          {warnings.map((w) => (
-            <AppText key={w} style={styles.muted}>
-              {w}
-            </AppText>
-          ))}
-        </View>
-      ) : null}
-
       {stage === 'draft' ? (
         <SimGameDraft ctx={ctx} onComplete={onDraftComplete} />
       ) : draftRecap ? (
@@ -985,16 +982,6 @@ function GameScreen({
         <SimFinalView ctx={ctx} onNewGame={onNewGame} onHub={onHub} />
       ) : stage === 'offseason' ? (
         <>
-          <SegmentedTabBar<SimTab>
-            options={[
-              { key: 'home', label: 'Offseason' },
-              { key: 'team', label: 'Team' },
-              { key: 'trades', label: 'Trades' },
-              { key: 'league', label: 'League' },
-            ]}
-            active={['team', 'trades', 'league'].includes(flow.tab) ? flow.tab : 'home'}
-            onChange={onTab}
-          />
           <FadeInView key={flow.tab}>
             {flow.tab === 'team' ? <SimTeamTab ctx={ctx} onTrade={() => onTab('trades')} /> : null}
             {flow.tab === 'trades' ? <SimTradesTab ctx={ctx} seed={tradeSeed} onSeedUsed={() => setTradeSeed(null)} /> : null}
@@ -1004,11 +991,6 @@ function GameScreen({
         </>
       ) : (
         <>
-          <SegmentedTabBar<SimTab>
-            options={SIM_TABS.map((t) => ({ key: t.value, label: t.label, glyph: t.glyph, count: t.value === 'trades' ? game.pending?.inbox ?? 0 : undefined }))}
-            active={flow.tab}
-            onChange={onTab}
-          />
           <FadeInView key={flow.tab}>
             {flow.tab === 'home' ? <SimHomeTab ctx={ctx} setClaims={setClaims} onTab={onTab} /> : null}
             {flow.tab === 'team' ? <SimTeamTab ctx={ctx} onTrade={() => onTab('trades')} /> : null}
@@ -1107,8 +1089,8 @@ function createStyles(colors: ThemeColors) {
     wrapRow: { flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: spacing.sm },
     rowBetween: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: spacing.md },
     grow: { flex: 1, minWidth: 0 },
-    back: { alignSelf: 'flex-start' },
-    youRow: { flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: 8 },
+    bottomStack: { position: 'absolute', left: 0, right: 0, bottom: 0, paddingHorizontal: spacing.md, gap: spacing.sm },
+    orbDock: { alignItems: 'flex-end' },
     start: { alignSelf: 'flex-start' },
     kicker: { fontSize: 12.5, fontWeight: '800', letterSpacing: 0.8, textTransform: 'uppercase', color: colors.textTertiary },
     heroTitle: { fontSize: 22, fontWeight: '800', color: colors.textPrimary },
