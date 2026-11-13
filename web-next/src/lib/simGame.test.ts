@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  simBlockTag,
+  simStatusOptions,
   simApplyTradeSeed,
   simTradeSeedFor,
   simChecklistProgress,
@@ -778,5 +780,13 @@ describe("simCounterDeltaLine", () => {
     const line = simCounterDeltaLine({ user_net_before: 5.2, user_net_after: 1, user_net_change: -4.2, asked: ["a"], removed: [], your_roster_after: 17, their_roster_after: 18, roster_limit: 18 });
     expect(line).toBe("Trade value for you: -4.2 (net +5.2 before, +1.0 now). Rosters after: you 17/18, them 18/18.");
     expect(simCounterDeltaLine(null)).toBeNull();
+  });
+
+  it("trade block chip: short labels for yours and the AI's, nothing when not blocked; the On the block filter only in a block game", () => {
+    expect(simBlockTag({ block: { by: "3", mine: true, looking_for: null, why: "On your block" } })).toEqual({ key: "block", label: "Your block", tone: "accent" });
+    expect(simBlockTag({ block: { by: "7", mine: false, looking_for: "RB", why: "Selling depth" } })?.label).toBe("On block");
+    expect(simBlockTag({})).toBeNull();
+    expect(simStatusOptions(false).some((o) => o.value === "block")).toBe(false);
+    expect(simStatusOptions(true).at(-1)).toEqual({ value: "block", label: "On the block" });
   });
 });

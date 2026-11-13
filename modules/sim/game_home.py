@@ -16,6 +16,7 @@ import logging
 import math
 from typing import Any, Mapping, Sequence
 
+from modules.sim import game_block as blockmod
 from modules.sim.game_actions import lineup_warnings
 from modules.sim.game_ai import ai_lineup, trade_window
 from modules.sim.game_engine import standing_rows
@@ -23,6 +24,7 @@ from modules.sim.game_eval import Evaluator
 from modules.sim.game_state import GameState
 from modules.sim.game_types import GameSnapshot, slot_positions
 from modules.sim.game_view import (
+    pick_asset,
     _opponent,
     _tx_players,
     _tx_text,
@@ -32,7 +34,7 @@ from modules.sim.game_view import (
 )
 from modules.sim.lineup import pick_lineup
 from modules.sim.personas import PERSONAS
-from modules.sim.types import FLEX_SLOTS, GAME_POSITIONS
+from modules.sim.types import FLEX_SLOTS, GAME_POSITIONS, is_pick_id
 
 BYE_LOOKAHEAD = 3  # weeks (including this one) a bye alert looks ahead
 MAX_WAIVER_SUGGESTIONS = 4
@@ -202,6 +204,9 @@ def team_detail(snap: GameSnapshot, state: GameState, tid: str, seed: int = 0) -
         "next_game": next_game,
         "trade": {"open": window is None and tid != snap.user_team.tid, "reason": window},
     }
+    if snap.settings.block:
+        bidx = blockmod.block_index(snap, state, ev, seed)
+        blockmod.attach(out["players"] + out["ir"] + out["taxi"] + out["injuries"] + [s["player"] for s in out["lineup"] if s["player"]], bidx)
     return out
 
 
@@ -209,7 +214,7 @@ SURPLUS_DEPTH = 2  # players beyond a position's starters before it reads as a s
 TOP_ASSETS = 3
 
 
-def league_rosters(snap: GameSnapshot, state: GameState) -> dict[str, Any]:
+def league_rosters(snap: GameSnapshot, state: GameState, seed: int = 0) -> dict[str, Any]:
     """Every team's full roster in one payload (the League tab's who-has-who view and the trade partner list).
 
     One Evaluator and one position report for the whole league, no per-team requests. Each team carries its
@@ -223,6 +228,8 @@ def league_rosters(snap: GameSnapshot, state: GameState) -> dict[str, Any]:
     by_team = {r["team_id"]: r for r in rows}
     power = sorted(snap.tids, key=lambda t: (-ev.lineup_total(state.rosters[t]) if state.rosters[t] else 0.0, t))
     report = _position_report(snap, ev)
+    bidx = blockmod.block_index(snap, state, ev, seed)  # {} unless the game has a trade block
+    blocks = {b["team_id"]: b for b in blockmod.league_blocks(snap, state, ev, seed)} if bidx or snap.settings.block else {}
     teams = []
     for t in snap.teams:
         tid = t.tid
@@ -243,6 +250,10 @@ def league_rosters(snap: GameSnapshot, state: GameState) -> dict[str, Any]:
             "top_assets": rows_[:TOP_ASSETS],
             "players": rows_,
         })
+        blockmod.attach(rows_, bidx)
+        if snap.settings.block:  # absent on a save from before the block, so its payload is unchanged
+            b = blocks.get(tid)
+            teams[-1]["block"] = {"stance": b["stance"], "looking_for": b["looking_for"], "items": [{"id": i["id"], "why": i["why"]} for i in b["items"]]} if b else None
     return {"teams": teams, "week": week}
 
 
@@ -668,3 +679,36 @@ def home_view(snap: GameSnapshot, state: GameState, seed: int) -> dict[str, Any]
 
 
 __all__ = ["home_view", "team_detail", "bye_alerts"]
+
+
+# ----------------------------------------------------------------- trade block
+
+
+def block_view(snap: GameSnapshot, state: GameState, seed: int) -> dict[str, Any]:
+    """The Trades tab's block: yours (with the position hint), every AI team shopping this week with its stated needs, and how
+    many of this week's offers came from your block."""
+
+    if not snap.settings.block:
+        return {"enabled": False, "mine": [], "league": [], "offers_from_block": 0, "max_items": 0}
+    ev = Evaluator(snap, state)
+    owners = state.owner_map()
+    week = max(state.week, 1)
+    mine = []
+    for pid, v in blockmod.user_block(snap, state).items():
+        asset = pick_asset(snap, state, ev, pid) if is_pick_id(pid) else player_row(snap, state, ev, pid, owners, week=week)
+        mine.append({"asset": asset, "looking_for": v.get("looking_for"), "since_week": v.get("week")})
+    mine.sort(key=lambda m: (m["since_week"] or 0, m["asset"]["id"]))
+    bidx = blockmod.block_index(snap, state, ev, seed)
+    blockmod.attach([m["asset"] for m in mine], bidx)
+    report = _position_report(snap, ev)
+    league = []
+    for b in blockmod.league_blocks(snap, state, ev, seed):
+        tid = b["team_id"]
+        league.append({
+            "team_id": tid, "name": snap.team(tid).name, "stance": b["stance"], "looking_for": b["looking_for"],
+            "needs": [p["pos"] for p in report[tid] if p["level"] == "need"],
+            "items": [{"asset": pick_asset(snap, state, ev, i["id"]) if is_pick_id(i["id"]) else player_row(snap, state, ev, i["id"], owners, week=week), "why": i["why"]} for i in b["items"]],
+        })
+    blockmod.attach([i["asset"] for b in league for i in b["items"]], bidx)
+    return {"enabled": True, "mine": mine, "league": league, "max_items": blockmod.MAX_BLOCK_ITEMS,
+            "offers_from_block": sum(1 for o in state.offers if o.get("via_block"))}

@@ -740,3 +740,21 @@ week, the free-preview paywall; `force_first` plays past a soft stop for the fir
 `time_budget`. Response: `weeks_played`, `stopped`, `from_seq`, `summary` (per-week results, record and rank change, your injuries and claims,
 AI trades, standings, champion) and the last week's full `recap`, plus `game`. `POST /v1/sim/games/{id}/undo-sim {from_seq}` takes the run
 back (deletes events and later checkpoints from `from_seq`, which must be an `advance` / `lineup_set` event, then replays).
+
+## Trade block (block_v 1+)
+
+Version gate: `settings.block_v` (1 on every new game, absent on older saves). Without it there is no block anywhere: the endpoints say
+`enabled: false`, offers are generated exactly as before, and no `block` key appears on any row, so an old save plays and fingerprints as
+it always did (the empty block is also left out of the state digest). The user's block is the `block_set` event
+(`{pid, on, looking_for}`) folded into `state.block`; blocked assets that leave the team drop off by themselves (derived from ownership).
+
+- `GET /games/{id}/block` -> `{enabled, mine: [{asset, looking_for, since_week}], league: [{team_id, name, stance, looking_for, needs, items: [{asset, why}]}], max_items, offers_from_block}`.
+- `PUT /games/{id}/block {asset_id, on, looking_for?}` puts a player or pick (dynasty) on / off your block (max 8; QB/RB/WR/TE hint; K/DEF cannot be traded).
+- AI teams' blocks are a pure function of (state, week, seed): at most 5 teams shop in a week, 3 assets each; contenders sell bench depth and a pick, rebuilders
+  vets age 28+, balanced teams a bench piece; `looking_for` is the position the team is shortest at. Never stored, so they replay exactly.
+- Offers answer the block: a team first looks for a deal that asks for something blocked (and sends the hinted position when it can), under the same rules as every AI
+  offer (roster legality on both sides via `legal_for_counter`, injury / IR valuation, one offer per team, three per week; at most two from the block). The inbox
+  item carries `via_block` and a note that only names what the deal really contains.
+- Rows carry `block: {by, mine, looking_for, why}` when on a block (players list, `/players/{id}`, `/teams/{id}`, `/league/rosters`); `GET /players?status=block`
+  lists everything on any block; each team in `/league/rosters` has `block` (its shelf) next to `needs`.
+- Harness: `PYTHONPATH=. python tests/test_sim_block_harness.py [seeds]` (offers per week with and without a block, block share, accepted-and-legal, shelves per week).

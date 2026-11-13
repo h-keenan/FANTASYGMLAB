@@ -46,13 +46,14 @@ export function createMock(opts = {}) {
   const state = {
     status: opts.status ?? "drafting", week: opts.week ?? 0, pro: opts.pro ?? true, storage: opts.storage ?? true, enabled: opts.enabled ?? true,
     owner: {}, // pid -> team id
+    blockMine: {}, // pid -> looking_for (the user's trade block)
     pick: 0, queue: [], picks: [], claims: [], advanced: 0, lineupLocked: false,
   };
   const you = "3";
   const teams = TEAMS.map((name, i) => ({ team_id: String(i + 1), name: i + 1 === 3 ? "Zach's Squad" : name, persona_id: PERSONAS[i % 7].id, is_you: i + 1 === 3 }));
   function order(i) { const round = Math.floor(i / 12); const idx = i % 12; return round % 2 === 0 ? idx + 1 : 12 - idx; }
   const owner = (p) => state.owner[p.id];
-  const row = (p) => ({ ...p, ...(opts.synthetic ? { headshot_id: null } : {}), owner: owner(p) ? { type: owner(p) === you ? "you" : "ai", team_id: owner(p), name: teams[Number(owner(p)) - 1].name } : { type: "free_agent", team_id: null, name: null } });
+  const row = (p) => ({ ...p, ...(blockMarkOf(p) ? { block: blockMarkOf(p) } : {}), ...(opts.synthetic ? { headshot_id: null } : {}), owner: owner(p) ? { type: owner(p) === you ? "you" : "ai", team_id: owner(p), name: teams[Number(owner(p)) - 1].name } : { type: "free_agent", team_id: null, name: null } });
   function assignRosters() {
     // after draft: snake assign the best 14*12 players
     const sorted = [...players];
@@ -64,7 +65,7 @@ export function createMock(opts = {}) {
   const premium = () => ({ ok: true, reason: "premium_required", is_premium: false, upsell: { title: "Keep your season going", body: "The draft and your first 3 weeks are free. Pro unlocks the rest of the season, the playoffs and your final grade." }, preview: { weeks_left: 0, paywall_week: 4, paywalled: true } });
   const roster = (tid) => players.filter((p) => state.owner[p.id] === tid).sort((a, b) => b.projection - a.projection).map(row);
   const standings = () => teams.map((t, i) => ({ rank: i + 1, team_id: t.team_id, name: t.name, owner: "Mgr " + (i + 1), is_you: t.is_you, persona_id: t.persona_id, wins: Math.max(0, 3 - (i % 4)), losses: i % 4, ties: 0, pf: 380 - i * 9.3, pa: 340 + i * 4.1, streak: i % 2 ? "W2" : "L1", seed: i < 6 ? i + 1 : null, playoff_status: i < 6 ? "in" : "out" }));
-  const settings = () => ({ teams: 12, scoring: "ppr", difficulty: "normal", regular_weeks: 14, playoff_teams: 6, playoff_weeks: 3, trade_deadline_week: 10, roster_limit: 16, rounds: 14, slots: SLOTS, user_slot: 3, auto_lineup: false });
+  const settings = () => ({ teams: 12, scoring: "ppr", difficulty: "normal", regular_weeks: 14, playoff_teams: 6, playoff_weeks: 3, trade_deadline_week: 10, roster_limit: 16, rounds: 14, slots: SLOTS, user_slot: 3, auto_lineup: false, ...(opts.block === false ? {} : { block_v: 1 }) });
   function game() {
     const inSeason = state.status === "in_season" || state.status === "playoffs";
     return {
@@ -144,6 +145,26 @@ export function createMock(opts = {}) {
     return { player: { ...row(p), value_rank: p.value_rank ?? players.indexOf(p) + 1, pos_value_rank: Math.max(1, pos.indexOf(p) + 1) }, weeks, history, news, ros, projection_flat: true, ...(p.rookieDemo ? { scouting: ROOKIE_SCOUTING } : {}) };
   }
 
+  // Trade block demo: the AI teams shopping this week (2 players each) and the user's own block.
+  const WHY = ["Selling a veteran", "Selling depth", "Moving a pick"];
+  function aiShelf(t, i) {
+    if (opts.block === false || t.is_you || i % 4 === 3) return null;
+    const held = players.filter((p) => state.owner[p.id] === t.team_id).sort((a, b) => b.value - a.value);
+    const items = held.slice(3, 5).map((p, k) => ({ id: p.id, why: WHY[(i + k) % 2] }));
+    return items.length ? { stance: i % 2 ? "rebuilding" : "contending", looking_for: ["RB", "WR", "QB", "TE"][i % 4], items } : null;
+  }
+  function blockMarkOf(p) {
+    if (opts.block === false) return null;
+    if (p.id in state.blockMine) return { by: you, mine: true, looking_for: state.blockMine[p.id] || null, why: "On your block" };
+    for (const [i, t] of teams.entries()) { const sh = aiShelf(t, i); const it = sh?.items.find((x) => x.id === p.id); if (it && state.owner[p.id] === t.team_id) return { by: t.team_id, mine: false, looking_for: sh.looking_for, why: it.why }; }
+    return null;
+  }
+  function blockView() {
+    const mine = Object.entries(state.blockMine).map(([id, hint]) => ({ asset: row(players.find((x) => x.id === id)), looking_for: hint || null, since_week: state.week }));
+    const league = teams.map((t, i) => ({ t, i, sh: aiShelf(t, i) })).filter((x) => x.sh).slice(0, 5).map(({ t, i, sh }) => ({ team_id: t.team_id, name: t.name, stance: sh.stance, looking_for: sh.looking_for, needs: rosterTeam(t, i).needs, items: sh.items.map((it) => ({ asset: row(players.find((x) => x.id === it.id)), why: it.why })) }));
+    return { enabled: opts.block !== false, mine, league, max_items: 8, offers_from_block: 1 };
+  }
+
   // One team's entry in GET /league/rosters (and the base of GET /teams/{id}): every held player with its squad, plus
   // record, power rank, strengths / needs / surplus by position and the top assets.
   function rosterTeam(t, i) {
@@ -162,6 +183,7 @@ export function createMock(opts = {}) {
       record: s ? { wins: s.wins, losses: s.losses, ties: 0, pf: s.pf, pa: s.pa, rank: s.rank, streak: s.streak, seed: null, playoff_status: "in" } : null,
       positions, strengths: positions.filter((p) => p.level === "strength").map((p) => p.pos), needs: positions.filter((p) => p.level === "need").map((p) => p.pos),
       surplus: positions.filter((p) => p.depth >= 2 && p.level !== "need").map((p) => p.pos), top_assets: rows.slice(0, 3), players: rows,
+      ...(opts.block === false ? {} : { block: aiShelf(t, i) }),
     };
   }
 
@@ -216,7 +238,9 @@ export function createMock(opts = {}) {
       const verdict = { decision, reason_code: "fits_need", reason: decision === "accept" ? "They need a RB and this fills it." : decision === "counter" ? "They want a bit more value." : "That asks for too much.", chips: ["needs RB", "fair value"], counter: decision === "counter" ? { give: body.give.map((i) => row(players.find((p) => p.id === i))), get: body.get.map((i) => row(players.find((p) => p.id === i))) } : null, counter_note: decision === "counter" ? "They want a TE: asking for " + (players.find((p) => p.id === body.give[body.give.length - 1])?.name ?? "a player") + "." : null, counter_delta: decision === "counter" ? { user_net_before: 5.2, user_net_after: 1.0, user_net_change: -4.2, asked: [body.give[body.give.length - 1]], removed: [], your_roster_after: 15, their_roster_after: 16, roster_limit: 16 } : null };
       return { status: 200, body: { ...env(), verdict, executed: sub === "/trades" && decision === "accept", trade: null } };
     }
-    if (sub === "/inbox") return { status: 200, body: { ...env(), items: [{ id: "o1", type: "trade_offer", from: { team_id: "7", name: "Red Zone Rats", persona_id: "passive" }, you_give: [row(players[9])], you_get: [row(players[20])], message: "Your WR depth looks strong. Interested in a swap?", expires_week: state.week }] } };
+    if (sub === "/block" && method === "GET") return { status: 200, body: { ...env(), ...blockView() } };
+    if (sub === "/block" && method === "PUT") { if (body.on) state.blockMine[body.asset_id] = body.looking_for ?? ""; else delete state.blockMine[body.asset_id]; return { status: 200, body: { ...env(), ...blockView() } }; }
+    if (sub === "/inbox") return { status: 200, body: { ...env(), items: [{ id: "o1", type: "trade_offer", from: { team_id: "7", name: "Red Zone Rats", persona_id: "passive" }, you_give: [row(players[9])], you_get: [row(players[20])], message: "Your WR depth looks strong. Interested in a swap?", expires_week: state.week }, { id: "o2", type: "trade_offer", via_block: true, from: { team_id: "5", name: "Hail Marys", persona_id: "contender" }, you_give: [row(players[11])], you_get: [row(players[24])], message: "Hail Marys saw " + players[11].name + " on your block. They can send the RB you are looking for.", expires_week: state.week }] } };
     if (sub === "/advance") {
       if (!state.pro && state.week >= 3 && opts.paywallOnAdvance) return { status: 200, body: premium() };
       state.advanced++; const week = state.week; state.week++;

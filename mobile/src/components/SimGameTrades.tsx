@@ -15,6 +15,7 @@ import { SkeletonCard } from './SkeletonBlock';
 import { MotionIn } from './Motion';
 import SimCrest from './SimCrest';
 import SimGlyph from './SimGlyph';
+import { SimBlockView } from './SimTradeBlock';
 import SimTeamCard from './SimTeamCard';
 import { SimPickLine, useSimPicks } from './SimGameDynastyParts';
 import { SimPlayerChip, SimPlayerLine, SimPopIn, SimSideLabel, SimStat, SimTeamOpenContext, SimToneBadge, createSimStyles, simToneColor, type SimCtx } from './SimGameParts';
@@ -188,6 +189,7 @@ function OfferCard({ item, defaultOpen, busy, canTrade, onRespond }: { item: Sim
               </AppText>
             </View>
             <View style={common.row}>
+              {item.via_block ? <ToneBadge label="Your block" color={colors.accent} size="xs" /> : null}
               <ToneBadge label={`Wk ${item.expires_week}`} color={colors.warning} size="xs" />
               <AppText style={common.muted} accessibilityElementsHidden>
                 {open ? '\u2212' : '+'}
@@ -523,7 +525,10 @@ function Builder({ ctx, seed, onSeedUsed }: { ctx: SimCtx; seed: SimTradeSeed | 
 export function SimTradesTab({ ctx, seed, onSeedUsed }: { ctx: SimCtx; seed: SimTradeSeed | null; onSeedUsed: () => void }) {
   const { colors } = useThemeMode();
   const common = useMemo(() => createSimStyles(colors), [colors]);
-  const [mode, setMode] = useState<'inbox' | 'build'>(seed ? 'build' : 'inbox');
+  const [mode, setMode] = useState<'inbox' | 'build' | 'block'>(seed ? 'build' : 'inbox');
+  // "Make an offer" from the block view seeds the builder locally (partner + the asset asked for).
+  const [blockSeed, setBlockSeed] = useState<SimTradeSeed | null>(null);
+  const hasBlock = (ctx.game.settings.block_v ?? 0) >= 1;
   const offers = ctx.game.pending?.inbox ?? 0;
   const [prevSeed, setPrevSeed] = useState(seed);
   if (seed && seed !== prevSeed) {
@@ -532,16 +537,36 @@ export function SimTradesTab({ ctx, seed, onSeedUsed }: { ctx: SimCtx; seed: Sim
   }
   return (
     <View style={common.stack}>
-      <SegmentedTabBar<'inbox' | 'build'>
+      <SegmentedTabBar<'inbox' | 'build' | 'block'>
         options={[
           { key: 'inbox', label: `Inbox${offers ? ` ${offers}` : ''}`, glyph: 'inbox' },
           { key: 'build', label: 'Make an offer', glyph: 'build' },
+          ...(hasBlock ? [{ key: 'block' as const, label: 'My block', glyph: 'mine' as const }] : []),
         ]}
         active={mode}
         onChange={setMode}
       />
       {!ctx.game.can_trade && mode === 'inbox' ? <AppText style={common.muted}>{simTradeClosedReason(ctx.game)}</AppText> : null}
-      {mode === 'inbox' ? <Inbox ctx={ctx} /> : <Builder ctx={ctx} seed={seed} onSeedUsed={onSeedUsed} />}
+      {mode === 'inbox' ? (
+        <Inbox ctx={ctx} />
+      ) : mode === 'block' ? (
+        <SimBlockView
+          ctx={ctx}
+          onMakeOffer={(partner, get) => {
+            setBlockSeed({ partner, get });
+            setMode('build');
+          }}
+        />
+      ) : (
+        <Builder
+          ctx={ctx}
+          seed={blockSeed ?? seed}
+          onSeedUsed={() => {
+            setBlockSeed(null);
+            onSeedUsed();
+          }}
+        />
+      )}
     </View>
   );
 }

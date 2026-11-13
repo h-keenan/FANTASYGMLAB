@@ -46,12 +46,13 @@ export interface SimRosterEntry {
 export type SimRosterPosFilter = "ALL" | SimPos;
 
 /** Everyone on a roster, best overall first, filtered by position and a name / NFL team search. */
-export function simRosterEntries(teams: readonly SimLeagueRosterTeam[], pos: SimRosterPosFilter, query: string): SimRosterEntry[] {
+export function simRosterEntries(teams: readonly SimLeagueRosterTeam[], pos: SimRosterPosFilter, query: string, blockOnly = false): SimRosterEntry[] {
   const needle = query.trim().toLowerCase();
   const out: SimRosterEntry[] = [];
   for (const team of teams) {
     for (const player of team.players) {
       if (pos !== "ALL" && player.pos !== pos) continue;
+      if (blockOnly && !player.block) continue;
       if (needle && !player.name.toLowerCase().includes(needle) && !(player.team ?? "").toLowerCase().includes(needle)) continue;
       out.push({ player, team: { team_id: team.team_id, name: team.name, is_you: team.is_you } });
     }
@@ -82,4 +83,18 @@ export function simGroupBenchByPosition(bench: readonly SimGamePlayer[], order: 
   const rest = bench.filter((p) => !known.has(p.pos));
   if (rest.length) groups.push({ pos: "OTHER", players: rest });
   return groups;
+}
+
+/** Players on any trade block (yours and the AI teams' this week), the league's shelf. */
+export function simBlockEntryCount(teams: readonly SimLeagueRosterTeam[]): number {
+  return teams.reduce((n, t) => n + t.players.filter((p) => p.block).length, 0);
+}
+
+/** "Selling depth · looking for RB · needs RB, WR": what an AI team shopping a player says about itself. */
+export function simBlockNote(team: Pick<SimLeagueRosterTeam, "needs"> & { block?: SimLeagueRosterTeam["block"] }, why: string | undefined): string {
+  const parts: string[] = [];
+  if (why) parts.push(why);
+  if (team.block?.looking_for) parts.push(`looking for ${team.block.looking_for}`);
+  if (team.needs.length > 0) parts.push(`needs ${team.needs.join(", ")}`);
+  return parts.join(" · ");
 }

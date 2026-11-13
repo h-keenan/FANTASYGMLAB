@@ -31,6 +31,7 @@ import { SimPlayerSheet } from '../components/SimGamePlayers';
 import { SimNotice, SimOpenPlayerContext, SimPreviewBanner, SimTeamOpenContext, createSimStyles, type SimCtx } from '../components/SimGameParts';
 import { SimTeamSheet } from '../components/SimGameTeamSheet';
 import { SimToResultView, SimToSheet, type SimToRequest } from '../components/SimToControl';
+import { SimBlockToggle } from '../components/SimTradeBlock';
 import { SimFinalView } from '../components/SimGameRecap';
 import SimWeekRecapStory from '../components/SimRecapStory';
 import { SimPlayersTab, SimTeamTab } from '../components/SimGameTeam';
@@ -592,7 +593,8 @@ export default function GmGameScreen({ navigation }: Props) {
             player={sheetPlayer}
             onClose={() => setSheetPlayer(null)}
             actions={
-              game.can_trade && simTradeSeedFor(sheetPlayer) ? (
+              <>
+              {game.can_trade && simTradeSeedFor(sheetPlayer) ? (
                 <Button
                   size="sm"
                   variant="secondary"
@@ -605,7 +607,9 @@ export default function GmGameScreen({ navigation }: Props) {
                     dispatch({ type: 'tab', tab: 'trades' });
                   }}
                 />
-              ) : null
+              ) : null}
+              <SimBlockToggle ctx={ctx} player={sheetPlayer} />
+              </>
             }
           />
         ) : null}

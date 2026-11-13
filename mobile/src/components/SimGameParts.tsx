@@ -24,6 +24,7 @@ import {
   simHeadshotId,
   simTrendText,
   simPlayerInitials,
+  simBlockTag,
   simPlayerSubline,
   simSlotRepeatsPosition,
   type SimGlyphName,
@@ -259,6 +260,7 @@ export function SimPlayerLine({
   week?: number | null;
 }) {
   const [chip] = simDraftRowChips(player);
+  const blockTag = simBlockTag(player);
   return (
     <PlayerListRow
       testID="sim-player-line"
@@ -269,7 +271,7 @@ export function SimPlayerLine({
       meta={simDraftMeta(player, week)}
       chip={chip ? { label: chip.label, tone: chip.tone } : null}
       hurt={player.status === 'out'}
-      tags={tags}
+      tags={blockTag ? [blockTag, ...(tags ?? [])] : tags}
       stats={stats}
       extra={extra}
       actions={trailing}

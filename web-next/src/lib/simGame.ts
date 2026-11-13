@@ -69,8 +69,21 @@ export interface SimPlayerOwner {
   name?: string | null;
 }
 
+/** A player or pick on a trade block (the user's, or an AI team's this week): present on a row only when it is on one. */
+export interface SimBlockMark {
+  /** The team shopping him. */
+  by: string;
+  mine: boolean;
+  /** The position that team says it is looking for. */
+  looking_for: SimPos | null;
+  /** "On your block", "Selling depth", "Selling a veteran", "Moving a pick". */
+  why: string;
+}
+
 export interface SimGamePlayer {
   id: string;
+  /** Trade block (block_v 1+ games only). */
+  block?: SimBlockMark;
   /** Sleeper player id to fetch a photo with; null for defenses and synthetic players. */
   headshot_id?: string | null;
   name: string;
@@ -139,9 +152,18 @@ export function simRoleBadge(player: { role?: SimPlayerRole | null }): { label: 
   return { label: role.label, tone: role.kind === "fill_in" ? "accent" : "muted" };
 }
 
-/** Tags for a Players-list row: the owner, then the role chip (fill-in / backup). */
+/** The small block chip a list row carries (via the shared row's tags slot): "Your block" / "On block" (short, so it fits the row beside the owner tag). */
+export function simBlockTag(player: { block?: SimBlockMark | null }): { key: string; label: string; tone: SimGameTone } | null {
+  const b = player.block;
+  if (!b) return null;
+  return { key: "block", label: b.mine ? "Your block" : "On block", tone: "accent" };
+}
+
+/** Tags for a Players-list row: the block chip, the owner, then the role chip (fill-in / backup). */
 export function simPlayerTags(player: SimGamePlayer): { key: string; label: string; tone: SimGameTone }[] | undefined {
   const tags: { key: string; label: string; tone: SimGameTone }[] = [];
+  const blockTag = simBlockTag(player);
+  if (blockTag) tags.push(blockTag);
   if (player.owner) tags.push({ key: "owner", label: simOwnerLabel(player.owner), tone: simOwnerTone(player.owner) });
   const role = simRoleBadge(player);
   if (role) tags.push({ key: "role", label: role.label, tone: role.tone });
@@ -219,6 +241,8 @@ export interface SimGameSettings {
   tiebreaker?: SimTiebreaker;
   /** IR / taxi squads (saves from before game engine 1.2.0 omit all of these). */
   reserve_v?: number;
+  /** Trade block version (1+): the block exists in this game. */
+  block_v?: number;
   ir_slots?: number;
   taxi_slots?: number;
   taxi_years?: number;
@@ -846,6 +870,8 @@ export interface SimInboxItem {
   you_get: SimTradeAsset[];
   message: string;
   expires_week: number;
+  /** The offer asks for something on your trade block. */
+  via_block?: boolean;
 }
 
 export interface SimInboxResponse extends SimGameEnvelope {
@@ -1428,7 +1454,7 @@ export const SIM_SORT_OPTIONS: { value: SimPlayerSort; label: string }[] = [
   { value: "name", label: "Name" },
 ];
 
-export type SimPlayerStatusFilter = "" | "available" | "rostered" | "mine" | "injured" | "bye";
+export type SimPlayerStatusFilter = "" | "available" | "rostered" | "mine" | "injured" | "bye" | "block";
 
 export const SIM_STATUS_OPTIONS: { value: SimPlayerStatusFilter; label: string }[] = [
   { value: "", label: "All" },
@@ -1438,6 +1464,11 @@ export const SIM_STATUS_OPTIONS: { value: SimPlayerStatusFilter; label: string }
   { value: "injured", label: "Injured" },
   { value: "bye", label: "On bye" },
 ];
+
+/** The Players-tab "Show" options; "On the block" only in a game that has a trade block. */
+export function simStatusOptions(blockEnabled: boolean): { value: SimPlayerStatusFilter; label: string }[] {
+  return blockEnabled ? [...SIM_STATUS_OPTIONS, { value: "block", label: "On the block" }] : SIM_STATUS_OPTIONS;
+}
 
 export interface SimPlayerFilter {
   q: string;
@@ -2448,6 +2479,32 @@ export interface SimLeagueRosterTeam extends SimTeamProfile {
   top_assets: SimGamePlayer[];
   /** Everyone the team holds, by value; `squad` says roster, ir or taxi. */
   players: SimGamePlayer[];
+  /** This week's trade block of the team (null when it is not shopping); absent in a game without a block. */
+  block?: { stance: "contending" | "rebuilding" | "balanced"; looking_for: SimPos | null; items: { id: string; why: string }[] } | null;
+}
+
+export interface SimBlockItem {
+  asset: SimTradeAsset;
+  why: string;
+}
+
+/** What one AI team is shopping this week and what it says it needs. */
+export interface SimTeamBlock {
+  team_id: string;
+  name: string;
+  stance: "contending" | "rebuilding" | "balanced";
+  looking_for: SimPos | null;
+  needs: SimPos[];
+  items: SimBlockItem[];
+}
+
+/** GET / PUT /block: your block, who is shopping around the league, and how many offers answered your block this week. */
+export interface SimBlockResponse extends SimGameEnvelope {
+  enabled?: boolean;
+  mine?: { asset: SimTradeAsset; looking_for: SimPos | null; since_week: number | null }[];
+  league?: SimTeamBlock[];
+  max_items?: number;
+  offers_from_block?: number;
 }
 
 export interface SimLeagueRostersResponse extends SimGameEnvelope {

@@ -14,6 +14,7 @@ from modules.sim.game_draft import DraftContext, best_for_user
 from modules.sim.game_engine import rank_teams, standing_rows
 from modules.sim.game_eval import Evaluator
 from modules.sim.game_state import GameState
+from modules.sim import game_block as blockmod
 from modules.sim.game_types import PREVIEW_PAYWALL_WEEK, GameSnapshot, headshot_id
 from modules.sim.personas import PERSONAS
 from modules.sim.types import FLEX_SLOTS, is_pick_id
@@ -174,12 +175,13 @@ def adp_edge(adp: float | None, value_rank: int | None) -> float | None:
 
 def players_page(
     snap: GameSnapshot, state: GameState, *, q: str = "", pos: str = "", status: str = "", team: str = "",
-    sort: str = "projection", page: int = 1, page_size: int = 25,
+    sort: str = "projection", page: int = 1, page_size: int = 25, seed: int | None = None,
 ) -> dict[str, Any]:
     ev = Evaluator(snap, state)
     owners = state.owner_map()
     user = snap.user_team.tid
     w = max(state.week, 1)
+    bidx = blockmod.block_index(snap, state, ev, seed) if seed is not None else {}
     needle = q.strip().lower()
     # QB/RB/WR/TE/K/DEF, or a flex eligibility group (FLEX, REC_FLEX, SUPER_FLEX) from the lineup slot definitions.
     pos_group = FLEX_SLOTS.get(pos) or frozenset({pos})
@@ -200,6 +202,8 @@ def players_page(
         if status == "injured" and ev.status(pid, w) != "out":
             continue
         if status == "bye" and ev.status(pid, w) != "bye":
+            continue
+        if status == "block" and pid not in bidx:
             continue
         if team and owner != team:
             continue
@@ -232,10 +236,11 @@ def players_page(
         row["value_rank"] = ranks.get(pid)
         row["adp_edge"] = adp_edge(row["adp"], ranks.get(pid))
         items.append(row)
+    blockmod.attach(items, bidx)
     return {"items": items, "total": len(pids), "page": page, "page_size": page_size}
 
 
-def player_detail(snap: GameSnapshot, state: GameState, pid: str) -> dict[str, Any]:
+def player_detail(snap: GameSnapshot, state: GameState, pid: str, seed: int | None = None) -> dict[str, Any]:
     ev = Evaluator(snap, state)
     owners = state.owner_map()
     first = max(state.week, 1)
@@ -257,6 +262,8 @@ def player_detail(snap: GameSnapshot, state: GameState, pid: str) -> dict[str, A
     if state.out.get(pid) and not news:
         news.append({"week": 0, "text": f"Listed out for {state.out[pid]} week(s) to start the season."})
     row = player_row(snap, state, ev, pid, owners)
+    if seed is not None:
+        blockmod.attach([row], blockmod.block_index(snap, state, ev, seed))
     ranks = value_ranks(snap)
     same_pos = sorted((q for q in snap.pids if snap.players[q].pos == row["pos"]), key=lambda q: (-snap.players[q].value, q))
     row["value_rank"] = ranks.get(pid)
@@ -635,6 +642,7 @@ def inbox_view(snap: GameSnapshot, state: GameState) -> list[dict[str, Any]]:
             "you_give": [player_row(snap, state, ev, p, owners) for p in o["get"]],
             "you_get": [player_row(snap, state, ev, p, owners) for p in o["give"]],
             "message": o.get("message", ""), "expires_week": o["expires_week"],
+            **({"via_block": True} if o.get("via_block") else {}),
         })
     return items
 

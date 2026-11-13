@@ -430,10 +430,13 @@ class TradeDesk:
 
     # ------------------------------------------------------------- searching
 
-    def find_deal(self, proposer: str, partners: Sequence[str], *, to_user: bool = False):
+    def find_deal(self, proposer: str, partners: Sequence[str], *, to_user: bool = False,
+                  want: Iterable[str] | None = None, give_pos: str | None = None):
         """Best two-sided deal the ``proposer`` AI would make with one of
         ``partners`` (port of the season engine's search). With ``to_user`` the
-        partner is the user and acceptance is judged against a neutral lens."""
+        partner is the user and acceptance is judged against a neutral lens. ``want`` (the trade block) restricts what
+        the proposer asks for to those assets, and ``give_pos`` prefers sending that position; a block deal must also leave
+        both rosters legal (the same rule counters follow). Without ``want`` this is exactly the original search."""
 
         snap, state, ev = self.snap, self.state, self.ev
         params = self.params(proposer)
@@ -447,10 +450,19 @@ class TradeDesk:
             lens = USER_PARAMS if to_user else pparams
             gives = sorted(mine, key=lambda p: (-(ev.worth(lens, p) - ev.worth(params, p)), p))[:CANDIDATES_PER_SIDE]
             gets = sorted(theirs, key=lambda p: (-(ev.worth(params, p) - ev.worth(lens, p)), p))[:CANDIDATES_PER_SIDE]
+            if want is not None:
+                wanted = set(want)
+                gets = sorted((p for p in theirs if p in wanted), key=lambda p: (-(ev.worth(params, p) - ev.worth(lens, p)), p))[:CANDIDATES_PER_SIDE]
+                if give_pos:
+                    pool = [p for p in mine if not is_pick_id(p) and snap.players[p].pos == give_pos]
+                    if pool:
+                        gives = sorted(pool, key=lambda p: (-(ev.worth(lens, p) - ev.worth(params, p)), p))[:CANDIDATES_PER_SIDE]
             combos: list[tuple[tuple[str, ...], tuple[str, ...]]] = [((g,), (r,)) for g in gives for r in gets]
             for a, b in combinations(range(len(gives)), 2):
                 combos.extend(((gives[a], gives[b]), (r,)) for r in gets[:2])
             for give, get in combos:
+                if want is not None and not (self.legal_for_counter(proposer, give, get) and self.legal_for_counter(partner, get, give)):
+                    continue
                 ui, _, _ = self.utility(proposer, give, get)
                 if ui < params.propose_min or self.linear_loss(proposer, give, get) > floor_tolerance(params):
                     continue

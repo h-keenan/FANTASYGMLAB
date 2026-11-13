@@ -81,6 +81,8 @@ class GameState:
         self.offseason: dict[str, Any] | None = None  # stage, rookie-draft order and progress
         self.rookie_log: list[dict[str, Any]] = []  # completed rookie drafts
         self.retired: list[str] = []
+        # Trade block (block_v 1+): the user's blocked assets, {asset_id: {"looking_for": pos | None, "week": n}}. Inert (and out of the digest) while empty.
+        self.block: dict[str, dict[str, Any]] = {}
 
     # --------------------------------------------------------------- views
 
@@ -164,7 +166,7 @@ class GameState:
         for key in ("ir", "taxi"):
             if not any(raw[key].values()):
                 del raw[key]
-        for key in ("pick_owner", "created_picks", "spent_picks", "seasons", "rookie_log", "retired", "role_hist"):
+        for key in ("pick_owner", "created_picks", "spent_picks", "seasons", "rookie_log", "retired", "role_hist", "block"):
             if not raw[key]:
                 del raw[key]
         if raw["season_no"] == 1:
@@ -307,6 +309,16 @@ def _slot_move(state, snap, week, p):
 
 def _offer_key(state, snap, week, p):
     state.offer_keys.append(p["key"])
+
+
+def _block_set(state, snap, week, p):
+    """The user puts an asset on (``on``) or takes it off the trade block, optionally with a position hint."""
+
+    pid = str(p["pid"])
+    if p.get("on"):
+        state.block[pid] = {"looking_for": p.get("looking_for") or None, "week": int(week)}
+    else:
+        state.block.pop(pid, None)
 
 
 def _inbox_offer(state, snap, week, p):
@@ -505,7 +517,7 @@ _HANDLERS = {
     "inbox_response": _inbox_response, "injury": _injury, "week_scored": _week_scored,
     "playoff_seeded": _playoff_seeded, "season_complete": _season_complete,
     "week_advanced": _week_advanced, "advance": _advance_requested,
-    "slot_move": _slot_move, "rookie_draft_started": _rookie_draft_started, "rookie_pick": _rookie_pick,
+    "slot_move": _slot_move, "block_set": _block_set, "rookie_draft_started": _rookie_draft_started, "rookie_pick": _rookie_pick,
     "rookie_draft_complete": _rookie_draft_complete, "season_started": _season_started,
 }
 

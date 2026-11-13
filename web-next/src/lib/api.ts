@@ -4814,6 +4814,9 @@ export const api = {
   revertSimWeek: (gameId: string) =>
     authorizedRequest<SimGameTypes.SimGameResponse & { reverted?: number }>(`/v1/sim/games/${encodeURIComponent(gameId)}/revert-week`, { method: "POST", jsonBody: {} }),
   getSimLeague: (gameId: string) => authorizedRequest<SimGameTypes.SimLeagueResponse>(`/v1/sim/games/${encodeURIComponent(gameId)}/league`),
+  getSimBlock: (gameId: string) => authorizedRequest<SimGameTypes.SimBlockResponse>(`/v1/sim/games/${encodeURIComponent(gameId)}/block`),
+  putSimBlock: (gameId: string, body: { asset_id: string; on: boolean; looking_for?: SimGameTypes.SimPos | null }) =>
+    authorizedRequest<SimGameTypes.SimBlockResponse>(`/v1/sim/games/${encodeURIComponent(gameId)}/block`, { method: "PUT", jsonBody: body }),
   getSimLeagueRosters: (gameId: string) => authorizedRequest<SimGameTypes.SimLeagueRostersResponse>(`/v1/sim/games/${encodeURIComponent(gameId)}/league/rosters`),
   getSimGameResult: (gameId: string) => authorizedRequest<SimGameTypes.SimGameResultResponse>(`/v1/sim/games/${encodeURIComponent(gameId)}/result`),
   // Dynasty mode and IR / taxi squads (game engine 1.2.0).
