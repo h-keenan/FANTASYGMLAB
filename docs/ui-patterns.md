@@ -276,3 +276,63 @@ Buyers / Sellers / Pivot / Pick-rich segmented control, deleting the all-caps la
 Discovery into the same control, and the detail sheet's "Open trade finder with this team" and "View team"
 actions (the Draft Center page does not have the league id wired into the card component yet). The rows
 and the API are the foundation for all of those.
+
+## FilterSheet
+
+One **Filters** button (with a count badge) that opens a `Sheet` of grouped chips, committed with
+Apply. Replaces a row of native `<select>`s and pill rows. Active filters show as removable chips next
+to the button.
+
+```tsx
+import { FilterSheet } from "@/components/ui/FilterSheet";
+import { singleValue, valuesFromSingles, type FilterGroup } from "@/lib/filterSheet";
+
+const groups: FilterGroup[] = [
+  { id: "position", label: "Position", anyValue: "ALL", options: [{ value: "ALL", label: "Any" }, { value: "QB", label: "QB" }] },
+  { id: "tags", label: "Tags", multi: true, options: [...] },
+];
+
+<FilterSheet
+  groups={groups}
+  values={valuesFromSingles(groups, { position })}      // what the page is filtering by now
+  resultCount={(draft) => countMatches(draft)}          // optional: "Show 24 results" / "No results"
+  onApply={(next) => setPosition(singleValue(groups[0], next))}
+/>
+```
+
+- The sheet edits a **draft**. Nothing on the page changes until Apply, and closing (Escape, backdrop,
+  swipe) discards. Reset clears the draft. Apply is disabled when the draft would match nothing.
+- Single-select groups behave like radios (tap a chip to choose, tap it again or "Any" to clear);
+  multi-select groups toggle. A group can be `hidden` (for example Roster when ownership is unknown).
+- a11y: the sheet is a form (a `fieldset` and `legend` per group); single groups are `radiogroup` /
+  `radio` with `aria-checked`, multi groups are toggle buttons with `aria-pressed`; the trigger's
+  accessible name carries the count ("Filters, 2 active"); the footer count is a polite live region;
+  each active chip has its own "Remove Position filter: RB" button.
+- The model (`toggleFilterValue`, `activeFilterCount`, `activeFilterChips`, `applyButtonLabel`, ...) is the
+  lib twin `lib/filterSheet.ts`. Mobile: `<FilterSheet groups values onApply resultCount />` is the
+  multi-group version of `FilterDropdownButton` (which stays for one-group pills elsewhere).
+
+### Applied: Players and Waivers (web + mobile)
+
+- **Players:** the five selects (Position, Age, Status, Health, Roster) are one Filters button. Sort by
+  stays a select (it is a sort, not a filter). The live count uses the same filter function as the page
+  (including the IDP pool switch), so Apply reads "Show 1 result".
+- **Waivers:** the All Free Agents position select is a one-group FilterSheet, so the same control, count
+  badge and chips appear everywhere. The Add / Stash / Watch pill row is a segmented control (4 options,
+  one level) and stays.
+
+| Before: five selects | After: one button | The sheet | Applied: badge and chips |
+|---|---|---|---|
+| ![](ui-patterns/players-1-bar-before.jpg) | ![](ui-patterns/players-1-bar-after.jpg) | ![](ui-patterns/players-2-sheet-after.jpg) | ![](ui-patterns/players-3-applied-after.jpg) |
+
+Trade-off to know about: picking just a position used to be one tap on a native select; it is now three
+(Filters, chip, Apply), in exchange for one control, no five-row stack and a live result count. If that
+proves too slow, the follow-up is a position quick-pill row above the button that writes the same value.
+
+### Not done: TradePickerSheet extraction
+
+The trade picker (PR #1801, still open) has its own Filters panel (position and condition chips with
+Apply). Extracting it onto `FilterSheet` means touching a PR that has not merged, so it is a follow-up
+once #1801 lands: replace its inline filter panel with `FilterSheet` groups `position` and `condition`,
+and its shell with `Sheet`. Nothing in this PR blocks that; the group model already supports both.
+Other planned users: Trade Hub filters, News, Alerts, College Scouting, League Recaps, Live Draft.
