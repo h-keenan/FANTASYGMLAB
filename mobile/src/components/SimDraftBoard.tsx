@@ -34,7 +34,7 @@ import { radii, type ThemeColors } from '../theme';
 const SORTS: { key: SimPlayerSort; label: string }[] = [
   { key: 'adp', label: 'ADP' },
   { key: 'projection', label: 'Proj' },
-  { key: 'value', label: 'Value' },
+  { key: 'value', label: 'Trade value' },
 ];
 
 
@@ -266,7 +266,7 @@ export function SimDraftBoard({
           <AppText style={common.muted} accessibilityLiveRegion="polite">
             {total} player{total === 1 ? '' : 's'} left
           </AppText>
-          <AppText style={styles.scaleNote}>VAL is the model's 0-100 scale (top player = 100). EDGE: green = steal, red = reach.</AppText>
+          <AppText style={styles.scaleNote}>OVR is his rank at his position, same as everywhere. EDGE: green = steal, red = reach (trade value rank vs ADP).</AppText>
           {rows.shown.map((player) => (
             <SimDraftRow key={player.id} player={player} onOpen={onOpen} week={week} drafted={draftedIds?.includes(player.id)} actions={actions ? actions(player) : null} />
           ))}

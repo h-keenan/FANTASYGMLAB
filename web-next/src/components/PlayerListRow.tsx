@@ -2,14 +2,19 @@
 
 import type { CSSProperties, ReactNode } from "react";
 
+import { OvrGauge } from "@/components/OvrGauge";
 import { PlayerAvatar } from "@/components/PlayerAvatar";
 import { PlayerName } from "@/components/PlayerName";
 import { PositionBadge } from "@/components/PositionBadge";
 import { ToneBadge } from "@/components/ToneBadge";
+import { TapForWhy } from "@/components/ui/TapForWhy";
 import type { ChipTone } from "@/lib/playerCard";
+import type { WhyMetricId } from "@/lib/tapForWhyContent";
 import {
   PLAYER_LIST_DENSITY,
   PLAYER_LIST_LONG_NAME,
+  PLAYER_LIST_SLOT_WIDTH,
+  PLAYER_LIST_STAT_ORDER,
   PLAYER_LIST_STAT_WIDTH,
   limitPlayerListTags,
   orderPlayerListStats,
@@ -29,7 +34,7 @@ import { positionColorVar } from "@/lib/playerPresentation";
  *    one status chip only when it matters (OUT, Q, BYE soon, NEW, ROOKIE).
  *  - Line 2 (muted): TEAM · Age · Bye N. Generated players get a small info glyph by the actions.
  *  - Line 3: page tags (at most 2 + "+N") on the left, LABELED stat pills
- *    (PROJ / VAL / ADP / EDGE) in fixed-width slots on the right. A number never
+ *    (PROJ / OVR / ADP / EDGE; OVR is the shared overall gauge) in fixed-width slots on the right. A number never
  *    appears without its caption.
  *  - Actions slot (compact icon buttons) and tap-row-to-open.
  *
@@ -76,7 +81,21 @@ export interface PlayerListRowProps {
 }
 
 function StatPill({ stat }: { stat: PlayerListStat }) {
-  return (
+  // The player's Overall is the shared OVR gauge (same ring, thresholds and colors as the Quick View hero),
+  // explained on tap with the registry's OVR copy. Never a plain number pill.
+  if (stat.rating != null) {
+    return (
+      <TapForWhy metric="ovr" spoken={`Overall ${stat.rating}`}>
+        <span className="inline-flex items-center gap-1" data-stat={stat.key}>
+          <span className="text-[0.5625rem] font-bold uppercase" style={{ color: "var(--color-text-muted)", letterSpacing: "0.04em" }}>
+            {stat.label}
+          </span>
+          <OvrGauge rating={stat.rating} size="sm" />
+        </span>
+      </TapForWhy>
+    );
+  }
+  const pill = (
     <span
       className="inline-flex items-baseline justify-end gap-1 rounded-full px-1.5 leading-4 tabular-nums"
       style={{ background: "var(--glass-input-bg)" }}
@@ -89,6 +108,13 @@ function StatPill({ stat }: { stat: PlayerListStat }) {
         {stat.value}
       </span>
     </span>
+  );
+  return stat.why ? (
+    <TapForWhy metric={stat.why as WhyMetricId} spoken={`${stat.label} ${stat.value}`}>
+      {pill}
+    </TapForWhy>
+  ) : (
+    pill
   );
 }
 
@@ -211,11 +237,11 @@ export function PlayerListRow({
           <div className="flex shrink-0 items-center justify-end gap-0.5" data-testid="list-stats">
             {slots.map((stat, i) =>
               stat ? (
-                <span key={stat.key} className="flex justify-end" style={{ minWidth: PLAYER_LIST_STAT_WIDTH[stat.key] }}>
+                <span key={stat.key} className="flex justify-end" style={{ minWidth: PLAYER_LIST_STAT_WIDTH[stat.key] ?? 66 }}>
                   <StatPill stat={stat} />
                 </span>
               ) : (
-                <span key={`empty-${i}`} aria-hidden="true" style={{ minWidth: PLAYER_LIST_STAT_WIDTH[["proj", "val", "adp", "edge"][i]] }} />
+                <span key={`empty-${i}`} aria-hidden="true" style={{ minWidth: PLAYER_LIST_SLOT_WIDTH[PLAYER_LIST_STAT_ORDER[i] ?? "adp"] }} />
               ),
             )}
           </div>

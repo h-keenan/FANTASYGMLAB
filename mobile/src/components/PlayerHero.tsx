@@ -50,6 +50,7 @@ export default function PlayerHero({
   usageTrend,
   usageLoading = false,
   valueNote,
+  valueLabel,
   byeWeek = null,
   onByeThisWeek = false,
   unavailable = false,
@@ -85,6 +86,8 @@ export default function PlayerHero({
   usageLoading?: boolean;
   /** Server-provided reason the Value tile is empty (e.g. "No market value yet"). */
   valueNote?: string | null;
+  /** Overrides the VALUE caption (and explainer) when the number is not the real market value: Fantasy Sim passes "Trade value". */
+  valueLabel?: string | null;
   /** Team bye week (null when unknown / free agent). */
   byeWeek?: number | null;
   /** True when the current NFL week is that bye. */
@@ -178,8 +181,8 @@ export default function PlayerHero({
           <View style={styles.tile}>{scoreTileBody}</View>
         )}
         {score != null ? (
-          <TapForWhy metric="value" variant="tile" style={styles.tile} spoken={`Value ${Math.round(score).toLocaleString()}`} chart={valueChart} testID="pqv-value-why">
-            <AppText style={styles.tileCaption}>VALUE</AppText>
+          <TapForWhy metric={valueLabel ? 'trade_value' : 'value'} variant="tile" style={styles.tile} spoken={`${valueLabel ?? 'Value'} ${Math.round(score).toLocaleString()}`} chart={valueChart} testID="pqv-value-why">
+            <AppText style={styles.tileCaption}>{(valueLabel ?? 'Value').toUpperCase()}</AppText>
             <AppText style={styles.tileValue} numberOfLines={1} adjustsFontSizeToFit>
               {Math.round(score).toLocaleString()}
             </AppText>
@@ -187,12 +190,12 @@ export default function PlayerHero({
         ) : (
           usageLoading ? (
             <View style={styles.tile}>
-              <AppText style={styles.tileCaption}>VALUE</AppText>
+              <AppText style={styles.tileCaption}>{(valueLabel ?? 'Value').toUpperCase()}</AppText>
               <AppText style={[styles.tileValue, styles.tileValueEmpty]}>—</AppText>
             </View>
           ) : (
             <TapForWhy
-              metric="value"
+              metric={valueLabel ? 'trade_value' : 'value'}
               variant="tile"
               style={styles.tile}
               spoken="Value, none yet"
@@ -200,7 +203,7 @@ export default function PlayerHero({
               extra={[valueNote || 'No market value yet', 'A player gets a value once the market prices him. Until then the tile stays empty rather than showing a made-up number.']}
               testID="pqv-value-empty"
             >
-              <AppText style={styles.tileCaption}>VALUE</AppText>
+              <AppText style={styles.tileCaption}>{(valueLabel ?? 'Value').toUpperCase()}</AppText>
               <AppText style={[styles.tileValue, styles.tileValueEmpty]}>—</AppText>
               <AppText style={styles.tileNote}>{valueNote || 'No market value yet'}</AppText>
             </TapForWhy>

@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { Collapsible } from "./Collapsible";
 import { SimDraftRow } from "./SimDraftBoard";
+import { SimTradeValue } from "./SimGameParts";
 import { SimFinalView } from "./SimGameRecap";
 import { SimOpenPlayerContext, SimPlayerChip, type SimCtx } from "./SimGameParts";
 import { api } from "@/lib/api";
@@ -58,16 +59,28 @@ describe("SimPlayerChip quick", () => {
 
 describe("SimDraftRow", () => {
   it("shows the edge from value rank vs ADP (green steal, red reach) and four aligned stats", () => {
-    const { rerender } = render(<SimDraftRow player={player({ adp: 40, value_rank: 22, adp_edge: 18 })} />);
+    const { rerender } = render(<SimDraftRow player={player({ adp: 40, value_rank: 22, adp_edge: 18, overall: 91 })} />);
     expect(document.querySelector("[data-stat=edge]")).toHaveTextContent("Edge▲18");
     rerender(<SimDraftRow player={player({ adp: 10, value_rank: 25, adp_edge: -15 })} />);
     expect(document.querySelector("[data-stat=edge]")).toHaveTextContent("Edge▼15");
-    rerender(<SimDraftRow player={player({ adp: 20, value_rank: 21, adp_edge: -1 })} />);
+    rerender(<SimDraftRow player={player({ adp: 20, value_rank: 21, adp_edge: -1, overall: 77 })} />);
     expect(document.querySelector("[data-stat=edge]")).toBeNull();
     // every number carries its caption
     expect(document.querySelector("[data-stat=proj]")).toHaveTextContent(/^Proj/);
-    expect(document.querySelector("[data-stat=val]")).toHaveTextContent(/^Val/);
+    expect(document.querySelector("[data-stat=ovr]")).toHaveTextContent(/^OVR/);
+    expect(document.querySelector("[data-stat=ovr]")?.querySelector("[aria-label$='overall rating']")).not.toBeNull();
+    expect(screen.queryByText(/^val$/i)).toBeNull();
     expect(document.querySelector("[data-stat=adp]")).toHaveTextContent(/^ADP/);
+  });
+});
+
+describe("Trade value label", () => {
+  it("is always called Trade value (with a tap-for-why), never Value or VAL", () => {
+    render(<SimTradeValue value={70.4} />);
+    expect(screen.getByText("Trade value")).toBeInTheDocument();
+    expect(screen.getByText("70")).toBeInTheDocument();
+    expect(screen.queryByText(/^(value|val)$/i)).toBeNull();
+    expect(screen.getByRole("button", { name: /Trade value 70/ })).toBeInTheDocument();
   });
 });
 

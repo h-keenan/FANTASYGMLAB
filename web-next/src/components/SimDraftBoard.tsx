@@ -31,7 +31,7 @@ import {
 const SORTS: { label: string; value: SimPlayerSort }[] = [
   { label: "ADP", value: "adp" },
   { label: "Proj", value: "projection" },
-  { label: "Value", value: "value" },
+  { label: "Trade value", value: "value" },
 ];
 
 /**

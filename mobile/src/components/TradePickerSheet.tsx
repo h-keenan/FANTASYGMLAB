@@ -64,6 +64,7 @@ export default function TradePickerSheet<T = unknown>({
   renderPlayerRow,
   hidden: hiddenExternal = false,
   flexFilter = false,
+  valueLabel,
 }: {
   title: string;
   subtitle?: string;
@@ -89,6 +90,8 @@ export default function TradePickerSheet<T = unknown>({
   hidden?: boolean;
   /** Offer a FLEX chip (RB / WR / TE) in the position filter. */
   flexFilter?: boolean;
+  /** Caption under each row's value number. Fantasy Sim passes "Trade value" so the number is never bare. */
+  valueLabel?: string;
 }) {
   const { colors } = useThemeMode();
   const styles = useMemo(() => createStyles(colors), [colors]);
@@ -283,10 +286,11 @@ export default function TradePickerSheet<T = unknown>({
                               team={item.team}
                               tier={item.tier}
                               trailingValue={value}
+                              trailingCaption={valueLabel}
                               showDivider={false}
                             />
                           ) : (
-                            <DraftPickAssetRow pickId={item.id} round={item.round} label={item.label} projectedRange={item.detail} trailingValue={value} showDivider={false} />
+                            <DraftPickAssetRow pickId={item.id} round={item.round} label={item.label} projectedRange={item.detail} trailingValue={value} trailingCaption={valueLabel} showDivider={false} />
                           )}
                         </View>
                         {single ? null : (

@@ -273,6 +273,7 @@ export default function PlayerQuickViewSheet({
               age={age}
               score={player.score ?? resolved?.value_score ?? null}
               valueNote={request.valueNote ?? resolved?.value_note}
+              valueLabel={request.valueLabel ?? null}
               byeWeek={resolved?.bye_week ?? null}
               onByeThisWeek={resolved?.on_bye_this_week ?? false}
               unavailable={availability?.unavailable ?? false}

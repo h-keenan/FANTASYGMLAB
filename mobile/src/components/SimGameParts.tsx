@@ -34,6 +34,7 @@ import {
   type SimGameTone,
 } from '../lib/simGame';
 import { simSeeAllLabel } from '../lib/simLayout';
+import TapForWhy from './TapForWhy';
 import { radii, scrim, spacing, type ThemeColors } from '../theme';
 
 /** Semantic theme color for a presentation tone (never a raw hex). */
@@ -150,6 +151,20 @@ export function SimStat({ label, value, tone = 'muted' }: { label: string; value
       <AppText style={styles.statLabel}>{label}</AppText>
       <AppText style={[styles.statValue, tone !== 'muted' && { color: simToneColor(tone, colors) }]}>{value}</AppText>
     </View>
+  );
+}
+
+/**
+ * A trade/market value (the 0-100 number AI teams use in trades) with its real name and a tap-for-why
+ * explainer. Never labeled plain "Value" or "VAL": the player's Overall is a different number.
+ */
+export function SimTradeValue({ value }: { value: number | null | undefined }) {
+  if (value == null || Number.isNaN(value)) return null;
+  const rounded = Math.round(value);
+  return (
+    <TapForWhy metric="trade_value" spoken={`Trade value ${rounded}`}>
+      <SimStat label="Trade value" value={rounded} />
+    </TapForWhy>
   );
 }
 

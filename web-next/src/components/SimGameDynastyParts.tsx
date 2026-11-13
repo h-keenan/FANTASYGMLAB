@@ -4,7 +4,7 @@ import { useEffect, useState, type ReactNode } from "react";
 
 import { Button } from "@/components/Button";
 import { Collapsible } from "@/components/Collapsible";
-import { SimPlayerLine, SimSheet, SimStat, SimToneBadge, simToneColor, type SimCtx } from "@/components/SimGameParts";
+import { SimPlayerLine, SimSheet, SimTradeValue, SimToneBadge, simToneColor, type SimCtx } from "@/components/SimGameParts";
 import { ToneBadge } from "@/components/ToneBadge";
 import { api } from "@/lib/api";
 import { isSimRookieNoticeSeen, setSimRookieNoticeSeen } from "@/lib/simRookieNotice";
@@ -113,7 +113,7 @@ export function SimPickLine({
         </span>
       </div>
       <div className="ml-auto flex items-center gap-2">
-        <SimStat label="Value" value={Math.round(pick.value)} />
+        <SimTradeValue value={pick.value} />
         {trailing}
       </div>
     </div>
@@ -123,7 +123,7 @@ export function SimPickLine({
 /** A player or a pick, whichever the asset is (counter chips, inbox offers, verdicts). */
 export function SimAssetLine({ asset, trailing, onOpen }: { asset: SimTradeAsset; trailing?: ReactNode; onOpen?: (player: SimGamePlayer) => void }) {
   if (simIsPick(asset)) return <SimPickLine pick={asset} trailing={trailing} />;
-  return <SimPlayerLine player={asset} onOpen={onOpen} trailing={trailing ?? <SimStat label="Value" value={Math.round(asset.value)} />} />;
+  return <SimPlayerLine player={asset} onOpen={onOpen} trailing={trailing ?? <SimTradeValue value={asset.value} />} />;
 }
 
 /** The picks of the game (every team's), or null until loaded; null for a redraft game. */

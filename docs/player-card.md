@@ -87,3 +87,25 @@ instead. The "TapForWhy" affordance from the Wave 0 pattern components plugs in 
 | Fantasy Sim headers / chips (`SimPlayerChip` in cards) | `compact` | follow-up |
 
 Rule: new player UI uses this kit; do not hand-roll a photo + name + number row.
+
+## Two 0-100 numbers, two names (Overall vs Trade value)
+
+The real app has an **Overall** (the OVR gauge; "Player score" in the Quick View hero):
+where a player's value ranks among players at his position, 1-99, drawn by the one
+shared `OvrGauge` ring (same thresholds and red to gold to green tint everywhere; see
+`BEGINNER_HELP.overallRating`). It also has a **Value** (market value) number.
+
+Fantasy Sim has the same two ideas and must name them the same way:
+
+| Context | What it shows | Label / component |
+|---|---|---|
+| Player lists (draft Players/Board/Queue, rookie draft, Players, Waivers, rosters, pickers) | The player's Overall | `OVR` + the shared `OvrGauge` (`PlayerListStat.rating`); tap for the OVR explainer |
+| Player Quick View hero (sim players) | Overall as the "Player score" ring (the same number the row showed); a generated player's 0-100 value as "Trade value" | `overall_rating` + `value_label` on the quick-view identity |
+| Trade screens (trade picker rows, picks, offers, counters, verdicts, cut lists) | How much the AI teams think the player or pick is worth | `Trade value` + tap-for-why (`trade_value` in `lib/tapForWhyContent.ts`), via `SimTradeValue`, `PlayerListStat.why`, and `valueLabel` on `TradePickerSheet` |
+
+Rules: never label the sim's raw 0-100 `value` plain "Value" or "VAL"; a row shows ONE
+of Overall / Trade value (they share the `metric` slot in `orderPlayerListStats`), never
+both. Overall comes from `modules/sim/game_view.overall_ratings` (value percentile within
+position, the real app's curve, pinned by `tests/test_sim_overall.py`), sent as
+`player.overall` (null for a position pool under 10 players: no fabricated rating).
+The sort option that orders by this number is called "Trade value".

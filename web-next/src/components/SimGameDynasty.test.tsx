@@ -310,7 +310,7 @@ describe("picks in trades", () => {
     await openTrades();
     const row = await screen.findByTestId("pick-row");
     expect(row).toHaveTextContent("2028 Round 2");
-    expect(row).toHaveTextContent("Value");
+    expect(row).toHaveTextContent("Trade value");
   });
 
   it("the builder's sheet has a Picks group on each side, grouped by year, and toggles pick ids", async () => {
@@ -323,7 +323,7 @@ describe("picks in trades", () => {
     fireEvent.click(within(sheet).getByRole("tab", { name: /^Picks/ }));
     expect(sheet).toHaveTextContent("2027 picks");
     expect(within(sheet).getByRole("button", { name: "Add 2027 Round 1 (early)" })).toBeInTheDocument();
-    expect(sheet).toHaveTextContent("Value");
+    expect(sheet).toHaveTextContent("Trade value");
     mocked.previewSimTrade.mockResolvedValue({ ok: true, reason: "", verdict: { decision: "accept", reason: "Fair.", chips: [] } });
     fireEvent.click(within(sheet).getByRole("button", { name: "Add 2027 Round 1 (early)" }));
     fireEvent.click(within(sheet).getByRole("button", { name: /^Add 1 to trade/ }));

@@ -236,7 +236,10 @@ export function SimPlayerSheet({ gameId, player, onClose, actions }: { gameId: s
     age: player.age ?? null,
     injury_status: live.status === "out" ? "Out" : null,
     sourceLabel: "Fantasy Sim",
-    ...(feed ? { score: feed.score, value_note: feed.valueNote, overall_rank: feed.overall_rank, position_rank: feed.position_rank } : {}),
+    // The list rows' Overall also drives the hero's Player score ring (real and generated players alike), so the
+    // number never differs between a row and its quick view. A generated player's 0-100 value is "Trade value".
+    overall_rating: live.overall ?? null,
+    ...(feed ? { score: feed.score, value_note: feed.valueNote, value_label: "Trade value", overall_rank: feed.overall_rank, position_rank: feed.position_rank } : {}),
   };
   return <PlayerQuickView identity={identity} onClose={onClose} remote={Boolean(real)} simOverlay={<SimPlayerOverlay player={live} detail={detail} actions={actions} />} />;
 }
@@ -286,9 +289,9 @@ export function SimPlayerOverlay({ player, detail, actions }: { player: SimGameP
       : null,
     { label: "This season", value: simFmtPts(player.season_points ?? 0), note: `${player.games ?? 0} games${player.ppg != null ? ` · ${simFmtPts(player.ppg)} ppg` : ""}`, percentile: null },
     {
-      label: "Game value",
+      label: "Trade value rank",
       value: player.value_rank ? `#${player.value_rank}` : hero.score != null ? String(hero.score) : "—",
-      note: hero.score != null ? `Value ${hero.score}${player.adp != null ? ` · ADP ${simFmtValue(player.adp)}` : ""}` : "No market value",
+      note: hero.score != null ? `Trade value ${hero.score}${player.adp != null ? ` · ADP ${simFmtValue(player.adp)}` : ""}` : "No trade value",
       percentile: null,
     },
   ].filter((t): t is { label: string; value: string; note: string; percentile: null } => t != null);

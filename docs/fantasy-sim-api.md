@@ -489,7 +489,7 @@ already landed answers `reason: "player_taken"`; reload the draft.
 `value`, `adp`, `age`, `name`, `last_week`, `season`.
 ```jsonc
 player = {"id": "9509", "name": "...", "pos": "RB", "team": "ATL" /* NFL */, "age": 24.0,
-          "adp": 3.0, "value": 91.2, "projection": 17.4, "floor": 9.1, "ceiling": 27.7,
+          "adp": 3.0, "value": 91.2, "overall": 97, "projection": 17.4, "floor": 9.1, "ceiling": 27.7,
           "status": "healthy|out|bye", "out_weeks": 0, "bye_week": 9,
           "owner": {"type": "you|ai|free_agent", "team_id": "3", "name": "..."},
           "last_week": 12.4, "season_points": 51.0, "games": 3, "ppg": 17.0}
@@ -690,5 +690,5 @@ Reasons: `ir_full`, `ir_ineligible`, `taxi_full`, `taxi_ineligible`, `roster_ful
 
 `GET /v1/sim/games/{id}/players/{pid}` now also returns: `ros` (`mean`, `floor`, `ceiling`, `weeks_left`, `playable_weeks`,
 `bye_week`, `out_weeks`), `projection_flat` (every playable week carries the same projection: clients show one
-"Rest of season" line, never a week-by-week list), `player.value_rank` / `player.pos_value_rank`, and for generated rookies
+"Rest of season" line, never a week-by-week list), `player.overall` (1-99, null for a position pool under 10 players), `player.value_rank` / `player.pos_value_rank`, and for generated rookies
 `scouting` (see `docs/fantasy-sim-player-model.md` section 8).

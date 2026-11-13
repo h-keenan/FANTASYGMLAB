@@ -18,6 +18,8 @@ export interface QuickViewRequest {
   sourceLabel?: string;
   /** Why the Value tile is empty, when the caller knows (Fantasy Sim: below replacement in this league). */
   valueNote?: string | null;
+  /** Caption for the Value tile when it is not the real market value (Fantasy Sim: "Trade value"). */
+  valueLabel?: string | null;
 }
 
 export function buildQuickViewRequest(
