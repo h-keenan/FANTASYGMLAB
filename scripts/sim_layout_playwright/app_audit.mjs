@@ -1,5 +1,5 @@
 // UI audit for the MAIN app routes (not the Fantasy Sim): same DOM checks as ui_audit.mjs, optional 200% text scaling and axe-core.
-// The API is stubbed (every /v1 call answers an empty 200), so each route renders its loading / empty / error state: that is
+// The API is stubbed (set LIVE_API=1 to hit a real local backend: services.mobile_api_service with a fake GoTrue, see docs/audits) (every /v1 call answers an empty 200), so each route renders its loading / empty / error state: that is
 // what is audited here (overflow, tap targets, names, truncation, contrast, axe rules), not data-rich layouts.
 //   PW_CORE=.../playwright-core/index.mjs AXE_JS=.../axe-core/axe.min.js BASE=http://localhost:3197 OUT=/tmp/app-audit \
 //     [WIDTHS=360,390] [THEMES=dark,light] [SCALE=2] [AXE=1] [ROUTES=/,/players] node scripts/sim_layout_playwright/app_audit.mjs
@@ -27,11 +27,11 @@ for (const theme of THEMES) for (const w of WIDTHS) {
   await ctx.route("**/*", async (route) => {
     const u = new URL(route.request().url());
     const cors = { "access-control-allow-origin": "*", "access-control-allow-headers": "*", "access-control-allow-methods": "*" };
-    if (u.hostname === "localhost" && u.port === "8000") {
+    if (u.hostname === "localhost" && u.port === "8000" && process.env.LIVE_API !== "1") {
       if (route.request().method() === "OPTIONS") return route.fulfill({ status: 204, headers: cors });
       return route.fulfill({ status: 200, contentType: "application/json", body: "{}", headers: cors });
     }
-    if (u.hostname === "dummy.supabase.co") return route.fulfill({ status: 200, contentType: "application/json", body: "{}", headers: cors });
+    if (u.hostname === "dummy.supabase.co") return route.fulfill({ status: 200, contentType: "application/json", body: u.pathname.startsWith("/rest/v1/") ? "[]" : "{}", headers: cors });
     return route.continue();
   });
   const page = await ctx.newPage();

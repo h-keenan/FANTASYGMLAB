@@ -311,7 +311,7 @@ describe("GmPlanContent", () => {
         />,
       );
 
-      expect(screen.getByRole("tab", { name: "Rebuilding", selected: true })).toBeInTheDocument();
+      expect(screen.getByRole("tab", { name: /^Rebuilding/, selected: true })).toBeInTheDocument();
       expect(screen.getByText("Prioritize youth and future draft capital")).toBeInTheDocument();
     });
 
@@ -328,7 +328,7 @@ describe("GmPlanContent", () => {
         />,
       );
 
-      fireEvent.click(screen.getByRole("tab", { name: "Competing" }));
+      fireEvent.click(screen.getByRole("tab", { name: /^Competing/ }));
 
       expect(api.setTeamStance).toHaveBeenCalledWith("league-1", "competing");
     });
@@ -604,7 +604,7 @@ describe("GmPlanContent concept structure", () => {
     const locked: GmPlanResponse = { ok: true, quiet: true, reason: "", focus_areas: [], is_premium: false, upsell: { title: "Locked plan", body: "Upgrade." } };
     render(<GmPlanContent leagueName="L" data={locked} {...props} />);
     expect(screen.getAllByRole("heading", { name: "Locked plan" }).length).toBeGreaterThan(0);
-    expect(screen.getByRole("tab", { name: "Competing" })).toBeInTheDocument();
+    expect(screen.getByRole("tab", { name: /^Competing/ })).toBeInTheDocument();
   });
 
   it("shows an empty state with a next step when there are no trade ideas", () => {

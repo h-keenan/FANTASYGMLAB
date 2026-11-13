@@ -109,7 +109,6 @@ export function TeamSituationCard({
               type="button"
               role="tab"
               aria-selected={active}
-              aria-label={option.label}
               onClick={() => onPick(option.value)}
               className="flex flex-col items-center gap-1 px-2 py-3 text-center min-w-0"
               style={{
@@ -124,10 +123,10 @@ export function TeamSituationCard({
               }}
             >
               <StanceIcon stance={option.value} />
-              <span aria-hidden="true" className="text-xs font-extrabold uppercase" style={{ letterSpacing: "var(--letter-spacing-tight)" }}>
+              <span className="text-xs font-extrabold uppercase" style={{ letterSpacing: "var(--letter-spacing-tight)" }}>
                 {option.label}
               </span>
-              <span aria-hidden="true" className="text-[0.6875rem]" style={{ color: "var(--color-text-muted)" }}>
+              <span className="text-[0.6875rem]" style={{ color: "var(--color-text-muted)" }}>
                 {look.tagline}
               </span>
             </button>

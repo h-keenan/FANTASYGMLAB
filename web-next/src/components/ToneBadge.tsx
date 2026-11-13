@@ -25,14 +25,14 @@ export function ToneBadge({
   /** Full text for screen readers when `label` is an abbreviation. */
   srLabel?: string;
   testId?: string;
-  /** Let a long sentence-style label wrap inside its container instead of widening the page. */
+  /** Let a long sentence-style label wrap inside its container instead of widening the page. Multi-word labels wrap on their own (200% text, narrow rows). */
   wrap?: boolean;
 }) {
   return (
     <span
       data-testid={testId}
       title={title}
-      className={`${size === "xs" ? "px-1.5 text-[0.6875rem] leading-4 inline-flex items-center" : "px-1.5 py-0.5 text-xs"} font-extrabold uppercase ${wrap ? "min-w-0 max-w-full break-words" : "whitespace-nowrap shrink-0"}`}
+      className={`${size === "xs" ? "px-1.5 text-[0.6875rem] leading-4 inline-flex items-center" : "px-1.5 py-0.5 text-xs"} font-extrabold uppercase ${wrap || label.includes(" ") ? "min-w-0 max-w-full break-words" : "whitespace-nowrap shrink-0"}`}
       style={{
         borderRadius: "var(--radius-pill)",
         background: `color-mix(in srgb, ${color} var(--chip-fill-pct, 15%), transparent)`,

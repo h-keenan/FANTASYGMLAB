@@ -94,7 +94,6 @@ export function RankingRow({
     <div
       role={onOpen ? "button" : undefined}
       tabIndex={onOpen ? 0 : undefined}
-      aria-label={onOpen ? `${teamName} manager profile` : undefined}
       onClick={onOpen}
       onKeyDown={onOpen ? (event) => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); onOpen(); } } : undefined}
       className={`flex items-center gap-3 py-2.5 px-1${onOpen ? " cursor-pointer" : ""}`}
@@ -146,6 +145,7 @@ export function RankingRow({
           {metricLabel}
         </span>
       </div>
+      {onOpen ? <span className="sr-only">. Open manager profile</span> : null}
     </div>
   );
 }
