@@ -26,14 +26,17 @@ from modules.sim.game_ai import (
 )
 from modules.sim.game_eval import Evaluator, team_params
 from modules.sim.game_state import Emitter, GameState
-from modules.sim.game_types import GameError, GameSnapshot, slot_positions
+from modules.sim.types import is_pick_id
+from modules.sim.game_types import NON_TRADABLE, GameError, GameSnapshot, slot_positions
 
 
-def _require_season(state: GameState) -> None:
+def _require_season(state: GameState, *, offseason_ok: bool = False) -> None:
     if state.status == "drafting":
         raise GameError("wrong_phase", "Finish the draft first.", phase="draft")
     if state.status == "complete":
         raise GameError("wrong_phase", "The season is over.", phase="complete")
+    if state.status == "offseason" and not offseason_ok:
+        raise GameError("wrong_phase", "That is not available in the offseason.", phase="offseason")
 
 
 # ------------------------------------------------------------------ lineup
@@ -128,11 +131,135 @@ def cancel_claim(em: Emitter, claim_id: str) -> None:
 
 def cut_player(em: Emitter, pid: str) -> None:
     state, snap = em.state, em.snap
-    _require_season(state)
+    _require_season(state, offseason_ok=True)
     user = snap.user_team.tid
-    if pid not in state.rosters[user]:
+    if state.where(user, pid) is None:
         raise ValueError("You can only cut players on your roster.")
     em.emit(state.week, "user", "cut", team=user, pid=pid, reason="cut")
+
+
+# ------------------------------------------------------------ IR and taxi
+
+DESTINATIONS = ("roster", "ir", "taxi")
+LONG_INJURY_WEEKS = 4  # an AI manager stashes anyone out at least this long on IR
+
+
+def taxi_eligible(snap: GameSnapshot, pid: str) -> bool:
+    """Sleeper's usual taxi rule: a rookie, or a player whose years of NFL
+    experience are below the league's ``taxi_years`` (2 = rookies and second-years)."""
+
+    p = snap.players[pid]
+    years = p.extra.get("years_exp")
+    if years is None:
+        return bool(p.extra.get("is_rookie")) and snap.settings.taxi_years >= 1
+    return years < snap.settings.taxi_years
+
+
+def check_move(snap: GameSnapshot, state: GameState, tid: str, pid: str, dst: str) -> str:
+    """Validate moving ``pid`` to ``dst`` for ``tid``; returns where it is now.
+    ValueError for a malformed request (422), GameError for a rule (200 + reason)."""
+
+    S = snap.settings
+    if dst not in DESTINATIONS:
+        raise ValueError("dst must be one of: " + ", ".join(DESTINATIONS))
+    if not S.reserves:
+        raise GameError("reserves_unavailable", "This game has no IR or taxi squad.")
+    src = state.where(tid, pid)
+    if src is None:
+        raise ValueError("That player is not on your team.")
+    if src == dst:
+        raise ValueError(f"That player is already on your {dst}.")
+    if dst == "ir":
+        if S.ir_slots <= 0 or len(state.ir[tid]) >= S.ir_slots:
+            raise GameError("ir_full", "Your IR is full.")
+        if src != "roster":
+            raise GameError("ir_ineligible", "Only an active player can go on IR.")
+        if state.out.get(pid, 0) <= 0:
+            raise GameError("ir_ineligible", "Only an injured player (out) can go on IR.")
+    elif dst == "taxi":
+        if S.taxi_slots <= 0 or len(state.taxi[tid]) >= S.taxi_slots:
+            raise GameError("taxi_full", "Your taxi squad is full.")
+        if src != "roster":
+            raise GameError("taxi_ineligible", "Only an active player can go on the taxi squad.")
+        if not taxi_eligible(snap, pid):
+            raise GameError("taxi_ineligible", "Only rookies and second-year players can go on the taxi squad.")
+        if snap.players[pid].pos in NON_TRADABLE:
+            raise GameError("taxi_ineligible", "Kickers and defenses cannot go on the taxi squad.")
+    else:  # activate / promote
+        if len(state.rosters[tid]) >= S.roster_limit:
+            raise GameError("roster_full", "Open a roster spot first: cut or move a player.")
+    return src
+
+
+def move_player(em: Emitter, pid: str, dst: str) -> dict[str, Any]:
+    """The user moves one of their players between roster, IR and taxi."""
+
+    state, snap = em.state, em.snap
+    _require_season(state, offseason_ok=True)
+    user = snap.user_team.tid
+    src = check_move(snap, state, user, pid, dst)
+    em.emit(state.week, "user", "slot_move", team=user, pid=pid, src=src, dst=dst)
+    return {"pid": pid, "src": src, "dst": dst}
+
+
+def ai_manage_reserves(em: Emitter, ev: Evaluator, tid: str) -> list[dict[str, Any]]:
+    """What a sensible AI manager does with IR and the taxi squad: activate
+    anyone back to health when there is a spot (or make one), stash long-term
+    injured players on IR, and (dynasty) hold eligible young bench players on
+    the taxi squad, promoting one who would start."""
+
+    snap, state = em.snap, em.state
+    S = snap.settings
+    if not S.reserves or snap.team(tid).is_user:
+        return []
+    moves: list[dict[str, Any]] = []
+    params = team_params(snap, tid)
+
+    def go(pid: str, dst: str) -> None:
+        src = state.where(tid, pid)
+        em.emit(state.week, tid, "slot_move", team=tid, pid=pid, src=src, dst=dst)
+        moves.append({"team": tid, "pid": pid, "src": src, "dst": dst})
+
+    # 1. healthy players off IR (cut the worst bench player if the roster is full)
+    for pid in sorted(state.ir[tid]):
+        if state.out.get(pid, 0) > 0:
+            continue
+        if len(state.rosters[tid]) >= S.roster_limit:
+            best, _ = ev.best_lineup(state.rosters[tid], state.week)
+            starters = {p for _, p in best if p}
+            bench = sorted((p for p in state.rosters[tid] if p not in starters), key=lambda p: (ev.worth(params, p), p))
+            if not bench or ev.worth(params, bench[0]) >= ev.worth(params, pid):
+                continue
+            em.emit(state.week, tid, "drop", team=tid, pid=bench[0], reason="make_room")
+        go(pid, "roster")
+    # 2. long-term injured onto IR
+    if S.ir_slots:
+        hurt = sorted(
+            (p for p in state.rosters[tid] if state.out.get(p, 0) >= LONG_INJURY_WEEKS),
+            key=lambda p: (-state.out.get(p, 0), p),
+        )
+        for pid in hurt:
+            if len(state.ir[tid]) >= S.ir_slots:
+                break
+            go(pid, "ir")
+    # 3. taxi squad (dynasty): promote anyone who would start, then fill with eligible bench youth
+    if S.taxi_slots and S.dynasty:
+        best, _ = ev.best_lineup([*state.rosters[tid], *state.taxi[tid]], state.week)
+        starters = {p for _, p in best if p}
+        for pid in sorted(state.taxi[tid]):
+            if pid in starters and len(state.rosters[tid]) < S.roster_limit:
+                go(pid, "roster")
+        best, _ = ev.best_lineup(state.rosters[tid], state.week)
+        starters = {p for _, p in best if p}
+        stash = sorted(
+            (p for p in state.rosters[tid] if p not in starters and snap.players[p].pos not in NON_TRADABLE and taxi_eligible(snap, p)),
+            key=lambda p: (snap.players[p].age, -snap.players[p].market, p),
+        )
+        for pid in stash:
+            if len(state.taxi[tid]) >= S.taxi_slots:
+                break
+            go(pid, "taxi")
+    return moves
 
 
 # ------------------------------------------------------------------ trades
@@ -148,6 +275,8 @@ def enforce_roster_cap(em: Emitter, ev: Evaluator, tid: str) -> list[str]:
     params = team_params(snap, tid)
     cut: list[str] = []
     ev = Evaluator(snap, state)
+    if len(state.rosters[tid]) > snap.settings.roster_limit:
+        ai_manage_reserves(em, ev, tid)  # IR and taxi first: they free spots without losing anyone
     while len(state.rosters[tid]) > snap.settings.roster_limit:
         roster = state.rosters[tid]
         best, _ = ev.best_lineup(roster, state.week)
@@ -231,7 +360,10 @@ def respond_offer(em: Emitter, desk: TradeDesk, offer_id: str, action: str) -> d
     if state.trades_made[ai] >= AI_SEASON_TRADE_CAP:
         raise GameError("partner_trade_limit", "That team has made all the trades it will this season.")
     ai_gives, ai_gets = offer["give"], offer["get"]  # from the AI's side
-    if not all(p in state.rosters[ai] for p in ai_gives) or not all(p in state.rosters[user] for p in ai_gets):
+    def owns(tid: str, pid: str) -> bool:
+        return state.pick_owner.get(pid) == tid if is_pick_id(pid) else state.where(tid, pid) is not None
+
+    if not all(owns(ai, p) for p in ai_gives) or not all(owns(user, p) for p in ai_gets):
         raise GameError("offer_invalid", "Those players have moved, so the offer is off.")
     em.emit(state.week, "user", "inbox_response", id=offer_id, action="accept")
     return execute_trade(em, ai, user, ai_gives, ai_gets, key="", source="ai_offer")

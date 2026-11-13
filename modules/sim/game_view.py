@@ -15,6 +15,7 @@ from modules.sim.game_eval import Evaluator
 from modules.sim.game_state import GameState
 from modules.sim.game_types import PREVIEW_PAYWALL_WEEK, GameSnapshot, headshot_id
 from modules.sim.personas import PERSONAS
+from modules.sim.types import is_pick_id
 
 PAGE_MAX = 60
 SORTS = ("projection", "value", "adp", "age", "name", "last_week", "season")
@@ -56,18 +57,48 @@ def _owner(snap: GameSnapshot, state: GameState, owners: Mapping[str, str], pid:
 def player_row(
     snap: GameSnapshot, state: GameState, ev: Evaluator, pid: str, owners: Mapping[str, str], *, week: int | None = None
 ) -> dict[str, Any]:
+    if is_pick_id(pid):
+        return pick_asset(snap, state, ev, pid)
     p = snap.players[pid]
     w = week if week is not None else max(state.week, 1)
-    games = state.games_played(pid)
+    games = state.games_played(pid) if state.status != "offseason" else []
     floor, ceiling = ev.band(pid)
     return {
         "id": pid, "headshot_id": headshot_id(pid), "name": p.name, "pos": p.pos, "team": p.nfl_team,
         "age": p.age, "adp": p.adp, "value": p.value, "projection": round(ev.proj(pid, w), 1), "ros_mean": round(ev.ros_mean(pid), 1),
         "floor": round(floor, 1), "ceiling": round(ceiling, 1), "status": ev.status(pid, w),
         "out_weeks": state.out.get(pid, 0), "bye_week": snap.bye_of(pid) or None,
-        "owner": _owner(snap, state, owners, pid),
+        "owner": _owner(snap, state, owners, pid), "kind": "player",
+        "squad": state.where(owners[pid], pid) if pid in owners else None,
+        "taxi_eligible": taxi_ok(snap, pid), "rookie": bool(p.extra.get("is_rookie")), "generated": bool(p.extra.get("draft_year")),
         "last_week": state.last_points(pid), "season_points": round(sum(games), 1), "games": len(games),
         "ppg": round(sum(games) / len(games), 1) if games else None,
+    }
+
+
+def taxi_ok(snap: GameSnapshot, pid: str) -> bool:
+    from modules.sim.game_actions import taxi_eligible
+
+    return bool(snap.settings.reserves and snap.settings.taxi_slots and taxi_eligible(snap, pid))
+
+
+def pick_asset(snap: GameSnapshot, state: GameState, ev: Evaluator, pid: str) -> dict[str, Any]:
+    """A draft pick shaped like a player row (the trade builder, the inbox and
+    counters treat both as assets) with ``kind: "pick"``."""
+
+    season, rnd, orig = ev.pick_parts(pid)
+    holder = state.pick_owner.get(pid)
+    frac = ev.pick_slot_frac(orig) if season <= ev.draft_year_now() else None
+    hint = None if frac is None else ("early" if frac < 0.34 else "mid" if frac < 0.67 else "late")
+    team = snap.team(holder) if holder else None
+    return {
+        "id": pid, "kind": "pick", "headshot_id": None, "name": f"{season} Round {rnd}", "pos": "PICK", "team": "",
+        "season": season, "round": rnd, "orig_team_id": orig, "orig_team_name": snap.team(orig).name,
+        "slot_hint": hint, "label": ev.pick_name(pid), "age": None, "adp": None, "value": round(ev.pick_value(pid), 1),
+        "projection": 0.0, "ros_mean": 0.0, "floor": 0.0, "ceiling": 0.0, "status": "healthy", "out_weeks": 0,
+        "bye_week": None, "owner": ({"type": "you" if team.is_user else "ai", "team_id": holder, "name": team.name}
+                                      if team else {"type": "free_agent", "team_id": None, "name": None}),
+        "squad": "picks", "last_week": None, "season_points": 0.0, "games": 0, "ppg": None,
     }
 
 
@@ -201,7 +232,20 @@ def lineup_view(snap: GameSnapshot, state: GameState) -> dict[str, Any]:
         "projected_total": round(ev.lineup_projection(lineup, week), 1),
         "warnings": lineup_warnings(ev, lineup, week) if state.status in ("in_season", "playoffs") else [],
         "roster_size": len(state.rosters[user]), "roster_limit": snap.settings.roster_limit,
-        "opponent": _opponent(snap, state, ev, week), "locked": state.status == "complete",
+        "opponent": _opponent(snap, state, ev, week), "locked": state.status in ("complete", "offseason"),
+        **reserve_block(snap, state, ev, user, owners, week),
+    }
+
+
+def reserve_block(snap: GameSnapshot, state: GameState, ev: Evaluator, tid: str, owners: Mapping[str, str], week: int) -> dict[str, Any]:
+    """The IR and taxi squads of a team (empty lists and zero slots for a save from before them)."""
+
+    S = snap.settings
+    rows = lambda pids: [player_row(snap, state, ev, p, owners, week=week) for p in sorted(pids, key=lambda p: (-ev.ros_mean(p), p))]
+    return {
+        "ir": rows(state.ir.get(tid, ())), "taxi": rows(state.taxi.get(tid, ())),
+        "reserves": {"enabled": S.reserves, "ir_slots": S.ir_slots, "taxi_slots": S.taxi_slots if S.reserves else 0,
+                     "taxi_years": S.taxi_years, "ir_used": len(state.ir.get(tid, ())), "taxi_used": len(state.taxi.get(tid, ()))},
     }
 
 
@@ -229,6 +273,19 @@ def _opponent(snap: GameSnapshot, state: GameState, ev: Evaluator, week: int) ->
 # ---------------------------------------------------------------------- game
 
 
+def dynasty_block(snap: GameSnapshot, state: GameState) -> dict[str, Any] | None:
+    S = snap.settings
+    if not S.dynasty:
+        return None
+    user = snap.user_team.tid
+    return {
+        "season_no": state.season_no, "seasons": S.seasons, "year": S.start_year + state.season_no - 1,
+        "stage": (state.offseason or {}).get("stage") if state.status == "offseason" else None,
+        "picks_held": len(state.picks_of(user)), "titles": sum(1 for a in state.seasons if a["champion"] and a["champion"]["is_you"]),
+        "last_season": state.season_no >= S.seasons,
+    }
+
+
 def game_view(
     row: Mapping[str, Any], snap: GameSnapshot, state: GameState, *, is_pro: bool
 ) -> dict[str, Any]:
@@ -238,7 +295,8 @@ def game_view(
     me = next((r for r in standings if r["team_id"] == user), None)
     week = max(state.week, 1)
     opp = _opponent(snap, state, ev, week) if state.status in ("in_season", "playoffs") else None
-    phase = {"drafting": "draft", "in_season": "regular_season", "playoffs": "playoffs", "complete": "complete"}[state.status]
+    phase = {"drafting": "draft", "in_season": "regular_season", "playoffs": "playoffs", "offseason": "offseason",
+             "complete": "complete"}[state.status]
     user_roster = state.rosters[user]
     team = snap.user_team
     this_week = None
@@ -268,6 +326,7 @@ def game_view(
         },
         "can_trade": trade_window(snap, state) is None,
         "trade_deadline_week": snap.settings.trade_deadline_week,
+        "dynasty": dynasty_block(snap, state),
         "grade_letter": row.get("grade_letter"), "notes": list(snap.notes),
         "created_at": row.get("created_at"), "updated_at": row.get("updated_at"),
     }
@@ -338,9 +397,19 @@ def pick_row(snap: GameSnapshot, state: GameState, ev: Evaluator, owners: Mappin
 # -------------------------------------------------------------------- league
 
 
+def _asset_name(snap: GameSnapshot, pid: str) -> str:
+    if is_pick_id(pid):
+        _, season, rnd, orig = pid.split(":", 3)
+        return f"{season} round {rnd} pick ({snap.team(orig).name})"
+    return snap.players[pid].name
+
+
 def _tx_text(snap: GameSnapshot, tx: Mapping[str, Any]) -> tuple[str, str]:
-    name = lambda pid: snap.players[pid].name
+    name = lambda pid: _asset_name(snap, pid)
     kind = tx["type"]
+    if kind == "reserve":
+        where = {"ir": "IR", "taxi": "the taxi squad", "roster": "the active roster"}[tx["dst"]]
+        return tx["team"], f"{snap.team(tx['team']).name} moved {name(tx['pid'])} to {where}"
     if kind == "trade":
         a, b = snap.team(tx["team_a"]).name, snap.team(tx["team_b"]).name
         return tx["team_a"], f"{a} traded {', '.join(name(p) for p in tx['give'])} to {b} for {', '.join(name(p) for p in tx['get'])}"
@@ -360,11 +429,11 @@ def _tx_players(snap: GameSnapshot, tx: Mapping[str, Any]) -> list[dict[str, Any
     elif tx["type"] == "waiver":
         roles = [("add", tx.get("add")), ("drop", tx.get("drop"))]
     else:
-        roles = [("drop", tx.get("pid"))]
+        roles = [("drop", tx.get("pid"))] if tx["type"] != "reserve" else [("move", tx.get("pid"))]
     return [
         {"role": role, "id": pid, "headshot_id": headshot_id(pid), "name": snap.players[pid].name,
          "pos": snap.players[pid].pos, "team": snap.players[pid].nfl_team}
-        for role, pid in roles if pid and pid in snap.players
+        for role, pid in roles if pid and pid in snap.players and not is_pick_id(pid)
     ]
 
 
@@ -411,7 +480,8 @@ def team_roster(snap: GameSnapshot, state: GameState, tid: str) -> dict[str, Any
     ev = Evaluator(snap, state)
     owners = state.owner_map()
     return {"team_id": tid, "players": [player_row(snap, state, ev, p, owners) for p in
-                                        sorted(state.rosters[tid], key=lambda p: (-ev.ros_mean(p), p))]}
+                                        sorted(state.rosters[tid], key=lambda p: (-ev.ros_mean(p), p))],
+            **reserve_block(snap, state, ev, tid, owners, max(state.week, 1))}
 
 
 # --------------------------------------------------------------------- inbox
@@ -452,6 +522,6 @@ def players_for(snap: GameSnapshot, state: GameState, pids: Sequence[str]) -> li
 
 __all__ = [
     "preview_block", "paywalled", "player_row", "players_page", "player_detail", "lineup_view", "game_view",
-    "draft_view", "league_view", "team_roster", "inbox_view", "pending_claims", "players_for", "pick_row",
+    "draft_view", "league_view", "pick_asset", "reserve_block", "dynasty_block", "team_roster", "inbox_view", "pending_claims", "players_for", "pick_row",
     "SORTS", "PAGE_MAX", "rank_teams",
 ]

@@ -10,11 +10,13 @@ from __future__ import annotations
 from dataclasses import replace
 from typing import Iterable, Sequence
 
+from modules.sim import aging
 from modules.sim.game_state import GameState
 from modules.sim.game_types import GameSnapshot, slot_positions
+from modules.sim.picks import FUTURE_SLOT_FRAC, pick_label, pick_market_value
 from modules.sim.lineup import Assignment, SlotPlan, carry_lineup, pick_lineup
 from modules.sim.personas import PERSONAS, TeamParams
-from modules.sim.types import GAME_POSITIONS
+from modules.sim.types import GAME_POSITIONS, is_pick_id
 
 PRIOR_GAMES = 5.0  # a projection counts as this many games of evidence
 NEED_K = 8.0  # value units per projected weekly lineup point
@@ -63,6 +65,8 @@ class Evaluator:
         value in redraft (rules 2), the dynasty market value in dynasty/legacy."""
 
         p = self.snap.players[pid]
+        if self.policy.dynasty:
+            return aging.horizon_value(p.pos, p.age, p.market)
         return p.value if self.policy.season_valuation else p.market
 
     def _compute_now_scale(self) -> dict[str, float]:
@@ -95,7 +99,7 @@ class Evaluator:
         if cached is not None:
             return cached
         mean = self.snap.players[pid].mean
-        games = self.state.games_played(pid)
+        games = self.state.games_played(pid) if self.state.status != "offseason" else []
         value = (mean * PRIOR_GAMES + sum(games)) / (PRIOR_GAMES + len(games)) if games else mean
         self._ros[pid] = value
         return value
@@ -168,16 +172,73 @@ class Evaluator:
         """Late in a one-season game everyone cares more about now-value."""
 
         regular = self.snap.settings.regular_weeks
-        progress = min(1.0, max(0, self.state.week - 1) / max(1, regular))
+        week = 1 if self.state.status == "offseason" else self.state.week
+        progress = min(1.0, max(0, week - 1) / max(1, regular))
         return self.policy.horizon(min(1.0, params.horizon + (1.0 - params.horizon) * 0.7 * progress))
 
+    # ----------------------------------------------------------------- picks
+
+    def pick_parts(self, pid: str) -> tuple[int, int, str]:
+        _, season, rnd, orig = pid.split(":", 3)
+        return int(season), int(rnd), orig
+
+    def draft_year_now(self) -> int:
+        """The calendar year of the next (or, in the offseason, the current) rookie draft."""
+
+        return self.snap.settings.start_year + self.state.season_no
+
+    def pick_slot_frac(self, orig: str) -> float:
+        """0 = the first pick of a round, 1 = the last, for the next draft: exact
+        once the draft order is set, else projected from record and roster strength
+        (the weaker the team, the earlier its pick)."""
+
+        off = self.state.offseason
+        n = len(self.snap.teams)
+        if off and off.get("slots") and orig in off["slots"]:
+            return (off["slots"][orig] - 1) / max(1, n - 1)
+        if not hasattr(self, "_slot_cache"):
+            totals = {t: self.lineup_total(self.state.rosters[t]) for t in self.snap.tids}
+            by_power = sorted(self.snap.tids, key=lambda t: (totals[t], t))  # weakest first
+            power = {t: i / max(1, n - 1) for i, t in enumerate(by_power)}  # 0 = weakest
+            played = sum(self.state.stand[t]["w"] + self.state.stand[t]["l"] + self.state.stand[t]["t"] for t in self.snap.tids) / max(1, n)
+            w = min(1.0, played / max(1, self.snap.settings.regular_weeks))
+            def pct(t):
+                r = self.state.stand[t]
+                g = r["w"] + r["l"] + r["t"]
+                return (r["w"] + 0.5 * r["t"]) / g if g else 0.5
+            score = {t: w * pct(t) + (1 - w) * power[t] for t in self.snap.tids}
+            order = sorted(self.snap.tids, key=lambda t: (score[t], t))
+            self._slot_cache = {t: i / max(1, n - 1) for i, t in enumerate(order)}
+        return self._slot_cache.get(orig, FUTURE_SLOT_FRAC)
+
+    def pick_value(self, pid: str) -> float:
+        """The pick's market value on the 0-100 scale (what the rookie it becomes is worth)."""
+
+        season, rnd, orig = self.pick_parts(pid)
+        years_out = max(0, season - self.draft_year_now())
+        frac = self.pick_slot_frac(orig) if years_out == 0 else FUTURE_SLOT_FRAC
+        return pick_market_value(rnd, frac, years_out, len(self.snap.teams))
+
+    def pick_worth(self, params: TeamParams, pid: str) -> float:
+        """Picks are future value: rebuilders pay up, contenders discount, and the
+        late-season shift toward win-now makes everyone sell a little."""
+
+        h = self.horizon_now(params)
+        return max(0.0, self.pick_value(pid) * (1.0 + self.policy.pick_slope * (0.55 - h)))
+
+    def pick_name(self, pid: str) -> str:
+        season, rnd, orig = self.pick_parts(pid)
+        return f"{pick_label(season, rnd)} ({self.snap.team(orig).name})"
+
     def worth(self, params: TeamParams, pid: str) -> float:
+        if is_pick_id(pid):
+            return self.pick_worth(params, pid)
         p = self.snap.players[pid]
         h = self.horizon_now(params)
         now = min(100.0, self.now_scale[p.pos] * self.ros_mean(pid))
         now *= 1.0 - min(self.state.out.get(pid, 0), 6) / 10.0
         age_factor = (
-            1.0 if self.policy.season_valuation
+            1.0 if (self.policy.season_valuation or self.policy.dynasty)
             else max(0.4, 1.0 - (1.0 - h) * params.age_penalty * max(0.0, p.age - 26.0))
         )
         value = h * now + (1.0 - h) * self.base_value(pid) * age_factor

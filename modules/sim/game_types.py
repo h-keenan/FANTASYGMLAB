@@ -11,15 +11,34 @@ import math
 from dataclasses import dataclass, field
 from typing import Any, Mapping
 
-from modules.sim.game_mode import DEFAULT_MODE, MODES, POLICIES, RULES_VERSION, ModePolicy, policy_for
-from modules.sim.types import FLEX_SLOTS, GAME_POSITIONS, GAME_STRICT_SLOTS, POSITIONS, STRICT_SLOTS
+from modules.sim.game_mode import (
+    DEFAULT_MODE,
+    DEFAULT_ROOKIE_ROUNDS,
+    DEFAULT_SEASONS,
+    DYNASTY_VERSION,
+    MODES,
+    PICK_YEARS,
+    POLICIES,
+    ROOKIE_ROUNDS,
+    RULES_VERSION,
+    SEASON_CHOICES,
+    ModePolicy,
+    policy_for,
+)
+from modules.sim.types import FLEX_SLOTS, GAME_POSITIONS, GAME_STRICT_SLOTS, POSITIONS, STRICT_SLOTS, SimPick
 
-GAME_ENGINE_VERSION = "game-1.1.0"
+GAME_ENGINE_VERSION = "game-1.2.0"
 DIFFICULTIES = ("easy", "normal", "hard")
 TEAM_COUNTS = (8, 10, 12, 14)  # even: every team plays every week
 IMPORT_TEAM_COUNTS = (4, 6, 8, 10, 12, 14, 16)
 TE_PREMIUMS = (0.0, 0.5, 1.0)
 BENCH_RANGE = (4, 10)
+IR_SLOT_RANGE = (0, 4)
+TAXI_SLOT_RANGE = (0, 8)
+DEFAULT_IR_SLOTS = 2
+DEFAULT_TAXI_YEARS = 2  # rookies and second-year players (years of experience below this), Sleeper's usual rule
+DEFAULT_TAXI_SLOTS_DYNASTY = 4
+RESERVE_VERSION = 1
 TIEBREAKERS = ("points_for", "head_to_head")  # standings/seed tiebreak after win pct
 DEFAULT_TIEBREAKER = "points_for"
 LEGACY_TIEBREAKER = "head_to_head"  # saves from before the setting existed
@@ -156,6 +175,29 @@ class GameSettings:
     custom_scoring: Mapping[str, float] | None = None
     rules: int = RULES_VERSION
     tiebreaker: str = DEFAULT_TIEBREAKER
+    # Dynasty (all zero/absent on redraft and on every save made before it).
+    seasons: int = 1  # seasons the game runs; > 1 means offseasons and rookie drafts
+    start_year: int = 0  # the calendar label of season 1 (rookie drafts are start_year + 1 ...)
+    pick_years: int = 0  # future rookie drafts' picks held at any time
+    rookie_rounds: int = 0
+    dynasty_v: int = 0  # dynasty save-format version
+    # IR and taxi squads (reserve_v 0 = a save from before them: no reserve spots at all).
+    reserve_v: int = 0
+    ir_slots: int = 0
+    taxi_slots: int = 0
+    taxi_years: int = 2  # years of NFL experience a player may have and still sit on the taxi squad
+
+    @property
+    def reserves(self) -> bool:
+        return self.reserve_v >= 1
+
+    @property
+    def dynasty(self) -> bool:
+        return self.mode == "dynasty" and self.rules >= 2 and self.dynasty_v >= 1
+
+    @property
+    def multi_season(self) -> bool:
+        return self.dynasty and self.seasons > 1
 
     @property
     def playoff_weeks(self) -> int:
@@ -198,6 +240,17 @@ class GameSettings:
             raise ValueError("mode must be one of: " + ", ".join(MODES))
         if not POLICIES[mode].available:
             raise ValueError(f"{mode} leagues are not available yet.")
+        seasons, rookie_rounds, start_year = 1, 0, 0
+        if mode == "dynasty":
+            seasons = raw.get("seasons", DEFAULT_SEASONS)
+            if isinstance(seasons, bool) or not isinstance(seasons, int) or seasons not in SEASON_CHOICES:
+                raise ValueError("seasons must be one of: " + ", ".join(str(t) for t in SEASON_CHOICES))
+            rookie_rounds = raw.get("rookie_rounds", DEFAULT_ROOKIE_ROUNDS)
+            if isinstance(rookie_rounds, bool) or not isinstance(rookie_rounds, int) or rookie_rounds not in ROOKIE_ROUNDS:
+                raise ValueError("rookie_rounds must be one of: " + ", ".join(str(t) for t in ROOKIE_ROUNDS))
+            start_year = raw.get("start_year", 0)
+            if isinstance(start_year, bool) or not isinstance(start_year, int) or not (start_year == 0 or 2000 <= start_year <= 2100):
+                raise ValueError("start_year must be a calendar year")
         teams = raw.get("teams", DEFAULT_TEAMS)
         if isinstance(teams, bool) or not isinstance(teams, int) or teams not in TEAM_COUNTS:
             raise ValueError("teams must be one of: " + ", ".join(str(t) for t in TEAM_COUNTS))
@@ -225,6 +278,15 @@ class GameSettings:
         tiebreaker = raw.get("tiebreaker", DEFAULT_TIEBREAKER)
         if tiebreaker not in TIEBREAKERS:
             raise ValueError("tiebreaker must be one of: " + ", ".join(TIEBREAKERS))
+        ir_slots = raw.get("ir_slots", DEFAULT_IR_SLOTS)
+        if isinstance(ir_slots, bool) or not isinstance(ir_slots, int) or not IR_SLOT_RANGE[0] <= ir_slots <= IR_SLOT_RANGE[1]:
+            raise ValueError(f"ir_slots must be between {IR_SLOT_RANGE[0]} and {IR_SLOT_RANGE[1]}")
+        taxi_slots = raw.get("taxi_slots", DEFAULT_TAXI_SLOTS_DYNASTY if mode == "dynasty" else 0)
+        if isinstance(taxi_slots, bool) or not isinstance(taxi_slots, int) or not TAXI_SLOT_RANGE[0] <= taxi_slots <= TAXI_SLOT_RANGE[1]:
+            raise ValueError(f"taxi_slots must be between {TAXI_SLOT_RANGE[0]} and {TAXI_SLOT_RANGE[1]}")
+        taxi_years = raw.get("taxi_years", DEFAULT_TAXI_YEARS)
+        if isinstance(taxi_years, bool) or not isinstance(taxi_years, int) or taxi_years not in (1, 2, 3, 4):
+            raise ValueError("taxi_years must be 1, 2, 3 or 4")
         slots, limit, rounds = derive_layout(
             superflex=superflex, include_k=include_k, include_def=include_def, bench=bench
         )
@@ -233,6 +295,9 @@ class GameSettings:
             slots=slots, rounds=rounds, roster_limit=limit, playoff_teams=4 if teams <= 8 else 6,
             mode=mode, te_premium=float(te_premium), superflex=superflex, include_k=include_k,
             include_def=include_def, bench=bench, tiebreaker=tiebreaker,
+            reserve_v=RESERVE_VERSION, ir_slots=ir_slots, taxi_slots=taxi_slots, taxi_years=taxi_years,
+            seasons=seasons, start_year=start_year, rookie_rounds=rookie_rounds,
+            pick_years=PICK_YEARS if mode == "dynasty" else 0, dynasty_v=DYNASTY_VERSION if mode == "dynasty" else 0,
         )
 
     def to_dict(self) -> dict[str, Any]:
@@ -248,6 +313,14 @@ class GameSettings:
         }
         if self.custom_scoring:
             out["custom_scoring"] = {str(k): float(v) for k, v in self.custom_scoring.items()}
+        if self.reserve_v:
+            out.update({"reserve_v": self.reserve_v, "ir_slots": self.ir_slots, "taxi_slots": self.taxi_slots,
+                        "taxi_years": self.taxi_years})
+        if self.dynasty_v:  # only dynasty saves carry these: every other save serializes exactly as before
+            out.update({
+                "seasons": self.seasons, "start_year": self.start_year, "pick_years": self.pick_years,
+                "rookie_rounds": self.rookie_rounds, "dynasty_v": self.dynasty_v,
+            })
         return out
 
     @classmethod
@@ -274,6 +347,11 @@ class GameSettings:
             rules=int(raw.get("rules", 1)),
             # Saves from before the setting ranked ties head-to-head first; keep that.
             tiebreaker=str(raw.get("tiebreaker") or LEGACY_TIEBREAKER),
+            seasons=int(raw.get("seasons") or 1), start_year=int(raw.get("start_year") or 0),
+            pick_years=int(raw.get("pick_years") or 0), rookie_rounds=int(raw.get("rookie_rounds") or 0),
+            dynasty_v=int(raw.get("dynasty_v") or 0), reserve_v=int(raw.get("reserve_v") or 0),
+            ir_slots=int(raw.get("ir_slots") or 0), taxi_slots=int(raw.get("taxi_slots") or 0),
+            taxi_years=int(raw.get("taxi_years", 2)),
         )
 
 
@@ -286,6 +364,8 @@ class ImportedTeam:
     owner: str
     is_user: bool
     roster: tuple[str, ...]  # game player ids (real ids; DEF mapped to ``DEF-<TEAM>``)
+    ir: tuple[str, ...] = ()  # the real league's reserve (IR) squad, kept apart from ``roster``
+    taxi: tuple[str, ...] = ()  # the real league's taxi squad
 
 
 @dataclass(frozen=True)
@@ -328,6 +408,14 @@ class LeagueImport:
     scoring_settings: Mapping[str, float]
     playoff_teams: int
     notes: tuple[str, ...] = ()
+    # Dynasty import only: the league's real rookie-pick ownership for the next
+    # drafts, the calendar label season 1 plays under, and its rookie draft length.
+    picks: tuple[SimPick, ...] = ()
+    start_year: int = 0
+    rookie_rounds: int = 0
+    ir_slots: int = 0
+    taxi_slots: int = 0
+    taxi_years: int = 2
 
 
 @dataclass(frozen=True)
@@ -420,11 +508,42 @@ class GameSnapshot:
     # Starting rosters of a game imported from a real league ({tid: [pid]}).
     start_rosters: Mapping[str, tuple[str, ...]] = field(default_factory=dict)
     index: Mapping[str, int] = field(default_factory=dict)
+    # Dynasty: the game's own seed (so a later season's pool is a pure function
+    # of this snapshot) and every team's picks at the start (real ownership
+    # for a league import).
+    seed: int = 0
+    start_picks: tuple[SimPick, ...] = ()
+    start_ir: Mapping[str, tuple[str, ...]] = field(default_factory=dict)
+    start_taxi: Mapping[str, tuple[str, ...]] = field(default_factory=dict)
 
     def __post_init__(self) -> None:
         if not self.pids:
             object.__setattr__(self, "pids", tuple(sorted(self.players)))
         object.__setattr__(self, "index", {p: i for i, p in enumerate(self.pids)})
+
+    @property
+    def root(self) -> "GameSnapshot":
+        """The season-1 snapshot this one was derived from (itself for season 1)."""
+
+        return getattr(self, "_root", self)
+
+    def season_view(self, season: int) -> "GameSnapshot":
+        """The snapshot for dynasty season ``season``: the same league with its
+        players aged, retired and replaced by the incoming rookie classes. Season
+        1 (and every non-dynasty game) is this snapshot itself."""
+
+        root = self.root
+        if season <= 1 or not root.settings.multi_season:
+            return root
+        from modules.sim.game_dynasty import season_snapshot  # lazy: game_dynasty imports this module
+
+        views = getattr(root, "_views", None)
+        if views is None:
+            views = {}
+            object.__setattr__(root, "_views", views)
+        if season not in views:
+            views[season] = season_snapshot(root, season)
+        return views[season]
 
     @property
     def user_team(self) -> GameTeam:
@@ -451,6 +570,10 @@ class GameSnapshot:
             "schedule": [[list(pair) for pair in week] for week in self.schedule],
             "scoring_model": self.scoring_model, "notes": list(self.notes),
             "start_rosters": {t: list(p) for t, p in self.start_rosters.items()},
+            **({"start_ir": {t: list(p) for t, p in self.start_ir.items()},
+                "start_taxi": {t: list(p) for t, p in self.start_taxi.items()}} if self.start_ir or self.start_taxi else {}),
+            **({"seed": self.seed, "start_picks": [p.to_dict() for p in self.start_picks]}
+               if self.settings.dynasty_v else {}),
         }
 
     @classmethod
@@ -463,6 +586,10 @@ class GameSnapshot:
             schedule=tuple(tuple((str(a), str(b)) for a, b in week) for week in raw["schedule"]),
             scoring_model=str(raw.get("scoring_model") or ""), notes=tuple(raw.get("notes") or ()),
             start_rosters={str(t): tuple(str(p) for p in pids) for t, pids in (raw.get("start_rosters") or {}).items()},
+            start_ir={str(t): tuple(str(p) for p in pids) for t, pids in (raw.get("start_ir") or {}).items()},
+            start_taxi={str(t): tuple(str(p) for p in pids) for t, pids in (raw.get("start_taxi") or {}).items()},
+            seed=int(raw.get("seed") or 0),
+            start_picks=tuple(SimPick.from_dict(p) for p in (raw.get("start_picks") or ())),
         )
 
 

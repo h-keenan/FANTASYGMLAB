@@ -10,10 +10,13 @@ dynasty can be added later by filling in one more policy (and flipping
   this season. Trade worth uses the settings-aware one-season ``value`` (so
   superflex, TE premium and roster shape all matter), ignores age, and every AI
   manager leans win-now; personas keep their taste, not their dynasty horizon.
-* ``dynasty`` (declared, not playable): worth blends the dynasty market value
-  and age by each manager's horizon, as the original game rules did. Selecting
-  it is refused by ``GameSettings.parse`` until the rest of dynasty (rookie
-  drafts, picks, multi-season) exists.
+* ``dynasty`` (playable, Phase 1): worth blends the long-horizon value (the
+  dynasty market value bent by a position age curve, ``aging.horizon_value``)
+  with this season's production by each manager's own horizon, and the manager's
+  persona is its stance: rebuilders pay up for youth and draft picks, contenders
+  sell them. Draft picks are tradable assets, the season runs up to
+  ``seasons`` years with an offseason (aging, retirements, a rookie draft in
+  standings order) between them.
 
 ``rules`` is the version of the valuation rules a save was created under.
 Saves made before modes existed carry ``rules == 1`` and keep the original
@@ -38,6 +41,10 @@ class ModePolicy:
     vorp_weight: float  # draft value: share from value-over-replacement (rest: market)
     season_valuation: bool  # trade/waiver worth from this season's value, ignoring age
     horizon_floor: float  # AI managers never weigh "now" below this
+    dynasty: bool = False  # age curves, tradable picks, multi-season
+    max_trade_side: int = 3  # assets (players + picks) per side of a trade
+    draft_age_mult: float = 1.0  # scales the persona age preference in drafts
+    pick_slope: float = 0.8  # how far a manager's horizon moves its pick value
     pitches: Mapping[str, str] = field(default_factory=dict)  # persona id -> offer pitch
     blurbs: Mapping[str, str] = field(default_factory=dict)  # persona id -> setup blurb
 
@@ -67,18 +74,46 @@ _REDRAFT_BLURB = {
     "chaos": "Unpredictable. Might fleece you, might hand you a gift.",
 }
 
+_DYNASTY_PITCH = {
+    "contender": "wants proven production for the title run and will move picks for it",
+    "rebuilder": "is selling vets for younger upside and picks",
+    "value_shark": "thinks this is a fair swap",
+    "youth_hoarder": "likes the youth and the picks in this one",
+    "specialist": "is loading up at one position",
+    "passive": "rarely deals, but likes this one",
+    "chaos": "had a feeling about this one",
+}
+_DYNASTY_BLURB = {
+    "contender": "Win-now. Pays up in youth and draft picks for proven weekly production.",
+    "rebuilder": "Sells aging vets for young, high-upside players and picks.",
+    "value_shark": "Only accepts clear wins. Rarely overpays, rarely gets fleeced.",
+    "youth_hoarder": "Loves young players and picks; discounts anyone past 26 heavily.",
+    "specialist": "Overvalues one position group and will not sell it cheap.",
+    "passive": "Rarely trades, slow on the wire. Needs a very good offer.",
+    "chaos": "Unpredictable. Might fleece you, might hand you a gift.",
+}
+
 POLICIES: dict[str, ModePolicy] = {
     "redraft": ModePolicy(
         "redraft", "Redraft", True, vorp_weight=0.85, season_valuation=True, horizon_floor=0.8,
         pitches=_REDRAFT_PITCH, blurbs=_REDRAFT_BLURB,
     ),
     "dynasty": ModePolicy(
-        "dynasty", "Dynasty", False, vorp_weight=0.75, season_valuation=False, horizon_floor=0.0,
+        "dynasty", "Dynasty", True, vorp_weight=0.6, season_valuation=False, horizon_floor=0.0,
+        dynasty=True, max_trade_side=4, draft_age_mult=2.0, pick_slope=0.8,
+        pitches=_DYNASTY_PITCH, blurbs=_DYNASTY_BLURB,
     ),
 }
 # Saves created before modes existed (rules == 1).
 LEGACY_POLICY = replace(POLICIES["redraft"], vorp_weight=0.75, season_valuation=False, horizon_floor=0.0,
                         pitches={}, blurbs={})
+DYNASTY_VERSION = 1  # dynasty saves carry this in their settings ("dynasty_v")
+MAX_SEASONS = 5  # the initial dynasty cap
+SEASON_CHOICES = (3, 4, 5)
+DEFAULT_SEASONS = 5
+PICK_YEARS = 3  # rookie drafts of picks held at any time
+ROOKIE_ROUNDS = (2, 3, 4, 5)
+DEFAULT_ROOKIE_ROUNDS = 4
 
 
 def policy_for(mode: str, rules: int = RULES_VERSION) -> ModePolicy:
@@ -93,5 +128,6 @@ def mode_options() -> list[dict[str, object]]:
 
 __all__ = [
     "MODES", "DEFAULT_MODE", "RULES_VERSION", "ModePolicy", "POLICIES", "LEGACY_POLICY", "policy_for",
-    "mode_options",
+    "mode_options", "DYNASTY_VERSION", "MAX_SEASONS", "SEASON_CHOICES", "DEFAULT_SEASONS", "PICK_YEARS",
+    "ROOKIE_ROUNDS", "DEFAULT_ROOKIE_ROUNDS",
 ]

@@ -17,7 +17,8 @@ from __future__ import annotations
 
 from typing import Any, Sequence
 
-from modules.sim.game_actions import execute_trade
+from modules.sim import game_dynasty as dyn
+from modules.sim.game_actions import ai_manage_reserves, execute_trade
 from modules.sim.game_ai import (
     MAX_AI_TRADES_PER_WEEK,
     MAX_OFFERS_PER_WEEK,
@@ -34,6 +35,7 @@ from modules.sim.game_state import Emitter, GameState
 from modules.sim.game_types import GameError, GameSnapshot, headshot_id, slot_positions
 from modules.sim.lineup import pick_lineup
 from modules.sim.rng import WorldRng
+from modules.sim.types import is_pick_id
 
 INJURY_SEASON_ENDING = 0.06
 INJURY_SEASON_ENDING_WEEKS = 9
@@ -204,6 +206,10 @@ def user_alive(snap: GameSnapshot, state: GameState) -> bool:
 def _brief(snap: GameSnapshot, pid: str | None) -> dict[str, Any] | None:
     if not pid:
         return None
+    if is_pick_id(pid):
+        _, season, rnd, orig = pid.split(":", 3)
+        return {"id": pid, "kind": "pick", "headshot_id": None, "name": f"{season} round {rnd} pick", "pos": "PICK",
+                "team": snap.team(orig).name}
     p = snap.players[pid]
     return {"id": pid, "headshot_id": headshot_id(pid), "name": p.name, "pos": p.pos, "team": p.nfl_team}
 
@@ -213,6 +219,8 @@ def check_can_advance(snap: GameSnapshot, state: GameState) -> None:
         raise GameError("wrong_phase", "Finish the draft first.", phase="draft")
     if state.status == "complete":
         raise GameError("season_complete", "The season is over.")
+    if state.status == "offseason":
+        raise GameError("wrong_phase", "The season is over: finish the offseason first.", phase="offseason")
     over = len(state.rosters[snap.user_team.tid]) - snap.settings.roster_limit
     if over > 0:
         raise GameError("roster_over_limit", f"Cut {over} player(s) before advancing.", cuts_needed=over)
@@ -355,6 +363,32 @@ def generate_offers(em: Emitter, snap: GameSnapshot, state: GameState, seed: int
     return min(len(found), MAX_OFFERS_PER_WEEK)
 
 
+def _fill_holes(em: Emitter, ev: Evaluator, tid: str) -> list[str]:
+    """Before a new dynasty season: give an AI team a free agent for every starting
+    slot nobody on its roster can fill (retirements can leave holes)."""
+
+    from modules.sim.game_state import GameState  # noqa: F401 - typing only
+
+    snap, state = em.snap, em.state
+    added: list[str] = []
+    for _ in range(len(snap.settings.slots)):
+        best, _total = ev.best_lineup(state.rosters[tid], 1)
+        vacant = sorted({pos for slot, pid in best if not pid for pos in slot_positions(slot)})
+        if not vacant or len(state.rosters[tid]) >= snap.settings.roster_limit:
+            break
+        owned = state.owner_map()
+        cands = sorted(
+            (p for p in snap.pids if p not in owned and snap.players[p].pos in vacant),
+            key=lambda p: (-ev.ros_mean(p), p),
+        )
+        if not cands:
+            break
+        em.emit(1, "engine", "waiver_result", team=tid, add=cands[0], drop=None, ok=True, reason="",
+                start_slot=None, claim_id=None)
+        added.append(cands[0])
+    return added
+
+
 def finish_draft(
     em: Emitter, snap: GameSnapshot, state: GameState, seed: int, *, closing: str = "draft_complete"
 ) -> dict[str, Any]:
@@ -466,6 +500,8 @@ def run_week(em: Emitter, snap: GameSnapshot, state: GameState, seed: int) -> di
     for tid in snap.tids:
         if tid == user:
             continue
+        if S.reserves:
+            ai_manage_reserves(em, ev, tid)
         em.emit(W, tid, "lineup_set", team=tid, slots=ai_lineup(ev, tid, W, seed), auto=True)
     auto_filled = fill_empty_slots(em, ev, user, W)
 
@@ -537,7 +573,19 @@ def run_week(em: Emitter, snap: GameSnapshot, state: GameState, seed: int) -> di
     champion = ""
     if kind == "playoff" and len(alive_next) == 1 and alive_next[0]:
         champion = alive_next[0]
-        em.emit(W, "engine", "season_complete", champion=champion)
+        if S.dynasty:
+            more = S.multi_season and state.season_no < S.seasons
+            archive = dyn.season_archive(snap, state, champion)
+            if more:
+                nxt = snap.season_view(state.season_no + 1)
+                gone = dyn.retirees(snap, nxt)
+            else:
+                gone = []
+            em.emit(W, "engine", "season_complete", champion=champion, archive=archive, offseason=more,
+                    retired=gone, retired_owners={p: owners[p] for p in gone if p in owners},
+                    year=S.start_year + state.season_no)
+        else:
+            em.emit(W, "engine", "season_complete", champion=champion)
 
     recap = {
         "week": W, "kind": kind, "round": rnd, "your_game": your_game,
@@ -547,11 +595,12 @@ def run_week(em: Emitter, snap: GameSnapshot, state: GameState, seed: int) -> di
              "winner": g["winner"]} for g in games
         ],
         "standings": standing_rows(snap, state), "waivers": waiver_rows, "transactions": ai_trades,
-        "injuries": injuries, "playoffs": seeding, "season_complete": state.status == "complete",
+        "injuries": injuries, "playoffs": seeding, "season_complete": state.status in ("complete", "offseason"),
+        **({"offseason": True} if state.status == "offseason" else {}),
         "champion": champion or None, "next_week": W + 1,
     }
     # 9. next week's AI offers, then the boundary
-    if state.status != "complete":
+    if state.status not in ("complete", "offseason"):
         generate_offers(em, snap, state, seed, W + 1)
     em.emit(W, "engine", "week_advanced", week=W, next_week=W + 1, recap=recap)
     return recap

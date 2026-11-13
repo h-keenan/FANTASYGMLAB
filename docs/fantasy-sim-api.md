@@ -613,3 +613,50 @@ Event log reference (type: actor): `draft_pick` (user|team), `draft_queue`,
 `trade_reject`, `trade_counter`, `inbox_offer` (engine), `inbox_response`,
 `advance` (user marker), `week_scored`, `injury`, `playoff_seeded`,
 `season_complete`, `week_advanced` (carries the recap; closes a week).
+
+## Dynasty mode and IR / taxi squads (game engine 1.2.0)
+
+Everything here is additive: a game made before it (rules < dynasty, no `reserve_v`)
+loads, replays and plays exactly as before. No SQL is needed: the new state lives in the
+`settings` and `snapshot` JSON columns and in new event types; the `status` column only ever
+holds its four existing values (the offseason is stored as `in_season`, the real status is
+computed from the event log and returned in `game.status`).
+
+### Setup
+
+`POST /v1/sim/games` accepts `mode: "dynasty"` (it is listed as available in
+`GET /games/options`) plus `seasons` (3, 4 or 5; default 5, the initial cap), `rookie_rounds`
+(2-5; default 4), `start_year`, and for every mode `ir_slots` (0-4; default 2),
+`taxi_slots` (0-8; default 0 in redraft, 4 in dynasty) and `taxi_years` (1-4; default 2:
+rookies and second-years). A league import (`start: "league"`) with `mode: "dynasty"` carries the
+league's rosters, its real reserve (IR) and taxi squads, the real traded-pick ownership for the next
+three rookie drafts, its draft length, scoring, and runs as dynasty; without a mode it is the redraft
+import as before, but the real reserve/taxi squads are now kept apart from the active roster.
+
+### Picks as assets
+
+Pick ids are `pick:<year>:<round>:<original team id>`. They can appear in the `give`/`get` lists of
+`POST /trades/preview`, `POST /trades`, in inbox offers and in counters; a trade side holds up to 4 assets
+in dynasty. `GET /games/{id}/picks` lists every team's picks with value and an early/mid/late slot hint.
+A pick row is shaped like a player row with `kind: "pick"`. AI managers value picks by stance
+(rebuilders pay up, contenders sell) and the usual veto/fair-floor checks apply.
+
+### Offseason
+
+After the season's last playoff week a dynasty game with seasons left enters `status: "offseason"`:
+players are aged one year (position age curves calibrated on the player-model panel;
+`python -m modules.sim.calibration.age_curve`), some retire, the incoming rookie class exists.
+`GET /games/{id}/offseason` returns the stage (`review` -> `rookie_draft` -> `cutdown`), last season's
+archive, retirees, the aging report for your roster, the draft board and the roster check.
+`POST /offseason/rookie-draft/start`, `/rookie-draft/pick {player_id}`, `/rookie-draft/auto` and
+`POST /offseason/start-season` (refused with `roster_over_limit` until you cut). Trades and cuts are open
+in the offseason (not for the current year's picks once the draft is under way). The last season ends in
+`status: "complete"`; `GET /games/{id}/dynasty` (and `/result`) return the summary: titles, finish by year.
+
+### IR and taxi
+
+`POST /games/{id}/roster/move {player_id, to: "roster"|"ir"|"taxi"}`. IR takes an injured (out) active
+player while a slot is open; the taxi squad takes eligible (rookie / low-experience) players; activating or
+promoting needs an open roster spot (`roster_full`). IR and taxi players do not score and do not count toward the
+roster limit; they can be traded and cut. `lineup` and `teams/{id}` return `ir[]`, `taxi[]` and a `reserves` block.
+Reasons: `ir_full`, `ir_ineligible`, `taxi_full`, `taxi_ineligible`, `roster_full`, `reserves_unavailable`.
