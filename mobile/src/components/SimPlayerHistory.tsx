@@ -3,7 +3,7 @@ import { View } from 'react-native';
 
 import AccentCard from './AccentCard';
 import AppText from './AppText';
-import Button from './Button';
+import ErrorState from './ErrorState';
 import { Section as PqvSection } from './PlayerQuickViewSheet';
 import { SkeletonCard } from './SkeletonBlock';
 import SimCrest from './SimCrest';
@@ -45,17 +45,14 @@ export function SimPlayerHistory({ gameId, playerId }: { gameId: string; playerI
 
   if (failed) {
     return (
-      <View style={common.tight}>
-        <AppText style={common.small}>Could not load this player&apos;s history.</AppText>
-        <Button
-          label="Try again"
-          variant="secondary"
-          onPress={() => {
-            setFailed(false);
-            setAttempt((n) => n + 1);
-          }}
-        />
-      </View>
+      <ErrorState
+        title="History did not load"
+        message="Check your connection and try again."
+        onRetry={() => {
+          setFailed(false);
+          setAttempt((n) => n + 1);
+        }}
+      />
     );
   }
   if (!data) return <SkeletonCard rows={3} />;
