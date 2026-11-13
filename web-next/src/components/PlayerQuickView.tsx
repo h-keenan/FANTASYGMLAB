@@ -272,6 +272,8 @@ export function PlayerQuickView({
           positionRank={identity.position_rank}
           usageTrend={model?.usage_trend ?? null}
           usageLoading={loading}
+          valueChart={<PlayerValueHistory playerId={identity.player_id} bare />}
+          ovrChart={model ? <SubRatingRow model={model} bare /> : null}
           depthChartNote={model?.depth_chart_note}
           rookie={rookieBadge(bio)}
         />
@@ -364,19 +366,12 @@ export function PlayerQuickView({
 
               {bio ? <BioGrid bio={bio} /> : null}
 
-              {/* coridian_, 2026-10-18: "the model section needs to be
-                  moved all the way to the bottom and have that multi-axis
-                  thing still" — Model used to sit right after Decision
-                  Fit; now the last section, after stats/college/awards/
-                  bio. SubRatingRow (model) renders a real 5-axis radar
-                  chart (ModelRadarChart) when every factor is present,
-                  same as modules/player_quick_view.py's own
-                  model_radar_chart_html — the flat chip row stays the
-                  fallback for a player without a full read on every
-                  factor, same split the Python source makes. */}
-              <PlayerValueHistory playerId={identity.player_id} />
-
-              {model ? <SubRatingRow model={model} /> : null}
+              {/* Value history and the Model radar used to be standalone sections
+                  here (owner, 2026-10-18: Model at the bottom with the
+                  multi-axis chart). Owner direction, 2026-11: every number
+                  opens its "why", so both now live behind a tap on the
+                  Value tile and the Player score (OVR) tile in the hero
+                  (PlayerHeroHeader valueChart / ovrChart, TapForWhy). */}
             </ExplorerLeagueProvider>
           )}
         </div>
@@ -551,7 +546,10 @@ export function StatGroup({
  * chip-row/radar-chart renderer, not a second copy. */
 export function SubRatingRow({
   model,
+  bare = false,
 }: {
+  /** Drop the "Model" heading (used inside the tap-the-OVR popover, which has its own title). */
+  bare?: boolean;
   model: {
     market_rating?: number | null;
     opportunity_rating?: number | null;
@@ -568,8 +566,8 @@ export function SubRatingRow({
   if (chips.length === 0) return null;
   const hasFullRead = SUB_RATING_DISPLAY.every(({ key }) => model[key] != null);
   return (
-    <section className="pqv-model-row" aria-label="Model sub-ratings">
-      <h3>Model</h3>
+    <section className={bare ? "flex flex-col gap-2" : "pqv-model-row"} aria-label="Model sub-ratings">
+      {bare ? null : <h3>Model</h3>}
       {hasFullRead ? (
         <ModelRadarChart model={model} />
       ) : (

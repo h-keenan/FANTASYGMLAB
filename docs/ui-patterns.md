@@ -146,3 +146,61 @@ const { schedule, toast } = useUndoableRemoval<Target>({
 });
 // onRemove: setTargets(filtered); schedule(target);   ...   {toast}
 ```
+
+## TapForWhy
+
+The first thing someone does to learn more about a number is tap it. `TapForWhy` wraps any number,
+chip, badge, rank or grade and opens a small `Sheet` with its "why". It replaces always-visible
+explainer paragraphs, `BeginnerHelp` "?" icons, hover `title=` tooltips (which never show on a phone)
+and sections that only re-explain a number shown elsewhere on the same screen.
+
+```tsx
+import { TapForWhy } from "@/components/ui/TapForWhy";
+
+// A tile: the button takes the tile's own class, so the layout does not change.
+<TapForWhy metric="value" variant="tile" className="pqv-stat-tile" spoken={`Value ${score}`} chart={<ValueHistory playerId={id} bare />}>
+  <span className="pqv-stat-tile-value">{score}</span>
+  <span className="pqv-stat-tile-caption">Value</span>
+</TapForWhy>
+
+// An inline number or a chip
+<TapForWhy metric="win_probability" spoken="Win probability 62%">62%</TapForWhy>
+```
+
+- Renders a real `<button aria-haspopup="dialog">` labelled "Why: Value 2,133" (`spoken`, or the
+  registry title). The 44px target is an expanded `::after`, so the visible size does not change.
+- Affordance is quiet: a dotted underline (`inline`) or a faint accent ring (`chip`, `tile`) on hover
+  and keyboard focus, plus a pressed state. Nothing is added to the resting look. On mobile the
+  pressed state is the whole affordance.
+- The sheet has one structure: title, 1 to 3 plain sentences, an optional `chart` slot (rendered only
+  while the sheet is open, so a heavy chart costs nothing until asked for), and a "learn more" link when
+  the registry entry has one. Instance-specific lines go in `extra`.
+- Fires a `why_<metric>` usage event (`trackUse`), so we can see which numbers people actually ask
+  about.
+- **Copy lives in one registry**, `lib/tapForWhyContent.ts` (lib twin): `value, ovr, rank, tier, grade,
+  win_probability, playoff_odds, faab, balance, confidence, usage_trend, projection, age`. Entries reuse
+  `BEGINNER_HELP`, so captions, the glossary and the popover can never disagree. Add a metric by adding
+  an entry; a test fails if an entry has no title or more than three sentences.
+- Mobile: `<TapForWhy metric spoken chart extra onLearnMore />`. The learn-more link only shows when the
+  caller passes `onLearnMore` (the caller owns navigation so it can close its own modal first).
+
+### Applied: Player Quick View (web + mobile)
+
+Owner direction: consolidate. The standalone **Value history** and **Model** sections are gone; the
+Value tile opens the value history chart and the Player score (OVR) tile opens the Model radar. The
+Usage tile opens its explanation plus the engine's own detail line. `PlayerValueHistory` and
+`SubRatingRow` gained a `bare` prop so the same components render inside the popover without a second
+heading. The Player Profile page keeps its own Model tab; its tiles open the copy-only popover.
+
+| Before: top | Before: two sections at the bottom | After: top (same layout) |
+|---|---|---|
+| ![](ui-patterns/pqv-1-top-before.jpg) | ![](ui-patterns/pqv-2-bottom-before.jpg) | ![](ui-patterns/pqv-1-top-after.jpg) |
+
+| Tap the value | Tap the player score | Tap the usage trend |
+|---|---|---|
+| ![](ui-patterns/pqv-3-tap-value-after.jpg) | ![](ui-patterns/pqv-4-tap-ovr-after.jpg) | ![](ui-patterns/pqv-5-tap-usage-after.jpg) |
+
+Follow-ups (60+ call sites per the audit; each is a one-line wrap now that the component exists):
+`ToneBadge` (`onWhy`), `ValueStat`, `SnapshotTile`, win probability and playoff odds on Matchup and
+Dashboard, FAAB on Waivers, trade balance and confidence on the verdict card, `projection` and `age`
+wherever they appear. The registry already has copy for all of them.

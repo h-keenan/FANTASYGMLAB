@@ -17,9 +17,11 @@ const RatingHistoryChart = dynamic(() => import("@/components/RatingHistoryChart
  * overall rating across the real stored daily snapshots (GET
  * .../rating-history). Only stored days are drawn; a short history says how
  * short it is. Renders nothing while loading fails or storage is unavailable.
- * Mirrors mobile's PlayerValueHistory.
+ * Mirrors mobile's PlayerValueHistory. `bare` drops the section and its
+ * heading, for use inside the tap-the-value popover (TapForWhy chart slot),
+ * which already has its own title.
  */
-export function PlayerValueHistory({ playerId }: { playerId: string }) {
+export function PlayerValueHistory({ playerId, bare = false }: { playerId: string; bare?: boolean }) {
   const [history, setHistory] = useState<RatingHistoryResponse | null>(null);
 
   useEffect(() => {
@@ -38,8 +40,8 @@ export function PlayerValueHistory({ playerId }: { playerId: string }) {
   const caption = ratingHistoryCaption(history);
   if (!history || !caption) return null;
   return (
-    <section className="pqv-model-row" aria-label="Value history" data-testid="player-value-history">
-      <h3>Value history</h3>
+    <section className={bare ? "flex flex-col gap-2" : "pqv-model-row"} aria-label="Value history" data-testid="player-value-history">
+      {bare ? null : <h3>Value history</h3>}
       {caption.chart ? <RatingHistoryChart points={history.points} gradientId={`rh-${playerId}`} /> : null}
       {caption.changes.length ? (
         <p className="text-sm font-bold" style={{ color: "var(--color-text-primary)" }}>

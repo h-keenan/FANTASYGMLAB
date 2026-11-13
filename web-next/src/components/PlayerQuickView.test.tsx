@@ -206,7 +206,11 @@ describe("PlayerQuickView", () => {
     // 2026-10-18: "have that multi-axis thing") instead of the flat chip
     // row; its accessible summary carries the same real numbers.
     // The radar is a lazy chunk (next/dynamic), so await it rather than assume it is mounted.
+    // The Model radar now lives behind a tap on the Player score tile (no standalone section).
+    expect(screen.queryByRole("heading", { name: "Model" })).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: /^Why: Player score/ }));
     expect(await screen.findByText(/MKT 91, OPP 84, SCR 62, ROLE 73, DUR 58/)).toBeInTheDocument();
+    fireEvent.keyDown(screen.getByRole("dialog", { name: "What OVR means" }), { key: "Escape" });
     expect(screen.getByText("Targets")).toBeInTheDocument();
     expect(screen.getByText("140")).toBeInTheDocument();
     expect(screen.getByText("88th")).toBeInTheDocument();

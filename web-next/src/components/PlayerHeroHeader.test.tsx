@@ -65,7 +65,7 @@ describe("PlayerHeroHeader", () => {
     expect(usage).toHaveAttribute("data-tone", "positive");
     expect(usage).toHaveTextContent("▲ 13%");
     expect(usage).toHaveTextContent("High confidence");
-    expect(usage).toHaveAccessibleName("Usage up 13%, high confidence");
+    expect(usage).toHaveAccessibleName("Why: Usage up 13%, high confidence");
     expect(screen.getByText("Contributor").closest(".pqv-archetype-pill")).not.toBeNull();
   });
 

@@ -1,4 +1,4 @@
-import type { CSSProperties } from "react";
+import type { CSSProperties, ReactNode } from "react";
 
 import type { UsageTrend } from "@/lib/api";
 import { OvrGauge } from "@/components/OvrGauge";
@@ -10,6 +10,7 @@ import { byePillText } from "@/lib/playerAvailabilityPresentation";
 import { resolvePlayerTier } from "@/lib/playerTier";
 import { sentenceCase, usageConfidenceBars, usageTrendTone } from "@/lib/playerQuickViewPresentation";
 import { SkeletonBlock } from "@/components/Skeleton";
+import { TapForWhy } from "@/components/ui/TapForWhy";
 
 type ArchetypeStyle = CSSProperties & { "--archetype-color"?: string };
 
@@ -48,7 +49,13 @@ export function PlayerHeroHeader({
   onByeThisWeek = false,
   unavailable = false,
   rookie = null,
+  valueChart = null,
+  ovrChart = null,
 }: {
+  /** Shown in the tap-the-Value popover (for example the value history chart). */
+  valueChart?: ReactNode;
+  /** Shown in the tap-the-Player-score popover (for example the model radar). */
+  ovrChart?: ReactNode;
   /** ROOKIE badge from rookieBadge(bio); null for everyone else. */
   rookie?: { label: string; detail: string | null } | null;
   /** Team bye week (null when unknown / free agent). */
@@ -139,23 +146,29 @@ export function PlayerHeroHeader({
         </div>
 
         <div className="pqv-stat-tiles">
-          <div className="pqv-stat-tile">
-            {overallRating != null ? (
+          {overallRating != null ? (
+            <TapForWhy metric="ovr" variant="tile" className="pqv-stat-tile" spoken={`Player score ${overallRating}`} chart={ovrChart}>
               <OvrGauge rating={overallRating} size="lg" />
-            ) : (
+              <span className="pqv-stat-tile-caption">Player score</span>
+            </TapForWhy>
+          ) : (
+            <div className="pqv-stat-tile">
               <span className="pqv-stat-tile-value pqv-stat-tile-value--empty">—</span>
-            )}
-            <span className="pqv-stat-tile-caption">Player score</span>
-          </div>
-          <div className="pqv-stat-tile">
-            <span className={`pqv-stat-tile-value${score != null ? "" : " pqv-stat-tile-value--empty"}`}>
-              {score != null ? formatScore(score) : "—"}
-            </span>
-            <span className="pqv-stat-tile-caption">Value</span>
-            {score == null && !loadingIdentity ? (
-              <span className="pqv-stat-tile-note">{valueNote || "No market value yet"}</span>
-            ) : null}
-          </div>
+              <span className="pqv-stat-tile-caption">Player score</span>
+            </div>
+          )}
+          {score != null ? (
+            <TapForWhy metric="value" variant="tile" className="pqv-stat-tile" spoken={`Value ${formatScore(score)}`} chart={valueChart}>
+              <span className="pqv-stat-tile-value">{formatScore(score)}</span>
+              <span className="pqv-stat-tile-caption">Value</span>
+            </TapForWhy>
+          ) : (
+            <div className="pqv-stat-tile">
+              <span className="pqv-stat-tile-value pqv-stat-tile-value--empty">—</span>
+              <span className="pqv-stat-tile-caption">Value</span>
+              {!loadingIdentity ? <span className="pqv-stat-tile-note">{valueNote || "No market value yet"}</span> : null}
+            </div>
+          )}
           <UsageTile trend={usageTrend} loading={usageLoading} />
         </div>
 
@@ -193,12 +206,14 @@ function UsageTile({ trend, loading }: { trend: UsageTrend | null; loading: bool
   const confidence = sentenceCase(trend.confidence_label);
   const directionWord = trend.direction === "up" ? "up" : "down";
   return (
-    <div
+    <TapForWhy
+      metric="usage_trend"
+      variant="tile"
       className={`pqv-stat-tile pqv-stat-tile--usage pqv-stat-tile--${tone}`}
-      title={trend.detail}
-      aria-label={`Usage ${directionWord} ${magnitude}%, ${confidence.toLowerCase()}`}
-      data-testid="pqv-usage-tile"
-      data-tone={tone}
+      spoken={`Usage ${directionWord} ${magnitude}%, ${confidence.toLowerCase()}`}
+      extra={trend.detail ? [trend.detail] : undefined}
+      testId="pqv-usage-tile"
+      dataAttrs={{ "data-tone": tone }}
     >
       <span className="pqv-stat-tile-value pqv-stat-tile-trend" aria-hidden="true">
         {trend.arrow} {magnitude}%
@@ -211,7 +226,7 @@ function UsageTile({ trend, loading }: { trend: UsageTrend | null; loading: bool
         <SignalBars lit={usageConfidenceBars(trend.confidence_label)} />
         {confidence}
       </span>
-    </div>
+    </TapForWhy>
   );
 }
 
