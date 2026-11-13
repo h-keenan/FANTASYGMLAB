@@ -7,7 +7,10 @@ import { AccentCard } from "@/components/AccentCard";
 import { Button } from "@/components/Button";
 import { Collapsible } from "@/components/Collapsible";
 import { PlayerAvatar } from "@/components/PlayerAvatar";
+import { PlayerListRow } from "@/components/PlayerListRow";
 import { PlayerIdentity } from "@/components/PlayerRow";
+import type { PlayerListTag } from "@/lib/playerListRow";
+import { simDraftMeta, simDraftRowChips } from "@/lib/simDraft";
 import { ReviewGlyphChip } from "@/components/SeasonReviewSections";
 import { SectionHeading } from "@/components/SectionHeading";
 import { SheetHandle } from "@/components/SheetHandle";
@@ -196,43 +199,42 @@ export function SimPlayerLine({
   player,
   trailing,
   onOpen,
-  muted = false,
   selected = false,
   extra,
   hidePosition = false,
+  tags,
+  week = null,
 }: {
   player: SimGamePlayer;
   trailing?: ReactNode;
   onOpen?: (player: SimGamePlayer) => void;
+  /** Kept for callers that dimmed bench rows; a list row is never dimmed. */
   muted?: boolean;
   selected?: boolean;
   extra?: ReactNode;
   hidePosition?: boolean;
+  tags?: PlayerListTag[];
+  /** Current game week, to flag a bye that is close. Omit when unknown (the bye still shows). */
+  week?: number | null;
 }) {
-  const identity = <SimPlayerChip player={player} size={32} muted={muted} extra={extra} hidePosition={hidePosition} className="flex-1 min-w-0" />;
+  const [chip] = simDraftRowChips(player);
   return (
-    <div
-      className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1 py-1"
-      style={{
-        borderBottom: "var(--border-width-default) solid var(--color-border)",
-        background: selected ? "var(--color-accent-soft)" : undefined,
-      }}
-    >
-      {onOpen ? (
-        <button
-          type="button"
-          onClick={() => onOpen(player)}
-          className="flex flex-1 items-center text-left"
-          style={{ minHeight: "var(--touch-target-min)", minWidth: "min(100%, 12rem)" }}
-          aria-label={`${player.name}, ${player.pos}. Open player details`}
-        >
-          {identity}
-        </button>
-      ) : (
-        identity
-      )}
-      {trailing ? <div className="flex items-center gap-2 ml-auto">{trailing}</div> : null}
-    </div>
+    <PlayerListRow
+      testId="sim-player-line"
+      name={player.name}
+      position={hidePosition ? null : player.pos}
+      headshotId={simHeadshotId(player)}
+      fallbackLabel={simPlayerInitials(player)}
+      meta={simDraftMeta(player, week)}
+      chip={chip ? { label: chip.label, tone: chip.tone } : null}
+      hurt={player.status === "out"}
+      tags={tags}
+      extra={extra}
+      actions={trailing}
+      selected={selected}
+      onOpen={onOpen ? () => onOpen(player) : undefined}
+      openLabel={`${player.name}, ${player.pos}. Open player details`}
+    />
   );
 }
 

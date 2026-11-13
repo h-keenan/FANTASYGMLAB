@@ -1,6 +1,7 @@
 // Pure presentation helpers for the Fantasy Sim draft room. Byte-identical in
 // web-next/src/lib and mobile/src/lib (scripts/check_lib_twins.mjs IDENTICAL).
-import { simRosterNeeds, type SimDraftPick, type SimDraftState, type SimGamePlayer, type SimGameTone, type SimPos, type SimSlot } from "./simGame";
+import type { PlayerListStat } from "./playerListRow";
+import { simFmtPts, simFmtValue, simRosterNeeds, type SimDraftPick, type SimDraftState, type SimGamePlayer, type SimGameTone, type SimPos, type SimSlot } from "./simGame";
 
 export interface SimDraftProgress {
   round: number;
@@ -137,9 +138,9 @@ export function simDraftRowChips(player: Pick<SimGamePlayer, "status" | "out_wee
 export const SIM_BYE_SOON_WEEKS = 3;
 
 export interface SimDraftMetaPart {
-  key: "team" | "age" | "bye" | "rookie" | "out";
+  key: "team" | "age" | "bye" | "rookie";
   text: string;
-  /** "warning" = a bye inside the next SIM_BYE_SOON_WEEKS weeks; "accent" = rookie; "danger" = out note. */
+  /** "warning" = a bye inside the next SIM_BYE_SOON_WEEKS weeks; "accent" = rookie. An injury is the OUT chip, not meta text. */
   tone?: SimGameTone;
 }
 
@@ -148,22 +149,40 @@ export interface SimDraftMetaPart {
  * is ALWAYS shown (it used to appear only for byes in weeks 1-5, which read as
  * missing data); it turns into a warning color only when the bye is in the
  * next SIM_BYE_SOON_WEEKS game weeks (`week` is the current game week, 0 while
- * drafting, so weeks 1-3 then). Age shows a tenth when age_decimal is sent.
+ * drafting, so weeks 1-3 then; null = unknown, never flags). Age shows a tenth when age_decimal is sent.
  */
-export function simDraftMeta(player: Pick<SimGamePlayer, "team" | "age" | "bye_week" | "status" | "out_weeks"> & { age_decimal?: number | null }, week = 0): SimDraftMetaPart[] {
+export function simDraftMeta(player: Pick<SimGamePlayer, "team" | "age" | "bye_week" | "status" | "out_weeks"> & { age_decimal?: number | null }, week: number | null = 0): SimDraftMetaPart[] {
   const parts: SimDraftMetaPart[] = [];
   if (player.team) parts.push({ key: "team", text: player.team });
   const exact = player.age_decimal;
   const age = exact != null && !Number.isNaN(exact) ? exact.toFixed(1) : player.age != null && !Number.isNaN(player.age) ? `${Math.floor(player.age)}` : "";
   if (age) parts.push({ key: "age", text: `Age ${age}` });
   if (player.bye_week != null && player.bye_week > 0) {
-    const from = Math.max(1, week);
-    const soon = player.bye_week >= from && player.bye_week < from + SIM_BYE_SOON_WEEKS;
+    const from = Math.max(1, week ?? 1);
+    const soon = week != null && player.bye_week >= from && player.bye_week < from + SIM_BYE_SOON_WEEKS;
     parts.push({ key: "bye", text: `Bye ${player.bye_week}`, tone: soon ? "warning" : undefined });
   }
   if (player.age != null && player.age <= 21.99) parts.push({ key: "rookie", text: "Rookie", tone: "accent" });
-  if (player.status === "out" && player.out_weeks > 0) parts.push({ key: "out", text: `Out ${player.out_weeks} wk${player.out_weeks === 1 ? "" : "s"}`, tone: "danger" });
   return parts;
+}
+
+/**
+ * The labeled stat pills of a sim list row: PROJ, VAL, ADP and (only when the
+ * market and the model disagree by 3+ spots) EDGE. Projection is the per-game
+ * mean for an injured player (simBoardProjection), never a bare 0.0.
+ */
+export function simListStats(
+  player: Pick<SimGamePlayer, "status" | "projection" | "ros_mean" | "value" | "adp"> & { value_rank?: number | null; adp_edge?: number | null },
+  opts: { adp?: boolean } = {},
+): PlayerListStat[] {
+  const stats: PlayerListStat[] = [
+    { key: "proj", label: "Proj", value: simFmtPts(simBoardProjection(player).value) },
+    { key: "val", label: "Val", value: simFmtValue(player.value) },
+  ];
+  if (opts.adp !== false && player.adp != null) stats.push({ key: "adp", label: "ADP", value: simFmtValue(player.adp) });
+  const edge = simBoardEdge(player);
+  if (edge) stats.push({ key: "edge", label: "Edge", value: `${edge.tone === "success" ? "▲" : "▼"}${Math.abs(edge.delta)}`, tone: edge.tone === "success" ? "success" : "danger" });
+  return stats;
 }
 
 export interface SimDraftGridCell {

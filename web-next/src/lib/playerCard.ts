@@ -5,13 +5,15 @@
  * renderers (components/PlayerCardKit) only lay it out. See docs/player-card.md.
  */
 
-export type PlayerCardVariant = "compact" | "matchup" | "card";
+export type PlayerCardVariant = "compact" | "matchup" | "card" | "list";
 
 /** Avatar scale tokens: every player card of a given variant uses the same photo size. */
 export const PLAYER_CARD_AVATAR_SIZE: Record<PlayerCardVariant, number> = {
   compact: 32,
   matchup: 40,
   card: 56,
+  /** Dense list row (PlayerListRow); the `compact` density uses 32. */
+  list: 40,
 };
 
 export type PlayerGameStatus = "scheduled" | "in_progress" | "final";

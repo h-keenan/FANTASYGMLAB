@@ -7,9 +7,10 @@ import { Button } from "@/components/Button";
 import { EmptyState } from "@/components/EmptyState";
 import { PillRow } from "@/components/PillRow";
 import { SimDraftRow } from "@/components/SimDraftBoard";
+import { SimDraftGlyph } from "@/components/SimDraftGlyphs";
 import { SimDynastyStrip } from "@/components/SimGameDynasty";
 import { SimCollapse, SimGeneratedChip, SimGeneratedNoticeSheet, SimPickLine, SimPlayerChips, SimRookieNoticeGate, useSimPicks } from "@/components/SimGameDynastyParts";
-import { SimPlayerLine, SimStat, SimToneBadge, simToneColor, type SimCtx } from "@/components/SimGameParts";
+import { SimIconButton, SimPlayerLine, SimStat, SimToneBadge, simToneColor, type SimCtx } from "@/components/SimGameParts";
 import { SimReserveButton, SimReserveGroups, SimReserveSheet } from "@/components/SimGameReserves";
 import { SkeletonCard } from "@/components/Skeleton";
 import { api } from "@/lib/api";
@@ -355,7 +356,6 @@ function RookieStage({
           <EmptyState title="No rookies left that match" subtitle="Try a different position." />
         ) : (
           <div className="flex flex-col">
-            <p className="pb-1 text-xs" style={{ color: "var(--color-text-muted)" }}>Under each name: projection, value and ADP.</p>
             {d.available.map((player) => (
               <SimDraftRow
                 key={player.id}
@@ -364,9 +364,9 @@ function RookieStage({
                 onGeneratedInfo={() => setNotice(true)}
                 actions={
                   d.your_turn ? (
-                    <Button size="sm" loading={busy === "pick"} disabled={busy !== null && busy !== "pick"} aria-label={`Draft ${player.name}`} onClick={() => onPick(player)}>
-                      Draft
-                    </Button>
+                    <SimIconButton size={44} width={48} primary label={`Draft ${player.name}`} busy={busy === "pick"} disabled={busy !== null && busy !== "pick"} onClick={() => onPick(player)}>
+                      <SimDraftGlyph name="draft" />
+                    </SimIconButton>
                   ) : null
                 }
               />

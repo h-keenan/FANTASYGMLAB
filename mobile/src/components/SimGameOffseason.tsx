@@ -7,7 +7,7 @@ import Button from './Button';
 import EmptyState from './EmptyState';
 import ErrorState from './ErrorState';
 import SegmentedTabBar from './SegmentedTabBar';
-import { SimDraftRow } from './SimDraftBoard';
+import { SimDraftIconButton, SimDraftRow } from './SimDraftBoard';
 import { SkeletonCard } from './SkeletonBlock';
 import { SimDynastyStrip } from './SimGameDynasty';
 import { SimCollapse, SimGeneratedChip, SimGeneratedNoticeSheet, SimPickLine, SimPlayerChips, SimRookieNoticeGate, useSimPicks } from './SimGameDynastyParts';
@@ -355,14 +355,13 @@ function RookieStage({
           <EmptyState icon="people-outline" title="No rookies left that match" subtitle="Try a different position." />
         ) : (
           <View>
-            <AppText style={common.muted}>Under each name: projection, value and ADP.</AppText>
             {d.available.map((player) => (
               <SimDraftRow
                 key={player.id}
                 player={player}
                 onOpen={ctx.openPlayer}
                 onGeneratedInfo={() => setNotice(true)}
-                actions={d.your_turn ? <Button size="sm" label="Draft" loading={busy === 'pick'} disabled={busy !== null && busy !== 'pick'} onPress={() => onPick(player)} /> : null}
+                actions={d.your_turn ? <SimDraftIconButton icon="checkmark" size={44} width={48} primary label={`Draft ${player.name}`} disabled={busy !== null} onPress={() => onPick(player)} /> : null}
               />
             ))}
           </View>

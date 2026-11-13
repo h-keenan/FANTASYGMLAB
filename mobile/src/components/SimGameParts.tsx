@@ -3,6 +3,7 @@ import { AccessibilityInfo, Animated, Pressable, StyleSheet, View, type StylePro
 import { Ionicons } from '@expo/vector-icons';
 
 import AccentCard from './AccentCard';
+import PlayerListRow from './PlayerListRow';
 import AppText from './AppText';
 import Button from './Button';
 import Collapsible from './Collapsible';
@@ -14,6 +15,8 @@ import SimCrest from './SimCrest';
 import { SIM_GLYPH_ICONS } from './SimGlyph';
 import { SheetModal, SheetScrollView, SwipeDismissCard } from './SwipeDismissSheet';
 import ToneBadge from './ToneBadge';
+import type { PlayerListTag } from '../lib/playerListRow';
+import { simDraftMeta, simDraftRowChips } from '../lib/simDraft';
 import { useThemeMode } from '../context/ThemeModeContext';
 import {
   simGamePreviewLine,
@@ -219,38 +222,42 @@ export function SimPlayerLine({
   player,
   trailing,
   onOpen,
-  muted = false,
   selected = false,
   extra,
   hidePosition = false,
+  tags,
+  week = null,
 }: {
   player: SimGamePlayer;
   trailing?: ReactNode;
   onOpen?: (player: SimGamePlayer) => void;
+  /** Kept for callers that dimmed bench rows; a list row is never dimmed. */
   muted?: boolean;
   selected?: boolean;
   extra?: ReactNode;
   hidePosition?: boolean;
+  tags?: PlayerListTag[];
+  /** Current game week, to flag a bye that is close. Omit when unknown (the bye still shows). */
+  week?: number | null;
 }) {
-  const { colors } = useThemeMode();
-  const styles = useMemo(() => createStyles(colors), [colors]);
-  const identity = <SimPlayerChip player={player} size={40} muted={muted} extra={extra} hidePosition={hidePosition} />;
+  const [chip] = simDraftRowChips(player);
   return (
-    <View style={[styles.line, selected && styles.lineSelected]}>
-      {onOpen ? (
-        <Pressable
-          style={styles.lineOpen}
-          onPress={() => onOpen(player)}
-          accessibilityRole="button"
-          accessibilityLabel={`${player.name}, ${player.pos}. Open player details`}
-        >
-          {identity}
-        </Pressable>
-      ) : (
-        <View style={styles.lineOpen}>{identity}</View>
-      )}
-      {trailing ? <View style={styles.trailing}>{trailing}</View> : null}
-    </View>
+    <PlayerListRow
+      testID="sim-player-line"
+      name={player.name}
+      position={hidePosition ? null : player.pos}
+      headshotId={simHeadshotId(player)}
+      fallbackLabel={simPlayerInitials(player)}
+      meta={simDraftMeta(player, week)}
+      chip={chip ? { label: chip.label, tone: chip.tone } : null}
+      hurt={player.status === 'out'}
+      tags={tags}
+      extra={extra}
+      actions={trailing}
+      selected={selected}
+      onOpen={onOpen ? () => onOpen(player) : undefined}
+      openLabel={`${player.name}, ${player.pos}. Open player details`}
+    />
   );
 }
 

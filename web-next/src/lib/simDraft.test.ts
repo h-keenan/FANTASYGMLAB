@@ -68,10 +68,10 @@ describe("simDraft helpers", () => {
     expect(byeOf({ bye_week: 5 }, 6)?.tone).toBeUndefined();
     expect(simDraftMeta(p("a", "WR", { bye_week: null }))).not.toContainEqual(expect.objectContaining({ key: "bye" }));
   });
-  it("meta line: team, age (a tenth when sent), rookie and out note", () => {
+  it("meta line: team, age (a tenth when sent), rookie", () => {
     expect(simDraftMeta(p("a", "WR", { age: 24 })).map((x) => x.text)).toEqual(["KC", "Age 24", "Bye 9"]);
     expect(simDraftMeta({ ...p("a", "WR", { age: 24 }), age_decimal: 24.34 }).map((x) => x.text)[1]).toBe("Age 24.3");
-    expect(simDraftMeta(p("a", "WR", { age: 21, status: "out", out_weeks: 1 })).map((x) => x.text)).toEqual(["KC", "Age 21", "Bye 9", "Rookie", "Out 1 wk"]);
+    expect(simDraftMeta(p("a", "WR", { age: 21, status: "out", out_weeks: 1 })).map((x) => x.text)).toEqual(["KC", "Age 21", "Bye 9", "Rookie"]);
   });
   it("builds a rounds x teams grid keyed by team", () => {
     const grid = simDraftBoardGrid(
