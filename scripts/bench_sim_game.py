@@ -332,6 +332,9 @@ class Bench:
 
     # ---------------------------------------------------------------- workloads
 
+    def some_player(self, gid: str) -> str:
+        return next(x["player"]["id"] for x in self.call("GET", f"/games/{gid}/lineup")["slots"] if x["player"])
+
     def run_reads(self, tag: str, gid: str, n: int) -> None:
         you = self.you(gid)
         other = next(t["team_id"] for t in self.call("GET", f"/games/{gid}/league")["teams"] if not t["is_you"])
@@ -346,6 +349,12 @@ class Bench:
             self.measured(f"{tag}:GET lineup", "GET", f"/games/{gid}/lineup")
             self.measured(f"{tag}:GET inbox", "GET", f"/games/{gid}/inbox")
             self.measured(f"{tag}:GET picks", "GET", f"/games/{gid}/picks")
+            # Added with the league / history / block / sim-to work (perf audit 2, 2026-11).
+            self.measured(f"{tag}:GET league/rosters", "GET", f"/games/{gid}/league/rosters")
+            self.measured(f"{tag}:GET player detail", "GET", f"/games/{gid}/players/{self.some_player(gid)}")
+            self.measured(f"{tag}:GET player history", "GET", f"/games/{gid}/players/{self.some_player(gid)}/history")
+            self.measured(f"{tag}:GET team history", "GET", f"/games/{gid}/teams/{other}/history")
+            self.measured(f"{tag}:GET sim-to options", "GET", f"/games/{gid}/sim-to/options")
 
     def run_waivers(self, tag: str, gid: str, n: int) -> None:
         you = self.you(gid)
@@ -514,6 +523,9 @@ def profile_one(bench: Bench, gid: str, which: str, base: dict) -> None:
         "trade_send": ("POST", f"/games/{gid}/trades", {"json": {"partner": partner, "give": give, "get": get}}),
         "advance": ("POST", f"/games/{gid}/advance", {}),
         "lineup_auto": ("POST", f"/games/{gid}/lineup/auto", {}),
+        "team_history": ("GET", f"/games/{gid}/teams/{you}/history", {}),
+        "picks": ("GET", f"/games/{gid}/picks", {}),
+        "inbox": ("GET", f"/games/{gid}/inbox", {}),
     }
     method, path, kw = plan[which]
     for _ in range(3):  # warm

@@ -11,6 +11,7 @@ insert; a lost write race is a 409 the client retries.
 from __future__ import annotations
 
 import functools
+from collections import OrderedDict
 import json
 import logging
 import secrets
@@ -45,7 +46,7 @@ from modules.sim.game_setup import (
     pick_random_team_name,
 )
 from modules.sim.game_state import Emitter, GameState
-from modules.sim.game_store import GameConflict, GameStore, public_game_row
+from modules.sim.game_store import GameConflict, GameStore, public_game_row, row_version
 from modules.sim.game_mode import DEFAULT_ROOKIE_ROUNDS, DEFAULT_SEASONS, PICK_YEARS, ROOKIE_ROUNDS, SEASON_CHOICES, mode_options
 from modules.sim.game_types import (
     BENCH_RANGE,
@@ -306,6 +307,27 @@ def add_routes(router: APIRouter, ctx: GameApiCtx) -> None:
         return wrapper
 
     # ------------------------------------------------------------- helpers
+
+    history_cache: "OrderedDict[tuple, dict[str, Any]]" = OrderedDict()
+    history_lock = threading.Lock()
+
+    def _history(store, uid: str, gid: str, row, kind: str, key: str, fold) -> dict[str, Any]:
+        """A history fold is a pure function of the event log, and the row version (event count + save stamp, the same
+        proof the state cache trusts) names exactly one log: reuse the result instead of re-reading and re-folding the
+        whole log (a dynasty log is thousands of events). Bounded LRU; undo/redo changes the stamp so it misses."""
+
+        ck = (uid, gid, row_version(row), kind, key)
+        with history_lock:
+            hit = history_cache.get(ck)
+            if hit is not None:
+                history_cache.move_to_end(ck)
+                return hit
+        out = fold(store.load_events(uid, gid))
+        with history_lock:
+            history_cache[ck] = out
+            while len(history_cache) > 64:
+                history_cache.popitem(last=False)
+        return out
 
     def load(user: dict[str, Any], game_id: str, *, write: bool = False):
         """Row (the version check), frozen snapshot and folded state. The state is a shared read-only
@@ -675,20 +697,20 @@ def add_routes(router: APIRouter, ctx: GameApiCtx) -> None:
     def get_player_history(game_id: str, pid: str, user: dict[str, Any] = Depends(require_user)):
         """Where a player came from and every move since, folded from the event log (fetched when the History tab opens)."""
         pro = ctx.is_pro(user)
-        store, uid, _, snap, state = load(user, _gid(game_id))
+        store, uid, row, snap, state = load(user, _gid(game_id))
         root = snap.root
         if not any(pid in root.season_view(n).players for n in range(1, max(1, int(root.settings.seasons)) + 1)):
             raise HTTPException(status_code=404, detail="Player not found.")
-        return {**_env(pro, state), **hist.player_history(root, store.load_events(uid, _gid(game_id)), pid)}
+        return {**_env(pro, state), **_history(store, uid, _gid(game_id), row, "p", pid, lambda ev: hist.player_history(root, ev, pid))}
 
     @router.get("/games/{game_id}/teams/{team_id}/history")
     @guarded
     def get_team_history(game_id: str, team_id: str, user: dict[str, Any] = Depends(require_user)):
         pro = ctx.is_pro(user)
-        store, uid, _, snap, state = load(user, _gid(game_id))
+        store, uid, row, snap, state = load(user, _gid(game_id))
         if team_id not in snap.tids:
             raise HTTPException(status_code=404, detail="Team not found.")
-        return {**_env(pro, state), **hist.team_history(snap.root, store.load_events(uid, _gid(game_id)), team_id)}
+        return {**_env(pro, state), **_history(store, uid, _gid(game_id), row, "t", team_id, lambda ev: hist.team_history(snap.root, ev, team_id))}
 
     @router.get("/games/{game_id}/teams/{team_id}")
     @guarded
