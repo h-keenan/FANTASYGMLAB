@@ -596,7 +596,7 @@ def run_week(em: Emitter, snap: GameSnapshot, state: GameState, seed: int) -> di
         ],
         "standings": standing_rows(snap, state), "waivers": waiver_rows, "transactions": ai_trades,
         "injuries": injuries, "playoffs": seeding, "season_complete": state.status in ("complete", "offseason"),
-        "offseason": state.status == "offseason",
+        **({"offseason": True} if state.status == "offseason" else {}),
         "champion": champion or None, "next_week": W + 1,
     }
     # 9. next week's AI offers, then the boundary

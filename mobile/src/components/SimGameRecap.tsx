@@ -271,8 +271,13 @@ export function SimFinalView({ ctx, onNewGame, onHub }: { ctx: SimCtx; onNewGame
   const shareModel = buildReviewShareModel({
     letter: view.letter,
     gradeTone: tone,
-    headline: youWon ? `Champions! ${record}` : mine ? `${record}, ${simPlayoffResultLabel(mine.playoff_result)}` : 'Season complete',
-    subline: view.championName && !youWon ? `${view.championName} won the title` : view.summaryText,
+    teamName: mine?.name ?? '',
+    playoffResult: mine?.playoff_result,
+    isChampion: youWon,
+    record,
+    finish: mine ? view.standings.findIndex((row) => row.team_id === mine.team_id) + 1 || null : null,
+    summary: result.grade?.summary,
+    championName: view.championName,
     sections: sections,
   });
   return (

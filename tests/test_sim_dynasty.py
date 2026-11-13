@@ -156,7 +156,7 @@ def test_progression_is_deterministic_and_changes_the_pool():
     retired = dyn.retirees(a, v2a)
     assert retired and all(p not in v2a.players for p in retired)
     rookies = [p for p in v2a.players.values() if p.extra.get("is_rookie")]
-    assert len(rookies) >= 3 * 8 and all(21 <= p.age <= 23 for p in rookies)
+    assert len(rookies) >= 3 * 8 and all(21 <= p.age <= 25 for p in rookies)
     assert v2a.schedule != a.schedule
     young = [p for p in a.players.values() if p.pos == "RB" and p.age < 24]
     old = [p for p in a.players.values() if p.pos == "RB" and p.age >= 29 and p.pid in v2a.players]
@@ -718,3 +718,74 @@ def test_inbox_offers_can_carry_picks_and_be_accepted():
         found = True
         break
     assert found, "no AI offer with a pick appeared in 30 seeds"
+
+
+def test_home_understands_reserves_and_picks():
+    from modules.sim import game_home
+
+    run = Run()
+    snap, st = run.snap, run.state
+    user = snap.user_team.tid
+    home = game_home.home_view(snap, st, run.sd)
+    assert home["dynasty"]["picks_held"] == 9 and home["dynasty"]["picks_value"] > 0 and home["reserves"]["taxi_slots"] == 4
+    p = st.rosters[user][0]
+    st.out[p] = 6
+    ids = {i["id"] for i in game_home.home_view(snap, st, run.sd)["checklist"]}
+    assert "ir_stash" in ids
+    act.move_player(run.em, p, "ir")
+    st.out[p] = 0
+    ids = {i["id"] for i in game_home.home_view(snap, st, run.sd)["checklist"]}
+    assert "ir_activate" in ids
+    redraft = build_snapshot(ROWS, BYES, replace(GameSettings.parse({"teams": 8, "user_slot": 3}), reserve_v=0, ir_slots=0), SEED)
+    rs = GameState(redraft)
+    assert "dynasty" not in game_home._extras(redraft, rs, Evaluator(redraft, rs))
+
+
+# ------------------------------------------------- generated rookie classes vs the real ones
+
+
+def test_generated_rookie_classes_match_real_ones_within_tolerance():
+    """Guards the key distributions against the 2021-2025 real classes (small sample: tolerances are wide)."""
+
+    from modules.sim.calibration.rookie_audit import real_classes, sim_classes, summarize
+
+    real, sim = summarize(real_classes()), summarize(sim_classes(range(2000, 2300)))
+    for pos in ("QB", "RB", "WR", "TE"):
+        assert abs(real["mix"][pos] - sim["mix"][pos]) < 0.06, pos
+    for k in (12, 24, 36):
+        assert abs(real["rel"][k] - sim["rel"][k]) / real["rel"][k] < 0.35, k
+    for b in ("1-6", "7-15", "16-30"):
+        assert abs(real["bucket"][b] - sim["bucket"][b]) < 0.12, b
+    assert abs(real["age_mean"] - sim["age_mean"]) < 0.4 and abs(real["age_sd"] - sim["age_sd"]) < 0.4
+    assert 0.08 < sim["strength_cv"] < 0.20  # classes differ year to year, about as much as real ones
+
+
+def test_class_strength_label_varies_and_is_deterministic():
+    labels = {dyn.class_strength(new_snapshot(seed=s), 2)[1] for s in range(40)}
+    assert labels == {"weak", "average", "strong"}
+    snap = new_snapshot()
+    assert dyn.class_strength(snap, 2) == dyn.class_strength(snap, 2)
+    a, b = dyn.rookie_class(snap, {p.pid: {"pid": p.pid, "pos": p.pos, "mean": p.mean, "market": p.market, "nfl_team": p.nfl_team} for p in snap.players.values() if p.pos != "DEF"}, 2), None
+    assert len({r["pid"] for r in a}) == len(a) and all(r["extra"]["is_rookie"] for r in a)
+    assert dyn.class_strength(snap, 2)[0] != dyn.class_strength(snap, 3)[0]
+
+
+def test_rookies_develop_without_a_te_or_qb_jump():
+    ups = {}
+    for pos in ("QB", "RB", "WR", "TE"):
+        import statistics
+        ups[pos] = statistics.median(
+            aging.progress(pos, 22.9, 10.0, 5.0, 50.0, z / 10.0, 0.99)[1] / 10.0 for z in range(-20, 21)
+        )
+    assert ups["TE"] < 1.06 and 0.95 < ups["RB"] < 1.06 and ups["QB"] < 1.08
+
+
+def test_offseason_view_flags_the_generated_class_and_its_strength():
+    from modules.sim import game_dynasty_view as dv
+
+    run = Run()
+    run.play_season()
+    view = dv.offseason_view(run.snap, run.state)
+    assert view["rookie_class"]["generated"] is True and view["rookie_class"]["strength"] in ("weak", "average", "strong")
+    assert view["rookie_class"]["size"] >= 3 * 8
+    assert all(r["generated"] and r["rookie"] for r in view["draft"]["available"])

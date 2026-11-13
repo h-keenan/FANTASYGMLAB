@@ -38,15 +38,24 @@ LAST = (
     "Underwood", "Vaughn", "Walker", "Yates", "Zimmer", "Abbott", "Boone", "Crawford", "Dixon", "Easton", "Forbes",
     "Garrett", "Hobbs", "Irvin", "Jolley", "Knox", "Lowe", "Mercer", "Nolan", "Oakes", "Pryor", "Reeves", "Sloan",
 )
-# Class shape: share of the class by position, then where the position's best rookie sits in the
-# current pool (rank, then rank per further rookie): how good a class's best QB is *relative to
-# the pool the game already froze*, so the scale follows the league's own scoring.
-CLASS_SHARE = {"QB": 0.10, "RB": 0.28, "WR": 0.38, "TE": 0.14}
-CLASS_TOP_RANK = {"QB": 7, "RB": 6, "WR": 7, "TE": 5}
-CLASS_RANK_STEP = {"QB": 5.0, "RB": 4.2, "WR": 3.6, "TE": 4.0}
-ROOKIE_MEAN_DISCOUNT = 0.82  # an unproven player projects below the established player of the same value
-ROOKIE_MARKET_BOOST = 1.12  # ...but the dynasty market pays for his years
-ROOKIE_AGES = (21.0, 22.0, 23.0)
+# Class shape, calibrated against the 2021-2025 real classes in the calibration panel
+# (``python -m modules.sim.calibration.rookie_audit``; report in docs/audits/). A class is a
+# ranked list of slots; slot ``j`` (1 = the best rookie) projects at
+#   ref12[pos] * SLOT_TOP / (1 + (j / SLOT_HALF) ** SLOT_POWER)
+# where ``ref12`` is the pool's 12th-best veteran projection at the position, so the scale
+# follows the league's own scoring. A class-wide strength factor (lognormal) makes some
+# classes strong and some weak; ``jitter`` makes every rookie his own player.
+SLOT_TOP = 1.0
+SLOT_HALF = 15.0
+SLOT_POWER = 1.6
+CLASS_SIGMA = 0.13  # year-to-year spread of class strength (real classes: cv 0.13)
+JITTER_SIGMA = 0.14
+POS_SHARE = {"QB": 0.05, "RB": 0.31, "WR": 0.45, "TE": 0.19}  # of the relevant class
+QB_EARLY_SLOTS = 6  # quarterbacks go early or not at all
+QB_EARLY_PROB = 0.17
+ROOKIE_AGES = (21.0, 22.0, 23.0, 24.0, 25.0)
+ROOKIE_AGE_P = (0.08, 0.27, 0.35, 0.20, 0.10)  # real mean 22.9, sd 1.2
+STRENGTH_LABELS = ((0.90, "weak"), (1.10, "average"), (9.0, "strong"))
 
 
 def season_seed(seed: int, season: int) -> int:
@@ -66,6 +75,22 @@ def _class_size(snap: GameSnapshot) -> int:
     return s.rookie_rounds * s.teams + max(10, s.teams)
 
 
+def class_strength(root: GameSnapshot, season: int) -> tuple[float, str]:
+    """The strength factor of the class entering season ``season`` and its label
+    (weak / average / strong). A pure function of the game's seed."""
+
+    z = float(WorldRng(root.seed).stream(season, "grookie", 1).standard_normal())
+    factor = math.exp(CLASS_SIGMA * z - 0.5 * CLASS_SIGMA ** 2)
+    return factor, next(label for cap, label in STRENGTH_LABELS if factor < cap)
+
+
+def _market_at(pool: Sequence[Mapping[str, Any]], mean: float) -> float:
+    """The dynasty market value of the veteran whose projection is closest to ``mean``."""
+
+    best = min(pool, key=lambda r: (abs(r["mean"] - mean), r["pid"]))
+    return best["market"]
+
+
 def rookie_class(
     base: GameSnapshot, vets: Mapping[str, Mapping[str, Any]], season: int
 ) -> list[dict[str, Any]]:
@@ -76,40 +101,46 @@ def rookie_class(
     s = base.settings
     n = _class_size(base)
     year = s.start_year + season - 1  # the draft after season ``season - 1``
-    rng = WorldRng(base.seed)
-    gen = rng.stream(season, "grookie", 0)
+    gen = WorldRng(base.seed).stream(season, "grookie", 0)
+    factor, _label = class_strength(base, season)
     by_pos: dict[str, list[Mapping[str, Any]]] = {}
     for row in vets.values():
         by_pos.setdefault(row["pos"], []).append(row)
     for pos in by_pos:
         by_pos[pos].sort(key=lambda r: (-r["mean"], r["pid"]))
+    positions = [p for p in POS_SHARE if p in by_pos]
+    ref12 = {p: by_pos[p][min(11, len(by_pos[p]) - 1)]["mean"] for p in positions}
     teams = sorted({r["nfl_team"] for rows in by_pos.values() for r in rows if r["nfl_team"] not in ("", "FA") and r["pos"] != "DEF"})
-    counts = {pos: max(1, int(round(CLASS_SHARE[pos] * n))) for pos in CLASS_SHARE if pos in by_pos}
     used: set[str] = set()
     rows: list[dict[str, Any]] = []
-    k = 0
-    for pos in sorted(counts):
-        pool = by_pos[pos]
-        for j in range(counts[pos]):
-            rank = min(len(pool) - 1, int(CLASS_TOP_RANK[pos] + CLASS_RANK_STEP[pos] * j))
-            ref = pool[rank]
-            z = float(gen.standard_normal())
-            jitter = math.exp(0.12 * z)
-            mean = max(1.5, ref["mean"] * ROOKIE_MEAN_DISCOUNT * jitter)
-            market = max(1.0, min(97.0, ref["market"] * ROOKIE_MARKET_BOOST * jitter))
-            while True:
-                name = f"{FIRST[int(gen.integers(0, len(FIRST)))]} {LAST[int(gen.integers(0, len(LAST)))]}"
-                if name not in used:
-                    used.add(name)
-                    break
-            k += 1
-            rows.append({
-                "pid": f"R{year}-{k:03d}", "name": name, "pos": pos,
-                "nfl_team": teams[int(gen.integers(0, len(teams)))] if teams else "FA",
-                "age": ROOKIE_AGES[int(gen.choice(3, p=[0.3, 0.5, 0.2]))],
-                "market": market, "mean": mean, "sd": max(2.0, mean * 0.5), "injury_weeks": 0,
-                "extra": {"is_rookie": 1.0, "years_exp": 0.0, "draft_year": float(year)},
-            })
+    for j in range(1, n + 1):
+        w = {p: POS_SHARE[p] for p in positions}
+        if "QB" in w:
+            w["QB"] = QB_EARLY_PROB if j <= QB_EARLY_SLOTS else POS_SHARE["QB"] * 0.5
+        total = sum(w.values())
+        draw = float(gen.random()) * total
+        pos = positions[-1]
+        for p in positions:
+            draw -= w[p]
+            if draw <= 0:
+                pos = p
+                break
+        jitter = math.exp(JITTER_SIGMA * float(gen.standard_normal()))
+        mean = max(1.5, ref12[pos] * SLOT_TOP / (1.0 + (j / SLOT_HALF) ** SLOT_POWER) * factor * jitter)
+        boost = 1.05 + 0.25 * math.exp(-(j - 1) / 12.0)  # the dynasty market pays for draft capital and years
+        market = max(1.0, min(97.0, _market_at(by_pos[pos], mean) * boost))
+        while True:
+            name = f"{FIRST[int(gen.integers(0, len(FIRST)))]} {LAST[int(gen.integers(0, len(LAST)))]}"
+            if name not in used:
+                used.add(name)
+                break
+        rows.append({
+            "pid": f"R{year}-{j:03d}", "name": name, "pos": pos,
+            "nfl_team": teams[int(gen.integers(0, len(teams)))] if teams else "FA",
+            "age": ROOKIE_AGES[int(gen.choice(len(ROOKIE_AGES), p=ROOKIE_AGE_P))],
+            "market": market, "mean": mean, "sd": max(2.0, mean * 0.5), "injury_weeks": 0,
+            "extra": {"is_rookie": 1.0, "years_exp": 0.0, "draft_year": float(year)},
+        })
     return rows
 
 
@@ -410,7 +441,7 @@ def start_next_season(em: Emitter, seed: int) -> None:
 
 
 __all__ = [
-    "season_seed", "season_snapshot", "rookie_class", "retirees", "season_archive", "dynasty_summary", "rookie_order",
+    "season_seed", "season_snapshot", "rookie_class", "class_strength", "retirees", "season_archive", "dynasty_summary", "rookie_order",
     "rookies_available", "start_rookie_draft", "choose_rookie", "run_ai_rookie_picks", "user_rookie_pick",
     "auto_rookie_draft", "finish_rookie_draft", "start_next_season",
 ]

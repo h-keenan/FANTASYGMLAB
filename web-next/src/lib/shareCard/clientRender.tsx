@@ -248,19 +248,37 @@ export async function renderMultiTradeCardBlob(model: ShareModel, leagueName: st
   return svgToPngBlob(svg, STORY_SIZE.width, STORY_SIZE.height);
 }
 
-/** The Fantasy Sim Season in Review card as SVG text. No images are fetched. */
-export async function renderSeasonReviewCardSvg(model: ReviewShareModel, assets: ShareStaticAssets): Promise<string> {
+/** Season in Review sizes: the 4:5 feed card and a 9:16 story. */
+export const SEASON_REVIEW_SIZES = {
+  feed: STORY_SIZE,
+  story: { width: 1080, height: 1920 },
+} as const;
+export type SeasonReviewSize = keyof typeof SEASON_REVIEW_SIZES;
+
+/** The Fantasy Sim Season in Review card as SVG text. Player photos are
+ * fetched (Sleeper CDN only) and embedded; a failed one draws initials. */
+export async function renderSeasonReviewCardSvg(
+  model: ReviewShareModel,
+  assets: ShareStaticAssets,
+  options: { size?: SeasonReviewSize; fetchImage?: (url: string | null | undefined) => Promise<string | null> } = {},
+): Promise<string> {
   const satori = await loadSatori(assets.yoga);
-  const { width, height } = STORY_SIZE;
+  const { width, height } = SEASON_REVIEW_SIZES[options.size ?? "feed"];
+  // Privacy mode masks names on screen, so real photos stay off the card too.
+  const fetchImage = options.fetchImage ?? (isPrivacyMode() ? async () => null : fetchImageDataUri);
+  const ids = Array.from(new Set(model.highlights.map((h) => h.player?.headshotId).filter((id): id is string => Boolean(id))));
+  const shots = await Promise.all(ids.map((id) => fetchImage(`https://sleepercdn.com/content/nfl/players/thumb/${encodeURIComponent(id)}.jpg`)));
+  const headshots = Object.fromEntries(ids.map((id, index) => [id, shots[index]]));
   const backdrop = svgDataUri(await satori(<ShareBackdrop width={width} height={height} />, { width, height, fonts: assets.fonts }));
   const brand: ShareBrandAssets = { lockup: assets.lockup, qr: assets.qr, backdrop };
-  return satori(<SeasonReviewShareCard model={model} brand={brand} width={width} height={height} />, { width, height, fonts: assets.fonts });
+  return satori(<SeasonReviewShareCard model={model} brand={brand} width={width} height={height} images={{ headshots }} />, { width, height, fonts: assets.fonts });
 }
 
-export async function renderSeasonReviewCardBlob(model: ReviewShareModel): Promise<Blob> {
+export async function renderSeasonReviewCardBlob(model: ReviewShareModel, size: SeasonReviewSize = "feed"): Promise<Blob> {
   const assets = await loadBrowserAssets();
-  const svg = await renderSeasonReviewCardSvg(model, assets);
-  return svgToPngBlob(svg, STORY_SIZE.width, STORY_SIZE.height);
+  const svg = await renderSeasonReviewCardSvg(model, assets, { size });
+  const { width, height } = SEASON_REVIEW_SIZES[size];
+  return svgToPngBlob(svg, width, height);
 }
 
 /** The whole browser flow: assets -> Satori SVG -> PNG Blob. */
