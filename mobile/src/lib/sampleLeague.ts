@@ -25,9 +25,9 @@ export const SAMPLE_TRY_LABEL = "Try a sample league";
 
 export type SampleTab = "dashboard" | "roster" | "game_plan" | "trade";
 export const SAMPLE_TABS: { value: SampleTab; label: string; glyph: TabIconName }[] = [
-  { value: "dashboard", label: "Dashboard", glyph: "dashboard" },
+  { value: "dashboard", label: "Today", glyph: "dashboard" },
   { value: "roster", label: "Roster", glyph: "roster" },
-  { value: "game_plan", label: "Today", glyph: "today" },
+  { value: "game_plan", label: "Top moves", glyph: "today" },
   { value: "trade", label: "Trade", glyph: "trades" },
 ];
 
@@ -113,7 +113,7 @@ export function sampleTradeVerdict(trade: SampleTrade): SampleVerdict {
 }
 
 // ---------------------------------------------------------------------------
-// Sample Dashboard: fictional inputs for the REAL Dashboard modules (Today
+// Sample Today: fictional inputs for the REAL Dashboard modules (Today
 // hero, rank strip, Watchlist & Alerts, League Activity, Team Snapshot). Each
 // platform maps these to its own API shapes (lib/sampleDashboard.ts on web and
 // mobile); nothing here is fetched or stored. Player ids are left empty on
@@ -122,7 +122,7 @@ export function sampleTradeVerdict(trade: SampleTrade): SampleVerdict {
 
 export const SAMPLE_DASHBOARD_WEEK = 6;
 export const SAMPLE_DASHBOARD_NOTE =
-  "Sample Dashboard: every card, rank and number below is made up. Taps are turned off here; connect your league to open them.";
+  "Sample Today: every card, rank and number below is made up. Taps are turned off here; connect your league to open them.";
 export const SAMPLE_BLOCKED_MESSAGE = "That opens in your real league. Connect your league to use it.";
 
 export interface SampleThisWeekRow {

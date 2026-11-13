@@ -80,7 +80,7 @@ export default function GamesScreen({ route, navigation }: Props) {
       <ScrollView contentContainerStyle={[styles.content, { paddingBottom: orbClearance }]}>
         <SegmentedTabBar
           options={[
-            { key: 'sim', label: 'Season Sim', glyph: 'sim' as const },
+            { key: 'sim', label: 'Season Outlook', glyph: 'sim' as const },
             { key: 'pickem', label: "Pick'em", glyph: 'pickem' as const },
           ]}
           active={tab}

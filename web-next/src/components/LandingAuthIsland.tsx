@@ -15,6 +15,7 @@ import { setLandingPending, setLandingSignedIn } from "@/lib/landingPending";
 import { leagueHomePath } from "@/lib/leaguePlatform";
 import { analyzerBridgePath, bridgePickerPath, consumePendingBridge, pathAfterLeagueChosen } from "@/lib/tradeBridge";
 import { consumeProtectedReturnPath } from "@/lib/protectedRouteReturn";
+import { api } from "@/lib/api";
 import { supabase } from "@/lib/supabase";
 import { hasCompletedOnboardingStep, markOnboardingStepCompleted, trialOfferState } from "@/lib/onboardingProgress";
 import { armTrialOffer, firstRunStage, funnelStepIndex } from "@/lib/firstRunFlow";
@@ -117,8 +118,8 @@ export function LandingAuthIsland() {
   // either (coridian_, 2026-10-17: "the website needs to remember that
   // you've signed in, and whenever you open it, it needs to take you to
   // the dashboard"). Mirrors mobile's own HomeScreen auto-nav exactly:
-  // exactly one saved league jumps straight to its Dashboard; two or more
-  // land on the cross-league Portfolio view instead of guessing which one;
+  // one saved league jumps straight to its Today page; two or more reopen the
+  // last-used league's Today (the Portfolio only when none is remembered);
   // zero saved leagues falls through to the normal sign-in flow below.
   // Only applies once, on load — never re-triggers mid-flow.
   // Signed in => onboarding view: hide the marketing blocks (CSS keys off this).
@@ -171,7 +172,11 @@ export function LandingAuthIsland() {
           return;
         }
         if (leagues.length > 1) {
-          router.replace("/portfolio");
+          // Today is the landing: reopen the league they used last (when still saved) instead of
+          // sending them to the Pro-only Portfolio to pick again. Portfolio only when none is known.
+          const last = await api.getDevicePreferences().then((p) => p.last_league, () => null);
+          const match = last ? leagues.find((row) => row.league_id === last.league_id) : undefined;
+          router.replace(match ? leagueHomePath(match.league_id, match.league_name || match.league_id) : "/portfolio");
           return;
         }
         savedLeaguesCheck.current = "resolved";

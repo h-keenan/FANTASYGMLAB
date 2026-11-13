@@ -68,7 +68,7 @@ export const FEATURE_ITEMS: readonly FeatureItem[] = [
   { id: 'games', group: 'league', name: 'Games', line: "Season simulator and weekly pick'em.", route: 'Games', leagueScoped: true, icon: 'dice-outline', color: accentFor('games') },
   { id: 'league-recaps', group: 'league', name: 'League Recaps', line: "Your league's weekly recap, stories, and your lineup roundup.", route: 'Recap', leagueScoped: true, icon: 'newspaper-outline', color: accentFor('league-recaps') },
 
-  { id: 'dashboard', group: 'keepup', name: 'Dashboard', line: 'Your game plan and top moves for this week.', route: 'Dashboard', leagueScoped: true, icon: 'flash-outline', color: accentFor('dashboard') },
+  { id: 'dashboard', group: 'keepup', name: 'Today', line: 'Your game plan and top moves for this week.', route: 'Dashboard', leagueScoped: true, icon: 'flash-outline', color: accentFor('dashboard') },
   { id: 'alerts', group: 'keepup', name: 'Alerts', line: 'Injuries, news and updates on your players.', route: 'Alerts', leagueScoped: true, icon: 'notifications-outline', color: accentFor('alerts') },
   { id: 'news', group: 'keepup', name: 'News', line: 'The latest NFL news.', route: 'News', leagueScoped: false, icon: 'globe-outline', color: accentFor('news') },
   { id: 'portfolio', group: 'keepup', name: 'Portfolio', line: 'Your standing across every saved league.', pro: true, route: 'Portfolio', leagueScoped: false, icon: 'layers-outline', color: accentFor('portfolio') },

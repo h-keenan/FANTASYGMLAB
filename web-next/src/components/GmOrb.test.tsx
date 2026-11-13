@@ -33,6 +33,10 @@ vi.mock("@/lib/analytics", () => ({
   trackFeatureUse: vi.fn(),
 }));
 
+// The phone shell flag (lib/useShellNav.ts): off by default here, switched on by the retirement test below.
+const shellNav = vi.hoisted(() => ({ barVisible: false }));
+vi.mock("@/lib/useShellNav", () => ({ useShellNav: () => ({ enabled: shellNav.barVisible, barVisible: shellNav.barVisible }) }));
+
 type MockSession = { user: { id: string; app_metadata?: Record<string, unknown> } };
 
 function mockAuth(session: MockSession | null) {
@@ -159,5 +163,15 @@ describe("GmOrb search", () => {
     expect(screen.getByText("Waivers")).toBeInTheDocument();
     expect(screen.queryByText("General")).not.toBeInTheDocument();
     expect(api.searchLeaguePlayers).not.toHaveBeenCalled();
+  });
+});
+
+describe("GmOrb with the phone shell bar", () => {
+  it("retires the floating trigger when the bottom bar is showing", () => {
+    shellNav.barVisible = true;
+    mockAuth({ user: { id: "user-1" } });
+    render(<GmOrb />);
+    expect(screen.queryByLabelText("Open GM menu")).not.toBeInTheDocument();
+    shellNav.barVisible = false;
   });
 });

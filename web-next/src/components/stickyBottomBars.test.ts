@@ -24,7 +24,7 @@ describe("bottom-pinned chrome stays sticky, not fixed", () => {
     expect(stack).toContain("env(safe-area-inset-bottom");
     const dock = css.slice(css.indexOf(".game-orb-dock {"), css.indexOf("}", css.indexOf(".game-orb-dock {")));
     expect(dock).toContain("position: absolute");
-    for (const f of ["SimGameOrb.tsx", "SimGameHeader.tsx", "ui/BottomTabBar.tsx"]) {
+    for (const f of ["SimGameOrb.tsx", "SimGameHeader.tsx", "ui/BottomTabBar.tsx", "AppShellBar.tsx", "ShellHeader.tsx", "ShellActionSlot.tsx"]) {
       expect(read(f), f).not.toMatch(/className="[^"]*\bfixed\b/);
       expect(read(f), f).not.toContain("visualViewport");
     }

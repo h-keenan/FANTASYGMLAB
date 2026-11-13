@@ -49,7 +49,7 @@ export interface NavCatalogPage {
 
 /* prettier-ignore */
 export const NAV_PAGES: readonly NavCatalogPage[] = [
-  { key: "dashboard", label: "Dashboard", subtitle: "Personalized insights and recommendations", group: "core", leagueScoped: true },
+  { key: "dashboard", label: "Today", subtitle: "Personalized insights and recommendations", group: "core", leagueScoped: true },
   { key: "alerts", label: "Alerts", subtitle: "Injuries, news, and important updates", group: "core", leagueScoped: true },
   { key: "my-team", label: "My Team", subtitle: "Roster, lineup, and team analysis", group: "core", leagueScoped: true },
   { key: "matchup", label: "Matchup", subtitle: "This week's matchup and comparison", group: "core", leagueScoped: true },
@@ -94,7 +94,7 @@ export const NAV_PAGES: readonly NavCatalogPage[] = [
     ] },
   { key: "games", label: "Games", subtitle: "Season simulator and weekly pick'em", group: "tools", leagueScoped: true,
     tabs: [
-      { label: "Season Sim", subtitle: "Season simulator", keywords: ["simulator", "simulation", "playoff odds", "what if"] },
+      { label: "Season Outlook", subtitle: "What-if season simulator", keywords: ["simulator", "simulation", "playoff odds", "what if"] },
       { label: "Pick'em", subtitle: "Weekly pick'em in your league", keywords: ["pickem", "picks", "weekly"] },
     ] },
   { key: "commissioner", label: "Commissioner", subtitle: "League integrity: lineups, tanking signals, trades", group: "tools", leagueScoped: true, pro: true },

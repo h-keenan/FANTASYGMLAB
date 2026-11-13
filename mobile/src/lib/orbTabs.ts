@@ -88,7 +88,7 @@ const TAB_TARGETS: Readonly<Record<string, Readonly<Record<string, TabTarget>>>>
   },
   'league-recaps': { Roundup: { params: { initialTab: 'roundup' } } },
   games: {
-    'Season Sim': { params: { tab: 'sim' } },
+    'Season Outlook': { params: { tab: 'sim' } },
     "Pick'em": { params: { tab: 'pickem' } },
   },
 };

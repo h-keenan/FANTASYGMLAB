@@ -69,7 +69,7 @@ export function GamesContent({ leagueId, leagueName, initialTab }: { leagueId: s
       <PillRow
         fullWidth
         options={[
-          { label: "Season Sim", value: "sim", glyph: "sim" },
+          { label: "Season Outlook", value: "sim", glyph: "sim" },
           { label: "Pick'em", value: "pickem", glyph: "pickem" },
         ]}
         active={tab}
@@ -86,7 +86,7 @@ function ReasonState({ reason }: { reason: string }) {
   return (
     <EmptyState
       title={gamesReasonMessage(reason)}
-      actionLabel={goAccount ? "Open Account" : "Back to Dashboard"}
+      actionLabel={goAccount ? "Open Account" : "Back to Today"}
       onAction={() => router.push(goAccount ? "/account" : "/")}
     />
   );
@@ -439,7 +439,7 @@ function PickemPanel({ leagueId }: { leagueId: string }) {
       <EmptyState
         title="Pick'em is not open yet"
         subtitle="Check back soon."
-        actionLabel="Back to Dashboard"
+        actionLabel="Back to Today"
         onAction={() => router.push("/")}
       />
     );

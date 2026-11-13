@@ -17,6 +17,7 @@ import { PositionBadge } from "@/components/PositionBadge";
 import { FOUNDER_DESTINATION, isFounderSession, searchNavDestinations, useNavDestinations, type NavDestination } from "@/lib/navDestinations";
 import { OPEN_SEARCH_EVENT } from "@/lib/orbSearch";
 import { pathOwnsPhoneChrome } from "@/lib/bottomNav";
+import { useShellNav } from "@/lib/useShellNav";
 import { useIsPro } from "@/lib/useIsPro";
 import { useSheetDragDismiss } from "@/lib/useSheetDragDismiss";
 import { SheetHandle } from "@/components/SheetHandle";
@@ -84,6 +85,7 @@ export function GmOrb() {
   const { session } = useAuth();
   const { collegeInterest } = useDisplayPreferences();
   const pathname = usePathname();
+  const { barVisible: shellBar } = useShellNav();
   const params = useParams<{ leagueId?: string }>();
   const searchParams = useSearchParams();
   const leagueId = params?.leagueId ? decodeURIComponent(params.leagueId) : null;
@@ -131,7 +133,8 @@ export function GmOrb() {
 
   // The game's own bottom bar replaces the floating trigger on phones; the sheet (search, destinations) stays
   // mounted and opens from the game header's search icon.
-  const showTrigger = !pathOwnsPhoneChrome(pathname);
+  // Phase B: with the site bottom bar showing, the orb is retired on phones too (More holds the menu).
+  const showTrigger = !pathOwnsPhoneChrome(pathname) && !shellBar;
 
   return (
     <>
