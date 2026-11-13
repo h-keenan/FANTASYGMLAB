@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState, type CSSProperties } from "react";
 
-import { classifySheetGesture, sheetDragOffset, shouldDismissSheet } from "@/lib/sheetGesture";
+import { canStartSheetDrag, classifySheetGesture, sheetDragOffset, shouldDismissSheet, sheetDragProgress } from "@/lib/sheetGesture";
 
 /** A release older than this since the last move is a "hold, then let go",
  * not a flick, so its velocity is treated as zero. */
@@ -17,18 +17,16 @@ function prefersReducedMotion(): boolean {
     : false;
 }
 
-/** True when nothing scrollable between the touch target and the sheet is
- * scrolled away from its top, so pulling down can only mean "close". */
-function scrollChainAtTop(target: EventTarget | null, sheet: HTMLElement): boolean {
+/** scrollTop of every overflowing scroll area between the touch target and the sheet. */
+function scrollTopsAbove(target: EventTarget | null, sheet: HTMLElement): number[] {
+  const tops: number[] = [];
   let element = target instanceof Element ? target : null;
   while (element) {
-    if (element instanceof HTMLElement && element.scrollTop > 0 && element.scrollHeight > element.clientHeight) {
-      return false;
-    }
+    if (element instanceof HTMLElement && element.scrollHeight > element.clientHeight) tops.push(element.scrollTop);
     if (element === sheet) break;
     element = element.parentElement;
   }
-  return true;
+  return tops;
 }
 
 /**
@@ -43,6 +41,7 @@ function scrollChainAtTop(target: EventTarget | null, sheet: HTMLElement): boole
  * - Mostly-horizontal swipes are left alone.
  * - The sheet follows the finger, with rubber-band resistance past the
  *   dismiss distance and when pulled upward.
+ * - The backdrop fades with the drag (`backdropStyle`).
  * - On release it closes when pulled past a quarter of its height (80 to
  *   160px) or flicked down fast; otherwise it springs back.
  * - Touch only. Mouse and keyboard users keep the X button, Esc and the
@@ -54,7 +53,7 @@ export function useSheetDragDismiss<T extends HTMLElement = HTMLDivElement>({
 }: {
   onDismiss: () => void;
   enabled?: boolean;
-}): { sheetRef: React.RefObject<T | null>; sheetStyle: CSSProperties; dragProgress: number } {
+}): { sheetRef: React.RefObject<T | null>; sheetStyle: CSSProperties; dragProgress: number; backdropStyle: CSSProperties } {
   const sheetRef = useRef<T | null>(null);
   const onDismissRef = useRef(onDismiss);
   const [offset, setOffset] = useState(0);
@@ -102,7 +101,7 @@ export function useSheetDragDismiss<T extends HTMLElement = HTMLDivElement>({
       velocity = 0;
       currentOffset = 0;
       height = sheet.getBoundingClientRect().height;
-      canStartDrag = Boolean(target?.closest("[data-sheet-handle]")) || scrollChainAtTop(target, sheet);
+      canStartDrag = canStartSheetDrag({ onHandle: Boolean(target?.closest("[data-sheet-handle]")), scrollTops: scrollTopsAbove(target, sheet) });
     }
 
     function handleTouchMove(event: TouchEvent) {
@@ -186,7 +185,9 @@ export function useSheetDragDismiss<T extends HTMLElement = HTMLDivElement>({
     transform: offset !== 0 ? `translate3d(0, ${offset}px, 0)` : undefined,
     transition: dragging ? "none" : closing ? `transform ${CLOSE_TRANSITION_MS}ms ease-in` : SNAP_BACK_TRANSITION,
   };
-  const dragProgress = sheetHeight > 0 ? Math.min(1, Math.max(0, offset / sheetHeight)) : 0;
+  const dragProgress = sheetDragProgress(offset, sheetHeight);
+  // Spread onto the backdrop: the scrim fades as the sheet is pulled away (.pqv-backdrop / .ui-sheet-backdrop read --sheet-drag).
+  const backdropStyle = { "--sheet-drag": dragProgress, transition: dragging ? "none" : "background 200ms ease-out" } as CSSProperties;
 
-  return { sheetRef, sheetStyle, dragProgress };
+  return { sheetRef, sheetStyle, dragProgress, backdropStyle };
 }

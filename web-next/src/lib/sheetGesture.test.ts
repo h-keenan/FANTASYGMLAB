@@ -2,7 +2,9 @@ import { describe, expect, it } from "vitest";
 
 import {
   SHEET_FLICK_MIN_DISTANCE_PX,
+  canStartSheetDrag,
   classifySheetGesture,
+  sheetDragProgress,
   rubberBand,
   sheetDismissDistance,
   sheetDragOffset,
@@ -79,5 +81,41 @@ describe("classifySheetGesture", () => {
   it("ignores upward and horizontal gestures", () => {
     expect(classifySheetGesture({ dx: 0, dy: -20, canStartDrag: true })).toBe("ignore");
     expect(classifySheetGesture({ dx: 30, dy: 12, canStartDrag: true })).toBe("ignore");
+  });
+});
+
+describe("canStartSheetDrag", () => {
+  it("always starts on the grab handle, even over scrolled content", () => {
+    expect(canStartSheetDrag({ onHandle: true, scrollTops: [400] })).toBe(true);
+  });
+  it("starts from the header or top area (no scrolling ancestor) and from a body scrolled to its top", () => {
+    expect(canStartSheetDrag({ onHandle: false, scrollTops: [] })).toBe(true);
+    expect(canStartSheetDrag({ onHandle: false, scrollTops: [0, 0] })).toBe(true);
+  });
+  it("does not start from a body (or any nested scroller) scrolled away from the top", () => {
+    expect(canStartSheetDrag({ onHandle: false, scrollTops: [0, 1] })).toBe(false);
+    expect(canStartSheetDrag({ onHandle: false, scrollTops: [250] })).toBe(false);
+  });
+  it("a negative scrollTop (iOS overscroll bounce) still counts as the top", () => {
+    expect(canStartSheetDrag({ onHandle: false, scrollTops: [-12] })).toBe(true);
+  });
+});
+
+describe("sheetDragProgress", () => {
+  it("is 0 at rest or pulled up, and rises to 1 as the sheet leaves", () => {
+    expect(sheetDragProgress(0, 500)).toBe(0);
+    expect(sheetDragProgress(-20, 500)).toBe(0);
+    expect(sheetDragProgress(250, 500)).toBe(0.5);
+    expect(sheetDragProgress(900, 500)).toBe(1);
+    expect(sheetDragProgress(50, 0)).toBe(0);
+  });
+});
+
+describe("dismiss decision at the documented thresholds", () => {
+  it("dismisses past ~100px, or on a fast flick, and springs back otherwise", () => {
+    expect(shouldDismissSheet({ offset: 120, velocity: 0, sheetHeight: 400 })).toBe(true);
+    expect(shouldDismissSheet({ offset: 60, velocity: 0.1, sheetHeight: 400 })).toBe(false);
+    expect(shouldDismissSheet({ offset: 40, velocity: 0.9, sheetHeight: 400 })).toBe(true);
+    expect(shouldDismissSheet({ offset: 120, velocity: -0.4, sheetHeight: 400 })).toBe(false);
   });
 });

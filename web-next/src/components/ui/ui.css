@@ -10,7 +10,7 @@
   display: flex;
   align-items: flex-end;
   justify-content: center;
-  background: var(--color-scrim);
+  background: color-mix(in srgb, var(--color-scrim) calc((1 - var(--sheet-drag, 0)) * 100%), transparent);
 }
 .ui-sheet-backdrop[hidden] {
   display: none;

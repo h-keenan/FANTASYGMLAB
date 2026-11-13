@@ -12,6 +12,8 @@ import { StatStrip } from "@/components/StatStrip";
 import { ToneBadge } from "@/components/ToneBadge";
 import { gradeToneColor, sampleFill, TENDENCY_SIGNALS, tendencyBadgeText, tendencyTone, tradeDateLabel } from "@/lib/managerTendencies";
 import { SheetHandle } from "@/components/SheetHandle";
+import { useSheetDragDismiss } from "@/lib/useSheetDragDismiss";
+
 import { PositionBadge } from "@/components/PositionBadge";
 import { PickPlate } from "@/components/PickRow";
 import { OpponentProfileCard } from "@/components/OpponentProfileCard";
@@ -105,6 +107,8 @@ export function ManagerProfileSheet({
   avatarUrl?: string | null;
   onClose: () => void;
 }) {
+  // Swipe down on touch to close; the backdrop fades with the drag (lib/useSheetDragDismiss.ts).
+  const { sheetRef, sheetStyle, backdropStyle } = useSheetDragDismiss<HTMLDivElement>({ onDismiss: onClose });
   const [data, setData] = useState<ManagerTendenciesDetailResponse | null>(null);
   const [failed, setFailed] = useState(false);
   const [profile, setProfile] = useState<OpponentProfileResponse | null>(null);
@@ -159,11 +163,12 @@ export function ManagerProfileSheet({
   return (
     <div
       className="pqv-backdrop"
+      style={backdropStyle}
       onMouseDown={(event) => {
         if (event.target === event.currentTarget) onClose();
       }}
     >
-      <div className="pqv-modal" role="dialog" aria-modal="true" aria-labelledby="mgr-profile-name">
+      <div ref={sheetRef} style={sheetStyle} className="pqv-modal" role="dialog" aria-modal="true" aria-labelledby="mgr-profile-name">
         <SheetHandle />
         <button type="button" className="pqv-close" aria-label="Close manager profile" onClick={onClose}>
           ×

@@ -114,7 +114,7 @@ export function PlayerQuickView({
   // Swipe-down-to-dismiss on touch devices: the shared sheet gesture (see
   // lib/useSheetDragDismiss.ts). Only closes when the body is scrolled to
   // its top, so scrolling back up inside a long PQV never closes it.
-  const { sheetRef, sheetStyle } = useSheetDragDismiss({ onDismiss: onClose });
+  const { sheetRef, sheetStyle, backdropStyle } = useSheetDragDismiss({ onDismiss: onClose });
   const [loadError, setLoadError] = useState(false);
 
   // Fetch detail/awards for this player. The provider mounts one
@@ -223,6 +223,7 @@ export function PlayerQuickView({
   return (
     <div
       className="pqv-backdrop"
+      style={backdropStyle}
       onMouseDown={(event) => {
         if (event.target === event.currentTarget) onClose();
       }}

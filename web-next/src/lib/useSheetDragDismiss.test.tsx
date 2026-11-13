@@ -5,13 +5,15 @@ import { SheetHandle } from "@/components/SheetHandle";
 import { useSheetDragDismiss } from "./useSheetDragDismiss";
 
 function Sheet({ onDismiss }: { onDismiss: () => void }) {
-  const { sheetRef, sheetStyle } = useSheetDragDismiss({ onDismiss });
+  const { sheetRef, sheetStyle, backdropStyle } = useSheetDragDismiss({ onDismiss });
   return (
+    <div style={backdropStyle} data-testid="backdrop">
     <div ref={sheetRef} style={sheetStyle} data-testid="sheet">
       <SheetHandle />
       <div data-testid="scroll" style={{ overflowY: "auto" }}>
         <p data-testid="content">Long content</p>
       </div>
+    </div>
     </div>
   );
 }
@@ -34,6 +36,19 @@ function setScrolled(element: HTMLElement, scrollTop: number) {
 describe("useSheetDragDismiss", () => {
   beforeEach(() => vi.useFakeTimers());
   afterEach(() => vi.useRealTimers());
+
+  it("fades the backdrop while the sheet follows the finger, and starts from the handle over scrolled content", () => {
+    const onDismiss = vi.fn();
+    render(<Sheet onDismiss={onDismiss} />);
+    setScrolled(screen.getByTestId("scroll"), 300);
+    const handle = document.querySelector("[data-sheet-handle]") as Element;
+    fireEvent.touchStart(handle, { touches: [{ clientX: 100, clientY: 100 }] });
+    fireEvent.touchMove(handle, { touches: [{ clientX: 100, clientY: 130 }] });
+    fireEvent.touchMove(handle, { touches: [{ clientX: 100, clientY: 160 }] });
+    expect(Number(screen.getByTestId("backdrop").style.getPropertyValue("--sheet-drag"))).toBeGreaterThanOrEqual(0);
+    expect(screen.getByTestId("sheet").style.transform).toContain("translate3d");
+    fireEvent.touchEnd(handle, { touches: [] });
+  });
 
   it("closes on a long downward drag when the content is at its top", () => {
     const onDismiss = vi.fn();
