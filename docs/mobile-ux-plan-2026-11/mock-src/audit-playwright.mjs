@@ -35,7 +35,7 @@ for (const [name, path] of routes) {
   await page.screenshot({ path:`${OUT}/${name}_fold.png` });
   await page.screenshot({ path:`${OUT}/${name}_full.png`, fullPage:true });
   const m = await page.evaluate(() => {
-    const vh = innerHeight, vis=[]; 
+    const vh = innerHeight, vis=[];
     const parse = (c)=>{const m=c.match(/rgba?\(([^)]+)\)/); if(!m) return null; const a=m[1].split(",").map(s=>parseFloat(s)); return {r:a[0],g:a[1],b:a[2],a:a[3]??1};};
     const lum=(c)=>{const f=v=>{v/=255;return v<=0.03928?v/12.92:Math.pow((v+0.055)/1.055,2.4)};return 0.2126*f(c.r)+0.7152*f(c.g)+0.0722*f(c.b)};
     const bgOf=(el)=>{let e=el; while(e){const c=parse(getComputedStyle(e).backgroundColor); if(c&&c.a>0.5) return c; e=e.parentElement;} return {r:0,g:0,b:0,a:1}};
