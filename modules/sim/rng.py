@@ -35,6 +35,7 @@ SUBSYSTEMS = {
     "grookie": 17,
     "grdraft": 18,
     "gseason": 19,
+    "gscout": 20,  # scouting seeds of generated rookies
 }
 
 

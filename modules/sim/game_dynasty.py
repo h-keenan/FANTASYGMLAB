@@ -18,7 +18,7 @@ import math
 from dataclasses import replace
 from typing import Any, Mapping, Sequence
 
-from modules.sim import aging
+from modules.sim import aging, scouting
 from modules.sim.game_eval import USER_PARAMS, Evaluator, team_params
 from modules.sim.game_setup import value_pool
 from modules.sim.game_state import Emitter, GameState
@@ -134,12 +134,18 @@ def rookie_class(
             if name not in used:
                 used.add(name)
                 break
+        extra = {"is_rookie": 1.0, "years_exp": 0.0, "draft_year": float(year)}
+        nfl_team = teams[int(gen.integers(0, len(teams)))] if teams else "FA"  # draw order is part of the saved world: team, then age
+        age = ROOKIE_AGES[int(gen.choice(len(ROOKIE_AGES), p=ROOKIE_AGE_P))]
+        if s.rookie_curves:  # version-gated: older dynasty saves keep the plain age curve and no scouting profile
+            sseed = int(WorldRng(base.seed).stream(season, "gscout", j).integers(1, 2 ** 31 - 1))
+            extra.update(scouting.rookie_dev_fields(pos, age, scouting.talent_z(mean, ref12[pos]), sseed, j, n))
         rows.append({
             "pid": f"R{year}-{j:03d}", "name": name, "pos": pos,
-            "nfl_team": teams[int(gen.integers(0, len(teams)))] if teams else "FA",
-            "age": ROOKIE_AGES[int(gen.choice(len(ROOKIE_AGES), p=ROOKIE_AGE_P))],
+            "nfl_team": nfl_team,
+            "age": age,
             "market": market, "mean": mean, "sd": max(2.0, mean * 0.5), "injury_weeks": 0,
-            "extra": {"is_rookie": 1.0, "years_exp": 0.0, "draft_year": float(year)},
+            "extra": extra,
         })
     return rows
 
@@ -156,7 +162,8 @@ def season_snapshot(root: GameSnapshot, season: int) -> GameSnapshot:
         p = prev.players[pid]
         r = rng.stream(season - 1, "gage", aging.stable_key(pid))
         z, u = float(r.standard_normal()), float(r.random())
-        age, mean, sd, market, retired = aging.progress(p.pos, p.age, p.mean, p.sd, p.market, z, u)
+        own = scouting.step_ratio(p.extra, p.extra.get("years_exp", 0.0)) if root.settings.rookie_curves else None
+        age, mean, sd, market, retired = aging.progress(p.pos, p.age, p.mean, p.sd, p.market, z, u, mult=own)
         if retired:
             continue
         extra = {k: v for k, v in p.extra.items() if k not in ("is_rookie",)}

@@ -6,6 +6,7 @@ import EmptyState from './EmptyState';
 import Input from './Input';
 import MetricCard from './MetricCard';
 import PlayerQuickViewSheet, { Section as PqvSection } from './PlayerQuickViewSheet';
+import SimScoutingSections from './SimScoutingSections';
 import WeeklyPointsChart from './WeeklyPointsChart';
 import { ReviewGlyphChip } from './SeasonReviewSections';
 import SegmentedTabBar from './SegmentedTabBar';
@@ -295,6 +296,7 @@ export function SimPlayerOverlay({ player, detail, actions }: { player: SimGameP
         <SkeletonCard rows={2} />
       ) : (
         <>
+          {body.scouting ? <SimScoutingSections profile={body.scouting} /> : null}
           {actual.length > 0 || band || ros ? (
             <PqvSection title="Week by Week · This sim season">
               {actual.length > 0 || band ? (

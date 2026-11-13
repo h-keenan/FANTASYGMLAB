@@ -635,3 +635,44 @@ Isolation: `player_model.py` and everything under `modules/sim/calibration/` imp
 the stdlib, numpy and `modules.sim.*`; `tests/test_sim_isolation.py` lists `player_model.py`
 as a pure-engine file, loads it in a clean interpreter with no real module imported, and
 checks the calibration package's imports. Nothing here reads `data/players.db`.
+
+## 8. Generated rookies: scouting profiles and development curves (dynasty_v 2)
+
+Owner ask (2026-11): a generated rookie must read like a prospect, not a blank row. `modules/sim/scouting.py`
+(pure, stdlib + numpy) gives every generated rookie two things, both deterministic in the game seed:
+
+**A development archetype that the sim really plays.** At class generation each rookie gets a talent z (projection
+vs the position's 12th-best veteran), a scouting seed, his class rank/size, and a hidden archetype (early bloomer,
+steady, late bloomer, star trajectory, bust risk; star odds rise and bust odds fall with talent). The archetype is
+stored in the player record (`extra`: `dev_arch`, `dev_r1`..`dev_r4`) as four per-offseason ratios = the plain age
+curve at his age times an archetype multiplier (so position cliffs such as the RB drop still apply) times a little
+per-player wobble. `game_dynasty.season_snapshot` multiplies a rookie's projection by `dev_r{years_exp+1}` in place of
+the age curve (`aging.progress(..., mult=)`); from year 5 the age curve takes over again. Averaged over the class mix
+the archetypes are about 1.0, so the calibrated age-curve medians (audit above) are unchanged.
+**Version gate:** only games created with `dynasty_v >= 2` (`GameSettings.rookie_curves`) get the fields; older dynasty
+saves generate the identical class (same names, positions, projections, teams) with no scouting fields and keep the
+plain age curve. The scouting draws use their own RNG stream (`gscout`), so gating never shifts another draw.
+
+**A scouting profile** (`player_detail().scouting`, only for generated players), a pure function of the record:
+draft capital proxy (class rank -> round/pick), measurables by position (height, weight, 40, speed score, athletic score
+with percentiles vs the position class), a final-season college line by position (RB rush/rec, WR/TE rec/yprr/target
+share, QB comp%/ypa/TD/INT/rush) over 2-4 college seasons, analytics percentile bars (dominator, yards per route run,
+target share, explosive rate, breakout age, athletic score), EA-style tags with a confidence ("High upside", "Polished",
+"Reliable floor", "Raw", "Boom/bust", "Elite athlete", "Production machine"; "Injury history" is informational only),
+and a template blurb driven by the numbers.
+
+**What the user sees of the curve is a scouting estimate.** `expected_curve` starts at the sim's own current projection
+and blends the plain age curve with the true stored ratios by `confidence` (a per-player starting clarity 0.30-0.55 plus
+0.20 per year in the league plus up to 0.12 for games played). The band widens with the horizon and with doubt. The
+archetype label is revealed only at confidence 0.75 (about two seasons); before that the user sees a vague tag, and the
+tag itself is the true archetype's tag with probability 0.5 + 0.5 x confidence (so early tags can mislead). At full
+confidence the displayed steps equal the stored ratios (tested).
+
+Real prospects (`data/college_prospects_2027.json`: 192 names and schools, no stats) are not wired into the sim. The payload
+is shaped for them: `college.columns` names the stats and `college.seasons[].stats` holds values by key, so a real feed
+(CollegeFootballData.com; needs an API key the owner will provide) only has to fill those and set `source` to something
+other than `"generated"` (the UI then drops the "Generated prospect" label). Draft capital would come from the real pick,
+measurables from the combine, and `analytics` percentiles from the same pool the real stats come from.
+
+Tests: `tests/test_sim_rookie_scouting.py` (determinism, version gate, per-position distributions, archetype mix, progression
+equals the stored curve, displayed curve converges to it, payload), `tests/test_sim_player_sheet.py` (flat-projection flag).

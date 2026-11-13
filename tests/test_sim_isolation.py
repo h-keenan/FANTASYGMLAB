@@ -50,7 +50,7 @@ PURE_ENGINE_FILES = [
     "game_types.py", "game_scoring.py", "game_setup.py", "game_state.py", "game_eval.py", "game_draft.py",
     "game_ai.py", "game_actions.py", "game_engine.py", "game_result.py", "game_store.py", "game_view.py", "game_home.py",
     # dynasty mode: age curves, rookie classes, the offseason and its views
-    "aging.py", "game_dynasty.py", "game_dynasty_view.py",
+    "aging.py", "game_dynasty.py", "game_dynasty_view.py", "scouting.py",
 ]
 CALIBRATION_DIR = SIM_DIR / "calibration"
 

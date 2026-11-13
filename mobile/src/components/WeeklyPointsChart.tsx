@@ -44,12 +44,15 @@ export default function WeeklyPointsChart({
   projection = null,
   pointsLabel = 'pts',
   emptyText,
+  xLabel = 'Week',
 }: {
   weeks: WeeklyStatPoint[];
   /** Optional rest-of-season projection drawn as a band behind the played weeks (Fantasy Sim). */
   projection?: readonly WeeklyProjectionPoint[] | null;
   pointsLabel?: string;
   emptyText?: string;
+  /** What the x axis counts (the development curve plots 'Year'). */
+  xLabel?: string;
 }) {
   const { colors } = useThemeMode();
   const styles = useMemo(() => createStyles(colors), [colors]);
@@ -164,7 +167,7 @@ export default function WeeklyPointsChart({
           ]}
         >
           <AppText style={styles.tooltipText}>
-            Week {selectedTooltipPoint.week} · {selectedTooltipPoint.value.toFixed(1)} {pointsLabel}
+            {xLabel} {selectedTooltipPoint.week} · {selectedTooltipPoint.value.toFixed(1)} {pointsLabel}
           </AppText>
         </View>
       ) : null}

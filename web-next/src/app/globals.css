@@ -4138,3 +4138,46 @@ main > header:has(> h1.sr-only:only-child) {
   font-size: 0.8125rem;
   font-weight: 800;
 }
+
+/* Fantasy Sim generated-prospect analytics: percentile bars vs the position class, same band colors as .pqv-percentile. */
+.sim-pct-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+}
+.sim-pct-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 2px var(--space-sm);
+  font-size: 0.78rem;
+}
+.sim-pct-label {
+  color: var(--color-text-secondary);
+}
+.sim-pct-value {
+  font-weight: 700;
+  color: var(--color-text-primary);
+}
+.sim-pct-track {
+  grid-column: 1 / -1;
+  position: relative;
+  height: 6px;
+  border-radius: var(--radius-pill);
+  background: var(--color-surface-muted);
+  overflow: hidden;
+}
+.sim-pct-fill {
+  position: absolute;
+  inset: 0 auto 0 0;
+  border-radius: var(--radius-pill);
+  background: var(--color-text-muted);
+}
+.sim-pct-fill--low {
+  background: var(--color-danger);
+}
+.sim-pct-fill--mid {
+  background: var(--color-action);
+}
+.sim-pct-fill--high {
+  background: var(--color-success);
+}

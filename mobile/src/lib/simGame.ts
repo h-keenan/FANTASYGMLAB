@@ -456,7 +456,82 @@ export interface SimRosSummary {
   out_weeks: number[];
 }
 
+/** Generated-prospect scouting profile (player detail of a generated rookie). Shaped so real college stats can slot in unchanged:
+ * fill `college.seasons[].stats` for the keys named in `college.columns` and set `source` to something other than "generated". */
+export interface SimScoutingTag {
+  tag: string;
+  confidence: number;
+}
+
+export interface SimScoutingMeasurable {
+  key: string;
+  label: string;
+  display: string;
+  percentile: number;
+}
+
+export interface SimScoutingAnalytic {
+  key: string;
+  label: string;
+  value: number;
+  display: string;
+  percentile: number;
+  higher_is_better: boolean;
+}
+
+export interface SimScoutingCollegeColumn {
+  key: string;
+  label: string;
+  fmt: "int" | "num1" | "num2" | "pct1";
+}
+
+export interface SimScoutingCollege {
+  columns: SimScoutingCollegeColumn[];
+  seasons: { season: number; team: string; class: string; games: number; stats: Record<string, number> }[];
+  career: Record<string, number>;
+  /** Percentile vs the position class for the final season's stats, by column key. */
+  percentiles: Record<string, number>;
+  final: { season: number; team: string; games: number; stats: Record<string, number> };
+}
+
+export interface SimDevelopmentPoint {
+  year: number;
+  mean: number;
+  lo: number;
+  hi: number;
+}
+
+export interface SimDevelopmentCurve {
+  base_year: number;
+  points: SimDevelopmentPoint[];
+  confidence: number;
+  confidence_label: "Low" | "Medium" | "High";
+  /** Only set once scouts have a firm read (confidence 0.75+); until then just the vague tags. */
+  archetype: string | null;
+  archetype_label: string | null;
+  revealed: boolean;
+  note: string;
+}
+
+export interface SimScoutingProfile {
+  version: number;
+  source: string;
+  label: string;
+  school: string;
+  class_year: number | null;
+  position_word: string;
+  draft: { round: number; pick: number; class_rank: number; class_size: number; basis: string };
+  measurables: SimScoutingMeasurable[];
+  college: SimScoutingCollege;
+  analytics: SimScoutingAnalytic[];
+  tags: SimScoutingTag[];
+  blurb: string;
+  development: SimDevelopmentCurve;
+}
+
 export interface SimPlayerDetailResponse extends SimGameEnvelope {
+  /** Present for generated rookies only. */
+  scouting?: SimScoutingProfile;
   player?: SimGamePlayer;
   weeks?: SimPlayerWeek[];
   /** True when every playable week carries the same projection (render one summary, never a week-by-week list). */
