@@ -96,6 +96,30 @@ describe("league Players view (find a player, position by position)", () => {
   });
 });
 
+describe("league Players view: On the block", () => {
+  const blocked = p("w9", "Vet Vince", "RB", 30, "1", { block: { by: "1", mine: false, looking_for: "WR", why: "Selling a veteran" } });
+  const withBlock = [
+    team("1", "Bench Mob", 2, [p("q1", "QB", "Quinn Back", 90, "1", { overall: 91 }), blocked], { needs: ["TE"], block: { stance: "rebuilding", looking_for: "WR", items: [{ id: "w9", why: "Selling a veteran" }] } }),
+    team("2", "Goal Line Gamblers", 1, [p("q2", "QB", "Quentin Arm", 70, "2", { overall: 78 })]),
+  ];
+
+  it("a pill lists every player on a block across the league with the team's stated needs", () => {
+    render(<SimLeaguePlayersView ctx={ctx()} state={{ status: "ready", teams: withBlock }} onRetry={() => {}} />);
+    fireEvent.click(screen.getByRole("tab", { name: /On the block 1/ }));
+    const rows = screen.getAllByTestId("sim-player-line");
+    expect(rows).toHaveLength(1);
+    expect(rows[0]).toHaveTextContent(/Vince/i);
+    expect(rows[0]).toHaveTextContent("On block"); // the shared row's chip
+    expect(screen.getByTestId("block-note")).toHaveTextContent("Selling a veteran · looking for WR · needs TE");
+    expect(screen.getByText(/1 player on a trade block/)).toBeInTheDocument();
+  });
+
+  it("has no pill when nothing is on a block", () => {
+    render(<SimLeaguePlayersView ctx={ctx()} state={{ status: "ready", teams }} onRetry={() => {}} />);
+    expect(screen.queryByRole("tab", { name: /On the block/ })).toBeNull();
+  });
+});
+
 describe("SimTeamCard", () => {
   it("is not a button without onOpen (the selected partner card) and carries no chips when the team is balanced", () => {
     render(<SimTeamCard team={team("9", "Even Steven", 5, [], { needs: [], surplus: [] })} selected />);

@@ -19,6 +19,7 @@ from typing import Any, Sequence
 
 from modules.sim import game_dynasty as dyn
 from modules.sim.game_actions import ai_manage_reserves, execute_trade
+from modules.sim import game_block as blockmod
 from modules.sim.game_ai import (
     MAX_AI_TRADES_PER_WEEK,
     MAX_OFFERS_PER_WEEK,
@@ -363,7 +364,11 @@ def _ai_trade_phase(em: Emitter, snap: GameSnapshot, state: GameState, seed: int
 def generate_offers(em: Emitter, snap: GameSnapshot, state: GameState, seed: int, week: int) -> int:
     """AI managers' offers to the user for ``week``: at most one per team and
     three league-wide, each one a deal the AI wants and the user is not robbed
-    in. Unanswered offers expire at the next Advance."""
+    in. Unanswered offers expire at the next Advance.
+
+    With a trade block (block_v 1+) and assets on it, a team first looks for a deal that asks for something blocked (and sends
+    the position the user said they are looking for when it can), under the same rules as every offer; at most
+    ``MAX_BLOCK_OFFERS`` of the week's offers come from the block, and with nothing blocked this is exactly the original search."""
 
     s = snap.settings
     if week > s.regular_weeks or week > s.trade_deadline_week:
@@ -373,7 +378,8 @@ def generate_offers(em: Emitter, snap: GameSnapshot, state: GameState, seed: int
     n = len(snap.tids)
     order = rng.stream(week, "goffer", 0).permutation(n)
     desk = TradeDesk(Evaluator(snap, state), seed, week)
-    found: list[tuple[float, str, list[str], list[str]]] = []
+    blocked = blockmod.user_block(snap, state)
+    found: list[tuple[float, str, list[str], list[str], list[str], str | None]] = []
     for ti in order:
         tid = snap.tids[int(ti)]
         if tid == user:
@@ -383,15 +389,44 @@ def generate_offers(em: Emitter, snap: GameSnapshot, state: GameState, seed: int
             continue
         if rng.stream(week, "goffer", 1 + int(ti)).random() > 0.8 * params.activity:
             continue
-        deal = desk.find_deal(tid, [user], to_user=True)
+        deal = None
+        via: list[str] = []
+        hint: str | None = None
+        if blocked:
+            best = None
+            for h in sorted({v.get("looking_for") for v in blocked.values()}, key=lambda x: (x is None, x or "")):
+                want = [p for p, v in blocked.items() if v.get("looking_for") == h]
+                cand = desk.find_deal(tid, [user], to_user=True, want=want, give_pos=h)
+                if cand is not None and (best is None or cand[3] + cand[4] > best[0][3] + best[0][4]):
+                    best = (cand, want, h)
+            if best is not None:
+                deal, want, hint = best
+                via = [p for p in deal[2] if p in blocked]
+        if deal is None:
+            deal = desk.find_deal(tid, [user], to_user=True)
         if deal is not None:
             _, give, get, ui, uj = deal
-            found.append((ui + uj, tid, give, get))
+            found.append((ui + uj + (blockmod.BLOCK_OFFER_BONUS if via else 0.0), tid, give, get, via, hint))
     found.sort(key=lambda f: (-f[0], f[1]))
-    for _, tid, give, get in found[:MAX_OFFERS_PER_WEEK]:
+    picked: list[tuple[float, str, list[str], list[str], list[str], str | None]] = []
+    from_block = 0
+    for f in found:
+        if len(picked) >= MAX_OFFERS_PER_WEEK:
+            break
+        if f[4]:
+            if from_block >= blockmod.MAX_BLOCK_OFFERS:
+                continue
+            from_block += 1
+        picked.append(f)
+    for _, tid, give, get, via, hint in picked:
+        message = offer_message(snap, tid)
+        extra: dict[str, Any] = {}
+        if via:
+            message = blockmod.block_message(snap, tid, via, give, hint)
+            extra["via_block"] = via
         em.emit(week, "engine", "inbox_offer", id=f"o{state.seq}", team=tid, give=give, get=get,
-                expires_week=week, message=offer_message(snap, tid))
-    return min(len(found), MAX_OFFERS_PER_WEEK)
+                expires_week=week, message=message, **extra)
+    return len(picked)
 
 
 def _fill_holes(em: Emitter, ev: Evaluator, tid: str) -> list[str]:

@@ -12,7 +12,7 @@ import { SimTeamCard } from "@/components/SimTeamCard";
 import { SkeletonCard } from "@/components/Skeleton";
 import { simWindow, SIM_WINDOW_STEP } from "@/lib/simLayout";
 import { simListStats } from "@/lib/simDraft";
-import { simRosterEntries, simRosterPositions, simTeamsByPower, type SimRosterPosFilter } from "@/lib/simLeagueRosters";
+import { simBlockEntryCount, simBlockNote, simRosterEntries, simRosterPositions, simTeamsByPower, type SimRosterPosFilter } from "@/lib/simLeagueRosters";
 import type { SimLeagueRostersState } from "@/lib/useSimLeagueRosters";
 
 function Loading({ state, onRetry }: { state: SimLeagueRostersState; onRetry: () => void }) {
@@ -41,10 +41,13 @@ export function SimLeagueTeamsView({ ctx, state, onRetry }: { ctx: SimCtx; state
  */
 export function SimLeaguePlayersView({ ctx, state, onRetry }: { ctx: SimCtx; state: SimLeagueRostersState; onRetry: () => void }) {
   const [pos, setPos] = useState<SimRosterPosFilter>("ALL");
+  const [onlyBlock, setOnlyBlock] = useState(false);
   const [text, setText] = useState("");
   const [visible, setVisible] = useState(SIM_WINDOW_STEP);
   const teams = state.status === "ready" ? state.teams : null;
-  const entries = useMemo(() => (teams ? simRosterEntries(teams, pos, text) : []), [teams, pos, text]);
+  const entries = useMemo(() => (teams ? simRosterEntries(teams, pos, text, onlyBlock) : []), [teams, pos, text, onlyBlock]);
+  const blockCount = useMemo(() => (teams ? simBlockEntryCount(teams) : 0), [teams]);
+  const teamById = useMemo(() => new Map((teams ?? []).map((t) => [t.team_id, t])), [teams]);
   const positions = useMemo(() => (teams ? simRosterPositions(teams) : []), [teams]);
   if (!teams) return <Loading state={state} onRetry={onRetry} />;
   const { shown, remaining } = simWindow(entries, visible);
@@ -63,12 +66,16 @@ export function SimLeaguePlayersView({ ctx, state, onRetry }: { ctx: SimCtx; sta
       <PillRow
         ariaLabel="Position filter"
         variant="scroll"
-        options={[{ label: "All", value: "ALL" }, ...positions.map((p) => ({ label: p, value: p }))]}
-        active={pos}
-        onSelect={(value) => { setPos(value as SimRosterPosFilter); setVisible(SIM_WINDOW_STEP); }}
+        options={[{ label: "All", value: "ALL" }, ...positions.map((p) => ({ label: p, value: p })), ...(blockCount > 0 || onlyBlock ? [{ label: `On the block ${blockCount}`, value: "BLOCK" }] : [])]}
+        active={onlyBlock ? "BLOCK" : pos}
+        onSelect={(value) => {
+          setOnlyBlock(value === "BLOCK");
+          setPos(value === "BLOCK" ? "ALL" : (value as SimRosterPosFilter));
+          setVisible(SIM_WINDOW_STEP);
+        }}
       />
       <p className="text-xs" style={{ color: "var(--color-text-muted)" }} aria-live="polite">
-        {entries.length} {entries.length === 1 ? "player" : "players"}{pos === "ALL" ? "" : ` at ${pos}`}, best value first
+        {entries.length} {entries.length === 1 ? "player" : "players"}{onlyBlock ? " on a trade block" : pos === "ALL" ? "" : ` at ${pos}`}, best value first
       </p>
       {entries.length === 0 ? (
         <EmptyState title="No one matches" subtitle="Try another name, or pick All positions. Free agents are on the Players tab." />
@@ -81,6 +88,7 @@ export function SimLeaguePlayersView({ ctx, state, onRetry }: { ctx: SimCtx; sta
                 onOpen={ctx.openPlayer}
                 stats={simListStats(player, { adp: false })}
                 tags={[{ key: "owner", label: team.is_you ? "Your team" : team.name, tone: team.is_you ? "accent" : undefined }]}
+                extra={onlyBlock && player.block && !team.is_you ? <span className="text-xs" style={{ color: "var(--color-text-secondary)" }} data-testid="block-note">{simBlockNote(teamById.get(team.team_id) ?? { needs: [] }, player.block.why)}</span> : undefined}
                 trailing={
                   <button
                     type="button"

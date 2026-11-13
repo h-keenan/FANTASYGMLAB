@@ -533,7 +533,7 @@ export function SimPlayersTab({
           {game.pending?.claims} claim{game.pending?.claims === 1 ? ' is' : 's are'} already queued for this week.
         </AppText>
       ) : null}
-      <SimPlayerBrowser key={mode} gameId={gameId} fixedStatus={mode === 'waivers' ? 'available' : undefined} positions={simFilterPositionsFor(game.settings.slots)} week={game.week} onOpen={ctx.openPlayer} actions={actions} refreshKey={ctx.tick} />
+      <SimPlayerBrowser key={mode} gameId={gameId} fixedStatus={mode === 'waivers' ? 'available' : undefined} positions={simFilterPositionsFor(game.settings.slots)} week={game.week} blockEnabled={(game.settings.block_v ?? 0) >= 1} onOpen={ctx.openPlayer} actions={actions} refreshKey={ctx.tick} />
       {claiming ? (
         <ClaimSheet
           ctx={ctx}

@@ -25,7 +25,7 @@ import {
   SIM_PAGE_SIZE,
   SIM_POSITIONS,
   SIM_SORT_OPTIONS,
-  SIM_STATUS_OPTIONS,
+  simStatusOptions,
   simDefaultFilter,
   simFilterQuery,
   simFilterReducer,
@@ -65,6 +65,7 @@ export function SimPlayerBrowser({
   onItems,
   emptyTitle = 'No players match',
   week = 0,
+  blockEnabled = false,
   positions = SIM_POSITIONS.map((pos) => ({ label: pos as string, value: pos as SimPosFilter })),
 }: {
   gameId: string;
@@ -73,6 +74,8 @@ export function SimPlayerBrowser({
   positions?: { label: string; value: SimPosFilter }[];
   /** Current game week, to flag a bye that is close. */
   week?: number;
+  /** The game has a trade block: adds the "On the block" status filter. */
+  blockEnabled?: boolean;
   /** Lock the status filter (the draft board is always free agents). */
   fixedStatus?: SimPlayerStatusFilter;
   initial?: Partial<SimPlayerFilter>;
@@ -145,7 +148,7 @@ export function SimPlayerBrowser({
       {!fixedStatus ? (
         <SegmentedTabBar<string>
           scrollable
-          options={SIM_STATUS_OPTIONS.map((o) => ({ key: o.value as string, label: o.label }))}
+          options={simStatusOptions(blockEnabled).map((o) => ({ key: o.value as string, label: o.label }))}
           active={filter.status}
           onChange={(key) => dispatch({ type: 'status', value: key as SimPlayerStatusFilter })}
         />

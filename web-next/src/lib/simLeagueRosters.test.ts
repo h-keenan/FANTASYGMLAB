@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { simGroupBenchByPosition, simOverallLabel, simRosterEntries, simRosterPositions, simTeamChips, simTeamRecordLine, simValueLabel } from "./simLeagueRosters";
+import { simBlockEntryCount, simBlockNote, simGroupBenchByPosition, simOverallLabel, simRosterEntries, simRosterPositions, simTeamChips, simTeamRecordLine, simValueLabel } from "./simLeagueRosters";
 import type { SimGamePlayer, SimLeagueRosterTeam } from "./simGame";
 
 const pl = (id: string, pos: SimGamePlayer["pos"], name: string, value: number, team = "KC") => ({ id, pos, name, value, team, ros_mean: value / 10, projection: 10, status: "healthy" }) as unknown as SimGamePlayer;
@@ -26,5 +26,17 @@ describe("league roster helpers", () => {
     expect([null, 0, 71.6].map(simOverallLabel)).toEqual(["—", "0", "72"]);
     const g = simGroupBenchByPosition([pl("a", "WR", "A", 1), pl("b", "QB", "B", 1), pl("c", "WR", "C", 1)], ["QB", "RB", "WR"]);
     expect(g.map((x) => [x.pos, x.players.length])).toEqual([["QB", 1], ["WR", 2]]);
+  });
+  it("filters to what is on a trade block and notes what the team says about itself", () => {
+    const withBlock = (p: SimGamePlayer): SimGamePlayer => ({ ...p, block: { by: "1", mine: false, looking_for: "RB", why: "Selling depth" } });
+    const teams = [
+      { ...t("1", [withBlock(pl("a", "QB", "Alpha", 50)), pl("b", "RB", "Bravo", 90)]), needs: ["RB", "WR"], block: { stance: "contending", looking_for: "RB", items: [{ id: "a", why: "Selling depth" }] } },
+      t("2", [pl("c", "QB", "Charlie", 70)]),
+    ] as unknown as SimLeagueRosterTeam[];
+    expect(simRosterEntries(teams, "ALL", "", true).map((e) => e.player.id)).toEqual(["a"]);
+    expect(simRosterEntries(teams, "RB", "", true)).toEqual([]);
+    expect(simBlockEntryCount(teams)).toBe(1);
+    expect(simBlockNote(teams[0], "Selling depth")).toBe("Selling depth · looking for RB · needs RB, WR");
+    expect(simBlockNote({ needs: [] }, undefined)).toBe("");
   });
 });

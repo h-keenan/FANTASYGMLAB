@@ -23,6 +23,7 @@ import { Sheet } from "@/components/ui/Sheet";
 import { SimOffseasonBar } from "@/components/SimOffseasonBar";
 import { ConfirmInPlace } from "@/components/ui/ConfirmInPlace";
 import { SimNotice, SimOpenPlayerContext, SimPreviewBanner, SimTeamLink, SimTeamOpenContext, simToneColor, type SimCtx } from "@/components/SimGameParts";
+import { SimBlockToggle } from "@/components/SimTradeBlock";
 import { SimTeamSheet } from "@/components/SimGameTeamSheet";
 import { SimToResultView, SimToSheet, type SimToRequest } from "@/components/SimToControl";
 import { SimFinalView } from "@/components/SimGameRecap";
@@ -478,6 +479,7 @@ export function SimGameContent() {
                   Add to trade
                 </Button>
               ) : null}
+              <SimBlockToggle ctx={ctx} player={sheetPlayer} />
               </>
             }
           />

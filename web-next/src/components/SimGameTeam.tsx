@@ -520,6 +520,7 @@ export function SimPlayersTab({
         fixedStatus={mode === "waivers" ? "available" : undefined}
         positions={simFilterPositionsFor(game.settings.slots)}
         week={game.week}
+        blockEnabled={(game.settings.block_v ?? 0) >= 1}
         onOpen={ctx.openPlayer}
         actions={actions}
         refreshKey={ctx.tick}

@@ -20,7 +20,7 @@ vi.mock("@/lib/api", async () => {
   const names = [
     "getSimGameOptions", "getSimLeagueTeams", "listSimGames", "createSimGame", "getSimGame", "deleteSimGame", "getSimDraft", "simDraftPick", "simDraftAuto",
     "putSimDraftQueue", "getSimGamePlayers", "getSimGamePlayer", "getSimGameTeam", "getSimHome", "getSimLineup", "putSimLineup", "autoSimLineup",
-    "claimSimWaiver", "cancelSimWaiver", "cutSimPlayer", "previewSimTrade", "sendSimTrade", "getSimInbox", "respondSimInbox",
+    "claimSimWaiver", "cancelSimWaiver", "cutSimPlayer", "previewSimTrade", "sendSimTrade", "getSimInbox", "respondSimInbox", "getSimBlock", "putSimBlock",
     "advanceSimGame", "revertSimWeek", "getSimLeague", "getSimLeagueRosters", "getSimTeamHistory", "getSimToOptions", "simToGame", "undoSimTo", "getSimGameResult",
   ];
   return { ...actual, api: { ...actual.api, ...Object.fromEntries(names.map((n) => [n, vi.fn()])) } };
@@ -449,6 +449,33 @@ describe("SimGameContent", () => {
     await waitFor(() => expect(mocked.simToGame).toHaveBeenCalledTimes(2));
     expect(mocked.simToGame).toHaveBeenLastCalledWith("g1", { target: "weeks", weeks: 1, auto_set: false, force_first: true });
     expect(await screen.findByTestId("sim-to-result")).toHaveTextContent("Simmed Week 4");
+  });
+
+  it("Trades has a My block tab only in a game with a trade block, and an offer that answers the block says so", async () => {
+    mocked.listSimGames.mockResolvedValue({ ok: true, reason: "", games: [lite(game())] });
+    mocked.getSimGame.mockResolvedValue({ ok: true, reason: "", game: game({ settings: { ...SETTINGS, block_v: 1 } as SimGame["settings"], pending: { claims: 0, inbox: 1, lineup_warnings: 0, roster_size: 16, roster_limit: 16, cuts_needed: 0 } }) });
+    mocked.getSimInbox.mockResolvedValue({
+      ok: true, reason: "",
+      items: [{ id: "o1", type: "trade_offer", from: { team_id: "7", name: "Rivals" }, you_give: [player("1", "QB", "Quinn Back")], you_get: [player("2", "RB", "Ray Runner")], message: "Rivals saw Quinn Back on your block.", expires_week: 4, via_block: true }],
+    });
+    mocked.getSimBlock.mockResolvedValue({ ok: true, reason: "", enabled: true, mine: [], league: [], max_items: 8, offers_from_block: 1 });
+    mocked.getSimGameTeam.mockResolvedValue({ ok: true, reason: "", players: [], ir: [], taxi: [] });
+    render(<SimGameContent />);
+    await openFirstGame();
+    fireEvent.click(await screen.findByRole("tab", { name: /Trades/ }));
+    expect(await screen.findByText("Your block")).toBeInTheDocument();
+    fireEvent.click(await screen.findByRole("tab", { name: "My block" }));
+    expect(await screen.findByTestId("sim-block-summary")).toHaveTextContent("1 offer from your block this week");
+  });
+
+  it("Trades has no My block tab in a game from before the trade block", async () => {
+    mocked.listSimGames.mockResolvedValue({ ok: true, reason: "", games: [lite(game())] });
+    mocked.getSimInbox.mockResolvedValue({ ok: true, reason: "", items: [] });
+    render(<SimGameContent />);
+    await openFirstGame();
+    fireEvent.click(await screen.findByRole("tab", { name: /Trades/ }));
+    await screen.findByRole("tab", { name: "Make an offer" });
+    expect(screen.queryByRole("tab", { name: "My block" })).toBeNull();
   });
 
   it("a raced write (409) reloads the game and says so instead of failing", async () => {

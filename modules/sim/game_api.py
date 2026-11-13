@@ -28,6 +28,7 @@ from modules.sim import game_actions as act
 from modules.sim import game_dynasty as dyn
 from modules.sim import game_dynasty_view as dview
 from modules.sim import game_draft as draft
+from modules.sim import game_block as blockmod
 from modules.sim import game_history as hist
 from modules.sim import game_simto as simto
 from modules.sim import game_home as home
@@ -171,6 +172,12 @@ class SimToBody(BaseModel):
 
 class UndoSimBody(BaseModel):
     from_seq: int
+
+
+class BlockBody(BaseModel):
+    asset_id: str
+    on: bool = True
+    looking_for: str | None = None
 
 
 def seedof(row: Mapping[str, Any], state: GameState) -> int:
@@ -642,25 +649,25 @@ def add_routes(router: APIRouter, ctx: GameApiCtx) -> None:
         page: int = 1, page_size: int = 25, user: dict[str, Any] = Depends(require_user),
     ):
         pro = ctx.is_pro(user)
-        _, _, _, snap, state = load(user, _gid(game_id))
+        _, _, row, snap, state = load(user, _gid(game_id))
         pos = pos.upper()
         if pos and pos not in GAME_POSITIONS and pos not in FLEX_SLOTS:
             raise ValueError("pos must be one of QB, RB, WR, TE, K, DEF, FLEX, REC_FLEX, SUPER_FLEX.")
-        if status not in ("", "available", "rostered", "mine", "injured", "bye"):
-            raise ValueError("status must be available, rostered, mine, injured or bye.")
+        if status not in ("", "available", "rostered", "mine", "injured", "bye", "block"):
+            raise ValueError("status must be available, rostered, mine, injured, bye or block.")
         if sort not in view.SORTS:
             raise ValueError("sort must be one of: " + ", ".join(view.SORTS))
         return {**_env(pro, state), **view.players_page(
-            snap, state, q=q, pos=pos, status=status, team=team, sort=sort, page=page, page_size=page_size)}
+            snap, state, q=q, pos=pos, status=status, team=team, sort=sort, page=page, page_size=page_size, seed=seedof(row, state))}
 
     @router.get("/games/{game_id}/players/{pid}")
     @guarded
     def get_player(game_id: str, pid: str, user: dict[str, Any] = Depends(require_user)):
         pro = ctx.is_pro(user)
-        _, _, _, snap, state = load(user, _gid(game_id))
+        _, _, row, snap, state = load(user, _gid(game_id))
         if pid not in snap.players:
             raise HTTPException(status_code=404, detail="Player not found.")
-        return {**_env(pro, state), **view.player_detail(snap, state, pid)}
+        return {**_env(pro, state), **view.player_detail(snap, state, pid, seed=seedof(row, state))}
 
     @router.get("/games/{game_id}/players/{pid}/history")
     @guarded
@@ -943,6 +950,26 @@ def add_routes(router: APIRouter, ctx: GameApiCtx) -> None:
             snap = snap.season_view(state.view_no)
             return {**_env(pro, state), "undone": True, "game": game_json({**row, "status": state.status}, snap, state, pro)}
 
+    @router.get("/games/{game_id}/block")
+    @guarded
+    def get_block(game_id: str, user: dict[str, Any] = Depends(require_user)):
+        pro = ctx.is_pro(user)
+        _, _, row, snap, state = load(user, _gid(game_id))
+        if state.status == "drafting" and snap.settings.block:
+            return {**_env(pro, state, "wrong_phase"), "phase": "draft"}
+        return {**_env(pro, state), **home.block_view(snap, state, seedof(row, state))}
+
+    @router.put("/games/{game_id}/block")
+    @guarded
+    def put_block(game_id: str, body: BlockBody, user: dict[str, Any] = Depends(require_user)):
+        """Put an asset on (or take it off) your trade block, optionally with the position you are looking for."""
+
+        def run(em, snap, state, row, seed):
+            blockmod.set_block(em, body.asset_id, body.on, body.looking_for)
+            return home.block_view(snap, state, seed)
+
+        return _mutate(user, game_id, run)
+
     @router.post("/games/{game_id}/revert-week")
     @guarded
     def revert_week(game_id: str, user: dict[str, Any] = Depends(require_user)):
@@ -1075,10 +1102,10 @@ def add_routes(router: APIRouter, ctx: GameApiCtx) -> None:
     @guarded
     def get_league_rosters(game_id: str, user: dict[str, Any] = Depends(require_user)):
         pro = ctx.is_pro(user)
-        _, _, _, snap, state = load(user, _gid(game_id))
+        _, _, row, snap, state = load(user, _gid(game_id))
         if state.status == "drafting":
             return {**_env(pro, state, "wrong_phase"), "phase": "draft"}
-        return {**_env(pro, state), **home.league_rosters(snap, state)}
+        return {**_env(pro, state), **home.league_rosters(snap, state, seedof(row, state))}
 
     @router.get("/games/{game_id}/result")
     @guarded

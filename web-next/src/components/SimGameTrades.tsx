@@ -12,6 +12,7 @@ import { SimCrest } from "@/components/SimCrest";
 import { SimGlyph } from "@/components/SimGlyph";
 import { SimPlayerChip, SimPlayerLine, SimSideLabel, SimStat, SimTeamOpenContext, SimToneBadge, simToneColor, type SimCtx } from "@/components/SimGameParts";
 import { SimPickLine, useSimPicks } from "@/components/SimGameDynastyParts";
+import { SimBlockView } from "@/components/SimTradeBlock";
 import { SimTeamCard } from "@/components/SimTeamCard";
 import { SkeletonCard, SkeletonRows } from "@/components/Skeleton";
 import { ToneBadge } from "@/components/ToneBadge";
@@ -166,6 +167,7 @@ function OfferCard({ item, defaultOpen, busy, canTrade, onRespond }: { item: Sim
               <span className="min-w-0 truncate text-sm font-bold">{item.from.name}</span>
             </span>
             <span className="flex shrink-0 items-center gap-2">
+              {item.via_block ? <ToneBadge label="Your block" color="var(--color-accent)" size="xs" /> : null}
               <ToneBadge label={`Wk ${item.expires_week}`} color="var(--color-warning)" size="xs" />
               <span aria-hidden="true" className="text-xs" style={{ color: "var(--color-text-muted)" }}>{open ? "\u2212" : "+"}</span>
             </span>
@@ -483,13 +485,16 @@ export function SimTradesTab({
   seed: SimTradeSeed | null;
   onSeedUsed: () => void;
 }) {
-  const [mode, setMode] = useState<"inbox" | "build">(seed ? "build" : "inbox");
+  const [mode, setMode] = useState<"inbox" | "build" | "block">(seed ? "build" : "inbox");
   const offers = ctx.game.pending?.inbox ?? 0;
   const [prevSeed, setPrevSeed] = useState(seed);
+  // "Make an offer" from the block view seeds the builder locally (partner + the asset asked for).
+  const [blockSeed, setBlockSeed] = useState<SimTradeSeed | null>(null);
   if (seed && seed !== prevSeed) {
     setPrevSeed(seed);
     setMode("build");
   }
+  const hasBlock = (ctx.game.settings.block_v ?? 0) >= 1;
   return (
     <div className="flex flex-col gap-3">
       <PillRow
@@ -498,12 +503,19 @@ export function SimTradesTab({
         options={[
           { label: `Inbox${offers ? ` ${offers}` : ""}`, value: "inbox", glyph: "inbox" },
           { label: "Make an offer", value: "build", glyph: "build" },
+          ...(hasBlock ? [{ label: "My block", value: "block", glyph: "mine" as const }] : []),
         ]}
         active={mode}
-        onSelect={(value) => setMode(value as "inbox" | "build")}
+        onSelect={(value) => setMode(value as "inbox" | "build" | "block")}
       />
       {!ctx.game.can_trade && mode === "inbox" ? <p className="text-xs" style={{ color: "var(--color-text-muted)" }}>{simTradeClosedReason(ctx.game)}</p> : null}
-      {mode === "inbox" ? <Inbox ctx={ctx} /> : <Builder ctx={ctx} seed={seed} onSeedUsed={onSeedUsed} />}
+      {mode === "inbox" ? (
+        <Inbox ctx={ctx} />
+      ) : mode === "block" ? (
+        <SimBlockView ctx={ctx} onMakeOffer={(partner, get) => { setBlockSeed({ partner, get }); setMode("build"); }} />
+      ) : (
+        <Builder ctx={ctx} seed={blockSeed ?? seed} onSeedUsed={() => { setBlockSeed(null); onSeedUsed(); }} />
+      )}
     </div>
   );
 }
