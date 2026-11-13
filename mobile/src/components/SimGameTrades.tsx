@@ -13,20 +13,25 @@ import SegmentedTabBar from './SegmentedTabBar';
 import { SkeletonCard } from './SkeletonBlock';
 import SimCrest from './SimCrest';
 import SimGlyph from './SimGlyph';
+import { SimPickLine, useSimPicks } from './SimGameDynastyParts';
 import { SimPlayerChip, SimPopIn, SimSideLabel, SimStat, SimTeamOpenContext, SimToneBadge, createSimStyles, simToneColor, type SimCtx } from './SimGameParts';
 import ToneBadge from './ToneBadge';
 import { useThemeMode } from '../context/ThemeModeContext';
 import { api } from '../lib/api';
-import { simGroupByPosition, simSideSummary, simTradeFit } from '../lib/simLayout';
+import { simGroupByPosition, simSideSummary, simTradeFit, type SimAssetGroup } from '../lib/simLayout';
 import { simGroupsToSheetItems } from '../lib/simTradeSheet';
 import { selectedItems } from '../lib/tradeSheetPicker';
 import TradePickerSheet, { TradeSideSummary } from './TradePickerSheet';
 import {
   SIM_TRADE_EMPTY,
-  SIM_TRADE_MAX_PER_SIDE,
   simFmtPts,
+  simIsPick,
+  simIsPickId,
+  simPickLabelText,
+  simPicksOf,
   simHeadshotId,
   simPositionsFor,
+  simTradeMaxPerSide,
   simTradable,
   simTradeClosedReason,
   simTradeDecisionLabel,
@@ -38,6 +43,8 @@ import {
   type SimGamePlayer,
   type SimInboxItem,
   type SimLeagueTeam,
+  type SimPickAsset,
+  type SimTradeAsset,
   type SimTradeVerdict,
 } from '../lib/simGame';
 import type { ThemeColors } from '../theme';
@@ -55,17 +62,22 @@ function ScoutButton({ teamId, name }: { teamId: string; name: string }) {
   );
 }
 
-function PlayerList({ players }: { players: SimGamePlayer[] }) {
+/** Players and picks in an offer, counter or verdict: a pick renders as a pick row, never as a player. */
+function PlayerList({ players }: { players: SimTradeAsset[] }) {
   return (
     <View>
-      {players.map((p) => (
-        <View key={p.id} style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8, paddingVertical: 4 }}>
-          <View style={{ flex: 1, minWidth: 0 }}>
-            <SimPlayerChip player={p} size={28} quick />
+      {players.map((p) =>
+        simIsPick(p) ? (
+          <SimPickLine key={p.id} pick={p} />
+        ) : (
+          <View key={p.id} style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8, paddingVertical: 4 }}>
+            <View style={{ flex: 1, minWidth: 0 }}>
+              <SimPlayerChip player={p} size={28} quick />
+            </View>
+            <SimStat label="Proj" value={simFmtPts(p.projection)} />
           </View>
-          <SimStat label="Proj" value={simFmtPts(p.projection)} />
-        </View>
-      ))}
+        ),
+      )}
     </View>
   );
 }
@@ -146,7 +158,7 @@ function OfferCard({ item, defaultOpen, busy, canTrade, onRespond }: { item: Sim
   const [open, setOpen] = useState(defaultOpen);
   const give = simSideSummary(item.you_give);
   const get = simSideSummary(item.you_get);
-  const names = (list: SimGamePlayer[]) => list.map((p) => p.name.split(' ').slice(-1)[0]).join(', ');
+  const names = (list: SimTradeAsset[]) => list.map((p) => (simIsPick(p) ? simPickLabelText(p) : p.name.split(' ').slice(-1)[0])).join(', ');
   return (
     <FadeInView>
       <AccentCard accent={colors.premium} compact>
@@ -257,6 +269,8 @@ function Builder({ ctx, seed, onSeedUsed }: { ctx: SimCtx; seed: { partner: stri
   const [sheetSide, setSheetSide] = useState<'give' | 'get' | null>(null);
   const closed = simTradeClosedReason(game);
   const teamId = game.you?.team_id;
+  const maxPerSide = simTradeMaxPerSide(game.settings);
+  const picks = useSimPicks(ctx);
 
   useEffect(() => {
     let cancelled = false;
@@ -278,7 +292,7 @@ function Builder({ ctx, seed, onSeedUsed }: { ctx: SimCtx; seed: { partner: stri
     let cancelled = false;
     api
       .getSimGameTeam(gameId, teamId)
-      .then((b) => !cancelled && setMine(b.players ?? []))
+      .then((b) => !cancelled && setMine([...(b.players ?? []), ...(b.ir ?? []), ...(b.taxi ?? [])]))
       .catch(() => {});
     return () => {
       cancelled = true;
@@ -291,7 +305,7 @@ function Builder({ ctx, seed, onSeedUsed }: { ctx: SimCtx; seed: { partner: stri
     let cancelled = false;
     api
       .getSimGameTeam(gameId, partnerId)
-      .then((b) => !cancelled && setPartnerLoaded({ partner: partnerId, players: b.players ?? [] }))
+      .then((b) => !cancelled && setPartnerLoaded({ partner: partnerId, players: [...(b.players ?? []), ...(b.ir ?? []), ...(b.taxi ?? [])] }))
       .catch(() => {});
     return () => {
       cancelled = true;
@@ -303,9 +317,9 @@ function Builder({ ctx, seed, onSeedUsed }: { ctx: SimCtx; seed: { partner: stri
   useEffect(() => {
     if (!seed) return;
     dispatch({ type: 'partner', teamId: seed.partner });
-    if (seed.get) dispatch({ type: 'toggle', side: 'get', id: seed.get });
+    if (seed.get) dispatch({ type: 'toggle', side: 'get', id: seed.get, max: maxPerSide });
     onSeedUsed();
-  }, [seed, onSeedUsed]);
+  }, [seed, onSeedUsed, maxPerSide]);
 
   const key = simTradeKey(draft);
   const verdict = verdictFor && verdictFor.key === key ? verdictFor.verdict : null;
@@ -360,12 +374,29 @@ function Builder({ ctx, seed, onSeedUsed }: { ctx: SimCtx; seed: { partner: stri
   }
   if (!teams) return <SkeletonCard rows={4} />;
 
-  const giveSelected = mine.filter((p) => draft.give.includes(p.id));
-  const getSelected = partnerRoster.filter((p) => draft.get.includes(p.id));
-  const fit = simTradeFit(mine.length, game.settings.roster_limit, giveSelected.length, getSelected.length);
-  const sheetPool = sheetSide === 'give' ? mine : partnerRoster;
-  const sheetItems = sheetSide ? simGroupsToSheetItems(simGroupByPosition(sheetPool.filter((p) => simTradable(p.pos)), simPositionsFor(game.settings.slots)), simHeadshotId) : [];
-  const sideItems = (players: SimGamePlayer[]) => simGroupsToSheetItems(simGroupByPosition(players, simPositionsFor(game.settings.slots)), simHeadshotId);
+  // Picks ride in the same id-based draft as players; they take no roster spot.
+  const myPicks = simPicksOf(picks, teamId);
+  const theirPicks = simPicksOf(picks, partner?.team_id);
+  const giveSelected: SimTradeAsset[] = [...mine, ...myPicks].filter((p) => draft.give.includes(p.id));
+  const getSelected: SimTradeAsset[] = [...partnerRoster, ...theirPicks].filter((p) => draft.get.includes(p.id));
+  const fit = simTradeFit(mine.length, game.settings.roster_limit, giveSelected.filter((p) => !simIsPick(p)).length, getSelected.filter((p) => !simIsPick(p)).length);
+  // The picker's groups: players by position, then a Picks group; the same shape feeds the page summaries.
+  const groupsFor = (players: SimGamePlayer[], pickList: SimPickAsset[]): SimAssetGroup<SimTradeAsset>[] => {
+    const groups: SimAssetGroup<SimTradeAsset>[] = simGroupByPosition(players.filter((p) => simTradable(p.pos)), simPositionsFor(game.settings.slots));
+    if (pickList.length > 0) groups.push({ key: 'PICK', label: 'Picks', kind: 'pick', items: pickList });
+    return groups;
+  };
+  const describePick = (p: SimTradeAsset) => {
+    const pick = p as SimPickAsset;
+    return { label: simPickLabelText(pick), detail: pick.own === false ? `via ${pick.orig_team_name}` : null, round: pick.round, group: `${pick.season} picks` };
+  };
+  const toItems = (groups: SimAssetGroup<SimTradeAsset>[]) => simGroupsToSheetItems(groups, simHeadshotId, describePick);
+  const sheetItems = sheetSide ? toItems(groupsFor(sheetSide === 'give' ? mine : partnerRoster, sheetSide === 'give' ? myPicks : theirPicks)) : [];
+  const sideItems = (assets: SimTradeAsset[]) =>
+    toItems([
+      ...simGroupByPosition(assets.filter((a): a is SimGamePlayer => !simIsPick(a)), simPositionsFor(game.settings.slots)),
+      ...(assets.some(simIsPick) ? [{ key: 'PICK', label: 'Picks', kind: 'pick' as const, items: assets.filter(simIsPick) }] : []),
+    ]);
 
   return (
     <View style={common.stack}>
@@ -416,8 +447,8 @@ function Builder({ ctx, seed, onSeedUsed }: { ctx: SimCtx; seed: { partner: stri
       {partner ? (
         <>
           <View style={{ flexDirection: 'row', gap: 8 }} accessibilityLabel="Offer">
-            <TradeSideSummary testID="trade-side-give" label="You send" tone="danger" items={sideItems(giveSelected)} onOpen={() => setSheetSide('give')} onRemove={(key) => dispatch({ type: 'toggle', side: 'give', id: key.slice(key.indexOf(':') + 1) })} hint="Add from your roster" />
-            <TradeSideSummary testID="trade-side-get" label="You receive" tone="success" items={sideItems(getSelected)} onOpen={() => setSheetSide('get')} onRemove={(key) => dispatch({ type: 'toggle', side: 'get', id: key.slice(key.indexOf(':') + 1) })} hint={`Add from ${partner.name}`} />
+            <TradeSideSummary testID="trade-side-give" label="You send" tone="danger" items={sideItems(giveSelected)} onOpen={() => setSheetSide('give')} onRemove={(key) => dispatch({ type: 'toggle', side: 'give', id: key.slice(key.indexOf(':') + 1), max: maxPerSide })} hint="Add from your team" />
+            <TradeSideSummary testID="trade-side-get" label="You receive" tone="success" items={sideItems(getSelected)} onOpen={() => setSheetSide('get')} onRemove={(key) => dispatch({ type: 'toggle', side: 'get', id: key.slice(key.indexOf(':') + 1), max: maxPerSide })} hint={`Add from ${partner.name}`} />
           </View>
           <AppText style={[common.muted, fit.over ? { color: colors.danger } : null]} testID="trade-fit">
             Your roster after: {fit.after}/{game.settings.roster_limit}
@@ -459,13 +490,13 @@ function Builder({ ctx, seed, onSeedUsed }: { ctx: SimCtx; seed: { partner: stri
         <TradePickerSheet
           key={sheetSide}
           title={sheetSide === 'give' ? 'You send' : 'You receive'}
-          subtitle={sheetSide === 'give' ? 'From your roster' : `From ${partner.name}`}
+          subtitle={sheetSide === 'give' ? 'From your team' : `From ${partner.name}`}
           tone={sheetSide === 'give' ? 'danger' : 'success'}
           items={sheetItems}
-          initialSelected={(sheetSide === 'give' ? draft.give : draft.get).map((id) => `player:${id}`)}
-          max={SIM_TRADE_MAX_PER_SIDE}
+          initialSelected={(sheetSide === 'give' ? draft.give : draft.get).map((id) => `${simIsPickId(id) ? 'pick' : 'player'}:${id}`)}
+          max={maxPerSide}
           onApply={(keys) => {
-            dispatch({ type: 'set', side: sheetSide, ids: selectedItems(sheetItems, keys).map((i) => i.id) });
+            dispatch({ type: 'set', side: sheetSide, ids: selectedItems(sheetItems, keys).map((i) => i.id), max: maxPerSide });
             setSheetSide(null);
           }}
           onClose={() => setSheetSide(null)}

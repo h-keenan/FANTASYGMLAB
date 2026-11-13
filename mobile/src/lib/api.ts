@@ -3,6 +3,7 @@ import type { VerdictAssumptions, VerdictFeedbackReason } from './verdictTrust';
 import type { TradeCaution } from './tradeCautions';
 
 import { supabase } from './supabase';
+import { simDynastyPaths } from './simGame';
 import type * as SimGameTypes from './simGame';
 import type { SimForecastResponse } from './simPresentation';
 import type { CandidateCompare, MoveRange } from './startSitRange';
@@ -3963,6 +3964,21 @@ export const api = {
     authorizedRequest<SimGameTypes.SimGameResponse & { reverted?: number }>(`/v1/sim/games/${encodeURIComponent(gameId)}/revert-week`, { method: "POST", jsonBody: {} }),
   getSimLeague: (gameId: string) => authorizedRequest<SimGameTypes.SimLeagueResponse>(`/v1/sim/games/${encodeURIComponent(gameId)}/league`),
   getSimGameResult: (gameId: string) => authorizedRequest<SimGameTypes.SimGameResultResponse>(`/v1/sim/games/${encodeURIComponent(gameId)}/result`),
+  // Dynasty mode and IR / taxi squads (game engine 1.2.0).
+  getSimPicks: (gameId: string) => authorizedRequest<SimGameTypes.SimPicksResponse>(simDynastyPaths(gameId).picks),
+  moveSimPlayer: (gameId: string, body: { player_id: string; to: SimGameTypes.SimReserveMoveTo }) =>
+    authorizedRequest<SimGameTypes.SimLineupResponse>(simDynastyPaths(gameId).rosterMove, { method: "POST", jsonBody: body }),
+  getSimOffseason: (gameId: string, pos?: string) =>
+    authorizedRequest<SimGameTypes.SimOffseasonResponse>(simDynastyPaths(gameId).offseason(pos)),
+  startSimRookieDraft: (gameId: string) =>
+    authorizedRequest<SimGameTypes.SimOffseasonResponse>(simDynastyPaths(gameId).rookieDraftStart, { method: "POST", jsonBody: {} }),
+  pickSimRookie: (gameId: string, playerId: string) =>
+    authorizedRequest<SimGameTypes.SimOffseasonResponse>(simDynastyPaths(gameId).rookieDraftPick, { method: "POST", jsonBody: { player_id: playerId } }),
+  autoSimRookieDraft: (gameId: string) =>
+    authorizedRequest<SimGameTypes.SimOffseasonResponse>(simDynastyPaths(gameId).rookieDraftAuto, { method: "POST", jsonBody: {} }),
+  startSimSeason: (gameId: string) =>
+    authorizedRequest<SimGameTypes.SimGameResponse>(simDynastyPaths(gameId).startSeason, { method: "POST", jsonBody: {} }),
+  getSimDynasty: (gameId: string) => authorizedRequest<SimGameTypes.SimDynastyResponse>(simDynastyPaths(gameId).dynasty),
   getLeagueDraftCenter: (leagueId: string, options?: { lens?: ValuationLens }) => {
     const params = new URLSearchParams();
     if (options?.lens) params.set('lens', options.lens);

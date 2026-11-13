@@ -14,8 +14,7 @@ export function SimCrest({ name, size = 28, label = false }: { name: string; siz
   const art = useMemo(() => simCrestArt(spec), [spec]);
   return (
     <svg
-      width={size}
-      height={size}
+      style={{ width: `calc(${size}px * var(--sim-scale, 1))`, height: `calc(${size}px * var(--sim-scale, 1))` }}
       viewBox={art.viewBox}
       role={label ? "img" : undefined}
       aria-label={label ? simCrestLabel(name) : undefined}

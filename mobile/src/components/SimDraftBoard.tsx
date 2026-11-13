@@ -9,6 +9,7 @@ import PlayerAvatar from './PlayerAvatar';
 import PositionBadge from './PositionBadge';
 import SegmentedTabBar from './SegmentedTabBar';
 import { SkeletonCard } from './SkeletonBlock';
+import { SimGeneratedChip } from './SimGameDynastyParts';
 import { SimPager, createSimStyles, simToneColor, useSimDebounced } from './SimGameParts';
 import ToneBadge from './ToneBadge';
 import { useThemeMode } from '../context/ThemeModeContext';
@@ -26,6 +27,7 @@ import {
   simHeadshotId,
   simPageCount,
   simPlayerInitials,
+  simPlayerIsGenerated,
   type SimGamePlayer,
   type SimPlayerSort,
   type SimPos,
@@ -82,7 +84,18 @@ export function SimDraftIconButton({
  * buttons) right-aligned. Line 2: Proj / Value / ADP / Edge in four equal
  * columns that match the header strip above the list.
  */
-export function SimDraftRow({ player, onOpen, actions }: { player: SimGamePlayer; onOpen?: (player: SimGamePlayer) => void; actions?: ReactNode }) {
+export function SimDraftRow({
+  player,
+  onOpen,
+  actions,
+  onGeneratedInfo,
+}: {
+  player: SimGamePlayer;
+  onOpen?: (player: SimGamePlayer) => void;
+  actions?: ReactNode;
+  /** Opens the generated-class notice; shows a small chip on simulated rookies. */
+  onGeneratedInfo?: () => void;
+}) {
   const { colors, isDark } = useThemeMode();
   const styles = useMemo(() => createStyles(colors), [colors]);
   const edge = positionColor(player.pos, isDark, colors.borderStrong);
@@ -140,6 +153,11 @@ export function SimDraftRow({ player, onOpen, actions }: { player: SimGamePlayer
             </AppText>
           ) : null}
         </View>
+        {onGeneratedInfo && simPlayerIsGenerated(player) ? (
+          <View style={{ marginLeft: 'auto' }}>
+            <SimGeneratedChip label="Generated" onInfo={onGeneratedInfo} compact />
+          </View>
+        ) : null}
       </View>
     </View>
   );

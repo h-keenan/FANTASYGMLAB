@@ -13,9 +13,11 @@ import { PremiumUpsellCard } from "@/components/PremiumUpsellCard";
 import { SectionHeading } from "@/components/SectionHeading";
 import { SimDraftRecapView, SimGameDraft } from "@/components/SimGameDraft";
 import { SimLeagueTab } from "@/components/SimGameLeague";
+import { SimGameOffseason } from "@/components/SimGameOffseason";
 import { SimHomeTab } from "@/components/SimGameHome";
 import { SimPlayerSheet } from "@/components/SimGamePlayers";
 import { SimActionBar } from "@/components/SimActionBar";
+import { SimOffseasonBar } from "@/components/SimOffseasonBar";
 import { SimNotice, SimOpenPlayerContext, SimPreviewBanner, SimTeamLink, SimTeamOpenContext, simToneColor, type SimCtx } from "@/components/SimGameParts";
 import { SimTeamSheet } from "@/components/SimGameTeamSheet";
 import { SimFinalView, SimWeekRecapView } from "@/components/SimGameRecap";
@@ -31,6 +33,7 @@ import {
   SIM_SCORING_LABELS,
   simAdvanceBlockers,
   simAdvanceWarnings,
+  simDynastyProgressLine,
   simFmtPts,
   simFmtRecord,
   simGameGate,
@@ -45,14 +48,19 @@ import {
   simSetupAdvancedChanged,
   simSetupBlock,
   simSetupBody,
+  simSetupCountOptions,
   simSetupDefaults,
+  simSetupDynastyNote,
+  simSetupModes,
   simSetupSummary,
+  simSetupTaxiDefault,
   simTeamNameChoices,
   simWeekHeading,
   SIM_NAME_CUSTOM,
   SIM_TEAM_NAME_MAX,
   SIM_TE_PREMIUM_LABELS,
   type SimDifficulty,
+  type SimMode,
   type SimTiebreaker,
   SIM_TIEBREAKER_LABELS,
   type SimDraftRecap,
@@ -455,7 +463,7 @@ export function SimGameContent() {
 
 function Shell({ children, wide = false }: { children: React.ReactNode; wide?: boolean }) {
   return (
-    <main className={`flex-1 flex flex-col gap-3 px-4 py-3 w-full mx-auto ${wide ? "max-w-5xl" : "max-w-3xl"}`}>
+    <main className={`sim-root flex-1 flex flex-col gap-3 px-4 py-3 w-full mx-auto ${wide ? "max-w-5xl xl:max-w-[1200px]" : "max-w-3xl"}`}>
       <PageTitle page="Fantasy Sim" />
       {children}
     </main>
@@ -498,6 +506,9 @@ function SetupForm({
   const leagues = useSimLeagueChoices(state.start === "league");
   const leagueTeams = useSimLeagueTeams(league ? state.leagueId : "", (rosterId) => set("rosterId", rosterId));
   const nameChoices = simTeamNameChoices(options);
+  const modes = simSetupModes(options);
+  const dynasty = state.mode === "dynasty";
+  const dynastyNote = simSetupDynastyNote(state);
   const changed = simSetupAdvancedChanged(state, defaults);
   const block = simSetupBlock(state);
   return (
@@ -588,12 +599,52 @@ function SetupForm({
         />
         <p className="text-xs" style={{ color: "var(--color-text-muted)" }}>{SIM_DIFFICULTY_COPY[state.difficulty].blurb} Your own scoring is the same at every level.</p>
       </div>
-      {!league ? (
-        <details className="flex flex-col gap-4" data-testid="sim-advanced">
+      {dynastyNote ? <p className="text-xs" style={{ color: "var(--color-text-muted)" }} data-testid="sim-dynasty-note">{dynastyNote}</p> : null}
+      {(
+        <details className="flex flex-col" data-testid="sim-advanced">
           <summary className="text-sm font-semibold cursor-pointer" style={{ minHeight: "var(--touch-target-min)" }}>
             Advanced options{changed ? ` (${changed} changed)` : ""}
           </summary>
           <div className="flex flex-col gap-4 pt-2">
+            {modes.length > 1 ? (
+              <div className="flex flex-col gap-1">
+                <span className="text-sm font-semibold">Game mode</span>
+                <PillRow
+                  ariaLabel="Game mode"
+                  variant="fill"
+                  options={modes}
+                  active={state.mode}
+                  onSelect={(value) => set("mode", value as SimMode)}
+                />
+              </div>
+            ) : null}
+            {dynasty ? (
+              <>
+                <div className="flex flex-col gap-1">
+                  <span className="text-sm font-semibold">Seasons</span>
+                  <PillRow
+                    ariaLabel="Seasons"
+                    variant="fill"
+                    options={(opts?.seasons?.values ?? [3, 4, 5]).map((n) => ({ label: String(n), value: String(n) }))}
+                    active={String(state.seasons)}
+                    onSelect={(value) => set("seasons", Number(value))}
+                  />
+                  <p className="text-xs" style={{ color: "var(--color-text-muted)" }}>How many seasons you play. Each one ends with an offseason.</p>
+                </div>
+                <div className="flex flex-col gap-1">
+                  <span className="text-sm font-semibold">Rookie draft rounds</span>
+                  <PillRow
+                    ariaLabel="Rookie draft rounds"
+                    variant="fill"
+                    options={(opts?.rookie_rounds?.values ?? [2, 3, 4, 5]).map((n) => ({ label: String(n), value: String(n) }))}
+                    active={String(state.rookieRounds)}
+                    onSelect={(value) => set("rookieRounds", Number(value))}
+                  />
+                </div>
+              </>
+            ) : null}
+            {!league ? (
+              <>
             <div className="flex flex-col gap-1">
               <span className="text-sm font-semibold">League size</span>
               <PillRow
@@ -660,9 +711,44 @@ function SetupForm({
                 ))}
               </Select>
             </label>
+              </>
+            ) : null}
+            <div className="flex flex-col gap-1">
+              <span className="text-sm font-semibold">IR slots</span>
+              <PillRow
+                ariaLabel="IR slots"
+                variant="scroll"
+                options={simSetupCountOptions(opts?.ir_slots?.max ?? 4, opts?.ir_slots?.default ?? null, opts?.ir_slots?.min ?? 0)}
+                active={state.irSlots == null ? "" : String(state.irSlots)}
+                onSelect={(value) => set("irSlots", value === "" ? null : Number(value))}
+              />
+              <p className="text-xs" style={{ color: "var(--color-text-muted)" }}>Injured players stash here and do not use a roster spot.</p>
+            </div>
+            <div className="flex flex-col gap-1">
+              <span className="text-sm font-semibold">Taxi slots</span>
+              <PillRow
+                ariaLabel="Taxi slots"
+                variant="scroll"
+                options={simSetupCountOptions(opts?.taxi_slots?.max ?? 8, simSetupTaxiDefault(options, state.mode), opts?.taxi_slots?.min ?? 0)}
+                active={state.taxiSlots == null ? "" : String(state.taxiSlots)}
+                onSelect={(value) => set("taxiSlots", value === "" ? null : Number(value))}
+              />
+              <p className="text-xs" style={{ color: "var(--color-text-muted)" }}>Young players stash here and do not score or use a roster spot.</p>
+            </div>
+            <div className="flex flex-col gap-1">
+              <span className="text-sm font-semibold">Taxi eligibility</span>
+              <PillRow
+                ariaLabel="Taxi eligibility"
+                variant="fill"
+                options={[{ label: "Default", value: "" }, ...(opts?.taxi_years?.values ?? [1, 2, 3, 4]).map((n) => ({ label: n === 1 ? "Rookies" : `${n} years`, value: String(n) }))]}
+                active={state.taxiYears == null ? "" : String(state.taxiYears)}
+                onSelect={(value) => set("taxiYears", value === "" ? null : Number(value))}
+              />
+              <p className="text-xs" style={{ color: "var(--color-text-muted)" }}>Who can go on the taxi squad: rookies only, or players in their first 2, 3 or 4 years.</p>
+            </div>
           </div>
         </details>
-      ) : null}
+      )}
       <div className="flex items-center justify-between gap-3">
         <div className="flex flex-col">
           <span className="text-sm font-semibold">Auto-set my lineup</span>
@@ -748,18 +834,22 @@ function GameScreen({
   const youLine = game.you;
   const inSeason = (stage === "week" || stage === "playoffs") && !draftRecap;
   const showBar = inSeason && !recap;
+  const showOffBar = stage === "offseason" && !draftRecap && !recap;
 
   return (
     <SimTeamOpenContext.Provider value={ctx.openTeam}>
     <SimOpenPlayerContext.Provider value={ctx.openPlayer}>
     {/* pb-24: the floating GM orb never covers the last row */}
-    <div className={`flex flex-col gap-3 ${showBar ? "pb-40 md:pb-3" : "pb-24"}`}>
+    <div className={`flex flex-col gap-3 ${showBar || showOffBar ? "pb-40 md:pb-3" : "pb-24"}`}>
       <div className="flex items-center justify-between gap-2">
         <div className="flex min-w-0 flex-col">
           <button type="button" className="tap-link text-xs font-bold self-start" style={{ color: "var(--color-accent)" }} onClick={onHub}>
             All games
           </button>
           <h2 className="text-lg font-extrabold break-words" data-testid="game-heading">{simWeekHeading(game)}</h2>
+          {game.dynasty ? (
+            <p className="text-xs" style={{ color: "var(--color-text-muted)" }} data-testid="dynasty-progress">{simDynastyProgressLine(game.dynasty)}</p>
+          ) : null}
           {youLine && stage !== "draft" ? (
             <div className="flex flex-wrap items-center gap-x-2 text-xs" style={{ color: "var(--color-text-muted)" }}>
               <SimTeamLink teamId={youLine.team_id} name={youLine.name} size={20} bold={false} />
@@ -788,6 +878,28 @@ function GameScreen({
         <SimWeekRecapView recap={recap} index={flow.recapIndex} total={flow.recaps.length} ctx={ctx} onNext={onRecapNext} onClose={onRecapClose} />
       ) : stage === "final" ? (
         <SimFinalView ctx={ctx} onNewGame={onNewGame} onHub={onHub} />
+      ) : stage === "offseason" ? (
+        <>
+          <PillRow
+            ariaLabel="Offseason sections"
+            variant="fill"
+            sticky
+            options={[
+              { label: "Offseason", value: "home" },
+              { label: "Team", value: "team" },
+              { label: "Trades", value: "trades" },
+              { label: "League", value: "league" },
+            ]}
+            active={["team", "trades", "league"].includes(flow.tab) ? flow.tab : "home"}
+            onSelect={(value) => onTab(value as SimTab)}
+          />
+          <div key={flow.tab} className="enter-rise">
+            {flow.tab === "team" ? <SimTeamTab ctx={ctx} onTrade={() => onTab("trades")} /> : null}
+            {flow.tab === "trades" ? <SimTradesTab ctx={ctx} seed={tradeSeed} onSeedUsed={() => setTradeSeed(null)} /> : null}
+            {flow.tab === "league" ? <SimLeagueTab ctx={ctx} /> : null}
+            {["team", "trades", "league"].includes(flow.tab) ? null : <SimGameOffseason ctx={ctx} onTrade={() => onTab("trades")} onTeam={() => onTab("team")} />}
+          </div>
+        </>
       ) : (
         <>
           <PillRow
@@ -818,7 +930,8 @@ function GameScreen({
           </div>
         </>
       )}
-      {showBar ? <SimActionBar ctx={ctx} paywalled={paywalled} advancing={advancing} onAdvance={onAdvance} /> : null}
+      {showOffBar ? <SimOffseasonBar ctx={ctx} /> : null}
+      {showBar ? <SimActionBar ctx={ctx} paywalled={paywalled} advancing={advancing} onAdvance={onAdvance} onTab={onTab} /> : null}
     </div>
     </SimOpenPlayerContext.Provider>
     </SimTeamOpenContext.Provider>
@@ -871,7 +984,7 @@ function SimMoreTab({ ctx, onDeleted, onHub }: { ctx: SimCtx; onDeleted: () => v
             ["stats", "accent", `${simSettingsSummary(s)} · ${SIM_DIFFICULTY_COPY[s.difficulty].label}`],
             ["lineup", "success", `Starters: ${s.slots.join(", ")} · roster limit ${s.roster_limit}`],
             ["trophy", "warning", `${s.regular_weeks}-week season, ${s.playoff_teams}-team playoffs. Trade deadline: week ${s.trade_deadline_week}.`],
-            ["waiver", "accent", "Waiver claims resolve when you advance, worst record first."],
+            ["waiver", "accent", "Waiver claims resolve when you advance, before games are scored, worst record first."],
           ] as const).map(([glyph, tone, text]) => (
             <li key={glyph} className="flex items-start gap-2">
               <ReviewGlyphChip glyph={glyph} tone={tone} size={24} />

@@ -221,7 +221,11 @@ export function filterSummary(filters: SheetFilters): string {
   return parts.join(" · ");
 }
 
-/** Group picks by their `group` (season) while keeping order; players come back as one unnamed group. */
+/**
+ * Group picks by their `group` (season) while keeping order; players come back
+ * as one unnamed group. Pick groups sort by label (earliest season first) and
+ * their picks by round, so a pool in any order reads year then round.
+ */
 export function groupSheetItems<T>(items: SheetItem<T>[]): { key: string; label: string; items: SheetItem<T>[] }[] {
   const groups: { key: string; label: string; items: SheetItem<T>[] }[] = [];
   for (const item of items) {
@@ -232,6 +236,10 @@ export function groupSheetItems<T>(items: SheetItem<T>[]): { key: string; label:
       groups.push(group);
     }
     group.items.push(item);
+  }
+  if (items.some((i) => i.kind === "pick")) {
+    groups.sort((a, b) => a.label.localeCompare(b.label, undefined, { numeric: true }));
+    for (const group of groups) group.items.sort((a, b) => (a.round ?? 99) - (b.round ?? 99));
   }
   return groups;
 }

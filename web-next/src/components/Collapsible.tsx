@@ -82,8 +82,8 @@ export function Collapsible({
         className="flex w-full items-center gap-2 text-left"
         style={{ minHeight: "var(--touch-target-min)" }}
       >
-        <span className="min-w-0 flex-1 text-sm font-extrabold uppercase" style={{ letterSpacing: "0.02em" }}>{title}</span>
-        {summary ? <span className="shrink-0">{summary}</span> : null}
+        <span className="shrink-0 whitespace-nowrap text-sm font-extrabold uppercase" style={{ letterSpacing: "0.02em" }}>{title}</span>
+        <span className="min-w-0 flex-1 text-right">{summary}</span>
         <span aria-hidden="true" className="shrink-0 text-xs" style={{ color: "var(--color-text-muted)", width: 12, textAlign: "center" }}>
           {open ? "−" : "+"}
         </span>

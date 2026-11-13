@@ -57,7 +57,9 @@ export function PlayerAvatar({
   const failed = !!playerId && failedId === playerId;
   const tierIdentity = resolvePlayerTier(tier);
   const ringColor = `var(${tierIdentity.colorVar})`;
-  const dimension = { width: size, height: size, borderRadius: "50%" };
+  // --sim-scale is set by the Fantasy Sim shell at desktop widths so photos grow with the screen; 1 everywhere else.
+  const px = `calc(${size}px * var(--sim-scale, 1))`;
+  const dimension = { width: px, height: px, borderRadius: "50%" };
   // coridian_, 2026-10-18: "The prestige ring is still too small around
   // player PFP's" — a flat 2px border read fine at the 24-32px sizes most
   // list rows use, but PQV's 112px hero avatar (bumped up from 88px

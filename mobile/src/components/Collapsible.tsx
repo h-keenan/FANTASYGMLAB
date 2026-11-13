@@ -51,7 +51,7 @@ export default function Collapsible({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id, defaultOpen]);
 
-  const styles = useMemo(() => StyleSheet.create({ head: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, minHeight: 44 }, title: { flex: 1, minWidth: 0 }, chevron: { width: 14, textAlign: 'center', color: colors.textTertiary, fontSize: 14 } }), [colors]);
+  const styles = useMemo(() => StyleSheet.create({ head: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, minHeight: 44 }, title: { flexShrink: 0 }, summary: { flex: 1, minWidth: 0, alignItems: 'flex-end' }, chevron: { width: 14, textAlign: 'center', color: colors.textTertiary, fontSize: 14 } }), [colors]);
 
   function toggle() {
     const next = !open;
@@ -64,7 +64,7 @@ export default function Collapsible({
     <AccentCard accent={accent ?? colors.accent} compact>
       <Pressable accessibilityRole="button" accessibilityState={{ expanded: open }} onPress={toggle} style={styles.head} testID={testID}>
         <View style={styles.title}>{typeof title === 'string' ? <AppText style={{ fontSize: 14, fontWeight: '800', textTransform: 'uppercase', color: colors.textPrimary }}>{title}</AppText> : title}</View>
-        {summary ? <View>{summary}</View> : null}
+        <View style={styles.summary}>{summary}</View>
         <AppText style={styles.chevron}>{open ? '−' : '+'}</AppText>
       </Pressable>
       {open ? <View style={{ gap: spacing.md }}>{children}</View> : null}
