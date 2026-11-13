@@ -355,9 +355,13 @@ describe("SimGameContent", () => {
     render(<SimGameContent />);
     await openFirstGame();
     expect(await screen.findByText("You are on the clock.")).toBeInTheDocument();
-    fireEvent.click(await screen.findByRole("button", { name: "Draft Rory Runner" }));
+    const draftButton = await screen.findByRole("button", { name: "Draft Rory Runner" });
+    // A double tap in the same frame still submits once, carrying the pick the client believes is on the clock.
+    fireEvent.click(draftButton);
+    fireEvent.click(draftButton);
     expect(await screen.findByTestId("draft-recap")).toHaveTextContent("Draft grade A-");
-    expect(mocked.simDraftPick).toHaveBeenCalledWith("g1", "10");
+    expect(mocked.simDraftPick).toHaveBeenCalledTimes(1);
+    expect(mocked.simDraftPick).toHaveBeenCalledWith("g1", "10", 3);
     fireEvent.click(screen.getByRole("button", { name: "Start the season" }));
     expect(await screen.findByTestId("game-heading")).toHaveTextContent("Week 1 of 14");
   });

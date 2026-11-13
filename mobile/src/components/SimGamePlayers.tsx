@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useReducer, useState, type ReactNode } from 'react';
-import { Pressable, StyleSheet, View, useWindowDimensions } from 'react-native';
+import { Pressable, StyleSheet, View } from 'react-native';
 
 import AppText from './AppText';
 import EmptyState from './EmptyState';
@@ -9,7 +9,8 @@ import PlayerQuickViewSheet from './PlayerQuickViewSheet';
 import { ReviewGlyphChip } from './SeasonReviewSections';
 import SegmentedTabBar from './SegmentedTabBar';
 import { SkeletonCard } from './SkeletonBlock';
-import { SimPager, SimPlayerLine, SimStat, SimToneBadge, createSimStyles, useSimDebounced } from './SimGameParts';
+import { SimDraftRow } from './SimDraftBoard';
+import { SimPager, SimToneBadge, createSimStyles, useSimDebounced } from './SimGameParts';
 import { useThemeMode } from '../context/ThemeModeContext';
 import { api } from '../lib/api';
 import { stubPlayer } from '../lib/playerQuickView';
@@ -36,7 +37,7 @@ import {
   type SimPlayerFilter,
   type SimPlayerSort,
   type SimPlayerStatusFilter,
-  type SimPos,
+  type SimPosFilter,
 } from '../lib/simGame';
 import { spacing, type ThemeColors } from '../theme';
 
@@ -56,11 +57,15 @@ export function SimPlayerBrowser({
   refreshKey = 0,
   onItems,
   emptyTitle = 'No players match',
-  positions = SIM_POSITIONS,
+  week = 0,
+  positions = SIM_POSITIONS.map((pos) => ({ label: pos as string, value: pos as SimPosFilter })),
 }: {
   gameId: string;
   /** Positions this league plays (no K / DEF chips when it has no such slot). */
-  positions?: SimPos[];
+  /** Filter segments after "All" (simFilterPositionsFor). */
+  positions?: { label: string; value: SimPosFilter }[];
+  /** Current game week, to flag a bye that is close. */
+  week?: number;
   /** Lock the status filter (the draft board is always free agents). */
   fixedStatus?: SimPlayerStatusFilter;
   initial?: Partial<SimPlayerFilter>;
@@ -80,8 +85,6 @@ export function SimPlayerBrowser({
   const [total, setTotal] = useState(0);
   const [state, setState] = useState<'loading' | 'ready' | 'error'>('loading');
   const [attempt, setAttempt] = useState(0);
-  const { width } = useWindowDimensions();
-  const showValue = width >= 640;
   // A new page or filter starts at the top window again (the window is keyed to the filter).
   const windowKey = [filter.page, filter.pos, filter.sort, filter.q, filter.status].join('|');
   const [win, setWin] = useState({ key: windowKey, n: SIM_WINDOW_STEP });
@@ -128,9 +131,9 @@ export function SimPlayerBrowser({
       />
       <SegmentedTabBar<string>
         scrollable
-        options={[{ key: '', label: 'All' }, ...positions.map((pos) => ({ key: pos as string, label: pos }))]}
+        options={[{ key: '', label: 'All' }, ...positions.map((p) => ({ key: p.value as string, label: p.label }))]}
         active={filter.pos}
-        onChange={(key) => dispatch({ type: 'pos', value: key as SimPos | '' })}
+        onChange={(key) => dispatch({ type: 'pos', value: key as SimPosFilter | '' })}
       />
       {!fixedStatus ? (
         <SegmentedTabBar<string>
@@ -170,23 +173,13 @@ export function SimPlayerBrowser({
             {total} player{total === 1 ? '' : 's'}
           </AppText>
           {rows.shown.map((player) => (
-            <SimPlayerLine
+            <SimDraftRow
               key={player.id}
               player={player}
+              week={week}
               onOpen={onOpen}
-              extra={
-                <>
-                  {player.owner ? <SimToneBadge label={simOwnerLabel(player.owner)} tone={simOwnerTone(player.owner)} /> : null}
-                  {player.adp != null ? <AppText style={common.muted}>ADP {simFmtValue(player.adp)}</AppText> : null}
-                </>
-              }
-              trailing={
-                <>
-                  <SimStat label="Proj" value={simFmtPts(player.projection)} />
-                  {showValue ? <SimStat label="Value" value={simFmtValue(player.value)} /> : null}
-                  {actions ? actions(player) : null}
-                </>
-              }
+              tags={player.owner ? [{ key: 'owner', label: simOwnerLabel(player.owner), tone: simOwnerTone(player.owner) }] : undefined}
+              actions={actions ? actions(player) : null}
             />
           ))}
           {rows.remaining > 0 ? (

@@ -76,7 +76,7 @@ from modules.sim.game_types import (
 from modules.sim.personas import PERSONAS
 from modules.sim.rng import WorldRng
 from modules.sim.store import SimStoreError
-from modules.sim.types import GAME_POSITIONS, POSITIONS, SimInputsError
+from modules.sim.types import FLEX_SLOTS, GAME_POSITIONS, POSITIONS, SimInputsError
 
 _log = logging.getLogger(__name__)
 
@@ -119,6 +119,10 @@ class LineupBody(BaseModel):
 
 class PickBody(BaseModel):
     player_id: str
+    # The pick the client believes is on the clock (1-based). Optional so old
+    # clients keep working; when sent, a stale value is a 409 `already_picked`
+    # so a double tap can never draft two players.
+    pick_no: int | None = None
 
 
 class QueueBody(BaseModel):
@@ -526,11 +530,18 @@ def add_routes(router: APIRouter, ctx: GameApiCtx) -> None:
             "completed": completed, "recap": recap, "game": game_json(row, snap, state, pro),
         }
 
-    def _run_draft_command(user, game_id, command):
+    def _already_picked(state):
+        return JSONResponse(status_code=409, content={
+            "ok": False, "reason": "already_picked", "pick_no": min(state.pick_index + 1, 10_000),
+            "error": "That pick was already made. Your draft board has been refreshed."})
+
+    def _run_draft_command(user, game_id, command, expect_pick_no=None):
         pro = ctx.is_pro(user)
         gid = _gid(game_id)
         with _lock_for(gid):
             store, uid, row, snap, state = load(user, gid)
+            if expect_pick_no is not None and state.status == "drafting" and expect_pick_no != state.pick_index + 1:
+                return _already_picked(state)
             seed = seedof(row, state)
             heal_draft(store, uid, gid, snap, state, seed)
             dctx = draft.DraftContext(snap, state)
@@ -550,7 +561,8 @@ def add_routes(router: APIRouter, ctx: GameApiCtx) -> None:
     @guarded
     def draft_pick(game_id: str, body: PickBody, user: dict[str, Any] = Depends(require_user)):
         return _run_draft_command(
-            user, game_id, lambda dctx, em, seed: draft.user_pick(dctx, em, str(body.player_id), seed)
+            user, game_id, lambda dctx, em, seed: draft.user_pick(dctx, em, str(body.player_id), seed),
+            expect_pick_no=body.pick_no,
         )
 
     @router.post("/games/{game_id}/draft/auto")
@@ -583,8 +595,8 @@ def add_routes(router: APIRouter, ctx: GameApiCtx) -> None:
         pro = ctx.is_pro(user)
         _, _, _, snap, state = load(user, _gid(game_id))
         pos = pos.upper()
-        if pos and pos not in GAME_POSITIONS:
-            raise ValueError("pos must be one of QB, RB, WR, TE, K, DEF.")
+        if pos and pos not in GAME_POSITIONS and pos not in FLEX_SLOTS:
+            raise ValueError("pos must be one of QB, RB, WR, TE, K, DEF, FLEX, REC_FLEX, SUPER_FLEX.")
         if status not in ("", "available", "rostered", "mine", "injured", "bye"):
             raise ValueError("status must be available, rostered, mine, injured or bye.")
         if sort not in view.SORTS:

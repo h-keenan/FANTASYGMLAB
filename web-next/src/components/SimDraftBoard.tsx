@@ -5,33 +5,27 @@ import { useEffect, useMemo, useReducer, useState, type ReactNode } from "react"
 import { EmptyState } from "@/components/EmptyState";
 import { Input } from "@/components/Input";
 import { PillRow } from "@/components/PillRow";
-import { PlayerAvatar } from "@/components/PlayerAvatar";
-import { PlayerNameText } from "@/components/PlayerNameText";
-import { PositionBadge } from "@/components/PositionBadge";
-import { SimGeneratedChip } from "@/components/SimGameDynastyParts";
 import { SimDraftGlyph } from "@/components/SimDraftGlyphs";
-import { SimPager, simToneColor, useSimDebounced, useSimWide } from "@/components/SimGameParts";
+import { SimPager, useSimDebounced, useSimWide } from "@/components/SimGameParts";
 import { SkeletonRows } from "@/components/Skeleton";
-import { ToneBadge } from "@/components/ToneBadge";
 import { api } from "@/lib/api";
 import { PLAYER_SEARCH_DEBOUNCE_MS } from "@/lib/leaguePlayerSearch";
-import { positionColorVar } from "@/lib/playerPresentation";
-import { simBoardEdge, simBoardProjection, simDraftRowChips } from "@/lib/simDraft";
+import { PlayerListRow } from "@/components/PlayerListRow";
+import type { PlayerListDensity, PlayerListTag } from "@/lib/playerListRow";
+import { simDraftMeta, simDraftRowChips, simListStats } from "@/lib/simDraft";
 import { SIM_WINDOW_STEP, simWindow } from "@/lib/simLayout";
 import {
   SIM_PAGE_SIZE,
   simDefaultFilter,
   simFilterQuery,
   simFilterReducer,
-  simFmtPts,
-  simFmtValue,
   simHeadshotId,
   simPageCount,
   simPlayerInitials,
   simPlayerIsGenerated,
   type SimGamePlayer,
   type SimPlayerSort,
-  type SimPos,
+  type SimPosFilter,
 } from "@/lib/simGame";
 
 const SORTS: { label: string; value: SimPlayerSort }[] = [
@@ -40,99 +34,59 @@ const SORTS: { label: string; value: SimPlayerSort }[] = [
   { label: "Value", value: "value" },
 ];
 
-/** Proj / Value / ADP / Edge: the same four equal columns in the header and in every row, so numbers line up by construction. */
-const STAT_GRID = "grid grid-cols-4 gap-1 text-center tabular-nums";
-
 /**
- * One draft-board row, built for a 390px phone. Line 1: position badge, photo,
- * name with the NFL team chip and status chips inline, and the actions
- * (icon buttons) right-aligned. Line 2: Proj / Value / ADP / Edge in four
- * equal columns that match the header strip above the list.
+ * One sim player-list row: a thin mapping from a sim player onto the shared
+ * PlayerListRow (docs/player-card.md, `list` variant). Draft Players/Board,
+ * the rookie draft and the Players / Waivers tabs all render through it.
+ * Bye is always shown (simDraftMeta), an injury is a chip + dot (never a
+ * dimmed row), and every number is a labeled pill (simListStats).
  */
 export function SimDraftRow({
   player,
   onOpen,
   actions,
   onGeneratedInfo,
+  week = 0,
+  drafted = false,
+  tags,
+  extra,
+  density,
 }: {
   player: SimGamePlayer;
   onOpen?: (player: SimGamePlayer) => void;
   actions?: ReactNode;
-  /** Opens the generated-class notice; shows a small chip on simulated rookies. */
+  /** Opens the generated-class notice; shows a tiny "sim" dot on simulated rookies. */
   onGeneratedInfo?: () => void;
+  /** Current game week (0 while drafting): decides which byes count as "soon". */
+  week?: number;
+  /** Optimistic: this player was just picked; the row flashes and slides out while the server confirms. */
+  drafted?: boolean;
+  /** Page-specific tags (at most two shown plus "+N"). */
+  tags?: PlayerListTag[];
+  extra?: ReactNode;
+  density?: PlayerListDensity;
 }) {
-  const colorVar = positionColorVar(player.pos);
-  const chips = simDraftRowChips(player);
-  const delta = simBoardEdge(player);
-  const proj = simBoardProjection(player);
-  const identity = (
-    <div className="flex min-w-0 flex-1 items-center gap-2">
-      <span className="flex shrink-0 justify-center" style={{ width: 38 }}>
-        <PositionBadge position={player.pos} />
-      </span>
-      <span className="flex shrink-0 items-center justify-center" style={{ width: 32, height: 32 }}>
-        <PlayerAvatar playerId={simHeadshotId(player)} size={32} fallbackLabel={simPlayerInitials(player)} />
-      </span>
-      <div className="flex min-w-0 flex-1 items-center gap-1.5">
-        <PlayerNameText name={player.name} threshold={Infinity} className="min-w-0 truncate text-sm font-bold" style={{ color: "var(--color-text-primary)" }} />
-        {player.team ? (
-          <span
-            className="shrink-0 text-[0.625rem] font-extrabold uppercase px-1.5 leading-4"
-            style={{ borderRadius: "var(--radius-pill)", border: "var(--border-width-default) solid var(--color-border-strong)", color: "var(--color-text-secondary)" }}
-            title="NFL team"
-          >
-            {player.team}
-          </span>
-        ) : null}
-        {chips.map((chip) => (
-          <ToneBadge key={chip.key} label={chip.label} color={simToneColor(chip.tone)} size="xs" />
-        ))}
-      </div>
-    </div>
-  );
+  const [chip] = simDraftRowChips(player);
   return (
-    <div
-      className="flex flex-col pb-0.5 pl-2 pr-1"
-      style={{
-        borderBottom: "var(--border-width-default) solid var(--color-border)",
-        borderLeft: `4px solid ${colorVar ? `var(${colorVar})` : "var(--color-border-strong)"}`,
-        opacity: proj.discounted ? 0.62 : 1,
-      }}
-      data-testid="draft-row"
-      data-out={proj.discounted ? "true" : undefined}
-    >
-      <div className="flex items-center justify-between gap-1">
-        {onOpen ? (
-          <button
-            type="button"
-            onClick={() => onOpen(player)}
-            className="flex min-w-0 flex-1 items-center text-left"
-            style={{ minHeight: 40 }}
-            aria-label={`${player.name}, ${player.pos}. Open player details`}
-          >
-            {identity}
-          </button>
-        ) : (
-          identity
-        )}
-        {actions ? <div className="flex shrink-0 items-center gap-1">{actions}</div> : null}
-      </div>
-      <div className={`${STAT_GRID} pb-0.5 text-xs leading-4`} style={{ color: "var(--color-text-primary)" }}>
-        <span title={proj.discounted ? "Per-game projection when healthy. Out or on bye this week." : undefined}>{simFmtPts(proj.value)}</span>
-        <span>{simFmtValue(player.value)}</span>
-        <span>{simFmtValue(player.adp)}</span>
-        <span style={{ minHeight: 16 }}>
-          {delta ? (
-            <span className="font-extrabold" style={{ color: simToneColor(delta.tone) }} title={delta.tone === "success" ? "Steal: the market lets him fall past where our value ranks him" : "Reach: the market takes him earlier than our value ranks him"}>
-              {delta.tone === "success" ? "▲" : "▼"} {delta.label.replace(/^[+-]/, "")}
-            </span>
-          ) : (
-            <span aria-hidden="true" style={{ color: "var(--color-text-muted)" }}>-</span>
-          )}
-        </span>
-        {onGeneratedInfo && simPlayerIsGenerated(player) ? <span className="ml-auto"><SimGeneratedChip label="Generated" onInfo={onGeneratedInfo} inRow /></span> : null}
-      </div>
-    </div>
+    <PlayerListRow
+      testId="draft-row"
+      name={player.name}
+      position={player.pos}
+      headshotId={simHeadshotId(player)}
+      fallbackLabel={simPlayerInitials(player)}
+      meta={simDraftMeta(player, week)}
+      chip={chip ? { label: chip.label, tone: chip.tone } : null}
+      hurt={player.status === "out"}
+      stats={simListStats(player)}
+      tags={tags}
+      extra={extra}
+      actions={actions}
+      density={density}
+      done={drafted}
+      onSimInfo={onGeneratedInfo && simPlayerIsGenerated(player) ? onGeneratedInfo : undefined}
+      onOpen={onOpen ? () => onOpen(player) : undefined}
+      openLabel={`${player.name}, ${player.pos}. Open player details`}
+    />
   );
 }
 
@@ -148,9 +102,15 @@ export function SimDraftBoard({
   actions,
   refreshKey = 0,
   onItems,
+  week = 0,
+  draftedIds,
 }: {
   gameId: string;
-  positions: SimPos[];
+  /** Filter pills after "All" (simFilterPositionsFor): positions plus FLEX / SUPERFLEX. */
+  positions: { label: string; value: SimPosFilter }[];
+  week?: number;
+  /** Players picked optimistically and still awaiting the server. */
+  draftedIds?: string[];
   onOpen: (player: SimGamePlayer) => void;
   actions?: (player: SimGamePlayer) => ReactNode;
   refreshKey?: number;
@@ -215,9 +175,9 @@ export function SimDraftBoard({
       <PillRow
         ariaLabel="Position filter"
         variant="scroll"
-        options={[{ label: "All", value: "" }, ...positions.map((pos) => ({ label: pos, value: pos }))]}
+        options={[{ label: "All", value: "" }, ...positions]}
         active={filter.pos}
-        onSelect={(value) => dispatch({ type: "pos", value: value as SimPos | "" })}
+        onSelect={(value) => dispatch({ type: "pos", value: value as SimPosFilter | "" })}
       />
       <div className="flex items-center gap-2">
         <span className="text-xs font-bold shrink-0" style={{ color: "var(--color-text-muted)" }}>Sort</span>
@@ -236,14 +196,8 @@ export function SimDraftBoard({
           <p className="text-xs pb-1" style={{ color: "var(--color-text-muted)" }} aria-live="polite">
             {total} player{total === 1 ? "" : "s"} left
           </p>
-          <div className={`${STAT_GRID} pb-1 text-[0.625rem] font-extrabold uppercase`} style={{ color: "var(--color-text-muted)", paddingLeft: 4 + 8, paddingRight: 4 }} aria-hidden="true">
-            <span>Proj</span>
-            <span title="Model value on a 0-100 scale (the top player is 100), not the main app's raw market value">Value</span>
-            <span title="Average draft position">ADP</span>
-            <span title="Value rank vs ADP: green = steal, red = reach">Edge</span>
-          </div>
           {rows.shown.map((player) => (
-            <SimDraftRow key={player.id} player={player} onOpen={onOpen} actions={actions ? actions(player) : null} />
+            <SimDraftRow key={player.id} player={player} onOpen={onOpen} week={week} drafted={draftedIds?.includes(player.id)} actions={actions ? actions(player) : null} />
           ))}
           {rows.remaining > 0 ? (
             <button

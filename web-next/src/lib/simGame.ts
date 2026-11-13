@@ -74,6 +74,8 @@ export interface SimGamePlayer {
   /** NFL team. */
   team: string | null;
   age: number | null;
+  /** Age to a tenth when the server sends it; rows fall back to `age`. */
+  age_decimal?: number | null;
   adp: number | null;
   /** Model value on the sim's 0-100 scale (the best player is 100), not the main app's raw market value. */
   value: number;
@@ -962,6 +964,34 @@ export function simAdvanceLabel(game: Pick<SimGame, "phase" | "week" | "settings
 export const SIM_QUEUE_MAX = 30;
 export const SIM_POSITIONS: SimPos[] = ["QB", "RB", "WR", "TE", "K", "DEF"];
 
+/** A position filter value: a real position or a flex eligibility group (server: game_view.players_page). */
+export type SimPosFilter = SimPos | "FLEX" | "SUPER_FLEX";
+/** Positions a flex filter covers, from the game's lineup slot definitions (modules/sim/types.py FLEX_SLOTS). */
+export const SIM_FLEX_GROUPS: Record<"FLEX" | "SUPER_FLEX", SimPos[]> = { FLEX: ["RB", "WR", "TE"], SUPER_FLEX: ["QB", "RB", "WR", "TE"] };
+
+/**
+ * Pills for a player-list position filter, in order QB RB WR TE FLEX SUPER_FLEX K DEF.
+ * FLEX shows when the league has a FLEX, REC_FLEX or SUPER_FLEX slot, SUPER_FLEX
+ * only with a super-flex slot, K / DEF only when a slot uses them.
+ */
+export function simFilterPositionsFor(slots: SimSlot[] | undefined): { label: string; value: SimPosFilter }[] {
+  const list = slots ?? [];
+  const has = (s: SimSlot) => list.includes(s);
+  const out: { label: string; value: SimPosFilter }[] = (["QB", "RB", "WR", "TE"] as SimPos[]).map((p) => ({ label: p, value: p }));
+  if (has("FLEX") || has("REC_FLEX") || has("SUPER_FLEX")) out.push({ label: "FLEX", value: "FLEX" });
+  if (has("SUPER_FLEX")) out.push({ label: "SUPERFLEX", value: "SUPER_FLEX" });
+  if (has("K")) out.push({ label: "K", value: "K" });
+  if (has("DEF")) out.push({ label: "DEF", value: "DEF" });
+  return out;
+}
+
+/** Does a player's position pass a position filter value (client-side twin of the server rule)? */
+export function simPosMatches(pos: SimPos, filter: SimPosFilter | ""): boolean {
+  if (!filter) return true;
+  if (filter === "FLEX" || filter === "SUPER_FLEX") return SIM_FLEX_GROUPS[filter].includes(pos);
+  return pos === filter;
+}
+
 /** Positions a league's player pool contains: no kickers without a K slot, no defenses without a DEF slot. */
 export function simPositionsFor(slots: SimSlot[] | undefined): SimPos[] {
   const list = slots ?? [];
@@ -1039,7 +1069,7 @@ export const SIM_STATUS_OPTIONS: { value: SimPlayerStatusFilter; label: string }
 
 export interface SimPlayerFilter {
   q: string;
-  pos: SimPos | "";
+  pos: SimPosFilter | "";
   status: SimPlayerStatusFilter;
   sort: SimPlayerSort;
   page: number;
@@ -1053,7 +1083,7 @@ export function simDefaultFilter(overrides: Partial<SimPlayerFilter> = {}): SimP
 
 export type SimFilterAction =
   | { type: "q"; value: string }
-  | { type: "pos"; value: SimPos | "" }
+  | { type: "pos"; value: SimPosFilter | "" }
   | { type: "status"; value: SimPlayerStatusFilter }
   | { type: "sort"; value: SimPlayerSort }
   | { type: "page"; value: number }

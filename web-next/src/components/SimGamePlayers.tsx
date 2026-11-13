@@ -9,7 +9,8 @@ import { EmptyState } from "@/components/EmptyState";
 import { Input, Select } from "@/components/Input";
 import { PillRow } from "@/components/PillRow";
 import { ReviewGlyphChip } from "@/components/SeasonReviewSections";
-import { SimPager, SimPlayerLine, SimStat, SimToneBadge, useSimDebounced, useSimWide } from "@/components/SimGameParts";
+import { SimDraftRow } from "@/components/SimDraftBoard";
+import { SimPager, SimToneBadge, useSimDebounced, useSimWide } from "@/components/SimGameParts";
 import { SkeletonRows } from "@/components/Skeleton";
 import { api } from "@/lib/api";
 import { SIM_WINDOW_STEP, simWindow } from "@/lib/simLayout";
@@ -35,7 +36,7 @@ import {
   type SimPlayerFilter,
   type SimPlayerSort,
   type SimPlayerStatusFilter,
-  type SimPos,
+  type SimPosFilter,
 } from "@/lib/simGame";
 
 /**
@@ -55,11 +56,14 @@ export function SimPlayerBrowser({
   showStatusFilter = true,
   onItems,
   emptyTitle = "No players match",
-  positions = SIM_POSITIONS,
+  week = 0,
+  positions = SIM_POSITIONS.map((pos) => ({ label: pos as string, value: pos as SimPosFilter })),
 }: {
   gameId: string;
-  /** Positions this league plays (no K / DEF chips when it has no such slot). */
-  positions?: SimPos[];
+  /** Current game week, to flag a bye that is close. */
+  week?: number;
+  /** Filter pills after "All" (simFilterPositionsFor). */
+  positions?: { label: string; value: SimPosFilter }[];
   /** Lock the status filter (the draft board is always free agents). */
   fixedStatus?: SimPlayerStatusFilter;
   initial?: Partial<SimPlayerFilter>;
@@ -125,9 +129,9 @@ export function SimPlayerBrowser({
       <PillRow
         ariaLabel="Position filter"
         variant="scroll"
-        options={[{ label: "All", value: "" }, ...positions.map((pos) => ({ label: pos, value: pos }))]}
+        options={[{ label: "All", value: "" }, ...positions]}
         active={filter.pos}
-        onSelect={(value) => dispatch({ type: "pos", value: value as SimPos | "" })}
+        onSelect={(value) => dispatch({ type: "pos", value: value as SimPosFilter | "" })}
       />
       <div className="flex gap-2">
         {showStatusFilter && !fixedStatus ? (
@@ -178,27 +182,13 @@ export function SimPlayerBrowser({
             {total} player{total === 1 ? "" : "s"}
           </p>
           {rows.shown.map((player) => (
-            <SimPlayerLine
+            <SimDraftRow
               key={player.id}
               player={player}
+              week={week}
               onOpen={onOpen}
-              extra={
-                <span className="flex flex-wrap items-center gap-1.5">
-                  {player.owner ? <SimToneBadge label={simOwnerLabel(player.owner)} tone={simOwnerTone(player.owner)} /> : null}
-                  {player.adp != null ? (
-                    <span className="text-xs" style={{ color: "var(--color-text-muted)" }}>
-                      ADP {simFmtValue(player.adp)}
-                    </span>
-                  ) : null}
-                </span>
-              }
-              trailing={
-                <>
-                  <SimStat label="Proj" value={simFmtPts(player.projection)} />
-                  <span className="hidden sm:block"><SimStat label="Value" value={simFmtValue(player.value)} /></span>
-                  {actions ? actions(player) : null}
-                </>
-              }
+              tags={player.owner ? [{ key: "owner", label: simOwnerLabel(player.owner), tone: simOwnerTone(player.owner) }] : undefined}
+              actions={actions ? actions(player) : null}
             />
           ))}
           {rows.remaining > 0 ? (

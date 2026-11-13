@@ -24,6 +24,7 @@ import {
   simFmtValue,
   simPickLabel,
   simQueueReducer,
+  simFilterPositionsFor,
   simPositionsFor,
   simRosterNeeds,
   simValueOverAdpLabel,
@@ -55,6 +56,9 @@ export function SimGameDraft({ ctx, onComplete }: { ctx: SimCtx; onComplete: (re
   const [players, setPlayers] = useState<Record<string, SimGamePlayer>>({});
   const [panel, setPanel] = useState<Panel>('board');
   const [busy, setBusy] = useState<'pick' | 'auto' | null>(null);
+  // Optimistic pick: the player just tapped, shown as drafted until the server answers.
+  const [optimistic, setOptimistic] = useState<SimGamePlayer | null>(null);
+  const pickInFlight = useRef(false);
   const [confirmAuto, setConfirmAuto] = useState(false);
   const [freshPickNos, setFreshPickNos] = useState<number[]>([]);
   const [attempt, setAttempt] = useState(0);
@@ -130,10 +134,15 @@ export function SimGameDraft({ ctx, onComplete }: { ctx: SimCtx; onComplete: (re
   );
 
   async function pick(player: SimGamePlayer) {
-    if (busy) return;
+    // A ref, not state: two taps in one frame must still submit once.
+    if (busy || pickInFlight.current) return;
+    pickInFlight.current = true;
     setBusy('pick');
-    const body = await call(() => api.simDraftPick(gameId, player.id));
+    setOptimistic(player);
+    const body = await call(() => api.simDraftPick(gameId, player.id, draft?.pick_no));
     setBusy(null);
+    pickInFlight.current = false;
+    setOptimistic(null);
     if (body) {
       applyResult(body);
       // Refresh the hint for the next turn.
@@ -142,7 +151,8 @@ export function SimGameDraft({ ctx, onComplete }: { ctx: SimCtx; onComplete: (re
         .then((next) => setHint(next.hint ?? null))
         .catch(() => {});
     } else {
-      // player_taken / conflict: the board is stale. Reload it.
+      // Rejected (player_taken / already_picked / conflict): roll the row back and reload a fresh board.
+      ctx.notify('That pick did not go through. The board was refreshed.', 'danger');
       setAttempt((n) => n + 1);
       ctx.bump();
     }
@@ -194,6 +204,7 @@ export function SimGameDraft({ ctx, onComplete }: { ctx: SimCtx; onComplete: (re
     return (
       <>
         <SimDraftIconButton
+          size={36}
           icon={inQueue ? 'checkmark-done-outline' : 'add-circle-outline'}
           label={inQueue ? `Remove ${player.name} from queue` : `Queue ${player.name}`}
           active={inQueue}
@@ -202,7 +213,7 @@ export function SimGameDraft({ ctx, onComplete }: { ctx: SimCtx; onComplete: (re
             dispatchQueue({ type: inQueue ? 'remove' : 'add', id: player.id });
           }}
         />
-        {onClock ? <SimDraftIconButton icon="checkmark-circle" primary label={`Draft ${player.name}`} disabled={busy === 'pick'} onPress={() => pick(player)} /> : null}
+        {onClock ? <SimDraftIconButton icon="checkmark" size={44} width={48} primary label={`Draft ${player.name}`} disabled={busy === 'pick'} onPress={() => pick(player)} /> : null}
       </>
     );
   };
@@ -210,7 +221,9 @@ export function SimGameDraft({ ctx, onComplete }: { ctx: SimCtx; onComplete: (re
   const board = (
     <SimDraftBoard
       gameId={gameId}
-      positions={simPositionsFor(game.settings.slots)}
+      positions={simFilterPositionsFor(game.settings.slots)}
+      week={game.week}
+      draftedIds={optimistic ? [optimistic.id] : undefined}
       onOpen={ctx.openPlayer}
       actions={boardActions}
       refreshKey={ctx.tick}
@@ -307,7 +320,7 @@ export function SimGameDraft({ ctx, onComplete }: { ctx: SimCtx; onComplete: (re
           <View style={common.grow}>
             <AppText style={styles.kicker}>{draft.status === 'complete' ? 'Draft' : simPickLabel(draft.pick_no, game.settings.teams)}</AppText>
             <AppText style={common.title} accessibilityLiveRegion="polite" testID="draft-clock">
-              {simDraftClockLine(draft)}
+              {optimistic ? 'Picking…' : simDraftClockLine(draft)}
             </AppText>
           </View>
           {onClock ? <ToneBadge label="Your pick" color={colors.accent} /> : null}

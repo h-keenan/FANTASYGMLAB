@@ -30,10 +30,25 @@ the position color (`--color-position-*`), cyan win emphasis, existing
   expandable detail (pre-game projection, points so far, OVR, slot, injury).
   `mirror` faces the numbers toward the center on wide screens; `pulseKey` re-runs
   the "points just changed" pulse; `sideTag` shows YOU / OPP on phones.
+- `list`: THE list row (`components/PlayerListRow.tsx`, web + app; pure model in
+  `lib/playerListRow.ts`, byte-identical twins). Line 1: position badge, 40px photo
+  (32 in `density="compact"`), name (one font size smaller past 18 chars before it
+  truncates; a clean seam for the shared `<PlayerName/>`), one status chip only when
+  it matters (OUT, Q, ...). Line 2, muted: `TEAM · Age 24 · Bye 7` (the bye is
+  ALWAYS shown, warning-colored only inside the next 3 game weeks). Line 3: page
+  `tags=[...]` (at most 2, then `+N`) on the left and LABELED stat pills
+  (`PROJ 10.8`, `VAL 49`, `ADP 38`, `EDGE ▲6` only when |edge| >= 3) in fixed-width
+  slots on the right, so a bare number never appears. `actions` slot for compact
+  40-44px icon buttons, `onOpen` for tap-row-to-open, `done` for the optimistic
+  "Drafted ✓" slide-out. Injured rows are never dimmed: a red chip plus a dot on the
+  photo. Fantasy Sim maps its players onto it through `SimDraftRow` (draft Players /
+  Board, rookie draft, Players tab, Waivers) and `SimPlayerLine` (queue, roster,
+  bench / lineup pickers, trade rows, inbox), using `simDraftMeta` and
+  `simListStats` in `lib/simDraft.ts`.
 - `card`: larger tile (photo 56) with the value ring (`OvrGauge`) for rosters and
   grids; up to 3 stats.
 
-Avatar scale tokens: `PLAYER_CARD_AVATAR_SIZE = { compact: 32, matchup: 40, card: 56 }`.
+Avatar scale tokens: `PLAYER_CARD_AVATAR_SIZE = { compact: 32, matchup: 40, card: 56, list: 40 }`.
 
 ## Model rules (lib/playerCard.ts)
 
@@ -67,6 +82,8 @@ instead. The "TapForWhy" affordance from the Wave 0 pattern components plugs in 
 | Trade builder summary assets | `compact` | follow-up |
 | Players list / rankings | `compact` (replaces PlayerRow identity half) | follow-up |
 | Dashboard lists (needs attention, opportunities) | `compact` (replaces CompactPlayerModule) | follow-up |
-| Fantasy Sim | keep SimPlayerChip/SimPlayerLine; adopt `card` in roster views later | follow-up |
+| Fantasy Sim lists (draft Players/Board/Queue, rookie draft, Players, Waivers, roster / bench pickers, trade rows, inbox) | `list` via SimDraftRow / SimPlayerLine | done (web + app) |
+| Real app Waivers, Players, My Team roster | `list` (add `tags` for waiver target / trending / hot streak) | follow-up: each page has its own row today (`PlayerRow`, `CompactPlayerModule`); swap them to `PlayerListRow` one page at a time |
+| Fantasy Sim headers / chips (`SimPlayerChip` in cards) | `compact` | follow-up |
 
 Rule: new player UI uses this kit; do not hand-roll a photo + name + number row.

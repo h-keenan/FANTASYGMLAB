@@ -15,7 +15,7 @@ from modules.sim.game_eval import Evaluator
 from modules.sim.game_state import GameState
 from modules.sim.game_types import PREVIEW_PAYWALL_WEEK, GameSnapshot, headshot_id
 from modules.sim.personas import PERSONAS
-from modules.sim.types import is_pick_id
+from modules.sim.types import FLEX_SLOTS, is_pick_id
 
 PAGE_MAX = 60
 SORTS = ("projection", "value", "adp", "age", "name", "last_week", "season")
@@ -125,10 +125,12 @@ def players_page(
     user = snap.user_team.tid
     w = max(state.week, 1)
     needle = q.strip().lower()
+    # QB/RB/WR/TE/K/DEF, or a flex eligibility group (FLEX, REC_FLEX, SUPER_FLEX) from the lineup slot definitions.
+    pos_group = FLEX_SLOTS.get(pos) or frozenset({pos})
     pids = []
     for pid in snap.pids:
         p = snap.players[pid]
-        if pos and p.pos != pos:
+        if pos and p.pos not in pos_group:
             continue
         if needle and needle not in p.name.lower() and needle != p.nfl_team.lower():
             continue

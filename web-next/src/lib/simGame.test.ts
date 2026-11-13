@@ -37,6 +37,8 @@ import {
   simHeadshotId,
   simPlayerInitials,
   simPlayerSubline,
+  simFilterPositionsFor,
+  simPosMatches,
   simSlotRepeatsPosition,
   simGameReasonMessage,
   simGameStage,
@@ -703,5 +705,21 @@ describe("simTradeReducer set (the sheet's Apply)", () => {
     expect(simTradeReducer(base, { type: "set", side: "give", ids: ["a", "b", "c", "d", "e"], max: 4 }).give).toEqual(["a", "b", "c", "d"]);
     expect(simTradeReducer(base, { type: "set", side: "get", ids: [] }).get).toEqual([]);
     expect(simTradeReducer(base, { type: "set", side: "give", ids: ["pick:2027:1:3", "q"], max: 4 }).give).toEqual(["pick:2027:1:3", "q"]);
+  });
+});
+
+describe("flex position filters", () => {
+  it("orders pills QB RB WR TE FLEX SUPERFLEX K DEF from the league's slots", () => {
+    const labels = (slots: Parameters<typeof simFilterPositionsFor>[0]) => simFilterPositionsFor(slots).map((o) => o.label);
+    expect(labels(["QB", "RB", "RB", "WR", "WR", "TE", "FLEX", "K"])).toEqual(["QB", "RB", "WR", "TE", "FLEX", "K"]);
+    expect(labels(["QB", "RB", "WR", "TE", "SUPER_FLEX", "DEF"])).toEqual(["QB", "RB", "WR", "TE", "FLEX", "SUPERFLEX", "DEF"]);
+    expect(labels(["QB", "RB", "WR", "TE"])).toEqual(["QB", "RB", "WR", "TE"]);
+  });
+  it("matches eligibility the way the server does", () => {
+    expect(simPosMatches("RB", "FLEX")).toBe(true);
+    expect(simPosMatches("QB", "FLEX")).toBe(false);
+    expect(simPosMatches("QB", "SUPER_FLEX")).toBe(true);
+    expect(simPosMatches("K", "SUPER_FLEX")).toBe(false);
+    expect(simPosMatches("K", "")).toBe(true);
   });
 });

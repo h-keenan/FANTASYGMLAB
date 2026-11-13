@@ -59,11 +59,37 @@ describe("SimPlayerChip quick", () => {
 describe("SimDraftRow", () => {
   it("shows the edge from value rank vs ADP (green steal, red reach) and four aligned stats", () => {
     const { rerender } = render(<SimDraftRow player={player({ adp: 40, value_rank: 22, adp_edge: 18 })} />);
-    expect(screen.getByTitle(/Steal/)).toHaveTextContent("18");
+    expect(document.querySelector("[data-stat=edge]")).toHaveTextContent("Edge▲18");
     rerender(<SimDraftRow player={player({ adp: 10, value_rank: 25, adp_edge: -15 })} />);
-    expect(screen.getByTitle(/Reach/)).toHaveTextContent("15");
+    expect(document.querySelector("[data-stat=edge]")).toHaveTextContent("Edge▼15");
     rerender(<SimDraftRow player={player({ adp: 20, value_rank: 21, adp_edge: -1 })} />);
-    expect(screen.queryByTitle(/Steal|Reach/)).toBeNull();
+    expect(document.querySelector("[data-stat=edge]")).toBeNull();
+    // every number carries its caption
+    expect(document.querySelector("[data-stat=proj]")).toHaveTextContent(/^Proj/);
+    expect(document.querySelector("[data-stat=val]")).toHaveTextContent(/^Val/);
+    expect(document.querySelector("[data-stat=adp]")).toHaveTextContent(/^ADP/);
+  });
+});
+
+describe("SimDraftRow bye, injury and drafted states", () => {
+  it("always shows the bye week in the meta line, warning-colored only when it is soon", () => {
+    const { rerender } = render(<SimDraftRow player={player({ bye_week: 11 })} />);
+    expect(screen.getByTestId("list-meta")).toHaveTextContent("Bye 11");
+    expect(screen.getByText("Bye 11").style.fontWeight).toBe("");
+    rerender(<SimDraftRow player={player({ bye_week: 2 })} />);
+    expect(screen.getByText("Bye 2").style.fontWeight).toBe("700");
+  });
+  it("marks an injured player with the OUT chip and a note, and never dims the row", () => {
+    render(<SimDraftRow player={player({ status: "out", out_weeks: 4, ros_mean: 15, projection: 0 })} actions={<button>Draft</button>} />);
+    expect(screen.getByText("OUT 4W")).toBeInTheDocument();
+    const row = screen.getByTestId("draft-row");
+    expect(row.style.opacity).toBe("");
+    expect(screen.getByRole("button", { name: "Draft" })).toBeEnabled();
+  });
+  it("an optimistic pick shows Drafted and hides the actions", () => {
+    render(<SimDraftRow player={player()} drafted actions={<button>Draft</button>} />);
+    expect(screen.getByRole("status")).toHaveTextContent("Drafted");
+    expect(screen.queryByRole("button", { name: "Draft" })).toBeNull();
   });
 });
 

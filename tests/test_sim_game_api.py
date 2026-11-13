@@ -141,6 +141,42 @@ def test_pick_resolves_ai_picks_until_your_next_turn():
     assert bad.status_code == 422
 
 
+def test_double_submitted_pick_drafts_exactly_one_player():
+    client, _, _ = make_app()
+    data = new_game(client, user_slot=3)
+    gid = data["game"]["id"]
+    on_clock = data["draft"]["pick_no"]
+    first_pid = data["hint"]["player"]["id"]
+    ok = client.post(f"/v1/sim/games/{gid}/draft/pick", json={"player_id": first_pid, "pick_no": on_clock}, headers=hdr())
+    assert ok.status_code == 200 and ok.json()["reason"] == ""
+    mine_before = len(client.get(f"/v1/sim/games/{gid}/draft", headers=hdr()).json()["draft"]["your_roster"])
+    # the second tap carries the same (now stale) pick_no and a different player
+    other = client.get(f"/v1/sim/games/{gid}/players?status=available", headers=hdr()).json()["items"][0]["id"]
+    dup = client.post(f"/v1/sim/games/{gid}/draft/pick", json={"player_id": other, "pick_no": on_clock}, headers=hdr())
+    assert dup.status_code == 409 and dup.json()["reason"] == "already_picked"
+    mine_after = len(client.get(f"/v1/sim/games/{gid}/draft", headers=hdr()).json()["draft"]["your_roster"])
+    assert mine_after == mine_before == 1
+    # old clients (no pick_no) still work
+    legacy = client.post(f"/v1/sim/games/{gid}/draft/pick", json={"player_id": other}, headers=hdr())
+    assert legacy.status_code == 200
+
+
+def test_players_pos_accepts_flex_eligibility_groups():
+    client, _, _ = make_app()
+    gid = new_game(client)["game"]["id"]
+
+    def positions(pos):
+        res = client.get(f"/v1/sim/games/{gid}/players?status=available&page_size=100&pos={pos}", headers=hdr())
+        assert res.status_code == 200
+        return {p["pos"] for p in res.json()["items"]}
+
+    assert positions("FLEX") == {"RB", "WR", "TE"}
+    assert positions("SUPER_FLEX") == {"QB", "RB", "WR", "TE"}
+    assert positions("REC_FLEX") == {"WR", "TE"}
+    assert positions("QB") == {"QB"}
+    assert client.get(f"/v1/sim/games/{gid}/players?pos=BOGUS", headers=hdr()).status_code == 422
+
+
 def test_draft_auto_completes_the_draft_and_starts_week_one():
     client, backend, _ = make_app()
     gid = new_game(client)["game"]["id"]

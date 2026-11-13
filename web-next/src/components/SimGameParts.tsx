@@ -7,7 +7,10 @@ import { AccentCard } from "@/components/AccentCard";
 import { Button } from "@/components/Button";
 import { Collapsible } from "@/components/Collapsible";
 import { PlayerAvatar } from "@/components/PlayerAvatar";
+import { PlayerListRow } from "@/components/PlayerListRow";
 import { PlayerIdentity } from "@/components/PlayerRow";
+import type { PlayerListTag } from "@/lib/playerListRow";
+import { simDraftMeta, simDraftRowChips } from "@/lib/simDraft";
 import { ReviewGlyphChip } from "@/components/SeasonReviewSections";
 import { SectionHeading } from "@/components/SectionHeading";
 import { SheetHandle } from "@/components/SheetHandle";
@@ -196,47 +199,75 @@ export function SimPlayerLine({
   player,
   trailing,
   onOpen,
-  muted = false,
   selected = false,
   extra,
   hidePosition = false,
+  tags,
+  week = null,
 }: {
   player: SimGamePlayer;
   trailing?: ReactNode;
   onOpen?: (player: SimGamePlayer) => void;
+  /** Kept for callers that dimmed bench rows; a list row is never dimmed. */
   muted?: boolean;
   selected?: boolean;
   extra?: ReactNode;
   hidePosition?: boolean;
+  tags?: PlayerListTag[];
+  /** Current game week, to flag a bye that is close. Omit when unknown (the bye still shows). */
+  week?: number | null;
 }) {
-  const identity = <SimPlayerChip player={player} size={32} muted={muted} extra={extra} hidePosition={hidePosition} className="flex-1 min-w-0" />;
+  const [chip] = simDraftRowChips(player);
   return (
-    <div
-      className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1 py-1"
-      style={{
-        borderBottom: "var(--border-width-default) solid var(--color-border)",
-        background: selected ? "var(--color-accent-soft)" : undefined,
-      }}
-    >
-      {onOpen ? (
-        <button
-          type="button"
-          onClick={() => onOpen(player)}
-          className="flex flex-1 items-center text-left"
-          style={{ minHeight: "var(--touch-target-min)", minWidth: "min(100%, 12rem)" }}
-          aria-label={`${player.name}, ${player.pos}. Open player details`}
-        >
-          {identity}
-        </button>
-      ) : (
-        identity
-      )}
-      {trailing ? <div className="flex items-center gap-2 ml-auto">{trailing}</div> : null}
-    </div>
+    <PlayerListRow
+      testId="sim-player-line"
+      name={player.name}
+      position={hidePosition ? null : player.pos}
+      headshotId={simHeadshotId(player)}
+      fallbackLabel={simPlayerInitials(player)}
+      meta={simDraftMeta(player, week)}
+      chip={chip ? { label: chip.label, tone: chip.tone } : null}
+      hurt={player.status === "out"}
+      tags={tags}
+      extra={extra}
+      actions={trailing}
+      selected={selected}
+      onOpen={onOpen ? () => onOpen(player) : undefined}
+      openLabel={`${player.name}, ${player.pos}. Open player details`}
+    />
   );
 }
 
-/** A 40px icon-only control for dense rows (queue, draft). The label is the accessible name. */
+/**
+ * Shared "action in flight" guard for every game button. `run(fn)` flips
+ * `pending` on in the same event (one frame to a spinner/disabled state), ignores
+ * a second call while the first is still running (a synchronous ref, so a
+ * double tap in one frame cannot double submit) and clears when it settles.
+ * mobile/src/components/SimGameParts.tsx has the same hook.
+ */
+export function useSimPending() {
+  const inflight = useRef(false);
+  const [pending, setPending] = useState(false);
+  const run = async <T,>(fn: () => T | Promise<T>): Promise<T | undefined> => {
+    if (inflight.current) return undefined;
+    inflight.current = true;
+    setPending(true);
+    try {
+      return await fn();
+    } finally {
+      inflight.current = false;
+      setPending(false);
+    }
+  };
+  return { pending, run };
+}
+
+/**
+ * An icon-only control for dense rows (queue, draft). The label is the
+ * accessible name. Instant feedback: on press it shows a pressed state and, when
+ * the handler returns a promise, a spinner and a disabled state until it
+ * settles (a synchronous ref guard blocks a double tap in the same frame).
+ */
 export function SimIconButton({
   label,
   onClick,
@@ -244,40 +275,49 @@ export function SimIconButton({
   primary = false,
   disabled = false,
   busy = false,
+  size = 40,
+  width,
   children,
 }: {
   label: string;
-  onClick: () => void;
+  onClick: () => void | Promise<unknown>;
   pressed?: boolean;
   primary?: boolean;
   disabled?: boolean;
   busy?: boolean;
+  /** Height in px (also the width unless `width` is set). */
+  size?: number;
+  width?: number;
   children: ReactNode;
 }) {
+  const { pending, run } = useSimPending();
   const on = primary || pressed;
+  const working = busy || pending;
   return (
     <button
       type="button"
       aria-label={label}
       aria-pressed={pressed}
-      disabled={disabled || busy}
+      aria-busy={working || undefined}
+      disabled={disabled || working}
       onClick={(event) => {
         event.stopPropagation();
-        onClick();
+        void run(onClick);
       }}
-      className="inline-flex shrink-0 items-center justify-center"
+      className="inline-flex shrink-0 items-center justify-center active:scale-95"
       style={{
-        width: 40,
-        height: 40,
+        width: width ?? size,
+        height: size,
         borderRadius: "var(--radius-control)",
-        border: `var(--border-width-default) solid ${on ? "var(--color-accent)" : "var(--color-border-strong)"}`,
-        background: primary ? "var(--color-accent-strong)" : pressed ? "var(--color-accent-soft)" : "transparent",
+        border: `var(--border-width-default) solid ${on ? "var(--color-accent)" : "transparent"}`,
+        background: primary ? "var(--color-accent-strong)" : pressed ? "var(--color-accent-soft)" : "var(--color-surface-muted)",
         color: primary ? "var(--color-on-accent)" : on ? "var(--color-accent)" : "var(--color-text-secondary)",
-        opacity: disabled ? 0.5 : 1,
-        cursor: disabled || busy ? "default" : "pointer",
+        opacity: disabled && !working ? 0.5 : 1,
+        cursor: disabled || working ? "default" : "pointer",
+        transition: "transform 90ms ease-out",
       }}
     >
-      {children}
+      {working ? <span aria-hidden="true" className="inline-block h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent" /> : children}
     </button>
   );
 }
