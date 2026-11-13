@@ -289,6 +289,29 @@ describe("MatchupContent", () => {
     expect(within(table).getAllByTestId("slot-bar").length).toBeGreaterThan(1);
   });
 
+  it("phone: one compact row per slot, accordion expands one slot at a time", () => {
+    const original = window.matchMedia;
+    window.matchMedia = ((query: string) => ({
+      matches: true, media: query, addEventListener: () => {}, removeEventListener: () => {},
+    })) as unknown as typeof window.matchMedia;
+    try {
+      render(<MatchupContent leagueName="My League" matchup={liveResponse()} />);
+      const list = screen.getByRole("list", { name: "Lineup comparison by slot" });
+      expect(within(list).getAllByTestId("slot-row").length).toBeGreaterThan(1);
+      expect(within(list).queryByTestId("player-card-matchup")).not.toBeInTheDocument();
+      expect(screen.getByTestId("slot-legend")).toBeInTheDocument();
+      const centers = within(list).getAllByTestId("slot-center");
+      fireEvent.click(centers[0]);
+      expect(within(list).getAllByTestId("slot-expanded")).toHaveLength(1);
+      fireEvent.click(centers[1]);
+      expect(within(list).getAllByTestId("slot-expanded")).toHaveLength(1);
+      fireEvent.click(centers[1]);
+      expect(within(list).queryByTestId("slot-expanded")).not.toBeInTheDocument();
+    } finally {
+      window.matchMedia = original;
+    }
+  });
+
   it("live: shows Proj final for an in-progress starter and the freshness indicator with refresh", () => {
     const base = liveResponse();
     const matchup = liveResponse({

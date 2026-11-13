@@ -1,8 +1,9 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { StyleSheet, View } from 'react-native';
+import { Animated, StyleSheet, TouchableOpacity, View } from 'react-native';
 
 import AppText from './AppText';
-import { EmptySlotCard, PlayerCard } from './PlayerCardKit';
+import { PlayerCard } from './PlayerCardKit';
+import PlayerAvatar from './PlayerAvatar';
 import PositionBadge from './PositionBadge';
 import SegmentedTabBar from './SegmentedTabBar';
 import TickNumber from './TickNumber';
@@ -12,6 +13,7 @@ import type { MatchupSide, MatchupWinProbability } from '../lib/api';
 import { changedPlayerIds, slotTotals, sortSlots, type SlotComparison, type SlotSortMode } from '../lib/lineupSlots';
 import { freshnessLabel } from '../lib/liveScores';
 import { formatSigned, type LineupPlayer } from '../lib/matchupPresentation';
+import { headlinePoints, playerCardAriaLabel, playerStatusChips, trendVsProjection, type ChipTone } from '../lib/playerCard';
 import { radii, spacing, type ThemeColors } from '../theme';
 
 /**
@@ -114,70 +116,212 @@ export function ComparisonHeader({
   );
 }
 
-function SlotCenter({ slot }: { slot: SlotComparison }) {
+function dotColor(colors: ThemeColors, tone: ChipTone): string {
+  switch (tone) {
+    case 'success':
+      return colors.successBright;
+    case 'danger':
+      return colors.danger;
+    case 'warning':
+      return colors.warning;
+    case 'accent':
+      return colors.accent;
+    default:
+      return colors.textTertiary;
+  }
+}
+
+function CompactSide({
+  cell,
+  mirror,
+  emphasis,
+  pulseKey,
+  onPress,
+}: {
+  cell: SlotComparison['mine'];
+  mirror: boolean;
+  emphasis: 'win' | 'lose' | 'even';
+  pulseKey: number;
+  onPress?: () => void;
+}) {
   const { colors } = useThemeMode();
   const styles = useMemo(() => createStyles(colors), [colors]);
-  const share = slot.barShare;
-  const lead = slot.leader === 'mine' ? slot.margin : slot.leader === 'opponent' ? -slot.margin : 0;
-  return (
-    <View style={styles.center} testID="slot-center">
-      <PositionBadge position={slot.slot} label={slot.label} size="md" />
-      <View
-        style={styles.barTrack}
-        accessible
-        accessibilityLabel={
-          share == null
-            ? `${slot.label}: no comparison yet`
-            : `${slot.label}: you ${Math.round(share)}% of this slot, opponent ${100 - Math.round(share)}%`
-        }
-      >
-        <View style={[styles.barFill, { width: `${share ?? 50}%`, opacity: share == null ? 0.25 : 1 }]} />
+  if (cell.kind === 'none') return <View style={styles.flex} />;
+  if (cell.kind === 'empty') {
+    return (
+      <View style={styles.flex}>
+        <AppText style={styles.empty}>{onPress ? 'Empty, tap to fill' : 'Empty slot'}</AppText>
       </View>
-      <AppText style={[styles.lead, { color: leadColor(colors, lead) }]}>
-        {slot.leader == null ? '—' : slot.leader === 'tie' ? 'Even' : formatSigned(lead)}
-      </AppText>
-      {slot.decides ? <ToneBadge size="xs" label="Decides" color={colors.warning} /> : null}
-    </View>
+    );
+  }
+  const card = cell.card;
+  const head = headlinePoints(card);
+  const trend = trendVsProjection(card);
+  const chips = playerStatusChips(card);
+  const primary = chips[0];
+  const flag = chips.find((chip) => chip.kind === 'questionable' || chip.kind === 'doubtful');
+  const align = mirror ? 'flex-end' : 'flex-start';
+  const trendColor = trend ? (trend.dir === 'up' ? colors.successBright : trend.dir === 'down' ? colors.danger : colors.textTertiary) : colors.textSecondary;
+  return (
+    <TouchableOpacity
+      style={[
+        styles.flex,
+        styles.side,
+        mirror && { flexDirection: 'row-reverse' },
+        emphasis === 'win' && { backgroundColor: colors.accentMuted },
+      ]}
+      onPress={onPress}
+      disabled={!onPress}
+      accessibilityRole="button"
+      accessibilityLabel={playerCardAriaLabel(card)}
+    >
+      {pulseKey > 0 ? <PulseRing pulseKey={pulseKey} /> : null}
+      <PlayerAvatar playerId={card.playerId} tier={card.tier} size={36} fallbackLabel={card.team} />
+      <View style={[styles.flex, { alignItems: align, gap: 1 }]}>
+        <AppText style={[styles.sideName, mirror && { textAlign: 'right' }]} numberOfLines={1}>
+          {card.name}
+        </AppText>
+        <View style={[styles.statusRow, mirror && { flexDirection: 'row-reverse' }]}>
+          {primary ? <View style={[styles.dot, { backgroundColor: dotColor(colors, primary.tone) }]} /> : null}
+          {primary ? <AppText style={[styles.statusText, { color: dotColor(colors, primary.tone) }]}>{primary.label}</AppText> : null}
+          {flag ? <AppText style={[styles.statusText, { color: dotColor(colors, flag.tone) }]}>{flag.kind === 'doubtful' ? 'D' : 'Q'}</AppText> : null}
+        </View>
+        <View style={[styles.statusRow, mirror && { flexDirection: 'row-reverse' }, { gap: 6 }]}>
+          {head.value != null ? (
+            <TickNumber
+              value={head.value}
+              style={[styles.sidePoints, { color: emphasis === 'lose' ? colors.textTertiary : colors.textPrimary }]}
+            />
+          ) : (
+            <AppText style={[styles.sidePoints, { color: colors.textTertiary }]}>{card.bye || card.out ? '0.0' : '—'}</AppText>
+          )}
+          {card.projectedFinal != null ? (
+            <AppText style={[styles.statusText, { color: trendColor }]}>
+              {trend ? (trend.dir === 'up' ? '▲' : trend.dir === 'down' ? '▼' : '–') : ''}
+              {card.projectedFinal.toFixed(1)}
+            </AppText>
+          ) : head.kind === 'proj' ? (
+            <AppText style={[styles.statusText, { color: colors.textTertiary }]}>PROJ</AppText>
+          ) : null}
+        </View>
+      </View>
+    </TouchableOpacity>
   );
 }
 
+function PulseRing({ pulseKey }: { pulseKey: number }) {
+  const { colors } = useThemeMode();
+  const opacity = useRef(new Animated.Value(0)).current;
+  useEffect(() => {
+    opacity.setValue(0.85);
+    Animated.timing(opacity, { toValue: 0, duration: 1400, useNativeDriver: true }).start();
+  }, [pulseKey, opacity]);
+  return (
+    <Animated.View
+      pointerEvents="none"
+      style={[StyleSheet.absoluteFillObject, { borderRadius: radii.md, borderWidth: 2, borderColor: colors.successBright, opacity }]}
+    />
+  );
+}
+
+/** Phone row: [my player] [slot label + lead bar + margin, tap to expand] [opponent mirrored]. */
 export function SlotRow({
   slot,
   pulses,
   onPressPlayer,
   onEditMine,
+  open,
+  onToggle,
 }: {
   slot: SlotComparison;
   pulses: Map<string, number>;
   onPressPlayer: (player: LineupPlayer) => void;
   onEditMine?: () => void;
+  open: boolean;
+  onToggle: () => void;
 }) {
   const { colors } = useThemeMode();
   const styles = useMemo(() => createStyles(colors), [colors]);
   const emphasis = (side: 'mine' | 'opponent') =>
     slot.leader == null || slot.leader === 'tie' ? 'even' : slot.leader === side ? 'win' : 'lose';
-  const cell = (side: 'mine' | 'opponent') => {
-    const value = side === 'mine' ? slot.mine : slot.opponent;
-    if (value.kind === 'none') return null;
-    if (value.kind === 'empty') return <EmptySlotCard onPress={side === 'mine' ? onEditMine : undefined} />;
-    const editing = side === 'mine' && onEditMine != null;
-    return (
-      <PlayerCard
-        variant="matchup"
-        model={value.card}
-        emphasis={emphasis(side)}
-        sideTag={side === 'mine' ? 'you' : 'opp'}
-        editing={editing}
-        pulseKey={value.card.playerId ? (pulses.get(value.card.playerId) ?? 0) : 0}
-        onPress={editing ? onEditMine : () => onPressPlayer(value.source)}
-      />
-    );
-  };
+  const pulse = (cell: SlotComparison['mine']) => (cell.kind === 'player' && cell.card.playerId ? (pulses.get(cell.card.playerId) ?? 0) : 0);
+  const lead = slot.leader === 'mine' ? slot.margin : slot.leader === 'opponent' ? -slot.margin : 0;
+  const share = slot.barShare;
   return (
-    <View style={[styles.slotRow, slot.decides && { borderColor: colors.warning, backgroundColor: colors.warningMuted }]} testID="slot-row">
-      {cell('mine')}
-      <SlotCenter slot={slot} />
-      {cell('opponent')}
+    <View
+      style={[styles.slotRow, slot.decides && { borderColor: colors.warning, backgroundColor: colors.warningMuted }]}
+      testID="slot-row"
+    >
+      <View style={styles.compactGrid}>
+        <CompactSide
+          cell={slot.mine}
+          mirror={false}
+          emphasis={emphasis('mine')}
+          pulseKey={pulse(slot.mine)}
+          onPress={onEditMine ?? (slot.mine.kind === 'player' ? () => onPressPlayer((slot.mine as { source: LineupPlayer }).source) : undefined)}
+        />
+        <TouchableOpacity
+          style={styles.compactCenter}
+          onPress={onToggle}
+          accessibilityRole="button"
+          accessibilityState={{ expanded: open }}
+          accessibilityLabel={`${slot.label} details`}
+        >
+          <PositionBadge position={slot.slot} label={slot.label} />
+          <View style={styles.barTrack}>
+            <View style={[styles.barFill, { width: `${share ?? 50}%`, opacity: share == null ? 0.25 : 1 }]} />
+          </View>
+          <AppText style={[styles.leadSmall, { color: leadColor(colors, lead) }]}>
+            {slot.leader == null ? '—' : slot.leader === 'tie' ? 'Even' : formatSigned(lead)}
+            {open ? ' ▴' : ' ▾'}
+          </AppText>
+        </TouchableOpacity>
+        <CompactSide
+          cell={slot.opponent}
+          mirror
+          emphasis={emphasis('opponent')}
+          pulseKey={pulse(slot.opponent)}
+          onPress={slot.opponent.kind === 'player' ? () => onPressPlayer((slot.opponent as { source: LineupPlayer }).source) : undefined}
+        />
+      </View>
+      {open ? (
+        <View style={{ gap: 6, paddingTop: 6 }} testID="slot-expanded">
+          {([['mine', slot.mine], ['opponent', slot.opponent]] as const).map(([side, cell]) =>
+            cell.kind === 'player' ? (
+              <PlayerCard
+                key={side}
+                variant="matchup"
+                model={cell.card}
+                emphasis={emphasis(side)}
+                sideTag={side === 'mine' ? 'you' : 'opp'}
+                onPress={() => onPressPlayer(cell.source)}
+              />
+            ) : null,
+          )}
+        </View>
+      ) : null}
+    </View>
+  );
+}
+
+function Legend() {
+  const { colors } = useThemeMode();
+  const styles = useMemo(() => createStyles(colors), [colors]);
+  const items: [string, string][] = [
+    ['LIVE', colors.successBright],
+    ['FINAL', colors.textTertiary],
+    ['UPCOMING', colors.accent],
+    ['BYE / OUT', colors.warning],
+  ];
+  return (
+    <View style={styles.legend}>
+      {items.map(([label, color]) => (
+        <View key={label} style={styles.statusRow}>
+          <View style={[styles.dot, { backgroundColor: color }]} />
+          <AppText style={styles.statusText}>{label}</AppText>
+        </View>
+      ))}
+      <AppText style={styles.statusText}>DECIDES = amber ring · tap middle to expand</AppText>
     </View>
   );
 }
@@ -195,10 +339,20 @@ export function SlotList({
 }) {
   const pulses = usePointPulses(slots);
   const ordered = useMemo(() => sortSlots(slots, sort), [slots, sort]);
+  const [openKey, setOpenKey] = useState<string | null>(null);
   return (
-    <View style={{ gap: spacing.md }}>
+    <View style={{ gap: spacing.xs }}>
+      <Legend />
       {ordered.map((slot) => (
-        <SlotRow key={slot.key} slot={slot} pulses={pulses} onPressPlayer={onPressPlayer} onEditMine={planEditIndex?.(slot)} />
+        <SlotRow
+          key={slot.key}
+          slot={slot}
+          pulses={pulses}
+          onPressPlayer={onPressPlayer}
+          onEditMine={planEditIndex?.(slot)}
+          open={openKey === slot.key}
+          onToggle={() => setOpenKey((current) => (current === slot.key ? null : slot.key))}
+        />
       ))}
     </View>
   );
@@ -219,6 +373,17 @@ function createStyles(colors: ThemeColors) {
       borderWidth: 1,
       borderColor: 'transparent',
     },
+    compactGrid: { flexDirection: 'row', alignItems: 'center', gap: 2 },
+    compactCenter: { width: 52, alignItems: 'center', gap: 4 },
+    side: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingVertical: 4, paddingHorizontal: 3, borderRadius: radii.md },
+    sideName: { fontSize: 13, fontWeight: '700', color: colors.textPrimary, alignSelf: 'stretch' },
+    sidePoints: { fontSize: 17, fontWeight: '800', fontVariant: ['tabular-nums'] },
+    statusRow: { flexDirection: 'row', alignItems: 'center', gap: 3 },
+    statusText: { fontSize: 12, fontWeight: '800', letterSpacing: 0.3, color: colors.textTertiary, fontVariant: ['tabular-nums'] },
+    dot: { width: 6, height: 6, borderRadius: 3 },
+    empty: { fontSize: 12.5, fontStyle: 'italic', color: colors.textTertiary },
+    leadSmall: { fontSize: 12, fontWeight: '800', fontVariant: ['tabular-nums'] },
+    legend: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm, alignItems: 'center' },
     center: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, paddingHorizontal: 4 },
     barTrack: { flex: 1, height: 4, borderRadius: 2, backgroundColor: colors.border, overflow: 'hidden' },
     barFill: { height: '100%', backgroundColor: colors.successBright },
