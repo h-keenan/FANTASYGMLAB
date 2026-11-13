@@ -45,7 +45,7 @@ FILE_REAL_MODULES = {
 EXTERNAL_IMPORTERS = {"services/mobile_api_service.py": {"modules.sim.api"}}
 PURE_ENGINE_FILES = [
     "engine.py", "analysis.py", "lineup.py", "personas.py", "rng.py", "types.py", "synthetic.py",
-    "store.py", "version.py", "__init__.py", "picks.py", "player_model.py", "forecast.py",
+    "store.py", "version.py", "__init__.py", "picks.py", "player_model.py", "player_model_v1.py", "forecast.py",
     # the interactive GM game (everything but its router is pure stdlib + numpy + modules.sim)
     "game_types.py", "game_scoring.py", "game_setup.py", "game_state.py", "game_eval.py", "game_draft.py",
     "game_ai.py", "game_actions.py", "game_engine.py", "game_result.py", "game_store.py", "game_view.py", "game_home.py",
@@ -170,7 +170,7 @@ def test_player_model_and_calibration_are_pure_engine_files():
     for name in PURE_ENGINE_FILES:
         assert (SIM_DIR / name).exists(), name
     assert "player_model.py" in PURE_ENGINE_FILES
-    files = sorted(CALIBRATION_DIR.glob("*.py")) + [SIM_DIR / "player_model.py"]
+    files = sorted(CALIBRATION_DIR.glob("*.py")) + [SIM_DIR / "player_model.py", SIM_DIR / "player_model_v1.py"]
     assert {f.name for f in files} >= {"player_model.py", "dataset.py", "backtest.py", "fit.py"}
     for path in files:
         bad = []
