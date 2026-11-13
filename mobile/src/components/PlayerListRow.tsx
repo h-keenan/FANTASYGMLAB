@@ -229,10 +229,10 @@ function createStyles(colors: ThemeColors) {
     doneText: { fontSize: 12, fontWeight: '800', color: colors.accent, paddingRight: 4 },
     line3: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8, paddingBottom: 2 },
     tags: { flex: 1, minWidth: 0, flexDirection: 'row', alignItems: 'center', gap: 4, overflow: 'hidden' },
-    more: { fontSize: 10, fontWeight: '700', color: colors.textTertiary },
+    more: { fontSize: 12, fontWeight: '700', color: colors.textTertiary },
     stats: { flexShrink: 0, flexDirection: 'row', alignItems: 'center', justifyContent: 'flex-end', columnGap: 2 },
     pill: { flexDirection: 'row', alignItems: 'baseline', gap: 4, borderRadius: radii.pill, paddingHorizontal: 6, backgroundColor: colors.glassInput },
-    pillLabel: { fontSize: 9, lineHeight: 16, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.4, color: colors.textTertiary },
+    pillLabel: { fontSize: 12, lineHeight: 16, fontWeight: '600', color: colors.textTertiary },
     pillValue: { fontSize: 12, lineHeight: 16, fontWeight: '700', color: colors.textPrimary, fontVariant: ['tabular-nums'] },
   });
 }
