@@ -4294,6 +4294,7 @@ main > header:has(> h1.sr-only:only-child) {
   align-items: center;
   gap: 0.125rem;
   color: var(--color-accent);
+}
 
 /* Overlay layers (lib/overlayStack.ts OVERLAY_Z): sheets 70, real dialogs 90, toasts 100. Toasts are not pop-ups. */
 :root {
