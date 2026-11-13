@@ -2,9 +2,9 @@ import React, { useEffect, useMemo, useState, type ReactNode } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 
-import AccentCard from './AccentCard';
 import AppText from './AppText';
 import Button from './Button';
+import Collapsible from './Collapsible';
 import { SimPlayerLine, SimSheet, SimStat, SimToneBadge, createSimStyles, simToneColor, type SimCtx } from './SimGameParts';
 import ToneBadge from './ToneBadge';
 import { useThemeMode } from '../context/ThemeModeContext';
@@ -28,9 +28,10 @@ import {
 import { spacing, type ThemeColors } from '../theme';
 
 /**
- * A collapsible block: a full-width header (title, one summary line, chevron)
- * over a body. Collapsed by default so a phone screen shows the summary first.
- * Used by the Team tab, the offseason screens and the dynasty result.
+ * A collapsible block for the dynasty screens: a thin adapter over the shared
+ * Collapsible (mirrors web-next), so the Team tab, the offseason screens and
+ * the dynasty result open, close and remember their state like every other
+ * fold. Collapsed by default so a phone screen shows the summary first.
  */
 export function SimCollapse({
   title,
@@ -51,28 +52,22 @@ export function SimCollapse({
 }) {
   const { colors } = useThemeMode();
   const styles = useMemo(() => createStyles(colors), [colors]);
-  const [open, setOpen] = useState(defaultOpen);
   return (
-    <AccentCard accent={simToneColor(tone === 'muted' ? 'accent' : tone, colors)} compact>
-      <Pressable
-        style={styles.collapseHead}
-        onPress={() => setOpen((v) => !v)}
-        accessibilityRole="button"
-        accessibilityState={{ expanded: open }}
-        accessibilityLabel={`${title}${summary ? `. ${summary}` : ''}`}
-        testID={testID}
-      >
-        <View style={styles.collapseText}>
-          <View style={styles.collapseTitleRow}>
-            <AppText style={styles.collapseTitle}>{title}</AppText>
-            {badge}
-          </View>
-          {summary ? <AppText style={styles.collapseSummary}>{summary}</AppText> : null}
+    <Collapsible
+      id={`dyn.${testID ?? title}`}
+      testID={testID}
+      accent={simToneColor(tone === 'muted' ? 'accent' : tone, colors)}
+      defaultOpen={defaultOpen}
+      title={
+        <View style={styles.collapseTitleRow}>
+          <AppText style={styles.collapseTitle}>{title}</AppText>
+          {badge}
         </View>
-        <Ionicons name={open ? 'chevron-up' : 'chevron-down'} size={18} color={colors.textTertiary} />
-      </Pressable>
-      {open ? <View style={styles.collapseBody}>{children}</View> : null}
-    </AccentCard>
+      }
+      summary={summary ? <AppText style={styles.collapseSummary}>{summary}</AppText> : undefined}
+    >
+      {children}
+    </Collapsible>
   );
 }
 

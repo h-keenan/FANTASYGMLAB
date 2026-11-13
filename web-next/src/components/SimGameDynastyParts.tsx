@@ -2,8 +2,8 @@
 
 import { useEffect, useState, type ReactNode } from "react";
 
-import { AccentCard } from "@/components/AccentCard";
 import { Button } from "@/components/Button";
+import { Collapsible } from "@/components/Collapsible";
 import { SimPlayerLine, SimSheet, SimStat, SimToneBadge, simToneColor, type SimCtx } from "@/components/SimGameParts";
 import { ToneBadge } from "@/components/ToneBadge";
 import { api } from "@/lib/api";
@@ -25,10 +25,11 @@ import {
 } from "@/lib/simGame";
 
 /**
- * A collapsible block: a full-width header button (title, one summary line,
- * chevron) over a body. Collapsed by default so a phone screen shows the
- * summary first. Used by the Team tab, the offseason screens and the dynasty
- * result, so they all open and close the same way.
+ * A collapsible block for the dynasty screens: a thin adapter over the shared
+ * Collapsible (the one the whole game uses), so the Team tab, the offseason
+ * screens and the dynasty result open, close and remember their state the
+ * same way as every other fold. Collapsed by default so a phone screen shows
+ * the summary first.
  */
 export function SimCollapse({
   title,
@@ -47,44 +48,22 @@ export function SimCollapse({
   children: ReactNode;
   testId?: string;
 }) {
-  const [open, setOpen] = useState(defaultOpen);
   return (
-    <AccentCard accent={simToneColor(tone === "muted" ? "accent" : tone)} compact as="section" data-testid={testId}>
-      <button
-        type="button"
-        className="flex w-full items-center justify-between gap-2 text-left"
-        style={{ minHeight: "var(--touch-target-min)" }}
-        aria-expanded={open}
-        onClick={() => setOpen((v) => !v)}
-      >
-        <span className="flex min-w-0 flex-col">
-          <span className="flex items-center gap-2 text-sm font-extrabold">
-            {title}
-            {badge}
-          </span>
-          {summary ? (
-            <span className="text-xs" style={{ color: "var(--color-text-muted)" }}>
-              {summary}
-            </span>
-          ) : null}
+    <Collapsible
+      id={`dyn.${testId ?? title}`}
+      testId={testId}
+      accent={simToneColor(tone === "muted" ? "accent" : tone)}
+      defaultOpen={defaultOpen}
+      title={
+        <span className="inline-flex items-center gap-2">
+          {title}
+          {badge}
         </span>
-        <svg
-          aria-hidden="true"
-          width="16"
-          height="16"
-          viewBox="0 0 16 16"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth="1.6"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-          style={{ flexShrink: 0, transform: open ? "rotate(180deg)" : undefined, color: "var(--color-text-muted)" }}
-        >
-          <path d="M4 6l4 4 4-4" />
-        </svg>
-      </button>
-      {open ? <div className="flex flex-col gap-1 pt-1">{children}</div> : null}
-    </AccentCard>
+      }
+      summary={summary ? <span className="text-xs font-normal normal-case" style={{ color: "var(--color-text-muted)" }}>{summary}</span> : undefined}
+    >
+      {children}
+    </Collapsible>
   );
 }
 

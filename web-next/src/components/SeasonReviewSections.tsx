@@ -6,7 +6,8 @@ import { AccentCard } from "@/components/AccentCard";
 import { PositionBadge } from "@/components/PositionBadge";
 import { SectionHeading } from "@/components/SectionHeading";
 import { ReviewGlyphIcon } from "@/components/SimReviewGlyph";
-import { SimPlayerChip as BaseChip, simToneColor } from "@/components/SimGameParts";
+import { Collapsible } from "@/components/Collapsible";
+import { SimPlayerChip as BaseChip, simToneColor, useSimWide } from "@/components/SimGameParts";
 import { ToneBadge } from "@/components/ToneBadge";
 import type { SimPlayerRef } from "@/lib/simGame";
 import type {
@@ -86,13 +87,13 @@ export function ReviewCardView({ card }: { card: ReviewCard }) {
   const color = simToneColor(card.tone);
   return (
     <AccentCard accent={color} compact as="div" data-testid="review-card">
-      <div className="flex items-start gap-2">
+      <div className="flex flex-wrap items-start gap-2">
         <ReviewGlyphChip glyph={card.glyph} tone={card.tone} />
-        <div className="flex min-w-0 flex-1 flex-col">
+        <div className="flex min-w-[9rem] flex-1 flex-col">
           <span className="text-xs uppercase font-extrabold" style={{ color, letterSpacing: "var(--letter-spacing-badge)" }}>{card.label}</span>
           <p className="text-sm font-bold break-words">{card.headline}</p>
         </div>
-        <div className="flex shrink-0 flex-col items-end gap-1">
+        <div className="ml-auto flex shrink-0 flex-col items-end gap-1">
           {card.delta ? <ReviewDeltaText text={card.delta.text} tone={card.delta.tone} /> : null}
           {card.chip ? <ToneBadge label={card.chip.label} color={simToneColor(card.chip.tone)} size="xs" /> : null}
         </div>
@@ -220,37 +221,71 @@ function GameRow({ row }: { row: ReviewGameRow }) {
   );
 }
 
+/** Phone: swipeable snap cards (one screen of height, not a tall stack); md and up: the original grid. */
+const CAROUSEL = "-mx-1 flex snap-x gap-2 overflow-x-auto px-1 pb-1 md:mx-0 md:grid md:grid-cols-2 md:overflow-visible md:px-0 md:pb-0";
+const CAROUSEL_ITEM = "flex w-[84%] shrink-0 snap-start flex-col md:w-auto [&>*]:flex-1";
+
 function SectionBody({ section }: { section: ReviewSection }): ReactNode {
   switch (section.kind) {
     case "stats":
       return <div className="grid grid-cols-2 gap-2 md:grid-cols-4">{section.items.map((s, i) => <StatTile key={i} stat={s} />)}</div>;
     case "cards":
-      return <div className="grid grid-cols-1 gap-2 md:grid-cols-2">{section.cards.map((c) => <ReviewCardView key={c.id} card={c} />)}</div>;
+      return <div className={CAROUSEL}>{section.cards.map((c) => <div key={c.id} className={CAROUSEL_ITEM}><ReviewCardView card={c} /></div>)}</div>;
     case "path":
       return <PathView steps={section.steps} caption={section.caption} />;
     case "journey":
       return <JourneyView points={section.points} teams={section.teams} />;
     case "leaders":
-      return <div className="grid grid-cols-1 gap-2 md:grid-cols-2">{section.groups.map((g, i) => <LeaderGroup key={`${g.title}-${i}`} group={g} />)}</div>;
+      return <div className={CAROUSEL}>{section.groups.map((g, i) => <div key={`${g.title}-${i}`} className={CAROUSEL_ITEM}><LeaderGroup group={g} /></div>)}</div>;
     case "games":
       return <div className="flex flex-col gap-2">{section.rows.map((r, i) => <GameRow key={i} row={r} />)}</div>;
   }
 }
 
-export function SeasonReviewSections({ sections }: { sections: readonly ReviewSection[] }) {
+export function SeasonReviewSections({
+  sections,
+  only,
+  closed = [],
+}: {
+  sections: readonly ReviewSection[];
+  /** Render just these section ids (a Season in Review tab). */
+  only?: readonly string[];
+  /** Section ids that start collapsed on a phone. */
+  closed?: readonly string[];
+}) {
+  const wide = useSimWide();
+  const list = only ? sections.filter((s) => only.includes(s.id)) : sections;
   return (
     <>
-      {sections.map((section) => (
-        <section key={section.id} className="flex flex-col gap-2" aria-label={section.title} data-testid={`review-section-${section.id}`}>
-          <SectionHeading note={section.note} size="compact">
-            <span className="inline-flex items-center gap-2">
-              <ReviewGlyphChip glyph={section.glyph} tone="accent" size={24} />
-              {section.title}
-            </span>
-          </SectionHeading>
-          <SectionBody section={section} />
-        </section>
-      ))}
+      {list.map((section) =>
+        wide ? (
+          <section key={section.id} className="flex flex-col gap-2" aria-label={section.title} data-testid={`review-section-${section.id}`}>
+            <SectionHeading note={section.note} size="compact">
+              <span className="inline-flex items-center gap-2">
+                <ReviewGlyphChip glyph={section.glyph} tone="accent" size={24} />
+                {section.title}
+              </span>
+            </SectionHeading>
+            <SectionBody section={section} />
+          </section>
+        ) : (
+          <Collapsible
+            key={section.id}
+            id={`review.${section.id}`}
+            testId={`review-section-${section.id}`}
+            defaultOpen={!closed.includes(section.id)}
+            title={
+              <span className="inline-flex items-center gap-2">
+                <ReviewGlyphChip glyph={section.glyph} tone="accent" size={24} />
+                {section.title}
+              </span>
+            }
+          >
+            {section.note ? <p className="text-xs" style={{ color: "var(--color-text-muted)" }}>{section.note}</p> : null}
+            <SectionBody section={section} />
+          </Collapsible>
+        ),
+      )}
     </>
   );
 }

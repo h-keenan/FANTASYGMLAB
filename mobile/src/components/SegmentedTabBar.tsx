@@ -8,6 +8,10 @@ import { radii, spacing, type ThemeColors } from '../theme';
 export interface SegmentedTabOption<T extends string> {
   key: T;
   label: string;
+  /** Optional glyph slot, stacked over the label on phones (tab icons are added in this one place). */
+  icon?: React.ReactNode;
+  /** Small count pill beside the label. */
+  count?: number;
 }
 
 /**
@@ -45,9 +49,17 @@ export default function SegmentedTabBar<T extends string>({
             onPress={() => onChange(option.key)}
             activeOpacity={0.75}
           >
-            <AppText style={[styles.label, isActive && styles.labelActive]} numberOfLines={1}>
-              {option.label}
-            </AppText>
+            {option.icon ? <View style={styles.icon}>{option.icon}</View> : null}
+            <View style={styles.labelRow}>
+              <AppText style={[styles.label, isActive && styles.labelActive]} numberOfLines={1}>
+                {option.label}
+              </AppText>
+              {option.count ? (
+                <View style={styles.countPill} accessibilityLabel={`${option.count} new`}>
+                  <AppText style={styles.countText}>{option.count}</AppText>
+                </View>
+              ) : null}
+            </View>
           </TouchableOpacity>
         );
       })}
@@ -88,6 +100,10 @@ function createStyles(colors: ThemeColors) {
       borderWidth: 1,
       borderColor: colors.accent,
     },
+    icon: { marginBottom: 2 },
+    labelRow: { flexDirection: 'row', alignItems: 'center', gap: 4 },
+    countPill: { minWidth: 16, height: 16, paddingHorizontal: 4, borderRadius: radii.pill, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.accent },
+    countText: { fontSize: 12, fontWeight: '800', color: colors.onAccent },
     label: { fontSize: 13.5, fontWeight: '600', letterSpacing: -0.2, color: colors.textSecondary },
     // accentOnTint, not accent: this label sits directly on `segmentActive`'s
     // accentMuted fill, where light mode's plain accent falls under AA

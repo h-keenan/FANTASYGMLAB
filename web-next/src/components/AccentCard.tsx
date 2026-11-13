@@ -27,6 +27,7 @@ export function AccentCard({
   children: ReactNode;
   ref?: Ref<HTMLElement>;
   "data-highlighted"?: string;
+  "data-testid"?: string;
 }) {
   return (
     <Tag

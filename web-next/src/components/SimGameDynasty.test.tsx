@@ -288,6 +288,7 @@ describe("picks in trades", () => {
         { team_id: "7", name: "Rivals", is_you: false, picks: [pk("pick:2028:2:7", 2028, 2, "7", "7"), pk("pick:2027:2:9", 2027, 2, "9", "7", "late")], total_value: 82 },
       ],
     });
+    mocked.getSimLineup.mockResolvedValue({ ok: true, reason: "", slots: [], bench: [] });
     mocked.getSimLeague.mockResolvedValue({ ok: true, reason: "", teams: [{ team_id: "7", name: "Rivals", is_you: false, power_rank: 2, persona: { id: "passive", label: "Passive", blurb: "Rarely deals." } }], standings: [] });
     mocked.getSimGameTeam.mockImplementation(async (_g: string, t: string) => ({ ok: true, reason: "", team_id: t, players: [player(t === "3" ? "1" : "5", "QB", t === "3" ? "Quinn Back" : "Otis Opp")] }));
     mocked.getSimInbox.mockResolvedValue({
@@ -310,14 +311,25 @@ describe("picks in trades", () => {
     await openTrades();
     fireEvent.click(await screen.findByRole("tab", { name: "Make an offer" }));
     fireEvent.click(await screen.findByRole("button", { name: "Trade with Rivals" }));
-    const give = await screen.findByTestId("pick-group-give");
+    // Your side: the position-grouped picker has a Picks group beside QB.
+    const giveBox = await screen.findByRole("region", { name: "Your roster" });
+    fireEvent.click(within(giveBox).getByRole("tab", { name: "Picks" }));
+    const give = within(giveBox).getByRole("region", { name: "Picks group" });
+    expect(give).toHaveTextContent("2027");
     expect(give).toHaveTextContent("2027 Round 1 (early)");
-    const get = await screen.findByTestId("pick-group-get");
-    const text = get.textContent ?? "";
-    expect(text.indexOf("2027 Round 2 (late)")).toBeLessThan(text.indexOf("2028 Round 2"));
+    expect(give).toHaveTextContent("Value");
     mocked.previewSimTrade.mockResolvedValue({ ok: true, reason: "", verdict: { decision: "accept", reason: "Fair.", chips: [] } });
     fireEvent.click(within(give).getByRole("button", { name: "Give 2027 Round 1 (early)" }));
+    // Their side: picks grouped by year, earliest year first.
+    fireEvent.click(screen.getByRole("button", { name: /You receive/ }));
+    const getBox = await screen.findByRole("region", { name: "Rivals's roster" });
+    fireEvent.click(within(getBox).getByRole("tab", { name: "Picks" }));
+    const get = within(getBox).getByRole("region", { name: "Picks group" });
+    const text = get.textContent ?? "";
+    expect(text.indexOf("2027 Round 2 (late)")).toBeLessThan(text.indexOf("2028 Round 2"));
     fireEvent.click(within(get).getByRole("button", { name: "Get 2028 Round 2" }));
     await waitFor(() => expect(mocked.previewSimTrade).toHaveBeenCalledWith("g1", { partner: "7", give: ["pick:2027:1:3"], get: ["pick:2028:2:7"] }));
+    // Picks show in the offer summary as pick chips, and removing one clears it.
+    expect(screen.getAllByTestId("pick-chip")).toHaveLength(2);
   });
 });

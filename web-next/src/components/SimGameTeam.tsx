@@ -7,18 +7,24 @@ import { Button } from "@/components/Button";
 import { EmptyState } from "@/components/EmptyState";
 import { Select } from "@/components/Input";
 import { PillRow } from "@/components/PillRow";
+import { PlayerAvatar } from "@/components/PlayerAvatar";
+import { PlayerNameText } from "@/components/PlayerNameText";
 import { PositionBadge } from "@/components/PositionBadge";
+import { SimGlyph } from "@/components/SimGlyph";
 import { SimPlayerBrowser } from "@/components/SimGamePlayers";
-import { SimCollapse, SimPlayerChips, SimPickLine, useSimPicks } from "@/components/SimGameDynastyParts";
+import { SimPlayerChips, SimPickLine, useSimPicks } from "@/components/SimGameDynastyParts";
 import { SimReserveButton, SimReserveGroups, SimReserveSheet } from "@/components/SimGameReserves";
-import { SimPlayerChip, SimPlayerLine, SimSectionTitle, SimSheet, SimStat, SimTeamLink, SimToneBadge, simToneColor, type SimCtx } from "@/components/SimGameParts";
+import { SimFold, SimIconButton, SimPlayerChip, SimPlayerLine, SimSectionTitle, SimSheet, SimStat, SimTeamLink, SimToneBadge, simToneColor, type SimCtx } from "@/components/SimGameParts";
 import { ReviewGlyphChip } from "@/components/SeasonReviewSections";
 import { SkeletonCard } from "@/components/Skeleton";
 import { api } from "@/lib/api";
+import { positionColorVar } from "@/lib/playerPresentation";
 import {
   simAssignSlot,
   simClaimPayload,
   simFmtPts,
+  simHeadshotId,
+  simPlayerInitials,
   simSlotRepeatsPosition,
   simLineupPayload,
   simMatchupLine,
@@ -188,8 +194,9 @@ export function SimTeamTab({ ctx, onTrade }: { ctx: SimCtx; onTrade: () => void 
           glyph="team"
           tone="accent"
           action={
-            <Button size="sm" variant="secondary" loading={saving} disabled={lineup.locked} onClick={auto}>
-              Auto-set
+            <Button size="sm" variant="secondary" loading={saving} disabled={lineup.locked} onClick={auto} className="rounded-full">
+              <SimGlyph name="spark" size={14} />
+              <span className="ml-1.5">Auto-set</span>
             </Button>
           }
           note={`Projected ${simFmtPts(lineup.projected_total)} points`}
@@ -197,36 +204,7 @@ export function SimTeamTab({ ctx, onTrade }: { ctx: SimCtx; onTrade: () => void 
           Lineup
         </SimSectionTitle>
         {slots.map((slot, index) => (
-          <div key={`${slot.slot}-${index}`} className="flex items-center gap-2" style={{ borderBottom: "var(--border-width-default) solid var(--color-border)" }}>
-            <span className="w-12 shrink-0">
-              <PositionBadge position={slot.slot} label={labels[index]} />
-            </span>
-            {slot.player ? (
-              <div className="flex-1 min-w-0">
-                <SimPlayerLine
-                  player={slot.player}
-                  hidePosition={simSlotRepeatsPosition(slot.slot, slot.player.pos)}
-                  onOpen={ctx.openPlayer}
-                  trailing={
-                    <>
-                      <SimStat label="Proj" value={simFmtPts(slot.player.projection)} />
-                      {reservesOn && slot.player.status === "out" ? <SimReserveButton player={slot.player} onOpen={setMoving} /> : null}
-                      <Button size="sm" variant="secondary" disabled={lineup.locked} aria-label={`Change ${labels[index]}`} onClick={() => setPickSlot(index)}>
-                        Change
-                      </Button>
-                    </>
-                  }
-                />
-              </div>
-            ) : (
-              <div className="flex flex-1 items-center justify-between gap-2 py-2">
-                <span className="text-sm" style={{ color: "var(--color-warning)" }}>Empty slot</span>
-                <Button size="sm" onClick={() => setPickSlot(index)} aria-label={`Fill ${labels[index]}`}>
-                  Fill
-                </Button>
-              </div>
-            )}
-          </div>
+          <LineupRow key={`${slot.slot}-${index}`} slotLabel={labels[index]} slot={slot.slot} player={slot.player} locked={lineup.locked} onOpen={ctx.openPlayer} onPick={() => setPickSlot(index)} onMove={reservesOn && slot.player?.status === "out" ? setMoving : undefined} />
         ))}
       </section>
 
@@ -535,11 +513,51 @@ export function SimPlayersTab({
   );
 }
 
-/** "Your picks": collapsed by default, one summary line, then your picks by year and round. */
+/**
+ * One lineup row, one fixed grid for every row: slot badge (fixed width),
+ * photo, name + one-line subline (truncated, never wraps), projection (fixed)
+ * and a 40px Change / Fill control. The player's own position shows only
+ * where the slot does not already say it (FLEX, SUPERFLEX), as a small dot
+ * inside the subline, so rows keep identical height at 390px.
+ */
+function LineupRow({ slotLabel, slot, player, locked, onOpen, onPick, onMove }: { slotLabel: string; slot: SimSlot; player: SimGamePlayer | null; locked?: boolean; onOpen: (p: SimGamePlayer) => void; onPick: () => void; onMove?: (p: SimGamePlayer) => void }) {
+  const showPos = player ? !simSlotRepeatsPosition(slot, player.pos) : false;
+  const posVar = player ? positionColorVar(player.pos) : null;
+  return (
+    <div
+      className="grid items-center gap-2"
+      style={{ gridTemplateColumns: onMove ? "3.25rem minmax(0,1fr) 2.75rem auto 2.5rem" : "3.25rem minmax(0,1fr) 2.75rem 2.5rem", minHeight: 52, borderBottom: "var(--border-width-default) solid var(--color-border)" }}
+      data-testid="lineup-row"
+    >
+      <span className="flex justify-center"><PositionBadge position={slot} label={slotLabel} /></span>
+      {player ? (
+        <button type="button" className="flex min-w-0 items-center gap-2 text-left" style={{ minHeight: 44 }} onClick={() => onOpen(player)} aria-label={`${player.name}, ${player.pos}. Open player details`}>
+          <PlayerAvatar playerId={simHeadshotId(player)} size={32} fallbackLabel={simPlayerInitials(player)} />
+          <span className="flex min-w-0 flex-col leading-tight">
+            <PlayerNameText name={player.name} threshold={Infinity} className="truncate text-sm font-bold" style={{ color: "var(--color-text-primary)" }} />
+            <span className="flex min-w-0 items-center gap-1 text-xs" style={{ color: "var(--color-text-muted)" }}>
+              {showPos ? <span aria-label={player.pos} className="inline-flex shrink-0 items-center gap-0.5 font-bold" style={{ color: posVar ? `var(${posVar})` : undefined }}><span aria-hidden="true" style={{ width: 6, height: 6, borderRadius: "50%", background: "currentColor" }} />{player.pos}</span> : null}
+              <span className="truncate">{[player.team, player.status === "out" ? "Out" : player.status === "bye" ? "Bye" : null].filter(Boolean).join(" · ")}</span>
+            </span>
+          </span>
+        </button>
+      ) : (
+        <span className="text-sm" style={{ color: "var(--color-warning)" }}>Empty slot</span>
+      )}
+      <span className="text-right text-sm font-extrabold tabular-nums">{player ? simFmtPts(player.projection) : ""}</span>
+      {onMove && player ? <SimReserveButton player={player} onOpen={onMove} /> : null}
+      <SimIconButton disabled={locked} label={player ? `Change ${slotLabel}` : `Fill ${slotLabel}`} primary={!player} onClick={onPick}>
+        <SimGlyph name={player ? "trade" : "check"} size={16} />
+      </SimIconButton>
+    </div>
+  );
+}
+
+/** "Your picks": the shared fold (closed on phones), one summary line, then your picks by year and round. */
 export function SimYourPicks({ picks, draftYear }: { picks: SimPickAsset[]; draftYear?: number | null }) {
   const groups = simPickGroups(picks);
   return (
-    <SimCollapse title="Your picks" summary={simPicksSummaryLine(picks)} testId="your-picks">
+    <SimFold id="team.picks" glyph="league" title="Your picks" summary={<span className="text-xs" style={{ color: "var(--color-text-muted)" }}>{simPicksSummaryLine(picks)}</span>} testId="your-picks">
       {groups.length === 0 ? (
         <p className="text-xs" style={{ color: "var(--color-text-muted)" }}>You hold no draft picks. Trade for some on the Trades tab.</p>
       ) : (
@@ -552,6 +570,6 @@ export function SimYourPicks({ picks, draftYear }: { picks: SimPickAsset[]; draf
           </div>
         ))
       )}
-    </SimCollapse>
+    </SimFold>
   );
 }

@@ -10,13 +10,14 @@ import { PlayerNameText } from "@/components/PlayerNameText";
 import { PositionBadge } from "@/components/PositionBadge";
 import { SimGeneratedChip } from "@/components/SimGameDynastyParts";
 import { SimDraftGlyph } from "@/components/SimDraftGlyphs";
-import { SimPager, simToneColor, useSimDebounced } from "@/components/SimGameParts";
+import { SimPager, simToneColor, useSimDebounced, useSimWide } from "@/components/SimGameParts";
 import { SkeletonRows } from "@/components/Skeleton";
 import { ToneBadge } from "@/components/ToneBadge";
 import { api } from "@/lib/api";
 import { PLAYER_SEARCH_DEBOUNCE_MS } from "@/lib/leaguePlayerSearch";
 import { positionColorVar } from "@/lib/playerPresentation";
-import { simDraftAdpDelta, simDraftRowChips } from "@/lib/simDraft";
+import { simBoardEdge, simBoardProjection, simDraftRowChips } from "@/lib/simDraft";
+import { SIM_WINDOW_STEP, simWindow } from "@/lib/simLayout";
 import {
   SIM_PAGE_SIZE,
   simDefaultFilter,
@@ -39,24 +40,22 @@ const SORTS: { label: string; value: SimPlayerSort }[] = [
   { label: "Value", value: "value" },
 ];
 
-const STAT_CELL = "w-11 text-right tabular-nums";
-const STAT_INDENT = 4 + 8 + 44 + 8 + 40 + 8;
+/** Proj / Value / ADP / Edge: the same four equal columns in the header and in every row, so numbers line up by construction. */
+const STAT_GRID = "grid grid-cols-4 gap-1 text-center tabular-nums";
 
 /**
- * One draft-board row with a fixed grid: position-colored edge, a fixed badge
- * slot, a fixed avatar slot, then name / meta, with Proj / Value / ADP in
- * fixed-width right-aligned cells underneath so numbers line up row to row
- * and nothing shifts when a photo loads.
+ * One draft-board row, built for a 390px phone. Line 1: position badge, photo,
+ * name with the NFL team chip and status chips inline, and the actions
+ * (icon buttons) right-aligned. Line 2: Proj / Value / ADP / Edge in four
+ * equal columns that match the header strip above the list.
  */
 export function SimDraftRow({
   player,
-  pickNo,
   onOpen,
   actions,
   onGeneratedInfo,
 }: {
   player: SimGamePlayer;
-  pickNo: number;
   onOpen?: (player: SimGamePlayer) => void;
   actions?: ReactNode;
   /** Opens the generated-class notice; shows a small chip on simulated rookies. */
@@ -64,50 +63,51 @@ export function SimDraftRow({
 }) {
   const colorVar = positionColorVar(player.pos);
   const chips = simDraftRowChips(player);
-  const delta = simDraftAdpDelta(player.adp, pickNo);
+  const delta = simBoardEdge(player);
+  const proj = simBoardProjection(player);
   const identity = (
     <div className="flex min-w-0 flex-1 items-center gap-2">
-      <span className="flex shrink-0 justify-center" style={{ width: 44 }}>
+      <span className="flex shrink-0 justify-center" style={{ width: 38 }}>
         <PositionBadge position={player.pos} />
       </span>
-      <span className="flex shrink-0 items-center justify-center" style={{ width: 40, height: 40 }}>
-        <PlayerAvatar playerId={simHeadshotId(player)} size={40} fallbackLabel={simPlayerInitials(player)} />
+      <span className="flex shrink-0 items-center justify-center" style={{ width: 32, height: 32 }}>
+        <PlayerAvatar playerId={simHeadshotId(player)} size={32} fallbackLabel={simPlayerInitials(player)} />
       </span>
-      <div className="flex min-w-0 flex-col gap-0.5">
-        <PlayerNameText name={player.name} threshold={Infinity} className="text-sm font-bold" style={{ color: "var(--color-text-primary)" }} />
-        <span className="flex flex-wrap items-center gap-1.5" style={{ minHeight: 16 }}>
-          {player.team ? (
-            <span
-              className="text-[0.625rem] font-extrabold uppercase px-1.5 leading-4"
-              style={{ borderRadius: "var(--radius-pill)", border: "var(--border-width-default) solid var(--color-border-strong)", color: "var(--color-text-secondary)" }}
-              title="NFL team"
-            >
-              {player.team}
-            </span>
-          ) : null}
-          {chips.map((chip) => (
-            <ToneBadge key={chip.key} label={chip.label} color={simToneColor(chip.tone)} size="xs" />
-          ))}
-        </span>
+      <div className="flex min-w-0 flex-1 items-center gap-1.5">
+        <PlayerNameText name={player.name} threshold={Infinity} className="min-w-0 truncate text-sm font-bold" style={{ color: "var(--color-text-primary)" }} />
+        {player.team ? (
+          <span
+            className="shrink-0 text-[0.625rem] font-extrabold uppercase px-1.5 leading-4"
+            style={{ borderRadius: "var(--radius-pill)", border: "var(--border-width-default) solid var(--color-border-strong)", color: "var(--color-text-secondary)" }}
+            title="NFL team"
+          >
+            {player.team}
+          </span>
+        ) : null}
+        {chips.map((chip) => (
+          <ToneBadge key={chip.key} label={chip.label} color={simToneColor(chip.tone)} size="xs" />
+        ))}
       </div>
     </div>
   );
   return (
     <div
-      className="flex flex-col gap-1 py-2 pl-2 pr-1"
+      className="flex flex-col pb-0.5 pl-2 pr-1"
       style={{
         borderBottom: "var(--border-width-default) solid var(--color-border)",
         borderLeft: `4px solid ${colorVar ? `var(${colorVar})` : "var(--color-border-strong)"}`,
+        opacity: proj.discounted ? 0.62 : 1,
       }}
       data-testid="draft-row"
+      data-out={proj.discounted ? "true" : undefined}
     >
-      <div className="flex items-center justify-between gap-2">
+      <div className="flex items-center justify-between gap-1">
         {onOpen ? (
           <button
             type="button"
             onClick={() => onOpen(player)}
             className="flex min-w-0 flex-1 items-center text-left"
-            style={{ minHeight: "var(--touch-target-min)" }}
+            style={{ minHeight: 40 }}
             aria-label={`${player.name}, ${player.pos}. Open player details`}
           >
             {identity}
@@ -117,16 +117,18 @@ export function SimDraftRow({
         )}
         {actions ? <div className="flex shrink-0 items-center gap-1">{actions}</div> : null}
       </div>
-      <div className="flex items-center gap-2 text-xs" style={{ paddingLeft: STAT_INDENT - 4 - 8, color: "var(--color-text-primary)" }}>
-        <span className={STAT_CELL}>{simFmtPts(player.projection)}</span>
-        <span className={STAT_CELL}>{simFmtValue(player.value)}</span>
-        <span className={STAT_CELL}>{simFmtValue(player.adp)}</span>
-        <span className="w-11 text-right" style={{ minHeight: 16 }}>
+      <div className={`${STAT_GRID} pb-0.5 text-xs leading-4`} style={{ color: "var(--color-text-primary)" }}>
+        <span title={proj.discounted ? "Per-game projection when healthy. Out or on bye this week." : undefined}>{simFmtPts(proj.value)}</span>
+        <span>{simFmtValue(player.value)}</span>
+        <span>{simFmtValue(player.adp)}</span>
+        <span style={{ minHeight: 16 }}>
           {delta ? (
-            <span className="font-extrabold tabular-nums" style={{ color: simToneColor(delta.tone) }} title={delta.tone === "success" ? "Steal: past his ADP" : "Reach: ahead of his ADP"}>
-              {delta.tone === "success" ? "▲" : "▼"} {delta.label.replace("-", "")}
+            <span className="font-extrabold" style={{ color: simToneColor(delta.tone) }} title={delta.tone === "success" ? "Steal: the market lets him fall past where our value ranks him" : "Reach: the market takes him earlier than our value ranks him"}>
+              {delta.tone === "success" ? "▲" : "▼"} {delta.label.replace(/^[+-]/, "")}
             </span>
-          ) : null}
+          ) : (
+            <span aria-hidden="true" style={{ color: "var(--color-text-muted)" }}>-</span>
+          )}
         </span>
         {onGeneratedInfo && simPlayerIsGenerated(player) ? <span className="ml-auto"><SimGeneratedChip label="Generated" onInfo={onGeneratedInfo} inRow /></span> : null}
       </div>
@@ -142,7 +144,6 @@ export function SimDraftRow({
 export function SimDraftBoard({
   gameId,
   positions,
-  pickNo,
   onOpen,
   actions,
   refreshKey = 0,
@@ -150,8 +151,6 @@ export function SimDraftBoard({
 }: {
   gameId: string;
   positions: SimPos[];
-  /** Overall pick on the clock, for the ADP delta. */
-  pickNo: number;
   onOpen: (player: SimGamePlayer) => void;
   actions?: (player: SimGamePlayer) => ReactNode;
   refreshKey?: number;
@@ -164,6 +163,12 @@ export function SimDraftBoard({
   const [total, setTotal] = useState(0);
   const [state, setState] = useState<"loading" | "ready" | "error">("loading");
   const [attempt, setAttempt] = useState(0);
+  const wide = useSimWide();
+  // A new page or filter starts at the top window again (the window is keyed to the filter).
+  const windowKey = [filter.page, filter.pos, filter.sort, filter.q, filter.status].join("|");
+  const [win, setWin] = useState({ key: windowKey, n: SIM_WINDOW_STEP });
+  const visible = win.key === windowKey ? win.n : SIM_WINDOW_STEP;
+  const setVisible = (update: (n: number) => number) => setWin({ key: windowKey, n: update(visible) });
 
   useEffect(() => {
     dispatch({ type: "q", value: debounced });
@@ -189,6 +194,7 @@ export function SimDraftBoard({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [gameId, query, refreshKey, attempt]);
 
+  const rows = simWindow(items, wide ? items.length : visible);
   return (
     <section className="flex flex-col gap-3" aria-label="Players">
       <div className="relative">
@@ -230,15 +236,25 @@ export function SimDraftBoard({
           <p className="text-xs pb-1" style={{ color: "var(--color-text-muted)" }} aria-live="polite">
             {total} player{total === 1 ? "" : "s"} left
           </p>
-          <div className="flex items-center gap-2 pb-1 text-[0.625rem] font-extrabold uppercase" style={{ paddingLeft: STAT_INDENT - 4 - 8 + 4 + 8, color: "var(--color-text-muted)" }} aria-hidden="true">
-            <span className={STAT_CELL}>Proj</span>
-            <span className={STAT_CELL}>Value</span>
-            <span className={STAT_CELL}>ADP</span>
-            <span className="w-11 text-right">Edge</span>
+          <div className={`${STAT_GRID} pb-1 text-[0.625rem] font-extrabold uppercase`} style={{ color: "var(--color-text-muted)", paddingLeft: 4 + 8, paddingRight: 4 }} aria-hidden="true">
+            <span>Proj</span>
+            <span title="Model value on a 0-100 scale (the top player is 100), not the main app's raw market value">Value</span>
+            <span title="Average draft position">ADP</span>
+            <span title="Value rank vs ADP: green = steal, red = reach">Edge</span>
           </div>
-          {items.map((player) => (
-            <SimDraftRow key={player.id} player={player} pickNo={pickNo} onOpen={onOpen} actions={actions ? actions(player) : null} />
+          {rows.shown.map((player) => (
+            <SimDraftRow key={player.id} player={player} onOpen={onOpen} actions={actions ? actions(player) : null} />
           ))}
+          {rows.remaining > 0 ? (
+            <button
+              type="button"
+              className="tap-link self-center text-sm font-bold"
+              style={{ color: "var(--color-accent)", minHeight: "var(--touch-target-min)" }}
+              onClick={() => setVisible((n) => n + SIM_WINDOW_STEP)}
+            >
+              Show {Math.min(SIM_WINDOW_STEP, rows.remaining)} more on this page ({rows.remaining} left)
+            </button>
+          ) : null}
         </div>
       )}
       <SimPager page={filter.page} pages={simPageCount(total, SIM_PAGE_SIZE)} onPage={(page) => dispatch({ type: "page", value: page })} />

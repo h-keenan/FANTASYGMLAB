@@ -398,8 +398,6 @@ function RookieStage({
               <SimDraftRow
                 key={player.id}
                 player={player}
-                // Rookie ADP is not comparable to a pick number in this small class, so no steal/reach edge.
-                pickNo={player.adp ?? 0}
                 onOpen={ctx.openPlayer}
                 onGeneratedInfo={() => setNotice(true)}
                 actions={d.your_turn ? <Button size="sm" label="Draft" loading={busy === 'pick'} disabled={busy !== null && busy !== 'pick'} onPress={() => onPick(player)} /> : null}

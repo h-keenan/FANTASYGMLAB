@@ -7,7 +7,8 @@ import { Button } from "@/components/Button";
 import { EmptyState } from "@/components/EmptyState";
 import { PositionBadge } from "@/components/PositionBadge";
 import { SectionHeading } from "@/components/SectionHeading";
-import { SimPlayerChip, SimPlayerLine, SimStat, SimToneBadge, simToneColor, type SimCtx } from "@/components/SimGameParts";
+import { PillRow } from "@/components/PillRow";
+import { SimPlayerChip, SimPlayerLine, SimStat, SimToneBadge, simToneColor, useSimWide, type SimCtx } from "@/components/SimGameParts";
 import { SimDynastyResult } from "@/components/SimGameDynasty";
 import { SimStandingsList } from "@/components/SimGameLeague";
 import { SkeletonCard } from "@/components/Skeleton";
@@ -16,6 +17,7 @@ import { ReviewGlyphIcon } from "@/components/SimReviewGlyph";
 import { SimReviewShareButton } from "@/components/SimReviewShareButton";
 import { api } from "@/lib/api";
 import { buildReviewShareModel, buildSimReviewSections } from "@/lib/simReview";
+import { SIM_REVIEW_COLLAPSED_ON_PHONE, SIM_REVIEW_VIEWS, simReviewViewFor, type SimReviewView } from "@/lib/simLayout";
 import {
   simFmtPts,
   normalizeSimResult,
@@ -197,6 +199,8 @@ export function SimFinalView({ ctx, onNewGame, onHub }: { ctx: SimCtx; onNewGame
   const [failed, setFailed] = useState(false);
   const [failMessage, setFailMessage] = useState("");
   const [attempt, setAttempt] = useState(0);
+  const wide = useSimWide();
+  const [tab, setTab] = useState<SimReviewView>("overview");
 
   useEffect(() => {
     let cancelled = false;
@@ -244,13 +248,46 @@ export function SimFinalView({ ctx, onNewGame, onHub }: { ctx: SimCtx; onNewGame
     championName: view.championName,
     sections: sections,
   });
+  const standingsSection = (
+    <section className="flex flex-col gap-2" aria-label="Final standings">
+      <SectionHeading size="compact">
+        <span className="inline-flex items-center gap-2"><ReviewGlyphChip glyph="rank" tone="accent" size={24} />Final standings</span>
+      </SectionHeading>
+      <ol className="flex flex-col gap-2">
+        {view.standings.map((row, i) => (
+          <li key={row.team_id}>
+            <AccentCard accent={row.is_you ? "var(--color-accent)" : simToneColor(simPlayoffOutcomeTone(row.playoff_result))} compact as="div">
+              {wide ? (
+                <>
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="text-sm font-semibold break-words min-w-0">{i + 1}. {row.name}{row.is_you ? " (you)" : ""}</span>
+                    <span className="text-sm font-bold shrink-0 tabular-nums">{row.wins}-{row.losses}{row.ties ? `-${row.ties}` : ""}</span>
+                  </div>
+                  <div className="flex items-center justify-between gap-2">
+                    <SimToneBadge label={simPlayoffResultLabel(row.playoff_result)} tone={simPlayoffOutcomeTone(row.playoff_result)} />
+                    <span className="text-xs tabular-nums" style={{ color: "var(--color-text-secondary)" }}>{simFmtPts(row.pf)} PF</span>
+                  </div>
+                </>
+              ) : (
+                <div className="flex items-center gap-2">
+                  <span className="min-w-0 flex-1 truncate text-sm font-semibold">{i + 1}. {row.name}{row.is_you ? " (you)" : ""}</span>
+                  <SimToneBadge label={simPlayoffResultLabel(row.playoff_result)} tone={simPlayoffOutcomeTone(row.playoff_result)} />
+                  <span className="w-10 shrink-0 text-right text-sm font-bold tabular-nums">{row.wins}-{row.losses}{row.ties ? `-${row.ties}` : ""}</span>
+                </div>
+              )}
+            </AccentCard>
+          </li>
+        ))}
+      </ol>
+    </section>
+  );
   return (
     <div className="flex flex-col gap-3" data-testid="final-result">
       {dynasty ? <SimDynastyResult summary={result.dynasty} onNewGame={onNewGame} onHub={onHub} /> : (
       <AccentCard accent={simToneColor(tone)} as="section" glow>
         <p className="text-xs uppercase font-extrabold" style={{ color: "var(--color-text-muted)", letterSpacing: "var(--letter-spacing-badge)" }}>Season in review</p>
         <div className="flex items-center gap-4 enter-pop">
-          <span className="text-6xl font-extrabold leading-none" style={{ color: simToneColor(tone) }} aria-label={`Grade ${view.letter}`}>
+          <span className="text-5xl font-extrabold leading-none sm:text-6xl" style={{ color: simToneColor(tone) }} aria-label={`Grade ${view.letter}`}>
             {view.letter || "-"}
           </span>
           <div className="flex min-w-0 flex-col gap-1">
@@ -275,29 +312,27 @@ export function SimFinalView({ ctx, onNewGame, onHub }: { ctx: SimCtx; onNewGame
       </AccentCard>
       )}
 
-      {dynasty ? null : <SeasonReviewSections sections={sections} />}
-
-      <section className="flex flex-col gap-2" aria-label="Final standings">
-        <SectionHeading size="compact">
-          <span className="inline-flex items-center gap-2"><ReviewGlyphChip glyph="rank" tone="accent" size={24} />Final standings</span>
-        </SectionHeading>
-        <ol className="flex flex-col gap-2">
-          {view.standings.map((row, i) => (
-            <li key={row.team_id}>
-              <AccentCard accent={row.is_you ? "var(--color-accent)" : simToneColor(simPlayoffOutcomeTone(row.playoff_result))} compact as="div">
-                <div className="flex items-center justify-between gap-2">
-                  <span className="text-sm font-semibold break-words min-w-0">{i + 1}. {row.name}{row.is_you ? " (you)" : ""}</span>
-                  <span className="text-sm font-bold shrink-0 tabular-nums">{row.wins}-{row.losses}{row.ties ? `-${row.ties}` : ""}</span>
-                </div>
-                <div className="flex items-center justify-between gap-2">
-                  <SimToneBadge label={simPlayoffResultLabel(row.playoff_result)} tone={simPlayoffOutcomeTone(row.playoff_result)} />
-                  <span className="text-xs tabular-nums" style={{ color: "var(--color-text-secondary)" }}>{simFmtPts(row.pf)} PF</span>
-                </div>
-              </AccentCard>
-            </li>
-          ))}
-        </ol>
-      </section>
+      {dynasty ? standingsSection : wide ? (
+        <>
+          <SeasonReviewSections sections={sections} />
+          {standingsSection}
+        </>
+      ) : (
+        <>
+          <PillRow
+            ariaLabel="Season in review sections"
+            variant="fill"
+            options={SIM_REVIEW_VIEWS.map((v) => ({ label: v.label, value: v.value }))}
+            active={tab}
+            onSelect={(value) => setTab(value as SimReviewView)}
+          />
+          {tab === "standings" ? (
+            standingsSection
+          ) : (
+            <SeasonReviewSections sections={sections} only={sections.filter((sec) => simReviewViewFor(sec.id) === tab).map((sec) => sec.id)} closed={SIM_REVIEW_COLLAPSED_ON_PHONE} />
+          )}
+        </>
+      )}
       <p className="text-xs" style={{ color: "var(--color-text-muted)" }}>
         A game, not a forecast. Season {game.settings.regular_weeks} weeks plus playoffs against AI managers; nothing here touches your real leagues.
       </p>

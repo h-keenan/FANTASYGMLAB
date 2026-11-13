@@ -143,7 +143,7 @@ export function SimDraftHero({
         <span className="text-xs" style={{ color: "var(--color-text-secondary)" }}>{eta.detail}</span>
       </div>
 
-      <div className="flex flex-col gap-1">
+      <div className="hidden flex-col gap-1 md:flex">
         <span className="text-[0.625rem] font-extrabold uppercase" style={LABEL_STYLE}>Recent picks</span>
         <ol className="flex gap-2 overflow-x-auto" style={{ minHeight: 44 }} aria-label="Recent picks">
           {recent.length === 0 ? (

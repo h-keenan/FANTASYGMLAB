@@ -16,13 +16,14 @@ import Input from '../components/Input';
 import PremiumLock from '../components/PremiumLock';
 import SectionHeading from '../components/SectionHeading';
 import SegmentedTabBar from '../components/SegmentedTabBar';
+import SimActionBar, { SIM_ACTION_BAR_HEIGHT, useSimActionBarBottom } from '../components/SimActionBar';
 import { SkeletonCard } from '../components/SkeletonBlock';
 import { SimDraftRecapView, SimGameDraft } from '../components/SimGameDraft';
 import { SimLeagueTab } from '../components/SimGameLeague';
 import { SimGameOffseason } from '../components/SimGameOffseason';
 import { SimHomeTab } from '../components/SimGameHome';
 import { SimPlayerSheet } from '../components/SimGamePlayers';
-import { SimNotice, SimPreviewBanner, SimTeamLink, SimTeamOpenContext, createSimStyles, type SimCtx } from '../components/SimGameParts';
+import { SimNotice, SimOpenPlayerContext, SimPreviewBanner, SimTeamLink, SimTeamOpenContext, createSimStyles, type SimCtx } from '../components/SimGameParts';
 import { SimTeamSheet } from '../components/SimGameTeamSheet';
 import { SimFinalView, SimWeekRecapView } from '../components/SimGameRecap';
 import { SimPlayersTab, SimTeamTab } from '../components/SimGameTeam';
@@ -327,16 +328,26 @@ export default function GmGameScreen({ navigation }: Props) {
     [game, preview, call, setGame, reloadGame, notify, tick],
   );
 
+  // The in-season tabs get a persistent bottom action bar (Advance week / Auto-set) above the orb.
+  const barBottom = useSimActionBarBottom();
+  const showBar =
+    flow.view === 'game' && Boolean(game) && (flow.stage === 'week' || flow.stage === 'playoffs') && !draftRecap && !flow.recaps[flow.recapIndex];
   const shell = (children: React.ReactNode, sheet?: React.ReactNode) => (
     <View style={styles.root}>
       <GridBackground />
       <ScrollView
         style={styles.container}
-        contentContainerStyle={[styles.content, { paddingBottom: orbClearance, paddingTop: headerHeight + spacing.sm }]}
+        contentContainerStyle={[
+          styles.content,
+          { paddingBottom: showBar ? Math.max(orbClearance, barBottom + SIM_ACTION_BAR_HEIGHT + spacing.xl) : orbClearance, paddingTop: headerHeight + spacing.sm },
+        ]}
         keyboardShouldPersistTaps="handled"
       >
         {children}
       </ScrollView>
+      {showBar && game && ctx ? (
+        <SimActionBar ctx={ctx} paywalled={simGamePaywalled(preview)} advancing={advancing} onAdvance={advance} onGoPro={goPaywall} />
+      ) : null}
       {sheet}
     </View>
   );
@@ -871,6 +882,7 @@ function GameScreen({
 
   return (
     <SimTeamOpenContext.Provider value={ctx.openTeam}>
+    <SimOpenPlayerContext.Provider value={ctx.openPlayer}>
     <View style={styles.stack}>
       <View style={styles.rowBetween}>
         <View style={styles.grow}>
@@ -893,15 +905,7 @@ function GameScreen({
             </View>
           ) : null}
         </View>
-        {inSeason && !recap ? (
-          paywalled ? (
-            <Button label="Go Pro" variant="premium" size="sm" onPress={onGoPro} />
-          ) : (
-            <Button label={game.phase === 'playoffs' ? 'Play round' : 'Advance week'} loading={advancing} onPress={onAdvance} />
-          )
-        ) : null}
       </View>
-      {inSeason && !recap && !paywalled ? <AppText style={styles.muted}>{simAdvanceLabel(game)}</AppText> : null}
 
       <SimPreviewBanner preview={preview} />
       {flow.paywall ? <PaywallCard flow={flow} onDismiss={onDismissPaywall} /> : null}
@@ -946,7 +950,7 @@ function GameScreen({
       ) : (
         <>
           <SegmentedTabBar<SimTab>
-            options={SIM_TABS.map((t) => ({ key: t.value, label: t.value === 'trades' && (game.pending?.inbox ?? 0) > 0 ? `Trades ${game.pending?.inbox}` : t.label }))}
+            options={SIM_TABS.map((t) => ({ key: t.value, label: t.label, count: t.value === 'trades' ? game.pending?.inbox ?? 0 : undefined }))}
             active={flow.tab}
             onChange={onTab}
           />
@@ -971,6 +975,7 @@ function GameScreen({
         </>
       )}
     </View>
+    </SimOpenPlayerContext.Provider>
     </SimTeamOpenContext.Provider>
   );
 }

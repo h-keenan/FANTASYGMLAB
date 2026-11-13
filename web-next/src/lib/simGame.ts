@@ -75,8 +75,15 @@ export interface SimGamePlayer {
   team: string | null;
   age: number | null;
   adp: number | null;
+  /** Model value on the sim's 0-100 scale (the best player is 100), not the main app's raw market value. */
   value: number;
+  /** 1-based rank by model value across the whole pool (players list only). */
+  value_rank?: number | null;
+  /** ADP minus value rank (players list only): positive = the market lets him fall past the model (steal). */
+  adp_edge?: number | null;
   projection: number;
+  /** Per-game mean when healthy (the projection is 0.0 for an injured player this week). */
+  ros_mean?: number | null;
   floor: number;
   ceiling: number;
   status: "healthy" | "out" | "bye";
