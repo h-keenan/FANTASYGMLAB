@@ -41,7 +41,7 @@ export type FilterSheetProps = {
 
 /**
  * One "Filters (n)" button that opens a Sheet of grouped chips, committed
- * with Apply. Replaces a row of native <select>s and pill rows. The sheet
+ * with Apply. Replaces a row of native dropdowns and pill rows. The sheet
  * edits a draft: nothing on the page changes until Apply, and closing
  * discards. Active filters show as removable chips under the button.
  *

@@ -462,7 +462,7 @@ export function WaiversContent({
       .filter((p) => !query || (p.name ?? "").toLowerCase().includes(query));
   }, [data.players, idpPlayers, position, search]);
 
-  // The position <select> is a one-group FilterSheet now (count badge, Apply with a live result count).
+  // The position dropdown is a one-group FilterSheet now (count badge, Apply with a live result count).
   const freeAgentFilterGroups = useMemo<FilterGroup[]>(
     () => [{ id: "position", label: "Position", anyValue: "ALL", options: positionFilters.map((pos) => ({ value: pos, label: pos === "ALL" ? "Any" : pos })) }],
     [positionFilters],
