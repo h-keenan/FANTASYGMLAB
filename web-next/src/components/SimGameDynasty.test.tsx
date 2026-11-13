@@ -13,7 +13,7 @@ vi.mock("@/lib/api", async () => {
   const actual = await vi.importActual<typeof import("@/lib/api")>("@/lib/api");
   const names = [
     "getSimGameOptions", "getSimLeagueTeams", "listSimGames", "createSimGame", "getSimGame", "getSimGamePlayers", "getSimGameTeam", "getSimHome",
-    "getSimLineup", "putSimLineup", "autoSimLineup", "cutSimPlayer", "previewSimTrade", "sendSimTrade", "getSimInbox", "getSimLeague", "getSimGameResult",
+    "getSimLineup", "putSimLineup", "autoSimLineup", "cutSimPlayer", "previewSimTrade", "sendSimTrade", "getSimInbox", "getSimLeague", "getSimLeagueRosters", "getSimGameResult",
     "getSimPicks", "moveSimPlayer", "getSimOffseason", "startSimRookieDraft", "pickSimRookie", "autoSimRookieDraft", "startSimSeason", "getSimDynasty",
   ];
   return { ...actual, api: { ...actual.api, ...Object.fromEntries(names.map((n) => [n, vi.fn()])) } };
@@ -296,6 +296,7 @@ describe("picks in trades", () => {
     });
     mocked.getSimLineup.mockResolvedValue({ ok: true, reason: "", slots: [], bench: [] });
     mocked.getSimLeague.mockResolvedValue({ ok: true, reason: "", teams: [{ team_id: "7", name: "Rivals", is_you: false, power_rank: 2, persona: { id: "passive", label: "Passive", blurb: "Rarely deals." } }], standings: [] });
+    mocked.getSimLeagueRosters.mockResolvedValue({ ok: true, reason: "", teams: [{ team_id: "7", name: "Rivals", is_you: false, power_rank: 2, persona: { id: "passive", label: "Passive", blurb: "Rarely deals." }, record: null, avg_age: 25, roster_size: 1, positions: [], strengths: [], needs: [], surplus: [], top_assets: [], players: [] }] });
     mocked.getSimGameTeam.mockImplementation(async (_g: string, t: string) => ({ ok: true, reason: "", team_id: t, players: [player(t === "3" ? "1" : "5", "QB", t === "3" ? "Quinn Back" : "Otis Opp")] }));
     mocked.getSimInbox.mockResolvedValue({
       ok: true, reason: "",

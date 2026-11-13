@@ -12,12 +12,15 @@ import { SimCrest } from "@/components/SimCrest";
 import { SimGlyph } from "@/components/SimGlyph";
 import { SimPlayerChip, SimPlayerLine, SimSideLabel, SimStat, SimTeamOpenContext, SimToneBadge, simToneColor, type SimCtx } from "@/components/SimGameParts";
 import { SimPickLine, useSimPicks } from "@/components/SimGameDynastyParts";
+import { SimTeamCard } from "@/components/SimTeamCard";
 import { SkeletonCard, SkeletonRows } from "@/components/Skeleton";
 import { ToneBadge } from "@/components/ToneBadge";
 import { api } from "@/lib/api";
 import { simGroupByPosition, simSideSummary, simTradeFit, type SimAssetGroup } from "@/lib/simLayout";
 import { simListStats } from "@/lib/simDraft";
+import { simTeamsByPower } from "@/lib/simLeagueRosters";
 import { simGroupsToSheetItems } from "@/lib/simTradeSheet";
+import { useSimLeagueRosters } from "@/lib/useSimLeagueRosters";
 import { selectedItems } from "@/lib/tradeSheetPicker";
 import { TradePickerSheet, TradeSideSummary } from "@/components/TradePickerSheet";
 import {
@@ -43,7 +46,6 @@ import {
   simWithout,
   type SimGamePlayer,
   type SimInboxItem,
-  type SimLeagueTeam,
   type SimPickAsset,
   type SimTradeAsset,
   type SimTradeDraft,
@@ -236,8 +238,6 @@ function VerdictCard({ verdict, onSendCounter, busy }: { verdict: SimTradeVerdic
 function Builder({ ctx, seed, onSeedUsed }: { ctx: SimCtx; seed: SimTradeSeed | null; onSeedUsed: () => void }) {
   const { gameId, game, call } = ctx;
   const [draft, dispatch] = useReducer(simTradeReducer, SIM_TRADE_EMPTY);
-  const [teams, setTeams] = useState<SimLeagueTeam[] | null>(null);
-  const [teamsError, setTeamsError] = useState<string | null>(null);
   const [teamsAttempt, setTeamsAttempt] = useState(0);
   const [partnerLoaded, setPartnerLoaded] = useState<{ partner: string; players: SimGamePlayer[] } | null>(null);
   const [mine, setMine] = useState<SimGamePlayer[]>([]);
@@ -252,26 +252,10 @@ function Builder({ ctx, seed, onSeedUsed }: { ctx: SimCtx; seed: SimTradeSeed | 
   const maxPerSide = simTradeMaxPerSide(game.settings);
   const picks = useSimPicks(ctx);
 
-  useEffect(() => {
-    let cancelled = false;
-    api
-      .getSimLeague(gameId)
-      .then((body) => {
-        if (cancelled) return;
-        if (body.reason) {
-          setTeamsError(body.message || simGameReasonMessage(body.reason, body));
-          return;
-        }
-        setTeamsError(null);
-        setTeams((body.teams ?? []).filter((t) => !t.is_you));
-      })
-      .catch(() => {
-        if (!cancelled) setTeamsError("We could not load the other teams. Check your connection and try again.");
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [gameId, teamsAttempt]);
+  // Every partner's record, top assets, needs and depth from one request (the shared team card's data).
+  const rosters = useSimLeagueRosters(gameId, ctx.tick, teamsAttempt);
+  const teams = useMemo(() => (rosters.status === "ready" ? rosters.teams.filter((t) => !t.is_you) : null), [rosters]);
+  const teamsError = rosters.status === "error" ? "We could not load the other teams. Check your connection and try again." : null;
 
   useEffect(() => {
     if (!teamId) return;
@@ -340,14 +324,14 @@ function Builder({ ctx, seed, onSeedUsed }: { ctx: SimCtx; seed: SimTradeSeed | 
 
   const partner = teams?.find((t) => t.team_id === draft.partner) ?? null;
   const ready = simTradeReady(draft);
-  const teamOptions = useMemo(() => [...(teams ?? [])].sort((a, b) => a.power_rank - b.power_rank), [teams]);
+  const teamOptions = useMemo(() => simTeamsByPower(teams ?? []), [teams]);
 
   if (closed) {
     return <EmptyState title="Trades are closed" subtitle={closed} />;
   }
   // The partner list never renders empty without saying why.
   if (teamsError && !teams) {
-    return <EmptyState title="Could not load the teams" subtitle={teamsError} actionLabel="Try again" onAction={() => { setTeamsError(null); setTeamsAttempt((n) => n + 1); }} />;
+    return <EmptyState title="Could not load the teams" subtitle={teamsError} actionLabel="Try again" onAction={() => setTeamsAttempt((n) => n + 1)} />;
   }
   if (!teams) return <SkeletonRows count={4} />;
   if (teams.length === 0) return <EmptyState title="No teams to trade with" subtitle="This league has no other teams to trade with right now." />;
@@ -379,39 +363,23 @@ function Builder({ ctx, seed, onSeedUsed }: { ctx: SimCtx; seed: SimTradeSeed | 
     <div className="flex flex-col gap-3">
       <section className="flex flex-col gap-2" aria-label="Trade partner">
         <SectionHeading note={partner ? undefined : "Pick a team to trade with."}>Partner</SectionHeading>
-        <ul className="-mx-1 flex snap-x gap-2 overflow-x-auto px-1 pb-1" aria-label="Teams">
-          {teamOptions.map((team) => {
-            const active = draft.partner === team.team_id;
-            return (
-              <li key={team.team_id} className="shrink-0 snap-start">
-                <button
-                  type="button"
-                  className="flex w-20 flex-col items-center gap-1 p-1.5 text-center"
-                  style={{
-                    borderRadius: "var(--radius-card, 12px)",
-                    border: `var(--border-width-default) solid ${active ? "var(--color-accent)" : "var(--color-border)"}`,
-                    background: active ? "var(--color-accent-soft)" : undefined,
-                  }}
-                  aria-pressed={active}
-                  aria-label={`Trade with ${team.name}`}
-                  onClick={() => dispatch({ type: "partner", teamId: team.team_id })}
-                >
-                  <SimCrest name={team.name} size={32} />
-                  <span className="line-clamp-2 text-[0.6875rem] font-bold leading-tight">{team.name}</span>
-                </button>
-              </li>
-            );
-          })}
-        </ul>
         {partner ? (
-          <div className="flex items-center justify-between gap-2">
-            <span className="flex min-w-0 items-center gap-2 text-xs" style={{ color: "var(--color-text-secondary)" }}>
-              <ToneBadge label={partner.persona.label} color="var(--color-accent)" size="xs" />
-              <span className="min-w-0 truncate">{partner.persona.blurb}</span>
-            </span>
-            <SimTeamScout teamId={partner.team_id} name={partner.name} />
-          </div>
-        ) : null}
+          <>
+            <SimTeamCard team={partner} selected />
+            <div className="flex items-center justify-between gap-2">
+              <Button size="sm" variant="secondary" onClick={() => dispatch({ type: "partner", teamId: "" })}>Change partner</Button>
+              <SimTeamScout teamId={partner.team_id} name={partner.name} />
+            </div>
+          </>
+        ) : (
+          <ul className="flex flex-col gap-2" aria-label="Teams">
+            {teamOptions.map((team) => (
+              <li key={team.team_id}>
+                <SimTeamCard team={team} openLabel={`Trade with ${team.name}`} onOpen={(id) => dispatch({ type: "partner", teamId: id })} />
+              </li>
+            ))}
+          </ul>
+        )}
       </section>
 
       {partner ? (

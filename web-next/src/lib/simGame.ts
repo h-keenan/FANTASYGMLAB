@@ -2241,6 +2241,24 @@ export interface SimTeamProfile {
   roster_size: number;
 }
 
+/** One team in GET /league/rosters: the League tab's who-has-who row and the trade partner card. */
+export interface SimLeagueRosterTeam extends SimTeamProfile {
+  positions: SimPositionGrade[];
+  strengths: SimPos[];
+  needs: SimPos[];
+  /** Positions with spare depth to trade from (two or more players beyond the starters). */
+  surplus: SimPos[];
+  /** Highest-value players held (roster, IR and taxi). */
+  top_assets: SimGamePlayer[];
+  /** Everyone the team holds, by value; `squad` says roster, ir or taxi. */
+  players: SimGamePlayer[];
+}
+
+export interface SimLeagueRostersResponse extends SimGameEnvelope {
+  teams?: SimLeagueRosterTeam[];
+  week?: number;
+}
+
 export type SimNeedLevel = "strength" | "ok" | "need";
 
 export interface SimPositionGrade {

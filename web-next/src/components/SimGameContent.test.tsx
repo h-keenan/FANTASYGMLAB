@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { SimGameContent } from "./SimGameContent";
@@ -21,7 +21,7 @@ vi.mock("@/lib/api", async () => {
     "getSimGameOptions", "getSimLeagueTeams", "listSimGames", "createSimGame", "getSimGame", "deleteSimGame", "getSimDraft", "simDraftPick", "simDraftAuto",
     "putSimDraftQueue", "getSimGamePlayers", "getSimGamePlayer", "getSimGameTeam", "getSimHome", "getSimLineup", "putSimLineup", "autoSimLineup",
     "claimSimWaiver", "cancelSimWaiver", "cutSimPlayer", "previewSimTrade", "sendSimTrade", "getSimInbox", "respondSimInbox",
-    "advanceSimGame", "revertSimWeek", "getSimLeague", "getSimGameResult",
+    "advanceSimGame", "revertSimWeek", "getSimLeague", "getSimLeagueRosters", "getSimGameResult",
   ];
   return { ...actual, api: { ...actual.api, ...Object.fromEntries(names.map((n) => [n, vi.fn()])) } };
 });
@@ -194,7 +194,32 @@ describe("SimGameContent", () => {
     expect(sheet).toHaveTextContent("Rivals");
     expect(mocked.getSimGameTeam).toHaveBeenCalledWith("g1", "7");
     expect(screen.getByText("Strong at QB. Needs RB.")).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /Trade with Rivals/ })).toBeEnabled();
+    expect(screen.getByRole("button", { name: /Make an offer to Rivals/ })).toBeEnabled();
+  });
+
+  it("a team's sheet is its full roster in the shared rows: starters, bench by position, IR and taxi, then a prefilled Make an offer", async () => {
+    mocked.listSimGames.mockResolvedValue({ ok: true, reason: "", games: [lite(game())] });
+    const detail: SimTeamRosterResponse = {
+      ok: true, reason: "", team_id: "7",
+      players: [star("5", "QB", "Otis Opp"), star("6", "RB", "Benny Bench"), star("10", "WR", "Wide Wally"), star("11", "WR", "Wide Wendy")],
+      ir: [star("12", "RB", "Hurt Harry", { status: "out", out_weeks: 5, value: 0 })], taxi: [star("13", "WR", "Rookie Ron")],
+      team: { team_id: "7", name: "Rivals", is_you: false, persona: { id: "passive", label: "Passive", blurb: "Rarely deals." }, record: null, power_rank: 2, avg_age: 25, roster_size: 4 },
+      lineup: [{ slot: "QB", player: star("5", "QB", "Otis Opp") }], projected_total: 117.9, positions: [], strengths: [], needs: [], injuries: [], recent: [], next_game: null, trade: { open: true, reason: null },
+    };
+    mocked.getSimGameTeam.mockResolvedValue(detail);
+    render(<SimGameContent />);
+    await openFirstGame();
+    fireEvent.click((await screen.findAllByRole("button", { name: "Rivals. Open team" }))[0]);
+    await screen.findByTestId("team-sheet-name");
+    const lineup = screen.getByRole("region", { name: "Lineup" });
+    expect(within(lineup).getByText("Otis Opp")).toBeInTheDocument();
+    expect(within(lineup).getByText("PROJ")).toBeInTheDocument();
+    const bench = screen.getByRole("region", { name: "Bench" });
+    expect(within(bench).getByRole("group", { name: "RB bench" })).toHaveTextContent("Benny Bench");
+    expect(within(bench).getByRole("group", { name: "WR bench" })).toHaveTextContent("Wide Wendy");
+    expect(within(screen.getByRole("region", { name: "Injured reserve" })).getByText("Hurt Harry")).toBeInTheDocument();
+    expect(within(screen.getByRole("region", { name: "Taxi squad" })).getByText("Rookie Ron")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Make an offer to Rivals" })).toBeEnabled();
   });
 
   it("shows coming-soon when the flag is off (404)", async () => {

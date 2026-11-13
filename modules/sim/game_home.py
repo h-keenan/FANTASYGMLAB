@@ -27,6 +27,7 @@ from modules.sim.game_view import (
     _tx_players,
     _tx_text,
     player_row,
+    reserve_block,
     team_roster,
 )
 from modules.sim.lineup import pick_lineup
@@ -184,6 +185,7 @@ def team_detail(snap: GameSnapshot, state: GameState, tid: str, seed: int = 0) -
             "roster_size": len(roster),
         },
         "players": team_roster(snap, state, tid)["players"],
+        **reserve_block(snap, state, ev, tid, owners, week),
         "lineup": [
             {"slot": slot, "player": player_row(snap, state, ev, pid, owners, week=week) if pid else None}
             for slot, pid in lineup_slots
@@ -201,6 +203,47 @@ def team_detail(snap: GameSnapshot, state: GameState, tid: str, seed: int = 0) -
         "trade": {"open": window is None and tid != snap.user_team.tid, "reason": window},
     }
     return out
+
+
+SURPLUS_DEPTH = 2  # players beyond a position's starters before it reads as a surplus to trade from (never at a position of need)
+TOP_ASSETS = 3
+
+
+def league_rosters(snap: GameSnapshot, state: GameState) -> dict[str, Any]:
+    """Every team's full roster in one payload (the League tab's who-has-who view and the trade partner list).
+
+    One Evaluator and one position report for the whole league, no per-team requests. Each team carries its
+    record, power rank, strengths / needs / surplus by position, its top assets and every player it holds
+    (roster, IR and taxi; ``squad`` on a row says which)."""
+
+    ev = Evaluator(snap, state)
+    owners = state.owner_map()
+    week = max(state.week, 1)
+    rows = standing_rows(snap, state) if state.status != "drafting" else []
+    by_team = {r["team_id"]: r for r in rows}
+    power = sorted(snap.tids, key=lambda t: (-ev.lineup_total(state.rosters[t]) if state.rosters[t] else 0.0, t))
+    report = _position_report(snap, ev)
+    teams = []
+    for t in snap.teams:
+        tid = t.tid
+        roster = state.rosters[tid]
+        held = [*roster, *state.ir.get(tid, ()), *state.taxi.get(tid, ())]
+        positions = report[tid] if roster else []
+        rows_ = [player_row(snap, state, ev, pid, owners, week=week) for pid in sorted(held, key=lambda p: (-snap.players[p].value, p))]
+        teams.append({
+            "team_id": tid, "name": t.name, "owner": t.owner, "is_you": t.is_user, "persona": _persona(snap, t.persona_id),
+            "record": _record(by_team[tid]) if tid in by_team else None,
+            "power_rank": power.index(tid) + 1,
+            "avg_age": round(sum(snap.players[p].age for p in roster) / len(roster), 1) if roster else None,
+            "roster_size": len(roster),
+            "positions": positions,
+            "strengths": [p["pos"] for p in positions if p["level"] == "strength"],
+            "needs": [p["pos"] for p in positions if p["level"] == "need"],
+            "surplus": [p["pos"] for p in positions if p["depth"] >= SURPLUS_DEPTH and p["level"] != "need"],
+            "top_assets": rows_[:TOP_ASSETS],
+            "players": rows_,
+        })
+    return {"teams": teams, "week": week}
 
 
 # ------------------------------------------------------------------- matchup

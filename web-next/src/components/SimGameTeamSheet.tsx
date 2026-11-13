@@ -7,10 +7,11 @@ import { Button } from "@/components/Button";
 import { PositionBadge } from "@/components/PositionBadge";
 import { SimCrest } from "@/components/SimCrest";
 import { SimGlyph } from "@/components/SimGlyph";
-import { SimPlayerChip, SimPlayerLine, SimSectionTitle, SimSheet, SimStat, SimToneBadge, simToneColor, type SimCtx } from "@/components/SimGameParts";
+import { SimPlayerChip, SimPlayerLine, SimSectionTitle, SimSheet, SimToneBadge, simToneColor, type SimCtx } from "@/components/SimGameParts";
 import { SkeletonCard } from "@/components/Skeleton";
 import { ToneBadge } from "@/components/ToneBadge";
 import { api } from "@/lib/api";
+import { simGroupBenchByPosition, simRosterStats } from "@/lib/simLeagueRosters";
 import {
   simFmtPts,
   simFmtRecord,
@@ -23,10 +24,12 @@ import {
   type SimTeamRosterResponse,
 } from "@/lib/simGame";
 
+const SIM_ROSTER_POS_ORDER = ["QB", "RB", "WR", "TE", "K", "DEF"] as const;
+
 /**
  * The scouting sheet for any team (GET /teams/{id}): record and rank, which
- * positions are strengths and needs, the lineup it will start, its injuries,
- * its recent moves and a way to open a trade. Works for your own team too.
+ * positions are strengths and needs, the lineup it will start, its full roster (starters, bench by position, IR, taxi) in the shared player rows, its
+ * recent moves and a prefilled "Make an offer" (the trade tab opens with this team as the partner). Works for your own team too.
  */
 export function SimTeamSheet({ ctx, teamId, onClose, onTrade }: { ctx: SimCtx; teamId: string; onClose: () => void; onTrade: (teamId: string) => void }) {
   const [data, setData] = useState<SimTeamRosterResponse | null>(null);
@@ -134,15 +137,6 @@ function TeamBody({ ctx, data, onTrade }: { ctx: SimCtx; data: SimTeamRosterResp
         </ul>
       </section>
 
-      {(data.injuries ?? []).length > 0 ? (
-        <section className="flex flex-col gap-1" aria-label="Injuries">
-          <SimSectionTitle glyph="injury" tone="danger">Injuries</SimSectionTitle>
-          {data.injuries!.map((p) => (
-            <SimPlayerLine key={p.id} player={p} onOpen={ctx.openPlayer} trailing={<SimToneBadge label={`${p.out_weeks} wk`} tone="danger" />} />
-          ))}
-        </section>
-      ) : null}
-
       <section className="flex flex-col gap-1" aria-label="Lineup">
         <SimSectionTitle glyph="team" tone="accent" note={`Projected ${simFmtPts(data.projected_total)} points this week`}>Lineup</SimSectionTitle>
         {lineup.map((slot, index) => (
@@ -156,7 +150,7 @@ function TeamBody({ ctx, data, onTrade }: { ctx: SimCtx; data: SimTeamRosterResp
                   player={slot.player}
                   hidePosition={simSlotRepeatsPosition(slot.slot, slot.player.pos)}
                   onOpen={ctx.openPlayer}
-                  trailing={<SimStat label="Proj" value={simFmtPts(slot.player.projection)} />}
+                  stats={simRosterStats(slot.player)}
                 />
               ) : (
                 <p className="py-3 text-xs" style={{ color: "var(--color-text-muted)" }}>Empty</p>
@@ -168,9 +162,32 @@ function TeamBody({ ctx, data, onTrade }: { ctx: SimCtx; data: SimTeamRosterResp
 
       {bench.length > 0 ? (
         <section className="flex flex-col gap-1" aria-label="Bench">
-          <SimSectionTitle glyph="bye" tone="muted">Bench</SimSectionTitle>
-          {bench.map((p) => (
-            <SimPlayerLine key={p.id} player={p} muted onOpen={ctx.openPlayer} trailing={<SimStat label="Proj" value={simFmtPts(p.projection)} />} />
+          <SimSectionTitle glyph="bye" tone="muted" note={`${bench.length} on the bench, grouped by position`}>Bench</SimSectionTitle>
+          {simGroupBenchByPosition(bench, SIM_ROSTER_POS_ORDER).map((group) => (
+            <div key={group.pos} className="flex flex-col" role="group" aria-label={`${group.pos} bench`}>
+              <p className="pt-1 text-xs font-extrabold" style={{ color: "var(--color-text-muted)" }}>{group.pos} · {group.players.length}</p>
+              {group.players.map((p) => (
+                <SimPlayerLine key={p.id} player={p} muted onOpen={ctx.openPlayer} stats={simRosterStats(p)} />
+              ))}
+            </div>
+          ))}
+        </section>
+      ) : null}
+
+      {(data.ir ?? []).length > 0 ? (
+        <section className="flex flex-col gap-1" aria-label="Injured reserve">
+          <SimSectionTitle glyph="injury" tone="danger" note="Not counted against the roster limit.">Injured reserve</SimSectionTitle>
+          {data.ir!.map((p) => (
+            <SimPlayerLine key={p.id} player={p} onOpen={ctx.openPlayer} stats={simRosterStats(p)} />
+          ))}
+        </section>
+      ) : null}
+
+      {(data.taxi ?? []).length > 0 ? (
+        <section className="flex flex-col gap-1" aria-label="Taxi squad">
+          <SimSectionTitle glyph="spark" tone="accent" note="Young players stashed off the active roster.">Taxi squad</SimSectionTitle>
+          {data.taxi!.map((p) => (
+            <SimPlayerLine key={p.id} player={p} onOpen={ctx.openPlayer} stats={simRosterStats(p)} />
           ))}
         </section>
       ) : null}
@@ -198,7 +215,7 @@ function TeamBody({ ctx, data, onTrade }: { ctx: SimCtx; data: SimTeamRosterResp
       {!team.is_you ? (
         <div className="flex flex-col gap-1">
           <Button disabled={!data.trade?.open} onClick={() => onTrade(team.team_id)}>
-            <span className="inline-flex items-center gap-2"><SimGlyph name="trade" size={14} />Trade with {team.name}</span>
+            <span className="inline-flex items-center gap-2"><SimGlyph name="trade" size={14} />Make an offer to {team.name}</span>
           </Button>
           {!data.trade?.open ? <p className="text-xs" style={{ color: "var(--color-text-muted)" }}>Trades are closed right now.</p> : null}
         </div>
