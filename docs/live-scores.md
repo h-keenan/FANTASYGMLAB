@@ -121,3 +121,5 @@ Simulation (`tests/test_live_scores_adaptive.py`, 1000 live leagues x 4 users,
 the baseline after the first minute; worst staleness 101 s (the 90 s tier with
 jitter), i.e. under heavy load the live screen degrades gracefully to about 100 s
 of server age plus the poll, instead of blowing the budget.
+
+See also `docs/live-plays-research.md` (Live feed derived from polled stat lines, and real play-by-play options) and `docs/player-card.md`.

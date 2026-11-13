@@ -1798,6 +1798,8 @@ export interface MatchupRealStarter {
   game_opponent_score?: number | null;
   /** Share (0-1) of his own game already played, a wall-clock estimate; null before kickoff. */
   game_progress?: number | null;
+  /** Live stat line (non-zero tracked stats) while his game is live; the Live feed diffs these between polls. */
+  stats?: Record<string, number> | null;
 
   /** "scheduled" / "in_progress" / "final" for this player's own game —
    * null when unknown. Optional: absent on older payloads. */

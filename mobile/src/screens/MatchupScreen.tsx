@@ -24,6 +24,8 @@ import GuillotineCard from '../components/GuillotineCard';
 import GridBackground from '../components/GridBackground';
 import { ComparisonHeader, SlotList } from '../components/MatchupLineup';
 import { PlayerCard } from '../components/PlayerCardKit';
+import LiveFeedPanel from '../components/LiveFeedPanel';
+import { feedKey, liveFeedStore } from '../lib/liveFeed';
 import { playerCardFromStarter } from '../lib/playerCard';
 import PositionBadge from '../components/PositionBadge';
 import SectionHeading from '../components/SectionHeading';
@@ -152,6 +154,8 @@ export default function MatchupScreen({ route, navigation }: Props) {
     queryFn: async () => {
       try {
         const result = await api.getLeagueMatchup(leagueId);
+        // Derive Live feed events from consecutive polls (in-memory, per matchup).
+        liveFeedStore.ingest(feedKey(leagueId, result.week), result, Date.now());
         failures.current = 0;
         retryAfter.current = undefined;
         return result;
@@ -335,6 +339,7 @@ export default function MatchupScreen({ route, navigation }: Props) {
               .join(', ')}.`}
           </AppText>
         ) : null}
+        <LiveFeedPanel feedKey={feedKey(leagueId, matchup.week)} live={matchup.game_state === 'live'} />
         <Insights matchup={shown} />
         <LineupComparison
           matchup={matchup}

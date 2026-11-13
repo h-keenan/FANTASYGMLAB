@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 
 import { api, type MatchupResponse } from "@/lib/api";
+import { feedKey, liveFeedStore } from "@/lib/liveFeed";
 import { dataAgeSeconds, nextPollDelayMs, shouldPoll } from "@/lib/liveScores";
 
 /**
@@ -54,6 +55,7 @@ export function useLiveMatchup(leagueId: string, lens: string, enabled: boolean)
         if (cancelled.current) return;
         failures.current = 0;
         latest.current = result;
+        liveFeedStore.ingest(feedKey(leagueId, result.week), result, Date.now());
         setMatchup(result);
         setReceivedAt(Date.now());
         setError(null);
