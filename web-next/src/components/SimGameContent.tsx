@@ -455,7 +455,7 @@ export function SimGameContent() {
 
 function Shell({ children, wide = false }: { children: React.ReactNode; wide?: boolean }) {
   return (
-    <main className={`flex-1 flex flex-col gap-3 px-4 py-3 w-full mx-auto ${wide ? "max-w-5xl" : "max-w-3xl"}`}>
+    <main className={`sim-root flex-1 flex flex-col gap-3 px-4 py-3 w-full mx-auto ${wide ? "max-w-5xl xl:max-w-[1200px]" : "max-w-3xl"}`}>
       <PageTitle page="Fantasy Sim" />
       {children}
     </main>

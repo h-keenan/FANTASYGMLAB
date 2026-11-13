@@ -50,21 +50,12 @@ export function SimActionBar({ ctx, paywalled, advancing, onAdvance, onTab }: { 
   };
   const reasonId = "sim-advance-reason";
   return (
-    <div
-      className="fixed inset-x-0 bottom-0 z-30 md:sticky md:inset-x-auto"
-      style={{
-        background: "color-mix(in srgb, var(--color-bg) 92%, transparent)",
-        backdropFilter: "blur(10px)",
-        borderTop: "var(--border-width-default) solid var(--color-border)",
-        paddingBottom: "env(safe-area-inset-bottom)",
-      }}
-      data-testid="sim-action-bar"
-    >
+    <div className="sim-action-bar fixed inset-x-0 bottom-0 z-30 md:sticky md:inset-x-auto md:bottom-4 md:mx-auto md:flex md:w-full md:items-center md:justify-between md:gap-4 md:px-4 md:py-2" data-testid="sim-action-bar">
       {confirming && state.confirm && !paywalled ? (
-        <div className="px-4 pt-1.5 text-center text-xs font-bold" role="alertdialog" aria-label="Confirm advance" data-testid="sim-advance-confirm" style={{ color: "var(--color-warning)" }}>
+        <div className="px-4 pt-1.5 text-center text-xs font-bold md:flex-1 md:p-0 md:text-left md:text-sm" role="alertdialog" aria-label="Confirm advance" data-testid="sim-advance-confirm" style={{ color: "var(--color-warning)" }}>
           <p>{state.confirm}</p>
           {onTab ? (
-            <p className="mt-1 flex justify-center gap-3">
+            <p className="mt-1 flex justify-center gap-3 md:justify-start">
               <button type="button" className="tap-link underline" onClick={() => { setConfirming(false); onTab("team"); }}>Fill from bench</button>
               <button type="button" className="tap-link underline" onClick={() => { setConfirming(false); onTab("players"); }}>Free agents</button>
               <button type="button" className="tap-link underline" onClick={() => setConfirming(false)}>Cancel</button>
@@ -72,21 +63,27 @@ export function SimActionBar({ ctx, paywalled, advancing, onAdvance, onTab }: { 
           ) : null}
         </div>
       ) : state.warning && !state.reason && !paywalled ? (
-        <p className="px-4 pt-1.5 text-center text-xs font-bold" style={{ color: "var(--color-warning)" }} role="status" data-testid="sim-advance-warning">
+        <p className="px-4 pt-1.5 text-center text-xs font-bold md:flex-1 md:p-0 md:text-left md:text-sm" style={{ color: "var(--color-warning)" }} role="status" data-testid="sim-advance-warning">
           {state.warning}
         </p>
       ) : null}
       {state.reason && !paywalled ? (
-        <p id={reasonId} className="px-4 pt-1.5 text-center text-xs font-bold" style={{ color: "var(--color-warning)" }} role="status">
+        <p id={reasonId} className="px-4 pt-1.5 text-center text-xs font-bold md:flex-1 md:p-0 md:text-left md:text-sm" style={{ color: "var(--color-warning)" }} role="status">
           {state.reason}
         </p>
-      ) : null}
-      <div className="mx-auto grid max-w-3xl grid-cols-[1fr_4.25rem_1fr] items-center gap-2 px-4 py-2 md:grid-cols-[auto_1fr_auto]">
+      ) : confirming && state.confirm && !paywalled ? null : state.warning && !paywalled ? null : (
+        <p className="hidden text-sm font-bold md:block md:flex-1" style={{ color: "var(--color-text-secondary)" }} data-testid="sim-action-bar-status">
+          Week {game.week}{game.phase !== "playoffs" && game.settings?.regular_weeks ? ` of ${game.settings.regular_weeks}` : ""}
+          <span aria-hidden="true"> &middot; </span>
+          <span style={{ color: auto.optimal ? "var(--color-success)" : undefined }}>{auto.optimal ? "Lineup optimal" : "Lineup can improve"}</span>
+        </p>
+      )}
+      <div className="mx-auto grid max-w-3xl grid-cols-[1fr_4.25rem_1fr] items-center gap-2 px-4 py-2 md:mx-0 md:flex md:max-w-none md:flex-none md:gap-2 md:p-0">
         <Button variant="secondary" size="sm" loading={auto.busy} disabled={auto.optimal || paywalled} onClick={auto.run} aria-label={auto.optimal ? "Lineup is optimal" : "Auto-set best lineup"}>
           <SimGlyph name={auto.optimal ? "check" : "spark"} size={16} />
           <span className="ml-1.5">{auto.optimal ? "Optimal" : "Auto-set"}</span>
         </Button>
-        <span aria-hidden="true" />
+        <span aria-hidden="true" className="md:hidden" />
         {paywalled ? (
           <ButtonLink href="/premium" variant="premium" size="sm">Go Pro to continue</ButtonLink>
         ) : (

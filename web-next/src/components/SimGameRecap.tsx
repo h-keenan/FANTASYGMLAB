@@ -58,7 +58,7 @@ export function SimWeekRecapView({
   const last = index + 1 >= total;
   const tone = simResultTone(game?.result);
   return (
-    <div className="flex flex-col gap-3" data-testid="week-recap">
+    <div className="flex flex-col gap-3 md:pb-2" data-testid="week-recap">
       <AccentCard accent={simToneColor(tone)} as="section" glow={game?.result === "win"}>
         <p className="text-xs uppercase font-extrabold" style={{ color: "var(--color-text-muted)", letterSpacing: "var(--letter-spacing-badge)" }}>
           {title}
@@ -93,6 +93,7 @@ export function SimWeekRecapView({
         ) : null}
       </AccentCard>
 
+      <div className="flex flex-col gap-3 xl:grid xl:grid-cols-2 xl:items-start xl:gap-6">
       {game ? (
         <section className="flex flex-col gap-1" aria-label="Your starters">
           <SectionHeading><span className="inline-flex items-center gap-2"><ReviewGlyphChip glyph="lineup" tone="accent" size={24} />Your starters</span></SectionHeading>
@@ -122,6 +123,7 @@ export function SimWeekRecapView({
         </section>
       ) : null}
 
+      <div className="flex flex-col gap-3">
       {recap.mvp || recap.bust ? (
         <div className="grid grid-cols-2 gap-2">
           {recap.mvp ? (
@@ -179,7 +181,10 @@ export function SimWeekRecapView({
         </section>
       ) : null}
 
-      <div className="flex gap-2 sticky bottom-16 md:bottom-2">
+      </div>
+      </div>
+
+      <div className="sim-recap-cta flex gap-2 sticky bottom-16 md:bottom-4">
         {!last ? (
           <Button fullWidth onClick={onNext}>Next round</Button>
         ) : (
