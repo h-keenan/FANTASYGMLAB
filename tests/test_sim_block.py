@@ -63,6 +63,42 @@ def test_a_game_without_a_block_plays_exactly_as_before_and_new_games_carry_the_
     assert blk.user_block(old.snap, old.state) == {} and blk.block_index(old.snap, old.state, Evaluator(old.snap, old.state), old.sd) == {}
 
 
+def with_gates(run, *, ai_v=None, block_v=None):
+    """Flip one version gate on an existing game (the three gates are independent settings)."""
+    changes = {k: v for k, v in (("ai_v", ai_v), ("block_v", block_v)) if v is not None}
+    object.__setattr__(run.root, "settings", replace(run.root.settings, **changes))
+    run.root.__dict__.pop("_views", None)
+    return run
+
+
+@pytest.mark.parametrize("ai_v", [0, 1])
+def test_golden_digest_a_dynasty_v3_game_with_block_v1_and_nothing_blocked_equals_the_block_free_engine(ai_v):
+    """The version gates (dynasty_v, ai_v, block_v) are independent: with block_v 1 and an empty block, a dynasty_v 3 game
+    plays two full seasons and an offseason event for event and digest for digest like the same game with block_v 0 (the
+    engine as it was before the block), whatever ai_v is."""
+    a, b = with_gates(Run(), ai_v=ai_v, block_v=1), with_gates(Run(), ai_v=ai_v, block_v=0)
+    assert a.root.settings.dynasty_v == 3 and a.root.settings.block_v == 1 and b.root.settings.block_v == 0
+    for run in (a, b):
+        run.play_season()
+        run.offseason()
+        run.play_season()
+    assert json.dumps(a.em.events, sort_keys=True) == json.dumps(b.em.events, sort_keys=True)
+    assert a.state.digest() == b.state.digest()
+    assert {t["type"] for t in a.em.events} >= {"rookie_pick", "season_started"}  # it really crossed a season boundary
+    assert not any(e["type"] == "block_set" or e["payload"].get("via_block") for e in a.em.events)
+
+
+def test_the_block_settings_serialize_independently_of_the_other_gates():
+    r = Run()
+    d = r.root.settings.to_dict()
+    assert d["dynasty_v"] == 3 and d["ai_v"] == 1 and d["block_v"] == 1
+    for ai_v, block_v in ((0, 0), (0, 1), (1, 0), (1, 1)):
+        g = with_gates(Run(), ai_v=ai_v, block_v=block_v).root.settings
+        back = type(g).from_dict(g.to_dict()) if hasattr(type(g), "from_dict") else g
+        assert (back.dynasty_v, back.ai_v, back.block_v) == (3, ai_v, block_v)
+        assert ("ai_v" in g.to_dict()) == bool(ai_v) and ("block_v" in g.to_dict()) == bool(block_v)
+
+
 # ---------------------------------------------------------------- the user's block
 
 
