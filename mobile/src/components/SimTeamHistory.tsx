@@ -4,6 +4,7 @@ import { View } from 'react-native';
 import AccentCard from './AccentCard';
 import AppText from './AppText';
 import Button from './Button';
+import ErrorState from './ErrorState';
 import PositionBadge from './PositionBadge';
 import { SkeletonCard } from './SkeletonBlock';
 import { SimSectionTitle, createSimStyles } from './SimGameParts';
@@ -58,17 +59,14 @@ export function SimTeamHistory({ gameId, teamId }: { gameId: string; teamId: str
 
   if (failed) {
     return (
-      <View style={common.tight}>
-        <AppText style={common.bodyStrong}>Could not load this team&apos;s history.</AppText>
-        <Button
-          label="Try again"
-          variant="secondary"
-          onPress={() => {
-            setFailed(false);
-            setAttempt((n) => n + 1);
-          }}
-        />
-      </View>
+      <ErrorState
+        title="History did not load"
+        message="Check your connection and try again."
+        onRetry={() => {
+          setFailed(false);
+          setAttempt((n) => n + 1);
+        }}
+      />
     );
   }
   if (!data) return <SkeletonCard rows={5} />;
