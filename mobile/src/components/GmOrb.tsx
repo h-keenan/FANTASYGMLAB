@@ -48,6 +48,7 @@ import { ORB_SCRIM_BASE_HEIGHT, ORB_SIZE } from '../lib/orbLayout';
 import { useOrbHorizontalFraction } from '../lib/orbPosition';
 import { PLAYER_SEARCH_MAX_RESULTS, PLAYER_SEARCH_MIN_CHARS, useLeaguePlayerSearchState } from '../lib/leaguePlayerSearch';
 import { OPEN_ORB_SEARCH_EVENT } from '../lib/orbEvents';
+import { useSimGameOwnsOrb } from '../lib/simGameChrome';
 import { maskShowcaseFields } from '../lib/showcaseMode';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../context/AuthContext';
@@ -412,6 +413,8 @@ export default function GmOrb() {
   const { openPlayer: openQuickView } = usePlayerQuickView();
   const { colors } = useThemeMode();
   const styles = useMemo(() => createStyles(colors), [colors]);
+  // The Fantasy Sim game draws its own orb (SimGameOrb); this one keeps only its sheet (search) mounted.
+  const gameOwnsOrb = useSimGameOwnsOrb();
   const [visible, setVisible] = useState(false);
   const [open, setOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
@@ -731,11 +734,14 @@ export default function GmOrb() {
 
   return (
     <>
+      {gameOwnsOrb ? null : (
       <LinearGradient
         pointerEvents="none"
         colors={[`${colors.background}00`, `${colors.background}EB`]}
         style={[styles.scrim, { height: ORB_SCRIM_BASE_HEIGHT + insets.bottom }]}
       />
+      )}
+      {gameOwnsOrb ? null : (
       <View style={[styles.orbWrap, { bottom: insets.bottom }]}>
         <GestureDetector gesture={dragGesture}>
           <Animated.View style={orbAnimatedStyle}>
@@ -761,6 +767,7 @@ export default function GmOrb() {
           </Animated.View>
         </GestureDetector>
       </View>
+      )}
 
       {SHOW_ORB_DEBUG_OVERLAY && (
         <View pointerEvents="none" style={[styles.debugOverlay, { top: rawInsets.top + 4 }]}>
