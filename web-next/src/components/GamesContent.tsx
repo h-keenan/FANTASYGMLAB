@@ -62,15 +62,15 @@ export function GamesContent({ leagueId, leagueName, initialTab }: { leagueId: s
     if (initialTab) setTab(initialTab);
   }
   return (
-    <main className="flex-1 flex flex-col gap-3 px-4 py-3 max-w-3xl w-full mx-auto">
+    <main className="page-shell">
       <header className="flex flex-col gap-1">
         <PageTitle page="Games" leagueName={leagueName} />
       </header>
       <PillRow
         fullWidth
         options={[
-          { label: "Season Sim", value: "sim" },
-          { label: "Pick'em", value: "pickem" },
+          { label: "Season Sim", value: "sim", glyph: "sim" },
+          { label: "Pick'em", value: "pickem", glyph: "pickem" },
         ]}
         active={tab}
         onSelect={(value) => setTab(value as Tab)}

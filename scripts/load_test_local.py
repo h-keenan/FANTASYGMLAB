@@ -42,6 +42,17 @@ FLOWS = [
 
 
 # --------------------------------------------------------------- stub server
+def _latency() -> float:
+    """Sleeper stub latency: 30 ms, or uniform in LT_LATENCY_MS="lo,hi" (Portfolio bench: 30,60)."""
+    spec = os.environ.get("LT_LATENCY_MS")
+    if not spec:
+        return 0.03
+    import random
+
+    lo, _, hi = spec.partition(",")
+    return random.uniform(float(lo), float(hi or lo)) / 1000.0
+
+
 def _players() -> dict:
     return json.load(open(os.environ.get("LT_PLAYERS_JSON", "data/sleeper_players.json")))
 
@@ -78,6 +89,10 @@ class Stub(BaseHTTPRequestHandler):
     def _league_n(self, league_id: str) -> int:
         return int(league_id.lstrip("L") or 0)
 
+    @staticmethod
+    def _owner_n(n: int) -> int:
+        return n % 100000
+
     def _roster(self, n: int, rid: int) -> dict:
         pool, ids = self.pool(), []
         take = {"QB": 3, "RB": 7, "WR": 9, "TE": 3}
@@ -87,7 +102,7 @@ class Stub(BaseHTTPRequestHandler):
             ids += p[start : start + cnt]
         return {
             "roster_id": rid,
-            "owner_id": f"sl{n}_{rid}",
+            "owner_id": f"sl{self._owner_n(n)}_{rid}",
             "players": ids,
             "starters": ids[:9],
             "reserve": [],
@@ -104,16 +119,21 @@ class Stub(BaseHTTPRequestHandler):
             q = parse_qs(u.query)
             uid = (q.get("user_id") or [""])[0].replace("eq.", "")
             n = int(uid.split("-")[-1] or 0) if uid else 0
+            if os.environ.get("LT_SUPABASE_LATENCY_MS"):
+                time.sleep(float(os.environ["LT_SUPABASE_LATENCY_MS"]) / 1000.0)
             if parts[2] == "profiles":
                 return self._send([{"entitlement": "pro" if n % 4 == 0 else "free", "sleeper_username": f"sluser{n}"}])
             if parts[2] == "saved_leagues":
-                return self._send([{"user_id": uid, "sleeper_username": f"sluser{n}", "league_id": f"L{n}", "league_name": f"Load League {n}", "roster_id": "1", "team_id": "1", "owner_id": f"sl{n}_1", "is_default": True}])
+                # LT_LEAGUES_PER_USER > 1 gives every user several leagues (Portfolio bench):
+                # league k of user n is L{n + 100000*k}; _owner_n() maps it back to the user.
+                count = int(os.environ.get("LT_LEAGUES_PER_USER", "1"))
+                return self._send([{"user_id": uid, "sleeper_username": f"sluser{n}", "league_id": f"L{n + 100000 * k}", "league_name": f"Load League {n}-{k}", "roster_id": "1", "team_id": "1", "owner_id": f"sl{n}_1", "is_default": k == 0} for k in range(count)])
             return self._send([])
         # ---- Sleeper
         with self.lock:
             self.sleeper_hits["/".join(["*" if p.isdigit() or p.startswith(("L", "sl")) else p for p in parts[:4]])] += 1
             self.sleeper_hits["__total__"] += 1
-        time.sleep(0.03)  # nominal upstream latency
+        time.sleep(_latency())  # nominal upstream latency
         if parts[:1] == ["__stats"]:
             return self._send({"hits": self.sleeper_hits, "unhandled": self.unhandled})
         if parts[:2] == ["v1", "state"]:
@@ -135,7 +155,7 @@ class Stub(BaseHTTPRequestHandler):
                                    "settings": {"num_teams": 12, "playoff_week_start": 15, "playoff_teams": 6, "leg": WEEK, "trade_deadline": 12, "type": 2},
                                    "previous_league_id": None})
             if tail == ["users"]:
-                return self._send([{"user_id": f"sl{n}_{r}", "display_name": f"Mgr{r}", "avatar": None, "metadata": {"team_name": f"Team {r}"}} for r in range(1, 13)])
+                return self._send([{"user_id": f"sl{self._owner_n(n)}_{r}", "display_name": f"Mgr{r}", "avatar": None, "metadata": {"team_name": f"Team {r}"}} for r in range(1, 13)])
             if tail == ["rosters"]:
                 return self._send([self._roster(n, r) for r in range(1, 13)])
             if tail[0] == "matchups":

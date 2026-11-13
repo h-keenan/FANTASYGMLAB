@@ -1,5 +1,6 @@
 "use client";
 
+import type { TabIconName } from "@/lib/tabIcons";
 import { ExplorerLeagueProvider } from "@/context/ExplorerLeagueContext";
 import { useEffect, useState } from "react";
 
@@ -54,13 +55,13 @@ import { trackUse } from "@/lib/analytics";
 
 type ProfileTab = "stats" | "trends" | "schedule" | "career" | "model" | "news";
 
-const PROFILE_TABS: Array<{ label: string; value: ProfileTab }> = [
-  { label: "Stats", value: "stats" },
-  { label: "Trends", value: "trends" },
-  { label: "Schedule", value: "schedule" },
-  { label: "Career", value: "career" },
-  { label: "Model", value: "model" },
-  { label: "News", value: "news" },
+const PROFILE_TABS: Array<{ label: string; value: ProfileTab; glyph: TabIconName }> = [
+  { label: "Stats", value: "stats", glyph: "stats" },
+  { label: "Trends", value: "trends", glyph: "trends" },
+  { label: "Schedule", value: "schedule", glyph: "schedule" },
+  { label: "Career", value: "career", glyph: "career" },
+  { label: "Model", value: "model", glyph: "model" },
+  { label: "News", value: "news", glyph: "news" },
 ];
 
 /** `?tab=news` (Quick View "See all news") opens that tab; anything unknown is Stats. */
@@ -193,7 +194,7 @@ export function PlayerProfileContent({
   const name = player.name || `Player ${player.player_id}`;
 
   return (
-    <main className="flex-1 flex flex-col gap-3 px-4 py-3 max-w-3xl w-full mx-auto">
+    <main className="page-shell">
       <PlayerHeroHeader
         playerId={player.player_id}
         name={name}
@@ -241,7 +242,7 @@ export function PlayerProfileContent({
             {model?.decision_fit_narrative ? <DecisionFitCard narrative={model.decision_fit_narrative} /> : null}
 
             <PillRow
-              options={PROFILE_TABS.map((option) => ({ label: option.label, value: option.value }))}
+              options={PROFILE_TABS.map((option) => ({ label: option.label, value: option.value, glyph: option.glyph }))}
               active={tab}
               onSelect={(value) => setTab(value as ProfileTab)}
               variant="scroll"

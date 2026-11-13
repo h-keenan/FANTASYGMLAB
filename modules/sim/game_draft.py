@@ -194,7 +194,7 @@ def choose_pick(ctx: DraftContext, tid: str, n: int, seed: int, *, human: bool =
         value = p.value * (math.exp(sigma * float(noise[snap.index[pid]])) if noise is not None else 1.0)
         need = need_w * _need_bonus(snap.settings.slots, counts, p.pos, rnd)
         persona = 28.0 * team.pos_bias.get(p.pos, 0.0) if not human else 0.0
-        age = age_pref * 5.0 * max(-1.0, min(1.0, (26.0 - p.age) / 4.0)) if not human else 0.0
+        age = age_pref * snap.settings.policy.draft_age_mult * 5.0 * max(-1.0, min(1.0, (26.0 - p.age) / 4.0)) if not human else 0.0
         scored.append((value + need + persona + age, pid))
     scored.sort(key=lambda t: (-t[0], t[1]))
     if topk <= 1:

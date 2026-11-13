@@ -5,6 +5,7 @@
  * "which screen am I on and why", so the gating rules (unavailable, paywall,
  * recap-then-hub) are tested once and cannot drift per platform.
  */
+import type { TabIconName } from "./tabIcons";
 import {
   simGameStage,
   type SimGame,
@@ -17,13 +18,13 @@ import {
 
 export type SimTab = "home" | "team" | "players" | "trades" | "league" | "more";
 
-export const SIM_TABS: { value: SimTab; label: string }[] = [
-  { value: "home", label: "Home" },
-  { value: "team", label: "Team" },
-  { value: "players", label: "Players" },
-  { value: "trades", label: "Trades" },
-  { value: "league", label: "League" },
-  { value: "more", label: "More" },
+export const SIM_TABS: { value: SimTab; label: string; glyph: TabIconName }[] = [
+  { value: "home", label: "Home", glyph: "home" },
+  { value: "team", label: "Team", glyph: "team" },
+  { value: "players", label: "Players", glyph: "players" },
+  { value: "trades", label: "Trades", glyph: "trades" },
+  { value: "league", label: "League", glyph: "league" },
+  { value: "more", label: "More", glyph: "more" },
 ];
 
 export type SimFlowView = "loading" | "unavailable" | "hub" | "setup" | "game" | "error";

@@ -1,3 +1,4 @@
+import type { TabIconName } from "@/lib/tabIcons";
 import Link from "next/link";
 
 import { BeginnerHelp } from "@/components/BeginnerHelp";
@@ -13,10 +14,10 @@ import { SkeletonBlock } from "@/components/Skeleton";
 import { PageTitle } from "@/components/PageTitle";
 
 export const GM_PLAN_TABS = [
-  { label: "Overview", value: "overview" },
-  { label: "Trades", value: "trades" },
-  { label: "Core", value: "core" },
-  { label: "Watching", value: "watching" },
+  { label: "Overview", value: "overview", glyph: "overview" },
+  { label: "Trades", value: "trades", glyph: "trades" },
+  { label: "Core", value: "core", glyph: "core" },
+  { label: "Watching", value: "watching", glyph: "watching" },
 ] as const;
 export type GmPlanTab = (typeof GM_PLAN_TABS)[number]["value"];
 
@@ -274,7 +275,7 @@ export function GmPlanSkeleton({ leagueName }: { leagueName: string }) {
     <SkeletonBlock key={key} height={height} />
   );
   return (
-    <main className="flex-1 flex flex-col gap-3 px-4 py-3 max-w-3xl w-full mx-auto" aria-busy="true">
+    <main className="page-shell" aria-busy="true">
       <header className="flex flex-col gap-1">
         <PageTitle page="GM Plan" leagueName={leagueName} />
       </header>

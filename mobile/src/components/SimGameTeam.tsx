@@ -421,8 +421,8 @@ export function SimPlayersTab({
     <View style={common.stack}>
       <SegmentedTabBar<'all' | 'waivers'>
         options={[
-          { key: 'all', label: 'All players' },
-          { key: 'waivers', label: `Waivers${claims.length ? ` ${claims.length}` : ''}` },
+          { key: 'all', label: 'All players', glyph: 'team' },
+          { key: 'waivers', label: `Waivers${claims.length ? ` ${claims.length}` : ''}`, glyph: 'addDrop' },
         ]}
         active={mode}
         onChange={setMode}

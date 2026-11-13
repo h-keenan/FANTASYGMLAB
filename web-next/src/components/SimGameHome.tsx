@@ -133,7 +133,7 @@ export function SimHomeTab({
         <PillRow
           ariaLabel="Home sections"
           variant="fill"
-          options={SIM_HOME_VIEWS.map((v) => ({ label: v.value === "week" && inboxCount > 0 ? `${v.label} · ${inboxCount}` : v.label, value: v.value }))}
+          options={SIM_HOME_VIEWS.map((v) => ({ label: v.value === "week" && inboxCount > 0 ? `${v.label} · ${inboxCount}` : v.label, value: v.value, glyph: v.glyph }))}
           active={view}
           onSelect={(value) => setView(value as SimHomeView)}
         />

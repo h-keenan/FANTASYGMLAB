@@ -1,5 +1,6 @@
 "use client";
 
+import type { TabIconName } from "@/lib/tabIcons";
 import { EmptyState } from "@/components/EmptyState";
 import { SectionHeading } from "@/components/SectionHeading";
 import { useEffect, useState, type ReactNode } from "react";
@@ -81,6 +82,8 @@ import { ErrorState } from "@/components/ErrorState";
 type MemoryView = "Recaps" | "History" | "Storylines" | "Roundup";
 
 const MEMORY_VIEWS: MemoryView[] = ["Recaps", "Roundup", "History", "Storylines"];
+
+const MEMORY_VIEW_GLYPHS: Record<MemoryView, TabIconName> = { Recaps: "recaps", Roundup: "roundup", History: "history", Storylines: "storylines" };
 
 const VIEW_BY_TAB: Record<RecapsTab, MemoryView> = { recaps: "Recaps", history: "History", storylines: "Storylines", roundup: "Roundup" };
 
@@ -1092,7 +1095,7 @@ export function LeagueRecapsContent({
     );
 
   return (
-    <main className="flex-1 flex flex-col gap-3 px-4 py-3 max-w-3xl w-full mx-auto">
+    <main className="page-shell">
       <header className="flex flex-col gap-1">
         <PageTitle page="League Recaps" leagueName={leagueName} />
       </header>
@@ -1100,7 +1103,7 @@ export function LeagueRecapsContent({
         <PillRow
           variant="fill"
           ariaLabel="League memory view"
-          options={MEMORY_VIEWS.map((v) => ({ label: v, value: v }))}
+          options={MEMORY_VIEWS.map((v) => ({ label: v, value: v, glyph: MEMORY_VIEW_GLYPHS[v] }))}
           active={view}
           onSelect={(value) => setView(value as MemoryView)}
         />

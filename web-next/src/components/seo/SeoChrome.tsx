@@ -100,7 +100,7 @@ export function SeoPageShell({
   children: ReactNode;
 }) {
   return (
-    <main className="flex-1 flex flex-col gap-6 px-4 py-8 max-w-3xl w-full mx-auto">
+    <main className="page-shell page-shell-prose">
       <JsonLd data={[breadcrumbLd(crumbs), ...jsonLd]} />
       <div className="flex flex-col gap-2">
         <Breadcrumbs crumbs={crumbs} />

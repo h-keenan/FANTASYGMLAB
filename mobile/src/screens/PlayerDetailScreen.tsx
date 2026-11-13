@@ -1,3 +1,4 @@
+import type { TabIconName } from '../lib/tabIcons';
 import { ProjectionWeatherChip } from '../components/WeatherReasonChip';
 import React, { useEffect, useMemo, useState } from 'react';
 import {
@@ -72,13 +73,13 @@ import { SheetModal, SheetScrollView, SwipeDismissCard } from '../components/Swi
 import GlassCard from '../components/GlassCard';
 
 export type DetailTab = 'stats' | 'trends' | 'schedule' | 'career' | 'model' | 'news';
-const TABS: Array<{ key: DetailTab; label: string }> = [
-  { key: 'stats', label: 'Stats' },
-  { key: 'trends', label: 'Trends' },
-  { key: 'schedule', label: 'Schedule' },
-  { key: 'career', label: 'Career' },
-  { key: 'model', label: 'Model' },
-  { key: 'news', label: 'News' },
+const TABS: Array<{ key: DetailTab; label: string; glyph: TabIconName }> = [
+  { key: 'stats', label: 'Stats', glyph: 'stats' },
+  { key: 'trends', label: 'Trends', glyph: 'trends' },
+  { key: 'schedule', label: 'Schedule', glyph: 'schedule' },
+  { key: 'career', label: 'Career', glyph: 'career' },
+  { key: 'model', label: 'Model', glyph: 'model' },
+  { key: 'news', label: 'News', glyph: 'news' },
 ];
 
 type Props = NativeStackScreenProps<RootStackParamList, 'PlayerDetail'>;

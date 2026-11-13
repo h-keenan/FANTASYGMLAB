@@ -79,7 +79,7 @@ export default function TradeHubPage() {
 
   if (authLoading || (!tradeHub && !error)) {
     return (
-      <main className="flex-1 flex flex-col gap-3 px-4 py-3 max-w-3xl w-full mx-auto">
+      <main className="page-shell">
         <TradesTabBar leagueId={leagueId} leagueName={leagueName} active="trade_hub" />
         <TradeHubSkeleton />
       </main>

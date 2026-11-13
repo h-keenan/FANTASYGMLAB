@@ -432,8 +432,8 @@ export function SimPlayersTab({
         ariaLabel="Players view"
         variant="fill"
         options={[
-          { label: "All players", value: "all" },
-          { label: `Waivers${claims.length ? ` ${claims.length}` : ""}`, value: "waivers" },
+          { label: "All players", value: "all", glyph: "team" },
+          { label: `Waivers${claims.length ? ` ${claims.length}` : ""}`, value: "waivers", glyph: "addDrop" },
         ]}
         active={mode}
         onSelect={(value) => setMode(value as "all" | "waivers")}

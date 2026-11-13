@@ -49,6 +49,7 @@ export const IDENTICAL = [
   "simPresentation.ts",
   "startHere.ts",
   "startSitRange.ts",
+  "tabIcons.ts",
   "terms.ts",
   "tradeCautions.ts",
   "tradeValueBands.generated.ts",

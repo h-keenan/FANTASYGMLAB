@@ -1,3 +1,4 @@
+import type { TabIconName } from '../lib/tabIcons';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   FlatList,
@@ -80,10 +81,10 @@ const POSITIONS = ['ALL', 'QB', 'RB', 'WR', 'TE', 'K'];
 const BEST_AVAILABLE_POSITIONS = ['QB', 'RB', 'WR', 'TE', 'K'];
 
 type WaiverTab = 'recommended' | 'explore' | 'watchlist';
-const TAB_OPTIONS: Array<{ key: WaiverTab; label: string }> = [
-  { key: 'recommended', label: 'Recommended' },
-  { key: 'explore', label: 'Explore' },
-  { key: 'watchlist', label: 'Watchlist' },
+const TAB_OPTIONS: Array<{ key: WaiverTab; label: string; glyph: TabIconName }> = [
+  { key: 'recommended', label: 'Recommended', glyph: 'recommended' },
+  { key: 'explore', label: 'Explore', glyph: 'explore' },
+  { key: 'watchlist', label: 'Watchlist', glyph: 'watchlist' },
 ];
 const REC_FILTER_OPTIONS: Array<{ key: WaiverRecFilter; label: string }> = [
   { key: 'all', label: 'All' },

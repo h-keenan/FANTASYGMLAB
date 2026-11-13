@@ -49,6 +49,8 @@ PURE_ENGINE_FILES = [
     # the interactive GM game (everything but its router is pure stdlib + numpy + modules.sim)
     "game_types.py", "game_scoring.py", "game_setup.py", "game_state.py", "game_eval.py", "game_draft.py",
     "game_ai.py", "game_actions.py", "game_engine.py", "game_result.py", "game_store.py", "game_view.py", "game_home.py",
+    # dynasty mode: age curves, rookie classes, the offseason and its views
+    "aging.py", "game_dynasty.py", "game_dynasty_view.py",
 ]
 CALIBRATION_DIR = SIM_DIR / "calibration"
 
@@ -171,7 +173,7 @@ def test_player_model_and_calibration_are_pure_engine_files():
         assert (SIM_DIR / name).exists(), name
     assert "player_model.py" in PURE_ENGINE_FILES
     files = sorted(CALIBRATION_DIR.glob("*.py")) + [SIM_DIR / "player_model.py", SIM_DIR / "player_model_v1.py"]
-    assert {f.name for f in files} >= {"player_model.py", "dataset.py", "backtest.py", "fit.py"}
+    assert {f.name for f in files} >= {"player_model.py", "dataset.py", "backtest.py", "fit.py", "age_curve.py"}
     for path in files:
         bad = []
         for module, names, level in _imports(path):

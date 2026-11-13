@@ -3,6 +3,10 @@
 import Link from "next/link";
 import { useCallback, useEffect, useRef, useState, type KeyboardEvent, type ReactNode } from "react";
 
+import type { TabIconName } from "@/lib/tabIcons";
+
+import { TabGlyph } from "./TabGlyph";
+
 /**
  * The one segmented control / tab bar. Every tab strip in the app is this
  * component; sizing comes from the `--segmented-*` tokens in globals.css.
@@ -15,6 +19,13 @@ import { useCallback, useEffect, useRef, useState, type KeyboardEvent, type Reac
  *              edge fades, never wraps (many / long labels, e.g. filters).
  * Any variant falls back to horizontal scrolling instead of wrapping when
  * its labels overflow. `fullWidth` is kept as an alias for variant="fill".
+ *
+ * Icons: an option may carry `glyph` (a name from lib/tabIcons.ts, the
+ * registry shared with mobile) or a raw `icon` node. With icons, phones stack
+ * the glyph over the label (equal-width segments, so six tabs fit 390px with
+ * no clipped last tab); from sm up they sit side by side. The active tab is
+ * marked by a cyan glass pill plus a sliding underline (~180ms, off under
+ * prefers-reduced-motion).
  *
  * Accessibility: role="tablist", role="tab" + aria-selected, roving tabindex,
  * Arrow/Home/End keys move focus (and select, for button tabs). Options with
@@ -32,7 +43,7 @@ export function PillRow({
   sticky = false,
 }: {
   /** `icon` is an optional glyph slot rendered before the label (tab icons are added in this one place). */
-  options: { label: string; value: string; href?: string; icon?: ReactNode; count?: number }[];
+  options: { label: string; value: string; href?: string; icon?: ReactNode; glyph?: TabIconName; count?: number }[];
   active: string;
   onSelect?: (value: string) => void;
   fullWidth?: boolean;
@@ -44,6 +55,8 @@ export function PillRow({
   const mode: PillRowVariant = variant ?? (fullWidth ? "fill" : "compact");
   const scrollerRef = useRef<HTMLDivElement>(null);
   const [fade, setFade] = useState({ left: false, right: false });
+  const [indicator, setIndicator] = useState<{ left: number; width: number } | null>(null);
+  const [animate, setAnimate] = useState(false);
 
   const measure = useCallback(() => {
     const el = scrollerRef.current;
@@ -68,13 +81,35 @@ export function PillRow({
     measure();
   }, [active, options.length, measure]);
 
+  // Sliding underline: track the selected tab's box inside the scroller.
+  const placeIndicator = useCallback(() => {
+    const el = scrollerRef.current;
+    const selected = el?.querySelector<HTMLElement>('[aria-selected="true"]');
+    if (!selected) {
+      setIndicator(null);
+      return;
+    }
+    const next = { left: selected.offsetLeft, width: selected.offsetWidth };
+    setIndicator((prev) => (prev && prev.left === next.left && prev.width === next.width ? prev : next));
+  }, []);
+
+  useEffect(() => {
+    placeIndicator();
+    // Animate only moves after the first placement, never the initial paint.
+    const frame = requestAnimationFrame(() => setAnimate(true));
+    return () => cancelAnimationFrame(frame);
+  }, [active, options.length, placeIndicator]);
+
   useEffect(() => {
     measure();
     if (typeof ResizeObserver === "undefined" || !scrollerRef.current) return;
-    const observer = new ResizeObserver(measure);
+    const observer = new ResizeObserver(() => {
+      measure();
+      placeIndicator();
+    });
     observer.observe(scrollerRef.current);
     return () => observer.disconnect();
-  }, [measure]);
+  }, [measure, placeIndicator]);
 
   function onKeyDown(event: KeyboardEvent<HTMLDivElement>) {
     const keys = ["ArrowLeft", "ArrowRight", "Home", "End"];
@@ -97,7 +132,11 @@ export function PillRow({
   const mask = `linear-gradient(to right, ${fade.left ? "transparent 0, #000 var(--space-xl)" : "#000 0"}, ${
     fade.right ? "#000 calc(100% - var(--space-xl)), transparent 100%" : "#000 100%"
   })`;
-  const segment = mode === "fill" ? "flex-1 min-w-fit" : mode === "scroll" ? "shrink-0" : "shrink-0";
+  const anyIcon = options.some((option) => option.icon || option.glyph);
+  // Five or more icon tabs in a fill row split the width equally (min-w-0) so they fit a phone.
+  const equalFit = mode === "fill" && anyIcon && options.length >= 5;
+  const segment =
+    mode === "fill" ? (equalFit ? "flex-1 min-w-0" : "flex-1 min-w-fit") : "shrink-0";
 
   return (
     <div
@@ -114,7 +153,7 @@ export function PillRow({
         aria-label={ariaLabel}
         onKeyDown={onKeyDown}
         onScroll={measure}
-        className={`flex min-w-0 overflow-x-auto ${mode === "fill" ? "w-full" : ""}`}
+        className={`relative flex min-w-0 overflow-x-auto ${mode === "fill" ? "w-full" : ""}`}
         style={{
           gap: "var(--segmented-gap)",
           scrollbarWidth: "none",
@@ -125,14 +164,19 @@ export function PillRow({
         {options.map((option, index) => {
           const isActive = option.value === active;
           const tabbable = isActive || (!hasActive && index === 0);
-          const className = `${segment} flex items-center justify-center whitespace-nowrap text-center font-bold uppercase text-[length:var(--segmented-font-size)]`;
+          const hasIcon = Boolean(option.icon || option.glyph);
+          const className = `${segment} relative flex items-center justify-center whitespace-nowrap text-center font-bold uppercase ${
+            hasIcon ? "text-[length:var(--segmented-font-size-stacked)] sm:text-[length:var(--segmented-font-size)]" : "text-[length:var(--segmented-font-size)]"
+          }`;
           const style = {
-            minHeight: sticky ? "var(--segmented-height-compact)" : "var(--segmented-height)",
-            padding: mode === "fill" ? "0 min(var(--segmented-padding-x), 0.5rem)" : "0 var(--segmented-padding-x)",
+            // Icon tabs keep the full 44px touch target even in the sticky bar.
+            minHeight: sticky && !anyIcon ? "var(--segmented-height-compact)" : "var(--segmented-height)",
+            padding: equalFit ? "0 var(--space-xs)" : mode === "fill" ? "0 min(var(--segmented-padding-x), 0.5rem)" : "0 var(--segmented-padding-x)",
             letterSpacing: "var(--letter-spacing-tight)",
             background: isActive ? "var(--segmented-active-bg, var(--color-information-soft))" : "transparent",
             color: isActive ? "var(--segmented-active-fg, var(--color-text-primary))" : "var(--color-text-secondary)",
-            boxShadow: isActive ? "inset 0 -2px 0 var(--color-information)" : "none",
+            // The sliding underline replaces the static one once measured.
+            boxShadow: isActive && !indicator ? "inset 0 -2px 0 var(--color-information)" : "none",
             borderLeft: index === 0 ? "none" : "var(--border-width-default) solid var(--color-border)",
           } as const;
           const common = {
@@ -144,7 +188,9 @@ export function PillRow({
           };
           const countPill = option.count ? (
             <span
-              className="inline-flex items-center justify-center text-[0.625rem] font-extrabold leading-none"
+              className={`inline-flex items-center justify-center text-[0.625rem] font-extrabold leading-none${
+                option.icon || option.glyph ? " absolute right-1 top-1 sm:static" : ""
+              }`}
               style={{ minWidth: 16, height: 16, padding: "0 4px", borderRadius: "var(--radius-pill)", background: "var(--color-accent)", color: "var(--color-on-accent)" }}
               aria-label={`${option.count} new`}
             >
@@ -152,11 +198,20 @@ export function PillRow({
             </span>
           ) : null;
           // Phones stack the icon over the label so six tabs fit; from sm up they sit side by side.
+          const iconNode = option.icon ?? (option.glyph ? <TabGlyph name={option.glyph} /> : null);
           const content: ReactNode =
-            option.icon || countPill ? (
-              <span className="inline-flex flex-col items-center gap-0.5 sm:flex-row sm:gap-1.5">
-                {option.icon ? <span aria-hidden="true" className="inline-flex">{option.icon}</span> : null}
-                <span className="inline-flex items-center gap-1">
+            iconNode || countPill ? (
+              <span className="inline-flex min-w-0 flex-col items-center gap-0.5 sm:flex-row sm:gap-1.5">
+                {iconNode ? (
+                  <span
+                    aria-hidden="true"
+                    className="inline-flex"
+                    style={{ color: isActive ? "var(--segmented-active-icon, var(--segmented-active-fg, var(--color-accent)))" : "var(--color-text-muted)" }}
+                  >
+                    {iconNode}
+                  </span>
+                ) : null}
+                <span className="inline-flex min-w-0 items-center gap-1">
                   {option.label}
                   {countPill}
                 </span>
@@ -177,6 +232,14 @@ export function PillRow({
             </button>
           );
         })}
+        {indicator ? (
+          <span
+            aria-hidden="true"
+            className="tab-indicator"
+            data-animate={animate ? "true" : "false"}
+            style={{ width: indicator.width, transform: `translateX(${indicator.left}px)` }}
+          />
+        ) : null}
       </div>
     </div>
   );

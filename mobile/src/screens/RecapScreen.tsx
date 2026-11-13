@@ -254,8 +254,8 @@ export default function RecapScreen({ route, navigation }: Props) {
     <View style={styles.tabBarRow}>
       <SegmentedTabBar
         options={[
-          { key: 'recap', label: 'Recap' },
-          { key: 'roundup', label: 'Roundup' },
+          { key: 'recap', label: 'Recap', glyph: 'recaps' as const },
+          { key: 'roundup', label: 'Roundup', glyph: 'roundup' as const },
         ]}
         active={tab}
         onChange={setTab}

@@ -290,8 +290,8 @@ export default function TradeHubScreen({ leagueId, leagueName, navigation }: Pro
           <View style={styles.viewModeRow}>
             <SegmentedTabBar<'for_you' | 'all_trades'>
               options={[
-                { key: 'for_you', label: 'For You' },
-                { key: 'all_trades', label: 'All Trades' },
+                { key: 'for_you', label: 'For You', glyph: 'suggested' as const },
+                { key: 'all_trades', label: 'All Trades', glyph: 'feed' as const },
               ]}
               active={viewMode}
               onChange={(key) => (key === 'for_you' ? setViewMode('for_you') : onSelectAllTrades())}
@@ -691,7 +691,7 @@ function createStyles(colors: ThemeColors) {
   container: { flex: 1, backgroundColor: 'transparent' },
   content: { padding: spacing.lg, paddingBottom: spacing.xl * 4 },
   disclaimer: { fontSize: 12.5, color: colors.textTertiary, marginBottom: spacing.md },
-  viewModeRow: { marginBottom: spacing.sm },
+  viewModeRow: { marginBottom: spacing.md },
   loadMoreButton: { alignSelf: 'center', marginTop: spacing.sm, marginBottom: spacing.xl, paddingHorizontal: spacing.xl },
   loading: { marginVertical: spacing.xl },
   skeletonWrap: { marginTop: spacing.sm },

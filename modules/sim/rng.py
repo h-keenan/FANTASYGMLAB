@@ -30,6 +30,11 @@ SUBSYSTEMS = {
     "gtrade": 13,
     "gsetup": 14,
     "goffer": 15,
+    # Dynasty mode (multi-season). ``week`` carries the season number.
+    "gage": 16,
+    "grookie": 17,
+    "grdraft": 18,
+    "gseason": 19,
 }
 
 

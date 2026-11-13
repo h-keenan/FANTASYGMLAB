@@ -48,4 +48,30 @@ describe("PillRow", () => {
     rerender(<PillRow options={OPTIONS} active="all" fullWidth />);
     expect((container.firstChild as HTMLElement).className).toContain("w-full");
   });
+
+  it("renders registry glyphs as decorative SVGs and keeps the accessible name the label", () => {
+    const options = [
+      { label: "Home", value: "home", glyph: "home" as const },
+      { label: "Team", value: "team", glyph: "team" as const },
+      { label: "Players", value: "players", glyph: "players" as const },
+      { label: "Trades", value: "trades", glyph: "trades" as const, count: 2 },
+      { label: "League", value: "league", glyph: "league" as const },
+      { label: "More", value: "more", glyph: "more" as const },
+    ];
+    render(<PillRow options={options} active="home" variant="fill" ariaLabel="Game sections" />);
+    const tabs = screen.getAllByRole("tab");
+    expect(tabs).toHaveLength(6);
+    for (const tab of tabs) {
+      expect(tab.querySelector('svg[aria-hidden="true"]')).not.toBeNull();
+      // Six icon tabs split the width equally so the last one is never clipped on a phone.
+      expect(tab.className).toContain("min-w-0");
+      expect(tab.style.minHeight).toBe("var(--segmented-height)");
+    }
+    expect(screen.getByLabelText("2 new")).toBeInTheDocument();
+  });
+
+  it("uses the full touch target on sticky bars that carry icons", () => {
+    render(<PillRow sticky fullWidth options={[{ label: "Hub", value: "hub", glyph: "hub" }, { label: "Finder", value: "finder", glyph: "finder" }]} active="hub" />);
+    expect(screen.getAllByRole("tab")[0].style.minHeight).toBe("var(--segmented-height)");
+  });
 });

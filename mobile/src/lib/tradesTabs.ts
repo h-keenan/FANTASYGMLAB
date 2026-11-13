@@ -7,11 +7,13 @@
  *
  * Pure data, no react-native imports, so it runs under node:test.
  */
+import type { TabIconName } from './tabIcons';
+
 export type TradesTab = 'block' | 'search' | 'make';
 
 /** `key` is the TradesScreen route param (`initialTab`) the orb tabs also use. */
-export const TRADES_TAB_OPTIONS: Array<{ key: TradesTab; label: string }> = [
-  { key: 'block', label: 'Hub' },
-  { key: 'search', label: 'Finder' },
-  { key: 'make', label: 'Analyzer' },
+export const TRADES_TAB_OPTIONS: Array<{ key: TradesTab; label: string; glyph: TabIconName }> = [
+  { key: 'block', label: 'Hub', glyph: 'hub' },
+  { key: 'search', label: 'Finder', glyph: 'finder' },
+  { key: 'make', label: 'Analyzer', glyph: 'analyzer' },
 ];

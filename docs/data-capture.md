@@ -143,6 +143,13 @@ python scripts/run_league_roster_snapshot.py --slot post_waivers --prune
    work) or disable the "League Roster Snapshot" workflow. Existing rows stay until
    pruned; to erase everything run `truncate public.league_roster_snapshots;`.
 
+Per-league diagnostics: every failed league is listed in the summary `errors` as
+`<truncated id>: <reason>` and every skip in `skipped_leagues`, and both are printed to
+the log. Reasons: `league_not_found` (deleted/never existed: skipped, not a failure, no
+alert), `season_mismatch_previous_season_league` (id Sleeper rolled over; skipped),
+`sleeper_http_<code>`, `sleeper_unreachable`, `sleeper_fetch_failed_transient`,
+`rosters_empty`, `league_season_unreadable`, `exception:<Type>` (these count as failures).
+
 Failure alerts: both new workflows open (and later close) a tracking issue like the
 Advanced Stats Refresh does. They are deliberately not in
 `scripts/ops_health_check.py`'s freshness list: that check reads only the newest

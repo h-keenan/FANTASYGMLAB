@@ -718,7 +718,7 @@ function createStyles(colors: ThemeColors) {
   headerButtonRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   root: { flex: 1, backgroundColor: 'transparent' },
   topSection: { backgroundColor: 'transparent' },
-  tabBarWrap: { paddingHorizontal: spacing.lg, paddingTop: spacing.xs, paddingBottom: spacing.sm },
+  tabBarWrap: { paddingHorizontal: spacing.lg, paddingTop: spacing.sm, paddingBottom: spacing.md },
   contentArea: { flex: 1 },
   tabPane: { flex: 1 },
   // display: 'none' (not unmounting) keeps each tab's state alive across switches.

@@ -2222,6 +2222,9 @@ export interface PortfolioLeagueResponse {
   league: PortfolioLeague | null;
   failed_league: PortfolioFailedLeague | null;
   upsell: PremiumUpsell | null;
+  /** Headline-first answer (`deferSignals`): `league.top_item(s)` are empty
+   * because the signals are still being computed; absent on a complete row. */
+  signals_pending?: boolean;
 }
 
 /** GM Plan — a season-arc roadmap: where the caller stands, their best
@@ -4529,9 +4532,11 @@ export const api = {
   getPortfolioExposure: (lens: string = "Dynasty") =>
     authorizedRequest<PortfolioExposureResponse>(`/v1/portfolio/exposure?lens=${encodeURIComponent(lens)}`),
 
-  getPortfolioLeague: (leagueId: string, lens: string = "Dynasty", signal?: AbortSignal) =>
+  // `deferSignals` asks for the headline-first row (no trade-idea search); the
+  // server answers complete anyway when the full row is already cached.
+  getPortfolioLeague: (leagueId: string, lens: string = "Dynasty", signal?: AbortSignal, deferSignals = false) =>
     authorizedRequest<PortfolioLeagueResponse>(
-      `/v1/portfolio/leagues/${encodeURIComponent(leagueId)}?lens=${encodeURIComponent(lens)}`,
+      `/v1/portfolio/leagues/${encodeURIComponent(leagueId)}?lens=${encodeURIComponent(lens)}${deferSignals ? "&signals=defer" : ""}`,
       { signal },
     ),
 

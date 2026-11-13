@@ -114,7 +114,7 @@ export default function DashboardPage() {
     // skeletons, and League Pulse as soon as its own request lands, instead
     // of a splash until the slowest request finishes.
     return (
-      <main className="flex-1 flex flex-col gap-3 px-4 py-3 max-w-3xl w-full mx-auto" aria-busy="true">
+      <main className="page-shell" aria-busy="true">
         <h1 className="sr-only">{leagueName}</h1>
         {/* Same shape and order as the loaded page (Now strip, Trades, Next
             moves, My Team, More) so nothing jumps when the data lands. */}

@@ -232,7 +232,7 @@ def test_sweep_skips_inapplicable_slot_and_stale_leagues(monkeypatch):
 def test_sweep_circuit_breaker_and_failure_alarm(monkeypatch):
     ids = [str(i) for i in range(30)]
     api = FakeSleeper({}, fail=ids)
-    stats, rows = _sweep(monkeypatch, api, ids)
+    stats, rows = _sweep(monkeypatch, api, ids, probe=lambda lid: "sleeper_http_503")
     assert stats["circuit_open"] and stats["ok"] is False and not rows and stats["failed"] == lrs.CIRCUIT_BREAKER_FAILURES
 
 
@@ -254,3 +254,71 @@ def test_sweep_disable_and_unconfigured(monkeypatch):
 def test_no_pii_columns_in_rows(monkeypatch):
     _, rows = _sweep(monkeypatch, FakeSleeper({}), ["1"])
     assert set(rows[0]) == {"league_id", "season", "week", "slot", "captured_at", "content_hash", "unchanged", "league_status", "rosters", "picks"}
+
+
+def test_league_ref_truncates_and_classify_probe():
+    assert lrs.league_ref("1124841399277105152") == "112484...152"
+    assert lrs.league_ref("123") == "123"
+    assert lrs.classify_probe(404, None) == "league_not_found"
+    assert lrs.classify_probe(200, None) == "league_not_found"  # Sleeper: 200 + null for deleted leagues
+    assert lrs.classify_probe(200, {"league_id": "1"}) == lrs.REASON_TRANSIENT
+    assert lrs.classify_probe(429, None) == "sleeper_http_429"
+    assert lrs.classify_probe(None, None) == "sleeper_unreachable"
+
+
+def test_deleted_league_is_skipped_with_reason_not_failed(monkeypatch, capsys):
+    api = FakeSleeper({}, fail=["1124841399277105152"])
+    stats, rows = _sweep(monkeypatch, api, ["1124841399277105152", "11"], probe=lambda lid: "league_not_found")
+    assert stats["skipped_gone"] == 1 and stats["failed"] == 0 and stats["ok"] is True
+    assert stats["skipped_leagues"] == [{"league": "112484...152", "reason": "league_not_found"}]
+    assert stats["errors"] == [] and stats["snapshotted"] == 1
+    assert "skip 112484...152: league_not_found" in capsys.readouterr().err
+
+
+def test_many_deleted_leagues_never_trip_breaker_or_alert(monkeypatch):
+    ids = [str(100000 + i) for i in range(40)]
+    stats, _ = _sweep(monkeypatch, FakeSleeper({}, fail=ids), ids, probe=lambda lid: "league_not_found")
+    assert stats["ok"] and not stats["circuit_open"] and stats["skipped_gone"] == 40
+
+
+def test_transient_failure_reported_with_reason_and_counts_as_failure(monkeypatch):
+    stats, _ = _sweep(monkeypatch, FakeSleeper({}, fail=["99"]), ["99", "11"], probe=lambda lid: "sleeper_http_429")
+    assert stats["failed"] == 1 and stats["errors"] == ["99: sleeper_http_429"]
+
+
+def test_exception_reason_and_stale_reason(monkeypatch):
+    class Boom(FakeSleeper):
+        def get_rosters(self, lid):
+            raise ValueError("x")
+
+    stats, _ = _sweep(monkeypatch, Boom({}), ["5"])
+    assert stats["errors"] == ["5: exception:ValueError"]
+    stale = lambda: SimpleNamespace(season=2027, phase="regular", week=2)
+    stats, _ = _sweep(monkeypatch, FakeSleeper({}), ["5"], clock_fn=stale)
+    assert stats["skipped_leagues"][0]["reason"] == "season_mismatch_previous_season_league: league=2026 clock=2027"
+
+
+def test_empty_rosters_and_unreadable_season_reasons(monkeypatch):
+    class NoRosters(FakeSleeper):
+        def get_rosters(self, lid):
+            return []
+
+    stats, _ = _sweep(monkeypatch, NoRosters({}), ["5"])
+    assert stats["errors"] == ["5: rosters_empty"]
+
+    class NoSeason(FakeSleeper):
+        def get_league(self, lid):
+            return {"status": "x"}
+
+    stats, _ = _sweep(monkeypatch, NoSeason({}), ["5"])
+    assert stats["errors"] == ["5: league_season_unreadable"]
+
+
+def test_read_failure_reason_includes_status(monkeypatch):
+    class R:
+        status_code = 500
+
+    monkeypatch.setattr(lrs.requests, "get", lambda *a, **k: R())
+    cfg = lrs.SnapshotConfig("http://x", "k")
+    assert lrs.fetch_saved_league_ids(cfg) is None
+    assert lrs.last_get_error() == "saved_leagues: HTTP 500"
