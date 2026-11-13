@@ -390,7 +390,7 @@ export function TradeSideSummary({
         <AppText style={[styles.sideAdd, { color: colors.accent }]}>{items.length ? 'Edit' : '+ Add'}</AppText>
       </Pressable>
       {items.length ? (
-        <View style={styles.chips}>
+        <View style={styles.sideChips}>
           {items.map((item) => (
             <Pressable key={item.key} style={styles.chip} onPress={() => onRemove(item.key)} accessibilityRole="button" accessibilityLabel={`Remove ${item.label}`}>
               <AppText style={styles.chipText} numberOfLines={1}>
@@ -424,6 +424,7 @@ function createStyles(colors: ThemeColors) {
     subtitle: { fontSize: 13, color: colors.textTertiary },
     close: { width: 44, height: 44, borderRadius: radii.pill, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: colors.glassBorder, backgroundColor: colors.glassInset },
     chips: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.xs, paddingHorizontal: spacing.lg, paddingBottom: spacing.xs, maxHeight: 112, overflow: 'hidden' },
+    sideChips: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.xs, paddingBottom: spacing.xs },
     chip: {
       flexDirection: 'row',
       alignItems: 'center',
@@ -465,7 +466,7 @@ function createStyles(colors: ThemeColors) {
     footer: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, paddingHorizontal: spacing.lg, paddingTop: spacing.sm, paddingBottom: spacing.xl, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.border, backgroundColor: colors.surface },
     footerCount: { fontSize: 13, color: colors.textSecondary },
     footerButton: { flex: 1 },
-    side: { flex: 1, minWidth: 0, backgroundColor: colors.glass, borderRadius: radii.md, borderWidth: 1, borderColor: colors.glassBorder, padding: spacing.sm, gap: spacing.xs },
+    side: { minWidth: 0, backgroundColor: colors.glass, borderRadius: radii.md, borderWidth: 1, borderColor: colors.glassBorder, padding: spacing.sm, gap: spacing.xs },
     sideOpen: { minHeight: 56, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: spacing.sm },
     sideText: { flex: 1, minWidth: 0, gap: 2 },
     sideLabelRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },

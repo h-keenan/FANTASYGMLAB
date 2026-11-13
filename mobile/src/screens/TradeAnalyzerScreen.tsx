@@ -1081,7 +1081,7 @@ function createStyles(colors: ThemeColors) {
   disclaimer: { fontSize: 13.5, color: colors.textSecondary, marginBottom: spacing.md, lineHeight: 18 },
   notReadyText: { textAlign: 'center', color: colors.textSecondary, lineHeight: 20 },
   modeRow: { marginBottom: spacing.sm },
-  sidesRow: { flexDirection: 'row', gap: spacing.sm, marginBottom: spacing.sm },
+  sidesRow: { flexDirection: 'column', gap: spacing.sm, marginBottom: spacing.sm },
   // The side panel is a drop target, so it needs a visible edge even when
   // inactive — a `surface` fill alone is only 1.09 against `background`.
   // The 2pt width is unchanged between states; only the color swaps.

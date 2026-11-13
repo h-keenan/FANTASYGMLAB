@@ -388,7 +388,7 @@ function Builder({ ctx, seed, onSeedUsed }: { ctx: SimCtx; seed: { partner: stri
   };
   const describePick = (p: SimTradeAsset) => {
     const pick = p as SimPickAsset;
-    return { label: simPickLabelText(pick), detail: pick.own === false ? `via ${pick.orig_team_name}` : null, round: pick.round, group: `${pick.season} picks` };
+    return { label: `${simPickLabelText(pick)}${pick.own === false ? ` via ${pick.orig_team_name}` : ""}`, detail: null, round: pick.round, group: `${pick.season} picks` };
   };
   const toItems = (groups: SimAssetGroup<SimTradeAsset>[]) => simGroupsToSheetItems(groups, simHeadshotId, describePick);
   const sheetItems = sheetSide ? toItems(groupsFor(sheetSide === 'give' ? mine : partnerRoster, sheetSide === 'give' ? myPicks : theirPicks)) : [];
@@ -446,7 +446,7 @@ function Builder({ ctx, seed, onSeedUsed }: { ctx: SimCtx; seed: { partner: stri
 
       {partner ? (
         <>
-          <View style={{ flexDirection: 'row', gap: 8 }} accessibilityLabel="Offer">
+          <View style={{ flexDirection: 'column', gap: 8 }} accessibilityLabel="Offer">
             <TradeSideSummary testID="trade-side-give" label="You send" tone="danger" items={sideItems(giveSelected)} onOpen={() => setSheetSide('give')} onRemove={(key) => dispatch({ type: 'toggle', side: 'give', id: key.slice(key.indexOf(':') + 1), max: maxPerSide })} hint="Add from your team" />
             <TradeSideSummary testID="trade-side-get" label="You receive" tone="success" items={sideItems(getSelected)} onOpen={() => setSheetSide('get')} onRemove={(key) => dispatch({ type: 'toggle', side: 'get', id: key.slice(key.indexOf(':') + 1), max: maxPerSide })} hint={`Add from ${partner.name}`} />
           </View>

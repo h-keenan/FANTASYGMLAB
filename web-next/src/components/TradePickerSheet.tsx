@@ -458,7 +458,7 @@ export function TradeSideSummary({
         </span>
       </button>
       {items.length ? (
-        <ul className="tps-chips" aria-label={`${label} assets`}>
+        <ul className="tps-chips tps-side-chips" aria-label={`${label} assets`}>
           {items.map((item) => (
             <li key={item.key} className="tps-chip">
               <span className="truncate">{item.label}</span>

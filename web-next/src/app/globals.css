@@ -3865,6 +3865,11 @@ main > header:has(> h1.sr-only:only-child) {
   overflow-y: auto;
   list-style: none;
 }
+.tps-side-chips {
+  max-height: none;
+  overflow: visible;
+  padding: 0 var(--space-xs) var(--space-xs);
+}
 .tps-chip {
   display: inline-flex;
   align-items: center;
