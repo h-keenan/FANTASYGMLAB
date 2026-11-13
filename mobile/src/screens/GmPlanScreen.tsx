@@ -1,3 +1,4 @@
+import type { TabIconName } from '../lib/tabIcons';
 import FreeLimitNote from '../components/FreeLimitNote';
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, RefreshControl, ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
@@ -58,11 +59,11 @@ type Props = NativeStackScreenProps<RootStackParamList, 'GmPlan'>;
 type IconName = React.ComponentProps<typeof Ionicons>['name'];
 type Tab = 'overview' | 'trades' | 'core' | 'watching';
 
-const TABS: Array<{ key: Tab; label: string }> = [
-  { key: 'overview', label: 'Overview' },
-  { key: 'trades', label: 'Trades' },
-  { key: 'core', label: 'Core' },
-  { key: 'watching', label: 'Watching' },
+const TABS: Array<{ key: Tab; label: string; glyph: TabIconName }> = [
+  { key: 'overview', label: 'Overview', glyph: 'overview' },
+  { key: 'trades', label: 'Trades', glyph: 'trades' },
+  { key: 'core', label: 'Core', glyph: 'core' },
+  { key: 'watching', label: 'Watching', glyph: 'watching' },
 ];
 
 const FOCUS_META: Record<string, { icon: IconName }> = {

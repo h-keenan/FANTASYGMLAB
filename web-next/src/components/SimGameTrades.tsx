@@ -597,8 +597,8 @@ export function SimTradesTab({
         ariaLabel="Trades view"
         variant="fill"
         options={[
-          { label: `Inbox${offers ? ` ${offers}` : ""}`, value: "inbox" },
-          { label: "Make an offer", value: "build" },
+          { label: `Inbox${offers ? ` ${offers}` : ""}`, value: "inbox", glyph: "inbox" },
+          { label: "Make an offer", value: "build", glyph: "build" },
         ]}
         active={mode}
         onSelect={(value) => setMode(value as "inbox" | "build")}

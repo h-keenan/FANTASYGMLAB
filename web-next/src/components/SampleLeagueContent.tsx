@@ -49,7 +49,7 @@ function DashboardTab() {
   const [teamRankings] = useState(sampleTeamRankings);
   const [blocked, setBlocked] = useState(false);
   return (
-    <section className="flex flex-col gap-3" aria-label="Sample dashboard">
+    <section className="flex flex-col gap-4" aria-label="Sample dashboard">
       <p className="text-xs" style={{ color: "var(--color-text-secondary)" }}>
         {SAMPLE_DASHBOARD_NOTE}
       </p>
@@ -155,7 +155,7 @@ function TradeTab() {
 export function SampleLeagueContent() {
   const [tab, setTab] = useState<SampleTab>("dashboard");
   return (
-    <main className="flex-1 flex flex-col gap-4 px-4 py-4 w-full max-w-2xl mx-auto">
+    <main className="page-shell page-shell-narrow">
       <SampleLeagueBanner />
       <div className="flex flex-col gap-1">
         <h1 style={{ font: "var(--font-page-title)" }}>{SAMPLE_TEAM_NAME}</h1>
@@ -166,7 +166,7 @@ export function SampleLeagueContent() {
       <PillRow
         fullWidth
         ariaLabel="Sample league views"
-        options={SAMPLE_TABS.map((t) => ({ label: t.label, value: t.value }))}
+        options={SAMPLE_TABS.map((t) => ({ label: t.label, value: t.value, glyph: t.glyph }))}
         active={tab}
         onSelect={(value) => setTab(value as SampleTab)}
       />

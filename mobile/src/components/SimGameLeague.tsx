@@ -160,10 +160,10 @@ export function SimLeagueTab({ ctx }: { ctx: SimCtx }) {
     <View style={common.stack}>
       <SegmentedTabBar<View_>
         options={[
-          { key: 'standings', label: 'Standings' },
-          { key: 'scores', label: 'Scores' },
-          { key: 'feed', label: 'Feed' },
-          { key: 'teams', label: 'Teams' },
+          { key: 'standings', label: 'Standings', glyph: 'standings' },
+          { key: 'scores', label: 'Scores', glyph: 'scores' },
+          { key: 'feed', label: 'Feed', glyph: 'feed' },
+          { key: 'teams', label: 'Teams', glyph: 'team' },
         ]}
         active={view}
         onChange={setView}

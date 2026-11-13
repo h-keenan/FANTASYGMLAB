@@ -58,4 +58,7 @@ jobs:
         env:
           GITHUB_PUSH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GITHUB_REPO_SLUG: ${{ github.repository }}
+          # Repo VARIABLE INJURY_HISTORY_DISABLE=1 pauses point-in-time history
+          # capture (docs/data-capture.md); the players.db patch is unaffected.
+          INJURY_HISTORY_DISABLE: ${{ vars.INJURY_HISTORY_DISABLE }}
         run: python scripts/sync_injury_status.py

@@ -139,6 +139,14 @@
   --space-3xl: 48px;
   --space-4xl: 64px;
 
+  /* Page rhythm (one shell for every page: see docs/ui-spacing-and-tabs.md).
+     Gutter 16, gap between sections 16, vertical padding 16; prose/long-form
+     pages (legal, pricing) step the gap and padding up to 24. */
+  --page-gutter: var(--space-lg);
+  --page-gap: var(--space-lg);
+  --page-pad-y: var(--space-lg);
+  --page-gap-prose: var(--space-xl);
+
   /* Canonical asset portrait sizes */
   --size-asset-chip: 1.5rem;
   --size-asset-compact: 2.25rem;
@@ -254,6 +262,7 @@
   --segmented-height-compact: 2.5rem;
   --segmented-gap: 0px;
   --segmented-font-size: 0.75rem;
+  --segmented-font-size-stacked: 0.6875rem;
   --segmented-stack-gap: var(--space-md);
   --motion-fast: 120ms;
   --motion-standard: 180ms;
@@ -3709,4 +3718,44 @@ main > header:has(> h1.sr-only:only-child) {
 :root[data-theme="light"] .premium-glow {
   animation: none;
   box-shadow: 0 1px 3px rgba(15, 40, 60, 0.22);
+}
+
+/* Sliding active-tab underline for PillRow (cyan, with a soft glow). Moves in
+   ~180ms; reduced-motion users get an instant jump. */
+.tab-indicator {
+  position: absolute;
+  left: 0;
+  bottom: 0;
+  height: 2px;
+  background: var(--color-information);
+  box-shadow: 0 0 10px var(--color-information);
+  pointer-events: none;
+}
+.tab-indicator[data-animate="true"] {
+  transition: transform 180ms ease, width 180ms ease;
+}
+@media (prefers-reduced-motion: reduce) {
+  .tab-indicator[data-animate="true"] {
+    transition: none;
+  }
+}
+
+/* The page shell: the one <main> for app pages. Replaces per-page copies of
+   "flex-1 flex flex-col gap-N px-4 py-N max-w-3xl w-full mx-auto". */
+.page-shell {
+  flex: 1 1 0%;
+  display: flex;
+  flex-direction: column;
+  gap: var(--page-gap);
+  padding: var(--page-pad-y) var(--page-gutter);
+  width: 100%;
+  max-width: 48rem;
+  margin-inline: auto;
+}
+.page-shell-prose {
+  gap: var(--page-gap-prose);
+  padding-block: var(--space-xl);
+}
+.page-shell-narrow {
+  max-width: 42rem;
 }

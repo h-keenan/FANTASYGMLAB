@@ -55,7 +55,7 @@ export function PublicPricingContent() {
       : null;
 
   return (
-    <main className="flex-1 flex flex-col gap-6 px-4 py-6 max-w-3xl w-full mx-auto">
+    <main className="page-shell page-shell-prose">
       <header className="flex flex-col gap-1">
         <span className="text-xs" style={{ color: "var(--color-text-muted)" }}>
           Pro

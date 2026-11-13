@@ -343,11 +343,11 @@ export function SimGameDraft({ ctx, onComplete }: { ctx: SimCtx; onComplete: (re
 
   const sidePanel = (wide ? (panel === "board" || panel === "grid" ? "queue" : panel) : panel) as Exclude<Panel, "board" | "grid">;
   const tabs = [
-    ...(wide ? [] : [{ label: "Players", value: "board" }]),
-    { label: "Board", value: "grid" },
-    { label: `Queue${queue.ids.length ? ` ${queue.ids.length}` : ""}`, value: "queue" },
-    { label: "Roster", value: "roster" },
-    { label: "Picks", value: "picks" },
+    ...(wide ? [] : [{ label: "Players", value: "board", glyph: "players" as const }]),
+    { label: "Board", value: "grid", glyph: "board" as const },
+    { label: `Queue${queue.ids.length ? ` ${queue.ids.length}` : ""}`, value: "queue", glyph: "queue" as const },
+    { label: "Roster", value: "roster", glyph: "roster" as const },
+    { label: "Picks", value: "picks", glyph: "picks" as const },
   ];
   const activeTab = wide && panel === "board" ? "queue" : panel;
 

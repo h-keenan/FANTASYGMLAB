@@ -9,6 +9,8 @@
  * Names are deliberately obvious placeholders, not real NFL players.
  */
 
+import type { TabIconName } from "./tabIcons";
+
 export const SAMPLE_ROUTE = "/sample-league";
 export const SAMPLE_LEAGUE_NAME = "Sample Dynasty League";
 export const SAMPLE_TEAM_NAME = "Demo Squad";
@@ -22,11 +24,11 @@ export const SAMPLE_ENTRY_LABEL = "Explore a sample league first";
 export const SAMPLE_TRY_LABEL = "Try a sample league";
 
 export type SampleTab = "dashboard" | "roster" | "game_plan" | "trade";
-export const SAMPLE_TABS: { value: SampleTab; label: string }[] = [
-  { value: "dashboard", label: "Dashboard" },
-  { value: "roster", label: "Roster" },
-  { value: "game_plan", label: "Today" },
-  { value: "trade", label: "Trade" },
+export const SAMPLE_TABS: { value: SampleTab; label: string; glyph: TabIconName }[] = [
+  { value: "dashboard", label: "Dashboard", glyph: "dashboard" },
+  { value: "roster", label: "Roster", glyph: "roster" },
+  { value: "game_plan", label: "Today", glyph: "today" },
+  { value: "trade", label: "Trade", glyph: "trades" },
 ];
 
 export interface SamplePlayer {

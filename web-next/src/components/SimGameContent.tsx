@@ -904,7 +904,7 @@ function GameScreen({
             ariaLabel="Game sections"
             variant="fill"
             sticky
-            options={SIM_TABS.map((t) => ({ label: t.label, value: t.value, count: t.value === "trades" ? game.pending?.inbox ?? 0 : undefined }))}
+            options={SIM_TABS.map((t) => ({ label: t.label, value: t.value, glyph: t.glyph, count: t.value === "trades" ? game.pending?.inbox ?? 0 : undefined }))}
             active={flow.tab}
             onSelect={(value) => onTab(value as SimTab)}
           />

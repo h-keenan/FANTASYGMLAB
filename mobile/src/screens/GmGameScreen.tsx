@@ -950,7 +950,7 @@ function GameScreen({
       ) : (
         <>
           <SegmentedTabBar<SimTab>
-            options={SIM_TABS.map((t) => ({ key: t.value, label: t.label, count: t.value === 'trades' ? game.pending?.inbox ?? 0 : undefined }))}
+            options={SIM_TABS.map((t) => ({ key: t.value, label: t.label, glyph: t.glyph, count: t.value === 'trades' ? game.pending?.inbox ?? 0 : undefined }))}
             active={flow.tab}
             onChange={onTab}
           />

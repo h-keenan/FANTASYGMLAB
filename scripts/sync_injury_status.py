@@ -116,7 +116,7 @@ ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-from modules import sleeper  # noqa: E402
+from modules import injury_history, season_clock, sleeper  # noqa: E402
 from modules.rankings import normalize_player_record  # noqa: E402
 from scripts.refresh_and_commit_players_db import (  # noqa: E402
     DEFAULT_REPO_SLUG,
@@ -305,6 +305,32 @@ def _record_news_value_events(status_changes) -> None:
         print(f"news_value_events record skipped: {exc}", file=sys.stderr)
 
 
+def _capture_injury_history(players: Dict[str, Any]) -> None:
+    """Append point-in-time injury history (change events + twice-weekly
+    snapshots) under data/injury_history/ -- see modules/injury_history.py.
+    Strictly best-effort and additive: never alters the players.db patch, never
+    fails the job. Disable with INJURY_HISTORY_DISABLE=1 (repo variable)."""
+
+    try:
+        clock = season_clock.season_clock()
+        stats = injury_history.capture(
+            players, ROOT, now=datetime.now(timezone.utc), season=clock.season, week=clock.week
+        )
+        print(f"injury history: {stats}")
+    except Exception as exc:  # noqa: BLE001
+        print(f"injury history skipped: {exc}", file=sys.stderr)
+
+
+def history_sibling_paths() -> tuple[Path, ...]:
+    """History files refresh_and_commit should stage alongside players.db."""
+
+    try:
+        season = season_clock.season_clock().season
+    except Exception:  # noqa: BLE001
+        return ()
+    return tuple(injury_history.history_paths(ROOT, season))
+
+
 def default_patch_runner(db_path: Path) -> int:
     """Fetch Sleeper's player list and patch db_path's injury columns.
 
@@ -327,6 +353,9 @@ def default_patch_runner(db_path: Path) -> int:
             file=sys.stderr,
         )
         return 1
+
+    if db_path == DEFAULT_DB_PATH:  # never write history for throwaway/test dbs
+        _capture_injury_history(players)
 
     examined, updated = patch_injury_columns(db_path, players)
     print(
@@ -365,7 +394,7 @@ def main(argv: list[str]) -> int:
     return refresh_and_commit(
         repo_root=ROOT,
         db_path=DEFAULT_DB_PATH,
-        sibling_paths=DEFAULT_SIBLING_PATHS,
+        sibling_paths=(*DEFAULT_SIBLING_PATHS, *history_sibling_paths()),
         push_url=push_url,
         refresh_runner=default_patch_runner,
         branch=GIT_BRANCH,
