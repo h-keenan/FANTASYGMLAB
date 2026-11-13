@@ -61,7 +61,7 @@ export function PlayerIdentity({
       <div className="flex flex-col gap-0.5 min-w-0">
         <PlayerName
           name={name}
-         
+
           className="text-sm font-bold"
           style={{ color: muted ? "var(--color-text-secondary)" : "var(--color-text-primary)" }}
         />

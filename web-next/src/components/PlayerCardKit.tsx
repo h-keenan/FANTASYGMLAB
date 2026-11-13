@@ -155,7 +155,7 @@ function NameBlock({ model, size }: { model: PlayerCardModel; size: PlayerCardVa
     <span className="flex flex-col min-w-0 flex-1 gap-1">
       <PlayerName
         name={model.name}
-       
+
         className={`${size === "compact" ? "text-sm" : "text-[13px]"} font-bold leading-tight w-full`}
         style={{ color: "var(--color-text-primary)" }}
       />
@@ -301,7 +301,7 @@ function MatchupCard({ model, identity, onEdit, editLabel, mirror = false, empha
           <span className={`flex flex-col min-w-0 flex-1 gap-1${align}`}>
             <PlayerName
               name={model.name}
-             
+
               className="text-[13px] font-bold leading-tight w-full"
               style={{ color: "var(--color-text-primary)" }}
             />
