@@ -7,6 +7,7 @@ from __future__ import annotations
 
 from typing import Any, Mapping, Sequence
 
+from modules.sim import scouting
 from modules.sim.game_actions import lineup_warnings
 from modules.sim.game_ai import trade_window
 from modules.sim.game_draft import DraftContext, best_for_user
@@ -205,10 +206,29 @@ def player_detail(snap: GameSnapshot, state: GameState, pid: str) -> dict[str, A
     same_pos = sorted((q for q in snap.pids if snap.players[q].pos == row["pos"]), key=lambda q: (-snap.players[q].value, q))
     row["value_rank"] = ranks.get(pid)
     row["pos_value_rank"] = same_pos.index(pid) + 1 if pid in same_pos else None
-    return {
+    out = {
         "player": row, "weeks": weeks, "history": history, "news": news,
         "ros": ros_summary(ev, pid, weeks), "projection_flat": projection_is_flat(weeks),
     }
+    profile = scouting_view(snap, state, ev, pid)
+    if profile is not None:
+        out["scouting"] = profile
+    return out
+
+
+def scouting_view(snap: GameSnapshot, state: GameState, ev: Evaluator, pid: str) -> dict[str, Any] | None:
+    """The generated scouting profile and development curve of a generated rookie (None for everyone else).
+
+    Pure function of the player's record, so the same prospect reads the same at the draft, in his first season and
+    years later; only the confidence (and so how much of the true curve is revealed) moves with time."""
+    p = snap.players[pid]
+    if "scout_seed" not in p.extra:
+        return None
+    games = len(state.games_played(pid)) if state.status != "offseason" else 0
+    return scouting.build_profile(
+        pos=p.pos, age=p.age, name=p.name, extra=p.extra, mean=ev.ros_mean(pid), draft_year=int(p.extra.get("draft_year") or 0) or None,
+        years_exp=float(p.extra.get("years_exp", 0.0)), games=games,
+    )
 
 
 def projection_is_flat(weeks: Sequence[Mapping[str, Any]]) -> bool:

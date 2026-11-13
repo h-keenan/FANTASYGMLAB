@@ -196,6 +196,11 @@ class GameSettings:
         return self.mode == "dynasty" and self.rules >= 2 and self.dynasty_v >= 1
 
     @property
+    def rookie_curves(self) -> bool:
+        """Generated rookies carry a scouting profile and a per-player development curve (dynasty_v 2+). Older dynasty saves keep the plain age curve."""
+        return self.dynasty and self.dynasty_v >= 2
+
+    @property
     def multi_season(self) -> bool:
         return self.dynasty and self.seasons > 1
 

@@ -675,3 +675,10 @@ player while a slot is open; the taxi squad takes eligible (rookie / low-experie
 promoting needs an open roster spot (`roster_full`). IR and taxi players do not score and do not count toward the
 roster limit; they can be traded and cut. `lineup` and `teams/{id}` return `ir[]`, `taxi[]` and a `reserves` block.
 Reasons: `ir_full`, `ir_ineligible`, `taxi_full`, `taxi_ineligible`, `roster_full`, `reserves_unavailable`.
+
+## Player detail additions (sheet consistency, rookie scouting)
+
+`GET /v1/sim/games/{id}/players/{pid}` now also returns: `ros` (`mean`, `floor`, `ceiling`, `weeks_left`, `playable_weeks`,
+`bye_week`, `out_weeks`), `projection_flat` (every playable week carries the same projection: clients show one
+"Rest of season" line, never a week-by-week list), `player.value_rank` / `player.pos_value_rank`, and for generated rookies
+`scouting` (see `docs/fantasy-sim-player-model.md` section 8).

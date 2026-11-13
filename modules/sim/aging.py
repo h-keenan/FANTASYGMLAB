@@ -92,13 +92,15 @@ def retire_prob(pos: str, age: float, quality: float) -> float:
 
 
 def progress(
-    pos: str, age: float, mean: float, sd: float, market: float, z: float, u_ret: float,
+    pos: str, age: float, mean: float, sd: float, market: float, z: float, u_ret: float, mult: float | None = None,
 ) -> tuple[float, float, float, float, bool]:
     """One offseason for one player. ``z`` is a standard normal and ``u_ret`` a
-    uniform from the player's own stream. Returns
-    ``(age, mean, sd, market, retired)`` for next season."""
+    uniform from the player's own stream. ``mult`` replaces the plain age curve for a
+    player with his own development curve (a generated rookie, see ``scouting``).
+    Returns ``(age, mean, sd, market, retired)`` for next season."""
 
-    mult = age_mult(pos, age)
+    if mult is None:
+        mult = age_mult(pos, age)
     spread = 0.10 if pos != "K" else 0.06
     noise = math.exp(spread * z - 0.5 * spread * spread)
     new_mean = max(0.5, mean * mult * noise) if pos != "DEF" else mean

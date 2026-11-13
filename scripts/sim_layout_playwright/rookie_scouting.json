@@ -1,0 +1,278 @@
+{
+ "version": 1,
+ "source": "generated",
+ "label": "Generated prospect",
+ "school": "Prairie A&M",
+ "class_year": 2027,
+ "position_word": "running back",
+ "draft": {
+  "round": 1,
+  "pick": 19,
+  "class_rank": 8,
+  "class_size": 60,
+  "basis": "class-rank proxy (generated class, no real draft)"
+ },
+ "measurables": [
+  {
+   "key": "height",
+   "label": "Height",
+   "display": "6'1\"",
+   "percentile": 93
+  },
+  {
+   "key": "weight",
+   "label": "Weight",
+   "display": "223 lb",
+   "percentile": 84
+  },
+  {
+   "key": "forty",
+   "label": "40-yard dash",
+   "display": "4.48s",
+   "percentile": 69
+  },
+  {
+   "key": "speed_score",
+   "label": "Speed score",
+   "display": "111",
+   "percentile": 91
+  },
+  {
+   "key": "athletic",
+   "label": "Athletic score",
+   "display": "8.3",
+   "percentile": 82
+  }
+ ],
+ "college": {
+  "columns": [
+   {
+    "key": "rush_att",
+    "label": "Rush att",
+    "fmt": "int"
+   },
+   {
+    "key": "rush_yd",
+    "label": "Rush yds",
+    "fmt": "int"
+   },
+   {
+    "key": "ypc",
+    "label": "Yds/carry",
+    "fmt": "num1"
+   },
+   {
+    "key": "rush_td",
+    "label": "Rush TD",
+    "fmt": "int"
+   },
+   {
+    "key": "rec",
+    "label": "Rec",
+    "fmt": "int"
+   },
+   {
+    "key": "rec_yd",
+    "label": "Rec yds",
+    "fmt": "int"
+   }
+  ],
+  "seasons": [
+   {
+    "season": 2023,
+    "team": "Prairie A&M",
+    "class": "FR",
+    "games": 12,
+    "stats": {
+     "yprr": 1.04,
+     "share": 4.6,
+     "rush_att": 57,
+     "ypc": 5.9,
+     "rush_yd": 341,
+     "rush_td": 2,
+     "rec": 6,
+     "rec_yd": 64,
+     "rec_td": 0
+    }
+   },
+   {
+    "season": 2024,
+    "team": "Prairie A&M",
+    "class": "SO",
+    "games": 12,
+    "stats": {
+     "yprr": 1.04,
+     "share": 4.6,
+     "rush_att": 82,
+     "ypc": 5.9,
+     "rush_yd": 486,
+     "rush_td": 4,
+     "rec": 9,
+     "rec_yd": 91,
+     "rec_td": 0
+    }
+   },
+   {
+    "season": 2025,
+    "team": "Prairie A&M",
+    "class": "JR",
+    "games": 12,
+    "stats": {
+     "yprr": 1.04,
+     "share": 4.6,
+     "rush_att": 123,
+     "ypc": 5.9,
+     "rush_yd": 730,
+     "rush_td": 5,
+     "rec": 14,
+     "rec_yd": 136,
+     "rec_td": 1
+    }
+   },
+   {
+    "season": 2026,
+    "team": "Prairie A&M",
+    "class": "SR",
+    "games": 13,
+    "stats": {
+     "yprr": 1.04,
+     "share": 4.6,
+     "rush_att": 164,
+     "ypc": 5.9,
+     "rush_yd": 973,
+     "rush_td": 7,
+     "rec": 18,
+     "rec_yd": 182,
+     "rec_td": 1
+    }
+   }
+  ],
+  "career": {
+   "rec_td": 2,
+   "rush_att": 426,
+   "rec": 47,
+   "rec_yd": 473,
+   "rush_td": 18,
+   "rush_yd": 2530
+  },
+  "percentiles": {
+   "rush_att": 35,
+   "rush_yd": 46,
+   "ypc": 62,
+   "rush_td": 23,
+   "rec": 33,
+   "rec_yd": 62
+  },
+  "final": {
+   "season": 2026,
+   "team": "Prairie A&M",
+   "games": 13,
+   "stats": {
+    "rush_att": 164,
+    "rush_yd": 973,
+    "ypc": 5.9,
+    "rush_td": 7,
+    "rec": 18,
+    "rec_yd": 182
+   }
+  }
+ },
+ "analytics": [
+  {
+   "key": "dominator",
+   "label": "Dominator rating",
+   "value": 22.11,
+   "display": "22.1%",
+   "percentile": 41,
+   "higher_is_better": true
+  },
+  {
+   "key": "yprr",
+   "label": "Yards/route run",
+   "value": 1.04,
+   "display": "1.04",
+   "percentile": 16,
+   "higher_is_better": true
+  },
+  {
+   "key": "share",
+   "label": "Target share",
+   "value": 4.6,
+   "display": "4.6%",
+   "percentile": 11,
+   "higher_is_better": true
+  },
+  {
+   "key": "expl",
+   "label": "Explosive run rate",
+   "value": 8.6,
+   "display": "8.6%",
+   "percentile": 10,
+   "higher_is_better": true
+  },
+  {
+   "key": "breakout",
+   "label": "Breakout age",
+   "value": 20.14,
+   "display": "20.1",
+   "percentile": 62,
+   "higher_is_better": false
+  },
+  {
+   "key": "athletic",
+   "label": "Athletic score",
+   "value": 8.3,
+   "display": "8.3",
+   "percentile": 81,
+   "higher_is_better": true
+  }
+ ],
+ "tags": [
+  {
+   "tag": "Raw",
+   "confidence": 0.55
+  }
+ ],
+ "blurb": "Brock Briggs is a 6'1\", 223 lb running back from Prairie A&M, projected as a first-round pick. Last season: 973 rushing yards at 5.9 per carry with 7 TD, and 18 catches for 182 yards. His production is solid without a standout trait. A 4.48 forty and plus athletic testing. Scouts call him raw: the tools are there, the polish is not.",
+ "development": {
+  "base_year": 1,
+  "points": [
+   {
+    "year": 1,
+    "mean": 6.4,
+    "lo": 6.4,
+    "hi": 6.4
+   },
+   {
+    "year": 2,
+    "mean": 6.0,
+    "lo": 5.2,
+    "hi": 6.9
+   },
+   {
+    "year": 3,
+    "mean": 5.7,
+    "lo": 4.7,
+    "hi": 6.9
+   },
+   {
+    "year": 4,
+    "mean": 5.3,
+    "lo": 4.2,
+    "hi": 6.7
+   },
+   {
+    "year": 5,
+    "mean": 4.5,
+    "lo": 3.4,
+    "hi": 5.9
+   }
+  ],
+  "confidence": 0.454,
+  "confidence_label": "Medium",
+  "archetype": null,
+  "archetype_label": null,
+  "revealed": false,
+  "note": "Scouting estimate. The true curve is revealed over time."
+ }
+}

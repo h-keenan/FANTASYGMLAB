@@ -14,6 +14,10 @@ const PERSONAS = [
 const POS_CYCLE = ["QB","RB","WR","RB","WR","TE","WR","RB","QB","WR","TE","RB","WR","K","RB","WR","TE","QB"];
 const SLOTS = ["QB","RB","RB","WR","WR","TE","FLEX","K"];
 
+import fs from "fs";
+// A real payload of the generated-prospect scouting profile (modules/sim/scouting.py build_profile), for the rookie demo player.
+const ROOKIE_SCOUTING = JSON.parse(fs.readFileSync(new URL("./rookie_scouting.json", import.meta.url), "utf8"));
+
 export function makePlayers(n = 200) {
   const out = [];
   for (let i = 0; i < n; i++) {
@@ -113,7 +117,7 @@ export function createMock(opts = {}) {
 
   // Player-sheet demo cast (opts.sheetDemo): a real-id veteran, a real-id veteran on IR with no market value, and a generated rookie.
   if (opts.sheetDemo) {
-    const base = { team: "BUF", status: "healthy", out_weeks: 0, bye_week: 9, adp: 40, season_points: 0, games: 0, ppg: null, last_week: null, floor: 0.6, ceiling: 3.8, projection: 2.2, ros_mean: 2.2 };
+    const base = { team: "BUF", status: "healthy", out_weeks: 0, bye_week: 9, adp: 40, season_points: 0, games: 0, ppg: null, last_week: null, floor: 0.6, ceiling: 3.8, projection: 6.4, floor: 2.1, ceiling: 10.7, ros_mean: 6.4 };
     if (state.status !== "drafting") state.owner["9990"] = you;
     players.unshift(
       { ...base, id: "9990", name: "Dalton Reyes", pos: "WR", age: 31, value: 0, value_rank: 211, adp: 188, status: "out", out_weeks: 6, season_points: 14.7, games: 2, ppg: 7.4, last_week: 6.1, ir: true },
@@ -132,7 +136,7 @@ export function createMock(opts = {}) {
     const pos = players.filter((x) => x.pos === p.pos).sort((a, b) => b.value - a.value);
     const ros = { mean: p.projection, floor: p.floor, ceiling: p.ceiling, weeks_left: weeks.length, playable_weeks: weeks.filter((w) => !w.bye && !w.out).length, bye_week: p.bye_week ?? null, out_weeks: weeks.filter((w) => w.out).map((w) => w.week) };
     const news = p.ir ? [{ week: 0, text: "Listed out for 6 week(s) to start the season." }] : [];
-    return { player: { ...row(p), value_rank: p.value_rank ?? players.indexOf(p) + 1, pos_value_rank: Math.max(1, pos.indexOf(p) + 1) }, weeks, history, news, ros, projection_flat: true, ...(p.rookieDemo && opts.scouting ? { scouting: opts.scouting(p) } : {}) };
+    return { player: { ...row(p), value_rank: p.value_rank ?? players.indexOf(p) + 1, pos_value_rank: Math.max(1, pos.indexOf(p) + 1) }, weeks, history, news, ros, projection_flat: true, ...(p.rookieDemo ? { scouting: ROOKIE_SCOUTING } : {}) };
   }
 
   // returns {status, body} or null if not a sim route

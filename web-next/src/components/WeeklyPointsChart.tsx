@@ -74,6 +74,7 @@ export function WeeklyPointsPanel({
   projection = null,
   pointsLabel = "PPR points",
   emptyText,
+  xLabel = "Week",
 }: {
   name: string;
   weeks: WeeklyStatPoint[];
@@ -84,6 +85,8 @@ export function WeeklyPointsPanel({
   pointsLabel?: string;
   /** Replaces the "no weekly fantasy points" line when nothing is played and there is no projection. */
   emptyText?: string;
+  /** What the x axis counts ("Week" by default; the development curve plots "Year"). */
+  xLabel?: string;
   /** Unique per panel — two <defs><linearGradient> on the same page with the
    * same id would collide (the second panel would silently paint with the
    * first panel's gradient), same reason app.py's own _gradient_id scopes
@@ -103,7 +106,7 @@ export function WeeklyPointsPanel({
       {!hasPlayedWeek && !(projection && projection.length > 0) ? (
         <WeeklyPointsEmpty season={season} text={emptyText} />
       ) : (
-        <PlayedWeeksChart weeks={weeks} gradientId={gradientId} name={name} projection={projection} pointsLabel={pointsLabel} />
+        <PlayedWeeksChart weeks={weeks} gradientId={gradientId} name={name} projection={projection} pointsLabel={pointsLabel} xLabel={xLabel} />
       )}
     </div>
   );
@@ -115,7 +118,9 @@ function PlayedWeeksChart({
   name,
   projection,
   pointsLabel,
+  xLabel,
 }: {
+  xLabel: string;
   weeks: WeeklyStatPoint[];
   gradientId: string;
   name: string;
@@ -199,7 +204,7 @@ function PlayedWeeksChart({
                     ? [`${formatPoints(Number(value))} projected`, undefined]
                     : [`${formatPoints(Number(value))} ${pointsLabel}`, undefined]
               }
-              labelFormatter={(label) => `Week ${label}`}
+              labelFormatter={(label) => `${xLabel} ${label}`}
               contentStyle={{
                 background: "var(--color-surface-secondary)",
                 border: "var(--border-width-default) solid var(--color-border)",

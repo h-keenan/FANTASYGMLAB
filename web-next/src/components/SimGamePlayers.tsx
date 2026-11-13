@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useReducer, useState, type ReactNode } from "react";
 
 import { PlayerQuickView, StatGroup } from "@/components/PlayerQuickView";
+import { SimScoutingSections } from "@/components/SimScoutingSections";
 import { WeeklyPointsPanel } from "@/components/WeeklyPointsChartLazy";
 import type { PlayerQuickViewIdentity } from "@/context/PlayerQuickViewContext";
 import { EmptyState } from "@/components/EmptyState";
@@ -308,6 +309,7 @@ export function SimPlayerOverlay({ player, detail, actions }: { player: SimGameP
         <SkeletonRows count={2} />
       ) : (
         <>
+          {body.scouting ? <SimScoutingSections profile={body.scouting} /> : null}
           {actual.length > 0 || band || ros ? (
             <section className="pqv-stat-season" data-testid="sim-weekly">
               <h3>Week by Week · This sim season</h3>
