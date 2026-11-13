@@ -12,7 +12,8 @@ import { SimPlayerLine, SimSectionTitle, createSimStyles, type SimCtx } from './
 import SimTeamCard from './SimTeamCard';
 import { useThemeMode } from '../context/ThemeModeContext';
 import { SIM_WINDOW_STEP, simWindow } from '../lib/simLayout';
-import { simRosterEntries, simRosterPositions, simRosterStats, simTeamsByPower, type SimRosterPosFilter } from '../lib/simLeagueRosters';
+import { simListStats } from '../lib/simDraft';
+import { simRosterEntries, simRosterPositions, simTeamsByPower, type SimRosterPosFilter } from '../lib/simLeagueRosters';
 import type { SimLeagueRostersState } from '../lib/useSimLeagueRosters';
 
 function Loading({ state, onRetry }: { state: SimLeagueRostersState; onRetry: () => void }) {
@@ -88,7 +89,7 @@ export function SimLeaguePlayersView({ ctx, state, onRetry }: { ctx: SimCtx; sta
               key={player.id}
               player={player}
               onOpen={ctx.openPlayer}
-              stats={simRosterStats(player)}
+              stats={simListStats(player, { adp: false })}
               tags={[{ key: 'owner', label: team.is_you ? 'Your team' : team.name, tone: team.is_you ? 'accent' : undefined }]}
               trailing={
                 <Pressable

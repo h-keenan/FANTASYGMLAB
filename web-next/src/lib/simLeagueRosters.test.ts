@@ -1,13 +1,13 @@
 import { describe, expect, it } from "vitest";
 
-import { simGroupBenchByPosition, simRosterEntries, simRosterPositions, simRosterStats, simTeamChips, simTeamRecordLine, simValueLabel } from "./simLeagueRosters";
+import { simGroupBenchByPosition, simOverallLabel, simRosterEntries, simRosterPositions, simTeamChips, simTeamRecordLine, simValueLabel } from "./simLeagueRosters";
 import type { SimGamePlayer, SimLeagueRosterTeam } from "./simGame";
 
 const pl = (id: string, pos: SimGamePlayer["pos"], name: string, value: number, team = "KC") => ({ id, pos, name, value, team, ros_mean: value / 10, projection: 10, status: "healthy" }) as unknown as SimGamePlayer;
 const t = (id: string, players: SimGamePlayer[]) => ({ team_id: id, name: `T${id}`, is_you: false, players }) as unknown as SimLeagueRosterTeam;
 
 describe("league roster helpers", () => {
-  it("filters by position and search and sorts best value first across teams", () => {
+  it("filters by position and search and sorts best overall (then value) first across teams", () => {
     const teams = [t("1", [pl("a", "QB", "Alpha", 50), pl("b", "RB", "Bravo", 90)]), t("2", [pl("c", "QB", "Charlie", 70, "BUF")])];
     expect(simRosterEntries(teams, "ALL", "").map((e) => e.player.id)).toEqual(["b", "c", "a"]);
     expect(simRosterEntries(teams, "QB", "").map((e) => [e.player.id, e.team.team_id])).toEqual([["c", "2"], ["a", "1"]]);
@@ -22,9 +22,8 @@ describe("league roster helpers", () => {
     expect(simTeamRecordLine({ record: null, power_rank: 4 })).toBe("Power #4");
     expect([0, 0.4, 71.6, null].map(simValueLabel)).toEqual(["—", "—", "72", "—"]);
   });
-  it("labels stats and groups the bench by position", () => {
-    expect(simRosterStats({ projection: 11.26, value: 0, status: "healthy" }).map((s) => `${s.label} ${s.value}`)).toEqual(["PROJ 11.3", "VAL —"]);
-    expect(simRosterStats({ projection: 0, value: 5, status: "out" })[0]).toMatchObject({ value: "OUT", tone: "danger" });
+  it("labels overall and groups the bench by position", () => {
+    expect([null, 0, 71.6].map(simOverallLabel)).toEqual(["—", "0", "72"]);
     const g = simGroupBenchByPosition([pl("a", "WR", "A", 1), pl("b", "QB", "B", 1), pl("c", "WR", "C", 1)], ["QB", "RB", "WR"]);
     expect(g.map((x) => [x.pos, x.players.length])).toEqual([["QB", 1], ["WR", 2]]);
   });

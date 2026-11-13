@@ -365,7 +365,7 @@ function Builder({ ctx, seed, onSeedUsed }: { ctx: SimCtx; seed: SimTradeSeed | 
         <SectionHeading note={partner ? undefined : "Pick a team to trade with."}>Partner</SectionHeading>
         {partner ? (
           <>
-            <SimTeamCard team={partner} selected />
+            <SimTeamCard team={partner} selected valueMode="trade" />
             <div className="flex items-center justify-between gap-2">
               <Button size="sm" variant="secondary" onClick={() => dispatch({ type: "partner", teamId: "" })}>Change partner</Button>
               <SimTeamScout teamId={partner.team_id} name={partner.name} />
@@ -375,7 +375,7 @@ function Builder({ ctx, seed, onSeedUsed }: { ctx: SimCtx; seed: SimTradeSeed | 
           <ul className="flex flex-col gap-2" aria-label="Teams">
             {teamOptions.map((team) => (
               <li key={team.team_id}>
-                <SimTeamCard team={team} openLabel={`Trade with ${team.name}`} onOpen={(id) => dispatch({ type: "partner", teamId: id })} />
+                <SimTeamCard team={team} valueMode="trade" openLabel={`Trade with ${team.name}`} onOpen={(id) => dispatch({ type: "partner", teamId: id })} />
               </li>
             ))}
           </ul>
