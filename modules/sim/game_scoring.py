@@ -25,6 +25,12 @@ from typing import Any, Mapping
 
 FALLBACK_ID = "fallback-meansd-1"
 _REAL_MODULE = "modules.sim.player_model"
+# Every player-model generation a saved game can name. v1 is a frozen copy (never edit it): games created
+# under it keep their exact weekly points, results and grades. The newest entry is what new games use.
+_MODEL_MODULES = {
+    "player-model-1": "modules.sim.player_model_v1",
+    "player-model-2": "modules.sim.player_model",
+}
 
 
 @dataclass(frozen=True)
@@ -144,14 +150,23 @@ class PlayerModelAdapter(ScoringModel):
         )
 
 
-def _load_real() -> ScoringModel | None:
+def _load_module(version: str) -> ScoringModel | None:
+    name = _MODEL_MODULES.get(version)
+    if name is None:
+        return None
     try:
-        module = importlib.import_module(_REAL_MODULE)
+        module = importlib.import_module(name)
     except ImportError:
         return None
     if not (hasattr(module, "draw_season_profile") and hasattr(module, "draw_week_points")):
         return None
     return PlayerModelAdapter(module)
+
+
+def _load_real() -> ScoringModel | None:
+    """The newest player model (what new games use)."""
+
+    return _load_module(list(_MODEL_MODULES)[-1])
 
 
 _FALLBACK = FallbackModel()
@@ -163,16 +178,26 @@ def default_model() -> ScoringModel:
     return _load_real() or _FALLBACK
 
 
-def get_model(model_id: str | None) -> ScoringModel:
-    """The model a saved game was created with. An unknown or unavailable id
-    falls back to the current default (logged in the response notes by callers)."""
+def resolve_model(model_id: str | None) -> tuple[ScoringModel, str | None]:
+    """The model a saved game was created with, and a note when it could not be honoured.
+    Known ids route to their own frozen module; the fallback id (or none) to FallbackModel;
+    an unknown id falls back to the current default with a note."""
 
     if not model_id or model_id == FALLBACK_ID:
-        return _FALLBACK
-    real = _load_real()
-    if real is not None and real.model_id == model_id:
-        return real
-    return real or _FALLBACK
+        return _FALLBACK, None
+    prefix = "player_model-"
+    if model_id.startswith(prefix):
+        exact = _load_module(model_id[len(prefix):])
+        if exact is not None and exact.model_id == model_id:
+            return exact, None
+    current = default_model()
+    return current, f"scoring model {model_id!r} is unavailable; using {current.model_id!r}, results may differ"
 
 
-__all__ = ["PlayerWeek", "ScoringModel", "FallbackModel", "PlayerModelAdapter", "default_model", "get_model", "FALLBACK_ID"]
+def get_model(model_id: str | None) -> ScoringModel:
+    """The model a saved game was created with (see ``resolve_model`` for the unknown-id note)."""
+
+    return resolve_model(model_id)[0]
+
+
+__all__ = ["resolve_model", "PlayerWeek", "ScoringModel", "FallbackModel", "PlayerModelAdapter", "default_model", "get_model", "FALLBACK_ID"]
