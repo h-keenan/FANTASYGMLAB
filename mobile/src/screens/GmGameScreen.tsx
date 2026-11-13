@@ -82,6 +82,8 @@ import {
   type SimScoring,
   type SimSetupState,
   type SimWaiverClaim,
+  simTradeSeedFor,
+  type SimTradeSeed,
 } from '../lib/simGame';
 import { SIM_FLOW_INITIAL, SIM_TABS, simFlowReducer, simRecapsFromAdvance, type SimTab } from '../lib/simGameFlow';
 import { useSimGameRequest } from '../lib/useSimGameRequest';
@@ -123,7 +125,7 @@ export default function GmGameScreen({ navigation }: Props) {
   const [sheetTeam, setSheetTeam] = useState<string | null>(null);
   const [draftRecap, setDraftRecap] = useState<{ recap: SimDraftRecap | null } | null>(null);
   const [claims, setClaims] = useState<SimWaiverClaim[]>([]);
-  const [tradeSeed, setTradeSeed] = useState<{ partner: string; get: string } | null>(null);
+  const [tradeSeed, setTradeSeed] = useState<SimTradeSeed | null>(null);
   const [advancing, setAdvancing] = useState(false);
   const [creating, setCreating] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
@@ -446,7 +448,29 @@ export default function GmGameScreen({ navigation }: Props) {
         }}
       />,
       <>
-        {sheetPlayer ? <SimPlayerSheet gameId={game.id} player={sheetPlayer} onClose={() => setSheetPlayer(null)} /> : null}
+        {sheetPlayer ? (
+          <SimPlayerSheet
+            gameId={game.id}
+            player={sheetPlayer}
+            onClose={() => setSheetPlayer(null)}
+            actions={
+              game.can_trade && simTradeSeedFor(sheetPlayer) ? (
+                <Button
+                  size="sm"
+                  variant="secondary"
+                  label="Add to trade"
+                  onPress={() => {
+                    const seed = simTradeSeedFor(sheetPlayer);
+                    if (!seed) return;
+                    setTradeSeed(seed);
+                    setSheetPlayer(null);
+                    dispatch({ type: 'tab', tab: 'trades' });
+                  }}
+                />
+              ) : null
+            }
+          />
+        ) : null}
         {sheetTeam ? (
           <SimTeamSheet
             ctx={ctx}
@@ -853,8 +877,8 @@ function GameScreen({
   onStartSeason: () => void;
   claims: SimWaiverClaim[];
   setClaims: (claims: SimWaiverClaim[]) => void;
-  tradeSeed: { partner: string; get: string } | null;
-  setTradeSeed: (seed: { partner: string; get: string } | null) => void;
+  tradeSeed: SimTradeSeed | null;
+  setTradeSeed: (seed: SimTradeSeed | null) => void;
   onRecapNext: () => void;
   onRecapClose: () => void;
   onDismissPaywall: () => void;

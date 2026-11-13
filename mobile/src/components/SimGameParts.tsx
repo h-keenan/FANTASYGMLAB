@@ -16,7 +16,7 @@ import SimCrest from './SimCrest';
 import { SIM_GLYPH_ICONS } from './SimGlyph';
 import { SheetModal, SheetScrollView, SwipeDismissCard } from './SwipeDismissSheet';
 import ToneBadge from './ToneBadge';
-import type { PlayerListTag } from '../lib/playerListRow';
+import type { PlayerListStat, PlayerListTag } from '../lib/playerListRow';
 import { simDraftMeta, simDraftRowChips } from '../lib/simDraft';
 import { useThemeMode } from '../context/ThemeModeContext';
 import {
@@ -224,6 +224,7 @@ export function SimPlayerLine({
   extra,
   hidePosition = false,
   tags,
+  stats,
   week = null,
 }: {
   player: SimGamePlayer;
@@ -235,6 +236,8 @@ export function SimPlayerLine({
   extra?: ReactNode;
   hidePosition?: boolean;
   tags?: PlayerListTag[];
+  /** Labeled stat pills (PROJ / VAL ...); see simListStats. */
+  stats?: PlayerListStat[];
   /** Current game week, to flag a bye that is close. Omit when unknown (the bye still shows). */
   week?: number | null;
 }) {
@@ -250,6 +253,7 @@ export function SimPlayerLine({
       chip={chip ? { label: chip.label, tone: chip.tone } : null}
       hurt={player.status === 'out'}
       tags={tags}
+      stats={stats}
       extra={extra}
       actions={trailing}
       selected={selected}

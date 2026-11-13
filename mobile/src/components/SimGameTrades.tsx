@@ -1,4 +1,5 @@
 import React, { useContext, useEffect, useMemo, useReducer, useState } from 'react';
+import { Ionicons } from '@expo/vector-icons';
 import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
 
 import AccentCard from './AccentCard';
@@ -14,12 +15,14 @@ import { SkeletonCard } from './SkeletonBlock';
 import SimCrest from './SimCrest';
 import SimGlyph from './SimGlyph';
 import { SimPickLine, useSimPicks } from './SimGameDynastyParts';
-import { SimPlayerChip, SimPopIn, SimSideLabel, SimStat, SimTeamOpenContext, SimToneBadge, createSimStyles, simToneColor, type SimCtx } from './SimGameParts';
+import { SimPlayerChip, SimPlayerLine, SimPopIn, SimSideLabel, SimStat, SimTeamOpenContext, SimToneBadge, createSimStyles, simToneColor, type SimCtx } from './SimGameParts';
 import ToneBadge from './ToneBadge';
 import { useThemeMode } from '../context/ThemeModeContext';
 import { api } from '../lib/api';
 import { simGroupByPosition, simSideSummary, simTradeFit, type SimAssetGroup } from '../lib/simLayout';
+import { simListStats } from '../lib/simDraft';
 import { simGroupsToSheetItems } from '../lib/simTradeSheet';
+import { SimPlayerSheet } from './SimGamePlayers';
 import { selectedItems } from '../lib/tradeSheetPicker';
 import TradePickerSheet, { TradeSideSummary } from './TradePickerSheet';
 import {
@@ -31,6 +34,8 @@ import {
   simPicksOf,
   simHeadshotId,
   simPositionsFor,
+  simGameReasonMessage,
+  type SimTradeSeed,
   simTradeMaxPerSide,
   simTradable,
   simTradeClosedReason,
@@ -251,13 +256,13 @@ function VerdictCard({ verdict, onSendCounter, busy }: { verdict: SimTradeVerdic
 }
 
 /** Build an offer to any AI team, preview the (deterministic) verdict, then send it. */
-function Builder({ ctx, seed, onSeedUsed }: { ctx: SimCtx; seed: { partner: string; get: string } | null; onSeedUsed: () => void }) {
+function Builder({ ctx, seed, onSeedUsed }: { ctx: SimCtx; seed: SimTradeSeed | null; onSeedUsed: () => void }) {
   const { gameId, game, call } = ctx;
   const { colors } = useThemeMode();
   const common = useMemo(() => createSimStyles(colors), [colors]);
   const [draft, dispatch] = useReducer(simTradeReducer, SIM_TRADE_EMPTY);
   const [teams, setTeams] = useState<SimLeagueTeam[] | null>(null);
-  const [teamsFailed, setTeamsFailed] = useState(false);
+  const [teamsFailed, setTeamsFailed] = useState<string | null>(null);
   const [teamsAttempt, setTeamsAttempt] = useState(0);
   const [partnerLoaded, setPartnerLoaded] = useState<{ partner: string; players: SimGamePlayer[] } | null>(null);
   const [mine, setMine] = useState<SimGamePlayer[]>([]);
@@ -267,6 +272,7 @@ function Builder({ ctx, seed, onSeedUsed }: { ctx: SimCtx; seed: { partner: stri
   const [previewing, setPreviewing] = useState(false);
   const [sending, setSending] = useState(false);
   const [sheetSide, setSheetSide] = useState<'give' | 'get' | null>(null);
+  const [viewing, setViewing] = useState<SimGamePlayer | null>(null);
   const closed = simTradeClosedReason(game);
   const teamId = game.you?.team_id;
   const maxPerSide = simTradeMaxPerSide(game.settings);
@@ -277,10 +283,15 @@ function Builder({ ctx, seed, onSeedUsed }: { ctx: SimCtx; seed: { partner: stri
     api
       .getSimLeague(gameId)
       .then((body) => {
-        if (!cancelled) setTeams((body.teams ?? []).filter((t) => !t.is_you));
+        if (cancelled) return;
+        if (body.reason) {
+          setTeamsFailed(body.message || simGameReasonMessage(body.reason, body));
+          return;
+        }
+        setTeams((body.teams ?? []).filter((t) => !t.is_you));
       })
       .catch(() => {
-        if (!cancelled) setTeamsFailed(true);
+        if (!cancelled) setTeamsFailed('Check your connection and try again.');
       });
     return () => {
       cancelled = true;
@@ -316,8 +327,7 @@ function Builder({ ctx, seed, onSeedUsed }: { ctx: SimCtx; seed: { partner: stri
   // "Trade for him" from the Players tab: preselect the partner and the player.
   useEffect(() => {
     if (!seed) return;
-    dispatch({ type: 'partner', teamId: seed.partner });
-    if (seed.get) dispatch({ type: 'toggle', side: 'get', id: seed.get, max: maxPerSide });
+    dispatch({ type: 'seed', seed, max: maxPerSide });
     onSeedUsed();
   }, [seed, onSeedUsed, maxPerSide]);
 
@@ -367,12 +377,13 @@ function Builder({ ctx, seed, onSeedUsed }: { ctx: SimCtx; seed: { partner: stri
     return <EmptyState icon="lock-closed-outline" title="Trades are closed" subtitle={closed} />;
   }
   if (teamsFailed) {
-    return <ErrorState title="Teams did not load" message="Check your connection and try again." onRetry={() => {
-          setTeamsFailed(false);
+    return <ErrorState title="Teams did not load" message={teamsFailed} onRetry={() => {
+          setTeamsFailed(null);
           setTeamsAttempt((n) => n + 1);
         }} />;
   }
   if (!teams) return <SkeletonCard rows={4} />;
+  if (teams.length === 0) return <EmptyState icon="people-outline" title="No teams to trade with" subtitle="This league has no other teams to trade with right now." />;
 
   // Picks ride in the same id-based draft as players; they take no roster spot.
   const myPicks = simPicksOf(picks, teamId);
@@ -500,7 +511,41 @@ function Builder({ ctx, seed, onSeedUsed }: { ctx: SimCtx; seed: { partner: stri
             setSheetSide(null);
           }}
           onClose={() => setSheetSide(null)}
-          onInfo={(item) => ctx.openPlayer(item.ref as SimGamePlayer)}
+          hidden={viewing !== null}
+          flexFilter={game.settings.slots.includes('FLEX')}
+          renderPlayerRow={(item, { on, blocked, toggle }) => {
+            const player = item.ref as SimGamePlayer;
+            return (
+              <SimPlayerLine
+                player={player}
+                week={game.week}
+                stats={simListStats(player, { adp: false })}
+                selected={on}
+                onOpen={setViewing}
+                trailing={
+                  <Pressable
+                    onPress={toggle}
+                    disabled={blocked}
+                    accessibilityRole="checkbox"
+                    accessibilityState={{ checked: on, disabled: blocked }}
+                    accessibilityLabel={`${on ? 'Remove' : 'Add'} ${player.name}`}
+                    hitSlop={6}
+                    style={{ width: 36, height: 36, borderRadius: 18, borderWidth: 2, borderColor: on ? colors.accent : colors.borderStrong, backgroundColor: on ? colors.accent : 'transparent', alignItems: 'center', justifyContent: 'center', opacity: blocked ? 0.45 : 1 }}
+                  >
+                    {on ? <Ionicons name="checkmark" size={18} color={colors.onAccent} /> : null}
+                  </Pressable>
+                }
+              />
+            );
+          }}
+        />
+      ) : null}
+      {viewing ? (
+        <SimPlayerSheet
+          gameId={gameId}
+          player={viewing}
+          onClose={() => setViewing(null)}
+          actions={<Button size="sm" variant="ghost" label="‹ Back to picker" onPress={() => setViewing(null)} />}
         />
       ) : null}
     </View>
@@ -508,7 +553,7 @@ function Builder({ ctx, seed, onSeedUsed }: { ctx: SimCtx; seed: { partner: stri
 }
 
 /** Trades tab: your inbox of AI offers and the offer builder. */
-export function SimTradesTab({ ctx, seed, onSeedUsed }: { ctx: SimCtx; seed: { partner: string; get: string } | null; onSeedUsed: () => void }) {
+export function SimTradesTab({ ctx, seed, onSeedUsed }: { ctx: SimCtx; seed: SimTradeSeed | null; onSeedUsed: () => void }) {
   const { colors } = useThemeMode();
   const common = useMemo(() => createSimStyles(colors), [colors]);
   const [mode, setMode] = useState<'inbox' | 'build'>(seed ? 'build' : 'inbox');

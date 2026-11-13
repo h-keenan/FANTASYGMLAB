@@ -202,6 +202,38 @@ export function simEmptySlotLabels(slots: readonly { slot: string; player?: unkn
   return out;
 }
 
+/** A starter who is in the lineup but will score 0 this week (bye or out). */
+export interface SimZeroStarter {
+  label: string;
+  name: string;
+  reason: "bye" | "out";
+}
+
+/**
+ * What the Advance bar warns about, derived ONLY from the current authoritative
+ * lineup response: `empty` comes from the slots (a slot with no player), `zero`
+ * from the response's bye/out warnings matched to the player actually sitting in a
+ * slot. A filled slot can therefore never be reported as empty.
+ */
+export function simLineupIssues(
+  slots: readonly { slot: string; player?: { id?: string; name?: string } | null }[],
+  warnings: readonly { code: string; player_id?: string | null }[] = [],
+): { empty: string[]; zero: SimZeroStarter[] } {
+  const total: Record<string, number> = {};
+  for (const s of slots) total[s.slot] = (total[s.slot] ?? 0) + 1;
+  const seen: Record<string, number> = {};
+  const zero: SimZeroStarter[] = [];
+  for (const s of slots) {
+    seen[s.slot] = (seen[s.slot] ?? 0) + 1;
+    const label = total[s.slot] > 1 ? `${s.slot}${seen[s.slot]}` : s.slot;
+    const player = s.player;
+    if (!player) continue;
+    const hit = warnings.find((w) => (w.code === "bye" || w.code === "out") && w.player_id && w.player_id === player.id);
+    if (hit) zero.push({ label, name: player.name ?? "Your starter", reason: hit.code as "bye" | "out" });
+  }
+  return { empty: simEmptySlotLabels(slots), zero };
+}
+
 /**
  * Whether the bar's Advance button is available. An empty starting slot is a
  * warning, never a block: claims are resolved at the START of Advance (before
@@ -213,23 +245,28 @@ export function simEmptySlotLabels(slots: readonly { slot: string; player?: unkn
 export function simAdvanceState(
   game: { phase?: string; week: number; pending?: { cuts_needed?: number } | null },
   empty: number | readonly string[],
+  zero: readonly SimZeroStarter[] = [],
 ): SimAdvanceState {
   const label = game.phase === "playoffs" ? "Play round" : `Wk ${game.week} \u2192 ${game.week + 1}`;
   const cuts = game.pending?.cuts_needed ?? 0;
   if (cuts > 0) return { label, blocked: true, reason: `Cut ${cuts} player${cuts === 1 ? "" : "s"} first`, warning: null, confirm: null };
   const names = typeof empty === "number" ? Array.from({ length: empty }, () => "A starting slot") : empty;
-  if (names.length > 0) {
-    const n = names.length;
-    const who = n === 1 ? `${names[0]} is` : `${names.join(", ")} are`;
-    return {
-      label,
-      blocked: false,
-      reason: null,
-      warning: `${n} empty slot${n === 1 ? "" : "s"}: ${n === 1 ? names[0] : names.join(", ")} will score 0. Claims process when you advance, before games are scored.`,
-      confirm: `${who} empty and will score 0 unless a healthy bench player fits. Advance anyway?`,
-    };
-  }
-  return { label, blocked: false, reason: null, warning: null, confirm: null };
+  if (names.length === 0 && zero.length === 0) return { label, blocked: false, reason: null, warning: null, confirm: null };
+  const n = names.length;
+  const who = n === 1 ? `${names[0]} is` : `${names.join(", ")} are`;
+  const zeroConfirmWho = zero.map((z) => `${z.name} (${z.label}) ${z.reason === "bye" ? "is on a bye" : "is out"}`).join(", ");
+  const zeroWarnWho = zero.map((z) => `${z.name} (${z.label}, ${z.reason === "bye" ? "bye" : "out"})`).join(", ");
+  const emptyConfirm = n > 0 ? `${who} empty and will score 0 unless a healthy bench player fits.` : "";
+  const zeroConfirm = zero.length > 0 ? `${zeroConfirmWho} and will score 0 unless you swap ${zero.length === 1 ? "him" : "them"}.` : "";
+  const emptyWarning = n > 0 ? `${n} empty slot${n === 1 ? "" : "s"}: ${n === 1 ? names[0] : names.join(", ")} will score 0.` : "";
+  const zeroWarning = zero.length > 0 ? `${zero.length} starter${zero.length === 1 ? "" : "s"} will score 0: ${zeroWarnWho}.` : "";
+  return {
+    label,
+    blocked: false,
+    reason: null,
+    warning: `${[emptyWarning, zeroWarning].filter(Boolean).join(" ")} Claims process when you advance, before games are scored.`,
+    confirm: `${[emptyConfirm, zeroConfirm].filter(Boolean).join(" ")} Advance anyway?`,
+  };
 }
 
 /** Bottom clearance (rem) page content needs so the fixed bar and the floating GM orb never cover the last row. */

@@ -10,7 +10,7 @@ import { Collapsible } from "@/components/Collapsible";
 import { PlayerAvatar } from "@/components/PlayerAvatar";
 import { PlayerListRow } from "@/components/PlayerListRow";
 import { PlayerIdentity } from "@/components/PlayerRow";
-import type { PlayerListTag } from "@/lib/playerListRow";
+import type { PlayerListStat, PlayerListTag } from "@/lib/playerListRow";
 import { simDraftMeta, simDraftRowChips } from "@/lib/simDraft";
 import { ReviewGlyphChip } from "@/components/SeasonReviewSections";
 import { SectionHeading } from "@/components/SectionHeading";
@@ -203,6 +203,7 @@ export function SimPlayerLine({
   extra,
   hidePosition = false,
   tags,
+  stats,
   week = null,
 }: {
   player: SimGamePlayer;
@@ -214,6 +215,8 @@ export function SimPlayerLine({
   extra?: ReactNode;
   hidePosition?: boolean;
   tags?: PlayerListTag[];
+  /** Labeled stat pills (PROJ / VAL ...); see simListStats. */
+  stats?: PlayerListStat[];
   /** Current game week, to flag a bye that is close. Omit when unknown (the bye still shows). */
   week?: number | null;
 }) {
@@ -229,6 +232,7 @@ export function SimPlayerLine({
       chip={chip ? { label: chip.label, tone: chip.tone } : null}
       hurt={player.status === "out"}
       tags={tags}
+      stats={stats}
       extra={extra}
       actions={trailing}
       selected={selected}
@@ -354,6 +358,7 @@ export function SimSheet({ title, onClose, children, labelledBy = "sim-sheet-tit
   const sheet = (
     <div
       className="pqv-backdrop"
+      data-sheet-hideable="true"
       data-testid="sim-sheet-backdrop"
       onMouseDown={(event) => {
         if (event.target === event.currentTarget) onClose();

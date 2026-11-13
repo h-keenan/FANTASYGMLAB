@@ -61,6 +61,9 @@ export default function TradePickerSheet<T = unknown>({
   hideOnInfo = false,
   mode = 'multi',
   initialFilters,
+  renderPlayerRow,
+  hidden: hiddenExternal = false,
+  flexFilter = false,
 }: {
   title: string;
   subtitle?: string;
@@ -80,6 +83,12 @@ export default function TradePickerSheet<T = unknown>({
   mode?: 'multi' | 'single';
   /** Filters already in effect when the sheet opens (e.g. the same position as the player being compared). */
   initialFilters?: SheetFilters;
+  /** Render player rows with the caller's own row (Fantasy Sim: the shared PlayerListRow, tap the body for the quick view, a checkbox as its action). Picks keep the built-in row and the info button is not drawn. */
+  renderPlayerRow?: (item: SheetItem<T>, control: { on: boolean; blocked: boolean; toggle: () => void }) => React.ReactNode;
+  /** Hide this sheet (selection and scroll are kept by the caller's state) while a player card is up: iOS cannot present two native modals. */
+  hidden?: boolean;
+  /** Offer a FLEX chip (RB / WR / TE) in the position filter. */
+  flexFilter?: boolean;
 }) {
   const { colors } = useThemeMode();
   const styles = useMemo(() => createStyles(colors), [colors]);
@@ -94,7 +103,7 @@ export default function TradePickerSheet<T = unknown>({
 
   const visibleItems = useMemo(() => (playersOnly ? items.filter((i) => i.kind === 'player') : items), [items, playersOnly]);
   const hasPicks = !playersOnly && visibleItems.some((i) => i.kind === 'pick');
-  const positions = useMemo(() => positionsFor(visibleItems), [visibleItems]);
+  const positions = useMemo(() => positionsFor(visibleItems, flexFilter), [visibleItems, flexFilter]);
   const rows = useMemo(
     () => filterSheetItems(visibleItems, { tab: state.tab, query: state.query, filters: state.filters }),
     [visibleItems, state.tab, state.query, state.filters],
@@ -123,7 +132,7 @@ export default function TradePickerSheet<T = unknown>({
   }, []);
 
   return (
-    <SheetModal visible={!hidden} transparent animationType={reduceMotion ? 'none' : 'slide'} onRequestClose={() => (filtersOpen ? dispatch({ type: 'closeFilters' }) : onClose())}>
+    <SheetModal visible={!hidden && !hiddenExternal} transparent animationType={reduceMotion ? 'none' : 'slide'} onRequestClose={() => (filtersOpen ? dispatch({ type: 'closeFilters' }) : onClose())}>
       <Pressable style={styles.backdrop} onPress={onClose} accessibilityLabel={`Close ${title}`}>
         <SwipeDismissCard style={styles.sheet} onDismiss={onClose} handleOnly testID="trade-picker">
           <View style={styles.header}>
@@ -252,6 +261,9 @@ export default function TradePickerSheet<T = unknown>({
                   const on = state.selected.includes(item.key);
                   const blocked = !on && atMax;
                   const value = item.value != null ? String(Math.round(item.value)) : '—';
+                  if (renderPlayerRow && item.kind === 'player') {
+                    return <View style={[styles.row, on && styles.rowOn]}>{renderPlayerRow(item, { on, blocked, toggle: () => dispatch({ type: 'toggle', key: item.key, max }) })}</View>;
+                  }
                   return (
                     <View style={[styles.row, on && styles.rowOn]}>
                       <Pressable

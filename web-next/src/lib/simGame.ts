@@ -48,6 +48,8 @@ export interface SimGameEnvelope {
   error?: string;
   /** Plain sentence the engine wrote for a rule `reason` (not-ready states). */
   message?: string;
+  /** Coarse diagnostic code on sim_storage_unavailable (conflict, timeout, http_5xx, constraint, rls ...). */
+  detail?: string;
   is_premium?: boolean;
   upsell?: SimGameUpsell | null;
   preview?: SimGamePreview | null;
@@ -987,6 +989,18 @@ export function simGameErrorGate(error: unknown): SimGameGate | null {
   return null;
 }
 
+/** A failed ACTION (pick, claim, trade) that is worth one automatic retry: storage hiccup or busy server, never "feature off". */
+export function simIsTransientGate(gate: SimGameGate | null): boolean {
+  return gate !== null && gate.kind === "unavailable" && gate.cause !== "off";
+}
+
+/** Inline copy for a failed action. The game stays on screen: only the initial load shows the full-page unavailable state. */
+export function simActionFailureMessage(body?: SimGameEnvelope | null, gate?: SimGameGate | null): string {
+  if (gate && gate.kind === "unavailable" && gate.cause === "busy") return "The simulator is busy right now. Try again in a few seconds.";
+  const code = body?.detail ? ` (${body.detail})` : "";
+  return `Couldn't save that. Your game is safe. Try it again${code}.`;
+}
+
 export function simGameUnavailableCopy(cause: "off" | "storage" | "busy"): { title: string; subtitle: string } {
   if (cause === "storage") {
     return {
@@ -1437,7 +1451,35 @@ export type SimTradeAction =
   | { type: "toggle"; side: "give" | "get"; id: string; max?: number }
   | { type: "set"; side: "give" | "get"; ids: string[]; max?: number }
   | { type: "load"; give: string[]; get: string[]; max?: number }
+  | { type: "seed"; seed: SimTradeSeed; max?: number }
   | { type: "clear" };
+
+/** A player handed to the trade builder from elsewhere (quick view, Players tab, team sheet). `partner` "" keeps the current partner. */
+export interface SimTradeSeed {
+  partner: string;
+  give?: string;
+  get?: string;
+}
+
+/**
+ * The one rule for "Add to trade": my player goes on the give side (partner unchanged), an AI
+ * team's player picks that team as the partner and goes on the get side. Free agents cannot be
+ * traded, so they yield null.
+ */
+export function simTradeSeedFor(player: Pick<SimGamePlayer, "id" | "owner">): SimTradeSeed | null {
+  const owner = player.owner;
+  if (!owner || owner.type === "free_agent") return null;
+  if (owner.type === "you") return { partner: "", give: player.id };
+  return owner.team_id ? { partner: owner.team_id, get: player.id } : null;
+}
+
+/** Apply a seed to a draft. Idempotent: adding a player already in the offer leaves it there. */
+export function simApplyTradeSeed(draft: SimTradeDraft, seed: SimTradeSeed, max: number = SIM_TRADE_MAX_PER_SIDE): SimTradeDraft {
+  let next = seed.partner && seed.partner !== draft.partner ? { partner: seed.partner, give: draft.give, get: [] as string[] } : draft;
+  if (seed.give && !next.give.includes(seed.give) && next.give.length < max) next = { ...next, give: [...next.give, seed.give] };
+  if (seed.get && !next.get.includes(seed.get) && next.get.length < max) next = { ...next, get: [...next.get, seed.get] };
+  return next;
+}
 
 export const SIM_TRADE_EMPTY: SimTradeDraft = { partner: null, give: [], get: [] };
 
@@ -1456,6 +1498,8 @@ export function simTradeReducer(state: SimTradeDraft, action: SimTradeAction): S
       return { ...state, [action.side]: [...new Set(action.ids)].slice(0, action.max ?? SIM_TRADE_MAX_PER_SIDE) };
     case "load":
       return { ...state, give: action.give.slice(0, action.max ?? SIM_TRADE_MAX_PER_SIDE), get: action.get.slice(0, action.max ?? SIM_TRADE_MAX_PER_SIDE) };
+    case "seed":
+      return simApplyTradeSeed(state, action.seed, action.max);
     case "clear":
       return SIM_TRADE_EMPTY;
   }
@@ -2297,6 +2341,8 @@ export interface SimHomeResponse extends SimGameEnvelope {
   reserves?: { ir_used: number; ir_slots: number; taxi_used: number; taxi_slots: number };
   /** Dynasty games only: where you are and what you hold. `next_pick` is a pick id "season:round:team". */
   dynasty?: { season_no: number; seasons: number; picks_held: number; picks_value: number; next_pick: string | null };
+  /** Cards the server could not build (card name to error class); the rest of the page is valid. */
+  errors?: Record<string, string>;
 }
 
 /** One plain line for the Home dynasty/IR strip, or null when the game has neither. */

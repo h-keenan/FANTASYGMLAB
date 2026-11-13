@@ -22,6 +22,7 @@ function harness() {
   return {
     seen,
     handlers: {
+      retryMs: 0,
       onGate: (gate: { kind: string }) => seen.gates.push(gate.kind),
       onError: (message: string) => seen.errors.push(message),
       onConflict: () => {
@@ -66,8 +67,9 @@ test('404 is flag-off, 503 is busy, anything else is a plain message', async () 
   await runSimGameCall(throwing(Object.assign(new Error('x'), { status: 503 })), h.handlers);
   await runSimGameCall(throwing(new Error('Request failed (500).')), h.handlers);
   await runSimGameCall(throwing(new Error('Pick not allowed')), h.handlers);
-  assert.deepEqual(h.seen.gates, ['unavailable', 'unavailable']);
-  assert.deepEqual(h.seen.errors, ['Something went wrong. Try again.', 'Pick not allowed']);
+  // 503 busy is retried once and then reported inline (the game stays on screen), not as a gate.
+  assert.deepEqual(h.seen.gates, ['unavailable']);
+  assert.deepEqual(h.seen.errors, ['The simulator is busy right now. Try again in a few seconds.', 'Something went wrong. Try again.', 'Pick not allowed']);
 });
 
 test('gm-game is a registered nav page with a route, a screen and an orb icon', () => {

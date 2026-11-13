@@ -99,14 +99,22 @@ function toggled<V>(list: V[], value: V): V[] {
 
 /** Positions present in the pool, in a stable football order. */
 const POSITION_ORDER = ["QB", "RB", "WR", "TE", "K", "DEF", "DL", "LB", "DB"];
-export function positionsFor(items: SheetItem[]): string[] {
+export const FLEX_POSITIONS = ["RB", "WR", "TE"];
+
+/** Position chips for the filter panel. `flex` adds a FLEX chip (RB / WR / TE) after the real positions, for leagues that start a flex slot. */
+export function positionsFor(items: SheetItem[], flex = false): string[] {
   const seen = new Set<string>();
   for (const item of items) if (item.kind === "player" && item.position) seen.add(item.position.toUpperCase());
-  return [...seen].sort((a, b) => {
+  const sorted = [...seen].sort((a, b) => {
     const ia = POSITION_ORDER.indexOf(a);
     const ib = POSITION_ORDER.indexOf(b);
     return (ia < 0 ? 99 : ia) - (ib < 0 ? 99 : ib) || a.localeCompare(b);
   });
+  if (flex && sorted.some((pos) => FLEX_POSITIONS.includes(pos))) {
+    const lastFlexIndex = Math.max(...FLEX_POSITIONS.map((pos) => sorted.indexOf(pos)));
+    sorted.splice(lastFlexIndex + 1, 0, "FLEX");
+  }
+  return sorted;
 }
 
 /** Items for the tab, narrowed by search and filters. Filters apply to players; picks only follow the search. */
@@ -117,7 +125,11 @@ export function filterSheetItems<T>(items: SheetItem<T>[], opts: { tab: SheetTab
     if (item.kind !== kind) return false;
     if (query && !`${item.label} ${item.team ?? ""} ${item.position ?? ""}`.toLowerCase().includes(query)) return false;
     if (kind === "pick") return true;
-    if (opts.filters.positions.length && !opts.filters.positions.includes((item.position ?? "").toUpperCase())) return false;
+    if (opts.filters.positions.length) {
+      const pos = (item.position ?? "").toUpperCase();
+      const flex = opts.filters.positions.includes("FLEX") && FLEX_POSITIONS.includes(pos);
+      if (!flex && !opts.filters.positions.includes(pos)) return false;
+    }
     if (opts.filters.conditions.length && !opts.filters.conditions.some((c) => item.conditions.includes(c))) return false;
     return true;
   });

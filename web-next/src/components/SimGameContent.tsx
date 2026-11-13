@@ -76,6 +76,8 @@ import {
   type SimSetupState,
   type SimWaiverClaim,
   simGradeTone,
+  simTradeSeedFor,
+  type SimTradeSeed,
 } from "@/lib/simGame";
 import { SIM_FLOW_INITIAL, SIM_TABS, simFlowReducer, simRecapsFromAdvance, type SimTab } from "@/lib/simGameFlow";
 import { useSimGameCall } from "@/lib/useSimGameCall";
@@ -101,11 +103,20 @@ export function SimGameContent() {
   const [sheetTeam, setSheetTeam] = useState<string | null>(null);
   const [draftRecap, setDraftRecap] = useState<{ recap: SimDraftRecap | null } | null>(null);
   const [claims, setClaims] = useState<SimWaiverClaim[]>([]);
-  const [tradeSeed, setTradeSeed] = useState<{ partner: string; get: string } | null>(null);
+  const [tradeSeed, setTradeSeed] = useState<SimTradeSeed | null>(null);
   const [advancing, setAdvancing] = useState(false);
   const [creating, setCreating] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [managing, setManaging] = useState(false);
+
+  // One overlay at a time: while a player card is up, CSS hides every sim sheet under it (they stay mounted,
+  // so a trade picker keeps its selection and scroll). `stackedUnder` adds a Back button to the card.
+  useEffect(() => {
+    if (!sheetPlayer) return;
+    document.body.setAttribute("data-sim-pqv", "1");
+    return () => document.body.removeAttribute("data-sim-pqv");
+  }, [sheetPlayer]);
+  const stackedUnder = useMemo(() => Boolean(sheetPlayer) && typeof document !== "undefined" && document.querySelector("[data-sheet-hideable]") !== null, [sheetPlayer]);
 
   const notify = useCallback((message: string, tone: SimGameTone = "warning") => setNotice(message ? { message, tone } : null), []);
 
@@ -368,7 +379,38 @@ export function SimGameContent() {
           onNewGame={() => { dispatch({ type: "setup" }); setGameState(null); }}
           onDeleted={() => { dispatch({ type: "deleted" }); setGameState(null); void refreshList(); }}
         />
-        {sheetPlayer ? <SimPlayerSheet gameId={game.id} player={sheetPlayer} onClose={() => setSheetPlayer(null)} /> : null}
+        {sheetPlayer ? (
+          <SimPlayerSheet
+            gameId={game.id}
+            player={sheetPlayer}
+            onClose={() => setSheetPlayer(null)}
+            actions={
+              <>
+                {stackedUnder ? (
+                  <Button size="sm" variant="ghost" onClick={() => setSheetPlayer(null)}>
+                    ‹ Back
+                  </Button>
+                ) : null}
+                {game.can_trade && !stackedUnder && simTradeSeedFor(sheetPlayer) ? (
+                <Button
+                  size="sm"
+                  variant="secondary"
+                  aria-label={`Add ${sheetPlayer.name} to trade`}
+                  onClick={() => {
+                    const seed = simTradeSeedFor(sheetPlayer);
+                    if (!seed) return;
+                    setTradeSeed(seed);
+                    setSheetPlayer(null);
+                    dispatch({ type: "tab", tab: "trades" });
+                  }}
+                >
+                  Add to trade
+                </Button>
+              ) : null}
+              </>
+            }
+          />
+        ) : null}
         {sheetTeam ? (
           <SimTeamSheet
             ctx={ctx}
@@ -807,8 +849,8 @@ function GameScreen({
   onStartSeason: () => void;
   claims: SimWaiverClaim[];
   setClaims: (claims: SimWaiverClaim[]) => void;
-  tradeSeed: { partner: string; get: string } | null;
-  setTradeSeed: (seed: { partner: string; get: string } | null) => void;
+  tradeSeed: SimTradeSeed | null;
+  setTradeSeed: (seed: SimTradeSeed | null) => void;
   onRecapNext: () => void;
   onRecapClose: () => void;
   onDismissPaywall: () => void;

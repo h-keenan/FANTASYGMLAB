@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { SIM_ASSET_ALL, simAdvanceState, simEmptySlotLabels, simAutoSetMessage, simLineupDiff, simFilterGroups, simGroupByPosition, simSideSummary, simTradeFit, SIM_REVIEW_VIEWS, simReviewViewFor, simOpenKey, simParseOpen, simPreview, simSeeAllLabel, simWindow } from "./simLayout";
+import { SIM_ASSET_ALL, simAdvanceState, simEmptySlotLabels, simLineupIssues, simAutoSetMessage, simLineupDiff, simFilterGroups, simGroupByPosition, simSideSummary, simTradeFit, SIM_REVIEW_VIEWS, simReviewViewFor, simOpenKey, simParseOpen, simPreview, simSeeAllLabel, simWindow } from "./simLayout";
 
 describe("simLayout", () => {
   it("namespaces and parses open state", () => {
@@ -70,5 +70,17 @@ describe("simLayout", () => {
     expect(simAdvanceState({ phase: "regular_season", week: 4, pending: { cuts_needed: 2 } }, ["WR"])).toMatchObject({ blocked: true, reason: "Cut 2 players first", confirm: null });
     expect(simEmptySlotLabels([{ slot: "QB", player: {} }, { slot: "WR", player: {} }, { slot: "WR", player: null }, { slot: "TE", player: null }])).toEqual(["WR2", "TE"]);
     expect(simAdvanceState({ phase: "playoffs", week: 15 }, 0).label).toBe("Play round");
+  });
+  it("warns only from the current lineup: a filled WR2 is never empty; bye/out starters are separate", () => {
+    const before = [{ slot: "QB", player: { id: "q", name: "Q" } }, { slot: "WR", player: { id: "w1", name: "W1" } }, { slot: "WR", player: null }];
+    expect(simLineupIssues(before, []).empty).toEqual(["WR2"]);
+    const after = [before[0], before[1], { slot: "WR", player: { id: "w2", name: "Jakobi Meyers" } }];
+    expect(simLineupIssues(after, []).empty).toEqual([]);
+    expect(simAdvanceState({ week: 2 }, simLineupIssues(after, []).empty, []).confirm).toBeNull();
+    const out = simLineupIssues(after, [{ code: "out", player_id: "w2" }, { code: "empty_slot", player_id: null }]);
+    expect(out.empty).toEqual([]);
+    expect(out.zero).toEqual([{ label: "WR2", name: "Jakobi Meyers", reason: "out" }]);
+    expect(simAdvanceState({ week: 2 }, out.empty, out.zero).confirm).toBe("Jakobi Meyers (WR2) is out and will score 0 unless you swap him. Advance anyway?");
+    expect(simAdvanceState({ week: 2 }, ["WR1"], [{ label: "RB", name: "A", reason: "bye" }]).confirm).toMatch(/WR1 is empty .* A \(RB\) is on a bye and will score 0/);
   });
 });

@@ -7,6 +7,7 @@ import {
   SIM_REVIEW_VIEWS,
   simAdvanceState,
   simEmptySlotLabels,
+  simLineupIssues,
   simAutoSetMessage,
   simFilterGroups,
   simGroupByPosition,
@@ -70,4 +71,20 @@ test('auto-set message and advance state', () => {
   assert.equal(one.confirm, 'WR2 is empty and will score 0 unless a healthy bench player fits. Advance anyway?');
   assert.deepEqual(simEmptySlotLabels([{ slot: 'QB', player: {} }, { slot: 'WR', player: {} }, { slot: 'WR', player: null }]), ['WR2']);
   assert.equal(simAdvanceState({ phase: 'regular_season', week: 4, pending: { cuts_needed: 2 } }, 0).reason, 'Cut 2 players first');
+});
+
+test('the advance bar warns only from the current lineup: filled WR2 is never empty, bye/out starters are separate', () => {
+  const before = [{ slot: 'QB', player: { id: 'q', name: 'Q' } }, { slot: 'WR', player: { id: 'w1', name: 'W1' } }, { slot: 'WR', player: null }];
+  assert.deepEqual(simLineupIssues(before, []).empty, ['WR2']);
+  // after a set-lineup / auto-set fills the slot, the next lineup response has no empty slot
+  const after = [before[0], before[1], { slot: 'WR', player: { id: 'w2', name: 'Jakobi Meyers' } }];
+  assert.deepEqual(simLineupIssues(after, []).empty, []);
+  assert.equal(simAdvanceState({ week: 2 }, simLineupIssues(after, []).empty, []).confirm, null);
+  const out = simLineupIssues(after, [{ code: 'out', player_id: 'w2' }, { code: 'empty_slot', player_id: null }]);
+  assert.deepEqual(out.empty, []);
+  assert.deepEqual(out.zero, [{ label: 'WR2', name: 'Jakobi Meyers', reason: 'out' }]);
+  const state = simAdvanceState({ week: 2 }, out.empty, out.zero);
+  assert.equal(state.confirm, 'Jakobi Meyers (WR2) is out and will score 0 unless you swap him. Advance anyway?');
+  const both = simAdvanceState({ week: 2 }, ['WR1'], [{ label: 'RB', name: 'A', reason: 'bye' }]);
+  assert.match(both.confirm ?? '', /WR1 is empty .* A \(RB\) is on a bye and will score 0/);
 });

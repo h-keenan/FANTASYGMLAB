@@ -10,17 +10,20 @@ import { SectionHeading } from "@/components/SectionHeading";
 import { ReviewGlyphChip } from "@/components/SeasonReviewSections";
 import { SimCrest } from "@/components/SimCrest";
 import { SimGlyph } from "@/components/SimGlyph";
-import { SimPlayerChip, SimSideLabel, SimStat, SimTeamOpenContext, SimToneBadge, simToneColor, type SimCtx } from "@/components/SimGameParts";
+import { SimPlayerChip, SimPlayerLine, SimSideLabel, SimStat, SimTeamOpenContext, SimToneBadge, simToneColor, type SimCtx } from "@/components/SimGameParts";
 import { SimPickLine, useSimPicks } from "@/components/SimGameDynastyParts";
 import { SkeletonCard, SkeletonRows } from "@/components/Skeleton";
 import { ToneBadge } from "@/components/ToneBadge";
 import { api } from "@/lib/api";
 import { simGroupByPosition, simSideSummary, simTradeFit, type SimAssetGroup } from "@/lib/simLayout";
+import { simListStats } from "@/lib/simDraft";
 import { simGroupsToSheetItems } from "@/lib/simTradeSheet";
 import { selectedItems } from "@/lib/tradeSheetPicker";
 import { TradePickerSheet, TradeSideSummary } from "@/components/TradePickerSheet";
 import {
   SIM_TRADE_EMPTY,
+  simGameReasonMessage,
+  type SimTradeSeed,
   simFmtPts,
   simIsPick,
   simIsPickId,
@@ -228,10 +231,12 @@ function VerdictCard({ verdict, onSendCounter, busy }: { verdict: SimTradeVerdic
 }
 
 /** Build an offer to any AI team, preview the (deterministic) verdict, then send it. */
-function Builder({ ctx, seed, onSeedUsed }: { ctx: SimCtx; seed: { partner: string; get: string } | null; onSeedUsed: () => void }) {
+function Builder({ ctx, seed, onSeedUsed }: { ctx: SimCtx; seed: SimTradeSeed | null; onSeedUsed: () => void }) {
   const { gameId, game, call } = ctx;
   const [draft, dispatch] = useReducer(simTradeReducer, SIM_TRADE_EMPTY);
   const [teams, setTeams] = useState<SimLeagueTeam[] | null>(null);
+  const [teamsError, setTeamsError] = useState<string | null>(null);
+  const [teamsAttempt, setTeamsAttempt] = useState(0);
   const [partnerLoaded, setPartnerLoaded] = useState<{ partner: string; players: SimGamePlayer[] } | null>(null);
   const [mine, setMine] = useState<SimGamePlayer[]>([]);
   // The verdict is stored with the offer it answers, so a changed offer
@@ -250,15 +255,21 @@ function Builder({ ctx, seed, onSeedUsed }: { ctx: SimCtx; seed: { partner: stri
     api
       .getSimLeague(gameId)
       .then((body) => {
-        if (!cancelled) setTeams((body.teams ?? []).filter((t) => !t.is_you));
+        if (cancelled) return;
+        if (body.reason) {
+          setTeamsError(body.message || simGameReasonMessage(body.reason, body));
+          return;
+        }
+        setTeamsError(null);
+        setTeams((body.teams ?? []).filter((t) => !t.is_you));
       })
       .catch(() => {
-        if (!cancelled) setTeams([]);
+        if (!cancelled) setTeamsError("We could not load the other teams. Check your connection and try again.");
       });
     return () => {
       cancelled = true;
     };
-  }, [gameId]);
+  }, [gameId, teamsAttempt]);
 
   useEffect(() => {
     if (!teamId) return;
@@ -283,8 +294,7 @@ function Builder({ ctx, seed, onSeedUsed }: { ctx: SimCtx; seed: { partner: stri
   // "Trade for him" from the Players tab: preselect the partner and the player.
   useEffect(() => {
     if (!seed) return;
-    dispatch({ type: "partner", teamId: seed.partner });
-    if (seed.get) dispatch({ type: "toggle", side: "get", id: seed.get, max: maxPerSide });
+    dispatch({ type: "seed", seed, max: maxPerSide });
     onSeedUsed();
   }, [seed, onSeedUsed, maxPerSide]);
 
@@ -333,7 +343,12 @@ function Builder({ ctx, seed, onSeedUsed }: { ctx: SimCtx; seed: { partner: stri
   if (closed) {
     return <EmptyState title="Trades are closed" subtitle={closed} />;
   }
+  // The partner list never renders empty without saying why.
+  if (teamsError && !teams) {
+    return <EmptyState title="Could not load the teams" subtitle={teamsError} actionLabel="Try again" onAction={() => { setTeamsError(null); setTeamsAttempt((n) => n + 1); }} />;
+  }
   if (!teams) return <SkeletonRows count={4} />;
+  if (teams.length === 0) return <EmptyState title="No teams to trade with" subtitle="This league has no other teams to trade with right now." />;
 
   // Picks ride in the same id-based draft as players; they take no roster spot.
   const myPicks = simPicksOf(picks, teamId);
@@ -448,7 +463,34 @@ function Builder({ ctx, seed, onSeedUsed }: { ctx: SimCtx; seed: { partner: stri
             setSheetSide(null);
           }}
           onClose={() => setSheetSide(null)}
-          onInfo={(item) => ctx.openPlayer(item.ref as SimGamePlayer)}
+          flexFilter={game.settings.slots.includes("FLEX")}
+          renderPlayerRow={(item, { on, blocked, toggle }) => {
+            const player = item.ref as SimGamePlayer;
+            return (
+              <SimPlayerLine
+                player={player}
+                week={game.week}
+                stats={simListStats(player, { adp: false })}
+                selected={on}
+                onOpen={ctx.openPlayer}
+                trailing={
+                  <button
+                    type="button"
+                    role="checkbox"
+                    aria-checked={on}
+                    aria-label={`${on ? "Remove" : "Add"} ${player.name}`}
+                    disabled={blocked}
+                    className="tps-check"
+                    data-on={on ? "true" : "false"}
+                    style={{ width: "2.25rem", height: "2.25rem", opacity: blocked ? 0.45 : undefined }}
+                    onClick={toggle}
+                  >
+                    {on ? "✓" : ""}
+                  </button>
+                }
+              />
+            );
+          }}
         />
       ) : null}
     </div>
@@ -462,7 +504,7 @@ export function SimTradesTab({
   onSeedUsed,
 }: {
   ctx: SimCtx;
-  seed: { partner: string; get: string } | null;
+  seed: SimTradeSeed | null;
   onSeedUsed: () => void;
 }) {
   const [mode, setMode] = useState<"inbox" | "build">(seed ? "build" : "inbox");

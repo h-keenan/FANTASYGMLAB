@@ -8,7 +8,7 @@ import type { SimCtx } from "@/components/SimGameParts";
 import { useSimAutoSet } from "@/components/useSimAutoSet";
 import { api } from "@/lib/api";
 import { simAdvanceLabel } from "@/lib/simGame";
-import { simAdvanceState, simEmptySlotLabels } from "@/lib/simLayout";
+import { simAdvanceState, simLineupIssues, type SimZeroStarter } from "@/lib/simLayout";
 
 /**
  * The persistent bottom action bar for the in-season tabs: Advance week
@@ -20,7 +20,7 @@ import { simAdvanceState, simEmptySlotLabels } from "@/lib/simLayout";
  */
 export function SimActionBar({ ctx, paywalled, advancing, onAdvance, onTab }: { ctx: SimCtx; paywalled: boolean; advancing: boolean; onAdvance: () => void; onTab?: (tab: "team" | "players") => void }) {
   const { gameId, game } = ctx;
-  const [emptySlots, setEmptySlots] = useState<string[]>([]);
+  const [issues, setIssues] = useState<{ empty: string[]; zero: SimZeroStarter[] }>({ empty: [], zero: [] });
   const [confirming, setConfirming] = useState(false);
   const auto = useSimAutoSet(ctx);
 
@@ -31,16 +31,16 @@ export function SimActionBar({ ctx, paywalled, advancing, onAdvance, onTab }: { 
       .getSimLineup(gameId)
       .then((body) => {
         if (cancelled) return;
-        setEmptySlots(simEmptySlotLabels(body.slots ?? []));
+        setIssues(simLineupIssues(body.slots ?? [], body.warnings ?? []));
         setConfirming(false); // the lineup changed (e.g. the slot was filled): ask again
       })
       .catch(() => {});
     return () => {
       cancelled = true;
     };
-  }, [gameId, ctx.tick, game.week]);
+  }, [gameId, ctx.tick, game]);
 
-  const state = simAdvanceState(game, emptySlots);
+  const state = simAdvanceState(game, issues.empty, issues.zero);
   const tapAdvance = () => {
     if (state.confirm && !confirming) setConfirming(true);
     else {

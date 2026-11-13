@@ -95,6 +95,7 @@ export function SimTeamTab({ ctx, onTrade }: { ctx: SimCtx; onTrade: () => void 
     setSaving(false);
     if (body) {
       setLineup(body);
+      ctx.bump();
       await refreshGame();
     } else {
       setLineup(previous);
@@ -107,6 +108,7 @@ export function SimTeamTab({ ctx, onTrade }: { ctx: SimCtx; onTrade: () => void 
     setSaving(false);
     if (body) {
       setLineup(body);
+      ctx.bump();
       await refreshGame();
     }
   }
@@ -255,7 +257,7 @@ export function SimTeamTab({ ctx, onTrade }: { ctx: SimCtx; onTrade: () => void 
           ))
         )}
         {game.can_trade ? <Button size="sm" variant="ghost" label="Shop a trade" onPress={onTrade} style={styles.shop} /> : null}
-        {reservesOn ? <SimReserveGroups ir={lineup.ir ?? []} taxi={lineup.taxi ?? []} state={reserveState} onOpen={setMoving} openPlayer={ctx.openPlayer} /> : null}
+        {reservesOn ? <SimReserveGroups ir={lineup.ir ?? []} taxi={lineup.taxi ?? []} state={reserveState} onOpen={setMoving} openPlayer={ctx.openPlayer} cutting={cutting} onAskCut={setCutting} onCut={cut} /> : null}
         {game.settings.mode === 'dynasty' && picks ? <SimYourPicks picks={myPicks} draftYear={picks.draft_year} /> : null}
       </View>
 

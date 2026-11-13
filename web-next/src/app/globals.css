@@ -4045,6 +4045,18 @@ main > header:has(> h1.sr-only:only-child) {
 .tps-row[data-selected="true"] {
   background: var(--color-accent-soft);
 }
+.tps-row-shared {
+  border-bottom: var(--border-width-default) solid var(--color-border);
+  list-style: none;
+}
+.tps-row-shared[data-selected="true"] {
+  background: var(--color-accent-soft);
+}
+/* One overlay at a time: while a Fantasy Sim player card is up, every sim sheet under it is invisible (still mounted, so selections and scroll survive). */
+body[data-sim-pqv] [data-sheet-hideable] {
+  visibility: hidden;
+  pointer-events: none;
+}
 .tps-row-main {
   display: flex;
   align-items: center;
