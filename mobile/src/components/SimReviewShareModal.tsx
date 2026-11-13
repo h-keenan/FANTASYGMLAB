@@ -46,7 +46,7 @@ export default function SimReviewShareModal({
   };
 
   const onShareText = () => {
-    const lines = [`${model.headline} Grade ${model.letter}.`, ...reviewShareLines(sections), '', 'Play Fantasy Sim on FantasyDesk.', shareLink('recap')];
+    const lines = [`${[model.headline, model.record].filter(Boolean).join(", ")}. Grade ${model.letter}.`, ...reviewShareLines(sections), '', 'Play Fantasy Sim on FantasyDesk.', shareLink('recap')];
     Share.share({ message: lines.join('\n') }).catch(() => {});
   };
 
