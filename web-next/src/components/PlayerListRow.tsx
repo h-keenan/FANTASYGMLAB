@@ -13,7 +13,8 @@ import type { WhyMetricId } from "@/lib/tapForWhyContent";
 import {
   PLAYER_LIST_DENSITY,
   PLAYER_LIST_LONG_NAME,
-  PLAYER_LIST_SLOT_WIDTH,
+  PLAYER_LIST_ALIGNED_WIDTH,
+  playerListSlotWidth,
   PLAYER_LIST_STAT_ORDER,
   PLAYER_LIST_STAT_WIDTH,
   limitPlayerListTags,
@@ -78,6 +79,8 @@ export interface PlayerListRowProps {
   onSimInfo?: () => void;
   testId?: string;
   selected?: boolean;
+  /** Every row of this list shows the same stats: anchor the stat block left at a fixed width so columns line up even when only some rows have an EDGE. */
+  alignColumns?: boolean;
 }
 
 function StatPill({ stat }: { stat: PlayerListStat }) {
@@ -87,7 +90,7 @@ function StatPill({ stat }: { stat: PlayerListStat }) {
     return (
       <TapForWhy metric="ovr" spoken={`Overall ${stat.rating}`}>
         <span className="inline-flex items-center gap-1" data-stat={stat.key}>
-          <span className="text-[0.5625rem] font-bold uppercase" style={{ color: "var(--color-text-muted)", letterSpacing: "0.04em" }}>
+          <span className="text-[0.6875rem] font-bold uppercase" style={{ color: "var(--color-text-muted)", letterSpacing: "0.04em" }}>
             {stat.label}
           </span>
           <OvrGauge rating={stat.rating} size="sm" />
@@ -101,7 +104,7 @@ function StatPill({ stat }: { stat: PlayerListStat }) {
       style={{ background: "var(--glass-input-bg)" }}
       data-stat={stat.key}
     >
-      <span className="text-[0.5625rem] font-bold uppercase" style={{ color: "var(--color-text-muted)", letterSpacing: "0.04em" }}>
+      <span className="text-[0.6875rem] font-bold uppercase" style={{ color: "var(--color-text-muted)", letterSpacing: "0.04em" }}>
         {stat.label}
       </span>
       <span className="text-xs font-bold" style={{ color: stat.tone ? TONE_COLOR[stat.tone] : "var(--color-text-primary)" }}>
@@ -138,6 +141,7 @@ export function PlayerListRow({
   onSimInfo,
   testId = "player-list-row",
   selected = false,
+  alignColumns = false,
 }: PlayerListRowProps) {
   const dims = PLAYER_LIST_DENSITY[density];
   const colorVar = positionColorVar(position);
@@ -234,14 +238,14 @@ export function PlayerListRow({
               </span>
             ) : null}
           </div>
-          <div className="flex shrink-0 items-center justify-end gap-0.5" data-testid="list-stats">
+          <div className={`flex shrink-0 items-center gap-0.5 ${alignColumns ? "justify-start" : "justify-end"}`} style={alignColumns ? { minWidth: PLAYER_LIST_ALIGNED_WIDTH } : undefined} data-testid="list-stats">
             {slots.map((stat, i) =>
               stat ? (
                 <span key={stat.key} className="flex justify-end" style={{ minWidth: PLAYER_LIST_STAT_WIDTH[stat.key] ?? 66 }}>
                   <StatPill stat={stat} />
                 </span>
               ) : (
-                <span key={`empty-${i}`} aria-hidden="true" style={{ minWidth: PLAYER_LIST_SLOT_WIDTH[PLAYER_LIST_STAT_ORDER[i] ?? "adp"] }} />
+                <span key={`empty-${i}`} aria-hidden="true" style={{ minWidth: playerListSlotWidth(i, alignColumns) }} />
               ),
             )}
           </div>

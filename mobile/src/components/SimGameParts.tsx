@@ -273,6 +273,7 @@ export function SimPlayerLine({
       hurt={player.status === 'out'}
       tags={blockTag ? [blockTag, ...(tags ?? [])] : tags}
       stats={stats}
+      alignColumns={stats !== undefined}
       extra={extra}
       actions={trailing}
       selected={selected}
@@ -655,8 +656,8 @@ export function SimIconButton({ label, onPress, pressed, primary = false, disabl
       accessibilityLabel={label}
       accessibilityState={{ selected: pressed, disabled }}
       style={{
-        width: 40,
-        height: 40,
+        width: 44,
+        height: 44,
         alignItems: 'center',
         justifyContent: 'center',
         borderRadius: radii.md,

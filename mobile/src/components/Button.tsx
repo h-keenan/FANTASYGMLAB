@@ -93,7 +93,7 @@ function createStyles(colors: ThemeColors, isDark: boolean) {
       alignItems: 'center',
       justifyContent: 'center',
     },
-    baseSm: { minHeight: 36, paddingVertical: spacing.sm, paddingHorizontal: spacing.md },
+    baseSm: { minHeight: 44, paddingVertical: spacing.sm, paddingHorizontal: spacing.md },
     primary: { backgroundColor: colors.accentStrong },
     secondary: { backgroundColor: 'transparent', borderWidth: 1, borderColor: colors.borderStrong },
     ghost: { backgroundColor: 'transparent' },

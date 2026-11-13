@@ -5,6 +5,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { Button } from "@/components/Button";
 import { PulseOnIncrease } from "@/components/Motion";
 import type { SimCtx } from "@/components/SimGameParts";
+import { SIM_ICON_BTN, SIM_ICON_STYLE } from "@/components/SimGameHeader";
 import { SimGlyph } from "@/components/SimGlyph";
 import { Sheet } from "@/components/ui/Sheet";
 import { api } from "@/lib/api";
@@ -102,8 +103,8 @@ export function SimNotificationBell({ notif, onOpenTab }: { notif: ReturnType<ty
     <>
       <button
         type="button"
-        className="relative inline-grid place-items-center rounded-full"
-        style={{ width: 40, height: 40, border: "var(--border-width-default) solid var(--color-border)", background: "var(--glass-input-bg)", color: "var(--color-text-secondary)" }}
+        className={`relative ${SIM_ICON_BTN}`}
+        style={SIM_ICON_STYLE}
         aria-label={unread > 0 ? `Notifications, ${unread} unread` : "Notifications"}
         onClick={openSheet}
         data-testid="sim-bell"

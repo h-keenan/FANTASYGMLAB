@@ -257,6 +257,7 @@ export function SimPlayerLine({
       hurt={player.status === "out"}
       tags={blockTag ? [blockTag, ...(tags ?? [])] : tags}
       stats={stats}
+      alignColumns={stats !== undefined}
       extra={extra}
       actions={trailing}
       selected={selected}
@@ -346,7 +347,7 @@ export function SimIconButton({
   primary = false,
   disabled = false,
   busy = false,
-  size = 40,
+  size = 44,
   width,
   children,
 }: {
