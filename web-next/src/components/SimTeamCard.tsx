@@ -1,6 +1,7 @@
 "use client";
 
 import { AccentCard } from "@/components/AccentCard";
+import { PlayerName } from "@/components/PlayerName";
 import { PositionBadge } from "@/components/PositionBadge";
 import { SimCrest } from "@/components/SimCrest";
 import { simToneColor } from "@/components/SimGameParts";
@@ -55,7 +56,7 @@ export function SimTeamCard({
           {team.top_assets.map((p) => (
             <li key={p.id} className="flex items-center gap-2 text-xs">
               <PositionBadge position={p.pos} />
-              <span className="min-w-0 flex-1 truncate font-bold">{p.name}</span>
+              <PlayerName name={p.name} className="min-w-0 flex-1 truncate font-bold" />
               <span className="shrink-0 tabular-nums" style={{ color: "var(--color-text-muted)" }}>
                 VAL <strong style={{ color: "var(--color-text-primary)" }}>{simValueLabel(p.value)}</strong>
               </span>

@@ -3,6 +3,7 @@ import { Pressable, View } from 'react-native';
 
 import AccentCard from './AccentCard';
 import AppText from './AppText';
+import PlayerName from './PlayerName';
 import PositionBadge from './PositionBadge';
 import SimCrest from './SimCrest';
 import { createSimStyles, simToneColor } from './SimGameParts';
@@ -60,9 +61,9 @@ export default function SimTeamCard({
           {team.top_assets.map((p) => (
             <View key={p.id} style={common.row}>
               <PositionBadge position={p.pos} />
-              <AppText style={[common.small, common.grow, { fontWeight: '700', color: colors.textPrimary }]} numberOfLines={1}>
-                {p.name}
-              </AppText>
+              <View style={common.grow}>
+                <PlayerName name={p.name} style={{ fontSize: 13, fontWeight: '700', color: colors.textPrimary }} />
+              </View>
               <AppText style={common.muted}>
                 VAL <AppText style={{ fontWeight: '800', color: colors.textPrimary }}>{simValueLabel(p.value)}</AppText>
               </AppText>
