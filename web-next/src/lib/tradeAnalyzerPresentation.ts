@@ -15,6 +15,7 @@
 
 import type { DraftPickAsset, RankedPlayer, TradeAsset } from "./api";
 import { notReadyReasonMessage } from "./notReadyMessages";
+import { conditionsFor, itemKey, type SheetItem } from "./tradeSheetPicker";
 
 export const ALL_TEAMS_ID = "__all__";
 export const POSITION_FILTERS = ["QB", "RB", "WR", "TE", "K", "DEF"];
@@ -83,3 +84,41 @@ export function pickToTradeAsset(pick: DraftPickAsset): TradeAsset {
  * sends `value_summary` on the verdict, and this is the same ladder the
  * verdict itself is decided on, so a fallback can never disagree with it. */
 export { valueDirectionLabel } from "./tradeValueBands.generated";
+
+/** A ranked player as a sheet-picker item (the picker's generic shape; `ref` hands the player back). */
+export function playerToSheetItem(player: RankedPlayer): SheetItem<RankedPlayer> {
+  return {
+    key: itemKey("player", player.player_id),
+    kind: "player",
+    id: player.player_id,
+    label: player.name ?? "Player",
+    position: player.position,
+    team: player.team,
+    age: player.age,
+    value: player.score,
+    conditions: conditionsFor({ injuryStatus: player.injury_status, status: player.status, age: player.age }),
+    photoId: player.player_id,
+    tier: player.tier,
+    injury: player.injury_status,
+    ref: player,
+  };
+}
+
+/** A draft pick as a sheet-picker item, grouped by season. */
+export function pickToSheetItem(pick: DraftPickAsset): SheetItem<DraftPickAsset> {
+  return {
+    key: itemKey("pick", pick.pick_id),
+    kind: "pick",
+    id: pick.pick_id,
+    label: pick.label ?? "Draft pick",
+    position: null,
+    team: null,
+    age: null,
+    value: pick.score,
+    conditions: [],
+    detail: [pick.projected_pick_range, pick.owner_team_name].filter(Boolean).join(" · ") || null,
+    group: pick.season != null ? `${pick.season} picks` : null,
+    round: pick.round,
+    ref: pick,
+  };
+}

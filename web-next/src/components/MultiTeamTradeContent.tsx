@@ -7,7 +7,8 @@ import { Button } from "@/components/Button";
 import { ErrorState } from "@/components/ErrorState";
 import { PageTitle } from "@/components/PageTitle";
 import { PitchShareButton } from "@/components/MultiTeamPitchButton";
-import { PickGroupList } from "@/components/PickGroupList";
+import { TradePickerSheet } from "@/components/TradePickerSheet";
+import { usePlayerQuickView } from "@/context/PlayerQuickViewContext";
 import { PillRow } from "@/components/PillRow";
 import { PremiumUpsellCard } from "@/components/PremiumUpsellCard";
 import { SheetHandle } from "@/components/SheetHandle";
@@ -25,6 +26,7 @@ import {
   MULTI_TEAM_MAX,
   MULTI_TEAM_MIN,
   addTeam,
+  builderKey,
   analysisOrder,
   assetsLine,
   buildMatrix,
@@ -53,7 +55,8 @@ import {
   type MultiTransfer,
   type SemanticTone,
 } from "@/lib/multiTeamTrade";
-import { pickToTradeAsset, playerToTradeAsset } from "@/lib/tradeAnalyzerPresentation";
+import { pickToSheetItem, pickToTradeAsset, playerToSheetItem, playerToTradeAsset } from "@/lib/tradeAnalyzerPresentation";
+import { selectedItems, type SheetItem } from "@/lib/tradeSheetPicker";
 import { useSheetDragDismiss } from "@/lib/useSheetDragDismiss";
 
 /**
@@ -69,8 +72,6 @@ import { useSheetDragDismiss } from "@/lib/useSheetDragDismiss";
  * duplicated here. Presentation logic lives in lib/multiTeamTrade.ts, a
  * byte-identical twin of the mobile file.
  */
-
-const MAX_RESULTS = 40;
 
 const TONE_VAR: Record<SemanticTone, string> = {
   success: "var(--color-success)",
@@ -353,7 +354,7 @@ export function MultiTeamTradeContent({
   const [picker, setPicker] = useState<PickerState | null>(null);
   const [pending, setPending] = useState<BuilderAsset | null>(null);
   const [search, setSearch] = useState("");
-  const [assetType, setAssetType] = useState<"players" | "picks">("players");
+  const { openPlayer } = usePlayerQuickView();
   const [analyzing, setAnalyzing] = useState(false);
   const [response, setResponse] = useState<MultiTeamTradeResponse | null>(null);
   const [failure, setFailure] = useState<string[] | null>(null);
@@ -384,24 +385,24 @@ export function MultiTeamTradeContent({
   const playerById = useMemo(() => new Map(pool.map((p) => [p.player_id, p])), [pool]);
   const pickById = useMemo(() => new Map(picks.map((p) => [p.pick_id, p])), [picks]);
 
-  const taken = useMemo(() => new Set(assets.map((a) => `${a.type}:${a.id}`)), [assets]);
-  const playerResults = useMemo(() => {
+  // Items for the open sheet: the picking team's players and picks, plus anything it already sends that sits
+  // outside the loaded pool, so applying never drops an asset.
+  const sheetItems = useMemo<SheetItem<RankedPlayer | DraftPickAsset>[]>(() => {
     if (!picker) return [];
     const owned = rosterPlayers.get(picker.from) ?? new Set<string>();
-    const query = search.trim().toLowerCase();
-    return pool
-      .filter((p) => owned.has(p.player_id) && !taken.has(`player:${p.player_id}`))
-      .filter((p) => !query || (p.name ?? "").toLowerCase().includes(query))
-      .slice(0, MAX_RESULTS);
-  }, [picker, pool, rosterPlayers, taken, search]);
-  const pickResults = useMemo(() => {
-    if (!picker) return [];
-    const query = search.trim().toLowerCase();
-    return picks
-      .filter((p) => p.owner_roster_id === picker.from && !taken.has(`pick:${p.pick_id}`))
-      .filter((p) => !query || (p.label ?? "").toLowerCase().includes(query))
-      .slice(0, MAX_RESULTS);
-  }, [picker, picks, taken, search]);
+    const sent = assets.filter((a) => a.fromRosterId === picker.from);
+    const players = new Map(pool.filter((p) => owned.has(p.player_id)).map((p) => [p.player_id, p]));
+    for (const a of sent) {
+      const player = a.type === "player" ? playerById.get(a.id) : undefined;
+      if (player) players.set(player.player_id, player);
+    }
+    const pickMap = new Map(picks.filter((p) => p.owner_roster_id === picker.from).map((p) => [p.pick_id, p]));
+    for (const a of sent) {
+      const pick = a.type === "pick" ? pickById.get(a.id) : undefined;
+      if (pick) pickMap.set(pick.pick_id, pick);
+    }
+    return [...[...players.values()].map(playerToSheetItem), ...[...pickMap.values()].map(pickToSheetItem)];
+  }, [picker, pool, rosterPlayers, picks, assets, playerById, pickById]);
 
   const issue = builderIssue(participants, assets);
   const transfersCount = assets.length;
@@ -417,17 +418,30 @@ export function MultiTeamTradeContent({
     invalidate();
   }
 
-  function chooseAsset(type: "player" | "pick", id: string) {
+  /** The sheet's Apply: this team's sent assets become exactly the selection; kept ones keep their receiver. */
+  function applySheet(keys: string[]) {
     if (!picker) return;
-    const asset: BuilderAsset = { type, id, fromRosterId: picker.from, toRosterId: picker.to };
-    if (picker.to) addToTrade(asset);
-    else setPending(asset);
+    const from = picker.from;
+    const chosen = selectedItems(sheetItems, keys);
+    const next: BuilderAsset[] = chosen.map((item) => {
+      const type = item.kind;
+      const existing = assets.find((a) => a.fromRosterId === from && a.type === type && a.id === item.id);
+      return existing ?? { type, id: item.id, fromRosterId: from, toRosterId: picker.to };
+    });
+    setAssets((prev) => [...prev.filter((a) => a.fromRosterId !== from), ...next]);
+    invalidate();
+    setPicker(null);
+    // Anything new without a receiver goes through the "Send to" sheet, one asset at a time.
+    const unrouted = next.find((a) => !a.toRosterId);
+    if (unrouted) setPending(unrouted);
   }
 
   function chooseDestination(toRosterId: string) {
     if (!pending) return;
-    addToTrade({ ...pending, toRosterId });
-    setPending(null);
+    const routed = { ...pending, toRosterId };
+    addToTrade(routed);
+    const nextUnrouted = assets.find((a) => a.fromRosterId === pending.fromRosterId && !a.toRosterId && builderKey(a) !== builderKey(pending));
+    setPending(nextUnrouted ?? null);
   }
 
   function addParticipant() {
@@ -524,8 +538,8 @@ export function MultiTeamTradeContent({
                   {isMe ? <span className="ml-2 text-xs font-bold uppercase" style={{ color: "var(--color-accent)" }}>You</span> : null}
                 </span>
                 <div className="flex items-center gap-2 shrink-0">
-                  <Button size="sm" variant="secondary" onClick={() => { setPicker(open ? null : { from: rosterId, to: "" }); setSearch(""); }}>
-                    {open ? "Done" : "Add asset"}
+                  <Button size="sm" variant="secondary" onClick={() => { setPicker({ from: rosterId, to: "" }); setSearch(""); }}>
+                    {sends.length ? "Edit assets" : "Add assets"}
                   </Button>
                   {!isMe ? (
                     <Button size="sm" variant="ghost" onClick={() => dropTeam(rosterId)} aria-label={`Remove ${teamName(rosterId)}`}>
@@ -562,53 +576,6 @@ export function MultiTeamTradeContent({
                   Sends nothing yet
                 </span>
               )}
-              {open ? (
-                <div className="flex flex-col gap-2 pt-2" data-testid="asset-picker">
-                  <PillRow
-                    options={[
-                      { label: "Players", value: "players" },
-                      { label: "Picks", value: "picks" },
-                    ]}
-                    active={assetType}
-                    onSelect={(value) => setAssetType(value === "picks" ? "picks" : "players")}
-                  />
-                  <label className="sr-only" htmlFor={`multi-search-${rosterId}`}>
-                    Search {teamName(rosterId)}
-                  </label>
-                  <input
-                    id={`multi-search-${rosterId}`}
-                    type="text"
-                    value={search}
-                    onChange={(event) => setSearch(event.target.value)}
-                    placeholder={`Search ${teamName(rosterId)}'s ${assetType === "picks" ? "picks" : "roster"}`}
-                    className="glass-input w-full px-3 py-2 text-sm"
-                    style={{ color: "var(--color-text-primary)" }}
-                  />
-                  <div className="flex flex-col divide-y max-h-72 overflow-y-auto" style={{ borderColor: "var(--color-border)" }}>
-                    {assetType === "picks" ? (
-                      <PickGroupList
-                        picks={pickResults}
-                        emptyMessage={search ? "No matching picks." : "No picks available."}
-                        renderPick={(pick) => (
-                          <button type="button" className="w-full text-left" onClick={() => chooseAsset("pick", pick.pick_id)}>
-                            <TradeAssetRow asset={pickToTradeAsset(pick)} />
-                          </button>
-                        )}
-                      />
-                    ) : playerResults.length === 0 ? (
-                      <p className="text-sm py-2" style={{ color: "var(--color-text-muted)" }}>
-                        {search ? "No matching players." : "No players to show."}
-                      </p>
-                    ) : (
-                      playerResults.map((player) => (
-                        <button key={player.player_id} type="button" className="w-full text-left" onClick={() => chooseAsset("player", player.player_id)}>
-                          <TradeAssetRow asset={playerToTradeAsset(player)} disableQuickView />
-                        </button>
-                      ))
-                    )}
-                  </div>
-                </div>
-              ) : null}
             </div>
           );
         })}
@@ -724,6 +691,21 @@ export function MultiTeamTradeContent({
         ) : null}
         {response ? <ResultsView response={response} leagueName={leagueName} leagueId={leagueId} /> : null}
       </div>
+
+      {picker ? (
+        <TradePickerSheet
+          key={`${picker.from}>${picker.to}`}
+          title={`${teamName(picker.from)} sends`}
+          subtitle={picker.to ? `To ${teamName(picker.to)}` : "Choose who gets each asset next"}
+          tone="danger"
+          items={sheetItems}
+          initialSelected={assets.filter((a) => a.fromRosterId === picker.from).map((a) => `${a.type}:${a.id}`)}
+          onApply={applySheet}
+          onClose={() => setPicker(null)}
+          onSearch={setSearch}
+          onInfo={(item) => openPlayer({ ...(item.ref as RankedPlayer), leagueId, leagueName, sourceLabel: "Trade Analyzer" })}
+        />
+      ) : null}
 
       {pending ? (
         <div

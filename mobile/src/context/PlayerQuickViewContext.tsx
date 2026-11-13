@@ -1,4 +1,4 @@
-import React, { createContext, useCallback, useContext, useMemo, useState } from 'react';
+import React, { createContext, useCallback, useContext, useMemo, useRef, useState } from 'react';
 
 import PlayerQuickViewSheet from '../components/PlayerQuickViewSheet';
 import type { RankedPlayer } from '../lib/api';
@@ -11,6 +11,8 @@ export interface OpenPlayerOptions {
   leagueName?: string | null;
   /** Small provenance label shown in the sheet, e.g. "Waivers". */
   sourceLabel?: string;
+  /** Runs once when the sheet closes (a pop-up that hid itself to let this sheet present can come back). */
+  onClosed?: () => void;
 }
 
 interface PlayerQuickViewContextValue {
@@ -27,12 +29,24 @@ const PlayerQuickViewContext = createContext<PlayerQuickViewContextValue>(NOOP);
  * sheet's "Full profile" action is the only path into PlayerDetail. */
 export function PlayerQuickViewProvider({ children }: { children: React.ReactNode }) {
   const [request, setRequest] = useState<QuickViewRequest | null>(null);
+  const onClosedRef = useRef<(() => void) | null>(null);
 
   const openPlayer = useCallback((player: RankedPlayer, options?: OpenPlayerOptions) => {
     const next = buildQuickViewRequest(player, options, options?.sourceLabel);
+    onClosedRef.current = options?.onClosed ?? null;
     if (next) setRequest(next);
+    else {
+      const callback = onClosedRef.current;
+      onClosedRef.current = null;
+      callback?.();
+    }
   }, []);
-  const closePlayer = useCallback(() => setRequest(null), []);
+  const closePlayer = useCallback(() => {
+    setRequest(null);
+    const callback = onClosedRef.current;
+    onClosedRef.current = null;
+    callback?.();
+  }, []);
   const value = useMemo(() => ({ openPlayer, closePlayer }), [openPlayer, closePlayer]);
 
   return (

@@ -1164,6 +1164,7 @@ export interface SimTradeDraft {
 export type SimTradeAction =
   | { type: "partner"; teamId: string | null }
   | { type: "toggle"; side: "give" | "get"; id: string }
+  | { type: "set"; side: "give" | "get"; ids: string[] }
   | { type: "load"; give: string[]; get: string[] }
   | { type: "clear" };
 
@@ -1180,6 +1181,8 @@ export function simTradeReducer(state: SimTradeDraft, action: SimTradeAction): S
       if (list.length >= SIM_TRADE_MAX_PER_SIDE) return state;
       return { ...state, [action.side]: [...list, action.id] };
     }
+    case "set":
+      return { ...state, [action.side]: [...new Set(action.ids)].slice(0, SIM_TRADE_MAX_PER_SIDE) };
     case "load":
       return { ...state, give: action.give.slice(0, SIM_TRADE_MAX_PER_SIDE), get: action.get.slice(0, SIM_TRADE_MAX_PER_SIDE) };
     case "clear":
