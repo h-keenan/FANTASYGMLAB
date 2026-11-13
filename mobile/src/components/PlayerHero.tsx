@@ -11,6 +11,7 @@ import ToneBadge from './ToneBadge';
 import { useThemeMode } from '../context/ThemeModeContext';
 import type { UsageTrend } from '../lib/api';
 import { byePills } from '../lib/playerByePresentation';
+import { heroInitials } from '../lib/playerQuickViewPresentation';
 import { byePillText } from '../lib/playerAvailability';
 import { sentenceCase, usageConfidenceBars, usageTrendTone } from '../lib/usageTrendPresentation';
 import { radii, spacing, type ThemeColors } from '../theme';
@@ -35,6 +36,7 @@ import { radii, spacing, type ThemeColors } from '../theme';
  */
 export default function PlayerHero({
   playerId,
+  avatarId,
   tier,
   tierLabel,
   tierColor,
@@ -63,6 +65,8 @@ export default function PlayerHero({
   /** Shown in the tap-the-Player-score popover (for example the model radar). */
   ovrChart?: React.ReactNode;
   playerId: string;
+  /** Photo id when it differs from playerId; null = no photo exists (initials). */
+  avatarId?: string | null;
   tier?: string | null;
   /** Archetype pill text (resolvePlayerTier's semantic label); omit for
    * no tier. */
@@ -121,7 +125,7 @@ export default function PlayerHero({
       <View style={styles.identityRow}>
         <View style={styles.avatarCol}>
           <View style={[styles.avatarGlow, { shadowColor: colors.accent, borderColor: colors.accentMuted }]}>
-            <PlayerAvatar playerId={playerId} size={100} tier={tier} />
+            <PlayerAvatar playerId={avatarId === undefined ? playerId : avatarId} size={100} tier={tier} fallbackLabel={heroInitials(name)} />
           </View>
           {tierLabel ? (
             <View style={[styles.archetypePill, { borderColor: tierColor }]}>
@@ -181,11 +185,26 @@ export default function PlayerHero({
             </AppText>
           </TapForWhy>
         ) : (
-          <View style={styles.tile}>
-            <AppText style={styles.tileCaption}>VALUE</AppText>
-            <AppText style={[styles.tileValue, styles.tileValueEmpty]}>—</AppText>
-            {!usageLoading ? <AppText style={styles.tileNote}>{valueNote || 'No market value yet'}</AppText> : null}
-          </View>
+          usageLoading ? (
+            <View style={styles.tile}>
+              <AppText style={styles.tileCaption}>VALUE</AppText>
+              <AppText style={[styles.tileValue, styles.tileValueEmpty]}>—</AppText>
+            </View>
+          ) : (
+            <TapForWhy
+              metric="value"
+              variant="tile"
+              style={styles.tile}
+              spoken="Value, none yet"
+              title="Why there is no value"
+              extra={[valueNote || 'No market value yet', 'A player gets a value once the market prices him. Until then the tile stays empty rather than showing a made-up number.']}
+              testID="pqv-value-empty"
+            >
+              <AppText style={styles.tileCaption}>VALUE</AppText>
+              <AppText style={[styles.tileValue, styles.tileValueEmpty]}>—</AppText>
+              <AppText style={styles.tileNote}>{valueNote || 'No market value yet'}</AppText>
+            </TapForWhy>
+          )
         )}
         <UsageTile trend={usageTrend} loading={usageLoading} />
       </View>

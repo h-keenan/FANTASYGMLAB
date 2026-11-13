@@ -200,7 +200,36 @@ def player_detail(snap: GameSnapshot, state: GameState, pid: str) -> dict[str, A
             for n in state.news if n["pid"] == pid]
     if state.out.get(pid) and not news:
         news.append({"week": 0, "text": f"Listed out for {state.out[pid]} week(s) to start the season."})
-    return {"player": player_row(snap, state, ev, pid, owners), "weeks": weeks, "history": history, "news": news}
+    row = player_row(snap, state, ev, pid, owners)
+    ranks = value_ranks(snap)
+    same_pos = sorted((q for q in snap.pids if snap.players[q].pos == row["pos"]), key=lambda q: (-snap.players[q].value, q))
+    row["value_rank"] = ranks.get(pid)
+    row["pos_value_rank"] = same_pos.index(pid) + 1 if pid in same_pos else None
+    return {
+        "player": row, "weeks": weeks, "history": history, "news": news,
+        "ros": ros_summary(ev, pid, weeks), "projection_flat": projection_is_flat(weeks),
+    }
+
+
+def projection_is_flat(weeks: Sequence[Mapping[str, Any]]) -> bool:
+    """True when every playable (not bye, not out) week carries the same projection and band.
+
+    The engine projects a healthy player at his rest-of-season mean every week (there is no NFL opponent
+    model), so today this is always true; it is reported so clients render one rest-of-season summary instead of
+    a list of identical rows, and start charting the moment the projection genuinely varies by week."""
+    playable = [(w["projection"], w["floor"], w["ceiling"]) for w in weeks if not w["bye"] and not w["out"]]
+    return len(set(playable)) <= 1
+
+
+def ros_summary(ev: Evaluator, pid: str, weeks: Sequence[Mapping[str, Any]]) -> dict[str, Any]:
+    """Rest-of-season line: per-game mean and band, how many weeks he can still play, and the bye / out weeks."""
+    floor, ceiling = ev.band(pid)
+    return {
+        "mean": round(ev.ros_mean(pid), 1), "floor": round(floor, 1), "ceiling": round(ceiling, 1),
+        "weeks_left": len(weeks), "playable_weeks": sum(1 for w in weeks if not w["bye"] and not w["out"]),
+        "bye_week": next((w["week"] for w in weeks if w["bye"]), None),
+        "out_weeks": [w["week"] for w in weeks if w["out"]],
+    }
 
 
 def _stats_for(state: GameState, pid: str, week: int) -> dict[str, float] | None:

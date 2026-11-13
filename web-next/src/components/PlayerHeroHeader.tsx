@@ -8,7 +8,7 @@ import { PositionBadge } from "@/components/PositionBadge";
 import { formatRank, formatScore } from "@/lib/leagueRankingsPresentation";
 import { byePillText } from "@/lib/playerAvailabilityPresentation";
 import { resolvePlayerTier } from "@/lib/playerTier";
-import { sentenceCase, usageConfidenceBars, usageTrendTone } from "@/lib/playerQuickViewPresentation";
+import { heroInitials, sentenceCase, usageConfidenceBars, usageTrendTone } from "@/lib/playerQuickViewPresentation";
 import { SkeletonBlock } from "@/components/Skeleton";
 import { TapForWhy } from "@/components/ui/TapForWhy";
 
@@ -28,6 +28,7 @@ type ArchetypeStyle = CSSProperties & { "--archetype-color"?: string };
  */
 export function PlayerHeroHeader({
   playerId,
+  avatarId,
   name,
   nameId,
   headingLevel = 2,
@@ -69,6 +70,8 @@ export function PlayerHeroHeader({
   /** True while server-resolved identity may still fill team/value. */
   loadingIdentity?: boolean;
   playerId: string;
+  /** Photo id when it differs from playerId; null = no photo exists (initials). */
+  avatarId?: string | null;
   name: string;
   nameId: string;
   headingLevel?: 1 | 2;
@@ -102,7 +105,7 @@ export function PlayerHeroHeader({
       <header className="pqv-hero">
         <div className="pqv-hero-avatar-col">
           <span className="pqv-avatar-glow">
-            <PlayerAvatar playerId={playerId} tier={tier} size={112} />
+            <PlayerAvatar playerId={avatarId === undefined ? playerId : avatarId} tier={tier} size={112} fallbackLabel={heroInitials(name)} />
           </span>
           {tier ? (
             <span
@@ -163,11 +166,26 @@ export function PlayerHeroHeader({
               <span className="pqv-stat-tile-caption">Value</span>
             </TapForWhy>
           ) : (
-            <div className="pqv-stat-tile">
-              <span className="pqv-stat-tile-value pqv-stat-tile-value--empty">—</span>
-              <span className="pqv-stat-tile-caption">Value</span>
-              {!loadingIdentity ? <span className="pqv-stat-tile-note">{valueNote || "No market value yet"}</span> : null}
-            </div>
+            loadingIdentity ? (
+              <div className="pqv-stat-tile">
+                <span className="pqv-stat-tile-value pqv-stat-tile-value--empty">—</span>
+                <span className="pqv-stat-tile-caption">Value</span>
+              </div>
+            ) : (
+              <TapForWhy
+                metric="value"
+                variant="tile"
+                className="pqv-stat-tile"
+                spoken="Value, none yet"
+                title="Why there is no value"
+                extra={[valueNote || "No market value yet", "A player gets a value once the market prices him. Until then the tile stays empty rather than showing a made-up number."]}
+                testId="pqv-value-empty"
+              >
+                <span className="pqv-stat-tile-value pqv-stat-tile-value--empty">—</span>
+                <span className="pqv-stat-tile-caption">Value</span>
+                <span className="pqv-stat-tile-note">{valueNote || "No market value yet"}</span>
+              </TapForWhy>
+            )
           )}
           <UsageTile trend={usageTrend} loading={usageLoading} />
         </div>

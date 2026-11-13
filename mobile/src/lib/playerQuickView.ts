@@ -16,6 +16,8 @@ export interface QuickViewRequest {
   league: QuickViewLeague | null;
   /** Small provenance label, e.g. "Waivers". Cosmetic. */
   sourceLabel?: string;
+  /** Why the Value tile is empty, when the caller knows (Fantasy Sim: below replacement in this league). */
+  valueNote?: string | null;
 }
 
 export function buildQuickViewRequest(

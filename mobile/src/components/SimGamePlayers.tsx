@@ -4,8 +4,9 @@ import { Pressable, StyleSheet, View } from 'react-native';
 import AppText from './AppText';
 import EmptyState from './EmptyState';
 import Input from './Input';
-import Collapsible from './Collapsible';
-import PlayerQuickViewSheet from './PlayerQuickViewSheet';
+import MetricCard from './MetricCard';
+import PlayerQuickViewSheet, { Section as PqvSection } from './PlayerQuickViewSheet';
+import WeeklyPointsChart from './WeeklyPointsChart';
 import { ReviewGlyphChip } from './SeasonReviewSections';
 import SegmentedTabBar from './SegmentedTabBar';
 import { SkeletonCard } from './SkeletonBlock';
@@ -15,6 +16,7 @@ import { useThemeMode } from '../context/ThemeModeContext';
 import { api } from '../lib/api';
 import { stubPlayer } from '../lib/playerQuickView';
 import { SIM_WINDOW_STEP, simWindow } from '../lib/simLayout';
+import { simActualPoints, simAvailabilityLine, simHeroFeed, simProjectionBand, simProjectionIsFlat, simRosLine } from '../lib/simPlayerSheet';
 import { PLAYER_SEARCH_DEBOUNCE_MS } from '../lib/leaguePlayerSearch';
 import {
   SIM_PAGE_SIZE,
@@ -24,7 +26,6 @@ import {
   simDefaultFilter,
   simFilterQuery,
   simFilterReducer,
-  simFmtProjection,
   simFmtPts,
   simFmtValue,
   simHeadshotId,
@@ -39,7 +40,7 @@ import {
   type SimPlayerStatusFilter,
   type SimPosFilter,
 } from '../lib/simGame';
-import { spacing, type ThemeColors } from '../theme';
+import { spacing } from '../theme';
 
 /**
  * Searchable, filterable, sortable list of every player in the game: owner
@@ -198,139 +199,121 @@ export function SimPlayerBrowser({
 
 /**
  * The game's player detail IS the app's shared Player Quick View: the same
- * sheet (hero, news, stats, trends, bio, model) fed by an adapter that maps
- * the sim player to a quick-view identity (real Sleeper id -> real data from
- * the main API), plus a sim overlay with what only this game knows. A
- * synthetic player (no real id) renders the same layout with remote={false}.
+ * sheet (hero tiles, news, stats, trends, bio, model) fed by an adapter that
+ * maps the sim player to a quick-view identity (real Sleeper id -> real data
+ * from the main API; a generated player has no real data, so the hero tiles
+ * take the sim's own value and ranks), plus sim sections rendered with the
+ * quick view's own section shell, tiles and weekly chart.
  */
 export function SimPlayerSheet({ gameId, player, onClose, actions }: { gameId: string; player: SimGamePlayer; onClose: () => void; actions?: ReactNode }) {
+  const detail = useSimPlayerDetail(gameId, player.id);
+  const live = detail.data?.player ?? player;
   const real = simHeadshotId(player);
+  const feed = real ? null : simHeroFeed(live);
   const request = {
     player: {
       ...stubPlayer({ player_id: real ?? player.id, name: player.name, position: player.pos, team: player.team ?? null }),
       age: player.age ?? null,
-      injury_status: player.status === 'out' ? 'Out' : null,
+      injury_status: live.status === 'out' ? 'Out' : null,
+      ...(feed ? { score: feed.score, overall_rank: feed.overall_rank, position_rank: feed.position_rank } : {}),
     },
     league: null,
     sourceLabel: 'Fantasy Sim',
+    valueNote: feed?.valueNote ?? null,
   };
-  return <PlayerQuickViewSheet request={request} onClose={onClose} remote={Boolean(real)} simOverlay={<SimPlayerOverlay gameId={gameId} player={player} actions={actions} />} />;
+  return <PlayerQuickViewSheet request={request} onClose={onClose} remote={Boolean(real)} simOverlay={<SimPlayerOverlay player={live} detail={detail} actions={actions} />} />;
 }
 
-/** The sim-only sections of the player detail, as phone-friendly collapsibles. */
-export function SimPlayerOverlay({ gameId, player, actions }: { gameId: string; player: SimGamePlayer; actions?: ReactNode }) {
-  const { colors } = useThemeMode();
-  const common = useMemo(() => createSimStyles(colors), [colors]);
-  const styles = useMemo(() => createStyles(colors), [colors]);
-  const [detail, setDetail] = useState<SimPlayerDetailResponse | null>(null);
-  const [failed, setFailed] = useState(false);
+interface SimPlayerDetailState {
+  data: SimPlayerDetailResponse | null;
+  failed: boolean;
+}
+
+function useSimPlayerDetail(gameId: string, playerId: string): SimPlayerDetailState {
+  const key = `${gameId}/${playerId}`;
+  const [state, setState] = useState<SimPlayerDetailState & { key: string }>({ data: null, failed: false, key: '' });
   useEffect(() => {
     let cancelled = false;
     api
-      .getSimGamePlayer(gameId, player.id)
+      .getSimGamePlayer(gameId, playerId)
       .then((body) => {
-        if (!cancelled) setDetail(body);
+        if (!cancelled) setState({ data: body, failed: false, key });
       })
       .catch(() => {
-        if (!cancelled) setFailed(true);
+        if (!cancelled) setState({ data: null, failed: true, key });
       });
     return () => {
       cancelled = true;
     };
-  }, [gameId, player.id]);
+  }, [gameId, playerId, key]);
+  return state.key === key ? state : { data: null, failed: false };
+}
 
-  const live = detail?.player ?? player;
-  const status = simPlayerStatusLabel(live);
-  const weeks = detail?.weeks ?? [];
-  const maxCeiling = Math.max(1, ...weeks.map((w) => w.ceiling));
-  const pct = (value: number) => `${Math.max(0, Math.min(100, (value / maxCeiling) * 100))}%` as const;
-  const title = (text: string) => <AppText style={styles.foldTitle}>{text}</AppText>;
+/** The sim-only sections of the player detail, in the quick view's own section shell, tiles and weekly chart. */
+export function SimPlayerOverlay({ player, detail, actions }: { player: SimGamePlayer; detail: SimPlayerDetailState; actions?: ReactNode }) {
+  const { colors } = useThemeMode();
+  const common = useMemo(() => createSimStyles(colors), [colors]);
+  const styles = useMemo(() => createStyles(), []);
+  const body = detail.data;
+  const status = simPlayerStatusLabel(player);
+  const ros = body?.ros ?? null;
+  const flat = body ? simProjectionIsFlat(body) : true;
+  const band = body ? simProjectionBand(body) : null;
+  const actual = body ? simActualPoints(body) : [];
+  const availability = ros ? simAvailabilityLine(ros) : null;
+  const hero = simHeroFeed(player);
   return (
-    <View style={common.stack} testID="sim-player-overlay">
-      <Collapsible
-        id="player.sim"
-        accent={colors.accent}
-        defaultOpen
-        title={title('In this game')}
-        summary={
+    <View style={styles.overlay} testID="sim-player-overlay">
+      <PqvSection
+        title="In this game"
+        right={
           <View style={common.wrapRow}>
             {status ? <SimToneBadge label={status.label} tone={status.tone} /> : null}
-            {live.owner ? <SimToneBadge label={simOwnerLabel(live.owner)} tone={simOwnerTone(live.owner)} /> : null}
+            {player.owner ? <SimToneBadge label={simOwnerLabel(player.owner)} tone={simOwnerTone(player.owner)} /> : null}
           </View>
         }
       >
-        <View style={styles.statGrid}>
-          <View style={styles.statCell}>
-            <AppText style={common.muted}>This week</AppText>
-            <AppText style={styles.statBig}>{simFmtPts(live.projection)}</AppText>
-            <AppText style={common.muted}>
-              {simFmtPts(live.floor)}-{simFmtPts(live.ceiling)}
-            </AppText>
-          </View>
-          <View style={styles.statCell}>
-            <AppText style={common.muted} accessibilityHint="Model value on the game's 0-100 scale">
-              Value
-            </AppText>
-            <AppText style={styles.statBig}>{simFmtValue(live.value)}</AppText>
-            <AppText style={common.muted}>ADP {simFmtValue(live.adp)}</AppText>
-          </View>
-          <View style={styles.statCell}>
-            <AppText style={common.muted}>Season</AppText>
-            <AppText style={styles.statBig}>{simFmtPts(live.season_points ?? 0)}</AppText>
-            <AppText style={common.muted}>{live.games ?? 0} games</AppText>
-          </View>
+        <View style={styles.tileGrid}>
+          <MetricCard label="This week" value={simFmtPts(player.projection)} note={status ? status.label : `${simFmtPts(player.floor)}-${simFmtPts(player.ceiling)}`} />
+          {ros ? <MetricCard label="Rest of season" value={`${simFmtPts(ros.mean)} ppg`} note={`${simFmtPts(ros.floor)}-${simFmtPts(ros.ceiling)}`} /> : null}
+          <MetricCard
+            label="This season"
+            value={simFmtPts(player.season_points ?? 0)}
+            note={`${player.games ?? 0} games${player.ppg != null ? ` · ${simFmtPts(player.ppg)} ppg` : ''}`}
+          />
+          <MetricCard
+            label="Game value"
+            value={player.value_rank ? `#${player.value_rank}` : hero.score != null ? String(hero.score) : null}
+            note={hero.score != null ? `Value ${hero.score}${player.adp != null ? ` · ADP ${simFmtValue(player.adp)}` : ''}` : 'No market value'}
+          />
         </View>
         {actions ? <View style={common.wrapRow}>{actions}</View> : null}
-      </Collapsible>
-      {failed ? (
+      </PqvSection>
+      {detail.failed ? (
         <AppText style={common.small}>The full outlook is unavailable right now.</AppText>
-      ) : !detail ? (
+      ) : !body ? (
         <SkeletonCard rows={2} />
       ) : (
         <>
-          {weeks.length > 0 ? (
-            <Collapsible id="player.sim.weeks" accent={colors.accent} defaultOpen={false} title={title('Week by week')} summary={<AppText style={common.muted}>{weeks.length} weeks</AppText>}>
-              <View style={common.stack} accessibilityLabel="Week-by-week projection">
-                {weeks.map((w) => (
-                  <View key={w.week} style={styles.weekRow}>
-                    <AppText style={styles.weekLabel}>W{w.week}</AppText>
-                    {w.bye || w.out ? (
-                      <AppText style={[common.small, { color: w.out ? colors.danger : colors.warning }]}>{w.out ? 'Out' : 'Bye'}</AppText>
-                    ) : (
-                      <>
-                        <View
-                          style={styles.track}
-                          accessible
-                          accessibilityRole="image"
-                          accessibilityLabel={`Week ${w.week} projection ${simFmtPts(w.projection)}, range ${simFmtPts(w.floor)} to ${simFmtPts(w.ceiling)}`}
-                        >
-                          <View style={[styles.band, { left: pct(w.floor), width: `${Math.max(2, ((w.ceiling - w.floor) / maxCeiling) * 100)}%` }]} />
-                          <View style={[styles.mark, { left: pct(w.projection) }]} />
-                        </View>
-                        <AppText style={styles.weekValue}>{simFmtProjection(w)}</AppText>
-                      </>
-                    )}
-                  </View>
-                ))}
-              </View>
-            </Collapsible>
+          {actual.length > 0 || band || ros ? (
+            <PqvSection title="Week by Week · This sim season">
+              {actual.length > 0 || band ? (
+                <WeeklyPointsChart weeks={actual.map((a) => ({ week: a.week, fantasy_points_ppr: a.points, snap_share: null }))} projection={band} pointsLabel="pts" />
+              ) : null}
+              {flat && ros ? (
+                <AppText style={common.small} testID="sim-ros-line">
+                  <AppText style={common.bodyStrong}>{simRosLine(ros)}</AppText>
+                  {availability ? ` · ${availability}` : ''}
+                </AppText>
+              ) : availability ? (
+                <AppText style={common.small}>{availability}</AppText>
+              ) : null}
+            </PqvSection>
           ) : null}
-          {(detail.history ?? []).length > 0 ? (
-            <Collapsible id="player.sim.results" accent={colors.success} defaultOpen title={title('Results so far')}>
-              <View style={common.wrapRow}>
-                {detail.history!.map((h) => (
-                  <View key={h.week} style={styles.chip}>
-                    <AppText style={common.muted}>W{h.week} </AppText>
-                    <AppText style={common.bodyStrong}>{simFmtPts(h.points)}</AppText>
-                  </View>
-                ))}
-              </View>
-            </Collapsible>
-          ) : null}
-          {(detail.news ?? []).length > 0 ? (
-            <Collapsible id="player.sim.news" accent={colors.warning} defaultOpen title={title('Game news')}>
+          {(body.news ?? []).length > 0 ? (
+            <PqvSection title="Game news">
               <View style={common.stack}>
-                {detail.news!.map((n, i) => (
+                {body.news!.map((n, i) => (
                   <View key={i} style={common.row}>
                     <ReviewGlyphChip glyph="stats" tone="accent" size={22} />
                     <AppText style={[common.body, common.grow]}>
@@ -340,7 +323,7 @@ export function SimPlayerOverlay({ gameId, player, actions }: { gameId: string; 
                   </View>
                 ))}
               </View>
-            </Collapsible>
+            </PqvSection>
           ) : null}
         </>
       )}
@@ -348,27 +331,9 @@ export function SimPlayerOverlay({ gameId, player, actions }: { gameId: string; 
   );
 }
 
-function createStyles(colors: ThemeColors) {
+function createStyles() {
   return StyleSheet.create({
-    statGrid: { flexDirection: 'row', gap: spacing.sm },
-    statCell: { flex: 1, minWidth: 0 },
-    foldTitle: { fontSize: 14, fontWeight: '800', textTransform: 'uppercase', color: colors.textPrimary },
-    statBig: { fontSize: 20, fontWeight: '800', color: colors.textPrimary },
-    weekRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
-    weekLabel: { width: 34, fontSize: 13, fontWeight: '700', color: colors.textTertiary },
-    weekValue: { width: 92, textAlign: 'right', fontSize: 13, fontWeight: '600', color: colors.textPrimary },
-    track: { flex: 1, height: 10, borderRadius: 5, overflow: 'hidden', backgroundColor: colors.backgroundElevated },
-    band: { position: 'absolute', top: 0, bottom: 0, borderRadius: 5, backgroundColor: colors.accentMuted },
-    mark: { position: 'absolute', top: 0, bottom: 0, width: 3, backgroundColor: colors.accentStrong },
-    chip: {
-      flexDirection: 'row',
-      alignItems: 'baseline',
-      paddingHorizontal: spacing.md,
-      paddingVertical: spacing.xs,
-      borderRadius: 12,
-      backgroundColor: colors.glass,
-      borderWidth: StyleSheet.hairlineWidth,
-      borderColor: colors.glassBorder,
-    },
+    overlay: { gap: spacing.md, paddingTop: spacing.sm },
+    tileGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
   });
 }

@@ -79,8 +79,10 @@ export interface SimGamePlayer {
   adp: number | null;
   /** Model value on the sim's 0-100 scale (the best player is 100), not the main app's raw market value. */
   value: number;
-  /** 1-based rank by model value across the whole pool (players list only). */
+  /** 1-based rank by model value across the whole pool (players list and player detail). */
   value_rank?: number | null;
+  /** 1-based rank by model value among players at the same position (player detail only). */
+  pos_value_rank?: number | null;
   /** ADP minus value rank (players list only): positive = the market lets him fall past the model (steal). */
   adp_edge?: number | null;
   projection: number;
@@ -443,9 +445,23 @@ export interface SimPlayerWeek {
   out: boolean;
 }
 
+/** Rest-of-season line of a player detail: per-game mean and band, remaining weeks, bye and out weeks. */
+export interface SimRosSummary {
+  mean: number;
+  floor: number;
+  ceiling: number;
+  weeks_left: number;
+  playable_weeks: number;
+  bye_week: number | null;
+  out_weeks: number[];
+}
+
 export interface SimPlayerDetailResponse extends SimGameEnvelope {
   player?: SimGamePlayer;
   weeks?: SimPlayerWeek[];
+  /** True when every playable week carries the same projection (render one summary, never a week-by-week list). */
+  projection_flat?: boolean;
+  ros?: SimRosSummary;
   history?: { week: number; points: number; stats?: Record<string, number> | null }[];
   news?: { week: number; text: string }[];
 }
