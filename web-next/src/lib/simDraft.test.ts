@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  simBoardEdge,
+  simBoardProjection,
   simDraftAdpDelta,
   simDraftBestByPosition,
   simDraftBoardGrid,
@@ -70,5 +72,17 @@ describe("simDraft helpers", () => {
     expect(grid.rows[1].map((c) => c.pickNo)).toEqual([4, 3]);
     expect(grid.rows[0][0].pick?.pick_no).toBe(1);
     expect(grid.rows[1][0].pick).toBeNull();
+  });
+  it("board edge: market ADP vs model value rank, not the pick on the clock", () => {
+    expect(simBoardEdge({ adp: 40, value_rank: 22 })).toEqual({ delta: 18, label: "+18", tone: "success" });
+    expect(simBoardEdge({ adp: 10, value_rank: 25 })).toEqual({ delta: -15, label: "-15", tone: "danger" });
+    expect(simBoardEdge({ adp: 20, value_rank: 22 })).toBeNull();
+    expect(simBoardEdge({ adp: 30, value_rank: 28, adp_edge: 9.4 })?.delta).toBe(9);
+    expect(simBoardEdge({ adp: 30 })).toBeNull();
+  });
+  it("shows an injured player's per-game projection instead of 0.0", () => {
+    expect(simBoardProjection({ status: "out", projection: 0, ros_mean: 17.4 })).toEqual({ value: 17.4, discounted: true });
+    expect(simBoardProjection({ status: "healthy", projection: 12.1, ros_mean: 12.1 })).toEqual({ value: 12.1, discounted: false });
+    expect(simBoardProjection({ status: "out", projection: 0 })).toEqual({ value: 0, discounted: false });
   });
 });

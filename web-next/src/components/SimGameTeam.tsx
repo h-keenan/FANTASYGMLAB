@@ -7,16 +7,22 @@ import { Button } from "@/components/Button";
 import { EmptyState } from "@/components/EmptyState";
 import { Select } from "@/components/Input";
 import { PillRow } from "@/components/PillRow";
+import { PlayerAvatar } from "@/components/PlayerAvatar";
+import { PlayerNameText } from "@/components/PlayerNameText";
 import { PositionBadge } from "@/components/PositionBadge";
+import { SimGlyph } from "@/components/SimGlyph";
 import { SimPlayerBrowser } from "@/components/SimGamePlayers";
-import { SimPlayerChip, SimPlayerLine, SimSectionTitle, SimSheet, SimStat, SimTeamLink, SimToneBadge, simToneColor, type SimCtx } from "@/components/SimGameParts";
+import { SimIconButton, SimPlayerChip, SimPlayerLine, SimSectionTitle, SimSheet, SimStat, SimTeamLink, SimToneBadge, simToneColor, type SimCtx } from "@/components/SimGameParts";
 import { ReviewGlyphChip } from "@/components/SeasonReviewSections";
 import { SkeletonCard } from "@/components/Skeleton";
 import { api } from "@/lib/api";
+import { positionColorVar } from "@/lib/playerPresentation";
 import {
   simAssignSlot,
   simClaimPayload,
   simFmtPts,
+  simHeadshotId,
+  simPlayerInitials,
   simSlotRepeatsPosition,
   simLineupPayload,
   simMatchupLine,
@@ -176,8 +182,9 @@ export function SimTeamTab({ ctx, onTrade }: { ctx: SimCtx; onTrade: () => void 
           glyph="team"
           tone="accent"
           action={
-            <Button size="sm" variant="secondary" loading={saving} onClick={auto}>
-              Auto-set
+            <Button size="sm" variant="secondary" loading={saving} onClick={auto} className="rounded-full">
+              <SimGlyph name="spark" size={14} />
+              <span className="ml-1.5">Auto-set</span>
             </Button>
           }
           note={`Projected ${simFmtPts(lineup.projected_total)} points`}
@@ -185,35 +192,7 @@ export function SimTeamTab({ ctx, onTrade }: { ctx: SimCtx; onTrade: () => void 
           Lineup
         </SimSectionTitle>
         {slots.map((slot, index) => (
-          <div key={`${slot.slot}-${index}`} className="flex items-center gap-2" style={{ borderBottom: "var(--border-width-default) solid var(--color-border)" }}>
-            <span className="w-12 shrink-0">
-              <PositionBadge position={slot.slot} label={labels[index]} />
-            </span>
-            {slot.player ? (
-              <div className="flex-1 min-w-0">
-                <SimPlayerLine
-                  player={slot.player}
-                  hidePosition={simSlotRepeatsPosition(slot.slot, slot.player.pos)}
-                  onOpen={ctx.openPlayer}
-                  trailing={
-                    <>
-                      <SimStat label="Proj" value={simFmtPts(slot.player.projection)} />
-                      <Button size="sm" variant="secondary" aria-label={`Change ${labels[index]}`} onClick={() => setPickSlot(index)}>
-                        Change
-                      </Button>
-                    </>
-                  }
-                />
-              </div>
-            ) : (
-              <div className="flex flex-1 items-center justify-between gap-2 py-2">
-                <span className="text-sm" style={{ color: "var(--color-warning)" }}>Empty slot</span>
-                <Button size="sm" onClick={() => setPickSlot(index)} aria-label={`Fill ${labels[index]}`}>
-                  Fill
-                </Button>
-              </div>
-            )}
-          </div>
+          <LineupRow key={`${slot.slot}-${index}`} slotLabel={labels[index]} slot={slot.slot} player={slot.player} onOpen={ctx.openPlayer} onPick={() => setPickSlot(index)} />
         ))}
       </section>
 
@@ -496,6 +475,45 @@ export function SimPlayersTab({
       {claiming ? (
         <ClaimSheet ctx={ctx} player={claiming} roster={roster} onClose={() => setClaiming(null)} onClaimed={setClaims} />
       ) : null}
+    </div>
+  );
+}
+
+/**
+ * One lineup row, one fixed grid for every row: slot badge (fixed width),
+ * photo, name + one-line subline (truncated, never wraps), projection (fixed)
+ * and a 40px Change / Fill control. The player's own position shows only
+ * where the slot does not already say it (FLEX, SUPERFLEX), as a small dot
+ * inside the subline, so rows keep identical height at 390px.
+ */
+function LineupRow({ slotLabel, slot, player, onOpen, onPick }: { slotLabel: string; slot: SimSlot; player: SimGamePlayer | null; onOpen: (p: SimGamePlayer) => void; onPick: () => void }) {
+  const showPos = player ? !simSlotRepeatsPosition(slot, player.pos) : false;
+  const posVar = player ? positionColorVar(player.pos) : null;
+  return (
+    <div
+      className="grid items-center gap-2"
+      style={{ gridTemplateColumns: "3.25rem minmax(0,1fr) 2.75rem 2.5rem", minHeight: 52, borderBottom: "var(--border-width-default) solid var(--color-border)" }}
+      data-testid="lineup-row"
+    >
+      <span className="flex justify-center"><PositionBadge position={slot} label={slotLabel} /></span>
+      {player ? (
+        <button type="button" className="flex min-w-0 items-center gap-2 text-left" style={{ minHeight: 44 }} onClick={() => onOpen(player)} aria-label={`${player.name}, ${player.pos}. Open player details`}>
+          <PlayerAvatar playerId={simHeadshotId(player)} size={32} fallbackLabel={simPlayerInitials(player)} />
+          <span className="flex min-w-0 flex-col leading-tight">
+            <PlayerNameText name={player.name} threshold={Infinity} className="truncate text-sm font-bold" style={{ color: "var(--color-text-primary)" }} />
+            <span className="flex min-w-0 items-center gap-1 text-xs" style={{ color: "var(--color-text-muted)" }}>
+              {showPos ? <span aria-label={player.pos} className="inline-flex shrink-0 items-center gap-0.5 font-bold" style={{ color: posVar ? `var(${posVar})` : undefined }}><span aria-hidden="true" style={{ width: 6, height: 6, borderRadius: "50%", background: "currentColor" }} />{player.pos}</span> : null}
+              <span className="truncate">{[player.team, player.status === "out" ? "Out" : player.status === "bye" ? "Bye" : null].filter(Boolean).join(" · ")}</span>
+            </span>
+          </span>
+        </button>
+      ) : (
+        <span className="text-sm" style={{ color: "var(--color-warning)" }}>Empty slot</span>
+      )}
+      <span className="text-right text-sm font-extrabold tabular-nums">{player ? simFmtPts(player.projection) : ""}</span>
+      <SimIconButton label={player ? `Change ${slotLabel}` : `Fill ${slotLabel}`} primary={!player} onClick={onPick}>
+        <SimGlyph name={player ? "trade" : "check"} size={16} />
+      </SimIconButton>
     </div>
   );
 }

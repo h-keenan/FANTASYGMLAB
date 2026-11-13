@@ -11,7 +11,7 @@ import { SimDraftBoard } from "@/components/SimDraftBoard";
 import { SimDraftGlyph } from "@/components/SimDraftGlyphs";
 import { SimDraftGrid } from "@/components/SimDraftGrid";
 import { SimDraftHero } from "@/components/SimDraftHero";
-import { SimPlayerChip, SimPlayerLine, SimStat, SimToneBadge, useSimWide, type SimCtx } from "@/components/SimGameParts";
+import { SimIconButton, SimPlayerChip, SimPlayerLine, SimStat, SimToneBadge, useSimWide, type SimCtx } from "@/components/SimGameParts";
 import { SkeletonCard } from "@/components/Skeleton";
 import { ToneBadge } from "@/components/ToneBadge";
 import { api } from "@/lib/api";
@@ -179,23 +179,20 @@ export function SimGameDraft({ ctx, onComplete }: { ctx: SimCtx; onComplete: (re
     const inQueue = queue.ids.includes(player.id);
     return (
       <>
-        <Button
-          size="sm"
-          variant={inQueue ? "primary" : "secondary"}
-          aria-label={inQueue ? `Remove ${player.name} from queue` : `Queue ${player.name}`}
-          aria-pressed={inQueue}
+        <SimIconButton
+          label={inQueue ? `Remove ${player.name} from queue` : `Queue ${player.name}`}
+          pressed={inQueue}
           onClick={() => {
             setPlayers((prev) => ({ ...prev, [player.id]: player }));
             dispatchQueue({ type: inQueue ? "remove" : "add", id: player.id });
           }}
         >
           <SimDraftGlyph name={inQueue ? "queued" : "queue"} />
-        </Button>
+        </SimIconButton>
         {onClock ? (
-          <Button size="sm" loading={busy === "pick"} onClick={() => pick(player)} aria-label={`Draft ${player.name}`}>
+          <SimIconButton label={`Draft ${player.name}`} primary busy={busy === "pick"} onClick={() => pick(player)}>
             <SimDraftGlyph name="draft" />
-            <span className="ml-1">Draft</span>
-          </Button>
+          </SimIconButton>
         ) : null}
       </>
     );
@@ -205,7 +202,6 @@ export function SimGameDraft({ ctx, onComplete }: { ctx: SimCtx; onComplete: (re
     <SimDraftBoard
       gameId={gameId}
       positions={simPositionsFor(game.settings.slots)}
-      pickNo={draft.pick_no}
       onOpen={ctx.openPlayer}
       actions={boardActions}
       refreshKey={ctx.tick}

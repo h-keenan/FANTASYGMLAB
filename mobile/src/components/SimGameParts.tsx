@@ -5,6 +5,8 @@ import { Ionicons } from '@expo/vector-icons';
 import AccentCard from './AccentCard';
 import AppText from './AppText';
 import Button from './Button';
+import Collapsible from './Collapsible';
+import SimGlyph from './SimGlyph';
 import PlayerAvatar from './PlayerAvatar';
 import PositionBadge from './PositionBadge';
 import SectionHeading from './SectionHeading';
@@ -28,6 +30,7 @@ import {
   type SimGamePreview,
   type SimGameTone,
 } from '../lib/simGame';
+import { simSeeAllLabel } from '../lib/simLayout';
 import { radii, scrim, spacing, type ThemeColors } from '../theme';
 
 /** Semantic theme color for a presentation tone (never a raw hex). */
@@ -161,6 +164,8 @@ export function SimPlayerChip({
   muted = false,
   extra,
   hidePosition = false,
+  onOpen,
+  quick = false,
 }: {
   player: SimPlayerRef;
   size?: number;
@@ -168,10 +173,16 @@ export function SimPlayerChip({
   extra?: ReactNode;
   /** Drop the position chip when the row's slot label already says it. */
   hidePosition?: boolean;
+  /** Make the chip itself tappable with this handler (it must not already sit inside a Pressable). */
+  onOpen?: (player: SimGamePlayer) => void;
+  /** Make the chip tappable with the shared default: the game's player detail (the shared Player Quick View fed by the sim row). */
+  quick?: boolean;
 }) {
   const { colors } = useThemeMode();
   const styles = useMemo(() => createStyles(colors), [colors]);
-  return (
+  const openSheet = useContext(SimOpenPlayerContext);
+  const handler = onOpen ?? (quick ? openSheet : null);
+  const body = (
     <View style={[styles.identity, muted && styles.muted]}>
       <PlayerAvatar playerId={simHeadshotId(player)} fallbackLabel={simPlayerInitials(player)} size={size} />
       <View style={styles.identityText}>
@@ -188,6 +199,12 @@ export function SimPlayerChip({
         {extra ? <View style={styles.extra}>{extra}</View> : null}
       </View>
     </View>
+  );
+  if (!handler) return body;
+  return (
+    <Pressable onPress={() => handler(player as SimGamePlayer)} accessibilityRole="button" accessibilityLabel={`${player.name}, ${player.pos}. Open player details`}>
+      {body}
+    </Pressable>
   );
 }
 
@@ -438,6 +455,9 @@ function createStyles(colors: ThemeColors) {
 // Color and glyph building blocks shared by every game screen (mirrors web)
 
 /** Opens the team scouting sheet. Provided once by the game screen; a team link outside it is plain text. */
+/** Opens the game's own player detail; provided once by the game screen so a chip can use it. */
+export const SimOpenPlayerContext = createContext<((player: SimGamePlayer) => void) | null>(null);
+
 export const SimTeamOpenContext = createContext<((teamId: string) => void) | null>(null);
 
 /**
@@ -512,6 +532,72 @@ export function SimSectionTitle({
   const { colors } = useThemeMode();
   // SectionHeading takes an Ionicons name; the glyph map keeps web and app on the same names.
   return <SectionHeading title={title} icon={SIM_GLYPH_ICONS[glyph]} iconColor={simToneColor(tone, colors)} caption={caption} right={right} />;
+}
+
+/**
+ * A summary-first card: the shared Collapsible with a tinted glyph title and
+ * an always-visible summary. Open by default on wide screens and closed on
+ * phones unless `openOnPhone` (mirrors web-next's SimFold).
+ */
+export function SimFold({ id, glyph, tone = 'accent', title, summary, openOnPhone = false, children, testID }: { id: string; glyph: SimGlyphName; tone?: SimGameTone; title: string; summary?: ReactNode; openOnPhone?: boolean; children: ReactNode; testID?: string }) {
+  const { colors } = useThemeMode();
+  const color = simToneColor(tone, colors);
+  return (
+    <Collapsible
+      id={id}
+      testID={testID}
+      accent={color}
+      defaultOpen={openOnPhone}
+      title={
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm }}>
+          <SimGlyph name={glyph} color={color} size={16} />
+          <AppText style={{ fontSize: 14, fontWeight: '800', textTransform: 'uppercase', color: colors.textPrimary }}>{title}</AppText>
+        </View>
+      }
+      summary={summary}
+    >
+      {children}
+    </Collapsible>
+  );
+}
+
+/** "See all (n more)" toggle under a previewed list. */
+export function SimSeeAll({ hidden, expanded, onToggle, noun }: { hidden: number; expanded: boolean; onToggle: () => void; noun?: string }) {
+  const { colors } = useThemeMode();
+  if (hidden <= 0 && !expanded) return null;
+  return (
+    <Pressable onPress={onToggle} accessibilityRole="button" accessibilityState={{ expanded }} style={{ minHeight: 44, justifyContent: 'center', alignSelf: 'flex-start' }}>
+      <AppText style={{ fontSize: 13, fontWeight: '800', color: colors.accent }}>{simSeeAllLabel(hidden, expanded, noun)}</AppText>
+    </Pressable>
+  );
+}
+
+/** A 40pt icon-only control for dense rows (queue, draft, change). The label is the accessible name. */
+export function SimIconButton({ label, onPress, pressed, primary = false, disabled = false, glyph }: { label: string; onPress: () => void; pressed?: boolean; primary?: boolean; disabled?: boolean; glyph: SimGlyphName }) {
+  const { colors } = useThemeMode();
+  const on = primary || pressed;
+  return (
+    <Pressable
+      onPress={onPress}
+      disabled={disabled}
+      accessibilityRole="button"
+      accessibilityLabel={label}
+      accessibilityState={{ selected: pressed, disabled }}
+      style={{
+        width: 40,
+        height: 40,
+        alignItems: 'center',
+        justifyContent: 'center',
+        borderRadius: radii.md,
+        borderWidth: 1,
+        borderColor: on ? colors.accent : colors.borderStrong ?? colors.border,
+        backgroundColor: primary ? colors.accent : pressed ? colors.accentSoft ?? 'transparent' : 'transparent',
+        opacity: disabled ? 0.5 : 1,
+      }}
+    >
+      <SimGlyph name={glyph} color={primary ? colors.onAccent ?? colors.background : on ? colors.accent : colors.textSecondary} size={16} />
+    </Pressable>
+  );
 }
 
 /** Green up / red down text for a points change. */

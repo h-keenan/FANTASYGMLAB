@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { View } from 'react-native';
+import { StyleSheet, View } from 'react-native';
 
 import AccentCard from './AccentCard';
 import AppText from './AppText';
@@ -9,7 +9,7 @@ import ErrorState from './ErrorState';
 import SegmentedTabBar from './SegmentedTabBar';
 import { SkeletonCard } from './SkeletonBlock';
 import { ReviewGlyphChip } from './SeasonReviewSections';
-import { SimPlayerChip, SimSectionTitle, SimTeamLink, SimToneBadge, createSimStyles, simToneColor, type SimCtx } from './SimGameParts';
+import { SimPlayerChip, SimSectionTitle, SimSeeAll, SimTeamLink, SimToneBadge, createSimStyles, simToneColor, type SimCtx } from './SimGameParts';
 import ToneBadge from './ToneBadge';
 import { useThemeMode } from '../context/ThemeModeContext';
 import { api } from '../lib/api';
@@ -28,39 +28,42 @@ import {
   type SimRecapScore,
   type SimStandingRow,
 } from '../lib/simGame';
+import { simPreview } from '../lib/simLayout';
+import { spacing } from '../theme';
 
 type View_ = 'standings' | 'scores' | 'feed' | 'teams';
 
 export function SimStandingsList({ rows, playoffTeams }: { rows: SimStandingRow[]; playoffTeams?: number }) {
   const { colors } = useThemeMode();
   const common = useMemo(() => createSimStyles(colors), [colors]);
+  // One dense row per team (rank, crest, name, streak, record) in a single card, dashed line at the playoff cut.
   return (
-    <View style={common.stack} accessibilityLabel="Standings">
-      {rows.map((row, index) => (
-        <AccentCard key={row.team_id} accent={row.is_you ? colors.accent : index < (playoffTeams ?? 0) ? colors.success : colors.borderStrong} compact>
-          <View style={common.rowBetween}>
-            <View style={[common.row, common.grow]}>
-              <AppText style={[common.bodyStrong, { color: index < (playoffTeams ?? 0) ? colors.success : colors.textTertiary }]}>{row.rank ?? index + 1}</AppText>
+    <AccentCard accent={colors.success} compact>
+      <View accessibilityLabel="Standings">
+        {rows.map((row, index) => {
+          const inPlayoffs = index < (playoffTeams ?? 0);
+          const cut = index === (playoffTeams ?? 0) - 1;
+          return (
+            <View
+              key={row.team_id}
+              accessibilityHint={simPlayoffStatusLabel(row.playoff_status) || undefined}
+              style={[
+                { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, minHeight: 36, paddingHorizontal: 4 },
+                row.is_you && { backgroundColor: colors.accentMuted },
+                cut ? { borderBottomWidth: 2, borderStyle: 'dashed', borderBottomColor: colors.success } : { borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border },
+              ]}
+            >
+              <AppText style={{ width: 20, fontSize: 12.5, fontWeight: '800', color: inPlayoffs ? colors.success : colors.textTertiary }}>{row.rank ?? index + 1}</AppText>
               <View style={common.grow}>
-                <SimTeamLink teamId={row.team_id} name={row.name} isYou={row.is_you} size={28} />
+                <SimTeamLink teamId={row.team_id} name={row.name} isYou={row.is_you} size={22} bold={row.is_you} />
               </View>
+              <AppText style={{ fontSize: 12.5, fontWeight: '700', color: simToneColor(simStreakTone(row.streak ?? ''), colors) }}>{row.streak ?? ''}</AppText>
+              <AppText style={[common.bodyStrong, { width: 48, textAlign: 'right' }]}>{simFmtRecord(row)}</AppText>
             </View>
-            <View style={common.row}>
-              {simPlayoffStatusLabel(row.playoff_status) ? (
-                <SimToneBadge label={simPlayoffStatusLabel(row.playoff_status)} tone={simPlayoffStatusTone(row.playoff_status)} />
-              ) : null}
-              <AppText style={common.bodyStrong}>{simFmtRecord(row)}</AppText>
-            </View>
-          </View>
-          <View style={common.rowBetween}>
-            <AppText style={common.small}>
-              {simFmtPts(row.pf)} PF · {simFmtPts(row.pa)} PA
-            </AppText>
-            {row.streak ? <AppText style={[common.small, { color: simToneColor(simStreakTone(row.streak), colors), fontWeight: '700' }]}>{row.streak}</AppText> : null}
-          </View>
-        </AccentCard>
-      ))}
-    </View>
+          );
+        })}
+      </View>
+    </AccentCard>
   );
 }
 
@@ -118,6 +121,7 @@ export function SimLeagueTab({ ctx }: { ctx: SimCtx }) {
   const [league, setLeague] = useState<SimLeagueResponse | null>(null);
   const [failed, setFailed] = useState(false);
   const [attempt, setAttempt] = useState(0);
+  const [allMoves, setAllMoves] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -177,7 +181,7 @@ export function SimLeagueTab({ ctx }: { ctx: SimCtx }) {
           {(league.transactions ?? []).length === 0 ? (
             <EmptyState icon="newspaper-outline" title="Quiet so far" subtitle="Moves show up here once the season gets going." />
           ) : (
-            (league.transactions ?? []).map((tx, i) => (
+            simPreview(league.transactions ?? [], allMoves, 6).shown.map((tx, i) => (
               <AccentCard key={i} accent={simToneColor(simTransactionGlyph(tx).tone, colors)} compact>
                 <View style={common.row}>
                   {tx.team_id ? <SimTeamLink teamId={tx.team_id} name={names[tx.team_id] ?? 'Team'} size={24} hideName /> : null}
@@ -195,6 +199,7 @@ export function SimLeagueTab({ ctx }: { ctx: SimCtx }) {
               </AccentCard>
             ))
           )}
+          <SimSeeAll hidden={simPreview(league.transactions ?? [], allMoves, 6).hidden} expanded={allMoves} onToggle={() => setAllMoves((v) => !v)} />
         </View>
       ) : null}
       {view === 'teams' ? (
@@ -211,7 +216,6 @@ export function SimLeagueTab({ ctx }: { ctx: SimCtx }) {
                   </View>
                   <ToneBadge label={team.persona.label} color={colors.accent} size="xs" />
                 </View>
-                <AppText style={common.small}>{team.persona.blurb}</AppText>
                 {team.avg_age != null ? <AppText style={common.muted}>Average age {team.avg_age.toFixed(1)}</AppText> : null}
               </AccentCard>
             ))}

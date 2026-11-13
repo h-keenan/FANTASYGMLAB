@@ -102,6 +102,20 @@ def pick_asset(snap: GameSnapshot, state: GameState, ev: Evaluator, pid: str) ->
     }
 
 
+def value_ranks(snap: GameSnapshot) -> dict[str, int]:
+    """1-based rank of every player by model value (best first), the basis of the board edge."""
+    ordered = sorted(snap.pids, key=lambda pid: (-snap.players[pid].value, pid))
+    return {pid: i + 1 for i, pid in enumerate(ordered)}
+
+
+def adp_edge(adp: float | None, value_rank: int | None) -> float | None:
+    """ADP minus value rank. Positive: the market drafts him later than the model ranks him (a steal);
+    negative: the market takes him earlier than the model would (a reach). Independent of the pick on the clock."""
+    if adp is None or value_rank is None:
+        return None
+    return round(float(adp) - float(value_rank), 1)
+
+
 def players_page(
     snap: GameSnapshot, state: GameState, *, q: str = "", pos: str = "", status: str = "", team: str = "",
     sort: str = "projection", page: int = 1, page_size: int = 25,
@@ -153,10 +167,14 @@ def players_page(
     page_size = max(1, min(PAGE_MAX, page_size))
     page = max(1, page)
     chunk = pids[(page - 1) * page_size: page * page_size]
-    return {
-        "items": [player_row(snap, state, ev, pid, owners) for pid in chunk],
-        "total": len(pids), "page": page, "page_size": page_size,
-    }
+    ranks = value_ranks(snap)
+    items = []
+    for pid in chunk:
+        row = player_row(snap, state, ev, pid, owners)
+        row["value_rank"] = ranks.get(pid)
+        row["adp_edge"] = adp_edge(row["adp"], ranks.get(pid))
+        items.append(row)
+    return {"items": items, "total": len(pids), "page": page, "page_size": page_size}
 
 
 def player_detail(snap: GameSnapshot, state: GameState, pid: str) -> dict[str, Any]:
