@@ -4764,8 +4764,8 @@ export const api = {
     authorizedRequest<SimGameTypes.SimGameEnvelope>(`/v1/sim/games/${encodeURIComponent(gameId)}`, { method: "DELETE" }),
   getSimDraft: (gameId: string, query: string, signal?: AbortSignal) =>
     authorizedRequest<SimGameTypes.SimDraftResponse>(`/v1/sim/games/${encodeURIComponent(gameId)}/draft?${query}`, { signal }),
-  simDraftPick: (gameId: string, playerId: string) =>
-    authorizedRequest<SimGameTypes.SimDraftPickResponse>(`/v1/sim/games/${encodeURIComponent(gameId)}/draft/pick`, { method: "POST", jsonBody: { player_id: playerId } }),
+  simDraftPick: (gameId: string, playerId: string, pickNo?: number) =>
+    authorizedRequest<SimGameTypes.SimDraftPickResponse>(`/v1/sim/games/${encodeURIComponent(gameId)}/draft/pick`, { method: "POST", jsonBody: pickNo != null ? { player_id: playerId, pick_no: pickNo } : { player_id: playerId } }),
   simDraftAuto: (gameId: string) =>
     authorizedRequest<SimGameTypes.SimDraftPickResponse>(`/v1/sim/games/${encodeURIComponent(gameId)}/draft/auto`, { method: "POST", jsonBody: {} }),
   putSimDraftQueue: (gameId: string, playerIds: string[]) =>

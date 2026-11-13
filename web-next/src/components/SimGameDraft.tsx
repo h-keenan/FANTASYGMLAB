@@ -22,6 +22,7 @@ import {
   simFmtValue,
   simPickLabel,
   simQueueReducer,
+  simFilterPositionsFor,
   simPositionsFor,
   simRosterNeeds,
   simValueOverAdpLabel,
@@ -50,6 +51,9 @@ export function SimGameDraft({ ctx, onComplete }: { ctx: SimCtx; onComplete: (re
   const [players, setPlayers] = useState<Record<string, SimGamePlayer>>({});
   const [panel, setPanel] = useState<Panel>("board");
   const [busy, setBusy] = useState<"pick" | "auto" | null>(null);
+  // Optimistic pick: the player the user just tapped, shown as drafted until the server answers.
+  const [optimistic, setOptimistic] = useState<SimGamePlayer | null>(null);
+  const pickInFlight = useRef(false);
   const [confirmAuto, setConfirmAuto] = useState(false);
   const [freshPickNos, setFreshPickNos] = useState<number[]>([]);
   const [attempt, setAttempt] = useState(0);
@@ -125,19 +129,26 @@ export function SimGameDraft({ ctx, onComplete }: { ctx: SimCtx; onComplete: (re
   );
 
   async function pick(player: SimGamePlayer) {
-    if (busy) return;
+    // A ref, not state: two taps in the same frame must still submit once.
+    if (busy || pickInFlight.current) return;
+    pickInFlight.current = true;
     setBusy("pick");
-    const body = await call(() => api.simDraftPick(gameId, player.id));
+    setOptimistic(player);
+    const body = await call(() => api.simDraftPick(gameId, player.id, draft?.pick_no));
     setBusy(null);
+    pickInFlight.current = false;
     if (body) {
       applyResult(body);
+      setOptimistic(null);
       // Refresh the hint for the next turn.
       api
         .getSimDraft(gameId, "page=1&page_size=1")
         .then((next) => setHint(next.hint ?? null))
         .catch(() => {});
     } else {
-      // player_taken / conflict: the board is stale. Reload it.
+      // Rejected (player_taken / already_picked / conflict): roll the row back and reload a fresh board.
+      setOptimistic(null);
+      ctx.notify("That pick did not go through. The board was refreshed.", "danger");
       setAttempt((n) => n + 1);
       ctx.bump();
     }
@@ -180,6 +191,7 @@ export function SimGameDraft({ ctx, onComplete }: { ctx: SimCtx; onComplete: (re
     return (
       <>
         <SimIconButton
+          size={36}
           label={inQueue ? `Remove ${player.name} from queue` : `Queue ${player.name}`}
           pressed={inQueue}
           onClick={() => {
@@ -190,7 +202,7 @@ export function SimGameDraft({ ctx, onComplete }: { ctx: SimCtx; onComplete: (re
           <SimDraftGlyph name={inQueue ? "queued" : "queue"} />
         </SimIconButton>
         {onClock ? (
-          <SimIconButton label={`Draft ${player.name}`} primary busy={busy === "pick"} onClick={() => pick(player)}>
+          <SimIconButton size={44} width={48} label={`Draft ${player.name}`} primary busy={busy === "pick"} onClick={() => pick(player)}>
             <SimDraftGlyph name="draft" />
           </SimIconButton>
         ) : null}
@@ -201,7 +213,9 @@ export function SimGameDraft({ ctx, onComplete }: { ctx: SimCtx; onComplete: (re
   const board = (
     <SimDraftBoard
       gameId={gameId}
-      positions={simPositionsFor(game.settings.slots)}
+      positions={simFilterPositionsFor(game.settings.slots)}
+      week={game.week}
+      draftedIds={optimistic ? [optimistic.id] : undefined}
       onOpen={ctx.openPlayer}
       actions={boardActions}
       refreshKey={ctx.tick}
@@ -308,7 +322,7 @@ export function SimGameDraft({ ctx, onComplete }: { ctx: SimCtx; onComplete: (re
             {draft.status === "complete" ? "Draft" : simPickLabel(draft.pick_no, game.settings.teams)}
           </p>
           <p className="text-base font-extrabold" aria-live="polite" data-testid="draft-clock">
-            {simDraftClockLine(draft)}
+            {optimistic ? "Picking…" : simDraftClockLine(draft)}
           </p>
         </div>
         {onClock ? <ToneBadge label="Your pick" color="var(--color-action)" /> : null}

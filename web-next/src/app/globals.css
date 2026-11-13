@@ -3390,6 +3390,28 @@ select optgroup {
   }
 }
 
+/* A draft row the user just picked: cyan flash, then slide out and collapse
+   (~220ms) while the server call is in flight. Reduced motion: quick fade. */
+@keyframes sim-row-drafted {
+  0% { background: color-mix(in srgb, var(--color-accent) 30%, transparent); max-height: 96px; opacity: 1; transform: none; }
+  45% { background: color-mix(in srgb, var(--color-accent) 22%, transparent); max-height: 96px; opacity: 1; transform: none; }
+  100% { background: transparent; max-height: 0; opacity: 0; transform: translateX(24px); }
+}
+@keyframes sim-row-drafted-fade {
+  from { opacity: 1; }
+  to { opacity: 0; }
+}
+.sim-row-drafted {
+  overflow: hidden;
+  pointer-events: none;
+  animation: sim-row-drafted 240ms ease-in forwards;
+}
+@media (prefers-reduced-motion: reduce) {
+  .sim-row-drafted {
+    animation: sim-row-drafted-fade 120ms linear forwards;
+  }
+}
+
 /* Inline text links/buttons (View All, card CTAs) keep their text-sm look but
    get the 44px touch target. Use instead of per-link padding hacks. */
 .tap-link,

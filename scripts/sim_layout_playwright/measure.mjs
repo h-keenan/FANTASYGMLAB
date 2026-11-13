@@ -78,6 +78,8 @@ await scenario("01-hub", { status: "complete", week: 17 }, async () => {});
 await scenario("02-final-champion", { status: "complete", week: 17, variant: "champion" }, async (page) => { await click(page, "Open game"); await sleep(2500); });
 await scenario("03-final-missed", { status: "complete", week: 17, variant: "missed" }, async (page) => { await click(page, "Open game"); await sleep(2500); });
 await scenario("04-draft-players", { status: "drafting", pickStart: 14 }, async (page) => { await click(page, "Open game"); await sleep(2000); });
+await scenario("04b-draft-on-clock", { status: "drafting", pickStart: 2 }, async (page) => { await click(page, "Open game"); await sleep(2000); });
+await scenario("04c-draft-pick-pending", { status: "drafting", pickStart: 2 }, async (page) => { await click(page, "Open game"); await sleep(2000); await page.getByRole("button", { name: /^Draft /i }).nth(0).click(); await sleep(60); });
 await scenario("05-draft-board", { status: "drafting", pickStart: 14 }, async (page) => { await click(page, "Open game"); await sleep(1500); await tab(page, "Board"); await sleep(800); });
 await scenario("06-draft-queue", { status: "drafting", pickStart: 14 }, async (page, w) => {
   await click(page, "Open game"); await sleep(1500);

@@ -35,7 +35,7 @@ import {
   type SimPlayerFilter,
   type SimPlayerSort,
   type SimPlayerStatusFilter,
-  type SimPos,
+  type SimPosFilter,
 } from "@/lib/simGame";
 
 /**
@@ -55,11 +55,12 @@ export function SimPlayerBrowser({
   showStatusFilter = true,
   onItems,
   emptyTitle = "No players match",
-  positions = SIM_POSITIONS,
+  positions = SIM_POSITIONS.map((pos) => ({ label: pos as string, value: pos as SimPosFilter })),
 }: {
   gameId: string;
   /** Positions this league plays (no K / DEF chips when it has no such slot). */
-  positions?: SimPos[];
+  /** Filter pills after "All" (simFilterPositionsFor). */
+  positions?: { label: string; value: SimPosFilter }[];
   /** Lock the status filter (the draft board is always free agents). */
   fixedStatus?: SimPlayerStatusFilter;
   initial?: Partial<SimPlayerFilter>;
@@ -125,9 +126,9 @@ export function SimPlayerBrowser({
       <PillRow
         ariaLabel="Position filter"
         variant="scroll"
-        options={[{ label: "All", value: "" }, ...positions.map((pos) => ({ label: pos, value: pos }))]}
+        options={[{ label: "All", value: "" }, ...positions]}
         active={filter.pos}
-        onSelect={(value) => dispatch({ type: "pos", value: value as SimPos | "" })}
+        onSelect={(value) => dispatch({ type: "pos", value: value as SimPosFilter | "" })}
       />
       <div className="flex gap-2">
         {showStatusFilter && !fixedStatus ? (

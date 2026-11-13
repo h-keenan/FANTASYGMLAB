@@ -67,6 +67,29 @@ describe("SimDraftRow", () => {
   });
 });
 
+describe("SimDraftRow bye, injury and drafted states", () => {
+  it("always shows the bye week in the meta line, warning-colored only when it is soon", () => {
+    const { rerender } = render(<SimDraftRow player={player({ bye_week: 11 })} />);
+    expect(screen.getByTestId("draft-meta")).toHaveTextContent("Bye 11");
+    expect(screen.getByText("Bye 11")).not.toHaveAttribute("title");
+    rerender(<SimDraftRow player={player({ bye_week: 2 })} />);
+    expect(screen.getByText("Bye 2")).toHaveAttribute("title", expect.stringMatching(/soon/));
+  });
+  it("marks an injured player with the OUT chip and a note, and never dims the row", () => {
+    render(<SimDraftRow player={player({ status: "out", out_weeks: 4, ros_mean: 15, projection: 0 })} actions={<button>Draft</button>} />);
+    expect(screen.getByText("OUT 4W")).toBeInTheDocument();
+    expect(screen.getByTestId("draft-meta")).toHaveTextContent("Out 4 wks");
+    const row = screen.getByTestId("draft-row");
+    expect(row.style.opacity).toBe("");
+    expect(screen.getByRole("button", { name: "Draft" })).toBeEnabled();
+  });
+  it("an optimistic pick shows Drafted and hides the actions", () => {
+    render(<SimDraftRow player={player()} drafted actions={<button>Draft</button>} />);
+    expect(screen.getByRole("status")).toHaveTextContent("Drafted");
+    expect(screen.queryByRole("button", { name: "Draft" })).toBeNull();
+  });
+});
+
 describe("Season in review on a phone", () => {
   const ctx = { gameId: "g1", game: { settings: { regular_weeks: 14 } } } as unknown as SimCtx;
   it("splits into Overview / Awards / Stats / Standings tabs", async () => {

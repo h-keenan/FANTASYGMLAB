@@ -36,7 +36,7 @@ import {
   type SimPlayerFilter,
   type SimPlayerSort,
   type SimPlayerStatusFilter,
-  type SimPos,
+  type SimPosFilter,
 } from '../lib/simGame';
 import { spacing, type ThemeColors } from '../theme';
 
@@ -56,11 +56,12 @@ export function SimPlayerBrowser({
   refreshKey = 0,
   onItems,
   emptyTitle = 'No players match',
-  positions = SIM_POSITIONS,
+  positions = SIM_POSITIONS.map((pos) => ({ label: pos as string, value: pos as SimPosFilter })),
 }: {
   gameId: string;
   /** Positions this league plays (no K / DEF chips when it has no such slot). */
-  positions?: SimPos[];
+  /** Filter segments after "All" (simFilterPositionsFor). */
+  positions?: { label: string; value: SimPosFilter }[];
   /** Lock the status filter (the draft board is always free agents). */
   fixedStatus?: SimPlayerStatusFilter;
   initial?: Partial<SimPlayerFilter>;
@@ -128,9 +129,9 @@ export function SimPlayerBrowser({
       />
       <SegmentedTabBar<string>
         scrollable
-        options={[{ key: '', label: 'All' }, ...positions.map((pos) => ({ key: pos as string, label: pos }))]}
+        options={[{ key: '', label: 'All' }, ...positions.map((p) => ({ key: p.value as string, label: p.label }))]}
         active={filter.pos}
-        onChange={(key) => dispatch({ type: 'pos', value: key as SimPos | '' })}
+        onChange={(key) => dispatch({ type: 'pos', value: key as SimPosFilter | '' })}
       />
       {!fixedStatus ? (
         <SegmentedTabBar<string>

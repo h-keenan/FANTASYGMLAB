@@ -236,7 +236,36 @@ export function SimPlayerLine({
   );
 }
 
-/** A 40px icon-only control for dense rows (queue, draft). The label is the accessible name. */
+/**
+ * Shared "action in flight" guard for every game button. `run(fn)` flips
+ * `pending` on in the same event (one frame to a spinner/disabled state), ignores
+ * a second call while the first is still running (a synchronous ref, so a
+ * double tap in one frame cannot double submit) and clears when it settles.
+ * mobile/src/components/SimGameParts.tsx has the same hook.
+ */
+export function useSimPending() {
+  const inflight = useRef(false);
+  const [pending, setPending] = useState(false);
+  const run = async <T,>(fn: () => T | Promise<T>): Promise<T | undefined> => {
+    if (inflight.current) return undefined;
+    inflight.current = true;
+    setPending(true);
+    try {
+      return await fn();
+    } finally {
+      inflight.current = false;
+      setPending(false);
+    }
+  };
+  return { pending, run };
+}
+
+/**
+ * An icon-only control for dense rows (queue, draft). The label is the
+ * accessible name. Instant feedback: on press it shows a pressed state and, when
+ * the handler returns a promise, a spinner and a disabled state until it
+ * settles (a synchronous ref guard blocks a double tap in the same frame).
+ */
 export function SimIconButton({
   label,
   onClick,
@@ -244,40 +273,49 @@ export function SimIconButton({
   primary = false,
   disabled = false,
   busy = false,
+  size = 40,
+  width,
   children,
 }: {
   label: string;
-  onClick: () => void;
+  onClick: () => void | Promise<unknown>;
   pressed?: boolean;
   primary?: boolean;
   disabled?: boolean;
   busy?: boolean;
+  /** Height in px (also the width unless `width` is set). */
+  size?: number;
+  width?: number;
   children: ReactNode;
 }) {
+  const { pending, run } = useSimPending();
   const on = primary || pressed;
+  const working = busy || pending;
   return (
     <button
       type="button"
       aria-label={label}
       aria-pressed={pressed}
-      disabled={disabled || busy}
+      aria-busy={working || undefined}
+      disabled={disabled || working}
       onClick={(event) => {
         event.stopPropagation();
-        onClick();
+        void run(onClick);
       }}
-      className="inline-flex shrink-0 items-center justify-center"
+      className="inline-flex shrink-0 items-center justify-center active:scale-95"
       style={{
-        width: 40,
-        height: 40,
+        width: width ?? size,
+        height: size,
         borderRadius: "var(--radius-control)",
-        border: `var(--border-width-default) solid ${on ? "var(--color-accent)" : "var(--color-border-strong)"}`,
-        background: primary ? "var(--color-accent-strong)" : pressed ? "var(--color-accent-soft)" : "transparent",
+        border: `var(--border-width-default) solid ${on ? "var(--color-accent)" : "transparent"}`,
+        background: primary ? "var(--color-accent-strong)" : pressed ? "var(--color-accent-soft)" : "var(--color-surface-muted)",
         color: primary ? "var(--color-on-accent)" : on ? "var(--color-accent)" : "var(--color-text-secondary)",
-        opacity: disabled ? 0.5 : 1,
-        cursor: disabled || busy ? "default" : "pointer",
+        opacity: disabled && !working ? 0.5 : 1,
+        cursor: disabled || working ? "default" : "pointer",
+        transition: "transform 90ms ease-out",
       }}
     >
-      {children}
+      {working ? <span aria-hidden="true" className="inline-block h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent" /> : children}
     </button>
   );
 }

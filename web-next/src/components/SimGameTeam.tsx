@@ -33,7 +33,7 @@ import {
   simPicksOf,
   simPicksSummaryLine,
   simPickGroups,
-  simPositionsFor,
+  simFilterPositionsFor,
   simReservesOn,
   simSlotAccepts,
   simSlotCandidates,
@@ -501,7 +501,7 @@ export function SimPlayersTab({
         key={mode}
         gameId={gameId}
         fixedStatus={mode === "waivers" ? "available" : undefined}
-        positions={simPositionsFor(game.settings.slots)}
+        positions={simFilterPositionsFor(game.settings.slots)}
         onOpen={ctx.openPlayer}
         actions={actions}
         refreshKey={ctx.tick}

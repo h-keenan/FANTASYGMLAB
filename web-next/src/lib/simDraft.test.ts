@@ -10,6 +10,7 @@ import {
   simDraftNextPickLabel,
   simDraftProgress,
   simDraftRecentPicks,
+  simDraftMeta,
   simDraftRowChips,
   simDraftTeamEmblem,
 } from "./simDraft";
@@ -54,9 +55,23 @@ describe("simDraft helpers", () => {
     expect(simDraftAdpDelta(15, 16)).toBeNull();
     expect(simDraftAdpDelta(null, 16)).toBeNull();
   });
-  it("shows only informative chips", () => {
+  it("shows a chip only for an out player", () => {
     expect(simDraftRowChips(p("a", "RB"))).toEqual([]);
-    expect(simDraftRowChips(p("a", "RB", { status: "out", out_weeks: 3, bye_week: 4, age: 21 })).map((c) => c.key)).toEqual(["out", "bye", "rookie"]);
+    expect(simDraftRowChips(p("a", "RB", { status: "out", out_weeks: 4 }))).toEqual([{ key: "out", label: "Out 4w", tone: "danger" }]);
+  });
+  it("always shows the bye week; warns only when it is in the next 3 game weeks", () => {
+    const byeOf = (over: Partial<SimGamePlayer>, week = 0) => simDraftMeta(p("a", "WR", over), week).find((x) => x.key === "bye");
+    expect(byeOf({ bye_week: 9 })).toEqual({ key: "bye", text: "Bye 9", tone: undefined });
+    expect(byeOf({ bye_week: 3 })?.tone).toBe("warning");
+    expect(byeOf({ bye_week: 4 })?.tone).toBeUndefined();
+    expect(byeOf({ bye_week: 7 }, 6)?.tone).toBe("warning");
+    expect(byeOf({ bye_week: 5 }, 6)?.tone).toBeUndefined();
+    expect(simDraftMeta(p("a", "WR", { bye_week: null }))).not.toContainEqual(expect.objectContaining({ key: "bye" }));
+  });
+  it("meta line: team, age (a tenth when sent), rookie and out note", () => {
+    expect(simDraftMeta(p("a", "WR", { age: 24 })).map((x) => x.text)).toEqual(["KC", "Age 24", "Bye 9"]);
+    expect(simDraftMeta({ ...p("a", "WR", { age: 24 }), age_decimal: 24.34 }).map((x) => x.text)[1]).toBe("Age 24.3");
+    expect(simDraftMeta(p("a", "WR", { age: 21, status: "out", out_weeks: 1 })).map((x) => x.text)).toEqual(["KC", "Age 21", "Bye 9", "Rookie", "Out 1 wk"]);
   });
   it("builds a rounds x teams grid keyed by team", () => {
     const grid = simDraftBoardGrid(
