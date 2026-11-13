@@ -25,6 +25,9 @@ import {
   type PickScope,
 } from "@/lib/draftCenterPresentation";
 import { ValuesCredit } from "@/components/ValuesCredit";
+import { StructuredRow, StructuredRowList } from "@/components/ui/StructuredRow";
+import { TeamAvatar } from "@/components/TeamAvatar";
+import { cardRows, signalPills, signalSpokenLabel, strategyTone, type DraftSignalRow } from "@/lib/draftSignals";
 import { PageTitle } from "@/components/PageTitle";
 
 /**
@@ -206,8 +209,8 @@ export function DraftCenterContent({
 
       {tab === "overview" ? (
         <>
-          <DraftCardSection id="decision-signals-heading" title="League Draft Decision Signals" cards={decisionCards} />
-          <DraftCardSection id="partner-discovery-heading" title="Draft Partner Discovery" cards={partnerCards} />
+          <DraftCardSection id="decision-signals-heading" title="League Draft Decision Signals" cards={decisionCards} myRosterId={myRosterId} />
+          <DraftCardSection id="partner-discovery-heading" title="Draft Partner Discovery" cards={partnerCards} myRosterId={myRosterId} />
         </>
       ) : null}
 
@@ -274,7 +277,7 @@ function CapitalCell({
  * card, railed and badged in the tone's semantic color (same vocabulary as the
  * `.tone-*` CSS classes), with the items as icon rows.
  */
-function DraftCardSection({ id, title, cards }: { id: string; title: string; cards: DraftCard[] }) {
+function DraftCardSection({ id, title, cards, myRosterId }: { id: string; title: string; cards: DraftCard[]; myRosterId: string }) {
   if (cards.length === 0) return null;
   return (
     <section className="flex flex-col gap-3" aria-labelledby={id}>
@@ -290,19 +293,82 @@ function DraftCardSection({ id, title, cards }: { id: string; title: string; car
               <p className="text-sm font-bold" style={{ color: "var(--color-text-primary)" }}>
                 {card.title}
               </p>
-              {card.items.length > 0 ? (
-                <div className="flex flex-col gap-2">
-                  {card.items.map((item, index) => (
-                    <IconRow key={index} icon="arrow" color={color}>
-                      {item}
-                    </IconRow>
-                  ))}
-                </div>
-              ) : null}
+              {(() => {
+                // Schema 2 responses carry structured rows; a response from before that
+                // (or a cached one) still renders the legacy strings.
+                const rows = cardRows(card);
+                if (rows) {
+                  return (
+                    <StructuredRowList
+                      ariaLabel={card.label}
+                      items={rows}
+                      renderRow={(row) => <DraftSignalRowView row={row} mine={Boolean(myRosterId) && row.team_id === myRosterId} />}
+                    />
+                  );
+                }
+                return card.items.length > 0 ? (
+                  <div className="flex flex-col gap-2">
+                    {card.items.map((item, index) => (
+                      <IconRow key={index} icon="arrow" color={color}>
+                        {item}
+                      </IconRow>
+                    ))}
+                  </div>
+                ) : null;
+              })()}
             </AccentCard>
           );
         })}
       </div>
     </section>
+  );
+}
+
+const SIGNAL_TONE_COLOR = {
+  success: "var(--color-success)",
+  warning: "var(--color-warning)",
+  accent: "var(--color-accent)",
+  neutral: "var(--color-text-secondary)",
+} as const;
+
+/**
+ * One Draft Center signal row: crest, team, direction chip, rank pills, one
+ * short reason. Tapping it opens the full sentence and the numbers behind it.
+ */
+function DraftSignalRowView({ row, mine }: { row: DraftSignalRow; mine: boolean }) {
+  return (
+    <StructuredRow
+      lead={<TeamAvatar avatarUrl={row.avatar_url} name={row.team_name} size={36} />}
+      title={row.team_name}
+      chip={{ label: row.strategy_display, color: SIGNAL_TONE_COLOR[strategyTone(row.strategy)] }}
+      pills={signalPills(row)}
+      reason={row.reason_short}
+      highlight={mine}
+      spoken={signalSpokenLabel(row)}
+      detailTitle={row.team_name}
+      detail={
+        <>
+          <p className="text-sm" style={{ color: "var(--color-text-secondary)" }}>
+            {row.reason_long}
+          </p>
+          {row.evidence.length > 0 ? (
+            <dl className="flex flex-col" aria-label="Evidence">
+              {row.evidence.map((entry) => (
+                <div
+                  key={entry.key}
+                  className="flex items-center justify-between gap-3 py-2"
+                  style={{ borderBottom: "var(--border-width-default) solid var(--color-border)" }}
+                >
+                  <dt className="text-sm" style={{ color: "var(--color-text-muted)" }}>
+                    {entry.label}
+                  </dt>
+                  <dd className="text-sm font-extrabold">{entry.value}</dd>
+                </div>
+              ))}
+            </dl>
+          ) : null}
+        </>
+      }
+    />
   );
 }

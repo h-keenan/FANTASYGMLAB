@@ -113,6 +113,39 @@ def _draft_posture_profile(
 draft_posture_profile = _draft_posture_profile
 
 
+def _classification_reason(row, mode: str, implication: str) -> str:
+    strategy = _safe_text(
+        row.get("strategy_display"),
+        tidy_label(row.get("mode", "unknown")),
+    )
+    draft_rank = _format_rank(row.get("draft_capital_rank"), tied=bool(row.get("draft_capital_rank_tied")))
+    future_rank = _format_rank(row.get("future_draft_capital_rank"), tied=bool(row.get("future_draft_capital_rank_tied")))
+    power_rank = _format_rank(row.get("power_rank"), tied=bool(row.get("power_rank_tied")))
+    firsts = _safe_positive_int(row.get("first_rounders"), 0)
+
+    if mode in {"pick_buyer", "buy_picks"}:
+        if team_eval_module.normalize_team_strategy(
+            row.get("strategy_key")
+            or row.get("strategy")
+            or row.get("mode")
+        ) in {"rebuild", "tank"}:
+            return f"{strategy} timeline, but draft rank {draft_rank} says this roster still needs more future capital."
+        return f"Draft rank {draft_rank} leaves too little flexibility for a {strategy.lower()} build."
+    if mode in {"pick_seller", "sell_picks"}:
+        return f"Roster Power rank {power_rank} gives this roster a real reason to spend picks for points now."
+    if mode == "pivot":
+        return "Middle-tier Roster Power and franchise ranks leave this roster needing optionality before it picks a direction."
+    if mode == "pick_rich":
+        return f"{firsts} first-rounder{'s' if firsts != 1 else ''} and future rank {future_rank} keep the board open."
+    if mode == "pick_poor":
+        return f"Draft rank {draft_rank} and future rank {future_rank} leave this roster with very little pick leverage."
+    if mode == "move_veterans":
+        return f"{strategy} posture plus an older roster base makes veteran-for-pick moves easier to justify."
+    if mode == "spend_future":
+        return f"Contender pressure plus future rank {future_rank} makes this one of the cleaner all-in teams."
+    return implication
+
+
 def _draft_workspace_team_lines(
     df: pd.DataFrame,
     *,
@@ -125,38 +158,6 @@ def _draft_workspace_team_lines(
 ) -> list[str]:
     if df is None or df.empty:
         return ["No clear team cluster is standing out yet."]
-
-    def _classification_reason(row, mode: str, implication: str) -> str:
-        strategy = _safe_text(
-            row.get("strategy_display"),
-            tidy_label(row.get("mode", "unknown")),
-        )
-        draft_rank = _format_rank(row.get("draft_capital_rank"), tied=bool(row.get("draft_capital_rank_tied")))
-        future_rank = _format_rank(row.get("future_draft_capital_rank"), tied=bool(row.get("future_draft_capital_rank_tied")))
-        power_rank = _format_rank(row.get("power_rank"), tied=bool(row.get("power_rank_tied")))
-        firsts = _safe_positive_int(row.get("first_rounders"), 0)
-
-        if mode in {"pick_buyer", "buy_picks"}:
-            if team_eval_module.normalize_team_strategy(
-                row.get("strategy_key")
-                or row.get("strategy")
-                or row.get("mode")
-            ) in {"rebuild", "tank"}:
-                return f"{strategy} timeline, but draft rank {draft_rank} says this roster still needs more future capital."
-            return f"Draft rank {draft_rank} leaves too little flexibility for a {strategy.lower()} build."
-        if mode in {"pick_seller", "sell_picks"}:
-            return f"Roster Power rank {power_rank} gives this roster a real reason to spend picks for points now."
-        if mode == "pivot":
-            return "Middle-tier Roster Power and franchise ranks leave this roster needing optionality before it picks a direction."
-        if mode == "pick_rich":
-            return f"{firsts} first-rounder{'s' if firsts != 1 else ''} and future rank {future_rank} keep the board open."
-        if mode == "pick_poor":
-            return f"Draft rank {draft_rank} and future rank {future_rank} leave this roster with very little pick leverage."
-        if mode == "move_veterans":
-            return f"{strategy} posture plus an older roster base makes veteran-for-pick moves easier to justify."
-        if mode == "spend_future":
-            return f"Contender pressure plus future rank {future_rank} makes this one of the cleaner all-in teams."
-        return implication
 
     items: list[str] = []
     for _, row in df.head(limit).iterrows():
@@ -195,6 +196,150 @@ def _draft_workspace_team_lines(
             team_name + (f" | {' | '.join(details)}" if details else "")
         )
     return items
+
+
+# ---------------------------------------------------------------------------
+# Structured rows (card schema 2)
+#
+# The legacy `items` strings ("Team | Retool | Draft #10 | Future #10 | long
+# sentence") are kept for one release because the iOS build in App Store review
+# and older Android builds still render them. New clients render `rows`.
+# Rule (docs/audits/2026-11-convolution-audit.md section 6): the API returns
+# fields, never a joined string; `reason_short` is at most 60 characters and
+# the long sentence lives only in `reason_long`.
+# ---------------------------------------------------------------------------
+
+CARD_SCHEMA_VERSION = 2
+# Teams kept per card for `rows`. The legacy `items` strings stay at the top 3;
+# clients show 3 rows and offer "See all" for the rest.
+CARD_ROW_POOL = 6
+REASON_SHORT_MAX = 60
+
+
+def _short_reason(text: str) -> str:
+    text = " ".join(_safe_text(text).split())
+    if len(text) <= REASON_SHORT_MAX:
+        return text
+    return text[: REASON_SHORT_MAX - 1].rstrip() + "\u2026"
+
+
+def _optional_rank(value) -> int | None:
+    rank = _safe_positive_int(value, 0)
+    return rank if rank > 0 else None
+
+
+def _row_reason(row, mode: str, strategy: str, long_text: str) -> tuple[str, str]:
+    """(reason_code, reason_short) for a card row. The short line never repeats
+    the rank numbers already shown as pills."""
+    strategy_key = team_eval_module.normalize_team_strategy(
+        row.get("strategy_key") or row.get("strategy") or row.get("mode")
+    )
+    firsts = _safe_positive_int(row.get("first_rounders"), 0)
+    if mode in {"pick_buyer", "buy_picks"}:
+        if mode == "buy_picks":
+            return "buys_picks", "Likely to add future picks"
+        if strategy_key in {"rebuild", "tank"}:
+            return "rebuild_needs_capital", "Rebuild timeline, pick base still thin"
+        return "too_few_picks", f"Too few picks for a {strategy.lower()}"
+    if mode in {"pick_seller", "sell_picks"}:
+        if mode == "sell_picks":
+            return "sells_picks", "Likely to move picks for help now"
+        return "strong_roster_spends", "Strong roster, ready to spend picks now"
+    if mode == "pivot":
+        return "no_direction", "Mid-tier roster with no clear direction"
+    if mode == "pick_rich":
+        return "pick_rich", f"{firsts} first-rounder{'s' if firsts != 1 else ''} and a deep future board"
+    if mode == "pick_poor":
+        return "pick_poor", "Very little pick leverage"
+    if mode == "move_veterans":
+        return "moves_veterans", f"{strategy} with an older base: vets for picks"
+    if mode == "spend_future":
+        return "spends_future", "Contender with the picks to push now"
+    return "signal", _short_reason(long_text)
+
+
+_IMPLICATION_CLASSIFICATIONS = frozenset({"buy_picks", "sell_picks", "move_veterans", "spend_future"})
+
+
+def _draft_workspace_team_rows(
+    df: pd.DataFrame,
+    *,
+    limit: int = CARD_ROW_POOL,
+    classification: str = "",
+) -> list[dict]:
+    """Structured twin of `_draft_workspace_team_lines`: same teams, same order,
+    same long sentence, as fields."""
+    if df is None or df.empty:
+        return []
+    include_implication = classification in _IMPLICATION_CLASSIFICATIONS
+    rows: list[dict] = []
+    for _, row in df.head(limit).iterrows():
+        strategy = _safe_text(row.get("strategy_display"), tidy_label(row.get("mode", "unknown")))
+        draft_rank = _optional_rank(row.get("draft_capital_rank"))
+        future_rank = _optional_rank(row.get("future_draft_capital_rank"))
+        power_rank = _optional_rank(row.get("power_rank"))
+        franchise_rank = _optional_rank(row.get("franchise_rank"))
+        draft_tied = bool(row.get("draft_capital_rank_tied"))
+        future_tied = bool(row.get("future_draft_capital_rank_tied"))
+        implication = (
+            _recommendation_reason_text(_safe_text(row.get("manager_trade_implication")), 92)
+            if include_implication
+            else ""
+        )
+        # Same call the legacy `items` string uses, so the two can never drift.
+        reason_long = _recommendation_reason_text(_classification_reason(row, classification, implication), 112)
+        reason_code, reason_short = _row_reason(row, classification, strategy, reason_long)
+        evidence = []
+        if draft_rank is not None:
+            evidence.append({"key": "draft_rank", "label": "Draft capital rank", "value": _format_rank(draft_rank, tied=draft_tied)})
+        if future_rank is not None:
+            evidence.append({"key": "future_rank", "label": "Future capital rank", "value": _format_rank(future_rank, tied=future_tied)})
+        if power_rank is not None:
+            evidence.append({"key": "power_rank", "label": "Roster Power rank", "value": _format_rank(power_rank, tied=bool(row.get("power_rank_tied")))})
+        if franchise_rank is not None:
+            evidence.append({"key": "franchise_rank", "label": "Franchise rank", "value": _format_rank(franchise_rank, tied=bool(row.get("franchise_rank_tied")))})
+        evidence.append({"key": "firsts", "label": "First-round picks", "value": str(_safe_positive_int(row.get("first_rounders"), 0))})
+        avatar = row.get("avatar_url")
+        rows.append(
+            {
+                "team_id": _safe_text(row.get("roster_id")),
+                "team_name": _safe_text(row.get("team_name"), "Team"),
+                "avatar_url": avatar if isinstance(avatar, str) and avatar else None,
+                "strategy": team_eval_module.normalize_team_strategy(
+                    row.get("strategy_key") or row.get("strategy") or row.get("mode")
+                ),
+                "strategy_display": strategy,
+                "draft_rank": draft_rank,
+                "draft_rank_tied": draft_tied,
+                "future_rank": future_rank,
+                "future_rank_tied": future_tied,
+                "firsts": _safe_positive_int(row.get("first_rounders"), 0),
+                "reason_code": reason_code,
+                "reason_short": reason_short,
+                "reason_long": reason_long,
+                "evidence": evidence,
+            }
+        )
+    return rows
+
+
+def _signal_card(
+    label: str,
+    title: str,
+    tone: str,
+    df: pd.DataFrame,
+    classification: str,
+    **line_options,
+) -> dict:
+    """One card: legacy `items` strings + schema-2 `rows` from the same frame."""
+    return {
+        "label": label,
+        "title": title,
+        "tone": tone,
+        "schema": CARD_SCHEMA_VERSION,
+        "items": _draft_workspace_team_lines(df, classification=classification, **line_options),
+        "rows": _draft_workspace_team_rows(df, classification=classification),
+    }
 
 
 def build_draft_decision_cards(
@@ -249,7 +394,7 @@ def build_draft_decision_cards(
             "team_name",
         ],
         ascending=[False, False, False, True],
-    ).head(3)
+    ).head(CARD_ROW_POOL)
     if pick_buyers.empty:
         pick_buyers = working.sort_values(
             [
@@ -258,7 +403,7 @@ def build_draft_decision_cards(
                 "team_name",
             ],
             ascending=[False, False, True],
-        ).head(3)
+        ).head(CARD_ROW_POOL)
 
     pick_sellers = working[
         working["strategy_key"].isin({"contender", "fringe_contender"})
@@ -270,12 +415,12 @@ def build_draft_decision_cards(
             "team_name",
         ],
         ascending=[True, True, True, True],
-    ).head(3)
+    ).head(CARD_ROW_POOL)
     if pick_sellers.empty:
         pick_sellers = working.sort_values(
             ["power_rank", "draft_capital_rank", "team_name"],
             ascending=[True, True, True],
-        ).head(3)
+        ).head(CARD_ROW_POOL)
 
     pivot_candidates = working[
         working["power_rank"].between(middle_low, middle_high)
@@ -284,7 +429,7 @@ def build_draft_decision_cards(
     ].sort_values(
         ["pivot_distance", "team_name"],
         ascending=[True, True],
-    ).head(3)
+    ).head(CARD_ROW_POOL)
     if pivot_candidates.empty:
         pivot_candidates = working[
             ~working["strategy_key"].isin(
@@ -293,7 +438,7 @@ def build_draft_decision_cards(
         ].sort_values(
             ["pivot_distance", "team_name"],
             ascending=[True, True],
-        ).head(3)
+        ).head(CARD_ROW_POOL)
 
     pick_rich = working.sort_values(
         [
@@ -303,7 +448,7 @@ def build_draft_decision_cards(
             "team_name",
         ],
         ascending=[False, False, False, True],
-    ).head(3)
+    ).head(CARD_ROW_POOL)
     pick_poor = working.sort_values(
         [
             "draft_capital",
@@ -312,69 +457,59 @@ def build_draft_decision_cards(
             "team_name",
         ],
         ascending=[True, True, True, True],
-    ).head(3)
+    ).head(CARD_ROW_POOL)
 
     return [
-        {
-            "label": "Best Pick Buyers",
-            "title": "Teams that should be acquiring more picks",
-            "tone": "opportunity",
-            "items": _draft_workspace_team_lines(
-                pick_buyers,
-                include_strategy=True,
-                include_draft=True,
-                include_future=True,
-                classification="pick_buyer",
-            ),
-        },
-        {
-            "label": "Best Pick Sellers",
-            "title": "Teams best positioned to spend picks for points now",
-            "tone": "power",
-            "items": _draft_workspace_team_lines(
-                pick_sellers,
-                include_strategy=True,
-                include_draft=True,
-                include_future=True,
-                classification="pick_seller",
-            ),
-        },
-        {
-            "label": "Pivot Candidates",
-            "title": "Middle teams that still need a draft direction",
-            "tone": "strategy",
-            "items": _draft_workspace_team_lines(
-                pivot_candidates,
-                include_strategy=True,
-                include_draft=True,
-                include_future=True,
-                classification="pivot",
-            ),
-        },
-        {
-            "label": "Pick-Rich Teams",
-            "title": "The strongest future capital bases in the league",
-            "tone": "strength",
-            "items": _draft_workspace_team_lines(
-                pick_rich,
-                include_strategy=True,
-                include_draft=True,
-                include_future=True,
-                classification="pick_rich",
-            ),
-        },
-        {
-            "label": "Pick-Poor Teams",
-            "title": "The thinnest future cupboards right now",
-            "tone": "weakness",
-            "items": _draft_workspace_team_lines(
-                pick_poor,
-                include_strategy=True,
-                include_draft=True,
-                include_future=True,
-                classification="pick_poor",
-            ),
-        },
+        _signal_card(
+            "Best Pick Buyers",
+            "Teams that should be acquiring more picks",
+            "opportunity",
+            pick_buyers,
+            "pick_buyer",
+            include_strategy=True,
+            include_draft=True,
+            include_future=True,
+        ),
+        _signal_card(
+            "Best Pick Sellers",
+            "Teams best positioned to spend picks for points now",
+            "power",
+            pick_sellers,
+            "pick_seller",
+            include_strategy=True,
+            include_draft=True,
+            include_future=True,
+        ),
+        _signal_card(
+            "Pivot Candidates",
+            "Middle teams that still need a draft direction",
+            "strategy",
+            pivot_candidates,
+            "pivot",
+            include_strategy=True,
+            include_draft=True,
+            include_future=True,
+        ),
+        _signal_card(
+            "Pick-Rich Teams",
+            "The strongest future capital bases in the league",
+            "strength",
+            pick_rich,
+            "pick_rich",
+            include_strategy=True,
+            include_draft=True,
+            include_future=True,
+        ),
+        _signal_card(
+            "Pick-Poor Teams",
+            "The thinnest future cupboards right now",
+            "weakness",
+            pick_poor,
+            "pick_poor",
+            include_strategy=True,
+            include_draft=True,
+            include_future=True,
+        ),
     ]
 
 
@@ -420,7 +555,7 @@ def build_draft_partner_cards(
             "team_name",
         ],
         ascending=[False, False, False, True],
-    ).head(3)
+    ).head(CARD_ROW_POOL)
 
     likely_sell_picks = working[
         working["strategy_key"].isin({"contender", "fringe_contender"})
@@ -432,7 +567,7 @@ def build_draft_partner_cards(
             "team_name",
         ],
         ascending=[True, True, True, True],
-    ).head(3)
+    ).head(CARD_ROW_POOL)
 
     likely_move_veterans = working[
         working["strategy_key"].isin({"rebuild", "tank", "retool"})
@@ -440,14 +575,14 @@ def build_draft_partner_cards(
     ].sort_values(
         ["age_rank", "power_rank", "draft_capital_rank", "team_name"],
         ascending=[False, False, False, True],
-    ).head(3)
+    ).head(CARD_ROW_POOL)
     if likely_move_veterans.empty:
         likely_move_veterans = working[
             working["strategy_key"].isin({"rebuild", "tank", "retool"})
         ].sort_values(
             ["power_rank", "age_rank", "team_name"],
             ascending=[False, False, True],
-        ).head(3)
+        ).head(CARD_ROW_POOL)
 
     likely_spend_future = working[
         working["strategy_key"].isin({"contender", "fringe_contender"})
@@ -455,57 +590,49 @@ def build_draft_partner_cards(
     ].sort_values(
         ["future_draft_capital_rank", "power_rank", "team_name"],
         ascending=[True, True, True],
-    ).head(3)
+    ).head(CARD_ROW_POOL)
     if likely_spend_future.empty:
-        likely_spend_future = likely_sell_picks.head(3)
+        likely_spend_future = likely_sell_picks.head(CARD_ROW_POOL)
 
     return [
-        {
-            "label": "Likely To Buy Picks",
-            "title": "Teams most likely to add future capital",
-            "tone": "opportunity",
-            "items": _draft_workspace_team_lines(
-                likely_buy_picks,
-                include_strategy=True,
-                include_draft=True,
-                include_implication=True,
-                classification="buy_picks",
-            ),
-        },
-        {
-            "label": "Likely To Sell Picks",
-            "title": "Teams most likely to move picks for current help",
-            "tone": "power",
-            "items": _draft_workspace_team_lines(
-                likely_sell_picks,
-                include_strategy=True,
-                include_draft=True,
-                include_implication=True,
-                classification="sell_picks",
-            ),
-        },
-        {
-            "label": "Move Veterans For Picks",
-            "title": "Teams most likely to trade short-window assets for future outs",
-            "tone": "strategy",
-            "items": _draft_workspace_team_lines(
-                likely_move_veterans,
-                include_strategy=True,
-                include_future=True,
-                include_implication=True,
-                classification="move_veterans",
-            ),
-        },
-        {
-            "label": "Spend Future Capital",
-            "title": "Teams with both the reason and the ammo to push now",
-            "tone": "franchise",
-            "items": _draft_workspace_team_lines(
-                likely_spend_future,
-                include_strategy=True,
-                include_future=True,
-                include_implication=True,
-                classification="spend_future",
-            ),
-        },
+        _signal_card(
+            "Likely To Buy Picks",
+            "Teams most likely to add future capital",
+            "opportunity",
+            likely_buy_picks,
+            "buy_picks",
+            include_strategy=True,
+            include_draft=True,
+            include_implication=True,
+        ),
+        _signal_card(
+            "Likely To Sell Picks",
+            "Teams most likely to move picks for current help",
+            "power",
+            likely_sell_picks,
+            "sell_picks",
+            include_strategy=True,
+            include_draft=True,
+            include_implication=True,
+        ),
+        _signal_card(
+            "Move Veterans For Picks",
+            "Teams most likely to trade short-window assets for future outs",
+            "strategy",
+            likely_move_veterans,
+            "move_veterans",
+            include_strategy=True,
+            include_future=True,
+            include_implication=True,
+        ),
+        _signal_card(
+            "Spend Future Capital",
+            "Teams with both the reason and the ammo to push now",
+            "franchise",
+            likely_spend_future,
+            "spend_future",
+            include_strategy=True,
+            include_future=True,
+            include_implication=True,
+        ),
     ]

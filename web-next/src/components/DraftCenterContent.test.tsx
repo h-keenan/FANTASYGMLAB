@@ -1,6 +1,7 @@
 import { fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 
+import type { DraftSignalRow } from "@/lib/draftSignals";
 import { DraftCenterContent } from "./DraftCenterContent";
 import type { DraftCenterResponse, DraftPickAsset, DraftPosture } from "@/lib/api";
 
@@ -111,5 +112,71 @@ describe("DraftCenterContent", () => {
     );
 
     expect(screen.getByText(/don't appear to have a roster/)).toBeInTheDocument();
+  });
+
+  describe("structured signal rows (card schema 2)", () => {
+    function signalRow(n: number, over: Partial<DraftSignalRow> = {}): DraftSignalRow {
+      return {
+        team_id: String(n),
+        team_name: `Team ${n}`,
+        avatar_url: null,
+        strategy: "retool",
+        strategy_display: "Retool",
+        draft_rank: 10,
+        draft_rank_tied: false,
+        future_rank: 10,
+        future_rank_tied: false,
+        firsts: 0,
+        reason_code: "too_few_picks",
+        reason_short: "Too few picks for a retool",
+        reason_long: "Draft rank #10 leaves too little flexibility for a retool build.",
+        evidence: [{ key: "draft_rank", label: "Draft capital rank", value: "#10" }],
+        ...over,
+      };
+    }
+    const schema2 = (rows: DraftSignalRow[]): DraftCenterResponse => ({
+      ...BASE_RESPONSE,
+      decision_cards: [
+        { label: "Best Pick Buyers", title: "Teams most likely to buy picks", tone: "power", schema: 2, items: rows.slice(0, 3).map((r) => `${r.team_name} | Retool | Draft #10 | Future #10 | long`), rows },
+      ],
+    });
+
+    it("renders fields, not the joined string: one Picks pill, a chip, a short reason", () => {
+      render(<DraftCenterContent leagueName="L" data={schema2([signalRow(1)])} picks={PICKS} myRosterId="9" />);
+      expect(screen.getByText("Picks #10")).toBeInTheDocument();
+      expect(screen.queryByText(/Draft #10/)).toBeNull();
+      expect(screen.getByText("Retool")).toBeInTheDocument();
+      expect(screen.getByText("Too few picks for a retool")).toBeInTheDocument();
+      expect(document.body.textContent).not.toContain(" | ");
+    });
+
+    it("shows the top 3 and expands the rest in place with See all (n)", () => {
+      render(<DraftCenterContent leagueName="L" data={schema2([1, 2, 3, 4, 5].map((n) => signalRow(n)))} picks={PICKS} myRosterId="9" />);
+      expect(screen.getByText("Team 3")).toBeInTheDocument();
+      expect(screen.queryByText("Team 4")).toBeNull();
+      const more = screen.getByRole("button", { name: "See all (5)" });
+      expect(more).toHaveAttribute("aria-expanded", "false");
+      fireEvent.click(more);
+      expect(screen.getByText("Team 5")).toBeInTheDocument();
+    });
+
+    it("opens a detail sheet with the full sentence and evidence on tap", () => {
+      render(<DraftCenterContent leagueName="L" data={schema2([signalRow(1)])} picks={PICKS} myRosterId="9" />);
+      fireEvent.click(screen.getByRole("button", { name: /Team 1, Retool, Picks #10/ }));
+      const dialog = screen.getByRole("dialog", { name: "Team 1" });
+      expect(dialog).toHaveTextContent("leaves too little flexibility for a retool build");
+      expect(dialog).toHaveTextContent("Draft capital rank");
+    });
+
+    it("outlines the signed-in user's own team", () => {
+      render(<DraftCenterContent leagueName="L" data={schema2([signalRow(1), signalRow(2)])} picks={PICKS} myRosterId="2" />);
+      expect(screen.getByRole("button", { name: /Team 2,/ }).className).toContain("ui-srow-me");
+      expect(screen.getByRole("button", { name: /Team 1,/ }).className).not.toContain("ui-srow-me");
+    });
+
+    it("still renders legacy strings for a response without rows", () => {
+      render(<DraftCenterContent leagueName="L" data={BASE_RESPONSE} picks={PICKS} myRosterId="1" />);
+      expect(screen.getByText("Team A has the leverage.")).toBeInTheDocument();
+    });
   });
 });

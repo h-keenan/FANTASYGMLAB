@@ -35,6 +35,7 @@ export const IDENTICAL = [
   "busyRetry.ts",
   "destinationAccents.generated.ts",
   "directionCheckin.ts",
+  "draftSignals.ts",
   "freeLimits.ts",
   "injuryTone.generated.ts",
   "limitWall.ts",
