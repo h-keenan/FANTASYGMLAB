@@ -11,7 +11,7 @@ from urllib.parse import quote
 
 import requests
 
-from modules import performance, season_clock, sleeper_budget, sleeper_cache
+from modules import live_policy, performance, season_clock, sleeper_budget, sleeper_cache
 from modules.file_lock import ExclusiveFileLock
 
 SLEEPER_BASE = "https://api.sleeper.app/v1"
@@ -985,7 +985,7 @@ SLEEPER_REQUEST_RETRY_BACKOFF_SECONDS = float(
 _RETRYABLE_STATUS_CODES = frozenset({429, 500, 502, 503, 504})
 
 
-def _request_json(label: str, url: str, *, timeout: int = 5, max_retries: int | None = None):
+def _request_json(label: str, url: str, *, timeout: int = 5, max_retries: int | None = None, allow_defer: bool = True):
     """GET ``url`` as JSON, retrying transient failures with backoff.
 
     Return contract unchanged from before this fix: ``None`` on any failure
@@ -1006,7 +1006,7 @@ def _request_json(label: str, url: str, *, timeout: int = 5, max_retries: int | 
     # Over the soft call-rate threshold: pausable work (warm-ups, background
     # refresh, free-tier requests) serves the last real payload instead of
     # spending budget; background work with nothing cached just skips.
-    if sleeper_budget.should_defer():
+    if allow_defer and sleeper_budget.should_defer():
         known = sleeper_budget.last_known(url)
         sleeper_budget.note_deferred()
         if known is not None:
@@ -1742,37 +1742,54 @@ def clear_live_league_endpoint_caches() -> None:
     get_draft_picks.cache_clear()
     _get_traded_picks_cached.cache_clear()
     _get_transactions_cached.cache_clear()
-    _get_matchups_cached.cache_clear()
     sleeper_cache.clear_local()
 
 
-@lru_cache(maxsize=512)
-def _get_matchups_cached(league_id: str, round_num: int, _bucket: int) -> List[Dict[str, Any]]:
+def _matchups_url(league_id: str, round_num: Any) -> str | None:
     if not league_id or round_num is None or _is_espn_league(league_id):
-        return []
+        return None
     try:
-        round_num = int(round_num)
+        round_i = int(round_num)
     except Exception:
-        return []
-    if round_num <= 0:
-        return []
-
-    url = f"{SLEEPER_BASE}/league/{league_id}/matchups/{round_num}"
-    try:
-        matchups = _live_league_json("sleeper_matchups", url)
-        return matchups if isinstance(matchups, list) else []
-    except Exception:
-        return []
+        return None
+    if round_i <= 0:
+        return None
+    return f"{SLEEPER_BASE}/league/{league_id}/matchups/{round_i}"
 
 
 def get_matchups(league_id: str, round_num: int) -> List[Dict[str, Any]]:
     """
     Get league matchups for a specific round/week from Sleeper.
 
-    Time-bucketed — scores update live during games, and mobile's long-lived
-    process has no other invalidation hook for this endpoint.
+    Live-aware: scores update during games, so the week being played right
+    now is cached only ``live_policy.LIVE_TTL_SECONDS`` (single-flight and
+    cluster-wide via modules.sleeper_cache: one upstream call per league per
+    interval for all users). Other weeks keep the longer idle TTL. There is
+    deliberately NO extra per-process lru_cache layered on top (that used to
+    double the worst-case age), and live reads are never deferred by the
+    free-tier Sleeper budget (a deferral served arbitrarily old payloads).
     """
-    return _get_matchups_cached(league_id, round_num, _live_league_cache_bucket())
+
+    url = _matchups_url(league_id, round_num)
+    if url is None:
+        return []
+    ttl = live_policy.matchups_ttl(int(round_num))
+    try:
+        matchups = sleeper_cache.shared_json(
+            url,
+            ttl=ttl,
+            fetch=lambda: _request_json("sleeper_matchups", url, timeout=5, allow_defer=ttl != live_policy.LIVE_TTL_SECONDS),
+        )
+        return matchups if isinstance(matchups, list) else []
+    except Exception:
+        return []
+
+
+def matchups_fetched_at(league_id: str, round_num: int) -> float | None:
+    """Epoch seconds the cached matchups payload was fetched from Sleeper."""
+
+    url = _matchups_url(league_id, round_num)
+    return sleeper_cache.fetched_at(url) if url else None
 
 
 def get_matchups_for_weeks(league_id: str, weeks: Iterable[int]) -> Dict[int, List[Dict[str, Any]]]:

@@ -198,6 +198,7 @@ from modules import (
     league_value_settings,
     league_display,
     live_activity,
+    live_policy,
     live_draft,
     live_draft_trade_evaluator,
     manager_activity,
@@ -15869,11 +15870,40 @@ def _empty_matchup(reason: str, week: int | None = None) -> dict[str, Any]:
 @app.get("/v1/leagues/{league_id}/matchup")
 @_with_sleeper_as_of
 def get_league_matchup(
+    response: Response,
     league_id: str = Depends(resolve_league_path_id),
     lens: str = "Dynasty",
     user: dict[str, Any] = Depends(require_user),
 ) -> dict[str, Any]:
-    return _build_matchup(league_id, lens, user)
+    # Live scores must never be reused by a browser/CDN/proxy layer.
+    response.headers["Cache-Control"] = "private, no-store"
+    started = time.perf_counter()
+    payload = _build_matchup(league_id, lens, user)
+    response.headers["Server-Timing"] = f"matchup;dur={(time.perf_counter() - started) * 1000:.0f}"
+    if isinstance(payload, dict) and payload.get("as_of_age_seconds") is not None:
+        response.headers["Age"] = str(payload["as_of_age_seconds"])
+    return payload
+
+
+def _matchup_freshness(league_id: str, week: int, is_external: bool) -> dict[str, Any]:
+    """Honest freshness of the live scores in this payload.
+
+    `as_of`: ISO-8601 UTC instant Sleeper's matchups payload was really
+    fetched (not when this response was built), `as_of_age_seconds` its age
+    now, `live` whether NFL games are in progress, and `poll_after_seconds`
+    the interval a client should refresh at while live (None otherwise).
+    """
+
+    fetched = None if is_external else sleeper.matchups_fetched_at(league_id, week)
+    now = time.time()
+    if fetched is None:
+        fetched = now
+    return {
+        "as_of": datetime.fromtimestamp(fetched, tz=timezone.utc).isoformat(timespec="seconds"),
+        "as_of_age_seconds": max(0, int(now - fetched)),
+        "live": live_policy.is_live(),
+        "poll_after_seconds": live_policy.poll_hint_seconds(week),
+    }
 
 
 def _build_matchup(
@@ -16084,6 +16114,12 @@ def _build_matchup(
             idp_result=idp_result,
         )
     )
+    # Live projected final per real starter: pure arithmetic on the points and
+    # projection already fetched above (no extra I/O), so it recomputes from
+    # the freshest points on every request.
+    for _side_payload in (my_side, opponent_side):
+        for _starter in _side_payload.get("real_starters") or []:
+            _starter["projected_final"] = matchup_win_probability.projected_final(_starter)
     unmapped_players: list[dict[str, Any]] = []
     if is_external:
         for side, entry in ((my_side, my_entry), (opponent_side, opponent_entry)):
@@ -16140,6 +16176,7 @@ def _build_matchup(
             league_calendar.BEST_BALL_LINEUP_MESSAGE if league_calendar.is_best_ball(league) else ""
         ),
     }
+    response.update(_matchup_freshness(league_id, current_week, is_external))
     if is_external:
         response["platform"] = external_leagues.league_platform(league_id)
         response["unmapped_players"] = unmapped_players

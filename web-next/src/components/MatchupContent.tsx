@@ -27,6 +27,7 @@ import { SectionHeading } from "@/components/SectionHeading";
 import { StatStrip } from "@/components/StatStrip";
 import { TeamAvatar } from "@/components/TeamAvatar";
 import { ToneBadge } from "@/components/ToneBadge";
+import { projFinalLabel, freshnessLabel } from "@/lib/liveScores";
 import { WeatherReasonChip } from "@/components/WeatherReasonChip";
 import { ValuesCredit } from "@/components/ValuesCredit";
 import {
@@ -362,6 +363,10 @@ function LineupCell({
   const points = lineupPlayerPoints(player);
   const valueText = points.value != null ? points.value.toFixed(1) : points.note === "bye" ? null : "—";
   const reverse = mine ? "" : "flex-row-reverse";
+  const projFinal =
+    points.kind === "pts" && player.game_status === "in_progress" && "projected_final" in player
+      ? projFinalLabel(player.projected_final)
+      : null;
   const pointsColor =
     emphasis === "win" ? "var(--color-accent)" : emphasis === "lose" ? "var(--color-text-muted)" : "var(--color-text-primary)";
   // Two lines: avatar + name, then points (outer edge) and team/injury.
@@ -386,6 +391,11 @@ function LineupCell({
           ) : (
             <ToneBadge label="Bye" color="var(--color-warning)" size="xs" />
           )}
+          {projFinal ? (
+            <span className="text-[11px] tabular-nums shrink-0" style={{ color: "var(--color-text-secondary)" }} data-testid="proj-final">
+              {projFinal}
+            </span>
+          ) : null}
           <span className="truncate text-[11px]" style={{ color: "var(--color-text-muted)" }}>
             {player.team || "FA"}
           </span>
@@ -789,11 +799,18 @@ export function MatchupContent({
   matchup,
   leagueId,
   lens = "Dynasty",
+  ageSeconds,
+  refreshing = false,
+  onRefresh,
 }: {
   leagueName: string;
   matchup: MatchupResponse;
   leagueId?: string;
   lens?: string;
+  /** Current age of the live scores (server as_of + time since received); omit to hide the indicator. */
+  ageSeconds?: number | null;
+  refreshing?: boolean;
+  onRefresh?: () => void;
 }) {
   const router = useRouter();
   const guillotineData = useGuillotine(leagueId, lens);
@@ -853,6 +870,20 @@ export function MatchupContent({
   return (
     <main className="page-shell">
       <MatchupHeader week={matchup.week} live={matchup.game_state === "live"} leagueName={leagueName} />
+      {onRefresh ? (
+        <div className="flex items-center gap-2 text-xs" style={{ color: "var(--color-text-muted)" }} data-testid="matchup-freshness">
+          <span aria-live="polite">{ageSeconds != null ? freshnessLabel(ageSeconds) : "Live scores"}</span>
+          <button
+            type="button"
+            onClick={onRefresh}
+            disabled={refreshing}
+            className="underline"
+            style={{ color: "var(--color-accent)" }}
+          >
+            {refreshing ? "Refreshing…" : "Refresh"}
+          </button>
+        </div>
+      ) : null}
       <Scoreboard matchup={shown} />
       {matchup.unmapped_players && matchup.unmapped_players.length > 0 ? (
         <p className="m-0 text-xs" style={{ color: "var(--color-text-muted)" }} data-testid="unmapped-starters">

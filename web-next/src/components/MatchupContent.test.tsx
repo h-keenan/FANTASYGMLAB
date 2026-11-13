@@ -285,6 +285,22 @@ describe("MatchupContent", () => {
     expect(within(table).getByText("Empty slot")).toBeInTheDocument();
   });
 
+  it("live: shows Proj final for an in-progress starter and the freshness indicator with refresh", () => {
+    const base = liveResponse();
+    const matchup = liveResponse({
+      my_team: {
+        ...base.my_team!,
+        real_starters: [realStarter({ player_id: "s1", name: "Ashton Jeanty", projected_final: 18.44 })],
+      },
+    });
+    const onRefresh = vi.fn();
+    render(<MatchupContent leagueName="My League" matchup={matchup} ageSeconds={12} onRefresh={onRefresh} />);
+    expect(screen.getByTestId("proj-final")).toHaveTextContent("Proj final 18.4");
+    expect(screen.getByTestId("matchup-freshness")).toHaveTextContent("Updated 12s ago");
+    screen.getByRole("button", { name: "Refresh" }).click();
+    expect(onRefresh).toHaveBeenCalled();
+  });
+
   it("marks a bye-week starter instead of showing a number", () => {
     const withBye = liveResponse();
     withBye.my_team!.real_starters = [

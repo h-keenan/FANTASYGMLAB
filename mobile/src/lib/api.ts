@@ -939,6 +939,8 @@ export interface MatchupRealStarter {
   game_started: boolean | null;
   /** "scheduled" / "in_progress" / "final" for his own game; null when unknown. */
   game_status?: MatchupGameStatus | null;
+  /** Live projected final points; null unless his game is in progress. */
+  projected_final?: number | null;
   /** The league lineup slot he fills, named like the suggested lineup's slots. */
   slot?: string | null;
 }
@@ -1076,6 +1078,14 @@ export interface MatchupResponse {
   /** Imported leagues only: starters on either side we could not match to a FantasyDesk player. */
   platform?: string;
   unmapped_players?: { name: string; position: string; team: string; slot?: string; fantasy_team: string }[];
+  /** ISO instant Sleeper's live scores in this payload were really fetched. */
+  as_of?: string;
+  /** Age of those scores at response time, in seconds. */
+  as_of_age_seconds?: number;
+  /** NFL games are in progress right now (server-side live policy). */
+  live?: boolean;
+  /** Seconds a client should wait between refreshes while live; null otherwise. */
+  poll_after_seconds?: number | null;
 }
 
 /** One slot of a proposed lineup sent to POST .../matchup/what-if. */

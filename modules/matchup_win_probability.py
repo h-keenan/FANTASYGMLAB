@@ -110,6 +110,57 @@ def game_fraction_remaining(starter: dict[str, Any], *, now: datetime | None = N
     return max(0.0, min(1.0, 1.0 - elapsed))
 
 
+# Live projected final (owner-approved). projected_final =
+#   actual + remaining * projection_mean + pace_adjustment
+# The pace adjustment moves the remaining estimate toward how the player is
+# actually scoring, but is capped: its blend weight never exceeds
+# PACE_MAX_BLEND of the pace gap (actual minus what the projection expected
+# by now), ramps in with game progress (no reaction to an early TD), and is
+# scaled by the share remaining so it vanishes as the game ends.
+PACE_MAX_BLEND = 0.25
+PACE_FULL_WEIGHT_AT_ELAPSED = 0.5
+# Mid-game exits: an injury designation that means he is not coming back.
+EXIT_INJURY_STATUSES = frozenset({"out", "ir", "inactive", "pup", "suspended"})
+
+
+def _has_exited(starter: dict[str, Any]) -> bool:
+    if starter.get("exited_game") is True:
+        return True
+    return str(starter.get("injury_status") or "").strip().lower() in EXIT_INJURY_STATUSES
+
+
+def projected_final(starter: dict[str, Any], *, now: datetime | None = None) -> float | None:
+    raw = _projected_final_raw(starter, now=now)
+    return None if raw is None else round(raw, 1)
+
+
+def _projected_final_raw(starter: dict[str, Any], *, now: datetime | None = None) -> float | None:
+    """Live projected final points for one starter, or None when there is no
+    live in-progress game to project (not started, final, unknown clock) or
+    nothing real to project from. Pure arithmetic on fields already in the
+    matchup payload."""
+
+    if starter.get("game_started") is not True or starter.get("game_final") is True:
+        return None
+    actual = starter.get("actual_points")
+    if not isinstance(actual, (int, float)):
+        return None
+    remaining = game_fraction_remaining(starter, now=now)
+    if remaining is None or remaining <= 0.0:
+        return None
+    if _has_exited(starter):
+        return float(actual)
+    moments = _projection_moments(starter)
+    if moments is None:
+        return None
+    mean = moments[0]
+    elapsed = 1.0 - remaining
+    pace_gap = float(actual) - elapsed * mean
+    weight = PACE_MAX_BLEND * min(1.0, elapsed / PACE_FULL_WEIGHT_AT_ELAPSED)
+    remaining_estimate = max(0.0, remaining * mean + weight * pace_gap * remaining)
+    return float(actual) + remaining_estimate
+
+
 def _projection_moments(starter: dict[str, Any]) -> tuple[float, float] | None:
     projection = starter.get("projection") or {}
     if projection.get("status") != "ok":
@@ -170,11 +221,13 @@ def _starter_distribution(starter: dict[str, Any], *, now: datetime | None = Non
         # for what's left.
         return float(actual_points), 0.0, True
     projection_mean, projection_variance = moments
-    return (
-        float(actual_points) + remaining * projection_mean,
-        remaining * projection_variance,
-        True,
-    )
+    if _has_exited(starter) and starter.get("game_final") is not True:
+        # Left the game hurt: nothing more to come, so no remaining variance.
+        return float(actual_points), 0.0, True
+    final = _projected_final_raw(starter, now=now)
+    if final is None:
+        final = float(actual_points) + remaining * projection_mean
+    return final, remaining * projection_variance, True
 
 
 def _team_distribution(

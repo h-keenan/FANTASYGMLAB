@@ -10,6 +10,7 @@ tests pin the fix: an automatic time-bucketed expiry.
 
 from __future__ import annotations
 
+import uuid
 from unittest.mock import Mock, patch
 
 from modules import sleeper, sleeper_cache
@@ -21,7 +22,7 @@ def _clear_all():
     sleeper._get_users_cached.cache_clear()
     sleeper._get_traded_picks_cached.cache_clear()
     sleeper._get_transactions_cached.cache_clear()
-    sleeper._get_matchups_cached.cache_clear()
+    sleeper_cache.reset_for_tests()
 
 
 def test_get_league_hits_cache_within_the_same_ttl_bucket():
@@ -106,16 +107,17 @@ def test_get_transactions_expires_on_bucket_advance():
 
 def test_get_matchups_expires_on_bucket_advance():
     _clear_all()
+    lid = "L1-" + uuid.uuid4().hex  # Redis may outlive a test run
     stale = Mock(status_code=200)
     stale.json.return_value = [{"roster_id": 1, "points": 90.0}]
     fresh = Mock(status_code=200)
     fresh.json.return_value = [{"roster_id": 1, "points": 112.4}]
-    with patch("requests.get", side_effect=[stale, fresh]) as mock_get:
-        with patch("modules.sleeper._live_league_cache_bucket", return_value=1):
-            first = sleeper.get_matchups("L1", 3)
-        sleeper_cache.clear_local()  # the shared TTL layer expires with the bucket
-        with patch("modules.sleeper._live_league_cache_bucket", return_value=2):
-            second = sleeper.get_matchups("L1", 3)
+    with patch("modules.live_policy.live_nfl_week", return_value=3), patch(
+        "requests.get", side_effect=[stale, fresh]
+    ) as mock_get:
+        first = sleeper.get_matchups(lid, 3)
+        sleeper_cache.clear_local()  # the shared TTL layer expires
+        second = sleeper.get_matchups(lid, 3)
     assert first[0]["points"] == 90.0
     assert second[0]["points"] == 112.4
     assert mock_get.call_count == 2

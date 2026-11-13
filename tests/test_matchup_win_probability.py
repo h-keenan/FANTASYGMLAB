@@ -179,19 +179,20 @@ def test_no_jump_at_kickoff():
 
 
 def test_mid_game_is_points_so_far_plus_remaining_projection_with_shrunk_variance():
-    # Halfway through: mean = 10 + 0.5 * 15 = 17.5, variance = 0.5 * 7^2.
-    # Opponent: a final 17.5, no variance. diff = 0, so exactly 50%.
+    # Halfway through: mean = 10 + 0.5 * 15 + pace adjustment, variance = 0.5 * 7^2.
+    # Pace adjustment = 0.25 (cap) * (10 - 0.5*15 = 2.5 pace gap) * 0.5 remaining = 0.3125,
+    # so projected final 17.8125. Opponent: a final 17.8125, no variance: exactly 50%.
     now = KICKOFF + GAME_WALL_CLOCK / 2
     mine = [_live(10.0)]
-    opponent = [_projected_starter(0.0, 0.0, 0.0, started=True, actual=17.5, final=True)]
+    opponent = [_projected_starter(0.0, 0.0, 0.0, started=True, actual=17.8125, final=True)]
     result = compute_live_win_probability(mine, opponent, now=now)
-    assert result["my_projected_total"] == 17.5
+    assert result["my_projected_total"] == 17.8
     assert result["probability"] == 0.5
 
     # Same game state vs a final 20: P = Phi((17.5 - 20) / (C * sqrt(0.5 * 49))).
     opponent = [_projected_starter(0.0, 0.0, 0.0, started=True, actual=20.0, final=True)]
     result = compute_live_win_probability(mine, opponent, now=now)
-    expected = 0.5 * (1.0 + math.erf(((17.5 - 20.0) / (C * math.sqrt(0.5 * 49.0))) / math.sqrt(2.0)))
+    expected = 0.5 * (1.0 + math.erf(((17.8125 - 20.0) / (C * math.sqrt(0.5 * 49.0))) / math.sqrt(2.0)))
     assert result["probability"] == round(expected, 4)
 
 
@@ -234,4 +235,4 @@ def test_in_progress_starter_without_projection_counts_real_points_only():
     opponent = [_projected_starter(15.0, 8.0, 22.0), _projected_starter(5.0, 0.0, 10.0)]
     result = compute_live_win_probability(mine, opponent, now=KICKOFF + GAME_WALL_CLOCK / 2)
     assert result["available"] is True
-    assert result["my_projected_total"] == round(10.0 + 7.5 + 6.0, 1)
+    assert result["my_projected_total"] == round(10.0 + 7.5 + 0.3125 + 6.0, 1)
