@@ -91,4 +91,11 @@ describe("ConfirmInPlace ask (icon / row)", () => {
     });
     expect(screen.getByRole("button", { name: "Retry" })).toBeInTheDocument();
   });
+
+  it("plain ask mode renders a bare text trigger with the caller's own look", () => {
+    render(<ConfirmInPlace plain variant="row" mode="ask" label="Remove" triggerClassName="my-link" prompt="Remove it?" onConfirm={() => {}} />);
+    const trigger = screen.getByRole("button", { name: "Remove" });
+    expect(trigger).toHaveClass("my-link");
+    expect(trigger.className).not.toContain("px-4");
+  });
 });

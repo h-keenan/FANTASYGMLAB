@@ -242,7 +242,21 @@ export function ConfirmInPlace({
       </Button>
     );
   } else {
-    trigger = (
+    trigger = plain ? (
+      <button
+        type="button"
+        role={triggerRole}
+        data-confirm-trigger=""
+        aria-expanded={showPanel || undefined}
+        aria-controls={showPanel ? panelId : undefined}
+        disabled={disabled}
+        onClick={onTrigger}
+        className={`ui-confirm-trigger ${triggerClassName}`.trim()}
+        style={plainStyle}
+      >
+        {label}
+      </button>
+    ) : (
       <Button
         variant={destructive}
         size={size}
