@@ -58,20 +58,7 @@ export default function SimActionBar({ ctx, paywalled, advancing, onAdvance, onS
         </AppText>
       ) : null}
       <View style={styles.row}>
-        {onSimTo && !paywalled ? (
-          <Pressable
-            onPress={onSimTo}
-            disabled={advancing}
-            accessibilityRole="button"
-            accessibilityLabel="Sim to..."
-            accessibilityState={{ disabled: advancing }}
-            style={[styles.pill, advancing && styles.pillOff]}
-            testID="sim-to-button"
-          >
-            <SimGlyph name="matchup" color={colors.textPrimary} size={16} />
-            <AppText style={styles.pillLabel}>Sim to...</AppText>
-          </Pressable>
-        ) : null}
+        {onSimTo && !paywalled ? <Button label="Sim to..." variant="secondary" size="sm" disabled={advancing} onPress={onSimTo} /> : null}
         <View style={styles.advance}>
           {paywalled ? (
             <Button label="Go Pro to continue" variant="premium" size="sm" onPress={onGoPro} />

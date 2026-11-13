@@ -728,3 +728,15 @@ Rules, pinned by `tests/test_sim_trade_counters.py`:
 - The AI accepts its own counter; valuation of OUT/IR players is the same `worth()` on both sides.
 - Accept/decline of the offer itself is unchanged, and counters are never re-derived on replay (events record the
   outcome), so no engine-version gate is needed.
+
+## Sim to... (several weeks in one request)
+
+`GET /v1/sim/games/{id}/sim-to/options` lists the milestones that make sense now (`weeks` 1 / 4, `trade_deadline`,
+`playoffs_start`, `season_end`). `POST /v1/sim/games/{id}/sim-to` `{target, weeks?, auto_set?, force_first?}` plays weeks in ONE request
+(`modules/sim/game_simto.py`): it is the same `advance` repeated on one Emitter, so the events, replayed state and digest equal that many
+manual Advances (plus a `lineup_set` before each week when `auto_set`, exactly what Auto-set emits). Before each week it stops with
+`stopped: {code, week, message, fix}` for: roster over the limit (hard), a starter out / on a bye / an empty slot, trade offers expiring this
+week, the free-preview paywall; `force_first` plays past a soft stop for the first week ("Sim anyway"). A 25 s budget pauses with
+`time_budget`. Response: `weeks_played`, `stopped`, `from_seq`, `summary` (per-week results, record and rank change, your injuries and claims,
+AI trades, standings, champion) and the last week's full `recap`, plus `game`. `POST /v1/sim/games/{id}/undo-sim {from_seq}` takes the run
+back (deletes events and later checkpoints from `from_seq`, which must be an `advance` / `lineup_set` event, then replays).
