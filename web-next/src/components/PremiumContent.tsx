@@ -228,7 +228,7 @@ export function PremiumContent({
   const rows = comparison ?? FALLBACK_PREMIUM_COMPARISON;
   const tiers = Array.from(new Set(plans.map((p) => p.tier)));
   return (
-    <main className="flex-1 flex flex-col gap-6 px-4 py-6 max-w-3xl w-full mx-auto">
+    <main className="page-shell page-shell-prose">
       <header className="flex flex-col gap-2">
         <span className="text-xs font-bold uppercase" style={{ color: "var(--color-premium)", letterSpacing: "var(--letter-spacing-badge)" }}>
           Pro

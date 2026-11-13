@@ -229,9 +229,9 @@ export default function DraftCenterScreen({ route, navigation }: Props) {
         <View style={styles.scopeRow}>
           <SegmentedTabBar<DraftTab>
             options={[
-              { key: 'overview', label: 'Overview' },
-              { key: 'picks', label: 'Picks' },
-              { key: 'scouting', label: 'Scouting' },
+              { key: 'overview', label: 'Overview', glyph: 'overview' },
+              { key: 'picks', label: 'Picks', glyph: 'picks' },
+              { key: 'scouting', label: 'Scouting', glyph: 'scouting' },
             ]}
             active={tab}
             onChange={setTab}

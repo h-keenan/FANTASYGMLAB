@@ -316,7 +316,7 @@ export function SimFinalView({ ctx, onNewGame, onHub }: { ctx: SimCtx; onNewGame
           <PillRow
             ariaLabel="Season in review sections"
             variant="fill"
-            options={SIM_REVIEW_VIEWS.map((v) => ({ label: v.label, value: v.value }))}
+            options={SIM_REVIEW_VIEWS.map((v) => ({ label: v.label, value: v.value, glyph: v.glyph }))}
             active={tab}
             onSelect={(value) => setTab(value as SimReviewView)}
           />

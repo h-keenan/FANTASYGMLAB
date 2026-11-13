@@ -1014,7 +1014,7 @@ export function TradeAnalyzerContent({
         : `Search ${activeTeamLabel}'s ${assetType === "picks" ? "picks" : "roster"}`;
 
   return (
-    <main className="flex-1 flex flex-col gap-4 px-4 py-4 max-w-3xl w-full mx-auto">
+    <main className="page-shell">
       <TradesTabBar leagueId={leagueId} leagueName={leagueName} active="trade_analyzer" />
       <header className="flex flex-col gap-1">
         <PageTitle page="Trade Analyzer" leagueName={leagueName} />

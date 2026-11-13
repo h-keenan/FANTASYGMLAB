@@ -543,8 +543,8 @@ function LineupComparison({
         <div className="flex items-center justify-between gap-2">
           <PillRow
             options={[
-              { label: "Suggested", value: "suggested" },
-              { label: "Actual", value: "actual" },
+              { label: "Suggested", value: "suggested", glyph: "suggested" },
+              { label: "Actual", value: "actual", glyph: "actual" },
             ]}
             active={view}
             onSelect={(value) => onViewChange(value as LineupView)}
@@ -823,7 +823,7 @@ export function MatchupContent({
   if (guillotine) {
     // No head-to-head in guillotine leagues: survival replaces win probability.
     return (
-      <main className="flex-1 flex flex-col gap-4 px-4 py-3 max-w-3xl w-full mx-auto">
+      <main className="page-shell">
         <MatchupHeader week={guillotine.week ?? matchup.week} live={false} leagueName={leagueName} />
         <GuillotineCard data={guillotine} />
       </main>
@@ -838,7 +838,7 @@ export function MatchupContent({
       return router.push(`/dashboard/${encodeURIComponent(leagueId)}?name=${encodeURIComponent(leagueName)}`);
     };
     return (
-      <main className="flex-1 flex flex-col gap-3 px-4 py-3 max-w-3xl w-full mx-auto">
+      <main className="page-shell">
         <MatchupHeader week={matchup.week} live={false} leagueName={leagueName} />
         <EmptyState
           title={matchupReasonMessage(matchup.reason)}
@@ -851,7 +851,7 @@ export function MatchupContent({
   }
 
   return (
-    <main className="flex-1 flex flex-col gap-4 px-4 py-3 max-w-3xl w-full mx-auto">
+    <main className="page-shell">
       <MatchupHeader week={matchup.week} live={matchup.game_state === "live"} leagueName={leagueName} />
       <Scoreboard matchup={shown} />
       {matchup.unmapped_players && matchup.unmapped_players.length > 0 ? (

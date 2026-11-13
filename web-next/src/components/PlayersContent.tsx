@@ -349,7 +349,7 @@ export function PlayersContent({
   const pickSeasons = useMemo(() => groupPicksBySeason(visibleDraftPicks(picks, "league", "")), [picks]);
 
   return (
-    <main className="flex-1 flex flex-col gap-3 px-4 py-3 max-w-3xl w-full mx-auto">
+    <main className="page-shell">
       <header className="flex flex-col gap-1">
         <PageTitle page="Players" leagueName={leagueName} />
       </header>
@@ -357,8 +357,8 @@ export function PlayersContent({
       {picks.length > 0 ? (
         <PillRow
           options={[
-            { label: "Players", value: "players" },
-            { label: "Picks", value: "picks" },
+            { label: "Players", value: "players", glyph: "players" },
+            { label: "Picks", value: "picks", glyph: "picks" },
           ]}
           active={view}
           onSelect={(value) => setView(value as PlayersView)}

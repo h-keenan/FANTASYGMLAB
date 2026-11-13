@@ -251,8 +251,8 @@ export default function CollegeScoutingPanel({
         <View style={styles.lensBlock}>
           <SegmentedTabBar<ScoutView>
             options={[
-              { key: 'base', label: 'Best available' },
-              { key: 'league', label: 'For my league' },
+              { key: 'base', label: 'Best available', glyph: 'prospects' },
+              { key: 'league', label: 'For my league', glyph: 'league' },
             ]}
             active={view}
             onChange={setView}

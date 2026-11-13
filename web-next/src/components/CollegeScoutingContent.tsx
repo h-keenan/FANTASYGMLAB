@@ -246,7 +246,7 @@ function ProspectCard({
 
 function Shell({ embedded, children }: { embedded: boolean; children: ReactNode }) {
   if (embedded) return <div className="flex flex-col gap-3">{children}</div>;
-  return <main className="flex-1 flex flex-col gap-3 px-4 py-3 max-w-3xl w-full mx-auto">{children}</main>;
+  return <main className="page-shell">{children}</main>;
 }
 
 export function CollegeScoutingContent({
@@ -369,8 +369,8 @@ export function CollegeScoutingContent({
         <div className="flex flex-col gap-4">
           <PillRow
             options={[
-              { label: "All Prospects", value: "all" },
-              { label: "My Watchlist", value: "watchlist" },
+              { label: "All Prospects", value: "all", glyph: "prospects" },
+              { label: "My Watchlist", value: "watchlist", glyph: "watchlist" },
             ]}
             active={filter}
             onSelect={(value) => setFilter(value as FilterKey)}

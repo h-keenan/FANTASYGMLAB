@@ -120,7 +120,7 @@ export function SimHomeTab({ ctx, setClaims, onTab }: { ctx: SimCtx; setClaims: 
   return (
     <View style={common.stack} testID="sim-home">
       <SegmentedTabBar
-        options={SIM_HOME_VIEWS.map((v) => ({ key: v.value, label: v.value === 'week' && inboxCount > 0 ? `${v.label} · ${inboxCount}` : v.label }))}
+        options={SIM_HOME_VIEWS.map((v) => ({ key: v.value, label: v.value === 'week' && inboxCount > 0 ? `${v.label} · ${inboxCount}` : v.label, glyph: v.glyph }))}
         active={view}
         onChange={setView}
       />

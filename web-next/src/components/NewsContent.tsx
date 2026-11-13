@@ -213,7 +213,7 @@ export function NewsContent({ data, playerName }: { data: NewsResponse; playerNa
   const sections = groupNewsByDate(data.items);
 
   return (
-    <main className="flex-1 flex flex-col gap-3 px-4 py-3 max-w-3xl w-full mx-auto">
+    <main className="page-shell">
       <header className="flex flex-col gap-1">
         <PageTitle page={playerName ? `News: ${playerName}` : "News"} />
         {playerName ? (

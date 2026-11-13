@@ -311,7 +311,7 @@ export function SimFinalView({ ctx, onNewGame, onHub }: { ctx: SimCtx; onNewGame
         </View>
       </AccentCard>
 
-      <SegmentedTabBar options={SIM_REVIEW_VIEWS.map((v) => ({ key: v.value, label: v.label }))} active={tab} onChange={setTab} />
+      <SegmentedTabBar options={SIM_REVIEW_VIEWS.map((v) => ({ key: v.value, label: v.label, glyph: v.glyph }))} active={tab} onChange={setTab} />
       {tab === 'standings' ? (
         <View style={common.stack} accessibilityLabel="Final standings">
           <SectionHeading title="Final standings" icon="analytics-outline" />

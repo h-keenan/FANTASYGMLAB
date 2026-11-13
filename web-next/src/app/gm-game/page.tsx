@@ -13,7 +13,7 @@ export default function GmGamePage() {
   if (loading) return <LoadingScreen status="Loading Fantasy Sim…" />;
   if (!session) {
     return (
-      <main className="flex-1 flex flex-col gap-3 px-4 py-6 max-w-3xl w-full mx-auto">
+      <main className="page-shell">
         <EmptyState title="Sign in to play Fantasy Sim" subtitle="Draft a team, play a season against AI managers and get graded. Your saves follow your account." centered>
           <ButtonLink href="/">Sign in</ButtonLink>
         </EmptyState>

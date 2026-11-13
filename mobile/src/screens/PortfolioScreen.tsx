@@ -297,8 +297,8 @@ export default function PortfolioScreen() {
           <View style={styles.infoNoteWrap}>
             <SegmentedTabBar
               options={[
-                { key: 'leagues', label: 'Leagues' },
-                { key: 'exposure', label: 'Exposure' },
+                { key: 'leagues', label: 'Leagues', glyph: 'leagues' as const },
+                { key: 'exposure', label: 'Exposure', glyph: 'exposure' as const },
               ]}
               active={view}
               onChange={setView}

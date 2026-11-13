@@ -86,7 +86,7 @@ function ForecastSkeleton() {
 
 function Shell({ children }: { children: React.ReactNode }) {
   return (
-    <main className="flex-1 flex flex-col gap-5 px-4 py-6 max-w-3xl w-full mx-auto">
+    <main className="page-shell">
       <PageTitle page="Season Outlook" />
       {children}
     </main>
