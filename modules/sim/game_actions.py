@@ -24,6 +24,7 @@ from modules.sim.game_ai import (
     trade_window,
     validate_offer,
 )
+from modules.sim.game_ai_depth import cut_order
 from modules.sim.game_eval import Evaluator, team_params
 from modules.sim.game_state import Emitter, GameState
 from modules.sim.types import is_pick_id
@@ -279,6 +280,12 @@ def enforce_roster_cap(em: Emitter, ev: Evaluator, tid: str) -> list[str]:
     ev = Evaluator(snap, state)
     if len(state.rosters[tid]) > snap.settings.roster_limit:
         ai_manage_reserves(em, ev, tid)  # IR and taxi first: they free spots without losing anyone
+    while len(state.rosters[tid]) > snap.settings.roster_limit and snap.settings.ai_depth:
+        ordered = cut_order(Evaluator(snap, state), tid, state.rosters[tid], max(state.week, 1))
+        if not ordered:
+            break
+        em.emit(state.week, tid, "drop", team=tid, pid=ordered[0], reason="roster_limit")
+        cut.append(ordered[0])
     while len(state.rosters[tid]) > snap.settings.roster_limit:
         roster = state.rosters[tid]
         best, _ = ev.best_lineup(roster, state.week)

@@ -28,6 +28,7 @@ from modules.sim.game_ai import (
     ai_waiver_claim,
     offer_message,
 )
+from modules.sim.game_ai_depth import ai_waiver_claims, depth_adds
 from modules.sim.game_draft import draft_recap
 from modules.sim.game_eval import Evaluator, team_params
 from modules.sim.game_scoring import PlayerWeek, ScoringModel, get_model
@@ -265,6 +266,11 @@ def _resolve_waivers(em: Emitter, snap: GameSnapshot, state: GameState, seed: in
     for tid in waiver_order(snap, state):
         if snap.team(tid).is_user:
             continue
+        if snap.settings.ai_depth:  # ai_v 1: plan around byes and injuries, several claims when several holes open
+            for c in ai_waiver_claims(ev, tid, week, seed, claimed):
+                claims[tid].append(c)
+                claimed.add(c["add"])
+            continue
         c = ai_waiver_claim(ev, tid, week, seed, claimed)
         if c is not None:
             claims[tid].append(c)
@@ -287,12 +293,32 @@ def _resolve_waivers(em: Emitter, snap: GameSnapshot, state: GameState, seed: in
                 start = None
             em.emit(week, "user" if snap.team(tid).is_user else "engine", "waiver_result",
                     team=tid, add=add, drop=drop, ok=not reason, reason=reason,
-                    start_slot=start if not reason else None, claim_id=c.get("id"))
+                    start_slot=start if not reason else None, claim_id=c.get("id"),
+                    **({"why": c["why"]} if c.get("why") and not reason else {}))
             out.append({
                 "team_id": tid, "name": snap.team(tid).name, "is_you": snap.team(tid).is_user,
                 "add": _brief(snap, add), "drop": _brief(snap, drop), "ok": not reason, "reason": reason,
             })
     return out
+
+
+def _post_trade_cover(em: Emitter, snap: GameSnapshot, state: GameState, seed: int, week: int) -> None:
+    """ai_v 1: after the week's AI trades, any AI team with a hole this week or next picks up cover (waiver order, one
+    emergency pass; the wire is shared, so a free agent another team just took is gone)."""
+
+    limit = snap.settings.roster_limit
+    for tid in waiver_order(snap, state):
+        if snap.team(tid).is_user:
+            continue
+        ev = Evaluator(snap, state)
+        for c in ai_waiver_claims(ev, tid, week, seed, (), emergency_only=True):
+            roster = state.rosters[tid]
+            add, drop = c["add"], c.get("drop")
+            if add in state.owner_map() or (drop is not None and drop not in roster) or len(roster) - (1 if drop else 0) + 1 > limit:
+                continue
+            em.emit(week, "engine", "waiver_result", team=tid, add=add, drop=drop, ok=True, reason="", start_slot=None,
+                    claim_id=None, why=c.get("why", "injury"))
+            ev = Evaluator(snap, state)
 
 
 def _ai_trade_phase(em: Emitter, snap: GameSnapshot, state: GameState, seed: int, week: int) -> list[dict[str, Any]]:
@@ -376,6 +402,14 @@ def _fill_holes(em: Emitter, ev: Evaluator, tid: str) -> list[str]:
 
     snap, state = em.snap, em.state
     added: list[str] = []
+    if snap.settings.ai_depth:  # ai_v 1: also a healthy backup at every core position
+        owned = state.owner_map()
+        free = [p for p in snap.pids if p not in owned]
+        for pid in depth_adds(ev, tid, 1, free):
+            em.emit(1, "engine", "waiver_result", team=tid, add=pid, drop=None, ok=True, reason="", start_slot=None,
+                    claim_id=None, why="depth")
+            added.append(pid)
+        return added
     for _ in range(len(snap.settings.slots)):
         best, _total = ev.best_lineup(state.rosters[tid], 1)
         vacant = sorted({pos for slot, pid in best if not pid for pos in slot_positions(slot)})
@@ -499,6 +533,8 @@ def run_week(em: Emitter, snap: GameSnapshot, state: GameState, seed: int) -> di
 
     # 3. AI-to-AI trades (before the deadline)
     ai_trades = _ai_trade_phase(em, snap, state, seed, W)
+    if S.ai_depth:  # a trade can open a hole: cover it before lineups lock
+        _post_trade_cover(em, snap, state, seed, W)
 
     # 4. lineups: AI sets its own, the user's empty slots are auto-filled
     ev = Evaluator(snap, state)

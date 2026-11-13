@@ -262,7 +262,7 @@ def _waiver_result(state, snap, week, p):
                 if row[0] == slot:
                     row[1] = p["add"]
                     break
-        _tx(state, week, "waiver", team=tid, add=p["add"], drop=p.get("drop"))
+        _tx(state, week, "waiver", team=tid, add=p["add"], drop=p.get("drop"), **({"why": p["why"]} if p.get("why") else {}))
 
 
 def _cut(state, snap, week, p):

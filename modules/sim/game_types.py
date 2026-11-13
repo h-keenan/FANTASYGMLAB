@@ -39,6 +39,7 @@ DEFAULT_IR_SLOTS = 2
 DEFAULT_TAXI_YEARS = 2  # rookies and second-year players (years of experience below this), Sleeper's usual rule
 DEFAULT_TAXI_SLOTS_DYNASTY = 4
 RESERVE_VERSION = 1
+AI_VERSION = 1  # 1: AI managers plan depth around byes and injuries, use the wire proactively (new games only)
 TIEBREAKERS = ("points_for", "head_to_head")  # standings/seed tiebreak after win pct
 DEFAULT_TIEBREAKER = "points_for"
 LEGACY_TIEBREAKER = "head_to_head"  # saves from before the setting existed
@@ -186,6 +187,13 @@ class GameSettings:
     ir_slots: int = 0
     taxi_slots: int = 0
     taxi_years: int = 2  # years of NFL experience a player may have and still sit on the taxi squad
+    # AI manager generation (0 = a save from before bye/injury-aware depth planning: its AI decisions replay exactly as they were).
+    ai_v: int = 0
+
+    @property
+    def ai_depth(self) -> bool:
+        """AI managers plan around byes and injuries (ai_v 1+). Older saves keep their original, reactive AI."""
+        return self.ai_v >= 1
 
     @property
     def reserves(self) -> bool:
@@ -300,7 +308,7 @@ class GameSettings:
             slots=slots, rounds=rounds, roster_limit=limit, playoff_teams=4 if teams <= 8 else 6,
             mode=mode, te_premium=float(te_premium), superflex=superflex, include_k=include_k,
             include_def=include_def, bench=bench, tiebreaker=tiebreaker,
-            reserve_v=RESERVE_VERSION, ir_slots=ir_slots, taxi_slots=taxi_slots, taxi_years=taxi_years,
+            reserve_v=RESERVE_VERSION, ir_slots=ir_slots, taxi_slots=taxi_slots, taxi_years=taxi_years, ai_v=AI_VERSION,
             seasons=seasons, start_year=start_year, rookie_rounds=rookie_rounds,
             pick_years=PICK_YEARS if mode == "dynasty" else 0, dynasty_v=DYNASTY_VERSION if mode == "dynasty" else 0,
         )
@@ -321,6 +329,8 @@ class GameSettings:
         if self.reserve_v:
             out.update({"reserve_v": self.reserve_v, "ir_slots": self.ir_slots, "taxi_slots": self.taxi_slots,
                         "taxi_years": self.taxi_years})
+        if self.ai_v:  # saves from before the AI generation serialize exactly as before
+            out["ai_v"] = self.ai_v
         if self.dynasty_v:  # only dynasty saves carry these: every other save serializes exactly as before
             out.update({
                 "seasons": self.seasons, "start_year": self.start_year, "pick_years": self.pick_years,
@@ -356,7 +366,7 @@ class GameSettings:
             pick_years=int(raw.get("pick_years") or 0), rookie_rounds=int(raw.get("rookie_rounds") or 0),
             dynasty_v=int(raw.get("dynasty_v") or 0), reserve_v=int(raw.get("reserve_v") or 0),
             ir_slots=int(raw.get("ir_slots") or 0), taxi_slots=int(raw.get("taxi_slots") or 0),
-            taxi_years=int(raw.get("taxi_years", 2)),
+            taxi_years=int(raw.get("taxi_years", 2)), ai_v=int(raw.get("ai_v") or 0),
         )
 
 
