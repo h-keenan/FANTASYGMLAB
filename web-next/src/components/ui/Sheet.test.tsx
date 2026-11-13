@@ -30,7 +30,7 @@ describe("Sheet", () => {
     expect(screen.queryByRole("dialog")).toBeNull();
   });
 
-  it("portals a labelled modal dialog to body and locks scroll", () => {
+  it("portals a labelled modal dialog to body (scroll lock is the overlay runtime's)", () => {
     const { baseElement, unmount } = render(
       <Sheet open onClose={() => {}} title="Hello" description="Sub">
         <p>body</p>
@@ -40,9 +40,7 @@ describe("Sheet", () => {
     expect(dialog).toHaveAttribute("aria-modal", "true");
     expect(dialog).toHaveAccessibleDescription("Sub");
     expect(dialog.closest(".ui-sheet-backdrop")?.parentElement).toBe(baseElement);
-    expect(document.body.style.overflow).toBe("hidden");
     unmount();
-    expect(document.body.style.overflow).not.toBe("hidden");
   });
 
   it("closes on Escape, on the close button and on a backdrop press, not on a body press", () => {

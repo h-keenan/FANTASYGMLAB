@@ -22,6 +22,8 @@ import { SheetHandle } from "@/components/SheetHandle";
 import { usePlayerQuickView } from "@/context/PlayerQuickViewContext";
 import { explorerStatKey } from "@/lib/percentileExplorer";
 import { CHART_HEIGHT } from "@/components/weeklyPointsChartHeight";
+import { OverlayBack } from "@/components/OverlayBack";
+import { useOverlay } from "@/lib/useOverlay";
 import { useSheetDragDismiss } from "@/lib/useSheetDragDismiss";
 import { AvailabilityBlock, LatestNewsSection } from "@/components/PlayerQuickViewNews";
 import { Tabs } from "@/components/Tabs";
@@ -138,6 +140,8 @@ export function PlayerQuickView({
   // lib/useSheetDragDismiss.ts). Only closes when the body is scrolled to
   // its top, so scrolling back up inside a long PQV never closes it.
   const { sheetRef, sheetStyle, backdropStyle } = useSheetDragDismiss({ onDismiss: onClose });
+  // One pop-up at a time (lib/overlayStack.ts): opened from another pop-up this replaces it on screen and gets "‹ Back".
+  const overlay = useOverlay({ title: identity.name || "Player", onClose });
   const [loadError, setLoadError] = useState(false);
 
   // Fetch detail/awards for this player. The provider mounts one
@@ -192,22 +196,17 @@ export function PlayerQuickView({
     };
   }, [identity.player_id, remote, realWorld.fetchNews]);
 
-  // Focus the close button on open, restore body scroll on close — the
-  // minimal accessible-modal contract (focus moves into the dialog, page
-  // behind it stops scrolling) without pulling in a dialog library.
+  // Focus moves into the dialog whenever it becomes the visible pop-up (first open, or returning from one opened on top).
+  // Page scroll lock, history and layering belong to the overlay runtime, not to this shell.
+  const visible = !overlay.hidden;
   useEffect(() => {
-    const previousOverflow = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
-    closeButtonRef.current?.focus();
-    return () => {
-      document.body.style.overflow = previousOverflow;
-    };
-  }, []);
+    if (visible) closeButtonRef.current?.focus();
+  }, [visible]);
 
   function handleKeyDown(event: React.KeyboardEvent<HTMLDivElement>) {
     if (event.key === "Escape") {
       event.stopPropagation();
-      onClose();
+      overlay.back();
       return;
     }
     if (event.key !== "Tab") return;
@@ -256,8 +255,9 @@ export function PlayerQuickView({
     <div
       className="pqv-backdrop"
       style={backdropStyle}
+      hidden={overlay.hidden}
       onMouseDown={(event) => {
-        if (event.target === event.currentTarget) onClose();
+        if (event.target === event.currentTarget) overlay.closeAll();
       }}
     >
       <div
@@ -279,12 +279,13 @@ export function PlayerQuickView({
         <div className="pqv-field" aria-hidden="true" />
         <div className="pqv-sweep" aria-hidden="true" />
         <SheetHandle />
+        <OverlayBack overlay={overlay} />
         <button
           ref={closeButtonRef}
           type="button"
           className="pqv-close"
           aria-label="Close player details"
-          onClick={onClose}
+          onClick={overlay.closeAll}
         >
           ×
         </button>

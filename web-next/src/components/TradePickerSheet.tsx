@@ -10,6 +10,8 @@ import { PillRow } from "@/components/PillRow";
 import { PlayerIdentity } from "@/components/PlayerRow";
 import { SheetHandle } from "@/components/SheetHandle";
 import { ValueStat } from "@/components/ValueStat";
+import { OverlayBack } from "@/components/OverlayBack";
+import { useOverlay } from "@/lib/useOverlay";
 import { useSheetDragDismiss } from "@/lib/useSheetDragDismiss";
 import {
   SHEET_CONDITIONS,
@@ -89,7 +91,10 @@ export function TradePickerSheet<T = unknown>({
   const filterPanelId = useId();
   const filterButtonRef = useRef<HTMLButtonElement>(null);
   const panelRef = useRef<HTMLDivElement>(null);
-  const { sheetRef, sheetStyle } = useSheetDragDismiss<HTMLDivElement>({ onDismiss: onClose });
+  const { sheetRef, sheetStyle, backdropStyle } = useSheetDragDismiss<HTMLDivElement>({ onDismiss: onClose });
+  // One pop-up at a time (lib/overlayStack.ts): a player card opened from a row replaces this picker on screen (it stays
+  // mounted but hidden, so selections, filters and scroll survive) and its Back returns here.
+  const overlay = useOverlay({ title, onClose });
   const filtersOpen = state.draft !== null;
   const single = mode === "single";
 
@@ -103,17 +108,14 @@ export function TradePickerSheet<T = unknown>({
   const atMax = max != null && state.selected.length >= max;
   const filterCount = activeFilterCount(state.filters);
 
-  // Scroll lock + focus in on open, focus back to the trigger on close.
+  // Focus in whenever this is the visible pop-up, focus back to the trigger on close. Scroll lock is the overlay runtime's.
+  const pickerVisible = !overlay.hidden;
   useEffect(() => {
-    const previousOverflow = document.body.style.overflow;
+    if (!pickerVisible) return;
     const previousFocus = document.activeElement as HTMLElement | null;
-    document.body.style.overflow = "hidden";
     sheetRef.current?.focus({ preventScroll: true });
-    return () => {
-      document.body.style.overflow = previousOverflow;
-      previousFocus?.focus?.({ preventScroll: true });
-    };
-  }, [sheetRef]);
+    return () => previousFocus?.focus?.({ preventScroll: true });
+  }, [pickerVisible, sheetRef]);
 
   // Move focus into the filter panel when it opens and back to its button when it closes.
   const wasOpen = useRef(false);
@@ -127,7 +129,7 @@ export function TradePickerSheet<T = unknown>({
     if (event.key === "Escape") {
       event.stopPropagation();
       if (filtersOpen) dispatch({ type: "closeFilters" });
-      else onClose();
+      else overlay.back();
       return;
     }
     if (event.key !== "Tab") return;
@@ -154,10 +156,11 @@ export function TradePickerSheet<T = unknown>({
   const dialog = (
     <div
       className="pqv-backdrop"
-      data-sheet-hideable="true"
       data-testid="trade-picker-backdrop"
+      style={backdropStyle}
+      hidden={overlay.hidden}
       onMouseDown={(event) => {
-        if (event.target === event.currentTarget) onClose();
+        if (event.target === event.currentTarget) overlay.closeAll();
       }}
     >
       <div
@@ -172,6 +175,7 @@ export function TradePickerSheet<T = unknown>({
         data-testid="trade-picker"
       >
         <SheetHandle />
+        <OverlayBack overlay={overlay} />
         <header className="tps-header">
           <span aria-hidden="true" className="inline-block shrink-0" style={{ width: 8, height: 8, borderRadius: "50%", background: toneColor }} />
           <div className="min-w-0 flex-1">
@@ -184,7 +188,7 @@ export function TradePickerSheet<T = unknown>({
               </p>
             ) : null}
           </div>
-          <button type="button" className="pqv-close tps-close" aria-label={`Close ${title}`} onClick={onClose}>
+          <button type="button" className="pqv-close tps-close" aria-label={`Close ${title}`} onClick={overlay.closeAll}>
             ×
           </button>
         </header>

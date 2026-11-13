@@ -58,7 +58,7 @@ describe("PlayerAvatar fallback", () => {
 });
 
 describe("SimSheet", () => {
-  it("renders into document.body (viewport-centered), locks scroll, focuses itself, and closes on Escape and backdrop", () => {
+  it("renders into document.body (viewport-centered), focuses itself, and closes on Escape and backdrop", () => {
     const onClose = vi.fn();
     const { container, unmount } = render(
       <div style={{ transform: "translateY(1px)" }}>
@@ -70,13 +70,11 @@ describe("SimSheet", () => {
     const dialog = screen.getByRole("dialog");
     expect(container.contains(dialog)).toBe(false);
     expect(document.body.contains(dialog)).toBe(true);
-    expect(document.body.style.overflow).toBe("hidden");
     expect(document.activeElement).toBe(dialog);
     fireEvent.keyDown(window, { key: "Escape" });
     expect(onClose).toHaveBeenCalledTimes(1);
     fireEvent.mouseDown(screen.getByTestId("sim-sheet-backdrop"));
     expect(onClose).toHaveBeenCalledTimes(2);
     unmount();
-    expect(document.body.style.overflow).not.toBe("hidden");
   });
 });

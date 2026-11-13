@@ -1127,7 +1127,10 @@ a {
   align-items: center;
   justify-content: center;
   padding: var(--space-lg);
-  z-index: 50;
+  z-index: var(--z-overlay-sheet, 70); /* one layer for every pop-up shell (lib/overlayStack.ts OVERLAY_Z); only the newest sheet is visible */
+}
+.pqv-backdrop[hidden] {
+  display: none;
 }
 .pqv-modal {
   position: relative;
@@ -4057,11 +4060,6 @@ main > header:has(> h1.sr-only:only-child) {
 .tps-row-shared[data-selected="true"] {
   background: var(--color-accent-soft);
 }
-/* One overlay at a time: while a Fantasy Sim player card is up, every sim sheet under it is invisible (still mounted, so selections and scroll survive). */
-body[data-sim-pqv] [data-sheet-hideable] {
-  visibility: hidden;
-  pointer-events: none;
-}
 .tps-row-main {
   display: flex;
   align-items: center;
@@ -4296,4 +4294,26 @@ body[data-sim-pqv] [data-sheet-hideable] {
   align-items: center;
   gap: 0.125rem;
   color: var(--color-accent);
+}
+
+/* Overlay layers (lib/overlayStack.ts OVERLAY_Z): sheets 70, real dialogs 90, toasts 100. Toasts are not pop-ups. */
+:root {
+  --z-overlay-sheet: 70;
+  --z-overlay-dialog: 90;
+  --z-toast: 100;
+}
+/* "‹ Back to <previous pop-up>" at the top of a pop-up opened from another one. */
+.overlay-back {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  align-self: flex-start;
+  min-height: var(--touch-target-min);
+  padding: 0 var(--space-lg);
+  background: transparent;
+  border: 0;
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: var(--color-accent);
+  cursor: pointer;
 }

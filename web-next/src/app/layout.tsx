@@ -5,6 +5,7 @@ import "./globals.css";
 import { AuthProvider } from "@/context/AuthContext";
 import { DisplayPreferencesProvider } from "@/context/DisplayPreferencesContext";
 import { ExperienceLevelProvider } from "@/context/ExperienceLevelContext";
+import { OverlayRuntime } from "@/components/OverlayRuntime";
 import { PlayerQuickViewProvider } from "@/context/PlayerQuickViewContext";
 import { ValuationLensProvider } from "@/context/ValuationLensContext";
 import { AppContentShell } from "@/components/AppContentShell";
@@ -70,6 +71,7 @@ export default function RootLayout({ children }: { children: ReactNode }) {
           <ExperienceLevelProvider>
             <DisplayPreferencesProvider>
             <ValuationLensProvider>
+              <OverlayRuntime />
               <PlayerQuickViewProvider>
                 {/* Desktop-width persistent left nav (coridian_, 2026-10-17:
                     "desktop side menu") — fixed-position, so it sits outside
