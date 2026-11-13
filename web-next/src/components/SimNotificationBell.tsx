@@ -24,6 +24,7 @@ import {
 } from "@/lib/simNotifications";
 
 function readCursor(gameId: string): number {
+  if (typeof window === "undefined") return 0;
   try {
     return simNotifParseCursor(window.localStorage.getItem(simNotifCursorKey(gameId)));
   } catch {
@@ -48,12 +49,10 @@ export function useSimNotifications(ctx: SimCtx) {
   const { gameId, game } = ctx;
   const [items, setItems] = useState<SimNotification[]>([]);
   const [latest, setLatest] = useState(0);
-  const [cursor, setCursor] = useState(0);
+  // The cursor is state keyed by game (read from storage on first use per game, no effect needed).
+  const [cursorState, setCursorState] = useState<{ id: string; value: number }>(() => ({ id: gameId, value: readCursor(gameId) }));
+  const cursor = cursorState.id === gameId ? cursorState.value : readCursor(gameId);
   const key = simNotifKey(game, ctx.tick);
-
-  useEffect(() => {
-    setCursor(readCursor(gameId));
-  }, [gameId]);
 
   useEffect(() => {
     let cancelled = false;
@@ -73,7 +72,7 @@ export function useSimNotifications(ctx: SimCtx) {
   const unread = useMemo(() => simNotifUnread(items, cursor), [items, cursor]);
   const markAllRead = useCallback(() => {
     const next = simNotifMarkAllRead(cursor, latest);
-    setCursor(next);
+    setCursorState({ id: gameId, value: next });
     writeCursor(gameId, next);
   }, [cursor, latest, gameId]);
   return { items, unread, cursor, markAllRead };
