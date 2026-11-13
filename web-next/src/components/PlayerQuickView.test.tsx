@@ -501,11 +501,13 @@ describe("PlayerQuickView", () => {
       render(<PlayerQuickView identity={identity()} onClose={vi.fn()} asOfSeason={2025} simOverlay={<p>Sim overlay</p>} />);
 
       await waitFor(() => expect(screen.queryByText(/Loading player detail/)).not.toBeInTheDocument());
+      fireEvent.click(screen.getByRole("tab", { name: "Stats" }));
       expect(screen.getAllByText(/2025 Regular Season/).length).toBeGreaterThan(0);
       expect(screen.getAllByText(/2024 Regular Season/).length).toBeGreaterThan(0);
       expect(screen.getAllByText("Targets").length).toBeGreaterThan(0);
       expect(screen.queryByText(/2026 Regular Season/)).toBeNull();
       expect(screen.queryByText("CURRENT-2026-TARGETS")).toBeNull();
+      fireEvent.click(screen.getByRole("tab", { name: "Profile" }));
       expect(screen.getByText(/AWARD-2025/)).toBeInTheDocument();
       expect(screen.queryByText(/AWARD-2026-CURRENT/)).toBeNull();
       expect(screen.queryByText(/AWARD-UNDATED/)).toBeNull(); // cannot be placed in time, never guessed
@@ -520,6 +522,7 @@ describe("PlayerQuickView", () => {
       vi.mocked(api.getPlayerAwards).mockResolvedValue(awardsResult());
       render(<PlayerQuickView identity={identity()} onClose={vi.fn()} />);
       await waitFor(() => expect(screen.queryByText(/Loading player detail/)).not.toBeInTheDocument());
+      fireEvent.click(screen.getByRole("tab", { name: "Stats" }));
       expect(screen.getAllByText(/2026 Regular Season/).length).toBeGreaterThan(0);
     });
   });
