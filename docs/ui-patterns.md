@@ -18,6 +18,7 @@ Ground rules for every pattern here:
 |---|---|---|---|---|
 | `Sheet` | `ui/Sheet.tsx` | `Sheet.tsx` | `sheetStack.ts` | built; first users are TapForWhy, StructuredRow, FilterSheet |
 | `ConfirmInPlace` | `ui/ConfirmInPlace.tsx` | `ConfirmInPlace.tsx` | `confirmInPlace.ts` | built and applied (see below) |
+| `StoryCarousel` | `ui/StoryCarousel.tsx` | `StoryCarousel.tsx` | `storyCarousel.ts` | built; first user: Fantasy Sim weekly recap |
 | `UndoToast` | `ui/UndoToast.tsx` | `UndoToast.tsx` | `confirmInPlace.ts` (timing) | built; used by GM targets |
 
 ## Sheet
@@ -64,6 +65,42 @@ Not migrated yet (low-risk later, one at a time): `PlayerQuickView`, `Percentile
 `SimSheet`, `TradePickerSheet`. They keep working as they are; each can be swapped for
 `Sheet` in its own PR. The PQV in particular has bespoke chrome (field/sweep textures, header
 layout), so it stays a hand-rolled shell until a design pass decides what becomes a `Sheet` prop.
+
+## StoryCarousel
+
+A full-screen, story-style carousel for "moments": one glanceable page at a time, the way a story or a
+recap reads. Web `components/ui/StoryCarousel.tsx`, app `components/StoryCarousel.tsx`; the pure logic
+(page index, tap zones, swipes, keys) is the byte-identical twin `lib/storyCarousel.ts`.
+
+```tsx
+import { StoryCarousel, type StoryPage } from "@/components/ui/StoryCarousel";
+
+const pages: StoryPage[] = [
+  { key: "result", label: "Result", content: <Hero .../> },
+  { key: "next", label: "Next week", content: <Next .../>, footer: <Button onClick={done}>Back to your team</Button> },
+];
+<StoryCarousel title="Week 4 recap" pages={pages} onClose={done} />
+```
+
+- **A page is glanceable**: a hero number plus at most three supporting items, no scrolling. Put the
+  selection logic (which pages exist, what goes on each) in a pure `lib/` module with tests, like
+  `lib/simRecapStory.ts` (`STORY_ITEMS = 3`). Pages with nothing to say are dropped, not shown empty.
+- **Navigation**: swipe, tap the left 30% (back) or the rest (forward), arrow keys / PageUp / PageDown,
+  the page-progress segments (tap one to jump), desktop arrow buttons. Taps on a button, link or
+  anything marked `data-story-interactive` never flip the page. The last page has no forward action:
+  its `footer` is the finish CTA.
+- **Close and the overlay rule**: it registers with THE overlay stack (`useOverlay` on web, `overlayStack` in the
+  app; see "Overlays"), so only one pop-up is ever on screen: a player card (PQV) opened from a page REPLACES the
+  story (it stays mounted/hidden with its page) and its "‹ Back to ..." returns to the same page. The X (top right)
+  closes everything; Escape and the phone/browser Back go back one step. The stack owns the scroll lock, history and
+  z-index: the carousel sets none of them.
+- **Look and motion**: glass over the page background, safe-area padding on all sides, a 240ms slide
+  between pages that is off under `prefers-reduced-motion` (app: `useReducedMotion`), no horizontal
+  overflow (every column is `min-w-0`).
+- **Reuse**: a story is `{ title, pages[], onClose }`. First user: the Fantasy Sim weekly recap
+  (`SimRecapStory`: Result, Matchup breakdown, Injuries and lineup, Around the league, Next week; a
+  "Full details" button opens the classic recap). Meant for the season recap, draft recap and offseason
+  review next; those are not built yet.
 
 ## ConfirmInPlace
 

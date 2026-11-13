@@ -24,7 +24,8 @@ import { SimOffseasonBar } from "@/components/SimOffseasonBar";
 import { ConfirmInPlace } from "@/components/ui/ConfirmInPlace";
 import { SimNotice, SimOpenPlayerContext, SimPreviewBanner, SimTeamLink, SimTeamOpenContext, simToneColor, type SimCtx } from "@/components/SimGameParts";
 import { SimTeamSheet } from "@/components/SimGameTeamSheet";
-import { SimFinalView, SimWeekRecapView } from "@/components/SimGameRecap";
+import { SimFinalView } from "@/components/SimGameRecap";
+import { SimWeekRecapStory } from "@/components/SimRecapStory";
 import { SimPlayersTab, SimTeamTab } from "@/components/SimGameTeam";
 import { SimTradesTab } from "@/components/SimGameTrades";
 import { SkeletonCard } from "@/components/Skeleton";
@@ -924,7 +925,7 @@ function GameScreen({
       ) : draftRecap ? (
         <SimDraftRecapView recap={draftRecap.recap} ctx={ctx} onStart={onStartSeason} />
       ) : recap ? (
-        <SimWeekRecapView recap={recap} index={flow.recapIndex} total={flow.recaps.length} ctx={ctx} onNext={onRecapNext} onClose={onRecapClose} />
+        <SimWeekRecapStory recap={recap} index={flow.recapIndex} total={flow.recaps.length} ctx={ctx} onNext={onRecapNext} onClose={onRecapClose} onFixLineup={() => { onRecapClose(); onTab("team"); }} />
       ) : stage === "final" ? (
         <SimFinalView ctx={ctx} onNewGame={onNewGame} onHub={onHub} />
       ) : stage === "offseason" ? (

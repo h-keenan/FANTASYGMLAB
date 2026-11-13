@@ -379,11 +379,15 @@ describe("SimGameContent", () => {
     render(<SimGameContent />);
     await openFirstGame();
     fireEvent.click(await screen.findByRole("button", { name: "Advance to week 5" }));
-    expect(await screen.findByTestId("week-recap")).toHaveTextContent("Week 4 recap");
+    // The recap is a full-screen story: Result first, Next week last (this recap has no starters, scores or injuries).
+    const story = await screen.findByTestId("week-recap-story");
+    expect(story).toHaveAttribute("aria-label", "Week 4 recap");
     expect(screen.getByText("Win")).toBeInTheDocument();
+    expect(screen.getByText("Won by 18.7")).toBeInTheDocument();
     expect(mocked.advanceSimGame).toHaveBeenCalledWith("g1", 4);
+    fireEvent.keyDown(story, { key: "ArrowRight" });
     fireEvent.click(screen.getByRole("button", { name: "Back to your team" }));
-    await waitFor(() => expect(screen.queryByTestId("week-recap")).not.toBeInTheDocument());
+    await waitFor(() => expect(screen.queryByTestId("week-recap-story")).not.toBeInTheDocument());
     expect(screen.getByTestId("game-heading")).toHaveTextContent("Week 5 of 14");
   });
 
