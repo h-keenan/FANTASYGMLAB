@@ -283,7 +283,9 @@ export function SimGeneratedNoticeSheet({ onClose }: { onClose: () => void }) {
 export function SimRookieNoticeGate({ gameId }: { gameId: string }) {
   const [open, setOpen] = useState(false);
   useEffect(() => {
-    setOpen(!isSimRookieNoticeSeen(gameId));
+    // Storage is read after mount (never during render) so the server and client markup agree.
+    const timer = window.setTimeout(() => setOpen(!isSimRookieNoticeSeen(gameId)), 0);
+    return () => window.clearTimeout(timer);
   }, [gameId]);
   if (!open) return null;
   return (
