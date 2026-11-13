@@ -229,3 +229,29 @@ def test_ir_and_taxi_players_can_be_traded_and_arrive_on_the_active_roster(monke
     act.execute_trade(run.em, user, partner, [mine], [theirs], key="", source="test")
     assert state.where(partner, mine) in ("roster", None) and state.where(user, theirs) == "roster"
     assert mine not in state.taxi[user]
+
+
+def test_auto_set_fills_an_empty_slot_from_the_bench_and_reports_when_nobody_fits():
+    from modules.sim import game_actions as act
+    from tests.test_sim_dynasty import Run
+
+    run = Run()
+    snap, state, em = run.snap, run.state, run.em
+    user = snap.user_team.tid
+    em.snap = snap
+    qbs = [p for p in sorted(state.rosters[user]) if snap.players[p].pos == "QB"]
+    assert len(qbs) >= 2
+    starter = next(r[1] for r in state.lineups[user] if r[0] == "QB")
+    act.cut_player(em, starter)
+    assert [r for r in state.lineups[user] if r[0] == "QB"] == [["QB", None]]
+    act.auto_lineup(em)  # a healthy bench QB fills the empty slot
+    assert [r for r in state.lineups[user] if r[0] == "QB"][0][1] in qbs
+    for qb in qbs:  # now nobody is left: the slot stays empty and the lineup says so
+        if state.where(user, qb):
+            act.cut_player(em, qb)
+    act.auto_lineup(em)
+    assert [r for r in state.lineups[user] if r[0] == "QB"] == [["QB", None]]
+    from modules.sim.game_eval import Evaluator
+
+    warnings = act.lineup_warnings(Evaluator(snap, state), state.lineups[user], state.week)
+    assert {"code": "empty_slot", "slot": "QB", "player_id": None} in warnings

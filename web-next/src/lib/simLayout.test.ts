@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { SIM_ASSET_ALL, simAdvanceState, simEmptySlotLabels, simLineupIssues, simAutoSetMessage, simLineupDiff, simFilterGroups, simGroupByPosition, simSideSummary, simTradeFit, SIM_REVIEW_VIEWS, simReviewViewFor, simOpenKey, simParseOpen, simPreview, simSeeAllLabel, simWindow } from "./simLayout";
+import { SIM_ASSET_ALL, simAdvanceState, simEmptySlotLabels, simLineupIssues, simAutoSetMessage, simScoreboardLabel, simMatchupStatus, simMatchupMargin, simLineupDiff, simFilterGroups, simGroupByPosition, simSideSummary, simTradeFit, SIM_REVIEW_VIEWS, simReviewViewFor, simOpenKey, simParseOpen, simPreview, simSeeAllLabel, simWindow } from "./simLayout";
 
 describe("simLayout", () => {
   it("namespaces and parses open state", () => {
@@ -82,5 +82,26 @@ describe("simLayout", () => {
     expect(out.zero).toEqual([{ label: "WR2", name: "Jakobi Meyers", reason: "out" }]);
     expect(simAdvanceState({ week: 2 }, out.empty, out.zero).confirm).toBe("Jakobi Meyers (WR2) is out and will score 0 unless you swap him. Advance anyway?");
     expect(simAdvanceState({ week: 2 }, ["WR1"], [{ label: "RB", name: "A", reason: "bye" }]).confirm).toMatch(/WR1 is empty .* A \(RB\) is on a bye and will score 0/);
+  });
+  it("auto-set never says optimal while a slot is empty or a starter is on a bye/out", () => {
+    const same = { swaps: [], gain: 0 };
+    expect(simAutoSetMessage(same)).toBe("Lineup is optimal");
+    expect(simAutoSetMessage(same, { empty: [], zero: [] })).toBe("Lineup is optimal");
+    expect(simAutoSetMessage(same, { empty: ["QB"], zero: [] })).toBe("Nothing to swap. No QB on your roster to start in QB. Claim one from the Players tab.");
+    expect(simAutoSetMessage(same, { empty: ["FLEX"], zero: [] })).toContain("No RB, WR or TE on your roster");
+    expect(simAutoSetMessage(same, { empty: [], zero: [{ label: "WR1", name: "C. Watson", reason: "bye" }] })).toContain("C. Watson (WR1) is on a bye and no healthier player fits");
+    const four = { swaps: ["RB", "WR", "TE", "K"].map((slot) => ({ slot, out: "a", in: "b" })), gain: 3.2 };
+    expect(simAutoSetMessage(four, { empty: [], zero: [] })).toBe("Made 4 lineup swaps, +3.2 proj");
+    expect(simAutoSetMessage(four, { empty: ["QB"], zero: [] })).toMatch(/^Made 4 lineup swaps, \+3\.2 proj\. No QB on your roster/);
+  });
+  it("scoreboard label never duplicates the week; matchup status and margin", () => {
+    expect(simScoreboardLabel("Week 10", 10)).toBe("Week 10");
+    expect(simScoreboardLabel("Semifinal", 15)).toBe("Semifinal · Week 15");
+    expect(simMatchupStatus({ home_pts: 68.9, away_pts: 140.7, winner: "b" })).toEqual({ key: "final", label: "FINAL", tone: "success" });
+    expect(simMatchupStatus({ home_pts: null, away_pts: null, winner: null }).key).toBe("upcoming");
+    const names = { a: "Boom or Bust", b: "Flex Appeal" };
+    expect(simMatchupMargin({ home: "a", away: "b", home_pts: 68.9, away_pts: 140.7 }, names)).toBe("Flex Appeal won by 71.8");
+    expect(simMatchupMargin({ home: "a", away: "b", home_pts: 90, away_pts: 90 }, names)).toBe("Tie");
+    expect(simMatchupMargin({ home: "a", away: "b", home_pts: null, away_pts: null }, names)).toBe("Not played yet");
   });
 });
