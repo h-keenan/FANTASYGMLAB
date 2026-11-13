@@ -301,13 +301,13 @@ def add_routes(router: APIRouter, ctx: GameApiCtx) -> None:
 
     # ------------------------------------------------------------- helpers
 
-    history_cache: "OrderedDict[tuple, dict[str, Any]]" = OrderedDict()
+    history_cache: "OrderedDict[tuple, Any]" = OrderedDict()
     history_lock = threading.Lock()
 
-    def _history(store, uid: str, gid: str, row, kind: str, key: str, fold) -> dict[str, Any]:
-        """A history fold is a pure function of the event log, and the row version (event count + save stamp, the same
+    def _memo(uid: str, gid: str, row, kind: str, key: str, compute) -> dict[str, Any]:
+        """A read view (history fold, picks, inbox) is a pure function of the event log, and the row version (event count + save stamp, the same
         proof the state cache trusts) names exactly one log: reuse the result instead of re-reading and re-folding the
-        whole log (a dynasty log is thousands of events). Bounded LRU; undo/redo changes the stamp so it misses."""
+        whole log or re-evaluating every asset. Bounded LRU; undo/redo changes the stamp so it misses."""
 
         ck = (uid, gid, row_version(row), kind, key)
         with history_lock:
@@ -315,7 +315,7 @@ def add_routes(router: APIRouter, ctx: GameApiCtx) -> None:
             if hit is not None:
                 history_cache.move_to_end(ck)
                 return hit
-        out = fold(store.load_events(uid, gid))
+        out = compute()
         with history_lock:
             history_cache[ck] = out
             while len(history_cache) > 64:
@@ -694,7 +694,7 @@ def add_routes(router: APIRouter, ctx: GameApiCtx) -> None:
         root = snap.root
         if not any(pid in root.season_view(n).players for n in range(1, max(1, int(root.settings.seasons)) + 1)):
             raise HTTPException(status_code=404, detail="Player not found.")
-        return {**_env(pro, state), **_history(store, uid, _gid(game_id), row, "p", pid, lambda ev: hist.player_history(root, ev, pid))}
+        return {**_env(pro, state), **_memo(uid, _gid(game_id), row, "p", pid, lambda: hist.player_history(root, store.load_events(uid, _gid(game_id)), pid))}
 
     @router.get("/games/{game_id}/teams/{team_id}/history")
     @guarded
@@ -703,7 +703,7 @@ def add_routes(router: APIRouter, ctx: GameApiCtx) -> None:
         store, uid, row, snap, state = load(user, _gid(game_id))
         if team_id not in snap.tids:
             raise HTTPException(status_code=404, detail="Team not found.")
-        return {**_env(pro, state), **_history(store, uid, _gid(game_id), row, "t", team_id, lambda ev: hist.team_history(snap.root, ev, team_id))}
+        return {**_env(pro, state), **_memo(uid, _gid(game_id), row, "t", team_id, lambda: hist.team_history(snap.root, store.load_events(uid, _gid(game_id)), team_id))}
 
     @router.get("/games/{game_id}/teams/{team_id}")
     @guarded
@@ -858,8 +858,8 @@ def add_routes(router: APIRouter, ctx: GameApiCtx) -> None:
     @guarded
     def get_inbox(game_id: str, user: dict[str, Any] = Depends(require_user)):
         pro = ctx.is_pro(user)
-        _, _, _, snap, state = load(user, _gid(game_id))
-        return {**_env(pro, state), "items": view.inbox_view(snap, state)}
+        _, uid, row, snap, state = load(user, _gid(game_id))
+        return {**_env(pro, state), "items": _memo(uid, _gid(game_id), row, "inbox", "", lambda: view.inbox_view(snap, state))}
 
     @router.get("/games/{game_id}/notifications")
     @guarded
@@ -1009,10 +1009,10 @@ def add_routes(router: APIRouter, ctx: GameApiCtx) -> None:
     @guarded
     def get_picks(game_id: str, user: dict[str, Any] = Depends(require_user)):
         pro = ctx.is_pro(user)
-        _, _, _, snap, state = load(user, _gid(game_id))
+        _, uid, row, snap, state = load(user, _gid(game_id))
         if not snap.settings.dynasty:
             return _env(pro, state, "not_dynasty")
-        return {**_env(pro, state), **dview.picks_view(snap, state)}
+        return {**_env(pro, state), **_memo(uid, _gid(game_id), row, "picks", "", lambda: dview.picks_view(snap, state))}
 
     # --------------------------------------------------- dynasty offseason
 
