@@ -93,7 +93,7 @@ export function Sheet({
   const onCloseRef = useRef(onClose);
   // False on the server and on hydration, true on the client: keeps the portal out of SSR without an effect.
   const mounted = useSyncExternalStore(subscribeNever, () => true, () => false);
-  const { sheetRef, sheetStyle } = useSheetDragDismiss<HTMLDivElement>({ onDismiss: onClose, enabled: open });
+  const { sheetRef, sheetStyle, backdropStyle } = useSheetDragDismiss<HTMLDivElement>({ onDismiss: onClose, enabled: open });
 
   useEffect(() => {
     onCloseRef.current = onClose;
@@ -164,6 +164,7 @@ export function Sheet({
       className="ui-sheet-backdrop"
       data-hidden={hidden || undefined}
       hidden={hidden}
+      style={backdropStyle}
       onMouseDown={(event) => {
         if (event.target === event.currentTarget) onClose();
       }}

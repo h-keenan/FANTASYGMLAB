@@ -16,6 +16,8 @@ import { ConfirmInPlace } from "@/components/ui/ConfirmInPlace";
 import { PlayerRow } from "@/components/PlayerRow";
 import { RangeCompare } from "@/components/RangeCompare";
 import { SheetHandle } from "@/components/SheetHandle";
+import { useSheetDragDismiss } from "@/lib/useSheetDragDismiss";
+
 import { ToneBadge } from "@/components/ToneBadge";
 import {
   applySwap,
@@ -270,6 +272,7 @@ export function SwapSheet({
   onPick: (candidate: MatchupWhatIfCandidate) => void;
   onClose: () => void;
 }) {
+  const { sheetRef, sheetStyle, backdropStyle } = useSheetDragDismiss<HTMLDivElement>({ onDismiss: onClose });
   useEffect(() => {
     const previous = document.body.style.overflow;
     document.body.style.overflow = "hidden";
@@ -287,11 +290,12 @@ export function SwapSheet({
   return (
     <div
       className="pqv-backdrop"
+      style={backdropStyle}
       onMouseDown={(event) => {
         if (event.target === event.currentTarget) onClose();
       }}
     >
-      <div className="pqv-modal" role="dialog" aria-modal="true" aria-labelledby="swap-sheet-title">
+      <div ref={sheetRef} style={sheetStyle} className="pqv-modal" role="dialog" aria-modal="true" aria-labelledby="swap-sheet-title">
         <SheetHandle />
         <button type="button" className="pqv-close" aria-label="Close" onClick={onClose}>
           ×

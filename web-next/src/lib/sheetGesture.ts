@@ -84,3 +84,17 @@ export function classifySheetGesture({
   if (dy <= 0) return "ignore";
   return canStartDrag ? "drag" : "ignore";
 }
+
+/** Whether a touch may start dragging the sheet: it began on the grab handle (always allowed), or every scroll
+ * area between the finger and the sheet is at its top (`scrollTops` = scrollTop of each scrollable ancestor that
+ * actually overflows). Pulling down inside content that is scrolled away from its top scrolls it instead and
+ * never closes the sheet. Header and top-area touches have no overflowing ancestor, so they always qualify. */
+export function canStartSheetDrag({ onHandle, scrollTops }: { onHandle: boolean; scrollTops: readonly number[] }): boolean {
+  return onHandle || scrollTops.every((top) => top <= 0);
+}
+
+/** 0..1 for how far a drag has pulled the sheet toward closing; the backdrop fades by this much. */
+export function sheetDragProgress(offset: number, sheetHeight: number): number {
+  if (offset <= 0 || sheetHeight <= 0) return 0;
+  return Math.min(1, offset / sheetHeight);
+}

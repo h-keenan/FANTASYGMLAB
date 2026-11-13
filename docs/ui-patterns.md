@@ -48,6 +48,17 @@ React Native's `Modal`, so keep anything that must survive in the caller's state
 Mobile: `<Sheet open onClose title ... />` wraps the existing `SheetModal` / `SwipeDismissCard` /
 `SheetScrollView` (which own the gesture), so the swipe thresholds are unchanged.
 
+Swipe-to-dismiss (web) is `useSheetDragDismiss` + `<SheetHandle />` on EVERY pop-up shell, hand-rolled or not:
+`Sheet`, `PlayerQuickView`, `SimSheet` (claim, team and every other Fantasy Sim sheet), `ManagerProfileSheet`, the
+Matchup `SwapSheet`, `TradePickerSheet`, `PercentileExplorerSheet`, `AlertsDropdown`, checkout. Spread `sheetStyle`
+on the moving surface and `backdropStyle` on the backdrop (the scrim fades with the drag). A drag starts from the
+handle always, and from the header or body only when every scroll area under the finger is at its top
+(`canStartSheetDrag`, so inner scroll and iOS overscroll never fight it); it closes past ~80-160px (a quarter of
+the sheet) or on a fast flick, else springs back; under reduced motion it closes without the slide. New pop-up
+shells must use the hook (a handle without the hook is the bug this rule exists for). Touch check:
+`scripts/sim_layout_playwright/sheet_drag.mjs` (real CDP touch drags). Mobile sheets get it from `SheetModal` +
+`SwipeDismissCard`.
+
 Not migrated yet (low-risk later, one at a time): `PlayerQuickView`, `PercentileExplorerSheet`,
 `ManagerProfileSheet`, `MultiTeamTradeContent`, `MatchupPlanner` SwapSheet, `AlertsDropdown`,
 `SimSheet`, `TradePickerSheet`. They keep working as they are; each can be swapped for

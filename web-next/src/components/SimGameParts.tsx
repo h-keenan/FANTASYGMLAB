@@ -36,6 +36,7 @@ import {
   type SimGameTone,
 } from "@/lib/simGame";
 import { TapForWhy } from "@/components/ui/TapForWhy";
+import { useSheetDragDismiss } from "@/lib/useSheetDragDismiss";
 import { simSeeAllLabel } from "@/lib/simLayout";
 
 /** Semantic color token for a presentation tone (never a raw hex). */
@@ -351,6 +352,7 @@ export function SimProjection({ player }: { player: SimGamePlayer }) {
  * close X) the other detail sheets use, with Escape and scroll lock.
  */
 export function SimSheet({ title, onClose, children, labelledBy = "sim-sheet-title" }: { title: string; onClose: () => void; children: ReactNode; labelledBy?: string }) {
+  const { sheetRef, sheetStyle, backdropStyle } = useSheetDragDismiss<HTMLDivElement>({ onDismiss: onClose });
   useEffect(() => {
     const previous = document.body.style.overflow;
     document.body.style.overflow = "hidden";
@@ -375,11 +377,23 @@ export function SimSheet({ title, onClose, children, labelledBy = "sim-sheet-tit
       className="pqv-backdrop"
       data-sheet-hideable="true"
       data-testid="sim-sheet-backdrop"
+      style={backdropStyle}
       onMouseDown={(event) => {
         if (event.target === event.currentTarget) onClose();
       }}
     >
-      <div ref={modalRef} tabIndex={-1} className="pqv-modal" role="dialog" aria-modal="true" aria-labelledby={labelledBy} style={{ outline: "none" }}>
+      <div
+        ref={(node) => {
+          modalRef.current = node;
+          sheetRef.current = node;
+        }}
+        tabIndex={-1}
+        className="pqv-modal"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby={labelledBy}
+        style={{ outline: "none", ...sheetStyle }}
+      >
         <SheetHandle />
         <button type="button" className="pqv-close" aria-label={`Close ${title}`} onClick={onClose}>
           ×

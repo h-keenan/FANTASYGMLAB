@@ -1121,7 +1121,8 @@ a {
 .pqv-backdrop {
   position: fixed;
   inset: 0;
-  background: var(--color-scrim);
+  /* Fades while a sheet is dragged down (--sheet-drag 0..1 from useSheetDragDismiss.backdropStyle). */
+  background: color-mix(in srgb, var(--color-scrim) calc((1 - var(--sheet-drag, 0)) * 100%), transparent);
   display: flex;
   align-items: center;
   justify-content: center;
