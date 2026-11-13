@@ -6,7 +6,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import AppText from './AppText';
 import { SheetModal, SheetScrollView, SwipeDismissCard } from './SwipeDismissSheet';
 import { useThemeMode } from '../context/ThemeModeContext';
-import { sheetStack } from '../lib/sheetStack';
+import { overlayStack } from '../lib/overlayStack';
 import { radii, scrim, spacing, type ThemeColors } from '../theme';
 
 export type SheetProps = {
@@ -32,10 +32,12 @@ export type SheetProps = {
  * Android back to close, safe-area aware. It composes SheetModal /
  * SwipeDismissCard / SheetScrollView, which already own the gesture.
  *
- * Stacking rule: sheets never stack. Opening a second sheet HIDES the first
- * (React Native cannot present two Modals reliably); closing the second brings
- * it back. A hidden sheet's children are unmounted by the Modal, so keep
- * anything that must survive in the CALLER's state, not inside the sheet.
+ * Overlay rule (lib/overlayStack.ts, same as web): one pop-up at a time. Opening a
+ * second sheet REPLACES the first on screen (React Native cannot present two Modals
+ * reliably), the newer one shows "‹ Back to <first>", Android back returns to the
+ * first, and the X closes everything. A hidden sheet's children are unmounted by
+ * the Modal, so keep anything that must survive in the CALLER's state, not inside
+ * the sheet.
  */
 export function Sheet({ open, onClose, title, description, children, footer, hideTitle = false, testID }: SheetProps) {
   const { colors } = useThemeMode();
@@ -43,20 +45,26 @@ export function Sheet({ open, onClose, title, description, children, footer, hid
   const insets = useSafeAreaInsets();
   const id = useId();
 
-  useSyncExternalStore(sheetStack.subscribe, sheetStack.version, sheetStack.version);
+  useSyncExternalStore(overlayStack.subscribe, overlayStack.version, overlayStack.version);
   useEffect(() => {
     if (!open) return;
-    sheetStack.open(id);
-    return () => sheetStack.close(id);
-  }, [open, id]);
+    overlayStack.open({ id, kind: 'sheet', title, dismiss: onClose });
+    return () => overlayStack.close(id);
+  }, [open, id, title, onClose]);
 
-  const hidden = open && sheetStack.isHidden(id);
+  const hidden = open && overlayStack.isHidden(id);
+  const backTitle = open ? overlayStack.previousSheet(id)?.title ?? null : null;
   if (!open) return null;
 
   return (
     <SheetModal visible={!hidden} transparent animationType="slide" onRequestClose={onClose} statusBarTranslucent>
       <Pressable style={styles.backdrop} onPress={onClose} accessibilityLabel={`Close ${title}`} accessibilityRole="button">
         <SwipeDismissCard style={styles.sheet} onDismiss={onClose} testID={testID}>
+          {backTitle ? (
+            <Pressable onPress={onClose} accessibilityRole="button" accessibilityLabel={`Back to ${backTitle}`} style={styles.back} hitSlop={8} testID="overlay-back">
+              <AppText style={styles.backText}>‹ Back to {backTitle}</AppText>
+            </Pressable>
+          ) : null}
           <View style={styles.header} accessibilityViewIsModal>
             <View style={styles.headerText}>
               <AppText
@@ -68,7 +76,7 @@ export function Sheet({ open, onClose, title, description, children, footer, hid
               </AppText>
               {description ? <AppText style={styles.description}>{description}</AppText> : null}
             </View>
-            <Pressable onPress={onClose} hitSlop={10} style={styles.close} accessibilityRole="button" accessibilityLabel={`Close ${title}`}>
+            <Pressable onPress={() => { overlayStack.closeAll(); }} hitSlop={10} style={styles.close} accessibilityRole="button" accessibilityLabel={`Close ${title}`}>
               <Ionicons name="close" size={18} color={colors.textSecondary} />
             </Pressable>
           </View>
@@ -99,6 +107,8 @@ function createStyles(colors: ThemeColors) {
       maxHeight: '88%',
     },
     header: { flexDirection: 'row', alignItems: 'flex-start', gap: spacing.sm, paddingHorizontal: spacing.lg, paddingBottom: spacing.xs },
+    back: { paddingHorizontal: spacing.lg, paddingBottom: spacing.xs, minHeight: 44, justifyContent: 'center' },
+    backText: { fontSize: 14, fontWeight: '700', color: colors.accent },
     headerText: { flex: 1, minWidth: 0 },
     title: { fontSize: 19, fontWeight: '800', color: colors.textPrimary },
     description: { fontSize: 13, color: colors.textTertiary, marginTop: 2 },

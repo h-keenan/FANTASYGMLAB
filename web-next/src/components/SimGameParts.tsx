@@ -39,6 +39,9 @@ import {
   type SimGameTone,
 } from "@/lib/simGame";
 import { TapForWhy } from "@/components/ui/TapForWhy";
+import { OverlayBack } from "@/components/OverlayBack";
+import { overlayStack } from "@/lib/overlayStack";
+import { useOverlay } from "@/lib/useOverlay";
 import { useSheetDragDismiss } from "@/lib/useSheetDragDismiss";
 import { simSeeAllLabel } from "@/lib/simLayout";
 
@@ -399,33 +402,32 @@ export function SimProjection({ player }: { player: SimGamePlayer }) {
  */
 export function SimSheet({ title, onClose, children, labelledBy = "sim-sheet-title" }: { title: string; onClose: () => void; children: ReactNode; labelledBy?: string }) {
   const { sheetRef, sheetStyle, backdropStyle } = useSheetDragDismiss<HTMLDivElement>({ onDismiss: onClose });
+  // One pop-up at a time (lib/overlayStack.ts): scroll lock, history and layering belong to the overlay runtime.
+  const overlay = useOverlay({ title, onClose });
   useEffect(() => {
-    const previous = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
     const onKey = (event: KeyboardEvent) => {
-      if (event.key === "Escape") onClose();
+      if (event.key === "Escape" && overlayStack.isTop(overlay.id)) onClose();
     };
     window.addEventListener("keydown", onKey);
-    return () => {
-      document.body.style.overflow = previous;
-      window.removeEventListener("keydown", onKey);
-    };
-  }, [onClose]);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [onClose, overlay.id]);
   const modalRef = useRef<HTMLDivElement>(null);
+  const visible = !overlay.hidden;
   useEffect(() => {
-    // Focus moves into the dialog on open and returns to the trigger on close.
+    // Focus moves into the dialog whenever it is the visible pop-up and returns to the trigger on close.
+    if (!visible) return;
     const previous = document.activeElement as HTMLElement | null;
     modalRef.current?.focus();
     return () => previous?.focus?.();
-  }, []);
+  }, [visible]);
   const sheet = (
     <div
       className="pqv-backdrop"
-      data-sheet-hideable="true"
       data-testid="sim-sheet-backdrop"
       style={backdropStyle}
+      hidden={overlay.hidden}
       onMouseDown={(event) => {
-        if (event.target === event.currentTarget) onClose();
+        if (event.target === event.currentTarget) overlay.closeAll();
       }}
     >
       <div
@@ -441,7 +443,8 @@ export function SimSheet({ title, onClose, children, labelledBy = "sim-sheet-tit
         style={{ outline: "none", ...sheetStyle }}
       >
         <SheetHandle />
-        <button type="button" className="pqv-close" aria-label={`Close ${title}`} onClick={onClose}>
+        <OverlayBack overlay={overlay} />
+        <button type="button" className="pqv-close" aria-label={`Close ${title}`} onClick={overlay.closeAll}>
           ×
         </button>
         <div className="pqv-scroll">

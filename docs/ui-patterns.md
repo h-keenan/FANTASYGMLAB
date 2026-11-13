@@ -40,7 +40,7 @@ scroll is locked (reference counted), safe-area aware, swipe-down to dismiss on 
 screens underneath never bleed through, rise animation off under reduced motion. The sheet stops
 key events so a dialog underneath it (the Player Quick View) never reacts to them.
 
-**Stacking rule: sheets never stack.** Opening a second sheet hides the first (it stays mounted, so
+**Overlay rule (superseded detail below: see "Overlays"): sheets never stack.** Opening a second sheet hides the first (it stays mounted, so
 its state survives) and closing the second brings the first back. The rule lives in
 `lib/sheetStack.ts` and is shared with mobile. On mobile a hidden sheet's children are unmounted by
 React Native's `Modal`, so keep anything that must survive in the caller's state.
@@ -375,3 +375,46 @@ Below 768px, for signed-in users with the flag on, the floating GM orb and the c
 - Route to tab mapping lives in `lib/shellNav.ts` (`shellActiveTab`), covered by tests.
 
 Flag (`lib/shellNav.ts`, `lib/useShellNav.ts`): `NEXT_PUBLIC_BOTTOM_NAV` = `founder` (default: founder/owner account only), `on` (everyone), `off` (kill switch for everyone, nothing overrides it). `?nav=bottom` turns it on and `?nav=off` turns it off for that browser (remembered in localStorage `fgl:nav`). Naming: "Dashboard" is **Today** everywhere user-facing (route and code names keep `dashboard`); **Fantasy Sim** is the game; **Season Outlook** is the forecast (GM Plan and Games tab; "Season Sim" is a retired term).
+
+
+## Overlays (one pop-up at a time)
+
+Rule (coridian_, approved): ONE pop-up on screen at a time.
+
+- Opening a pop-up from inside another one REPLACES it on screen. The first stays mounted but hidden (`hidden` /
+  `display:none`; on mobile its Modal is not visible), so its scroll, typed text and selections survive.
+- The newer pop-up shows **‹ Back to <previous title>** (`OverlayBack`). The phone back gesture / browser Back (web;
+  Android back on mobile) goes back one step. The **X closes everything** and returns to the page. Tapping the scrim
+  equals the X; Escape equals Back.
+- Confirms happen in place inside the pop-up (`ConfirmInPlace`), never by opening another. Toasts are not pop-ups and
+  sit above everything. A real dialog (`kind: "dialog"`, e.g. sign out) sits ON TOP of the visible sheet without hiding
+  it, and closing it returns to the sheet underneath.
+- Layers (one place, `OVERLAY_Z` / `--z-overlay-*`): sheets 70, dialogs 90, toasts 100. No pop-up picks its own z-index.
+  This is what fixes "quick view opens behind a picker": there is no longer a second visible layer to be behind.
+
+Pieces (web; mobile uses the same stack):
+
+| Piece | File |
+|---|---|
+| Pure stack: entries, hidden / top / previous sheet, back, close-all, history plan | `lib/overlayStack.ts` (byte-identical twin in mobile) |
+| Hook every pop-up shell calls once (`useOverlay({ title, onClose })` -> `hidden`, `backTitle`, `back`, `closeAll`, `zIndex`) | `lib/useOverlay.ts` |
+| Browser-history sync (one entry per open overlay; Back dismisses the newest; X pops its entries once; route change forgets them) | `lib/overlayHistory.ts` |
+| One runtime: body scroll lock, history, close-all on route change | `components/OverlayRuntime.tsx` (mounted in `app/layout.tsx`) |
+| Back button | `components/OverlayBack.tsx` (mobile: inside `Sheet.tsx`) |
+| Swipe down to dismiss (per pop-up, unchanged) | `lib/useSheetDragDismiss.ts` |
+
+A shell does: `const overlay = useOverlay({ title, onClose })`; renders its backdrop with `hidden={overlay.hidden}`;
+renders `<OverlayBack overlay={overlay} />` at the top; wires the X and scrim to `overlay.closeAll` and Escape to
+`overlay.back`; and focuses itself when `!overlay.hidden`. It must NOT lock body scroll, push history or set a
+z-index itself. Hand-rolled `.pqv-backdrop` shells keep their markup and only gain those lines.
+
+Migrated (web): `Sheet` (and everything built on it: TapForWhy, FilterSheet, StructuredRow, the game navigator),
+`PlayerQuickView` (so the sim player card, Real quick view), `SimSheet` (claim, team and every Fantasy Sim sheet),
+`TradePickerSheet`. Mobile: `Sheet`. Follow-up PR: `ManagerProfileSheet`, Matchup `SwapSheet`,
+`PercentileExplorerSheet`, `MultiTeamTradeContent` assign sheet, `AlertsDropdown` and GM orb sheets,
+`EmbeddedCheckoutModal`, real dialogs (password recovery, privacy), and the remaining mobile `SheetModal` users.
+
+Tests: `lib/overlayStack.test.ts`, `lib/overlayHistory.test.ts`, `components/OverlayManager.test.tsx` (replace, Back,
+selection survives, X), `components/OverlayRuntime.test.tsx` (the one scroll lock). Real-browser check:
+`scripts/sim_layout_playwright/overlay_back.mjs` (browser Back closes a pop-up without leaving the page; a card opened
+from the trade picker replaces it and Back returns with the selection intact; the X closes everything).

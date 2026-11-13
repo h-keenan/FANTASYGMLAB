@@ -13,7 +13,8 @@ import {
 import { createPortal } from "react-dom";
 
 import { SheetHandle } from "@/components/SheetHandle";
-import { sheetStack } from "@/lib/sheetStack";
+import { OverlayBack } from "@/components/OverlayBack";
+import { useOverlay } from "@/lib/useOverlay";
 import { useSheetDragDismiss } from "@/lib/useSheetDragDismiss";
 
 import "./ui.css";
@@ -22,23 +23,6 @@ const FOCUSABLE =
   'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
 
 const subscribeNever = () => () => {};
-
-let scrollLocks = 0;
-let savedOverflow = "";
-
-/** Reference-counted body scroll lock, so two sheets never fight over it. */
-function lockScroll() {
-  if (scrollLocks === 0) {
-    savedOverflow = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
-  }
-  scrollLocks += 1;
-}
-
-function unlockScroll() {
-  scrollLocks = Math.max(0, scrollLocks - 1);
-  if (scrollLocks === 0) document.body.style.overflow = savedOverflow;
-}
 
 export type SheetProps = {
   open: boolean;
@@ -67,9 +51,10 @@ export type SheetProps = {
  * the trigger, Escape and backdrop close, body scroll locked, safe-area aware,
  * swipe-down to dismiss on touch.
  *
- * Stacking rule: sheets never stack. Opening a second sheet HIDES the first
- * (it stays mounted so its draft state survives) and closing the second brings
- * it back. See lib/sheetStack.ts.
+ * Overlay rule: one pop-up at a time. Opening a second sheet REPLACES the first
+ * on screen (it stays mounted but hidden, so its scroll and draft state survive),
+ * the newer one gets "‹ Back to <first>", browser/phone back returns to the first,
+ * and the X closes everything. See lib/overlayStack.ts and docs/ui-patterns.md.
  *
  * Mount it with `open` toggled; its children are not rendered while closed.
  */
@@ -99,21 +84,16 @@ export function Sheet({
     onCloseRef.current = onClose;
   }, [onClose]);
 
-  useSyncExternalStore(sheetStack.subscribe, sheetStack.version, sheetStack.version);
-  const hidden = open && sheetStack.isHidden(id);
+  // THE overlay stack decides visibility, back-stack, history, scroll lock and layering (lib/overlayStack.ts).
+  const overlay = useOverlay({ title, onClose, enabled: open });
+  const hidden = overlay.hidden;
 
-  // Join the stack while open; lock page scroll; remember what to focus on close.
+  // Remember what to focus on close.
   useEffect(() => {
     if (!open) return;
     const previousFocus = document.activeElement as HTMLElement | null;
-    sheetStack.open(id);
-    lockScroll();
-    return () => {
-      sheetStack.close(id);
-      unlockScroll();
-      previousFocus?.focus?.({ preventScroll: true });
-    };
-  }, [open, id]);
+    return () => previousFocus?.focus?.({ preventScroll: true });
+  }, [open]);
 
   // Move focus in when the sheet becomes the visible one (first open, or restored after a newer sheet closed).
   useEffect(() => {
@@ -164,9 +144,9 @@ export function Sheet({
       className="ui-sheet-backdrop"
       data-hidden={hidden || undefined}
       hidden={hidden}
-      style={backdropStyle}
+      style={{ ...backdropStyle, zIndex: overlay.zIndex }}
       onMouseDown={(event) => {
-        if (event.target === event.currentTarget) onClose();
+        if (event.target === event.currentTarget) overlay.closeAll();
       }}
     >
       <div
@@ -182,6 +162,7 @@ export function Sheet({
         data-testid={testId}
       >
         <SheetHandle />
+        <OverlayBack overlay={overlay} />
         <header className="ui-sheet-header">
           <div className="min-w-0 flex-1">
             <h2 id={titleId} className={hideTitle ? "sr-only" : "ui-sheet-title"}>
@@ -193,7 +174,7 @@ export function Sheet({
               </p>
             ) : null}
           </div>
-          <button ref={closeRef} type="button" className="ui-sheet-close" aria-label={`Close ${title}`} onClick={onClose}>
+          <button ref={closeRef} type="button" className="ui-sheet-close" aria-label={`Close ${title}`} onClick={overlay.closeAll}>
             <span aria-hidden="true">×</span>
           </button>
         </header>

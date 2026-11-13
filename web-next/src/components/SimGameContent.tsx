@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useLayoutEffect, useMemo, useReducer, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useReducer, useRef, useState, useSyncExternalStore } from "react";
 
 import { AccentCard } from "@/components/AccentCard";
 import { Button, ButtonLink } from "@/components/Button";
@@ -31,6 +31,7 @@ import { SkeletonCard } from "@/components/Skeleton";
 import { Toggle } from "@/components/Toggle";
 import { ReviewGlyphChip } from "@/components/SeasonReviewSections";
 import { ToneBadge } from "@/components/ToneBadge";
+import { overlayStack } from "@/lib/overlayStack";
 import { api } from "@/lib/api";
 import {
   SIM_DIFFICULTY_COPY,
@@ -113,14 +114,10 @@ export function SimGameContent() {
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [managing, setManaging] = useState(false);
 
-  // One overlay at a time: while a player card is up, CSS hides every sim sheet under it (they stay mounted,
-  // so a trade picker keeps its selection and scroll). `stackedUnder` adds a Back button to the card.
-  useEffect(() => {
-    if (!sheetPlayer) return;
-    document.body.setAttribute("data-sim-pqv", "1");
-    return () => document.body.removeAttribute("data-sim-pqv");
-  }, [sheetPlayer]);
-  const stackedUnder = useMemo(() => Boolean(sheetPlayer) && typeof document !== "undefined" && document.querySelector("[data-sheet-hideable]") !== null, [sheetPlayer]);
+  // One overlay at a time (lib/overlayStack.ts): a player card opened from a trade picker / claim sheet replaces it on screen
+  // and shows "‹ Back to ..." itself. `stackedUnder` (card opened from another pop-up) hides the card's trade shortcut.
+  const overlayCount = useSyncExternalStore(overlayStack.subscribe, () => overlayStack.size(), () => 0);
+  const stackedUnder = Boolean(sheetPlayer) && overlayCount > 1;
 
   // A new page (tab, recap, draft -> season, offseason step) starts at the top, instantly.
   const scrollKey = simScrollKey({ view: flow.view, stage: flow.stage, tab: flow.tab, recapIndex: flow.recapIndex, hasRecap: flow.recaps.length > 0, draftRecap: draftRecap !== null, week: game?.week ?? null, status: game?.status ?? null, step: game?.dynasty?.stage ?? null });
@@ -404,11 +401,6 @@ export function SimGameContent() {
             onClose={() => setSheetPlayer(null)}
             actions={
               <>
-                {stackedUnder ? (
-                  <Button size="sm" variant="ghost" onClick={() => setSheetPlayer(null)}>
-                    ‹ Back
-                  </Button>
-                ) : null}
                 {game.can_trade && !stackedUnder && simTradeSeedFor(sheetPlayer) ? (
                 <Button
                   size="sm"

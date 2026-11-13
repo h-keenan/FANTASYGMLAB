@@ -31,7 +31,7 @@ export const IDENTICAL = [
   "simTradeSheet.ts",
   "tradeSheetPicker.ts",
   "confirmInPlace.ts",
-  "sheetStack.ts",
+  "overlayStack.ts",
   "busyRetry.ts",
   "destinationAccents.generated.ts",
   "directionCheckin.ts",
