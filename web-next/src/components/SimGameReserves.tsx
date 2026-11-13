@@ -139,12 +139,19 @@ export function SimReserveGroups({
   state,
   onOpen,
   openPlayer,
+  cutting = null,
+  onAskCut,
+  onCut,
 }: {
   ir: SimGamePlayer[];
   taxi: SimGamePlayer[];
   state: SimReserveState;
   onOpen: (player: SimGamePlayer) => void;
   openPlayer: (player: SimGamePlayer) => void;
+  /** Id awaiting a cut confirmation, and the handlers: IR and taxi players can be released like anyone else (Sleeper rules). */
+  cutting?: string | null;
+  onAskCut?: (id: string | null) => void;
+  onCut?: (player: SimGamePlayer) => void;
 }) {
   const r = state.reserves;
   if (!r) return null;
@@ -171,10 +178,20 @@ export function SimReserveGroups({
                 onOpen={openPlayer}
                 extra={<SimPlayerChips player={{ ...player, squad: g.kind }} />}
                 trailing={
-                  <>
-                    <SimStat label="Proj" value={simFmtPts(player.projection)} />
-                    <SimReserveButton player={{ ...player, squad: g.kind }} onOpen={onOpen} />
-                  </>
+                  cutting === player.id && onCut ? (
+                    <>
+                      <Button size="sm" variant="danger" onClick={() => onCut(player)}>Cut {player.name.split(" ").slice(-1)[0]}</Button>
+                      <Button size="sm" variant="ghost" onClick={() => onAskCut?.(null)}>Keep</Button>
+                    </>
+                  ) : (
+                    <>
+                      <SimStat label="Proj" value={simFmtPts(player.projection)} />
+                      <SimReserveButton player={{ ...player, squad: g.kind }} onOpen={onOpen} />
+                      {onCut && onAskCut ? (
+                        <Button size="sm" variant="ghost" aria-label={`Cut ${player.name}`} onClick={() => onAskCut(player.id)}>Cut</Button>
+                      ) : null}
+                    </>
+                  )
                 }
               />
             ))

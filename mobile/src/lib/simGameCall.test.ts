@@ -3,6 +3,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 
 import { runSimGameCall } from './simGameCall.ts';
+import { simApplyTradeSeed, simTradeSeedFor } from './simGame.ts';
 
 function handlers() {
   const log = { gates: [] as string[], errors: [] as string[] };
@@ -36,4 +37,19 @@ test('flag-off and conflicts keep their gates', async () => {
   const conflict = handlers();
   await runSimGameCall(async () => ({ reason: 'conflict' }), conflict.h);
   assert.deepEqual(conflict.log.gates, ['conflict']);
+});
+
+test('Add to trade seeds: mine go on the give side, an AI team\'s player picks that partner, free agents cannot be traded; adding is idempotent', () => {
+  assert.equal(simTradeSeedFor({ id: 'f', owner: { type: 'free_agent' } }), null);
+  assert.deepEqual(simTradeSeedFor({ id: 'm', owner: { type: 'you', team_id: '3' } }), { partner: '', give: 'm' });
+  assert.deepEqual(simTradeSeedFor({ id: 'a', owner: { type: 'ai', team_id: '7' } }), { partner: '7', get: 'a' });
+  let draft = simApplyTradeSeed({ partner: null, give: [], get: [] }, { partner: '7', get: 'a' });
+  assert.deepEqual(draft, { partner: '7', give: [], get: ['a'] });
+  draft = simApplyTradeSeed(draft, { partner: '', give: 'm' });
+  draft = simApplyTradeSeed(draft, { partner: '', give: 'm' });
+  assert.deepEqual(draft, { partner: '7', give: ['m'], get: ['a'] });
+  // a different partner clears the incoming side but keeps what I give
+  assert.deepEqual(simApplyTradeSeed(draft, { partner: '9', get: 'z' }), { partner: '9', give: ['m'], get: ['z'] });
+  // sides cap
+  assert.deepEqual(simApplyTradeSeed({ partner: '7', give: ['x'], get: [] }, { partner: '', give: 'y' }, 1).give, ['x']);
 });

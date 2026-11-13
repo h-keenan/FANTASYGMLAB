@@ -145,3 +145,23 @@ def test_picks_trade_during_the_rookie_draft_and_the_draft_order_follows():
         spent = c.post(f"/v1/sim/games/{gid}/trades/preview",
                        json={"partner": used["team_id"], "give": [mine[-1]["pick"]], "get": [used["pick"]]}, headers=H)
         assert spent.status_code == 422 or spent.json()["reason"] == "picks_locked"  # never tradable
+
+
+def test_a_player_on_the_taxi_squad_or_ir_can_be_cut_and_replays_identically(monkeypatch):
+    from modules.sim import game_actions as act
+    from modules.sim.game_state import Emitter, GameState, fold
+    from tests.test_sim_dynasty import Run
+
+    monkeypatch.setattr(act, "taxi_eligible", lambda snap, pid: True)  # a seed's veterans are not rookies
+    run = Run()
+    user = run.snap.user_team.tid
+    pid = next(p for p in sorted(run.state.rosters[user]) if run.snap.players[p].pos in ("RB", "WR", "TE", "QB"))
+    run.em.snap = run.snap
+    act.move_player(run.em, pid, "taxi")
+    assert run.state.where(user, pid) == "taxi"
+    act.cut_player(run.em, pid)
+    assert run.state.where(user, pid) is None and pid in run.state.free_agents(run.snap)
+    events = list(run.em.events)
+    replay = GameState(run.root)
+    fold(run.root, events, replay)
+    assert replay.where(user, pid) is None and replay.taxi[user] == run.state.taxi[user]

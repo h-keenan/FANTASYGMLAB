@@ -134,12 +134,19 @@ export function SimReserveGroups({
   state,
   onOpen,
   openPlayer,
+  cutting = null,
+  onAskCut,
+  onCut,
 }: {
   ir: SimGamePlayer[];
   taxi: SimGamePlayer[];
   state: SimReserveState;
   onOpen: (player: SimGamePlayer) => void;
   openPlayer: (player: SimGamePlayer) => void;
+  /** Id awaiting a cut confirmation, and the handlers: IR and taxi players can be released like anyone else (Sleeper rules). */
+  cutting?: string | null;
+  onAskCut?: (id: string | null) => void;
+  onCut?: (player: SimGamePlayer) => void;
 }) {
   const { colors } = useThemeMode();
   const common = useMemo(() => createSimStyles(colors), [colors]);
@@ -168,10 +175,18 @@ export function SimReserveGroups({
                 onOpen={openPlayer}
                 extra={<SimPlayerChips player={{ ...player, squad: g.kind }} />}
                 trailing={
-                  <>
-                    <SimStat label="Proj" value={simFmtPts(player.projection)} />
-                    <SimReserveButton player={{ ...player, squad: g.kind }} onOpen={onOpen} />
-                  </>
+                  cutting === player.id && onCut ? (
+                    <>
+                      <Button size="sm" variant="danger" label={`Cut ${player.name.split(' ').slice(-1)[0]}`} onPress={() => onCut(player)} />
+                      <Button size="sm" variant="ghost" label="Keep" onPress={() => onAskCut?.(null)} />
+                    </>
+                  ) : (
+                    <>
+                      <SimStat label="Proj" value={simFmtPts(player.projection)} />
+                      <SimReserveButton player={{ ...player, squad: g.kind }} onOpen={onOpen} />
+                      {onCut && onAskCut ? <Button size="sm" variant="ghost" label="Cut" onPress={() => onAskCut(player.id)} /> : null}
+                    </>
+                  )
                 }
               />
             ))

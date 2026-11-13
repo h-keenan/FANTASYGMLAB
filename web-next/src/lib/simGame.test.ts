@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  simApplyTradeSeed,
+  simTradeSeedFor,
   simChecklistProgress,
   simChecklistTone,
   simLevelLabel,
@@ -721,5 +723,16 @@ describe("flex position filters", () => {
     expect(simPosMatches("QB", "SUPER_FLEX")).toBe(true);
     expect(simPosMatches("K", "SUPER_FLEX")).toBe(false);
     expect(simPosMatches("K", "")).toBe(true);
+  });
+  it("Add to trade seeds: mine give, an AI player picks the partner, free agents cannot be traded; adding is idempotent", () => {
+    expect(simTradeSeedFor({ id: "f", owner: { type: "free_agent" } })).toBeNull();
+    expect(simTradeSeedFor({ id: "m", owner: { type: "you", team_id: "3" } })).toEqual({ partner: "", give: "m" });
+    expect(simTradeSeedFor({ id: "a", owner: { type: "ai", team_id: "7" } })).toEqual({ partner: "7", get: "a" });
+    let draft = simApplyTradeSeed({ partner: null, give: [], get: [] }, { partner: "7", get: "a" });
+    expect(draft).toEqual({ partner: "7", give: [], get: ["a"] });
+    draft = simApplyTradeSeed(simApplyTradeSeed(draft, { partner: "", give: "m" }), { partner: "", give: "m" });
+    expect(draft).toEqual({ partner: "7", give: ["m"], get: ["a"] });
+    expect(simApplyTradeSeed(draft, { partner: "9", get: "z" })).toEqual({ partner: "9", give: ["m"], get: ["z"] });
+    expect(simApplyTradeSeed({ partner: "7", give: ["x"], get: [] }, { partner: "", give: "y" }, 1).give).toEqual(["x"]);
   });
 });

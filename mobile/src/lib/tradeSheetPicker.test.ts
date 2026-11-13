@@ -9,6 +9,7 @@ import {
   filterSheetItems,
   initialSheetState,
   itemKey,
+  positionsFor,
   selectedItems,
   sheetReducer,
   summarizeItems,
@@ -50,4 +51,12 @@ test('summaries and footer label', () => {
   assert.deepEqual(summarizeItems(chosen), { count: 2, players: 1, picks: 1, total: 150 });
   assert.equal(applyLabel(['a', 'b'], []), 'Add 2 to trade');
   assert.equal(applyLabel(['a'], ['a']), 'Done');
+});
+
+test('FLEX is an opt-in position chip that matches RB / WR / TE', () => {
+  const items = [player('1', { position: 'QB' }), player('2', { position: 'RB' }), player('3', { position: 'WR' }), player('4', { position: 'TE' }), player('5', { position: 'K' })];
+  assert.deepEqual(positionsFor(items), ['QB', 'RB', 'WR', 'TE', 'K']);
+  assert.deepEqual(positionsFor(items, true), ['QB', 'RB', 'WR', 'TE', 'FLEX', 'K']);
+  const filters = { positions: ['FLEX'], conditions: [] };
+  assert.deepEqual(filterSheetItems(items, { tab: 'players', query: '', filters }).map((i) => i.id), ['2', '3', '4']);
 });

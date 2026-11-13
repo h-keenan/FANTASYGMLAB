@@ -140,4 +140,11 @@ describe("summaries", () => {
     const groups = groupSheetItems([pick("a"), pick("b", { group: "2028 picks" }), pick("c")]);
     expect(groups.map((g) => [g.label, g.items.length])).toEqual([["2027 picks", 2], ["2028 picks", 1]]);
   });
+  it("FLEX is an opt-in position chip that matches RB / WR / TE", () => {
+    const items = [player("1", { position: "QB" }), player("2", { position: "RB" }), player("3", { position: "WR" }), player("4", { position: "TE" }), player("5", { position: "K" })];
+    expect(positionsFor(items)).toEqual(["QB", "RB", "WR", "TE", "K"]);
+    expect(positionsFor(items, true)).toEqual(["QB", "RB", "WR", "TE", "FLEX", "K"]);
+    const filters = { positions: ["FLEX"], conditions: [] };
+    expect(filterSheetItems(items, { tab: "players", query: "", filters }).map((i) => i.id)).toEqual(["2", "3", "4"]);
+  });
 });

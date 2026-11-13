@@ -54,6 +54,8 @@ export function TradePickerSheet<T = unknown>({
   onSearch,
   mode = "multi",
   initialFilters,
+  renderPlayerRow,
+  flexFilter = false,
 }: {
   title: string;
   subtitle?: string;
@@ -71,6 +73,13 @@ export function TradePickerSheet<T = unknown>({
   mode?: "multi" | "single";
   /** Filters already in effect when the sheet opens (e.g. the same position as the player being compared). */
   initialFilters?: SheetFilters;
+  /**
+   * Render player rows with the caller's own row (Fantasy Sim: the shared PlayerListRow, tap the body for the
+   * quick view, a checkbox as its action). Picks keep the built-in row, and the info button is not drawn.
+   */
+  renderPlayerRow?: (item: SheetItem<T>, control: { on: boolean; blocked: boolean; toggle: () => void }) => ReactNode;
+  /** Offer a FLEX chip (RB / WR / TE) in the position filter. */
+  flexFilter?: boolean;
 }) {
   const [state, dispatch] = useReducer(sheetReducer, undefined, () => initialSheetState(initialSelected, firstTab(items, initialSelected), initialFilters));
   const titleId = useId();
@@ -82,7 +91,7 @@ export function TradePickerSheet<T = unknown>({
   const single = mode === "single";
 
   const hasPicks = useMemo(() => items.some((i) => i.kind === "pick"), [items]);
-  const positions = useMemo(() => positionsFor(items), [items]);
+  const positions = useMemo(() => positionsFor(items, flexFilter), [items, flexFilter]);
   const visible = useMemo(() => filterSheetItems(items, { tab: state.tab, query: state.query, filters: state.filters }), [items, state.tab, state.query, state.filters]);
   const chosen = useMemo(() => selectedItems(items, state.selected), [items, state.selected]);
   const summary = summarizeItems(chosen);
@@ -142,6 +151,7 @@ export function TradePickerSheet<T = unknown>({
   const dialog = (
     <div
       className="pqv-backdrop"
+      data-sheet-hideable="true"
       data-testid="trade-picker-backdrop"
       onMouseDown={(event) => {
         if (event.target === event.currentTarget) onClose();
@@ -268,6 +278,13 @@ export function TradePickerSheet<T = unknown>({
                     {group.items.map((item) => {
                       const on = state.selected.includes(item.key);
                       const blocked = !on && atMax;
+                      if (renderPlayerRow && item.kind === "player") {
+                        return (
+                          <li key={item.key} className="tps-row-shared" data-selected={on ? "true" : "false"}>
+                            {renderPlayerRow(item, { on, blocked, toggle: () => dispatch({ type: "toggle", key: item.key, max }) })}
+                          </li>
+                        );
+                      }
                       return (
                         <li key={item.key} className="tps-row" data-selected={on ? "true" : "false"}>
                           <button
