@@ -17,6 +17,9 @@ import { SimGameOffseason } from "@/components/SimGameOffseason";
 import { SimHomeTab } from "@/components/SimGameHome";
 import { SimPlayerSheet } from "@/components/SimGamePlayers";
 import { SimActionBar } from "@/components/SimActionBar";
+import { SimGameHeader, SimStatusChips } from "@/components/SimGameHeader";
+import { SimGameOrb } from "@/components/SimGameOrb";
+import { Sheet } from "@/components/ui/Sheet";
 import { SimOffseasonBar } from "@/components/SimOffseasonBar";
 import { ConfirmInPlace } from "@/components/ui/ConfirmInPlace";
 import { SimNotice, SimOpenPlayerContext, SimPreviewBanner, SimTeamLink, SimTeamOpenContext, simToneColor, type SimCtx } from "@/components/SimGameParts";
@@ -368,7 +371,7 @@ export function SimGameContent() {
 
   if (flow.view === "game" && game && ctx) {
     return (
-      <Shell wide>
+      <Shell wide game>
         <GameScreen
           flow={flow}
           game={game}
@@ -507,9 +510,11 @@ export function SimGameContent() {
   );
 }
 
-function Shell({ children, wide = false }: { children: React.ReactNode; wide?: boolean }) {
+function Shell({ children, wide = false, game = false }: { children: React.ReactNode; wide?: boolean; game?: boolean }) {
   return (
-    <main className={`sim-root flex-1 flex flex-col gap-3 px-4 py-3 w-full mx-auto ${wide ? "max-w-5xl xl:max-w-[1200px]" : "max-w-3xl"}`}>
+    // `game`: on phones the in-game screen owns the whole viewport (its own compact header on top, bottom tab bar
+    // in flow at the bottom of a 100dvh column), so no outer padding or gap.
+    <main className={`sim-root flex-1 flex flex-col gap-3 px-4 py-3 w-full mx-auto ${game ? "max-md:min-h-dvh max-md:pt-0 max-md:pb-0 max-md:gap-0" : ""} ${wide ? "max-w-5xl xl:max-w-[1200px]" : "max-w-3xl"}`}>
       <PageTitle page="Fantasy Sim" />
       {children}
     </main>
@@ -881,15 +886,18 @@ function GameScreen({
   const inSeason = (stage === "week" || stage === "playoffs") && !draftRecap;
   const showBar = inSeason && !recap;
   const showOffBar = stage === "offseason" && !draftRecap && !recap;
+  const [moreOpen, setMoreOpen] = useState(false);
+  // Phones: the game orb (docked above the Advance pill) is the page navigator; the top PillRows render from md up.
+  const showOrb = showBar || showOffBar;
 
   return (
     <SimTeamOpenContext.Provider value={ctx.openTeam}>
     <SimOpenPlayerContext.Provider value={ctx.openPlayer}>
-    {/* pb-24: the floating GM orb never covers the last row */}
-    {/* With an action bar the bar is this column's last (sticky) child, so no big
-        bottom padding: sticky only moves within its parent's content box. */}
-    <div className={`flex flex-1 flex-col gap-3 ${showBar || showOffBar ? "pb-3" : "pb-24"}`}>
-      <div className="flex items-center justify-between gap-2">
+    {/* Phones: a 100dvh flex column. Compact header on top, content flex-1, and the action pill + bottom tab bar as an in-flow
+        sticky footer (no position:fixed, no JS placement), so iOS Safari viewport quirks cannot float it. */}
+    <div className={`flex flex-1 flex-col gap-3 max-md:gap-2 ${showBar || showOffBar ? "pb-3 max-md:pb-0" : "pb-6"} md:pb-3`}>
+      <SimGameHeader game={game} onHub={onHub} onTeam={(id) => ctx.openTeam(id)} onMore={() => setMoreOpen(true)} />
+      <div className="hidden items-center justify-between gap-2 md:flex">
         <div className="flex min-w-0 flex-col">
           <button type="button" className="tap-link text-xs font-bold self-start" style={{ color: "var(--color-accent)" }} onClick={onHub}>
             All games
@@ -911,12 +919,13 @@ function GameScreen({
       {flow.paywall ? <PaywallCard flow={flow} onDismiss={onDismissPaywall} /> : null}
       {notice ? <SimNotice message={notice.message} tone={notice.tone} onDismiss={clearNotice} /> : null}
       {inSeason && !recap && !paywalled && warnings.length > 0 ? (
-        <ul className="flex flex-col gap-0.5 text-xs" style={{ color: "var(--color-text-muted)" }} aria-label="Before you advance">
+        <ul className="hidden flex-col gap-0.5 text-xs md:flex" style={{ color: "var(--color-text-muted)" }} aria-label="Before you advance">
           {warnings.map((w) => (
             <li key={w}>{w}</li>
           ))}
         </ul>
       ) : null}
+      {inSeason && !recap && !paywalled ? <SimStatusChips game={game} onTab={onTab} /> : null}
 
       {stage === "draft" ? (
         <SimGameDraft ctx={ctx} onComplete={onDraftComplete} />
@@ -929,6 +938,7 @@ function GameScreen({
       ) : stage === "offseason" ? (
         <>
           <PillRow
+            className="max-md:hidden"
             ariaLabel="Offseason sections"
             variant="fill"
             sticky
@@ -941,7 +951,7 @@ function GameScreen({
             active={["team", "trades", "league"].includes(flow.tab) ? flow.tab : "home"}
             onSelect={(value) => onTab(value as SimTab)}
           />
-          <div key={flow.tab} className="enter-rise">
+          <div key={flow.tab} className="enter-rise flex-1 max-md:pb-16">
             {flow.tab === "team" ? <SimTeamTab ctx={ctx} onTrade={() => onTab("trades")} /> : null}
             {flow.tab === "trades" ? <SimTradesTab ctx={ctx} seed={tradeSeed} onSeedUsed={() => setTradeSeed(null)} /> : null}
             {flow.tab === "league" ? <SimLeagueTab ctx={ctx} /> : null}
@@ -951,6 +961,7 @@ function GameScreen({
       ) : (
         <>
           <PillRow
+            className="max-md:hidden"
             ariaLabel="Game sections"
             variant="fill"
             sticky
@@ -958,7 +969,7 @@ function GameScreen({
             active={flow.tab}
             onSelect={(value) => onTab(value as SimTab)}
           />
-          <div key={flow.tab} className="enter-rise">
+          <div key={flow.tab} className="enter-rise flex-1 max-md:pb-16">
             {flow.tab === "home" ? <SimHomeTab ctx={ctx} setClaims={setClaims} onTab={onTab} /> : null}
             {flow.tab === "team" ? <SimTeamTab ctx={ctx} onTrade={() => onTab("trades")} /> : null}
             {flow.tab === "players" ? (
@@ -978,8 +989,23 @@ function GameScreen({
           </div>
         </>
       )}
-      {showOffBar ? <SimOffseasonBar ctx={ctx} onTab={onTab} /> : null}
-      {showBar ? <SimActionBar ctx={ctx} paywalled={paywalled} advancing={advancing} onAdvance={onAdvance} onTab={onTab} /> : null}
+      <div className="bottom-stack" data-testid="sim-bottom-stack">
+        {showOffBar ? <SimOffseasonBar ctx={ctx} onTab={onTab} /> : null}
+        {showBar ? <SimActionBar ctx={ctx} paywalled={paywalled} advancing={advancing} onAdvance={onAdvance} onTab={onTab} /> : null}
+        {showOrb ? (
+          <SimGameOrb
+            tab={flow.tab}
+            offseason={stage === "offseason"}
+            inbox={game.pending?.inbox ?? 0}
+            onTab={onTab}
+            onMore={() => setMoreOpen(true)}
+            onHub={onHub}
+          />
+        ) : null}
+      </div>
+      <Sheet open={moreOpen} onClose={() => setMoreOpen(false)} title="Game menu" description="Rules, reset the week, or leave this game.">
+        <SimMoreTab ctx={ctx} onDeleted={() => { setMoreOpen(false); onDeleted(); }} onHub={() => { setMoreOpen(false); onHub(); }} />
+      </Sheet>
     </div>
     </SimOpenPlayerContext.Provider>
     </SimTeamOpenContext.Provider>

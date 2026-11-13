@@ -350,3 +350,16 @@ to `FilterSheet` (same groups, same draft model from `lib/filterSheet.ts`, panel
 the picker onto it, then swaps the picker's shell for `Sheet`. The model already supports both groups
 (`position`, `condition`). Left for its own PR so the just-merged picker is not edited alongside this work.
 Other planned users: Trade Hub filters, News, Alerts, College Scouting, League Recaps, Live Draft.
+## Phone game shell (Fantasy Sim) and BottomTabBar
+
+Phase A of `docs/mobile-ux-plan-2026-11.md`. In the game on phones (`/gm-game`, below 768px):
+
+- The global header and the global GM orb button step aside (`pathOwnsPhoneChrome` in `lib/bottomNav.ts`; the orb's sheet stays mounted so search still opens).
+- `SimGameHeader`: one sticky glass line. Back arrow, `Wk 3/14 S1/5`, the team as a tappable chip (opens the team sheet), search, and the overflow menu (rules, reset week, delete). The pre-advance notes are `SimStatusChips`, tappable and scrolling with the content.
+- `SimGameOrb`: the game's own navigator, replacing the global orb inside the game. Brand mark plus the current page name and a badge for trade offers. One tap opens Home, Team, Players, Trades, League, More with the current page lit, plus search, All games and a way home.
+- The footer is Advance only (`SimActionBar` / `SimOffseasonBar`, `.action-pill`). Auto-set lives on Home, "What to do this week".
+- The six top tabs and the "This week | League" strip are gone on phones (`max-md:hidden`); the league cards are a collapsed "League" section on Home.
+
+Layout rule (immune to iOS Safari fixed-position drift): nothing here is `position: fixed` or JS-positioned. The game is a `min-height: 100dvh` flex column and the footer is a `position: sticky; bottom: 0` `.bottom-stack` at the end of it with `env(safe-area-inset-bottom)` padding. The orb is `position: absolute` inside that stack (`.game-orb-dock`), so it can never disagree with the pill.
+
+`BottomTabBar` (`components/ui/BottomTabBar.tsx`, lib twin `lib/bottomNav.ts`) is the 5-tab bar the site shell (Phase B) uses; it lives inside the same `.bottom-stack`. It is not used in the game.

@@ -16,6 +16,7 @@ import { NavProMarker } from "@/components/NavProMarker";
 import { PositionBadge } from "@/components/PositionBadge";
 import { FOUNDER_DESTINATION, isFounderSession, searchNavDestinations, useNavDestinations, type NavDestination } from "@/lib/navDestinations";
 import { OPEN_SEARCH_EVENT } from "@/lib/orbSearch";
+import { pathOwnsPhoneChrome } from "@/lib/bottomNav";
 import { useIsPro } from "@/lib/useIsPro";
 import { useSheetDragDismiss } from "@/lib/useSheetDragDismiss";
 import { SheetHandle } from "@/components/SheetHandle";
@@ -128,8 +129,14 @@ export function GmOrb() {
   // Paywall's own Subscribe button.
   if (pathname === "/") return null;
 
+  // The game's own bottom bar replaces the floating trigger on phones; the sheet (search, destinations) stays
+  // mounted and opens from the game header's search icon.
+  const showTrigger = !pathOwnsPhoneChrome(pathname);
+
   return (
     <>
+      {showTrigger ? (
+      <>
       {/* The orb lives in a zero-height `position: sticky; bottom: 0` rail at
           the end of <body>, NOT `position: fixed`. iOS Safari anchors fixed
           elements to the layout viewport, which drifts from the visible one
@@ -182,6 +189,8 @@ export function GmOrb() {
         </span>
       </button>
       </div>
+      </>
+      ) : null}
 
       {open ? (
         <div className="fixed inset-0" style={{ zIndex: 50 }}>

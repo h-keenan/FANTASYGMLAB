@@ -17,7 +17,7 @@ import {
   SimWaiverCard,
 } from "@/components/SimGameHomeCards";
 import { SimMiniPlayer, SimSectionTitle, SimTeamLink, SimToneBadge, simToneColor, useSimWide, type SimCtx } from "@/components/SimGameParts";
-import { PillRow } from "@/components/PillRow";
+import { Collapsible } from "@/components/Collapsible";
 import { useSimAutoSet } from "@/components/useSimAutoSet";
 import { ClaimSheet } from "@/components/SimGameTeam";
 import { SkeletonCard } from "@/components/Skeleton";
@@ -41,7 +41,6 @@ import {
   simGameReasonMessage,
 } from "@/lib/simGame";
 import type { SimTab } from "@/lib/simGameFlow";
-import { SIM_HOME_VIEWS, type SimHomeView } from "@/lib/simLayout";
 
 /**
  * The game's landing tab: this week's head-to-head, what to do this week,
@@ -67,7 +66,6 @@ export function SimHomeTab({
   const [claiming, setClaiming] = useState<{ player: SimGamePlayer; roster: SimGamePlayer[] } | null>(null);
   const teamId = ctx.game.you?.team_id;
   const wide = useSimWide();
-  const [view, setView] = useState<SimHomeView>("week");
 
   useEffect(() => {
     let cancelled = false;
@@ -126,39 +124,29 @@ export function SimHomeTab({
   }
 
   const names = Object.fromEntries((home.standings?.rows ?? []).map((r) => [r.team_id, r.name]));
-  const inboxCount = home.inbox?.count ?? 0;
   const sheet = claiming ? (
     <ClaimSheet ctx={ctx} player={claiming.player} roster={claiming.roster} onClose={() => setClaiming(null)} onClaimed={(next) => { setClaims(next); ctx.bump(); }} />
   ) : null;
 
-  // Phones: two sub-views so the first screen is the week, not every card. Desktop keeps one two-column page.
+  // Phones: one scrolling column. This week's cards first, then a collapsed "League" section (standings, hot/cold,
+  // league moves), so there is no second tab strip under the bottom bar's tabs. Desktop keeps one two-column page.
   if (!wide) {
     return (
       <div className="flex flex-col gap-3" data-testid="sim-home">
-        <PillRow
-          ariaLabel="Home sections"
-          variant="fill"
-          options={SIM_HOME_VIEWS.map((v) => ({ label: v.value === "week" && inboxCount > 0 ? `${v.label} · ${inboxCount}` : v.label, value: v.value, glyph: v.glyph }))}
-          active={view}
-          onSelect={(value) => setView(value as SimHomeView)}
-        />
-        {view === "week" ? (
-          <>
-            {home.matchup ? <SimMatchupCard ctx={ctx} matchup={home.matchup} onTab={onTab} /> : null}
-            <SimChecklistCard home={home} onTab={onTab} onAuto={home.matchup && !home.matchup.bye ? auto.run : undefined} autoBusy={auto.busy} optimal={auto.optimal} />
-            <SimReservesStrip home={home} onTab={onTab} />
-            <SimInboxCard ctx={ctx} inbox={home.inbox} onTab={onTab} />
-            <SimWaiverCard ctx={ctx} suggestions={home.waiver_suggestions ?? []} onClaim={claim} onTab={onTab} />
-            <SimByeCard ctx={ctx} alerts={home.bye_alerts ?? []} onTab={onTab} onClaim={claim} />
-            <SimInjuriesCard ctx={ctx} injuries={home.injuries ?? []} />
-          </>
-        ) : (
-          <>
+        {home.matchup ? <SimMatchupCard ctx={ctx} matchup={home.matchup} onTab={onTab} /> : null}
+        <SimChecklistCard home={home} onTab={onTab} onAuto={home.matchup && !home.matchup.bye ? auto.run : undefined} autoBusy={auto.busy} optimal={auto.optimal} />
+        <SimReservesStrip home={home} onTab={onTab} />
+        <SimInboxCard ctx={ctx} inbox={home.inbox} onTab={onTab} />
+        <SimWaiverCard ctx={ctx} suggestions={home.waiver_suggestions ?? []} onClaim={claim} onTab={onTab} />
+        <SimByeCard ctx={ctx} alerts={home.bye_alerts ?? []} onTab={onTab} onClaim={claim} />
+        <SimInjuriesCard ctx={ctx} injuries={home.injuries ?? []} />
+        <Collapsible id="home.league" testId="home-league-section" title="League" defaultOpen={false}>
+          <div className="flex flex-col gap-3">
             <SimStandingsCard standings={home.standings} onTab={onTab} />
             <SimHotColdCard ctx={ctx} hotCold={home.hot_cold} onClaim={claim} />
             <SimLeagueMovesCard league={home.league} names={names} onTab={onTab} />
-          </>
-        )}
+          </div>
+        </Collapsible>
         {sheet}
       </div>
     );

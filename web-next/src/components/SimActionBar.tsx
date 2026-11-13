@@ -13,10 +13,9 @@ import { simAdvanceState, simLineupIssues, type SimZeroStarter } from "@/lib/sim
 /**
  * The persistent bottom action bar for the in-season tabs: Advance week
  * ("Week 4 -> 5", disabled only when a cut is owed; an empty slot warns and
- * asks to confirm) and a secondary Auto-set pill. Sticky (never `fixed`: iOS Safari
- * mis-anchors fixed elements mid-scroll) at the bottom of the page column,
- * above the iOS safe area, with a notch in the middle for the floating GM orb. Page content gets matching
- * bottom padding from the caller. Mobile twin: mobile/src/components/SimActionBar.tsx.
+ * asks to confirm) and a secondary Auto-set pill. On phones it is an Advance-only floating glass pill
+ * (.action-pill; Auto-set lives on Home "What to do this week") docked at the bottom of the game's in-flow
+ * sticky `.bottom-stack` (no orb, no position:fixed); sticky inside the page on desktop. Mobile twin: mobile/src/components/SimActionBar.tsx.
  */
 export function SimActionBar({ ctx, paywalled, advancing, onAdvance, onTab }: { ctx: SimCtx; paywalled: boolean; advancing: boolean; onAdvance: () => void; onTab?: (tab: "team" | "players") => void }) {
   const { gameId, game } = ctx;
@@ -50,7 +49,7 @@ export function SimActionBar({ ctx, paywalled, advancing, onAdvance, onTab }: { 
   };
   const reasonId = "sim-advance-reason";
   return (
-    <div className="sim-action-bar sticky bottom-0 mt-auto z-30 -mx-4 -mb-[4.5rem] md:mx-auto md:mb-0 md:bottom-4 md:flex md:w-full md:items-center md:justify-between md:gap-4 md:px-4 md:py-2" data-testid="sim-action-bar">
+    <div className="sim-action-bar action-pill md:sticky md:inset-x-auto md:bottom-4 md:mx-auto md:flex md:w-full md:items-center md:justify-between md:gap-4 md:px-4 md:py-2" data-testid="sim-action-bar">
       {confirming && state.confirm && !paywalled ? (
         <div className="px-4 pt-1.5 text-center text-xs font-bold md:flex-1 md:p-0 md:text-left md:text-sm" role="alertdialog" aria-label="Confirm advance" data-testid="sim-advance-confirm" style={{ color: "var(--color-warning)" }}>
           <p>{state.confirm}</p>
@@ -63,7 +62,7 @@ export function SimActionBar({ ctx, paywalled, advancing, onAdvance, onTab }: { 
           ) : null}
         </div>
       ) : state.warning && !state.reason && !paywalled ? (
-        <p className="px-4 pt-1.5 text-center text-xs font-bold md:flex-1 md:p-0 md:text-left md:text-sm" style={{ color: "var(--color-warning)" }} role="status" data-testid="sim-advance-warning">
+        <p className="max-md:hidden px-4 pt-1.5 text-center text-xs font-bold md:flex-1 md:p-0 md:text-left md:text-sm" style={{ color: "var(--color-warning)" }} role="status" data-testid="sim-advance-warning">
           {state.warning}
         </p>
       ) : null}
@@ -78,17 +77,15 @@ export function SimActionBar({ ctx, paywalled, advancing, onAdvance, onTab }: { 
           <span style={{ color: auto.optimal ? "var(--color-success)" : undefined }}>{auto.optimal ? "Lineup optimal" : "Lineup can improve"}</span>
         </p>
       )}
-      <div className="mx-auto grid max-w-3xl grid-cols-[auto_4.25rem_1fr] min-[360px]:grid-cols-[1fr_4.25rem_1fr] items-center gap-2 px-4 py-2 md:mx-0 md:flex md:max-w-none md:flex-none md:gap-2 md:p-0">
-        <Button variant="secondary" size="sm" loading={auto.busy} disabled={auto.optimal || paywalled} onClick={auto.run} aria-label={auto.optimal ? "Lineup is optimal" : "Auto-set best lineup"}>
+      <div className="mx-auto grid max-w-3xl grid-cols-1 items-center gap-2 p-1 md:mx-0 md:flex md:max-w-none md:flex-none md:gap-2 md:p-0">
+        <Button className="max-md:hidden" variant="secondary" size="sm" loading={auto.busy} disabled={auto.optimal || paywalled} onClick={auto.run} aria-label={auto.optimal ? "Lineup is optimal" : "Auto-set best lineup"}>
           <SimGlyph name={auto.optimal ? "check" : "spark"} size={16} />
-          {/* Icon-only on 320px phones: the label + notch + Advance overflowed the bar. */}
-          <span className="ml-1.5 max-[359px]:hidden">{auto.optimal ? "Optimal" : "Auto-set"}</span>
+          <span className="ml-1.5">{auto.optimal ? "Optimal" : "Auto-set"}</span>
         </Button>
-        <span aria-hidden="true" className="md:hidden" />
         {paywalled ? (
           <ButtonLink href="/premium" variant="premium" size="sm">Go Pro to continue</ButtonLink>
         ) : (
-          <Button className="whitespace-nowrap" loading={advancing} disabled={state.blocked} onClick={tapAdvance} aria-label={simAdvanceLabel(game)} aria-describedby={state.reason ? reasonId : undefined}>
+          <Button className="whitespace-nowrap max-md:w-full" loading={advancing} disabled={state.blocked} onClick={tapAdvance} aria-label={simAdvanceLabel(game)} aria-describedby={state.reason ? reasonId : undefined}>
             {confirming ? "Advance anyway" : game.phase === "playoffs" ? "Play round" : `Advance ${state.label}`}
           </Button>
         )}
