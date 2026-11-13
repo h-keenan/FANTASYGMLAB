@@ -17,7 +17,7 @@ import secrets
 import threading
 import time
 import uuid
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from typing import Any, Callable, ContextManager, Mapping
 
 from fastapi import APIRouter, Body, Depends, HTTPException
@@ -25,6 +25,8 @@ from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
 
 from modules.sim import game_actions as act
+from modules.sim import game_dynasty as dyn
+from modules.sim import game_dynasty_view as dview
 from modules.sim import game_draft as draft
 from modules.sim import game_home as home
 from modules.sim import game_view as view
@@ -40,7 +42,7 @@ from modules.sim.game_setup import (
 )
 from modules.sim.game_state import Emitter, GameState
 from modules.sim.game_store import GameConflict, GameStore, public_game_row
-from modules.sim.game_mode import mode_options
+from modules.sim.game_mode import DEFAULT_ROOKIE_ROUNDS, DEFAULT_SEASONS, PICK_YEARS, ROOKIE_ROUNDS, SEASON_CHOICES, mode_options
 from modules.sim.game_types import (
     BENCH_RANGE,
     DEFAULT_BENCH,
@@ -48,7 +50,11 @@ from modules.sim.game_types import (
     DEFAULT_TEAMS,
     DEFAULT_TIEBREAKER,
     DIFFICULTIES,
+    DEFAULT_IR_SLOTS,
+    DEFAULT_TAXI_SLOTS_DYNASTY,
+    DEFAULT_TAXI_YEARS,
     DRAFT_SPARE_SPOTS,
+    IR_SLOT_RANGE,
     START_FRESH,
     START_KINDS,
     START_LEAGUE,
@@ -61,6 +67,7 @@ from modules.sim.game_types import (
     PREVIEW_PAYWALL_WEEK,
     SCORING_NAMES,
     SCORING_PRESETS,
+    TAXI_SLOT_RANGE,
     TEAM_COUNTS,
     GameError,
     GameSettings,
@@ -134,12 +141,33 @@ class TradeBody(BaseModel):
     get: list[str] = Field(max_length=12)
 
 
+class MoveBody(BaseModel):
+    player_id: str
+    to: str
+
+
 class RespondBody(BaseModel):
     action: str
 
 
 class AdvanceBody(BaseModel):
     week: int | None = None
+
+
+def seedof(row: Mapping[str, Any], state: GameState) -> int:
+    """The RNG seed the game's current season plays under (season 1: the game's own seed)."""
+
+    return dyn.season_seed(int(row["seed"]), state.view_no)
+
+
+def default_start_year(today: Any = None) -> int:
+    """The calendar label a fresh dynasty's season 1 plays under (the NFL season in
+    progress or next up; Jan-Feb still belongs to the season just played)."""
+
+    import datetime
+
+    d = today or datetime.date.today()
+    return d.year if d.month >= 3 else d.year - 1
 
 
 def _gid(raw: str) -> str:
@@ -245,7 +273,7 @@ def add_routes(router: APIRouter, ctx: GameApiCtx) -> None:
         if snap is None:
             raise HTTPException(status_code=404, detail="Game not found.")
         state = store.load_state(uid, game_id, snap)
-        return store, uid, row, snap, state
+        return store, uid, row, snap.season_view(state.view_no), state
 
     def commit(store: GameStore, uid: str, game_id: str, snap: GameSnapshot, state: GameState,
                em: Emitter, *, checkpoint: bool = False) -> None:
@@ -304,7 +332,16 @@ def add_routes(router: APIRouter, ctx: GameApiCtx) -> None:
                 "auto_lineup": {"default": False},
                 "team_names": {"values": list(TEAM_NAMES), "max_length": USER_TEAM_NAME_MAX},
                 "tiebreaker": {"values": list(TIEBREAKERS), "default": DEFAULT_TIEBREAKER},
+                # IR and taxi squads (taxi defaults to 4 in dynasty, 0 in redraft; a league import reads its own).
+                "ir_slots": {"min": IR_SLOT_RANGE[0], "max": IR_SLOT_RANGE[1], "default": DEFAULT_IR_SLOTS},
+                "taxi_slots": {"min": TAXI_SLOT_RANGE[0], "max": TAXI_SLOT_RANGE[1], "default": 0,
+                               "default_dynasty": DEFAULT_TAXI_SLOTS_DYNASTY},
+                "taxi_years": {"values": [1, 2, 3, 4], "default": DEFAULT_TAXI_YEARS},
+                # Dynasty only.
+                "seasons": {"values": list(SEASON_CHOICES), "default": DEFAULT_SEASONS},
+                "rookie_rounds": {"values": list(ROOKIE_ROUNDS), "default": DEFAULT_ROOKIE_ROUNDS},
             },
+            "dynasty": {"pick_years": PICK_YEARS, "max_seasons": max(SEASON_CHOICES), "start_year": default_start_year()},
             # Draft rounds are derived: roster size minus the spots left for the wire.
             "layout": {"base_slots": ["QB", "RB", "RB", "WR", "WR", "TE", "FLEX"], "draft_spare_spots": DRAFT_SPARE_SPOTS},
             "start_modes": [
@@ -373,12 +410,19 @@ def add_routes(router: APIRouter, ctx: GameApiCtx) -> None:
             if not league_id or len(league_id) > 64:
                 raise ValueError("league_id is required.")
             # Size, scoring and lineup come from the league; only these two are the player's choice.
-            picked = GameSettings.parse({k: raw[k] for k in ("difficulty", "auto_lineup", "tiebreaker") if k in raw})
+            picked = GameSettings.parse({k: raw[k] for k in (
+                "difficulty", "auto_lineup", "tiebreaker", "mode", "seasons", "rookie_rounds", "taxi_years",
+            ) if k in raw})
+            league_dynasty = picked.mode == "dynasty"
+            ir_pick, taxi_pick = raw.get("ir_slots"), raw.get("taxi_slots")
+            GameSettings.parse({k: v for k, v in (("ir_slots", ir_pick), ("taxi_slots", taxi_pick)) if v is not None})
         else:
             if raw.get("user_slot") is None:
                 teams = raw.get("teams", DEFAULT_TEAMS)
                 n = teams if isinstance(teams, int) and not isinstance(teams, bool) and teams in TEAM_COUNTS else DEFAULT_TEAMS
                 raw["user_slot"] = int(WorldRng(seed).stream(0, "gsetup", 7).integers(1, n + 1))
+            if raw.get("mode") == "dynasty" and not raw.get("start_year"):
+                raw["start_year"] = default_start_year()
             settings = GameSettings.parse(raw)
         store = ctx.store_for(user)
         limit = MAX_GAMES_PRO if pro else MAX_GAMES_FREE
@@ -392,9 +436,15 @@ def add_routes(router: APIRouter, ctx: GameApiCtx) -> None:
                 return busy()
             try:
                 if start == START_LEAGUE:
+                    extra_kw = {"dynasty": True} if league_dynasty else {}
                     imported = ctx.inputs.league_import(
-                        league_id, username=ctx.sleeper_username(user), roster_id=roster_id)
-                    settings = league_settings(imported, difficulty=picked.difficulty, auto_lineup=picked.auto_lineup, tiebreaker=picked.tiebreaker)
+                        league_id, username=ctx.sleeper_username(user), roster_id=roster_id, **extra_kw)
+                    settings = league_settings(
+                        imported, difficulty=picked.difficulty, auto_lineup=picked.auto_lineup, tiebreaker=picked.tiebreaker,
+                        dynasty=league_dynasty, seasons=picked.seasons, ir_slots=ir_pick, taxi_slots=taxi_pick,
+                    )
+                    if league_dynasty and picked.rookie_rounds and not imported.rookie_rounds:
+                        settings = replace(settings, rookie_rounds=picked.rookie_rounds)
                     pool = _pool_for(ctx.inputs, settings.scoring_settings)
                     snap = build_league_snapshot(
                         pool.rows, pool.bye_weeks, imported, settings, seed, user_team_name=team_name,
@@ -439,7 +489,7 @@ def add_routes(router: APIRouter, ctx: GameApiCtx) -> None:
         pro = ctx.is_pro(user)
         gid = _gid(game_id)
         store, uid, row, snap, state = load(user, gid)
-        heal_draft(store, uid, gid, snap, state, int(row["seed"]))
+        heal_draft(store, uid, gid, snap, state, seedof(row, state))
         return {**_env(pro, state), "game": game_json(row, snap, state, pro)}
 
     @router.delete("/games/{game_id}")
@@ -460,7 +510,7 @@ def add_routes(router: APIRouter, ctx: GameApiCtx) -> None:
         pro = ctx.is_pro(user)
         gid = _gid(game_id)
         store, uid, row, snap, state = load(user, gid)
-        seed = int(row["seed"])
+        seed = seedof(row, state)
         heal_draft(store, uid, gid, snap, state, seed)
         dctx = draft.DraftContext(snap, state)
         return {**_env(pro, state), **view.draft_view(snap, state, dctx, seed, page=page, page_size=page_size,
@@ -481,7 +531,7 @@ def add_routes(router: APIRouter, ctx: GameApiCtx) -> None:
         gid = _gid(game_id)
         with _lock_for(gid):
             store, uid, row, snap, state = load(user, gid)
-            seed = int(row["seed"])
+            seed = seedof(row, state)
             heal_draft(store, uid, gid, snap, state, seed)
             dctx = draft.DraftContext(snap, state)
             em = Emitter(state, snap)
@@ -558,7 +608,7 @@ def add_routes(router: APIRouter, ctx: GameApiCtx) -> None:
         _, _, row, snap, state = load(user, _gid(game_id))
         if team_id not in snap.tids:
             raise HTTPException(status_code=404, detail="Team not found.")
-        return {**_env(pro, state), **home.team_detail(snap, state, team_id, int(row["seed"]))}
+        return {**_env(pro, state), **home.team_detail(snap, state, team_id, seedof(row, state))}
 
     # ------------------------------------------------------------------ home
 
@@ -568,8 +618,9 @@ def add_routes(router: APIRouter, ctx: GameApiCtx) -> None:
         pro = ctx.is_pro(user)
         _, _, row, snap, state = load(user, _gid(game_id))
         if state.status not in ("in_season", "playoffs"):
-            return {**_env(pro, state, "wrong_phase"), "phase": "draft" if state.status == "drafting" else "complete"}
-        return {**_env(pro, state), **home.home_view(snap, state, int(row["seed"]))}
+            return {**_env(pro, state, "wrong_phase"),
+                    "phase": {"drafting": "draft", "offseason": "offseason"}.get(state.status, "complete")}
+        return {**_env(pro, state), **home.home_view(snap, state, seedof(row, state))}
 
     # ---------------------------------------------------------------- lineup
 
@@ -592,7 +643,7 @@ def add_routes(router: APIRouter, ctx: GameApiCtx) -> None:
             if view.paywalled(pro, state):
                 return _premium(state)
             em = Emitter(state, snap)
-            extra = action(em, snap, state, row, int(row["seed"]))
+            extra = action(em, snap, state, row, seedof(row, state))
             commit(store, uid, gid, snap, state, em, checkpoint=checkpoint)
             return {**_env(pro, state), **(respond(snap, state) if respond else {}), **(extra or {})}
 
@@ -648,7 +699,7 @@ def add_routes(router: APIRouter, ctx: GameApiCtx) -> None:
     def trade_preview(game_id: str, body: TradeBody, user: dict[str, Any] = Depends(require_user)):
         pro = ctx.is_pro(user)
         _, _, row, snap, state = load(user, _gid(game_id))
-        desk = TradeDesk(Evaluator(snap, state), int(row["seed"]))
+        desk = TradeDesk(Evaluator(snap, state), seedof(row, state))
         verdict = act.preview_trade(desk, body.partner, body.give, body.get)
         return {**_env(pro, state), "verdict": _verdict_json(snap, state, verdict), "executed": False, "trade": None}
 
@@ -729,8 +780,9 @@ def add_routes(router: APIRouter, ctx: GameApiCtx) -> None:
             with ctx.compute() as ok:
                 if not ok:
                     return busy()
-                recaps = advance(em, snap, state, int(row["seed"]))
+                recaps = advance(em, snap, state, seedof(row, state))
             commit(store, uid, gid, snap, state, em, checkpoint=True)
+            snap = snap.season_view(state.view_no)  # the season may have ended into the offseason
             return {**_env(pro, state), "recap": recaps[0], "also_played": recaps[1:], "replayed": False,
                     "game": game_json({**row, "status": state.status}, snap, state, pro)}
 
@@ -741,7 +793,7 @@ def add_routes(router: APIRouter, ctx: GameApiCtx) -> None:
         gid = _gid(game_id)
         with _lock_for(gid):
             store, uid, row, snap, state = load(user, gid)
-            if state.status in ("drafting", "complete"):
+            if state.status in ("drafting", "complete", "offseason"):
                 raise GameError("wrong_phase", "Nothing to revert right now.", phase=state.status)
             if view.paywalled(pro, state):
                 return _premium(state)
@@ -751,6 +803,105 @@ def add_routes(router: APIRouter, ctx: GameApiCtx) -> None:
                 state = store.load_state(uid, gid, snap)
                 store.touch(uid, gid, status=state.status, week=state.week, event_count=state.seq)
             return {**_env(pro, state), "reverted": max(0, reverted), "game": game_json(row, snap, state, pro)}
+
+    # ---------------------------------------------------- IR / taxi / picks
+
+    @router.post("/games/{game_id}/roster/move")
+    @guarded
+    def roster_move(game_id: str, body: MoveBody, user: dict[str, Any] = Depends(require_user)):
+        def resp(snap, state):
+            return {**view.lineup_view(snap, state)}
+
+        return _mutate(user, game_id, lambda em, *_: {"move": act.move_player(em, body.player_id, body.to)}, respond=resp)
+
+    @router.get("/games/{game_id}/picks")
+    @guarded
+    def get_picks(game_id: str, user: dict[str, Any] = Depends(require_user)):
+        pro = ctx.is_pro(user)
+        _, _, _, snap, state = load(user, _gid(game_id))
+        if not snap.settings.dynasty:
+            return _env(pro, state, "not_dynasty")
+        return {**_env(pro, state), **dview.picks_view(snap, state)}
+
+    # --------------------------------------------------- dynasty offseason
+
+    def _offseason_resp(pro, snap, state, row, **extra):
+        snap = snap.season_view(state.view_no)
+        return {**_env(pro, state), "game": game_json(row, snap, state, pro), "offseason": dview.offseason_view(snap, state), **extra}
+
+    def _require_offseason(state):
+        if state.status != "offseason":
+            raise GameError("wrong_phase", "The offseason has not started.", phase=state.status)
+
+    @router.get("/games/{game_id}/offseason")
+    @guarded
+    def get_offseason(game_id: str, pos: str = "", user: dict[str, Any] = Depends(require_user)):
+        pro = ctx.is_pro(user)
+        _, _, row, snap, state = load(user, _gid(game_id))
+        if not snap.settings.dynasty:
+            return _env(pro, state, "not_dynasty")
+        _require_offseason(state)
+        return {**_env(pro, state), "game": game_json(row, snap, state, pro),
+                "offseason": dview.offseason_view(snap, state, pos=pos.upper())}
+
+    def _offseason_command(user, game_id, command):
+        pro = ctx.is_pro(user)
+        gid = _gid(game_id)
+        with _lock_for(gid):
+            store, uid, row, snap, state = load(user, gid)
+            _require_offseason(state)
+            em = Emitter(state, snap)
+            with ctx.compute() as ok:
+                if not ok:
+                    return busy()
+                made = command(em, snap, state, seedof(row, state))
+            commit(store, uid, gid, snap, state, em, checkpoint=True)
+            row = {**row, "status": state.status}
+            return _offseason_resp(pro, snap, state, row, made=made or [])
+
+    @router.post("/games/{game_id}/offseason/rookie-draft/start")
+    @guarded
+    def rookie_draft_start(game_id: str, user: dict[str, Any] = Depends(require_user)):
+        def run(em, snap, state, seed):
+            dyn.start_rookie_draft(em)
+            return dyn.run_ai_rookie_picks(em, seed)
+
+        return _offseason_command(user, game_id, run)
+
+    @router.post("/games/{game_id}/offseason/rookie-draft/pick")
+    @guarded
+    def rookie_draft_pick(game_id: str, body: PickBody, user: dict[str, Any] = Depends(require_user)):
+        return _offseason_command(user, game_id, lambda em, snap, state, seed: dyn.user_rookie_pick(em, str(body.player_id), seed))
+
+    @router.post("/games/{game_id}/offseason/rookie-draft/auto")
+    @guarded
+    def rookie_draft_auto(game_id: str, user: dict[str, Any] = Depends(require_user)):
+        return _offseason_command(user, game_id, lambda em, snap, state, seed: dyn.auto_rookie_draft(em, seed))
+
+    @router.post("/games/{game_id}/offseason/start-season")
+    @guarded
+    def offseason_start_season(game_id: str, user: dict[str, Any] = Depends(require_user)):
+        pro = ctx.is_pro(user)
+        gid = _gid(game_id)
+        with _lock_for(gid):
+            store, uid, row, snap, state = load(user, gid)
+            _require_offseason(state)
+            em = Emitter(state, snap)
+            with ctx.compute() as ok:
+                if not ok:
+                    return busy()
+                dyn.start_next_season(em, seedof(row, state))
+            commit(store, uid, gid, snap, state, em, checkpoint=True)
+            return {**_env(pro, state), "game": game_json({**row, "status": state.status}, snap, state, pro)}
+
+    @router.get("/games/{game_id}/dynasty")
+    @guarded
+    def get_dynasty(game_id: str, user: dict[str, Any] = Depends(require_user)):
+        pro = ctx.is_pro(user)
+        _, _, row, snap, state = load(user, _gid(game_id))
+        if not snap.settings.dynasty:
+            return _env(pro, state, "not_dynasty")
+        return {**_env(pro, state), "dynasty": dview.summary_view(snap, state), "game": game_json(row, snap, state, pro)}
 
     # --------------------------------------------------------- league / result
 
@@ -772,6 +923,15 @@ def add_routes(router: APIRouter, ctx: GameApiCtx) -> None:
             store, uid, row, snap, state = load(user, gid)
             if state.status != "complete":
                 return {**_env(pro, state, "not_complete"), "game": game_json(row, snap, state, pro)}
+            if snap.settings.dynasty:
+                summary = dview.summary_view(snap, state)
+                last = state.seasons[-1] if state.seasons else None
+                result = {
+                    "engine_version": GAME_ENGINE_VERSION, "seed": int(row["seed"]), "mode": "dynasty", "dynasty": summary,
+                    "champion": last["champion"] if last else None, "final_standings": last["standings"] if last else [],
+                    "grade": None, "decisions_that_mattered": [], "review": None, "weeks": [],
+                }
+                return {**_env(pro, state), "result": result, "game": game_json(row, snap, state, pro)}
             result = store.get_result(uid, gid)
             if result is None:
                 with ctx.compute() as ok:
@@ -779,7 +939,7 @@ def add_routes(router: APIRouter, ctx: GameApiCtx) -> None:
                         return busy()
                     events = store.load_events(uid, gid, 0)
                     try:
-                        result = build_result(snap, int(row["seed"]), events, state)
+                        result = build_result(snap, seedof(row, state), events, state)
                         json.dumps(result, allow_nan=False)  # fail here, not inside the storage call
                     except (SimStoreError, GameConflict):
                         raise

@@ -11,8 +11,10 @@ from __future__ import annotations
 from typing import Any, Iterable, Mapping
 
 
+from modules.sim.game_mode import DEFAULT_ROOKIE_ROUNDS, DEFAULT_SEASONS, DYNASTY_VERSION, PICK_YEARS
 from modules.sim.game_types import (
     FLEX_SHARE,
+    RESERVE_VERSION,
     POOL_CAPS,
     SINGLETON_POSITIONS,
     START_LEAGUE,
@@ -26,7 +28,7 @@ from modules.sim.game_types import (
 from modules.sim.personas import assign_personas
 from modules.sim.rng import WorldRng
 from modules.sim.synthetic import round_robin
-from modules.sim.types import GAME_POSITIONS, SimInputsError
+from modules.sim.types import GAME_POSITIONS, SimInputsError, SimPick
 
 TEAM_NAMES = (
     "Gridiron Ghosts", "Blitz Brigade", "Red Zone Rascals", "Hail Mary Heroes", "Pocket Aces",
@@ -97,6 +99,20 @@ def finalize_pool(
         kept.extend(rs[: POOL_CAPS[pos]])
         kept.extend(r for r in rs[POOL_CAPS[pos]:] if str(r["pid"]) in keep_ids)
 
+    return value_pool(kept, settings, by_pos)
+
+
+def value_pool(
+    kept: list[Mapping[str, Any]], settings: GameSettings, by_pos: Mapping[str, list[Mapping[str, Any]]] | None = None
+) -> dict[str, GamePlayer]:
+    """Draft ``value`` and ``adp`` for an already-trimmed set of rows. Dynasty's
+    later seasons reuse this on the aged pool so a player's one-season value
+    follows his new projection."""
+
+    if by_pos is None:
+        by_pos = {p: [] for p in settings.pool_positions}
+        for r in kept:
+            by_pos.setdefault(str(r["pos"]).upper(), []).append(r)
     repl = replacement_levels(settings, by_pos)
     vor = {str(r["pid"]): max(0.0, _num(r["mean"]) - repl[str(r["pos"]).upper()]) for r in kept}
     max_vor = max(vor.values(), default=0.0) or 1.0
@@ -228,12 +244,28 @@ def build_snapshot(
     return GameSnapshot(
         settings=settings, teams=tuple(teams), players=players, bye_weeks=byes, schedule=schedule,
         scoring_model=scoring_model, notes=tuple(notes) + tuple(bye_notes),
+        seed=seed if settings.dynasty else 0, start_picks=own_picks(settings, [t.tid for t in teams]),
+    )
+
+
+def own_picks(settings: GameSettings, tids: Iterable[str]) -> tuple[SimPick, ...]:
+    """Every team holds its own picks for the next ``pick_years`` rookie drafts
+    (the first draft is the one after season 1). Empty outside dynasty."""
+
+    if not settings.dynasty:
+        return ()
+    first = settings.start_year + 1
+    return tuple(
+        SimPick(season=y, round=r, orig=t, owner=t)
+        for y in range(first, first + settings.pick_years)
+        for r in range(1, settings.rookie_rounds + 1) for t in sorted(tids)
     )
 
 
 def league_settings(
     imported: LeagueImport, *, difficulty: str, auto_lineup: bool, regular_weeks: int = 14, trade_deadline_week: int = 10,
-    tiebreaker: str = "points_for",
+    tiebreaker: str = "points_for", dynasty: bool = False, seasons: int = DEFAULT_SEASONS, start_year: int = 0,
+    ir_slots: int | None = None, taxi_slots: int | None = None,
 ) -> GameSettings:
     """Game settings that mirror a real league: its size, lineup, scoring and
     playoff field, over a fresh 14-week season."""
@@ -242,7 +274,19 @@ def league_settings(
     user = next(i for i, t in enumerate(imported.teams) if t.is_user) + 1
     limit = max(len(imported.slots) + imported.bench, max(len(t.roster) for t in imported.teams))
     scoring = {str(k): float(v) for k, v in imported.scoring_settings.items()}
+    ir = imported.ir_slots if ir_slots is None else ir_slots
+    taxi = imported.taxi_slots if taxi_slots is None else taxi_slots
+    ir = max(ir, max((len(t.ir) for t in imported.teams), default=0))
+    taxi = max(taxi, max((len(t.taxi) for t in imported.teams), default=0))
+    dyn = {}
+    if dynasty:
+        dyn = dict(
+            mode="dynasty", seasons=seasons, dynasty_v=DYNASTY_VERSION, pick_years=PICK_YEARS,
+            start_year=start_year or imported.start_year or imported_year(imported),
+            rookie_rounds=max(2, min(5, imported.rookie_rounds or DEFAULT_ROOKIE_ROUNDS)),
+        )
     return GameSettings(
+        reserve_v=RESERVE_VERSION, ir_slots=min(ir, 8), taxi_slots=min(taxi, 12), taxi_years=imported.taxi_years, **dyn,
         teams=n, scoring=scoring_label(scoring), difficulty=difficulty, user_slot=user, auto_lineup=auto_lineup,
         slots=imported.slots, rounds=0, roster_limit=limit, regular_weeks=regular_weeks,
         playoff_teams=max(2, min(imported.playoff_teams, n)), trade_deadline_week=trade_deadline_week,
@@ -251,6 +295,13 @@ def league_settings(
         include_def="DEF" in imported.slots, bench=limit - len(imported.slots),
         start=START_LEAGUE, custom_scoring=scoring, tiebreaker=tiebreaker,
     )
+
+
+def imported_year(imported: LeagueImport) -> int:
+    try:
+        return int(imported.season)
+    except (TypeError, ValueError):
+        return 2026
 
 
 def build_league_snapshot(
@@ -268,10 +319,12 @@ def build_league_snapshot(
     Rostered players the pool cannot project are dropped from their team and
     counted in the notes; free agents are the rest of the pool."""
 
-    rostered = {p for t in imported.teams for p in t.roster}
+    rostered = {p for t in imported.teams for p in (*t.roster, *t.ir, *t.taxi)}
     players = finalize_pool(rows, settings, keep=rostered)
     require_pool(players, settings)
     dropped = sum(1 for p in rostered if p not in players)
+    picks = imported.picks if settings.dynasty and imported.picks else own_picks(settings, [t.tid for t in imported.teams])
+    picks = tuple(p for p in picks if settings.start_year < p.season < settings.start_year + 1 + settings.pick_years and p.round <= settings.rookie_rounds)
     byes, bye_notes = resolve_byes(players, bye_weeks, settings, seed)
     rng = WorldRng(seed)
     ai_ids = [t.tid for t in imported.teams if not t.is_user]
@@ -283,8 +336,12 @@ def build_league_snapshot(
     coins = rng.stream(0, "gsetup", 4).permutation(len(imported.teams))
     teams: list[GameTeam] = []
     start_rosters: dict[str, tuple[str, ...]] = {}
+    start_ir: dict[str, tuple[str, ...]] = {}
+    start_taxi: dict[str, tuple[str, ...]] = {}
     for i, t in enumerate(imported.teams):
         start_rosters[t.tid] = tuple(p for p in t.roster if p in players)
+        start_ir[t.tid] = tuple(p for p in t.ir if p in players)
+        start_taxi[t.tid] = tuple(p for p in t.taxi if p in players)
         if t.is_user:
             teams.append(GameTeam(
                 tid=t.tid, name=(user_team_name or t.name)[:40] or "Your Team", owner="You", is_user=True,
@@ -305,6 +362,8 @@ def build_league_snapshot(
     return GameSnapshot(
         settings=settings, teams=tuple(teams), players=players, bye_weeks=byes, schedule=schedule,
         scoring_model=scoring_model, notes=tuple(extra), start_rosters=start_rosters,
+        start_ir=start_ir if settings.reserves else {}, start_taxi=start_taxi if settings.reserves else {},
+        seed=seed if settings.dynasty else 0, start_picks=picks if settings.dynasty else (),
     )
 
 

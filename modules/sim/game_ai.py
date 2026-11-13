@@ -15,10 +15,11 @@ from typing import Any, Iterable, Sequence
 
 from modules.sim.game_eval import NEED_K, USER_PARAMS, Evaluator, convex, team_params
 from modules.sim.game_state import GameState
-from modules.sim.game_types import NON_TRADABLE, SINGLETON_POSITIONS, GameSnapshot, slot_positions
+from modules.sim.game_types import NON_TRADABLE, SINGLETON_POSITIONS, GameError, GameSnapshot, slot_positions
 from modules.sim.lineup import pick_lineup
 from modules.sim.personas import PERSONAS, TeamParams
 from modules.sim.rng import WorldRng
+from modules.sim.types import is_pick_id
 
 MAX_TRADE_SIDE = 3
 MAX_AI_TRADES_PER_WEEK = 3
@@ -192,7 +193,8 @@ class TradeDesk:
 
         params = self.params(tid)
         give_set = set(give)
-        roster = [p for p in self.state.rosters[tid] if p not in give_set] + list(get)
+        # Picks never touch the roster; a taxi/IR player who arrives is active (and counts) here.
+        roster = [p for p in self.state.rosters[tid] if p not in give_set] + [p for p in get if not is_pick_id(p)]
         dropped: list[str] = []
         limit = self.snap.settings.roster_limit
         while len(roster) > limit:
@@ -234,6 +236,15 @@ class TradeDesk:
         ok = margin >= 0 and loss <= floor_tolerance(params)
         return ok, margin, dval, need, loss
 
+    def tradable(self, tid: str) -> list[str]:
+        """What ``tid`` can put in a trade: every player it owns (active, IR, taxi) except
+        kickers and defenses, plus its picks when the mode trades them."""
+
+        out = [p for p in self.state.holdings(tid) if self.snap.players[p].pos not in NON_TRADABLE]
+        if self.snap.settings.policy.dynasty:
+            out += self.state.picks_of(tid)
+        return out
+
     # --------------------------------------------------------------- needs
 
     def need_position(self, tid: str) -> tuple[str, float]:
@@ -272,7 +283,7 @@ class TradeDesk:
                 chips=["fits their need"] if fits else ["fair value"], margin=margin,
             )
         pos, ratio = self.need_position(ai)
-        incoming_positions = {snap.players[p].pos for p in user_gives}
+        incoming_positions = {snap.players[p].pos for p in user_gives if not is_pick_id(p)}
         chips: list[str] = []
         if loss > floor_tolerance(params):
             code, reason = "fair_floor", "They will not give up that much value in one deal."
@@ -302,10 +313,10 @@ class TradeDesk:
         user = snap.user_team.tid
         options: list[tuple[float, str, tuple[str, ...], tuple[str, ...]]] = []
         extra = sorted(
-            (p for p in state.rosters[user] if p not in user_gives and snap.players[p].pos not in NON_TRADABLE),
+            (p for p in self.tradable(user) if p not in user_gives),
             key=lambda p: (-(ev.worth(self.params(ai), p) - ev.worth(USER_PARAMS, p)), p),
         )[:8]
-        if len(user_gives) < MAX_TRADE_SIDE:
+        if len(user_gives) < snap.settings.policy.max_trade_side:
             for p in extra:
                 give = tuple(user_gives) + (p,)
                 if self.ai_accepts(ai, give, user_gets)[0]:
@@ -335,8 +346,8 @@ class TradeDesk:
             if not to_user and state.trades_made[partner] >= self.params(partner).max_trades:
                 continue
             pparams = self.params(partner)
-            mine = [p for p in state.rosters[proposer] if snap.players[p].pos not in NON_TRADABLE]
-            theirs = [p for p in state.rosters[partner] if snap.players[p].pos not in NON_TRADABLE]
+            mine = self.tradable(proposer)
+            theirs = self.tradable(partner)
             lens = USER_PARAMS if to_user else pparams
             gives = sorted(mine, key=lambda p: (-(ev.worth(lens, p) - ev.worth(params, p)), p))[:CANDIDATES_PER_SIDE]
             gets = sorted(theirs, key=lambda p: (-(ev.worth(params, p) - ev.worth(lens, p)), p))[:CANDIDATES_PER_SIDE]
@@ -374,20 +385,25 @@ def validate_offer(snap: GameSnapshot, state: GameState, partner: str, give: Seq
     user = snap.user_team.tid
     if partner == user or partner not in snap.tids:
         raise ValueError("partner must be another team.")
+    side_max = snap.settings.policy.max_trade_side
     for label, side in (("give", give), ("get", get)):
-        if not 1 <= len(side) <= MAX_TRADE_SIDE:
-            raise ValueError(f"{label} must list 1-{MAX_TRADE_SIDE} players.")
+        if not 1 <= len(side) <= side_max:
+            raise ValueError(f"{label} must list 1-{side_max} assets.")
         if len(set(side)) != len(side):
             raise ValueError(f"{label} has duplicates.")
-    for pid in give:
-        if pid not in state.rosters[user]:
-            raise ValueError("You can only give players on your roster.")
-    for pid in get:
-        if pid not in state.rosters[partner]:
-            raise ValueError("You can only ask for players on that team's roster.")
-    for pid in [*give, *get]:
-        if snap.players[pid].pos in NON_TRADABLE:
-            raise ValueError("Kickers and defenses cannot be traded.")
+    for label, side, owner, who in (("give", give, user, "your"), ("get", get, partner, "that team's")):
+        for pid in side:
+            if is_pick_id(pid):
+                if not snap.settings.policy.dynasty:
+                    raise ValueError("Draft picks cannot be traded in this league.")
+                if state.pick_owner.get(pid) != owner:
+                    raise ValueError(f"You can only trade picks on {who} side that {'you' if label == 'give' else 'they'} own.")
+                if state.offseason and state.offseason.get("stage") == "rookie_draft" and pid.split(":")[1] == str(state.offseason["year"]):
+                    raise GameError("picks_locked", "That draft is under way: its picks cannot be traded.")
+            elif pid not in snap.players or state.where(owner, pid) is None:
+                raise ValueError(f"You can only {'give players on your roster' if label == 'give' else 'ask for players on that team' + chr(39) + 's roster'}.")
+            elif snap.players[pid].pos in NON_TRADABLE:
+                raise ValueError("Kickers and defenses cannot be traded.")
 
 
 def offer_key(partner: str, give: Iterable[str], get: Iterable[str]) -> str:
@@ -399,6 +415,9 @@ def trade_window(snap: GameSnapshot, state: GameState) -> str | None:
 
     if state.status == "drafting":
         return "wrong_phase"
+    if state.status == "offseason":
+        # Dynasty's offseason is trade season, until the rookie draft is under way.
+        return None if snap.settings.policy.dynasty else "trades_closed"
     if state.status != "in_season":
         return "trades_closed"
     if state.week > snap.settings.trade_deadline_week:

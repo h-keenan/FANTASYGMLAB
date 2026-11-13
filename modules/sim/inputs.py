@@ -44,6 +44,7 @@ GAMES_CSV_DEFAULT = "data/nfl_games.csv"
 _TEAM_ALIASES = {"LA": "LAR", "OAK": "LV", "SD": "LAC", "STL": "LAR"}
 _MIN_SCHEDULED_TEAMS = 28  # a schedule missing most of the league is not usable
 _PICK_SEASONS_AHEAD = 2  # next two rookie drafts
+_DYNASTY_PICK_YEARS = 3  # the dynasty game holds picks for the next three
 _DEFAULT_DRAFT_ROUNDS = 4
 _MAX_DRAFT_ROUNDS = 7
 MODES = ("remaining", "full")
@@ -62,7 +63,9 @@ class SimInputs(Protocol):
 
     def player_pool(self, scoring_settings: Mapping[str, float]) -> "PlayerPool": ...
 
-    def league_import(self, league_id: str, *, username: str = "", roster_id: str = "") -> LeagueImport: ...
+    def league_import(
+        self, league_id: str, *, username: str = "", roster_id: str = "", dynasty: bool = False
+    ) -> LeagueImport: ...
 
     def league_teams(self, league_id: str, *, username: str = "") -> LeagueTeams: ...
 
@@ -389,7 +392,9 @@ class RealSimInputs:
         return out
 
     @staticmethod
-    def _draft_picks(sleeper, league_id, league, settings_raw, tids) -> tuple[SimPick, ...]:
+    def _draft_picks(
+        sleeper, league_id, league, settings_raw, tids, *, n_years: int = _PICK_SEASONS_AHEAD, first: int | None = None,
+    ) -> tuple[SimPick, ...]:
         """Every team's next-two-drafts picks with real (traded) ownership.
         Sleeper lists only traded picks; everything else is held by the team it
         belongs to. No league season means no pick years: no picks."""
@@ -400,8 +405,9 @@ class RealSimInputs:
         rounds = _int(settings_raw.get("draft_rounds"), _DEFAULT_DRAFT_ROUNDS) or _DEFAULT_DRAFT_ROUNDS
         rounds = max(1, min(rounds, _MAX_DRAFT_ROUNDS))
         # In the pre-draft offseason the league's own season is still undrafted.
-        first = season if str(league.get("status") or "") == "pre_draft" else season + 1
-        years = range(first, first + _PICK_SEASONS_AHEAD)
+        if first is None:
+            first = season if str(league.get("status") or "") == "pre_draft" else season + 1
+        years = range(first, first + n_years)
         owner: dict[tuple[int, int, str], str] = {}
         try:
             traded = sleeper.get_traded_picks(league_id) or []
@@ -532,7 +538,9 @@ class RealSimInputs:
 
     # ----------------------------------------------------------- league import
 
-    def league_import(self, league_id: str, *, username: str = "", roster_id: str = "") -> LeagueImport:
+    def league_import(
+        self, league_id: str, *, username: str = "", roster_id: str = "", dynasty: bool = False
+    ) -> LeagueImport:
         """Read-only. A real Sleeper league's size, lineup, scoring and current
         rosters, frozen. The only thing the "start from one of my leagues" mode
         takes from the league; nothing is ever written back."""
@@ -563,17 +571,36 @@ class RealSimInputs:
         for roster in rosters:
             rid = str(roster.get("roster_id"))
             profile = profiles.get(rid) or {}
-            taxi = {str(p) for p in (roster.get("taxi") or [])}
-            ids = [self._game_id(p) for p in (roster.get("players") or []) if str(p) not in taxi]
+            taxi = [self._game_id(p) for p in (roster.get("taxi") or [])]
+            reserve = [self._game_id(p) for p in (roster.get("reserve") or [])]
+            apart = {*taxi, *reserve}
+            ids = [self._game_id(p) for p in (roster.get("players") or [])]
             teams.append(ImportedTeam(
                 tid=rid, name=str(profile.get("team_name") or f"Team {rid}"),
                 owner=str(profile.get("owner_name") or ""), is_user=rid == user_rid,
-                roster=tuple(sorted(dict.fromkeys(p for p in ids if p))),
+                roster=tuple(sorted(dict.fromkeys(p for p in ids if p and p not in apart))),
+                ir=tuple(sorted(dict.fromkeys(p for p in reserve if p))),
+                taxi=tuple(sorted(dict.fromkeys(p for p in taxi if p))),
             ))
+        picks: tuple[SimPick, ...] = ()
+        start_year = 0
+        season_no = _int(league.get("season"))
+        rounds = max(2, min(5, _int(settings_raw.get("draft_rounds"), _DEFAULT_DRAFT_ROUNDS) or _DEFAULT_DRAFT_ROUNDS))
+        if dynasty and season_no:
+            # The game plays one season (labelled ``start_year``) before its first rookie draft, so a
+            # league still waiting on this year's draft starts a year earlier.
+            start_year = season_no - 1 if str(league.get("status") or "") == "pre_draft" else season_no
+            picks = self._draft_picks(
+                sleeper, league_id, league, settings_raw, [t.tid for t in teams], n_years=_DYNASTY_PICK_YEARS, first=start_year + 1,
+            )
+        taxi_years = _int(settings_raw.get("taxi_years"), 0)
         return LeagueImport(
             league_id=str(league_id), league_name=str(league.get("name") or ""), season=str(league.get("season") or ""),
             teams=tuple(teams), slots=slots, bench=bench, scoring_settings=scoring,
             playoff_teams=_int(settings_raw.get("playoff_teams"), 6) or 6, notes=tuple(notes),
+            picks=tuple(p for p in picks if p.round <= rounds), start_year=start_year, rookie_rounds=rounds,
+            ir_slots=_int(settings_raw.get("reserve_slots")), taxi_slots=_int(settings_raw.get("taxi_slots")),
+            taxi_years=taxi_years if 1 <= taxi_years <= 4 else 4,
         )
 
     def league_teams(self, league_id: str, *, username: str = "") -> LeagueTeams:

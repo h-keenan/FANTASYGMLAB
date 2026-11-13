@@ -81,7 +81,7 @@ def test_layout_is_derived_from_the_toggles(superflex, k, d, bench, slots, limit
 @pytest.mark.parametrize("bad", [
     {"teams": 9}, {"teams": 16}, {"teams": True}, {"scoring": "nope"}, {"te_premium": 0.25}, {"te_premium": True},
     {"superflex": "yes"}, {"include_def": 1}, {"include_k": None}, {"bench": 3}, {"bench": 11}, {"bench": 8.5},
-    {"mode": "keeper"}, {"mode": "dynasty"}, {"difficulty": "brutal"}, {"user_slot": 13}, {"auto_lineup": "x"},
+    {"mode": "keeper"}, {"mode": "dynasty", "seasons": 9}, {"difficulty": "brutal"}, {"user_slot": 13}, {"auto_lineup": "x"},
 ])
 def test_invalid_settings_are_rejected(bad):
     with pytest.raises(ValueError):
@@ -105,9 +105,9 @@ def test_settings_round_trip_and_old_saves_load_with_inferred_new_fields():
     assert legacy.rules == 1 and legacy.policy is LEGACY_POLICY and legacy.scoring_settings["rec"] == 1.0
 
 
-def test_modes_are_extensible_and_dynasty_is_declared_but_not_playable():
+def test_modes_are_extensible_and_dynasty_is_playable():
     assert policy_for("redraft").season_valuation and policy_for("redraft").available
-    assert not policy_for("dynasty").available and not policy_for("dynasty").season_valuation
+    assert policy_for("dynasty").available and policy_for("dynasty").dynasty and not policy_for("dynasty").season_valuation
     assert not policy_for("redraft", rules=1).season_valuation
 
 
@@ -467,7 +467,7 @@ def test_options_expose_quick_start_defaults_advanced_options_and_start_modes():
     data = client.get("/v1/sim/games/options", headers=H).json()
     o = data["options"]
     assert (o["teams"]["default"], o["scoring"]["default"], o["te_premium"]["values"]) == (12, "half", [0.0, 0.5, 1.0])
-    assert o["teams"]["values"] == [8, 10, 12, 14] and o["mode"]["values"] == ["redraft"]
+    assert o["teams"]["values"] == [8, 10, 12, 14] and o["mode"]["values"] == ["redraft", "dynasty"]
     assert (o["bench"]["min"], o["bench"]["max"], o["bench"]["default"]) == (4, 10, 8)
     assert o["superflex"]["default"] is False and o["include_k"]["default"] is True and o["include_def"]["default"] is False
     assert data["layout"] == {"base_slots": ["QB", "RB", "RB", "WR", "WR", "TE", "FLEX"], "draft_spare_spots": 2}
@@ -493,7 +493,7 @@ def test_create_with_advanced_options_saves_them_and_projects_in_that_scoring():
     assert reloaded == s
     bad = client.post("/v1/sim/games", json={"teams": 9}, headers=H)
     assert bad.status_code == 422
-    assert client.post("/v1/sim/games", json={"mode": "dynasty"}, headers=H).status_code == 422
+    assert client.post("/v1/sim/games", json={"mode": "dynasty", "seasons": 9}, headers=H).status_code == 422
 
 
 def test_pool_cache_is_keyed_by_the_full_scoring_not_just_the_preset():
