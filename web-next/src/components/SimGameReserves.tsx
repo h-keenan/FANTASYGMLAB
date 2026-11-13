@@ -117,7 +117,7 @@ export function SimReserveSheet({
       </p>
       <div className="flex items-center gap-2 pt-1 text-xs" style={{ color: "var(--color-text-muted)" }}>
         <span>{player.pos}{player.team ? ` · ${player.team}` : ""}</span>
-        <SimPlayerChips player={{ ...player, out_weeks: 0 }} />
+        <SimPlayerChips player={player} />
       </div>
       <ul className="flex flex-col gap-2 pt-3" aria-label="Moves">
         {actions.map((action) => {
@@ -220,7 +220,7 @@ export function SimReserveGroups({
                 key={player.id}
                 player={{ ...player, squad: g.kind }}
                 onOpen={openPlayer}
-                extra={<SimPlayerChips player={{ ...player, squad: g.kind, out_weeks: 0 }} />}
+                extra={<SimPlayerChips player={{ ...player, squad: g.kind }} />}
                 trailing={
                   cutting === player.id && onCut ? (
                     <>

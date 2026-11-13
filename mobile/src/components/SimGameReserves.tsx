@@ -120,7 +120,7 @@ export function SimReserveSheet({
           {player.pos}
           {player.team ? ` · ${player.team}` : ''}
         </AppText>
-        <SimPlayerChips player={{ ...player, out_weeks: 0 }} />
+        <SimPlayerChips player={player} />
       </View>
       <View style={common.stack}>
         {actions.map((action) => {
@@ -210,7 +210,7 @@ export function SimReserveGroups({
                 key={player.id}
                 player={{ ...player, squad: g.kind }}
                 onOpen={openPlayer}
-                extra={<SimPlayerChips player={{ ...player, squad: g.kind, out_weeks: 0 }} />}
+                extra={<SimPlayerChips player={{ ...player, squad: g.kind }} />}
                 trailing={
                   cutting === player.id && onCut ? (
                     <>

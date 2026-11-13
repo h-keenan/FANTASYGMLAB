@@ -224,7 +224,7 @@ export function SimTeamTab({ ctx, onTrade }: { ctx: SimCtx; onTrade: () => void 
               player={player}
               week={game.week}
               onOpen={ctx.openPlayer}
-              extra={<SimPlayerChips player={{ ...player, out_weeks: 0 }} />}
+              extra={<SimPlayerChips player={player} />}
               trailing={
                 cutting === player.id ? (
                   <>
