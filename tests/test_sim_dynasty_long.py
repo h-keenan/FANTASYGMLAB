@@ -13,7 +13,7 @@ from modules.sim.game_state import fold
 from modules.sim.game_types import GameSettings
 import tests.test_sim_dynasty as base
 
-# 3- and 4-season dynasty games played by the code before dynasty_v 3 existed (dynasty_v 2 settings), seeds 4242 and 77
+# 3- and 4-season dynasty games played by the code before dynasty_v 3 and ai_v 1 existed (dynasty_v 2, ai_v 0 settings), seeds 4242 and 77
 GOLDEN_DYNASTY_V2 = {
     "3": "609131e87a06dda4f97f555f790897d92591304121a20c0ed67f6fd93d16d8e4",
     "4": "6d524d02b9474ff17a615166eec5e67e17aad2030cff77e8a295c366b19a36ec",
@@ -44,7 +44,7 @@ def _golden(seed, seasons):
 
     def v2(seed=base.SEED, **kw):
         snap = orig(seed, **kw)
-        object.__setattr__(snap, "settings", replace(snap.settings, dynasty_v=2))
+        object.__setattr__(snap, "settings", replace(snap.settings, dynasty_v=2, ai_v=0))
         return snap
 
     base.new_snapshot = v2

@@ -41,6 +41,7 @@ def test_profile_is_deterministic_json_safe_and_seed_dependent():
 def test_class_generation_is_deterministic_and_adds_fields_only_when_gated():
     snap = new_snapshot()
     vets = {p.pid: {"pid": p.pid, "pos": p.pos, "mean": p.mean, "market": p.market, "nfl_team": p.nfl_team} for p in snap.players.values() if p.pos != "DEF"}
+    snap = replace(snap, settings=replace(snap.settings, dynasty_v=2))  # dynasty_v 3 draws a different (equilibrium) class; see test_sim_dynasty_long
     a, b = dyn.rookie_class(snap, vets, 2), dyn.rookie_class(snap, vets, 2)
     assert a == b and all(sc.has_curve(r["extra"]) and "scout_seed" in r["extra"] for r in a)
     old = replace(snap, settings=replace(snap.settings, dynasty_v=1))
@@ -141,6 +142,7 @@ def test_displayed_curve_converges_to_the_curve_the_sim_plays():
 
 def test_progression_applies_the_stored_curve_and_old_saves_keep_the_age_curve():
     run = Run()
+    object.__setattr__(run.root, "settings", replace(run.root.settings, dynasty_v=2))  # (dynasty_v 3 adds the league anchor and a top bound; that is tested in test_sim_dynasty_long)
     run.play_season()
     run.offseason()  # enters season 2: rookie class 2 is in the pool, played season 2 next
     root = run.root
