@@ -4,7 +4,7 @@ import { View } from 'react-native';
 import AppText from './AppText';
 import Button from './Button';
 import { SimCollapse, SimPlayerChips } from './SimGameDynastyParts';
-import { SimRosterLine, SimSheet, createSimStyles, type SimCtx } from './SimGameParts';
+import { SimIconButton, SimRosterLine, SimSheet, createSimStyles, type SimCtx } from './SimGameParts';
 import { useThemeMode } from '../context/ThemeModeContext';
 import { api } from '../lib/api';
 import {
@@ -159,7 +159,8 @@ export function SimReserveSheet({
 
 /** The "Move" button for a roster row; opens the sheet through `onOpen`. */
 export function SimReserveButton({ player, onOpen }: { player: SimGamePlayer; onOpen: (player: SimGamePlayer) => void }) {
-  return <Button size="sm" variant="ghost" label="Move" onPress={() => onOpen(player)} />;
+  // A compact icon (not a text button) so the player's name keeps the row width.
+  return <SimIconButton label={`Move ${player.name} to IR, taxi or roster`} glyph="injury" onPress={() => onOpen(player)} />;
 }
 
 /**

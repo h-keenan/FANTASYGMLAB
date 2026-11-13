@@ -11,7 +11,7 @@ import { SimDraftIconButton, SimDraftRow } from './SimDraftBoard';
 import { SkeletonCard } from './SkeletonBlock';
 import { SimDynastyStrip } from './SimGameDynasty';
 import { SimCollapse, SimGeneratedChip, SimGeneratedNoticeSheet, SimPickLine, SimPlayerChips, SimRookieNoticeGate, useSimPicks } from './SimGameDynastyParts';
-import { SimPlayerLine, SimToneBadge, SimTradeValue, createSimStyles, simToneColor, type SimCtx } from './SimGameParts';
+import { SimRosterLine, SimToneBadge, createSimStyles, simToneColor, type SimCtx } from './SimGameParts';
 import { SimReserveButton, SimReserveGroups, SimReserveSheet } from './SimGameReserves';
 import { useThemeMode } from '../context/ThemeModeContext';
 import { api } from '../lib/api';
@@ -244,7 +244,7 @@ function ReviewStage({ off, ctx, years }: { off: SimOffseason; ctx: SimCtx; year
             {movers.map((m) => {
               const t = simMoverText(m);
               return (
-                <SimPlayerLine
+                <SimRosterLine
                   key={m.id}
                   player={m}
                   onOpen={ctx.openPlayer}
@@ -454,7 +454,7 @@ function CutdownStage({ off, ctx, onTrade, onTeam }: { off: SimOffseason; ctx: S
           <AppText style={common.muted}>Loading your roster.</AppText>
         ) : (
           players.map((player) => (
-            <SimPlayerLine
+            <SimRosterLine
               key={player.id}
               player={player}
               onOpen={ctx.openPlayer}
@@ -462,12 +462,11 @@ function CutdownStage({ off, ctx, onTrade, onTeam }: { off: SimOffseason; ctx: S
               trailing={
                 cutting === player.id ? (
                   <>
-                    <Button size="sm" variant="danger" label={`Cut ${player.name.split(' ').slice(-1)[0]}`} onPress={() => void cut(player)} />
+                    <Button size="sm" variant="danger" label="Cut" onPress={() => void cut(player)} />
                     <Button size="sm" variant="ghost" label="Keep" onPress={() => setCutting(null)} />
                   </>
                 ) : (
                   <>
-                    <SimTradeValue value={player.value} />
                     {reservesOn ? <SimReserveButton player={player} onOpen={setMoving} /> : null}
                     <Button size="sm" variant={over ? 'dangerOutline' : 'ghost'} label="Cut" onPress={() => setCutting(player.id)} />
                   </>
@@ -478,7 +477,7 @@ function CutdownStage({ off, ctx, onTrade, onTeam }: { off: SimOffseason; ctx: S
         )}
       </SimCollapse>
 
-      {reservesOn ? <SimReserveGroups ir={roster?.ir ?? r.ir ?? []} taxi={roster?.taxi ?? r.taxi ?? []} state={reserveState} onOpen={setMoving} openPlayer={ctx.openPlayer} /> : null}
+      {reservesOn ? <SimReserveGroups ir={roster?.ir ?? r.ir ?? []} taxi={roster?.taxi ?? r.taxi ?? []} state={reserveState} onOpen={setMoving} openPlayer={ctx.openPlayer} cutting={cutting} onAskCut={setCutting} onCut={(p) => void cut(p)} /> : null}
 
       {game.settings.mode === 'dynasty' && myPicks.length > 0 ? (
         <SimCollapse title="Your future picks" summary={`${myPicks.length} pick${myPicks.length === 1 ? '' : 's'}`} testID="cutdown-picks">

@@ -4,7 +4,8 @@ import { useState } from "react";
 
 import { Button } from "@/components/Button";
 import { SimCollapse, SimPlayerChips } from "@/components/SimGameDynastyParts";
-import { SimRosterLine, SimSheet, type SimCtx } from "@/components/SimGameParts";
+import { SimGlyph } from "@/components/SimGlyph";
+import { SimIconButton, SimRosterLine, SimSheet, type SimCtx } from "@/components/SimGameParts";
 import { api } from "@/lib/api";
 import {
   simFmtPts,
@@ -167,10 +168,11 @@ export function SimReserveSheet({
 
 /** The "Move" button for a roster row; opens the sheet through `onOpen`. */
 export function SimReserveButton({ player, onOpen }: { player: SimGamePlayer; onOpen: (player: SimGamePlayer) => void }) {
+  // A compact icon (not a text button) so the player's name keeps the row width.
   return (
-    <Button size="sm" variant="ghost" aria-label={`Move ${player.name} to IR, taxi or roster`} onClick={() => onOpen(player)}>
-      Move
-    </Button>
+    <SimIconButton label={`Move ${player.name} to IR, taxi or roster`} onClick={() => onOpen(player)}>
+      <SimGlyph name="injury" size={16} />
+    </SimIconButton>
   );
 }
 

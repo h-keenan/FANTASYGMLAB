@@ -10,7 +10,7 @@ import { SimDraftRow } from "@/components/SimDraftBoard";
 import { SimDraftGlyph } from "@/components/SimDraftGlyphs";
 import { SimDynastyStrip } from "@/components/SimGameDynasty";
 import { SimCollapse, SimGeneratedChip, SimGeneratedNoticeSheet, SimPickLine, SimPlayerChips, SimRookieNoticeGate, useSimPicks } from "@/components/SimGameDynastyParts";
-import { SimIconButton, SimPlayerLine, SimTradeValue, SimToneBadge, simToneColor, type SimCtx } from "@/components/SimGameParts";
+import { SimIconButton, SimRosterLine, SimToneBadge, simToneColor, type SimCtx } from "@/components/SimGameParts";
 import { SimReserveButton, SimReserveGroups, SimReserveSheet } from "@/components/SimGameReserves";
 import { SkeletonCard } from "@/components/Skeleton";
 import { api } from "@/lib/api";
@@ -244,7 +244,7 @@ function ReviewStage({ off, ctx, years }: { off: SimOffseason; ctx: SimCtx; year
             {movers.map((m) => {
               const t = simMoverText(m);
               return (
-                <SimPlayerLine
+                <SimRosterLine
                   key={m.id}
                   player={m}
                   onOpen={ctx.openPlayer}
@@ -458,7 +458,7 @@ function CutdownStage({ off, ctx, onTrade, onTeam }: { off: SimOffseason; ctx: S
           <p className="text-xs" style={{ color: "var(--color-text-muted)" }}>Loading your roster.</p>
         ) : (
           players.map((player) => (
-            <SimPlayerLine
+            <SimRosterLine
               key={player.id}
               player={player}
               onOpen={ctx.openPlayer}
@@ -466,12 +466,11 @@ function CutdownStage({ off, ctx, onTrade, onTeam }: { off: SimOffseason; ctx: S
               trailing={
                 cutting === player.id ? (
                   <>
-                    <Button size="sm" variant="danger" onClick={() => void cut(player)}>Cut {player.name.split(" ").slice(-1)[0]}</Button>
+                    <Button size="sm" variant="danger" aria-label={`Cut ${player.name}`} onClick={() => void cut(player)}>Cut</Button>
                     <Button size="sm" variant="ghost" onClick={() => setCutting(null)}>Keep</Button>
                   </>
                 ) : (
                   <>
-                    <SimTradeValue value={player.value} />
                     {reservesOn ? <SimReserveButton player={player} onOpen={setMoving} /> : null}
                     <Button size="sm" variant={over ? "dangerOutline" : "ghost"} aria-label={`Cut ${player.name}`} onClick={() => setCutting(player.id)}>
                       Cut
@@ -485,7 +484,7 @@ function CutdownStage({ off, ctx, onTrade, onTeam }: { off: SimOffseason; ctx: S
       </SimCollapse>
 
       {reservesOn ? (
-        <SimReserveGroups ir={roster?.ir ?? r.ir ?? []} taxi={roster?.taxi ?? r.taxi ?? []} state={reserveState} onOpen={setMoving} openPlayer={ctx.openPlayer} />
+        <SimReserveGroups ir={roster?.ir ?? r.ir ?? []} taxi={roster?.taxi ?? r.taxi ?? []} state={reserveState} onOpen={setMoving} openPlayer={ctx.openPlayer} cutting={cutting} onAskCut={setCutting} onCut={(p) => void cut(p)} />
       ) : null}
 
       {game.settings.mode === "dynasty" && myPicks.length > 0 ? (
