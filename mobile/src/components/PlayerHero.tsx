@@ -6,6 +6,7 @@ import AppText from './AppText';
 import OvrGauge from './OvrGauge';
 import PlayerAvatar from './PlayerAvatar';
 import PositionBadge from './PositionBadge';
+import TapForWhy from './TapForWhy';
 import ToneBadge from './ToneBadge';
 import { useThemeMode } from '../context/ThemeModeContext';
 import type { UsageTrend } from '../lib/api';
@@ -53,8 +54,14 @@ export default function PlayerHero({
   rookie = null,
   expanded,
   onToggleExpand,
+  valueChart = null,
+  ovrChart = null,
   children,
 }: {
+  /** Shown in the tap-the-Value popover (for example the value history chart). */
+  valueChart?: React.ReactNode;
+  /** Shown in the tap-the-Player-score popover (for example the model radar). */
+  ovrChart?: React.ReactNode;
   playerId: string;
   tier?: string | null;
   /** Archetype pill text (resolvePlayerTier's semantic label); omit for
@@ -159,18 +166,27 @@ export default function PlayerHero({
           >
             {scoreTileBody}
           </TouchableOpacity>
+        ) : overallRating !== null ? (
+          <TapForWhy metric="ovr" variant="tile" style={styles.tile} spoken={`Player score ${overallRating}`} chart={ovrChart} testID="pqv-ovr-why">
+            {scoreTileBody}
+          </TapForWhy>
         ) : (
           <View style={styles.tile}>{scoreTileBody}</View>
         )}
-        <View style={styles.tile}>
-          <AppText style={styles.tileCaption}>VALUE</AppText>
-          <AppText style={[styles.tileValue, score == null && styles.tileValueEmpty]} numberOfLines={1} adjustsFontSizeToFit>
-            {score != null ? Math.round(score).toLocaleString() : '—'}
-          </AppText>
-          {score == null && !usageLoading ? (
-            <AppText style={styles.tileNote}>{valueNote || 'No market value yet'}</AppText>
-          ) : null}
-        </View>
+        {score != null ? (
+          <TapForWhy metric="value" variant="tile" style={styles.tile} spoken={`Value ${Math.round(score).toLocaleString()}`} chart={valueChart} testID="pqv-value-why">
+            <AppText style={styles.tileCaption}>VALUE</AppText>
+            <AppText style={styles.tileValue} numberOfLines={1} adjustsFontSizeToFit>
+              {Math.round(score).toLocaleString()}
+            </AppText>
+          </TapForWhy>
+        ) : (
+          <View style={styles.tile}>
+            <AppText style={styles.tileCaption}>VALUE</AppText>
+            <AppText style={[styles.tileValue, styles.tileValueEmpty]}>—</AppText>
+            {!usageLoading ? <AppText style={styles.tileNote}>{valueNote || 'No market value yet'}</AppText> : null}
+          </View>
+        )}
         <UsageTile trend={usageTrend} loading={usageLoading} />
       </View>
       {children}
@@ -197,10 +213,13 @@ function UsageTile({ trend, loading }: { trend: UsageTrend | null; loading: bool
   const confidence = sentenceCase(trend.confidence_label);
   const lit = usageConfidenceBars(trend.confidence_label);
   return (
-    <View
+    <TapForWhy
+      metric="usage_trend"
+      variant="tile"
       style={[styles.tile, tone !== 'neutral' && { borderColor: tint, backgroundColor: background }]}
-      accessible
-      accessibilityLabel={`Usage ${trend.direction === 'up' ? 'up' : 'down'} ${magnitude}%, ${confidence.toLowerCase()}`}
+      spoken={`Usage ${trend.direction === 'up' ? 'up' : 'down'} ${magnitude}%, ${confidence.toLowerCase()}`}
+      extra={trend.detail ? [trend.detail] : undefined}
+      testID="pqv-usage-why"
     >
       <AppText style={[styles.tileValue, { color: tint }]} numberOfLines={1} adjustsFontSizeToFit>
         {trend.arrow} {magnitude}%
@@ -223,7 +242,7 @@ function UsageTile({ trend, loading }: { trend: UsageTrend | null; loading: bool
           {confidence}
         </AppText>
       </View>
-    </View>
+    </TapForWhy>
   );
 }
 

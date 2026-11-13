@@ -129,6 +129,9 @@ export function Sheet({
         onCloseRef.current();
         return;
       }
+      // The sheet is a modal boundary: key events never reach a dialog underneath it
+      // (React bubbles through portals, and a parent dialog's focus trap would steal focus).
+      event.stopPropagation();
       if (event.key !== "Tab") return;
       const root = sheetRef.current;
       if (!root) return;

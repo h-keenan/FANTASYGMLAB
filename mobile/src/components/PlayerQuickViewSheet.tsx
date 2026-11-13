@@ -280,6 +280,15 @@ export default function PlayerQuickViewSheet({
               ringColor={overallRating != null ? overallRatingColor(overallRating, colors) : colors.accent}
               usageTrend={model?.usage_trend ?? null}
               usageLoading={loading}
+              valueChart={historyQuery.data && ratingHistoryCaption(historyQuery.data) ? <PlayerValueHistory history={historyQuery.data} /> : null}
+              ovrChart={
+                hasSubRatings ? (
+                  <>
+                    <ModelRadarChart ratings={subRatings} />
+                    {subRatings.every((item) => item.rating != null) ? null : <SubRatingRow ratings={subRatings} size="md" />}
+                  </>
+                ) : null
+              }
             >
               {ranks || model?.depth_chart_note ? (
                 <View style={styles.footnote}>
@@ -365,21 +374,8 @@ export default function PlayerQuickViewSheet({
                     </View>
                   </Section>
                 ) : null}
-                {/* Model is the last section, as on web: radar when every
-                    axis has a rating, chip row otherwise. */}
-                {historyQuery.data && ratingHistoryCaption(historyQuery.data) ? (
-                  <Section title="Value history">
-                    <PlayerValueHistory history={historyQuery.data} />
-                  </Section>
-                ) : null}
-                {hasSubRatings ? (
-                  <Section title="Model">
-                    <ModelRadarChart ratings={subRatings} />
-                    {subRatings.every((item) => item.rating != null) ? null : (
-                      <SubRatingRow ratings={subRatings} size="md" />
-                    )}
-                  </Section>
-                ) : null}
+                {/* Value history and the Model radar live behind a tap on the Value and
+                    Player score tiles in the hero (TapForWhy), as on web. */}
               </View>
             )}
 

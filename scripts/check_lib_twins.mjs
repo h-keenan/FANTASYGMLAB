@@ -76,6 +76,7 @@ export const MIRRORED = [
   "premiumComparison.ts",
   "sleeperConnectErrors.ts",
   "support.ts",
+  "tapForWhyContent.ts",
   "teamStatus.ts",
   "useDelayedFlag.ts",
   "valueHistoryPresentation.ts",
