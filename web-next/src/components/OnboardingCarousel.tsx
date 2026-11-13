@@ -161,13 +161,9 @@ export function OnboardingCarousel({ onDone, replay = false }: { onDone: () => v
       return;
     }
     trackOnboarding("skipped", { step: stepName(step), step_index: step });
-    // Skipping the question is "decide later": move on to the value step with
-    // the level unanswered (beginner-lite help), never straight out.
-    if (step === levelStep) {
-      setDirection("next");
-      setStep(valueStep);
-      return;
-    }
+    // First-run paywall-after-connect (2026-11): "Decide later" / "Skip" leaves
+    // the intro in ONE tap (level stays unanswered: beginner-lite help). The
+    // next screen is the connect step, never a paywall.
     onDone();
   };
   const pickLevel = (value: ExperienceLevel) => {

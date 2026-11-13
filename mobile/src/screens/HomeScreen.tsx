@@ -1,3 +1,5 @@
+import { funnelStepIndex } from '../lib/firstRunFlow';
+import { trackOnboarding, trackOnboardingStepViewed } from '../lib/onboardingAnalytics';
 import FreeLimitNote from '../components/FreeLimitNote';
 import { clearPendingReferralCode, getPendingReferralCode } from '../lib/referralCapture';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
@@ -77,7 +79,7 @@ export default function HomeScreen({ navigation, route }: Props) {
   const styles = useMemo(() => createStyles(colors), [colors]);
   const { session, signOut } = useAuth();
   const { showcaseMode } = useShowcaseMode();
-  const { consumeFirstLeagueTeamStanceRouting, consumeFirstLeagueTrialOffer } = useOnboarding();
+  const { consumeFirstLeagueTeamStanceRouting } = useOnboarding();
   const [me, setMe] = useState<MeResponse['user'] | null>(null);
   const [leagues, setLeagues] = useState<SavedLeague[] | null>(null);
   const [loading, setLoading] = useState(true);
@@ -247,13 +249,10 @@ export default function HomeScreen({ navigation, route }: Props) {
     closeAddLeague();
     await load();
     if (routeToTeamStance) {
-      navigation.navigate('GmPlan', { leagueId, leagueName: leagueName || 'League', initialTab: 'overview' });
-    }
-    // Pro trial offer, shown once, right after the very first league connects
-    // (moved here from before the connect step, 2026-11-10). Closing it
-    // returns to the league they just connected.
-    if (await consumeFirstLeagueTrialOffer()) {
-      navigation.navigate('Paywall', undefined);
+      // First league: land on its Today view (Dashboard), no paywall in
+      // between. The trial offer is a dismissible card on that view
+      // (components/FirstValueOfferCard.tsx), armed by OnboardingContext.
+      navigation.navigate('Dashboard', { leagueId, leagueName: leagueName || 'League' });
     }
   };
 
@@ -279,6 +278,9 @@ export default function HomeScreen({ navigation, route }: Props) {
         // "tell us your team's situation" promise. Pre-arm autoNavigated so
         // the effect below never races this with its own Dashboard jump.
         const wasFirstLeagueEver = (leagues?.length ?? 0) === 0;
+        if (wasFirstLeagueEver) {
+          trackOnboarding('completed', { step: 'connect', step_index: funnelStepIndex('connect') });
+        }
         const routeToTeamStance = wasFirstLeagueEver && consumeFirstLeagueTeamStanceRouting();
         if (routeToTeamStance) autoNavigated.current = true;
         if (result.warming) {
@@ -368,6 +370,11 @@ export default function HomeScreen({ navigation, route }: Props) {
   // useFocusEffect (not a plain mount effect) so returning here after a
   // Premium purchase (Paywall -> goBack) or an entitlement change made
   // elsewhere re-fetches /v1/me instead of showing stale Free/Premium state.
+  // Funnel: the connect step was shown to someone with no league yet.
+  useEffect(() => {
+    if (leagues && leagues.length === 0) trackOnboardingStepViewed('connect', funnelStepIndex('connect'));
+  }, [leagues]);
+
   useFocusEffect(
     useCallback(() => {
       void load();

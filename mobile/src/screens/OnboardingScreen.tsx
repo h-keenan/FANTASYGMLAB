@@ -187,10 +187,10 @@ const GOAL_OPTIONS: { value: ExperienceGoalValue; label: string }[] = (
  * First-run intro carousel, shown once after sign-in (gated by
  * OnboardingContext) and replayable from More > "Replay intro tutorial".
  *
- * On a genuine first run it hands off to the Paywall as a skippable trial
- * offer (web-next's OnboardingCarousel -> OnboardingPaywall sequence), and
- * the Paywall finishes onboarding when it is dismissed. A replay just
- * returns to wherever it was opened from.
+ * On a genuine first run finishing or skipping it goes on to connect a
+ * league; the trial offer is a dismissible card on the first league's Today
+ * view (FirstValueOfferCard), never a screen here. A replay just returns to
+ * wherever it was opened from.
  */
 function isReplayRoute(route: Props['route'] | undefined): boolean {
   return route?.params?.replay === true;
@@ -257,12 +257,8 @@ export default function OnboardingScreen({ navigation, route }: Props) {
       return;
     }
     trackOnboarding('skipped', { step: STEP_KEYS[index], step_index: index });
-    // Skipping the question is "decide later": go on to the value step with
-    // the level unanswered (beginner-lite help), never straight out.
-    if (isLevelStep) {
-      goTo(index + 1);
-      return;
-    }
+    // First-run paywall-after-connect (2026-11): "Decide later" / "Skip" leaves
+    // the intro in ONE tap (level stays unanswered: beginner-lite help).
     // The trial offer now comes AFTER the first league connects (HomeScreen).
     completeOnboarding();
     if (navigation.canGoBack()) navigation.goBack();

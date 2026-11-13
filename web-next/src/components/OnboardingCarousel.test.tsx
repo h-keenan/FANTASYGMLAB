@@ -114,18 +114,14 @@ describe("OnboardingCarousel", () => {
     expect(screen.getByRole("heading", { name: /how familiar are you/i })).toBeInTheDocument();
   });
 
-  it("Decide later skips the question without saving a level and does NOT leave onboarding", () => {
+  it("Decide later leaves the intro in one tap without saving a level", () => {
     const onDone = vi.fn();
     render(<OnboardingCarousel onDone={onDone} />);
 
     fireEvent.click(screen.getByRole("button", { name: "Decide later" }));
 
-    expect(onDone).not.toHaveBeenCalled();
-    expect(screen.getByRole("heading", { name: ONBOARDING_VALUE_HEADLINE })).toBeInTheDocument();
-    expect(api.setExperienceLevel).not.toHaveBeenCalled();
-    // Skip on the value step finishes.
-    fireEvent.click(screen.getByRole("button", { name: "Skip" }));
     expect(onDone).toHaveBeenCalledTimes(1);
+    expect(api.setExperienceLevel).not.toHaveBeenCalled();
   });
 
   it("still moves on even when the preference write fails", async () => {
@@ -140,11 +136,15 @@ describe("OnboardingCarousel", () => {
 });
 
 describe("OnboardingCarousel value step previews", () => {
-  it("auto-advances screenshots inside the value step without adding steps, and pauses on request", () => {
+  it("auto-advances screenshots inside the value step without adding steps, and pauses on request", async () => {
     vi.useFakeTimers();
     try {
       render(<OnboardingCarousel onDone={vi.fn()} />);
-      fireEvent.click(screen.getByRole("button", { name: "Decide later" }));
+      fireEvent.click(screen.getByRole("button", { name: /veteran dynasty manager/i }));
+      fireEvent.click(screen.getByRole("button", { name: /^continue$/i }));
+      await act(async () => {
+        await Promise.resolve();
+      });
       expect(screen.getByRole("img", { name: /Today screen/ })).toBeInTheDocument();
       act(() => {
         vi.advanceTimersByTime(ONBOARDING_VALUE_SLIDE_MS + 50);
