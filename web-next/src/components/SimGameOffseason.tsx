@@ -17,7 +17,6 @@ import {
   simArchiveToYear,
   simFmtPts,
   simMoverText,
-  simOffseasonCta,
   simOffseasonHeading,
   simOffseasonProgressLine,
   simOffseasonSteps,
@@ -53,7 +52,6 @@ export function SimGameOffseason({ ctx, onTrade, onTeam }: { ctx: SimCtx; onTrad
   const [state, setState] = useState<"loading" | "ready" | "error">("loading");
   const [pos, setPos] = useState<SimPos | "">("");
   const [busy, setBusy] = useState<Busy>(null);
-  const [confirmAuto, setConfirmAuto] = useState(false);
   const [years, setYears] = useState<SimDynastyYear[]>([]);
   const [attempt, setAttempt] = useState(0);
 
@@ -126,7 +124,6 @@ export function SimGameOffseason({ ctx, onTrade, onTeam }: { ctx: SimCtx; onTrad
     return <EmptyState title="Could not load the offseason" subtitle="Check your connection and try again." actionLabel="Try again" onAction={() => { setState("loading"); setAttempt((n) => n + 1); }} />;
   }
 
-  const cta = simOffseasonCta(off);
   const steps = simOffseasonSteps(off.stage);
 
   return (
@@ -161,38 +158,6 @@ export function SimGameOffseason({ ctx, onTrade, onTeam }: { ctx: SimCtx; onTrad
         />
       ) : null}
       {off.stage === "cutdown" ? <CutdownStage off={off} ctx={ctx} onTrade={onTrade} onTeam={onTeam} /> : null}
-
-      <div className="sticky bottom-16 flex flex-col gap-2 md:bottom-2">
-        {off.stage === "rookie_draft" && confirmAuto ? (
-          <AccentCard accent="var(--color-warning)" compact as="div">
-            <p className="text-sm" role="alert">Auto-draft makes every one of your remaining picks for you, best available by your needs.</p>
-            <div className="flex gap-2">
-              <Button size="sm" loading={busy === "auto"} onClick={() => { setConfirmAuto(false); void run("auto", () => api.autoSimRookieDraft(gameId), () => "The rookie draft is done."); }}>
-                Auto-draft the rest
-              </Button>
-              <Button size="sm" variant="ghost" onClick={() => setConfirmAuto(false)}>Keep drafting</Button>
-            </div>
-          </AccentCard>
-        ) : null}
-        {cta.blocked ? (
-          <p className="text-xs font-semibold" role="status" style={{ color: "var(--color-warning)" }}>{cta.blocked}</p>
-        ) : null}
-        {off.stage === "review" ? (
-          <Button fullWidth loading={busy === "start"} onClick={() => void run("start", () => api.startSimRookieDraft(gameId), (b) => ((b.made?.length ?? 0) > 0 ? `${b.made?.length} AI picks made. You are up.` : ""))}>
-            {cta.label}
-          </Button>
-        ) : null}
-        {off.stage === "rookie_draft" ? (
-          <Button fullWidth variant="secondary" loading={busy === "auto"} disabled={busy === "pick" || confirmAuto} onClick={() => setConfirmAuto(true)}>
-            {cta.label}
-          </Button>
-        ) : null}
-        {off.stage === "cutdown" ? (
-          <Button fullWidth loading={busy === "season"} disabled={Boolean(cta.blocked)} onClick={() => void run("season", async () => (await api.startSimSeason(gameId)) as SimOffseasonResponse, () => `Season ${off.season_no + 1} is on.`)}>
-            {cta.label}
-          </Button>
-        ) : null}
-      </div>
     </div>
   );
 }

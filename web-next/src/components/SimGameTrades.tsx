@@ -22,6 +22,7 @@ import {
   simFmtPts,
   simIsPick,
   simPickGroups,
+  simPickChipText,
   simPickLabelText,
   simPicksOf,
   simPositionsFor,
@@ -457,13 +458,12 @@ function SideSummary({ label, tone, active, onSelect, assets, onRemove }: { labe
             <li key={p.id} className="flex items-center justify-between gap-1">
               {simIsPick(p) ? (
                 <span className="flex min-w-0 flex-1 items-center gap-1.5 text-xs font-bold" data-testid="pick-chip">
-                  <ToneBadge label={`R${p.round}`} color="var(--color-accent)" size="xs" />
-                  <span className="min-w-0 truncate">{simPickLabelText(p)}</span>
+                  <span className="min-w-0 truncate" title={simPickLabelText(p)}>{simPickChipText(p)}</span>
                 </span>
               ) : (
                 <SimPlayerChip player={p} size={20} quick hidePosition className="min-w-0 flex-1" />
               )}
-              <button type="button" className="shrink-0 px-1 text-sm font-bold" style={{ color: "var(--color-text-muted)", minHeight: "var(--touch-target-min)", minWidth: 28 }} aria-label={`Remove ${simIsPick(p) ? simPickLabelText(p) : p.name}`} onClick={() => onRemove(p.id)}>
+              <button type="button" className="shrink-0 px-1 text-sm font-bold" style={{ color: "var(--color-text-muted)", minHeight: "var(--touch-target-min)", minWidth: "var(--touch-target-min)" }} aria-label={`Remove ${simIsPick(p) ? simPickLabelText(p) : p.name}`} onClick={() => onRemove(p.id)}>
                 ×
               </button>
             </li>

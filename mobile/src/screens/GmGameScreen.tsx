@@ -20,6 +20,7 @@ import SimActionBar, { SIM_ACTION_BAR_HEIGHT, useSimActionBarBottom } from '../c
 import { SkeletonCard } from '../components/SkeletonBlock';
 import { SimDraftRecapView, SimGameDraft } from '../components/SimGameDraft';
 import { SimLeagueTab } from '../components/SimGameLeague';
+import SimOffseasonBar from '../components/SimOffseasonBar';
 import { SimGameOffseason } from '../components/SimGameOffseason';
 import { SimHomeTab } from '../components/SimGameHome';
 import { SimPlayerSheet } from '../components/SimGamePlayers';
@@ -332,6 +333,8 @@ export default function GmGameScreen({ navigation }: Props) {
   const barBottom = useSimActionBarBottom();
   const showBar =
     flow.view === 'game' && Boolean(game) && (flow.stage === 'week' || flow.stage === 'playoffs') && !draftRecap && !flow.recaps[flow.recapIndex];
+  const showOffBar = flow.view === 'game' && Boolean(game) && flow.stage === 'offseason' && !draftRecap && !flow.recaps[flow.recapIndex];
+  const anyBar = showBar || showOffBar;
   const shell = (children: React.ReactNode, sheet?: React.ReactNode) => (
     <View style={styles.root}>
       <GridBackground />
@@ -339,7 +342,7 @@ export default function GmGameScreen({ navigation }: Props) {
         style={styles.container}
         contentContainerStyle={[
           styles.content,
-          { paddingBottom: showBar ? Math.max(orbClearance, barBottom + SIM_ACTION_BAR_HEIGHT + spacing.xl) : orbClearance, paddingTop: headerHeight + spacing.sm },
+          { paddingBottom: anyBar ? Math.max(orbClearance, barBottom + SIM_ACTION_BAR_HEIGHT + spacing.xl) : orbClearance, paddingTop: headerHeight + spacing.sm },
         ]}
         keyboardShouldPersistTaps="handled"
       >
@@ -348,6 +351,7 @@ export default function GmGameScreen({ navigation }: Props) {
       {showBar && game && ctx ? (
         <SimActionBar ctx={ctx} paywalled={simGamePaywalled(preview)} advancing={advancing} onAdvance={advance} onGoPro={goPaywall} />
       ) : null}
+      {showOffBar && game && ctx ? <SimOffseasonBar ctx={ctx} /> : null}
       {sheet}
     </View>
   );

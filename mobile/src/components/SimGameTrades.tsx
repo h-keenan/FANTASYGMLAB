@@ -25,6 +25,7 @@ import {
   simFmtPts,
   simIsPick,
   simPickGroups,
+  simPickChipText,
   simPickLabelText,
   simPicksOf,
   simPositionsFor,
@@ -515,16 +516,15 @@ function SideSummary({ label, tone, active, onSelect, assets, onRemove }: { labe
             <View style={{ flex: 1, minWidth: 0 }}>
               {simIsPick(p) ? (
                 <View style={common.row} testID="pick-chip">
-                  <ToneBadge label={`R${p.round}`} color={colors.accent} size="xs" />
-                  <AppText style={[common.bodyStrong, common.grow]} numberOfLines={1}>
-                    {simPickLabelText(p)}
+                  <AppText style={[common.bodyStrong, common.grow]} numberOfLines={1} accessibilityLabel={simPickLabelText(p)}>
+                    {simPickChipText(p)}
                   </AppText>
                 </View>
               ) : (
                 <SimPlayerChip player={p} size={20} quick hidePosition />
               )}
             </View>
-            <Pressable onPress={() => onRemove(p.id)} accessibilityRole="button" accessibilityLabel={`Remove ${simIsPick(p) ? simPickLabelText(p) : p.name}`} hitSlop={8} style={{ minWidth: 28, minHeight: 44, alignItems: 'center', justifyContent: 'center' }}>
+            <Pressable onPress={() => onRemove(p.id)} accessibilityRole="button" accessibilityLabel={`Remove ${simIsPick(p) ? simPickLabelText(p) : p.name}`} hitSlop={8} style={{ minWidth: 44, minHeight: 44, alignItems: 'center', justifyContent: 'center' }}>
               <AppText style={{ fontSize: 16, fontWeight: '700', color: colors.textTertiary }}>×</AppText>
             </Pressable>
           </View>

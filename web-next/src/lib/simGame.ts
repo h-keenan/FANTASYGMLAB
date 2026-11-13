@@ -1391,7 +1391,7 @@ export function simPlayerSubline(player: Partial<Pick<SimGamePlayer, "team" | "a
   const parts: string[] = [];
   if (player.team) parts.push(player.team);
   const age = simFmtAge(player.age ?? null);
-  if (age) parts.push(`Age ${age}`);
+  if (age) parts.push(`${age}y`);
   if (player.bye_week) parts.push(`Bye ${player.bye_week}`);
   return parts.join(" · ");
 }
@@ -2131,6 +2131,25 @@ export interface SimHomeResponse extends SimGameEnvelope {
   hot_cold?: { hot: SimTrendRow[]; cold: SimTrendRow[]; wire: SimTrendRow[] };
   standings?: SimHomeStandings;
   league?: { recent: (SimTransaction & { team_id: string; text: string })[]; spotlight: SimHomeSpotlight | null };
+  /** IR / taxi usage (reserve games only). */
+  reserves?: { ir_used: number; ir_slots: number; taxi_used: number; taxi_slots: number };
+  /** Dynasty games only: where you are and what you hold. `next_pick` is a pick id "season:round:team". */
+  dynasty?: { season_no: number; seasons: number; picks_held: number; picks_value: number; next_pick: string | null };
+}
+
+/** One plain line for the Home dynasty/IR strip, or null when the game has neither. */
+export function simHomeDynastyLine(home: Pick<SimHomeResponse, "reserves" | "dynasty"> | null | undefined): string | null {
+  if (!home) return null;
+  const parts: string[] = [];
+  if (home.dynasty) {
+    parts.push(`Season ${home.dynasty.season_no} of ${home.dynasty.seasons}`);
+    parts.push(`${home.dynasty.picks_held} pick${home.dynasty.picks_held === 1 ? "" : "s"}`);
+  }
+  if (home.reserves) {
+    if (home.reserves.ir_slots > 0) parts.push(`IR ${home.reserves.ir_used}/${home.reserves.ir_slots}`);
+    if (home.reserves.taxi_slots > 0) parts.push(`Taxi ${home.reserves.taxi_used}/${home.reserves.taxi_slots}`);
+  }
+  return parts.length ? parts.join(" · ") : null;
 }
 
 /** Section glyph names shared by web (inline SVG) and the app (Ionicons map). */
@@ -2171,7 +2190,16 @@ export function simTrendText(delta: number | null | undefined): { text: string; 
 }
 
 export function simChecklistTone(severity: SimChecklistSeverity): SimGameTone {
-  return severity === "ok" ? "success" : severity;
+  if (severity === "ok") return "success";
+  // Newer engines may add severities: show them as a plain to-do instead of an unstyled row.
+  return severity === "danger" || severity === "warning" || severity === "accent" ? severity : "warning";
+}
+
+const CHECKLIST_TARGETS: readonly string[] = ["home", "team", "players", "trades", "league", "more"];
+
+/** The tab a checklist row opens, or null for a target this build does not know (the row is then not a link). */
+export function simChecklistTarget(item: Pick<SimChecklistItem, "target">): SimTabTarget | null {
+  return CHECKLIST_TARGETS.includes(item.target) ? item.target : null;
 }
 
 export function simChecklistProgress(items: Pick<SimChecklistItem, "done">[] | undefined): { done: number; total: number } {
@@ -2483,6 +2511,16 @@ export function simPickLabelText(pick: Pick<SimPickAsset, "id"> & Partial<Pick<S
   return `${season} Round ${round}${hint}`;
 }
 
+/** "2029 R3 (early)": the compact form for a trade-side chip, where the full label gets cut off at phone width. */
+export function simPickChipText(pick: Pick<SimPickAsset, "id"> & Partial<Pick<SimPickAsset, "season" | "round" | "slot_hint">>): string {
+  const parsed = simParsePickId(pick.id);
+  const season = pick.season ?? parsed?.season;
+  const round = pick.round ?? parsed?.round;
+  if (season == null || round == null) return "Draft pick";
+  const hint = pick.slot_hint ? ` (${HINT_WORD[pick.slot_hint]})` : "";
+  return `${season} R${round}${hint}`;
+}
+
 /** Plain explanation of the early / mid / late hint ("Projected near the top of the round"). */
 export function simPickSlotHint(pick: Pick<SimPickAsset, "slot_hint" | "season">, draftYear?: number | null): string {
   if (pick.slot_hint === "early") return "Projected near the top of the round.";
@@ -2684,7 +2722,7 @@ export function simOffseasonCta(off: Pick<SimOffseason, "stage" | "season_no" | 
   const cuts = off.roster?.cuts_needed ?? 0;
   return {
     action: "start_season",
-    label: `Start season ${off.season_no + 1}`,
+    label: cuts > 0 ? "Finish cut-down" : `Start season ${off.season_no + 1}`,
     blocked: cuts > 0 ? `Cut ${cuts} player${cuts === 1 ? "" : "s"} to get to the roster limit first.` : null,
   };
 }

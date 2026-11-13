@@ -17,6 +17,7 @@ import { SimGameOffseason } from "@/components/SimGameOffseason";
 import { SimHomeTab } from "@/components/SimGameHome";
 import { SimPlayerSheet } from "@/components/SimGamePlayers";
 import { SimActionBar } from "@/components/SimActionBar";
+import { SimOffseasonBar } from "@/components/SimOffseasonBar";
 import { SimNotice, SimOpenPlayerContext, SimPreviewBanner, SimTeamLink, SimTeamOpenContext, simToneColor, type SimCtx } from "@/components/SimGameParts";
 import { SimTeamSheet } from "@/components/SimGameTeamSheet";
 import { SimFinalView, SimWeekRecapView } from "@/components/SimGameRecap";
@@ -600,7 +601,7 @@ function SetupForm({
       </div>
       {dynastyNote ? <p className="text-xs" style={{ color: "var(--color-text-muted)" }} data-testid="sim-dynasty-note">{dynastyNote}</p> : null}
       {(
-        <details className="flex flex-col gap-4" data-testid="sim-advanced">
+        <details className="flex flex-col" data-testid="sim-advanced">
           <summary className="text-sm font-semibold cursor-pointer" style={{ minHeight: "var(--touch-target-min)" }}>
             Advanced options{changed ? ` (${changed} changed)` : ""}
           </summary>
@@ -833,12 +834,13 @@ function GameScreen({
   const youLine = game.you;
   const inSeason = (stage === "week" || stage === "playoffs") && !draftRecap;
   const showBar = inSeason && !recap;
+  const showOffBar = stage === "offseason" && !draftRecap && !recap;
 
   return (
     <SimTeamOpenContext.Provider value={ctx.openTeam}>
     <SimOpenPlayerContext.Provider value={ctx.openPlayer}>
     {/* pb-24: the floating GM orb never covers the last row */}
-    <div className={`flex flex-col gap-3 ${showBar ? "pb-40 md:pb-3" : "pb-24"}`}>
+    <div className={`flex flex-col gap-3 ${showBar || showOffBar ? "pb-40 md:pb-3" : "pb-24"}`}>
       <div className="flex items-center justify-between gap-2">
         <div className="flex min-w-0 flex-col">
           <button type="button" className="tap-link text-xs font-bold self-start" style={{ color: "var(--color-accent)" }} onClick={onHub}>
@@ -928,6 +930,7 @@ function GameScreen({
           </div>
         </>
       )}
+      {showOffBar ? <SimOffseasonBar ctx={ctx} /> : null}
       {showBar ? <SimActionBar ctx={ctx} paywalled={paywalled} advancing={advancing} onAdvance={onAdvance} /> : null}
     </div>
     </SimOpenPlayerContext.Provider>

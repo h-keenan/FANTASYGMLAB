@@ -26,6 +26,8 @@ import { useThemeMode } from '../context/ThemeModeContext';
 import { api } from '../lib/api';
 import {
   simChecklistProgress,
+  simChecklistTarget,
+  simHomeDynastyLine,
   simChecklistTone,
   simFmtPts,
   simFmtRecord,
@@ -128,6 +130,7 @@ export function SimHomeTab({ ctx, setClaims, onTab }: { ctx: SimCtx; setClaims: 
         <>
           {home.matchup ? <SimMatchupCard ctx={ctx} matchup={home.matchup} onTab={onTab} /> : null}
           <SimChecklistCard home={home} onTab={onTab} onAuto={home.matchup && !home.matchup.bye ? auto.run : undefined} autoBusy={auto.busy} optimal={auto.optimal} />
+          <SimReservesStrip home={home} onTab={onTab} />
           <SimInboxCard ctx={ctx} inbox={home.inbox} onTab={onTab} />
           <SimWaiverCard ctx={ctx} suggestions={home.waiver_suggestions ?? []} onClaim={claim} onTab={onTab} />
           <SimByeCard ctx={ctx} alerts={home.bye_alerts ?? []} onTab={onTab} onClaim={claim} />
@@ -278,6 +281,25 @@ function Side({ player, win, lose, align, ctx }: { player: SimGamePlayer | null;
   );
 }
 
+/** One tappable line for dynasty / IR games (season, picks, IR and taxi use); nothing in redraft. */
+function SimReservesStrip({ home, onTab }: { home: SimHomeResponse; onTab: (tab: SimTab) => void }) {
+  const { colors } = useThemeMode();
+  const line = simHomeDynastyLine(home);
+  if (!line) return null;
+  return (
+    <Pressable
+      onPress={() => onTab('team')}
+      accessibilityRole="button"
+      accessibilityLabel={`${line}. Open Team`}
+      testID="home-reserves-strip"
+      style={{ minHeight: 48, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: spacing.sm, paddingHorizontal: spacing.md, borderRadius: radii.md, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.surface }}
+    >
+      <AppText style={{ flex: 1, minWidth: 0, fontSize: 12.5, fontWeight: '800', color: colors.textSecondary }}>{line}</AppText>
+      <AppText style={{ fontSize: 12.5, fontWeight: '800', color: colors.accent }}>Team</AppText>
+    </Pressable>
+  );
+}
+
 function SimChecklistCard({ home, onTab, onAuto, autoBusy = false, optimal = false }: { home: SimHomeResponse; onTab: (tab: SimTab) => void; onAuto?: () => void; autoBusy?: boolean; optimal?: boolean }) {
   const { colors } = useThemeMode();
   const common = useMemo(() => createSimStyles(colors), [colors]);
@@ -299,7 +321,7 @@ function SimChecklistCard({ home, onTab, onAuto, autoBusy = false, optimal = fal
         const color = simToneColor(simChecklistTone(item.severity), colors);
         return (
           <View key={item.id} style={index > 0 ? common.divider : undefined}>
-            <AccentTap onPress={() => onTab(item.target)} label={`${item.label}. ${item.detail}`}>
+            <AccentTap onPress={() => { const t = simChecklistTarget(item); if (t) onTab(t as SimTab); }} label={`${item.label}. ${item.detail}`}>
               <View style={[styles.check, { backgroundColor: item.done ? colors.success : colors.glassInset }]}>
                 <SimGlyph name={item.done ? 'check' : item.severity === 'accent' ? 'trade' : 'alert'} color={item.done ? colors.onAccent : color} size={14} />
               </View>

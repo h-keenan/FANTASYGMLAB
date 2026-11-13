@@ -235,7 +235,13 @@ describe("offseason", () => {
   it("roster check: Start season is blocked until the cuts are made", async () => {
     mocked.getSimGameTeam.mockResolvedValue({ ok: true, reason: "", team_id: "3", players: [player("1", "QB", "Quinn Back")] });
     await openOffseason(off({ stage: "cutdown" }));
-    expect(screen.getByRole("button", { name: "Start season 3" })).toBeDisabled();
+    expect(await screen.findByTestId("sim-offseason-bar")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Finish cut-down" })).toBeDisabled();
+    // The same single action stays on the Team tab.
+    mocked.getSimLineup.mockResolvedValue({ ok: true, reason: "", week: 0, slots: [], bench: [], projected_total: 0, warnings: [] } as never);
+    fireEvent.click(screen.getByRole("tab", { name: /^Team/ }));
+    expect(await screen.findByRole("button", { name: "Finish cut-down" })).toBeDisabled();
+    expect(screen.getAllByTestId("sim-offseason-bar")).toHaveLength(1);
     expect(screen.getByText(/Cut 2 players to get to the roster limit first/)).toBeInTheDocument();
   });
 });

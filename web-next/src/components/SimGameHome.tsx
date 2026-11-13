@@ -25,6 +25,8 @@ import { ToneBadge } from "@/components/ToneBadge";
 import { api } from "@/lib/api";
 import {
   simChecklistProgress,
+  simChecklistTarget,
+  simHomeDynastyLine,
   simChecklistTone,
   simFmtPts,
   simFmtRecord,
@@ -141,6 +143,7 @@ export function SimHomeTab({
           <>
             {home.matchup ? <SimMatchupCard ctx={ctx} matchup={home.matchup} onTab={onTab} /> : null}
             <SimChecklistCard home={home} onTab={onTab} onAuto={home.matchup && !home.matchup.bye ? auto.run : undefined} autoBusy={auto.busy} optimal={auto.optimal} />
+            <SimReservesStrip home={home} onTab={onTab} />
             <SimInboxCard ctx={ctx} inbox={home.inbox} onTab={onTab} />
             <SimWaiverCard ctx={ctx} suggestions={home.waiver_suggestions ?? []} onClaim={claim} onTab={onTab} />
             <SimByeCard ctx={ctx} alerts={home.bye_alerts ?? []} onTab={onTab} onClaim={claim} />
@@ -161,6 +164,7 @@ export function SimHomeTab({
     <div className="flex flex-col gap-4 lg:grid lg:grid-cols-2 lg:items-start" data-testid="sim-home">
       <div className="flex flex-col gap-4">
         {home.matchup ? <SimMatchupCard ctx={ctx} matchup={home.matchup} onTab={onTab} /> : null}
+        <SimReservesStrip home={home} onTab={onTab} />
         <SimInjuriesCard ctx={ctx} injuries={home.injuries ?? []} />
         <SimStandingsCard standings={home.standings} onTab={onTab} />
         <SimHotColdCard ctx={ctx} hotCold={home.hot_cold} onClaim={claim} />
@@ -299,6 +303,24 @@ function Side({ player, win, lose, align, ctx }: { player: SimGamePlayer | null;
   );
 }
 
+/** One tappable line for dynasty / IR games (season, picks, IR and taxi use); nothing in redraft. */
+function SimReservesStrip({ home, onTab }: { home: SimHomeResponse; onTab: (tab: SimTab) => void }) {
+  const line = simHomeDynastyLine(home);
+  if (!line) return null;
+  return (
+    <button
+      type="button"
+      className="flex w-full items-center justify-between gap-2 px-3 text-left text-xs font-bold"
+      style={{ minHeight: "var(--touch-target-min)", borderRadius: "var(--radius-card, 12px)", border: "var(--border-width-default) solid var(--color-border)", background: "var(--color-surface)", color: "var(--color-text-secondary)" }}
+      onClick={() => onTab("team")}
+      data-testid="home-reserves-strip"
+    >
+      <span className="min-w-0">{line}</span>
+      <span className="shrink-0" style={{ color: "var(--color-accent)" }}>Team</span>
+    </button>
+  );
+}
+
 function SimChecklistCard({ home, onTab, onAuto, autoBusy = false, optimal = false }: { home: SimHomeResponse; onTab: (tab: SimTab) => void; onAuto?: () => void; autoBusy?: boolean; optimal?: boolean }) {
   const items = home.checklist ?? [];
   const { done, total } = simChecklistProgress(items);
@@ -322,7 +344,7 @@ function SimChecklistCard({ home, onTab, onAuto, autoBusy = false, optimal = fal
           const color = simToneColor(simChecklistTone(item.severity));
           return (
             <li key={item.id} style={index > 0 ? { borderTop: "var(--border-width-default) solid var(--color-border)" } : undefined}>
-              <button type="button" className="flex w-full items-center gap-3 py-2 text-left" style={{ minHeight: "var(--touch-target-min)" }} onClick={() => onTab(item.target as SimTab)}>
+              <button type="button" className="flex w-full items-center gap-3 py-2 text-left" style={{ minHeight: "var(--touch-target-min)" }} onClick={() => { const t = simChecklistTarget(item); if (t) onTab(t as SimTab); }}>
                 <span
                   className="flex h-7 w-7 shrink-0 items-center justify-center"
                   style={{ borderRadius: "50%", color: item.done ? "var(--color-on-accent)" : color, background: item.done ? "var(--color-success)" : `color-mix(in srgb, ${color} 16%, transparent)` }}
