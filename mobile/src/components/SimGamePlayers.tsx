@@ -5,6 +5,7 @@ import AppText from './AppText';
 import EmptyState from './EmptyState';
 import Input from './Input';
 import MetricCard from './MetricCard';
+import { simAsOfSeason } from '../lib/simAsOf';
 import PlayerQuickViewSheet, { Section as PqvSection } from './PlayerQuickViewSheet';
 import SimScoutingSections from './SimScoutingSections';
 import WeeklyPointsChart from './WeeklyPointsChart';
@@ -209,7 +210,7 @@ export function SimPlayerBrowser({
  * take the sim's own value and ranks), plus sim sections rendered with the
  * quick view's own section shell, tiles and weekly chart.
  */
-export function SimPlayerSheet({ gameId, player, onClose, actions }: { gameId: string; player: SimGamePlayer; onClose: () => void; actions?: ReactNode }) {
+export function SimPlayerSheet({ gameId, player, onClose, actions, startYear }: { gameId: string; player: SimGamePlayer; onClose: () => void; actions?: ReactNode; /** game.settings.start_year: drives the as-of cut of real data. */ startYear?: number | null }) {
   const detail = useSimPlayerDetail(gameId, player.id);
   const live = detail.data?.player ?? player;
   const real = simHeadshotId(player);
@@ -228,7 +229,7 @@ export function SimPlayerSheet({ gameId, player, onClose, actions }: { gameId: s
     valueNote: feed?.valueNote ?? null,
     valueLabel: feed ? 'Trade value' : null,
   };
-  return <PlayerQuickViewSheet request={request} onClose={onClose} remote={Boolean(real)} simOverlay={<SimPlayerOverlay player={live} detail={detail} actions={actions} />} />;
+  return <PlayerQuickViewSheet request={request} onClose={onClose} remote={Boolean(real)} asOfSeason={simAsOfSeason(startYear)} simOverlay={<SimPlayerOverlay player={live} detail={detail} actions={actions} />} />;
 }
 
 interface SimPlayerDetailState {

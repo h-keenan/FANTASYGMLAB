@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useReducer, useState, type ReactNode } from "react";
 
+import { simAsOfSeason } from "@/lib/simAsOf";
 import { PlayerQuickView, StatGroup } from "@/components/PlayerQuickView";
 import { SimScoutingSections } from "@/components/SimScoutingSections";
 import { WeeklyPointsPanel } from "@/components/WeeklyPointsChartLazy";
@@ -222,7 +223,7 @@ export function SimPlayerBrowser({
  * sim season's actual points, the rest-of-season band when it truly varies by
  * week, and a one-line summary when it does not.
  */
-export function SimPlayerSheet({ gameId, player, onClose, actions }: { gameId: string; player: SimGamePlayer; onClose: () => void; actions?: ReactNode }) {
+export function SimPlayerSheet({ gameId, player, onClose, actions, startYear }: { gameId: string; player: SimGamePlayer; onClose: () => void; actions?: ReactNode; /** game.settings.start_year: drives the as-of cut of real data. */ startYear?: number | null }) {
   const detail = useSimPlayerDetail(gameId, player.id);
   const live = detail.data?.player ?? player;
   const real = simHeadshotId(player);
@@ -241,7 +242,7 @@ export function SimPlayerSheet({ gameId, player, onClose, actions }: { gameId: s
     overall_rating: live.overall ?? null,
     ...(feed ? { score: feed.score, value_note: feed.valueNote, value_label: "Trade value", overall_rank: feed.overall_rank, position_rank: feed.position_rank } : {}),
   };
-  return <PlayerQuickView identity={identity} onClose={onClose} remote={Boolean(real)} simOverlay={<SimPlayerOverlay player={live} detail={detail} actions={actions} />} />;
+  return <PlayerQuickView identity={identity} onClose={onClose} remote={Boolean(real)} asOfSeason={simAsOfSeason(startYear)} simOverlay={<SimPlayerOverlay player={live} detail={detail} actions={actions} />} />;
 }
 
 interface SimPlayerDetailState {

@@ -460,6 +460,61 @@ describe("PlayerQuickView", () => {
     });
   });
 
+  // coridian_, 2026-11-13: the sim feels like 2K: it starts at the end of the last finished real season; nothing current.
+  describe("inside Fantasy Sim: real data is cut as-of the sim's start season", () => {
+    const season = (year: number, targets: string) => ({
+      season: year,
+      season_type: "Regular Season",
+      games: 15,
+      complete: null,
+      label: `${year} Regular Season`,
+      key_stats: [{ label: "Targets", value: targets, note: "", tone: "reference" as const, percentile: 88 }],
+      fantasy: [{ label: "PPR", value: "280.4", note: "", tone: "reference" as const, percentile: 91 }],
+      usage: [],
+      efficiency: [],
+    });
+    const award = (id: string, year: number | null, title: string) => ({
+      badge_id: id, category: "fantasy_finish", family: "positional_finish", title, short_label: title, tier: "gold" as const, season: year,
+      rank: 1, metric_value: null, description: `${title} in ${year}`, occurrence_count: 1,
+    });
+
+    it("shows seasons up to the as-of season (and awards), and never the in-progress season, usage trend or weekly trends", async () => {
+      const base = quickView();
+      vi.mocked(api.getPlayerQuickView).mockResolvedValue(
+        quickView({
+          stats: { ...base.stats!, seasons: [season(2026, "CURRENT-2026-TARGETS"), season(2025, "PRIOR-2025-TARGETS"), season(2024, "PRIOR-2024-TARGETS")] },
+          model: { ...base.model!, usage_trend: { direction: "up", trend_pct: 33, confidence_label: "High confidence", arrow: "↑", tone: "positive" } },
+        }),
+      );
+      vi.mocked(api.getPlayerAwards).mockResolvedValue(awardsResult({ awards: [award("a1", 2025, "AWARD-2025"), award("a2", 2026, "AWARD-2026-CURRENT"), award("a3", null, "AWARD-UNDATED")] }));
+      vi.mocked(api.getPlayerWeeklyStats).mockResolvedValue({ ok: true, season: 2026, weeks: [{ week: 1, fantasy_points_ppr: 99, snap_share: 0.9 }] });
+
+      render(<PlayerQuickView identity={identity()} onClose={vi.fn()} asOfSeason={2025} simOverlay={<p>Sim overlay</p>} />);
+
+      await waitFor(() => expect(screen.queryByText(/Loading player detail/)).not.toBeInTheDocument());
+      expect(screen.getAllByText(/2025 Regular Season/).length).toBeGreaterThan(0);
+      expect(screen.getAllByText(/2024 Regular Season/).length).toBeGreaterThan(0);
+      expect(screen.getAllByText("Targets").length).toBeGreaterThan(0);
+      expect(screen.queryByText(/2026 Regular Season/)).toBeNull();
+      expect(screen.queryByText("CURRENT-2026-TARGETS")).toBeNull();
+      expect(screen.getByText(/AWARD-2025/)).toBeInTheDocument();
+      expect(screen.queryByText(/AWARD-2026-CURRENT/)).toBeNull();
+      expect(screen.queryByText(/AWARD-UNDATED/)).toBeNull(); // cannot be placed in time, never guessed
+      expect(screen.queryByTestId("pqv-usage-tile")).toBeNull(); // the real current usage trend
+      expect(screen.queryByText(/Week by Week · 2026/)).toBeNull(); // no current-season game logs / weekly trends
+      expect(api.getPlayerWeeklyStats).not.toHaveBeenCalled();
+    });
+
+    it("the real PQV (no sim) still shows the current season", async () => {
+      const base = quickView();
+      vi.mocked(api.getPlayerQuickView).mockResolvedValue(quickView({ stats: { ...base.stats!, seasons: [season(2026, "CURRENT-2026-TARGETS"), season(2025, "PRIOR-2025-TARGETS")] } }));
+      vi.mocked(api.getPlayerAwards).mockResolvedValue(awardsResult());
+      render(<PlayerQuickView identity={identity()} onClose={vi.fn()} />);
+      await waitFor(() => expect(screen.queryByText(/Loading player detail/)).not.toBeInTheDocument());
+      expect(screen.getAllByText(/2026 Regular Season/).length).toBeGreaterThan(0);
+    });
+  });
+
   describe("availability and latest news", () => {
     const irIdentity = {
       player_id: "p1",

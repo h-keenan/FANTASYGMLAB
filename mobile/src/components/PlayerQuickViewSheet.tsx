@@ -14,6 +14,7 @@ import PlayerHero from './PlayerHero';
 import PlayerLeagueActions from './PlayerLeagueActions';
 import { AvailabilityBlock, LatestNewsSection } from './PlayerQuickViewNews';
 import { pqvBioForContext, pqvRealWorld } from '../lib/pqvContext';
+import { rowsAsOf, simAsOfSeason } from '../lib/simAsOf';
 import PlayerTrendsPanel from './PlayerTrendsPanel';
 import SectionHeading from './SectionHeading';
 import SkeletonBlock, { SkeletonChart } from './SkeletonBlock';
@@ -82,12 +83,15 @@ export default function PlayerQuickViewSheet({
   request,
   onClose,
   simOverlay,
+  asOfSeason,
   remote = true,
 }: {
   request: QuickViewRequest;
   onClose: () => void;
   /** Fantasy Sim: game-specific sections rendered right under the hero (mirrors web PlayerQuickView). Omit everywhere else. */
   simOverlay?: React.ReactNode;
+  /** Fantasy Sim only: the last fully finished real season at the sim's start (lib/simAsOf.ts). Real season stats and awards are cut to it; current usage / trend / value-history never show. */
+  asOfSeason?: number;
   /** false for a synthetic sim player with no real data behind the id: same layout, no remote fetches. */
   remote?: boolean;
 }) {
@@ -169,10 +173,13 @@ export default function PlayerQuickViewSheet({
 
   const detail = detailQuery.data ?? null;
   const resolved = detail?.identity ?? null;
-  const stats = detail?.stats ?? null;
-  const model = detail?.model ?? null;
+  // Fantasy Sim "as-of" cut: only seasons up to the sim's start; nothing current (usage trend / profile, value history).
+  const asOf = isSim ? (asOfSeason ?? simAsOfSeason(null)) : null;
+  const stats = detail?.stats ? (asOf != null ? { ...detail.stats, seasons: rowsAsOf(detail.stats.seasons, asOf) } : detail.stats) : null;
+  const model = detail?.model ? (asOf != null ? { ...detail.model, usage_trend: null, usage_profile: null } : detail.model) : null;
   const bio = detail?.bio ?? null;
-  const awards = awardsQuery.data?.ok ? awardsQuery.data.awards : [];
+  const allAwards = awardsQuery.data?.ok ? awardsQuery.data.awards : [];
+  const awards = asOf != null ? rowsAsOf(allAwards, asOf) : allAwards;
 
   const name = player.name || resolved?.name || `Player ${player.player_id}`;
   const position = player.position || resolved?.position || null;
@@ -287,7 +294,7 @@ export default function PlayerQuickViewSheet({
               ringColor={overallRating != null ? overallRatingColor(overallRating, colors) : colors.accent}
               usageTrend={model?.usage_trend ?? null}
               usageLoading={loading}
-              valueChart={historyQuery.data && ratingHistoryCaption(historyQuery.data) ? <PlayerValueHistory history={historyQuery.data} /> : null}
+              valueChart={asOf == null && historyQuery.data && ratingHistoryCaption(historyQuery.data) ? <PlayerValueHistory history={historyQuery.data} /> : null}
               ovrChart={
                 hasSubRatings ? (
                   <>
@@ -352,9 +359,12 @@ export default function PlayerQuickViewSheet({
               <View style={styles.body}>
                 {model?.decision_fit_narrative ? <DecisionFitCard narrative={model.decision_fit_narrative} /> : null}
                 <HeadlineTiles rows={headlineRows(stats ?? null, model?.usage_profile)} onExplore={setExplorer} />
-                <View style={styles.section}>
-                  <PlayerTrendsPanel playerId={player.player_id} yearsInLeague={bio?.years_in_league ?? null} />
-                </View>
+                {/* Real weekly game logs are current-season data: never inside the sim (it has its own week-by-week). */}
+                {isSim ? null : (
+                  <View style={styles.section}>
+                    <PlayerTrendsPanel playerId={player.player_id} yearsInLeague={bio?.years_in_league ?? null} />
+                  </View>
+                )}
                 <UsageBlock profile={model?.usage_profile} position={stats?.position ?? player.position} onExplore={setExplorer} />
                 <SeasonStatsRows stats={stats ?? null} usageProfile={model?.usage_profile} onExplore={setExplorer} />
                 {stats && stats.college.length > 0 ? (
