@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useReducer, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useReducer, useRef, useState } from "react";
 
 import { AccentCard } from "@/components/AccentCard";
 import { Button, ButtonLink } from "@/components/Button";
@@ -79,6 +79,7 @@ import {
   simTradeSeedFor,
   type SimTradeSeed,
 } from "@/lib/simGame";
+import { simScrollKey, simShouldScrollTop } from "@/lib/simScroll";
 import { SIM_FLOW_INITIAL, SIM_TABS, simFlowReducer, simRecapsFromAdvance, type SimTab } from "@/lib/simGameFlow";
 import { useSimDeltaReload, useSimGameCall } from "@/lib/useSimGameCall";
 import { useSimLeagueTeams } from "@/lib/useSimLeagueTeams";
@@ -117,6 +118,14 @@ export function SimGameContent() {
     return () => document.body.removeAttribute("data-sim-pqv");
   }, [sheetPlayer]);
   const stackedUnder = useMemo(() => Boolean(sheetPlayer) && typeof document !== "undefined" && document.querySelector("[data-sheet-hideable]") !== null, [sheetPlayer]);
+
+  // A new page (tab, recap, draft -> season, offseason step) starts at the top, instantly.
+  const scrollKey = simScrollKey({ view: flow.view, stage: flow.stage, tab: flow.tab, recapIndex: flow.recapIndex, hasRecap: flow.recaps.length > 0, draftRecap: draftRecap !== null, week: game?.week ?? null, status: game?.status ?? null });
+  const lastScrollKey = useRef<string | null>(null);
+  useLayoutEffect(() => {
+    if (simShouldScrollTop(lastScrollKey.current, scrollKey)) window.scrollTo({ top: 0, left: 0, behavior: "instant" });
+    lastScrollKey.current = scrollKey;
+  }, [scrollKey]);
 
   const notify = useCallback((message: string, tone: SimGameTone = "warning") => setNotice(message ? { message, tone } : null), []);
 
