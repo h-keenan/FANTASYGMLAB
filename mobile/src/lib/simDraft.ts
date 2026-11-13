@@ -92,6 +92,31 @@ export function simDraftAdpDelta(adp: number | null | undefined, pickNo: number)
   return delta > 0 ? { delta, label: `+${delta}`, tone: "success" } : { delta, label: `${delta}`, tone: "danger" };
 }
 
+/**
+ * The board "Edge" column: model value rank against market ADP, independent of
+ * the pick on the clock (so a board sorted by ADP is not a wall of reaches).
+ * ADP 40 with value rank 22 is +18 (green, the market sleeps on him); ADP 10
+ * with value rank 25 is -15 (red, the market is ahead of the model). Within 3
+ * spots is noise (null). Without a rank (older server) there is no edge.
+ */
+export function simBoardEdge(player: { adp?: number | null; value_rank?: number | null; adp_edge?: number | null }): SimDraftAdpDelta | null {
+  const raw = player.adp_edge ?? (player.adp != null && player.value_rank != null ? player.adp - player.value_rank : null);
+  if (raw == null || Number.isNaN(raw) || Math.abs(raw) < 3) return null;
+  const delta = Math.round(raw);
+  return delta > 0 ? { delta, label: `+${delta}`, tone: "success" } : { delta, label: `${delta}`, tone: "danger" };
+}
+
+/**
+ * Projection to show in a draft/board row. An injured or bye player projects
+ * 0.0 for the current week (the engine scores him zero), which reads as "he is
+ * bad"; show his per-game mean when healthy instead, flagged so the row can be
+ * dimmed. Display only: engine scoring is untouched.
+ */
+export function simBoardProjection(player: { status?: string; projection: number; ros_mean?: number | null }): { value: number; discounted: boolean } {
+  if (player.status && player.status !== "healthy" && player.ros_mean != null && player.ros_mean > 0) return { value: player.ros_mean, discounted: true };
+  return { value: player.projection, discounted: false };
+}
+
 export interface SimDraftChip {
   key: "out" | "bye" | "rookie";
   label: string;

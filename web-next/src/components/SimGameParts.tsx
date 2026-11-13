@@ -5,6 +5,7 @@ import { createPortal } from "react-dom";
 
 import { AccentCard } from "@/components/AccentCard";
 import { Button } from "@/components/Button";
+import { Collapsible } from "@/components/Collapsible";
 import { PlayerAvatar } from "@/components/PlayerAvatar";
 import { PlayerIdentity } from "@/components/PlayerRow";
 import { ReviewGlyphChip } from "@/components/SeasonReviewSections";
@@ -31,6 +32,7 @@ import {
   type SimGamePreview,
   type SimGameTone,
 } from "@/lib/simGame";
+import { simSeeAllLabel } from "@/lib/simLayout";
 
 /** Semantic color token for a presentation tone (never a raw hex). */
 export function simToneColor(tone: SimGameTone): string {
@@ -48,7 +50,8 @@ export function simToneColor(tone: SimGameTone): string {
   }
 }
 
-const WIDE_QUERY = "(min-width: 1024px)";
+// Two columns only where both fit comfortably; a phone in landscape or a tablet stays single-column.
+const WIDE_QUERY = "(min-width: 1100px)";
 
 function subscribeWide(callback: () => void): () => void {
   if (typeof window === "undefined" || typeof window.matchMedia !== "function") return () => {};
@@ -127,6 +130,8 @@ export function SimPlayerChip({
   extra,
   hidePosition = false,
   className = "min-w-0",
+  onOpen,
+  quick = false,
 }: {
   player: SimPlayerRef;
   size?: number;
@@ -135,10 +140,22 @@ export function SimPlayerChip({
   /** Drop the position chip when the row's slot label already says it. */
   hidePosition?: boolean;
   className?: string;
+  /** Make the chip itself tappable with this handler (it must not already sit inside a button). */
+  onOpen?: (player: SimGamePlayer) => void;
+  /**
+   * Make the chip tappable with the shared default: the game's player detail,
+   * which is the main app's Player Quick View fed by the sim row (see
+   * SimPlayerSheet), same for real and synthetic players. Use it
+   * wherever a chip is a mention (trade builder, offers, feed), never inside
+   * another button.
+   */
+  quick?: boolean;
 }) {
-  return (
+  const openSheet = useContext(SimOpenPlayerContext);
+  const real = simHeadshotId(player);
+  const body = (
     <PlayerIdentity
-      playerId={simHeadshotId(player)}
+      playerId={real}
       fallbackLabel={simPlayerInitials(player)}
       name={player.name}
       position={hidePosition ? null : player.pos}
@@ -150,6 +167,21 @@ export function SimPlayerChip({
     >
       {simPlayerSubline(player)}
     </PlayerIdentity>
+  );
+  const handler = onOpen ?? (quick && openSheet ? openSheet : null);
+  if (!handler) return body;
+  return (
+    <button
+      type="button"
+      className="block min-w-0 text-left"
+      aria-label={`${player.name}, ${player.pos}. Open player details`}
+      onClick={(event) => {
+        event.stopPropagation();
+        handler(player as SimGamePlayer);
+      }}
+    >
+      {body}
+    </button>
   );
 }
 
@@ -177,10 +209,10 @@ export function SimPlayerLine({
   extra?: ReactNode;
   hidePosition?: boolean;
 }) {
-  const identity = <SimPlayerChip player={player} size={40} muted={muted} extra={extra} hidePosition={hidePosition} className="flex-1 min-w-0" />;
+  const identity = <SimPlayerChip player={player} size={32} muted={muted} extra={extra} hidePosition={hidePosition} className="flex-1 min-w-0" />;
   return (
     <div
-      className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1 py-2"
+      className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1 py-1"
       style={{
         borderBottom: "var(--border-width-default) solid var(--color-border)",
         background: selected ? "var(--color-accent-soft)" : undefined,
@@ -201,6 +233,52 @@ export function SimPlayerLine({
       )}
       {trailing ? <div className="flex items-center gap-2 ml-auto">{trailing}</div> : null}
     </div>
+  );
+}
+
+/** A 40px icon-only control for dense rows (queue, draft). The label is the accessible name. */
+export function SimIconButton({
+  label,
+  onClick,
+  pressed,
+  primary = false,
+  disabled = false,
+  busy = false,
+  children,
+}: {
+  label: string;
+  onClick: () => void;
+  pressed?: boolean;
+  primary?: boolean;
+  disabled?: boolean;
+  busy?: boolean;
+  children: ReactNode;
+}) {
+  const on = primary || pressed;
+  return (
+    <button
+      type="button"
+      aria-label={label}
+      aria-pressed={pressed}
+      disabled={disabled || busy}
+      onClick={(event) => {
+        event.stopPropagation();
+        onClick();
+      }}
+      className="inline-flex shrink-0 items-center justify-center"
+      style={{
+        width: 40,
+        height: 40,
+        borderRadius: "var(--radius-control)",
+        border: `var(--border-width-default) solid ${on ? "var(--color-accent)" : "var(--color-border-strong)"}`,
+        background: primary ? "var(--color-accent-strong)" : pressed ? "var(--color-accent-soft)" : "transparent",
+        color: primary ? "var(--color-on-accent)" : on ? "var(--color-accent)" : "var(--color-text-secondary)",
+        opacity: disabled ? 0.5 : 1,
+        cursor: disabled || busy ? "default" : "pointer",
+      }}
+    >
+      {children}
+    </button>
   );
 }
 
@@ -329,6 +407,9 @@ export function SimPager({ page, pages, onPage }: { page: number; pages: number;
 // ---------------------------------------------------------------------------
 // Color and glyph building blocks shared by every game screen
 
+/** Opens the game's own player sheet; provided once by the game screen so a chip can fall back to it. */
+export const SimOpenPlayerContext = createContext<((player: SimGamePlayer) => void) | null>(null);
+
 /** Opens the team scouting sheet. Provided once by the game screen; a team link outside it is plain text. */
 export const SimTeamOpenContext = createContext<((teamId: string) => void) | null>(null);
 
@@ -384,6 +465,69 @@ export function SimTeamLink({
       aria-label={`${name}${isYou ? " (you)" : ""}. Open team`}
     >
       {body}
+    </button>
+  );
+}
+
+/**
+ * A summary-first card: the shared Collapsible with a tinted glyph title and
+ * an always-visible summary. Open by default on desktop (two columns have the
+ * room) and closed on phones unless `openOnPhone`; the player's own toggle is
+ * remembered per `id`.
+ */
+export function SimFold({
+  id,
+  glyph,
+  tone = "accent",
+  title,
+  summary,
+  openOnPhone = false,
+  children,
+  testId,
+}: {
+  id: string;
+  glyph: SimGlyphName;
+  tone?: SimGameTone;
+  title: ReactNode;
+  summary?: ReactNode;
+  openOnPhone?: boolean;
+  children: ReactNode;
+  testId?: string;
+}) {
+  const wide = useSimWide();
+  return (
+    <Collapsible
+      id={`${id}`}
+      testId={testId}
+      accent={simToneColor(tone)}
+      defaultOpen={wide || openOnPhone}
+      title={
+        <span className="inline-flex items-center gap-2">
+          <span className="inline-flex" style={{ color: simToneColor(tone) }}>
+            <SimGlyph name={glyph} size={16} />
+          </span>
+          {title}
+        </span>
+      }
+      summary={summary}
+    >
+      {children}
+    </Collapsible>
+  );
+}
+
+/** "See all (n more)" toggle under a previewed list. */
+export function SimSeeAll({ hidden, expanded, onToggle, noun }: { hidden: number; expanded: boolean; onToggle: () => void; noun?: string }) {
+  if (hidden <= 0 && !expanded) return null;
+  return (
+    <button
+      type="button"
+      className="tap-link self-start text-xs font-bold"
+      style={{ color: "var(--color-accent)", minHeight: "var(--touch-target-min)" }}
+      aria-expanded={expanded}
+      onClick={onToggle}
+    >
+      {simSeeAllLabel(hidden, expanded, noun)}
     </button>
   );
 }

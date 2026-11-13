@@ -31,7 +31,8 @@ export function PillRow({
   ariaLabel,
   sticky = false,
 }: {
-  options: { label: string; value: string; href?: string }[];
+  /** `icon` is an optional glyph slot rendered before the label (tab icons are added in this one place). */
+  options: { label: string; value: string; href?: string; icon?: ReactNode; count?: number }[];
   active: string;
   onSelect?: (value: string) => void;
   fullWidth?: boolean;
@@ -141,7 +142,28 @@ export function PillRow({
             className,
             style,
           };
-          const content: ReactNode = option.label;
+          const countPill = option.count ? (
+            <span
+              className="inline-flex items-center justify-center text-[0.625rem] font-extrabold leading-none"
+              style={{ minWidth: 16, height: 16, padding: "0 4px", borderRadius: "var(--radius-pill)", background: "var(--color-accent)", color: "var(--color-on-accent)" }}
+              aria-label={`${option.count} new`}
+            >
+              {option.count}
+            </span>
+          ) : null;
+          // Phones stack the icon over the label so six tabs fit; from sm up they sit side by side.
+          const content: ReactNode =
+            option.icon || countPill ? (
+              <span className="inline-flex flex-col items-center gap-0.5 sm:flex-row sm:gap-1.5">
+                {option.icon ? <span aria-hidden="true" className="inline-flex">{option.icon}</span> : null}
+                <span className="inline-flex items-center gap-1">
+                  {option.label}
+                  {countPill}
+                </span>
+              </span>
+            ) : (
+              option.label
+            );
           if (option.href) {
             return (
               <Link key={option.value} href={option.href} {...common}>

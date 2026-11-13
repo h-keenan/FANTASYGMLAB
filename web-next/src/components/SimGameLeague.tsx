@@ -7,10 +7,11 @@ import { Button } from "@/components/Button";
 import { EmptyState } from "@/components/EmptyState";
 import { PillRow } from "@/components/PillRow";
 import { ReviewGlyphChip } from "@/components/SeasonReviewSections";
-import { SimPlayerChip, SimSectionTitle, SimTeamLink, SimToneBadge, simToneColor, type SimCtx } from "@/components/SimGameParts";
+import { SimPlayerChip, SimSectionTitle, SimSeeAll, SimTeamLink, SimToneBadge, simToneColor, useSimWide, type SimCtx } from "@/components/SimGameParts";
 import { SkeletonCard } from "@/components/Skeleton";
 import { ToneBadge } from "@/components/ToneBadge";
 import { api } from "@/lib/api";
+import { simPreview } from "@/lib/simLayout";
 import {
   simFmtPts,
   simFmtRecord,
@@ -30,6 +31,33 @@ import {
 type View = "standings" | "scores" | "feed" | "teams";
 
 export function SimStandingsList({ rows, regularWeeks, playoffTeams }: { rows: SimStandingRow[]; regularWeeks?: number; playoffTeams?: number }) {
+  const wide = useSimWide();
+  if (!wide) {
+    // Phone: one dense table-like row per team (rank, crest, name, streak, record) in a single card.
+    return (
+      <ol className="glass-surface flex flex-col px-2" aria-label="Standings" data-reg-weeks={regularWeeks}>
+        {rows.map((row, index) => {
+          const inPlayoffs = index < (playoffTeams ?? 0);
+          const label = simPlayoffStatusLabel(row.playoff_status);
+          return (
+            <li
+              key={row.team_id}
+              className="grid grid-cols-[1.25rem_minmax(0,1fr)_auto_auto] items-center gap-2"
+              style={{
+                borderBottom: index === (playoffTeams ?? 0) - 1 ? "2px dashed var(--color-success)" : "var(--border-width-default) solid var(--color-border)",
+                background: row.is_you ? "var(--color-accent-soft)" : undefined,
+              }}
+            >
+              <span className="text-xs font-extrabold tabular-nums" style={{ color: inPlayoffs ? "var(--color-success)" : "var(--color-text-muted)" }}>{row.rank ?? index + 1}</span>
+              <SimTeamLink teamId={row.team_id} name={row.name} isYou={row.is_you} size={22} bold={row.is_you} />
+              <span className="text-xs font-bold tabular-nums" style={{ color: simToneColor(simStreakTone(row.streak ?? "")) }} title={label || undefined}>{row.streak ?? ""}</span>
+              <span className="w-12 text-right text-sm font-bold tabular-nums">{simFmtRecord(row)}</span>
+            </li>
+          );
+        })}
+      </ol>
+    );
+  }
   return (
     <ol className="flex flex-col gap-2" aria-label="Standings" data-reg-weeks={regularWeeks}>
       {rows.map((row, index) => (
@@ -104,6 +132,7 @@ export function SimLeagueTab({ ctx }: { ctx: SimCtx }) {
   const [league, setLeague] = useState<SimLeagueResponse | null>(null);
   const [failed, setFailed] = useState(false);
   const [attempt, setAttempt] = useState(0);
+  const [allMoves, setAllMoves] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -156,7 +185,7 @@ export function SimLeagueTab({ ctx }: { ctx: SimCtx }) {
           {(league.transactions ?? []).length === 0 ? (
             <EmptyState title="Quiet so far" subtitle="Moves show up here once the season gets going." />
           ) : (
-            (league.transactions ?? []).map((tx, i) => (
+            simPreview(league.transactions ?? [], allMoves, 6).shown.map((tx, i) => (
               <AccentCard key={i} accent={simToneColor(simTransactionGlyph(tx).tone)} compact as="div">
                 <div className="flex items-center gap-2">
                   {tx.team_id ? <SimTeamLink teamId={tx.team_id} name={names[tx.team_id] ?? "Team"} size={24} hideName /> : null}
@@ -178,6 +207,7 @@ export function SimLeagueTab({ ctx }: { ctx: SimCtx }) {
               </AccentCard>
             ))
           )}
+          <SimSeeAll hidden={simPreview(league.transactions ?? [], allMoves, 6).hidden} expanded={allMoves} onToggle={() => setAllMoves((v) => !v)} />
         </section>
       ) : null}
       {view === "teams" ? (
@@ -192,7 +222,7 @@ export function SimLeagueTab({ ctx }: { ctx: SimCtx }) {
                 </span>
                 <ToneBadge label={team.persona.label} color="var(--color-accent)" size="xs" />
               </div>
-              <p className="text-xs" style={{ color: "var(--color-text-secondary)" }}>{team.persona.blurb}</p>
+              <p className="hidden text-xs sm:block" style={{ color: "var(--color-text-secondary)" }}>{team.persona.blurb}</p>
               {team.avg_age != null ? <p className="text-xs" style={{ color: "var(--color-text-muted)" }}>Average age {team.avg_age.toFixed(1)}</p> : null}
             </AccentCard>
           ))}

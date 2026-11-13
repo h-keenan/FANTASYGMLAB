@@ -16,7 +16,9 @@ import {
   SimStandingsCard,
   SimWaiverCard,
 } from "@/components/SimGameHomeCards";
-import { SimMiniPlayer, SimSectionTitle, SimTeamLink, SimToneBadge, simToneColor, type SimCtx } from "@/components/SimGameParts";
+import { SimMiniPlayer, SimSectionTitle, SimTeamLink, SimToneBadge, simToneColor, useSimWide, type SimCtx } from "@/components/SimGameParts";
+import { PillRow } from "@/components/PillRow";
+import { useSimAutoSet } from "@/components/useSimAutoSet";
 import { ClaimSheet } from "@/components/SimGameTeam";
 import { SkeletonCard } from "@/components/Skeleton";
 import { ToneBadge } from "@/components/ToneBadge";
@@ -36,6 +38,7 @@ import {
   type SimWaiverClaim,
 } from "@/lib/simGame";
 import type { SimTab } from "@/lib/simGameFlow";
+import { SIM_HOME_VIEWS, type SimHomeView } from "@/lib/simLayout";
 
 /**
  * The game's landing tab: this week's head-to-head, what to do this week,
@@ -60,6 +63,8 @@ export function SimHomeTab({
   const [attempt, setAttempt] = useState(0);
   const [claiming, setClaiming] = useState<{ player: SimGamePlayer; roster: SimGamePlayer[] } | null>(null);
   const teamId = ctx.game.you?.team_id;
+  const wide = useSimWide();
+  const [view, setView] = useState<SimHomeView>("week");
 
   useEffect(() => {
     let cancelled = false;
@@ -80,6 +85,15 @@ export function SimHomeTab({
       cancelled = true;
     };
   }, [gameId, ctx.tick, attempt]);
+
+  // Auto-set best lineup (shared hook): names the swap in a toast; the matchup card refreshes in place.
+  const auto = useSimAutoSet(ctx, (applied) =>
+    setHome((prev) =>
+      prev?.matchup
+        ? { ...prev, matchup: { ...prev.matchup, you_projection: applied.projected_total ?? prev.matchup.you_projection, rows: prev.matchup.rows.map((row, i) => ({ ...row, you: applied.slots?.[i]?.player ?? row.you })) } }
+        : prev,
+    ),
+  );
 
   async function claim(player: SimGamePlayer) {
     let roster: SimGamePlayer[] = [];
@@ -107,30 +121,63 @@ export function SimHomeTab({
   }
 
   const names = Object.fromEntries((home.standings?.rows ?? []).map((r) => [r.team_id, r.name]));
+  const inboxCount = home.inbox?.count ?? 0;
+  const sheet = claiming ? (
+    <ClaimSheet ctx={ctx} player={claiming.player} roster={claiming.roster} onClose={() => setClaiming(null)} onClaimed={(next) => { setClaims(next); ctx.bump(); }} />
+  ) : null;
+
+  // Phones: two sub-views so the first screen is the week, not every card. Desktop keeps one two-column page.
+  if (!wide) {
+    return (
+      <div className="flex flex-col gap-3" data-testid="sim-home">
+        <PillRow
+          ariaLabel="Home sections"
+          variant="fill"
+          options={SIM_HOME_VIEWS.map((v) => ({ label: v.value === "week" && inboxCount > 0 ? `${v.label} · ${inboxCount}` : v.label, value: v.value }))}
+          active={view}
+          onSelect={(value) => setView(value as SimHomeView)}
+        />
+        {view === "week" ? (
+          <>
+            {home.matchup ? <SimMatchupCard ctx={ctx} matchup={home.matchup} onTab={onTab} /> : null}
+            <SimChecklistCard home={home} onTab={onTab} onAuto={home.matchup && !home.matchup.bye ? auto.run : undefined} autoBusy={auto.busy} optimal={auto.optimal} />
+            <SimInboxCard ctx={ctx} inbox={home.inbox} onTab={onTab} />
+            <SimWaiverCard ctx={ctx} suggestions={home.waiver_suggestions ?? []} onClaim={claim} onTab={onTab} />
+            <SimByeCard ctx={ctx} alerts={home.bye_alerts ?? []} onTab={onTab} onClaim={claim} />
+            <SimInjuriesCard ctx={ctx} injuries={home.injuries ?? []} />
+          </>
+        ) : (
+          <>
+            <SimStandingsCard standings={home.standings} onTab={onTab} />
+            <SimHotColdCard ctx={ctx} hotCold={home.hot_cold} onClaim={claim} />
+            <SimLeagueMovesCard league={home.league} names={names} onTab={onTab} />
+          </>
+        )}
+        {sheet}
+      </div>
+    );
+  }
   return (
     <div className="flex flex-col gap-4 lg:grid lg:grid-cols-2 lg:items-start" data-testid="sim-home">
-      <div className="contents lg:flex lg:flex-col lg:gap-4">
-        {home.matchup ? <div className="order-1"><SimMatchupCard ctx={ctx} matchup={home.matchup} onTab={onTab} /></div> : null}
-        <div className="order-6"><SimInjuriesCard ctx={ctx} injuries={home.injuries ?? []} /></div>
-        <div className="order-7"><SimStandingsCard standings={home.standings} onTab={onTab} /></div>
-        <div className="order-8"><SimHotColdCard ctx={ctx} hotCold={home.hot_cold} onClaim={claim} /></div>
+      <div className="flex flex-col gap-4">
+        {home.matchup ? <SimMatchupCard ctx={ctx} matchup={home.matchup} onTab={onTab} /> : null}
+        <SimInjuriesCard ctx={ctx} injuries={home.injuries ?? []} />
+        <SimStandingsCard standings={home.standings} onTab={onTab} />
+        <SimHotColdCard ctx={ctx} hotCold={home.hot_cold} onClaim={claim} />
       </div>
-      <div className="contents lg:flex lg:flex-col lg:gap-4">
-        <div className="order-2"><SimChecklistCard home={home} onTab={onTab} /></div>
-        <div className="order-3"><SimByeCard ctx={ctx} alerts={home.bye_alerts ?? []} onTab={onTab} onClaim={claim} /></div>
-        <div className="order-4"><SimWaiverCard ctx={ctx} suggestions={home.waiver_suggestions ?? []} onClaim={claim} onTab={onTab} /></div>
-        <div className="order-5"><SimInboxCard ctx={ctx} inbox={home.inbox} onTab={onTab} /></div>
-        <div className="order-9"><SimLeagueMovesCard league={home.league} names={names} onTab={onTab} /></div>
+      <div className="flex flex-col gap-4">
+        <SimChecklistCard home={home} onTab={onTab} onAuto={home.matchup && !home.matchup.bye ? auto.run : undefined} autoBusy={auto.busy} optimal={auto.optimal} />
+        <SimByeCard ctx={ctx} alerts={home.bye_alerts ?? []} onTab={onTab} onClaim={claim} />
+        <SimWaiverCard ctx={ctx} suggestions={home.waiver_suggestions ?? []} onClaim={claim} onTab={onTab} />
+        <SimInboxCard ctx={ctx} inbox={home.inbox} onTab={onTab} />
+        <SimLeagueMovesCard league={home.league} names={names} onTab={onTab} />
       </div>
-      {claiming ? (
-        <ClaimSheet ctx={ctx} player={claiming.player} roster={claiming.roster} onClose={() => setClaiming(null)} onClaimed={(next) => { setClaims(next); ctx.bump(); }} />
-      ) : null}
+      {sheet}
     </div>
   );
 }
 
 function SimMatchupCard({ ctx, matchup, onTab }: { ctx: SimCtx; matchup: SimHomeMatchup; onTab: (tab: SimTab) => void }) {
-  const you = ctx.game.you;
   const opp = matchup.opponent;
   const week = matchup.week;
   if (matchup.bye || !opp) {
@@ -147,6 +194,16 @@ function SimMatchupCard({ ctx, matchup, onTab }: { ctx: SimCtx; matchup: SimHome
   const oppProj = matchup.opp_projection ?? 0;
   const labels = simSlotLabels(matchup.rows);
   const flagged = (matchup.you_flagged ?? 0) + (matchup.opp_flagged ?? 0);
+  return <MatchupBody ctx={ctx} matchup={matchup} onTab={onTab} prob={prob} tone={tone} youProj={youProj} oppProj={oppProj} labels={labels} flagged={flagged} />;
+}
+
+function MatchupBody({ ctx, matchup, onTab, prob, tone, youProj, oppProj, labels, flagged }: { ctx: SimCtx; matchup: SimHomeMatchup; onTab: (tab: SimTab) => void; prob: number; tone: ReturnType<typeof simWinChanceTone>; youProj: number; oppProj: number; labels: string[]; flagged: number }) {
+  const you = ctx.game.you;
+  const opp = matchup.opponent!;
+  const week = matchup.week;
+  const wide = useSimWide();
+  const [showLineups, setShowLineups] = useState<boolean | null>(null);
+  const lineupsOpen = showLineups ?? wide;
   return (
     <AccentCard accent="var(--color-accent)" glow as="section" className="min-w-0">
       <div className="flex items-center justify-between gap-2">
@@ -156,12 +213,12 @@ function SimMatchupCard({ ctx, matchup, onTab }: { ctx: SimCtx; matchup: SimHome
 
       <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-2">
         <div className="flex min-w-0 flex-col items-center gap-1 text-center">
-          <SimTeamLink teamId={you?.team_id} name={you?.name ?? "You"} isYou size={48} stacked />
+          <SimTeamLink teamId={you?.team_id} name={you?.name ?? "You"} isYou size={36} stacked />
           <span className="text-xs" style={{ color: "var(--color-text-muted)" }}>{matchup.you_record ? simFmtRecord(matchup.you_record) : ""}</span>
         </div>
         <span className="text-xs font-extrabold" style={{ color: "var(--color-text-muted)" }}>VS</span>
         <div className="flex min-w-0 flex-col items-center gap-1 text-center">
-          <SimTeamLink teamId={opp.team_id} name={opp.name} size={48} stacked />
+          <SimTeamLink teamId={opp.team_id} name={opp.name} size={36} stacked />
           <span className="text-xs" style={{ color: "var(--color-text-muted)" }}>{opp.record ? simFmtRecord(opp.record) : ""} · {opp.persona.label}</span>
         </div>
       </div>
@@ -189,23 +246,37 @@ function SimMatchupCard({ ctx, matchup, onTab }: { ctx: SimCtx; matchup: SimHome
         </p>
       ) : null}
 
-      <ol className="flex flex-col" aria-label="Lineups head to head">
-        {matchup.rows.map((row, index) => {
-          const edge = simRowEdge(row);
-          return (
-            <li
-              key={`${row.slot}-${index}`}
-              className="grid grid-cols-[1fr_auto_1fr] items-center gap-1 py-1.5"
-              style={{ borderTop: "var(--border-width-default) solid var(--color-border)" }}
-            >
-              <Side player={row.you} win={edge === "you"} lose={edge === "opp"} align="left" ctx={ctx} />
-              <span className="flex w-11 justify-center"><PositionBadge position={row.slot} label={labels[index]} /></span>
-              <Side player={row.opp} win={edge === "opp"} lose={edge === "you"} align="right" ctx={ctx} />
-            </li>
-          );
-        })}
-      </ol>
-      <p className="text-xs" style={{ color: "var(--color-text-muted)" }}>Their lineup is what their manager will start. Projections update when injuries or byes change.</p>
+      <button
+        type="button"
+        className="tap-link self-start text-xs font-bold"
+        style={{ color: "var(--color-accent)", minHeight: "var(--touch-target-min)" }}
+        aria-expanded={lineupsOpen}
+        aria-controls="sim-matchup-lineups"
+        onClick={() => setShowLineups(!lineupsOpen)}
+      >
+        {lineupsOpen ? "Hide lineups" : `Show lineups (${matchup.rows.length} slots)`}
+      </button>
+      {lineupsOpen ? (
+        <div id="sim-matchup-lineups" className="flex flex-col gap-2">
+          <ol className="flex flex-col" aria-label="Lineups head to head">
+            {matchup.rows.map((row, index) => {
+              const edge = simRowEdge(row);
+              return (
+                <li
+                  key={`${row.slot}-${index}`}
+                  className="grid grid-cols-[1fr_auto_1fr] items-center gap-1 py-1.5"
+                  style={{ borderTop: "var(--border-width-default) solid var(--color-border)" }}
+                >
+                  <Side player={row.you} win={edge === "you"} lose={edge === "opp"} align="left" ctx={ctx} />
+                  <span className="flex w-11 justify-center"><PositionBadge position={row.slot} label={labels[index]} /></span>
+                  <Side player={row.opp} win={edge === "opp"} lose={edge === "you"} align="right" ctx={ctx} />
+                </li>
+              );
+            })}
+          </ol>
+          <p className="text-xs" style={{ color: "var(--color-text-muted)" }}>Their lineup is what their manager will start. Projections update when injuries or byes change.</p>
+        </div>
+      ) : null}
     </AccentCard>
   );
 }
@@ -228,7 +299,7 @@ function Side({ player, win, lose, align, ctx }: { player: SimGamePlayer | null;
   );
 }
 
-function SimChecklistCard({ home, onTab }: { home: SimHomeResponse; onTab: (tab: SimTab) => void }) {
+function SimChecklistCard({ home, onTab, onAuto, autoBusy = false, optimal = false }: { home: SimHomeResponse; onTab: (tab: SimTab) => void; onAuto?: () => void; autoBusy?: boolean; optimal?: boolean }) {
   const items = home.checklist ?? [];
   const { done, total } = simChecklistProgress(items);
   const allDone = total > 0 && done === total;
@@ -240,12 +311,18 @@ function SimChecklistCard({ home, onTab }: { home: SimHomeResponse; onTab: (tab:
       <div className="h-1.5 w-full overflow-hidden" style={{ borderRadius: "var(--radius-pill)", background: "var(--color-surface-muted)" }} aria-hidden="true">
         <div className="h-full" style={{ width: total ? `${(done / total) * 100}%` : 0, background: allDone ? "var(--color-success)" : "var(--color-warning)" }} />
       </div>
+      {onAuto ? (
+        <Button variant="secondary" loading={autoBusy} disabled={optimal} onClick={onAuto} data-testid="auto-lineup">
+          <SimGlyph name={optimal ? "check" : "spark"} size={16} />
+          <span className="ml-2">{optimal ? "Lineup is optimal" : "Auto-set best lineup"}</span>
+        </Button>
+      ) : null}
       <ul className="flex flex-col" aria-label="This week's checklist">
         {items.map((item, index) => {
           const color = simToneColor(simChecklistTone(item.severity));
           return (
             <li key={item.id} style={index > 0 ? { borderTop: "var(--border-width-default) solid var(--color-border)" } : undefined}>
-              <button type="button" className="flex w-full items-center gap-3 py-2.5 text-left" style={{ minHeight: "var(--touch-target-min)" }} onClick={() => onTab(item.target as SimTab)}>
+              <button type="button" className="flex w-full items-center gap-3 py-2 text-left" style={{ minHeight: "var(--touch-target-min)" }} onClick={() => onTab(item.target as SimTab)}>
                 <span
                   className="flex h-7 w-7 shrink-0 items-center justify-center"
                   style={{ borderRadius: "50%", color: item.done ? "var(--color-on-accent)" : color, background: item.done ? "var(--color-success)" : `color-mix(in srgb, ${color} 16%, transparent)` }}
@@ -255,7 +332,7 @@ function SimChecklistCard({ home, onTab }: { home: SimHomeResponse; onTab: (tab:
                 </span>
                 <span className="flex min-w-0 flex-1 flex-col">
                   <span className="text-sm font-bold" style={{ textDecoration: item.done ? "line-through" : undefined, color: item.done ? "var(--color-text-muted)" : undefined }}>{item.label}</span>
-                  <span className="text-xs" style={{ color: "var(--color-text-secondary)" }}>{item.detail}</span>
+                  {item.done ? null : <span className="text-xs" style={{ color: "var(--color-text-secondary)" }}>{item.detail}</span>}
                 </span>
                 <SimToneBadge label={item.done ? "Done" : item.severity === "danger" ? "Fix" : item.severity === "accent" ? "New" : "To do"} tone={item.done ? "success" : simChecklistTone(item.severity)} />
               </button>
