@@ -21,6 +21,8 @@ import { PillRow } from "@/components/PillRow";
 import { NextSteps } from "@/components/NextSteps";
 import { PlannerBar, SwapSheet, useLineupPlanner } from "@/components/MatchupPlanner";
 import { ComparisonHeader, SlotList } from "@/components/MatchupLineup";
+import { LiveFeedPanel } from "@/components/LiveFeedPanel";
+import { feedKey } from "@/lib/liveFeed";
 import { PlayerCard } from "@/components/PlayerCardKit";
 import { playerCardFromStarter } from "@/lib/playerCard";
 import { PositionBadge } from "@/components/PositionBadge";
@@ -736,6 +738,7 @@ export function MatchupContent({
           {matchup.unmapped_players.map((p) => `${p.name} (${p.fantasy_team})`).join(", ")}.
         </p>
       ) : null}
+      {leagueId ? <LiveFeedPanel feedKey={feedKey(leagueId, matchup.week)} live={matchup.game_state === "live"} /> : null}
       <MatchupInsights matchup={shown} />
       <LineupComparison
         matchup={matchup}

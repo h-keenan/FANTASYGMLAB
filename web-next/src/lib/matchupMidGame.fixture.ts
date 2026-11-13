@@ -74,6 +74,7 @@ function toStarter(spec: Spec): MatchupRealStarter {
     game_team_score: spec.game === "final" ? (spec.teamScore ?? 24) : null,
     game_opponent_score: spec.game === "final" ? (spec.oppScore ?? 17) : null,
     slot: spec.slot,
+    stats: spec.stats ?? null,
   };
 }
 

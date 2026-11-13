@@ -199,6 +199,7 @@ from modules import (
     league_display,
     live_activity,
     live_policy,
+    live_stat_lines,
     live_draft,
     live_draft_trade_evaluator,
     manager_activity,
@@ -16134,8 +16135,17 @@ def _build_matchup(
     # Live projected final per real starter: pure arithmetic on the points and
     # projection already fetched above (no extra I/O), so it recomputes from
     # the freshest points on every request.
+    # Live stat lines (one shared league-wide payload per live TTL) so the
+    # client can derive "rushing TD, 4 yds" feed events by diffing polls.
+    _live_stats = (
+        live_stat_lines.week_payload(projection_context.season, projection_context.week)
+        if projection_context is not None and not is_external
+        else None
+    )
     for _side_payload in (my_side, opponent_side):
         for _starter in _side_payload.get("real_starters") or []:
+            if _live_stats is not None and _starter.get("game_started") is True:
+                _starter["stats"] = live_stat_lines.compact_line(_live_stats, _starter.get("player_id"))
             _starter["projected_final"] = matchup_win_probability.projected_final(_starter)
             # Share of his own game already played (0-1, wall-clock estimate):
             # drives the player card's progress bar. None before kickoff / bye.
