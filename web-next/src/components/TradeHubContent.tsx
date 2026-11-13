@@ -105,7 +105,7 @@ export function TradeHubContent({
   const entitlement = data.entitlement;
 
   return (
-    <main className="flex-1 flex flex-col gap-2 px-4 pt-1 pb-4 max-w-3xl w-full mx-auto">
+    <main className="page-shell">
       <TradesTabBar leagueId={leagueId} leagueName={leagueName} active="trade_hub" />
       <PageTitle
         page="Trade Hub"

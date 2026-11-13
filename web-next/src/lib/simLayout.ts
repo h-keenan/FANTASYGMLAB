@@ -5,6 +5,8 @@
  */
 
 /** Persisted open/closed state key for a collapsible section. */
+import type { TabIconName } from "./tabIcons";
+
 export const SIM_OPEN_KEY_PREFIX = "fgl:sim-open:";
 
 export function simOpenKey(id: string): string {
@@ -43,16 +45,16 @@ export function simWindow<T>(items: readonly T[], visible: number): { shown: T[]
 
 /** Review / home sub-views (segmented controls inside long pages). */
 export const SIM_REVIEW_VIEWS = [
-  { value: "overview", label: "Overview" },
-  { value: "awards", label: "Awards" },
-  { value: "stats", label: "Stats" },
-  { value: "standings", label: "Standings" },
+  { value: "overview", label: "Overview", glyph: "overview" },
+  { value: "awards", label: "Awards", glyph: "awards" },
+  { value: "stats", label: "Stats", glyph: "stats" },
+  { value: "standings", label: "Standings", glyph: "standings" },
 ] as const;
 export type SimReviewView = (typeof SIM_REVIEW_VIEWS)[number]["value"];
 
 export const SIM_HOME_VIEWS = [
-  { value: "week", label: "This week" },
-  { value: "league", label: "League" },
+  { value: "week", label: "This week", glyph: "week" },
+  { value: "league", label: "League", glyph: "league" },
 ] as const;
 export type SimHomeView = (typeof SIM_HOME_VIEWS)[number]["value"];
 

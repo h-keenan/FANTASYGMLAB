@@ -659,8 +659,8 @@ function LineupComparison({
           <View style={{ flex: 1 }}>
             <SegmentedTabBar
               options={[
-                { key: 'suggested' as const, label: 'Suggested' },
-                { key: 'actual' as const, label: 'Actual' },
+                { key: 'suggested' as const, label: 'Suggested', glyph: 'suggested' as const },
+                { key: 'actual' as const, label: 'Actual', glyph: 'actual' as const },
               ]}
               active={view}
               onChange={onViewChange}

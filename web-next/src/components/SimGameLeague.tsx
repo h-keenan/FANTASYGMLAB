@@ -164,10 +164,10 @@ export function SimLeagueTab({ ctx }: { ctx: SimCtx }) {
         ariaLabel="League view"
         variant="fill"
         options={[
-          { label: "Standings", value: "standings" },
-          { label: "Scores", value: "scores" },
-          { label: "Feed", value: "feed" },
-          { label: "Teams", value: "teams" },
+          { label: "Standings", value: "standings", glyph: "standings" },
+          { label: "Scores", value: "scores", glyph: "scores" },
+          { label: "Feed", value: "feed", glyph: "feed" },
+          { label: "Teams", value: "teams", glyph: "team" },
         ]}
         active={view}
         onSelect={(value) => setView(value as View)}

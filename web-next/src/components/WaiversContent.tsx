@@ -1,3 +1,4 @@
+import type { TabIconName } from "@/lib/tabIcons";
 import { isEspnLeagueId } from "@/lib/leaguePlatform";
 import { sleeperLeagueUrl } from "@/lib/matchupPlanner";
 import { PlayerIdentity } from "@/components/PlayerRow";
@@ -62,10 +63,10 @@ const DISCLOSURE_TEXT =
 
 
 
-const TAB_OPTIONS: { label: string; value: WaiverTab }[] = [
-  { label: "Recommended", value: "recommended" },
-  { label: "Explore", value: "explore" },
-  { label: "Watchlist", value: "watchlist" },
+const TAB_OPTIONS: { label: string; value: WaiverTab; glyph: TabIconName }[] = [
+  { label: "Recommended", value: "recommended", glyph: "recommended" },
+  { label: "Explore", value: "explore", glyph: "explore" },
+  { label: "Watchlist", value: "watchlist", glyph: "watchlist" },
 ];
 
 const REC_FILTER_OPTIONS: { label: string; value: WaiverRecFilter }[] = [
@@ -511,7 +512,7 @@ export function WaiversContent({
     ) : undefined;
 
   return (
-    <main className="flex-1 flex flex-col gap-3 px-4 py-3 max-w-3xl w-full mx-auto">
+    <main className="page-shell">
       <header className="flex flex-wrap items-center justify-between gap-2">
         <div className="flex flex-col gap-1">
           <PageTitle page="Waivers" leagueName={leagueName} info={helpInfo} />

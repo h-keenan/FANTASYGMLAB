@@ -372,7 +372,7 @@ export function TradeFinderContent({
   }
 
   return (
-    <main className="flex-1 flex flex-col gap-4 px-4 py-4 max-w-3xl w-full mx-auto">
+    <main className="page-shell">
       <TradesTabBar leagueId={leagueId} leagueName={leagueName} active="trade_finder" />
       <header className="flex flex-col gap-1">
         <PageTitle page="Trade Finder" leagueName={leagueName} />

@@ -346,11 +346,11 @@ export function SimGameDraft({ ctx, onComplete }: { ctx: SimCtx; onComplete: (re
       </AccentCard>
       <SegmentedTabBar<Panel>
         options={[
-          { key: 'board', label: 'Players' },
-          { key: 'grid', label: 'Board' },
-          { key: 'queue', label: `Queue${queue.ids.length ? ` ${queue.ids.length}` : ''}` },
-          { key: 'roster', label: 'Roster' },
-          { key: 'picks', label: 'Picks' },
+          { key: 'board', label: 'Players', glyph: 'players' },
+          { key: 'grid', label: 'Board', glyph: 'board' },
+          { key: 'queue', label: `Queue${queue.ids.length ? ` ${queue.ids.length}` : ''}`, glyph: 'queue' },
+          { key: 'roster', label: 'Roster', glyph: 'roster' },
+          { key: 'picks', label: 'Picks', glyph: 'picks' },
         ]}
         active={panel}
         onChange={setPanel}

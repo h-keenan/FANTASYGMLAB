@@ -442,7 +442,7 @@ function PortfolioHeader({ title }: { title: string }) {
  * height, painted before the saved-leagues index arrives. */
 export function PortfolioShell() {
   return (
-    <main className="flex-1 flex flex-col gap-3 px-4 py-3 max-w-3xl w-full mx-auto" data-portfolio-shell="">
+    <main className="page-shell" data-portfolio-shell="">
       <PortfolioHeader title="Portfolio" />
       <div className="flex flex-col gap-4">
         {Array.from({ length: PORTFOLIO_SHELL_SKELETON_COUNT }, (_, index) => (
@@ -500,7 +500,7 @@ export function PortfolioContent({
 
   if (data.leagues.length === 0 && allFailedLeagues.length === 0 && pending.length === 0) {
     return (
-      <main className="flex-1 flex flex-col gap-4 px-4 py-3 max-w-3xl w-full mx-auto">
+      <main className="page-shell">
         <header className="flex flex-col gap-1">
           <PageTitle page="Portfolio" />
         </header>
@@ -520,13 +520,13 @@ export function PortfolioContent({
   }
 
   return (
-    <main className="flex-1 flex flex-col gap-3 px-4 py-3 max-w-3xl w-full mx-auto">
+    <main className="page-shell">
       <PortfolioHeader title="Portfolio" />
 
       <PillRow
         options={[
-          { label: "Leagues", value: "leagues" },
-          { label: "Exposure", value: "exposure" },
+          { label: "Leagues", value: "leagues", glyph: "leagues" },
+          { label: "Exposure", value: "exposure", glyph: "exposure" },
         ]}
         active={view}
         onSelect={(value) => setView(value as "leagues" | "exposure")}

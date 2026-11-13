@@ -93,7 +93,7 @@ function TradeHistoryRow({ outcome }: { outcome: PastTradeOutcome }) {
 
 export function TradeHistoryContent({ data }: { data: TradeOutcomeHistoryResponse }) {
   return (
-    <main className="flex-1 flex flex-col gap-4 px-4 py-4 max-w-3xl w-full mx-auto">
+    <main className="page-shell">
       <header className="flex flex-col gap-1">
         <PageTitle page="Trade History" />
         <div className="flex flex-col gap-1">

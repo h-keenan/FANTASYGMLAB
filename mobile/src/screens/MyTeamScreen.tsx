@@ -641,7 +641,7 @@ function createStyles(colors: ThemeColors) {
   root: { flex: 1, backgroundColor: 'transparent' },
   container: { flex: 1, backgroundColor: 'transparent' },
   content: { padding: spacing.lg, paddingBottom: spacing.xl * 4 },
-  tabBar: { marginBottom: spacing.sm },
+  tabBar: { marginBottom: spacing.md },
   skeletonList: { padding: spacing.md, marginTop: spacing.sm, marginBottom: spacing.sm },
   analysisRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, paddingVertical: spacing.sm },
   analysisStatus: { flex: 1, minWidth: 0, alignItems: 'flex-start', gap: 6 },

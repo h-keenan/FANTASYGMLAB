@@ -78,7 +78,7 @@ export default function SampleLeagueScreen({ navigation }: Props) {
           <AppText style={styles.muted}>{SAMPLE_LEAGUE_NAME} (sample)</AppText>
         </View>
         <SegmentedTabBar<SampleTab>
-          options={SAMPLE_TABS.map((t) => ({ key: t.value, label: t.label }))}
+          options={SAMPLE_TABS.map((t) => ({ key: t.value, label: t.label, glyph: t.glyph }))}
           active={tab}
           onChange={setTab}
         />

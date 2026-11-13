@@ -591,8 +591,8 @@ export function SimTradesTab({ ctx, seed, onSeedUsed }: { ctx: SimCtx; seed: { p
     <View style={common.stack}>
       <SegmentedTabBar<'inbox' | 'build'>
         options={[
-          { key: 'inbox', label: `Inbox${offers ? ` ${offers}` : ''}` },
-          { key: 'build', label: 'Make an offer' },
+          { key: 'inbox', label: `Inbox${offers ? ` ${offers}` : ''}`, glyph: 'inbox' },
+          { key: 'build', label: 'Make an offer', glyph: 'build' },
         ]}
         active={mode}
         onChange={setMode}

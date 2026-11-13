@@ -39,7 +39,7 @@ export default async function LegalPage({ params }: { params: Promise<{ pageKey:
   if (!page) notFound();
 
   return (
-    <main className="flex-1 flex flex-col gap-6 px-4 py-8 max-w-3xl w-full mx-auto">
+    <main className="page-shell page-shell-prose">
       <div className="flex flex-col gap-2">
         <Link href="/" className="text-xs font-bold uppercase inline-flex items-center self-start min-h-[var(--touch-target-min)]" style={{ color: "var(--color-text-muted)", letterSpacing: "0.03em" }}>
           ← FantasyDesk

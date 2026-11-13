@@ -281,7 +281,7 @@ export function AlertsContent({
   const groups = groupAlertsByType(items);
 
   return (
-    <main className="flex-1 flex flex-col gap-3 px-4 py-3 max-w-3xl w-full mx-auto">
+    <main className="page-shell">
       <header className="flex flex-col gap-1">
         <PageTitle page="Alerts" leagueName={leagueName} />
       </header>
