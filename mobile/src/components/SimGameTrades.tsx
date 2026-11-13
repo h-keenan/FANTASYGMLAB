@@ -505,6 +505,7 @@ function Builder({ ctx, seed, onSeedUsed }: { ctx: SimCtx; seed: SimTradeSeed | 
       {viewing ? (
         <SimPlayerSheet
           gameId={gameId}
+          startYear={game.settings.start_year}
           player={viewing}
           onClose={() => setViewing(null)}
           actions={<Button size="sm" variant="ghost" label="‹ Back to picker" onPress={() => setViewing(null)} />}

@@ -396,6 +396,7 @@ export function SimGameContent() {
         {sheetPlayer ? (
           <SimPlayerSheet
             gameId={game.id}
+            startYear={game.settings.start_year}
             player={sheetPlayer}
             onClose={() => setSheetPlayer(null)}
             actions={

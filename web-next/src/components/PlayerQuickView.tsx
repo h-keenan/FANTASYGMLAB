@@ -25,6 +25,7 @@ import { CHART_HEIGHT } from "@/components/weeklyPointsChartHeight";
 import { useSheetDragDismiss } from "@/lib/useSheetDragDismiss";
 import { AvailabilityBlock, LatestNewsSection } from "@/components/PlayerQuickViewNews";
 import { pqvBioForContext, pqvRealWorld } from "@/lib/pqvContext";
+import { rowsAsOf, simAsOfSeason } from "@/lib/simAsOf";
 import { cleanInjuryLabel, playerProfileNewsHref } from "@/lib/playerAvailabilityPresentation";
 import { waiverInjuryDisplay } from "@/lib/waiversPresentation";
 import {
@@ -82,6 +83,7 @@ export function PlayerQuickView({
   identity,
   onClose,
   simOverlay,
+  asOfSeason,
   remote = true,
 }: {
   identity: PlayerQuickViewIdentity;
@@ -92,6 +94,11 @@ export function PlayerQuickView({
    * hero, so the game's player detail is this same Quick View. Omit everywhere else.
    */
   simOverlay?: ReactNode;
+  /**
+   * Fantasy Sim only: the last fully finished real season at the sim's start (see lib/simAsOf.ts). Real season stats and
+   * awards are cut to it; the in-progress real season, current usage / trend charts and value history never show.
+   */
+  asOfSeason?: number;
   /** false for a synthetic sim player with no real data behind the id: same layout, no remote fetches. */
   remote?: boolean;
 }) {
@@ -205,9 +212,12 @@ export function PlayerQuickView({
     }
   }
 
-  const stats = detail?.stats ?? null;
+  // Fantasy Sim "as-of" cut: only seasons up to the sim's start; nothing current (usage trend / profile, value history).
+  const asOf = isSim ? (asOfSeason ?? simAsOfSeason(null)) : null;
+  const stats = detail?.stats ? (asOf != null ? { ...detail.stats, seasons: rowsAsOf(detail.stats.seasons, asOf) } : detail.stats) : null;
   const bio = detail?.bio ?? null;
-  const model = detail?.model ?? null;
+  const model = detail?.model ? (asOf != null ? { ...detail.model, usage_trend: null, usage_profile: null } : detail.model) : null;
+  const shownAwards = asOf != null ? rowsAsOf(awards, asOf) : awards;
   const resolved = detail?.identity ?? null;
   // The server's availability block (directory status) wins; the row's raw
   // status only drives the chip until it arrives, with a clean label.
@@ -281,7 +291,7 @@ export function PlayerQuickView({
           positionRank={identity.position_rank}
           usageTrend={model?.usage_trend ?? null}
           usageLoading={loading}
-          valueChart={<PlayerValueHistory playerId={identity.player_id} bare />}
+          valueChart={asOf != null ? null : <PlayerValueHistory playerId={identity.player_id} bare />}
           ovrChart={model ? <SubRatingRow model={model} bare /> : null}
           depthChartNote={realWorld.showDepthChartNote ? model?.depth_chart_note : null}
           rookie={rookieBadge(bio)}
@@ -354,11 +364,14 @@ export function PlayerQuickView({
 
               <HeadlineTiles rows={headlineRows(stats ?? null, model?.usage_profile)} playerId={identity.player_id} />
 
-              <PlayerTrendsPanel
-                playerId={identity.player_id}
-                name={identity.name || "This player"}
-                gradientId="pqv-weekly-fill"
-              />
+              {/* Real weekly game logs are current-season data: never inside the sim (it has its own week-by-week). */}
+              {isSim ? null : (
+                <PlayerTrendsPanel
+                  playerId={identity.player_id}
+                  name={identity.name || "This player"}
+                  gradientId="pqv-weekly-fill"
+                />
+              )}
 
               <PlayerUsageBlock profile={model?.usage_profile} position={stats?.position ?? identity.position} playerId={identity.player_id} />
 
@@ -371,7 +384,7 @@ export function PlayerQuickView({
                 </section>
               ) : null}
 
-              {awards.length > 0 ? <AwardsStrip awards={awards} /> : null}
+              {shownAwards.length > 0 ? <AwardsStrip awards={shownAwards} /> : null}
 
               {bio ? <BioGrid bio={pqvBioForContext(bio, isSim)} /> : null}
 

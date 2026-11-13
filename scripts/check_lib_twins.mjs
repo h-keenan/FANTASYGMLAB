@@ -54,6 +54,7 @@ export const IDENTICAL = [
   "pqvContext.ts",
   "sampleLeague.ts",
   "sessionTab.ts",
+  "simAsOf.ts",
   "simCrest.ts",
   "simGame.ts",
   "simPlayerSheet.ts",

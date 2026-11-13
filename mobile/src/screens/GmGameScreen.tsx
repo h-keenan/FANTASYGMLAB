@@ -490,6 +490,7 @@ export default function GmGameScreen({ navigation }: Props) {
         {sheetPlayer ? (
           <SimPlayerSheet
             gameId={game.id}
+            startYear={game.settings.start_year}
             player={sheetPlayer}
             onClose={() => setSheetPlayer(null)}
             actions={
