@@ -85,9 +85,12 @@ export interface SimGamePlayer {
   pos_value_rank?: number | null;
   /** ADP minus value rank (players list only): positive = the market lets him fall past the model (steal). */
   adp_edge?: number | null;
+  /** Expected per-game points for the next game he can play, given his NFL team's depth chart and who is out. */
   projection: number;
   /** Per-game mean when healthy (the projection is 0.0 for an injured player this week). */
   ros_mean?: number | null;
+  /** Team-level role (new games only): one fill-in per injured starter; the other backups show baseline numbers. */
+  role?: SimPlayerRole | null;
   floor: number;
   ceiling: number;
   status: "healthy" | "out" | "bye";
@@ -106,6 +109,41 @@ export interface SimGamePlayer {
   rookie?: boolean;
   /** True for a simulated (not real NFL draft) rookie. */
   generated?: boolean;
+}
+
+/** A player's role on his NFL team's depth chart in his next game (player-model-3 games; older saves omit it). */
+export interface SimPlayerRole {
+  kind: "starter" | "fill_in" | "backup" | "bench" | "out";
+  /** "Starting while Hurts is out" / "Filling in for X" / "Backup"; null for a normal starter. */
+  label: string | null;
+  covering?: string | null;
+  covering_name?: string | null;
+  /** What he would average if he started (the old, role-free projection). */
+  if_starts: number;
+  week?: number | null;
+}
+
+/** The role chip for a row, or null when the player has the ordinary role. */
+export function simRoleBadge(player: { role?: SimPlayerRole | null }): { label: string; tone: SimGameTone } | null {
+  const role = player.role;
+  if (!role || !role.label) return null;
+  return { label: role.label, tone: role.kind === "fill_in" ? "accent" : "muted" };
+}
+
+/** Tags for a Players-list row: the owner, then the role chip (fill-in / backup). */
+export function simPlayerTags(player: SimGamePlayer): { key: string; label: string; tone: SimGameTone }[] | undefined {
+  const tags: { key: string; label: string; tone: SimGameTone }[] = [];
+  if (player.owner) tags.push({ key: "owner", label: simOwnerLabel(player.owner), tone: simOwnerTone(player.owner) });
+  const role = simRoleBadge(player);
+  if (role) tags.push({ key: "role", label: role.label, tone: role.tone });
+  return tags.length ? tags : undefined;
+}
+
+/** "If he starts: 13.5 pts" for a fill-in or backup: the separate hint next to the expected projection. */
+export function simIfStartsHint(player: { role?: SimPlayerRole | null }): string | null {
+  const role = player.role;
+  if (!role || (role.kind !== "fill_in" && role.kind !== "backup")) return null;
+  return `If he starts: ${simFmtPts(role.if_starts)} pts`;
 }
 
 /** Where one of your players sits. Picks report "picks". */

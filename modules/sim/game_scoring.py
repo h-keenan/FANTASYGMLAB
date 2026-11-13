@@ -29,7 +29,8 @@ _REAL_MODULE = "modules.sim.player_model"
 # under it keep their exact weekly points, results and grades. The newest entry is what new games use.
 _MODEL_MODULES = {
     "player-model-1": "modules.sim.player_model_v1",
-    "player-model-2": "modules.sim.player_model",
+    "player-model-2": "modules.sim.player_model_v2",  # frozen copy: games created under it never change
+    "player-model-3": "modules.sim.player_model",  # + team-level role coupling (modules/sim/team_roles.py)
 }
 
 
@@ -53,8 +54,12 @@ class ScoringModel:
     def profile(self, player: Mapping[str, Any], rng: Any) -> Any:  # pragma: no cover - interface
         raise NotImplementedError
 
+    # True when the engine should resolve team-level roles and pass ``role_mult`` (player-model-3 and later).
+    team_roles = False
+
     def week(
-        self, player: Mapping[str, Any], profile: Any, week: int, rng: Any, scoring: Mapping[str, float]
+        self, player: Mapping[str, Any], profile: Any, week: int, rng: Any, scoring: Mapping[str, float],
+        role_mult: float | None = None,
     ) -> PlayerWeek:  # pragma: no cover - interface
         raise NotImplementedError
 
@@ -80,7 +85,7 @@ class FallbackModel(ScoringModel):
         talent = 1.0 + 0.10 * float(rng.standard_normal())
         return _FallbackProfile(talent=min(1.3, max(0.75, talent)))
 
-    def week(self, player, profile, week, rng, scoring):
+    def week(self, player, profile, week, rng, scoring, role_mult=None):
         mean = float(player.get("mean") or 0.0) * profile.talent
         sd = float(player.get("sd") or 0.0)
         z = float(rng.standard_normal())
@@ -137,11 +142,14 @@ class PlayerModelAdapter(ScoringModel):
     def __init__(self, module: Any) -> None:
         self._m = module
         self.model_id = f"player_model-{getattr(module, 'MODEL_VERSION', '1')}"
+        self.team_roles = bool(getattr(module, "TEAM_ROLES", False))
 
     def profile(self, player, rng):
         return self._m.draw_season_profile(player, rng)
 
-    def week(self, player, profile, week, rng, scoring):
+    def week(self, player, profile, week, rng, scoring, role_mult=None):
+        if role_mult is not None and self.team_roles:
+            profile = self._m.with_role_multiplier(profile, week, role_mult)
         result = self._m.draw_week_points(player, profile, week, rng, scoring)
         hurt = bool(result.injury_incurred)
         return PlayerWeek(
@@ -194,10 +202,17 @@ def resolve_model(model_id: str | None) -> tuple[ScoringModel, str | None]:
     return current, f"scoring model {model_id!r} is unavailable; using {current.model_id!r}, results may differ"
 
 
+def team_roles_enabled(model_id: str | None) -> bool:
+    """Does a game created with ``model_id`` resolve team-level roles (one fill-in per vacated starter)?
+    Only player-model-3 and later: older saves keep exactly their old behaviour."""
+
+    return bool(getattr(resolve_model(model_id)[0], "team_roles", False))
+
+
 def get_model(model_id: str | None) -> ScoringModel:
     """The model a saved game was created with (see ``resolve_model`` for the unknown-id note)."""
 
     return resolve_model(model_id)[0]
 
 
-__all__ = ["resolve_model", "PlayerWeek", "ScoringModel", "FallbackModel", "PlayerModelAdapter", "default_model", "get_model", "FALLBACK_ID"]
+__all__ = ["resolve_model", "PlayerWeek", "ScoringModel", "FallbackModel", "PlayerModelAdapter", "default_model", "get_model", "team_roles_enabled", "FALLBACK_ID"]

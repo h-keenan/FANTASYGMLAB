@@ -29,8 +29,11 @@ import {
   simFmtPts,
   simFmtValue,
   simHeadshotId,
+  simIfStartsHint,
+  simPlayerTags,
   simOwnerLabel,
   simOwnerTone,
+  simRoleBadge,
   simPageCount,
   simPlayerStatusLabel,
   type SimGamePlayer,
@@ -179,7 +182,7 @@ export function SimPlayerBrowser({
               player={player}
               week={week}
               onOpen={onOpen}
-              tags={player.owner ? [{ key: 'owner', label: simOwnerLabel(player.owner), tone: simOwnerTone(player.owner) }] : undefined}
+              tags={simPlayerTags(player)}
               actions={actions ? actions(player) : null}
             />
           ))}
@@ -270,6 +273,7 @@ export function SimPlayerOverlay({ player, detail, actions }: { player: SimGameP
           <View style={common.wrapRow}>
             {status ? <SimToneBadge label={status.label} tone={status.tone} /> : null}
             {player.owner ? <SimToneBadge label={simOwnerLabel(player.owner)} tone={simOwnerTone(player.owner)} /> : null}
+            {simRoleBadge(player) ? <SimToneBadge label={simRoleBadge(player)!.label} tone={simRoleBadge(player)!.tone} /> : null}
           </View>
         }
       >
@@ -287,6 +291,7 @@ export function SimPlayerOverlay({ player, detail, actions }: { player: SimGameP
             note={hero.score != null ? `Value ${hero.score}${player.adp != null ? ` · ADP ${simFmtValue(player.adp)}` : ''}` : 'No market value'}
           />
         </View>
+        {simIfStartsHint(player) ? <AppText style={common.muted} testID="sim-if-starts">{simIfStartsHint(player)}</AppText> : null}
         {actions ? <View style={common.wrapRow}>{actions}</View> : null}
       </PqvSection>
       {detail.failed ? (

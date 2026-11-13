@@ -11,14 +11,17 @@ from dataclasses import replace
 from typing import Iterable, Sequence
 
 from modules.sim import aging
+from modules.sim.game_scoring import team_roles_enabled
 from modules.sim.game_state import GameState
 from modules.sim.game_types import GameSnapshot, slot_positions
 from modules.sim.picks import FUTURE_SLOT_FRAC, pick_label, pick_market_value
 from modules.sim.lineup import Assignment, SlotPlan, carry_lineup, pick_lineup
 from modules.sim.personas import PERSONAS, TeamParams
+from modules.sim.team_roles import Role, RoleBook
 from modules.sim.types import GAME_POSITIONS, is_pick_id
 
 PRIOR_GAMES = 5.0  # a projection counts as this many games of evidence
+ROLE_HORIZON_WEEKS = 17  # a player's rest-of-season mean averages his role over the playable weeks left (known injuries only)
 NEED_K = 8.0  # value units per projected weekly lineup point
 USER_PARAMS = TeamParams(
     horizon=0.55, accept_threshold=0.0, propose_min=0.0, activity=0.0, noise_sd=0.0, waiver_aggr=0.0,
@@ -53,7 +56,15 @@ class Evaluator:
         self.plan = SlotPlan(snapshot.settings.slots)
         self.policy = snapshot.settings.policy
         self._ros: dict[str, float] = {}
-        self._ros_key = -1
+        self._ros_key: object = -1
+        self._seq = -1
+        self._roles: dict[tuple, dict[str, Role]] = {}
+        book = getattr(snapshot, "_role_book", None)
+        if book is None:  # frozen snapshot: memoize on the instance (False = this game does not use team roles)
+            book = RoleBook(snapshot.players) if team_roles_enabled(snapshot.scoring_model) else False
+            object.__setattr__(snapshot, "_role_book", book)
+        self.book = book or None
+        self.roles_on = self.book is not None
         scale = getattr(snapshot, "_now_scale", None)
         if scale is None:  # frozen snapshot: memoize on the instance
             scale = self._compute_now_scale()
@@ -87,22 +98,117 @@ class Evaluator:
 
     # ------------------------------------------------------------ projections
 
-    def ros_mean(self, pid: str) -> float:
-        """Rest-of-season weekly mean: the frozen projection updated by what the
-        player has actually done this season (a Bayesian blend, so one big week
-        moves it a little, not a lot)."""
+    def base_mean(self, pid: str) -> float:
+        """The player's own rest-of-season weekly mean, role-free (``if he plays his usual role``): the frozen
+        projection updated by what he has actually done this season (a Bayesian blend, so one big week moves
+        it a little, not a lot)."""
 
-        if self._ros_key != len(self.state.history):
+        mean = self.snap.players[pid].mean
+        games = self.state.games_played(pid) if self.state.status != "offseason" else []
+        return (mean * PRIOR_GAMES + sum(games)) / (PRIOR_GAMES + len(games)) if games else mean
+
+    def _sync(self) -> None:
+        """Drop the caches when the game moved on (an event was applied: a week scored, an injury, a claim)."""
+
+        seq = self.state.seq
+        if seq == self._seq:
+            return
+        self._seq = seq
+        # What the caches depend on: games played, the week, and who is out (rosters never matter: roles are NFL-level).
+        key = (len(self.state.history), self.state.week, frozenset(self.state.out.items()))
+        if self._ros_key != key:
             self._ros.clear()
-            self._ros_key = len(self.state.history)
+            self._roles.clear()
+            self._ros_key = key
+
+    def ros_mean(self, pid: str) -> float:
+        """Rest-of-season weekly mean: ``base_mean`` times his expected team role over the coming weeks, so two
+        backups of one injured starter are not both valued as the starter (team roles, player-model-3+; the
+        same as ``base_mean`` for older saves)."""
+
+        self._sync()
         cached = self._ros.get(pid)
         if cached is not None:
             return cached
-        mean = self.snap.players[pid].mean
-        games = self.state.games_played(pid) if self.state.status != "offseason" else []
-        value = (mean * PRIOR_GAMES + sum(games)) / (PRIOR_GAMES + len(games)) if games else mean
+        value = self.base_mean(pid) * self.role_factor(pid)
         self._ros[pid] = value
         return value
+
+    # ------------------------------------------------------------ team roles
+
+    def role(self, pid: str, week: int) -> Role | None:
+        """The role this player has in ``week`` given what is publicly known (current injuries and byes), or
+        None when team roles are off or the position has none (K, DEF). One fill-in per vacated starter."""
+
+        if self.book is None:
+            return None
+        key = self.book.key(pid)
+        if key is None:
+            return None
+        self._sync()
+        ck = (key, week)
+        roles = self._roles.get(ck)
+        if roles is None:
+            roles = self.book.roles(key, lambda p: self.status(p, week) == "healthy")
+            self._roles[ck] = roles
+        return roles.get(pid)
+
+    def role_mult(self, pid: str, week: int) -> float:
+        r = self.role(pid, week)
+        return r.mult if r is not None else 1.0
+
+    def _playable_weeks(self, pid: str, start: int, count: int) -> list[int]:
+        last = self.snap.settings.regular_weeks
+        return [w for w in range(start, min(last, start + count - 1) + 1) if self.status(pid, w) == "healthy"]
+
+    def role_factor(self, pid: str) -> float:
+        """Average role multiplier over his playable regular-season weeks left (1.0 without roles)."""
+
+        if self.book is None or self.book.key(pid) is None:
+            return 1.0
+        start = 1 if self.state.status == "offseason" else max(self.state.week, 1)
+        weeks = self._playable_weeks(pid, start, ROLE_HORIZON_WEEKS)
+        if not weeks:
+            return 1.0
+        return sum(self.role_mult(pid, w) for w in weeks) / len(weeks)
+
+    def week_mean(self, pid: str, week: int) -> float:
+        """His mean for one specific week: ``base_mean`` times that week's role multiplier."""
+
+        return self.base_mean(pid) * self.role_mult(pid, week)
+
+    def next_game(self, pid: str, week: int) -> int | None:
+        """The first week from ``week`` on in which he can play (not out, not on a bye), or None."""
+
+        for w in range(max(week, 1), self.snap.settings.regular_weeks + 1):
+            if self.status(pid, w) == "healthy":
+                return w
+        return None
+
+    def next_proj(self, pid: str, week: int) -> float:
+        """Projection for the next game he plays (so an injured player shows what he will do when he is back)."""
+
+        w = self.next_game(pid, week)
+        return self.week_mean(pid, w) if w is not None else self.ros_mean(pid)
+
+    def role_info(self, pid: str, week: int) -> dict | None:
+        """What the UI shows beside a projection: the role in his next game, the starter he covers, and his
+        'if he starts' number. None when team roles do not apply."""
+
+        w = self.next_game(pid, week)
+        r = self.role(pid, w if w is not None else week)
+        if r is None:
+            return None
+        covering = self.snap.players[r.covering].name if r.covering else None
+        label = {
+            "fill_in": (f"Starting while {covering} is out" if self.snap.players[pid].pos == "QB" else f"Filling in for {covering}"),
+            "backup": "Backup",
+            "starter": None, "bench": None, "out": None,
+        }.get(r.kind)
+        return {
+            "kind": r.kind, "label": label, "covering": r.covering or None, "covering_name": covering,
+            "if_starts": round(self.base_mean(pid), 1), "week": w,
+        }
 
     def out_in(self, pid: str, week: int) -> bool:
         """Is the player injured (out) in ``week``? Only meaningful for weeks
@@ -122,7 +228,7 @@ class Evaluator:
         return "healthy"
 
     def proj(self, pid: str, week: int) -> float:
-        return 0.0 if self.status(pid, week) != "healthy" else self.ros_mean(pid)
+        return 0.0 if self.status(pid, week) != "healthy" else self.week_mean(pid, week) if self.roles_on else self.ros_mean(pid)
 
     def band(self, pid: str) -> tuple[float, float]:
         p = self.snap.players[pid]
@@ -139,7 +245,7 @@ class Evaluator:
         for pid in roster:
             if self.out_in(pid, week) or (bye and self.on_bye(pid, week)):
                 continue
-            out.append((self.ros_mean(pid), pid, self.snap.players[pid].pos))
+            out.append((self.week_mean(pid, week) if self.roles_on else self.ros_mean(pid), pid, self.snap.players[pid].pos))
         return out
 
     def best_lineup(self, roster: Iterable[str], week: int) -> tuple[list[list], float]:

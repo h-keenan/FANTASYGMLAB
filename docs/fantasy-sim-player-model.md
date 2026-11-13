@@ -17,6 +17,8 @@ real NFL seasons by `modules/sim/calibration/`.
 - Held-out 2024-25: season-PPG percentile KS distance **0.105** (mean PIT 0.555), 50/80/90% intervals cover **45/77/85%**, mean absolute error of breakout/bust tier hit rates **0.057** (0.026 in-sample), weekly points SD ratio sim/real **0.99-1.08** by position, boom/bust week rates within **0.03**, games missed 2.56 vs 2.37 per season; all five seasons in-sample: KS **0.050**, tier-hit MAE **0.026**.
 - **player-model-2 (2026-11 audit)**: role-collapse tail, QB/star fixes and an opt-in depth-chart coupling; see 4.0 for the
   before/after. Tables 4.1-4.2 and the headline numbers above are the player-model-1 baseline.
+- **player-model-3 (2026-11 team roles)**: same weekly draws, plus team-level role coupling in the engine (one fill-in per injured
+  starter, other backups near baseline; see section 8). New games only; player-model-2 is frozen in `player_model_v2.py`.
 - Honest weak spots are in "Limitations" below. The biggest: the real projection
   source runs hot or cold by season (median actual/projected PPG 0.80 in 2021, 0.97
   in 2024), so out-of-sample the model sits about 5 percentile points low (mean PIT 0.555) and is
@@ -68,9 +70,12 @@ Speed: about 80 microseconds per player-week (pure Python + numpy scalars); a 12
 
 ## 1a. Versions and replay safety
 
+`modules/sim/player_model_v2.py` is the same kind of frozen copy of player-model-2 (sha256 pinned in
+`tests/test_sim_game_model_versions.py`, golden digests for a v2 game too). `player_model.py` is now **player-model-3**.
+
 `modules/sim/player_model_v1.py` is a **frozen byte-for-byte copy** of player-model-1 (sha256 pinned in
 `tests/test_sim_game_model_versions.py`); never edit it. `modules/sim/player_model.py` is the current model (player-model-2).
-`game_scoring.get_model(model_id)` routes by the id a game stored: `player_model-player-model-1` -> v1, `-2` -> v2, the fallback id
+`game_scoring.get_model(model_id)` routes by the id a game stored: `player_model-player-model-1` -> v1, `-2` -> v2 (frozen copy), `-3` -> the current module, the fallback id
 -> `FallbackModel`; an unknown id falls back to the newest model and `resolve_model` returns a note saying so. New games use the
 newest. A new generation = copy the then-current module to `player_model_vN.py`, register it in `_MODEL_MODULES`, add it to the
 pure-engine list in `tests/test_sim_isolation.py`, and add a golden-digest replay test. Evaluate the old model with
@@ -87,6 +92,19 @@ come from the public preseason mean and games played; `expected_points`, `season
 archetype and event lists never reach a game module (a test scans for it). When a starting slot cannot
 be filled (injury, bye, lone kicker) the AI makes an emergency waiver claim. `tests/test_sim_game_player_model.py`
 plays a full game and checks scoring, injury coherence, resume == replay and no writes under `data/`.
+
+## 1c. Team roles (player-model-3)
+
+The player model draws each player independently, so by itself two backups of one injured starter both score starter-level points. The
+engine now resolves roles per NFL team, position group and week with `modules/sim/team_roles.py` (pure, deterministic, from public injury and
+bye state only) and passes the result to the model as a one-week mean multiplier (`with_role_multiplier`, no extra draws). Only models with
+`TEAM_ROLES = True` (player-model-3+) receive it; older saves never see it. Rules, in short: depth order from `depth_chart_order` (an injured
+top-market star keeps the top spot), starters = QB 1 / RB 2 / WR 3 / TE 1, each vacated starter slot is inherited by exactly one next-in-line
+healthy player, the QB who plays gets `0.2 x own + 0.6 x starter mean` and every other healthy QB behind him is a bench QB at 0.2, RB/WR/TE
+inheritors get `own + absorb x 0.8 x starter mean` (calibrated `InSeasonParams.absorb`), K and defenses are exempt. The Players/waiver/draft
+"Proj" is the role-resolved mean for the next game he can play (rows carry `role` with a label and `if_starts`). Full write-up and the real-app
+check: `docs/audits/2026-11-sim-team-role-coupling.md`. Limits: roles use public depth order (a stale chart is wrong), and the Bayesian blend
+of a player's actual games into his rest-of-season mean mixes games played in different roles.
 
 ## 2. What is modelled
 

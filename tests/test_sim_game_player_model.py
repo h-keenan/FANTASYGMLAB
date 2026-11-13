@@ -166,4 +166,7 @@ def test_user_facing_projections_never_use_the_hidden_season_outcome(played):
     # before any week is played, the projection a player sees is exactly the public preseason number
     fresh_snap = snap
     ev = Evaluator(fresh_snap, type(state)(fresh_snap))
-    assert all(ev.ros_mean(pid) == fresh_snap.players[pid].mean for pid in fresh_snap.pids)
+    assert all(ev.base_mean(pid) == fresh_snap.players[pid].mean for pid in fresh_snap.pids)
+    # with team roles the shown rest-of-season number is that public mean times a role factor from the public
+    # depth chart and injury list only (no hidden profile); K and defenses are exempt
+    assert all(ev.ros_mean(pid) == fresh_snap.players[pid].mean for pid in fresh_snap.pids if fresh_snap.players[pid].pos in ("K", "DEF"))
