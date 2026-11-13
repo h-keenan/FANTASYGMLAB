@@ -23,7 +23,7 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const results = [];
 for (const theme of THEMES) for (const w of WIDTHS) {
   const ctx = await browser.newContext({ viewport: { width: w, height: 844 }, hasTouch: true, isMobile: true, deviceScaleFactor: 1 });
-  await ctx.addInitScript(([t, s]) => { try { localStorage.setItem("fgl:theme-mode", t); localStorage.setItem("sb-dummy-auth-token", JSON.stringify(s)); localStorage.setItem("fgl:onboarding-complete", "1"); } catch (e) {} }, [theme, session]);
+  await ctx.addInitScript(([t, s, onb]) => { try { localStorage.setItem("fgl:theme-mode", t); localStorage.setItem("sb-dummy-auth-token", JSON.stringify(s)); if (!onb) localStorage.setItem("fgl:onboarding-complete", "1"); } catch (e) {} }, [theme, session, process.env.ONBOARDING === "1"]);
   await ctx.route("**/*", async (route) => {
     const u = new URL(route.request().url());
     const cors = { "access-control-allow-origin": "*", "access-control-allow-headers": "*", "access-control-allow-methods": "*" };
@@ -31,6 +31,7 @@ for (const theme of THEMES) for (const w of WIDTHS) {
       if (route.request().method() === "OPTIONS") return route.fulfill({ status: 204, headers: cors });
       return route.fulfill({ status: 200, contentType: "application/json", body: "{}", headers: cors });
     }
+    if (u.hostname === "dummy.supabase.co" && process.env.LINKED === "1" && u.pathname.startsWith("/rest/v1/saved_leagues")) return route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify([{ user_id: "u1", league_id: "1221647449446162432", league_name: "Donk Dynasty", is_default: true, season: "2026", platform: "sleeper" }]), headers: cors });
     if (u.hostname === "dummy.supabase.co") return route.fulfill({ status: 200, contentType: "application/json", body: u.pathname.startsWith("/rest/v1/") ? "[]" : "{}", headers: cors });
     return route.continue();
   });

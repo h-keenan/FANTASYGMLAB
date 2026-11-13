@@ -71,7 +71,7 @@ export function seeAllLabel(total: number, top: number = SIGNAL_TOP_N): string |
 /** One spoken line for the row button. */
 export function signalSpokenLabel(row: DraftSignalRow): string {
   const pills = signalPills(row).map((pill) => pill.label);
-  return [row.team_name, row.strategy_display, ...pills, row.reason_short].filter(Boolean).join(", ");
+  return [row.team_name, ...pills, row.strategy_display, row.reason_short].filter(Boolean).join(", ");
 }
 
 /** The structured rows of a card, or null when the response is a legacy (pre-schema-2) one. */

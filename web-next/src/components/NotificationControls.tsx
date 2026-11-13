@@ -29,7 +29,7 @@ const BORDER = "var(--border-width-default) solid var(--color-border)";
 function Row({ title, description, children }: { title: string; description?: string; children: React.ReactNode }) {
   return (
     <div className="flex items-center justify-between gap-3 p-3">
-      <div className="flex flex-col gap-0.5">
+      <div className="flex flex-col gap-0.5 min-w-0">
         <span className="text-sm">{title}</span>
         {description ? (
           <span className="text-xs" style={{ color: "var(--color-text-muted)" }}>

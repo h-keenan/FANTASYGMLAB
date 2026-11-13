@@ -21,6 +21,7 @@ import { GmPlanContent } from "@/components/GmPlanContent";
 import { GmPlanSkeleton, isGmPlanTab } from "@/components/GmPlanSections";
 import { buildPlanSnapshot } from "@/lib/gmPlanSnapshot";
 import { ErrorState, reloadPage } from "@/components/ErrorState";
+import { UNNAMED_LEAGUE } from "@/lib/leagueName";
 
 export default function GmPlanPage() {
   const params = useParams<{ leagueId: string }>();
@@ -29,7 +30,7 @@ export default function GmPlanPage() {
   const { session, loading: authLoading } = useAuth();
 
   const leagueId = decodeURIComponent(params.leagueId);
-  const leagueName = searchParams.get("name") || leagueId;
+  const leagueName = searchParams.get("name") || UNNAMED_LEAGUE;
   const { lens, lensReady } = useValuationLens(leagueId);
 
   const [gmPlan, setGmPlan] = useState<GmPlanResponse | null>(null);

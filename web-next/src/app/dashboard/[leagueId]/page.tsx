@@ -12,6 +12,7 @@ import { DashboardContent } from "@/components/DashboardContent";
 import { ErrorState } from "@/components/ErrorState";
 import { LoadingScreen } from "@/components/LoadingScreen";
 import { SkeletonBlock, SkeletonCard } from "@/components/Skeleton";
+import { UNNAMED_LEAGUE } from "@/lib/leagueName";
 
 export default function DashboardPage() {
   const params = useParams<{ leagueId: string }>();
@@ -20,7 +21,7 @@ export default function DashboardPage() {
   const { session, loading: authLoading } = useAuth();
 
   const leagueId = decodeURIComponent(params.leagueId);
-  const leagueName = searchParams.get("name") || leagueId;
+  const leagueName = searchParams.get("name") || UNNAMED_LEAGUE;
   const { lens, lensReady } = useValuationLens(leagueId);
 
   const [data, setData] = useState<DashboardResponse | null>(null);

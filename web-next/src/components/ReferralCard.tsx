@@ -88,7 +88,7 @@ export function ReferralCard({
               readOnly
               value={referral.link}
               aria-label="Your referral link"
-              className="flex-1 px-3 py-2 text-sm"
+              className="flex-1 min-w-0 px-3 py-2 text-sm min-h-[var(--touch-target-min)]"
               style={{
                 border: "var(--border-width-default) solid var(--color-border)",
                 background: "transparent",
@@ -99,7 +99,7 @@ export function ReferralCard({
             <button
               type="button"
               onClick={handleCopy}
-              className="px-4 py-2 text-sm font-bold"
+              className="shrink-0 px-4 py-2 text-sm font-bold"
               style={{ minHeight: "var(--touch-target-min)", border: "var(--border-width-default) solid var(--color-border)", color: "var(--color-text-secondary)" }}
             >
               {copied ? "Copied!" : "Copy link"}

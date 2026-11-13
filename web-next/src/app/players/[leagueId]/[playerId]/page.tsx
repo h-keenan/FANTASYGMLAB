@@ -11,6 +11,7 @@ import { api, type LeagueRankingsResponse } from "@/lib/api";
 import { ErrorState, reloadPage } from "@/components/ErrorState";
 import { LoadingScreen } from "@/components/LoadingScreen";
 import { PlayerProfileContent, profileTabFromParam } from "@/components/PlayerProfileContent";
+import { UNNAMED_LEAGUE } from "@/lib/leagueName";
 
 /**
  * Route for the full Player Profile page (the "PQV parity gap" —
@@ -36,7 +37,7 @@ export default function PlayerProfilePage() {
 
   const leagueId = decodeURIComponent(params.leagueId);
   const playerId = decodeURIComponent(params.playerId);
-  const leagueName = searchParams.get("name") || leagueId;
+  const leagueName = searchParams.get("name") || UNNAMED_LEAGUE;
   const { lens } = useValuationLens(leagueId);
 
   const [rankings, setRankings] = useState<LeagueRankingsResponse | null>(null);

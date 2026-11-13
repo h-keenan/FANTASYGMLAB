@@ -10,6 +10,7 @@ import { api, type MyTeamResponse } from "@/lib/api";
 import { TradeFinderContent } from "@/components/TradeFinderContent";
 import { ErrorState, reloadPage } from "@/components/ErrorState";
 import { LoadingScreen } from "@/components/LoadingScreen";
+import { UNNAMED_LEAGUE } from "@/lib/leagueName";
 
 export default function TradeFinderPage() {
   const params = useParams<{ leagueId: string }>();
@@ -18,7 +19,7 @@ export default function TradeFinderPage() {
   const { session, loading: authLoading } = useAuth();
 
   const leagueId = decodeURIComponent(params.leagueId);
-  const leagueName = searchParams.get("name") || leagueId;
+  const leagueName = searchParams.get("name") || UNNAMED_LEAGUE;
   // "Find trades" from Player Quick View / Player Profile.
   const initialPlayerId = searchParams.get("playerId") || undefined;
   const { lens, lensReady } = useValuationLens(leagueId);

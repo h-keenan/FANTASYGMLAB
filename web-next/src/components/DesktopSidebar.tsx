@@ -11,6 +11,7 @@ import { NavProMarker } from "@/components/NavProMarker";
 import { NavDestinationGlyph } from "@/components/NavDestinationGlyph";
 import { useIsPro } from "@/lib/useIsPro";
 import { FOUNDER_DESTINATION, isFounderSession, useNavDestinations, type NavDestination } from "@/lib/navDestinations";
+import { UNNAMED_LEAGUE } from "@/lib/leagueName";
 
 /**
  * Desktop-width persistent left nav — coridian_, 2026-10-17: "desktop side
@@ -30,7 +31,7 @@ export function DesktopSidebar() {
   const params = useParams<{ leagueId?: string }>();
   const searchParams = useSearchParams();
   const leagueId = params?.leagueId ? decodeURIComponent(params.leagueId) : null;
-  const leagueName = searchParams.get("name") || leagueId || "";
+  const leagueName = searchParams.get("name") || (leagueId ? UNNAMED_LEAGUE : "");
   const { coreLeagueDestinations, gmToolsDestinations, generalDestinations, accountDestinations } = useNavDestinations(leagueId, leagueName, collegeInterest);
   const showProMarkers = useIsPro() === false;
 

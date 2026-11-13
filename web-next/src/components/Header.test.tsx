@@ -94,12 +94,12 @@ describe("Header league name", () => {
     expect(await screen.findByRole("button", { name: /Dynasty Overlords/ })).toBeInTheDocument();
   });
 
-  it("falls back to the raw id only when no name is available anywhere (saved_leagues empty, no query param)", async () => {
+  it("falls back to a friendly name (never the raw id) when no name is available anywhere (saved_leagues empty, no query param)", async () => {
     mockSearchParams.get.mockReturnValue(null);
     mockSavedLeagues([]);
     render(<Header />);
 
-    expect(await screen.findByRole("button", { name: /league-7/ })).toBeInTheDocument();
+    expect(await screen.findByRole("button", { name: /Your league/ })).toBeInTheDocument();
   });
 });
 

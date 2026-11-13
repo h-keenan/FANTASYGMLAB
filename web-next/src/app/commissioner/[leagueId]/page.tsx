@@ -8,6 +8,7 @@ import { useValuationLens } from "@/context/ValuationLensContext";
 import { useAuth } from "@/context/AuthContext";
 import { CommissionerContent } from "@/components/CommissionerContent";
 import { LoadingScreen } from "@/components/LoadingScreen";
+import { UNNAMED_LEAGUE } from "@/lib/leagueName";
 
 export default function CommissionerPage() {
   const params = useParams<{ leagueId: string }>();
@@ -16,7 +17,7 @@ export default function CommissionerPage() {
   const { session, loading: authLoading } = useAuth();
 
   const leagueId = decodeURIComponent(params.leagueId);
-  const leagueName = searchParams.get("name") || leagueId;
+  const leagueName = searchParams.get("name") || UNNAMED_LEAGUE;
 
   const { lens } = useValuationLens(leagueId);
 

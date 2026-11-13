@@ -12,7 +12,7 @@ import { type ThemeColors } from '../theme';
  */
 export default function ValueStat({
   value,
-  label = 'Value',
+  label = 'Trade value',
   align = 'flex-end',
   size = 'md',
   color,

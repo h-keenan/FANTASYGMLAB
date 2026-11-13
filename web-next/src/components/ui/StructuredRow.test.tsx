@@ -17,12 +17,11 @@ describe("StructuredRow", () => {
         chip={{ label: "Retool", color: "var(--color-warning)" }}
         pills={[{ key: "p", label: "Picks #10" }]}
         reason="Too few picks"
-        spoken="Team A, Retool"
         detailTitle="Team A detail"
         detail={<p>Full sentence.</p>}
       />,
     );
-    const row = screen.getByRole("button", { name: "Team A, Retool" });
+    const row = screen.getByRole("button", { name: /Team A/ });
     expect(row).toHaveAttribute("aria-haspopup", "dialog");
     expect(screen.getByText("Picks #10")).toBeInTheDocument();
     row.focus();

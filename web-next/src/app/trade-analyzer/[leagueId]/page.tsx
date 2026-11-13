@@ -22,6 +22,7 @@ import { bridgeTradeFromSearch } from "@/lib/tradeBridge";
 import { offerPrefillFromSearch } from "@/lib/tradeOffer";
 import { decodePrefill } from "@/lib/multiTeamIdeas";
 import { LoadingScreen } from "@/components/LoadingScreen";
+import { UNNAMED_LEAGUE } from "@/lib/leagueName";
 
 interface LoadedData {
   myRoster: MyRosterResponse;
@@ -38,7 +39,7 @@ export default function TradeAnalyzerPage() {
   const { session, loading: authLoading } = useAuth();
 
   const leagueId = decodeURIComponent(params.leagueId);
-  const leagueName = searchParams.get("name") || leagueId;
+  const leagueName = searchParams.get("name") || UNNAMED_LEAGUE;
   // Players' "Add to Trade" quick-add (Revision 20) threads the tapped
   // player through here as ?playerId=, the same gamePlanTileHref
   // convention Waivers/Trade Hub already read — TradeAnalyzerContent

@@ -8,6 +8,7 @@ import { useAuth } from "@/context/AuthContext";
 import { GamesContent } from "@/components/GamesContent";
 import { parseGamesTab } from "@/lib/pageTabs";
 import { LoadingScreen } from "@/components/LoadingScreen";
+import { UNNAMED_LEAGUE } from "@/lib/leagueName";
 
 export default function GamesPage() {
   const params = useParams<{ leagueId: string }>();
@@ -16,7 +17,7 @@ export default function GamesPage() {
   const { session, loading: authLoading } = useAuth();
 
   const leagueId = decodeURIComponent(params.leagueId);
-  const leagueName = searchParams.get("name") || leagueId;
+  const leagueName = searchParams.get("name") || UNNAMED_LEAGUE;
 
   useEffect(() => {
     if (!authLoading && !session) router.replace("/");

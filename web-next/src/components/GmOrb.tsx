@@ -24,6 +24,7 @@ import { useSheetDragDismiss } from "@/lib/useSheetDragDismiss";
 import { SheetHandle } from "@/components/SheetHandle";
 import { PLAYER_SEARCH_MAX_RESULTS, PLAYER_SEARCH_MIN_CHARS, useLeaguePlayerSearchState } from "@/lib/leaguePlayerSearch";
 import { PlayerName } from "@/components/PlayerName";
+import { UNNAMED_LEAGUE } from "@/lib/leagueName";
 
 /**
  * web-next's counterpart to mobile's GmOrb.tsx and the Streamlit web app's
@@ -92,7 +93,7 @@ export function GmOrb() {
   const params = useParams<{ leagueId?: string }>();
   const searchParams = useSearchParams();
   const leagueId = params?.leagueId ? decodeURIComponent(params.leagueId) : null;
-  const leagueName = searchParams.get("name") || leagueId || "";
+  const leagueName = searchParams.get("name") || (leagueId ? UNNAMED_LEAGUE : "");
   const { coreLeagueDestinations, gmToolsDestinations, generalDestinations, accountDestinations } = useNavDestinations(leagueId, leagueName, collegeInterest);
   // Gold "Pro" markers on paid rows, shown only once we know the plan is Free.
   const showProMarkers = useIsPro() === false;

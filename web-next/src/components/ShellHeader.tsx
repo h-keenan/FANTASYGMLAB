@@ -10,6 +10,7 @@ import { PAGE_TITLE_BY_SEGMENT } from "@/lib/navDestinations";
 import { shellParent } from "@/lib/shellNav";
 import { useSearchParams } from "@/lib/useSearchParams";
 import { useShellNav } from "@/lib/useShellNav";
+import { UNNAMED_LEAGUE } from "@/lib/leagueName";
 
 /**
  * The one standard phone page header (Phase B): back (named for the parent
@@ -25,7 +26,7 @@ export function ShellHeader({ leagueControls, actions }: { leagueControls: React
   const searchParams = useSearchParams();
   if (!barVisible) return null;
   const leagueId = params?.leagueId ? decodeURIComponent(params.leagueId) : null;
-  const leagueName = searchParams.get("name") || leagueId || "";
+  const leagueName = searchParams.get("name") || (leagueId ? UNNAMED_LEAGUE : "");
   const segment = (pathname || "").split("/").filter(Boolean)[0] ?? "";
   const title = segment ? PAGE_TITLE_BY_SEGMENT[segment] ?? "" : "Home";
   const parent = shellParent(pathname, { leagueId, leagueName });

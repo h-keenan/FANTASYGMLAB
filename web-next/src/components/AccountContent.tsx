@@ -214,7 +214,7 @@ function ExplanationsSetting() {
                 background: selected ? "var(--color-action-soft)" : "transparent",
               }}
             >
-              <span className="flex flex-col gap-0.5">
+              <span className="flex flex-col gap-0.5 min-w-0">
                 <span className="text-sm">{option.label}</span>
                 <span className="text-xs" style={{ color: "var(--color-text-muted)" }}>
                   {option.description}
@@ -289,7 +289,7 @@ function DisplaySettings() {
         className="flex items-center justify-between gap-3 p-3"
         style={{ border: "var(--border-width-default) solid var(--color-border)" }}
       >
-        <div className="flex flex-col gap-0.5">
+        <div className="flex flex-col gap-0.5 min-w-0">
           <span className="text-sm font-semibold">College football</span>
           <span className="text-xs" style={{ color: "var(--color-text-muted)" }}>
             Show College Scouting in the menu
@@ -333,7 +333,7 @@ function PreferencesSection({
         className="flex items-center justify-between gap-3 p-3"
         style={{ border: "var(--border-width-default) solid var(--color-border)" }}
       >
-        <div className="flex flex-col gap-0.5">
+        <div className="flex flex-col gap-0.5 min-w-0">
           <span className="text-sm font-semibold">Community Trade Feed</span>
           <span className="text-xs" style={{ color: "var(--color-text-muted)" }}>
             I don&apos;t want MY trades to appear in this feed
@@ -363,7 +363,7 @@ function PreferencesSection({
                   borderTop: index === 0 ? "none" : "var(--border-width-default) solid var(--color-border)",
                 }}
               >
-                <div className="flex flex-col gap-0.5">
+                <div className="flex flex-col gap-0.5 min-w-0">
                   <span className="text-sm">{item.label}</span>
                   <span className="text-xs" style={{ color: "var(--color-text-muted)" }}>
                     {item.description}

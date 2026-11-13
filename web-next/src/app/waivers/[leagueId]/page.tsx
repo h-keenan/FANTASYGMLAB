@@ -12,6 +12,7 @@ import { WaiversContent } from "@/components/WaiversContent";
 import { parseWaiverTab } from "@/lib/pageTabs";
 import { ErrorState, reloadPage } from "@/components/ErrorState";
 import { LoadingScreen } from "@/components/LoadingScreen";
+import { UNNAMED_LEAGUE } from "@/lib/leagueName";
 
 export default function WaiversPage() {
   const params = useParams<{ leagueId: string }>();
@@ -20,7 +21,7 @@ export default function WaiversPage() {
   const { session, loading: authLoading } = useAuth();
 
   const leagueId = decodeURIComponent(params.leagueId);
-  const leagueName = searchParams.get("name") || leagueId;
+  const leagueName = searchParams.get("name") || UNNAMED_LEAGUE;
   // Recommendation-compliance audit, Check 3 — a GM Plan/Dashboard waiver
   // tile's CTA now threads the specific player it's about through here (see
   // gamePlanTileHref) instead of landing on this generic board with no way

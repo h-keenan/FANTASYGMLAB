@@ -8,6 +8,7 @@ import { LoadingScreen } from "@/components/LoadingScreen";
 import { useAuth } from "@/context/AuthContext";
 import { trackFeatureUse } from "@/lib/analytics";
 import { useSearchParams } from "@/lib/useSearchParams";
+import { UNNAMED_LEAGUE } from "@/lib/leagueName";
 
 export default function FantasySimPage() {
   const params = useParams<{ leagueId: string }>();
@@ -16,7 +17,7 @@ export default function FantasySimPage() {
   const { session, loading: authLoading } = useAuth();
 
   const leagueId = decodeURIComponent(params.leagueId);
-  const leagueName = searchParams.get("name") || leagueId;
+  const leagueName = searchParams.get("name") || UNNAMED_LEAGUE;
 
   useEffect(() => {
     if (authLoading) return;

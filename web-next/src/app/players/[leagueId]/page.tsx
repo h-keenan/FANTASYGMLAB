@@ -10,6 +10,7 @@ import { api, type DraftPickAsset, type LeagueIdpValuesResponse, type LeagueRank
 import { PlayersContent } from "@/components/PlayersContent";
 import { ErrorState, reloadPage } from "@/components/ErrorState";
 import { LoadingScreen } from "@/components/LoadingScreen";
+import { UNNAMED_LEAGUE } from "@/lib/leagueName";
 
 interface LoadedData {
   rankings: LeagueRankingsResponse;
@@ -25,7 +26,7 @@ export default function PlayersPage() {
   const { session, loading: authLoading } = useAuth();
 
   const leagueId = decodeURIComponent(params.leagueId);
-  const leagueName = searchParams.get("name") || leagueId;
+  const leagueName = searchParams.get("name") || UNNAMED_LEAGUE;
   const { lens, lensReady } = useValuationLens(leagueId);
 
   const [data, setData] = useState<LoadedData | null>(null);

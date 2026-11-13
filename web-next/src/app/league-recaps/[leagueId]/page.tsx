@@ -10,6 +10,7 @@ import { LeagueRecapsContent } from "@/components/LeagueRecapsContent";
 import { parseRecapsTab, parseRoundupWeek } from "@/lib/pageTabs";
 import { ErrorState, reloadPage } from "@/components/ErrorState";
 import { LoadingScreen } from "@/components/LoadingScreen";
+import { UNNAMED_LEAGUE } from "@/lib/leagueName";
 
 export default function LeagueRecapsPage() {
   const params = useParams<{ leagueId: string }>();
@@ -18,7 +19,7 @@ export default function LeagueRecapsPage() {
   const { session, loading: authLoading } = useAuth();
 
   const leagueId = decodeURIComponent(params.leagueId);
-  const leagueName = searchParams.get("name") || leagueId;
+  const leagueName = searchParams.get("name") || UNNAMED_LEAGUE;
 
   const [recap, setRecap] = useState<RecapResponse | null>(null);
   const [error, setError] = useState<string | null>(null);

@@ -91,7 +91,7 @@ export function TeamSituationCard({
   return (
     <section className="glass-surface flex flex-col gap-3 p-4" aria-label="Team Situation">
       <div className="flex items-start justify-between gap-3">
-        <div className="whitespace-nowrap">
+        <div className="min-w-0">
           <SectionHeading>Team Situation</SectionHeading>
         </div>
         <InfoTip label="How you see this team" className="items-end text-right">

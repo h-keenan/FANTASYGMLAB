@@ -9,6 +9,7 @@ import { api, type AlertsResponse } from "@/lib/api";
 import { AlertsContent } from "@/components/AlertsContent";
 import { ErrorState, reloadPage } from "@/components/ErrorState";
 import { LoadingScreen } from "@/components/LoadingScreen";
+import { UNNAMED_LEAGUE } from "@/lib/leagueName";
 
 export default function AlertsPage() {
   const params = useParams<{ leagueId: string }>();
@@ -17,7 +18,7 @@ export default function AlertsPage() {
   const { session, loading: authLoading } = useAuth();
 
   const leagueId = decodeURIComponent(params.leagueId);
-  const leagueName = searchParams.get("name") || leagueId;
+  const leagueName = searchParams.get("name") || UNNAMED_LEAGUE;
 
   const [alerts, setAlerts] = useState<AlertsResponse | null>(null);
   const [error, setError] = useState<string | null>(null);

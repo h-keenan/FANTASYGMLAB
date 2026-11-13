@@ -162,7 +162,7 @@ describe("DraftCenterContent", () => {
 
     it("opens a detail sheet with the full sentence and evidence on tap", () => {
       render(<DraftCenterContent leagueName="L" data={schema2([signalRow(1)])} picks={PICKS} myRosterId="9" />);
-      fireEvent.click(screen.getByRole("button", { name: /Team 1, Retool, Picks #10/ }));
+      fireEvent.click(screen.getByRole("button", { name: /Team 1 Picks #10/ }));
       const dialog = screen.getByRole("dialog", { name: "Team 1" });
       expect(dialog).toHaveTextContent("leaves too little flexibility for a retool build");
       expect(dialog).toHaveTextContent("Draft capital rank");
@@ -170,8 +170,8 @@ describe("DraftCenterContent", () => {
 
     it("outlines the signed-in user's own team", () => {
       render(<DraftCenterContent leagueName="L" data={schema2([signalRow(1), signalRow(2)])} picks={PICKS} myRosterId="2" />);
-      expect(screen.getByRole("button", { name: /Team 2,/ }).className).toContain("ui-srow-me");
-      expect(screen.getByRole("button", { name: /Team 1,/ }).className).not.toContain("ui-srow-me");
+      expect(screen.getByRole("button", { name: /Team 2 / }).className).toContain("ui-srow-me");
+      expect(screen.getByRole("button", { name: /Team 1 / }).className).not.toContain("ui-srow-me");
     });
 
     it("still renders legacy strings for a response without rows", () => {

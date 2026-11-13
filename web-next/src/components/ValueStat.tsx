@@ -5,7 +5,7 @@
  */
 export function ValueStat({
   value,
-  label = "Value",
+  label = "Trade value",
   align = "right",
   children,
 }: {
