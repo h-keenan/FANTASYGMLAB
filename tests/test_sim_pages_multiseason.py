@@ -165,3 +165,42 @@ def test_a_player_on_the_taxi_squad_or_ir_can_be_cut_and_replays_identically(mon
     replay = GameState(run.root)
     fold(run.root, events, replay)
     assert replay.where(user, pid) is None and replay.taxi[user] == run.state.taxi[user]
+
+
+def _cut_ok(c, gid, pid):
+    r = c.post(f"/v1/sim/games/{gid}/cut", json={"player_id": pid}, headers=H)
+    assert r.status_code == 200, r.text
+    body = r.json()
+    assert body["reason"] == "", body
+    assert pid not in {p["id"] for p in body["roster"]}
+    return body
+
+
+def test_cut_answers_success_in_every_phase_and_is_idempotent():
+    c = client(StrictBackend())
+    gid = c.post("/v1/sim/games", json={"mode": "dynasty", "teams": 8, "seasons": 3, "rookie_rounds": 2, "user_slot": 3}, headers=H).json()["game"]["id"]
+    c.post(f"/v1/sim/games/{gid}/draft/auto", headers=H)
+    # in season, then a repeat of the same cut (double tap / retry after a lost response)
+    team = c.get(f"/v1/sim/games/{gid}/lineup", headers=H).json()
+    pid = team["bench"][-1]["id"]
+    _cut_ok(c, gid, pid)
+    again = c.post(f"/v1/sim/games/{gid}/cut", json={"player_id": pid}, headers=H)
+    assert again.status_code == 200 and again.json()["reason"] == "", again.text
+    # another team's player still cannot be cut
+    rival = c.get(f"/v1/sim/games/{gid}/teams/1", headers=H).json()["players"][0]["id"]
+    assert c.post(f"/v1/sim/games/{gid}/cut", json={"player_id": rival}, headers=H).status_code == 422
+    # offseason (the next season's view), after a rollover
+    for season in (1, 2):
+        while True:
+            out = c.post(f"/v1/sim/games/{gid}/advance", headers=H).json()
+            if out["game"]["status"] in ("offseason", "complete"):
+                break
+        if out["game"]["status"] == "complete":
+            break
+        c.post(f"/v1/sim/games/{gid}/offseason/rookie-draft/start", headers=H)
+        c.post(f"/v1/sim/games/{gid}/offseason/rookie-draft/auto", headers=H)
+        mine = c.get(f"/v1/sim/games/{gid}/teams/{out['game']['you']['team_id']}", headers=H).json()
+        _cut_ok(c, gid, mine["players"][-1]["id"])
+        c.post(f"/v1/sim/games/{gid}/offseason/start-season", headers=H)
+        mine = c.get(f"/v1/sim/games/{gid}/teams/{out['game']['you']['team_id']}", headers=H).json()
+        _cut_ok(c, gid, mine["players"][-1]["id"])

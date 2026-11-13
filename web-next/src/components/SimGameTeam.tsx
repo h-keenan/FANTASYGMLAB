@@ -114,6 +114,13 @@ export function SimTeamTab({ ctx, onTrade }: { ctx: SimCtx; onTrade: () => void 
   async function cut(player: SimGamePlayer) {
     setCutting(null);
     const body = await call(() => api.cutSimPlayer(gameId, player.id));
+    if (!body) {
+      // The server may have finished the cut even though this call reported a failure (lost response, retry):
+      // show what the server now holds instead of leaving a stale roster that needs a page refresh.
+      ctx.bump();
+      await refreshGame();
+      return;
+    }
     if (body) {
       ctx.notify(`Cut ${player.name}. He is back in the free-agent pool.`, "success");
       ctx.bump();

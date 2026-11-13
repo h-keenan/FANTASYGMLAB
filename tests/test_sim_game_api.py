@@ -344,7 +344,9 @@ def test_cut_claim_and_waiver_resolution(season):
     bench = [p for p in mine if p["pos"] == "TE"][-1]
     cut = client.post(f"/v1/sim/games/{gid}/cut", json={"player_id": bench["id"]}, headers=hdr()).json()
     assert cut["reason"] == "" and len(cut["roster"]) == 13
-    assert client.post(f"/v1/sim/games/{gid}/cut", json={"player_id": bench["id"]}, headers=hdr()).status_code == 422
+    # a repeat of the same cut (double tap, retry after a lost response) is success, not an error
+    again = client.post(f"/v1/sim/games/{gid}/cut", json={"player_id": bench["id"]}, headers=hdr())
+    assert again.status_code == 200 and again.json()["reason"] == "" and len(again.json()["roster"]) == 13
     rec = advance(client, gid)["recap"]
     mine_claim = [w for w in rec["waivers"] if w["is_you"]]
     assert len(mine_claim) == 1 and mine_claim[0]["add"]["id"] == fa[0]["id"]
