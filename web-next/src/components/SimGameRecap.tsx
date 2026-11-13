@@ -8,6 +8,7 @@ import { EmptyState } from "@/components/EmptyState";
 import { PositionBadge } from "@/components/PositionBadge";
 import { SectionHeading } from "@/components/SectionHeading";
 import { SimPlayerChip, SimPlayerLine, SimStat, SimToneBadge, simToneColor, type SimCtx } from "@/components/SimGameParts";
+import { SimDynastyResult } from "@/components/SimGameDynasty";
 import { SimStandingsList } from "@/components/SimGameLeague";
 import { SkeletonCard } from "@/components/Skeleton";
 import { SeasonReviewSections, ReviewDeltaText, ReviewGlyphChip } from "@/components/SeasonReviewSections";
@@ -21,6 +22,7 @@ import {
   simGameReasonMessage,
   simSlotRepeatsPosition,
   simGradeTone,
+  simIsDynastyResult,
   simPlayoffOutcomeTone,
   simPlayoffResultLabel,
   simPlayoffRoundLabel,
@@ -181,7 +183,7 @@ export function SimWeekRecapView({
         {!last ? (
           <Button fullWidth onClick={onNext}>Next round</Button>
         ) : (
-          <Button fullWidth onClick={onClose}>{recap.season_complete ? "See your final grade" : "Back to your team"}</Button>
+          <Button fullWidth onClick={onClose}>{recap.season_complete ? (ctx.game.status === "offseason" ? "Go to the offseason" : ctx.game.settings.mode === "dynasty" ? "See your dynasty review" : "See your final grade") : "Back to your team"}</Button>
         )}
       </div>
     </div>
@@ -222,7 +224,9 @@ export function SimFinalView({ ctx, onNewGame, onHub }: { ctx: SimCtx; onNewGame
   if (!result) return <div className="flex flex-col gap-3" aria-busy="true"><SkeletonCard lines={4} /><SkeletonCard lines={6} /></div>;
 
   const view = normalizeSimResult(result);
-  const sections = buildSimReviewSections({ decisions: view.decisions, review: result.review, components: result.grade?.components });
+  // A dynasty result has no grade and no review (both null): the summary stands in their place.
+  const dynasty = simIsDynastyResult(result);
+  const sections = dynasty ? [] : buildSimReviewSections({ decisions: view.decisions, review: result.review, components: result.grade?.components });
   const tone = simGradeTone(view.letter);
   const mine = view.mine;
   const youWon = Boolean(view.championId && view.championId === mine?.team_id);
@@ -237,6 +241,7 @@ export function SimFinalView({ ctx, onNewGame, onHub }: { ctx: SimCtx; onNewGame
   });
   return (
     <div className="flex flex-col gap-3" data-testid="final-result">
+      {dynasty ? <SimDynastyResult summary={result.dynasty} onNewGame={onNewGame} onHub={onHub} /> : (
       <AccentCard accent={simToneColor(tone)} as="section" glow>
         <p className="text-xs uppercase font-extrabold" style={{ color: "var(--color-text-muted)", letterSpacing: "var(--letter-spacing-badge)" }}>Season in review</p>
         <div className="flex items-center gap-4 enter-pop">
@@ -263,8 +268,9 @@ export function SimFinalView({ ctx, onNewGame, onHub }: { ctx: SimCtx; onNewGame
           <SimReviewShareButton model={shareModel} sections={sections} gameId={gameId} />
         </div>
       </AccentCard>
+      )}
 
-      <SeasonReviewSections sections={sections} />
+      {dynasty ? null : <SeasonReviewSections sections={sections} />}
 
       <section className="flex flex-col gap-2" aria-label="Final standings">
         <SectionHeading size="compact">

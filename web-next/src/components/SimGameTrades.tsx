@@ -11,13 +11,16 @@ import { ReviewGlyphChip } from "@/components/SeasonReviewSections";
 import { SimCrest } from "@/components/SimCrest";
 import { SimGlyph } from "@/components/SimGlyph";
 import { SimPlayerLine, SimSideLabel, SimStat, SimTeamLink, SimTeamOpenContext, SimToneBadge, simToneColor, type SimCtx } from "@/components/SimGameParts";
+import { SimPickGroup, SimPickLine, useSimPicks } from "@/components/SimGameDynastyParts";
 import { SkeletonCard, SkeletonRows } from "@/components/Skeleton";
 import { ToneBadge } from "@/components/ToneBadge";
 import { api } from "@/lib/api";
 import {
   SIM_TRADE_EMPTY,
-  SIM_TRADE_MAX_PER_SIDE,
   simFmtPts,
+  simIsPick,
+  simPicksOf,
+  simTradeMaxPerSide,
   simTradable,
   simTradeClosedReason,
   simTradeDecisionLabel,
@@ -29,6 +32,7 @@ import {
   type SimGamePlayer,
   type SimInboxItem,
   type SimLeagueTeam,
+  type SimTradeAsset,
   type SimTradeDraft,
   type SimTradeVerdict,
 } from "@/lib/simGame";
@@ -51,12 +55,13 @@ function SimTeamScout({ teamId, name }: { teamId: string; name: string }) {
   );
 }
 
-function PlayerList({ players }: { players: SimGamePlayer[] }) {
+/** Players and picks in an offer, counter or verdict: a pick renders as a pick row, never as a player. */
+function PlayerList({ players }: { players: SimTradeAsset[] }) {
   return (
     <ul className="flex flex-col">
       {players.map((p) => (
         <li key={p.id}>
-          <SimPlayerLine player={p} trailing={<SimStat label="Proj" value={simFmtPts(p.projection)} />} />
+          {simIsPick(p) ? <SimPickLine pick={p} /> : <SimPlayerLine player={p} trailing={<SimStat label="Proj" value={simFmtPts(p.projection)} />} />}
         </li>
       ))}
     </ul>
@@ -186,6 +191,8 @@ function Builder({ ctx, seed, onSeedUsed }: { ctx: SimCtx; seed: { partner: stri
   const [changingPartner, setChangingPartner] = useState(false);
   const closed = simTradeClosedReason(game);
   const teamId = game.you?.team_id;
+  const maxPerSide = simTradeMaxPerSide(game.settings);
+  const picks = useSimPicks(ctx);
 
   useEffect(() => {
     let cancelled = false;
@@ -205,7 +212,7 @@ function Builder({ ctx, seed, onSeedUsed }: { ctx: SimCtx; seed: { partner: stri
   useEffect(() => {
     if (!teamId) return;
     let cancelled = false;
-    api.getSimGameTeam(gameId, teamId).then((b) => !cancelled && setMine(b.players ?? [])).catch(() => {});
+    api.getSimGameTeam(gameId, teamId).then((b) => !cancelled && setMine([...(b.players ?? []), ...(b.ir ?? []), ...(b.taxi ?? [])])).catch(() => {});
     return () => {
       cancelled = true;
     };
@@ -215,7 +222,7 @@ function Builder({ ctx, seed, onSeedUsed }: { ctx: SimCtx; seed: { partner: stri
     const partnerId = draft.partner;
     if (!partnerId) return;
     let cancelled = false;
-    api.getSimGameTeam(gameId, partnerId).then((b) => !cancelled && setPartnerLoaded({ partner: partnerId, players: b.players ?? [] })).catch(() => {});
+    api.getSimGameTeam(gameId, partnerId).then((b) => !cancelled && setPartnerLoaded({ partner: partnerId, players: [...(b.players ?? []), ...(b.ir ?? []), ...(b.taxi ?? [])] })).catch(() => {});
     return () => {
       cancelled = true;
     };
@@ -226,9 +233,9 @@ function Builder({ ctx, seed, onSeedUsed }: { ctx: SimCtx; seed: { partner: stri
   useEffect(() => {
     if (!seed) return;
     dispatch({ type: "partner", teamId: seed.partner });
-    if (seed.get) dispatch({ type: "toggle", side: "get", id: seed.get });
+    if (seed.get) dispatch({ type: "toggle", side: "get", id: seed.get, max: maxPerSide });
     onSeedUsed();
-  }, [seed, onSeedUsed]);
+  }, [seed, onSeedUsed, maxPerSide]);
 
   const key = simTradeKey(draft);
   const verdict = verdictFor && verdictFor.key === key ? verdictFor.verdict : null;
@@ -323,7 +330,7 @@ function Builder({ ctx, seed, onSeedUsed }: { ctx: SimCtx; seed: { partner: stri
       {partner ? (
         <>
           <section className="flex flex-col gap-1" aria-label="You give">
-            <SectionHeading note={`Up to ${SIM_TRADE_MAX_PER_SIDE}. ${draft.give.length} selected.`}>You give</SectionHeading>
+            <SectionHeading note={`Up to ${maxPerSide}. ${draft.give.length} selected.`}>You give</SectionHeading>
             {mine.filter((p) => simTradable(p.pos)).map((p) => (
               <SimPlayerLine
                 key={p.id}
@@ -332,13 +339,21 @@ function Builder({ ctx, seed, onSeedUsed }: { ctx: SimCtx; seed: { partner: stri
                 trailing={
                   <>
                     <SimStat label="Value" value={Math.round(p.value)} />
-                    <Button size="sm" variant={draft.give.includes(p.id) ? "primary" : "secondary"} aria-pressed={draft.give.includes(p.id)} aria-label={`Give ${p.name}`} onClick={() => dispatch({ type: "toggle", side: "give", id: p.id })}>
+                    <Button size="sm" variant={draft.give.includes(p.id) ? "primary" : "secondary"} aria-pressed={draft.give.includes(p.id)} aria-label={`Give ${p.name}`} onClick={() => dispatch({ type: "toggle", side: "give", id: p.id, max: maxPerSide })}>
                       {draft.give.includes(p.id) ? "Giving" : "Give"}
                     </Button>
                   </>
                 }
               />
             ))}
+            <SimPickGroup
+              side="give"
+              picks={simPicksOf(picks, teamId)}
+              selected={draft.give}
+              full={draft.give.length >= maxPerSide}
+              draftYear={picks?.draft_year}
+              onToggle={(id) => dispatch({ type: "toggle", side: "give", id, max: maxPerSide })}
+            />
           </section>
           <section className="flex flex-col gap-1" aria-label="You get">
             <SectionHeading note={`${partner.name}'s roster. ${draft.get.length} selected.`}>You get</SectionHeading>
@@ -350,13 +365,21 @@ function Builder({ ctx, seed, onSeedUsed }: { ctx: SimCtx; seed: { partner: stri
                 trailing={
                   <>
                     <SimStat label="Value" value={Math.round(p.value)} />
-                    <Button size="sm" variant={draft.get.includes(p.id) ? "primary" : "secondary"} aria-pressed={draft.get.includes(p.id)} aria-label={`Get ${p.name}`} onClick={() => dispatch({ type: "toggle", side: "get", id: p.id })}>
+                    <Button size="sm" variant={draft.get.includes(p.id) ? "primary" : "secondary"} aria-pressed={draft.get.includes(p.id)} aria-label={`Get ${p.name}`} onClick={() => dispatch({ type: "toggle", side: "get", id: p.id, max: maxPerSide })}>
                       {draft.get.includes(p.id) ? "Getting" : "Get"}
                     </Button>
                   </>
                 }
               />
             ))}
+            <SimPickGroup
+              side="get"
+              picks={simPicksOf(picks, partner.team_id)}
+              selected={draft.get}
+              full={draft.get.length >= maxPerSide}
+              draftYear={picks?.draft_year}
+              onToggle={(id) => dispatch({ type: "toggle", side: "get", id, max: maxPerSide })}
+            />
           </section>
         </>
       ) : null}

@@ -13,14 +13,17 @@ import SegmentedTabBar from './SegmentedTabBar';
 import { SkeletonCard } from './SkeletonBlock';
 import SimCrest from './SimCrest';
 import SimGlyph from './SimGlyph';
+import { SimPickGroup, SimPickLine, useSimPicks } from './SimGameDynastyParts';
 import { SimPlayerLine, SimPopIn, SimSideLabel, SimStat, SimTeamLink, SimTeamOpenContext, SimToneBadge, createSimStyles, simToneColor, type SimCtx } from './SimGameParts';
 import ToneBadge from './ToneBadge';
 import { useThemeMode } from '../context/ThemeModeContext';
 import { api } from '../lib/api';
 import {
   SIM_TRADE_EMPTY,
-  SIM_TRADE_MAX_PER_SIDE,
   simFmtPts,
+  simIsPick,
+  simPicksOf,
+  simTradeMaxPerSide,
   simTradable,
   simTradeClosedReason,
   simTradeDecisionLabel,
@@ -32,6 +35,7 @@ import {
   type SimGamePlayer,
   type SimInboxItem,
   type SimLeagueTeam,
+  type SimTradeAsset,
   type SimTradeVerdict,
 } from '../lib/simGame';
 import type { ThemeColors } from '../theme';
@@ -49,12 +53,13 @@ function ScoutButton({ teamId, name }: { teamId: string; name: string }) {
   );
 }
 
-function PlayerList({ players }: { players: SimGamePlayer[] }) {
+/** Players and picks in an offer, counter or verdict: a pick renders as a pick row, never as a player. */
+function PlayerList({ players }: { players: SimTradeAsset[] }) {
   return (
     <View>
-      {players.map((p) => (
-        <SimPlayerLine key={p.id} player={p} trailing={<SimStat label="Proj" value={simFmtPts(p.projection)} />} />
-      ))}
+      {players.map((p) =>
+        simIsPick(p) ? <SimPickLine key={p.id} pick={p} /> : <SimPlayerLine key={p.id} player={p} trailing={<SimStat label="Proj" value={simFmtPts(p.projection)} />} />,
+      )}
     </View>
   );
 }
@@ -205,6 +210,8 @@ function Builder({ ctx, seed, onSeedUsed }: { ctx: SimCtx; seed: { partner: stri
   const [changingPartner, setChangingPartner] = useState(false);
   const closed = simTradeClosedReason(game);
   const teamId = game.you?.team_id;
+  const maxPerSide = simTradeMaxPerSide(game.settings);
+  const picks = useSimPicks(ctx);
 
   useEffect(() => {
     let cancelled = false;
@@ -226,7 +233,7 @@ function Builder({ ctx, seed, onSeedUsed }: { ctx: SimCtx; seed: { partner: stri
     let cancelled = false;
     api
       .getSimGameTeam(gameId, teamId)
-      .then((b) => !cancelled && setMine(b.players ?? []))
+      .then((b) => !cancelled && setMine([...(b.players ?? []), ...(b.ir ?? []), ...(b.taxi ?? [])]))
       .catch(() => {});
     return () => {
       cancelled = true;
@@ -239,7 +246,7 @@ function Builder({ ctx, seed, onSeedUsed }: { ctx: SimCtx; seed: { partner: stri
     let cancelled = false;
     api
       .getSimGameTeam(gameId, partnerId)
-      .then((b) => !cancelled && setPartnerLoaded({ partner: partnerId, players: b.players ?? [] }))
+      .then((b) => !cancelled && setPartnerLoaded({ partner: partnerId, players: [...(b.players ?? []), ...(b.ir ?? []), ...(b.taxi ?? [])] }))
       .catch(() => {});
     return () => {
       cancelled = true;
@@ -251,9 +258,9 @@ function Builder({ ctx, seed, onSeedUsed }: { ctx: SimCtx; seed: { partner: stri
   useEffect(() => {
     if (!seed) return;
     dispatch({ type: 'partner', teamId: seed.partner });
-    if (seed.get) dispatch({ type: 'toggle', side: 'get', id: seed.get });
+    if (seed.get) dispatch({ type: 'toggle', side: 'get', id: seed.get, max: maxPerSide });
     onSeedUsed();
-  }, [seed, onSeedUsed]);
+  }, [seed, onSeedUsed, maxPerSide]);
 
   const key = simTradeKey(draft);
   const verdict = verdictFor && verdictFor.key === key ? verdictFor.verdict : null;
@@ -345,7 +352,7 @@ function Builder({ ctx, seed, onSeedUsed }: { ctx: SimCtx; seed: { partner: stri
       {partner ? (
         <>
           <View>
-            <SectionHeading title="You give" caption={`Up to ${SIM_TRADE_MAX_PER_SIDE}. ${draft.give.length} selected.`} />
+            <SectionHeading title="You give" caption={`Up to ${maxPerSide}. ${draft.give.length} selected.`} />
             {mine
               .filter((p) => simTradable(p.pos))
               .map((p) => (
@@ -356,11 +363,19 @@ function Builder({ ctx, seed, onSeedUsed }: { ctx: SimCtx; seed: { partner: stri
                   trailing={
                     <>
                       <SimStat label="Value" value={Math.round(p.value)} />
-                      <Button size="sm" variant={draft.give.includes(p.id) ? 'primary' : 'secondary'} label={draft.give.includes(p.id) ? 'Giving' : 'Give'} onPress={() => dispatch({ type: 'toggle', side: 'give', id: p.id })} />
+                      <Button size="sm" variant={draft.give.includes(p.id) ? 'primary' : 'secondary'} label={draft.give.includes(p.id) ? 'Giving' : 'Give'} onPress={() => dispatch({ type: 'toggle', side: 'give', id: p.id, max: maxPerSide })} />
                     </>
                   }
                 />
               ))}
+            <SimPickGroup
+              side="give"
+              picks={simPicksOf(picks, teamId)}
+              selected={draft.give}
+              full={draft.give.length >= maxPerSide}
+              draftYear={picks?.draft_year}
+              onToggle={(id) => dispatch({ type: 'toggle', side: 'give', id, max: maxPerSide })}
+            />
           </View>
           <View>
             <SectionHeading title="You get" caption={`${partner.name}'s roster. ${draft.get.length} selected.`} />
@@ -374,11 +389,19 @@ function Builder({ ctx, seed, onSeedUsed }: { ctx: SimCtx; seed: { partner: stri
                   trailing={
                     <>
                       <SimStat label="Value" value={Math.round(p.value)} />
-                      <Button size="sm" variant={draft.get.includes(p.id) ? 'primary' : 'secondary'} label={draft.get.includes(p.id) ? 'Getting' : 'Get'} onPress={() => dispatch({ type: 'toggle', side: 'get', id: p.id })} />
+                      <Button size="sm" variant={draft.get.includes(p.id) ? 'primary' : 'secondary'} label={draft.get.includes(p.id) ? 'Getting' : 'Get'} onPress={() => dispatch({ type: 'toggle', side: 'get', id: p.id, max: maxPerSide })} />
                     </>
                   }
                 />
               ))}
+            <SimPickGroup
+              side="get"
+              picks={simPicksOf(picks, partner.team_id)}
+              selected={draft.get}
+              full={draft.get.length >= maxPerSide}
+              draftYear={picks?.draft_year}
+              onToggle={(id) => dispatch({ type: 'toggle', side: 'get', id, max: maxPerSide })}
+            />
           </View>
         </>
       ) : null}

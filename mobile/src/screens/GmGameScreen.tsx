@@ -19,6 +19,7 @@ import SegmentedTabBar from '../components/SegmentedTabBar';
 import { SkeletonCard } from '../components/SkeletonBlock';
 import { SimDraftRecapView, SimGameDraft } from '../components/SimGameDraft';
 import { SimLeagueTab } from '../components/SimGameLeague';
+import { SimGameOffseason } from '../components/SimGameOffseason';
 import { SimHomeTab } from '../components/SimGameHome';
 import { SimPlayerSheet } from '../components/SimGamePlayers';
 import { SimNotice, SimPreviewBanner, SimTeamLink, SimTeamOpenContext, createSimStyles, type SimCtx } from '../components/SimGameParts';
@@ -37,6 +38,7 @@ import {
   simAdvanceBlockers,
   simAdvanceLabel,
   simAdvanceWarnings,
+  simDynastyProgressLine,
   simFmtPts,
   simFmtRecord,
   simGameGate,
@@ -50,7 +52,11 @@ import {
   simSetupAdvancedChanged,
   simSetupBlock,
   simSetupBody,
+  simSetupCountOptions,
   simSetupDefaults,
+  simSetupDynastyNote,
+  simSetupModes,
+  simSetupTaxiDefault,
   simSetupSummary,
   simTeamNameChoices,
   simLeagueTeamLabel,
@@ -60,6 +66,7 @@ import {
   simWeekHeading,
   SIM_TE_PREMIUM_LABELS,
   type SimDifficulty,
+  type SimMode,
   type SimTiebreaker,
   SIM_TIEBREAKER_LABELS,
   type SimDraftRecap,
@@ -555,6 +562,9 @@ function SetupForm({
   const leagueTeams = useSimLeagueTeams(league ? state.leagueId : '', (rosterId) => set('rosterId', rosterId));
   const nameChoices = simTeamNameChoices(options);
   const nameLabel = (value: string) => nameChoices.find((c) => c.value === value)?.label ?? 'Random';
+  const modes = simSetupModes(options);
+  const dynasty = state.mode === 'dynasty';
+  const dynastyNote = simSetupDynastyNote(state);
   const changed = simSetupAdvancedChanged(state, defaults);
   const block = simSetupBlock(state);
   return (
@@ -631,7 +641,8 @@ function SetupForm({
         />
         <AppText style={styles.muted}>{SIM_DIFFICULTY_COPY[state.difficulty].blurb} Your own scoring is the same at every level.</AppText>
       </View>
-      {!league ? (
+      {dynastyNote ? <AppText style={styles.muted} testID="sim-dynasty-note">{dynastyNote}</AppText> : null}
+      {(
         <View style={styles.stack}>
           <Button
             variant="ghost"
@@ -642,6 +653,35 @@ function SetupForm({
           />
           {advancedOpen ? (
             <View style={styles.stack}>
+              {modes.length > 1 ? (
+                <View style={styles.tight}>
+                  <AppText style={styles.label}>Game mode</AppText>
+                  <SegmentedTabBar<string> options={modes.map((m) => ({ key: m.value, label: m.label }))} active={state.mode} onChange={(key) => set('mode', key as SimMode)} />
+                </View>
+              ) : null}
+              {dynasty ? (
+                <>
+                  <View style={styles.tight}>
+                    <AppText style={styles.label}>Seasons</AppText>
+                    <SegmentedTabBar<string>
+                      options={(opts?.seasons?.values ?? [3, 4, 5]).map((n) => ({ key: String(n), label: String(n) }))}
+                      active={String(state.seasons)}
+                      onChange={(key) => set('seasons', Number(key))}
+                    />
+                    <AppText style={styles.muted}>How many seasons you play. Each one ends with an offseason.</AppText>
+                  </View>
+                  <View style={styles.tight}>
+                    <AppText style={styles.label}>Rookie draft rounds</AppText>
+                    <SegmentedTabBar<string>
+                      options={(opts?.rookie_rounds?.values ?? [2, 3, 4, 5]).map((n) => ({ key: String(n), label: String(n) }))}
+                      active={String(state.rookieRounds)}
+                      onChange={(key) => set('rookieRounds', Number(key))}
+                    />
+                  </View>
+                </>
+              ) : null}
+              {!league ? (
+                <>
               <View style={styles.tight}>
                 <AppText style={styles.label}>League size</AppText>
                 <SegmentedTabBar<string>
@@ -697,10 +737,42 @@ function SetupForm({
                   onChange={(key) => set('slot', key)}
                 />
               </View>
+                </>
+              ) : null}
+              <View style={styles.tight}>
+                <AppText style={styles.label}>IR slots</AppText>
+                <SegmentedTabBar<string>
+                  scrollable
+                  options={simSetupCountOptions(opts?.ir_slots?.max ?? 4, opts?.ir_slots?.default ?? null, opts?.ir_slots?.min ?? 0).map((o) => ({ key: o.value, label: o.label }))}
+                  active={state.irSlots == null ? '' : String(state.irSlots)}
+                  onChange={(key) => set('irSlots', key === '' ? null : Number(key))}
+                />
+                <AppText style={styles.muted}>Injured players stash here and do not use a roster spot.</AppText>
+              </View>
+              <View style={styles.tight}>
+                <AppText style={styles.label}>Taxi slots</AppText>
+                <SegmentedTabBar<string>
+                  scrollable
+                  options={simSetupCountOptions(opts?.taxi_slots?.max ?? 8, simSetupTaxiDefault(options, state.mode), opts?.taxi_slots?.min ?? 0).map((o) => ({ key: o.value, label: o.label }))}
+                  active={state.taxiSlots == null ? '' : String(state.taxiSlots)}
+                  onChange={(key) => set('taxiSlots', key === '' ? null : Number(key))}
+                />
+                <AppText style={styles.muted}>Young players stash here and do not score or use a roster spot.</AppText>
+              </View>
+              <View style={styles.tight}>
+                <AppText style={styles.label}>Taxi eligibility</AppText>
+                <SegmentedTabBar<string>
+                  scrollable
+                  options={[{ key: '', label: 'Default' }, ...(opts?.taxi_years?.values ?? [1, 2, 3, 4]).map((n) => ({ key: String(n), label: n === 1 ? 'Rookies' : `${n} years` }))]}
+                  active={state.taxiYears == null ? '' : String(state.taxiYears)}
+                  onChange={(key) => set('taxiYears', key === '' ? null : Number(key))}
+                />
+                <AppText style={styles.muted}>Who can go on the taxi squad: rookies only, or players in their first 2, 3 or 4 years.</AppText>
+              </View>
             </View>
           ) : null}
         </View>
-      ) : null}
+      )}
       <SetupToggle styles={styles} label="Auto-set my lineup" note="Starts your best healthy players each week. You can still change it." value={state.auto} onChange={(v) => set('auto', v)} />
       <AppText style={styles.muted}>
         {simSetupSummary(state, options?.layout)}
@@ -806,6 +878,11 @@ function GameScreen({
           <AppText style={styles.heading} testID="game-heading">
             {simWeekHeading(game)}
           </AppText>
+          {game.dynasty ? (
+            <AppText style={styles.muted} testID="dynasty-progress">
+              {simDynastyProgressLine(game.dynasty)}
+            </AppText>
+          ) : null}
           {youLine && stage !== 'draft' ? (
             <View style={styles.youRow}>
               <SimTeamLink teamId={youLine.team_id} name={youLine.name} size={22} bold={false} />
@@ -847,6 +924,25 @@ function GameScreen({
         <SimWeekRecapView recap={recap} index={flow.recapIndex} total={flow.recaps.length} ctx={ctx} onNext={onRecapNext} onClose={onRecapClose} />
       ) : stage === 'final' ? (
         <SimFinalView ctx={ctx} onNewGame={onNewGame} onHub={onHub} />
+      ) : stage === 'offseason' ? (
+        <>
+          <SegmentedTabBar<SimTab>
+            options={[
+              { key: 'home', label: 'Offseason' },
+              { key: 'team', label: 'Team' },
+              { key: 'trades', label: 'Trades' },
+              { key: 'league', label: 'League' },
+            ]}
+            active={['team', 'trades', 'league'].includes(flow.tab) ? flow.tab : 'home'}
+            onChange={onTab}
+          />
+          <FadeInView key={flow.tab}>
+            {flow.tab === 'team' ? <SimTeamTab ctx={ctx} onTrade={() => onTab('trades')} /> : null}
+            {flow.tab === 'trades' ? <SimTradesTab ctx={ctx} seed={tradeSeed} onSeedUsed={() => setTradeSeed(null)} /> : null}
+            {flow.tab === 'league' ? <SimLeagueTab ctx={ctx} /> : null}
+            {['team', 'trades', 'league'].includes(flow.tab) ? null : <SimGameOffseason ctx={ctx} onTrade={() => onTab('trades')} onTeam={() => onTab('team')} />}
+          </FadeInView>
+        </>
       ) : (
         <>
           <SegmentedTabBar<SimTab>

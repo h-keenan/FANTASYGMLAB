@@ -16,15 +16,15 @@ import type { ReviewGlyph } from "./simReview";
 // ---------------------------------------------------------------------------
 // Envelope, gating and reasons
 
-export type SimGameStatus = "drafting" | "in_season" | "playoffs" | "complete";
-export type SimGamePhase = "draft" | "regular_season" | "playoffs" | "complete";
+export type SimGameStatus = "drafting" | "in_season" | "playoffs" | "offseason" | "complete";
+export type SimGamePhase = "draft" | "regular_season" | "playoffs" | "offseason" | "complete";
 export type SimScoring = "ppr" | "half" | "std";
 export type SimDifficulty = "easy" | "normal" | "hard";
 export type SimTiebreaker = "points_for" | "head_to_head";
 export const SIM_TIEBREAKER_LABELS: Record<SimTiebreaker, string> = { points_for: "Points for", head_to_head: "Head-to-head" };
 export type SimPos = "QB" | "RB" | "WR" | "TE" | "K" | "DEF";
 export type SimSlot = "QB" | "RB" | "WR" | "TE" | "FLEX" | "REC_FLEX" | "SUPER_FLEX" | "K" | "DEF";
-/** League mode. Only redraft is playable today; dynasty is declared by the API (available: false). */
+/** League mode: redraft (one season) or dynasty (several seasons with an offseason, rookie draft and picks). */
 export type SimMode = "redraft" | "dynasty";
 /** How a new game starts: a fresh draft, or a real league's rosters (read-only import). */
 export type SimStartKind = "fresh" | "league";
@@ -87,7 +87,40 @@ export interface SimGamePlayer {
   season_points?: number | null;
   games?: number;
   ppg?: number | null;
+  /** Dynasty / reserves engine (1.2.0); older saves omit these. */
+  kind?: "player";
+  /** Where the player sits: active roster, IR or the taxi squad. */
+  squad?: SimSquad | null;
+  taxi_eligible?: boolean;
+  rookie?: boolean;
 }
+
+/** Where one of your players sits. Picks report "picks". */
+export type SimSquad = "roster" | "ir" | "taxi" | "picks";
+
+/** A draft pick shaped like a player row (kind "pick"; the trade builder treats both as assets). */
+export interface SimPickAsset extends Omit<SimGamePlayer, "pos" | "kind" | "squad" | "team"> {
+  kind: "pick";
+  pos: "PICK";
+  team: string | null;
+  squad?: "picks";
+  /** "pick:<year>:<round>:<original team id>". */
+  id: string;
+  season: number;
+  round: number;
+  orig_team_id: string;
+  orig_team_name: string;
+  slot_hint: SimPickSlotHint | null;
+  /** The engine's own name for the pick, e.g. "2027 Round 1 (early)". */
+  label?: string;
+  /** Set on GET /picks rows: true when the holder is also the original owner. */
+  own?: boolean;
+}
+
+export type SimPickSlotHint = "early" | "mid" | "late";
+
+/** A player or a pick: what a trade side holds. */
+export type SimTradeAsset = SimGamePlayer | SimPickAsset;
 
 export interface SimGameTeamLine {
   team_id: string;
@@ -124,6 +157,17 @@ export interface SimGameSettings {
   start?: SimStartKind;
   /** Standings/seed tiebreak after record (older saves omit it and used head_to_head). */
   tiebreaker?: SimTiebreaker;
+  /** IR / taxi squads (saves from before game engine 1.2.0 omit all of these). */
+  reserve_v?: number;
+  ir_slots?: number;
+  taxi_slots?: number;
+  taxi_years?: number;
+  /** Dynasty only. */
+  seasons?: number;
+  start_year?: number;
+  pick_years?: number;
+  rookie_rounds?: number;
+  dynasty_v?: number;
 }
 
 export interface SimGameThisWeek {
@@ -159,9 +203,24 @@ export interface SimGame {
   pending: SimGamePending | null;
   can_trade: boolean;
   trade_deadline_week: number;
+  /** Dynasty games only (null or absent otherwise). */
+  dynasty?: SimDynastyBlock | null;
   grade_letter: string | null;
   created_at: string;
   updated_at: string;
+}
+
+/** The small dynasty block every game payload carries. */
+export interface SimDynastyBlock {
+  season_no: number;
+  seasons: number;
+  year: number;
+  /** "review" | "rookie_draft" | "cutdown" during the offseason, else null. */
+  stage: SimOffseasonStage | null;
+  picks_held: number;
+  titles: number;
+  /** True while playing the final season. */
+  last_season: boolean;
 }
 
 /** The cheap list row from GET /v1/sim/games. */
@@ -203,7 +262,14 @@ export interface SimGameOptionsResponse extends SimGameEnvelope {
     /** Preset fantasy-style team names for a fresh league. */
     team_names?: { values: string[]; max_length: number };
     tiebreaker?: { values: SimTiebreaker[]; default: SimTiebreaker };
+    ir_slots?: { min: number; max: number; default: number };
+    taxi_slots?: { min: number; max: number; default: number; default_dynasty?: number };
+    taxi_years?: { values: number[]; default: number };
+    /** Dynasty only. */
+    seasons?: { values: number[]; default: number };
+    rookie_rounds?: { values: number[]; default: number };
   };
+  dynasty?: { pick_years: number; max_seasons: number; start_year: number };
   /** Lineup rule the setup form mirrors to show roster size and draft rounds. */
   layout?: { base_slots: SimSlot[]; draft_spare_spots: number };
   start_modes?: { id: string; available: boolean; reason?: string }[];
@@ -251,6 +317,12 @@ export interface SimGameCreateBody {
   bench?: number;
   tiebreaker?: SimTiebreaker;
   mode?: SimMode;
+  /** Dynasty: 3, 4 or 5 seasons (the cap). */
+  seasons?: number;
+  rookie_rounds?: number;
+  ir_slots?: number;
+  taxi_slots?: number;
+  taxi_years?: number;
   difficulty?: SimDifficulty;
   user_slot?: number | null;
   auto_lineup?: boolean;
@@ -388,6 +460,21 @@ export interface SimLineupResponse extends SimGameEnvelope {
   roster_limit?: number;
   opponent?: { team_id: string; name: string } | null;
   locked?: boolean;
+  /** IR and taxi squads (empty and no `reserves` on saves from before them). */
+  ir?: SimGamePlayer[];
+  taxi?: SimGamePlayer[];
+  reserves?: SimReserves;
+  /** Present on POST /roster/move. */
+  move?: { pid: string; src: string; dst: string };
+}
+
+export interface SimReserves {
+  enabled: boolean;
+  ir_slots: number;
+  taxi_slots: number;
+  taxi_years: number;
+  ir_used: number;
+  taxi_used: number;
 }
 
 export interface SimWaiverClaim {
@@ -421,6 +508,9 @@ export interface SimTeamRosterResponse extends SimGameEnvelope {
   recent?: SimTeamMove[];
   next_game?: { week: number; opponent: SimTeamRef } | null;
   trade?: { open: boolean; reason: string | null };
+  ir?: SimGamePlayer[];
+  taxi?: SimGamePlayer[];
+  reserves?: SimReserves;
 }
 
 // ---------------------------------------------------------------------------
@@ -433,7 +523,7 @@ export interface SimTradeVerdict {
   reason_code?: string;
   reason: string;
   chips?: string[];
-  counter?: { give: SimGamePlayer[]; get: SimGamePlayer[] } | null;
+  counter?: { give: SimTradeAsset[]; get: SimTradeAsset[] } | null;
 }
 
 export interface SimTradeResponse extends SimGameEnvelope {
@@ -448,8 +538,8 @@ export interface SimInboxItem {
   id: string;
   type: "trade_offer";
   from: { team_id: string; name: string; persona_id?: string };
-  you_give: SimGamePlayer[];
-  you_get: SimGamePlayer[];
+  you_give: SimTradeAsset[];
+  you_get: SimTradeAsset[];
   message: string;
   expires_week: number;
 }
@@ -609,6 +699,9 @@ export interface SimGameResult {
   user?: Record<string, unknown> | null;
   /** Season in Review payload (modules/sim/game_review.py); absent on results stored before it existed. */
   review?: Record<string, unknown> | null;
+  /** Dynasty games: grade and review are null; the multi-year summary is here. */
+  mode?: SimMode;
+  dynasty?: SimDynastySummary | null;
 }
 
 /** A render-safe view of a stored result: every field is present, every value is a primitive. */
@@ -686,6 +779,14 @@ const REASON_COPY: Record<string, string> = {
   offer_invalid: "That offer is no longer valid. The players moved or it expired.",
   week_mismatch: "That week is not ready to play. Reload the game.",
   not_complete: "The season is not over yet.",
+  ir_full: "Your IR is full.",
+  ir_ineligible: "Only an injured (out) player on your active roster can go on IR.",
+  taxi_full: "Your taxi squad is full.",
+  taxi_ineligible: "Only rookies and young players can go on the taxi squad.",
+  roster_full: "Your roster is full. Cut someone first.",
+  reserves_unavailable: "This game has no IR or taxi squad.",
+  not_dynasty: "That is only in dynasty games.",
+  pool_exhausted: "No rookies are left to draft.",
   conflict: "The game changed somewhere else. We reloaded it. Try again.",
   sim_busy: "The simulator is busy right now. Try again in a few seconds.",
   team_not_found: "We could not tell which team is yours in that league. Pick it from the list.",
@@ -768,7 +869,7 @@ export function simGameUnavailableCopy(cause: "off" | "storage" | "busy"): { tit
 // ---------------------------------------------------------------------------
 // Stage machine: which screen a game belongs on
 
-export type SimGameStage = "draft" | "week" | "playoffs" | "final";
+export type SimGameStage = "draft" | "week" | "playoffs" | "offseason" | "final";
 
 export function simGameStage(game: Pick<SimGame, "status">): SimGameStage {
   switch (game.status) {
@@ -776,6 +877,8 @@ export function simGameStage(game: Pick<SimGame, "status">): SimGameStage {
       return "draft";
     case "playoffs":
       return "playoffs";
+    case "offseason":
+      return "offseason";
     case "complete":
       return "final";
     default:
@@ -840,6 +943,7 @@ export function simAdvanceWarnings(game: SimGame | null | undefined): string[] {
 export function simAdvanceLabel(game: Pick<SimGame, "phase" | "week" | "settings">): string {
   if (game.phase === "playoffs") return `Play playoff week ${game.week}`;
   if (game.phase === "complete") return "Season complete";
+  if (game.phase === "offseason") return "Offseason";
   return `Advance to week ${game.week + 1}`;
 }
 
@@ -1147,6 +1251,12 @@ export function simClaimPayload(draft: SimClaimDraft): { add: string; drop: stri
 }
 
 export const SIM_TRADE_MAX_PER_SIDE = 3;
+/** A dynasty trade side holds up to 4 assets (players and picks). */
+export const SIM_TRADE_MAX_PER_SIDE_DYNASTY = 4;
+
+export function simTradeMaxPerSide(settings: Pick<SimGameSettings, "mode"> | null | undefined): number {
+  return settings?.mode === "dynasty" ? SIM_TRADE_MAX_PER_SIDE_DYNASTY : SIM_TRADE_MAX_PER_SIDE;
+}
 
 export interface SimTradeDraft {
   partner: string | null;
@@ -1156,8 +1266,8 @@ export interface SimTradeDraft {
 
 export type SimTradeAction =
   | { type: "partner"; teamId: string | null }
-  | { type: "toggle"; side: "give" | "get"; id: string }
-  | { type: "load"; give: string[]; get: string[] }
+  | { type: "toggle"; side: "give" | "get"; id: string; max?: number }
+  | { type: "load"; give: string[]; get: string[]; max?: number }
   | { type: "clear" };
 
 export const SIM_TRADE_EMPTY: SimTradeDraft = { partner: null, give: [], get: [] };
@@ -1170,11 +1280,11 @@ export function simTradeReducer(state: SimTradeDraft, action: SimTradeAction): S
     case "toggle": {
       const list = state[action.side];
       if (list.includes(action.id)) return { ...state, [action.side]: list.filter((id) => id !== action.id) };
-      if (list.length >= SIM_TRADE_MAX_PER_SIDE) return state;
+      if (list.length >= (action.max ?? SIM_TRADE_MAX_PER_SIDE)) return state;
       return { ...state, [action.side]: [...list, action.id] };
     }
     case "load":
-      return { ...state, give: action.give.slice(0, SIM_TRADE_MAX_PER_SIDE), get: action.get.slice(0, SIM_TRADE_MAX_PER_SIDE) };
+      return { ...state, give: action.give.slice(0, action.max ?? SIM_TRADE_MAX_PER_SIDE), get: action.get.slice(0, action.max ?? SIM_TRADE_MAX_PER_SIDE) };
     case "clear":
       return SIM_TRADE_EMPTY;
   }
@@ -1310,6 +1420,7 @@ export function simResultTone(result: SimGameResultKind | undefined): SimGameTon
 export function simWeekHeading(game: Pick<SimGame, "phase" | "week" | "round" | "settings">): string {
   if (game.phase === "draft") return "Draft";
   if (game.phase === "complete") return "Final";
+  if (game.phase === "offseason") return "Offseason";
   if (game.phase === "playoffs") return `${simPlayoffRoundLabel(game.week, game.settings)} · Week ${game.week}`;
   return `Week ${game.week} of ${game.settings.regular_weeks}`;
 }
@@ -1528,7 +1639,20 @@ export interface SimSetupState {
   nameChoice: string;
   /** Start-from-league: the roster picked from the league's teams. Never a typed name. */
   rosterId: string;
+  /** Redraft (one season) or dynasty (several, with an offseason). */
+  mode: SimMode;
+  /** Dynasty: how many seasons (the cap). */
+  seasons: number;
+  /** Dynasty: rounds in each rookie draft. */
+  rookieRounds: number;
+  /** IR / taxi: null means "the engine default" (or the league's own on a league import) and is not sent. */
+  irSlots: number | null;
+  taxiSlots: number | null;
+  taxiYears: number | null;
 }
+
+/** Dynasty setup fallbacks, used until the options response says otherwise. */
+export const SIM_DYNASTY_FALLBACK = { seasons: 5, rookieRounds: 4, irSlots: 2, taxiSlots: 0, taxiSlotsDynasty: 4, taxiYears: 2 };
 
 export const SIM_NAME_RANDOM = "__random__";
 export const SIM_NAME_CUSTOM = "__custom__";
@@ -1554,12 +1678,21 @@ export function simSetupDefaults(options: SimGameOptionsResponse | null | undefi
     name: "",
     nameChoice: SIM_NAME_RANDOM,
     rosterId: "",
+    mode: o?.mode?.default ?? "redraft",
+    seasons: o?.seasons?.default ?? SIM_DYNASTY_FALLBACK.seasons,
+    rookieRounds: o?.rookie_rounds?.default ?? SIM_DYNASTY_FALLBACK.rookieRounds,
+    irSlots: null,
+    taxiSlots: null,
+    taxiYears: null,
   };
 }
 
 /** True when any "Advanced options" field differs from its default (so a collapsed section can say so). */
 export function simSetupAdvancedChanged(state: SimSetupState, defaults: SimSetupState): number {
-  const keys: (keyof SimSetupState)[] = ["scoring", "tePremium", "superflex", "includeK", "includeDef", "tiebreaker", "bench", "teams"];
+  const keys: (keyof SimSetupState)[] = [
+    "scoring", "tePremium", "superflex", "includeK", "includeDef", "tiebreaker", "bench", "teams",
+    "mode", "seasons", "rookieRounds", "irSlots", "taxiSlots", "taxiYears",
+  ];
   return keys.filter((key) => state[key] !== defaults[key]).length;
 }
 
@@ -1590,7 +1723,22 @@ export function simCleanTeamName(raw: string): string {
 /** The POST /v1/sim/games body for the form. "league" sends only what the league does not decide, and picks the team by roster_id. */
 export function simSetupBody(state: SimSetupState): SimGameCreateBody {
   const common = { difficulty: state.difficulty, auto_lineup: state.auto, tiebreaker: state.tiebreaker };
-  if (state.start === "league") return { ...common, start: "league", league_id: state.leagueId, ...(state.rosterId ? { roster_id: state.rosterId } : {}) };
+  const dynasty = state.mode === "dynasty";
+  const reserves: SimGameCreateBody = {
+    ...(state.irSlots != null ? { ir_slots: state.irSlots } : {}),
+    ...(state.taxiSlots != null ? { taxi_slots: state.taxiSlots } : {}),
+    ...(state.taxiYears != null ? { taxi_years: state.taxiYears } : {}),
+  };
+  if (state.start === "league") {
+    return {
+      ...common,
+      start: "league",
+      league_id: state.leagueId,
+      ...(state.rosterId ? { roster_id: state.rosterId } : {}),
+      ...(dynasty ? { mode: "dynasty" as const, seasons: state.seasons, rookie_rounds: state.rookieRounds } : {}),
+      ...reserves,
+    };
+  }
   const custom = simCleanTeamName(state.name);
   const nameField =
     state.nameChoice === SIM_NAME_RANDOM
@@ -1610,7 +1758,9 @@ export function simSetupBody(state: SimSetupState): SimGameCreateBody {
     include_k: state.includeK,
     include_def: state.includeDef,
     bench: state.bench,
-    mode: "redraft",
+    mode: dynasty ? "dynasty" : "redraft",
+    ...(dynasty ? { seasons: state.seasons, rookie_rounds: state.rookieRounds } : {}),
+    ...reserves,
     user_slot: state.slot ? Number(state.slot) : null,
   };
 }
@@ -1669,15 +1819,56 @@ export function simSettingsSummary(settings: Partial<SimGameSettings> | undefine
   if (settings.include_def) parts.push("DEF");
   if (settings.include_k === false) parts.push("No kickers");
   if (settings.tiebreaker === "head_to_head") parts.push("Head-to-head tiebreak");
+  if (settings.mode === "dynasty") parts.unshift(settings.seasons ? `Dynasty (${settings.seasons} seasons)` : "Dynasty");
   if (settings.start === "league") parts.push("From your league");
   return parts.join(" · ");
 }
 
 /** What the setup tells the player about the league they are about to start. */
 export function simSetupSummary(state: SimSetupState, layoutHint?: SimGameOptionsResponse["layout"]): string {
-  if (state.start === "league") return "Your league's size, lineup, scoring and current rosters. A new 14-week season; nothing changes in your real league.";
+  const dynasty = state.mode === "dynasty";
+  if (state.start === "league") {
+    const base = "Your league's size, lineup, scoring and current rosters. A new 14-week season; nothing changes in your real league.";
+    return dynasty ? `${base} ${simDynastyLine(state.seasons, state.rookieRounds)}` : base;
+  }
   const layout = simDeriveLayout(state, layoutHint?.base_slots, layoutHint?.draft_spare_spots);
-  return `${state.teams} teams, ${layout.rounds}-round snake draft. Starters: ${layout.slots.join(", ")}. Roster ${layout.rosterLimit}.`;
+  const base = `${state.teams} teams, ${layout.rounds}-round snake draft. Starters: ${layout.slots.join(", ")}. Roster ${layout.rosterLimit}.`;
+  return dynasty ? `${base} ${simDynastyLine(state.seasons, state.rookieRounds)}` : base;
+}
+
+/** "Dynasty: 5 seasons, a 4-round rookie draft each offseason." */
+export function simDynastyLine(seasons: number, rookieRounds: number): string {
+  return `Dynasty: up to ${seasons} seasons, with a ${rookieRounds}-round rookie draft each offseason.`;
+}
+
+/** Plain note under the mode choice when a real league is imported as dynasty. */
+export function simSetupDynastyNote(state: Pick<SimSetupState, "start" | "mode">): string | null {
+  if (state.mode !== "dynasty") return null;
+  return state.start === "league"
+    ? "Starting from your league as dynasty brings its traded picks, taxi squad and IR along."
+    : "Dynasty keeps your team going for several seasons. After each one: aging, retirements, a rookie draft and roster cuts.";
+}
+
+/** Mode choices the options say are playable ("Redraft" and, when available, "Dynasty"). */
+export function simSetupModes(options: SimGameOptionsResponse | null | undefined): { value: SimMode; label: string }[] {
+  const modes = options?.options?.mode;
+  const labels: Record<SimMode, string> = { redraft: "Redraft", dynasty: "Dynasty" };
+  const values = modes?.values ?? ["redraft"];
+  return values.map((value) => ({ value, label: labels[value] ?? value }));
+}
+
+/** The engine default for taxi slots in this mode (0 in redraft, 4 in dynasty by default). */
+export function simSetupTaxiDefault(options: SimGameOptionsResponse | null | undefined, mode: SimMode): number {
+  const t = options?.options?.taxi_slots;
+  if (mode === "dynasty") return t?.default_dynasty ?? SIM_DYNASTY_FALLBACK.taxiSlotsDynasty;
+  return t?.default ?? SIM_DYNASTY_FALLBACK.taxiSlots;
+}
+
+/** Pill options for a "Default or 0..max" count (null = the default, labelled with its value when known). */
+export function simSetupCountOptions(max: number, defaultValue: number | null, min = 0): { label: string; value: string }[] {
+  const out = [{ label: defaultValue == null ? "Default" : `Default (${defaultValue})`, value: "" }];
+  for (let n = min; n <= max; n += 1) out.push({ label: String(n), value: String(n) });
+  return out;
 }
 
 /** Difficulty only changes the AI managers; your own dice are identical at every level. */
@@ -2013,4 +2204,577 @@ export function simShortName(name: string, maxLength = 17): string {
   const suffix = /^(jr\.?|sr\.?|ii|iii|iv|v)$/i.test(words[words.length - 1]) && words.length > 2 ? ` ${words[words.length - 1]}` : "";
   const last = suffix ? words[words.length - 2] : words[words.length - 1];
   return `${words[0][0]}. ${last}${suffix}`;
+}
+
+// ---------------------------------------------------------------------------
+// Dynasty: picks, offseason, rookie draft, summary (game engine 1.2.0)
+
+/** Endpoint paths for the dynasty and reserve routes (web and mobile call these through their own fetch). */
+export function simDynastyPaths(gameId: string) {
+  const base = `/v1/sim/games/${encodeURIComponent(gameId)}`;
+  return {
+    picks: `${base}/picks`,
+    rosterMove: `${base}/roster/move`,
+    offseason: (pos?: string) => `${base}/offseason${pos ? `?pos=${encodeURIComponent(pos)}` : ""}`,
+    rookieDraftStart: `${base}/offseason/rookie-draft/start`,
+    rookieDraftPick: `${base}/offseason/rookie-draft/pick`,
+    rookieDraftAuto: `${base}/offseason/rookie-draft/auto`,
+    startSeason: `${base}/offseason/start-season`,
+    dynasty: `${base}/dynasty`,
+  };
+}
+
+export type SimOffseasonStage = "review" | "rookie_draft" | "cutdown";
+
+export interface SimPicksTeam {
+  team_id: string;
+  name: string;
+  is_you: boolean;
+  picks: SimPickAsset[];
+  total_value: number;
+}
+
+/** GET /games/{id}/picks (reason "not_dynasty" on a redraft game). */
+export interface SimPicksResponse extends SimGameEnvelope {
+  enabled?: boolean;
+  draft_year?: number;
+  rounds?: number;
+  years?: number;
+  you?: SimPickAsset[];
+  teams?: SimPicksTeam[];
+}
+
+export interface SimTopScorer {
+  id: string;
+  name: string;
+  pos: string;
+  pts: number;
+}
+
+export interface SimSeasonArchiveYou {
+  rank: number;
+  wins: number;
+  losses: number;
+  ties: number;
+  pf: number;
+  pa?: number;
+  seed?: number | null;
+  playoff_result: string;
+  made_playoffs: boolean;
+  avg_age: number | null;
+  top_scorers: SimTopScorer[];
+}
+
+export interface SimSeasonChampion {
+  team_id: string;
+  name: string;
+  is_you: boolean;
+}
+
+/** One finished season, as stored in the dynasty archive (offseason.last_season). */
+export interface SimSeasonArchive {
+  season_no: number;
+  year: number;
+  champion: SimSeasonChampion | null;
+  you: SimSeasonArchiveYou;
+  standings?: { rank: number; team_id: string; name: string; is_you: boolean; wins: number; losses: number; ties: number; pf: number; playoff_result: string }[];
+}
+
+export interface SimOffseasonRetiree {
+  id: string;
+  name: string;
+  pos: string;
+  age: number | null;
+  market?: number | null;
+  is_yours: boolean;
+}
+
+/** A player of yours with last season's and this season's age and expected points. */
+export interface SimOffseasonMover extends SimGamePlayer {
+  age_before: number | null;
+  age_after: number | null;
+  mean_before: number;
+  mean_after: number;
+  delta: number;
+}
+
+export interface SimRookieOrderRow {
+  n: number;
+  round: number;
+  pick: string;
+  orig_team_id: string;
+  orig_team_name: string;
+  team_id: string | null;
+  team_name: string | null;
+  is_yours: boolean;
+  traded: boolean;
+  made: { id: string; name: string; pos: string } | null;
+}
+
+export interface SimOffseasonRoster {
+  size: number;
+  limit: number;
+  cuts_needed: number;
+  ir: SimGamePlayer[];
+  taxi: SimGamePlayer[];
+  reserves: SimReserves;
+}
+
+export type SimOffseasonNextAction = "start_rookie_draft" | "finish_draft" | "start_season";
+
+export interface SimOffseason {
+  stage: SimOffseasonStage;
+  /** Calendar year of the coming season. */
+  year: number;
+  /** The season just finished (the next one is season_no + 1). */
+  season_no: number;
+  seasons: number;
+  next_year?: number;
+  last_season: SimSeasonArchive | null;
+  retired: SimOffseasonRetiree[];
+  movers: SimOffseasonMover[];
+  your_picks_this_draft: SimRookieOrderRow[];
+  draft: {
+    round_count: number;
+    total: number;
+    pick_index: number;
+    order: SimRookieOrderRow[];
+    on_clock: SimRookieOrderRow | null;
+    your_turn: boolean;
+    available: SimGamePlayer[];
+    available_count: number;
+  };
+  roster: SimOffseasonRoster;
+  can_trade: boolean;
+  next: SimOffseasonNextAction | null;
+  picks_held: number;
+}
+
+/** One pick as the engine logs it (the `made` list of the draft calls). */
+export interface SimRookiePickMade {
+  n: number;
+  round: number;
+  pick: string;
+  orig: string;
+  team: string;
+  pid: string;
+  auto?: boolean;
+}
+
+export interface SimOffseasonResponse extends SimGameEnvelope {
+  game?: SimGame;
+  offseason?: SimOffseason;
+  made?: SimRookiePickMade[];
+}
+
+export interface SimDynastyYear {
+  season_no: number;
+  year: number;
+  rank: number;
+  record: string;
+  pf: number;
+  playoff_result: string;
+  champion: SimSeasonChampion | null;
+  avg_age: number | null;
+  top_scorers: SimTopScorer[];
+}
+
+export interface SimDynastySummary {
+  mode: "dynasty";
+  seasons_total: number;
+  seasons_played: number;
+  start_year: number;
+  complete: boolean;
+  titles: number;
+  playoff_trips: number;
+  avg_finish: number | null;
+  wins: number;
+  losses: number;
+  best_season: { year: number; rank: number; record: string } | null;
+  by_year: SimDynastyYear[];
+  rookie_drafts?: { year: number; picks: unknown[] }[];
+  picks_held: number;
+}
+
+export interface SimDynastyResponse extends SimGameEnvelope {
+  dynasty?: SimDynastySummary;
+  game?: SimGame;
+}
+
+// --- picks
+
+const PICK_ID = /^pick:(\d{4}):(\d+):(.+)$/;
+
+export function simIsPickId(id: string | null | undefined): boolean {
+  return typeof id === "string" && PICK_ID.test(id);
+}
+
+/** Type guard for a trade asset that is a pick (kind "pick", or a pick id). */
+export function simIsPick(asset: Pick<SimTradeAsset, "id"> & { kind?: string }): asset is SimPickAsset {
+  return asset.kind === "pick" || simIsPickId(asset.id);
+}
+
+export function simParsePickId(id: string): { season: number; round: number; origTeamId: string } | null {
+  const m = PICK_ID.exec(id);
+  return m ? { season: Number(m[1]), round: Number(m[2]), origTeamId: m[3] } : null;
+}
+
+const HINT_WORD: Record<SimPickSlotHint, string> = { early: "early", mid: "mid", late: "late" };
+
+/** "2027 Round 1 (early)": the slot hint is only known for the next draft. */
+export function simPickLabelText(pick: Pick<SimPickAsset, "id"> & Partial<Pick<SimPickAsset, "season" | "round" | "slot_hint">>): string {
+  const parsed = simParsePickId(pick.id);
+  const season = pick.season ?? parsed?.season;
+  const round = pick.round ?? parsed?.round;
+  if (season == null || round == null) return "Draft pick";
+  const hint = pick.slot_hint ? ` (${HINT_WORD[pick.slot_hint]})` : "";
+  return `${season} Round ${round}${hint}`;
+}
+
+/** Plain explanation of the early / mid / late hint ("Projected near the top of the round"). */
+export function simPickSlotHint(pick: Pick<SimPickAsset, "slot_hint" | "season">, draftYear?: number | null): string {
+  if (pick.slot_hint === "early") return "Projected near the top of the round.";
+  if (pick.slot_hint === "late") return "Projected near the bottom of the round.";
+  if (pick.slot_hint === "mid") return "Projected in the middle of the round.";
+  if (draftYear != null && pick.season > draftYear) return "Slot is set after that season.";
+  return "Slot not set yet.";
+}
+
+/** "via Rivals" when a pick came from another team, else null. */
+export function simPickViaLine(pick: Pick<SimPickAsset, "orig_team_id" | "orig_team_name" | "own" | "owner">): string | null {
+  if (pick.own === true) return null;
+  if (pick.own === false) return `via ${pick.orig_team_name}`;
+  const holder = pick.owner?.team_id;
+  return holder && holder !== pick.orig_team_id ? `via ${pick.orig_team_name}` : null;
+}
+
+export interface SimPickYearGroup {
+  season: number;
+  rounds: { round: number; picks: SimPickAsset[] }[];
+  count: number;
+}
+
+/** Picks grouped by year, then round (oldest year first, round 1 first). */
+export function simPickGroups(picks: SimPickAsset[] | null | undefined): SimPickYearGroup[] {
+  const byYear = new Map<number, Map<number, SimPickAsset[]>>();
+  for (const pick of picks ?? []) {
+    const rounds = byYear.get(pick.season) ?? new Map<number, SimPickAsset[]>();
+    rounds.set(pick.round, [...(rounds.get(pick.round) ?? []), pick]);
+    byYear.set(pick.season, rounds);
+  }
+  return [...byYear.entries()]
+    .sort((a, b) => a[0] - b[0])
+    .map(([season, rounds]) => {
+      const list = [...rounds.entries()].sort((a, b) => a[0] - b[0]).map(([round, ps]) => ({ round, picks: ps }));
+      return { season, rounds: list, count: list.reduce((n, r) => n + r.picks.length, 0) };
+    });
+}
+
+/** The picks a team holds, from GET /picks. */
+export function simPicksOf(res: Pick<SimPicksResponse, "teams" | "you"> | null | undefined, teamId: string | null | undefined): SimPickAsset[] {
+  if (!res) return [];
+  if (!teamId) return res.you ?? [];
+  return res.teams?.find((t) => t.team_id === teamId)?.picks ?? res.you?.filter((p) => p.owner?.team_id === teamId) ?? [];
+}
+
+/** One line for the collapsed "Your picks" summary: "6 picks: 2027 (2), 2028 (2), 2029 (2)". */
+export function simPicksSummaryLine(picks: SimPickAsset[] | null | undefined): string {
+  const groups = simPickGroups(picks);
+  const total = groups.reduce((n, g) => n + g.count, 0);
+  if (total === 0) return "No picks";
+  return `${total} pick${total === 1 ? "" : "s"}: ${groups.map((g) => `${g.season} (${g.count})`).join(", ")}`;
+}
+
+/** Display fields for any trade asset (player or pick) in a chip or list. */
+export function simAssetTitle(asset: SimTradeAsset): string {
+  return simIsPick(asset) ? simPickLabelText(asset) : asset.name;
+}
+
+// --- IR and taxi
+
+export interface SimMoveCheck {
+  ok: boolean;
+  /** The backend reason code this would be refused with (when not ok). */
+  reason?: "ir_full" | "ir_ineligible" | "taxi_full" | "taxi_ineligible" | "roster_full" | "reserves_unavailable";
+}
+
+export interface SimMoveContext {
+  reserves: SimReserves | null | undefined;
+  rosterSize?: number | null;
+  rosterLimit?: number | null;
+}
+
+/** True when the game has an IR or taxi squad (older saves and redraft games without slots do not). */
+export function simReservesOn(settings: Partial<SimGameSettings> | null | undefined, reserves?: SimReserves | null): boolean {
+  if (reserves) return Boolean(reserves.enabled) && (reserves.ir_slots > 0 || reserves.taxi_slots > 0);
+  return Boolean(settings?.reserve_v) && ((settings?.ir_slots ?? 0) > 0 || (settings?.taxi_slots ?? 0) > 0);
+}
+
+function squadOf(player: Pick<SimGamePlayer, "squad">): SimSquad {
+  return player.squad ?? "roster";
+}
+
+/** Mirrors the engine's check order for a move to IR (modules/sim/game_actions.py check_move). */
+export function simCanMoveToIr(player: Pick<SimGamePlayer, "squad" | "status" | "out_weeks">, ctx: SimMoveContext): SimMoveCheck {
+  const r = ctx.reserves;
+  if (!r || !r.enabled) return { ok: false, reason: "reserves_unavailable" };
+  if (squadOf(player) === "ir") return { ok: false };
+  if (r.ir_slots <= 0 || r.ir_used >= r.ir_slots) return { ok: false, reason: "ir_full" };
+  if (squadOf(player) !== "roster") return { ok: false, reason: "ir_ineligible" };
+  if (!(player.out_weeks > 0 || player.status === "out")) return { ok: false, reason: "ir_ineligible" };
+  return { ok: true };
+}
+
+export function simCanMoveToTaxi(player: Pick<SimGamePlayer, "squad" | "pos" | "taxi_eligible">, ctx: SimMoveContext): SimMoveCheck {
+  const r = ctx.reserves;
+  if (!r || !r.enabled) return { ok: false, reason: "reserves_unavailable" };
+  if (squadOf(player) === "taxi") return { ok: false };
+  if (r.taxi_slots <= 0 || r.taxi_used >= r.taxi_slots) return { ok: false, reason: "taxi_full" };
+  if (squadOf(player) !== "roster") return { ok: false, reason: "taxi_ineligible" };
+  if (!player.taxi_eligible || !simTradable(player.pos)) return { ok: false, reason: "taxi_ineligible" };
+  return { ok: true };
+}
+
+/** Activate (from IR) or promote (from taxi) needs an open roster spot. */
+export function simCanMoveToRoster(player: Pick<SimGamePlayer, "squad">, ctx: SimMoveContext): SimMoveCheck {
+  if (!ctx.reserves || !ctx.reserves.enabled) return { ok: false, reason: "reserves_unavailable" };
+  if (squadOf(player) === "roster") return { ok: false };
+  if (ctx.rosterSize != null && ctx.rosterLimit != null && ctx.rosterSize >= ctx.rosterLimit) return { ok: false, reason: "roster_full" };
+  return { ok: true };
+}
+
+export type SimReserveMoveTo = "roster" | "ir" | "taxi";
+
+export interface SimReserveAction {
+  to: SimReserveMoveTo;
+  label: string;
+  check: SimMoveCheck;
+}
+
+/** The menu for one player: only moves that make sense from where he sits, each with its legality. */
+export function simReserveActions(player: SimGamePlayer, ctx: SimMoveContext): SimReserveAction[] {
+  const squad = squadOf(player);
+  if (squad === "ir") return [{ to: "roster", label: "Activate", check: simCanMoveToRoster(player, ctx) }];
+  if (squad === "taxi") return [{ to: "roster", label: "Promote", check: simCanMoveToRoster(player, ctx) }];
+  return [
+    { to: "ir", label: "Move to IR", check: simCanMoveToIr(player, ctx) },
+    { to: "taxi", label: "Move to taxi", check: simCanMoveToTaxi(player, ctx) },
+  ];
+}
+
+/** Why a move is not allowed, in plain words (the backend `message` wins when there is one). */
+export function simReserveReasonText(reason: string | null | undefined, message?: string | null): string {
+  if (message) return message;
+  return simGameReasonMessage(reason ?? "");
+}
+
+/** "IR 1 of 2" / "Taxi 3 of 4". */
+export function simReserveUsedLine(kind: "ir" | "taxi", reserves: SimReserves | null | undefined): string {
+  if (!reserves) return "";
+  const used = kind === "ir" ? reserves.ir_used : reserves.taxi_used;
+  const slots = kind === "ir" ? reserves.ir_slots : reserves.taxi_slots;
+  return `${kind === "ir" ? "IR" : "Taxi"} ${used} of ${slots}`;
+}
+
+export interface SimPlayerChipSpec {
+  key: "ir" | "taxi" | "rookie" | "out";
+  label: string;
+  tone: SimGameTone;
+}
+
+/** Status chips for a roster row: IR, TAXI, ROOKIE, OUT n wks. */
+export function simPlayerChips(player: Pick<SimGamePlayer, "squad" | "rookie" | "status" | "out_weeks">): SimPlayerChipSpec[] {
+  const chips: SimPlayerChipSpec[] = [];
+  const squad = squadOf(player);
+  if (squad === "ir") chips.push({ key: "ir", label: "IR", tone: "danger" });
+  if (squad === "taxi") chips.push({ key: "taxi", label: "TAXI", tone: "accent" });
+  if (player.rookie) chips.push({ key: "rookie", label: "ROOKIE", tone: "success" });
+  if (player.out_weeks > 0) chips.push({ key: "out", label: `OUT ${player.out_weeks} ${player.out_weeks === 1 ? "wk" : "wks"}`, tone: "danger" });
+  return chips;
+}
+
+// --- offseason
+
+const OFFSEASON_STAGES: SimOffseasonStage[] = ["review", "rookie_draft", "cutdown"];
+
+export function simOffseasonStageLabel(stage: SimOffseasonStage | null | undefined): string {
+  switch (stage) {
+    case "review":
+      return "Review";
+    case "rookie_draft":
+      return "Rookie draft";
+    case "cutdown":
+      return "Roster check";
+    default:
+      return "Offseason";
+  }
+}
+
+/** The three offseason steps with which is done, current or still ahead. */
+export function simOffseasonSteps(stage: SimOffseasonStage | null | undefined): { key: SimOffseasonStage; label: string; state: "done" | "current" | "todo" }[] {
+  const at = stage ? OFFSEASON_STAGES.indexOf(stage) : 0;
+  return OFFSEASON_STAGES.map((key, i) => ({ key, label: simOffseasonStageLabel(key), state: i < at ? "done" : i === at ? "current" : "todo" }));
+}
+
+export interface SimOffseasonCta {
+  /** Which call the button makes; null when nothing is left to press (the draft is the work). */
+  action: SimOffseasonNextAction | null;
+  label: string;
+  /** Plain reason the button is disabled. */
+  blocked: string | null;
+}
+
+/** The one big button for the current stage. */
+export function simOffseasonCta(off: Pick<SimOffseason, "stage" | "season_no" | "roster"> | null | undefined): SimOffseasonCta {
+  if (!off) return { action: null, label: "", blocked: null };
+  if (off.stage === "review") return { action: "start_rookie_draft", label: "Start rookie draft", blocked: null };
+  if (off.stage === "rookie_draft") return { action: "finish_draft", label: "Auto-draft the rest", blocked: null };
+  const cuts = off.roster?.cuts_needed ?? 0;
+  return {
+    action: "start_season",
+    label: `Start season ${off.season_no + 1}`,
+    blocked: cuts > 0 ? `Cut ${cuts} player${cuts === 1 ? "" : "s"} to get to the roster limit first.` : null,
+  };
+}
+
+/** "Offseason after 2026" heading for the screen. */
+export function simOffseasonHeading(off: Pick<SimOffseason, "last_season" | "season_no" | "seasons"> | null | undefined): string {
+  if (!off) return "Offseason";
+  const year = off.last_season?.year;
+  return year ? `Offseason after ${year}` : `Offseason after season ${off.season_no}`;
+}
+
+/** "Season 2 of 5 is next" style line. */
+export function simOffseasonProgressLine(off: Pick<SimOffseason, "season_no" | "seasons" | "year"> | null | undefined): string {
+  if (!off) return "";
+  const next = off.season_no + 1;
+  return `Season ${next} of ${off.seasons} is next (${off.year}).`;
+}
+
+/** The draft clock as a banner line. */
+export function simRookieClockLine(draft: Pick<SimOffseason["draft"], "on_clock" | "your_turn" | "total" | "pick_index">): string {
+  if (!draft.on_clock) return draft.pick_index >= draft.total && draft.total > 0 ? "Rookie draft complete." : "Rookie draft not started.";
+  const c = draft.on_clock;
+  if (draft.your_turn) return `You are on the clock: round ${c.round}, pick ${c.n} of ${draft.total}.`;
+  return `${c.team_name ?? "An AI team"} is on the clock: round ${c.round}, pick ${c.n} of ${draft.total}.`;
+}
+
+/** "Round 1, pick 4" for one of your picks in the order. */
+export function simRookiePickLine(row: Pick<SimRookieOrderRow, "round" | "n" | "traded" | "orig_team_name" | "made">): string {
+  const base = `Round ${row.round}, pick ${row.n}`;
+  const via = row.traded ? ` (via ${row.orig_team_name})` : "";
+  return row.made ? `${base}${via}: ${row.made.name}` : `${base}${via}`;
+}
+
+export function simAgeDeltaTone(delta: number): SimGameTone {
+  if (delta >= 0.5) return "success";
+  if (delta <= -0.5) return "danger";
+  return "muted";
+}
+
+/** Aging arrow and signed points change for a mover row. */
+export function simMoverText(row: Pick<SimOffseasonMover, "delta" | "age_before" | "age_after" | "mean_before" | "mean_after">): {
+  arrow: string;
+  delta: string;
+  age: string;
+  tone: SimGameTone;
+} {
+  const tone = simAgeDeltaTone(row.delta);
+  const arrow = tone === "success" ? "▲" : tone === "danger" ? "▼" : "–";
+  const sign = row.delta > 0 ? "+" : row.delta < 0 ? "-" : "";
+  const age = row.age_before != null && row.age_after != null ? `${row.age_before} to ${row.age_after}` : "";
+  return { arrow, delta: `${sign}${Math.abs(row.delta).toFixed(1)}`, age, tone };
+}
+
+/** Your retirees first, then the rest. */
+export function simRetireesSorted(rows: SimOffseasonRetiree[] | null | undefined): SimOffseasonRetiree[] {
+  return [...(rows ?? [])].sort((a, b) => Number(b.is_yours) - Number(a.is_yours) || (b.market ?? 0) - (a.market ?? 0) || a.name.localeCompare(b.name));
+}
+
+// --- dynasty summary
+
+export function simOrdinal(n: number): string {
+  return `${n}${simOrdinalSuffix(n)}`;
+}
+
+/** "5 of 5 seasons" style progress for a dynasty game. */
+export function simDynastyProgressLine(d: Pick<SimDynastyBlock, "season_no" | "seasons" | "year"> | null | undefined): string {
+  if (!d) return "";
+  return `Season ${d.season_no} of ${d.seasons} (${d.year})`;
+}
+
+export interface SimDynastyYearView {
+  year: number;
+  seasonNo: number;
+  record: string;
+  finish: string;
+  result: string;
+  resultTone: SimGameTone;
+  champion: string;
+  youWon: boolean;
+  scorers: string;
+}
+
+/** One per-year row, ready to render (every field a string). */
+export function simDynastyYearView(y: SimDynastyYear): SimDynastyYearView {
+  const youWon = Boolean(y.champion?.is_you);
+  return {
+    year: y.year,
+    seasonNo: y.season_no,
+    record: y.record,
+    finish: simOrdinal(y.rank),
+    result: simPlayoffResultLabel(y.playoff_result),
+    resultTone: simPlayoffOutcomeTone(y.playoff_result),
+    champion: y.champion ? `${y.champion.name}${youWon ? " (you)" : ""}` : "No champion",
+    youWon,
+    scorers: (y.top_scorers ?? []).map((s) => `${s.name} ${s.pts.toFixed(1)}`).join(", "),
+  };
+}
+
+export interface SimDynastySummaryView {
+  titles: number;
+  titlesLine: string;
+  avgFinish: string;
+  bestSeason: string;
+  trips: string;
+  record: string;
+  years: SimDynastyYearView[];
+  seasonsLine: string;
+}
+
+/** The dynasty result card, shaped: nothing crashes on a missing summary or empty year list. */
+export function simDynastySummaryView(d: SimDynastySummary | null | undefined): SimDynastySummaryView {
+  const years = (d?.by_year ?? []).map(simDynastyYearView);
+  const titles = d?.titles ?? 0;
+  return {
+    titles,
+    titlesLine: titles === 0 ? "No titles yet" : `${titles} title${titles === 1 ? "" : "s"}`,
+    avgFinish: d?.avg_finish != null ? d.avg_finish.toFixed(1) : "-",
+    bestSeason: d?.best_season ? `${d.best_season.year}: ${simOrdinal(d.best_season.rank)} at ${d.best_season.record}` : "-",
+    trips: d ? `${d.playoff_trips} of ${d.seasons_played}` : "-",
+    record: d ? `${d.wins}-${d.losses}` : "-",
+    years,
+    seasonsLine: d ? `${d.seasons_played} of ${d.seasons_total} seasons played` : "",
+  };
+}
+
+/** A finished season's archive as a per-year row (the offseason strip uses the same shape as the summary). */
+export function simArchiveToYear(a: SimSeasonArchive): SimDynastyYear {
+  const you = a.you;
+  return {
+    season_no: a.season_no,
+    year: a.year,
+    rank: you.rank,
+    record: `${you.wins}-${you.losses}${you.ties ? `-${you.ties}` : ""}`,
+    pf: you.pf,
+    playoff_result: you.playoff_result,
+    champion: a.champion,
+    avg_age: you.avg_age,
+    top_scorers: you.top_scorers ?? [],
+  };
+}
+
+/** True when the result payload is a dynasty one (grade and review are null there). */
+export function simIsDynastyResult(result: SimGameResult | null | undefined): boolean {
+  return result?.mode === "dynasty" || Boolean(result?.dynasty);
 }
