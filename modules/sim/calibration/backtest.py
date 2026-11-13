@@ -313,6 +313,79 @@ def availability_report(rows: list[dict], sims: list[list[dict]], core_adp: floa
     return out
 
 
+def simulate_weeks_coupled(rows: list[dict], copy: int, params=None, couple: bool = True) -> list[list]:
+    """One simulated copy of the whole panel in the real panel's ``weeks`` layout (``None`` on a bye, else
+    ``[played, points]``), with or without the depth-chart coupling of ``pm.apply_depth_coupling`` applied
+    per (season, team). Used to check the backup-uplift the model reproduces."""
+
+    sp, ip = params if params else (pm.SEASON, pm.INSEASON)
+    ranks = rank_by_adp(rows)
+    out: list[list | None] = [None] * len(rows)
+    for season in sorted({r["season"] for r in rows}):
+        idx = [i for i, r in enumerate(rows) if r["season"] == season]
+        players, profs = {}, {}
+        for i in idx:
+            r = rows[i]
+            pl = dataset.player_mapping(r, rank_in_pos=ranks.get((r["season"], r["pid"])))
+            pl["season_environment"] = environment_for(season, copy)
+            seed = 7_000_003 * (copy + 1) + season
+            players[pl["player_id"]] = pl
+            profs[pl["player_id"]] = pm._draw_season_profile(pl, pm.profile_rng(seed, pl["player_id"]), sp, ip)
+        if couple:
+            profs = pm.apply_depth_coupling(players, profs, ip=ip)
+        seed = 7_000_003 * (copy + 1) + season
+        for i in idx:
+            pid = f"{season}:{rows[i]['pid']}"
+            prof, pl = profs[pid], players[pid]
+            wk = []
+            for w in range(1, pm.SEASON_WEEKS + 1):
+                if prof.unavailable_reason[w - 1] == "bye":
+                    wk.append(None)
+                    continue
+                res = pm._draw_week_points(pl, prof, w, pm.week_rng(seed, pid, w), PPR, ip)
+                wk.append([1 if res.active else 0, res.points])
+            out[i] = wk
+    return out
+
+
+def depth_cover_report(rows: list[dict], weeks: list[list] | None = None, min_proj: float = 8.0, depth: int = 2) -> dict[str, Any]:
+    """Backup uplift when the team's top-projected player at his position is out: the backup's PPG in the weeks
+    the starter missed minus his PPG in the weeks the starter played, over the starter's own PPG ("absorb share").
+    ``weeks`` defaults to the real panel's weeks; pass ``simulate_weeks_coupled`` output for the model."""
+
+    groups: dict[tuple, list[int]] = defaultdict(list)
+    for i, r in enumerate(rows):
+        if r["pos"] in ("QB", "RB", "WR", "TE") and r.get("team"):
+            groups[(r["season"], r["team"], r["pos"])].append(i)
+    acc: dict[tuple[str, int], list[tuple[int, float, float]]] = defaultdict(list)
+    for (_s, _t, pos), idxs in groups.items():
+        idxs.sort(key=lambda i: -rows[i]["proj_ppg"])
+        if len(idxs) < 2 or rows[idxs[0]]["proj_ppg"] < min_proj:
+            continue
+        wk = lambda i: (weeks[i] if weeks is not None else rows[i]["weeks"])  # noqa: E731
+        st = wk(idxs[0])
+        out = [k for k, w in enumerate(st) if w is not None and w[0] == 0]
+        inn = [k for k, w in enumerate(st) if w is not None and w[0] == 1]
+        if not out or len(inn) < 4:
+            continue
+        spp = float(np.mean([st[k][1] for k in inn]))
+        for d, j in enumerate(idxs[1:1 + depth], 1):
+            bw = wk(j)
+            bo = [bw[k][1] for k in out if bw[k] is not None and bw[k][0] == 1]
+            bi = [bw[k][1] for k in inn if bw[k] is not None and bw[k][0] == 1]
+            if len(bi) >= 3 and bo:
+                acc[(pos, d)].append((len(bo), float(np.mean(bo) - np.mean(bi)), spp))
+    res: dict[str, Any] = {}
+    for (pos, d), v in sorted(acc.items()):
+        if len(v) < 8:
+            continue
+        a = np.array(v)
+        w = a[:, 0]
+        up = float((a[:, 1] * w).sum() / w.sum())
+        res[f"{pos} backup{d}"] = {"cases": len(v), "uplift_ppg": round(up, 2), "absorb_share": round(up / float((a[:, 2] * w).sum() / w.sum()), 3)}
+    return res
+
+
 def season_variance_report(rows: list[dict], sims: list[list[dict]], min_played: int = 4) -> dict[str, Any]:
     """Variance ratio of log(season PPG / projection): simulated variance over real variance."""
 
@@ -320,6 +393,7 @@ def season_variance_report(rows: list[dict], sims: list[list[dict]], min_played:
     groups = {
         "all": lambda r: True, **{p: (lambda q: lambda r: r["pos"] == q)(p) for p in CORE},
         "rookies": lambda r: r["rookie"], "veterans": lambda r: not r["rookie"],
+        "rookie WR/RB/TE": lambda r: r["rookie"] and r["pos"] != "QB",
         "proj >= 8": lambda r: r["proj_ppg"] >= 8, "proj < 8": lambda r: r["proj_ppg"] < 8,
     }
     for name, pred in groups.items():
@@ -337,7 +411,9 @@ def season_variance_report(rows: list[dict], sims: list[list[dict]], min_played:
         lr, ls = np.log(np.maximum(real_v, 0.05)), np.log(np.maximum(sim_v, 0.05))
         out[name] = {"n": len(real_v), "real_sd": round(float(lr.std()), 3), "sim_sd": round(float(ls.std()), 3),
                      "var_ratio": round(float(ls.var() / lr.var()), 2), "real_mean": round(float(lr.mean()), 3),
-                     "sim_mean": round(float(ls.mean()), 3)}
+                     "sim_mean": round(float(ls.mean()), 3),
+                     "real_q": [round(float(np.exp(np.percentile(lr, q))), 2) for q in (5, 25, 50, 75, 95)],
+                     "sim_q": [round(float(np.exp(np.percentile(ls, q))), 2) for q in (5, 25, 50, 75, 95)]}
     return out
 
 
@@ -556,9 +632,18 @@ def main(argv: list[str] | None = None) -> None:
     ap.add_argument("--seasons", nargs="*", type=int, default=None, help="seasons to score (default: all)")
     ap.add_argument("--json", type=str, default=None)
     ap.add_argument("--markdown", action="store_true", help="print the doc tables instead of JSON")
+    ap.add_argument("--params-json", type=str, default=None,
+                    help='JSON {"season": {...}, "inseason": {...}} of constants overriding the shipped ones (before/after runs)')
     args = ap.parse_args(argv)
     rows = [r for r in dataset.load_panel() if args.seasons is None or r["season"] in args.seasons]
-    result = run(rows, args.copies)
+    params = None
+    if args.params_json:
+        import dataclasses
+
+        with open(args.params_json) as fh:
+            over = json.load(fh)
+        params = (dataclasses.replace(pm.SEASON, **over.get("season", {})), dataclasses.replace(pm.INSEASON, **over.get("inseason", {})))
+    result = run(rows, args.copies, params)
     text = json.dumps(result, indent=1, default=str)
     if args.json:
         with open(args.json, "w") as fh:

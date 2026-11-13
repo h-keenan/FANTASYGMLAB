@@ -15,6 +15,8 @@ real NFL seasons by `modules/sim/calibration/`.
   preseason ADP or projection), real weekly box scores, real week-1 preseason
   projections and ADP, real bye weeks. Fit on 2021-23, scored on held-out 2024-25.
 - Held-out 2024-25: season-PPG percentile KS distance **0.105** (mean PIT 0.555), 50/80/90% intervals cover **45/77/85%**, mean absolute error of breakout/bust tier hit rates **0.057** (0.026 in-sample), weekly points SD ratio sim/real **0.99-1.08** by position, boom/bust week rates within **0.03**, games missed 2.56 vs 2.37 per season; all five seasons in-sample: KS **0.050**, tier-hit MAE **0.026**.
+- **player-model-2 (2026-11 audit)**: role-collapse tail, QB/star fixes and an opt-in depth-chart coupling; see 4.0 for the
+  before/after. Tables 4.1-4.2 and the headline numbers above are the player-model-1 baseline.
 - Honest weak spots are in "Limitations" below. The biggest: the real projection
   source runs hot or cold by season (median actual/projected PPG 0.80 in 2021, 0.97
   in 2024), so out-of-sample the model sits about 5 percentile points low (mean PIT 0.555) and is
@@ -141,7 +143,61 @@ build --cache DIR --players data/sleeper_players.json` rebuilds it.
 
 ## 4. Calibration results
 
-### 4.1 Out-of-sample: fit on 2021-2023, scored on held-out 2024-2025 (754 player-seasons, 30 simulated copies each)
+### 4.0 player-model-2 (2026-11 audit): what changed and the before/after
+
+Full write-up, with the real-projection review and the injury audit, in `docs/audits/2026-11-sim-projection-audit.md`.
+Tables 4.1 and 4.2 below are the player-model-1 baseline and are kept for the record.
+
+What changed (all general model changes, fit by `fit.py season2`, which scores position/tier/rookie/age groups on quantiles,
+breakout/bust rates, SD of log(actual/projection) and preseason-rank finish rates):
+
+| Weak spot | Change |
+| --- | --- |
+| Rookie / depth downside too thin | a **role-collapse** component (heavy left tail: the season keeps about 33% of the projection, likelier for depth and rookies), rookie spread term, widened bust SD bound |
+| QB seasons too loose | QB-specific bust depth and probability, QB role changes damped (`role_qb` 0.1, a one-dimensional fit: QBs rarely change roles), `qb_sig` bound lowered |
+| Stars too unstable (WR1 retention) | role-change rate falls with tier (`role_star`): a star keeps his job more often |
+| No starter-injury / backup coupling | `apply_depth_coupling(players, profiles)`: temporary promotions for same-team same-position backups for exactly the games a starter misses, absorb shares measured on the real panel. Pure, no extra random draws; **not wired into the game engine** (needs every NFL teammate's profile, an engine decision) |
+| Year-to-year drift | audited, **no change**: the shared environment SD 0.057 is right (year medians have SD 0.066, of which sampling noise accounts for about 0.038) and position x year differences are mostly noise |
+
+Out-of-sample, apples to apples (both structures refit with the same optimiser, loss, budget and data: fit 2021-23, scored on
+held-out 2024-25, 20 simulated copies):
+
+| metric | v1 structure | v2 structure | real |
+| --- | --- | --- | --- |
+| season log-ratio variance ratio sim/real, all | 0.97 | 0.93 | 1.0 |
+| QB | 1.44 | 1.10 | 1.0 |
+| rookies | 0.67 | 0.74 | 1.0 |
+| TE | 0.62 | 0.58 | 1.0 |
+| tier-hit MAE | 0.077 | 0.070 | 0 |
+| PIT KS / mean PIT | 0.171 / 0.590 | 0.164 / 0.586 | 0 / 0.5 |
+
+The held-out years were hot (mean PIT 0.59 whichever structure), which dominates the PIT numbers. Shipped constants, refit on all
+five seasons (in-sample, 14 copies), against the previous shipped constants:
+
+| metric | player-model-1 | player-model-2 | real |
+| --- | --- | --- | --- |
+| variance ratio all / rookies / QB / RB / WR / TE | 0.78 / 0.56 / 1.76 / 0.71 / 0.79 / 0.79 | 0.90 / 0.70 / 1.28 / 0.83 / 0.92 / 0.95 | 1.0 |
+| season log-ratio SD, all | 0.490 | 0.526 | 0.554 |
+| WR ADP top-12 finishing top-12 | 0.396 | 0.452 | 0.521 |
+| RB ADP top-12 finishing top-12 | 0.460 | 0.500 | 0.562 |
+| WR top-12 finishing outside 36 | 0.257 | 0.235 | 0.146 |
+| 5th percentile of actual/projection, rookies | 0.38 | 0.31 | 0.21 |
+| tier-hit MAE | 0.0252 | 0.0267 | 0 |
+| PIT KS / 80% coverage | 0.079 / 0.71 | 0.107 / 0.69 | 0 / 0.80 |
+| games missed (mean) | 2.53 | 2.54 | 2.55 |
+| weekly SD ratio QB/RB/WR/TE | 1.04/1.02/0.99/1.05 | 1.01/1.02/1.00/1.05 | 1.0 |
+
+Honest reading: spread, QB looseness and star retention moved the right way; **PIT KS and the 80% coverage got slightly worse**
+(the wider left tail and lower QB centre cost some centre calibration), the rookie 5th percentile is still not low enough
+(0.31 vs 0.21 real) and TE variance out of sample did not improve. Determinism and cost are unchanged (about 72 us per player-week
+both versions on the same machine, profile draw 104 -> 134 us).
+
+Backup coupling (`backtest.depth_cover_report`, backup uplift in games the starter missed over the starter's PPG, first / second
+backup): real 2021-23 RB 0.36 / 0.22, WR 0.20 / 0.09, TE 0.08 / 0.13. Simulated panel uncoupled: about 0.0 everywhere. Coupled:
+RB 0.36 / 0.17, WR 0.18 / 0.07, TE 0.14 / 0.04. Held-out 2024-25 real RB 0.55 / 0.50, WR 0.18 / 0.11, TE 0.26; coupled sim RB 0.36 / 0.11,
+WR 0.20 / 0.09, TE 0.11: RB cover was stronger in the held-out years than the fit years (28 cases), so the RB value is conservative.
+
+### 4.1 (player-model-1 baseline) Out-of-sample: fit on 2021-2023, scored on held-out 2024-2025 (754 player-seasons, 30 simulated copies each)
 
 The season-level story constants (`SeasonParams`) were fit on 2021-23 only; the weekly dispersion, templates and injury pmf were also fit on 2021-23. This is the honest generalisation number.
 
@@ -274,7 +330,7 @@ Half-season split log-ratio SD: real 0.372, sim 0.404; lag-1 autocorrelation: re
 - TE: rec_tgt 6.11/5.98, rec 4.47/4.23, rec_yd 46.11/46.86, rec_td 0.37/0.31
 
 
-### 4.2 Shipped constants: refit on all five seasons, scored on all 1,757 usable player-seasons
+### 4.2 (player-model-1 baseline) Shipped constants: refit on all five seasons, scored on all 1,757 usable player-seasons
 
 In-sample (the shipped `SeasonParams` use every season), so these are optimistic; they are the regression guard `tests/test_sim_player_model.py` replays. Compare with 4.1 for how much generalisation costs.
 
@@ -415,38 +471,47 @@ Half-season split log-ratio SD: real 0.392, sim 0.396; lag-1 autocorrelation: re
 
 Season level (`SeasonParams`, fit by evolution strategy on the season-PPG quantiles and tier hit rates of
 position x tier, rookie x tier, age and tier groups; bounded to plausible ranges so the search cannot
-buy fit with nonsense such as negative breakout gains). Values at a bound (`qb_sig` 0.4, `pb_rook` 2.0,
-`pb_age` 1.0, `pu_age` 0.0, `gain_rook` 0.5, `qb_gain` 0.2, `bust_sd` 0.35) say the structure is straining
-there; see Limitations.
+buy fit with nonsense such as negative breakout gains). Values at a bound in the v2 fit (`b_solid` 1.05, `pb_tier` 0.8, `pu_rook` 1.5, `ps_tier` 1.2, `gain_tier` near 0.27) say the
+structure is still straining there; see Limitations. The v1 bounds that were hit (`qb_sig`, `bust_sd`, `pb_rook`, `gain_rook`,
+`qb_gain`) were widened for the v2 fit (`fit.py` `SEASON2_BOUNDS`).
 
 | Parameter | Value |
 | --- | --- |
-| `b_solid` | 1.0106 |
-| `b_solid_qb` | 0.9059 |
+| `b_solid` | 1.05 |
+| `b_solid_qb` | 0.8733 |
 | `b_solid_k` | 0.93 |
-| `b_tier` | 0.0315 |
-| `sigma0` | 0.1033 |
-| `sigma_tier` | 0.5646 |
-| `qb_sig` | 0.4 |
-| `pb0` | -2.3304 |
-| `pb_rook` | 2.0 |
-| `pb_age` | 1.0 |
-| `pb_tier` | 0.4534 |
-| `pu0` | -2.1728 |
-| `pu_rook` | 1.4342 |
-| `pu_age` | 0.0 |
-| `pu_tier` | 0.1979 |
-| `ps0` | -2.5 |
-| `ps_tier` | 0.8 |
+| `b_tier` | 0.0784 |
+| `sigma0` | 0.0708 |
+| `sigma_tier` | 0.6782 |
+| `qb_sig` | 0.2314 |
+| `pb0` | -2.7566 |
+| `pb_rook` | 2.6637 |
+| `pb_age` | 0.5535 |
+| `pb_tier` | 0.8 |
+| `pu0` | -1.5948 |
+| `pu_rook` | 1.5 |
+| `pu_age` | 0.0158 |
+| `pu_tier` | 0.1004 |
+| `ps0` | -2.0203 |
+| `ps_tier` | 1.2 |
 | `pi0` | -2.2 |
-| `bust_mult` | 0.7502 |
-| `bust_sd` | 0.35 |
-| `gain_mean` | 5.4713 |
+| `bust_mult` | 0.7645 |
+| `bust_sd` | 0.371 |
+| `gain_mean` | 3.1523 |
 | `gain_shape` | 2.5 |
-| `gain_tier` | 0.1398 |
-| `gain_rook` | 0.5 |
-| `qb_gain` | 0.2 |
-| `te_gain` | 0.472 |
+| `gain_tier` | 0.2711 |
+| `gain_rook` | 1.1329 |
+| `qb_gain` | 0.2328 |
+| `te_gain` | 0.6098 |
+| `pc0` | -4.1131 |
+| `pc_tier` | 1.1977 |
+| `pc_rook` | 0.076 |
+| `collapse_mult` | 0.3282 |
+| `collapse_sd` | 0.2566 |
+| `pu_qb` | -0.1733 |
+| `qb_bust_mult` | 0.7853 |
+| `sig_rook` | 0.0 |
+| `te_sig` | 1.0325 |
 
 In-season (`InSeasonParams`): hazard fit to games missed (mean, P(0), P(>=3), P(>=6), P(>=10)); the
 duration pmf is the real episode-length distribution with the long tail widened to 10% because the
@@ -462,6 +527,9 @@ SD (0.40) and form AR(1) chosen so weekly lag-1 autocorrelation stays at the rea
 | `role_rate` | 0.65 |
 | `role_rate_deep` | 0.5 |
 | `p_promotion` | 0.35 |
+| `role_star` | 1.0137 |
+| `role_qb` | 0.1 |
+| `absorb` | (0.6, 0.33, 0.23, 0.1, 0.0) |
 | `promo_mult` | (1.2, 1.9) |
 | `demo_mult` | (0.45, 0.85) |
 | `vol_sd` | 0.12 |
@@ -516,7 +584,7 @@ Why these choices, in plain terms:
    (2025). One shared environment shock models it but five seasons barely identify its SD, and the held-out
    years were hot (mean PIT 0.555: the model sits about 5 percentile points low). Out-of-sample 50% intervals
    cover 45%, 90% intervals 85%: the model is slightly over-confident.
-3. **Left tail of depth players is too thin.** Real log(actual/proj) SD is 0.55 vs 0.49 simulated (variance
+3. **Left tail of depth players is thinner than real** (v2 narrowed it: variance ratio 0.90 overall, 0.70 rookies, TE about 0.6-0.95). Real log(actual/proj) SD is 0.55 vs 0.49 simulated (variance
    ratio 0.78; rookies 0.5-0.6, TE 0.47 held out): real low-usage players can fall to a fifth of projection,
    the model rarely does. QBs go the other way (variance ratio 1.7; the real QB season is very tight and
    `qb_sig` is at its lower bound).
@@ -528,9 +596,8 @@ Why these choices, in plain terms:
    there is no preseason-injured start (the model has no one starting the season on IR).
 6. **Rookies are thin.** 219 rookie seasons (58 core). Rookie PIT 80% interval covers 73% (in-sample) and the
    rookie season variance is under-dispersed (variance ratio about 0.5).
-7. **No cross-player structure beyond the weekly `team_shock`.** Role changes and injuries are independent
-   events per player: a starter's injury does not promote his backup. The game engine should couple those
-   (call `draw_season_profile`, then adjust teammates) if it wants that realism. No opponent, weather or
+7. **Cross-player structure.** `apply_depth_coupling` (v2) promotes backups for the games a starter misses, but the game engine does
+   not call it yet; without it injuries and role changes are independent per player. No opponent, weather or
    schedule strength.
 8. **Weeks 15-17 are treated like any week.** Real week-17 resting of starters and playoff-week effects are
    not modelled, and the calibration data stops at week 17 (the NFL's 18th week is not in the panel).
