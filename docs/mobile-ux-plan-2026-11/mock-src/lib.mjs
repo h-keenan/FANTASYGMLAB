@@ -1,0 +1,33 @@
+export const I = {
+  home:'<path d="M3 11l9-8 9 8v9a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z"/>',
+  team:'<path d="M8 3 3 6l2 4 2-1v12h10V9l2 1 2-4-5-3a4 4 0 0 1-8 0z"/>',
+  swap:'<path d="M4 8h14l-4-4M20 16H6l4 4"/>',
+  league:'<path d="M5 21V11M12 21V4M19 21v-7"/>',
+  more:'<circle cx="5" cy="12" r="1.6"/><circle cx="12" cy="12" r="1.6"/><circle cx="19" cy="12" r="1.6"/>',
+  search:'<circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/>',
+  bell:'<path d="M6 17V11a6 6 0 1 1 12 0v6l2 2H4zM10 21h4"/>',
+  back:'<path d="m15 5-7 7 7 7"/>',
+  chev:'<path d="m9 5 7 7-7 7"/>',
+  down:'<path d="m6 9 6 6 6-6"/>',
+  list:'<path d="M5 6h14M5 12h14M5 18h14"/>',
+  plus:'<path d="M12 5v14M5 12h14"/>',
+  user:'<circle cx="12" cy="8" r="4"/><path d="M4 21c0-4 3.5-7 8-7s8 3 8 7"/>',
+  crown:'<path d="M3 8l4 4 5-7 5 7 4-4-2 11H5z"/>',
+  card:'<rect x="3" y="5" width="18" height="14" rx="2"/><path d="M3 10h18"/>',
+  gear:'<circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3M5 5l2 2M17 17l2 2M19 5l-2 2M7 17l-2 2"/>',
+  news:'<rect x="4" y="4" width="16" height="16" rx="2"/><path d="M8 9h8M8 13h8M8 17h5"/>',
+  game:'<rect x="3" y="7" width="18" height="11" rx="4"/><path d="M8 10v5M5.5 12.5h5"/>',
+  cal:'<rect x="4" y="5" width="16" height="15" rx="2"/><path d="M4 10h16M9 3v4M15 3v4"/>',
+  bolt:'<path d="M13 2 4 14h7l-1 8 9-12h-7z"/>',
+  check:'<path d="m5 12 5 5 9-10"/>',
+  flag:'<path d="M5 21V4h11l-2 4 2 4H5"/>',
+  people:'<circle cx="9" cy="8" r="3.5"/><path d="M2 20c0-3.5 3-6 7-6s7 2.5 7 6M17 5a3.5 3.5 0 0 1 0 7M22 20c0-3-2-5-5-5.5"/>',
+  info:'<circle cx="12" cy="12" r="9"/><path d="M12 11v6M12 7.5v.5"/>',
+  doc:'<path d="M6 3h9l4 4v14H6z"/><path d="M9 12h7M9 16h7"/>',
+  out:'<path d="M10 4H5v16h5M16 8l4 4-4 4M20 12H9"/>',
+  star:'<path d="m12 3 2.7 5.8 6.3.8-4.6 4.4 1.2 6.3L12 17.2 6.4 20.3l1.2-6.3L3 9.6l6.3-.8z"/>',
+  share:'<path d="M12 15V3M7 8l5-5 5 5M5 13v7h14v-7"/>',
+};
+export const ic = (n, s = 22, w = 1.9, extra = "") => `<svg class="ic" width="${s}" height="${s}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="${w}" stroke-linecap="round" stroke-linejoin="round" ${extra}>${I[n]}</svg>`;
+export const TOKENS = `:root{--bg:#000;--surface:#1f2226;--raised:#3d4248;--tx:#f7f8fa;--tx2:#e5e7eb;--mut:#a8adb7;--bd:#2a2e35;--bd2:#64748b;--acc:#67e8f9;--acc2:#22d3ee;--ok:#22c55e;--opp:#14b8a6;--act:#facc15;--warn:#f59e0b;--bad:#ef4444;--dx:#8b93ff;--prem:#e0a526;--qb:#fb7185;--rb:#4ade80;--wr:#38bdf8;--te:#fb923c;--k:#a78bfa;--font:system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}*{box-sizing:border-box;margin:0;padding:0}html,body{width:390px;height:844px;overflow:hidden}body{font-family:var(--font);background:var(--bg);color:var(--tx);-webkit-font-smoothing:antialiased;font-variant-numeric:tabular-nums;position:relative}.ic{display:block;flex:none}`;
+export const page = (title, css, body) => `<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=390"><title>${title}</title><style>${TOKENS}${css}</style></head><body>${body}</body></html>`;
