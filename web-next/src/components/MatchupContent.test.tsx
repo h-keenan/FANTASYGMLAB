@@ -300,6 +300,9 @@ describe("MatchupContent", () => {
       expect(within(list).getAllByTestId("slot-row").length).toBeGreaterThan(1);
       expect(within(list).queryByTestId("player-card-matchup")).not.toBeInTheDocument();
       expect(screen.getByTestId("slot-legend")).toBeInTheDocument();
+      // Compact rows carry a status glyph (shape + color) but no status word; the legend explains them.
+      expect(list.querySelector("[data-glyph='live']")).not.toBeNull();
+      expect(list.querySelector("[data-glyph]")).not.toBeNull();
       const centers = within(list).getAllByTestId("slot-center");
       fireEvent.click(centers[0]);
       expect(within(list).getAllByTestId("slot-expanded")).toHaveLength(1);

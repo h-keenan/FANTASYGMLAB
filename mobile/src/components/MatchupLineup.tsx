@@ -116,6 +116,9 @@ export function ComparisonHeader({
   );
 }
 
+/** Status as color AND shape: live = filled dot, upcoming = hollow ring, final = check, bye = dash, out = x. */
+const STATUS_GLYPH: Record<string, string> = { live: '●', upcoming: '○', final: '✓', bye: '–', out: '✕' };
+
 function dotColor(colors: ThemeColors, tone: ChipTone): string {
   switch (tone) {
     case 'success':
@@ -182,8 +185,14 @@ function CompactSide({
           {card.name}
         </AppText>
         <View style={[styles.statusRow, mirror && { flexDirection: 'row-reverse' }]}>
-          {primary ? <View style={[styles.dot, { backgroundColor: dotColor(colors, primary.tone) }]} /> : null}
-          {primary ? <AppText style={[styles.statusText, { color: dotColor(colors, primary.tone) }]}>{primary.label}</AppText> : null}
+          {primary ? (
+            <AppText
+              style={[styles.statusText, { color: dotColor(colors, primary.tone) }]}
+              accessibilityLabel={primary.label}
+            >
+              {STATUS_GLYPH[primary.kind] ?? '●'}
+            </AppText>
+          ) : null}
           {flag ? <AppText style={[styles.statusText, { color: dotColor(colors, flag.tone) }]}>{flag.kind === 'doubtful' ? 'D' : 'Q'}</AppText> : null}
         </View>
         <View style={[styles.statusRow, mirror && { flexDirection: 'row-reverse' }, { gap: 6 }]}>
@@ -307,17 +316,18 @@ export function SlotRow({
 function Legend() {
   const { colors } = useThemeMode();
   const styles = useMemo(() => createStyles(colors), [colors]);
-  const items: [string, string][] = [
-    ['LIVE', colors.successBright],
-    ['FINAL', colors.textTertiary],
-    ['UPCOMING', colors.accent],
-    ['BYE / OUT', colors.warning],
+  const items: [string, string, string][] = [
+    ['live', 'LIVE', colors.successBright],
+    ['upcoming', 'UPCOMING', colors.accent],
+    ['final', 'FINAL', colors.textTertiary],
+    ['bye', 'BYE', colors.warning],
+    ['out', 'OUT', colors.danger],
   ];
   return (
     <View style={styles.legend}>
-      {items.map(([label, color]) => (
+      {items.map(([kind, label, color]) => (
         <View key={label} style={styles.statusRow}>
-          <View style={[styles.dot, { backgroundColor: color }]} />
+          <AppText style={[styles.statusText, { color }]}>{STATUS_GLYPH[kind]}</AppText>
           <AppText style={styles.statusText}>{label}</AppText>
         </View>
       ))}
