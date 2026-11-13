@@ -1,6 +1,6 @@
 """Trade-block harness: offers per week and acceptance, with and without a block, over several seeds.
 
-    PYTHONPATH=. python tests/harness_sim_block.py [seeds]
+    PYTHONPATH=. python tests/test_sim_block_harness.py [seeds]
 
 Reports, per variant: offers a week (mean / max), the share that answer the block, how often the user accepting a block offer
 executes a legal trade, AI teams shopping a week (mean, by stance) and how the shelves change week to week."""
