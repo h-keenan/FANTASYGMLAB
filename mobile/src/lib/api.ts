@@ -3998,6 +3998,11 @@ export const api = {
     authorizedRequest<SimGameTypes.SimInboxResponse>(`/v1/sim/games/${encodeURIComponent(gameId)}/inbox/${encodeURIComponent(itemId)}/respond`, { method: "POST", jsonBody: { action } }),
   advanceSimGame: (gameId: string, week: number) =>
     authorizedRequest<SimGameTypes.SimAdvanceResponse>(`/v1/sim/games/${encodeURIComponent(gameId)}/advance`, { method: "POST", jsonBody: { week } }),
+  getSimToOptions: (gameId: string) => authorizedRequest<SimGameTypes.SimToOptionsResponse>(`/v1/sim/games/${encodeURIComponent(gameId)}/sim-to/options`),
+  simToGame: (gameId: string, body: { target: SimGameTypes.SimToTarget; weeks?: number; auto_set?: boolean; force_first?: boolean }) =>
+    authorizedRequest<SimGameTypes.SimToResponse>(`/v1/sim/games/${encodeURIComponent(gameId)}/sim-to`, { method: "POST", jsonBody: body }),
+  undoSimTo: (gameId: string, fromSeq: number) =>
+    authorizedRequest<SimGameTypes.SimGameResponse & { undone?: boolean }>(`/v1/sim/games/${encodeURIComponent(gameId)}/undo-sim`, { method: "POST", jsonBody: { from_seq: fromSeq } }),
   revertSimWeek: (gameId: string) =>
     authorizedRequest<SimGameTypes.SimGameResponse & { reverted?: number }>(`/v1/sim/games/${encodeURIComponent(gameId)}/revert-week`, { method: "POST", jsonBody: {} }),
   getSimLeague: (gameId: string) => authorizedRequest<SimGameTypes.SimLeagueResponse>(`/v1/sim/games/${encodeURIComponent(gameId)}/league`),

@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useLayoutEffect, useMemo, useReducer, useRef, useState } from 'react';
-import { ScrollView, StyleSheet, View } from 'react-native';
+import { ActivityIndicator, ScrollView, StyleSheet, View } from 'react-native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useHeaderHeight } from '@react-navigation/elements';
@@ -29,6 +29,7 @@ import { SimHomeTab } from '../components/SimGameHome';
 import { SimPlayerSheet } from '../components/SimGamePlayers';
 import { SimNotice, SimOpenPlayerContext, SimPreviewBanner, SimTeamOpenContext, createSimStyles, type SimCtx } from '../components/SimGameParts';
 import { SimTeamSheet } from '../components/SimGameTeamSheet';
+import { SimToResultView, SimToSheet, type SimToRequest } from '../components/SimToControl';
 import { SimFinalView } from '../components/SimGameRecap';
 import SimWeekRecapStory from '../components/SimRecapStory';
 import { SimPlayersTab, SimTeamTab } from '../components/SimGameTeam';
@@ -88,7 +89,9 @@ import {
   type SimWaiverClaim,
   simTradeSeedFor,
   type SimTradeSeed,
+  type SimToResponse,
 } from '../lib/simGame';
+import { simToProgressLabel } from '../lib/simTo';
 import { simScrollKey, simShouldScrollTop } from '../lib/simScroll';
 import { SIM_FLOW_INITIAL, simFlowReducer, simRecapsFromAdvance, type SimTab } from '../lib/simGameFlow';
 import { useSimGameRequest } from '../lib/useSimGameRequest';
@@ -129,6 +132,10 @@ export default function GmGameScreen({ navigation }: Props) {
   const [sheetPlayer, setSheetPlayer] = useState<SimGamePlayer | null>(null);
   const [sheetTeam, setSheetTeam] = useState<string | null>(null);
   const [draftRecap, setDraftRecap] = useState<{ recap: SimDraftRecap | null } | null>(null);
+  const [simToOpen, setSimToOpen] = useState(false);
+  const [simToResult, setSimToResult] = useState<SimToResponse | null>(null);
+  const [simToRequest, setSimToRequest] = useState<SimToRequest | null>(null);
+  const [simToBusy, setSimToBusy] = useState<string | null>(null);
   const [claims, setClaims] = useState<SimWaiverClaim[]>([]);
   const [tradeSeed, setTradeSeed] = useState<SimTradeSeed | null>(null);
   const [advancing, setAdvancing] = useState(false);
@@ -338,6 +345,49 @@ export default function GmGameScreen({ navigation }: Props) {
     }
   }
 
+  async function runSimTo(request: SimToRequest) {
+    if (!game) return;
+    const blockers = simAdvanceBlockers(game, preview);
+    if (blockers.some((b) => b.code === 'paywalled')) {
+      dispatch({ type: 'gate', gate: { kind: 'premium', upsell: null, preview } });
+      return;
+    }
+    setAdvancing(true);
+    setSimToRequest(request);
+    setSimToBusy(request.option.label);
+    setNotice(null);
+    const res = await call(() => api.simToGame(game.id, { target: request.option.id, weeks: request.option.weeks, auto_set: request.autoSet, force_first: request.forceFirst }));
+    setAdvancing(false);
+    setSimToBusy(null);
+    if (!res) return;
+    if (res.game) {
+      setGameState(res.game);
+      if (res.preview !== undefined) setPreview(res.preview ?? null);
+      if ((res.weeks_played ?? 0) > 0) {
+        setClaims([]);
+        dispatch({ type: 'advanced', recaps: [], game: res.game });
+        setTick((n) => n + 1);
+        void refreshList();
+      }
+    }
+    setSimToResult(res);
+  }
+
+  async function undoSimTo(): Promise<boolean> {
+    const from = simToResult?.from_seq;
+    if (!game || from == null) return false;
+    const res = await call(() => api.undoSimTo(game.id, from));
+    if (!res?.game) return false;
+    setGameState(res.game);
+    setClaims([]);
+    dispatch({ type: 'advanced', recaps: [], game: res.game });
+    setTick((n) => n + 1);
+    setSimToResult(null);
+    notify('Took the simulated weeks back.', 'success');
+    void refreshList();
+    return true;
+  }
+
   const ctx: SimCtx | null = useMemo(
     () =>
       game
@@ -371,7 +421,7 @@ export default function GmGameScreen({ navigation }: Props) {
   const insets = useSafeAreaInsets();
   const [stackHeight, setStackHeight] = useState(0);
   const showBar =
-    flow.view === 'game' && Boolean(game) && (flow.stage === 'week' || flow.stage === 'playoffs') && !draftRecap && !flow.recaps[flow.recapIndex];
+    flow.view === 'game' && Boolean(game) && (flow.stage === 'week' || flow.stage === 'playoffs') && !draftRecap && !flow.recaps[flow.recapIndex] && !simToResult;
   const showOffBar = flow.view === 'game' && Boolean(game) && flow.stage === 'offseason' && !draftRecap && !flow.recaps[flow.recapIndex];
   const anyBar = showBar || showOffBar;
   // The game draws its own orb above the Advance pill, so the global GM orb steps aside while it is up.
@@ -419,7 +469,7 @@ export default function GmGameScreen({ navigation }: Props) {
             />
           </View>
           {showBar ? (
-            <SimActionBar ctx={ctx} paywalled={simGamePaywalled(preview)} advancing={advancing} onAdvance={advance} onGoPro={goPaywall} onTab={(tab) => dispatch({ type: 'tab', tab })} />
+            <SimActionBar ctx={ctx} paywalled={simGamePaywalled(preview)} advancing={advancing} onAdvance={advance} onSimTo={() => setSimToOpen(true)} onGoPro={goPaywall} onTab={(tab) => dispatch({ type: 'tab', tab })} />
           ) : (
             <SimOffseasonBar ctx={ctx} onTab={(tab) => dispatch({ type: 'tab', tab })} />
           )}
@@ -494,6 +544,16 @@ export default function GmGameScreen({ navigation }: Props) {
         clearNotice={() => setNotice(null)}
         onAdvance={advance}
         onGoPro={goPaywall}
+        simToResult={simToResult}
+        simToBusy={simToBusy}
+        onSimToDone={() => setSimToResult(null)}
+        onSimToForce={() => {
+          if (simToRequest) {
+            setSimToResult(null);
+            void runSimTo({ ...simToRequest, forceFirst: true });
+          }
+        }}
+        onSimToUndo={undoSimTo}
         onTab={(tab) => dispatch({ type: 'tab', tab })}
         draftRecap={draftRecap}
         onDraftComplete={(recap) => setDraftRecap({ recap })}
@@ -517,6 +577,13 @@ export default function GmGameScreen({ navigation }: Props) {
         }}
       />,
       <>
+        {simToOpen ? <SimToSheet ctx={ctx} onClose={() => setSimToOpen(false)} onRun={runSimTo} /> : null}
+        {simToBusy ? (
+          <View style={styles.simToBusy} accessibilityLiveRegion="polite" testID="sim-to-progress">
+            <ActivityIndicator size="small" />
+            <AppText style={styles.muted}>{simToProgressLabel(simToBusy)}</AppText>
+          </View>
+        ) : null}
         {sheetPlayer ? (
           <SimPlayerSheet
             gameId={game.id}
@@ -917,6 +984,11 @@ function GameScreen({
   clearNotice,
   onAdvance,
   onGoPro,
+  simToResult,
+  simToBusy,
+  onSimToDone,
+  onSimToForce,
+  onSimToUndo,
   onTab,
   draftRecap,
   onDraftComplete,
@@ -941,6 +1013,11 @@ function GameScreen({
   clearNotice: () => void;
   onAdvance: () => void;
   onGoPro: () => void;
+  simToResult: SimToResponse | null;
+  simToBusy: string | null;
+  onSimToDone: () => void;
+  onSimToForce: () => void;
+  onSimToUndo: () => Promise<boolean>;
   onTab: (tab: SimTab) => void;
   draftRecap: { recap: SimDraftRecap | null } | null;
   onDraftComplete: (recap: SimDraftRecap | null) => void;
@@ -977,6 +1054,8 @@ function GameScreen({
         <SimGameDraft ctx={ctx} onComplete={onDraftComplete} />
       ) : draftRecap ? (
         <SimDraftRecapView recap={draftRecap.recap} ctx={ctx} onStart={onStartSeason} />
+      ) : simToResult ? (
+        <SimToResultView result={simToResult} onClose={onSimToDone} onTab={(tab) => onTab(tab)} onForce={onSimToForce} onUndo={onSimToUndo} onGoPro={onGoPro} />
       ) : recap ? (
         <SimWeekRecapStory recap={recap} index={flow.recapIndex} total={flow.recaps.length} ctx={ctx} onNext={onRecapNext} onClose={onRecapClose} onFixLineup={() => { onRecapClose(); onTab('team'); }} />
       ) : stage === 'final' ? (
@@ -1101,5 +1180,6 @@ function createStyles(colors: ThemeColors) {
     bodyStrong: { fontSize: 15, fontWeight: '700', color: colors.textPrimary },
     muted: { fontSize: 13, lineHeight: 18, color: colors.textTertiary },
     link: { fontSize: 13.5, fontWeight: '700', color: colors.accent },
+    simToBusy: { position: 'absolute', left: spacing.lg, right: spacing.lg, bottom: 140, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: spacing.sm, paddingVertical: spacing.sm, borderRadius: 14, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.backgroundElevated, zIndex: 20 },
   });
 }

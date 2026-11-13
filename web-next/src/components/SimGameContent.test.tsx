@@ -21,7 +21,7 @@ vi.mock("@/lib/api", async () => {
     "getSimGameOptions", "getSimLeagueTeams", "listSimGames", "createSimGame", "getSimGame", "deleteSimGame", "getSimDraft", "simDraftPick", "simDraftAuto",
     "putSimDraftQueue", "getSimGamePlayers", "getSimGamePlayer", "getSimGameTeam", "getSimHome", "getSimLineup", "putSimLineup", "autoSimLineup",
     "claimSimWaiver", "cancelSimWaiver", "cutSimPlayer", "previewSimTrade", "sendSimTrade", "getSimInbox", "respondSimInbox",
-    "advanceSimGame", "revertSimWeek", "getSimLeague", "getSimLeagueRosters", "getSimTeamHistory", "getSimGameResult",
+    "advanceSimGame", "revertSimWeek", "getSimLeague", "getSimLeagueRosters", "getSimTeamHistory", "getSimToOptions", "simToGame", "undoSimTo", "getSimGameResult",
   ];
   return { ...actual, api: { ...actual.api, ...Object.fromEntries(names.map((n) => [n, vi.fn()])) } };
 });
@@ -389,6 +389,66 @@ describe("SimGameContent", () => {
     fireEvent.click(screen.getByRole("button", { name: "Back to your team" }));
     await waitFor(() => expect(screen.queryByTestId("week-recap-story")).not.toBeInTheDocument());
     expect(screen.getByTestId("game-heading")).toHaveTextContent("Week 5 of 14");
+  });
+
+  const simToSummary = {
+    weeks: [
+      { week: 4, kind: "regular", round: null, result: "w", your_pts: 128.4, opp_pts: 109.7, opponent: "Rivals", auto_filled: [] },
+      { week: 5, kind: "regular", round: null, result: "l", your_pts: 90.1, opp_pts: 101.3, opponent: "Rats", auto_filled: ["WR"] },
+    ],
+    record: { before: "2-1", after: "3-2" }, rank: { before: 4, after: 5 }, pf: 218.5,
+    injuries: [{ week: 5, player: { id: "9", name: "Hurt Harry", pos: "RB" }, weeks: 3 }], claims: [], ai_trades: 2,
+    standings: [{ rank: 1, team_id: "7", name: "Rivals", is_you: false, wins: 4, losses: 1, ties: 0, pf: 500, pa: 400, playoff_status: "in" }], champion: null, season_complete: false,
+  };
+
+  it("Sim to... offers the stage's milestones, runs one request with the auto-set toggle, and shows a compact summary with undo", async () => {
+    mocked.listSimGames.mockResolvedValue({ ok: true, reason: "", games: [lite(game())] });
+    mocked.getSimToOptions.mockResolvedValue({ ok: true, reason: "", options: [{ id: "weeks", weeks: 1, label: "Next week" }, { id: "trade_deadline", label: "Trade deadline (week 10)" }, { id: "season_end", label: "Through the playoffs" }] });
+    mocked.simToGame.mockResolvedValue({ ok: true, reason: "", is_premium: true, target: "trade_deadline", weeks_played: 2, stopped: { code: "starter_out", week: 6, message: "Stopped at Week 6: your QB is out: Quinn Back (QB).", fix: "lineup" }, from_seq: 41, to_seq: 80, summary: simToSummary, recap: null, game: game({ week: 6 }) });
+    mocked.undoSimTo.mockResolvedValue({ ok: true, reason: "", undone: true, game: game({ week: 4 }) });
+    render(<SimGameContent />);
+    await openFirstGame();
+    fireEvent.click(await screen.findByTestId("sim-to-button"));
+    expect(await screen.findByRole("button", { name: "Trade deadline (week 10)" })).toBeInTheDocument();
+    expect(screen.getByRole("checkbox", { name: "Auto-set my lineup each week" })).not.toBeChecked(); // off by default
+    fireEvent.click(screen.getByRole("checkbox", { name: "Auto-set my lineup each week" }));
+    fireEvent.click(screen.getByRole("button", { name: "Trade deadline (week 10)" }));
+    const result = await screen.findByTestId("sim-to-result");
+    expect(mocked.simToGame).toHaveBeenCalledTimes(1);
+    expect(mocked.simToGame).toHaveBeenCalledWith("g1", { target: "trade_deadline", weeks: undefined, auto_set: true, force_first: undefined });
+    expect(result).toHaveTextContent("Simmed 2 weeks (Weeks 4-5)");
+    expect(result).toHaveTextContent("2-1 to 3-2 · #4 to #5");
+    expect(screen.getByTestId("sim-to-stop")).toHaveTextContent("Stopped at Week 6: your QB is out");
+    expect(within(result).getByRole("button", { name: "Fix lineup" })).toBeInTheDocument();
+    expect(within(result).queryByRole("button", { name: "Sim anyway" })).toBeNull(); // weeks were played: nothing to force
+    expect(result).toHaveTextContent("Hurt Harry (RB), out 3 weeks");
+    expect(result).toHaveTextContent("W 128.4-109.7 vs Rivals");
+    expect(screen.getByTestId("game-heading")).toHaveTextContent("Week 6 of 14");
+    // undo takes the whole run back
+    fireEvent.click(within(result).getByRole("button", { name: "Undo this sim" }));
+    fireEvent.click(await within(result).findByRole("button", { name: /Tap again/ }));
+    await waitFor(() => expect(mocked.undoSimTo).toHaveBeenCalledWith("g1", 41));
+    await waitFor(() => expect(screen.queryByTestId("sim-to-result")).not.toBeInTheDocument());
+  });
+
+  it("a stop before any week is played shows the reason, a fix button to the right tab, and Sim anyway forces the first week", async () => {
+    mocked.listSimGames.mockResolvedValue({ ok: true, reason: "", games: [lite(game())] });
+    mocked.getSimToOptions.mockResolvedValue({ ok: true, reason: "", options: [{ id: "weeks", weeks: 1, label: "Next week" }] });
+    const stop = { code: "trade_offers", week: 4, message: "Stopped at Week 4: 2 trade offers will expire this week.", fix: "inbox", count: 2 };
+    mocked.simToGame.mockResolvedValueOnce({ ok: true, reason: "", is_premium: true, target: "weeks", weeks_played: 0, stopped: stop, from_seq: 40, to_seq: 40, summary: null, recap: null, game: game() });
+    mocked.simToGame.mockResolvedValueOnce({ ok: true, reason: "", is_premium: true, target: "weeks", weeks_played: 1, stopped: null, from_seq: 40, to_seq: 70, summary: { ...simToSummary, weeks: [simToSummary.weeks[0]] }, recap: null, game: game({ week: 5 }) });
+    render(<SimGameContent />);
+    await openFirstGame();
+    fireEvent.click(await screen.findByTestId("sim-to-button"));
+    fireEvent.click(await screen.findByRole("button", { name: "Next week" }));
+    const result = await screen.findByTestId("sim-to-result");
+    expect(result).toHaveTextContent("Nothing simulated");
+    expect(screen.getByTestId("sim-to-stop")).toHaveTextContent("Stopped at Week 4: 2 trade offers will expire this week.");
+    expect(within(result).queryByRole("button", { name: "Undo this sim" })).toBeNull();
+    fireEvent.click(within(result).getByRole("button", { name: "Sim anyway" }));
+    await waitFor(() => expect(mocked.simToGame).toHaveBeenCalledTimes(2));
+    expect(mocked.simToGame).toHaveBeenLastCalledWith("g1", { target: "weeks", weeks: 1, auto_set: false, force_first: true });
+    expect(await screen.findByTestId("sim-to-result")).toHaveTextContent("Simmed Week 4");
   });
 
   it("a raced write (409) reloads the game and says so instead of failing", async () => {

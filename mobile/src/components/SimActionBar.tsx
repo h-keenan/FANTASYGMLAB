@@ -17,7 +17,7 @@ import { radii, spacing, type ThemeColors } from '../theme';
  * "What to do this week". An in-flow glass pill: the screen's bottom stack docks
  * it at the bottom with the game orb right above it, and pads the content to match.
  */
-export default function SimActionBar({ ctx, paywalled, advancing, onAdvance, onGoPro, onTab }: { ctx: SimCtx; paywalled: boolean; advancing: boolean; onAdvance: () => void; onGoPro: () => void; onTab?: (tab: 'team' | 'players') => void }) {
+export default function SimActionBar({ ctx, paywalled, advancing, onAdvance, onSimTo, onGoPro, onTab }: { ctx: SimCtx; paywalled: boolean; advancing: boolean; onAdvance: () => void; onSimTo?: () => void; onGoPro: () => void; onTab?: (tab: 'team' | 'players') => void }) {
   const { colors } = useThemeMode();
   const styles = useMemo(() => createStyles(colors), [colors]);
   const { gameId, game } = ctx;
@@ -58,6 +58,20 @@ export default function SimActionBar({ ctx, paywalled, advancing, onAdvance, onG
         </AppText>
       ) : null}
       <View style={styles.row}>
+        {onSimTo && !paywalled ? (
+          <Pressable
+            onPress={onSimTo}
+            disabled={advancing}
+            accessibilityRole="button"
+            accessibilityLabel="Sim to..."
+            accessibilityState={{ disabled: advancing }}
+            style={[styles.pill, advancing && styles.pillOff]}
+            testID="sim-to-button"
+          >
+            <SimGlyph name="matchup" color={colors.textPrimary} size={16} />
+            <AppText style={styles.pillLabel}>Sim to...</AppText>
+          </Pressable>
+        ) : null}
         <View style={styles.advance}>
           {paywalled ? (
             <Button label="Go Pro to continue" variant="premium" size="sm" onPress={onGoPro} />

@@ -17,7 +17,7 @@ import { simAdvanceState, simLineupIssues, type SimZeroStarter } from "@/lib/sim
  * (.action-pill; Auto-set lives on Home "What to do this week") docked at the bottom of the game's in-flow
  * sticky `.bottom-stack` (no orb, no position:fixed); sticky inside the page on desktop. Mobile twin: mobile/src/components/SimActionBar.tsx.
  */
-export function SimActionBar({ ctx, paywalled, advancing, onAdvance, onTab }: { ctx: SimCtx; paywalled: boolean; advancing: boolean; onAdvance: () => void; onTab?: (tab: "team" | "players") => void }) {
+export function SimActionBar({ ctx, paywalled, advancing, onAdvance, onSimTo, onTab }: { ctx: SimCtx; paywalled: boolean; advancing: boolean; onAdvance: () => void; onSimTo?: () => void; onTab?: (tab: "team" | "players") => void }) {
   const { gameId, game } = ctx;
   const [issues, setIssues] = useState<{ empty: string[]; zero: SimZeroStarter[] }>({ empty: [], zero: [] });
   const [confirming, setConfirming] = useState(false);
@@ -77,7 +77,13 @@ export function SimActionBar({ ctx, paywalled, advancing, onAdvance, onTab }: { 
           <span style={{ color: auto.optimal ? "var(--color-success)" : undefined }}>{auto.optimal ? "Lineup optimal" : "Lineup can improve"}</span>
         </p>
       )}
-      <div className="mx-auto grid max-w-3xl grid-cols-1 items-center gap-2 p-1 md:mx-0 md:flex md:max-w-none md:flex-none md:gap-2 md:p-0">
+      <div className={`mx-auto grid max-w-3xl ${onSimTo && !paywalled ? "grid-cols-[auto_1fr]" : "grid-cols-1"} items-center gap-2 p-1 md:mx-0 md:flex md:max-w-none md:flex-none md:gap-2 md:p-0`}>
+        {onSimTo && !paywalled ? (
+          <Button variant="secondary" size="sm" className="whitespace-nowrap" disabled={advancing} onClick={onSimTo} aria-label="Sim to..." data-testid="sim-to-button">
+            <SimGlyph name="matchup" size={16} />
+            <span className="ml-1.5">Sim to...</span>
+          </Button>
+        ) : null}
         <Button className="max-md:hidden" variant="secondary" size="sm" loading={auto.busy} disabled={auto.optimal || paywalled} onClick={auto.run} aria-label={auto.optimal ? "Lineup is optimal" : "Auto-set best lineup"}>
           <SimGlyph name={auto.optimal ? "check" : "spark"} size={16} />
           <span className="ml-1.5">{auto.optimal ? "Optimal" : "Auto-set"}</span>
