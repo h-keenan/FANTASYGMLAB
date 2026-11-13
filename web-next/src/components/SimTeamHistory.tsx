@@ -18,7 +18,7 @@ function PickRow({ pick }: { pick: SimTeamHistoryPick }) {
       <PositionBadge position={pick.pos} />
       <span className="min-w-0 flex-1 truncate font-bold">{pick.name}</span>
       <span className="shrink-0 text-xs tabular-nums" style={{ color: "var(--color-text-secondary)" }}>
-        {simDraftSlotText(pick.round, pick.pick, pick.auto).replace(" overall", "")}
+        {simDraftSlotText(pick.round, pick.pick, pick.auto)}
       </span>
     </li>
   );

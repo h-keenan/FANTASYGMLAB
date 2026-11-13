@@ -63,6 +63,13 @@ await scenario("1-league-teams", async (page) => { await tab(page, "League"); aw
 await scenario("2-league-qbs", async (page) => { await tab(page, "League"); await page.getByRole("tab", { name: "Players", exact: true }).last().click(); await sleep(1200); await page.getByRole("tab", { name: "QB", exact: true }).click(); await sleep(800); });
 await scenario("3-find-player", async (page) => { await tab(page, "League"); await page.getByRole("tab", { name: "Players", exact: true }).last().click(); await sleep(1200); await page.getByLabel("Find a player").fill("moore"); await sleep(800); });
 await scenario("4-team-roster", async (page) => { await tab(page, "League"); await tab(page, "Teams"); await page.getByRole("button", { name: /Open roster/ }).nth(4).click(); await sleep(1800); }, { shots: 6 });
+for (const [i, name] of ["Overview", "Roster", "Trades", "History"].entries()) {
+  await scenario(`6-team-tab-${i + 1}-${name.toLowerCase()}`, async (page) => {
+    await tab(page, "League"); await tab(page, "Teams");
+    await page.getByRole("button", { name: /Open roster/ }).nth(4).click(); await sleep(1500);
+    await page.getByRole("dialog").getByRole("tab", { name }).click(); await sleep(1200);
+  }, { shots: name === "Overview" || name === "History" ? 2 : 1 });
+}
 await scenario("5-trade-partner", async (page) => { await tab(page, "Trades"); await tab(page, "Make an offer"); await sleep(800); }, { shots: 2 });
 console.log([...new Set(requests)].join("\n"));
 await browser.close();

@@ -22,7 +22,7 @@ function PickRow({ pick }: { pick: SimTeamHistoryPick }) {
       <AppText style={[common.bodyStrong, common.grow]} numberOfLines={1}>
         {pick.name}
       </AppText>
-      <AppText style={common.muted}>{simDraftSlotText(pick.round, pick.pick, pick.auto).replace(' overall', '')}</AppText>
+      <AppText style={common.muted}>{simDraftSlotText(pick.round, pick.pick, pick.auto)}</AppText>
     </View>
   );
 }
