@@ -12,16 +12,16 @@ after #1816 (team roles), #1836 (player-model-4), #1843 (AI managers) and #1851 
 
 | # | Sev | Finding | Evidence | Status |
 | --- | --- | --- | --- | --- |
-| 1 | High | `revert-week` left a checkpoint past the truncated event log: live state kept reverted actions, the log lost them, a cold replay raised "list.remove(x)" / "event log has a gap" | fuzzer seed 101, 5 of 8 first-batch games diverged; resume != replay | Fixed in #1859 (+ regression test that fails without the fix) |
+| 1 | High | `revert-week` left a checkpoint past the truncated event log: live state kept reverted actions, the log lost them, a cold replay raised "list.remove(x)" / "event log has a gap" | fuzzer seeds 100, 101 and 106 (3 of the first 8 games): resume != replay, one cold replay crashed | Fixed in #1859 (+ regression test that fails without the fix) |
 | 2 | Medium | Scoring fell through the season: team scores 112.9 (week 1) -> 96.9 (week 13) in a 12-team league (-15%). Model level: expected weekly mean relative to the season mean 1.00 -> 0.92 for starters; real panel is flat (-0.1% to -0.2% a week) | `realism_sweep seasons`, `path_fit`: model slopes -0.5% / -0.7% a week (elite / starter) vs real -0.1% / -0.2% | Fixed in #1861 (player-model-5, centered tilt, season totals and calibration unchanged) |
 | 3 | Medium | Payload and cold-start budget: `/league/rosters` 120-131 KB and `/picks` 63 KB per call; cold `/home` 61-112 ms, cold `/advance` about 570 ms on the in-memory store | `realism_sweep latency` | Reported; no change (see below) |
 | 4 | Low | `POST /sim-to` with an unknown `target` is accepted and behaves like "through the playoffs"; unbounded `weeks` | probe of 40 malformed requests: no 5xx, but this is the only silently-lenient one | Reported |
 | 5 | Low | `sim-to` stops with 0 weeks on any pending trade offer even with `auto_set` (needs `force_first`) | 5 of 6 games stopped at week 3 with `trade_offers`, repeated calls stop again until the offers expire | Reported (by design, worth a UI hint) |
 | 6 | Info | Dynasty aging looks too fast (RB 28-29: 0.62 vs real 0.72, WR 26-27: 0.80 vs 0.89, TE 26-27: 0.72 vs 0.93) but only on an unconditional sample; conditioned on still being in the draftable pool, as the real panel is, it matches (RB 28-29 0.80, WR 26-27 0.87, WR 28-29 0.83, TE 28-29 0.85) | `realism_sweep dynasty` | Not a bug: the real table is survivorship-conditioned |
-| 7 | Info | AI trade desk is not farmable for wins: a greedy trader that only sends AI-accepted trades raises its market asset value 50-80% but loses games | `realism_sweep exploit`, below | No action |
+| 7 | Info | AI trade desk is not farmable for wins: a greedy trader that only sends AI-accepted trades raises its market asset value 43-75% but loses games | `realism_sweep exploit`, below | No action |
 | 8 | Info | Harness caveat: scoring variants (half, std) show the same team score because the harness pool is PPR points; the product converts the pool to the league's scoring at the input door (`RealSimInputs.player_pool`), and the model solves its stat lines to the supplied mean (existing test) | `realism_sweep seasons` | Not a product issue |
 
-No crash, 5xx, illegal state, asset-conservation break, retry double-apply or dead end was found in 56 fuzzed games (about 17,000 requests) once #1 was fixed.
+No crash, 5xx, illegal state, asset-conservation break, retry double-apply or dead end was found in 56 fuzzed games (tens of thousands of requests) once #1 was fixed.
 
 ## 1. League shapes vs real fantasy (5 seeded games per shape, 16 for title odds; pool from the real 2025 panel, player-model-4)
 
@@ -65,7 +65,7 @@ the market-value gap of a trade is reported by `season_metrics` (`trade_market_g
 Random legal and illegal sequences through the real FastAPI app: draft picks, waivers, cuts, lineups, trades in both directions (players and picks), inbox responses, IR/taxi moves, advance with
 current/stale/future weeks, sim-to, undo-sim, revert-week, rookie draft, cutdown, season rollover, junk ids, retried trades. After every few steps: no 5xx and a JSON body; one owner per player;
 legal lineups; IR/taxi capacity; AI rosters within the limit outside the rookie draft; pick ledger (held + spent = created); traded assets arrive where the trade says; retried trades never
-double-execute; a user over the roster limit always has a cut that works; resume == replay. Results: the first batch (8 games) found finding 1 in 5; after the fix 24 games x 300 steps, then 24 games x 350 steps with
+double-execute; a user over the roster limit always has a cut that works; resume == replay. Results: the first batch (8 games) found finding 1 in 3 games (the other flags were harness issues: a transient AI roster over the limit during the rookie draft, which the invariant now allows); after the fix 24 games x 300 steps, then 24 games x 350 steps with
 random bench size, IR and taxi slots, taxi years, tiebreaker, TE premium and auto-lineup: 0 violations. Most common refusals are the intended ones (wrong phase, trade deadline, taxi ineligible, week mismatch).
 Malformed-input probe (40 bad query strings and bodies: negative and huge pages, unknown sorts, huge ids, wrong types, path tricks): no 5xx; only the unknown `sim-to` target is silently accepted (finding 4).
 
@@ -99,10 +99,10 @@ the lineup each time, 3 games per cell, season played out against the same game 
 
 | | trades | asset value | wins vs no-trade | points for vs no-trade |
 | --- | --- | --- | --- | --- |
-| redraft, maximize assets | 22-28 | +65% to +75% | 0-3 vs 5-7 | -20% to -43% |
-| redraft, maximize lineup | 9-16 | -12% to +16% | 3-5 vs 5-7 | -6% to -11% |
-| dynasty, maximize assets | 23-29 | +41% to +48% | 1-6 vs 3-5 | -3% to -32% |
-| dynasty, maximize lineup | 1-4 | -9% to +11% | 3-5 vs 3-5 | -3% to +2% |
+| redraft, maximize assets | 22-28 | +63% to +75% | 0-3 vs 5-7 | -21% to -43% |
+| redraft, maximize lineup | 9-16 | -11% to +16% | 3-5 vs 5-7 | -6% to -12% |
+| dynasty, maximize assets | 23-29 | +43% to +47% | 1-6 vs 3-5 | -3% to -32% |
+| dynasty, maximize lineup | 1-4 | -9% to +11% | 3-5 vs 3-5 | -2% to +2% |
 
 The AI accepts trades that raise the user's market value a lot (personas value production, youth and picks differently, the intended source of trades), but nothing here converts into wins:
 selling production for market value costs the current season. Per-AI trade caps (6 a season with anyone) and the deadline bound the volume. A multi-season check of whether stacked youth and picks
