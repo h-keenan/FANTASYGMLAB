@@ -11,12 +11,13 @@ from dataclasses import replace
 from typing import Iterable, Sequence
 
 from modules.sim import aging
-from modules.sim.game_scoring import team_roles_enabled
+from modules.sim.game_scoring import team_roles_mode
 from modules.sim.game_state import GameState
 from modules.sim.game_types import GameSnapshot, slot_positions
 from modules.sim.picks import FUTURE_SLOT_FRAC, pick_label, pick_market_value
 from modules.sim.lineup import Assignment, SlotPlan, carry_lineup, pick_lineup
 from modules.sim.personas import PERSONAS, TeamParams
+from modules.sim import team_roles as tr
 from modules.sim.team_roles import Role, RoleBook
 from modules.sim.types import GAME_POSITIONS, is_pick_id
 
@@ -61,10 +62,15 @@ class Evaluator:
         self._roles: dict[tuple, dict[str, Role]] = {}
         book = getattr(snapshot, "_role_book", None)
         if book is None:  # frozen snapshot: memoize on the instance (False = this game does not use team roles)
-            book = RoleBook(snapshot.players) if team_roles_enabled(snapshot.scoring_model) else False
+            mode = team_roles_mode(snapshot.scoring_model)
+            book = RoleBook(snapshot.players) if mode else False
             object.__setattr__(snapshot, "_role_book", book)
+            object.__setattr__(snapshot, "_role_mode", mode)
         self.book = book or None
         self.roles_on = self.book is not None
+        # "additive" (player-model-4+): additive team roles and a robust, role-normalised player level.
+        self.additive = getattr(snapshot, "_role_mode", "") == "additive"
+        self._level: dict[str, float] = {}
         scale = getattr(snapshot, "_now_scale", None)
         if scale is None:  # frozen snapshot: memoize on the instance
             scale = self._compute_now_scale()
@@ -103,9 +109,43 @@ class Evaluator:
         projection updated by what he has actually done this season (a Bayesian blend, so one big week moves
         it a little, not a lot)."""
 
+        if self.additive:
+            return self.level(pid)
         mean = self.snap.players[pid].mean
         games = self.state.games_played(pid) if self.state.status != "offseason" else []
         return (mean * PRIOR_GAMES + sum(games)) / (PRIOR_GAMES + len(games)) if games else mean
+
+    def level(self, pid: str) -> float:
+        """player-model-4: his own per-game level (what he scores in his usual role). A credibility-weighted
+        average of the projection and what he has done, where each game is first stripped of the team role he had
+        (``(points - role points) / role scale``), weighted by that role's share (a bench QB's 2 points say little), and
+        winsorised (one game counts at most ``LEVEL_WIN_MULT x max(projection, 3)`` and never above the position's
+        ceiling). One 70-point freak game, or a stretch as a fill-in, cannot make a depth player a star."""
+
+        self._sync()
+        cached = self._level.get(pid)
+        if cached is not None:
+            return cached
+        p = self.snap.players[pid]
+        mu = p.mean
+        hist = self.state.points.get(pid) if self.state.status != "offseason" else None
+        if not hist:
+            self._level[pid] = mu
+            return mu
+        cap = min(tr.PROJ_CEIL.get(p.pos, 1e9), tr.LEVEL_WIN_MULT * max(mu, tr.LEVEL_WIN_FLOOR))
+        roles = self.state.role_hist.get(pid, {})
+        num, den = tr.LEVEL_PRIOR_GAMES * mu, tr.LEVEL_PRIOR_GAMES
+        for i, pts in enumerate(hist):
+            if pts is None:
+                continue
+            scale, add = roles.get(str(i + 1), (1.0, 0.0))
+            w = max(float(scale), tr.MIN_ROLE_WEIGHT)
+            x = min(cap, max(0.0, pts - float(add)) / w)
+            num += w * x
+            den += w
+        value = num / den
+        self._level[pid] = value
+        return value
 
     def _sync(self) -> None:
         """Drop the caches when the game moved on (an event was applied: a week scored, an injury, a claim)."""
@@ -119,6 +159,7 @@ class Evaluator:
         if self._ros_key != key:
             self._ros.clear()
             self._roles.clear()
+            self._level.clear()
             self._ros_key = key
 
     def ros_mean(self, pid: str) -> float:
@@ -130,7 +171,7 @@ class Evaluator:
         cached = self._ros.get(pid)
         if cached is not None:
             return cached
-        value = self.base_mean(pid) * self.role_factor(pid)
+        value = self._additive_ros(pid) if self.additive else self.base_mean(pid) * self.role_factor(pid)
         self._ros[pid] = value
         return value
 
@@ -149,13 +190,29 @@ class Evaluator:
         ck = (key, week)
         roles = self._roles.get(ck)
         if roles is None:
-            roles = self.book.roles(key, lambda p: self.status(p, week) == "healthy")
+            roles = self.book.roles(key, lambda p: self.status(p, week) == "healthy", self.level if self.additive else None)
             self._roles[ck] = roles
         return roles.get(pid)
 
     def role_mult(self, pid: str, week: int) -> float:
         r = self.role(pid, week)
         return r.mult if r is not None else 1.0
+
+    def role_param(self, pid: str, week: int):
+        """What the engine hands the scoring model for this week: a float multiplier (player-model-3) or a
+        ``(scale, points)`` pair (player-model-4+)."""
+
+        if not self.additive:
+            return self.role_mult(pid, week)
+        r = self.role(pid, week)
+        return (r.mult, r.add) if r is not None else (1.0, 0.0)
+
+    def _additive_ros(self, pid: str) -> float:
+        start = 1 if self.state.status == "offseason" else max(self.state.week, 1)
+        weeks = self._playable_weeks(pid, start, ROLE_HORIZON_WEEKS)
+        if not weeks:
+            return self.week_mean(pid, start)
+        return sum(self.week_mean(pid, w) for w in weeks) / len(weeks)
 
     def _playable_weeks(self, pid: str, start: int, count: int) -> list[int]:
         last = self.snap.settings.regular_weeks
@@ -175,6 +232,10 @@ class Evaluator:
     def week_mean(self, pid: str, week: int) -> float:
         """His mean for one specific week: ``base_mean`` times that week's role multiplier."""
 
+        if self.additive:
+            r = self.role(pid, week)
+            scale, add = (r.mult, r.add) if r is not None else (1.0, 0.0)
+            return tr.soft_ceiling(self.level(pid) * scale + add, tr.PROJ_CEIL.get(self.snap.players[pid].pos))
         return self.base_mean(pid) * self.role_mult(pid, week)
 
     def next_game(self, pid: str, week: int) -> int | None:

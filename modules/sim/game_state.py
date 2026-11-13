@@ -59,6 +59,8 @@ class GameState:
         self.streak: dict[str, str] = {t.tid: "" for t in snapshot.teams}
         self.history: list[dict[str, Any]] = []  # one entry per played week
         self.points: dict[str, list[float | None]] = {}
+        # player-model-4: the team role (scale, points) a player had in each game he played, {pid: {"week": [scale, add]}}.
+        self.role_hist: dict[str, dict[str, list[float]]] = {}
         self.claims: list[dict[str, Any]] = []
         self.offers: list[dict[str, Any]] = []
         self.offer_keys: list[str] = []
@@ -162,7 +164,7 @@ class GameState:
         for key in ("ir", "taxi"):
             if not any(raw[key].values()):
                 del raw[key]
-        for key in ("pick_owner", "created_picks", "spent_picks", "seasons", "rookie_log", "retired"):
+        for key in ("pick_owner", "created_picks", "spent_picks", "seasons", "rookie_log", "retired", "role_hist"):
             if not raw[key]:
                 del raw[key]
         if raw["season_no"] == 1:
@@ -329,6 +331,8 @@ def _week_scored(state, snap, week, p):
     games = p["games"]
     played = p["points"]
     state.week = week + 1  # next week to play (out-week counters tick below)
+    for pid, ra in (p.get("roles") or {}).items():
+        state.role_hist.setdefault(pid, {})[str(week)] = [float(ra[0]), float(ra[1])]
     for pid in snap.pids:
         hist = state.points.setdefault(pid, [])
         while len(hist) < week - 1:
@@ -442,6 +446,7 @@ def _season_started(state, snap, week, p):
     state.streak = {t.tid: "" for t in snap.teams}
     state.history = []
     state.points = {}
+    state.role_hist = {}
     state.claims = []
     state.offers = []
     state.offer_keys = []

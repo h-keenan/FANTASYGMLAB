@@ -9,13 +9,24 @@ import hashlib
 from dataclasses import replace
 from pathlib import Path
 
-from modules.sim import game_scoring, player_model, player_model_v1, player_model_v2
+from modules.sim import game_scoring, player_model, player_model_v1, player_model_v2, player_model_v3
 from tests.test_sim_game_engine import BYES, ROWS, InMemoryBackend
 from tests import test_sim_game_engine as eng
 
 V1_ID = "player_model-player-model-1"
 V2_ID = "player_model-player-model-2"
 V3_ID = "player_model-player-model-3"
+V4_ID = "player_model-player-model-4"
+# sha256 of modules/sim/player_model_v3.py: the frozen copy of player-model-3 (multiplicative team roles) before player-model-4
+V3_SHA256 = "a3516d0163b00d67710961774582dea310875cf9e603e64ffb1d288b8eaa8c75"
+# state digests after weeks 2..6 for seed 11 / user slot 4, produced by the player-model-3 code before player-model-4 existed
+GOLDEN_V3_DIGESTS = {
+    2: "f735464118e9d00e231844cdc501fad68c1051e1a2219d122c033572ca6c91e0",
+    3: "278b72d1596deb28a9c3fabef7af9b732aaeeb4329b8002fdf361ad3d300cb8c",
+    4: "d07ae0281cc0e60a908fdab4a7d55fb69e595d6bd8e2e3bf77e0fb0febdf41b8",
+    5: "cee768074372bd424016744b662465873ef45bcbc72a8c11739661b12f66f984",
+    6: "97f20e407b48d7ab3b6f1ca39b54ff3a6b6ce086c98e1746676bb94f1af403a2",
+}
 # sha256 of modules/sim/player_model_v2.py: the frozen copy of player-model-2 as it was before team roles (player-model-3)
 V2_SHA256 = "0f688ea2b0abb7656e2b1becc4416de06ed82e37ced658a61d9c16881202ec64"
 # state digests after weeks 2..6 for seed 11 / user slot 4, produced by the player-model-2 code before team roles existed
@@ -66,7 +77,7 @@ def test_v1_module_is_a_frozen_copy():
     path = Path(player_model_v1.__file__)
     assert hashlib.sha256(path.read_bytes()).hexdigest() == V1_SHA256, "player_model_v1.py must never change"
     assert player_model_v1.MODEL_VERSION == "player-model-1"
-    assert player_model.MODEL_VERSION == "player-model-3"
+    assert player_model.MODEL_VERSION == "player-model-4"
 
 
 def test_v2_module_is_a_frozen_copy():
@@ -76,17 +87,18 @@ def test_v2_module_is_a_frozen_copy():
 
 def test_get_model_routes_each_id_to_its_own_module_and_new_games_use_the_latest():
     assert game_scoring.get_model(V1_ID)._m is player_model_v1
-    assert game_scoring.get_model(V2_ID)._m is player_model_v2 and game_scoring.get_model(V3_ID)._m is player_model
+    assert game_scoring.get_model(V2_ID)._m is player_model_v2 and game_scoring.get_model(V3_ID)._m is player_model_v3
+    assert game_scoring.get_model(V4_ID)._m is player_model
     assert game_scoring.get_model(V1_ID).model_id == V1_ID and game_scoring.get_model(V2_ID).model_id == V2_ID
-    assert game_scoring.default_model().model_id == V3_ID
+    assert game_scoring.default_model().model_id == V4_ID
     assert game_scoring.get_model(game_scoring.FALLBACK_ID).model_id == game_scoring.FALLBACK_ID
     assert game_scoring.get_model("").model_id == game_scoring.FALLBACK_ID
 
 
 def test_unknown_model_ids_fall_back_to_the_default_with_a_note():
     model, note = game_scoring.resolve_model("player_model-player-model-99")
-    assert model.model_id == V3_ID and note and "player_model-player-model-99" in note
-    for known in (V1_ID, V2_ID, V3_ID, game_scoring.FALLBACK_ID, None):
+    assert model.model_id == V4_ID and note and "player_model-player-model-99" in note
+    for known in (V1_ID, V2_ID, V3_ID, V4_ID, game_scoring.FALLBACK_ID, None):
         assert game_scoring.resolve_model(known)[1] is None
 
 
@@ -123,3 +135,19 @@ def test_a_game_created_under_v2_replays_and_resumes_identically():
     store, gid, snap, state, digests = _play(V2_ID)
     assert snap.scoring_model == V2_ID and digests == GOLDEN_V2_DIGESTS, "v2 game results changed"
     assert store.load_state("u", gid, snap, use_checkpoint=False).digest() == GOLDEN_V2_DIGESTS[STOP_WEEK]
+
+
+def test_v3_module_is_a_frozen_copy():
+    assert hashlib.sha256(Path(player_model_v3.__file__).read_bytes()).hexdigest() == V3_SHA256, "player_model_v3.py must never change"
+    assert player_model_v3.MODEL_VERSION == "player-model-3" and player_model_v3.TEAM_ROLES
+
+
+def test_a_game_created_under_v3_replays_and_resumes_identically():
+    store, gid, snap, state, digests = _play(V3_ID)
+    assert snap.scoring_model == V3_ID and digests == GOLDEN_V3_DIGESTS, "v3 game results changed"
+    assert store.load_state("u", gid, snap, use_checkpoint=False).digest() == GOLDEN_V3_DIGESTS[STOP_WEEK]
+
+
+def test_v4_games_resume_equal_replay():
+    store, gid, snap, state, _ = _play(V4_ID)
+    assert store.load_state("u", gid, snap, use_checkpoint=True).digest() == store.load_state("u", gid, snap, use_checkpoint=False).digest() == state.digest()

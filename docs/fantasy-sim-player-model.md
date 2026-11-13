@@ -17,6 +17,9 @@ real NFL seasons by `modules/sim/calibration/`.
 - Held-out 2024-25: season-PPG percentile KS distance **0.105** (mean PIT 0.555), 50/80/90% intervals cover **45/77/85%**, mean absolute error of breakout/bust tier hit rates **0.057** (0.026 in-sample), weekly points SD ratio sim/real **0.99-1.08** by position, boom/bust week rates within **0.03**, games missed 2.56 vs 2.37 per season; all five seasons in-sample: KS **0.050**, tier-hit MAE **0.026**.
 - **player-model-2 (2026-11 audit)**: role-collapse tail, QB/star fixes and an opt-in depth-chart coupling; see 4.0 for the
   before/after. Tables 4.1-4.2 and the headline numbers above are the player-model-1 baseline.
+- **player-model-4 (2026-11 tail realism)**: bounded expected points (smooth per-position ceilings), capped spread and role compounding,
+  additive team roles and a robust, role-normalised projection; fixes a depth WR scoring 72 and being projected 70. New games only;
+  player-model-3 is frozen in `player_model_v3.py`. Numbers: `docs/audits/2026-11-sim-tail-realism.md`.
 - **player-model-3 (2026-11 team roles)**: same weekly draws, plus team-level role coupling in the engine (one fill-in per injured
   starter, other backups near baseline; see section 8). New games only; player-model-2 is frozen in `player_model_v2.py`.
 - Honest weak spots are in "Limitations" below. The biggest: the real projection
@@ -70,12 +73,12 @@ Speed: about 80 microseconds per player-week (pure Python + numpy scalars); a 12
 
 ## 1a. Versions and replay safety
 
-`modules/sim/player_model_v2.py` is the same kind of frozen copy of player-model-2 (sha256 pinned in
+`modules/sim/player_model_v3.py` is the frozen copy of player-model-3 (sha256 and golden digests pinned too); `modules/sim/player_model_v2.py` is the same kind of frozen copy of player-model-2 (sha256 pinned in
 `tests/test_sim_game_model_versions.py`, golden digests for a v2 game too). `player_model.py` is now **player-model-3**.
 
 `modules/sim/player_model_v1.py` is a **frozen byte-for-byte copy** of player-model-1 (sha256 pinned in
 `tests/test_sim_game_model_versions.py`); never edit it. `modules/sim/player_model.py` is the current model (player-model-2).
-`game_scoring.get_model(model_id)` routes by the id a game stored: `player_model-player-model-1` -> v1, `-2` -> v2 (frozen copy), `-3` -> the current module, the fallback id
+`game_scoring.get_model(model_id)` routes by the id a game stored: `player_model-player-model-1` -> v1, `-2` -> v2 (frozen copy), `-3` -> v3 (frozen copy), `-4` -> the current module, the fallback id
 -> `FallbackModel`; an unknown id falls back to the newest model and `resolve_model` returns a note saying so. New games use the
 newest. A new generation = copy the then-current module to `player_model_vN.py`, register it in `_MODEL_MODULES`, add it to the
 pure-engine list in `tests/test_sim_isolation.py`, and add a golden-digest replay test. Evaluate the old model with
@@ -105,6 +108,17 @@ inheritors get `own + absorb x 0.8 x starter mean` (calibrated `InSeasonParams.a
 "Proj" is the role-resolved mean for the next game he can play (rows carry `role` with a label and `if_starts`). Full write-up and the real-app
 check: `docs/audits/2026-11-sim-team-role-coupling.md`. Limits: roles use public depth order (a stale chart is wrong), and the Bayesian blend
 of a player's actual games into his rest-of-season mean mixes games played in different roles.
+
+## 1d. player-model-4: bounded tails, additive roles, robust projections
+
+Why: with multiplicative team roles a 0.6 ppg depth WR filling in for a 25 ppg star was scored at `own mean x (5 / 0.6)` on top of a season story
+with a 43x tail, then "projected" from a blend that fed on those games and multiplied the role again (72-point game, 70.3 shown). v4:
+`soft_ceiling` per position on season and weekly means (`SEASON_CEIL`, `WEEK_CEIL`, from the real panel), solid-season sigma capped (`SIGMA_MAX`) with
+truncated draws (`Z_SEASON`, `Z_TRUNC`, `MIX_MAX`), natural role changes bounded (`ROLE_CUM`), team roles additive (`with_role(profile, week, scale, add)`,
+`team_roles.resolve_group_additive`), and the Evaluator projects from `Evaluator.level` (credibility-weighted, role-normalised, winsorised; `state.role_hist` stores
+each game's role). The shown "This week" is the public expected value of the engine's own expression, ceilinged. Harness: `python -m modules.sim.calibration.tail_report`
+(real vs sim percentiles, max, share above 30/40/50 by position and depth slot, team scores, projection error); `backtest --model v3|v4` for season-level
+calibration. Before/after tables in `docs/audits/2026-11-sim-tail-realism.md`. Games on v1-v3 keep exactly their old behaviour.
 
 ## 2. What is modelled
 

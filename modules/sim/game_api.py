@@ -76,7 +76,8 @@ from modules.sim.game_types import (
 from modules.sim.personas import PERSONAS
 from modules.sim.rng import WorldRng
 from modules.sim.store import SimStoreError
-from modules.sim.team_roles import week_one_roles
+from modules.sim.team_roles import PROJ_CEIL, week_one_roles
+from modules.sim.team_roles import soft_ceiling as tr_soft_ceiling
 from modules.sim.types import FLEX_SLOTS, GAME_POSITIONS, POSITIONS, SimInputsError
 
 _log = logging.getLogger(__name__)
@@ -1068,7 +1069,10 @@ def add_preview_route(router: APIRouter, ctx: GameApiCtx) -> None:
         rows = [p for p in players.values() if (not pos or p.pos == pos) and (not needle or needle in p.name.lower())]
         # Team roles (what new games use): one fill-in per injured starter, other backups at their baseline.
         roles = week_one_roles(players)
-        shown = {pid: round(p.mean * (r.mult if (r := roles.get(pid)) else 1.0), 1) for pid, p in players.items()}
+        shown = {
+            pid: round(tr_soft_ceiling(p.mean * (r.mult if (r := roles.get(pid)) else 1.0) + (r.add if r else 0.0), PROJ_CEIL.get(p.pos)), 1)
+            for pid, p in players.items()
+        }
         keys = {
             "projection": lambda p: (-shown[p.pid], p.pid), "value": lambda p: (-p.value, p.pid),
             "adp": lambda p: (p.adp, p.pid), "age": lambda p: (p.age, p.pid), "name": lambda p: (p.name.lower(), p.pid),
