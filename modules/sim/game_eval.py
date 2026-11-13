@@ -21,7 +21,7 @@ from modules.sim.team_roles import Role, RoleBook
 from modules.sim.types import GAME_POSITIONS, is_pick_id
 
 PRIOR_GAMES = 5.0  # a projection counts as this many games of evidence
-ROLE_HORIZON_WEEKS = 17  # a player's rest-of-season mean averages his role over the playable weeks left (known injuries only)
+ROLE_HORIZON_WEEKS = 8  # a player's rest-of-season mean averages his role over his next playable weeks (known injuries only; 17 let a trade-spammer beat the anti-exploit margin)
 NEED_K = 8.0  # value units per projected weekly lineup point
 USER_PARAMS = TeamParams(
     horizon=0.55, accept_threshold=0.0, propose_min=0.0, activity=0.0, noise_sd=0.0, waiver_aggr=0.0,
@@ -162,7 +162,7 @@ class Evaluator:
         return [w for w in range(start, min(last, start + count - 1) + 1) if self.status(pid, w) == "healthy"]
 
     def role_factor(self, pid: str) -> float:
-        """Average role multiplier over his playable regular-season weeks left (1.0 without roles)."""
+        """Average role multiplier over his playable weeks in the next ROLE_HORIZON_WEEKS (1.0 without roles)."""
 
         if self.book is None or self.book.key(pid) is None:
             return 1.0

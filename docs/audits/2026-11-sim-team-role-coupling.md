@@ -60,7 +60,7 @@ profile; `Evaluator.status` is the single source, so scoring and display agree a
 
 Engine wiring: `ScoringSession.week(pid, week, role_mult)` hands the multiplier to the model, which applies it as a one-week `RoleChange`
 (`player_model.with_role_multiplier`, no extra random draw). The Evaluator carries the same roles: `proj`/lineup entries use the week's role,
-`ros_mean` (valuations, waivers, AI lineups, power rankings) is the base mean times the average role over his playable weeks left, so a
+`ros_mean` (valuations, waivers, AI lineups, power rankings) is the base mean times the average role over his playable weeks in the next 8, so a
 four-week fill-in is not valued as a starter, and a stash of both backups is not rewarded.
 
 Displayed projection ("Proj" in Players, waivers, draft board, roster rows): expected per-game points for the **next game he can play**,
