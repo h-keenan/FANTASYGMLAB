@@ -611,6 +611,17 @@
    JS-positioned: the stack is `position: sticky; bottom: 0` at the end of a
    min-height:100dvh column, so iOS Safari's visual-viewport quirks cannot
    float it. Existing glass tokens only. */
+/* Sizes come from lib/bottomBarMetrics.ts (bottomBarMetrics.test.ts keeps these in step). */
+:root {
+  --bar-side-inset: 12px;
+  --bar-pill-bottom-gap: 8px;
+  --bar-pill-padding: 4px;
+  --bar-button-min-height: 44px;
+  --bar-orb-size: 56px;
+  --bar-orb-gap: 4px;
+  --bar-tab-height: 52px;
+  --bar-header-height: 52px;
+}
 .bottom-stack {
   position: sticky;
   bottom: 0;
@@ -624,16 +635,16 @@
 /* The game's navigation orb docks to the stack (absolute inside the sticky stack, not fixed), bottom-right, just above the Advance pill. */
 .game-orb-dock {
   position: absolute;
-  right: 0.75rem;
-  bottom: calc(100% + 0.25rem);
+  right: var(--bar-side-inset);
+  bottom: calc(100% + var(--bar-orb-gap));
   pointer-events: none;
 }
 .game-orb-dock > * { pointer-events: auto; }
 .game-orb {
   position: relative;
   display: flex;
-  width: 3.5rem;
-  height: 3.5rem;
+  width: var(--bar-orb-size);
+  height: var(--bar-orb-size);
   flex-direction: column;
   align-items: center;
   justify-content: center;
@@ -700,7 +711,7 @@
   position: relative;
   display: flex;
   width: 100%;
-  min-height: 52px;
+  min-height: var(--bar-tab-height);
   flex-direction: column;
   align-items: center;
   justify-content: center;
@@ -745,7 +756,7 @@
 /* The floating glass pill that holds the page's primary + secondary action (phones only; md+ pages style their own). */
 @media (max-width: 767px) {
 .action-pill {
-    margin: 0 0.75rem 0.5rem;
+    margin: 0 var(--bar-side-inset) var(--bar-pill-bottom-gap);
     background: color-mix(in srgb, var(--color-bg) 94%, transparent);
     -webkit-backdrop-filter: blur(22px) saturate(180%);
     backdrop-filter: blur(22px) saturate(180%);
