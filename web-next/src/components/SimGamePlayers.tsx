@@ -2,17 +2,17 @@
 
 import { useEffect, useMemo, useReducer, useState, type ReactNode } from "react";
 
-import { AccentCard } from "@/components/AccentCard";
+import { Collapsible } from "@/components/Collapsible";
+import { PlayerQuickView } from "@/components/PlayerQuickView";
+import type { PlayerQuickViewIdentity } from "@/context/PlayerQuickViewContext";
 import { EmptyState } from "@/components/EmptyState";
 import { Input, Select } from "@/components/Input";
 import { PillRow } from "@/components/PillRow";
-import { SectionHeading } from "@/components/SectionHeading";
 import { ReviewGlyphChip } from "@/components/SeasonReviewSections";
-import { SimPager, SimPlayerLine, SimSheet, SimStat, SimToneBadge, useSimDebounced } from "@/components/SimGameParts";
+import { SimPager, SimPlayerLine, SimStat, SimToneBadge, useSimDebounced, useSimWide } from "@/components/SimGameParts";
 import { SkeletonRows } from "@/components/Skeleton";
-import { PositionBadge } from "@/components/PositionBadge";
-import { PlayerAvatar } from "@/components/PlayerAvatar";
 import { api } from "@/lib/api";
+import { SIM_WINDOW_STEP, simWindow } from "@/lib/simLayout";
 import { PLAYER_SEARCH_DEBOUNCE_MS } from "@/lib/leaguePlayerSearch";
 import {
   SIM_PAGE_SIZE,
@@ -22,10 +22,10 @@ import {
   simDefaultFilter,
   simFilterQuery,
   simFilterReducer,
-  simFmtAge,
   simFmtProjection,
   simFmtPts,
   simFmtValue,
+  simHeadshotId,
   simOwnerLabel,
   simOwnerTone,
   simPageCount,
@@ -78,6 +78,12 @@ export function SimPlayerBrowser({
   const [total, setTotal] = useState(0);
   const [state, setState] = useState<"loading" | "ready" | "error">("loading");
   const [attempt, setAttempt] = useState(0);
+  const wide = useSimWide();
+  // A new page or filter starts at the top window again (the window is keyed to the filter).
+  const windowKey = [filter.page, filter.pos, filter.sort, filter.q, filter.status].join("|");
+  const [win, setWin] = useState({ key: windowKey, n: SIM_WINDOW_STEP });
+  const visible = win.key === windowKey ? win.n : SIM_WINDOW_STEP;
+  const setVisible = (update: (n: number) => number) => setWin({ key: windowKey, n: update(visible) });
 
   useEffect(() => {
     dispatch({ type: "q", value: debouncedText });
@@ -104,6 +110,7 @@ export function SimPlayerBrowser({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [gameId, query, refreshKey, attempt]);
 
+  const rows = simWindow(items, wide ? items.length : visible);
   return (
     <section className="flex flex-col gap-3" aria-label="Players">
       <Input
@@ -170,7 +177,7 @@ export function SimPlayerBrowser({
           <p className="text-xs pb-1" style={{ color: "var(--color-text-muted)" }} aria-live="polite">
             {total} player{total === 1 ? "" : "s"}
           </p>
-          {items.map((player) => (
+          {rows.shown.map((player) => (
             <SimPlayerLine
               key={player.id}
               player={player}
@@ -188,12 +195,22 @@ export function SimPlayerBrowser({
               trailing={
                 <>
                   <SimStat label="Proj" value={simFmtPts(player.projection)} />
-                  <SimStat label="Value" value={simFmtValue(player.value)} />
+                  <span className="hidden sm:block"><SimStat label="Value" value={simFmtValue(player.value)} /></span>
                   {actions ? actions(player) : null}
                 </>
               }
             />
           ))}
+          {rows.remaining > 0 ? (
+            <button
+              type="button"
+              className="tap-link self-center text-sm font-bold"
+              style={{ color: "var(--color-accent)", minHeight: "var(--touch-target-min)" }}
+              onClick={() => setVisible((n) => n + SIM_WINDOW_STEP)}
+            >
+              Show {Math.min(SIM_WINDOW_STEP, rows.remaining)} more on this page ({rows.remaining} left)
+            </button>
+          ) : null}
         </div>
       )}
       <SimPager page={filter.page} pages={simPageCount(total, SIM_PAGE_SIZE)} onPage={(page) => dispatch({ type: "page", value: page })} />
@@ -201,8 +218,31 @@ export function SimPlayerBrowser({
   );
 }
 
-/** Player sheet: this week's projection and band, week-by-week outlook, results so far, news. */
+/**
+ * The game's player detail IS the main app's Player Quick View: the shared
+ * PlayerQuickView (hero, news, stats, trends, bio, model) fed by an adapter
+ * that maps the sim player to a quick-view identity (real Sleeper id ->
+ * real data from the main API), plus a sim overlay with what only this game
+ * knows: this week's projection band, status, owner, week-by-week outlook,
+ * results so far and sim news. A synthetic player (no real id) renders the
+ * same layout without the remote sections.
+ */
 export function SimPlayerSheet({ gameId, player, onClose, actions }: { gameId: string; player: SimGamePlayer; onClose: () => void; actions?: ReactNode }) {
+  const real = simHeadshotId(player);
+  const identity: PlayerQuickViewIdentity = {
+    player_id: real ?? player.id,
+    name: player.name,
+    position: player.pos,
+    team: player.team ?? null,
+    age: player.age ?? null,
+    injury_status: player.status === "out" ? "Out" : null,
+    sourceLabel: "Fantasy Sim",
+  };
+  return <PlayerQuickView identity={identity} onClose={onClose} remote={Boolean(real)} simOverlay={<SimPlayerOverlay gameId={gameId} player={player} actions={actions} />} />;
+}
+
+/** The sim-only sections of the player detail, as phone-friendly collapsibles. */
+export function SimPlayerOverlay({ gameId, player, actions }: { gameId: string; player: SimGamePlayer; actions?: ReactNode }) {
   const [detail, setDetail] = useState<SimPlayerDetailResponse | null>(null);
   const [failed, setFailed] = useState(false);
   useEffect(() => {
@@ -225,47 +265,46 @@ export function SimPlayerSheet({ gameId, player, onClose, actions }: { gameId: s
   const weeks = detail?.weeks ?? [];
   const maxCeiling = Math.max(1, ...weeks.map((w) => w.ceiling));
   return (
-    <SimSheet title={`${player.name} details`} onClose={onClose}>
-      <div className="flex items-center gap-3 pr-10">
-        <PlayerAvatar playerId={player.id} size={56} />
-        <div className="flex min-w-0 flex-col gap-1">
-          <p className="text-lg font-extrabold break-words">{player.name}</p>
-          <div className="flex flex-wrap items-center gap-2 text-xs" style={{ color: "var(--color-text-muted)" }}>
-            <PositionBadge position={live.pos} />
-            <span>{live.team ?? "Free agent"}</span>
-            {simFmtAge(live.age) ? <span>Age {simFmtAge(live.age)}</span> : null}
+    <div className="flex flex-col gap-2 pt-2" data-testid="sim-player-overlay">
+      <Collapsible
+        id="player.sim"
+        accent="var(--color-accent)"
+        defaultOpen
+        title="In this game"
+        summary={
+          <span className="flex items-center gap-1">
             {status ? <SimToneBadge label={status.label} tone={status.tone} /> : null}
             {live.owner ? <SimToneBadge label={simOwnerLabel(live.owner)} tone={simOwnerTone(live.owner)} /> : null}
+          </span>
+        }
+      >
+        <div className="grid grid-cols-3 gap-2">
+          <div className="flex flex-col">
+            <span className="text-xs" style={{ color: "var(--color-text-muted)" }}>This week</span>
+            <span className="text-base font-extrabold">{simFmtPts(live.projection)}</span>
+            <span className="text-xs" style={{ color: "var(--color-text-muted)" }}>{simFmtPts(live.floor)}-{simFmtPts(live.ceiling)}</span>
+          </div>
+          <div className="flex flex-col">
+            <span className="text-xs" style={{ color: "var(--color-text-muted)" }} title="Model value on the game's 0-100 scale">Value</span>
+            <span className="text-base font-extrabold">{simFmtValue(live.value)}</span>
+            <span className="text-xs" style={{ color: "var(--color-text-muted)" }}>ADP {simFmtValue(live.adp)}</span>
+          </div>
+          <div className="flex flex-col">
+            <span className="text-xs" style={{ color: "var(--color-text-muted)" }}>Season</span>
+            <span className="text-base font-extrabold">{simFmtPts(live.season_points ?? 0)}</span>
+            <span className="text-xs" style={{ color: "var(--color-text-muted)" }}>{live.games ?? 0} games</span>
           </div>
         </div>
-      </div>
-      <div className="grid grid-cols-3 gap-2 pt-3">
-        <AccentCard accent="var(--color-accent)" compact as="div">
-          <span className="text-xs" style={{ color: "var(--color-text-muted)" }}>This week</span>
-          <span className="text-base font-extrabold">{simFmtPts(live.projection)}</span>
-          <span className="text-xs" style={{ color: "var(--color-text-muted)" }}>{simFmtPts(live.floor)}-{simFmtPts(live.ceiling)}</span>
-        </AccentCard>
-        <AccentCard accent="var(--color-premium)" compact as="div">
-          <span className="text-xs" style={{ color: "var(--color-text-muted)" }}>Value</span>
-          <span className="text-base font-extrabold">{simFmtValue(live.value)}</span>
-          <span className="text-xs" style={{ color: "var(--color-text-muted)" }}>ADP {simFmtValue(live.adp)}</span>
-        </AccentCard>
-        <AccentCard accent="var(--color-success)" compact as="div">
-          <span className="text-xs" style={{ color: "var(--color-text-muted)" }}>Season</span>
-          <span className="text-base font-extrabold">{simFmtPts(live.season_points ?? 0)}</span>
-          <span className="text-xs" style={{ color: "var(--color-text-muted)" }}>{live.games ?? 0} games</span>
-        </AccentCard>
-      </div>
-      {actions ? <div className="flex flex-wrap gap-2 pt-3">{actions}</div> : null}
+        {actions ? <div className="flex flex-wrap gap-2">{actions}</div> : null}
+      </Collapsible>
       {failed ? (
-        <p className="pt-3 text-sm" style={{ color: "var(--color-text-muted)" }}>Could not load the full outlook.</p>
+        <p className="text-sm" style={{ color: "var(--color-text-muted)" }}>Could not load the full outlook.</p>
       ) : !detail ? (
-        <div className="pt-3"><SkeletonRows count={3} /></div>
+        <SkeletonRows count={2} />
       ) : (
         <>
           {weeks.length > 0 ? (
-            <div className="flex flex-col gap-2 pt-4">
-              <SectionHeading note="Projection with its floor-to-ceiling band for each remaining week.">Week by week</SectionHeading>
+            <Collapsible id="player.sim.weeks" accent="var(--color-accent)" defaultOpen={false} title="Week by week" summary={<span className="text-xs" style={{ color: "var(--color-text-muted)" }}>{weeks.length} weeks</span>}>
               <ol className="flex flex-col gap-1.5" aria-label="Week-by-week projection">
                 {weeks.map((w) => (
                   <li key={w.week} className="flex items-center gap-2 text-xs">
@@ -289,10 +328,7 @@ export function SimPlayerSheet({ gameId, player, onClose, actions }: { gameId: s
                               borderRadius: "var(--radius-pill)",
                             }}
                           />
-                          <span
-                            className="absolute inset-y-0"
-                            style={{ left: `${(w.projection / maxCeiling) * 100}%`, width: 3, background: "var(--color-accent-strong)" }}
-                          />
+                          <span className="absolute inset-y-0" style={{ left: `${(w.projection / maxCeiling) * 100}%`, width: 3, background: "var(--color-accent-strong)" }} />
                         </span>
                         <span className="w-24 shrink-0 text-right font-semibold">{simFmtProjection(w)}</span>
                       </>
@@ -300,11 +336,10 @@ export function SimPlayerSheet({ gameId, player, onClose, actions }: { gameId: s
                   </li>
                 ))}
               </ol>
-            </div>
+            </Collapsible>
           ) : null}
           {(detail.history ?? []).length > 0 ? (
-            <div className="flex flex-col gap-2 pt-4">
-              <SectionHeading>Results so far</SectionHeading>
+            <Collapsible id="player.sim.results" accent="var(--color-success)" defaultOpen title="Results so far">
               <ul className="flex flex-wrap gap-2">
                 {detail.history!.map((h) => (
                   <li key={h.week} className="glass-surface px-3 py-1 text-xs">
@@ -313,26 +348,25 @@ export function SimPlayerSheet({ gameId, player, onClose, actions }: { gameId: s
                   </li>
                 ))}
               </ul>
-            </div>
+            </Collapsible>
           ) : null}
           {(detail.news ?? []).length > 0 ? (
-            <div className="flex flex-col gap-2 pt-4">
-              <SectionHeading>News</SectionHeading>
+            <Collapsible id="player.sim.news" accent="var(--color-warning)" defaultOpen title="Game news">
               <ul className="flex flex-col gap-1.5">
                 {detail.news!.map((n, i) => (
                   <li key={i} className="flex items-start gap-2 text-sm">
                     <ReviewGlyphChip glyph="stats" tone="accent" size={22} />
-                    <span className="flex-1 min-w-0">
+                    <span className="min-w-0 flex-1">
                       <span className="text-xs font-bold" style={{ color: "var(--color-accent)" }}>Week {n.week} · </span>
                       {n.text}
                     </span>
                   </li>
                 ))}
               </ul>
-            </div>
+            </Collapsible>
           ) : null}
         </>
       )}
-    </SimSheet>
+    </div>
   );
 }

@@ -15,7 +15,8 @@ import { SimDraftRecapView, SimGameDraft } from "@/components/SimGameDraft";
 import { SimLeagueTab } from "@/components/SimGameLeague";
 import { SimHomeTab } from "@/components/SimGameHome";
 import { SimPlayerSheet } from "@/components/SimGamePlayers";
-import { SimNotice, SimPreviewBanner, SimTeamLink, SimTeamOpenContext, simToneColor, type SimCtx } from "@/components/SimGameParts";
+import { SimActionBar } from "@/components/SimActionBar";
+import { SimNotice, SimOpenPlayerContext, SimPreviewBanner, SimTeamLink, SimTeamOpenContext, simToneColor, type SimCtx } from "@/components/SimGameParts";
 import { SimTeamSheet } from "@/components/SimGameTeamSheet";
 import { SimFinalView, SimWeekRecapView } from "@/components/SimGameRecap";
 import { SimPlayersTab, SimTeamTab } from "@/components/SimGameTeam";
@@ -29,7 +30,6 @@ import {
   SIM_DIFFICULTY_COPY,
   SIM_SCORING_LABELS,
   simAdvanceBlockers,
-  simAdvanceLabel,
   simAdvanceWarnings,
   simFmtPts,
   simFmtRecord,
@@ -747,10 +747,13 @@ function GameScreen({
   const warnings = simAdvanceWarnings(game);
   const youLine = game.you;
   const inSeason = (stage === "week" || stage === "playoffs") && !draftRecap;
+  const showBar = inSeason && !recap;
 
   return (
     <SimTeamOpenContext.Provider value={ctx.openTeam}>
-    <div className="flex flex-col gap-3">
+    <SimOpenPlayerContext.Provider value={ctx.openPlayer}>
+    {/* pb-24: the floating GM orb never covers the last row */}
+    <div className={`flex flex-col gap-3 ${showBar ? "pb-40 md:pb-3" : "pb-24"}`}>
       <div className="flex items-center justify-between gap-2">
         <div className="flex min-w-0 flex-col">
           <button type="button" className="tap-link text-xs font-bold self-start" style={{ color: "var(--color-accent)" }} onClick={onHub}>
@@ -764,15 +767,6 @@ function GameScreen({
             </div>
           ) : null}
         </div>
-        {inSeason && !recap ? (
-          paywalled ? (
-            <ButtonLink href="/premium" variant="premium" size="sm">Go Pro to continue</ButtonLink>
-          ) : (
-            <Button loading={advancing} onClick={onAdvance} aria-label={simAdvanceLabel(game)}>
-              {game.phase === "playoffs" ? "Play round" : "Advance week"}
-            </Button>
-          )
-        ) : null}
       </div>
 
       <SimPreviewBanner preview={preview} />
@@ -800,7 +794,7 @@ function GameScreen({
             ariaLabel="Game sections"
             variant="fill"
             sticky
-            options={SIM_TABS.map((t) => ({ label: t.value === "trades" && (game.pending?.inbox ?? 0) > 0 ? `Trades ${game.pending?.inbox}` : t.label, value: t.value }))}
+            options={SIM_TABS.map((t) => ({ label: t.label, value: t.value, count: t.value === "trades" ? game.pending?.inbox ?? 0 : undefined }))}
             active={flow.tab}
             onSelect={(value) => onTab(value as SimTab)}
           />
@@ -824,7 +818,9 @@ function GameScreen({
           </div>
         </>
       )}
+      {showBar ? <SimActionBar ctx={ctx} paywalled={paywalled} advancing={advancing} onAdvance={onAdvance} /> : null}
     </div>
+    </SimOpenPlayerContext.Provider>
     </SimTeamOpenContext.Provider>
   );
 }

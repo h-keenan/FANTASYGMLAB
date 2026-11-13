@@ -54,7 +54,7 @@ const options = (over: Partial<SimGameOptionsResponse> = {}): SimGameOptionsResp
 });
 
 const lineup: SimLineupResponse = {
-  ok: true, reason: "", week: 4, slots: [{ slot: "QB", player: player("1", "QB", "Quinn Back") }, { slot: "RB", player: null }], bench: [player("2", "RB", "Benny Bench")],
+  ok: true, reason: "", week: 4, slots: [{ slot: "QB", player: player("1", "QB", "Quinn Back") }, { slot: "RB", player: player("8", "RB", "Ray Starter") }], bench: [player("2", "RB", "Benny Bench")],
   projected_total: 121.4, warnings: [], roster_size: 16, roster_limit: 16, opponent: null, locked: false,
 };
 
@@ -116,6 +116,12 @@ describe("SimGameContent", () => {
     expect(await screen.findByTestId("sim-home")).toBeInTheDocument();
     expect(screen.getByRole("tab", { name: "Home" })).toHaveAttribute("aria-selected", "true");
     expect(screen.getByTestId("win-chance")).toHaveTextContent("62%");
+    // Phone layout: lineups and the secondary cards start collapsed, summary first.
+    expect(screen.queryByRole("list", { name: "Lineups head to head" })).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: /Show lineups/ }));
+    fireEvent.click(screen.getByRole("button", { name: /Bye-week cover/ }));
+    fireEvent.click(screen.getByRole("button", { name: /Injury report/ }));
+    expect(screen.getByRole("button", { name: /Injury report/ })).toHaveAttribute("aria-expanded", "true");
     expect(screen.getByRole("list", { name: "Lineups head to head" }).querySelectorAll("li")).toHaveLength(2);
     expect(screen.getByText("Otis Opp")).toBeInTheDocument();
     expect(screen.getByText("What to do this week")).toBeInTheDocument();
@@ -126,6 +132,30 @@ describe("SimGameContent", () => {
     // a checklist row jumps to the tab that handles it
     fireEvent.click(screen.getByRole("button", { name: /Answer trade offers/ }));
     expect(await screen.findByRole("tab", { name: /Trades/ })).toHaveAttribute("aria-selected", "true");
+  });
+
+  it("Home's Auto-set best lineup names the swap and refreshes the matchup, then says when it is optimal", async () => {
+    mocked.listSimGames.mockResolvedValue({ ok: true, reason: "", games: [lite(game())] });
+    mocked.getSimInbox.mockResolvedValue({ ok: true, reason: "", items: [] });
+    mocked.getSimGameTeam.mockResolvedValue({ ok: true, reason: "", players: [] });
+    mocked.getSimHome.mockResolvedValueOnce(home).mockResolvedValue({ ...home, matchup: { ...home.matchup!, rows: [home.matchup!.rows[0], { ...home.matchup!.rows[1], you: star("9", "RB", "Wally Wire") }] } });
+    const beforeLineup = { ...lineup, slots: [{ slot: "QB", player: star("1", "QB", "Quinn Back") }, { slot: "RB", player: star("2", "RB", "Hurt Harry") }], projected_total: 121.4 };
+    const afterLineup = { ...lineup, slots: [{ slot: "QB", player: star("1", "QB", "Quinn Back") }, { slot: "RB", player: star("9", "RB", "Wally Wire") }], projected_total: 129.4 };
+    let applied = false;
+    mocked.getSimLineup.mockImplementation(async () => (applied ? afterLineup : beforeLineup));
+    mocked.autoSimLineup.mockImplementation(async () => {
+      applied = true;
+      return afterLineup;
+    });
+    render(<SimGameContent />);
+    await openFirstGame();
+    fireEvent.click(await screen.findByTestId("auto-lineup"));
+    expect(await screen.findByText(/Swapped Hurt Harry for Wally Wire, \+8\.0 proj/)).toBeInTheDocument();
+    expect(mocked.autoSimLineup).toHaveBeenCalledTimes(1);
+    expect(await screen.findByText("Wally Wire", { selector: "span" })).toBeInTheDocument();
+    fireEvent.click(await screen.findByTestId("auto-lineup"));
+    await waitFor(() => expect(mocked.autoSimLineup).toHaveBeenCalledTimes(2));
+    expect(await screen.findByRole("button", { name: /Lineup is optimal/ })).toBeDisabled();
   });
 
   it("tapping a team anywhere opens its scouting sheet with strengths and needs", async () => {
@@ -258,6 +288,19 @@ describe("SimGameContent", () => {
     fireEvent.click(await screen.findByRole("button", { name: "Advance to week 5" }));
     expect(await screen.findAllByText(/Cut 2 players/)).not.toHaveLength(0);
     expect(mocked.advanceSimGame).not.toHaveBeenCalled();
+  });
+
+  it("the bottom bar keeps Advance reachable from every tab and disables it with a reason for an empty slot", async () => {
+    mocked.listSimGames.mockResolvedValue({ ok: true, reason: "", games: [lite(game())] });
+    mocked.getSimLineup.mockResolvedValue({ ...lineup, slots: [{ slot: "QB", player: player("1", "QB", "Quinn Back") }, { slot: "RB", player: null }] });
+    render(<SimGameContent />);
+    await openFirstGame();
+    const bar = await screen.findByTestId("sim-action-bar");
+    expect(await screen.findByText("Fill 1 empty slot")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Advance to week 5" })).toBeDisabled();
+    expect(bar).toHaveTextContent("Wk 4");
+    await openTeamTab();
+    expect(screen.getByTestId("sim-action-bar")).toBeInTheDocument();
   });
 
   it("Advance plays the week, shows the recap, then returns to the team", async () => {

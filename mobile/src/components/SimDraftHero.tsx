@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, View, useWindowDimensions } from 'react-native';
 
 import AppText from './AppText';
 import PositionBadge from './PositionBadge';
@@ -56,6 +56,7 @@ export function SimDraftHero({
   onOpen: (player: SimGamePlayer) => void;
 }) {
   const { colors, isDark } = useThemeMode();
+  const { width } = useWindowDimensions();
   const styles = useMemo(() => createStyles(colors), [colors]);
   const progress = simDraftProgress(draft, teams);
   const eta = simDraftNextPickLabel(draft);
@@ -113,6 +114,8 @@ export function SimDraftHero({
         <AppText style={styles.small}>{eta.detail}</AppText>
       </View>
 
+      {/* Phones: the ticker lives in the Picks tab; keep it only on tablet-width screens. */}
+      {width >= 768 ? (
       <View style={styles.block}>
         <AppText style={styles.kicker}>Recent picks</AppText>
         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.strip} style={styles.stripBox}>
@@ -136,6 +139,7 @@ export function SimDraftHero({
           )}
         </ScrollView>
       </View>
+      ) : null}
 
       {!done ? (
         <View style={styles.block}>

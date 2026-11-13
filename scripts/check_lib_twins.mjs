@@ -45,6 +45,7 @@ export const IDENTICAL = [
   "simReview.ts",
   "simDraft.ts",
   "simGameFlow.ts",
+  "simLayout.ts",
   "simPresentation.ts",
   "startHere.ts",
   "startSitRange.ts",

@@ -3,7 +3,7 @@
 import { ExplorerLeagueProvider } from "@/context/ExplorerLeagueContext";
 import dynamic from "next/dynamic";
 import { usePathname } from "next/navigation";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 
 import { api, type PlayerAward, type PlayerNewsResponse, type QuickViewResponse } from "@/lib/api";
 import type { PlayerQuickViewIdentity } from "@/context/PlayerQuickViewContext";
@@ -78,20 +78,30 @@ const ModelRadarChart = dynamic(() => import("@/components/ModelRadarChart").the
 export function PlayerQuickView({
   identity,
   onClose,
+  simOverlay,
+  remote = true,
 }: {
   identity: PlayerQuickViewIdentity;
   onClose: () => void;
+  /**
+   * Fantasy Sim: game-specific sections (this sim's projection band, status,
+   * week-by-week outlook, results, owner, actions) rendered right under the
+   * hero, so the game's player detail is this same Quick View. Omit everywhere else.
+   */
+  simOverlay?: ReactNode;
+  /** false for a synthetic sim player with no real data behind the id: same layout, no remote fetches. */
+  remote?: boolean;
 }) {
   const pathname = usePathname();
   const dialogRef = useRef<HTMLDivElement | null>(null);
   const closeButtonRef = useRef<HTMLButtonElement | null>(null);
   const [detail, setDetail] = useState<QuickViewResponse | null>(null);
   const [awards, setAwards] = useState<PlayerAward[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(remote);
   // News loads lazily and independently: it never gates the sheet. null =
   // not loaded (or failed -> section renders nothing).
   const [news, setNews] = useState<PlayerNewsResponse | null>(null);
-  const [newsLoading, setNewsLoading] = useState(true);
+  const [newsLoading, setNewsLoading] = useState(remote);
 
   // Swipe-down-to-dismiss on touch devices: the shared sheet gesture (see
   // lib/useSheetDragDismiss.ts). Only closes when the body is scrolled to
@@ -112,6 +122,7 @@ export function PlayerQuickView({
   // GET .../weekly-stats endpoint + WeeklyPointsPanel component Player
   // Compare's dual chart already does, not a new fetch/chart.
   useEffect(() => {
+    if (!remote) return;
     let cancelled = false;
 
     Promise.all([api.getPlayerQuickView(identity.player_id), api.getPlayerAwards(identity.player_id)])
@@ -131,9 +142,10 @@ export function PlayerQuickView({
     return () => {
       cancelled = true;
     };
-  }, [identity.player_id]);
+  }, [identity.player_id, remote]);
 
   useEffect(() => {
+    if (!remote) return;
     let cancelled = false;
     api
       .getPlayerNews(identity.player_id, 3)
@@ -147,7 +159,7 @@ export function PlayerQuickView({
     return () => {
       cancelled = true;
     };
-  }, [identity.player_id]);
+  }, [identity.player_id, remote]);
 
   // Focus the close button on open, restore body scroll on close — the
   // minimal accessible-modal contract (focus moves into the dialog, page
@@ -283,6 +295,8 @@ export function PlayerQuickView({
         {overallRating != null ? <BeginnerHelp term="overallRating" className="mt-1" /> : null}
         {identity.tier ? <BeginnerHelp term="playerTier" className="mt-1" /> : null}
 
+        {simOverlay}
+
         {availability ? (
           <AvailabilityBlock
             availability={availability}
@@ -290,7 +304,7 @@ export function PlayerQuickView({
             newsLoading={newsLoading}
           />
         ) : null}
-        {!loadError ? (
+        {!loadError && remote ? (
           <LatestNewsSection
             items={news ? news.items : null}
             hideItem={availability ? news?.injury_item ?? null : null}
@@ -308,7 +322,7 @@ export function PlayerQuickView({
         <div className="pqv-body">
           {loading ? (
             <PqvBodySkeleton />
-          ) : loadError ? (
+          ) : !remote ? null : loadError ? (
             <p className="pqv-status-text">Couldn&apos;t load this player&apos;s detail right now.</p>
           ) : (
             <ExplorerLeagueProvider leagueId={identity.leagueId}>

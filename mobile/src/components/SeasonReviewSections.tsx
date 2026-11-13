@@ -1,12 +1,12 @@
 import React, { useMemo } from 'react';
-import { StyleSheet, View } from 'react-native';
+import { ScrollView, StyleSheet, useWindowDimensions, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import Svg, { Circle, Line, Path } from 'react-native-svg';
 
 import AccentCard from './AccentCard';
 import AppText from './AppText';
+import Collapsible from './Collapsible';
 import PositionBadge from './PositionBadge';
-import SectionHeading from './SectionHeading';
 import { SimPlayerChip as BaseChip, createSimStyles, simToneColor } from './SimGameParts';
 import ToneBadge from './ToneBadge';
 import { useThemeMode } from '../context/ThemeModeContext';
@@ -239,6 +239,28 @@ function GameRow({ row }: { row: ReviewGameRow }) {
   );
 }
 
+/** Swipeable snap cards (about 84% of the content width) instead of a tall stack. */
+function Carousel({ children, label }: { children: React.ReactNode[]; label: string }) {
+  const { width } = useWindowDimensions();
+  // Screen gutters plus the section card's padding come off before taking 84%.
+  const itemWidth = Math.max(220, Math.round((width - 64) * 0.84));
+  const gap = spacing.sm;
+  return (
+    <ScrollView
+      horizontal
+      showsHorizontalScrollIndicator={false}
+      snapToInterval={itemWidth + gap}
+      decelerationRate="fast"
+      contentContainerStyle={{ gap }}
+      accessibilityLabel={label}
+    >
+      {React.Children.map(children, (child) => (
+        <View style={{ width: itemWidth }}>{child}</View>
+      ))}
+    </ScrollView>
+  );
+}
+
 function SectionBody({ section }: { section: ReviewSection }) {
   const { colors } = useThemeMode();
   const common = useMemo(() => createSimStyles(colors), [colors]);
@@ -246,28 +268,49 @@ function SectionBody({ section }: { section: ReviewSection }) {
     case 'stats':
       return <View style={styles.grid}>{section.items.map((s, i) => <View key={i} style={styles.half}><StatTile stat={s} /></View>)}</View>;
     case 'cards':
-      return <View style={common.stack}>{section.cards.map((c) => <ReviewCardView key={c.id} card={c} />)}</View>;
+      return <Carousel label={section.title}>{section.cards.map((c) => <ReviewCardView key={c.id} card={c} />)}</Carousel>;
     case 'path':
       return <PathView steps={section.steps} caption={section.caption} />;
     case 'journey':
       return <JourneyView points={section.points} teams={section.teams} />;
     case 'leaders':
-      return <View style={common.stack}>{section.groups.map((g, i) => <LeaderGroup key={`${g.title}-${i}`} group={g} />)}</View>;
+      return <Carousel label={section.title}>{section.groups.map((g, i) => <LeaderGroup key={`${g.title}-${i}`} group={g} />)}</Carousel>;
     case 'games':
       return <View style={common.stack}>{section.rows.map((r, i) => <GameRow key={i} row={r} />)}</View>;
   }
 }
 
-export function SeasonReviewSections({ sections }: { sections: readonly ReviewSection[] }) {
+export function SeasonReviewSections({
+  sections,
+  only,
+  closed = [],
+}: {
+  sections: readonly ReviewSection[];
+  /** Render just these section ids (a Season in Review tab). */
+  only?: readonly string[];
+  /** Section ids that start collapsed. */
+  closed?: readonly string[];
+}) {
   const { colors } = useThemeMode();
-  const common = useMemo(() => createSimStyles(colors), [colors]);
+  const list = only ? sections.filter((s) => only.includes(s.id)) : sections;
   return (
     <>
-      {sections.map((section) => (
-        <View key={section.id} style={common.stack} testID={`review-section-${section.id}`}>
-          <SectionHeading title={section.title} icon={REVIEW_ICON[section.glyph]} caption={section.note} />
+      {list.map((section) => (
+        <Collapsible
+          key={section.id}
+          id={`review.${section.id}`}
+          testID={`review-section-${section.id}`}
+          defaultOpen={!closed.includes(section.id)}
+          title={
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm }}>
+              <ReviewGlyphChip glyph={section.glyph} tone="accent" size={24} />
+              <AppText style={{ flex: 1, fontSize: 14, fontWeight: '800', textTransform: 'uppercase', color: colors.textPrimary }} numberOfLines={1}>{section.title}</AppText>
+            </View>
+          }
+        >
+          {section.note ? <AppText style={{ fontSize: 12, color: colors.textTertiary }}>{section.note}</AppText> : null}
           <SectionBody section={section} />
-        </View>
+        </Collapsible>
       ))}
     </>
   );

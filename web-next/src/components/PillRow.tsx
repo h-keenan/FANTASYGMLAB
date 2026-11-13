@@ -31,7 +31,8 @@ export function PillRow({
   ariaLabel,
   sticky = false,
 }: {
-  options: { label: string; value: string; href?: string }[];
+  /** `icon` is an optional glyph slot rendered before the label (tab icons are added in this one place). */
+  options: { label: string; value: string; href?: string; icon?: ReactNode; count?: number }[];
   active: string;
   onSelect?: (value: string) => void;
   fullWidth?: boolean;
@@ -96,7 +97,7 @@ export function PillRow({
   const mask = `linear-gradient(to right, ${fade.left ? "transparent 0, #000 var(--space-xl)" : "#000 0"}, ${
     fade.right ? "#000 calc(100% - var(--space-xl)), transparent 100%" : "#000 100%"
   })`;
-  const segment = mode === "fill" ? "flex-1 min-w-0" : mode === "scroll" ? "shrink-0" : "shrink-0";
+  const segment = mode === "fill" ? "flex-1 min-w-fit" : mode === "scroll" ? "shrink-0" : "shrink-0";
 
   return (
     <div
@@ -127,7 +128,7 @@ export function PillRow({
           const className = `${segment} flex items-center justify-center whitespace-nowrap text-center font-bold uppercase text-[length:var(--segmented-font-size)]`;
           const style = {
             minHeight: sticky ? "var(--segmented-height-compact)" : "var(--segmented-height)",
-            padding: "0 var(--segmented-padding-x)",
+            padding: mode === "fill" ? "0 min(var(--segmented-padding-x), 0.5rem)" : "0 var(--segmented-padding-x)",
             letterSpacing: "var(--letter-spacing-tight)",
             background: isActive ? "var(--segmented-active-bg, var(--color-information-soft))" : "transparent",
             color: isActive ? "var(--segmented-active-fg, var(--color-text-primary))" : "var(--color-text-secondary)",
@@ -141,7 +142,28 @@ export function PillRow({
             className,
             style,
           };
-          const content: ReactNode = option.label;
+          const countPill = option.count ? (
+            <span
+              className="inline-flex items-center justify-center text-[0.625rem] font-extrabold leading-none"
+              style={{ minWidth: 16, height: 16, padding: "0 4px", borderRadius: "var(--radius-pill)", background: "var(--color-accent)", color: "var(--color-on-accent)" }}
+              aria-label={`${option.count} new`}
+            >
+              {option.count}
+            </span>
+          ) : null;
+          // Phones stack the icon over the label so six tabs fit; from sm up they sit side by side.
+          const content: ReactNode =
+            option.icon || countPill ? (
+              <span className="inline-flex flex-col items-center gap-0.5 sm:flex-row sm:gap-1.5">
+                {option.icon ? <span aria-hidden="true" className="inline-flex">{option.icon}</span> : null}
+                <span className="inline-flex items-center gap-1">
+                  {option.label}
+                  {countPill}
+                </span>
+              </span>
+            ) : (
+              option.label
+            );
           if (option.href) {
             return (
               <Link key={option.value} href={option.href} {...common}>
