@@ -4197,6 +4197,8 @@ body[data-sim-pqv] [data-sheet-hideable] {
 }
 .sim-pct-fill--high {
   background: var(--color-success);
+}
+
 /* Fantasy Sim phone header (SimGameHeader): one sticky glass line. */
 .sim-game-header {
   position: sticky;
