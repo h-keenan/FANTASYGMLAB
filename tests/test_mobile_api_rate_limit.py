@@ -36,7 +36,20 @@ def _client(monkeypatch):
     return TestClient(mobile_api_service.app), mobile_api_service
 
 
+def _start_of_fresh_window(*window_seconds: int, margin: float = 3.0) -> None:
+    """The limiter counts in FIXED wall-clock windows (floor(now / window)). A test that fires a handful of requests
+    and expects the Nth to be limited would see the counter reset (and the 429 turn into a 401/200) whenever a window
+    boundary falls between its requests: a ~1-in-several-hundred flake that shows up on unrelated PRs. Wait out the
+    last `margin` seconds of the current window (at most `margin` seconds, only when we are that close) so the whole
+    test runs inside one window."""
+    for window in window_seconds:
+        remaining = window - (time.time() % window)
+        if remaining < margin:
+            time.sleep(remaining + 0.05)
+
+
 def _force_rate_limiting(monkeypatch, mobile_api_service, **overrides):
+    _start_of_fresh_window(*(int(v) for k, v in overrides.items() if k.endswith("_WINDOW_SECONDS")))
     monkeypatch.setenv("DYNASTYGM_FORCE_RATE_LIMIT", "1")
     monkeypatch.setattr(mobile_api_service, "RATE_LIMIT_ENABLED", True)
     for key, value in overrides.items():

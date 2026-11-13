@@ -269,7 +269,13 @@ def client(monkeypatch, pool):
     from services import mobile_api_service
 
     monkeypatch.setenv("FANTASYDESK_EXTERNAL_API_KEY", "the-real-secret-key")
-    monkeypatch.setattr(E, "get_pool", lambda db, fmt, lens, now=None: (pool, 1_790_000_000.0))
+    # The endpoint reads the wall clock, but the module-scoped pool was generated at the fixed NOW (2026-10-27). A
+    # `since` derived from the wall clock (14 days ago) would then sit AFTER every item's generated_at and return
+    # nothing once the real date drifts past NOW + 14 days. The served pool is a pool that was just generated, so
+    # stamp its items at the wall clock (an hour ago): the tests exercise the same filter at any date.
+    just_generated = (datetime.now(timezone.utc) - timedelta(hours=1)).isoformat()
+    served = [{**item, "generated_at": just_generated} for item in pool]
+    monkeypatch.setattr(E, "get_pool", lambda db, fmt, lens, now=None: (served, 1_790_000_000.0))
     return TestClient(mobile_api_service.app)
 
 
