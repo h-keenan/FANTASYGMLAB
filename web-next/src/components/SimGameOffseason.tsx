@@ -549,4 +549,3 @@ function CutdownStage({ off, ctx, onTrade, onTeam }: { off: SimOffseason; ctx: S
     </>
   );
 }
-
