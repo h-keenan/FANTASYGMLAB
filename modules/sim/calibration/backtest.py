@@ -632,8 +632,8 @@ def main(argv: list[str] | None = None) -> None:
     ap.add_argument("--seasons", nargs="*", type=int, default=None, help="seasons to score (default: all)")
     ap.add_argument("--json", type=str, default=None)
     ap.add_argument("--markdown", action="store_true", help="print the doc tables instead of JSON")
-    ap.add_argument("--model", choices=["v2", "v1"], default="v2",
-                    help="v1 evaluates the frozen player-model-1 (modules.sim.player_model_v1) instead of the current model")
+    ap.add_argument("--model", choices=["v4", "v3", "v1"], default="v4",
+                    help="v3 / v1 evaluate the frozen player-model-3 / -1 modules instead of the current model (v4)")
     ap.add_argument("--params-json", type=str, default=None,
                     help='JSON {"season": {...}, "inseason": {...}} of constants overriding the shipped ones (before/after runs)')
     args = ap.parse_args(argv)
@@ -641,6 +641,8 @@ def main(argv: list[str] | None = None) -> None:
     global pm
     if args.model == "v1":
         from modules.sim import player_model_v1 as pm  # noqa: F811  (the frozen model: same API, same harness)
+    elif args.model == "v3":
+        from modules.sim import player_model_v3 as pm  # noqa: F811
     params = None
     if args.params_json:
         import dataclasses

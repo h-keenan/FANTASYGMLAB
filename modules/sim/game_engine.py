@@ -517,7 +517,7 @@ def run_week(em: Emitter, snap: GameSnapshot, state: GameState, seed: int) -> di
     for pid in snap.pids:
         if ev.status(pid, W) != "healthy":
             continue
-        res = session.week(pid, W, ev.role_mult(pid, W) if ev.roles_on else None)
+        res = session.week(pid, W, ev.role_param(pid, W) if ev.roles_on else None)
         if not res.active:
             continue
         played[pid] = PlayerWeek(round(max(0.0, res.points), 2), res.stats, True, res.newly_injured)
@@ -563,8 +563,17 @@ def run_week(em: Emitter, snap: GameSnapshot, state: GameState, seed: int) -> di
         for pid, weeks in hurt if pid in owners
     ]
 
+    extra: dict[str, Any] = {}
+    if ev.roles_on and ev.additive:  # the role behind each score, so his level can be read without it
+        roles = {}
+        for pid in played:
+            scale, add = ev.role_param(pid, W)
+            if abs(scale - 1.0) > 1e-9 or add > 1e-9:
+                roles[pid] = [round(scale, 4), round(add, 4)]
+        if roles:
+            extra["roles"] = roles
     em.emit(W, "engine", "week_scored", kind=kind, round=rnd, games=games,
-            points={pid: v for pid, v in pts.items()}, alive_next=alive_next, eliminated=eliminated)
+            points={pid: v for pid, v in pts.items()}, alive_next=alive_next, eliminated=eliminated, **extra)
     if hurt:
         em.emit(W, "engine", "injury", items=hurt)
 

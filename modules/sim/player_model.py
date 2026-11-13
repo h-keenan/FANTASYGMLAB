@@ -43,12 +43,31 @@ from typing import Any, Mapping
 
 import numpy as np
 
-MODEL_VERSION = "player-model-3"
-# player-model-3 = player-model-2 (frozen in player_model_v2.py) + team-level role coupling. The weekly draws are
-# unchanged; the game engine resolves, per NFL team and position group and week, who actually plays which role
-# (``modules/sim/team_roles.py``) and hands the model a mean multiplier through ``with_role_multiplier``.
+MODEL_VERSION = "player-model-4"
+# player-model-3 (frozen in player_model_v3.py) = player-model-2 + team-level role coupling (a multiplier on the hidden
+# season mean). player-model-4 fixes the unbounded tails that composition made (a 0.6 ppg depth WR filling in for a
+# star scored 72 in one game and was then "projected" 70):
+#   * expected points are BOUNDED: a smooth ceiling per position on the season mean and on every weekly mean
+#     (``SEASON_CEIL`` / ``WEEK_CEIL``, from the best real seasons and best 6-game stretches of 2021-25);
+#   * a solid season's log-spread is capped and its normal draw truncated (the old spread grew without limit as the
+#     projection fell, so a 1.2 ppg player had a 1-in-100 season of 40+ ppg);
+#   * natural role changes cannot compound without limit (the cumulative multiplier is bounded to ``ROLE_CUM``);
+#   * a team role is ADDITIVE points (a share of the vacated starter's points) on top of the player's own
+#     (scaled) mean, never a multiplier on his hidden season story (``with_role``);
+#   * the weekly game / efficiency / touchdown-luck draws are truncated at ``Z_TRUNC`` standard deviations.
 TEAM_ROLES = True
+ROLE_MODE = "additive"
 SEASON_WEEKS = 17
+# Smooth ceilings (PPR points per game). Best real season PPG (8+ games) 2021-25: QB 26.7, RB 25.3, WR 25.8, TE 19.2, K 11.8;
+# best 6-game stretch: QB 31.6, RB 30.7, WR 31.4, TE 24.1, K 16.5. A mean can approach but never pass these.
+SEASON_CEIL = {"QB": 27.0, "RB": 25.5, "WR": 26.0, "TE": 19.5, "K": 12.0}
+WEEK_CEIL = {"QB": 31.0, "RB": 30.0, "WR": 30.0, "TE": 23.0, "K": 15.5}
+CEIL_SHARPNESS = 6.0
+ROLE_CUM = (0.2, 3.5)   # bounds of the product of a player's natural role-change multipliers
+SIGMA_MAX = 1.1         # cap on a solid season's log-sd
+Z_SEASON = 2.3          # truncation of the solid-season normal draw
+Z_TRUNC = 2.6           # truncation of the weekly game / efficiency normals
+MIX_MAX = 4.0           # cap on the touchdown-luck gamma mixture
 POSITIONS = ("QB", "RB", "WR", "TE", "K")
 POS_INDEX = {p: i for i, p in enumerate(POSITIONS)}
 ARCHETYPES = ("solid", "breakout", "bust", "slump", "injury_prone")
@@ -240,6 +259,7 @@ class RoleChange:
     kind: str            # "promotion" | "demotion"
     multiplier: float    # applied to the weekly mean from ``week`` on
     end_week: int = 0    # last week of the role (0 = rest of the season); set for injury cover
+    add: float = 0.0     # points per game added to the weekly mean (player-model-4 team roles; kind "team_role")
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)
@@ -288,7 +308,7 @@ class SeasonProfile:
             games_available_mask=tuple(bool(x) for x in raw["games_available_mask"]),
             unavailable_reason=tuple(str(x) for x in raw["unavailable_reason"]),
             injury_events=tuple(InjuryEvent(int(e["week"]), int(e["weeks_out"]), str(e["kind"])) for e in raw["injury_events"]),
-            role_changes=tuple(RoleChange(int(e["week"]), str(e["kind"]), float(e["multiplier"]), int(e.get("end_week", 0))) for e in raw["role_changes"]),
+            role_changes=tuple(RoleChange(int(e["week"]), str(e["kind"]), float(e["multiplier"]), int(e.get("end_week", 0)), float(e.get("add", 0.0))) for e in raw["role_changes"]),
             form=tuple(float(x) for x in raw["form"]), slump_window=(int(sw[0]), int(sw[1])) if sw else None,
             rookie=bool(raw["rookie"]), style=tuple((str(k), float(v)) for k, v in raw["style"]),
             model_version=str(raw.get("model_version", MODEL_VERSION)),
@@ -309,6 +329,14 @@ class WeekResult:
 
 
 # --------------------------------------------------------------------------- helpers
+
+
+def soft_ceiling(m: float, ceil: float | None, k: float = CEIL_SHARPNESS) -> float:
+    """Smooth saturation: ~m well below ``ceil``, 0.89 x ceil at the ceiling, never above it."""
+
+    if ceil is None or m <= 0.0:
+        return m
+    return m / (1.0 + (m / ceil) ** k) ** (1.0 / k)
 
 
 def _sigmoid(x: np.ndarray | float) -> np.ndarray | float:
@@ -458,8 +486,8 @@ def season_level(
     arch = np.where(cat < cum[0], 1, arch)
     b = np.where(is_qb, p.b_solid_qb, np.where(is_k, p.b_solid_k, p.b_solid)) + p.b_tier * np.clip(tau, -1.0, 1.0)
     sig_mult = np.where(is_qb, p.qb_sig, np.where(is_te, p.te_sig, 1.0)) * (1.0 + p.sig_rook * rk)
-    sigma = (p.sigma0 + p.sigma_tier * np.maximum(0.0, -tau)) * sig_mult
-    solid = proj * b * np.exp(sigma * u["z1"] - 0.5 * sigma**2)
+    sigma = np.minimum((p.sigma0 + p.sigma_tier * np.maximum(0.0, -tau)) * sig_mult, SIGMA_MAX)
+    solid = proj * b * np.exp(sigma * np.clip(u["z1"], -Z_SEASON, Z_SEASON) - 0.5 * sigma**2)
     gain_scale = np.where(is_qb, p.qb_gain, np.where(is_te, p.te_gain, 1.0)) * np.where(rookie, p.gain_rook, 1.0)
     gain = p.gain_mean * gain_scale * np.exp(p.gain_tier * np.clip(tau, -2.0, 1.0)) * u["g"] / p.gain_shape
     breakout = proj * b + gain
@@ -506,7 +534,7 @@ def _draw_season_profile(
          "g": rng.gamma(sp.gain_shape, 1.0, 1), "c2": rng.random(1)}
     arch_i, mean = season_level(pos_idx, np.array([proj]), np.array([n["age"]]), np.array([n["rookie"]]), u, sp)
     archetype = ARCHETYPES[int(arch_i[0])]
-    mean_ppg = float(mean[0]) * n["env"]
+    mean_ppg = soft_ceiling(float(mean[0]) * n["env"], SEASON_CEIL.get(pos))
     if proj <= 0.0:
         mean_ppg = 0.0
     mult = mean_ppg / proj if proj > 0 else 1.0
@@ -671,6 +699,17 @@ def apply_depth_coupling(
 ROLE_MULT_MAX = 20.0
 
 
+def with_role(profile: SeasonProfile, week: int, scale: float, add: float) -> SeasonProfile:
+    """The profile for one week with a team role: the player's own mean scaled by ``scale`` plus ``add`` points per
+    game (a share of the starter he replaces). The additive part is NOT amplified by his hidden season story.
+    Adds no random draw; ``scale == 1`` and ``add == 0`` returns the profile itself."""
+
+    if abs(scale - 1.0) < 1e-9 and abs(add) < 1e-9:
+        return profile
+    rc = RoleChange(week=int(week), kind="team_role", multiplier=min(ROLE_MULT_MAX, max(0.0, float(scale))), end_week=int(week), add=max(0.0, float(add)))
+    return replace(profile, role_changes=(*profile.role_changes, rc))
+
+
 def with_role_multiplier(profile: SeasonProfile, week: int, mult: float) -> SeasonProfile:
     """The profile for one week with a team-role multiplier on that week's mean (a one-week ``RoleChange``).
     Adds no random draw. A multiplier of 1 returns the profile itself."""
@@ -695,9 +734,21 @@ def expected_week_points(player: Mapping[str, Any], profile: SeasonProfile, week
 
 def _week_mean(profile: SeasonProfile, week: int, ip: InSeasonParams) -> float:
     m = profile.season_mean_ppg * profile.form[week - 1]
+    cum = 1.0
+    team_scale, team_add = 1.0, 0.0
     for rc in profile.role_changes:
         if week >= rc.week and (not rc.end_week or week <= rc.end_week):
-            m *= rc.multiplier
+            if rc.kind == "team_role":
+                team_scale *= rc.multiplier
+                team_add += rc.add
+            else:
+                cum *= rc.multiplier
+    # Natural role changes (promotions, demotions, injury cover) compound, but a role is a share of a team's volume:
+    # bound the product smoothly in log space so six promotions cannot make a 20x player.
+    lo, hi = math.log(ROLE_CUM[0]), math.log(ROLE_CUM[1])
+    lc = math.log(cum)
+    cum = math.exp(hi * math.tanh(lc / hi)) if lc > 0 else math.exp(lo * math.tanh(lc / lo))
+    m *= cum
     if profile.rookie and week <= 4:
         m *= ip.rookie_ramp
     if week >= 2:
@@ -705,7 +756,8 @@ def _week_mean(profile: SeasonProfile, week: int, ip: InSeasonParams) -> float:
         prev_mask = profile.games_available_mask[week - 2]
         if not prev_mask and profile.unavailable_reason[week - 2] == "injury" and profile.games_available_mask[week - 1]:
             m *= ip.return_ramp
-    return m
+    m = m * team_scale + team_add
+    return soft_ceiling(m, WEEK_CEIL.get(profile.pos))
 
 
 # --------------------------------------------------------------------------- stat lines
@@ -794,7 +846,7 @@ def _units_yards(rng: np.random.Generator, n: int, ypu: float, kappa: float, eff
 
 
 def _mix(rng: np.random.Generator, cv: float) -> float:
-    return float(rng.gamma(1.0 / cv**2, cv**2)) if cv > 0 else 1.0
+    return min(MIX_MAX, float(rng.gamma(1.0 / cv**2, cv**2))) if cv > 0 else 1.0
 
 
 def _draw_stat_line(
@@ -803,11 +855,11 @@ def _draw_stat_line(
     wk = WEEK[pos]
     e = _expected_stats(pos, rho, style)
     sg = wk["sg"] * vol
-    own = float(rng.standard_normal())
+    own = float(np.clip(rng.standard_normal(), -Z_TRUNC, Z_TRUNC))
     z = own if z_team is None else math.sqrt(0.85) * own + math.sqrt(0.15) * z_team
     g = sg * z
     se = wk["eff"] * vol
-    eff = math.exp(se * float(rng.standard_normal()) - 0.5 * se**2)
+    eff = math.exp(se * float(np.clip(rng.standard_normal(), -Z_TRUNC, Z_TRUNC)) - 0.5 * se**2)
     cvv = wk["vol_cv"] * vol
     if pos == "QB":
         att = _nb(rng, e["pass_att"] * _gfac(g, 0.35, sg), cvv * 0.7)
@@ -927,5 +979,5 @@ __all__ = [
     "ARCHETYPES", "ENV_SD", "InjuryEvent", "InSeasonParams", "MODEL_VERSION", "RoleChange", "SEASON_WEEKS", "SeasonParams",
     "SeasonProfile", "WeekResult", "apply_depth_coupling", "default_bye_week", "draw_season_profile", "draw_week_points",
     "draw_environment", "expected_week_points", "normalize_player", "profile_rng", "score_stat_line", "simulate_season",
-    "team_week_shock", "week_rng", "weights_for", "TEAM_ROLES", "with_role_multiplier",
+    "team_week_shock", "week_rng", "weights_for", "TEAM_ROLES", "ROLE_MODE", "with_role", "with_role_multiplier", "soft_ceiling", "SEASON_CEIL", "WEEK_CEIL",
 ]

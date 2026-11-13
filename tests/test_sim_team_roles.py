@@ -7,7 +7,8 @@ from __future__ import annotations
 import copy
 from dataclasses import replace
 
-from modules.sim import game_scoring, player_model, player_model_v2
+from modules.sim import game_scoring, player_model_v2
+from modules.sim import player_model_v3 as player_model  # the multiplicative team-role generation these tests cover
 from modules.sim import team_roles as tr
 from modules.sim.game_engine import ScoringSession, advance, finish_draft
 from modules.sim.game_eval import Evaluator

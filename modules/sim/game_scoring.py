@@ -30,7 +30,8 @@ _REAL_MODULE = "modules.sim.player_model"
 _MODEL_MODULES = {
     "player-model-1": "modules.sim.player_model_v1",
     "player-model-2": "modules.sim.player_model_v2",  # frozen copy: games created under it never change
-    "player-model-3": "modules.sim.player_model",  # + team-level role coupling (modules/sim/team_roles.py)
+    "player-model-3": "modules.sim.player_model_v3",  # frozen copy: + team-level role coupling (multiplicative)
+    "player-model-4": "modules.sim.player_model",  # bounded tails, additive team roles, robust projections
 }
 
 
@@ -56,10 +57,12 @@ class ScoringModel:
 
     # True when the engine should resolve team-level roles and pass ``role_mult`` (player-model-3 and later).
     team_roles = False
+    # "mult": the engine passes a float multiplier (player-model-3); "additive": a (scale, points) pair (player-model-4+).
+    role_mode = "mult"
 
     def week(
         self, player: Mapping[str, Any], profile: Any, week: int, rng: Any, scoring: Mapping[str, float],
-        role_mult: float | None = None,
+        role_mult: Any = None,
     ) -> PlayerWeek:  # pragma: no cover - interface
         raise NotImplementedError
 
@@ -143,13 +146,17 @@ class PlayerModelAdapter(ScoringModel):
         self._m = module
         self.model_id = f"player_model-{getattr(module, 'MODEL_VERSION', '1')}"
         self.team_roles = bool(getattr(module, "TEAM_ROLES", False))
+        self.role_mode = str(getattr(module, "ROLE_MODE", "mult"))
 
     def profile(self, player, rng):
         return self._m.draw_season_profile(player, rng)
 
     def week(self, player, profile, week, rng, scoring, role_mult=None):
         if role_mult is not None and self.team_roles:
-            profile = self._m.with_role_multiplier(profile, week, role_mult)
+            if self.role_mode == "additive":
+                profile = self._m.with_role(profile, week, role_mult[0], role_mult[1])
+            else:
+                profile = self._m.with_role_multiplier(profile, week, role_mult)
         result = self._m.draw_week_points(player, profile, week, rng, scoring)
         hurt = bool(result.injury_incurred)
         return PlayerWeek(
@@ -209,10 +216,17 @@ def team_roles_enabled(model_id: str | None) -> bool:
     return bool(getattr(resolve_model(model_id)[0], "team_roles", False))
 
 
+def team_roles_mode(model_id: str | None) -> str:
+    """"" (no team roles), "mult" (player-model-3) or "additive" (player-model-4+)."""
+
+    m = resolve_model(model_id)[0]
+    return str(getattr(m, "role_mode", "mult")) if getattr(m, "team_roles", False) else ""
+
+
 def get_model(model_id: str | None) -> ScoringModel:
     """The model a saved game was created with (see ``resolve_model`` for the unknown-id note)."""
 
     return resolve_model(model_id)[0]
 
 
-__all__ = ["resolve_model", "PlayerWeek", "ScoringModel", "FallbackModel", "PlayerModelAdapter", "default_model", "get_model", "team_roles_enabled", "FALLBACK_ID"]
+__all__ = ["resolve_model", "PlayerWeek", "ScoringModel", "FallbackModel", "PlayerModelAdapter", "default_model", "get_model", "team_roles_enabled", "team_roles_mode", "FALLBACK_ID"]
