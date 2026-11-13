@@ -168,9 +168,9 @@ function OfferCard({ item, defaultOpen, busy, canTrade, onRespond }: { item: Sim
             </span>
           </span>
           <span className="text-xs" style={{ color: "var(--color-text-secondary)" }}>
-            <span className="font-bold" style={{ color: "var(--color-danger)" }}>Give</span> {names(item.you_give)} ({give.value})
+            <span className="font-bold" style={{ color: "var(--color-danger)" }}>Give</span> {names(item.you_give)} (trade value {give.value})
             {" · "}
-            <span className="font-bold" style={{ color: "var(--color-success)" }}>Get</span> {names(item.you_get)} ({get.value})
+            <span className="font-bold" style={{ color: "var(--color-success)" }}>Get</span> {names(item.you_get)} (trade value {get.value})
           </span>
         </button>
         {open ? (
@@ -466,13 +466,14 @@ function Builder({ ctx, seed, onSeedUsed }: { ctx: SimCtx; seed: SimTradeSeed | 
           }}
           onClose={() => setSheetSide(null)}
           flexFilter={game.settings.slots.includes("FLEX")}
+          valueLabel="Trade value"
           renderPlayerRow={(item, { on, blocked, toggle }) => {
             const player = item.ref as SimGamePlayer;
             return (
               <SimPlayerLine
                 player={player}
                 week={game.week}
-                stats={simListStats(player, { adp: false })}
+                stats={simListStats(player, { adp: false, tradeValue: true })}
                 selected={on}
                 onOpen={ctx.openPlayer}
                 trailing={

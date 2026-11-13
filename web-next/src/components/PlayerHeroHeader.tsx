@@ -45,6 +45,7 @@ export function PlayerHeroHeader({
   usageLoading = false,
   depthChartNote,
   valueNote,
+  valueLabel,
   loadingIdentity = false,
   byeWeek = null,
   onByeThisWeek = false,
@@ -67,6 +68,8 @@ export function PlayerHeroHeader({
   unavailable?: boolean;
   /** Why the Value tile is empty (server-provided), e.g. "No market value yet". */
   valueNote?: string | null;
+  /** Overrides the "Value" caption (and explainer) when the number is not the real market value: Fantasy Sim passes "Trade value". */
+  valueLabel?: string | null;
   /** True while server-resolved identity may still fill team/value. */
   loadingIdentity?: boolean;
   playerId: string;
@@ -161,19 +164,19 @@ export function PlayerHeroHeader({
             </div>
           )}
           {score != null ? (
-            <TapForWhy metric="value" variant="tile" className="pqv-stat-tile" spoken={`Value ${formatScore(score)}`} chart={valueChart}>
+            <TapForWhy metric={valueLabel ? "trade_value" : "value"} variant="tile" className="pqv-stat-tile" spoken={`${valueLabel ?? "Value"} ${formatScore(score)}`} chart={valueChart}>
               <span className="pqv-stat-tile-value">{formatScore(score)}</span>
-              <span className="pqv-stat-tile-caption">Value</span>
+              <span className="pqv-stat-tile-caption">{valueLabel ?? "Value"}</span>
             </TapForWhy>
           ) : (
             loadingIdentity ? (
               <div className="pqv-stat-tile">
                 <span className="pqv-stat-tile-value pqv-stat-tile-value--empty">—</span>
-                <span className="pqv-stat-tile-caption">Value</span>
+                <span className="pqv-stat-tile-caption">{valueLabel ?? "Value"}</span>
               </div>
             ) : (
               <TapForWhy
-                metric="value"
+                metric={valueLabel ? "trade_value" : "value"}
                 variant="tile"
                 className="pqv-stat-tile"
                 spoken="Value, none yet"
@@ -182,7 +185,7 @@ export function PlayerHeroHeader({
                 testId="pqv-value-empty"
               >
                 <span className="pqv-stat-tile-value pqv-stat-tile-value--empty">—</span>
-                <span className="pqv-stat-tile-caption">Value</span>
+                <span className="pqv-stat-tile-caption">{valueLabel ?? "Value"}</span>
                 <span className="pqv-stat-tile-note">{valueNote || "No market value yet"}</span>
               </TapForWhy>
             )

@@ -81,8 +81,13 @@ export interface SimGamePlayer {
   /** Age to a tenth when the server sends it; rows fall back to `age`. */
   age_decimal?: number | null;
   adp: number | null;
-  /** Model value on the sim's 0-100 scale (the best player is 100), not the main app's raw market value. */
+  /** Trade value on the sim's 0-100 scale (the best player is 100), not the main app's raw market value. Label it "Trade value", never "Value"/"VAL". */
   value: number;
+  /**
+   * Overall (1-99): where his value ranks among players at his position, the SAME definition and gauge as the main
+   * app's OVR (modules/sim/game_view.overall_ratings). Null for a position pool too thin to rank, or an older server.
+   */
+  overall?: number | null;
   /** 1-based rank by model value across the whole pool (players list and player detail). */
   value_rank?: number | null;
   /** 1-based rank by model value among players at the same position (player detail only). */

@@ -219,11 +219,14 @@ export function SimPlayerSheet({ gameId, player, onClose, actions }: { gameId: s
       ...stubPlayer({ player_id: real ?? player.id, name: player.name, position: player.pos, team: player.team ?? null }),
       age: player.age ?? null,
       injury_status: live.status === 'out' ? 'Out' : null,
+      // The list rows' Overall also drives the hero's Player score ring, so the number never differs between a row and its quick view.
+      overall_rating: live.overall ?? null,
       ...(feed ? { score: feed.score, overall_rank: feed.overall_rank, position_rank: feed.position_rank } : {}),
     },
     league: null,
     sourceLabel: 'Fantasy Sim',
     valueNote: feed?.valueNote ?? null,
+    valueLabel: feed ? 'Trade value' : null,
   };
   return <PlayerQuickViewSheet request={request} onClose={onClose} remote={Boolean(real)} simOverlay={<SimPlayerOverlay player={live} detail={detail} actions={actions} />} />;
 }
@@ -287,9 +290,9 @@ export function SimPlayerOverlay({ player, detail, actions }: { player: SimGameP
             note={`${player.games ?? 0} games${player.ppg != null ? ` · ${simFmtPts(player.ppg)} ppg` : ''}`}
           />
           <MetricCard
-            label="Game value"
+            label="Trade value rank"
             value={player.value_rank ? `#${player.value_rank}` : hero.score != null ? String(hero.score) : null}
-            note={hero.score != null ? `Value ${hero.score}${player.adp != null ? ` · ADP ${simFmtValue(player.adp)}` : ''}` : 'No market value'}
+            note={hero.score != null ? `Trade value ${hero.score}${player.adp != null ? ` · ADP ${simFmtValue(player.adp)}` : ''}` : 'No trade value'}
           />
         </View>
         {simIfStartsHint(player) ? <AppText style={common.muted} testID="sim-if-starts">{simIfStartsHint(player)}</AppText> : null}

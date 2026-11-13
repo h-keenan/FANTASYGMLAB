@@ -56,6 +56,7 @@ export function TradePickerSheet<T = unknown>({
   initialFilters,
   renderPlayerRow,
   flexFilter = false,
+  valueLabel,
 }: {
   title: string;
   subtitle?: string;
@@ -71,6 +72,8 @@ export function TradePickerSheet<T = unknown>({
   onSearch?: (query: string) => void;
   /** "single" is a pick-one flow (Player Compare): tapping a row chooses it and closes, no chips or footer. */
   mode?: "multi" | "single";
+  /** Caption for the value number on rows (default "Value"). Fantasy Sim passes "Trade value". */
+  valueLabel?: string;
   /** Filters already in effect when the sheet opens (e.g. the same position as the player being compared). */
   initialFilters?: SheetFilters;
   /**
@@ -295,7 +298,7 @@ export function TradePickerSheet<T = unknown>({
                             aria-label={single ? `Choose ${item.label}` : `${on ? "Remove" : "Add"} ${item.label}`}
                             onClick={() => (single ? onApply([item.key]) : dispatch({ type: "toggle", key: item.key, max }))}
                           >
-                            <SheetItemIdentity item={item} />
+                            <SheetItemIdentity item={item} valueLabel={valueLabel} />
                             {single ? null : (
                               <span className="tps-check" aria-hidden="true" data-on={on ? "true" : "false"}>
                                 {on ? "✓" : ""}
@@ -390,14 +393,14 @@ function FilterChip({ label, on, onClick }: { label: string; on: boolean; onClic
 }
 
 /** The row identity shared by every caller: avatar, position, name, team and age; picks use the pick row. */
-function SheetItemIdentity({ item }: { item: SheetItem }) {
+function SheetItemIdentity({ item, valueLabel }: { item: SheetItem; valueLabel?: string }) {
   if (item.kind === "pick") {
     return (
       <span className="flex min-w-0 flex-1 items-center gap-2">
         <span className="min-w-0 flex-1">
           <PickRow dense round={item.round} pickNo={item.pickNo} label={item.label} context={item.detail ?? null} />
         </span>
-        {item.value != null ? <ValueStat value={Math.round(item.value).toLocaleString()} /> : null}
+        {item.value != null ? <ValueStat value={Math.round(item.value).toLocaleString()} label={valueLabel} /> : null}
       </span>
     );
   }
@@ -417,7 +420,7 @@ function SheetItemIdentity({ item }: { item: SheetItem }) {
       >
         {meta}
       </PlayerIdentity>
-      {item.value != null ? <ValueStat value={Math.round(item.value).toLocaleString()} /> : null}
+      {item.value != null ? <ValueStat value={Math.round(item.value).toLocaleString()} label={valueLabel} /> : null}
     </span>
   );
 }

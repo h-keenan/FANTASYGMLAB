@@ -11,7 +11,7 @@ import { SimDraftIconButton, SimDraftRow } from './SimDraftBoard';
 import { SkeletonCard } from './SkeletonBlock';
 import { SimDynastyStrip } from './SimGameDynasty';
 import { SimCollapse, SimGeneratedChip, SimGeneratedNoticeSheet, SimPickLine, SimPlayerChips, SimRookieNoticeGate, useSimPicks } from './SimGameDynastyParts';
-import { SimPlayerLine, SimStat, SimToneBadge, createSimStyles, simToneColor, type SimCtx } from './SimGameParts';
+import { SimPlayerLine, SimToneBadge, SimTradeValue, createSimStyles, simToneColor, type SimCtx } from './SimGameParts';
 import { SimReserveButton, SimReserveGroups, SimReserveSheet } from './SimGameReserves';
 import { useThemeMode } from '../context/ThemeModeContext';
 import { api } from '../lib/api';
@@ -467,7 +467,7 @@ function CutdownStage({ off, ctx, onTrade, onTeam }: { off: SimOffseason; ctx: S
                   </>
                 ) : (
                   <>
-                    <SimStat label="Value" value={Math.round(player.value)} />
+                    <SimTradeValue value={player.value} />
                     {reservesOn ? <SimReserveButton player={player} onOpen={setMoving} /> : null}
                     <Button size="sm" variant={over ? 'dangerOutline' : 'ghost'} label="Cut" onPress={() => setCutting(player.id)} />
                   </>

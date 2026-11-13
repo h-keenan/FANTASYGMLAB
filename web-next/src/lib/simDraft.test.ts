@@ -12,6 +12,7 @@ import {
   simDraftRecentPicks,
   simDraftMeta,
   simDraftRowChips,
+  simListStats,
   simDraftTeamEmblem,
 } from "./simDraft";
 import type { SimDraftPick, SimGamePlayer } from "./simGame";
@@ -72,6 +73,20 @@ describe("simDraft helpers", () => {
     expect(simDraftMeta(p("a", "WR", { age: 24 })).map((x) => x.text)).toEqual(["KC", "Age 24", "Bye 9"]);
     expect(simDraftMeta({ ...p("a", "WR", { age: 24 }), age_decimal: 24.34 }).map((x) => x.text)[1]).toBe("Age 24.3");
     expect(simDraftMeta(p("a", "WR", { age: 21, status: "out", out_weeks: 1 })).map((x) => x.text)).toEqual(["KC", "Age 21", "Bye 9", "Rookie"]);
+  });
+  it("list stats show the player's Overall as the OVR gauge, never a bare value", () => {
+    const keys = (stats: ReturnType<typeof simListStats>) => stats.map((x) => x.key);
+    const stats = simListStats({ ...p("a", "RB"), overall: 88, value: 70 });
+    expect(keys(stats)).toEqual(["proj", "ovr", "adp"]);
+    expect(stats.find((x) => x.key === "ovr")).toMatchObject({ label: "OVR", rating: 88 });
+    expect(stats.some((x) => /^val/i.test(x.label))).toBe(false);
+    // no overall (thin position pool or an older server): no number rather than a made-up one
+    expect(keys(simListStats({ ...p("a", "RB"), overall: null }))).toEqual(["proj", "adp"]);
+  });
+  it("trade screens show Trade value (with its explainer) instead of Overall, never both", () => {
+    const stats = simListStats({ ...p("a", "RB"), overall: 88, value: 70.4 }, { adp: false, tradeValue: true });
+    expect(stats.map((x) => x.key)).toEqual(["proj", "tval"]);
+    expect(stats[1]).toMatchObject({ label: "Trade value", value: "70", why: "trade_value" });
   });
   it("builds a rounds x teams grid keyed by team", () => {
     const grid = simDraftBoardGrid(

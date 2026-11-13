@@ -34,6 +34,8 @@ export interface PlayerQuickViewIdentity {
   score?: number | null;
   /** Why the Value tile is empty, when the caller knows (Fantasy Sim: below replacement in this league). */
   value_note?: string | null;
+  /** Caption for the Value tile when it is not the real market value (Fantasy Sim: "Trade value"). */
+  value_label?: string | null;
   overall_rank?: number | null;
   position_rank?: number | null;
   rank_unavailable_reason?: string | null;

@@ -3,15 +3,20 @@ import { AccessibilityInfo, Animated, Pressable, StyleSheet, View } from 'react-
 import { Ionicons } from '@expo/vector-icons';
 
 import AppText from './AppText';
+import OvrGauge from './OvrGauge';
 import PlayerAvatar from './PlayerAvatar';
 import PlayerName from './PlayerName';
 import PositionBadge from './PositionBadge';
+import TapForWhy from './TapForWhy';
 import ToneBadge from './ToneBadge';
 import { useThemeMode } from '../context/ThemeModeContext';
 import type { ChipTone } from '../lib/playerCard';
+import type { WhyMetricId } from '../lib/tapForWhyContent';
 import {
   PLAYER_LIST_DENSITY,
   PLAYER_LIST_LONG_NAME,
+  PLAYER_LIST_SLOT_WIDTH,
+  PLAYER_LIST_STAT_ORDER,
   PLAYER_LIST_STAT_WIDTH,
   limitPlayerListTags,
   orderPlayerListStats,
@@ -27,7 +32,7 @@ import { positionColor, radii, spacing, type ThemeColors } from '../theme';
  * the `list` variant of the player card system, docs/player-card.md. Line 1:
  * position badge, photo, name, one status chip only when it matters. Line 2:
  * muted TEAM · Age · Bye. Line 3: page tags (2 + "+N") and LABELED stat pills
- * (PROJ / VAL / ADP / EDGE) in fixed slots. Actions slot and tap-to-open. An
+ * (PROJ / OVR / TRADE VALUE / ADP / EDGE; OVR is the shared overall gauge) in fixed slots. Actions slot and tap-to-open. An
  * injured row is never dimmed.
  */
 
@@ -186,14 +191,31 @@ export default function PlayerListRow({
           <View style={styles.stats} testID="list-stats">
             {slots.map((stat, i) =>
               stat ? (
-                <View key={stat.key} style={{ minWidth: PLAYER_LIST_STAT_WIDTH[stat.key], alignItems: 'flex-end' }}>
-                  <View style={styles.pill}>
-                    <AppText style={styles.pillLabel}>{stat.label}</AppText>
-                    <AppText style={[styles.pillValue, stat.tone && { color: toneColor(stat.tone, colors, colors.textPrimary) }]}>{stat.value}</AppText>
-                  </View>
+                <View key={stat.key} style={{ minWidth: PLAYER_LIST_STAT_WIDTH[stat.key] ?? 66, alignItems: 'flex-end' }}>
+                  {stat.rating != null ? (
+                    // The player's Overall is the shared OVR gauge (same ring, thresholds and colors as the Quick View hero).
+                    <TapForWhy metric="ovr" spoken={`Overall ${stat.rating}`}>
+                      <View style={styles.gaugeStat}>
+                        <AppText style={styles.pillLabel}>{stat.label}</AppText>
+                        <OvrGauge rating={stat.rating} size="xs" />
+                      </View>
+                    </TapForWhy>
+                  ) : stat.why ? (
+                    <TapForWhy metric={stat.why as WhyMetricId} spoken={`${stat.label} ${stat.value}`}>
+                      <View style={styles.pill}>
+                        <AppText style={styles.pillLabel}>{stat.label}</AppText>
+                        <AppText style={styles.pillValue}>{stat.value}</AppText>
+                      </View>
+                    </TapForWhy>
+                  ) : (
+                    <View style={styles.pill}>
+                      <AppText style={styles.pillLabel}>{stat.label}</AppText>
+                      <AppText style={[styles.pillValue, stat.tone && { color: toneColor(stat.tone, colors, colors.textPrimary) }]}>{stat.value}</AppText>
+                    </View>
+                  )}
                 </View>
               ) : (
-                <View key={`empty-${i}`} style={{ minWidth: PLAYER_LIST_STAT_WIDTH[['proj', 'val', 'adp', 'edge'][i]] }} />
+                <View key={`empty-${i}`} style={{ minWidth: PLAYER_LIST_SLOT_WIDTH[PLAYER_LIST_STAT_ORDER[i] ?? 'adp'] }} />
               ),
             )}
           </View>
@@ -229,6 +251,7 @@ function createStyles(colors: ThemeColors) {
     tags: { flex: 1, minWidth: 0, flexDirection: 'row', alignItems: 'center', gap: 4, overflow: 'hidden' },
     more: { fontSize: 12, fontWeight: '700', color: colors.textTertiary },
     stats: { flexShrink: 0, flexDirection: 'row', alignItems: 'center', justifyContent: 'flex-end', columnGap: 2 },
+    gaugeStat: { flexDirection: 'row', alignItems: 'center', gap: 4 },
     pill: { flexDirection: 'row', alignItems: 'baseline', gap: 4, borderRadius: radii.pill, paddingHorizontal: 6, backgroundColor: colors.glassInput },
     pillLabel: { fontSize: 12, lineHeight: 16, fontWeight: '600', color: colors.textTertiary },
     pillValue: { fontSize: 12, lineHeight: 16, fontWeight: '700', color: colors.textPrimary, fontVariant: ['tabular-nums'] },

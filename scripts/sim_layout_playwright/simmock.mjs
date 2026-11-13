@@ -33,6 +33,11 @@ export function makePlayers(n = 200) {
       last_week: Math.round(proj * 0.9 * 10) / 10, season_points: Math.round(proj * 3.4 * 10) / 10, games: 3, ppg: Math.round(proj * 10) / 10,
     });
   }
+  // Overall (1-99): value percentile within position, like modules/sim/game_view.overall_ratings.
+  for (const pos of new Set(out.map((p) => p.pos))) {
+    const pool = out.filter((p) => p.pos === pos).sort((a, b) => a.value - b.value);
+    pool.forEach((p, i) => { p.overall = pool.length < 10 ? null : Math.round(40 + ((i + 1) / pool.length) * 59); });
+  }
   return out;
 }
 

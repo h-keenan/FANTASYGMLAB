@@ -9,6 +9,7 @@ import { BEGINNER_HELP } from "./experienceCopy";
 
 export type WhyMetricId =
   | "value"
+  | "trade_value"
   | "ovr"
   | "rank"
   | "tier"
@@ -42,6 +43,15 @@ export const WHY_REGISTRY: Record<WhyMetricId, WhyEntry> = {
     sentences: [BEGINNER_HELP.playerValue],
     learnMoreHref: METHODOLOGY,
     learnMoreLabel: "How values are built",
+  },
+  // Fantasy Sim only: the 0-100 number AI teams use in trades. Never labeled plain "Value" or "VAL".
+  trade_value: {
+    id: "trade_value",
+    title: "What trade value means",
+    sentences: [
+      "Trade value is how much this game's AI teams think a player or pick is worth in a trade, on a 0-100 scale where the top player is 100.",
+      "It is not Overall (his rank at his position) and not a points projection. Use it to judge whether a trade is fair.",
+    ],
   },
   ovr: {
     id: "ovr",

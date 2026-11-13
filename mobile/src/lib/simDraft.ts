@@ -167,18 +167,23 @@ export function simDraftMeta(player: Pick<SimGamePlayer, "team" | "age" | "bye_w
 }
 
 /**
- * The labeled stat pills of a sim list row: PROJ, VAL, ADP and (only when the
+ * The labeled stats of a sim list row: PROJ, OVR (the player's Overall, drawn as the same gauge the real
+ * app uses; never the raw 0-100 trade value, which would be a second number with a similar name), ADP and (only when the
  * market and the model disagree by 3+ spots) EDGE. Projection is the per-game
  * mean for an injured player (simBoardProjection), never a bare 0.0.
  */
 export function simListStats(
-  player: Pick<SimGamePlayer, "status" | "projection" | "ros_mean" | "value" | "adp"> & { value_rank?: number | null; adp_edge?: number | null },
-  opts: { adp?: boolean } = {},
+  player: Pick<SimGamePlayer, "status" | "projection" | "ros_mean" | "adp"> & { value?: number | null; overall?: number | null; value_rank?: number | null; adp_edge?: number | null },
+  opts: { adp?: boolean; tradeValue?: boolean } = {},
 ): PlayerListStat[] {
   const stats: PlayerListStat[] = [
     { key: "proj", label: "Proj", value: simFmtPts(simBoardProjection(player).value) },
-    { key: "val", label: "Val", value: simFmtValue(player.value) },
   ];
+  // One 0-100 number by default: Overall in lists. Trade screens (opts.tradeValue) swap it for the labeled
+  // "Trade value", never both, so two similar-looking numbers with different meanings never sit side by side.
+  if (opts.tradeValue) {
+    if (player.value != null) stats.push({ key: "tval", label: "Trade value", value: simFmtValue(player.value), why: "trade_value" });
+  } else if (player.overall != null) stats.push({ key: "ovr", label: "OVR", value: String(player.overall), rating: player.overall });
   if (opts.adp !== false && player.adp != null) stats.push({ key: "adp", label: "ADP", value: simFmtValue(player.adp) });
   const edge = simBoardEdge(player);
   if (edge) stats.push({ key: "edge", label: "Edge", value: `${edge.tone === "success" ? "▲" : "▼"}${Math.abs(edge.delta)}`, tone: edge.tone === "success" ? "success" : "danger" });

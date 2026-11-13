@@ -69,7 +69,7 @@ def player_row(
     projection = ev.next_proj(pid, w) if ev.roles_on else ev.proj(pid, w)
     return {
         "id": pid, "headshot_id": headshot_id(pid), "name": p.name, "pos": p.pos, "team": p.nfl_team,
-        "age": p.age, "adp": p.adp, "value": p.value, "projection": round(projection, 1), "ros_mean": round(ev.ros_mean(pid), 1),
+        "age": p.age, "adp": p.adp, "value": p.value, "overall": overall_ratings(snap).get(pid), "projection": round(projection, 1), "ros_mean": round(ev.ros_mean(pid), 1),
         "role": ev.role_info(pid, w),
         "floor": round(floor, 1), "ceiling": round(ceiling, 1), "status": ev.status(pid, w),
         "out_weeks": state.out.get(pid, 0), "bye_week": snap.bye_of(pid) or None,
@@ -115,6 +115,53 @@ def value_ranks(snap: GameSnapshot) -> dict[str, int]:
         ranks = {pid: i + 1 for i, pid in enumerate(ordered)}
         object.__setattr__(snap, "_value_ranks", ranks)
     return ranks
+
+
+# Overall (1-99): where a player's value ranks among players at his position, the SAME definition and curve the real
+# app's OVR gauge uses (modules/player_quick_view._overall_rating_from_percentile, BEGINNER_HELP.overallRating).
+# The sim may not import real modules (test_sim_isolation), so the curve is copied here and
+# tests/test_sim_overall.py pins it to the real one.
+OVERALL_MAX = 99
+OVERALL_MIN_POOL = 10
+OVERALL_CURVE = ((0.0, 40.0), (0.50, 62.0), (0.80, 72.0), (0.93, 80.0), (0.97, 85.0), (0.995, 90.0), (1.0, float(OVERALL_MAX)))
+
+
+def overall_from_percentile(percentile: float) -> int:
+    clamped = min(1.0, max(0.0, percentile))
+    rating = OVERALL_CURVE[-1][1]
+    for (p_a, r_a), (p_b, r_b) in zip(OVERALL_CURVE, OVERALL_CURVE[1:]):
+        if p_a <= clamped <= p_b:
+            frac = 0.0 if p_b == p_a else (clamped - p_a) / (p_b - p_a)
+            rating = r_a + frac * (r_b - r_a)
+            break
+    return int(min(OVERALL_MAX, max(1, round(rating))))
+
+
+def overall_ratings(snap: GameSnapshot) -> dict[str, int]:
+    """Overall (1-99) per player: percentile of model value within the position pool (ties share the average rank),
+    through the real app's curve. A position pool thinner than OVERALL_MIN_POOL gets no overall (no fabricated rating)."""
+    cached = getattr(snap, "_overall_ratings", None)
+    if cached is None:  # a frozen snapshot's values never change: compute once per snapshot
+        by_pos: dict[str, list[str]] = {}
+        for pid in snap.pids:
+            by_pos.setdefault(snap.players[pid].pos, []).append(pid)
+        cached = {}
+        for pids in by_pos.values():
+            n = len(pids)
+            if n < OVERALL_MIN_POOL:
+                continue
+            ordered = sorted(pids, key=lambda pid: snap.players[pid].value)
+            i = 0
+            while i < n:  # average rank for ties, like pandas rank(pct=True)
+                j = i
+                while j + 1 < n and snap.players[ordered[j + 1]].value == snap.players[ordered[i]].value:
+                    j += 1
+                pct = ((i + 1) + (j + 1)) / 2 / n
+                for k in range(i, j + 1):
+                    cached[ordered[k]] = overall_from_percentile(pct)
+                i = j + 1
+        object.__setattr__(snap, "_overall_ratings", cached)
+    return cached
 
 
 def adp_edge(adp: float | None, value_rank: int | None) -> float | None:

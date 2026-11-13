@@ -191,8 +191,8 @@ function OfferCard({ item, defaultOpen, busy, canTrade, onRespond }: { item: Sim
             </View>
           </View>
           <AppText style={common.small}>
-            <AppText style={{ fontWeight: '800', color: colors.danger, fontSize: 13 }}>Give</AppText> {names(item.you_give)} ({give.value}){' \u00b7 '}
-            <AppText style={{ fontWeight: '800', color: colors.success, fontSize: 13 }}>Get</AppText> {names(item.you_get)} ({get.value})
+            <AppText style={{ fontWeight: '800', color: colors.danger, fontSize: 13 }}>Give</AppText> {names(item.you_give)} (trade value {give.value}){' \u00b7 '}
+            <AppText style={{ fontWeight: '800', color: colors.success, fontSize: 13 }}>Get</AppText> {names(item.you_get)} (trade value {get.value})
           </AppText>
         </Pressable>
         {open ? (
@@ -515,13 +515,14 @@ function Builder({ ctx, seed, onSeedUsed }: { ctx: SimCtx; seed: SimTradeSeed | 
           onClose={() => setSheetSide(null)}
           hidden={viewing !== null}
           flexFilter={game.settings.slots.includes('FLEX')}
+          valueLabel="Trade value"
           renderPlayerRow={(item, { on, blocked, toggle }) => {
             const player = item.ref as SimGamePlayer;
             return (
               <SimPlayerLine
                 player={player}
                 week={game.week}
-                stats={simListStats(player, { adp: false })}
+                stats={simListStats(player, { adp: false, tradeValue: true })}
                 selected={on}
                 onOpen={setViewing}
                 trailing={

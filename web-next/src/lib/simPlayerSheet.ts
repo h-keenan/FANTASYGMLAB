@@ -12,6 +12,8 @@ export interface SimHeroFeed {
   valueNote: string | null;
   overall_rank: number | null;
   position_rank: number | null;
+  /** Overall 1-99, the same number the list rows show; drives the hero's Player score ring. */
+  overall_rating: number | null;
 }
 
 /**
@@ -19,13 +21,14 @@ export interface SimHeroFeed {
  * league (below replacement), never a real zero: it renders as an em dash with a reason,
  * and the player still shows the sim's own value rank so the tile row is not empty.
  */
-export function simHeroFeed(player: Pick<SimGamePlayer, "value" | "value_rank" | "pos_value_rank" | "kind">): SimHeroFeed {
+export function simHeroFeed(player: Pick<SimGamePlayer, "value" | "value_rank" | "pos_value_rank" | "kind" | "overall">): SimHeroFeed {
   const hasValue = typeof player.value === "number" && player.value > 0;
   return {
     score: hasValue ? Math.round(player.value) : null,
     valueNote: hasValue ? null : "No market value in this league (below replacement level)",
     overall_rank: player.value_rank ?? null,
     position_rank: player.pos_value_rank ?? null,
+    overall_rating: player.overall ?? null,
   };
 }
 
