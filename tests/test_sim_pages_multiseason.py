@@ -204,3 +204,28 @@ def test_cut_answers_success_in_every_phase_and_is_idempotent():
         c.post(f"/v1/sim/games/{gid}/offseason/start-season", headers=H)
         mine = c.get(f"/v1/sim/games/{gid}/teams/{out['game']['you']['team_id']}", headers=H).json()
         _cut_ok(c, gid, mine["players"][-1]["id"])
+
+
+def test_ir_and_taxi_players_can_be_traded_and_arrive_on_the_active_roster(monkeypatch):
+    """Sleeper lets IR and taxi players be traded. The engine already validates against every squad; the
+    player arrives on the receiving team's active roster (a team over the limit cuts or, for AI, drops)."""
+    from modules.sim import game_actions as act
+    from modules.sim.game_ai import TradeDesk
+    from modules.sim.game_eval import Evaluator
+    from tests.test_sim_dynasty import Run
+
+    monkeypatch.setattr(act, "taxi_eligible", lambda snap, pid: True)
+    run = Run()
+    snap, state = run.snap, run.state
+    user = snap.user_team.tid
+    mine = next(p for p in sorted(state.rosters[user]) if snap.players[p].pos in ("RB", "WR", "TE", "QB"))
+    run.em.snap = snap
+    act.move_player(run.em, mine, "taxi")
+    assert state.where(user, mine) == "taxi"
+    partner = next(t for t in snap.tids if t != user)
+    theirs = sorted(state.rosters[partner])[0]
+    desk = TradeDesk(Evaluator(snap, state), run.sd)
+    act.preview_trade(desk, partner, [mine], [theirs])  # not refused for being on the taxi squad
+    act.execute_trade(run.em, user, partner, [mine], [theirs], key="", source="test")
+    assert state.where(partner, mine) in ("roster", None) and state.where(user, theirs) == "roster"
+    assert mine not in state.taxi[user]

@@ -17,7 +17,7 @@ import { SIM_GLYPH_ICONS } from './SimGlyph';
 import { SheetModal, SheetScrollView, SwipeDismissCard } from './SwipeDismissSheet';
 import ToneBadge from './ToneBadge';
 import type { PlayerListStat, PlayerListTag } from '../lib/playerListRow';
-import { simDraftMeta, simDraftRowChips } from '../lib/simDraft';
+import { simDraftMeta, simDraftRowChips, simListStats } from '../lib/simDraft';
 import { useThemeMode } from '../context/ThemeModeContext';
 import {
   simGamePreviewLine,
@@ -25,7 +25,9 @@ import {
   simTrendText,
   simPlayerInitials,
   simPlayerSubline,
+  simSlotRepeatsPosition,
   type SimGlyphName,
+  type SimSlot,
   type SimPlayerRef,
   type SimGame,
   type SimGameEnvelope,
@@ -275,6 +277,49 @@ export function SimPlayerLine({
       onOpen={onOpen ? () => onOpen(player) : undefined}
       openLabel={`${player.name}, ${player.pos}. Open player details`}
     />
+  );
+}
+
+/**
+ * THE roster row (lineup starters, bench, IR, taxi): one component, one info set. Age, bye, injury chip,
+ * labeled PROJ and VAL, tags and tap-to-open all come from SimPlayerLine + simListStats, so a starter shows
+ * exactly what a bench player shows. `slot` adds the leading slot-label column (QB, RB1, FLEX ...); a
+ * flex-type slot also keeps the player's own position pill, since the slot label no longer says it.
+ */
+export function SimRosterLine({
+  player,
+  slot,
+  trailing,
+  onOpen,
+  extra,
+  week = null,
+}: {
+  player: SimGamePlayer;
+  slot?: { slot: SimSlot; label: string };
+  trailing?: ReactNode;
+  onOpen?: (player: SimGamePlayer) => void;
+  extra?: ReactNode;
+  week?: number | null;
+}) {
+  const line = (
+    <SimPlayerLine
+      player={player}
+      week={week}
+      stats={simListStats(player, { adp: false })}
+      hidePosition={slot ? simSlotRepeatsPosition(slot.slot, player.pos) : false}
+      extra={extra}
+      trailing={trailing}
+      onOpen={onOpen}
+    />
+  );
+  if (!slot) return line;
+  return (
+    <View testID="lineup-row" style={{ flexDirection: 'row', alignItems: 'stretch' }}>
+      <View style={{ width: 52, alignItems: 'center', justifyContent: 'center' }}>
+        <PositionBadge position={slot.slot} label={slot.label} />
+      </View>
+      <View style={{ flex: 1, minWidth: 0 }}>{line}</View>
+    </View>
   );
 }
 

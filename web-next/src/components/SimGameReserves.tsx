@@ -4,12 +4,14 @@ import { useState } from "react";
 
 import { Button } from "@/components/Button";
 import { SimCollapse, SimPlayerChips } from "@/components/SimGameDynastyParts";
-import { SimPlayerLine, SimSheet, SimStat, type SimCtx } from "@/components/SimGameParts";
+import { SimRosterLine, SimSheet, type SimCtx } from "@/components/SimGameParts";
 import { api } from "@/lib/api";
 import {
   simFmtPts,
   simGameGate,
   simReserveActions,
+  simReserveButtonLabel,
+  simTaxiSwapCandidates,
   simReserveReasonText,
   simReserveUsedLine,
   type SimGamePlayer,
@@ -41,18 +43,47 @@ export function SimReserveSheet({
   ctx,
   player,
   state,
+  taxi = [],
   onClose,
   onMoved,
 }: {
   ctx: SimCtx;
   player: SimGamePlayer;
   state: SimReserveState;
+  /** Players on the taxi squad, for the "Taxi full - swap with..." shortcut. */
+  taxi?: SimGamePlayer[];
   onClose: () => void;
   onMoved: (body: SimLineupResponse, player: SimGamePlayer, to: SimReserveMoveTo) => void;
 }) {
   const [busy, setBusy] = useState<SimReserveMoveTo | null>(null);
   const [refusal, setRefusal] = useState<string | null>(null);
   const actions = simReserveActions(player, moveContext(state));
+
+  const [swapOpen, setSwapOpen] = useState(false);
+
+  async function swap(other: SimGamePlayer) {
+    // Promote the taxi player first (that frees the taxi slot), then move him in.
+    setBusy("taxi");
+    setRefusal(null);
+    try {
+      const freed = await api.moveSimPlayer(ctx.gameId, { player_id: other.id, to: "roster" });
+      const gate = simGameGate(freed);
+      if (gate.kind === "blocked") {
+        setRefusal(simReserveReasonText(gate.reason, freed.message));
+        return;
+      }
+      if (gate.kind !== "ready") {
+        await ctx.call(async () => freed);
+        return;
+      }
+    } catch {
+      setRefusal("Could not swap. Try again.");
+      return;
+    } finally {
+      setBusy(null);
+    }
+    await go({ to: "taxi", label: "Move to taxi", check: { ok: true } });
+  }
 
   async function go(action: SimReserveAction) {
     setBusy(action.to);
@@ -86,36 +117,50 @@ export function SimReserveSheet({
       </p>
       <div className="flex items-center gap-2 pt-1 text-xs" style={{ color: "var(--color-text-muted)" }}>
         <span>{player.pos}{player.team ? ` · ${player.team}` : ""}</span>
-        <SimPlayerChips player={player} />
+        <SimPlayerChips player={{ ...player, out_weeks: 0 }} />
       </div>
       <ul className="flex flex-col gap-2 pt-3" aria-label="Moves">
-        {actions.map((action) => (
-          <li key={action.to} className="flex flex-col gap-1">
-            <Button
-              fullWidth
-              variant={action.check.ok ? "primary" : "secondary"}
-              disabled={!action.check.ok || busy !== null}
-              loading={busy === action.to}
-              onClick={() => void go(action)}
-            >
-              {action.label}
-            </Button>
-            {!action.check.ok && action.check.reason ? (
-              <p className="text-xs" style={{ color: "var(--color-text-muted)" }} data-testid={`reserve-hint-${action.to}`}>
-                {simReserveReasonText(action.check.reason)}
-              </p>
-            ) : null}
-          </li>
-        ))}
+        {actions.map((action) => {
+          const swaps = simTaxiSwapCandidates(player, action, taxi);
+          return (
+            <li key={action.to} className="flex flex-col gap-1">
+              <Button
+                fullWidth
+                variant={action.check.ok ? "primary" : "secondary"}
+                disabled={!action.check.ok || busy !== null}
+                loading={busy === action.to}
+                onClick={() => void go(action)}
+                data-testid={action.check.ok ? undefined : `reserve-hint-${action.to}`}
+              >
+                {simReserveButtonLabel(action)}
+              </Button>
+              {swaps.length > 0 ? (
+                <>
+                  <Button fullWidth variant="ghost" disabled={busy !== null} aria-expanded={swapOpen} onClick={() => setSwapOpen((v) => !v)}>
+                    Taxi full — swap with…
+                  </Button>
+                  {swapOpen ? (
+                    <ul className="flex flex-col gap-1" aria-label="Swap with a taxi player">
+                      {swaps.map((other) => (
+                        <li key={other.id}>
+                          <Button fullWidth size="sm" variant="secondary" disabled={busy !== null} onClick={() => void swap(other)}>
+                            Swap with {other.name}
+                          </Button>
+                        </li>
+                      ))}
+                    </ul>
+                  ) : null}
+                </>
+              ) : null}
+            </li>
+          );
+        })}
       </ul>
       {refusal ? (
         <p className="pt-2 text-sm font-semibold" role="alert" style={{ color: "var(--color-warning)" }} data-testid="reserve-refusal">
           {refusal}
         </p>
       ) : null}
-      <Button variant="ghost" className="mt-2" onClick={onClose}>
-        Close
-      </Button>
     </SimSheet>
   );
 }
@@ -171,12 +216,11 @@ export function SimReserveGroups({
             <p className="text-xs" style={{ color: "var(--color-text-muted)" }}>{g.empty}</p>
           ) : (
             g.players.map((player) => (
-              <SimPlayerLine
+              <SimRosterLine
                 key={player.id}
-                player={player}
-                muted
+                player={{ ...player, squad: g.kind }}
                 onOpen={openPlayer}
-                extra={<SimPlayerChips player={{ ...player, squad: g.kind }} />}
+                extra={<SimPlayerChips player={{ ...player, squad: g.kind, out_weeks: 0 }} />}
                 trailing={
                   cutting === player.id && onCut ? (
                     <>
@@ -185,7 +229,6 @@ export function SimReserveGroups({
                     </>
                   ) : (
                     <>
-                      <SimStat label="Proj" value={simFmtPts(player.projection)} />
                       <SimReserveButton player={{ ...player, squad: g.kind }} onOpen={onOpen} />
                       {onCut && onAskCut ? (
                         <Button size="sm" variant="ghost" aria-label={`Cut ${player.name}`} onClick={() => onAskCut(player.id)}>Cut</Button>

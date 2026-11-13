@@ -135,7 +135,7 @@ test('every mobile sim list that names a player uses the shared chip or line', (
 test('lineup rows drop the position chip only when the slot repeats it', () => {
   assert.equal(simSlotRepeatsPosition('RB', 'RB'), true);
   assert.equal(simSlotRepeatsPosition('FLEX', 'RB'), false);
-  for (const file of ['SimGameTeam.tsx', 'SimGameRecap.tsx']) {
+  for (const file of ['SimGameParts.tsx', 'SimGameRecap.tsx']) {
     assert.match(read('components', file), /simSlotRepeatsPosition\(/, file);
   }
 });

@@ -143,8 +143,10 @@ describe("IR and taxi on the Team tab", () => {
     await openTeam();
     fireEvent.click(screen.getByRole("button", { name: "Move Rookie Ray to IR, taxi or roster" }));
     const dialog = await screen.findByRole("dialog");
-    expect(within(dialog).getByRole("button", { name: "Move to IR" })).toBeDisabled();
-    expect(within(dialog).getByTestId("reserve-hint-ir")).toHaveTextContent(/injured/);
+    expect(within(dialog).getByRole("button", { name: /^Move to IR/ })).toBeDisabled();
+    // the reason is part of the disabled button, not a floating sentence
+    expect(within(dialog).getByTestId("reserve-hint-ir")).toHaveTextContent("Move to IR · Not injured");
+    expect(within(dialog).queryByRole("button", { name: "Close" })).toBeNull(); // the X and swipe close the sheet
     mocked.moveSimPlayer.mockResolvedValue({ ...lineup, ok: true, reason: "", bench: [lineup.bench![1]], taxi: [player("2", "RB", "Rookie Ray", { squad: "taxi", rookie: true })], reserves: { ...lineup.reserves!, taxi_used: 1 }, move: { pid: "2", src: "roster", dst: "taxi" } });
     fireEvent.click(within(dialog).getByRole("button", { name: "Move to taxi" }));
     await waitFor(() => expect(mocked.moveSimPlayer).toHaveBeenCalledWith("g1", { player_id: "2", to: "taxi" }));
@@ -166,12 +168,12 @@ describe("IR and taxi on the Team tab", () => {
     await openTeam();
     fireEvent.click(screen.getByRole("button", { name: "Move Hurt Hank to IR, taxi or roster" }));
     expect(within(await screen.findByRole("dialog")).getByRole("button", { name: "Move to IR" })).toBeEnabled();
-    fireEvent.click(within(screen.getByRole("dialog")).getByRole("button", { name: "Close" }));
+    fireEvent.click(within(screen.getByRole("dialog")).getByRole("button", { name: /^Close/ }));
     fireEvent.click(screen.getByRole("button", { name: "Move Ivy Reserve to IR, taxi or roster" }));
     // roster is 16 of 16, so activating is blocked with the reason beside it
     const dialog = await screen.findByRole("dialog");
-    expect(within(dialog).getByRole("button", { name: "Activate" })).toBeDisabled();
-    expect(within(dialog).getByTestId("reserve-hint-roster")).toHaveTextContent(/roster is full/i);
+    expect(within(dialog).getByRole("button", { name: /^Activate/ })).toBeDisabled();
+    expect(within(dialog).getByTestId("reserve-hint-roster")).toHaveTextContent("Activate · Roster full");
   });
 });
 
