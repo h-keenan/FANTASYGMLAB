@@ -182,6 +182,7 @@ class Fuzz:
         self.req("GET", f"/teams/{tid}/history")
         self.req("GET", "/players/nope")
         self.req("GET", "/teams/zzz")
+        self.check_block()
 
     def op_draft(self, snap, state):
         r = self.rng.random()
@@ -258,6 +259,39 @@ class Fuzz:
             res2, data2 = self.req("POST", "/trades", {"partner": partner, "give": give, "get": get}, tag="POST /trades (retry)")
             if data2.get("executed"):
                 self.violations.append("a retried trade executed twice")
+
+    def op_block(self, snap, state):
+        user = snap.user_team.tid
+        mine = state.rosters[user] + state.ir[user] + state.taxi[user] + [p for p, o in state.pick_owner.items() if o == user]
+        if self.rng.random() < 0.2:
+            self.check_block()
+            return
+        asset = self.pick(mine) if self.rng.random() < 0.85 else self.junk_id()
+        self.req("PUT", "/block", {"asset_id": asset or "x", "on": bool(self.rng.random() < 0.7),
+                                   "looking_for": self.pick([None, None, "QB", "RB", "WR", "TE", "K", "zz"])})
+
+    def check_block(self):
+        """The block view only ever shows assets the user still holds (a stale entry in the state is filtered, by design) and AI items its owner holds."""
+
+        res, data = self.req("GET", "/block")
+        if not data.get("enabled"):
+            return
+        snap, state = self.load()
+        user = snap.user_team.tid
+        held = set(state.rosters[user]) | set(state.ir[user]) | set(state.taxi[user]) | {p for p, o in state.pick_owner.items() if o == user}
+        for m in data["mine"]:
+            if m["asset"]["id"] not in held:
+                self.violations.append(f"block view shows {m['asset']['id']} which the user does not hold")
+        if len(data["mine"]) > data["max_items"]:
+            self.violations.append("the user's block is over its limit")
+        for b in data["league"]:
+            tid = b["team_id"]
+            for item in b["items"]:
+                aid = item["asset"]["id"]
+                if aid in snap.players and aid not in (set(state.rosters[tid]) | set(state.ir[tid]) | set(state.taxi[tid])):
+                    self.violations.append(f"AI team {tid} shops {aid} which it does not hold")
+                if aid not in snap.players and state.pick_owner.get(aid) != tid:
+                    self.violations.append(f"AI team {tid} shops pick {aid} which it does not hold")
 
     def op_inbox(self, snap, state):
         if state.offers and self.rng.random() < 0.8:
@@ -341,7 +375,7 @@ class Fuzz:
         if status == "offseason":
             (self.op_offseason if self.rng.random() < 0.85 else self.op_trade)(snap, state) if True else None
             return
-        ops = [(self.op_advance, 22), (self.op_lineup, 10), (self.op_wire, 18), (self.op_trade, 14), (self.op_inbox, 6),
+        ops = [(self.op_advance, 22), (self.op_lineup, 10), (self.op_wire, 18), (self.op_trade, 14), (self.op_inbox, 6), (self.op_block, 6),
                (self.op_reserve, 8), (self.op_history, 3), (self.op_views, 3)]
         w = np.array([x[1] for x in ops], dtype=float)
         fn = ops[int(self.rng.choice(len(ops), p=w / w.sum()))][0]
