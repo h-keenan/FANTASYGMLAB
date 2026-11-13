@@ -1,4 +1,4 @@
-import React, { useEffect, useId, useMemo, useSyncExternalStore, type ReactNode } from 'react';
+import React, { useMemo, type ReactNode } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -6,7 +6,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import AppText from './AppText';
 import { SheetModal, SheetScrollView, SwipeDismissCard } from './SwipeDismissSheet';
 import { useThemeMode } from '../context/ThemeModeContext';
-import { overlayStack } from '../lib/overlayStack';
+import { useOverlay } from '../lib/useOverlay';
 import { radii, scrim, spacing, type ThemeColors } from '../theme';
 
 export type SheetProps = {
@@ -43,21 +43,14 @@ export function Sheet({ open, onClose, title, description, children, footer, hid
   const { colors } = useThemeMode();
   const styles = useMemo(() => createStyles(colors), [colors]);
   const insets = useSafeAreaInsets();
-  const id = useId();
 
-  useSyncExternalStore(overlayStack.subscribe, overlayStack.version, overlayStack.version);
-  useEffect(() => {
-    if (!open) return;
-    overlayStack.open({ id, kind: 'sheet', title, dismiss: onClose });
-    return () => overlayStack.close(id);
-  }, [open, id, title, onClose]);
-
-  const hidden = open && overlayStack.isHidden(id);
-  const backTitle = open ? overlayStack.previousSheet(id)?.title ?? null : null;
+  const overlay = useOverlay({ title, onClose, enabled: open });
+  const hidden = overlay.hidden;
+  const backTitle = overlay.backTitle;
   if (!open) return null;
 
   return (
-    <SheetModal visible={!hidden} transparent animationType="slide" onRequestClose={onClose} statusBarTranslucent>
+    <SheetModal unmanaged visible={!hidden} transparent animationType="slide" onRequestClose={onClose} statusBarTranslucent>
       <Pressable style={styles.backdrop} onPress={onClose} accessibilityLabel={`Close ${title}`} accessibilityRole="button">
         <SwipeDismissCard style={styles.sheet} onDismiss={onClose} testID={testID}>
           {backTitle ? (
@@ -76,7 +69,7 @@ export function Sheet({ open, onClose, title, description, children, footer, hid
               </AppText>
               {description ? <AppText style={styles.description}>{description}</AppText> : null}
             </View>
-            <Pressable onPress={() => { overlayStack.closeAll(); }} hitSlop={10} style={styles.close} accessibilityRole="button" accessibilityLabel={`Close ${title}`}>
+            <Pressable onPress={overlay.closeAll} hitSlop={10} style={styles.close} accessibilityRole="button" accessibilityLabel={`Close ${title}`}>
               <Ionicons name="close" size={18} color={colors.textSecondary} />
             </Pressable>
           </View>

@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState, Fragment } from "react";
+import { useCallback, useRef, useState, Fragment } from "react";
 
 import {
   api,
@@ -15,8 +15,7 @@ import { Button } from "@/components/Button";
 import { ConfirmInPlace } from "@/components/ui/ConfirmInPlace";
 import { PlayerRow } from "@/components/PlayerRow";
 import { RangeCompare } from "@/components/RangeCompare";
-import { SheetHandle } from "@/components/SheetHandle";
-import { useSheetDragDismiss } from "@/lib/useSheetDragDismiss";
+import { PopupShell } from "@/components/PopupShell";
 
 import { ToneBadge } from "@/components/ToneBadge";
 import {
@@ -272,34 +271,9 @@ export function SwapSheet({
   onPick: (candidate: MatchupWhatIfCandidate) => void;
   onClose: () => void;
 }) {
-  const { sheetRef, sheetStyle, backdropStyle } = useSheetDragDismiss<HTMLDivElement>({ onDismiss: onClose });
-  useEffect(() => {
-    const previous = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
-    const onKey = (event: KeyboardEvent) => {
-      if (event.key === "Escape") onClose();
-    };
-    window.addEventListener("keydown", onKey);
-    return () => {
-      document.body.style.overflow = previous;
-      window.removeEventListener("keydown", onKey);
-    };
-  }, [onClose]);
-
   const candidates = sheet.data?.candidates ?? [];
   return (
-    <div
-      className="pqv-backdrop"
-      style={backdropStyle}
-      onMouseDown={(event) => {
-        if (event.target === event.currentTarget) onClose();
-      }}
-    >
-      <div ref={sheetRef} style={sheetStyle} className="pqv-modal" role="dialog" aria-modal="true" aria-labelledby="swap-sheet-title">
-        <SheetHandle />
-        <button type="button" className="pqv-close" aria-label="Close" onClick={onClose}>
-          ×
-        </button>
+    <PopupShell title={`${slotDisplayLabel(slot)} options`} onClose={onClose} labelledBy="swap-sheet-title" closeLabel="Close" portal={false}>
         <div className="pqv-scroll">
           <h2 id="swap-sheet-title" className="text-lg font-extrabold pr-10">
             {slotDisplayLabel(slot)} options
@@ -343,8 +317,7 @@ export function SwapSheet({
             </ul>
           )}
         </div>
-      </div>
-    </div>
+    </PopupShell>
   );
 }
 

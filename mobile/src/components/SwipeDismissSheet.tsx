@@ -12,6 +12,7 @@ import Animated, {
 } from 'react-native-reanimated';
 
 import { useThemeMode } from '../context/ThemeModeContext';
+import { useOverlay } from '../lib/useOverlay';
 import { classifySheetGesture, sheetDragOffset, shouldDismissSheet } from '../lib/sheetGesture';
 import { radii, spacing } from '../theme';
 
@@ -157,9 +158,28 @@ export function useSheetDismissGesture({
  * without their own root); this adds one that fills the modal and changes
  * nothing else.
  */
-export function SheetModal({ children, ...modalProps }: ModalProps & { children: React.ReactNode }) {
+export function SheetModal({
+  children,
+  overlayTitle,
+  unmanaged = false,
+  ...modalProps
+}: ModalProps & {
+  children: React.ReactNode;
+  /** Name in the "‹ Back to ..." of a pop-up opened from this one. Defaults to the Modal's accessibilityLabel / "Pop-up". */
+  overlayTitle?: string;
+  /** The caller registers with the overlay stack itself (the shared `Sheet` does, it needs the Back row). */
+  unmanaged?: boolean;
+}) {
+  // One pop-up at a time (lib/overlayStack.ts): opening another Modal hides this one (React Native cannot present two
+  // reliably), Android back returns to it, and the X (closeAll) closes everything.
+  const overlay = useOverlay({
+    title: overlayTitle ?? (modalProps as { accessibilityLabel?: string }).accessibilityLabel ?? 'Pop-up',
+    onClose: () => modalProps.onRequestClose?.({} as never),
+    enabled: Boolean(modalProps.visible) && !unmanaged,
+  });
+  const visible = Boolean(modalProps.visible) && !overlay.hidden;
   return (
-    <Modal {...modalProps}>
+    <Modal {...modalProps} visible={visible}>
       <GestureHandlerRootView style={styles.root}>{children}</GestureHandlerRootView>
     </Modal>
   );

@@ -12,7 +12,6 @@ import { TradePickerSheet } from "@/components/TradePickerSheet";
 import { usePlayerQuickView } from "@/context/PlayerQuickViewContext";
 import { PillRow } from "@/components/PillRow";
 import { PremiumUpsellCard } from "@/components/PremiumUpsellCard";
-import { SheetHandle } from "@/components/SheetHandle";
 import { SkeletonBlock, SkeletonCard } from "@/components/Skeleton";
 import { ToneBadge } from "@/components/ToneBadge";
 import { ExchangeSide, TradeAssetRow } from "@/components/TradeAssetExchange";
@@ -58,7 +57,7 @@ import {
 } from "@/lib/multiTeamTrade";
 import { pickToSheetItem, pickToTradeAsset, playerToSheetItem, playerToTradeAsset } from "@/lib/tradeAnalyzerPresentation";
 import { selectedItems, type SheetItem } from "@/lib/tradeSheetPicker";
-import { useSheetDragDismiss } from "@/lib/useSheetDragDismiss";
+import { PopupShell } from "@/components/PopupShell";
 
 /**
  * Multi-team (3 to 6 team) Trade Analyzer. Two separate surfaces:
@@ -504,16 +503,6 @@ export function MultiTeamTradeContent({
     void analyze();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
-  const { sheetRef, sheetStyle } = useSheetDragDismiss({ onDismiss: () => setPending(null), enabled: Boolean(pending) });
-
-  useEffect(() => {
-    if (!pending) return;
-    const onKey = (event: KeyboardEvent) => {
-      if (event.key === "Escape") setPending(null);
-    };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [pending]);
 
   return (
     <main className="page-shell">
@@ -725,14 +714,7 @@ export function MultiTeamTradeContent({
       ) : null}
 
       {pending ? (
-        <div
-          className="pqv-backdrop"
-          onMouseDown={(event) => {
-            if (event.target === event.currentTarget) setPending(null);
-          }}
-        >
-          <div ref={sheetRef} className="pqv-modal" role="dialog" aria-modal="true" aria-label="Who receives this asset" style={sheetStyle}>
-            <SheetHandle />
+        <PopupShell title="Send to" onClose={() => setPending(null)} ariaLabel="Who receives this asset" portal={false}>
             <div className="flex flex-col gap-3 p-4">
               <h2 className="text-base font-black">Send to</h2>
               <div className="flex flex-col gap-2">
@@ -748,8 +730,7 @@ export function MultiTeamTradeContent({
                 Cancel
               </Button>
             </div>
-          </div>
-        </div>
+        </PopupShell>
       ) : null}
 
       <ValuesCredit />

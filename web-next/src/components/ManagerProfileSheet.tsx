@@ -11,8 +11,7 @@ import { SectionHeading } from "@/components/SectionHeading";
 import { StatStrip } from "@/components/StatStrip";
 import { ToneBadge } from "@/components/ToneBadge";
 import { gradeToneColor, sampleFill, TENDENCY_SIGNALS, tendencyBadgeText, tendencyTone, tradeDateLabel } from "@/lib/managerTendencies";
-import { SheetHandle } from "@/components/SheetHandle";
-import { useSheetDragDismiss } from "@/lib/useSheetDragDismiss";
+import { PopupShell } from "@/components/PopupShell";
 
 import { PositionBadge } from "@/components/PositionBadge";
 import { PickPlate } from "@/components/PickRow";
@@ -107,8 +106,6 @@ export function ManagerProfileSheet({
   avatarUrl?: string | null;
   onClose: () => void;
 }) {
-  // Swipe down on touch to close; the backdrop fades with the drag (lib/useSheetDragDismiss.ts).
-  const { sheetRef, sheetStyle, backdropStyle } = useSheetDragDismiss<HTMLDivElement>({ onDismiss: onClose });
   const [data, setData] = useState<ManagerTendenciesDetailResponse | null>(null);
   const [failed, setFailed] = useState(false);
   const [profile, setProfile] = useState<OpponentProfileResponse | null>(null);
@@ -143,36 +140,12 @@ export function ManagerProfileSheet({
     };
   }, [leagueId, rosterId]);
 
-  useEffect(() => {
-    const previous = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
-    const onKey = (event: KeyboardEvent) => {
-      if (event.key === "Escape") onClose();
-    };
-    window.addEventListener("keydown", onKey);
-    return () => {
-      document.body.style.overflow = previous;
-      window.removeEventListener("keydown", onKey);
-    };
-  }, [onClose]);
-
   const signals = data?.manager?.signals ?? {};
   const sample = data?.manager?.sample ?? null;
   const rows = TENDENCY_SIGNALS.filter(([key]) => signals[key]?.status === "ok");
 
   return (
-    <div
-      className="pqv-backdrop"
-      style={backdropStyle}
-      onMouseDown={(event) => {
-        if (event.target === event.currentTarget) onClose();
-      }}
-    >
-      <div ref={sheetRef} style={sheetStyle} className="pqv-modal" role="dialog" aria-modal="true" aria-labelledby="mgr-profile-name">
-        <SheetHandle />
-        <button type="button" className="pqv-close" aria-label="Close manager profile" onClick={onClose}>
-          ×
-        </button>
+    <PopupShell title={teamName || "Manager profile"} onClose={onClose} labelledBy="mgr-profile-name" closeLabel="Close manager profile" portal={false}>
         <div className="pqv-scroll">
           <div className="flex items-center gap-3 pr-10">
             <TeamAvatar avatarUrl={avatarUrl} name={ownerName || teamName} size={48} />
@@ -268,7 +241,6 @@ export function ManagerProfileSheet({
             </div>
           )}
         </div>
-      </div>
-    </div>
+    </PopupShell>
   );
 }

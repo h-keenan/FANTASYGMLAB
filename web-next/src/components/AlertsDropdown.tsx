@@ -11,6 +11,7 @@ import { markAlertReadSynced, overlayPendingAlertReads, reconcileAlertReads } fr
 import { alertsReasonMessage } from "@/lib/alertsPresentation";
 import { trackUse } from "@/lib/analytics";
 import { api, type AlertItem, type AlertsResponse } from "@/lib/api";
+import { useOverlay } from "@/lib/useOverlay";
 import { useSheetDragDismiss } from "@/lib/useSheetDragDismiss";
 import { ErrorState } from "@/components/ErrorState";
 
@@ -94,14 +95,16 @@ export function AlertsBell({
     load();
   };
 
+  // One pop-up at a time (lib/overlayStack.ts): scroll lock, history and layering belong to the overlay runtime.
+  const overlay = useOverlay({ title: "Alerts", onClose: close, enabled: open });
   useEffect(() => {
     if (!open) return;
     const onKey = (event: KeyboardEvent) => {
-      if (event.key === "Escape") close();
+      if (event.key === "Escape" && overlay.isTop) close();
     };
     document.addEventListener("keydown", onKey);
     return () => document.removeEventListener("keydown", onKey);
-  }, [open, close]);
+  }, [open, close, overlay.isTop]);
 
   const { sheetRef, sheetStyle } = useSheetDragDismiss<HTMLDivElement>({ onDismiss: close, enabled: open });
   const notice = data?.reason ? alertsReasonMessage(data.reason) : null;
@@ -143,7 +146,7 @@ export function AlertsBell({
         ) : null}
       </button>
       {open ? (
-        <div className="fixed inset-0" style={{ zIndex: 50 }}>
+        <div className="fixed inset-0" style={{ zIndex: overlay.zIndex }} hidden={overlay.hidden}>
           <div
             data-testid="alerts-backdrop"
             className="absolute inset-0"
