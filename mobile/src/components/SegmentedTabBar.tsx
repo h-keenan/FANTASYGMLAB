@@ -3,6 +3,7 @@ import { Animated, Easing, ScrollView, StyleSheet, TouchableOpacity, View, type 
 import { useReducedMotion } from 'react-native-reanimated';
 
 import AppText from './AppText';
+import { PulseOnIncrease } from './Motion';
 import TabIcon from './TabIcon';
 import type { TabIconName } from '../lib/tabIcons';
 import { useThemeMode } from '../context/ThemeModeContext';
@@ -102,7 +103,7 @@ export default function SegmentedTabBar<T extends string>({
               </AppText>
               {option.count ? (
                 <View style={[styles.countPill, Boolean(option.glyph || option.icon) && styles.countPillOverlay]} accessibilityLabel={`${option.count} new`}>
-                  <AppText style={styles.countText}>{option.count}</AppText>
+                  <PulseOnIncrease value={option.count}><AppText style={styles.countText}>{option.count}</AppText></PulseOnIncrease>
                 </View>
               ) : null}
             </View>

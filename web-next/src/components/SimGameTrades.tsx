@@ -16,6 +16,7 @@ import { SimTeamCard } from "@/components/SimTeamCard";
 import { SkeletonCard, SkeletonRows } from "@/components/Skeleton";
 import { ToneBadge } from "@/components/ToneBadge";
 import { api } from "@/lib/api";
+import { shouldAnimateList, staggerDelay } from "@/lib/motion";
 import { simGroupByPosition, simSideSummary, simTradeFit, type SimAssetGroup } from "@/lib/simLayout";
 import { simListStats } from "@/lib/simDraft";
 import { simTeamsByPower } from "@/lib/simLeagueRosters";
@@ -137,20 +138,20 @@ function Inbox({ ctx }: { ctx: SimCtx }) {
   return (
     <ul className="flex flex-col gap-2" aria-label="Trade offers">
       {items.map((item, index) => (
-        <OfferCard key={item.id} item={item} defaultOpen={index === 0} busy={busyId === item.id} canTrade={Boolean(ctx.game.can_trade)} onRespond={respond} />
+        <OfferCard key={item.id} index={index} count={items.length} item={item} defaultOpen={index === 0} busy={busyId === item.id} canTrade={Boolean(ctx.game.can_trade)} onRespond={respond} />
       ))}
     </ul>
   );
 }
 
 /** One AI offer as a compact card: who, what moves and when it expires; tap to expand the players and the Accept / Decline buttons. */
-function OfferCard({ item, defaultOpen, busy, canTrade, onRespond }: { item: SimInboxItem; defaultOpen: boolean; busy: boolean; canTrade: boolean; onRespond: (item: SimInboxItem, action: "accept" | "decline") => void }) {
+function OfferCard({ item, index, count, defaultOpen, busy, canTrade, onRespond }: { item: SimInboxItem; index: number; count: number; defaultOpen: boolean; busy: boolean; canTrade: boolean; onRespond: (item: SimInboxItem, action: "accept" | "decline") => void }) {
   const [open, setOpen] = useState(defaultOpen);
   const give = simSideSummary(item.you_give);
   const get = simSideSummary(item.you_get);
   const names = (list: SimTradeAsset[]) => list.map((p) => (simIsPick(p) ? simPickLabelText(p) : p.name.split(" ").slice(-1)[0])).join(", ");
   return (
-    <li className="enter-rise">
+    <li className="enter-rise" style={shouldAnimateList(count) ? { animationDelay: `${staggerDelay(index, count)}ms` } : undefined}>
       <AccentCard accent="var(--color-premium)" compact as="div">
         <button
           type="button"

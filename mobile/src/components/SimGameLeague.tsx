@@ -29,6 +29,7 @@ import {
   type SimRecapScore,
   type SimStandingRow,
 } from '../lib/simGame';
+import { CountUp, MotionIn } from './Motion';
 import SimCrest from './SimCrest';
 import { simMatchupMargin, simMatchupStatus, simPreview, simScoreboardLabel } from '../lib/simLayout';
 import { useSimLeagueRosters } from '../lib/useSimLeagueRosters';
@@ -91,7 +92,11 @@ export function SimScoreCard({ g, names, youId, onOpen }: { g: SimRecapScore; na
     </View>
   );
   const score = (t: ReturnType<typeof side>) => (
-    <AppText style={{ fontSize: 20, fontWeight: t.won ? '900' : '600', color: t.won ? colors.success : t.lost ? colors.textTertiary : colors.textPrimary }}>{t.pts == null ? '-' : simFmtPts(t.pts)}</AppText>
+    t.pts == null ? (
+      <AppText style={{ fontSize: 20, fontWeight: '600', color: colors.textPrimary }}>-</AppText>
+    ) : (
+      <CountUp value={t.pts} render={(text) => <AppText style={{ fontSize: 20, fontWeight: t.won ? '900' : '600', color: t.won ? colors.success : t.lost ? colors.textTertiary : colors.textPrimary }}>{text}</AppText>} />
+    )
   );
   return (
     <Pressable
@@ -170,7 +175,12 @@ function Scoreboard({ game, schedule, names }: { game: SimCtx['game']; schedule:
       {!entry || entry.games.length === 0 ? (
         <EmptyState icon="calendar-outline" title="No games" subtitle="Nothing is scheduled this week." />
       ) : (
-        entry.games.map((g: SimRecapScore) => <SimScoreCard key={`${g.home}-${g.away}`} g={g} names={names} youId={youId} onOpen={() => setOpen(g)} />)
+        // The cards rise in a capped stagger; changing the week remounts them (key) so the scores count up again.
+        entry.games.map((g: SimRecapScore, i) => (
+          <MotionIn key={`${week}-${g.home}-${g.away}`} index={i} count={entry.games.length}>
+            <SimScoreCard g={g} names={names} youId={youId} onOpen={() => setOpen(g)} />
+          </MotionIn>
+        ))
       )}
       {open ? <SimMatchupSheet g={open} names={names} youId={youId} week={week} label={label} onClose={() => setOpen(null)} /> : null}
     </View>

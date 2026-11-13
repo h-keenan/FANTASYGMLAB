@@ -69,6 +69,7 @@ export const IDENTICAL = [
   "simScroll.ts",
   "simRecapStory.ts",
   "storyCarousel.ts",
+  "motion.ts",
   "simLayout.ts",
   "simPresentation.ts",
   "startHere.ts",
@@ -117,6 +118,7 @@ export const DIVERGED = [
   "guessThePlayerNameMatchDismissed.ts",
   "onboardingAnalytics.ts",
   "sheetGesture.ts",
+  "useMotion.ts", // platform glue: matchMedia / IntersectionObserver vs AccessibilityInfo
   "simRookieNotice.ts",
   "supabase.ts",
   // Pure logic that has drifted or been edited on one side only. Promote to

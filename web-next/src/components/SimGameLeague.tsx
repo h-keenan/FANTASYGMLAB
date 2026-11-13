@@ -8,6 +8,7 @@ import { EmptyState } from "@/components/EmptyState";
 import { PillRow } from "@/components/PillRow";
 import { ReviewGlyphChip } from "@/components/SeasonReviewSections";
 import { SimPlayerChip, SimSectionTitle, SimSeeAll, SimSheet, SimTeamLink, SimToneBadge, simToneColor, useSimWide, type SimCtx } from "@/components/SimGameParts";
+import { CountUp, MotionIn } from "@/components/Motion";
 import { SimCrest } from "@/components/SimCrest";
 import { SimLeaguePlayersView, SimLeagueTeamsView } from "@/components/SimLeagueWho";
 import { SkeletonCard } from "@/components/Skeleton";
@@ -113,7 +114,7 @@ export function SimScoreCard({ g, names, youId, onOpen }: { g: SimRecapScore; na
   );
   const score = (t: ReturnType<typeof side>) => (
     <span className="tabular-nums" style={{ fontSize: "1.25rem", fontWeight: t.won ? 900 : 600, color: t.won ? "var(--color-success)" : t.lost ? "var(--color-text-muted)" : "var(--color-text-primary)" }}>
-      {t.pts == null ? "-" : simFmtPts(t.pts)}
+      {t.pts == null ? "-" : <CountUp value={t.pts} />}
     </span>
   );
   return (
@@ -182,7 +183,14 @@ function Scoreboard({ game, schedule, names }: { game: SimCtx["game"]; schedule:
       {!entry || entry.games.length === 0 ? (
         <EmptyState title="No games" subtitle="Nothing is scheduled this week." />
       ) : (
-        entry.games.map((g: SimRecapScore) => <SimScoreCard key={`${g.home}-${g.away}`} g={g} names={names} youId={youId} onOpen={() => setOpen(g)} />)
+        // Changing the week sweeps a light band across the new scoreboard; the cards rise in a capped stagger.
+        <div key={week} className="motion-sweep flex flex-col gap-2 rounded-xl">
+          {entry.games.map((g: SimRecapScore, i) => (
+            <MotionIn key={`${g.home}-${g.away}`} index={i} count={entry.games.length}>
+              <SimScoreCard g={g} names={names} youId={youId} onOpen={() => setOpen(g)} />
+            </MotionIn>
+          ))}
+        </div>
       )}
       {open ? <SimMatchupSheet g={open} names={names} youId={youId} week={week} label={label} onClose={() => setOpen(null)} /> : null}
     </section>

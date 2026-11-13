@@ -6,6 +6,7 @@ import AccentCard from './AccentCard';
 import AppText from './AppText';
 import Button from './Button';
 import ErrorState from './ErrorState';
+import { Confetti, CountUp } from './Motion';
 import PositionBadge from './PositionBadge';
 import SectionHeading from './SectionHeading';
 import SegmentedTabBar from './SegmentedTabBar';
@@ -80,7 +81,7 @@ export function SimWeekRecapView({
               <AppText style={common.muted}>vs {game.opponent_name}</AppText>
             </View>
             <View style={styles.score} accessible accessibilityLabel={`You ${simFmtPts(game.your_pts)}, ${game.opponent_name} ${simFmtPts(game.opp_pts)}`}>
-              <AppText style={[styles.scoreYou, { color: toneColor }]}>{simFmtPts(game.your_pts)}</AppText>
+              <CountUp value={game.your_pts} render={(text) => <AppText style={[styles.scoreYou, { color: toneColor }]}>{text}</AppText>} />
               <AppText style={common.muted}>to</AppText>
               <AppText style={styles.scoreOpp}>{simFmtPts(game.opp_pts)}</AppText>
             </View>
@@ -94,6 +95,7 @@ export function SimWeekRecapView({
         ) : (
           <AppText style={common.bodyStrong}>You had a bye this week.</AppText>
         )}
+        <Confetti wonTitle={recap.season_complete && recap.champion != null && recap.champion === youId} />
         {recap.season_complete ? (
           <View style={common.row}>
             <ReviewGlyphChip glyph="trophy" tone="success" size={24} />

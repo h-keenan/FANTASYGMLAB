@@ -12,6 +12,7 @@ import { ReviewGlyphChip } from './SeasonReviewSections';
 import SectionHeading from './SectionHeading';
 import SegmentedTabBar from './SegmentedTabBar';
 import { SkeletonCard } from './SkeletonBlock';
+import { MotionIn } from './Motion';
 import SimCrest from './SimCrest';
 import SimGlyph from './SimGlyph';
 import SimTeamCard from './SimTeamCard';
@@ -155,7 +156,7 @@ function Inbox({ ctx }: { ctx: SimCtx }) {
   return (
     <View style={common.stack} accessibilityLabel="Trade offers">
       {items.map((item, index) => (
-        <OfferCard key={item.id} item={item} defaultOpen={index === 0} busy={busyId === item.id} canTrade={Boolean(ctx.game.can_trade)} onRespond={respond} />
+        <MotionIn key={item.id} index={index} count={items.length}><OfferCard item={item} defaultOpen={index === 0} busy={busyId === item.id} canTrade={Boolean(ctx.game.can_trade)} onRespond={respond} /></MotionIn>
       ))}
     </View>
   );

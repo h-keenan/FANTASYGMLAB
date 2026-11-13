@@ -3911,6 +3911,10 @@ main > header:has(> h1.sr-only:only-child) {
   color: var(--color-success);
   transition: none;
 }
+.tick-number[data-flash="down"] {
+  color: var(--color-danger);
+  transition: none;
+}
 @media (prefers-reduced-motion: reduce) {
   .player-card-progress > span { transition: none; }
   .player-card-pulse { animation: none; opacity: 0; }
@@ -4317,3 +4321,68 @@ main > header:has(> h1.sr-only:only-child) {
   color: var(--color-accent);
   cursor: pointer;
 }
+
+/* ---------------------------------------------------------------------------
+   Motion library (docs/ui-patterns.md "Motion"; lib/motion.ts is the pure twin).
+   Durations 120-300ms, one set of easings, opacity/transform only, reduced motion
+   turns every one of these off (the content is simply there).
+   --------------------------------------------------------------------------- */
+:root {
+  --motion-instant: 120ms;
+  --motion-base: 240ms;
+  --motion-slow: 300ms;
+  --ease-out: cubic-bezier(0.2, 0.9, 0.3, 1);
+  --ease-in-out: cubic-bezier(0.4, 0, 0.2, 1);
+  --ease-in: cubic-bezier(0.4, 0, 1, 1);
+}
+@keyframes motion-in {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: none; }
+}
+/* Plays once the block is in view (data-motion="in"); until then it waits invisible but in place (no layout shift). */
+.motion-in[data-motion="pending"] { opacity: 0; }
+.motion-in[data-motion="in"] { animation: motion-in var(--motion-base) var(--ease-out) both; }
+
+/* A value that just changed: a quick green (up) or red (down) glow behind it. */
+@keyframes motion-flash-up { 0% { background-color: color-mix(in srgb, var(--color-success) 38%, transparent); } 100% { background-color: transparent; } }
+@keyframes motion-flash-down { 0% { background-color: color-mix(in srgb, var(--color-danger) 38%, transparent); } 100% { background-color: transparent; } }
+.motion-flash-up { animation: motion-flash-up 1100ms var(--ease-out) both; border-radius: 6px; }
+.motion-flash-down { animation: motion-flash-down 1100ms var(--ease-out) both; border-radius: 6px; }
+
+/* New-item badge pulse. */
+@keyframes motion-pulse { 0% { transform: scale(1); } 40% { transform: scale(1.25); } 100% { transform: scale(1); } }
+.motion-pulse { display: inline-flex; animation: motion-pulse var(--motion-slow) var(--ease-out) both; }
+
+/* The advance-week sweep: a soft light band crossing a block once. Add to a `position: relative; overflow: hidden` parent. */
+@keyframes motion-sweep { from { transform: translateX(-120%); } to { transform: translateX(120%); } }
+.motion-sweep { position: relative; overflow: hidden; }
+.motion-sweep::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: linear-gradient(100deg, transparent 30%, color-mix(in srgb, var(--color-accent) 22%, transparent) 50%, transparent 70%);
+  animation: motion-sweep 600ms var(--ease-in-out) both;
+}
+
+/* Title confetti. */
+.motion-confetti { position: fixed; left: 50%; top: 38%; width: 0; height: 0; pointer-events: none; z-index: 95; }
+@keyframes motion-confetti { from { opacity: 1; transform: translate(0, 0) rotate(0); } to { opacity: 0; transform: translate(var(--x), calc(var(--y) + 80px)) rotate(var(--r)); } }
+.motion-confetti-piece { position: absolute; width: 8px; height: 12px; border-radius: 2px; animation: motion-confetti 1200ms var(--ease-out) both; }
+.motion-confetti-piece[data-hue="0"] { background: var(--color-accent); }
+.motion-confetti-piece[data-hue="1"] { background: var(--color-success); }
+.motion-confetti-piece[data-hue="2"] { background: var(--color-warning); }
+.motion-confetti-piece[data-hue="3"] { background: var(--color-text-primary); }
+
+@media (prefers-reduced-motion: reduce) {
+  .motion-in[data-motion="pending"] { opacity: 1; }
+  .motion-in[data-motion="in"], .motion-pulse, .motion-sweep::after, .motion-confetti-piece { animation: none; }
+  /* The flash stays (a colour change, nothing moves) but is shorter. */
+  .motion-flash-up, .motion-flash-down { animation-duration: 600ms; }
+}
+
+/* Hero OVR rings (md / lg only, never the dozens in a list) fill from 0 when they appear. */
+@property --value-ring-pct { syntax: "<number>"; inherits: true; initial-value: 0; }
+@keyframes value-ring-fill { from { --value-ring-pct: 0; } }
+.value-ring--md, .value-ring--lg { animation: value-ring-fill var(--motion-slow) var(--ease-out) both; }
+@media (prefers-reduced-motion: reduce) { .value-ring--md, .value-ring--lg { animation: none; } }
