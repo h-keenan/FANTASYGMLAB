@@ -30,7 +30,9 @@ export function SimActionBar({ ctx, paywalled, advancing, onAdvance, onTab }: { 
     api
       .getSimLineup(gameId)
       .then((body) => {
-        if (!cancelled) setEmptySlots(simEmptySlotLabels(body.slots ?? []));
+        if (cancelled) return;
+        setEmptySlots(simEmptySlotLabels(body.slots ?? []));
+        setConfirming(false); // the lineup changed (e.g. the slot was filled): ask again
       })
       .catch(() => {});
     return () => {
@@ -39,8 +41,6 @@ export function SimActionBar({ ctx, paywalled, advancing, onAdvance, onTab }: { 
   }, [gameId, ctx.tick, game.week]);
 
   const state = simAdvanceState(game, emptySlots);
-  // Reset the confirm whenever the lineup changes (e.g. the user filled the slot).
-  useEffect(() => setConfirming(false), [emptySlots, game.week]);
   const tapAdvance = () => {
     if (state.confirm && !confirming) setConfirming(true);
     else {
