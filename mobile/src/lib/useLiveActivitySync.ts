@@ -4,7 +4,7 @@ import { AppState } from 'react-native';
 import { useAuth } from '../context/AuthContext';
 import { liveActivitiesEnabled, syncLiveActivity } from './liveActivity';
 
-const POLL_MS = 60_000;
+const POLL_MS = 30_000;
 
 /** Mount once under AuthProvider. No-op (no timers, no listeners) while the feature flag is off. */
 export function useLiveActivitySync(): void {

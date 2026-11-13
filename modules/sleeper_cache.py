@@ -227,6 +227,14 @@ def _fetch_and_store(
     return payload, True
 
 
+def fetched_at(url: str) -> float | None:
+    """Epoch seconds the newest cached payload for ``url`` was really fetched
+    (None when nothing is cached). For honest "as of" labels."""
+
+    entry = _get_entry(cache_key(url))
+    return entry[1] if entry is not None else None
+
+
 def shared_json(
     url: str,
     *,

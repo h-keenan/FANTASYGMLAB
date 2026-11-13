@@ -1,9 +1,9 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { AppState, RefreshControl, ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
 import AppText from '../components/AppText';
 import PageTitle from '../components/PageTitle';
 import ErrorState from '../components/ErrorState';
-import { useFocusEffect } from '@react-navigation/native';
+import { useFocusEffect, useIsFocused } from '@react-navigation/native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { useHeaderHeight } from '@react-navigation/elements';
 import { Ionicons } from '@expo/vector-icons';
@@ -64,6 +64,7 @@ import {
 import { emptySlotsOf, plannerBase, plannerOpponentPlayers, slotIndexFor, winPercent } from '../lib/matchupPlanner';
 import { useOrbClearance } from '../lib/orbLayout';
 import { queryKeys } from '../lib/queryKeys';
+import { dataAgeSeconds, freshnessLabel, nextPollDelayMs, projFinalLabel } from '../lib/liveScores';
 import { useScreenHeaderTitle } from '../lib/useScreenHeaderTitle';
 import { toUserErrorMessage } from '../lib/errorMessages';
 import { useThemeMode } from '../context/ThemeModeContext';
@@ -141,11 +142,46 @@ export default function MatchupScreen({ route, navigation }: Props) {
   const queryClient = useQueryClient();
   const isRestoring = useIsRestoring();
   // Shares its cache entry with DashboardScreen's own matchup fetch.
+  // Live scores: while the server says games are live (`live`/`poll_after_seconds`) and
+  // this screen is focused + the app foregrounded, refetch every 30-60 s (React Query also
+  // pauses while offline). Errors back off exponentially (lib/liveScores). The persisted
+  // cache paints first, then staleTime 0 while live forces the revalidation.
+  const isFocused = useIsFocused();
+  const failures = useRef(0);
+  const retryAfter = useRef<number | undefined>(undefined);
   const matchupQuery = useQuery({
     queryKey: queryKeys.matchup(leagueId),
-    queryFn: () => api.getLeagueMatchup(leagueId),
+    queryFn: async () => {
+      try {
+        const result = await api.getLeagueMatchup(leagueId);
+        failures.current = 0;
+        retryAfter.current = undefined;
+        return result;
+      } catch (err) {
+        failures.current += 1;
+        retryAfter.current = (err as { retryAfterSeconds?: number } | null)?.retryAfterSeconds;
+        throw err;
+      }
+    },
     enabled: !isRestoring,
+    staleTime: (query) => (query.state.data?.live ? 0 : 30_000),
+    refetchInterval: (query) =>
+      query.state.data?.live === true && isFocused && AppState.currentState === 'active'
+        ? nextPollDelayMs(query.state.data.poll_after_seconds, failures.current, retryAfter.current)
+        : false,
+    refetchIntervalInBackground: false,
   });
+  const [nowMs, setNowMs] = useState(() => Date.now());
+  useEffect(() => {
+    const tick = setInterval(() => setNowMs(Date.now()), 5000);
+    const sub = AppState.addEventListener('change', (state) => {
+      if (state === 'active') void queryClient.invalidateQueries({ queryKey: queryKeys.matchup(leagueId) });
+    });
+    return () => {
+      clearInterval(tick);
+      sub.remove();
+    };
+  }, [queryClient, leagueId]);
   const guillotineQuery = useQuery({
     queryKey: queryKeys.guillotine(leagueId),
     queryFn: () => api.getLeagueGuillotine(leagueId),
@@ -257,6 +293,9 @@ export default function MatchupScreen({ route, navigation }: Props) {
       <ScrollView
         style={styles.container}
         contentContainerStyle={[styles.content, { paddingBottom: orbClearance, paddingTop: headerHeight }]}
+        refreshControl={
+          <RefreshControl refreshing={matchupQuery.isRefetching} onRefresh={() => void matchupQuery.refetch()} />
+        }
       >
         <BrandHeaderBar leagueId={leagueId} leagueName={leagueName} />
         <View style={styles.titleRow}>
@@ -269,6 +308,24 @@ export default function MatchupScreen({ route, navigation }: Props) {
             </View>
           ) : null}
         </View>
+
+        {matchup.as_of_age_seconds != null ? (
+          <View style={styles.freshnessRow} accessibilityLiveRegion="polite">
+            <AppText style={{ color: colors.textSecondary, fontSize: 12.5 }}>
+              {freshnessLabel(dataAgeSeconds(matchup.as_of_age_seconds, matchupQuery.dataUpdatedAt, nowMs))}
+            </AppText>
+            <TouchableOpacity
+              onPress={() => void matchupQuery.refetch()}
+              disabled={matchupQuery.isFetching}
+              accessibilityRole="button"
+              accessibilityLabel="Refresh live scores"
+            >
+              <AppText style={{ color: colors.accent, fontSize: 12.5 }}>
+                {matchupQuery.isFetching ? 'Refreshing…' : 'Refresh'}
+              </AppText>
+            </TouchableOpacity>
+          </View>
+        ) : null}
 
         <BeginnerHelp term="matchupIntro" />
         <BeginnerHelp term="matchupWinProbability" />
@@ -510,6 +567,10 @@ function LineupCell({
   }
   const points = lineupPlayerPoints(player);
   const valueText = points.value != null ? points.value.toFixed(1) : points.note === 'bye' ? null : '—';
+  const projFinal =
+    points.kind === 'pts' && player.game_status === 'in_progress' && 'projected_final' in player
+      ? projFinalLabel(player.projected_final)
+      : null;
   const align = mine ? 'flex-start' : 'flex-end';
   return (
     <TouchableOpacity
@@ -542,6 +603,7 @@ function LineupCell({
           ) : (
             <ToneBadge label="Bye" color={colors.premium} />
           )}
+          {projFinal ? <AppText style={styles.cellProjFinal}>{projFinal}</AppText> : null}
           <AppText style={styles.cellTeam} numberOfLines={1}>
             {player.team || 'FA'}
             {player.injury_label ? ` · ${player.injury_label}` : ''}
@@ -917,6 +979,8 @@ function createStyles(colors: ThemeColors) {
     cellBody: { flex: 1, minWidth: 0 },
     cellName: { fontSize: 14.5, fontWeight: '700', color: colors.textPrimary, alignSelf: 'stretch' },
     textRight: { textAlign: 'right' },
+    cellProjFinal: { fontSize: 12, color: colors.textSecondary },
+    freshnessRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
     cellTeam: { fontSize: 12.5, color: colors.textTertiary, alignSelf: 'stretch' },
         cellPoints: { fontSize: 16.5, fontWeight: '700', color: colors.textPrimary },
     cellPointsWin: { fontWeight: '800', color: colors.accent },

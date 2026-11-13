@@ -2,11 +2,11 @@
 
 import { useParams, useRouter } from "next/navigation";
 import { useSearchParams } from "@/lib/useSearchParams";
-import { useEffect, useState } from "react";
+import { useEffect } from "react";
 
 import { useAuth } from "@/context/AuthContext";
 import { useValuationLens } from "@/context/ValuationLensContext";
-import { api, type MatchupResponse } from "@/lib/api";
+import { useLiveMatchup } from "@/lib/useLiveMatchup";
 import { MatchupContent } from "@/components/MatchupContent";
 import { ErrorState, reloadPage } from "@/components/ErrorState";
 import { LoadingScreen } from "@/components/LoadingScreen";
@@ -21,33 +21,14 @@ export default function MatchupPage() {
   const leagueName = searchParams.get("name") || leagueId;
   const { lens, lensReady } = useValuationLens(leagueId);
 
-  const [matchup, setMatchup] = useState<MatchupResponse | null>(null);
-  const [error, setError] = useState<string | null>(null);
+  const ready = !authLoading && !!session && lensReady;
+  // Hold the first fetch until the league type is known (see ValuationLensContext), so a redraft
+  // league is requested once as Non-Dynasty, not once as Dynasty and again after detection.
+  const { matchup, error, refreshing, ageSeconds, refresh } = useLiveMatchup(leagueId, lens, ready);
 
   useEffect(() => {
-    if (authLoading) return;
-    if (!session) {
-      router.replace("/");
-      return;
-    }
-    // Hold the first fetch until the league type is known (see ValuationLensContext), so a redraft
-    // league is requested once as Non-Dynasty, not once as Dynasty and again after detection.
-    if (!lensReady) return;
-    let cancelled = false;
-
-    api
-      .getLeagueMatchup(leagueId, lens)
-      .then((result) => {
-        if (!cancelled) setMatchup(result);
-      })
-      .catch((err) => {
-        if (!cancelled) setError(err instanceof Error ? err.message : "Could not load this week's matchup.");
-      });
-
-    return () => {
-      cancelled = true;
-    };
-  }, [authLoading, session, leagueId, lens, lensReady, router]);
+    if (!authLoading && !session) router.replace("/");
+  }, [authLoading, session, router]);
 
   if (authLoading || (!matchup && !error)) {
     return (
@@ -61,5 +42,15 @@ export default function MatchupPage() {
     );
   }
 
-  return <MatchupContent leagueName={leagueName} matchup={matchup} leagueId={leagueId} lens={lens} />;
+  return (
+    <MatchupContent
+      leagueName={leagueName}
+      matchup={matchup}
+      leagueId={leagueId}
+      lens={lens}
+      ageSeconds={ageSeconds}
+      refreshing={refreshing}
+      onRefresh={refresh}
+    />
+  );
 }

@@ -1779,6 +1779,8 @@ export interface MatchupRealStarter {
   /** True once nflverse has a final score for this player's game. Null when
    * unknown. Used by the live win probability. */
   game_final?: boolean | null;
+  /** Live projected final points (actual + remaining projection, pace-adjusted, 0 more after an injury exit); null unless his game is in progress. */
+  projected_final?: number | null;
   /** Real kickoff instant (ISO-8601 UTC) for this player's game, or null. */
   game_kickoff_at?: string | null;
 
@@ -1940,6 +1942,14 @@ export interface MatchupResponse {
   /** Imported leagues only: starters on either side we could not match to a FantasyDesk player. */
   platform?: string;
   unmapped_players?: { name: string; position: string; team: string; slot?: string; fantasy_team: string }[];
+  /** ISO instant Sleeper's live scores in this payload were really fetched. */
+  as_of?: string;
+  /** Age of those scores at response time, in seconds. */
+  as_of_age_seconds?: number;
+  /** NFL games are in progress right now (server-side live policy). */
+  live?: boolean;
+  /** Seconds a client should wait between refreshes while live; null otherwise. */
+  poll_after_seconds?: number | null;
 }
 
 /** One slot of a proposed lineup sent to POST .../matchup/what-if. */
