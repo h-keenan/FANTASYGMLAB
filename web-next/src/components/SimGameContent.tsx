@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useReducer, useState } from "react";
 
 import { AccentCard } from "@/components/AccentCard";
 import { Button, ButtonLink } from "@/components/Button";
