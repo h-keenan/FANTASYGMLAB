@@ -8,7 +8,7 @@ import { EmptyState } from "@/components/EmptyState";
 import { PillRow } from "@/components/PillRow";
 import { SimDraftRow } from "@/components/SimDraftBoard";
 import { SimDynastyStrip } from "@/components/SimGameDynasty";
-import { SimCollapse, SimPickLine, SimPlayerChips, useSimPicks } from "@/components/SimGameDynastyParts";
+import { SimCollapse, SimGeneratedChip, SimGeneratedNoticeSheet, SimPickLine, SimPlayerChips, SimRookieNoticeGate, useSimPicks } from "@/components/SimGameDynastyParts";
 import { SimPlayerLine, SimStat, SimToneBadge, simToneColor, type SimCtx } from "@/components/SimGameParts";
 import { SimReserveButton, SimReserveGroups, SimReserveSheet } from "@/components/SimGameReserves";
 import { SkeletonCard } from "@/components/Skeleton";
@@ -28,6 +28,7 @@ import {
   simPositionsFor,
   simReservesOn,
   simRetireesSorted,
+  simRookieClassChip,
   simRookieClockLine,
   simRookiePickLine,
   type SimDynastyYear,
@@ -209,8 +210,11 @@ function ReviewStage({ off, ctx, years }: { off: SimOffseason; ctx: SimCtx; year
   const fell = movers.filter((m) => m.delta <= -0.5).length;
   const mine = off.your_picks_this_draft ?? [];
   const titles = ctx.game.dynasty?.titles ?? years.filter((y) => y.champion?.is_you).length;
+  const classChip = simRookieClassChip(off);
+  const [notice, setNotice] = useState(false);
   return (
     <>
+      {notice ? <SimGeneratedNoticeSheet onClose={() => setNotice(false)} /> : null}
       {last && lastYear ? (
         <SimCollapse
           title={`${last.year} season`}
@@ -293,6 +297,13 @@ function ReviewStage({ off, ctx, years }: { off: SimOffseason; ctx: SimCtx; year
         )}
       </SimCollapse>
 
+      {classChip ? (
+        <div className="flex flex-wrap items-center gap-x-2" data-testid="review-class">
+          <SimGeneratedChip label={classChip} onInfo={() => setNotice(true)} />
+          <span className="text-xs" style={{ color: "var(--color-text-muted)" }}>Preview of the incoming class.</span>
+        </div>
+      ) : null}
+
       <SimCollapse
         title="Your rookie picks"
         summary={mine.length === 0 ? "You hold no picks this year" : `${mine.length} pick${mine.length === 1 ? "" : "s"} in a ${off.draft.round_count}-round draft`}
@@ -338,10 +349,15 @@ function RookieStage({
   const positions = simPositionsFor(ctx.game.settings.slots);
   const mine = off.your_picks_this_draft ?? [];
   const made = d.order.filter((o) => o.made);
+  const classChip = simRookieClassChip(off);
+  const [notice, setNotice] = useState(false);
   return (
     <>
+      {classChip ? <SimRookieNoticeGate gameId={ctx.gameId} /> : null}
+      {notice ? <SimGeneratedNoticeSheet onClose={() => setNotice(false)} /> : null}
       <AccentCard accent={d.your_turn ? "var(--color-action)" : "var(--color-accent)"} compact as="section" glow={d.your_turn}>
         <p className="text-sm font-bold" role="status" data-testid="rookie-clock">{simRookieClockLine(d)}</p>
+        {classChip ? <div><SimGeneratedChip label={classChip} onInfo={() => setNotice(true)} /></div> : null}
         <p className="text-xs" style={{ color: "var(--color-text-muted)" }}>
           {d.available_count} rookie{d.available_count === 1 ? "" : "s"} left. {mine.filter((m) => !m.made).length} pick{mine.filter((m) => !m.made).length === 1 ? "" : "s"} still to make.
         </p>
@@ -382,6 +398,7 @@ function RookieStage({
                 // Rookie ADP is not comparable to a pick number in this small class, so no steal/reach edge.
                 pickNo={player.adp ?? 0}
                 onOpen={ctx.openPlayer}
+                onGeneratedInfo={() => setNotice(true)}
                 actions={
                   d.your_turn ? (
                     <Button size="sm" loading={busy === "pick"} disabled={busy !== null && busy !== "pick"} aria-label={`Draft ${player.name}`} onClick={() => onPick(player)}>

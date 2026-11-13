@@ -5,11 +5,14 @@ import { Ionicons } from '@expo/vector-icons';
 import AccentCard from './AccentCard';
 import AppText from './AppText';
 import Button from './Button';
-import { SimPlayerLine, SimStat, SimToneBadge, createSimStyles, simToneColor, type SimCtx } from './SimGameParts';
+import { SimPlayerLine, SimSheet, SimStat, SimToneBadge, createSimStyles, simToneColor, type SimCtx } from './SimGameParts';
 import ToneBadge from './ToneBadge';
 import { useThemeMode } from '../context/ThemeModeContext';
 import { api } from '../lib/api';
+import { isSimRookieNoticeSeen, setSimRookieNoticeSeen } from '../lib/simRookieNotice';
 import {
+  SIM_GENERATED_CLASS_LABEL,
+  SIM_GENERATED_CLASS_NOTICE,
   simIsPick,
   simPickGroups,
   simPickLabelText,
@@ -197,6 +200,65 @@ export function SimPickGroup({
   );
 }
 
+/**
+ * The small "Generated class - strong" chip with an info affordance. Tapping it
+ * opens the notice (the parent owns the sheet). hitSlop keeps a 44pt target.
+ */
+export function SimGeneratedChip({ label = SIM_GENERATED_CLASS_LABEL, onInfo, compact = false }: { label?: string; onInfo: () => void; compact?: boolean }) {
+  const { colors } = useThemeMode();
+  const styles = useMemo(() => createStyles(colors), [colors]);
+  return (
+    <Pressable
+      onPress={onInfo}
+      hitSlop={compact ? { top: 14, bottom: 14, left: 8, right: 8 } : { top: 8, bottom: 8, left: 8, right: 8 }}
+      accessibilityRole="button"
+      accessibilityLabel={`${label}. ${SIM_GENERATED_CLASS_NOTICE}`}
+      testID="generated-chip"
+      style={styles.generatedChip}
+    >
+      <AppText style={styles.generatedChipText} numberOfLines={1}>{label}</AppText>
+      <Ionicons name="information-circle-outline" size={13} color={colors.accent} />
+    </Pressable>
+  );
+}
+
+/** The notice sheet behind every Generated class chip and the first-time popup. */
+export function SimGeneratedNoticeSheet({ onClose }: { onClose: () => void }) {
+  const { colors } = useThemeMode();
+  const styles = useMemo(() => createStyles(colors), [colors]);
+  return (
+    <SimSheet title="Simulated rookie class" onClose={onClose}>
+      <View style={styles.noticeBody} testID="generated-notice">
+        <AppText style={styles.noticeText}>{SIM_GENERATED_CLASS_NOTICE}</AppText>
+        <Button label="Got it" onPress={onClose} />
+      </View>
+    </SimSheet>
+  );
+}
+
+/** Shows the notice once per game, the first time a rookie draft screen opens. */
+export function SimRookieNoticeGate({ gameId }: { gameId: string }) {
+  const [open, setOpen] = useState(false);
+  useEffect(() => {
+    let cancelled = false;
+    void isSimRookieNoticeSeen(gameId).then((seen) => {
+      if (!cancelled) setOpen(!seen);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [gameId]);
+  if (!open) return null;
+  return (
+    <SimGeneratedNoticeSheet
+      onClose={() => {
+        void setSimRookieNoticeSeen(gameId);
+        setOpen(false);
+      }}
+    />
+  );
+}
+
 function createStyles(colors: ThemeColors) {
   return StyleSheet.create({
     collapseHead: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: spacing.sm, minHeight: 44 },
@@ -220,6 +282,21 @@ function createStyles(colors: ThemeColors) {
     pickMain: { flex: 1, minWidth: 180 },
     pickTrailing: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, marginLeft: 'auto' },
     groupKicker: { paddingTop: spacing.sm, fontSize: 12.5, fontWeight: '800', letterSpacing: 0.8, textTransform: 'uppercase', color: colors.textTertiary },
+    generatedChip: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      alignSelf: 'flex-start',
+      gap: 4,
+      paddingHorizontal: 8,
+      paddingVertical: 3,
+      borderRadius: 999,
+      borderWidth: 1,
+      borderColor: colors.accent,
+      backgroundColor: colors.accentMuted,
+    },
+    generatedChipText: { fontSize: 12, fontWeight: '800', letterSpacing: 0.6, textTransform: 'uppercase', color: colors.accent },
+    noticeBody: { gap: spacing.md, paddingBottom: spacing.sm },
+    noticeText: { fontSize: 15, lineHeight: 22, color: colors.textSecondary },
     yearLabel: { paddingTop: spacing.xs, fontSize: 13, fontWeight: '700', color: colors.textSecondary },
   });
 }

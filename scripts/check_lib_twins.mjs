@@ -84,6 +84,7 @@ export const DIVERGED = [
   "guessThePlayerNameMatchDismissed.ts",
   "onboardingAnalytics.ts",
   "sheetGesture.ts",
+  "simRookieNotice.ts",
   "supabase.ts",
   // Pure logic that has drifted or been edited on one side only. Promote to
   // MIRRORED / SHARED markers as each one is reconciled.

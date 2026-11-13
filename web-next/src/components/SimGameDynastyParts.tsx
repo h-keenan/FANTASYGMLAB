@@ -4,10 +4,13 @@ import { useEffect, useState, type ReactNode } from "react";
 
 import { AccentCard } from "@/components/AccentCard";
 import { Button } from "@/components/Button";
-import { SimPlayerLine, SimStat, SimToneBadge, simToneColor, type SimCtx } from "@/components/SimGameParts";
+import { SimPlayerLine, SimSheet, SimStat, SimToneBadge, simToneColor, type SimCtx } from "@/components/SimGameParts";
 import { ToneBadge } from "@/components/ToneBadge";
 import { api } from "@/lib/api";
+import { isSimRookieNoticeSeen, setSimRookieNoticeSeen } from "@/lib/simRookieNotice";
 import {
+  SIM_GENERATED_CLASS_LABEL,
+  SIM_GENERATED_CLASS_NOTICE,
   simIsPick,
   simPickGroups,
   simPickLabelText,
@@ -225,5 +228,70 @@ export function SimPickGroup({
         </div>
       ))}
     </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Generated rookie class disclosure
+
+/**
+ * The small "Generated class - strong" chip with an info affordance. Tapping
+ * it opens the notice (the parent owns the sheet). The hit area is a full
+ * touch target even though the pill is small.
+ */
+export function SimGeneratedChip({ label = SIM_GENERATED_CLASS_LABEL, onInfo, inRow = false }: { label?: string; onInfo: () => void; inRow?: boolean }) {
+  return (
+    <button
+      type="button"
+      onClick={onInfo}
+      className="inline-flex shrink-0 items-center"
+      style={{ minHeight: "var(--touch-target-min)", marginBlock: inRow ? "-0.75rem" : undefined }}
+      aria-label={`${label}. ${SIM_GENERATED_CLASS_NOTICE}`}
+      data-testid="generated-chip"
+    >
+      <span
+        className="inline-flex items-center gap-1 whitespace-nowrap px-2 py-0.5 text-[0.6875rem] font-extrabold uppercase"
+        style={{
+          borderRadius: "var(--radius-pill)",
+          background: "color-mix(in srgb, var(--color-accent) 15%, transparent)",
+          boxShadow: "inset 0 0 0 1px color-mix(in srgb, var(--color-accent) 40%, transparent)",
+          color: "var(--color-accent)",
+          letterSpacing: "var(--letter-spacing-badge)",
+        }}
+      >
+        {label}
+        <span aria-hidden="true" className="font-black normal-case">ⓘ</span>
+      </span>
+    </button>
+  );
+}
+
+/** The notice sheet behind every Generated class chip and the first-time popup. */
+export function SimGeneratedNoticeSheet({ onClose }: { onClose: () => void }) {
+  return (
+    <SimSheet title="Simulated rookie class" onClose={onClose}>
+      <div className="flex flex-col gap-3 pb-2" data-testid="generated-notice">
+        <p className="pr-8 text-lg font-extrabold">Simulated rookie class</p>
+        <p className="text-sm" style={{ color: "var(--color-text-secondary)" }}>{SIM_GENERATED_CLASS_NOTICE}</p>
+        <Button fullWidth onClick={onClose}>Got it</Button>
+      </div>
+    </SimSheet>
+  );
+}
+
+/** Shows the notice once per game, the first time a rookie draft screen opens. */
+export function SimRookieNoticeGate({ gameId }: { gameId: string }) {
+  const [open, setOpen] = useState(false);
+  useEffect(() => {
+    setOpen(!isSimRookieNoticeSeen(gameId));
+  }, [gameId]);
+  if (!open) return null;
+  return (
+    <SimGeneratedNoticeSheet
+      onClose={() => {
+        setSimRookieNoticeSeen(gameId);
+        setOpen(false);
+      }}
+    />
   );
 }

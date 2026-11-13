@@ -93,6 +93,8 @@ export interface SimGamePlayer {
   squad?: SimSquad | null;
   taxi_eligible?: boolean;
   rookie?: boolean;
+  /** True for a simulated (not real NFL draft) rookie. */
+  generated?: boolean;
 }
 
 /** Where one of your players sits. Picks report "picks". */
@@ -1844,9 +1846,42 @@ export function simDynastyLine(seasons: number, rookieRounds: number): string {
 /** Plain note under the mode choice when a real league is imported as dynasty. */
 export function simSetupDynastyNote(state: Pick<SimSetupState, "start" | "mode">): string | null {
   if (state.mode !== "dynasty") return null;
-  return state.start === "league"
-    ? "Starting from your league as dynasty brings its traded picks, taxi squad and IR along."
-    : "Dynasty keeps your team going for several seasons. After each one: aging, retirements, a rookie draft and roster cuts.";
+  const base =
+    state.start === "league"
+      ? "Starting from your league as dynasty brings its traded picks, taxi squad and IR along."
+      : "Dynasty keeps your team going for several seasons. After each one: aging, retirements, a rookie draft and roster cuts.";
+  return `${base} ${SIM_SETUP_ROOKIE_CLASS_NOTE}`;
+}
+
+/** One plain sentence for the dynasty setup: the rookie classes are not the real NFL draft. */
+export const SIM_SETUP_ROOKIE_CLASS_NOTE = "Incoming rookie classes are simulated, with generated names and talent.";
+
+/** The disclosure shown the first time a rookie draft opens and behind every "Generated class" info tap. */
+export const SIM_GENERATED_CLASS_NOTICE =
+  "These rookies are simulated, not the real NFL draft class. Names and talent are generated for the game.";
+
+/** Short chip label for a generated rookie class. */
+export const SIM_GENERATED_CLASS_LABEL = "Generated class";
+
+/** "Generated class" or "Generated class - strong" when the strength is known. */
+export function simGeneratedClassLabel(strength?: SimRookieClassStrength | string | null): string {
+  return strength === "weak" || strength === "average" || strength === "strong" ? `${SIM_GENERATED_CLASS_LABEL} - ${strength}` : SIM_GENERATED_CLASS_LABEL;
+}
+
+/** The chip label for an offseason payload, or null when the class is not generated (older saves). */
+export function simRookieClassChip(off: Pick<SimOffseason, "rookie_class"> | null | undefined): string | null {
+  const rc = off?.rookie_class;
+  return rc && rc.generated ? simGeneratedClassLabel(rc.strength) : null;
+}
+
+/** True for a rookie row that is simulated (draws the small per-row chip). */
+export function simPlayerIsGenerated(player: Pick<SimGamePlayer, "generated">): boolean {
+  return player.generated === true;
+}
+
+/** Storage key for "this game's generated-class popup was dismissed". */
+export function simRookieNoticeKey(gameId: string): string {
+  return `fgl:sim-rookie-notice:${gameId}`;
 }
 
 /** Mode choices the options say are playable ("Redraft" and, when available, "Dynasty"). */
@@ -2224,6 +2259,14 @@ export function simDynastyPaths(gameId: string) {
   };
 }
 
+export type SimRookieClassStrength = "weak" | "average" | "strong";
+
+export interface SimRookieClass {
+  generated: boolean;
+  strength: SimRookieClassStrength;
+  size?: number;
+}
+
 export type SimOffseasonStage = "review" | "rookie_draft" | "cutdown";
 
 export interface SimPicksTeam {
@@ -2348,6 +2391,8 @@ export interface SimOffseason {
   can_trade: boolean;
   next: SimOffseasonNextAction | null;
   picks_held: number;
+  /** The incoming rookie class is simulated; strength is flavor (weak / average / strong). */
+  rookie_class?: SimRookieClass;
 }
 
 /** One pick as the engine logs it (the `made` list of the draft calls). */

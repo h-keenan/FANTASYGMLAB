@@ -9,6 +9,7 @@ import PlayerAvatar from './PlayerAvatar';
 import PositionBadge from './PositionBadge';
 import SegmentedTabBar from './SegmentedTabBar';
 import { SkeletonCard } from './SkeletonBlock';
+import { SimGeneratedChip } from './SimGameDynastyParts';
 import { SimPager, createSimStyles, simToneColor, useSimDebounced } from './SimGameParts';
 import ToneBadge from './ToneBadge';
 import { useThemeMode } from '../context/ThemeModeContext';
@@ -25,6 +26,7 @@ import {
   simHeadshotId,
   simPageCount,
   simPlayerInitials,
+  simPlayerIsGenerated,
   type SimGamePlayer,
   type SimPlayerSort,
   type SimPos,
@@ -81,7 +83,20 @@ export function SimDraftIconButton({
  * slot, a fixed avatar slot, name / meta, then Proj / Value / ADP in fixed
  * right-aligned cells so numbers line up and photos never shift the row.
  */
-export function SimDraftRow({ player, pickNo, onOpen, actions }: { player: SimGamePlayer; pickNo: number; onOpen?: (player: SimGamePlayer) => void; actions?: ReactNode }) {
+export function SimDraftRow({
+  player,
+  pickNo,
+  onOpen,
+  actions,
+  onGeneratedInfo,
+}: {
+  player: SimGamePlayer;
+  pickNo: number;
+  onOpen?: (player: SimGamePlayer) => void;
+  actions?: ReactNode;
+  /** Opens the generated-class notice; shows a small chip on simulated rookies. */
+  onGeneratedInfo?: () => void;
+}) {
   const { colors, isDark } = useThemeMode();
   const styles = useMemo(() => createStyles(colors), [colors]);
   const edge = positionColor(player.pos, isDark, colors.borderStrong);
@@ -140,6 +155,11 @@ export function SimDraftRow({ player, pickNo, onOpen, actions }: { player: SimGa
             </AppText>
           ) : null}
         </View>
+        {onGeneratedInfo && simPlayerIsGenerated(player) ? (
+          <View style={{ marginLeft: 'auto' }}>
+            <SimGeneratedChip label="Generated" onInfo={onGeneratedInfo} compact />
+          </View>
+        ) : null}
       </View>
     </View>
   );
