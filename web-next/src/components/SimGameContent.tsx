@@ -829,7 +829,9 @@ function GameScreen({
     <SimTeamOpenContext.Provider value={ctx.openTeam}>
     <SimOpenPlayerContext.Provider value={ctx.openPlayer}>
     {/* pb-24: the floating GM orb never covers the last row */}
-    <div className={`flex flex-col gap-3 ${showBar || showOffBar ? "pb-40 md:pb-3" : "pb-24"}`}>
+    {/* With an action bar the bar is this column's last (sticky) child, so no big
+        bottom padding: sticky only moves within its parent's content box. */}
+    <div className={`flex flex-1 flex-col gap-3 ${showBar || showOffBar ? "pb-3" : "pb-24"}`}>
       <div className="flex items-center justify-between gap-2">
         <div className="flex min-w-0 flex-col">
           <button type="button" className="tap-link text-xs font-bold self-start" style={{ color: "var(--color-accent)" }} onClick={onHub}>
