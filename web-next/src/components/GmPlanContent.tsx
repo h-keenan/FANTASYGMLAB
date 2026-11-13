@@ -32,8 +32,8 @@ import {
 import { trackFeatureUse } from "@/lib/analytics";
 import { OvrGauge } from "@/components/OvrGauge";
 import { PillRow } from "@/components/PillRow";
-import { PlayerIdentityTrigger } from "@/components/PlayerIdentityTrigger";
-import { PlayerInjuryBadge } from "@/components/PlayerInjuryBadge";
+import { PlayerCard } from "@/components/PlayerCardKit";
+import { playerCardFromStarter } from "@/lib/playerCard";
 import { PositionBadge } from "@/components/PositionBadge";
 import { PLAIN_COPY } from "@/lib/experienceCopy";
 import { PremiumUpsellCard } from "@/components/PremiumUpsellCard";
@@ -45,7 +45,6 @@ import { groupTargetRows, targetContextLine, type GmTargetRow } from "@/lib/gmTa
 import { formatWaiverScore, waiverInjuryDisplay } from "@/lib/waiversPresentation";
 import { ValuesCredit } from "@/components/ValuesCredit";
 import { PageTitle } from "@/components/PageTitle";
-import { PlayerNameText } from "@/components/PlayerNameText";
 
 /**
  * Ports modules/gm_plan_ui.py's render_gm_plan_workspace / mobile's
@@ -142,20 +141,21 @@ function InjuryExposureFact({ item }: { item: GmPlanInjuryItem }) {
         {item.summary || `No healthy bench cover at ${positions}.`}
       </p>
       {item.injured_players.length > 0 ? (
-        <div className="flex flex-col divide-y mt-1" style={{ borderColor: "var(--color-border)" }}>
+        <div className="flex flex-col gap-2 mt-1">
           {item.injured_players.map((player) => (
-            <div key={player.player_id} className="flex items-center gap-2 py-1">
-              <PlayerIdentityTrigger identity={{ ...player, sourceLabel: "GM Plan" }} className="flex items-center gap-2 flex-1 min-w-0">
-                <PositionBadge position={player.position} />
-                <PlayerNameText name={player.name} threshold={Infinity} className="text-sm font-bold" style={{ color: "var(--color-text-primary)" }} />
-                {player.team ? (
-                  <span className="text-xs" style={{ color: "var(--color-text-muted)" }}>
-                    {player.team}
-                  </span>
-                ) : null}
-              </PlayerIdentityTrigger>
-              <PlayerInjuryBadge status={player.injury_status} />
-            </div>
+            <PlayerCard
+              key={player.player_id}
+              variant="compact"
+              model={playerCardFromStarter({
+                player_id: player.player_id,
+                name: player.name,
+                position: player.position,
+                team: player.team,
+                tier: player.player_tier,
+                injury_label: player.injury_status,
+              })}
+              identity={{ ...player, sourceLabel: "GM Plan" }}
+            />
           ))}
         </div>
       ) : null}

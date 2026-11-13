@@ -20,15 +20,15 @@ import { reloadPage } from "@/components/ErrorState";
 import { PillRow } from "@/components/PillRow";
 import { NextSteps } from "@/components/NextSteps";
 import { PlannerBar, SwapSheet, useLineupPlanner } from "@/components/MatchupPlanner";
-import { PlayerAvatar } from "@/components/PlayerAvatar";
-import { PlayerIdentityTrigger } from "@/components/PlayerIdentityTrigger";
-import { PlayerInjuryBadge } from "@/components/PlayerInjuryBadge";
+import { ComparisonHeader, SlotList } from "@/components/MatchupLineup";
+import { PlayerCard } from "@/components/PlayerCardKit";
+import { playerCardFromStarter } from "@/lib/playerCard";
 import { PositionBadge } from "@/components/PositionBadge";
 import { SectionHeading } from "@/components/SectionHeading";
 import { StatStrip } from "@/components/StatStrip";
 import { TeamAvatar } from "@/components/TeamAvatar";
 import { ToneBadge } from "@/components/ToneBadge";
-import { projFinalLabel, freshnessLabel } from "@/lib/liveScores";
+import { freshnessLabel } from "@/lib/liveScores";
 import { WeatherReasonChip } from "@/components/WeatherReasonChip";
 import { ValuesCredit } from "@/components/ValuesCredit";
 import {
@@ -36,10 +36,7 @@ import {
   formatSeasonValue,
   formatSigned,
   hasKickedOff,
-  lineupTotals,
-  rowWinner,
   lineupComparisonRows,
-  lineupPlayerPoints,
   matchupActionLabel,
   matchupNextAction,
   matchupReasonMessage,
@@ -47,11 +44,10 @@ import {
   moveOverLine,
   moveSlotLabel,
   recordLabel,
-  slotDisplayLabel,
   winProbabilityUnavailableMessage,
-  type LineupPlayer,
   type VerdictTone,
 } from "@/lib/matchupPresentation";
+import { compareLineupSlots, type SlotSortMode } from "@/lib/lineupSlots";
 import { emptySlotsOf, plannerBase, plannerOpponentPlayers, slotIndexFor, winPercent } from "@/lib/matchupPlanner";
 
 /**
@@ -332,135 +328,6 @@ function MatchupInsights({ matchup }: { matchup: MatchupResponse }) {
   );
 }
 
-type CellEmphasis = "win" | "lose" | "even";
-
-function LineupCell({
-  player,
-  mine,
-  emphasis,
-  onEdit,
-}: {
-  player: LineupPlayer | "empty" | null;
-  mine: boolean;
-  emphasis: CellEmphasis;
-  /** Planner mode: tapping the cell opens the swap sheet instead of Quick View. */
-  onEdit?: () => void;
-}) {
-  if (player === null) return <div />;
-  if (player === "empty") {
-    const label = (
-      <span className="text-xs italic truncate" style={{ color: onEdit ? "var(--color-accent)" : "var(--color-text-muted)" }}>
-        {onEdit ? "Empty, tap to fill" : "Empty slot"}
-      </span>
-    );
-    return onEdit ? (
-      <button type="button" onClick={onEdit} className="flex items-center py-2 w-full text-left min-w-0">
-        {label}
-      </button>
-    ) : (
-      <div className={`flex items-center py-2 min-w-0 ${mine ? "" : "justify-end"}`}>{label}</div>
-    );
-  }
-  const points = lineupPlayerPoints(player);
-  const valueText = points.value != null ? points.value.toFixed(1) : points.note === "bye" ? null : "—";
-  const reverse = mine ? "" : "flex-row-reverse";
-  const projFinal =
-    points.kind === "pts" && player.game_status === "in_progress" && "projected_final" in player
-      ? projFinalLabel(player.projected_final)
-      : null;
-  const pointsColor =
-    emphasis === "win" ? "var(--color-accent)" : emphasis === "lose" ? "var(--color-text-muted)" : "var(--color-text-primary)";
-  // Two lines: avatar + name, then points (outer edge) and team/injury.
-  const body = (
-    <>
-      <PlayerAvatar playerId={player.player_id} tier={player.tier} size={30} />
-      <span className={`flex flex-col min-w-0 flex-1 gap-0.5 ${mine ? "" : "items-end text-right"}`}>
-        <PlayerNameText
-          name={player.name || "Unknown player"}
-          className="text-[13px] font-bold w-full leading-tight"
-          style={{ color: "var(--color-text-primary)" }}
-        />
-        <span className={`flex items-center gap-1.5 min-w-0 leading-tight ${reverse}`}>
-          {valueText ? (
-            <span
-              className="text-[15px] tabular-nums shrink-0"
-              style={{ color: pointsColor, fontWeight: emphasis === "lose" ? 600 : 800 }}
-              title={points.kind === "pts" ? "Real points" : "Projected points"}
-            >
-              {valueText}
-            </span>
-          ) : (
-            <ToneBadge label="Bye" color="var(--color-warning)" size="xs" />
-          )}
-          {projFinal ? (
-            <span className="text-[11px] tabular-nums shrink-0" style={{ color: "var(--color-text-secondary)" }} data-testid="proj-final">
-              {projFinal}
-            </span>
-          ) : null}
-          <span className="truncate text-[11px]" style={{ color: "var(--color-text-muted)" }}>
-            {player.team || "FA"}
-          </span>
-          <PlayerInjuryBadge status={player.injury_label} />
-        </span>
-      </span>
-    </>
-  );
-  const cls = `flex items-center gap-1.5 w-full min-w-0 ${reverse}`;
-  const wrap = "rounded-lg px-1.5 py-2.5 min-w-0";
-  const tint = emphasis === "win" ? { background: "color-mix(in srgb, var(--color-accent) 9%, transparent)" } : undefined;
-  return (
-    <div className={wrap} style={tint}>
-      {onEdit ? (
-        <button type="button" onClick={onEdit} aria-label={`Swap ${player.name || "player"}`} className={`${cls} text-left`}>
-          {body}
-        </button>
-      ) : (
-        <PlayerIdentityTrigger identity={{ ...player, sourceLabel: "Matchup" }} className={cls}>
-          {body}
-        </PlayerIdentityTrigger>
-      )}
-    </div>
-  );
-}
-
-function emphasisFor(winner: ReturnType<typeof rowWinner>, side: "mine" | "opponent"): CellEmphasis {
-  if (winner == null || winner === "tie") return "even";
-  return winner === side ? "win" : "lose";
-}
-
-function TeamHeadCell({ side, mine }: { side: MatchupSide; mine: boolean }) {
-  return (
-    <span
-      role="columnheader"
-      className={`flex items-center gap-2 min-w-0 ${mine ? "" : "flex-row-reverse text-right"}`}
-    >
-      <TeamAvatar
-        avatarUrl={side.avatar_url}
-        name={side.team_name}
-        size={30}
-        ringColor={mine ? "var(--color-accent)" : "var(--color-border-strong)"}
-      />
-      <span className="flex flex-col min-w-0 flex-1">
-        <span
-          className="text-xs font-bold leading-tight break-words"
-          style={{
-            color: mine ? "var(--color-accent)" : "var(--color-text-primary)",
-            display: "-webkit-box",
-            WebkitLineClamp: 2,
-            WebkitBoxOrient: "vertical",
-            overflow: "hidden",
-          }}
-        >
-          {side.team_name || (mine ? "You" : "Opponent")}
-        </span>
-        <span className="text-[11px]" style={{ color: "var(--color-text-muted)" }}>
-          {recordLabel(side)}
-        </span>
-      </span>
-    </span>
-  );
-}
-
 type LineupView = "suggested" | "actual";
 
 function LineupComparison({
@@ -469,12 +336,14 @@ function LineupComparison({
   onViewChange,
   leagueId,
   planner,
+  ageSeconds,
 }: {
   matchup: MatchupResponse;
   view: LineupView;
   onViewChange: (view: LineupView) => void;
   leagueId?: string;
   planner?: ReturnType<typeof useLineupPlanner>;
+  ageSeconds?: number | null;
 }) {
   const mine = matchup.my_team!;
   const opponent = matchup.opponent!;
@@ -483,7 +352,7 @@ function LineupComparison({
   const plan = planner?.plan ?? null;
   const canPlan = Boolean(planner && leagueId && !bestBall && plannerBase(matchup, view));
   const [helpOpen, setHelpOpen] = useState(false);
-  const rows = plan
+  const rows = useMemo(() => (plan
     ? lineupComparisonRows(
         plan.starters ?? [],
         plannerOpponentPlayers(matchup),
@@ -497,18 +366,14 @@ function LineupComparison({
         mine.real_empty_slots ?? [],
         opponent.real_empty_slots ?? [],
       )
-    : lineupComparisonRows(mine.starters, opponent.starters);
-  const totals = lineupTotals(rows);
-  const pointsOf = (cell: LineupPlayer | "empty" | null) =>
-    cell && cell !== "empty" ? lineupPlayerPoints(cell).value : null;
+    : lineupComparisonRows(mine.starters, opponent.starters)), [plan, actual, mine, opponent, matchup]);
+  const slots = useMemo(() => compareLineupSlots(rows), [rows]);
+  const [sort, setSort] = useState<SlotSortMode>("lineup");
   const caption = plan
     ? "Tap one of your players to see who could take the slot. A planner only: make the final change in Sleeper."
     : actual
     ? "Lineups as set in Sleeper."
     : "Our best lineup for each team, run the same way for both sides. A planner only: set your lineup in Sleeper.";
-  const marginTone =
-    Math.abs(totals.margin) < 0.05 ? "var(--color-text-muted)" : totals.margin > 0 ? "var(--color-success)" : "var(--color-danger)";
-  const gridCols = "grid-cols-[minmax(0,1fr)_2.5rem_minmax(0,1fr)]";
 
   return (
     <section className="glass-surface flex flex-col gap-2 p-3 sm:p-4" aria-labelledby="lineup-comparison-title">
@@ -575,77 +440,34 @@ function LineupComparison({
             : "No startable players on either roster right now."}
         </p>
       ) : (
-        <div role="table" aria-label={actual ? "Actual lineups" : "Suggested lineups"} className="flex flex-col">
-          <div role="row" className={`grid ${gridCols} gap-1 items-center pb-2`}>
-            <TeamHeadCell side={mine} mine />
-            <span />
-            <TeamHeadCell side={opponent} mine={false} />
-          </div>
-          {rows.map((row, index) => {
-            const emptyOrdinal =
-              row.mine === "empty"
-                ? rows.slice(0, index).filter((r) => r.slot === row.slot && r.mine === "empty").length
-                : 0;
-            const editIndex = plan ? slotIndexFor(plan.slots, row.mine, row.slot, emptyOrdinal) : -1;
-            const myPts = pointsOf(row.mine);
-            const theirPts = pointsOf(row.opponent);
-            const winner = rowWinner(myPts, theirPts);
-            return (
-              <div
-                role="row"
-                key={`${row.slot}-${index}`}
-                className="flex flex-col"
-                style={index > 0 ? { borderTop: "var(--border-width-default) solid var(--color-border)" } : undefined}
-              >
-                <div className={`grid ${gridCols} gap-1 items-center`}>
-                  <div role="cell" className="min-w-0">
-                    <LineupCell
-                      player={row.mine}
-                      mine
-                      emphasis={emphasisFor(winner, "mine")}
-                      onEdit={plan && editIndex >= 0 ? () => void planner!.openSlot(editIndex) : undefined}
-                    />
-                  </div>
-                  <div role="cell" className="flex items-center justify-center">
-                    <PositionBadge position={row.slot} />
-                  </div>
-                  <div role="cell" className="min-w-0">
-                    <LineupCell player={row.opponent} mine={false} emphasis={emphasisFor(winner, "opponent")} />
-                  </div>
-                </div>
-              </div>
-            );
-          })}
-          <div
-            role="row"
-            className="grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] gap-2 items-center mt-1 pt-3"
-            style={{ borderTop: "var(--border-width-default) solid var(--color-border-strong)" }}
-          >
-            <span role="cell" className="flex items-baseline gap-1.5 min-w-0">
-              <span className="text-[11px] font-bold uppercase tracking-wide" style={{ color: "var(--color-text-muted)" }}>
-                Total
-              </span>
-              <span className="text-base font-extrabold tabular-nums" style={{ color: "var(--color-text-primary)" }}>
-                {totals.mine.toFixed(1)}
-              </span>
-            </span>
-            <span role="cell">
-              <ToneBadge
-                label={Math.abs(totals.margin) < 0.05 ? "Even" : formatSigned(totals.margin)}
-                color={marginTone}
-                title="Your margin over this lineup's total"
-              />
-            </span>
-            <span role="cell" className="flex items-baseline justify-end gap-1.5 min-w-0">
-              <span className="text-base font-extrabold tabular-nums" style={{ color: "var(--color-text-primary)" }}>
-                {totals.opponent.toFixed(1)}
-              </span>
-              <span className="text-[11px] font-bold uppercase tracking-wide" style={{ color: "var(--color-text-muted)" }}>
-                Total
-              </span>
-            </span>
-          </div>
-        </div>
+        <>
+          <ComparisonHeader
+            mine={mine}
+            opponent={opponent}
+            slots={slots}
+            odds={matchup.win_probability}
+            ageSeconds={ageSeconds}
+            live={matchup.game_state === "live"}
+            sort={sort}
+            onSort={setSort}
+          />
+          <SlotList
+            slots={slots}
+            sort={sort}
+            planEditIndex={
+              plan
+                ? (slot) => {
+                    const emptyOrdinal =
+                      slot.row.mine === "empty"
+                        ? rows.slice(0, slot.index).filter((r) => r.slot === slot.slot && r.mine === "empty").length
+                        : 0;
+                    const editIndex = slotIndexFor(plan.slots, slot.row.mine, slot.slot, emptyOrdinal);
+                    return editIndex >= 0 ? () => void planner!.openSlot(editIndex) : undefined;
+                  }
+                : undefined
+            }
+          />
+        </>
       )}
     </section>
   );
@@ -661,36 +483,45 @@ function MoveCard({ move, slotLabel }: { move: MatchupSuggestedMove; slotLabel: 
       style={{ border: "var(--border-width-default) solid var(--color-border)", background: "var(--color-muted-soft)" }}
     >
       <div className="flex items-center gap-3">
-      <PlayerIdentityTrigger
-        identity={{
-          player_id: move.start.player_id ?? "",
-          name: move.start.name,
-          position: move.start.position,
-          team: move.start.team,
-          tier: move.start.tier,
-          sourceLabel: "Matchup",
-        }}
-        className="flex-1 flex items-center gap-3 min-w-0"
-      >
-        <span className="inline-flex shrink-0">
-          <PlayerAvatar playerId={move.start.player_id} tier={move.start.tier} size={40} />
+      <div className="flex-1 flex flex-col gap-1.5 min-w-0">
+        <span className="flex items-center gap-2">
+          <PositionBadge position={move.slot} label={slotLabel} />
+          <span className="text-[11px] font-extrabold uppercase" style={{ color: "var(--color-success)", letterSpacing: "var(--letter-spacing-badge)" }}>
+            Start
+          </span>
         </span>
-        <div className="flex flex-col gap-0.5 min-w-0">
-          <span className="flex items-center gap-2">
-            <PositionBadge position={move.slot} label={slotLabel} />
-            <span className="text-xs" style={{ color: "var(--color-text-secondary)" }}>
-              {move.start.points != null ? `Proj ${move.start.points.toFixed(1)}` : move.start_note || "No projection yet"}
-            </span>
-          </span>
-          <span className="text-sm font-bold" style={{ color: "var(--color-text-primary)" }}>
-            <span style={{ color: "var(--color-success)" }}>Start</span> {move.start.name || "Unknown player"}
-          </span>
-          <span className="text-xs" style={{ color: "var(--color-text-muted)" }}>
-            {moveOverLine(move)}
-          </span>
-          <WeatherReasonChip notes={move.weather_notes?.filter((note) => note.applied)} />
-        </div>
-      </PlayerIdentityTrigger>
+        <PlayerCard
+          variant="compact"
+          model={playerCardFromStarter({
+            player_id: move.start.player_id,
+            name: move.start.name,
+            position: move.start.position,
+            team: move.start.team,
+            tier: move.start.tier,
+            injury_label: move.start.injury_label,
+            projection:
+              move.start.points != null
+                ? { status: "ok", point_estimate: move.start.points }
+                : move.start.projection_status
+                  ? { status: move.start.projection_status, point_estimate: null }
+                  : null,
+          })}
+          identity={{
+            player_id: move.start.player_id ?? "",
+            name: move.start.name,
+            position: move.start.position,
+            team: move.start.team,
+            tier: move.start.tier,
+            sourceLabel: "Matchup",
+          }}
+          stats={[{ label: "Proj", value: move.start.points != null ? move.start.points.toFixed(1) : "—" }]}
+        />
+        <span className="text-xs" style={{ color: "var(--color-text-muted)" }}>
+          {move.start.points == null ? `${move.start_note || "No projection yet"}. ` : ""}
+          {moveOverLine(move)}
+        </span>
+        <WeatherReasonChip notes={move.weather_notes?.filter((note) => note.applied)} />
+      </div>
       <div className="flex flex-col items-center gap-1 shrink-0">
         <div
           className="flex flex-col items-center px-2.5 py-1.5"
@@ -742,6 +573,7 @@ function MoveCard({ move, slotLabel }: { move: MatchupSuggestedMove; slotLabel: 
 }
 
 function SuggestedMoves({ matchup }: { matchup: MatchupResponse }) {
+  const [open, setOpen] = useState(false);
   const [expanded, setExpanded] = useState(false);
   const moves = matchup.suggested_moves ?? null;
   const actualStarters = matchup.my_team?.real_starters ?? [];
@@ -752,48 +584,60 @@ function SuggestedMoves({ matchup }: { matchup: MatchupResponse }) {
     <section className="glass-surface flex flex-col gap-3 p-4" aria-labelledby="suggested-moves-title">
       <div className="flex items-center justify-between gap-3">
         <SectionHeading id="suggested-moves-title">Suggested Moves</SectionHeading>
-        {hiddenCount > 0 ? (
-          <button
-            type="button"
-            onClick={() => setExpanded((open) => !open)}
-            aria-expanded={expanded}
-            className="text-xs font-bold"
-            style={{ color: "var(--color-accent)" }}
-          >
-            {expanded ? "Show fewer" : `View all (${moves!.length})`}
-          </button>
-        ) : null}
+        <button
+          type="button"
+          onClick={() => setOpen((value) => !value)}
+          aria-expanded={open}
+          className="text-xs font-bold"
+          style={{ color: "var(--color-accent)" }}
+        >
+          {open ? "Hide" : moves ? `Show (${moves.length})` : "Show"}
+        </button>
       </div>
-      {moves === null ? (
-        <p className="text-sm" style={{ color: "var(--color-text-muted)" }}>
-          Suggested moves appear once Sleeper has your lineup for this week.
-        </p>
-      ) : moves.length === 0 ? (
-        <EmptyState title="Your Sleeper lineup already matches our suggested lineup." />
-      ) : (
-        <ul className="flex flex-col gap-2">
-          {shown.map((move) => (
-            <MoveCard
-              key={`${move.start.player_id}-${move.slot}`}
-              move={move}
-              slotLabel={moveSlotLabel(move, actualStarters)}
-            />
-          ))}
-        </ul>
-      )}
-      <p className="text-xs" style={{ color: "var(--color-text-muted)" }}>
-        {RANGE_CAPTION} Weather shows only when it changes a projection.
-      </p>
-      <p className="text-xs" style={{ color: "var(--color-text-muted)" }}>
-        The suggested lineup ranks by this week&apos;s projected points (season-long value only breaks ties or fills in where a projection is missing); gains are projected points. FantasyDesk
-        can&apos;t change your Sleeper lineup, so make any swap in Sleeper.
-      </p>
+      {open ? (
+        <>
+          {moves !== null && hiddenCount > 0 ? (
+            <button
+              type="button"
+              onClick={() => setExpanded((value) => !value)}
+              aria-expanded={expanded}
+              className="self-start text-xs font-bold"
+              style={{ color: "var(--color-accent)" }}
+            >
+              {expanded ? "Show fewer" : `View all (${moves.length})`}
+            </button>
+          ) : null}
+          {moves === null ? (
+            <p className="text-sm" style={{ color: "var(--color-text-muted)" }}>
+              Suggested moves appear once Sleeper has your lineup for this week.
+            </p>
+          ) : moves.length === 0 ? (
+            <EmptyState title="Your Sleeper lineup already matches our suggested lineup." />
+          ) : (
+            <ul className="flex flex-col gap-2">
+              {shown.map((move) => (
+                <MoveCard
+                  key={`${move.start.player_id}-${move.slot}`}
+                  move={move}
+                  slotLabel={moveSlotLabel(move, actualStarters)}
+                />
+              ))}
+            </ul>
+          )}
+          <p className="text-xs" style={{ color: "var(--color-text-muted)" }}>
+            {RANGE_CAPTION} Weather shows only when it changes a projection.
+          </p>
+          <p className="text-xs" style={{ color: "var(--color-text-muted)" }}>
+            The suggested lineup ranks by this week&apos;s projected points (season-long value only breaks ties or fills in where a projection is missing); gains are projected points. FantasyDesk
+            can&apos;t change your Sleeper lineup, so make any swap in Sleeper.
+          </p>
+        </>
+      ) : null}
     </section>
   );
 }
 
 import { GuillotineCard, useGuillotine } from "@/components/GuillotineCard";
-import { PlayerNameText } from "@/components/PlayerNameText";
 
 export function MatchupContent({
   leagueName,
@@ -899,6 +743,7 @@ export function MatchupContent({
         onViewChange={setView}
         leagueId={leagueId}
         planner={leagueId ? planner : undefined}
+        ageSeconds={ageSeconds}
       />
       {planner.sheet && planner.plan ? (
         <SwapSheet

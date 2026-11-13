@@ -239,7 +239,7 @@ describe("GmPlanContent", () => {
 
     expect(screen.getByText("Major Starter Absence: TE")).toBeInTheDocument();
     expect(screen.getByText("My Player 7")).toBeInTheDocument();
-    expect(screen.getByText("Out")).toBeInTheDocument();
+    expect(screen.getByTestId("player-chip-out")).toBeInTheDocument();
   });
 
   it("shows an honest no-signal message instead of a fabricated recommendation", () => {

@@ -215,6 +215,7 @@ describe("MatchupContent", () => {
 
     expect(screen.getByRole("tab", { name: "Suggested" })).toHaveAttribute("aria-selected", "true");
     expect(screen.getByText("Win probability appears once Sleeper posts both lineups.")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Show" }));
     expect(screen.getByText("Suggested moves appear once Sleeper has your lineup for this week.")).toBeInTheDocument();
     expect(screen.getByText(/projections for each team's suggested lineup/)).toBeInTheDocument();
     // Suggested starters show their projection in the table.
@@ -275,14 +276,17 @@ describe("MatchupContent", () => {
     render(<MatchupContent leagueName="My League" matchup={liveResponse()} />);
 
     expect(screen.getByRole("tab", { name: "Actual" })).toHaveAttribute("aria-selected", "true");
-    const table = screen.getByRole("table", { name: "Actual lineups" });
-    expect(within(table).getByText("A. Jeanty")).toBeInTheDocument();
+    const table = screen.getByRole("list", { name: "Lineup comparison by slot" });
+    expect(within(table).getByText("Ashton Jeanty")).toBeInTheDocument();
     expect(within(table).getByText("Chase Brown")).toBeInTheDocument();
     // Started: real points. Not started: projection, never a fake 0.0.
     expect(within(table).getByText("14.2")).toBeInTheDocument();
     expect(within(table).getByText("7.4")).toBeInTheDocument();
     expect(within(table).queryByText("0.0")).not.toBeInTheDocument();
     expect(within(table).getByText("Empty slot")).toBeInTheDocument();
+    // Cards, not bare rows: every filled slot carries a status chip and a team line.
+    expect(within(table).getAllByTestId("player-card-matchup").length).toBeGreaterThan(1);
+    expect(within(table).getAllByTestId("slot-bar").length).toBeGreaterThan(1);
   });
 
   it("live: shows Proj final for an in-progress starter and the freshness indicator with refresh", () => {
@@ -324,7 +328,9 @@ describe("MatchupContent", () => {
       gain: 5 - index,
     }));
     render(<MatchupContent leagueName="My League" matchup={liveResponse({ suggested_moves: [MOVES[0], ...many] })} />);
-
+    // Collapsed by default.
+    expect(screen.queryByText("Aaron Jones Sr.")).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Show (6)" }));
     expect(screen.getByText("Aaron Jones Sr.")).toBeInTheDocument();
     expect(screen.getAllByText("Over Tyrone Tracy Jr. (Proj 7.4)").length).toBeGreaterThan(0);
     expect(screen.getByText("+8.3")).toBeInTheDocument();
@@ -338,6 +344,7 @@ describe("MatchupContent", () => {
 
   it("suggested moves: says so when the Sleeper lineup already matches", () => {
     render(<MatchupContent leagueName="My League" matchup={liveResponse({ suggested_moves: [] })} />);
+    fireEvent.click(screen.getByRole("button", { name: "Show (0)" }));
     expect(screen.getByText("Your Sleeper lineup already matches our suggested lineup.")).toBeInTheDocument();
   });
 

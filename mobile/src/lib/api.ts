@@ -892,6 +892,13 @@ export interface MatchupStarter extends LineupPlayer {
   actual_points?: number | null;
   game_started?: boolean | null;
   game_status?: MatchupGameStatus | null;
+  /** Player-card game context (modules.nfl_schedule): opponent / home-away always, score only once final. */
+  game_opponent?: string | null;
+  game_is_home?: boolean | null;
+  game_team_score?: number | null;
+  game_opponent_score?: number | null;
+  /** Share (0-1) of his own game already played, a wall-clock estimate; null before kickoff. */
+  game_progress?: number | null;
 }
 
 /** modules.nfl_schedule.game_phase for one player's own NFL game. */
@@ -942,6 +949,16 @@ export interface MatchupRealStarter {
   game_status?: MatchupGameStatus | null;
   /** Live projected final points; null unless his game is in progress. */
   projected_final?: number | null;
+  /** Real kickoff instant (ISO-8601 UTC) for his game, or null. */
+  game_kickoff_at?: string | null;
+  game_final?: boolean | null;
+  /** Player-card game context (modules.nfl_schedule): opponent / home-away always, score only once final. */
+  game_opponent?: string | null;
+  game_is_home?: boolean | null;
+  game_team_score?: number | null;
+  game_opponent_score?: number | null;
+  /** Share (0-1) of his own game already played, a wall-clock estimate; null before kickoff. */
+  game_progress?: number | null;
   /** The league lineup slot he fills, named like the suggested lineup's slots. */
   slot?: string | null;
 }

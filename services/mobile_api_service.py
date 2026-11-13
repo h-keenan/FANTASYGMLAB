@@ -15014,6 +15014,10 @@ def _player_game_state(team: Any, projection_context: "_ProjectionContext | None
         "game_final": None,
         "game_kickoff_at": None,
         "game_status": None,
+        "game_opponent": None,
+        "game_is_home": None,
+        "game_team_score": None,
+        "game_opponent_score": None,
     }
     if projection_context is None or projection_context.games is None or not team:
         return state
@@ -15028,6 +15032,14 @@ def _player_game_state(team: Any, projection_context: "_ProjectionContext | None
         # Final implies kicked off (game_has_started is True once played).
         state["game_final"] = bool(matchup.get("played")) and state["game_started"] is True
         state["game_kickoff_at"] = matchup.get("kickoff_at") or None
+        # Player-card game context: opponent and home/away always; the score
+        # only once nflverse has a final (no live scoreboard feed is cached,
+        # see docs/live-plays-research.md).
+        state["game_opponent"] = matchup.get("opponent") or None
+        state["game_is_home"] = matchup.get("is_home") if isinstance(matchup.get("is_home"), bool) else None
+        if state["game_final"]:
+            state["game_team_score"] = matchup.get("team_score")
+            state["game_opponent_score"] = matchup.get("opponent_score")
         try:
             state["game_status"] = nfl_schedule.game_phase(matchup)
         except Exception:
@@ -16125,6 +16137,14 @@ def _build_matchup(
     for _side_payload in (my_side, opponent_side):
         for _starter in _side_payload.get("real_starters") or []:
             _starter["projected_final"] = matchup_win_probability.projected_final(_starter)
+            # Share of his own game already played (0-1, wall-clock estimate):
+            # drives the player card's progress bar. None before kickoff / bye.
+            _remaining = matchup_win_probability.game_fraction_remaining(_starter)
+            _starter["game_progress"] = (
+                round(1.0 - _remaining, 3)
+                if _starter.get("game_started") is True and _remaining is not None
+                else None
+            )
     unmapped_players: list[dict[str, Any]] = []
     if is_external:
         for side, entry in ((my_side, my_entry), (opponent_side, opponent_entry)):
