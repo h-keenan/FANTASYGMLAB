@@ -18,6 +18,8 @@ export type ConfirmInPlaceProps = {
   variant?: "button" | "icon" | "row";
   /** Trigger text (button / row) or accessible name (icon). */
   label: string;
+  /** Accessible name for the idle trigger when the visible text is shorter ("Remove" vs "Remove Team 3"). */
+  ariaLabel?: string;
   /**
    * "tap-again": the control keeps its footprint, its label becomes "Tap again to confirm", reverts after 4 s.
    * "ask": the control is covered, in place, by "<prompt> [Confirm] [Keep]". Default: tap-again for
@@ -80,6 +82,7 @@ function TrashGlyph() {
 export function ConfirmInPlace({
   variant = "button",
   label,
+  ariaLabel,
   mode,
   prompt = "Are you sure?",
   confirmLabel,
@@ -215,6 +218,7 @@ export function ConfirmInPlace({
         type="button"
         role={triggerRole}
         data-confirm-trigger=""
+        aria-label={armedTapAgain ? undefined : ariaLabel}
         aria-expanded={phase === "armed" || undefined}
         disabled={disabled || busy}
         onClick={onTrigger}
@@ -231,6 +235,7 @@ export function ConfirmInPlace({
         fullWidth={variant === "row"}
         disabled={disabled}
         loading={busy}
+        aria-label={armedTapAgain ? undefined : ariaLabel}
         aria-expanded={phase === "armed" || undefined}
         onClick={onTrigger}
         className={`ui-confirm-trigger ${armedTapAgain ? "ui-confirm-armed" : ""}`}
@@ -247,6 +252,7 @@ export function ConfirmInPlace({
         type="button"
         role={triggerRole}
         data-confirm-trigger=""
+        aria-label={ariaLabel}
         aria-expanded={showPanel || undefined}
         aria-controls={showPanel ? panelId : undefined}
         disabled={disabled}
@@ -262,6 +268,7 @@ export function ConfirmInPlace({
         size={size}
         fullWidth={variant === "row"}
         disabled={disabled}
+        aria-label={ariaLabel}
         aria-expanded={showPanel || undefined}
         aria-controls={showPanel ? panelId : undefined}
         onClick={onTrigger}

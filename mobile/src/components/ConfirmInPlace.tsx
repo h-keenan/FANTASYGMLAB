@@ -19,6 +19,8 @@ export type ConfirmInPlaceProps = {
   variant?: 'button' | 'icon' | 'row';
   /** Trigger text (button / row) or accessible name (icon). */
   label: string;
+  /** Accessible name for the idle trigger when the visible text is shorter ("Remove" vs "Remove Team 3"). */
+  ariaLabel?: string;
   /**
    * 'tap-again': the control keeps its footprint, its label becomes "Tap again to confirm", reverts
    * after 4 s. 'ask': the control is replaced, in place, by "<prompt> [Confirm] [Keep]".
@@ -59,6 +61,7 @@ export type ConfirmInPlaceProps = {
 export default function ConfirmInPlace({
   variant = 'button',
   label,
+  ariaLabel,
   mode,
   prompt = 'Are you sure?',
   confirmLabel,
@@ -129,7 +132,7 @@ export default function ConfirmInPlace({
     ) : resolvedMode === 'tap-again' ? (
       <Pressable
         accessibilityRole="button"
-        accessibilityLabel={armedTapAgain ? `Tap again to confirm: ${label}` : label}
+        accessibilityLabel={armedTapAgain ? `Tap again to confirm: ${label}` : (ariaLabel ?? label)}
         accessibilityState={{ disabled: disabled || busy, busy, expanded: armedTapAgain }}
         disabled={disabled || busy}
         onPress={onTrigger}

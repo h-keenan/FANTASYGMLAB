@@ -238,7 +238,10 @@ describe("MultiTeamTradeContent", () => {
   it("removing a team drops the assets routed to it", () => {
     renderBuilder();
     buildThreeTeamTrade();
+    // The team holds assets, so removing it asks first (in place).
     fireEvent.click(screen.getByRole("button", { name: "Remove Team 3" }));
+    expect(screen.getAllByText("Charlie Tight").length).toBeGreaterThan(0);
+    fireEvent.click(screen.getByRole("button", { name: "Remove" }));
     expect(screen.queryByText("Charlie Tight")).not.toBeInTheDocument();
     expect(screen.queryByText("Bravo Wideout")).not.toBeInTheDocument();
   });

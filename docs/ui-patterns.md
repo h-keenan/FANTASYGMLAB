@@ -50,7 +50,7 @@ Mobile: `<Sheet open onClose title ... />` wraps the existing `SheetModal` / `Sw
 
 Not migrated yet (low-risk later, one at a time): `PlayerQuickView`, `PercentileExplorerSheet`,
 `ManagerProfileSheet`, `MultiTeamTradeContent`, `MatchupPlanner` SwapSheet, `AlertsDropdown`,
-`SimSheet`, `TradePickerSheet` (PR #1801). They keep working as they are; each can be swapped for
+`SimSheet`, `TradePickerSheet`. They keep working as they are; each can be swapped for
 `Sheet` in its own PR. The PQV in particular has bespoke chrome (field/sweep textures, header
 layout), so it stays a hand-rolled shell until a design pass decides what becomes a `Sheet` prop.
 
@@ -121,13 +121,16 @@ The other variants (tap-again, row ask, an inline link that asks, the error stat
 | Remove my scouting report | `CollegeScoutingContent.tsx` | `ProspectScoutingDetailScreen.tsx` | ask |
 | Delete a shared trade | `SharedTradesFeed.tsx`, `app/community/page.tsx` | `SharedTradesFeed.tsx`, `CommunityScreen.tsx` | ask; a failed delete now shows an error instead of being swallowed |
 | Reset lineup to suggested | `MatchupPlanner.tsx` | `MatchupPlanner.tsx` | tap-again |
+| Remove a team (with assets) from a multi-team trade | `MultiTeamTradeContent.tsx` | `MultiTeamTradePanel.tsx` | ask |
 | Remove a GM target | `GmPlanContent.tsx` | `GmPlanScreen.tsx` | **UndoToast** (see below) |
 
-**Left alone on purpose:** removing a single trade asset or a trade team
-(`TradeAnalyzerContent`, `MultiTeamTradeContent`). Those screens are being rebuilt around the picker
-sheet in PR #1801 and the removal is trivially re-added from the picker, so wiring a confirm into code
-that is about to change would only create a conflict. Follow-up once #1801 lands: asset removal uses
-`useUndoableRemoval`, dropping a team that holds assets uses `ConfirmInPlace`.
+Also applied after #1801 merged: **removing a team from a multi-team trade** (web `MultiTeamTradeContent.tsx`,
+mobile `MultiTeamTradePanel.tsx`). Dropping a team takes every asset routed to or from it, so a team that
+holds assets asks first ("Remove Team 3 and its assets?"); an empty team is removed straight away.
+
+**Left alone on purpose:** removing a single asset from a trade side. After #1801 that is a chip with an x in
+the side summary, and the asset is one tap away in the picker, so a confirm would only add friction. If it
+ever needs a safety net it should use `useUndoableRemoval`, not a confirm.
 
 ### UndoToast
 
