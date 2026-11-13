@@ -514,3 +514,53 @@ def test_concurrent_write_race_is_a_409_and_changes_nothing():
     assert len(backend.tables["sim_events"]) == len(before) + 1  # only the other worker's row
     # a retry after reload succeeds (it sees the other worker's pick)
     backend.insert_many = real_insert
+
+
+# ------------------------------------- empty starting slot is never a deadlock
+
+
+def _strip_position(client, gid, pos):
+    """Cut every rostered player at ``pos`` (the 'all my WRs got hurt' end state: no legal fill on the roster)."""
+    mine = client.get(f"/v1/sim/games/{gid}/players?status=mine&page_size=60", headers=hdr()).json()["items"]
+    for p in [p for p in mine if p["pos"] == pos]:
+        assert client.post(f"/v1/sim/games/{gid}/cut", json={"player_id": p["id"]}, headers=hdr()).status_code == 200
+    lineup = client.get(f"/v1/sim/games/{gid}/lineup", headers=hdr()).json()
+    return [s["slot"] for s in lineup["slots"] if not s["player"]]
+
+
+def test_empty_starting_slot_never_blocks_advance_and_scores_zero(season):
+    client, _, gid = season
+    empty = _strip_position(client, gid, "WR")
+    assert empty and set(empty) <= {"WR", "FLEX"}
+    assert client.get(f"/v1/sim/games/{gid}", headers=hdr()).json()["game"]["pending"]["cuts_needed"] == 0
+    res = advance(client, gid)
+    assert res["game"]["week"] == 2 and res["replayed"] is False
+    starters = res["recap"]["your_game"]["starters"]
+    gaps = [s for s in starters if s["player"] is None]
+    assert gaps and all(s["pts"] == 0.0 and s["flag"] == "empty" for s in gaps)
+    # replaying the same week is idempotent
+    assert advance(client, gid, week=1)["recap"] == res["recap"]
+
+
+def test_claim_placed_this_week_lands_before_scoring_and_fills_the_slot(season):
+    client, _, gid = season
+    empty = _strip_position(client, gid, "WR")
+    assert "WR" in empty
+    fa = client.get(f"/v1/sim/games/{gid}/players?status=available&pos=WR&page_size=1", headers=hdr()).json()["items"]
+    client.post(f"/v1/sim/games/{gid}/waivers", json={"add": fa[0]["id"], "start_slot": "WR"}, headers=hdr())
+    rec = advance(client, gid)["recap"]
+    mine = [w for w in rec["waivers"] if w["is_you"]]
+    assert len(mine) == 1
+    if mine[0]["ok"]:  # worst-record-first; a lost race to an AI team is legal, a won claim must start this very week
+        wr = [s for s in rec["your_game"]["starters"] if s["slot"] == "WR" and s["player"]]
+        assert any(s["player"]["id"] == fa[0]["id"] for s in wr)
+    else:
+        assert mine[0]["reason"] == "taken"
+
+
+def test_cut_stays_available_so_over_limit_is_always_fixable(season):
+    client, _, gid = season
+    fa = client.get(f"/v1/sim/games/{gid}/players?status=available&page_size=4", headers=hdr()).json()["items"]
+    mine = client.get(f"/v1/sim/games/{gid}/players?status=mine&page_size=60", headers=hdr()).json()["items"]
+    assert len(mine) == 14 and fa  # the cut path stays open at any roster size
+    assert client.post(f"/v1/sim/games/{gid}/cut", json={"player_id": mine[-1]["id"]}, headers=hdr()).status_code == 200

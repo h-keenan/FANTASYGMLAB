@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { SIM_ASSET_ALL, simAdvanceState, simAutoSetMessage, simLineupDiff, simFilterGroups, simGroupByPosition, simSideSummary, simTradeFit, SIM_REVIEW_VIEWS, simReviewViewFor, simOpenKey, simParseOpen, simPreview, simSeeAllLabel, simWindow } from "./simLayout";
+import { SIM_ASSET_ALL, simAdvanceState, simEmptySlotLabels, simAutoSetMessage, simLineupDiff, simFilterGroups, simGroupByPosition, simSideSummary, simTradeFit, SIM_REVIEW_VIEWS, simReviewViewFor, simOpenKey, simParseOpen, simPreview, simSeeAllLabel, simWindow } from "./simLayout";
 
 describe("simLayout", () => {
   it("namespaces and parses open state", () => {
@@ -60,10 +60,15 @@ describe("simLayout", () => {
     expect(simAutoSetMessage({ swaps: [{ slot: "QB", out: "A", in: "B" }, { slot: "RB", out: "C", in: "D" }], gain: null })).toBe("Made 2 lineup swaps");
   });
   it("explains why Advance is disabled", () => {
-    expect(simAdvanceState({ phase: "regular_season", week: 4 }, 0)).toEqual({ label: "Wk 4 \u2192 5", blocked: false, reason: null });
-    expect(simAdvanceState({ phase: "regular_season", week: 4 }, 1).reason).toBe("Fill 1 empty slot");
-    expect(simAdvanceState({ phase: "regular_season", week: 4 }, 3).reason).toBe("Fill 3 empty slots");
-    expect(simAdvanceState({ phase: "regular_season", week: 4, pending: { cuts_needed: 2 } }, 1).reason).toBe("Cut 2 players first");
+    expect(simAdvanceState({ phase: "regular_season", week: 4 }, 0)).toEqual({ label: "Wk 4 \u2192 5", blocked: false, reason: null, warning: null, confirm: null });
+    expect(simAdvanceState({ phase: "regular_season", week: 4 }, 0)).toMatchObject({ blocked: false, warning: null, confirm: null });
+    const one = simAdvanceState({ phase: "regular_season", week: 4 }, ["WR2"]);
+    expect(one).toMatchObject({ blocked: false, reason: null });
+    expect(one.confirm).toBe("WR2 is empty and will score 0 unless a healthy bench player fits. Advance anyway?");
+    expect(one.warning).toContain("Claims process when you advance, before games are scored");
+    expect(simAdvanceState({ phase: "regular_season", week: 4 }, 3).blocked).toBe(false);
+    expect(simAdvanceState({ phase: "regular_season", week: 4, pending: { cuts_needed: 2 } }, ["WR"])).toMatchObject({ blocked: true, reason: "Cut 2 players first", confirm: null });
+    expect(simEmptySlotLabels([{ slot: "QB", player: {} }, { slot: "WR", player: {} }, { slot: "WR", player: null }, { slot: "TE", player: null }])).toEqual(["WR2", "TE"]);
     expect(simAdvanceState({ phase: "playoffs", week: 15 }, 0).label).toBe("Play round");
   });
 });

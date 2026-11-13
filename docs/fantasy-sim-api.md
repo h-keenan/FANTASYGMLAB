@@ -292,6 +292,21 @@ tiebreakers, playoff seeding, waivers that resolve in priority order.
 - Waivers: claims resolve at Advance, worst record first, AI claims in the same
   order, before that week's games. Cuts are immediate. Trades resolve
   instantly (see Trades). Trade deadline: week 10; none in the playoffs.
+- Empty starting slots never block Advance. Order inside one Advance: the
+  user's claims (and AI claims) resolve first, worst record first, and a
+  winning claim with `start_slot` is already in the lineup; then AI lineups are
+  set and the user's still-empty slots are auto-filled from the healthy bench;
+  then the week is scored. A slot nobody can fill scores 0 (`starters[].flag:
+  "empty"`). So a user whose WRs are all hurt can claim a free agent this week
+  and have him play this week. The API never rejects Advance for an empty slot
+  (only `roster_over_limit`, `drafting`, `offseason`, `complete`), and cuts are
+  always allowed, so an over-limit roster is always fixable. Rule (kept
+  claims-only, no instant free-agent signing, matching the engine and keeping AI
+  teams on the same waiver path): clients warn on an empty slot ("WR2 is empty
+  and will score 0 unless a healthy bench player fits. Advance anyway?") with
+  shortcuts to the bench / free agents; only an over-limit roster disables
+  Advance. No engine behavior changed, so no version gate and old saves replay
+  identically.
 - Randomness: a game has one seed. Every draw is keyed by `(seed, week, stream,
   key)`, so reverting a week and re-advancing with the same decisions gives the
   same result, and trade verdicts never change between preview and send.
