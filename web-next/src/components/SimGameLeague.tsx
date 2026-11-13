@@ -8,10 +8,12 @@ import { EmptyState } from "@/components/EmptyState";
 import { PillRow } from "@/components/PillRow";
 import { ReviewGlyphChip } from "@/components/SeasonReviewSections";
 import { SimPlayerChip, SimSectionTitle, SimSeeAll, SimTeamLink, SimToneBadge, simToneColor, useSimWide, type SimCtx } from "@/components/SimGameParts";
+import { SimLeaguePlayersView, SimLeagueTeamsView } from "@/components/SimLeagueWho";
 import { SkeletonCard } from "@/components/Skeleton";
 import { ToneBadge } from "@/components/ToneBadge";
 import { api } from "@/lib/api";
 import { simPreview } from "@/lib/simLayout";
+import { useSimLeagueRosters } from "@/lib/useSimLeagueRosters";
 import {
   simFmtPts,
   simFmtRecord,
@@ -28,7 +30,7 @@ import {
   type SimStandingRow,
 } from "@/lib/simGame";
 
-type View = "standings" | "scores" | "feed" | "teams";
+type View = "standings" | "scores" | "feed" | "teams" | "players";
 
 export function SimStandingsList({ rows, regularWeeks, playoffTeams }: { rows: SimStandingRow[]; regularWeeks?: number; playoffTeams?: number }) {
   const wide = useSimWide();
@@ -133,6 +135,9 @@ export function SimLeagueTab({ ctx }: { ctx: SimCtx }) {
   const [failed, setFailed] = useState(false);
   const [attempt, setAttempt] = useState(0);
   const [allMoves, setAllMoves] = useState(false);
+  const [rosterAttempt, setRosterAttempt] = useState(0);
+  // One request for every team's roster, only once Teams or Players is opened.
+  const rosters = useSimLeagueRosters(gameId, ctx.tick, rosterAttempt, view === "teams" || view === "players");
 
   useEffect(() => {
     let cancelled = false;
@@ -168,6 +173,7 @@ export function SimLeagueTab({ ctx }: { ctx: SimCtx }) {
           { label: "Scores", value: "scores", glyph: "scores" },
           { label: "Feed", value: "feed", glyph: "feed" },
           { label: "Teams", value: "teams", glyph: "team" },
+          { label: "Players", value: "players", glyph: "league" },
         ]}
         active={view}
         onSelect={(value) => setView(value as View)}
@@ -210,24 +216,8 @@ export function SimLeagueTab({ ctx }: { ctx: SimCtx }) {
           <SimSeeAll hidden={simPreview(league.transactions ?? [], allMoves, 6).hidden} expanded={allMoves} onToggle={() => setAllMoves((v) => !v)} />
         </section>
       ) : null}
-      {view === "teams" ? (
-        <section className="flex flex-col gap-2" aria-label="Scouting report">
-          <SimSectionTitle glyph="team" tone="accent" note="Power rank is roster strength right now. Tap a team to scout it.">Scouting report</SimSectionTitle>
-          {[...(league.teams ?? [])].sort((a, b) => a.power_rank - b.power_rank).map((team) => (
-            <AccentCard key={team.team_id} accent={team.is_you ? "var(--color-accent)" : "var(--color-border-strong)"} compact as="div">
-              <div className="flex items-center justify-between gap-2">
-                <span className="flex min-w-0 items-center gap-2">
-                  <span className="text-sm font-extrabold tabular-nums" style={{ color: team.power_rank <= 3 ? "var(--color-success)" : "var(--color-text-muted)" }}>#{team.power_rank}</span>
-                  <SimTeamLink teamId={team.team_id} name={team.name} isYou={team.is_you} size={28} />
-                </span>
-                <ToneBadge label={team.persona.label} color="var(--color-accent)" size="xs" />
-              </div>
-              <p className="hidden text-xs sm:block" style={{ color: "var(--color-text-secondary)" }}>{team.persona.blurb}</p>
-              {team.avg_age != null ? <p className="text-xs" style={{ color: "var(--color-text-muted)" }}>Average age {team.avg_age.toFixed(1)}</p> : null}
-            </AccentCard>
-          ))}
-        </section>
-      ) : null}
+      {view === "teams" ? <SimLeagueTeamsView ctx={ctx} state={rosters} onRetry={() => setRosterAttempt((n) => n + 1)} /> : null}
+      {view === "players" ? <SimLeaguePlayersView ctx={ctx} state={rosters} onRetry={() => setRosterAttempt((n) => n + 1)} /> : null}
     </div>
   );
 }

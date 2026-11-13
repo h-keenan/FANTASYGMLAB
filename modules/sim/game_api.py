@@ -979,6 +979,15 @@ def add_routes(router: APIRouter, ctx: GameApiCtx) -> None:
             return {**_env(pro, state, "wrong_phase"), "phase": "draft"}
         return {**_env(pro, state), **view.league_view(snap, state)}
 
+    @router.get("/games/{game_id}/league/rosters")
+    @guarded
+    def get_league_rosters(game_id: str, user: dict[str, Any] = Depends(require_user)):
+        pro = ctx.is_pro(user)
+        _, _, _, snap, state = load(user, _gid(game_id))
+        if state.status == "drafting":
+            return {**_env(pro, state, "wrong_phase"), "phase": "draft"}
+        return {**_env(pro, state), **home.league_rosters(snap, state)}
+
     @router.get("/games/{game_id}/result")
     @guarded
     def get_result(game_id: str, user: dict[str, Any] = Depends(require_user)):

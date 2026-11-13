@@ -144,6 +144,27 @@ export function createMock(opts = {}) {
     return { player: { ...row(p), value_rank: p.value_rank ?? players.indexOf(p) + 1, pos_value_rank: Math.max(1, pos.indexOf(p) + 1) }, weeks, history, news, ros, projection_flat: true, ...(p.rookieDemo ? { scouting: ROOKIE_SCOUTING } : {}) };
   }
 
+  // One team's entry in GET /league/rosters (and the base of GET /teams/{id}): every held player with its squad, plus
+  // record, power rank, strengths / needs / surplus by position and the top assets.
+  function rosterTeam(t, i) {
+    const held = players.filter((p) => state.owner[p.id] === t.team_id).sort((a, b) => b.value - a.value).map(row);
+    const rows = held.map((p, k) => ({ ...p, squad: p.status === "out" ? "ir" : k === held.length - 1 && p.age < 24 ? "taxi" : "roster" }));
+    const need = { QB: 1, RB: 2, WR: 2, TE: 1, K: 1, DEF: 0 };
+    const positions = ["QB", "RB", "WR", "TE", "K"].map((pos, k) => {
+      const n = rows.filter((p) => p.pos === pos && p.squad === "roster").length;
+      const level = (i + k * 5) % 12 < 4 ? "strength" : (i + k * 5) % 12 >= 8 ? "need" : "ok";
+      return { pos, rank: ((i + k * 5) % 12) + 1, teams: 12, level, depth: Math.max(0, n - need[pos]), starters: need[pos], strength: 20 };
+    });
+    const s = standings().find((x) => x.team_id === t.team_id);
+    return {
+      team_id: t.team_id, name: t.name, owner: "Mgr " + (i + 1), is_you: t.is_you, persona: PERSONAS[i % 7], power_rank: i + 1,
+      avg_age: 25.4 + i * 0.2, roster_size: rows.filter((p) => p.squad === "roster").length,
+      record: s ? { wins: s.wins, losses: s.losses, ties: 0, pf: s.pf, pa: s.pa, rank: s.rank, streak: s.streak, seed: null, playoff_status: "in" } : null,
+      positions, strengths: positions.filter((p) => p.level === "strength").map((p) => p.pos), needs: positions.filter((p) => p.level === "need").map((p) => p.pos),
+      surplus: positions.filter((p) => p.depth >= 2 && p.level !== "need").map((p) => p.pos), top_assets: rows.slice(0, 3), players: rows,
+    };
+  }
+
   // returns {status, body} or null if not a sim route
   return function handle(method, path, query, body) {
     if (!state.enabled) return { status: 404, body: { detail: "Not Found" } };
@@ -172,7 +193,8 @@ export function createMock(opts = {}) {
     }
     let mm;
     if ((mm = sub.match(/^\/players\/(.+)$/))) { const p = players.find((x) => x.id === mm[1]); return { status: 200, body: { ...env(), ...playerDetail(p) } }; }
-    if ((mm = sub.match(/^\/teams\/(.+)$/))) return { status: 200, body: { ...env(), team_id: mm[1], players: roster(mm[1]) } };
+    if (sub === "/league/rosters") return { status: 200, body: { ...env(), week: state.week, teams: teams.map((t, i) => rosterTeam(t, i)) } };
+    if ((mm = sub.match(/^\/teams\/(.+)$/))) { const t = teams.find((x) => x.team_id === mm[1]); const rt = rosterTeam(t, teams.indexOf(t)); const held = rt.players; const active = held.filter((p) => p.squad === "roster"); const starters = []; const used = new Set(); for (const slot of SLOTS) { const pick = active.find((p) => !used.has(p.id) && (slot === "FLEX" ? ["RB", "WR", "TE"].includes(p.pos) : p.pos === slot)); if (pick) used.add(pick.id); starters.push({ slot, player: pick ?? null }); } return { status: 200, body: { ...env(), team_id: t.team_id, players: active, ir: held.filter((p) => p.squad === "ir"), taxi: held.filter((p) => p.squad === "taxi"), team: { team_id: t.team_id, name: t.name, owner: "Mgr " + (teams.indexOf(t) + 1), is_you: t.is_you, persona: PERSONAS[teams.indexOf(t) % 7], record: rt.record, power_rank: rt.power_rank, avg_age: rt.avg_age, roster_size: active.length }, lineup: starters, projected_total: Math.round(starters.reduce((a, x) => a + (x.player?.projection ?? 0), 0) * 10) / 10, positions: rt.positions, strengths: rt.strengths, needs: rt.needs, injuries: held.filter((p) => p.status === "out"), recent: [], next_game: { week: state.week, opponent: { team_id: "7", name: "Red Zone Rats" } }, trade: { open: !t.is_you, reason: null } } }; }
     if (sub === "/lineup" && method === "GET") return { status: 200, body: lineup() };
     if (sub === "/lineup" && method === "PUT") return { status: 200, body: lineup() };
     if (sub === "/lineup/auto") return { status: 200, body: lineup() };

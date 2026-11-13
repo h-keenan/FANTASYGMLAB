@@ -692,3 +692,12 @@ Reasons: `ir_full`, `ir_ineligible`, `taxi_full`, `taxi_ineligible`, `roster_ful
 `bye_week`, `out_weeks`), `projection_flat` (every playable week carries the same projection: clients show one
 "Rest of season" line, never a week-by-week list), `player.overall` (1-99, null for a position pool under 10 players), `player.value_rank` / `player.pos_value_rank`, and for generated rookies
 `scouting` (see `docs/fantasy-sim-player-model.md` section 8).
+
+## League rosters (who has who)
+
+`GET /v1/sim/games/{id}/league/rosters` returns every team's roster in ONE request (the League tab's Teams and Players views
+and the Trade tab's partner list read it; no per-team fan-out): `{teams: [{team_id, name, owner, is_you, persona, record,
+power_rank, avg_age, roster_size, positions[], strengths[], needs[], surplus[], top_assets[3], players[]}], week}`. `players` is
+everyone the team holds (roster, IR, taxi; `squad` says which) in the usual player-row shape, best value first. `surplus` is
+positions with two or more players beyond the starters, never a position of need. Wrong phase during the draft
+(`reason: "wrong_phase"`). `GET /teams/{id}` now also returns `ir` and `taxi`.

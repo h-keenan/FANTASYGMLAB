@@ -7,6 +7,7 @@ import Button from './Button';
 import EmptyState from './EmptyState';
 import ErrorState from './ErrorState';
 import SegmentedTabBar from './SegmentedTabBar';
+import { SimLeaguePlayersView, SimLeagueTeamsView } from './SimLeagueWho';
 import { SkeletonCard } from './SkeletonBlock';
 import { ReviewGlyphChip } from './SeasonReviewSections';
 import { SimPlayerChip, SimSectionTitle, SimSeeAll, SimTeamLink, SimToneBadge, createSimStyles, simToneColor, type SimCtx } from './SimGameParts';
@@ -29,9 +30,10 @@ import {
   type SimStandingRow,
 } from '../lib/simGame';
 import { simPreview } from '../lib/simLayout';
+import { useSimLeagueRosters } from '../lib/useSimLeagueRosters';
 import { spacing } from '../theme';
 
-type View_ = 'standings' | 'scores' | 'feed' | 'teams';
+type View_ = 'standings' | 'scores' | 'feed' | 'teams' | 'players';
 
 export function SimStandingsList({ rows, playoffTeams }: { rows: SimStandingRow[]; playoffTeams?: number }) {
   const { colors } = useThemeMode();
@@ -122,6 +124,9 @@ export function SimLeagueTab({ ctx }: { ctx: SimCtx }) {
   const [failed, setFailed] = useState(false);
   const [attempt, setAttempt] = useState(0);
   const [allMoves, setAllMoves] = useState(false);
+  const [rosterAttempt, setRosterAttempt] = useState(0);
+  // One request for every team's roster, only once Teams or Players is opened.
+  const rosters = useSimLeagueRosters(gameId, ctx.tick, rosterAttempt, view === 'teams' || view === 'players');
 
   useEffect(() => {
     let cancelled = false;
@@ -164,6 +169,7 @@ export function SimLeagueTab({ ctx }: { ctx: SimCtx }) {
           { key: 'scores', label: 'Scores', glyph: 'scores' },
           { key: 'feed', label: 'Feed', glyph: 'feed' },
           { key: 'teams', label: 'Teams', glyph: 'team' },
+          { key: 'players', label: 'Players', glyph: 'league' },
         ]}
         active={view}
         onChange={setView}
@@ -202,25 +208,8 @@ export function SimLeagueTab({ ctx }: { ctx: SimCtx }) {
           <SimSeeAll hidden={simPreview(league.transactions ?? [], allMoves, 6).hidden} expanded={allMoves} onToggle={() => setAllMoves((v) => !v)} />
         </View>
       ) : null}
-      {view === 'teams' ? (
-        <View style={common.stack}>
-          <SimSectionTitle glyph="team" title="Scouting report" caption="Power rank is roster strength right now. Tap a team to scout it." />
-          {[...(league.teams ?? [])]
-            .sort((a, b) => a.power_rank - b.power_rank)
-            .map((team) => (
-              <AccentCard key={team.team_id} accent={team.is_you ? colors.accent : colors.borderStrong} compact>
-                <View style={common.rowBetween}>
-                  <View style={[common.row, common.grow]}>
-                    <AppText style={[common.bodyStrong, { color: team.power_rank <= 3 ? colors.success : colors.textTertiary }]}>#{team.power_rank}</AppText>
-                    <SimTeamLink teamId={team.team_id} name={team.name} isYou={team.is_you} size={28} />
-                  </View>
-                  <ToneBadge label={team.persona.label} color={colors.accent} size="xs" />
-                </View>
-                {team.avg_age != null ? <AppText style={common.muted}>Average age {team.avg_age.toFixed(1)}</AppText> : null}
-              </AccentCard>
-            ))}
-        </View>
-      ) : null}
+      {view === 'teams' ? <SimLeagueTeamsView ctx={ctx} state={rosters} onRetry={() => setRosterAttempt((n) => n + 1)} /> : null}
+      {view === 'players' ? <SimLeaguePlayersView ctx={ctx} state={rosters} onRetry={() => setRosterAttempt((n) => n + 1)} /> : null}
     </View>
   );
 }

@@ -56,6 +56,7 @@ export const IDENTICAL = [
   "simCrest.ts",
   "simGame.ts",
   "simPlayerSheet.ts",
+  "simLeagueRosters.ts",
   "simScouting.ts",
   "weeklyProjection.ts",
   "simReview.ts",
@@ -91,6 +92,7 @@ export const MIRRORED = [
   "tapForWhyContent.ts",
   "teamStatus.ts",
   "useDelayedFlag.ts",
+  "useSimLeagueRosters.ts",
   "valueHistoryPresentation.ts",
 ];
 

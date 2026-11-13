@@ -1,0 +1,89 @@
+import React, { useMemo, type ReactNode } from 'react';
+import { Pressable, View } from 'react-native';
+
+import AccentCard from './AccentCard';
+import AppText from './AppText';
+import PlayerName from './PlayerName';
+import PositionBadge from './PositionBadge';
+import SimCrest from './SimCrest';
+import { createSimStyles, simToneColor } from './SimGameParts';
+import ToneBadge from './ToneBadge';
+import { useThemeMode } from '../context/ThemeModeContext';
+import type { SimLeagueRosterTeam } from '../lib/simGame';
+import { simTeamChips, simTeamRecordLine, simValueLabel } from '../lib/simLeagueRosters';
+
+/**
+ * THE Fantasy Sim team card: who a team is and who it has, at a glance. Used by the League tab's Teams view and
+ * the Trade tab's partner list (twin of web-next's SimTeamCard). Crest, name, record and rank, the team's top
+ * assets with their value, and what it needs vs where it is deep as position chips. The whole card is one
+ * tap target (no nested buttons).
+ */
+export default function SimTeamCard({
+  team,
+  onOpen,
+  selected = false,
+  openLabel,
+  compact = false,
+  trailing,
+}: {
+  team: SimLeagueRosterTeam;
+  onOpen?: (teamId: string) => void;
+  selected?: boolean;
+  openLabel?: string;
+  /** Hide the top assets. */
+  compact?: boolean;
+  trailing?: ReactNode;
+}) {
+  const { colors } = useThemeMode();
+  const common = useMemo(() => createSimStyles(colors), [colors]);
+  const chips = simTeamChips(team);
+  const accent = selected || team.is_you ? colors.accent : team.power_rank <= 3 ? colors.success : colors.borderStrong;
+  const body = (
+    <AccentCard accent={accent} compact>
+      <View style={common.rowBetween}>
+        <View style={[common.row, common.grow]}>
+          <SimCrest name={team.name} size={32} />
+          <View style={common.grow}>
+            <AppText style={common.bodyStrong} numberOfLines={2}>
+              {team.name}
+              {team.is_you ? ' (you)' : ''}
+            </AppText>
+            <AppText style={common.small}>{simTeamRecordLine(team)}</AppText>
+          </View>
+        </View>
+        <View style={common.row}>
+          <ToneBadge label={`Power #${team.power_rank}`} color={team.power_rank <= 3 ? colors.success : colors.textSecondary} size="xs" />
+          {trailing}
+        </View>
+      </View>
+      {compact ? null : (
+        <View style={common.tight} accessibilityLabel={`${team.name} top assets`}>
+          {team.top_assets.map((p) => (
+            <View key={p.id} style={common.row}>
+              <PositionBadge position={p.pos} />
+              <View style={common.grow}>
+                <PlayerName name={p.name} style={{ fontSize: 13, fontWeight: '700', color: colors.textPrimary }} />
+              </View>
+              <AppText style={common.muted}>
+                VAL <AppText style={{ fontWeight: '800', color: colors.textPrimary }}>{simValueLabel(p.value)}</AppText>
+              </AppText>
+            </View>
+          ))}
+        </View>
+      )}
+      {chips.length > 0 ? (
+        <View style={common.wrapRow} accessibilityLabel="Needs and depth">
+          {chips.map((c) => (
+            <ToneBadge key={c.key} label={c.label} color={simToneColor(c.tone, colors)} size="xs" />
+          ))}
+        </View>
+      ) : null}
+    </AccentCard>
+  );
+  if (!onOpen) return body;
+  return (
+    <Pressable accessibilityRole="button" accessibilityLabel={openLabel ?? `${team.name}. Open roster`} accessibilityState={{ selected }} onPress={() => onOpen(team.team_id)} style={{ minHeight: 44 }}>
+      {body}
+    </Pressable>
+  );
+}
