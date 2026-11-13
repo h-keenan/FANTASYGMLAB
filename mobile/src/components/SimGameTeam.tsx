@@ -1,23 +1,27 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { StyleSheet, View } from 'react-native';
+import { Pressable, StyleSheet, View } from 'react-native';
 
 import AccentCard from './AccentCard';
 import AppText from './AppText';
 import Button from './Button';
 import EmptyState from './EmptyState';
 import ErrorState from './ErrorState';
+import PlayerAvatar from './PlayerAvatar';
 import PositionBadge from './PositionBadge';
+import SimGlyph from './SimGlyph';
 import { ReviewGlyphChip } from './SeasonReviewSections';
 import SegmentedTabBar from './SegmentedTabBar';
 import { SkeletonCard } from './SkeletonBlock';
 import { SimPlayerBrowser } from './SimGamePlayers';
-import { SimPlayerChip, SimPlayerLine, SimSectionTitle, SimSheet, SimStat, SimTeamLink, SimToneBadge, createSimStyles, simToneColor, type SimCtx } from './SimGameParts';
+import { SimIconButton, SimPlayerChip, SimPlayerLine, SimSectionTitle, SimSheet, SimStat, SimTeamLink, SimToneBadge, createSimStyles, simToneColor, type SimCtx } from './SimGameParts';
 import { useThemeMode } from '../context/ThemeModeContext';
 import { api } from '../lib/api';
 import {
   simAssignSlot,
   simClaimPayload,
   simFmtPts,
+  simHeadshotId,
+  simPlayerInitials,
   simSlotRepeatsPosition,
   simLineupPayload,
   simMatchupLine,
@@ -33,7 +37,7 @@ import {
   type SimSlot,
   type SimWaiverClaim,
 } from '../lib/simGame';
-import { spacing, type ThemeColors } from '../theme';
+import { positionColor, radii, spacing, type ThemeColors } from '../theme';
 
 /** Lineup, bench and this week's matchup. Every change saves at once (PUT /lineup). */
 export function SimTeamTab({ ctx, onTrade }: { ctx: SimCtx; onTrade: () => void }) {
@@ -189,34 +193,22 @@ export function SimTeamTab({ ctx, onTrade }: { ctx: SimCtx; onTrade: () => void 
           glyph="team"
           title="Lineup"
           caption={`Projected ${simFmtPts(lineup.projected_total)} points`}
-          right={<Button size="sm" variant="secondary" label="Auto-set" loading={saving} onPress={auto} />}
+          right={
+            <Pressable
+              onPress={auto}
+              disabled={saving}
+              accessibilityRole="button"
+              accessibilityLabel="Auto-set best lineup"
+              accessibilityState={{ disabled: saving, busy: saving }}
+              style={{ flexDirection: 'row', alignItems: 'center', gap: 6, minHeight: 36, paddingHorizontal: spacing.md, borderRadius: radii.pill, borderWidth: 1, borderColor: colors.borderStrong ?? colors.border, opacity: saving ? 0.6 : 1 }}
+            >
+              <SimGlyph name="spark" color={colors.accent} size={14} />
+              <AppText style={{ fontSize: 12.5, fontWeight: '800', color: colors.textPrimary }}>{saving ? 'Setting...' : 'Auto-set'}</AppText>
+            </Pressable>
+          }
         />
         {slots.map((slot, index) => (
-          <View key={`${slot.slot}-${index}`} style={[common.row, common.divider]}>
-            <View style={common.slotCol}>
-              <PositionBadge position={slot.slot} label={labels[index]} />
-            </View>
-            {slot.player ? (
-              <View style={common.grow}>
-                <SimPlayerLine
-                  player={slot.player}
-                  hidePosition={simSlotRepeatsPosition(slot.slot, slot.player.pos)}
-                  onOpen={ctx.openPlayer}
-                  trailing={
-                    <>
-                      <SimStat label="Proj" value={simFmtPts(slot.player.projection)} />
-                      <Button size="sm" variant="secondary" label="Change" onPress={() => setPickSlot(index)} />
-                    </>
-                  }
-                />
-              </View>
-            ) : (
-              <View style={[common.rowBetween, common.grow, styles.emptySlot]}>
-                <AppText style={[common.small, { color: colors.warning }]}>Empty slot</AppText>
-                <Button size="sm" label="Fill" onPress={() => setPickSlot(index)} />
-              </View>
-            )}
-          </View>
+          <LineupRow key={`${slot.slot}-${index}`} slotLabel={labels[index]} slot={slot.slot} player={slot.player} onOpen={ctx.openPlayer} onPick={() => setPickSlot(index)} />
         ))}
       </View>
 
@@ -474,4 +466,57 @@ function createStyles(colors: ThemeColors) {
     emptySlot: { paddingVertical: spacing.sm },
     shop: { alignSelf: 'flex-start' },
   });
+}
+
+/**
+ * One lineup row, one fixed layout for every row: slot badge (fixed width),
+ * 32pt avatar, one-line name + subline, projection (fixed) and a 40pt
+ * Change / Fill control. The player's own position shows only where the slot
+ * does not already say it (FLEX, SUPERFLEX), as a small dot + label in the subline.
+ */
+function LineupRow({ slotLabel, slot, player, onOpen, onPick }: { slotLabel: string; slot: SimSlot; player: SimGamePlayer | null; onOpen: (p: SimGamePlayer) => void; onPick: () => void }) {
+  const { colors, isDark } = useThemeMode();
+  const showPos = player ? !simSlotRepeatsPosition(slot, player.pos) : false;
+  const posColor = player ? positionColor(player.pos, isDark, colors.textSecondary) : colors.textSecondary;
+  const sub = player ? [player.team, player.status === 'out' ? 'Out' : player.status === 'bye' ? 'Bye' : null].filter(Boolean).join(' · ') : '';
+  return (
+    <View
+      testID="lineup-row"
+      style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm, minHeight: 52, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border }}
+    >
+      <View style={{ width: 52, alignItems: 'center' }}>
+        <PositionBadge position={slot} label={slotLabel} />
+      </View>
+      {player ? (
+        <Pressable
+          onPress={() => onOpen(player)}
+          accessibilityRole="button"
+          accessibilityLabel={`${player.name}, ${player.pos}. Open player details`}
+          style={{ flex: 1, minWidth: 0, flexDirection: 'row', alignItems: 'center', gap: spacing.sm, minHeight: 44 }}
+        >
+          <PlayerAvatar playerId={simHeadshotId(player)} fallbackLabel={simPlayerInitials(player)} size={32} />
+          <View style={{ flex: 1, minWidth: 0 }}>
+            <AppText style={{ fontSize: 14, fontWeight: '800', color: player.status === 'healthy' ? colors.textPrimary : colors.textTertiary }} numberOfLines={1}>
+              {player.name}
+            </AppText>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+              {showPos ? (
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 3 }} accessibilityLabel={player.pos}>
+                  <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: posColor }} />
+                  <AppText style={{ fontSize: 12, fontWeight: '800', color: posColor }}>{player.pos}</AppText>
+                </View>
+              ) : null}
+              <AppText style={{ flex: 1, fontSize: 12, color: colors.textTertiary }} numberOfLines={1}>
+                {sub}
+              </AppText>
+            </View>
+          </View>
+        </Pressable>
+      ) : (
+        <AppText style={{ flex: 1, fontSize: 13, color: colors.warning }}>Empty slot</AppText>
+      )}
+      <AppText style={{ width: 44, textAlign: 'right', fontSize: 14, fontWeight: '800', color: colors.textPrimary }}>{player ? simFmtPts(player.projection) : ''}</AppText>
+      <SimIconButton label={player ? `Change ${slotLabel}` : `Fill ${slotLabel}`} primary={!player} glyph={player ? 'trade' : 'check'} onPress={onPick} />
+    </View>
+  );
 }

@@ -8,6 +8,7 @@ import Button from './Button';
 import ErrorState from './ErrorState';
 import PositionBadge from './PositionBadge';
 import SectionHeading from './SectionHeading';
+import SegmentedTabBar from './SegmentedTabBar';
 import { SkeletonCard } from './SkeletonBlock';
 import { SimStandingsList } from './SimGameLeague';
 import { SimPlayerChip, SimPlayerLine, SimPopIn, SimStat, SimToneBadge, createSimStyles, simToneColor, type SimCtx } from './SimGameParts';
@@ -32,6 +33,7 @@ import {
   type SimWeekRecap,
 } from '../lib/simGame';
 import { buildReviewShareModel, buildSimReviewSections } from '../lib/simReview';
+import { SIM_REVIEW_COLLAPSED_ON_PHONE, SIM_REVIEW_VIEWS, simReviewViewFor, type SimReviewView } from '../lib/simLayout';
 import { spacing, type ThemeColors } from '../theme';
 
 /** One week's recap: the score lands first, then your starters, the league and what changed. */
@@ -214,6 +216,7 @@ export function SimFinalView({ ctx, onNewGame, onHub }: { ctx: SimCtx; onNewGame
   const [failMessage, setFailMessage] = useState('');
   const [attempt, setAttempt] = useState(0);
   const [sharing, setSharing] = useState(false);
+  const [tab, setTab] = useState<SimReviewView>('overview');
 
   useEffect(() => {
     let cancelled = false;
@@ -303,29 +306,29 @@ export function SimFinalView({ ctx, onNewGame, onHub }: { ctx: SimCtx; onNewGame
         </View>
       </AccentCard>
 
-      <SeasonReviewSections sections={sections} />
-
-      <View style={common.stack}>
-        <SectionHeading title="Final standings" icon="analytics-outline" />
-        {view.standings.map((row, i) => (
-          <AccentCard key={row.team_id} accent={row.is_you ? colors.accent : simToneColor(simPlayoffOutcomeTone(row.playoff_result), colors)} compact>
-            <View style={common.rowBetween}>
-              <AppText style={[common.body, common.grow]}>
-                {i + 1}. {row.name}
-                {row.is_you ? ' (you)' : ''}
-              </AppText>
-              <AppText style={common.bodyStrong}>
-                {row.wins}-{row.losses}
-                {row.ties ? `-${row.ties}` : ''}
-              </AppText>
-            </View>
-            <View style={common.rowBetween}>
-              <SimToneBadge label={simPlayoffResultLabel(row.playoff_result)} tone={simPlayoffOutcomeTone(row.playoff_result)} />
-              <AppText style={common.small}>{simFmtPts(row.pf)} PF</AppText>
-            </View>
-          </AccentCard>
-        ))}
-      </View>
+      <SegmentedTabBar options={SIM_REVIEW_VIEWS.map((v) => ({ key: v.value, label: v.label }))} active={tab} onChange={setTab} />
+      {tab === 'standings' ? (
+        <View style={common.stack} accessibilityLabel="Final standings">
+          <SectionHeading title="Final standings" icon="analytics-outline" />
+          {view.standings.map((row, i) => (
+            <AccentCard key={row.team_id} accent={row.is_you ? colors.accent : simToneColor(simPlayoffOutcomeTone(row.playoff_result), colors)} compact>
+              <View style={common.row}>
+                <AppText style={[common.body, common.grow]} numberOfLines={1}>
+                  {i + 1}. {row.name}
+                  {row.is_you ? ' (you)' : ''}
+                </AppText>
+                <SimToneBadge label={simPlayoffResultLabel(row.playoff_result)} tone={simPlayoffOutcomeTone(row.playoff_result)} />
+                <AppText style={[common.bodyStrong, { width: 44, textAlign: 'right' }]}>
+                  {row.wins}-{row.losses}
+                  {row.ties ? `-${row.ties}` : ''}
+                </AppText>
+              </View>
+            </AccentCard>
+          ))}
+        </View>
+      ) : (
+        <SeasonReviewSections sections={sections} only={sections.filter((sec) => simReviewViewFor(sec.id) === tab).map((sec) => sec.id)} closed={SIM_REVIEW_COLLAPSED_ON_PHONE} />
+      )}
       <AppText style={common.muted}>
         A game, not a forecast. Season {game.settings.regular_weeks} weeks plus playoffs against AI managers; nothing here touches your real leagues.
       </AppText>
@@ -340,6 +343,6 @@ function createStyles(colors: ThemeColors) {
     score: { flexDirection: 'row', alignItems: 'baseline', justifyContent: 'center', gap: spacing.md },
     scoreYou: { fontSize: 44, fontWeight: '800' },
     scoreOpp: { fontSize: 32, fontWeight: '700', color: colors.textSecondary },
-    grade: { fontSize: 64, lineHeight: 70, fontWeight: '800' },
+    grade: { fontSize: 52, lineHeight: 58, fontWeight: '800' },
   });
 }

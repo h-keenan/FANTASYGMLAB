@@ -14,7 +14,8 @@ import ToneBadge from './ToneBadge';
 import { useThemeMode } from '../context/ThemeModeContext';
 import { api } from '../lib/api';
 import { PLAYER_SEARCH_DEBOUNCE_MS } from '../lib/leaguePlayerSearch';
-import { simDraftAdpDelta, simDraftRowChips } from '../lib/simDraft';
+import { simBoardEdge, simBoardProjection, simDraftRowChips } from '../lib/simDraft';
+import { SIM_WINDOW_STEP, simWindow } from '../lib/simLayout';
 import {
   SIM_PAGE_SIZE,
   simDefaultFilter,
@@ -37,13 +38,12 @@ const SORTS: { key: SimPlayerSort; label: string }[] = [
   { key: 'value', label: 'Value' },
 ];
 
-const BADGE_W = 44;
-const AVATAR = 40;
-const STAT_W = 44;
+const BADGE_W = 38;
+const AVATAR = 32;
 
 type IconName = React.ComponentProps<typeof Ionicons>['name'];
 
-/** A 44pt icon-only action button (queue / draft / reorder / remove). */
+/** A 40pt icon-only action button (queue / draft / reorder / remove). */
 export function SimDraftIconButton({
   icon,
   label,
@@ -77,16 +77,18 @@ export function SimDraftIconButton({
 }
 
 /**
- * One draft-board row with fixed columns: position-colored edge, a fixed badge
- * slot, a fixed avatar slot, name / meta, then Proj / Value / ADP in fixed
- * right-aligned cells so numbers line up and photos never shift the row.
+ * One draft-board row, built for a 390pt phone. Line 1: position badge, photo,
+ * name with the NFL team chip and status chips inline, actions (40pt icon
+ * buttons) right-aligned. Line 2: Proj / Value / ADP / Edge in four equal
+ * columns that match the header strip above the list.
  */
-export function SimDraftRow({ player, pickNo, onOpen, actions }: { player: SimGamePlayer; pickNo: number; onOpen?: (player: SimGamePlayer) => void; actions?: ReactNode }) {
+export function SimDraftRow({ player, onOpen, actions }: { player: SimGamePlayer; onOpen?: (player: SimGamePlayer) => void; actions?: ReactNode }) {
   const { colors, isDark } = useThemeMode();
   const styles = useMemo(() => createStyles(colors), [colors]);
   const edge = positionColor(player.pos, isDark, colors.borderStrong);
   const chips = simDraftRowChips(player);
-  const delta = simDraftAdpDelta(player.adp, pickNo);
+  const delta = simBoardEdge(player);
+  const proj = simBoardProjection(player);
   const identity = (
     <View style={styles.identity}>
       <View style={styles.badgeSlot}>
@@ -95,33 +97,26 @@ export function SimDraftRow({ player, pickNo, onOpen, actions }: { player: SimGa
       <View style={styles.avatarSlot}>
         <PlayerAvatar playerId={simHeadshotId(player)} fallbackLabel={simPlayerInitials(player)} size={AVATAR} />
       </View>
-      <View style={styles.nameCol}>
+      <View style={styles.nameRow}>
         <AppText style={styles.name} numberOfLines={1}>
           {player.name}
         </AppText>
-        <View style={styles.metaRow}>
-          {player.team ? (
-            <View style={styles.teamTag}>
-              <AppText style={styles.teamTagText}>{player.team}</AppText>
-            </View>
-          ) : null}
-          {chips.map((chip) => (
-            <ToneBadge key={chip.key} label={chip.label} color={simToneColor(chip.tone, colors)} size="xs" />
-          ))}
-        </View>
+        {player.team ? (
+          <View style={styles.teamTag}>
+            <AppText style={styles.teamTagText}>{player.team}</AppText>
+          </View>
+        ) : null}
+        {chips.map((chip) => (
+          <ToneBadge key={chip.key} label={chip.label} color={simToneColor(chip.tone, colors)} size="xs" />
+        ))}
       </View>
     </View>
   );
   return (
-    <View style={[styles.row, { borderLeftColor: edge }]} testID="draft-row">
+    <View style={[styles.row, { borderLeftColor: edge, opacity: proj.discounted ? 0.62 : 1 }]} testID="draft-row">
       <View style={styles.rowTop}>
         {onOpen ? (
-          <Pressable
-            style={styles.open}
-            onPress={() => onOpen(player)}
-            accessibilityRole="button"
-            accessibilityLabel={`${player.name}, ${player.pos}. Open player details`}
-          >
+          <Pressable style={styles.open} onPress={() => onOpen(player)} accessibilityRole="button" accessibilityLabel={`${player.name}, ${player.pos}. Open player details`}>
             {identity}
           </Pressable>
         ) : (
@@ -130,13 +125,18 @@ export function SimDraftRow({ player, pickNo, onOpen, actions }: { player: SimGa
         {actions ? <View style={styles.actions}>{actions}</View> : null}
       </View>
       <View style={styles.statsRow}>
-        <AppText style={styles.stat}>{simFmtPts(player.projection)}</AppText>
+        <AppText style={styles.stat} accessibilityHint={proj.discounted ? 'Per-game projection when healthy. Out or on bye this week.' : undefined}>
+          {simFmtPts(proj.value)}
+        </AppText>
         <AppText style={styles.stat}>{simFmtValue(player.value)}</AppText>
         <AppText style={styles.stat}>{simFmtValue(player.adp)}</AppText>
         <View style={styles.statCell}>
           {delta ? (
-            <AppText style={[styles.deltaText, { color: simToneColor(delta.tone, colors) }]}>
-              {delta.tone === 'success' ? '▲' : '▼'} {delta.label.replace('-', '')}
+            <AppText
+              style={[styles.deltaText, { color: simToneColor(delta.tone, colors) }]}
+              accessibilityLabel={delta.tone === 'success' ? `Steal, ${Math.abs(delta.delta)} spots` : `Reach, ${Math.abs(delta.delta)} spots`}
+            >
+              {delta.tone === 'success' ? '▲' : '▼'} {Math.abs(delta.delta)}
             </AppText>
           ) : null}
         </View>
@@ -149,7 +149,6 @@ export function SimDraftRow({ player, pickNo, onOpen, actions }: { player: SimGa
 export function SimDraftBoard({
   gameId,
   positions,
-  pickNo,
   onOpen,
   actions,
   refreshKey = 0,
@@ -157,7 +156,6 @@ export function SimDraftBoard({
 }: {
   gameId: string;
   positions: SimPos[];
-  pickNo: number;
   onOpen: (player: SimGamePlayer) => void;
   actions?: (player: SimGamePlayer) => ReactNode;
   refreshKey?: number;
@@ -173,6 +171,11 @@ export function SimDraftBoard({
   const [total, setTotal] = useState(0);
   const [state, setState] = useState<'loading' | 'ready' | 'error'>('loading');
   const [attempt, setAttempt] = useState(0);
+  // A new page or filter starts at the top window again (the window is keyed to the filter).
+  const windowKey = [filter.page, filter.pos, filter.sort, filter.q, filter.status].join('|');
+  const [win, setWin] = useState({ key: windowKey, n: SIM_WINDOW_STEP });
+  const visible = win.key === windowKey ? win.n : SIM_WINDOW_STEP;
+  const rows = simWindow(items, visible);
 
   useEffect(() => {
     dispatch({ type: 'q', value: debounced });
@@ -251,9 +254,17 @@ export function SimDraftBoard({
             <AppText style={styles.headerCell}>ADP</AppText>
             <AppText style={styles.headerCell}>Edge</AppText>
           </View>
-          {items.map((player) => (
-            <SimDraftRow key={player.id} player={player} pickNo={pickNo} onOpen={onOpen} actions={actions ? actions(player) : null} />
+          <AppText style={styles.scaleNote}>Value is the model's 0-100 scale (top player = 100). Edge: green = steal, red = reach.</AppText>
+          {rows.shown.map((player) => (
+            <SimDraftRow key={player.id} player={player} onOpen={onOpen} actions={actions ? actions(player) : null} />
           ))}
+          {rows.remaining > 0 ? (
+            <Pressable onPress={() => setWin({ key: windowKey, n: visible + SIM_WINDOW_STEP })} accessibilityRole="button" style={styles.showMore}>
+              <AppText style={styles.showMoreText}>
+                Show {Math.min(SIM_WINDOW_STEP, rows.remaining)} more on this page ({rows.remaining} left)
+              </AppText>
+            </Pressable>
+          ) : null}
         </View>
       )}
       <SimPager page={filter.page} pages={simPageCount(total, SIM_PAGE_SIZE)} onPage={(page) => dispatch({ type: 'page', value: page })} />
@@ -262,11 +273,11 @@ export function SimDraftBoard({
 }
 
 function createStyles(colors: ThemeColors) {
-  const indent = 4 + spacing.sm + BADGE_W + spacing.sm + AVATAR + spacing.sm;
+  const pad = spacing.sm;
   return StyleSheet.create({
     iconButton: {
-      width: 44,
-      height: 44,
+      width: 40,
+      height: 40,
       borderRadius: radii.md,
       alignItems: 'center',
       justifyContent: 'center',
@@ -276,28 +287,30 @@ function createStyles(colors: ThemeColors) {
     row: {
       borderLeftWidth: 4,
       paddingLeft: spacing.sm,
-      paddingVertical: spacing.sm,
-      gap: spacing.xs,
+      paddingRight: spacing.xs,
+      paddingBottom: 2,
       borderBottomWidth: StyleSheet.hairlineWidth,
       borderBottomColor: colors.border,
     },
-    rowTop: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: spacing.sm },
-    open: { flex: 1, minWidth: 0, minHeight: 44, justifyContent: 'center' },
+    rowTop: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: spacing.xs },
+    open: { flex: 1, minWidth: 0, minHeight: 40, justifyContent: 'center' },
     identity: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, minWidth: 0 },
     badgeSlot: { width: BADGE_W, alignItems: 'center' },
     avatarSlot: { width: AVATAR, height: AVATAR, alignItems: 'center', justifyContent: 'center' },
-    nameCol: { flex: 1, minWidth: 0, gap: 2 },
-    name: { fontSize: 15, fontWeight: '700', color: colors.textPrimary },
-    metaRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs, minHeight: 18, flexWrap: 'wrap' },
-    teamTag: { borderRadius: radii.pill, borderWidth: StyleSheet.hairlineWidth, borderColor: colors.borderStrong, paddingHorizontal: 6 },
-    teamTagText: { fontSize: 12, fontWeight: '800', color: colors.textSecondary },
-    actions: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs },
-    statsRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, paddingLeft: indent - 4 - spacing.sm },
-    stat: { width: STAT_W, textAlign: 'right', fontSize: 13, fontWeight: '700', color: colors.textPrimary, fontVariant: ['tabular-nums'] },
-    statCell: { width: STAT_W, alignItems: 'flex-end', minHeight: 16 },
+    nameRow: { flex: 1, minWidth: 0, flexDirection: 'row', alignItems: 'center', gap: 6 },
+    name: { flexShrink: 1, minWidth: 0, fontSize: 14, fontWeight: '700', color: colors.textPrimary },
+    teamTag: { flexShrink: 0, borderRadius: radii.pill, borderWidth: StyleSheet.hairlineWidth, borderColor: colors.borderStrong, paddingHorizontal: 6 },
+    teamTagText: { fontSize: 12, fontWeight: '800', textTransform: 'uppercase', color: colors.textSecondary },
+    actions: { flexShrink: 0, flexDirection: 'row', alignItems: 'center', gap: spacing.xs },
+    statsRow: { flexDirection: 'row', alignItems: 'center', paddingBottom: 2 },
+    stat: { flex: 1, minWidth: 0, textAlign: 'center', fontSize: 12, fontWeight: '600', color: colors.textPrimary, fontVariant: ['tabular-nums'] },
+    statCell: { flex: 1, minWidth: 0, alignItems: 'center', minHeight: 16 },
     deltaText: { fontSize: 12, fontWeight: '800', fontVariant: ['tabular-nums'] },
-    headerRow: { flexDirection: 'row', gap: spacing.sm, paddingLeft: indent, paddingTop: spacing.xs },
-    headerCell: { width: STAT_W, textAlign: 'right', fontSize: 12, fontWeight: '800', textTransform: 'uppercase', color: colors.textTertiary },
+    headerRow: { flexDirection: 'row', paddingLeft: pad + 4, paddingRight: spacing.xs, paddingTop: spacing.xs },
+    headerCell: { flex: 1, minWidth: 0, textAlign: 'center', fontSize: 12, fontWeight: '800', textTransform: 'uppercase', color: colors.textTertiary },
+    scaleNote: { fontSize: 12, color: colors.textTertiary, paddingBottom: 2 },
+    showMore: { minHeight: 44, alignItems: 'center', justifyContent: 'center' },
+    showMoreText: { fontSize: 14, fontWeight: '800', color: colors.accent },
     searchIcon: { position: 'absolute', left: 12, top: 13, zIndex: 1 },
     searchInput: { paddingLeft: 38 },
   });

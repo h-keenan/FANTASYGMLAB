@@ -87,13 +87,13 @@ export function ReviewCardView({ card }: { card: ReviewCard }) {
   const color = simToneColor(card.tone);
   return (
     <AccentCard accent={color} compact as="div" data-testid="review-card">
-      <div className="flex items-start gap-2">
+      <div className="flex flex-wrap items-start gap-2">
         <ReviewGlyphChip glyph={card.glyph} tone={card.tone} />
-        <div className="flex min-w-0 flex-1 flex-col">
+        <div className="flex min-w-[9rem] flex-1 flex-col">
           <span className="text-xs uppercase font-extrabold" style={{ color, letterSpacing: "var(--letter-spacing-badge)" }}>{card.label}</span>
           <p className="text-sm font-bold break-words">{card.headline}</p>
         </div>
-        <div className="flex shrink-0 flex-col items-end gap-1">
+        <div className="ml-auto flex shrink-0 flex-col items-end gap-1">
           {card.delta ? <ReviewDeltaText text={card.delta.text} tone={card.delta.tone} /> : null}
           {card.chip ? <ToneBadge label={card.chip.label} color={simToneColor(card.chip.tone)} size="xs" /> : null}
         </div>

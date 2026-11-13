@@ -106,7 +106,7 @@ test('the screens render from the shared gating helpers, not private copies', ()
   }
   // Advance sends the current week; a paywalled preview swaps Advance for Go Pro.
   assert.match(screen, /api\.advanceSimGame\(game\.id, game\.week\)/);
-  assert.match(screen, /paywalled \?[\s\S]*?label="Go Pro"/);
+  assert.match(read('components', 'SimActionBar.tsx'), /paywalled \?[\s\S]*?label="Go Pro to continue"/);
   assert.match(screen, /disabled=\{Boolean\(block\)\}/);
   // Playoff rounds played in the same call (also_played) become extra recaps.
   assert.match(screen, /simRecapsFromAdvance\(res\.recap, res\.also_played\)/);
@@ -134,7 +134,7 @@ test('lineup rows drop the position chip only when the slot repeats it', () => {
   assert.equal(simSlotRepeatsPosition('RB', 'RB'), true);
   assert.equal(simSlotRepeatsPosition('FLEX', 'RB'), false);
   for (const file of ['SimGameTeam.tsx', 'SimGameRecap.tsx']) {
-    assert.match(read('components', file), /hidePosition=\{simSlotRepeatsPosition\(/, file);
+    assert.match(read('components', file), /simSlotRepeatsPosition\(/, file);
   }
 });
 

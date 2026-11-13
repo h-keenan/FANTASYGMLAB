@@ -7,6 +7,7 @@ import Button from './Button';
 import ErrorState from './ErrorState';
 import PositionBadge from './PositionBadge';
 import SimGlyph from './SimGlyph';
+import SegmentedTabBar from './SegmentedTabBar';
 import { SkeletonCard } from './SkeletonBlock';
 import {
   SimByeCard,
@@ -20,6 +21,7 @@ import {
 import { SimMiniPlayer, SimSectionTitle, SimTeamLink, SimToneBadge, createSimStyles, simToneColor, type SimCtx } from './SimGameParts';
 import { ClaimSheet } from './SimGameTeam';
 import ToneBadge from './ToneBadge';
+import { useSimAutoSet } from './useSimAutoSet';
 import { useThemeMode } from '../context/ThemeModeContext';
 import { api } from '../lib/api';
 import {
@@ -37,6 +39,7 @@ import {
   type SimWaiverClaim,
 } from '../lib/simGame';
 import type { SimTab } from '../lib/simGameFlow';
+import { SIM_HOME_VIEWS, type SimHomeView } from '../lib/simLayout';
 import { radii, spacing, type ThemeColors } from '../theme';
 
 /**
@@ -55,6 +58,7 @@ export function SimHomeTab({ ctx, setClaims, onTab }: { ctx: SimCtx; setClaims: 
   const [attempt, setAttempt] = useState(0);
   const [claiming, setClaiming] = useState<{ player: SimGamePlayer; roster: SimGamePlayer[] } | null>(null);
   const teamId = ctx.game.you?.team_id;
+  const [view, setView] = useState<SimHomeView>('week');
 
   useEffect(() => {
     let cancelled = false;
@@ -75,6 +79,15 @@ export function SimHomeTab({ ctx, setClaims, onTab }: { ctx: SimCtx; setClaims: 
       cancelled = true;
     };
   }, [gameId, ctx.tick, attempt]);
+
+  // Auto-set best lineup (shared hook): names the swap in a toast; the matchup card refreshes in place.
+  const auto = useSimAutoSet(ctx, (applied) =>
+    setHome((prev) =>
+      prev?.matchup
+        ? { ...prev, matchup: { ...prev.matchup, you_projection: applied.projected_total ?? prev.matchup.you_projection, rows: prev.matchup.rows.map((row, i) => ({ ...row, you: applied.slots?.[i]?.player ?? row.you })) } }
+        : prev,
+    ),
+  );
 
   async function claim(player: SimGamePlayer) {
     let roster: SimGamePlayer[] = [];
@@ -103,17 +116,30 @@ export function SimHomeTab({ ctx, setClaims, onTab }: { ctx: SimCtx; setClaims: 
   if (!home) return <SkeletonCard rows={6} />;
 
   const names = Object.fromEntries((home.standings?.rows ?? []).map((r) => [r.team_id, r.name]));
+  const inboxCount = home.inbox?.count ?? 0;
   return (
     <View style={common.stack} testID="sim-home">
-      {home.matchup ? <SimMatchupCard ctx={ctx} matchup={home.matchup} onTab={onTab} /> : null}
-      <SimChecklistCard home={home} onTab={onTab} />
-      <SimByeCard ctx={ctx} alerts={home.bye_alerts ?? []} onTab={onTab} onClaim={claim} />
-      <SimWaiverCard ctx={ctx} suggestions={home.waiver_suggestions ?? []} onClaim={claim} onTab={onTab} />
-      <SimInboxCard ctx={ctx} inbox={home.inbox} onTab={onTab} />
-      <SimInjuriesCard ctx={ctx} injuries={home.injuries ?? []} />
-      <SimStandingsCard standings={home.standings} onTab={onTab} />
-      <SimHotColdCard ctx={ctx} hotCold={home.hot_cold} onClaim={claim} />
-      <SimLeagueMovesCard league={home.league} names={names} onTab={onTab} />
+      <SegmentedTabBar
+        options={SIM_HOME_VIEWS.map((v) => ({ key: v.value, label: v.value === 'week' && inboxCount > 0 ? `${v.label} · ${inboxCount}` : v.label }))}
+        active={view}
+        onChange={setView}
+      />
+      {view === 'week' ? (
+        <>
+          {home.matchup ? <SimMatchupCard ctx={ctx} matchup={home.matchup} onTab={onTab} /> : null}
+          <SimChecklistCard home={home} onTab={onTab} onAuto={home.matchup && !home.matchup.bye ? auto.run : undefined} autoBusy={auto.busy} optimal={auto.optimal} />
+          <SimInboxCard ctx={ctx} inbox={home.inbox} onTab={onTab} />
+          <SimWaiverCard ctx={ctx} suggestions={home.waiver_suggestions ?? []} onClaim={claim} onTab={onTab} />
+          <SimByeCard ctx={ctx} alerts={home.bye_alerts ?? []} onTab={onTab} onClaim={claim} />
+          <SimInjuriesCard ctx={ctx} injuries={home.injuries ?? []} />
+        </>
+      ) : (
+        <>
+          <SimStandingsCard standings={home.standings} onTab={onTab} />
+          <SimHotColdCard ctx={ctx} hotCold={home.hot_cold} onClaim={claim} />
+          <SimLeagueMovesCard league={home.league} names={names} onTab={onTab} />
+        </>
+      )}
       {claiming ? (
         <ClaimSheet
           ctx={ctx}
@@ -136,6 +162,7 @@ function SimMatchupCard({ ctx, matchup, onTab }: { ctx: SimCtx; matchup: SimHome
   const styles = useMemo(() => createStyles(colors), [colors]);
   const you = ctx.game.you;
   const opp = matchup.opponent;
+  const [showLineups, setShowLineups] = useState(false);
   if (matchup.bye || !opp) {
     return (
       <AccentCard accent={colors.warning}>
@@ -150,6 +177,7 @@ function SimMatchupCard({ ctx, matchup, onTab }: { ctx: SimCtx; matchup: SimHome
   const oppProj = matchup.opp_projection ?? 0;
   const labels = simSlotLabels(matchup.rows);
   const flagged = (matchup.you_flagged ?? 0) + (matchup.opp_flagged ?? 0);
+  const lineupsOpen = showLineups;
   return (
     <AccentCard accent={colors.accent} glow>
       <SimSectionTitle
@@ -159,12 +187,12 @@ function SimMatchupCard({ ctx, matchup, onTab }: { ctx: SimCtx; matchup: SimHome
       />
       <View style={styles.versus}>
         <View style={styles.versusSide}>
-          <SimTeamLink teamId={you?.team_id} name={you?.name ?? 'You'} isYou size={48} stacked />
+          <SimTeamLink teamId={you?.team_id} name={you?.name ?? 'You'} isYou size={36} stacked />
           <AppText style={common.muted}>{matchup.you_record ? simFmtRecord(matchup.you_record) : ''}</AppText>
         </View>
         <AppText style={styles.vs}>VS</AppText>
         <View style={styles.versusSide}>
-          <SimTeamLink teamId={opp.team_id} name={opp.name} size={48} stacked />
+          <SimTeamLink teamId={opp.team_id} name={opp.name} size={36} stacked />
           <AppText style={[common.muted, common.center]}>
             {opp.record ? simFmtRecord(opp.record) : ''} · {opp.persona.label}
           </AppText>
@@ -198,21 +226,33 @@ function SimMatchupCard({ ctx, matchup, onTab }: { ctx: SimCtx; matchup: SimHome
         </View>
       ) : null}
 
+      <Pressable
+        accessibilityRole="button"
+        accessibilityState={{ expanded: lineupsOpen }}
+        onPress={() => setShowLineups(!lineupsOpen)}
+        style={{ minHeight: 44, justifyContent: 'center', alignSelf: 'flex-start' }}
+      >
+        <AppText style={{ fontSize: 12.5, fontWeight: '800', color: colors.accent }}>{lineupsOpen ? 'Hide lineups' : `Show lineups (${matchup.rows.length} slots)`}</AppText>
+      </Pressable>
+      {lineupsOpen ? (
+        <View style={common.tight}>
       <View accessibilityLabel="Lineups head to head">
-        {matchup.rows.map((row, index) => {
-          const edge = simRowEdge(row);
-          return (
-            <View key={`${row.slot}-${index}`} style={styles.slotRow}>
-              <Side player={row.you} win={edge === 'you'} lose={edge === 'opp'} align="left" ctx={ctx} />
-              <View style={styles.slotMid}>
-                <PositionBadge position={row.slot} label={labels[index]} />
+          {matchup.rows.map((row, index) => {
+            const edge = simRowEdge(row);
+            return (
+              <View key={`${row.slot}-${index}`} style={styles.slotRow}>
+                <Side player={row.you} win={edge === 'you'} lose={edge === 'opp'} align="left" ctx={ctx} />
+                <View style={styles.slotMid}>
+                  <PositionBadge position={row.slot} label={labels[index]} />
+                </View>
+                <Side player={row.opp} win={edge === 'opp'} lose={edge === 'you'} align="right" ctx={ctx} />
               </View>
-              <Side player={row.opp} win={edge === 'opp'} lose={edge === 'you'} align="right" ctx={ctx} />
-            </View>
-          );
-        })}
-      </View>
-      <AppText style={common.muted}>Their lineup is what their manager will start. Projections update when injuries or byes change.</AppText>
+            );
+          })}
+        </View>
+        <AppText style={common.muted}>Their lineup is what their manager will start. Projections update when injuries or byes change.</AppText>
+        </View>
+      ) : null}
     </AccentCard>
   );
 }
@@ -238,7 +278,7 @@ function Side({ player, win, lose, align, ctx }: { player: SimGamePlayer | null;
   );
 }
 
-function SimChecklistCard({ home, onTab }: { home: SimHomeResponse; onTab: (tab: SimTab) => void }) {
+function SimChecklistCard({ home, onTab, onAuto, autoBusy = false, optimal = false }: { home: SimHomeResponse; onTab: (tab: SimTab) => void; onAuto?: () => void; autoBusy?: boolean; optimal?: boolean }) {
   const { colors } = useThemeMode();
   const common = useMemo(() => createSimStyles(colors), [colors]);
   const styles = useMemo(() => createStyles(colors), [colors]);
@@ -252,6 +292,9 @@ function SimChecklistCard({ home, onTab }: { home: SimHomeResponse; onTab: (tab:
       <View style={styles.thinTrack}>
         <View style={[styles.thinFill, { width: total ? `${(done / total) * 100}%` : '0%', backgroundColor: accent }]} />
       </View>
+      {onAuto ? (
+        <Button label={optimal ? 'Lineup is optimal' : 'Auto-set best lineup'} variant="secondary" loading={autoBusy} disabled={optimal} onPress={onAuto} />
+      ) : null}
       {items.map((item, index) => {
         const color = simToneColor(simChecklistTone(item.severity), colors);
         return (
@@ -262,7 +305,7 @@ function SimChecklistCard({ home, onTab }: { home: SimHomeResponse; onTab: (tab:
               </View>
               <View style={common.grow}>
                 <AppText style={[common.bodyStrong, item.done && { color: colors.textTertiary, textDecorationLine: 'line-through' }]}>{item.label}</AppText>
-                <AppText style={common.small}>{item.detail}</AppText>
+                {item.done ? null : <AppText style={common.small}>{item.detail}</AppText>}
               </View>
               <SimToneBadge label={item.done ? 'Done' : item.severity === 'danger' ? 'Fix' : item.severity === 'accent' ? 'New' : 'To do'} tone={item.done ? 'success' : simChecklistTone(item.severity)} />
             </AccentTap>

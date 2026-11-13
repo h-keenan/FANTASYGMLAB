@@ -77,7 +77,19 @@ function insideTradeAnalyzer(): boolean {
   return isTradeAnalyzerRoute(route?.name, (route?.params as { initialTab?: string } | undefined)?.initialTab);
 }
 
-export default function PlayerQuickViewSheet({ request, onClose }: { request: QuickViewRequest; onClose: () => void }) {
+export default function PlayerQuickViewSheet({
+  request,
+  onClose,
+  simOverlay,
+  remote = true,
+}: {
+  request: QuickViewRequest;
+  onClose: () => void;
+  /** Fantasy Sim: game-specific sections rendered right under the hero (mirrors web PlayerQuickView). Omit everywhere else. */
+  simOverlay?: React.ReactNode;
+  /** false for a synthetic sim player with no real data behind the id: same layout, no remote fetches. */
+  remote?: boolean;
+}) {
   const { colors, isDark } = useThemeMode();
   const styles = useMemo(() => createStyles(colors), [colors]);
   const { openPlayer } = usePlayerQuickView();
@@ -88,11 +100,13 @@ export default function PlayerQuickViewSheet({ request, onClose }: { request: Qu
   const detailQuery = useQuery({
     queryKey: queryKeys.playerQuickView(player.player_id),
     queryFn: () => api.getPlayerQuickView(player.player_id),
+    enabled: remote,
   });
   const awardsQuery = useQuery({
     queryKey: [...queryKeys.playerQuickView(player.player_id), 'awards'],
     queryFn: () => api.getPlayerAwards(player.player_id),
     staleTime: 5 * 60 * 1000,
+    enabled: remote,
   });
 
   // Value history (daily rating snapshots) is lazy and never gates the sheet.
@@ -139,7 +153,7 @@ export default function PlayerQuickViewSheet({ request, onClose }: { request: Qu
 
   const [fallback, setFallback] = useState<QuickViewLeague | null>(null);
   useEffect(() => {
-    if (request.league) return;
+    if (request.league || !remote) return;
     let cancelled = false;
     void getLastLeague().then((last) => {
       if (!cancelled && last) setFallback({ leagueId: last.leagueId, leagueName: last.leagueName });
@@ -147,7 +161,7 @@ export default function PlayerQuickViewSheet({ request, onClose }: { request: Qu
     return () => {
       cancelled = true;
     };
-  }, [request.league]);
+  }, [request.league, remote]);
 
   const detail = detailQuery.data ?? null;
   const resolved = detail?.identity ?? null;
@@ -169,7 +183,7 @@ export default function PlayerQuickViewSheet({ request, onClose }: { request: Qu
   // League-less opens (News) borrow the last-used league for the trade
   // shortcuts too, same as Full Profile; none known means no actions.
   const actionsLeague = request.league ?? fallback;
-  const loading = detailQuery.isPending;
+  const loading = remote && detailQuery.isPending;
 
   const openWaivers = () => {
     if (!request.league) return;
@@ -289,6 +303,8 @@ export default function PlayerQuickViewSheet({ request, onClose }: { request: Qu
               {mismatch ? <AppText style={styles.note}>{mismatch}</AppText> : null}
             </PlayerHero>
 
+            {simOverlay}
+
             {availability ? (
               <AvailabilityBlock
                 availability={availability}
@@ -296,7 +312,7 @@ export default function PlayerQuickViewSheet({ request, onClose }: { request: Qu
                 newsLoading={newsLoading}
               />
             ) : null}
-            {detail ? (
+            {detail && remote ? (
               <LatestNewsSection
                 items={newsQuery.data ? newsQuery.data.items : null}
                 loading={newsLoading}
@@ -312,7 +328,7 @@ export default function PlayerQuickViewSheet({ request, onClose }: { request: Qu
                 <SkeletonBlock height={90} />
                 <SkeletonBlock height={90} />
               </View>
-            ) : detailQuery.isError || !detail ? (
+            ) : !remote ? null : detailQuery.isError || !detail ? (
               <AppText style={styles.muted}>Couldn&apos;t load this player&apos;s detail right now.</AppText>
             ) : (
               <View style={styles.body}>
@@ -368,7 +384,7 @@ export default function PlayerQuickViewSheet({ request, onClose }: { request: Qu
             {/* Actions row (web .pqv-actions): league actions, then the
                 profile / waivers destinations. */}
             <View style={styles.actions}>
-              {actionsLeague ? (
+              {actionsLeague && remote ? (
                 <PlayerLeagueActions
                   player={player}
                   leagueId={actionsLeague.leagueId}
@@ -381,7 +397,7 @@ export default function PlayerQuickViewSheet({ request, onClose }: { request: Qu
                 {onWaivers ? (
                   <Button label="View on Waivers" variant="secondary" onPress={openWaivers} style={styles.actionButton} />
                 ) : null}
-                {target ? <Button label="Open Full Profile" onPress={openFullProfile} style={styles.actionButton} /> : null}
+                {target && remote ? <Button label="Open Full Profile" onPress={openFullProfile} style={styles.actionButton} /> : null}
               </View>
             </View>
             <ValuesCredit />

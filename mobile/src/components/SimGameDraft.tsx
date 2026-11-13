@@ -211,7 +211,6 @@ export function SimGameDraft({ ctx, onComplete }: { ctx: SimCtx; onComplete: (re
     <SimDraftBoard
       gameId={gameId}
       positions={simPositionsFor(game.settings.slots)}
-      pickNo={draft.pick_no}
       onOpen={ctx.openPlayer}
       actions={boardActions}
       refreshKey={ctx.tick}
