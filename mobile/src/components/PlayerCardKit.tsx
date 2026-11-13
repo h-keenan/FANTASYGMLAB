@@ -394,7 +394,7 @@ function createStyles(colors: ThemeColors) {
     muted: { fontSize: 12.5, color: colors.textTertiary },
     stat: { alignItems: 'flex-end' },
     statValue: { fontSize: 15, fontWeight: '800', color: colors.textPrimary, fontVariant: ['tabular-nums'] },
-    statLabel: { fontSize: 11, fontWeight: '700', letterSpacing: 0.6, color: colors.textTertiary, textTransform: 'uppercase' },
+    statLabel: { fontSize: 12, fontWeight: '700', letterSpacing: 0.6, color: colors.textTertiary, textTransform: 'uppercase' },
     tileTop: { flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between' },
     points: { fontSize: 22, fontWeight: '800', lineHeight: 24 },
     trendRow: { flexDirection: 'row', alignItems: 'center', gap: 2 },
