@@ -43,12 +43,13 @@ export function SimGameHeader({ game, onHub, onTeam, onMore, bell }: { game: Sim
           type="button"
           className="sim-team-chip"
           onClick={() => you.team_id && onTeam(you.team_id)}
-          aria-label={`Your team: ${you.name}, ${simFmtRecord(you)}. Open team`}
           data-testid="sim-team-chip"
         >
           <SimCrest name={you.name} size={20} />
           <span className="min-w-0 flex-1 break-words text-xs font-bold">{you.name}</span>
+          {" "}
           <span className="shrink-0 text-xs tabular-nums" style={{ color: "var(--color-text-muted)" }}>{simFmtRecord(you)}</span>
+          <span className="sr-only">. Your team, open team</span>
         </button>
       ) : (
         <span className="flex-1" />

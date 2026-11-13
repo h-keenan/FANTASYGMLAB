@@ -113,9 +113,9 @@ export function SimWaiverCard({ ctx, suggestions, onClaim, onTab }: { ctx: SimCt
           {shown.map((s) => (
             <li key={s.player.id} className="flex flex-col gap-1" data-testid="waiver-suggestion">
               <div className="flex items-center justify-between gap-2">
-                <button type="button" className="min-w-0 flex-1 text-left" onClick={() => ctx.openPlayer(s.player)} aria-label={`${s.player.name}, ${s.player.pos}. Open player details`}>
+                <button type="button" className="min-w-0 flex-1 text-left" style={{ minHeight: "var(--touch-target-min)" }} onClick={() => ctx.openPlayer(s.player)}>
                   <SimPlayerChip player={s.player} size={32} />
-                </button>
+                <span className="sr-only">. Open player details</span></button>
                 <span className="flex shrink-0 flex-col items-end leading-tight">
                   <SimTrend delta={Math.max(s.gain_now, s.gain_ros)} />
                   <span className="text-[0.6875rem]" style={{ color: "var(--color-text-muted)" }}>{s.gain_now >= s.gain_ros ? "this week" : "per week"}</span>
@@ -205,9 +205,9 @@ export function SimInjuriesCard({ ctx, injuries }: { ctx: SimCtx; injuries: SimH
         <ul className="flex flex-col gap-2" aria-label="Injuries on your roster">
           {list.map((i) => (
             <li key={i.player.id} className="flex items-center justify-between gap-2" data-testid="home-injury">
-              <button type="button" className="min-w-0 flex-1 text-left" onClick={() => ctx.openPlayer(i.player)} aria-label={`${i.player.name}, ${i.player.pos}. Open player details`}>
+              <button type="button" className="min-w-0 flex-1 text-left" style={{ minHeight: "var(--touch-target-min)" }} onClick={() => ctx.openPlayer(i.player)}>
                 <SimPlayerChip player={i.player} size={28} />
-              </button>
+              <span className="sr-only">. Open player details</span></button>
               <span className="flex shrink-0 flex-col items-end gap-1">
                 <SimToneBadge label={`Out ${i.out_weeks} wk`} tone="danger" />
                 <span className="text-[0.6875rem]" style={{ color: i.starting ? "var(--color-warning)" : "var(--color-text-muted)" }}>{i.starting ? "In your lineup" : i.note}</span>

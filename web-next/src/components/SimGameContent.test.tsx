@@ -151,7 +151,7 @@ describe("SimGameContent", () => {
     fireEvent.click(await screen.findByText(/Make an offer/));
     expect(await screen.findByText("Not available at this stage.")).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "Try again" }));
-    expect(await screen.findByRole("button", { name: "Trade with Rival Rovers" })).toBeInTheDocument();
+    expect(await screen.findByRole("button", { name: /Rival Rovers.*Trade with this team/ })).toBeInTheDocument();
   });
 
   it("Home's Auto-set best lineup names the swap and refreshes the matchup, then says when it is optimal", async () => {
@@ -333,7 +333,7 @@ describe("SimGameContent", () => {
     mocked.advanceSimGame.mockResolvedValue(premiumBody);
     render(<SimGameContent />);
     await openFirstGame();
-    fireEvent.click(await screen.findByRole("button", { name: "Advance to week 4" }));
+    fireEvent.click(await screen.findByRole("button", { name: /Advance to week 4/ }));
     expect(await screen.findByTestId("sim-paywall")).toHaveTextContent("Pro unlocks the rest of the season.");
     expect(mocked.advanceSimGame).toHaveBeenCalledWith("g1", 3);
     expect(screen.getByTestId("sim-home")).toBeInTheDocument();
@@ -347,7 +347,7 @@ describe("SimGameContent", () => {
     mocked.getSimGame.mockResolvedValue({ ok: true, reason: "", game: over });
     render(<SimGameContent />);
     await openFirstGame();
-    fireEvent.click(await screen.findByRole("button", { name: "Advance to week 5" }));
+    fireEvent.click(await screen.findByRole("button", { name: /Advance to week 5/ }));
     expect(await screen.findAllByText(/Cut 2 players/)).not.toHaveLength(0);
     expect(mocked.advanceSimGame).not.toHaveBeenCalled();
   });
@@ -359,7 +359,7 @@ describe("SimGameContent", () => {
     await openFirstGame();
     const bar = await screen.findByTestId("sim-action-bar");
     expect(await screen.findByTestId("sim-advance-warning")).toHaveTextContent("RB will score 0");
-    const advanceBtn = screen.getByRole("button", { name: "Advance to week 5" });
+    const advanceBtn = screen.getByRole("button", { name: /Advance to week 5/ });
     expect(advanceBtn).not.toBeDisabled();
     fireEvent.click(advanceBtn);
     expect(await screen.findByTestId("sim-advance-confirm")).toHaveTextContent("RB is empty and will score 0");
@@ -378,7 +378,7 @@ describe("SimGameContent", () => {
     });
     render(<SimGameContent />);
     await openFirstGame();
-    fireEvent.click(await screen.findByRole("button", { name: "Advance to week 5" }));
+    fireEvent.click(await screen.findByRole("button", { name: /Advance to week 5/ }));
     // The recap is a full-screen story: Result first, Next week last (this recap has no starters, scores or injuries).
     const story = await screen.findByTestId("week-recap-story");
     expect(story).toHaveAttribute("aria-label", "Week 4 recap");
@@ -456,7 +456,7 @@ describe("SimGameContent", () => {
     mocked.advanceSimGame.mockRejectedValue(Object.assign(new Error("Request failed with status 409."), { status: 409 }));
     render(<SimGameContent />);
     await openFirstGame();
-    fireEvent.click(await screen.findByRole("button", { name: "Advance to week 5" }));
+    fireEvent.click(await screen.findByRole("button", { name: /Advance to week 5/ }));
     expect(await screen.findByText(/game changed somewhere else/)).toBeInTheDocument();
     await waitFor(() => expect(mocked.getSimGame.mock.calls.length).toBeGreaterThan(1));
   });

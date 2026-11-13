@@ -122,7 +122,6 @@ export function SimScoreCard({ g, names, youId, onOpen }: { g: SimRecapScore; na
       type="button"
       onClick={onOpen}
       className="w-full text-left"
-      aria-label={`${names[g.home] ?? "Team"} ${left.pts == null ? "" : simFmtPts(left.pts)} versus ${names[g.away] ?? "Team"} ${right.pts == null ? "" : simFmtPts(right.pts)}. ${status.label}. Open matchup`}
       data-testid="sim-score-card"
     >
       <AccentCard accent={mine ? simToneColor(mineTone) : "var(--color-border-strong)"} compact as="div">
@@ -138,6 +137,7 @@ export function SimScoreCard({ g, names, youId, onOpen }: { g: SimRecapScore; na
           {team(right)}
         </div>
       </AccentCard>
+      <span className="sr-only">. Open matchup</span>
     </button>
   );
 }

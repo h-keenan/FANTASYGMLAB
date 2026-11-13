@@ -149,7 +149,7 @@ export function PillRow({
   // Five or more icon tabs in a fill row split the width equally (min-w-0) so they fit a phone.
   const equalFit = mode === "fill" && anyIcon && options.length >= 5;
   const segment =
-    mode === "fill" ? (equalFit ? "flex-1 min-w-0" : "flex-1 min-w-fit") : "shrink-0";
+    mode === "fill" ? (equalFit ? "flex-1 min-w-0" : "flex-1 min-w-fit") : "shrink-0 min-w-[var(--touch-target-min)]";
 
   return (
     <div

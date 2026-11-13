@@ -60,7 +60,9 @@ describe("route ownership", () => {
 import { simOrbAriaLabel } from "./bottomNav";
 describe("game orb label", () => {
   it("adds pending offers to the name", () => {
-    expect(simOrbAriaLabel("Home", 0)).toBe("Game menu, Home");
-    expect(simOrbAriaLabel("Home", 1)).toBe("Game menu, Home. 1 trade offer waiting");
+    expect(simOrbAriaLabel("Home", 0)).toBe("Home. Game menu");
+    // The name starts with what the orb shows (page, then badge): WCAG 2.5.3 Label in Name.
+    expect(simOrbAriaLabel("Home", 1)).toBe("Home 1. Game menu, 1 trade offer waiting");
+    expect(simOrbAriaLabel("Home", 12)).toBe("Home 9+. Game menu, 12 trade offers waiting");
   });
 });
