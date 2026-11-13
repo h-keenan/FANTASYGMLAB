@@ -432,15 +432,157 @@ def exploit_probe(seeds: int = 3, mode: str = "dynasty", objective: str = "asset
     return {"mode": mode, "objective": objective, "runs": out}
 
 
+# ----------------------------------------------------------------- 20-season exploit bots
+
+
+def exploit_long(strategy: str, seed: int, n_seasons: int = 20, trade_weeks: int = 4, per_week: int = 2) -> dict[str, Any]:
+    """One user bot against the AI league for a whole dynasty (12 teams, 3 rookie rounds, player-model default, ai_v default).
+
+    ``balanced``: auto lineup, auto rookie draft, nothing else. ``stacker``: every early week, up to ``per_week`` AI-accepted 1-for-1 trades that raise
+    its asset value (market / long-horizon value of players plus pick value). ``hoarder``: the same but only trades that bring back a pick.
+    ``churn``: waiver claims every week (best free agent by dynasty value for the weakest bench player), no trades. ``lineup``: AI-accepted trades that
+    raise its lineup. Reports per season: wins, rank, title, asset value and its share of the league's, pick count, plus league-wide asset totals."""
+
+    from modules.sim import game_actions as act
+    from modules.sim.game_ai import TradeDesk
+    from modules.sim.game_eval import USER_PARAMS
+    from modules.sim.game_types import GameError
+
+    model_id = game_scoring.default_model().model_id
+    pool, byes = tail_report.pool_from_panel(dataset.load_panel())
+    base = GameSettings.parse({"mode": "dynasty", "teams": 12, "user_slot": 4, "start_year": 2026, "seasons": 5, "rookie_rounds": 3, "scoring": "ppr"})
+    settings = replace(base, seasons=n_seasons)
+    root = build_snapshot(pool, byes, settings, seed, scoring_model=model_id)
+    state = GameState(root)
+    em = Emitter(state, root)
+    auto_for_user(DraftContext(root, state), em, seed)
+    finish_draft(em, root, state, seed)
+    user = root.user_team.tid
+    rows: list[dict[str, Any]] = []
+
+    def value_of(ev, snap, pid):
+        return ev.base_value(pid) if pid in snap.players else ev.pick_value(pid)
+
+    def team_assets(ev, snap, tid):
+        return sum(value_of(ev, snap, p) for p in [*state.holdings(tid), *state.picks_of(tid)])
+
+    def trade_loop(snap, sd):
+        for _ in range(per_week):
+            ev = Evaluator(snap, state)
+            desk = TradeDesk(ev, sd, state.week)
+            best = None
+            lineup0 = ev.lineup_total(state.rosters[user])
+            mine = sorted(desk.tradable(user), key=lambda p: value_of(ev, snap, p))[:8]
+            for tid in snap.tids:
+                if tid == user:
+                    continue
+                theirs = sorted(desk.tradable(tid), key=lambda p: -value_of(ev, snap, p))[:8]
+                if strategy == "farmer":  # consolidation and spreading: two for one, one for two, judged on the sum of neutral values
+                    for i in range(len(mine)):
+                        for j in range(i + 1, len(mine)):
+                            for get in theirs[:5]:
+                                give2 = [mine[i], mine[j]]
+                                if desk.ai_accepts(tid, give2, [get])[0]:
+                                    gain = value_of(ev, snap, get) - sum(value_of(ev, snap, g) for g in give2)
+                                    if best is None or gain > best[0]:
+                                        best = (gain, tid, give2, [get])
+                    for give in mine[:4]:
+                        for a2 in range(min(5, len(theirs))):
+                            for b2 in range(a2 + 1, min(5, len(theirs))):
+                                get2 = [theirs[a2], theirs[b2]]
+                                if desk.ai_accepts(tid, [give], get2)[0]:
+                                    gain = sum(value_of(ev, snap, g) for g in get2) - value_of(ev, snap, give)
+                                    if best is None or gain > best[0]:
+                                        best = (gain, tid, [give], get2)
+                for give in mine:
+                    for get in theirs:
+                        if strategy == "hoarder" and get in snap.players:
+                            continue
+                        if not desk.ai_accepts(tid, [give], [get])[0]:
+                            continue
+                        if strategy == "lineup":
+                            gain = ev.lineup_total([p for p in state.rosters[user] if p != give] + ([get] if get in snap.players else [])) - lineup0
+                        else:
+                            gain = value_of(ev, snap, get) - value_of(ev, snap, give)
+                        if best is None or gain > best[0]:
+                            best = (gain, tid, [give], [get])
+            if best is None or best[0] <= (0.2 if strategy == "lineup" else 0.5):
+                return
+            try:
+                _, trade = act.send_trade(em, TradeDesk(Evaluator(snap, state), sd, state.week), best[1], best[2], best[3])
+            except (GameError, ValueError):
+                return
+            if trade is None:
+                return
+
+    def churn(snap):
+        ev = Evaluator(snap, state)
+        owned = state.owner_map()
+        free = sorted((p for p in snap.pids if p not in owned and snap.players[p].pos in CORE and state.out.get(p, 0) == 0), key=lambda p: -ev.base_value(p))[:6]
+        lineup_ids = {pid for _, pid in ev.best_lineup(state.rosters[user], state.week)[0] if pid}
+        bench = sorted((p for p in state.rosters[user] if p not in lineup_ids), key=lambda p: ev.base_value(p))
+        for add, drop in zip(free[:3], bench[:3]):
+            if ev.base_value(add) > ev.base_value(drop):
+                try:
+                    act.queue_claim(em, add, drop, None)
+                except (GameError, ValueError):
+                    pass
+
+    t0 = __import__("time").time()
+    while True:
+        snap = root.season_view(state.view_no)
+        sd = dyn.season_seed(seed, state.view_no)
+        em.snap = snap
+        ev = Evaluator(snap, state)
+        a0 = team_assets(ev, snap, user)
+        league0 = float(np.mean([team_assets(ev, snap, t) for t in snap.tids]))
+        while state.status in ("in_season", "playoffs"):
+            if state.status == "in_season":
+                if strategy in ("stacker", "hoarder", "lineup", "farmer") and state.week <= trade_weeks and state.week < snap.settings.trade_deadline_week:
+                    trade_loop(snap, sd)
+                if strategy == "churn":
+                    churn(snap)
+                over = len(state.rosters[user]) - snap.settings.roster_limit
+                for _ in range(max(0, over)):
+                    ev = Evaluator(snap, state)
+                    act.cut_player(em, min(state.rosters[user], key=lambda p: (ev.worth(USER_PARAMS, p), p)))
+                act.auto_lineup(em)
+            advance(em, snap, state, sd)
+        archive = state.seasons[-1] if state.seasons else None
+        you = archive["you"] if archive else {}
+        ev = Evaluator(snap, state)
+        rows.append({
+            "season": state.season_no, "wins": you.get("wins"), "rank": you.get("rank"), "title": bool(archive and archive["champion"] and archive["champion"]["is_you"]),
+            "assets_start": round(a0, 1), "assets_end": round(team_assets(ev, snap, user), 1), "league_mean_start": round(league0, 1),
+            "league_mean_end": round(float(np.mean([team_assets(ev, snap, t) for t in snap.tids])), 1),
+            "picks": len(state.picks_of(user)),
+        })
+        if state.status != "offseason":
+            break
+        snap = root.season_view(state.view_no)
+        sd = dyn.season_seed(seed, state.view_no)
+        em.snap = snap
+        dyn.start_rookie_draft(em)
+        dyn.run_ai_rookie_picks(em, sd)
+        dyn.auto_rookie_draft(em, sd)
+        while len(state.rosters[user]) > snap.settings.roster_limit:
+            ev = Evaluator(snap, state)
+            act.cut_player(em, min(state.rosters[user], key=lambda p: (ev.worth(USER_PARAMS, p), p)))
+        dyn.start_next_season(em, sd)
+    return {"strategy": strategy, "seed": seed, "seasons": rows, "wall_s": round(__import__("time").time() - t0, 1)}
+
+
 def main(argv: list[str] | None = None) -> None:
     ap = argparse.ArgumentParser(description=__doc__)
-    ap.add_argument("cmd", choices=["seasons", "dynasty", "real", "exploit"])
+    ap.add_argument("cmd", choices=["seasons", "dynasty", "real", "exploit", "exploit20"])
     ap.add_argument("--seeds", type=int, default=3)
     ap.add_argument("--shapes", default="")
     ap.add_argument("--json", default="")
     args = ap.parse_args(argv)
     if args.cmd == "real":
         res = real_yardsticks()
+    elif args.cmd == "exploit20":
+        res = exploit_long(args.shapes or "balanced", args.seeds, 20)
     elif args.cmd == "exploit":
         res = {f"{m}/{o}": exploit_probe(args.seeds, m, o) for m in ("redraft", "dynasty") for o in ("assets", "lineup")}
     elif args.cmd == "seasons":

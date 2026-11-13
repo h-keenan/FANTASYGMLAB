@@ -116,3 +116,51 @@ to farm. Pick hoarding: the pick ledger invariant held in every fuzzed dynasty g
 3. Offer a one-line UI hint when `sim-to` stops on trade offers ("Respond, or Sim anyway").
 4. Measure the dynasty youth-and-picks strategy over 10-20 seasons against a balanced manager.
 5. Run the fuzzer for a longer budget in CI nightly (`--seeds 40 --steps 400`, about 10 minutes).
+
+
+## 7. Follow-up (after #1859, #1861, #1862, #1864): low items, 20-season exploit check, re-sweep
+
+### Low items
+
+- `POST /sim-to` unknown target: now 422 with the allowed targets, `weeks` must be 1-30; trade-block entries are removed from the state when the asset leaves the team
+  (`block_v` 2, new games; `block_v` 1 saves replay as before): #1865, merged.
+- `sim-to` and pending offers: by design, not a defect. Every AI offer is generated for one week (`expires_week` is the week it is made), so an offer pending at the start of a week
+  is expiring that week; the stop is "you are about to lose this offer", `force_first` plays past it, and offers are 4-5 a season. No change.
+
+### 20-season exploit check (`realism_sweep exploit20`; 12 teams, 3 rookie rounds, 4 seeds x 20 seasons per bot = 80 seasons; every bot uses auto lineup and auto rookie draft)
+
+| bot | what it does | win rate | avg rank | titles / 80 | asset value / league mean (seasons 1-5 -> 16-20) | picks held mean / max |
+| --- | --- | --- | --- | --- | --- | --- |
+| balanced | nothing else | 0.40 | 8.1 | 1 | 0.93 -> 1.02 | 9.0 / 9 |
+| lineup trader | AI-accepted 1-for-1 trades that raise its lineup | 0.44 | 7.5 | 1 | 0.93 -> 1.00 | 9.0 / 9 |
+| waiver churn | claims the best free agent for its weakest bench player every week | 0.46 | 7.2 | 1 | 1.03 -> 1.07 | 9.0 / 9 |
+| farmer | AI-accepted 1-for-1, 2-for-1 and 1-for-2 trades that raise neutral asset value | 0.55 | 5.6 | 5 | 1.40 -> 1.55 | 4.0 / 11 |
+| pick hoarder | only trades that bring back a pick | 0.54 | 6.1 | 1 | 1.30 -> 1.73 | 14.2 / 19 |
+| stacker | up to 2 AI-accepted 1-for-1 trades a week for 4 weeks a season, maximizing neutral asset value (market / long-horizon value plus pick value) | 0.58 | 5.2 | 8 | 1.37 -> 1.62 | 11.4 / 17 |
+
+(Chance would be 0.50 wins and 6.7 titles in 80 seasons; the balanced bot is below average because it never claims anyone while the AI teams do.)
+Reading: the strongest bot gains about 18 points of win rate on the do-nothing bot, finishes about 3 places better (rank 3.8 in seasons 16-20) and holds about 1.6x the league's asset
+value, which levels off after about 10 seasons instead of compounding (1.37, 1.57, 1.64, 1.62 by five-season block). Titles stay near chance (8 in 80 against 6.7 expected). League-wide
+asset value drifts +3% over 20 seasons (768 -> 792), so the AI valuation does not inflate or deflate; nobody corners the pick market (at most 19 of the league's 108 live picks);
+waiver churn is worth about 6 points of win rate and nothing in assets. This is the persona disagreement the trade desk is built on, paid for with current-season strength, not a
+loop that grows without bound. No fair-value guard was needed or added.
+
+### Re-sweep (player-model-5, ai_v 1, dynasty_v 3, block_v 1; run just before #1865 made new games block_v 2)
+
+| check | before | now |
+| --- | --- | --- |
+| 12-team PPR team score week 13 / week 1 | 0.858 (112.9 -> 96.9) | 0.879 (110.4 -> 97.0); with injuries switched off 0.928 (112.7 -> 104.5) |
+| model-level weekly path, starters (expected mean / season mean slope per week) | -0.7% | -0.4% (real -0.2%) |
+| team score by shape (8 / 10 / 12 / 14 teams PPR) | 111.1 / 105.5 / 102.5 / 98.0 | 110.6 / 105.1 / 101.7 / 97.6 |
+| win% sd, 12 teams | 0.158 | 0.154 (all shapes 0.14-0.18) |
+| rho(points for, wins) | 0.53-0.76 | 0.59-0.79 |
+| games missed per drafted skill player / 3+ share | 1.97 / 0.29 | 1.95 / 0.29 |
+| AI empty starting slots / backup cover (redraft; dynasty) | 0.15% / 77%; 0.05% / 74% | 0.15% / 77%; 0.05% / 74% |
+| weekly scores over 40 and the largest (depth, WR, RB, QB, TE) | 0.04% 62; 0.18% 51; 0.66% 64; 0.32% 55; 0.03% 42 | unchanged |
+| projections shown over 30 / projection MAE | 0 / 4.09 | 0 / 4.08 |
+| fuzzer (16 games x 300 steps, random shapes incl. block ops) | 0 violations | 0 violations |
+
+20-season equilibrium (3 seeds, `dynasty_report`): team score 100.8 / 95.9 / 91.4 / 92.9 / 94.8 at seasons 1 / 5 / 10 / 15 / 20; top-12 QB / RB / WR / TE 24.2 / 19.4 / 18.8 / 11.4 at season 20
+(season 1: 22.3 / 18.4 / 17.1 / 11.7); kickers 30 and QBs 38 held; pool 383 -> 459; starter age 26.7; weekly over-40 share 0.2-0.4%; AI rosters 14.9 -> 15.8, kickers 1.2-1.4, about 60-90 waiver adds
+and 10-11 AI trades a season, flat. The in-season scoring decline that remains (about 12%) is injury attrition (about 5 points), byes and a residual 2-4% of path, consistent with the real data's
+attrition; it no longer comes from the model's role-change bias.
