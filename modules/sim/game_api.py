@@ -1017,6 +1017,9 @@ def add_routes(router: APIRouter, ctx: GameApiCtx) -> None:
                 return _premium(state)
             reverted = state.seq - state.boundary_seq
             if reverted > 0:
+                # A checkpoint past the boundary (a sim-to that stopped at once still writes a marker event and a checkpoint)
+                # would describe events that are about to be deleted: drop it first, as undo-sim does.
+                store.delete_checkpoints_after(uid, gid, state.boundary_seq)
                 store.delete_events_from(uid, gid, state.boundary_seq)
                 state = store.load_state(uid, gid, snap)
                 store.touch(uid, gid, status=state.status, week=state.week, event_count=state.seq)
