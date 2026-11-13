@@ -53,12 +53,12 @@ import { radii, scrim, spacing, type ThemeColors } from '../theme';
 type ExplorerTarget = { key: string; label: string };
 
 /** One web-PQV section: hairline top rule, small caps heading. */
-function Section({ title, icon, children }: { title: string; icon?: React.ComponentProps<typeof SectionHeading>['icon']; children: React.ReactNode }) {
+export function Section({ title, icon, right, children }: { title: string; icon?: React.ComponentProps<typeof SectionHeading>['icon']; right?: React.ReactNode; children: React.ReactNode }) {
   const { colors } = useThemeMode();
   const styles = useMemo(() => createStyles(colors), [colors]);
   return (
     <View style={styles.section}>
-      <SectionHeading title={title} icon={icon} />
+      <SectionHeading title={title} icon={icon} right={right} />
       {children}
     </View>
   );
@@ -263,6 +263,7 @@ export default function PlayerQuickViewSheet({
 
             <PlayerHero
               playerId={player.player_id}
+              avatarId={remote ? player.player_id : null}
               tier={scoped.tier}
               tierLabel={scoped.tier ? tierIdentity.semanticLabel : null}
               tierColor={tierIdentity.color}
@@ -271,7 +272,7 @@ export default function PlayerQuickViewSheet({
               team={team}
               age={age}
               score={player.score ?? resolved?.value_score ?? null}
-              valueNote={resolved?.value_note}
+              valueNote={request.valueNote ?? resolved?.value_note}
               byeWeek={resolved?.bye_week ?? null}
               onByeThisWeek={resolved?.on_bye_this_week ?? false}
               unavailable={availability?.unavailable ?? false}

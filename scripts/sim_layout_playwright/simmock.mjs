@@ -111,6 +111,30 @@ export function createMock(opts = {}) {
     mvp: { player: row(players[2]), pts: 31.2 }, bust: { player: row(players[11]), pts: 2.4 }, playoffs: null, season_complete: false, champion: null, next_week: week + 1,
   });
 
+  // Player-sheet demo cast (opts.sheetDemo): a real-id veteran, a real-id veteran on IR with no market value, and a generated rookie.
+  if (opts.sheetDemo) {
+    const base = { team: "BUF", status: "healthy", out_weeks: 0, bye_week: 9, adp: 40, season_points: 0, games: 0, ppg: null, last_week: null, floor: 0.6, ceiling: 3.8, projection: 2.2, ros_mean: 2.2 };
+    if (state.status !== "drafting") state.owner["9990"] = you;
+    players.unshift(
+      { ...base, id: "9990", name: "Dalton Reyes", pos: "WR", age: 31, value: 0, value_rank: 211, adp: 188, status: "out", out_weeks: 6, season_points: 14.7, games: 2, ppg: 7.4, last_week: 6.1, ir: true },
+      { ...base, id: "R2027-001", headshot_id: null, name: "Brock Briggs", pos: "RB", age: 24, value: 0, value_rank: 118, adp: 61, generated: true, rookie: true, rookieDemo: true },
+    );
+  }
+  // What GET /players/{id} returns: weeks are flat (the engine projects every healthy week at his rest-of-season mean), plus the ros summary and flat flag.
+  function playerDetail(p) {
+    const first = Math.max(state.week, 1);
+    const weeks = [];
+    for (let w = first; w <= 14; w++) {
+      const out = (p.out_weeks || 0) > 0 && w - first < p.out_weeks, bye = w === p.bye_week, ok = !out && !bye;
+      weeks.push({ week: w, projection: ok ? p.projection : 0, floor: ok ? p.floor : 0, ceiling: ok ? p.ceiling : 0, bye, out });
+    }
+    const history = []; for (let i = 0; i < Math.min(p.games || 0, state.week - 1 || 0); i++) history.push({ week: i + 1, points: Math.round(((p.ppg || 6) + ((i * 5) % 7) - 3) * 10) / 10, stats: null });
+    const pos = players.filter((x) => x.pos === p.pos).sort((a, b) => b.value - a.value);
+    const ros = { mean: p.projection, floor: p.floor, ceiling: p.ceiling, weeks_left: weeks.length, playable_weeks: weeks.filter((w) => !w.bye && !w.out).length, bye_week: p.bye_week ?? null, out_weeks: weeks.filter((w) => w.out).map((w) => w.week) };
+    const news = p.ir ? [{ week: 0, text: "Listed out for 6 week(s) to start the season." }] : [];
+    return { player: { ...row(p), value_rank: p.value_rank ?? players.indexOf(p) + 1, pos_value_rank: Math.max(1, pos.indexOf(p) + 1) }, weeks, history, news, ros, projection_flat: true, ...(p.rookieDemo && opts.scouting ? { scouting: opts.scouting(p) } : {}) };
+  }
+
   // returns {status, body} or null if not a sim route
   return function handle(method, path, query, body) {
     if (!state.enabled) return { status: 404, body: { detail: "Not Found" } };
@@ -138,7 +162,7 @@ export function createMock(opts = {}) {
       return { status: 200, body: { ...env(), items: items.slice((page - 1) * size, page * size), total: items.length, page, page_size: size } };
     }
     let mm;
-    if ((mm = sub.match(/^\/players\/(.+)$/))) { const p = players.find((x) => x.id === mm[1]); return { status: 200, body: { ...env(), player: row(p), weeks: Array.from({ length: 6 }, (_, i) => ({ week: state.week + i || 1 + i, projection: p.projection + ((i * 7) % 5) - 2, floor: p.floor, ceiling: p.ceiling + i, bye: i === 3, out: false })), history: [{ week: 1, points: 18.2, stats: null }, { week: 2, points: 9.4, stats: null }, { week: 3, points: 21.1, stats: null }], news: [{ week: 3, text: `${p.name} saw a season-high in snaps and looks to be the lead option.` }] } }; }
+    if ((mm = sub.match(/^\/players\/(.+)$/))) { const p = players.find((x) => x.id === mm[1]); return { status: 200, body: { ...env(), ...playerDetail(p) } }; }
     if ((mm = sub.match(/^\/teams\/(.+)$/))) return { status: 200, body: { ...env(), team_id: mm[1], players: roster(mm[1]) } };
     if (sub === "/lineup" && method === "GET") return { status: 200, body: lineup() };
     if (sub === "/lineup" && method === "PUT") return { status: 200, body: lineup() };

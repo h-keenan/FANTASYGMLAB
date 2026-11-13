@@ -100,3 +100,11 @@ export function opportunityUsageCaption(
   if (!highConfidence && pct < 20) return null;
   return `${opportunityLabel} is his depth-chart role; usage is down ${pct}% recently, so the role has not translated into recent workload.`;
 }
+
+/** Two-letter initials for the hero avatar when there is no photo ("Brock Briggs" -> "BB"). */
+export function heroInitials(name: string | null | undefined): string {
+  const words = (name ?? '').replace(/[^A-Za-z\s'-]/g, ' ').split(/\s+/).filter(Boolean);
+  if (words.length === 0) return '';
+  if (words.length === 1) return words[0][0].toUpperCase();
+  return (words[0][0] + words[words.length - 1][0]).toUpperCase();
+}

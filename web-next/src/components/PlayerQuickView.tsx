@@ -262,7 +262,8 @@ export function PlayerQuickView({
           age={identity.age ?? resolved?.age ?? null}
           tier={identity.tier}
           score={identity.score ?? resolved?.value_score ?? null}
-          valueNote={resolved?.value_note}
+          valueNote={identity.value_note ?? resolved?.value_note}
+          avatarId={remote ? identity.player_id : null}
           loadingIdentity={loading}
           byeWeek={resolved?.bye_week ?? null}
           onByeThisWeek={resolved?.on_bye_this_week ?? false}

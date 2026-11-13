@@ -5,6 +5,7 @@ import type { DotProps } from "recharts";
 
 import type { WeeklyStatPoint } from "@/lib/api";
 import { buildWeeklyPointsSummary, fillWeeklyPointGaps } from "@/lib/playerComparePresentation";
+import { buildWeeklyChartRows, type WeeklyProjectionPoint } from "@/lib/weeklyProjection";
 
 /**
  * Points By Week — web-next's port of app.py's weekly_points_chart.py
@@ -57,10 +58,10 @@ function PeakDot(props: DotProps & { peakWeek: number }) {
   );
 }
 
-function WeeklyPointsEmpty({ season }: { season: number }) {
+function WeeklyPointsEmpty({ season, text }: { season: number; text?: string }) {
   return (
     <p className="text-xs px-1 py-6 text-center" style={{ color: "var(--color-text-muted)" }}>
-      No weekly fantasy points are recorded for the {season} season yet.
+      {text ?? `No weekly fantasy points are recorded for the ${season} season yet.`}
     </p>
   );
 }
@@ -70,10 +71,19 @@ export function WeeklyPointsPanel({
   weeks,
   season,
   gradientId,
+  projection = null,
+  pointsLabel = "PPR points",
+  emptyText,
 }: {
   name: string;
   weeks: WeeklyStatPoint[];
   season: number;
+  /** Optional rest-of-season projection drawn as a band behind the played weeks (Fantasy Sim). Omit for a plain history chart. */
+  projection?: readonly WeeklyProjectionPoint[] | null;
+  /** Unit in the tooltip and summary ("PPR points" by default). */
+  pointsLabel?: string;
+  /** Replaces the "no weekly fantasy points" line when nothing is played and there is no projection. */
+  emptyText?: string;
   /** Unique per panel — two <defs><linearGradient> on the same page with the
    * same id would collide (the second panel would silently paint with the
    * first panel's gradient), same reason app.py's own _gradient_id scopes
@@ -90,31 +100,60 @@ export function WeeklyPointsPanel({
       >
         {name}
       </div>
-      {!hasPlayedWeek ? (
-        <WeeklyPointsEmpty season={season} />
+      {!hasPlayedWeek && !(projection && projection.length > 0) ? (
+        <WeeklyPointsEmpty season={season} text={emptyText} />
       ) : (
-        <PlayedWeeksChart weeks={fillWeeklyPointGaps(weeks)} gradientId={gradientId} name={name} />
+        <PlayedWeeksChart weeks={weeks} gradientId={gradientId} name={name} projection={projection} pointsLabel={pointsLabel} />
       )}
     </div>
   );
 }
 
-function PlayedWeeksChart({ weeks, gradientId, name }: { weeks: WeeklyStatPoint[]; gradientId: string; name: string }) {
-  const summary = buildWeeklyPointsSummary(weeks);
-  const values = weeks
-    .map((week) => week.fantasy_points_ppr)
-    .filter((value): value is number => value != null);
+function PlayedWeeksChart({
+  weeks,
+  gradientId,
+  name,
+  projection,
+  pointsLabel,
+}: {
+  weeks: WeeklyStatPoint[];
+  gradientId: string;
+  name: string;
+  projection: readonly WeeklyProjectionPoint[] | null;
+  pointsLabel: string;
+}) {
+  const dense = fillWeeklyPointGaps(weeks);
+  const hasProjection = Boolean(projection && projection.length > 0);
+  // With a projection the rows also carry the rest-of-season band; without one this is exactly the plain history chart.
+  const rows: Array<WeeklyStatPoint & { proj_mean?: number | null; proj_band?: [number, number] | null }> = hasProjection
+    ? buildWeeklyChartRows(
+        dense.map((w) => ({ week: w.week, points: w.fantasy_points_ppr })),
+        projection,
+      ).map((r) => ({
+        week: r.week,
+        fantasy_points_ppr: r.actual,
+        snap_share: null,
+        proj_mean: r.mean,
+        proj_band: r.floor != null && r.ceiling != null ? ([r.floor, r.ceiling] as [number, number]) : null,
+      }))
+    : dense;
+  const summary = buildWeeklyPointsSummary(dense);
+  const values = rows.map((row) => row.fantasy_points_ppr).filter((value): value is number => value != null);
+  const ceilings = rows.map((row) => row.proj_band?.[1]).filter((value): value is number => value != null);
+  const projMeans = rows.map((row) => row.proj_mean).filter((value): value is number => value != null);
   // Same framing as app.py's weekly_points_chart_html: the floor never rises
   // above zero and the ceiling never drops below 1, so a quiet season still
   // reads as a legible shape instead of amplifying noise.
   const minimum = Math.min(0, ...values);
-  const maximum = Math.max(1, ...values);
-  const firstWeek = weeks[0].week;
-  const lastWeek = weeks[weeks.length - 1].week;
+  const maximum = Math.max(1, ...values, ...ceilings);
+  const firstWeek = rows[0].week;
+  const lastWeek = rows[rows.length - 1].week;
+  const projAverage = projMeans.length > 0 ? projMeans.reduce((a, b) => a + b, 0) / projMeans.length : null;
 
   const accessibleSummary =
     `Points by week for ${name}: ${summary.games} game${summary.games !== 1 ? "s" : ""}, ` +
-    `average ${formatPoints(summary.average)} PPR points, high ${formatPoints(summary.peak)} in week ${summary.peakWeek}.`;
+    `average ${formatPoints(summary.average)} ${pointsLabel}, high ${formatPoints(summary.peak)} in week ${summary.peakWeek}.` +
+    (projAverage != null ? ` Projected ${formatPoints(projAverage)} per game for the weeks ahead.` : "");
 
   return (
     <div className="flex flex-col gap-1">
@@ -126,7 +165,7 @@ function PlayedWeeksChart({ weeks, gradientId, name }: { weeks: WeeklyStatPoint[
       <p className="sr-only">{accessibleSummary}</p>
       <div style={{ width: "100%", height: CHART_HEIGHT }} aria-hidden="true">
         <ResponsiveContainer width="100%" height="100%">
-          <AreaChart data={weeks} margin={{ top: 8, right: 8, bottom: 0, left: 0 }}>
+          <AreaChart data={rows} margin={{ top: 8, right: 8, bottom: 0, left: 0 }}>
             <defs>
               <linearGradient id={gradientId} x1="0" y1="0" x2="0" y2="1">
                 <stop offset="0%" stopColor="var(--color-accent)" stopOpacity={0.35} />
@@ -142,7 +181,7 @@ function PlayedWeeksChart({ weeks, gradientId, name }: { weeks: WeeklyStatPoint[
               tickLine={false}
               axisLine={{ stroke: "var(--color-border)" }}
               tick={{ fill: "var(--color-text-muted)", fontSize: 10 }}
-              interval={weeks.length > 10 ? 1 : 0}
+              interval={rows.length > 10 ? 1 : 0}
             />
             <YAxis
               domain={[minimum, maximum]}
@@ -153,7 +192,13 @@ function PlayedWeeksChart({ weeks, gradientId, name }: { weeks: WeeklyStatPoint[
               tickFormatter={(value: number) => value.toFixed(0)}
             />
             <Tooltip
-              formatter={(value) => [`${formatPoints(Number(value))} PPR points`, undefined]}
+              formatter={(value, key) =>
+                key === "proj_band" && Array.isArray(value)
+                  ? [`${formatPoints(Number(value[0]))}-${formatPoints(Number(value[1]))} projected`, undefined]
+                  : key === "proj_mean"
+                    ? [`${formatPoints(Number(value))} projected`, undefined]
+                    : [`${formatPoints(Number(value))} ${pointsLabel}`, undefined]
+              }
               labelFormatter={(label) => `Week ${label}`}
               contentStyle={{
                 background: "var(--color-surface-secondary)",
@@ -164,6 +209,12 @@ function PlayedWeeksChart({ weeks, gradientId, name }: { weeks: WeeklyStatPoint[
               }}
               labelStyle={{ color: "var(--color-text-muted)" }}
             />
+            {hasProjection ? (
+              <>
+                <Area type="monotone" dataKey="proj_band" stroke="none" fill="var(--color-accent)" fillOpacity={0.16} isAnimationActive={false} connectNulls={false} />
+                <Area type="monotone" dataKey="proj_mean" stroke="var(--color-accent)" strokeOpacity={0.7} strokeDasharray="4 3" strokeWidth={1.5} fill="none" dot={false} isAnimationActive={false} connectNulls={false} />
+              </>
+            ) : null}
             <Area
               type="monotone"
               dataKey="fantasy_points_ppr"
@@ -176,11 +227,22 @@ function PlayedWeeksChart({ weeks, gradientId, name }: { weeks: WeeklyStatPoint[
           </AreaChart>
         </ResponsiveContainer>
       </div>
-      <p className="text-xs text-center" style={{ color: "var(--color-text-secondary)" }}>
-        <strong style={{ color: "var(--color-text-primary)" }}>{formatPoints(summary.average)}</strong> avg &middot;{" "}
-        <strong style={{ color: "var(--color-text-primary)" }}>{formatPoints(summary.peak)}</strong> high (Wk {summary.peakWeek}) &middot;{" "}
-        <strong style={{ color: "var(--color-text-primary)" }}>{summary.games}</strong> week{summary.games !== 1 ? "s" : ""} played
-      </p>
+      {summary.games > 0 ? (
+        <p className="text-xs text-center" style={{ color: "var(--color-text-secondary)" }}>
+          <strong style={{ color: "var(--color-text-primary)" }}>{formatPoints(summary.average)}</strong> avg &middot;{" "}
+          <strong style={{ color: "var(--color-text-primary)" }}>{formatPoints(summary.peak)}</strong> high (Wk {summary.peakWeek}) &middot;{" "}
+          <strong style={{ color: "var(--color-text-primary)" }}>{summary.games}</strong> week{summary.games !== 1 ? "s" : ""} played
+          {projAverage != null ? (
+            <>
+              {" "}&middot; <strong style={{ color: "var(--color-text-primary)" }}>{formatPoints(projAverage)}</strong> projected
+            </>
+          ) : null}
+        </p>
+      ) : projAverage != null ? (
+        <p className="text-xs text-center" style={{ color: "var(--color-text-secondary)" }}>
+          <strong style={{ color: "var(--color-text-primary)" }}>{formatPoints(projAverage)}</strong> projected per game
+        </p>
+      ) : null}
     </div>
   );
 }

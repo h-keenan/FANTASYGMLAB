@@ -32,6 +32,8 @@ export interface PlayerQuickViewIdentity {
   injury_status?: string | null;
   tier?: string | null;
   score?: number | null;
+  /** Why the Value tile is empty, when the caller knows (Fantasy Sim: below replacement in this league). */
+  value_note?: string | null;
   overall_rank?: number | null;
   position_rank?: number | null;
   rank_unavailable_reason?: string | null;
