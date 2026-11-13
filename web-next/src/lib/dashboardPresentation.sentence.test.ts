@@ -52,3 +52,22 @@ describe("watchTag trending direction", () => {
     expect(watchTag({ ...base, headline: "Morgan is losing usage", reason: "Usage down 31%." }).color).toBe("var(--text-negative)");
   });
 });
+
+describe("bye cover alert", () => {
+  const bye = {
+    ...base,
+    reason: "Look at the waiver wire for a fill-in: Fits One, Fits Two. You have no other healthy WR to start.",
+    supporting_context: "Bye Week Cover",
+    route_player_injury_status: "Questionable",
+    presentation: { bye_cover: { week: 9, slot_label: "WR1" } },
+  } as unknown as BriefingItem;
+
+  it("tags the week and summarizes from structured data, never as an injury", () => {
+    expect(watchTag(bye).label).toBe("Bye Wk 9");
+    expect(watchSummary(bye)).toBe("WR1 on bye in Week 9. Look at the waiver wire for a fill-in: Fits One, Fits Two.");
+  });
+
+  it("is not a bye alert without the structured week", () => {
+    expect(watchTag({ ...bye, presentation: null }).label).not.toMatch(/Bye/);
+  });
+});

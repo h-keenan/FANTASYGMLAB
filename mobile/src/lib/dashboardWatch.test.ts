@@ -2,7 +2,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
-import { firstSentence, usageTrendPct, watchSummary, watchTagKind, watchTitle, watchTrendDirection } from './dashboardWatch.ts';
+import { byeCover, firstSentence, usageTrendPct, watchSummary, watchTagKind, watchTitle, watchTrendDirection } from './dashboardWatch.ts';
 
 const base = { category: 'watch', headline: 'x', reason: '' } as const;
 
@@ -36,4 +36,22 @@ test('watchTrendDirection: up for "trending up", down for usage drops and losing
   assert.equal(watchTrendDirection({ headline: 'Taylor Exampleton is trending up', reason: 'Snap share is climbing.' }), 'up');
   assert.equal(watchTrendDirection({ headline: 'Morgan Testwell is losing usage', reason: 'Usage down 31%.' }), 'down');
   assert.equal(watchTrendDirection({ headline: 'Value is falling', reason: '' }), 'down');
+});
+
+test('byeCover reads the Bye Week Cover alert and never invents one', () => {
+  const bye = {
+    category: 'watch',
+    headline: 'Your WR1 (Wade WR) is on bye in Week 9',
+    reason: 'Look at the waiver wire for a fill-in: Fits One, Fits Two. You have no other healthy WR to start.',
+    supporting_context: 'Bye Week Cover',
+    route_player_injury_status: '',
+    presentation: { bye_cover: { week: 9, slot_label: 'WR1' } },
+  } as const;
+  assert.deepEqual(byeCover(bye), { week: 9, slotLabel: 'WR1' });
+  assert.equal(watchTagKind(bye), 'bye');
+  assert.equal(watchSummary(bye), 'WR1 on bye in Week 9. Look at the waiver wire for a fill-in: Fits One, Fits Two.');
+  // A Questionable bye player still reads as a bye alert, not "Listed as ...".
+  assert.equal(watchSummary({ ...bye, route_player_injury_status: 'Questionable' }).startsWith('WR1 on bye'), true);
+  assert.equal(byeCover({ supporting_context: 'Bye Week Cover', presentation: null }), null);
+  assert.equal(byeCover({ supporting_context: 'Injury Alert', presentation: { bye_cover: { week: 9 } } }), null);
 });

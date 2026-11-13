@@ -1,6 +1,6 @@
 import type { DashboardItem } from './api';
 
-export type WatchTagKind = 'trending' | 'injury' | 'waiver' | 'other';
+export type WatchTagKind = 'trending' | 'injury' | 'waiver' | 'bye' | 'other';
 
 /**
  * The real usage-drop percentage a Value Trend item carries. The backend
@@ -17,13 +17,34 @@ export function usageTrendPct(item: Pick<DashboardItem, 'reason'> & { supporting
   return Number.isFinite(value) ? value : null;
 }
 
-/** Which TRENDING / INJURY / WAIVER tag a Watchlist & Alerts row gets. */
+export interface ByeCoverInfo {
+  week: number;
+  slotLabel: string;
+}
+
+/**
+ * The Bye Week Cover alert's structured data (modules/bye_cover.py: the item's
+ * supporting_context is its label and presentation.bye_cover carries the week).
+ * Null for every other item, so nothing is ever invented. Mirrors web
+ * lib/dashboardPresentation.ts.
+ */
+export function byeCover(item: { supporting_context?: string | null; presentation?: unknown }): ByeCoverInfo | null {
+  if ((item.supporting_context ?? '').trim().toLowerCase() !== 'bye week cover') return null;
+  const info = (item.presentation as { bye_cover?: { week?: unknown; slot_label?: unknown } } | null | undefined)?.bye_cover;
+  const week = Number(info?.week);
+  if (!Number.isFinite(week) || week <= 0) return null;
+  return { week, slotLabel: typeof info?.slot_label === 'string' ? info.slot_label : '' };
+}
+
+/** Which TRENDING / INJURY / WAIVER / BYE tag a Watchlist & Alerts row gets. */
 export function watchTagKind(
   item: Pick<DashboardItem, 'category' | 'headline' | 'reason'> & {
     route_player_injury_status?: string | null;
     supporting_context?: string | null;
+    presentation?: unknown;
   },
 ): WatchTagKind {
+  if (byeCover(item)) return 'bye';
   if (item.category === 'waiver_opportunity') return 'waiver';
   if (usageTrendPct(item) !== null || /trend/i.test(item.headline)) return 'trending';
   if (item.route_player_injury_status || /injur/i.test(`${item.headline} ${item.reason}`)) return 'injury';
@@ -40,6 +61,7 @@ export const WATCH_TAG_LABEL: Record<WatchTagKind, string | null> = {
   trending: 'Trending',
   injury: 'Injury',
   waiver: 'Waiver',
+  bye: 'Bye',
   other: null,
 };
 
@@ -67,8 +89,11 @@ export function firstSentence(text: string | null | undefined, max = 140): strin
 
 /** One clean sentence for a Watchlist row: from structured fields when there are any, else the first sentence. */
 export function watchSummary(
-  item: Pick<DashboardItem, 'reason'> & { supporting_context?: string | null; route_player_injury_status?: string | null },
+  item: Pick<DashboardItem, 'reason'> & { supporting_context?: string | null; route_player_injury_status?: string | null; presentation?: unknown },
 ): string {
+  // A bye alert's player is healthy: its first sentence is the waiver pointer, never "Listed as ...".
+  const bye = byeCover(item);
+  if (bye) return `${bye.slotLabel ? `${bye.slotLabel} on` : 'On'} bye in Week ${bye.week}. ${firstSentence(item.reason)}`;
   const pct = usageTrendPct(item);
   if (pct !== null) return `Usage is down ${pct}% recently.`;
   const status = (item.route_player_injury_status ?? '').trim();

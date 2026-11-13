@@ -1059,7 +1059,7 @@ function DashboardInsightRow({
   const { colors } = useThemeMode();
   const baseMeta = categoryMeta(colors)[item.category] ?? categoryMeta(colors).watch;
   const tagKind = watchTagKind(item);
-  const tagColor = tagKind === 'trending' ? (watchTrendDirection(item) === 'up' ? colors.success : colors.danger) : tagKind === 'injury' ? colors.premium : tagKind === 'waiver' ? colors.success : baseMeta.color;
+  const tagColor = tagKind === 'trending' ? (watchTrendDirection(item) === 'up' ? colors.success : colors.danger) : tagKind === 'injury' ? colors.premium : tagKind === 'waiver' ? colors.success : tagKind === 'bye' ? colors.premium : baseMeta.color;
   const meta = { ...baseMeta, label: WATCH_TAG_LABEL[tagKind] ?? baseMeta.label, color: tagColor };
   const routeName = DESTINATION_ROUTE[item.destination];
   const onActionPress = routeName

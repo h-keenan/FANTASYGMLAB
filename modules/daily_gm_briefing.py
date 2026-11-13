@@ -51,6 +51,9 @@ _WATCH_LABELS = frozenset(
         # build_strategy_check_tile), only once there's enough of a real
         # season to say so with confidence.
         "Strategy Check",
+        # A projected starter's upcoming bye the bench can't cover
+        # (modules.bye_cover); only built when genuinely true.
+        "Bye Week Cover",
     }
 )
 

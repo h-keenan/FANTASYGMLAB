@@ -2826,6 +2826,8 @@ export interface DashboardTradePresentation {
   posture_note?: string;
   posture_alignment?: 'aligned' | 'neutral' | 'costly' | '';
   lineup_points?: number | null;
+  /** Set only on a Bye Week Cover item (modules/bye_cover.py), which has no trade_package. */
+  bye_cover?: { week: number; weeks_away: number; slot_label: string; depth: number; also_on_bye: number };
 }
 
 export interface DashboardMentionedPlayer {
