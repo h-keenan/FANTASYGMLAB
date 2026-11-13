@@ -123,7 +123,7 @@ to farm. Pick hoarding: the pick ledger invariant held in every fuzzed dynasty g
 ### Low items
 
 - `POST /sim-to` unknown target: now 422 with the allowed targets, `weeks` must be 1-30; trade-block entries are removed from the state when the asset leaves the team
-  (`block_v` 2, new games; `block_v` 1 saves replay as before): #1865.
+  (`block_v` 2, new games; `block_v` 1 saves replay as before): #1865, merged.
 - `sim-to` and pending offers: by design, not a defect. Every AI offer is generated for one week (`expires_week` is the week it is made), so an offer pending at the start of a week
   is expiring that week; the stop is "you are about to lose this offer", `force_first` plays past it, and offers are 4-5 a season. No change.
 
@@ -145,7 +145,7 @@ asset value drifts +3% over 20 seasons (768 -> 792), so the AI valuation does no
 waiver churn is worth about 6 points of win rate and nothing in assets. This is the persona disagreement the trade desk is built on, paid for with current-season strength, not a
 loop that grows without bound. No fair-value guard was needed or added.
 
-### Re-sweep on current main (player-model-5, ai_v 1, dynasty_v 3, block_v 1; #1865 adds block_v 2)
+### Re-sweep (player-model-5, ai_v 1, dynasty_v 3, block_v 1; run just before #1865 made new games block_v 2)
 
 | check | before | now |
 | --- | --- | --- |
