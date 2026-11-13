@@ -1,0 +1,188 @@
+snapshot_key,captured_at,season,week,player_id,team,position,status,injury_status,body_part,practice,practice_desc,source
+2026-11-13-fri,2026-11-13T22:47:39Z,2026,10,10210,NE,TE,Active,Questionable,Back,,,sleeper_snapshot
+2026-11-13-fri,2026-11-13T22:47:39Z,2026,10,10212,GB,TE,Active,Out,Concussion,,,sleeper_snapshot
+2026-11-13-fri,2026-11-13T22:47:39Z,2026,10,10214,LAR,TE,Active,Questionable,Oblique,,,sleeper_snapshot
+2026-11-13-fri,2026-11-13T22:47:39Z,2026,10,10220,IND,TE,Active,Questionable,Hamstring,,,sleeper_snapshot
+2026-11-13-fri,2026-11-13T22:47:39Z,2026,10,10222,GB,WR,Inactive,IR,Neck,,,sleeper_snapshot
+2026-11-13-fri,2026-11-13T22:47:39Z,2026,10,10225,DAL,WR,Active,Questionable,Ankle,,,sleeper_snapshot
+2026-11-13-fri,2026-11-13T22:47:39Z,2026,10,10226,CIN,WR,Inactive,IR,Thumb,,,sleeper_snapshot
+2026-11-13-fri,2026-11-13T22:47:39Z,2026,10,10232,ARI,WR,Inactive,IR,Neck,,,sleeper_snapshot
+2026-11-13-fri,2026-11-13T22:47:39Z,2026,10,10867,SEA,WR,Inactive,IR,Knee,,,sleeper_snapshot
+2026-11-13-fri,2026-11-13T22:47:39Z,2026,10,11034,ARI,WR,Inactive,IR,Wrist,,,sleeper_snapshot
+2026-11-13-fri,2026-11-13T22:47:39Z,2026,10,11056,MIA,WR,Active,Out,Quadriceps,,,sleeper_snapshot
+2026-11-13-fri,2026-11-13T22:47:39Z,2026,10,11058,LAR,K,Inactive,IR,Knee,,,sleeper_snapshot
+2026-11-13-fri,2026-11-13T22:47:39Z,2026,10,11299,CHI,RB,Inactive,IR,Wrist,,,sleeper_snapshot
+2026-11-13-fri,2026-11-13T22:47:39Z,2026,10,11370,GB,RB,Inactive,IR,Ankle,,,sleeper_snapshot
+2026-11-13-fri,2026-11-13T22:47:39Z,2026,10,11371,NE,TE,Inactive,IR,Knee,,,sleeper_snapshot
+2026-11-13-fri,2026-11-13T22:47:39Z,2026,10,11377,BUF,WR,Active,PUP,Knee - ACL,,,sleeper_snapshot
+2026-11-13-fri,2026-11-13T22:47:39Z,2026,10,11508,DAL,TE,Inactive,IR,Knee - ACL + MCL,,,sleeper_snapshot
+2026-11-13-fri,2026-11-13T22:47:39Z,2026,10,11577,PHI,RB,Inactive,IR,Foot,,,sleeper_snapshot
+2026-11-13-fri,2026-11-13T22:47:39Z,2026,10,11583,CAR,RB,Inactive,IR,Abdomen,,,sleeper_snapshot
+2026-11-13-fri,2026-11-13T22:47:39Z,2026,10,11588,HOU,RB,Active,Out,Undisclosed,,,sleeper_snapshot
+2026-11-13-fri,2026-11-13T22:47:39Z,2026,10,11589,ARI,RB,Inactive,IR,Knee,,,sleeper_snapshot
+2026-11-13-fri,2026-11-13T22:47:39Z,2026,10,11592,CIN,TE,Inactive,IR,Knee - ACL,,,sleeper_snapshot
+2026-11-13-fri,2026-11-13T22:47:39Z,2026,10,11618,TB,WR,Inactive,IR,Knee - PCL,,,sleeper_snapshot
+2026-11-13-fri,2026-11-13T22:47:39Z,2026,10,11623,LAR,WR,Inactive,IR,Back,,,sleeper_snapshot
+2026-11-13-fri,2026-11-13T22:47:39Z,2026,10,11625,NYJ,WR,Active,Questionable,Knee,,,sleeper_snapshot
+2026-11-13-fri,2026-11-13T22:47:39Z,2026,10,11626,CAR,WR,Inactive,IR,Knee,,,sleeper_snapshot
+2026-11-13-fri,2026-11-13T22:47:39Z,2026,10,11628,HOU,WR,Active,Out,Hamstring,,,sleeper_snapshot
+2026-11-13-fri,2026-11-13T22:47:39Z,2026,10,11630,PIT,WR,Inactive,IR,Finger,,,sleeper_snapshot
+2026-11-13-fri,2026-11-13T22:47:39Z,2026,10,11635,LAC,WR,Active,Questionable,Back,,,sleeper_snapshot
+2026-11-13-fri,2026-11-13T22:47:39Z,2026,10,11636,PHI,WR,Inactive,IR,Knee,,,sleeper_snapshot
+2026-11-13-fri,2026-11-13T22:47:39Z,2026,10,11638,SF,WR,Inactive,IR,Knee - PCL,,,sleeper_snapshot
+2026-11-13-fri,2026-11-13T22:47:39Z,2026,10,11651,SF,RB,Active,PUP,Pectoral,,,sleeper_snapshot
+2026-11-13-fri,2026-11-13T22:47:39Z,2026,10,11655,NYG,RB,Inactive,IR,Hamstring,,,sleeper_snapshot
+2026-11-13-fri,2026-11-13T22:47:39Z,2026,10,11716,ARI,TE,Active,PUP,Ankle,,,sleeper_snapshot
+2026-11-13-fri,2026-11-13T22:47:39Z,2026,10,11729,DET,RB,Active,Questionable,Ankle,,,sleeper_snapshot
+2026-11-13-fri,2026-11-13T22:47:39Z,2026,10,11895,NO,WR,Active,PUP,Groin,,,sleeper_snapshot
+2026-11-13-fri,2026-11-13T22:47:39Z,2026,10,11942,WAS,TE,Active,Out,Knee,,,sleeper_snapshot
+2026-11-13-fri,2026-11-13T22:47:39Z,2026,10,11963,LV,RB,Inactive,Questionable,Undisclosed,,,sleeper_snapshot
+2026-11-13-fri,2026-11-13T22:47:39Z,2026,10,12113,GB,TE,Inactive,IR,Undisclosed,,,sleeper_snapshot
+2026-11-13-fri,2026-11-13T22:47:39Z,2026,10,12171,HOU,RB,Inactive,IR,Hamstring,,,sleeper_snapshot
+2026-11-13-fri,2026-11-13T22:47:39Z,2026,10,12455,KC,RB,Inactive,IR,Hamstring,,,sleeper_snapshot
+2026-11-13-fri,2026-11-13T22:47:39Z,2026,10,12472,CLE,RB,Inactive,IR,Hip,,,sleeper_snapshot
+2026-11-13-fri,2026-11-13T22:47:39Z,2026,10,12480,NO,TE,Inactive,IR,Knee,,,sleeper_snapshot
+2026-11-13-fri,2026-11-13T22:47:39Z,2026,10,12484,HOU,WR,Inactive,IR,Knee - ACL,,,sleeper_snapshot
+2026-11-13-fri,2026-11-13T22:47:39Z,2026,10,12487,LAR,TE,Inactive,IR,Ankle,,,sleeper_snapshot
+2026-11-13-fri,2026-11-13T22:47:39Z,2026,10,12489,DEN,RB,Inactive,IR,Knee,,,sleeper_snapshot
+2026-11-13-fri,2026-11-13T22:47:39Z,2026,10,12508,NYG,QB,Inactive,IR,Knee - Meniscus,,,sleeper_snapshot
+2026-11-13-fri,2026-11-13T22:47:39Z,2026,10,12509,LAC,WR,Active,Questionable,Shoulder,,,sleeper_snapshot
+2026-11-13-fri,2026-11-13T22:47:39Z,2026,10,12519,CHI,WR,Active,Questionable,Undisclosed,,,sleeper_snapshot
+2026-11-13-fri,2026-11-13T22:47:39Z,2026,10,12521,SEA,TE,Inactive,IR,Shoulder,,,sleeper_snapshot
+2026-11-13-fri,2026-11-13T22:47:39Z,2026,10,12529,NE,RB,Active,Out,Illness,,,sleeper_snapshot
+2026-11-13-fri,2026-11-13T22:47:39Z,2026,10,12533,WAS,RB,Inactive,IR,Groin,,,sleeper_snapshot
+2026-11-13-fri,2026-11-13T22:47:39Z,2026,10,12534,CHI,RB,Active,Out,Toe,,,sleeper_snapshot
+2026-11-13-fri,2026-11-13T22:47:39Z,2026,10,12536,HOU,WR,Inactive,IR,Toe,,,sleeper_snapshot
+2026-11-13-fri,2026-11-13T22:47:39Z,2026,10,12539,NYJ,WR,Inactive,IR,Knee,,,sleeper_snapshot
+2026-11-13-fri,2026-11-13T22:47:39Z,2026,10,12541,LV,WR,Active,Questionable,Back,,,sleeper_snapshot
+2026-11-13-fri,2026-11-13T22:47:39Z,2026,10,12641,WAS,WR,Inactive,IR,Ankle,,,sleeper_snapshot
+2026-11-13-fri,2026-11-13T22:47:39Z,2026,10,12656,SEA,RB,Inactive,IR,Undisclosed,,,sleeper_snapshot
+2026-11-13-fri,2026-11-13T22:47:39Z,2026,10,12705,HOU,QB,Inactive,IR,Knee - ACL,,,sleeper_snapshot
+2026-11-13-fri,2026-11-13T22:47:39Z,2026,10,12711,BAL,K,Inactive,IR,Groin,,,sleeper_snapshot
+2026-11-13-fri,2026-11-13T22:47:39Z,2026,10,12715,NYG,TE,Active,Out,Coach's Decision,,,sleeper_snapshot
+2026-11-13-fri,2026-11-13T22:47:39Z,2026,10,12735,DEN,TE,Inactive,IR,Lower Body,,,sleeper_snapshot
+2026-11-13-fri,2026-11-13T22:47:39Z,2026,10,13047,SEA,RB,Active,Out,Foot,,,sleeper_snapshot
+2026-11-13-fri,2026-11-13T22:47:39Z,2026,10,13173,KC,WR,Inactive,IR,Undisclosed,,,sleeper_snapshot
+2026-11-13-fri,2026-11-13T22:47:39Z,2026,10,13276,NYJ,WR,Active,Questionable,Ankle,,,sleeper_snapshot
+2026-11-13-fri,2026-11-13T22:47:39Z,2026,10,13277,NO,RB,Active,Out,Shoulder,,,sleeper_snapshot
+2026-11-13-fri,2026-11-13T22:47:39Z,2026,10,13279,TEN,WR,Active,Out,Shoulder,,,sleeper_snapshot
+2026-11-13-fri,2026-11-13T22:47:39Z,2026,10,13287,ARI,RB,Inactive,IR,Ankle,,,sleeper_snapshot
+2026-11-13-fri,2026-11-13T22:47:39Z,2026,10,13302,BAL,RB,Inactive,IR,Undisclosed,,,sleeper_snapshot
+2026-11-13-fri,2026-11-13T22:47:39Z,2026,10,13311,MIA,WR,Active,Doubtful,Knee,,,sleeper_snapshot
+2026-11-13-fri,2026-11-13T22:47:39Z,2026,10,13312,CIN,TE,Active,Out,Undisclosed,,,sleeper_snapshot
+2026-11-13-fri,2026-11-13T22:47:39Z,2026,10,13315,LAR,RB,Inactive,IR,Hand,,,sleeper_snapshot
+2026-11-13-fri,2026-11-13T22:47:39Z,2026,10,13320,ATL,WR,Active,Out,Hamstring,,,sleeper_snapshot
+2026-11-13-fri,2026-11-13T22:47:39Z,2026,10,13342,KC,TE,Inactive,IR,Knee,,,sleeper_snapshot
+2026-11-13-fri,2026-11-13T22:47:39Z,2026,10,13346,CLE,WR,Active,Questionable,Toe,,,sleeper_snapshot
+2026-11-13-fri,2026-11-13T22:47:39Z,2026,10,13347,MIN,RB,Inactive,IR,Knee,,,sleeper_snapshot
+2026-11-13-fri,2026-11-13T22:47:39Z,2026,10,13353,CAR,WR,Inactive,IR,Knee,,,sleeper_snapshot
+2026-11-13-fri,2026-11-13T22:47:39Z,2026,10,13380,LAC,WR,Active,Questionable,Quadriceps,,,sleeper_snapshot
+2026-11-13-fri,2026-11-13T22:47:39Z,2026,10,13392,KC,WR,Inactive,IR,Knee,,,sleeper_snapshot
+2026-11-13-fri,2026-11-13T22:47:39Z,2026,10,13407,IND,TE,Inactive,IR,Undisclosed,,,sleeper_snapshot
+2026-11-13-fri,2026-11-13T22:47:39Z,2026,10,13412,DET,WR,Inactive,IR,Knee - ACL,,,sleeper_snapshot
+2026-11-13-fri,2026-11-13T22:47:39Z,2026,10,13417,SF,WR,Inactive,IR,Ankle,,,sleeper_snapshot
+2026-11-13-fri,2026-11-13T22:47:39Z,2026,10,13419,KC,RB,Active,Questionable,Hamstring,,,sleeper_snapshot
+2026-11-13-fri,2026-11-13T22:47:39Z,2026,10,13422,TEN,TE,Inactive,IR,Pectoral,,,sleeper_snapshot
+2026-11-13-fri,2026-11-13T22:47:39Z,2026,10,13435,CLE,TE,Active,PUP,Personal,,,sleeper_snapshot
+2026-11-13-fri,2026-11-13T22:47:39Z,2026,10,13437,HOU,RB,Active,Out,Quadriceps,,,sleeper_snapshot
+2026-11-13-fri,2026-11-13T22:47:39Z,2026,10,13438,NYJ,RB,Inactive,,,,,sleeper_snapshot
+2026-11-13-fri,2026-11-13T22:47:39Z,2026,10,13557,WAS,QB,Active,Out,Coach's Decision,,,sleeper_snapshot
+2026-11-13-fri,2026-11-13T22:47:39Z,2026,10,13577,DEN,TE,Active,Out,Coach's Decision,,,sleeper_snapshot
+2026-11-13-fri,2026-11-13T22:47:39Z,2026,10,13597,LAR,QB,Inactive,IR,Undisclosed,,,sleeper_snapshot
+2026-11-13-fri,2026-11-13T22:47:39Z,2026,10,13712,CHI,TE,Inactive,IR,Undisclosed,,,sleeper_snapshot
+2026-11-13-fri,2026-11-13T22:47:39Z,2026,10,13890,MIN,WR,Active,Out,Undisclosed,,,sleeper_snapshot
+2026-11-13-fri,2026-11-13T22:47:39Z,2026,10,13964,NE,RB,Inactive,IR,Undisclosed,,,sleeper_snapshot
+2026-11-13-fri,2026-11-13T22:47:39Z,2026,10,1642,NYG,TE,Inactive,,,,,sleeper_snapshot
+2026-11-13-fri,2026-11-13T22:47:39Z,2026,10,1737,CHI,QB,Active,Out,Coach's Decision,,,sleeper_snapshot
+2026-11-13-fri,2026-11-13T22:47:39Z,2026,10,2118,PIT,TE,Inactive,,,,,sleeper_snapshot
+2026-11-13-fri,2026-11-13T22:47:39Z,2026,10,2133,LAR,WR,Inactive,IR,Hamstring,,,sleeper_snapshot
+2026-11-13-fri,2026-11-13T22:47:39Z,2026,10,2216,SF,WR,Active,Out,Achilles,,,sleeper_snapshot
+2026-11-13-fri,2026-11-13T22:47:39Z,2026,10,3702,NYG,WR,Inactive,,,,,sleeper_snapshot
+2026-11-13-fri,2026-11-13T22:47:39Z,2026,10,4033,LAC,TE,Inactive,IR,Lower Leg,,,sleeper_snapshot
+2026-11-13-fri,2026-11-13T22:47:39Z,2026,10,4054,IND,TE,Active,Out,Groin,,,sleeper_snapshot
+2026-11-13-fri,2026-11-13T22:47:39Z,2026,10,4137,ARI,RB,Inactive,IR,Foot,,,sleeper_snapshot
+2026-11-13-fri,2026-11-13T22:47:39Z,2026,10,4219,WAS,RB,Inactive,IR,Foot,,,sleeper_snapshot
+2026-11-13-fri,2026-11-13T22:47:39Z,2026,10,4349,NYG,RB,Inactive,,,,,sleeper_snapshot
+2026-11-13-fri,2026-11-13T22:47:39Z,2026,10,4451,ARI,WR,Inactive,,,,,sleeper_snapshot
+2026-11-13-fri,2026-11-13T22:47:39Z,2026,10,4454,ARI,WR,Inactive,IR,Lower Leg,,,sleeper_snapshot
+2026-11-13-fri,2026-11-13T22:47:39Z,2026,10,4881,BAL,QB,Inactive,IR,Thumb,,,sleeper_snapshot
+2026-11-13-fri,2026-11-13T22:47:39Z,2026,10,4943,SEA,QB,Active,Out,Quadriceps,,,sleeper_snapshot
+2026-11-13-fri,2026-11-13T22:47:39Z,2026,10,4950,SF,WR,Inactive,IR,Knee - Meniscus,,,sleeper_snapshot
+2026-11-13-fri,2026-11-13T22:47:39Z,2026,10,5008,BAL,TE,Inactive,IR,Achilles,,,sleeper_snapshot
+2026-11-13-fri,2026-11-13T22:47:39Z,2026,10,5121,NYG,WR,Inactive,IR,Foot,,,sleeper_snapshot
+2026-11-13-fri,2026-11-13T22:47:39Z,2026,10,5282,CHI,WR,Inactive,,,,,sleeper_snapshot
+2026-11-13-fri,2026-11-13T22:47:39Z,2026,10,5288,TEN,TE,Inactive,Questionable,,,,sleeper_snapshot
+2026-11-13-fri,2026-11-13T22:47:39Z,2026,10,5409,CIN,TE,Inactive,IR,Pectoral,,,sleeper_snapshot
+2026-11-13-fri,2026-11-13T22:47:39Z,2026,10,5844,MIN,TE,Active,Out,Wrist,,,sleeper_snapshot
+2026-11-13-fri,2026-11-13T22:47:39Z,2026,10,5849,MIN,QB,Active,Out,Hamstring,,,sleeper_snapshot
+2026-11-13-fri,2026-11-13T22:47:39Z,2026,10,5850,GB,RB,Active,Out,Finger,,,sleeper_snapshot
+2026-11-13-fri,2026-11-13T22:47:39Z,2026,10,5859,NE,WR,Active,Questionable,Knee,,,sleeper_snapshot
+2026-11-13-fri,2026-11-13T22:47:39Z,2026,10,5892,HOU,RB,Active,Questionable,Groin,,,sleeper_snapshot
+2026-11-13-fri,2026-11-13T22:47:39Z,2026,10,5927,WAS,WR,Inactive,IR,Knee,,,sleeper_snapshot
+2026-11-13-fri,2026-11-13T22:47:39Z,2026,10,5938,DEN,WR,Active,Out,Coach's Decision,,,sleeper_snapshot
+2026-11-13-fri,2026-11-13T22:47:39Z,2026,10,5957,GB,TE,Inactive,,,,,sleeper_snapshot
+2026-11-13-fri,2026-11-13T22:47:39Z,2026,10,5973,MIN,TE,Inactive,IR,Biceps,,,sleeper_snapshot
+2026-11-13-fri,2026-11-13T22:47:39Z,2026,10,6011,ARI,QB,Inactive,IR,Elbow,,,sleeper_snapshot
+2026-11-13-fri,2026-11-13T22:47:39Z,2026,10,6167,MIA,RB,Inactive,,,,,sleeper_snapshot
+2026-11-13-fri,2026-11-13T22:47:39Z,2026,10,6453,IND,WR,Inactive,IR,Abdomen,,,sleeper_snapshot
+2026-11-13-fri,2026-11-13T22:47:39Z,2026,10,6465,CHI,WR,Inactive,,,,,sleeper_snapshot
+2026-11-13-fri,2026-11-13T22:47:39Z,2026,10,6540,GB,WR,Inactive,,,,,sleeper_snapshot
+2026-11-13-fri,2026-11-13T22:47:39Z,2026,10,6588,DET,WR,Inactive,IR,Knee - MCL,,,sleeper_snapshot
+2026-11-13-fri,2026-11-13T22:47:39Z,2026,10,6677,KC,WR,Practice Squad,NA,,,,sleeper_snapshot
+2026-11-13-fri,2026-11-13T22:47:39Z,2026,10,6699,NYG,WR,Inactive,IR,Achilles,,,sleeper_snapshot
+2026-11-13-fri,2026-11-13T22:47:39Z,2026,10,6803,SF,WR,Active,DNR,Knee - ACL + MCL,,,sleeper_snapshot
+2026-11-13-fri,2026-11-13T22:47:39Z,2026,10,6819,PIT,WR,Inactive,IR,Foot,,,sleeper_snapshot
+2026-11-13-fri,2026-11-13T22:47:39Z,2026,10,6826,CHI,TE,Inactive,IR,Knee,,,sleeper_snapshot
+2026-11-13-fri,2026-11-13T22:47:39Z,2026,10,6904,PHI,QB,Inactive,IR,Calf,,,sleeper_snapshot
+2026-11-13-fri,2026-11-13T22:47:39Z,2026,10,6992,DET,RB,Inactive,,,,,sleeper_snapshot
+2026-11-13-fri,2026-11-13T22:47:39Z,2026,10,7049,MIN,WR,Active,Out,Calf,,,sleeper_snapshot
+2026-11-13-fri,2026-11-13T22:47:39Z,2026,10,7083,BAL,QB,Inactive,IR,Toe,,,sleeper_snapshot
+2026-11-13-fri,2026-11-13T22:47:39Z,2026,10,7093,DEN,RB,Inactive,,,,,sleeper_snapshot
+2026-11-13-fri,2026-11-13T22:47:39Z,2026,10,7204,NE,RB,Inactive,IR,Ankle,,,sleeper_snapshot
+2026-11-13-fri,2026-11-13T22:47:39Z,2026,10,7525,PHI,WR,Active,Out,Hamstring,,,sleeper_snapshot
+2026-11-13-fri,2026-11-13T22:47:39Z,2026,10,7526,DEN,WR,Active,Out,Head,,,sleeper_snapshot
+2026-11-13-fri,2026-11-13T22:47:39Z,2026,10,7535,ARI,TE,Inactive,IR,Knee,,,sleeper_snapshot
+2026-11-13-fri,2026-11-13T22:47:39Z,2026,10,7543,NO,RB,Inactive,IR,Hamstring,,,sleeper_snapshot
+2026-11-13-fri,2026-11-13T22:47:39Z,2026,10,7547,DET,WR,Active,Questionable,Ribs,,,sleeper_snapshot
+2026-11-13-fri,2026-11-13T22:47:39Z,2026,10,7559,CAR,WR,Active,Out,Undisclosed,,,sleeper_snapshot
+2026-11-13-fri,2026-11-13T22:47:39Z,2026,10,7568,HOU,TE,Active,Out,Finger,,,sleeper_snapshot
+2026-11-13-fri,2026-11-13T22:47:39Z,2026,10,7571,BAL,WR,Active,Questionable,Calf,,,sleeper_snapshot
+2026-11-13-fri,2026-11-13T22:47:39Z,2026,10,7583,DEN,QB,Active,Out,Coach's Decision,,,sleeper_snapshot
+2026-11-13-fri,2026-11-13T22:47:39Z,2026,10,7587,WAS,WR,Inactive,IR,Calf,,,sleeper_snapshot
+2026-11-13-fri,2026-11-13T22:47:39Z,2026,10,7593,ATL,RB,Inactive,IR,Undisclosed,,,sleeper_snapshot
+2026-11-13-fri,2026-11-13T22:47:39Z,2026,10,7597,ARI,TE,Active,Out,Undisclosed,,,sleeper_snapshot
+2026-11-13-fri,2026-11-13T22:47:39Z,2026,10,7610,LAC,QB,Inactive,IR,Groin,,,sleeper_snapshot
+2026-11-13-fri,2026-11-13T22:47:39Z,2026,10,7611,NE,RB,Active,Questionable,Knee,,,sleeper_snapshot
+2026-11-13-fri,2026-11-13T22:47:39Z,2026,10,7670,BUF,WR,Inactive,IR,Hamstring,,,sleeper_snapshot
+2026-11-13-fri,2026-11-13T22:47:39Z,2026,10,8107,CHI,TE,Inactive,IR,Knee,,,sleeper_snapshot
+2026-11-13-fri,2026-11-13T22:47:39Z,2026,10,8110,DAL,TE,Active,Out,Knee,,,sleeper_snapshot
+2026-11-13-fri,2026-11-13T22:47:39Z,2026,10,8121,NE,WR,Inactive,IR,Shoulder,,,sleeper_snapshot
+2026-11-13-fri,2026-11-13T22:47:39Z,2026,10,8125,NYG,WR,Inactive,IR,Knee,,,sleeper_snapshot
+2026-11-13-fri,2026-11-13T22:47:39Z,2026,10,8142,IND,WR,Inactive,IR,Heel,,,sleeper_snapshot
+2026-11-13-fri,2026-11-13T22:47:39Z,2026,10,8146,NYJ,WR,Active,Questionable,Concussion,,,sleeper_snapshot
+2026-11-13-fri,2026-11-13T22:47:39Z,2026,10,8151,KC,RB,Active,Questionable,Groin,,,sleeper_snapshot
+2026-11-13-fri,2026-11-13T22:47:39Z,2026,10,8154,ATL,RB,Inactive,IR,Hamstring,,,sleeper_snapshot
+2026-11-13-fri,2026-11-13T22:47:39Z,2026,10,8161,MIA,QB,Inactive,IR,Groin,,,sleeper_snapshot
+2026-11-13-fri,2026-11-13T22:47:39Z,2026,10,8168,GB,WR,Inactive,IR,Ankle,,,sleeper_snapshot
+2026-11-13-fri,2026-11-13T22:47:39Z,2026,10,8188,KC,WR,Inactive,IR,Ankle,,,sleeper_snapshot
+2026-11-13-fri,2026-11-13T22:47:39Z,2026,10,8205,DET,RB,Inactive,IR,Back,,,sleeper_snapshot
+2026-11-13-fri,2026-11-13T22:47:39Z,2026,10,8206,BAL,QB,Inactive,IR,Undisclosed,,,sleeper_snapshot
+2026-11-13-fri,2026-11-13T22:47:39Z,2026,10,8207,DAL,RB,Active,Out,Knee,,,sleeper_snapshot
+2026-11-13-fri,2026-11-13T22:47:39Z,2026,10,8208,DEN,RB,Inactive,IR,Thumb,,,sleeper_snapshot
+2026-11-13-fri,2026-11-13T22:47:39Z,2026,10,8210,WAS,TE,Active,Questionable,Back,,,sleeper_snapshot
+2026-11-13-fri,2026-11-13T22:47:39Z,2026,10,8214,MIA,TE,Inactive,IR,Undisclosed,,,sleeper_snapshot
+2026-11-13-fri,2026-11-13T22:47:39Z,2026,10,8230,NO,RB,Inactive,IR,Knee,,,sleeper_snapshot
+2026-11-13-fri,2026-11-13T22:47:39Z,2026,10,8414,PHI,WR,Active,Out,Knee,,,sleeper_snapshot
+2026-11-13-fri,2026-11-13T22:47:39Z,2026,10,8423,CHI,RB,Inactive,IR,Undisclosed,,,sleeper_snapshot
+2026-11-13-fri,2026-11-13T22:47:39Z,2026,10,8583,NO,TE,Active,Out,Undisclosed,,,sleeper_snapshot
+2026-11-13-fri,2026-11-13T22:47:39Z,2026,10,8698,SF,TE,Inactive,IR,Knee,,,sleeper_snapshot
+2026-11-13-fri,2026-11-13T22:47:39Z,2026,10,8800,DAL,RB,Inactive,IR,Hip,,,sleeper_snapshot
+2026-11-13-fri,2026-11-13T22:47:39Z,2026,10,8917,DAL,WR,Active,Questionable,Ribs,,,sleeper_snapshot
+2026-11-13-fri,2026-11-13T22:47:39Z,2026,10,9225,PHI,RB,Inactive,IR,Abdomen,,,sleeper_snapshot
+2026-11-13-fri,2026-11-13T22:47:39Z,2026,10,9226,MIA,RB,Inactive,IR,Knee - ACL,,,sleeper_snapshot
+2026-11-13-fri,2026-11-13T22:47:39Z,2026,10,9481,GB,TE,Active,PUP,Undisclosed,,,sleeper_snapshot
+2026-11-13-fri,2026-11-13T22:47:39Z,2026,10,9486,PHI,WR,Active,Out,Ankle,,,sleeper_snapshot
+2026-11-13-fri,2026-11-13T22:47:39Z,2026,10,9493,LAR,WR,Inactive,IR,Knee - MCL,,,sleeper_snapshot
+2026-11-13-fri,2026-11-13T22:47:39Z,2026,10,9508,TEN,RB,Active,Questionable,Knee,,,sleeper_snapshot
+2026-11-13-fri,2026-11-13T22:47:39Z,2026,10,9511,LAC,RB,Active,Questionable,Hip,,,sleeper_snapshot
+2026-11-13-fri,2026-11-13T22:47:39Z,2026,10,9756,MIN,WR,Active,Questionable,Thumb,,,sleeper_snapshot
