@@ -48,7 +48,7 @@ def play(run, weeks):
 
 
 def test_a_game_without_a_block_plays_exactly_as_before_and_new_games_carry_the_flag():
-    assert Run().root.settings.block_v == 1 and Run().root.settings.to_dict()["block_v"] == 1
+    assert Run().root.settings.block_v == 2 and Run().root.settings.to_dict()["block_v"] == 2
     old = old_save(Run())
     assert "block_v" not in old.root.settings.to_dict()  # an old save serializes as it always did
     a, b = Run(), old_save(Run())
@@ -91,7 +91,7 @@ def test_golden_digest_a_dynasty_v3_game_with_block_v1_and_nothing_blocked_equal
 def test_the_block_settings_serialize_independently_of_the_other_gates():
     r = Run()
     d = r.root.settings.to_dict()
-    assert d["dynasty_v"] == 3 and d["ai_v"] == 1 and d["block_v"] == 1
+    assert d["dynasty_v"] == 3 and d["ai_v"] == 1 and d["block_v"] == 2
     for ai_v, block_v in ((0, 0), (0, 1), (1, 0), (1, 1)):
         g = with_gates(Run(), ai_v=ai_v, block_v=block_v).root.settings
         back = type(g).from_dict(g.to_dict()) if hasattr(type(g), "from_dict") else g
@@ -298,3 +298,61 @@ def test_api_block_put_get_filter_rosters_and_inbox_flag():
     league = client.get(f"/v1/sim/games/{gid}/block", headers=hdr()).json()["league"]
     for b in league:
         assert b["items"] and set(b["needs"]) <= {"QB", "RB", "WR", "TE", "K", "DEF"}
+
+
+# ----------------------------------------------------- block_v 2: assets that leave the team leave the block for good
+
+
+def _reclaim(run, user, pid):
+    run.em.emit(run.state.week, "engine", "waiver_result", team=user, add=pid, drop=None, ok=True, reason="", start_slot=None, claim_id=None)
+
+
+def test_a_cut_player_is_off_the_block_even_when_he_comes_back():
+    run = Run()
+    assert run.root.settings.block_v == 2 and run.root.settings.block_forgets
+    user, players = user_assets(run)
+    pid = players[-1]
+    blk.set_block(run.em, pid, True, "RB")
+    assert pid in blk.user_block(run.snap, run.state)
+    act.cut_player(run.em, pid)
+    assert pid not in run.state.block  # forgotten in the state, not just filtered from the view
+    _reclaim(run, user, pid)
+    assert pid in run.state.rosters[user] and pid not in blk.user_block(run.snap, run.state)
+
+
+def test_a_traded_player_and_a_spent_pick_leave_the_block():
+    run = Run()
+    user, players = user_assets(run)
+    partner = next(t for t in run.snap.tids if t != user)
+    mine, theirs = players[-1], next(p for p in run.state.rosters[partner] if run.snap.players[p].pos in ("RB", "WR"))
+    pick = next(p for p, o in run.state.pick_owner.items() if o == user)
+    blk.set_block(run.em, mine, True)
+    blk.set_block(run.em, pick, True)
+    act.execute_trade(run.em, user, partner, [mine, pick], [theirs], key="", source="user")
+    assert mine not in run.state.block and pick not in run.state.block
+    act.execute_trade(run.em, user, partner, [theirs], [mine, pick], key="", source="user")  # and back again
+    assert mine in run.state.rosters[user] and not blk.user_block(run.snap, run.state)
+
+
+def test_block_v1_saves_keep_the_derived_only_behaviour():
+    run = Run()
+    object.__setattr__(run.root, "settings", replace(run.root.settings, block_v=1))
+    run.root.__dict__.pop("_views", None)
+    user, players = user_assets(run)
+    pid = players[-1]
+    blk.set_block(run.em, pid, True)
+    act.cut_player(run.em, pid)
+    assert pid not in blk.user_block(run.snap, run.state) and pid in run.state.block  # filtered from the view, kept in the state
+    _reclaim(run, user, pid)
+    assert pid in blk.user_block(run.snap, run.state)  # the old resurrection, unchanged for old saves
+
+
+def test_sim_to_rejects_an_unknown_target_and_silly_weeks():
+    client, _, _ = make_app()
+    gid = new_game(client)["game"]["id"]
+    finish_draft(client, gid)
+    for body in ({"target": "zz"}, {"target": "weeks", "weeks": 0}, {"target": "weeks", "weeks": 31}, {"target": "weeks", "weeks": -3}):
+        res = client.post(f"/v1/sim/games/{gid}/sim-to", json=body, headers=hdr())
+        assert res.status_code == 422, (body, res.text)
+    assert "target must be one of" in client.post(f"/v1/sim/games/{gid}/sim-to", json={"target": "zz"}, headers=hdr()).json()["detail"]
+    assert client.post(f"/v1/sim/games/{gid}/sim-to", json={"target": "weeks", "weeks": 1}, headers=hdr()).status_code == 200
