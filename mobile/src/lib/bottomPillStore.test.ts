@@ -23,7 +23,7 @@ test('publishes only when what is shown changes, and keeps callbacks fresh', () 
   assert.equal(n, 2);
 });
 
-test('only the owner may clear; bar-present is tracked', () => {
+test('only the owner may clear; bar-present is tracked', async () => {
   const a = {};
   const b = {};
   setPillContext(a, ctx());
@@ -31,6 +31,7 @@ test('only the owner may clear; bar-present is tracked', () => {
   setPillContext(a, null);
   assert.equal(getPillState().ctx?.id, 'trades');
   setPillContext(b, null);
+  await new Promise((r) => setTimeout(r, 350));
   assert.equal(getPillState().ctx, null);
   setPillBarPresent(true);
   assert.equal(getPillState().barPresent, true);

@@ -1,11 +1,25 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { getPillState, resetPillStore, setPillBarPresent, setPillContext, subscribePill } from "./bottomPillStore";
+import { getPillState, PILL_CLEAR_DELAY_MS, resetPillStore, setPillBarPresent, setPillContext, subscribePill } from "./bottomPillStore";
 
 const ctx = (over = {}) => ({ id: "team", label: "Team", tabs: [{ key: "a", label: "A" }], activeKey: "a", onSelect: () => {}, ...over });
 
 describe("bottomPillStore", () => {
-  beforeEach(resetPillStore);
+  beforeEach(() => {
+    vi.useFakeTimers();
+    resetPillStore();
+  });
+  afterEach(() => vi.useRealTimers());
+  it("a page swap (unmount then mount) never shows the plain global pill in between", () => {
+    const a = {};
+    const b = {};
+    setPillContext(a, ctx());
+    setPillContext(a, null);
+    setPillContext(b, ctx({ activeKey: "a" }));
+    vi.advanceTimersByTime(PILL_CLEAR_DELAY_MS + 1);
+    expect(getPillState().ctx?.id).toBe("team");
+  });
+  
   it("publishes only when what is shown changes, and keeps callbacks fresh", () => {
     const l = vi.fn();
     subscribePill(l);
@@ -29,6 +43,7 @@ describe("bottomPillStore", () => {
     setPillContext(a, null);
     expect(getPillState().ctx?.id).toBe("trades");
     setPillContext(b, null);
+    vi.advanceTimersByTime(PILL_CLEAR_DELAY_MS + 1);
     expect(getPillState().ctx).toBeNull();
     setPillBarPresent(true);
     expect(getPillState().barPresent).toBe(true);

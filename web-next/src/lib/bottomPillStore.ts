@@ -10,6 +10,9 @@ export type PillState = { ctx: PillContext | null; barPresent: boolean };
 
 let owner: object | null = null;
 let latest: PillContext | null = null;
+let clearTimer: ReturnType<typeof setTimeout> | null = null;
+/** A page that unmounts as the next family page mounts must not flash the plain global tabs in between. */
+export const PILL_CLEAR_DELAY_MS = 300;
 let state: PillState = { ctx: null, barPresent: false };
 const listeners = new Set<() => void>();
 
@@ -39,9 +42,17 @@ export function setPillContext(who: object, ctx: PillContext | null) {
     if (owner === who) {
       owner = null;
       latest = null;
-      publish({ ...state, ctx: null });
+      if (clearTimer) clearTimeout(clearTimer);
+      clearTimer = setTimeout(() => {
+        clearTimer = null;
+        if (owner === null) publish({ ...state, ctx: null });
+      }, PILL_CLEAR_DELAY_MS);
     }
     return;
+  }
+  if (clearTimer) {
+    clearTimeout(clearTimer);
+    clearTimer = null;
   }
   owner = who;
   latest = ctx;
@@ -62,6 +73,8 @@ export const getServerPillState = (): PillState => ({ ctx: null, barPresent: fal
 export function resetPillStore() {
   owner = null;
   latest = null;
+  if (clearTimer) clearTimeout(clearTimer);
+  clearTimer = null;
   state = { ctx: null, barPresent: false };
   listeners.clear();
 }

@@ -13,10 +13,11 @@ describe("useBottomPillContext", () => {
   beforeEach(() => {
     resetPillStore();
   });
-  it("registers on mount, clears on unmount", () => {
+  it("registers on mount, clears shortly after unmount", async () => {
     const { unmount } = render(<Page />);
     expect(getPillState().ctx?.id).toBe("team");
     unmount();
+    await act(async () => { await new Promise((r) => setTimeout(r, 350)); });
     expect(getPillState().ctx).toBeNull();
   });
   it("tells the page to drop its own tab row only while the pill bar is on screen", () => {
