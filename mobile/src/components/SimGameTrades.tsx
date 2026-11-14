@@ -15,6 +15,7 @@ import { SkeletonCard } from './SkeletonBlock';
 import { MotionIn } from './Motion';
 import SimCrest from './SimCrest';
 import SimGlyph from './SimGlyph';
+import { TapForWhyOff } from './TapForWhy';
 import { SimBlockView } from './SimTradeBlock';
 import SimTeamCard from './SimTeamCard';
 import { SimPickLine, useSimPicks } from './SimGameDynastyParts';
@@ -533,6 +534,7 @@ export function SimTradesTab({ ctx, seed, onSeedUsed }: { ctx: SimCtx; seed: Sim
     setMode('build');
   }
   return (
+    <TapForWhyOff>
     <View style={common.stack}>
       <SegmentedTabBar<'inbox' | 'build' | 'block'>
         options={[
@@ -565,6 +567,7 @@ export function SimTradesTab({ ctx, seed, onSeedUsed }: { ctx: SimCtx; seed: Sim
         />
       )}
     </View>
+    </TapForWhyOff>
   );
 }
 

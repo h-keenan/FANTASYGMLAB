@@ -1,4 +1,4 @@
-import React, { useMemo, useState, type ReactNode } from 'react';
+import React, { createContext, useContext, useMemo, useState, type ReactNode } from 'react';
 import { Pressable, StyleSheet, View, type StyleProp, type ViewStyle } from 'react-native';
 
 import AppText from './AppText';
@@ -7,6 +7,13 @@ import { useThemeMode } from '../context/ThemeModeContext';
 import { trackUse } from '../lib/analytics';
 import { whyEntry, whyTriggerLabel, type WhyMetricId } from '../lib/tapForWhyContent';
 import { spacing, type ThemeColors } from '../theme';
+
+const TapForWhyOffContext = createContext(false);
+
+/** Turns every TapForWhy underneath into plain, untappable content (Fantasy Sim's trade window: a stat pill must never open a sheet over the trade). Twin of web's TapForWhyOff. */
+export function TapForWhyOff({ children }: { children: ReactNode }) {
+  return <TapForWhyOffContext.Provider value>{children}</TapForWhyOffContext.Provider>;
+}
 
 export type TapForWhyProps = {
   /** Registry key (lib/tapForWhyContent.ts), the same table web uses. */
@@ -40,8 +47,10 @@ export default function TapForWhy({ metric, children, spoken, variant = 'inline'
   const { colors } = useThemeMode();
   const styles = useMemo(() => createStyles(colors), [colors]);
   const [open, setOpen] = useState(false);
+  const off = useContext(TapForWhyOffContext);
   const entry = whyEntry(metric);
   const sentences = [...entry.sentences, ...(extra ?? [])];
+  if (off) return <>{children}</>;
   return (
     <>
       <Pressable

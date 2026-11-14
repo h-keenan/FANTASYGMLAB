@@ -24,6 +24,7 @@ import { simTeamsByPower } from "@/lib/simLeagueRosters";
 import { simGroupsToSheetItems } from "@/lib/simTradeSheet";
 import { useSimLeagueRosters } from "@/lib/useSimLeagueRosters";
 import { selectedItems } from "@/lib/tradeSheetPicker";
+import { TapForWhyOff } from "@/components/ui/TapForWhy";
 import { TradePickerSheet, TradeSideSummary } from "@/components/TradePickerSheet";
 import {
   SIM_TRADE_EMPTY,
@@ -493,6 +494,7 @@ export function SimTradesTab({
   }
   const hasBlock = (ctx.game.settings.block_v ?? 0) >= 1;
   return (
+    <TapForWhyOff>
     <div className="flex flex-col gap-3">
       <PillRow
         ariaLabel="Trades view"
@@ -514,6 +516,7 @@ export function SimTradesTab({
         <Builder ctx={ctx} seed={blockSeed ?? seed} onSeedUsed={() => { setBlockSeed(null); onSeedUsed(); }} />
       )}
     </div>
+    </TapForWhyOff>
   );
 }
 
