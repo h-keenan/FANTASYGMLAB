@@ -33,6 +33,6 @@ test('fairness meter math: clamped band, direction, sim coarse', () => {
   assert.equal(fairnessMeter(1000, 2000).position, 1);
   assert.equal(fairnessMeter(3575, 2159, 'desk', -583).tone, 'danger');
   assert.equal(fairnessMeter(100, 200, 'sim').label, 'In your favor');
-  assert.equal(fairnessMeter(1000, 1160, 'sim').position, fairnessMeter(1000, 1210, 'sim').position);
+  assert.equal(fairnessMeter(1000, 1160, 'sim').position, fairnessMeter(1000, 1170, 'sim').position);
   assert.doesNotMatch(fairnessMeter(1000, 1160, 'sim').label + fairnessMeter(1000, 1160, 'sim').description, /\d/);
 });

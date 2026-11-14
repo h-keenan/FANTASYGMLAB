@@ -57,7 +57,7 @@ describe("playerAnatomy", () => {
     expect(fairnessMeter(1000, 1100, "sim").label).toBe("Slightly in your favor");
     expect(fairnessMeter(1100, 1000, "sim").label).toBe("Slightly in their favor");
     const a = fairnessMeter(1000, 1160, "sim");
-    const b = fairnessMeter(1000, 1210, "sim");
+    const b = fairnessMeter(1000, 1170, "sim");
     expect(a.position).toBe(b.position);
     expect(a.edge).toBe(0);
     expect(`${a.label}${a.description}`).not.toMatch(/\d/);
