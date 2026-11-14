@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 
 import { AccentCard } from "@/components/AccentCard";
+import { BottomDock } from "@/components/ui/BottomDock";
 import { DashboardContent } from "@/components/DashboardContent";
 import { PillRow } from "@/components/PillRow";
 import { BottomTabBar } from "@/components/ui/BottomTabBar";
@@ -160,8 +161,8 @@ function TradeTab() {
 /**
  * Static sample league: no network calls, no auth, no analytics. It wears the
  * same chrome as a real league: a sticky tab strip under a slim sample bar on
- * wider screens, and on phones the shared in-flow sticky `.bottom-stack` with
- * the shared BottomTabBar (the one bottom mechanism, never position: fixed).
+ * wider screens, and on phones the shared fixed, portaled `BottomDock` with
+ * the shared BottomTabBar (the one bottom mechanism: fixed dock + content clearance).
  */
 export function SampleLeagueContent() {
   const [tab, setTab] = useState<SampleTab>("dashboard");
@@ -208,9 +209,9 @@ export function SampleLeagueContent() {
           </aside>
         </div>
       </main>
-      <div className="bottom-stack md:hidden" data-bare data-testid="sample-bottom-stack">
+      <BottomDock className="md:hidden" testId="sample-bottom-stack">
         <BottomTabBar ariaLabel="Sample league views" tabs={tabs} active={tab} testId="sample-tab-bar" onSelect={(key) => setTab(key as SampleTab)} />
-      </div>
+      </BottomDock>
     </>
   );
 }

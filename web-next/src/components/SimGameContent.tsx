@@ -18,6 +18,7 @@ import { SimLeagueTab } from "@/components/SimGameLeague";
 import { SimGameOffseason } from "@/components/SimGameOffseason";
 import { SimHomeTab } from "@/components/SimGameHome";
 import { SimPlayerSheet } from "@/components/SimGamePlayers";
+import { BottomDock } from "@/components/ui/BottomDock";
 import { SimPillHost } from "@/components/SimPillHost";
 import { SimActionBar } from "@/components/SimActionBar";
 import { SimGameHeader, SimStatusChips } from "@/components/SimGameHeader";
@@ -1047,7 +1048,7 @@ function GameScreen({
     <SimOpenPlayerContext.Provider value={ctx.openPlayer}>
     {/* Phones: a 100dvh flex column. Compact header on top, content flex-1, and the action pill + bottom tab bar as an in-flow
         sticky footer (no position:fixed, no JS placement), so iOS Safari viewport quirks cannot float it. */}
-    <div className={`flex flex-auto flex-col gap-3 max-md:gap-2 ${showBar || showOffBar ? "pb-3 max-md:pb-0" : "pb-6"} md:pb-3`}>
+    <div className={`flex flex-auto flex-col gap-3 max-md:gap-2 ${showBar || showOffBar ? "pb-3 max-md:pb-[var(--bottom-clearance,0px)]" : "pb-6 max-md:pb-[calc(var(--bottom-clearance,0px)+1.5rem)]"} md:pb-3`}>
       <SimGameHeader game={game} onHub={onHub} onTeam={(id) => ctx.openTeam(id)} onMore={() => setMoreOpen(true)} bell={<SimNotificationBell notif={notif} onOpenTab={onTab} />} />
       <div className="hidden items-center justify-between gap-2 md:flex">
         <div className="flex min-w-0 flex-col">
@@ -1144,11 +1145,11 @@ function GameScreen({
           </div>
         </>
       )}
-      <div className="bottom-stack" data-testid="sim-bottom-stack">
+      <BottomDock testId="sim-bottom-stack">
         <SimPillHost standalone={!showBar && !showOffBar} />
         {showOffBar ? <SimOffseasonBar ctx={ctx} onTab={onTab} orb={orbNode} /> : null}
         {showBar ? <SimActionBar ctx={ctx} paywalled={paywalled} advancing={advancing} onAdvance={onAdvance} onSimTo={onSimTo} onTab={onTab} orb={orbNode} /> : null}
-      </div>
+      </BottomDock>
       <SimToSheet ctx={ctx} open={simToOpen} onClose={onSimToClose} onRun={onRunSimTo} />
       {simToBusy ? (
         <div className="fixed inset-x-0 bottom-24 z-40 mx-auto flex w-fit max-w-[90vw] items-center gap-2 glass-surface px-4 py-2 text-sm font-bold" role="status" aria-live="polite" data-testid="sim-to-progress">
