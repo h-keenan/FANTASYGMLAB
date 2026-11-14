@@ -63,7 +63,7 @@ export function confidenceBars(label: string | null | undefined): 1 | 2 | 3 | nu
 }
 
 function PickPlate({ asset, size }: { asset: TradeAsset; size: number }) {
-  // Same plate as the in-app pick tile: accent-soft square, round label.
+  // Same plate as the in-app pick tile: accent-soft circle (same slot as a player photo), round label.
   return (
     <div
       style={{
@@ -73,7 +73,7 @@ function PickPlate({ asset, size }: { asset: TradeAsset; size: number }) {
         height: size,
         alignItems: "center",
         justifyContent: "center",
-        borderRadius: shareRadius("--radius-sm"),
+        borderRadius: size / 2,
         border: `2px solid ${withAlpha(T["--color-accent"], 0.5)}`,
         backgroundColor: T["--color-accent-soft"],
         gap: 2,

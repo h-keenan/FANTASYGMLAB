@@ -5,7 +5,8 @@ import AppText from './AppText';
 import CompactPlayerCard from './CompactPlayerCard';
 import OvrGauge from './OvrGauge';
 import { useThemeMode } from '../context/ThemeModeContext';
-import { fairnessMeter, type FactTone, type PlayerMode, type PlayerRef } from '../lib/playerAnatomy';
+import PickAvatar from './PickAvatar';
+import { avatarSize, fairnessMeter, type FactTone, type PlayerMode, type PlayerRef } from '../lib/playerAnatomy';
 import { radii, spacing, type ThemeColors } from '../theme';
 
 export interface TradeCardAsset {
@@ -89,7 +90,10 @@ export default function TradeCompactCard({
           />
           </Pressable>
         ) : (
-          <AppText key={a.key} style={styles.pick}>{a.pickLabel}</AppText>
+          <View key={a.key} style={styles.pickRow} testID="trade-pick-row">
+            <PickAvatar label={a.pickLabel} size={avatarSize('row')} />
+            <AppText style={styles.pick}>{a.pickLabel}</AppText>
+          </View>
         ),
       )}
     </View>
@@ -128,7 +132,8 @@ function createStyles(colors: ThemeColors) {
     side: { gap: 2 },
     kicker: { fontSize: 12, fontWeight: '800', letterSpacing: 0.6, color: colors.textTertiary, textTransform: 'uppercase' },
     value: { fontSize: 14, fontWeight: '800', color: colors.textPrimary },
-    pick: { minHeight: 44, fontSize: 14, fontWeight: '700', color: colors.textPrimary },
+    pickRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, minHeight: 44 },
+    pick: { flex: 1, fontSize: 14, fontWeight: '700', color: colors.textPrimary },
     meterRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
     track: { flex: 1, height: 8, borderRadius: 4, backgroundColor: 'rgba(255,255,255,0.12)', justifyContent: 'center' },
     fill: { position: 'absolute', top: 0, height: 8, borderRadius: 4, opacity: 0.55 },

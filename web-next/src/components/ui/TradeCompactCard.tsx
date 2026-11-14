@@ -4,7 +4,8 @@ import { useId, useState, type ReactNode } from "react";
 
 import { OvrGauge } from "@/components/OvrGauge";
 import { CompactPlayerCard } from "@/components/ui/CompactPlayerCard";
-import { fairnessMeter, type FactTone, type PlayerMode, type PlayerRef } from "@/lib/playerAnatomy";
+import { PickAvatar } from "@/components/PickAvatar";
+import { avatarSize, fairnessMeter, type FactTone, type PlayerMode, type PlayerRef } from "@/lib/playerAnatomy";
 
 export interface TradeCardAsset {
   key: string;
@@ -54,7 +55,10 @@ function Side({ label, assets, mode }: { label: string; assets: TradeCardAsset[]
             } />
           </TapWrap>
         ) : (
-          <div key={a.key} className="flex items-center text-sm font-bold" style={{ minHeight: 40 }}>{a.pickLabel}</div>
+          <div key={a.key} className="flex items-center gap-2 text-sm font-bold" style={{ minHeight: 44 }} data-testid="trade-pick-row">
+            <PickAvatar label={a.pickLabel} size={avatarSize("row")} />
+            <span className="min-w-0 break-words">{a.pickLabel}</span>
+          </div>
         ),
       )}
     </div>
