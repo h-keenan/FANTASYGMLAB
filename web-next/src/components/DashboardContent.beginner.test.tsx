@@ -76,9 +76,10 @@ describe("DashboardContent for a beginner", () => {
     expect(screen.getByText(/^Today lists the roster moves/)).toBeInTheDocument();
   });
 
-  it("tells a beginner no move is needed when nothing is urgent", () => {
+  it("tells a beginner no move is needed when nothing is urgent", async () => {
     const quiet: DashboardResponse = { ...FIXTURE, items: [], entitlement: { is_premium: true, visible_count: 0, hidden_count: 0 } };
     render(<DashboardContent leagueId="abc" leagueName="Dynasty Overlords" data={quiet} />);
+    await screen.findByText("Nothing needs you this week");
     expandHelp();
     expect(screen.getByText(/No move is needed right now/)).toBeInTheDocument();
   });

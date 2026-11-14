@@ -256,15 +256,13 @@ function lineupDecision(input: DecisionInput): Decision | null {
     return mapPlayer(m.over as DecisionMovePlayer, `${why} · ${swap}`, gain);
   });
   const impact = Math.min(99, round1(holes.reduce((sum, m) => sum + Math.max(0, m.gain ?? 0), 0)));
-  const count = holes.length + empty;
-  const title =
-    count > 0
-      ? `${plural(holes.length > 0 ? holes.length : count, holes.length > 0 ? "starter" : "open slot")} can't play`
-      : (weekRow?.headline ?? "Fix your lineup");
   const parts: string[] = [];
-  if (holes.length > 0) parts.push(`${plural(holes.length, "starter")} on bye or out`);
+  if (holes.length > 0) parts.push(`${plural(holes.length, "starter")} can't play (bye or out)`);
   if (empty > 0) parts.push(plural(empty, "open slot"));
-  const summary = parts.length > 0 ? parts.join(", ") : (weekRow?.why ?? "A starter cannot play this week");
+  const title = parts.length > 0 ? parts.join(", ") : (weekRow?.headline ?? "Fix your lineup");
+  const best = [...holes].sort((x, y) => (y.gain ?? 0) - (x.gain ?? 0))[0];
+  const swap = best && best.start.name ? `Best swap: start ${best.start.name}${best.over?.name ? ` over ${best.over.name}` : ""}${best.gain && best.gain > 0 ? ` (+${round1(best.gain)} pts)` : ""}` : null;
+  const summary = swap ?? weekRow?.why ?? (parts.length > 0 ? "Fix it before lineups lock" : "A starter cannot play this week");
   const facts = holes.length > 0 && impact > 0 ? [`Swaps add about ${impact.toFixed(1)} projected points`] : [];
   return {
     key: "lineup",
@@ -274,7 +272,7 @@ function lineupDecision(input: DecisionInput): Decision | null {
     impact,
     tone: "danger",
     label: KIND_LABEL.lineup,
-    title: holes.length > 0 || empty > 0 ? `Fix your lineup: ${title}` : title,
+    title,
     summary,
     why: weekRow?.why ?? (holes.length > 0 ? "A starter who is out or on bye scores nothing. The swap below is the best healthy replacement on your roster." : null),
     players,
@@ -460,12 +458,18 @@ export function buildDecisionQueue<T extends DecisionItem>(input: DecisionInput<
   };
 }
 
-/** The collapsed summary line: badge-less, one status plus the one-line reason ("1 starter on bye or out", ...). */
-export function decisionSummaryParts(d: Decision): { key: string; text: string; tone?: DecisionTone | "muted"; strong?: boolean }[] {
-  return [
-    { key: "title", text: d.title, tone: d.tone, strong: true },
-    d.summary && d.summary !== d.title ? { key: "summary", text: d.summary, tone: "muted" as const } : null,
-  ].filter((p): p is { key: string; text: string; tone?: DecisionTone | "muted"; strong?: boolean } => p !== null);
+export interface DecisionSummaryPart {
+  key: string;
+  text: string;
+  tone?: DecisionTone | "muted";
+  strong?: boolean;
+}
+
+/** The collapsed summary line: the title (bold, toned) then the one-line reason ("1 starter on bye or out"). */
+export function decisionSummaryParts(d: Decision): DecisionSummaryPart[] {
+  const parts: DecisionSummaryPart[] = [{ key: "title", text: d.title, tone: d.tone, strong: true }];
+  if (d.summary && d.summary !== d.title) parts.push({ key: "summary", text: d.summary, tone: "muted" });
+  return parts;
 }
 
 /** "See all (N)" label; the toggle reads "Show top 3" once opened. Null when nothing is hidden. */

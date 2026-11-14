@@ -29,6 +29,7 @@ export function TodayModule({
   leagueName,
   now,
   hideEmpty = false,
+  omitGating = false,
 }: {
   data: DashboardResponse;
   leagueId: string;
@@ -37,12 +38,14 @@ export function TodayModule({
   now?: Date;
   /** "Needs attention" already lists urgent items: don't also say nothing is urgent. */
   hideEmpty?: boolean;
+  /** The Decision Queue shows the Free-limit note / Pro line: don't repeat it here. */
+  omitGating?: boolean;
 }) {
   const thisWeek = data.this_week ?? null;
   const plan = buildTodayPlan(thisWeek, data.items, now);
   const query = `?name=${encodeURIComponent(leagueName)}`;
   const nextAction = plan.nextAction;
-  const hidden = data.entitlement.hidden_count;
+  const hidden = omitGating ? 0 : data.entitlement.hidden_count;
   // The progressive first Dashboard pass has no trade verdict yet: reserve its
   // row's space so the full response fills it without a layout jump.
   const tradePending =
@@ -88,7 +91,7 @@ export function TodayModule({
       >
         {todayTitle(thisWeek)}
       </SectionHeading>
-      {hidden > 0 && !data.entitlement.is_premium ? null : (
+      {omitGating || (hidden > 0 && !data.entitlement.is_premium) ? null : (
         <FreeLimitNote
           kind="window"
           noun="next moves"

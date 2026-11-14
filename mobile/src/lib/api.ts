@@ -1098,6 +1098,7 @@ export interface MatchupResponse {
   game_state?: MatchupGameState | null;
   position_edges?: { actual: MatchupPositionEdge[] | null; suggested: MatchupPositionEdge[] } | null;
   suggested_moves?: MatchupSuggestedMove[] | null;
+  open_slots?: string[];
   /** Sleeper settings.best_ball — suggested-lineup sections are hidden. */
   best_ball?: boolean;
   lineup_advice_message?: string;

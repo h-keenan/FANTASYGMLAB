@@ -22,11 +22,13 @@ import { leagueAverageAge } from "@/lib/teamStatus";
 import { TodayModule } from "@/components/TodayModule";
 import { WatchListCard } from "@/components/WatchListCard";
 import { useSeasonOdds } from "@/components/DashboardOddsStrip";
-import { attentionEntryHref, DashboardMore, DashboardNeedsAttention, DashboardTradesBlock } from "@/components/DashboardBlocks";
-import { splitTodayAttention } from "@/lib/statusHeader";
-import { thisWeekHref } from "@/lib/thisWeek";
+import { DashboardMore, DashboardTradesBlock } from "@/components/DashboardBlocks";
+import { DecisionQueue, decisionHref } from "@/components/DecisionQueue";
+import { buildDecisionQueue } from "@/lib/decisionQueue";
+import { notReadyReasonMessage } from "@/lib/notReadyMessages";
 import { useExperienceCopy, useExperienceLevel } from "@/context/ExperienceLevelContext";
-import { buildNeedsAttention, isTradeItem, itemsAfterAttention, weekRowsAfterAttention } from "@/lib/dashboardLayout";
+import { isTradeItem } from "@/lib/dashboardLayout";
+import { buildTeamStatusMatchup } from "@/lib/teamStatus";
 
 /**
  * Ports modules/dashboard_workflow.py's render_dashboard_workflow for
@@ -92,20 +94,7 @@ export function DashboardContent({
   // one line (count + Trade Hub link); urgent items sit once in "Needs
   // attention"; "This week" keeps only what is left, so nothing shows twice.
   const tradeItems = data.items.filter((item) => item.category === "top_priority" && isTradeItem(item));
-  const attention = buildNeedsAttention(
-    data.this_week?.rows,
-    data.trade_window,
-    data.items.filter((item) => item.category === "top_priority"),
-  );
-  const nextMovesData: DashboardResponse = {
-    ...data,
-    items: itemsAfterAttention(
-      data.items.filter((item) => !tradeItems.includes(item)),
-      attention,
-    ),
-    this_week: data.this_week ? { ...data.this_week, rows: weekRowsAfterAttention(data.this_week.rows, attention) } : data.this_week,
-  };
-  const deadlineInAttention = attention.some((entry) => entry.source === "deadline");
+  // Decision Queue state is computed below, once the matchup read has settled.
   // My Team: six equal tiles (the odds come from the season simulator; until
   // it has something real the two slots hold Starter / Bench Strength), the
   // rest behind "More team stats".
@@ -115,16 +104,40 @@ export function DashboardContent({
   const { caption: oddsCaption, sim } = useSeasonOdds(leagueId, !sample && !data.trade_ideas_deferred);
   const teamStatus = useTeamStatusData(leagueId, lens, !sample, teamRankings, prefetch);
   const teams = teamStatus.rankings?.teams ?? null;
-  // The status header shows lineup holes and single-player items as player rows; the "Needs attention" card keeps the rest.
-  // Until the hero's reads have settled the hero is a skeleton, so nothing moves out of the card yet.
-  const statusAttention = teamStatus.settled
-    ? splitTodayAttention(
-        attention,
-        teamStatus.matchup?.suggested_moves,
-        (entry) => attentionEntryHref(entry, leagueId, leagueName),
-        thisWeekHref("matchup", leagueId, leagueName),
-      )
-    : { rows: [], remaining: attention };
+  // The Decision Queue (lib/decisionQueue.ts): ONE ranked, deduped list of what needs a decision (lineup holes, waivers,
+  // deadline, injuries, draft events). The hero leads with its top decision; the rest of the old modules sit below.
+  // Until the hero's reads have settled the queue is a skeleton, so nothing moves when the lineup holes land.
+  const matchupLine = buildTeamStatusMatchup(teamStatus.matchup);
+  const queue = buildDecisionQueue({
+    now: new Date(),
+    moves: teamStatus.matchup?.suggested_moves,
+    openSlots: teamStatus.matchup?.open_slots?.length ?? 0,
+    thisWeek: data.this_week,
+    items: data.items,
+    tradeWindow: data.trade_window,
+    tradeIdeaCount: tradeItems.length,
+    entitlement: data.entitlement ? { isPremium: data.entitlement.is_premium, hiddenCount: data.entitlement.hidden_count } : null,
+    nextGame: matchupLine ? { week: matchupLine.week, opponentName: matchupLine.opponentName } : data.this_week?.week ? { week: data.this_week.week, opponentName: "" } : null,
+  });
+  // Holds the place only while the queue would otherwise read "nothing needs you" before the matchup has said otherwise.
+  const queuePending = !sample && !teamStatus.settled && queue.total === 0;
+  const hasKind = (kind: string) => queue.all.some((d) => d.kind === kind);
+  const heroQueue = queuePending
+    ? undefined
+    : { next: queue.next ? { title: queue.next.title, label: queue.next.primary.label, href: decisionHref(queue.next, leagueId, leagueName) } : null, nothing: null };
+  // What the queue did not take stays in "This week" (the lineup-is-set row, later-this-week rows, the trade-pending skeleton).
+  const nextMovesData: DashboardResponse = {
+    ...data,
+    items: [],
+    this_week: data.this_week
+      ? {
+          ...data.this_week,
+          rows: data.this_week.rows.filter((row) => row.key !== "trade" && !(row.key === "lineup" && (hasKind("lineup") || row.tone !== "risk")) && !(row.key === "waiver" && hasKind("waiver"))),
+          next_action: data.this_week.next_action && (data.this_week.next_action.route === "trade_hub" || data.this_week.next_action.route === "connect_league") ? data.this_week.next_action : null,
+        }
+      : data.this_week,
+  };
+  const deadlineInAttention = hasKind("deadline");
   const teamStats = snapshot
     ? buildTeamStats(snapshot, copy.label("averageAge", "Avg Age"), {
         teamCount: teams && teams.length > 1 ? teams.length : null,
@@ -170,15 +183,22 @@ export function DashboardContent({
         </p>
       ) : null}
 
-      <TeamStatusHero leagueId={leagueId} leagueName={leagueName} snapshot={snapshot} sim={sim} oddsCaption={oddsCaption} data={teamStatus} attention={statusAttention.rows} tradeCount={tradeItems.length} />
+      <TeamStatusHero leagueId={leagueId} leagueName={leagueName} snapshot={snapshot} sim={sim} oddsCaption={oddsCaption} data={teamStatus} attention={[]} tradeCount={tradeItems.length} queue={heroQueue} />
 
       {/* A few times a season: does the declared direction still fit? Server-decided,
           dismissible, once per moment (modules/direction_checkin.py). */}
       {sample ? null : <DirectionCheckinCard leagueId={leagueId} />}
 
-      <DashboardNeedsAttention entries={statusAttention.remaining} leagueId={leagueId} leagueName={leagueName} />
+      <DecisionQueue
+        queue={queue}
+        leagueId={leagueId}
+        leagueName={leagueName}
+        pending={queuePending}
+        entitlement={data.entitlement}
+        emptyOverride={data.reason ? notReadyReasonMessage(data.reason, { linkAccount: "Connect your Sleeper account to see what to do today.", emptyRoster: "Your roster doesn't have any players yet. This is expected if your draft is still in progress." }) || undefined : undefined}
+      />
 
-      <TodayModule data={nextMovesData} leagueId={leagueId} leagueName={leagueName} hideEmpty={attention.length > 0} />
+      <TodayModule data={nextMovesData} leagueId={leagueId} leagueName={leagueName} hideEmpty omitGating />
 
       {/* First-run trial offer, after the person has seen their own Today
           briefing (paywall-after-connect). Dismissible; nothing is gated. */}

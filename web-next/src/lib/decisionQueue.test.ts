@@ -66,7 +66,7 @@ describe("decision queue: each decision type", () => {
   it("open slots alone make a lineup decision", () => {
     const q = buildDecisionQueue(base({ openSlots: 2 }));
     expect(q.all[0].kind).toBe("lineup");
-    expect(q.all[0].summary).toBe("2 open slots");
+    expect(q.all[0].title).toBe("2 open slots");
   });
 
   it("a trade deadline this week or next is a decision; 2+ weeks out, passed or absent is not", () => {
@@ -227,6 +227,7 @@ describe("decision queue: empty state and gating", () => {
     const q = buildDecisionQueue(base({ moves: [hole("p1", "Rob")] }));
     const parts = decisionSummaryParts(q.all[0]);
     expect(parts[0]).toMatchObject({ key: "title", strong: true, tone: "danger" });
-    expect(parts[1].text).toBe("1 starter on bye or out");
+    expect(parts[0].text).toBe("1 starter can't play (bye or out)");
+    expect(parts[1].text).toBe("Best swap: start Sub Rob over Rob (+4.1 pts)");
   });
 });
