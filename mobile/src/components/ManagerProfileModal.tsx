@@ -1,5 +1,6 @@
 import React, { useMemo } from 'react';
-import { Modal, Pressable, ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
+import { Modal, Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import PressableScale from './PressableScale';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
@@ -76,7 +77,7 @@ export default function ManagerProfileModal({ visible, onClose, leagueId, league
       ) : !data ? (
         <AppText style={styles.muted}>Loading…</AppText>
       ) : !data.is_premium ? (
-        <TouchableOpacity
+        <PressableScale
           onPress={() => {
             onClose();
             navigation.navigate('Paywall');
@@ -84,7 +85,7 @@ export default function ManagerProfileModal({ visible, onClose, leagueId, league
         >
           <AppText style={styles.upsellTitle}>{data.upsell?.title ?? 'Manager Tendencies'}</AppText>
           <AppText style={styles.upsellCta}>Upgrade</AppText>
-        </TouchableOpacity>
+        </PressableScale>
       ) : rows.length === 0 ? (
         <AppText style={styles.muted}>Not enough trade history yet.</AppText>
       ) : sample ? (

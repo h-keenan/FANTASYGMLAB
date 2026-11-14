@@ -1,5 +1,6 @@
 import React, { useMemo, useState } from 'react';
-import { Pressable, StyleSheet, TouchableOpacity, View } from 'react-native';
+import { Pressable, StyleSheet, View } from 'react-native';
+import PressableScale from './PressableScale';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { Ionicons } from '@expo/vector-icons';
 
@@ -233,9 +234,9 @@ function RationaleDetailModal({
             <AppText style={styles.rationaleSheetTitle} numberOfLines={1}>
               Why this works
             </AppText>
-            <TouchableOpacity onPress={onClose} hitSlop={8}>
+            <PressableScale onPress={onClose} hitSlop={8}>
               <Ionicons name="close" size={20} color={colors.textSecondary} />
-            </TouchableOpacity>
+            </PressableScale>
           </View>
           <AppText style={styles.rationaleSheetPartner} numberOfLines={1}>
             vs. {partnerTeamName}
@@ -381,7 +382,7 @@ export default function TradeIdeaCard({
           ) : null}
           <ManagerTendenciesChips leagueId={leagueId} teamName={idea.partner_team_name} />
         </View>
-        <TouchableOpacity
+        <PressableScale
           style={styles.shareButton}
           onPress={() => setShareOpen(true)}
           hitSlop={8}
@@ -390,7 +391,7 @@ export default function TradeIdeaCard({
         >
           <Ionicons name="share-outline" size={16} color={colors.accent} />
           <AppText style={styles.shareButtonText}>Share Trade</AppText>
-        </TouchableOpacity>
+        </PressableScale>
       </View>
 
       <View style={styles.valueRow}>
@@ -449,13 +450,13 @@ export default function TradeIdeaCard({
       </View>
 
       {showExplanations && idea.rationale ? (
-        <TouchableOpacity activeOpacity={0.7} onPress={() => setRationaleOpen(true)}>
+        <PressableScale onPress={() => setRationaleOpen(true)}>
           <AppText style={styles.rationaleLabel}>Why this works</AppText>
           <AppText style={styles.rationale} numberOfLines={3}>
             {idea.rationale}
           </AppText>
           <AppText style={styles.rationaleExpandHint}>View details</AppText>
-        </TouchableOpacity>
+        </PressableScale>
       ) : null}
 
       <RationaleDetailModal

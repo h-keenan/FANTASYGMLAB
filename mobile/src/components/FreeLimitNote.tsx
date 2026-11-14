@@ -1,5 +1,6 @@
 import React from 'react';
-import { StyleSheet, TouchableOpacity, View } from 'react-native';
+import { StyleSheet, View } from 'react-native';
+import PressableScale from './PressableScale';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 
@@ -26,9 +27,9 @@ export default function FreeLimitNote(props: Omit<FreeLimitInput, 'isGuest'>) {
   return (
     <View style={styles.row} accessibilityRole="summary">
       <AppText style={[typography.caption, { color: colors.textTertiary }]}>{note.text}</AppText>
-      <TouchableOpacity accessibilityRole="button" onPress={() => navigation.navigate('Paywall')} hitSlop={LINK_HIT_SLOP}>
+      <PressableScale accessibilityRole="button" onPress={() => navigation.navigate('Paywall')} hitSlop={LINK_HIT_SLOP}>
         <AppText style={[typography.caption, styles.cta, { color: colors.premium }]}>{note.ctaLabel} ›</AppText>
-      </TouchableOpacity>
+      </PressableScale>
     </View>
   );
 }

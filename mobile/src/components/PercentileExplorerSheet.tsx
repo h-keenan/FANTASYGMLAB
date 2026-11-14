@@ -1,7 +1,8 @@
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { PanResponder, StyleSheet, TouchableOpacity, View } from 'react-native';
+import { PanResponder, StyleSheet, View } from 'react-native';
+import PressableScale from './PressableScale';
 
 import AppText from './AppText';
 import PlayerName from './PlayerName';
@@ -235,12 +236,12 @@ export default function PercentileExplorerSheet({
 
   const side = (player: ExplorerPlayer) => (
     <View style={styles.side}>
-      <TouchableOpacity style={styles.sideId} onPress={() => onOpenPlayer(player)} accessibilityLabel={`Open ${player.name}`}>
+      <PressableScale style={styles.sideId} onPress={() => onOpenPlayer(player)} accessibilityLabel={`Open ${player.name}`}>
         <PlayerAvatar playerId={player.player_id} size={36} />
         <AppText style={styles.sideName} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>
           {abbreviatePlayerName(player.name)}
         </AppText>
-      </TouchableOpacity>
+      </PressableScale>
       <AppText style={styles.sideMeta}>{[player.team, player.position].filter(Boolean).join(' · ')}</AppText>
       <View style={styles.sideStat}>
         <AppText style={styles.sideValue}>{formatExplorerValue(player.value, data?.format)}</AppText>
@@ -256,7 +257,7 @@ export default function PercentileExplorerSheet({
       const isMe = player.player_id === me?.player_id;
       const isPicked = player.player_id === comparison?.player_id;
       return (
-        <TouchableOpacity
+        <PressableScale
           key={player.player_id}
           disabled={isMe}
           style={[styles.row, isPicked && styles.rowPicked]}
@@ -276,7 +277,7 @@ export default function PercentileExplorerSheet({
           <View style={[styles.badge, { borderColor: percentileColor(player.percentile, colors) }]}>
             <AppText style={styles.badgeText}>{ordinal(player.percentile)}</AppText>
           </View>
-        </TouchableOpacity>
+        </PressableScale>
       );
     });
 
@@ -291,9 +292,9 @@ export default function PercentileExplorerSheet({
               <AppText style={styles.title}>{metric.label} Percentile Explorer</AppText>
               <AppText style={styles.hint}>Drag across the chart or tap a bar to see who sits there.</AppText>
             </View>
-            <TouchableOpacity onPress={onClose} style={styles.close} hitSlop={8} accessibilityLabel="Close percentile explorer">
+            <PressableScale onPress={onClose} style={styles.close} hitSlop={8} accessibilityLabel="Close percentile explorer">
               <Ionicons name="close" size={22} color={colors.textSecondary} />
-            </TouchableOpacity>
+            </PressableScale>
           </View>
           <SheetScrollView style={styles.scroll} keyboardShouldPersistTaps="handled">
             <SegmentedTabBar
@@ -368,7 +369,7 @@ export default function PercentileExplorerSheet({
                         return (
                           <React.Fragment key={marker.player_id}>
                             <View pointerEvents="none" style={[styles.stem, { left: x, height: BAR_AREA + lift }]} />
-                            <TouchableOpacity
+                            <PressableScale
                               disabled={isMe}
                               style={[styles.marker, { left: boxX, bottom: AXIS_H + BAR_AREA + lift }]}
                               onPress={() => pick(marker)}
@@ -394,7 +395,7 @@ export default function PercentileExplorerSheet({
                                 </View>
                                 {isMine ? <AppText style={styles.tag}>MY</AppText> : null}
                               </View>
-                            </TouchableOpacity>
+                            </PressableScale>
                           </React.Fragment>
                         );
                       })
@@ -443,11 +444,11 @@ export default function PercentileExplorerSheet({
                       <View style={styles.list}>{renderRows(bucketShown, pick)}</View>
                     )}
                     {bucket.length > LIST_PREVIEW ? (
-                      <TouchableOpacity style={styles.more} onPress={() => setShowAllBucket((v) => !v)}>
+                      <PressableScale style={styles.more} onPress={() => setShowAllBucket((v) => !v)}>
                         <AppText style={styles.moreText}>
                           {showAllBucket ? 'Show fewer' : `Show ${Math.min(bucket.length, LIST_CAP) - LIST_PREVIEW} more`}
                         </AppText>
-                      </TouchableOpacity>
+                      </PressableScale>
                     ) : null}
                   </View>
                     ) : (
@@ -498,9 +499,9 @@ export default function PercentileExplorerSheet({
               <View style={styles.compare}>
                 {side(left)}
                 <View style={styles.delta}>
-                  <TouchableOpacity style={styles.swap} onPress={() => setSwapped((value) => !value)} accessibilityLabel="Swap comparison">
+                  <PressableScale style={styles.swap} onPress={() => setSwapped((value) => !value)} accessibilityLabel="Swap comparison">
                     <Ionicons name="swap-horizontal" size={18} color={colors.textSecondary} />
-                  </TouchableOpacity>
+                  </PressableScale>
                   <AppText style={styles.deltaValue}>{formatExplorerDelta(left.value, right.value, data.format)}</AppText>
                   <AppText style={styles.deltaLabel}>vs comparison</AppText>
                   {median != null ? (

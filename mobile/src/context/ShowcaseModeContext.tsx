@@ -1,7 +1,8 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import React, { createContext, useContext, useEffect, useMemo, useState } from 'react';
 
-import { Text, TouchableOpacity } from 'react-native';
+import { Text, } from 'react-native';
+import PressableScale from '../components/PressableScale';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { api } from '../lib/api';
@@ -83,7 +84,7 @@ export function useShowcaseMode(): ShowcaseModeContextValue {
 function PrivacyModePill({ onPress }: { onPress: () => void }) {
   const insets = useSafeAreaInsets();
   return (
-    <TouchableOpacity
+    <PressableScale
       onPress={onPress}
       accessibilityRole="button"
       accessibilityLabel="Privacy mode on. Tap to turn off"
@@ -102,6 +103,6 @@ function PrivacyModePill({ onPress }: { onPress: () => void }) {
       }}
     >
       <Text style={{ color: '#fff', fontSize: 12.5, fontWeight: '700' }}>Privacy mode on</Text>
-    </TouchableOpacity>
+    </PressableScale>
   );
 }

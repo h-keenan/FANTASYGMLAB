@@ -1,11 +1,13 @@
 import React, { useEffect, useId, useMemo, useReducer, useRef, useSyncExternalStore, type ReactNode } from 'react';
-import { Animated, PanResponder, Pressable, StyleSheet, View } from 'react-native';
+import { Animated, Easing, PanResponder, Pressable, StyleSheet, View } from 'react-native';
 import { useReducedMotion } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import AppText from './AppText';
+import PressableScale from './PressableScale';
 import { SheetModal } from './SwipeDismissSheet';
 import { useThemeMode } from '../context/ThemeModeContext';
+import { EASE, MOTION_MS } from '../lib/motion';
 import { overlayStack } from '../lib/overlayStack';
 import { storyInitial, storyIsLast, storyReducer, storySegmentFill, storySwipeAction, storyTapAction } from '../lib/storyCarousel';
 import { spacing, type ThemeColors } from '../theme';
@@ -67,7 +69,7 @@ export default function StoryCarousel({
   useEffect(() => {
     if (state.direction === 'none' || reduceMotion) return;
     slide.setValue(0);
-    Animated.timing(slide, { toValue: 1, duration: 220, useNativeDriver: true }).start();
+    Animated.timing(slide, { toValue: 1, duration: MOTION_MS.base, easing: Easing.bezier(...EASE.out), useNativeDriver: true }).start();
   }, [state.index, state.direction, reduceMotion, slide]);
 
   const pan = useMemo(
@@ -94,16 +96,16 @@ export default function StoryCarousel({
         <View style={styles.top}>
           <View style={styles.progress} accessibilityRole="progressbar" accessibilityLabel={`Page ${state.index + 1} of ${state.count}`}>
             {pages.map((p, i) => (
-              <Pressable key={p.key} style={styles.segHit} onPress={() => dispatch({ type: 'goto', index: i })} accessibilityRole="button" accessibilityLabel={`Go to ${p.label}`}>
+              <PressableScale key={p.key} style={styles.segHit} onPress={() => dispatch({ type: 'goto', index: i })} accessibilityRole="button" accessibilityLabel={`Go to ${p.label}`}>
                 <View style={styles.seg}>
                   <View style={[styles.segFill, { opacity: storySegmentFill(i, state.index) }]} />
                 </View>
-              </Pressable>
+              </PressableScale>
             ))}
           </View>
-          <Pressable style={styles.close} onPress={() => overlayStack.closeAll()} accessibilityRole="button" accessibilityLabel={`Close ${title}`} hitSlop={8}>
+          <PressableScale style={styles.close} onPress={() => overlayStack.closeAll()} accessibilityRole="button" accessibilityLabel={`Close ${title}`} hitSlop={8}>
             <AppText style={styles.closeText}>×</AppText>
-          </Pressable>
+          </PressableScale>
         </View>
         <AppText style={styles.kicker}>{page.label}</AppText>
         <View style={styles.stage} {...pan.panHandlers} onLayout={(e) => (widthRef.current = e.nativeEvent.layout.width)} testID="story-stage">
@@ -117,7 +119,7 @@ export default function StoryCarousel({
               else if (!storyIsLast(stateRef.current)) dispatch({ type: 'next' });
             }}
           />
-          <Animated.View style={[styles.page, { opacity: reduceMotion ? 1 : slide, transform: reduceMotion ? [] : [{ translateX }] }]} pointerEvents="box-none" key={page.key} testID={`story-page-${page.key}`}>
+          <Animated.View style={[styles.page, { opacity: reduceMotion ? 1 : slide, transform: reduceMotion ? [] : [{ translateX }, { scale: slide.interpolate({ inputRange: [0, 1], outputRange: [0.985, 1] }) }] }]} pointerEvents="box-none" key={page.key} testID={`story-page-${page.key}`}>
             {page.content}
           </Animated.View>
         </View>
@@ -139,7 +141,7 @@ function createStyles(colors: ThemeColors) {
     closeText: { fontSize: 22, lineHeight: 24, color: colors.textSecondary },
     kicker: { paddingHorizontal: spacing.lg, fontSize: 12, fontWeight: '800', letterSpacing: 0.8, textTransform: 'uppercase', color: colors.textTertiary },
     stage: { flex: 1, minHeight: 0 },
-    page: { flex: 1, justifyContent: 'center', gap: spacing.md, paddingHorizontal: spacing.lg, paddingVertical: spacing.md },
+    page: { flex: 1, justifyContent: 'center', gap: spacing.md, paddingHorizontal: spacing.lg, paddingVertical: spacing.sm },
     foot: { gap: spacing.sm, paddingHorizontal: spacing.lg, paddingTop: spacing.sm },
   });
 }

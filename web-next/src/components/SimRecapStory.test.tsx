@@ -65,4 +65,47 @@ describe("SimWeekRecapStory", () => {
     fireEvent.click(screen.getByRole("button", { name: "Full details" }));
     expect(screen.getByTestId("week-recap")).toBeInTheDocument();
   });
+
+  const final = (over: Record<string, unknown>) =>
+    ({
+      ...recap,
+      kind: "playoff",
+      round: 3,
+      season_complete: true,
+      next_week: null,
+      standings: [{ rank: 1, team_id: "9", name: "Me", is_you: true, wins: 11, losses: 3, ties: 0, pf: 1800, pa: 1500 }, { rank: 2, team_id: "7", name: "Rats", is_you: false, wins: 10, losses: 4, ties: 0, pf: 1700, pa: 1500 }],
+      ...over,
+    }) as unknown as SimWeekRecap;
+
+  it("championship win: trophy, 'Champions' headline, confetti, glow, then the season page", () => {
+    render(<SimWeekRecapStory recap={final({ champion: "9" })} index={0} total={1} ctx={ctx} onNext={() => {}} onClose={() => {}} onFixLineup={() => {}} />);
+    expect(screen.getByTestId("recap-headline")).toHaveTextContent("Champions");
+    expect(screen.getByTestId("recap-trophy")).toBeInTheDocument();
+    expect(screen.getByTestId("confetti")).toBeInTheDocument();
+    expect(screen.getByTestId("recap-glow")).toBeInTheDocument();
+    expect(screen.getAllByRole("button", { name: /^Go to / }).at(-1)).toHaveAttribute("aria-label", expect.stringContaining("Season complete"));
+  });
+
+  it("a lost playoff game is Eliminated with the trophy but no confetti; a regular win has neither", () => {
+    const lost = { ...recap.your_game, result: "loss", your_pts: 90, opp_pts: 100 };
+    const { unmount } = render(<SimWeekRecapStory recap={{ ...recap, kind: "playoff", round: 1, your_game: lost } as unknown as SimWeekRecap} index={0} total={2} ctx={ctx} onNext={() => {}} onClose={() => {}} onFixLineup={() => {}} />);
+    expect(screen.getByTestId("recap-headline")).toHaveTextContent("Eliminated");
+    expect(screen.getByTestId("recap-trophy")).toBeInTheDocument();
+    expect(screen.queryByTestId("confetti")).not.toBeInTheDocument();
+    unmount();
+    render(<SimWeekRecapStory recap={recap} index={0} total={1} ctx={ctx} onNext={() => {}} onClose={() => {}} onFixLineup={() => {}} />);
+    expect(screen.getByTestId("recap-headline")).toHaveTextContent("Win");
+    expect(screen.queryByTestId("recap-trophy")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("confetti")).not.toBeInTheDocument();
+  });
+
+  it("injuries show one marker per player: the OUT chip plus a duration, never 'Out 4w' as well", () => {
+    const hurt = { ...recap, injuries: [{ player: player("a", "Alf Hurt", "WR"), weeks: 4, team_id: "9", is_yours: true }] } as unknown as SimWeekRecap;
+    render(<SimWeekRecapStory recap={hurt} index={0} total={1} ctx={ctx} onNext={() => {}} onClose={() => {}} onFixLineup={() => {}} />);
+    const dialog = screen.getByRole("dialog");
+    fireEvent.keyDown(dialog, { key: "ArrowRight" });
+    fireEvent.keyDown(dialog, { key: "ArrowRight" });
+    expect(screen.getByText("4 weeks · yours")).toBeInTheDocument();
+    expect(screen.queryByText(/Out 4w/)).not.toBeInTheDocument();
+  });
 });

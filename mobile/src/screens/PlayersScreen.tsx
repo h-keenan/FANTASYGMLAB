@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { FlatList, ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
+import { FlatList, ScrollView, StyleSheet, View } from 'react-native';
+import PressableScale from '../components/PressableScale';
 import AppText from '../components/AppText';
 import GlassCard from '../components/GlassCard';
 import Input from '../components/Input';
@@ -97,7 +98,7 @@ function RowTradeActions({
   return (
     <View style={styles.rowActions}>
       {onAddToTrade ? (
-        <TouchableOpacity
+        <PressableScale
           onPress={onAddToTrade}
           hitSlop={6}
           style={[styles.rowActionButton, styles.rowActionAccent]}
@@ -105,10 +106,10 @@ function RowTradeActions({
           accessibilityLabel={`Add ${playerName} to a trade`}
         >
           <Ionicons name="swap-horizontal-outline" size={18} color={colors.accent} />
-        </TouchableOpacity>
+        </PressableScale>
       ) : null}
       {onFindTrades ? (
-        <TouchableOpacity
+        <PressableScale
           onPress={onFindTrades}
           hitSlop={6}
           style={styles.rowActionButton}
@@ -116,7 +117,7 @@ function RowTradeActions({
           accessibilityLabel={`Find trades for ${playerName}`}
         >
           <Ionicons name="search-outline" size={18} color={colors.accent} />
-        </TouchableOpacity>
+        </PressableScale>
       ) : null}
     </View>
   );
@@ -189,7 +190,7 @@ function PlayerRankRow({
             trailingValue prop, matching how the list-mode row above composes
             its own trailing block beside (not inside) PlayerIdentityRow. */}
         <View style={styles.gridFooterRow}>
-        <TouchableOpacity onPress={onPress} activeOpacity={0.7} style={styles.gridTrailingFooter}>
+        <PressableScale onPress={onPress} style={styles.gridTrailingFooter}>
           <AppText style={styles.playerScore}>{scoreText}</AppText>
           <View style={styles.playerTrailingChips}>
             {player.position && player.position_rank ? (
@@ -209,7 +210,7 @@ function PlayerRankRow({
             )}
             {player.usage_trend ? <UsageTrendPill trend={player.usage_trend} /> : null}
           </View>
-        </TouchableOpacity>
+        </PressableScale>
         {tradeActions}
         </View>
       </GlassCard>
@@ -242,7 +243,7 @@ function PlayerRankRow({
           showDivider={false}
         />
       </View>
-      <TouchableOpacity onPress={onPress} activeOpacity={0.7} style={styles.playerTrailing}>
+      <PressableScale onPress={onPress} style={styles.playerTrailing}>
         <AppText style={styles.playerScore}>{scoreText}</AppText>
         <View style={styles.playerTrailingChips}>
           {player.position && player.position_rank ? (
@@ -262,7 +263,7 @@ function PlayerRankRow({
           )}
           {player.usage_trend ? <UsageTrendPill trend={player.usage_trend} /> : null}
         </View>
-      </TouchableOpacity>
+      </PressableScale>
       {tradeActions}
     </View>
   );
@@ -399,7 +400,7 @@ export default function PlayersScreen({ route, navigation }: Props) {
         {/* Position is the most-used filter, so it stays one tap: pills that apply at once. */}
         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.positionRow} accessibilityRole="tablist">
           {positionOptions.map((pos) => (
-            <TouchableOpacity
+            <PressableScale
               key={pos}
               accessibilityRole="tab"
               accessibilityState={{ selected: position === pos }}
@@ -407,7 +408,7 @@ export default function PlayersScreen({ route, navigation }: Props) {
               style={[styles.positionPill, position === pos && styles.positionPillOn]}
             >
               <AppText style={[styles.positionPillText, position === pos && { color: colors.accent }]}>{pos === 'ALL' ? 'All' : pos}</AppText>
-            </TouchableOpacity>
+            </PressableScale>
           ))}
         </ScrollView>
         <View style={styles.filterRow}>

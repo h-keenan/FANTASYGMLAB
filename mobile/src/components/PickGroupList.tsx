@@ -1,5 +1,6 @@
 import React, { useMemo, useState } from 'react';
-import { StyleSheet, TouchableOpacity, View } from 'react-native';
+import { StyleSheet, View } from 'react-native';
+import PressableScale from './PressableScale';
 import { Ionicons } from '@expo/vector-icons';
 
 import AppText from './AppText';
@@ -54,13 +55,12 @@ export default function PickGroupList<T extends GroupablePick>({
         const selectedCount = selectedIds ? group.picks.filter((pick) => selectedIds.has(pick.pick_id)).length : 0;
         return (
           <View key={key} style={styles.group}>
-            <TouchableOpacity
+            <PressableScale
               style={styles.header}
               onPress={() => setToggled((prev) => ({ ...prev, [key]: !open }))}
               accessibilityRole="button"
               accessibilityState={{ expanded: open }}
               accessibilityLabel={`${group.label}, ${group.picks.length} picks`}
-              activeOpacity={0.7}
             >
               <AppText style={styles.headerTitle}>{group.label}</AppText>
               <ToneBadge label={`${group.picks.length} ${group.picks.length === 1 ? 'pick' : 'picks'}`} color={colors.accent} />
@@ -71,7 +71,7 @@ export default function PickGroupList<T extends GroupablePick>({
                 color={colors.textSecondary}
                 style={styles.chevron}
               />
-            </TouchableOpacity>
+            </PressableScale>
             {open ? (
               <View style={styles.body}>
                 {group.picks.map((pick, i) => (

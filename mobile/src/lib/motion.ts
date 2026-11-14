@@ -20,6 +20,29 @@ export const easeCss = (name: keyof typeof EASE): string => `cubic-bezier(${EASE
 export const COUNT_MS = 450;
 export const FLASH_MS = 1100;
 
+/**
+ * THE press feedback (every tappable, web and app): a 3% shrink and a slight fade for `ms`, released on lift.
+ * Web: one zero-specificity rule in globals.css ("Press feedback") uses `scale`/`opacity` from these numbers
+ * (`--press-scale`, `--press-opacity`); the app's PressableScale and shared Button/GlassCard use them directly.
+ * Opt out with `data-no-press` (web) / `pressFeedback={false}` (app) only where a control already animates itself.
+ */
+export const PRESS = { scale: 0.97, opacity: 0.88, ms: MOTION_MS.instant } as const;
+
+/** The scale and opacity a pressable shows right now. Reduced motion keeps the fade (a colour-like change) and drops the shrink. */
+export function pressFeedback(pressed: boolean, reduced: boolean, disabled = false): { scale: number; opacity: number } {
+  if (!pressed || disabled) return { scale: 1, opacity: 1 };
+  return { scale: reduced ? 1 : PRESS.scale, opacity: PRESS.opacity };
+}
+
+/** Transition durations by surface, so a list, a sheet, a tab and a toast do not each invent their own (all within MOTION_MS). */
+export const TRANSITION_MS = { page: MOTION_MS.base, sheet: MOTION_MS.slow, tab: MOTION_MS.fast, toast: MOTION_MS.base, list: MOTION_MS.fast, press: MOTION_MS.instant } as const;
+
+/** The success pulse (a saved/claimed/added confirmation): one scale up to this and back, `MOTION_MS.slow`, once. */
+export const SUCCESS_PULSE = { scale: 1.08, ms: MOTION_MS.slow } as const;
+
+/** A one-shot hero glow behind a result: fades in over `ms`, then settles at `rest` opacity (never loops). */
+export const HERO_GLOW = { ms: 600, rest: 0.55 } as const;
+
 /** Lists longer than this do not animate their rows at all (long lists stay instant and cheap). */
 export const MAX_ANIMATED_ROWS = 24;
 /** Staggers never add more than this much total delay, however many items there are. */

@@ -7,9 +7,9 @@ import {
   type NativeSyntheticEvent,
   ScrollView,
   StyleSheet,
-  TouchableOpacity,
   View,
 } from 'react-native';
+import PressableScale from '../components/PressableScale';
 import AppText from '../components/AppText';
 import PlayerName from '../components/PlayerName';
 import { isEspnLeagueId } from '../lib/leaguePlatform';
@@ -389,14 +389,14 @@ export default function WaiversScreen({ route, navigation }: Props) {
       <View style={styles.headerRow}>
         <AppText style={styles.headerSubtitle}>Ranked by fit for your team.</AppText>
         {!isEspnLeagueId(leagueId) ? (
-          <TouchableOpacity
+          <PressableScale
             onPress={() => void Linking.openURL(sleeperLeagueUrl(leagueId))}
             accessibilityRole="link"
             accessibilityLabel="Open your league in Sleeper to place a claim"
             hitSlop={{ top: 12, bottom: 12, left: 8, right: 8 }}
           >
             <AppText style={styles.sleeperLink}>Open your league in Sleeper ↗</AppText>
-          </TouchableOpacity>
+          </PressableScale>
         ) : null}
       </View>
       <DashboardStatRow
@@ -825,7 +825,7 @@ function FreeAgentRow({
           trendingAddLabel={waiverTrendingAddLabel(player)}
           onPress={onPress}
         />
-        <TouchableOpacity accessibilityRole="button" onPress={onPress} activeOpacity={0.7} style={styles.gridTrailingFooter}>
+        <PressableScale accessibilityRole="button" onPress={onPress} style={styles.gridTrailingFooter}>
           <AppText style={styles.freeAgentValue}>{scoreText}</AppText>
           <View style={styles.freeAgentTrailingChips}>
             {player.position_rank ? (
@@ -838,7 +838,7 @@ function FreeAgentRow({
             ) : null}
             <OverallRatingBadge rating={player.overall_rating} positionRank={player.position_rank} />
           </View>
-        </TouchableOpacity>
+        </PressableScale>
       </GlassCard>
     );
   }
@@ -871,7 +871,7 @@ function FreeAgentRow({
           showDivider={false}
         />
       </View>
-      <TouchableOpacity accessibilityRole="button" onPress={onPress} activeOpacity={0.7} style={styles.freeAgentTrailing}>
+      <PressableScale accessibilityRole="button" onPress={onPress} style={styles.freeAgentTrailing}>
         <AppText style={styles.freeAgentValue}>{scoreText}</AppText>
         <View style={styles.freeAgentTrailingChips}>
           {player.position_rank ? (
@@ -884,7 +884,7 @@ function FreeAgentRow({
           ) : null}
           <OverallRatingBadge rating={player.overall_rating} positionRank={player.position_rank} />
         </View>
-      </TouchableOpacity>
+      </PressableScale>
     </View>
   );
 }

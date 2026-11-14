@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { StyleSheet, TouchableOpacity, View } from 'react-native';
+import { StyleSheet, View } from 'react-native';
+import PressableScale from '../components/PressableScale';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { useHeaderHeight } from '@react-navigation/elements';
 import { Ionicons } from '@expo/vector-icons';
@@ -75,7 +76,7 @@ export default function TradesScreen({ route, navigation }: Props) {
           {/* Same Trade History affordance Trade Hub used to carry on its own
               header (discoverability audit, 2026-09-26) — now lives on the
               shared Trades header instead of just one of the three tabs. */}
-          <TouchableOpacity
+          <PressableScale
             onPress={() => navigation.navigate('TradeHistory')}
             hitSlop={8}
             accessibilityRole="button"
@@ -83,7 +84,7 @@ export default function TradesScreen({ route, navigation }: Props) {
             accessibilityHint="Trades you've confirmed and how they've worked out"
           >
             <Ionicons name="time-outline" size={20} color={colors.textSecondary} />
-          </TouchableOpacity>
+          </PressableScale>
         </View>
       ),
     });

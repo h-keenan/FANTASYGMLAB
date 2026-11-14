@@ -100,8 +100,14 @@ const pages: StoryPage[] = [
   between pages that is off under `prefers-reduced-motion` (app: `useReducedMotion`), no horizontal
   overflow (every column is `min-w-0`).
 - **Reuse**: a story is `{ title, pages[], onClose }`. First user: the Fantasy Sim weekly recap
-  (`SimRecapStory`: Result, Matchup breakdown, Injuries and lineup, Around the league, Next week; a
-  "Full details" button opens the classic recap). Meant for the season recap, draft recap and offseason
+  (`SimRecapStory`: Result, Matchup breakdown, Injuries and lineup, Around the league, Season complete (final week only), Next week; a
+  "Full details" button opens the classic recap).
+- **Recap page anatomy** (web `ui-recap*` classes in `ui.css`, app `HeroZone`): a hero zone that fills the top of the screen (min 34dvh, centered, a
+  one-shot accent glow `HERO_GLOW`, never looping), then at most three supporting rows. Result: team avatars both sides, score with `CountUp`, tone glow,
+  best/worst as `SimPlayerLine` rows (avatar, position badge, OVR gauge). Playoffs and the championship: trophy mark (`TrophyIcon`), headline from
+  `simRecapOutcome` (Advancing / Eliminated / Playoff bye / Runner-up / Champions), `Confetti` only for the title and never under reduced motion.
+  Matchup: efficiency ring, position-coloured chips (`positionColorVar`), top starters with OVR. Injuries: ONE marker per player (the OUT chip; the trailing text is
+  only the duration). Season: champion crowned, your finish, awards the standings can back up. All variant logic is pure and tested in `lib/simRecapStory.ts`. Meant for the season recap, draft recap and offseason
   review next; those are not built yet.
 ## Motion
 
@@ -126,6 +132,12 @@ pure tokens and rules in `lib/motion.ts` (byte-identical twin), web CSS variable
   `.sim-row-drafted` (existing: results landing, a drafted/claimed row sliding away), skeleton shimmer, Tabs slide, toast.
 - **Where it is applied**: Scores cards (stagger, count-up, week sweep), recap hero score (count-up) and title confetti, trade
   offers (capped stagger in, verdict pop), tab count badges (pulse), hero OVR rings (fill), TickNumber everywhere it is used.
+- **The ONE press feedback**: `PRESS` in `lib/motion.ts` (3% shrink, slight fade, 120ms; reduced motion keeps only the fade). Web: a single
+  zero-specificity rule in `globals.css` ("Press feedback") covers every `button`, `[role=button|tab|menuitem]`, `summary`, `a[href]` and `[data-press]`;
+  opt out with `data-no-press` only where a control animates itself. App: `components/PressableScale` is THE tappable (drop-in for
+  `TouchableOpacity`; do not use `activeOpacity` or a hand-rolled `pressed` style). `AnimatedCard` already matches (.97 spring).
+- **Transitions by surface**: `TRANSITION_MS` (page 240, sheet 300, tab 180, toast 240, list 180, press 120). **Success pulse**: `.motion-success` /
+  `SUCCESS_PULSE` for a saved/added/claimed confirmation, `PulseOnIncrease` for counts. **Count-up**: `CountUp`. **Hero glow**: `HERO_GLOW`.
 - **Adding motion**: use a class/hook above, never a new keyframe with its own duration; check the reduced-motion test
   (`components/Motion.test.tsx`) still describes your component's behaviour, and keep it off long lists.
 

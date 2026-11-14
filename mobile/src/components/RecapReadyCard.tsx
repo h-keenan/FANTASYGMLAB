@@ -1,5 +1,6 @@
 import React, { useMemo } from 'react';
-import { StyleSheet, TouchableOpacity, View } from 'react-native';
+import { StyleSheet, View } from 'react-native';
+import PressableScale from './PressableScale';
 import { Ionicons } from '@expo/vector-icons';
 
 import AnimatedCard from './AnimatedCard';
@@ -35,7 +36,7 @@ export default function RecapReadyCard({
   const { colors } = useThemeMode();
   const styles = useMemo(() => createStyles(colors), [colors]);
   return (
-    <TouchableOpacity onPress={onPress}>
+    <PressableScale onPress={onPress}>
       <AnimatedCard glow style={styles.recapCard}>
         <IconCircle name={icon} color={colors.accent} size={36} style={styles.recapIconDisc} />
         <View style={styles.recapTextGroup}>
@@ -44,7 +45,7 @@ export default function RecapReadyCard({
         </View>
         <Ionicons name="chevron-forward" size={18} color={colors.textTertiary} />
       </AnimatedCard>
-    </TouchableOpacity>
+    </PressableScale>
   );
 }
 

@@ -7,9 +7,9 @@ import {
   ScrollView,
   Share,
   StyleSheet,
-  TouchableOpacity,
   View,
 } from 'react-native';
+import PressableScale from '../components/PressableScale';
 import { File, Paths } from 'expo-file-system';
 import * as Sharing from 'expo-sharing';
 import AppText from '../components/AppText';
@@ -844,14 +844,13 @@ function OptionCard({
   const { colors } = useThemeMode();
   const styles = useMemo(() => createStyles(colors), [colors]);
   return (
-    <TouchableOpacity accessibilityRole="button"
+    <PressableScale accessibilityRole="button"
       style={[styles.optionCard, active && styles.optionCardActive]}
       onPress={onPress}
-      activeOpacity={0.8}
     >
       <AppText style={[styles.optionLabel, active && styles.optionLabelActive]}>{label}</AppText>
       {description ? <AppText style={styles.optionDescription}>{description}</AppText> : null}
-    </TouchableOpacity>
+    </PressableScale>
   );
 }
 
@@ -913,9 +912,9 @@ function SettingsRow({
   );
   if (!onPress) return content;
   return (
-    <TouchableOpacity accessibilityRole="button" onPress={onPress} disabled={disabled} activeOpacity={0.7}>
+    <PressableScale accessibilityRole="button" onPress={onPress} disabled={disabled}>
       {content}
-    </TouchableOpacity>
+    </PressableScale>
   );
 }
 

@@ -1,6 +1,7 @@
 import GlossaryNote from '../components/GlossaryNote';
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
+import { ScrollView, StyleSheet, View } from 'react-native';
+import PressableScale from '../components/PressableScale';
 import { Ionicons } from '@expo/vector-icons';
 import AppText from '../components/AppText';
 import ValueStat from '../components/ValueStat';
@@ -277,15 +278,14 @@ export default function MyTeamScreen({ route, navigation }: Props) {
         <SectionHeading title="Team Snapshot" topGap={12} />
         <TeamSnapshot team={myTeam} leagueSize={leagueSize} teamValue={teamValue} open={(key) => openInsight(navigation.navigate as never, key, leagueId, leagueName)} />
         {myTeam && hasRosterAnalysis(myTeam) ? (
-          <TouchableOpacity
+          <PressableScale
             style={styles.headerLink}
             onPress={() => setShowFullAnalysis((v) => !v)}
-            activeOpacity={0.7}
             hitSlop={6}
           >
             <AppText style={styles.linkRowText}>{showFullAnalysis ? 'Hide team analytics' : 'Team analytics'}</AppText>
             <Ionicons name={showFullAnalysis ? 'chevron-up' : 'chevron-forward'} size={13} color={colors.accent} />
-          </TouchableOpacity>
+          </PressableScale>
         ) : null}
         {showFullAnalysis && myTeam ? (
           <TeamAnalysisPanel
@@ -435,10 +435,9 @@ function TeamAnalysisRows({ rows }: { rows: TeamAnalysisRow[] }) {
         const isOpen = open === row.position;
         return (
           <View key={row.position} style={index < rows.length - 1 ? styles.compactDivider : undefined}>
-            <TouchableOpacity
+            <PressableScale
               style={styles.analysisRow}
               onPress={() => setOpen(isOpen ? null : row.position)}
-              activeOpacity={0.7}
               accessibilityRole="button"
               accessibilityState={{ expanded: isOpen }}
             >
@@ -458,7 +457,7 @@ function TeamAnalysisRows({ rows }: { rows: TeamAnalysisRow[] }) {
                 </View>
               </View>
               <Ionicons name={isOpen ? 'chevron-down' : 'chevron-forward'} size={16} color={colors.textTertiary} />
-            </TouchableOpacity>
+            </PressableScale>
             {isOpen ? <AppText style={styles.analysisBody}>{row.body}</AppText> : null}
           </View>
         );

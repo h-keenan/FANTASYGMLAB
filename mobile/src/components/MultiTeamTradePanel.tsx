@@ -1,6 +1,7 @@
 import ConfirmInPlace from './ConfirmInPlace';
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { Pressable, StyleSheet, TouchableOpacity, useWindowDimensions, View } from 'react-native';
+import { Pressable, StyleSheet, useWindowDimensions, View } from 'react-native';
+import PressableScale from './PressableScale';
 import { Ionicons } from '@expo/vector-icons';
 
 import AccentCard from './AccentCard';
@@ -393,12 +394,12 @@ export default function MultiTeamTradePanel({
                       />
                     )}
                   </View>
-                  <TouchableOpacity accessibilityRole="button" accessibilityLabel="Change who receives this asset" onPress={() => setPending(asset)} hitSlop={6}>
+                  <PressableScale accessibilityRole="button" accessibilityLabel="Change who receives this asset" onPress={() => setPending(asset)} hitSlop={6}>
                     <AppText style={[styles.destination, !asset.toRosterId && { color: colors.warning }]} numberOfLines={1}>
                       {asset.toRosterId ? `to ${nameOf(asset.toRosterId)}` : 'Choose team'}
                     </AppText>
-                  </TouchableOpacity>
-                  <TouchableOpacity
+                  </PressableScale>
+                  <PressableScale
                     accessibilityRole="button"
                     accessibilityLabel={`Remove ${assetName(asset)}`}
                     hitSlop={8}
@@ -408,7 +409,7 @@ export default function MultiTeamTradePanel({
                     }}
                   >
                     <Ionicons name="close-circle-outline" size={20} color={colors.textTertiary} />
-                  </TouchableOpacity>
+                  </PressableScale>
                 </View>
               ))
             ) : (
@@ -449,7 +450,7 @@ export default function MultiTeamTradePanel({
                     <AppText style={styles.muted}>-</AppText>
                   </View>
                 ) : (
-                  <TouchableOpacity
+                  <PressableScale
                     key={to}
                     style={styles.matrixCell}
                     accessibilityRole="button"
@@ -462,7 +463,7 @@ export default function MultiTeamTradePanel({
                     <AppText style={[styles.matrixCellText, !cell.length && { color: colors.accent }]} numberOfLines={3}>
                       {cell.length ? cell.map(assetName).join(', ') : '+ Add'}
                     </AppText>
-                  </TouchableOpacity>
+                  </PressableScale>
                 );
               })}
             </View>
@@ -652,7 +653,7 @@ function RankedRow({
   const tone = toneColor(toneSemantic(team.tone));
   return (
     <AccentCard accent={tone} compact>
-      <TouchableOpacity accessibilityRole="button" accessibilityState={{ expanded: open }} onPress={() => setOpen((v) => !v)} style={styles.rankedHead}>
+      <PressableScale accessibilityRole="button" accessibilityState={{ expanded: open }} onPress={() => setOpen((v) => !v)} style={styles.rankedHead}>
         <AppText style={styles.rank}>{rank}</AppText>
         <AppText style={styles.rankedName} numberOfLines={1}>
           {team.team_name}
@@ -660,7 +661,7 @@ function RankedRow({
         </AppText>
         <AppText style={styles.strong}>{formatSigned(team.market_delta)}</AppText>
         <ToneBadge label={verdictChipLabel(team)} color={tone} />
-      </TouchableOpacity>
+      </PressableScale>
       {open ? (
         <View style={styles.expanded}>
           <TeamStats team={team} styles={styles} />

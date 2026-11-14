@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
-import { Animated, StyleSheet, TouchableOpacity, View } from 'react-native';
+import { Animated, StyleSheet, View } from 'react-native';
+import PressableScale from './PressableScale';
 import { Ionicons } from '@expo/vector-icons';
 
 import AppText from './AppText';
@@ -115,9 +116,9 @@ function Tappable({
 }) {
   if (!onPress) return <View style={style}>{children}</View>;
   return (
-    <TouchableOpacity style={style} onPress={onPress} accessibilityRole="button" accessibilityLabel={label}>
+    <PressableScale style={style} onPress={onPress} accessibilityRole="button" accessibilityLabel={label}>
       {children}
-    </TouchableOpacity>
+    </PressableScale>
   );
 }
 
@@ -339,7 +340,7 @@ function MatchupCard({ model, onPress, editing, mirror = false, emphasis = 'even
           />
         </View>
       ) : null}
-      <TouchableOpacity
+      <PressableScale
         onPress={() => setOpen((value) => !value)}
         accessibilityRole="button"
         accessibilityState={{ expanded: open }}
@@ -348,7 +349,7 @@ function MatchupCard({ model, onPress, editing, mirror = false, emphasis = 'even
       >
         <Ionicons name={open ? 'chevron-up' : 'chevron-down'} size={12} color={colors.textTertiary} />
         <AppText style={styles.expandText}>{open ? 'Less' : 'Details'}</AppText>
-      </TouchableOpacity>
+      </PressableScale>
       {open ? <View>{detail ?? <PlayerCardDetail model={model} />}</View> : null}
     </View>
   );
@@ -360,9 +361,9 @@ export function EmptySlotCard({ onPress }: { onPress?: () => void }) {
   return (
     <View style={[styles.card, { minHeight: 64, justifyContent: 'center', borderStyle: 'dashed' }]} testID="player-card-empty">
       {onPress ? (
-        <TouchableOpacity onPress={onPress} accessibilityRole="button">
+        <PressableScale onPress={onPress} accessibilityRole="button">
           <AppText style={[styles.empty, { color: colors.accent }]}>Empty, tap to fill</AppText>
-        </TouchableOpacity>
+        </PressableScale>
       ) : (
         <AppText style={styles.empty}>Empty slot</AppText>
       )}
