@@ -22,6 +22,7 @@ import {
   type SimReserveMoveTo,
   type SimReserves,
 } from '../lib/simGame';
+import { playerSurname } from '../lib/playerNameDisplay';
 
 /** Everything the move menu needs to know about the squads. */
 export interface SimReserveState {
@@ -215,7 +216,7 @@ export function SimReserveGroups({
                 trailing={
                   cutting === player.id && onCut ? (
                     <>
-                      <Button size="sm" variant="danger" label={`Cut ${player.name.split(' ').slice(-1)[0]}`} onPress={() => onCut(player)} />
+                      <Button size="sm" variant="danger" label={`Cut ${playerSurname(player.name)}`} onPress={() => onCut(player)} />
                       <Button size="sm" variant="ghost" label="Keep" onPress={() => onAskCut?.(null)} />
                     </>
                   ) : (

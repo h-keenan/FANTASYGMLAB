@@ -35,4 +35,16 @@ describe("useSimGameCall", () => {
     expect(fn).toHaveBeenCalledTimes(1);
     expect(onGate).toHaveBeenCalledWith({ kind: "unavailable", cause: "off" });
   });
+
+  it("retries a raced write (409) once silently so one tap applies; a second conflict still reports", async () => {
+    const { call, onGate } = setup();
+    const ok = vi.fn().mockRejectedValueOnce({ status: 409 }).mockResolvedValueOnce({ reason: "", executed: true });
+    await expect(call(ok)).resolves.toEqual({ reason: "", executed: true });
+    expect(ok).toHaveBeenCalledTimes(2);
+    expect(onGate).not.toHaveBeenCalled();
+    const bad = vi.fn().mockRejectedValue({ status: 409 });
+    await expect(call(bad)).resolves.toBeNull();
+    expect(bad).toHaveBeenCalledTimes(2);
+    expect(onGate).toHaveBeenCalledWith({ kind: "conflict" });
+  });
 });

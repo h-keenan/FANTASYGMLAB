@@ -9,6 +9,7 @@ import ToneBadge from './ToneBadge';
 import { useThemeMode } from '../context/ThemeModeContext';
 import { feedAgeLabel, feedPointsLabel, groupFeedByGame, liveFeedStore, type FeedEvent } from '../lib/liveFeed';
 import { radii, spacing, type ThemeColors } from '../theme';
+import PlayerName from './PlayerName';
 
 /**
  * Collapsible "Live feed": scoring events derived by diffing polled snapshots
@@ -88,9 +89,7 @@ function FeedItem({ event, now, isNew }: { event: FeedEvent; now: number; isNew:
       <PositionBadge position={event.position} />
       <View style={{ flex: 1, minWidth: 0 }}>
         <View style={styles.nameRow}>
-          <AppText style={styles.name} numberOfLines={1}>
-            {event.name}
-          </AppText>
+          <PlayerName name={event.name} style={styles.name} />
           <AppText style={[styles.points, { color: event.points < 0 ? colors.danger : colors.successBright }]}>
             {feedPointsLabel(event.points)}
           </AppText>

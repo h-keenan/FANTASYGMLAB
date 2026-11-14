@@ -49,6 +49,13 @@ export function useSimGameCall(
           return null;
         }
       }
+      // A raced write (409) was rejected, nothing was saved: the server re-reads the newest game on the retry, so one silent retry applies
+      // the tap instead of a "Try again" toast the player may never see (coridian_, 2026-11-14: "Take their counter ... turned back, and the
+      // second tap worked"). A second conflict is reported as before.
+      if (gate.kind === "conflict" && attempt === 0) {
+        await new Promise((resolve) => setTimeout(resolve, 150));
+        continue;
+      }
       if (simIsTransientGate(gate)) {
         if (attempt === 0) {
           await new Promise((resolve) => setTimeout(resolve, SIM_CALL_RETRY_MS));

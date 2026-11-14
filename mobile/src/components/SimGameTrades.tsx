@@ -15,6 +15,7 @@ import { SkeletonCard } from './SkeletonBlock';
 import { MotionIn } from './Motion';
 import SimCrest from './SimCrest';
 import SimGlyph from './SimGlyph';
+import { TapForWhyOff } from './TapForWhy';
 import { SimBlockView } from './SimTradeBlock';
 import SimTeamCard from './SimTeamCard';
 import { SimPickLine, useSimPicks } from './SimGameDynastyParts';
@@ -42,7 +43,7 @@ import {
   simGameReasonMessage,
   type SimTradeSeed,
   simTradeMaxPerSide,
-  simTradable,
+  simTradableIn,
   simTradeClosedReason,
   simCounterDeltaLine,
   simTradeDecisionLabel,
@@ -59,6 +60,7 @@ import {
   simWithout,
 } from '../lib/simGame';
 import type { ThemeColors } from '../theme';
+import { playerSurname } from '../lib/playerNameDisplay';
 
 /** "Scout" button for the partner list: opens the team's scouting sheet without picking it as the partner. */
 function ScoutButton({ teamId, name }: { teamId: string; name: string }) {
@@ -168,7 +170,7 @@ function OfferCard({ item, defaultOpen, busy, canTrade, onRespond }: { item: Sim
   const { colors } = useThemeMode();
   const common = useMemo(() => createSimStyles(colors), [colors]);
   const [open, setOpen] = useState(defaultOpen);
-  const names = (list: SimTradeAsset[]) => list.map((p) => (simIsPick(p) ? simPickLabelText(p) : p.name.split(' ').slice(-1)[0])).join(', ');
+  const names = (list: SimTradeAsset[]) => list.map((p) => (simIsPick(p) ? simPickLabelText(p) : playerSurname(p.name))).join(', ');
   return (
     <FadeInView>
       <AccentCard accent={colors.premium} compact>
@@ -385,7 +387,7 @@ function Builder({ ctx, seed, onSeedUsed }: { ctx: SimCtx; seed: SimTradeSeed | 
   const fit = simTradeFit(mine.filter((p) => (p.squad ?? "roster") === "roster").length, game.settings.roster_limit, giveSelected.filter((p) => !simIsPick(p) && (p.squad ?? "roster") === "roster").length, getSelected.filter((p) => !simIsPick(p)).length, soft);
   // The picker's groups: players by position, then a Picks group; the same shape feeds the page summaries.
   const groupsFor = (players: SimGamePlayer[], pickList: SimPickAsset[]): SimAssetGroup<SimTradeAsset>[] => {
-    const groups: SimAssetGroup<SimTradeAsset>[] = simGroupByPosition(players.filter((p) => simTradable(p.pos)), simPositionsFor(game.settings.slots));
+    const groups: SimAssetGroup<SimTradeAsset>[] = simGroupByPosition(players.filter((p) => simTradableIn(game.settings, p.pos)), simPositionsFor(game.settings.slots));
     if (pickList.length > 0) groups.push({ key: 'PICK', label: 'Picks', kind: 'pick', items: pickList });
     return groups;
   };
@@ -536,6 +538,7 @@ export function SimTradesTab({ ctx, seed, onSeedUsed }: { ctx: SimCtx; seed: Sim
     setMode('build');
   }
   return (
+    <TapForWhyOff>
     <View style={common.stack}>
       <SegmentedTabBar<'inbox' | 'build' | 'block'>
         options={[
@@ -568,6 +571,7 @@ export function SimTradesTab({ ctx, seed, onSeedUsed }: { ctx: SimCtx; seed: Sim
         />
       )}
     </View>
+    </TapForWhyOff>
   );
 }
 

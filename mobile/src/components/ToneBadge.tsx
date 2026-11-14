@@ -18,6 +18,7 @@ export default function ToneBadge({
   solid,
   textColor,
   style,
+  shrink,
 }: {
   label: string;
   color: string;
@@ -28,6 +29,8 @@ export default function ToneBadge({
   solid?: boolean;
   textColor?: string;
   style?: StyleProp<ViewStyle>;
+  /** Shrink (ellipsis) inside a row narrower than the label instead of overflowing and being clipped by the row. */
+  shrink?: boolean;
 }) {
   const fg = textColor ?? color;
   return (
@@ -35,12 +38,13 @@ export default function ToneBadge({
       style={[
         styles.pill,
         size === 'xs' && styles.pillXs,
+        shrink && styles.pillShrink,
         { backgroundColor: solid ? color : withAlpha(color, 0.15) },
         style,
       ]}
     >
       {icon ? <Ionicons name={icon} size={9} color={fg} /> : null}
-      <AppText style={[styles.text, size === 'xs' && styles.textXs, { color: fg }]} numberOfLines={1}>
+      <AppText style={[styles.text, size === 'xs' && styles.textXs, { color: fg }, shrink && styles.textShrink]} numberOfLines={1}>
         {label}
       </AppText>
     </View>
@@ -69,9 +73,11 @@ const styles = StyleSheet.create({
     paddingVertical: 2,
     alignSelf: 'flex-start',
   },
+  pillShrink: { flexShrink: 1, minWidth: 0 },
   pillXs: { paddingHorizontal: spacing.xs + 2, paddingVertical: 1 },
   // Web: text-xs (12px) / 0.625rem xs, tracking --letter-spacing-badge (0.085em). 11/10 on phone
   // so a pill stays one size family with PositionBadge (11).
   text: { fontSize: 12.5, fontWeight: '800', textTransform: 'uppercase', letterSpacing: 0.9 },
+  textShrink: { flexShrink: 1 },
   textXs: { fontSize: 12, letterSpacing: 0.85 },
 });

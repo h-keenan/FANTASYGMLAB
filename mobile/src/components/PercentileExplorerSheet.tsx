@@ -16,7 +16,6 @@ import { percentileTabs } from '../lib/sheetTabs';
 import { useThemeMode } from '../context/ThemeModeContext';
 import { api } from '../lib/api';
 import { trackUse } from '../lib/analytics';
-import { abbreviatePlayerName } from '../lib/formatPlayerName';
 import {
   addPin,
   assignMarkerLanes,
@@ -36,7 +35,7 @@ import {
   type PercentileExplorerResponse,
 } from '../lib/percentileExplorer';
 import { ordinal, percentileColor } from '../lib/percentile';
-import { radii, scrim, spacing, type ThemeColors } from '../theme';
+import { radii, scrim, sheetHeight, spacing, type ThemeColors } from '../theme';
 import ErrorState from './ErrorState';
 
 const LANE_STEP = 74;
@@ -238,9 +237,7 @@ export default function PercentileExplorerSheet({
     <View style={styles.side}>
       <PressableScale style={styles.sideId} onPress={() => onOpenPlayer(player)} accessibilityLabel={`Open ${player.name}`}>
         <PlayerAvatar playerId={player.player_id} size={36} />
-        <AppText style={styles.sideName} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>
-          {abbreviatePlayerName(player.name)}
-        </AppText>
+        <PlayerName name={player.name} style={styles.sideName} />
       </PressableScale>
       <AppText style={styles.sideMeta}>{[player.team, player.position].filter(Boolean).join(' · ')}</AppText>
       <View style={styles.sideStat}>
@@ -375,14 +372,7 @@ export default function PercentileExplorerSheet({
                               onPress={() => pick(marker)}
                               accessibilityLabel={`${marker.name}, ${formatExplorerValue(marker.value, data.format)} ${metric.label}, ${ordinal(marker.percentile)} percentile`}
                             >
-                              <AppText
-                                style={[styles.markerName, (isMe || isMine) && { color: colors.accent }]}
-                                numberOfLines={1}
-                                adjustsFontSizeToFit
-                                minimumFontScale={0.8}
-                              >
-                                {abbreviatePlayerName(marker.name)}
-                              </AppText>
+                              <PlayerName name={marker.name} style={[styles.markerName, (isMe || isMine) && { color: colors.accent }]} />
                               <View style={[styles.face, isPicked && styles.facePicked, isMe && styles.faceMe]}>
                                 <PlayerAvatar playerId={marker.player_id} size={isMe ? 36 : 30} />
                               </View>
@@ -529,7 +519,8 @@ function createStyles(colors: ThemeColors) {
       borderTopRightRadius: radii.lg,
       borderWidth: 1,
       borderColor: colors.cardBorder,
-      maxHeight: '92%',
+      minHeight: sheetHeight.min,
+      maxHeight: sheetHeight.max,
       padding: spacing.lg,
     },
     scroll: { flexGrow: 0, flexShrink: 1 },

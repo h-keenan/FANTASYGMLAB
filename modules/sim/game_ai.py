@@ -252,8 +252,9 @@ class TradeDesk:
         return ok, margin, dval, need, loss
 
     def tradable(self, tid: str) -> list[str]:
-        """What ``tid`` can put in a trade: every player it owns (active, IR, taxi) except
-        kickers and defenses, plus its picks when the mode trades them."""
+        """What the AI itself puts in or asks for in a trade (its own offers, AI-AI deals, counters): every player it owns
+        (active, IR, taxi) except kickers and defenses, plus its picks when the mode trades them. The user may trade a K or
+        DEF (settings.kd_v 1, see validate_offer); the AI never builds a deal around one, so it never crafts a nonsense kicker counter."""
 
         out = [p for p in self.state.holdings(tid) if self.snap.players[p].pos not in NON_TRADABLE]
         if self.snap.settings.policy.dynasty:
@@ -512,8 +513,17 @@ def validate_offer(snap: GameSnapshot, state: GameState, partner: str, give: Seq
                     raise GameError("picks_locked", "That pick has already been used in the draft.")
             elif pid not in snap.players or state.where(owner, pid) is None:
                 raise ValueError(f"You can only {'give players on your roster' if label == 'give' else 'ask for players on that team' + chr(39) + 's roster'}.")
-            elif snap.players[pid].pos in NON_TRADABLE:
+            elif snap.players[pid].pos in snap.settings.non_tradable:
                 raise ValueError("Kickers and defenses cannot be traded.")
+    # Kickers and defenses are one per roster: a trade may not leave either team with two of one (it can swap them one for one).
+    if not snap.settings.non_tradable:
+        for tid, leaving, arriving in ((user, give, get), (partner, get, give)):
+            for pos in SINGLETON_POSITIONS:
+                held = sum(1 for p in state.holdings(tid) if snap.players[p].pos == pos and p not in leaving)
+                coming = sum(1 for p in arriving if not is_pick_id(p) and snap.players[p].pos == pos)
+                if coming and held + coming > 1:  # only a trade that ADDS one is refused (a roster already over, e.g. mid-offseason, is not blocked)
+                    who = "You" if tid == user else "They"
+                    raise GameError("singleton_limit", f"{who} would end up with two {'kickers' if pos == 'K' else 'defenses'}. Trade yours away in the same deal.")
 
 
 def offer_key(partner: str, give: Iterable[str], get: Iterable[str]) -> str:

@@ -668,8 +668,9 @@ def test_ai_never_takes_a_lopsided_loss_and_kickers_are_not_tradable():
         assert v.decision != "accept", (team, v)
     kicker = next(p for p in state.rosters[user] if snap.players[p].pos == "K")
     other = next(t for t in snap.tids if t != user)
+    old = dataclasses.replace(snap, settings=dataclasses.replace(snap.settings, kd_v=0))  # a save from before kd_v
     with pytest.raises(ValueError):
-        validate_offer(snap, state, other, [kicker], [state.rosters[other][0]])
+        validate_offer(old, state, other, [kicker], [state.rosters[other][0]])
 
 
 def test_trade_rules_deadline_duplicates_caps_and_playoffs():

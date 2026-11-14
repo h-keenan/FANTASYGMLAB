@@ -411,9 +411,12 @@ def test_trade_validation_and_gating(season):
         {"partner": "4", "give": [a["id"]], "get": [b["id"]]},  # yourself
         {"partner": "1", "give": [b["id"]], "get": [a["id"]]},  # sides swapped: not owned
         {"partner": "1", "give": [], "get": [b["id"]]}, {"partner": "1", "give": [a["id"]] * 2, "get": [b["id"]]},
-        {"partner": "1", "give": [kicker["id"]], "get": [b["id"]]}, {"partner": "99", "give": [a["id"]], "get": [b["id"]]},
+        {"partner": "99", "give": [a["id"]], "get": [b["id"]]},
     ):
         assert client.post(f"/v1/sim/games/{gid}/trades/preview", json=body, headers=hdr()).status_code == 422, body
+    # A kicker is tradable in a new game, but one per roster: kicker for a non-kicker would leave them with two.
+    got = client.post(f"/v1/sim/games/{gid}/trades/preview", json={"partner": "1", "give": [kicker["id"]], "get": [b["id"]]}, headers=hdr())
+    assert got.status_code == 200 and got.json()["reason"] == "singleton_limit"
 
 
 def test_inbox_offers_and_respond(season):

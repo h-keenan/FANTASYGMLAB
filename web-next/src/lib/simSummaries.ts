@@ -4,8 +4,9 @@
  * byte-identical twin of mobile/src/lib/simSummaries.ts.
  */
 import { compactCount, type CompactPart } from "./compactModule";
+import { playerSurname } from "./playerNameDisplay";
 
-const last = (name: string): string => name.trim().split(/\s+/).slice(-1)[0] ?? name;
+const last = (name: string): string => playerSurname(name) || name;
 
 export function simInboxParts(inbox: { count: number; items: { from: { name: string }; expires_week: number }[] } | null | undefined): CompactPart[] {
   const count = inbox?.count ?? 0;

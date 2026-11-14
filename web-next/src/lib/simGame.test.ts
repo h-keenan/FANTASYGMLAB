@@ -57,6 +57,9 @@ import {
   simQueueReducer,
   simRosterNeeds,
   simSlotAccepts,
+  simTradableIn,
+  simBenchSwapTargets,
+  simBenchOffersReserveMove,
   simSlotCandidates,
   simSlotLabels,
   simDeriveLayout,
@@ -446,6 +449,39 @@ describe("league settings and start modes (setup)", () => {
     expect(simDeriveLayout(simSetupDefaults(null)).slots).toEqual(["QB", "RB", "RB", "WR", "WR", "TE", "FLEX", "K"]);
   });
 
+  it("flex spot: RB/WR/TE is the default and is never sent; RB/WR swaps the slot and is sent", () => {
+    const d = simSetupDefaults(options);
+    expect(d.flexType).toBe("flex");
+    expect(simSetupBody(d)).not.toHaveProperty("flex_type");
+    const s = { ...d, flexType: "rb_wr" as const };
+    expect(simSetupBody(s)).toMatchObject({ flex_type: "rb_wr" });
+    expect(simSetupAdvancedChanged(s, d)).toBe(1);
+    expect(simDeriveLayout(s).slots).toEqual(["QB", "RB", "RB", "WR", "WR", "TE", "WRRB_FLEX", "K"]);
+    expect(simSlotAccepts("WRRB_FLEX", "TE")).toBe(false);
+    expect(simSlotAccepts("WRRB_FLEX", "RB") && simSlotAccepts("WRRB_FLEX", "WR")).toBe(true);
+    expect(simSlotAccepts("FLEX", "TE")).toBe(true);
+    expect(simFilterPositionsFor(["QB", "WRRB_FLEX"]).find((p) => p.label === "FLEX")?.value).toBe("WRRB_FLEX");
+    expect(simPosMatches("TE", "WRRB_FLEX")).toBe(false);
+    expect(simSettingsSummary({ flex_type: "rb_wr" })).toBe("RB/WR flex");
+  });
+
+  it("bench swap lists only the lineup slots his position fits; the IR/taxi move shows only when it could happen", () => {
+    const wr = { id: "w1", pos: "WR" as const };
+    const slots = [
+      { slot: "QB", player: null },
+      { slot: "WR", player: { id: "w2", pos: "WR" } },
+      { slot: "WRRB_FLEX", player: null },
+      { slot: "FLEX", player: { id: "w1", pos: "WR" } },
+      { slot: "TE", player: { id: "t1", pos: "TE" } },
+    ] as never;
+    expect(simBenchSwapTargets(wr, slots, ["QB", "WR", "W/R", "FLEX", "TE"]).map((t) => [t.index, t.label, t.current?.id ?? null])).toEqual([[1, "WR", "w2"], [2, "W/R", null]]);
+    expect(simBenchSwapTargets({ id: "t9", pos: "TE" }, slots, ["QB", "WR", "W/R", "FLEX", "TE"]).map((t) => t.label)).toEqual(["FLEX", "TE"]);
+    const ctx = { reserves: { enabled: true, ir_slots: 2, ir_used: 0, taxi_slots: 0, taxi_used: 0 } as never, rosterSize: 10, rosterLimit: 16 };
+    const healthy = { squad: "roster" as const, status: "healthy" as const, out_weeks: 0, pos: "WR" as const, taxi_eligible: false };
+    expect(simBenchOffersReserveMove(healthy, ctx)).toBe(false);
+    expect(simBenchOffersReserveMove({ ...healthy, status: "out", out_weeks: 3 }, ctx)).toBe(true);
+  });
+
   it("sends advanced options and counts what changed", () => {
     const d = simSetupDefaults(options);
     const s = { ...d, teams: 14, scoring: "std" as const, tePremium: 0.5, superflex: true, includeDef: true, bench: 6, slot: "3", nameChoice: SIM_NAME_CUSTOM, name: " Mine " };
@@ -789,5 +825,15 @@ describe("simCounterDeltaLine", () => {
     expect(simBlockTag({})).toBeNull();
     expect(simStatusOptions(false).some((o) => o.value === "block")).toBe(false);
     expect(simStatusOptions(true).at(-1)).toEqual({ value: "block", label: "On the block" });
+  });
+});
+
+describe("kickers and defenses in trades", () => {
+  it("tradable once the save carries kd_v 1; older saves never trade them", () => {
+    expect(simTradableIn({ kd_v: 1 }, "K")).toBe(true);
+    expect(simTradableIn({ kd_v: 1 }, "DEF")).toBe(true);
+    expect(simTradableIn({}, "K")).toBe(false);
+    expect(simTradableIn({ kd_v: 0 }, "DEF")).toBe(false);
+    expect(simTradableIn({}, "QB")).toBe(true);
   });
 });

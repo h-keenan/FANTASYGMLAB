@@ -42,6 +42,7 @@ RESERVE_VERSION = 1
 AI_VERSION = 1  # 1: AI managers plan depth around byes and injuries, use the wire proactively (new games only)
 from modules.sim.game_names import NAMES_VERSION
 VIEWS_KEPT = 2  # dynasty_v 3: season pools kept in memory behind the latest
+KD_VERSION = 1  # 1 = kickers and defenses can be traded (user-initiated; 0 = a save from before: they never trade)
 LIMIT_VERSION = 1  # 1 = a roster over the limit never blocks advancing, only acquiring players (0 = a save from before it: over the limit blocks Advance and Start season)
 BLOCK_VERSION = 2  # 1 = the trade block: user block, AI blocks, block-aware offers (0 = a save from before it: nothing changes); 2 = an asset leaving the team leaves the block for good
 TIEBREAKERS = ("points_for", "head_to_head")  # standings/seed tiebreak after win pct
@@ -58,6 +59,11 @@ NON_TRADABLE = SINGLETON_POSITIONS
 DRAFT_SPARE_SPOTS = 2  # roster spots the draft leaves open for the wire
 SCORING_NAMES = ("ppr", "half", "std")
 DEFAULT_SLOTS = ("QB", "RB", "RB", "WR", "WR", "TE", "FLEX", "K")
+# The flex slot's eligibility, picked at setup. "flex" (RB/WR/TE) is the default and is never serialized; "rb_wr" swaps the
+# FLEX slot for WRRB_FLEX (RB/WR only). A save made before the option has no flex_type and replays exactly as it was.
+FLEX_TYPES = ("flex", "rb_wr")
+DEFAULT_FLEX_TYPE = "flex"
+FLEX_SLOT_FOR_TYPE = {"flex": "FLEX", "rb_wr": "WRRB_FLEX"}
 PREVIEW_PAYWALL_WEEK = 4  # Free can play weeks 1-3; week 4 is paywalled
 MAX_GAMES_PRO = 3
 MAX_GAMES_FREE = 1
@@ -87,6 +93,7 @@ POOL_CAPS = {"QB": 64, "RB": 160, "WR": 220, "TE": 90, "K": 36, "DEF": 32}
 FLEX_SHARE: dict[str, dict[str, float]] = {
     "FLEX": {"RB": 0.40, "WR": 0.45, "TE": 0.15},
     "REC_FLEX": {"WR": 0.60, "TE": 0.40},
+    "WRRB_FLEX": {"RB": 0.47, "WR": 0.53},
     "SUPER_FLEX": {"QB": 0.70, "RB": 0.10, "WR": 0.17, "TE": 0.03},
 }
 
@@ -113,12 +120,12 @@ def playoff_rounds(playoff_teams: int) -> int:
 
 
 def derive_layout(
-    *, superflex: bool, include_k: bool, include_def: bool, bench: int
+    *, superflex: bool, include_k: bool, include_def: bool, bench: int, flex_type: str = DEFAULT_FLEX_TYPE
 ) -> tuple[tuple[str, ...], int, int]:
     """(starting slots, roster limit, draft rounds) from the lineup toggles.
     The draft fills every roster but ``DRAFT_SPARE_SPOTS`` spots."""
 
-    slots = ["QB", "RB", "RB", "WR", "WR", "TE", "FLEX"]
+    slots = ["QB", "RB", "RB", "WR", "WR", "TE", FLEX_SLOT_FOR_TYPE[flex_type]]
     if superflex:
         slots.append("SUPER_FLEX")
     if include_k:
@@ -172,6 +179,7 @@ class GameSettings:
     mode: str = DEFAULT_MODE
     te_premium: float = 0.0  # extra points per TE reception
     superflex: bool = False
+    flex_type: str = DEFAULT_FLEX_TYPE  # "flex" (RB/WR/TE) or "rb_wr" (RB/WR only); serialized only when not the default
     include_k: bool = True
     include_def: bool = False
     bench: int = DEFAULT_BENCH
@@ -188,6 +196,7 @@ class GameSettings:
     dynasty_v: int = 0  # dynasty save-format version
     # IR and taxi squads (reserve_v 0 = a save from before them: no reserve spots at all).
     reserve_v: int = 0
+    kd_v: int = 0  # K/DEF trade version (0 on every save made before it: kickers and defenses are never traded)
     block_v: int = 0  # trade block version (0 on every save made before it)
     ir_slots: int = 0
     taxi_slots: int = 0
@@ -203,6 +212,11 @@ class GameSettings:
     def soft_limit(self) -> bool:
         """limit_v 1+: a roster over the limit never blocks the game moving on; it only blocks acquiring players until back under."""
         return self.limit_v >= 1
+
+    @property
+    def non_tradable(self) -> tuple[str, ...]:
+        """Positions that cannot be traded in this game: K and DEF on a save from before kd_v, none after."""
+        return () if self.kd_v >= 1 else NON_TRADABLE
 
     @property
     def ai_depth(self) -> bool:
@@ -308,6 +322,9 @@ class GameSettings:
         if difficulty not in DIFFICULTIES:
             raise ValueError("difficulty must be one of: " + ", ".join(DIFFICULTIES))
         superflex = _flag(raw, "superflex", False)
+        flex_type = raw.get("flex_type", DEFAULT_FLEX_TYPE)
+        if flex_type not in FLEX_TYPES:
+            raise ValueError("flex_type must be one of: " + ", ".join(FLEX_TYPES))
         include_k = _flag(raw, "include_k", True)
         include_def = _flag(raw, "include_def", False)
         bench = raw.get("bench", DEFAULT_BENCH)
@@ -332,14 +349,14 @@ class GameSettings:
         if isinstance(taxi_years, bool) or not isinstance(taxi_years, int) or taxi_years not in (1, 2, 3, 4):
             raise ValueError("taxi_years must be 1, 2, 3 or 4")
         slots, limit, rounds = derive_layout(
-            superflex=superflex, include_k=include_k, include_def=include_def, bench=bench
+            superflex=superflex, include_k=include_k, include_def=include_def, bench=bench, flex_type=flex_type
         )
         return cls(
             teams=teams, scoring=scoring, difficulty=difficulty, user_slot=slot, auto_lineup=auto,
             slots=slots, rounds=rounds, roster_limit=limit, playoff_teams=4 if teams <= 8 else 6,
-            mode=mode, te_premium=float(te_premium), superflex=superflex, include_k=include_k,
+            mode=mode, te_premium=float(te_premium), superflex=superflex, flex_type=flex_type, include_k=include_k,
             include_def=include_def, bench=bench, tiebreaker=tiebreaker,
-            reserve_v=RESERVE_VERSION, block_v=BLOCK_VERSION, ir_slots=ir_slots, taxi_slots=taxi_slots, taxi_years=taxi_years, ai_v=AI_VERSION, limit_v=LIMIT_VERSION,
+            reserve_v=RESERVE_VERSION, block_v=BLOCK_VERSION, kd_v=KD_VERSION, ir_slots=ir_slots, taxi_slots=taxi_slots, taxi_years=taxi_years, ai_v=AI_VERSION, limit_v=LIMIT_VERSION,
             seasons=seasons, start_year=start_year, rookie_rounds=rookie_rounds,
             pick_years=PICK_YEARS if mode == "dynasty" else 0, dynasty_v=DYNASTY_VERSION if mode == "dynasty" else 0,
             names_v=NAMES_VERSION if mode == "dynasty" else 0,
@@ -361,10 +378,14 @@ class GameSettings:
         if self.reserve_v:
             out.update({"reserve_v": self.reserve_v, "ir_slots": self.ir_slots, "taxi_slots": self.taxi_slots,
                         "taxi_years": self.taxi_years})
+        if self.flex_type != DEFAULT_FLEX_TYPE:  # the default flex never serializes, so every older save and digest is unchanged
+            out["flex_type"] = self.flex_type
         if self.ai_v:  # saves from before the AI generation serialize exactly as before
             out["ai_v"] = self.ai_v
         if self.block_v:
             out["block_v"] = self.block_v
+        if self.kd_v:
+            out["kd_v"] = self.kd_v
         if self.names_v:
             out["names_v"] = self.names_v
         if self.limit_v:  # absent on every save made before the soft limit
@@ -393,6 +414,7 @@ class GameSettings:
             playoff_teams=int(raw["playoff_teams"]), trade_deadline_week=int(raw["trade_deadline_week"]),
             mode=str(raw.get("mode") or DEFAULT_MODE), te_premium=float(raw.get("te_premium") or 0.0),
             superflex=bool(raw.get("superflex", "SUPER_FLEX" in slots)),
+            flex_type=str(raw.get("flex_type") or DEFAULT_FLEX_TYPE),
             include_k=bool(raw.get("include_k", "K" in slots)),
             include_def=bool(raw.get("include_def", "DEF" in slots)),
             bench=int(raw.get("bench", limit - len(slots))), start=str(raw.get("start") or START_FRESH),
@@ -402,7 +424,7 @@ class GameSettings:
             tiebreaker=str(raw.get("tiebreaker") or LEGACY_TIEBREAKER),
             seasons=int(raw.get("seasons") or 1), start_year=int(raw.get("start_year") or 0),
             pick_years=int(raw.get("pick_years") or 0), rookie_rounds=int(raw.get("rookie_rounds") or 0),
-            dynasty_v=int(raw.get("dynasty_v") or 0), reserve_v=int(raw.get("reserve_v") or 0), block_v=int(raw.get("block_v") or 0),
+            dynasty_v=int(raw.get("dynasty_v") or 0), reserve_v=int(raw.get("reserve_v") or 0), block_v=int(raw.get("block_v") or 0), kd_v=int(raw.get("kd_v") or 0),
             ir_slots=int(raw.get("ir_slots") or 0), taxi_slots=int(raw.get("taxi_slots") or 0),
             taxi_years=int(raw.get("taxi_years", 2)), ai_v=int(raw.get("ai_v") or 0), names_v=int(raw.get("names_v") or 0),
             limit_v=int(raw.get("limit_v") or 0),
@@ -662,7 +684,7 @@ __all__ = [
     "GAME_ENGINE_VERSION", "DIFFICULTIES", "TEAM_COUNTS", "SCORING_NAMES", "DEFAULT_SLOTS",
     "PREVIEW_PAYWALL_WEEK", "MAX_GAMES_PRO", "MAX_GAMES_FREE", "SCORING_PRESETS", "POOL_CAPS",
     "TE_PREMIUMS", "BENCH_RANGE", "DEFAULT_BENCH", "DEFAULT_TEAMS", "DEFAULT_SCORING", "IMPORT_TEAM_COUNTS",
-    "START_FRESH", "START_LEAGUE", "START_KINDS", "SINGLETON_POSITIONS", "NON_TRADABLE", "FLEX_SHARE",
+    "KD_VERSION", "FLEX_TYPES", "DEFAULT_FLEX_TYPE", "FLEX_SLOT_FOR_TYPE", "START_FRESH", "START_LEAGUE", "START_KINDS", "SINGLETON_POSITIONS", "NON_TRADABLE", "FLEX_SHARE",
     "DRAFT_SPARE_SPOTS", "derive_layout", "scoring_label", "GAME_POSITIONS", "GAME_STRICT_SLOTS",
     "ImportedTeam", "LeagueImport", "LeagueTeamChoice", "LeagueTeams", "GameError", "GameSettings", "GamePlayer", "GameTeam", "GameSnapshot", "slot_positions",
     "playoff_rounds", "POSITIONS", "STRICT_SLOTS", "FLEX_SLOTS",

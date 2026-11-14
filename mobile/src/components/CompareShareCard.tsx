@@ -9,6 +9,7 @@ import ShareCardChrome, { CARD_HEIGHT, CARD_WIDTH } from './ShareCardChrome';
 import { compareRowWinner, type CompareRow } from '../lib/playerCompare';
 import { overallRatingColor } from '../lib/percentile';
 import { colors, spacing } from '../theme';
+import PlayerName from './PlayerName';
 
 // Same safety net as TradeShareCard/PlayerShareCard's AVATAR_READY_TIMEOUT_MS
 // — not the fix, just a floor so a hung headshot request on either side
@@ -57,9 +58,7 @@ function IdentityColumn({
           label="OVR"
         />
       ) : null}
-      <AppText style={styles.identityName} numberOfLines={2}>
-        {side.name}
-      </AppText>
+      <PlayerName name={side.name} style={styles.identityName} />
       <View style={styles.identityMetaRow}>
         <PositionBadge position={side.position} />
         {side.team ? (

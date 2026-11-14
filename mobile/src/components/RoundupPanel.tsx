@@ -25,6 +25,7 @@ import {
 } from '../lib/roundupPresentation';
 import { useThemeMode } from '../context/ThemeModeContext';
 import { radii, spacing, type ThemeColors } from '../theme';
+import PlayerName from './PlayerName';
 
 /**
  * League Recaps > Roundup: your lineup against the best one you could have
@@ -165,12 +166,22 @@ function RoundupBody({
                   <View style={styles.slotCell}>
                     <PositionBadge position={row.slot} />
                   </View>
-                  <AppText style={[styles.lineupName, changed && styles.muted]} numberOfLines={1}>
-                    {row.actual.player_id ? `${row.actual.name} ${formatPoints(row.actual.points)}` : 'Empty'}
-                  </AppText>
-                  <AppText style={[styles.lineupName, changed && { color: colors.success, fontWeight: '700' }]} numberOfLines={1}>
-                    {row.optimal.player_id ? `${row.optimal.name} ${formatPoints(row.optimal.points)}` : 'Empty'}
-                  </AppText>
+                  {row.actual.player_id ? (
+                    <View style={{ flex: 1, minWidth: 0 }}>
+                      <PlayerName name={row.actual.name} style={[styles.lineupName, changed && styles.muted]} />
+                      <AppText style={[styles.lineupName, changed && styles.muted]}>{formatPoints(row.actual.points)}</AppText>
+                    </View>
+                  ) : (
+                    <AppText style={[styles.lineupName, changed && styles.muted]}>Empty</AppText>
+                  )}
+                  {row.optimal.player_id ? (
+                    <View style={{ flex: 1, minWidth: 0 }}>
+                      <PlayerName name={row.optimal.name} style={[styles.lineupName, changed && { color: colors.success, fontWeight: '700' }]} />
+                      <AppText style={[styles.lineupName, changed && { color: colors.success, fontWeight: '700' }]}>{formatPoints(row.optimal.points)}</AppText>
+                    </View>
+                  ) : (
+                    <AppText style={[styles.lineupName, changed && { color: colors.success, fontWeight: '700' }]}>Empty</AppText>
+                  )}
                 </View>
               );
             })}

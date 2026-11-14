@@ -11,12 +11,13 @@ import { ToneBadge } from "@/components/ToneBadge";
 import { api } from "@/lib/api";
 import { simSeasonText, type SimTeamHistoryPick, type SimTeamHistoryResponse } from "@/lib/simGame";
 import { simDraftSlotText, simSeasonRecord, simTeamMoveText, simWhenLabel } from "@/lib/simHistory";
+import { PlayerName } from "@/components/PlayerName";
 
 function PickRow({ pick }: { pick: SimTeamHistoryPick }) {
   return (
     <li className="flex items-center gap-2 py-1 text-sm" style={{ borderBottom: "var(--border-width-default) solid var(--color-border)" }}>
       <PositionBadge position={pick.pos} />
-      <span className="min-w-0 flex-1 truncate font-bold">{pick.name}</span>
+      <PlayerName name={pick.name} className="min-w-0 flex-1 font-bold" />
       <span className="shrink-0 text-xs tabular-nums" style={{ color: "var(--color-text-secondary)" }}>
         {simDraftSlotText(pick.round, pick.pick, pick.auto)}
       </span>
