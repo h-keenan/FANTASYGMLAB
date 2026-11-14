@@ -4611,3 +4611,10 @@ main > header:has(> h1.sr-only:only-child) {
 .row-expand-inner { min-height: 0; overflow: hidden; }
 @keyframes row-expand-in { from { grid-template-rows: 0fr; opacity: 0; } to { grid-template-rows: 1fr; opacity: 1; } }
 @media (prefers-reduced-motion: reduce) { .row-expand { animation: none; } }
+
+/* Trade scale (ui/TradeScale): the "+" tile collapses away when the offer is ready for Send / Tweak and grows back on Tweak.
+   Reduced motion: it simply appears or disappears. */
+.scale-collapse { display: grid; grid-template-rows: 0fr; opacity: 0; transition: grid-template-rows 240ms cubic-bezier(0.2, 0.9, 0.3, 1), opacity 180ms ease-out; }
+.scale-collapse[data-open="true"] { grid-template-rows: 1fr; opacity: 1; }
+.scale-collapse-inner { min-height: 0; overflow: hidden; }
+@media (prefers-reduced-motion: reduce) { .scale-collapse, .fairness-glide { transition: none !important; } }

@@ -1,22 +1,23 @@
 "use client";
 
-import { useState } from "react";
-
 import { SimDraftGrid } from "@/components/SimDraftGrid";
 import { Sheet } from "@/components/ui/Sheet";
 import { CompactModule } from "@/components/ui/CompactModule";
+import { CompactPlayerCard } from "@/components/ui/CompactPlayerCard";
+import { LetterGrade } from "@/components/ui/LetterGrade";
+import { SimTeamIdentity } from "@/components/SimTeamIdentity";
 import { positionColorVar } from "@/lib/playerPresentation";
-import { simDraftMiniBoard, simDraftMiniWindow, simDraftPickChip, simDraftProgress, simDraftRecentPicks, simRookieMiniBoard, simRookieRecentChips, type SimMiniCell } from "@/lib/simDraft";
+import { simDraftMiniBoard, simDraftMiniWindow, simDraftPickChip, simDraftProgress, simDraftRecentPicks, simRookieMiniBoard, simRookieRecentCards, simRookieRecentChips, type SimMiniCell, type SimRecentPickCard, type SimSurvival } from "@/lib/simDraft";
 import type { SimDraftState, SimGamePlayer } from "@/lib/simGame";
 
 /**
- * "Who has been drafted", always on the draft page (not behind a tab): a strip of the latest picks and a mini board
- * (rounds x teams of tiny position-coloured cells, your column outlined, the pick on the clock ringed). The mini
- * board shows the rounds around the clock; "Full board" opens the whole grid in a sheet. Mobile twin: SimDraftOverview.tsx.
+ * "Who has been drafted", always on the draft page (not behind a tab). The recent picks live in the pinned clock area
+ * (`SimRecentStrip`, below); this is the mini board module under it: rounds x teams of tiny position-coloured cells, your
+ * column outlined, the pick on the clock ringed, rounds around the clock; "Full board" opens the whole grid
+ * (`onFullBoard`, the page owns the sheet). Mobile twin: SimDraftOverview.tsx.
  */
-export function SimDraftOverview({ draft, teams, onOpen }: { draft: SimDraftState; teams: number; onOpen: (player: SimGamePlayer) => void }) {
-  const [full, setFull] = useState(false);
-  const recent = simDraftRecentPicks(draft.picks, 8);
+export function SimDraftOverview({ draft, teams, onFullBoard }: { draft: SimDraftState; teams: number; onFullBoard: () => void }) {
+  const recent = simDraftRecentPicks(draft.picks, 1);
   const progress = simDraftProgress(draft, teams);
   const mini = simDraftMiniBoard(draft, teams);
   const win = simDraftMiniWindow(mini.rows, progress.round);
@@ -24,9 +25,6 @@ export function SimDraftOverview({ draft, teams, onOpen }: { draft: SimDraftStat
   const last = recent[0];
   return (
     <div className="flex flex-col gap-2" data-testid="draft-overview">
-      <SimRecentStrip
-        chips={recent.map((pk) => ({ key: String(pk.pick_no), label: simDraftPickChip(pk), pos: pk.player.pos, aria: `Pick ${pk.pick_no}: ${pk.player.name}, ${pk.player.pos}. Open player details`, onPress: () => onOpen(pk.player) }))}
-      />
       <CompactModule
         id="draft.board"
         title="Draft board"
@@ -39,49 +37,79 @@ export function SimDraftOverview({ draft, teams, onOpen }: { draft: SimDraftStat
         ]}
       >
         <SimMiniBoard rows={win.rows} from={win.from} to={win.to} />
-        <button type="button" className="tap-link self-start text-xs font-bold" style={{ color: "var(--color-accent)", minHeight: "var(--touch-target-min)" }} onClick={() => setFull(true)}>
+        <button type="button" className="tap-link self-start text-xs font-bold" style={{ color: "var(--color-accent)", minHeight: "var(--touch-target-min)" }} onClick={onFullBoard}>
           Full board
         </button>
       </CompactModule>
-      <Sheet open={full} onClose={() => setFull(false)} title="Full draft board" size="lg">
-        <SimDraftGrid draft={draft} teams={teams} onOpen={(p) => { setFull(false); onOpen(p); }} />
-      </Sheet>
     </div>
   );
 }
 
-export interface SimRecentChip {
-  key: string;
-  label: string;
-  pos: string;
-  aria?: string;
-  onPress?: () => void;
+/** The full draft grid in a sheet (the strip's "Full board" and the board module's link both open it). */
+export function SimFullBoardSheet({ open, onClose, draft, teams, onOpen }: { open: boolean; onClose: () => void; draft: SimDraftState; teams: number; onOpen: (player: SimGamePlayer) => void }) {
+  return (
+    <Sheet open={open} onClose={onClose} title="Full draft board" size="lg">
+      <SimDraftGrid draft={draft} teams={teams} onOpen={(p) => { onClose(); onOpen(p); }} />
+    </Sheet>
+  );
 }
 
-/** The latest picks as a horizontally scrolling strip of position-underlined chips (shared by the redraft and rookie drafts). */
-export function SimRecentStrip({ chips }: { chips: SimRecentChip[] }) {
+/**
+ * The latest picks as a horizontally scrolling strip of compact player cards (coridian_: "the prior picks with the prior
+ * players taken"): pick number, the picking team's logo (SimTeamIdentity), avatar, name, position and letter grade. A card
+ * opens the player; "Full board" opens the whole board. Lives in the pinned clock area (redraft and rookie drafts).
+ */
+export function SimRecentStrip({ cards, onOpenPlayer, onFullBoard }: { cards: SimRecentPickCard[]; onOpenPlayer?: (card: SimRecentPickCard) => void; onFullBoard?: () => void }) {
   return (
-    <ol className="flex gap-1.5 overflow-x-auto pb-0.5" aria-label="Recent picks" data-testid="recent-picks" style={{ scrollbarWidth: "none" }}>
-      {chips.length === 0 ? (
-        <li className="text-xs" style={{ color: "var(--color-text-muted)", minHeight: 32, display: "flex", alignItems: "center" }}>No picks yet. The first ones land here.</li>
-      ) : (
-        chips.map((chip) => {
-          const colorVar = positionColorVar(chip.pos);
-          const style = { minHeight: 32, borderRadius: "var(--radius-control)", background: "var(--color-surface-muted)", borderBottom: `3px solid ${colorVar ? `var(${colorVar})` : "var(--color-border-strong)"}` };
-          return (
-            <li key={chip.key} className="shrink-0">
-              {chip.onPress ? (
-                <button type="button" onClick={chip.onPress} className="whitespace-nowrap px-2 text-xs font-bold" style={style} aria-label={chip.aria ?? chip.label}>
-                  {chip.label}
-                </button>
-              ) : (
-                <span className="flex items-center whitespace-nowrap px-2 text-xs font-bold" style={style}>{chip.label}</span>
-              )}
+    <div className="flex flex-col gap-1" data-testid="recent-picks-wrap">
+      <div className="flex items-center justify-between gap-2">
+        <span className="text-[0.6875rem] font-extrabold uppercase" style={{ color: "var(--color-text-muted)", letterSpacing: "var(--letter-spacing-badge)" }}>Just drafted</span>
+        {onFullBoard ? (
+          <button type="button" onClick={onFullBoard} className="tap-link text-xs font-bold" style={{ color: "var(--color-accent)", minHeight: 28 }} data-testid="recent-full-board">
+            Full board
+          </button>
+        ) : null}
+      </div>
+      <ol className="flex gap-2 overflow-x-auto pb-1" aria-label="Recent picks" data-testid="recent-picks" style={{ scrollbarWidth: "none" }}>
+        {cards.length === 0 ? (
+          <li className="text-xs" style={{ color: "var(--color-text-muted)", minHeight: 40, display: "flex", alignItems: "center" }}>No picks yet. The first ones land here.</li>
+        ) : (
+          cards.map((card, i) => (
+            <li key={card.key} className={i === 0 ? "enter-rise shrink-0" : "shrink-0"} style={{ width: 168 }} data-testid="recent-pick-card">
+              <button
+                type="button"
+                onClick={onOpenPlayer ? () => onOpenPlayer(card) : undefined}
+                disabled={!onOpenPlayer}
+                aria-label={card.aria}
+                className="flex w-full flex-col gap-1 p-2 text-left"
+                style={{ background: "var(--color-surface-muted)", borderRadius: "var(--radius-control)", border: card.isYou ? "1px solid var(--color-accent)" : "1px solid transparent", color: "inherit" }}
+              >
+                <span className="flex items-center justify-between gap-1 text-[0.6875rem] font-extrabold tabular-nums" style={{ color: "var(--color-text-muted)" }}>
+                  <span>{card.pickLabel}</span>
+                  {card.teamName ? <SimTeamIdentity name={card.teamName} size="chip" hideName /> : null}
+                </span>
+                <CompactPlayerCard
+                  player={card.player}
+                  testId="recent-pick-player"
+                  trailing={card.grade ? <LetterGrade grade={card.grade} size="xs" /> : undefined}
+                />
+              </button>
             </li>
-          );
-        })
-      )}
-    </ol>
+          ))
+        )}
+      </ol>
+    </div>
+  );
+}
+
+/** "Who survives to my pick": one calm line from public ADP, a running position and your needs (`simDraftSurvival`). */
+export function SimSurvivalLine({ survival }: { survival: SimSurvival | null }) {
+  if (!survival) return null;
+  return (
+    <p className="enter-rise text-xs" style={{ color: "var(--color-text-secondary)" }} data-testid="draft-survival">
+      <span className="font-extrabold" style={{ color: "var(--color-accent)" }}>Before your pick </span>
+      {survival.text}
+    </p>
   );
 }
 
@@ -117,15 +145,16 @@ export function SimMiniBoard({ rows, from, to }: { rows: SimMiniCell[][]; from: 
   );
 }
 
-/** The rookie draft's always-visible "who has been drafted": recent strip plus the mini board in a CompactModule. */
+/** The rookie draft's always-visible "who has been drafted": the recent strip plus the mini board in a CompactModule. */
 export function SimRookieOverview({ order, onClockPick, round, made, total }: { order: readonly { n: number; round: number; pick: string; is_yours: boolean; made: { id: string; name: string; pos: string } | null }[]; onClockPick: string | null | undefined; round: number; made: number; total: number }) {
   const rows = simRookieMiniBoard(order, onClockPick);
   const win = simDraftMiniWindow(rows, round);
-  const chips = simRookieRecentChips(order);
+  const cards = simRookieRecentCards(order);
+  const last = simRookieRecentChips(order, 1)[0];
   return (
     <div className="flex flex-col gap-2" data-testid="rookie-overview">
-      <SimRecentStrip chips={chips} />
-      <CompactModule id="rookie.board" title="Draft board" defaultOpen parts={[{ key: "n", text: `${made}/${total} picks`, strong: true }, chips[0] ? { key: "last", text: `last ${chips[0].label}` } : null]}>
+      <SimRecentStrip cards={cards} />
+      <CompactModule id="rookie.board" title="Draft board" defaultOpen parts={[{ key: "n", text: `${made}/${total} picks`, strong: true }, last ? { key: "last", text: `last ${last.label}` } : null]}>
         <SimMiniBoard rows={win.rows} from={win.from} to={win.to} />
       </CompactModule>
     </div>

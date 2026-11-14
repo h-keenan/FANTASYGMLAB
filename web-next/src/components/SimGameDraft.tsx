@@ -10,7 +10,7 @@ import { useBottomPillContext } from "@/lib/useBottomPillContext";
 import { SectionHeading } from "@/components/SectionHeading";
 import { SimDraftBoard } from "@/components/SimDraftBoard";
 import { SimDraftGlyph } from "@/components/SimDraftGlyphs";
-import { SimDraftOverview } from "@/components/SimDraftOverview";
+import { SimDraftOverview, SimFullBoardSheet, SimRecentStrip, SimSurvivalLine } from "@/components/SimDraftOverview";
 import { SimDraftHero } from "@/components/SimDraftHero";
 import { SimIconButton, SimPlayerChip, SimPlayerLine, SimToneBadge, useSimWide, type SimCtx } from "@/components/SimGameParts";
 import { SkeletonCard } from "@/components/Skeleton";
@@ -18,7 +18,7 @@ import { ToneBadge } from "@/components/ToneBadge";
 import { CompactModule } from "@/components/ui/CompactModule";
 import { SimDraftBar } from "@/components/SimDraftBar";
 import { api } from "@/lib/api";
-import { simDraftBarModel, simDraftNeedPills, simDraftSummaryParts } from "@/lib/simDraft";
+import { simDraftBarModel, simDraftNeedPills, simDraftSummaryParts, simDraftSurvival, simRecentPickCards } from "@/lib/simDraft";
 import { simGradeOf } from "@/lib/simGrade";
 import { LetterGrade } from "@/components/ui/LetterGrade";
 import {
@@ -63,6 +63,7 @@ export function SimGameDraft({ ctx, onComplete }: { ctx: SimCtx; onComplete: (re
   const [confirmAuto, setConfirmAuto] = useState(false);
   const [freshPickNos, setFreshPickNos] = useState<number[]>([]);
   const [attempt, setAttempt] = useState(0);
+  const [fullBoard, setFullBoard] = useState(false);
   const queueLoaded = useRef(false);
 
   // The first load, and after a conflict/retry.
@@ -365,6 +366,11 @@ export function SimGameDraft({ ctx, onComplete }: { ctx: SimCtx; onComplete: (re
   const draftLast = hint ? playerSurname(hint.player.name) : "";
   // The pinned bar's second line: the server's pick for you, else the top ADP player still on the board.
   const barPlayer = hint?.player ?? topAvailable;
+  const recentCards = simRecentPickCards(draft, 6);
+  // Who survives to your pick: your queue first, then the best-ADP players the board has loaded that are still available (public ADP only).
+  const takenIds = new Set(picks.map((pk) => pk.player.id));
+  const survivalTargets = [...queued, ...Object.values(players).filter((pl) => pl.adp != null)].filter((pl) => !takenIds.has(pl.id) && !draft.your_roster.some((r) => r.id === pl.id));
+  const survival = simDraftSurvival(draft, survivalTargets, need);
   const header = (
     <CompactModule
       id="draft.clock"
@@ -374,7 +380,19 @@ export function SimGameDraft({ ctx, onComplete }: { ctx: SimCtx; onComplete: (re
       glow={onClock}
       persist={false}
       parts={simDraftSummaryParts(draft, game.settings.teams, need, { picking: Boolean(optimistic) })}
-      preview={draft.status !== "complete" && barPlayer ? <SimDraftBar model={simDraftBarModel(barPlayer, need)} onOpen={() => ctx.openPlayer(barPlayer)} grade={simGradeOf(barPlayer)} /> : undefined}
+      preview={
+        draft.status !== "complete" || recentCards.length > 0 ? (
+          <div className="flex flex-col gap-2" data-testid="draft-pinned">
+            {draft.status !== "complete" && barPlayer ? <SimDraftBar model={simDraftBarModel(barPlayer, need)} onOpen={() => ctx.openPlayer(barPlayer)} grade={simGradeOf(barPlayer)} /> : null}
+            <SimRecentStrip
+              cards={recentCards}
+              onOpenPlayer={(card) => { const found = players[card.player.id]; if (found) ctx.openPlayer(found); }}
+              onFullBoard={() => setFullBoard(true)}
+            />
+            <SimSurvivalLine survival={survival} />
+          </div>
+        ) : undefined
+      }
       action={
         onClock && hint ? (
           <Button size="sm" loading={busy === "pick"} onClick={() => pick(hint.player)}>
@@ -418,7 +436,8 @@ export function SimGameDraft({ ctx, onComplete }: { ctx: SimCtx; onComplete: (re
   return (
     <div className="flex flex-col gap-3">
       {header}
-      <SimDraftOverview draft={draft} teams={game.settings.teams} onOpen={ctx.openPlayer} />
+      <SimDraftOverview draft={draft} teams={game.settings.teams} onFullBoard={() => setFullBoard(true)} />
+      <SimFullBoardSheet open={fullBoard} onClose={() => setFullBoard(false)} draft={draft} teams={game.settings.teams} onOpen={ctx.openPlayer} />
       {pillOwnsTabs ? null : <PillRow ariaLabel="Draft panels" variant="fill" options={tabs} active={activeTab} onSelect={(value) => setPanel(value as Panel)} />}
       {wide ? (
         <div className="grid gap-4" style={{ gridTemplateColumns: "minmax(0, 3fr) minmax(0, 2fr)" }}>
