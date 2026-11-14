@@ -1,6 +1,6 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import React, { useEffect, useMemo, useState, type ReactNode } from 'react';
-import { Pressable, StyleSheet, View } from 'react-native';
+import { AccessibilityInfo, LayoutAnimation, Platform, Pressable, StyleSheet, UIManager, View } from 'react-native';
 
 import AccentCard from './AccentCard';
 import AppText from './AppText';
@@ -9,6 +9,14 @@ import { useThemeMode } from '../context/ThemeModeContext';
 import { compactAriaLabel, compactParts, type CompactPart, type CompactTone } from '../lib/compactModule';
 import { simOpenKey, simParseOpen } from '../lib/simLayout';
 import { spacing, type ThemeColors } from '../theme';
+
+let reduceMotion = false;
+try {
+  void Promise.resolve(AccessibilityInfo.isReduceMotionEnabled?.()).then((v) => { reduceMotion = Boolean(v); }).catch(() => {});
+} catch {
+  /* keep the animation */
+}
+if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) UIManager.setLayoutAnimationEnabledExperimental(true);
 
 function toneColor(tone: CompactTone | undefined, colors: ThemeColors): string {
   switch (tone) {
@@ -86,6 +94,8 @@ export default function CompactModule({
 
   function toggle() {
     const next = !open;
+    // The body grows in and fades (twin of web's .module-expand); reduced motion: it simply appears.
+    if (!reduceMotion && expandIn === 'inline') LayoutAnimation.configureNext(LayoutAnimation.create(200, LayoutAnimation.Types.easeInEaseOut, LayoutAnimation.Properties.opacity));
     setTouched(true);
     setOpen(next);
     if (persist && expandIn === 'inline') AsyncStorage.setItem(simOpenKey(id), next ? '1' : '0').catch(() => {});

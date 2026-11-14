@@ -4615,6 +4615,13 @@ main > header:has(> h1.sr-only:only-child) {
 @keyframes row-expand-in { from { grid-template-rows: 0fr; opacity: 0; } to { grid-template-rows: 1fr; opacity: 1; } }
 @media (prefers-reduced-motion: reduce) { .row-expand { animation: none; } }
 
+/* CompactModule inline body: grows from 0 to its height and fades in (the same motion as .row-expand). The inner box only clips
+   while the animation runs, so popovers and focus rings are never cut off once it settles. Reduced motion: it simply appears. */
+.module-expand { display: grid; grid-template-rows: 1fr; animation: row-expand-in 200ms ease-out; }
+.module-expand-inner { min-height: 0; animation: module-expand-clip 200ms; }
+@keyframes module-expand-clip { from, to { overflow: hidden; } }
+@media (prefers-reduced-motion: reduce) { .module-expand, .module-expand-inner { animation: none; } }
+
 /* Trade scale (ui/TradeScale): the "+" tile collapses away when the offer is ready for Send / Tweak and grows back on Tweak.
    Reduced motion: it simply appears or disappears. */
 .scale-collapse { display: grid; grid-template-rows: 0fr; opacity: 0; transition: grid-template-rows 240ms cubic-bezier(0.2, 0.9, 0.3, 1), opacity 180ms ease-out; }
