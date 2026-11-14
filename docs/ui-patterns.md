@@ -496,7 +496,7 @@ from the trade picker replaces it and Back returns with the selection intact; th
 Related pages are tabs of one page family (`lib/pageFamilies.ts`: Trades, Team, League), rendered by `PageTabBar` over
 `PillRow glass` (sticky, scroll-snap, cyan glass active pill). Each tab keeps its route. The phone footer
 (`BottomTabBar`) uses the same glass tokens. Plan: `docs/audits/2026-11-menu-consolidation.md`.
-=======
+
 ## Sheet tabs (quick views that would otherwise scroll long)
 
 Rule: a pop-up that scrolls past about one and a half screens groups its content under the shared `Tabs`
@@ -533,4 +533,3 @@ through `useOverlay` / `PopupShell` / `Sheet`, so the one-pop-up-at-a-time, Back
 
 Left as they are (short or already segmented): trade picker (Players / Picks segmented control), Matchup swap sheet,
 share previews, filter sheets, alerts dropdown.
->>>>>>> origin/main
