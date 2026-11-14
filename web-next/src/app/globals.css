@@ -1321,9 +1321,8 @@ a {
 .pqv-avatar-glow {
   display: inline-flex;
   border-radius: 50%;
-  box-shadow:
-    0 0 0 1px color-mix(in srgb, var(--color-accent) 30%, transparent),
-    0 0 26px color-mix(in srgb, var(--color-accent) 28%, transparent);
+  /* Blur only: a 0-blur spread ring here drew a hard edge around the glow. */
+  box-shadow: 0 0 26px color-mix(in srgb, var(--color-accent) 28%, transparent);
 }
 /* Archetype (tier) pill: rounded, with an icon, bordered in the tier's own
    prestige color — same color the avatar ring already uses. */
@@ -1926,7 +1925,7 @@ a {
   .pqv-modal .pqv-avatar-glow > * { transform-origin: 0 0; transition: transform 240ms var(--ease-out, ease-out); }
   .pqv-modal .pqv-peek-fold { max-height: 14rem; opacity: 1; transition: max-height 240ms var(--ease-out, ease-out), opacity 180ms linear, margin 240ms var(--ease-out, ease-out); }
   .pqv-modal .pqv-hero { transition: row-gap 240ms var(--ease-out, ease-out); }
-  .pqv-modal[data-snap="peek"] .pqv-avatar-glow { width: 56px; height: 56px; box-shadow: 0 0 0 1px color-mix(in srgb, var(--color-accent) 30%, transparent); }
+  .pqv-modal[data-snap="peek"] .pqv-avatar-glow { width: 56px; height: 56px; box-shadow: 0 0 13px color-mix(in srgb, var(--color-accent) 28%, transparent); }
   .pqv-modal[data-snap="peek"] .pqv-avatar-glow > * { transform: scale(0.5); }
   .pqv-modal[data-snap="peek"] .pqv-peek-fold { max-height: 0; opacity: 0; margin-top: 0; margin-bottom: 0; padding-top: 0; padding-bottom: 0; overflow: hidden; pointer-events: none; }
   .pqv-modal[data-snap="peek"] .pqv-hero { row-gap: 0; }

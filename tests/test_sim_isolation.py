@@ -53,7 +53,7 @@ EXTERNAL_IMPORTERS = {
 }
 PURE_ENGINE_FILES = [
     "engine.py", "analysis.py", "lineup.py", "personas.py", "rng.py", "types.py", "synthetic.py",
-    "store.py", "version.py", "__init__.py", "picks.py", "player_model.py", "player_model_v1.py", "player_model_v2.py", "player_model_v3.py", "player_model_v4.py", "player_model_v5.py", "team_roles.py", "game_ai_depth.py", "forecast.py",
+    "store.py", "version.py", "__init__.py", "picks.py", "player_model.py", "player_model_v1.py", "player_model_v2.py", "player_model_v3.py", "player_model_v4.py", "player_model_v5.py", "team_roles.py", "game_usage.py", "game_ai_depth.py", "forecast.py",
     # the interactive GM game (everything but its router is pure stdlib + numpy + modules.sim)
     "game_types.py", "game_scoring.py", "game_setup.py", "game_state.py", "game_eval.py", "game_draft.py",
     "game_ai.py", "game_actions.py", "game_engine.py", "game_result.py", "game_store.py", "game_view.py", "game_home.py",

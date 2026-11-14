@@ -235,6 +235,7 @@ export function TradeIdeaCardView({
       give={idea.package.send.map((a, i) => tradeCardAsset(a, i, openAsset))}
       get={idea.package.receive.map((a, i) => tradeCardAsset(a, i, openAsset))}
       verdictLabel={idea.value_edge_band || null}
+      netValue={idea.trade_gain}
       meta={[`${idea.confidence_label} confidence`]}
       defaultOpen={highlighted}
     >
