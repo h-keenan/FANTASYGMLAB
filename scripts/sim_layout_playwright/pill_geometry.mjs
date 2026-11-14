@@ -82,10 +82,18 @@ const measure = () => {
     const t = [...strip.querySelectorAll(".pill-tab")]; const s = strip.getBoundingClientRect();
     stripPad = { left: t[0].getBoundingClientRect().left - s.left, right: s.right - t[t.length - 1].getBoundingClientRect().right };
   }
-  return { pillH: pr.height, items, capsule, padL: first.left - lr.left, padR: lr.right - last.right, stripPad, overflowX: document.documentElement.scrollWidth - innerWidth };
+  // Clipping: every tab label must sit inside the segment (the scroll strip) and clear of the primary chip. Scrolled tabs
+  // (only allowed when the strip really overflows) are reachable, so there the check is the LIT tab plus "scrolls".
+  const sr = strip ? strip.getBoundingClientRect() : null;
+  const prim = layer.querySelector(".pill-primary");
+  const clip = strip ? [...strip.querySelectorAll(".pill-tab")].map((e) => {
+    const range = document.createRange(); range.selectNodeContents(e.querySelector(".pill-tab-text") || e); const r = range.getBoundingClientRect();
+    return { label: e.textContent, active: e.getAttribute("aria-selected") === "true", left: r.left - sr.left, right: sr.right - r.right, overChip: prim ? r.right > prim.getBoundingClientRect().left + 0.5 : false, fullLabel: e.getAttribute("aria-label") };
+  }) : [];
+  return { dbg: strip ? { strip: strip.clientWidth, tabs: [...strip.querySelectorAll(".pill-tab")].map((e) => Math.round(e.getBoundingClientRect().width)), layer: layer.getBoundingClientRect().width, kids: [...layer.children].map((k) => Math.round(k.getBoundingClientRect().width)) } : null, clip, scrolls: strip ? strip.scrollWidth > strip.clientWidth + 1 : false, fade: strip ? !!strip.dataset.fade : false, primW: prim ? prim.getBoundingClientRect().width : 0, pillH: pr.height, items, capsule, padL: first.left - lr.left, padR: lr.right - last.right, stripPad, overflowX: document.documentElement.scrollWidth - innerWidth };
 };
 
-const cases = [["team", "?family=team"], ["team + primary", "?family=team&primary=1"], ["trades", "?family=trades"], ["league", "?family=league"], ["sim bar", "?family=team&sim=1"]];
+const cases = [["draft 4 + Auto-pick", "?family=draft"], ["draft 5 + Auto-pick", "?family=draft&draft=5"], ["trades + New trade", "?family=trades&primary=1"], ["team", "?family=team"], ["team + primary", "?family=team&primary=1"], ["trades", "?family=trades"], ["league", "?family=league"], ["sim bar", "?family=team&sim=1"]];
 const rows = [];
 let bad = 0;
 for (const w of [390, 360]) {
@@ -102,9 +110,12 @@ for (const w of [390, 360]) {
     if (m.capsule && (Math.abs(m.capsule.dx) > 1 || Math.abs(m.capsule.dw) > 1)) problems.push(`capsule not on its tab (dx ${m.capsule.dx.toFixed(1)}, dw ${m.capsule.dw.toFixed(1)})`);
     if (Math.abs(m.padL - m.padR) > 1) problems.push(`side padding ${m.padL.toFixed(1)} vs ${m.padR.toFixed(1)}`);
     if (m.stripPad && Math.abs(m.stripPad.left - m.stripPad.right) > 1.5) problems.push(`tab strip unbalanced ${m.stripPad.left.toFixed(1)} vs ${m.stripPad.right.toFixed(1)}`);
+    const clipped = m.clip.filter((c) => c.left < -0.5 || c.right < -0.5 || c.overChip);
+    // Up to 4 tabs at 390 must all fit; 5 tabs, or 360, may scroll (with the edge fade on) as long as the lit tab is fully shown.
+    if (clipped.length && ((w >= 390 && m.clip.length <= 4) || !m.scrolls || !m.fade || clipped.some((c) => c.active))) problems.push(`label clipped: ${clipped.map((c) => `${c.label} (L${c.left.toFixed(1)} R${c.right.toFixed(1)}${c.overChip ? " under chip" : ""})`).join(", ")}`);
     if (m.overflowX > 0) problems.push(`page scrolls sideways by ${m.overflowX}px`);
     if (problems.length) bad++;
-    rows.push({ w, case: name, pillH: Math.round(m.pillH), worstDy: +worst.toFixed(2), capsule: m.capsule && { dy: +m.capsule.dy.toFixed(2), dx: +m.capsule.dx.toFixed(2) }, padL: +m.padL.toFixed(1), padR: +m.padR.toFixed(1), stripPad: m.stripPad, problems });
+    rows.push({ w, case: name, dbg: m.dbg, scrolls: m.scrolls, primW: Math.round(m.primW), pillH: Math.round(m.pillH), worstDy: +worst.toFixed(2), capsule: m.capsule && { dy: +m.capsule.dy.toFixed(2), dx: +m.capsule.dx.toFixed(2) }, padL: +m.padL.toFixed(1), padR: +m.padR.toFixed(1), stripPad: m.stripPad, problems });
   }
   await ctx.close();
 }
