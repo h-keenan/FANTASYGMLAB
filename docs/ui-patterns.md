@@ -1029,3 +1029,37 @@ only). The client adds the Grade stat only when a grade exists (`gradeStat` in `
 - **Waivers header** is ONE `CompactModule` ("Waivers": "394 available · $81 FAAB · Need QB", Sleeper link as its action). The
   stat tiles, ranking explainer, needs sentence + badges, breakdown, limited-data note, beginner help and claim disclosure are
   its body (`lib/waiversHeader.ts`). The tab strip and filter row stay visible above the list.
+
+## Trade builder "two-column scale" and the draft room's pinned clock (2026-11-14, ui-pass-3 topics 3 and 4, coridian_ picks V1)
+
+Audit: `docs/audits/2026-11-ui-pass-3.md` findings 3 and 7; sheet: `docs/audits/ui-pass-3/sheet-2-trade-draft.html`. Logic is the byte-identical lib twins
+`lib/tradeScale.ts` (new) and `lib/simDraft.ts`; every piece below has a web and an app twin.
+
+**Trade builder (`ui/TradeScale`, app `TradeScale`).** Give and Get sit side by side (two columns even at phone width) as `TradeAssetCard`s (the
+`CompactPlayerCard` with its required avatar, or a pick row with `PickAvatar`; tap a card = the PQV peek). Under them a glass card holds the
+`FairnessMeterRow` (the one meter, shared with `TradeCompactCard`; marker and fill glide between values, reduced motion snaps) and a footer line
+(roster after the trade). A dashed cyan "+" tile at the end of each column opens the existing `TradePickerSheet`; it hides at the per-side cap. The
+phase comes from `tradeScalePhase`: `empty` / `building` (meter says what is missing: "Add something you get"), `review` (both sides filled: the "+" tiles
+collapse away and the verdict plus **Send / Tweak** take their place), `tweak` (tiles and remove buttons return, "Review" goes back).
+- **Sim** (`SimGameTrades` Builder, web + app): `mode="sim"`, the meter is `simAcceptanceMeter(verdict.decision)` = the AI manager's public answer in three coarse
+  plain-word steps ("They would decline / counter / accept", "Checking their answer" while the preview loads). No value, no percentage, no number; the verdict
+  card under it is only the reason, chips and the counter ("Take their counter"). Send shows only when they would accept.
+- **Trade Analyzer** (`TradeAnalyzerContent`, `TradeAnalyzerScreen`): the same scale with the live market-value meter (`fairnessMeter`, values from the assets);
+  Analyze is the scale's primary action (`buildingAction` for a one-sided "what is this worth" check, Send-style button in review). Analyze failures use the shared
+  `ErrorState` with Try again. Notes, league settings, picks, saved trades, share and Send to Sleeper stay in the verdict/expanders below it.
+- **Build an offer** (`OfferCard` / `TradeOfferScreen`): each built offer is a `TradeCompactCard` (open) with `netValue` from the server's send/receive values.
+- Not changed: the 3-team `MultiTeamTradeContent` (three sides do not fit two columns; it already uses the shared picker) and the Sim inbox offer cards (still a
+  collapsed summary plus `SimPlayerChip` lists; next: `TradeCompactCard mode="sim"`).
+
+**Sim draft room: pinned clock + list (V1) with the recent picks.** The clock `CompactModule`'s always-visible `preview` is now three lines: best available
+(`SimDraftBar`), the **Just drafted strip** (`SimRecentStrip`: the last 6 picks as cards with pick number, the picking team's logo through `SimTeamIdentity`
+(`hideName`), avatar, `J. Surname`, position and letter grade; yours is cyan-outlined; a card opens the player; "Full board" opens the whole grid sheet via
+`SimFullBoardSheet`, which the page owns) and the **survival line** (`SimSurvivalLine`). The mini board stays its own module under the clock. The rookie draft
+uses the same strip (`simRookieRecentCards`; the rookie order carries no team or grade, so those parts are absent). Models: `simRecentPickCards`, `simRookieRecentCards`.
+- **Who survives to your pick** (`simDraftSurvival`): public information only. Factors: your next pick and how many picks come before it, each target's public ADP against
+  that line (gone / could go either way / still there), a position **run** in the last six picks (3+ of one position pulls its players about three picks earlier), and your
+  open starter needs (needs first). Targets are your queue first, then the best-ADP available players the board has loaded. Silent when you are on the clock, the draft is
+  over, you have no later pick, or no target has an ADP. It never reads the model's value or rating. Not modelled: other teams' needs (the client has no AI roster needs, only
+  their picks so far); the run signal is the public proxy.
+- The player list (`SimDraftBoard` -> `SimDraftRow` -> `SimPlayerLine`) was already `PlayerAccordionRow mode="sim"`; the Full board grid (`SimDraftGrid`) stays a dense grid of
+  position-tinted pick cells (a board, not a list).

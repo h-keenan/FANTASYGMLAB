@@ -62,7 +62,9 @@ import { valueDirectionLabel } from '../lib/tradeValue';
 import { formatTradeGain } from '../lib/liveDraft';
 import { idpTradePoolPlayers } from '../lib/idpPresentation';
 import { quickAddPlacement } from '../lib/tradeShortcuts';
-import TradePickerSheet, { TradeSideSummary } from '../components/TradePickerSheet';
+import TradePickerSheet from '../components/TradePickerSheet';
+import TradeScale from '../components/TradeScale';
+import type { TradeCardAsset } from '../components/TradeCompactCard';
 import { usePlayerQuickView } from '../context/PlayerQuickViewContext';
 import { pickToSheetItem, playerToSheetItem } from '../lib/tradeSheetItems';
 import { selectedItems, type SheetItem } from '../lib/tradeSheetPicker';
@@ -457,6 +459,16 @@ export default function TradeAnalyzerScreen({ leagueId, leagueName, navigation, 
 
   const sendCount = sendIds.length + sendPicks.length;
   const receiveCount = receiveIds.length + receivePicks.length;
+  const scalePlayer = (p: RankedPlayer): TradeCardAsset => ({
+    key: `player:${p.player_id}`,
+    player: { id: p.player_id, name: p.name ?? '', position: p.position ?? null, team: p.team ?? null, age: p.age ?? null },
+    value: playerScore(p),
+    ovr: p.overall_rating ?? null,
+    onPress: () => openQuickView(p, { leagueId, leagueName, sourceLabel: 'Trade Analyzer' }),
+  });
+  const scalePick = (p: DraftPickAsset): TradeCardAsset => ({ key: `pick:${p.pick_id}`, pickLabel: p.label ?? 'Draft pick', value: p.score });
+  const sendScaleAssets = [...sendIds.map(scalePlayer), ...sendPicks.map(scalePick)];
+  const receiveScaleAssets = [...receiveIds.map(scalePlayer), ...receivePicks.map(scalePick)];
   const canAnalyze = hasAnyAssets;
   const analyzeLabel = canAnalyze ? `Analyze Trade (${sendCount} for ${receiveCount})` : 'Analyze Trade';
 
@@ -572,34 +584,31 @@ export default function TradeAnalyzerScreen({ leagueId, leagueName, navigation, 
         </View>
       ) : null}
 
-      <View style={styles.sidesRow}>
-        <TradeSideSummary
-          testID="trade-side-send"
-          label={TRADE_SIDE_LABEL.send}
-          tone="danger"
-          items={[...sendIds.map(playerToSheetItem), ...sendPicks.map(pickToSheetItem)]}
-          onOpen={() => openSheet('send')}
-          onRemove={(key) => removeFromSide('send', key.slice(key.indexOf(':') + 1))}
-          hint="Add from your roster"
-        />
-        <TradeSideSummary
-          testID="trade-side-receive"
-          label={TRADE_SIDE_LABEL.receive}
-          tone="success"
-          items={[...receiveIds.map(playerToSheetItem), ...receivePicks.map(pickToSheetItem)]}
-          onOpen={() => openSheet('receive')}
-          onRemove={(key) => removeFromSide('receive', key.slice(key.indexOf(':') + 1))}
-          hint={selectedTeamId === ALL_TEAMS_ID ? 'Add from any team' : `Add from ${otherTeams.find((t) => t.rosterId === selectedTeamId)?.ownerName ?? 'team'}`}
-        />
-      </View>
+      <TradeScale
+        giveLabel={TRADE_SIDE_LABEL.send}
+        getLabel={TRADE_SIDE_LABEL.receive}
+        give={sendScaleAssets}
+        get={receiveScaleAssets}
+        addHint={{ give: 'Add from your roster', get: selectedTeamId === ALL_TEAMS_ID ? 'Add from any team' : `Add from ${otherTeams.find((t) => t.rosterId === selectedTeamId)?.ownerName ?? 'team'}` }}
+        onAdd={(side) => openSheet(side === 'give' ? 'send' : 'receive')}
+        onRemove={(side, key) => removeFromSide(side === 'give' ? 'send' : 'receive', key.slice(key.indexOf(':') + 1))}
+        onSend={quickMode ? undefined : analyze}
+        sending={analyzing}
+        canSend={canAnalyze}
+        sendLabel={analyzing ? 'Analyzing…' : analyzeLabel}
+        buildingAction={
+          quickMode ? undefined : canAnalyze ? (
+            <Button label={analyzeLabel} onPress={analyze} loading={analyzing} style={styles.analyzeButton} />
+          ) : (
+            <AppText style={styles.analyzeHint}>Add players or picks to analyze.</AppText>
+          )
+        }
+      />
 
       {!quickMode ? (
         <>
-          <Button label={analyzeLabel} onPress={analyze} disabled={!canAnalyze} loading={analyzing} style={styles.analyzeButton} />
-          {!canAnalyze ? <AppText style={styles.analyzeHint}>Add players or picks to analyze.</AppText> : null}
-
           {limitWall ? <LimitWall wall={limitWall} feature="trade_analyzer_weekly_limit" /> : null}
-          {analyzeError ? <AppText style={styles.error}>{analyzeError}</AppText> : null}
+          {analyzeError ? <ErrorState title="Couldn't analyze this trade" message={analyzeError} onRetry={() => void analyze()} /> : null}
           {/* Past the trade deadline the analyzer stays open for offseason
               planning — this note just says the trade can't be sent yet. */}
           {planningNote ? <AppText style={styles.planningNote}>{planningNote}</AppText> : null}
