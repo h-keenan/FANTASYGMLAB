@@ -99,6 +99,8 @@ def player_history(root: GameSnapshot, events: Iterable[Mapping[str, Any]], pid:
     holder: str | None = None
     seasons: dict[int, dict[str, Any]] = {}
     origin: dict[str, Any] | None = None
+    # Every scored player's total per season (a position rank needs the whole field), read from the same week_scored events.
+    field: dict[int, dict[str, float]] = {}
 
     def team_ref(tid: str | None) -> dict[str, Any]:
         return {"team_id": tid, "team_name": names.team(tid)}
@@ -145,9 +147,14 @@ def player_history(root: GameSnapshot, events: Iterable[Mapping[str, Any]], pid:
                 add("retired", ev, holder)
                 holder = None
         elif kind == "week_scored":
+            totals = field.setdefault(clock.season_no, {})
+            for other, v in p["points"].items():
+                if v is not None:
+                    totals[other] = totals.get(other, 0.0) + float(v)
             pts = p["points"].get(pid)
             if pts is not None and holder is not None:
-                line = seasons.setdefault(clock.season_no, {"season": clock.season_no, "year": clock.year, "season_label": season_label(clock.season_no, clock.year), "games": 0, "points": 0.0, "teams": {}})
+                line = seasons.setdefault(clock.season_no, {"season": clock.season_no, "year": clock.year, "season_label": season_label(clock.season_no, clock.year), "games": 0, "points": 0.0, "teams": {}, "weeks": []})
+                line["weeks"].append({"week": int(ev.get("week") or 0), "points": round(float(pts), 1), "playoff": p.get("kind") != "regular"})
                 line["games"] += 1
                 line["points"] += float(pts)
                 t = line["teams"].setdefault(holder, {"team_id": holder, "team_name": names.team(holder), "games": 0, "points": 0.0})
@@ -158,10 +165,26 @@ def player_history(root: GameSnapshot, events: Iterable[Mapping[str, Any]], pid:
     season_rows = []
     for line in sorted(seasons.values(), key=lambda s: s["season"]):
         teams = [{**t, "points": round(t["points"], 1), "ppg": round(t["points"] / t["games"], 1)} for t in line["teams"].values()]
+        pos, rank = _position_rank(root, field.get(line["season"], {}), line["season"], pid)
+        best = max(line["weeks"], key=lambda w: (w["points"], -w["week"]), default=None)
         season_rows.append({"season": line["season"], "year": line["year"], "season_label": line["season_label"], "games": line["games"], "points": round(line["points"], 1),
-                            "ppg": round(line["points"] / line["games"], 1) if line["games"] else None, "teams": teams})
+                            "ppg": round(line["points"] / line["games"], 1) if line["games"] else None, "teams": teams,
+                            # What the engine stores per player per game is his fantasy points (the component stats are not kept for the
+                            # whole league), so a season is points / games / average / best week / position rank, never invented components.
+                            "weeks": line["weeks"], "best_week": best, "pos": pos, "pos_rank": rank})
     return {"pid": pid, "name": names.player(pid)["name"], "origin": origin, "current_team": team_ref(holder) if holder else None,
             "entries": entries, "seasons": season_rows}
+
+
+def _position_rank(root: GameSnapshot, totals: Mapping[str, float], season: int, pid: str) -> tuple[str | None, int | None]:
+    """His position and where his season total ranked among that position's scored players (1 = best); (None, None) when unknown."""
+
+    players = root.season_view(season).players
+    me = players.get(pid)
+    if me is None or pid not in totals:
+        return None, None
+    mine = totals[pid]
+    return me.pos, 1 + sum(1 for other, v in totals.items() if v > mine and (q := players.get(other)) is not None and q.pos == me.pos)
 
 
 # ------------------------------------------------------------------- one team

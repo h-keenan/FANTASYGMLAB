@@ -739,6 +739,11 @@ export interface SimHistorySeason {
   points: number;
   ppg: number | null;
   teams: SimHistorySeasonTeam[];
+  /** Every game he scored in that season (regular and playoff), the best of them, and his position rank by season points (older servers omit these). */
+  weeks?: { week: number; points: number; playoff?: boolean }[];
+  best_week?: { week: number; points: number } | null;
+  pos?: string | null;
+  pos_rank?: number | null;
 }
 
 export interface SimPlayerHistoryResponse extends SimGameEnvelope {

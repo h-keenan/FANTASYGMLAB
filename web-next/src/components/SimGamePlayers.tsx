@@ -6,6 +6,7 @@ import { simAsOfSeason } from "@/lib/simAsOf";
 import { PlayerQuickView, StatGroup, type SimPqvSections } from "@/components/PlayerQuickView";
 import { GradeBar, GradeTile } from "@/components/ui/LetterGrade";
 import { SimRealHistory } from "@/components/SimRealHistory";
+import { SimSimSeasons } from "@/components/SimSimSeasons";
 import { SimPlayerHistory } from "@/components/SimPlayerHistory";
 import { SimScoutingSections } from "@/components/SimScoutingSections";
 import { WeeklyPointsPanel } from "@/components/WeeklyPointsChartLazy";
@@ -293,7 +294,12 @@ export function simPqvSections(gameId: string, player: SimGamePlayer, detail: Si
     heroTiles: simHeroTiles(player),
     scouting: detail.data?.scouting ? <SimScoutingSections profile={detail.data.scouting} /> : undefined,
     history: <SimPlayerHistory gameId={gameId} playerId={player.id} />,
-    stats: real ? <SimRealHistory playerId={real.playerId} asOf={real.asOf} /> : undefined,
+    stats: (
+      <>
+        {real ? <SimRealHistory playerId={real.playerId} asOf={real.asOf} /> : null}
+        <SimSimSeasons gameId={gameId} playerId={player.id} />
+      </>
+    ),
   };
 }
 

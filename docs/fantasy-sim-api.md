@@ -911,3 +911,13 @@ from before it has no key and keeps today's helpers and replays identically; gol
 
 A save with `hint_v` 0 keeps the value-for-need hint ("Best available for your need: RB"). Clients show `hint.why` verbatim and pick the Auto-pick
 confirmation copy with `simAutoPickConfirmText(settings)` (web + app lib twins).
+
+## Player career in the sim (`GET /players/{id}/history` -> `seasons`)
+Each sim season a player has played (regular and playoff games, every season of a dynasty, the current one included) is a row:
+`season`, `year`, `season_label` ("S3 2028"), `games`, `points`, `ppg`, `teams` (per-team split), plus `weeks`
+(`[{week, points, playoff}]`, the game log), `best_week`, and `pos` / `pos_rank` (his rank among that position's scored players that
+season). All of it is folded from the `week_scored` events, so it needs no engine or state change and saves made before it get it too
+(pinned by an old-save fixture test). What the engine records per player per game is his fantasy points, not component stats (targets,
+yards, ...), which exist only for the user's own recap games; the view therefore shows points / games / average / best week / rank and never
+invents components. The Stats tab shows these under the real career (badges "Real" and "Sim"); a generated rookie has sim seasons only.
+Not covered: league leaders by past season (the season review ranks the season just finished) and a past season's weekly chart.

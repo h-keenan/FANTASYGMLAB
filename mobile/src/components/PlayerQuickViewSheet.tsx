@@ -349,15 +349,16 @@ export default function PlayerQuickViewSheet({
           },
         ]
       : []),
-    ...(remote
+    ...(remote || sim?.stats
       ? [
           {
             key: 'stats',
             label: 'Stats',
             render: () =>
-              bodyGate ?? (
+              (remote ? bodyGate : null) ?? (
                 <View style={styles.body}>
                   {sim?.stats ?? null}
+                  {!remote ? null : <>
                   <UsageBlock profile={model?.usage_profile} position={stats?.position ?? player.position} onExplore={setExplorer} />
                   <SeasonStatsRows stats={stats ?? null} usageProfile={model?.usage_profile} onExplore={setExplorer} />
                   {stats && stats.college.length > 0 ? (
@@ -370,9 +371,14 @@ export default function PlayerQuickViewSheet({
                       </View>
                     </View>
                   ) : null}
+                  </>}
                 </View>
               ),
           },
+        ]
+      : []),
+    ...(remote
+      ? [
           {
             key: 'profile',
             label: 'Profile',
