@@ -43,6 +43,7 @@ AI_VERSION = 1  # 1: AI managers plan depth around byes and injuries, use the wi
 from modules.sim.game_names import NAMES_VERSION
 VIEWS_KEPT = 2  # dynasty_v 3: season pools kept in memory behind the latest
 KD_VERSION = 1  # 1 = kickers and defenses can be traded (user-initiated; 0 = a save from before: they never trade)
+AGING_VERSION = 1  # 1 = position hazard curves x role/production retirement, flatter K/QB aging, older kicker rookies (new dynasties only; 0 = the original age-logistic retirement)
 LIMIT_VERSION = 1  # 1 = a roster over the limit never blocks advancing, only acquiring players (0 = a save from before it: over the limit blocks Advance and Start season)
 HINT_VERSION = 1  # 1 = the user's draft hint / auto-pick / rookie auto-draft, counters and recaps use public information only (ADP, need, byes, projections, shown grade), never the hidden value (0 = a save from before it: the hidden-value helpers replay exactly as they were)
 BLOCK_VERSION = 2  # 1 = the trade block: user block, AI blocks, block-aware offers (0 = a save from before it: nothing changes); 2 = an asset leaving the team leaves the block for good
@@ -216,9 +217,16 @@ class GameSettings:
     limit_v: int = 0
     # Helper generation (0 = a save from before it: the draft hint, auto-pick and counters rank by the hidden value, exactly as they did).
     hint_v: int = 0
+    # Aging generation (0 = a save from before it: the original retirement logistic, aging knots and rookie ages replay exactly).
+    aging_v: int = 0
     # First week the game plays (0 = the usual week 1; >= 2 = a league import that picked up from the real league's current week).
     # Serialized only when set, so every other save serializes, replays and fingerprints exactly as it did.
     start_week: int = 0
+
+    @property
+    def aging_curves(self) -> bool:
+        """aging_v 1+: position hazard retirement (age x role x production), flatter kicker/QB aging, older kicker rookies."""
+        return self.dynasty and self.aging_v >= 1
 
     @property
     def mid_season(self) -> bool:
@@ -376,7 +384,7 @@ class GameSettings:
             reserve_v=RESERVE_VERSION, block_v=BLOCK_VERSION, kd_v=KD_VERSION, ir_slots=ir_slots, taxi_slots=taxi_slots, taxi_years=taxi_years, ai_v=AI_VERSION, limit_v=LIMIT_VERSION, hint_v=HINT_VERSION,
             seasons=seasons, start_year=start_year, rookie_rounds=rookie_rounds,
             pick_years=PICK_YEARS if mode == "dynasty" else 0, dynasty_v=DYNASTY_VERSION if mode == "dynasty" else 0,
-            names_v=NAMES_VERSION if mode == "dynasty" else 0,
+            names_v=NAMES_VERSION if mode == "dynasty" else 0, aging_v=AGING_VERSION if mode == "dynasty" else 0,
         )
 
     def to_dict(self) -> dict[str, Any]:
@@ -409,6 +417,8 @@ class GameSettings:
             out["limit_v"] = self.limit_v
         if self.hint_v:  # absent on every save made before public-information helpers
             out["hint_v"] = self.hint_v
+        if self.aging_v:  # absent on every save made before position hazard curves
+            out["aging_v"] = self.aging_v
         if self.start_week:
             out["start_week"] = self.start_week
         if self.dynasty_v:  # only dynasty saves carry these: every other save serializes exactly as before
@@ -448,7 +458,7 @@ class GameSettings:
             dynasty_v=int(raw.get("dynasty_v") or 0), reserve_v=int(raw.get("reserve_v") or 0), block_v=int(raw.get("block_v") or 0), kd_v=int(raw.get("kd_v") or 0),
             ir_slots=int(raw.get("ir_slots") or 0), taxi_slots=int(raw.get("taxi_slots") or 0),
             taxi_years=int(raw.get("taxi_years", 2)), ai_v=int(raw.get("ai_v") or 0), names_v=int(raw.get("names_v") or 0),
-            limit_v=int(raw.get("limit_v") or 0), hint_v=int(raw.get("hint_v") or 0), start_week=int(raw.get("start_week") or 0),
+            limit_v=int(raw.get("limit_v") or 0), hint_v=int(raw.get("hint_v") or 0), aging_v=int(raw.get("aging_v") or 0), start_week=int(raw.get("start_week") or 0),
         )
 
 
@@ -729,7 +739,7 @@ __all__ = [
     "GAME_ENGINE_VERSION", "DIFFICULTIES", "TEAM_COUNTS", "SCORING_NAMES", "DEFAULT_SLOTS",
     "PREVIEW_PAYWALL_WEEK", "MAX_GAMES_PRO", "MAX_GAMES_FREE", "SCORING_PRESETS", "POOL_CAPS",
     "TE_PREMIUMS", "BENCH_RANGE", "DEFAULT_BENCH", "DEFAULT_TEAMS", "DEFAULT_SCORING", "IMPORT_TEAM_COUNTS",
-    "KD_VERSION", "HINT_VERSION", "FLEX_TYPES", "DEFAULT_FLEX_TYPE", "FLEX_SLOT_FOR_TYPE", "START_FRESH", "START_LEAGUE", "START_KINDS", "SINGLETON_POSITIONS", "NON_TRADABLE", "FLEX_SHARE",
+    "KD_VERSION", "HINT_VERSION", "AGING_VERSION", "FLEX_TYPES", "DEFAULT_FLEX_TYPE", "FLEX_SLOT_FOR_TYPE", "START_FRESH", "START_LEAGUE", "START_KINDS", "SINGLETON_POSITIONS", "NON_TRADABLE", "FLEX_SHARE",
     "DRAFT_SPARE_SPOTS", "derive_layout", "scoring_label", "GAME_POSITIONS", "GAME_STRICT_SLOTS",
     "ImportedTeam", "RealWeek", "LeagueImport", "START_POINTS", "START_POINT_PRESEASON", "START_POINT_CURRENT", "MIN_START_WEEK", "LeagueTeamChoice", "LeagueTeams", "GameError", "GameSettings", "GamePlayer", "GameTeam", "GameSnapshot", "slot_positions",
     "playoff_rounds", "POSITIONS", "STRICT_SLOTS", "FLEX_SLOTS",

@@ -29,6 +29,13 @@ AGE_KNOTS: dict[str, tuple[tuple[float, float], ...]] = {
     "K": ((21, 1.00), (30, 1.02), (35, 0.98), (38, 0.90), (42, 0.78)),
     "DEF": ((21, 1.0), (40, 1.0)),
 }
+# aging_v 1: kickers hold their level into the late 30s (real kickers and punters play into their 40s), quarterbacks decline slowly
+# until the late 30s. Other positions keep the panel-fitted curves above.
+AGE_KNOTS_V1: dict[str, tuple[tuple[float, float], ...]] = {
+    **AGE_KNOTS,
+    "QB": ((21, 1.08), (23, 1.04), (25, 1.02), (30, 1.00), (34, 0.985), (37, 0.95), (40, 0.89), (43, 0.80)),
+    "K": ((21, 1.00), (38, 1.00), (40, 0.97), (43, 0.91), (46, 0.84)),
+}
 # Age at which retirement starts to be likely, and how fast the hazard climbs.
 RETIRE_AGE = {"QB": 38.0, "RB": 31.0, "WR": 34.0, "TE": 34.5, "K": 41.0, "DEF": 99.0}
 RETIRE_SCALE = 1.7
@@ -44,10 +51,11 @@ def stable_key(text: str) -> int:
     return zlib.crc32(str(text).encode("utf-8")) & 0x7FFFFFFF
 
 
-def age_mult(pos: str, age: float) -> float:
-    """Expected multiplier on next season's PPG for a player of ``age`` now."""
+def age_mult(pos: str, age: float, v: int = 0) -> float:
+    """Expected multiplier on next season's PPG for a player of ``age`` now (``v`` = the game's aging_v)."""
 
-    knots = AGE_KNOTS.get(pos) or AGE_KNOTS["WR"]
+    table = AGE_KNOTS_V1 if v >= 1 else AGE_KNOTS
+    knots = table.get(pos) or table["WR"]
     if age <= knots[0][0]:
         return knots[0][1]
     for (a0, m0), (a1, m1) in zip(knots, knots[1:]):
@@ -91,9 +99,35 @@ def retire_prob(pos: str, age: float, quality: float) -> float:
     return 1.0 / (1.0 + math.exp(-(float(age) - start) / RETIRE_SCALE))
 
 
+# --- aging_v 1 retirement: a position age hazard x role x recent production, plus a small career-ending injury floor ----------------
+# Logistic hazard per offseason, centred at HAZ_MID[pos] (years) with width HAZ_SCALE[pos]; a starter's centre sits ROLE_YEARS above
+# and a deep reserve's ROLE_YEARS below the neutral one, a falling production level (this offseason's PPG ratio) pulls it earlier,
+# stars (market) play a little longer. No hard age cutoff: every age has a nonzero chance, no age a certainty.
+HAZ_MID = {"QB": 36.0, "RB": 30.2, "WR": 33.9, "TE": 36.3, "K": 37.7, "DEF": 99.0}
+HAZ_SCALE = {"QB": 2.5, "RB": 1.7, "WR": 1.9, "TE": 1.9, "K": 1.5, "DEF": 1.0}
+ROLE_YEARS = {"QB": 2.0, "RB": 2.5, "WR": 2.5, "TE": 2.5, "K": 1.5}
+DECLINE_YEARS = {"K": 1.0}  # years earlier per 20% production drop (capped at 2 x); default 3.0
+STAR_YEARS = 1.0
+INJURY_FLOOR = {"QB": 0.008, "RB": 0.022, "WR": 0.012, "TE": 0.014, "K": 0.004, "DEF": 0.0}  # career-ending injury, per offseason
+
+
+def retire_prob_v1(pos: str, age: float, role: float, quality: float, ratio: float = 1.0) -> float:
+    """aging_v 1: chance a player retires this offseason. ``role`` 0 (deep reserve) to 1 (starter), ``quality`` 0..1 (market),
+    ``ratio`` the player's new / old PPG (a collapsing player is on his way out)."""
+
+    if pos == "DEF":
+        return 0.0
+    mid = HAZ_MID.get(pos, 32.0) + ROLE_YEARS.get(pos, 2.5) * (2.0 * max(0.0, min(1.0, role)) - 1.0) + STAR_YEARS * max(0.0, min(1.0, quality))
+    mid -= DECLINE_YEARS.get(pos, 3.0) * min(2.0, max(0.0, (1.0 - ratio) / 0.2))
+    z = (float(age) - mid) / HAZ_SCALE.get(pos, 1.9)
+    age_p = 1.0 / (1.0 + math.exp(-max(-30.0, min(30.0, z))))
+    inj = INJURY_FLOOR.get(pos, 0.01) if age >= 23 else 0.0
+    return 1.0 - (1.0 - age_p) * (1.0 - inj)
+
+
 def progress(
     pos: str, age: float, mean: float, sd: float, market: float, z: float, u_ret: float, mult: float | None = None,
-    flat_k: bool = False,
+    flat_k: bool = False, aging_v: int = 0, role: float = 0.5,
 ) -> tuple[float, float, float, float, bool]:
     """One offseason for one player. ``z`` is a standard normal and ``u_ret`` a
     uniform from the player's own stream. ``mult`` replaces the plain age curve for a
@@ -101,7 +135,7 @@ def progress(
     Returns ``(age, mean, sd, market, retired)`` for next season."""
 
     if mult is None:
-        mult = age_mult(pos, age)
+        mult = age_mult(pos, age, aging_v)
         if flat_k and pos == "K":  # dynasty_v 3: kickers hold their level until their late decline (the plain curve compounds +2% a year)
             mult = min(mult, 1.0)
     spread = 0.10 if pos != "K" else 0.06
@@ -110,13 +144,16 @@ def progress(
     ratio = new_mean / mean if mean > 0 else 1.0
     new_age = age + 1.0
     # Dynasty market value follows the production change and the new age.
-    shift = (future_factor(pos, new_age) / future_factor(pos, age)) ** 0.5
+    shift = (future_factor(pos, new_age) / future_factor(pos, age)) ** 0.5  # the market's own age belief is the original curve in every version
     new_market = max(0.0, min(100.0, market * (ratio ** MARKET_HALF_LIFE) * shift))
     quality = max(0.0, min(1.0, market / 100.0))
-    retired = u_ret < retire_prob(pos, new_age, quality)
+    if aging_v >= 1:
+        retired = u_ret < retire_prob_v1(pos, new_age, role, quality, ratio)
+    else:
+        retired = u_ret < retire_prob(pos, new_age, quality)
     return new_age, new_mean, max(1.5, sd * ratio), new_market, retired
 
 
 __all__ = [
-    "age_mult", "future_factor", "horizon_value", "retire_prob", "progress", "stable_key", "AGE_KNOTS",
+    "age_mult", "retire_prob_v1", "AGE_KNOTS_V1", "future_factor", "horizon_value", "retire_prob", "progress", "stable_key", "AGE_KNOTS",
 ]

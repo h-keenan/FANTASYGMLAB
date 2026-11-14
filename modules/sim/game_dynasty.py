@@ -57,6 +57,9 @@ QB_EARLY_SLOTS = 6  # quarterbacks go early or not at all
 QB_EARLY_PROB = 0.17
 ROOKIE_AGES = (21.0, 22.0, 23.0, 24.0, 25.0)
 ROOKIE_AGE_P = (0.08, 0.27, 0.35, 0.20, 0.10)  # real mean 22.9, sd 1.2
+# aging_v 1 kickers arrive older (real kickers and punters debut around 23-27; many are 25+).
+K_ROOKIE_AGES = (22.0, 23.0, 24.0, 25.0, 26.0, 27.0, 28.0)
+K_ROOKIE_AGE_P = (0.06, 0.16, 0.24, 0.22, 0.16, 0.10, 0.06)
 STRENGTH_LABELS = ((0.90, "weak"), (1.10, "average"), (9.0, "strong"))
 
 
@@ -255,7 +258,10 @@ def rookie_class(
                     break
         extra = {"is_rookie": 1.0, "years_exp": 0.0, "draft_year": float(year)}
         nfl_team = teams[int(gen.integers(0, len(teams)))] if teams else "FA"  # draw order is part of the saved world: team, then age
-        age = ROOKIE_AGES[int(gen.choice(len(ROOKIE_AGES), p=ROOKIE_AGE_P))]
+        if s.aging_curves and pos == "K":
+            age = K_ROOKIE_AGES[int(gen.choice(len(K_ROOKIE_AGES), p=K_ROOKIE_AGE_P))]
+        else:
+            age = ROOKIE_AGES[int(gen.choice(len(ROOKIE_AGES), p=ROOKIE_AGE_P))]
         if s.rookie_curves:  # version-gated: older dynasty saves keep the plain age curve and no scouting profile
             sseed = int(WorldRng(base.seed).stream(season, "gscout", j).integers(1, 2 ** 31 - 1))
             extra.update(scouting.rookie_dev_fields(pos, age, scouting.talent_z(mean, ref12[pos]), sseed, j, n))
@@ -269,6 +275,25 @@ def rookie_class(
     return rows
 
 
+def _roles(prev: GameSnapshot) -> dict[str, float]:
+    """aging_v 1: how much of a starter each player is, from his rank at his position in the season just played: 1 inside 1.5x the league's
+    starting slots, falling linearly to 0 at 4x (a deep reserve). Retirement reads it (starters play longer, reserves leave earlier)."""
+
+    teams = len(prev.teams)
+    out: dict[str, float] = {}
+    by_pos: dict[str, list[Any]] = {}
+    for p in prev.players.values():
+        by_pos.setdefault(p.pos, []).append(p)
+    for pos, group in by_pos.items():
+        n = sum(1 for sl in prev.settings.slots if sl == pos) * teams or teams  # no slot (an unscored K) = one per team
+        if pos in ("RB", "WR", "TE"):
+            n += teams // 2 if pos != "TE" else 0  # the flex
+        group.sort(key=lambda p: (-p.mean, p.pid))
+        for r, p in enumerate(group):
+            out[p.pid] = max(0.0, min(1.0, (4.0 * n - r) / (2.5 * n)))
+    return out
+
+
 def season_snapshot(root: GameSnapshot, season: int) -> GameSnapshot:
     """Season ``season`` (>= 2) of a dynasty game: last season's pool aged one
     year, retirees gone, the new rookie class added, values and ADP recomputed,
@@ -277,12 +302,13 @@ def season_snapshot(root: GameSnapshot, season: int) -> GameSnapshot:
     prev = root.season_view(season - 1)
     rng = WorldRng(root.seed)
     rows: dict[str, dict[str, Any]] = {}
+    roles = _roles(prev) if root.settings.aging_curves else {}
     for pid in prev.pids:
         p = prev.players[pid]
         r = rng.stream(season - 1, "gage", aging.stable_key(pid))
         z, u = float(r.standard_normal()), float(r.random())
         own = scouting.step_ratio(p.extra, p.extra.get("years_exp", 0.0)) if root.settings.rookie_curves else None
-        age, mean, sd, market, retired = aging.progress(p.pos, p.age, p.mean, p.sd, p.market, z, u, mult=own, flat_k=root.settings.league_anchor)
+        age, mean, sd, market, retired = aging.progress(p.pos, p.age, p.mean, p.sd, p.market, z, u, mult=own, flat_k=root.settings.league_anchor, aging_v=root.settings.aging_v, role=roles.get(pid, 0.5))
         if root.settings.league_anchor:  # nobody runs far past the best the league ever had: compress above it (no unbounded drift at the top)
             top = _anchor_top(root).get(p.pos)
             if top and mean > top:
