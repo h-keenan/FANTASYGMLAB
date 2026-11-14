@@ -4,7 +4,8 @@ import { useId, useState, type ReactNode } from "react";
 
 import { OvrGauge } from "@/components/OvrGauge";
 import { CompactPlayerCard } from "@/components/ui/CompactPlayerCard";
-import { fairnessMeter, type FactTone, type PlayerMode, type PlayerRef } from "@/lib/playerAnatomy";
+import { PickAvatar } from "@/components/PickAvatar";
+import { avatarSize, fairnessMeter, type FactTone, type PlayerMode, type PlayerRef } from "@/lib/playerAnatomy";
 
 export interface TradeCardAsset {
   key: string;
@@ -54,7 +55,10 @@ function Side({ label, assets, mode }: { label: string; assets: TradeCardAsset[]
             } />
           </TapWrap>
         ) : (
-          <div key={a.key} className="flex items-center text-sm font-bold" style={{ minHeight: 40 }}>{a.pickLabel}</div>
+          <div key={a.key} className="flex items-center gap-2 text-sm font-bold" style={{ minHeight: 44 }} data-testid="trade-pick-row">
+            <PickAvatar label={a.pickLabel} size={avatarSize("row")} />
+            <span className="min-w-0 break-words">{a.pickLabel}</span>
+          </div>
         ),
       )}
     </div>
@@ -73,6 +77,7 @@ export function TradeCompactCard({
   get,
   mode = "desk",
   verdictLabel,
+  netValue,
   children,
   defaultOpen = false,
   testId = "trade-compact-card",
@@ -86,6 +91,8 @@ export function TradeCompactCard({
   mode?: PlayerMode;
   /** Overrides the meter's computed label (e.g. the server's value-edge band). */
   verdictLabel?: string | null;
+  /** The server's net value for the trade (positive = you win); wins over the asset sums, which can miss pick values. */
+  netValue?: number | null;
   /** Details shown when expanded (reasoning, odds, share). */
   children?: ReactNode;
   defaultOpen?: boolean;
@@ -98,7 +105,7 @@ export function TradeCompactCard({
   const [open, setOpen] = useState(defaultOpen);
   const bodyId = useId();
   const sum = (xs: TradeCardAsset[]) => xs.reduce((n, a) => n + (a.value ?? 0), 0);
-  const meter = fairnessMeter(sum(give), sum(get), mode);
+  const meter = fairnessMeter(sum(give), sum(get), mode, netValue);
   const hasBody = children != null && children !== false;
   return (
     <section className="glass-surface flex min-w-0 flex-col gap-2 p-3" data-testid={testId} style={{ borderRadius: "var(--radius-panel)" }}>
@@ -109,11 +116,17 @@ export function TradeCompactCard({
         <Side label={getLabel} assets={get} mode={mode} />
       </div>
       <div className="flex items-center gap-2" data-testid="fairness-meter">
-        <div className="relative h-1.5 flex-1 rounded-full" style={{ background: "rgba(255,255,255,0.12)" }} role="img" aria-label={`Fairness: ${verdictLabel ?? meter.label}`}>
-          <span className="absolute top-1/2 h-3 w-0.5 -translate-y-1/2" style={{ left: "50%", background: "var(--color-text-muted)" }} aria-hidden="true" />
-          <span className="absolute top-1/2 h-3 w-3 -translate-x-1/2 -translate-y-1/2 rounded-full" style={{ left: `${Math.round(meter.position * 100)}%`, background: TONE[meter.tone] }} aria-hidden="true" data-testid="fairness-marker" />
+        <div className="relative h-2 flex-1 rounded-full" style={{ background: "rgba(255,255,255,0.12)" }} role="img" aria-label={verdictLabel && mode === "desk" ? `${meter.description}. Market read: ${verdictLabel}` : meter.description}>
+          <span
+            className="absolute top-0 h-full rounded-full"
+            style={{ left: `${Math.min(50, meter.position * 100)}%`, width: `${Math.abs(meter.position - 0.5) * 100}%`, background: TONE[meter.tone], opacity: 0.55 }}
+            aria-hidden="true"
+            data-testid="fairness-fill"
+          />
+          <span className="absolute top-1/2 h-3.5 w-0.5 -translate-y-1/2" style={{ left: "50%", background: "var(--color-text-muted)" }} aria-hidden="true" />
+          <span className="absolute top-1/2 h-3.5 w-3.5 -translate-x-1/2 -translate-y-1/2 rounded-full" style={{ left: `${meter.position * 100}%`, background: TONE[meter.tone], boxShadow: "0 0 0 2px var(--color-surface-muted)" }} aria-hidden="true" data-testid="fairness-marker" />
         </div>
-        <span className="shrink-0 text-xs font-extrabold" style={{ color: TONE[meter.tone] }}>{verdictLabel ?? meter.label}</span>
+        <span className="shrink-0 text-xs font-extrabold" style={{ color: TONE[meter.tone] }} data-testid="fairness-label">{meter.label}</span>
       </div>
       {hasBody ? (
         <>

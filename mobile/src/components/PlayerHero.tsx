@@ -136,7 +136,7 @@ export default function PlayerHero({
     <View style={styles.wrap}>
       <View style={styles.identityRow}>
         <View style={styles.avatarCol}>
-          <View style={[styles.avatarGlow, { shadowColor: colors.accent, borderColor: colors.accentMuted }]}>
+          <View style={[styles.avatarGlow, { shadowColor: colors.accent, backgroundColor: colors.surfaceSolid }]}>
             <PlayerAvatar playerId={avatarId === undefined ? playerId : avatarId} size={100} tier={tier} fallbackLabel={heroInitials(name)} />
           </View>
           {tierLabel ? (
@@ -295,13 +295,14 @@ function createStyles(colors: ThemeColors) {
     avatarCol: { alignItems: 'center', gap: spacing.sm },
     // Soft accent glow around the headshot (concept); the tier prestige
     // ring itself stays PlayerAvatar's.
+    // No border and no Android elevation: a bordered wrapper drew a second ring around the glow and elevation
+    // paints a rectangular shadow box (coridian_: "you can see the border around the glow"). The solid fill is
+    // hidden behind the opaque headshot and only gives the iOS shadow a circle to follow.
     avatarGlow: {
       borderRadius: 999,
-      borderWidth: 1,
       shadowOpacity: 0.45,
       shadowRadius: 14,
       shadowOffset: { width: 0, height: 0 },
-      elevation: 6,
     },
     archetypePill: {
       flexDirection: 'row',

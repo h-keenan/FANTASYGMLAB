@@ -981,3 +981,21 @@ file that never uses the template (explicit `TEXT_ONLY` allowlist).
 ### Recap rows never show a blank Grade
 Recap player briefs (`game_engine._brief(snap, pid, season)`) carry the shown letter grade (`grade`, `grade_range`, `grade_uncertain`; presentation
 only). The client adds the Grade stat only when a grade exists (`gradeStat` in `SimRecapStory`); recaps saved before the field omit the chip.
+
+## Avatar glow, fairness meter, pick avatar, waivers header (2026-11-14, coridian_ five-bug pass)
+
+- **Avatar glow is a soft halo, never an edge.** Web: blurred `box-shadow` only (`.prestige-glow`, `.pqv-avatar-glow`; no border,
+  outline, background or zero-blur spread ring on the glow). App: `PrestigeGlow` is a stack of faint concentric discs
+  (`lib/avatarGlow.ts`), not one solid disc (which read as a second ring), and the PQV hero wrapper has no border and no Android
+  `elevation` (rectangular shadow box). Tests: `avatarGlowCss.test.ts`, `avatarGlow.test.ts`.
+- **Fairness meter** (`fairnessMeter` in `lib/playerAnatomy.ts`, both platforms): centre is even, the marker sits on a +-25% band
+  (`METER_BAND`) of the trade size, a fill runs from the centre to the marker in `success` (you win) / `danger` (you lose) /
+  muted (within 3%). Labels: "Even", "Slight edge to you/them", "You win/lose by ~N%". `netValue` (the server's `trade_gain`)
+  overrides the asset sums, because pick values are often missing from them. `mode="sim"`: plain words, three coarse steps each
+  way, no percentage, `edge` is 0. Accessible description comes from `meter.description`.
+- **Pick avatar**: `PickAvatar` (web `components/PickAvatar.tsx`, app `components/PickAvatar.tsx`, text from `lib/pickBadge.ts`) is a
+  round "R1" badge (pick number small below) in the circular player-photo slot. `PickPlate`/`PickRow`/`DraftPickAssetRow`, the
+  trade card pick rows and the share card all render it; never an illustration or a square plate.
+- **Waivers header** is ONE `CompactModule` ("Waivers": "394 available · $81 FAAB · Need QB", Sleeper link as its action). The
+  stat tiles, ranking explainer, needs sentence + badges, breakdown, limited-data note, beginner help and claim disclosure are
+  its body (`lib/waiversHeader.ts`). The tab strip and filter row stay visible above the list.

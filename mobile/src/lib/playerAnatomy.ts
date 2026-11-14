@@ -136,21 +136,60 @@ export function nextOpenId(current: string | null, tapped: string): string | nul
   return current === tapped ? null : tapped;
 }
 
-/** Fairness meter for a trade (recommended V3): the share of the combined value that comes to you. */
+/**
+ * Fairness meter for a trade. The marker sits on a band of +-METER_BAND (25%) of the trade's size, so a typical
+ * trade is not a sliver in the middle: centre is even, the left end is "you lose by 25% or more", the right end is
+ * "you win by 25% or more". Direction colours the fill (success when you win, danger when you lose, muted near even).
+ * `sim` mode never shows a percentage: plain words and a coarse marker position (three steps each way) so the hidden
+ * value cannot be read back off the marker.
+ */
 export interface FairnessMeter {
-  /** 0..1 position of the marker; 0.5 is even. */
+  /** 0..1 position of the marker on the clamped band; 0.5 is even. */
   position: number;
+  /** Signed edge as a fraction of the trade size (positive = you win). Always 0 in sim mode (hidden). */
+  edge: number;
   label: string;
+  /** Screen-reader sentence describing the meter. */
+  description: string;
   tone: FactTone;
 }
 
-export function fairnessMeter(giveValue: number, getValue: number, mode: PlayerMode = "desk"): FairnessMeter {
-  const total = Math.max(0, giveValue) + Math.max(0, getValue);
-  const position = total > 0 ? Math.min(1, Math.max(0, getValue / total)) : 0.5;
-  const edge = position - 0.5;
-  if (Math.abs(edge) < 0.04) return { position, label: mode === "sim" ? "About even" : "Fair", tone: "muted" };
-  if (edge > 0) return { position, label: mode === "sim" ? "A better deal for you" : edge > 0.12 ? "Big win" : "Slight win", tone: "success" };
-  return { position, label: mode === "sim" ? "A better deal for them" : edge < -0.12 ? "Big loss" : "Slight loss", tone: "danger" };
+/** Half-width of the meter band: the marker pins to an end at +-25%. */
+export const METER_BAND = 0.25;
+
+/**
+ * Signed trade edge as a fraction of the larger side (-1..1; positive = you get more than you give).
+ * `net` is the server's own net value (e.g. `trade_gain`) when it has one: pick values are often missing from the
+ * asset sums, so the net wins and the trade size is taken as the larger of what you give and what you get.
+ */
+export function tradeEdge(giveValue: number, getValue: number, net?: number | null): number {
+  const give = Math.max(0, Number.isFinite(giveValue) ? giveValue : 0);
+  let get = Math.max(0, Number.isFinite(getValue) ? getValue : 0);
+  if (net != null && Number.isFinite(net)) get = Math.max(0, give + net);
+  const size = Math.max(give, get);
+  if (size <= 0) return 0;
+  return Math.max(-1, Math.min(1, (get - give) / size));
+}
+
+export function fairnessMeter(giveValue: number, getValue: number, mode: PlayerMode = "desk", net?: number | null): FairnessMeter {
+  const edge = tradeEdge(giveValue, getValue, net);
+  const abs = Math.abs(edge);
+  const wins = edge > 0;
+  if (mode === "sim") {
+    const step = abs < 0.05 ? 0 : abs < 0.15 ? 1 : abs < 0.3 ? 2 : 3;
+    const position = 0.5 + (wins ? 1 : -1) * step * (0.5 / 3);
+    const label = step === 0 ? "About even" : wins ? (step === 1 ? "Slightly in your favor" : "In your favor") : step === 1 ? "Slightly in their favor" : "In their favor";
+    return { position, edge: 0, label, description: `Trade fairness: ${label}`, tone: step === 0 ? "muted" : wins ? "success" : "danger" };
+  }
+  const position = 0.5 + Math.max(-1, Math.min(1, edge / METER_BAND)) * 0.5;
+  const pct = Math.round(abs * 100);
+  if (abs < 0.03) return { position, edge, label: "Even", description: "Trade fairness: even, within 3% either way", tone: "muted" };
+  if (abs < 0.08) {
+    const label = wins ? "Slight edge to you" : "Slight edge to them";
+    return { position, edge, label, description: `Trade fairness: ${label.toLowerCase()}, about ${pct}%`, tone: wins ? "success" : "danger" };
+  }
+  const label = wins ? `You win by ~${pct}%` : `You lose by ~${pct}%`;
+  return { position, edge, label, description: `Trade fairness: ${label.toLowerCase()} of the trade's value`, tone: wins ? "success" : "danger" };
 }
 
 /** Bar rows (waivers add row, standings row): each value as a 0..1 share of the largest, so the gap reads at a glance. */

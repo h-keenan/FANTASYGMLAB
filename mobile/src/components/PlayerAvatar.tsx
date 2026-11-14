@@ -6,6 +6,7 @@ import Animated, { Easing, useAnimatedStyle, useSharedValue, withRepeat, withTim
 import { useThemeMode } from '../context/ThemeModeContext';
 import AppText from './AppText';
 import type { ThemeColors } from '../theme';
+import { glowLayers } from '../lib/avatarGlow';
 import { resolvePlayerTier, tierGlowIntensity, type TierGlowIntensity } from '../lib/playerTier';
 
 const SLEEPER_HEADSHOT_BASE = 'https://sleepercdn.com/content/nfl/players';
@@ -33,26 +34,32 @@ function PrestigeGlow({ size, color, intensity }: { size: number; color: string;
   }, [pulse, durationMs]);
 
   const animatedStyle = useAnimatedStyle(() => ({
-    opacity: peakOpacity * (0.4 + pulse.value * 0.6),
+    opacity: 0.4 + pulse.value * 0.6,
   }));
 
-  const haloSize = size + spread * 2;
+  // Soft falloff (see lib/avatarGlow.ts): stacked faint discs, never one solid disc with a visible edge.
+  const layers = glowLayers(spread * 1.6, peakOpacity);
   return (
-    <Animated.View
-      pointerEvents="none"
-      style={[
-        {
-          position: 'absolute',
-          width: haloSize,
-          height: haloSize,
-          borderRadius: haloSize / 2,
-          backgroundColor: color,
-          left: -spread,
-          top: -spread,
-        },
-        animatedStyle,
-      ]}
-    />
+    <Animated.View pointerEvents="none" style={[StyleSheet.absoluteFill, animatedStyle]}>
+      {layers.map((layer) => {
+        const haloSize = size + layer.spread * 2;
+        return (
+          <View
+            key={layer.spread}
+            style={{
+              position: 'absolute',
+              width: haloSize,
+              height: haloSize,
+              borderRadius: haloSize / 2,
+              backgroundColor: color,
+              opacity: layer.opacity,
+              left: -layer.spread,
+              top: -layer.spread,
+            }}
+          />
+        );
+      })}
+    </Animated.View>
   );
 }
 

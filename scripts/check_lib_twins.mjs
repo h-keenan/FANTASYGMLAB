@@ -107,6 +107,8 @@ export const IDENTICAL = [
 
 // Same code, differing only in comments / import specifiers / quote style.
 export const MIRRORED = [
+  "pickBadge.ts",
+  "waiversHeader.ts",
   "playerNameFit.ts",
   "bottomNav.ts",
   "bottomPillStore.ts",
