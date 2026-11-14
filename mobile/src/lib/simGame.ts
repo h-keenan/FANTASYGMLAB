@@ -2042,6 +2042,11 @@ export function simHeadshotId(player: Pick<SimPlayerRef, "id" | "headshot_id">):
   return player.headshot_id === undefined && /^\d+$/.test(player.id) ? player.id : null;
 }
 
+/** A sim player (row or brief ref) as the shared player anatomy's `PlayerRef` (what every player template takes). */
+export function simPlayerAnatomyRef(player: { id: string; name: string; pos?: string | null; team?: string | null; age?: number | null; headshot_id?: string | null }) {
+  return { id: player.id, name: player.name, position: player.pos ?? null, team: player.team ?? null, age: player.age ?? null, headshotId: simHeadshotId(player) };
+}
+
 /** Initials for the avatar fallback: a defense shows its team code, a person first + last initial. */
 export function simPlayerInitials(player: Pick<SimPlayerRef, "name" | "pos" | "team">): string {
   if (player.pos === "DEF") return (player.team ?? player.name).slice(0, 3).toUpperCase();

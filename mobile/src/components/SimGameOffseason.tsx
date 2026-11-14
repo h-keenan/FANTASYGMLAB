@@ -11,6 +11,7 @@ import EmptyState from './EmptyState';
 import ErrorState from './ErrorState';
 import SegmentedTabBar from './SegmentedTabBar';
 import CompactModule from './CompactModule';
+import CompactPlayerCard from './CompactPlayerCard';
 import { SimDraftIconButton, SimDraftRow } from './SimDraftBoard';
 import { SimRookieOverview } from './SimDraftOverview';
 import { SkeletonCard } from './SkeletonBlock';
@@ -44,6 +45,7 @@ import {
   simPlayoffResultLabel,
   simPositionsFor,
   simReservesOn,
+  simPlayerAnatomyRef,
   simRetireesSorted,
   simRookieClassChip,
   simRookieClockLine,
@@ -288,11 +290,7 @@ function ReviewStage({ off, ctx, years }: { off: SimOffseason; ctx: SimCtx; year
           retired.map((r) => (
             <View key={r.id} style={[common.rowBetween, common.divider, { paddingVertical: 8 }]}>
               <View style={common.grow}>
-                <AppText style={common.bodyStrong}>{r.name}</AppText>
-                <AppText style={common.muted}>
-                  {r.pos}
-                  {r.age != null ? ` · age ${r.age}` : ''}
-                </AppText>
+                <CompactPlayerCard player={simPlayerAnatomyRef(r)} detail={r.age != null ? `age ${r.age}` : null} testID="retiree-player" />
               </View>
               {r.is_yours ? <SimToneBadge label="Yours" tone="danger" /> : null}
             </View>

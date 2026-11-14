@@ -15,22 +15,10 @@ import { describe, expect, it } from "vitest";
 const WEB_ALLOW: Record<string, string> = {
   "components/GmOrb.tsx": "TEXT: names inside the assistant's spoken sentences",
   "components/LiveFeedPanel.tsx": "TEXT: names inside a news headline",
-  "components/seo/PublicTradeAnalyzer.tsx": "TODO: public marketing analyzer, move onto TradeCompactCard",
-  "components/ManagerProfileSheet.tsx": "TODO: manager trade history lines",
-  "components/OpponentProfileCard.tsx": "TODO: opponent profile target lines",
-  "components/SampleLeagueContent.tsx": "TODO: sample league roster rows",
-  "components/SimDraftGrid.tsx": "TODO: draft grid cells (name only in a tight grid)",
-  "components/SimTeamCard.tsx": "TODO: sim team card key players",
-  "components/SimTeamHistory.tsx": "TODO: sim history award lines",
 };
 const APP_ALLOW: Record<string, string> = {
   "components/LiveFeedPanel.tsx": "TEXT: names inside a news headline",
   "components/RoundupPanel.tsx": "TEXT: names inside roundup sentences",
-  "components/ManagerProfileModal.tsx": "TODO: manager trade history lines",
-  "components/OpponentProfileCard.tsx": "TODO: opponent profile target lines",
-  "components/SimDraftGrid.tsx": "TODO: draft grid cells",
-  "components/SimTeamCard.tsx": "TODO: sim team card key players",
-  "components/SimTeamHistory.tsx": "TODO: sim history award lines",
 };
 
 function walk(dir: string, out: string[] = []): string[] {
