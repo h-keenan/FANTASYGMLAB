@@ -132,6 +132,7 @@ export function DashboardContent({
       {...(sample
         ? {
             "data-testid": "sample-dashboard",
+            "data-inert-links": "",
             onClickCapture: (event: MouseEvent) => {
               if ((event.target as HTMLElement).closest("a")) {
                 event.preventDefault();

@@ -200,7 +200,7 @@ function MoveRows({ rows, leagueId, leagueName }: { rows: ThisWeekRow[]; leagueI
               </span>
             </span>
             {actionable ? (
-              <span aria-hidden="true" style={{ color: "var(--color-accent)" }}>
+              <span aria-hidden="true" data-row-arrow style={{ color: "var(--color-accent)" }}>
                 →
               </span>
             ) : null}

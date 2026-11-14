@@ -59,7 +59,23 @@ export function themeAttribute(mode: ThemeMode): "light" | "dark" | null {
  * flashes the system theme. Must stay in sync with THEME_STORAGE_KEY and
  * themeAttribute (a unit test pins both).
  */
+/**
+ * Public, signed-out pages (the sample league, methodology and the SEO tools)
+ * are the first thing a prospect sees after the always-dark landing page, so
+ * with no saved Day/Night/Auto choice they open dark (the product look)
+ * instead of flipping to the system's light theme. An explicit choice, Auto
+ * included, always wins. Prefix match on the first path segment.
+ */
+export const PUBLIC_DEFAULT_DARK_SEGMENTS = ["sample-league", "methodology", "dynasty-tools", "dynasty-rankings", "dynasty-trade-value-chart"] as const;
+
+export function publicPageDefaultsDark(pathname: string | null | undefined): boolean {
+  const segment = (pathname || "").split("/").filter(Boolean)[0] ?? "";
+  return (PUBLIC_DEFAULT_DARK_SEGMENTS as readonly string[]).includes(segment);
+}
+
 export const THEME_BOOT_SCRIPT =
   '(function(){try{var t=localStorage.getItem("' +
   THEME_STORAGE_KEY +
-  '");if(t==="light"||t==="dark"){document.documentElement.setAttribute("data-theme",t)}}catch(e){}})();';
+  '");var d=document.documentElement;if(t==="light"||t==="dark"){d.setAttribute("data-theme",t)}else if(t!=="auto"&&' +
+  JSON.stringify(PUBLIC_DEFAULT_DARK_SEGMENTS) +
+  '.indexOf(location.pathname.split("/")[1])>-1){d.setAttribute("data-theme","dark")}}catch(e){}})();';

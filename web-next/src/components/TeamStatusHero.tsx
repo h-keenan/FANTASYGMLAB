@@ -90,7 +90,7 @@ function RowLink({ href, label, children }: { href: string; label: string; child
       style={{ minHeight: 44, color: "inherit", textDecoration: "none", borderTopColor: "var(--color-border)" }}
     >
       <span className="min-w-0 flex-1 flex flex-col gap-1">{children}</span>
-      <span aria-hidden="true" style={{ color: "var(--color-accent)" }}>
+      <span aria-hidden="true" data-row-arrow style={{ color: "var(--color-accent)" }}>
         →
       </span>
     </Link>

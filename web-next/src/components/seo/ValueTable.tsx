@@ -13,6 +13,15 @@ export interface ValueRow {
   extra?: { value: number; rank: number } | null;
 }
 
+/** One glyph per trend so the meta line stays on one row at phone width; the words live in the accessible name. */
+const TREND_GLYPH: Record<string, string> = { rising: "↑", stable: "→", cooling: "↓", fragile: "!", blocked: "×" };
+const TREND_COLOR: Record<string, string> = {
+  rising: "var(--color-success)",
+  cooling: "var(--color-warning)",
+  fragile: "var(--color-danger)",
+  blocked: "var(--color-danger)",
+};
+
 export function ValueTable({
   rows,
   valueHeader,
@@ -49,7 +58,7 @@ export function ValueTable({
         <tbody>
           {rows.map(({ rank, player, slug, extra }) => {
             const trend = trendLabel(player.trend);
-            const meta = [player.team, player.age !== null ? `age ${player.age}` : null, trend ? `trend ${trend}` : null]
+            const meta = [player.team, player.age !== null ? `age ${player.age}` : null]
               .filter(Boolean)
               .join(" · ");
             return (
@@ -65,6 +74,14 @@ export function ValueTable({
                   )}
                   <span className="block text-xs" style={{ color: "var(--color-text-muted)" }}>
                     {player.position} · {meta}
+                    {trend ? (
+                      <>
+                        {" · "}
+                        <span role="img" aria-label={`Workload trend: ${trend}`} title={`Trend: ${trend}`} data-trend={trend} style={{ color: TREND_COLOR[trend] ?? "inherit" }}>
+                          {TREND_GLYPH[trend] ?? "•"}
+                        </span>
+                      </>
+                    ) : null}
                   </span>
                 </td>
                 <td className="px-2 py-2 text-right align-top font-bold">{player.score.toLocaleString("en-US")}</td>

@@ -5,8 +5,9 @@ import { useState } from "react";
 import { AccentCard } from "@/components/AccentCard";
 import { DashboardContent } from "@/components/DashboardContent";
 import { PillRow } from "@/components/PillRow";
+import { BottomTabBar } from "@/components/ui/BottomTabBar";
 import { PositionBadge } from "@/components/PositionBadge";
-import { SampleLeagueBanner } from "@/components/SampleLeagueBanner";
+import { SampleConnectModule, SampleLeagueBanner } from "@/components/SampleLeagueBanner";
 import { SectionHeading } from "@/components/SectionHeading";
 import { ToneBadge } from "@/components/ToneBadge";
 import { ValueStat } from "@/components/ValueStat";
@@ -26,9 +27,9 @@ import {
 } from "@/lib/sampleLeague";
 import { PlayerName } from "@/components/PlayerName";
 
-function SamplePlayerRow({ player }: { player: SamplePlayer }) {
+function SamplePlayerRow({ player, first = false }: { player: SamplePlayer; first?: boolean }) {
   return (
-    <li className="flex items-center gap-3 py-2 min-h-[var(--touch-target-min)]" style={{ borderTop: "1px solid var(--color-border)" }}>
+    <li className="flex items-center gap-3 py-2 min-h-[var(--touch-target-min)]" style={first ? undefined : { borderTop: "1px solid var(--color-border)" }}>
       <span className="flex w-10 shrink-0 justify-start">
         <PositionBadge position={player.position} />
       </span>
@@ -77,8 +78,8 @@ function RosterTab() {
       </SectionHeading>
       <AccentCard accent="var(--color-accent)" compact>
         <ul style={{ listStyle: "none", margin: 0, padding: 0 }}>
-          {SAMPLE_ROSTER.map((player) => (
-            <SamplePlayerRow key={player.id} player={player} />
+          {SAMPLE_ROSTER.map((player, index) => (
+            <SamplePlayerRow key={player.id} player={player} first={index === 0} />
           ))}
         </ul>
       </AccentCard>
@@ -137,8 +138,8 @@ function TradeTab() {
               {side.title}
             </p>
             <ul style={{ listStyle: "none", margin: 0, padding: 0 }}>
-              {side.players.map((player) => (
-                <SamplePlayerRow key={player.id} player={player} />
+              {side.players.map((player, index) => (
+                <SamplePlayerRow key={player.id} player={player} first={index === 0} />
               ))}
             </ul>
           </div>
@@ -147,33 +148,48 @@ function TradeTab() {
           Sample verdict: a real one weighs your roster needs, league scoring and what this manager tends to accept.
         </p>
       </AccentCard>
+      <SampleConnectModule />
     </section>
   );
 }
 
-/** Static sample league: no network calls, no auth, no analytics. */
+/**
+ * Static sample league: no network calls, no auth, no analytics. It wears the
+ * same chrome as a real league: a sticky tab strip under a slim sample bar on
+ * wider screens, and on phones the shared in-flow sticky `.bottom-stack` with
+ * the shared BottomTabBar (the one bottom mechanism, never position: fixed).
+ */
 export function SampleLeagueContent() {
   const [tab, setTab] = useState<SampleTab>("dashboard");
+  const tabs = SAMPLE_TABS.map((t) => ({ key: t.value, label: t.label, glyph: t.glyph }));
   return (
-    <main className="page-shell page-shell-narrow">
-      <SampleLeagueBanner />
-      <div className="flex flex-col gap-1">
-        <h1 style={{ font: "var(--font-page-title)" }}>{SAMPLE_TEAM_NAME}</h1>
-        <p className="text-xs" style={{ color: "var(--color-text-secondary)" }}>
-          {SAMPLE_LEAGUE_NAME} (sample)
-        </p>
+    <>
+      <main className="page-shell page-shell-narrow">
+        <SampleLeagueBanner />
+        <div className="flex flex-col gap-1">
+          <h1 style={{ font: "var(--font-page-title)" }}>{SAMPLE_TEAM_NAME}</h1>
+          <p className="text-xs" style={{ color: "var(--color-text-secondary)" }}>
+            {SAMPLE_LEAGUE_NAME} (sample)
+          </p>
+        </div>
+        <div className="sticky z-20 max-md:hidden" style={{ top: "3.25rem" }} data-testid="sample-tab-strip">
+          <PillRow
+            glass
+            variant="scroll"
+            ariaLabel="Sample league views"
+            options={SAMPLE_TABS.map((t) => ({ label: t.label, value: t.value, glyph: t.glyph }))}
+            active={tab}
+            onSelect={(value) => setTab(value as SampleTab)}
+          />
+        </div>
+        {tab === "dashboard" ? <DashboardTab /> : null}
+        {tab === "roster" ? <RosterTab /> : null}
+        {tab === "game_plan" ? <GamePlanTab onNavigate={setTab} /> : null}
+        {tab === "trade" ? <TradeTab /> : null}
+      </main>
+      <div className="bottom-stack md:hidden" data-bare data-testid="sample-bottom-stack">
+        <BottomTabBar ariaLabel="Sample league views" tabs={tabs} active={tab} testId="sample-tab-bar" onSelect={(key) => setTab(key as SampleTab)} />
       </div>
-      <PillRow
-        fullWidth
-        ariaLabel="Sample league views"
-        options={SAMPLE_TABS.map((t) => ({ label: t.label, value: t.value, glyph: t.glyph }))}
-        active={tab}
-        onSelect={(value) => setTab(value as SampleTab)}
-      />
-      {tab === "dashboard" ? <DashboardTab /> : null}
-      {tab === "roster" ? <RosterTab /> : null}
-      {tab === "game_plan" ? <GamePlanTab onNavigate={setTab} /> : null}
-      {tab === "trade" ? <TradeTab /> : null}
-    </main>
+    </>
   );
 }

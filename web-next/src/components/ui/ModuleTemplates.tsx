@@ -199,12 +199,12 @@ export function LinkModule({
             {shown.map((part, i) => (
               <span key={part.key}>
                 {i > 0 ? <span style={{ color: "var(--color-text-muted)" }}>{" · "}</span> : null}
-                <span style={{ color: part.tone ? TONE_COLOR[part.tone] : "var(--color-text-primary)", fontWeight: part.strong ? 800 : 600 }}>{part.text}</span>
+                <span style={{ color: part.tone ? TONE_COLOR[part.tone] : "var(--color-text-primary)", fontWeight: part.strong ? 800 : 600, whiteSpace: part.text.length <= 14 ? "nowrap" : undefined }}>{part.text}</span>
               </span>
             ))}
           </span>
         </span>
-        <span aria-hidden="true" style={{ color: "var(--color-accent)" }}>
+        <span aria-hidden="true" data-row-arrow style={{ color: "var(--color-accent)" }}>
           →
         </span>
       </Link>

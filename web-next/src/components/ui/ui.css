@@ -1101,3 +1101,21 @@
   .trend-draw { stroke-dasharray: 1; stroke-dashoffset: 1; animation: trend-draw 600ms ease-out forwards; }
   @keyframes trend-draw { to { stroke-dashoffset: 0; } }
 }
+
+/* ---------- Inert preview scope (sample league: taps are turned off) ----------
+   Rows inside `[data-inert-links]` must not look tappable: no arrows or chevrons, no "Open ->" text links,
+   no pointer cursor and no pressed state. The sample banner and the tab strip sit outside this scope. */
+[data-inert-links] [data-row-arrow],
+[data-inert-links] .ui-insight-chevron,
+[data-inert-links] .ui-srow-chevron,
+[data-inert-links] .tap-link {
+  display: none;
+}
+[data-inert-links] a {
+  cursor: default;
+}
+[data-inert-links] .ui-insight:active,
+[data-inert-links] a:active {
+  scale: 1;
+  opacity: 1;
+}
