@@ -46,6 +46,8 @@ import { sharedBidNote, sharedDropCandidate } from "@/lib/waiverGroups";
 import { isIdpPositionFilter, withIdpPositionOptions } from "@/lib/idpPresentation";
 import { ValuesCredit } from "@/components/ValuesCredit";
 import { DroppablePlayersSection, NeedsBreakdown, SharedDropNote, SuggestedDrop } from "@/components/SuggestedDrop";
+import { CompactModule } from "@/components/ui/CompactModule";
+import { waiversHeaderParts } from "@/lib/waiversHeader";
 import { limitedDataNote, needsHeadline, teamNeedStat } from "@/lib/dropsPresentation";
 import { EmptyState } from "@/components/EmptyState";
 import { PlayerName } from "@/components/PlayerName";
@@ -608,11 +610,84 @@ export function WaiversContent({
   return (
     <main className="page-shell">
       {leagueId ? <PageTabBar family="team" active="waivers" leagueId={leagueId} leagueName={leagueName} /> : null}
-      <header className="flex flex-wrap items-center justify-between gap-2">
+      <header className="flex flex-col gap-2">
         <div className="flex flex-col gap-1">
           <PageTitle page="Waivers" leagueName={leagueName} info={helpInfo} />
         </div>
-        <StatStrip items={stats} />
+        {/* ONE compact header module: summary "394 available · $81 FAAB · Need QB"; the stat strip, needs sentence,
+            position badges, ranking notes, Sleeper link and injury cover are all inside, one tap away. Nothing was
+            removed (coridian_: "look how much space is wasted by informational garbage"). App twin: WaiversScreen. */}
+        <CompactModule
+          id="waivers.header"
+          testId="waivers-header-module"
+          title="Waivers"
+          tone="accent"
+          parts={waiversHeaderParts({ available: data.available_count ?? data.players.length, faabLabel: faabItem.label, faab: faabItem.value, need: teamNeedStat(data) })}
+          action={
+            leagueId && !isEspnLeagueId(leagueId) ? (
+              <a href={sleeperLeagueUrl(leagueId)} target="_blank" rel="noopener noreferrer" className="tap-link text-sm font-bold" style={{ color: "var(--color-accent)" }}>
+                Sleeper ↗
+              </a>
+            ) : undefined
+          }
+        >
+          <div className="flex flex-col gap-3">
+            <StatStrip items={stats} />
+            {tab === "recommended" ? (
+              <>
+            <div className="flex flex-wrap items-center gap-2">
+              <p className="text-sm min-w-0" style={{ color: "var(--color-text-secondary)" }} data-testid="needs-headline">
+                {needsHeadline(data)}
+              </p>
+              {data.needed_positions.length > 0 ? (
+                <span className="inline-flex flex-wrap items-center gap-1" data-testid="needs-badges">
+                  {data.needed_positions.map((pos) => (
+                    <PositionBadge key={pos} position={pos} />
+                  ))}
+                </span>
+              ) : null}
+            </div>
+            {data.needs_model ? <NeedsBreakdown needs={data.needs_model} /> : null}
+            {limitedNote ? (
+              <p className="text-xs" style={{ color: "var(--color-warning)" }} data-testid="limited-data-note">
+                {limitedNote}
+              </p>
+            ) : null}
+            <InfoTip label="How Priority Adds rank">
+              Need fits and injury cover rank first, then value. {DISCLOSURE_TEXT}
+            </InfoTip>
+            <div className="flex flex-wrap items-center justify-between gap-x-3">
+              <p className="text-xs" style={{ color: "var(--color-text-muted)" }}>
+                Place claims in Sleeper — we don&apos;t submit them.
+              </p>
+              {leagueId && !isEspnLeagueId(leagueId) ? (
+                <a
+                  href={sleeperLeagueUrl(leagueId)}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="tap-link text-sm font-bold"
+                  style={{ color: "var(--color-accent)" }}
+                >
+                  Open your league in Sleeper ↗
+                </a>
+              ) : null}
+            </div>
+            {data.team_defense?.empty_slot ? (
+              <p className="text-xs" style={{ color: "var(--color-text-muted)" }}>
+                Your D/ST slot is open. Team defenses are not ranked here yet, so check Sleeper&apos;s free agents for one.
+              </p>
+            ) : null}
+            {data.injury_positions && data.injury_positions.length > 0 ? (
+              <p className="text-xs" style={{ color: "var(--color-warning)" }}>
+                Injury cover: {data.injury_positions.join(" / ")} ({data.injured_starters ?? 0} injured starter
+                {data.injured_starters === 1 ? "" : "s"}).
+              </p>
+            ) : null}
+
+              </>
+            ) : null}
+          </div>
+        </CompactModule>
       </header>
 
       <div className="flex flex-wrap items-center gap-2" data-testid="waiver-controls">
@@ -663,55 +738,6 @@ export function WaiversContent({
             <span id="priority-adds-heading" className="sr-only">
               Priority Adds
             </span>
-            <div className="flex flex-wrap items-center gap-2">
-              <p className="text-sm min-w-0" style={{ color: "var(--color-text-secondary)" }} data-testid="needs-headline">
-                {needsHeadline(data)}
-              </p>
-              {data.needed_positions.length > 0 ? (
-                <span className="inline-flex flex-wrap items-center gap-1" data-testid="needs-badges">
-                  {data.needed_positions.map((pos) => (
-                    <PositionBadge key={pos} position={pos} />
-                  ))}
-                </span>
-              ) : null}
-            </div>
-            {data.needs_model ? <NeedsBreakdown needs={data.needs_model} /> : null}
-            {limitedNote ? (
-              <p className="text-xs" style={{ color: "var(--color-warning)" }} data-testid="limited-data-note">
-                {limitedNote}
-              </p>
-            ) : null}
-            <InfoTip label="How Priority Adds rank">
-              Need fits and injury cover rank first, then value. {DISCLOSURE_TEXT}
-            </InfoTip>
-            <div className="flex flex-wrap items-center justify-between gap-x-3">
-              <p className="text-xs" style={{ color: "var(--color-text-muted)" }}>
-                Place claims in Sleeper — we don&apos;t submit them.
-              </p>
-              {leagueId && !isEspnLeagueId(leagueId) ? (
-                <a
-                  href={sleeperLeagueUrl(leagueId)}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="tap-link text-sm font-bold"
-                  style={{ color: "var(--color-accent)" }}
-                >
-                  Open your league in Sleeper ↗
-                </a>
-              ) : null}
-            </div>
-            {data.team_defense?.empty_slot ? (
-              <p className="text-xs" style={{ color: "var(--color-text-muted)" }}>
-                Your D/ST slot is open. Team defenses are not ranked here yet, so check Sleeper&apos;s free agents for one.
-              </p>
-            ) : null}
-            {data.injury_positions && data.injury_positions.length > 0 ? (
-              <p className="text-xs" style={{ color: "var(--color-warning)" }}>
-                Injury cover: {data.injury_positions.join(" / ")} ({data.injured_starters ?? 0} injured starter
-                {data.injured_starters === 1 ? "" : "s"}).
-              </p>
-            ) : null}
-
             {!topPriority ? (
               <p className="text-sm" style={{ color: "var(--color-text-muted)" }}>
                 No waiver option clearly helps right now. See Position Snapshot below.

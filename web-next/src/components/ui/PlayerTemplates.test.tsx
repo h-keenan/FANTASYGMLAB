@@ -43,11 +43,14 @@ describe("player templates always draw the avatar", () => {
     render(<TradeCompactCard title="Rival" give={[{ key: "a", player: chase, value: 100 }]} get={[{ key: "b", player: gen, value: 300 }, { key: "pick", pickLabel: "2027 R1" }]} />);
     expect(screen.getAllByTestId("compact-player-card")).toHaveLength(2);
     expect(screen.getAllByTestId("player-avatar-slot")).toHaveLength(2);
-    expect(screen.getByTestId("fairness-meter")).toHaveTextContent("Big win");
+    expect(screen.getByTestId("fairness-meter")).toHaveTextContent("You win by ~67%");
+    // The pick renders a round badge in the avatar slot, never a bare line of text.
+    expect(screen.getByTestId("pick-avatar")).toHaveAttribute("aria-label", "Round 1 pick");
+    expect(screen.getByTestId("pick-avatar")).toHaveTextContent("R1");
   });
   it("sim trade card uses plain words and no numbers", () => {
     render(<TradeCompactCard mode="sim" title="Sim" give={[{ key: "a", player: chase, value: 100 }]} get={[{ key: "b", player: gen, value: 300 }]} />);
-    expect(screen.getByTestId("fairness-meter")).toHaveTextContent("A better deal for you");
+    expect(screen.getByTestId("fairness-meter")).toHaveTextContent("In your favor");
     expect(screen.queryByText("100")).toBeNull();
     expect(screen.queryByText("300")).toBeNull();
   });

@@ -192,7 +192,10 @@ class Evaluator:
         if roles is None:
             roles = self.book.roles(key, lambda p: self.status(p, week) == "healthy", self.level if self.additive else None)
             self._roles[ck] = roles
-        return roles.get(pid)
+        r = roles.get(pid)
+        if r is not None and r.kind == "backup" and self.additive and self.snap.settings.world_v:
+            return Role("backup", 0.0)  # world_v 1+: a backup quarterback does not play (he is the starter's insurance, nothing more)
+        return r
 
     def role_mult(self, pid: str, week: int) -> float:
         r = self.role(pid, week)

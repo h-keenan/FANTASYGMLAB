@@ -831,6 +831,12 @@ gives its own in the same deal. The AI never initiates or counters with a K/DEF 
 cannot craft a nonsense kicker counter. A save without `kd_v` behaves exactly as before (K/DEF refused: "cannot be traded") and
 replays to the same digest.
 
+## NFL-world usage (`world_v`)
+New games (settings `world_v` 1, serialized only when set) simulate a usage-conserving NFL: a healthy backup QB behind a playing starter does not
+play (his role is `backup`, projection 0.0, no row in the week's scores), RB/WR/TE group totals and scrub upside are bounded, dynasty depth
+charts are re-ranked every season and rookies are placed by need. No endpoint or payload changes; a save without `world_v` replays to the same
+digest. Details and the audit: `docs/audits/2026-11-sim-injuries-and-usage.md`.
+
 ## Season labels, bye/out projections, rookie names
 
 **Season label (`S3 2028`).** One presentation rule for every place the sim names a season: season number, then

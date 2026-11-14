@@ -186,7 +186,12 @@ def main(argv: list[str] | None = None) -> None:
     ap.add_argument("--probes", default="1,5,10,20", help="seasons at which to measure payload and replay cost ('' = none)")
     ap.add_argument("--dynasty-v", type=int, default=None, help="2 = the dynasty engine before the talent equilibrium (for before/after runs)")
     ap.add_argument("--json", default="")
+    ap.add_argument("--world-v", type=int, default=None, help="0 = the NFL world before usage conservation (for before/after runs); default = the current WORLD_VERSION")
     args = ap.parse_args(argv)
+    if args.world_v is not None:
+        from modules.sim import game_types
+
+        game_types.WORLD_VERSION = args.world_v
     from modules.sim import game_scoring
 
     model_id = game_scoring.default_model().model_id

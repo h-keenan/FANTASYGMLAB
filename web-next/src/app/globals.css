@@ -1321,9 +1321,8 @@ a {
 .pqv-avatar-glow {
   display: inline-flex;
   border-radius: 50%;
-  box-shadow:
-    0 0 0 1px color-mix(in srgb, var(--color-accent) 30%, transparent),
-    0 0 26px color-mix(in srgb, var(--color-accent) 28%, transparent);
+  /* Blur only: a 0-blur spread ring here drew a hard edge around the glow. */
+  box-shadow: 0 0 26px color-mix(in srgb, var(--color-accent) 28%, transparent);
 }
 /* Archetype (tier) pill: rounded, with an icon, bordered in the tier's own
    prestige color — same color the avatar ring already uses. */

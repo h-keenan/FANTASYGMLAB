@@ -131,6 +131,18 @@ are unchanged: PIT KS 0.204 -> 0.204, 80% coverage 65.3% -> 65.2%, tier-hit MAE 
 elite +0.1% / starter -0.4% a week (real -0.1% / -0.2%). Games created under player-model-4 keep it (`player_model_v4.py`, sha256 pinned, golden digests
 for a v4 game pinned). What remains of the in-season scoring decline is attrition (injuries and byes), which the real data has too.
 
+## 1f. world_v 1: usage conservation in the simulated NFL (engine, not a new player model)
+
+The player model still draws each player independently (player-model-6 is unchanged and no new frozen model was needed), so nothing tied a depth
+player's season to his team's usage: a 1.9 ppg back could post 20 ppg beside an 18 ppg starter, and every healthy backup quarterback threw 20+
+passes a week (the stat template's intercept). `world_v` (settings, serialized only when set, 0 on every older save) gates four engine rules, all
+reading the same public depth chart and adding no random draw to the stat-line streams: a backup QB sits unless the starter is out
+(`Evaluator.role`, `run_week`); a team's RB/WR/TE group cannot run past `game_usage.USAGE_CAP` x its preseason baseline and a player without a vacancy
+cannot pass `TIER_A + TIER_B x projection` (`modules/sim/game_usage.py`); dynasty depth charts follow the aged projections each season
+(`game_dynasty.refresh_depth_charts`); rookies go where there is need (`game_dynasty._need_team`). Numbers, the injury audit and the harness
+(`python -m modules.sim.calibration.injury_usage_report`): `docs/audits/2026-11-sim-injuries-and-usage.md`. Old saves replay byte-for-byte
+(`tests/test_sim_world_v.py` pins redraft and 3-season dynasty digests for player-model-5 and -6 settings without `world_v`).
+
 ## 2. What is modelled
 
 **Season story** (`season_level`, vectorised, one categorical draw per player):
