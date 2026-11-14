@@ -51,6 +51,7 @@ export default function CompactModule({
   children,
   testID,
   preview,
+  summaryWhenCollapsed = false,
 }: {
   id: string;
   title: ReactNode;
@@ -69,12 +70,14 @@ export default function CompactModule({
   testID?: string;
   /** Always-visible line under the header (collapsed AND expanded): the pinned draft bar's best-available player. Sits outside the toggle, so interactive content is fine. */
   preview?: ReactNode;
+  /** Show the summary line only while collapsed (its text repeats inside the body, e.g. a feed's newest headline). */
+  summaryWhenCollapsed?: boolean;
 }) {
   const { colors } = useThemeMode();
   const styles = useMemo(() => createStyles(colors), [colors]);
   const [open, setOpen] = useState(defaultOpen);
   const [touched, setTouched] = useState(false);
-  const shown = compactParts(parts ?? []);
+  const shown = compactParts(summaryWhenCollapsed && open ? [] : (parts ?? []));
   const name = label ?? (typeof title === 'string' ? title : 'Details');
   const hasBody = children != null && children !== false;
 

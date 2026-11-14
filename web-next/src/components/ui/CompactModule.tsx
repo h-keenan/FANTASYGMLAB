@@ -50,6 +50,7 @@ export function CompactModule({
   testId,
   glow = false,
   preview,
+  summaryWhenCollapsed = false,
 }: {
   /** Stable key for remembering the open state, e.g. "draft.clock". */
   id: string;
@@ -73,6 +74,8 @@ export function CompactModule({
   glow?: boolean;
   /** Always-visible line under the header (collapsed AND expanded): the pinned draft bar's best-available player. Interactive content is fine, it sits outside the toggle button. */
   preview?: ReactNode;
+  /** Show the summary line only while collapsed (its text repeats inside the body, e.g. a feed's newest headline). */
+  summaryWhenCollapsed?: boolean;
 }) {
   const key = simOpenKey(id);
   const bodyId = useId();
@@ -90,7 +93,7 @@ export function CompactModule({
   );
   const [override, setOverride] = useState<boolean | null>(null);
   const open = override ?? simParseOpen(stored, defaultOpen);
-  const shown = compactParts(parts ?? []);
+  const shown = compactParts(summaryWhenCollapsed && open ? [] : (parts ?? []));
   const name = label ?? (typeof title === "string" ? title : "Details");
   const hasBody = children != null && children !== false;
 
