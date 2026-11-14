@@ -633,14 +633,8 @@
   padding-bottom: env(safe-area-inset-bottom, 0px);
 }
 .bottom-stack[data-bare] { margin-inline: 0; }
-/* The game's navigation orb docks to the stack (absolute inside the sticky stack, not fixed), bottom-right, just above the Advance pill. */
-.game-orb-dock {
-  position: absolute;
-  right: var(--bar-side-inset);
-  bottom: calc(100% + var(--bar-orb-gap));
-  pointer-events: none;
-}
-.game-orb-dock > * { pointer-events: auto; }
+/* The game's navigation orb is a slot inside the action bar's one row (Sim to | orb | Advance), in flow: nothing overlaps content or clips. */
+.game-orb-slot { display: flex; flex: 0 0 auto; align-items: center; justify-content: center; }
 .game-orb {
   position: relative;
   display: flex;
@@ -651,12 +645,14 @@
   justify-content: center;
   gap: 1px;
   border-radius: 50%;
-  background: var(--color-bg);
+  background: linear-gradient(165deg, color-mix(in srgb, var(--color-accent) 20%, var(--color-bg)), var(--color-bg));
   border: 1.5px solid var(--color-accent);
-  box-shadow: var(--shadow-card);
+  box-shadow: var(--shadow-card), 0 0 14px color-mix(in srgb, var(--color-accent) 30%, transparent);
   color: var(--color-accent);
   -webkit-tap-highlight-color: transparent;
 }
+/* In the bar the orb matches the 44px buttons beside it. */
+.game-orb--bar { width: var(--bar-orb-bar-size, 48px); height: var(--bar-orb-bar-size, 48px); }
 .game-orb-label {
   font-size: 0.5625rem;
   font-weight: 800;
@@ -666,8 +662,9 @@
 }
 .game-orb-badge {
   position: absolute;
-  top: -2px;
-  right: -2px;
+  top: 0;
+  right: 0;
+  transform: translate(35%, -35%);
   min-width: 18px;
   height: 18px;
   padding: 0 4px;
@@ -794,7 +791,6 @@
 @media (min-width: 768px) {
   .bottom-stack { display: contents; }
   .bottom-tab-bar { display: none; }
-  .game-orb-dock { display: none; }
 }
 @media (prefers-reduced-motion: reduce) {
   .bottom-tab { transition: none; }

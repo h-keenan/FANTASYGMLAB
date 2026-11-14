@@ -8,7 +8,6 @@ import { api, type TradeOutcomeHistoryResponse } from "@/lib/api";
 import { TradeHistoryContent } from "@/components/TradeHistoryContent";
 import { ErrorState, reloadPage } from "@/components/ErrorState";
 import { LoadingScreen } from "@/components/LoadingScreen";
-import { useSearchParams } from "@/lib/useSearchParams";
 import { onTradeOutcomeAnswered } from "@/lib/tradeOutcomeEvents";
 
 // Like Portfolio, Trade History has no [leagueId] segment — the real
@@ -19,7 +18,13 @@ import { onTradeOutcomeAnswered } from "@/lib/tradeOutcomeEvents";
 // anywhere in the call.
 export default function TradeHistoryPage() {
   const router = useRouter();
-  const searchParams = useSearchParams();
+  // League context (?league=&name=) read once on the client: useSearchParams would force a Suspense boundary around
+  // the page. The first render shows only the loading screen, so there is no visible mismatch.
+  const [league] = useState(() => {
+    if (typeof window === "undefined") return { id: null as string | null, name: undefined as string | undefined };
+    const params = new URLSearchParams(window.location.search);
+    return { id: params.get("league"), name: params.get("name") ?? undefined };
+  });
   const { session, loading: authLoading } = useAuth();
 
   const [data, setData] = useState<TradeOutcomeHistoryResponse | null>(null);
@@ -72,5 +77,5 @@ export default function TradeHistoryPage() {
     );
   }
 
-  return <TradeHistoryContent data={data} leagueId={searchParams.get("league")} leagueName={searchParams.get("name") ?? undefined} />;
+  return <TradeHistoryContent data={data} leagueId={league.id} leagueName={league.name} />;
 }

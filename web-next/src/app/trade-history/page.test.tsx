@@ -15,7 +15,6 @@ vi.mock("@/context/AuthContext", () => ({
 const router = { replace: vi.fn(), push: vi.fn() };
 vi.mock("next/navigation", () => ({
   useRouter: () => router,
-  useSearchParams: () => new URLSearchParams(),
 }));
 
 vi.mock("@/lib/api", async () => {

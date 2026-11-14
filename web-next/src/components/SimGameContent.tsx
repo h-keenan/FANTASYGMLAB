@@ -572,7 +572,7 @@ function Shell({ children, wide = false, game = false }: { children: React.React
   return (
     // `game`: on phones the in-game screen owns the whole viewport (its own compact header on top, bottom tab bar
     // in flow at the bottom of a 100dvh column), so no outer padding or gap.
-    <main className={`sim-root flex-1 flex flex-col gap-3 px-4 py-3 w-full mx-auto ${game ? "max-md:min-h-dvh max-md:pt-0 max-md:pb-0 max-md:gap-0" : ""} ${wide ? "max-w-5xl xl:max-w-[1200px]" : "max-w-3xl"}`}>
+    <main className={`sim-root flex-auto flex flex-col gap-3 px-4 py-3 w-full mx-auto ${game ? "max-md:min-h-dvh max-md:pt-0 max-md:pb-0 max-md:gap-0" : ""} ${wide ? "max-w-5xl xl:max-w-[1200px]" : "max-w-3xl"}`}>
       {game ? null : <SimExitBar />}
       <PageTitle page="Fantasy Sim" />
       {children}
@@ -994,13 +994,23 @@ function GameScreen({
   const [moreOpen, setMoreOpen] = useState(false);
   // Phones: the game orb (docked above the Advance pill) is the page navigator; the top PillRows render from md up.
   const showOrb = showBar || showOffBar;
+  const orbNode = showOrb ? (
+    <SimGameOrb
+              tab={flow.tab}
+              offseason={stage === "offseason"}
+              inbox={game.pending?.inbox ?? 0}
+              onTab={onTab}
+              onMore={() => setMoreOpen(true)}
+              onHub={onHub}
+            />
+  ) : null;
 
   return (
     <SimTeamOpenContext.Provider value={ctx.openTeam}>
     <SimOpenPlayerContext.Provider value={ctx.openPlayer}>
     {/* Phones: a 100dvh flex column. Compact header on top, content flex-1, and the action pill + bottom tab bar as an in-flow
         sticky footer (no position:fixed, no JS placement), so iOS Safari viewport quirks cannot float it. */}
-    <div className={`flex flex-1 flex-col gap-3 max-md:gap-2 ${showBar || showOffBar ? "pb-3 max-md:pb-0" : "pb-6"} md:pb-3`}>
+    <div className={`flex flex-auto flex-col gap-3 max-md:gap-2 ${showBar || showOffBar ? "pb-3 max-md:pb-0" : "pb-6"} md:pb-3`}>
       <SimGameHeader game={game} onHub={onHub} onTeam={(id) => ctx.openTeam(id)} onMore={() => setMoreOpen(true)} bell={<SimNotificationBell notif={notif} onOpenTab={onTab} />} />
       <div className="hidden items-center justify-between gap-2 md:flex">
         <div className="flex min-w-0 flex-col">
@@ -1059,7 +1069,7 @@ function GameScreen({
             active={["team", "trades", "league"].includes(flow.tab) ? flow.tab : "home"}
             onSelect={(value) => onTab(value as SimTab)}
           />
-          <div key={flow.tab} className="enter-rise flex-1 max-md:pb-16">
+          <div key={flow.tab} className="enter-rise flex-auto max-md:pb-16">
             {flow.tab === "team" ? <SimTeamTab ctx={ctx} onTrade={() => onTab("trades")} /> : null}
             {flow.tab === "trades" ? <SimTradesTab ctx={ctx} seed={tradeSeed} onSeedUsed={() => setTradeSeed(null)} /> : null}
             {flow.tab === "league" ? <SimLeagueTab ctx={ctx} /> : null}
@@ -1077,7 +1087,7 @@ function GameScreen({
             active={flow.tab}
             onSelect={(value) => onTab(value as SimTab)}
           />
-          <div key={flow.tab} className="enter-rise flex-1 max-md:pb-16">
+          <div key={flow.tab} className="enter-rise flex-auto max-md:pb-16">
             {flow.tab === "home" ? <SimHomeTab ctx={ctx} setClaims={setClaims} onTab={onTab} /> : null}
             {flow.tab === "team" ? <SimTeamTab ctx={ctx} onTrade={() => onTab("trades")} /> : null}
             {flow.tab === "players" ? (
@@ -1098,18 +1108,8 @@ function GameScreen({
         </>
       )}
       <div className="bottom-stack" data-testid="sim-bottom-stack">
-        {showOffBar ? <SimOffseasonBar ctx={ctx} onTab={onTab} /> : null}
-        {showBar ? <SimActionBar ctx={ctx} paywalled={paywalled} advancing={advancing} onAdvance={onAdvance} onSimTo={onSimTo} onTab={onTab} /> : null}
-        {showOrb ? (
-          <SimGameOrb
-            tab={flow.tab}
-            offseason={stage === "offseason"}
-            inbox={game.pending?.inbox ?? 0}
-            onTab={onTab}
-            onMore={() => setMoreOpen(true)}
-            onHub={onHub}
-          />
-        ) : null}
+        {showOffBar ? <SimOffseasonBar ctx={ctx} onTab={onTab} orb={orbNode} /> : null}
+        {showBar ? <SimActionBar ctx={ctx} paywalled={paywalled} advancing={advancing} onAdvance={onAdvance} onSimTo={onSimTo} onTab={onTab} orb={orbNode} /> : null}
       </div>
       <SimToSheet ctx={ctx} open={simToOpen} onClose={onSimToClose} onRun={onRunSimTo} />
       {simToBusy ? (

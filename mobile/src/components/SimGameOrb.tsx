@@ -7,7 +7,7 @@ import BrandMark from './BrandMark';
 import { Sheet } from './Sheet';
 import TabIcon from './TabIcon';
 import { useThemeMode } from '../context/ThemeModeContext';
-import { activeBottomTab, bottomTabBadgeText, simGameBottomTabs, simOrbAriaLabel } from '../lib/bottomNav';
+import { activeBottomTab, bottomTabBadgeText, simGameBottomTabs, simOrbAriaLabel, SIM_NAV_META } from '../lib/bottomNav';
 import { requestOrbSearch } from '../lib/orbEvents';
 import type { SimTab } from '../lib/simGameFlow';
 import { radii, spacing, type ThemeColors } from '../theme';
@@ -18,7 +18,7 @@ import { radii, spacing, type ThemeColors } from '../theme';
  * for pending trade offers. One tap opens the game navigator (Home, Team,
  * Players, Trades, League, More) with the current page marked, plus search,
  * All games and a way back to the app home. Mirrors web-next's SimGameOrb;
- * the screen docks it right-aligned directly above the Advance pill.
+ * the screen places it in the action bar's one row (Sim to | orb | Advance), and the menu rows reuse the More sheet look (tinted glyph over label + subtitle).
  */
 export default function SimGameOrb({
   tab,
@@ -45,6 +45,7 @@ export default function SimGameOrb({
   const currentTab = tabs.find((t) => t.key === current) ?? tabs[0];
   const badge = bottomTabBadgeText(inbox);
   const close = () => setOpen(false);
+  const toneColor = (key: string) => colors[SIM_NAV_META[key]?.tone ?? 'accent'];
 
   return (
     <>
@@ -60,7 +61,7 @@ export default function SimGameOrb({
         <BrandMark width={22} height={15} />
         <AppText style={styles.label} importantForAccessibility="no" accessibilityElementsHidden>{currentTab.label}</AppText>
         {badge ? (
-          <View style={styles.badge} testID="sim-game-orb-badge" importantForAccessibility="no" accessibilityElementsHidden>
+          <View style={[styles.badge, styles.orbBadge]} testID="sim-game-orb-badge" importantForAccessibility="no" accessibilityElementsHidden>
             <AppText style={styles.badgeText}>{badge}</AppText>
           </View>
         ) : null}
@@ -82,8 +83,11 @@ export default function SimGameOrb({
                 accessibilityLabel={isCurrent ? `${t.label}, current page` : t.badge ? `${t.label}, ${t.badge} new` : t.label}
                 style={[styles.row, isCurrent && styles.rowCurrent]}
               >
-                <TabIcon name={t.glyph} color={isCurrent ? colors.accent : colors.textSecondary} size={22} />
-                <AppText style={[styles.rowLabel, isCurrent && { color: colors.accent }]}>{t.label}</AppText>
+                <TabIcon name={t.glyph} color={toneColor(t.key)} size={22} />
+                <View style={styles.rowText}>
+                  <AppText style={[styles.rowLabel, isCurrent && { color: colors.accent }]}>{t.label}</AppText>
+                  <AppText style={styles.rowSub} numberOfLines={1}>{SIM_NAV_META[t.key]?.subtitle}</AppText>
+                </View>
                 {count ? (
                   <View style={styles.badge} importantForAccessibility="no" accessibilityElementsHidden>
                     <AppText style={styles.badgeText}>{count}</AppText>
@@ -98,11 +102,14 @@ export default function SimGameOrb({
               onMore();
             }}
             accessibilityRole="button"
-            accessibilityLabel="More: rules, reset week, delete"
+            accessibilityLabel="More: rules, reset the week, or leave this game"
             style={styles.row}
           >
-            <TabIcon name="more" color={colors.textSecondary} size={22} />
-            <AppText style={styles.rowLabel}>More: rules, reset week, delete</AppText>
+            <TabIcon name="more" color={colors.accent} size={22} />
+            <View style={styles.rowText}>
+              <AppText style={styles.rowLabel}>More</AppText>
+              <AppText style={styles.rowSub} numberOfLines={1}>{SIM_NAV_META.more.subtitle}</AppText>
+            </View>
           </Pressable>
         </View>
         <View style={styles.footer}>
@@ -115,7 +122,7 @@ export default function SimGameOrb({
             accessibilityLabel="Search players and pages"
             style={styles.row}
           >
-            <Ionicons name="search-outline" size={22} color={colors.textSecondary} />
+            <Ionicons name="search-outline" size={22} color={colors.accent} />
             <AppText style={styles.rowLabel}>Search players and pages</AppText>
           </Pressable>
           <Pressable
@@ -127,7 +134,7 @@ export default function SimGameOrb({
             accessibilityLabel="All games"
             style={styles.row}
           >
-            <TabIcon name="league" color={colors.textSecondary} size={22} />
+            <TabIcon name="league" color={colors.premium} size={22} />
             <AppText style={styles.rowLabel}>All games</AppText>
           </Pressable>
           <Pressable
@@ -139,7 +146,7 @@ export default function SimGameOrb({
             accessibilityLabel="Back to FantasyDesk home"
             style={styles.row}
           >
-            <TabIcon name="home" color={colors.textSecondary} size={22} />
+            <TabIcon name="home" color={colors.accent} size={22} />
             <AppText style={styles.rowLabel}>Back to FantasyDesk home</AppText>
           </Pressable>
         </View>
@@ -151,17 +158,17 @@ export default function SimGameOrb({
 function createStyles(colors: ThemeColors) {
   return StyleSheet.create({
     orb: {
-      minHeight: 44,
-      flexDirection: 'row',
+      width: 48,
+      height: 48,
       alignItems: 'center',
-      gap: spacing.xs,
-      paddingHorizontal: spacing.md,
-      borderRadius: radii.pill,
-      borderWidth: 1,
-      borderColor: colors.borderStrong ?? colors.border,
+      justifyContent: 'center',
+      gap: 1,
+      borderRadius: 24,
+      borderWidth: 1.5,
+      borderColor: colors.accent,
       backgroundColor: colors.backgroundElevated,
     },
-    label: { fontSize: 12.5, fontWeight: '800', color: colors.textPrimary },
+    label: { fontSize: 8, fontWeight: '800', letterSpacing: 0.4, textTransform: 'uppercase', color: colors.accent },
     badge: {
       minWidth: 18,
       height: 18,
@@ -172,10 +179,13 @@ function createStyles(colors: ThemeColors) {
       backgroundColor: colors.accent,
     },
     badgeText: { fontSize: 12, fontWeight: '800', color: colors.onAccent },
+    orbBadge: { position: 'absolute', top: -4, right: -4 },
     list: { gap: spacing.xs },
     footer: { marginTop: spacing.sm, paddingTop: spacing.sm, gap: spacing.xs, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.border },
     row: { minHeight: 48, flexDirection: 'row', alignItems: 'center', gap: spacing.md, paddingHorizontal: spacing.md, borderRadius: radii.md },
     rowCurrent: { backgroundColor: colors.glassInset },
-    rowLabel: { flex: 1, fontSize: 15, fontWeight: '700', color: colors.textPrimary },
+    rowText: { flex: 1, minWidth: 0 },
+    rowSub: { fontSize: 12, color: colors.textTertiary },
+    rowLabel: { fontSize: 15, fontWeight: '700', color: colors.textPrimary },
   });
 }

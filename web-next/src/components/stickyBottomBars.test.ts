@@ -17,13 +17,13 @@ describe("bottom-pinned chrome stays sticky, not fixed", () => {
       expect(src, f).not.toMatch(/className="[^"]*\bfixed\b/);
     }
   });
-  it("the game's bottom stack is sticky in flow and its orb is absolute inside it", () => {
+  it("the game's bottom stack is sticky in flow and its orb is an in-flow slot of the action bar row", () => {
     const css = read("ui/ui.css");
     const stack = css.slice(css.indexOf(".bottom-stack {"), css.indexOf("}", css.indexOf(".bottom-stack {")));
     expect(stack).toContain("position: sticky");
     expect(stack).toContain("env(safe-area-inset-bottom");
-    const dock = css.slice(css.indexOf(".game-orb-dock {"), css.indexOf("}", css.indexOf(".game-orb-dock {")));
-    expect(dock).toContain("position: absolute");
+    const slot = css.slice(css.indexOf(".game-orb-slot {"), css.indexOf("}", css.indexOf(".game-orb-slot {")));
+    expect(slot).not.toMatch(/position:\s*(absolute|fixed)/);
     for (const f of ["SimGameOrb.tsx", "SimGameHeader.tsx", "ui/BottomTabBar.tsx", "AppShellBar.tsx", "ShellHeader.tsx", "ShellActionSlot.tsx"]) {
       expect(read(f), f).not.toMatch(/className="[^"]*\bfixed\b/);
       expect(read(f), f).not.toContain("visualViewport");
