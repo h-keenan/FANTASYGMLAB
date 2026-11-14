@@ -1,5 +1,8 @@
 "use client";
 
+import { SimAchievementsModule } from "@/components/SimAchievements";
+import type { SimAchievementsPayload } from "@/lib/simAchievements";
+
 import { useCallback, useEffect, useState } from "react";
 
 import { AccentCard } from "@/components/AccentCard";
@@ -72,6 +75,7 @@ export function SimGameOffseason({ ctx, onTrade, onTeam }: { ctx: SimCtx; onTrad
   const [pos, setPos] = useState<SimPos | "">("");
   const [busy, setBusy] = useState<Busy>(null);
   const [years, setYears] = useState<SimDynastyYear[]>([]);
+  const [achievements, setAchievements] = useState<SimAchievementsPayload | null>(null);
   const [attempt, setAttempt] = useState(0);
 
   useEffect(() => {
@@ -101,7 +105,10 @@ export function SimGameOffseason({ ctx, onTrade, onTeam }: { ctx: SimCtx; onTrad
     api
       .getSimDynasty(gameId)
       .then((body) => {
-        if (!cancelled && body.dynasty) setYears(body.dynasty.by_year ?? []);
+        if (!cancelled && body.dynasty) {
+          setYears(body.dynasty.by_year ?? []);
+          setAchievements(body.achievements ?? null);
+        }
       })
       .catch(() => {
         /* the strip is optional */
@@ -150,6 +157,8 @@ export function SimGameOffseason({ ctx, onTrade, onTeam }: { ctx: SimCtx; onTrad
       <OffseasonHero off={off} steps={steps} />
 
       {years.length > 0 && off.stage === "review" ? <SimDynastyStrip years={years} /> : null}
+
+      {off.stage === "review" ? <SimAchievementsModule payload={achievements} seasonNo={off.season_no} id="offseason.achievements" openOnPhone /> : null}
 
       {off.stage === "review" ? <ReviewStage off={off} ctx={ctx} years={years} /> : null}
       {off.stage === "rookie_draft" ? (

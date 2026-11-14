@@ -4,7 +4,9 @@
 // the unread logic against the client-held read cursor, and where an item deep-links. Pure (no React, no storage).
 
 export interface SimNotificationTarget {
-  screen: "trades" | "team" | "home" | "players" | "league" | "draft";
+  screen: "trades" | "team" | "home" | "players" | "league" | "draft" | "achievements";
+  achievement_id?: string;
+  rarity?: "common" | "rare" | "epic";
   player_id?: string;
   offer_id?: string;
 }
@@ -71,7 +73,7 @@ export function simNotifTime(item: Pick<SimNotification, "week">): string {
   return item.week === 0 ? "Draft" : `Wk ${item.week}`;
 }
 
-/** Which tab an item opens (the draft lives on Home while it is on). */
+/** Which tab an item opens (the draft lives on Home while it is on; the Achievements module lives on Home too). */
 export function simNotifTargetTab(target: SimNotificationTarget): SimNotifTab {
   switch (target.screen) {
     case "trades":

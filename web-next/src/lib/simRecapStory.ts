@@ -2,11 +2,12 @@
 //
 // Which pages the weekly-recap story shows and what goes on each one: pure selection logic, no React.
 // Every page is glanceable by construction: a hero number plus at most STORY_ITEMS supporting items.
+import { simRecapHasAchievements } from "./simAchievements";
 import type { SimGamePlayer, SimRecapScore, SimRecapStarter, SimWeekRecap } from "./simGame";
 
 export const STORY_ITEMS = 3;
 
-export type SimRecapPageKey = "result" | "matchup" | "injuries" | "league" | "standings" | "season" | "next";
+export type SimRecapPageKey = "result" | "achievements" | "matchup" | "injuries" | "league" | "standings" | "season" | "next";
 
 export interface SimRecapFacts {
   youId?: string | null;
@@ -28,9 +29,10 @@ export interface SimRecapFacts {
 
 const fmt = (n: number) => (Math.round(n * 10) / 10).toFixed(1);
 
-/** The page order: Result, Matchup, Injuries and lineup, Around the league, Standings (regular season), Season (the final week only), Next week. Pages with nothing to say are dropped. */
+/** The page order: Result, Achievements (only when the week unlocked a badge or hit a milestone), Matchup, Injuries and lineup, Around the league, Standings (regular season), Season (the final week only), Next week. Pages with nothing to say are dropped. */
 export function simRecapPageKeys(recap: SimWeekRecap, facts: SimRecapFacts): SimRecapPageKey[] {
   const keys: SimRecapPageKey[] = ["result"];
+  if (simRecapHasAchievements(recap.achievements)) keys.push("achievements");
   if (recap.your_game && recap.your_game.result !== "bye" && recap.your_game.starters.length > 0) keys.push("matchup");
   const hurt = (recap.injuries ?? []).length > 0;
   const flagged = (recap.your_game?.starters ?? []).some((s) => s.flag != null);
@@ -291,6 +293,8 @@ export function simRecapPageTitle(key: SimRecapPageKey, recap: SimWeekRecap, opt
       const subtitle = g.result === "tie" ? `You tied ${g.opponent_name}`.trim() : `You ${g.result === "win" ? "won" : "lost"} by ${fmt(diff)}${vs}`;
       return { eyebrow, title: playoff ? opts.roundLabel || "Playoffs" : "Matchup Result", subtitle };
     }
+    case "achievements":
+      return { eyebrow, title: "Achievement Unlocked", subtitle: null };
     case "matchup":
       return { eyebrow, title: "How You Scored", subtitle: g && g.optimal_pts != null ? `Best possible lineup: ${fmt(g.optimal_pts)}` : null };
     case "injuries":
