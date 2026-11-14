@@ -13,7 +13,7 @@ import SectionHeading from './SectionHeading';
 import SegmentedTabBar from './SegmentedTabBar';
 import { SkeletonCard } from './SkeletonBlock';
 import { MotionIn } from './Motion';
-import SimCrest from './SimCrest';
+import { SimTeamIdentity } from './SimTeamIdentity';
 import SimGlyph from './SimGlyph';
 import { TapForWhyOff } from './TapForWhy';
 import { SimBlockView } from './SimTradeBlock';
@@ -184,10 +184,7 @@ function OfferCard({ item, defaultOpen, busy, canTrade, onRespond }: { item: Sim
         >
           <View style={common.rowBetween}>
             <View style={[common.row, { flex: 1, minWidth: 0 }]}>
-              <SimCrest name={item.from.name} size={24} />
-              <AppText style={[common.bodyStrong, { flexShrink: 1 }]} numberOfLines={1}>
-                {item.from.name}
-              </AppText>
+              <SimTeamIdentity name={item.from.name} size='chip' />
             </View>
             <View style={common.row}>
               {item.via_block ? <PlayerBadge kind="block" detail="yours" /> : null}

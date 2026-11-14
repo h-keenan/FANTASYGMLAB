@@ -8,7 +8,7 @@ import { EmptyState } from "@/components/EmptyState";
 import { PillRow } from "@/components/PillRow";
 import { SectionHeading } from "@/components/SectionHeading";
 import { ReviewGlyphChip } from "@/components/SeasonReviewSections";
-import { SimCrest } from "@/components/SimCrest";
+import { SimTeamIdentity } from "@/components/SimTeamIdentity";
 import { SimGlyph } from "@/components/SimGlyph";
 import { SimPlayerChip, SimPlayerLine, SimSideLabel, SimStat, SimTeamOpenContext, SimToneBadge, simToneColor, type SimCtx } from "@/components/SimGameParts";
 import { SimPickLine, useSimPicks } from "@/components/SimGameDynastyParts";
@@ -163,10 +163,7 @@ function OfferCard({ item, index, count, defaultOpen, busy, canTrade, onRespond 
           onClick={() => setOpen((v) => !v)}
         >
           <span className="flex items-center justify-between gap-2">
-            <span className="flex min-w-0 items-center gap-2">
-              <SimCrest name={item.from.name} size={24} />
-              <span className="min-w-0 truncate text-sm font-bold">{item.from.name}</span>
-            </span>
+            <SimTeamIdentity name={item.from.name} size="chip" className="flex-1" />
             <span className="flex shrink-0 items-center gap-2">
               {item.via_block ? <PlayerBadge kind="block" detail="yours" /> : null}
               <ToneBadge label={`Wk ${item.expires_week}`} color="var(--color-warning)" size="xs" />

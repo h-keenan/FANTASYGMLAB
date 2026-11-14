@@ -991,3 +991,50 @@ def test_a_trade_spammer_does_not_beat_a_balanced_manager_by_more_than_a_set_mar
     wins_spammer = sum(w for w, _ in spammer)
     assert pf_spammer <= pf_balanced * 1.04
     assert wins_spammer - wins_balanced <= 5  # across 5 seasons: under a win per season
+
+
+# ------------------------------------------------------- standings movement + recap grades
+
+
+def test_annotate_rank_movement_up_down_flat_and_missing():
+    from modules.sim.game_engine import annotate_rank_movement
+
+    prev = [{"team_id": "a", "rank": 1}, {"team_id": "b", "rank": 2}, {"team_id": "c", "rank": 3}]
+    now = [{"team_id": "c", "rank": 1}, {"team_id": "a", "rank": 2}, {"team_id": "b", "rank": 3}, {"team_id": "z", "rank": 4}]
+    rows = annotate_rank_movement(now, prev)
+    by = {r["team_id"]: r for r in rows}
+    assert by["c"]["rank_delta"] == 2 and by["c"]["rank_prev"] == 3  # up two
+    assert by["a"]["rank_delta"] == -1  # down one
+    assert by["b"]["rank_delta"] == -1
+    assert by["z"]["rank_delta"] is None  # not in the previous table: no invented movement
+    flat = annotate_rank_movement([{"team_id": "a", "rank": 1}], [{"team_id": "a", "rank": 1}])
+    assert flat[0]["rank_delta"] == 0
+    assert annotate_rank_movement([{"team_id": "a", "rank": 1}], None)[0]["rank_delta"] is None  # week 1
+
+
+def test_new_recaps_carry_movement_and_old_saves_derive_it():
+    from modules.sim.game_engine import ensure_rank_movement
+
+    snap, state, em = drafted(11)
+    recaps = advance(em, snap, state, 11)
+    assert all(r["rank_delta"] is None for r in recaps[0]["standings"])  # week 1
+    recaps = advance(em, snap, state, 11)
+    w2 = recaps[0]["standings"]
+    w1 = state.recaps["1"]["standings"]
+    prev = {r["team_id"]: r["rank"] for r in w1}
+    assert all(r["rank_delta"] == prev[r["team_id"]] - r["rank"] for r in w2)
+    # an old save: the stored recap has no movement fields, the serving path derives the same numbers
+    old = {**state.recaps["2"], "standings": [{k: v for k, v in r.items() if k not in ("rank_prev", "rank_delta")} for r in w2]}
+    derived = ensure_rank_movement(old, state)
+    assert [r["rank_delta"] for r in derived["standings"]] == [r["rank_delta"] for r in w2]
+    assert ensure_rank_movement(recaps[0], state) is recaps[0]  # idempotent
+    assert all("rank_delta" not in r for r in old["standings"])  # never mutates the stored recap
+
+
+def test_recap_player_briefs_carry_the_shown_grade_key():
+    snap, state, em = drafted(11)
+    rc = advance(em, snap, state, 11)[0]
+    rows = [s["player"] for s in rc["your_game"]["starters"] if s["player"]]
+    assert rows and all("grade" in p for p in rows)  # letter or None, never a missing key (the client omits a null chip)
+    if rc["your_game"].get("mvp"):
+        assert "grade" in rc["your_game"]["mvp"]["player"]

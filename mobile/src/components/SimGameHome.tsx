@@ -202,12 +202,12 @@ function SimMatchupCard({ ctx, matchup, onTab }: { ctx: SimCtx; matchup: SimHome
     >
       <View style={styles.versus}>
         <View style={styles.versusSide}>
-          <SimTeamLink teamId={you?.team_id} name={you?.name ?? 'You'} isYou size={36} stacked />
+          <SimTeamLink teamId={you?.team_id} name={you?.name ?? 'You'} isYou size='row' stacked />
           <AppText style={common.muted}>{matchup.you_record ? simFmtRecord(matchup.you_record) : ''}</AppText>
         </View>
         <AppText style={styles.vs}>VS</AppText>
         <View style={styles.versusSide}>
-          <SimTeamLink teamId={opp.team_id} name={opp.name} size={36} stacked />
+          <SimTeamLink teamId={opp.team_id} name={opp.name} size='row' stacked />
           <AppText style={[common.muted, common.center]}>
             {opp.record ? simFmtRecord(opp.record) : ''} · {opp.persona.label}
           </AppText>

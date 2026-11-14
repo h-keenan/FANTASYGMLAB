@@ -18,7 +18,8 @@ import type { BadgeKind } from "@/lib/playerBadges";
 import { ReviewGlyphChip } from "@/components/SeasonReviewSections";
 import { SectionHeading } from "@/components/SectionHeading";
 import { SheetHandle } from "@/components/SheetHandle";
-import { SimCrest } from "@/components/SimCrest";
+import { SimTeamIdentity } from "@/components/SimTeamIdentity";
+import type { SimTeamSize } from "@/lib/simTeamIdentity";
 import { SimGlyph } from "@/components/SimGlyph";
 import { ReviewGlyphIcon } from "@/components/SimReviewGlyph";
 import { PositionBadge } from "@/components/PositionBadge";
@@ -624,7 +625,7 @@ export function SimTeamLink({
   teamId,
   name,
   isYou = false,
-  size = 24,
+  size = "chip",
   suffix,
   className = "",
   bold = true,
@@ -634,35 +635,23 @@ export function SimTeamLink({
   teamId: string | null | undefined;
   name: string;
   isYou?: boolean;
-  size?: number;
+  size?: SimTeamSize;
   suffix?: ReactNode;
   className?: string;
   bold?: boolean;
-  /** Emblem only (the name is printed beside it); the tap target keeps the name for screen readers. */
+  /** Logo only (the name is printed beside it); the tap target keeps the name for screen readers. */
   hideName?: boolean;
-  /** Emblem above the name, centered (the matchup header). */
+  /** Logo above the name, centered (the matchup header). */
   stacked?: boolean;
 }) {
   const open = useContext(SimTeamOpenContext);
-  const body = (
-    <>
-      <SimCrest name={name} size={size} />
-      {hideName ? null : (
-        <span className={`min-w-0 break-words text-sm ${bold ? "font-bold" : "font-medium"}`}>
-          {name}
-          {isYou ? " (you)" : ""}
-        </span>
-      )}
-      {suffix}
-    </>
-  );
-  const layout = stacked ? "flex-col justify-center text-center gap-1" : "items-center gap-2";
-  if (!open || !teamId) return <span className={`inline-flex min-w-0 ${layout} ${className}`}>{body}</span>;
+  const body = <SimTeamIdentity name={name} size={size} stacked={stacked} isYou={isYou} suffix={suffix} bold={bold} hideName={hideName} />;
+  if (!open || !teamId) return <span className={`inline-flex min-w-0 ${className}`}>{body}</span>;
   return (
     <button
       type="button"
       onClick={() => open(teamId)}
-      className={`tap-link inline-flex min-w-0 ${layout} ${stacked ? "" : "text-left"} ${className}`}
+      className={`tap-link inline-flex min-w-0 ${stacked ? "" : "text-left"} ${className}`}
       style={{ minHeight: "var(--touch-target-min)" }}
     >
       {body}

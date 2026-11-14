@@ -21,7 +21,7 @@ const recap = {
     efficiency: 0.96,
   },
   scores: [{ home: "1", away: "2", home_pts: 102, away_pts: 95, winner: "1" }],
-  standings: [{ team_id: "1", name: "Goats" }, { team_id: "2", name: "Brigade" }],
+  standings: [{ rank: 1, team_id: "1", name: "Goats", is_you: false, wins: 3, losses: 1, ties: 0, pf: 500, pa: 400, rank_delta: 1 }, { rank: 2, team_id: "9", name: "Me", is_you: true, wins: 3, losses: 1, ties: 0, pf: 480, pa: 400, rank_delta: -1 }, { rank: 3, team_id: "2", name: "Brigade", is_you: false, wins: 2, losses: 2, ties: 0, pf: 450, pa: 400, rank_delta: 0 }],
   injuries: [],
   season_complete: false,
   champion: null,
@@ -29,7 +29,7 @@ const recap = {
 } as unknown as SimWeekRecap;
 const openPlayer = vi.fn();
 const ctx = {
-  game: { status: "in_season", week: 5, settings: { mode: "redraft" }, you: { team_id: "9", name: "Me" }, trade_deadline_week: 10, pending: { lineup_warnings: 1, inbox: 2 }, this_week: { opponent: { team_id: "3", name: "Titans" }, bye: false, your_projection: 121.4, opponent_projection: 117.9 } },
+  game: { status: "in_season", week: 5, settings: { mode: "redraft", playoff_teams: 2 }, you: { team_id: "9", name: "Me" }, trade_deadline_week: 10, pending: { lineup_warnings: 1, inbox: 2 }, this_week: { opponent: { team_id: "3", name: "Titans" }, bye: false, your_projection: 121.4, opponent_projection: 117.9 } },
   openPlayer,
 } as unknown as SimCtx;
 
@@ -39,7 +39,8 @@ describe("SimWeekRecapStory", () => {
     const onFix = vi.fn();
     render(<SimWeekRecapStory recap={recap} index={0} total={1} ctx={ctx} onNext={() => {}} onClose={onClose} onFixLineup={onFix} />);
     const labels = screen.getAllByRole("button", { name: /^Go to / }).map((b) => b.getAttribute("aria-label"));
-    expect(labels).toHaveLength(5);
+    expect(labels).toHaveLength(6);
+    expect(screen.getByTestId("story-title")).toHaveTextContent("Matchup Result");
     expect(screen.getByText("Won by 18.7")).toBeInTheDocument();
     const dialog = screen.getByRole("dialog");
     fireEvent.keyDown(dialog, { key: "ArrowRight" });
@@ -53,16 +54,28 @@ describe("SimWeekRecapStory", () => {
     fireEvent.keyDown(dialog, { key: "ArrowRight" });
     expect(screen.getByText("Top score: Goats")).toBeInTheDocument();
     fireEvent.keyDown(dialog, { key: "ArrowRight" });
+    expect(screen.getByTestId("story-title")).toHaveTextContent("Standings");
+    expect(screen.getAllByTestId("recap-standing-row")).toHaveLength(3);
+    expect(screen.getByText("Seed 2, down 1")).toBeInTheDocument();
+    fireEvent.keyDown(dialog, { key: "ArrowRight" });
     expect(screen.getByText("Titans")).toBeInTheDocument();
     expect(screen.getByText("You are favored by 3.5")).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "Back to your team" }));
     expect(onClose).toHaveBeenCalledTimes(1);
   });
 
+  it("result page: sim team logos (never initials circles), names uncut, and no blank Grade chip when a player has no grade", () => {
+    const noGrade = { ...recap, your_game: { ...recap.your_game!, starters: [{ slot: "QB", player: { ...player("q", "Quinn Moore", "QB"), grade: null }, pts: 25, flag: null }] } } as unknown as SimWeekRecap;
+    render(<SimWeekRecapStory recap={noGrade} index={0} total={1} ctx={ctx} onNext={() => {}} onClose={() => {}} onFixLineup={() => {}} />);
+    expect(screen.getAllByTestId("sim-crest").length).toBeGreaterThanOrEqual(2);
+    expect(screen.getAllByTestId("sim-team-identity").length).toBeGreaterThanOrEqual(2);
+    expect(screen.queryByText("Grade")).not.toBeInTheDocument();
+  });
+
   it("Full details opens the classic recap", () => {
     render(<SimWeekRecapStory recap={recap} index={0} total={1} ctx={ctx} onNext={() => {}} onClose={() => {}} onFixLineup={() => {}} />);
     const dialog = screen.getByRole("dialog");
-    for (let i = 0; i < 4; i += 1) fireEvent.keyDown(dialog, { key: "ArrowRight" });
+    for (let i = 0; i < 5; i += 1) fireEvent.keyDown(dialog, { key: "ArrowRight" });
     fireEvent.click(screen.getByRole("button", { name: "Full details" }));
     expect(screen.getByTestId("week-recap")).toBeInTheDocument();
   });

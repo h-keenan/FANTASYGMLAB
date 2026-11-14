@@ -10,10 +10,19 @@ import { storyInitial, storyIsLast, storyKeyAction, storyReducer, storySegmentFi
 
 import "./ui.css";
 
+export interface StoryHeader {
+  eyebrow: string;
+  /** Heavy ~30px title; wraps to a second line, never ellipsized. */
+  title: string;
+  subtitle?: string | null;
+}
+
 export interface StoryPage {
   key: string;
   /** Short kicker above the page ("Result", "Around the league"). */
   label: string;
+  /** Optional big page header (eyebrow + bold title + one-line subtitle) in the fixed top zone; replaces the small kicker. */
+  header?: StoryHeader;
   /** The page itself: a hero number and at most three supporting items. No scrolling. */
   content: ReactNode;
   /** Page footer (a CTA). The last page's footer is the story's finish action. */
@@ -138,7 +147,15 @@ export function StoryCarousel({
           <span aria-hidden="true">×</span>
         </button>
       </div>
-      <p className="ui-story-kicker">{page.label}</p>
+      {page.header ? (
+        <div key={`head-${page.key}`} className="ui-story-head" data-testid="story-header">
+          <p className="ui-story-kicker ui-story-eyebrow">{page.header.eyebrow}</p>
+          <h2 className="ui-story-title" data-testid="story-title">{page.header.title}</h2>
+          {page.header.subtitle ? <p className="ui-story-subtitle">{page.header.subtitle}</p> : null}
+        </div>
+      ) : (
+        <p className="ui-story-kicker">{page.label}</p>
+      )}
       <div className="ui-story-stage" onPointerDown={onPointerDown} onPointerUp={onPointerUp} onPointerCancel={() => (pointer.current = null)} data-testid="story-stage">
         <div key={page.key} className="ui-story-page" data-dir={state.direction} data-testid={`story-page-${page.key}`} aria-live="polite">
           {page.content}

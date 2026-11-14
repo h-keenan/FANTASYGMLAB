@@ -991,6 +991,12 @@
   letter-spacing: var(--letter-spacing-badge);
   color: var(--color-text-muted);
 }
+.ui-story-head { padding: 0 var(--space-lg); display: flex; flex-direction: column; gap: 4px; animation: ui-story-head-in var(--motion-fast, 180ms) var(--ease-out, ease-out) both; }
+.ui-story-head .ui-story-kicker { padding: 0; }
+.ui-story-title { margin: 0; font-size: 1.875rem; line-height: 1.1; font-weight: 900; letter-spacing: -0.01em; color: var(--color-text-primary); text-wrap: balance; overflow-wrap: break-word; }
+.ui-story-subtitle { margin: 0; font-size: 0.9375rem; font-weight: 600; color: var(--color-text-secondary); overflow-wrap: break-word; }
+@keyframes ui-story-head-in { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+@media (prefers-reduced-motion: reduce) { .ui-story-head { animation: none; } }
 .ui-story-stage {
   position: relative;
   flex: 1;
@@ -1109,7 +1115,20 @@
   width: 100%;
 }
 .ui-recap-team { display: flex; min-width: 0; flex-direction: column; align-items: center; gap: 6px; }
-.ui-recap-team > span:last-child { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 0.75rem; font-weight: 700; color: var(--color-text-secondary); }
+/* A team name is never ellipsized (lib/simTeamIdentity.ts fit ladder): it wraps, balanced, under the logo. */
+.ui-recap-team .ui-recap-team-name { max-width: 100%; font-size: 0.8125rem; font-weight: 700; color: var(--color-text-secondary); }
+.ui-recap-standings { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 2px; }
+.ui-recap-standing { display: flex; align-items: center; gap: 8px; padding: 6px 8px; border-radius: var(--radius-md, 10px); border-left: 3px solid transparent; font-variant-numeric: tabular-nums; }
+.ui-recap-standing[data-status="in"], .ui-recap-standing[data-status="bubble"] { border-left-color: var(--color-success); }
+.ui-recap-standing[data-status="bubble"] { border-left-color: var(--color-warning); }
+.ui-recap-standing[data-status="out"] { opacity: 0.62; }
+.ui-recap-standing[data-you="true"] { background: color-mix(in srgb, var(--color-accent) 14%, transparent); opacity: 1; }
+.ui-recap-standing-rank { width: 1.5rem; text-align: center; font-weight: 800; color: var(--color-text-muted); }
+.ui-recap-standing-rec { display: flex; flex-direction: column; align-items: flex-end; font-size: 0.8125rem; font-weight: 700; }
+.ui-recap-standing-rec small { font-size: 0.6875rem; font-weight: 600; color: var(--color-text-muted); }
+.ui-recap-standing-move { min-width: 2.25rem; text-align: right; font-size: 0.8125rem; font-weight: 800; }
+.ui-recap-cut { display: flex; align-items: center; gap: 8px; list-style: none; margin: 2px 0; font-size: 0.6875rem; font-weight: 800; text-transform: uppercase; letter-spacing: var(--letter-spacing-badge); color: var(--color-warning); }
+.ui-recap-cut::before, .ui-recap-cut::after { content: ""; flex: 1; border-top: 1px dashed var(--color-warning); }
 .ui-recap-score { display: flex; align-items: baseline; justify-content: center; gap: 10px; font-variant-numeric: tabular-nums; }
 .ui-recap-chip {
   --pos: var(--color-text-secondary);

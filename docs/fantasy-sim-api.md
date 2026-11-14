@@ -605,9 +605,12 @@ returns:
                          "starters": [{"slot", "player", "pts", "stats": {...}|null, "flag": "bye|out|null"}],
                          "bench": [...], "optimal_pts": 131.2, "efficiency": 0.93},
            "scores": [{"home", "away", "home_pts", "away_pts", "winner": null|"id"}],
-           "standings": [...top rows], "waivers": [{"team_id","name","add":player,"drop":player|null,"ok": true,"reason": ""}],
+           "standings": [{"rank", "team_id", "name", "wins", "losses", "ties", "pf", "pa", "seed", "playoff_status",
+                          "rank_prev": 4|null, "rank_delta": 2|null /* regular season only: spots moved up (+) or down (-) since last week;
+                          null at week 1 / real-league weeks; derived from the stored previous week for saves from before the field */}, ...],
+           "waivers": [{"team_id","name","add":player,"drop":player|null,"ok": true,"reason": ""}],
            "transactions": [...AI trades/drops this week], "injuries": [{"player", "weeks", "team_id", "is_yours"}],
-           "mvp": {...}, "bust": {...}, "playoffs": null | {"seeds": [...], "bracket": [...]},
+           "mvp": {...}, "bust": {...} /* player briefs carry grade / grade_range / grade_uncertain (letter or null) */, "playoffs": null | {"seeds": [...], "bracket": [...]},
            "season_complete": false, "champion": null, "next_week": 5},
  "also_played": [recap, ...],   // playoff weeks played in the same call once you are out of the bracket
  "replayed": false,             // true when `week` was already played (stored recap returned, nothing written)

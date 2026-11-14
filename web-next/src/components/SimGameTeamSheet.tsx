@@ -5,7 +5,7 @@ import { useEffect, useState } from "react";
 import { AccentCard } from "@/components/AccentCard";
 import { Button } from "@/components/Button";
 import { PositionBadge } from "@/components/PositionBadge";
-import { SimCrest } from "@/components/SimCrest";
+import { SimTeamLogo } from "@/components/SimTeamIdentity";
 import { SimGlyph } from "@/components/SimGlyph";
 import { SimPlayerChip, SimPlayerLine, SimSectionTitle, SimSheet, SimToneBadge, simToneColor, type SimCtx } from "@/components/SimGameParts";
 import { SimTeamHistory } from "@/components/SimTeamHistory";
@@ -89,7 +89,7 @@ function TeamBody({ ctx, data, onTrade }: { ctx: SimCtx; data: SimTeamRosterResp
   return (
     <div className="flex flex-col gap-4 pr-1">
       <header className="flex items-center gap-3 pr-10">
-        <SimCrest name={team.name} size={56} label />
+        <SimTeamLogo name={team.name} size="hero" label />
         <div className="flex min-w-0 flex-col gap-1">
           <p className="text-lg font-extrabold break-words" data-testid="team-sheet-name">
             {team.name}

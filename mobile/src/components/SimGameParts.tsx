@@ -15,7 +15,8 @@ import SimGlyph from './SimGlyph';
 import PlayerAvatar from './PlayerAvatar';
 import PositionBadge from './PositionBadge';
 import SectionHeading from './SectionHeading';
-import SimCrest from './SimCrest';
+import { SimTeamIdentity } from './SimTeamIdentity';
+import type { SimTeamSize } from '../lib/simTeamIdentity';
 import { SIM_GLYPH_ICONS } from './SimGlyph';
 import { SheetModal, SheetScrollView, SwipeDismissCard } from './SwipeDismissSheet';
 import ToneBadge, { withAlpha } from './ToneBadge';
@@ -575,11 +576,6 @@ function createStyles(colors: ThemeColors) {
     noticeRow: { flexDirection: 'row', alignItems: 'flex-start', gap: spacing.sm },
     noticeText: { flex: 1, minWidth: 0, fontSize: 14.5, lineHeight: 20, color: colors.textPrimary },
     noticeDismiss: { fontSize: 13, fontWeight: '700', color: colors.accent },
-    teamLink: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, flexShrink: 1, minWidth: 0 },
-    teamLinkStacked: { alignItems: 'center', justifyContent: 'center', gap: spacing.xs, flexShrink: 1, minWidth: 0 },
-    teamName: { fontSize: 15, fontWeight: '700', color: colors.textPrimary, flexShrink: 1 },
-    teamNameLight: { fontWeight: '500' },
-    teamNameStacked: { textAlign: 'center' },
     mini: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs, minWidth: 0, flexShrink: 1 },
     miniRight: { flexDirection: 'row-reverse' },
     miniText: { flexShrink: 1, minWidth: 0, gap: 1 },
@@ -610,7 +606,7 @@ export function SimTeamLink({
   teamId,
   name,
   isYou = false,
-  size = 24,
+  size = 'chip',
   suffix,
   bold = true,
   hideName = false,
@@ -619,35 +615,21 @@ export function SimTeamLink({
   teamId: string | null | undefined;
   name: string;
   isYou?: boolean;
-  size?: number;
+  size?: SimTeamSize;
   suffix?: ReactNode;
   bold?: boolean;
-  /** Emblem only (the name is printed beside it); the tap target keeps the name for screen readers. */
+  /** Logo only (the name is printed beside it); the tap target keeps the name for screen readers. */
   hideName?: boolean;
-  /** Emblem above the name, centered (the matchup header). */
+  /** Logo above the name, centered (the matchup header). */
   stacked?: boolean;
 }) {
-  const { colors } = useThemeMode();
-  const styles = useMemo(() => createStyles(colors), [colors]);
   const open = useContext(SimTeamOpenContext);
-  const body = (
-    <>
-      <SimCrest name={name} size={size} />
-      {hideName ? null : (
-        <AppText style={[styles.teamName, !bold && styles.teamNameLight, stacked && styles.teamNameStacked]} numberOfLines={2}>
-          {name}
-          {isYou ? ' (you)' : ''}
-        </AppText>
-      )}
-      {suffix}
-    </>
-  );
-  const layout = stacked ? styles.teamLinkStacked : styles.teamLink;
-  if (!open || !teamId) return <View style={layout}>{body}</View>;
+  const body = <SimTeamIdentity name={name} size={size} stacked={stacked} isYou={isYou} suffix={suffix} bold={bold} hideName={hideName} />;
+  if (!open || !teamId) return body;
   return (
     <Pressable
       onPress={() => open(teamId)}
-      style={[layout, { minHeight: 44 }]}
+      style={{ minHeight: 44, justifyContent: 'center', flexShrink: 1 }}
       accessibilityRole="button"
       accessibilityLabel={`${name}${isYou ? ' (you)' : ''}. Open team`}
     >

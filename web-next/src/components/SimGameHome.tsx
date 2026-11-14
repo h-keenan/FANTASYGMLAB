@@ -255,12 +255,12 @@ function MatchupBody({ ctx, matchup, onTab, prob, youProj, oppProj, labels, flag
     >
       <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-2 text-xs" style={{ color: "var(--color-text-muted)" }}>
         <div className="flex min-w-0 flex-col items-center gap-1 text-center">
-          <SimTeamLink teamId={you?.team_id} name={you?.name ?? "You"} isYou size={28} stacked />
+          <SimTeamLink teamId={you?.team_id} name={you?.name ?? "You"} isYou size="row" stacked />
           <span>{matchup.you_record ? simFmtRecord(matchup.you_record) : ""}</span>
         </div>
         <span className="font-extrabold">VS</span>
         <div className="flex min-w-0 flex-col items-center gap-1 text-center">
-          <SimTeamLink teamId={opp.team_id} name={opp.name} size={28} stacked />
+          <SimTeamLink teamId={opp.team_id} name={opp.name} size="row" stacked />
           <span>{opp.record ? simFmtRecord(opp.record) : ""} · {opp.persona.label}</span>
         </div>
       </div>

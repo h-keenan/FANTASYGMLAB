@@ -940,3 +940,44 @@ the player's `grade` once the letter-grades change lands.
 `ui/RecapCard` + `lib/recapCard.ts`: kicker, optional grade/finish badge, three label/value rows, extra rows behind "More".
 Used on the StoryCarousel Around the league / Season complete / Next week pages and as the Season in Review stats cards.
 Player-line pages (Result, Matchup, Injuries) keep their avatar rows.
+
+### Recap page header (bigger titles, 2026-11-14)
+Every StoryCarousel page can carry `header: {eyebrow, title, subtitle}` (web `ui/StoryCarousel`, app `StoryCarousel`): a small eyebrow
+("Week 2 recap"), a ~30px heavy title that wraps to two lines and is never ellipsized, and an optional one-line subtitle ("You lost by 7.3
+to Snap Crackle Pop"). It sits in the same fixed top zone under the progress bars on every page, replaces the old small kicker, enters
+with the short `motion-fast` fade and leaves the swipe-down area free. Titles come from ONE lib twin: `simRecapPageTitle(pageKey, recap,
+{roundLabel})` in `lib/simRecapStory.ts` (Matchup Result / How You Scored / Injuries & Lineup / Around the League / Standings / Next Week /
+Season Complete; playoffs use the round name, "Playoff Bye" for a bye).
+
+### Recap Standings page (key `standings`)
+After League, before Season/Next, regular-season recaps only. Hero = your rank, "Seed 3, up 2" and a green ▲n / red ▼n / – movement
+(spots moved since last week). Rows (`simRecapStandingsModel`): rank, team identity, record, PF, movement; a dashed "Playoff cut" line after
+seed N (`settings.playoff_teams`); teams inside the cut get a green edge, the last seed and first team out are marked "Bubble", the rest are
+dimmed, you are highlighted. Compact = top 6 + you + the cut neighbours; "Full standings" opens the whole league (web: sim sheet; app:
+in-place scroll). Movement is server data (`standings[].rank_prev` / `rank_delta`, `modules/sim/game_engine.annotate_rank_movement`;
+old saves derive it from the stored previous week in `ensure_rank_movement`); null (week 1) shows no chip. Clinched / eliminated badges
+are not shown (needs per-setting tiebreaker math). The Season in Review "Standings journey" note states the net spots gained or lost.
+
+## Team identity (Fantasy Sim)
+A sim team is its generated logo (`SimCrest`, shape/pattern/colours seeded from the name, `lib/simCrest.ts`) plus its name, rendered ONLY
+through `components/SimTeamIdentity.tsx` (web + app): `SimTeamIdentity` = logo + name (`stacked`, `hideName`, `isYou`), `SimTeamLogo` = the
+logo alone for layouts that print the name themselves, `SimTeamLink` (in SimGameParts) = the tappable identity that opens the team sheet.
+Never `TeamAvatar` (that is the real-league initials circle) and never `<SimCrest>` directly.
+
+| Size slot | px | Use |
+| --- | --- | --- |
+| `inline` | 16 | in a sentence, "via Team" labels, offseason pick team |
+| `chip` | 20 | header chip, feed lines, trade partner line |
+| `row` | 28 | standings, schedule, league, draft board, team card |
+| `card` | 44 | recap hero side logos, trade partner cards |
+| `hero` | 56 | recap result sides, team sheet header |
+| `sheet` | 72 | reserved for large team headers |
+
+Names are never ellipsized: `simTeamNameFit` (`lib/simTeamIdentity.ts`) walks full name on one line, then two balanced lines, then one font
+step smaller and wrapped (stacked/narrow layouts switch earlier). `lib/simTeamIdentityRule.test.ts` fails when a sim component imports
+`TeamAvatar`, mounts `SimCrest` directly, passes a raw pixel `size`, wraps a team name in a truncating element, or prints a team name in a
+file that never uses the template (explicit `TEXT_ONLY` allowlist).
+
+### Recap rows never show a blank Grade
+Recap player briefs (`game_engine._brief(snap, pid, season)`) carry the shown letter grade (`grade`, `grade_range`, `grade_uncertain`; presentation
+only). The client adds the Grade stat only when a grade exists (`gradeStat` in `SimRecapStory`); recaps saved before the field omit the chip.

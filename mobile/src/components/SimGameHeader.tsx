@@ -3,7 +3,7 @@ import { Pressable, StyleSheet, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 
 import AppText from './AppText';
-import SimCrest from './SimCrest';
+import { SimTeamLogo } from './SimTeamIdentity';
 import SimGlyph from './SimGlyph';
 import { useThemeMode } from '../context/ThemeModeContext';
 import { simCompactSeason, simCompactWeek, simStatusChips } from '../lib/bottomNav';
@@ -49,7 +49,7 @@ export function SimGameHeader({ game, onHub, onTeam, onMore, bell }: { game: Sim
           style={styles.chip}
           testID="sim-team-chip"
         >
-          <SimCrest name={you.name} size={20} />
+          <SimTeamLogo name={you.name} size='chip' />
           <AppText style={styles.chipName}>{you.name}</AppText>
           <AppText style={styles.chipRecord}>{simFmtRecord(you)}</AppText>
         </Pressable>

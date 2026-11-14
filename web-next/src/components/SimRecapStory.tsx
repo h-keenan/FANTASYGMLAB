@@ -1,13 +1,13 @@
 "use client";
 
-import { useMemo, useState, type CSSProperties, type ReactNode } from "react";
+import { Fragment, useMemo, useState, type CSSProperties, type ReactNode } from "react";
 
 import { Button } from "@/components/Button";
 import { CountUp, Confetti, MotionIn } from "@/components/Motion";
-import { TeamAvatar } from "@/components/TeamAvatar";
 import { TrophyIcon } from "@/components/TrophyIcon";
 import { ValueRing } from "@/components/ValueRing";
-import { SimPlayerChip, SimPlayerLine, type SimCtx } from "@/components/SimGameParts";
+import { SimPlayerChip, SimPlayerLine, SimSheet, SimToneBadge, type SimCtx } from "@/components/SimGameParts";
+import { SimTeamIdentity, SimTeamLogo } from "@/components/SimTeamIdentity";
 import { SimWeekRecapView } from "@/components/SimGameRecap";
 import { RecapCard } from "@/components/ui/RecapCard";
 import { recapCardModel, recapRowsFromItems } from "@/lib/recapCard";
@@ -20,8 +20,12 @@ import {
   simNextWeekModel,
   simPositionTotals,
   simRecapInjuryModel,
+  simMovementText,
   simRecapOutcome,
   simRecapPageKeys,
+  simRecapPageTitle,
+  simRecapStandingsModel,
+  type SimStandingsRow,
   simRecapProj,
   simRecapResultModel,
   simRecapSeasonModel,
@@ -36,6 +40,7 @@ const KICKER: Record<SimRecapPageKey, string> = {
   matchup: "Matchup breakdown",
   injuries: "Injuries and lineup",
   league: "Around the league",
+  standings: "Standings",
   season: "Season complete",
   next: "Next week",
 };
@@ -84,11 +89,46 @@ function EfficiencyRing({ efficiency }: { efficiency: number }) {
   return <ValueRing percent={pct} tint="var(--color-accent)" display={`${pct}%`} ariaLabel={`${pct}% lineup efficiency`} size="lg" />;
 }
 
+/** The Grade stat, only when the player carries a letter grade: a chip with a label and no value is never rendered. */
+const gradeStat = (player: SimGamePlayer | null | undefined) => {
+  const grade = simGradeOf(player);
+  return grade ? [{ key: "ovr", label: "Grade", value: "", grade }] : [];
+};
+
+/** One standings row: rank (or seed), logo + name, record, PF and the movement since last week. */
+function StandingsRow({ row }: { row: SimStandingsRow }) {
+  const text = simMovementText(row.delta);
+  const tone = row.delta == null || row.delta === 0 ? "var(--color-text-muted)" : row.delta > 0 ? "var(--color-success)" : "var(--color-danger)";
+  return (
+    <li className="ui-recap-standing" data-status={row.status} data-you={row.isYou ? "true" : undefined} data-testid="recap-standing-row">
+      <span className="ui-recap-standing-rank">{row.rank}</span>
+      <SimTeamIdentity name={row.name} size="row" isYou={row.isYou} bold={row.isYou} className="min-w-0 flex-1" />
+      {row.status === "bubble" ? <SimToneBadge label="Bubble" tone="warning" /> : null}
+      <span className="ui-recap-standing-rec">{row.record}<small>{simFmtPts(row.pf)} PF</small></span>
+      <span className="ui-recap-standing-move" style={{ color: tone }} aria-label={row.delta == null ? undefined : row.delta === 0 ? "No change" : row.delta > 0 ? `Up ${row.delta}` : `Down ${-row.delta}`}>{text}</span>
+    </li>
+  );
+}
+
+/** Rows in rank order with the playoff cut line drawn after the last seed. */
+function StandingsList({ rows, spots }: { rows: SimStandingsRow[]; spots: number }) {
+  return (
+    <ul className="ui-recap-standings" aria-label="Standings">
+      {rows.map((r, i) => (
+        <Fragment key={r.teamId}>
+          <StandingsRow row={r} />
+          {spots > 0 && r.rank === spots && rows[i + 1] ? <li className="ui-recap-cut" role="separator" aria-label="Playoff cut line"><span>Playoff cut</span></li> : null}
+        </Fragment>
+      ))}
+    </ul>
+  );
+}
+
 const performer = (label: string, p: { name: string; pts: number; player: SimGamePlayer | null }, ctx: SimCtx, accent: string) =>
   p.player ? (
     <MotionIn key={label}>
       <p className="mb-0.5 text-xs font-extrabold uppercase" style={{ color: accent, letterSpacing: "var(--letter-spacing-badge)" }}>{label}</p>
-      <SimPlayerLine player={p.player} stats={[{ key: "pts", label: "Pts", value: simFmtPts(p.pts), tone: label === "Best performer" ? "success" : undefined }, { key: "ovr", label: "Grade", value: "", grade: simGradeOf(p.player) }]} onOpen={ctx.openPlayer} />
+      <SimPlayerLine player={p.player} stats={[{ key: "pts", label: "Pts", value: simFmtPts(p.pts), tone: label === "Best performer" ? "success" : undefined }, ...gradeStat(p.player)]} onOpen={ctx.openPlayer} />
     </MotionIn>
   ) : (
     <Fact key={label} label={label} accent={accent}>{p.name} · {simFmtPts(p.pts)}</Fact>
@@ -106,6 +146,7 @@ export function recapFacts(recap: SimWeekRecap, ctx: SimCtx): SimRecapFacts {
     nextOpponent: tw?.opponent?.name ?? null,
     nextProjection: tw && !tw.bye ? { yours: tw.your_projection, theirs: tw.opponent_projection } : null,
     tradeDeadlineWeek: g.trade_deadline_week,
+    playoffTeams: g.settings.playoff_teams,
     week: g.week,
   };
 }
@@ -129,6 +170,7 @@ export function SimWeekRecapStory({
   onFixLineup: () => void;
 }) {
   const [detail, setDetail] = useState(false);
+  const [fullTable, setFullTable] = useState(false);
   const facts = useMemo(() => recapFacts(recap, ctx), [recap, ctx]);
   const keys = useMemo(() => simRecapPageKeys(recap, facts), [recap, facts]);
   const last = index + 1 >= total;
@@ -172,8 +214,7 @@ export function SimWeekRecapStory({
             {result.kind === "game" ? (
               <div className="ui-recap-versus" aria-label={`${youName} ${simFmtPts(result.yours)}, ${result.opponent} ${simFmtPts(result.theirs)}`}>
                 <div className="ui-recap-team">
-                  <TeamAvatar name={youName} size={56} ringColor={toneVar(outcome.tone)} />
-                  <span>{youName}</span>
+                  <SimTeamIdentity name={youName} size="hero" stacked bold={false} nameClassName="ui-recap-team-name" />
                 </div>
                 <div className="ui-recap-score">
                   <CountUp value={result.yours} className="text-5xl font-extrabold leading-none" style={{ color: toneVar(outcome.tone) }} />
@@ -181,8 +222,7 @@ export function SimWeekRecapStory({
                   <CountUp value={result.theirs} className="text-3xl font-bold" style={{ color: "var(--color-text-secondary)" }} />
                 </div>
                 <div className="ui-recap-team">
-                  <TeamAvatar name={result.opponent} size={56} />
-                  <span>{result.opponent}</span>
+                  <SimTeamIdentity name={result.opponent} size="hero" stacked bold={false} nameClassName="ui-recap-team-name" />
                 </div>
               </div>
             ) : null}
@@ -219,7 +259,7 @@ export function SimWeekRecapStory({
                   stats={[
                     { key: "pts", label: "Pts", value: simFmtPts(s.pts), tone: simRecapProj(s) != null && s.pts >= simRecapProj(s)! ? "success" : undefined },
                     { key: "proj", label: "Proj", value: simFmtPts(simRecapProj(s)) },
-                    { key: "ovr", label: "Grade", value: "", grade: simGradeOf(s.player) },
+                    ...gradeStat(s.player),
                   ]}
                   onOpen={ctx.openPlayer}
                 />
@@ -261,9 +301,29 @@ export function SimWeekRecapStory({
           <HeroZone>
             <p className="text-xs font-extrabold uppercase" style={{ color: "var(--color-text-muted)", letterSpacing: "var(--letter-spacing-badge)" }}>Top score of the week</p>
             <Hero value={h.hero?.value ? <CountUp value={Number(h.hero.value)} /> : ""} caption={h.hero?.who ? `Top score: ${h.hero.who}` : undefined} color="var(--color-success)" />
-            {h.hero?.who ? <TeamAvatar name={h.hero.who} size={44} ringColor="var(--color-success)" /> : null}
+            {h.hero?.who ? <SimTeamLogo name={h.hero.who} size="card" label /> : null}
           </HeroZone>
           <RecapCard model={recapCardModel({ kicker: "Around the league", rows: recapRowsFromItems(h.items.map((it) => ({ ...it, tone: it.key === "closest" ? ("warning" as const) : it.key === "blowout" ? ("danger" as const) : undefined }))) })} />
+        </Page>
+      );
+    }
+    if (key === "standings") {
+      const m = simRecapStandingsModel(recap, facts);
+      const you = m.you;
+      const moveColor = !you || you.delta == null || you.delta === 0 ? "var(--color-text-muted)" : you.delta > 0 ? "var(--color-success)" : "var(--color-danger)";
+      return (
+        <Page tone={you && you.seed != null ? "success" : "accent"}>
+          <HeroZone>
+            <Hero value={you ? <CountUp value={you.rank} /> : ""} caption={m.caption || undefined} color={you && you.seed != null ? "var(--color-success)" : undefined} />
+            {you && you.delta != null ? <p className="text-2xl font-extrabold tabular-nums" style={{ color: moveColor }} data-testid="standings-move">{simMovementText(you.delta)}</p> : null}
+          </HeroZone>
+          <StandingsList rows={m.compact} spots={m.spots} />
+          {m.rows.length > m.compact.length ? <Button fullWidth variant="secondary" onClick={() => setFullTable(true)}>Full standings</Button> : null}
+          {fullTable ? (
+            <SimSheet title="Standings" onClose={() => setFullTable(false)}>
+              <StandingsList rows={m.rows} spots={m.spots} />
+            </SimSheet>
+          ) : null}
         </Page>
       );
     }
@@ -275,7 +335,7 @@ export function SimWeekRecapStory({
             <span className="ui-recap-trophy enter-pop"><TrophyIcon size={72} color="var(--color-premium)" /></span>
             <p className="text-xs font-extrabold uppercase" style={{ color: "var(--color-text-muted)", letterSpacing: "var(--letter-spacing-badge)" }}>{m.youChampion ? "Your finish" : "Champion"}</p>
             <p className="ui-recap-headline" data-testid="season-headline">{m.youChampion ? "Champions" : m.championName ?? "Season complete"}</p>
-            {m.championName && !m.youChampion ? <TeamAvatar name={m.championName} size={48} ringColor="var(--color-premium)" /> : null}
+            {m.championName && !m.youChampion ? <SimTeamLogo name={m.championName} size="card" label /> : null}
             <p className="ui-recap-sub">{m.youChampion ? `${youName} won it all.` : `You finished ${m.finish}.`}</p>
           </HeroZone>
           <RecapCard model={recapCardModel({ kicker: "Season complete", badge: m.finish, rows: recapRowsFromItems(m.items) })} />
@@ -287,7 +347,7 @@ export function SimWeekRecapStory({
       return (
         <Page>
           <HeroZone>
-            {n.opponent ? <TeamAvatar name={n.opponent} size={56} /> : null}
+            {n.opponent ? <SimTeamLogo name={n.opponent} size="hero" label /> : null}
             <Hero value={n.opponent ?? `Week ${n.week ?? ""}`} caption={n.week != null ? `Week ${n.week}${n.opponent ? " opponent" : ""}` : undefined} />
             {n.yours != null && n.theirs != null ? (
               <p className="text-lg font-bold tabular-nums">
@@ -306,6 +366,7 @@ export function SimWeekRecapStory({
   const pages: StoryPage[] = keys.map((key, i) => ({
     key,
     label: `${title}${total > 1 ? ` · ${index + 1} of ${total}` : ""} · ${KICKER[key]}`,
+    header: simRecapPageTitle(key, recap, { roundLabel: recap.kind === "playoff" ? simPlayoffRoundLabel(recap.week, ctx.game.settings) : null, youId: facts.youId }),
     content: pageFor(key),
     footer:
       i === keys.length - 1 ? (

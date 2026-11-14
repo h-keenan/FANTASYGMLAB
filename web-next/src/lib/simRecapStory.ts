@@ -6,7 +6,7 @@ import type { SimGamePlayer, SimRecapScore, SimRecapStarter, SimWeekRecap } from
 
 export const STORY_ITEMS = 3;
 
-export type SimRecapPageKey = "result" | "matchup" | "injuries" | "league" | "season" | "next";
+export type SimRecapPageKey = "result" | "matchup" | "injuries" | "league" | "standings" | "season" | "next";
 
 export interface SimRecapFacts {
   youId?: string | null;
@@ -20,13 +20,15 @@ export interface SimRecapFacts {
   nextOpponent?: string | null;
   nextProjection?: { yours: number; theirs: number } | null;
   tradeDeadlineWeek?: number | null;
+  /** Playoff spots (settings.playoff_teams): where the standings page draws the cut line. */
+  playoffTeams?: number | null;
   /** The week the game is on now (the recap's next week). */
   week?: number | null;
 }
 
 const fmt = (n: number) => (Math.round(n * 10) / 10).toFixed(1);
 
-/** The page order: Result, Matchup, Injuries and lineup, Around the league, Season (the final week only), Next week. Pages with nothing to say are dropped. */
+/** The page order: Result, Matchup, Injuries and lineup, Around the league, Standings (regular season), Season (the final week only), Next week. Pages with nothing to say are dropped. */
 export function simRecapPageKeys(recap: SimWeekRecap, facts: SimRecapFacts): SimRecapPageKey[] {
   const keys: SimRecapPageKey[] = ["result"];
   if (recap.your_game && recap.your_game.result !== "bye" && recap.your_game.starters.length > 0) keys.push("matchup");
@@ -34,6 +36,7 @@ export function simRecapPageKeys(recap: SimWeekRecap, facts: SimRecapFacts): Sim
   const flagged = (recap.your_game?.starters ?? []).some((s) => s.flag != null);
   if (hurt || flagged || facts.lineupWarnings > 0) keys.push("injuries");
   if (recap.scores.length > 0) keys.push("league");
+  if (recap.kind === "regular" && (recap.standings ?? []).length > 0) keys.push("standings");
   if (recap.season_complete) keys.push("season");
   if (!recap.season_complete && recap.next_week != null) keys.push("next");
   return keys;
@@ -258,4 +261,110 @@ export function simNextWeekModel(recap: SimWeekRecap, facts: SimRecapFacts): Sim
     edge = d === 0 ? "Even matchup" : d > 0 ? `You are favored by ${fmt(d)}` : `You are the underdog by ${fmt(-d)}`;
   }
   return { week, opponent: facts.nextOpponent ?? null, yours: p?.yours ?? null, theirs: p?.theirs ?? null, edge, notes: notes.slice(0, STORY_ITEMS) };
+}
+
+// ---------------------------------------------------------------------------------------------------------------------
+// Page titles: one big bold title per page so you know what you are looking at (shared header, web + app)
+
+export interface SimRecapPageTitle {
+  /** The small line above the title ("Week 2 recap"). */
+  eyebrow: string;
+  /** The big bold title ("Matchup Result"). Never ellipsized: it wraps. */
+  title: string;
+  /** One line under it when it helps ("You lost by 7.3 to Snap Crackle"); null when the page speaks for itself. */
+  subtitle: string | null;
+}
+
+/**
+ * The header of a recap page. `roundLabel` is the playoff round name for the recap's week ("Quarterfinals", "Semifinals",
+ * "Championship"; simPlayoffRoundLabel), used as the result title in the playoffs.
+ */
+export function simRecapPageTitle(key: SimRecapPageKey, recap: SimWeekRecap, opts: { roundLabel?: string | null; youId?: string | null } = {}): SimRecapPageTitle {
+  const playoff = recap.kind === "playoff";
+  const eyebrow = `Week ${recap.week} recap`;
+  const g = recap.your_game;
+  switch (key) {
+    case "result": {
+      if (!g || g.result === "bye") return { eyebrow, title: playoff ? "Playoff Bye" : "Bye Week", subtitle: playoff ? "You skip this round" : null };
+      const diff = Math.round(Math.abs(g.your_pts - g.opp_pts) * 10) / 10;
+      const vs = g.opponent_name ? ` ${g.result === "win" ? "over" : "to"} ${g.opponent_name}` : "";
+      const subtitle = g.result === "tie" ? `You tied ${g.opponent_name}`.trim() : `You ${g.result === "win" ? "won" : "lost"} by ${fmt(diff)}${vs}`;
+      return { eyebrow, title: playoff ? opts.roundLabel || "Playoffs" : "Matchup Result", subtitle };
+    }
+    case "matchup":
+      return { eyebrow, title: "How You Scored", subtitle: g && g.optimal_pts != null ? `Best possible lineup: ${fmt(g.optimal_pts)}` : null };
+    case "injuries":
+      return { eyebrow, title: "Injuries & Lineup", subtitle: null };
+    case "league":
+      return { eyebrow, title: "Around the League", subtitle: null };
+    case "standings":
+      return { eyebrow, title: "Standings", subtitle: null };
+    case "season":
+      return { eyebrow, title: "Season Complete", subtitle: null };
+    case "next":
+      return { eyebrow, title: "Next Week", subtitle: null };
+  }
+}
+
+// ---------------------------------------------------------------------------------------------------------------------
+// Standings page: the league table with a playoff cut line and how far each team moved since last week
+
+export type SimStandingsStatus = "in" | "bubble" | "out";
+
+export interface SimStandingsRow {
+  teamId: string;
+  name: string;
+  rank: number;
+  isYou: boolean;
+  record: string;
+  pf: number;
+  /** Spots moved since the previous week: > 0 up, < 0 down, 0 no change, null when there is no previous week to compare. */
+  delta: number | null;
+  status: SimStandingsStatus;
+  /** Playoff seed (1..playoffTeams) for the teams currently inside the cut; null outside. */
+  seed: number | null;
+}
+
+export interface SimStandingsModel {
+  rows: SimStandingsRow[];
+  /** The compact list: top 6, your team and the cut-line neighbours, in rank order. */
+  compact: SimStandingsRow[];
+  spots: number;
+  you: SimStandingsRow | null;
+  /** The hero line: "Seed 3, up 2" / "Out of the picture". */
+  caption: string;
+}
+
+/** "▲2" / "▼1" / "–" text for a movement; empty when unknown. */
+export function simMovementText(delta: number | null | undefined): string {
+  if (delta == null) return "";
+  return delta > 0 ? `\u25B2${delta}` : delta < 0 ? `\u25BC${-delta}` : "\u2013";
+}
+
+export function simRecapStandingsModel(recap: SimWeekRecap, facts: Pick<SimRecapFacts, "youId" | "playoffTeams">): SimStandingsModel {
+  const src = [...(recap.standings ?? [])].sort((a, b) => a.rank - b.rank);
+  const spots = Math.max(0, facts.playoffTeams ?? 0);
+  const rows: SimStandingsRow[] = src.map((r) => ({
+    teamId: r.team_id,
+    name: r.name,
+    rank: r.rank,
+    isYou: r.is_you || r.team_id === facts.youId,
+    record: `${r.wins}-${r.losses}${r.ties ? `-${r.ties}` : ""}`,
+    pf: r.pf,
+    delta: typeof r.rank_delta === "number" ? r.rank_delta : null,
+    status: spots > 0 && r.rank <= spots ? (r.rank === spots ? "bubble" : "in") : spots > 0 && r.rank === spots + 1 ? "bubble" : "out",
+    seed: spots > 0 && r.rank <= spots ? r.rank : null,
+  }));
+  const you = rows.find((r) => r.isYou) ?? null;
+  const keep = new Set<string>(rows.slice(0, 6).map((r) => r.teamId));
+  if (you) keep.add(you.teamId);
+  for (const r of rows) if (spots > 0 && (r.rank === spots || r.rank === spots + 1)) keep.add(r.teamId);
+  const compact = rows.filter((r) => keep.has(r.teamId));
+  let caption = "";
+  if (you) {
+    const place = you.seed != null ? `Seed ${you.seed}` : spots > 0 ? "Outside the cut" : `Rank ${you.rank}`;
+    const move = you.delta == null ? "" : you.delta > 0 ? `, up ${you.delta}` : you.delta < 0 ? `, down ${-you.delta}` : ", no change";
+    caption = `${place}${move}`;
+  }
+  return { rows, compact, spots, you, caption };
 }

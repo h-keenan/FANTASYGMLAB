@@ -7,7 +7,7 @@ import ErrorState from './ErrorState';
 import Input from './Input';
 import SegmentedTabBar from './SegmentedTabBar';
 import { SkeletonCard } from './SkeletonBlock';
-import SimCrest from './SimCrest';
+import { SimTeamLogo } from './SimTeamIdentity';
 import { SimPlayerLine, SimSectionTitle, createSimStyles, type SimCtx } from './SimGameParts';
 import SimTeamCard from './SimTeamCard';
 import { useThemeMode } from '../context/ThemeModeContext';
@@ -103,7 +103,7 @@ export function SimLeaguePlayersView({ ctx, state, onRetry }: { ctx: SimCtx; sta
                   onPress={() => ctx.openTeam(team.team_id)}
                   style={{ width: 44, height: 44, alignItems: 'center', justifyContent: 'center' }}
                 >
-                  <SimCrest name={team.name} size={28} />
+                  <SimTeamLogo name={team.name} size='row' />
                 </Pressable>
               }
             />

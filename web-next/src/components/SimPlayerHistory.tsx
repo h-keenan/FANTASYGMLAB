@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 
 import { AccentCard } from "@/components/AccentCard";
 import { Button } from "@/components/Button";
-import { SimCrest } from "@/components/SimCrest";
+import { SimTeamIdentity, SimTeamLogo } from "@/components/SimTeamIdentity";
 import { SkeletonRows } from "@/components/Skeleton";
 import { ToneBadge } from "@/components/ToneBadge";
 import { api } from "@/lib/api";
@@ -57,7 +57,7 @@ export function SimPlayerHistory({ gameId, playerId }: { gameId: string; playerI
         {origin ? (
           <AccentCard accent="var(--color-accent)" compact as="div">
             <div className="flex items-center gap-2">
-              {origin.team_name ? <SimCrest name={origin.team_name} size={28} /> : null}
+              {origin.team_name ? <SimTeamLogo name={origin.team_name} size="row" /> : null}
               <div className="flex min-w-0 flex-col">
                 <span className="text-sm font-extrabold">{origin.kind === "drafted" ? simDraftSlotText(origin.round, origin.pick, origin.auto) : `Started on ${origin.team_name ?? "a team"}`}</span>
                 <span className="text-xs" style={{ color: "var(--color-text-secondary)" }}>{simHistoryText(origin)}</span>
@@ -107,7 +107,7 @@ export function SimPlayerHistory({ gameId, playerId }: { gameId: string; playerI
                   </div>
                   {s.teams.map((t) => (
                     <div key={t.team_id} className="flex items-center justify-between gap-2 text-xs">
-                      <span className="flex min-w-0 items-center gap-1">{t.team_name ? <SimCrest name={t.team_name} size={16} /> : null}<span className="truncate">{t.team_name}</span></span>
+                      {t.team_name ? <SimTeamIdentity name={t.team_name} size="inline" bold={false} nameClassName="text-xs" className="min-w-0" /> : <span />}
                       <span className="tabular-nums" style={{ color: "var(--color-text-secondary)" }}>{t.games} g · {t.ppg.toFixed(1)} ppg</span>
                     </div>
                   ))}

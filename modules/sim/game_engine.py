@@ -18,6 +18,7 @@ from __future__ import annotations
 from typing import Any, Callable, Sequence
 
 from modules.sim import game_dynasty as dyn
+from modules.sim import game_grades
 from modules.sim.game_actions import ai_manage_reserves, execute_trade
 from modules.sim import game_block as blockmod
 from modules.sim.game_ai import (
@@ -193,6 +194,32 @@ def standing_rows(snap: GameSnapshot, state: GameState) -> list[dict[str, Any]]:
     return rows
 
 
+def annotate_rank_movement(standings: list[dict[str, Any]], prev: Sequence[dict[str, Any]] | None) -> list[dict[str, Any]]:
+    """Presentation only: add ``rank_prev`` / ``rank_delta`` to each standings row (delta > 0 = moved UP that many places).
+
+    ``prev`` is the previous week's standings rows. With no previous table (week 1, a real-league week, a team
+    missing from it) the row carries ``rank_prev``/``rank_delta`` = None: no movement is ever invented. Ranks are the
+    tie-broken table order, so two teams never share one; "no change" is a delta of 0."""
+    before = {r["team_id"]: r.get("rank") for r in (prev or ()) if r.get("team_id")}
+    for r in standings:
+        old = before.get(r.get("team_id"))
+        r["rank_prev"] = old if isinstance(old, int) else None
+        r["rank_delta"] = (old - r["rank"]) if isinstance(old, int) and isinstance(r.get("rank"), int) else None
+    return standings
+
+
+def ensure_rank_movement(recap: dict[str, Any] | None, state: GameState) -> dict[str, Any] | None:
+    """Old saves: a stored regular-season recap without movement gets it derived from the previous week's stored
+    standings (the same rule ``run_week`` uses for new weeks). Idempotent; returns a shallow copy when it changes."""
+    if not recap or recap.get("kind") != "regular":
+        return recap
+    rows = recap.get("standings") or []
+    if not rows or any("rank_delta" in r for r in rows):
+        return recap
+    prev = (state.recaps.get(str(int(recap["week"]) - 1)) or {}).get("standings")
+    return {**recap, "standings": annotate_rank_movement([dict(r) for r in rows], prev)}
+
+
 def _playoff_status(state: GameState, tid: str, rank: int, spots: int, label: str | None) -> str:
     if state.playoff is not None:
         if label == "champion":
@@ -210,7 +237,7 @@ def user_alive(snap: GameSnapshot, state: GameState) -> bool:
 # --------------------------------------------------------------------- weeks
 
 
-def _brief(snap: GameSnapshot, pid: str | None) -> dict[str, Any] | None:
+def _brief(snap: GameSnapshot, pid: str | None, season: int | None = None) -> dict[str, Any] | None:
     if not pid:
         return None
     if is_pick_id(pid):
@@ -218,7 +245,10 @@ def _brief(snap: GameSnapshot, pid: str | None) -> dict[str, Any] | None:
         return {"id": pid, "kind": "pick", "headshot_id": None, "name": f"{season} round {rnd} pick", "pos": "PICK",
                 "team": snap.team(orig).name}
     p = snap.players[pid]
-    return {"id": pid, "headshot_id": headshot_id(pid), "name": p.name, "pos": p.pos, "team": p.nfl_team}
+    out = {"id": pid, "headshot_id": headshot_id(pid), "name": p.name, "pos": p.pos, "team": p.nfl_team}
+    if season is not None:  # the shown letter grade (presentation only): recap rows render it, so they must carry it
+        out.update(game_grades.grade_fields(snap, pid, season))
+    return out
 
 
 def check_can_advance(snap: GameSnapshot, state: GameState) -> None:
@@ -515,13 +545,13 @@ def _team_score(lineup: Sequence[Sequence[Any]], pts: dict[str, float]) -> float
 
 def _lineup_rows(
     snap: GameSnapshot, status_of: dict[str, str], lineup: Sequence[Sequence[Any]], roster: Sequence[str],
-    played: dict[str, PlayerWeek], with_bench: bool, proj_of: Callable[[str], float] | None = None,
+    played: dict[str, PlayerWeek], with_bench: bool, proj_of: Callable[[str], float] | None = None, season: int | None = None,
 ) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
     def row(slot: str | None, pid: str) -> dict[str, Any]:
         pw = played.get(pid)
         status = status_of[pid]
         return {
-            "slot": slot, "player": _brief(snap, pid), "pts": round(pw.points, 2) if pw else 0.0,
+            "slot": slot, "player": _brief(snap, pid, season), "pts": round(pw.points, 2) if pw else 0.0,
             # the projection the game showed for this week (what the lineup was set against), so a recap row never has to guess
             "proj": round(proj_of(pid), 2) if proj_of else None,
             "stats": dict(pw.stats) if pw and pw.stats else None,
@@ -539,7 +569,7 @@ def _lineup_rows(
 def _your_game(snap, ev, state, user, games, lineups, played, pts, status_of, ros_before, alive_before, kind, auto_filled):
     mine = next((g for g in games if user in (g["home"], g["away"])), None)
     proj_of = lambda pid: ev.proj(pid, state.week)  # noqa: E731  (ev is the pre-week evaluator: the number shown going into the week)
-    starters, bench = _lineup_rows(snap, status_of, lineups[user], state.rosters[user], played, True, proj_of)
+    starters, bench = _lineup_rows(snap, status_of, lineups[user], state.rosters[user], played, True, proj_of, state.view_no)
     if mine is None:
         if kind == "playoff" and user in alive_before:
             return {"result": "bye", "starters": starters, "bench": bench[:10]}
@@ -552,7 +582,7 @@ def _your_game(snap, ev, state, user, games, lineups, played, pts, status_of, ro
         result = "win" if mine["winner"] == user else "loss"
     else:
         result = "win" if you_pts > opp_pts + 1e-9 else "loss" if you_pts < opp_pts - 1e-9 else "tie"
-    o_starters, _ = _lineup_rows(snap, status_of, lineups[opp], state.rosters[opp], played, False, proj_of)
+    o_starters, _ = _lineup_rows(snap, status_of, lineups[opp], state.rosters[opp], played, False, proj_of, state.view_no)
     out = {
         "opponent_id": opp, "opponent_name": snap.team(opp).name, "your_pts": you_pts,
         "opp_pts": opp_pts, "result": result, "starters": starters, "bench": bench[:10],
@@ -654,7 +684,7 @@ def run_week(em: Emitter, snap: GameSnapshot, state: GameState, seed: int) -> di
             )
     your_game = _your_game(snap, ev, state, user, games, lineups, played, pts, status_of, ros_before, alive_before, kind, auto_filled)
     injuries = [
-        {"player": _brief(snap, pid), "weeks": weeks, "team_id": owners.get(pid), "is_yours": owners.get(pid) == user}
+        {"player": _brief(snap, pid, state.view_no), "weeks": weeks, "team_id": owners.get(pid), "is_yours": owners.get(pid) == user}
         for pid, weeks in hurt if pid in owners
     ]
 
@@ -703,7 +733,9 @@ def run_week(em: Emitter, snap: GameSnapshot, state: GameState, seed: int) -> di
              "away_name": snap.team(g["away"]).name, "home_pts": g["home_pts"], "away_pts": g["away_pts"],
              "winner": g["winner"]} for g in games
         ],
-        "standings": standing_rows(snap, state), "waivers": waiver_rows, "transactions": ai_trades,
+        "standings": (annotate_rank_movement(standing_rows(snap, state), (state.recaps.get(str(W - 1)) or {}).get("standings"))
+                      if kind == "regular" else standing_rows(snap, state)),
+        "waivers": waiver_rows, "transactions": ai_trades,
         "injuries": injuries, "playoffs": seeding, "season_complete": state.status in ("complete", "offseason"),
         **({"offseason": True} if state.status == "offseason" else {}),
         "champion": champion or None, "next_week": W + 1,
