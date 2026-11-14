@@ -173,6 +173,16 @@ class GameState:
             del raw["season_no"]
         if raw["offseason"] is None:
             del raw["offseason"]
+        # ``proj`` on a recap row is display-only (the projection shown going into the week, added after player-model-5 shipped):
+        # it is not part of the fingerprint, so every older game keeps its digest.
+        recaps = raw.get("recaps")
+        if recaps:
+            raw["recaps"] = {
+                wk: {**rc, "your_game": {**rc["your_game"], **{part: [{k: v for k, v in r.items() if k != "proj"} for r in rc["your_game"][part]]
+                                                               for part in ("starters", "bench", "opp_starters") if rc["your_game"].get(part)}}}
+                if isinstance(rc, dict) and isinstance(rc.get("your_game"), dict) else rc
+                for wk, rc in recaps.items()
+            }
         blob = json.dumps(raw, sort_keys=True, separators=(",", ":"), default=str)
         return hashlib.sha256(blob.encode()).hexdigest()
 
