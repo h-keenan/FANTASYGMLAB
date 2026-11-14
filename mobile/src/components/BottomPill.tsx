@@ -85,7 +85,7 @@ export default function BottomPill({ children, context: rawContext, style, testI
                     onLayout={(e) => { tabX.current[tab.key] = { x: e.nativeEvent.layout.x, w: e.nativeEvent.layout.width }; }}
                     style={[styles.tab, segW > 0 && { minWidth: Math.floor((segW - Math.max(0, context.tabs.length - 1)) / context.tabs.length) }, on && styles.tabOn]}
                   >
-                    <AppText style={[styles.tabText, context.tabs.length >= 4 && styles.tabTextDense, on && styles.tabTextOn]} numberOfLines={1}>
+                    <AppText style={[styles.tabText, on && styles.tabTextOn]} numberOfLines={1}>
                       {pillTabText(tab)}
                     </AppText>
                   </PressableScale>
@@ -152,7 +152,6 @@ function createStyles(colors: ThemeColors) {
     tab: { minHeight: target, paddingHorizontal: 5, alignItems: 'center', justifyContent: 'center', borderRadius: radii.pill, flexShrink: 0, flexGrow: 1 },
     tabOn: { backgroundColor: colors.glassInset },
     tabText: { fontSize: 12, fontWeight: '700', color: colors.textTertiary },
-    tabTextDense: { fontSize: 11 },
     tabTextOn: { color: colors.textPrimary },
     primary: { minHeight: target, paddingHorizontal: 14, justifyContent: 'center', borderRadius: radii.pill, backgroundColor: colors.accentStrong },
     primaryIcon: { width: 40, height: 40, minHeight: 40, paddingHorizontal: 0, alignItems: 'center' },

@@ -113,4 +113,3 @@ describe("pill tab overflow helpers", () => {
     expect(pillPrimaryCompact({ tabs: four }, 100)).toBe(false);
   });
 });
-
