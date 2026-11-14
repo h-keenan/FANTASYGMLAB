@@ -87,3 +87,30 @@ describe("smart pill context helpers", () => {
     expect(pillActiveIndex({ tabs: [{ key: "a", label: "A" }, { key: "b", label: "B" }], activeKey: "b" })).toBe(1);
   });
 });
+
+describe("pill tab overflow helpers", () => {
+  const four = ["Hub", "Finder", "Analyzer", "History"].map((label, i) => ({ key: `k${i}`, label, ...(label === "History" ? { short: "Hist." } : {}) }));
+  it("uses the short label when defined, the label otherwise", async () => {
+    const { pillTabText } = await import("./bottomNav");
+    expect(pillTabText(four[3])).toBe("Hist.");
+    expect(pillTabText(four[0])).toBe("Hub");
+  });
+  it("scrolls the lit tab fully into view with a margin, moving as little as possible, clamped", async () => {
+    const { pillScrollTarget, PILL_SCROLL_MARGIN } = await import("./bottomNav");
+    expect(pillScrollTarget(10, 50, 200, 0, 400)).toBe(0); // already visible
+    expect(pillScrollTarget(300, 60, 200, 0, 400)).toBe(300 + 60 + PILL_SCROLL_MARGIN - 200); // right edge: clear of the fade
+    expect(pillScrollTarget(340, 60, 200, 0, 400)).toBe(200); // clamped to the content end
+    expect(pillScrollTarget(20, 50, 200, 150, 400)).toBe(2); // brought back from the left
+  });
+  it("collapses the primary chip to the icon button with 4+ tabs or when a text chip would not fit; never without a glyph", async () => {
+    const { pillPrimaryCompact } = await import("./bottomNav");
+    const primary = { key: "p", label: "New trade", glyph: "trades" as const, onPress: () => {} };
+    expect(pillPrimaryCompact({ tabs: four, primary }, 900)).toBe(true);
+    const three = four.slice(0, 3);
+    expect(pillPrimaryCompact({ tabs: three, primary }, 900)).toBe(false);
+    expect(pillPrimaryCompact({ tabs: three, primary }, 200)).toBe(true);
+    expect(pillPrimaryCompact({ tabs: four, primary: { ...primary, glyph: undefined } }, 100)).toBe(false);
+    expect(pillPrimaryCompact({ tabs: four }, 100)).toBe(false);
+  });
+});
+
