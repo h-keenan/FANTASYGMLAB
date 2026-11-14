@@ -18,6 +18,7 @@ import EvaluationLensHeaderButton from '../components/EvaluationLensHeaderButton
 import GmStanceHeaderButton from '../components/GmStanceHeaderButton';
 import LeagueSwitcherHeaderButton from '../components/LeagueSwitcherHeaderButton';
 import BrandHeaderBar from '../components/BrandHeaderBar';
+import PageFamilyTabs from '../components/PageFamilyTabs';
 import BrandedSpinner from '../components/BrandedSpinner';
 import { PlannerBar, SwapSheet, useLineupPlanner } from '../components/MatchupPlanner';
 import GuillotineCard from '../components/GuillotineCard';
@@ -245,6 +246,7 @@ export default function MatchupScreen({ route, navigation }: Props) {
           contentContainerStyle={[styles.content, { paddingBottom: orbClearance, paddingTop: headerHeight }]}
         >
           <BrandHeaderBar leagueId={leagueId} leagueName={leagueName} />
+        <PageFamilyTabs family="team" active="matchup" leagueId={leagueId} leagueName={leagueName} padded={false} />
           <View style={styles.titleRow}>
             <PageTitle>Matchup</PageTitle>
             {guillotine.week != null ? <AppText style={styles.weekLabel}>Week {guillotine.week}</AppText> : null}
@@ -303,6 +305,7 @@ export default function MatchupScreen({ route, navigation }: Props) {
         }
       >
         <BrandHeaderBar leagueId={leagueId} leagueName={leagueName} />
+        <PageFamilyTabs family="team" active="matchup" leagueId={leagueId} leagueName={leagueName} padded={false} />
         <View style={styles.titleRow}>
           <PageTitle>Matchup</PageTitle>
           {matchup.week != null ? <AppText style={styles.weekLabel}>Week {matchup.week}</AppText> : null}

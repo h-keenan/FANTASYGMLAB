@@ -9,7 +9,7 @@ import BrandHeaderBar from '../components/BrandHeaderBar';
 import EvaluationLensHeaderButton from '../components/EvaluationLensHeaderButton';
 import GmStanceHeaderButton from '../components/GmStanceHeaderButton';
 import LeagueSwitcherHeaderButton from '../components/LeagueSwitcherHeaderButton';
-import SegmentedTabBar from '../components/SegmentedTabBar';
+import PageFamilyTabs from '../components/PageFamilyTabs';
 import TradeAnalyzerScreen from './TradeAnalyzerScreen';
 import TradeFinderScreen from './TradeFinderScreen';
 import TradeHubScreen from './TradeHubScreen';
@@ -23,6 +23,8 @@ import type { RootStackParamList } from '../navigation/RootNavigator';
 type Props = NativeStackScreenProps<RootStackParamList, 'Trades'>;
 
 const TAB_OPTIONS = TRADES_TAB_OPTIONS;
+/** The host's panes as keys of the shared Trades family strip (lib/pageFamilies.ts). */
+const TRADES_FAMILY_KEY: Record<TradesTab, string> = { block: 'trade_hub', search: 'trade_finder', make: 'trade_analyzer' };
 
 /**
  * Single host screen for FantasyDesk's three trade workflows — Trade Hub
@@ -94,9 +96,24 @@ export default function TradesScreen({ route, navigation }: Props) {
     <View style={styles.root}>
       <View style={[styles.topSection, { paddingTop: headerHeight }]}>
         <BrandHeaderBar leagueId={leagueId} leagueName={leagueName} />
-        <View style={styles.tabBarWrap}>
-          <SegmentedTabBar<TradesTab> options={tabOptions} active={activeTab} onChange={onChangeTab} />
-        </View>
+        <PageFamilyTabs
+          family="trades"
+          active={TRADES_FAMILY_KEY[activeTab]}
+          leagueId={leagueId}
+          leagueName={leagueName}
+          onLocalSelect={(key) => {
+            const tab = (Object.keys(TRADES_FAMILY_KEY) as TradesTab[]).find((t) => TRADES_FAMILY_KEY[t] === key);
+            if (tab) {
+              onChangeTab(tab);
+              return true;
+            }
+            if (key === 'trade_history') {
+              navigation.navigate('TradeHistory');
+              return true;
+            }
+            return false;
+          }}
+        />
       </View>
       <View style={styles.contentArea}>
         {visitedTabs.has('block') ? (

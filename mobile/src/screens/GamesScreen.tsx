@@ -15,7 +15,8 @@ import Input from '../components/Input';
 import PlayerIdentityRow from '../components/PlayerIdentityRow';
 import PremiumLock from '../components/PremiumLock';
 import SectionHeading from '../components/SectionHeading';
-import SegmentedTabBar from '../components/SegmentedTabBar';
+import PageFamilyTabs from '../components/PageFamilyTabs';
+import FilterDropdownButton from '../components/FilterDropdownButton';
 import TeamAvatar from '../components/TeamAvatar';
 import ToneBadge from '../components/ToneBadge';
 import { useThemeMode } from '../context/ThemeModeContext';
@@ -79,14 +80,16 @@ export default function GamesScreen({ route, navigation }: Props) {
       <GridBackground />
       <BrandHeaderBar leagueId={leagueId} leagueName={leagueName} />
       <ScrollView contentContainerStyle={[styles.content, { paddingBottom: orbClearance }]}>
-        <SegmentedTabBar
-          options={[
-            { key: 'sim', label: 'Season Outlook', glyph: 'sim' as const },
-            { key: 'pickem', label: "Pick'em", glyph: 'pickem' as const },
-          ]}
-          active={tab}
-          onChange={setTab}
-        />
+        <PageFamilyTabs family="league" active="games" leagueId={leagueId} leagueName={leagueName} padded={false} />
+        <View style={{ flexDirection: 'row' }}>
+          <FilterDropdownButton<string>
+            label="View"
+            options={['Season Outlook', "Pick'em"]}
+            value={tab === 'pickem' ? "Pick'em" : 'Season Outlook'}
+            allValue="Season Outlook"
+            onChange={(label) => setTab(label === "Pick'em" ? 'pickem' : 'sim')}
+          />
+        </View>
         {tab === 'sim' ? (
           <SeasonSim leagueId={leagueId} colors={colors} styles={styles} navigation={navigation} />
         ) : (

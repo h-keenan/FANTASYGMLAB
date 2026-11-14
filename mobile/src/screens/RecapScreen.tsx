@@ -19,7 +19,8 @@ import LeagueSwitcherHeaderButton from '../components/LeagueSwitcherHeaderButton
 import GridBackground from '../components/GridBackground';
 import IconCircle from '../components/IconCircle';
 import RoundupPanel from '../components/RoundupPanel';
-import SegmentedTabBar from '../components/SegmentedTabBar';
+import PageFamilyTabs from '../components/PageFamilyTabs';
+import FilterDropdownButton from '../components/FilterDropdownButton';
 import RecapSharePreviewModal from '../components/RecapSharePreviewModal';
 import RecapTradeDetailModal from '../components/RecapTradeDetailModal';
 import SkeletonBlock, { SkeletonRow } from '../components/SkeletonBlock';
@@ -252,15 +253,17 @@ export default function RecapScreen({ route, navigation }: Props) {
   };
 
   const tabBar = (
-    <View style={styles.tabBarRow}>
-      <SegmentedTabBar
-        options={[
-          { key: 'recap', label: 'Recap', glyph: 'recaps' as const },
-          { key: 'roundup', label: 'Roundup', glyph: 'roundup' as const },
-        ]}
-        active={tab}
-        onChange={setTab}
-      />
+    <View>
+      <PageFamilyTabs family="league" active="recaps" leagueId={leagueId} leagueName={leagueName} />
+      <View style={styles.tabBarRow}>
+        <FilterDropdownButton<string>
+          label="View"
+          options={['Recap', 'Roundup']}
+          value={tab === 'roundup' ? 'Roundup' : 'Recap'}
+          allValue="Recap"
+          onChange={(label) => setTab(label === 'Roundup' ? 'roundup' : 'recap')}
+        />
+      </View>
     </View>
   );
 

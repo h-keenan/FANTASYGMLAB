@@ -19,7 +19,8 @@ import LeagueSwitcherHeaderButton from '../components/LeagueSwitcherHeaderButton
 import GridBackground from '../components/GridBackground';
 import ManagerProfileModal from '../components/ManagerProfileModal';
 import ScreenInfoNote from '../components/ScreenInfoNote';
-import SegmentedTabBar from '../components/SegmentedTabBar';
+import PageFamilyTabs from '../components/PageFamilyTabs';
+import FilterDropdownButton from '../components/FilterDropdownButton';
 import TeamAvatar from '../components/TeamAvatar';
 import PlayoffOddsPanel from './PlayoffOddsPanel';
 import NextSteps from '../components/NextSteps';
@@ -242,9 +243,16 @@ export default function TeamsScreen({ route, navigation }: Props) {
       <GridBackground />
       <View style={[styles.topSection, { paddingTop: headerHeight }]}>
         <BrandHeaderBar leagueId={leagueId} leagueName={leagueName} />
+        <PageFamilyTabs family="league" active="rankings" leagueId={leagueId} leagueName={leagueName} />
         {tabOptions.length > 1 ? (
-          <View style={styles.tabBarWrap}>
-            <SegmentedTabBar<TeamsTab> options={tabOptions} active={activeTab} onChange={onChangeTab} />
+          <View style={styles.viewRow}>
+            <FilterDropdownButton<string>
+              label="View"
+              options={tabOptions.map((o) => o.label)}
+              value={tabOptions.find((o) => o.key === activeTab)?.label ?? 'Rankings'}
+              allValue="Rankings"
+              onChange={(label) => onChangeTab(tabOptions.find((o) => o.label === label)?.key ?? 'rankings')}
+            />
           </View>
         ) : null}
       </View>
@@ -461,7 +469,13 @@ function RankingsPanel({
     <View style={styles.root}>
       <GridBackground />
       <View style={styles.metricTabBarWrap}>
-        <SegmentedTabBar options={METRIC_TABS} active={metric} onChange={setMetric} />
+        <FilterDropdownButton<string>
+          label="Rank by"
+          options={METRIC_TABS.map((o) => o.label)}
+          value={METRIC_TABS.find((o) => o.key === metric)?.label ?? 'Power'}
+          allValue="Power"
+          onChange={(label) => setMetric(METRIC_TABS.find((o) => o.label === label)?.key ?? 'power')}
+        />
       </View>
       <FlatList
         ListFooterComponent={
@@ -718,7 +732,7 @@ function createStyles(colors: ThemeColors) {
   headerButtonRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   root: { flex: 1, backgroundColor: 'transparent' },
   topSection: { backgroundColor: 'transparent' },
-  tabBarWrap: { paddingHorizontal: spacing.lg, paddingTop: spacing.sm, paddingBottom: spacing.md },
+  viewRow: { flexDirection: 'row', paddingHorizontal: spacing.lg, paddingBottom: spacing.sm },
   contentArea: { flex: 1 },
   tabPane: { flex: 1 },
   // display: 'none' (not unmounting) keeps each tab's state alive across switches.

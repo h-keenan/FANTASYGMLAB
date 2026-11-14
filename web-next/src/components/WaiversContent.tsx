@@ -606,7 +606,55 @@ export function WaiversContent({
         <StatStrip items={stats} />
       </header>
 
-      <PillRow options={TAB_OPTIONS} active={tab} onSelect={(value) => setTab(value as WaiverTab)} fullWidth />
+      <div className="flex flex-wrap items-center gap-2" data-testid="waiver-controls">
+        <select
+          aria-label="View"
+          value={tab}
+          onChange={(event) => setTab(event.target.value as WaiverTab)}
+          className="filter-input px-3 text-sm font-bold"
+          style={{ minHeight: "2.75rem" }}
+        >
+          {TAB_OPTIONS.map((option) => (
+            <option key={option.value} value={option.value}>
+              {option.label}
+            </option>
+          ))}
+        </select>
+        {tab === "recommended" && secondaryPriority.length > 0 ? (
+          <select
+            aria-label="Recommendation filter"
+            value={recFilter}
+            onChange={(event) => setRecFilter(event.target.value as WaiverRecFilter)}
+            className="filter-input px-3 text-sm"
+            style={{ minHeight: "2.75rem" }}
+          >
+            {REC_FILTER_OPTIONS.map((option) => (
+              <option key={option.value} value={option.value}>
+                {option.value === "all" ? "All adds" : option.label}
+              </option>
+            ))}
+          </select>
+        ) : null}
+        {tab === "explore" ? (
+          <>
+            <input
+              type="text"
+              value={search}
+              onChange={(event) => setSearch(event.target.value)}
+              placeholder="Search free agents"
+              aria-label="Search free agents"
+              className="filter-input px-3 text-sm flex-1 min-w-[8rem]"
+              style={{ minHeight: "2.75rem" }}
+            />
+            <FilterSheet
+              groups={freeAgentFilterGroups}
+              values={freeAgentFilterValues}
+              resultCount={freeAgentResultCount}
+              onApply={(next) => setPosition(singleValue(freeAgentFilterGroups[0], next))}
+            />
+          </>
+        ) : null}
+      </div>
 
       {tab === "recommended" ? (
         <>
@@ -680,12 +728,6 @@ export function WaiversContent({
                 <SectionHeading>
                   <span id="more-adds-heading">More recommended adds</span>
                 </SectionHeading>
-                <PillRow
-                  ariaLabel="Recommendation filter"
-                  options={REC_FILTER_OPTIONS}
-                  active={recFilter}
-                  onSelect={(value) => setRecFilter(value as WaiverRecFilter)}
-                />
               </div>
               {visibleSecondary.length === 0 ? (
                 <EmptyState title="None in this group." />
@@ -774,21 +816,6 @@ export function WaiversContent({
             Showing the best available players not currently on a roster in this league. Stale or retired profiles are
             pushed to the bottom.
           </InfoTip>
-          <div className="flex flex-wrap gap-2">
-            <input
-              type="text"
-              value={search}
-              onChange={(event) => setSearch(event.target.value)}
-              placeholder="Search free agents"
-              className="filter-input px-3 py-2 text-sm flex-1 min-w-[10rem]"
-            />
-            <FilterSheet
-              groups={freeAgentFilterGroups}
-              values={freeAgentFilterValues}
-              resultCount={freeAgentResultCount}
-              onApply={(next) => setPosition(singleValue(freeAgentFilterGroups[0], next))}
-            />
-          </div>
           {visibleFreeAgents.length === 0 ? (
             <EmptyState title="No free agents match." />
           ) : (
