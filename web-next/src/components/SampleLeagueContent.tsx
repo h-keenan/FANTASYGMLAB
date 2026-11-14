@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 import { AccentCard } from "@/components/AccentCard";
 import { DashboardContent } from "@/components/DashboardContent";
@@ -26,6 +26,7 @@ import {
   type SampleTab,
 } from "@/lib/sampleLeague";
 import { PlayerName } from "@/components/PlayerName";
+import { SAMPLE_ACTIVE_EVENT, SAMPLE_SELECT_EVENT } from "@/lib/sampleSidebar";
 
 function SamplePlayerRow({ player, first = false }: { player: SamplePlayer; first?: boolean }) {
   return (
@@ -148,7 +149,10 @@ function TradeTab() {
           Sample verdict: a real one weighs your roster needs, league scoring and what this manager tends to accept.
         </p>
       </AccentCard>
-      <SampleConnectModule />
+      {/* On desktop the same module lives in the right rail (SampleLeagueContent). */}
+      <div className="lg:hidden">
+        <SampleConnectModule />
+      </div>
     </section>
   );
 }
@@ -162,9 +166,18 @@ function TradeTab() {
 export function SampleLeagueContent() {
   const [tab, setTab] = useState<SampleTab>("dashboard");
   const tabs = SAMPLE_TABS.map((t) => ({ key: t.value, label: t.label, glyph: t.glyph }));
+  // The desktop sidebar drives the views through a window event and mirrors the active one back.
+  useEffect(() => {
+    const onSelect = (event: Event) => setTab((event as CustomEvent<SampleTab>).detail);
+    window.addEventListener(SAMPLE_SELECT_EVENT, onSelect);
+    return () => window.removeEventListener(SAMPLE_SELECT_EVENT, onSelect);
+  }, []);
+  useEffect(() => {
+    window.dispatchEvent(new CustomEvent(SAMPLE_ACTIVE_EVENT, { detail: tab }));
+  }, [tab]);
   return (
     <>
-      <main className="page-shell page-shell-narrow">
+      <main className="page-shell page-shell-wide">
         <SampleLeagueBanner />
         <div className="flex flex-col gap-1">
           <h1 style={{ font: "var(--font-page-title)" }}>{SAMPLE_TEAM_NAME}</h1>
@@ -172,20 +185,28 @@ export function SampleLeagueContent() {
             {SAMPLE_LEAGUE_NAME} (sample)
           </p>
         </div>
-        <div className="sticky z-20 max-md:hidden" style={{ top: "3.25rem" }} data-testid="sample-tab-strip">
-          <PillRow
-            glass
-            variant="scroll"
-            ariaLabel="Sample league views"
-            options={SAMPLE_TABS.map((t) => ({ label: t.label, value: t.value, glyph: t.glyph }))}
-            active={tab}
-            onSelect={(value) => setTab(value as SampleTab)}
-          />
+        {/* Phone: one column. From lg: the view on the left, a sticky rail on the right with the one way to get the real thing. */}
+        <div className="sample-grid">
+          <div className="flex min-w-0 flex-col gap-[var(--page-gap)]">
+            <div className="sticky z-20 max-md:hidden" style={{ top: "3.25rem" }} data-testid="sample-tab-strip">
+              <PillRow
+                glass
+                variant="scroll"
+                ariaLabel="Sample league views"
+                options={SAMPLE_TABS.map((t) => ({ label: t.label, value: t.value, glyph: t.glyph }))}
+                active={tab}
+                onSelect={(value) => setTab(value as SampleTab)}
+              />
+            </div>
+            {tab === "dashboard" ? <DashboardTab /> : null}
+            {tab === "roster" ? <RosterTab /> : null}
+            {tab === "game_plan" ? <GamePlanTab onNavigate={setTab} /> : null}
+            {tab === "trade" ? <TradeTab /> : null}
+          </div>
+          <aside className="sample-rail max-lg:hidden" aria-label="Connect your league">
+            <SampleConnectModule />
+          </aside>
         </div>
-        {tab === "dashboard" ? <DashboardTab /> : null}
-        {tab === "roster" ? <RosterTab /> : null}
-        {tab === "game_plan" ? <GamePlanTab onNavigate={setTab} /> : null}
-        {tab === "trade" ? <TradeTab /> : null}
       </main>
       <div className="bottom-stack md:hidden" data-bare data-testid="sample-bottom-stack">
         <BottomTabBar ariaLabel="Sample league views" tabs={tabs} active={tab} testId="sample-tab-bar" onSelect={(key) => setTab(key as SampleTab)} />

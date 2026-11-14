@@ -10,7 +10,7 @@ describe("SampleLeagueContent", () => {
     render(<SampleLeagueContent />);
     const banner = screen.getByTestId("sample-banner");
     expect(banner.textContent).toContain("Sample league");
-    expect(screen.getByRole("link", { name: "Connect your league" }).getAttribute("href")).toBe("/connect-league");
+    expect(screen.getAllByRole("link", { name: "Connect your league" })[0].getAttribute("href")).toBe("/connect-league");
   });
 
   it("opens on the sample Dashboard with the real modules, filled from static data and no network", async () => {
@@ -74,7 +74,8 @@ describe("SampleLeagueContent", () => {
   it("ends the Trade tab with a connect-your-league CTA module", () => {
     render(<SampleLeagueContent />);
     fireEvent.click(screen.getByRole("tab", { name: "Trade" }));
-    const cta = screen.getByTestId("sample-connect-module");
+    // One in the desktop rail (lg+) and one at the end of the tab (hidden from lg).
+    const cta = screen.getAllByTestId("sample-connect-module")[0];
     expect(cta.textContent).toContain("Connect your league to see yours");
     expect(cta.querySelector("a")?.getAttribute("href")).toBe("/connect-league");
   });
