@@ -14,7 +14,6 @@ import Button from '../components/Button';
 import ScreenInfoNote from '../components/ScreenInfoNote';
 import BeginnerHelp from '../components/BeginnerHelp';
 import EmptyState from '../components/EmptyState';
-import AnimatedCard from '../components/AnimatedCard';
 import EvaluationLensHeaderButton from '../components/EvaluationLensHeaderButton';
 import GmStanceHeaderButton from '../components/GmStanceHeaderButton';
 import LeagueSwitcherHeaderButton from '../components/LeagueSwitcherHeaderButton';
@@ -29,9 +28,11 @@ import LiveFeedPanel from '../components/LiveFeedPanel';
 import { feedKey, liveFeedStore } from '../lib/liveFeed';
 import { playerCardFromStarter } from '../lib/playerCard';
 import PositionBadge from '../components/PositionBadge';
-import SectionHeading from '../components/SectionHeading';
 import SegmentedTabBar from '../components/SegmentedTabBar';
 import DashboardStatRow from '../components/DashboardStatRow';
+import CompactModule from '../components/CompactModule';
+import { Hero } from '../components/ModuleTemplates';
+import { edgeChips, insightsParts, lineupParts, matchupHeroModel, movesParts, teamsValuesParts } from '../lib/matchupModules';
 import TeamAvatar from '../components/TeamAvatar';
 import RangeCompare from '../components/RangeCompare';
 import WeatherReasonChip from '../components/WeatherReasonChip';
@@ -51,6 +52,7 @@ import {
   formatSigned,
   hasKickedOff,
   lineupComparisonRows,
+  lineupTotals,
   matchupActionLabel,
   matchupNextAction,
   matchupVerdict,
@@ -332,7 +334,7 @@ export default function MatchupScreen({ route, navigation }: Props) {
 
         <BeginnerHelp term="matchupIntro" />
         <BeginnerHelp term="matchupWinProbability" />
-        <Scoreboard matchup={shown} mine={mine} opponent={opponent} />
+        <MatchupHero matchup={shown} mine={mine} opponent={opponent} />
         {matchup.unmapped_players && matchup.unmapped_players.length > 0 ? (
           <AppText style={{ color: colors.textSecondary, fontSize: 13.5 }}>
             {`Not matched to a FantasyDesk player, so left out of the lineups and win odds: ${matchup.unmapped_players
@@ -360,6 +362,7 @@ export default function MatchupScreen({ route, navigation }: Props) {
             onRetry={() => void planner.openSlot(planner.sheet!.index)}
           />
         ) : null}
+        <TeamsValues matchup={shown} mine={mine} opponent={opponent} />
         {bestBall ? (
           // Best ball: Sleeper sets both lineups from the highest weekly
           // scorers, so there is no suggested lineup or start/sit call.
@@ -410,7 +413,43 @@ function ScoreSide({
   );
 }
 
-function Scoreboard({
+function scoreboardFacts(matchup: MatchupResponse) {
+  const odds = matchup.win_probability;
+  const hasOdds = odds?.available === true && odds.probability != null;
+  const myPct = hasOdds ? Math.round(odds!.probability! * 100) : null;
+  const myProjected = hasOdds ? (odds!.my_projected_total ?? null) : null;
+  const opponentProjected = hasOdds ? (odds!.opponent_projected_total ?? null) : null;
+  const margin = myProjected != null && opponentProjected != null ? myProjected - opponentProjected : null;
+  return { hasOdds, myPct, myProjected, opponentProjected, margin };
+}
+
+/** Hero: this week's win chance (or the score) with both teams in the context line. */
+function MatchupHero({ matchup, mine, opponent }: { matchup: MatchupResponse; mine: MatchupSide; opponent: MatchupSide }) {
+  const { colors } = useThemeMode();
+  const styles = useMemo(() => createStyles(colors), [colors]);
+  const { myPct, myProjected, opponentProjected } = scoreboardFacts(matchup);
+  const model = matchupHeroModel({
+    week: matchup.week,
+    myName: mine.team_name,
+    opponentName: opponent.team_name,
+    myScore: mine.has_live_data ? mine.real_points : null,
+    opponentScore: opponent.has_live_data ? opponent.real_points : null,
+    myProjected,
+    opponentProjected,
+    winPercent: myPct,
+    kickedOff: hasKickedOff(matchup),
+    live: matchup.game_state === 'live',
+    final: matchup.game_state === 'final',
+  });
+  return (
+    <>
+      <Hero label={model.label} value={model.value} context={model.context} tone={model.tone} testID="matchup-hero" />
+      {myPct == null ? <AppText style={styles.oddsUnavailable}>{winProbabilityUnavailableMessage(matchup)}</AppText> : null}
+    </>
+  );
+}
+
+function TeamsValues({
   matchup,
   mine,
   opponent,
@@ -422,16 +461,24 @@ function Scoreboard({
   const { colors } = useThemeMode();
   const styles = useMemo(() => createStyles(colors), [colors]);
   const comparison = matchup.comparison!;
-  const odds = matchup.win_probability;
-  const hasOdds = odds?.available === true && odds.probability != null;
-  const myPct = hasOdds ? Math.round(odds!.probability! * 100) : null;
-  const myProjected = hasOdds ? (odds!.my_projected_total ?? null) : null;
-  const opponentProjected = hasOdds ? (odds!.opponent_projected_total ?? null) : null;
-  const margin = myProjected != null && opponentProjected != null ? myProjected - opponentProjected : null;
+  const { hasOdds, myPct, myProjected, opponentProjected, margin } = scoreboardFacts(matchup);
+  const valueMargin =
+    comparison.margin === 0 ? '0' : `${comparison.margin > 0 ? '+' : '-'}${formatSeasonValue(Math.abs(comparison.margin))}`;
   const kickedOff = hasKickedOff(matchup);
 
   return (
-    <AnimatedCard glow style={styles.card}>
+    <CompactModule
+      id="matchup.teams"
+      title="Teams & values"
+      testID="matchup-teams"
+      parts={teamsValuesParts({
+        myValue: formatSeasonValue(comparison.my_season_value),
+        opponentValue: formatSeasonValue(comparison.opponent_season_value),
+        valueMargin,
+        edge: comparison.edge,
+        projectedMargin: margin,
+      })}
+    >
       <View style={styles.scoreRow}>
         <ScoreSide
           side={mine}
@@ -465,9 +512,7 @@ function Scoreboard({
             <AppText style={[styles.oddsPct, { color: colors.textSecondary }]}>{100 - myPct!}%</AppText>
           </View>
         </View>
-      ) : (
-        <AppText style={styles.oddsUnavailable}>{winProbabilityUnavailableMessage(matchup)}</AppText>
-      )}
+      ) : null}
 
       <DashboardStatRow
         style={{ marginBottom: 0 }}
@@ -481,15 +526,12 @@ function Scoreboard({
           { label: 'Their value', value: formatSeasonValue(comparison.opponent_season_value) },
           {
             label: 'Value margin',
-            value:
-              comparison.margin === 0
-                ? '0'
-                : `${comparison.margin > 0 ? '+' : '-'}${formatSeasonValue(Math.abs(comparison.margin))}`,
+            value: valueMargin,
             tone: comparison.edge === 'you' ? 'positive' : comparison.edge === 'opponent' ? 'risk' : undefined,
           },
         ]}
       />
-    </AnimatedCard>
+    </CompactModule>
   );
 }
 
@@ -505,36 +547,37 @@ function Insights({ matchup }: { matchup: MatchupResponse }) {
       ? 'Position edges: your Sleeper lineups, real points for started games plus projections.'
       : 'Position edges: this week’s projections for your Sleeper lineups.'
     : 'Position edges: projections for each team’s suggested lineup (Sleeper lineups aren’t posted yet).';
+  const tone = verdict.tone === 'positive' ? 'success' : verdict.tone === 'risk' ? 'danger' : 'accent';
   return (
-    <AnimatedCard style={styles.card}>
-      <SectionHeading title="Matchup Insights" icon="sparkles-outline" />
-      <View style={styles.insightsRow}>
-        <View style={styles.insightsText}>
-          <AppText style={[styles.verdict, { color: toneColor(colors, verdict.tone) }]}>{verdict.headline}</AppText>
-          <AppText style={styles.insightsBody}>{explanation ?? 'No position projections yet to compare.'}</AppText>
-        </View>
+    <CompactModule
+      id="matchup.insights"
+      title="Matchup Insights"
+      testID="matchup-insights"
+      defaultOpen
+      tone={tone}
+      parts={insightsParts(verdict.headline, tone, edges)}
+    >
+      <View style={{ gap: spacing.sm }}>
+        <AppText style={styles.insightsBody}>{explanation ?? 'No position projections yet to compare.'}</AppText>
         {edges.length ? (
-          <View style={styles.edgeList} accessibilityLabel="Position edges">
-            {edges.map((edge) => {
-              const tone = signedTone(edge.edge);
-              const color = toneColor(colors, tone);
+          <View style={styles.edgeChips} accessibilityLabel="Position edges">
+            {edgeChips(edges).map((chip) => {
+              const edge = edges.find((e) => e.position === chip.position)!;
+              const eTone = signedTone(edge.edge);
+              const color = toneColor(colors, eTone);
               return (
-                <View key={edge.position} style={styles.edgeRow}>
-                  <Ionicons
-                    name={tone === 'positive' ? 'arrow-up' : tone === 'risk' ? 'arrow-down' : 'remove'}
-                    size={14}
-                    color={color}
-                  />
-                  <PositionBadge position={edge.position} />
+                <View key={chip.position} style={styles.edgeChip}>
+                  <Ionicons name={eTone === 'positive' ? 'arrow-up' : eTone === 'risk' ? 'arrow-down' : 'remove'} size={14} color={color} />
+                  <PositionBadge position={chip.position} />
                   <AppText style={[styles.edgeValue, { color }]}>{formatSigned(edge.edge)}</AppText>
                 </View>
               );
             })}
           </View>
         ) : null}
+        <AppText style={styles.footnote}>{basis}</AppText>
       </View>
-      <AppText style={styles.footnote}>{basis}</AppText>
-    </AnimatedCard>
+    </CompactModule>
   );
 }
 
@@ -590,12 +633,23 @@ function LineupComparison({
       ? ' Started games show real points; the rest show projections.'
       : ' Numbers are this week’s projections.');
 
+  const totals = lineupTotals(rows);
   return (
-    <AnimatedCard style={styles.card}>
+    <CompactModule
+      id="matchup.lineup"
+      title="Lineup Comparison"
+      testID="matchup-lineup"
+      defaultOpen
+      parts={lineupParts({
+        view: actual ? 'actual' : 'suggested',
+        mineTotal: rows.length ? totals.mine : null,
+        opponentTotal: rows.length ? totals.opponent : null,
+        slotCount: rows.length,
+        bestBall,
+      })}
+    >
       <View style={styles.lineupHeader}>
-        <View style={{ flex: 1 }}>
-          <SectionHeading title="Lineup Comparison" icon="git-compare-outline" />
-        </View>
+        <View style={{ flex: 1 }} />
         <ScreenInfoNote text={caption} label="How it works" />
       </View>
       {plan ? (
@@ -660,7 +714,7 @@ function LineupComparison({
           />
         </View>
       )}
-    </AnimatedCard>
+    </CompactModule>
   );
 }
 
@@ -762,7 +816,6 @@ function MoveCard({ move, slotLabel, leagueId, leagueName }: { move: MatchupSugg
 function SuggestedMoves({ matchup, leagueId, leagueName }: { matchup: MatchupResponse; leagueId: string; leagueName: string }) {
   const { colors } = useThemeMode();
   const styles = useMemo(() => createStyles(colors), [colors]);
-  const [open, setOpen] = useState(false);
   const [expanded, setExpanded] = useState(false);
   const moves = matchup.suggested_moves ?? null;
   const actualStarters = matchup.my_team?.real_starters ?? [];
@@ -770,18 +823,13 @@ function SuggestedMoves({ matchup, leagueId, leagueName }: { matchup: MatchupRes
   const hasMore = moves != null && moves.length > MOVES_PREVIEW_COUNT;
 
   return (
-    <AnimatedCard style={styles.card}>
-      <SectionHeading
-        title="Suggested Moves"
-        icon="swap-horizontal-outline"
-        right={
-          <PressableScale onPress={() => setOpen((value) => !value)} accessibilityRole="button" accessibilityState={{ expanded: open }}>
-            <AppText style={styles.viewAll}>{open ? 'Hide' : moves ? `Show (${moves.length})` : 'Show'}</AppText>
-          </PressableScale>
-        }
-      />
-      {!open ? null : (
-        <>
+    <CompactModule
+      id="matchup.moves"
+      title="Suggested Moves"
+      testID="matchup-moves"
+      parts={movesParts(moves ? moves.map((m) => ({ startName: m.start.name ?? 'player', gain: m.gain ?? null })) : null)}
+    >
+      <View style={{ gap: spacing.sm }}>
       {hasMore ? (
         <PressableScale onPress={() => setExpanded((value) => !value)} accessibilityRole="button" style={{ alignSelf: 'flex-start' }}>
           <AppText style={styles.viewAll}>{expanded ? 'Show fewer' : `View all (${moves!.length})`}</AppText>
@@ -809,14 +857,15 @@ function SuggestedMoves({ matchup, leagueId, leagueName }: { matchup: MatchupRes
         The suggested lineup ranks by this week’s projected points (season-long value only breaks ties or fills in where a projection is missing); gains are projected points. FantasyDesk can’t
         change your Sleeper lineup, so make any swap in Sleeper.
       </AppText>
-        </>
-      )}
-    </AnimatedCard>
+      </View>
+    </CompactModule>
   );
 }
 
 function createStyles(colors: ThemeColors) {
   return StyleSheet.create({
+    edgeChips: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.xs },
+    edgeChip: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 8, paddingVertical: 4, borderWidth: 1, borderColor: colors.border, borderRadius: 999 },
     headerButtonRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
     root: { flex: 1, backgroundColor: 'transparent' },
     container: { flex: 1, backgroundColor: 'transparent' },

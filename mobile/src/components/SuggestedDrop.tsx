@@ -243,6 +243,42 @@ function CompactSuggestedDrop({ suggestion }: { suggestion: DropSuggestion }) {
   );
 }
 
+/**
+ * One group-level "Drop candidate" for a list whose rows all name the same cut (lib/waiverGroups sharedDropCandidate).
+ * One line, the why one tap away; rows with a different cut keep their own note. Mirrors web SharedDropNote.
+ */
+export function SharedDropNote({ drop, count }: { drop: DropPlayer; count: number }) {
+  const { colors } = useThemeMode();
+  const styles = useMemo(() => createStyles(colors), [colors]);
+  const [open, setOpen] = useState(false);
+  return (
+    <View testID="shared-drop-note" style={{ gap: spacing.xs }}>
+      <PressableScale
+        style={styles.compactRow}
+        onPress={() => setOpen((v) => !v)}
+        accessibilityRole="button"
+        accessibilityState={{ expanded: open }}
+        accessibilityLabel={`Drop candidate ${drop.name}, for ${count} adds below`}
+      >
+        <View style={[styles.badge, { borderColor: `${colors.danger}70`, backgroundColor: `${colors.danger}1A` }]}>
+          <AppText style={[styles.badgeText, { color: colors.danger }]}>Drop candidate</AppText>
+        </View>
+        <PlayerAvatar playerId={drop.player_id} size={24} />
+        <View style={{ flex: 1, minWidth: 0 }}>
+          <PlayerName name={drop.name} style={styles.playerName} />
+          <AppText style={styles.meta}>{`${drop.position} · for ${count} adds below`}</AppText>
+        </View>
+        <AppText style={[styles.meta, { color: colors.accent, fontWeight: '700' }]}>{open ? 'Hide' : 'Why'}</AppText>
+      </PressableScale>
+      {open ? (
+        <View style={styles.compactDetails} testID="shared-drop-details">
+          <DropPlayerLine player={drop} maxReasons={6} />
+        </View>
+      ) : null}
+    </View>
+  );
+}
+
 export function SuggestedDrop({ suggestion, compact = false }: { suggestion: DropSuggestion; compact?: boolean }) {
   const { colors } = useThemeMode();
   const styles = useMemo(() => createStyles(colors), [colors]);

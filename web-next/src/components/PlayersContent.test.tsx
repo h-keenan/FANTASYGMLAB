@@ -1,5 +1,5 @@
 import { fireEvent, render, screen, within } from "@testing-library/react";
-import { describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it } from "vitest";
 
 import { PlayersContent } from "./PlayersContent";
 import type {
@@ -118,32 +118,37 @@ describe("PlayersContent", () => {
     expect(screen.getByText("No players match")).toBeInTheDocument();
   });
 
-  it("hides the Players/Picks toggle and roster-status facet when no picks or rosters are given", () => {
+  it("hides the picks module and roster-status facet when no picks or rosters are given", () => {
     render(<PlayersContent leagueId="league1" leagueName="Dynasty Overlords" data={DATA} />);
 
-    expect(screen.queryByText("Picks")).not.toBeInTheDocument();
+    expect(screen.queryByText("Draft picks")).not.toBeInTheDocument();
     expect(screen.queryByText("Any roster status")).not.toBeInTheDocument();
   });
 
-  describe("Picks view", () => {
+  describe("Picks module", () => {
     const PICKS: DraftPickAsset[] = [
       pick({ pick_id: "2027:1:1", owner_team_name: "Dynasty Overlords" }),
       pick({ pick_id: "2028:1:1", season: 2028, owner_roster_id: "2", owner_team_name: "Rival Squad", label: "2028 1st" }),
     ];
 
-    it("shows the Players/Picks toggle once picks are given, defaulting to Players", () => {
+    beforeEach(() => window.localStorage.clear());
+
+    it("keeps the players list and adds one collapsed module whose summary carries real pick data", () => {
       render(<PlayersContent leagueId="league1" leagueName="Dynasty Overlords" data={DATA} picks={PICKS} />);
 
       expect(screen.getByText("Alpha Receiver")).toBeInTheDocument();
-      expect(screen.queryByText("2027 1st")).not.toBeInTheDocument();
+      const module = screen.getByRole("button", { name: /^Draft picks: 2 picks · 2027-2028/ });
+      expect(module).toBeInTheDocument();
+      // The single tab row is the family strip: no Players | Picks toggle.
+      expect(screen.queryByRole("tab", { name: "Picks" })).not.toBeInTheDocument();
+      expect(screen.queryByText("2028 1st")).not.toBeInTheDocument();
     });
 
-    it("switches to Picks and shows every pick, grouped by season with owner context", () => {
+    it("expands to every pick, grouped by season with owner context", () => {
       render(<PlayersContent leagueId="league1" leagueName="Dynasty Overlords" data={DATA} picks={PICKS} />);
 
-      fireEvent.click(screen.getByText("Picks"));
+      fireEvent.click(screen.getByRole("button", { name: /^Draft picks:/ }));
 
-      expect(screen.queryByText("Alpha Receiver")).not.toBeInTheDocument();
       expect(screen.getByText("2027 1st")).toBeInTheDocument();
       expect(screen.getByText("2028 1st")).toBeInTheDocument();
       expect(screen.getByText(/Rival Squad/)).toBeInTheDocument();
@@ -337,8 +342,9 @@ describe("PlayersContent", () => {
     const bar = search.parentElement as HTMLElement;
     expect(bar.className).toContain("grid-cols-2");
     expect(search.className).toContain("col-span-2");
-    // The five facet selects are one Filters button now (FilterSheet).
-    expect(bar.querySelectorAll("select")).toHaveLength(0);
+    // The five facet selects are one Filters button now (FilterSheet); Sort sits in the same row (the one select).
+    expect(bar.querySelectorAll("select")).toHaveLength(1);
+    expect(within(bar).getByRole("combobox", { name: "Sort by" })).toBeInTheDocument();
     expect(within(bar).getByRole("button", { name: /^Filters/ })).toBeInTheDocument();
     // No nested `contents` wrapper / forced full-width stacking on rows.
     expect(container.querySelector(".contents")).toBeNull();

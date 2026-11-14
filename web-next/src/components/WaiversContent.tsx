@@ -40,9 +40,10 @@ import {
   waiversReasonMessage,
   type WaiverRecFilter,
 } from "@/lib/waiversPresentation";
+import { sharedBidNote, sharedDropCandidate } from "@/lib/waiverGroups";
 import { isIdpPositionFilter, withIdpPositionOptions } from "@/lib/idpPresentation";
 import { ValuesCredit } from "@/components/ValuesCredit";
-import { DroppablePlayersSection, NeedsBreakdown, SuggestedDrop } from "@/components/SuggestedDrop";
+import { DroppablePlayersSection, NeedsBreakdown, SharedDropNote, SuggestedDrop } from "@/components/SuggestedDrop";
 import { limitedDataNote, needsHeadline, teamNeedStat } from "@/lib/dropsPresentation";
 import { EmptyState } from "@/components/EmptyState";
 import { PlayerName } from "@/components/PlayerName";
@@ -258,53 +259,117 @@ function TopWaiverTargetCard({ player }: { player: WaiverPriorityAdd }) {
   );
 }
 
-function RecommendedRow({ player, rank, showDivider }: { player: WaiverPriorityAdd; rank: number; showDivider: boolean }) {
-  const { openPlayer } = usePlayerQuickView();
+type ReasonIconKind = "up" | "down" | "spark";
+
+function ReasonPill({ label, kind, tone }: { label: string; kind: ReasonIconKind; tone: "accent" | "success" | "danger" }) {
+  const color = tone === "success" ? "var(--color-success)" : tone === "danger" ? "var(--color-danger)" : "var(--color-accent)";
+  const path = kind === "up" ? "M7 17 17 7M9 7h8v8" : kind === "down" ? "M7 7l10 10M17 9v8H9" : "M13 3 5 13h6l-1 8 8-10h-6z";
+  return (
+    <span
+      className="inline-flex items-center gap-1 text-[0.6875rem] font-bold px-1.5 min-w-0 max-w-full"
+      style={{ color, borderRadius: "var(--radius-pill)", background: `color-mix(in srgb, ${color} 12%, transparent)`, lineHeight: "1.25rem" }}
+      data-testid="waiver-reason"
+    >
+      <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" className="shrink-0">
+        <path d={path} />
+      </svg>
+      <span className="truncate">{label}</span>
+    </span>
+  );
+}
+
+/**
+ * "More recommended adds" row (module templates "Row"): name / position / team on line 1 with ONE compact bid range at
+ * the right; reasons as one line of small icon pills; the whole row is the tap target and expands in place (no
+ * chevron: the row itself is the control). The big blocks that used to repeat on every row now live in the expanded
+ * body: Value + gauge, "of $81 remaining", why, usage, this add's own roster move, and "Player details". A cut that
+ * the whole group shares is shown once above the list (SharedDropNote); a row only mentions its cut when it differs.
+ */
+function RecommendedRow({
+  player,
+  rank,
+  showDivider,
+  sharedDropId,
+  open,
+  onToggle,
+}: {
+  player: WaiverPriorityAdd;
+  rank: number;
+  showDivider: boolean;
+  sharedDropId: string | null;
+  open: boolean;
+  onToggle: () => void;
+}) {
   const injury = waiverInjuryDisplay(player.injury_status);
   const contextLine = freeAgentContextLine(player);
+  const { primary, secondary } = faabRangeText(player.faab);
+  const isBid = faabIsBid(player.faab);
+  const chips = waiverReasonChips(player);
+  const flag = player.usage_flag;
+  const ownDrop = player.drop_suggestion?.drop?.player_id;
+  const differentDrop = sharedDropId != null && ownDrop != null && ownDrop !== sharedDropId ? player.drop_suggestion!.drop! : null;
   return (
-    <div style={showDivider ? { borderBottom: "var(--border-width-default) solid var(--color-border)" } : undefined}>
-    <button
-      type="button"
-      onClick={() => openPlayer({ ...player, sourceLabel: "Waivers" })}
-      aria-label={`Open ${player.name || "player"}`}
-      className="appearance-none bg-transparent border-0 p-0 m-0 text-left cursor-pointer w-full flex flex-col gap-1.5 py-2.5 min-h-[var(--touch-target-min)]"
-    >
-      {/* Name line first at full width so names never truncate; value, ring,
-          bid and the chevron share the second line. */}
-      <span className="flex items-center gap-3 min-w-0 w-full">
-        <span className="text-xs font-bold w-5 text-center shrink-0" style={{ color: "var(--color-text-muted)" }}>
-          {rank}
+    <div style={showDivider ? { borderBottom: "var(--border-width-default) solid var(--color-border)" } : undefined} data-testid="waiver-rec-row">
+      <button
+        type="button"
+        onClick={onToggle}
+        aria-expanded={open}
+        aria-label={`${player.name || "Player"}, bid ${primary} ${secondary}, ${open ? "hide" : "show"} details`}
+        className="appearance-none bg-transparent border-0 p-0 m-0 text-left cursor-pointer w-full flex flex-col gap-1 py-2 min-h-[var(--touch-target-min)]"
+      >
+        <span className="flex items-center gap-2.5 min-w-0 w-full">
+          <span className="text-xs font-bold w-4 text-center shrink-0" style={{ color: "var(--color-text-muted)" }}>
+            {rank}
+          </span>
+          <PositionBadge position={player.position} />
+          <PlayerAvatar playerId={player.player_id} tier={player.tier} size={32} />
+          <span className="flex flex-col min-w-0 flex-1">
+            <PlayerName name={player.name || "Unknown player"} className="text-sm font-bold" style={{ color: "var(--color-text-primary)" }} />
+            <PlayerMetaLine injuryStatus={injury.label}>
+              {player.team || "FA"}
+              {contextLine ? ` · ${contextLine}` : ""}
+            </PlayerMetaLine>
+          </span>
+          <span
+            className="shrink-0 text-sm font-extrabold tabular-nums text-right"
+            style={{ color: isBid ? "var(--color-success)" : "var(--color-text-secondary)" }}
+            data-testid="waiver-bid"
+          >
+            {primary}
+          </span>
         </span>
-        <PositionBadge position={player.position} />
-        <PlayerAvatar playerId={player.player_id} tier={player.tier} size={40} />
-        <span className="flex flex-col min-w-0 flex-1">
-          <PlayerName name={player.name || "Unknown player"} className="text-sm font-bold" style={{ color: "var(--color-text-primary)" }} />
-          <PlayerMetaLine injuryStatus={injury.label}>
-            {player.team || "FA"}
-            {contextLine ? ` · ${contextLine}` : ""}
-          </PlayerMetaLine>
+        <span className="flex flex-wrap items-center gap-1 pl-[3.75rem] w-full empty:hidden">
+          {chips.map((chip) => (
+            <ReasonPill key={chip} label={chip} kind="spark" tone="accent" />
+          ))}
+          {flag ? <ReasonPill label={flag.label} kind={flag.tone === "positive" ? "up" : "down"} tone={flag.tone === "positive" ? "success" : "danger"} /> : null}
+          {differentDrop ? <ReasonPill label={`Drop ${differentDrop.name}`} kind="down" tone="danger" /> : null}
         </span>
-      </span>
-      <span className="flex flex-col gap-1.5 pl-8 w-full empty:hidden">
-        <ReasonChips chips={waiverReasonChips(player)} />
-        <UsageFlagChip player={player} />
-      </span>
-      <span className="flex items-center gap-3 pl-8 w-full">
-        <ValueWithRing player={player} />
-        <span className="ml-auto">
-          <FaabRange player={player} />
-        </span>
-        <span aria-hidden="true" style={{ color: "var(--color-text-muted)" }}>
-          ›
-        </span>
-      </span>
-    </button>
-    {player.drop_suggestion ? (
-      <div className="pb-2.5 pl-8">
-        <SuggestedDrop suggestion={player.drop_suggestion} compact />
-      </div>
-    ) : null}
+      </button>
+      {open ? (
+        <div className="flex flex-col gap-2 pb-3 pl-[3.75rem]" data-testid="waiver-rec-details">
+          <div className="flex items-center justify-between gap-3">
+            <ValueWithRing player={player} />
+            <FaabRange player={player} />
+          </div>
+          {player.faab?.why ? (
+            <p className="text-xs" style={{ color: "var(--color-text-secondary)" }}>
+              <span className="font-bold">Why: </span>
+              {player.faab.why}
+            </p>
+          ) : null}
+          {flag ? (
+            <p className="text-xs" style={{ color: "var(--color-text-secondary)" }}>
+              <span className="font-bold">Usage: </span>
+              {flag.explanation}
+            </p>
+          ) : null}
+          {player.drop_suggestion ? <SuggestedDrop suggestion={player.drop_suggestion} compact /> : null}
+          <div className="flex">
+            <ViewDetailsButton player={player} />
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 }
@@ -410,6 +475,7 @@ export function WaiversContent({
     if (initialTab) setTab(initialTab);
   }
   const [recFilter, setRecFilter] = useState<WaiverRecFilter>("all");
+  const [openRowId, setOpenRowId] = useState<string | null>(highlightPlayerId ?? null);
   const [search, setSearch] = useState("");
   const [position, setPosition] = useState("ALL");
   const [targetIds, setTargetIds] = useState<string[] | null>(null);
@@ -440,6 +506,8 @@ export function WaiversContent({
   const topPriority = priorityAdds[0] ?? null;
   const secondaryPriority = priorityAdds.length > 1 ? priorityAdds.slice(1) : [];
   const visibleSecondary = filterByRecommendation(secondaryPriority, recFilter);
+  const sharedDrop = sharedDropCandidate(visibleSecondary);
+  const bidNote = sharedBidNote(visibleSecondary);
 
   const bestAvailable = useMemo(() => {
     const activeAgents = data.players.filter((p) => !p.stale_free_agent && (p.score ?? 0) > 0);
@@ -613,6 +681,7 @@ export function WaiversContent({
                   <span id="more-adds-heading">More recommended adds</span>
                 </SectionHeading>
                 <PillRow
+                  ariaLabel="Recommendation filter"
                   options={REC_FILTER_OPTIONS}
                   active={recFilter}
                   onSelect={(value) => setRecFilter(value as WaiverRecFilter)}
@@ -622,9 +691,26 @@ export function WaiversContent({
                 <EmptyState title="None in this group." />
               ) : (
                 <div className="glass-surface flex flex-col px-3">
+                  {sharedDrop || bidNote ? (
+                    <div className="flex flex-col gap-0.5 py-1" style={{ borderBottom: "var(--border-width-default) solid var(--color-border)" }}>
+                      {sharedDrop ? <SharedDropNote drop={sharedDrop.first.drop_suggestion!.drop!} count={sharedDrop.count} /> : null}
+                      {bidNote ? (
+                        <p className="m-0 text-xs pb-1" style={{ color: "var(--color-text-muted)" }} data-testid="waiver-bid-note">
+                          Bid ranges are {bidNote}. Tap a row for its value, why and roster move.
+                        </p>
+                      ) : null}
+                    </div>
+                  ) : null}
                   {visibleSecondary.map((player, index) => (
                     <HighlightTarget key={player.player_id} active={player.player_id === highlightPlayerId}>
-                      <RecommendedRow player={player} rank={index + 2} showDivider={index < visibleSecondary.length - 1} />
+                      <RecommendedRow
+                        player={player}
+                        rank={index + 2}
+                        showDivider={index < visibleSecondary.length - 1}
+                        sharedDropId={sharedDrop?.playerId ?? null}
+                        open={openRowId === player.player_id}
+                        onToggle={() => setOpenRowId((id) => (id === player.player_id ? null : player.player_id))}
+                      />
                     </HighlightTarget>
                   ))}
                 </div>

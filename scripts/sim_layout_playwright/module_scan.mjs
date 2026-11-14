@@ -1,4 +1,4 @@
-// Module-template scan (docs/audits/2026-11-module-templates-rollout.md): Today, Team, Trades and League at phone width WITH data.
+// Module-template scan (docs/audits/2026-11-module-templates-rollout.md): Today, Team, Trades, League, Matchup, Waivers and Players at 390 and 1440 WITH data (desktop also checks one header bar).
 // Unlike app_audit.mjs (empty stubs) this answers the league endpoints with fixtures, then checks per page:
 //   - no horizontal overflow (scrollWidth <= width),
 //   - every collapsed compact module shows >= 12 characters of summary (the same rule as the unit tests),
@@ -12,7 +12,7 @@ import fs from "fs";
 const { chromium } = await import(process.env.PW_CORE || "playwright-core");
 const BASE = process.env.BASE || "http://localhost:3197";
 const OUT = process.env.OUT || "/private/tmp/claude-501/module-scan";
-const WIDTHS = (process.env.WIDTHS || "360,390").split(",").map(Number);
+const WIDTHS = (process.env.WIDTHS || "390,1440").split(",").map(Number);
 const LID = "1221647449446162432";
 fs.mkdirSync(OUT, { recursive: true });
 
@@ -60,11 +60,25 @@ const FIX = {
     trade_window: { trade_deadline_week: 11, current_week: 9, trade_deadline_passed: false, message: "" },
   },
 };
+
+// Matchup / Waivers / Players fixtures (page migration pass 2).
+const mStarter = (id, name, position, pts, slot) => ({ player_id: id, name, position, team: "SF", age: 25, status: "Active", injury_status: null, injury_label: "", ruled_out: false, tier: "starter", score: 1500, slot, suggested_starter: true, roster_slot: "starter", opportunity_label: "Lead back", overall_rating: 82, why: "", projection: { status: "ok", point_estimate: pts, low: pts - 3, high: pts + 3, confidence: "medium", opponent: "SEA" } });
+const mSide = (rid, name, w, l, val, extra = {}) => ({ roster_id: rid, team_name: name, owner_name: "o", avatar_url: null, wins: w, losses: l, ties: 0, season_value_total: val, starters_basis: "suggested_optimal_lineup", real_starters: [], real_points: null, has_live_data: false, real_starters_basis: "sleeper_actual_lineup", real_empty_slots: [], starters: [mStarter(`${rid}q`, `Quarterback ${rid}`, "QB", 20, "QB"), mStarter(`${rid}r`, `Running Back ${rid}`, "RB", 15, "RB"), mStarter(`${rid}w`, `Wide Receiver ${rid}`, "WR", 14, "WR")], ...extra });
+const EDGES = [{ position: "RB", my_points: 30, opponent_points: 13, edge: 16.7, my_count: 2, opponent_count: 2, unmodeled: 0 }, { position: "QB", my_points: 20, opponent_points: 19.6, edge: 0.4, my_count: 1, opponent_count: 1, unmodeled: 0 }, { position: "TE", my_points: 8, opponent_points: 11.2, edge: -3.2, my_count: 1, opponent_count: 1, unmodeled: 0 }, { position: "WR", my_points: 30, opponent_points: 34.6, edge: -4.6, my_count: 3, opponent_count: 3, unmodeled: 0 }];
+FIX.matchup = { ok: true, week: 10, my_team: mSide("1", "Not Your Dad's Dih", 3, 6, 45719), opponent: mSide("2", "Shiesty", 4, 5, 48673), comparison: { my_season_value: 45719, opponent_season_value: 48673, margin: -2954, edge: "opponent", headline: "", basis: "season_value", basis_label: "" }, real_comparison: null, win_probability: { available: true, probability: 0.57, my_projected_total: 118.3, opponent_projected_total: 109.7, coverage: { my: 1, opponent: 1 } }, game_state: null, position_edges: { actual: null, suggested: EDGES }, suggested_moves: [{ slot: "RB", start: { player_id: "b1", name: "Aaron Jones", position: "RB", team: "MIN", tier: "starter", slot: "RB", points: 15.7, projection_status: "ok", injury_label: "" }, over: { player_id: "s2", name: "Tyrone Tracy", position: "RB", team: "NYG", tier: "starter", slot: "RB", points: 7.4, projection_status: "ok", injury_label: "" }, over_reason: null, gain: 8.3, locked: false }], basis: "season_value", basis_label: "", reason: "" };
+const wDrop = { player_id: "d1", name: "Tutu Atwell", position: "WR", team: "LAR", age: 26, status: "Active", injury_status: "", value: 300, start_share: 0, usage_flag: null, reasons: ["never starts in your best lineup"], effect: { lineup_points_ros: 0, lineup_points_per_week: 0, this_week: 0, value_delta: 300, score: 900, weeks: 9 }, action: "drop" };
+const wAdd = (id, name, pos, team, score, lo, hi, why) => ({ player_id: id, name, position: pos, team, age: 24, status: "Active", injury_status: "", tier: "starter", opportunity_label: "Strong Opportunity", score, position_rank: 30, overall_rank: 90, stale_free_agent: false, injury_replacement_fit: false, sleeper_trending_add: id !== "w3", sleeper_trending_add_count: 900, sleeper_trending_add_rank: 4, overall_rating: 75, recommendation_label: "Add", recommendation_tone: "opportunity", faab: { low_bid: lo, high_bid: hi, pct_low: lo, pct_high: hi, remaining: 81, dollars_known: true, label: "", reasons: [why], why }, confidence_label: "High", confidence_reason: "", usage_flag: id === "w1" || id === "w2" ? { label: "Usage +40%", tone: "positive", explanation: "Snap share up 40% over four weeks." } : null, drop_suggestion: { status: "ok", add: { player_id: id, name, position: pos }, roster: { active_limit: 22, active_count: 22, open_spots: 0, is_full: true, reserve_slots: 3, reserve_used: 1, taxi_slots: 0, taxi_used: 0 }, drop_required: true, drop: wDrop, alternatives: [], no_good_drop: false, why: "" } });
+const WA = [wAdd("w0", "Jalen Nailor", "WR", "LV", 2608, 8, 12, "Best on the wire for your WR need"), wAdd("w1", "Marvin Mims Jr.", "WR", "DEN", 1786, 3, 5, "Rival demand: two teams need WR"), wAdd("w2", "Khalil Herbert", "RB", "ATL", 1283, 2, 4, "Role rising"), wAdd("w3", "John Metchie III", "WR", "CAR", 1223, 1, 3, "Rival demand"), wAdd("w4", "Coleman Owen", "WR", "GB", 1100, 1, 2, "Role rising")];
+FIX.waivers = { ok: true, reason: "", players: WA, priority_adds: WA, needed_positions: ["WR"], available_count: 120, avg_wire_score: 650, injured_starters: 0, injury_positions: [], stash_candidates: [], watchlist_candidates: [], faab_targets: [], entitlement: { is_premium: true } };
+FIX.rankings = { ok: true, players: Array.from({ length: 12 }, (_, i) => ({ player_id: `r${i}`, name: `Ranked Player ${i}`, position: ["QB", "RB", "WR", "TE"][i % 4], team: "DET", age: 24 + (i % 5), status: "Active", injury_status: null, tier: "starter", score: 5000 - i * 200, overall_rank: i + 1, position_rank: Math.floor(i / 4) + 1, rank_unavailable_reason: null, opportunity_label: null, overall_rating: 90 - i })) };
 const ROUTES = [
   { name: "today", path: `/dashboard/${LID}?name=Donk`, family: "none" },
   { name: "team", path: `/my-team/${LID}?name=Donk`, family: "team" },
   { name: "trades", path: `/trade-hub/${LID}?name=Donk`, family: "trades" },
   { name: "league", path: `/league-rankings/${LID}?name=Donk`, family: "league" },
+  { name: "matchup", path: `/matchup/${LID}?name=Donk`, family: "team", expect: "matchup-hero" },
+  { name: "waivers", path: `/waivers/${LID}?name=Donk`, family: "team", expect: "waiver-rec-row", maxTablists: 2, noModules: true },
+  { name: "players", path: `/players/${LID}?name=Donk`, family: "team", noModules: true },
 ];
 const session = { access_token: "a.b.c", refresh_token: "r", token_type: "bearer", expires_in: 99999, expires_at: Math.floor(Date.now() / 1000) + 99999, user: { id: "u1", aud: "authenticated", role: "authenticated", email: "t@example.com", app_metadata: {}, user_metadata: {}, created_at: "2026-01-01T00:00:00Z" } };
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -82,14 +96,24 @@ const PAGE_CHECK = () => {
     out.summaries.push(`${title}: ${summary.slice(0, 60)}`);
     if (summary.trim().length < 12) out.emptyHeaders.push({ title, chars: summary.trim().length });
   }
-  out.tablists = [...document.querySelectorAll('[role="tablist"]')].filter((el) => el.getBoundingClientRect().height > 0).length;
+  const vis = (el) => { const r = el.getBoundingClientRect(); return r.height > 0 && r.width > 0 && getComputedStyle(el).display !== "none"; };
+  out.headerBars = [...document.querySelectorAll("body header")].filter((h) => vis(h) && h.getBoundingClientRect().top < 120 && !h.closest("main") && !h.closest("section")).length;
+  out.shellHeaderVisible = [...document.querySelectorAll('[data-testid="shell-header"]')].some(vis);
+  const main = document.querySelector("main");
+  out.mainWidth = main ? Math.round(main.getBoundingClientRect().width) : 0;
+  out.recRows = document.querySelectorAll('[data-testid="waiver-rec-row"]').length;
+  out.recRowMaxH = Math.max(0, ...[...document.querySelectorAll('[data-testid="waiver-rec-row"]')].map((e) => Math.round(e.getBoundingClientRect().height)));
+  const tl = [...document.querySelectorAll('[role="tablist"]')].filter((el) => el.getBoundingClientRect().height > 0);
+  // The page tab row count: filter rows (aria-labelled pill rows) and view toggles inside a module are not page tabs.
+  out.tablists = tl.filter((el) => !el.getAttribute("aria-label")?.match(/^(Position|Recommendation filter)$/) && !el.closest('[data-testid^="matchup-"],[data-testid^="players-"]')).length;
+  out.tablistLabels = tl.map((el) => `${el.getAttribute("aria-label") || ""}|${[...el.querySelectorAll('[role="tab"]')].map((t) => t.textContent.trim()).join("/")}|inModule=${Boolean(el.closest('[data-testid^="matchup-"],[data-testid^="players-"]'))}`);
   return out;
 };
 
 const browser = await chromium.launch({ executablePath: process.env.CHROME || process.env.HOME + "/Library/Caches/ms-playwright/chromium_headless_shell-1248/chrome-headless-shell-mac-arm64/chrome-headless-shell" });
 const results = [];
 for (const w of WIDTHS) {
-  const ctx = await browser.newContext({ viewport: { width: w, height: 844 }, hasTouch: true, isMobile: true });
+  const ctx = await browser.newContext({ viewport: { width: w, height: w >= 768 ? 900 : 844 }, hasTouch: w < 768, isMobile: w < 768 });
   await ctx.addInitScript(([s]) => { try { localStorage.clear(); localStorage.setItem("fgl:theme-mode", "dark"); localStorage.setItem("sb-dummy-auth-token", JSON.stringify(s)); localStorage.setItem("fgl:onboarding-complete", "1"); } catch (e) {} }, [session]);
   await ctx.route("**/*", async (route) => {
     const u = new URL(route.request().url());
@@ -111,8 +135,9 @@ for (const w of WIDTHS) {
       await page.addStyleTag({ content: "nextjs-portal,[data-nextjs-toast]{display:none!important}" }).catch(() => {});
       await sleep(r.name === "today" && w === WIDTHS[0] ? 12000 : 5000);
       const res = await page.evaluate(PAGE_CHECK);
-      results.push({ page: r.name, width: w, ...res });
-      if (w === 390) await page.screenshot({ path: `${OUT}/${r.name}-390.png`, fullPage: false });
+      results.push({ page: r.name, width: w, maxTablists: r.maxTablists ?? 1, noModules: Boolean(r.noModules), expect: r.expect ? await page.locator(`[data-testid="${r.expect}"]`).count() : null, ...res });
+      if (r.expect === "waiver-rec-row") await page.locator(`[data-testid="${r.expect}"]`).first().scrollIntoViewIfNeeded().catch(() => {});
+      await page.screenshot({ path: `${OUT}/${r.name}-${w}.png`, fullPage: false });
     } catch (e) {
       results.push({ page: r.name, width: w, error: String(e).slice(0, 160) });
     }
@@ -127,10 +152,15 @@ for (const r of results) {
   if (r.error) problems.push(`error ${r.error}`);
   if (r.overflow) problems.push(`overflow ${r.overflow.scrollWidth}>${r.overflow.width}`);
   if (r.emptyHeaders?.length) problems.push(`empty collapsed headers: ${r.emptyHeaders.map((h) => h.title).join(", ")}`);
-  if ((r.tablists ?? 0) > 1) problems.push(`${r.tablists} tab rows`);
-  if (r.modules === 0) problems.push("no compact modules rendered (fixtures not applied?)");
+  if ((r.tablists ?? 0) > (r.maxTablists ?? 1)) problems.push(`${r.tablists} tab rows`);
+  if (r.width >= 768 && r.shellHeaderVisible) problems.push("phone ShellHeader visible on desktop (double header)");
+  if (r.width >= 768 && r.headerBars > 1) problems.push(`${r.headerBars} header bars on desktop`);
+  if (r.expect === 0) problems.push("expected page content missing (fixture not applied?)");
+  if (r.width >= 1024 && r.page === "matchup" && r.mainWidth < 1000) problems.push(`matchup column only ${r.mainWidth}px wide at desktop`);
+  if (r.recRowMaxH > 96) problems.push(`recommended-add row ${r.recRowMaxH}px tall (compact rows are <= 96)`);
+  if (r.modules === 0 && !r.noModules) problems.push("no compact modules rendered (fixtures not applied?)");
   if (problems.length) bad += 1;
-  console.log(`${problems.length ? "FAIL" : "ok  "} ${r.page}@${r.width}: modules=${r.modules} heroes=${r.heroes} tablists=${r.tablists} height=${r.height}${problems.length ? "  " + problems.join("; ") : ""}`);
+  console.log(`${problems.length ? "FAIL" : "ok  "} ${r.page}@${r.width}: modules=${r.modules} heroes=${r.heroes} headers=${r.headerBars} main=${r.mainWidth} recRows=${r.recRows}/${r.recRowMaxH} tablists=${r.tablists} height=${r.height}${problems.length ? "  " + problems.join("; ") : ""}`);
 }
 console.log(bad ? `${bad} page(s) with problems` : "module scan clean");
 process.exit(bad ? 1 : 0);
