@@ -42,6 +42,7 @@ def _settings(world: bool, **extra) -> GameSettings:
     d = s.to_dict()
     if not world:
         d.pop("world_v", None)  # a save from before world_v
+        d.pop("aging_v", None)  # ... and before aging_v
     return GameSettings.from_dict(d)
 
 
