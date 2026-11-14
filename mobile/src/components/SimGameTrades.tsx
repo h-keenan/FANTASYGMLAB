@@ -419,7 +419,7 @@ function Builder({ ctx, seed, onSeedUsed }: { ctx: SimCtx; seed: SimTradeSeed | 
         ) : (
           <View style={common.stack} accessibilityLabel="Teams">
             {teamOptions.map((team) => (
-              <SimTeamCard key={team.team_id} team={team} openLabel={`Trade with ${team.name}`} onOpen={(id) => dispatch({ type: 'partner', teamId: id })} />
+              <SimTeamCard key={team.team_id} team={team} dense openLabel={`Trade with ${team.name}`} onOpen={(id) => dispatch({ type: 'partner', teamId: id })} />
             ))}
           </View>
         )}

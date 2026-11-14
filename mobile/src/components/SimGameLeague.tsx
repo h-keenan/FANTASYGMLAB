@@ -31,6 +31,8 @@ import {
 } from '../lib/simGame';
 import { CountUp, MotionIn } from './Motion';
 import SimCrest from './SimCrest';
+import { Hero } from './ModuleTemplates';
+import { simStandingHero } from '../lib/simSummaries';
 import { simMatchupMargin, simMatchupStatus, simPreview, simScoreboardLabel } from '../lib/simLayout';
 import { useSimLeagueRosters } from '../lib/useSimLeagueRosters';
 import { spacing } from '../theme';
@@ -249,6 +251,10 @@ export function SimLeagueTab({ ctx }: { ctx: SimCtx }) {
       />
       {view === 'standings' ? (
         <View style={common.stack}>
+          {(() => {
+            const hero = simStandingHero(league.standings ?? [], game.settings.playoff_teams);
+            return hero ? <Hero label="Your standing" value={hero.value} context={hero.context} tone={hero.tone} trendHigherIsBetter={false} testID="sim-standing-hero" /> : null;
+          })()}
           <SimSectionTitle glyph="standings" tone="success" title="Standings" caption={`Top ${game.settings.playoff_teams} make the playoffs. Ties break on ${game.settings.tiebreaker === 'head_to_head' ? 'head-to-head, then points' : 'points for, then head-to-head'}.`} />
           <SimStandingsList rows={league.standings ?? []} playoffTeams={game.settings.playoff_teams} />
         </View>

@@ -43,6 +43,7 @@ export function PlayerHeroHeader({
   overallRank,
   positionRank,
   usageTrend,
+  simTiles = null,
   usageLoading = false,
   depthChartNote,
   valueNote,
@@ -89,6 +90,8 @@ export function PlayerHeroHeader({
   overallRank?: number | null;
   positionRank?: number | null;
   usageTrend: UsageTrend | null;
+  /** Fantasy Sim: replaces the Value and Usage tiles (the sim shows neither the model's value nor a real usage feed). */
+  simTiles?: { label: string; value: string; note: string }[] | null;
   /** True while the quick-view detail (which carries the usage read) is
    * still loading, so the tile shows a placeholder, not "no trend". */
   usageLoading?: boolean;
@@ -164,6 +167,16 @@ export function PlayerHeroHeader({
               <span className="pqv-stat-tile-caption">Player score</span>
             </div>
           )}
+          {simTiles && simTiles.length > 0 ? (
+            simTiles.map((t) => (
+              <div key={t.label} className="pqv-stat-tile" data-testid="pqv-sim-tile">
+                <span className="pqv-stat-tile-value">{t.value}</span>
+                <span className="pqv-stat-tile-caption">{t.label}</span>
+                <span className="pqv-stat-tile-note">{t.note}</span>
+              </div>
+            ))
+          ) : (
+            <>
           {score != null ? (
             <TapForWhy metric={valueLabel ? "trade_value" : "value"} variant="tile" className="pqv-stat-tile" spoken={`${valueLabel ?? "Value"} ${formatScore(score)}`} chart={valueChart}>
               <span className="pqv-stat-tile-value">{formatScore(score)}</span>
@@ -192,6 +205,8 @@ export function PlayerHeroHeader({
             )
           )}
           <UsageTile trend={usageTrend} loading={usageLoading} />
+            </>
+          )}
         </div>
 
         {rankBits.length > 0 || depthChartNote ? (

@@ -42,7 +42,8 @@ describe("Fantasy Sim player sheet is the real Player Quick View", () => {
     expect(screen.queryByLabelText("Week-by-week projection")).toBeNull();
     expect(screen.queryByText("W3")).toBeNull();
     expect(screen.queryByText(/results so far/i)).toBeNull();
-    expect(screen.queryByTestId("weekly-chart")).toBeNull(); // nothing played and a flat projection: no chart
+    expect(screen.getByTestId("weekly-chart")).toBeInTheDocument(); // nothing played yet: the flat projection still draws (mean line + floor/ceiling band)
+    expect(screen.getByText("Per game")).toBeInTheDocument();
     expect(screen.getByText("BB")).toBeInTheDocument(); // initials, same fallback as the real PQV
     expect(api.getPlayerQuickView).not.toHaveBeenCalled(); // a generated player has no real data
   });
@@ -50,9 +51,11 @@ describe("Fantasy Sim player sheet is the real Player Quick View", () => {
   it("shows an em dash with a reason, not 0, for a player with no market value", async () => {
     vi.mocked(api.getSimGamePlayer).mockResolvedValue(detail());
     render(<SimPlayerSheet gameId="g1" player={player()} onClose={() => {}} />);
-    const tile = await screen.findByTestId("pqv-value-empty");
-    expect(tile).toHaveTextContent("—");
-    expect(tile).toHaveTextContent(/no market value/i);
+    // The sim never shows the model's value: the hero swaps the Value and Usage tiles for this week's projection and ADP.
+    const tiles = await screen.findAllByTestId("pqv-sim-tile");
+    expect(tiles).toHaveLength(2);
+    expect(screen.queryByTestId("pqv-value-empty")).toBeNull();
+    expect(screen.queryByText(/no market value/i)).toBeNull();
     await waitFor(() => expect(screen.getByText("Overall #211 · RB #60")).toBeInTheDocument());
   });
 
@@ -63,7 +66,7 @@ describe("Fantasy Sim player sheet is the real Player Quick View", () => {
     fireEvent.click(await screen.findByRole("tab", { name: "Outlook" }));
     const flat = await screen.findByTestId("weekly-chart");
     expect(flat).toHaveAttribute("data-weeks", "2");
-    expect(flat).toHaveAttribute("data-band", "0");
+    expect(Number(flat.getAttribute("data-band"))).toBeGreaterThan(0); // flat still draws as a steady band
     unmount();
 
     const varied = weeks(3).map((w, i) => ({ ...w, projection: 8 + i }));

@@ -28,9 +28,9 @@ async function open(page, name) {
   await page.goto(`${BASE}/gm-game`, { waitUntil: "domcontentloaded" });
   await page.waitForSelector("main", { timeout: 60000 }).catch(() => {});
   await sleep(2500);
-  await page.getByRole("button", { name: "Open game" }).first().click();
+  await page.getByRole("button", { name: "Open game" }).first().dispatchEvent("click");
   await sleep(2500);
-  await page.getByRole("tab", { name: "Players" }).first().click();
+  await page.getByTestId("sim-game-orb").first().dispatchEvent("click"); await sleep(900); await page.getByTestId("sim-game-nav").getByRole("button", { name: /^Players/ }).first().dispatchEvent("click");
   await sleep(1500);
   await page.locator("input[type=search], input[type=text]").first().fill(name.split(" ")[1]);
   await sleep(1800);
@@ -44,7 +44,7 @@ for (const theme of ["dark"]) for (const [kind, name] of cast) {
   if (only && kind !== only) continue;
   const w = 390;
   const mock = createMock({ status: "in_season", week: 3, sheetDemo: true, ...(globalThis.__mockOpts || {}) });
-  const ctx = await browser.newContext({ viewport: { width: w, height: 844 }, deviceScaleFactor: 2 });
+  const ctx = await browser.newContext({ viewport: { width: w, height: 844 }, deviceScaleFactor: 1 });
   await ctx.addInitScript(([t, s]) => { try { localStorage.setItem("fgl:theme-mode", t); localStorage.setItem("sb-dummy-auth-token", JSON.stringify(s)); localStorage.setItem("fgl:onboarding-complete", "1"); } catch (e) {} }, [theme, session]);
   await ctx.route("**/*", async (route) => {
     const url = new URL(route.request().url());

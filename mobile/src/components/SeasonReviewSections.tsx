@@ -5,7 +5,7 @@ import { Ionicons } from '@expo/vector-icons';
 import AccentCard from './AccentCard';
 import TrendChart from './TrendChart';
 import AppText from './AppText';
-import Collapsible from './Collapsible';
+import CompactModule from './CompactModule';
 import PositionBadge from './PositionBadge';
 import { SimPlayerChip as BaseChip, createSimStyles, simToneColor } from './SimGameParts';
 import ToneBadge from './ToneBadge';
@@ -22,6 +22,7 @@ import type {
   ReviewStat,
   ReviewTone,
 } from '../lib/simReview';
+import { reviewSectionParts } from '../lib/simReview';
 import { radii, spacing } from '../theme';
 
 /**
@@ -294,21 +295,23 @@ export function SeasonReviewSections({
   return (
     <>
       {list.map((section) => (
-        <Collapsible
+        <CompactModule
           key={section.id}
           id={`review.${section.id}`}
           testID={`review-section-${section.id}`}
           defaultOpen={!closed.includes(section.id)}
+          label={section.title}
+          parts={reviewSectionParts(section)}
           title={
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm }}>
-              <ReviewGlyphChip glyph={section.glyph} tone="accent" size={24} />
-              <AppText style={{ flex: 1, fontSize: 14, fontWeight: '800', textTransform: 'uppercase', color: colors.textPrimary }} numberOfLines={1}>{section.title}</AppText>
+              <ReviewGlyphChip glyph={section.glyph} tone="accent" size={22} />
+              <AppText style={{ flex: 1, fontSize: 13, fontWeight: '800', textTransform: 'uppercase', color: colors.textPrimary }} numberOfLines={1}>{section.title}</AppText>
             </View>
           }
         >
           {section.note ? <AppText style={{ fontSize: 12, color: colors.textTertiary }}>{section.note}</AppText> : null}
           <SectionBody section={section} />
-        </Collapsible>
+        </CompactModule>
       ))}
     </>
   );

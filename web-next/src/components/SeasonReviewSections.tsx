@@ -7,10 +7,11 @@ import { AccentCard } from "@/components/AccentCard";
 import { PositionBadge } from "@/components/PositionBadge";
 import { SectionHeading } from "@/components/SectionHeading";
 import { ReviewGlyphIcon } from "@/components/SimReviewGlyph";
-import { Collapsible } from "@/components/Collapsible";
+import { CompactModule } from "@/components/ui/CompactModule";
 import { SimPlayerChip as BaseChip, simToneColor, useSimWide } from "@/components/SimGameParts";
 import { ToneBadge } from "@/components/ToneBadge";
 import type { SimPlayerRef } from "@/lib/simGame";
+import { reviewSectionParts } from "@/lib/simReview";
 import type {
   ReviewCard,
   ReviewGameRow,
@@ -270,21 +271,23 @@ export function SeasonReviewSections({
             <SectionBody section={section} />
           </section>
         ) : (
-          <Collapsible
+          <CompactModule
             key={section.id}
             id={`review.${section.id}`}
             testId={`review-section-${section.id}`}
             defaultOpen={!closed.includes(section.id)}
             title={
               <span className="inline-flex items-center gap-2">
-                <ReviewGlyphChip glyph={section.glyph} tone="accent" size={24} />
+                <ReviewGlyphChip glyph={section.glyph} tone="accent" size={22} />
                 {section.title}
               </span>
             }
+            label={section.title}
+            parts={reviewSectionParts(section)}
           >
             {section.note ? <p className="text-xs" style={{ color: "var(--color-text-muted)" }}>{section.note}</p> : null}
             <SectionBody section={section} />
-          </Collapsible>
+          </CompactModule>
         ),
       )}
     </>
