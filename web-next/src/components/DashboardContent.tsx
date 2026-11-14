@@ -1,4 +1,3 @@
-import { SectionHeading } from "@/components/SectionHeading";
 import Link from "next/link";
 import type { MouseEvent } from "react";
 
@@ -14,7 +13,10 @@ import { GuessThePlayerCard } from "@/components/GuessThePlayerCard";
 import { GuessThePlayerNameMatchCard } from "@/components/GuessThePlayerNameMatchCard";
 import { LeaguePulseCard } from "@/components/LeaguePulseCard";
 import { formatRank } from "@/components/SnapshotTile";
-import { StatStrip, type StatStripItem } from "@/components/StatStrip";
+import type { StatStripItem } from "@/components/StatStrip";
+import { CompactModule } from "@/components/ui/CompactModule";
+import { StatStripModule } from "@/components/ui/ModuleTemplates";
+import { listSummaryParts } from "@/lib/moduleTemplates";
 import { TeamStatusHero, useTeamStatusData, type TeamStatusPrefetch } from "@/components/TeamStatusHero";
 import { leagueAverageAge } from "@/lib/teamStatus";
 import { TodayModule } from "@/components/TodayModule";
@@ -179,12 +181,18 @@ export function DashboardContent({
         deadlineInAttention={deadlineInAttention}
       />
 
-      {snapshot ? (
-        <section className="flex flex-col gap-3" aria-labelledby="snapshot-heading" data-fgl-dashboard-complete="true" aria-label="Team summary">
-          <SectionHeading
-            id="snapshot-heading"
-            size="compact"
-            help={
+      {snapshot && teamStats ? (
+        // My Team: a StatStripModule. Collapsed it reads "Power #3 · Franchise #5 · Starters #2 · Bench #7"; the tiles
+        // (each an insight link) and the glossary open on tap. The marker below is the "dashboard rendered" signal.
+        <section aria-label="Team summary" data-fgl-dashboard-complete="true">
+          <StatStripModule
+            id="today.team"
+            title="My Team"
+            items={teamStats.main}
+            league={{ id: leagueId, name: leagueName }}
+            action={<ViewAllLink href={`/my-team/${encodeURIComponent(leagueId)}${query}`} label="Open My Team" label2="Open →" />}
+            footer={
+              <>
                 <BeginnerHelp
                   popover
                   label="My Team stats"
@@ -197,29 +205,27 @@ export function DashboardContent({
                     copy.help("benchStrength") ? `Bench Strength: ${copy.help("benchStrength")}` : null,
                   ]}
                 />
+                <GlossaryNote terms={["powerRank", "franchiseRank", "averageAge", "starterStrength", "benchStrength"]} />
+              </>
             }
-            action={<ViewAllLink href={`/my-team/${encodeURIComponent(leagueId)}${query}`} label="Open My Team" label2="Open →" />}
-          >
-            My Team
-          </SectionHeading>
-          {teamStats ? (
-            <>
-              <StatStrip columns={3} items={teamStats.main} league={{ id: leagueId, name: leagueName }} />
-            </>
-          ) : null}
-          <GlossaryNote terms={["powerRank", "franchiseRank", "averageAge", "starterStrength", "benchStrength"]} />
+          />
         </section>
       ) : null}
 
       <GuillotineCard data={guillotine} />
 
       {watchItems.length > 0 ? (
-        <section className="flex flex-col gap-3" aria-labelledby="watchlist-heading">
-          <SectionHeading id="watchlist-heading" size="compact" action={<ViewAllLink href={`/alerts/${encodeURIComponent(leagueId)}${query}`} label="View all alerts" label2="View all →" />}>
-            Watchlist &amp; Alerts
-          </SectionHeading>
+        <CompactModule
+          id="today.watchlist"
+          title="Watchlist & Alerts"
+          label="Watchlist and alerts"
+          testId="dashboard-watchlist"
+          tone="warning"
+          parts={listSummaryParts({ count: watchItems.length, noun: "alert", highlights: [watchItems[0]?.headline] })}
+          action={<ViewAllLink href={`/alerts/${encodeURIComponent(leagueId)}${query}`} label="View all alerts" label2="All →" />}
+        >
           <WatchListCard items={watchItems} leagueId={leagueId} leagueName={leagueName} />
-        </section>
+        </CompactModule>
       ) : null}
 
       {/* The sample preview has no More section, so it keeps League Activity inline. */}

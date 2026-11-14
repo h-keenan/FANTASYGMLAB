@@ -5,15 +5,16 @@ import { PlayerIdentity } from "@/components/PlayerRow";
 import { ToneBadge } from "@/components/ToneBadge";
 import { InfoTip } from "@/components/InfoTip";
 import { StatStrip, type StatStripItem } from "@/components/StatStrip";
-import { RosterCompositionBar, RosterTabs, TeamAnalysisList, type RosterTab } from "@/components/MyTeamSections";
+import { RosterCompositionBar, RosterSections, TeamAnalysisList, type RosterTab } from "@/components/MyTeamSections";
+import { CompactModule } from "@/components/ui/CompactModule";
+import { Hero, StatStripModule } from "@/components/ui/ModuleTemplates";
+import { listSummaryParts } from "@/lib/moduleTemplates";
 import { buildRosterComposition, buildTeamAnalysisRows } from "@/lib/myTeamAnalysis";
 import type { ReactNode } from "react";
 import { PillRow } from "@/components/PillRow";
 import type { KeepersResponse, LineupPlayer, MyTeamNeedsResponse, MyTeamResponse, TeamRanking } from "@/lib/api";
 import { BeginnerHelp } from "@/components/BeginnerHelp";
-import { SectionHeading } from "@/components/SectionHeading";
 import { formatRank } from "@/components/SnapshotTile";
-import { ValueRing } from "@/components/ValueRing";
 import {
   buildConstructionObservations,
   buildPositionGroupItems,
@@ -22,7 +23,7 @@ import {
   openSlotsMessage,
   sumScore,
 } from "@/lib/myTeamPresentation";
-import { metricToneBand, percentileFromRank, positionTextClass } from "@/lib/playerPresentation";
+import { percentileFromRank, positionTextClass } from "@/lib/playerPresentation";
 import { ValuesCredit } from "@/components/ValuesCredit";
 import { NextSteps } from "@/components/NextSteps";
 import { PageTitle } from "@/components/PageTitle";
@@ -220,8 +221,20 @@ export function MyTeamContent({
     { glyph: "age", insight: "age", label: "Avg Age", value: teamRanking?.average_age != null ? teamRanking.average_age.toFixed(1) : "—" },
   ];
 
+  const openSlots = openSlotsMessage(myTeam.open_slots);
+  const analysisParts = [
+    needs?.biggest_need ? { key: "need", text: `Biggest need: ${needs.biggest_need.value}`, tone: "warning" as const, strong: true } : null,
+    ...analysisRows.slice(0, 4).map((row) => ({
+      key: row.position,
+      text: `${row.position} ${row.status}`,
+      tone: row.tone === "success" ? ("success" as const) : row.tone === "danger" ? ("danger" as const) : row.tone === "warning" ? ("warning" as const) : undefined,
+    })),
+  ];
+  const keeperList = keepers?.is_keeper_league ? (keepers.candidates ?? []) : [];
+
   return (
     <main className="page-shell">
+      {/* The page's one tab row. Everything below is a Hero plus modules that read while collapsed. */}
       {leagueId ? <PageTabBar family="team" active="roster" leagueId={leagueId} leagueName={leagueName} /> : null}
       <header className="flex flex-col gap-1">
         <PageTitle page="My Team" leagueName={leagueName} />
@@ -230,60 +243,38 @@ export function MyTeamContent({
         </div>
       </header>
 
-      <section className="flex flex-col gap-3" aria-labelledby="team-snapshot-heading">
-        <SectionHeading>
-          <span id="team-snapshot-heading">Team Snapshot</span>
-        </SectionHeading>
-        <div className="flex items-center gap-4">
-          <ValueRing
-            percent={valuePercentile}
-            tone={metricToneBand(valuePercentile) || "mid"}
-            display={valuePercentile !== null ? String(Math.round(valuePercentile)) : "—"}
-            ariaLabel={
-              valuePercentile !== null ? `Team value ${Math.round(valuePercentile)}th percentile` : "Team value unavailable"
+      <Hero
+        label="Team Value"
+        value={formatScore(teamTotalValue)}
+        context={
+          valuePercentile !== null
+            ? `${ordinal(Math.round(valuePercentile))} percentile of ${leagueSize} teams${!bestBall && starters.length > 0 ? ` · Starters ${formatScore(startersTotalValue)}` : ""}`
+            : !bestBall && starters.length > 0
+              ? `Starters ${formatScore(startersTotalValue)}`
+              : null
+        }
+        badge={teamRanking?.archetype_label ? <ToneBadge label={teamRanking.archetype_label} color="var(--color-accent)" /> : undefined}
+        testId="team-hero"
+      />
+
+      <StatStripModule
+        id="team.snapshot"
+        title="Team Snapshot"
+        items={snapshotItems}
+        league={{ id: leagueId, name: leagueName }}
+        footer={
+          <GlossaryNote
+            terms={
+              showFranchiseConstruction
+                ? ["powerRank", "franchiseRank", "starterStrength", "benchStrength", "averageAge", "draftPicks", "pqv", "superflex", "tep"]
+                : ["powerRank", "starterStrength", "benchStrength", "averageAge"]
             }
           />
-          <div className="flex flex-col gap-1 items-start min-w-0">
-            {teamRanking?.archetype_label ? (
-              <span
-                className="px-2 py-1 text-xs font-extrabold uppercase"
-                style={{ background: "var(--color-accent)", color: "var(--color-bg)" }}
-              >
-                {teamRanking.archetype_label}
-              </span>
-            ) : null}
-            <span className="text-xs uppercase font-bold" style={{ color: "var(--color-text-muted)" }}>
-              Team Value
-            </span>
-            <span style={{ font: "var(--type-primary-metric)" }}>{formatScore(teamTotalValue)}</span>
-          </div>
-        </div>
-        <StatStrip items={snapshotItems.slice(0, 3)} columns={3} league={{ id: leagueId, name: leagueName }} />
-        <StatStrip items={snapshotItems.slice(3)} columns={3} league={{ id: leagueId, name: leagueName }} />
-        <GlossaryNote
-          terms={
-            showFranchiseConstruction
-              ? [
-                  "powerRank",
-                  "franchiseRank",
-                  "starterStrength",
-                  "benchStrength",
-                  "averageAge",
-                  "draftPicks",
-                  "pqv",
-                  "superflex",
-                  "tep",
-                ]
-              : ["powerRank", "starterStrength", "benchStrength", "averageAge"]
-          }
-        />
-      </section>
+        }
+      />
 
       {analysisRows.length > 0 ? (
-        <section className="flex flex-col gap-3" aria-labelledby="team-analysis-heading">
-          <SectionHeading>
-            <span id="team-analysis-heading">Team Analysis</span>
-          </SectionHeading>
+        <CompactModule id="team.analysis" title="Team Analysis" testId="team-analysis" parts={analysisParts}>
           <TeamAnalysisList rows={analysisRows} />
           {observations.length > 0 || needs?.biggest_need ? (
             <InfoTip label="Roster notes">
@@ -316,65 +307,63 @@ export function MyTeamContent({
           {needs && needs.weaknesses.length > 0 ? (
             <NextSteps title="Act on a need" steps={["waivers", "trade-hub"]} leagueId={leagueId} leagueName={leagueName} />
           ) : null}
-        </section>
+        </CompactModule>
       ) : null}
 
-      <section className="flex flex-col gap-3" aria-labelledby="roster-heading">
-        <div className="flex items-baseline justify-between">
-          <SectionHeading>
-            <span id="roster-heading">Your Roster</span>
-          </SectionHeading>
-          {!bestBall && starters.length > 0 ? (
-            <span className="text-xs font-bold" style={{ color: "var(--color-accent)" }}>
-              Starters Value {formatScore(startersTotalValue)}
-            </span>
-          ) : null}
-        </div>
-        {bestBall && myTeam.lineup_advice_message ? (
-          <p className="glass-surface text-sm p-4" style={{ color: "var(--color-text-secondary)" }}>
-            {myTeam.lineup_advice_message}
-          </p>
-        ) : null}
-        <RosterTabs
-          tabs={tabs}
-          keepers={keepers?.players}
-          highlightPlayerId={highlightPlayerId}
-          emptyText={bestBall ? "No players on this roster." : "Nobody here yet."}
-          topNote={
-            <>
-              {myTeam.lineup_basis_label && myTeam.lineup_basis && myTeam.lineup_basis !== "season_value" && !bestBall ? (
-                <p className="text-xs" style={{ color: "var(--color-text-muted)" }}>
-                  {myTeam.week ? `Week ${myTeam.week}. ` : ""}
-                  {myTeam.lineup_basis_label}
-                </p>
-              ) : null}
-              {openSlotsMessage(myTeam.open_slots) ? (
-                <p className="text-sm font-bold" role="status" style={{ color: "var(--color-warning)" }}>
-                  {openSlotsMessage(myTeam.open_slots)}
-                </p>
-              ) : null}
-            </>
-          }
-        />
-      </section>
+      {bestBall && myTeam.lineup_advice_message ? (
+        <p className="glass-surface text-sm p-4" style={{ color: "var(--color-text-secondary)" }}>
+          {myTeam.lineup_advice_message}
+        </p>
+      ) : null}
+      <RosterSections
+        tabs={tabs}
+        keepers={keepers?.players}
+        highlightPlayerId={highlightPlayerId}
+        emptyText={bestBall ? "No players on this roster." : "Nobody here yet."}
+        topNote={
+          <>
+            {myTeam.lineup_basis_label && myTeam.lineup_basis && myTeam.lineup_basis !== "season_value" && !bestBall ? (
+              <p className="text-xs" style={{ color: "var(--color-text-muted)" }}>
+                {myTeam.week ? `Week ${myTeam.week}. ` : ""}
+                {myTeam.lineup_basis_label}
+              </p>
+            ) : null}
+            {openSlots ? (
+              <p className="text-sm font-bold" role="status" style={{ color: "var(--color-warning)" }}>
+                {openSlots}
+              </p>
+            ) : null}
+          </>
+        }
+      />
 
       {composition.length > 0 ? (
-        <section className="flex flex-col gap-3" aria-labelledby="composition-heading">
-          <SectionHeading>
-            <span id="composition-heading">Roster Composition</span>
-          </SectionHeading>
+        <CompactModule
+          id="team.composition"
+          title="Roster Composition"
+          tone="muted"
+          parts={composition.map((segment) => ({ key: segment.key, text: `${segment.label} ${segment.percent}%` }))}
+        >
           <RosterCompositionBar segments={composition} />
-        </section>
+        </CompactModule>
       ) : null}
 
-      {keepers?.is_keeper_league && (keepers.candidates?.length ?? 0) > 0 ? (
-        <section className="flex flex-col gap-3" aria-labelledby="keeper-candidates-heading">
-          <SectionHeading>
-            <span id="keeper-candidates-heading">Keeper candidates</span>
-          </SectionHeading>
+      {keeperList.length > 0 && keepers ? (
+        <CompactModule
+          id="team.keepers"
+          title="Keeper candidates"
+          tone="success"
+          parts={listSummaryParts({
+            count: keeperList.length,
+            noun: "candidate",
+            highlights: [
+              keepers.keep_count != null ? `Keep up to ${keepers.keep_count}` : null,
+              (keepers.recommended_ids?.length ?? 0) > 0 ? `${keepers.recommended_ids?.length} recommended` : null,
+            ],
+          })}
+        >
           <p className="text-xs" style={{ color: "var(--color-text-muted)" }}>
-            Keep up to {keepers.keep_count} {KEEPER_BASIS_LABEL[keepers.keep_count_basis ?? ""] ?? ""}. Rounds and
-            surplus are estimates.
+            Keep up to {keepers.keep_count} {KEEPER_BASIS_LABEL[keepers.keep_count_basis ?? ""] ?? ""}. Rounds and surplus are estimates.
           </p>
           {onKeeperRoundPenalty ? (
             <div className="flex items-center gap-3">
@@ -389,12 +378,8 @@ export function MyTeamContent({
             </div>
           ) : null}
           <div>
-            {keepers.candidates!.map((c) => (
-              <div
-                key={c.player_id}
-                className="flex items-center gap-3 py-2"
-                style={{ borderBottom: "var(--border-width-default) solid var(--color-border)" }}
-              >
+            {keeperList.map((c) => (
+              <div key={c.player_id} className="flex items-center gap-3 py-2" style={{ borderBottom: "var(--border-width-default) solid var(--color-border)" }}>
                 <PlayerIdentity
                   identity={{ player_id: c.player_id, name: c.name, position: c.position, sourceLabel: "My Team" }}
                   playerId={c.player_id}
@@ -404,15 +389,19 @@ export function MyTeamContent({
                 >
                   {c.reason}
                 </PlayerIdentity>
-                {keepers.recommended_ids?.includes(c.player_id) ? (
-                  <ToneBadge label="Keep" color="var(--color-success)" />
-                ) : null}
+                {keepers.recommended_ids?.includes(c.player_id) ? <ToneBadge label="Keep" color="var(--color-success)" /> : null}
               </div>
             ))}
           </div>
-        </section>
+        </CompactModule>
       ) : null}
       <ValuesCredit />
     </main>
   );
+}
+
+function ordinal(n: number): string {
+  const v = n % 100;
+  const suffix = v >= 11 && v <= 13 ? "th" : ({ 1: "st", 2: "nd", 3: "rd" } as Record<number, string>)[n % 10] ?? "th";
+  return `${n}${suffix}`;
 }

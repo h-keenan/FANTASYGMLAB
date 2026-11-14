@@ -1,6 +1,7 @@
 import { fireEvent, render, screen } from "@testing-library/react";
-import { describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it } from "vitest";
 
+import { collapsedModuleProblems } from "@/components/ui/assertCompactInformative";
 import { MyTeamContent } from "./MyTeamContent";
 import type { LineupPlayer, MyTeamNeedsResponse, MyTeamResponse, TeamRanking } from "@/lib/api";
 
@@ -128,15 +129,24 @@ const TEAM_RANKING: TeamRanking = {
   health_flag: "Stable",
 };
 
+/** Open a CompactModule by its collapsed header. */
+function open(title: string) {
+  fireEvent.click(screen.getByRole("button", { name: new RegExp(`^${title}:`) }));
+}
+
+beforeEach(() => window.localStorage.clear());
+
 describe("MyTeamContent need links", () => {
   it("offers Waivers and Trade Hub under Team Analysis when there is a real need", () => {
     render(<MyTeamContent leagueId="L1" leagueName="Dynasty Overlords" myTeam={MY_TEAM} needs={NEEDS} teamRanking={TEAM_RANKING} leagueSize={10} />);
+    open("Team Analysis");
     expect(screen.getByRole("link", { name: /Find a waiver add/ })).toHaveAttribute("href", "/waivers/L1?name=Dynasty%20Overlords");
     expect(screen.getByRole("link", { name: /See trade ideas/ })).toHaveAttribute("href", "/trade-hub/L1?name=Dynasty%20Overlords");
   });
 
   it("makes every Team Snapshot tile a link to the rank board that explains it, Avg Age included", () => {
     render(<MyTeamContent leagueId="L1" leagueName="My League" myTeam={MY_TEAM} needs={NEEDS} teamRanking={TEAM_RANKING} leagueSize={10} />);
+    open("Team Snapshot");
     expect(screen.getByRole("link", { name: /Avg Age.*open the Roster Age rankings/ })).toHaveAttribute("href", "/league-rankings/L1?name=My%20League#board-age");
     expect(screen.getByRole("link", { name: /Record.*open your league standing/ })).toHaveAttribute("href", "/league-rankings/L1?name=My%20League#your-standing");
     expect(screen.getByRole("link", { name: /Bench Strength.*Bench Depth rankings/ })).toBeInTheDocument();
@@ -149,6 +159,14 @@ describe("MyTeamContent need links", () => {
 });
 
 describe("MyTeamContent", () => {
+  it("has one hero, no second tab row, and no collapsed module that is an empty header", () => {
+    const { container } = render(<MyTeamContent leagueName="Dynasty Overlords" myTeam={MY_TEAM} needs={NEEDS} teamRanking={TEAM_RANKING} leagueSize={10} />);
+    expect(screen.getAllByTestId("team-hero")).toHaveLength(1);
+    expect(screen.queryAllByRole("tablist")).toHaveLength(0);
+    expect(container.querySelectorAll('button[aria-expanded="false"]').length).toBeGreaterThan(2);
+    expect(collapsedModuleProblems(container)).toEqual([]);
+  });
+
   it("renders real starters/bench with OVR gauges and canonical position colors", () => {
     render(<MyTeamContent leagueName="Dynasty Overlords" myTeam={MY_TEAM} needs={NEEDS} teamRanking={TEAM_RANKING} leagueSize={10} />);
 
@@ -157,14 +175,14 @@ describe("MyTeamContent", () => {
     expect(screen.getByText("Test Running Back")).toBeInTheDocument();
     // Bench and IR players live behind their own tabs.
     expect(screen.queryByText("Test Bench Receiver")).not.toBeInTheDocument();
-    fireEvent.click(screen.getByRole("tab", { name: "Bench" }));
+    open("Bench");
     expect(screen.getByText("Test Bench Receiver")).toBeInTheDocument();
-    fireEvent.click(screen.getByRole("tab", { name: "IR" }));
+    open("IR");
     expect(screen.getByText("Test IR Tight End")).toBeInTheDocument();
 
     // Circular OVR gauges render a real rating, never a fabricated one for
     // the null case (the IR tight end's overall_rating is null above).
-    fireEvent.click(screen.getByRole("tab", { name: "Starters" }));
+    
     expect(screen.getByText("95")).toBeInTheDocument();
     expect(screen.getByText("88")).toBeInTheDocument();
   });
@@ -178,7 +196,7 @@ describe("MyTeamContent", () => {
       <MyTeamContent leagueName="Dynasty Overlords" myTeam={MY_TEAM} needs={NEEDS} teamRanking={TEAM_RANKING} leagueSize={10} />,
     );
 
-    fireEvent.click(screen.getByRole("tab", { name: "IR" }));
+    open("IR");
     expect(container.querySelector(".value-ring-placeholder")).toBeInTheDocument();
   });
 
@@ -199,7 +217,7 @@ describe("MyTeamContent", () => {
       <MyTeamContent leagueName="Dynasty Overlords" myTeam={mixedOrderTeam} needs={NEEDS} teamRanking={TEAM_RANKING} leagueSize={10} />,
     );
 
-    fireEvent.click(screen.getByRole("tab", { name: "Bench" }));
+    open("Bench");
     const text = container.textContent || "";
     const names = ["Bench Quarterback", "Bench Running Back", "Bench Receiver", "Bench Kicker"];
     const indices = names.map((name) => text.indexOf(name));
@@ -210,7 +228,9 @@ describe("MyTeamContent", () => {
   it("renders Team Analysis rows with a short status and the sentence only when expanded", () => {
     render(<MyTeamContent leagueName="Dynasty Overlords" myTeam={MY_TEAM} needs={NEEDS} teamRanking={TEAM_RANKING} leagueSize={10} />);
 
-    expect(screen.getByRole("heading", { name: "Team Analysis" })).toBeInTheDocument();
+    // Collapsed it already says which rooms are strong or thin.
+    expect(screen.getByRole("button", { name: /^Team Analysis: .*WR Thin/ })).toBeInTheDocument();
+    open("Team Analysis");
     expect(screen.getByText("Thin")).toBeInTheDocument();
     expect(screen.queryByText("WR is below the league comparison baseline.")).not.toBeInTheDocument();
     fireEvent.click(screen.getByText("Thin"));
@@ -220,6 +240,7 @@ describe("MyTeamContent", () => {
   it("shows the snapshot tiles and the real team value total", () => {
     render(<MyTeamContent leagueName="Dynasty Overlords" myTeam={MY_TEAM} needs={NEEDS} teamRanking={TEAM_RANKING} leagueSize={10} />);
 
+    open("Team Snapshot");
     expect(screen.getByText("Starter Strength")).toBeInTheDocument();
     expect(screen.getByText("Bench Strength")).toBeInTheDocument();
     expect(screen.getByText("Win-Now Contender")).toBeInTheDocument();
@@ -230,7 +251,8 @@ describe("MyTeamContent", () => {
   it("builds Roster Composition from real values and omits Taxi when there is none", () => {
     render(<MyTeamContent leagueName="Dynasty Overlords" myTeam={MY_TEAM} needs={NEEDS} teamRanking={TEAM_RANKING} leagueSize={10} />);
 
-    expect(screen.getByRole("heading", { name: "Roster Composition" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /^Roster Composition: Starters 50% · Bench 25% · IR 25%/ })).toBeInTheDocument();
+    open("Roster Composition");
     expect(screen.getByRole("img", { name: "Starters 50%, Bench 25%, IR 25%" })).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Taxi" })).not.toBeInTheDocument();
     expect(screen.queryByText(/placeholder/i)).not.toBeInTheDocument();
@@ -336,7 +358,7 @@ describe("MyTeamContent", () => {
     };
     render(<MyTeamContent leagueName="Dynasty Overlords" myTeam={weekly} needs={NEEDS} teamRanking={TEAM_RANKING} leagueSize={10} />);
 
-    fireEvent.click(screen.getByRole("tab", { name: "Bench" }));
+    open("Bench");
     expect(screen.getByText("· BYE")).toBeInTheDocument();
     expect(screen.getByRole("status")).toHaveTextContent("Open slot this week: TE");
     expect(screen.getByText(/Week 7\. This week's lineup/)).toBeInTheDocument();
@@ -366,12 +388,12 @@ describe("MyTeamContent best ball", () => {
       />,
     );
     expect(screen.getByText("Best ball league: Sleeper sets your lineup automatically.")).toBeInTheDocument();
-    expect(screen.queryByRole("tab", { name: "Starters" })).not.toBeInTheDocument();
-    expect(screen.getByRole("tab", { name: "Roster" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /^Starters:/ })).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /^Roster:/ })).toBeInTheDocument();
     // Suggested starters and active bench share the one roster list.
     expect(screen.getByText("Test Quarterback")).toBeInTheDocument();
     expect(screen.getByText("Test Bench Receiver")).toBeInTheDocument();
-    fireEvent.click(screen.getByRole("tab", { name: "IR" }));
+    open("IR");
     expect(screen.getByText("Test IR Tight End")).toBeInTheDocument();
   });
 
@@ -383,7 +405,7 @@ describe("MyTeamContent best ball", () => {
     render(
       <MyTeamContent leagueName="IDP League" myTeam={{ ...MY_TEAM, idp_players: idp }} needs={NEEDS} teamRanking={TEAM_RANKING} leagueSize={12} />,
     );
-    fireEvent.click(screen.getByRole("tab", { name: "IDP" }));
+    open("IDP");
     expect(screen.getByText("Test Edge")).toBeInTheDocument();
     expect(screen.getByText("Test Backer")).toBeInTheDocument();
     expect(screen.getByText("900")).toBeInTheDocument();

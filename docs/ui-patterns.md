@@ -521,6 +521,44 @@ status, and an optional single trailing `action` (a button such as "Draft Gibbs"
 
 Not-yet-migrated pages keep working; migrate one page per PR (the plan's later phases). `SimFold` already renders it.
 
+## Module templates (the catalog every page is built from)
+
+Direction (coridian_): the data points exist; the problem is how they are represented. Every page is a short stack of a
+small set of templates, and the Fantasy Sim uses the same templates through thin adapters. No module may be an empty
+header when collapsed. The catalog lives in code, `lib/moduleTemplates.ts` (byte-identical web + app twin, listed in
+`IDENTICAL` in `scripts/check_lib_twins.mjs`): `MODULE_TEMPLATES` (purpose, required props, collapsed-form rule, density
+tier, min/max height, web and app component) and `SIM_TEMPLATE_ADAPTERS`.
+
+| Template | Web | App | Collapsed form must show | Tier / height |
+|---|---|---|---|---|
+| Hero | `ui/ModuleTemplates#Hero` | `ModuleTemplates#Hero` | always open: big value + one context line + signed trend (sparkline from 2+ points, none otherwise) | T2, 88-120 |
+| CompactModule / CompactSummary (the base) | `ui/CompactModule` | `CompactModule` | title + 1-2 line summary (`parts`), optional one action | T0, 56-96 |
+| StatStrip | `StatStrip` inside `ui/ModuleTemplates#StatStripModule` | `DashboardStatRow` inside `StatStripModule` | "Power #3 · Starters #5 · Age 26.1" built by `statStripParts` | T3 |
+| LinkModule (a CompactSummary that navigates) | `ui/ModuleTemplates#LinkModule` | `LinkModule` | same summary, arrow instead of +/- | T0 |
+| Row (player / team / pick / trade asset) | `PlayerListRow`, `PickRow`, `StructuredRow` | `PlayerListRow`, `DraftPickAssetRow` | name + chip line; right edge = one action or number | T1, 56-72 |
+| Section header | `SectionHeading` | `SectionHeading` | title + count/context; never alone | T0 |
+| ActionBar | `SimActionBar`, `.bottom-stack` | `QuickActionsGrid` | max 3 labelled 44px actions; hidden if none | T0 |
+| List + FilterRow | `PillRow` + `ui/FilterSheet` | `FilterSheet` | ONE 44px control row; the rest behind Filters | T0 |
+| TabPage shell | `PageTabBar` | `SegmentedTabBar` | one tab row, 2-5 tabs, never a second | T0 |
+| Empty / Error / Loading | `EmptyState`, `ErrorState`, `Skeleton` | `EmptyState`, `ErrorState` | title + reason + one next step | T1 |
+| TrendChart usage | `ui/TrendChart` | `TrendChart` | `variant="compact"` sparkline beside a number | T2 |
+| InsightLink | `ui/InsightLink` | `InsightRow` | the stat itself, tappable | T0 |
+
+Pure builders in the lib twin keep the two platforms identical: `statStripParts`, `listSummaryParts` ("3 alerts · Gibbs out"),
+`trendModel` (delta, direction, tone; `higherIsBetter=false` for ranks), `heroParts`, `collapsedVerdict`.
+
+**The collapsed-form rule (lint-style, enforced).** A collapsed module renders at least `MIN_COLLAPSED_CHARS` (12) characters of
+real data; placeholders ("—", "Loading…") do not count and a title never counts. Enforced three ways:
+`collapsedVerdict` (lib), `collapsedModuleProblems(container)` in `ui/assertCompactInformative.ts` (page tests assert
+`expect(collapsedModuleProblems(container)).toEqual([])` on Today and My Team), and a source scan in
+`ui/ModuleTemplates.test.tsx` that fails if any `<CompactModule>` in `web-next/src` or `mobile/src` lacks `parts`/`summary`.
+
+**Fantasy Sim adapters** (no template of their own): SimFold (CompactModule + `simSummaries`), SimDraftHero (Hero + bar),
+SimDraftRow / SimPlayerLine / SimRosterLine (Row), SimDraftBoard filters (List + FilterRow), SimActionBar (ActionBar),
+SimNotice (state), SimGameHome modules (CompactModule via `simInboxParts` etc.), SimGameTeamSheet / SimPlayerSheet (Sheet tabs).
+
+Rollout status per page: `docs/audits/2026-11-module-templates-rollout.md`.
+
 ## Player row anatomy (shared by FantasyDesk and the Fantasy Sim)
 
 `PlayerListRow` is THE row: line 1 name (+ the one status chip), line 2 muted meta (TEAM, age, bye), line 3 the **chips

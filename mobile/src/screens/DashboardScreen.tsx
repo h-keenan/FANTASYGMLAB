@@ -57,6 +57,8 @@ import ScreenInfoNote from '../components/ScreenInfoNote';
 import FreeLimitNote from '../components/FreeLimitNote';
 import GlossaryNote from '../components/GlossaryNote';
 import SectionHeading from '../components/SectionHeading';
+import CompactModule from '../components/CompactModule';
+import { listSummaryParts } from '../lib/moduleTemplates';
 import BriefingItemPlayers from '../components/BriefingItemPlayers';
 import LeaguePulseCard from '../components/LeaguePulseCard';
 import { leaguePulseHighlights } from '../lib/leaguePulse';
@@ -544,15 +546,14 @@ export default function DashboardScreen({ route, navigation }: Props) {
 
       {teamSnapshot ? (
         <View style={styles.snapshotSection}>
-          <SectionHeading
-            title="My Team"
-            right={
-              <TouchableOpacity onPress={() => navigation.navigate('MyTeam', { leagueId, leagueName })} hitSlop={LINK_HIT_SLOP}>
-                <AppText style={styles.viewAll}>Open ›</AppText>
-              </TouchableOpacity>
-            }
+          <DashboardTeamStats
+            snapshot={teamSnapshot}
+            teams={teamRankings}
+            leagueId={leagueId}
+            leagueName={leagueName}
+            onNavigate={navigate}
+            onOpen={() => navigation.navigate('MyTeam', { leagueId, leagueName })}
           />
-          <DashboardTeamStats snapshot={teamSnapshot} teams={teamRankings} leagueId={leagueId} leagueName={leagueName} onNavigate={navigate} />
         </View>
       ) : null}
 
@@ -1173,14 +1174,23 @@ export function WatchlistAlertsSection({
 
   return (
     <View style={styles.groupSection}>
-      <SectionHeading
+      <CompactModule
+        id="today.watchlist"
         title="Watchlist & Alerts"
-        right={
-          <TouchableOpacity onPress={() => navigation.navigate('Alerts', { leagueId, leagueName })} hitSlop={LINK_HIT_SLOP}>
-            <AppText style={styles.viewAll}>View All ›</AppText>
+        label="Watchlist and alerts"
+        testID="dashboard-watchlist"
+        tone="warning"
+        parts={listSummaryParts({
+          count: items.length + (showHealth ? 1 : 0),
+          noun: 'alert',
+          highlights: [items[0]?.headline ?? (showHealth ? 'Key injuries on your roster' : null)],
+        })}
+        action={
+          <TouchableOpacity onPress={() => navigation.navigate('Alerts', { leagueId, leagueName })} hitSlop={LINK_HIT_SLOP} style={{ minHeight: 44, justifyContent: 'center' }}>
+            <AppText style={styles.viewAll}>All ›</AppText>
           </TouchableOpacity>
         }
-      />
+      >
       {richItems.map((item, index) => (
         <TopPriorityTradeCard
           key={`watch-trade-${index}`}
@@ -1231,6 +1241,7 @@ export function WatchlistAlertsSection({
           ))}
         </AnimatedCard>
       ) : null}
+      </CompactModule>
     </View>
   );
 }
