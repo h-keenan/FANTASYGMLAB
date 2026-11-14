@@ -3843,20 +3843,34 @@ main > header:has(> h1.sr-only:only-child) {
    hairline, motion is 160ms and off under prefers-reduced-motion. Same glass tokens as the footer. */
 .pill-row-glass {
   top: 0;
-  margin-inline: calc(var(--page-gutter, 1rem) * -1);
-  padding: 6px var(--page-gutter, 1rem);
-  background: linear-gradient(180deg, color-mix(in srgb, var(--color-surface-raised, var(--color-surface)) 46%, transparent), color-mix(in srgb, var(--color-bg) 78%, transparent));
+  /* Full-bleed on phones. The strip lives inside a page column padded by --page-gutter; negative margins alone leave a
+     `width: 100%` box SHIFTED left by the gutter (right edge short by 2x gutter: page content peeked out on the right),
+     so the width is stated explicitly as the column plus both gutters. */
+  --pill-row-gutter: var(--page-gutter, 1rem);
+  width: calc(100% + 2 * var(--pill-row-gutter)) !important;
+  max-width: none;
+  margin-inline: calc(var(--pill-row-gutter) * -1);
+  padding: 6px var(--pill-row-gutter);
+  box-sizing: border-box;
+  /* Solid glass: an OPAQUE base (page background) under the translucent tint, so scrolled content never shows
+     through; the blur only softens the shadow edge. */
+  background-color: var(--color-bg);
+  background-image: linear-gradient(180deg, color-mix(in srgb, var(--color-surface-raised, var(--color-surface)) 46%, transparent), color-mix(in srgb, var(--color-surface-raised, var(--color-surface)) 18%, transparent));
   -webkit-backdrop-filter: blur(20px) saturate(170%);
   backdrop-filter: blur(20px) saturate(170%);
   border-bottom: var(--border-width-default) solid var(--glass-border, var(--color-border));
+  box-shadow: 0 6px 10px -8px rgb(0 0 0 / 0.5);
 }
 @media (max-width: 767px) {
   body:has(.shell-header) .pill-row-glass { top: var(--bar-header-height, 52px); }
 }
 @media (min-width: 768px) {
-  .pill-row-glass { margin-inline: 0; border: var(--border-width-default) solid var(--glass-border, var(--color-border)); border-radius: var(--radius-panel, 16px); padding: 4px; }
+  .pill-row-glass { width: 100% !important; margin-inline: 0; border: var(--border-width-default) solid var(--glass-border, var(--color-border)); border-radius: var(--radius-panel, 16px); padding: 4px; }
 }
-.pill-row-glass-scroller { gap: 4px !important; scroll-snap-type: x proximity; scroll-padding-inline: 12px; overscroll-behavior-x: contain; }
+/* Tabs share the row equally when they fit (equal-width columns, so the set is centred) and keep their natural width,
+   scrolling, only when they overflow. A flex scroller shrink-wrapped its tabs to the left; a grid with
+   minmax(max-content, 1fr) columns is equal-width when it fits and content-width when it does not. */
+.pill-row-glass-scroller { display: grid !important; grid-auto-flow: column; grid-auto-columns: minmax(max-content, 1fr); width: 100%; gap: 4px !important; scroll-snap-type: x proximity; scroll-padding-inline: 12px; overscroll-behavior-x: contain; }
 .pill-row-glass-scroller > [role="tab"] {
   scroll-snap-align: center;
   border-radius: var(--radius-pill, 999px);
