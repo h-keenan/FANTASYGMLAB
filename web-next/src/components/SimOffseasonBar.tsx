@@ -11,8 +11,8 @@ import { simOffseasonCta, simOffseasonStageLabel, type SimOffseason, type SimOff
 /**
  * The one persistent primary action for every offseason tab (Offseason, Team,
  * Trades, League): Start rookie draft, Auto-draft the rest (asks first), then
- * "Finish cut-down" (disabled, with the reason) until the roster is legal and
- * Start season N. A floating glass pill above the bottom tab bar on phones (no orb), sticky on desktop, same frame as SimActionBar. It reads the offseason
+ * Start season N (saves from before the soft roster limit show "Finish cut-down", disabled with the reason, until the roster is legal;
+ * newer saves only show a compact over-the-limit note: you can start the season over the limit, you just cannot add players). A floating glass pill above the bottom tab bar on phones (no orb), sticky on desktop, same frame as SimActionBar. It reads the offseason
  * itself, so any tab can mount it. Mobile twin: mobile/src/components/SimOffseasonBar.tsx.
  */
 export function SimOffseasonBar({ ctx, onTab, orb }: { ctx: SimCtx; onTab?: (tab: "home") => void; orb?: ReactNode }) {
@@ -81,6 +81,9 @@ export function SimOffseasonBar({ ctx, onTab, orb }: { ctx: SimCtx; onTab?: (tab
             <Button size="sm" variant="ghost" onClick={() => setConfirmAuto(false)}>Keep drafting</Button>
           </div>
         </div>
+      ) : null}
+      {cta.note ? (
+        <p className="px-4 pt-1.5 text-center text-xs font-bold" style={{ color: "var(--color-warning)" }} role="status" data-testid="offseason-over-note">{cta.note}</p>
       ) : null}
       {cta.blocked ? (
         <p id={reasonId} className="px-4 pt-1.5 text-center text-xs font-bold" style={{ color: "var(--color-warning)" }} role="status">{cta.blocked}</p>

@@ -41,6 +41,7 @@ DEFAULT_TAXI_SLOTS_DYNASTY = 4
 RESERVE_VERSION = 1
 AI_VERSION = 1  # 1: AI managers plan depth around byes and injuries, use the wire proactively (new games only)
 VIEWS_KEPT = 2  # dynasty_v 3: season pools kept in memory behind the latest
+LIMIT_VERSION = 1  # 1 = a roster over the limit never blocks advancing, only acquiring players (0 = a save from before it: over the limit blocks Advance and Start season)
 BLOCK_VERSION = 2  # 1 = the trade block: user block, AI blocks, block-aware offers (0 = a save from before it: nothing changes); 2 = an asset leaving the team leaves the block for good
 TIEBREAKERS = ("points_for", "head_to_head")  # standings/seed tiebreak after win pct
 DEFAULT_TIEBREAKER = "points_for"
@@ -192,6 +193,13 @@ class GameSettings:
     taxi_years: int = 2  # years of NFL experience a player may have and still sit on the taxi squad
     # AI manager generation (0 = a save from before bye/injury-aware depth planning: its AI decisions replay exactly as they were).
     ai_v: int = 0
+    # Roster limit rule generation (0 = a save from before it: being over the limit hard-stops Advance / Start season).
+    limit_v: int = 0
+
+    @property
+    def soft_limit(self) -> bool:
+        """limit_v 1+: a roster over the limit never blocks the game moving on; it only blocks acquiring players until back under."""
+        return self.limit_v >= 1
 
     @property
     def ai_depth(self) -> bool:
@@ -328,7 +336,7 @@ class GameSettings:
             slots=slots, rounds=rounds, roster_limit=limit, playoff_teams=4 if teams <= 8 else 6,
             mode=mode, te_premium=float(te_premium), superflex=superflex, include_k=include_k,
             include_def=include_def, bench=bench, tiebreaker=tiebreaker,
-            reserve_v=RESERVE_VERSION, block_v=BLOCK_VERSION, ir_slots=ir_slots, taxi_slots=taxi_slots, taxi_years=taxi_years, ai_v=AI_VERSION,
+            reserve_v=RESERVE_VERSION, block_v=BLOCK_VERSION, ir_slots=ir_slots, taxi_slots=taxi_slots, taxi_years=taxi_years, ai_v=AI_VERSION, limit_v=LIMIT_VERSION,
             seasons=seasons, start_year=start_year, rookie_rounds=rookie_rounds,
             pick_years=PICK_YEARS if mode == "dynasty" else 0, dynasty_v=DYNASTY_VERSION if mode == "dynasty" else 0,
         )
@@ -353,6 +361,8 @@ class GameSettings:
             out["ai_v"] = self.ai_v
         if self.block_v:
             out["block_v"] = self.block_v
+        if self.limit_v:  # absent on every save made before the soft limit
+            out["limit_v"] = self.limit_v
         if self.dynasty_v:  # only dynasty saves carry these: every other save serializes exactly as before
             out.update({
                 "seasons": self.seasons, "start_year": self.start_year, "pick_years": self.pick_years,
@@ -389,6 +399,7 @@ class GameSettings:
             dynasty_v=int(raw.get("dynasty_v") or 0), reserve_v=int(raw.get("reserve_v") or 0), block_v=int(raw.get("block_v") or 0),
             ir_slots=int(raw.get("ir_slots") or 0), taxi_slots=int(raw.get("taxi_slots") or 0),
             taxi_years=int(raw.get("taxi_years", 2)), ai_v=int(raw.get("ai_v") or 0),
+            limit_v=int(raw.get("limit_v") or 0),
         )
 
 

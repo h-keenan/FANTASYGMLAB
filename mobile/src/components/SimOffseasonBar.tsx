@@ -13,8 +13,8 @@ import { radii, spacing, type ThemeColors } from '../theme';
 /**
  * The one persistent primary action for every offseason tab (Offseason, Team,
  * Trades, League), mirroring web-next's SimOffseasonBar: Start rookie draft,
- * Auto-draft the rest (asks first), "Finish cut-down" (disabled with the
- * reason) until the roster is legal, then Start season N. It reads the
+ * Auto-draft the rest (asks first), Start season N ("Finish cut-down",
+ * disabled with the reason, only in saves from before the soft roster limit; newer saves show a compact over-the-limit note and can start over the limit). It reads the
  * offseason itself so any tab can mount it. An in-flow glass pill like
  * SimActionBar: the screen's bottom stack docks it with the game orb above it.
  */
@@ -90,6 +90,11 @@ export default function SimOffseasonBar({ ctx, onTab, orb }: { ctx: SimCtx; onTa
             <Button size="sm" variant="ghost" label="Keep drafting" onPress={() => setConfirmAuto(false)} />
           </View>
         </View>
+      ) : null}
+      {cta.note ? (
+        <AppText style={styles.reason} testID="offseason-over-note">
+          {cta.note}
+        </AppText>
       ) : null}
       {cta.blocked ? (
         <AppText style={styles.reason} accessibilityRole="alert">
