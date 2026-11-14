@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 const baseDetail = {
@@ -37,10 +37,14 @@ async function mountWith(recent_trades: unknown[]) {
 }
 
 describe("ManagerProfileSheet recent trades", () => {
-  afterEach(() => vi.doUnmock("@/lib/api"));
+  afterEach(() => {
+    vi.doUnmock("@/lib/api");
+    window.sessionStorage.clear();
+  });
 
   it("renders trades with pick plate, position badge and grade", async () => {
     await mountWith([trade]);
+    fireEvent.click(await screen.findByRole("tab", { name: "Trades" }));
     expect(await screen.findByText("Recent trades")).toBeTruthy();
     expect(screen.getByText("2026 1st")).toBeTruthy();
     expect(screen.getByText("Vet WR One")).toBeTruthy();
@@ -51,13 +55,24 @@ describe("ManagerProfileSheet recent trades", () => {
 
   it("omits the grade badge when null and hides the section when empty", async () => {
     await mountWith([{ ...trade, grade: null }]);
+    fireEvent.click(await screen.findByRole("tab", { name: "Trades" }));
     expect(await screen.findByText("Recent trades")).toBeTruthy();
     expect(screen.queryByText("B+")).toBeNull();
   });
 
   it("hides the section when there are no recent trades", async () => {
     await mountWith([]);
+    fireEvent.click(await screen.findByRole("tab", { name: "Tendencies" }));
     expect(await screen.findByText("Leaning rebuild.")).toBeTruthy();
+    expect(screen.queryByRole("tab", { name: "Trades" })).toBeNull();
     expect(screen.queryByText("Recent trades")).toBeNull();
+  });
+
+  it("groups the sheet into Overview, Tendencies and Trades with the sample on Overview", async () => {
+    await mountWith([trade]);
+    expect(await screen.findByRole("tab", { name: "Overview" })).toHaveAttribute("aria-selected", "true");
+    expect(screen.getByRole("tab", { name: "Tendencies" })).toBeTruthy();
+    expect(screen.getByText("Wire moves")).toBeTruthy();
+    expect(screen.queryByText("Leaning rebuild.")).toBeNull();
   });
 });

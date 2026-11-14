@@ -1,9 +1,10 @@
 "use client";
 
-import { useEffect, useId, useRef, useState, type ReactNode } from "react";
+import { useEffect, useId, useLayoutEffect, useRef, useState, type ReactNode } from "react";
 
 import { PillRow } from "@/components/PillRow";
 import { readSavedTab, resolveTab, saveTab, tabDirection } from "@/lib/sessionTab";
+import { nextPanelMinHeight } from "@/lib/sheetTabs";
 import type { TabIconName } from "@/lib/tabIcons";
 
 export interface TabItem {
@@ -37,6 +38,7 @@ export function Tabs({
   initial,
   ariaLabel,
   onChange,
+  sticky = true,
 }: {
   /** Stable name of the surface ("pqv", "sim-team"); the remembered tab is stored under it. */
   id: string;
@@ -44,6 +46,8 @@ export function Tabs({
   initial?: string;
   ariaLabel?: string;
   onChange?: (key: string) => void;
+  /** Pin the tab strip to the top of the sheet's scroll area (default). Off only where nothing scrolls. */
+  sticky?: boolean;
 }) {
   const uid = useId().replace(/:/g, "");
   const keys = tabs.map((t) => t.key);
@@ -65,9 +69,24 @@ export function Tabs({
     previous.current = current;
   }, [current]);
 
+  // No layout jump between tabs: the panel keeps the tallest height this open sheet has shown as its minimum, so a
+  // short tab after a long one does not pull the sheet (and the strip) up under the finger.
+  const panelRef = useRef<HTMLDivElement>(null);
+  const [minHeight, setMinHeight] = useState(0);
+  useLayoutEffect(() => {
+    const el = panelRef.current;
+    if (!el) return;
+    const measured = el.scrollHeight;
+    setMinHeight((prev) => {
+      const next = nextPanelMinHeight(prev, measured);
+      return next === prev ? prev : next;
+    });
+  });
+
   const tab = tabs.find((t) => t.key === current);
   return (
     <div className="flex flex-col gap-3" data-testid="tabs">
+      <div className={sticky ? "tabs-sticky" : undefined} data-sticky={sticky ? "true" : undefined}>
       <PillRow
         slim
         variant="scroll"
@@ -77,8 +96,11 @@ export function Tabs({
         active={current}
         onSelect={select}
       />
+      </div>
       <div
         key={current}
+        ref={panelRef}
+        style={minHeight > 0 ? { minHeight } : undefined}
         role="tabpanel"
         id={`${id}-${uid}-panel-${current}`}
         aria-labelledby={`${id}-${uid}-tab-${current}`}

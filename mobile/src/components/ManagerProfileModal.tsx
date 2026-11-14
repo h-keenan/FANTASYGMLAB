@@ -14,6 +14,8 @@ import PositionBadge from './PositionBadge';
 import SectionHeading from './SectionHeading';
 import TeamAvatar from './TeamAvatar';
 import ToneBadge from './ToneBadge';
+import { useTabs } from './Tabs';
+import { managerProfileTabs } from '../lib/sheetTabs';
 import { api } from '../lib/api';
 import { gradeToneSlug, sampleFill, TENDENCY_SIGNALS, tendencyBadgeText, tendencyTone, tradeDateLabel, type ManagerRecentTradeAsset } from '../lib/managerTendencies';
 import { queryKeys } from '../lib/queryKeys';
@@ -65,6 +67,127 @@ export default function ManagerProfileModal({ visible, onClose, leagueId, league
   const toneColors = { success: colors.success, warning: colors.premium, accent: colors.accent, premium: colors.violet };
   const rows = TENDENCY_SIGNALS.filter(([key]) => signals[key]?.status === 'ok');
 
+  const premiumReady = Boolean(data?.is_premium) && rows.length > 0;
+  const overviewPanel = (
+    <>
+      <OpponentProfileCard profile={profileQuery.data} onOffer={offer} />
+      {query.isError ? (
+        <AppText style={styles.muted}>Couldn&apos;t load this profile.</AppText>
+      ) : !data ? (
+        <AppText style={styles.muted}>Loading…</AppText>
+      ) : !data.is_premium ? (
+        <TouchableOpacity
+          onPress={() => {
+            onClose();
+            navigation.navigate('Paywall');
+          }}
+        >
+          <AppText style={styles.upsellTitle}>{data.upsell?.title ?? 'Manager Tendencies'}</AppText>
+          <AppText style={styles.upsellCta}>Upgrade</AppText>
+        </TouchableOpacity>
+      ) : rows.length === 0 ? (
+        <AppText style={styles.muted}>Not enough trade history yet.</AppText>
+      ) : sample ? (
+        <DashboardStatRow
+          items={[
+            { label: 'Trades', icon: 'swap-horizontal', value: String(sample.trades), valueColor: colors.success },
+            { label: 'Wire moves', icon: 'flash-outline', value: String(sample.wire_moves) },
+            { label: 'Seasons', icon: 'calendar-outline', value: String(sample.seasons) },
+          ]}
+        />
+      ) : null}
+    </>
+  );
+  const tendenciesPanel = premiumReady ? (
+    <>
+      <SectionHeading title="Tendencies" />
+      {rows.map(([key, title]) => {
+        const signal = signals[key];
+        const tone = toneColors[tendencyTone(signal.label)];
+        const badge = tendencyBadgeText(signal.label);
+        return (
+          <AccentCard key={key} accent={tone} compact style={styles.signal}>
+            <View style={styles.signalHead}>
+              <AppText style={styles.signalTitle}>{title}</AppText>
+              {badge ? <ToneBadge label={badge} color={tone} /> : null}
+            </View>
+            <AppText style={styles.signalSummary}>{signal.summary}</AppText>
+            <View style={styles.meterRow}>
+              <View style={styles.meterTrack}>
+                <View
+                  style={[
+                    styles.meterFill,
+                    { backgroundColor: tone, width: `${Math.round(sampleFill(signal.sample_size, signal.min_sample) * 100)}%` },
+                  ]}
+                />
+              </View>
+              <AppText style={styles.muted}>
+                {signal.sample_size} trade{signal.sample_size === 1 ? '' : 's'}
+              </AppText>
+            </View>
+          </AccentCard>
+        );
+      })}
+    </>
+  ) : null;
+  const tradesPanel = premiumReady && data?.recent_trades && data.recent_trades.length > 0 ? (
+    <>
+      <>
+        <SectionHeading title="Recent trades" />
+        {(data?.recent_trades ?? []).map((trade) => (
+          <AccentCard key={trade.transaction_id} accent={colors.border} compact style={styles.signal}>
+            <View style={styles.signalHead}>
+              <AppText style={[styles.muted, styles.tradeMeta]} numberOfLines={2}>
+                {tradeDateLabel(trade.date, trade.week)}
+                {trade.partners.length ? ` · with ${trade.partners.join(', ')}` : ''}
+              </AppText>
+              {trade.grade ? (
+                <ToneBadge
+                  label={trade.grade.letter}
+                  color={{ success: colors.success, accent: colors.accent, danger: colors.danger, muted: colors.textSecondary }[gradeToneSlug(trade.grade.tone)]}
+                />
+              ) : null}
+            </View>
+            {([['Got', trade.received], ['Sent', trade.sent]] as Array<[string, ManagerRecentTradeAsset[]]>).map(([label, assets]) =>
+              assets.length ? (
+                <View key={label} style={styles.tradeSide}>
+                  <AppText style={styles.signalTitle}>{label}</AppText>
+                  {assets.map((asset, i) => (
+                    <View key={`${asset.player_id ?? asset.label}-${i}`} style={styles.assetLine}>
+                      {asset.kind === 'pick' ? (
+                        <PickPlate round={asset.round} />
+                      ) : (
+                        <View style={styles.badgeGap}>
+                          <PositionBadge position={asset.position} />
+                        </View>
+                      )}
+                      <AppText style={styles.assetName} numberOfLines={2}>
+                        {asset.kind === 'pick' ? asset.label || 'Draft pick' : asset.name}
+                        {asset.kind === 'player' && asset.team ? `  ${asset.team}` : ''}
+                      </AppText>
+                    </View>
+                  ))}
+                </View>
+              ) : null,
+            )}
+          </AccentCard>
+        ))}
+      </>
+    </>
+  ) : null;
+  const tabs = useTabs({
+    id: 'manager-profile',
+    tabs: managerProfileTabs({
+      hasProfile: profileQuery.data != null,
+      tendencyCount: data?.is_premium ? rows.length : 0,
+      tradeCount: data?.is_premium ? data.recent_trades?.length ?? 0 : 0,
+    }).map((tab) => ({
+      key: tab.key,
+      label: tab.label,
+      render: () => (tab.key === 'tendencies' ? tendenciesPanel : tab.key === 'trades' ? tradesPanel : overviewPanel),
+    })),
+  });
+
   return (
     <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
       <Pressable style={styles.backdrop} onPress={onClose}>
@@ -85,109 +208,9 @@ export default function ManagerProfileModal({ visible, onClose, leagueId, league
               <Ionicons name="close" size={20} color={colors.textSecondary} />
             </Pressable>
           </View>
-          <ScrollView style={styles.body}>
-            <OpponentProfileCard profile={profileQuery.data} onOffer={offer} />
-            {query.isError ? (
-              <AppText style={styles.muted}>Couldn&apos;t load this profile.</AppText>
-            ) : !data ? (
-              <AppText style={styles.muted}>Loading…</AppText>
-            ) : !data.is_premium ? (
-              <TouchableOpacity
-                onPress={() => {
-                  onClose();
-                  navigation.navigate('Paywall');
-                }}
-              >
-                <AppText style={styles.upsellTitle}>{data.upsell?.title ?? 'Manager Tendencies'}</AppText>
-                <AppText style={styles.upsellCta}>Upgrade</AppText>
-              </TouchableOpacity>
-            ) : rows.length === 0 ? (
-              <AppText style={styles.muted}>Not enough trade history yet.</AppText>
-            ) : (
-              <>
-                {sample ? (
-                  <DashboardStatRow
-                    items={[
-                      { label: 'Trades', icon: 'swap-horizontal', value: String(sample.trades), valueColor: colors.success },
-                      { label: 'Wire moves', icon: 'flash-outline', value: String(sample.wire_moves) },
-                      { label: 'Seasons', icon: 'calendar-outline', value: String(sample.seasons) },
-                    ]}
-                  />
-                ) : null}
-                <SectionHeading title="Tendencies" />
-                {rows.map(([key, title]) => {
-                  const signal = signals[key];
-                  const tone = toneColors[tendencyTone(signal.label)];
-                  const badge = tendencyBadgeText(signal.label);
-                  return (
-                    <AccentCard key={key} accent={tone} compact style={styles.signal}>
-                      <View style={styles.signalHead}>
-                        <AppText style={styles.signalTitle}>{title}</AppText>
-                        {badge ? <ToneBadge label={badge} color={tone} /> : null}
-                      </View>
-                      <AppText style={styles.signalSummary}>{signal.summary}</AppText>
-                      <View style={styles.meterRow}>
-                        <View style={styles.meterTrack}>
-                          <View
-                            style={[
-                              styles.meterFill,
-                              { backgroundColor: tone, width: `${Math.round(sampleFill(signal.sample_size, signal.min_sample) * 100)}%` },
-                            ]}
-                          />
-                        </View>
-                        <AppText style={styles.muted}>
-                          {signal.sample_size} trade{signal.sample_size === 1 ? '' : 's'}
-                        </AppText>
-                      </View>
-                    </AccentCard>
-                  );
-                })}
-                {data.recent_trades && data.recent_trades.length > 0 ? (
-                  <>
-                    <SectionHeading title="Recent trades" />
-                    {data.recent_trades.map((trade) => (
-                      <AccentCard key={trade.transaction_id} accent={colors.border} compact style={styles.signal}>
-                        <View style={styles.signalHead}>
-                          <AppText style={[styles.muted, styles.tradeMeta]} numberOfLines={2}>
-                            {tradeDateLabel(trade.date, trade.week)}
-                            {trade.partners.length ? ` · with ${trade.partners.join(', ')}` : ''}
-                          </AppText>
-                          {trade.grade ? (
-                            <ToneBadge
-                              label={trade.grade.letter}
-                              color={{ success: colors.success, accent: colors.accent, danger: colors.danger, muted: colors.textSecondary }[gradeToneSlug(trade.grade.tone)]}
-                            />
-                          ) : null}
-                        </View>
-                        {([['Got', trade.received], ['Sent', trade.sent]] as Array<[string, ManagerRecentTradeAsset[]]>).map(([label, assets]) =>
-                          assets.length ? (
-                            <View key={label} style={styles.tradeSide}>
-                              <AppText style={styles.signalTitle}>{label}</AppText>
-                              {assets.map((asset, i) => (
-                                <View key={`${asset.player_id ?? asset.label}-${i}`} style={styles.assetLine}>
-                                  {asset.kind === 'pick' ? (
-                                    <PickPlate round={asset.round} />
-                                  ) : (
-                                    <View style={styles.badgeGap}>
-                                      <PositionBadge position={asset.position} />
-                                    </View>
-                                  )}
-                                  <AppText style={styles.assetName} numberOfLines={2}>
-                                    {asset.kind === 'pick' ? asset.label || 'Draft pick' : asset.name}
-                                    {asset.kind === 'player' && asset.team ? `  ${asset.team}` : ''}
-                                  </AppText>
-                                </View>
-                              ))}
-                            </View>
-                          ) : null,
-                        )}
-                      </AccentCard>
-                    ))}
-                  </>
-                ) : null}
-              </>
-            )}
-          </ScrollView>
+          {/* Sticky tab strip: outside the scroll, so it stays put while the panel scrolls. */}
+          <View style={styles.tabBar}>{tabs.bar}</View>
+          <ScrollView style={styles.body}>{tabs.panel}</ScrollView>
         </Pressable>
       </Pressable>
     </Modal>
@@ -219,6 +242,7 @@ function createStyles(colors: ThemeColors) {
     kicker: { fontSize: 12.5, color: colors.textSecondary },
     title: { fontSize: 17, fontWeight: '700', color: colors.textPrimary },
     body: { flexGrow: 0 },
+    tabBar: { paddingBottom: spacing.sm },
     signal: { marginBottom: spacing.sm },
     signalHead: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: spacing.sm },
     meterRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
