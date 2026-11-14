@@ -14,7 +14,7 @@ const rules = [".pqv-scroll", ".tabs-sticky", ".tabs-sticky::before"].map(rule).
 const exe = process.env.CHROMIUM || process.env.HOME + "/Library/Caches/ms-playwright/chromium_headless_shell-1248/chrome-headless-shell-mac-arm64/chrome-headless-shell";
 const browser = await chromium.launch({ executablePath: fs.existsSync(exe) ? exe : undefined });
 let failed = 0;
-for (const sheetH of [475, 777]) { // ~56% and ~92% of 844
+for (const sheetH of [475, 338, 777]) { // ~56% and ~92% of 844
   const page = await browser.newPage({ viewport: { width: 390, height: 844 } });
   await page.setContent(`<style>:root{--space-lg:1rem;--space-xl:1.25rem;--color-surface-primary:#1f2226;--color-border:#444}body{margin:0;background:#000}
 ${rules}

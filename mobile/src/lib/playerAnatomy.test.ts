@@ -32,6 +32,8 @@ test('peek sheet height is computed from the content and clamped to 40-70% of th
   assert.equal(peekSheetHeight({ anchorBottom: 400, viewportH: 844, bottomInset: 34 }), 486);
   assert.equal(peekShowsTabs(210, peekSheetHeight({ anchorBottom: 210, viewportH: 844 })), true);
   assert.equal(peekShowsTabs(300, 250), false);
+});
+
 test('fairness meter math: clamped band, direction, sim coarse', () => {
   assert.equal(fairnessMeter(100, 100).label, 'Even');
   assert.equal(tradeEdge(100, 200), 0.5);
