@@ -17,7 +17,7 @@ describe("bottom-pinned chrome stays sticky, not fixed", () => {
       expect(src, f).not.toMatch(/className="[^"]*\bfixed\b/);
     }
   });
-  it("the game's bottom stack is sticky in flow and its orb is an in-flow slot of the action bar row", () => {
+  it("the game's bottom stack is a sticky fallback that BottomDock pins fixed on phones, and its orb is an in-flow slot of the action bar row", () => {
     const css = read("ui/ui.css");
     const stack = css.slice(css.indexOf(".bottom-stack {"), css.indexOf("}", css.indexOf(".bottom-stack {")));
     expect(stack).toContain("position: sticky");
@@ -28,7 +28,8 @@ describe("bottom-pinned chrome stays sticky, not fixed", () => {
       expect(read(f), f).not.toMatch(/className="[^"]*\bfixed\b/);
       expect(read(f), f).not.toContain("visualViewport");
     }
-    expect(css).not.toMatch(/\.(bottom-stack|game-orb|bottom-tab-bar|action-pill)[^{]*\{[^}]*position:\s*fixed/);
+    expect(css).toContain('.bottom-stack[data-dock="fixed"]');
+    expect(read("ui/BottomDock.tsx")).toContain("createPortal");
   });
   it("GmOrb trigger button is not fixed", () => {
     const src = read("GmOrb.tsx");
