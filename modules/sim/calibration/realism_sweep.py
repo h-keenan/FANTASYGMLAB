@@ -435,7 +435,7 @@ def exploit_probe(seeds: int = 3, mode: str = "dynasty", objective: str = "asset
 # ----------------------------------------------------------------- 20-season exploit bots
 
 
-def exploit_long(strategy: str, seed: int, n_seasons: int = 20, trade_weeks: int = 4, per_week: int = 2) -> dict[str, Any]:
+def exploit_long(strategy: str, seed: int, n_seasons: int = 20, trade_weeks: int = 4, per_week: int = 2, econ_v: int | None = None) -> dict[str, Any]:
     """One user bot against the AI league for a whole dynasty (12 teams, 3 rookie rounds, player-model default, ai_v default).
 
     ``balanced``: auto lineup, auto rookie draft, nothing else. ``stacker``: every early week, up to ``per_week`` AI-accepted 1-for-1 trades that raise
@@ -452,6 +452,8 @@ def exploit_long(strategy: str, seed: int, n_seasons: int = 20, trade_weeks: int
     pool, byes = tail_report.pool_from_panel(dataset.load_panel())
     base = GameSettings.parse({"mode": "dynasty", "teams": 12, "user_slot": 4, "start_year": 2026, "seasons": 5, "rookie_rounds": 3, "scoring": "ppr"})
     settings = replace(base, seasons=n_seasons)
+    if econ_v is not None:
+        settings = replace(settings, econ_v=econ_v)
     root = build_snapshot(pool, byes, settings, seed, scoring_model=model_id)
     state = GameState(root)
     em = Emitter(state, root)

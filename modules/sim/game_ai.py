@@ -197,15 +197,24 @@ class TradeDesk:
         self._base: dict[str, float] = {}
         self._noise: dict[str, float] = {}
         self._params: dict[str, TeamParams] = {}
+        self._cover: list[str] | None = None
 
     def params(self, tid: str) -> TeamParams:
         if tid not in self._params:
             self._params[tid] = team_params(self.snap, tid)
         return self._params[tid]
 
+    def cover(self) -> list[str]:
+        """econ_v 1+: the free agents any team could add for nothing, counted into every lineup a trade is judged by (an empty or weak slot is
+        filled from the wire; handing a team a player no better than the wire's does not improve its lineup). Empty for older saves."""
+
+        if self._cover is None:
+            self._cover = self.ev.cover() if self.snap.settings.econ_v else []
+        return self._cover
+
     def base_total(self, tid: str) -> float:
         if tid not in self._base:
-            self._base[tid] = self.ev.lineup_total(self.state.rosters[tid])
+            self._base[tid] = self.ev.lineup_total([*self.state.rosters[tid], *self.cover()])
         return self._base[tid]
 
     def noise(self, tid: str) -> float:
@@ -248,7 +257,7 @@ class TradeDesk:
             - sum(convex(ev.worth(params, p)) for p in give)
             - sum(convex(ev.worth(params, p)) for p in dropped)
         )
-        need = (ev.lineup_total(new_roster) - self.base_total(tid)) * NEED_K * (0.4 + ev.horizon_now(params))
+        need = (ev.lineup_total([*new_roster, *self.cover()]) - self.base_total(tid)) * NEED_K * (0.4 + ev.horizon_now(params))
         return dval + need, dval, need
 
     def linear_loss(self, tid: str, give: Sequence[str], get: Sequence[str]) -> float:
@@ -270,7 +279,7 @@ class TradeDesk:
         """(what ``ai`` loses in the league's neutral lens, what it is willing to lose): sent minus received, and the tolerance."""
 
         ev = self.ev
-        sent = sum(ev.worth(USER_PARAMS, p) for p in user_gets)
+        sent = sum(ev.worth(USER_PARAMS, p, healthy=True) for p in user_gets)  # a seller anchors on the healthy price: he does not dump an injured star
         received = sum(ev.worth(USER_PARAMS, p) for p in user_gives)
         tol = CONSENSUS_TOL_BASE + CONSENSUS_TOL_FRAC * sent + CONSENSUS_TOL_NOISE * self.params(ai).noise_sd
         return sent - received, tol

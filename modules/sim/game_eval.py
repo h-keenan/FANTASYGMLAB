@@ -19,7 +19,7 @@ from modules.sim.lineup import Assignment, SlotPlan, carry_lineup, pick_lineup
 from modules.sim.personas import PERSONAS, TeamParams
 from modules.sim import team_roles as tr
 from modules.sim.team_roles import Role, RoleBook
-from modules.sim.types import GAME_POSITIONS, is_pick_id
+from modules.sim.types import FLEX_SLOTS, GAME_POSITIONS, is_pick_id
 
 PRIOR_GAMES = 5.0  # a projection counts as this many games of evidence
 ROLE_HORIZON_WEEKS = 8  # a player's rest-of-season mean averages his role over his next playable weeks (known injuries only; 17 let a trade-spammer beat the anti-exploit margin)
@@ -71,6 +71,7 @@ class Evaluator:
         # "additive" (player-model-4+): additive team roles and a robust, role-normalised player level.
         self.additive = getattr(snapshot, "_role_mode", "") == "additive"
         self._level: dict[str, float] = {}
+        self._repl: dict[str, float] | None = None
         scale = getattr(snapshot, "_now_scale", None)
         if scale is None:  # frozen snapshot: memoize on the instance
             scale = self._compute_now_scale()
@@ -89,18 +90,72 @@ class Evaluator:
     def _compute_now_scale(self) -> dict[str, float]:
         scale: dict[str, float] = {}
         base = (lambda p: p.value) if self.policy.season_valuation else (lambda p: p.market)
+        econ = bool(self.snap.settings.econ_v)
+        repl0 = self._static_replacement() if econ else {}
         for pos in GAME_POSITIONS:
             rows = sorted(
                 (p for p in self.snap.players.values() if p.pos == pos and p.mean > 0),
                 key=lambda p: (-base(p), p.pid),
             )[:24]
             if rows:
-                mean_mean = sum(p.mean for p in rows) / len(rows)
+                # econ_v 1: "now" is production over what the wire offers for free, so the scale is per point over replacement
+                mean_mean = sum(max(0.0, p.mean - repl0.get(pos, 0.0)) for p in rows) / len(rows)
                 mean_market = sum(base(p) for p in rows) / len(rows)
                 scale[pos] = mean_market / mean_mean if mean_mean > 0 else 4.0
             else:
                 scale[pos] = 4.0
         return scale
+
+    def _static_replacement(self) -> dict[str, float]:
+        """econ_v 1: the replacement level of each position from the pool alone (the wire's level before anyone has drafted): the mean of the
+        player ranked 1.75 x (the league's starting slots at the position) in the pool, a typical free agent once every team is stocked."""
+
+        S = self.snap.settings
+        n = len(self.snap.teams)
+        out: dict[str, float] = {}
+        for pos in GAME_POSITIONS:
+            strict = sum(1 for sl in S.slots if sl == pos)
+            flex = sum(1.0 / len(FLEX_SLOTS[sl]) for sl in S.slots if sl in FLEX_SLOTS and pos in FLEX_SLOTS[sl])
+            starters = max(1.0, strict + flex)
+            means = sorted((p.mean for p in self.snap.players.values() if p.pos == pos), reverse=True)
+            if means:
+                out[pos] = means[min(len(means) - 1, int(round(1.75 * n * starters)) - 1)]
+        return out
+
+    def replacement(self, pos: str) -> float:
+        """econ_v 1: what a free agent at ``pos`` gives right now: the mean of the best three healthy free agents' rest-of-season means
+        (one for K and DEF). Every manager could claim him, so production at or below it is worth nothing in a trade."""
+
+        self._sync()
+        if self._repl is None:
+            owned = self.state.owner_map()
+            by: dict[str, list[float]] = {}
+            for pid in self.snap.pids:
+                if pid in owned or self.state.out.get(pid, 0) > 0:
+                    continue
+                by.setdefault(self.snap.players[pid].pos, []).append(self.ros_mean(pid))
+            self._repl = {}
+            for q, vals in by.items():
+                k = 1 if q in ("K", "DEF") else 3
+                top = sorted(vals, reverse=True)[:k]
+                self._repl[q] = sum(top) / len(top)
+        return self._repl.get(pos, 0.0)
+
+    def cover(self) -> list[str]:
+        """econ_v 1: the free agents any manager could add for nothing (the best three per skill position, one K, one DEF): the lineup
+        a roster really has, because an empty slot is filled from the wire, not left empty."""
+
+        self._sync()
+        owned = self.state.owner_map()
+        by: dict[str, list[str]] = {}
+        for pid in self.snap.pids:
+            if pid not in owned and self.state.out.get(pid, 0) == 0:
+                by.setdefault(self.snap.players[pid].pos, []).append(pid)
+        out: list[str] = []
+        for q, pids in by.items():
+            k = 1 if q in ("K", "DEF") else 3
+            out += sorted(pids, key=lambda p: (-self.ros_mean(p), p))[:k]
+        return out
 
     # ------------------------------------------------------------ projections
 
@@ -154,6 +209,7 @@ class Evaluator:
         if seq == self._seq:
             return
         self._seq = seq
+        self._repl = None
         # What the caches depend on: games played, the week, and who is out (rosters never matter: roles are NFL-level).
         key = (len(self.state.history), self.state.week, frozenset(self.state.out.items()))
         if self._ros_key != key:
@@ -402,13 +458,18 @@ class Evaluator:
         season, rnd, orig = self.pick_parts(pid)
         return f"{pick_label(season, rnd)} ({self.snap.team(orig).name})"
 
-    def worth(self, params: TeamParams, pid: str) -> float:
+    def worth(self, params: TeamParams, pid: str, healthy: bool = False) -> float:
+        """A manager's value of an asset. ``healthy`` (econ_v 1 callers only) values a player as if he were not injured: what a seller anchors on."""
+
         if is_pick_id(pid):
             return self.pick_worth(params, pid)
         p = self.snap.players[pid]
         h = self.horizon_now(params)
-        now = min(100.0, self.now_scale[p.pos] * self.ros_mean(pid))
-        out = self.state.out.get(pid, 0)
+        if self.snap.settings.econ_v:  # econ_v 1: only production above the free-agent level is worth anything
+            now = min(100.0, self.now_scale[p.pos] * max(0.0, self.ros_mean(pid) - self.replacement(p.pos)))
+        else:
+            now = min(100.0, self.now_scale[p.pos] * self.ros_mean(pid))
+        out = 0 if healthy else self.state.out.get(pid, 0)
         keep = 1.0
         if self.snap.settings.econ_v:  # econ_v 1: an injury costs the share of the season he misses (the old cap: 6 weeks, 60% of the "now" half)
             weeks_left = self.snap.settings.regular_weeks if self.state.status == "offseason" else max(1, self.snap.settings.regular_weeks - self.state.week + 1)
