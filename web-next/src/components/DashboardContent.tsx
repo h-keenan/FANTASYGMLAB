@@ -12,7 +12,7 @@ import { GlossaryNote } from "@/components/GlossaryNote";
 import { GuessThePlayerCard } from "@/components/GuessThePlayerCard";
 import { GuessThePlayerNameMatchCard } from "@/components/GuessThePlayerNameMatchCard";
 import { LeaguePulseCard } from "@/components/LeaguePulseCard";
-import { formatRank } from "@/components/SnapshotTile";
+import { formatRank, rankFill } from "@/components/SnapshotTile";
 import type { StatStripItem } from "@/components/StatStrip";
 import { CompactModule } from "@/components/ui/CompactModule";
 import { StatStripModule } from "@/components/ui/ModuleTemplates";
@@ -22,7 +22,9 @@ import { leagueAverageAge } from "@/lib/teamStatus";
 import { TodayModule } from "@/components/TodayModule";
 import { WatchListCard } from "@/components/WatchListCard";
 import { useSeasonOdds } from "@/components/DashboardOddsStrip";
-import { DashboardMore, DashboardNeedsAttention, DashboardTradesBlock } from "@/components/DashboardBlocks";
+import { attentionEntryHref, DashboardMore, DashboardNeedsAttention, DashboardTradesBlock } from "@/components/DashboardBlocks";
+import { splitTodayAttention } from "@/lib/statusHeader";
+import { thisWeekHref } from "@/lib/thisWeek";
 import { useExperienceCopy, useExperienceLevel } from "@/context/ExperienceLevelContext";
 import { buildNeedsAttention, isTradeItem, itemsAfterAttention, weekRowsAfterAttention } from "@/lib/dashboardLayout";
 
@@ -113,6 +115,16 @@ export function DashboardContent({
   const { caption: oddsCaption, sim } = useSeasonOdds(leagueId, !sample && !data.trade_ideas_deferred);
   const teamStatus = useTeamStatusData(leagueId, lens, !sample, teamRankings, prefetch);
   const teams = teamStatus.rankings?.teams ?? null;
+  // The status header shows lineup holes and single-player items as player rows; the "Needs attention" card keeps the rest.
+  // Until the hero's reads have settled the hero is a skeleton, so nothing moves out of the card yet.
+  const statusAttention = teamStatus.settled
+    ? splitTodayAttention(
+        attention,
+        teamStatus.matchup?.suggested_moves,
+        (entry) => attentionEntryHref(entry, leagueId, leagueName),
+        thisWeekHref("matchup", leagueId, leagueName),
+      )
+    : { rows: [], remaining: attention };
   const teamStats = snapshot
     ? buildTeamStats(snapshot, copy.label("averageAge", "Avg Age"), {
         teamCount: teams && teams.length > 1 ? teams.length : null,
@@ -158,13 +170,13 @@ export function DashboardContent({
         </p>
       ) : null}
 
-      <TeamStatusHero leagueId={leagueId} leagueName={leagueName} snapshot={snapshot} sim={sim} oddsCaption={oddsCaption} data={teamStatus} />
+      <TeamStatusHero leagueId={leagueId} leagueName={leagueName} snapshot={snapshot} sim={sim} oddsCaption={oddsCaption} data={teamStatus} attention={statusAttention.rows} tradeCount={tradeItems.length} />
 
       {/* A few times a season: does the declared direction still fit? Server-decided,
           dismissible, once per moment (modules/direction_checkin.py). */}
       {sample ? null : <DirectionCheckinCard leagueId={leagueId} />}
 
-      <DashboardNeedsAttention entries={attention} leagueId={leagueId} leagueName={leagueName} />
+      <DashboardNeedsAttention entries={statusAttention.remaining} leagueId={leagueId} leagueName={leagueName} />
 
       <TodayModule data={nextMovesData} leagueId={leagueId} leagueName={leagueName} hideEmpty={attention.length > 0} />
 
@@ -266,6 +278,7 @@ function buildTeamStats(
     value: formatRank(value, tied),
     tone: value === 1 ? "premium" : "neutral",
     note: value != null ? note : undefined,
+    fill: rankFill(value, context.teamCount),
   });
   const main: StatStripItem[] = [
     rank("power", "Power Rank", snapshot.power_rank, snapshot.power_rank_tied, ofTeams),

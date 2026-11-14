@@ -20,7 +20,9 @@ import BrandHeaderBar from '../components/BrandHeaderBar';
 import PageFamilyTabs from '../components/PageFamilyTabs';
 import GridBackground from '../components/GridBackground';
 import CompactModule from '../components/CompactModule';
-import { Hero, StatStripModule } from '../components/ModuleTemplates';
+import { StatStripModule } from '../components/ModuleTemplates';
+import StatusHeader from '../components/StatusHeader';
+import { buildTeamStatusHeader, rosterAttentionItems } from '../lib/statusHeader';
 import { listSummaryParts } from '../lib/moduleTemplates';
 import PositionBadge from '../components/PositionBadge';
 import PlayerIdentityRow from '../components/PlayerIdentityRow';
@@ -35,7 +37,7 @@ import { buildRosterComposition, buildTeamAnalysisRows, type CompositionSegment,
 import { toUserErrorMessage } from '../lib/errorMessages';
 import { isByeOnlyLabel, lineupStatusLabel, openSlotsMessage } from '../lib/lineupAvailability';
 import { useOrbClearance } from '../lib/orbLayout';
-import { formatRank, percentileFromRank } from '../lib/percentile';
+import { formatRank, percentileFromRank, rankFill, winShare } from '../lib/percentile';
 import { queryKeys } from '../lib/queryKeys';
 import { useScreenHeaderTitle } from '../lib/useScreenHeaderTitle';
 import { useThemeMode } from '../context/ThemeModeContext';
@@ -274,8 +276,17 @@ export default function MyTeamScreen({ route, navigation }: Props) {
 
         <BeginnerHelp term="myTeamIntro" />
         <BeginnerHelp term="myTeamValueTiers" />
-        <TeamHero team={myTeam} leagueSize={leagueSize} teamValue={teamValue} startersValue={bestBall ? 0 : startersValue} />
-        <TeamSnapshotModule team={myTeam} open={(key) => openInsight(navigation.navigate as never, key, leagueId, leagueName)} />
+        <TeamHero
+          team={myTeam}
+          leagueSize={leagueSize}
+          teamValue={teamValue}
+          startersValue={bestBall ? 0 : startersValue}
+          starters={starters}
+          openSlotCount={bestBall ? 0 : (myTeamData?.open_slots ?? []).length}
+          bestBall={bestBall}
+          onOpenLineup={() => navigation.navigate('Matchup', { leagueId, leagueName })}
+        />
+        <TeamSnapshotModule team={myTeam} leagueSize={leagueSize} open={(key) => openInsight(navigation.navigate as never, key, leagueId, leagueName)} />
         {myTeam && hasRosterAnalysis(myTeam) ? (
           <CompactModule
             id="team.analytics"
@@ -385,8 +396,30 @@ export default function MyTeamScreen({ route, navigation }: Props) {
   );
 }
 
-/** The Hero: Team Value as the one big number, percentile of the league as the context line, archetype as the badge. */
-function TeamHero({ team, leagueSize, teamValue, startersValue }: { team: TeamRanking | null; leagueSize: number; teamValue: number; startersValue: number }) {
+/**
+ * The status header (twin of web MyTeamContent): ring = how high the roster's value sits in the league, Team Value in
+ * the headline (or the roster hole), holes / injuries as mini stats, the starters who cannot play as player rows,
+ * archetype as the badge. A best-ball roster has no lineup to fix, so no holes or rows.
+ */
+function TeamHero({
+  team,
+  leagueSize,
+  teamValue,
+  startersValue,
+  starters,
+  openSlotCount,
+  bestBall,
+  onOpenLineup,
+}: {
+  team: TeamRanking | null;
+  leagueSize: number;
+  teamValue: number;
+  startersValue: number;
+  starters: LineupPlayer[];
+  openSlotCount: number;
+  bestBall: boolean;
+  onOpenLineup: () => void;
+}) {
   const { colors } = useThemeMode();
   const valuePercentile = team ? percentileFromRank(team.power_rank, leagueSize) : null;
   const outlook = team ? team.archetype_label || team.strategy_label : null;
@@ -395,13 +428,24 @@ function TeamHero({ team, leagueSize, teamValue, startersValue }: { team: TeamRa
     startersValue > 0 ? `Starters ${Math.round(startersValue).toLocaleString()}` : null,
   ]
     .filter(Boolean)
-    .join(' · ');
+    .join(' \u00b7 ');
+  const model = buildTeamStatusHeader({
+    teamValue: teamValue > 0 ? Math.round(teamValue).toLocaleString() : '\u2014',
+    valuePercentile,
+    leagueSize: leagueSize > 0 ? leagueSize : null,
+    context: context || null,
+    record: team ? `${team.wins ?? 0}-${team.losses ?? 0}${team.ties ? `-${team.ties}` : ''}` : null,
+    openSlots: openSlotCount,
+    flaggedStarters: bestBall ? 0 : starters.filter((p) => p.ruled_out || p.start_ineligible_reason).length,
+    injuredStarters: bestBall ? 0 : starters.filter((p) => p.injury_label && p.injury_label.trim()).length,
+    attention: bestBall ? [] : rosterAttentionItems(starters, 3, 'Matchup'),
+    hrefs: { lineup: 'Matchup' },
+  });
   return (
-    <Hero
-      label="Team Value"
-      value={teamValue > 0 ? Math.round(teamValue).toLocaleString() : '—'}
-      context={context || null}
+    <StatusHeader
+      model={model}
       badge={outlook ? <ToneBadge solid label={outlook} color={colors.accent} textColor={colors.onAccent} /> : undefined}
+      onOpen={() => onOpenLineup()}
       testID="team-hero"
     />
   );
@@ -414,7 +458,7 @@ function ordinal(n: number): string {
 }
 
 /** The six rank tiles as a StatStripModule: collapsed "Record 3-5 · Power #3 · Franchise #5 · Starters #2". */
-function TeamSnapshotModule({ team, open }: { team: TeamRanking | null; open: (key: InsightKey) => () => void }) {
+function TeamSnapshotModule({ team, open, leagueSize }: { team: TeamRanking | null; open: (key: InsightKey) => () => void; leagueSize: number }) {
   const record = team ? `${team.wins ?? 0}-${team.losses ?? 0}${team.ties ? `-${team.ties}` : ''}` : '—';
   const rank = (value: number | null | undefined, tied: boolean | undefined) => (value != null ? formatRank(value, Boolean(tied)) : '—');
   return (
@@ -422,11 +466,11 @@ function TeamSnapshotModule({ team, open }: { team: TeamRanking | null; open: (k
       id="team.snapshot"
       title="Team Snapshot"
       items={[
-        { label: 'Record', icon: 'ribbon-outline', value: record, onPress: open('record') },
-        { label: 'Power Rank', icon: 'flash-outline', value: rank(team?.power_rank, team?.power_rank_tied), onPress: open('power') },
-        { label: 'Franchise Rank', icon: 'star-outline', value: rank(team?.franchise_rank, team?.franchise_rank_tied), onPress: open('franchise') },
-        { label: 'Starter Strength', icon: 'american-football-outline', value: rank(team?.starter_rank, team?.starter_rank_tied), onPress: open('starter') },
-        { label: 'Bench Strength', icon: 'people-outline', value: rank(team?.bench_rank, team?.bench_rank_tied), onPress: open('bench') },
+        { label: 'Record', icon: 'ribbon-outline', value: record, fill: team ? winShare(team.wins, team.losses, team.ties) : null, onPress: open('record') },
+        { label: 'Power Rank', icon: 'flash-outline', value: rank(team?.power_rank, team?.power_rank_tied), fill: rankFill(team?.power_rank, leagueSize), onPress: open('power') },
+        { label: 'Franchise Rank', icon: 'star-outline', value: rank(team?.franchise_rank, team?.franchise_rank_tied), fill: rankFill(team?.franchise_rank, leagueSize), onPress: open('franchise') },
+        { label: 'Starter Strength', icon: 'american-football-outline', value: rank(team?.starter_rank, team?.starter_rank_tied), fill: rankFill(team?.starter_rank, leagueSize), onPress: open('starter') },
+        { label: 'Bench Strength', icon: 'people-outline', value: rank(team?.bench_rank, team?.bench_rank_tied), fill: rankFill(team?.bench_rank, leagueSize), onPress: open('bench') },
         { label: 'Avg Age', icon: 'hourglass-outline', value: team?.average_age != null ? team.average_age.toFixed(1) : '—', onPress: open('age') },
       ]}
       footer={<GlossaryNote terms={['powerRank', 'franchiseRank', 'starterStrength', 'benchStrength', 'averageAge', 'draftPicks', 'pqv', 'superflex', 'tep']} />}

@@ -57,23 +57,25 @@ describe("collapsed-form rule", () => {
 });
 
 describe("template components: collapsed form carries data", () => {
-  it("StatStripModule reads as a stat line collapsed and opens into tiles", () => {
+  it("StatStripModule shows the compact tiles always and expands into rank bars", () => {
     render(
       <StatStripModule
         id="t.stats"
         title="My Team"
         items={[
-          { glyph: "power", label: "Power Rank", value: "#3" },
-          { glyph: "starter", label: "Starter Strength", value: "#5" },
+          { glyph: "power", label: "Power Rank", value: "#3", fill: 0.8 },
+          { glyph: "starter", label: "Starter Strength", value: "#5", fill: 0.5 },
           { glyph: "age", label: "Avg Age", value: "26.1" },
         ]}
       />,
     );
-    expect(collapsedModuleProblems(document.body)).toEqual([]);
-    expect(screen.getByTestId("compact-summary")).toHaveTextContent("Power #3 · Starters #5 · Age 26.1");
-    expect(screen.queryByText("Power Rank")).toBeNull();
-    fireEvent.click(screen.getByRole("button", { name: /^My Team:/ }));
-    expect(screen.getByText("Power Rank")).toBeInTheDocument();
+    expect(screen.getByRole("group", { name: "My Team: Power #3 · Starters #5 · Age 26.1" })).toBeInTheDocument();
+    expect(screen.getAllByTestId("stat-strip-tile")).toHaveLength(3);
+    expect(screen.queryByTestId("stat-strip-bars")).toBeNull();
+    fireEvent.click(screen.getByTestId("stat-strip-toggle"));
+    expect(screen.getByTestId("stat-strip-bars")).toHaveTextContent("Power Rank");
+    expect(screen.getAllByRole("progressbar")).toHaveLength(2);
+    expect(screen.getByTestId("stat-strip-bars")).toHaveTextContent("26.1");
   });
 
   it("Hero shows the big number, one context line and a signed trend; no trend with one point", () => {

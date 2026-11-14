@@ -85,7 +85,8 @@ import { toUserErrorMessage } from '../lib/errorMessages';
 import { isInSeason } from '../lib/seasonPhase';
 import { useDensity } from '../context/DensityContext';
 import { useExperienceCopy, useExperienceLevel } from '../context/ExperienceLevelContext';
-import { DashboardMore, DashboardNeedsAttention, DashboardTeamStats, DashboardTradesBlock } from '../components/DashboardBlocks';
+import { attentionEntryRoute, DashboardMore, DashboardNeedsAttention, DashboardTeamStats, DashboardTradesBlock } from '../components/DashboardBlocks';
+import { splitTodayAttention } from '../lib/statusHeader';
 import { buildNeedsAttention, isTradeItem, itemsAfterAttention, weekRowsAfterAttention } from '../lib/dashboardLayout';
 import BeginnerHelp from '../components/BeginnerHelp';
 import { useThemeMode } from '../context/ThemeModeContext';
@@ -433,6 +434,17 @@ export default function DashboardScreen({ route, navigation }: Props) {
     dashboardData?.trade_window,
     grouped.topPriority,
   );
+  // The status header shows lineup holes and single-player items as player rows; the "Needs attention" card keeps the rest.
+  // Until the matchup read has settled the header is still forming, so nothing moves out of the card yet.
+  const wrappedAttention = attention.map((entry) => ({
+    source: entry.source,
+    item: entry.item ? { ...entry.item, route_player_injury_status: entry.item.route_player_injury_status ?? '' } : undefined,
+    entry,
+  }));
+  const split = !matchupQuery.isPending
+    ? splitTodayAttention(wrappedAttention, matchup?.suggested_moves, (wrapped) => attentionEntryRoute(wrapped.entry), 'Matchup')
+    : { rows: [], remaining: wrappedAttention };
+  const statusAttention = { rows: split.rows, remaining: split.remaining.map((wrapped) => wrapped.entry) };
   const nonTradeTopPriority = itemsAfterAttention(
     grouped.topPriority.filter((item) => !isTradeItem(item)),
     attention,
@@ -468,13 +480,15 @@ export default function DashboardScreen({ route, navigation }: Props) {
         rankings={teamRankings}
         standingsAvailable={teamRankingsQuery.data?.standings_available}
         onNavigate={navigate}
+        attention={statusAttention.rows}
+        tradeCount={tradeItems.length}
       />
 
       {/* A few times a season: does the declared direction still fit? Server-decided,
           dismissible, once per moment (modules/direction_checkin.py). Same slot on web. */}
       <DirectionCheckinCard leagueId={leagueId} />
 
-      <DashboardNeedsAttention entries={attention} leagueId={leagueId} leagueName={leagueName} onNavigate={navigate} />
+      <DashboardNeedsAttention entries={statusAttention.remaining} leagueId={leagueId} leagueName={leagueName} onNavigate={navigate} />
 
       {/* Next moves: what is left of the week's plan once the trade idea (Trades
           block) and a "lineup set" row (Now strip) are shown where they belong. */}

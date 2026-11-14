@@ -818,3 +818,50 @@ Audit and status: `docs/audits/2026-11-sim-ui-pass.md`. New shared pieces: `SimP
 `simOutlookTiles` / `simProfileRead` (the sim player sheet: the hero shows This week + ADP, never Value or Usage; Outlook tiles + an
 always-drawn projection chart; a "Scouting read" for players without a generated scouting report), `simLineupParts` / `simBenchParts` /
 `simStandingHero` / `simMenuHero` / `simRulesParts` (Team tab, Standings hero, Game menu), and `SimTeamCard dense` for pickers.
+
+## Players-first stacks (2026-11-14, coridian_ picks from the variant sheets)
+
+Picks: `docs/audits/2026-11-module-variant-sheets.md`. Shared by FantasyDesk and Fantasy Sim, web + app via lib twins
+(`statusHeader.ts`, `recapCard.ts`, and additions to `matchupModules.ts`, `simDraft.ts`). Cyan is the one primary action
+colour in these modules (`Button` primary); gold is premium meaning only. The sim never shows a numeric rating or Value:
+projection, ADP and letter grades only. Every player render uses the shared `PlayerAvatar`.
+
+### StatusHeader (hero + module stack, V2 "players-first")
+`ui/StatusHeader` / app `StatusHeader`: status ring (`StatusRing`: pct + centre text), up to **3** mini stats, "Needs your
+attention" list of up to **3** player rows (`PlayerRow` + avatar; a row with `detail` expands inline with an Open link; the
+right edge is one figure or one letter grade), then the one primary action, then `children` (CompactModules). The page
+passes a `StatusHeaderModel` from the pure builders in `lib/statusHeader.ts`:
+
+| Page | Builder | Ring | Rows |
+|---|---|---|---|
+| Today (`TeamStatusHero`) | `buildTodayStatusHeader` | win chance | `splitTodayAttention`: lineup holes (`lineupAttentionItems`) + single-player Needs-attention items |
+| My Team | `buildTeamStatusHeader` | team value percentile | `rosterAttentionItems` (starters out / bye / injured) |
+| Sim Home | `buildSimStatusHeader` | this week's win chance | `simHomeAttentionItems` (starters out, uncovered byes, best waiver target) |
+
+Nothing is dropped: an entry leaves the plain "Needs attention" card only when a player row now says the same thing;
+the Lineup / Standing / Position rooms modules stay under the header. Rows reuse the existing `PlayerRow`; when the compact
+V1/V2 `PlayerRow` lands, swap it inside `AttentionRow` only.
+
+### Stat strip (V1 compact + V2 expanded)
+`StatStripModule` (web `ui/ModuleTemplates`, app `ModuleTemplates`): compact = one row of small glass tiles always visible,
+each an `InsightLink` to what explains it; "Rank bars" expands the same stats into labelled `FillBar` rows (`fill` 0..1 from
+`rankFill` / win share; items with no honest scale list their value). The old collapsed-summary header is gone; the tiles
+are the informative collapsed form (the aria group name keeps the "Power #3 · Starters #5" sentence).
+
+### Matchup hero and ticker (6)
+`ui/MatchupModule`: `MatchupHeroCard` (week + LIVE/FINAL, win chip, both scores, win bar, "Proj final ... · N players left",
+two swing players with avatars = widest projection range still to play on each side, tap opens the player peek, one cyan
+"Open lineup") and `MatchupTicker` ("WK 7 · You 112.4 - 98.1 Mike · 71%", links to the Matchup page). Model: `matchupCardModel`
+(`matchupSwingPlayers`, `matchupTickerParts`, sim adapter `simMatchupCardModel` using floor/ceiling). Used on the Matchup page and the
+Sim Home matchup card; the ticker is the form to use wherever matchup is one module in a stack.
+
+### Sim draft clock bar (7a)
+`CompactModule` gained `preview` (always-visible line under the header, outside the toggle button). `SimDraftBar` is the
+clock's preview: best-available avatar, name, position and letter grade (ADP when the game has no grade), tap opens the
+player; expanding shows the existing on-the-clock module. `simDraftBarModel` in `lib/simDraft.ts`. The grade is read from
+the player's `grade` once the letter-grades change lands.
+
+### Recap card (7b V2)
+`ui/RecapCard` + `lib/recapCard.ts`: kicker, optional grade/finish badge, three label/value rows, extra rows behind "More".
+Used on the StoryCarousel Around the league / Season complete / Next week pages and as the Season in Review stats cards.
+Player-line pages (Result, Matchup, Injuries) keep their avatar rows.

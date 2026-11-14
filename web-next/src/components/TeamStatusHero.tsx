@@ -6,11 +6,11 @@ import { useEffect, useState } from "react";
 import { SkeletonCard } from "@/components/Skeleton";
 
 import { CompactModule } from "@/components/ui/CompactModule";
-import { Hero, LinkModule } from "@/components/ui/ModuleTemplates";
+import { LinkModule } from "@/components/ui/ModuleTemplates";
+import { StatusHeader } from "@/components/ui/StatusHeader";
+import { buildTodayStatusHeader, type StatusAttentionItem } from "@/lib/statusHeader";
 import { lineupModuleParts, roomsModuleParts, standingModuleParts, teamStatusHeroModel } from "@/lib/teamStatusModules";
 import { SectionHeading } from "@/components/SectionHeading";
-import { TeamAvatar } from "@/components/TeamAvatar";
-import { ToneBadge } from "@/components/ToneBadge";
 import { api, type GamesSeasonSimResponse, type LeagueTeamRankingsResponse, type MatchupResponse, type MyTeamNeedsResponse, type TeamSnapshot } from "@/lib/api";
 import {
   buildTeamStatusLineup,
@@ -81,22 +81,6 @@ function Fact({ label, value, tone = "neutral" }: { label: string; value: string
   );
 }
 
-function RowLink({ href, label, children }: { href: string; label: string; children: React.ReactNode }) {
-  return (
-    <Link
-      href={href}
-      aria-label={label}
-      className="flex items-center gap-2 py-2.5 border-t first:border-t-0"
-      style={{ minHeight: 44, color: "inherit", textDecoration: "none", borderTopColor: "var(--color-border)" }}
-    >
-      <span className="min-w-0 flex-1 flex flex-col gap-1">{children}</span>
-      <span aria-hidden="true" data-row-arrow style={{ color: "var(--color-accent)" }}>
-        →
-      </span>
-    </Link>
-  );
-}
-
 function PositionChip({ row, league }: { row: TeamStatusPosition; league: { id: string; name: string } }) {
   const color = TONE_COLOR[row.tone];
   return (
@@ -134,6 +118,8 @@ export function TeamStatusHero({
   sim,
   oddsCaption,
   data,
+  attention = [],
+  tradeCount = 0,
 }: {
   leagueId: string;
   leagueName: string;
@@ -142,6 +128,10 @@ export function TeamStatusHero({
   /** "6 weeks left, 3,000 simulated seasons" under the odds. */
   oddsCaption?: string;
   data: ReturnType<typeof useTeamStatusData>;
+  /** Player rows for "Needs your attention" (lib/statusHeader lineupAttentionItems + briefingAttentionItems). */
+  attention?: StatusAttentionItem[];
+  /** Trade ideas the dashboard found (a mini stat on the header). */
+  tradeCount?: number;
 }) {
   const query = `?name=${encodeURIComponent(leagueName)}`;
   const id = encodeURIComponent(leagueId);
@@ -170,30 +160,30 @@ export function TeamStatusHero({
       </section>
     );
   }
-  if (!matchupLine && !lineup && !standing && positions.length === 0) return null;
+  if (!matchupLine && !lineup && !standing && positions.length === 0 && attention.length === 0) return null;
 
   const heroModel = teamStatusHeroModel(matchupLine, standing);
   // No decision twice: when the Hero already IS the standing, the Standing module only appears if it adds odds or a projection.
   const heroIsStanding = heroModel != null && !(matchupLine && (matchupLine.winPercent != null || matchupLine.live));
   const showStanding = standing != null && (!heroIsStanding || Boolean(standing.playoffOdds || standing.projectedRecord || standing.playoffStatus));
   const league = { id: leagueId, name: leagueName };
+  const statusModel = buildTodayStatusHeader({
+    matchup: matchupLine,
+    hero: heroModel,
+    lineup,
+    standing,
+    attention,
+    tradeCount,
+    hrefs: { matchup: `/matchup/${id}${query}`, rankings: `/league-rankings/${id}${query}`, trades: `/trade-hub/${id}${query}` },
+  });
 
   return (
     <section className="flex flex-col gap-2" aria-labelledby="team-status-heading" data-testid="team-status-hero">
       <h2 id="team-status-heading" className="sr-only">
         Your team right now
       </h2>
-      {/* One Hero (the number that matters this week) then three modules that read while collapsed. */}
-      {heroModel ? (
-        <Hero
-          label={heroModel.label}
-          value={heroModel.value}
-          context={heroModel.context}
-          tone={heroModel.tone}
-          href={matchupLine ? `/matchup/${id}${query}` : `/league-rankings/${id}${query}`}
-          testId="team-status-main"
-        />
-      ) : null}
+      {/* The players-first status header (ring, 3 mini stats, player rows, one action), then the modules that read while collapsed. */}
+      {statusModel ? <StatusHeader model={statusModel} headerHref={matchupLine ? `/matchup/${id}${query}` : `/league-rankings/${id}${query}`} testId="team-status-main" /> : null}
 
       {lineup ? (
         <LinkModule

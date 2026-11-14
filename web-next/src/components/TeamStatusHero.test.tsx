@@ -85,11 +85,19 @@ describe("TeamStatusHero on the Dashboard", () => {
     render(<DashboardContent leagueId="abc" leagueName="L" data={DATA} />);
     const hero = await screen.findByTestId("team-status-hero");
     window.localStorage.clear();
-    // The Hero: one big number (win chance) with the matchup as its one context line.
-    await waitFor(() => expect(within(hero).getByTestId("hero-value")).toHaveTextContent("63%"));
-    expect(within(hero).getByText("Your win chance")).toBeInTheDocument();
-    expect(within(hero).getByTestId("hero-context")).toHaveTextContent("vs Rival FC");
-    expect(within(hero).getByTestId("hero-context")).toHaveTextContent("Proj 101.3 - 96.0");
+    // The status header: the ring is the win chance, the context line is the matchup, the lineup hole is the headline.
+    await waitFor(() => expect(within(hero).getByTestId("status-ring")).toHaveAttribute("aria-label", "Win chance 63%"));
+    expect(within(hero).getByTestId("status-ring")).toHaveTextContent("63%");
+    expect(within(hero).getByTestId("status-headline")).toHaveTextContent("1 starter can't play (bye or out)");
+    expect(within(hero).getByTestId("status-context")).toHaveTextContent("vs Rival FC");
+    expect(within(hero).getByTestId("status-context")).toHaveTextContent("Proj 101.3 - 96.0");
+    // "Needs your attention": the starter who cannot play is a player row with the swap that fixes it and its gain.
+    const row = within(hero).getByTestId("status-attention-row");
+    expect(row).toHaveTextContent("Hurt Back");
+    expect(row).toHaveTextContent("Start Backup Back instead");
+    expect(row).toHaveTextContent("+6.2");
+    expect(within(hero).getByTestId("status-primary")).toHaveAttribute("href", "/matchup/abc?name=L");
+    expect(within(hero).getByTestId("status-primary")).toHaveTextContent("Fix lineup");
     // Lineup is a link module: the headline and best swap read without any tap.
     const lineup = within(hero).getByTestId("team-status-lineup");
     expect(lineup).toHaveTextContent("1 starter can't play (bye or out)");
@@ -106,7 +114,6 @@ describe("TeamStatusHero on the Dashboard", () => {
     expect(within(hero).getByRole("link", { name: /Improve RB first/ })).toHaveAttribute("href", "/trade-hub/abc?name=L");
     // Every position room is a link to the analysis that explains it.
     expect(within(hero).getByRole("link", { name: /RB room, Needs help, open Team Analysis on My Team/ })).toHaveAttribute("href", "/my-team/abc?name=L#team-analysis-heading");
-    fireEvent.click(screen.getByRole("button", { name: /^My Team:/ }));
     // Every dashboard stat tile opens the page that explains it (central map: lib/insightLinks.ts).
     expect(screen.getByRole("link", { name: /Power Rank.*open the Roster Power rankings/ })).toHaveAttribute("href", "/league-rankings/abc?name=L#board-power");
     expect(screen.getByRole("link", { name: /Injured starters.*open Alerts/ })).toHaveAttribute("href", "/alerts/abc?name=L");

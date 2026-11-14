@@ -9,6 +9,8 @@ import { TrophyIcon } from "@/components/TrophyIcon";
 import { ValueRing } from "@/components/ValueRing";
 import { SimPlayerChip, SimPlayerLine, type SimCtx } from "@/components/SimGameParts";
 import { SimWeekRecapView } from "@/components/SimGameRecap";
+import { RecapCard } from "@/components/ui/RecapCard";
+import { recapCardModel, recapRowsFromItems } from "@/lib/recapCard";
 import { StoryCarousel, type StoryPage } from "@/components/ui/StoryCarousel";
 import { positionColorVar } from "@/lib/playerPresentation";
 import { simFmtPts, simPlayoffRoundLabel, simTeamNameMap, type SimGamePlayer, type SimWeekRecap } from "@/lib/simGame";
@@ -261,11 +263,7 @@ export function SimWeekRecapStory({
             <Hero value={h.hero?.value ? <CountUp value={Number(h.hero.value)} /> : ""} caption={h.hero?.who ? `Top score: ${h.hero.who}` : undefined} color="var(--color-success)" />
             {h.hero?.who ? <TeamAvatar name={h.hero.who} size={44} ringColor="var(--color-success)" /> : null}
           </HeroZone>
-          <div className="ui-recap-rows">
-            {h.items.map((it) => (
-              <Fact key={it.key} label={it.label} accent={it.key === "closest" ? "var(--color-warning)" : it.key === "blowout" ? "var(--color-danger)" : "var(--color-accent)"}>{it.detail}</Fact>
-            ))}
-          </div>
+          <RecapCard model={recapCardModel({ kicker: "Around the league", rows: recapRowsFromItems(h.items.map((it) => ({ ...it, tone: it.key === "closest" ? ("warning" as const) : it.key === "blowout" ? ("danger" as const) : undefined }))) })} />
         </Page>
       );
     }
@@ -280,11 +278,7 @@ export function SimWeekRecapStory({
             {m.championName && !m.youChampion ? <TeamAvatar name={m.championName} size={48} ringColor="var(--color-premium)" /> : null}
             <p className="ui-recap-sub">{m.youChampion ? `${youName} won it all.` : `You finished ${m.finish}.`}</p>
           </HeroZone>
-          <div className="ui-recap-rows">
-            {m.items.map((it) => (
-              <Fact key={it.key} label={it.label} accent={it.key === "champion" ? "var(--color-premium)" : "var(--color-accent)"}>{it.detail}</Fact>
-            ))}
-          </div>
+          <RecapCard model={recapCardModel({ kicker: "Season complete", badge: m.finish, rows: recapRowsFromItems(m.items) })} />
         </Page>
       );
     }
@@ -302,11 +296,7 @@ export function SimWeekRecapStory({
             ) : null}
             {n.edge ? <p className="text-sm font-semibold" style={{ color: "var(--color-text-secondary)" }}>{n.edge}</p> : null}
           </HeroZone>
-          <div className="ui-recap-rows">
-            {n.notes.map((note) => (
-              <Fact key={note.label} label={note.label} accent={note.label === "Lineup" ? "var(--color-warning)" : "var(--color-accent)"}>{note.text}</Fact>
-            ))}
-          </div>
+          <RecapCard model={recapCardModel({ kicker: `Week ${n.week ?? ""} plan`.trim(), rows: recapRowsFromItems(n.notes.map((note) => ({ ...note, tone: note.label === "Lineup" ? ("warning" as const) : undefined }))) })} />
         </Page>
       );
     }

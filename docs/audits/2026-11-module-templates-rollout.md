@@ -90,6 +90,16 @@ Heights from `module_scan.mjs` (390 / 1440, fixtures, same script run on `origin
 - [ ] Teams (app) has "View" and "Rank by" dropdowns in two places (header and panel); merge into one row when the panels are hoisted.
 - [ ] `Hero` for the Games odds and the Live Draft clock (they stay bespoke cards; tests pin their testids).
 
+## Players-first stacks rollout (variant-sheet picks, 2026-11-14)
+
+- [x] StatusHeader on Today, My Team, Sim Home (web + app); builders in `lib/statusHeader.ts` with tests.
+- [x] Stat strip V1 compact + V2 rank bars (`StatStripModule`, My Team + Today).
+- [x] Matchup hero V1 on the Matchup page and Sim Home card; ticker built (`MatchupTicker`).
+- [x] Sim draft clock bar with best-available avatar (`SimDraftBar`, `CompactModule preview`).
+- [x] Recap card V2 on story pages and season-review stats.
+- [ ] Adopt the ticker on a stack (none uses it yet); swap `PlayerRow` for the compact V1/V2 row when it lands; use `LetterGrade` for the draft bar and recap badge once the letter-grades PR merges.
+- [ ] No on-device check of the app screens.
+
 ## Enforcement and verification
 
 - [x] Row rule: `rowRightEdgeProblems` (trailing `list-actions` slot holds at most one control) + source scan that no `PlayerListRow actions={<>...</>}` exists on web or app (`ui/ModuleTemplates.test.tsx`). Number-vs-action mixing is not machine-checkable and stays a review rule.

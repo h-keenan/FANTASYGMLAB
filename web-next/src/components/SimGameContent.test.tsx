@@ -116,7 +116,8 @@ describe("SimGameContent", () => {
     await openFirstGame();
     expect(await screen.findByTestId("sim-home")).toBeInTheDocument();
     expect(screen.getByRole("tab", { name: "Home" })).toHaveAttribute("aria-selected", "true");
-    expect(screen.getByTestId("win-chance")).toHaveTextContent("62%");
+    expect(screen.getByTestId("matchup-win-chip")).toHaveTextContent("62% win");
+    expect(screen.getByTestId("sim-matchup-hero")).toHaveTextContent("Projected points");
     // Phone layout: lineups and the secondary cards start collapsed, summary first.
     expect(screen.queryByRole("list", { name: "Lineups head to head" })).toBeNull();
     fireEvent.click(screen.getByRole("button", { name: /Show lineups/ }));
@@ -126,7 +127,9 @@ describe("SimGameContent", () => {
     expect(screen.getByRole("list", { name: "Lineups head to head" }).querySelectorAll("li")).toHaveLength(2);
     expect(screen.getByText("Otis Opp")).toBeInTheDocument();
     expect(screen.getByText("What to do this week")).toBeInTheDocument();
-    expect(screen.getByText("Set your lineup")).toBeInTheDocument();
+    // The checklist step and the status header's one action both say it.
+    expect(screen.getAllByText("Set your lineup").length).toBe(2);
+    expect(screen.getByTestId("status-primary")).toHaveTextContent("Set your lineup");
     expect(screen.getByTestId("bye-alert")).toHaveTextContent("Look at the wire for a fill-in: Fill Ford");
     expect(screen.getByTestId("waiver-suggestion")).toHaveTextContent("Covers Hurt Harry (out)");
     expect(screen.getByTestId("home-injury")).toHaveTextContent("Out 2 wk");
@@ -172,7 +175,7 @@ describe("SimGameContent", () => {
     fireEvent.click(await screen.findByTestId("auto-lineup"));
     expect(await screen.findByText(/Swapped Hurt Harry for Wally Wire, \+8\.0 proj/)).toBeInTheDocument();
     expect(mocked.autoSimLineup).toHaveBeenCalledTimes(1);
-    expect(await screen.findByText("Wally Wire", { selector: "span" })).toBeInTheDocument();
+    expect((await screen.findAllByText("Wally Wire", { selector: "span" }))[0]).toBeInTheDocument();
     fireEvent.click(await screen.findByTestId("auto-lineup"));
     await waitFor(() => expect(mocked.autoSimLineup).toHaveBeenCalledTimes(2));
     expect(await screen.findByRole("button", { name: /Lineup is optimal/ })).toBeDisabled();

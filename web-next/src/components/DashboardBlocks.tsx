@@ -24,6 +24,16 @@ import { thisWeekHref } from "@/lib/thisWeek";
  * (lib/dashboardLayout.ts buildNeedsAttention); the full plan stays on GM Plan.
  * Renders nothing when nothing is urgent.
  */
+/** Where a "Needs attention" entry opens (shared by the card and the status header's player rows). */
+export function attentionEntryHref(entry: DashboardAttentionEntry<BriefingItem>, leagueId: string, leagueName: string): string {
+  const id = encodeURIComponent(leagueId);
+  const query = `?name=${encodeURIComponent(leagueName)}`;
+  if (entry.target === "matchup") return thisWeekHref("matchup", leagueId, leagueName);
+  if (entry.target === "gm_plan" || !entry.item) return `/gm-plan/${id}${query}`;
+  const route = GAME_PLAN_INTERNAL_ROUTES[entry.item.destination] ?? "gm-plan";
+  return gamePlanTileHref(route, leagueId, leagueName, resolveGamePlanTargetPlayerId(entry.item));
+}
+
 export function DashboardNeedsAttention({
   entries,
   leagueId,
@@ -34,14 +44,7 @@ export function DashboardNeedsAttention({
   leagueName: string;
 }) {
   if (entries.length === 0) return null;
-  const id = encodeURIComponent(leagueId);
-  const query = `?name=${encodeURIComponent(leagueName)}`;
-  const hrefFor = (entry: DashboardAttentionEntry<BriefingItem>): string => {
-    if (entry.target === "matchup") return thisWeekHref("matchup", leagueId, leagueName);
-    if (entry.target === "gm_plan" || !entry.item) return `/gm-plan/${id}${query}`;
-    const route = GAME_PLAN_INTERNAL_ROUTES[entry.item.destination] ?? "gm-plan";
-    return gamePlanTileHref(route, leagueId, leagueName, resolveGamePlanTargetPlayerId(entry.item));
-  };
+  const hrefFor = (entry: DashboardAttentionEntry<BriefingItem>): string => attentionEntryHref(entry, leagueId, leagueName);
   return (
     <section className="flex flex-col gap-3" aria-labelledby="needs-attention-heading" data-testid="dashboard-needs-attention">
       <SectionHeading id="needs-attention-heading" size="compact">
