@@ -1,11 +1,12 @@
 import React, { useEffect, useId, useMemo, useReducer, useRef, useSyncExternalStore, type ReactNode } from 'react';
 import { Animated, Easing, PanResponder, Pressable, StyleSheet, View } from 'react-native';
-import { useReducedMotion } from 'react-native-reanimated';
+import { GestureDetector } from 'react-native-gesture-handler';
+import Reanimated, { useAnimatedStyle, useReducedMotion, useSharedValue } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import AppText from './AppText';
 import PressableScale from './PressableScale';
-import { SheetModal } from './SwipeDismissSheet';
+import { SheetModal, useSheetDismissGesture } from './SwipeDismissSheet';
 import { useThemeMode } from '../context/ThemeModeContext';
 import { EASE, MOTION_MS } from '../lib/motion';
 import { overlayStack } from '../lib/overlayStack';
@@ -72,6 +73,18 @@ export default function StoryCarousel({
     Animated.timing(slide, { toValue: 1, duration: MOTION_MS.base, easing: Easing.bezier(...EASE.out), useNativeDriver: true }).start();
   }, [state.index, state.direction, reduceMotion, slide]);
 
+  // Swipe down to leave, like every sheet (shared gesture, lib/sheetGesture.ts): the whole card follows the finger,
+  // shrinks and fades, then closes through the same path as the X (overlayStack.closeAll). It only claims a vertical
+  // pull; the horizontal page swipe and the tap zones are untouched. Pages never scroll, so there is no content to
+  // conflict with.
+  const pullY = useSharedValue(0);
+  const screenHeight = useSharedValue(0);
+  const { gesture: pullGesture } = useSheetDismissGesture({ translateY: pullY, sheetHeight: screenHeight, onDismiss: () => overlayStack.closeAll(), enabled: !hidden });
+  const pullStyle = useAnimatedStyle(() => {
+    const progress = screenHeight.value > 0 ? Math.min(1, Math.max(0, pullY.value / screenHeight.value)) : 0;
+    return { opacity: 1 - 0.55 * progress, transform: [{ translateY: pullY.value }, { scale: 1 - 0.1 * progress }] };
+  });
+
   const pan = useMemo(
     () =>
       PanResponder.create({
@@ -92,7 +105,13 @@ export default function StoryCarousel({
 
   return (
     <SheetModal visible={!hidden} transparent={false} animationType="fade" onRequestClose={() => overlayStack.back?.() ?? onClose()} statusBarTranslucent>
-      <View style={[styles.root, { paddingTop: insets.top, paddingBottom: Math.max(insets.bottom, spacing.md) }]} testID={testID} accessibilityViewIsModal>
+      <GestureDetector gesture={pullGesture}>
+      <Reanimated.View
+        style={[styles.root, { paddingTop: insets.top, paddingBottom: Math.max(insets.bottom, spacing.md) }, pullStyle]}
+        testID={testID}
+        accessibilityViewIsModal
+        onLayout={(e) => (screenHeight.value = e.nativeEvent.layout.height)}
+      >
         <View style={styles.top}>
           <View style={styles.progress} accessibilityRole="progressbar" accessibilityLabel={`Page ${state.index + 1} of ${state.count}`}>
             {pages.map((p, i) => (
@@ -124,7 +143,8 @@ export default function StoryCarousel({
           </Animated.View>
         </View>
         {page.footer ? <View style={styles.foot}>{page.footer}</View> : null}
-      </View>
+      </Reanimated.View>
+      </GestureDetector>
     </SheetModal>
   );
 }

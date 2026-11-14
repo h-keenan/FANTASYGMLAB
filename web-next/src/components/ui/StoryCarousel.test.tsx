@@ -74,4 +74,24 @@ describe("StoryCarousel", () => {
     fireEvent.click(screen.getByRole("button", { name: "Close Recap" }));
     expect(onClose).toHaveBeenCalled();
   });
+
+  it("a swipe down closes it through the same path as the X; a short pull springs back; a sideways swipe never closes", () => {
+    vi.useFakeTimers();
+    const onClose = vi.fn();
+    render(<StoryCarousel title="Recap" pages={pages} onClose={onClose} />);
+    const dialog = screen.getByRole("dialog");
+    const touch = (points: Array<[number, number]>) => {
+      fireEvent.touchStart(dialog, { touches: [{ clientX: points[0][0], clientY: points[0][1] }] });
+      for (const [x, y] of points.slice(1)) fireEvent.touchMove(dialog, { touches: [{ clientX: x, clientY: y }] });
+      fireEvent.touchEnd(dialog, { touches: [] });
+      act(() => vi.advanceTimersByTime(400));
+    };
+    touch([[100, 200], [180, 215]]);
+    touch([[300, 200], [200, 205], [60, 210]]);
+    expect(onClose).not.toHaveBeenCalled();
+    expect(dialog.style.transform).toBe("");
+    touch([[100, 100], [100, 130], [100, 260], [100, 420]]);
+    expect(onClose).toHaveBeenCalledTimes(1);
+    vi.useRealTimers();
+  });
 });

@@ -114,4 +114,51 @@ describe("useSheetDragDismiss", () => {
     act(() => vi.advanceTimersByTime(1000));
     expect(onDismiss).not.toHaveBeenCalled();
   });
+
+  it("does not render per touchmove: the live transform survives a re-render", () => {
+    const { rerender } = render(<Sheet onDismiss={vi.fn()} />);
+    const handle = document.querySelector("[data-sheet-handle]") as Element;
+    fireEvent.touchStart(handle, { touches: [{ clientX: 100, clientY: 100 }] });
+    fireEvent.touchMove(handle, { touches: [{ clientX: 100, clientY: 130 }] });
+    fireEvent.touchMove(handle, { touches: [{ clientX: 100, clientY: 180 }] });
+    const live = screen.getByTestId("sheet").style.transform;
+    expect(live).toContain("translate3d");
+    rerender(<Sheet onDismiss={vi.fn()} />);
+    expect(screen.getByTestId("sheet").style.transform).toBe(live);
+  });
+});
+
+function Peek({ onDismiss, onSnap }: { onDismiss: () => void; onSnap: (s: number) => void }) {
+  const { sheetRef, sheetStyle } = useSheetDragDismiss({ onDismiss, snapPoints: [0.5, 1], snap: 0.5, onSnapChange: onSnap });
+  return (
+    <div ref={sheetRef} style={sheetStyle} data-testid="peek">
+      <SheetHandle />
+    </div>
+  );
+}
+
+describe("useSheetDragDismiss snap points", () => {
+  beforeEach(() => vi.useFakeTimers());
+  afterEach(() => vi.useRealTimers());
+
+  it("rests at the peek, drags up to full, and dismisses down from the peek", () => {
+    vi.spyOn(HTMLElement.prototype, "getBoundingClientRect").mockReturnValue({ height: 800, width: 390, top: 0, left: 0, right: 390, bottom: 800, x: 0, y: 0, toJSON() {} } as DOMRect);
+    const onDismiss = vi.fn();
+    const onSnap = vi.fn();
+    render(<Peek onDismiss={onDismiss} onSnap={onSnap} />);
+    const peek = screen.getByTestId("peek");
+    act(() => vi.advanceTimersByTime(50));
+    expect(peek.style.transform).toContain("400px");
+    const handle = document.querySelector("[data-sheet-handle]") as Element;
+    swipe(handle, [[100, 500], [100, 470], [100, 300], [100, 120]]);
+    act(() => vi.advanceTimersByTime(400));
+    expect(onSnap).toHaveBeenCalledWith(1);
+    expect(peek.style.transform).toBe("");
+    // Down from full lands on the peek first, not closed.
+    swipe(handle, [[100, 100], [100, 130], [100, 330], [100, 520]]);
+    act(() => vi.advanceTimersByTime(400));
+    expect(onDismiss).not.toHaveBeenCalled();
+    expect(onSnap).toHaveBeenLastCalledWith(0.5);
+    vi.restoreAllMocks();
+  });
 });

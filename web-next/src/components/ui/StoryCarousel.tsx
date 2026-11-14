@@ -5,6 +5,7 @@ import { createPortal } from "react-dom";
 
 import { OverlayBack } from "@/components/OverlayBack";
 import { useOverlay } from "@/lib/useOverlay";
+import { useSheetDragDismiss } from "@/lib/useSheetDragDismiss";
 import { storyInitial, storyIsLast, storyKeyAction, storyReducer, storySegmentFill, storySwipeAction, storyTapAction } from "@/lib/storyCarousel";
 
 import "./ui.css";
@@ -58,6 +59,10 @@ export function StoryCarousel({
   // its Back returns here on the same page.
   const overlay = useOverlay({ title, onClose });
   const hidden = overlay.hidden;
+  // Swipe down to leave (like every sheet): the whole card follows the finger, shrinks and fades, then closes through
+  // the same path as the X (closeAll: overlay stack + history entry). Starts only on a vertical pull that is not
+  // scrolling page content; horizontal swipes and tap zones are untouched (lib/useSheetDragDismiss.ts).
+  const { sheetRef } = useSheetDragDismiss<HTMLDivElement>({ onDismiss: overlay.closeAll, enabled: !hidden, effect: "story" });
   useEffect(() => {
     const previousFocus = document.activeElement as HTMLElement | null;
     return () => previousFocus?.focus?.({ preventScroll: true });
@@ -106,7 +111,10 @@ export function StoryCarousel({
 
   const dialog = (
     <div
-      ref={rootRef}
+      ref={(node) => {
+        rootRef.current = node;
+        sheetRef.current = node;
+      }}
       className="ui-story"
       role="dialog"
       aria-modal="true"
