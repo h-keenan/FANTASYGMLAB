@@ -7,6 +7,7 @@ from __future__ import annotations
 
 from typing import Any, Mapping, Sequence
 
+from modules.sim.game_rules import FLAGS, rules_info
 from modules.sim import game_grades, scouting
 from modules.sim.game_actions import lineup_warnings
 from modules.sim.game_ai import trade_window
@@ -455,6 +456,7 @@ def game_view(
         "round": (state.week - snap.settings.regular_weeks) if state.status == "playoffs" else None,
         "seed": row.get("seed"), "engine_version": row.get("engine_version"),
         "scoring_model": row.get("scoring_model"), "settings": snap.settings.to_dict(),
+        "rules": rules_info(snap.unruled.settings, snap.settings, state.rules, state.status, state.view_no),
         "you": {
             "team_id": user, "name": team.name,
             "wins": me["wins"] if me else 0, "losses": me["losses"] if me else 0, "ties": me["ties"] if me else 0,
@@ -555,6 +557,9 @@ def _asset_name(snap: GameSnapshot, pid: str) -> str:
 def _tx_text(snap: GameSnapshot, tx: Mapping[str, Any]) -> tuple[str, str]:
     name = lambda pid: _asset_name(snap, pid)
     kind = tx["type"]
+    if kind == "rules":
+        names = ", ".join(FLAGS.get(f, {}).get("label", f) for f in tx.get("flags", ()))
+        return "", f"Rules updated: {names}. Past results stay as they were."
     if kind == "reserve":
         where = {"ir": "IR", "taxi": "the taxi squad", "roster": "the active roster"}[tx["dst"]]
         return tx["team"], f"{snap.team(tx['team']).name} moved {name(tx['pid'])} to {where}"

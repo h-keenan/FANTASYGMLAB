@@ -87,6 +87,8 @@ def derive(
             for n, (pid, weeks) in enumerate(p.get("items", ())):
                 if state.where(user, pid) is not None:
                     items.append(_item(seq, n, week, "injury", "injury", f"{_asset(snap, pid)} is out {int(weeks)} week{'' if int(weeks) == 1 else 's'}", "team", player_id=pid))
+        elif typ == "realism_upgrade":
+            items.append(_item(seq, 0, week, "rules", "check", "Rules updated: past results stay as they were, new rules apply going forward", "home"))
         elif typ == "week_advanced":
             boundaries.append((seq, week))
             items.append(_item(seq, 0, week, "recap", "matchup", f"Week {week} recap is ready", "home"))

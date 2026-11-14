@@ -26,6 +26,7 @@ import {
 } from './SimGameHomeCards';
 import { SimMiniPlayer, SimSectionTitle, SimTeamLink, SimToneBadge, createSimStyles, simToneColor, type SimCtx } from './SimGameParts';
 import { ClaimSheet } from './SimGameTeam';
+import { SimRealismBanner } from './SimRealism';
 import ToneBadge from './ToneBadge';
 import { useSimAutoSet } from './useSimAutoSet';
 import { useThemeMode } from '../context/ThemeModeContext';
@@ -129,6 +130,7 @@ export function SimHomeTab({ ctx, setClaims, onTab }: { ctx: SimCtx; setClaims: 
   const names = Object.fromEntries((home.standings?.rows ?? []).map((r) => [r.team_id, r.name]));
   return (
     <View style={common.stack} testID="sim-home">
+      <SimRealismBanner ctx={ctx} />
       <SimStatusHeader home={home} onTab={onTab} />
       {home.matchup ? <SimMatchupCard ctx={ctx} matchup={home.matchup} onTab={onTab} /> : null}
       <SimChecklistCard home={home} onTab={onTab} onAuto={home.matchup && !home.matchup.bye ? auto.run : undefined} autoBusy={auto.busy} optimal={auto.optimal} />

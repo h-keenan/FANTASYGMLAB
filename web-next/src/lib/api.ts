@@ -4814,6 +4814,8 @@ export const api = {
     authorizedRequest<SimGameTypes.SimToResponse>(`/v1/sim/games/${encodeURIComponent(gameId)}/sim-to`, { method: "POST", jsonBody: body }),
   undoSimTo: (gameId: string, fromSeq: number) =>
     authorizedRequest<SimGameTypes.SimGameResponse & { undone?: boolean }>(`/v1/sim/games/${encodeURIComponent(gameId)}/undo-sim`, { method: "POST", jsonBody: { from_seq: fromSeq } }),
+  realismUpgradeSimGame: (gameId: string) =>
+    authorizedRequest<SimGameTypes.SimRealismResponse>(`/v1/sim/games/${encodeURIComponent(gameId)}/realism-upgrade`, { method: "POST", jsonBody: {} }),
   revertSimWeek: (gameId: string) =>
     authorizedRequest<SimGameTypes.SimGameResponse & { reverted?: number }>(`/v1/sim/games/${encodeURIComponent(gameId)}/revert-week`, { method: "POST", jsonBody: {} }),
   getSimLeague: (gameId: string) => authorizedRequest<SimGameTypes.SimLeagueResponse>(`/v1/sim/games/${encodeURIComponent(gameId)}/league`),

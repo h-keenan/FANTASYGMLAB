@@ -350,16 +350,17 @@ def season_snapshot(root: GameSnapshot, season: int) -> GameSnapshot:
     and a fresh schedule."""
 
     prev = root.season_view(season - 1)
+    gen = root.generation_root(season)  # == root unless a realism update turned a rule on: then the settings this season is generated under
     rng = WorldRng(root.seed)
     rows: dict[str, dict[str, Any]] = {}
-    roles = _roles(prev) if root.settings.aging_curves else {}
+    roles = _roles(prev) if gen.settings.aging_curves else {}
     for pid in prev.pids:
         p = prev.players[pid]
         r = rng.stream(season - 1, "gage", aging.stable_key(pid))
         z, u = float(r.standard_normal()), float(r.random())
-        own = scouting.step_ratio(p.extra, p.extra.get("years_exp", 0.0)) if root.settings.rookie_curves else None
-        age, mean, sd, market, retired = aging.progress(p.pos, p.age, p.mean, p.sd, p.market, z, u, mult=own, flat_k=root.settings.league_anchor, aging_v=root.settings.aging_v, role=roles.get(pid, 0.5))
-        if root.settings.league_anchor:  # nobody runs far past the best the league ever had: compress above it (no unbounded drift at the top)
+        own = scouting.step_ratio(p.extra, p.extra.get("years_exp", 0.0)) if gen.settings.rookie_curves else None
+        age, mean, sd, market, retired = aging.progress(p.pos, p.age, p.mean, p.sd, p.market, z, u, mult=own, flat_k=gen.settings.league_anchor, aging_v=gen.settings.aging_v, role=roles.get(pid, 0.5))
+        if gen.settings.league_anchor:  # nobody runs far past the best the league ever had: compress above it (no unbounded drift at the top)
             top = _anchor_top(root).get(p.pos)
             if top and mean > top:
                 mean = top * (mean / top) ** 0.5
@@ -374,16 +375,16 @@ def season_snapshot(root: GameSnapshot, season: int) -> GameSnapshot:
             "pid": pid, "name": p.name, "pos": p.pos, "nfl_team": p.nfl_team, "age": age, "market": market,
             "mean": mean, "sd": sd, "injury_weeks": 0, "extra": extra,
         }
-    for row in rookie_class(root, rows, season):
+    for row in rookie_class(gen, rows, season):
         rows[row["pid"]] = row
-    if root.settings.world_v:
+    if gen.settings.world_v:
         refresh_depth_charts(rows)
-    players = value_pool(list(rows.values()), root.settings)
+    players = value_pool(list(rows.values()), gen.settings)
     order = [t.tid for t in root.teams]
     perm = WorldRng(root.seed).stream(season, "gseason", 0).permutation(len(order))
     schedule = round_robin([order[int(i)] for i in perm], root.settings.regular_weeks)
     view = GameSnapshot(
-        settings=root.settings, teams=root.teams, players=players, bye_weeks=root.bye_weeks, schedule=schedule,
+        settings=root.view_settings(season), teams=root.teams, players=players, bye_weeks=root.bye_weeks, schedule=schedule,
         scoring_model=root.scoring_model, notes=root.notes, seed=root.seed, start_picks=root.start_picks,
     )
     object.__setattr__(view, "_root", root)
