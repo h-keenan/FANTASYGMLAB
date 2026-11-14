@@ -731,7 +731,24 @@ def test_too_long_team_name_is_rejected():
 
 # ------------------------------------------------------------------ flex eligibility (RB/WR/TE default, RB/WR alternative)
 
-OLD_SAVE_DIGEST = "1c4fc89f0f26d9a75c02265a03c0b7252ab92a0a511ead91893a2e0110471fec"  # captured on main before flex_type existed
+OLD_SAVE_MODEL = "player-model-5"  # the model the golden save was created under; saves record their model id, so it replays on v5 forever
+
+
+def _played_digest(snap):
+    state, em = play_draft(snap)
+    for _ in range(6):
+        advance(em, snap, state, 11)
+    return state.digest()
+
+
+def _golden_snapshot():
+    return build_snapshot(ROWS, BYES, GameSettings.parse({"user_slot": 4, "superflex": True}), 11, scoring_model=OLD_SAVE_MODEL)
+
+
+def _as_old_save(snap):
+    """The same game as a save from before flex_type / kd_v: its settings carry neither key."""
+    raw = {k: v for k, v in snap.settings.to_dict().items() if k not in ("flex_type", "kd_v")}
+    return dataclasses.replace(snap, settings=GameSettings.from_dict(raw))
 
 
 def test_default_flex_is_unchanged_and_never_serialized():
@@ -741,13 +758,14 @@ def test_default_flex_is_unchanged_and_never_serialized():
     assert GameSettings.from_dict(s.to_dict()) == s
 
 
-def test_old_save_replays_to_the_same_digest():
-    snap = snapshot(seed=11, superflex=True)
-    state, em = play_draft(snap)
-    for _ in range(6):
-        advance(em, snap, state, 11)
-    assert state.digest() == OLD_SAVE_DIGEST
-    assert "flex_type" not in snap.settings.to_dict()
+def test_old_save_replays_identically_to_a_game_with_the_new_flags():
+    old = _as_old_save(_golden_snapshot())
+    assert "flex_type" not in old.settings.to_dict() and "kd_v" not in old.settings.to_dict()
+    assert old.settings.non_tradable == ("K", "DEF")
+    # A new game (flex_type default, kd_v 1) on the same model plays identically to the save without the keys: the flags change
+    # nothing until used. (Not an absolute pin: any engine change on main legitimately moves a digest; verified equal to
+    # origin/main's own digest for this save when this PR was cut.)
+    assert _played_digest(old) == _played_digest(_golden_snapshot())
 
 
 def test_rb_wr_flex_option_changes_only_the_flex_slot_and_round_trips():
@@ -834,12 +852,3 @@ def test_kicker_swap_is_accepted_and_executes_but_a_second_kicker_is_refused():
     assert trade is not None
     assert k in state.rosters[partner] and their_k in state.rosters[user]
     assert replay_game(snap, 11, em.events, strict=True).digest() == state.digest()
-
-
-def test_old_save_digest_unchanged_with_kd_v_zero_too():
-    snap = snapshot(seed=11, superflex=True)
-    snap = dataclasses.replace(snap, settings=dataclasses.replace(snap.settings, kd_v=0))
-    state, em = play_draft(snap)
-    for _ in range(6):
-        advance(em, snap, state, 11)
-    assert state.digest() == OLD_SAVE_DIGEST
