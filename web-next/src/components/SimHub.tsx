@@ -6,7 +6,7 @@ import { AccentCard } from "@/components/AccentCard";
 import { Button, ButtonLink } from "@/components/Button";
 import { EmptyState } from "@/components/EmptyState";
 import { PillRow } from "@/components/PillRow";
-import { SimCrest } from "@/components/SimCrest";
+import { SimTeamLogo } from "@/components/SimTeamIdentity";
 import { SimProgressBar, simToneColor } from "@/components/SimGameParts";
 import { ToneBadge } from "@/components/ToneBadge";
 import { CompactModule } from "@/components/ui/CompactModule";
@@ -141,7 +141,7 @@ function SavedGameRow({ game }: { game: SimGameLite }) {
   return (
     <AccentCard accent={done ? simToneColor(tone) : "var(--color-accent)"} compact as="div">
       <div className="flex items-center gap-2.5">
-        <SimCrest name={`${name} ${game.seed}`} size={34} />
+        <SimTeamLogo name={`${name} ${game.seed}`} size="card" />
         <span className="flex min-w-0 flex-1 flex-col">
           <span className="text-sm font-bold">{name}</span>
           <span className="text-xs" style={{ color: "var(--color-text-muted)" }}>{row.meta.split(" · ").slice(1).join(" · ")}</span>

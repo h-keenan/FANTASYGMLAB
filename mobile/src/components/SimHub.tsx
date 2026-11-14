@@ -10,7 +10,7 @@ import EmptyState from './EmptyState';
 import { LetterGrade } from './LetterGrade';
 import { Sheet } from './Sheet';
 import SegmentedTabBar from './SegmentedTabBar';
-import SimCrest from './SimCrest';
+import { SimTeamLogo } from './SimTeamIdentity';
 import { SimProgressBar, simToneColor } from './SimGameParts';
 import ToneBadge from './ToneBadge';
 import { useThemeMode } from '../context/ThemeModeContext';
@@ -142,7 +142,7 @@ function SavedGameRow({ game, onPress }: { game: SimGameLite; onPress: () => voi
   return (
     <AccentCard accent={done ? simToneColor(tone, colors) : colors.accent} compact onPress={onPress}>
       <View style={styles.rowHead}>
-        <SimCrest name={`${name} ${game.seed}`} size={34} />
+        <SimTeamLogo name={`${name} ${game.seed}`} size="card" />
         <View style={styles.grow}>
           <AppText style={styles.rowName}>{name}</AppText>
           <AppText style={styles.muted}>{row.meta.split(' · ').slice(1).join(' · ')}</AppText>
