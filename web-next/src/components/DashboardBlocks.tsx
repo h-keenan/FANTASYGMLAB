@@ -72,7 +72,7 @@ export function DashboardNeedsAttention({
                     {entry.why}
                   </span>
                 </span>
-                <span aria-hidden="true" style={{ color: "var(--color-accent)" }}>
+                <span aria-hidden="true" data-row-arrow style={{ color: "var(--color-accent)" }}>
                   →
                 </span>
               </Link>

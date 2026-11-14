@@ -339,11 +339,29 @@ function HeaderLeagueControls() {
  * needs no per-page wiring — it's already correct for every route today
  * and for any future one that reuses an existing path segment.
  */
+/** Titles for signed-out public routes that are not league destinations (phone header has no wordmark room). */
+const PUBLIC_PAGE_TITLE_BY_SEGMENT: Record<string, string> = {
+  "sample-league": "Sample league",
+  methodology: "Methodology",
+  "dynasty-tools": "Dynasty tools",
+  "dynasty-rankings": "Rankings",
+  "dynasty-trade-value-chart": "Trade values",
+};
+
 function HeaderPageTitle() {
   const pathname = usePathname();
   const segment = (pathname || "").split("/").filter(Boolean)[0] || "";
   const title = PAGE_TITLE_BY_SEGMENT[segment];
-  if (!title) return null;
+  if (!title) {
+    // Public pages (no league nav destination) still say where you are, compactly; they own their own <h1>.
+    const publicTitle = PUBLIC_PAGE_TITLE_BY_SEGMENT[segment];
+    if (!publicTitle) return null;
+    return (
+      <span className="flex items-center min-w-0 text-xs font-bold uppercase leading-tight break-words" style={{ color: "var(--color-text-muted)", letterSpacing: "0.03em" }} data-testid="header-public-title">
+        {publicTitle}
+      </span>
+    );
+  }
   return (
     <span className="flex items-center min-w-0">
       {/* The page's name is its h1 (some pages render only a header title; axe page-has-heading-one). */}

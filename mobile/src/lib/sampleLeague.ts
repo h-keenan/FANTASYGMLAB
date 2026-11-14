@@ -15,8 +15,10 @@ export const SAMPLE_ROUTE = "/sample-league";
 export const SAMPLE_LEAGUE_NAME = "Sample Dynasty League";
 export const SAMPLE_TEAM_NAME = "Demo Squad";
 export const SAMPLE_BANNER_TITLE = "Sample league";
-export const SAMPLE_BANNER_BODY = "Made-up players and numbers so you can look around. Nothing here is your data.";
-export const SAMPLE_CTA_LABEL = "Connect your real league";
+export const SAMPLE_BANNER_BODY = "Made-up data";
+export const SAMPLE_CONNECT_TITLE = "Connect your league to see yours";
+export const SAMPLE_CONNECT_BODY = "Real rosters, real values and verdicts that weigh your needs. Sleeper import takes about a minute.";
+export const SAMPLE_CTA_LABEL = "Connect your league";
 /** Where the CTA goes: the existing Add-a-league flow. */
 export const SAMPLE_CONNECT_ROUTE = "/connect-league";
 export const SAMPLE_ENTRY_LABEL = "Explore a sample league first";

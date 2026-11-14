@@ -119,6 +119,21 @@ export default function LandingPage() {
             {/* Google Play is live; the App Store slot stays "Coming soon"
                 until lib/appStoreLinks.ts has a URL. */}
             <AppStoreModules />
+            {/* Wide screens only: a real product screen (sample league data) fills the right half of the hero
+                instead of leaving it empty. Decorative; the "See it in action" section carries the real copy. */}
+            <div className="lp-hero-preview" aria-hidden="true">
+              <div className="lp-device">
+                <Image
+                  src="/onboarding/onboarding-tradehub.webp"
+                  alt=""
+                  width={600}
+                  height={1298}
+                  sizes="272px"
+                  loading="lazy"
+                  className="lp-device-img"
+                />
+              </div>
+            </div>
           </header>
 
           <section aria-labelledby="lp-how-heading" className="lp-section lp-marketing">

@@ -10,7 +10,7 @@ describe("SampleLeagueContent", () => {
     render(<SampleLeagueContent />);
     const banner = screen.getByTestId("sample-banner");
     expect(banner.textContent).toContain("Sample league");
-    expect(screen.getByRole("link", { name: "Connect your real league" }).getAttribute("href")).toBe("/connect-league");
+    expect(screen.getByRole("link", { name: "Connect your league" }).getAttribute("href")).toBe("/connect-league");
   });
 
   it("opens on the sample Dashboard with the real modules, filled from static data and no network", async () => {
@@ -50,5 +50,32 @@ describe("SampleLeagueContent", () => {
     expect(screen.getByTestId("sample-verdict").textContent).toBe("Fair");
     expect(screen.getByTestId("sample-banner")).toBeTruthy();
     expect(fetchSpy).not.toHaveBeenCalled();
+  });
+
+  it("wears the shared chrome: sticky tab strip, in-flow bottom stack and an inert (no arrows) dashboard", () => {
+    render(<SampleLeagueContent />);
+    expect(screen.getByTestId("sample-tab-strip").className).toContain("sticky");
+    const stack = screen.getByTestId("sample-bottom-stack");
+    expect(stack.className).toContain("bottom-stack");
+    expect(stack.querySelector('[data-testid="sample-tab-bar"]')).toBeTruthy();
+    // Taps are off, so the dashboard opts into the inert-links scope (hides arrows/chevrons in CSS).
+    expect(screen.getByTestId("sample-dashboard").hasAttribute("data-inert-links")).toBe(true);
+    // The banner is one slim row: badge + CTA, no stacked layout.
+    expect(screen.getByTestId("sample-banner").className).toContain("items-center");
+  });
+
+  it("shows initials, not blank discs, for League Activity teams", async () => {
+    render(<SampleLeagueContent />);
+    const card = await screen.findByTestId("league-pulse-card");
+    expect(card.textContent).toMatch(/TP|MM|EE/);
+    expect(card.textContent).not.toContain("›");
+  });
+
+  it("ends the Trade tab with a connect-your-league CTA module", () => {
+    render(<SampleLeagueContent />);
+    fireEvent.click(screen.getByRole("tab", { name: "Trade" }));
+    const cta = screen.getByTestId("sample-connect-module");
+    expect(cta.textContent).toContain("Connect your league to see yours");
+    expect(cta.querySelector("a")?.getAttribute("href")).toBe("/connect-league");
   });
 });

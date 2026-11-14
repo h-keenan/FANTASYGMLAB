@@ -3376,6 +3376,10 @@ select optgroup {
   .lp-hero {
     max-width: 36rem;
   }
+  /* The site header already carries the wordmark at this width; the big lockup is the phone's only brand. */
+  .lp-logo {
+    display: none;
+  }
   .lp-features {
     grid-template-columns: repeat(2, 1fr);
   }
@@ -3393,6 +3397,30 @@ select optgroup {
   .lp-screen {
     flex: 1 1 0;
     min-width: 0;
+  }
+}
+
+/* Wide landing hero: copy left, a product screen right (hidden below 1024px, where the hero stays one column). */
+.lp-hero-preview {
+  display: none;
+}
+@media (min-width: 1024px) {
+  .lp-hero {
+    max-width: none;
+    display: grid;
+    grid-template-columns: minmax(0, 36rem) minmax(0, 1fr);
+    column-gap: var(--space-3xl);
+    align-items: start;
+  }
+  .lp-hero > * {
+    grid-column: 1;
+  }
+  .lp-hero > .lp-hero-preview {
+    display: block;
+    grid-column: 2;
+    grid-row: 1 / span 9;
+    justify-self: center;
+    width: 17rem;
   }
 }
 

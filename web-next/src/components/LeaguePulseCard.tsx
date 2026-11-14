@@ -129,14 +129,11 @@ export function LeaguePulseCard({
     <article className="glass-surface flex flex-col gap-3 p-4" data-testid="league-pulse-card">
       <div className="flex items-center justify-between gap-2">
         <h3 style={{ font: "var(--font-card-title)" }}>League Activity</h3>
-        <span aria-hidden="true" style={{ color: "var(--color-accent)" }}>
-          ›
-        </span>
       </div>
       <div className="flex flex-col gap-2.5">
         {highlights.map((highlight) => (
           <div key={highlight.key} className="flex items-center gap-3">
-            <TeamAvatar avatarUrl={highlight.team.avatar_url} size={28} />
+            <TeamAvatar avatarUrl={highlight.team.avatar_url} name={highlight.team.team_name} size={28} />
             <div className="flex-1 flex flex-col min-w-0">
               <span
                 className="uppercase"

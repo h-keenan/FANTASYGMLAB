@@ -9,7 +9,7 @@ import AppText from '../components/AppText';
 import GridBackground from '../components/GridBackground';
 import PositionBadge from '../components/PositionBadge';
 import SampleDashboard from '../components/SampleDashboard';
-import SampleLeagueBanner from '../components/SampleLeagueBanner';
+import SampleLeagueBanner, { SampleConnectModule } from '../components/SampleLeagueBanner';
 import SectionHeading from '../components/SectionHeading';
 import SegmentedTabBar from '../components/SegmentedTabBar';
 import ToneBadge from '../components/ToneBadge';
@@ -71,6 +71,8 @@ export default function SampleLeagueScreen({ navigation }: Props) {
       <GridBackground />
       <ScrollView
         style={styles.container}
+        // The tab strip (child 2) stays pinned while the page scrolls, like a real league's tab strip.
+        stickyHeaderIndices={[2]}
         contentContainerStyle={[styles.content, { paddingTop: headerHeight + spacing.md, paddingBottom: orbClearance }]}
       >
         <SampleLeagueBanner onConnect={connect} />
@@ -134,6 +136,7 @@ export default function SampleLeagueScreen({ navigation }: Props) {
                 Sample verdict: a real one weighs your roster needs, league scoring and what this manager tends to accept.
               </AppText>
             </AccentCard>
+            <SampleConnectModule onConnect={connect} />
           </>
         ) : null}
       </ScrollView>

@@ -84,6 +84,22 @@ describe("displayPreferences helpers", () => {
     new Function(THEME_BOOT_SCRIPT)();
     expect(document.documentElement.hasAttribute("data-theme")).toBe(false);
   });
+
+  it("boot script opens public pages dark unless a choice (Auto included) is saved", () => {
+    window.localStorage.clear();
+    window.history.pushState({}, "", "/sample-league");
+    new Function(THEME_BOOT_SCRIPT)();
+    expect(document.documentElement.getAttribute("data-theme")).toBe("dark");
+    document.documentElement.removeAttribute("data-theme");
+    window.localStorage.setItem(THEME_STORAGE_KEY, "auto");
+    new Function(THEME_BOOT_SCRIPT)();
+    expect(document.documentElement.hasAttribute("data-theme")).toBe(false);
+    window.localStorage.clear();
+    window.history.pushState({}, "", "/portfolio");
+    new Function(THEME_BOOT_SCRIPT)();
+    expect(document.documentElement.hasAttribute("data-theme")).toBe(false);
+    window.history.pushState({}, "", "/");
+  });
 });
 
 describe("DisplayPreferencesProvider", () => {
