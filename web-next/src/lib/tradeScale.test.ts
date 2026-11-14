@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
-import { simAcceptanceMeter, tradeScaleCount, tradeScaleMissing, tradeScalePhase } from "./tradeScale";
+import type { SimGamePlayer } from "./simGame";
+import { simAcceptanceMeter, simScaleAsset, tradeScaleCount, tradeScaleMissing, tradeScalePhase } from "./tradeScale";
 
 describe("trade scale model", () => {
   it("walks empty, building, review, tweak", () => {
@@ -32,5 +33,19 @@ describe("trade scale model", () => {
       expect(s.edge).toBe(0);
       expect(`${s.label} ${s.description}`).not.toMatch(/\d/);
     }
+  });
+});
+
+describe("sim scale assets", () => {
+  it("maps a player to avatar fields with a projection detail and no rating, and a pick to its label", () => {
+    const player = { id: "123", name: "Ja'Marr Chase", pos: "WR", team: "CIN", age: 25, projection: 15.2, status: "healthy", grade: "A" } as unknown as SimGamePlayer;
+    const a = simScaleAsset(player as never);
+    expect(a.player).toMatchObject({ id: "123", name: "Ja'Marr Chase", position: "WR", headshotId: "123" });
+    expect(a.detail).toBe("CIN \u00b7 15.2");
+    expect(JSON.stringify(a)).not.toMatch(/overall|trade_value/);
+    const pick = simScaleAsset({ id: "pick:2027:1:t1", season: 2027, round: 1, own: false, orig_team_name: "Rivals" } as never);
+    expect(pick.pickLabel).toContain("Round 1");
+    expect(pick.pickLabel).toContain("via Rivals");
+    expect(pick.player).toBeUndefined();
   });
 });

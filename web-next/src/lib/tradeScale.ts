@@ -1,7 +1,8 @@
 // Pure model for the trade builder's "two-column scale" (coridian_ pick, ui-pass-3 topic 3, V1): Give and Get side by side,
 // the fairness meter under them updating live, and the verdict replacing the add buttons once the offer is ready.
 // Byte-identical in web-next/src/lib and mobile/src/lib (scripts/check_lib_twins.mjs IDENTICAL).
-import type { FairnessMeter } from "./playerAnatomy";
+import type { FairnessMeter, PlayerRef } from "./playerAnatomy";
+import { simHeadshotId, simIsPick, simPickLabelText, simProjText, type SimGamePlayer, type SimPickAsset, type SimTradeAsset } from "./simGame";
 
 /**
  * empty    nothing on either side: both columns show their "+" tile.
@@ -42,4 +43,29 @@ export function simAcceptanceMeter(decision: SimScaleDecision | null): FairnessM
   if (decision === "counter") return { position: 0.5, edge: 0, label: "They would counter", description: "Their answer: they would counter this offer", tone: "warning" };
   if (decision === "decline") return { position: 0.17, edge: 0, label: "They would decline", description: "Their answer: they would decline this offer", tone: "danger" };
   return { position: 0.5, edge: 0, label: "Checking their answer", description: "Their answer is loading", tone: "muted" };
+}
+
+/** A scale card without the platform's tap handler (web `onOpen`, app `onPress`), so both platforms map sim assets the same way. */
+export interface SimScaleAsset {
+  key: string;
+  player?: PlayerRef;
+  pickLabel?: string;
+  detail?: string | null;
+  /** The sim player behind the card, for the peek sheet; absent for picks. */
+  source?: SimGamePlayer;
+}
+
+/** A sim player or pick as a scale card: avatar fields, "KC · Proj 14.2" (projection or "Bye" / "Out", never a rating) and the pick's label. */
+export function simScaleAsset(asset: SimTradeAsset): SimScaleAsset {
+  if (simIsPick(asset)) {
+    const pick = asset as SimPickAsset;
+    return { key: pick.id, pickLabel: `${simPickLabelText(pick)}${pick.own === false && pick.orig_team_name ? ` via ${pick.orig_team_name}` : ""}` };
+  }
+  const p = asset as SimGamePlayer;
+  return {
+    key: p.id,
+    player: { id: p.id, name: p.name, position: p.pos, team: p.team ?? null, age: p.age ?? null, headshotId: simHeadshotId(p) },
+    detail: [p.team, simProjText(p)].filter(Boolean).join(" · "),
+    source: p,
+  };
 }
