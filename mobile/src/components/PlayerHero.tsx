@@ -64,6 +64,7 @@ export default function PlayerHero({
   valueChart = null,
   ovrChart = null,
   gradeTile = null,
+  compact = false,
   children,
 }: {
   /** Shown in the tap-the-Value popover (for example the value history chart). */
@@ -110,11 +111,22 @@ export default function PlayerHero({
   /** Supplying this turns the score tile into the expand toggle for the
    * Snapshot card; omit to keep it static. */
   onToggleExpand?: () => void;
+  /** Peek sheet: 56px avatar, no archetype pill, the three tiles collapsed into one summary line (the full snap shows them). */
+  compact?: boolean;
   children?: React.ReactNode;
 }) {
   const { colors } = useThemeMode();
   const styles = useMemo(() => createStyles(colors), [colors]);
   const bye = byePills(byeWeek, onByeThisWeek);
+  // One-line stand-in for the tiles at peek: "Score 64 · Value 60 · ▼ 22%" (the sim shows its own tiles' values only).
+  const summary = (simTiles && simTiles.length > 0
+    ? [...(gradeTile || overallRating == null ? [] : [`Score ${overallRating}`]), ...simTiles.map((t) => `${t.label} ${t.value}`)]
+    : [
+        overallRating != null ? `Score ${overallRating}` : null,
+        score != null ? `${valueLabel ?? 'Value'} ${Math.round(score).toLocaleString()}` : null,
+        usageTrend ? `${usageTrend.arrow} ${Math.abs(usageTrend.trend_pct)}%` : null,
+      ].filter((b): b is string => b != null)
+  ).join(' · ');
 
   const scoreTileBody = (
     <>
@@ -137,9 +149,9 @@ export default function PlayerHero({
       <View style={styles.identityRow}>
         <View style={styles.avatarCol}>
           <View style={[styles.avatarGlow, { shadowColor: colors.accent, borderColor: colors.accentMuted }]}>
-            <PlayerAvatar playerId={avatarId === undefined ? playerId : avatarId} size={100} tier={tier} fallbackLabel={heroInitials(name)} />
+            <PlayerAvatar playerId={avatarId === undefined ? playerId : avatarId} size={compact ? 56 : 100} tier={tier} fallbackLabel={heroInitials(name)} />
           </View>
-          {tierLabel ? (
+          {tierLabel && !compact ? (
             <View style={[styles.archetypePill, { borderColor: tierColor }]}>
               <Ionicons name="person" size={11} color={tierColor} />
               <AppText style={styles.archetypeText} numberOfLines={1}>
@@ -165,11 +177,12 @@ export default function PlayerHero({
             ) : null}
             {bye.thisWeek && !unavailable ? <ToneBadge label="On bye this week" color={colors.premium} /> : null}
           </View>
-          {rookie?.detail ? <AppText style={styles.rookieLine}>Rookie · {rookie.detail}</AppText> : null}
+          {compact && summary ? <AppText style={styles.peekSummary} numberOfLines={1} testID="pqv-peek-summary">{summary}</AppText> : null}
+          {rookie?.detail && !compact ? <AppText style={styles.rookieLine}>Rookie · {rookie.detail}</AppText> : null}
         </View>
       </View>
 
-      <View style={styles.tilesRow}>
+      {compact ? null : <View style={styles.tilesRow}>
         {gradeTile ? (
           <View style={styles.tile}>{gradeTile}</View>
         ) : onToggleExpand && overallRating !== null ? (
@@ -230,7 +243,7 @@ export default function PlayerHero({
         <UsageTile trend={usageTrend} loading={usageLoading} />
           </>
         )}
-      </View>
+      </View>}
       {children}
     </View>
   );
@@ -315,6 +328,7 @@ function createStyles(colors: ThemeColors) {
       backgroundColor: colors.backgroundElevated,
     },
     archetypeText: { flexShrink: 1, fontSize: 14, fontWeight: '700', color: colors.textPrimary },
+    peekSummary: { fontSize: 12.5, fontWeight: '700', color: colors.textSecondary },
     infoCol: { flex: 1, alignItems: 'flex-start', gap: spacing.sm, paddingTop: spacing.xs },
     name: { fontSize: 29, fontWeight: '800', color: colors.textPrimary, lineHeight: 32, letterSpacing: -0.3 },
     rookieLine: { fontSize: 13.5, color: colors.textSecondary },

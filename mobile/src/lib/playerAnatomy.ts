@@ -170,6 +170,27 @@ export function nextSheetSnap(current: SheetSnap, dragY: number, velocity = 0): 
   return current;
 }
 
+/** The first content line (one row of the open tab) that must be visible under the pills at the peek height. */
+export const PEEK_FIRST_LINE_PX = 52;
+export const PEEK_MIN_FRAC = 0.4;
+export const PEEK_MAX_FRAC = 0.7;
+
+/**
+ * Peek height in px, computed from the content (coridian_, 2026-11-14: the tab row sat clipped at the bottom of a fixed 56%
+ * peek). `anchorBottom` is where the pill row ends, measured from the sheet's top with the compact header showing; the
+ * sheet shows that plus one content line plus the bottom inset, clamped between 40% and 70% of the screen so it never
+ * opens as a sliver or right up under the page header.
+ */
+export function peekSheetHeight({ anchorBottom, viewportH, bottomInset = 0 }: { anchorBottom: number; viewportH: number; bottomInset?: number }): number {
+  const want = anchorBottom + PEEK_FIRST_LINE_PX + Math.max(0, bottomInset);
+  return Math.round(Math.max(viewportH * PEEK_MIN_FRAC, Math.min(viewportH * PEEK_MAX_FRAC, want)));
+}
+
+/** True when the pill row is fully inside the part of the sheet that shows at `peekH` (a check for tests and the geometry script). */
+export function peekShowsTabs(anchorBottom: number, peekH: number, bottomInset = 0): boolean {
+  return anchorBottom <= peekH - Math.max(0, bottomInset) + 0.5;
+}
+
 const PQV_ORDER = ["overview", "stats", "outlook", "history", "scouting", "profile"];
 /** Pill order for the player sheet: Overview, Stats, Outlook, History, Scouting (then anything else). */
 export function orderPlayerSheetTabs<T extends { key: string }>(tabs: readonly T[]): T[] {

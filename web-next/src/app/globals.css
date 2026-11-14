@@ -1390,8 +1390,9 @@ a {
   color: var(--color-text-muted);
   font-size: 0.6rem;
 }
+.pqv-fold--tiles { grid-column: 2; }
+.pqv-peek-summary { display: none; margin: 0; font-size: 0.8rem; font-weight: 700; color: var(--color-text-secondary); font-variant-numeric: tabular-nums; }
 .pqv-stat-tiles {
-  grid-column: 2;
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: var(--space-sm);
@@ -1500,7 +1501,7 @@ a {
   .pqv-hero-avatar-col {
     grid-row: 1;
   }
-  .pqv-stat-tiles {
+  .pqv-fold--tiles {
     grid-column: 1 / -1;
   }
 }
@@ -1907,13 +1908,39 @@ a {
     padding-bottom: env(safe-area-inset-bottom, 0px);
   }
   /* Peek / full (coridian_ pick 1b): peek is one fixed height, so switching pills never moves the sheet; the handle drags to full. */
-  .pqv-modal[data-snap="peek"] {
-    height: calc(56dvh - var(--kb-inset, 0px));
-    max-height: calc(56dvh - var(--kb-inset, 0px));
-  }
   .pqv-modal[data-snap="full"] {
     min-height: calc(92dvh - var(--kb-inset, 0px));
     max-height: calc(92dvh - var(--kb-inset, 0px));
+  }
+  /* Peek height is computed from the content (PlayerQuickView measures the pill row and sets --pqv-peek-h; lib/playerAnatomy
+     peekSheetHeight): compact header + pill row + one content line. 56dvh is only the first-paint fallback. */
+  .pqv-modal[data-snap="peek"] {
+    height: var(--pqv-peek-h, calc(56dvh - var(--kb-inset, 0px)));
+    max-height: var(--pqv-peek-h, calc(56dvh - var(--kb-inset, 0px)));
+    min-height: 0;
+  }
+  /* Compact header at peek (coridian_ "PQV glitch", 2026-11-14): 56px avatar, name + meta + a one-line summary of the three
+     tiles, signals; the pill row follows at once. The big avatar, the tiles and the explainers belong to the full snap.
+     Everything animates between the two (height / size / opacity), nothing jumps. */
+  .pqv-modal .pqv-avatar-glow { width: 112px; height: 112px; transition: width 240ms var(--ease-out, ease-out), height 240ms var(--ease-out, ease-out), box-shadow 240ms var(--ease-out, ease-out); }
+  .pqv-modal .pqv-avatar-glow > * { transform-origin: 0 0; transition: transform 240ms var(--ease-out, ease-out); }
+  .pqv-modal .pqv-peek-fold { max-height: 14rem; opacity: 1; transition: max-height 240ms var(--ease-out, ease-out), opacity 180ms linear, margin 240ms var(--ease-out, ease-out); }
+  .pqv-modal .pqv-hero { transition: row-gap 240ms var(--ease-out, ease-out); }
+  .pqv-modal[data-snap="peek"] .pqv-avatar-glow { width: 56px; height: 56px; box-shadow: 0 0 0 1px color-mix(in srgb, var(--color-accent) 30%, transparent); }
+  .pqv-modal[data-snap="peek"] .pqv-avatar-glow > * { transform: scale(0.5); }
+  .pqv-modal[data-snap="peek"] .pqv-peek-fold { max-height: 0; opacity: 0; margin-top: 0; margin-bottom: 0; padding-top: 0; padding-bottom: 0; overflow: hidden; pointer-events: none; }
+  .pqv-modal[data-snap="peek"] .pqv-hero { row-gap: 0; }
+  .pqv-modal[data-snap="peek"] .pqv-peek-summary { display: block; animation: pqv-peek-in 240ms var(--ease-out, ease-out) both; }
+  .pqv-modal[data-snap="peek"] .pqv-name { font-size: 1.2rem; -webkit-line-clamp: 2; }
+  .pqv-modal[data-snap="peek"] .pqv-hero-copy { gap: var(--space-xs); }
+  .pqv-modal[data-snap="peek"] .pqv-hero-shell { gap: 0; }
+  .pqv-modal[data-snap="peek"] .pqv-scroll { gap: var(--space-sm); }
+  .pqv-modal[data-snap="peek"] .pqv-signal-row { flex-wrap: nowrap; overflow: hidden; margin-top: 0; }
+  .pqv-modal[data-snap="peek"] .pqv-scroll > .pqv-peek-fold { margin-top: calc(-1 * var(--space-sm)); }
+  @keyframes pqv-peek-in { from { opacity: 0; } to { opacity: 1; } }
+  @media (prefers-reduced-motion: reduce) {
+    .pqv-modal .pqv-avatar-glow, .pqv-modal .pqv-avatar-glow > *, .pqv-modal .pqv-peek-fold, .pqv-modal .pqv-hero { transition: none; }
+    .pqv-modal[data-snap="peek"] .pqv-peek-summary { animation: none; }
   }
   @media (prefers-reduced-motion: no-preference) {
     .pqv-modal { transition: max-height 240ms var(--ease-out, ease-out), height 240ms var(--ease-out, ease-out); }

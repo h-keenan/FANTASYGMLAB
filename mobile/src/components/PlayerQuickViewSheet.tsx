@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { Pressable, StyleSheet, View } from 'react-native';
+import { LayoutAnimation, Platform, Pressable, StyleSheet, UIManager, useWindowDimensions, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useQuery } from '@tanstack/react-query';
 
@@ -53,7 +54,7 @@ import { queryKeys } from '../lib/queryKeys';
 import { isOnWaiverList } from '../lib/waiverHighlight';
 import { playerSubRatings } from '../lib/subRatings';
 import { navigationRef } from '../navigation/navigationRef';
-import { nextSheetSnap, orderPlayerSheetTabs, type SheetSnap } from '../lib/playerAnatomy';
+import { nextSheetSnap, orderPlayerSheetTabs, peekSheetHeight, type SheetSnap } from '../lib/playerAnatomy';
 import { radii, scrim, sheetHeight, spacing, type ThemeColors } from '../theme';
 
 type ExplorerTarget = { key: string; label: string };
@@ -304,7 +305,18 @@ export default function PlayerQuickViewSheet({
   const showSignals = !!scoped.opportunityLabel || !!injury || headerTags.length > 0;
 
   // Peek sheet (coridian_ pick 1b): opens at half height, drag the grip up (or tap it) for full; pills never move it.
-  const [snap, setSnap] = useState<SheetSnap>('peek');
+  const [snap, setSnapRaw] = useState<SheetSnap>('peek');
+  // Peek -> full animates the header (avatar, tiles) with a layout animation; nothing jumps. Peek height is computed from the
+  // content (compact header + pill row + one content line, lib/playerAnatomy peekSheetHeight), not a fixed 56%.
+  const setSnap = (next: SheetSnap) => {
+    if (Platform.OS === 'android') UIManager.setLayoutAnimationEnabledExperimental?.(true);
+    LayoutAnimation.configureNext(LayoutAnimation.create(240, LayoutAnimation.Types.easeInEaseOut, LayoutAnimation.Properties.opacity));
+    setSnapRaw(next);
+  };
+  const { height: windowH } = useWindowDimensions();
+  const insets = useSafeAreaInsets();
+  const [tabsBottom, setTabsBottom] = useState<number | null>(null); // pill row's bottom edge from the sheet top, compact header showing
+  const peekPx = tabsBottom == null ? null : peekSheetHeight({ anchorBottom: tabsBottom, viewportH: windowH, bottomInset: insets.bottom });
   const gripStart = useRef<{ y: number; t: number } | null>(null);
 
   const pqvTabs = useTabs({
@@ -417,7 +429,7 @@ export default function PlayerQuickViewSheet({
   return (
     <SheetModal visible transparent animationType="fade" onRequestClose={onClose}>
       <Pressable style={styles.backdrop} onPress={onClose} accessibilityLabel="Close player quick view">
-        <SwipeDismissCard style={[styles.sheet, snap === 'peek' ? styles.sheetPeek : styles.sheetFull]} onDismiss={onClose} testID="player-quick-view">
+        <SwipeDismissCard style={[styles.sheet, snap === 'peek' ? (peekPx != null ? { minHeight: peekPx, maxHeight: peekPx } : styles.sheetPeek) : styles.sheetFull]} onDismiss={onClose} testID="player-quick-view">
           <View
             style={styles.grip}
             accessible
@@ -456,6 +468,7 @@ export default function PlayerQuickViewSheet({
             </View>
 
             <PlayerHero
+              compact={snap === 'peek'}
               playerId={player.player_id}
               avatarId={remote ? player.player_id : null}
               tier={scoped.tier}
@@ -520,12 +533,20 @@ export default function PlayerQuickViewSheet({
                   <BadgeLegendSheet open={legendOpen} onClose={() => setLegendOpen(false)} />
                 </View>
               ) : null}
-              {mismatch ? <AppText style={styles.note}>{mismatch}</AppText> : null}
-              {usageCaption ? <AppText style={styles.note}>{usageCaption}</AppText> : null}
+              {mismatch && snap === 'full' ? <AppText style={styles.note}>{mismatch}</AppText> : null}
+              {usageCaption && snap === 'full' ? <AppText style={styles.note}>{usageCaption}</AppText> : null}
             </PlayerHero>
 
             {/* Sticky tab strip: child index 2 (top bar, hero, strip), so keep those three as direct children. */}
-            <View style={styles.stickyTabs}>{pqvTabs.bar}</View>
+            <View
+              style={styles.stickyTabs}
+              onLayout={(e) => {
+                if (snap !== 'peek') return;
+                const { y, height } = e.nativeEvent.layout;
+                const next = Math.round(24 + y + height); // 24 = grip row above the scroller
+                setTabsBottom((cur) => (cur != null && Math.abs(cur - next) < 2 ? cur : next));
+              }}
+            >{pqvTabs.bar}</View>
             {pqvTabs.panel}
 
             {/* Actions row (web .pqv-actions): league actions, then the
