@@ -6,7 +6,7 @@ import AppText from './AppText';
 import ErrorState from './ErrorState';
 import { Section as PqvSection } from './PlayerQuickViewSheet';
 import { SkeletonCard } from './SkeletonBlock';
-import SimCrest from './SimCrest';
+import { SimTeamIdentity, SimTeamLogo } from './SimTeamIdentity';
 import { createSimStyles } from './SimGameParts';
 import ToneBadge from './ToneBadge';
 import { useThemeMode } from '../context/ThemeModeContext';
@@ -65,7 +65,7 @@ export function SimPlayerHistory({ gameId, playerId }: { gameId: string; playerI
         {origin ? (
           <AccentCard accent={colors.accent} compact>
             <View style={common.row}>
-              {origin.team_name ? <SimCrest name={origin.team_name} size={28} /> : null}
+              {origin.team_name ? <SimTeamLogo name={origin.team_name} size='row' /> : null}
               <View style={common.grow}>
                 <AppText style={common.bodyStrong}>{origin.kind === 'drafted' ? simDraftSlotText(origin.round, origin.pick, origin.auto) : `Started on ${origin.team_name ?? 'a team'}`}</AppText>
                 <AppText style={common.small}>{simHistoryText(origin)}</AppText>
@@ -110,12 +110,7 @@ export function SimPlayerHistory({ gameId, playerId }: { gameId: string; playerI
                 </View>
                 {s.teams.map((t) => (
                   <View key={t.team_id} style={common.rowBetween}>
-                    <View style={[common.row, common.grow]}>
-                      {t.team_name ? <SimCrest name={t.team_name} size={16} /> : null}
-                      <AppText style={common.small} numberOfLines={1}>
-                        {t.team_name}
-                      </AppText>
-                    </View>
+                    <View style={[common.row, common.grow]}>{t.team_name ? <SimTeamIdentity name={t.team_name} size='inline' bold={false} fontSize={12} /> : null}</View>
                     <AppText style={common.muted}>
                       {t.games} g · {t.ppg.toFixed(1)} ppg
                     </AppText>

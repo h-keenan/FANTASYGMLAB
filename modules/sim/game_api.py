@@ -36,7 +36,7 @@ from modules.sim import game_home as home
 from modules.sim import game_notifications as notif
 from modules.sim import game_view as view
 from modules.sim.game_ai import TradeDesk
-from modules.sim.game_engine import advance, finish_draft, start_from_league
+from modules.sim.game_engine import advance, ensure_rank_movement, finish_draft, start_from_league
 from modules.sim.game_eval import Evaluator
 from modules.sim.game_result import _draft_from_state, build_result
 from modules.sim.game_review import build_review
@@ -928,7 +928,7 @@ def add_routes(router: APIRouter, ctx: GameApiCtx) -> None:
         with _lock_for(gid):
             store, uid, row, snap, state = load(user, gid)
             if want is not None and want < state.week and str(want) in state.recaps:
-                return {**_env(pro, state), "recap": state.recaps[str(want)], "also_played": [],
+                return {**_env(pro, state), "recap": ensure_rank_movement(state.recaps[str(want)], state), "also_played": [],
                         "replayed": True, "game": game_json(row, snap, state, pro)}
             if want is not None and want < state.week and snap.settings.mid_season and str(want) not in state.recaps:
                 raise GameError("week_mismatch", "That week was played in the real league before this game began.", current_week=state.week)

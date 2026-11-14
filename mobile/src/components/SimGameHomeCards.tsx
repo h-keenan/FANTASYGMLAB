@@ -174,7 +174,7 @@ export function SimInboxCard({ inbox, onTab }: { ctx?: SimCtx; inbox: SimHomeRes
         shown.map((o) => (
           <View key={o.id} style={common.tight} testID="home-offer">
             <View style={common.rowBetween}>
-              <SimTeamLink teamId={o.from.team_id} name={o.from.name} size={22} />
+              <SimTeamLink teamId={o.from.team_id} name={o.from.name} size='chip' />
               <AppText style={common.muted}>expires wk {o.expires_week}</AppText>
             </View>
             <AppText style={common.small}>
@@ -260,7 +260,7 @@ export function SimStandingsCard({ standings, onTab }: { standings: SimHomeRespo
             >
               <AppText style={[styles.stRank, { color: r.rank <= standings.playoff_spots ? colors.success : colors.textTertiary }]}>{r.rank}</AppText>
               <View style={common.grow}>
-                <SimTeamLink teamId={r.team_id} name={r.name} isYou={r.is_you} size={22} bold={r.is_you} />
+                <SimTeamLink teamId={r.team_id} name={r.name} isYou={r.is_you} size='chip' bold={r.is_you} />
               </View>
               <AppText style={[common.small, { color: r.streak?.startsWith('W') ? colors.success : r.streak?.startsWith('L') ? colors.danger : colors.textTertiary }]}>{r.streak ?? ''}</AppText>
               <AppText style={common.bodyStrong}>{simFmtRecord(r)}</AppText>
@@ -329,9 +329,9 @@ export function SimLeagueMovesCard({ league, names, onTab }: { league: SimHomeRe
             <AppText style={common.muted}>Week {spot.week}</AppText>
           </View>
           <View style={styles.spotTeams}>
-            <SimTeamLink teamId={spot.team_a.team_id} name={spot.team_a.name} isYou={spot.team_a.is_you} size={28} stacked />
+            <SimTeamLink teamId={spot.team_a.team_id} name={spot.team_a.name} isYou={spot.team_a.is_you} size='row' stacked />
             <SimGlyph name="trade" color={colors.textSecondary} size={18} />
-            <SimTeamLink teamId={spot.team_b.team_id} name={spot.team_b.name} isYou={spot.team_b.is_you} size={28} stacked />
+            <SimTeamLink teamId={spot.team_b.team_id} name={spot.team_b.name} isYou={spot.team_b.is_you} size='row' stacked />
           </View>
           <AppText style={common.bodyStrong}>{spot.headline}</AppText>
           <AppText style={common.small}>{spot.text}</AppText>
@@ -347,7 +347,7 @@ export function SimLeagueMovesCard({ league, names, onTab }: { league: SimHomeRe
       ) : null}
       {shown.map((m, i) => (
         <View key={i} style={[common.row, i > 0 && common.divider, { alignItems: 'flex-start', paddingVertical: spacing.xs }]}>
-          <SimTeamLink teamId={m.team_id} name={names[m.team_id] ?? 'Team'} size={22} hideName />
+          <SimTeamLink teamId={m.team_id} name={names[m.team_id] ?? 'Team'} size='chip' hideName />
           <AppText style={[common.small, common.grow]}>{m.text}</AppText>
           <ToneBadge label={`Wk ${m.week}`} color={simToneColor('muted', colors)} size="xs" />
         </View>

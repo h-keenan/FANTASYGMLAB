@@ -139,7 +139,7 @@ export function SimBlockView({ ctx, onMakeOffer }: { ctx: SimCtx; onMakeOffer: (
           (block.league ?? []).map((t) => (
             <AccentCard key={t.team_id} accent="var(--color-border-strong)" compact as="div">
               <div className="flex flex-wrap items-center justify-between gap-2">
-                <SimTeamLink teamId={t.team_id} name={t.name} size={24} />
+                <SimTeamLink teamId={t.team_id} name={t.name} size="chip" />
                 <span className="flex items-center gap-1">
                   <ToneBadge label={t.stance} color="var(--color-premium)" size="xs" />
                   {t.looking_for ? <ToneBadge label={`Wants ${t.looking_for}`} color="var(--color-danger)" size="xs" /> : null}

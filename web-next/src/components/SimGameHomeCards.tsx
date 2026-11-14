@@ -172,7 +172,7 @@ export function SimInboxCard({ inbox, onTab }: { ctx?: SimCtx; inbox: SimHomeRes
           {shown.map((o) => (
             <li key={o.id} className="flex flex-col gap-1" data-testid="home-offer">
               <div className="flex items-center justify-between gap-2">
-                <SimTeamLink teamId={o.from.team_id} name={o.from.name} size={22} />
+                <SimTeamLink teamId={o.from.team_id} name={o.from.name} size="chip" />
                 <span className="shrink-0 text-xs" style={{ color: "var(--color-text-muted)" }}>expires wk {o.expires_week}</span>
               </div>
               <p className="text-xs" style={{ color: "var(--color-text-secondary)" }}>
@@ -252,7 +252,7 @@ export function SimStandingsCard({ standings, onTab }: { standings: SimHomeRespo
               }}
             >
               <span className="text-xs font-extrabold tabular-nums" style={{ color: r.rank <= standings.playoff_spots ? "var(--color-success)" : "var(--color-text-muted)" }}>{r.rank}</span>
-              <SimTeamLink teamId={r.team_id} name={r.name} isYou={r.is_you} size={22} bold={r.is_you} />
+              <SimTeamLink teamId={r.team_id} name={r.name} isYou={r.is_you} size="chip" bold={r.is_you} />
               <span className="text-xs tabular-nums" style={{ color: r.streak?.startsWith("W") ? "var(--color-success)" : r.streak?.startsWith("L") ? "var(--color-danger)" : "var(--color-text-muted)" }}>{r.streak ?? ""}</span>
               <span className="text-sm font-bold tabular-nums" title={label || undefined}>{simFmtRecord(r)}</span>
             </li>
@@ -317,9 +317,9 @@ export function SimLeagueMovesCard({ league, names, onTab }: { league: SimHomeRe
         <div className="flex flex-col gap-2 p-2" style={{ borderRadius: "var(--radius-card, 12px)", background: "color-mix(in srgb, var(--color-premium) 10%, transparent)" }} data-testid="trade-spotlight">
           <div className="flex items-center gap-2"><SimGlyph name="spark" size={14} /><ToneBadge label="Trade to know" color="var(--color-premium)" size="xs" /><span className="text-xs" style={{ color: "var(--color-text-muted)" }}>Week {spot.week}</span></div>
           <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-2">
-            <SimTeamLink teamId={spot.team_a.team_id} name={spot.team_a.name} isYou={spot.team_a.is_you} size={28} stacked />
+            <SimTeamLink teamId={spot.team_a.team_id} name={spot.team_a.name} isYou={spot.team_a.is_you} size="row" stacked />
             <SimGlyph name="trade" size={18} />
-            <SimTeamLink teamId={spot.team_b.team_id} name={spot.team_b.name} isYou={spot.team_b.is_you} size={28} stacked />
+            <SimTeamLink teamId={spot.team_b.team_id} name={spot.team_b.name} isYou={spot.team_b.is_you} size="row" stacked />
           </div>
           <p className="text-sm font-bold">{spot.headline}</p>
           <p className="text-xs" style={{ color: "var(--color-text-secondary)" }}>{spot.text}</p>
@@ -333,7 +333,7 @@ export function SimLeagueMovesCard({ league, names, onTab }: { league: SimHomeRe
       <ul className="flex flex-col" aria-label="Recent moves">
         {shown.map((m, i) => (
           <li key={i} className="flex items-start gap-2 py-1.5" style={{ borderTop: i > 0 ? "var(--border-width-default) solid var(--color-border)" : undefined }}>
-            <SimTeamLink teamId={m.team_id} name={names[m.team_id] ?? "Team"} size={22} hideName />
+            <SimTeamLink teamId={m.team_id} name={names[m.team_id] ?? "Team"} size="chip" hideName />
             <span className="min-w-0 flex-1 text-xs" style={{ color: "var(--color-text-secondary)" }}>{m.text}</span>
             <ToneBadge label={`Wk ${m.week}`} color={simToneColor("muted")} size="xs" />
           </li>

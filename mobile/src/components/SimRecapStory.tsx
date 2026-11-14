@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
-import { Animated, Easing, StyleSheet, View } from 'react-native';
+import { Animated, Easing, ScrollView, StyleSheet, View } from 'react-native';
 
 import AppText from './AppText';
 import Button from './Button';
@@ -7,9 +7,9 @@ import StoryCarousel, { type StoryPage } from './StoryCarousel';
 import { SimWeekRecapView } from './SimGameRecap';
 import CircularProgressRing from './CircularProgressRing';
 import { Confetti, CountUp, MotionIn } from './Motion';
-import { SimPlayerChip, SimPlayerLine, createSimStyles, type SimCtx } from './SimGameParts';
+import { SimPlayerChip, SimPlayerLine, SimToneBadge, createSimStyles, type SimCtx } from './SimGameParts';
+import { SimTeamIdentity, SimTeamLogo } from './SimTeamIdentity';
 import RecapCard from './RecapCard';
-import TeamAvatar from './TeamAvatar';
 import { recapCardModel, recapRowsFromItems } from '../lib/recapCard';
 import TrophyIcon from './TrophyIcon';
 import { useThemeMode } from '../context/ThemeModeContext';
@@ -23,8 +23,12 @@ import {
   simNextWeekModel,
   simPositionTotals,
   simRecapInjuryModel,
+  simMovementText,
   simRecapOutcome,
   simRecapPageKeys,
+  simRecapPageTitle,
+  simRecapStandingsModel,
+  type SimStandingsRow,
   simRecapProj,
   simRecapResultModel,
   simRecapSeasonModel,
@@ -39,6 +43,7 @@ const KICKER: Record<SimRecapPageKey, string> = {
   matchup: 'Matchup breakdown',
   injuries: 'Injuries and lineup',
   league: 'Around the league',
+  standings: 'Standings',
   season: 'Season complete',
   next: 'Next week',
 };
@@ -63,12 +68,21 @@ function HeroGlow({ color }: { color: string }) {
   );
 }
 
+/** The Grade stat, only when the player carries a letter grade: a chip with a label and no value is never rendered. */
+const gradeStat = (player: SimGamePlayer | null | undefined) => {
+  const grade = simGradeOf(player);
+  return grade ? [{ key: 'ovr', label: 'Grade', value: '', grade }] : [];
+};
+
 function createStyles() {
   return StyleSheet.create({
     hero: { flex: 1, minHeight: 240, alignItems: 'center', justifyContent: 'center', gap: spacing.sm },
     glow: { position: 'absolute', width: 300, height: 300, alignItems: 'center', justifyContent: 'center' },
     versus: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, alignSelf: 'stretch' },
     fact: { borderRadius: 12, paddingHorizontal: 12, paddingVertical: 8, borderLeftWidth: 3 },
+    standing: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 6, paddingHorizontal: 8, borderRadius: 10, borderLeftWidth: 3, borderLeftColor: 'transparent' },
+    cut: { flexDirection: 'row', alignItems: 'center', gap: 8, marginVertical: 2 },
+    cutLine: { flex: 1, height: 0, borderTopWidth: 1, borderStyle: 'dashed' },
     chip: { flexDirection: 'row', alignItems: 'baseline', gap: 6, borderRadius: 999, borderWidth: 1, paddingHorizontal: 12, paddingVertical: 5 },
   });
 }
@@ -86,6 +100,7 @@ export function recapFacts(recap: SimWeekRecap, ctx: SimCtx): SimRecapFacts {
     nextOpponent: tw?.opponent?.name ?? null,
     nextProjection: tw && !tw.bye ? { yours: tw.your_projection, theirs: tw.opponent_projection } : null,
     tradeDeadlineWeek: g.trade_deadline_week,
+    playoffTeams: g.settings.playoff_teams,
     week: g.week,
   };
 }
@@ -111,6 +126,7 @@ export default function SimWeekRecapStory({
   const { colors, isDark } = useThemeMode();
   const common = useMemo(() => createSimStyles(colors), [colors]);
   const [detail, setDetail] = useState(false);
+  const [fullTable, setFullTable] = useState(false);
   const facts = useMemo(() => recapFacts(recap, ctx), [recap, ctx]);
   const keys = useMemo(() => simRecapPageKeys(recap, facts), [recap, facts]);
   const last = index + 1 >= total;
@@ -155,17 +171,45 @@ export default function SimWeekRecapStory({
     p.player ? (
       <MotionIn key={label}>
         <AppText style={[common.muted, { fontWeight: '800', textTransform: 'uppercase', color: accent }]}>{label}</AppText>
-        <SimPlayerLine player={p.player} stats={[{ key: 'pts', label: 'Pts', value: simFmtPts(p.pts), tone: label === 'Best performer' ? 'success' : undefined }, { key: 'ovr', label: 'Grade', value: '', grade: simGradeOf(p.player) }]} onOpen={ctx.openPlayer} />
+        <SimPlayerLine player={p.player} stats={[{ key: 'pts', label: 'Pts', value: simFmtPts(p.pts), tone: label === 'Best performer' ? 'success' : undefined }, ...gradeStat(p.player)]} onOpen={ctx.openPlayer} />
       </MotionIn>
     ) : (
       <Fact key={label} label={label} accent={accent}>{`${p.name} · ${simFmtPts(p.pts)}`}</Fact>
     );
-  const Team = ({ name, ring }: { name: string; ring?: string }) => (
-    <View style={{ flex: 1, minWidth: 0, alignItems: 'center', gap: 6 }}>
-      <View style={ring ? { borderRadius: 30, borderWidth: 2, borderColor: ring, padding: 1 } : undefined}>
-        <TeamAvatar avatarId={null} name={name} size={56} />
-      </View>
-      <AppText numberOfLines={1} style={[common.muted, { fontWeight: '700' }]}>{name}</AppText>
+  const Team = ({ name }: { name: string }) => (
+    <View style={{ flex: 1, minWidth: 0, alignItems: 'center' }}>
+      <SimTeamIdentity name={name} size="hero" stacked bold={false} fontSize={13} />
+    </View>
+  );
+  const standingsList = (rows: SimStandingsRow[], spots: number) => (
+    <View accessibilityLabel="Standings">
+      {rows.map((r, i) => {
+        const moveColor = r.delta == null || r.delta === 0 ? colors.textTertiary : r.delta > 0 ? colors.success : colors.danger;
+        const edge = r.status === 'out' ? 'transparent' : r.status === 'bubble' ? colors.warning : colors.success;
+        return (
+          <React.Fragment key={r.teamId}>
+            <View style={[styles.standing, { borderLeftColor: edge, opacity: r.status === 'out' && !r.isYou ? 0.62 : 1 }, r.isYou && { backgroundColor: colors.accent + '24' }]} testID="recap-standing-row">
+              <AppText style={[common.muted, { width: 24, textAlign: 'center', fontWeight: '800' }]}>{r.rank}</AppText>
+              <View style={{ flex: 1, minWidth: 0 }}>
+                <SimTeamIdentity name={r.name} size="row" isYou={r.isYou} bold={r.isYou} fontSize={14} />
+              </View>
+              {r.status === 'bubble' ? <SimToneBadge label="Bubble" tone="warning" /> : null}
+              <View style={{ alignItems: 'flex-end' }}>
+                <AppText style={{ fontSize: 13, fontWeight: '700', color: colors.textPrimary }}>{r.record}</AppText>
+                <AppText style={[common.muted, { fontSize: 11 }]}>{`${simFmtPts(r.pf)} PF`}</AppText>
+              </View>
+              <AppText style={{ minWidth: 36, textAlign: 'right', fontSize: 13, fontWeight: '800', color: moveColor }}>{simMovementText(r.delta)}</AppText>
+            </View>
+            {spots > 0 && r.rank === spots && rows[i + 1] ? (
+              <View style={styles.cut} accessibilityLabel="Playoff cut line">
+                <View style={[styles.cutLine, { borderColor: colors.warning }]} />
+                <AppText style={[common.muted, { color: colors.warning, fontWeight: '800', textTransform: 'uppercase', fontSize: 11 }]}>Playoff cut</AppText>
+                <View style={[styles.cutLine, { borderColor: colors.warning }]} />
+              </View>
+            ) : null}
+          </React.Fragment>
+        );
+      })}
     </View>
   );
 
@@ -186,7 +230,7 @@ export default function SimWeekRecapStory({
             {outcome.sub ? <AppText style={[common.bodyStrong, { textAlign: 'center', color: colors.textSecondary }]}>{outcome.sub}</AppText> : null}
             {result.kind === 'game' ? (
               <View style={styles.versus} accessible accessibilityLabel={`${youName} ${simFmtPts(result.yours)}, ${result.opponent} ${simFmtPts(result.theirs)}`}>
-                <Team name={youName} ring={tc} />
+                <Team name={youName} />
                 <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: 8 }}>
                   <CountUp value={result.yours} render={(t) => <AppText style={{ fontSize: 44, lineHeight: 50, fontWeight: '800', color: tc }}>{t}</AppText>} />
                   <AppText style={common.muted}>-</AppText>
@@ -238,7 +282,7 @@ export default function SimWeekRecapStory({
                   stats={[
                     { key: 'pts', label: 'Pts', value: simFmtPts(s.pts), tone: simRecapProj(s) != null && s.pts >= simRecapProj(s)! ? 'success' : undefined },
                     { key: 'proj', label: 'Proj', value: simFmtPts(simRecapProj(s)) },
-                    { key: 'ovr', label: 'Grade', value: '', grade: simGradeOf(s.player) },
+                    ...gradeStat(s.player),
                   ]}
                   onOpen={ctx.openPlayer}
                 />
@@ -282,9 +326,32 @@ export default function SimWeekRecapStory({
           <HeroZone tone={colors.success}>
             <AppText style={[common.muted, { fontWeight: '800', textTransform: 'uppercase' }]}>Top score of the week</AppText>
             {h.hero?.value ? <CountUp value={Number(h.hero.value)} render={(t) => <Hero value={t} caption={h.hero?.who ? `Top score: ${h.hero.who}` : undefined} color={colors.success} />} /> : null}
-            {h.hero?.who ? <TeamAvatar avatarId={null} name={h.hero.who} size={44} /> : null}
+            {h.hero?.who ? <SimTeamLogo name={h.hero.who} size="card" label /> : null}
           </HeroZone>
           <RecapCard model={recapCardModel({ kicker: 'Around the league', rows: recapRowsFromItems(h.items.map((it) => ({ ...it, tone: it.key === 'closest' ? ('warning' as const) : it.key === 'blowout' ? ('danger' as const) : undefined }))) })} />
+        </>
+      );
+    }
+    if (key === 'standings') {
+      const m = simRecapStandingsModel(recap, facts);
+      const you = m.you;
+      const moveColor = !you || you.delta == null || you.delta === 0 ? colors.textTertiary : you.delta > 0 ? colors.success : colors.danger;
+      if (fullTable) {
+        return (
+          <>
+            <ScrollView style={{ flex: 1 }} showsVerticalScrollIndicator={false}>{standingsList(m.rows, m.spots)}</ScrollView>
+            <Button label="Back to summary" variant="secondary" onPress={() => setFullTable(false)} />
+          </>
+        );
+      }
+      return (
+        <>
+          <HeroZone tone={you && you.seed != null ? colors.success : colors.accent}>
+            <Hero value={you ? you.rank : ''} caption={m.caption || undefined} color={you && you.seed != null ? colors.success : undefined} />
+            {you && you.delta != null ? <AppText style={{ fontSize: 24, fontWeight: '800', color: moveColor }} testID="standings-move">{simMovementText(you.delta)}</AppText> : null}
+          </HeroZone>
+          {standingsList(m.compact, m.spots)}
+          {m.rows.length > m.compact.length ? <Button label="Full standings" variant="secondary" onPress={() => setFullTable(true)} /> : null}
         </>
       );
     }
@@ -298,7 +365,7 @@ export default function SimWeekRecapStory({
             </MotionIn>
             <AppText style={[common.muted, { fontWeight: '800', textTransform: 'uppercase' }]}>{m.youChampion ? 'Your finish' : 'Champion'}</AppText>
             <AppText style={{ fontSize: 36, lineHeight: 42, fontWeight: '800', color: m.youChampion ? gold : colors.textPrimary, textAlign: 'center' }} testID="season-headline">{m.youChampion ? 'Champions' : m.championName ?? 'Season complete'}</AppText>
-            {m.championName && !m.youChampion ? <TeamAvatar avatarId={null} name={m.championName} size={48} /> : null}
+            {m.championName && !m.youChampion ? <SimTeamLogo name={m.championName} size="card" label /> : null}
             <AppText style={[common.bodyStrong, { textAlign: 'center', color: colors.textSecondary }]}>{m.youChampion ? `${youName} won it all.` : `You finished ${m.finish}.`}</AppText>
           </HeroZone>
           <RecapCard model={recapCardModel({ kicker: 'Season complete', badge: m.finish, rows: recapRowsFromItems(m.items) })} />
@@ -310,7 +377,7 @@ export default function SimWeekRecapStory({
       return (
         <>
           <HeroZone>
-            {n.opponent ? <TeamAvatar avatarId={null} name={n.opponent} size={56} /> : null}
+            {n.opponent ? <SimTeamLogo name={n.opponent} size="hero" label /> : null}
             <Hero value={n.opponent ?? `Week ${n.week ?? ''}`} caption={n.week != null ? `Week ${n.week}${n.opponent ? ' opponent' : ''}` : undefined} />
             {n.yours != null && n.theirs != null ? <AppText style={[common.bodyStrong, { textAlign: 'center', fontSize: 18 }]}>{`${simFmtPts(n.yours)} proj vs ${simFmtPts(n.theirs)}`}</AppText> : null}
             {n.edge ? <AppText style={[common.bodyStrong, { textAlign: 'center', color: colors.textSecondary }]}>{n.edge}</AppText> : null}
@@ -325,6 +392,7 @@ export default function SimWeekRecapStory({
   const pages: StoryPage[] = keys.map((key, i) => ({
     key,
     label: `${title}${total > 1 ? ` · ${index + 1} of ${total}` : ''} · ${KICKER[key]}`,
+    header: simRecapPageTitle(key, recap, { roundLabel: recap.kind === 'playoff' ? simPlayoffRoundLabel(recap.week, ctx.game.settings) : null, youId: facts.youId }),
     content: pageFor(key),
     footer:
       i === keys.length - 1 ? (

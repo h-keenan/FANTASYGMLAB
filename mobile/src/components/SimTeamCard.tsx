@@ -5,7 +5,7 @@ import AccentCard from './AccentCard';
 import AppText from './AppText';
 import PlayerName from './PlayerName';
 import PositionBadge from './PositionBadge';
-import SimCrest from './SimCrest';
+import { SimTeamLogo } from './SimTeamIdentity';
 import { createSimStyles, simToneColor } from './SimGameParts';
 import ToneBadge from './ToneBadge';
 import { useThemeMode } from '../context/ThemeModeContext';
@@ -48,9 +48,9 @@ export default function SimTeamCard({
     <AccentCard accent={accent} compact>
       <View style={common.rowBetween}>
         <View style={[common.row, common.grow]}>
-          <SimCrest name={team.name} size={32} />
+          <SimTeamLogo name={team.name} size='row' />
           <View style={common.grow}>
-            <AppText style={common.bodyStrong} numberOfLines={2}>
+            <AppText style={common.bodyStrong}>
               {team.name}
               {team.is_you ? ' (you)' : ''}
             </AppText>

@@ -25,6 +25,7 @@ import {
 import { SimDraftGlyph } from "@/components/SimDraftGlyphs";
 import { SimDynastyStrip } from "@/components/SimGameDynasty";
 import { SimCollapse, SimGeneratedChip, SimGeneratedNoticeSheet, SimPickLine, SimRookieNoticeGate, useSimPicks } from "@/components/SimGameDynastyParts";
+import { SimTeamIdentity } from "@/components/SimTeamIdentity";
 import { SimIconButton, SimRosterLine, SimToneBadge, simToneColor, type SimCtx } from "@/components/SimGameParts";
 import { SimReserveButton, SimReserveGroups, SimReserveSheet } from "@/components/SimGameReserves";
 import { SkeletonCard } from "@/components/Skeleton";
@@ -449,7 +450,7 @@ function RookieStage({
                 <span className="min-w-0">
                   <span className="font-bold tabular-nums">#{row.n}</span> {row.made?.name} <span style={{ color: "var(--color-text-muted)" }}>({row.made?.pos})</span>
                 </span>
-                <span className="shrink-0" style={{ color: row.is_yours ? "var(--color-accent)" : "var(--color-text-muted)" }}>{row.is_yours ? "You" : row.team_name}</span>
+                <span className="shrink-0" style={{ color: row.is_yours ? "var(--color-accent)" : "var(--color-text-muted)" }}>{row.is_yours || !row.team_name ? "You" : <SimTeamIdentity name={row.team_name} size="inline" bold={false} nameClassName="text-xs" />}</span>
               </li>
             ))}
           </ol>

@@ -1,7 +1,7 @@
 "use client";
 
 import type { ReactNode } from "react";
-import { SimCrest } from "@/components/SimCrest";
+import { SimTeamLogo } from "@/components/SimTeamIdentity";
 import { SimGlyph } from "@/components/SimGlyph";
 import { simStatusChips, simCompactSeason, simCompactWeek } from "@/lib/bottomNav";
 import { OPEN_SEARCH_EVENT } from "@/lib/orbSearch";
@@ -45,7 +45,7 @@ export function SimGameHeader({ game, onHub, onTeam, onMore, bell }: { game: Sim
           onClick={() => you.team_id && onTeam(you.team_id)}
           data-testid="sim-team-chip"
         >
-          <SimCrest name={you.name} size={20} />
+          <SimTeamLogo name={you.name} size="chip" />
           <span className="min-w-0 flex-1 break-words text-xs font-bold">{you.name}</span>
           {" "}
           <span className="shrink-0 text-xs tabular-nums" style={{ color: "var(--color-text-muted)" }}>{simFmtRecord(you)}</span>

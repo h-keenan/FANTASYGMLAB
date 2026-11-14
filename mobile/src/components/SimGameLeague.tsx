@@ -30,7 +30,7 @@ import {
   type SimStandingRow,
 } from '../lib/simGame';
 import { CountUp, MotionIn } from './Motion';
-import SimCrest from './SimCrest';
+import { SimTeamLogo } from './SimTeamIdentity';
 import { Hero } from './ModuleTemplates';
 import { simStandingHero } from '../lib/simSummaries';
 import { simMatchupMargin, simMatchupStatus, simPreview, simScoreboardLabel } from '../lib/simLayout';
@@ -61,7 +61,7 @@ export function SimStandingsList({ rows, playoffTeams }: { rows: SimStandingRow[
             >
               <AppText style={{ width: 20, fontSize: 12.5, fontWeight: '800', color: inPlayoffs ? colors.success : colors.textTertiary }}>{row.rank ?? index + 1}</AppText>
               <View style={common.grow}>
-                <SimTeamLink teamId={row.team_id} name={row.name} isYou={row.is_you} size={22} bold={row.is_you} />
+                <SimTeamLink teamId={row.team_id} name={row.name} isYou={row.is_you} size='chip' bold={row.is_you} />
               </View>
               <AppText style={{ fontSize: 12.5, fontWeight: '700', color: simToneColor(simStreakTone(row.streak ?? ''), colors) }}>{row.streak ?? ''}</AppText>
               <AppText style={[common.bodyStrong, { width: 48, textAlign: 'right' }]}>{simFmtRecord(row)}</AppText>
@@ -88,7 +88,7 @@ export function SimScoreCard({ g, names, youId, onOpen }: { g: SimRecapScore; na
   const right = side(g.away, g.away_pts);
   const team = (t: ReturnType<typeof side>) => (
     <View style={{ flex: 1, minWidth: 0, alignItems: 'center', gap: 4, opacity: t.lost ? 0.7 : 1 }}>
-      <SimCrest name={names[t.id] ?? 'Team'} size={36} />
+      <SimTeamLogo name={names[t.id] ?? 'Team'} size='row' />
       <AppText numberOfLines={2} style={{ fontSize: 12, textAlign: 'center', fontWeight: t.won ? '800' : '600', color: colors.textPrimary }}>{names[t.id] ?? 'Team'}</AppText>
       {t.id === youId ? <ToneBadge label="YOU" color={colors.accent} size="xs" /> : null}
     </View>
@@ -143,7 +143,7 @@ function SimMatchupSheet({ g, names, youId, week, label, onClose }: { g: SimReca
         {rows.map(([id, pts]) => (
           <View key={id} style={common.rowBetween}>
             <View style={common.grow}>
-              <SimTeamLink teamId={id} name={names[id] ?? 'Team'} isYou={id === youId} size={32} bold={g.winner === id} />
+              <SimTeamLink teamId={id} name={names[id] ?? 'Team'} isYou={id === youId} size='row' bold={g.winner === id} />
             </View>
             <AppText style={{ fontSize: 22, fontWeight: g.winner === id ? '900' : '600', color: g.winner === id ? colors.success : colors.textPrimary }}>{pts == null ? '-' : simFmtPts(pts)}</AppText>
           </View>
@@ -269,7 +269,7 @@ export function SimLeagueTab({ ctx }: { ctx: SimCtx }) {
             simPreview(league.transactions ?? [], allMoves, 6).shown.map((tx, i) => (
               <AccentCard key={i} accent={simToneColor(simTransactionGlyph(tx).tone, colors)} compact>
                 <View style={common.row}>
-                  {tx.team_id ? <SimTeamLink teamId={tx.team_id} name={names[tx.team_id] ?? 'Team'} size={24} hideName /> : null}
+                  {tx.team_id ? <SimTeamLink teamId={tx.team_id} name={names[tx.team_id] ?? 'Team'} size='chip' hideName /> : null}
                   <ReviewGlyphChip glyph={simTransactionGlyph(tx).glyph} tone={simTransactionGlyph(tx).tone} size={24} />
                   {tx.week != null ? <ToneBadge label={`Week ${tx.week}`} color={colors.textSecondary} size="xs" /> : null}
                   <ToneBadge label={String(tx.type ?? tx.kind ?? 'move').replace(/_/g, ' ')} color={simToneColor(simTransactionGlyph(tx).tone, colors)} size="xs" />

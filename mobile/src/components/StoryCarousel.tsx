@@ -13,10 +13,19 @@ import { overlayStack } from '../lib/overlayStack';
 import { storyInitial, storyIsLast, storyReducer, storySegmentFill, storySwipeAction, storyTapAction } from '../lib/storyCarousel';
 import { spacing, type ThemeColors } from '../theme';
 
+export interface StoryHeader {
+  eyebrow: string;
+  /** Heavy ~30px title; wraps to a second line, never ellipsized. */
+  title: string;
+  subtitle?: string | null;
+}
+
 export interface StoryPage {
   key: string;
   /** Short kicker above the page ("Result", "Around the league"). */
   label: string;
+  /** Optional big page header (eyebrow + bold title + one-line subtitle) in the fixed top zone; replaces the small kicker. */
+  header?: StoryHeader;
   /** The page itself: a hero number and at most three supporting items. No scrolling. */
   content: ReactNode;
   /** Page footer (a CTA). The last page's footer is the story's finish action. */
@@ -126,7 +135,15 @@ export default function StoryCarousel({
             <AppText style={styles.closeText}>×</AppText>
           </PressableScale>
         </View>
-        <AppText style={styles.kicker}>{page.label}</AppText>
+        {page.header ? (
+          <Animated.View style={[styles.head, state.direction !== 'none' && !reduceMotion ? { opacity: slide } : null]} testID="story-header">
+            <AppText style={styles.eyebrow}>{page.header.eyebrow}</AppText>
+            <AppText style={styles.title} accessibilityRole="header" testID="story-title">{page.header.title}</AppText>
+            {page.header.subtitle ? <AppText style={styles.subtitle}>{page.header.subtitle}</AppText> : null}
+          </Animated.View>
+        ) : (
+          <AppText style={styles.kicker}>{page.label}</AppText>
+        )}
         <View style={styles.stage} {...pan.panHandlers} onLayout={(e) => (widthRef.current = e.nativeEvent.layout.width)} testID="story-stage">
           {/* Tap zones sit under the page: taps on empty space reach them, taps on controls reach the controls. */}
           <Pressable
@@ -159,6 +176,10 @@ function createStyles(colors: ThemeColors) {
     segFill: { flex: 1, backgroundColor: colors.accent },
     close: { width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: colors.border, backgroundColor: colors.backgroundElevated ?? 'transparent' },
     closeText: { fontSize: 22, lineHeight: 24, color: colors.textSecondary },
+    head: { paddingHorizontal: spacing.lg, gap: 4 },
+    eyebrow: { fontSize: 12, fontWeight: '800', letterSpacing: 0.8, textTransform: 'uppercase', color: colors.textTertiary },
+    title: { fontSize: 30, lineHeight: 33, fontWeight: '900', color: colors.textPrimary },
+    subtitle: { fontSize: 15, fontWeight: '600', color: colors.textSecondary },
     kicker: { paddingHorizontal: spacing.lg, fontSize: 12, fontWeight: '800', letterSpacing: 0.8, textTransform: 'uppercase', color: colors.textTertiary },
     stage: { flex: 1, minHeight: 0 },
     page: { flex: 1, justifyContent: 'center', gap: spacing.md, paddingHorizontal: spacing.lg, paddingVertical: spacing.sm },

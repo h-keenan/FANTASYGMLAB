@@ -6,7 +6,7 @@ import { Button } from "@/components/Button";
 import { EmptyState } from "@/components/EmptyState";
 import { Input } from "@/components/Input";
 import { PillRow } from "@/components/PillRow";
-import { SimCrest } from "@/components/SimCrest";
+import { SimTeamLogo } from "@/components/SimTeamIdentity";
 import { SimPlayerLine, SimSectionTitle, type SimCtx } from "@/components/SimGameParts";
 import { SimTeamCard } from "@/components/SimTeamCard";
 import { SkeletonCard } from "@/components/Skeleton";
@@ -97,7 +97,7 @@ export function SimLeaguePlayersView({ ctx, state, onRetry }: { ctx: SimCtx; sta
                     aria-label={`Owned by ${team.name}${team.is_you ? " (you)" : ""}. Open team`}
                     onClick={() => ctx.openTeam(team.team_id)}
                   >
-                    <SimCrest name={team.name} size={28} />
+                    <SimTeamLogo name={team.name} size="row" />
                   </button>
                 }
               />

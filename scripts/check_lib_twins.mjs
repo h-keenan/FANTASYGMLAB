@@ -31,6 +31,7 @@ export const IDENTICAL = [
   "compactModule.ts",
   "statusHeader.ts",
   "recapCard.ts",
+  "simTeamIdentity.ts",
   "playerBadges.ts",
   "moduleTemplates.ts",
   "tradeIdeaSummary.ts",

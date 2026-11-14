@@ -1060,7 +1060,7 @@ function GameScreen({
           ) : null}
           {youLine && stage !== "draft" ? (
             <div className="flex flex-wrap items-center gap-x-2 text-xs" style={{ color: "var(--color-text-muted)" }}>
-              <SimTeamLink teamId={youLine.team_id} name={youLine.name} size={20} bold={false} />
+              <SimTeamLink teamId={youLine.team_id} name={youLine.name} size="chip" bold={false} />
               <span>{simFmtRecord(youLine)}{youLine.rank ? ` · #${youLine.rank}` : ""} · {simFmtPts(youLine.pf)} PF</span>
             </div>
           ) : null}

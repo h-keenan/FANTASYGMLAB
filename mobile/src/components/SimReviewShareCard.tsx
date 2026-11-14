@@ -4,7 +4,7 @@ import { Ionicons } from '@expo/vector-icons';
 
 import AppText from './AppText';
 import ShareCardChrome, { ShareGlass } from './ShareCardChrome';
-import SimCrest from './SimCrest';
+import { SimTeamLogo } from './SimTeamIdentity';
 import { REVIEW_ICON } from './SeasonReviewSections';
 import { splitReviewGrade, type ReviewShareHighlight, type ReviewShareModel, type ReviewTone } from '../lib/simReview';
 import { colors, positionColor, radii, spacing } from '../theme';
@@ -64,10 +64,10 @@ const SimReviewShareCard = forwardRef<View, { model: ReviewShareModel }>(({ mode
       <ShareGlass style={[styles.hero, { borderColor: champion ? GOLD : `${gradeColor}80`, borderWidth: champion ? 2 : 1, backgroundColor: champion ? `${GOLD}26` : undefined }]}>
         {model.teamName ? (
           <View style={styles.teamRow}>
-            <SimCrest name={model.teamName} size={34} />
+            <SimTeamLogo name={model.teamName} size='row' />
             <View style={styles.flex}>
               <AppText style={styles.kind}>Your team</AppText>
-              <AppText style={styles.team} numberOfLines={1}>{model.teamName}</AppText>
+              <AppText style={styles.team}>{model.teamName}</AppText>
             </View>
           </View>
         ) : null}

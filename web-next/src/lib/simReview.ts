@@ -360,7 +360,7 @@ export function buildSimReviewSections(input: { decisions?: unknown; review?: un
     const first = journey[0].rank;
     const last = journey[journey.length - 1].rank;
     out.push({ id: "journey", kind: "journey", glyph: "rank", title: "Standings journey", teams, points: journey,
-      note: `${ordinal(first)} after week 1, ${ordinal(last)} at the end of the regular season.` });
+      note: `${ordinal(first)} after week 1, ${ordinal(last)} at the end of the regular season${first === last ? "" : first > last ? ` (up ${first - last} ${first - last === 1 ? "spot" : "spots"})` : ` (down ${last - first} ${last - first === 1 ? "spot" : "spots"})`}.` });
   }
 
   const leaders = obj(review.leaders);

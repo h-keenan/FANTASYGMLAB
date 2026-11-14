@@ -9,7 +9,7 @@ import { PillRow } from "@/components/PillRow";
 import { ReviewGlyphChip } from "@/components/SeasonReviewSections";
 import { SimPlayerChip, SimSectionTitle, SimSeeAll, SimSheet, SimTeamLink, SimToneBadge, simToneColor, simToneInk, useSimWide, type SimCtx } from "@/components/SimGameParts";
 import { CountUp, MotionIn } from "@/components/Motion";
-import { SimCrest } from "@/components/SimCrest";
+import { SimTeamLogo } from "@/components/SimTeamIdentity";
 import { SimLeaguePlayersView, SimLeagueTeamsView } from "@/components/SimLeagueWho";
 import { SkeletonCard } from "@/components/Skeleton";
 import { Hero } from "@/components/ui/ModuleTemplates";
@@ -55,7 +55,7 @@ export function SimStandingsList({ rows, regularWeeks, playoffTeams }: { rows: S
               }}
             >
               <span className="text-xs font-extrabold tabular-nums" style={{ color: inPlayoffs ? "color-mix(in srgb, var(--color-success) 78%, var(--color-text-primary))" : "var(--color-text-secondary)" }}>{row.rank ?? index + 1}</span>
-              <SimTeamLink teamId={row.team_id} name={row.name} isYou={row.is_you} size={22} bold={row.is_you} />
+              <SimTeamLink teamId={row.team_id} name={row.name} isYou={row.is_you} size="chip" bold={row.is_you} />
               <span className="text-xs font-bold tabular-nums" style={{ color: simToneInk(simStreakTone(row.streak ?? "")) }} title={label || undefined}>{row.streak ?? ""}</span>
               <span className="w-12 text-right text-sm font-bold tabular-nums">{simFmtRecord(row)}</span>
             </li>
@@ -72,7 +72,7 @@ export function SimStandingsList({ rows, regularWeeks, playoffTeams }: { rows: S
             <div className="flex items-center justify-between gap-2">
               <span className="flex min-w-0 items-center gap-2">
                 <span className="text-sm font-extrabold w-5 shrink-0 tabular-nums" style={{ color: index < (playoffTeams ?? 0) ? "var(--color-success)" : "var(--color-text-muted)" }}>{row.rank ?? index + 1}</span>
-                <SimTeamLink teamId={row.team_id} name={row.name} isYou={row.is_you} size={28} />
+                <SimTeamLink teamId={row.team_id} name={row.name} isYou={row.is_you} size="row" />
               </span>
               <span className="flex items-center gap-2 shrink-0">
                 {simPlayoffStatusLabel(row.playoff_status) ? (
@@ -109,7 +109,7 @@ export function SimScoreCard({ g, names, youId, onOpen }: { g: SimRecapScore; na
   const right = side(g.away, g.away_pts);
   const team = (t: ReturnType<typeof side>) => (
     <span className="flex min-w-0 flex-col items-center gap-1 text-center" style={{ opacity: t.lost ? 0.7 : 1 }}>
-      <SimCrest name={names[t.id] ?? "Team"} size={36} />
+      <SimTeamLogo name={names[t.id] ?? "Team"} size="row" />
       <span className="text-xs leading-tight break-words" style={{ fontWeight: t.won ? 800 : 600, color: "var(--color-text-primary)" }}>{names[t.id] ?? "Team"}</span>
       {t.id === youId ? <ToneBadge label="YOU" color="var(--color-accent)" size="xs" /> : null}
     </span>
@@ -156,7 +156,7 @@ function SimMatchupSheet({ g, names, youId, week, label, onClose }: { g: SimReca
       <div className="flex flex-col gap-3 pt-3" data-testid="sim-matchup-sheet">
         {rows.map(([id, pts]) => (
           <div key={id} className="flex items-center justify-between gap-3">
-            <SimTeamLink teamId={id} name={names[id] ?? "Team"} isYou={id === youId} size={32} bold={g.winner === id} />
+            <SimTeamLink teamId={id} name={names[id] ?? "Team"} isYou={id === youId} size="row" bold={g.winner === id} />
             <span className="tabular-nums text-2xl" style={{ fontWeight: g.winner === id ? 900 : 600, color: g.winner === id ? "var(--color-success)" : undefined }}>{pts == null ? "-" : simFmtPts(pts)}</span>
           </div>
         ))}
@@ -270,7 +270,7 @@ export function SimLeagueTab({ ctx }: { ctx: SimCtx }) {
             simPreview(league.transactions ?? [], allMoves, 6).shown.map((tx, i) => (
               <AccentCard key={i} accent={simToneColor(simTransactionGlyph(tx).tone)} compact as="div">
                 <div className="flex items-center gap-2">
-                  {tx.team_id ? <SimTeamLink teamId={tx.team_id} name={names[tx.team_id] ?? "Team"} size={24} hideName /> : null}
+                  {tx.team_id ? <SimTeamLink teamId={tx.team_id} name={names[tx.team_id] ?? "Team"} size="chip" hideName /> : null}
                   <ReviewGlyphChip glyph={simTransactionGlyph(tx).glyph} tone={simTransactionGlyph(tx).tone} size={24} />
                   {tx.week != null ? <ToneBadge label={`Week ${tx.week}`} color="var(--color-text-secondary)" size="xs" /> : null}
                   <ToneBadge label={String(tx.type ?? tx.kind ?? "move").replace(/_/g, " ")} color={simToneColor(simTransactionGlyph(tx).tone)} size="xs" />

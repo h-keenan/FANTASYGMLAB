@@ -1122,6 +1122,9 @@ export interface SimStandingRow {
   streak?: string;
   seed?: number | null;
   playoff_status?: string;
+  /** Regular-season recaps: last week's rank and spots moved since (positive = up). Null/absent at week 1 and on real-league weeks. */
+  rank_prev?: number | null;
+  rank_delta?: number | null;
 }
 
 /** A player a feed row names (role: add / drop / give / get), enough for a photo row. */

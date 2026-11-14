@@ -14,6 +14,7 @@ import { SimRookieOverview } from './SimDraftOverview';
 import { SkeletonCard } from './SkeletonBlock';
 import { SimDynastyStrip } from './SimGameDynasty';
 import { SimCollapse, SimGeneratedChip, SimGeneratedNoticeSheet, SimPickLine, SimRookieNoticeGate, useSimPicks } from './SimGameDynastyParts';
+import { SimTeamIdentity } from './SimTeamIdentity';
 import { SimRosterLine, SimToneBadge, createSimStyles, simToneColor, type SimCtx } from './SimGameParts';
 import { SimReserveButton, SimReserveGroups, SimReserveSheet } from './SimGameReserves';
 import { useThemeMode } from '../context/ThemeModeContext';
@@ -447,7 +448,7 @@ function RookieStage({
                 <AppText style={[common.small, common.grow]}>
                   #{row.n} {row.made?.name} ({row.made?.pos})
                 </AppText>
-                <AppText style={[common.muted, row.is_yours && { color: colors.accent }]}>{row.is_yours ? 'You' : row.team_name}</AppText>
+                {row.is_yours || !row.team_name ? <AppText style={[common.muted, { color: colors.accent }]}>You</AppText> : <SimTeamIdentity name={row.team_name} size='inline' bold={false} fontSize={12} />}
               </View>
             ))
         )}

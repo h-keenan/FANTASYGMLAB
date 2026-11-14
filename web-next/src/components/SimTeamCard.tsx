@@ -4,7 +4,7 @@ import { playerSurname } from "@/lib/playerNameDisplay";
 import { AccentCard } from "@/components/AccentCard";
 import { PlayerName } from "@/components/PlayerName";
 import { PositionBadge } from "@/components/PositionBadge";
-import { SimCrest } from "@/components/SimCrest";
+import { SimTeamLogo } from "@/components/SimTeamIdentity";
 import { simToneColor } from "@/components/SimGameParts";
 import { ToneBadge } from "@/components/ToneBadge";
 import type { SimLeagueRosterTeam } from "@/lib/simGame";
@@ -43,7 +43,7 @@ export function SimTeamCard({
     <AccentCard accent={accent} compact as="div" data-testid="sim-team-card">
       <div className="flex items-center justify-between gap-2">
         <span className="flex min-w-0 items-center gap-2">
-          <SimCrest name={team.name} size={32} />
+          <SimTeamLogo name={team.name} size="row" />
           <span className="flex min-w-0 flex-col text-left">
             <span className="break-words text-sm font-extrabold leading-tight">
               {team.name}

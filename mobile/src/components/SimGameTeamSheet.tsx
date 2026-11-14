@@ -6,7 +6,7 @@ import AppText from './AppText';
 import Button from './Button';
 import ErrorState from './ErrorState';
 import PositionBadge from './PositionBadge';
-import SimCrest from './SimCrest';
+import { SimTeamLogo } from './SimTeamIdentity';
 import { SimTeamHistory } from './SimTeamHistory';
 import { SkeletonCard } from './SkeletonBlock';
 import Tabs from './Tabs';
@@ -87,7 +87,7 @@ function TeamBody({ ctx, data, onTrade }: { ctx: SimCtx; data: SimTeamRosterResp
   return (
     <View style={common.stack}>
       <View style={common.row}>
-        <SimCrest name={team.name} size={56} label />
+        <SimTeamLogo name={team.name} size='hero' label />
         <View style={common.grow}>
           <AppText style={common.title} testID="team-sheet-name">
             {team.name}
