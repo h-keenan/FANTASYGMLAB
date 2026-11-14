@@ -154,7 +154,7 @@ describe("LandingPage welcome-page analytics", () => {
       mockAuth(null);
       render(<LandingPage />);
 
-      expect(await screen.findByTestId("connect-hero")).toBeInTheDocument();
+      expect(await screen.findByText("SignInForm")).toBeInTheDocument();
       expect(root()).not.toHaveAttribute(LANDING_PENDING_ATTR);
     });
 
@@ -170,7 +170,7 @@ describe("LandingPage welcome-page analytics", () => {
       // ...then corrected once auth resolves to no session.
       mockAuth(null);
       rerender(<LandingPage />);
-      expect(await screen.findByTestId("connect-hero")).toBeInTheDocument();
+      expect(await screen.findByText("SignInForm")).toBeInTheDocument();
       expect(root()).not.toHaveAttribute(LANDING_PENDING_ATTR);
     });
   });
@@ -209,7 +209,7 @@ describe("LandingPage welcome-page analytics", () => {
     mockAuth(null);
     render(<LandingPage />);
 
-    expect(await screen.findByTestId("connect-hero")).toBeInTheDocument();
+    expect(await screen.findByText("SignInForm")).toBeInTheDocument();
     expect(trackFeatureUse).toHaveBeenCalledTimes(1);
     expect(trackFeatureUse).toHaveBeenCalledWith("landing_viewed", { props: { source_surface: "landing_hero" } });
   });
@@ -221,7 +221,7 @@ describe("LandingPage welcome-page analytics", () => {
     // The marketing content is server-rendered and present regardless; only
     // the auth island's slot is held back until auth resolves.
     expect(screen.getByRole("heading", { name: /Get the trade your leaguemate would actually accept/ })).toBeInTheDocument();
-    expect(screen.queryByTestId("connect-hero")).toBeNull();
+    expect(screen.queryByText("SignInForm")).toBeNull();
     expect(trackFeatureUse).not.toHaveBeenCalled();
   });
 
@@ -337,7 +337,7 @@ describe("LandingPage app store modules", () => {
     mockAuth(null);
     render(<LandingPage />);
 
-    expect(await screen.findByTestId("connect-hero")).toBeInTheDocument();
+    expect(await screen.findByText("SignInForm")).toBeInTheDocument();
     expect(screen.getByRole("group", { name: /App Store app for iPhone: coming soon/ })).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "Get it on Google Play" })).toHaveAttribute(
       "href",
@@ -506,14 +506,14 @@ describe("LandingPage signed-in view", () => {
     unmount();
     mockAuth(null);
     render(<LandingPage />);
-    await screen.findByTestId("connect-hero");
+    await screen.findByText("SignInForm");
     expect(document.getElementById(LANDING_ROOT_ID)).not.toHaveAttribute("data-landing-signed-in");
   });
 
   it("marks Pro-only features as Pro instead of presenting them as free", async () => {
     mockAuth(null);
     render(<LandingPage />);
-    await screen.findByTestId("connect-hero");
+    await screen.findByText("SignInForm");
     expect(screen.getByText(/Pro adds the full waiver board and FAAB bid ranges/)).toBeInTheDocument();
     expect(screen.getByText(/Pro adds simulated playoff odds for every team/)).toBeInTheDocument();
     expect(screen.getByTestId("landing-free-vs-pro")).toHaveTextContent(/Free includes/);

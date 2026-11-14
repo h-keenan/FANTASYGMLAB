@@ -21,6 +21,7 @@ import { hasCompletedOnboardingStep, markOnboardingStepCompleted, trialOfferStat
 import { armTrialOffer, firstRunStage, funnelStepIndex } from "@/lib/firstRunFlow";
 import { trackOnboarding, trackOnboardingStepViewed } from "@/lib/onboardingAnalytics";
 import { maskSavedLeagueRows } from "@/lib/privacy";
+import { LANDING_FRONT_DOOR } from "@/lib/landingFrontDoor";
 
 /**
  * Reserves the sign-in card's slot while auth is still resolving (and as
@@ -251,7 +252,7 @@ export function LandingAuthIsland() {
   // league_import_completed -> first_league_view).
   const stage = firstRunStage({ signedIn: accountReady, introSeen: carouselSeen, leagueCount: 0 });
   // Signed out (or in the middle of the guest connect): the landing IS the one-field connect form.
-  const showHero = !session || guestFlow;
+  const showHero = LANDING_FRONT_DOOR === "connect" && (!session || guestFlow);
   const connectViewed = stage === "connect" || showHero;
   useEffect(() => {
     if (connectViewed) trackOnboardingStepViewed("connect", funnelStepIndex("connect"));
@@ -286,6 +287,8 @@ export function LandingAuthIsland() {
       </div>
     );
   }
+
+  if (stage === "sign_in") return <SignInForm onSignedIn={() => setAccountReady(true)} />;
 
   return stage === "intro" ? (
     <OnboardingCarousel

@@ -359,7 +359,11 @@ describe("picks in trades", () => {
     fireEvent.click(within(sheet).getByRole("button", { name: "Add 2028 Round 2" }));
     fireEvent.click(within(sheet).getByRole("button", { name: /^Add 1 to trade/ }));
     await waitFor(() => expect(mocked.previewSimTrade).toHaveBeenCalledWith("g1", { partner: "7", give: ["pick:2027:1:3"], get: ["pick:2028:2:7"] }));
-    // Picks show in the offer summary as chips, and removing one clears it.
+    // Picks show on the scale with the pick avatar; with both sides filled the verdict takes over (Send / Tweak), and Tweak brings the remove buttons back.
+    expect(screen.getAllByTestId("pick-avatar").length).toBeGreaterThanOrEqual(2);
+    expect(await screen.findByRole("button", { name: "Send offer" })).toBeInTheDocument();
+    expect(screen.getByTestId("fairness-label")).toHaveTextContent("They would accept");
+    fireEvent.click(screen.getByRole("button", { name: "Tweak" }));
     expect(screen.getByRole("button", { name: "Remove 2027 Round 1 (early)" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Remove 2028 Round 2" })).toBeInTheDocument();
   });

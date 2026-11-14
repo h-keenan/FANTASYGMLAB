@@ -155,7 +155,7 @@ export function ReasoningTags({ tags }: { tags: string[] }) {
   );
 }
 
-function tradeCardAsset(asset: TradeAsset, index: number, open?: (asset: TradeAsset) => void): TradeCardAsset {
+export function tradeCardAsset(asset: TradeAsset, index: number, open?: (asset: TradeAsset) => void): TradeCardAsset {
   if (asset.asset_type === "pick") {
     return { key: `pick-${index}`, pickLabel: asset.label || [asset.season, asset.round ? `R${asset.round}` : null].filter(Boolean).join(" ") || "Draft pick", value: asset.score ?? null };
   }

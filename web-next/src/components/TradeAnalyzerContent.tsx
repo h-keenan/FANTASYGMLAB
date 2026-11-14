@@ -32,7 +32,10 @@ import { isPrivacyMode } from "@/lib/privacy";
 import { shareCardCacheKey } from "@/lib/shareCard/cacheKey";
 import { BeginnerHelp } from "@/components/BeginnerHelp";
 import { ExchangeSide } from "@/components/TradeAssetExchange";
-import { TradePickerSheet, TradeSideSummary } from "@/components/TradePickerSheet";
+import { ErrorState } from "@/components/ErrorState";
+import { TradePickerSheet } from "@/components/TradePickerSheet";
+import { TradeScale } from "@/components/ui/TradeScale";
+import type { TradeCardAsset } from "@/components/ui/TradeCompactCard";
 import { usePlayerQuickView } from "@/context/PlayerQuickViewContext";
 import { Select } from "@/components/Input";
 import { selectedItems, type SheetItem } from "@/lib/tradeSheetPicker";
@@ -937,6 +940,17 @@ export function TradeAnalyzerContent({
     ...receivePicks.map(pickToTradeAsset),
   ];
 
+  const scalePlayer = (p: RankedPlayer): TradeCardAsset => ({
+    key: `player:${p.player_id}`,
+    player: { id: p.player_id, name: p.name ?? "", position: p.position ?? null, team: p.team ?? null, age: p.age ?? null },
+    value: p.score,
+    ovr: p.overall_rating ?? null,
+    onOpen: () => openPlayer({ ...p, leagueId, leagueName, sourceLabel: "Trade Analyzer" }),
+  });
+  const scalePick = (p: DraftPickAsset): TradeCardAsset => ({ key: `pick:${p.pick_id}`, pickLabel: p.label ?? "Draft pick", value: p.score });
+  const sendScaleAssets = [...sendPlayers.map(scalePlayer), ...sendPicks.map(scalePick)];
+  const receiveScaleAssets = [...receivePlayers.map(scalePlayer), ...receivePicks.map(scalePick)];
+
   const canAnalyze = hasAnyAssets;
   const analyzeLabel = canAnalyze
     ? `Analyze Trade (${sendAssets.length} for ${receiveAssets.length})`
@@ -978,26 +992,28 @@ export function TradeAnalyzerContent({
         </label>
       ) : null}
 
-      <div className="grid grid-cols-1 sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)] gap-3 items-start">
-        <TradeSideSummary
-          testId="trade-side-send"
-          label="You send"
-          tone="danger"
-          items={[...sendPlayers.map(playerToSheetItem), ...sendPicks.map(pickToSheetItem)]}
-          onOpen={() => openSheet("send")}
-          onRemove={(key) => removeFromSide("send", key)}
-          hint="Add from your roster"
-        />
-        <TradeSideSummary
-          testId="trade-side-receive"
-          label="You receive"
-          tone="success"
-          items={[...receivePlayers.map(playerToSheetItem), ...receivePicks.map(pickToSheetItem)]}
-          onOpen={() => openSheet("receive")}
-          onRemove={(key) => removeFromSide("receive", key)}
-          hint={selectedTeamId === ALL_TEAMS_ID ? "Add from any team" : `Add from ${activeTeamLabel}`}
-        />
-      </div>
+      <TradeScale
+        giveLabel="You send"
+        getLabel="You receive"
+        give={sendScaleAssets}
+        get={receiveScaleAssets}
+        addHint={{ give: "Add from your roster", get: selectedTeamId === ALL_TEAMS_ID ? "Add from any team" : `Add from ${activeTeamLabel}` }}
+        onAdd={(side) => openSheet(side === "give" ? "send" : "receive")}
+        onRemove={(side, key) => removeFromSide(side === "give" ? "send" : "receive", key)}
+        onSend={analyze}
+        sending={analyzing}
+        canSend={canAnalyze}
+        sendLabel={analyzing ? "Analyzing…" : analyzeLabel}
+        buildingAction={
+          canAnalyze ? (
+            <Button onClick={analyze} loading={analyzing}>
+              {analyzing ? "Analyzing…" : analyzeLabel}
+            </Button>
+          ) : (
+            <p className="text-xs" style={{ color: "var(--color-text-muted)" }}>Add players or picks to analyze.</p>
+          )
+        }
+      />
 
       {selectedTeamId !== ALL_TEAMS_ID ? (
         <ManagerTendenciesCard
@@ -1008,20 +1024,8 @@ export function TradeAnalyzerContent({
       ) : null}
 
       <div className="flex flex-col gap-2">
-        <Button onClick={analyze} disabled={!canAnalyze} loading={analyzing}>
-          {analyzing ? "Analyzing…" : analyzeLabel}
-        </Button>
-        {!canAnalyze ? (
-          <p className="text-xs" style={{ color: "var(--color-text-muted)" }}>
-            Add players or picks to analyze.
-          </p>
-        ) : null}
         {limitWall ? <LimitWall wall={limitWall} feature="trade_analyzer_weekly_limit" /> : null}
-        {analyzeError ? (
-          <p role="alert" className="text-sm" style={{ color: "var(--color-danger)" }}>
-            {analyzeError}
-          </p>
-        ) : null}
+        {analyzeError ? <ErrorState bare message={analyzeError} onRetry={() => void analyze()} /> : null}
       </div>
 
       {planningNote ? (

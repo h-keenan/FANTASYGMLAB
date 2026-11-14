@@ -44,6 +44,7 @@ export const IDENTICAL = [
   "simTradeSheet.ts",
   "simSetupView.ts",
   "tradeSheetPicker.ts",
+  "tradeScale.ts",
   "confirmInPlace.ts",
   "overlayStack.ts",
   "busyRetry.ts",
