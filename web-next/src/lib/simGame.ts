@@ -235,6 +235,8 @@ export interface SimGameSettings {
   superflex?: boolean;
   /** Flex eligibility; omitted on every save made with the standard RB/WR/TE flex. */
   flex_type?: SimFlexType;
+  /** 1 = kickers and defenses can be traded; older saves omit it and never could. */
+  kd_v?: number;
   include_k?: boolean;
   include_def?: boolean;
   bench?: number;
@@ -1406,7 +1408,12 @@ export function simPositionsFor(slots: SimSlot[] | undefined): SimPos[] {
   return SIM_POSITIONS.filter((pos) => (pos !== "K" && pos !== "DEF") || list.includes(pos));
 }
 
-/** Positions that are one-per-roster and never traded (kickers, defenses). */
+/** Can a player of `pos` go in a trade in this game? Kickers and defenses can once the save carries kd_v 1 (older saves: never). */
+export function simTradableIn(settings: Pick<SimGameSettings, "kd_v"> | undefined, pos: SimPos): boolean {
+  return (settings?.kd_v ?? 0) >= 1 || simTradable(pos);
+}
+
+/** Positions that are one-per-roster and (on older saves) never traded (kickers, defenses). */
 export function simTradable(pos: SimPos): boolean {
   return pos !== "K" && pos !== "DEF";
 }

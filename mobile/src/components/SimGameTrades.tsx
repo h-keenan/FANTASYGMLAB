@@ -43,7 +43,7 @@ import {
   simGameReasonMessage,
   type SimTradeSeed,
   simTradeMaxPerSide,
-  simTradable,
+  simTradableIn,
   simTradeClosedReason,
   simCounterDeltaLine,
   simTradeDecisionLabel,
@@ -384,7 +384,7 @@ function Builder({ ctx, seed, onSeedUsed }: { ctx: SimCtx; seed: SimTradeSeed | 
   const fit = simTradeFit(mine.length, game.settings.roster_limit, giveSelected.filter((p) => !simIsPick(p)).length, getSelected.filter((p) => !simIsPick(p)).length);
   // The picker's groups: players by position, then a Picks group; the same shape feeds the page summaries.
   const groupsFor = (players: SimGamePlayer[], pickList: SimPickAsset[]): SimAssetGroup<SimTradeAsset>[] => {
-    const groups: SimAssetGroup<SimTradeAsset>[] = simGroupByPosition(players.filter((p) => simTradable(p.pos)), simPositionsFor(game.settings.slots));
+    const groups: SimAssetGroup<SimTradeAsset>[] = simGroupByPosition(players.filter((p) => simTradableIn(game.settings, p.pos)), simPositionsFor(game.settings.slots));
     if (pickList.length > 0) groups.push({ key: 'PICK', label: 'Picks', kind: 'pick', items: pickList });
     return groups;
   };

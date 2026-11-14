@@ -57,6 +57,7 @@ import {
   simQueueReducer,
   simRosterNeeds,
   simSlotAccepts,
+  simTradableIn,
   simBenchSwapTargets,
   simBenchOffersReserveMove,
   simSlotCandidates,
@@ -824,5 +825,15 @@ describe("simCounterDeltaLine", () => {
     expect(simBlockTag({})).toBeNull();
     expect(simStatusOptions(false).some((o) => o.value === "block")).toBe(false);
     expect(simStatusOptions(true).at(-1)).toEqual({ value: "block", label: "On the block" });
+  });
+});
+
+describe("kickers and defenses in trades", () => {
+  it("tradable once the save carries kd_v 1; older saves never trade them", () => {
+    expect(simTradableIn({ kd_v: 1 }, "K")).toBe(true);
+    expect(simTradableIn({ kd_v: 1 }, "DEF")).toBe(true);
+    expect(simTradableIn({}, "K")).toBe(false);
+    expect(simTradableIn({ kd_v: 0 }, "DEF")).toBe(false);
+    expect(simTradableIn({}, "QB")).toBe(true);
   });
 });

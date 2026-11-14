@@ -766,3 +766,10 @@ PUT, auto-set, waiver start slot, AI lineups, draft needs, player-list `pos=` fi
 `FLEX_SLOTS` in `modules/sim/types.py`, so the new slot needs no per-site rule. Replay safety: `flex_type` is serialized in
 settings ONLY when it is not the default, so every save made before the option (and every default-flex save) has
 byte-identical settings and replays to the same digest (pinned by `test_old_save_replays_to_the_same_digest`).
+
+## Kickers and defenses in trades (`kd_v`)
+New games (settings `kd_v` 1, serialized only when set) let the user trade K and DEF like any player. Rules: one per roster, so a
+trade that would leave either team with two kickers (or two defenses) is refused with reason `singleton_limit` unless that team
+gives its own in the same deal. The AI never initiates or counters with a K/DEF (`TradeDesk.tradable` still excludes them), so it
+cannot craft a nonsense kicker counter. A save without `kd_v` behaves exactly as before (K/DEF refused: "cannot be traded") and
+replays to the same digest.
