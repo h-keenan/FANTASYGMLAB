@@ -33,12 +33,12 @@ describe("simSetupView", () => {
     const s = { ...base, start: "league" as const };
     expect(simSetupChips(s).slice(0, 3)).toEqual(["Your league", "Its scoring", "Its lineup"]);
     expect(simSetupCardSummaries(s).league).toBe("Set by your league");
-    expect(simSetupCardSummaries(s).start).toBe("From your Sleeper league");
+    expect(simSetupCardSummaries(s).start).toBe("From your league");
   });
 
   it("card summaries carry the team name and difficulty descriptor", () => {
     const sum = simSetupCardSummaries({ ...base, difficulty: "hard", irSlots: 2 }, "Blitz Brigade");
-    expect(sum.start).toBe("Fresh league, Blitz Brigade");
+    expect(sum.start).toBe("New league, Blitz Brigade");
     expect(sum.difficulty).toBe("Hard: cutthroat");
     expect(sum.extras).toBe("8 bench, 2 IR");
   });

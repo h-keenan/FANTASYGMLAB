@@ -238,6 +238,54 @@ def _league_rosters(state, snap, week, p):
     state.taxi = {t.tid: list(snap.start_taxi.get(t.tid, ())) for t in snap.teams}
 
 
+def _league_midseason(state, snap, week, p):
+    """A league import that picks up from the real league's current week: the weeks it already played (real scores and player
+    points), then the league's own current standings. ``state.week`` is set here; the closing ``midseason_start`` event opens
+    the season (status, boundary), after the engine has set lineups and queued offers on this state."""
+
+    n = int(p["week"])
+    for wk in p.get("weeks", ()):
+        w = int(wk["week"])
+        games = [dict(g) for g in wk["games"]]
+        _record_games(state, games)
+        state.history.append({"week": w, "kind": "regular", "round": None, "games": games})
+        for pid, pts in (wk.get("points") or {}).items():
+            hist = state.points.setdefault(pid, [])
+            while len(hist) < w - 1:
+                hist.append(None)
+            hist.append(float(pts))
+        mine = next((g for g in games if snap.user_team.tid in (g["home"], g["away"])), None)
+        if mine is not None:
+            you_home = mine["home"] == snap.user_team.tid
+            you, opp = (mine["home_pts"], mine["away_pts"]) if you_home else (mine["away_pts"], mine["home_pts"])
+            opp_id = mine["away"] if you_home else mine["home"]
+            state.recaps[str(w)] = {
+                "week": w, "kind": "regular", "round": None, "real": True,
+                "your_game": {"opponent_id": opp_id, "opponent_name": snap.team(opp_id).name, "your_pts": you, "opp_pts": opp,
+                              "result": "win" if you > opp + 1e-9 else "loss" if you < opp - 1e-9 else "tie",
+                              "starters": [], "bench": [], "opp_starters": []},
+                "scores": [{"home": g["home"], "away": g["away"], "home_name": snap.team(g["home"]).name,
+                            "away_name": snap.team(g["away"]).name, "home_pts": g["home_pts"], "away_pts": g["away_pts"],
+                            "winner": None} for g in games],
+                "standings": [], "waivers": [], "transactions": 0, "injuries": [], "playoffs": None,
+                "season_complete": False, "champion": None, "next_week": w + 1,
+            }
+    for hist in state.points.values():  # every history lines up: one slot per played week
+        while len(hist) < n - 1:
+            hist.append(None)
+    if p.get("stand"):  # the league's own record wins over the sum of the weeks (commissioner edits, forfeits, medians)
+        state.stand = {t.tid: {k: (float(v) if k in ("pf", "pa") else int(v)) for k, v in p["stand"][t.tid].items()}
+                       if t.tid in p["stand"] else state.stand[t.tid] for t in snap.teams}
+    state.week = n
+
+
+def _midseason_start(state, snap, week, p):
+    state.status = "in_season"
+    state.week = int(p["week"])
+    state.queue = []
+    state.boundary_seq = state.seq + 1
+
+
 def _draft_queue(state, snap, week, p):
     state.queue = [str(x) for x in p["pids"]]
 
@@ -376,27 +424,33 @@ def _week_scored(state, snap, week, p):
         if state.out[pid] <= 0:
             del state.out[pid]
     if kind == "regular":
-        for g in games:
-            home, away = g["home"], g["away"]
-            hs, aws = float(g["home_pts"]), float(g["away_pts"])
-            sh, sa = state.stand[home], state.stand[away]
-            sh["pf"] += hs
-            sh["pa"] += aws
-            sa["pf"] += aws
-            sa["pa"] += hs
-            res = _result(hs, aws)
-            for me, opp, r in ((home, away, res), (away, home, {"w": "l", "l": "w", "t": "t"}[res])):
-                state.stand[me][r] += 1
-                rec = state.h2h[me].setdefault(opp, [0, 0, 0])
-                rec["wlt".index(r)] += 1
-                s = state.streak[me]
-                state.streak[me] = (s[0] + str(int(s[1:] or 0) + 1)) if s and s[0] == r.upper() else r.upper() + "1"
+        _record_games(state, games)
     else:
         pl = state.playoff
         pl["alive"] = list(p["alive_next"])
         pl["rounds"].append({"round": p["round"], "week": week, "games": games})
         pl["results"].update(p["eliminated"])
     state.history.append({"week": week, "kind": kind, "round": p.get("round"), "games": games})
+
+
+def _record_games(state: GameState, games: Iterable[Mapping[str, Any]]) -> None:
+    """Fold one regular-season week's games into the standings, head-to-head records and streaks."""
+
+    for g in games:
+        home, away = g["home"], g["away"]
+        hs, aws = float(g["home_pts"]), float(g["away_pts"])
+        sh, sa = state.stand[home], state.stand[away]
+        sh["pf"] += hs
+        sh["pa"] += aws
+        sa["pf"] += aws
+        sa["pa"] += hs
+        res = _result(hs, aws)
+        for me, opp, r in ((home, away, res), (away, home, {"w": "l", "l": "w", "t": "t"}[res])):
+            state.stand[me][r] += 1
+            rec = state.h2h[me].setdefault(opp, [0, 0, 0])
+            rec["wlt".index(r)] += 1
+            s = state.streak[me]
+            state.streak[me] = (s[0] + str(int(s[1:] or 0) + 1)) if s and s[0] == r.upper() else r.upper() + "1"
 
 
 def _result(hs: float, aws: float) -> str:
@@ -534,6 +588,7 @@ def _week_advanced(state, snap, week, p):
 _HANDLERS = {
     "draft_pick": _draft_pick, "draft_queue": _draft_queue, "draft_complete": _draft_complete,
     "league_rosters": _league_rosters, "league_start": _draft_complete,
+    "league_midseason": _league_midseason, "midseason_start": _midseason_start,
     "lineup_set": _lineup_set, "waiver_claim": _waiver_claim, "waiver_cancel": _waiver_cancel,
     "waiver_result": _waiver_result, "cut": _cut, "drop": _cut, "trade": _trade,
     "trade_reject": _offer_key, "trade_counter": _offer_key, "inbox_offer": _inbox_offer,

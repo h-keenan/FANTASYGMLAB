@@ -14,6 +14,7 @@ from typing import Any, Iterable, Mapping
 from modules.sim.game_mode import DEFAULT_ROOKIE_ROUNDS, DEFAULT_SEASONS, DYNASTY_VERSION, PICK_YEARS
 from modules.sim.game_names import NAMES_VERSION
 from modules.sim.game_types import (
+    slot_positions,
     FLEX_SHARE,
     BLOCK_VERSION,
     LIMIT_VERSION,
@@ -22,6 +23,7 @@ from modules.sim.game_types import (
     KD_VERSION,
     SINGLETON_POSITIONS,
     START_LEAGUE,
+    MIN_START_WEEK,
     GamePlayer,
     GameSettings,
     GameSnapshot,
@@ -269,10 +271,12 @@ def own_picks(settings: GameSettings, tids: Iterable[str]) -> tuple[SimPick, ...
 def league_settings(
     imported: LeagueImport, *, difficulty: str, auto_lineup: bool, regular_weeks: int = 14, trade_deadline_week: int = 10,
     tiebreaker: str = "points_for", dynasty: bool = False, seasons: int = DEFAULT_SEASONS, start_year: int = 0,
-    ir_slots: int | None = None, taxi_slots: int | None = None,
+    ir_slots: int | None = None, taxi_slots: int | None = None, current: bool = False,
 ) -> GameSettings:
     """Game settings that mirror a real league: its size, lineup, scoring and
-    playoff field, over a fresh 14-week season."""
+    playoff field, over a fresh 14-week season. ``current=True`` (and a league
+    import that read a current week) starts at that week instead, over the real
+    league's own regular-season length and trade deadline."""
 
     n = len(imported.teams)
     user = next(i for i, t in enumerate(imported.teams) if t.is_user) + 1
@@ -289,8 +293,12 @@ def league_settings(
             start_year=start_year or imported.start_year or imported_year(imported),
             rookie_rounds=max(2, min(5, imported.rookie_rounds or DEFAULT_ROOKIE_ROUNDS)),
         )
+    start_week = 0
+    if current and imported.current_week >= MIN_START_WEEK and imported.regular_weeks >= imported.current_week:
+        start_week, regular_weeks = imported.current_week, imported.regular_weeks
+        trade_deadline_week = imported.trade_deadline or imported.regular_weeks
     return GameSettings(
-        reserve_v=RESERVE_VERSION, block_v=BLOCK_VERSION, kd_v=KD_VERSION, limit_v=LIMIT_VERSION, ir_slots=min(ir, 8), taxi_slots=min(taxi, 12), taxi_years=imported.taxi_years, **dyn,
+        start_week=start_week, reserve_v=RESERVE_VERSION, block_v=BLOCK_VERSION, kd_v=KD_VERSION, limit_v=LIMIT_VERSION, ir_slots=min(ir, 8), taxi_slots=min(taxi, 12), taxi_years=imported.taxi_years, **dyn,
         teams=n, scoring=scoring_label(scoring), difficulty=difficulty, user_slot=user, auto_lineup=auto_lineup,
         slots=imported.slots, rounds=0, roster_limit=limit, regular_weeks=regular_weeks,
         playoff_teams=max(2, min(imported.playoff_teams, n)), trade_deadline_week=trade_deadline_week,
@@ -361,14 +369,91 @@ def build_league_snapshot(
     order = [imported.teams[int(i)].tid for i in rng.stream(0, "gsetup", 6).permutation(len(imported.teams))]
     schedule = round_robin(order, settings.regular_weeks)
     extra = list(notes) + list(imported.notes) + list(bye_notes)
+    mid_start: dict[str, Any] = {}
+    if settings.mid_season:
+        schedule, estimated = real_schedule(imported, schedule, settings)
+        if estimated:
+            extra.append("schedule_estimated_weeks:" + ",".join(str(w) for w in estimated))
+        mid_start, mid_notes = midseason_start(imported, settings, players, start_rosters)
+        extra.extend(mid_notes)
+        if imported.trade_deadline and imported.trade_deadline < settings.start_week:
+            extra.append("trade_deadline_passed")
     if dropped:
         extra.append(f"roster_players_not_projected:{dropped}")
     return GameSnapshot(
         settings=settings, teams=tuple(teams), players=players, bye_weeks=byes, schedule=schedule,
         scoring_model=scoring_model, notes=tuple(extra), start_rosters=start_rosters,
         start_ir=start_ir if settings.reserves else {}, start_taxi=start_taxi if settings.reserves else {},
-        seed=seed if settings.dynasty else 0, start_picks=picks if settings.dynasty else (),
+        seed=seed if settings.dynasty else 0, start_picks=picks if settings.dynasty else (), mid_start=mid_start,
     )
+
+
+def real_schedule(
+    imported: LeagueImport, generated: tuple[tuple[tuple[str, str], ...], ...], settings: GameSettings
+) -> tuple[tuple[tuple[tuple[str, str], ...], ...], list[int]]:
+    """The real league's pairings for every regular-season week. A week the league did not return as one clean game per team
+    keeps the generated round robin for that week. Returns (schedule, generated weeks that are still to be played)."""
+
+    played = {r.week: tuple((a, b) for a, b, _x, _y in r.games) for r in imported.results}
+    weeks: list[tuple[tuple[str, str], ...]] = []
+    estimated: list[int] = []
+    for w in range(1, settings.regular_weeks + 1):
+        real = played.get(w) or (imported.schedule[w - 1] if w - 1 < len(imported.schedule) else ())
+        if real:
+            weeks.append(tuple(real))
+            continue
+        weeks.append(generated[w - 1])
+        if w >= settings.start_week:
+            estimated.append(w)
+    return tuple(weeks), estimated
+
+
+def real_lineup(
+    slots: tuple[str, ...], starters: Iterable[tuple[str, str]], roster: Iterable[str], players: Mapping[str, GamePlayer]
+) -> list[list[Any]] | None:
+    """The real lineup laid onto the game's slot order, or None when it does not fit (an empty or unfillable slot, a player no
+    longer on the roster): that team's lineup is then auto-set instead."""
+
+    held = set(roster)
+    pool = [(slot, pid) for slot, pid in starters if pid in held and pid in players]
+    out: list[list[Any]] = []
+    for slot in slots:
+        hit = next((i for i, (s, pid) in enumerate(pool) if s == slot and players[pid].pos in slot_positions(slot)), None)
+        if hit is None:
+            return None
+        out.append([slot, pool.pop(hit)[1]])
+    return out
+
+
+def midseason_start(
+    imported: LeagueImport, settings: GameSettings, players: Mapping[str, GamePlayer], rosters: Mapping[str, tuple[str, ...]]
+) -> tuple[dict[str, Any], list[str]]:
+    """Plain data the engine opens a mid-season game with: the real played weeks (scores and player points), the real current
+    standings (the league's own records; summed from the played weeks only when it gave none) and each team's real lineup."""
+
+    tids = {t.tid for t in imported.teams}
+    weeks = []
+    for r in sorted(imported.results, key=lambda r: r.week):
+        if r.week >= settings.start_week or any(a not in tids or b not in tids for a, b, _x, _y in r.games):
+            continue
+        weeks.append({
+            "week": r.week,
+            "games": [{"home": a, "away": b, "home_pts": round(x, 2), "away_pts": round(y, 2), "winner": None} for a, b, x, y in r.games],
+            "points": {pid: round(v, 2) for pid, v in sorted(r.points.items()) if pid in players},
+        })
+    notes: list[str] = []
+    out: dict[str, Any] = {"week": settings.start_week, "weeks": weeks}
+    if imported.records and set(imported.records) >= tids:
+        out["stand"] = {tid: {"w": rec[0], "l": rec[1], "t": rec[2], "pf": rec[3], "pa": rec[4]} for tid, rec in imported.records.items() if tid in tids}
+    lineups: dict[str, list[list[Any]]] = {}
+    for t in imported.teams:
+        fit = real_lineup(settings.slots, t.starters, rosters.get(t.tid, ()), players) if t.starters else None
+        if fit is not None:
+            lineups[t.tid] = fit
+    if len(lineups) < len(imported.teams):
+        notes.append(f"lineups_auto_set:{len(imported.teams) - len(lineups)}")
+    out["lineups"] = lineups
+    return out, notes
 
 
 def draft_order(snapshot: GameSnapshot) -> list[str]:

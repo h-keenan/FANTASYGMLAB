@@ -22,7 +22,7 @@ import sqlite3
 from pathlib import Path
 from typing import Any, Mapping, Protocol
 
-from modules.sim.game_types import IMPORT_TEAM_COUNTS, ImportedTeam, LeagueImport, LeagueTeamChoice, LeagueTeams
+from modules.sim.game_types import IMPORT_TEAM_COUNTS, ImportedTeam, LeagueImport, LeagueTeamChoice, LeagueTeams, RealWeek
 from modules.sim.synthetic import round_robin
 from modules.sim.types import (
     FLEX_SLOTS,
@@ -64,7 +64,7 @@ class SimInputs(Protocol):
     def player_pool(self, scoring_settings: Mapping[str, float]) -> "PlayerPool": ...
 
     def league_import(
-        self, league_id: str, *, username: str = "", roster_id: str = "", dynasty: bool = False
+        self, league_id: str, *, username: str = "", roster_id: str = "", dynasty: bool = False, current: bool = False
     ) -> LeagueImport: ...
 
     def league_teams(self, league_id: str, *, username: str = "") -> LeagueTeams: ...
@@ -539,11 +539,13 @@ class RealSimInputs:
     # ----------------------------------------------------------- league import
 
     def league_import(
-        self, league_id: str, *, username: str = "", roster_id: str = "", dynasty: bool = False
+        self, league_id: str, *, username: str = "", roster_id: str = "", dynasty: bool = False, current: bool = False
     ) -> LeagueImport:
         """Read-only. A real Sleeper league's size, lineup, scoring and current
         rosters, frozen. The only thing the "start from one of my leagues" mode
-        takes from the league; nothing is ever written back."""
+        takes from the league; nothing is ever written back. ``current=True``
+        also reads the real current week, records, lineups, schedule and the
+        weeks already played (see ``_current_point``)."""
 
         if ":" in str(league_id):  # ESPN / Fleaflicker / MFL ids carry a platform prefix
             raise SimInputsError("league_platform_unsupported")
@@ -581,7 +583,12 @@ class RealSimInputs:
                 roster=tuple(sorted(dict.fromkeys(p for p in ids if p and p not in apart))),
                 ir=tuple(sorted(dict.fromkeys(p for p in reserve if p))),
                 taxi=tuple(sorted(dict.fromkeys(p for p in taxi if p))),
+                starters=self._real_starters(league.get("roster_positions"), roster.get("starters")) if current else (),
             ))
+        point: dict[str, Any] = {}
+        if current:
+            point, point_notes = self._current_point(sleeper, league_id, league, settings_raw, rosters, [t.tid for t in teams])
+            notes.extend(point_notes)
         picks: tuple[SimPick, ...] = ()
         start_year = 0
         season_no = _int(league.get("season"))
@@ -600,8 +607,95 @@ class RealSimInputs:
             playoff_teams=_int(settings_raw.get("playoff_teams"), 6) or 6, notes=tuple(notes),
             picks=tuple(p for p in picks if p.round <= rounds), start_year=start_year, rookie_rounds=rounds,
             ir_slots=_int(settings_raw.get("reserve_slots")), taxi_slots=_int(settings_raw.get("taxi_slots")),
-            taxi_years=taxi_years if 1 <= taxi_years <= 4 else 4,
+            taxi_years=taxi_years if 1 <= taxi_years <= 4 else 4, **point,
         )
+
+    @staticmethod
+    def _real_starters(roster_positions: Any, starters: Any) -> tuple[tuple[str, str], ...]:
+        """The roster's real lineup as (game slot, game id) pairs. Sleeper lists ``starters`` in the order of the league's
+        non-bench ``roster_positions``; slots the game does not model (IDP) and empty slots ("0") are left out."""
+
+        out: list[tuple[str, str]] = []
+        raw_slots = [str(r).upper() for r in (roster_positions or []) if str(r).upper() not in ("BN", "IR", "TAXI")]
+        for raw, pid in zip(raw_slots, starters or []):
+            slot = _IMPORT_SLOT_ALIASES.get(raw, raw)
+            pid = str(pid or "")
+            if slot in _IMPORT_SLOTS and pid and pid != "0":
+                out.append((slot, RealSimInputs._game_id(pid)))
+        return tuple(out)
+
+    def _current_point(
+        self, sleeper, league_id: str, league: Mapping[str, Any], settings_raw: Mapping[str, Any],
+        rosters: list[Mapping[str, Any]], tids: list[str],
+    ) -> tuple[dict[str, Any], list[str]]:
+        """Read-only: where the real league is right now. Returns the ``LeagueImport`` fields for a mid-season start and notes.
+        ``current_week`` stays 0 (the game starts in the preseason as before) when the league is not in its regular season
+        (offseason, drafting, playoffs, or week 1: nothing played yet). Played weeks come from the league's own matchup history
+        (team scores and every player's points); a week Sleeper did not return is simply absent (``played_weeks_unavailable``)."""
+
+        status = str(league.get("status") or "")
+        leg = _int(settings_raw.get("leg"))
+        playoff_start = _int(settings_raw.get("playoff_week_start"), 15) or 15
+        regular_end = max(4, min(18, playoff_start - 1))
+        reason = ""
+        if status != "in_season":
+            reason = "offseason"
+        elif leg > regular_end:
+            reason = "playoffs"
+        elif leg < 2:
+            reason = "season_not_started"
+        if reason:
+            return {}, [f"start_fell_back_to_preseason:{reason}"]
+        notes: list[str] = []
+        known = set(tids)
+        weeks = list(range(1, regular_end + 1))
+        try:
+            by_week = sleeper.get_matchups_for_weeks(league_id, weeks) or {}
+        except Exception:
+            by_week = {}
+        schedule: list[tuple[tuple[str, str], ...]] = []
+        results: list[RealWeek] = []
+        for week in weeks:
+            groups: dict[Any, list[Mapping[str, Any]]] = {}
+            for entry in by_week.get(week) or []:
+                mid, rid = entry.get("matchup_id"), str(entry.get("roster_id") or "")
+                if mid is not None and rid in known:
+                    groups.setdefault(mid, []).append(entry)
+            pairs = [m for _, m in sorted(groups.items(), key=lambda kv: str(kv[0])) if len(m) == 2]
+            covered = [str(e.get("roster_id")) for m in pairs for e in m]
+            if len(covered) != len(known) or set(covered) != known:  # not a clean one-game-per-team week
+                schedule.append(())
+                continue
+            schedule.append(tuple((str(m[0]["roster_id"]), str(m[1]["roster_id"])) for m in pairs))
+            if week < leg:
+                games = tuple((str(m[0]["roster_id"]), str(m[1]["roster_id"]), _num(m[0].get("points")), _num(m[1].get("points"))) for m in pairs)
+                points: dict[str, float] = {}
+                for m in pairs:
+                    for e in m:
+                        for pid, pts in (e.get("players_points") or {}).items():
+                            if isinstance(pts, (int, float)) and not isinstance(pts, bool) and pts != 0:
+                                points[self._game_id(pid)] = float(pts)
+                results.append(RealWeek(week=week, games=games, points=points))
+        if len(results) < leg - 1:
+            notes.append("played_weeks_unavailable:" + ",".join(str(w) for w in range(1, leg) if w not in {r.week for r in results}))
+        records: dict[str, tuple[int, int, int, float, float]] = {}
+        for roster in rosters:
+            rs = roster.get("settings") if isinstance(roster.get("settings"), dict) else None
+            if rs is None or "wins" not in rs:
+                records = {}
+                break
+            records[str(roster.get("roster_id"))] = (
+                _int(rs.get("wins")), _int(rs.get("losses")), _int(rs.get("ties")),
+                round(_num(rs.get("fpts")) + _num(rs.get("fpts_decimal")) / 100.0, 2),
+                round(_num(rs.get("fpts_against")) + _num(rs.get("fpts_against_decimal")) / 100.0, 2),
+            )
+        if not records:
+            notes.append("records_unavailable")
+        deadline = _int(settings_raw.get("trade_deadline"))
+        return {
+            "current_week": leg, "regular_weeks": regular_end, "trade_deadline": deadline if 0 < deadline <= regular_end else 0,
+            "schedule": tuple(schedule), "results": tuple(results), "records": records,
+        }, notes
 
     def league_teams(self, league_id: str, *, username: str = "") -> LeagueTeams:
         """Read-only. The league's teams for the setup picker (name, owner,

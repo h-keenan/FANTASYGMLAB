@@ -16,7 +16,7 @@ export type SimSetupCardId = "start" | "difficulty" | "format" | "league" | "ext
 
 /** Icon (existing SimGlyph names), title and the static one-line job of each card. */
 export const SIM_SETUP_CARDS: Record<SimSetupCardId, { title: string; glyph: SimGlyphName; hint: string }> = {
-  start: { title: "Start", glyph: "spark", hint: "Fresh league or yours, and your team name." },
+  start: { title: "Start", glyph: "spark", hint: "A new league by default, and your team name." },
   difficulty: { title: "Difficulty", glyph: "hot", hint: "How sharp the AI managers are." },
   format: { title: "Format", glyph: "checklist", hint: "Redraft or dynasty, and how long you play." },
   league: { title: "League", glyph: "league", hint: "Size, scoring, lineup and tiebreaker." },
@@ -70,7 +70,7 @@ export function simSetupCardSummaries(s: SimSetupState, teamLabel = ""): Record<
   const league = s.start === "league";
   const dynasty = s.mode === "dynasty";
   return {
-    start: league ? "From your Sleeper league" : `Fresh league${teamLabel ? `, ${teamLabel}` : ""}`,
+    start: league ? (s.startPoint === "current" ? "From your league, current week" : "From your league") : `New league${teamLabel ? `, ${teamLabel}` : ""}`,
     difficulty: `${s.difficulty.charAt(0).toUpperCase()}${s.difficulty.slice(1)}: ${SIM_DIFFICULTY_CARDS[s.difficulty].tagline.toLowerCase()}`,
     format: dynasty ? `Dynasty, ${s.seasons} seasons, ${s.rookieRounds}-round rookie draft` : "Redraft, one season",
     league: league ? "Set by your league" : `${s.teams} teams, ${scoringLabel(s)}, ${simSetupLineupLabel(s)}`,

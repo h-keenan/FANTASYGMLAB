@@ -28,6 +28,18 @@ export type SimSlot = "QB" | "RB" | "WR" | "TE" | "FLEX" | "WRRB_FLEX" | "REC_FL
 export type SimMode = "redraft" | "dynasty";
 /** How a new game starts: a fresh draft, or a real league's rosters (read-only import). */
 export type SimStartKind = "fresh" | "league";
+/** "Use my league as a starting point" only: where the league's game begins. "preseason" (the default) plays the whole season;
+ * "current" picks up at the real league's current week with its real record, lineups and played weeks (server: start_point). */
+export type SimStartPoint = "preseason" | "current";
+export const SIM_START_POINT_LABELS: Record<SimStartPoint, string> = { preseason: "Preseason", current: "Current point" };
+/** The one line under the Start-from choice. */
+export const SIM_START_POINT_NOTE =
+  "Current point in the season opens at your league's real week with its record, lineups and results so far. In the offseason it starts at Week 1.";
+/** "Use my league as a starting point": the optional choice, and the only place a Sleeper connection is ever asked for. */
+export const SIM_START_NEW_LABEL = "Start a new league";
+export const SIM_START_LEAGUE_LABEL = "Use my league";
+export const SIM_START_LEAGUE_NOTE = "Optional. Play one of your own Sleeper leagues forward instead of drafting a new one. Nothing changes in your real league.";
+export const SIM_START_CONNECT_NOTE = "You have not connected a Sleeper league yet. Only this option needs one; starting a new league does not.";
 
 export interface SimGameUpsell {
   title: string;
@@ -251,6 +263,8 @@ export interface SimGameSettings {
   include_def?: boolean;
   bench?: number;
   start?: SimStartKind;
+  /** First week played: set only on a league game that picked up from the real league's current week (absent = Week 1). */
+  start_week?: number;
   /** Standings/seed tiebreak after record (older saves omit it and used head_to_head). */
   tiebreaker?: SimTiebreaker;
   /** IR / taxi squads (saves from before game engine 1.2.0 omit all of these). */
@@ -309,6 +323,8 @@ export interface SimGame {
   engine_version: string;
   scoring_model?: string;
   settings: SimGameSettings;
+  /** How the snapshot approximates the real league (league games): "trade_deadline_passed", "schedule_estimated_weeks:9,10", ... */
+  notes?: string[];
   you: SimGameTeamLine | null;
   this_week: SimGameThisWeek | null;
   pending: SimGamePending | null;
@@ -411,6 +427,8 @@ export interface SimGameOptionsResponse extends SimGameEnvelope {
     /** Dynasty only. */
     seasons?: { values: number[]; default: number };
     rookie_rounds?: { values: number[]; default: number };
+    /** League start only: preseason (default) or the league's current week. */
+    start_point?: { values: SimStartPoint[]; default: SimStartPoint };
   };
   dynasty?: { pick_years: number; max_seasons: number; start_year: number };
   /** Lineup rule the setup form mirrors to show roster size and draft rounds. */
@@ -477,6 +495,8 @@ export interface SimGameCreateBody {
   start?: SimStartKind;
   league_id?: string;
   roster_id?: string;
+  /** League start only; omitted for the default (preseason). */
+  start_point?: SimStartPoint;
 }
 
 // ---------------------------------------------------------------------------
@@ -2223,6 +2243,8 @@ export interface SimSetupState {
   start: SimStartKind;
   /** Chosen real league (start === "league"). */
   leagueId: string;
+  /** League start: where the game begins. Only sent (and only shown) with "Use my league". */
+  startPoint: SimStartPoint;
   teams: number;
   scoring: SimScoring;
   tePremium: number;
@@ -2267,6 +2289,7 @@ export function simSetupDefaults(options: SimGameOptionsResponse | null | undefi
   return {
     start: "fresh",
     leagueId: "",
+    startPoint: o?.start_point?.default ?? "preseason",
     teams: o?.teams.default ?? SIM_SETUP_FALLBACK.teams,
     scoring: o?.scoring.default ?? SIM_SETUP_FALLBACK.scoring,
     tePremium: o?.te_premium?.default ?? SIM_SETUP_FALLBACK.te_premium,
@@ -2339,6 +2362,7 @@ export function simSetupBody(state: SimSetupState): SimGameCreateBody {
       start: "league",
       league_id: state.leagueId,
       ...(state.rosterId ? { roster_id: state.rosterId } : {}),
+      ...(state.startPoint === "current" ? { start_point: "current" as const } : {}),
       ...(dynasty ? { mode: "dynasty" as const, seasons: state.seasons, rookie_rounds: state.rookieRounds } : {}),
       ...reserves,
     };
@@ -2426,15 +2450,35 @@ export function simSettingsSummary(settings: Partial<SimGameSettings> | undefine
   if (settings.include_k === false) parts.push("No kickers");
   if (settings.tiebreaker === "head_to_head") parts.push("Head-to-head tiebreak");
   if (settings.mode === "dynasty") parts.unshift(settings.seasons ? `Dynasty (${settings.seasons} seasons)` : "Dynasty");
-  if (settings.start === "league") parts.push("From your league");
+  if (settings.start === "league") parts.push(settings.start_week ? `From your league, Week ${settings.start_week}` : "From your league");
   return parts.join(" · ");
+}
+
+/**
+ * Heads-up after a league game opens, or null. Only a league game that asked for "Current point" says anything: it either
+ * opened mid-season (and says so, plus a passed trade deadline) or, with no regular season to pick up, started at Week 1.
+ */
+export function simStartNotice(
+  game: { notes?: readonly string[]; settings?: Partial<SimGameSettings> } | null | undefined,
+  body: Pick<SimGameCreateBody, "start" | "start_point">,
+): string | null {
+  if (body.start !== "league" || body.start_point !== "current" || !game) return null;
+  const week = game.settings?.start_week;
+  if (!week) {
+    return "Your league is not in its regular season right now, so the game started at Week 1 of the preseason.";
+  }
+  const passed = (game.notes ?? []).includes("trade_deadline_passed");
+  return `Started at Week ${week} with your league's real record and lineups.${passed ? " Your league's trade deadline has already passed, so trades are closed." : ""}`;
 }
 
 /** What the setup tells the player about the league they are about to start. */
 export function simSetupSummary(state: SimSetupState, layoutHint?: SimGameOptionsResponse["layout"]): string {
   const dynasty = state.mode === "dynasty";
   if (state.start === "league") {
-    const base = "Your league's size, lineup, scoring and current rosters. A new 14-week season; nothing changes in your real league.";
+    const base =
+      state.startPoint === "current"
+        ? "Your league's size, lineup, scoring, rosters and record as of its current week, then the rest of the season. Nothing changes in your real league."
+        : "Your league's size, lineup, scoring and current rosters. A new 14-week season; nothing changes in your real league.";
     return dynasty ? `${base} ${simDynastyLine(state.seasons, state.rookieRounds)}` : base;
   }
   const layout = simDeriveLayout(state, layoutHint?.base_slots, layoutHint?.draft_spare_spots);

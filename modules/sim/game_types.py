@@ -54,6 +54,12 @@ DEFAULT_SCORING = "half"
 START_FRESH = "fresh"
 START_LEAGUE = "league"
 START_KINDS = (START_FRESH, START_LEAGUE)
+# Where a league-import game begins. "preseason" (the default, never serialized) is week 1 on the league's current rosters;
+# "current" starts at the real league's current NFL week with its real records, lineups and played weeks (start_week >= 2).
+START_POINT_PRESEASON = "preseason"
+START_POINT_CURRENT = "current"
+START_POINTS = (START_POINT_PRESEASON, START_POINT_CURRENT)
+MIN_START_WEEK = 2
 SINGLETON_POSITIONS = ("K", "DEF")  # one per roster, drafted late, never traded
 NON_TRADABLE = SINGLETON_POSITIONS
 DRAFT_SPARE_SPOTS = 2  # roster spots the draft leaves open for the wire
@@ -207,6 +213,14 @@ class GameSettings:
     names_v: int = 0
     # Roster limit rule generation (0 = a save from before it: being over the limit hard-stops Advance / Start season).
     limit_v: int = 0
+    # First week the game plays (0 = the usual week 1; >= 2 = a league import that picked up from the real league's current week).
+    # Serialized only when set, so every other save serializes, replays and fingerprints exactly as it did.
+    start_week: int = 0
+
+    @property
+    def mid_season(self) -> bool:
+        """A league import that starts at the real league's current week, with its real record, lineups and played weeks."""
+        return self.start_week >= MIN_START_WEEK
 
     @property
     def soft_limit(self) -> bool:
@@ -390,6 +404,8 @@ class GameSettings:
             out["names_v"] = self.names_v
         if self.limit_v:  # absent on every save made before the soft limit
             out["limit_v"] = self.limit_v
+        if self.start_week:
+            out["start_week"] = self.start_week
         if self.dynasty_v:  # only dynasty saves carry these: every other save serializes exactly as before
             out.update({
                 "seasons": self.seasons, "start_year": self.start_year, "pick_years": self.pick_years,
@@ -427,7 +443,7 @@ class GameSettings:
             dynasty_v=int(raw.get("dynasty_v") or 0), reserve_v=int(raw.get("reserve_v") or 0), block_v=int(raw.get("block_v") or 0), kd_v=int(raw.get("kd_v") or 0),
             ir_slots=int(raw.get("ir_slots") or 0), taxi_slots=int(raw.get("taxi_slots") or 0),
             taxi_years=int(raw.get("taxi_years", 2)), ai_v=int(raw.get("ai_v") or 0), names_v=int(raw.get("names_v") or 0),
-            limit_v=int(raw.get("limit_v") or 0),
+            limit_v=int(raw.get("limit_v") or 0), start_week=int(raw.get("start_week") or 0),
         )
 
 
@@ -442,6 +458,8 @@ class ImportedTeam:
     roster: tuple[str, ...]  # game player ids (real ids; DEF mapped to ``DEF-<TEAM>``)
     ir: tuple[str, ...] = ()  # the real league's reserve (IR) squad, kept apart from ``roster``
     taxi: tuple[str, ...] = ()  # the real league's taxi squad
+    # The real lineup as (game slot, player id) pairs, only read when starting from the league's current week.
+    starters: tuple[tuple[str, str], ...] = ()
 
 
 @dataclass(frozen=True)
@@ -470,6 +488,15 @@ class LeagueTeams:
 
 
 @dataclass(frozen=True)
+class RealWeek:
+    """One already-played week of a real league: every game's score and each player's points."""
+
+    week: int
+    games: tuple[tuple[str, str, float, float], ...]  # (home roster id, away roster id, home pts, away pts)
+    points: Mapping[str, float] = field(default_factory=dict)  # game player id -> points (players who did not play are absent)
+
+
+@dataclass(frozen=True)
 class LeagueImport:
     """A real league's settings and current rosters, frozen. Everything the
     "start from one of my leagues" mode needs and nothing else; the game never
@@ -492,6 +519,14 @@ class LeagueImport:
     ir_slots: int = 0
     taxi_slots: int = 0
     taxi_years: int = 2
+    # "Current point in the season" reads (``league_import(..., current=True)``). ``current_week`` is the week to be played
+    # next (0 = could not start mid-season: offseason, playoffs, week 1 or no read; the reason is in ``notes``).
+    current_week: int = 0
+    regular_weeks: int = 0
+    trade_deadline: int = 0  # 0 = the league has no deadline
+    schedule: tuple[tuple[tuple[str, str], ...], ...] = ()  # the real regular-season pairings, [week-1]; () for a week not on hand
+    results: tuple[RealWeek, ...] = ()  # played weeks (1 .. current_week - 1) the league's matchup history had
+    records: Mapping[str, tuple[int, int, int, float, float]] = field(default_factory=dict)  # roster id -> (w, l, t, pf, pa)
 
 
 @dataclass(frozen=True)
@@ -591,6 +626,9 @@ class GameSnapshot:
     start_picks: tuple[SimPick, ...] = ()
     start_ir: Mapping[str, tuple[str, ...]] = field(default_factory=dict)
     start_taxi: Mapping[str, tuple[str, ...]] = field(default_factory=dict)
+    # Mid-season league start only: the real played weeks, standings and lineups the game opens with (plain data; see
+    # ``game_setup.midseason_start``). Empty (and not serialized) on every other game.
+    mid_start: Mapping[str, Any] = field(default_factory=dict)
 
     def __post_init__(self) -> None:
         if not self.pids:
@@ -661,6 +699,7 @@ class GameSnapshot:
                 "start_taxi": {t: list(p) for t, p in self.start_taxi.items()}} if self.start_ir or self.start_taxi else {}),
             **({"seed": self.seed, "start_picks": [p.to_dict() for p in self.start_picks]}
                if self.settings.dynasty_v else {}),
+            **({"mid_start": dict(self.mid_start)} if self.mid_start else {}),
         }
 
     @classmethod
@@ -677,6 +716,7 @@ class GameSnapshot:
             start_taxi={str(t): tuple(str(p) for p in pids) for t, pids in (raw.get("start_taxi") or {}).items()},
             seed=int(raw.get("seed") or 0),
             start_picks=tuple(SimPick.from_dict(p) for p in (raw.get("start_picks") or ())),
+            mid_start=dict(raw.get("mid_start") or {}),
         )
 
 
@@ -686,6 +726,6 @@ __all__ = [
     "TE_PREMIUMS", "BENCH_RANGE", "DEFAULT_BENCH", "DEFAULT_TEAMS", "DEFAULT_SCORING", "IMPORT_TEAM_COUNTS",
     "KD_VERSION", "FLEX_TYPES", "DEFAULT_FLEX_TYPE", "FLEX_SLOT_FOR_TYPE", "START_FRESH", "START_LEAGUE", "START_KINDS", "SINGLETON_POSITIONS", "NON_TRADABLE", "FLEX_SHARE",
     "DRAFT_SPARE_SPOTS", "derive_layout", "scoring_label", "GAME_POSITIONS", "GAME_STRICT_SLOTS",
-    "ImportedTeam", "LeagueImport", "LeagueTeamChoice", "LeagueTeams", "GameError", "GameSettings", "GamePlayer", "GameTeam", "GameSnapshot", "slot_positions",
+    "ImportedTeam", "RealWeek", "LeagueImport", "START_POINTS", "START_POINT_PRESEASON", "START_POINT_CURRENT", "MIN_START_WEEK", "LeagueTeamChoice", "LeagueTeams", "GameError", "GameSettings", "GamePlayer", "GameTeam", "GameSnapshot", "slot_positions",
     "playoff_rounds", "POSITIONS", "STRICT_SLOTS", "FLEX_SLOTS",
 ]

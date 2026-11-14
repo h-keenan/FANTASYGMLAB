@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  simStartNotice,
   simBlockTag,
   simStatusOptions,
   simApplyTradeSeed,
@@ -501,6 +502,26 @@ describe("league settings and start modes (setup)", () => {
     expect(simSetupBody(ready)).toEqual({ difficulty: "hard", auto_lineup: true, tiebreaker: "points_for", start: "league", league_id: "123", roster_id: "7" });
     expect(simSetupSummary(ready)).toMatch(/nothing changes in your real league/);
     expect(simSetupBlock(simSetupDefaults(options))).toBeNull();
+  });
+
+  it("Start from: the preseason is the default and never sent; the current point is sent only with a league start", () => {
+    const ready = { ...simSetupDefaults(options), start: "league" as const, leagueId: "123", rosterId: "7" };
+    expect(ready.startPoint).toBe("preseason");
+    expect(simSetupBody(ready)).not.toHaveProperty("start_point");
+    expect(simSetupBody({ ...ready, startPoint: "current" })).toMatchObject({ start: "league", start_point: "current" });
+    expect(simSetupBody({ ...simSetupDefaults(options), startPoint: "current" })).not.toHaveProperty("start_point"); // a new league ignores it
+    expect(simSetupSummary({ ...ready, startPoint: "current" })).toMatch(/as of its current week/);
+    expect(simSettingsSummary({ teams: 12, start: "league", start_week: 6 })).toMatch(/From your league, Week 6$/);
+    expect(simSettingsSummary({ teams: 12, start: "league" })).toMatch(/From your league$/);
+  });
+
+  it("the start notice says what happened to a current-point request, and nothing for any other start", () => {
+    const ask = { start: "league" as const, start_point: "current" as const };
+    expect(simStartNotice({ settings: { start_week: 6 }, notes: [] }, ask)).toBe("Started at Week 6 with your league's real record and lineups.");
+    expect(simStartNotice({ settings: { start_week: 6 }, notes: ["trade_deadline_passed"] }, ask)).toMatch(/trade deadline has already passed/);
+    expect(simStartNotice({ settings: {}, notes: ["start_fell_back_to_preseason:offseason"] }, ask)).toMatch(/started at Week 1 of the preseason/);
+    expect(simStartNotice({ settings: {} }, { start: "league" })).toBeNull();
+    expect(simStartNotice({ settings: {} }, { start: "fresh" })).toBeNull();
   });
 
   it("fresh league names: random, a preset, or a custom name that keeps spaces, apostrophes and emoji", () => {

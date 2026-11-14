@@ -486,7 +486,27 @@ def start_from_league(em: Emitter, snap: GameSnapshot, state: GameState, seed: i
     the same week-1 setup a finished draft gets."""
 
     em.emit(0, "engine", "league_rosters")
+    if snap.settings.mid_season and snap.mid_start:
+        return start_midseason(em, snap, state, seed)
     return finish_draft(em, snap, state, seed, closing="league_start")
+
+
+def start_midseason(em: Emitter, snap: GameSnapshot, state: GameState, seed: int) -> dict[str, Any]:
+    """Pick up from the real league's current week: the played weeks and real standings first, then each team's real lineup
+    (auto-set when the real one does not fit), the first week's offers, and the season opens at that week."""
+
+    ms = snap.mid_start
+    week = int(ms["week"])
+    em.emit(0, "engine", "league_midseason", week=week, weeks=ms.get("weeks", []), stand=ms.get("stand"))
+    ev = Evaluator(snap, state)
+    real = ms.get("lineups") or {}
+    for tid in snap.tids:
+        slots = real.get(tid) or ev.best_lineup(state.rosters[tid], week)[0]
+        em.emit(week, "engine", "lineup_set", team=tid, slots=slots, auto=tid not in real)
+    recap = draft_recap(snap, state)
+    generate_offers(em, snap, state, seed, week)
+    em.emit(week, "engine", "midseason_start", week=week, recap=recap)
+    return recap
 
 
 def _team_score(lineup: Sequence[Sequence[Any]], pts: dict[str, float]) -> float:
@@ -708,7 +728,7 @@ def advance(em: Emitter, snap: GameSnapshot, state: GameState, seed: int) -> lis
 
 
 __all__ = [
-    "advance", "run_week", "finish_draft", "start_from_league", "check_can_advance", "rank_teams", "standing_rows",
+    "advance", "run_week", "finish_draft", "start_from_league", "start_midseason", "check_can_advance", "rank_teams", "standing_rows",
     "bracket_slots", "waiver_order", "user_alive", "session_for", "ScoringSession", "generate_offers",
     "fill_empty_slots",
 ]

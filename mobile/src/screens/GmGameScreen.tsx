@@ -65,10 +65,17 @@ import {
   simSetupDynastyNote,
   simSetupModes,
   simSetupTaxiDefault,
+  simStartNotice,
   simSetupSummary,
   simTeamNameChoices,
   simLeagueTeamLabel,
   SIM_NAME_CUSTOM,
+  SIM_START_CONNECT_NOTE,
+  SIM_START_LEAGUE_LABEL,
+  SIM_START_LEAGUE_NOTE,
+  SIM_START_NEW_LABEL,
+  SIM_START_POINT_LABELS,
+  SIM_START_POINT_NOTE,
   SIM_NAME_RANDOM,
   SIM_TEAM_NAME_MAX,
   SIM_TE_PREMIUM_LABELS,
@@ -93,6 +100,7 @@ import {
   type SimGameTone,
   type SimScoring,
   type SimSetupState,
+  type SimStartPoint,
   type SimWaiverClaim,
   simTradeSeedFor,
   type SimTradeSeed,
@@ -318,6 +326,8 @@ export default function GmGameScreen({ navigation }: Props) {
       setClaims([]);
       dispatch({ type: 'open', game: res.game });
       void refreshList();
+      const heads = simStartNotice(res.game, body);
+      if (heads) notify(heads, 'warning');
     }
   }
 
@@ -537,6 +547,7 @@ export default function GmGameScreen({ navigation }: Props) {
         creating={creating}
         onCreate={createGame}
         onBack={() => dispatch({ type: 'hub' })}
+        onConnect={() => navigation.navigate('Home', { openAddLeague: true })}
         top={
           <>
             {flow.paywall ? <PaywallCard flow={flow} onDismiss={() => dispatch({ type: 'dismiss_paywall' })} /> : null}
@@ -726,12 +737,15 @@ function SetupForm({
   creating,
   onCreate,
   onBack,
+  onConnect,
   top,
 }: {
   options: SimGameOptionsResponse | null;
   creating: boolean;
   onCreate: (body: SimGameCreateBody) => void;
   onBack: () => void;
+  /** Opens the Add League sheet. Only the "Use my league" option offers it. */
+  onConnect: () => void;
   /** Paywall / notice banners shown above the form. */
   top?: React.ReactNode;
 }) {
@@ -771,19 +785,24 @@ function SetupForm({
         />
         <SetupSummaryCard headline={simSetupHeadline(state)} chips={simSetupChips(state)} detail={detail} />
         <SetupCard id="start" summary={summaries.start} index={0} count={cardCount}>
-          {canImport ? (
-            <SetupField label="How to start">
+          {canImport && (custom || league) ? (
+            <SetupField label="Starting point" note={league ? SIM_START_LEAGUE_NOTE : undefined}>
               <SegmentedTabBar<string>
-                options={[{ key: 'fresh', label: 'Fresh league' }, { key: 'league', label: 'My league' }]}
+                options={[{ key: 'fresh', label: SIM_START_NEW_LABEL }, { key: 'league', label: SIM_START_LEAGUE_LABEL }]}
                 active={state.start}
                 onChange={(key) => set('start', key as SimSetupState['start'])}
               />
             </SetupField>
           ) : null}
           {league ? (
-            <SetupField label="Start from">
+            <SetupField label="Your league">
               {leagues === null ? <SetupNote>Loading your leagues...</SetupNote> : null}
-              {leagues !== null && leagues.length === 0 ? <SetupNote>No Sleeper leagues saved.</SetupNote> : null}
+              {leagues !== null && leagues.length === 0 ? (
+                <>
+                  <SetupNote>{SIM_START_CONNECT_NOTE}</SetupNote>
+                  <Button size="sm" variant="secondary" label="Connect a Sleeper league" onPress={onConnect} />
+                </>
+              ) : null}
               {(leagues ?? []).map((row) => (
                 <Button
                   key={row.league_id}
@@ -813,6 +832,15 @@ function SetupForm({
                     />
                   ))
                 : null}
+            </SetupField>
+          ) : null}
+          {league && state.leagueId ? (
+            <SetupField label="Start from" note={SIM_START_POINT_NOTE}>
+              <SegmentedTabBar<string>
+                options={(opts?.start_point?.values ?? ['preseason', 'current']).map((v) => ({ key: v, label: SIM_START_POINT_LABELS[v as SimStartPoint] }))}
+                active={state.startPoint}
+                onChange={(key) => set('startPoint', key as SimStartPoint)}
+              />
             </SetupField>
           ) : null}
           {!league ? (

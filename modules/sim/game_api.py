@@ -66,6 +66,9 @@ from modules.sim.game_types import (
     START_FRESH,
     START_KINDS,
     START_LEAGUE,
+    START_POINT_CURRENT,
+    START_POINT_PRESEASON,
+    START_POINTS,
     TE_PREMIUMS,
     TIEBREAKERS,
     headshot_id,
@@ -427,6 +430,9 @@ def add_routes(router: APIRouter, ctx: GameApiCtx) -> None:
                 # Dynasty only.
                 "seasons": {"values": list(SEASON_CHOICES), "default": DEFAULT_SEASONS},
                 "rookie_rounds": {"values": list(ROOKIE_ROUNDS), "default": DEFAULT_ROOKIE_ROUNDS},
+                # "Use my league as a starting point" only: where the game begins. "current" picks up at the real league's
+                # current week (real record, lineups and played weeks); it falls back to the preseason when there is none.
+                "start_point": {"values": list(START_POINTS), "default": START_POINT_PRESEASON},
             },
             "dynasty": {"pick_years": PICK_YEARS, "max_seasons": max(SEASON_CHOICES), "start_year": default_start_year()},
             # Draft rounds are derived: roster size minus the spots left for the wire.
@@ -492,6 +498,12 @@ def add_routes(router: APIRouter, ctx: GameApiCtx) -> None:
             raise ValueError("start must be one of: " + ", ".join(START_KINDS))
         league_id = str(raw.pop("league_id", "") or "").strip()
         roster_id = str(raw.pop("roster_id", "") or "").strip()
+        start_point = raw.pop("start_point", START_POINT_PRESEASON) or START_POINT_PRESEASON
+        if start_point not in START_POINTS:
+            raise ValueError("start_point must be one of: " + ", ".join(START_POINTS))
+        if start_point != START_POINT_PRESEASON and start != START_LEAGUE:
+            raise ValueError("start_point only applies when starting from your own league.")
+        current = start_point == START_POINT_CURRENT
         seed = secrets.randbits(62)
         if start == START_LEAGUE:
             if not league_id or len(league_id) > 64:
@@ -523,13 +535,15 @@ def add_routes(router: APIRouter, ctx: GameApiCtx) -> None:
                 return busy()
             try:
                 if start == START_LEAGUE:
-                    extra_kw = {"dynasty": True} if league_dynasty else {}
+                    extra_kw = {**({"dynasty": True} if league_dynasty else {}), **({"current": True} if current else {})}
                     imported = ctx.inputs.league_import(
                         league_id, username=ctx.sleeper_username(user), roster_id=roster_id, **extra_kw)
                     settings = league_settings(
                         imported, difficulty=picked.difficulty, auto_lineup=picked.auto_lineup, tiebreaker=picked.tiebreaker,
-                        dynasty=league_dynasty, seasons=picked.seasons, ir_slots=ir_pick, taxi_slots=taxi_pick,
+                        dynasty=league_dynasty, seasons=picked.seasons, ir_slots=ir_pick, taxi_slots=taxi_pick, current=current,
                     )
+                    if not pro and settings.start_week >= PREVIEW_PAYWALL_WEEK:  # it would open already past the free weeks
+                        return _premium(None)
                     if league_dynasty and picked.rookie_rounds and not imported.rookie_rounds:
                         settings = replace(settings, rookie_rounds=picked.rookie_rounds)
                     pool = _pool_for(ctx.inputs, settings.scoring_settings)
@@ -916,6 +930,8 @@ def add_routes(router: APIRouter, ctx: GameApiCtx) -> None:
             if want is not None and want < state.week and str(want) in state.recaps:
                 return {**_env(pro, state), "recap": state.recaps[str(want)], "also_played": [],
                         "replayed": True, "game": game_json(row, snap, state, pro)}
+            if want is not None and want < state.week and snap.settings.mid_season and str(want) not in state.recaps:
+                raise GameError("week_mismatch", "That week was played in the real league before this game began.", current_week=state.week)
             if want is not None and want > state.week:
                 raise GameError("week_mismatch", "That week has not started.", current_week=state.week)
             if view.paywalled(pro, state):
@@ -1275,5 +1291,5 @@ __all__ = ["GameApiCtx", "add_routes", "add_preview_route", "clear_pool_cache", 
 def _draft_for_review(snap, events, state):
     """The draft recap the grade used (event payload when present, else rebuilt from state)."""
 
-    found = next((e["payload"]["recap"] for e in events if e["type"] in ("draft_complete", "league_start")), None)
+    found = next((e["payload"]["recap"] for e in events if e["type"] in ("draft_complete", "league_start", "midseason_start")), None)
     return found if found is not None else _draft_from_state(snap, state)
