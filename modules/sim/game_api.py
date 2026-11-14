@@ -173,6 +173,7 @@ class SimToBody(BaseModel):
     weeks: int = 1
     auto_set: bool = False
     force_first: bool = False
+    stops: dict[str, bool] | None = None  # per-run stop toggles (game_simto.Stops); absent = all on
 
 
 class UndoSimBody(BaseModel):
@@ -851,7 +852,8 @@ def add_routes(router: APIRouter, ctx: GameApiCtx) -> None:
                 "roster": view.team_roster(snap, state, snap.user_team.tid)["players"],
                 "pending": {"roster_size": len(state.rosters[snap.user_team.tid]),
                             "roster_limit": snap.settings.roster_limit,
-                            "cuts_needed": max(0, len(state.rosters[snap.user_team.tid]) - snap.settings.roster_limit)},
+                            "cuts_needed": max(0, len(state.rosters[snap.user_team.tid]) - snap.settings.roster_limit),
+                            "limit_blocks": not snap.settings.soft_limit},
             }
 
         return _mutate(user, game_id, run, respond=resp)
@@ -945,6 +947,7 @@ def add_routes(router: APIRouter, ctx: GameApiCtx) -> None:
             raise ValueError("target must be one of: " + ", ".join(simto.TARGETS) + ".")
         if not 1 <= body.weeks <= simto.MAX_WEEKS:
             raise ValueError(f"weeks must be between 1 and {simto.MAX_WEEKS}.")
+        stops = simto.Stops.parse(body.stops)
         """Play weeks in one request (see game_simto): the same Advance repeated, so the events are what that many
         Advances would write, one commit, one response. Stops early with a reason when you have something to decide."""
         pro = ctx.is_pro(user)
@@ -959,7 +962,7 @@ def add_routes(router: APIRouter, ctx: GameApiCtx) -> None:
                 if not ok:
                     return busy()
                 result = simto.run(em, snap, state, seedof(row, state), target=body.target, weeks=body.weeks, auto_set=body.auto_set,
-                                   force_first=body.force_first, pro=pro, paywalled_fn=lambda s: view.paywalled(pro, s))
+                                   force_first=body.force_first, stops=stops, pro=pro, paywalled_fn=lambda s: view.paywalled(pro, s))
             if result["weeks_played"] == 0 and not em.events:
                 return {**_env(pro, state), **{k: result[k] for k in ("target", "weeks_played", "stopped", "from_seq", "to_seq")},
                         "summary": None, "recap": None, "game": game_json(row, snap, state, pro)}

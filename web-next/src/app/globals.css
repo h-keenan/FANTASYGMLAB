@@ -478,9 +478,17 @@
   --font-sans: var(--font-family-sans);
 }
 
-html,
+/* NEVER give html or body a fixed height (height: 100%). A sticky bottom bar is clamped to its parent's box, and with a
+   one-viewport-tall body that box ends one screen down: the footer / orb then scrolls away mid-page with content
+   still below it (the "footer floats when scrolling" bug). The page is exactly as tall as its content, at least one
+   dynamic viewport (min-height on body); every ancestor of a bottom bar therefore spans the whole document.
+   lib/bottomChrome.test.ts guards this. */
+html {
+  min-height: 100%;
+}
 body {
-  height: 100%;
+  min-height: 100vh;
+  min-height: 100dvh;
 }
 
 /* Zach + coridian_, 2026-10-19 (mockup approved): the shared "liquid

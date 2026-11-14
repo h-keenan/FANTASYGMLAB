@@ -4,30 +4,70 @@ import { useEffect, useState } from "react";
 
 import { AccentCard } from "@/components/AccentCard";
 import { Button } from "@/components/Button";
+import { SimCollapse } from "@/components/SimGameDynastyParts";
 import { SimStandingsList } from "@/components/SimGameLeague";
 import { SimGlyph } from "@/components/SimGlyph";
 import { SimSectionTitle, SimToneBadge, type SimCtx } from "@/components/SimGameParts";
+import { SetupToggleRow } from "@/components/SimSetupParts";
 import { SkeletonRows } from "@/components/Skeleton";
 import { ConfirmInPlace } from "@/components/ui/ConfirmInPlace";
 import { Sheet } from "@/components/ui/Sheet";
 import { api } from "@/lib/api";
-import type { SimToOption, SimToResponse } from "@/lib/simGame";
-import { simToCanForce, simToFixLabel, simToFixTab, simToHeadline, simToRecordLine, simToWeekLine } from "@/lib/simTo";
+import type { SimToOption, SimToResponse, SimToStops } from "@/lib/simGame";
+import {
+  SIM_TO_DEFAULT_PREFS,
+  SIM_TO_PREFS_KEY,
+  SIM_TO_STOP_ROWS,
+  simToCanForce,
+  simToFixLabel,
+  simToFixTab,
+  simToHeadline,
+  simToParsePrefs,
+  simToReadout,
+  simToRecordLine,
+  simToSerializePrefs,
+  simToStopCount,
+  simToWeekLine,
+  type SimToPrefs,
+} from "@/lib/simTo";
 
 export interface SimToRequest {
   option: SimToOption;
   autoSet: boolean;
+  stops: SimToStops;
   forceFirst?: boolean;
+}
+
+function readPrefs(): SimToPrefs {
+  try {
+    return simToParsePrefs(window.localStorage.getItem(SIM_TO_PREFS_KEY));
+  } catch {
+    return simToParsePrefs(null);
+  }
+}
+
+function writePrefs(prefs: SimToPrefs) {
+  try {
+    window.localStorage.setItem(SIM_TO_PREFS_KEY, simToSerializePrefs(prefs));
+  } catch {
+    /* private window: the choices last for this session only */
+  }
 }
 
 /**
  * The "Sim to..." chooser: only the milestones that make sense for the stage the game is in (the server decides), and the
- * optional "auto-set my lineup each week" toggle (off by default). One tap runs the whole thing as a single request.
+ * "auto-set my lineup each week" toggle (on by default, like Madden / 2K franchise auto-play) and the stop toggles (trade offers,
+ * injuries to starters, starter out or bye, the deadline, waiver or roster issues). The choices persist on this device.
+ * One tap runs the whole thing as a single request. Twin of mobile's SimToSheet.
  */
 export function SimToSheet({ ctx, open, onClose, onRun }: { ctx: SimCtx; open: boolean; onClose: () => void; onRun: (request: SimToRequest) => void }) {
   const [options, setOptions] = useState<SimToOption[] | null>(null);
   const [failed, setFailed] = useState(false);
-  const [autoSet, setAutoSet] = useState(false);
+  const [prefs, setPrefs] = useState<SimToPrefs>(() => (typeof window === "undefined" ? SIM_TO_DEFAULT_PREFS : readPrefs()));
+  const update = (next: SimToPrefs) => {
+    setPrefs(next);
+    writePrefs(next);
+  };
   useEffect(() => {
     if (!open) return;
     let cancelled = false;
@@ -61,7 +101,7 @@ export function SimToSheet({ ctx, open, onClose, onRun }: { ctx: SimCtx; open: b
           <ul className="flex flex-col gap-2" aria-label="Sim to">
             {options.map((o) => (
               <li key={`${o.id}-${o.weeks ?? 0}`}>
-                <Button className="w-full justify-start" variant="secondary" onClick={() => { onClose(); onRun({ option: o, autoSet }); }}>
+                <Button className="w-full justify-start" variant="secondary" onClick={() => { onClose(); onRun({ option: o, autoSet: prefs.autoSet, stops: prefs.stops }); }}>
                   <SimGlyph name="matchup" size={14} />
                   <span className="ml-2">{o.label}</span>
                 </Button>
@@ -69,13 +109,14 @@ export function SimToSheet({ ctx, open, onClose, onRun }: { ctx: SimCtx; open: b
             ))}
           </ul>
         )}
-        <label className="flex items-start gap-2 text-sm" style={{ minHeight: "var(--touch-target-min)" }}>
-          <input type="checkbox" className="mt-1" checked={autoSet} onChange={(event) => setAutoSet(event.target.checked)} aria-label="Auto-set my lineup each week" />
-          <span>
-            <strong>Auto-set my lineup each week</strong>
-            <span className="block text-xs" style={{ color: "var(--color-text-muted)" }}>Plays your best healthy lineup before every week. Off: it stops when a starter is out or on a bye.</span>
-          </span>
-        </label>
+        <div className="flex flex-col" data-testid="sim-to-toggles">
+          <SetupToggleRow first label="Auto-set my lineup each week" note="Plays your best healthy lineup every week, so you never start a bye or injured player." checked={prefs.autoSet} onChange={(autoSet) => update({ ...prefs, autoSet })} />
+        </div>
+        <SimCollapse title="Stop me when" summary={`${simToStopCount(prefs.stops)} of ${SIM_TO_STOP_ROWS.length} on`} testId="sim-to-stops">
+          {SIM_TO_STOP_ROWS.map((row, i) => (
+            <SetupToggleRow key={row.key} first={i === 0} label={row.label} note={row.hint} checked={prefs.stops[row.key]} onChange={(on) => update({ ...prefs, stops: { ...prefs.stops, [row.key]: on } })} />
+          ))}
+        </SimCollapse>
       </div>
     </Sheet>
   );
@@ -123,7 +164,7 @@ export function SimToResultView({
                 {fixLabel}
               </Button>
             ) : null}
-            {played === 0 && simToCanForce(stop) ? <Button size="sm" variant="secondary" onClick={onForce}>Sim anyway</Button> : null}
+            {simToCanForce(stop) ? <Button size="sm" variant="secondary" onClick={onForce}>{played === 0 ? "Sim anyway" : "Keep simming"}</Button> : null}
           </div>
         </AccentCard>
       ) : null}
@@ -145,6 +186,16 @@ export function SimToResultView({
               </li>
             ))}
           </ul>
+          {simToReadout(s).length > 0 ? (
+            <ul className="flex flex-col gap-0.5 text-xs" aria-label="What happened" data-testid="sim-to-readout" style={{ color: "var(--color-text-secondary)" }}>
+              {simToReadout(s).map((line) => <li key={line}>{line}</li>)}
+            </ul>
+          ) : null}
+          {(s.lineup_changes ?? []).length > 0 ? (
+            <SimCollapse title="Lineup changes" summary={`${s.lineup_changes?.length} auto-set`} testId="sim-to-lineup-changes">
+              <ul className="text-sm">{(s.lineup_changes ?? []).map((c, k) => <li key={k}>Week {c.week}: {c.slot} {c.out ?? "empty"} to {c.in ?? "empty"}</li>)}</ul>
+            </SimCollapse>
+          ) : null}
           {s.injuries.length > 0 ? (
             <AccentCard accent="var(--color-danger)" compact as="div">
               <p className="text-xs font-extrabold">Injuries to your team</p>

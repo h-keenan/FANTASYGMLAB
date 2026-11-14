@@ -1,5 +1,6 @@
 "use client";
 
+import { TrendChart } from "@/components/ui/TrendChart";
 import type { ReactNode } from "react";
 
 import { AccentCard } from "@/components/AccentCard";
@@ -155,24 +156,24 @@ function PathView({ steps, caption }: { steps: ReviewPathStep[]; caption?: strin
 }
 
 function JourneyView({ points, teams }: { points: { label: string; rank: number; sub?: string }[]; teams: number }) {
-  const w = 300;
-  const h = 96;
-  const pad = 14;
-  const x = (i: number) => pad + (i * (w - 2 * pad)) / Math.max(1, points.length - 1);
-  const y = (rank: number) => pad + ((rank - 1) * (h - 2 * pad)) / Math.max(1, teams - 1);
   const best = Math.min(...points.map((p) => p.rank));
   const worst = Math.max(...points.map((p) => p.rank));
-  const path = points.map((p, i) => `${i === 0 ? "M" : "L"}${x(i).toFixed(1)} ${y(p.rank).toFixed(1)}`).join(" ");
   const last = points[points.length - 1];
   return (
     <div className="glass-surface flex flex-col gap-2 p-3" data-testid="review-journey">
-      <svg viewBox={`0 0 ${w} ${h}`} width="100%" role="img" aria-label={`Standings rank by week, best ${best}, worst ${worst}, finished ${last.rank}`} style={{ display: "block", aspectRatio: `${w} / ${h}`, maxHeight: "9rem" }}>
-        <line x1={pad} x2={w - pad} y1={y(1)} y2={y(1)} stroke="var(--color-border)" strokeDasharray="3 4" />
-        <path d={path} fill="none" stroke="var(--color-accent)" strokeWidth="2.5" strokeLinejoin="round" strokeLinecap="round" />
-        {points.map((p, i) => (
-          <circle key={i} cx={x(i)} cy={y(p.rank)} r={p.rank === best ? 4.5 : 3} fill={p.rank === best ? "var(--color-success)" : p.rank === worst ? "var(--color-danger)" : "var(--color-accent)"} />
-        ))}
-      </svg>
+      <TrendChart
+        points={points.map((p, i) => ({ x: i, y: p.rank, label: `${p.label} · ${p.sub ?? ""}`.replace(/ · $/, "") }))}
+        name="Standings rank by week"
+        unit="rank"
+        xNoun="week"
+        formatX={(i) => points[Math.round(i)]?.label ?? ""}
+        formatY={(v) => `#${Math.round(v)}`}
+        yDomain={[1, Math.max(2, teams)]}
+        invertY
+        height={120}
+        pointColor={(pt) => (pt.y === best ? "var(--color-success)" : pt.y === worst ? "var(--color-danger)" : undefined)}
+        testId="review-journey-chart"
+      />
       <div className="flex items-center justify-between text-xs" style={{ color: "var(--color-text-muted)" }}>
         <span>{points[0].label}: #{points[0].rank}</span>
         <span><span style={{ color: "var(--color-success)" }}>Peak #{best}</span> · <span style={{ color: "var(--color-danger)" }}>Low #{worst}</span></span>

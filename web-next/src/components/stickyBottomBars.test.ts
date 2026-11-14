@@ -32,7 +32,7 @@ describe("bottom-pinned chrome stays sticky, not fixed", () => {
   });
   it("GmOrb trigger button is not fixed", () => {
     const src = read("GmOrb.tsx");
-    expect(src).toContain('position: "sticky"');
+    expect(src).toContain('className="bottom-rail md:hidden"'); // .bottom-rail = sticky, bottom 0 (ui.css, guarded by lib/bottomChrome.test.ts)
     expect(src).toContain('className="absolute left-1/2 flex items-center justify-center"');
   });
 });

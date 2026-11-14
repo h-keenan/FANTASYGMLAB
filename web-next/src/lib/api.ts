@@ -4807,7 +4807,7 @@ export const api = {
   advanceSimGame: (gameId: string, week: number) =>
     authorizedRequest<SimGameTypes.SimAdvanceResponse>(`/v1/sim/games/${encodeURIComponent(gameId)}/advance`, { method: "POST", jsonBody: { week } }),
   getSimToOptions: (gameId: string) => authorizedRequest<SimGameTypes.SimToOptionsResponse>(`/v1/sim/games/${encodeURIComponent(gameId)}/sim-to/options`),
-  simToGame: (gameId: string, body: { target: SimGameTypes.SimToTarget; weeks?: number; auto_set?: boolean; force_first?: boolean }) =>
+  simToGame: (gameId: string, body: { target: SimGameTypes.SimToTarget; weeks?: number; auto_set?: boolean; force_first?: boolean; stops?: SimGameTypes.SimToStops }) =>
     authorizedRequest<SimGameTypes.SimToResponse>(`/v1/sim/games/${encodeURIComponent(gameId)}/sim-to`, { method: "POST", jsonBody: body }),
   undoSimTo: (gameId: string, fromSeq: number) =>
     authorizedRequest<SimGameTypes.SimGameResponse & { undone?: boolean }>(`/v1/sim/games/${encodeURIComponent(gameId)}/undo-sim`, { method: "POST", jsonBody: { from_seq: fromSeq } }),

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import copy
+import dataclasses
 import json
 
 import pytest
@@ -62,14 +63,30 @@ def test_auto_set_each_week_equals_pressing_auto_set_then_advance():
     assert got["weeks_played"] >= 1 and got["from_seq"] < got["to_seq"]
 
 
-def test_roster_over_limit_always_stops_before_a_week_even_when_forced():
-    r = Run()
+def over_the_limit(r, n=3):
     user = r.snap.user_team.tid
-    extra = next(p for p in r.snap.pids if p not in r.state.owner_map())
-    r.state.rosters[user].extend([extra] * 0 + [p for p in r.snap.pids if p not in r.state.owner_map()][:3])
+    free = [p for p in r.snap.pids if p not in r.state.owner_map()]
+    r.state.rosters[user].extend(free[:max(0, r.snap.settings.roster_limit + n - len(r.state.rosters[user]))])
+    return user
+
+
+def test_old_save_over_the_limit_always_stops_before_a_week_even_when_forced():
+    r = Run()
+    object.__setattr__(r.root, "settings", dataclasses.replace(r.root.settings, limit_v=0))
+    r.root.__dict__.pop("_views", None)
+    over_the_limit(r)
     got = sim(r, target="weeks", weeks=2, force_first=True)
     assert got["weeks_played"] == 0 and got["stopped"]["code"] == "roster_over_limit" and got["stopped"]["fix"] == "roster"
     assert got["stopped"]["message"].startswith(f"Stopped at Week {r.state.week}:")
+
+
+def test_over_the_limit_does_not_stop_a_run_and_the_summary_notes_it():
+    r = Run()
+    over_the_limit(r, 3)
+    r.state.offers = []
+    got = sim(r, target="weeks", weeks=2, auto_set=True, stops=simto.Stops(offers=False, injuries=False))
+    assert got["weeks_played"] == 2 and (got["stopped"] is None or got["stopped"]["code"] != "roster_over_limit")
+    assert got["summary"]["roster"]["over"] == 3 and got["summary"]["roster"]["limit"] == r.snap.settings.roster_limit
 
 
 def test_a_starter_who_is_out_stops_with_a_named_reason_and_force_first_plays_through():
@@ -224,3 +241,208 @@ def test_api_free_user_stops_at_the_paywall_not_with_an_error():
     assert out["game"]["week"] == out["preview"]["paywall_week"]
     blocked = client.post(f"/v1/sim/games/{gid}/sim-to", json={"target": "weeks", "weeks": 1}, headers=hdr("free")).json()
     assert blocked["reason"] == "premium_required"
+
+
+# ------------------------------------------------------ per-run stop toggles and auto-set lineup
+
+QUIET = dict(offers=False, injuries=False, starters=False, deadline=False, roster=False)
+
+
+def only(**on):
+    return simto.Stops(**{**QUIET, **on})
+
+
+def starters_of(r):
+    return [p for _, p in r.state.lineups[r.snap.user_team.tid] if p]
+
+
+def test_auto_set_each_week_changes_the_lineup_over_a_multi_week_run_and_never_starts_an_out_or_bye_player():
+    r = Run()
+    user = r.snap.user_team.tid
+    hurt = next(p for p in starters_of(r))
+    r.state.out[hurt] = 10  # hurt for the whole run
+    r.state.offers = []
+    seen_weeks = []
+    real = simto.advance
+
+    def spy(em, snap, state, seed):
+        from modules.sim.game_eval import Evaluator
+        ev = Evaluator(snap, state)
+        bad = [p for _, p in state.lineups[user] if p and ev.status(p, state.week) != "healthy"]
+        seen_weeks.append((state.week, bad))
+        return real(em, snap, state, seed)
+
+    simto.advance = spy
+    try:
+        got = sim(r, target="weeks", weeks=4, auto_set=True, stops=simto.Stops(**QUIET))
+    finally:
+        simto.advance = real
+    assert got["weeks_played"] == 4 and got["stopped"] is None
+    assert [w for w, _ in seen_weeks] == [1, 2, 3, 4] and all(bad == [] for _, bad in seen_weeks)  # never started an out/bye player
+    ch = got["summary"]["lineup_changes"]
+    name = r.snap.players[hurt].name
+    assert got["summary"]["auto_set"] is True and ch and ch[0]["week"] == 1 and ch[0]["out"] == name and ch[0]["in"]
+    assert hurt not in starters_of(r)
+    # the same run without auto-set stops at the problem instead (it does not fix anything for you)
+    r2 = Run()
+    r2.state.out[starters_of(r2)[0]] = 10
+    r2.state.offers = []
+    stop = sim(r2, target="weeks", weeks=4, stops=simto.Stops(offers=False))["stopped"]
+    assert stop["code"] == "starter_out"
+
+
+def test_auto_set_fixes_a_bye_starter_in_the_week_it_matters():
+    r = Run()
+    user = r.snap.user_team.tid
+    r.state.offers = []
+    W = r.state.week
+    bye = next((p for p in r.state.rosters[user] if r.snap.bye_of(p) == W), None)
+    if bye is None:
+        pytest.skip("no bye player on the user roster in week 1 for this seed")
+    r.state.lineups[user][0][1] = bye
+    got = sim(r, target="weeks", weeks=1, auto_set=True, stops=simto.Stops(**QUIET))
+    assert got["weeks_played"] == 1 and any(c["out"] == r.snap.players[bye].name for c in got["summary"]["lineup_changes"])
+
+
+def test_stop_toggle_trade_offers_new_or_expiring_and_off():
+    r = Run()
+    ai = next(t.tid for t in r.snap.teams if not t.is_user)
+    ev = simto.Evaluator(r.snap, r.state)
+    r.state.offers = [{"id": "o1", "team": ai, "give": [], "get": [], "expires_week": r.state.week + 3, "message": ""}]
+    kw = dict(pro=True, paywalled=False)
+    fresh = simto.stop_reason(r.snap, r.state, ev, stops=only(offers=True), seen_offers=frozenset(), **kw)
+    assert fresh["code"] == "trade_offers" and "waiting" in fresh["message"] and fresh["fix"] == "inbox"
+    assert simto.stop_reason(r.snap, r.state, ev, stops=only(offers=True), seen_offers=frozenset({"o1"}), **kw) is None  # not news
+    r.state.offers[0]["expires_week"] = r.state.week
+    exp = simto.stop_reason(r.snap, r.state, ev, stops=only(offers=True), seen_offers=frozenset({"o1"}), **kw)
+    assert exp["code"] == "trade_offers" and "expire" in exp["message"]
+    assert simto.stop_reason(r.snap, r.state, ev, stops=only(offers=False), seen_offers=frozenset(), **kw) is None
+
+
+def test_a_run_stops_for_an_offer_that_arrives_mid_run_unless_the_toggle_is_off():
+    def with_new_offer(r):
+        real = simto.advance
+        ai = next(t.tid for t in r.snap.teams if not t.is_user)
+
+        def adv(em, snap, state, seed):
+            out = real(em, snap, state, seed)
+            state.offers.append({"id": f"new{state.week}", "team": ai, "give": [], "get": [], "expires_week": state.week + 5, "message": ""})
+            return out
+        return real, adv
+
+    for toggle, expect_stop in ((True, True), (False, False)):
+        r = Run()
+        r.state.offers = []
+        real, adv = with_new_offer(r)
+        simto.advance = adv
+        try:
+            got = sim(r, target="weeks", weeks=3, auto_set=True, stops=only(offers=toggle))
+        finally:
+            simto.advance = real
+        if expect_stop:
+            assert got["weeks_played"] == 1 and got["stopped"]["code"] == "trade_offers" and got["summary"]["offers_new"] >= 1
+        else:
+            assert got["weeks_played"] == 3 and got["stopped"] is None
+
+
+def test_stop_toggle_injury_to_a_starter_stops_after_the_week_he_got_hurt_and_can_be_skipped():
+    def run_with(toggle):
+        r = Run()
+        r.state.offers = []
+        real = simto.advance
+        box = {}
+
+        def adv(em, snap, state, seed):
+            if state.week == 1:
+                box["v"] = [p for _, p in state.lineups[snap.user_team.tid] if p][0]  # a starter of the lineup that is about to play
+            victim = box["v"]
+            out = real(em, snap, state, seed)
+            if state.week == 2:  # the week just played was week 1
+                out[-1]["injuries"].append({"player": {"id": victim}, "weeks": 3, "team_id": snap.user_team.tid, "is_yours": True})
+            return out
+        simto.advance = adv
+        try:
+            res = sim(r, target="weeks", weeks=3, auto_set=True, stops=only(injuries=toggle))
+            return r, box["v"], res
+        finally:
+            simto.advance = real
+
+    r, victim, got = run_with(True)
+    assert got["weeks_played"] == 1 and got["stopped"]["code"] == "starter_injured" and got["stopped"]["player_id"]
+    assert got["stopped"]["fix"] == "lineup" and "lineup was updated" in got["stopped"]["message"]
+    r, victim, got = run_with(False)
+    assert got["weeks_played"] == 3 and got["stopped"] is None
+
+
+def test_stop_toggle_starter_out_with_no_fix_can_be_skipped():
+    r = Run()
+    r.state.offers = []
+    r.state.out[starters_of(r)[0]] = 3
+    assert sim(r, target="weeks", weeks=1, stops=only(starters=True))["stopped"]["code"] == "starter_out"
+    r2 = Run()
+    r2.state.offers = []
+    r2.state.out[starters_of(r2)[0]] = 3
+    got = sim(r2, target="weeks", weeks=1, stops=only(starters=False))
+    assert got["weeks_played"] == 1 and got["stopped"] is None
+
+
+def test_stop_toggle_trade_deadline_stops_in_deadline_week_only_mid_run():
+    r = Run()
+    D = r.snap.settings.trade_deadline_week
+    got = sim(r, target="season_end", auto_set=True, stops=only(deadline=True))
+    assert got["stopped"]["code"] == "trade_deadline" and got["stopped"]["fix"] == "inbox" and r.state.week == D
+    assert got["weeks_played"] == D - 1
+    again = sim(r, target="season_end", auto_set=True, stops=only(deadline=True))  # starting AT the deadline week does not stop at once
+    assert again["weeks_played"] >= 1 and (again["stopped"] is None or again["stopped"]["code"] != "trade_deadline")
+    r2 = Run()
+    off = sim(r2, target="playoffs_start", auto_set=True, stops=only(deadline=False))
+    assert off["stopped"] is None and r2.state.status != "in_season"
+
+
+def test_stop_toggle_waiver_claim_that_cannot_go_through_stops_unless_off():
+    for toggle, stops_run in ((True, True), (False, False)):
+        r = Run()
+        r.state.offers = []
+        user = over_the_limit(r, 0)  # exactly at the limit
+        assert len(r.state.rosters[user]) == r.snap.settings.roster_limit
+        free = [p for p in r.snap.pids if p not in r.state.owner_map()][5]
+        r.state.claims.append({"id": "c1", "team": user, "add": free, "drop": None, "start_slot": None})
+        got = sim(r, target="weeks", weeks=1, auto_set=True, stops=only(roster=toggle))
+        if stops_run:
+            assert got["weeks_played"] == 0 and got["stopped"]["code"] == "waiver_issue" and got["stopped"]["fix"] == "roster"
+        else:
+            assert got["weeks_played"] == 1
+    r = Run()
+    user = over_the_limit(r, 0)
+    drop = next(p for p in r.state.rosters[user] if p not in starters_of(r))
+    r.state.claims.append({"id": "c1", "team": user, "add": [p for p in r.snap.pids if p not in r.state.owner_map()][5], "drop": drop, "start_slot": None})
+    assert simto.failing_claims(r.snap, r.state) == []  # a swap is fine
+
+
+def test_stops_parse_rejects_unknown_and_non_boolean_toggles_and_defaults_all_on():
+    assert simto.Stops.parse(None) == simto.Stops() and all(vars(simto.Stops()).values())
+    assert simto.Stops.parse({"offers": False}).offers is False
+    for bad in ({"nope": True}, {"offers": "yes"}):
+        with pytest.raises(ValueError):
+            simto.Stops.parse(bad)
+
+
+def test_the_summary_reads_out_record_pending_offers_injuries_and_lineup_changes():
+    r = Run()
+    r.state.offers = []
+    r.state.out[starters_of(r)[0]] = 2
+    got = sim(r, target="weeks", weeks=2, auto_set=True, stops=simto.Stops(**QUIET))
+    s = got["summary"]
+    assert {"record", "lineup_changes", "offers_pending", "offers_new", "roster", "injuries", "auto_set"} <= set(s)
+    assert s["record"]["after"] and s["roster"]["size"] == len(r.state.rosters[r.snap.user_team.tid]) and s["offers_pending"] == len(r.state.offers)
+
+
+def test_api_accepts_stops_and_rejects_bad_ones():
+    client, _, _ = make_app()
+    gid = new_game(client)["game"]["id"]
+    finish_draft(client, gid)
+    ok = client.post(f"/v1/sim/games/{gid}/sim-to", json={"target": "weeks", "weeks": 1, "force_first": True, "auto_set": True,
+                                                         "stops": {"offers": False, "deadline": False}}, headers=hdr())
+    assert ok.status_code == 200 and ok.json()["weeks_played"] == 1 and "lineup_changes" in ok.json()["summary"]
+    bad = client.post(f"/v1/sim/games/{gid}/sim-to", json={"target": "weeks", "stops": {"bogus": True}}, headers=hdr())
+    assert bad.status_code == 422

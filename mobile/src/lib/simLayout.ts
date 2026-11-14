@@ -126,10 +126,15 @@ export function simSideSummary(items: readonly { value: number }[]): { count: nu
   return { count: items.length, value: Math.round(items.reduce((sum, item) => sum + (Number.isFinite(item.value) ? item.value : 0), 0)) };
 }
 
-/** Roster size after the trade against the limit: `over` > 0 means that many must be cut. */
-export function simTradeFit(rosterSize: number, limit: number, giving: number, getting: number): { after: number; room: number; over: number } {
+/**
+ * Roster size after the trade against the limit. `rosterSize`, `giving` and `getting` are ACTIVE players only (IR, taxi and picks
+ * never count), the same count the server uses (TradeDesk.roster_size_after). `over` > 0 means that many beyond the limit.
+ * `soft` (a save with the soft limit): `blocked` is true when the trade adds players past the limit (the server turns it away);
+ * a trade that ends within the limit, or leaves the roster no fuller than it is, is always allowed.
+ */
+export function simTradeFit(rosterSize: number, limit: number, giving: number, getting: number, soft = false): { after: number; room: number; over: number; blocked: boolean } {
   const after = Math.max(0, rosterSize - giving + getting);
-  return { after, room: Math.max(0, limit - after), over: Math.max(0, after - limit) };
+  return { after, room: Math.max(0, limit - after), over: Math.max(0, after - limit), blocked: soft && after > limit && after > rosterSize };
 }
 
 // ---------------------------------------------------------------------------
@@ -262,17 +267,18 @@ export function simLineupIssues(
  * warning, never a block: claims are resolved at the START of Advance (before
  * lineups lock and games are scored) and the engine auto-fills empty slots from
  * the healthy bench, so a user with no legal fill must still be able to move on
- * (the slot scores 0). Only a roster over the limit blocks (cut is always possible).
+ * (the slot scores 0). A roster over the limit blocks only in saves from before the soft limit (`limit_blocks`); newer
+ * saves just stop you adding players until you are back under.
  * `empty` is the empty slot labels (or just a count).
  */
 export function simAdvanceState(
-  game: { phase?: string; week: number; pending?: { cuts_needed?: number } | null },
+  game: { phase?: string; week: number; pending?: { cuts_needed?: number; limit_blocks?: boolean } | null },
   empty: number | readonly string[],
   zero: readonly SimZeroStarter[] = [],
 ): SimAdvanceState {
   const label = game.phase === "playoffs" ? "Play round" : `Wk ${game.week} \u2192 ${game.week + 1}`;
   const cuts = game.pending?.cuts_needed ?? 0;
-  if (cuts > 0) return { label, blocked: true, reason: `Cut ${cuts} player${cuts === 1 ? "" : "s"} first`, warning: null, confirm: null };
+  if (cuts > 0 && game.pending?.limit_blocks !== false) return { label, blocked: true, reason: `Cut ${cuts} player${cuts === 1 ? "" : "s"} first`, warning: null, confirm: null };
   const names = typeof empty === "number" ? Array.from({ length: empty }, () => "A starting slot") : empty;
   if (names.length === 0 && zero.length === 0) return { label, blocked: false, reason: null, warning: null, confirm: null };
   const n = names.length;

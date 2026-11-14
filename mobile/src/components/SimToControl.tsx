@@ -1,5 +1,6 @@
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import React, { useEffect, useMemo, useState } from 'react';
-import { StyleSheet, Switch, View } from 'react-native';
+import { StyleSheet, View } from 'react-native';
 
 import AccentCard from './AccentCard';
 import AppText from './AppText';
@@ -7,31 +8,65 @@ import Button from './Button';
 import ConfirmInPlace from './ConfirmInPlace';
 import ErrorState from './ErrorState';
 import { SkeletonCard } from './SkeletonBlock';
+import { SimCollapse } from './SimGameDynastyParts';
 import { SimStandingsList } from './SimGameLeague';
+import { SetupToggleRow } from './SimSetupParts';
 import { SimSectionTitle, SimSheet, SimToneBadge, createSimStyles, simToneColor, type SimCtx } from './SimGameParts';
 import { useThemeMode } from '../context/ThemeModeContext';
 import { api } from '../lib/api';
-import type { SimToOption, SimToResponse } from '../lib/simGame';
-import { simToCanForce, simToFixLabel, simToFixTab, simToHeadline, simToRecordLine, simToWeekLine } from '../lib/simTo';
+import type { SimToOption, SimToResponse, SimToStops } from '../lib/simGame';
+import {
+  SIM_TO_DEFAULT_PREFS,
+  SIM_TO_PREFS_KEY,
+  SIM_TO_STOP_ROWS,
+  simToCanForce,
+  simToFixLabel,
+  simToFixTab,
+  simToHeadline,
+  simToParsePrefs,
+  simToReadout,
+  simToRecordLine,
+  simToSerializePrefs,
+  simToStopCount,
+  simToWeekLine,
+  type SimToPrefs,
+} from '../lib/simTo';
 import { spacing } from '../theme';
 
 export interface SimToRequest {
   option: SimToOption;
   autoSet: boolean;
+  stops: SimToStops;
   forceFirst?: boolean;
 }
 
 /**
  * The "Sim to..." chooser: only the milestones that make sense for the stage the game is in (the server decides), and the
- * optional "auto-set my lineup each week" toggle (off by default). One tap runs the whole thing as a single request.
- * Twin of web's SimToSheet.
+ * "auto-set my lineup each week" toggle (on by default, like Madden / 2K franchise auto-play) and the stop toggles (trade offers,
+ * injuries to starters, starter out or bye, the deadline, waiver or roster issues), persisted on the device. One tap runs the
+ * whole thing as a single request. Twin of web's SimToSheet.
  */
 export function SimToSheet({ ctx, onClose, onRun }: { ctx: SimCtx; onClose: () => void; onRun: (request: SimToRequest) => void }) {
   const { colors } = useThemeMode();
   const common = useMemo(() => createSimStyles(colors), [colors]);
   const [options, setOptions] = useState<SimToOption[] | null>(null);
   const [failed, setFailed] = useState(false);
-  const [autoSet, setAutoSet] = useState(false);
+  const [prefs, setPrefs] = useState<SimToPrefs>(SIM_TO_DEFAULT_PREFS);
+  useEffect(() => {
+    let cancelled = false;
+    AsyncStorage.getItem(SIM_TO_PREFS_KEY)
+      .then((raw) => {
+        if (!cancelled) setPrefs(simToParsePrefs(raw));
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+  const update = (next: SimToPrefs) => {
+    setPrefs(next);
+    AsyncStorage.setItem(SIM_TO_PREFS_KEY, simToSerializePrefs(next)).catch(() => {});
+  };
   const [attempt, setAttempt] = useState(0);
   useEffect(() => {
     let cancelled = false;
@@ -74,18 +109,25 @@ export function SimToSheet({ ctx, onClose, onRun }: { ctx: SimCtx; onClose: () =
               variant="secondary"
               onPress={() => {
                 onClose();
-                onRun({ option: o, autoSet });
+                onRun({ option: o, autoSet: prefs.autoSet, stops: prefs.stops });
               }}
             />
           ))
         )}
-        <View style={[common.rowBetween, { minHeight: 48 }]}>
-          <View style={common.grow}>
-            <AppText style={common.bodyStrong}>Auto-set my lineup each week</AppText>
-            <AppText style={common.muted}>Plays your best healthy lineup before every week. Off: it stops when a starter is out or on a bye.</AppText>
-          </View>
-          <Switch value={autoSet} onValueChange={setAutoSet} accessibilityLabel="Auto-set my lineup each week" />
+        <View testID="sim-to-toggles">
+          <SetupToggleRow
+            first
+            label="Auto-set my lineup each week"
+            note="Plays your best healthy lineup every week, so you never start a bye or injured player."
+            value={prefs.autoSet}
+            onChange={(autoSet) => update({ ...prefs, autoSet })}
+          />
         </View>
+        <SimCollapse title="Stop me when" summary={`${simToStopCount(prefs.stops)} of ${SIM_TO_STOP_ROWS.length} on`} testID="sim-to-stops">
+          {SIM_TO_STOP_ROWS.map((row, i) => (
+            <SetupToggleRow key={row.key} first={i === 0} label={row.label} note={row.hint} value={prefs.stops[row.key]} onChange={(on) => update({ ...prefs, stops: { ...prefs.stops, [row.key]: on } })} />
+          ))}
+        </SimCollapse>
       </View>
     </SimSheet>
   );
@@ -137,7 +179,7 @@ export function SimToResultView({
                 }}
               />
             ) : null}
-            {played === 0 && simToCanForce(stop) ? <Button size="sm" variant="secondary" label="Sim anyway" onPress={onForce} /> : null}
+            {simToCanForce(stop) ? <Button size="sm" variant="secondary" label={played === 0 ? 'Sim anyway' : 'Keep simming'} onPress={onForce} /> : null}
           </View>
         </AccentCard>
       ) : null}
@@ -159,6 +201,24 @@ export function SimToResultView({
               </View>
             ))}
           </View>
+          {simToReadout(s).length > 0 ? (
+            <View accessibilityLabel="What happened" testID="sim-to-readout">
+              {simToReadout(s).map((line) => (
+                <AppText key={line} style={common.small}>
+                  {line}
+                </AppText>
+              ))}
+            </View>
+          ) : null}
+          {(s.lineup_changes ?? []).length > 0 ? (
+            <SimCollapse title="Lineup changes" summary={`${s.lineup_changes?.length} auto-set`} testID="sim-to-lineup-changes">
+              {(s.lineup_changes ?? []).map((c, k) => (
+                <AppText key={k} style={common.small}>
+                  Week {c.week}: {c.slot} {c.out ?? 'empty'} to {c.in ?? 'empty'}
+                </AppText>
+              ))}
+            </SimCollapse>
+          ) : null}
           {s.injuries.length > 0 ? (
             <AccentCard accent={simToneColor('danger', colors)} compact>
               <AppText style={common.bodyStrong}>Injuries to your team</AppText>
