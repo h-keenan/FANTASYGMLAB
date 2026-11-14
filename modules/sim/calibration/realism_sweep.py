@@ -258,6 +258,9 @@ def seasons(seeds: int, shapes: list[str] | None = None) -> dict[str, Any]:
 # ----------------------------------------------------------------------------------- dynasty
 
 
+AGING_V: int | None = None
+
+
 def dynasty(seeds: int, n_seasons: int = 5) -> dict[str, Any]:
     from modules.sim.game_actions import cut_player
     from modules.sim.game_eval import USER_PARAMS
@@ -273,6 +276,8 @@ def dynasty(seeds: int, n_seasons: int = 5) -> dict[str, Any]:
     rookies: list[dict[str, Any]] = []
     for seed in range(1, seeds + 1):
         base = GameSettings.parse({"mode": "dynasty", "teams": 12, "user_slot": 3, "start_year": 2026, "seasons": n_seasons, "rookie_rounds": 3, "scoring": "ppr"})
+        if AGING_V is not None:  # --aging-v: before/after runs of the retirement curves
+            base = replace(base, aging_v=AGING_V)
         root = build_snapshot(pool, byes, base, seed, scoring_model=model_id)
         state = GameState(root)
         em = Emitter(state, root)
@@ -579,7 +584,10 @@ def main(argv: list[str] | None = None) -> None:
     ap.add_argument("--shapes", default="")
     ap.add_argument("--world-v", type=int, default=None, help="0 = the NFL world before usage conservation (for before/after runs); default = the current WORLD_VERSION")
     ap.add_argument("--json", default="")
+    ap.add_argument("--aging-v", type=int, default=None, help="dynasty command: force the aging generation (0 = before position hazard curves)")
     args = ap.parse_args(argv)
+    global AGING_V
+    AGING_V = args.aging_v
     if args.world_v is not None:
         from modules.sim import game_types
 
