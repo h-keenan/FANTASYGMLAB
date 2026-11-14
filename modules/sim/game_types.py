@@ -8,6 +8,7 @@ replays identically after real values refresh.
 from __future__ import annotations
 
 import math
+import dataclasses
 from dataclasses import dataclass, field
 from typing import Any, Mapping
 
@@ -676,11 +677,99 @@ class GameSnapshot:
             views = {}
             object.__setattr__(root, "_views", views)
         if season not in views:
-            views[season] = season_snapshot(root, season)
+            base = getattr(root, "_base", None)
+            if base is not None and season < root._first_view:  # a realism update: seasons before it are the seasons already played, exactly as they were
+                views[season] = root._wrap_view(base.season_view(season), season)
+            else:
+                views[season] = season_snapshot(root, season)
             if root.settings.league_anchor:  # a 20-season game must not pin 20 pools: keep the latest few, rebuild older ones on demand
                 for old in [k for k in views if k < season - VIEWS_KEPT]:
                     del views[old]
         return views[season]
+
+    # ------------------------------------------------ realism updates (see game_rules)
+
+    @property
+    def unruled(self) -> "GameSnapshot":
+        """The snapshot as the game was created, before any realism update (``root`` for a game with none)."""
+
+        root = self.root
+        return getattr(root, "_base", root)
+
+    def under(self, rules: Any) -> "GameSnapshot":
+        """The season-1 snapshot with the game's realism updates (``state.rules``) applied: ``unruled`` itself while there are
+        none, so a game that never updated plays on exactly the objects it always did. Memoized per rules history."""
+
+        base = self.unruled
+        if not rules:
+            return base
+        from modules.sim.game_rules import rules_key, decision_settings  # lazy: game_rules imports this module
+
+        key = rules_key(rules)
+        memo = getattr(base, "_ruled", None)
+        if memo is None:
+            memo = {}
+            object.__setattr__(base, "_ruled", memo)
+        hit = memo.get(key)
+        if hit is None:
+            hit = dataclasses.replace(base, settings=decision_settings(base.settings, rules, 1))
+            for name in ("_anchor_rows", "_anchor_top", "_user_team", "_team_index"):
+                if hasattr(base, name):
+                    object.__setattr__(hit, name, getattr(base, name))
+            object.__setattr__(hit, "_base", base)
+            object.__setattr__(hit, "_rules", tuple(rules))
+            object.__setattr__(hit, "_first_view", min(int(e["view_from"]) for e in rules))
+            while len(memo) >= 3:  # a game rarely holds more than one: bound what an undo/redo churn can pin
+                memo.pop(next(iter(memo)))
+            memo[key] = hit
+        return hit
+
+    def view_for(self, state: Any) -> "GameSnapshot":
+        """The snapshot a command or view uses for ``state``: the season in play, under the game's realism updates."""
+
+        return self.under(state.rules).season_view(state.view_no)
+
+    def view_settings(self, season: int) -> "GameSettings":
+        """The settings decisions in dynasty season ``season`` run under (this snapshot's own when no update applies)."""
+
+        rules = getattr(self.root, "_rules", ())
+        if not rules:
+            return self.root.settings
+        from modules.sim.game_rules import decision_settings
+
+        return decision_settings(self.unruled.settings, rules, season)
+
+    def generation_root(self, season: int) -> "GameSnapshot":
+        """The snapshot whose settings season ``season``'s pool and rookie class are generated under: the update's flags (aging, names,
+        world) reach a season only from the first one built after it. ``self`` when no update applies."""
+
+        root = self.root
+        rules = getattr(root, "_rules", ())
+        if not rules:
+            return root
+        from modules.sim.game_rules import generation_settings
+
+        gens = getattr(root, "_gens", None)
+        if gens is None:
+            gens = {}
+            object.__setattr__(root, "_gens", gens)
+        if season not in gens:
+            settings = generation_settings(root._base.settings, rules, season)
+            if settings == root.settings:
+                gens[season] = root
+            else:
+                gen = dataclasses.replace(root, settings=settings)
+                for name in ("_anchor_rows", "_anchor_top"):
+                    if hasattr(root, name):
+                        object.__setattr__(gen, name, getattr(root, name))
+                object.__setattr__(gen, "_root", root)
+                gens[season] = gen
+        return gens[season]
+
+    def _wrap_view(self, view: "GameSnapshot", season: int) -> "GameSnapshot":
+        wrapped = dataclasses.replace(view, settings=self.view_settings(season))
+        object.__setattr__(wrapped, "_root", self)
+        return wrapped
 
     @property
     def user_team(self) -> GameTeam:

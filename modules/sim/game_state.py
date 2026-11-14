@@ -83,6 +83,8 @@ class GameState:
         self.retired: list[str] = []
         # Trade block (block_v 1+): the user's blocked assets, {asset_id: {"looking_for": pos | None, "week": n}}. Inert (and out of the digest) while empty.
         self.block: dict[str, dict[str, Any]] = {}
+        # The game's settings history: one row per Realism update (``realism_upgrade`` event), see game_rules. Inert (and out of the digest) while empty.
+        self.rules: list[dict[str, Any]] = []
 
     # --------------------------------------------------------------- views
 
@@ -166,7 +168,7 @@ class GameState:
         for key in ("ir", "taxi"):
             if not any(raw[key].values()):
                 del raw[key]
-        for key in ("pick_owner", "created_picks", "spent_picks", "seasons", "rookie_log", "retired", "role_hist", "block"):
+        for key in ("pick_owner", "created_picks", "spent_picks", "seasons", "rookie_log", "retired", "role_hist", "block", "rules"):
             if not raw[key]:
                 del raw[key]
         if raw["season_no"] == 1:
@@ -241,7 +243,7 @@ def apply_event(state: GameState, snapshot: GameSnapshot, ev: Mapping[str, Any])
     handler = _HANDLERS.get(kind)
     if handler is None:
         raise ValueError(f"unknown event type: {kind}")
-    snapshot = snapshot.season_view(state.view_no)  # a later dynasty season has its own pool
+    snapshot = snapshot.view_for(state)  # a later dynasty season has its own pool; a Realism update turns rules on from its event on
     handler(state, snapshot, week, p)
     state.seq = int(ev["seq"]) + 1
 
@@ -413,6 +415,18 @@ def _block_set(state, snap, week, p):
         state.block[pid] = {"looking_for": p.get("looking_for") or None, "week": int(week)}
     else:
         state.block.pop(pid, None)
+
+
+def _realism_upgrade(state, snap, week, p):
+    """The Realism update: the listed rule flags apply from this event on (each at the boundary the payload names; see game_rules).
+    The settings the engine and views read are derived from ``state.rules``, so nothing before this event changes."""
+
+    from modules.sim.game_rules import make_entry  # lazy: game_rules imports game_types
+
+    entry = make_entry(p["flags"], seq=state.seq, week=week, season_no=state.season_no, status=state.status, view_no=state.view_no)
+    entry["bounds"] = dict(p.get("bounds") or entry["bounds"])
+    state.rules.append(entry)
+    _tx(state, week, "rules", flags=sorted(entry["flags"]))
 
 
 def _inbox_offer(state, snap, week, p):
@@ -620,7 +634,7 @@ _HANDLERS = {
     "inbox_response": _inbox_response, "injury": _injury, "week_scored": _week_scored,
     "playoff_seeded": _playoff_seeded, "season_complete": _season_complete,
     "week_advanced": _week_advanced, "advance": _advance_requested,
-    "slot_move": _slot_move, "block_set": _block_set, "rookie_draft_started": _rookie_draft_started, "rookie_pick": _rookie_pick,
+    "slot_move": _slot_move, "block_set": _block_set, "realism_upgrade": _realism_upgrade, "rookie_draft_started": _rookie_draft_started, "rookie_pick": _rookie_pick,
     "rookie_draft_complete": _rookie_draft_complete, "season_started": _season_started,
 }
 
@@ -638,6 +652,8 @@ class Emitter:
         ev = make_event(self.state, week, actor, etype, **payload)
         apply_event(self.state, self.snap, ev)
         self.events.append(ev)
+        if etype == "realism_upgrade":  # the rules changed under this emitter: what it hands out from here on is the updated game
+            self.snap = self.snap.view_for(self.state)
         return ev
 
 

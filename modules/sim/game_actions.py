@@ -150,6 +150,23 @@ def queue_claim(em: Emitter, add: str, drop: str | None, start_slot: str | None)
     return next(c for c in state.claims if c["id"] == cid)
 
 
+def upgrade_realism(em: Emitter) -> dict[str, int]:
+    """The Realism update: switch on every newer rule this game was made before (``game_rules.UPGRADABLE_FLAGS``), each from its
+    own boundary. Appends one ``realism_upgrade`` event and returns the flags it turned on; nothing is emitted (and ``{}``
+    returned) when the game is already current. Past results never change."""
+
+    from modules.sim import game_rules as rules  # lazy: game_rules imports game_types
+
+    state, snap = em.state, em.snap
+    if state.status == "complete":
+        raise GameError("wrong_phase", "This game is finished: there is nothing left to update.", phase=state.status)
+    flags = rules.pending_flags(snap.unruled.settings, state.rules)
+    if not flags:
+        return {}
+    em.emit(state.week, "user", "realism_upgrade", flags=flags, bounds={f: rules.UPGRADABLE_FLAGS[f][1] for f in flags})
+    return flags
+
+
 def cancel_claim(em: Emitter, claim_id: str) -> None:
     state = em.state
     _require_season(state)

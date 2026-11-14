@@ -255,7 +255,7 @@ def run(em: Emitter, snap: GameSnapshot, state: GameState, seed: int, *, target:
     deadline = time.monotonic() + budget_s
     played = 0
     while not target_reached(snap, state, target, weeks, played) and played < MAX_WEEKS:
-        em.snap = snap.season_view(state.view_no)
+        em.snap = snap.view_for(state)
         cur = em.snap
         if auto_set:
             was = [list(r) for r in state.lineups[user]]

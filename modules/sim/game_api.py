@@ -37,6 +37,7 @@ from modules.sim import game_home as home
 from modules.sim import game_notifications as notif
 from modules.sim import game_view as view
 from modules.sim.game_ai import TradeDesk
+from modules.sim.game_rules import rules_info
 from modules.sim.game_engine import advance, ensure_rank_movement, finish_draft, start_from_league
 from modules.sim.game_eval import Evaluator
 from modules.sim.game_result import _draft_from_state, build_result
@@ -409,7 +410,7 @@ def add_routes(router: APIRouter, ctx: GameApiCtx) -> None:
             raise HTTPException(status_code=404, detail="Game not found.")
         if write:
             state = state.clone()
-        return store, uid, row, snap.season_view(state.view_no), state
+        return store, uid, row, snap.view_for(state), state
 
     def commit(store: GameStore, uid: str, game_id: str, snap: GameSnapshot, state: GameState,
                em: Emitter, *, checkpoint: bool = False, defer: bool = False):
@@ -838,6 +839,7 @@ def add_routes(router: APIRouter, ctx: GameApiCtx) -> None:
                 return _premium(state)
             em = Emitter(state, snap)
             extra = action(em, snap, state, row, seedof(row, state))
+            snap = em.snap  # a command that changed the game's rules hands back the updated snapshot
             pending = commit(store, uid, gid, snap, state, em, checkpoint=checkpoint, defer=True)
             out = {**_env(pro, state), **(respond(snap, state) if respond else {}), **(extra or {}),
                    "delta": view.game_delta(snap, state)}
@@ -1008,7 +1010,7 @@ def add_routes(router: APIRouter, ctx: GameApiCtx) -> None:
                     return busy()
                 recaps = advance(em, snap, state, seedof(row, state))
             pending = commit(store, uid, gid, snap, state, em, checkpoint=True, defer=True)
-            snap = snap.season_view(state.view_no)  # the season may have ended into the offseason
+            snap = snap.view_for(state)  # the season may have ended into the offseason
             out = {**_env(pro, state), "recap": recaps[0], "also_played": recaps[1:], "replayed": False,
                    "game": game_json({**row, "status": state.status}, snap, state, pro),
                    "achievements": _ach(store, uid, gid, snap, state, new_events=em.events, read_log=True, weeks=(int(recaps[0]["week"]), int(recaps[-1]["week"])))}
@@ -1050,7 +1052,7 @@ def add_routes(router: APIRouter, ctx: GameApiCtx) -> None:
                 return {**_env(pro, state), **{k: result[k] for k in ("target", "weeks_played", "stopped", "from_seq", "to_seq")},
                         "summary": None, "recap": None, "game": game_json(row, snap, state, pro)}
             pending = commit(store, uid, gid, snap, state, em, checkpoint=True, defer=True)
-            snap = snap.season_view(state.view_no)
+            snap = snap.view_for(state)
             out = {**_env(pro, state), **result, "game": game_json({**row, "status": state.status}, snap, state, pro),
                    "achievements": _ach(store, uid, gid, snap, state, new_events=em.events, read_log=True, weeks=(first_week, max(first_week, int(state.week) - 1)))}
             pending.finish()
@@ -1078,7 +1080,7 @@ def add_routes(router: APIRouter, ctx: GameApiCtx) -> None:
             _ach_drop(uid, gid)
             state = store.load_state(uid, gid, snap)
             store.touch(uid, gid, status=state.status, week=state.week, event_count=state.seq)
-            snap = snap.season_view(state.view_no)
+            snap = snap.view_for(state)
             return {**_env(pro, state), "undone": True, "game": game_json({**row, "status": state.status}, snap, state, pro)}
 
     @router.get("/games/{game_id}/block")
@@ -1098,6 +1100,19 @@ def add_routes(router: APIRouter, ctx: GameApiCtx) -> None:
         def run(em, snap, state, row, seed):
             blockmod.set_block(em, body.asset_id, body.on, body.looking_for)
             return home.block_view(snap, state, seed)
+
+        return _mutate(user, game_id, run)
+
+    @router.post("/games/{game_id}/realism-upgrade")
+    @guarded
+    def post_realism_upgrade(game_id: str, user: dict[str, Any] = Depends(require_user)):
+        """The Realism update for a save made before newer rules: appends one ``realism_upgrade`` event that switches on every
+        rule the game lacks, each from its boundary (see game_rules). Idempotent: a current game appends nothing."""
+
+        def run(em, snap, state, row, seed):
+            flags = act.upgrade_realism(em)
+            info = rules_info(em.snap.unruled.settings, em.snap.settings, state.rules, state.status, state.view_no)
+            return {"upgraded": bool(flags), "flags": sorted(flags), "settings": em.snap.settings.to_dict(), "rules": info}
 
         return _mutate(user, game_id, run)
 
@@ -1121,6 +1136,7 @@ def add_routes(router: APIRouter, ctx: GameApiCtx) -> None:
                 _ach_drop(uid, gid)
                 state = store.load_state(uid, gid, snap)
                 store.touch(uid, gid, status=state.status, week=state.week, event_count=state.seq)
+                snap = snap.view_for(state)  # the rules in force are the ones the log has now (a reverted Realism update is gone)
             return {**_env(pro, state), "reverted": max(0, reverted), "game": game_json(row, snap, state, pro)}
 
     # ---------------------------------------------------- IR / taxi / picks
@@ -1145,7 +1161,7 @@ def add_routes(router: APIRouter, ctx: GameApiCtx) -> None:
     # --------------------------------------------------- dynasty offseason
 
     def _offseason_resp(pro, snap, state, row, **extra):
-        snap = snap.season_view(state.view_no)
+        snap = snap.view_for(state)
         return {**_env(pro, state), "game": game_json(row, snap, state, pro), "offseason": dview.offseason_view(snap, state), **extra}
 
     def _require_offseason(state):
