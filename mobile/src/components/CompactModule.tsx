@@ -136,7 +136,7 @@ function createStyles(colors: ThemeColors) {
     toggle: { flex: 1, minWidth: 0, minHeight: 44, flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
     text: { flex: 1, minWidth: 0 },
     titleRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
-    title: { fontSize: 11, fontWeight: '800', textTransform: 'uppercase', letterSpacing: 0.6, color: colors.textTertiary },
+    title: { fontSize: 12, fontWeight: '800', textTransform: 'uppercase', letterSpacing: 0.6, color: colors.textTertiary },
     summary: { flex: 1, minWidth: 0, alignItems: 'flex-end' },
     parts: { fontSize: 14, lineHeight: 19, color: colors.textPrimary },
     part: { fontSize: 14, fontWeight: '600', color: colors.textPrimary },

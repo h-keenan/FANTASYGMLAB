@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useState } from "react";
 
 import { SimDraftGrid } from "@/components/SimDraftGrid";
 import { Sheet } from "@/components/ui/Sheet";
@@ -18,7 +18,7 @@ export function SimDraftOverview({ draft, teams, onOpen }: { draft: SimDraftStat
   const [full, setFull] = useState(false);
   const recent = simDraftRecentPicks(draft.picks, 8);
   const progress = simDraftProgress(draft, teams);
-  const mini = useMemo(() => simDraftMiniBoard(draft, teams), [draft, teams]);
+  const mini = simDraftMiniBoard(draft, teams);
   const win = simDraftMiniWindow(mini.rows, progress.round);
   const mine = (draft.picks ?? []).filter((p) => draft.teams?.find((t) => t.team_id === p.team_id)?.is_you).length;
   const last = recent[0];
