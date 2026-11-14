@@ -117,7 +117,7 @@ export function SimMoveStrip({ specs, run, refusal, notes }: SimMoveHandle) {
               style={{ minHeight: 44, paddingHorizontal: 10, justifyContent: 'center', borderRadius: radii.md, borderWidth: 1, borderColor: colors.borderStrong ?? colors.border, backgroundColor: withAlpha(colors.textTertiary, 0.12) }}
             >
               <AppText style={{ fontSize: 12, fontWeight: '800', color: colors.textPrimary }}>{t.label}</AppText>
-              {t.hint ? <AppText style={{ fontSize: 11, color: colors.textTertiary }}>{t.hint}</AppText> : null}
+              {t.hint ? <AppText style={{ fontSize: 12, color: colors.textTertiary }}>{t.hint}</AppText> : null}
             </Pressable>
           ))}
         </View>
