@@ -7,6 +7,7 @@ import { PlayerAvatar } from "@/components/PlayerAvatar";
 import { PlayerName } from "@/components/PlayerName";
 import { PositionBadge } from "@/components/PositionBadge";
 import { ToneBadge } from "@/components/ToneBadge";
+import { PlayerBadges } from "@/components/ui/PlayerBadge";
 import { TapForWhy } from "@/components/ui/TapForWhy";
 import type { ChipTone } from "@/lib/playerCard";
 import type { WhyMetricId } from "@/lib/tapForWhyContent";
@@ -19,6 +20,7 @@ import {
   type PlayerListStat,
   type PlayerListTag,
 } from "@/lib/playerListRow";
+import { badgeFromTag, type BadgeInput, type BadgeKind } from "@/lib/playerBadges";
 import { positionColorVar } from "@/lib/playerPresentation";
 
 /**
@@ -57,8 +59,12 @@ export interface PlayerListRowProps {
   /** Show the red "hurt" dot on the photo. */
   hurt?: boolean;
   stats?: PlayerListStat[];
-  /** Page-specific tags; at most two are shown plus "+N". */
+  /** Page-specific tags; status-like ones (Free agent, On block, IR, ...) become glyph badges, the rest at most two text pills plus "+N". */
   tags?: PlayerListTag[];
+  /** Glyph badges (lib/playerBadges): Rookie, IR, Taxi, ... merged with the chip and the status tags into ONE strip after the name. */
+  badges?: BadgeInput[];
+  /** Badge kinds true for every row of this list (contextSuppressed), so they are not drawn. */
+  suppressBadges?: BadgeKind[];
   /** Free content under the meta line (e.g. an owner badge). */
   extra?: ReactNode;
   /** Small inline controls at the end of the chips line (e.g. a Queue toggle), so the trailing slot stays ONE action. */
@@ -128,6 +134,8 @@ export function PlayerListRow({
   hurt = false,
   stats = [],
   tags = [],
+  badges = [],
+  suppressBadges,
   extra,
   chipsExtra,
   actions,
@@ -143,7 +151,16 @@ export function PlayerListRow({
   const dims = PLAYER_LIST_DENSITY[density];
   const colorVar = positionColorVar(position);
   const slots = orderPlayerListStats(stats);
-  const { shown, extra: moreTags } = limitPlayerListTags(tags);
+  // The chip and the status-like tags are glyph badges (one strip after the name); only non-status tags stay text pills.
+  const chipBadge = chip ? badgeFromTag({ label: chip.label }) : null;
+  const textTags: PlayerListTag[] = [];
+  const tagBadges: BadgeInput[] = [];
+  for (const tag of tags) {
+    const badge = badgeFromTag(tag);
+    if (badge) tagBadges.push(badge);
+    else textTags.push(tag);
+  }
+  const { shown, extra: moreTags } = limitPlayerListTags(textTags);
   const hasLine3 = slots.length > 0 || shown.length > 0 || Boolean(chipsExtra);
   const identity = (
     <div className="flex min-w-0 flex-1 items-center gap-2">
@@ -161,11 +178,12 @@ export function PlayerListRow({
             className="min-w-0 text-sm font-bold"
             style={{ color: "var(--color-text-primary)" }}
           />
-          {chip ? (
+          {chip && !chipBadge ? (
             <span className="shrink-0">
               <ToneBadge label={chip.label.toUpperCase()} color={TONE_COLOR[chip.tone]} size="xs" />
             </span>
           ) : null}
+          <PlayerBadges badges={[chipBadge, ...badges, ...tagBadges]} suppress={suppressBadges} />
         </div>
         {meta.length > 0 ? (
           <p className="text-xs leading-4" style={{ color: "var(--color-text-muted)" }} data-testid="list-meta">

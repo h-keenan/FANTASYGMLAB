@@ -457,7 +457,7 @@ describe("PlayerQuickView", () => {
       expect(screen.queryByTestId("pqv-availability")).toBeNull();
       expect(screen.queryByTestId("pqv-injury-news")).toBeNull();
       expect(screen.queryByTestId("pqv-bye-pill")).toBeNull();
-      expect(screen.getByText("Health: Out")).toBeInTheDocument(); // the sim's own status still shows
+      expect(screen.getByRole("img", { name: "Out" })).toBeInTheDocument(); // the sim's own status still shows
     });
 
     it("the real Player Quick View (no overlay) is unchanged", async () => {

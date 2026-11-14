@@ -20,6 +20,7 @@ import { SimBlockView } from './SimTradeBlock';
 import SimTeamCard from './SimTeamCard';
 import { SimPickLine, useSimPicks } from './SimGameDynastyParts';
 import { SimPlayerChip, SimPlayerLine, SimPopIn, SimSideLabel, SimStat, SimTeamOpenContext, SimToneBadge, createSimStyles, simToneColor, type SimCtx } from './SimGameParts';
+import { PlayerBadge } from './PlayerBadge';
 import ToneBadge from './ToneBadge';
 import { useThemeMode } from '../context/ThemeModeContext';
 import { api } from '../lib/api';
@@ -189,7 +190,7 @@ function OfferCard({ item, defaultOpen, busy, canTrade, onRespond }: { item: Sim
               </AppText>
             </View>
             <View style={common.row}>
-              {item.via_block ? <ToneBadge label="Your block" color={colors.accent} size="xs" /> : null}
+              {item.via_block ? <PlayerBadge kind="block" detail="yours" /> : null}
               <ToneBadge label={`Wk ${item.expires_week}`} color={colors.warning} size="xs" />
               <AppText style={common.muted} accessibilityElementsHidden>
                 {open ? '\u2212' : '+'}

@@ -475,7 +475,7 @@ describe("SimGameContent", () => {
     render(<SimGameContent />);
     await openFirstGame();
     fireEvent.click(await screen.findByRole("tab", { name: /Trades/ }));
-    expect(await screen.findByText("Your block")).toBeInTheDocument();
+    expect(await screen.findByRole("img", { name: /On the trade block: yours/ })).toBeInTheDocument();
     fireEvent.click(await screen.findByRole("tab", { name: "My block" }));
     expect(await screen.findByTestId("sim-block-summary")).toHaveTextContent("1 offer from your block this week");
   });

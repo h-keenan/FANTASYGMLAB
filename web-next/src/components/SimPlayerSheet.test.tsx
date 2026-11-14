@@ -109,8 +109,9 @@ describe("Fantasy Sim player sheet is the real Player Quick View", () => {
     const hurt = player({ status: "out", out_weeks: 3, owner: { type: "free_agent" } as SimGamePlayer["owner"] });
     vi.mocked(api.getSimGamePlayer).mockResolvedValue(detail({ player: hurt }));
     render(<SimPlayerSheet gameId="g1" player={hurt} onClose={() => {}} />);
-    const tags = await screen.findAllByTestId("pqv-tag");
-    expect(tags.map((t) => t.textContent)).toEqual(["Out 3w", "Free agent"]);
+    const strip = await screen.findByTestId("pqv-badges");
+    const badges = Array.from(strip.querySelectorAll("[data-badge]"));
+    expect(badges.map((b) => b.getAttribute("aria-label"))).toEqual(["Out: 3 wks", "Free agent"]);
     expect(screen.queryByText(/Health:/)).toBeNull();
   });
 

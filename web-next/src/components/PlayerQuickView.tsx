@@ -44,6 +44,8 @@ import {
   opportunityUsageCaption,
 } from "@/lib/playerQuickViewPresentation";
 import { ValuesCredit } from "@/components/ValuesCredit";
+import { BadgeLegendSheet, PlayerBadges } from "@/components/ui/PlayerBadge";
+import { badgeFromInjury, badgeFromTag } from "@/lib/playerBadges";
 import { SkeletonBlock } from "@/components/Skeleton";
 
 // The radar is the only thing here that needs recharts (~110 KB gzip); this file
@@ -139,6 +141,7 @@ export function PlayerQuickView({
   const pathname = usePathname();
   const dialogRef = useRef<HTMLDivElement | null>(null);
   const closeButtonRef = useRef<HTMLButtonElement | null>(null);
+  const [legendOpen, setLegendOpen] = useState(false);
   const [detail, setDetail] = useState<QuickViewResponse | null>(null);
   const [awards, setAwards] = useState<PlayerAward[]>([]);
   const [loading, setLoading] = useState(remote);
@@ -334,12 +337,20 @@ export function PlayerQuickView({
         <div className="pqv-signal-row">
           {identity.opportunity_label ? <span className="pqv-chip">{identity.opportunity_label}</span> : null}
           {identity.tags?.length ? (
-            identity.tags.map((tag) => (
-              <ToneBadge key={tag.key} label={tag.label} color={TAG_TONE_COLOR[tag.tone]} size="xs" truncate testId="pqv-tag" />
-            ))
+            <>
+              <PlayerBadges badges={identity.tags.map((tag) => badgeFromTag(tag))} max={6} showDetail onLegend={() => setLegendOpen(true)} testId="pqv-badges" />
+              {identity.tags.filter((tag) => !badgeFromTag(tag)).map((tag) => (
+                <ToneBadge key={tag.key} label={tag.label} color={TAG_TONE_COLOR[tag.tone]} size="xs" truncate testId="pqv-tag" />
+              ))}
+            </>
           ) : injury.label ? (
-            <span className={`pqv-chip pqv-chip--${injury.tone}`}>Health: {injury.label}</span>
+            badgeFromInjury(injury.label) ? (
+              <PlayerBadges badges={[{ kind: badgeFromInjury(injury.label)!, detail: injury.label }]} showDetail onLegend={() => setLegendOpen(true)} testId="pqv-badges" />
+            ) : (
+              <span className={`pqv-chip pqv-chip--${injury.tone}`}>Health: {injury.label}</span>
+            )
           ) : null}
+          <BadgeLegendSheet open={legendOpen} onClose={() => setLegendOpen(false)} />
         </div>
         {/* coridian_, 2026-10-19 (screenshot): "the contributor tag doesnt
             make sense if he hasnt been playing much" — tier (season-long

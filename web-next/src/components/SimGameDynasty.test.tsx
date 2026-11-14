@@ -133,10 +133,11 @@ describe("IR and taxi on the Team tab", () => {
     await openTeam();
     expect(screen.getByTestId("reserve-summary")).toHaveTextContent("IR 1 of 2 · Taxi 0 of 4");
     expect(within(screen.getByTestId("reserve-ir")).getByText("Ivy Reserve")).toBeInTheDocument();
-    expect(within(screen.getByTestId("reserve-ir")).getAllByText("IR").length).toBeGreaterThan(0);
-    expect(screen.getByText("ROOKIE")).toBeInTheDocument();
+    // The IR group is all IR, so the glyph is suppressed there (context suppression); the rookie glyph shows.
+    expect(within(screen.getByTestId("reserve-ir")).queryAllByRole("img", { name: "Injured reserve" })).toHaveLength(0);
+    expect(screen.getAllByRole("img", { name: "Rookie" }).length).toBeGreaterThan(0);
     // One injury tag per row (the row's own chip), never a second "OUT n WKS" next to it.
-    expect(screen.getAllByText(/^OUT 3W$/i)).toHaveLength(1);
+    expect(screen.getAllByRole("img", { name: "Out: 3 wks" })).toHaveLength(1);
     expect(screen.queryByText("OUT 3 wks")).not.toBeInTheDocument();
     // taxi is collapsed (empty), picks summary is collapsed
     expect(within(screen.getByTestId("reserve-taxi")).queryByText(/Nobody on the taxi squad/)).not.toBeInTheDocument();
@@ -213,8 +214,8 @@ describe("offseason", () => {
     expect(screen.getByTestId("game-heading")).toHaveTextContent("Offseason");
     expect(screen.queryByRole("button", { name: /Advance/ })).not.toBeInTheDocument();
     expect(screen.getByTestId("dynasty-progress")).toHaveTextContent("S2 2027 (2 of 5)");
-    expect(screen.getByTestId("off-last-season")).toHaveTextContent("9-5, 3rd");
-    expect(screen.getByTestId("off-retired")).toHaveTextContent("2 retired, 1 yours");
+    expect(screen.getByTestId("off-last-season")).toHaveTextContent("9-5 · 3rd");
+    expect(screen.getByTestId("off-retired")).toHaveTextContent("2 retired · 1 yours");
     expect(screen.getByText("Old Otto")).toBeInTheDocument();
     expect(await screen.findByTestId("dynasty-strip")).toHaveTextContent("2026");
     expect(screen.getByTestId("mover")).toHaveTextContent("0.9");

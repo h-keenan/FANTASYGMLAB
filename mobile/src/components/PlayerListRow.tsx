@@ -8,7 +8,9 @@ import PlayerAvatar from './PlayerAvatar';
 import PlayerName from './PlayerName';
 import PositionBadge from './PositionBadge';
 import TapForWhy from './TapForWhy';
+import { PlayerBadges } from './PlayerBadge';
 import ToneBadge from './ToneBadge';
+import { badgeFromTag, type BadgeInput, type BadgeKind } from '../lib/playerBadges';
 import { useThemeMode } from '../context/ThemeModeContext';
 import type { ChipTone } from '../lib/playerCard';
 import type { WhyMetricId } from '../lib/tapForWhyContent';
@@ -43,6 +45,10 @@ export interface PlayerListRowProps {
   hurt?: boolean;
   stats?: PlayerListStat[];
   tags?: PlayerListTag[];
+  /** Glyph badges (lib/playerBadges): Rookie, IR, Taxi, ... merged with the chip and the status tags into ONE strip after the name. */
+  badges?: BadgeInput[];
+  /** Badge kinds true for every row of this list (contextSuppressed), so they are not drawn. */
+  suppressBadges?: BadgeKind[];
   extra?: ReactNode;
   /** Small inline controls at the end of the chips line (e.g. a Queue toggle), so the trailing slot stays ONE action. */
   chipsExtra?: ReactNode;
@@ -87,6 +93,8 @@ export default function PlayerListRow({
   hurt = false,
   stats = [],
   tags = [],
+  badges = [],
+  suppressBadges,
   extra,
   chipsExtra,
   actions,
@@ -104,7 +112,16 @@ export default function PlayerListRow({
   const dims = PLAYER_LIST_DENSITY[density];
   const edge = positionColor(position ?? '', isDark, colors.borderStrong);
   const slots = orderPlayerListStats(stats);
-  const { shown, extra: moreTags } = limitPlayerListTags(tags);
+  // The chip and the status-like tags are glyph badges (one strip after the name); only non-status tags stay text pills.
+  const chipBadge = chip ? badgeFromTag({ label: chip.label }) : null;
+  const textTags: PlayerListTag[] = [];
+  const tagBadges: BadgeInput[] = [];
+  for (const tag of tags) {
+    const badge = badgeFromTag(tag);
+    if (badge) tagBadges.push(badge);
+    else textTags.push(tag);
+  }
+  const { shown, extra: moreTags } = limitPlayerListTags(textTags);
   const slide = useRef(new Animated.Value(0)).current;
   useEffect(() => {
     if (!done) {
@@ -133,7 +150,8 @@ export default function PlayerListRow({
       <View style={styles.nameCol}>
         <View style={styles.nameRow}>
           <PlayerName name={name} style={[styles.name, name.length > PLAYER_LIST_LONG_NAME && { fontSize: 13 }]} />
-          {chip ? <ToneBadge label={chip.label.toUpperCase()} color={toneColor(chip.tone, colors, colors.textSecondary)} size="xs" /> : null}
+          {chip && !chipBadge ? <ToneBadge label={chip.label.toUpperCase()} color={toneColor(chip.tone, colors, colors.textSecondary)} size="xs" /> : null}
+          <PlayerBadges badges={[chipBadge, ...badges, ...tagBadges]} suppress={suppressBadges} />
         </View>
         {meta.length > 0 ? (
           <AppText style={styles.meta} testID="list-meta">

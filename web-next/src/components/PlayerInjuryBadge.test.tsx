@@ -37,8 +37,8 @@ describe("PlayerInjuryBadge", () => {
     render(<PlayerInjuryBadge status="Questionable" />);
     const badge = screen.getByTestId("player-injury-badge");
     expect(badge).toHaveAttribute("title", "Questionable");
+    expect(badge).toHaveAttribute("aria-label", "Questionable");
     expect(within(badge).getByText("Q")).toHaveAttribute("aria-hidden", "true");
-    expect(within(badge).getByText("Questionable")).toHaveClass("sr-only");
     expect(badge).toHaveClass("shrink-0");
     expect(badge.style.color).toContain("var(--color-warning)");
   });

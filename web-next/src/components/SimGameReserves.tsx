@@ -222,8 +222,8 @@ export function SimReserveGroups({
               <SimRosterLine
                 key={player.id}
                 player={{ ...player, squad: g.kind }}
+                suppressBadges={[g.kind]}
                 onOpen={openPlayer}
-                extra={<SimPlayerChips player={{ ...player, squad: g.kind }} />}
                 trailing={
                   cutting === player.id && onCut ? (
                     <>

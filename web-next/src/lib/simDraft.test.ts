@@ -78,10 +78,10 @@ describe("simDraft helpers", () => {
     expect(byeOf({ bye_week: 5 }, 6)?.tone).toBeUndefined();
     expect(simDraftMeta(p("a", "WR", { bye_week: null }))).not.toContainEqual(expect.objectContaining({ key: "bye" }));
   });
-  it("meta line: team, age (a tenth when sent), rookie", () => {
+  it("meta line: team, age (a tenth when sent), bye (rookie is a glyph badge)", () => {
     expect(simDraftMeta(p("a", "WR", { age: 24 })).map((x) => x.text)).toEqual(["KC", "Age 24", "Bye 9"]);
     expect(simDraftMeta({ ...p("a", "WR", { age: 24 }), age_decimal: 24.34 }).map((x) => x.text)[1]).toBe("Age 24.3");
-    expect(simDraftMeta(p("a", "WR", { age: 21, status: "out", out_weeks: 1 })).map((x) => x.text)).toEqual(["KC", "Age 21", "Bye 9", "Rookie"]);
+    expect(simDraftMeta(p("a", "WR", { age: 21, status: "out", out_weeks: 1 })).map((x) => x.text)).toEqual(["KC", "Age 21", "Bye 9"]);
   });
   it("list stats show the player's Overall as the OVR gauge, never a bare value", () => {
     const keys = (stats: ReturnType<typeof simListStats>) => stats.map((x) => x.key);
