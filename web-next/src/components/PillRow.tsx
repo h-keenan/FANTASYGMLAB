@@ -16,8 +16,8 @@ import { TabGlyph } from "./TabGlyph";
  *  - "fill"    equal-width segments across the full row (primary tabs).
  *  - "compact" segments hug their content, no empty bordered area (year /
  *              short toggles). Default.
- *  - "scroll"  full-width single-row strip that scrolls horizontally with
- *              edge fades, never wraps (many / long labels, e.g. filters).
+ *  - "scroll"  full-width single-row strip: segments share the row equally when they fit (never an empty bordered
+ *              box after the last one) and scroll horizontally with edge fades when they do not (never wraps).
  * Any variant falls back to horizontal scrolling instead of wrapping when
  * its labels overflow. `fullWidth` is kept as an alias for variant="fill".
  *
@@ -149,7 +149,14 @@ export function PillRow({
   // Five or more icon tabs in a fill row split the width equally (min-w-0) so they fit a phone.
   const equalFit = mode === "fill" && anyIcon && options.length >= 5;
   const segment =
-    mode === "fill" ? (equalFit ? "flex-1 min-w-0" : "flex-1 min-w-fit") : "shrink-0 min-w-[var(--touch-target-min)]";
+    mode === "fill"
+      ? equalFit
+        ? "flex-1 min-w-0"
+        : "flex-1 min-w-fit"
+      : mode === "scroll"
+        ? // Segments share a short row equally (no empty bordered box after the last tab) and keep their natural width, scrolling, when they overflow.
+          "flex-1 shrink-0 min-w-[var(--touch-target-min)]"
+        : "shrink-0 min-w-[var(--touch-target-min)]";
 
   return (
     <div

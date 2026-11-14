@@ -1,17 +1,14 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 
 import { PositionBadge } from "@/components/PositionBadge";
 import { simToneColor } from "@/components/SimGameParts";
 import { api } from "@/lib/api";
-import { positionColorVar } from "@/lib/playerPresentation";
 import {
   simDraftBestByPosition,
   simDraftNeedPills,
-  simDraftNextPickLabel,
   simDraftProgress,
-  simDraftRecentPicks,
   simDraftTeamEmblem,
 } from "@/lib/simDraft";
 import { simFmtValue, type SimDraftState, type SimGamePlayer, type SimPos, type SimSlot } from "@/lib/simGame";
@@ -45,9 +42,8 @@ export function SimDraftEmblem({ name, you = false }: { name: string; you?: bool
 }
 
 /**
- * The richer on-the-clock body: round/pick progress, countdown to your next
- * pick, a ticker of the last five picks, the best available player at each
- * position and your roster needs as colored pills. Every block has a fixed
+ * The expanded on-the-clock body (inside the clock CompactModule): the progress bar, the best available player at
+ * each position and your roster needs as colored pills. The status line, recent picks and mini board live elsewhere. Every block has a fixed
  * height so nothing shifts as picks land.
  */
 export function SimDraftHero({
@@ -68,11 +64,8 @@ export function SimDraftHero({
   onOpen: (player: SimGamePlayer) => void;
 }) {
   const progress = simDraftProgress(draft, teams);
-  const eta = simDraftNextPickLabel(draft);
   const onClock = Boolean(draft.on_the_clock?.is_you) && draft.status === "in_progress";
   const accent = onClock ? "var(--color-action)" : "var(--color-accent)";
-  const recent = simDraftRecentPicks(draft.picks, 5);
-  const teamById = useMemo(() => new Map((draft.teams ?? []).map((t) => [t.team_id, t])), [draft.teams]);
   const needs = simDraftNeedPills(draft.your_roster, slots);
   const [best, setBest] = useState<Record<string, SimGamePlayer | null>>({});
   const pickCount = draft.picks?.length ?? 0;
@@ -105,14 +98,6 @@ export function SimDraftHero({
   return (
     <div className="flex flex-col gap-3" data-testid="draft-hero">
       <div className="flex flex-col gap-1.5">
-        <div className="flex items-center justify-between gap-2 text-xs">
-          <span className="font-bold" style={{ color: "var(--color-text-secondary)" }}>
-            Round {progress.round} of {progress.totalRounds} · Pick {progress.pickInRound}
-          </span>
-          <span className="tabular-nums" style={{ color: "var(--color-text-muted)" }}>
-            {progress.made}/{progress.total}
-          </span>
-        </div>
         <div
           role="progressbar"
           aria-label="Draft progress"
@@ -124,55 +109,6 @@ export function SimDraftHero({
         >
           <div style={{ width: `${Math.round(progress.fraction * 100)}%`, height: "100%", background: accent, borderRadius: "var(--radius-pill)" }} />
         </div>
-      </div>
-
-      <div className="flex items-center gap-3" data-testid="draft-eta">
-        <span
-          className="inline-flex shrink-0 items-center justify-center text-lg font-extrabold tabular-nums"
-          style={{
-            minWidth: 48,
-            height: 40,
-            padding: "0 8px",
-            borderRadius: "var(--radius-control)",
-            color: accent,
-            background: `color-mix(in srgb, ${accent} 14%, transparent)`,
-          }}
-        >
-          {eta.label}
-        </span>
-        <span className="text-xs" style={{ color: "var(--color-text-secondary)" }}>{eta.detail}</span>
-      </div>
-
-      <div className="hidden flex-col gap-1 md:flex">
-        <span className="text-[0.6875rem] font-extrabold uppercase" style={LABEL_STYLE}>Recent picks</span>
-        <ol className="flex gap-2 overflow-x-auto" style={{ minHeight: 44 }} aria-label="Recent picks">
-          {recent.length === 0 ? (
-            <li className="text-xs self-center" style={{ color: "var(--color-text-muted)" }}>No picks yet.</li>
-          ) : (
-            recent.map((pk) => {
-              const team = teamById.get(pk.team_id);
-              const colorVar = positionColorVar(pk.player.pos);
-              return (
-                <li
-                  key={pk.pick_no}
-                  className="flex shrink-0 items-center gap-1.5 px-2"
-                  style={{
-                    height: 44,
-                    borderRadius: "var(--radius-control)",
-                    background: "var(--color-surface-muted)",
-                    borderBottom: `3px solid ${colorVar ? `var(${colorVar})` : "var(--color-border-strong)"}`,
-                  }}
-                >
-                  <SimDraftEmblem name={team?.name ?? "Team"} you={Boolean(team?.is_you)} />
-                  <span className="flex flex-col leading-tight">
-                    <span className="text-xs font-bold">{lastName(pk.player.name)}</span>
-                    <span className="text-[0.6875rem]" style={{ color: "var(--color-text-muted)" }}>#{pk.pick_no} · {pk.player.pos}</span>
-                  </span>
-                </li>
-              );
-            })
-          )}
-        </ol>
       </div>
 
       {!done ? (

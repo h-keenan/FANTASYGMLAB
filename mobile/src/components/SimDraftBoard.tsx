@@ -14,7 +14,7 @@ import { api } from '../lib/api';
 import { PLAYER_SEARCH_DEBOUNCE_MS } from '../lib/leaguePlayerSearch';
 import PlayerListRow from './PlayerListRow';
 import type { PlayerListDensity, PlayerListTag } from '../lib/playerListRow';
-import { simDraftMeta, simDraftRowChips, simListStats } from '../lib/simDraft';
+import { SIM_DRAFT_SORTS, simCycleSort, simDraftMeta, simDraftRowChips, simListStats } from '../lib/simDraft';
 import { SIM_WINDOW_STEP, simWindow } from '../lib/simLayout';
 import {
   SIM_PAGE_SIZE,
@@ -30,12 +30,6 @@ import {
   type SimPosFilter,
 } from '../lib/simGame';
 import { radii, type ThemeColors } from '../theme';
-
-const SORTS: { key: SimPlayerSort; label: string }[] = [
-  { key: 'adp', label: 'ADP' },
-  { key: 'projection', label: 'Proj' },
-  { key: 'value', label: 'Trade value' },
-];
 
 
 type IconName = React.ComponentProps<typeof Ionicons>['name'];
@@ -118,6 +112,7 @@ export function SimDraftRow({
   drafted = false,
   tags,
   extra,
+  chipsExtra,
   density,
 }: {
   player: SimGamePlayer;
@@ -131,6 +126,8 @@ export function SimDraftRow({
   drafted?: boolean;
   tags?: PlayerListTag[];
   extra?: ReactNode;
+  /** Small inline controls at the end of the chips line (a Queue toggle). */
+  chipsExtra?: ReactNode;
   density?: PlayerListDensity;
 }) {
   const [chip] = simDraftRowChips(player);
@@ -147,6 +144,7 @@ export function SimDraftRow({
       stats={simListStats(player)}
       tags={tags}
       extra={extra}
+      chipsExtra={chipsExtra}
       actions={actions}
       density={density}
       done={drafted}
@@ -163,6 +161,7 @@ export function SimDraftBoard({
   positions,
   onOpen,
   actions,
+  chipsExtra,
   refreshKey = 0,
   onItems,
   week = 0,
@@ -176,6 +175,7 @@ export function SimDraftBoard({
   draftedIds?: string[];
   onOpen: (player: SimGamePlayer) => void;
   actions?: (player: SimGamePlayer) => ReactNode;
+  chipsExtra?: (player: SimGamePlayer) => ReactNode;
   refreshKey?: number;
   onItems?: (items: SimGamePlayer[]) => void;
 }) {
@@ -236,15 +236,25 @@ export function SimDraftBoard({
           style={styles.searchInput}
         />
       </View>
-      <SegmentedTabBar<string>
-        scrollable
-        options={[{ key: '', label: 'All' }, ...positions.map((p) => ({ key: p.value as string, label: p.label }))]}
-        active={filter.pos}
-        onChange={(key) => dispatch({ type: 'pos', value: key as SimPosFilter | '' })}
-      />
-      <View style={common.tight}>
-        <AppText style={common.muted}>Sort by</AppText>
-        <SegmentedTabBar<string> options={SORTS.map((o) => ({ key: o.key as string, label: o.label }))} active={filter.sort} onChange={(key) => dispatch({ type: 'sort', value: key as SimPlayerSort })} />
+      {/* One compact row: position filter and a one-tap sort cycle together (not a strip each). */}
+      <View style={styles.filterRow} testID="draft-filters">
+        <View style={styles.filterGrow}>
+          <SegmentedTabBar<string>
+            scrollable
+            options={[{ key: '', label: 'All' }, ...positions.map((p) => ({ key: p.value as string, label: p.label }))]}
+            active={filter.pos}
+            onChange={(key) => dispatch({ type: 'pos', value: key as SimPosFilter | '' })}
+          />
+        </View>
+        <Pressable
+          onPress={() => dispatch({ type: 'sort', value: simCycleSort(filter.sort) })}
+          accessibilityRole="button"
+          accessibilityLabel={`Sort players, now ${SIM_DRAFT_SORTS.find((o) => o.value === filter.sort)?.label ?? 'ADP'}. Tap to change`}
+          style={styles.sortButton}
+        >
+          <AppText style={styles.sortText}>{SIM_DRAFT_SORTS.find((o) => o.value === filter.sort)?.label ?? 'ADP'}</AppText>
+          <Ionicons name="swap-vertical" size={14} color={colors.textSecondary} />
+        </Pressable>
       </View>
       {state === 'loading' && items.length === 0 ? (
         <SkeletonCard rows={6} />
@@ -266,9 +276,9 @@ export function SimDraftBoard({
           <AppText style={common.muted} accessibilityLiveRegion="polite">
             {total} player{total === 1 ? '' : 's'} left
           </AppText>
-          <AppText style={styles.scaleNote}>OVR is his rank at his position, same as everywhere. EDGE: green = steal, red = reach (trade value rank vs ADP).</AppText>
+          <AppText style={styles.scaleNote}>OVR is his rank at his position, same as everywhere. EDGE: green = steal, red = reach (the model vs ADP).</AppText>
           {rows.shown.map((player) => (
-            <SimDraftRow key={player.id} player={player} onOpen={onOpen} week={week} drafted={draftedIds?.includes(player.id)} actions={actions ? actions(player) : null} />
+            <SimDraftRow key={player.id} player={player} onOpen={onOpen} week={week} drafted={draftedIds?.includes(player.id)} actions={actions ? actions(player) : null} chipsExtra={chipsExtra ? chipsExtra(player) : undefined} />
           ))}
           {rows.remaining > 0 ? (
             <Pressable onPress={() => setWin({ key: windowKey, n: visible + SIM_WINDOW_STEP })} accessibilityRole="button" style={styles.showMore}>
@@ -292,6 +302,10 @@ function createStyles(colors: ThemeColors) {
       justifyContent: 'center',
       backgroundColor: colors.glassInset,
     },
+    filterRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+    filterGrow: { flex: 1, minWidth: 0 },
+    sortButton: { minHeight: 44, minWidth: 64, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 4, paddingHorizontal: 10, borderRadius: radii.pill, borderWidth: StyleSheet.hairlineWidth, borderColor: colors.border, backgroundColor: colors.glassInset },
+    sortText: { fontSize: 13, fontWeight: '800', color: colors.textPrimary },
     scaleNote: { fontSize: 12, color: colors.textTertiary, paddingBottom: 2 },
     showMore: { minHeight: 44, alignItems: 'center', justifyContent: 'center' },
     showMoreText: { fontSize: 14, fontWeight: '800', color: colors.accent },

@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, View, useWindowDimensions } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
 
 import AppText from './AppText';
 import PositionBadge from './PositionBadge';
@@ -9,13 +9,11 @@ import { api } from '../lib/api';
 import {
   simDraftBestByPosition,
   simDraftNeedPills,
-  simDraftNextPickLabel,
   simDraftProgress,
-  simDraftRecentPicks,
   simDraftTeamEmblem,
 } from '../lib/simDraft';
 import { simFmtValue, type SimDraftState, type SimGamePlayer, type SimPos, type SimSlot } from '../lib/simGame';
-import { positionColor, radii, spacing, type ThemeColors } from '../theme';
+import { radii, spacing, type ThemeColors } from '../theme';
 
 function lastName(name: string): string {
   const parts = name.trim().split(/\s+/);
@@ -34,9 +32,8 @@ export function SimDraftEmblem({ name, you = false }: { name: string; you?: bool
 }
 
 /**
- * The richer on-the-clock body: round/pick progress, countdown to your next
- * pick, ticker of the last five picks, best available by position and your
- * roster needs as colored position pills. Fixed heights, so no layout shift.
+ * The expanded on-the-clock body (inside the clock CompactModule): progress bar, best available by position and
+ * your roster needs as colored position pills. The status line, recent picks and mini board live elsewhere.
  */
 export function SimDraftHero({
   gameId,
@@ -55,14 +52,9 @@ export function SimDraftHero({
   tick: number;
   onOpen: (player: SimGamePlayer) => void;
 }) {
-  const { colors, isDark } = useThemeMode();
-  const { width } = useWindowDimensions();
+  const { colors } = useThemeMode();
   const styles = useMemo(() => createStyles(colors), [colors]);
   const progress = simDraftProgress(draft, teams);
-  const eta = simDraftNextPickLabel(draft);
-  const onClock = Boolean(draft.on_the_clock?.is_you) && draft.status === 'in_progress';
-  const recent = simDraftRecentPicks(draft.picks, 5);
-  const teamById = useMemo(() => new Map((draft.teams ?? []).map((t) => [t.team_id, t])), [draft.teams]);
   const needs = simDraftNeedPills(draft.your_roster, slots);
   const [best, setBest] = useState<Record<string, SimGamePlayer | null>>({});
   const pickCount = draft.picks?.length ?? 0;
@@ -94,52 +86,10 @@ export function SimDraftHero({
   return (
     <View style={styles.wrap} testID="draft-hero">
       <View style={styles.block}>
-        <View style={styles.between}>
-          <AppText style={styles.strong}>
-            Round {progress.round} of {progress.totalRounds} · Pick {progress.pickInRound}
-          </AppText>
-          <AppText style={styles.muted}>
-            {progress.made}/{progress.total}
-          </AppText>
-        </View>
         <View style={styles.track} accessibilityRole="progressbar" accessibilityLabel="Draft progress" accessibilityValue={{ min: 0, max: progress.total, now: progress.made }}>
           <View style={[styles.fill, { width: `${Math.round(progress.fraction * 100)}%` }]} />
         </View>
       </View>
-
-      <View style={styles.etaRow} testID="draft-eta">
-        <View style={[styles.etaBox, { backgroundColor: colors.accentMuted }]}>
-          <AppText style={[styles.etaText, { color: colors.accent }]}>{eta.label}</AppText>
-        </View>
-        <AppText style={styles.small}>{eta.detail}</AppText>
-      </View>
-
-      {/* Phones: the ticker lives in the Picks tab; keep it only on tablet-width screens. */}
-      {width >= 768 ? (
-      <View style={styles.block}>
-        <AppText style={styles.kicker}>Recent picks</AppText>
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.strip} style={styles.stripBox}>
-          {recent.length === 0 ? (
-            <AppText style={styles.muted}>No picks yet.</AppText>
-          ) : (
-            recent.map((pk) => {
-              const team = teamById.get(pk.team_id);
-              return (
-                <View key={pk.pick_no} style={[styles.pickChip, { borderBottomColor: positionColor(pk.player.pos, isDark, colors.borderStrong) }]}>
-                  <SimDraftEmblem name={team?.name ?? 'Team'} you={Boolean(team?.is_you)} />
-                  <View>
-                    <AppText style={styles.chipName}>{lastName(pk.player.name)}</AppText>
-                    <AppText style={styles.chipMeta}>
-                      #{pk.pick_no} · {pk.player.pos}
-                    </AppText>
-                  </View>
-                </View>
-              );
-            })
-          )}
-        </ScrollView>
-      </View>
-      ) : null}
 
       {!done ? (
         <View style={styles.block}>

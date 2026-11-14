@@ -1,7 +1,8 @@
 // Pure presentation helpers for the Fantasy Sim draft room. Byte-identical in
 // web-next/src/lib and mobile/src/lib (scripts/check_lib_twins.mjs IDENTICAL).
+import { compactParts, type CompactPart } from "./compactModule";
 import type { PlayerListStat } from "./playerListRow";
-import { simFmtPts, simFmtValue, simRosterNeeds, type SimDraftPick, type SimDraftState, type SimGamePlayer, type SimGameTone, type SimPos, type SimSlot } from "./simGame";
+import { simFmtPts, simFmtValue, simRosterNeeds, type SimDraftPick, type SimDraftState, type SimGamePlayer, type SimGameTone, type SimPlayerSort, type SimPos, type SimSlot } from "./simGame";
 
 export interface SimDraftProgress {
   round: number;
@@ -174,16 +175,13 @@ export function simDraftMeta(player: Pick<SimGamePlayer, "team" | "age" | "bye_w
  */
 export function simListStats(
   player: Pick<SimGamePlayer, "status" | "projection" | "ros_mean" | "adp"> & { value?: number | null; overall?: number | null; value_rank?: number | null; adp_edge?: number | null },
-  opts: { adp?: boolean; tradeValue?: boolean } = {},
+  opts: { adp?: boolean } = {},
 ): PlayerListStat[] {
   const stats: PlayerListStat[] = [
     { key: "proj", label: "Proj", value: simFmtPts(simBoardProjection(player).value) },
   ];
-  // One 0-100 number by default: Overall in lists. Trade screens (opts.tradeValue) swap it for the labeled
-  // "Trade value", never both, so two similar-looking numbers with different meanings never sit side by side.
-  if (opts.tradeValue) {
-    if (player.value != null) stats.push({ key: "tval", label: "Trade value", value: simFmtValue(player.value), why: "trade_value" });
-  } else if (player.overall != null) stats.push({ key: "ovr", label: "OVR", value: String(player.overall), rating: player.overall });
+  // The one 0-100 number is Overall. The model's internal rating is never shown anywhere in the sim.
+  if (player.overall != null) stats.push({ key: "ovr", label: "OVR", value: String(player.overall), rating: player.overall });
   if (opts.adp !== false && player.adp != null) stats.push({ key: "adp", label: "ADP", value: simFmtValue(player.adp) });
   const edge = simBoardEdge(player);
   if (edge) stats.push({ key: "edge", label: "Edge", value: `${edge.tone === "success" ? "▲" : "▼"}${Math.abs(edge.delta)}`, tone: edge.tone === "success" ? "success" : "danger" });
@@ -232,4 +230,100 @@ export function simDraftBoardGrid(draft: Pick<SimDraftState, "order" | "picks" |
     );
   }
   return { teams, rows };
+}
+
+/** "need RB/WR": the positions still short of their starter count, biggest hole first (at most three). Null when none. */
+export function simDraftNeedLabel(needs: readonly SimDraftNeed[], max = 3): string | null {
+  const short = needs
+    .filter((n) => n.starters > 0 && n.have < n.starters)
+    .sort((a, b) => b.starters - b.have - (a.starters - a.have))
+    .slice(0, max)
+    .map((n) => n.pos);
+  return short.length ? `need ${short.join("/")}` : null;
+}
+
+/**
+ * The collapsed draft-clock line (CompactModule `parts`): "R1 P2 · You pick now · need RB/WR · 1/192". The pick
+ * action ("Draft Gibbs") is the module's trailing action, so it is usable without expanding. No pick clock exists in
+ * the sim, so the status is who is up and how far away you are, never a countdown.
+ */
+export function simDraftSummaryParts(
+  draft: Pick<SimDraftState, "status" | "pick_no" | "total_picks" | "on_the_clock" | "picks_until_you" | "your_pick_numbers">,
+  teams: number,
+  needs: readonly SimDraftNeed[],
+  opts: { picking?: boolean } = {},
+): CompactPart[] {
+  if (draft.status === "complete") return [{ key: "done", text: "Draft complete", tone: "success", strong: true }];
+  const progress = simDraftProgress(draft, teams);
+  const onClock = Boolean(draft.on_the_clock?.is_you);
+  const eta = simDraftNextPickLabel(draft);
+  return compactParts([
+    { key: "rp", text: `R${progress.round} P${progress.pickInRound}`, strong: true },
+    opts.picking
+      ? { key: "state", text: "Picking...", tone: "action", strong: true }
+      : onClock
+        ? { key: "state", text: "You pick now", tone: "action", strong: true }
+        : { key: "state", text: `${eta.label} ${eta.detail}`.trim() },
+    (() => {
+      const need = simDraftNeedLabel(needs);
+      return need ? { key: "need", text: need, tone: "warning" as const } : null;
+    })(),
+    { key: "n", text: `${progress.made}/${progress.total}`, tone: "muted" },
+  ]);
+}
+
+export interface SimMiniCell {
+  key: string;
+  /** Position of the pick, or null while the slot is still open. */
+  pos: string | null;
+  you: boolean;
+  /** The slot on the clock. */
+  clock: boolean;
+  pickNo: number | null;
+}
+
+/** The mini board: rounds x teams of tiny position-coloured cells (no names), for the always-visible overview. */
+export function simDraftMiniBoard(draft: Pick<SimDraftState, "order" | "picks" | "teams" | "total_picks" | "pick_no" | "status">, teamCount: number): { you: boolean[]; rows: SimMiniCell[][] } {
+  const grid = simDraftBoardGrid(draft, teamCount);
+  const live = draft.status === "in_progress";
+  return {
+    you: grid.teams.map((t) => t.is_you),
+    rows: grid.rows.map((row) =>
+      row.map((cell, c) => ({
+        key: `${cell.round}:${cell.teamId}`,
+        pos: cell.pick?.player.pos ?? null,
+        you: grid.teams[c].is_you,
+        clock: live && !cell.pick && cell.pickNo === draft.pick_no,
+        pickNo: cell.pickNo,
+      })),
+    ),
+  };
+}
+
+/** One recent-pick chip's text: "#12 Lamb WR". */
+export function simDraftPickChip(pick: Pick<SimDraftPick, "pick_no" | "player">): string {
+  const parts = pick.player.name.trim().split(/\s+/);
+  const last = parts.length > 1 ? parts[parts.length - 1] : pick.player.name;
+  return `#${pick.pick_no} ${last} ${pick.player.pos}`;
+}
+
+/** The draft board's sorts. OVR is the shown rating; the model's internal value is never a sort or a label. */
+export const SIM_DRAFT_SORTS: { label: string; value: SimPlayerSort }[] = [
+  { label: "ADP", value: "adp" },
+  { label: "Proj", value: "projection" },
+  { label: "OVR", value: "overall" },
+];
+
+/** Next sort in the draft list (a one-tap cycle on phones). Unknown values restart at the first. */
+export function simCycleSort(current: string): SimPlayerSort {
+  const i = SIM_DRAFT_SORTS.findIndex((s) => s.value === current);
+  return SIM_DRAFT_SORTS[(i + 1) % SIM_DRAFT_SORTS.length].value;
+}
+
+/** The rounds the mini board shows: the one on the clock and a little context either side (the full grid is one tap away). */
+export function simDraftMiniWindow<T>(rows: readonly T[][], currentRound: number, size = 4): { rows: T[][]; from: number; to: number } {
+  const n = rows.length;
+  const span = Math.min(size, n);
+  const start = Math.max(0, Math.min(n - span, currentRound - 2));
+  return { rows: rows.slice(start, start + span) as T[][], from: start + 1, to: start + span };
 }

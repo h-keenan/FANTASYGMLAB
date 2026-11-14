@@ -7,7 +7,8 @@ import PlayerListRow from './PlayerListRow';
 import AppText from './AppText';
 import PlayerName from './PlayerName';
 import Button from './Button';
-import Collapsible from './Collapsible';
+import CompactModule from './CompactModule';
+import { noticeDismissMs, type CompactPart, type NoticeToastTone } from '../lib/compactModule';
 import SimGlyph from './SimGlyph';
 import PlayerAvatar from './PlayerAvatar';
 import PositionBadge from './PositionBadge';
@@ -37,7 +38,6 @@ import {
   type SimGameTone,
 } from '../lib/simGame';
 import { simSeeAllLabel } from '../lib/simLayout';
-import TapForWhy from './TapForWhy';
 import { radii, scrim, spacing, type ThemeColors } from '../theme';
 
 /** Semantic theme color for a presentation tone (never a raw hex). */
@@ -154,20 +154,6 @@ export function SimStat({ label, value, tone = 'muted' }: { label: string; value
       <AppText style={styles.statLabel}>{label}</AppText>
       <AppText style={[styles.statValue, tone !== 'muted' && { color: simToneColor(tone, colors) }]}>{value}</AppText>
     </View>
-  );
-}
-
-/**
- * A trade/market value (the 0-100 number AI teams use in trades) with its real name and a tap-for-why
- * explainer. Never labeled plain "Value" or "VAL": the player's Overall is a different number.
- */
-export function SimTradeValue({ value }: { value: number | null | undefined }) {
-  if (value == null || Number.isNaN(value)) return null;
-  const rounded = Math.round(value);
-  return (
-    <TapForWhy metric="trade_value" spoken={`Trade value ${rounded}`}>
-      <SimStat label="Trade value" value={rounded} />
-    </TapForWhy>
   );
 }
 
@@ -381,7 +367,26 @@ const NOTICE_ICON: Record<SimGameTone, React.ComponentProps<typeof Ionicons>['na
 };
 
 /** A transient or blocking one-line message inside a game. */
+/**
+ * The shared notice toast rule (lib/compactModule noticeDismissMs): a confirmation the player caused ("Trade
+ * completed") removes itself after a few seconds, a warning a little later, an error never. A new message restarts the timer.
+ */
+function useNoticeAutoDismiss(message: string, tone: SimGameTone, onDismiss?: () => void) {
+  const latest = useRef(onDismiss);
+  useEffect(() => {
+    latest.current = onDismiss;
+  }, [onDismiss]);
+  useEffect(() => {
+    if (!message) return;
+    const ms = noticeDismissMs(tone as NoticeToastTone);
+    if (ms == null) return;
+    const id = setTimeout(() => latest.current?.(), ms);
+    return () => clearTimeout(id);
+  }, [message, tone]);
+}
+
 export function SimNotice({ message, tone = 'warning', onDismiss }: { message: string; tone?: SimGameTone; onDismiss?: () => void }) {
+  useNoticeAutoDismiss(message, tone, onDismiss);
   const { colors } = useThemeMode();
   const styles = useMemo(() => createStyles(colors), [colors]);
   if (!message) return null;
@@ -607,19 +612,21 @@ export function SimSectionTitle({
 }
 
 /**
- * A summary-first card: the shared Collapsible with a tinted glyph title and
+ * A summary-first card: the shared CompactModule with a tinted glyph title and
  * an always-visible summary. Open by default on wide screens and closed on
  * phones unless `openOnPhone` (mirrors web-next's SimFold).
  */
-export function SimFold({ id, glyph, tone = 'accent', title, summary, openOnPhone = false, children, testID }: { id: string; glyph: SimGlyphName; tone?: SimGameTone; title: string; summary?: ReactNode; openOnPhone?: boolean; children: ReactNode; testID?: string }) {
+export function SimFold({ id, glyph, tone = 'accent', title, summary, parts, openOnPhone = false, children, testID }: { id: string; glyph: SimGlyphName; tone?: SimGameTone; title: string; summary?: ReactNode; parts?: ReadonlyArray<CompactPart | null | undefined | false | ''>; openOnPhone?: boolean; children: ReactNode; testID?: string }) {
   const { colors } = useThemeMode();
   const color = simToneColor(tone, colors);
   return (
-    <Collapsible
+    <CompactModule
       id={id}
       testID={testID}
       accent={color}
       defaultOpen={openOnPhone}
+      label={title}
+      parts={parts}
       title={
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm }}>
           <SimGlyph name={glyph} color={color} size={16} />
@@ -629,7 +636,7 @@ export function SimFold({ id, glyph, tone = 'accent', title, summary, openOnPhon
       summary={summary}
     >
       {children}
-    </Collapsible>
+    </CompactModule>
   );
 }
 

@@ -5,7 +5,7 @@ import { Ionicons } from '@expo/vector-icons';
 import AppText from './AppText';
 import Button from './Button';
 import Collapsible from './Collapsible';
-import { SimPlayerLine, SimSheet, SimToneBadge, SimTradeValue, createSimStyles, simToneColor, type SimCtx } from './SimGameParts';
+import { SimPlayerLine, SimSheet, SimToneBadge, createSimStyles, simToneColor, type SimCtx } from './SimGameParts';
 import ToneBadge from './ToneBadge';
 import { useThemeMode } from '../context/ThemeModeContext';
 import { api } from '../lib/api';
@@ -101,7 +101,6 @@ export function SimPickLine({ pick, trailing, selected = false, draftYear }: { p
         </View>
       </View>
       <View style={styles.pickTrailing}>
-        <SimTradeValue value={pick.value} />
         {trailing}
       </View>
     </View>
@@ -111,7 +110,7 @@ export function SimPickLine({ pick, trailing, selected = false, draftYear }: { p
 /** A player or a pick, whichever the asset is (counter chips, inbox offers, verdicts). */
 export function SimAssetLine({ asset, trailing, onOpen }: { asset: SimTradeAsset; trailing?: ReactNode; onOpen?: (player: SimGamePlayer) => void }) {
   if (simIsPick(asset)) return <SimPickLine pick={asset} trailing={trailing} />;
-  return <SimPlayerLine player={asset} onOpen={onOpen} trailing={trailing ?? <SimTradeValue value={asset.value} />} />;
+  return <SimPlayerLine player={asset} onOpen={onOpen} trailing={trailing} />;
 }
 
 /** The picks of the game (every team's), or null until loaded; null for a redraft game. */

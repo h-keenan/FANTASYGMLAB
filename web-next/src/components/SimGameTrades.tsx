@@ -18,7 +18,7 @@ import { SkeletonCard, SkeletonRows } from "@/components/Skeleton";
 import { ToneBadge } from "@/components/ToneBadge";
 import { api } from "@/lib/api";
 import { shouldAnimateList, staggerDelay } from "@/lib/motion";
-import { simGroupByPosition, simSideSummary, simTradeFit, type SimAssetGroup } from "@/lib/simLayout";
+import { simGroupByPosition, simTradeFit, type SimAssetGroup } from "@/lib/simLayout";
 import { simListStats } from "@/lib/simDraft";
 import { simTeamsByPower } from "@/lib/simLeagueRosters";
 import { simGroupsToSheetItems } from "@/lib/simTradeSheet";
@@ -148,8 +148,6 @@ function Inbox({ ctx }: { ctx: SimCtx }) {
 /** One AI offer as a compact card: who, what moves and when it expires; tap to expand the players and the Accept / Decline buttons. */
 function OfferCard({ item, index, count, defaultOpen, busy, canTrade, onRespond }: { item: SimInboxItem; index: number; count: number; defaultOpen: boolean; busy: boolean; canTrade: boolean; onRespond: (item: SimInboxItem, action: "accept" | "decline") => void }) {
   const [open, setOpen] = useState(defaultOpen);
-  const give = simSideSummary(item.you_give);
-  const get = simSideSummary(item.you_get);
   const names = (list: SimTradeAsset[]) => list.map((p) => (simIsPick(p) ? simPickLabelText(p) : p.name.split(" ").slice(-1)[0])).join(", ");
   return (
     <li className="enter-rise" style={shouldAnimateList(count) ? { animationDelay: `${staggerDelay(index, count)}ms` } : undefined}>
@@ -173,9 +171,9 @@ function OfferCard({ item, index, count, defaultOpen, busy, canTrade, onRespond 
             </span>
           </span>
           <span className="text-xs" style={{ color: "var(--color-text-secondary)" }}>
-            <span className="font-bold" style={{ color: "var(--color-danger)" }}>Give</span> {names(item.you_give)} (trade value {give.value})
+            <span className="font-bold" style={{ color: "var(--color-danger)" }}>Give</span> {names(item.you_give)}
             {" · "}
-            <span className="font-bold" style={{ color: "var(--color-success)" }}>Get</span> {names(item.you_get)} (trade value {get.value})
+            <span className="font-bold" style={{ color: "var(--color-success)" }}>Get</span> {names(item.you_get)}
           </span>
         </button>
         {open ? (
@@ -372,7 +370,7 @@ function Builder({ ctx, seed, onSeedUsed }: { ctx: SimCtx; seed: SimTradeSeed | 
         <SectionHeading note={partner ? undefined : "Pick a team to trade with."}>Partner</SectionHeading>
         {partner ? (
           <>
-            <SimTeamCard team={partner} selected valueMode="trade" />
+            <SimTeamCard team={partner} selected />
             <div className="flex items-center justify-between gap-2">
               <Button size="sm" variant="secondary" onClick={() => dispatch({ type: "partner", teamId: "" })}>Change partner</Button>
               <SimTeamScout teamId={partner.team_id} name={partner.name} />
@@ -382,7 +380,7 @@ function Builder({ ctx, seed, onSeedUsed }: { ctx: SimCtx; seed: SimTradeSeed | 
           <ul className="flex flex-col gap-2" aria-label="Teams">
             {teamOptions.map((team) => (
               <li key={team.team_id}>
-                <SimTeamCard team={team} valueMode="trade" openLabel="Trade with this team" onOpen={(id) => dispatch({ type: "partner", teamId: id })} />
+                <SimTeamCard team={team} openLabel="Trade with this team" onOpen={(id) => dispatch({ type: "partner", teamId: id })} />
               </li>
             ))}
           </ul>
@@ -441,14 +439,13 @@ function Builder({ ctx, seed, onSeedUsed }: { ctx: SimCtx; seed: SimTradeSeed | 
           }}
           onClose={() => setSheetSide(null)}
           flexFilter={game.settings.slots.includes("FLEX")}
-          valueLabel="Trade value"
           renderPlayerRow={(item, { on, blocked, toggle }) => {
             const player = item.ref as SimGamePlayer;
             return (
               <SimPlayerLine
                 player={player}
                 week={game.week}
-                stats={simListStats(player, { adp: false, tradeValue: true })}
+                stats={simListStats(player, { adp: false })}
                 selected={on}
                 onOpen={ctx.openPlayer}
                 trailing={

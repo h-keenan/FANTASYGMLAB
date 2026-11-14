@@ -1,6 +1,12 @@
 import { describe, expect, it } from "vitest";
 
+import { compactSummaryText } from "./compactModule";
 import {
+  SIM_DRAFT_SORTS,
+  simCycleSort,
+  simDraftMiniBoard,
+  simDraftMiniWindow,
+  simDraftSummaryParts,
   simBoardEdge,
   simBoardProjection,
   simDraftAdpDelta,
@@ -83,10 +89,10 @@ describe("simDraft helpers", () => {
     // no overall (thin position pool or an older server): no number rather than a made-up one
     expect(keys(simListStats({ ...p("a", "RB"), overall: null }))).toEqual(["proj", "adp"]);
   });
-  it("trade screens show Trade value (with its explainer) instead of Overall, never both", () => {
-    const stats = simListStats({ ...p("a", "RB"), overall: 88, value: 70.4 }, { adp: false, tradeValue: true });
-    expect(stats.map((x) => x.key)).toEqual(["proj", "tval"]);
-    expect(stats[1]).toMatchObject({ label: "Trade value", value: "70", why: "trade_value" });
+  it("never shows the model's trade value, even when the player carries one", () => {
+    const stats = simListStats({ ...p("a", "RB"), overall: 88, value: 70.4 }, { adp: false });
+    expect(stats.map((x) => x.key)).toEqual(["proj", "ovr"]);
+    expect(stats.some((x) => /value/i.test(x.label))).toBe(false);
   });
   it("builds a rounds x teams grid keyed by team", () => {
     const grid = simDraftBoardGrid(
@@ -114,5 +120,46 @@ describe("simDraft helpers", () => {
     expect(simBoardProjection({ status: "out", projection: 0, ros_mean: 17.4 })).toEqual({ value: 17.4, discounted: true });
     expect(simBoardProjection({ status: "healthy", projection: 12.1, ros_mean: 12.1 })).toEqual({ value: 12.1, discounted: false });
     expect(simBoardProjection({ status: "out", projection: 0 })).toEqual({ value: 0, discounted: false });
+  });
+});
+
+describe("draft summary line, mini board and sorts", () => {
+  const draft = (over = {}) => ({ status: "in_progress", pick_no: 2, total_picks: 192, on_the_clock: { team_id: "3", is_you: true }, picks_until_you: 0, your_pick_numbers: [2], ...over }) as never;
+  const needs = [
+    { pos: "QB", have: 0, starters: 1, tone: "danger" },
+    { pos: "RB", have: 0, starters: 2, tone: "danger" },
+    { pos: "WR", have: 2, starters: 2, tone: "success" },
+  ] as never;
+  it("on the clock: round/pick, status, biggest needs, progress; no countdown and no model number", () => {
+    const text = compactSummaryText(simDraftSummaryParts(draft(), 12, needs));
+    expect(text).toBe("R1 P2 · You pick now · need RB/QB · 1/192");
+    expect(text).not.toMatch(/value/i);
+  });
+  it("waiting: how far away your pick is", () => {
+    const text = compactSummaryText(simDraftSummaryParts(draft({ on_the_clock: { team_id: "9", is_you: false }, picks_until_you: 3, your_pick_numbers: [5] }), 12, needs));
+    expect(text).toMatch(/^R1 P2 · 3 picks until yours \(#5\)/);
+  });
+  it("complete", () => {
+    expect(compactSummaryText(simDraftSummaryParts(draft({ status: "complete" }), 12, needs))).toBe("Draft complete");
+  });
+  it("mini board: position-coloured cells, your column, the clock slot, and a round window", () => {
+    const mini = simDraftMiniBoard(
+      {
+        total_picks: 4, status: "in_progress", pick_no: 2,
+        teams: [{ team_id: "a", name: "A", is_you: true }, { team_id: "b", name: "B", is_you: false }],
+        order: [{ pick_no: 1, round: 1, team_id: "a" }, { pick_no: 2, round: 1, team_id: "b" }, { pick_no: 3, round: 2, team_id: "b" }, { pick_no: 4, round: 2, team_id: "a" }],
+        picks: [pk(1, 1, "a")],
+      } as never,
+      2,
+    );
+    expect(mini.rows[0][0]).toMatchObject({ pos: expect.any(String), you: true, clock: false });
+    expect(mini.rows[0][1]).toMatchObject({ pos: null, clock: true });
+    expect(simDraftMiniWindow([[1], [2], [3], [4], [5], [6]], 5).rows.map((r) => r[0])).toEqual([3, 4, 5, 6]);
+    expect(simDraftMiniWindow([[1], [2]], 1).rows.length).toBe(2);
+  });
+  it("sorts are ADP, Proj and OVR: never the model's value", () => {
+    expect(SIM_DRAFT_SORTS.map((s) => s.label)).toEqual(["ADP", "Proj", "OVR"]);
+    expect(simCycleSort("adp")).toBe("projection");
+    expect(simCycleSort("overall")).toBe("adp");
   });
 });

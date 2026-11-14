@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useReducer, useState, type ReactNode } from "react";
 
 import { EmptyState } from "@/components/EmptyState";
-import { Input } from "@/components/Input";
+import { Input, Select } from "@/components/Input";
 import { PillRow } from "@/components/PillRow";
 import { SimDraftGlyph } from "@/components/SimDraftGlyphs";
 import { SimPager, useSimDebounced, useSimWide } from "@/components/SimGameParts";
@@ -12,7 +12,7 @@ import { api } from "@/lib/api";
 import { PLAYER_SEARCH_DEBOUNCE_MS } from "@/lib/leaguePlayerSearch";
 import { PlayerListRow } from "@/components/PlayerListRow";
 import type { PlayerListDensity, PlayerListTag } from "@/lib/playerListRow";
-import { simDraftMeta, simDraftRowChips, simListStats } from "@/lib/simDraft";
+import { SIM_DRAFT_SORTS, simDraftMeta, simDraftRowChips, simListStats } from "@/lib/simDraft";
 import { SIM_WINDOW_STEP, simWindow } from "@/lib/simLayout";
 import {
   SIM_PAGE_SIZE,
@@ -27,12 +27,6 @@ import {
   type SimPlayerSort,
   type SimPosFilter,
 } from "@/lib/simGame";
-
-const SORTS: { label: string; value: SimPlayerSort }[] = [
-  { label: "ADP", value: "adp" },
-  { label: "Proj", value: "projection" },
-  { label: "Trade value", value: "value" },
-];
 
 /**
  * One sim player-list row: a thin mapping from a sim player onto the shared
@@ -50,6 +44,7 @@ export function SimDraftRow({
   drafted = false,
   tags,
   extra,
+  chipsExtra,
   density,
 }: {
   player: SimGamePlayer;
@@ -64,6 +59,8 @@ export function SimDraftRow({
   /** Page-specific tags (at most two shown plus "+N"). */
   tags?: PlayerListTag[];
   extra?: ReactNode;
+  /** Small inline controls at the end of the chips line (a Queue toggle). */
+  chipsExtra?: ReactNode;
   density?: PlayerListDensity;
 }) {
   const [chip] = simDraftRowChips(player);
@@ -80,6 +77,7 @@ export function SimDraftRow({
       stats={simListStats(player)}
       tags={tags}
       extra={extra}
+      chipsExtra={chipsExtra}
       actions={actions}
       density={density}
       done={drafted}
@@ -100,6 +98,7 @@ export function SimDraftBoard({
   positions,
   onOpen,
   actions,
+  chipsExtra,
   refreshKey = 0,
   onItems,
   week = 0,
@@ -113,6 +112,7 @@ export function SimDraftBoard({
   draftedIds?: string[];
   onOpen: (player: SimGamePlayer) => void;
   actions?: (player: SimGamePlayer) => ReactNode;
+  chipsExtra?: (player: SimGamePlayer) => ReactNode;
   refreshKey?: number;
   onItems?: (items: SimGamePlayer[]) => void;
 }) {
@@ -172,18 +172,24 @@ export function SimDraftBoard({
           style={{ paddingLeft: 36 }}
         />
       </div>
-      <PillRow
-        ariaLabel="Position filter"
-        variant="scroll"
-        options={[{ label: "All", value: "" }, ...positions]}
-        active={filter.pos}
-        onSelect={(value) => dispatch({ type: "pos", value: value as SimPosFilter | "" })}
-      />
-      <div className="flex items-center gap-2">
-        <span className="text-xs font-bold shrink-0" style={{ color: "var(--color-text-muted)" }}>Sort</span>
+      {/* One compact row: position filter and sort together (not a strip each). */}
+      <div className="flex items-center gap-2" data-testid="draft-filters">
         <div className="min-w-0 flex-1">
-          <PillRow ariaLabel="Sort players" variant="fill" options={SORTS} active={filter.sort} onSelect={(value) => dispatch({ type: "sort", value: value as SimPlayerSort })} />
+          <PillRow
+            ariaLabel="Position filter"
+            variant="scroll"
+            options={[{ label: "All", value: "" }, ...positions]}
+            active={filter.pos}
+            onSelect={(value) => dispatch({ type: "pos", value: value as SimPosFilter | "" })}
+          />
         </div>
+        <Select aria-label="Sort players" value={filter.sort} onChange={(event) => dispatch({ type: "sort", value: event.target.value as SimPlayerSort })} style={{ width: "auto", flexShrink: 0 }}>
+          {SIM_DRAFT_SORTS.map((option) => (
+            <option key={option.value} value={option.value}>
+              {option.label}
+            </option>
+          ))}
+        </Select>
       </div>
       {state === "loading" && items.length === 0 ? (
         <SkeletonRows count={6} />
@@ -197,7 +203,7 @@ export function SimDraftBoard({
             {total} player{total === 1 ? "" : "s"} left
           </p>
           {rows.shown.map((player) => (
-            <SimDraftRow key={player.id} player={player} onOpen={onOpen} week={week} drafted={draftedIds?.includes(player.id)} actions={actions ? actions(player) : null} />
+            <SimDraftRow key={player.id} player={player} onOpen={onOpen} week={week} drafted={draftedIds?.includes(player.id)} actions={actions ? actions(player) : null} chipsExtra={chipsExtra ? chipsExtra(player) : undefined} />
           ))}
           {rows.remaining > 0 ? (
             <button

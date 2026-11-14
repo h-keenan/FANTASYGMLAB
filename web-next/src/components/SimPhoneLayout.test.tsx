@@ -3,7 +3,6 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { Collapsible } from "./Collapsible";
 import { SimDraftRow } from "./SimDraftBoard";
-import { SimTradeValue } from "./SimGameParts";
 import { SimFinalView } from "./SimGameRecap";
 import { SimOpenPlayerContext, SimPlayerChip, type SimCtx } from "./SimGameParts";
 import { api } from "@/lib/api";
@@ -71,16 +70,6 @@ describe("SimDraftRow", () => {
     expect(document.querySelector("[data-stat=ovr]")?.querySelector("[aria-label*='overall rating']")).not.toBeNull();
     expect(screen.queryByText(/^val$/i)).toBeNull();
     expect(document.querySelector("[data-stat=adp]")).toHaveTextContent(/^ADP/);
-  });
-});
-
-describe("Trade value label", () => {
-  it("is always called Trade value (with a tap-for-why), never Value or VAL", () => {
-    render(<SimTradeValue value={70.4} />);
-    expect(screen.getByText("Trade value")).toBeInTheDocument();
-    expect(screen.getByText("70")).toBeInTheDocument();
-    expect(screen.queryByText(/^(value|val)$/i)).toBeNull();
-    expect(screen.getByRole("button", { name: /Trade value 70/ })).toBeInTheDocument();
   });
 });
 

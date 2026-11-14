@@ -32,6 +32,8 @@ import {
   type SimTrendRow,
   type SimWaiverSuggestion,
 } from '../lib/simGame';
+import { compactCount } from '../lib/compactModule';
+import { simByeParts, simInboxParts, simInjuryParts, simStandingsParts, simWaiverParts } from '../lib/simSummaries';
 import type { SimTab } from '../lib/simGameFlow';
 import { simPreview } from '../lib/simLayout';
 import { radii, spacing, type ThemeColors } from '../theme';
@@ -61,7 +63,7 @@ export function SimByeCard({ ctx, alerts, onTab, onClaim }: { ctx: SimCtx; alert
       glyph="bye"
       tone={uncovered ? 'warning' : 'success'}
       title="Bye-week cover"
-      summary={<ToneBadge label={uncovered ? `${uncovered} need cover` : 'Covered'} color={uncovered ? colors.warning : colors.success} size="xs" />}
+      parts={simByeParts(alerts)}
     >
       {shown.map((a) => (
         <View key={`${a.week}-${a.player.id}`} style={common.tight} testID="bye-alert">
@@ -109,7 +111,7 @@ export function SimWaiverCard({ ctx, suggestions, onClaim, onTab }: { ctx: SimCt
       tone="success"
       title="Waiver targets"
       openOnPhone={suggestions.length > 0}
-      summary={suggestions.length ? <ToneBadge label={`${suggestions.length}`} color={colors.success} size="xs" /> : undefined}
+      parts={simWaiverParts(suggestions)}
     >
       {suggestions.length === 0 ? (
         <AppText style={common.small}>Nothing on the wire beats your roster right now. Check back after the next games.</AppText>
@@ -163,7 +165,7 @@ export function SimInboxCard({ inbox, onTab }: { ctx?: SimCtx; inbox: SimHomeRes
       tone={count ? 'accent' : 'muted'}
       title="Trade inbox"
       openOnPhone={count > 0}
-      summary={count ? <ToneBadge label={`${count} new`} color={colors.accent} size="xs" /> : undefined}
+      parts={simInboxParts(inbox)}
     >
       {count === 0 ? (
         <AppText style={common.small}>No offers waiting. AI managers send new ones most weeks.</AppText>
@@ -193,14 +195,13 @@ export function SimInjuriesCard({ ctx, injuries }: { ctx: SimCtx; injuries: SimH
   const { colors } = useThemeMode();
   const common = useMemo(() => createSimStyles(colors), [colors]);
   const list = injuries ?? [];
-  const starters = list.filter((i) => i.starting).length;
   return (
     <SimFold
       id="home.injuries"
       glyph="injury"
       tone={list.length ? 'danger' : 'muted'}
       title="Injury report"
-      summary={<ToneBadge label={list.length ? `${list.length} out${starters ? ` · ${starters} starting` : ''}` : 'Healthy'} color={list.length ? colors.danger : colors.success} size="xs" />}
+      parts={simInjuryParts(list)}
     >
       {list.length === 0 ? (
         <View style={common.row}>
@@ -233,7 +234,6 @@ export function SimStandingsCard({ standings, onTab }: { standings: SimHomeRespo
   const rows = simStandingsWindow(standings.rows, 6);
   const margin = simMarginLine(standings);
   const accent = standings.in_playoffs ? colors.success : colors.warning;
-  const mine = standings.rows.find((r) => r.is_you);
   return (
     <SimFold
       id="home.standings"
@@ -241,7 +241,7 @@ export function SimStandingsCard({ standings, onTab }: { standings: SimHomeRespo
       tone={standings.in_playoffs ? 'success' : 'warning'}
       title="Playoff picture"
       openOnPhone
-      summary={<ToneBadge label={mine ? `#${mine.rank} · ${standings.in_playoffs ? 'In' : 'Out'}` : standings.in_playoffs ? 'In the playoffs' : 'Outside'} color={accent} size="xs" />}
+      parts={simStandingsParts(standings)}
     >
       {margin ? <AppText style={[common.small, { fontWeight: '800', color: standings.margin != null && standings.margin >= 0 ? colors.success : colors.danger }]}>{margin}</AppText> : null}
       <View accessibilityLabel="Standings snapshot">
@@ -300,7 +300,7 @@ export function SimHotColdCard({ ctx, hotCold, onClaim }: { ctx: SimCtx; hotCold
       </View>
     );
   return (
-    <SimFold id="home.hotcold" glyph="hot" tone="danger" title="Hot and cold" summary={<AppText style={common.muted}>vs projection</AppText>}>
+    <SimFold id="home.hotcold" glyph="hot" tone="danger" title="Hot and cold" parts={[{ key: 'hot', text: `${hot.length} hot`, tone: 'danger' }, { key: 'cold', text: `${cold.length} cold`, tone: 'accent' }, { key: 'wire', text: wire.length ? `${wire.length} on the wire` : '' }]}>
       {strip(hot, 'hot', 'Heating up', 'danger')}
       {strip(cold, 'cold', 'Cooling off', 'accent')}
       {strip(wire, 'waiver', 'Hot on the wire', 'success', true)}
@@ -319,7 +319,7 @@ export function SimLeagueMovesCard({ league, names, onTab }: { league: SimHomeRe
   if (!spot && league.recent.length === 0) return null;
   const { shown, hidden } = simPreview(league.recent, all, 3);
   return (
-    <SimFold id="home.league" glyph="league" tone="accent" title="Around the league" openOnPhone={Boolean(spot)} summary={<AppText style={common.muted}>{league.recent.length} moves</AppText>}>
+    <SimFold id="home.league" glyph="league" tone="accent" title="Around the league" openOnPhone={Boolean(spot)} parts={[spot ? { key: 'spot', text: 'Trade to know', tone: 'accent', strong: true } : null, { key: 'mv', text: compactCount(league.recent.length, 'move'), tone: 'muted' }]}>
       {spot ? (
         <View style={styles.spot} testID="trade-spotlight">
           <View style={common.row}>
