@@ -65,7 +65,7 @@ describe("PlayerName", () => {
     render(<PlayerName name="Jonathan Brisker" />);
     const short = screen.getByText("J. Brisker");
     const el = short.closest("[data-player-name-stage]") as HTMLElement;
-    expect(el.getAttribute("data-player-name-stage")).toBe("4");
+    expect(el.getAttribute("data-player-name-stage")).toBe("5");
     expect(el.className).toContain("whitespace-normal");
     expect(el.className).not.toMatch(/truncate|ellipsis|line-clamp/);
     expect(short.getAttribute("style")).toContain("font-size: 0.85em");

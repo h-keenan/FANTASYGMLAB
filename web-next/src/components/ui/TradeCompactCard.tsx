@@ -6,7 +6,7 @@ import { OvrGauge } from "@/components/OvrGauge";
 import { CompactPlayerCard } from "@/components/ui/CompactPlayerCard";
 import { PickAvatar } from "@/components/PickAvatar";
 import { FairnessMeterRow } from "@/components/ui/FairnessMeterRow";
-import { avatarSize, fairnessMeter, type PlayerMode, type PlayerRef } from "@/lib/playerAnatomy";
+import { avatarSize, fairnessMeter, type FairnessMeter, type PlayerMode, type PlayerRef } from "@/lib/playerAnatomy";
 
 export interface TradeCardAsset {
   key: string;
@@ -89,6 +89,7 @@ export function TradeCompactCard({
   giveLabel = "You send",
   getLabel = "You get",
   meta = [],
+  meter: meterOverride,
 }: {
   title: ReactNode;
   give: TradeCardAsset[];
@@ -106,11 +107,13 @@ export function TradeCompactCard({
   getLabel?: string;
   /** Short facts under the title (e.g. "High confidence"). */
   meta?: string[];
+  /** Replaces the computed fairness meter; null hides it (a card whose verdict is stated elsewhere, e.g. their counter). */
+  meter?: FairnessMeter | null;
 }) {
   const [open, setOpen] = useState(defaultOpen);
   const bodyId = useId();
   const sum = (xs: TradeCardAsset[]) => xs.reduce((n, a) => n + (a.value ?? 0), 0);
-  const meter = fairnessMeter(sum(give), sum(get), mode, netValue);
+  const meter = meterOverride === undefined ? fairnessMeter(sum(give), sum(get), mode, netValue) : meterOverride;
   const hasBody = children != null && children !== false;
   return (
     <section className="glass-surface flex min-w-0 flex-col gap-2 p-3" data-testid={testId} style={{ borderRadius: "var(--radius-panel)" }}>
@@ -120,7 +123,7 @@ export function TradeCompactCard({
         <Side label={giveLabel} assets={give} mode={mode} />
         <Side label={getLabel} assets={get} mode={mode} />
       </div>
-      <FairnessMeterRow meter={meter} ariaLabel={verdictLabel && mode === "desk" ? `${meter.description}. Market read: ${verdictLabel}` : undefined} />
+      {meter ? <FairnessMeterRow meter={meter} ariaLabel={verdictLabel && mode === "desk" ? `${meter.description}. Market read: ${verdictLabel}` : undefined} /> : null}
       {hasBody ? (
         <>
           <button

@@ -331,7 +331,7 @@ describe("picks in trades", () => {
 
   it("an inbox offer renders a pick as a pick row, not a player", async () => {
     await openTrades();
-    const row = await screen.findByTestId("pick-row");
+    const row = await screen.findByTestId("trade-pick-row");
     expect(row).toHaveTextContent("2028 Round 2");
     expect(row).not.toHaveTextContent(/trade value/i);
   });

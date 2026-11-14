@@ -17,8 +17,8 @@ import SimGlyph from './SimGlyph';
 import { TapForWhyOff } from './TapForWhy';
 import { SimBlockView } from './SimTradeBlock';
 import SimTeamCard from './SimTeamCard';
-import { SimPickLine, useSimPicks } from './SimGameDynastyParts';
-import { SimPlayerChip, SimPlayerLine, SimPopIn, SimSideLabel, SimStat, SimTeamOpenContext, createSimStyles, type SimCtx } from './SimGameParts';
+import { useSimPicks } from './SimGameDynastyParts';
+import { SimPlayerLine, SimPopIn, SimSideLabel, SimTeamOpenContext, createSimStyles, type SimCtx } from './SimGameParts';
 import { PlayerBadge } from './PlayerBadge';
 import ToneBadge from './ToneBadge';
 import { useThemeMode } from '../context/ThemeModeContext';
@@ -32,11 +32,10 @@ import { SimPlayerSheet } from './SimGamePlayers';
 import { selectedItems } from '../lib/tradeSheetPicker';
 import TradePickerSheet from './TradePickerSheet';
 import TradeScale from './TradeScale';
-import type { TradeCardAsset } from './TradeCompactCard';
+import TradeCompactCard, { TradeAssetCard, type TradeCardAsset } from './TradeCompactCard';
 import { simAcceptanceMeter, simScaleAsset } from '../lib/tradeScale';
 import {
   SIM_TRADE_EMPTY,
-  simProjText,
   simIsPick,
   simIsPickId,
   simPickLabelText,
@@ -75,22 +74,19 @@ function ScoutButton({ teamId, name }: { teamId: string; name: string }) {
   );
 }
 
-/** Players and picks in an offer, counter or verdict: a pick renders as a pick row, never as a player. */
+/** A sim player or pick as the shared trade card asset (avatar, name + position, "KC · Proj 14.2"; a pick gets the round pick avatar). */
+function tradeAsset(p: SimTradeAsset): TradeCardAsset {
+  const a = simScaleAsset(p);
+  return { key: a.key, player: a.player, pickLabel: a.pickLabel, detail: a.detail };
+}
+
+/** Players and picks in an offer: the same shared asset cards the scale and the trade card use, never a bespoke row. */
 function PlayerList({ players }: { players: SimTradeAsset[] }) {
   return (
     <View>
-      {players.map((p) =>
-        simIsPick(p) ? (
-          <SimPickLine key={p.id} pick={p} />
-        ) : (
-          <View key={p.id} style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8, paddingVertical: 4 }}>
-            <View style={{ flex: 1, minWidth: 0 }}>
-              <SimPlayerChip player={p} size={28} quick />
-            </View>
-            <SimStat label="Proj" value={simProjText(p)} />
-          </View>
-        ),
-      )}
+      {players.map((p) => (
+        <TradeAssetCard key={p.id} asset={tradeAsset(p)} mode="sim" />
+      ))}
     </View>
   );
 }
@@ -209,9 +205,9 @@ function OfferCard({ item, defaultOpen, busy, canTrade, onRespond }: { item: Sim
               <SimSideLabel side="get" />
               <PlayerList players={item.you_get} />
             </View>
-            <View style={common.row}>
-              <Button size="sm" label="Accept" loading={busy} disabled={!canTrade} onPress={() => onRespond(item, 'accept')} />
-              <Button size="sm" variant="secondary" label="Decline" disabled={busy} onPress={() => onRespond(item, 'decline')} />
+            <View style={[common.row, { gap: 8 }]}>
+              <View style={{ flex: 1 }}><Button size="sm" label="Accept" loading={busy} disabled={!canTrade} onPress={() => onRespond(item, 'accept')} /></View>
+              <View style={{ flex: 1 }}><Button size="sm" variant="secondary" label="Decline" disabled={busy} onPress={() => onRespond(item, 'decline')} /></View>
             </View>
           </View>
         ) : null}
@@ -220,32 +216,36 @@ function OfferCard({ item, defaultOpen, busy, canTrade, onRespond }: { item: Sim
   );
 }
 
-/** The sim verdict under the scale: their reason in plain words, chips, and a counter when they would make one. Their decision itself is the scale's meter. */
-function VerdictCard({ verdict, onSendCounter, busy }: { verdict: SimTradeVerdict; onSendCounter: () => void; busy: boolean }) {
+/**
+ * The sim verdict under the scale: their reason in one plain line and, when they would counter, their counter as the
+ * shared trade card (what moves, roster-after as the small meta line, the explanation behind "Show details"). Their
+ * decision itself is the scale's meter and "Take their counter" is the scale's primary action, so there is no second
+ * meter, orphan pill or button here. Twin of web VerdictCard.
+ */
+function VerdictCard({ verdict }: { verdict: SimTradeVerdict }) {
   const { colors } = useThemeMode();
   const common = useMemo(() => createSimStyles(colors), [colors]);
+  const chips = (verdict.chips ?? []).join(' \u00b7 ');
+  const delta = simCounterDeltaLine(verdict.counter_delta);
   return (
     <SimPopIn>
       <View testID="trade-verdict" style={common.stack} accessibilityLiveRegion="polite">
-        <AppText style={common.body}>{verdict.reason}</AppText>
-        {(verdict.chips ?? []).length > 0 ? (
-          <View style={common.wrapRow}>
-            {verdict.chips!.map((chip) => (
-              <ToneBadge key={chip} label={chip} color={colors.textSecondary} size="xs" />
-            ))}
-          </View>
-        ) : null}
+        <AppText style={common.body}>
+          {verdict.reason}
+          {chips ? <AppText style={[common.muted, { fontWeight: '800', textTransform: 'uppercase' }]}>{`  ${chips}`}</AppText> : null}
+        </AppText>
         {verdict.decision === 'counter' && verdict.counter ? (
-          <View style={common.stack}>
-            <AppText style={[common.bodyStrong, { color: colors.accent }]}>Their counter</AppText>
+          <TradeCompactCard
+            title="Their counter"
+            mode="sim"
+            meter={null}
+            give={verdict.counter.give.map(tradeAsset)}
+            get={verdict.counter.get.map(tradeAsset)}
+            meta={delta ? [delta] : []}
+            testID="counter-card"
+          >
             {verdict.counter_note ? <AppText style={common.body} testID="counter-note">{verdict.counter_note}</AppText> : null}
-            {simCounterDeltaLine(verdict.counter_delta) ? <AppText style={common.muted} testID="counter-delta">{simCounterDeltaLine(verdict.counter_delta)}</AppText> : null}
-            <SimSideLabel side="give" />
-            <PlayerList players={verdict.counter.give} />
-            <SimSideLabel side="get" />
-            <PlayerList players={verdict.counter.get} />
-            <Button size="sm" label="Take their counter" loading={busy} onPress={onSendCounter} />
-          </View>
+          </TradeCompactCard>
         ) : null}
       </View>
     </SimPopIn>
@@ -432,15 +432,7 @@ function Builder({ ctx, seed, onSeedUsed }: { ctx: SimCtx; seed: SimTradeSeed | 
               <View accessibilityLiveRegion="polite">
                 {previewing && !verdict ? <SkeletonCard rows={2} /> : null}
                 {verdict ? (
-                  <VerdictCard
-                    key={`${key}-${verdict.decision}`}
-                    verdict={verdict}
-                    busy={sending}
-                    onSendCounter={() => {
-                      if (!verdict.counter || !draft.partner) return;
-                      void send({ partner: draft.partner, give: verdict.counter.give.map((p) => p.id), get: verdict.counter.get.map((p) => p.id) });
-                    }}
-                  />
+                  <VerdictCard key={`${key}-${verdict.decision}`} verdict={verdict} />
                 ) : null}
               </View>
             }
@@ -450,8 +442,11 @@ function Builder({ ctx, seed, onSeedUsed }: { ctx: SimCtx; seed: SimTradeSeed | 
                     const payload = simTradePayload(draft);
                     if (payload) void send(payload);
                   }
-                : undefined
+                : verdict?.decision === 'counter' && verdict.counter && draft.partner
+                  ? () => void send({ partner: draft.partner as string, give: verdict.counter!.give.map((p) => p.id), get: verdict.counter!.get.map((p) => p.id) })
+                  : undefined
             }
+            sendLabel={verdict?.decision === 'counter' ? 'Take their counter' : undefined}
             canSend={!fit.blocked}
             sending={sending}
           />

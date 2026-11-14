@@ -147,14 +147,14 @@ export function TradeScale({
       {phase === "review" || phase === "tweak" ? (
         <div className="enter-rise flex flex-col gap-2" key={phase} data-testid="scale-actions">
           {phase === "review" ? verdict : null}
-          <div className="flex flex-wrap items-center gap-2">
+          <div className="grid grid-flow-col auto-cols-fr items-center gap-2" data-testid="scale-action-row">
             {phase === "review" ? (
               <>
-                {onSend ? <Button loading={sending} disabled={!canSend} onClick={onSend}>{sendLabel}</Button> : null}
-                <Button variant="secondary" onClick={() => setTweaking(true)}>Tweak</Button>
+                {onSend ? <Button fullWidth loading={sending} disabled={!canSend} onClick={onSend}>{sendLabel}</Button> : null}
+                <Button fullWidth variant="secondary" onClick={() => setTweaking(true)}>Tweak</Button>
               </>
             ) : (
-              <Button variant="secondary" onClick={() => setTweaking(false)}>Review</Button>
+              <Button fullWidth variant="secondary" onClick={() => setTweaking(false)}>Review</Button>
             )}
           </div>
         </div>
