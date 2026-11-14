@@ -63,6 +63,7 @@ export default function PlayerHero({
   onToggleExpand,
   valueChart = null,
   ovrChart = null,
+  gradeTile = null,
   children,
 }: {
   /** Shown in the tap-the-Value popover (for example the value history chart). */
@@ -71,6 +72,8 @@ export default function PlayerHero({
   valueChart?: React.ReactNode;
   /** Shown in the tap-the-Player-score popover (for example the model radar). */
   ovrChart?: React.ReactNode;
+  /** Fantasy Sim: a letter-grade tile that REPLACES the Player score ring (no numeric rating in the sim). */
+  gradeTile?: React.ReactNode;
   playerId: string;
   /** Photo id when it differs from playerId; null = no photo exists (initials). */
   avatarId?: string | null;
@@ -167,7 +170,9 @@ export default function PlayerHero({
       </View>
 
       <View style={styles.tilesRow}>
-        {onToggleExpand && overallRating !== null ? (
+        {gradeTile ? (
+          <View style={styles.tile}>{gradeTile}</View>
+        ) : onToggleExpand && overallRating !== null ? (
           <PressableScale
             style={styles.tile}
             onPress={onToggleExpand}

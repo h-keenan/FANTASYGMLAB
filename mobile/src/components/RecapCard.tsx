@@ -1,4 +1,6 @@
 import React, { useMemo, useState, type ReactNode } from 'react';
+import { LetterGrade } from './LetterGrade';
+import { simGradeIndex, type SimGradeLetter } from '../lib/simGrade';
 import { Pressable, StyleSheet, View } from 'react-native';
 
 import AccentCard from './AccentCard';
@@ -46,7 +48,9 @@ export default function RecapCard({ model, extras, testID = 'recap-card' }: { mo
       <View testID={testID} style={styles.stack}>
         <View style={styles.head}>
           <AppText style={styles.kicker}>{model.kicker}</AppText>
-          {model.badge ? (
+          {model.badge && simGradeIndex(model.badge) >= 0 ? (
+            <LetterGrade grade={{ grade: model.badge as SimGradeLetter }} size="sm" />
+          ) : model.badge ? (
             <View style={styles.badge} testID="recap-card-badge">
               <AppText style={styles.badgeText}>{model.badge}</AppText>
             </View>

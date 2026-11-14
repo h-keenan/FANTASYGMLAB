@@ -10,7 +10,6 @@ import {
   simDraftMiniBoard,
   simDraftMiniWindow,
   simDraftSummaryParts,
-  simBoardEdge,
   simBoardProjection,
   simDraftAdpDelta,
   simDraftBarModel,
@@ -84,17 +83,17 @@ describe("simDraft helpers", () => {
     expect(simDraftMeta({ ...p("a", "WR", { age: 24 }), age_decimal: 24.34 }).map((x) => x.text)[1]).toBe("Age 24.3");
     expect(simDraftMeta(p("a", "WR", { age: 21, status: "out", out_weeks: 1 })).map((x) => x.text)).toEqual(["KC", "Age 21", "Bye 9"]);
   });
-  it("list stats show the player's Overall as the OVR gauge, never a bare value", () => {
+  it("list stats show the player's overall as a letter grade, never a bare value", () => {
     const keys = (stats: ReturnType<typeof simListStats>) => stats.map((x) => x.key);
-    const stats = simListStats({ ...p("a", "RB"), overall: 88, value: 70 });
+    const stats = simListStats({ ...p("a", "RB"), grade: "A" });
     expect(keys(stats)).toEqual(["proj", "ovr", "adp"]);
-    expect(stats.find((x) => x.key === "ovr")).toMatchObject({ label: "OVR", rating: 88 });
+    expect(stats.find((x) => x.key === "ovr")).toMatchObject({ label: "Grade", grade: { grade: "A" } });
     expect(stats.some((x) => /^val/i.test(x.label))).toBe(false);
-    // no overall (thin position pool or an older server): no number rather than a made-up one
-    expect(keys(simListStats({ ...p("a", "RB"), overall: null }))).toEqual(["proj", "adp"]);
+    // no grade (thin position pool, a pick or an older server): the column keeps its footprint, no made-up letter
+    expect(simListStats({ ...p("a", "RB"), grade: null }).find((x) => x.key === "ovr")?.grade).toBeNull();
   });
   it("never shows the model's trade value, even when the player carries one", () => {
-    const stats = simListStats({ ...p("a", "RB"), overall: 88, value: 70.4 }, { adp: false });
+    const stats = simListStats({ ...p("a", "RB"), grade: "A" }, { adp: false });
     expect(stats.map((x) => x.key)).toEqual(["proj", "ovr"]);
     expect(stats.some((x) => /value/i.test(x.label))).toBe(false);
   });
@@ -113,12 +112,13 @@ describe("simDraft helpers", () => {
     expect(grid.rows[0][0].pick?.pick_no).toBe(1);
     expect(grid.rows[1][0].pick).toBeNull();
   });
-  it("board edge: market ADP vs model value rank, not the pick on the clock", () => {
-    expect(simBoardEdge({ adp: 40, value_rank: 22 })).toEqual({ delta: 18, label: "+18", tone: "success" });
-    expect(simBoardEdge({ adp: 10, value_rank: 25 })).toEqual({ delta: -15, label: "-15", tone: "danger" });
-    expect(simBoardEdge({ adp: 20, value_rank: 22 })).toBeNull();
-    expect(simBoardEdge({ adp: 30, value_rank: 28, adp_edge: 9.4 })?.delta).toBe(9);
-    expect(simBoardEdge({ adp: 30 })).toBeNull();
+  it("list stats show a letter grade, never a number, and no edge chip", () => {
+    const stats = simListStats({ status: "healthy", projection: 12, ros_mean: 12, adp: 30, grade: "B+", grade_range: ["B", "A-"], grade_uncertain: true } as never);
+    expect(stats.map((x) => x.key)).toEqual(["proj", "ovr", "adp"]);
+    const ovr = stats.find((x) => x.key === "ovr")!;
+    expect(ovr.grade?.grade).toBe("B+");
+    expect(ovr.rating).toBeUndefined();
+    expect(simListStats({ status: "healthy", projection: 5, ros_mean: 5, adp: null } as never).find((x) => x.key === "ovr")?.grade).toBeNull();
   });
   it("shows an injured player's per-game projection instead of 0.0", () => {
     expect(simBoardProjection({ status: "out", projection: 0, ros_mean: 17.4 })).toEqual({ value: 17.4, discounted: true });
@@ -162,7 +162,7 @@ describe("draft summary line, mini board and sorts", () => {
     expect(simDraftMiniWindow([[1], [2]], 1).rows.length).toBe(2);
   });
   it("sorts are ADP, Proj and OVR: never the model's value", () => {
-    expect(SIM_DRAFT_SORTS.map((s) => s.label)).toEqual(["ADP", "Proj", "OVR"]);
+    expect(SIM_DRAFT_SORTS.map((s) => s.label)).toEqual(["ADP", "Proj", "Grade"]);
     expect(simCycleSort("adp")).toBe("projection");
     expect(simCycleSort("overall")).toBe("adp");
   });

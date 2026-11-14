@@ -52,7 +52,7 @@ describe("bottom chrome: one sticky mechanism over a document-tall ancestor chai
     const css = read("components/ui/ui.css");
     expect(rule(css, ".bottom-tab-bar")).toContain("margin: 0 var(--bar-side-inset)");
     expect(rule(css, ".bottom-tab-bar")).not.toMatch(/position:\s*fixed/);
-    expect(rule(css, ".pill-layer")).toContain("grid-area: 1 / 1");
+    expect(css).toMatch(/\n\.pill-layer \{ grid-area: 1 \/ 1;/);
     expect(css).not.toMatch(/\.(pill-layer|pill-tabs|pill-indicator|pill-primary)[^{]*\{[^}]*position:\s*fixed/);
     const bar = read("components/ui/BottomTabBar.tsx");
     expect(bar).not.toContain("visualViewport");

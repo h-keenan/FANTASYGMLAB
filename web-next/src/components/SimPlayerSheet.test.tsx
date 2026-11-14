@@ -18,7 +18,7 @@ vi.mock("@/lib/api", async () => {
 });
 
 const player = (over: Partial<SimGamePlayer> = {}): SimGamePlayer => ({
-  id: "R2027-001", headshot_id: null, name: "Brock Briggs", pos: "RB", team: "BUF", age: 24, adp: 40, value: 0, projection: 2.2, floor: 0.6, ceiling: 3.8,
+  id: "R2027-001", headshot_id: null, name: "Brock Briggs", pos: "RB", team: "BUF", age: 24, adp: 40, projection: 2.2, floor: 0.6, ceiling: 3.8,
   status: "healthy", out_weeks: 0, bye_week: 9, season_points: 0, games: 0, ...over,
 });
 
@@ -26,7 +26,7 @@ const weeks = (n: number, from = 3) => Array.from({ length: n }, (_, i) => ({ we
 
 function detail(over: Partial<SimPlayerDetailResponse> = {}): SimPlayerDetailResponse {
   return {
-    ok: true, reason: "", is_premium: true, upsell: null, preview: null, player: player({ value_rank: 211, pos_value_rank: 60 }), weeks: weeks(12), history: [], news: [],
+    ok: true, reason: "", is_premium: true, upsell: null, preview: null, player: player(), weeks: weeks(12), history: [], news: [],
     projection_flat: true, ros: { mean: 2.2, floor: 0.6, ceiling: 3.8, weeks_left: 12, playable_weeks: 11, bye_week: 9, out_weeks: [] }, ...over,
   } as SimPlayerDetailResponse;
 }
@@ -48,15 +48,17 @@ describe("Fantasy Sim player sheet is the real Player Quick View", () => {
     expect(api.getPlayerQuickView).not.toHaveBeenCalled(); // a generated player has no real data
   });
 
-  it("shows an em dash with a reason, not 0, for a player with no market value", async () => {
-    vi.mocked(api.getSimGamePlayer).mockResolvedValue(detail());
-    render(<SimPlayerSheet gameId="g1" player={player()} onClose={() => {}} />);
-    // The sim never shows the model's value: the hero swaps the Value and Usage tiles for this week's projection and ADP.
-    const tiles = await screen.findAllByTestId("pqv-sim-tile");
-    expect(tiles).toHaveLength(2);
+  it("shows a letter grade tile and no value tile, score ring or rank (no numeric rating in the sim)", async () => {
+    vi.mocked(api.getSimGamePlayer).mockResolvedValue(detail({ player: player({ grade: "B+", grade_range: ["B", "A-"], grade_uncertain: true, attributes: [{ key: "volume", label: "Workload", grade: "B" }, { key: "durability", label: "Durability", grade: "C+", uncertain: true }] }) }));
+    render(<SimPlayerSheet gameId="g1" player={player({ grade: "B+", grade_range: ["B", "A-"], grade_uncertain: true })} onClose={() => {}} />);
+    const tile = await screen.findByTestId("hero-grade");
+    expect(await screen.findAllByTestId("pqv-sim-tile")).toHaveLength(2); // This week + ADP
+    expect(tile).toHaveTextContent("B+?");
     expect(screen.queryByTestId("pqv-value-empty")).toBeNull();
-    expect(screen.queryByText(/no market value/i)).toBeNull();
-    await waitFor(() => expect(screen.getByText("Overall #211 · RB #60")).toBeInTheDocument());
+    expect(screen.queryByText(/Player score/)).toBeNull();
+    expect(screen.queryByText(/Overall #/)).toBeNull();
+    const bars = await screen.findAllByTestId("grade-bar");
+    expect(bars.map((b) => b.getAttribute("data-attr"))).toEqual(["volume", "durability"]);
   });
 
   it("plots this season's actual points through the shared weekly chart, with the band only when the projection varies", async () => {

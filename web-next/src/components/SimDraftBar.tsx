@@ -2,6 +2,8 @@
 
 import { PlayerAvatar } from "@/components/PlayerAvatar";
 import { PositionBadge } from "@/components/PositionBadge";
+import { LetterGrade } from "@/components/ui/LetterGrade";
+import type { SimGradeInput } from "@/lib/simGrade";
 import type { SimDraftBarModel } from "@/lib/simDraft";
 
 /**
@@ -9,7 +11,7 @@ import type { SimDraftBarModel } from "@/lib/simDraft";
  * (ADP stays as the figure when the game has no grade). Tapping it opens the player. It is the `preview` of the Sim
  * draft-clock CompactModule, so it stays visible collapsed and expanded. Cyan / neutral only; gold is the clock's.
  */
-export function SimDraftBar({ model, onOpen, grade }: { model: SimDraftBarModel; onOpen?: () => void; grade?: React.ReactNode }) {
+export function SimDraftBar({ model, onOpen, grade }: { model: SimDraftBarModel; onOpen?: () => void; grade?: SimGradeInput | null }) {
   const body = (
     <>
       <PlayerAvatar playerId={model.playerId} size={36} fallbackLabel={model.name.trim().slice(0, 1)} />
@@ -27,7 +29,7 @@ export function SimDraftBar({ model, onOpen, grade }: { model: SimDraftBarModel;
           </span>
         ) : null}
       </span>
-      {grade ?? (model.grade ? <GradeCapsule grade={model.grade} /> : null)}
+      {grade?.grade ? <LetterGrade grade={grade} size="md" /> : null}
     </>
   );
   return onOpen ? (
@@ -38,13 +40,5 @@ export function SimDraftBar({ model, onOpen, grade }: { model: SimDraftBarModel;
     <div className="flex w-full items-center gap-2" style={{ minHeight: "var(--touch-target-min)" }} data-testid="draft-bar-player">
       {body}
     </div>
-  );
-}
-
-function GradeCapsule({ grade }: { grade: string }) {
-  return (
-    <span role="img" aria-label={`Grade ${grade}`} data-testid="draft-bar-grade" className="inline-flex shrink-0 items-center justify-center text-base font-extrabold" style={{ minWidth: 40, height: 32, padding: "0 8px", borderRadius: "var(--radius-pill)", color: "var(--color-accent)", background: "color-mix(in srgb, var(--color-accent) 15%, transparent)", boxShadow: "inset 0 0 0 1.5px color-mix(in srgb, var(--color-accent) 55%, transparent)" }}>
-      {grade}
-    </span>
   );
 }

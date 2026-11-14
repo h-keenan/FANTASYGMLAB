@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import type { SimPlayerWeek } from "./simGame";
-import { simActualPoints, simAvailabilityLine, simHeroFeed, simProjectionBand, simProjectionIsFlat, simRosLine } from "./simPlayerSheet";
+import { simActualPoints, simAvailabilityLine, simHeroGrade, simProjectionBand, simProjectionIsFlat, simRosLine } from "./simPlayerSheet";
 
 const wk = (week: number, projection: number, extra: Partial<SimPlayerWeek> = {}): SimPlayerWeek => ({ week, projection, floor: projection * 0.3, ceiling: projection * 1.7, bye: false, out: false, ...extra });
 
@@ -34,17 +34,9 @@ describe("flat projection suppression", () => {
   });
 });
 
-describe("hero feed (the PQV adapter)", () => {
-  it("shows a dash with a reason, never 0, for a player with no market value", () => {
-    const feed = simHeroFeed({ value: 0, value_rank: 211, pos_value_rank: 60 });
-    expect(feed.score).toBeNull();
-    expect(feed.valueNote).toMatch(/no market value/i);
-    expect(feed.overall_rank).toBe(211);
-    expect(feed.position_rank).toBe(60);
-  });
-  it("passes a real value through", () => {
-    const feed = simHeroFeed({ value: 71.4, value_rank: 12, pos_value_rank: 4 });
-    expect(feed.score).toBe(71);
-    expect(feed.valueNote).toBeNull();
+describe("hero grade (the PQV adapter)", () => {
+  it("hands the hero a letter grade and nothing numeric", () => {
+    expect(simHeroGrade({ grade: "A-", grade_range: ["B+", "A"], grade_uncertain: true })).toEqual({ grade: "A-", grade_range: ["B+", "A"], grade_uncertain: true });
+    expect(simHeroGrade({ grade: null })).toBeNull();
   });
 });

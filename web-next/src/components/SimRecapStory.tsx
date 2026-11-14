@@ -14,6 +14,7 @@ import { recapCardModel, recapRowsFromItems } from "@/lib/recapCard";
 import { StoryCarousel, type StoryPage } from "@/components/ui/StoryCarousel";
 import { positionColorVar } from "@/lib/playerPresentation";
 import { simFmtPts, simPlayoffRoundLabel, simTeamNameMap, type SimGamePlayer, type SimWeekRecap } from "@/lib/simGame";
+import { simGradeOf } from "@/lib/simGrade";
 import {
   simLeagueHighlights,
   simNextWeekModel,
@@ -87,7 +88,7 @@ const performer = (label: string, p: { name: string; pts: number; player: SimGam
   p.player ? (
     <MotionIn key={label}>
       <p className="mb-0.5 text-xs font-extrabold uppercase" style={{ color: accent, letterSpacing: "var(--letter-spacing-badge)" }}>{label}</p>
-      <SimPlayerLine player={p.player} stats={[{ key: "pts", label: "Pts", value: simFmtPts(p.pts), tone: label === "Best performer" ? "success" : undefined }, { key: "ovr", label: "OVR", value: "", rating: p.player.overall ?? null }]} onOpen={ctx.openPlayer} />
+      <SimPlayerLine player={p.player} stats={[{ key: "pts", label: "Pts", value: simFmtPts(p.pts), tone: label === "Best performer" ? "success" : undefined }, { key: "ovr", label: "Grade", value: "", grade: simGradeOf(p.player) }]} onOpen={ctx.openPlayer} />
     </MotionIn>
   ) : (
     <Fact key={label} label={label} accent={accent}>{p.name} · {simFmtPts(p.pts)}</Fact>
@@ -218,7 +219,7 @@ export function SimWeekRecapStory({
                   stats={[
                     { key: "pts", label: "Pts", value: simFmtPts(s.pts), tone: simRecapProj(s) != null && s.pts >= simRecapProj(s)! ? "success" : undefined },
                     { key: "proj", label: "Proj", value: simFmtPts(simRecapProj(s)) },
-                    { key: "ovr", label: "OVR", value: "", rating: s.player!.overall ?? null },
+                    { key: "ovr", label: "Grade", value: "", grade: simGradeOf(s.player) },
                   ]}
                   onOpen={ctx.openPlayer}
                 />

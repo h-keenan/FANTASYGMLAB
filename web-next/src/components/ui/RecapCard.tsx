@@ -2,6 +2,8 @@
 
 import { useId, useState, type ReactNode } from "react";
 
+import { LetterGrade } from "@/components/ui/LetterGrade";
+import { simGradeIndex, type SimGradeLetter } from "@/lib/simGrade";
 import { AccentCard } from "@/components/AccentCard";
 import type { RecapCardModel, RecapCardRow, RecapTone } from "@/lib/recapCard";
 
@@ -48,7 +50,9 @@ export function RecapCard({ model, extras, testId = "recap-card" }: { model: Rec
         <span className="text-[0.6875rem] font-extrabold uppercase" style={{ color: "var(--color-accent)", letterSpacing: "var(--letter-spacing-badge)" }}>
           {model.kicker}
         </span>
-        {model.badge ? (
+        {model.badge && simGradeIndex(model.badge) >= 0 ? (
+          <span data-testid="recap-card-badge"><LetterGrade grade={{ grade: model.badge as SimGradeLetter }} size="sm" /></span>
+        ) : model.badge ? (
           <span
             data-testid="recap-card-badge"
             className="inline-flex min-w-9 items-center justify-center px-2 text-sm font-extrabold"

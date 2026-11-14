@@ -11,7 +11,9 @@ import ToneBadge from './ToneBadge';
 import { useThemeMode } from '../context/ThemeModeContext';
 import type { SimLeagueRosterTeam } from '../lib/simGame';
 import { playerSurname } from '../lib/playerNameDisplay';
-import { simOverallLabel, simTeamChips, simTeamRecordLine } from '../lib/simLeagueRosters';
+import { simTeamChips, simTeamRecordLine } from '../lib/simLeagueRosters';
+import { simGradeOf } from '../lib/simGrade';
+import { LetterGrade } from './LetterGrade';
 
 /**
  * THE Fantasy Sim team card: who a team is and who it has, at a glance. Used by the League tab's Teams view and
@@ -66,7 +68,7 @@ export default function SimTeamCard({
             <View key={p.id} style={[common.row, { gap: 4 }]}>
               <PositionBadge position={p.pos} />
               <AppText style={{ fontSize: 13, fontWeight: '700', color: colors.textPrimary }}>{playerSurname(p.name)}</AppText>
-              <AppText style={{ fontSize: 13, fontWeight: '800', color: colors.textSecondary }}>{simOverallLabel(p.overall)}</AppText>
+              <LetterGrade grade={simGradeOf(p)} size="sm" />
             </View>
           ) : (
             <View key={p.id} style={common.row}>
@@ -74,10 +76,7 @@ export default function SimTeamCard({
               <View style={common.grow}>
                 <PlayerName name={p.name} style={{ fontSize: 13, fontWeight: '700', color: colors.textPrimary }} />
               </View>
-              <AppText style={common.muted}>
-                OVR{' '}
-                <AppText style={{ fontWeight: '800', color: colors.textPrimary }}>{simOverallLabel(p.overall)}</AppText>
-              </AppText>
+              <LetterGrade grade={simGradeOf(p)} size="sm" />
             </View>
           ))}
         </View>

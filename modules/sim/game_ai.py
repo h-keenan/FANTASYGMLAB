@@ -152,10 +152,17 @@ class Verdict:
     counter_delta: dict[str, Any] | None = None
 
     def to_dict(self) -> dict[str, Any]:
+        delta = self.counter_delta
+        if delta is not None:
+            # The API never carries the model's trade-value numbers (they are the hidden rating): only the direction
+            # of the change (-1 / 0 / +1), which is all the client turns into words.
+            change = float(delta.get("user_net_change") or 0.0)
+            delta = {k: v for k, v in delta.items() if k not in ("user_net_before", "user_net_after")}
+            delta["user_net_change"] = 0 if abs(change) < 0.5 else (1 if change > 0 else -1)
         return {
             "decision": self.decision, "reason_code": self.reason_code, "reason": self.reason,
             "chips": list(self.chips), "counter": self.counter,
-            "counter_note": self.counter_note, "counter_delta": self.counter_delta,
+            "counter_note": self.counter_note, "counter_delta": delta,
         }
 
 

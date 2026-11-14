@@ -5,7 +5,9 @@ import AppText from './AppText';
 import PlayerAvatar from './PlayerAvatar';
 import PositionBadge from './PositionBadge';
 import { useThemeMode } from '../context/ThemeModeContext';
+import { LetterGrade } from './LetterGrade';
 import type { SimDraftBarModel } from '../lib/simDraft';
+import type { SimGradeInput } from '../lib/simGrade';
 import { spacing, type ThemeColors } from '../theme';
 
 /**
@@ -13,7 +15,7 @@ import { spacing, type ThemeColors } from '../theme';
  * position and letter grade (ADP stays as the figure when the game has no grade). Tapping it opens the player. It is the
  * `preview` of the Sim draft-clock CompactModule. Cyan / neutral only; gold is the clock's.
  */
-export function SimDraftBar({ model, onOpen }: { model: SimDraftBarModel; onOpen?: () => void }) {
+export function SimDraftBar({ model, onOpen, grade }: { model: SimDraftBarModel; onOpen?: () => void; grade?: SimGradeInput | null }) {
   const { colors } = useThemeMode();
   const styles = useMemo(() => createStyles(colors), [colors]);
   const body = (
@@ -27,11 +29,7 @@ export function SimDraftBar({ model, onOpen }: { model: SimDraftBarModel; onOpen
         </View>
         {model.adp || model.fit ? <AppText style={styles.meta}>{[model.adp, model.fit].filter(Boolean).join(' · ')}</AppText> : null}
       </View>
-      {model.grade ? (
-        <View style={styles.grade} accessible accessibilityRole="image" accessibilityLabel={`Grade ${model.grade}`} testID="draft-bar-grade">
-          <AppText style={styles.gradeText}>{model.grade}</AppText>
-        </View>
-      ) : null}
+      {grade?.grade ? <LetterGrade grade={grade} size="md" /> : null}
     </>
   );
   const label = `Best available: ${model.name}, ${model.position}${model.grade ? `, grade ${model.grade}` : ''}. Open player`;
@@ -54,7 +52,5 @@ function createStyles(colors: ThemeColors) {
     nameRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs },
     name: { flexShrink: 1, fontSize: 14, fontWeight: '700', color: colors.textPrimary },
     meta: { fontSize: 12.5, color: colors.textTertiary },
-    grade: { minWidth: 40, height: 32, paddingHorizontal: 8, alignItems: 'center', justifyContent: 'center', borderRadius: 16, borderWidth: 1.5, borderColor: colors.accent, backgroundColor: colors.accentMuted },
-    gradeText: { fontSize: 16, fontWeight: '800', color: colors.accent },
   });
 }

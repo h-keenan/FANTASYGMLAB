@@ -9,6 +9,7 @@ import ErrorState from './ErrorState';
 import FadeInView from './FadeInView';
 import SectionHeading from './SectionHeading';
 import SegmentedTabBar from './SegmentedTabBar';
+import { useBottomPillContext } from '../lib/useBottomPillContext.ts';
 import { SkeletonCard } from './SkeletonBlock';
 import CompactModule from './CompactModule';
 import { SimDraftBoard, SimDraftIconButton } from './SimDraftBoard';
@@ -20,6 +21,8 @@ import { useThemeMode } from '../context/ThemeModeContext';
 import { api } from '../lib/api';
 import { SimDraftBar } from './SimDraftBar';
 import { simDraftBarModel, simDraftNeedPills, simDraftSummaryParts } from '../lib/simDraft';
+import { simGradeOf } from '../lib/simGrade';
+import { LetterGrade } from './LetterGrade';
 import {
   SIM_QUEUE_MAX,
   simFmtPts,
@@ -191,6 +194,25 @@ export function SimGameDraft({ ctx, onComplete }: { ctx: SimCtx; onComplete: (re
     return map;
   }, [draft?.teams]);
 
+  // Phones: the draft room's panel tabs live in the bottom pill (web twin: SimGameDraft.tsx), so the top row steps aside there.
+  const pillOwnsTabs = useBottomPillContext(
+    loadState === 'ready' && draft
+      ? {
+          id: 'sim-draft',
+          label: 'Draft panels',
+          tabs: [
+            { key: 'board', label: 'Players', glyph: 'players' },
+            { key: 'queue', label: queue.ids.length ? `Queue ${queue.ids.length}` : 'Queue', glyph: 'queue' },
+            { key: 'roster', label: 'Roster', glyph: 'roster' },
+            { key: 'picks', label: 'Picks', glyph: 'picks' },
+          ],
+          activeKey: panel,
+          onSelect: (key) => setPanel(key as Panel),
+          primary: { key: 'auto-pick', label: 'Auto-pick', glyph: 'recommended', disabled: draft.status === 'complete' || busy === 'pick', onPress: () => setConfirmAuto(true) },
+        }
+      : null,
+  );
+
   if (loadState === 'loading') {
     return (
       <View style={common.stack}>
@@ -349,14 +371,14 @@ export function SimGameDraft({ ctx, onComplete }: { ctx: SimCtx; onComplete: (re
         tone={onClock ? 'action' : 'accent'}
         persist={false}
         parts={simDraftSummaryParts(draft, game.settings.teams, needPills, { picking: Boolean(optimistic) })}
-        preview={draft.status !== 'complete' && barPlayer ? <SimDraftBar model={simDraftBarModel(barPlayer, needPills)} onOpen={() => ctx.openPlayer(barPlayer)} /> : undefined}
+        preview={draft.status !== 'complete' && barPlayer ? <SimDraftBar model={simDraftBarModel(barPlayer, needPills)} onOpen={() => ctx.openPlayer(barPlayer)} grade={simGradeOf(barPlayer)} /> : undefined}
         action={onClock && hint ? <Button size="sm" label={`Draft ${hintLast}`} loading={busy === 'pick'} onPress={() => pick(hint.player)} /> : null}
       >
         {onClock && hint ? (
           <FadeInView>
             <View style={common.tight} testID="draft-hint">
               <AppText style={common.muted}>{hint.why}</AppText>
-              <SimPlayerChip player={hint.player} extra={hint.player.overall != null ? <AppText style={common.muted}>OVR {hint.player.overall}</AppText> : undefined} />
+              <SimPlayerChip player={hint.player} extra={hint.player.grade ? <LetterGrade grade={simGradeOf(hint.player)} size="sm" /> : undefined} />
             </View>
           </FadeInView>
         ) : null}
@@ -382,6 +404,7 @@ export function SimGameDraft({ ctx, onComplete }: { ctx: SimCtx; onComplete: (re
         )}
       </CompactModule>
       <SimDraftOverview draft={draft} teams={game.settings.teams} onOpen={ctx.openPlayer} />
+      {pillOwnsTabs ? null : (
       <SegmentedTabBar<Panel>
         options={[
           { key: 'board', label: 'Players', glyph: 'players' },
@@ -392,6 +415,7 @@ export function SimGameDraft({ ctx, onComplete }: { ctx: SimCtx; onComplete: (re
         active={panel}
         onChange={setPanel}
       />
+      )}
       {panel === 'board' ? board : side()}
     </View>
   );

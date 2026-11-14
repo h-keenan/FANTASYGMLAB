@@ -464,11 +464,13 @@ def test_advance_is_idempotent_per_week_and_revert_restores_the_week(season):
     assert r1["week"] == 2
 
 
-def test_players_sort_overall_orders_by_shown_overall(season):
+def test_players_sort_overall_orders_by_shown_grade(season):
+    from modules.sim.game_grades import LETTERS
+
     client, _, gid = season
     page = client.get(f"/v1/sim/games/{gid}/players?pos=WR&sort=overall&page_size=10", headers=hdr()).json()
-    ovr = [p["overall"] or 0 for p in page["items"]]
-    assert ovr == sorted(ovr, reverse=True) and len(ovr) == 10
+    idx = [LETTERS.index(p["grade"]) if p["grade"] else -1 for p in page["items"]]
+    assert idx == sorted(idx, reverse=True) and len(idx) == 10
 
 
 def test_players_search_filters_and_detail(season):

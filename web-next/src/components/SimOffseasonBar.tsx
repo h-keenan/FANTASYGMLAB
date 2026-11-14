@@ -2,6 +2,8 @@
 
 import { useCallback, useEffect, useState, type ReactNode } from "react";
 
+import { PillMorph } from "@/components/ui/PillMorph";
+import { usePillState } from "@/lib/useBottomPillContext";
 import { Button } from "@/components/Button";
 import type { SimCtx } from "@/components/SimGameParts";
 import { api } from "@/lib/api";
@@ -16,6 +18,7 @@ import { simOffseasonCta, simOffseasonStageLabel, simSeasonLabel, type SimOffsea
  * itself, so any tab can mount it. Mobile twin: mobile/src/components/SimOffseasonBar.tsx.
  */
 export function SimOffseasonBar({ ctx, onTab, orb }: { ctx: SimCtx; onTab?: (tab: "home") => void; orb?: ReactNode }) {
+  const pill = usePillState();
   const { gameId, call } = ctx;
   const [off, setOff] = useState<SimOffseason | null>(null);
   const [busy, setBusy] = useState(false);
@@ -88,6 +91,7 @@ export function SimOffseasonBar({ ctx, onTab, orb }: { ctx: SimCtx; onTab?: (tab
       {cta.blocked ? (
         <p id={reasonId} className="px-4 pt-1.5 text-center text-xs font-bold" style={{ color: "var(--color-warning)" }} role="status">{cta.blocked}</p>
       ) : null}
+      <PillMorph context={pill.barPresent ? pill.ctx : null}>
       <div className="mx-auto flex max-w-3xl items-center gap-2 p-1 md:grid md:grid-cols-[1fr_auto]">
         {orb}
         <span className="min-w-0 text-xs font-bold max-md:hidden" style={{ color: "var(--color-text-muted)" }}>
@@ -97,6 +101,7 @@ export function SimOffseasonBar({ ctx, onTab, orb }: { ctx: SimCtx; onTab?: (tab
           {cta.label}
         </Button>
       </div>
+      </PillMorph>
     </div>
   );
 }

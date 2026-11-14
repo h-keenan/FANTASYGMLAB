@@ -22,6 +22,7 @@ Ground rules for every pattern here:
 | `InsightLink` | `ui/InsightLink.tsx` (+ `StatStrip` `insight`/`league`) | `MetricCard` `onPress` via `lib/insightNav.ts` | `insightLinks.ts` | built; every stat about your league/team must resolve here, see `docs/audits/2026-11-navigation-audit.md` |
 | `UndoToast` | `ui/UndoToast.tsx` | `UndoToast.tsx` | `confirmInPlace.ts` (timing) | built; used by GM targets |
 | `PlayerBadge` | `ui/PlayerBadge.tsx` | `PlayerBadge.tsx` | `playerBadges.ts` | built; every player row tag, PQV header and Sim roster/draft list routes through it |
+| `LetterGrade` / `GradeBar` / `GradeLegendSheet` | `ui/LetterGrade.tsx` | `LetterGrade.tsx` | `simGrade.ts` | built; the Fantasy Sim's overall (replaces the OVR gauge there only), see "Fantasy Sim letter grades" |
 | `CompactModule` | `ui/CompactModule.tsx` | `CompactModule.tsx` | `compactModule.ts` (+ `simSummaries.ts`, `simDraft.ts`) | built (Phase 1 of `docs/audits/2026-11-information-architecture.md`); Sim home folds and the Sim draft room use it; `Collapsible` is superseded (SimFold renders CompactModule) |
 
 ## Sheet
@@ -54,22 +55,40 @@ React Native's `Modal`, so keep anything that must survive in the caller's state
 Mobile: `<Sheet open onClose title ... />` wraps the existing `SheetModal` / `SwipeDismissCard` /
 `SheetScrollView` (which own the gesture), so the swipe thresholds are unchanged.
 
-Swipe-to-dismiss (web) is `useSheetDragDismiss` + `<SheetHandle />` on EVERY pop-up shell, hand-rolled or not:
-`Sheet`, `PlayerQuickView`, `SimSheet` (claim, team and every other Fantasy Sim sheet), `ManagerProfileSheet`, the
-Matchup `SwapSheet`, `TradePickerSheet`, `PercentileExplorerSheet`, `AlertsDropdown`, checkout. Spread `sheetStyle`
-on the moving surface and `backdropStyle` on the backdrop (the scrim fades with the drag). A drag starts from the
-handle always, and from the header or body only when every scroll area under the finger is at its top
-(`canStartSheetDrag`, so inner scroll and iOS overscroll never fight it); it closes past ~80-160px (a quarter of
-the sheet) or on a fast flick, else springs back; under reduced motion it closes without the slide. New pop-up
-shells must use the hook (a handle without the hook is the bug this rule exists for). Touch check:
-`scripts/sim_layout_playwright/sheet_drag.mjs` (real CDP touch drags). Mobile sheets get it from `SheetModal` +
-`SwipeDismissCard`.
+Swipe-to-dismiss: see "Gestures" below (one shared state machine, web hook + app hook). Every web pop-up shell
+(`Sheet`, `PlayerQuickView`, `SimSheet`, `ManagerProfileSheet`, Matchup `SwapSheet`, `TradePickerSheet`,
+`PercentileExplorerSheet`, `AlertsDropdown`, checkout, `PopupShell`, GM orb) and the weekly recap `StoryCarousel` use
+`useSheetDragDismiss`; every app pop-up uses `SwipeDismissCard` / `useSheetDismissGesture`. New shells must use the
+hook (a handle without the hook is the bug this rule exists for). The PQV has bespoke chrome, so it stays a
+hand-rolled shell around the same hook until a design pass decides what becomes a `Sheet` prop.
 
-Not migrated yet (low-risk later, one at a time): `PlayerQuickView`, `PercentileExplorerSheet`,
-`ManagerProfileSheet`, `MultiTeamTradeContent`, `MatchupPlanner` SwapSheet, `AlertsDropdown`,
-`SimSheet`, `TradePickerSheet`. They keep working as they are; each can be swapped for
-`Sheet` in its own PR. The PQV in particular has bespoke chrome (field/sweep textures, header
-layout), so it stays a hand-rolled shell until a design pass decides what becomes a `Sheet` prop.
+## Gestures (swipe down to dismiss, snap points)
+
+ONE implementation of drag-to-dismiss on both platforms. The pure rules and a state machine live in the twin
+`lib/sheetGesture.ts` (web `web-next/src/lib`, app `mobile/src/lib`, the app copy only adds the `'worklet'`
+directive; both run the same `sheetGesture.test.ts` cases, including simulated touch sequences). The web hook
+`lib/useSheetDragDismiss.ts` and the app `useSheetDismissGesture` (`SwipeDismissSheet.tsx`) only wire events to it.
+
+- **Start zones**: the handle always drags. Anywhere else a drag starts only when the pull is downward AND every
+  scroll area under the finger was at its top when the touch BEGAN (1px tolerance for fractional scroll offsets).
+  Scrolling content back up to the top and carrying on never turns into a dismiss.
+- **Axis lock**: past an 8px slop a clearly vertical pull (1.25x the horizontal travel) claims the gesture;
+  horizontal swipes (tab strips, chip rows, carousels) and diagonals that never resolve (24px) stay with the page.
+- **Follow + resistance**: the surface follows the finger 1:1 (from where the drag was claimed, no jump), then
+  rubber-bands past the dismiss distance and when pulled above its top. Web writes `transform` straight to the
+  element: no React render per touchmove (re-rendering the PQV 60 times a second was the stutter).
+- **Release**: dismiss when pulled past a quarter of the sheet (80-160px) OR flicked down at >= 0.55px/ms and >= 40px.
+  Velocity is averaged over the last 100ms (one jittery sample used to close a sheet pulled 24px), is 0 after a 100ms
+  rest, and a release moving back up never dismisses. Otherwise it springs back / settles on a snap point.
+- **Snap points** (the peek sheet): `useSheetDragDismiss({ snapPoints: [0.5, 1], snap, onSnapChange })` (fractions of
+  the sheet that stay visible; `snapTo(f)` from code). The sheet is laid out full height and translated to its rest
+  offset. Down from the lowest point dismisses; a flick from full lands on the peek first; below full a pull up from
+  anywhere expands (the content is not scrollable until full). Pure side: `sheetStops`, `resolveSheetRelease`.
+- **Story effect**: `effect: "story"` (full-screen card): translate + scale to 0.9 + fade to 0.45 with the pull.
+- **Dismissal path**: `onDismiss` must close like the X. The story passes `overlay.closeAll` so the overlay stack pops
+  its history entry. Under reduced motion it still follows the finger and closes, with no slide-out or spring.
+- Opt a region out with `data-sheet-no-drag`. Touch only (mouse/keyboard keep X, Esc, backdrop).
+- Check: `scripts/sim_layout_playwright/sheet_drag.mjs` (real CDP touches).
 
 ## StoryCarousel
 
@@ -98,7 +117,9 @@ const pages: StoryPage[] = [
   app; see "Overlays"), so only one pop-up is ever on screen: a player card (PQV) opened from a page REPLACES the
   story (it stays mounted/hidden with its page) and its "‹ Back to ..." returns to the same page. The X (top right)
   closes everything; Escape and the phone/browser Back go back one step. The stack owns the scroll lock, history and
-  z-index: the carousel sets none of them.
+  z-index: the carousel sets none of them. Swiping down out of it works like every sheet (see "Gestures"): the whole
+  card follows the finger, shrinks and fades, and closes via `overlay.closeAll` (same as the X); horizontal swipes and tap
+  zones are unchanged.
 - **Look and motion**: glass over the page background, safe-area padding on all sides, a 240ms slide
   between pages that is off under `prefers-reduced-motion` (app: `useReducedMotion`), no horizontal
   overflow (every column is `min-w-0`).
@@ -451,6 +472,7 @@ Layout rule (immune to iOS Safari fixed-position drift): nothing here is `positi
 - **API**: a page calls `useBottomPillContext({ id, label, tabs, activeKey, onSelect, primary })` (`lib/useBottomPillContext.ts`, store `lib/bottomPillStore.ts`, types and `normalizePillContext` in the `lib/bottomNav.ts` twin) and drops its own page-tab row only when the hook returns true (the pill is on screen and showing that context). Consolidate, never remove: desktop, the flag off and signed-out pages keep the in-page tabs. At most `PILL_MAX_TABS` (5) tabs; one primary; the tab strip scrolls inside the pill if it must.
 - **Motion** (lib/motion.ts tokens, opacity/transform only): entering a page slides the segment in; the menu cross-fades the layers and fans the global tabs out; the primary chip pulses once on mount. Reduced motion: crossfade only (no slide, scale, fan or pulse).
 - **One sticky mechanism**: both layers share one grid cell, so the pill is one row tall in every mode and the stack height is the content clearance. Never `position: fixed`. Guards: `lib/bottomChrome.test.ts`, `lib/bottomBarMetrics.test.ts`, `components/ui/BottomTabBar.test.tsx`, `scripts/sim_layout_playwright/footer_pin.mjs`.
+- **Wired contexts**: `PageTabBar` (every Team / Trades / League page: Team = Roster | Players | Waivers | Matchup, Trades = Hub | Finder | Analyzer | History + primary "New trade", League = Rankings | Recaps | Games) registers its family as `family:<key>`; each tab is a route (`PillContextTab.href`, rendered as a link) and the strip steps aside only while the pill is on screen. Fantasy Sim: the draft room (`sim-draft`: Players | Queue | Roster | Picks + Auto-pick) and Sim Team (`sim-team`: Auto-set). In the game `SimPillHost` marks the pill present and `PillMorph` (in `SimActionBar` / `SimOffseasonBar`) folds Sim to | orb | Advance into the page segment; with no bar mounted (the draft) `PillContextOnly` shows the segment alone. A page swap keeps the context for `PILL_CLEAR_DELAY_MS` so the global tabs never flash between two pages of one family. Not moved yet: the Waivers filter sheet (it owns its own open state), real-league Roster has no auto-set action to promote.
 - **App**: no tab bar (GM orb + More), so `components/BottomPill.tsx` hosts the screen's action row (Sim to | orb | Advance) and morphs to the page segment (Reanimated, `useReducedMotion`); the Sim bars use the same glass. `lib/bottomPillStore.ts` / `useBottomPillContext.ts` are mirrored twins.
 
 ## Phone site shell (Phase B, flagged)
@@ -671,17 +693,38 @@ Rollout status per page: `docs/audits/2026-11-module-templates-rollout.md`.
 ## Player row anatomy (shared by FantasyDesk and the Fantasy Sim)
 
 `PlayerListRow` is THE row: line 1 name (+ the one status chip), line 2 muted meta (TEAM, age, bye), line 3 the **chips
-under the name**: labeled stat chips (PROJ / OVR / ADP / EDGE) then page tags (max 2 plus "+N"), then optional
+under the name**: labeled stat chips (PROJ / OVR / ADP / EDGE; in the Fantasy Sim the OVR slot is a LetterGrade and there is no EDGE) then page tags (max 2 plus "+N"), then optional
 `chipsExtra` (small inline controls such as a Queue toggle). The chip line is indented to the name, **wraps instead of
 clipping**, and nothing sits at the far right except **one trailing action** (`actions`). The Sim reuses it through
 `SimDraftRow`, `SimPlayerLine` and `SimRosterLine`; do not build another row.
 
 ## Fantasy Sim: no internal rating, ever
 
-The model's trade value is the sim's own rating, so it is never shown: no "Value"/"Trade value" label, chip or tile, and
-never a sort. The player-facing number is OVR. Lists sort by ADP, Proj or OVR (`GET /players?sort=overall`; `value` is kept
-server-side only so old clients and saves do not break; outcomes and replays are unchanged). Trades describe a deal in plain
-words (`simDealWords`: "A better deal for you than your offer"), never as numbers.
+The model's trade value is the sim's own rating, so it is never shown: no "Value"/"Trade value" label, chip or tile, no numeric OVR, no
+overall / position rank and never a sort by it. coridian_ (2026-11-14): a numeric OVR is a tell ("I just draft the highest value players
+and it works"), so the sim shows **letter grades** like Madden / 2K. Trades describe a deal in plain words (`simDealWords`), never numbers.
+
+### Fantasy Sim letter grades (web + app)
+
+- **`LetterGrade`** (`ui/LetterGrade.tsx`, app `components/LetterGrade.tsx`, rules in the byte-identical twin `lib/simGrade.ts`): 12 bands
+  A+ .. F in a tinted capsule (same recipe as `PlayerBadge`). The ramp is five existing tokens: **green** (`success`, A), **cyan**
+  (`accent`, B), **gold** (`action` / app `premium`, C), **orange** (`warning`, D), **red** (`danger`, F); +/- share the tone. The letter
+  keeps the primary text colour (lightly mixed with the tone) so contrast holds in both themes. A "?" marks a scouting estimate (rookies);
+  `size="lg"` also prints the range ("B-/B+"). The accessible name is the full read: "Grade B plus, strong starter. Scouts are unsure: B to
+  A minus." No grade renders an invisible placeholder with the same footprint so list columns align.
+- **`PlayerListRow`**: a stat with `grade` (even `null`) renders `LetterGrade` instead of the `OvrGauge` ring; the Sim reaches it only through
+  `simListStats` (PROJ, GRD, ADP; the EDGE chip is gone: it compared model value rank with ADP). The real FantasyDesk keeps `OvrGauge` and its
+  numbers.
+- **`GradeBar`**: one position attribute (label, coarse bar tinted by the grade tone, letter), in the sim quick view's "Attributes" section
+  with the line "From usage and history. Graded on their own: they do not add up to the overall grade."
+- **`GradeLegendSheet` / `GradeLegendButton`**: every band and what it means, what "?" means, what the attributes are. The hero `GradeTile`
+  opens it.
+- **Player Quick View in the sim**: `simSections.heroGrade` replaces the Player score ring; the Value tile, the overall / position rank line
+  and the model radar do not show (`PlayerHeroHeader` `gradeTile` / `hideValue`). The Overview tile reads "Grade".
+- Where it shows: draft room and board, Players / waivers, rosters and team sheets, league rosters, trades and the block, recap
+  players, carousel rows, the draft hint, team cards (top assets), the quick view hero.
+- Tests: `lib/simGrade.test.ts` (web vitest + app node:test), `ui/LetterGrade.test.tsx`, `SimPhoneLayout.test.tsx`, `SimPlayerSheet.test.tsx`;
+  server: `tests/test_sim_grades.py` (including "no API response contains the raw overall"). Calibration: `docs/audits/2026-11-sim-letter-grades.md`.
 
 ## Notice toast (auto-dismiss)
 

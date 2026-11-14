@@ -11,8 +11,6 @@ import { StatusHeader } from "@/components/ui/StatusHeader";
 import { buildTodayStatusHeader, type StatusAttentionItem } from "@/lib/statusHeader";
 import { lineupModuleParts, roomsModuleParts, standingModuleParts, teamStatusHeroModel } from "@/lib/teamStatusModules";
 import { SectionHeading } from "@/components/SectionHeading";
-import { TeamAvatar } from "@/components/TeamAvatar";
-import { ToneBadge } from "@/components/ToneBadge";
 import { api, type GamesSeasonSimResponse, type LeagueTeamRankingsResponse, type MatchupResponse, type MyTeamNeedsResponse, type TeamSnapshot } from "@/lib/api";
 import {
   buildTeamStatusLineup,
@@ -80,22 +78,6 @@ function Fact({ label, value, tone = "neutral" }: { label: string; value: string
         {value}
       </span>
     </span>
-  );
-}
-
-function RowLink({ href, label, children }: { href: string; label: string; children: React.ReactNode }) {
-  return (
-    <Link
-      href={href}
-      aria-label={label}
-      className="flex items-center gap-2 py-2.5 border-t first:border-t-0"
-      style={{ minHeight: 44, color: "inherit", textDecoration: "none", borderTopColor: "var(--color-border)" }}
-    >
-      <span className="min-w-0 flex-1 flex flex-col gap-1">{children}</span>
-      <span aria-hidden="true" data-row-arrow style={{ color: "var(--color-accent)" }}>
-        →
-      </span>
-    </Link>
   );
 }
 

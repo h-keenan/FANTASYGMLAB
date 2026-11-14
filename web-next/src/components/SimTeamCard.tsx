@@ -8,7 +8,9 @@ import { SimCrest } from "@/components/SimCrest";
 import { simToneColor } from "@/components/SimGameParts";
 import { ToneBadge } from "@/components/ToneBadge";
 import type { SimLeagueRosterTeam } from "@/lib/simGame";
-import { simOverallLabel, simTeamChips, simTeamRecordLine } from "@/lib/simLeagueRosters";
+import { simTeamChips, simTeamRecordLine } from "@/lib/simLeagueRosters";
+import { simGradeOf } from "@/lib/simGrade";
+import { LetterGrade } from "@/components/ui/LetterGrade";
 
 /**
  * THE Fantasy Sim team card: who a team is and who it has, at a glance. Used by the League tab's Teams view and
@@ -61,15 +63,13 @@ export function SimTeamCard({
             <li key={p.id} className="flex items-center gap-1 text-xs">
               <PositionBadge position={p.pos} />
               <span className="font-bold">{playerSurname(p.name)}</span>
-              <strong className="tabular-nums" style={{ color: "var(--color-text-secondary)" }}>{simOverallLabel(p.overall)}</strong>
+              <LetterGrade grade={simGradeOf(p)} size="sm" />
             </li>
           ) : (
             <li key={p.id} className="flex items-center gap-2 text-xs">
               <PositionBadge position={p.pos} />
               <PlayerName name={p.name} className="min-w-0 flex-1 font-bold" />
-              <span className="shrink-0 tabular-nums" style={{ color: "var(--color-text-muted)" }}>
-                OVR <strong style={{ color: "var(--color-text-primary)" }}>{simOverallLabel(p.overall)}</strong>
-              </span>
+              <LetterGrade grade={simGradeOf(p)} size="sm" />
             </li>
           ))}
         </ul>

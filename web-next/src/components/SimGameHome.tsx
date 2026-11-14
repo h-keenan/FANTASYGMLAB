@@ -33,14 +33,11 @@ import {
   simChecklistTarget,
   simHomeDynastyLine,
   simChecklistTone,
-  simFmtPts,
   simProjText,
   simFmtRecord,
   simRowEdge,
   simSeasonText,
   simSlotLabels,
-  simWinChanceLabel,
-  simWinChanceTone,
   type SimGamePlayer,
   type SimHomeMatchup,
   type SimHomeResponse,
@@ -223,18 +220,16 @@ function SimMatchupCard({ ctx, matchup, onTab }: { ctx: SimCtx; matchup: SimHome
     );
   }
   const prob = matchup.win_prob ?? 0.5;
-  const tone = simWinChanceTone(prob);
   const youProj = matchup.you_projection ?? 0;
   const oppProj = matchup.opp_projection ?? 0;
   const labels = simSlotLabels(matchup.rows);
   const flagged = (matchup.you_flagged ?? 0) + (matchup.opp_flagged ?? 0);
-  return <MatchupBody ctx={ctx} matchup={matchup} onTab={onTab} prob={prob} tone={tone} youProj={youProj} oppProj={oppProj} labels={labels} flagged={flagged} />;
+  return <MatchupBody ctx={ctx} matchup={matchup} onTab={onTab} prob={prob} youProj={youProj} oppProj={oppProj} labels={labels} flagged={flagged} />;
 }
 
-function MatchupBody({ ctx, matchup, onTab, prob, tone, youProj, oppProj, labels, flagged }: { ctx: SimCtx; matchup: SimHomeMatchup; onTab: (tab: SimTab) => void; prob: number; tone: ReturnType<typeof simWinChanceTone>; youProj: number; oppProj: number; labels: string[]; flagged: number }) {
+function MatchupBody({ ctx, matchup, onTab, prob, youProj, oppProj, labels, flagged }: { ctx: SimCtx; matchup: SimHomeMatchup; onTab: (tab: SimTab) => void; prob: number; youProj: number; oppProj: number; labels: string[]; flagged: number }) {
   const you = ctx.game.you;
   const opp = matchup.opponent!;
-  const week = matchup.week;
   const wide = useSimWide();
   const [showLineups, setShowLineups] = useState<boolean | null>(null);
   const lineupsOpen = showLineups ?? wide;

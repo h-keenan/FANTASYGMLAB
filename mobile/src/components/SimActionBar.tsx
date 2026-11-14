@@ -3,10 +3,12 @@ import { Alert, Pressable, StyleSheet, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 
 import AppText from './AppText';
+import BottomPill from './BottomPill';
 import Button from './Button';
 import type { SimCtx } from './SimGameParts';
 import { useThemeMode } from '../context/ThemeModeContext';
 import { api } from '../lib/api';
+import { usePillState } from '../lib/useBottomPillContext.ts';
 import { simAdvanceLabel } from '../lib/simGame';
 import { simAdvanceState, simLineupIssues, type SimZeroStarter } from '../lib/simLayout';
 import { BAR_METRICS } from '../lib/bottomBarMetrics';
@@ -20,6 +22,7 @@ import { radii, spacing, type ThemeColors } from '../theme';
  * it at the bottom with the game orb inside its one row (Sim to | orb | Advance), and pads the content to match.
  */
 export default function SimActionBar({ ctx, paywalled, advancing, onAdvance, onSimTo, onGoPro, onTab, orb }: { ctx: SimCtx; paywalled: boolean; advancing: boolean; onAdvance: () => void; onSimTo?: () => void; onGoPro: () => void; onTab?: (tab: 'team' | 'players') => void; orb?: React.ReactNode }) {
+  const pill = usePillState();
   const { colors } = useThemeMode();
   const styles = useMemo(() => createStyles(colors), [colors]);
   const { gameId, game } = ctx;
@@ -59,6 +62,7 @@ export default function SimActionBar({ ctx, paywalled, advancing, onAdvance, onS
           {state.reason}
         </AppText>
       ) : null}
+      <BottomPill bare context={pill.barPresent ? pill.ctx : null}>
       <View style={styles.row}>
         {onSimTo && !paywalled ? (
           <Pressable onPress={onSimTo} disabled={advancing} accessibilityRole="button" accessibilityLabel="Sim to..." style={[styles.simTo, advancing && { opacity: 0.5 }]} testID="sim-to-button">
@@ -79,6 +83,7 @@ export default function SimActionBar({ ctx, paywalled, advancing, onAdvance, onS
           )}
         </View>
       </View>
+      </BottomPill>
       <AppText style={styles.srOnly} accessibilityElementsHidden importantForAccessibility="no">
         {simAdvanceLabel(game)}
       </AppText>
