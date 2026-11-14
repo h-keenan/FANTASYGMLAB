@@ -173,7 +173,7 @@ function OfferCard({ item, defaultOpen, busy, canTrade, onRespond }: { item: Sim
   const names = (list: SimTradeAsset[]) => list.map((p) => (simIsPick(p) ? simPickLabelText(p) : playerSurname(p.name))).join(', ');
   return (
     <FadeInView>
-      <AccentCard accent={colors.premium} compact>
+      <AccentCard accent={colors.accent} compact>
         <Pressable
           onPress={() => setOpen((v) => !v)}
           accessibilityRole="button"

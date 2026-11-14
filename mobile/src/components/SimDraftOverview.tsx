@@ -3,23 +3,27 @@ import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
 
 import AppText from './AppText';
 import CompactModule from './CompactModule';
+import CompactPlayerCard from './CompactPlayerCard';
+import { LetterGrade } from './LetterGrade';
+import { MotionIn } from './Motion';
+import { SimTeamIdentity } from './SimTeamIdentity';
 import { Sheet } from './Sheet';
 import { SimDraftGrid } from './SimDraftGrid';
 import { useThemeMode } from '../context/ThemeModeContext';
-import { simDraftMiniBoard, simDraftMiniWindow, simDraftPickChip, simDraftProgress, simDraftRecentPicks, simRookieMiniBoard, simRookieRecentChips, type SimMiniCell } from '../lib/simDraft';
+import { simDraftMiniBoard, simDraftMiniWindow, simDraftPickChip, simDraftProgress, simDraftRecentPicks, simRookieMiniBoard, simRookieRecentCards, simRookieRecentChips, type SimMiniCell, type SimRecentPickCard, type SimSurvival } from '../lib/simDraft';
 import type { SimDraftState, SimGamePlayer } from '../lib/simGame';
 import { positionColor, radii, spacing, type ThemeColors } from '../theme';
 
 /**
- * "Who has been drafted", always on the draft page (not behind a tab): a strip of the latest picks and a mini board
- * (rounds x teams of tiny position-coloured cells, your column outlined, the pick on the clock ringed). The mini
- * board shows the rounds around the clock; "Full board" opens the whole grid in a sheet. Web twin: SimDraftOverview.tsx.
+ * "Who has been drafted", always on the draft page (not behind a tab). The recent picks live in the pinned clock area
+ * (`SimRecentStrip`); this is the mini board module under it: rounds x teams of tiny position-coloured cells, your column
+ * outlined, the pick on the clock ringed; "Full board" opens the whole grid (`onFullBoard`, the page owns the sheet).
+ * Web twin: SimDraftOverview.tsx.
  */
-export function SimDraftOverview({ draft, teams, onOpen }: { draft: SimDraftState; teams: number; onOpen: (player: SimGamePlayer) => void }) {
+export function SimDraftOverview({ draft, teams, onFullBoard }: { draft: SimDraftState; teams: number; onFullBoard: () => void }) {
   const { colors } = useThemeMode();
   const styles = useMemo(() => createStyles(colors), [colors]);
-  const [full, setFull] = useState(false);
-  const recent = simDraftRecentPicks(draft.picks, 8);
+  const recent = simDraftRecentPicks(draft.picks, 1);
   const progress = simDraftProgress(draft, teams);
   const mini = useMemo(() => simDraftMiniBoard(draft, teams), [draft, teams]);
   const win = simDraftMiniWindow(mini.rows, progress.round);
@@ -27,9 +31,6 @@ export function SimDraftOverview({ draft, teams, onOpen }: { draft: SimDraftStat
   const last = recent[0];
   return (
     <View style={styles.wrap} testID="draft-overview">
-      <SimRecentStrip
-        chips={recent.map((pk) => ({ key: String(pk.pick_no), label: simDraftPickChip(pk), pos: pk.player.pos, aria: `Pick ${pk.pick_no}: ${pk.player.name}, ${pk.player.pos}. Open player details`, onPress: () => onOpen(pk.player) }))}
-      />
       <CompactModule
         id="draft.board"
         title="Draft board"
@@ -41,48 +42,79 @@ export function SimDraftOverview({ draft, teams, onOpen }: { draft: SimDraftStat
         ]}
       >
         <SimMiniBoard rows={win.rows} from={win.from} to={win.to} />
-        <Pressable onPress={() => setFull(true)} accessibilityRole="button" style={styles.fullLink}>
+        <Pressable onPress={onFullBoard} accessibilityRole="button" style={styles.fullLink}>
           <AppText style={styles.fullText}>Full board</AppText>
         </Pressable>
       </CompactModule>
-      <Sheet open={full} onClose={() => setFull(false)} title="Full draft board">
-        <SimDraftGrid draft={draft} teams={teams} onOpen={(p) => { setFull(false); onOpen(p); }} />
-      </Sheet>
     </View>
   );
 }
 
-export interface SimRecentChip {
-  key: string;
-  label: string;
-  pos: string;
-  aria?: string;
-  onPress?: () => void;
+/** The full draft grid in a sheet (the strip's "Full board" and the board module's link both open it). */
+export function SimFullBoardSheet({ open, onClose, draft, teams, onOpen }: { open: boolean; onClose: () => void; draft: SimDraftState; teams: number; onOpen: (player: SimGamePlayer) => void }) {
+  return (
+    <Sheet open={open} onClose={onClose} title="Full draft board">
+      <SimDraftGrid draft={draft} teams={teams} onOpen={(p) => { onClose(); onOpen(p); }} />
+    </Sheet>
+  );
 }
 
-/** The latest picks as a horizontally scrolling strip of position-underlined chips (shared by the redraft and rookie drafts). */
-export function SimRecentStrip({ chips }: { chips: SimRecentChip[] }) {
-  const { colors, isDark } = useThemeMode();
+/**
+ * The latest picks as a horizontally scrolling strip of compact player cards: pick number, the picking team's logo
+ * (SimTeamIdentity), avatar, name, position and letter grade. A card opens the player; "Full board" opens the whole board.
+ * Lives in the pinned clock area (redraft and rookie drafts). Web twin: SimDraftOverview.tsx.
+ */
+export function SimRecentStrip({ cards, onOpenPlayer, onFullBoard }: { cards: SimRecentPickCard[]; onOpenPlayer?: (card: SimRecentPickCard) => void; onFullBoard?: () => void }) {
+  const { colors } = useThemeMode();
   const styles = useMemo(() => createStyles(colors), [colors]);
   return (
-    <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.strip} accessibilityLabel="Recent picks" testID="recent-picks">
-      {chips.length === 0 ? (
-        <AppText style={styles.muted}>No picks yet. The first ones land here.</AppText>
-      ) : (
-        chips.map((chip) => (
-          <Pressable
-            key={chip.key}
-            disabled={!chip.onPress}
-            onPress={chip.onPress}
-            accessibilityRole={chip.onPress ? 'button' : undefined}
-            accessibilityLabel={chip.aria ?? chip.label}
-            style={[styles.chip, { borderBottomColor: positionColor(chip.pos, isDark, colors.borderStrong) }]}
-          >
-            <AppText style={styles.chipText}>{chip.label}</AppText>
+    <View style={styles.stripWrap} testID="recent-picks-wrap">
+      <View style={styles.stripHead}>
+        <AppText style={styles.kicker}>Just drafted</AppText>
+        {onFullBoard ? (
+          <Pressable onPress={onFullBoard} accessibilityRole="button" style={styles.boardLink} testID="recent-full-board">
+            <AppText style={styles.fullText}>Full board</AppText>
           </Pressable>
-        ))
-      )}
-    </ScrollView>
+        ) : null}
+      </View>
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.strip} accessibilityLabel="Recent picks" testID="recent-picks">
+        {cards.length === 0 ? (
+          <AppText style={styles.muted}>No picks yet. The first ones land here.</AppText>
+        ) : (
+          cards.map((card, i) => (
+            <MotionIn key={card.key} index={i} count={cards.length}>
+              <Pressable
+                disabled={!onOpenPlayer}
+                onPress={onOpenPlayer ? () => onOpenPlayer(card) : undefined}
+                accessibilityRole={onOpenPlayer ? 'button' : undefined}
+                accessibilityLabel={card.aria}
+                style={[styles.card, card.isYou && { borderColor: colors.accent }]}
+                testID="recent-pick-card"
+              >
+                <View style={styles.cardTop}>
+                  <AppText style={styles.pickNo}>{card.pickLabel}</AppText>
+                  {card.teamName ? <SimTeamIdentity name={card.teamName} size="chip" hideName /> : null}
+                </View>
+                <CompactPlayerCard player={card.player} testID="recent-pick-player" trailing={card.grade ? <LetterGrade grade={card.grade} size="xs" /> : undefined} />
+              </Pressable>
+            </MotionIn>
+          ))
+        )}
+      </ScrollView>
+    </View>
+  );
+}
+
+/** "Who survives to my pick": one calm line from public ADP, a running position and your needs (`simDraftSurvival`). */
+export function SimSurvivalLine({ survival }: { survival: SimSurvival | null }) {
+  const { colors } = useThemeMode();
+  const styles = useMemo(() => createStyles(colors), [colors]);
+  if (!survival) return null;
+  return (
+    <AppText style={styles.survival} testID="draft-survival">
+      <AppText style={[styles.survival, { color: colors.accent, fontWeight: '800' }]}>Before your pick </AppText>
+      {survival.text}
+    </AppText>
   );
 }
 
@@ -114,16 +146,17 @@ export function SimMiniBoard({ rows, from, to }: { rows: SimMiniCell[][]; from: 
   );
 }
 
-/** The rookie draft's always-visible "who has been drafted": recent strip plus the mini board in a CompactModule. */
+/** The rookie draft's always-visible "who has been drafted": the recent strip plus the mini board in a CompactModule. */
 export function SimRookieOverview({ order, onClockPick, round, made, total }: { order: readonly { n: number; round: number; pick: string; is_yours: boolean; made: { id: string; name: string; pos: string } | null }[]; onClockPick: string | null | undefined; round: number; made: number; total: number }) {
   const { colors } = useThemeMode();
   const styles = useMemo(() => createStyles(colors), [colors]);
   const win = simDraftMiniWindow(simRookieMiniBoard(order, onClockPick), round);
-  const chips = simRookieRecentChips(order);
+  const cards = simRookieRecentCards(order);
+  const last = simRookieRecentChips(order, 1)[0];
   return (
     <View style={styles.wrap} testID="rookie-overview">
-      <SimRecentStrip chips={chips} />
-      <CompactModule id="rookie.board" title="Draft board" defaultOpen parts={[{ key: 'n', text: `${made}/${total} picks`, strong: true }, chips[0] ? { key: 'last', text: `last ${chips[0].label}` } : null]}>
+      <SimRecentStrip cards={cards} />
+      <CompactModule id="rookie.board" title="Draft board" defaultOpen parts={[{ key: 'n', text: `${made}/${total} picks`, strong: true }, last ? { key: 'last', text: `last ${last.label}` } : null]}>
         <SimMiniBoard rows={win.rows} from={win.from} to={win.to} />
       </CompactModule>
     </View>
@@ -142,6 +175,14 @@ function createStyles(colors: ThemeColors) {
     round: { width: 24, fontSize: 12, fontWeight: '800', color: colors.textTertiary },
     cells: { flex: 1, flexDirection: 'row', gap: 3 },
     cell: { flex: 1, height: 18, borderRadius: 4 },
+    stripWrap: { gap: 4 },
+    stripHead: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+    kicker: { fontSize: 12, fontWeight: '800', letterSpacing: 0.6, textTransform: 'uppercase', color: colors.textTertiary },
+    boardLink: { minHeight: 32, justifyContent: 'center' },
+    card: { width: 168, gap: 4, padding: spacing.sm, borderRadius: radii.md, backgroundColor: colors.glass, borderWidth: 1, borderColor: 'transparent' },
+    cardTop: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+    pickNo: { fontSize: 12, fontWeight: '800', color: colors.textTertiary },
+    survival: { fontSize: 12.5, color: colors.textSecondary },
     fullLink: { minHeight: 44, justifyContent: 'center', alignSelf: 'flex-start' },
     fullText: { fontSize: 13, fontWeight: '800', color: colors.accent },
   });
