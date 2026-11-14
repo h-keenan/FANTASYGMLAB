@@ -19,6 +19,7 @@ from dataclasses import replace
 from typing import Any, Mapping, Sequence
 
 from modules.sim import aging, scouting
+from modules.sim.game_names import rookie_name
 from modules.sim.game_eval import USER_PARAMS, Evaluator, team_params
 from modules.sim.game_setup import value_pool
 from modules.sim.game_state import Emitter, GameState
@@ -216,6 +217,7 @@ def rookie_class(
             ref12["K"] = by_pos["K"][min(11, len(by_pos["K"]) - 1)]["mean"]
     teams = sorted({r["nfl_team"] for r in vets.values() if r["nfl_team"] not in ("", "FA") and r["pos"] != "DEF"})
     used: set[str] = set()
+    blocked = ({r.get("name") for r in vets.values()} | {p.name for p in base.players.values()}) if s.names_v else ()
     rows: list[dict[str, Any]] = []
     for j in range(1, n + 1):
         if plan is None:
@@ -241,11 +243,15 @@ def rookie_class(
             mean = max(1.5, ref12[pos] * SLOT_TOP / (1.0 + (j / SLOT_HALF) ** SLOT_POWER) * factor * jitter * supply.get(pos, 1.0))
             boost = 1.05 + 0.25 * math.exp(-(j - 1) / 12.0)  # the dynasty market pays for draft capital and years
         market = max(1.0, min(97.0, _market_at(by_pos[pos], mean) * boost))
-        while True:
-            name = f"{FIRST[int(gen.integers(0, len(FIRST)))]} {LAST[int(gen.integers(0, len(LAST)))]}"
-            if name not in used:
-                used.add(name)
-                break
+        if s.names_v:  # names_v 1+: a pure function of (seed, season, slot), never repeating in the save (see game_names)
+            gen.integers(0, 2, size=2)  # burn the two draws the old table lookup made, so the rest of the class (team, age, scouting) is the same world as before
+            name = rookie_name(base.seed, season, j, blocked)
+        else:
+            while True:
+                name = f"{FIRST[int(gen.integers(0, len(FIRST)))]} {LAST[int(gen.integers(0, len(LAST)))]}"
+                if name not in used:
+                    used.add(name)
+                    break
         extra = {"is_rookie": 1.0, "years_exp": 0.0, "draft_year": float(year)}
         nfl_team = teams[int(gen.integers(0, len(teams)))] if teams else "FA"  # draw order is part of the saved world: team, then age
         age = ROOKIE_AGES[int(gen.choice(len(ROOKIE_AGES), p=ROOKIE_AGE_P))]
