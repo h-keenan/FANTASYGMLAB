@@ -159,7 +159,7 @@ export function PlayerListRow({
         <div className="flex min-w-0 items-center gap-1.5">
           <PlayerName
             name={name}
-            className={`min-w-0 truncate font-bold ${name.length > PLAYER_LIST_LONG_NAME ? "text-[0.8125rem]" : "text-sm"}`}
+            className="min-w-0 text-sm font-bold"
             style={{ color: "var(--color-text-primary)" }}
           />
           {chip ? (

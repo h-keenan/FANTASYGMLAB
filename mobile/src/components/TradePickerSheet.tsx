@@ -28,6 +28,7 @@ import {
   type SheetItem,
 } from '../lib/tradeSheetPicker';
 import { radii, scrim, spacing, type ThemeColors } from '../theme';
+import PlayerName from './PlayerName';
 
 /**
  * The shared trade piece picker (mirrors web-next's TradePickerSheet). Tapping
@@ -159,9 +160,7 @@ export default function TradePickerSheet<T = unknown>({
             <View style={styles.chips} accessibilityLabel="Selected">
               {chosen.map((item) => (
                 <Pressable key={item.key} style={styles.chip} onPress={() => dispatch({ type: 'remove', key: item.key })} accessibilityRole="button" accessibilityLabel={`Remove ${item.label}`}>
-                  <AppText style={styles.chipText} numberOfLines={1}>
-                    {item.label}
-                  </AppText>
+                  {item.kind === 'player' ? <PlayerName name={item.label} style={styles.chipText} /> : <AppText style={styles.chipText}>{item.label}</AppText>}
                   <Ionicons name="close" size={14} color={colors.textTertiary} />
                 </Pressable>
               ))}
@@ -409,9 +408,7 @@ export function TradeSideSummary({
         <View style={styles.sideChips}>
           {items.map((item) => (
             <Pressable key={item.key} style={styles.chip} onPress={() => onRemove(item.key)} accessibilityRole="button" accessibilityLabel={`Remove ${item.label}`}>
-              <AppText style={styles.chipText} numberOfLines={1}>
-                {item.label}
-              </AppText>
+              {item.kind === 'player' ? <PlayerName name={item.label} style={styles.chipText} /> : <AppText style={styles.chipText}>{item.label}</AppText>}
               <Ionicons name="close" size={14} color={colors.textTertiary} />
             </Pressable>
           ))}

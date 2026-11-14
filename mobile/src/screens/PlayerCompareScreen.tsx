@@ -204,9 +204,7 @@ function CompareSlot({ label, player, onChoose, onInfo, testID }: { label: strin
                 </View>
               ) : null}
             </View>
-            <AppText style={styles.slotName} numberOfLines={2}>
-              {player.name ?? 'Unknown'}
-            </AppText>
+            <PlayerName name={player.name ?? 'Unknown'} style={styles.slotName} />
             <View style={styles.identityMetaRow}>
               <PositionBadge position={player.position} />
               {player.team ? <AppText style={styles.identityMeta}>{player.team}</AppText> : null}

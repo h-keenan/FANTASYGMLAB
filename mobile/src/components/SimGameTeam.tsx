@@ -51,6 +51,7 @@ import {
   simOverLimitNote,
 } from '../lib/simGame';
 import { positionColor, radii, spacing, type ThemeColors } from '../theme';
+import { playerSurname } from '../lib/playerNameDisplay';
 
 /** Lineup, bench and this week's matchup. Every change saves at once (PUT /lineup). */
 export function SimTeamTab({ ctx, onTrade }: { ctx: SimCtx; onTrade: () => void }) {
@@ -257,7 +258,7 @@ export function SimTeamTab({ ctx, onTrade }: { ctx: SimCtx; onTrade: () => void 
               trailing={
                 cutting === player.id ? (
                   <>
-                    <Button size="sm" variant="danger" label={`Cut ${player.name.split(' ').slice(-1)[0]}`} onPress={() => cut(player)} />
+                    <Button size="sm" variant="danger" label={`Cut ${playerSurname(player.name)}`} onPress={() => cut(player)} />
                     <Button size="sm" variant="ghost" label="Keep" onPress={() => setCutting(null)} />
                   </>
                 ) : (

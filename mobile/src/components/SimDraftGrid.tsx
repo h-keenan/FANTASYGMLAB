@@ -8,6 +8,7 @@ import { useThemeMode } from '../context/ThemeModeContext';
 import { simDraftBoardGrid } from '../lib/simDraft';
 import type { SimDraftState, SimGamePlayer } from '../lib/simGame';
 import { positionColor, spacing, type ThemeColors } from '../theme';
+import PlayerName from './PlayerName';
 
 const COL = 76;
 const ROUND_W = 32;
@@ -54,9 +55,7 @@ export function SimDraftGrid({ draft, teams, onOpen }: { draft: SimDraftState; t
                       accessibilityLabel={`Pick ${cell.pick.pick_no}: ${cell.pick.player.name}, ${cell.pick.player.pos}`}
                       style={[styles.cell, { borderLeftWidth: 3, borderLeftColor: tint ?? colors.borderStrong, backgroundColor: colors.glass }]}
                     >
-                      <AppText style={styles.cellName} numberOfLines={1}>
-                        {cell.pick.player.name.split(/\s+/).slice(-1)[0]}
-                      </AppText>
+                      <PlayerName name={cell.pick.player.name} style={styles.cellName} />
                       <AppText style={styles.cellMeta}>
                         {cell.pick.player.pos} · #{cell.pick.pick_no}
                       </AppText>

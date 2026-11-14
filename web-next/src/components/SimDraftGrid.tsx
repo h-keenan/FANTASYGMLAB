@@ -7,6 +7,7 @@ import { SimDraftEmblem } from "@/components/SimDraftHero";
 import { positionColorVar } from "@/lib/playerPresentation";
 import { simDraftBoardGrid } from "@/lib/simDraft";
 import type { SimDraftState, SimGamePlayer } from "@/lib/simGame";
+import { PlayerName } from "@/components/PlayerName";
 
 const COL = 76;
 
@@ -59,7 +60,7 @@ export function SimDraftGrid({ draft, teams, onOpen }: { draft: SimDraftState; t
                           }}
                           aria-label={`Pick ${cell.pick.pick_no}: ${cell.pick.player.name}, ${cell.pick.player.pos}`}
                         >
-                          <span className="w-full truncate text-[0.6875rem] font-bold">{cell.pick.player.name.split(/\s+/).slice(-1)[0]}</span>
+                          <PlayerName name={cell.pick.player.name} className="w-full text-[0.6875rem] font-bold" />
                           <span className="text-[0.6875rem]" style={{ color: "var(--color-text-muted)" }}>{cell.pick.player.pos} · #{cell.pick.pick_no}</span>
                         </button>
                       ) : (
