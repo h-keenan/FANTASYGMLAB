@@ -12,11 +12,38 @@ import { planHistorySync, type OverlayStack } from "@/lib/overlayStack";
  *   popstate is swallowed.
  * - `reset()` forgets our entries without touching history: used on a route change, where going back would leave
  *   the new page.
+ * - A tap on an in-app link (or `markNavigating()`, for router.push) means the page is about to change. Closing the
+ *   pop-up for that tap must NOT go back in history, or the Back undoes the navigation the tap just started (the
+ *   "tapping a More-menu row does nothing" bug). The entries are forgotten instead; the route change closes the rest.
  */
-export function installOverlayHistory(stack: OverlayStack, win: Window = window): { dispose: () => void; reset: () => void } {
+export function isInAppNavigationClick(event: MouseEvent, origin: string): boolean {
+  if (event.defaultPrevented || event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return false;
+  const target = event.target as Element | null;
+  const anchor = target && typeof target.closest === "function" ? (target.closest("a[href]") as HTMLAnchorElement | null) : null;
+  if (!anchor || (anchor.target && anchor.target !== "_self") || anchor.hasAttribute("download")) return false;
+  try {
+    const url = new URL(anchor.href, origin);
+    return url.origin === origin;
+  } catch {
+    return false;
+  }
+}
+
+/** How long a tap on a link / markNavigating() keeps history Back suppressed (covers a slow route transition). */
+const NAVIGATING_WINDOW_MS = 4000;
+
+export function installOverlayHistory(stack: OverlayStack, win: Window = window): { dispose: () => void; reset: () => void; markNavigating: () => void } {
   let pushed = 0;
   let ignorePops = 0;
   let scheduled = false;
+  let navigatingUntil = 0;
+  const markNavigating = () => {
+    navigatingUntil = Date.now() + NAVIGATING_WINDOW_MS;
+  };
+  const onClickCapture = (event: MouseEvent) => {
+    if (stack.size() > 0 && isInAppNavigationClick(event, win.location.origin)) markNavigating();
+  };
+  win.document.addEventListener("click", onClickCapture, true);
 
   const sync = () => {
     scheduled = false;
@@ -27,6 +54,7 @@ export function installOverlayHistory(stack: OverlayStack, win: Window = window)
     }
     if (plan.pop > 0) {
       pushed -= plan.pop;
+      if (Date.now() < navigatingUntil) return; // leaving the page: do not walk history back over the navigation
       ignorePops += 1;
       win.history.go(-plan.pop);
     }
@@ -55,10 +83,13 @@ export function installOverlayHistory(stack: OverlayStack, win: Window = window)
     dispose() {
       unsubscribe();
       win.removeEventListener("popstate", onPopState);
+      win.document.removeEventListener("click", onClickCapture, true);
     },
     reset() {
       pushed = 0;
       ignorePops = 0;
+      navigatingUntil = 0;
     },
+    markNavigating,
   };
 }

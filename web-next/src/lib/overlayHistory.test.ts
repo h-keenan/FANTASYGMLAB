@@ -67,4 +67,45 @@ describe("overlay history integration", () => {
     await flush();
     expect(go).not.toHaveBeenCalled();
   });
+
+  it("closing a pop-up for an in-app link tap does not walk history back over the navigation", async () => {
+    const go = vi.spyOn(window.history, "go").mockImplementation(() => {});
+    const { stack } = setup();
+    stack.open({ id: "a", kind: "sheet", title: "A", dismiss: () => {} });
+    await flush();
+    const link = document.createElement("a");
+    link.href = "/gm-game";
+    document.body.appendChild(link);
+    link.dispatchEvent(new MouseEvent("click", { bubbles: true, cancelable: true, button: 0 }));
+    stack.close("a"); // the row's onClose
+    await flush();
+    expect(go).not.toHaveBeenCalled();
+    link.remove();
+  });
+
+  it("an external or new-tab link does not suppress Back", async () => {
+    const go = vi.spyOn(window.history, "go").mockImplementation(() => {});
+    const { stack } = setup();
+    stack.open({ id: "a", kind: "sheet", title: "A", dismiss: () => {} });
+    await flush();
+    const link = document.createElement("a");
+    link.href = "https://example.com/x";
+    document.body.appendChild(link);
+    link.dispatchEvent(new MouseEvent("click", { bubbles: true, cancelable: true, button: 0 }));
+    stack.close("a");
+    await flush();
+    expect(go).toHaveBeenCalledWith(-1);
+    link.remove();
+  });
+
+  it("markNavigating covers programmatic router.push", async () => {
+    const go = vi.spyOn(window.history, "go").mockImplementation(() => {});
+    const { stack, handle } = setup();
+    stack.open({ id: "a", kind: "sheet", title: "A", dismiss: () => {} });
+    await flush();
+    handle.markNavigating();
+    stack.close("a");
+    await flush();
+    expect(go).not.toHaveBeenCalled();
+  });
 });
