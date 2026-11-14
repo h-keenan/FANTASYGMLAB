@@ -700,32 +700,39 @@
   color: var(--color-accent);
   background: color-mix(in srgb, var(--color-accent) 12%, transparent);
 }
+/* Floating glass pill (approved option B, docs/audits/2026-11-footer-options.html): a detached capsule 12px off the
+   screen edges and above the safe-area inset. The Fantasy Sim bar (.action-pill) shares the same glass below so the
+   two chromes match. Still inside the in-flow sticky .bottom-stack: the pill is margin inside the stack, never fixed. */
 .bottom-tab-bar {
-  /* Frosted glass over the page background: translucent surface tint, strong blur, a lit top hairline. */
+  /* Frosted glass over the page background: translucent surface tint, strong blur, a lit top hairline, a soft shadow. */
   background:
     linear-gradient(180deg, color-mix(in srgb, var(--color-surface-raised, var(--color-surface)) 46%, transparent), color-mix(in srgb, var(--color-bg) 70%, transparent));
   -webkit-backdrop-filter: blur(24px) saturate(180%);
   backdrop-filter: blur(24px) saturate(180%);
-  border-top: var(--border-width-default) solid var(--glass-border, var(--color-border));
-  box-shadow: inset 0 1px 0 color-mix(in srgb, #fff 10%, transparent), 0 -6px 24px color-mix(in srgb, var(--color-accent) 7%, transparent);
-  padding: 4px 6px env(safe-area-inset-bottom, 0px);
+  border: var(--border-width-default) solid var(--glass-border, var(--color-border));
+  border-radius: 999px;
+  box-shadow: inset 0 1px 0 color-mix(in srgb, #fff 10%, transparent), 0 6px 24px color-mix(in srgb, #000 40%, transparent), 0 0 20px color-mix(in srgb, var(--color-accent) 8%, transparent);
+  margin: 0 var(--bar-side-inset) calc(var(--bar-pill-bottom-gap) + env(safe-area-inset-bottom, 0px));
+  padding: 5px;
 }
-.bottom-tab-bar ul { display: flex; gap: 4px; margin: 0; padding: 0; list-style: none; }
-.bottom-tab-bar li { flex: 1 1 0; min-width: 0; }
+.bottom-tab-bar ul { display: flex; gap: 2px; margin: 0; padding: 0; list-style: none; }
+.bottom-tab-bar li { flex: 1 1 0; min-width: var(--bar-button-min-height); transition: flex-grow 240ms cubic-bezier(0.3, 0.7, 0.2, 1); }
+/* The lit tab takes about 2.6 icon-widths and shows its label; the rest are icon-only. */
+.bottom-tab-bar li[data-active] { flex-grow: 2.6; }
 .bottom-tab {
   position: relative;
   display: flex;
   width: 100%;
-  min-height: calc(var(--bar-tab-height) - 4px);
+  min-height: calc(var(--bar-tab-height) - 6px);
   box-sizing: border-box;
-  flex-direction: column;
+  flex-direction: row;
   align-items: center;
   justify-content: center;
-  gap: 3px;
+  gap: 6px;
   margin: 0;
-  padding: 5px 2px;
+  padding: 0 6px;
   font-family: inherit; /* <button> tabs (More) do not inherit the font by default; links do */
-  font-size: 0.6875rem;
+  font-size: 0.75rem;
   font-weight: 700;
   line-height: 1;
   letter-spacing: 0.01em;
@@ -741,10 +748,16 @@
   text-decoration: none;
   cursor: pointer;
   -webkit-tap-highlight-color: transparent;
-  transition: background-color 180ms ease, border-color 180ms ease, box-shadow 180ms ease, color 180ms ease, scale 120ms ease, opacity 120ms ease;
+  transition: background-color 200ms ease, border-color 200ms ease, box-shadow 200ms ease, color 200ms ease, scale 120ms ease, opacity 120ms ease;
 }
 .bottom-tab-icon { display: inline-flex; width: 24px; height: 24px; align-items: center; justify-content: center; flex-shrink: 0; }
 .bottom-tab-label { display: block; max-width: 100%; overflow: hidden; text-overflow: ellipsis; }
+/* Inactive tabs are icon-only: the label stays in the DOM (visually hidden) and aria-label names the control. */
+.bottom-tab:not([aria-current="page"]) .bottom-tab-label {
+  position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; overflow: hidden; clip-path: inset(50%); white-space: nowrap;
+}
+.bottom-tab[aria-current="page"] .bottom-tab-label { animation: bottom-tab-label-in 220ms ease-out both; }
+@keyframes bottom-tab-label-in { from { opacity: 0; } to { opacity: 1; } }
 /* Active: a cyan glass pill with a soft glow and a gold hairline highlight along its top edge. */
 .bottom-tab[aria-current="page"] {
   color: var(--color-accent);
@@ -764,10 +777,11 @@
   box-shadow: 0 0 8px color-mix(in srgb, var(--color-premium, var(--color-accent)) 70%, transparent);
 }
 .bottom-tab:focus-visible { outline: 2px solid var(--color-accent); outline-offset: -3px; }
+.bottom-tab[aria-current="page"] .bottom-tab-badge { left: auto; right: 6px; }
 .bottom-tab-badge {
   position: absolute;
-  top: 2px;
-  left: calc(50% + 6px);
+  top: 3px;
+  left: calc(50% + 3px);
   min-width: 16px;
   height: 16px;
   padding: 0 4px;
@@ -783,20 +797,108 @@
 @media (max-width: 767px) {
 .action-pill {
     margin: 0 var(--bar-side-inset) var(--bar-pill-bottom-gap);
-    background: color-mix(in srgb, var(--color-bg) 94%, transparent);
-    -webkit-backdrop-filter: blur(22px) saturate(180%);
-    backdrop-filter: blur(22px) saturate(180%);
+    /* Same frosted glass as .bottom-tab-bar so the site shell and Fantasy Sim footers match. */
+    background: linear-gradient(180deg, color-mix(in srgb, var(--color-surface-raised, var(--color-surface)) 46%, transparent), color-mix(in srgb, var(--color-bg) 70%, transparent));
+    -webkit-backdrop-filter: blur(24px) saturate(180%);
+    backdrop-filter: blur(24px) saturate(180%);
     border: 1px solid var(--glass-border, var(--color-border));
-    border-radius: var(--radius-panel, 20px);
-    box-shadow: var(--glass-shadow, var(--shadow-card)), 0 0 18px color-mix(in srgb, var(--color-accent) 12%, transparent);
+    border-radius: 28px;
+    box-shadow: inset 0 1px 0 color-mix(in srgb, #fff 10%, transparent), 0 6px 24px color-mix(in srgb, #000 40%, transparent), 0 0 20px color-mix(in srgb, var(--color-accent) 8%, transparent);
   }
+  .action-pill button:not(.tap-link), .action-pill a { border-radius: 999px; }
+  /* The orb sits in the pill: its badge hugs the orb's corner so nothing pokes past the pill edge. */
+  .game-orb--bar .game-orb-badge { transform: translate(15%, -15%); }
 }
+
+/* ---- Smart pill (V2): global row <-> two icons + page segment, one row, one grid cell. Opacity/transform only. ---- */
+.bottom-tab-bar[data-has-context] { display: grid; }
+.pill-layer { grid-area: 1 / 1; min-width: 0; display: flex; align-items: center; }
+.pill-layer--global ul { flex: 1 1 auto; min-width: 0; }
+.pill-layer--global,
+.pill-layer--context {
+  transition: opacity var(--motion-base, 240ms) var(--ease-out, ease-out), transform var(--motion-base, 240ms) var(--ease-out, ease-out), visibility 0s;
+}
+/* The folded layer: gone from view, hit-testing and the a11y tree once its fade ends. */
+.bottom-tab-bar[data-mode="context"] .pill-layer--global,
+.bottom-tab-bar[data-mode="menu"] .pill-layer--context {
+  opacity: 0; visibility: hidden; pointer-events: none;
+  transition: opacity var(--motion-base, 240ms) var(--ease-out, ease-out), transform var(--motion-base, 240ms) var(--ease-out, ease-out), visibility 0s var(--motion-base, 240ms);
+}
+.bottom-tab-bar[data-mode="context"] .pill-layer--global { transform: scale(0.96); }
+.bottom-tab-bar[data-mode="menu"] .pill-layer--context { transform: translateX(-10px) scale(0.97); }
+/* Menu opening: the global tabs fan out one after another. */
+.bottom-tab-bar[data-mode="menu"] .pill-layer--global li { animation: pill-fan 260ms var(--ease-out, ease-out) both; animation-delay: calc(var(--i, 0) * 30ms); }
+@keyframes pill-fan { from { opacity: 0; transform: translateX(-14px) scale(0.9); } to { opacity: 1; transform: none; } }
+/* Entering a page with context: the segment slides in from the right. */
+.pill-layer--context { animation: pill-context-in 260ms var(--ease-out, ease-out) both; }
+@keyframes pill-context-in { from { opacity: 0; transform: translateX(18px); } to { opacity: 1; transform: none; } }
+
+.pill-icon-btn {
+  position: relative; flex: 0 0 var(--bar-button-min-height); width: var(--bar-button-min-height); height: var(--bar-button-min-height);
+  display: inline-flex; align-items: center; justify-content: center; margin: 0; padding: 0;
+  -webkit-appearance: none; appearance: none; background: transparent; border: var(--border-width-default) solid transparent; border-radius: 999px;
+  color: var(--color-text-muted); cursor: pointer; text-decoration: none; -webkit-tap-highlight-color: transparent;
+  transition: background-color 180ms ease, color 180ms ease, box-shadow 180ms ease;
+}
+.pill-icon-btn--section {
+  color: var(--color-accent);
+  background: linear-gradient(180deg, color-mix(in srgb, var(--color-accent) 22%, transparent), color-mix(in srgb, var(--color-accent) 9%, transparent));
+  border-color: color-mix(in srgb, var(--color-accent) 40%, transparent);
+  box-shadow: inset 0 1px 0 color-mix(in srgb, #fff 18%, transparent), 0 0 14px color-mix(in srgb, var(--color-accent) 24%, transparent);
+}
+.pill-icon-btn--menu[aria-expanded="true"] { color: var(--color-text-primary); background: color-mix(in srgb, #fff 10%, transparent); }
+.pill-divider { flex: 0 0 1px; height: 24px; margin: 0 4px; background: var(--glass-border, var(--color-border)); }
+.pill-tabs {
+  position: relative; flex: 1 1 0; min-width: 0; display: flex; align-items: center; gap: 2px;
+  overflow-x: auto; scrollbar-width: none; overscroll-behavior-x: contain;
+}
+.pill-tabs::-webkit-scrollbar { display: none; }
+.pill-indicator {
+  position: absolute; left: 0; top: 50%; height: 36px; margin-top: -18px; width: var(--ind-w, 0px); border-radius: 999px; pointer-events: none;
+  transform: translateX(var(--ind-x, 0px));
+  background: color-mix(in srgb, #fff 10%, transparent);
+  box-shadow: inset 0 1px 0 color-mix(in srgb, #fff 14%, transparent);
+  transition: transform var(--motion-base, 240ms) var(--ease-out, ease-out), width var(--motion-base, 240ms) var(--ease-out, ease-out);
+}
+.pill-tabs:not([data-measured]) .pill-indicator { visibility: hidden; }
+.pill-tab {
+  position: relative; flex: 0 0 auto; min-height: var(--bar-button-min-height); margin: 0; padding: 0 10px;
+  -webkit-appearance: none; appearance: none; background: transparent; border: 0; border-radius: 999px; cursor: pointer;
+  font-family: inherit; font-size: 0.75rem; font-weight: 700; line-height: 1; white-space: nowrap; color: var(--color-text-muted);
+  -webkit-tap-highlight-color: transparent; transition: color 180ms ease;
+}
+.pill-tab[aria-selected="true"] { color: var(--color-text-primary); }
+.pill-tab-badge { margin-left: 4px; padding: 1px 5px; border-radius: 999px; font-size: 0.625rem; background: var(--color-accent); color: var(--color-on-accent, #001018); }
+.pill-primary {
+  flex: 0 0 auto; display: inline-flex; align-items: center; gap: 5px; min-height: var(--bar-button-min-height); margin: 0 0 0 4px; padding: 0 14px;
+  -webkit-appearance: none; appearance: none; border: 0; border-radius: 999px; cursor: pointer; white-space: nowrap;
+  font-family: inherit; font-size: 0.75rem; font-weight: 800; background: var(--color-accent-strong, var(--color-accent)); color: var(--color-on-accent, #001018);
+  animation: pill-pulse 300ms var(--ease-out, ease-out) 1;
+  -webkit-tap-highlight-color: transparent;
+}
+/* Four or more page tabs: the primary keeps its icon and gives the label to the strip (aria-label still names it). */
+.pill-primary[data-compact] { width: var(--bar-button-min-height); padding: 0; justify-content: center; }
+.pill-primary[data-compact] .pill-primary-label { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
+.pill-tabs { -webkit-mask-image: linear-gradient(90deg, #000 calc(100% - 14px), transparent); mask-image: linear-gradient(90deg, #000 calc(100% - 14px), transparent); }
+.pill-primary:disabled { opacity: 0.5; cursor: default; }
+@keyframes pill-pulse { 0% { transform: scale(0.92); } 60% { transform: scale(1.08); } 100% { transform: scale(1); } }
+.pill-icon-btn:focus-visible, .pill-tab:focus-visible, .pill-primary:focus-visible { outline: 2px solid var(--color-accent); outline-offset: -3px; }
+@media (prefers-reduced-motion: reduce) {
+  /* Crossfade only: no slide, scale, fan or pulse; the capsule jumps. */
+  .pill-layer--global, .pill-layer--context { transform: none !important; }
+  .bottom-tab-bar[data-mode="menu"] .pill-layer--global li,
+  .pill-primary { animation: none; }
+  .pill-layer--context { animation: pill-fade-in 180ms linear both; }
+  .pill-indicator { transition: none; }
+}
+@keyframes pill-fade-in { from { opacity: 0; } to { opacity: 1; } }
 @media (min-width: 768px) {
   .bottom-stack { display: contents; }
   .bottom-tab-bar { display: none; }
 }
 @media (prefers-reduced-motion: reduce) {
-  .bottom-tab { transition: none; }
+  .bottom-tab, .bottom-tab-bar li { transition: none; }
+  .bottom-tab[aria-current="page"] .bottom-tab-label { animation: none; }
 }
 .bottom-stack:has(.bottom-tab-bar) { padding-bottom: 0; }
 
