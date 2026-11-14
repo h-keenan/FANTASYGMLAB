@@ -589,3 +589,25 @@ through `useOverlay` / `PopupShell` / `Sheet`, so the one-pop-up-at-a-time, Back
 
 Left as they are (short or already segmented): trade picker (Players / Picks segmented control), Matchup swap sheet,
 share previews, filter sheets, alerts dropdown.
+
+## Charts: one module (web `ui/TrendChart` + mobile `TrendChart` + `lib/chartSeries.ts` twin)
+
+Every line / area chart goes through `TrendChart`; never hand-roll an SVG path or add a charting library for a trend.
+Data rules live in `lib/chartSeries.ts` (byte-identical twin, tested in `chartSeries.test.ts`):
+- A bye / missed / injured week is a gap row (`y: null`, optional `gap`): the line breaks, a dashed bridge crosses it and a
+  muted hollow marker sits on it (tap for "Bye week"). Never a blank hole.
+- One played point renders a labelled stat with a mini bar ("Not enough weeks yet for a trend"), not a lone dot; no data
+  renders a short sentence. 2-3 points get value labels and bigger dots.
+- Axes: nice ticks, optional zero baseline, `clamp` (ratings 0-99), exact `yDomain` + `invertY` for ranks; monotone smoothing.
+- `variant="compact"` is the axis-free sparkline for compact modules. Tap / hover / focus a point for the tooltip.
+- Draw-in animation only under `prefers-reduced-motion: no-preference`. Tokens only.
+Adapters: `WeeklyPointsChart` (weekly points, optional projection band), `RatingHistoryChart`, the season-review rank journey.
+Not trend charts (left as is): `ModelRadarChart` (radar), `CircularProgressRing`, progress bars.
+
+## Bottom chrome: one sticky mechanism
+
+Everything pinned to the bottom of a phone screen (tab bar + action strip, Fantasy Sim bar + orb, GM orb) is an in-flow
+`position: sticky; bottom: 0` element: `.bottom-stack` (full-width) or `.bottom-rail` (zero-height rail, orb absolute in it).
+Never `position: fixed`, never JS-placed. Sticky is clamped to its parent's box, so the parent must span the whole document:
+html/body never get a fixed height (body is `min-height: 100dvh`), and the column chain uses `flex-auto`, not `flex-1`/`min-h-0`.
+`lib/bottomChrome.test.ts` guards this; `scripts/sim_layout_playwright/footer_pin.mjs` checks it in a browser.

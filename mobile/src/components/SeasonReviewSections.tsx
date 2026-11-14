@@ -1,9 +1,9 @@
 import React, { useMemo } from 'react';
 import { ScrollView, StyleSheet, useWindowDimensions, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import Svg, { Circle, Line, Path } from 'react-native-svg';
 
 import AccentCard from './AccentCard';
+import TrendChart from './TrendChart';
 import AppText from './AppText';
 import Collapsible from './Collapsible';
 import PositionBadge from './PositionBadge';
@@ -166,26 +166,24 @@ function PathView({ steps, caption }: { steps: ReviewPathStep[]; caption?: strin
 
 function JourneyView({ points, teams }: { points: { label: string; rank: number; sub?: string }[]; teams: number }) {
   const { colors } = useThemeMode();
-  const w = 300;
-  const h = 96;
-  const pad = 14;
-  const x = (i: number) => pad + (i * (w - 2 * pad)) / Math.max(1, points.length - 1);
-  const y = (rank: number) => pad + ((rank - 1) * (h - 2 * pad)) / Math.max(1, teams - 1);
   const best = Math.min(...points.map((p) => p.rank));
   const worst = Math.max(...points.map((p) => p.rank));
-  const d = points.map((p, i) => `${i === 0 ? 'M' : 'L'}${x(i).toFixed(1)} ${y(p.rank).toFixed(1)}`).join(' ');
   const last = points[points.length - 1];
   return (
     <View style={[styles.tile, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-      <View accessible accessibilityRole="image" accessibilityLabel={`Standings rank by week, best ${best}, worst ${worst}, finished ${last.rank}`} style={{ aspectRatio: w / h }}>
-        <Svg width="100%" height="100%" viewBox={`0 0 ${w} ${h}`}>
-          <Line x1={pad} x2={w - pad} y1={y(1)} y2={y(1)} stroke={colors.border} strokeDasharray="3 4" />
-          <Path d={d} fill="none" stroke={colors.accent} strokeWidth={2.5} strokeLinejoin="round" strokeLinecap="round" />
-          {points.map((p, i) => (
-            <Circle key={i} cx={x(i)} cy={y(p.rank)} r={p.rank === best ? 4.5 : 3} fill={p.rank === best ? colors.success : p.rank === worst ? colors.danger : colors.accent} />
-          ))}
-        </Svg>
-      </View>
+      <TrendChart
+        points={points.map((p, i) => ({ x: i, y: p.rank, label: `${p.label} · ${p.sub ?? ''}`.replace(/ · $/, '') }))}
+        name="Standings rank by week"
+        unit="rank"
+        xNoun="week"
+        formatX={(i) => points[Math.round(i)]?.label ?? ''}
+        formatY={(v) => `#${Math.round(v)}`}
+        yDomain={[1, Math.max(2, teams)]}
+        invertY
+        height={120}
+        pointColor={(pt, _ctx, c) => (pt.y === best ? c.success : pt.y === worst ? c.danger : undefined)}
+        testID="review-journey-chart"
+      />
       <View style={styles.journeyLabels}>
         <AppText style={{ fontSize: 12, color: colors.textTertiary }}>{points[0].label}: #{points[0].rank}</AppText>
         <AppText style={{ fontSize: 12, color: colors.textTertiary }}>
