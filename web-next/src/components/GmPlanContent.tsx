@@ -4,6 +4,11 @@ import { FreeLimitNote } from "@/components/FreeLimitNote";
 import Link from "next/link";
 import { EmptyState } from "@/components/EmptyState";
 import { AccentCard } from "@/components/AccentCard";
+import { CompactModule } from "@/components/ui/CompactModule";
+import { LinkModule } from "@/components/ui/ModuleTemplates";
+import { listSummaryParts } from "@/lib/moduleTemplates";
+import { abbreviatePlayerName } from "@/lib/formatPlayerName";
+import { tradeIdeaSummaryParts } from "@/lib/tradeIdeaSummary";
 import { PlayerIdentity } from "@/components/PlayerRow";
 import { ValueStat } from "@/components/ValueStat";
 import { SectionHeading } from "@/components/SectionHeading";
@@ -170,22 +175,24 @@ function TradeOpportunityCard({ item, detailsHref }: { item: GmPlanTradeItem; de
   const accent = injuryDisplay ? "var(--color-danger)" : "var(--color-accent)";
   const gain = item.trade_gain;
   const hasGain = gain !== null && gain !== undefined;
-  const gainColor = hasGain && gain! > 0 ? "var(--color-success)" : hasGain && gain! < 0 ? "var(--color-danger)" : "var(--color-text-secondary)";
   const theirLabel = injuryDisplay ? `${item.their_player} (${injuryDisplay})` : item.their_player;
 
-  return (
-    <AccentCard accent={accent}>
-      <div className="flex items-center justify-between gap-2 flex-wrap">
-        <h3 className="text-base font-extrabold break-words" style={{ color: "var(--color-text-primary)" }}>
-          {item.partner_team_name || "Trade idea"}
-        </h3>
-        {hasGain ? (
-          <span className="text-sm font-bold shrink-0" style={{ color: gainColor, fontVariantNumeric: "tabular-nums" }}>
-            {formatTradeGain(gain!)}
-          </span>
-        ) : null}
-      </div>
+  // Collapsed: partner + the same summary the Trade Hub idea cards use; the package and rationale open on tap.
+  const summary = tradeIdeaSummaryParts({
+    gain: hasGain ? gain! : 0,
+    sendNames: item.send_assets.length > 0 ? item.send_assets.map((asset) => abbreviatePlayerName(asset.name)) : [abbreviatePlayerName(item.my_player)],
+    receiveNames: item.receive_assets.length > 0 ? item.receive_assets.map((asset) => abbreviatePlayerName(asset.name)) : [abbreviatePlayerName(item.their_player)],
+    confidenceLabel: item.trade_confidence_label,
+  }).filter((part) => hasGain || part.key !== "gain");
 
+  return (
+    <CompactModule
+      id={`gmplan.trade.${item.my_player_id}.${item.their_player_id}`}
+      title={item.partner_team_name || "Trade idea"}
+      parts={summary}
+      accent={accent}
+      persist={false}
+    >
       {hasAssets ? (
         <div className="grid grid-cols-1 sm:grid-cols-[minmax(0,1fr)_1.5rem_minmax(0,1fr)] gap-3 items-start">
           <ExchangeSide label="You send" dotColor="var(--color-danger)" assets={item.send_assets} />
@@ -218,7 +225,7 @@ function TradeOpportunityCard({ item, detailsHref }: { item: GmPlanTradeItem; de
           </Link>
         ) : null}
       </div>
-    </AccentCard>
+    </CompactModule>
   );
 }
 
@@ -231,18 +238,49 @@ function FocusItem({ item, detailsHref }: { item: GmPlanFocusItem; detailsHref?:
   return null;
 }
 
+function tradeIdeasParts(items: GmPlanTradeItem[], gated: boolean, watchFor?: string) {
+  if (gated) return [{ key: "gate", text: "Locked until GM Plan is available for this league", tone: "muted" as const }];
+  return listSummaryParts({
+    count: items.length,
+    noun: "trade idea",
+    none: "No trade ideas right now",
+    highlights: items.length > 0
+      ? items.slice(0, 2).map((item) => `${item.partner_team_name || "Trade idea"}${item.trade_gain != null ? ` ${formatTradeGain(item.trade_gain)}` : ""}`)
+      : [watchFor],
+  });
+}
+
+function coreParts(protectedRows: ProtectRow[], otherRows: ProtectRow[]) {
+  return listSummaryParts({
+    count: protectedRows.length,
+    noun: "protected player",
+    none: "No protected players yet",
+    highlights: [
+      protectedRows.length > 0 ? protectedRows.slice(0, 3).map((row) => abbreviatePlayerName(row.player.name)).join(", ") : null,
+      otherRows.length > 0 ? `${otherRows.length} more on your roster` : null,
+    ],
+  });
+}
+
+function focusAreaParts(area: GmPlanFocusArea) {
+  if (area.status === "no_signal") return [{ key: "none", text: area.watch_for || "Nothing to flag right now.", tone: "muted" as const }];
+  const tradeNames = area.items
+    .filter((item): item is GmPlanTradeItem => "partner_team_name" in item)
+    .map((item) => item.partner_team_name)
+    .filter(Boolean);
+  return [
+    ...listSummaryParts({ count: area.items.length, noun: "signal", highlights: tradeNames.length > 0 ? [tradeNames.join(", ")] : [area.framing] }),
+  ];
+}
+
 function FocusAreaSection({ area, detailsHref }: { area: GmPlanFocusArea; detailsHref?: (item: GmPlanTradeItem) => string }) {
   return (
-    <section className="flex flex-col gap-3">
-      <div className="flex flex-col gap-0.5">
-        <SectionHeading>{area.title}</SectionHeading>
-        {area.framing ? (
-          <p className="text-xs" style={{ color: "var(--color-text-muted)" }}>
-            {area.framing}
-          </p>
-        ) : null}
-      </div>
-
+    <CompactModule id={`gmplan.area.${area.key}`} title={area.title} parts={focusAreaParts(area)} defaultOpen={area.status !== "no_signal"}>
+      {area.framing ? (
+        <p className="text-xs" style={{ color: "var(--color-text-muted)" }}>
+          {area.framing}
+        </p>
+      ) : null}
       {area.status === "no_signal" ? (
         <p className="text-sm" style={{ color: "var(--color-text-muted)" }}>
           {area.watch_for || "Nothing to flag right now."}
@@ -254,7 +292,7 @@ function FocusAreaSection({ area, detailsHref }: { area: GmPlanFocusArea; detail
           ))}
         </div>
       )}
-    </section>
+    </CompactModule>
   );
 }
 
@@ -706,57 +744,57 @@ export function GmPlanContent({
             </section>
           ) : null}
 
-          <section className="flex flex-col gap-2">
-            <SectionHeading action={linkAction("View all", tradeHubHref)}>Trade ideas</SectionHeading>
+          <CompactModule
+            id="gmplan.overview.trades"
+            title="Trade ideas"
+            parts={tradeIdeasParts(tradeItems, Boolean(planGate), tradeArea?.watch_for)}
+            action={tradeHubHref ? linkAction("View all", tradeHubHref) : undefined}
+            defaultOpen
+          >
             {tradesBlock(tradeItems, 2)}
-          </section>
+          </CompactModule>
 
           {myTeam && leagueId && !noRoster ? (
-            <section className="flex flex-col gap-2">
-              <SectionHeading
-                action={
-                  <button type="button" onClick={() => setTab("core")} className="text-xs font-bold" style={{ color: "var(--color-accent)" }}>
-                    View all
-                  </button>
-                }
-              >
-                Protected Core
-              </SectionHeading>
+            <CompactModule
+              id="gmplan.overview.core"
+              title="Protected Core"
+              parts={coreParts(protectedRows, otherRows)}
+              action={
+                <button type="button" onClick={() => setTab("core")} className="text-xs font-bold px-2" style={{ color: "var(--color-accent)", minHeight: "var(--touch-target-min)" }}>
+                  View all
+                </button>
+              }
+            >
               {protectedRows.length > 0 ? protectedList(protectedRows.slice(0, 3)) : null}
               {otherRows.length > 0 ? rosterLine : null}
-            </section>
+            </CompactModule>
           ) : null}
 
           {leagueId ? (
-            <section className="flex flex-col gap-2">
-              <SectionHeading>Season outlook</SectionHeading>
-              <Link
-                href={`/fantasy-sim/${base}?${q}`}
-                className="glass-surface flex items-center justify-between gap-3 p-4"
-              >
-                <span className="flex flex-col gap-0.5">
-                  <span className="text-sm font-bold" style={{ color: "var(--color-text-primary)" }}>
-                    See your season forecast
-                  </span>
-                  <span className="text-xs" style={{ color: "var(--color-text-secondary)" }}>
-                    One tap: playoff odds, projected record and finish, title odds and what swings them. Pro.
-                  </span>
-                </span>
-                <span className="text-xs font-bold" style={{ color: "var(--color-accent)" }}>
-                  Open
-                </span>
-              </Link>
-            </section>
+            <LinkModule
+              title="Season outlook"
+              href={`/fantasy-sim/${base}?${q}`}
+              parts={[
+                { key: "a", text: "Season forecast", strong: true },
+                { key: "b", text: "playoff odds, record, title odds, what swings them" },
+                { key: "c", text: "Pro", tone: "action" },
+              ]}
+            />
           ) : null}
         </>
       ) : null}
 
       {tab === "trades" ? (
         <>
-          <section className="flex flex-col gap-2">
-            <SectionHeading action={linkAction("View all", tradeHubHref)}>Trade ideas</SectionHeading>
+          <CompactModule
+            id="gmplan.trades.ideas"
+            title="Trade ideas"
+            parts={tradeIdeasParts(tradeItems, Boolean(planGate), tradeArea?.watch_for)}
+            action={tradeHubHref ? linkAction("View all", tradeHubHref) : undefined}
+            defaultOpen
+          >
             {tradesBlock(tradeItems)}
-          </section>
+          </CompactModule>
           {!planGate ? (
             <div className="flex flex-col gap-6">
               {otherAreas.map((area) => (

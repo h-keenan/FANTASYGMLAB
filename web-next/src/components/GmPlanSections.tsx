@@ -5,6 +5,8 @@ import { BeginnerHelp } from "@/components/BeginnerHelp";
 import { InfoTip } from "@/components/InfoTip";
 import { IconRow } from "@/components/IconRow";
 import { SectionHeading } from "@/components/SectionHeading";
+import { CompactModule } from "@/components/ui/CompactModule";
+import { statStripParts } from "@/lib/moduleTemplates";
 import { ToneBadge } from "@/components/ToneBadge";
 import { ValueRing } from "@/components/ValueRing";
 import { SnapshotTileGlyph, type SnapshotGlyphName } from "@/components/SnapshotTileGlyph";
@@ -89,11 +91,20 @@ export function TeamSituationCard({
   const selected = TEAM_STANCE_OPTIONS.find((option) => option.value === stance);
   const selectedLook = selected ? STANCE_LOOK[selected.value] : null;
   return (
-    <section className="glass-surface flex flex-col gap-3 p-4" aria-label="Team Situation">
-      <div className="flex items-start justify-between gap-3">
-        <div className="min-w-0">
-          <SectionHeading>Team Situation</SectionHeading>
-        </div>
+    <CompactModule
+      id="gmplan.situation"
+      title="Team Situation"
+      tone="action"
+      defaultOpen={!selected}
+      parts={[
+        selected
+          ? { key: "stance", text: selected.label, strong: true, tone: "action" }
+          : { key: "stance", text: "Not set yet", tone: "warning" },
+        selectedLook ? { key: "tag", text: selectedLook.tagline } : { key: "tag", text: "Pick the stance that fits your team" },
+        banner ? { key: "deadline", text: `Trade deadline Wk ${banner.week}` } : pastDeadline ? { key: "deadline", text: "Past the trade deadline", tone: "muted" } : null,
+      ]}
+    >
+      <div className="flex items-start justify-end gap-3">
         <InfoTip label="How you see this team" className="items-end text-right">
           Tell us how you see this team right now. We&apos;ll lean trade-idea language toward that stance, and use
           it to shape your trade and lineup value adjustments too.
@@ -167,7 +178,7 @@ export function TeamSituationCard({
           Past the trade deadline
         </IconRow>
       ) : null}
-    </section>
+    </CompactModule>
   );
 }
 
@@ -246,25 +257,26 @@ function SnapshotCell({ tile }: { tile: PlanSnapshotTile }) {
 /** Plan Snapshot: Playoff Odds / Roster Power / Draft Capital lead, then the rest. */
 export function PlanSnapshotGrid({ tiles, analysisHref }: { tiles: PlanSnapshotTile[]; analysisHref?: string }) {
   if (tiles.length === 0) return null;
+  const short: Record<string, string> = { power: "Power", capital: "Capital", odds: "Odds", record: "Record", starter: "Starters", bench: "Bench", age: "Age" };
   return (
-    <section className="flex flex-col gap-2" aria-label="Plan Snapshot">
-      <SectionHeading
-        action={
-          analysisHref ? (
-            <Link href={analysisHref} className="text-xs font-bold" style={{ color: "var(--color-accent)" }}>
-              Full analysis
-            </Link>
-          ) : undefined
-        }
-      >
-        Plan Snapshot
-      </SectionHeading>
-      <div className="grid grid-cols-2 gap-2">
+    <CompactModule
+      id="gmplan.snapshot"
+      title="Plan Snapshot"
+      parts={statStripParts(tiles.map((tile) => ({ label: short[tile.key] ?? tile.label, value: tile.value })), 4)}
+      action={
+        analysisHref ? (
+          <Link href={analysisHref} className="px-2 text-xs font-bold" style={{ color: "var(--color-accent)", minHeight: "var(--touch-target-min)", display: "inline-flex", alignItems: "center" }}>
+            Full analysis
+          </Link>
+        ) : undefined
+      }
+    >
+      <div className="grid grid-cols-2 gap-2" aria-label="Plan Snapshot">
         {tiles.map((tile) => (
           <SnapshotCell key={tile.key} tile={tile} />
         ))}
       </div>
-    </section>
+    </CompactModule>
   );
 }
 
