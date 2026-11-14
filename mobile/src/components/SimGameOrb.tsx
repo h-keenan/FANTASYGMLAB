@@ -168,7 +168,7 @@ function createStyles(colors: ThemeColors) {
       borderColor: colors.accent,
       backgroundColor: colors.backgroundElevated,
     },
-    label: { fontSize: 8, fontWeight: '800', letterSpacing: 0.4, textTransform: 'uppercase', color: colors.accent },
+    label: { fontSize: 11, fontWeight: '800', letterSpacing: 0.2, textTransform: 'uppercase', color: colors.accent },
     badge: {
       minWidth: 18,
       height: 18,
