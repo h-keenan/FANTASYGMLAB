@@ -4,7 +4,6 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useLayoutEffect, useMemo, useReducer, useRef, useState, useSyncExternalStore } from "react";
 
-import { AccentCard } from "@/components/AccentCard";
 import { Button, ButtonLink } from "@/components/Button";
 import { EmptyState } from "@/components/EmptyState";
 import { ErrorState } from "@/components/ErrorState";
@@ -23,17 +22,16 @@ import { SimPillHost } from "@/components/SimPillHost";
 import { SimActionBar } from "@/components/SimActionBar";
 import { SimGameHeader, SimStatusChips } from "@/components/SimGameHeader";
 import { SimGameOrb } from "@/components/SimGameOrb";
+import { SimHub } from "@/components/SimHub";
 import { Sheet } from "@/components/ui/Sheet";
 import { simAttachAchievements } from "@/lib/simAchievements";
 import { SimNotificationBell, useSimNotifications } from "@/components/SimNotificationBell";
 import { SimOffseasonBar } from "@/components/SimOffseasonBar";
 import { ConfirmInPlace } from "@/components/ui/ConfirmInPlace";
-import { SimGlyph } from "@/components/SimGlyph";
-import { simHubRow } from "@/lib/simHub";
 import { simMenuHero, simRulesParts } from "@/lib/simSummaries";
 import { Hero } from "@/components/ui/ModuleTemplates";
 import { CompactModule } from "@/components/ui/CompactModule";
-import { SimNotice, SimOpenPlayerContext, SimPreviewBanner, SimProgressBar, SimRowAccordion, SimTeamLink, SimTeamOpenContext, simToneColor, type SimCtx } from "@/components/SimGameParts";
+import { SimNotice, SimOpenPlayerContext, SimPreviewBanner, SimRowAccordion, SimTeamLink, SimTeamOpenContext, type SimCtx } from "@/components/SimGameParts";
 import { SimBlockToggle } from "@/components/SimTradeBlock";
 import { SimTeamSheet } from "@/components/SimGameTeamSheet";
 import { SimRealismModule } from "@/components/SimRealism";
@@ -47,7 +45,6 @@ import { DifficultyTiles, SetupCard, SetupField, SetupNote, SetupStickyBar, Setu
 import { MotionIn } from "@/components/Motion";
 import { SIM_DIFFICULTY_FOOTNOTE, SIM_SETUP_TABS, simSetupCardSummaries, simSetupChips, simSetupHeadline, type SimSetupTab } from "@/lib/simSetupView";
 import { ReviewGlyphChip } from "@/components/SeasonReviewSections";
-import { ToneBadge } from "@/components/ToneBadge";
 import { overlayStack } from "@/lib/overlayStack";
 import { api } from "@/lib/api";
 import {
@@ -61,7 +58,6 @@ import {
   simGameGate,
   simLeagueTeamLabel,
   simGameDeleteFailure,
-  simGameLiteLine,
   simGamePaywalled,
   simGameUnavailableCopy,
   simNewGameBlock,
@@ -146,6 +142,7 @@ export function SimGameContent() {
   const [creating, setCreating] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [managing, setManaging] = useState(false);
+  const [setupSeed, setSetupSeed] = useState<SimSetupState | null>(null);
 
   // One overlay at a time (lib/overlayStack.ts): a player card opened from a trade picker / claim sheet replaces it on screen
   // and shows "‹ Back to ..." itself. `stackedUnder` (card opened from another pop-up) hides the card's trade shortcut.
@@ -439,7 +436,7 @@ export function SimGameContent() {
       <Shell>
         {flow.paywall ? <PaywallCard flow={flow} onDismiss={() => dispatch({ type: "dismiss_paywall" })} /> : null}
         {notice ? <SimNotice message={notice.message} tone={notice.tone} onDismiss={() => setNotice(null)} /> : null}
-        <SetupForm options={options} creating={creating} onCreate={createGame} onBack={() => dispatch({ type: "hub" })} />
+        <SetupForm options={options} creating={creating} initial={setupSeed} onCreate={createGame} onBack={() => { setSetupSeed(null); dispatch({ type: "hub" }); }} />
       </Shell>
     );
   }
@@ -534,75 +531,21 @@ export function SimGameContent() {
       <SimPreviewBanner preview={preview} />
       {flow.paywall ? <PaywallCard flow={flow} onDismiss={() => dispatch({ type: "dismiss_paywall" })} /> : null}
       {notice ? <SimNotice message={notice.message} tone={notice.tone} onDismiss={() => setNotice(null)} /> : null}
-      <AccentCard accent="var(--color-accent)" as="section" className="enter-rise">
-        <p className="text-xs uppercase font-extrabold" style={{ color: "var(--color-text-muted)", letterSpacing: "var(--letter-spacing-badge)" }}>Sandbox</p>
-        <p className="text-lg font-extrabold">Be the GM. Win the season.</p>
-        <p className="text-sm" style={{ color: "var(--color-text-secondary)" }}>
-          Draft a 12-team league against AI managers, set your lineup, work waivers and trades week by week, and take on the playoffs. At the end you get a grade. Nothing here touches your real leagues.
-        </p>
-        <div className="flex flex-wrap items-center gap-2">
-          <Button disabled={Boolean(block)} onClick={() => dispatch({ type: "setup" })}>New game</Button>
-          {block && options?.is_premium === false ? <ButtonLink href="/premium" variant="premiumOutline" size="sm">Go Pro</ButtonLink> : null}
-          {block ? (
-            <Button variant="secondary" size="sm" onClick={() => { setManaging(true); document.getElementById("sim-saved-games")?.scrollIntoView?.({ behavior: "smooth", block: "start" }); }}>
-              Manage games / delete one
-            </Button>
-          ) : null}
-        </div>
-        {block ? (
-          <p className="text-xs" style={{ color: "var(--color-text-muted)" }} data-testid="new-game-block">{block}</p>
-        ) : null}
-      </AccentCard>
-      <section id="sim-saved-games" className="flex flex-col gap-2" aria-label="Your games">
-        <SectionHeading note={games.length ? (managing ? "Tap the trash can on a game to delete it." : undefined) : "Your saved games show up here."}>Your games</SectionHeading>
-        {games.length === 0 ? (
-          <EmptyState title="No games yet" subtitle="Start a new game to draft your team." />
-        ) : (
-          games.map((g) => (
-            <div key={g.id} className="flex flex-col gap-1.5">
-              <div className="relative flex items-stretch gap-2">
-                <button type="button" className="flex-1 min-w-0 text-left" onClick={() => void openGame(g.id)} aria-label={`Open game: ${simGameLiteLine(g)}`}>
-                  <SavedGameCard game={g} />
-                </button>
-                <ConfirmInPlace
-                  variant="icon"
-                  overlay="parent"
-                  label={`Delete game: ${simGameLiteLine(g)}`}
-                  prompt="Delete this game? It can't be undone."
-                  confirmLabel="Delete"
-                  keepLabel="Keep"
-                  errorText="Could not delete it. Try again."
-                  disabled={deletingId !== null}
-                  onConfirm={() => deleteSaved(g.id)}
-                />
-              </div>
-            </div>
-          ))
-        )}
-      </section>
+      <SimHub
+        games={games}
+        options={options}
+        block={block}
+        isPremium={options?.is_premium}
+        managing={managing}
+        deletingId={deletingId}
+        creating={creating}
+        onManage={() => { setManaging(true); document.getElementById("sim-saved-games")?.scrollIntoView?.({ behavior: "smooth", block: "start" }); }}
+        onOpen={(id) => void openGame(id)}
+        onDelete={deleteSaved}
+        onStart={(body) => void createGame(body)}
+        onCustomize={(seed) => { setSetupSeed(seed); dispatch({ type: "setup" }); }}
+      />
     </Shell>
-  );
-}
-
-function SavedGameCard({ game }: { game: SimGameLite }) {
-  const row = simHubRow(game);
-  const tone = row.chip.tone;
-  const done = game.status === "complete";
-  return (
-    <AccentCard accent={done ? simToneColor(tone) : "var(--color-accent)"} compact as="div">
-      <div className="flex items-center justify-between gap-2">
-        <span className="inline-flex min-w-0 items-center gap-2">
-          <span style={{ color: simToneColor(tone) }}><SimGlyph name={done ? "check" : game.status === "drafting" ? "team" : "standings"} size={16} /></span>
-          <span className="text-sm font-bold truncate">{row.title}</span>
-        </span>
-        <ToneBadge label={row.chip.label} color={simToneColor(tone)} size="xs" />
-      </div>
-      {row.progress ? <SimProgressBar done={row.progress.done} total={row.progress.total} tone={tone} label={`${row.progress.done} of ${row.progress.total} weeks played`} /> : null}
-      <div className="flex items-center justify-between gap-2 text-xs" style={{ color: "var(--color-text-muted)" }}>
-        <span className="min-w-0 truncate">{row.meta}</span>
-        <span className="shrink-0">{row.played}{row.open ? <span className="font-bold" style={{ color: "var(--color-accent)" }}>{row.played ? " · " : ""}Continue</span> : null}</span>
-      </div>
-    </AccentCard>
   );
 }
 
@@ -661,17 +604,20 @@ function PaywallCard({ flow, onDismiss }: { flow: typeof SIM_FLOW_INITIAL; onDis
 function SetupForm({
   options,
   creating,
+  initial,
   onCreate,
   onBack,
 }: {
   options: SimGameOptionsResponse | null;
   creating: boolean;
+  /** A preset from the hub's New game sheet ("Customize everything"): the form opens on Customize with it applied. */
+  initial?: SimSetupState | null;
   onCreate: (body: SimGameCreateBody) => void;
   onBack: () => void;
 }) {
   const opts = options?.options;
   const defaults = useMemo(() => simSetupDefaults(options), [options]);
-  const [state, setState] = useState<SimSetupState>(defaults);
+  const [state, setState] = useState<SimSetupState>(initial ?? defaults);
   const set = <K extends keyof SimSetupState>(key: K, value: SimSetupState[K]) => setState((prev) => ({ ...prev, [key]: value }));
   const league = state.start === "league";
   const leagueMode = options?.start_modes?.find((m) => m.id === "league");
@@ -684,7 +630,7 @@ function SetupForm({
   const dynastyNote = simSetupDynastyNote(state);
   const changed = simSetupAdvancedChanged(state, defaults);
   const block = simSetupBlock(state);
-  const [tab, setTab] = useState<SimSetupTab>("quick");
+  const [tab, setTab] = useState<SimSetupTab>(initial && simSetupAdvancedChanged(initial, defaults) > 0 ? "custom" : "quick");
   const nameLabel = nameChoices.find((choice) => choice.value === state.nameChoice)?.label ?? "";
   const summaries = simSetupCardSummaries(state, state.nameChoice === SIM_NAME_CUSTOM ? state.name.trim() : nameLabel);
   const custom = tab === "custom";
