@@ -5,32 +5,15 @@
 
 import { simDraftRowChips } from "./simDraft";
 import { simPlayerTags, type SimGameTone, type SimGamePlayer, type SimPlayerDetailResponse, type SimRosSummary } from "./simGame";
+import { simGradeOf, simGradeText, type SimGradeInput } from "./simGrade";
 import { isFlatProjection, type WeeklyActualPoint, type WeeklyProjectionPoint } from "./weeklyProjection";
 
-export interface SimHeroFeed {
-  /** Value tile number, or null (the tile shows an em dash with `valueNote`). */
-  score: number | null;
-  valueNote: string | null;
-  overall_rank: number | null;
-  position_rank: number | null;
-  /** Overall 1-99, the same number the list rows show; drives the hero's Player score ring. */
-  overall_rating: number | null;
-}
-
 /**
- * What the hero tiles get for a sim player. A value of 0 means "no market value" in this
- * league (below replacement), never a real zero: it renders as an em dash with a reason,
- * and the player still shows the sim's own value rank so the tile row is not empty.
+ * What the hero shows for a sim player: ONE letter grade (never the numeric Player score ring, the Value tile or an
+ * overall / position rank: those would hand out the model's hidden rating). Null when there is no grade.
  */
-export function simHeroFeed(player: Pick<SimGamePlayer, "value" | "value_rank" | "pos_value_rank" | "kind" | "overall">): SimHeroFeed {
-  const hasValue = typeof player.value === "number" && player.value > 0;
-  return {
-    score: hasValue ? Math.round(player.value) : null,
-    valueNote: hasValue ? null : "No market value in this league (below replacement level)",
-    overall_rank: player.value_rank ?? null,
-    position_rank: player.pos_value_rank ?? null,
-    overall_rating: player.overall ?? null,
-  };
+export function simHeroGrade(player: SimGradeInput): SimGradeInput | null {
+  return simGradeOf(player);
 }
 
 /** Did the server (or, for an older server, the weeks themselves) say the projection never changes week to week? */
@@ -111,7 +94,7 @@ function pts(n: number | null | undefined): string {
  * The two hero tiles a sim player gets in place of the real app's Value and Usage tiles (the sim never shows the model's
  * value and has no real usage feed): what he projects for his next game and where the market (ADP) has him.
  */
-export function simHeroTiles(player: Pick<SimGamePlayer, "projection" | "next_projection" | "projection_note" | "status" | "out_weeks" | "floor" | "ceiling" | "adp" | "adp_edge">): SimTile[] {
+export function simHeroTiles(player: Pick<SimGamePlayer, "projection" | "next_projection" | "projection_note" | "status" | "out_weeks" | "floor" | "ceiling" | "adp">): SimTile[] {
   const out = player.projection_note === "out" || player.status === "out";
   const bye = player.projection_note === "bye" || (!out && player.status === "bye");
   const week: SimTile = out
@@ -119,11 +102,10 @@ export function simHeroTiles(player: Pick<SimGamePlayer, "projection" | "next_pr
     : bye
       ? { label: "This week", value: "Bye", note: player.next_projection != null ? `Next ${pts(player.next_projection)}` : "Not playing", percentile: null }
       : { label: "This week", value: pts(player.projection), note: `${pts(player.floor)}-${pts(player.ceiling)} range`, percentile: null };
-  const edge = player.adp_edge ?? 0;
   const adp: SimTile = {
     label: "ADP",
     value: player.adp != null ? String(Math.round(player.adp)) : "—",
-    note: player.adp == null ? "No ADP" : edge > 0 ? `Falls ${edge} past the sim` : edge < 0 ? `Goes ${Math.abs(edge)} early` : "Right on the market",
+    note: player.adp == null ? "No ADP" : "Market pick",
     percentile: null,
   };
   return [week, adp];
@@ -174,20 +156,18 @@ export interface SimProfileRead {
  * The Scouting tab for a player who has no generated scouting report (every veteran): a profile read built only from fields
  * the game already sends (age window, per-game range, ADP gap, production). No model value is used or shown.
  */
-export function simProfileRead(player: Pick<SimGamePlayer, "pos" | "age" | "overall" | "adp" | "adp_edge" | "projection" | "ros_mean" | "floor" | "ceiling" | "games" | "ppg" | "season_points" | "last_week" | "team">): SimProfileRead {
+export function simProfileRead(player: Pick<SimGamePlayer, "pos" | "age" | "grade" | "grade_uncertain" | "adp" | "projection" | "ros_mean" | "floor" | "ceiling" | "games" | "ppg" | "season_points" | "last_week" | "team">): SimProfileRead {
   const age = simAgePhase(player.pos, player.age);
   const base = player.ros_mean ?? player.projection;
   const spread = base > 0 ? (player.ceiling - player.floor) / base : 0;
   const steady = spread > 1.6 ? { label: "Boom or bust", line: "A wide week-to-week range: he wins or loses weeks on his own." } : spread < 1 ? { label: "Steady", line: "A tight range: you know roughly what you get each week." } : { label: "Balanced", line: "A normal range between his floor and ceiling." };
-  const edge = player.adp_edge ?? 0;
-  const market = player.adp == null ? null : edge >= 3 ? `The market lets him fall ${edge} spots past where the sim has him.` : edge <= -3 ? `The market takes him ${Math.abs(edge)} spots earlier than the sim does.` : "The market and the sim agree on where he goes.";
   const chips = [{ key: "steady", label: steady.label }, ...(player.team ? [{ key: "team", label: player.team }] : [])];
   const tiles: SimTile[] = [
     { label: "Age", value: player.age != null ? String(player.age) : "—", note: age ? age.label : "Unknown", percentile: null },
-    { label: "Overall", value: player.overall != null ? String(player.overall) : "—", note: `${player.pos} rating`, percentile: null },
+    { label: "Grade", value: simGradeText(player), note: `${player.pos} grade`, percentile: null },
     { label: "Range", value: `${pts(player.floor)}-${pts(player.ceiling)}`, note: steady.label.toLowerCase(), percentile: null },
-    { label: "ADP", value: player.adp != null ? String(Math.round(player.adp)) : "—", note: player.adp == null ? "No ADP" : edge > 0 ? `+${edge} vs sim` : edge < 0 ? `${edge} vs sim` : "In line", percentile: null },
+    { label: "ADP", value: player.adp != null ? String(Math.round(player.adp)) : "—", note: player.adp == null ? "No ADP" : "Market pick", percentile: null },
   ];
-  const lines = [age?.line, steady.line, market, (player.games ?? 0) > 0 ? `${pts(player.season_points ?? 0)} points in ${player.games} ${player.games === 1 ? "game" : "games"}${player.ppg != null ? ` (${pts(player.ppg)} ppg)` : ""}.` : null].filter((l): l is string => Boolean(l));
+  const lines = [age?.line, steady.line, (player.games ?? 0) > 0 ? `${pts(player.season_points ?? 0)} points in ${player.games} ${player.games === 1 ? "game" : "games"}${player.ppg != null ? ` (${pts(player.ppg)} ppg)` : ""}.` : null].filter((l): l is string => Boolean(l));
   return { phase: age ? { label: age.label, tone: age.tone } : null, chips, tiles, lines };
 }

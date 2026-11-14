@@ -136,7 +136,7 @@ def observe_transactions(m: Meter, snap, state, seen: int, adds_by_team: Counter
 
 
 def play_redraft(rows, byes, model_id: str, seed: int, ai_v: int, m: Meter) -> dict[str, Any]:
-    settings = replace(GameSettings.parse({"user_slot": 4, "scoring": "ppr"}), ai_v=ai_v)
+    settings = replace(GameSettings.parse({"user_slot": 4, "scoring": "ppr"}), ai_v=ai_v, hint_v=0)  # these AI-generation comparisons keep the original auto-pick so their baselines do not move
     snap = build_snapshot(rows, byes, settings, seed, scoring_model=model_id)
     state = GameState(snap)
     em = Emitter(state, snap)
@@ -166,7 +166,7 @@ def play_dynasty(model_id: str, seed: int, ai_v: int, m: Meter, seasons: int = 3
     from modules.sim.synthetic import build_synthetic_pool
 
     rows, byes = build_synthetic_pool(7)
-    settings = replace(GameSettings.parse({"mode": "dynasty", "teams": 8, "user_slot": 3, "start_year": 2026, "seasons": seasons, "rookie_rounds": 3}), ai_v=ai_v)
+    settings = replace(GameSettings.parse({"mode": "dynasty", "teams": 8, "user_slot": 3, "start_year": 2026, "seasons": seasons, "rookie_rounds": 3}), ai_v=ai_v, hint_v=0)  # these AI-generation comparisons keep the original auto-pick so their baselines do not move
     root = build_snapshot(rows, byes, settings, seed, scoring_model=model_id)
     state = GameState(root)
     em = Emitter(state, root)

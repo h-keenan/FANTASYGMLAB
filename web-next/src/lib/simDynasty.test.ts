@@ -51,13 +51,13 @@ import { simDraftRowChips } from "./simDraft";
 const reserves = (over: Partial<SimReserves> = {}): SimReserves => ({ enabled: true, ir_slots: 2, taxi_slots: 4, taxi_years: 2, ir_used: 0, taxi_used: 0, ...over });
 
 const row = (over: Partial<SimGamePlayer> = {}): SimGamePlayer => ({
-  id: "p1", name: "Rey Runner", pos: "RB", team: "KC", age: 22, adp: 40, value: 50, projection: 9, floor: 3, ceiling: 18,
+  id: "p1", name: "Rey Runner", pos: "RB", team: "KC", age: 22, adp: 40, projection: 9, floor: 3, ceiling: 18,
   status: "healthy", out_weeks: 0, bye_week: 9, squad: "roster", taxi_eligible: true, rookie: false, ...over,
 });
 
 const pick = (over: Partial<SimPickAsset> = {}): SimPickAsset => ({
   id: "pick:2027:1:3", kind: "pick", name: "2027 Round 1", pos: "PICK", team: "", season: 2027, round: 1, orig_team_id: "3", orig_team_name: "My Team",
-  slot_hint: "early", age: null, adp: null, value: 61.4, projection: 0, floor: 0, ceiling: 0, status: "healthy", out_weeks: 0, bye_week: null,
+  slot_hint: "early", age: null, adp: null, projection: 0, floor: 0, ceiling: 0, status: "healthy", out_weeks: 0, bye_week: null,
   owner: { type: "you", team_id: "3", name: "My Team" }, ...over,
 });
 
@@ -254,8 +254,8 @@ describe("offseason", () => {
     expect(simMoverText({ delta: 1.2, age_before: 22, age_after: 23, mean_before: 8, mean_after: 9.2 }).tone).toBe("success");
     expect(simMoverText({ delta: 0.1, age_before: null, age_after: null, mean_before: 8, mean_after: 8.1 })).toMatchObject({ tone: "muted", age: "" });
     const sorted = simRetireesSorted([
-      { id: "a", name: "A", pos: "QB", age: 38, market: 5, is_yours: false },
-      { id: "b", name: "B", pos: "RB", age: 33, market: 1, is_yours: true },
+      { id: "a", name: "A", pos: "QB", age: 38, is_yours: false },
+      { id: "b", name: "B", pos: "RB", age: 33, is_yours: true },
     ]);
     expect(sorted.map((r) => r.id)).toEqual(["b", "a"]);
     expect(simRetireesSorted(null)).toEqual([]);

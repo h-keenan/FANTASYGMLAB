@@ -17,6 +17,7 @@ import math
 from typing import Any, Mapping, Sequence
 
 from modules.sim import game_block as blockmod
+from modules.sim import game_grades
 from modules.sim.game_actions import lineup_warnings
 from modules.sim.game_ai import ai_lineup, trade_window
 from modules.sim.game_engine import standing_rows
@@ -68,6 +69,13 @@ def _lineup_sd(snap: GameSnapshot, ev: Evaluator, lineup: Sequence[Sequence[Any]
 
 def _record(row: Mapping[str, Any]) -> dict[str, Any]:
     return {k: row[k] for k in ("wins", "losses", "ties", "pf", "pa", "rank", "streak", "seed", "playoff_status")}
+
+
+def _trade_weight(snap: GameSnapshot, pid: str) -> float:
+    """How notable a player in a trade is, for the spotlight's centerpiece. hint_v 1+: his public projection, never the hidden value."""
+
+    p = snap.players[pid]
+    return p.mean * 5.0 if snap.settings.hint_v else p.value
 
 
 def _effective(ev: Evaluator, pid: str) -> float:
@@ -236,7 +244,7 @@ def league_rosters(snap: GameSnapshot, state: GameState, seed: int = 0) -> dict[
         roster = state.rosters[tid]
         held = [*roster, *state.ir.get(tid, ()), *state.taxi.get(tid, ())]
         positions = report[tid] if roster else []
-        rows_ = [player_row(snap, state, ev, pid, owners, week=week) for pid in sorted(held, key=lambda p: (-snap.players[p].value, p))]
+        rows_ = [player_row(snap, state, ev, pid, owners, week=week) for pid in sorted(held, key=lambda p: (-game_grades.sort_key(snap, p, state.view_no), -ev.ros_mean(p), p))]
         teams.append({
             "team_id": tid, "name": t.name, "owner": t.owner, "is_you": t.is_user, "persona": _persona(snap, t.persona_id),
             "record": _record(by_team[tid]) if tid in by_team else None,
@@ -527,14 +535,14 @@ def _league_moves(snap: GameSnapshot, state: GameState) -> dict[str, Any]:
         if item["type"] != "trade" or item["week"] < cutoff:
             continue
         moved = [p for p in (*item["give"], *item["get"]) if p in snap.players]
-        score = sum(snap.players[p].value for p in moved)
+        score = sum(_trade_weight(snap, p) for p in moved)
         if score >= best_score:
             best, best_score = item, score
     spotlight = None
     if best is not None:
         _, text = _tx_text(snap, best)
         moved = [p for p in (*best["give"], *best["get"]) if p in snap.players]
-        top = max(moved, key=lambda p: (snap.players[p].value, p)) if moved else None
+        top = max(moved, key=lambda p: (_trade_weight(snap, p), p)) if moved else None
         a, b = _team_ref(snap, best["team_a"]), _team_ref(snap, best["team_b"])
         spotlight = {
             "week": best["week"], "text": text, "team_a": a, "team_b": b, "players": _tx_players(snap, best),
@@ -616,7 +624,7 @@ def _extras(snap: GameSnapshot, state: GameState, ev: Evaluator) -> dict[str, An
         picks = sorted(state.picks_of(user))
         out["dynasty"] = {
             "season_no": state.season_no, "seasons": snap.settings.seasons,
-            "picks_held": len(picks), "picks_value": round(sum(ev.pick_value(p) for p in picks), 1),
+            "picks_held": len(picks),
             "next_pick": min(picks, key=lambda p: (p.split(":")[1], int(p.split(":")[2]))) if picks else None,
         }
     return out

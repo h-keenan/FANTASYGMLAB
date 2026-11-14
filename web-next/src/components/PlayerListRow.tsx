@@ -7,6 +7,7 @@ import { PlayerAvatar } from "@/components/PlayerAvatar";
 import { PlayerName } from "@/components/PlayerName";
 import { PositionBadge } from "@/components/PositionBadge";
 import { ToneBadge } from "@/components/ToneBadge";
+import { LetterGrade } from "@/components/ui/LetterGrade";
 import { PlayerBadges } from "@/components/ui/PlayerBadge";
 import { TapForWhy } from "@/components/ui/TapForWhy";
 import type { ChipTone } from "@/lib/playerCard";
@@ -87,6 +88,17 @@ export interface PlayerListRowProps {
 }
 
 function StatPill({ stat }: { stat: PlayerListStat }) {
+  // Fantasy Sim: the Overall is a letter grade, never the numeric gauge (the sim has no number to show).
+  if (stat.grade !== undefined) {
+    return (
+      <span className="inline-flex items-center gap-1" data-stat={stat.key}>
+        <span className="text-[0.6875rem] font-bold uppercase" style={{ color: "var(--color-text-secondary)", letterSpacing: "0.04em" }}>
+          {stat.label}
+        </span>{" "}
+        <LetterGrade grade={stat.grade} size="sm" />
+      </span>
+    );
+  }
   // The player's Overall is the shared OVR gauge (same ring, thresholds and colors as the Quick View hero),
   // explained on tap with the registry's OVR copy. Never a plain number pill.
   if (stat.rating != null) {

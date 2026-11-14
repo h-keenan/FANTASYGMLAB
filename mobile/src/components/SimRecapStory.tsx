@@ -12,6 +12,7 @@ import TeamAvatar from './TeamAvatar';
 import TrophyIcon from './TrophyIcon';
 import { useThemeMode } from '../context/ThemeModeContext';
 import { EASE, HERO_GLOW } from '../lib/motion';
+import { simGradeOf } from '../lib/simGrade';
 import { simFmtPts, simPlayoffRoundLabel, simTeamNameMap, type SimGamePlayer, type SimWeekRecap } from '../lib/simGame';
 import { useReducedMotion } from '../lib/useMotion';
 import { positionColor, spacing } from '../theme';
@@ -152,7 +153,7 @@ export default function SimWeekRecapStory({
     p.player ? (
       <MotionIn key={label}>
         <AppText style={[common.muted, { fontWeight: '800', textTransform: 'uppercase', color: accent }]}>{label}</AppText>
-        <SimPlayerLine player={p.player} stats={[{ key: 'pts', label: 'Pts', value: simFmtPts(p.pts), tone: label === 'Best performer' ? 'success' : undefined }, { key: 'ovr', label: 'OVR', value: '', rating: p.player.overall ?? null }]} onOpen={ctx.openPlayer} />
+        <SimPlayerLine player={p.player} stats={[{ key: 'pts', label: 'Pts', value: simFmtPts(p.pts), tone: label === 'Best performer' ? 'success' : undefined }, { key: 'ovr', label: 'Grade', value: '', grade: simGradeOf(p.player) }]} onOpen={ctx.openPlayer} />
       </MotionIn>
     ) : (
       <Fact key={label} label={label} accent={accent}>{`${p.name} · ${simFmtPts(p.pts)}`}</Fact>
@@ -235,7 +236,7 @@ export default function SimWeekRecapStory({
                   stats={[
                     { key: 'pts', label: 'Pts', value: simFmtPts(s.pts), tone: simRecapProj(s) != null && s.pts >= simRecapProj(s)! ? 'success' : undefined },
                     { key: 'proj', label: 'Proj', value: simFmtPts(simRecapProj(s)) },
-                    { key: 'ovr', label: 'OVR', value: '', rating: s.player!.overall ?? null },
+                    { key: 'ovr', label: 'Grade', value: '', grade: simGradeOf(s.player) },
                   ]}
                   onOpen={ctx.openPlayer}
                 />

@@ -4,6 +4,7 @@
  * import-free, byte-identical twin of mobile/src/lib/playerListRow.ts.
  */
 import type { ChipTone } from "./playerCard";
+import type { SimGradeInput } from "./simGrade";
 
 export type PlayerListDensity = "comfortable" | "compact";
 
@@ -25,6 +26,8 @@ export interface PlayerListStat {
   tone?: ChipTone;
   /** Overall 1-99: render the OVR gauge instead of a text pill. */
   rating?: number | null;
+  /** Fantasy Sim: the Overall as a letter grade (LetterGrade) instead of the numeric gauge. Present (even null) = grade stat; null = no grade, footprint kept. */
+  grade?: SimGradeInput | null;
   /** Tap-for-why registry key (lib/tapForWhyContent) that explains this stat, e.g. "trade_value". */
   why?: string;
 }

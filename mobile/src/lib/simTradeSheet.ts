@@ -8,7 +8,6 @@ export interface SimAssetLike {
   pos?: string;
   team?: string | null;
   age?: number | null;
-  value: number;
   status?: string;
 }
 

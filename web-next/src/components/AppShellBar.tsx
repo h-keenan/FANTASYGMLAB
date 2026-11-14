@@ -12,6 +12,7 @@ import { useAuth } from "@/context/AuthContext";
 import { useDisplayPreferences } from "@/context/DisplayPreferencesContext";
 import { FOUNDER_DESTINATION, isFounderSession, useNavDestinations, type NavDestination } from "@/lib/navDestinations";
 import { getPillState, getServerPillState, setPillBarPresent, subscribePill } from "@/lib/bottomPillStore";
+import { routeFamilyPillContext } from "@/lib/pageFamilyPill";
 import { shellActiveTab, shellLeagueContext, shellTabs, SHELL_ACTION_SLOT_ID } from "@/lib/shellNav";
 import { useSearchParams } from "@/lib/useSearchParams";
 import { useShellNav } from "@/lib/useShellNav";
@@ -66,7 +67,8 @@ function ShellBarInner() {
           tabs={tabs}
           active={active}
           testId="shell-tab-bar"
-          context={pill.ctx}
+          // A page registers its own context (counts, primary); until it does, the route alone gives the family tabs, so nothing flashes.
+          context={pill.ctx ?? routeFamilyPillContext(pathname, leagueId, leagueName)}
           onSelect={(key) => {
             if (key === "more") setMoreOpen(true);
           }}

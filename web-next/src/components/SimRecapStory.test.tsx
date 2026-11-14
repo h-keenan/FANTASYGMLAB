@@ -5,7 +5,7 @@ import { SimWeekRecapStory } from "@/components/SimRecapStory";
 import type { SimCtx } from "@/components/SimGameParts";
 import type { SimGamePlayer, SimWeekRecap } from "@/lib/simGame";
 
-const player = (id: string, name: string, pos: string) => ({ id, name, pos, team: "KC", age: 25, bye_week: 9, status: "healthy", out_weeks: 0, projection: 12, ros_mean: 12, value: 50, adp: 20, overall: 70 }) as unknown as SimGamePlayer;
+const player = (id: string, name: string, pos: string) => ({ id, name, pos, team: "KC", age: 25, bye_week: 9, status: "healthy", out_weeks: 0, projection: 12, ros_mean: 12, adp: 20, grade: "B" }) as unknown as SimGamePlayer;
 const recap = {
   week: 4,
   kind: "regular",

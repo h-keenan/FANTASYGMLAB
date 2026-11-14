@@ -8,7 +8,7 @@ import type { SimGamePlayer, SimLeagueRosterTeam } from "@/lib/simGame";
 import type { SimLeagueRostersState } from "@/lib/useSimLeagueRosters";
 
 function p(id: string, pos: SimGamePlayer["pos"], name: string, value: number, owner: string, over: Partial<SimGamePlayer> = {}): SimGamePlayer {
-  return { id, name, pos, team: "KC", age: 25, adp: 5, value, projection: 12.3, floor: 5, ceiling: 20, status: "healthy", out_weeks: 0, bye_week: 9, owner: { type: "ai", team_id: owner, name: owner }, squad: "roster", ...over };
+  return { id, name, pos, team: "KC", age: 25, adp: 5, grade: value >= 90 ? "A" : value >= 70 ? "B+" : value >= 60 ? "C+" : "C", projection: 12.3, floor: 5, ceiling: 20, status: "healthy", out_weeks: 0, bye_week: 9, owner: { type: "ai", team_id: owner, name: owner }, squad: "roster", ...over };
 }
 
 function team(id: string, name: string, power: number, players: SimGamePlayer[], over: Partial<SimLeagueRosterTeam> = {}): SimLeagueRosterTeam {
@@ -20,8 +20,8 @@ function team(id: string, name: string, power: number, players: SimGamePlayer[],
 }
 
 const teams = [
-  team("1", "Bench Mob", 2, [p("q1", "QB", "Quinn Back", 90, "1", { overall: 91 }), p("r1", "RB", "Ray Runner", 40, "1", { value: 0, overall: null })]),
-  team("2", "Goal Line Gamblers", 1, [p("q2", "QB", "Quentin Arm", 70, "2", { overall: 78 }), p("w1", "WR", "Wes Wide", 60, "2", { status: "out", out_weeks: 3, projection: 0 })]),
+  team("1", "Bench Mob", 2, [p("q1", "QB", "Quinn Back", 90, "1", {}), p("r1", "RB", "Ray Runner", 40, "1", { grade: "D" })]),
+  team("2", "Goal Line Gamblers", 1, [p("q2", "QB", "Quentin Arm", 70, "2", {}), p("w1", "WR", "Wes Wide", 60, "2", { status: "out", out_weeks: 3, projection: 0 })]),
   team("3", "Me", 3, [p("t1", "TE", "Tom Tight", 50, "3")], { is_you: true }),
 ];
 const ready: SimLeagueRostersState = { status: "ready", teams };
@@ -41,9 +41,9 @@ describe("league Teams view (shared team card)", () => {
     expect(cards[0]).toHaveTextContent("Needs RB");
     expect(cards[0]).toHaveTextContent("Deep WR");
     expect(cards[0]).toHaveTextContent("Quentin Arm");
-    expect(cards[0]).toHaveTextContent("OVR 78");
+    expect(cards[0]).toHaveTextContent("B+");
     expect(cards[1]).toHaveTextContent("Bench Mob");
-    expect(cards[1]).toHaveTextContent("OVR 91");
+    expect(cards[1]).toHaveTextContent("A");
     fireEvent.click(screen.getByRole("button", { name: /Bench Mob.*Open roster/ }));
     expect(c.openTeam).toHaveBeenCalledWith("1");
   });
@@ -64,7 +64,7 @@ describe("league Players view (find a player, position by position)", () => {
     const rows = screen.getAllByTestId("sim-player-line");
     expect(rows.map((r) => within(r).getByText(/Quinn Back|Quentin Arm|Wes Wide|Tom Tight|Ray Runner/).textContent)).toEqual(["Quinn Back", "Quentin Arm", "Wes Wide", "Tom Tight", "Ray Runner"]);
     expect(rows[0]).toHaveTextContent("Proj");
-    expect(rows[0]).toHaveTextContent("OVR");
+    expect(rows[0]).toHaveTextContent("Grade");
     expect(rows[0]).toHaveTextContent("Bench Mob");
     expect(within(rows[3]).getByRole("img", { name: "Your player" })).toBeInTheDocument();
     expect(within(rows[2]).getByRole("img", { name: /^Out/ })).toBeInTheDocument();
@@ -99,8 +99,8 @@ describe("league Players view (find a player, position by position)", () => {
 describe("league Players view: On the block", () => {
   const blocked = p("w9", "RB", "Vet Vince", 30, "1", { block: { by: "1", mine: false, looking_for: "WR", why: "Selling a veteran" } });
   const withBlock = [
-    team("1", "Bench Mob", 2, [p("q1", "QB", "Quinn Back", 90, "1", { overall: 91 }), blocked], { needs: ["TE"], block: { stance: "rebuilding", looking_for: "WR", items: [{ id: "w9", why: "Selling a veteran" }] } }),
-    team("2", "Goal Line Gamblers", 1, [p("q2", "QB", "Quentin Arm", 70, "2", { overall: 78 })]),
+    team("1", "Bench Mob", 2, [p("q1", "QB", "Quinn Back", 90, "1", {}), blocked], { needs: ["TE"], block: { stance: "rebuilding", looking_for: "WR", items: [{ id: "w9", why: "Selling a veteran" }] } }),
+    team("2", "Goal Line Gamblers", 1, [p("q2", "QB", "Quentin Arm", 70, "2", {})]),
   ];
 
   it("a pill lists every player on a block across the league with the team's stated needs", () => {

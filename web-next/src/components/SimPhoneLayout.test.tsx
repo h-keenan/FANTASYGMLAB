@@ -57,17 +57,18 @@ describe("SimPlayerChip quick", () => {
 });
 
 describe("SimDraftRow", () => {
-  it("shows the edge from value rank vs ADP (green steal, red reach) and four aligned stats", () => {
-    const { rerender } = render(<SimDraftRow player={player({ adp: 40, value_rank: 22, adp_edge: 18, overall: 91 })} />);
-    expect(document.querySelector("[data-stat=edge]")).toHaveTextContent("Edge ▲18");
-    rerender(<SimDraftRow player={player({ adp: 10, value_rank: 25, adp_edge: -15 })} />);
-    expect(document.querySelector("[data-stat=edge]")).toHaveTextContent("Edge ▼15");
-    rerender(<SimDraftRow player={player({ adp: 20, value_rank: 21, adp_edge: -1, overall: 77 })} />);
+  it("shows a letter grade (with a ? when scouts are unsure), never an OVR number or an edge chip", () => {
+    const { rerender } = render(<SimDraftRow player={player({ adp: 40, grade: "A-" })} />);
     expect(document.querySelector("[data-stat=edge]")).toBeNull();
+    expect(document.querySelector("[data-stat=ovr]")).toHaveTextContent(/^Grade/);
+    expect(screen.getByTestId("letter-grade")).toHaveAttribute("data-grade", "A-");
+    expect(screen.getByTestId("letter-grade")).toHaveAttribute("aria-label", expect.stringContaining("Grade A minus"));
+    rerender(<SimDraftRow player={player({ adp: 10, grade: "B+", grade_range: ["B", "A-"], grade_uncertain: true })} />);
+    expect(screen.getByTestId("letter-grade")).toHaveTextContent("B+?");
+    expect(screen.getByTestId("letter-grade")).toHaveAttribute("aria-label", expect.stringContaining("Scouts are unsure"));
+    expect(document.querySelector("[data-stat=ovr]")?.querySelector("[aria-label*='overall rating']")).toBeNull();
     // every number carries its caption
     expect(document.querySelector("[data-stat=proj]")).toHaveTextContent(/^Proj/);
-    expect(document.querySelector("[data-stat=ovr]")).toHaveTextContent(/^OVR/);
-    expect(document.querySelector("[data-stat=ovr]")?.querySelector("[aria-label*='overall rating']")).not.toBeNull();
     expect(screen.queryByText(/^val$/i)).toBeNull();
     expect(document.querySelector("[data-stat=adp]")).toHaveTextContent(/^ADP/);
   });

@@ -29,10 +29,11 @@ ROWS, BYES = build_synthetic_pool(7)
 SEED = 4242
 
 
-def settings(**kw):
+def settings(hint_v=0, **kw):
+    """hint_v 0 by default: these seeded-world tests predate the public-information helpers (tests/test_sim_hint_v.py covers hint_v 1)."""
     raw = {"mode": "dynasty", "teams": 8, "user_slot": 3, "start_year": 2026, "seasons": 3, "rookie_rounds": 3}
     raw.update(kw)
-    return GameSettings.parse(raw)
+    return replace(GameSettings.parse(raw), hint_v=hint_v)
 
 
 def new_snapshot(seed=SEED, **kw):
@@ -525,7 +526,7 @@ def test_api_dynasty_end_to_end():
     picks = c.get(f"/v1/sim/games/{gid}/picks", headers=H).json()
     assert picks["enabled"] and len(picks["you"]) == 3 * 2 and len(picks["teams"]) == 8
     mine = picks["you"][0]
-    assert mine["kind"] == "pick" and mine["value"] > 0 and mine["season"] == 2027 or mine["season"] >= 2026
+    assert mine["kind"] == "pick" and "value" not in mine and mine["season"] >= 2026
     theirs = next(t for t in picks["teams"] if not t["is_you"])
     pv = c.post(f"/v1/sim/games/{gid}/trades/preview",
                 json={"partner": theirs["team_id"], "give": [mine["id"]], "get": [theirs["picks"][0]["id"]]}, headers=H).json()
@@ -727,7 +728,7 @@ def test_home_understands_reserves_and_picks():
     snap, st = run.snap, run.state
     user = snap.user_team.tid
     home = game_home.home_view(snap, st, run.sd)
-    assert home["dynasty"]["picks_held"] == 9 and home["dynasty"]["picks_value"] > 0 and home["reserves"]["taxi_slots"] == 4
+    assert home["dynasty"]["picks_held"] == 9 and "picks_value" not in home["dynasty"] and home["reserves"]["taxi_slots"] == 4
     p = st.rosters[user][0]
     st.out[p] = 6
     ids = {i["id"] for i in game_home.home_view(snap, st, run.sd)["checklist"]}

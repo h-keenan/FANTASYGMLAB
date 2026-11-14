@@ -750,7 +750,7 @@ def _golden_snapshot():
 
 def _as_old_save(snap):
     """The same game as a save from before flex_type / kd_v: its settings carry neither key."""
-    raw = {k: v for k, v in snap.settings.to_dict().items() if k not in ("flex_type", "kd_v", "limit_v", "names_v")}
+    raw = {k: v for k, v in snap.settings.to_dict().items() if k not in ("flex_type", "kd_v", "limit_v", "names_v", "hint_v")}
     return dataclasses.replace(snap, settings=GameSettings.from_dict(raw))
 
 
@@ -771,7 +771,8 @@ def test_old_save_replays_identically_to_a_game_with_the_new_flags():
     # A new game (flex_type default, kd_v 1) on the same model plays identically to the save without the keys: the flags change
     # nothing until used. (Not an absolute pin: any engine change on main legitimately moves a digest; verified equal to
     # origin/main's own digest for this save when this PR was cut.)
-    assert _played_digest(old) == _played_digest(_golden_snapshot())
+    # (hint_v 1 changes the user's auto-pick helper, so the comparison game keeps hint_v 0: see test_sim_hint_v.py for the rest.)
+    assert _played_digest(old) == _played_digest(dataclasses.replace(_golden_snapshot(), settings=dataclasses.replace(_golden_snapshot().settings, hint_v=0)))
 
 
 def test_rb_wr_flex_option_changes_only_the_flex_slot_and_round_trips():

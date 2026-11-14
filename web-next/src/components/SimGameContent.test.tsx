@@ -29,7 +29,7 @@ vi.mock("@/lib/api", async () => {
 const mocked = api as unknown as Record<string, ReturnType<typeof vi.fn>>;
 
 function player(id: string, pos: SimGamePlayer["pos"], name: string): SimGamePlayer {
-  return { id, name, pos, team: "KC", age: 25, adp: 5, value: 80, projection: 14.2, floor: 7, ceiling: 24, status: "healthy", out_weeks: 0, bye_week: 9, owner: { type: "free_agent" } };
+  return { id, name, pos, team: "KC", age: 25, adp: 5, projection: 14.2, floor: 7, ceiling: 24, status: "healthy", out_weeks: 0, bye_week: 9, owner: { type: "free_agent" } };
 }
 
 const SETTINGS = { teams: 12, scoring: "ppr", difficulty: "normal", regular_weeks: 14, playoff_teams: 6, playoff_weeks: 3, trade_deadline_week: 10, roster_limit: 16, rounds: 14, slots: ["QB", "RB", "RB", "WR", "WR", "TE", "FLEX", "K"], user_slot: 3, auto_lineup: false } as SimGame["settings"];
@@ -204,7 +204,7 @@ describe("SimGameContent", () => {
     const detail: SimTeamRosterResponse = {
       ok: true, reason: "", team_id: "7",
       players: [star("5", "QB", "Otis Opp"), star("6", "RB", "Benny Bench"), star("10", "WR", "Wide Wally"), star("11", "WR", "Wide Wendy")],
-      ir: [star("12", "RB", "Hurt Harry", { status: "out", out_weeks: 5, value: 0 })], taxi: [star("13", "WR", "Rookie Ron")],
+      ir: [star("12", "RB", "Hurt Harry", { status: "out", out_weeks: 5 })], taxi: [star("13", "WR", "Rookie Ron")],
       team: { team_id: "7", name: "Rivals", is_you: false, persona: { id: "passive", label: "Passive", blurb: "Rarely deals." }, record: null, power_rank: 2, avg_age: 25, roster_size: 4 },
       lineup: [{ slot: "QB", player: star("5", "QB", "Otis Opp") }], projected_total: 117.9, positions: [], strengths: [], needs: [], injuries: [], recent: [], next_game: null, trade: { open: true, reason: null },
     };

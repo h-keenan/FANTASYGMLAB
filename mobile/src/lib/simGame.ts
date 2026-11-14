@@ -11,6 +11,7 @@
  * reads or writes real league data.
  */
 
+import type { SimAttributeGrade, SimGradeLetter } from "./simGrade";
 import type { ReviewGlyph } from "./simReview";
 
 // ---------------------------------------------------------------------------
@@ -108,19 +109,18 @@ export interface SimGamePlayer {
   /** Age to a tenth when the server sends it; rows fall back to `age`. */
   age_decimal?: number | null;
   adp: number | null;
-  /** Trade value on the sim's 0-100 scale (the best player is 100), not the main app's raw market value. The model's internal rating: NEVER shown in the UI (no label, no sort); use `overall` for anything the player sees. */
-  value: number;
   /**
-   * Overall (1-99): where his value ranks among players at his position, the SAME definition and gauge as the main
-   * app's OVR (modules/sim/game_view.overall_ratings). Null for a position pool too thin to rank, or an older server.
+   * Letter grade (A+ .. F, 12 bands): the ONLY overall rating the Fantasy Sim shows (modules/sim/game_grades.py). A noisy,
+   * coarse band of the model's hidden rating, never the rating itself. Null for a pick or a position pool too thin to grade.
+   * The server sends no numeric overall, no trade value and no value-derived rank.
    */
-  overall?: number | null;
-  /** 1-based rank by model value across the whole pool (players list and player detail). */
-  value_rank?: number | null;
-  /** 1-based rank by model value among players at the same position (player detail only). */
-  pos_value_rank?: number | null;
-  /** ADP minus value rank (players list only): positive = the market lets him fall past the model (steal). */
-  adp_edge?: number | null;
+  grade?: SimGradeLetter | null;
+  /** [low, high] when the scouts are unsure (rookies): the grade could be anywhere in this band range. */
+  grade_range?: [SimGradeLetter, SimGradeLetter] | null;
+  /** True when the grade is a scouting estimate (rookies): the UI adds a "?". */
+  grade_uncertain?: boolean;
+  /** Position attribute grades (player detail only). Independent of the overall: they do not add up to it. */
+  attributes?: SimAttributeGrade[];
   /** Expected per-game points for the next game he can play, given his NFL team's depth chart and who is out. */
   projection: number;
   /** "bye" or "out" when he is not projected any points this week (projection is then 0); null when he plays. In-season only. */
@@ -247,6 +247,8 @@ export interface SimGameSettings {
   roster_limit: number;
   /** Roster-limit rule generation: 1+ = the soft limit (over the limit only blocks adding players); absent = a save from before it. */
   limit_v?: number;
+  /** Helper generation: 1+ = the draft hint and Auto-pick use public information only (ADP, need, byes, shown grade); absent = a save from before it. */
+  hint_v?: number;
   rounds: number;
   slots: SimSlot[];
   user_slot: number;
@@ -906,6 +908,13 @@ export function simDealWords(change: number): string {
   return change > 0 ? "A better deal for you than your offer" : "A worse deal for you than your offer";
 }
 
+/** The Auto-pick confirmation: names the rule the helper really uses (public ADP for new games, the older value-for-need pick for saves from before hint_v). */
+export function simAutoPickConfirmText(settings: { hint_v?: number } | null | undefined): string {
+  return (settings?.hint_v ?? 0) >= 1
+    ? "Auto-draft the rest of your picks from your queue, then the best available by ADP for your needs (and bye weeks)?"
+    : "Auto-draft the rest of your picks from your queue, then best available and need?";
+}
+
 export function simCounterDeltaLine(delta: SimCounterDelta | null | undefined): string | null {
   if (!delta) return null;
   const change = delta.user_net_change;
@@ -1547,7 +1556,7 @@ export type SimPlayerSort = "projection" | "overall" | "adp" | "age" | "name" | 
 
 export const SIM_SORT_OPTIONS: { value: SimPlayerSort; label: string }[] = [
   { value: "projection", label: "Projection" },
-  { value: "overall", label: "OVR" },
+  { value: "overall", label: "Grade" },
   { value: "adp", label: "ADP" },
   { value: "season", label: "Season pts" },
   { value: "last_week", label: "Last week" },
@@ -2819,7 +2828,7 @@ export interface SimHomeResponse extends SimGameEnvelope {
   /** IR / taxi usage (reserve games only). */
   reserves?: { ir_used: number; ir_slots: number; taxi_used: number; taxi_slots: number };
   /** Dynasty games only: where you are and what you hold. `next_pick` is a pick id "season:round:team". */
-  dynasty?: { season_no: number; seasons: number; year?: number; season_label?: string; picks_held: number; picks_value: number; next_pick: string | null };
+  dynasty?: { season_no: number; seasons: number; year?: number; season_label?: string; picks_held: number; next_pick: string | null };
   /** Cards the server could not build (card name to error class); the rest of the page is valid. */
   errors?: Record<string, string>;
 }
@@ -2996,7 +3005,6 @@ export interface SimPicksTeam {
   name: string;
   is_you: boolean;
   picks: SimPickAsset[];
-  total_value: number;
 }
 
 /** GET /games/{id}/picks (reason "not_dynasty" on a redraft game). */
@@ -3050,7 +3058,6 @@ export interface SimOffseasonRetiree {
   name: string;
   pos: string;
   age: number | null;
-  market?: number | null;
   is_yours: boolean;
 }
 
@@ -3551,9 +3558,9 @@ export function simMoverText(row: Pick<SimOffseasonMover, "delta" | "age_before"
   return { arrow, delta: `${sign}${Math.abs(row.delta).toFixed(1)}`, age, tone };
 }
 
-/** Your retirees first, then the rest. */
+/** Your retirees first, then the oldest (the sim carries no rating to order them by). */
 export function simRetireesSorted(rows: SimOffseasonRetiree[] | null | undefined): SimOffseasonRetiree[] {
-  return [...(rows ?? [])].sort((a, b) => Number(b.is_yours) - Number(a.is_yours) || (b.market ?? 0) - (a.market ?? 0) || a.name.localeCompare(b.name));
+  return [...(rows ?? [])].sort((a, b) => Number(b.is_yours) - Number(a.is_yours) || (b.age ?? 0) - (a.age ?? 0) || a.name.localeCompare(b.name));
 }
 
 // --- dynasty summary

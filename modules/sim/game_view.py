@@ -7,10 +7,10 @@ from __future__ import annotations
 
 from typing import Any, Mapping, Sequence
 
-from modules.sim import scouting
+from modules.sim import game_grades, scouting
 from modules.sim.game_actions import lineup_warnings
 from modules.sim.game_ai import trade_window
-from modules.sim.game_draft import DraftContext, best_for_user
+from modules.sim.game_draft import DraftContext, best_for_user, hint_reason
 from modules.sim.game_engine import rank_teams, standing_rows
 from modules.sim.game_eval import Evaluator
 from modules.sim.game_state import GameState
@@ -77,7 +77,7 @@ def player_row(
         projection = 0.0
     return {
         "id": pid, "headshot_id": headshot_id(pid), "name": p.name, "pos": p.pos, "team": p.nfl_team,
-        "age": p.age, "adp": p.adp, "value": p.value, "overall": overall_ratings(snap).get(pid), "projection": round(projection, 1),
+        "age": p.age, "adp": p.adp, **game_grades.grade_fields(snap, pid, state.view_no), "projection": round(projection, 1),
         "projection_note": proj_note if proj_note != "healthy" else None, "next_projection": next_projection, "projection_week": w, "ros_mean": round(ev.ros_mean(pid), 1),
         "role": ev.role_info(pid, w),
         "floor": round(floor, 1), "ceiling": round(ceiling, 1), "status": ev.status(pid, w),
@@ -108,7 +108,7 @@ def pick_asset(snap: GameSnapshot, state: GameState, ev: Evaluator, pid: str) ->
     return {
         "id": pid, "kind": "pick", "headshot_id": None, "name": f"{season_label_for_year(season, snap.settings.start_year)} Round {rnd}", "pos": "PICK", "team": "",
         "season": season, "season_label": season_label_for_year(season, snap.settings.start_year), "round": rnd, "orig_team_id": orig, "orig_team_name": snap.team(orig).name,
-        "slot_hint": hint, "label": ev.pick_name(pid), "age": None, "adp": None, "value": round(ev.pick_value(pid), 1),
+        "slot_hint": hint, "label": ev.pick_name(pid), "age": None, "adp": None, "grade": None, "grade_range": None, "grade_uncertain": False,
         "projection": 0.0, "ros_mean": 0.0, "floor": 0.0, "ceiling": 0.0, "status": "healthy", "out_weeks": 0,
         "bye_week": None, "owner": ({"type": "you" if team.is_user else "ai", "team_id": holder, "name": team.name}
                                       if team else {"type": "free_agent", "team_id": None, "name": None}),
@@ -217,15 +217,15 @@ def players_page(
             continue
         pids.append(pid)
 
-    overall_by_pid = overall_ratings(snap) if sort == "overall" else {}
+    season = state.view_no
+    # "value" and "overall" are kept as sort names for old clients, but both order by the grade the player SEES (a coarse
+    # band, then the public projection): sorting by the model's internal number would hand out the exact hidden ranking.
+    grade_sort = sort in ("value", "overall")
 
     def key(pid: str):
         p = snap.players[pid]
-        if sort == "value":
-            return (-p.value, pid)
-        if sort == "overall":
-            # The shown OVR rating, never the model's internal trade value (that number is not shown in the UI).
-            return (-(overall_by_pid.get(pid) or 0), -p.value, pid)
+        if grade_sort:
+            return (-game_grades.sort_key(snap, pid, season), -(ev.next_proj(pid, w) if ev.roles_on else ev.proj(pid, w)), pid)
         if sort == "adp":
             return (p.adp, pid)
         if sort == "age":
@@ -242,13 +242,7 @@ def players_page(
     page_size = max(1, min(PAGE_MAX, page_size))
     page = max(1, page)
     chunk = pids[(page - 1) * page_size: page * page_size]
-    ranks = value_ranks(snap)
-    items = []
-    for pid in chunk:
-        row = player_row(snap, state, ev, pid, owners)
-        row["value_rank"] = ranks.get(pid)
-        row["adp_edge"] = adp_edge(row["adp"], ranks.get(pid))
-        items.append(row)
+    items = [player_row(snap, state, ev, pid, owners) for pid in chunk]
     blockmod.attach(items, bidx)
     return {"items": items, "total": len(pids), "page": page, "page_size": page_size}
 
@@ -277,10 +271,7 @@ def player_detail(snap: GameSnapshot, state: GameState, pid: str, seed: int | No
     row = player_row(snap, state, ev, pid, owners)
     if seed is not None:
         blockmod.attach([row], blockmod.block_index(snap, state, ev, seed))
-    ranks = value_ranks(snap)
-    same_pos = sorted((q for q in snap.pids if snap.players[q].pos == row["pos"]), key=lambda q: (-snap.players[q].value, q))
-    row["value_rank"] = ranks.get(pid)
-    row["pos_value_rank"] = same_pos.index(pid) + 1 if pid in same_pos else None
+    row["attributes"] = game_grades.attributes_of(snap, pid, state.view_no)
     out = {
         "player": row, "weeks": weeks, "history": history, "news": news,
         "ros": ros_summary(ev, pid, weeks), "projection_flat": projection_is_flat(weeks),
@@ -524,7 +515,7 @@ def draft_view(
     if state.status == "drafting" and state.pick_index < total and clock == user:
         pid = best_for_user(ctx, seed)
         hint = {"player": player_row(snap, state, ev, pid, owners),
-                "why": f"Best available for your need: {snap.players[pid].pos}"}
+                "why": (hint_reason(ctx, pid) if snap.settings.hint_v else f"Best available for your need: {snap.players[pid].pos}")}
     return {
         "draft": draft,
         "available": {"items": [player_row(snap, state, ev, p, owners) for p in chunk], "total": len(avail),

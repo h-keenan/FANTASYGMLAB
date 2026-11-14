@@ -2,6 +2,8 @@
 
 import { useEffect, useState, type ReactNode } from "react";
 
+import { PillMorph } from "@/components/ui/PillMorph";
+import { usePillState } from "@/lib/useBottomPillContext";
 import { Button, ButtonLink } from "@/components/Button";
 import { SimGlyph } from "@/components/SimGlyph";
 import type { SimCtx } from "@/components/SimGameParts";
@@ -18,6 +20,7 @@ import { simAdvanceState, simLineupIssues, type SimZeroStarter } from "@/lib/sim
  * sticky `.bottom-stack` (one row: icon-only Sim to, the game orb, Advance; no position:fixed); sticky inside the page on desktop. Mobile twin: mobile/src/components/SimActionBar.tsx.
  */
 export function SimActionBar({ ctx, paywalled, advancing, onAdvance, onSimTo, onTab, orb }: { ctx: SimCtx; paywalled: boolean; advancing: boolean; onAdvance: () => void; onSimTo?: () => void; onTab?: (tab: "team" | "players") => void; orb?: ReactNode }) {
+  const pill = usePillState();
   const { gameId, game } = ctx;
   const [issues, setIssues] = useState<{ empty: string[]; zero: SimZeroStarter[] }>({ empty: [], zero: [] });
   const [confirming, setConfirming] = useState(false);
@@ -79,6 +82,7 @@ export function SimActionBar({ ctx, paywalled, advancing, onAdvance, onSimTo, on
           <span style={{ color: auto.optimal ? "var(--color-success)" : undefined }}>{auto.optimal ? "Lineup optimal" : "Lineup can improve"}</span>
         </p>
       )}
+      <PillMorph context={pill.barPresent ? pill.ctx : null}>
       <div className="mx-auto flex max-w-3xl items-center gap-2 p-1 md:mx-0 md:max-w-none md:flex-none md:gap-2 md:p-0">
         {onSimTo && !paywalled ? (
           <Button variant="secondary" size="sm" className="min-w-0 shrink-0" disabled={advancing} onClick={onSimTo} aria-label="Sim to..." data-testid="sim-to-button">
@@ -99,6 +103,7 @@ export function SimActionBar({ ctx, paywalled, advancing, onAdvance, onSimTo, on
           </Button>
         )}
       </div>
+      </PillMorph>
     </div>
   );
 }

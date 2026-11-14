@@ -9,6 +9,7 @@ import ErrorState from './ErrorState';
 import FadeInView from './FadeInView';
 import SectionHeading from './SectionHeading';
 import SegmentedTabBar from './SegmentedTabBar';
+import { useBottomPillContext } from '../lib/useBottomPillContext.ts';
 import { SkeletonCard } from './SkeletonBlock';
 import CompactModule from './CompactModule';
 import { SimDraftBoard, SimDraftIconButton } from './SimDraftBoard';
@@ -19,6 +20,8 @@ import ToneBadge from './ToneBadge';
 import { useThemeMode } from '../context/ThemeModeContext';
 import { api } from '../lib/api';
 import { simDraftNeedPills, simDraftSummaryParts } from '../lib/simDraft';
+import { simGradeOf } from '../lib/simGrade';
+import { LetterGrade } from './LetterGrade';
 import {
   SIM_QUEUE_MAX,
   simFmtPts,
@@ -27,6 +30,7 @@ import {
   simFilterPositionsFor,
   simPositionsFor,
   simRosterNeeds,
+  simAutoPickConfirmText,
   simValueOverAdpLabel,
   simValueOverAdpTone,
   type SimDraftHint,
@@ -173,6 +177,25 @@ export function SimGameDraft({ ctx, onComplete }: { ctx: SimCtx; onComplete: (re
     for (const t of draft?.teams ?? []) map[t.team_id] = t.is_you ? `${t.name} (you)` : t.name;
     return map;
   }, [draft?.teams]);
+
+  // Phones: the draft room's panel tabs live in the bottom pill (web twin: SimGameDraft.tsx), so the top row steps aside there.
+  const pillOwnsTabs = useBottomPillContext(
+    loadState === 'ready' && draft
+      ? {
+          id: 'sim-draft',
+          label: 'Draft panels',
+          tabs: [
+            { key: 'board', label: 'Players', glyph: 'players' },
+            { key: 'queue', label: queue.ids.length ? `Queue ${queue.ids.length}` : 'Queue', glyph: 'queue' },
+            { key: 'roster', label: 'Roster', glyph: 'roster' },
+            { key: 'picks', label: 'Picks', glyph: 'picks' },
+          ],
+          activeKey: panel,
+          onSelect: (key) => setPanel(key as Panel),
+          primary: { key: 'auto-pick', label: 'Auto-pick', glyph: 'recommended', disabled: draft.status === 'complete' || busy === 'pick', onPress: () => setConfirmAuto(true) },
+        }
+      : null,
+  );
 
   if (loadState === 'loading') {
     return (
@@ -336,14 +359,14 @@ export function SimGameDraft({ ctx, onComplete }: { ctx: SimCtx; onComplete: (re
           <FadeInView>
             <View style={common.tight} testID="draft-hint">
               <AppText style={common.muted}>{hint.why}</AppText>
-              <SimPlayerChip player={hint.player} extra={hint.player.overall != null ? <AppText style={common.muted}>OVR {hint.player.overall}</AppText> : undefined} />
+              <SimPlayerChip player={hint.player} extra={hint.player.grade ? <LetterGrade grade={simGradeOf(hint.player)} size="sm" /> : undefined} />
             </View>
           </FadeInView>
         ) : null}
         <SimDraftHero gameId={gameId} draft={draft} teams={game.settings.teams} slots={game.settings.slots} positions={simPositionsFor(game.settings.slots)} tick={ctx.tick} onOpen={ctx.openPlayer} />
         {confirmAuto ? (
           <View style={common.tight}>
-            <AppText style={common.small}>Auto-draft the rest of your picks from your queue, then best available and need?</AppText>
+            <AppText style={common.small}>{simAutoPickConfirmText(game.settings)}</AppText>
             <View style={common.row}>
               <Button size="sm" label="Yes, auto-pick" onPress={autoDraft} />
               <Button size="sm" variant="ghost" label="Cancel" onPress={() => setConfirmAuto(false)} />
@@ -362,6 +385,7 @@ export function SimGameDraft({ ctx, onComplete }: { ctx: SimCtx; onComplete: (re
         )}
       </CompactModule>
       <SimDraftOverview draft={draft} teams={game.settings.teams} onOpen={ctx.openPlayer} />
+      {pillOwnsTabs ? null : (
       <SegmentedTabBar<Panel>
         options={[
           { key: 'board', label: 'Players', glyph: 'players' },
@@ -372,6 +396,7 @@ export function SimGameDraft({ ctx, onComplete }: { ctx: SimCtx; onComplete: (re
         active={panel}
         onChange={setPanel}
       />
+      )}
       {panel === 'board' ? board : side()}
     </View>
   );

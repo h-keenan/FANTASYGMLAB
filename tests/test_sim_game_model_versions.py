@@ -73,7 +73,7 @@ STOP_WEEK = 6
 
 
 def _play(model_id: str, seed: int = 11, stop_week: int = STOP_WEEK):
-    snap = eng.build_snapshot(ROWS, BYES, replace(eng.GameSettings.parse({"user_slot": 4}), reserve_v=0, ir_slots=0, ai_v=0), seed, scoring_model=model_id)  # settings of a save from before IR/taxi
+    snap = eng.build_snapshot(ROWS, BYES, replace(eng.GameSettings.parse({"user_slot": 4}), reserve_v=0, ir_slots=0, ai_v=0, hint_v=0), seed, scoring_model=model_id)  # settings of a save from before IR/taxi
     store = eng.GameStore(InMemoryBackend())
     row = store.create_game("u", snapshot=snap, seed=seed)
     gid = row["id"]

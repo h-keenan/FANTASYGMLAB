@@ -27,8 +27,7 @@ def picks_view(snap: GameSnapshot, state: GameState) -> dict[str, Any]:
         rows = [pick_asset(snap, state, ev, p) for p in sorted(state.picks_of(t.tid), key=lambda p: (p.split(":")[1], int(p.split(":")[2]), p))]
         for r in rows:
             r["own"] = r["orig_team_id"] == t.tid
-        teams.append({"team_id": t.tid, "name": t.name, "is_you": t.is_user, "picks": rows,
-                      "total_value": round(sum(r["value"] for r in rows), 1)})
+        teams.append({"team_id": t.tid, "name": t.name, "is_you": t.is_user, "picks": rows})
     return {
         "enabled": snap.settings.dynasty, "draft_year": ev.draft_year_now(), "rounds": snap.settings.rookie_rounds,
         "years": snap.settings.pick_years, "you": next(t for t in teams if t["team_id"] == user)["picks"] if teams else [],
@@ -59,7 +58,7 @@ def offseason_view(snap: GameSnapshot, state: GameState, *, pos: str = "", limit
     for p in off.get("retired", ()):
         if p in prev.players:
             pl = prev.players[p]
-            retired.append({"id": p, "name": pl.name, "pos": pl.pos, "age": pl.age, "market": pl.market, "is_yours": False})
+            retired.append({"id": p, "name": pl.name, "pos": pl.pos, "age": pl.age, "is_yours": False})
     for r in retired:
         r["is_yours"] = off.get("retired_owner", {}).get(r["id"]) == user
     order = []
