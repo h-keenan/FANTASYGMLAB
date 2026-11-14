@@ -2,7 +2,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
-import { barFractions, fairnessMeter, nextOpenId, nextSheetSnap, orderPlayerSheetTabs, playerInitials, playerRowModel } from './playerAnatomy.ts';
+import { barFractions, fairnessMeter, tradeEdge, METER_BAND, nextOpenId, nextSheetSnap, orderPlayerSheetTabs, playerInitials, playerRowModel } from './playerAnatomy.ts';
 
 const chase = { id: '7564', name: "Ja'Marr Chase", team: 'CIN', age: 25 };
 
@@ -20,8 +20,19 @@ test('desk shows proj, value and trend; sim never value or overall', () => {
 test('one open, fairness, bars, snap, tabs', () => {
   assert.equal(nextOpenId('a', 'b'), 'b');
   assert.equal(nextOpenId('b', 'b'), null);
-  assert.equal(fairnessMeter(100, 200, 'sim').label, 'A better deal for you');
   assert.deepEqual(barFractions([10, 5, null]), [1, 0.5, 0]);
   assert.equal(nextSheetSnap('peek', -80), 'full');
   assert.deepEqual(orderPlayerSheetTabs([{ key: 'outlook' }, { key: 'overview' }, { key: 'stats' }]).map((t) => t.key), ['overview', 'stats', 'outlook']);
+});
+test('fairness meter math: clamped band, direction, sim coarse', () => {
+  assert.equal(fairnessMeter(100, 100).label, 'Even');
+  assert.equal(tradeEdge(100, 200), 0.5);
+  assert.ok(Math.abs(fairnessMeter(1000, 900).position - (0.5 - (0.1 / METER_BAND) * 0.5)) < 1e-9);
+  assert.equal(fairnessMeter(1000, 900).label, 'You lose by ~10%');
+  assert.equal(fairnessMeter(1000, 1120).tone, 'success');
+  assert.equal(fairnessMeter(1000, 2000).position, 1);
+  assert.equal(fairnessMeter(3575, 2159, 'desk', -583).tone, 'danger');
+  assert.equal(fairnessMeter(100, 200, 'sim').label, 'In your favor');
+  assert.equal(fairnessMeter(1000, 1160, 'sim').position, fairnessMeter(1000, 1210, 'sim').position);
+  assert.doesNotMatch(fairnessMeter(1000, 1160, 'sim').label + fairnessMeter(1000, 1160, 'sim').description, /\d/);
 });

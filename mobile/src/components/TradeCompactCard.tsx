@@ -41,6 +41,7 @@ export default function TradeCompactCard({
   get,
   mode = 'desk',
   verdictLabel,
+  netValue,
   meta = [],
   children,
   defaultOpen = false,
@@ -53,6 +54,8 @@ export default function TradeCompactCard({
   get: TradeCardAsset[];
   mode?: PlayerMode;
   verdictLabel?: string | null;
+  /** The server's net value for the trade (positive = you win); wins over the asset sums, which can miss pick values. */
+  netValue?: number | null;
   meta?: string[];
   children?: ReactNode;
   defaultOpen?: boolean;
@@ -64,7 +67,7 @@ export default function TradeCompactCard({
   const styles = useMemo(() => createStyles(colors), [colors]);
   const [open, setOpen] = useState(defaultOpen);
   const sum = (xs: TradeCardAsset[]) => xs.reduce((n, a) => n + (a.value ?? 0), 0);
-  const meter = fairnessMeter(sum(give), sum(get), mode);
+  const meter = fairnessMeter(sum(give), sum(get), mode, netValue);
   const hasBody = children != null && children !== false;
   const side = (label: string, assets: TradeCardAsset[]) => (
     <View style={styles.side}>
@@ -98,11 +101,12 @@ export default function TradeCompactCard({
       {side(giveLabel, give)}
       {side(getLabel, get)}
       <View style={styles.meterRow} testID="fairness-meter">
-        <View style={styles.track} accessibilityLabel={`Fairness: ${verdictLabel ?? meter.label}`}>
+        <View style={styles.track} accessible accessibilityRole="image" accessibilityLabel={verdictLabel && mode === 'desk' ? `${meter.description}. Market read: ${verdictLabel}` : meter.description}>
+          <View style={[styles.fill, { left: `${Math.min(50, meter.position * 100)}%`, width: `${Math.abs(meter.position - 0.5) * 100}%`, backgroundColor: toneColor(meter.tone, colors) }]} testID="fairness-fill" />
           <View style={styles.mid} />
-          <View style={[styles.marker, { left: `${Math.round(meter.position * 100)}%`, backgroundColor: toneColor(meter.tone, colors) }]} />
+          <View style={[styles.marker, { left: `${meter.position * 100}%`, backgroundColor: toneColor(meter.tone, colors), borderColor: colors.surfaceSolid }]} testID="fairness-marker" />
         </View>
-        <AppText style={[styles.verdict, { color: toneColor(meter.tone, colors) }]}>{verdictLabel ?? meter.label}</AppText>
+        <AppText style={[styles.verdict, { color: toneColor(meter.tone, colors) }]}>{meter.label}</AppText>
       </View>
       {hasBody ? (
         <>
@@ -126,9 +130,10 @@ function createStyles(colors: ThemeColors) {
     value: { fontSize: 14, fontWeight: '800', color: colors.textPrimary },
     pick: { minHeight: 44, fontSize: 14, fontWeight: '700', color: colors.textPrimary },
     meterRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
-    track: { flex: 1, height: 6, borderRadius: 3, backgroundColor: 'rgba(255,255,255,0.12)', justifyContent: 'center' },
-    mid: { position: 'absolute', left: '50%', width: 2, height: 12, backgroundColor: colors.textTertiary },
-    marker: { position: 'absolute', width: 12, height: 12, borderRadius: 6, marginLeft: -6 },
+    track: { flex: 1, height: 8, borderRadius: 4, backgroundColor: 'rgba(255,255,255,0.12)', justifyContent: 'center' },
+    fill: { position: 'absolute', top: 0, height: 8, borderRadius: 4, opacity: 0.55 },
+    mid: { position: 'absolute', left: '50%', width: 2, height: 14, marginLeft: -1, backgroundColor: colors.textTertiary },
+    marker: { position: 'absolute', width: 14, height: 14, borderRadius: 7, marginLeft: -7, borderWidth: 2 },
     verdict: { fontSize: 12, fontWeight: '800' },
     toggle: { minHeight: 44, justifyContent: 'center', alignSelf: 'flex-start' },
     toggleText: { fontSize: 12, fontWeight: '700', color: colors.accent },

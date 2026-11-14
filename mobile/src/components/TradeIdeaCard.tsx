@@ -310,6 +310,7 @@ export default function TradeIdeaCard({
       give={idea.package.send.map(toCardAsset)}
       get={idea.package.receive.map(toCardAsset)}
       verdictLabel={idea.value_edge_band || null}
+      netValue={idea.trade_gain}
       meta={[`${idea.confidence_label} confidence`]}
     >
       {idea.category || idea.impact_tag ? (
