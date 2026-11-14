@@ -29,7 +29,7 @@ const fmt = (n: number) => (Math.round(n * 10) / 10).toFixed(1);
 /** The page order: Result, Matchup, Injuries and lineup, Around the league, Next week. Pages with nothing to say are dropped. */
 export function simRecapPageKeys(recap: SimWeekRecap, facts: SimRecapFacts): SimRecapPageKey[] {
   const keys: SimRecapPageKey[] = ["result"];
-  if (recap.your_game && recap.your_game.starters.length > 0) keys.push("matchup");
+  if (recap.your_game && recap.your_game.result !== "bye" && recap.your_game.starters.length > 0) keys.push("matchup");
   const hurt = (recap.injuries ?? []).length > 0;
   const flagged = (recap.your_game?.starters ?? []).some((s) => s.flag != null);
   if (hurt || flagged || facts.lineupWarnings > 0) keys.push("injuries");
@@ -52,7 +52,8 @@ export interface SimRecapResultModel {
 
 export function simRecapResultModel(recap: SimWeekRecap): SimRecapResultModel {
   const g = recap.your_game;
-  if (!g) return { kind: "bye", result: "bye", opponent: "", yours: 0, theirs: 0, margin: "Bye week", best: null, worst: null };
+  // A playoff bye comes from the server as a game whose result is "bye" (no opponent, no scores): never a loss by NaN.
+  if (!g || g.result === "bye") return { kind: "bye", result: "bye", opponent: "", yours: 0, theirs: 0, margin: "Bye week", best: null, worst: null };
   const diff = Math.round((g.your_pts - g.opp_pts) * 10) / 10;
   const margin = diff === 0 ? "Tied" : diff > 0 ? `Won by ${fmt(diff)}` : `Lost by ${fmt(-diff)}`;
   const played = g.starters.filter((s) => s.player && s.flag == null);
