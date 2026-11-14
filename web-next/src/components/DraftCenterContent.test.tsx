@@ -5,6 +5,11 @@ import type { DraftSignalRow } from "@/lib/draftSignals";
 import { DraftCenterContent } from "./DraftCenterContent";
 import type { DraftCenterResponse, DraftPickAsset, DraftPosture } from "@/lib/api";
 
+/** Posture, pick values and the signal sections are CompactModules; open the collapsed ones to assert on their bodies. */
+function expandAll() {
+  for (const b of document.querySelectorAll('button[aria-expanded="false"][aria-label$=". Expand"]')) fireEvent.click(b);
+}
+
 function posture(overrides: Partial<DraftPosture>): DraftPosture {
   return {
     label: "Pick-Rich Rebuilder",
@@ -68,12 +73,13 @@ describe("DraftCenterContent", () => {
     render(
       <DraftCenterContent leagueName="Test League" data={BASE_RESPONSE} picks={PICKS} myRosterId="1" />,
     );
+    expandAll();
 
     expect(screen.getByRole("tab", { name: "Scouting" })).toBeInTheDocument();
-    expect(screen.getByText("Pick-Rich Rebuilder")).toBeInTheDocument();
+    expect(screen.getAllByText("Pick-Rich Rebuilder")[0]).toBeInTheDocument();
     expect(screen.getByText("#1")).toBeInTheDocument(); // Draft Capital rank tile
-    expect(screen.getByText("Best Pick Buyers")).toBeInTheDocument();
-    expect(screen.getByText("Pick-Rich Teams")).toBeInTheDocument();
+    expect(screen.getAllByText("Best Pick Buyers")[0]).toBeInTheDocument();
+    expect(screen.getAllByText("Pick-Rich Teams")[0]).toBeInTheDocument();
     // Picks live on their own tab, grouped by year then round.
     fireEvent.click(screen.getByRole("tab", { name: "Picks" }));
     // My Picks is the default scope when a roster id is resolved.
@@ -84,6 +90,7 @@ describe("DraftCenterContent", () => {
 
   it("posture tiles link to the rankings and plan that explain them when the league is known", () => {
     render(<DraftCenterContent leagueId="L1" leagueName="Test League" data={BASE_RESPONSE} picks={PICKS} myRosterId="1" />);
+    expandAll();
     expect(screen.getByRole("link", { name: /Draft Capital.*open the Draft Capital rankings/ })).toHaveAttribute("href", "/league-rankings/L1?name=Test%20League#board-draft_capital");
     expect(screen.getByRole("link", { name: /Strategy.*open your GM Plan/ })).toHaveAttribute("href", "/gm-plan/L1?name=Test%20League");
   });
@@ -92,6 +99,7 @@ describe("DraftCenterContent", () => {
     render(
       <DraftCenterContent leagueName="Test League" data={BASE_RESPONSE} picks={PICKS} myRosterId="1" initialTab="picks" />,
     );
+    expandAll();
 
     fireEvent.click(screen.getByText("League"));
 
@@ -102,6 +110,7 @@ describe("DraftCenterContent", () => {
 
   it("hides the My Picks/League toggle when no roster id resolves, defaulting to league scope", () => {
     render(<DraftCenterContent leagueName="Test League" data={BASE_RESPONSE} picks={PICKS} myRosterId="" initialTab="picks" />);
+    expandAll();
 
     expect(screen.queryByText("My Picks")).not.toBeInTheDocument();
     expect(screen.getByText("2027 1st (Rival)")).toBeInTheDocument();
@@ -116,8 +125,9 @@ describe("DraftCenterContent", () => {
         myRosterId=""
       />,
     );
+    expandAll();
 
-    expect(screen.getByText(/don't appear to have a roster/)).toBeInTheDocument();
+    expect(screen.getAllByText(/don't appear to have a roster/)[0]).toBeInTheDocument();
   });
 
   describe("structured signal rows (card schema 2)", () => {
@@ -149,6 +159,7 @@ describe("DraftCenterContent", () => {
 
     it("renders fields, not the joined string: one Picks pill, a chip, a short reason", () => {
       render(<DraftCenterContent leagueName="L" data={schema2([signalRow(1)])} picks={PICKS} myRosterId="9" />);
+      expandAll();
       expect(screen.getByText("Picks #10")).toBeInTheDocument();
       expect(screen.queryByText(/Draft #10/)).toBeNull();
       expect(screen.getByText("Retool")).toBeInTheDocument();
@@ -158,6 +169,7 @@ describe("DraftCenterContent", () => {
 
     it("shows the top 3 and expands the rest in place with See all (n)", () => {
       render(<DraftCenterContent leagueName="L" data={schema2([1, 2, 3, 4, 5].map((n) => signalRow(n)))} picks={PICKS} myRosterId="9" />);
+      expandAll();
       expect(screen.getByText("Team 3")).toBeInTheDocument();
       expect(screen.queryByText("Team 4")).toBeNull();
       const more = screen.getByRole("button", { name: "See all (5)" });
@@ -168,6 +180,7 @@ describe("DraftCenterContent", () => {
 
     it("opens a detail sheet with the full sentence and evidence on tap", () => {
       render(<DraftCenterContent leagueName="L" data={schema2([signalRow(1)])} picks={PICKS} myRosterId="9" />);
+      expandAll();
       fireEvent.click(screen.getByRole("button", { name: /Team 1 Picks #10/ }));
       const dialog = screen.getByRole("dialog", { name: "Team 1" });
       expect(dialog).toHaveTextContent("leaves too little flexibility for a retool build");
@@ -176,12 +189,14 @@ describe("DraftCenterContent", () => {
 
     it("outlines the signed-in user's own team", () => {
       render(<DraftCenterContent leagueName="L" data={schema2([signalRow(1), signalRow(2)])} picks={PICKS} myRosterId="2" />);
+      expandAll();
       expect(screen.getByRole("button", { name: /Team 2 / }).className).toContain("ui-srow-me");
       expect(screen.getByRole("button", { name: /Team 1 / }).className).not.toContain("ui-srow-me");
     });
 
     it("still renders legacy strings for a response without rows", () => {
       render(<DraftCenterContent leagueName="L" data={BASE_RESPONSE} picks={PICKS} myRosterId="1" />);
+      expandAll();
       expect(screen.getByText("Team A has the leverage.")).toBeInTheDocument();
     });
   });

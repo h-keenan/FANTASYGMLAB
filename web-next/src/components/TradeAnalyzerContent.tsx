@@ -6,6 +6,7 @@ import type { VerdictAssumptions } from "@/lib/verdictTrust";
 import type { RosterOverflow } from "@/lib/api";
 import { RosterOverflowNote } from "@/components/SuggestedDrop";
 import { AccentCard } from "@/components/AccentCard";
+import { CompactModule } from "@/components/ui/CompactModule";
 import { Button } from "@/components/Button";
 import { LimitWall } from "@/components/LimitWall";
 import { useAuth } from "@/context/AuthContext";
@@ -394,6 +395,17 @@ function VerdictCard({
         <BeginnerHelp label="value balance" term="analyzerValueBalance" />
       </div>
 
+      <CompactModule
+        id="analyzer.lineup"
+        title="Lineup and odds"
+        persist={false}
+        parts={[
+          verdict.lineup_model
+            ? { key: "pts", text: `${formatLineupPoints(verdict.lineup_model.points.ros_delta)} lineup pts ROS`, strong: true, tone: verdict.posture_assessment?.lineup_costly ? "danger" : undefined }
+            : { key: "pts", text: "Playoff and title odds effect", tone: "muted" },
+          verdict.lineup_model ? { key: "wk", text: `${formatLineupPoints(verdict.lineup_model.points.this_week_delta)} this week` } : null,
+        ]}
+      >
       {verdict.lineup_model ? (
         <div className="flex flex-col gap-1" data-testid="lineup-model">
           <span
@@ -416,6 +428,7 @@ function VerdictCard({
       ) : null}
 
       <TradeOddsEffect leagueId={leagueId} send={sendAssets} receive={receiveAssets} lens={lens} />
+      </CompactModule>
 
       {summary ? (
         <InsightRow color="var(--color-information)" label={verdict.rationale_label || "Why this works"} icon={<path d="M9 18h6M10 21h4M12 3a6 6 0 0 0-4 10.5c.7.7 1 1.5 1 2.5h6c0-1 .3-1.8 1-2.5A6 6 0 0 0 12 3z" />}>
@@ -425,6 +438,18 @@ function VerdictCard({
         </InsightRow>
       ) : null}
 
+      <CompactModule
+        id="analyzer.counter"
+        title="Next move and alternatives"
+        persist={false}
+        defaultOpen={Boolean(verdict.counter_guidance)}
+        parts={[
+          verdict.counter_guidance ? { key: "g", text: shortSummary(verdict.counter_guidance) } : null,
+          alternatePackages.length > 0
+            ? { key: "alt", text: `${alternatePackages.length} alternative${alternatePackages.length === 1 ? "" : "s"}`, strong: true }
+            : { key: "alt", text: verdict.counter_search?.status === "none" ? "No better package found" : "No alternatives", tone: "muted" },
+        ]}
+      >
       {verdict.counter_guidance ? (
         <InsightRow color="var(--color-accent)" label="Next move" icon={<path d="M5 12h14M13 6l6 6-6 6" />}>
           <p className="text-sm" style={{ color: "var(--color-text-secondary)" }}>
@@ -480,7 +505,17 @@ function VerdictCard({
           {verdict.counter_search.message || "No better package found."}
         </p>
       ) : null}
+      </CompactModule>
 
+      <CompactModule
+        id="analyzer.confidence"
+        title="Confidence and risk"
+        persist={false}
+        parts={[
+          { key: "c", text: `${verdict.confidence}${verdict.confidence_pct != null ? ` (${Math.round(verdict.confidence_pct)}%)` : ""} confidence`, strong: true },
+          verdict.risk_summary ? { key: "r", text: shortSummary(verdict.risk_summary), tone: "warning" } : null,
+        ]}
+      >
       <ConfidenceMeter
         label="Confidence"
         value={verdict.confidence_pct != null ? `${verdict.confidence} (${Math.round(verdict.confidence_pct)}%)` : verdict.confidence}
@@ -496,6 +531,7 @@ function VerdictCard({
           </p>
         </InsightRow>
       ) : null}
+      </CompactModule>
 
       {hasMore ? (
         <details data-testid="verdict-read-more">

@@ -141,6 +141,12 @@ const STATE: LiveDraftStateResponse = {
   ],
 };
 
+/** The draft sections are CompactModules; open the collapsed ones to assert on their bodies. */
+function expandAll() {
+  for (const b of document.querySelectorAll('button[aria-expanded="false"][aria-label$=". Expand"]')) fireEvent.click(b);
+}
+
+
 describe("LiveDraftContent", () => {
   it("shows the Pro upsell instead of the empty-drafts message for a Free caller", () => {
     render(
@@ -225,9 +231,10 @@ describe("LiveDraftContent", () => {
         onRefresh={vi.fn()}
       />,
     );
+    expandAll();
 
-    expect(screen.getByText("Pick 4 · Round 1")).toBeInTheDocument();
-    expect(screen.getByText("On the clock")).toBeInTheDocument();
+    expect(screen.getAllByText("Pick 4 · Round 1").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("On the clock").length).toBeGreaterThan(0);
     expect(screen.getAllByText("Star Wideout").length).toBeGreaterThan(0);
     expect(screen.getByText("Backup Runner")).toBeInTheDocument();
     expect(screen.getByText("Also consider")).toBeInTheDocument();
@@ -252,6 +259,7 @@ describe("LiveDraftContent", () => {
         onRefresh={vi.fn()}
       />,
     );
+    expandAll();
 
     expect(screen.queryByText(/Scarcity/)).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "Score breakdown" }));
@@ -272,6 +280,7 @@ describe("LiveDraftContent", () => {
         onRefresh={vi.fn()}
       />,
     );
+    expandAll();
     expect(screen.getByRole("combobox", { name: "Position filter" })).toBeInTheDocument(); // the rankings filter select only
     expect(screen.queryByRole("combobox", { name: "Draft" })).not.toBeInTheDocument();
 
@@ -288,6 +297,7 @@ describe("LiveDraftContent", () => {
         onRefresh={vi.fn()}
       />,
     );
+    expandAll();
     expect(screen.getAllByRole("combobox").length).toBe(2);
     fireEvent.change(screen.getByRole("combobox", { name: "Draft" }), { target: { value: "draft-2" } });
     expect(onSelectDraft).toHaveBeenCalledWith("draft-2");

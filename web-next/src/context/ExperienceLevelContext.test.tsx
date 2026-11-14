@@ -167,15 +167,23 @@ describe("experience level copy on Dashboard", () => {
   });
 });
 
+
+/** Idea cards are CompactModules: collapsed they show the partner + a summary; open them to reach the package. */
+function openIdeaCards() {
+  for (const card of screen.getAllByTestId("trade-idea-card")) {
+    const header = card.querySelector("button[aria-expanded=false]");
+    if (header) fireEvent.click(header);
+  }
+}
+
 describe("experience level copy on Trade Hub idea cards", () => {
   it("explains Sell High, balance and realism for a beginner", async () => {
     vi.mocked(api.getDevicePreferences).mockResolvedValue(preferences("beginner"));
     render(withProvider(<TradeIdeaCardView idea={IDEA} leagueId="abc" />));
 
+    openIdeaCards();
     await expandHelp();
     expect(await screen.findByText(BEGINNER_HELP.impactSellHigh)).toBeInTheDocument();
-    fireEvent.click(screen.getByRole("button", { name: /view details/i }));
-    await expandHelp();
     expect(screen.getByText(BEGINNER_HELP.ideaBalance)).toBeInTheDocument();
     expect(screen.getByRole("img", { name: "Partner Acceptance: Plausible" })).toBeInTheDocument();
     expect(screen.getByText(BEGINNER_HELP.ideaRealism)).toBeInTheDocument();
@@ -186,7 +194,7 @@ describe("experience level copy on Trade Hub idea cards", () => {
     const { container } = render(withProvider(<TradeIdeaCardView idea={IDEA} leagueId="abc" />));
 
     await waitFor(() => expect(api.getDevicePreferences).toHaveBeenCalled());
-    fireEvent.click(screen.getByRole("button", { name: /view details/i }));
+    openIdeaCards();
     expect(screen.getByRole("img", { name: "Realism: Plausible" })).toBeInTheDocument();
     expect(container.querySelector("[data-beginner-help]")).toBeNull();
   });

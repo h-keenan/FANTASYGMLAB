@@ -1,4 +1,4 @@
-// Module-template scan (docs/audits/2026-11-module-templates-rollout.md): Today, Team, Trades, League, Matchup, Waivers and Players at 390 and 1440 WITH data (desktop also checks one header bar).
+// Module-template scan (docs/audits/2026-11-module-templates-rollout.md): Today, Team, Trades, League, Matchup, Waivers, Players, Trade Finder/Analyzer, GM Plan, Games, Recaps, Draft Center and the public sample league at 390 and 1440 WITH data (desktop also checks one header bar).
 // Unlike app_audit.mjs (empty stubs) this answers the league endpoints with fixtures, then checks per page:
 //   - no horizontal overflow (scrollWidth <= width),
 //   - every collapsed compact module shows >= 12 characters of summary (the same rule as the unit tests),
@@ -55,7 +55,7 @@ const FIX = {
   multi: { ok: true, locked: false, idea_count: 0, ideas: [], reason: "no_fit" },
   "trade-hub": {
     ok: true, reason: "", team_strategy: "contender", posture_sentence: "You are contending.", hold: null,
-    ideas: [1, 2, 3].map((n) => ({ partner_team_name: `Team ${n + 1}`, partner_team_avatar_url: null, rationale: "Fills your WR need with a surplus RB.", trade_gain: 400 * n, confidence_label: "High", market_realism_label: "Realistic", reasoning_tags: [], package: { send: [], receive: [] }, category: "need", value_edge_band: "Fair", impact_tag: "Lineup", landed_gm_target_player_ids: [], send_score: 1000, receive_score: 1400, recommendation_id: `idea-${n}` })),
+    ideas: [1, 2, 3].map((n) => ({ partner_team_name: `Team ${n + 1}`, partner_team_avatar_url: null, rationale: "Fills your WR need with a surplus RB.", trade_gain: 400 * n, confidence_label: "High", market_realism_label: "Realistic", reasoning_tags: [], package: { send: [{ asset_type: "player", player_id: `s${n}`, name: "Test Running Back", position: "RB", team: "DET", age: 25, score: 1000, tier: "starter" }, { asset_type: "player", player_id: `s${n}b`, name: "Test Bench Receiver", position: "WR", team: "DET", age: 24, score: 300, tier: "bench" }], receive: [{ asset_type: "player", player_id: `g${n}`, name: "Opponent Wide Receiver", position: "WR", team: "SEA", age: 24, score: 1700, tier: "starter" }], value_edge: "+400", confidence: "High" }, category: "need", value_edge_band: "Fair", impact_tag: "Lineup", landed_gm_target_player_ids: [], send_score: 1000, receive_score: 1400, recommendation_id: `idea-${n}` })),
     entitlement: { is_premium: true, free_limit: 3, approved_count: 3, visible_count: 3, hidden_count: 0 },
     trade_window: { trade_deadline_week: 11, current_week: 9, trade_deadline_passed: false, message: "" },
   },
@@ -71,6 +71,19 @@ const wAdd = (id, name, pos, team, score, lo, hi, why) => ({ player_id: id, name
 const WA = [wAdd("w0", "Jalen Nailor", "WR", "LV", 2608, 8, 12, "Best on the wire for your WR need"), wAdd("w1", "Marvin Mims Jr.", "WR", "DEN", 1786, 3, 5, "Rival demand: two teams need WR"), wAdd("w2", "Khalil Herbert", "RB", "ATL", 1283, 2, 4, "Role rising"), wAdd("w3", "John Metchie III", "WR", "CAR", 1223, 1, 3, "Rival demand"), wAdd("w4", "Coleman Owen", "WR", "GB", 1100, 1, 2, "Role rising")];
 FIX.waivers = { ok: true, reason: "", players: WA, priority_adds: WA, needed_positions: ["WR"], available_count: 120, avg_wire_score: 650, injured_starters: 0, injury_positions: [], stash_candidates: [], watchlist_candidates: [], faab_targets: [], entitlement: { is_premium: true } };
 FIX.rankings = { ok: true, players: Array.from({ length: 12 }, (_, i) => ({ player_id: `r${i}`, name: `Ranked Player ${i}`, position: ["QB", "RB", "WR", "TE"][i % 4], team: "DET", age: 24 + (i % 5), status: "Active", injury_status: null, tier: "starter", score: 5000 - i * 200, overall_rank: i + 1, position_rank: Math.floor(i / 4) + 1, rank_unavailable_reason: null, opportunity_label: null, overall_rating: 90 - i })) };
+
+// Pass 3 fixtures: GM Plan, Games, Draft Center (Recaps / Trade Analyzer use the generic empty shapes).
+const tradeItem = (n) => ({ partner_team_name: `Team ${n + 1}`, my_player: "Test Running Back", their_player: "Opponent Wide Receiver", my_player_id: `s${n}`, their_player_id: `g${n}`, their_player_injury_display: "", rationale: "Fills your WR need with a surplus RB.", trade_confidence_label: "High", priority: n, send_assets: [], receive_assets: [], trade_gain: 300 * n, source: "x" });
+FIX["gm-plan"] = { ok: true, quiet: false, reason: "", is_premium: true, upsell: null, season_phase_label: "In season", team_stance: "competing", team_stance_label: "Competing", headline: "Push for a title: your WR room is the one gap.", trade_window: { trade_deadline_week: 11, current_week: 9, trade_deadline_passed: false, message: "" }, focus_areas: [
+  { key: "standing", title: "Where you stand", status: "signal", items: [{ rank: 2, label: "Roster Power", total_teams: 8 }, { wins: 7, losses: 6, ties: 0 }], watch_for: "" },
+  { key: "trade_opportunities", title: "Trade opportunities", status: "signal", items: [1, 2, 3].map(tradeItem), watch_for: "" },
+  { key: "roster_construction", title: "Roster construction", status: "no_signal", items: [], watch_for: "No glaring holes." },
+] };
+const gOdds = (i) => ({ roster_id: String(i), team_name: `Team ${i}`, avatar_url: null, record_label: `${8 - i}-${i}`, playoff_probability: 90 - i * 10, title_probability: 30 - i * 3, median_seed: i, mine: i === 3 });
+FIX["games/season-sim"] = { ok: true, reason: "", is_premium: true, upsell: null, my_roster_id: "3", my_team: { ...gOdds(3), median_final_wins: 9, median_final_losses: 5, clinched: false, eliminated: false }, teams: [1, 2, 3, 4, 5, 6, 7, 8].map(gOdds), roster: [{ player_id: "r1", name: "Test Running Back", position: "RB", team: "DET", injury_status: null, tier: "starter" }], playoff_teams: 6, title_odds: { available: true, reason: "" }, current_week: 9, weeks_remaining: 5, trials: 2000 };
+FIX["draft-center"] = { ok: true, reason: "", posture: { label: "Pick-Rich Rebuilder", note: "Rebuild path already has strong pick insulation.", tone: "opportunity", draft_capital_rank: 1, draft_capital_rank_tied: false, draft_capital: 4200, future_draft_capital_rank: 2, future_draft_capital_rank_tied: false, future_draft_capital: 2000, first_rounders: 3, pick_count: 9, strategy_display: "Rebuild", power_rank: 5, power_rank_tied: false, franchise_rank: 4, franchise_rank_tied: false }, posture_reason: "", decision_cards: [{ label: "Best Pick Buyers", title: "Who will pay for picks", tone: "opportunity", items: ["Team 2 needs RB depth."] }], partner_cards: [{ label: "Pick-Rich Teams", title: "Teams with extra firsts", tone: "neutral", items: ["Team 4 holds 4 firsts."] }], is_premium: true, upsell: null };
+FIX["draft-picks"] = { ok: true, reason: "", picks: [1, 2, 3].flatMap((r) => [2026, 2027].map((y) => ({ pick_id: `${y}-${r}`, label: `${y} Round ${r}`, score: 900 - r * 200, season: y, round: r, original_roster_id: "1", owner_roster_id: "1", original_team_name: "Team 1", owner_team_name: "Team 1", pick_tier: "Early", projected_pick_range: "1.03-1.06" }))) };
+FIX["my-roster"] = { ok: true, roster: { roster_id: "1" } };
 const ROUTES = [
   { name: "today", path: `/dashboard/${LID}?name=Donk`, family: "none" },
   { name: "team", path: `/my-team/${LID}?name=Donk`, family: "team" },
@@ -79,6 +92,13 @@ const ROUTES = [
   { name: "matchup", path: `/matchup/${LID}?name=Donk`, family: "team", expect: "matchup-hero" },
   { name: "waivers", path: `/waivers/${LID}?name=Donk`, family: "team", expect: "waiver-rec-row", maxTablists: 2, noModules: true },
   { name: "players", path: `/players/${LID}?name=Donk`, family: "team", noModules: true },
+  { name: "trade-finder", path: `/trade-finder/${LID}?name=Donk`, family: "trades", maxTablists: 2, noModules: true },
+  { name: "trade-analyzer", path: `/trade-analyzer/${LID}?name=Donk`, family: "trades", maxTablists: 2, noModules: true },
+  { name: "gm-plan", path: `/gm-plan/${LID}?name=Donk`, family: "none", maxTablists: 2 },
+  { name: "games", path: `/games/${LID}?name=Donk`, family: "league" },
+  { name: "recaps", path: `/league-recaps/${LID}?name=Donk`, family: "league", maxTablists: 2, noModules: true },
+  { name: "draft-center", path: `/draft-center/${LID}?name=Donk`, family: "none" },
+  { name: "sample-league", path: `/sample-league`, family: "none", maxTablists: 2, noAuth: true },
 ];
 const session = { access_token: "a.b.c", refresh_token: "r", token_type: "bearer", expires_in: 99999, expires_at: Math.floor(Date.now() / 1000) + 99999, user: { id: "u1", aud: "authenticated", role: "authenticated", email: "t@example.com", app_metadata: {}, user_metadata: {}, created_at: "2026-01-01T00:00:00Z" } };
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -120,7 +140,7 @@ const PAGE_CHECK = () => {
   out.recRowMaxH = Math.max(0, ...[...document.querySelectorAll('[data-testid="waiver-rec-row"]')].map((e) => Math.round(e.getBoundingClientRect().height)));
   const tl = [...document.querySelectorAll('[role="tablist"]')].filter((el) => el.getBoundingClientRect().height > 0);
   // The page tab row count: filter rows (aria-labelled pill rows) and view toggles inside a module are not page tabs.
-  out.tablists = tl.filter((el) => !el.getAttribute("aria-label")?.match(/^(Position|Recommendation filter)$/) && !el.closest('[data-testid^="matchup-"],[data-testid^="players-"]')).length;
+  out.tablists = tl.filter((el) => !el.getAttribute("aria-label")?.match(/^(Position|Recommendation filter|What you want back|Season|Filter history|Recap week|Sample league views)$/) && !el.closest('[data-testid^="matchup-"],[data-testid^="players-"]')).length;
   out.tablistLabels = tl.map((el) => `${el.getAttribute("aria-label") || ""}|${[...el.querySelectorAll('[role="tab"]')].map((t) => t.textContent.trim()).join("/")}|inModule=${Boolean(el.closest('[data-testid^="matchup-"],[data-testid^="players-"]'))}`);
   return out;
 };
@@ -135,7 +155,7 @@ for (const w of WIDTHS) {
     const cors = { "access-control-allow-origin": "*", "access-control-allow-headers": "*", "access-control-allow-methods": "*" };
     if (u.hostname === "localhost" && u.port === "8000") {
       if (route.request().method() === "OPTIONS") return route.fulfill({ status: 204, headers: cors });
-      const m = u.pathname.match(/\/v1\/leagues\/[^/]+\/([a-z-]+)$/) || u.pathname.match(/\/v1\/players\/(value-signals)$/) || (u.pathname.endsWith("/trade-ideas/multi") ? [0, "multi"] : null);
+      const m = u.pathname.match(/\/v1\/leagues\/[^/]+\/(games\/season-sim)$/) || u.pathname.match(/\/v1\/leagues\/[^/]+\/([a-z-]+)$/) || u.pathname.match(/\/v1\/players\/(value-signals)$/) || (u.pathname.endsWith("/trade-ideas/multi") ? [0, "multi"] : null);
       const body = m && FIX[m[1]] ? FIX[m[1]] : {};
       return route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(body), headers: cors });
     }
@@ -167,7 +187,7 @@ for (const r of results) {
   if (r.error) problems.push(`error ${r.error}`);
   if (r.overflow) problems.push(`overflow ${r.overflow.scrollWidth}>${r.overflow.width}`);
   if (r.emptyHeaders?.length) problems.push(`empty collapsed headers: ${r.emptyHeaders.map((h) => h.title).join(", ")}`);
-  if (r.strip && r.width < 768) {
+  if (r.strip && r.width < 768 && r.page !== "sample-league") {
     const s = r.strip, spread = Math.max(...s.widths) - Math.min(...s.widths);
     if (Math.abs(s.left) > 0.5 || Math.abs(s.right) > 0.5) problems.push(`tab strip not full-bleed (left ${s.left}, right gap ${s.right})`);
     if (Math.abs(s.tabLeft - s.tabRight) > 2) problems.push(`tabs not centred (left ${s.tabLeft}, right ${s.tabRight})`);
@@ -179,6 +199,7 @@ for (const r of results) {
   if (r.width >= 768 && r.shellHeaderVisible) problems.push("phone ShellHeader visible on desktop (double header)");
   if (r.width >= 768 && r.headerBars > 1) problems.push(`${r.headerBars} header bars on desktop`);
   if (r.expect === 0) problems.push("expected page content missing (fixture not applied?)");
+  if (r.width >= 1024 && r.page === "sample-league" && r.mainWidth < 1000) problems.push(`sample league column only ${r.mainWidth}px wide at desktop`);
   if (r.width >= 1024 && r.page === "matchup" && r.mainWidth < 1000) problems.push(`matchup column only ${r.mainWidth}px wide at desktop`);
   if (r.recRowMaxH > 96) problems.push(`recommended-add row ${r.recRowMaxH}px tall (compact rows are <= 96)`);
   if (r.modules === 0 && !r.noModules) problems.push("no compact modules rendered (fixtures not applied?)");

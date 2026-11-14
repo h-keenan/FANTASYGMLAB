@@ -1,7 +1,6 @@
 "use client";
 
 import { PageTabBar } from "@/components/PageTabBar";
-import type { TabIconName } from "@/lib/tabIcons";
 import { EmptyState } from "@/components/EmptyState";
 import { SectionHeading } from "@/components/SectionHeading";
 import { useEffect, useState, type ReactNode } from "react";
@@ -19,6 +18,7 @@ import type {
   StorylinesResponse,
 } from "@/lib/api";
 import { PillRow, TabStack } from "@/components/PillRow";
+import { ViewSelect } from "@/components/ui/ViewSelect";
 import { PlayerAvatar } from "@/components/PlayerAvatar";
 import { PlayerIdentityTrigger } from "@/components/PlayerIdentityTrigger";
 import { PositionBadge } from "@/components/PositionBadge";
@@ -84,7 +84,6 @@ type MemoryView = "Recaps" | "History" | "Storylines" | "Roundup";
 
 const MEMORY_VIEWS: MemoryView[] = ["Recaps", "Roundup", "History", "Storylines"];
 
-const MEMORY_VIEW_GLYPHS: Record<MemoryView, TabIconName> = { Recaps: "recaps", Roundup: "roundup", History: "history", Storylines: "storylines" };
 
 const VIEW_BY_TAB: Record<RecapsTab, MemoryView> = { recaps: "Recaps", history: "History", storylines: "Storylines", roundup: "Roundup" };
 
@@ -1102,13 +1101,9 @@ export function LeagueRecapsContent({
         <PageTitle page="League Recaps" leagueName={leagueName} />
       </header>
       <div className="flex flex-col gap-4">
-        <PillRow
-          variant="fill"
-          ariaLabel="League memory view"
-          options={MEMORY_VIEWS.map((v) => ({ label: v, value: v, glyph: MEMORY_VIEW_GLYPHS[v] }))}
-          active={view}
-          onSelect={(value) => setView(value as MemoryView)}
-        />
+        <div className="flex flex-wrap items-center gap-2" data-testid="recaps-controls">
+          <ViewSelect label="League memory view" value={view} options={MEMORY_VIEWS.map((v) => ({ value: v, label: v }))} onChange={(value) => setView(value as MemoryView)} />
+        </div>
         {body}
       </div>
     </main>

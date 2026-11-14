@@ -5,7 +5,7 @@ import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { Ionicons } from '@expo/vector-icons';
 
 import AppText from './AppText';
-import AccentCard from './AccentCard';
+import CompactModule from './CompactModule';
 import BeginnerHelp from './BeginnerHelp';
 import MeterRow, { CONFIDENCE_LEVELS } from './ConfidenceMeter';
 import ManagerTendenciesChips from './ManagerTendenciesChips';
@@ -24,6 +24,8 @@ import { useExperienceCopy } from '../context/ExperienceLevelContext';
 import { useDensity } from '../context/DensityContext';
 import { useThemeMode } from '../context/ThemeModeContext';
 import { useValuationLens } from '../context/ValuationLensContext';
+import { abbreviatePlayerName } from '../lib/formatPlayerName';
+import { tradeIdeaSummaryParts } from '../lib/tradeIdeaSummary';
 import type { DraftPickAsset, PresentationAsset, RankedPlayer, TradeIdea, TradeVerdict } from '../lib/api';
 import { radii, spacing, type ThemeColors, scrim } from '../theme';
 import type { RootStackParamList } from '../navigation/RootNavigator';
@@ -288,8 +290,26 @@ export default function TradeIdeaCard({
     .map((playerId) => idea.package.receive.find((asset) => asset.player_id === playerId)?.name)
     .filter((name): name is string => Boolean(name));
 
+  // Collapsed: the partner and a real summary (balance, swap, fairness, confidence); the whole former card is the
+  // expanded body, so nothing is removed (docs/ui-patterns.md "Module templates"). Web twin: ui/CompactModule in TradeIdeaCard.
+  const summaryParts = tradeIdeaSummaryParts({
+    gain: idea.trade_gain,
+    sendNames: idea.package.send.map((asset) => abbreviatePlayerName(asset.name)),
+    receiveNames: idea.package.receive.map((asset) => abbreviatePlayerName(asset.name)),
+    band: idea.value_edge_band,
+    confidenceLabel: idea.confidence_label,
+  });
+  const moduleId = `trade.idea.${leagueId}.${idea.package.send.map((a) => a.player_id).join('-')}.${idea.package.receive.map((a) => a.player_id).join('-')}`;
+
   return (
-    <AccentCard accent={categoryAccent} compact style={styles.card}>
+    <CompactModule
+      id={moduleId}
+      title={idea.partner_team_name}
+      parts={summaryParts}
+      accent={categoryAccent}
+      persist={false}
+      testID="trade-idea-card"
+    >
       {idea.category || idea.impact_tag ? (
         <View style={[styles.categoryRow, styles.categoryRowSpread]}>
           {idea.category ? <ToneBadge label={idea.category} color={categoryAccent} /> : null}
@@ -499,7 +519,7 @@ export default function TradeIdeaCard({
           full-width, clearly-labeled primary affordance at the natural end
           of the card, after the reasoning that justifies it. */}
       <Button label="Share to Propose" onPress={() => setShareOpen(true)} style={styles.proposeButton} />
-    </AccentCard>
+    </CompactModule>
   );
 }
 

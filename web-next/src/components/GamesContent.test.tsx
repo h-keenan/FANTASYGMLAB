@@ -85,13 +85,19 @@ beforeEach(() => {
   vi.clearAllMocks();
 });
 
+/** League odds, what-if and the leaderboard are CompactModules; open them to assert on their bodies. */
+function expandAll() {
+  for (const b of document.querySelectorAll('button[aria-expanded="false"][aria-label$=". Expand"]')) fireEvent.click(b);
+}
+
 describe("GamesContent season sim", () => {
   it("shows my odds and the league table", async () => {
     vi.mocked(api.getGamesSeasonSim).mockResolvedValue(sim());
     render(<GamesContent leagueId="9" leagueName="Test League" />);
     expect(await screen.findByText("Your odds")).toBeInTheDocument();
     expect(screen.getAllByText("62%").length).toBeGreaterThan(0);
-    expect(screen.getByText("Bravo")).toBeInTheDocument();
+    expandAll();
+    expect(screen.getAllByText("Bravo").length).toBeGreaterThan(0);
   });
 
   it("shows the upgrade card instead of the what-if builder for Free", async () => {
@@ -116,6 +122,8 @@ describe("GamesContent season sim", () => {
       factors: [{ label: "Lineup strength", detail: "+20 starter value" }],
     });
     render(<GamesContent leagueId="9" leagueName="Test League" />);
+    await screen.findByText("Your odds");
+    expandAll();
     fireEvent.click(await screen.findByRole("button", { name: "Drop" }));
     fireEvent.click(screen.getByRole("button", { name: "Run what-if" }));
     await waitFor(() => expect(api.postGamesWhatIf).toHaveBeenCalledWith("9", { add: [], drop: ["10"] }));
@@ -133,6 +141,8 @@ describe("GamesContent season sim", () => {
       ],
     } as never);
     render(<GamesContent leagueId="9" leagueName="Test League" />);
+    await screen.findByText("Your odds");
+    expandAll();
     fireEvent.change(await screen.findByLabelText("Search players to add"), { target: { value: "beck" } });
     expect(await screen.findByText("Carson Beck")).toBeInTheDocument();
     expect(api.searchLeaguePlayers).toHaveBeenCalledWith("9", "beck", "Dynasty");
@@ -152,7 +162,7 @@ describe("GamesContent pick'em", () => {
   async function openPickem() {
     vi.mocked(api.getGamesSeasonSim).mockResolvedValue(sim());
     render(<GamesContent leagueId="9" leagueName="Test League" />);
-    fireEvent.click(await screen.findByRole("tab", { name: "Pick'em" }));
+    fireEvent.change(await screen.findByLabelText("View"), { target: { value: "pickem" } });
   }
 
   it("saves a pick optimistically", async () => {
@@ -187,6 +197,8 @@ describe("GamesContent pick'em", () => {
       }),
     );
     await openPickem();
-    expect(await screen.findByText("5/6")).toBeInTheDocument();
+    await screen.findByRole("button", { name: /Pick'em leaderboard/ });
+    expandAll();
+    expect((await screen.findAllByText("5/6")).length).toBeGreaterThan(0);
   });
 });

@@ -28,6 +28,8 @@ import ErrorState from '../components/ErrorState';
 import { SkeletonRows } from '../components/SkeletonBlock';
 import EvaluationLensHeaderButton from '../components/EvaluationLensHeaderButton';
 import FilterSheet from '../components/FilterSheet';
+import FilterDropdownButton from '../components/FilterDropdownButton';
+import PageFamilyTabs from '../components/PageFamilyTabs';
 import { singleValue, valuesFromSingles, type FilterGroup, type FilterValues } from '../lib/filterSheet';
 import GmStanceHeaderButton from '../components/GmStanceHeaderButton';
 import LeagueSwitcherHeaderButton from '../components/LeagueSwitcherHeaderButton';
@@ -37,7 +39,6 @@ import OverallRatingBadge from '../components/OverallRatingBadge';
 import PlayerIdentityRow from '../components/PlayerIdentityRow';
 import PositionBadge from '../components/PositionBadge';
 import PremiumLock from '../components/PremiumLock';
-import SegmentedTabBar from '../components/SegmentedTabBar';
 import DashboardStatRow from '../components/DashboardStatRow';
 import PlayerAvatar from '../components/PlayerAvatar';
 import ScreenInfoNote from '../components/ScreenInfoNote';
@@ -421,8 +422,37 @@ export default function WaiversScreen({ route, navigation }: Props) {
         <AppText style={styles.notice}>{"Your D/ST slot is open. Team defenses are not ranked here yet, so check Sleeper's free agents for one."}</AppText>
       ) : null}
 
-      <View style={styles.tabWrap}>
-        <SegmentedTabBar options={TAB_OPTIONS} active={tab} onChange={setTab} />
+      {/* ONE tab row (the Team family strip) and ONE compact control row: the view selector plus the filters
+          that belong to that view (web twin: the waiver-controls row). */}
+      <PageFamilyTabs family="team" active="waivers" leagueId={leagueId} leagueName={leagueName} />
+      <View style={styles.controlRow} testID="waiver-controls">
+        <FilterDropdownButton<string>
+          label="View"
+          options={TAB_OPTIONS.map((o) => o.label)}
+          value={TAB_OPTIONS.find((o) => o.key === tab)?.label ?? 'Recommended'}
+          allValue="Recommended"
+          onChange={(label) => setTab(TAB_OPTIONS.find((o) => o.label === label)?.key ?? 'recommended')}
+        />
+        {tab === 'recommended' && secondaryPriority.length > 0 ? (
+          <FilterDropdownButton<string>
+            label="Show"
+            options={REC_FILTER_OPTIONS.map((o) => (o.key === 'all' ? 'All adds' : o.label))}
+            value={recFilter === 'all' ? 'All adds' : recFilter}
+            allValue="All adds"
+            onChange={(label) => setRecFilter(label === 'All adds' ? 'all' : (label as WaiverRecFilter))}
+          />
+        ) : null}
+        {tab === 'explore' ? (
+          <>
+            <FilterSheet
+              groups={freeAgentFilterGroups}
+              values={freeAgentFilterValues}
+              resultCount={freeAgentResultCount}
+              onApply={(next) => setPosition(singleValue(freeAgentFilterGroups[0], next))}
+            />
+            <ViewModeToggle value={viewMode} onChange={setViewMode} />
+          </>
+        ) : null}
       </View>
 
       {loading ? (
@@ -495,9 +525,6 @@ export default function WaiversScreen({ route, navigation }: Props) {
                 {secondaryPriority.length > 0 ? (
                   <View style={styles.sectionBlock}>
                     <SectionHeading title="More recommended adds" />
-                    <View style={styles.filterPills}>
-                      <SegmentedTabBar options={REC_FILTER_OPTIONS} active={recFilter} onChange={setRecFilter} />
-                    </View>
                     {visibleSecondary.length === 0 ? (
                       <AppText style={styles.secondaryCaption}>None in this group.</AppText>
                     ) : (
@@ -572,15 +599,6 @@ export default function WaiversScreen({ route, navigation }: Props) {
                     onChangeText={setSearch}
                     autoCapitalize="none"
                   />
-                  <View style={styles.filterRow}>
-                    <FilterSheet
-                      groups={freeAgentFilterGroups}
-                      values={freeAgentFilterValues}
-                      resultCount={freeAgentResultCount}
-                      onApply={(next) => setPosition(singleValue(freeAgentFilterGroups[0], next))}
-                    />
-                    <ViewModeToggle value={viewMode} onChange={setViewMode} />
-                  </View>
                 </GlassCard>
                 <SectionHeading title="All Free Agents" />
               </View>
@@ -1014,7 +1032,7 @@ function createStyles(colors: ThemeColors) {
   statRow: { marginHorizontal: spacing.lg, marginBottom: spacing.md },
   headerSubtitle: { fontSize: 14.5, color: colors.textSecondary, flexShrink: 1 },
   sleeperLink: { fontSize: 14.5, fontWeight: '700', color: colors.accent },
-  tabWrap: { paddingHorizontal: spacing.lg, marginBottom: spacing.md },
+  controlRow: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: spacing.xs, paddingHorizontal: spacing.lg, marginBottom: spacing.sm },
   filterPills: { marginBottom: spacing.sm },
   freeAgentTrailingChips: { flexDirection: 'row', alignItems: 'center', gap: 4, flexWrap: 'wrap', justifyContent: 'flex-end' },
   positionRankPill: {

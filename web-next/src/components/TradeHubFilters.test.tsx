@@ -71,6 +71,8 @@ describe("TradeHubFilters", () => {
 describe("TradeHubContent filtering and states", () => {
   it("tags cards from engine category and impact tag, and filters by chip and position", () => {
     render(<TradeHubContent leagueId="1" leagueName="L" data={DATA} />);
+    // Idea cards are CompactModules: partner + summary collapsed, tags / package / share inside once opened.
+    for (const card of screen.getAllByTestId("trade-idea-card")) fireEvent.click(card.querySelector("button[aria-expanded=false]")!);
     expect(screen.getByText("Headline Recommendation")).toBeInTheDocument();
     expect(screen.getByText("Age Optimization")).toBeInTheDocument();
     expect(screen.getAllByRole("button", { name: "Share Trade" })).toHaveLength(3);

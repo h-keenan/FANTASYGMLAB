@@ -11,7 +11,8 @@ import { EmptyState } from "@/components/EmptyState";
 import { ErrorState } from "@/components/ErrorState";
 import { Input } from "@/components/Input";
 import { RankingRow } from "@/components/LeagueRankingsContent";
-import { PillRow } from "@/components/PillRow";
+import { ViewSelect } from "@/components/ui/ViewSelect";
+import { CompactModule } from "@/components/ui/CompactModule";
 import { PlayerRow } from "@/components/PlayerRow";
 import { PremiumUpsellCard } from "@/components/PremiumUpsellCard";
 import { SectionHeading } from "@/components/SectionHeading";
@@ -68,15 +69,16 @@ export function GamesContent({ leagueId, leagueName, initialTab }: { leagueId: s
       <header className="flex flex-col gap-1">
         <PageTitle page="Games" leagueName={leagueName} />
       </header>
-      <PillRow
-        fullWidth
-        options={[
-          { label: "Season Outlook", value: "sim", glyph: "sim" },
-          { label: "Pick'em", value: "pickem", glyph: "pickem" },
-        ]}
-        active={tab}
-        onSelect={(value) => setTab(value as Tab)}
-      />
+      <div className="flex flex-wrap items-center gap-2" data-testid="games-controls">
+        <ViewSelect
+          value={tab}
+          options={[
+            { value: "sim", label: "Season Outlook" },
+            { value: "pickem", label: "Pick'em" },
+          ]}
+          onChange={(value) => setTab(value as Tab)}
+        />
+      </div>
       {tab === "sim" ? <SeasonSimPanel leagueId={leagueId} /> : <PickemPanel leagueId={leagueId} />}
     </main>
   );
@@ -181,10 +183,19 @@ function SeasonSimPanel({ leagueId }: { leagueId: string }) {
 
       <WhatIfSection leagueId={leagueId} data={data} />
 
-      <section className="flex flex-col gap-3">
-        <SectionHeading kicker="League" note="Same simulation for every team.">
-          Playoff odds
-        </SectionHeading>
+      <CompactModule
+        id="games.league-odds"
+        title="League playoff odds"
+        persist={false}
+        parts={[
+          data.teams[0] ? { key: "top", text: `1. ${data.teams[0].team_name} ${formatOdds(data.teams[0].playoff_probability)}`, strong: true } : null,
+          { key: "you", text: `You #${Math.max(1, data.teams.findIndex((t) => t.mine) + 1)} ${formatOdds(mine.playoff_probability)}` },
+          { key: "n", text: `${data.teams.length} teams` },
+        ]}
+      >
+        <p className="text-xs" style={{ color: "var(--color-text-muted)" }}>
+          Same simulation for every team.
+        </p>
         <div className="glass-surface flex flex-col">
           {data.teams.map((team, index) => (
             <RankingRow
@@ -207,7 +218,7 @@ function SeasonSimPanel({ leagueId }: { leagueId: string }) {
             />
           ))}
         </div>
-      </section>
+      </CompactModule>
     </div>
   );
 }
@@ -258,10 +269,16 @@ function WhatIfSection({ leagueId, data }: { leagueId: string; data: GamesSeason
 
   const ready = adds.length > 0 || drops.length > 0;
   return (
-    <section className="flex flex-col gap-3">
-      <SectionHeading kicker="Pro" note={`Up to ${MAX_PLAYERS} players on each side.`}>
-        What if
-      </SectionHeading>
+    <CompactModule
+      id="games.what-if"
+      title="What if (Pro)"
+      persist={false}
+      defaultOpen={Boolean(result)}
+      parts={[
+        { key: "a", text: ready ? `${drops.length} drop${drops.length === 1 ? "" : "s"} · ${adds.length} add${adds.length === 1 ? "" : "s"}` : "Add or drop players", strong: ready },
+        { key: "b", text: result ? "Odds updated below" : `See your odds change · up to ${MAX_PLAYERS} per side`, tone: "muted" },
+      ]}
+    >
 
       <div className="glass-surface flex flex-col gap-1 p-4">
         <span className="text-xs font-bold uppercase" style={{ letterSpacing: "var(--letter-spacing-tight)" }}>
@@ -341,7 +358,7 @@ function WhatIfSection({ leagueId, data }: { leagueId: string; data: GamesSeason
       ) : null}
       {result && !result.reason && result.baseline && result.scenario && result.change ? <WhatIfResult result={result} /> : null}
       {result?.reason ? <ReasonState reason={result.reason} /> : null}
-    </section>
+    </CompactModule>
   );
 }
 
@@ -506,13 +523,20 @@ function PickemPanel({ leagueId }: { leagueId: string }) {
         )}
       </section>
 
-      <section className="flex flex-col gap-3">
-        <SectionHeading
-          kicker="Season"
-          note={data.leaderboard_scope === "you" ? "Showing your picks only." : "League members who made picks."}
-        >
-          Leaderboard
-        </SectionHeading>
+      <CompactModule
+        id="games.leaderboard"
+        title="Pick'em leaderboard"
+        persist={false}
+        parts={
+          data.leaderboard && data.leaderboard.length > 0
+            ? [
+                { key: "lead", text: `1. ${data.leaderboard[0].team_name} ${data.leaderboard[0].correct}/${data.leaderboard[0].graded}`, strong: true },
+                data.leaderboard.find((row) => row.mine) ? { key: "you", text: `You #${data.leaderboard.find((row) => row.mine)!.rank} · ${data.leaderboard.find((row) => row.mine)!.correct}/${data.leaderboard.find((row) => row.mine)!.graded}` } : null,
+                { key: "scope", text: data.leaderboard_scope === "you" ? "Your picks only" : "League members who made picks", tone: "muted" },
+              ]
+            : [{ key: "none", text: "No graded picks yet. Standings start once a week you picked is final." }]
+        }
+      >
         {data.leaderboard && data.leaderboard.length > 0 ? (
           <div className="glass-surface flex flex-col">
             {data.leaderboard.map((row) => (
@@ -534,7 +558,7 @@ function PickemPanel({ leagueId }: { leagueId: string }) {
         ) : (
           <EmptyState title="No graded picks yet" subtitle="Standings start once a week you picked is final." />
         )}
-      </section>
+      </CompactModule>
     </div>
   );
 }
