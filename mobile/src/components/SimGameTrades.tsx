@@ -382,7 +382,8 @@ function Builder({ ctx, seed, onSeedUsed }: { ctx: SimCtx; seed: SimTradeSeed | 
   const theirPicks = simPicksOf(picks, partner?.team_id);
   const giveSelected: SimTradeAsset[] = [...mine, ...myPicks].filter((p) => draft.give.includes(p.id));
   const getSelected: SimTradeAsset[] = [...partnerRoster, ...theirPicks].filter((p) => draft.get.includes(p.id));
-  const fit = simTradeFit(mine.length, game.settings.roster_limit, giveSelected.filter((p) => !simIsPick(p)).length, getSelected.filter((p) => !simIsPick(p)).length);
+  // Only the active roster counts toward the limit: IR and taxi players neither fill a spot nor free one when traded away.
+  const fit = simTradeFit(mine.filter((p) => (p.squad ?? "roster") === "roster").length, game.settings.roster_limit, giveSelected.filter((p) => !simIsPick(p) && (p.squad ?? "roster") === "roster").length, getSelected.filter((p) => !simIsPick(p)).length);
   // The picker's groups: players by position, then a Picks group; the same shape feeds the page summaries.
   const groupsFor = (players: SimGamePlayer[], pickList: SimPickAsset[]): SimAssetGroup<SimTradeAsset>[] => {
     const groups: SimAssetGroup<SimTradeAsset>[] = simGroupByPosition(players.filter((p) => simTradable(p.pos)), simPositionsFor(game.settings.slots));
