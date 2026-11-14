@@ -19,7 +19,7 @@ describe("bottomPillStore", () => {
     vi.advanceTimersByTime(PILL_CLEAR_DELAY_MS + 1);
     expect(getPillState().ctx?.id).toBe("team");
   });
-  
+
   it("publishes only when what is shown changes, and keeps callbacks fresh", () => {
     const l = vi.fn();
     subscribePill(l);
