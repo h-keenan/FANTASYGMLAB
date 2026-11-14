@@ -95,6 +95,21 @@ export function simMoveSpecs(input: SimMoveInput): SimMoveSpec[] {
   return out;
 }
 
+/**
+ * Plain-words reasons for the moves that are NOT offered but that the player would expect (the roster is full so he cannot be
+ * activated, IR is full). Not-eligible reasons stay silent: a healthy player is never offered IR, and nobody asks why.
+ */
+export function simMoveNotes(input: SimMoveInput): string[] {
+  if (!input.reserve) return [];
+  const notes: string[] = [];
+  for (const action of simReserveActions(input.player, input.reserve)) {
+    if (action.check.ok) continue;
+    if (action.check.reason === "roster_full") notes.push(`${action.label} needs an open roster spot: cut or move someone first.`);
+    else if (action.check.reason === "ir_full" && (input.player.status === "out" || input.player.out_weeks > 0)) notes.push("Your IR slots are full.");
+  }
+  return notes;
+}
+
 /** True when the row needs a Move button: anything besides the always-available profile. */
 export function simHasMove(specs: readonly SimMoveSpec[]): boolean {
   return specs.some((s) => s.kind !== "profile");

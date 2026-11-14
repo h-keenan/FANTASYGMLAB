@@ -227,7 +227,7 @@ describe("SimGameContent", () => {
     fireEvent.click(within(screen.getByRole("dialog")).getByRole("tab", { name: "Roster" }));
     const lineup = screen.getByRole("region", { name: "Lineup" });
     expect(within(lineup).getByText("Otis Opp")).toBeInTheDocument();
-    expect(within(lineup).getByText("Proj")).toBeInTheDocument();
+    expect(within(lineup).getByText(/PROJ \d/)).toBeInTheDocument();
     const bench = screen.getByRole("region", { name: "Bench" });
     expect(within(bench).getByRole("group", { name: "RB bench" })).toHaveTextContent("Benny Bench");
     expect(within(bench).getByRole("group", { name: "WR bench" })).toHaveTextContent("Wide Wendy");

@@ -60,24 +60,27 @@ describe("SimDraftRow", () => {
   it("shows a letter grade (with a ? when scouts are unsure), never an OVR number or an edge chip", () => {
     const { rerender } = render(<SimDraftRow player={player({ adp: 40, grade: "A-" })} />);
     expect(document.querySelector("[data-stat=edge]")).toBeNull();
-    expect(document.querySelector("[data-stat=ovr]")).toHaveTextContent(/^Grade/);
-    expect(screen.getByTestId("letter-grade")).toHaveAttribute("data-grade", "A-");
-    expect(screen.getByTestId("letter-grade")).toHaveAttribute("aria-label", expect.stringContaining("Grade A minus"));
+    // the grade is a small tile at the end of the stats line: no "GRADE" word, no capsule
+    expect(screen.getByTestId("row-grade")).toHaveAttribute("data-grade", "A-");
+    expect(screen.getByTestId("row-meta")).not.toHaveTextContent(/grade/i);
+    expect(screen.getByTestId("row-meta").contains(screen.getByTestId("row-grade"))).toBe(true);
+    expect(screen.getByTestId("row-grade")).toHaveAttribute("aria-label", expect.stringContaining("Grade A minus"));
     rerender(<SimDraftRow player={player({ adp: 10, grade: "B+", grade_range: ["B", "A-"], grade_uncertain: true })} />);
-    expect(screen.getByTestId("letter-grade")).toHaveTextContent("B+?");
-    expect(screen.getByTestId("letter-grade")).toHaveAttribute("aria-label", expect.stringContaining("Scouts are unsure"));
-    expect(document.querySelector("[data-stat=ovr]")?.querySelector("[aria-label*='overall rating']")).toBeNull();
-    // every number carries its caption
-    expect(document.querySelector("[data-stat=proj]")).toHaveTextContent(/^Proj/);
+    expect(screen.getByTestId("row-grade")).toHaveTextContent("B+?");
+    expect(screen.getByTestId("row-grade").querySelector("sup")).toHaveTextContent("?"); // a dim superscript, not "B+?" in a capsule
+    expect(screen.getByTestId("row-grade")).toHaveAttribute("aria-label", expect.stringContaining("Scouts are unsure"));
+    // PROJ is one number in the stats line; ADP and the rest are in the open tile; never an OVR gauge or a value
+    expect(screen.getByTestId("row-meta")).toHaveTextContent(/PROJ \d/);
     expect(screen.queryByText(/^val$/i)).toBeNull();
-    expect(document.querySelector("[data-stat=adp]")).toHaveTextContent(/^ADP/);
+    fireEvent.click(screen.getByRole("button", { name: /show details/ }));
+    expect(screen.getByTestId("row-expanded")).toHaveTextContent(/ADP/);
   });
 });
 
 describe("SimDraftRow bye, injury and drafted states", () => {
   it("always shows the bye week in the meta line, warning-colored only when it is soon", () => {
     const { rerender } = render(<SimDraftRow player={player({ bye_week: 11 })} />);
-    expect(screen.getByTestId("list-meta")).toHaveTextContent("Bye 11");
+    expect(screen.getByTestId("row-meta")).toHaveTextContent("Bye 11");
     expect(screen.getByText("Bye 11").style.fontWeight).toBe("");
     rerender(<SimDraftRow player={player({ bye_week: 2 })} />);
     expect(screen.getByText("Bye 2").style.fontWeight).toBe("700");

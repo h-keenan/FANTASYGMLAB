@@ -11,6 +11,7 @@ import { SkeletonRows } from "@/components/Skeleton";
 import { api } from "@/lib/api";
 import { PLAYER_SEARCH_DEBOUNCE_MS } from "@/lib/leaguePlayerSearch";
 import type { BadgeKind } from "@/lib/playerBadges";
+import type { PlayerListTag } from "@/lib/playerListRow";
 import { SIM_DRAFT_SORTS, simSuppressedBadges } from "@/lib/simDraft";
 import { SIM_WINDOW_STEP, simWindow } from "@/lib/simLayout";
 import {

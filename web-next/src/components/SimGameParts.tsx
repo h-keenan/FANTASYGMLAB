@@ -282,6 +282,7 @@ export function SimPlayerLine({
     <SimMoveStrip
       specs={moveWithProfile.specs}
       refusal={moveWithProfile.refusal}
+      notes={moveWithProfile.notes}
       run={(kind, key) => (kind === "profile" ? onOpen?.(player) : moveWithProfile.run(kind, key))}
     />
   ) : null;

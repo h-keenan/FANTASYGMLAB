@@ -11,6 +11,8 @@ export type SimMoveRun = (kind: SimMoveKind, targetKey?: string) => Promise<unkn
 export interface SimMoveHandle {
   specs: SimMoveSpec[];
   run: SimMoveRun;
+  /** Why an expected move is missing (roster full, IR full). */
+  notes?: string[];
   /** The server's reason when it refused a move; shown under the strip. */
   refusal?: string | null;
 }
@@ -48,7 +50,7 @@ export function SimMoveButton({ name, open, onToggle }: { name: string; open: bo
  * them primary. An action with choices (a lineup slot, a taxi player) reveals chips for them; Cut asks "Cut Name?" with
  * Cut / Keep before it runs. No sheet: everything happens in the row.
  */
-export function SimMoveStrip({ specs, run, refusal }: SimMoveHandle) {
+export function SimMoveStrip({ specs, run, refusal, notes }: SimMoveHandle) {
   const [choosing, setChoosing] = useState<SimMoveKind | null>(null);
   const [confirming, setConfirming] = useState(false);
   const [busy, setBusy] = useState<string | null>(null);
@@ -114,6 +116,9 @@ export function SimMoveStrip({ specs, run, refusal }: SimMoveHandle) {
             </button>
           ))}
         </div>
+      ) : null}
+      {notes && notes.length > 0 ? (
+        <p className="text-xs" style={{ color: "var(--color-text-muted)" }} data-testid="move-notes">{notes.join(" ")}</p>
       ) : null}
       {refusal ? (
         <p className="text-sm font-semibold" role="alert" style={{ color: "var(--color-warning)" }} data-testid="reserve-refusal">{refusal}</p>

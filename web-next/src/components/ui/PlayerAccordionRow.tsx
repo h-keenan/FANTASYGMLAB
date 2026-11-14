@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useState, type ReactNode } from "react";
+import { Fragment, useCallback, useState, type ReactNode } from "react";
 
 import { PlayerName } from "@/components/PlayerName";
 import { PositionBadge } from "@/components/PositionBadge";
@@ -112,10 +112,10 @@ export function PlayerAccordionRow({ open, onToggle, badges = [], positionLabel,
               <span className="flex min-w-0 items-center gap-1.5 text-xs leading-4" style={{ color: "var(--color-text-muted)" }} data-testid="row-meta">
                 <span className="min-w-0 truncate">
                   {metaLine.map((part, i) => (
-                    <span key={part.key} style={{ color: part.tone ? TONE[part.tone] : undefined, fontWeight: part.tone === "warning" || part.key === "proj" ? 700 : undefined }}>
+                    <Fragment key={part.key}>
                       {i > 0 ? " · " : ""}
-                      {part.text}
-                    </span>
+                      <span style={{ color: part.tone ? TONE[part.tone] : undefined, fontWeight: part.tone === "warning" || part.key === "proj" ? 700 : undefined }}>{part.text}</span>
+                    </Fragment>
                   ))}
                 </span>
                 {gradeTile ? <LetterGrade grade={gradeTile} size="xs" testId="row-grade" /> : null}

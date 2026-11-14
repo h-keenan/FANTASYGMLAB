@@ -17,7 +17,7 @@ import {
   type SimReserveMoveTo,
   type SimReserves,
 } from "@/lib/simGame";
-import { simMoveSpecs, type SimMoveKind } from "@/lib/simMove";
+import { simMoveNotes, simMoveSpecs, type SimMoveInput, type SimMoveKind } from "@/lib/simMove";
 
 /** Everything the move menu needs to know about the squads. */
 export interface SimReserveState {
@@ -115,7 +115,7 @@ export function useSimRosterMoves({
   }
 
   return function handleFor(player: SimGamePlayer, o: SimRowMoveOptions = {}): SimMoveHandle {
-    const specs = simMoveSpecs({
+    const input: SimMoveInput = {
       player,
       reserve: reservesOn ? moveContext(state) : null,
       taxi,
@@ -125,7 +125,8 @@ export function useSimRosterMoves({
       canCut: Boolean(onCut) && !o.noCut,
       block: blocksOn && !o.noBlock && player.pos !== "K" && player.pos !== "DEF" ? { on: Boolean(player.block?.mine) } : null,
       profile: true,
-    });
+    };
+    const specs = simMoveSpecs(input);
     const run = async (kind: SimMoveKind, key?: string) => {
       if (kind === "swap") return key != null ? o.onSwapTo?.(Number(key)) : o.onChangeSlot?.();
       if (kind === "roster" || kind === "ir" || kind === "taxi") return reserveMove(player, kind);
@@ -137,7 +138,7 @@ export function useSimRosterMoves({
       if (kind === "cut") return onCut?.(player);
       return undefined;
     };
-    return { specs, run, refusal: refusal?.id === player.id ? refusal.message : null };
+    return { specs, run, notes: simMoveNotes(input), refusal: refusal?.id === player.id ? refusal.message : null };
   };
 }
 

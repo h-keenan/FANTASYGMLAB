@@ -58,14 +58,21 @@ describe("league Teams view (shared team card)", () => {
   });
 });
 
+/** Tap a row: it expands in place (the owner, ADP and Open profile live in the open tile). */
+function expandRow(row: HTMLElement) {
+  fireEvent.click(row.querySelector("button[aria-expanded]") as HTMLElement);
+}
+
 describe("league Players view (find a player, position by position)", () => {
   it("lists rostered players best overall first, each with its owner and labeled stats", () => {
     render(<SimLeaguePlayersView ctx={ctx()} state={ready} onRetry={() => {}} />);
     const rows = screen.getAllByTestId("sim-player-line");
     expect(rows.map((r) => within(r).getByText(/Quinn Back|Quentin Arm|Wes Wide|Tom Tight|Ray Runner/).textContent)).toEqual(["Quinn Back", "Quentin Arm", "Wes Wide", "Tom Tight", "Ray Runner"]);
-    expect(rows[0]).toHaveTextContent("Proj");
-    expect(rows[0]).toHaveTextContent("Grade");
-    expect(rows[0]).toHaveTextContent("Bench Mob");
+    expect(rows[0]).toHaveTextContent("PROJ");
+    expect(within(rows[0]).getByTestId("row-grade")).toHaveAttribute("data-grade");
+    expect(rows[0]).not.toHaveTextContent("GRADE");
+    expandRow(rows[0]);
+    expect(rows[0]).toHaveTextContent("Bench Mob"); // the owner shows in the open tile
     expect(within(rows[3]).getByRole("img", { name: "Your player" })).toBeInTheDocument();
     expect(within(rows[2]).getByRole("img", { name: /^Out/ })).toBeInTheDocument();
   });
@@ -76,6 +83,7 @@ describe("league Players view (find a player, position by position)", () => {
     const rows = screen.getAllByTestId("sim-player-line");
     expect(rows).toHaveLength(2);
     expect(rows[0]).toHaveTextContent("Quinn Back");
+    expandRow(rows[1]);
     expect(rows[1]).toHaveTextContent("Goal Line Gamblers");
     expect(screen.getByText(/2 players at QB/)).toBeInTheDocument();
   });
@@ -86,10 +94,11 @@ describe("league Players view (find a player, position by position)", () => {
     fireEvent.change(screen.getByLabelText("Find a player"), { target: { value: "wes" } });
     const rows = screen.getAllByTestId("sim-player-line");
     expect(rows).toHaveLength(1);
+    expandRow(rows[0]);
     fireEvent.click(screen.getByRole("button", { name: "Owned by Goal Line Gamblers. Open team" }));
     expect(c.openTeam).toHaveBeenCalledWith("2");
     expect(c.openPlayer).not.toHaveBeenCalled();
-    fireEvent.click(screen.getByRole("button", { name: /Wes Wide.*Open player details/ }));
+    fireEvent.click(screen.getByRole("button", { name: "Open profile" }));
     expect(c.openPlayer).toHaveBeenCalledTimes(1);
     fireEvent.change(screen.getByLabelText("Find a player"), { target: { value: "zzz" } });
     expect(screen.getByText("No one matches")).toBeInTheDocument();
@@ -109,6 +118,7 @@ describe("league Players view: On the block", () => {
     const rows = screen.getAllByTestId("sim-player-line");
     expect(rows).toHaveLength(1);
     expect(rows[0]).toHaveTextContent(/Vince/i);
+    expandRow(rows[0]);
     expect(within(rows[0]).getByRole("img", { name: /On the trade block/ })).toBeInTheDocument(); // the shared row's glyph badge
     expect(screen.getByTestId("block-note")).toHaveTextContent("Selling a veteran · looking for WR · needs TE");
     expect(screen.getByText(/1 player on a trade block/)).toBeInTheDocument();

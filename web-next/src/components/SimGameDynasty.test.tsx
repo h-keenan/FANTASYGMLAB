@@ -144,41 +144,56 @@ describe("IR and taxi on the Team tab", () => {
     expect(screen.getByTestId("your-picks")).toBeInTheDocument();
   });
 
-  it("the move menu disables what the rules forbid and moves a player with POST /roster/move", async () => {
+  it("each row has ONE Move button; tapping it expands an inline strip of only the possible moves, and To taxi posts /roster/move", async () => {
     await openTeam();
-    fireEvent.click(screen.getByRole("button", { name: "Move Rookie Ray to IR, taxi or roster" }));
-    const dialog = await screen.findByRole("dialog");
-    expect(within(dialog).getByRole("button", { name: /^Move to IR/ })).toBeDisabled();
-    // the reason is part of the disabled button, not a floating sentence
-    expect(within(dialog).getByTestId("reserve-hint-ir")).toHaveTextContent("Move to IR · Not injured");
-    expect(within(dialog).queryByRole("button", { name: "Close" })).toBeNull(); // the X and swipe close the sheet
+    const bench = within(screen.getByTestId("sim-bench-module"));
+    expect(bench.getAllByTestId("move-button")).toHaveLength(3); // bench x2 and the IR player: one per row
+    for (const slot of bench.getAllByTestId("row-action")) expect(slot.querySelectorAll("button")).toHaveLength(1); // exactly one trailing control per row
+    expect(screen.queryByRole("button", { name: "Cut" })).toBeNull(); // Cut / Swap / To IR only appear when a row is open
+    expect(screen.queryByRole("button", { name: /^Swap/ })).toBeNull();
+    expect(screen.queryByRole("dialog")).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "Move Rookie Ray" }));
+    const strip = await screen.findByTestId("move-strip");
+    expect(within(strip).queryByRole("button", { name: "To IR" })).toBeNull(); // not injured: not offered, no disabled button
+    expect(within(strip).getByRole("button", { name: "To taxi" })).toBeEnabled();
+    expect(within(strip).getByRole("button", { name: "Cut" })).toBeInTheDocument();
+    expect(screen.queryByRole("dialog")).toBeNull(); // no bottom sheet
     mocked.moveSimPlayer.mockResolvedValue({ ...lineup, ok: true, reason: "", bench: [lineup.bench![1]], taxi: [player("2", "RB", "Rookie Ray", { squad: "taxi", rookie: true })], reserves: { ...lineup.reserves!, taxi_used: 1 }, move: { pid: "2", src: "roster", dst: "taxi" } });
-    fireEvent.click(within(dialog).getByRole("button", { name: "Move to taxi" }));
+    fireEvent.click(within(strip).getByRole("button", { name: "To taxi" }));
     await waitFor(() => expect(mocked.moveSimPlayer).toHaveBeenCalledWith("g1", { player_id: "2", to: "taxi" }));
-    await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
-    expect(screen.getByTestId("reserve-summary")).toHaveTextContent("Taxi 1 of 4");
+    await waitFor(() => expect(screen.getByTestId("reserve-summary")).toHaveTextContent("Taxi 1 of 4"));
+  });
+
+  it("only one row is open at a time, and the Move button toggles it", async () => {
+    await openTeam();
+    fireEvent.click(screen.getByRole("button", { name: "Move Rookie Ray" }));
+    expect(screen.getAllByTestId("move-strip")).toHaveLength(1);
+    fireEvent.click(screen.getByRole("button", { name: "Move Hurt Hank" }));
+    expect(screen.getAllByTestId("move-strip")).toHaveLength(1);
+    expect(within(screen.getByTestId("move-strip")).getByRole("button", { name: "To IR" })).toBeEnabled();
+    fireEvent.click(screen.getByRole("button", { name: "Move Hurt Hank" }));
+    expect(screen.queryByTestId("move-strip")).toBeNull();
   });
 
   it("shows the backend reason inline when a move is refused", async () => {
     await openTeam();
-    fireEvent.click(screen.getByRole("button", { name: "Move Rookie Ray to IR, taxi or roster" }));
-    const dialog = await screen.findByRole("dialog");
+    fireEvent.click(screen.getByRole("button", { name: "Move Rookie Ray" }));
     mocked.moveSimPlayer.mockResolvedValue({ ok: false, reason: "taxi_full", message: "Your taxi squad is full." });
-    fireEvent.click(within(dialog).getByRole("button", { name: "Move to taxi" }));
-    expect(await within(dialog).findByTestId("reserve-refusal")).toHaveTextContent("Your taxi squad is full.");
-    expect(screen.getByRole("dialog")).toBeInTheDocument();
+    fireEvent.click(within(await screen.findByTestId("move-strip")).getByRole("button", { name: "To taxi" }));
+    expect(await screen.findByTestId("reserve-refusal")).toHaveTextContent("Your taxi squad is full.");
+    expect(screen.getByTestId("move-strip")).toBeInTheDocument();
   });
 
-  it("an injured bench player can go to IR and an IR player can be activated when there is room", async () => {
+  it("an IR player cannot be activated when the roster is full, and the strip says why; Cut asks first", async () => {
     await openTeam();
-    fireEvent.click(screen.getByRole("button", { name: "Move Hurt Hank to IR, taxi or roster" }));
-    expect(within(await screen.findByRole("dialog")).getByRole("button", { name: "Move to IR" })).toBeEnabled();
-    fireEvent.click(within(screen.getByRole("dialog")).getByRole("button", { name: /^Close/ }));
-    fireEvent.click(screen.getByRole("button", { name: "Move Ivy Reserve to IR, taxi or roster" }));
-    // roster is 16 of 16, so activating is blocked with the reason beside it
-    const dialog = await screen.findByRole("dialog");
-    expect(within(dialog).getByRole("button", { name: /^Activate/ })).toBeDisabled();
-    expect(within(dialog).getByTestId("reserve-hint-roster")).toHaveTextContent("Activate · Roster full");
+    fireEvent.click(screen.getByRole("button", { name: "Move Ivy Reserve" }));
+    const strip = await screen.findByTestId("move-strip");
+    expect(within(strip).queryByRole("button", { name: "Activate" })).toBeNull();
+    expect(within(strip).getByTestId("move-notes")).toHaveTextContent("Activate needs an open roster spot");
+    fireEvent.click(within(strip).getByRole("button", { name: "Cut" }));
+    expect(within(strip).getByTestId("move-cut-confirm")).toHaveTextContent("Cut Reserve?");
+    fireEvent.click(within(strip).getByRole("button", { name: "Keep" }));
+    expect(within(strip).queryByTestId("move-cut-confirm")).toBeNull();
   });
 });
 
