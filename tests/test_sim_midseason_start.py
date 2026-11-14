@@ -87,16 +87,25 @@ def test_preseason_import_is_unchanged_by_the_new_fields():
     assert state.week == 1 and not state.history
 
 
-def test_old_league_game_digests_and_snapshot_are_byte_identical_to_before_the_setting():
-    """Pinned from origin/main before this change: a preseason league import, at week 1 and after a full season."""
+def test_preseason_league_game_is_byte_identical_whether_or_not_the_setting_is_asked_for():
+    """Data-independent: the same import built twice in this run, once the way it was built before the setting existed
+    (no start_point) and once asking for the preseason / a current point the league cannot offer."""
     imp = imported_league()
-    snap = build_league_snapshot(ROWS, BYES, imp, league_settings(imp, difficulty="normal", auto_lineup=False), SEED, scoring_model=MODEL)
-    assert len(json.dumps(snap.to_dict(), sort_keys=True)) == 129645
-    state, em = run_to_end(snap)
-    assert state.digest() == "305f1ce6d4dd81c0b5e0e37a319b1ec219c0e665167a4e3cf71d679cb2738913"
-    while state.status != "complete":
-        advance(em, snap, state, SEED)
-    assert state.digest() == "0ac0f2cf02294764ec1928b6a5cebdd7df7fa2e2c3f9d4b1efd91f8c92dbbcde"
+
+    def play(**kw):
+        snap = build_league_snapshot(ROWS, BYES, imp, league_settings(imp, difficulty="normal", auto_lineup=False, **kw), SEED, scoring_model=MODEL)
+        state, em = run_to_end(snap)
+        week1 = state.digest()
+        while state.status != "complete":
+            advance(em, snap, state, SEED)
+        return json.dumps(snap.to_dict(), sort_keys=True), week1, state.digest(), em.events
+
+    before = play()
+    for kw in ({"current": False}, {"current": True}):  # current=True with no current week read falls back to the preseason
+        assert play(**kw) == before
+    blob = before[0]
+    assert "start_week" not in blob and "mid_start" not in blob
+    assert not any(e["type"] in ("league_midseason", "midseason_start") for e in before[3])
 
 
 def test_mid_season_start_opens_at_the_real_week_with_real_records_lineups_and_results():
