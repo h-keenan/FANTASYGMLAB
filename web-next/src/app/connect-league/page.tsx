@@ -6,7 +6,6 @@ import { useEffect } from "react";
 import { useAuth } from "@/context/AuthContext";
 import { FreeLeagueLimitNote } from "@/components/FreeLeagueLimitNote";
 import { LoadingScreen } from "@/components/LoadingScreen";
-import { SampleLeagueButton } from "@/components/SampleLeagueBanner";
 import { SleeperImportForm } from "@/components/SleeperImportForm";
 import { pathAfterLeagueChosen } from "@/lib/tradeBridge";
 import { storeCurrentPathForReturnAfterSignIn } from "@/lib/protectedRouteReturn";
@@ -50,13 +49,12 @@ export default function ConnectLeaguePage() {
       <div className="w-full max-w-sm flex flex-col gap-1 text-center">
         <h1 style={{ font: "var(--font-page-title)" }}>Add a league</h1>
         <p className="text-sm" style={{ color: "var(--color-text-secondary)" }}>
-          Add a Sleeper, ESPN, Fleaflicker or MFL league alongside the leagues you already have.
+          Type your Sleeper username, or use More ways to connect for ESPN, Fleaflicker or MFL.
         </p>
       </div>
       <div className="w-full max-w-sm flex flex-col gap-3">
         <FreeLeagueLimitNote />
-        <SleeperImportForm sampleCtaBelow onLeagueChosen={(leagueId, leagueName) => router.push(pathAfterLeagueChosen(leagueId, leagueName))} />
-        <SampleLeagueButton surface="connect_step" />
+        <SleeperImportForm onLeagueChosen={(leagueId, leagueName) => router.push(pathAfterLeagueChosen(leagueId, leagueName))} />
       </div>
     </main>
   );

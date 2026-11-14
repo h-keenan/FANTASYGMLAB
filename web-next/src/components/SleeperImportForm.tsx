@@ -1,7 +1,7 @@
 "use client";
 
 import { HelpLink } from "@/components/HelpLink";
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 
 import { api, type SaveLeagueResponse, type SleeperLeagueSummary } from "@/lib/api";
 import { LEAGUE_CAP_UPSELL, isSaveFailure, saveFailureMessage } from "@/lib/leagueSave";
@@ -15,6 +15,27 @@ import { EspnImportForm } from "@/components/EspnImportForm";
 import { LeagueWarmupProgress } from "@/components/LeagueWarmupProgress";
 import { Button } from "@/components/Button";
 import { Input } from "@/components/Input";
+import { EmptyState } from "@/components/EmptyState";
+import { ErrorState } from "@/components/ErrorState";
+import { SkeletonRows } from "@/components/Skeleton";
+import { TeamAvatar } from "@/components/TeamAvatar";
+import {
+  CONNECT_FIELD_LABEL,
+  CONNECT_MORE_LABEL,
+  CONNECT_PLACEHOLDER,
+  CONNECT_PRIMARY_LABEL,
+  CONNECT_TRUST_LINE,
+  CONNECT_WHAT_IS_SLEEPER,
+  connectCtaLabel,
+  connectWays,
+  defaultLeagueSelection,
+  groupLeaguesBySeason,
+  leagueMeta,
+  planSaves,
+  summarizeSaves,
+  toggleLeague,
+  type SaveOutcome,
+} from "@/lib/connectFlow";
 
 /**
  * Ports app.py's guest Sleeper-username import (load_leagues_for_username /
@@ -40,99 +61,85 @@ import { Input } from "@/components/Input";
  */
 type LeaguePlatform = "sleeper" | "espn" | "fleaflicker" | "mfl";
 
-/** The two main platforms get cards (same treatment); the smaller ones are quiet links below. */
-const MAIN_PLATFORMS: { value: LeaguePlatform; label: string; monogram: string; blurb: string }[] = [
-  { value: "sleeper", label: "Sleeper", monogram: "S", blurb: "Use your username" },
-  { value: "espn", label: "ESPN", monogram: "E", blurb: "League ID. Private leagues need 2 cookies" },
-];
-const OTHER_PLATFORMS: { value: LeaguePlatform; label: string }[] = [
-  { value: "fleaflicker", label: "Fleaflicker" },
-  { value: "mfl", label: "MFL" },
-];
-
 /**
- * The Connect League flow, with the league's platform as its first choice.
- * Sleeper (the default) is the username lookup below; ESPN is
- * EspnImportForm (public leagues, a subset of features; see
- * lib/leaguePlatform.ts). Same component, same callers, so ESPN lives in
- * the existing onboarding and /connect-league flow rather than a new page.
+ * The Connect League flow, one field first (UI pass 3, sheet 1 topic 2 V1; copy and rules in lib/connectFlow.ts):
+ * a Sleeper username and one "Connect" button, an instant league list with avatars and checkboxes, then optional
+ * steps. ESPN / Fleaflicker / MFL, an account and the sample league are compact rows under "More ways to connect",
+ * so every previous capability is still one tap away. Mobile twin: the Add league sheet in screens/HomeScreen.tsx.
  */
 export function SleeperImportForm({
   onLeagueChosen,
   sampleCtaBelow = false,
+  onStartSession,
+  accountSlot,
 }: {
   onLeagueChosen: (leagueId: string, leagueName: string) => void;
   /** The caller already renders its own "Try a sample league" button under this
    * form; skip the one the error state would add so the user never sees two. */
   sampleCtaBelow?: boolean;
+  /** Fires right before a disposable guest session is created by Connect (the landing keeps the form mounted). */
+  onStartSession?: () => void;
+  /** Rendered under "More ways to connect" > account (sign in / create an account). Omitted: no account row. */
+  accountSlot?: ReactNode;
 }) {
   const [platform, setPlatform] = useState<LeaguePlatform>("sleeper");
+  const [moreOpen, setMoreOpen] = useState(false);
+  const [accountOpen, setAccountOpen] = useState(false);
+  const ways = connectWays({ hasAccount: !accountSlot });
+  const onWay = (key: string) => {
+    if (key === "espn" || key === "fleaflicker" || key === "mfl") setPlatform(key);
+    if (key === "account") setAccountOpen((open) => !open);
+  };
   return (
     <div className="flex flex-col gap-3">
-      <div className="flex flex-col gap-2">
-        <span className="text-xs font-bold uppercase tracking-wide" style={{ color: "var(--color-text-muted)" }}>
-          Your league is on
-        </span>
-        <div className="grid grid-cols-2 gap-2" role="radiogroup" aria-label="League platform">
-          {MAIN_PLATFORMS.map((option) => {
-            const selected = platform === option.value;
-            return (
-              <button
-                key={option.value}
-                type="button"
-                role="radio"
-                aria-checked={selected}
-                aria-label={option.label}
-                onClick={() => setPlatform(option.value)}
-                className="glass-surface flex flex-col items-start gap-1 px-3 py-3 text-left"
-                style={{
-                  color: "var(--color-text-primary)",
-                  borderLeft: selected ? "var(--border-width-semantic) solid var(--color-accent)" : undefined,
-                }}
-              >
-                <span
-                  aria-hidden="true"
-                  className="flex items-center justify-center font-bold"
-                  style={{
-                    width: 28,
-                    height: 28,
-                    borderRadius: "var(--radius-control)",
-                    background: selected ? "var(--color-accent)" : "var(--color-surface-secondary)",
-                    color: selected ? "var(--color-on-accent)" : "var(--color-text-primary)",
-                    border: "1px solid var(--color-border)",
-                  }}
-                >
-                  {option.monogram}
-                </span>
-                <span className="font-bold">{option.label}</span>
-                <span className="text-xs" style={{ color: "var(--color-text-muted)" }}>
-                  {option.blurb}
-                </span>
-              </button>
-            );
-          })}
-        </div>
-        <div className="flex items-center gap-3 text-xs" style={{ color: "var(--color-text-muted)" }}>
-          <span>Also:</span>
-          {OTHER_PLATFORMS.map((option) => (
-            <button
-              key={option.value}
-              type="button"
-              onClick={() => setPlatform(option.value)}
-              className="font-bold"
-              style={{ color: platform === option.value ? "var(--color-accent)" : "var(--color-text-secondary)" }}
-            >
-              {option.label}
-            </button>
-          ))}
-        </div>
-      </div>
       {platform !== "sleeper" ? (
-        // key: switching platform resets the form (league id, preview, team pick).
-        <EspnImportForm key={platform} platform={platform} onLeagueChosen={onLeagueChosen} />
+        <div className="flex flex-col gap-2">
+          <button type="button" onClick={() => setPlatform("sleeper")} className="tap-link self-start text-sm font-bold" style={{ color: "var(--color-accent)", minHeight: "var(--touch-target-min)" }}>
+            ← Use my Sleeper username
+          </button>
+          {/* key: switching platform resets the form (league id, preview, team pick). */}
+          <EspnImportForm key={platform} platform={platform} onLeagueChosen={onLeagueChosen} />
+        </div>
       ) : (
-        <SleeperUsernameImport onLeagueChosen={onLeagueChosen} sampleCtaBelow={sampleCtaBelow} />
+        <SleeperUsernameImport onLeagueChosen={onLeagueChosen} sampleCtaBelow={sampleCtaBelow} onStartSession={onStartSession} />
       )}
+      <div className="flex flex-col gap-2" data-testid="more-ways">
+        <button
+          type="button"
+          aria-expanded={moreOpen}
+          onClick={() => setMoreOpen(!moreOpen)}
+          className="tap-link flex items-center justify-between text-sm font-bold"
+          style={{ minHeight: "var(--touch-target-min)", color: "var(--color-text-secondary)" }}
+        >
+          <span>{CONNECT_MORE_LABEL}</span>
+          <span aria-hidden="true">{moreOpen ? "−" : "+"}</span>
+        </button>
+        {moreOpen ? (
+          <ul className="m-0 flex list-none flex-col gap-2 p-0 motion-in" data-motion="in">
+            {ways.map((way) => (
+              <li key={way.key}>
+                {way.key === "sample" ? (
+                  <SampleLeagueButton surface="connect_step" variant="secondary" />
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => onWay(way.key)}
+                    aria-expanded={way.key === "account" ? accountOpen : undefined}
+                    className="glass-surface flex w-full flex-col items-start gap-0.5 px-3 py-2 text-left"
+                    style={{ minHeight: "var(--touch-target-min)", color: "var(--color-text-primary)" }}
+                  >
+                    <span className="text-sm font-bold">{way.label}</span>
+                    <span className="text-xs" style={{ color: "var(--color-text-muted)" }}>
+                      {way.blurb}
+                    </span>
+                  </button>
+                )}
+                {way.key === "account" && accountOpen ? <div className="mt-2">{accountSlot}</div> : null}
+              </li>
+            ))}
+          </ul>
+        ) : null}
+      </div>
     </div>
   );
 }
@@ -140,13 +147,15 @@ export function SleeperImportForm({
 function SleeperUsernameImport({
   onLeagueChosen,
   sampleCtaBelow,
+  onStartSession,
 }: {
   onLeagueChosen: (leagueId: string, leagueName: string) => void;
   sampleCtaBelow: boolean;
+  onStartSession?: () => void;
 }) {
   const { signInAsGuest, session } = useAuth();
   const [username, setUsername] = useState("");
-  const [status, setStatus] = useState<"idle" | "loading" | "error">("idle");
+  const [status, setStatus] = useState<"idle" | "loading" | "saving" | "error">("idle");
   const [message, setMessage] = useState<string | null>(null);
   // Structured error from lib/sleeperConnectErrors (the single copy source):
   // user_not_found / no_leagues / network each get their own guidance, plus
@@ -154,19 +163,21 @@ function SleeperUsernameImport({
   // 2026-10-18; connect-failure analytics, 2026-10).
   const [connectError, setConnectError] = useState<SleeperConnectError | null>(null);
   const [leagues, setLeagues] = useState<SleeperLeagueSummary[]>([]);
+  const [selected, setSelected] = useState<string[]>([]);
+  const [whatIsOpen, setWhatIsOpen] = useState(false);
   // Set once a save reports the server is warming the league's first-load
   // data; shows real progress until it is ready, then continues.
   const [warming, setWarming] = useState<{ leagueId: string; name: string } | null>(null);
 
-  // Set when the server refuses the save because the plan's league cap is hit.
-  const [atCap, setAtCap] = useState(false);
+  // Set when the server refuses a save because the plan's league cap is hit. `open` is the league that DID save (if any).
+  const [atCap, setAtCap] = useState<{ open: { leagueId: string; leagueName: string } | null } | null>(null);
 
   // Returns false (and never opens the league) unless the server saved it.
   const finishSave = (saved: SaveLeagueResponse): boolean => {
     if (isSaveFailure(saved)) {
       if (saved?.reason === "at_cap") {
         setStatus("idle");
-        setAtCap(true);
+        setAtCap({ open: null });
       } else {
         setStatus("error");
         setMessage(saveFailureMessage(saved?.reason));
@@ -185,8 +196,8 @@ function SleeperUsernameImport({
     onLeagueChosen(leagueId, name);
   };
 
-  const handleSubmit = async (event: React.FormEvent) => {
-    event.preventDefault();
+  const handleSubmit = async (event?: React.FormEvent) => {
+    event?.preventDefault();
     const clean = username.trim();
     if (!clean) return;
 
@@ -201,6 +212,7 @@ function SleeperUsernameImport({
 
     try {
       if (!session) {
+        onStartSession?.();
         const { error } = await signInAsGuest();
         if (error) {
           setStatus("error");
@@ -256,6 +268,7 @@ function SleeperUsernameImport({
       }
 
       setLeagues(result.leagues);
+      setSelected(defaultLeagueSelection(result.leagues));
       setStatus("idle");
     } catch (error) {
       setStatus("error");
@@ -268,25 +281,51 @@ function SleeperUsernameImport({
     }
   };
 
-  const openLeague = async (league: SleeperLeagueSummary) => {
-    setStatus("loading");
-    try {
-      const saved = await api.saveLeague({ leagueId: league.league_id, sleeperUsername: username.trim(), leagueName: league.name });
-      if (finishSave(saved)) {
-        trackFeatureUse("league_import_completed", { leagueId: league.league_id });
-        setStatus("idle");
-        continueAfterSave(saved, league.league_id, league.name);
+  // Saves every checked league, newest season first. The first that saves opens; the plan's cap never blocks the ones that did.
+  const connectSelected = async () => {
+    const plan = planSaves(selected, leagues);
+    if (plan.length === 0) return;
+    setStatus("saving");
+    setMessage(null);
+    const outcomes: SaveOutcome[] = [];
+    for (const { league } of plan) {
+      try {
+        const saved = await api.saveLeague({ leagueId: league.league_id, sleeperUsername: username.trim(), leagueName: league.name });
+        if (isSaveFailure(saved)) {
+          outcomes.push({ leagueId: league.league_id, leagueName: league.name, ok: false, reason: saved?.reason || "unavailable" });
+          trackFeatureUse("league_import_failed", { dedupe: false, props: { reason: saved?.reason || "unavailable" } });
+        } else {
+          outcomes.push({ leagueId: league.league_id, leagueName: league.name, ok: true, warming: Boolean(saved?.warming) });
+          trackFeatureUse("league_import_completed", { leagueId: league.league_id });
+        }
+      } catch (error) {
+        outcomes.push({ leagueId: league.league_id, leagueName: league.name, ok: false, reason: error instanceof Error ? error.message : "exception" });
+        trackFeatureUse("league_import_failed", { dedupe: false, props: { reason: "exception" } });
       }
-    } catch (error) {
-      setStatus("error");
-      setMessage(error instanceof Error ? error.message : "Could not open that league.");
-      trackFeatureUse("league_import_failed", { dedupe: false, props: { reason: "exception" } });
     }
+    const summary = summarizeSaves(outcomes);
+    setStatus("idle");
+    if (summary.atCap) {
+      setAtCap({ open: summary.open ? { leagueId: summary.open.leagueId, leagueName: summary.open.leagueName } : null });
+      return;
+    }
+    if (!summary.open) {
+      setStatus("error");
+      const reason = summary.failedReason ?? "";
+      setMessage(reason && reason !== "exception" && !reason.includes(" ") ? saveFailureMessage(reason) : reason || "Could not open that league.");
+      return;
+    }
+    continueAfterSave({ ok: true, reason: "", cap: 0, warming: summary.open.warming } as SaveLeagueResponse, summary.open.leagueId, summary.open.leagueName);
   };
 
   if (atCap) {
     return (
-      <PremiumUpsellCard bare kicker="Saved leagues" upsell={LEAGUE_CAP_UPSELL} fallbackTitle={LEAGUE_CAP_UPSELL.title} fallbackBody={LEAGUE_CAP_UPSELL.body} />
+      <div className="flex flex-col gap-3">
+        <PremiumUpsellCard bare kicker="Saved leagues" upsell={LEAGUE_CAP_UPSELL} fallbackTitle={LEAGUE_CAP_UPSELL.title} fallbackBody={LEAGUE_CAP_UPSELL.body} />
+        {atCap.open ? (
+          <Button onClick={() => onLeagueChosen(atCap.open!.leagueId, atCap.open!.leagueName)}>Continue to {atCap.open.leagueName}</Button>
+        ) : null}
+      </div>
     );
   }
 
@@ -295,111 +334,107 @@ function SleeperUsernameImport({
   }
 
   if (leagues.length > 0) {
-    // Bug report, 2026-10-21: "it keeps auto defaulting to 2025" / "we need
-    // to be able to separate by year" — a continuing dynasty league gets a
-    // brand-new league_id every season it rolls over on Sleeper's side, so
-    // the SAME league can legitimately appear here twice (once per season).
-    // A flat list made it easy to tap the wrong year's card for "the same"
-    // league. Grouping by season under a visible year header, most recent
-    // season first, makes the distinction impossible to miss.
-    const seasons = Array.from(new Set(leagues.map((league) => league.season))).sort(
-      (a, b) => Number(b) - Number(a),
-    );
+    // A continuing dynasty league gets a brand-new league_id every season it
+    // rolls over on Sleeper, so the SAME league can legitimately appear twice
+    // (once per season). Grouped by season, newest first, under a visible
+    // year header so the wrong year's league is never picked by mistake.
+    const groups = groupLeaguesBySeason(leagues);
     return (
-      <div className="flex flex-col gap-3">
-        <h2 style={{ font: "var(--font-card-title)" }}>Choose a league</h2>
-        {seasons.map((season) => (
-          <div key={season} className="flex flex-col gap-2">
-            <span
-              className="text-xs font-bold uppercase tracking-wide"
-              style={{ color: "var(--color-text-muted)" }}
-            >
-              {season} season
+      <div className="flex flex-col gap-3 motion-in" data-motion="in" data-testid="league-picker">
+        <h2 style={{ font: "var(--font-card-title)" }}>
+          Found {leagues.length} leagues for {username.trim()}
+        </h2>
+        {groups.map((group) => (
+          <div key={group.season} className="flex flex-col gap-2">
+            <span className="text-xs font-bold uppercase tracking-wide" style={{ color: "var(--color-text-muted)" }}>
+              {group.season} season
             </span>
-            {leagues
-              .filter((league) => league.season === season)
-              .map((league) => (
+            {group.leagues.map((league) => {
+              const on = selected.includes(league.league_id);
+              return (
                 <button
                   key={league.league_id}
-                  onClick={() => openLeague(league)}
-                  className="glass-surface text-left px-4 py-3 flex items-center justify-between"
-                  style={{ color: "var(--color-text-primary)" }}
+                  type="button"
+                  role="checkbox"
+                  aria-checked={on}
+                  aria-label={`${league.name}, ${leagueMeta(league)}`}
+                  onClick={() => setSelected((current) => toggleLeague(current, league.league_id))}
+                  className="glass-surface flex items-center gap-3 px-3 py-2 text-left"
+                  style={{
+                    minHeight: "var(--touch-target-min)",
+                    color: "var(--color-text-primary)",
+                    borderLeft: on ? "var(--border-width-semantic) solid var(--color-accent)" : undefined,
+                  }}
                 >
-                  <span>
+                  <TeamAvatar avatarUrl={league.avatar_url} name={league.name} size={36} />
+                  <span className="min-w-0 flex-1">
                     <span className="block font-bold">{league.name}</span>
                     <span className="block text-xs" style={{ color: "var(--color-text-muted)" }}>
-                      {league.season} · {league.total_rosters} teams
+                      {leagueMeta(league)}
                     </span>
                   </span>
-                  <span style={{ color: "var(--color-accent)" }}>Open league →</span>
+                  <span
+                    aria-hidden="true"
+                    className="flex shrink-0 items-center justify-center font-bold"
+                    style={{
+                      width: 22,
+                      height: 22,
+                      borderRadius: "var(--radius-control)",
+                      border: "1px solid var(--color-border)",
+                      background: on ? "var(--color-accent)" : "transparent",
+                      color: "var(--color-on-accent)",
+                    }}
+                  >
+                    {on ? "✓" : ""}
+                  </span>
                 </button>
-              ))}
+              );
+            })}
           </div>
         ))}
+        {message ? (
+          <p role="alert" className="m-0 text-xs" style={{ color: "var(--color-warning)" }}>
+            {message}
+          </p>
+        ) : null}
+        <Button type="button" onClick={() => void connectSelected()} disabled={selected.length === 0} loading={status === "saving"} data-testid="connect-selected">
+          {connectCtaLabel(selected.length)}
+        </Button>
+        <p className="m-0 text-xs" style={{ color: "var(--color-text-muted)" }}>
+          {CONNECT_TRUST_LINE}
+        </p>
       </div>
     );
   }
 
+  const loading = status === "loading";
   return (
     <form onSubmit={handleSubmit} className="flex flex-col gap-3">
-      {/* Onboarding audit, 2026-10-18: a new user hit the Sleeper username
-          field with zero prior explanation of what Sleeper is or that an
-          existing account there is required — the landing page sells the
-          product's value but never mentions the dependency. */}
-      <div
-        className="glass-input flex flex-col gap-1 px-3 py-3 text-xs"
-        style={{
-          borderLeft: "var(--border-width-semantic) solid var(--color-accent)",
-          color: "var(--color-text-secondary)",
-        }}
-      >
-        <p className="m-0">
-          FantasyDesk connects to your existing <strong>Sleeper</strong> fantasy league — it reads your real roster,
-          matchups, and league settings to build recommendations.
-        </p>
-        <p className="m-0">
-          We never ask for your Sleeper password and never change your lineup. Read-only.
-        </p>
-        <p className="m-0">
-          Don&apos;t have a Sleeper league yet?{" "}
-          <a
-            href="https://sleeper.com"
-            target="_blank"
-            rel="noreferrer"
-            className="font-bold underline"
-            style={{ color: "var(--color-accent)" }}
-          >
-            Create a free one at sleeper.com
-          </a>
-          .
-        </p>
-      </div>
       <label className="flex flex-col gap-1 text-sm">
-        Sleeper username
-        <Input
-          value={username}
-          onChange={(event) => setUsername(event.target.value)}
-          placeholder="e.g. gridiron_gm"
-        />
+        {CONNECT_FIELD_LABEL}
+        <Input value={username} onChange={(event) => setUsername(event.target.value)} placeholder={CONNECT_PLACEHOLDER} autoCapitalize="none" autoCorrect="off" />
       </label>
-      {connectError ? (
-        <div role="alert" className="flex flex-col gap-2 text-xs" style={{ color: "var(--color-warning)" }}>
-          <p className="m-0 font-bold">{connectError.message}</p>
-          {connectError.hint ? (
-            <p className="m-0" style={{ color: "var(--color-text-secondary)" }}>
-              {connectError.hint}
-            </p>
-          ) : null}
+      <Button type="submit" loading={loading}>
+        {CONNECT_PRIMARY_LABEL}
+      </Button>
+      <p className="m-0 text-xs" style={{ color: "var(--color-text-muted)" }}>
+        {CONNECT_TRUST_LINE}
+      </p>
+      {loading ? (
+        // Skeleton identity: the list that is about to appear, not a "Loading..." line.
+        <div aria-busy="true" data-testid="connect-skeleton">
+          <SkeletonRows count={2} />
+        </div>
+      ) : null}
+      {connectError && connectError.kind === "network" ? (
+        <ErrorState bare message={connectError.message} onRetry={() => void handleSubmit()} />
+      ) : connectError ? (
+        <div role="alert" className="flex flex-col gap-2 text-xs">
+          <EmptyState title={connectError.message} subtitle={connectError.hint || undefined} icon={undefined} accent="var(--color-warning)" />
           {connectError.offerSleeperSignup ? (
             <p className="m-0" style={{ color: "var(--color-text-secondary)" }}>
               Don&apos;t have a Sleeper account?{" "}
-              <a
-                href="https://sleeper.com"
-                target="_blank"
-                rel="noreferrer"
-                className="font-bold underline"
-                style={{ color: "var(--color-accent)" }}
-              >
+              <a href="https://sleeper.com" target="_blank" rel="noreferrer" className="font-bold underline" style={{ color: "var(--color-accent)" }}>
                 Create a free one at sleeper.com
               </a>
               , join or start a league, then come back here.
@@ -413,12 +448,23 @@ function SleeperUsernameImport({
           <p className="m-0">{message}</p>
         </div>
       ) : null}
-      <Button
-        type="submit"
-        loading={status === "loading"}
-      >
-        {status === "loading" ? "Loading leagues from Sleeper…" : connectError?.kind === "network" ? "Try again" : "Load my leagues"}
-      </Button>
+      <div className="flex flex-col gap-1">
+        <button type="button" aria-expanded={whatIsOpen} onClick={() => setWhatIsOpen(!whatIsOpen)} className="tap-link self-start text-xs font-bold" style={{ color: "var(--color-text-secondary)", minHeight: "var(--touch-target-min)" }}>
+          What is Sleeper? {whatIsOpen ? "−" : "+"}
+        </button>
+        {whatIsOpen ? (
+          <div className="glass-input flex flex-col gap-1 px-3 py-3 text-xs motion-in" data-motion="in" style={{ borderLeft: "var(--border-width-semantic) solid var(--color-accent)", color: "var(--color-text-secondary)" }}>
+            <p className="m-0">{CONNECT_WHAT_IS_SLEEPER}</p>
+            <p className="m-0">
+              Don&apos;t have a Sleeper league yet?{" "}
+              <a href="https://sleeper.com" target="_blank" rel="noreferrer" className="font-bold underline" style={{ color: "var(--color-accent)" }}>
+                Create a free one at sleeper.com
+              </a>
+              .
+            </p>
+          </div>
+        ) : null}
+      </div>
     </form>
   );
 }

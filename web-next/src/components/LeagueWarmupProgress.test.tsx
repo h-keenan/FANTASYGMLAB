@@ -92,7 +92,7 @@ describe("SleeperImportForm warm-up hand-off", () => {
 
   const connect = () => {
     fireEvent.change(screen.getByPlaceholderText("e.g. gridiron_gm"), { target: { value: "someone" } });
-    fireEvent.click(screen.getByRole("button", { name: /load my leagues/i }));
+    fireEvent.click(screen.getByRole("button", { name: /^connect$/i }));
   };
 
   it("shows the progress steps for a cold league and continues once ready", async () => {

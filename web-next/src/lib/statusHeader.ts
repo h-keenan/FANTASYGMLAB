@@ -295,18 +295,26 @@ export interface TodayStatusInput {
   attention: StatusAttentionItem[];
   tradeCount: number;
   hrefs: { matchup: string; rankings: string; trades: string };
+  /**
+   * The Decision Queue's top decision (lib/decisionQueue.ts): when set it IS the hero's one next action (headline +
+   * primary button), and the lineup holes live in the queue instead of as rows here. `nothing` is the empty-queue line
+   * ("Nothing needs you this week", with the next game as its context).
+   */
+  queue?: { next: { title: string; label: string; href: string } | null; nothing?: { title: string; detail: string | null } | null };
 }
 
 const toneOf = (t: "positive" | "risk" | "warning" | "neutral" | undefined): StatusTone | undefined => (t === "positive" ? "success" : t === "risk" ? "danger" : t === "warning" ? "warning" : undefined);
 
 /** Today: ring = win chance; headline = the lineup hole when there is one, else the hero number; one cyan action. */
 export function buildTodayStatusHeader(input: TodayStatusInput): StatusHeaderModel | null {
-  const { matchup, hero, lineup, standing, attention, tradeCount, hrefs } = input;
+  const { matchup, hero, lineup, standing, attention, tradeCount, hrefs, queue } = input;
   const wp = matchup?.winPercent ?? null;
   const ring = wp != null ? statusRing(wp, `${wp}%`, `Win chance ${wp}%`) : null;
   const lineupRisk = lineup?.tone === "risk";
   const fallback = attention.length === 1 ? "1 item needs you" : `${attention.length} items need you`;
-  const headline = lineupRisk ? lineup!.headline : hero ? `${hero.label}: ${hero.value}` : (lineup?.headline ?? (attention.length > 0 ? fallback : ""));
+  const queueNext = queue?.next ?? null;
+  const queueNothing = !queueNext ? (queue?.nothing ?? null) : null;
+  const headline = queueNext ? queueNext.title : queueNothing ? queueNothing.title : lineupRisk ? lineup!.headline : hero ? `${hero.label}: ${hero.value}` : (lineup?.headline ?? (attention.length > 0 ? fallback : ""));
   if (!headline) return null;
   const stats: StatusMiniStat[] = [];
   const place = standing?.place ?? standing?.record ?? null;
@@ -316,11 +324,15 @@ export function buildTodayStatusHeader(input: TodayStatusInput): StatusHeaderMod
   return statusHeaderModel({
     kicker: matchup?.week != null ? `TODAY · WEEK ${matchup.week}` : "TODAY",
     headline,
-    context: hero?.context ?? null,
+    context: queueNext ? (hero?.context ?? null) : queueNothing ? (queueNothing.detail ?? hero?.context ?? null) : (hero?.context ?? null),
     ring,
     stats,
     attention,
-    primary: lineupRisk ? { label: "Fix lineup", href: hrefs.matchup } : tradeCount > 0 && attention.length === 0 ? { label: "Review trade ideas", href: hrefs.trades } : null,
+    primary: queueNext
+      ? { label: queueNext.label, href: queueNext.href }
+      : queue
+        ? tradeCount > 0 ? { label: "Review trade ideas", href: hrefs.trades } : null
+        : lineupRisk ? { label: "Fix lineup", href: hrefs.matchup } : tradeCount > 0 && attention.length === 0 ? { label: "Review trade ideas", href: hrefs.trades } : null,
   });
 }
 

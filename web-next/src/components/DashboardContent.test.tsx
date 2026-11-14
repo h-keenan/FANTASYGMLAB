@@ -65,7 +65,7 @@ describe("DashboardContent", () => {
     render(<DashboardContent leagueId="abc" leagueName="Dynasty Overlords" data={FIXTURE} />);
 
     expect(screen.getByRole("heading", { name: "Dynasty Overlords" })).toBeInTheDocument();
-    expect(screen.getByRole("heading", { name: "This week" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Do next · 1" })).toBeInTheDocument();
     expect(screen.getByText("Trade for a top-12 RB before the deadline")).toBeInTheDocument();
 
     // My Team is one compact module: its collapsed summary carries the ranks; the tiles open on tap.
@@ -120,9 +120,8 @@ describe("DashboardContent", () => {
     expandModule("Watchlist");
     expect(screen.getAllByText(/Ashton Jeanty trending down/).length).toBeGreaterThan(0);
     expect(screen.getByText("Chimere Dike")).toBeInTheDocument();
-    // ...but Watch and Waiver Opportunity share one card, while Top
-    // Priority gets its own — exactly 2 <article> cards total, not 3.
-    expect(document.querySelectorAll("article")).toHaveLength(2);
+    // ...but Watch and Waiver Opportunity share one card; Top Priority is a Decision Queue row whose full card opens on tap.
+    expect(document.querySelectorAll("article")).toHaveLength(1);
     // Type tags, a real usage-drop indicator, and no placeholder copy.
     expect(screen.getByText("Trending")).toBeInTheDocument();
     expect(screen.getByText("Waiver")).toBeInTheDocument();
@@ -131,7 +130,7 @@ describe("DashboardContent", () => {
     expect(document.body.textContent?.toLowerCase()).not.toContain("placeholder");
   });
 
-  it("shows the quiet-state copy instead of Game Plan cards when there's nothing urgent", () => {
+  it("shows the quiet-state copy instead of Game Plan cards when there's nothing urgent", async () => {
     const quietFixture: DashboardResponse = {
       ...FIXTURE,
       quiet: true,
@@ -140,7 +139,7 @@ describe("DashboardContent", () => {
     };
     render(<DashboardContent leagueId="abc" leagueName="Dynasty Overlords" data={quietFixture} />);
 
-    expect(screen.getByText("No urgent roster issues right now.")).toBeInTheDocument();
+    expect(await screen.findByText("Nothing needs you this week")).toBeInTheDocument();
   });
 
   it("orders modules: needs attention, this week, trade ideas, My Team, alerts, League Activity, More", () => {
@@ -163,7 +162,7 @@ describe("DashboardContent", () => {
     const html = container.innerHTML;
     const at = (marker: string) => html.indexOf(marker);
     const order = [
-      at("game-plan-heading"),
+      at("decision-queue-heading"),
       at("dashboard-trades-block"),
       at('aria-label="Team summary"'),
       at("dashboard-watchlist"),
@@ -196,7 +195,7 @@ describe("DashboardContent", () => {
     expect(within(block).queryByRole("heading", { level: 3 })).not.toBeInTheDocument();
   });
 
-  it("lists urgent items once under Needs attention, linking to GM Plan / Matchup", () => {
+  it("lists urgent items once in the Decision Queue, linking to GM Plan / Matchup", () => {
     const data: DashboardResponse = {
       ...FIXTURE,
       trade_window: { trade_deadline_week: 11, current_week: 11, trade_deadline_passed: false, message: "" },
@@ -208,27 +207,41 @@ describe("DashboardContent", () => {
       },
     };
     render(<DashboardContent leagueId="abc" leagueName="Dynasty Overlords" data={data} />);
-    const block = screen.getByTestId("dashboard-needs-attention");
-    expect(within(block).getByRole("heading", { name: "Needs attention" })).toBeInTheDocument();
+    const block = screen.getByTestId("decision-queue");
+    expect(within(block).getByRole("heading", { name: /^Do next/ })).toBeInTheDocument();
     expect(within(block).getByText("Starter ruled out")).toBeInTheDocument();
     expect(within(block).getByText(/Trade deadline: This week/)).toBeInTheDocument();
-    expect(within(block).getByRole("link", { name: /Starter ruled out/ })).toHaveAttribute("href", "/matchup/abc?name=Dynasty+Overlords");
-    expect(within(block).getByRole("link", { name: /Trade deadline/ })).toHaveAttribute("href", "/gm-plan/abc?name=Dynasty%20Overlords");
-    // Shown once: the at-a-glance strip drops the lineup and deadline chips.
+    expect(within(screen.getByTestId("decision-lineup")).getByTestId("decision-primary")).toHaveAttribute("href", "/matchup/abc?name=Dynasty+Overlords");
+    expect(within(screen.getByTestId("decision-deadline")).getByTestId("decision-primary")).toHaveAttribute("href", "/gm-plan/abc?name=Dynasty%20Overlords");
+    // Shown once: the queue owns the lineup issue, nothing else repeats it.
     expect(screen.getAllByText("Starter ruled out")).toHaveLength(1);
-    expect(screen.queryByText("Trade deadline")).not.toBeInTheDocument();
   });
 
-  it("treats the server's top-priority non-trade tile as urgent and shows it once", () => {
+  it("treats the server's top-priority non-trade tile as a queue decision and shows it once", () => {
     render(<DashboardContent leagueId="abc" leagueName="Dynasty Overlords" data={FIXTURE} />);
-    const block = screen.getByTestId("dashboard-needs-attention");
+    const block = screen.getByTestId("decision-queue");
     expect(within(block).getByText("Trade for a top-12 RB before the deadline")).toBeInTheDocument();
     expect(screen.getAllByText("Trade for a top-12 RB before the deadline")).toHaveLength(1);
   });
 
-  it("shows no Needs attention list when nothing is urgent", () => {
+  it("caps the queue at three rows and opens the rest in place with See all (N)", () => {
+    const many: DashboardResponse = {
+      ...FIXTURE,
+      items: Array.from({ length: 5 }, (_, i) => ({ ...FIXTURE.items[0], headline: `Decision ${i}`, recommendation_id: `r${i}`, route_player_score: 50 - i })),
+    };
+    render(<DashboardContent leagueId="abc" leagueName="Dynasty Overlords" data={many} />);
+    const block = screen.getByTestId("decision-queue");
+    expect(within(block).getAllByTestId("decision-primary")).toHaveLength(3);
+    fireEvent.click(within(block).getByRole("button", { name: "See all (5)" }));
+    expect(within(block).getAllByTestId("decision-primary")).toHaveLength(5);
+    fireEvent.click(within(block).getByRole("button", { name: "Show top 3" }));
+    expect(within(block).getAllByTestId("decision-primary")).toHaveLength(3);
+  });
+
+  it("shows no decision rows when nothing is urgent", async () => {
     render(<DashboardContent leagueId="abc" leagueName="Dynasty Overlords" data={{ ...FIXTURE, items: [] }} />);
-    expect(screen.queryByTestId("dashboard-needs-attention")).not.toBeInTheDocument();
+    expect(await screen.findByText("Nothing needs you this week")).toBeInTheDocument();
+    expect(screen.queryByTestId("decision-primary")).not.toBeInTheDocument();
   });
 
   it("never invents a deadline: no window means no deadline chip", () => {

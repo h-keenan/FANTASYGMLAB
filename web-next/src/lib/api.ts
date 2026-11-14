@@ -304,6 +304,8 @@ export interface SleeperLeagueSummary {
   name: string;
   season: string;
   total_rosters: number;
+  /** Sleeper's league avatar thumbnail; empty when the league has none. */
+  avatar_url?: string;
 }
 
 export interface SleeperLeaguesResponse {
@@ -1951,6 +1953,7 @@ export interface MatchupResponse {
   position_edges?: { actual: MatchupPositionEdge[] | null; suggested: MatchupPositionEdge[] } | null;
   /** Null until Sleeper has your actual lineup to diff against. */
   suggested_moves?: MatchupSuggestedMove[] | null;
+  open_slots?: string[];
   basis: "season_value";
   basis_label: string;
   reason: string;

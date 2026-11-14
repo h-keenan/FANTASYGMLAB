@@ -92,7 +92,8 @@ describe("TeamStatusHero on the Dashboard", () => {
     expect(within(hero).getByTestId("status-context")).toHaveTextContent("vs Rival FC");
     expect(within(hero).getByTestId("status-context")).toHaveTextContent("Proj 101.3 - 96.0");
     // "Needs your attention": the starter who cannot play is a player row with the swap that fixes it and its gain.
-    const row = within(hero).getByTestId("status-attention-row");
+    // The lineup hole is a Decision Queue row now (one place), not a hero row.
+    const row = screen.getByTestId("decision-lineup");
     expect(row).toHaveTextContent("Hurt Back");
     expect(row).toHaveTextContent("Start Backup Back instead");
     expect(row).toHaveTextContent("+6.2");

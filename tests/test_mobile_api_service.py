@@ -14724,9 +14724,25 @@ def test_lookup_sleeper_leagues_returns_the_picker_options(monkeypatch):
     assert body["ok"] is True
     assert body["username"] == "gm_dynasty"
     assert body["leagues"] == [
-        {"league_id": "abc", "name": "Dynasty", "season": "2026", "total_rosters": 12},
+        {"league_id": "abc", "name": "Dynasty", "season": "2026", "total_rosters": 12, "avatar_url": ""},
     ]
     mock_lookup.assert_called_once_with("gm_dynasty")
+
+
+def test_lookup_sleeper_leagues_returns_the_league_avatar_thumbnail(monkeypatch):
+    client = _client(monkeypatch)
+    from modules import sleeper_leagues
+
+    auth_user_response = Mock(status_code=200)
+    auth_user_response.json.return_value = {"id": "user-123", "email": "gm@example.com"}
+    lookup = sleeper_leagues.LeagueLookupResult(
+        [{"league_id": "abc", "name": "Dynasty", "season": "2026", "total_rosters": 12, "avatar": " av123 "}],
+        "ok",
+    )
+    with patch("requests.get", return_value=auth_user_response):
+        with patch("modules.sleeper_leagues.lookup_user_leagues", return_value=lookup):
+            response = client.get("/v1/sleeper/leagues?username=gm_dynasty", headers={"Authorization": "Bearer good-token"})
+    assert response.json()["leagues"][0]["avatar_url"] == "https://sleepercdn.com/avatars/thumbs/av123"
 
 
 def test_lookup_sleeper_leagues_falls_back_to_the_linked_username(monkeypatch):

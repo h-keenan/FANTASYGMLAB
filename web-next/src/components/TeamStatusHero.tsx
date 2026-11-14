@@ -120,6 +120,7 @@ export function TeamStatusHero({
   data,
   attention = [],
   tradeCount = 0,
+  queue,
 }: {
   leagueId: string;
   leagueName: string;
@@ -132,6 +133,8 @@ export function TeamStatusHero({
   attention?: StatusAttentionItem[];
   /** Trade ideas the dashboard found (a mini stat on the header). */
   tradeCount?: number;
+  /** The Decision Queue's lead: becomes the hero's one next action (see buildTodayStatusHeader). */
+  queue?: Parameters<typeof buildTodayStatusHeader>[0]["queue"];
 }) {
   const query = `?name=${encodeURIComponent(leagueName)}`;
   const id = encodeURIComponent(leagueId);
@@ -174,6 +177,7 @@ export function TeamStatusHero({
     standing,
     attention,
     tradeCount,
+    queue,
     hrefs: { matchup: `/matchup/${id}${query}`, rankings: `/league-rankings/${id}${query}`, trades: `/trade-hub/${id}${query}` },
   });
 

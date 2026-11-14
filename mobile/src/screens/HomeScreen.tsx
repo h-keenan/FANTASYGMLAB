@@ -42,6 +42,17 @@ import { useOnboarding } from '../context/OnboardingContext';
 import { useShowcaseMode } from '../context/ShowcaseModeContext';
 import { getLastLeague } from '../lib/lastLeague';
 import { groupLeagueOptionsBySeason } from '../lib/leagueSeasonGroups';
+import TeamAvatar from '../components/TeamAvatar';
+import {
+  CONNECT_MORE_LABEL,
+  CONNECT_TRUST_LINE,
+  connectCtaLabel,
+  connectWays,
+  defaultLeagueSelection,
+  leagueMeta,
+  planSaves,
+  toggleLeague,
+} from '../lib/connectFlow';
 import { glanceSectionState } from '../lib/leaguesGlance';
 import { useOrbClearance } from '../lib/orbLayout';
 import { lapsedTrialExpiration } from '../lib/revenuecat';
@@ -109,6 +120,9 @@ export default function HomeScreen({ navigation, route }: Props) {
   // appears exactly when it's needed, not only for someone who happens to
   // notice the persistent link first.
   const [showNoLeagueHelp, setShowNoLeagueHelp] = useState(false);
+  // One-field connect (lib/connectFlow.ts): checked leagues in the picker, and the "More ways to connect" disclosure.
+  const [addSelected, setAddSelected] = useState<string[]>([]);
+  const [addMoreOpen, setAddMoreOpen] = useState(false);
   // Set only when the server refuses a save with reason "at_cap" — the copy
   // is derived from the cap the server sent, never a hardcoded number.
   const [addCapMessage, setAddCapMessage] = useState<string | null>(null);
@@ -156,6 +170,8 @@ export default function HomeScreen({ navigation, route }: Props) {
     setAddConnectError(null);
     setAddCapMessage(null);
     setShowNoLeagueHelp(false);
+    setAddSelected([]);
+    setAddMoreOpen(false);
   };
 
   // Renames only this account's saved_leagues row (RLS-scoped to
@@ -316,6 +332,26 @@ export default function HomeScreen({ navigation, route }: Props) {
     }
   };
 
+  // Saves every checked league, newest season first: the first goes through the full save flow (routing, warm-up,
+  // cap card); the rest are saved quietly after it, and the plan's cap never blocks the one that opened.
+  const connectSelected = async () => {
+    const plan = planSaves(addSelected, addOptions ?? []);
+    if (plan.length === 0) return;
+    const [first, ...rest] = plan;
+    await saveLeague({ leagueId: first.league.league_id, leagueName: first.league.name, username: addQuery.trim() });
+    for (const { league } of rest) {
+      try {
+        const result = await api.saveLeague({ leagueId: league.league_id, leagueName: league.name, sleeperUsername: addQuery.trim() });
+        trackUse('league_connect', result.ok ? 'completed' : 'failed', {
+          props: { source_surface: 'sleeper', ...(result.ok ? {} : { reason: String(result.reason ?? 'unknown') }) },
+        });
+      } catch {
+        // The first league already opened; a failed extra is retried from Add a league.
+      }
+    }
+    if (rest.length > 0) await load();
+  };
+
   const findLeagues = async () => {
     const trimmed = addQuery.trim();
     if (!trimmed) {
@@ -335,6 +371,12 @@ export default function HomeScreen({ navigation, route }: Props) {
       const result = await api.lookupSleeperLeagues(trimmed, pendingRef || undefined);
       if (pendingRef && result.ok) void clearPendingReferralCode();
       setAddOptions(result.leagues);
+      setAddSelected(defaultLeagueSelection(result.leagues));
+      if (result.ok && result.leagues.length === 1) {
+        // One league: no list to pick from, connect it straight away.
+        await saveLeague({ leagueId: result.leagues[0].league_id, leagueName: result.leagues[0].name, username: trimmed });
+        return;
+      }
       if (!result.ok || result.leagues.length === 0) {
         setAddConnectError(
           describeSleeperConnectError({
@@ -676,22 +718,16 @@ export default function HomeScreen({ navigation, route }: Props) {
             ) : (
             <>
             <ModalFormTitle>Add a league</ModalFormTitle>
-            <View style={styles.platformTabs}>
-              <PlatformPicker
-                active={addPlatform}
-                onChange={(platform) => {
-                  setAddPlatform(platform);
-                  setAddMessage(null);
-                  setAddCapMessage(null);
-                }}
-              />
-            </View>
             {addPlatform !== 'sleeper' ? (
               addCapMessage ? (
                 <View style={styles.capLockInModal}>
                   <PremiumLock title="League limit reached" description={addCapMessage} />
                 </View>
               ) : (
+                <>
+                <PressableScale accessibilityRole="button" onPress={() => setAddPlatform('sleeper')} hitSlop={8} style={styles.noLeagueToggle}>
+                  <AppText style={styles.noLeagueToggleText}>← Use my Sleeper username</AppText>
+                </PressableScale>
                 <EspnLeagueImport
                   key={addPlatform}
                   platform={addPlatform}
@@ -704,13 +740,11 @@ export default function HomeScreen({ navigation, route }: Props) {
                     navigation.navigate('Dashboard', { leagueId, leagueName });
                   }}
                 />
+                </>
               )
             ) : (
             <>
-            <ModalFormHint>
-              Enter your Sleeper username to pick from your leagues — or paste a league ID directly. We never ask for
-              your Sleeper password and never change your lineup.
-            </ModalFormHint>
+            <ModalFormHint>{CONNECT_TRUST_LINE}</ModalFormHint>
             <Input
               value={addQuery}
               onChangeText={setAddQuery}
@@ -781,7 +815,7 @@ export default function HomeScreen({ navigation, route }: Props) {
 
             {addOptions && addOptions.length > 0 ? (
               <View style={styles.addOptions}>
-                <SectionHeading title="Tap a league to save it" />
+                <SectionHeading title={`Found ${addOptions.length} leagues`} />
                 {/* Bug report, 2026-10-21: "it keeps auto defaulting to
                     2025" / "we need to be able to separate by year" -- a
                     continuing dynasty league gets a new league_id every
@@ -799,28 +833,26 @@ export default function HomeScreen({ navigation, route }: Props) {
                     <SectionHeading title={`${section.title} season`} topGap={spacing.sm} />
                   )}
                   renderItem={({ item }) => (
-                    <PressableScale accessibilityRole="button"
-                      style={styles.addOptionRow}
+                    <PressableScale
+                      accessibilityRole="checkbox"
+                      accessibilityState={{ checked: addSelected.includes(item.league_id) }}
+                      accessibilityLabel={`${item.name || item.league_id}, ${leagueMeta(item)}`}
+                      style={[styles.addOptionRow, addSelected.includes(item.league_id) && styles.addOptionRowOn]}
                       disabled={addBusy}
-                      onPress={() =>
-                        void saveLeague({
-                          leagueId: item.league_id,
-                          leagueName: item.name,
-                          username: addQuery.trim(),
-                        })
-                      }
+                      onPress={() => setAddSelected((current) => toggleLeague(current, item.league_id))}
                     >
+                      <TeamAvatar avatarId={item.avatar_url} name={item.name} size={36} />
                       <View style={styles.addOptionText}>
                         <AppText style={styles.addOptionName} numberOfLines={1}>
                           {item.name || item.league_id}
                         </AppText>
-                        <AppText style={styles.addOptionMeta}>
-                          {[item.season, item.total_rosters ? `${item.total_rosters} teams` : '']
-                            .filter(Boolean)
-                            .join(' · ')}
-                        </AppText>
+                        <AppText style={styles.addOptionMeta}>{leagueMeta(item)}</AppText>
                       </View>
-                      <Ionicons name="chevron-forward" size={16} color={colors.textTertiary} />
+                      <Ionicons
+                        name={addSelected.includes(item.league_id) ? 'checkbox' : 'square-outline'}
+                        size={22}
+                        color={addSelected.includes(item.league_id) ? colors.accent : colors.textTertiary}
+                      />
                     </PressableScale>
                   )}
                 />
@@ -830,10 +862,46 @@ export default function HomeScreen({ navigation, route }: Props) {
             <ModalFormActions
               onCancel={closeAddLeague}
               cancelDisabled={addBusy}
-              confirmLabel="Find leagues"
-              onConfirm={() => void findLeagues()}
+              confirmLabel={addOptions && addOptions.length > 1 ? connectCtaLabel(addSelected.length) : 'Connect'}
+              confirmDisabled={addOptions != null && addOptions.length > 1 && addSelected.length === 0}
+              onConfirm={() => void (addOptions && addOptions.length > 1 ? connectSelected() : findLeagues())}
               confirmLoading={addBusy}
             />
+
+            {/* Secondary paths, compact: every other platform and the sample league stay one tap away. */}
+            <PressableScale
+              accessibilityRole="button"
+              accessibilityState={{ expanded: addMoreOpen }}
+              onPress={() => setAddMoreOpen((open) => !open)}
+              style={styles.noLeagueToggle}
+              testID="more-ways-toggle"
+            >
+              <AppText style={styles.noLeagueToggleText}>{CONNECT_MORE_LABEL}</AppText>
+              <Ionicons name={addMoreOpen ? 'chevron-up' : 'chevron-down'} size={14} color={colors.textSecondary} />
+            </PressableScale>
+            {addMoreOpen ? (
+              <View style={styles.moreWays}>
+                {connectWays({ hasAccount: true }).map((way) => (
+                  <PressableScale
+                    key={way.key}
+                    accessibilityRole="button"
+                    style={styles.moreWayRow}
+                    onPress={() => {
+                      if (way.key === 'sample') {
+                        openSampleLeague();
+                        return;
+                      }
+                      setAddPlatform(way.key as 'espn' | 'fleaflicker' | 'mfl');
+                      setAddMessage(null);
+                      setAddCapMessage(null);
+                    }}
+                  >
+                    <AppText style={styles.addOptionName}>{way.label}</AppText>
+                    <AppText style={styles.addOptionMeta}>{way.blurb}</AppText>
+                  </PressableScale>
+                ))}
+              </View>
+            ) : null}
             </>
             )}
             </>
@@ -982,7 +1050,10 @@ function createStyles(colors: ThemeColors) {
     borderBottomWidth: StyleSheet.hairlineWidth,
     borderBottomColor: colors.border,
   },
-  addOptionText: { flex: 1, marginRight: spacing.sm },
+  addOptionText: { flex: 1, marginHorizontal: spacing.sm },
+  addOptionRowOn: { borderColor: colors.accent },
+  moreWays: { gap: spacing.sm, marginTop: spacing.xs },
+  moreWayRow: { minHeight: 44, paddingVertical: spacing.sm, paddingHorizontal: spacing.md, borderRadius: radii.md, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.surface },
   addOptionName: { fontSize: 16.5, fontWeight: '600', color: colors.textPrimary },
   addOptionMeta: { fontSize: 13.5, color: colors.textSecondary, marginTop: 2 },
   listContent: {

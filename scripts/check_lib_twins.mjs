@@ -30,6 +30,7 @@ import { fileURLToPath } from "node:url";
 export const IDENTICAL = [
   "compactModule.ts",
   "statusHeader.ts",
+  "connectFlow.ts",
   "recapCard.ts",
   "simTeamIdentity.ts",
   "playerBadges.ts",

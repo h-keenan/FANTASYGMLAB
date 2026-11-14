@@ -13,6 +13,7 @@ vi.mock("@/context/AuthContext", () => ({
 vi.mock("@/lib/analytics", () => ({
   trackFeatureUse: vi.fn(),
   trackUse: vi.fn(),
+  trackClientError: vi.fn(),
 }));
 
 vi.mock("@/lib/api", async () => {
@@ -52,6 +53,9 @@ describe("SleeperImportForm", () => {
   it("always shows an explanation of what Sleeper is, with a link to sleeper.com", () => {
     render(<SleeperImportForm onLeagueChosen={vi.fn()} />);
 
+    // One trust line up front; the longer explanation is one tap away.
+    expect(screen.getByText(/never ask for your sleeper password/i)).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: /what is sleeper/i }));
     expect(screen.getByText(/connects to your existing/i)).toBeInTheDocument();
     expect(screen.getAllByRole("link", { name: /create a free one at sleeper\.com/i })[0]).toHaveAttribute(
       "href",
@@ -70,7 +74,7 @@ describe("SleeperImportForm", () => {
     render(<SleeperImportForm onLeagueChosen={vi.fn()} />);
 
     fireEvent.change(screen.getByPlaceholderText("e.g. gridiron_gm"), { target: { value: "nobody" } });
-    fireEvent.click(screen.getByRole("button", { name: /load my leagues/i }));
+    fireEvent.click(screen.getByRole("button", { name: /^connect$/i }));
 
     await waitFor(() => expect(screen.getByRole("alert")).toBeInTheDocument());
     expect(screen.getByRole("alert")).toHaveTextContent(/couldn't find a sleeper user named "nobody"/i);
@@ -91,7 +95,7 @@ describe("SleeperImportForm", () => {
     });
     render(<SleeperImportForm onLeagueChosen={vi.fn()} />);
     fireEvent.change(screen.getByPlaceholderText("e.g. gridiron_gm"), { target: { value: "empty" } });
-    fireEvent.click(screen.getByRole("button", { name: /load my leagues/i }));
+    fireEvent.click(screen.getByRole("button", { name: /^connect$/i }));
     await waitFor(() => expect(screen.getByRole("alert")).toBeInTheDocument());
     expect(screen.getByRole("alert")).toHaveTextContent(/no leagues found on sleeper for "empty"/i);
     expect(screen.getByRole("alert")).toHaveTextContent(/this season and last season/i);
@@ -103,7 +107,7 @@ describe("SleeperImportForm", () => {
     vi.mocked(api.lookupSleeperLeagues).mockRejectedValue(new ApiError(0, "Could not reach the server."));
     render(<SleeperImportForm onLeagueChosen={vi.fn()} />);
     fireEvent.change(screen.getByPlaceholderText("e.g. gridiron_gm"), { target: { value: "someone" } });
-    fireEvent.click(screen.getByRole("button", { name: /load my leagues/i }));
+    fireEvent.click(screen.getByRole("button", { name: /^connect$/i }));
     await waitFor(() => expect(screen.getByRole("alert")).toBeInTheDocument());
     expect(screen.getByRole("alert")).toHaveTextContent(/couldn't reach sleeper or fantasydesk/i);
     expect(screen.getByRole("button", { name: /try again/i })).toBeInTheDocument();
@@ -114,7 +118,7 @@ describe("SleeperImportForm", () => {
     vi.mocked(api.lookupSleeperLeagues).mockResolvedValue({ ok: false, status: "user_not_found", username: "x", leagues: [], message: "" });
     render(<SleeperImportForm onLeagueChosen={vi.fn()} />);
     fireEvent.change(screen.getByPlaceholderText("e.g. gridiron_gm"), { target: { value: "x" } });
-    fireEvent.click(screen.getByRole("button", { name: /load my leagues/i }));
+    fireEvent.click(screen.getByRole("button", { name: /^connect$/i }));
     const link = await screen.findByRole("link", { name: /try a sample league/i });
     fireEvent.click(link);
     expect(trackFeatureUse).toHaveBeenCalledWith("sample_league_cta_clicked", {
@@ -127,7 +131,7 @@ describe("SleeperImportForm", () => {
     vi.mocked(api.lookupSleeperLeagues).mockResolvedValue({ ok: false, status: "user_not_found", username: "x", leagues: [], message: "" });
     render(<SleeperImportForm sampleCtaBelow onLeagueChosen={vi.fn()} />);
     fireEvent.change(screen.getByPlaceholderText("e.g. gridiron_gm"), { target: { value: "x" } });
-    fireEvent.click(screen.getByRole("button", { name: /load my leagues/i }));
+    fireEvent.click(screen.getByRole("button", { name: /^connect$/i }));
     await screen.findByRole("alert");
     expect(screen.queryByRole("link", { name: /try a sample league/i })).toBeNull();
   });
@@ -143,7 +147,7 @@ describe("SleeperImportForm", () => {
     render(<SleeperImportForm onLeagueChosen={vi.fn()} />);
 
     fireEvent.change(screen.getByPlaceholderText("e.g. gridiron_gm"), { target: { value: "someone" } });
-    fireEvent.click(screen.getByRole("button", { name: /load my leagues/i }));
+    fireEvent.click(screen.getByRole("button", { name: /^connect$/i }));
 
     await waitFor(() => expect(screen.getByRole("alert")).toBeInTheDocument());
     expect(screen.getByRole("alert")).not.toHaveTextContent(/don't have a sleeper account/i);
@@ -158,7 +162,7 @@ describe("SleeperImportForm", () => {
     render(<SleeperImportForm onLeagueChosen={vi.fn()} />);
 
     fireEvent.change(screen.getByPlaceholderText("e.g. gridiron_gm"), { target: { value: "someone" } });
-    fireEvent.click(screen.getByRole("button", { name: /load my leagues/i }));
+    fireEvent.click(screen.getByRole("button", { name: /^connect$/i }));
 
     expect(trackFeatureUse).toHaveBeenCalledWith("league_import_started");
   });
@@ -174,7 +178,7 @@ describe("SleeperImportForm", () => {
     render(<SleeperImportForm onLeagueChosen={vi.fn()} />);
 
     fireEvent.change(screen.getByPlaceholderText("e.g. gridiron_gm"), { target: { value: "someone" } });
-    fireEvent.click(screen.getByRole("button", { name: /load my leagues/i }));
+    fireEvent.click(screen.getByRole("button", { name: /^connect$/i }));
 
     await waitFor(() => expect(screen.getByRole("alert")).toBeInTheDocument());
     expect(trackFeatureUse).toHaveBeenCalledWith("sleeper_connected");
@@ -192,7 +196,7 @@ describe("SleeperImportForm", () => {
     render(<SleeperImportForm onLeagueChosen={vi.fn()} />);
 
     fireEvent.change(screen.getByPlaceholderText("e.g. gridiron_gm"), { target: { value: "nobody" } });
-    fireEvent.click(screen.getByRole("button", { name: /load my leagues/i }));
+    fireEvent.click(screen.getByRole("button", { name: /^connect$/i }));
 
     await waitFor(() => expect(screen.getByRole("alert")).toBeInTheDocument());
     expect(trackFeatureUse).not.toHaveBeenCalledWith("sleeper_connected");
@@ -216,7 +220,7 @@ describe("SleeperImportForm", () => {
     render(<SleeperImportForm onLeagueChosen={onLeagueChosen} />);
 
     fireEvent.change(screen.getByPlaceholderText("e.g. gridiron_gm"), { target: { value: "someone" } });
-    fireEvent.click(screen.getByRole("button", { name: /load my leagues/i }));
+    fireEvent.click(screen.getByRole("button", { name: /^connect$/i }));
 
     await waitFor(() => expect(onLeagueChosen).toHaveBeenCalledWith("league-solo", "Solo League"));
     expect(trackFeatureUse).toHaveBeenCalledWith("league_import_completed", { leagueId: "league-solo" });
@@ -239,13 +243,18 @@ describe("SleeperImportForm", () => {
     render(<SleeperImportForm onLeagueChosen={onLeagueChosen} />);
 
     fireEvent.change(screen.getByPlaceholderText("e.g. gridiron_gm"), { target: { value: "someone" } });
-    fireEvent.click(screen.getByRole("button", { name: /load my leagues/i }));
+    fireEvent.click(screen.getByRole("button", { name: /^connect$/i }));
 
     await waitFor(() => expect(screen.getByText("League B")).toBeInTheDocument());
-    fireEvent.click(screen.getByText("League B"));
+    // The newest season's first league is preselected; tapping a row toggles its checkbox. Deselect A, pick B.
+    expect(screen.getByRole("checkbox", { name: /League A/ })).toHaveAttribute("aria-checked", "true");
+    fireEvent.click(screen.getByRole("checkbox", { name: /League A/ }));
+    fireEvent.click(screen.getByRole("checkbox", { name: /League B/ }));
+    fireEvent.click(screen.getByRole("button", { name: "Connect 1 league" }));
 
     await waitFor(() => expect(onLeagueChosen).toHaveBeenCalledWith("league-b", "League B"));
     expect(trackFeatureUse).toHaveBeenCalledWith("league_import_completed", { leagueId: "league-b" });
+    expect(api.saveLeague).toHaveBeenCalledTimes(1);
   });
 
   // Bug report, 2026-10-21: a continuing dynasty league gets a new
@@ -267,7 +276,7 @@ describe("SleeperImportForm", () => {
     render(<SleeperImportForm onLeagueChosen={vi.fn()} />);
 
     fireEvent.change(screen.getByPlaceholderText("e.g. gridiron_gm"), { target: { value: "someone" } });
-    fireEvent.click(screen.getByRole("button", { name: /load my leagues/i }));
+    fireEvent.click(screen.getByRole("button", { name: /^connect$/i }));
 
     await waitFor(() => expect(screen.getAllByText("Dynasty Warriors")).toHaveLength(2));
     const seasonHeaders = [screen.getByText("2026 season"), screen.getByText("2025 season")];
@@ -290,7 +299,7 @@ describe("SleeperImportForm", () => {
     render(<SleeperImportForm onLeagueChosen={vi.fn()} />);
 
     fireEvent.change(screen.getByPlaceholderText("e.g. gridiron_gm"), { target: { value: "someone" } });
-    fireEvent.click(screen.getByRole("button", { name: /load my leagues/i }));
+    fireEvent.click(screen.getByRole("button", { name: /^connect$/i }));
 
     await waitFor(() =>
       expect(trackFeatureUse).toHaveBeenCalledWith("league_import_failed", {
@@ -314,7 +323,7 @@ describe("SleeperImportForm", () => {
     render(<SleeperImportForm onLeagueChosen={onLeagueChosen} />);
 
     fireEvent.change(screen.getByPlaceholderText("e.g. gridiron_gm"), { target: { value: "someone" } });
-    fireEvent.click(screen.getByRole("button", { name: /load my leagues/i }));
+    fireEvent.click(screen.getByRole("button", { name: /^connect$/i }));
 
     await waitFor(() => expect(screen.getByText("Free includes 1 league. Upgrade to add more.")).toBeInTheDocument());
     expect(screen.getByRole("link", { name: /upgrade/i })).toHaveAttribute("href", "/premium");
@@ -339,9 +348,9 @@ describe("SleeperImportForm", () => {
     render(<SleeperImportForm onLeagueChosen={onLeagueChosen} />);
 
     fireEvent.change(screen.getByPlaceholderText("e.g. gridiron_gm"), { target: { value: "someone" } });
-    fireEvent.click(screen.getByRole("button", { name: /load my leagues/i }));
+    fireEvent.click(screen.getByRole("button", { name: /^connect$/i }));
     await waitFor(() => expect(screen.getByText("League B")).toBeInTheDocument());
-    fireEvent.click(screen.getByText("League B"));
+    fireEvent.click(screen.getByRole("button", { name: "Connect 1 league" }));
 
     await waitFor(() => expect(screen.getByText("Free includes 1 league. Upgrade to add more.")).toBeInTheDocument());
     expect(onLeagueChosen).not.toHaveBeenCalled();
@@ -361,9 +370,58 @@ describe("SleeperImportForm", () => {
     render(<SleeperImportForm onLeagueChosen={onLeagueChosen} />);
 
     fireEvent.change(screen.getByPlaceholderText("e.g. gridiron_gm"), { target: { value: "someone" } });
-    fireEvent.click(screen.getByRole("button", { name: /load my leagues/i }));
+    fireEvent.click(screen.getByRole("button", { name: /^connect$/i }));
 
     await waitFor(() => expect(screen.getByRole("alert")).toHaveTextContent(/didn't load just now/i));
     expect(onLeagueChosen).not.toHaveBeenCalled();
+  });
+
+  it("connects several checked leagues, opens the first that saved, and still opens it when the cap stops the rest", async () => {
+    vi.mocked(api.lookupSleeperLeagues).mockResolvedValue({
+      ok: true,
+      status: "ok",
+      username: "someone",
+      leagues: [
+        { league_id: "league-a", name: "League A", season: "2026", total_rosters: 12 },
+        { league_id: "league-b", name: "League B", season: "2026", total_rosters: 10 },
+      ],
+      message: "",
+    });
+    vi.mocked(api.linkSleeperUsername).mockResolvedValue({ ok: true } as never);
+    vi.mocked(api.saveLeague).mockResolvedValueOnce({ ok: true, reason: "", cap: 1 }).mockResolvedValueOnce({ ok: false, reason: "at_cap", cap: 1 });
+    const onLeagueChosen = vi.fn();
+    render(<SleeperImportForm onLeagueChosen={onLeagueChosen} />);
+    fireEvent.change(screen.getByPlaceholderText("e.g. gridiron_gm"), { target: { value: "someone" } });
+    fireEvent.click(screen.getByRole("button", { name: /^connect$/i }));
+    await waitFor(() => expect(screen.getByRole("checkbox", { name: /League B/ })).toBeInTheDocument());
+    fireEvent.click(screen.getByRole("checkbox", { name: /League B/ }));
+    fireEvent.click(screen.getByRole("button", { name: "Connect 2 leagues" }));
+    // The cap note shows with a Continue to the league that did save.
+    await waitFor(() => expect(screen.getByText("Free includes 1 league. Upgrade to add more.")).toBeInTheDocument());
+    fireEvent.click(screen.getByRole("button", { name: /continue to league a/i }));
+    expect(onLeagueChosen).toHaveBeenCalledWith("league-a", "League A");
+  });
+
+  it("keeps ESPN, Fleaflicker, MFL, the account and the sample league behind More ways to connect", async () => {
+    render(<SleeperImportForm onLeagueChosen={vi.fn()} accountSlot={<p>account form</p>} />);
+    expect(screen.queryByRole("link", { name: /try a sample league/i })).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: /more ways to connect/i }));
+    expect(screen.getByRole("button", { name: /^ESPN/ })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /^Fleaflicker/ })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /^MFL/ })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: /try a sample league/i })).toHaveAttribute("href", "/sample-league");
+    fireEvent.click(screen.getByRole("button", { name: /sign in or create an account/i }));
+    expect(screen.getByText("account form")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: /^ESPN/ }));
+    expect(screen.getByRole("button", { name: /use my sleeper username/i })).toBeInTheDocument();
+  });
+
+  it("shows a skeleton, not a Loading line, while the leagues are being looked up", async () => {
+    vi.mocked(api.lookupSleeperLeagues).mockReturnValue(new Promise(() => {}));
+    render(<SleeperImportForm onLeagueChosen={vi.fn()} />);
+    fireEvent.change(screen.getByPlaceholderText("e.g. gridiron_gm"), { target: { value: "someone" } });
+    fireEvent.click(screen.getByRole("button", { name: /^connect$/i }));
+    expect(await screen.findByTestId("connect-skeleton")).toBeInTheDocument();
+    expect(document.body.textContent).not.toMatch(/loading/i);
   });
 });

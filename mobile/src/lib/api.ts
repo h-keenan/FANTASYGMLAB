@@ -222,6 +222,8 @@ export interface SleeperLeagueOption {
   name: string;
   season: string;
   total_rosters: number;
+  /** Sleeper's league avatar thumbnail; empty when the league has none. */
+  avatar_url?: string;
 }
 
 export interface SleeperLeagueLookupResponse {
@@ -1098,6 +1100,7 @@ export interface MatchupResponse {
   game_state?: MatchupGameState | null;
   position_edges?: { actual: MatchupPositionEdge[] | null; suggested: MatchupPositionEdge[] } | null;
   suggested_moves?: MatchupSuggestedMove[] | null;
+  open_slots?: string[];
   /** Sleeper settings.best_ball — suggested-lineup sections are hidden. */
   best_ball?: boolean;
   lineup_advice_message?: string;
