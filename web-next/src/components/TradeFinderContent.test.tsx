@@ -125,6 +125,14 @@ function myTeam(overrides: Partial<MyTeamResponse>): MyTeamResponse {
   };
 }
 
+/** Idea cards are CompactModules: collapsed they show the partner + a summary; open them to reach the package. */
+function openIdeaCards() {
+  for (const card of screen.getAllByTestId("trade-idea-card")) {
+    const header = card.querySelector("button[aria-expanded=false]");
+    if (header) fireEvent.click(header);
+  }
+}
+
 describe("TradeFinderContent", () => {
   beforeEach(() => {
     // No Team Situation declared, by default — the same "retool" behavior
@@ -165,7 +173,8 @@ describe("TradeFinderContent", () => {
 
     expect(api.getTradeFinderIdeas).toHaveBeenCalledWith("123", ["p1"], "retool", "Dynasty", { pickIds: [], returnPicks: false, returnPlayers: false });
     expect(screen.getByText("Rival GM")).toBeInTheDocument();
-    expect(screen.getByText("Favorable")).toBeInTheDocument();
+    openIdeaCards();
+    expect(screen.getAllByText("Favorable").length).toBe(2);
     expect(screen.getByText("Opp Wide Receiver")).toBeInTheDocument();
   });
 
