@@ -94,7 +94,7 @@ export interface SimGamePlayer {
   /** Age to a tenth when the server sends it; rows fall back to `age`. */
   age_decimal?: number | null;
   adp: number | null;
-  /** Trade value on the sim's 0-100 scale (the best player is 100), not the main app's raw market value. Label it "Trade value", never "Value"/"VAL". */
+  /** Trade value on the sim's 0-100 scale (the best player is 100), not the main app's raw market value. The model's internal rating: NEVER shown in the UI (no label, no sort); use `overall` for anything the player sees. */
   value: number;
   /**
    * Overall (1-99): where his value ranks among players at his position, the SAME definition and gauge as the main
@@ -849,12 +849,17 @@ export interface SimCounterDelta {
   roster_limit: number;
 }
 
-/** "Trade value for you: -4.2 (now +1.0 net, was +5.2). Rosters after: you 17/18, them 18/18." */
+/** The counter in plain words, never the model's number: "A better deal for you than your offer. Rosters after: you 17/18, them 18/18." */
+/** How a change in a deal reads for you, in words (the sim never shows its internal number). */
+export function simDealWords(change: number): string {
+  if (Math.abs(change) < 0.5) return "About the same for you as your offer";
+  return change > 0 ? "A better deal for you than your offer" : "A worse deal for you than your offer";
+}
+
 export function simCounterDeltaLine(delta: SimCounterDelta | null | undefined): string | null {
   if (!delta) return null;
-  const sign = (n: number) => `${n > 0 ? "+" : ""}${n.toFixed(1)}`;
   const change = delta.user_net_change;
-  const head = `Trade value for you: ${change === 0 ? "no change" : sign(change)} (net ${sign(delta.user_net_before)} before, ${sign(delta.user_net_after)} now)`;
+  const head = simDealWords(change);
   return `${head}. Rosters after: you ${delta.your_roster_after}/${delta.roster_limit}, them ${delta.their_roster_after}/${delta.roster_limit}.`;
 }
 
@@ -1447,11 +1452,11 @@ function dedupe(ids: string[]): string[] {
   return ids.filter((id, index) => ids.indexOf(id) === index);
 }
 
-export type SimPlayerSort = "projection" | "value" | "adp" | "age" | "name" | "last_week" | "season";
+export type SimPlayerSort = "projection" | "overall" | "adp" | "age" | "name" | "last_week" | "season";
 
 export const SIM_SORT_OPTIONS: { value: SimPlayerSort; label: string }[] = [
   { value: "projection", label: "Projection" },
-  { value: "value", label: "Value" },
+  { value: "overall", label: "OVR" },
   { value: "adp", label: "ADP" },
   { value: "season", label: "Season pts" },
   { value: "last_week", label: "Last week" },

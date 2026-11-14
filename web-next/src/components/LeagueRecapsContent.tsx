@@ -1,5 +1,6 @@
 "use client";
 
+import { PageTabBar } from "@/components/PageTabBar";
 import type { TabIconName } from "@/lib/tabIcons";
 import { EmptyState } from "@/components/EmptyState";
 import { SectionHeading } from "@/components/SectionHeading";
@@ -1096,6 +1097,7 @@ export function LeagueRecapsContent({
 
   return (
     <main className="page-shell">
+      {leagueId ? <PageTabBar family="league" active="recaps" leagueId={leagueId} leagueName={leagueName} /> : null}
       <header className="flex flex-col gap-1">
         <PageTitle page="League Recaps" leagueName={leagueName} />
       </header>

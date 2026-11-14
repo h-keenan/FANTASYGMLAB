@@ -21,6 +21,7 @@ Ground rules for every pattern here:
 | `StoryCarousel` | `ui/StoryCarousel.tsx` | `StoryCarousel.tsx` | `storyCarousel.ts` | built; first user: Fantasy Sim weekly recap |
 | `InsightLink` | `ui/InsightLink.tsx` (+ `StatStrip` `insight`/`league`) | `MetricCard` `onPress` via `lib/insightNav.ts` | `insightLinks.ts` | built; every stat about your league/team must resolve here, see `docs/audits/2026-11-navigation-audit.md` |
 | `UndoToast` | `ui/UndoToast.tsx` | `UndoToast.tsx` | `confirmInPlace.ts` (timing) | built; used by GM targets |
+| `CompactModule` | `ui/CompactModule.tsx` | `CompactModule.tsx` | `compactModule.ts` (+ `simSummaries.ts`, `simDraft.ts`) | built (Phase 1 of `docs/audits/2026-11-information-architecture.md`); Sim home folds and the Sim draft room use it; `Collapsible` is superseded (SimFold renders CompactModule) |
 
 ## Sheet
 
@@ -492,3 +493,101 @@ Tests: `lib/overlayStack.test.ts`, `lib/overlayHistory.test.ts`, `components/Ove
 selection survives, X), `components/OverlayRuntime.test.tsx` (the one scroll lock). Real-browser check:
 `scripts/sim_layout_playwright/overlay_back.mjs` (browser Back closes a pop-up without leaving the page; a card opened
 from the trade picker replaces it and Back returns with the selection intact; the X closes everything).
+
+## CompactModule (the one compact / expandable module)
+
+One card for every dense block, so a page is a short stack of these instead of a wall of cards. It is **never an empty
+header when collapsed**: line 1 is a small title, line 2 (at most two lines) is a dense summary of the key numbers and
+status, and an optional single trailing `action` (a button such as "Draft Gibbs") works without expanding.
+
+```tsx
+<CompactModule
+  id="draft.clock" title="Draft clock" tone="action" persist={false}
+  parts={simDraftSummaryParts(draft, teams, needs)}   // "R1 P2 · You pick now · need RB/WR · 1/192"
+  action={<Button size="sm">Draft Gibbs</Button>}
+>
+  {/* expanded body: needs, best available, auto-pick */}
+</CompactModule>
+```
+
+- `parts` is `CompactPart[]` (`{ key, text, tone?, strong? }`), composed by pure helpers in the lib twin
+  (`compactModule.ts` for the primitives; `simSummaries.ts` for the Sim home modules; `simDraft.ts` for the draft).
+  Empty parts are dropped and the line is capped at six, so a summary stays a summary. Every module that can be
+  collapsed MUST pass `parts` (or the test for its page fails the "not an empty header" rule); `summary` (a node) is the
+  legacy right-aligned fallback only.
+- `expandIn="inline"` (default) opens the body under the header; `expandIn="sheet"` opens it in the shared `Sheet` for long
+  bodies. The open state is remembered per `id` (`persist={false}` for live state such as the draft clock).
+- Header is one 44px-minimum button with `aria-expanded` and a name of "title: summary. Expand/Collapse"; the action is a
+  sibling button so it never nests inside it. 44px targets, tokens only, no new colour.
+- Mobile twin: same props (`testID` instead of `testId`); tone colours come from the theme.
+
+Not-yet-migrated pages keep working; migrate one page per PR (the plan's later phases). `SimFold` already renders it.
+
+## Player row anatomy (shared by FantasyDesk and the Fantasy Sim)
+
+`PlayerListRow` is THE row: line 1 name (+ the one status chip), line 2 muted meta (TEAM, age, bye), line 3 the **chips
+under the name**: labeled stat chips (PROJ / OVR / ADP / EDGE) then page tags (max 2 plus "+N"), then optional
+`chipsExtra` (small inline controls such as a Queue toggle). The chip line is indented to the name, **wraps instead of
+clipping**, and nothing sits at the far right except **one trailing action** (`actions`). The Sim reuses it through
+`SimDraftRow`, `SimPlayerLine` and `SimRosterLine`; do not build another row.
+
+## Fantasy Sim: no internal rating, ever
+
+The model's trade value is the sim's own rating, so it is never shown: no "Value"/"Trade value" label, chip or tile, and
+never a sort. The player-facing number is OVR. Lists sort by ADP, Proj or OVR (`GET /players?sort=overall`; `value` is kept
+server-side only so old clients and saves do not break; outcomes and replays are unchanged). Trades describe a deal in plain
+words (`simDealWords`: "A better deal for you than your offer"), never as numbers.
+
+## Notice toast (auto-dismiss)
+
+`SimNotice` is the shared notice. A confirmation the player caused ("Trade completed") removes itself after ~4s, a warning
+after ~7s, an error never (`noticeDismissMs` in `lib/compactModule.ts`, same on web and app). A new message restarts the timer.
+
+## One tab row, one filter row
+
+A page has ONE tab row. `PillRow variant="scroll"` shares a short row's width equally (no empty bordered box after the
+last tab) and scrolls only when its labels overflow; the app's `SegmentedTabBar scrollable` does the same. Filters and sort
+share one compact row (`draft-filters`: position pills plus a sort control), never one strip each.
+
+## Page tab families and glass chrome (2026-11)
+
+Related pages are tabs of one page family (`lib/pageFamilies.ts`: Trades, Team, League), rendered by `PageTabBar` over
+`PillRow glass` (sticky, scroll-snap, cyan glass active pill). Each tab keeps its route. The phone footer
+(`BottomTabBar`) uses the same glass tokens. Plan: `docs/audits/2026-11-menu-consolidation.md`.
+
+## Sheet tabs (quick views that would otherwise scroll long)
+
+Rule: a pop-up that scrolls past about one and a half screens groups its content under the shared `Tabs`
+(`components/Tabs.tsx`, app `components/Tabs.tsx`), never one long page. The pop-up shell is unchanged (it still goes
+through `useOverlay` / `PopupShell` / `Sheet`, so the one-pop-up-at-a-time, Back and X rules in "Overlays" hold).
+
+- **Plans live in a lib twin**: `lib/sheetTabs.ts` (byte-identical web + app, listed in `IDENTICAL` in
+  `scripts/check_lib_twins.mjs`) decides which tabs a real-league sheet has, so both platforms group the same content
+  under the same names. A tab with nothing to show is dropped; the first tab always exists and carries loading /
+  upsell / empty states. Tests: `lib/sheetTabs.test.ts` (both trees), `Tabs.test.tsx`,
+  `ManagerProfileSheetTrades.test.tsx`, `PercentileExplorerSheet.test.tsx`.
+- **Sticky strip**: web `Tabs` wraps the strip in `.tabs-sticky` (position sticky, top 0, frosted glass, so content slides
+  under it). Opt out with `sticky={false}`. App: `useTabs()` returns `{ bar, panel }`; a sheet makes the bar a direct
+  child of its `SheetScrollView` and pins it with `stickyHeaderIndices` (Player Quick View: index 2 = top bar, hero,
+  strip), or puts the bar above its ScrollView (Manager profile) so only the panel scrolls. `<Tabs>` is the unpinned
+  stack of the same two pieces.
+- **No layout jump**: the panel keeps the tallest height it has shown as its minimum (`nextPanelMinHeight`), so a short
+  tab after a long one never pulls the sheet or the strip.
+- **State**: the open tab is remembered per surface id for the session (`lib/sessionTab.ts`); anything that must survive a
+  tab switch (search text, scrubbed bucket, selection) lives in the sheet's own state, not inside a panel, because panels
+  are lazy and unmount when hidden. The slide between panels is off under reduced motion (CSS media query / OS setting).
+  Swipe-to-dismiss is untouched (a drag still starts from the handle, or the body only at scroll top); tabs are tapped,
+  not swiped, so they never fight it.
+- **Fantasy Sim isolation**: sim sheets (SimPlayerSheet, SimGameTeamSheet, sim sections of the PQV) keep their own plans;
+  `sheetTabs.ts` knows nothing about the sim and the sim tabs never render real news.
+
+| Sheet | Tabs | Web | App |
+|---|---|---|---|
+| Player Quick View (real) | Overview, Outlook, Stats, Profile | yes | yes (sticky strip) |
+| Player Quick View (sim) | Overview, Outlook, Scouting, History, plus Stats/Profile for real-backed | yes | yes |
+| Sim team sheet | Overview and more | yes | yes |
+| Manager profile | Overview, Tendencies, Trades | yes | yes (strip pinned above the scroll) |
+| Percentile explorer | chart + comparison stay on top; tabs In this bucket, Find a player, My roster | yes | yes |
+
+Left as they are (short or already segmented): trade picker (Players / Picks segmented control), Matchup swap sheet,
+share previews, filter sheets, alerts dropdown.

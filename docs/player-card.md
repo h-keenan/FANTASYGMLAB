@@ -109,3 +109,11 @@ both. Overall comes from `modules/sim/game_view.overall_ratings` (value percenti
 position, the real app's curve, pinned by `tests/test_sim_overall.py`), sent as
 `player.overall` (null for a position pool under 10 players: no fabricated rating).
 The sort option that orders by this number is called "Trade value".
+
+## Player Quick View tabs
+
+PQV (real and sim) is tabbed, not one long scroll: Overview (availability, latest news in real leagues only, decision
+fit, headline tiles), Outlook, Stats, Profile (awards + bio), plus Fantasy Sim's own Scouting / History. The strip is
+sticky under the hero (web `.tabs-sticky`; app `stickyHeaderIndices` via `useTabs`), the panel holds the tallest height
+shown so tabs do not jump, and the last tab is remembered per session. The sim never shows real news. See "Sheet tabs"
+in `docs/ui-patterns.md` for the rules and the other sheets (Manager profile, Percentile explorer) that follow them.

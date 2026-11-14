@@ -1,3 +1,4 @@
+import { PageTabBar } from "@/components/PageTabBar";
 import { BEGINNER_HELP } from "@/lib/experienceCopy";
 import { GlossaryNote } from "@/components/GlossaryNote";
 import { PlayerIdentity } from "@/components/PlayerRow";
@@ -221,6 +222,7 @@ export function MyTeamContent({
 
   return (
     <main className="page-shell">
+      {leagueId ? <PageTabBar family="team" active="roster" leagueId={leagueId} leagueName={leagueName} /> : null}
       <header className="flex flex-col gap-1">
         <PageTitle page="My Team" leagueName={leagueName} />
         <div className="flex flex-wrap gap-2">

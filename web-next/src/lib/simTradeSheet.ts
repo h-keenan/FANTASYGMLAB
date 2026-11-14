@@ -42,7 +42,8 @@ export function simGroupsToSheetItems<T extends SimAssetLike>(
         position: isPlayer ? (item.pos ?? null) : null,
         team: isPlayer ? (item.team ?? null) : null,
         age: isPlayer ? (item.age ?? null) : null,
-        value: Number.isFinite(item.value) ? Math.round(item.value) : null,
+        // The sim's internal rating is never shown (it is the model's own number), so the picker gets no value.
+        value: null,
         conditions: isPlayer ? conditionsFor({ injuryStatus: item.status === "out" ? "Out" : null, bye: item.status === "bye", age: item.age ?? null }) : [],
         photoId: isPlayer ? photo(item) : null,
         injury: isPlayer && item.status === "out" ? "Out" : null,

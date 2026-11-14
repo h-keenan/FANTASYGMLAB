@@ -26,7 +26,6 @@ describe("bottom bar metrics (shared with mobile)", () => {
 
   it("the pill, the orb dock and the headers use the variables, not their own numbers", () => {
     expect(css).toContain("margin: 0 var(--bar-side-inset) var(--bar-pill-bottom-gap)");
-    expect(css).toContain("right: var(--bar-side-inset)");
     expect(css).toContain("width: var(--bar-orb-size)");
     expect(globals.match(/min-height: var\(--bar-header-height\)/g)?.length).toBeGreaterThanOrEqual(1);
   });

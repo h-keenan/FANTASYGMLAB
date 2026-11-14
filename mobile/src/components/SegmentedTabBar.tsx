@@ -113,7 +113,7 @@ export default function SegmentedTabBar<T extends string>({
     </View>
   );
   return scrollable ? (
-    <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+    <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ flexGrow: 1 }}>
       {body}
     </ScrollView>
   ) : (
@@ -140,11 +140,12 @@ function createStyles(colors: ThemeColors) {
       minHeight: 44,
       borderRadius: radii.pill,
     },
-    trackScroll: { alignSelf: 'flex-start' },
+    trackScroll: { alignSelf: 'stretch', flexGrow: 1 },
     trackSlim: { backgroundColor: 'transparent', borderWidth: 0, borderBottomWidth: StyleSheet.hairlineWidth, borderRadius: 0, padding: 0, gap: 0 },
     sliderSlim: { top: undefined, bottom: 0, height: 2, borderRadius: 0, borderWidth: 0, backgroundColor: colors.accent },
     segmentActiveSlim: { borderBottomWidth: 2, borderBottomColor: colors.accent },
-    segmentScroll: { flex: 0, paddingHorizontal: 12 },
+    // Share a short row equally (no empty box after the last tab); keep the natural width and scroll when they overflow.
+    segmentScroll: { flexGrow: 1, flexShrink: 0, flexBasis: 'auto', paddingHorizontal: 12 },
     segmentDense: { paddingHorizontal: 0 },
     slider: {
       position: 'absolute',

@@ -10,6 +10,8 @@ import Input from './Input';
 import PlayerAvatar from './PlayerAvatar';
 import SegmentedTabBar from './SegmentedTabBar';
 import { SheetModal, SheetScrollView, SwipeDismissCard } from './SwipeDismissSheet';
+import Tabs from './Tabs';
+import { percentileTabs } from '../lib/sheetTabs';
 import { useThemeMode } from '../context/ThemeModeContext';
 import { api } from '../lib/api';
 import { trackUse } from '../lib/analytics';
@@ -415,7 +417,14 @@ export default function PercentileExplorerSheet({
                   <AppText style={styles.hint}>MY = a player on your roster</AppText>
                 ) : null}
 
-                {focusBin >= 0 && hasFullPool && bins[focusBin] ? (
+                <Tabs
+                  id="percentile"
+                  tabs={percentileTabs({ hasFullPool, mineCount: mine.length }).map((tab) => ({
+                    key: tab.key,
+                    label: tab.label,
+                    render: () =>
+                      tab.key === 'bucket' ? (
+                    focusBin >= 0 && bins[focusBin] ? (
                   <View style={styles.section}>
                     <View style={styles.sectionHead}>
                       <AppText style={styles.sectionTitle}>
@@ -441,9 +450,10 @@ export default function PercentileExplorerSheet({
                       </TouchableOpacity>
                     ) : null}
                   </View>
-                ) : null}
-
-                {hasFullPool ? (
+                    ) : (
+                      <AppText style={styles.hint}>Drag across the chart or tap a bar to list the players in that bucket.</AppText>
+                    )
+                      ) : tab.key === 'find' ? (
                   <View style={styles.section}>
                     <Input
                       value={query}
@@ -469,9 +479,7 @@ export default function PercentileExplorerSheet({
                       )
                     ) : null}
                   </View>
-                ) : null}
-
-                {mine.length > 0 ? (
+                      ) : (
                   <View style={styles.section}>
                     <View style={styles.sectionHead}>
                       <AppText style={styles.sectionTitle}>Your roster here</AppText>
@@ -479,7 +487,9 @@ export default function PercentileExplorerSheet({
                     </View>
                     <View style={styles.list}>{renderRows(mine.slice(0, LIST_CAP), pick)}</View>
                   </View>
-                ) : null}
+                      ),
+                  }))}
+                />
               </>
             ) : null}
           </SheetScrollView>

@@ -13,7 +13,7 @@ import PercentileExplorerSheet from './PercentileExplorerSheet';
 import PlayerHero from './PlayerHero';
 import PlayerLeagueActions from './PlayerLeagueActions';
 import { AvailabilityBlock, LatestNewsSection } from './PlayerQuickViewNews';
-import Tabs from './Tabs';
+import { useTabs } from './Tabs';
 import { pqvBioForContext, pqvRealWorld } from '../lib/pqvContext';
 import { rowsAsOf, simAsOfSeason } from '../lib/simAsOf';
 import PlayerTrendsPanel from './PlayerTrendsPanel';
@@ -294,11 +294,112 @@ export default function PlayerQuickViewSheet({
   const headerTags = request.tags ?? [];
   const showSignals = !!scoped.opportunityLabel || !!injury || headerTags.length > 0;
 
+  const pqvTabs = useTabs({
+    id: 'pqv',
+    tabs: [
+    {
+      key: 'overview',
+      label: 'Overview',
+      render: () => (
+        <>
+          {sim?.overview ?? null}
+          {availability ? <AvailabilityBlock availability={availability} injuryItem={newsQuery.data?.injury_item ?? null} newsLoading={newsLoading} /> : null}
+          {detail && remote && realWorld.showNews ? (
+            <LatestNewsSection
+              items={newsQuery.data ? newsQuery.data.items : null}
+              loading={newsLoading}
+              onSeeAll={openPlayerNews}
+              hideItem={availability ? newsQuery.data?.injury_item ?? null : null}
+            />
+          ) : null}
+          {bodyGate ?? (
+            <View style={styles.body}>
+              {model?.decision_fit_narrative ? <DecisionFitCard narrative={model.decision_fit_narrative} /> : null}
+              <HeadlineTiles rows={headlineRows(stats ?? null, model?.usage_profile)} onExplore={setExplorer} />
+            </View>
+          )}
+        </>
+      ),
+    },
+    ...(sim?.outlook || (remote && !isSim)
+      ? [
+          {
+            key: 'outlook',
+            label: 'Outlook',
+            render: () => (
+              <View style={styles.body}>
+                {sim?.outlook ?? null}
+                {!isSim
+                  ? (bodyGate ?? (
+                      <View style={styles.section}>
+                        <PlayerTrendsPanel playerId={player.player_id} yearsInLeague={bio?.years_in_league ?? null} />
+                      </View>
+                    ))
+                  : null}
+              </View>
+            ),
+          },
+        ]
+      : []),
+    ...(remote
+      ? [
+          {
+            key: 'stats',
+            label: 'Stats',
+            render: () =>
+              bodyGate ?? (
+                <View style={styles.body}>
+                  {sim?.stats ?? null}
+                  <UsageBlock profile={model?.usage_profile} position={stats?.position ?? player.position} onExplore={setExplorer} />
+                  <SeasonStatsRows stats={stats ?? null} usageProfile={model?.usage_profile} onExplore={setExplorer} />
+                  {stats && stats.college.length > 0 ? (
+                    <View style={styles.section}>
+                      <SectionHeading title="College" />
+                      <View style={styles.tileGrid}>
+                        {stats.college.map((item) => (
+                          <MetricCard key={item.label} label={item.label} value={item.value || null} percentile={item.percentile ?? null} />
+                        ))}
+                      </View>
+                    </View>
+                  ) : null}
+                </View>
+              ),
+          },
+          {
+            key: 'profile',
+            label: 'Profile',
+            render: () =>
+              bodyGate ?? (
+                <View style={styles.body}>
+                  {awards.length > 0 ? (
+                    <Section title="Awards">
+                      <AwardsStrip awards={awards} />
+                    </Section>
+                  ) : null}
+                  {bioRows.length > 0 ? (
+                    <Section title="Bio">
+                      <View style={styles.tileGrid}>
+                        {bioRows.map(([label, value]) => (
+                          <MetricCard key={label} label={label} value={value} />
+                        ))}
+                      </View>
+                    </Section>
+                  ) : null}
+                </View>
+              ),
+          },
+        ]
+      : []),
+    ...(sim?.scouting ? [{ key: 'scouting', label: 'Scouting', render: () => <>{sim.scouting}</> }] : []),
+    ...(sim?.history ? [{ key: 'history', label: 'History', render: () => <>{sim.history}</> }] : []),
+    ],
+  });
+
   return (
     <SheetModal visible transparent animationType="fade" onRequestClose={onClose}>
       <Pressable style={styles.backdrop} onPress={onClose} accessibilityLabel="Close player quick view">
         <SwipeDismissCard style={styles.sheet} onDismiss={onClose} testID="player-quick-view">
-          <SheetScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+          <SheetScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false} stickyHeaderIndices={[2]}>
             {/* Top bar: source label left, round close right (web .pqv-topbar). */}
             <View style={styles.topBar}>
               <AppText style={styles.kicker} numberOfLines={1}>
@@ -374,106 +475,9 @@ export default function PlayerQuickViewSheet({
               {usageCaption ? <AppText style={styles.note}>{usageCaption}</AppText> : null}
             </PlayerHero>
 
-            <Tabs
-              id="pqv"
-              tabs={[
-                {
-                  key: 'overview',
-                  label: 'Overview',
-                  render: () => (
-                    <>
-                      {sim?.overview ?? null}
-                      {availability ? <AvailabilityBlock availability={availability} injuryItem={newsQuery.data?.injury_item ?? null} newsLoading={newsLoading} /> : null}
-                      {detail && remote && realWorld.showNews ? (
-                        <LatestNewsSection
-                          items={newsQuery.data ? newsQuery.data.items : null}
-                          loading={newsLoading}
-                          onSeeAll={openPlayerNews}
-                          hideItem={availability ? newsQuery.data?.injury_item ?? null : null}
-                        />
-                      ) : null}
-                      {bodyGate ?? (
-                        <View style={styles.body}>
-                          {model?.decision_fit_narrative ? <DecisionFitCard narrative={model.decision_fit_narrative} /> : null}
-                          <HeadlineTiles rows={headlineRows(stats ?? null, model?.usage_profile)} onExplore={setExplorer} />
-                        </View>
-                      )}
-                    </>
-                  ),
-                },
-                ...(sim?.outlook || (remote && !isSim)
-                  ? [
-                      {
-                        key: 'outlook',
-                        label: 'Outlook',
-                        render: () => (
-                          <View style={styles.body}>
-                            {sim?.outlook ?? null}
-                            {!isSim
-                              ? (bodyGate ?? (
-                                  <View style={styles.section}>
-                                    <PlayerTrendsPanel playerId={player.player_id} yearsInLeague={bio?.years_in_league ?? null} />
-                                  </View>
-                                ))
-                              : null}
-                          </View>
-                        ),
-                      },
-                    ]
-                  : []),
-                ...(remote
-                  ? [
-                      {
-                        key: 'stats',
-                        label: 'Stats',
-                        render: () =>
-                          bodyGate ?? (
-                            <View style={styles.body}>
-                              {sim?.stats ?? null}
-                              <UsageBlock profile={model?.usage_profile} position={stats?.position ?? player.position} onExplore={setExplorer} />
-                              <SeasonStatsRows stats={stats ?? null} usageProfile={model?.usage_profile} onExplore={setExplorer} />
-                              {stats && stats.college.length > 0 ? (
-                                <View style={styles.section}>
-                                  <SectionHeading title="College" />
-                                  <View style={styles.tileGrid}>
-                                    {stats.college.map((item) => (
-                                      <MetricCard key={item.label} label={item.label} value={item.value || null} percentile={item.percentile ?? null} />
-                                    ))}
-                                  </View>
-                                </View>
-                              ) : null}
-                            </View>
-                          ),
-                      },
-                      {
-                        key: 'profile',
-                        label: 'Profile',
-                        render: () =>
-                          bodyGate ?? (
-                            <View style={styles.body}>
-                              {awards.length > 0 ? (
-                                <Section title="Awards">
-                                  <AwardsStrip awards={awards} />
-                                </Section>
-                              ) : null}
-                              {bioRows.length > 0 ? (
-                                <Section title="Bio">
-                                  <View style={styles.tileGrid}>
-                                    {bioRows.map(([label, value]) => (
-                                      <MetricCard key={label} label={label} value={value} />
-                                    ))}
-                                  </View>
-                                </Section>
-                              ) : null}
-                            </View>
-                          ),
-                      },
-                    ]
-                  : []),
-                ...(sim?.scouting ? [{ key: 'scouting', label: 'Scouting', render: () => <>{sim.scouting}</> }] : []),
-                ...(sim?.history ? [{ key: 'history', label: 'History', render: () => <>{sim.history}</> }] : []),
-              ]}
-            />
+            {/* Sticky tab strip: child index 2 (top bar, hero, strip), so keep those three as direct children. */}
+            <View style={styles.stickyTabs}>{pqvTabs.bar}</View>
+            {pqvTabs.panel}
 
             {/* Actions row (web .pqv-actions): league actions, then the
                 profile / waivers destinations. */}
@@ -528,6 +532,7 @@ function createStyles(colors: ThemeColors) {
       minHeight: sheetHeight.min,
       maxHeight: sheetHeight.max,
     },
+    stickyTabs: { backgroundColor: colors.surface, paddingVertical: spacing.xs },
     content: { padding: spacing.lg, paddingBottom: spacing.xxl, gap: spacing.md },
     topBar: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', minHeight: 28 },
     kicker: { flex: 1, fontSize: 12.5, fontWeight: '700', letterSpacing: 0.8, color: colors.textTertiary, textTransform: 'uppercase' },

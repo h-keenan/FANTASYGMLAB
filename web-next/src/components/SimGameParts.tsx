@@ -6,7 +6,8 @@ import { createPortal } from "react-dom";
 
 import { AccentCard } from "@/components/AccentCard";
 import { Button } from "@/components/Button";
-import { Collapsible } from "@/components/Collapsible";
+import { CompactModule } from "@/components/ui/CompactModule";
+import { noticeDismissMs, type CompactPart, type NoticeToastTone } from "@/lib/compactModule";
 import { PlayerAvatar } from "@/components/PlayerAvatar";
 import { PlayerListRow } from "@/components/PlayerListRow";
 import { PlayerIdentity } from "@/components/PlayerRow";
@@ -39,7 +40,6 @@ import {
   type SimGamePreview,
   type SimGameTone,
 } from "@/lib/simGame";
-import { TapForWhy } from "@/components/ui/TapForWhy";
 import { OverlayBack } from "@/components/OverlayBack";
 import { overlayStack } from "@/lib/overlayStack";
 import { useOverlay } from "@/lib/useOverlay";
@@ -129,20 +129,6 @@ export function SimStat({ label, value, tone = "muted" }: { label: string; value
         {value}
       </span>
     </div>
-  );
-}
-
-/**
- * A trade/market value (the 0-100 number AI teams use in trades) with its real name and a tap-for-why
- * explainer. Never labeled plain "Value" or "VAL": the player's Overall is a different number.
- */
-export function SimTradeValue({ value }: { value: number | null | undefined }) {
-  if (value == null || Number.isNaN(value)) return null;
-  const rounded = Math.round(value);
-  return (
-    <TapForWhy metric="trade_value" spoken={`Trade value ${rounded}`}>
-      <SimStat label="Trade value" value={rounded} />
-    </TapForWhy>
   );
 }
 
@@ -488,8 +474,28 @@ export function SimPreviewBanner({ preview }: { preview: SimGamePreview | null |
   );
 }
 
+/**
+ * The shared notice toast rule (lib/compactModule noticeDismissMs): a confirmation the player caused ("Trade
+ * completed") removes itself after a few seconds, a warning a little later, an error never (it needs a decision).
+ * A new message restarts the timer.
+ */
+function useNoticeAutoDismiss(message: string, tone: SimGameTone, onDismiss?: () => void) {
+  const latest = useRef(onDismiss);
+  useEffect(() => {
+    latest.current = onDismiss;
+  }, [onDismiss]);
+  useEffect(() => {
+    if (!message) return;
+    const ms = noticeDismissMs(tone as NoticeToastTone);
+    if (ms == null) return;
+    const id = setTimeout(() => latest.current?.(), ms);
+    return () => clearTimeout(id);
+  }, [message, tone]);
+}
+
 /** A transient or blocking one-line message inside a game (role=status/alert). */
 export function SimNotice({ message, tone = "warning", onDismiss }: { message: string; tone?: SimGameTone; onDismiss?: () => void }) {
+  useNoticeAutoDismiss(message, tone, onDismiss);
   if (!message) return null;
   return (
     <AccentCard accent={simToneColor(tone)} compact as="div" className="enter-rise">
@@ -602,7 +608,7 @@ export function SimTeamLink({
 }
 
 /**
- * A summary-first card: the shared Collapsible with a tinted glyph title and
+ * A summary-first card: the shared CompactModule with a tinted glyph title and
  * an always-visible summary. Open by default on desktop (two columns have the
  * room) and closed on phones unless `openOnPhone`; the player's own toggle is
  * remembered per `id`.
@@ -613,6 +619,7 @@ export function SimFold({
   tone = "accent",
   title,
   summary,
+  parts,
   openOnPhone = false,
   children,
   testId,
@@ -620,19 +627,25 @@ export function SimFold({
   id: string;
   glyph: SimGlyphName;
   tone?: SimGameTone;
-  title: ReactNode;
+  title: string;
+  /** Legacy right-aligned node. Prefer `parts`. */
   summary?: ReactNode;
+  /** The collapsed summary line (key numbers and status): a collapsed fold is never an empty header. */
+  parts?: ReadonlyArray<CompactPart | null | undefined | false | "">;
   openOnPhone?: boolean;
   children: ReactNode;
   testId?: string;
 }) {
   const wide = useSimWide();
   return (
-    <Collapsible
+    <CompactModule
       id={`${id}`}
       testId={testId}
       accent={simToneColor(tone)}
       defaultOpen={wide || openOnPhone}
+      label={title}
+      parts={parts}
+      summary={summary}
       title={
         <span className="inline-flex items-center gap-2">
           <span className="inline-flex" style={{ color: simToneColor(tone) }}>
@@ -641,10 +654,9 @@ export function SimFold({
           {title}
         </span>
       }
-      summary={summary}
     >
       {children}
-    </Collapsible>
+    </CompactModule>
   );
 }
 

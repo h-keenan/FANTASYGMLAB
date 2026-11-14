@@ -515,7 +515,15 @@ describe("SimGameContent", () => {
     });
     render(<SimGameContent />);
     await openFirstGame();
-    expect(await screen.findByText("You are on the clock.")).toBeInTheDocument();
+    // Collapsed, the clock module is a dense status line with the pick action (not an empty header), and the draft
+    // overview (recent picks + mini board) is on the page without opening a tab.
+    expect(await within(await screen.findByTestId("draft-clock-module")).findByTestId("compact-summary")).toHaveTextContent(/R1 P3 · You pick now/);
+    expect(screen.getByTestId("draft-overview")).toBeInTheDocument();
+    expect(screen.getByTestId("mini-board")).toBeInTheDocument();
+    expect(screen.getAllByRole("tab").map((t) => t.textContent)).toEqual(expect.arrayContaining(["Players", "Roster", "Picks"]));
+    expect(screen.queryByRole("tab", { name: "Board" })).toBeNull();
+    expect(screen.getByTestId("draft-filters")).toBeInTheDocument();
+    expect(screen.queryByText(/trade value/i)).toBeNull();
     const draftButton = await screen.findByRole("button", { name: "Draft Rory Runner" });
     // A double tap in the same frame still submits once, carrying the pick the client believes is on the clock.
     fireEvent.click(draftButton);
@@ -553,12 +561,14 @@ describe("SimGameContent", () => {
       mocked.listSimGames.mockResolvedValue({ ok: true, reason: "", games: [] });
       render(<SimGameContent />);
       fireEvent.click(await screen.findByRole("button", { name: "New game" }));
-      await screen.findByText("Quick start is 12 teams, half PPR and a standard lineup. You can change nothing after the game starts.");
+      await screen.findByTestId("sim-setup-hero");
     }
 
-    it("quick start: advanced options start collapsed and the defaults are 12 teams, half PPR, standard lineup", async () => {
+    it("quick start: opens on Quick start with a live summary; the defaults are 12 teams, half PPR, standard lineup", async () => {
       await openSetup();
-      expect(screen.getByTestId("sim-advanced")).not.toHaveAttribute("open");
+      expect(screen.getByRole("tab", { name: "Quick start" })).toHaveAttribute("aria-selected", "true");
+      expect(screen.queryByTestId("sim-setup-card-league")).not.toBeInTheDocument();
+      expect(screen.getByTestId("sim-setup-hero")).toHaveTextContent("12 teams, half PPR, standard lineup + K");
       expect(screen.getByTestId("sim-setup-summary")).toHaveTextContent("12 teams, 14-round snake draft. Starters: QB, RB, RB, WR, WR, TE, FLEX, K. Roster 16.");
       mocked.createSimGame.mockResolvedValue({ ok: true, reason: "premium_required", is_premium: true });
       fireEvent.click(screen.getByRole("button", { name: "Start the draft" }));
@@ -569,14 +579,17 @@ describe("SimGameContent", () => {
       });
     });
 
-    it("advanced options change the league and the derived draft length", async () => {
+    it("customize changes the league and the derived draft length, and the live summary follows", async () => {
       await openSetup();
+      fireEvent.click(screen.getByRole("tab", { name: "Customize" }));
       fireEvent.click(screen.getByRole("switch", { name: "Superflex" }));
       fireEvent.click(screen.getByRole("switch", { name: "Defense (DEF)" }));
       fireEvent.click(screen.getByRole("tab", { name: "14 teams" }));
       fireEvent.click(screen.getByRole("tab", { name: "Standard" }));
       expect(screen.getByTestId("sim-setup-summary")).toHaveTextContent("14 teams, 16-round snake draft. Starters: QB, RB, RB, WR, WR, TE, FLEX, SUPER_FLEX, K, DEF. Roster 18.");
-      expect(screen.getByText(/Advanced options \(4 changed\)/)).toBeInTheDocument();
+      expect(screen.getByRole("tab", { name: /Customize/ })).toHaveTextContent("4");
+      expect(screen.getByTestId("sim-setup-hero")).toHaveTextContent("14 teams, standard, superflex lineup + K + DEF");
+      expect(screen.getByTestId("sim-setup-summary-league")).toHaveTextContent("14 teams, Standard, Superflex lineup + K + DEF");
       mocked.createSimGame.mockResolvedValue({ ok: true, reason: "premium_required", is_premium: true });
       fireEvent.click(screen.getByRole("button", { name: "Start the draft" }));
       await waitFor(() => expect(mocked.createSimGame).toHaveBeenCalled());
@@ -586,7 +599,8 @@ describe("SimGameContent", () => {
     it("start from one of my leagues: Sleeper leagues only, hides the league-shape options, sends league_id", async () => {
       await openSetup();
       fireEvent.click(screen.getByRole("tab", { name: "My league" }));
-      // The league decides size, scoring and lineup; only the reserve squads stay in Advanced.
+      // The league decides size, scoring and lineup; only the reserve squads stay in Customize.
+      fireEvent.click(screen.getByRole("tab", { name: "Customize" }));
       expect(screen.queryByRole("tablist", { name: "League size" })).not.toBeInTheDocument();
       expect(screen.queryByRole("tablist", { name: "Scoring" })).not.toBeInTheDocument();
       const pick = await screen.findByRole("combobox", { name: "League to start from" });

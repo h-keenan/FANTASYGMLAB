@@ -7,7 +7,9 @@ import Button from './Button';
 import EmptyState from './EmptyState';
 import ErrorState from './ErrorState';
 import SegmentedTabBar from './SegmentedTabBar';
+import CompactModule from './CompactModule';
 import { SimDraftIconButton, SimDraftRow } from './SimDraftBoard';
+import { SimRookieOverview } from './SimDraftOverview';
 import { SkeletonCard } from './SkeletonBlock';
 import { SimDynastyStrip } from './SimGameDynasty';
 import { SimCollapse, SimGeneratedChip, SimGeneratedNoticeSheet, SimPickLine, SimPlayerChips, SimRookieNoticeGate, useSimPicks } from './SimGameDynastyParts';
@@ -15,6 +17,7 @@ import { SimRosterLine, SimToneBadge, createSimStyles, simToneColor, type SimCtx
 import { SimReserveButton, SimReserveGroups, SimReserveSheet } from './SimGameReserves';
 import { useThemeMode } from '../context/ThemeModeContext';
 import { api } from '../lib/api';
+import { simRookieSummaryParts } from '../lib/simDraft';
 import {
   simArchiveToYear,
   simFmtPts,
@@ -321,28 +324,36 @@ function RookieStage({
     <>
       {classChip ? <SimRookieNoticeGate gameId={ctx.gameId} /> : null}
       {notice ? <SimGeneratedNoticeSheet onClose={() => setNotice(false)} /> : null}
-      <AccentCard accent={d.your_turn ? colors.accent : colors.borderStrong} compact glow={d.your_turn}>
-        <AppText style={common.bodyStrong} accessibilityLiveRegion="polite" testID="rookie-clock">
-          {simRookieClockLine(d)}
-        </AppText>
-        <AppText style={common.muted}>
-          {d.available_count} rookie{d.available_count === 1 ? '' : 's'} left. {toMake} pick{toMake === 1 ? '' : 's'} still to make.
-        </AppText>
+      <AppText style={{ position: 'absolute', width: 1, height: 1, opacity: 0 }} accessibilityLiveRegion="polite" testID="rookie-clock">{simRookieClockLine(d)}</AppText>
+      <CompactModule
+        id="rookie.clock"
+        title="Rookie draft"
+        testID="rookie-clock-module"
+        tone={d.your_turn ? 'action' : 'accent'}
+        persist={false}
+        parts={simRookieSummaryParts(d, toMake)}
+        action={
+          d.your_turn && d.available[0] ? (
+            <Button size="sm" label={`Draft ${d.available[0].name.split(' ').slice(-1)[0]}`} loading={busy === 'pick'} disabled={busy !== null && busy !== 'pick'} onPress={() => onPick(d.available[0])} />
+          ) : null
+        }
+      >
         {classChip ? <SimGeneratedChip label={classChip} onInfo={() => setNotice(true)} /> : null}
-      </AccentCard>
-
-      <SimCollapse title="Your picks" summary={`${mine.filter((m) => m.made).length} of ${mine.length} made`} defaultOpen testID="rookie-mine">
-        {mine.length === 0 ? (
-          <AppText style={common.muted}>You have no picks in this draft.</AppText>
-        ) : (
-          mine.map((row) => (
-            <View key={row.pick} style={[common.rowBetween, common.divider, { paddingVertical: 8 }]}>
-              <AppText style={[common.bodyStrong, common.grow]}>{simRookiePickLine(row)}</AppText>
-              {row.made ? <SimToneBadge label={row.made.pos} tone="success" /> : d.on_clock?.pick === row.pick ? <SimToneBadge label="On the clock" tone="accent" /> : null}
-            </View>
-          ))
-        )}
-      </SimCollapse>
+        <View testID="rookie-mine">
+          <AppText style={common.muted}>Your picks: {mine.filter((m) => m.made).length} of {mine.length} made</AppText>
+          {mine.length === 0 ? (
+            <AppText style={common.muted}>You have no picks in this draft.</AppText>
+          ) : (
+            mine.map((row) => (
+              <View key={row.pick} style={[common.rowBetween, common.divider, { paddingVertical: 8 }]}>
+                <AppText style={[common.bodyStrong, common.grow]}>{simRookiePickLine(row)}</AppText>
+                {row.made ? <SimToneBadge label={row.made.pos} tone="success" /> : d.on_clock?.pick === row.pick ? <SimToneBadge label="On the clock" tone="accent" /> : null}
+              </View>
+            ))
+          )}
+        </View>
+      </CompactModule>
+      <SimRookieOverview order={d.order} onClockPick={d.on_clock?.pick} round={d.on_clock?.round ?? 1} made={made.length} total={d.total} />
 
       <View style={common.stack}>
         <SegmentedTabBar<string>
@@ -361,6 +372,7 @@ function RookieStage({
                 player={player}
                 onOpen={ctx.openPlayer}
                 onGeneratedInfo={() => setNotice(true)}
+                hideRookie
                 actions={d.your_turn ? <SimDraftIconButton icon="checkmark" size={44} width={48} primary label={`Draft ${player.name}`} disabled={busy !== null} onPress={() => onPick(player)} /> : null}
               />
             ))}

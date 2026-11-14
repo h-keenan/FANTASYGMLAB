@@ -53,6 +53,11 @@ describe("page models", () => {
     expect(m.worst).toEqual({ name: "Wade", pts: 8 }); // the bye starter is not a performance
     expect(simRecapResultModel(recap({ your_game: null })).kind).toBe("bye");
   });
+  it("a playoff bye (server sends a game with result 'bye') is a bye: no NaN margin, no made-up performers, no matchup page", () => {
+    const r = recap({ your_game: { ...recap().your_game!, result: "bye" as never } });
+    expect(simRecapResultModel(r)).toMatchObject({ kind: "bye", margin: "Bye week", best: null, worst: null });
+    expect(simRecapPageKeys(r, { names: {}, lineupWarnings: 0, offers: 0 })).not.toContain("matchup");
+  });
   it("matchup: points by the player's own position, top starters capped", () => {
     const g = recap().your_game!;
     expect(simPositionTotals(g.starters).map((r) => [r.pos, r.pts, r.count])).toEqual([["QB", 25, 1], ["RB", 28, 2], ["WR", 0, 1]]);

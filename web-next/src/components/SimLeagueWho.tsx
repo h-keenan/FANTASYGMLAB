@@ -75,7 +75,7 @@ export function SimLeaguePlayersView({ ctx, state, onRetry }: { ctx: SimCtx; sta
         }}
       />
       <p className="text-xs" style={{ color: "var(--color-text-muted)" }} aria-live="polite">
-        {entries.length} {entries.length === 1 ? "player" : "players"}{onlyBlock ? " on a trade block" : pos === "ALL" ? "" : ` at ${pos}`}, best value first
+        {entries.length} {entries.length === 1 ? "player" : "players"}{onlyBlock ? " on a trade block" : pos === "ALL" ? "" : ` at ${pos}`}, best first
       </p>
       {entries.length === 0 ? (
         <EmptyState title="No one matches" subtitle="Try another name, or pick All positions. Free agents are on the Players tab." />

@@ -22,7 +22,7 @@ import { SimPlayerChip, SimPlayerLine, SimPopIn, SimSideLabel, SimStat, SimTeamO
 import ToneBadge from './ToneBadge';
 import { useThemeMode } from '../context/ThemeModeContext';
 import { api } from '../lib/api';
-import { simGroupByPosition, simSideSummary, simTradeFit, type SimAssetGroup } from '../lib/simLayout';
+import { simGroupByPosition, simTradeFit, type SimAssetGroup } from '../lib/simLayout';
 import { simListStats } from '../lib/simDraft';
 import { simTeamsByPower } from '../lib/simLeagueRosters';
 import { simGroupsToSheetItems } from '../lib/simTradeSheet';
@@ -168,8 +168,6 @@ function OfferCard({ item, defaultOpen, busy, canTrade, onRespond }: { item: Sim
   const { colors } = useThemeMode();
   const common = useMemo(() => createSimStyles(colors), [colors]);
   const [open, setOpen] = useState(defaultOpen);
-  const give = simSideSummary(item.you_give);
-  const get = simSideSummary(item.you_get);
   const names = (list: SimTradeAsset[]) => list.map((p) => (simIsPick(p) ? simPickLabelText(p) : p.name.split(' ').slice(-1)[0])).join(', ');
   return (
     <FadeInView>
@@ -197,8 +195,8 @@ function OfferCard({ item, defaultOpen, busy, canTrade, onRespond }: { item: Sim
             </View>
           </View>
           <AppText style={common.small}>
-            <AppText style={{ fontWeight: '800', color: colors.danger, fontSize: 13 }}>Give</AppText> {names(item.you_give)} (trade value {give.value}){' \u00b7 '}
-            <AppText style={{ fontWeight: '800', color: colors.success, fontSize: 13 }}>Get</AppText> {names(item.you_get)} (trade value {get.value})
+            <AppText style={{ fontWeight: '800', color: colors.danger, fontSize: 13 }}>Give</AppText> {names(item.you_give)}{' \u00b7 '}
+            <AppText style={{ fontWeight: '800', color: colors.success, fontSize: 13 }}>Get</AppText> {names(item.you_get)}
           </AppText>
         </Pressable>
         {open ? (
@@ -407,7 +405,7 @@ function Builder({ ctx, seed, onSeedUsed }: { ctx: SimCtx; seed: SimTradeSeed | 
         <SectionHeading title="Partner" caption={partner ? undefined : 'Pick a team to trade with.'} />
         {partner ? (
           <>
-            <SimTeamCard team={partner} selected valueMode="trade" />
+            <SimTeamCard team={partner} selected />
             <View style={common.rowBetween}>
               <Button label="Change partner" variant="secondary" onPress={() => dispatch({ type: 'partner', teamId: '' })} />
               <ScoutButton teamId={partner.team_id} name={partner.name} />
@@ -416,7 +414,7 @@ function Builder({ ctx, seed, onSeedUsed }: { ctx: SimCtx; seed: SimTradeSeed | 
         ) : (
           <View style={common.stack} accessibilityLabel="Teams">
             {teamOptions.map((team) => (
-              <SimTeamCard key={team.team_id} team={team} valueMode="trade" openLabel={`Trade with ${team.name}`} onOpen={(id) => dispatch({ type: 'partner', teamId: id })} />
+              <SimTeamCard key={team.team_id} team={team} openLabel={`Trade with ${team.name}`} onOpen={(id) => dispatch({ type: 'partner', teamId: id })} />
             ))}
           </View>
         )}
@@ -480,14 +478,13 @@ function Builder({ ctx, seed, onSeedUsed }: { ctx: SimCtx; seed: SimTradeSeed | 
           onClose={() => setSheetSide(null)}
           hidden={viewing !== null}
           flexFilter={game.settings.slots.includes('FLEX')}
-          valueLabel="Trade value"
           renderPlayerRow={(item, { on, blocked, toggle }) => {
             const player = item.ref as SimGamePlayer;
             return (
               <SimPlayerLine
                 player={player}
                 week={game.week}
-                stats={simListStats(player, { adp: false, tradeValue: true })}
+                stats={simListStats(player, { adp: false })}
                 selected={on}
                 onOpen={setViewing}
                 trailing={

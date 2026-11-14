@@ -13,10 +13,6 @@ import type { WhyMetricId } from "@/lib/tapForWhyContent";
 import {
   PLAYER_LIST_DENSITY,
   PLAYER_LIST_LONG_NAME,
-  PLAYER_LIST_ALIGNED_WIDTH,
-  playerListSlotWidth,
-  PLAYER_LIST_STAT_ORDER,
-  PLAYER_LIST_STAT_WIDTH,
   limitPlayerListTags,
   orderPlayerListStats,
   type PlayerListDensity,
@@ -34,10 +30,10 @@ import { positionColorVar } from "@/lib/playerPresentation";
  *  - Line 1: position badge, photo, name (a size smaller before it truncates),
  *    one status chip only when it matters (OUT, Q, BYE soon, NEW, ROOKIE).
  *  - Line 2 (muted): TEAM · Age · Bye N. Generated players get a small info glyph by the actions.
- *  - Line 3: page tags (at most 2 + "+N") on the left, LABELED stat pills
- *    (PROJ / OVR / ADP / EDGE; OVR is the shared overall gauge) in fixed-width slots on the right. A number never
- *    appears without its caption.
- *  - Actions slot (compact icon buttons) and tap-row-to-open.
+ *  - Line 3 (UNDER the name, aligned with it, wraps, never clipped): LABELED stat chips (PROJ / OVR / ADP / EDGE; OVR
+ *    is the shared overall gauge) then page tags (at most 2 + "+N"). A number never appears without its caption.
+ *  - ONE trailing action slot on the right (compact icon buttons) and tap-row-to-open.
+ *  Shared by FantasyDesk lists and the Fantasy Sim (SimDraftRow / SimPlayerLine / SimRosterLine).
  *
  * Never dims a row for an injury: the chip and a red avatar dot say it.
  */
@@ -66,6 +62,8 @@ export interface PlayerListRowProps {
   tags?: PlayerListTag[];
   /** Free content under the meta line (e.g. an owner badge). */
   extra?: ReactNode;
+  /** Small inline controls at the end of the chips line (e.g. a Queue toggle), so the trailing slot stays ONE action. */
+  chipsExtra?: ReactNode;
   /** Primary action slot: compact 36-44px icon buttons. */
   actions?: ReactNode;
   /** Tap the row to open (PQV or the game's own sheet). */
@@ -79,7 +77,7 @@ export interface PlayerListRowProps {
   onSimInfo?: () => void;
   testId?: string;
   selected?: boolean;
-  /** Every row of this list shows the same stats: anchor the stat block left at a fixed width so columns line up even when only some rows have an EDGE. */
+  /** Deprecated no-op: chips now sit left-aligned under the name, so there are no columns to line up. */
   alignColumns?: boolean;
 }
 
@@ -132,6 +130,7 @@ export function PlayerListRow({
   stats = [],
   tags = [],
   extra,
+  chipsExtra,
   actions,
   onOpen,
   openLabel,
@@ -141,13 +140,12 @@ export function PlayerListRow({
   onSimInfo,
   testId = "player-list-row",
   selected = false,
-  alignColumns = false,
 }: PlayerListRowProps) {
   const dims = PLAYER_LIST_DENSITY[density];
   const colorVar = positionColorVar(position);
   const slots = orderPlayerListStats(stats);
   const { shown, extra: moreTags } = limitPlayerListTags(tags);
-  const hasLine3 = slots.length > 0 || shown.length > 0;
+  const hasLine3 = slots.length > 0 || shown.length > 0 || Boolean(chipsExtra);
   const identity = (
     <div className="flex min-w-0 flex-1 items-center gap-2">
       <span className="flex shrink-0 justify-center" style={{ width: 34 }}>
@@ -227,8 +225,15 @@ export function PlayerListRow({
         ) : null}
       </div>
       {hasLine3 ? (
-        <div className="flex items-center justify-between gap-2 pb-0.5">
-          <div className="flex min-w-0 flex-1 items-center gap-1 overflow-hidden whitespace-nowrap" data-testid="list-tags">
+        <div
+          className="flex flex-wrap items-center gap-x-1.5 gap-y-1 pb-1 pt-0.5"
+          style={{ paddingLeft: `calc(34px + ${dims.avatar}px + 1rem)` }}
+          data-testid="list-chips"
+        >
+          <div className="contents" data-testid="list-stats">
+            {slots.map((stat) => (stat ? <StatPill key={stat.key} stat={stat} /> : null))}
+          </div>
+          <div className="contents" data-testid="list-tags">
             {shown.map((tag) => (
               <ToneBadge key={tag.key} label={tag.label} color={tag.tone ? TONE_COLOR[tag.tone] : "var(--color-text-secondary)"} size="xs" truncate />
             ))}
@@ -238,17 +243,7 @@ export function PlayerListRow({
               </span>
             ) : null}
           </div>
-          <div className={`flex shrink-0 items-center gap-0.5 ${alignColumns ? "justify-start" : "justify-end"}`} style={alignColumns ? { minWidth: PLAYER_LIST_ALIGNED_WIDTH } : undefined} data-testid="list-stats">
-            {slots.map((stat, i) =>
-              stat ? (
-                <span key={stat.key} className="flex justify-end" style={{ minWidth: PLAYER_LIST_STAT_WIDTH[stat.key] ?? 66 }}>
-                  <StatPill stat={stat} />
-                </span>
-              ) : (
-                <span key={`empty-${i}`} aria-hidden="true" style={{ minWidth: playerListSlotWidth(i, alignColumns) }} />
-              ),
-            )}
-          </div>
+          {chipsExtra}
         </div>
       ) : null}
     </div>

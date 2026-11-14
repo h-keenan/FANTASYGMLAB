@@ -1,3 +1,4 @@
+import { TradesTabBar } from "@/components/TradesTabBar";
 import { InfoTip } from "@/components/InfoTip";
 import { PageTitle } from "@/components/PageTitle";
 import type { PastTradeOutcome, TradeOutcomeHistoryResponse } from "@/lib/api";
@@ -91,9 +92,10 @@ function TradeHistoryRow({ outcome }: { outcome: PastTradeOutcome }) {
   );
 }
 
-export function TradeHistoryContent({ data }: { data: TradeOutcomeHistoryResponse }) {
+export function TradeHistoryContent({ data, leagueId, leagueName }: { data: TradeOutcomeHistoryResponse; leagueId?: string | null; leagueName?: string }) {
   return (
     <main className="page-shell">
+      {leagueId ? <TradesTabBar leagueId={leagueId} leagueName={leagueName || "League"} active="trade_history" /> : null}
       <header className="flex flex-col gap-1">
         <PageTitle page="Trade History" />
         <div className="flex flex-col gap-1">

@@ -54,6 +54,18 @@ export function simGameBottomTabs(opts: { offseason?: boolean; inbox?: number })
   ];
 }
 
+export type SimNavTone = "accent" | "success" | "warning" | "danger" | "premium";
+
+/** One-line description and accent tone per game page, so the game menu rows read like FantasyDesk's More sheet (glyph tinted, label over a subtitle). Tones are existing semantic colors on both platforms. */
+export const SIM_NAV_META: Record<string, { subtitle: string; tone: SimNavTone }> = {
+  home: { subtitle: "This week's to-dos and the league pulse", tone: "accent" },
+  team: { subtitle: "Lineup, bench, and roster moves", tone: "success" },
+  players: { subtitle: "Free agents, rankings, and waivers", tone: "warning" },
+  trades: { subtitle: "Offers, ideas, and the trade inbox", tone: "danger" },
+  league: { subtitle: "Standings, scores, and every team", tone: "premium" },
+  more: { subtitle: "Rules, reset the week, or leave this game", tone: "accent" },
+};
+
 /** Which tab is lit: unknown keys fall back to the first tab. */
 export function activeBottomTab(tabs: BottomTab[], active: string): string {
   return tabs.some((t) => t.key === active) ? active : (tabs[0]?.key ?? "");

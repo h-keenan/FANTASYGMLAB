@@ -3,7 +3,6 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { Collapsible } from "./Collapsible";
 import { SimDraftRow } from "./SimDraftBoard";
-import { SimTradeValue } from "./SimGameParts";
 import { SimFinalView } from "./SimGameRecap";
 import { SimOpenPlayerContext, SimPlayerChip, type SimCtx } from "./SimGameParts";
 import { api } from "@/lib/api";
@@ -74,16 +73,6 @@ describe("SimDraftRow", () => {
   });
 });
 
-describe("Trade value label", () => {
-  it("is always called Trade value (with a tap-for-why), never Value or VAL", () => {
-    render(<SimTradeValue value={70.4} />);
-    expect(screen.getByText("Trade value")).toBeInTheDocument();
-    expect(screen.getByText("70")).toBeInTheDocument();
-    expect(screen.queryByText(/^(value|val)$/i)).toBeNull();
-    expect(screen.getByRole("button", { name: /Trade value 70/ })).toBeInTheDocument();
-  });
-});
-
 describe("SimDraftRow bye, injury and drafted states", () => {
   it("always shows the bye week in the meta line, warning-colored only when it is soon", () => {
     const { rerender } = render(<SimDraftRow player={player({ bye_week: 11 })} />);
@@ -124,5 +113,15 @@ describe("Season in review on a phone", () => {
     expect(screen.queryByLabelText("Final standings")).toBeNull();
     fireEvent.click(screen.getByRole("tab", { name: "Standings" }));
     expect(screen.getByLabelText("Final standings")).toBeInTheDocument();
+  });
+});
+
+describe("SimDraftRow in a rookie-only draft", () => {
+  it("drops the redundant Rookie tag there, keeps it everywhere else", () => {
+    const rookie = player({ age: 21 });
+    const { rerender } = render(<SimDraftRow player={rookie} />);
+    expect(screen.getByTestId("list-meta")).toHaveTextContent("Rookie");
+    rerender(<SimDraftRow player={rookie} hideRookie />);
+    expect(screen.getByTestId("list-meta")).not.toHaveTextContent("Rookie");
   });
 });

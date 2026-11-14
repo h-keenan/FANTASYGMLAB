@@ -34,3 +34,23 @@ describe("BottomTabBar", () => {
     expect(screen.getByRole("link", { name: "Today" })).toHaveAttribute("href", "/dashboard/1");
   });
 });
+
+describe("BottomTabBar look", () => {
+  it("gives every tab, the More button included, the same icon slot and label markup", () => {
+    const tabs = [
+      { key: "a", label: "Today", glyph: "home" as const, href: "/a" },
+      { key: "more", label: "More", glyph: "more" as const },
+    ];
+    const { container } = render(<BottomTabBar ariaLabel="x" tabs={tabs} active="a" />);
+    const items = container.querySelectorAll(".bottom-tab");
+    expect(items).toHaveLength(2);
+    items.forEach((el) => {
+      expect(el.querySelectorAll(".bottom-tab-icon svg")).toHaveLength(1);
+      expect(el.querySelectorAll(".bottom-tab-label")).toHaveLength(1);
+    });
+    expect(items[0].tagName).toBe("A");
+    expect(items[1].tagName).toBe("BUTTON");
+    expect(items[0]).toHaveAttribute("aria-current", "page");
+    expect(items[1]).not.toHaveAttribute("aria-current");
+  });
+});

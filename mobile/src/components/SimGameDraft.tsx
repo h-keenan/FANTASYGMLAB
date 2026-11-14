@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useReducer, useRef, useState } from 'react';
-import { StyleSheet, View } from 'react-native';
+import { Pressable, StyleSheet, View } from 'react-native';
 
 import AccentCard from './AccentCard';
 import AppText from './AppText';
@@ -10,19 +10,18 @@ import FadeInView from './FadeInView';
 import SectionHeading from './SectionHeading';
 import SegmentedTabBar from './SegmentedTabBar';
 import { SkeletonCard } from './SkeletonBlock';
+import CompactModule from './CompactModule';
 import { SimDraftBoard, SimDraftIconButton } from './SimDraftBoard';
-import { SimDraftGrid } from './SimDraftGrid';
+import { SimDraftOverview } from './SimDraftOverview';
 import { SimDraftHero } from './SimDraftHero';
 import { SimPlayerChip, SimPlayerLine, SimPopIn, SimStat, SimToneBadge, createSimStyles, type SimCtx } from './SimGameParts';
 import ToneBadge from './ToneBadge';
 import { useThemeMode } from '../context/ThemeModeContext';
 import { api } from '../lib/api';
+import { simDraftNeedPills, simDraftSummaryParts } from '../lib/simDraft';
 import {
   SIM_QUEUE_MAX,
-  simDraftClockLine,
   simFmtPts,
-  simFmtValue,
-  simPickLabel,
   simQueueReducer,
   simFilterPositionsFor,
   simPositionsFor,
@@ -37,12 +36,13 @@ import {
 } from '../lib/simGame';
 import { spacing, type ThemeColors } from '../theme';
 
-type Panel = 'board' | 'grid' | 'queue' | 'roster' | 'picks';
+type Panel = 'board' | 'queue' | 'roster' | 'picks';
 
 /**
- * The draft room: a big board of every undrafted player (search, position
- * filter, sort), your queue, your roster by need, and the pick log. There is no
- * pick clock. A pick resolves every AI pick up to your next turn in one call.
+ * The draft room: ONE compact clock module (a dense status line with the pick action, expanding to needs, best
+ * available and auto-pick), who has been drafted (recent picks + mini board) always on the page, and ONE tab row:
+ * Players (search, one filter/sort row), queue, roster and the pick log. There is no pick clock. A pick resolves
+ * every AI pick up to your next turn in one call.
  */
 export function SimGameDraft({ ctx, onComplete }: { ctx: SimCtx; onComplete: (recap: SimDraftRecap | null) => void }) {
   const { gameId, game, call } = ctx;
@@ -199,22 +199,25 @@ export function SimGameDraft({ ctx, onComplete }: { ctx: SimCtx; onComplete: (re
   const recent = [...picks].reverse().slice(0, 40);
   const needs = simRosterNeeds(draft.your_roster, game.settings.slots);
 
-  const boardActions = (player: SimGamePlayer) => {
+  /** ONE trailing action: Draft while you are on the clock. The Queue toggle is a small chip at the end of the chips line. */
+  const boardActions = (player: SimGamePlayer) =>
+    onClock ? <SimDraftIconButton icon="checkmark" size={44} width={48} primary label={`Draft ${player.name}`} disabled={busy === 'pick'} onPress={() => pick(player)} /> : null;
+  const boardChipsExtra = (player: SimGamePlayer) => {
     const inQueue = queue.ids.includes(player.id);
     return (
-      <>
-        <SimDraftIconButton
-          size={36}
-          icon={inQueue ? 'checkmark-done-outline' : 'add-circle-outline'}
-          label={inQueue ? `Remove ${player.name} from queue` : `Queue ${player.name}`}
-          active={inQueue}
-          onPress={() => {
-            setPlayers((prev) => ({ ...prev, [player.id]: player }));
-            dispatchQueue({ type: inQueue ? 'remove' : 'add', id: player.id });
-          }}
-        />
-        {onClock ? <SimDraftIconButton icon="checkmark" size={44} width={48} primary label={`Draft ${player.name}`} disabled={busy === 'pick'} onPress={() => pick(player)} /> : null}
-      </>
+      <Pressable
+        accessibilityRole="button"
+        accessibilityState={{ selected: inQueue }}
+        accessibilityLabel={inQueue ? `Remove ${player.name} from queue` : `Queue ${player.name}`}
+        hitSlop={{ top: 10, bottom: 10, left: 6, right: 6 }}
+        onPress={() => {
+          setPlayers((prev) => ({ ...prev, [player.id]: player }));
+          dispatchQueue({ type: inQueue ? 'remove' : 'add', id: player.id });
+        }}
+        style={[styles.queueChip, inQueue && { backgroundColor: colors.accentMuted }]}
+      >
+        <AppText style={[styles.queueChipText, inQueue && { color: colors.accent }]}>{inQueue ? 'Queued' : '+ Queue'}</AppText>
+      </Pressable>
     );
   };
 
@@ -226,6 +229,7 @@ export function SimGameDraft({ ctx, onComplete }: { ctx: SimCtx; onComplete: (re
       draftedIds={optimistic ? [optimistic.id] : undefined}
       onOpen={ctx.openPlayer}
       actions={boardActions}
+      chipsExtra={boardChipsExtra}
       refreshKey={ctx.tick}
       onItems={(items) => setPlayers((prev) => ({ ...prev, ...Object.fromEntries(items.map((p) => [p.id, p])) }))}
     />
@@ -313,33 +317,31 @@ export function SimGameDraft({ ctx, onComplete }: { ctx: SimCtx; onComplete: (re
     );
   };
 
+  const needPills = simDraftNeedPills(draft.your_roster, game.settings.slots);
+  const hintLast = hint ? hint.player.name.split(' ').slice(-1)[0] : '';
   return (
     <View style={common.stack}>
-      <AccentCard accent={onClock ? colors.accent : colors.borderStrong} glow={onClock}>
-        <View style={common.rowBetween}>
-          <View style={common.grow}>
-            <AppText style={styles.kicker}>{draft.status === 'complete' ? 'Draft' : simPickLabel(draft.pick_no, game.settings.teams)}</AppText>
-            <AppText style={common.title} accessibilityLiveRegion="polite" testID="draft-clock">
-              {optimistic ? 'Picking…' : simDraftClockLine(draft)}
-            </AppText>
-          </View>
-          {onClock ? <ToneBadge label="Your pick" color={colors.accent} /> : null}
-        </View>
-        <SimDraftHero gameId={gameId} draft={draft} teams={game.settings.teams} slots={game.settings.slots} positions={simPositionsFor(game.settings.slots)} tick={ctx.tick} onOpen={ctx.openPlayer} />
+      <CompactModule
+        id="draft.clock"
+        title={draft.status === 'complete' ? 'Draft' : 'Draft clock'}
+        testID="draft-clock-module"
+        tone={onClock ? 'action' : 'accent'}
+        persist={false}
+        parts={simDraftSummaryParts(draft, game.settings.teams, needPills, { picking: Boolean(optimistic) })}
+        action={onClock && hint ? <Button size="sm" label={`Draft ${hintLast}`} loading={busy === 'pick'} onPress={() => pick(hint.player)} /> : null}
+      >
         {onClock && hint ? (
           <FadeInView>
-            <View style={common.rowBetween} testID="draft-hint">
-              <View style={common.grow}>
-                <AppText style={common.muted}>{hint.why}</AppText>
-                <SimPlayerChip player={hint.player} extra={<AppText style={common.muted}>Value {simFmtValue(hint.player.value)}</AppText>} />
-              </View>
-              <Button size="sm" label={`Draft ${hint.player.name.split(' ').slice(-1)[0]}`} loading={busy === 'pick'} onPress={() => pick(hint.player)} />
+            <View style={common.tight} testID="draft-hint">
+              <AppText style={common.muted}>{hint.why}</AppText>
+              <SimPlayerChip player={hint.player} extra={hint.player.overall != null ? <AppText style={common.muted}>OVR {hint.player.overall}</AppText> : undefined} />
             </View>
           </FadeInView>
         ) : null}
+        <SimDraftHero gameId={gameId} draft={draft} teams={game.settings.teams} slots={game.settings.slots} positions={simPositionsFor(game.settings.slots)} tick={ctx.tick} onOpen={ctx.openPlayer} />
         {confirmAuto ? (
           <View style={common.tight}>
-            <AppText style={common.small}>Auto-draft the rest of your picks from your queue, then best value and need?</AppText>
+            <AppText style={common.small}>Auto-draft the rest of your picks from your queue, then best available and need?</AppText>
             <View style={common.row}>
               <Button size="sm" label="Yes, auto-pick" onPress={autoDraft} />
               <Button size="sm" variant="ghost" label="Cancel" onPress={() => setConfirmAuto(false)} />
@@ -356,20 +358,19 @@ export function SimGameDraft({ ctx, onComplete }: { ctx: SimCtx; onComplete: (re
             style={styles.autoButton}
           />
         )}
-      </AccentCard>
+      </CompactModule>
+      <SimDraftOverview draft={draft} teams={game.settings.teams} onOpen={ctx.openPlayer} />
       <SegmentedTabBar<Panel>
         options={[
           { key: 'board', label: 'Players', glyph: 'players' },
-          { key: 'grid', label: 'Board', glyph: 'board' },
           { key: 'queue', label: `Queue${queue.ids.length ? ` ${queue.ids.length}` : ''}`, glyph: 'queue' },
           { key: 'roster', label: 'Roster', glyph: 'roster' },
           { key: 'picks', label: 'Picks', glyph: 'picks' },
         ]}
         active={panel}
         onChange={setPanel}
-        scrollable
       />
-      {panel === 'board' ? board : panel === 'grid' ? <SimDraftGrid draft={draft} teams={game.settings.teams} onOpen={ctx.openPlayer} /> : side()}
+      {panel === 'board' ? board : side()}
     </View>
   );
 }
@@ -433,6 +434,8 @@ function createStyles(colors: ThemeColors) {
   return StyleSheet.create({
     kicker: { fontSize: 12.5, fontWeight: '800', letterSpacing: 0.8, textTransform: 'uppercase', color: colors.textTertiary },
     autoButton: { alignSelf: 'flex-start' },
+    queueChip: { minHeight: 24, paddingHorizontal: 8, borderRadius: 12, justifyContent: 'center', backgroundColor: colors.glassInput },
+    queueChipText: { fontSize: 12, fontWeight: '700', color: colors.textSecondary },
     needs: { flexDirection: 'row', gap: spacing.sm },
     need: {
       flex: 1,

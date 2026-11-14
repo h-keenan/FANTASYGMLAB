@@ -28,7 +28,10 @@ import { fileURLToPath } from "node:url";
 
 // Byte-identical in both trees (generated files and imports-free pure modules).
 export const IDENTICAL = [
+  "compactModule.ts",
+  "simSummaries.ts",
   "simTradeSheet.ts",
+  "simSetupView.ts",
   "tradeSheetPicker.ts",
   "confirmInPlace.ts",
   "overlayStack.ts",
@@ -49,12 +52,14 @@ export const IDENTICAL = [
   "insightLinks.ts",
   "navCatalog.ts",
   "opponentProfile.ts",
+  "pageFamilies.ts",
   "playerCard.ts",
   "playerListRow.ts",
   "playerNameDisplay.ts",
   "pqvContext.ts",
   "sampleLeague.ts",
   "sessionTab.ts",
+  "sheetTabs.ts",
   "simAsOf.ts",
   "simCrest.ts",
   "simGame.ts",
