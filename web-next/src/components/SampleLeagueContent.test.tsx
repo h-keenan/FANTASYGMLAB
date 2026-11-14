@@ -20,9 +20,11 @@ describe("SampleLeagueContent", () => {
     // Today hero with a top priority, rank strip, watchlist, team snapshot.
     expect(screen.getByRole("heading", { name: /This week/ })).toBeTruthy();
     expect(screen.getAllByText(/Sell Casey Placeholder/).length).toBeGreaterThan(0);
+    // My Team and Watchlist are compact modules: informative collapsed, tiles/cards on tap.
+    fireEvent.click(screen.getByRole("button", { name: /^My Team/ }));
     expect(screen.getByText("Power Rank")).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: /^Watchlist/ }));
     expect(screen.getByTestId("watchlist-alerts")).toBeTruthy();
-    expect(screen.getByText("My Team")).toBeTruthy();
     // League Activity fills from the static promise.
     expect(await screen.findByTestId("league-pulse-card")).toBeTruthy();
     expect(screen.getByTestId("sample-banner")).toBeTruthy();

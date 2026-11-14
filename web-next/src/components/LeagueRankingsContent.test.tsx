@@ -1,5 +1,7 @@
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
-import { describe, expect, it, vi } from "vitest";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+
+import { collapsedModuleProblems } from "@/components/ui/assertCompactInformative";
 
 import { LeagueRankingsContent } from "./LeagueRankingsContent";
 import type { LeagueTeamRankingsResponse, PlayoffOddsResponse, TeamRanking } from "@/lib/api";
@@ -87,6 +89,7 @@ const BASE_RESPONSE: LeagueTeamRankingsResponse = {
 };
 
 describe("LeagueRankingsContent", () => {
+  beforeEach(() => window.localStorage.clear());
   it("renders the league name and every board's section heading", () => {
     render(<LeagueRankingsContent leagueId="L1" leagueName="My League" data={BASE_RESPONSE} />);
 
@@ -107,6 +110,9 @@ describe("LeagueRankingsContent", () => {
       team({ roster_id: String(i + 1), team_name: `Team ${i + 1}`, power_rank: i + 1, franchise_rank: i + 1, draft_capital_rank: i + 1, starter_rank: i + 1, bench_rank: i + 1, age_rank: i + 1, average_age: 24 + i, standing_rank: i + 1 }),
     );
     render(<LeagueRankingsContent leagueId="L1" leagueName="My League" data={{ ...BASE_RESPONSE, teams }} />);
+    // Boards are compact modules: Roster Power opens by default, the rest read "1. Team 1 · 8 teams" until tapped.
+    expect(collapsedModuleProblems(document.body)).toEqual([]);
+    for (const header of screen.getAllByRole("button", { expanded: false }).filter((b) => /\. Expand$/.test(b.getAttribute("aria-label") ?? ""))) fireEvent.click(header);
     const buttons = screen.getAllByRole("button", { name: "Show all 8 teams" });
     expect(buttons).toHaveLength(6);
     expect(screen.getAllByText("Team 8")).toHaveLength(1); // standings only
@@ -121,6 +127,8 @@ describe("LeagueRankingsContent", () => {
     const board = screen.getByTestId("rank-board-age");
     expect(board).toHaveAttribute("id", "board-age");
     expect(board).toHaveTextContent("Roster Age");
+    expect(within(board).getByTestId("compact-summary")).toHaveTextContent("1. Team 1 · You");
+    fireEvent.click(within(board).getByRole("button", { name: /^Roster Age:/ }));
     expect(board).toHaveTextContent("24.3");
     expect(document.getElementById("your-standing")).not.toBeNull();
   });

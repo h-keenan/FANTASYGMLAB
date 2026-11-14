@@ -1,7 +1,8 @@
-import { render, screen, within } from "@testing-library/react";
-import { describe, expect, it, vi } from "vitest";
+import { fireEvent, render, screen, within } from "@testing-library/react";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { DashboardContent } from "./DashboardContent";
+import { collapsedModuleProblems } from "@/components/ui/assertCompactInformative";
 import { api, type DashboardResponse } from "@/lib/api";
 
 const FIXTURE: DashboardResponse = {
@@ -52,7 +53,14 @@ const FIXTURE: DashboardResponse = {
   entitlement: { is_premium: false, visible_count: 1, hidden_count: 2 },
 };
 
+/** Open a CompactModule by its collapsed header (the accessible name starts with the title). */
+function expandModule(title: RegExp | string) {
+  fireEvent.click(screen.getByRole("button", { name: typeof title === "string" ? new RegExp(`^${title}`) : title }));
+}
+
 describe("DashboardContent", () => {
+  beforeEach(() => window.localStorage.clear());
+
   it("renders the league name, Game Plan cards, and Team Snapshot tiles from real fixture data", async () => {
     render(<DashboardContent leagueId="abc" leagueName="Dynasty Overlords" data={FIXTURE} />);
 
@@ -60,7 +68,9 @@ describe("DashboardContent", () => {
     expect(screen.getByRole("heading", { name: "This week" })).toBeInTheDocument();
     expect(screen.getByText("Trade for a top-12 RB before the deadline")).toBeInTheDocument();
 
-    expect(screen.getByRole("heading", { name: "My Team" })).toBeInTheDocument();
+    // My Team is one compact module: its collapsed summary carries the ranks; the tiles open on tap.
+    expect(screen.getByRole("button", { name: /^My Team: .*Power/ })).toBeInTheDocument();
+    expandModule("My Team");
     // Record lives once, in the "Your team right now" hero, not repeated in the tiles.
     expect(screen.getByRole("heading", { name: "Your team right now" })).toBeInTheDocument();
     expect(await screen.findAllByText("Record")).toHaveLength(1);
@@ -107,7 +117,8 @@ describe("DashboardContent", () => {
 
     // All three headlines render somewhere on the page...
     expect(screen.getByText("Headline trade")).toBeInTheDocument();
-    expect(screen.getByText("Ashton Jeanty trending down")).toBeInTheDocument();
+    expandModule("Watchlist");
+    expect(screen.getAllByText(/Ashton Jeanty trending down/).length).toBeGreaterThan(0);
     expect(screen.getByText("Chimere Dike")).toBeInTheDocument();
     // ...but Watch and Waiver Opportunity share one card, while Top
     // Priority gets its own — exactly 2 <article> cards total, not 3.
@@ -116,7 +127,7 @@ describe("DashboardContent", () => {
     expect(screen.getByText("Trending")).toBeInTheDocument();
     expect(screen.getByText("Waiver")).toBeInTheDocument();
     expect(screen.getByText("Usage is down 13% recently.")).toBeInTheDocument();
-    expect(screen.getByRole("heading", { name: /Watchlist/ })).toBeInTheDocument();
+    expect(screen.getByTestId("dashboard-watchlist")).toBeInTheDocument();
     expect(document.body.textContent?.toLowerCase()).not.toContain("placeholder");
   });
 
@@ -154,8 +165,8 @@ describe("DashboardContent", () => {
     const order = [
       at("game-plan-heading"),
       at("dashboard-trades-block"),
-      at("snapshot-heading"),
-      at("watchlist-heading"),
+      at('aria-label="Team summary"'),
+      at("dashboard-watchlist"),
       at("dashboard-more"),
     ];
     expect(order.every((i) => i > -1)).toBe(true);
@@ -176,7 +187,7 @@ describe("DashboardContent", () => {
       ],
     };
     render(<DashboardContent leagueId="abc" leagueName="Dynasty Overlords" data={data} />);
-    expect(screen.getByText("Trade deadline: 2 wks left (Wk 11)")).toBeInTheDocument();
+    expect(screen.getByText(/Deadline 2 wks left \(Wk 11\)/)).toBeInTheDocument();
     expect(screen.queryByTestId("dashboard-now-strip")).toBeNull();
     const block = screen.getByTestId("dashboard-trades-block");
     expect(block.textContent).toMatch(/1 trade idea/);
@@ -235,13 +246,20 @@ describe("DashboardContent", () => {
     expect(screen.getByTestId("dashboard-trades-block").textContent).toMatch(/Trade deadline has passed/);
   });
 
+  it("no collapsed module on Today is an empty header (module template rule)", () => {
+    const { container } = render(<DashboardContent leagueId="abc" leagueName="Dynasty Overlords" data={FIXTURE} />);
+    expect(container.querySelectorAll('button[aria-expanded="false"]').length).toBeGreaterThan(1);
+    expect(collapsedModuleProblems(container)).toEqual([]);
+  });
+
   it("keeps the mini-games collapsed behind More", () => {
     render(<DashboardContent leagueId="abc" leagueName="Dynasty Overlords" data={FIXTURE} />);
-    expect(screen.getByTestId("dashboard-more")).not.toHaveAttribute("open");
+    expect(within(screen.getByTestId("dashboard-more")).getByRole("button", { name: /^More/ })).toHaveAttribute("aria-expanded", "false");
   });
 
   it("offers one shared glossary for the rank labels", () => {
     render(<DashboardContent leagueId="abc" leagueName="Dynasty Overlords" data={FIXTURE} />);
+    expandModule("My Team");
     expect(screen.getAllByRole("button", { name: /what do these mean/i })).toHaveLength(1);
   });
 

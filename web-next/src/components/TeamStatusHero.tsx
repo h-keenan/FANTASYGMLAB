@@ -5,7 +5,9 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import { SkeletonCard } from "@/components/Skeleton";
 
-import { AccentCard } from "@/components/AccentCard";
+import { CompactModule } from "@/components/ui/CompactModule";
+import { Hero, LinkModule } from "@/components/ui/ModuleTemplates";
+import { lineupModuleParts, roomsModuleParts, standingModuleParts, teamStatusHeroModel } from "@/lib/teamStatusModules";
 import { SectionHeading } from "@/components/SectionHeading";
 import { TeamAvatar } from "@/components/TeamAvatar";
 import { ToneBadge } from "@/components/ToneBadge";
@@ -170,58 +172,42 @@ export function TeamStatusHero({
   }
   if (!matchupLine && !lineup && !standing && positions.length === 0) return null;
 
+  const heroModel = teamStatusHeroModel(matchupLine, standing);
+  // No decision twice: when the Hero already IS the standing, the Standing module only appears if it adds odds or a projection.
+  const heroIsStanding = heroModel != null && !(matchupLine && (matchupLine.winPercent != null || matchupLine.live));
+  const showStanding = standing != null && (!heroIsStanding || Boolean(standing.playoffOdds || standing.projectedRecord || standing.playoffStatus));
+  const league = { id: leagueId, name: leagueName };
+
   return (
-    <section className="flex flex-col gap-3" aria-labelledby="team-status-heading" data-testid="team-status-hero">
-      <SectionHeading id="team-status-heading" size="compact">
+    <section className="flex flex-col gap-2" aria-labelledby="team-status-heading" data-testid="team-status-hero">
+      <h2 id="team-status-heading" className="sr-only">
         Your team right now
-      </SectionHeading>
-      <AccentCard accent="var(--color-accent)" compact glow as="div">
-        {matchupLine ? (
-          <RowLink href={`/matchup/${id}${query}`} label="This week's matchup, open Matchup">
-            <span className="flex items-center gap-2">
-              <TeamAvatar avatarUrl={matchupLine.myAvatar} name={matchupLine.myName} size={32} ringColor="var(--color-accent)" />
-              <span className="text-xs font-bold" style={{ color: "var(--color-text-muted)" }}>
-                VS
-              </span>
-              <TeamAvatar avatarUrl={matchupLine.opponentAvatar} name={matchupLine.opponentName} size={32} ringColor="var(--color-danger)" />
-              <span className="min-w-0 flex flex-col">
-                <span className="text-xs" style={{ color: "var(--color-text-muted)" }}>
-                  {matchupLine.week != null ? `Week ${matchupLine.week} matchup` : "This week's matchup"}
-                  {matchupLine.stateLabel ? ` · ${matchupLine.stateLabel}` : ""}
-                </span>
-                <span className="text-sm font-bold break-words">vs {matchupLine.opponentName}</span>
-              </span>
-            </span>
-            <span className="grid grid-cols-3 gap-2">
-              {matchupLine.winPercent != null ? (
-                <Fact label="Your win chance" value={`${matchupLine.winPercent}%`} tone={matchupLine.winPercent >= 55 ? "positive" : matchupLine.winPercent <= 45 ? "risk" : "neutral"} />
-              ) : null}
-              {matchupLine.myProjected != null && matchupLine.opponentProjected != null ? (
-                <Fact label="Projected points (you - them)" value={`${matchupLine.myProjected.toFixed(1)} - ${matchupLine.opponentProjected.toFixed(1)}`} />
-              ) : null}
-              {matchupLine.live ? (
-                <Fact label="Score so far (you - them)" value={`${matchupLine.live.mine.toFixed(1)} - ${matchupLine.live.opponent.toFixed(1)}`} />
-              ) : null}
-            </span>
-          </RowLink>
-        ) : null}
+      </h2>
+      {/* One Hero (the number that matters this week) then three modules that read while collapsed. */}
+      {heroModel ? (
+        <Hero
+          label={heroModel.label}
+          value={heroModel.value}
+          context={heroModel.context}
+          tone={heroModel.tone}
+          href={matchupLine ? `/matchup/${id}${query}` : `/league-rankings/${id}${query}`}
+          testId="team-status-main"
+        />
+      ) : null}
 
-        {lineup ? (
-          <RowLink href={`/matchup/${id}${query}`} label="Lineup health, open Matchup">
-            <span className="flex items-center gap-2">
-              <ToneBadge label="Lineup" color={lineup.tone === "risk" ? "var(--color-danger)" : lineup.tone === "positive" ? "var(--color-success)" : "var(--color-text-muted)"} />
-              <span className="text-sm font-bold break-words">{lineup.headline}</span>
-            </span>
-            {lineup.detail ? (
-              <span className="text-xs" style={{ color: "var(--color-text-secondary)" }}>
-                {lineup.detail}
-              </span>
-            ) : null}
-          </RowLink>
-        ) : null}
+      {lineup ? (
+        <LinkModule
+          title="Lineup"
+          href={`/matchup/${id}${query}`}
+          tone={lineup.tone === "risk" ? "danger" : lineup.tone === "positive" ? "success" : "accent"}
+          parts={lineupModuleParts(lineup)}
+          testId="team-status-lineup"
+        />
+      ) : null}
 
-        {standing ? (
-          <RowLink href={`/league-rankings/${id}${query}`} label="Season standing, open League Rankings">
+      {standing && showStanding ? (
+        <CompactModule id="today.standing" title="Standing" tone={standing.tone === "risk" ? "danger" : standing.tone === "positive" ? "success" : "accent"} parts={standingModuleParts(standing)} testId="team-status-standing">
+          <Link href={`/league-rankings/${id}${query}`} aria-label="Season standing, open League Rankings" className="flex flex-col gap-2" style={{ color: "inherit", textDecoration: "none" }}>
             <span className="grid grid-cols-4 gap-2">
               {standing.record ? <Fact label="Record" value={standing.record} /> : null}
               {standing.place ? <Fact label="Standing" value={standing.place} /> : null}
@@ -238,27 +224,30 @@ export function TeamStatusHero({
                 {standing.playoffStatus}
               </span>
             ) : null}
-          </RowLink>
-        ) : null}
+            <span className="text-xs font-bold" style={{ color: "var(--color-accent)" }}>
+              Open League Rankings →
+            </span>
+          </Link>
+        </CompactModule>
+      ) : null}
 
-        {positions.length > 0 ? (
-          <div className="flex flex-col gap-2 pt-2.5" style={{ borderTop: "1px solid var(--color-border)" }} data-testid="team-status-positions">
-            <span className="text-xs" style={{ color: "var(--color-text-muted)" }}>
-              Position rooms vs the league. Tap a room for the detail ›
-            </span>
-            <span className="grid grid-cols-4 gap-2">
-              {positions.map((row) => (
-                <PositionChip key={row.position} row={row} league={{ id: leagueId, name: leagueName }} />
-              ))}
-            </span>
-            {weakest ? (
-              <Link href={`/trade-hub/${id}${query}`} className="text-xs font-bold" style={{ color: "var(--color-accent)", textDecoration: "none" }}>
-                Improve {weakest.position} first: see Trade Hub ideas →
-              </Link>
-            ) : null}
-          </div>
-        ) : null}
-      </AccentCard>
+      {positions.length > 0 ? (
+        <CompactModule id="today.rooms" title="Position rooms" tone={weakest ? "warning" : "accent"} parts={roomsModuleParts(positions)} testId="team-status-positions">
+          <span className="text-xs" style={{ color: "var(--color-text-muted)" }}>
+            Position rooms vs the league. Tap a room for the detail ›
+          </span>
+          <span className="grid grid-cols-4 gap-2">
+            {positions.map((row) => (
+              <PositionChip key={row.position} row={row} league={league} />
+            ))}
+          </span>
+          {weakest ? (
+            <Link href={`/trade-hub/${id}${query}`} className="text-xs font-bold" style={{ color: "var(--color-accent)", textDecoration: "none" }}>
+              Improve {weakest.position} first: see Trade Hub ideas →
+            </Link>
+          ) : null}
+        </CompactModule>
+      ) : null}
     </section>
   );
 }

@@ -120,6 +120,7 @@ function renderAccount() {
 }
 
 beforeEach(() => {
+  window.localStorage.clear();
   vi.mocked(api.getDevicePreferences).mockReset();
   vi.mocked(api.setExperienceLevel).mockReset();
   vi.mocked(api.setExperienceGoal).mockReset();
@@ -134,6 +135,7 @@ describe("experience level copy on Dashboard", () => {
   it("adds plain-language helper text and spells out labels for a beginner", async () => {
     vi.mocked(api.getDevicePreferences).mockResolvedValue(preferences("beginner"));
     render(withProvider(<DashboardContent leagueId="abc" leagueName="League" data={DASHBOARD} />));
+    fireEvent.click(await screen.findByRole("button", { name: /^My Team/ }));
 
     await expandHelp();
     expect(await screen.findByText(`Power Rank: ${BEGINNER_HELP.powerRank}`)).toBeInTheDocument();
@@ -146,6 +148,7 @@ describe("experience level copy on Dashboard", () => {
   it("gives an unset account beginner-lite: help shows, labels stay today's", async () => {
     vi.mocked(api.getDevicePreferences).mockResolvedValue(preferences(null));
     const { container } = render(withProvider(<DashboardContent leagueId="abc" leagueName="League" data={DASHBOARD} />));
+    fireEvent.click(screen.getByRole("button", { name: /^My Team/ }));
 
     await waitFor(() => expect(api.getDevicePreferences).toHaveBeenCalled());
     expect(screen.getByText("Avg Age")).toBeInTheDocument();
@@ -155,6 +158,7 @@ describe("experience level copy on Dashboard", () => {
   it.each([["advanced", "advanced" as const]])("renders today's terse copy for %s", async (_name, level) => {
     vi.mocked(api.getDevicePreferences).mockResolvedValue(preferences(level));
     const { container } = render(withProvider(<DashboardContent leagueId="abc" leagueName="League" data={DASHBOARD} />));
+    fireEvent.click(screen.getByRole("button", { name: /^My Team/ }));
 
     await waitFor(() => expect(api.getDevicePreferences).toHaveBeenCalled());
     expect(screen.getByText("Avg Age")).toBeInTheDocument();
