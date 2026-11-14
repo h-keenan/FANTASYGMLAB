@@ -118,14 +118,14 @@ describe("PlayersContent", () => {
     expect(screen.getByText("No players match")).toBeInTheDocument();
   });
 
-  it("hides the picks module and roster-status facet when no picks or rosters are given", () => {
+  it("hides the picks picksModule and roster-status facet when no picks or rosters are given", () => {
     render(<PlayersContent leagueId="league1" leagueName="Dynasty Overlords" data={DATA} />);
 
     expect(screen.queryByText("Draft picks")).not.toBeInTheDocument();
     expect(screen.queryByText("Any roster status")).not.toBeInTheDocument();
   });
 
-  describe("Picks module", () => {
+  describe("Picks picksModule", () => {
     const PICKS: DraftPickAsset[] = [
       pick({ pick_id: "2027:1:1", owner_team_name: "Dynasty Overlords" }),
       pick({ pick_id: "2028:1:1", season: 2028, owner_roster_id: "2", owner_team_name: "Rival Squad", label: "2028 1st" }),
@@ -133,12 +133,12 @@ describe("PlayersContent", () => {
 
     beforeEach(() => window.localStorage.clear());
 
-    it("keeps the players list and adds one collapsed module whose summary carries real pick data", () => {
+    it("keeps the players list and adds one collapsed picksModule whose summary carries real pick data", () => {
       render(<PlayersContent leagueId="league1" leagueName="Dynasty Overlords" data={DATA} picks={PICKS} />);
 
       expect(screen.getByText("Alpha Receiver")).toBeInTheDocument();
-      const module = screen.getByRole("button", { name: /^Draft picks: 2 picks · 2027-2028/ });
-      expect(module).toBeInTheDocument();
+      const picksModule = screen.getByRole("button", { name: /^Draft picks: 2 picks · 2027-2028/ });
+      expect(picksModule).toBeInTheDocument();
       // The single tab row is the family strip: no Players | Picks toggle.
       expect(screen.queryByRole("tab", { name: "Picks" })).not.toBeInTheDocument();
       expect(screen.queryByText("2028 1st")).not.toBeInTheDocument();
