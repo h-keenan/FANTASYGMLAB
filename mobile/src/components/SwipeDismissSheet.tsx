@@ -3,6 +3,7 @@ import { Modal, StyleSheet, View, type ModalProps, type ScrollViewProps, type St
 import { Gesture, GestureDetector, GestureHandlerRootView, type NativeGesture } from 'react-native-gesture-handler';
 import Animated, {
   runOnJS,
+  useReducedMotion,
   useAnimatedScrollHandler,
   useAnimatedStyle,
   useSharedValue,
@@ -13,7 +14,7 @@ import Animated, {
 
 import { useThemeMode } from '../context/ThemeModeContext';
 import { useOverlay } from '../lib/useOverlay';
-import { classifySheetGesture, sheetDragOffset, shouldDismissSheet } from '../lib/sheetGesture';
+import { SHEET_SCROLL_TOP_TOLERANCE_PX, classifySheetGesture, resolveSheetRelease, sheetDragPosition } from '../lib/sheetGesture';
 import { radii, spacing } from '../theme';
 
 /**
@@ -21,7 +22,7 @@ import { radii, spacing } from '../theme';
  * would still like a gesture to swipe down out of the PQV, or any other
  * pop-up windows"). One gesture, built on the react-native-gesture-handler
  * and Reanimated the app already ships; the thresholds live in
- * lib/sheetGesture.ts and match web-next's exactly.
+ * lib/sheetGesture.ts (the shared gesture state machine, twin of web-next's) and match it exactly.
  *
  * Usage:
  *   <SheetModal visible onRequestClose={close} ...>       // instead of <Modal>
@@ -86,6 +87,9 @@ export function useSheetDismissGesture({
   const startX = useSharedValue(0);
   const startY = useSharedValue(0);
   const startedOnHandle = useSharedValue(false);
+  // Scroll offset when the finger went down: a drag may only start from content that was ALREADY at its top then.
+  // (Reading the live offset let a scroll-up that merely reached the top carry straight on into a dismiss.)
+  const startScrollY = useSharedValue(0);
 
   // Stable JS callback for runOnJS, always calling the latest onDismiss.
   const onDismissRef = useRef(onDismiss);
@@ -95,6 +99,8 @@ export function useSheetDismissGesture({
   const dismiss = useCallback(() => onDismissRef.current(), []);
 
   const nativeScroll = useMemo(() => Gesture.Native(), []);
+  // Reduced motion (OS setting): it still follows the finger and dismisses, but no slide-out and no spring.
+  const reduceMotion = useReducedMotion();
 
   const gesture = useMemo(
     () =>
@@ -108,6 +114,7 @@ export function useSheetDismissGesture({
           startX.value = touch.absoluteX;
           startY.value = touch.absoluteY;
           startedOnHandle.value = touch.y <= HANDLE_ZONE;
+          startScrollY.value = scrollY.value;
         })
         .onTouchesMove((event, manager) => {
           const touch = event.allTouches[0];
@@ -115,28 +122,32 @@ export function useSheetDismissGesture({
             manager.fail();
             return;
           }
+          // Content that started scrolling after the touch began (a fling still settling) is not ours.
+          const contentAtTop = startScrollY.value <= SHEET_SCROLL_TOP_TOLERANCE_PX && scrollY.value <= SHEET_SCROLL_TOP_TOLERANCE_PX;
           const decision = classifySheetGesture({
             dx: touch.absoluteX - startX.value,
             dy: touch.absoluteY - startY.value,
-            canStartDrag: startedOnHandle.value || (!handleOnly && scrollY.value <= 0),
+            canStartDrag: startedOnHandle.value || (!handleOnly && contentAtTop),
           });
           if (decision === 'drag') manager.activate();
           else if (decision === 'ignore') manager.fail();
         })
         .onUpdate((event) => {
-          translateY.value = sheetDragOffset(event.translationY, sheetHeight.value);
+          translateY.value = sheetDragPosition({ base: 0, delta: event.translationY, stops: [0], height: sheetHeight.value });
         })
         .onEnd((event) => {
-          const close = shouldDismissSheet({
-            offset: translateY.value,
+          // Gesture handler reports px/s; the shared rules use px/ms.
+          const release = resolveSheetRelease({
+            position: translateY.value,
             velocity: event.velocityY / 1000,
-            sheetHeight: sheetHeight.value,
+            height: sheetHeight.value,
+            stops: [0],
           });
-          if (!close) {
-            translateY.value = withSpring(0, SNAP_BACK_SPRING);
+          if (release.type !== 'dismiss') {
+            translateY.value = reduceMotion ? withTiming(0, { duration: 0 }) : withSpring(0, SNAP_BACK_SPRING);
             return;
           }
-          if (!slideOut) {
+          if (!slideOut || reduceMotion) {
             runOnJS(dismiss)();
             return;
           }
@@ -144,7 +155,7 @@ export function useSheetDismissGesture({
             if (finished) runOnJS(dismiss)();
           });
         }),
-    [enabled, slideOut, handleOnly, nativeScroll, dismiss, scrollY, startX, startY, startedOnHandle, translateY, sheetHeight],
+    [enabled, slideOut, reduceMotion, handleOnly, nativeScroll, dismiss, scrollY, startX, startY, startedOnHandle, startScrollY, translateY, sheetHeight],
   );
 
   const scrollContext = useMemo(() => ({ scrollY, nativeScroll }), [scrollY, nativeScroll]);

@@ -55,22 +55,40 @@ React Native's `Modal`, so keep anything that must survive in the caller's state
 Mobile: `<Sheet open onClose title ... />` wraps the existing `SheetModal` / `SwipeDismissCard` /
 `SheetScrollView` (which own the gesture), so the swipe thresholds are unchanged.
 
-Swipe-to-dismiss (web) is `useSheetDragDismiss` + `<SheetHandle />` on EVERY pop-up shell, hand-rolled or not:
-`Sheet`, `PlayerQuickView`, `SimSheet` (claim, team and every other Fantasy Sim sheet), `ManagerProfileSheet`, the
-Matchup `SwapSheet`, `TradePickerSheet`, `PercentileExplorerSheet`, `AlertsDropdown`, checkout. Spread `sheetStyle`
-on the moving surface and `backdropStyle` on the backdrop (the scrim fades with the drag). A drag starts from the
-handle always, and from the header or body only when every scroll area under the finger is at its top
-(`canStartSheetDrag`, so inner scroll and iOS overscroll never fight it); it closes past ~80-160px (a quarter of
-the sheet) or on a fast flick, else springs back; under reduced motion it closes without the slide. New pop-up
-shells must use the hook (a handle without the hook is the bug this rule exists for). Touch check:
-`scripts/sim_layout_playwright/sheet_drag.mjs` (real CDP touch drags). Mobile sheets get it from `SheetModal` +
-`SwipeDismissCard`.
+Swipe-to-dismiss: see "Gestures" below (one shared state machine, web hook + app hook). Every web pop-up shell
+(`Sheet`, `PlayerQuickView`, `SimSheet`, `ManagerProfileSheet`, Matchup `SwapSheet`, `TradePickerSheet`,
+`PercentileExplorerSheet`, `AlertsDropdown`, checkout, `PopupShell`, GM orb) and the weekly recap `StoryCarousel` use
+`useSheetDragDismiss`; every app pop-up uses `SwipeDismissCard` / `useSheetDismissGesture`. New shells must use the
+hook (a handle without the hook is the bug this rule exists for). The PQV has bespoke chrome, so it stays a
+hand-rolled shell around the same hook until a design pass decides what becomes a `Sheet` prop.
 
-Not migrated yet (low-risk later, one at a time): `PlayerQuickView`, `PercentileExplorerSheet`,
-`ManagerProfileSheet`, `MultiTeamTradeContent`, `MatchupPlanner` SwapSheet, `AlertsDropdown`,
-`SimSheet`, `TradePickerSheet`. They keep working as they are; each can be swapped for
-`Sheet` in its own PR. The PQV in particular has bespoke chrome (field/sweep textures, header
-layout), so it stays a hand-rolled shell until a design pass decides what becomes a `Sheet` prop.
+## Gestures (swipe down to dismiss, snap points)
+
+ONE implementation of drag-to-dismiss on both platforms. The pure rules and a state machine live in the twin
+`lib/sheetGesture.ts` (web `web-next/src/lib`, app `mobile/src/lib`, the app copy only adds the `'worklet'`
+directive; both run the same `sheetGesture.test.ts` cases, including simulated touch sequences). The web hook
+`lib/useSheetDragDismiss.ts` and the app `useSheetDismissGesture` (`SwipeDismissSheet.tsx`) only wire events to it.
+
+- **Start zones**: the handle always drags. Anywhere else a drag starts only when the pull is downward AND every
+  scroll area under the finger was at its top when the touch BEGAN (1px tolerance for fractional scroll offsets).
+  Scrolling content back up to the top and carrying on never turns into a dismiss.
+- **Axis lock**: past an 8px slop a clearly vertical pull (1.25x the horizontal travel) claims the gesture;
+  horizontal swipes (tab strips, chip rows, carousels) and diagonals that never resolve (24px) stay with the page.
+- **Follow + resistance**: the surface follows the finger 1:1 (from where the drag was claimed, no jump), then
+  rubber-bands past the dismiss distance and when pulled above its top. Web writes `transform` straight to the
+  element: no React render per touchmove (re-rendering the PQV 60 times a second was the stutter).
+- **Release**: dismiss when pulled past a quarter of the sheet (80-160px) OR flicked down at >= 0.55px/ms and >= 40px.
+  Velocity is averaged over the last 100ms (one jittery sample used to close a sheet pulled 24px), is 0 after a 100ms
+  rest, and a release moving back up never dismisses. Otherwise it springs back / settles on a snap point.
+- **Snap points** (the peek sheet): `useSheetDragDismiss({ snapPoints: [0.5, 1], snap, onSnapChange })` (fractions of
+  the sheet that stay visible; `snapTo(f)` from code). The sheet is laid out full height and translated to its rest
+  offset. Down from the lowest point dismisses; a flick from full lands on the peek first; below full a pull up from
+  anywhere expands (the content is not scrollable until full). Pure side: `sheetStops`, `resolveSheetRelease`.
+- **Story effect**: `effect: "story"` (full-screen card): translate + scale to 0.9 + fade to 0.45 with the pull.
+- **Dismissal path**: `onDismiss` must close like the X. The story passes `overlay.closeAll` so the overlay stack pops
+  its history entry. Under reduced motion it still follows the finger and closes, with no slide-out or spring.
+- Opt a region out with `data-sheet-no-drag`. Touch only (mouse/keyboard keep X, Esc, backdrop).
+- Check: `scripts/sim_layout_playwright/sheet_drag.mjs` (real CDP touches).
 
 ## StoryCarousel
 
@@ -99,7 +117,9 @@ const pages: StoryPage[] = [
   app; see "Overlays"), so only one pop-up is ever on screen: a player card (PQV) opened from a page REPLACES the
   story (it stays mounted/hidden with its page) and its "‹ Back to ..." returns to the same page. The X (top right)
   closes everything; Escape and the phone/browser Back go back one step. The stack owns the scroll lock, history and
-  z-index: the carousel sets none of them.
+  z-index: the carousel sets none of them. Swiping down out of it works like every sheet (see "Gestures"): the whole
+  card follows the finger, shrinks and fades, and closes via `overlay.closeAll` (same as the X); horizontal swipes and tap
+  zones are unchanged.
 - **Look and motion**: glass over the page background, safe-area padding on all sides, a 240ms slide
   between pages that is off under `prefers-reduced-motion` (app: `useReducedMotion`), no horizontal
   overflow (every column is `min-w-0`).
