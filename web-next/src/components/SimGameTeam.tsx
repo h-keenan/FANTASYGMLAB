@@ -7,6 +7,7 @@ import { Button } from "@/components/Button";
 import { EmptyState } from "@/components/EmptyState";
 import { Select } from "@/components/Input";
 import { PillRow } from "@/components/PillRow";
+import { useBottomPillContext } from "@/lib/useBottomPillContext";
 import { PositionBadge } from "@/components/PositionBadge";
 import { SimGlyph } from "@/components/SimGlyph";
 import { SimPlayerBrowser } from "@/components/SimGamePlayers";
@@ -63,6 +64,15 @@ export function SimTeamTab({ ctx, onTrade }: { ctx: SimCtx; onTrade: () => void 
   const [attempt, setAttempt] = useState(0);
   const [moving, setMoving] = useState<SimGamePlayer | null>(null);
   const picks = useSimPicks(ctx);
+  // Phones: Auto-set (the lineup action) lives in the bottom pill on this page; it has no tab row of its own to move.
+  useBottomPillContext({
+    id: "sim-team",
+    label: "Team actions",
+    tabs: [],
+    activeKey: "",
+    onSelect: () => {},
+    primary: { key: "auto-set", label: "Auto-set", glyph: "recommended", disabled: !lineup || lineup.locked, busy: saving, onPress: () => void auto() },
+  });
 
   useEffect(() => {
     let cancelled = false;

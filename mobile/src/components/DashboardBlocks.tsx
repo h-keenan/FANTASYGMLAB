@@ -16,7 +16,7 @@ import SectionHeading from './SectionHeading';
 import { useThemeMode } from '../context/ThemeModeContext';
 import type { DashboardItem, DashboardResponse, TeamRanking, TeamSnapshot } from '../lib/api';
 import { useExperienceCopy } from '../context/ExperienceLevelContext';
-import { formatRank } from '../lib/percentile';
+import { formatRank, rankFill } from '../lib/percentile';
 import { leagueAverageAge } from '../lib/teamStatus';
 import {
   deadlineChip,
@@ -34,6 +34,13 @@ const ATTENTION_ROUTE: Record<string, string> = {
   waivers: 'Waivers',
   my_team: 'MyTeam',
 };
+
+/** Which screen a "Needs attention" entry opens (shared by the card and the status header's player rows). */
+export function attentionEntryRoute(entry: DashboardAttentionEntry<DashboardItem>): string {
+  if (entry.target === 'matchup') return 'Matchup';
+  if (entry.target === 'gm_plan' || !entry.item) return 'GmPlan';
+  return ATTENTION_ROUTE[entry.item.destination] ?? 'GmPlan';
+}
 
 /**
  * "Needs attention": the few urgent items, one line each, each opening where it
@@ -54,11 +61,7 @@ export function DashboardNeedsAttention({
   const { colors } = useThemeMode();
   const styles = useMemo(() => createStyles(colors), [colors]);
   if (entries.length === 0) return null;
-  const routeFor = (entry: DashboardAttentionEntry<DashboardItem>): string => {
-    if (entry.target === 'matchup') return 'Matchup';
-    if (entry.target === 'gm_plan' || !entry.item) return 'GmPlan';
-    return ATTENTION_ROUTE[entry.item.destination] ?? 'GmPlan';
-  };
+  const routeFor = attentionEntryRoute;
   return (
     <View style={styles.block}>
       <SectionHeading title="Needs attention" />
@@ -175,6 +178,7 @@ export function DashboardTeamStats({
     icon,
     value: value != null ? formatRank(value, tied) : '—',
     note: value != null ? ofTeams : null,
+    fill: rankFill(value, teams && teams.length > 1 ? teams.length : null),
     onPress,
   });
   const items: StatStripItem[] = [

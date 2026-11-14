@@ -14,6 +14,7 @@ import { ReviewGlyphChip } from './SeasonReviewSections';
 import SegmentedTabBar from './SegmentedTabBar';
 import { SkeletonCard } from './SkeletonBlock';
 import { SimPickLine, useSimPicks } from './SimGameDynastyParts';
+import { useBottomPillContext } from '../lib/useBottomPillContext.ts';
 import { SimPlayerBrowser } from './SimGamePlayers';
 import { SimReserveButton, SimReserveGroups, SimReserveSheet } from './SimGameReserves';
 import CompactModule from './CompactModule';
@@ -73,6 +74,15 @@ export function SimTeamTab({ ctx, onTrade }: { ctx: SimCtx; onTrade: () => void 
   const [attempt, setAttempt] = useState(0);
   const [moving, setMoving] = useState<SimGamePlayer | null>(null);
   const picks = useSimPicks(ctx);
+  // The lineup action lives in the bottom pill on this page (web twin: SimGameTeam.tsx); it has no tab row to move.
+  useBottomPillContext({
+    id: 'sim-team',
+    label: 'Team actions',
+    tabs: [],
+    activeKey: '',
+    onSelect: () => {},
+    primary: { key: 'auto-set', label: 'Auto-set', glyph: 'recommended', disabled: !lineup || lineup.locked, busy: saving, onPress: () => void auto() },
+  });
 
   useEffect(() => {
     let cancelled = false;

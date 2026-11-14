@@ -7,14 +7,16 @@ import { InfoTip } from "@/components/InfoTip";
 import { StatStrip, type StatStripItem } from "@/components/StatStrip";
 import { RosterCompositionBar, RosterSections, TeamAnalysisList, type RosterTab } from "@/components/MyTeamSections";
 import { CompactModule } from "@/components/ui/CompactModule";
-import { Hero, StatStripModule } from "@/components/ui/ModuleTemplates";
+import { StatStripModule } from "@/components/ui/ModuleTemplates";
+import { StatusHeader } from "@/components/ui/StatusHeader";
+import { buildTeamStatusHeader, rosterAttentionItems } from "@/lib/statusHeader";
 import { listSummaryParts } from "@/lib/moduleTemplates";
 import { buildRosterComposition, buildTeamAnalysisRows } from "@/lib/myTeamAnalysis";
 import type { ReactNode } from "react";
 import { PillRow } from "@/components/PillRow";
 import type { KeepersResponse, LineupPlayer, MyTeamNeedsResponse, MyTeamResponse, TeamRanking } from "@/lib/api";
 import { BeginnerHelp } from "@/components/BeginnerHelp";
-import { formatRank } from "@/components/SnapshotTile";
+import { formatRank, rankFill } from "@/components/SnapshotTile";
 import {
   buildConstructionObservations,
   buildPositionGroupItems,
@@ -70,6 +72,13 @@ function joinRooms(rooms: string[]): ReactNode {
       {positionRoomText(room)}
     </span>
   ));
+}
+
+/** Win share as a 0..1 bar fill; null before any game is played. */
+function winShare(wins: number | null, losses: number | null, ties: number | null): number | null {
+  const w = wins ?? 0;
+  const games = w + (losses ?? 0) + (ties ?? 0);
+  return games > 0 ? (w + (ties ?? 0) / 2) / games : null;
 }
 
 const KEEPER_BASIS_LABEL: Record<string, string> = {
@@ -204,8 +213,8 @@ export function MyTeamContent({
     ? `${teamRanking.wins ?? 0}-${teamRanking.losses ?? 0}${teamRanking.ties ? `-${teamRanking.ties}` : ""}`
     : "—";
   const snapshotItems: StatStripItem[] = [
-    { glyph: "record", insight: "record", label: "Record", value: record },
-    { glyph: "power", insight: "power", label: "Power Rank", value: formatRank(teamRanking?.power_rank ?? null, teamRanking?.power_rank_tied ?? false) },
+    { glyph: "record", insight: "record", label: "Record", value: record, fill: teamRanking ? winShare(teamRanking.wins, teamRanking.losses, teamRanking.ties) : null },
+    { glyph: "power", insight: "power", label: "Power Rank", value: formatRank(teamRanking?.power_rank ?? null, teamRanking?.power_rank_tied ?? false), fill: rankFill(teamRanking?.power_rank, leagueSize) },
     ...(showFranchiseConstruction
       ? [
           {
@@ -213,15 +222,37 @@ export function MyTeamContent({
             insight: "franchise" as const,
             label: "Franchise Rank",
             value: formatRank(teamRanking?.franchise_rank ?? null, teamRanking?.franchise_rank_tied ?? false),
+            fill: rankFill(teamRanking?.franchise_rank, leagueSize),
           },
         ]
       : []),
-    { glyph: "starter", insight: "starter", label: "Starter Strength", value: formatRank(teamRanking?.starter_rank ?? null, teamRanking?.starter_rank_tied ?? false) },
-    { glyph: "bench", insight: "bench", label: "Bench Strength", value: formatRank(teamRanking?.bench_rank ?? null, teamRanking?.bench_rank_tied ?? false) },
+    { glyph: "starter", insight: "starter", label: "Starter Strength", value: formatRank(teamRanking?.starter_rank ?? null, teamRanking?.starter_rank_tied ?? false), fill: rankFill(teamRanking?.starter_rank, leagueSize) },
+    { glyph: "bench", insight: "bench", label: "Bench Strength", value: formatRank(teamRanking?.bench_rank ?? null, teamRanking?.bench_rank_tied ?? false), fill: rankFill(teamRanking?.bench_rank, leagueSize) },
     { glyph: "age", insight: "age", label: "Avg Age", value: teamRanking?.average_age != null ? teamRanking.average_age.toFixed(1) : "—" },
   ];
 
   const openSlots = openSlotsMessage(myTeam.open_slots);
+  // The status header: ring = how high the roster's value sits in the league, holes and injuries as mini stats, the
+  // starters who cannot play as player rows. A best-ball roster has no lineup to fix, so no holes or rows.
+  const lineupHref = `/matchup/${encodeURIComponent(leagueId)}?name=${encodeURIComponent(leagueName)}`;
+  const flaggedStarters = bestBall ? 0 : starters.filter((p) => p.ruled_out || p.start_ineligible_reason).length;
+  const teamStatusModel = buildTeamStatusHeader({
+    teamValue: formatScore(teamTotalValue),
+    valuePercentile,
+    leagueSize: leagueSize > 0 ? leagueSize : null,
+    context:
+      valuePercentile !== null
+        ? `${ordinal(Math.round(valuePercentile))} percentile of ${leagueSize} teams${!bestBall && starters.length > 0 ? ` · Starters ${formatScore(startersTotalValue)}` : ""}`
+        : !bestBall && starters.length > 0
+          ? `Starters ${formatScore(startersTotalValue)}`
+          : null,
+    record: teamRanking ? record : null,
+    openSlots: bestBall ? 0 : (myTeam.open_slots ?? []).length,
+    flaggedStarters,
+    injuredStarters: bestBall ? 0 : starters.filter((p) => p.injury_label && p.injury_label.trim()).length,
+    attention: bestBall || !leagueId ? [] : rosterAttentionItems(starters, 3, lineupHref),
+    hrefs: { lineup: lineupHref },
+  });
   const analysisParts = [
     needs?.biggest_need ? { key: "need", text: `Biggest need: ${needs.biggest_need.value}`, tone: "warning" as const, strong: true } : null,
     ...analysisRows.slice(0, 4).map((row) => ({
@@ -243,16 +274,8 @@ export function MyTeamContent({
         </div>
       </header>
 
-      <Hero
-        label="Team Value"
-        value={formatScore(teamTotalValue)}
-        context={
-          valuePercentile !== null
-            ? `${ordinal(Math.round(valuePercentile))} percentile of ${leagueSize} teams${!bestBall && starters.length > 0 ? ` · Starters ${formatScore(startersTotalValue)}` : ""}`
-            : !bestBall && starters.length > 0
-              ? `Starters ${formatScore(startersTotalValue)}`
-              : null
-        }
+      <StatusHeader
+        model={teamStatusModel}
         badge={teamRanking?.archetype_label ? <ToneBadge label={teamRanking.archetype_label} color="var(--color-accent)" /> : undefined}
         testId="team-hero"
       />

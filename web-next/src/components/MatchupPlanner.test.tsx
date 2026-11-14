@@ -123,7 +123,8 @@ describe("Matchup lineup planner", () => {
       { slot: "QB", player_id: "qb" },
       { slot: "WR", player_id: "wr1" },
     ]);
-    await screen.findByText("60%");
+    // The hero's win chip carries the planned lineup's odds ("60% win").
+    await waitFor(() => expect(screen.getByTestId("matchup-win-chip")).toHaveTextContent("60% win"));
 
     post.mockResolvedValueOnce(
       whatIf(60, {
@@ -169,7 +170,7 @@ describe("Matchup lineup planner", () => {
       { slot: "QB", player_id: "qb" },
       { slot: "WR", player_id: "bench" },
     ]);
-    await screen.findByText("66%");
+    await waitFor(() => expect(screen.getByTestId("matchup-win-chip")).toHaveTextContent("66% win"));
 
     post.mockResolvedValueOnce(whatIf(60));
     const reset = screen.getByRole("button", { name: "Reset to suggested" });

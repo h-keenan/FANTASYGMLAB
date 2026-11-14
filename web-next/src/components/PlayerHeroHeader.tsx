@@ -55,11 +55,14 @@ export function PlayerHeroHeader({
   rookie = null,
   valueChart = null,
   ovrChart = null,
+  gradeTile = null,
 }: {
   /** Shown in the tap-the-Value popover (for example the value history chart). */
   valueChart?: ReactNode;
   /** Shown in the tap-the-Player-score popover (for example the model radar). */
   ovrChart?: ReactNode;
+  /** Fantasy Sim: a letter-grade tile that REPLACES the Player score ring (no numeric rating in the sim). */
+  gradeTile?: ReactNode;
   /** ROOKIE badge from rookieBadge(bio); null for everyone else. */
   rookie?: { label: string; detail: string | null } | null;
   /** Team bye week (null when unknown / free agent). */
@@ -156,7 +159,9 @@ export function PlayerHeroHeader({
         </div>
 
         <div className="pqv-stat-tiles">
-          {overallRating != null ? (
+          {gradeTile ? (
+            gradeTile
+          ) : overallRating != null ? (
             <TapForWhy metric="ovr" variant="tile" className="pqv-stat-tile" spoken={`Player score ${overallRating}`} chart={ovrChart}>
               <OvrGauge rating={overallRating} size="lg" />
               <span className="pqv-stat-tile-caption">Player score</span>

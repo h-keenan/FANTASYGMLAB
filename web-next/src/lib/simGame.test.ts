@@ -83,6 +83,7 @@ import {
   simTradePayload,
   simTradeReady,
   simTradeReducer,
+  simAutoPickConfirmText,
   simValueOverAdpLabel,
   simWeekHeading,
   type SimGame,
@@ -94,7 +95,7 @@ import {
 } from "./simGame";
 
 function player(id: string, pos: SimGamePlayer["pos"], projection = 10): SimGamePlayer {
-  return { id, name: `P${id}`, pos, team: "KC", age: 25, adp: 10, value: 50, projection, floor: 5, ceiling: 20, status: "healthy", out_weeks: 0, bye_week: 9 };
+  return { id, name: `P${id}`, pos, team: "KC", age: 25, adp: 10, projection, floor: 5, ceiling: 20, status: "healthy", out_weeks: 0, bye_week: 9 };
 }
 
 function game(overrides: Partial<SimGame> = {}): SimGame {
@@ -856,5 +857,13 @@ describe("kickers and defenses in trades", () => {
     expect(simTradableIn({}, "K")).toBe(false);
     expect(simTradableIn({ kd_v: 0 }, "DEF")).toBe(false);
     expect(simTradableIn({}, "QB")).toBe(true);
+  });
+});
+
+describe("simAutoPickConfirmText", () => {
+  it("names the public rule for new games and the old rule for saves from before hint_v", () => {
+    expect(simAutoPickConfirmText({ hint_v: 1 })).toContain("by ADP");
+    expect(simAutoPickConfirmText({})).toBe("Auto-draft the rest of your picks from your queue, then best available and need?");
+    expect(simAutoPickConfirmText(undefined)).not.toContain("ADP");
   });
 });

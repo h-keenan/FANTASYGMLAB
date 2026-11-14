@@ -14,7 +14,7 @@ vi.mock("@/lib/api", async () => {
 const mocked = api as unknown as Record<string, ReturnType<typeof vi.fn>>;
 
 function p(id: string, name: string, pos: SimGamePlayer["pos"], over: Partial<SimGamePlayer> = {}): SimGamePlayer {
-  return { id, name, pos, team: "KC", age: 26, adp: 5, value: 60, overall: 80, projection: 12.3, floor: 5, ceiling: 20, status: "healthy", out_weeks: 0, bye_week: 9, owner: { type: "you", team_id: "3", name: "Me" }, ...over };
+  return { id, name, pos, team: "KC", age: 26, adp: 5, grade: "B", projection: 12.3, floor: 5, ceiling: 20, status: "healthy", out_weeks: 0, bye_week: 9, owner: { type: "you", team_id: "3", name: "Me" }, ...over };
 }
 
 const game = { id: "g1", status: "in_season", week: 4, settings: { block_v: 1, slots: ["QB", "RB"] }, can_trade: true, you: { team_id: "3", name: "Me" } } as unknown as SimGame;

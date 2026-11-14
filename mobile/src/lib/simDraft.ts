@@ -3,6 +3,7 @@
 import { compactParts, type CompactPart } from "./compactModule";
 import { badgeFromTag, contextSuppressed, type BadgeInput, type BadgeKind } from "./playerBadges";
 import type { PlayerListStat } from "./playerListRow";
+import { simGradeOf, simGradeText, type SimGradeInput } from "./simGrade";
 import { simPlayerTags, simFmtPts, simFmtValue, simRosterNeeds, type SimDraftPick, type SimDraftState, type SimGamePlayer, type SimGameTone, type SimPlayerSort, type SimPos, type SimSlot } from "./simGame";
 
 export interface SimDraftProgress {
@@ -96,20 +97,6 @@ export function simDraftAdpDelta(adp: number | null | undefined, pickNo: number)
 }
 
 /**
- * The board "Edge" column: model value rank against market ADP, independent of
- * the pick on the clock (so a board sorted by ADP is not a wall of reaches).
- * ADP 40 with value rank 22 is +18 (green, the market sleeps on him); ADP 10
- * with value rank 25 is -15 (red, the market is ahead of the model). Within 3
- * spots is noise (null). Without a rank (older server) there is no edge.
- */
-export function simBoardEdge(player: { adp?: number | null; value_rank?: number | null; adp_edge?: number | null }): SimDraftAdpDelta | null {
-  const raw = player.adp_edge ?? (player.adp != null && player.value_rank != null ? player.adp - player.value_rank : null);
-  if (raw == null || Number.isNaN(raw) || Math.abs(raw) < 3) return null;
-  const delta = Math.round(raw);
-  return delta > 0 ? { delta, label: `+${delta}`, tone: "success" } : { delta, label: `${delta}`, tone: "danger" };
-}
-
-/**
  * Projection to show in a draft/board row. An injured or bye player projects
  * 0.0 for the current week (the engine scores him zero), which reads as "he is
  * bad"; show his per-game mean when healthy instead, flagged so the row can be
@@ -183,23 +170,21 @@ export function simRowBadges(player: { rookie?: boolean; age?: number | null; sq
 }
 
 /**
- * The labeled stats of a sim list row: PROJ, OVR (the player's Overall, drawn as the same gauge the real
- * app uses; never the raw 0-100 trade value, which would be a second number with a similar name), ADP and (only when the
- * market and the model disagree by 3+ spots) EDGE. Projection is the per-game
- * mean for an injured player (simBoardProjection), never a bare 0.0.
+ * The labeled stats of a sim list row: PROJ, GRD (the player's overall as a LETTER GRADE, never a number: the sim shows no
+ * numeric rating and no rank taken from it) and ADP. There is no "Edge" chip any more: it compared the model's value rank
+ * with ADP, which would hand out the hidden ranking. Projection is the per-game mean for an injured player
+ * (simBoardProjection), never a bare 0.0.
  */
 export function simListStats(
-  player: Pick<SimGamePlayer, "status" | "projection" | "ros_mean" | "adp"> & { value?: number | null; overall?: number | null; value_rank?: number | null; adp_edge?: number | null },
+  player: Pick<SimGamePlayer, "status" | "projection" | "ros_mean" | "adp"> & SimGradeInput,
   opts: { adp?: boolean } = {},
 ): PlayerListStat[] {
   const stats: PlayerListStat[] = [
     { key: "proj", label: "Proj", value: simFmtPts(simBoardProjection(player).value) },
   ];
-  // The one 0-100 number is Overall. The model's internal rating is never shown anywhere in the sim.
-  if (player.overall != null) stats.push({ key: "ovr", label: "OVR", value: String(player.overall), rating: player.overall });
+  // The one overall is a letter grade. A pick or a thin position pool has none (null keeps the column's footprint).
+  stats.push({ key: "ovr", label: "Grade", value: simGradeText(player), grade: simGradeOf(player) });
   if (opts.adp !== false && player.adp != null) stats.push({ key: "adp", label: "ADP", value: simFmtValue(player.adp) });
-  const edge = simBoardEdge(player);
-  if (edge) stats.push({ key: "edge", label: "Edge", value: `${edge.tone === "success" ? "▲" : "▼"}${Math.abs(edge.delta)}`, tone: edge.tone === "success" ? "success" : "danger" });
   return stats;
 }
 
@@ -322,11 +307,11 @@ export function simDraftPickChip(pick: Pick<SimDraftPick, "pick_no" | "player">)
   return `#${pick.pick_no} ${last} ${pick.player.pos}`;
 }
 
-/** The draft board's sorts. OVR is the shown rating; the model's internal value is never a sort or a label. */
+/** The draft board's sorts. Grade is the shown rating (a coarse letter band, then projection); the model's internal value is never a sort or a label. */
 export const SIM_DRAFT_SORTS: { label: string; value: SimPlayerSort }[] = [
   { label: "ADP", value: "adp" },
   { label: "Proj", value: "projection" },
-  { label: "OVR", value: "overall" },
+  { label: "Grade", value: "overall" },
 ];
 
 /** Next sort in the draft list (a one-tap cycle on phones). Unknown values restart at the first. */
@@ -403,4 +388,37 @@ export function simRookieRecentChips(order: readonly SimRookieOrderLike[], count
       const parts = o.made!.name.trim().split(/\s+/);
       return { key: o.pick, label: `#${o.n} ${parts[parts.length - 1]} ${o.made!.pos}`, pos: o.made!.pos };
     });
+}
+
+/**
+ * The pinned draft bar's second line (V1 with the avatar): the best available player with his avatar, position and
+ * letter grade. Never a number for the model's rating: the grade is a letter, ADP and projection are the only figures.
+ */
+export interface SimDraftBarModel {
+  playerId: string | null;
+  name: string;
+  position: string;
+  team: string | null;
+  /** "ADP 5" or null. */
+  adp: string | null;
+  /** A letter ("A-"), or null when the game has no grade for him. */
+  grade: string | null;
+  /** "Fills your RB need" when his position is a starter slot you have not filled. */
+  fit: string | null;
+}
+
+export function simDraftBarModel(
+  player: Pick<SimGamePlayer, "name" | "pos" | "team" | "adp"> & { headshot_id?: string | null; grade?: string | null },
+  needs: readonly SimDraftNeed[],
+): SimDraftBarModel {
+  const need = needs.find((n) => n.pos === player.pos && n.starters > 0 && n.have < n.starters);
+  return {
+    playerId: player.headshot_id ?? null,
+    name: player.name,
+    position: player.pos,
+    team: player.team,
+    adp: player.adp != null && !Number.isNaN(player.adp) ? `ADP ${simFmtValue(player.adp)}` : null,
+    grade: player.grade ?? null,
+    fit: need ? `Fills your ${need.pos} need` : null,
+  };
 }

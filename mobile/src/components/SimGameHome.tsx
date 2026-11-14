@@ -7,6 +7,10 @@ import Button from './Button';
 import ErrorState from './ErrorState';
 import PositionBadge from './PositionBadge';
 import SimGlyph from './SimGlyph';
+import StatusHeader from './StatusHeader';
+import { MatchupHeroCard } from './MatchupModule';
+import { simMatchupCardModel } from '../lib/matchupModules';
+import { buildSimStatusHeader, simHomeAttentionItems } from '../lib/statusHeader';
 import CompactModule from './CompactModule';
 import { simLeagueParts } from '../lib/simSummaries';
 import { SkeletonCard } from './SkeletonBlock';
@@ -34,6 +38,7 @@ import {
   simProjText,
   simFmtRecord,
   simRowEdge,
+  simSeasonText,
   simSlotLabels,
   simWinChanceLabel,
   simWinChanceTone,
@@ -123,6 +128,7 @@ export function SimHomeTab({ ctx, setClaims, onTab }: { ctx: SimCtx; setClaims: 
   const names = Object.fromEntries((home.standings?.rows ?? []).map((r) => [r.team_id, r.name]));
   return (
     <View style={common.stack} testID="sim-home">
+      <SimStatusHeader home={home} onTab={onTab} />
       {home.matchup ? <SimMatchupCard ctx={ctx} matchup={home.matchup} onTab={onTab} /> : null}
       <SimChecklistCard home={home} onTab={onTab} onAuto={home.matchup && !home.matchup.bye ? auto.run : undefined} autoBusy={auto.busy} optimal={auto.optimal} />
       <SimReservesStrip home={home} onTab={onTab} />
@@ -174,13 +180,26 @@ function SimMatchupCard({ ctx, matchup, onTab }: { ctx: SimCtx; matchup: SimHome
   const labels = simSlotLabels(matchup.rows);
   const flagged = (matchup.you_flagged ?? 0) + (matchup.opp_flagged ?? 0);
   const lineupsOpen = showLineups;
+  const cardModel = simMatchupCardModel({
+    week: matchup.week,
+    playoff: matchup.kind === 'playoff',
+    opponentName: opp.name,
+    youName: 'You',
+    youProjection: youProj,
+    oppProjection: oppProj,
+    winProb: prob,
+    rows: matchup.rows,
+  });
   return (
-    <AccentCard accent={colors.accent} glow>
-      <SimSectionTitle
-        glyph="matchup"
-        title={matchup.kind === 'playoff' ? 'Playoff matchup' : `Week ${matchup.week} matchup`}
-        right={<Button label="Set lineup" size="sm" variant="secondary" onPress={() => onTab('team')} />}
-      />
+    <MatchupHeroCard
+      model={cardModel}
+      testID="sim-matchup-hero"
+      onOpenPlayer={(p) => {
+        const hit = matchup.rows.flatMap((r) => [r.you, r.opp]).find((pl) => pl && pl.name === p.name);
+        if (hit) ctx.openPlayer(hit);
+      }}
+      action={<Button label="Set lineup" onPress={() => onTab('team')} />}
+    >
       <View style={styles.versus}>
         <View style={styles.versusSide}>
           <SimTeamLink teamId={you?.team_id} name={you?.name ?? 'You'} isYou size={36} stacked />
@@ -192,23 +211,6 @@ function SimMatchupCard({ ctx, matchup, onTab }: { ctx: SimCtx; matchup: SimHome
           <AppText style={[common.muted, common.center]}>
             {opp.record ? simFmtRecord(opp.record) : ''} · {opp.persona.label}
           </AppText>
-        </View>
-      </View>
-
-      <View style={common.tight} testID="win-chance">
-        <View style={styles.chanceRow}>
-          <AppText style={common.muted}>Your win chance</AppText>
-          <AppText style={[styles.chance, { color: simToneColor(tone, colors) }]}>{simWinChanceLabel(prob)}</AppText>
-        </View>
-        <View style={styles.track} accessibilityRole="progressbar" accessibilityLabel={`Win chance ${simWinChanceLabel(prob)}`}>
-          <View style={[styles.fill, { width: `${Math.round(prob * 100)}%` }]} />
-        </View>
-        <View style={common.rowBetween}>
-          <AppText style={[styles.proj, youProj >= oppProj && { color: colors.success }]} testID="your-projection">
-            {simFmtPts(youProj)}
-          </AppText>
-          <AppText style={common.muted}>projected points</AppText>
-          <AppText style={[styles.proj, oppProj > youProj && { color: colors.danger }]}>{simFmtPts(oppProj)}</AppText>
         </View>
       </View>
 
@@ -249,7 +251,7 @@ function SimMatchupCard({ ctx, matchup, onTab }: { ctx: SimCtx; matchup: SimHome
         <AppText style={common.muted}>Their lineup is what their manager will start. Projections update when injuries or byes change.</AppText>
         </View>
       ) : null}
-    </AccentCard>
+    </MatchupHeroCard>
   );
 }
 
@@ -272,6 +274,34 @@ function Side({ player, win, lose, align, ctx }: { player: SimGamePlayer | null;
       <SimMiniPlayer player={player} align={align} onOpen={ctx.openPlayer} size={24} wrap />
     </View>
   );
+}
+
+/**
+ * The players-first status header on Home (ring = this week's win chance, record, three mini stats, the starters and
+ * targets that need you as player rows, the first unfinished checklist step as the one action). The cards below keep
+ * every detail. Projection and ADP only; the sim never shows its internal rating. Mirrors web SimStatusHeader.
+ */
+function SimStatusHeader({ home, onTab }: { home: SimHomeResponse; onTab: (tab: SimTab) => void }) {
+  const mine = home.standings?.rows.find((r) => r.is_you);
+  const record = home.matchup?.you_record ?? (mine ? { wins: mine.wins, losses: mine.losses, ties: mine.ties } : null);
+  const next = (home.checklist ?? []).find((item) => !item.done && simChecklistTarget(item));
+  const model = buildSimStatusHeader({
+    week: home.week ?? home.matchup?.week ?? null,
+    seasonLabel: home.dynasty ? simSeasonText(home.dynasty) : null,
+    record: record ? simFmtRecord(record) : null,
+    rank: home.standings?.your_rank ?? mine?.rank ?? null,
+    teams: home.standings?.rows.length ?? null,
+    inPlayoffs: home.standings ? home.standings.in_playoffs : null,
+    opponentName: home.matchup?.opponent?.name ?? null,
+    winProb: home.matchup && !home.matchup.bye ? (home.matchup.win_prob ?? null) : null,
+    bye: Boolean(home.matchup?.bye),
+    injuredCount: (home.injuries ?? []).length,
+    offers: home.inbox?.count ?? 0,
+    waiverTargets: (home.waiver_suggestions ?? []).length,
+    attention: simHomeAttentionItems(home),
+    next: next ? { label: next.label, actionKey: simChecklistTarget(next) as string } : null,
+  });
+  return <StatusHeader model={model} onAction={(key) => onTab(key as SimTab)} testID="sim-status-header" />;
 }
 
 /** One tappable line for dynasty / IR games (season, picks, IR and taxi use); nothing in redraft. */

@@ -8,10 +8,13 @@ import { SimWeekRecapView } from './SimGameRecap';
 import CircularProgressRing from './CircularProgressRing';
 import { Confetti, CountUp, MotionIn } from './Motion';
 import { SimPlayerChip, SimPlayerLine, createSimStyles, type SimCtx } from './SimGameParts';
+import RecapCard from './RecapCard';
 import TeamAvatar from './TeamAvatar';
+import { recapCardModel, recapRowsFromItems } from '../lib/recapCard';
 import TrophyIcon from './TrophyIcon';
 import { useThemeMode } from '../context/ThemeModeContext';
 import { EASE, HERO_GLOW } from '../lib/motion';
+import { simGradeOf } from '../lib/simGrade';
 import { simFmtPts, simPlayoffRoundLabel, simTeamNameMap, type SimGamePlayer, type SimWeekRecap } from '../lib/simGame';
 import { useReducedMotion } from '../lib/useMotion';
 import { positionColor, spacing } from '../theme';
@@ -152,7 +155,7 @@ export default function SimWeekRecapStory({
     p.player ? (
       <MotionIn key={label}>
         <AppText style={[common.muted, { fontWeight: '800', textTransform: 'uppercase', color: accent }]}>{label}</AppText>
-        <SimPlayerLine player={p.player} stats={[{ key: 'pts', label: 'Pts', value: simFmtPts(p.pts), tone: label === 'Best performer' ? 'success' : undefined }, { key: 'ovr', label: 'OVR', value: '', rating: p.player.overall ?? null }]} onOpen={ctx.openPlayer} />
+        <SimPlayerLine player={p.player} stats={[{ key: 'pts', label: 'Pts', value: simFmtPts(p.pts), tone: label === 'Best performer' ? 'success' : undefined }, { key: 'ovr', label: 'Grade', value: '', grade: simGradeOf(p.player) }]} onOpen={ctx.openPlayer} />
       </MotionIn>
     ) : (
       <Fact key={label} label={label} accent={accent}>{`${p.name} · ${simFmtPts(p.pts)}`}</Fact>
@@ -235,7 +238,7 @@ export default function SimWeekRecapStory({
                   stats={[
                     { key: 'pts', label: 'Pts', value: simFmtPts(s.pts), tone: simRecapProj(s) != null && s.pts >= simRecapProj(s)! ? 'success' : undefined },
                     { key: 'proj', label: 'Proj', value: simFmtPts(simRecapProj(s)) },
-                    { key: 'ovr', label: 'OVR', value: '', rating: s.player!.overall ?? null },
+                    { key: 'ovr', label: 'Grade', value: '', grade: simGradeOf(s.player) },
                   ]}
                   onOpen={ctx.openPlayer}
                 />
@@ -281,13 +284,7 @@ export default function SimWeekRecapStory({
             {h.hero?.value ? <CountUp value={Number(h.hero.value)} render={(t) => <Hero value={t} caption={h.hero?.who ? `Top score: ${h.hero.who}` : undefined} color={colors.success} />} /> : null}
             {h.hero?.who ? <TeamAvatar avatarId={null} name={h.hero.who} size={44} /> : null}
           </HeroZone>
-          <View style={{ gap: 8 }}>
-            {h.items.map((it) => (
-              <Fact key={it.key} label={it.label} accent={it.key === 'closest' ? colors.warning : it.key === 'blowout' ? colors.danger : colors.accent}>
-                {it.detail}
-              </Fact>
-            ))}
-          </View>
+          <RecapCard model={recapCardModel({ kicker: 'Around the league', rows: recapRowsFromItems(h.items.map((it) => ({ ...it, tone: it.key === 'closest' ? ('warning' as const) : it.key === 'blowout' ? ('danger' as const) : undefined }))) })} />
         </>
       );
     }
@@ -304,13 +301,7 @@ export default function SimWeekRecapStory({
             {m.championName && !m.youChampion ? <TeamAvatar avatarId={null} name={m.championName} size={48} /> : null}
             <AppText style={[common.bodyStrong, { textAlign: 'center', color: colors.textSecondary }]}>{m.youChampion ? `${youName} won it all.` : `You finished ${m.finish}.`}</AppText>
           </HeroZone>
-          <View style={{ gap: 8 }}>
-            {m.items.map((it) => (
-              <Fact key={it.key} label={it.label} accent={it.key === 'champion' ? gold : colors.accent}>
-                {it.detail}
-              </Fact>
-            ))}
-          </View>
+          <RecapCard model={recapCardModel({ kicker: 'Season complete', badge: m.finish, rows: recapRowsFromItems(m.items) })} />
         </>
       );
     }
@@ -324,13 +315,7 @@ export default function SimWeekRecapStory({
             {n.yours != null && n.theirs != null ? <AppText style={[common.bodyStrong, { textAlign: 'center', fontSize: 18 }]}>{`${simFmtPts(n.yours)} proj vs ${simFmtPts(n.theirs)}`}</AppText> : null}
             {n.edge ? <AppText style={[common.bodyStrong, { textAlign: 'center', color: colors.textSecondary }]}>{n.edge}</AppText> : null}
           </HeroZone>
-          <View style={{ gap: 8 }}>
-            {n.notes.map((note) => (
-              <Fact key={note.label} label={note.label} accent={note.label === 'Lineup' ? colors.warning : colors.accent}>
-                {note.text}
-              </Fact>
-            ))}
-          </View>
+          <RecapCard model={recapCardModel({ kicker: `Week ${n.week ?? ''} plan`.trim(), rows: recapRowsFromItems(n.notes.map((note) => ({ ...note, tone: note.label === 'Lineup' ? ('warning' as const) : undefined }))) })} />
         </>
       );
     }

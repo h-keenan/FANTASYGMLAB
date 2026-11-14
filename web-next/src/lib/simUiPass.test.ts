@@ -33,7 +33,7 @@ describe("review sections never collapse to an empty header", () => {
 });
 
 describe("sim player sheet presentation", () => {
-  const p = { projection: 20, next_projection: 21, projection_note: null, status: "healthy" as const, out_weeks: 0, floor: 10, ceiling: 31, adp: 12, adp_edge: 4 };
+  const p = { projection: 20, next_projection: 21, projection_note: null, status: "healthy" as const, out_weeks: 0, floor: 10, ceiling: 31, adp: 12 };
   it("hero tiles replace Value and Usage with this week and ADP, never a value", () => {
     const tiles = simHeroTiles(p);
     expect(tiles.map((t) => t.label)).toEqual(["This week", "ADP"]);
@@ -58,10 +58,10 @@ describe("sim player sheet presentation", () => {
     expect(simAgePhase("WR", null)).toBeNull();
   });
   it("a veteran gets a profile read built only from game fields, no value", () => {
-    const read = simProfileRead({ pos: "WR", age: 27, overall: 88, adp: 20, adp_edge: 6, projection: 15, ros_mean: 15, floor: 6, ceiling: 31, games: 3, ppg: 14.2, season_points: 42.6, last_week: 12, team: "BUF" });
+    const read = simProfileRead({ pos: "WR", age: 27, grade: "A-" as const, adp: 20, projection: 15, ros_mean: 15, floor: 6, ceiling: 31, games: 3, ppg: 14.2, season_points: 42.6, last_week: 12, team: "BUF" });
     expect(read.phase?.label).toBe("Prime");
-    expect(read.tiles.map((t) => t.label)).toEqual(["Age", "Overall", "Range", "ADP"]);
-    expect(read.lines.join(" ")).toMatch(/sim has him/);
+    expect(read.tiles.map((t) => t.label)).toEqual(["Age", "Grade", "Range", "ADP"]);
+    expect(read.lines.join(" ")).not.toMatch(/sim has him|sim does/); // no market-vs-model line: that compares ADP with the hidden rating
     expect([...read.tiles.flatMap((t) => [t.label, t.note]), ...read.lines, ...read.chips.map((c) => c.label)].join(" ")).not.toMatch(/value/i);
   });
 });

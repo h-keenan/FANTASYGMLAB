@@ -23,6 +23,7 @@ Ground rules for every pattern here:
 | `UndoToast` | `ui/UndoToast.tsx` | `UndoToast.tsx` | `confirmInPlace.ts` (timing) | built; used by GM targets |
 | `PlayerBadge` | `ui/PlayerBadge.tsx` | `PlayerBadge.tsx` | `playerBadges.ts` | built; every player row tag, PQV header and Sim roster/draft list routes through it |
 | Player anatomy (`PlayerAccordionRow`, `CompactPlayerCard`, `TradeCompactCard`, `RankRow`, `PlayerAvatarSlot`) | `ui/PlayerAccordionRow.tsx` etc. | same names in `components/` | `playerAnatomy.ts` | built; see "Player anatomy" |
+| `LetterGrade` / `GradeBar` / `GradeLegendSheet` | `ui/LetterGrade.tsx` | `LetterGrade.tsx` | `simGrade.ts` | built; the Fantasy Sim's overall (replaces the OVR gauge there only), see "Fantasy Sim letter grades" |
 | `CompactModule` | `ui/CompactModule.tsx` | `CompactModule.tsx` | `compactModule.ts` (+ `simSummaries.ts`, `simDraft.ts`) | built (Phase 1 of `docs/audits/2026-11-information-architecture.md`); Sim home folds and the Sim draft room use it; `Collapsible` is superseded (SimFold renders CompactModule) |
 
 ## Sheet
@@ -472,6 +473,7 @@ Layout rule (immune to iOS Safari fixed-position drift): nothing here is `positi
 - **API**: a page calls `useBottomPillContext({ id, label, tabs, activeKey, onSelect, primary })` (`lib/useBottomPillContext.ts`, store `lib/bottomPillStore.ts`, types and `normalizePillContext` in the `lib/bottomNav.ts` twin) and drops its own page-tab row only when the hook returns true (the pill is on screen and showing that context). Consolidate, never remove: desktop, the flag off and signed-out pages keep the in-page tabs. At most `PILL_MAX_TABS` (5) tabs; one primary; the tab strip scrolls inside the pill if it must.
 - **Motion** (lib/motion.ts tokens, opacity/transform only): entering a page slides the segment in; the menu cross-fades the layers and fans the global tabs out; the primary chip pulses once on mount. Reduced motion: crossfade only (no slide, scale, fan or pulse).
 - **One sticky mechanism**: both layers share one grid cell, so the pill is one row tall in every mode and the stack height is the content clearance. Never `position: fixed`. Guards: `lib/bottomChrome.test.ts`, `lib/bottomBarMetrics.test.ts`, `components/ui/BottomTabBar.test.tsx`, `scripts/sim_layout_playwright/footer_pin.mjs`.
+- **Wired contexts**: `PageTabBar` (every Team / Trades / League page: Team = Roster | Players | Waivers | Matchup, Trades = Hub | Finder | Analyzer | History + primary "New trade", League = Rankings | Recaps | Games) registers its family as `family:<key>`; each tab is a route (`PillContextTab.href`, rendered as a link) and the strip steps aside only while the pill is on screen. Fantasy Sim: the draft room (`sim-draft`: Players | Queue | Roster | Picks + Auto-pick) and Sim Team (`sim-team`: Auto-set). In the game `SimPillHost` marks the pill present and `PillMorph` (in `SimActionBar` / `SimOffseasonBar`) folds Sim to | orb | Advance into the page segment; with no bar mounted (the draft) `PillContextOnly` shows the segment alone. A page swap keeps the context for `PILL_CLEAR_DELAY_MS` so the global tabs never flash between two pages of one family. Not moved yet: the Waivers filter sheet (it owns its own open state), real-league Roster has no auto-set action to promote.
 - **App**: no tab bar (GM orb + More), so `components/BottomPill.tsx` hosts the screen's action row (Sim to | orb | Advance) and morphs to the page segment (Reanimated, `useReducedMotion`); the Sim bars use the same glass. `lib/bottomPillStore.ts` / `useBottomPillContext.ts` are mirrored twins.
 
 ## Phone site shell (Phase B, flagged)
@@ -734,17 +736,38 @@ should become `PlayerAccordionRow mode="sim"`, and the Sim trade inbox `TradeCom
 ## Player row anatomy (shared by FantasyDesk and the Fantasy Sim)
 
 `PlayerListRow` is THE row: line 1 name (+ the one status chip), line 2 muted meta (TEAM, age, bye), line 3 the **chips
-under the name**: labeled stat chips (PROJ / OVR / ADP / EDGE) then page tags (max 2 plus "+N"), then optional
+under the name**: labeled stat chips (PROJ / OVR / ADP / EDGE; in the Fantasy Sim the OVR slot is a LetterGrade and there is no EDGE) then page tags (max 2 plus "+N"), then optional
 `chipsExtra` (small inline controls such as a Queue toggle). The chip line is indented to the name, **wraps instead of
 clipping**, and nothing sits at the far right except **one trailing action** (`actions`). The Sim reuses it through
 `SimDraftRow`, `SimPlayerLine` and `SimRosterLine`; do not build another row.
 
 ## Fantasy Sim: no internal rating, ever
 
-The model's trade value is the sim's own rating, so it is never shown: no "Value"/"Trade value" label, chip or tile, and
-never a sort. The player-facing number is OVR. Lists sort by ADP, Proj or OVR (`GET /players?sort=overall`; `value` is kept
-server-side only so old clients and saves do not break; outcomes and replays are unchanged). Trades describe a deal in plain
-words (`simDealWords`: "A better deal for you than your offer"), never as numbers.
+The model's trade value is the sim's own rating, so it is never shown: no "Value"/"Trade value" label, chip or tile, no numeric OVR, no
+overall / position rank and never a sort by it. coridian_ (2026-11-14): a numeric OVR is a tell ("I just draft the highest value players
+and it works"), so the sim shows **letter grades** like Madden / 2K. Trades describe a deal in plain words (`simDealWords`), never numbers.
+
+### Fantasy Sim letter grades (web + app)
+
+- **`LetterGrade`** (`ui/LetterGrade.tsx`, app `components/LetterGrade.tsx`, rules in the byte-identical twin `lib/simGrade.ts`): 12 bands
+  A+ .. F in a tinted capsule (same recipe as `PlayerBadge`). The ramp is five existing tokens: **green** (`success`, A), **cyan**
+  (`accent`, B), **gold** (`action` / app `premium`, C), **orange** (`warning`, D), **red** (`danger`, F); +/- share the tone. The letter
+  keeps the primary text colour (lightly mixed with the tone) so contrast holds in both themes. A "?" marks a scouting estimate (rookies);
+  `size="lg"` also prints the range ("B-/B+"). The accessible name is the full read: "Grade B plus, strong starter. Scouts are unsure: B to
+  A minus." No grade renders an invisible placeholder with the same footprint so list columns align.
+- **`PlayerListRow`**: a stat with `grade` (even `null`) renders `LetterGrade` instead of the `OvrGauge` ring; the Sim reaches it only through
+  `simListStats` (PROJ, GRD, ADP; the EDGE chip is gone: it compared model value rank with ADP). The real FantasyDesk keeps `OvrGauge` and its
+  numbers.
+- **`GradeBar`**: one position attribute (label, coarse bar tinted by the grade tone, letter), in the sim quick view's "Attributes" section
+  with the line "From usage and history. Graded on their own: they do not add up to the overall grade."
+- **`GradeLegendSheet` / `GradeLegendButton`**: every band and what it means, what "?" means, what the attributes are. The hero `GradeTile`
+  opens it.
+- **Player Quick View in the sim**: `simSections.heroGrade` replaces the Player score ring; the Value tile, the overall / position rank line
+  and the model radar do not show (`PlayerHeroHeader` `gradeTile` / `hideValue`). The Overview tile reads "Grade".
+- Where it shows: draft room and board, Players / waivers, rosters and team sheets, league rosters, trades and the block, recap
+  players, carousel rows, the draft hint, team cards (top assets), the quick view hero.
+- Tests: `lib/simGrade.test.ts` (web vitest + app node:test), `ui/LetterGrade.test.tsx`, `SimPhoneLayout.test.tsx`, `SimPlayerSheet.test.tsx`;
+  server: `tests/test_sim_grades.py` (including "no API response contains the raw overall"). Calibration: `docs/audits/2026-11-sim-letter-grades.md`.
 
 ## Notice toast (auto-dismiss)
 
@@ -838,3 +861,50 @@ Audit and status: `docs/audits/2026-11-sim-ui-pass.md`. New shared pieces: `SimP
 `simOutlookTiles` / `simProfileRead` (the sim player sheet: the hero shows This week + ADP, never Value or Usage; Outlook tiles + an
 always-drawn projection chart; a "Scouting read" for players without a generated scouting report), `simLineupParts` / `simBenchParts` /
 `simStandingHero` / `simMenuHero` / `simRulesParts` (Team tab, Standings hero, Game menu), and `SimTeamCard dense` for pickers.
+
+## Players-first stacks (2026-11-14, coridian_ picks from the variant sheets)
+
+Picks: `docs/audits/2026-11-module-variant-sheets.md`. Shared by FantasyDesk and Fantasy Sim, web + app via lib twins
+(`statusHeader.ts`, `recapCard.ts`, and additions to `matchupModules.ts`, `simDraft.ts`). Cyan is the one primary action
+colour in these modules (`Button` primary); gold is premium meaning only. The sim never shows a numeric rating or Value:
+projection, ADP and letter grades only. Every player render uses the shared `PlayerAvatar`.
+
+### StatusHeader (hero + module stack, V2 "players-first")
+`ui/StatusHeader` / app `StatusHeader`: status ring (`StatusRing`: pct + centre text), up to **3** mini stats, "Needs your
+attention" list of up to **3** player rows (`PlayerRow` + avatar; a row with `detail` expands inline with an Open link; the
+right edge is one figure or one letter grade), then the one primary action, then `children` (CompactModules). The page
+passes a `StatusHeaderModel` from the pure builders in `lib/statusHeader.ts`:
+
+| Page | Builder | Ring | Rows |
+|---|---|---|---|
+| Today (`TeamStatusHero`) | `buildTodayStatusHeader` | win chance | `splitTodayAttention`: lineup holes (`lineupAttentionItems`) + single-player Needs-attention items |
+| My Team | `buildTeamStatusHeader` | team value percentile | `rosterAttentionItems` (starters out / bye / injured) |
+| Sim Home | `buildSimStatusHeader` | this week's win chance | `simHomeAttentionItems` (starters out, uncovered byes, best waiver target) |
+
+Nothing is dropped: an entry leaves the plain "Needs attention" card only when a player row now says the same thing;
+the Lineup / Standing / Position rooms modules stay under the header. Rows reuse the existing `PlayerRow`; when the compact
+V1/V2 `PlayerRow` lands, swap it inside `AttentionRow` only.
+
+### Stat strip (V1 compact + V2 expanded)
+`StatStripModule` (web `ui/ModuleTemplates`, app `ModuleTemplates`): compact = one row of small glass tiles always visible,
+each an `InsightLink` to what explains it; "Rank bars" expands the same stats into labelled `FillBar` rows (`fill` 0..1 from
+`rankFill` / win share; items with no honest scale list their value). The old collapsed-summary header is gone; the tiles
+are the informative collapsed form (the aria group name keeps the "Power #3 · Starters #5" sentence).
+
+### Matchup hero and ticker (6)
+`ui/MatchupModule`: `MatchupHeroCard` (week + LIVE/FINAL, win chip, both scores, win bar, "Proj final ... · N players left",
+two swing players with avatars = widest projection range still to play on each side, tap opens the player peek, one cyan
+"Open lineup") and `MatchupTicker` ("WK 7 · You 112.4 - 98.1 Mike · 71%", links to the Matchup page). Model: `matchupCardModel`
+(`matchupSwingPlayers`, `matchupTickerParts`, sim adapter `simMatchupCardModel` using floor/ceiling). Used on the Matchup page and the
+Sim Home matchup card; the ticker is the form to use wherever matchup is one module in a stack.
+
+### Sim draft clock bar (7a)
+`CompactModule` gained `preview` (always-visible line under the header, outside the toggle button). `SimDraftBar` is the
+clock's preview: best-available avatar, name, position and letter grade (ADP when the game has no grade), tap opens the
+player; expanding shows the existing on-the-clock module. `simDraftBarModel` in `lib/simDraft.ts`. The grade is read from
+the player's `grade` once the letter-grades change lands.
+
+### Recap card (7b V2)
+`ui/RecapCard` + `lib/recapCard.ts`: kicker, optional grade/finish badge, three label/value rows, extra rows behind "More".
+Used on the StoryCarousel Around the league / Season complete / Next week pages and as the Season in Review stats cards.
+Player-line pages (Result, Matchup, Injuries) keep their avatar rows.

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { simBlockEntryCount, simBlockNote, simGroupBenchByPosition, simOverallLabel, simRosterEntries, simRosterPositions, simTeamChips, simTeamRecordLine, simValueLabel } from "./simLeagueRosters";
+import { simBlockEntryCount, simBlockNote, simGroupBenchByPosition, simRosterEntries, simRosterPositions, simTeamChips, simTeamRecordLine } from "./simLeagueRosters";
 import type { SimGamePlayer, SimLeagueRosterTeam } from "./simGame";
 
 const pl = (id: string, pos: SimGamePlayer["pos"], name: string, value: number, team = "KC") => ({ id, pos, name, value, team, ros_mean: value / 10, projection: 10, status: "healthy" }) as unknown as SimGamePlayer;
@@ -20,10 +20,8 @@ describe("league roster helpers", () => {
     expect(simTeamRecordLine(rec(3, 0))).toBe("3-0 · #2 · 10.0 PF");
     expect(simTeamRecordLine(rec(0, 0))).toBe("0-0 · Power #4");
     expect(simTeamRecordLine({ record: null, power_rank: 4 })).toBe("Power #4");
-    expect([0, 0.4, 71.6, null].map(simValueLabel)).toEqual(["—", "—", "72", "—"]);
   });
-  it("labels overall and groups the bench by position", () => {
-    expect([null, 0, 71.6].map(simOverallLabel)).toEqual(["—", "0", "72"]);
+  it("groups the bench by position", () => {
     const g = simGroupBenchByPosition([pl("a", "WR", "A", 1), pl("b", "QB", "B", 1), pl("c", "WR", "C", 1)], ["QB", "RB", "WR"]);
     expect(g.map((x) => [x.pos, x.players.length])).toEqual([["QB", 1], ["WR", 2]]);
   });

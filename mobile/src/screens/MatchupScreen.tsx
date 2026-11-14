@@ -32,8 +32,9 @@ import PositionBadge from '../components/PositionBadge';
 import SegmentedTabBar from '../components/SegmentedTabBar';
 import DashboardStatRow from '../components/DashboardStatRow';
 import CompactModule from '../components/CompactModule';
-import { Hero } from '../components/ModuleTemplates';
-import { edgeChips, insightsParts, lineupParts, matchupHeroModel, movesParts, teamsValuesParts } from '../lib/matchupModules';
+import { MatchupHeroCard } from '../components/MatchupModule';
+import type { MatchupSwingPlayer } from '../lib/matchupModules';
+import { edgeChips, insightsParts, lineupParts, matchupCardModel, matchupSwingPlayers, movesParts, teamsValuesParts, type MatchupSwingInput } from '../lib/matchupModules';
 import TeamAvatar from '../components/TeamAvatar';
 import RangeCompare from '../components/RangeCompare';
 import WeatherReasonChip from '../components/WeatherReasonChip';
@@ -41,6 +42,8 @@ import { RANGE_CAPTION, leanLabel, rangeDisplayRows } from '../lib/startSitRange
 import NextSteps from '../components/NextSteps';
 import ValuesCredit from '../components/ValuesCredit';
 import {
+  type MatchupStarter,
+  type MatchupRealStarter,
   api,
   type MatchupPositionEdge,
   type MatchupResponse,
@@ -151,6 +154,8 @@ export default function MatchupScreen({ route, navigation }: Props) {
   // pauses while offline). Errors back off exponentially (lib/liveScores). The persisted
   // cache paints first, then staleTime 0 while live forces the revalidation.
   const isFocused = useIsFocused();
+  const scrollRef = useRef<ScrollView>(null);
+  const lineupY = useRef(0);
   const failures = useRef(0);
   const retryAfter = useRef<number | undefined>(undefined);
   const matchupQuery = useQuery({
@@ -298,6 +303,7 @@ export default function MatchupScreen({ route, navigation }: Props) {
     <View style={styles.root}>
       <GridBackground />
       <ScrollView
+        ref={scrollRef}
         style={styles.container}
         contentContainerStyle={[styles.content, { paddingBottom: orbClearance, paddingTop: headerHeight }]}
         refreshControl={
@@ -337,7 +343,19 @@ export default function MatchupScreen({ route, navigation }: Props) {
 
         <BeginnerHelp term="matchupIntro" />
         <BeginnerHelp term="matchupWinProbability" />
-        <MatchupHero matchup={shown} mine={mine} opponent={opponent} />
+        <MatchupHero
+          matchup={shown}
+          mine={mine}
+          opponent={opponent}
+          onOpenPlayer={(p) => {
+            if (!p.playerId) return;
+            openQuickView(
+              { player_id: p.playerId, name: p.name, position: p.position, team: p.team, age: null, status: null, injury_status: null, tier: p.tier, score: null, overall_rank: null, position_rank: null, rank_unavailable_reason: null, opportunity_label: null },
+              { leagueId, leagueName },
+            );
+          }}
+          onOpenLineup={() => scrollRef.current?.scrollTo({ y: Math.max(0, lineupY.current - headerHeight), animated: true })}
+        />
         {matchup.unmapped_players && matchup.unmapped_players.length > 0 ? (
           <AppText style={{ color: colors.textSecondary, fontSize: 13.5 }}>
             {`Not matched to a FantasyDesk player, so left out of the lineups and win odds: ${matchup.unmapped_players
@@ -347,6 +365,7 @@ export default function MatchupScreen({ route, navigation }: Props) {
         ) : null}
         <LiveFeedPanel feedKey={feedKey(leagueId, matchup.week)} live={matchup.game_state === 'live'} />
         <Insights matchup={shown} />
+        <View onLayout={(e) => { lineupY.current = e.nativeEvent.layout.y; }}>
         <LineupComparison
           matchup={matchup}
           view={activeView}
@@ -356,6 +375,7 @@ export default function MatchupScreen({ route, navigation }: Props) {
           planner={planner}
           ageSeconds={matchup.as_of_age_seconds != null ? dataAgeSeconds(matchup.as_of_age_seconds, matchupQuery.dataUpdatedAt, nowMs) : null}
         />
+        </View>
         {planner.sheet && planner.plan ? (
           <SwapSheet
             sheet={planner.sheet}
@@ -426,14 +446,44 @@ function scoreboardFacts(matchup: MatchupResponse) {
   return { hasOdds, myPct, myProjected, opponentProjected, margin };
 }
 
-/** Hero: this week's win chance (or the score) with both teams in the context line. */
-function MatchupHero({ matchup, mine, opponent }: { matchup: MatchupResponse; mine: MatchupSide; opponent: MatchupSide }) {
+/**
+ * Hero (V1, mirrors web MatchupHero): week + live state, win chance, both scores, the win bar, projection / players left,
+ * and the swing player on each side (widest projection range still to play) with their avatars. "Open lineup" scrolls to
+ * the lineup comparison.
+ */
+function MatchupHero({
+  matchup,
+  mine,
+  opponent,
+  onOpenPlayer,
+  onOpenLineup,
+}: {
+  matchup: MatchupResponse;
+  mine: MatchupSide;
+  opponent: MatchupSide;
+  onOpenPlayer: (player: MatchupSwingPlayer) => void;
+  onOpenLineup: () => void;
+}) {
   const { colors } = useThemeMode();
   const styles = useMemo(() => createStyles(colors), [colors]);
   const { myPct, myProjected, opponentProjected } = scoreboardFacts(matchup);
-  const model = matchupHeroModel({
+  const swingInputs: MatchupSwingInput[] = [];
+  let playersLeft: number | null = null;
+  for (const [side, team] of [['mine', mine], ['opponent', opponent]] as const) {
+    const list: Array<MatchupStarter | MatchupRealStarter> = team.has_live_data ? team.real_starters : team.starters;
+    for (const p of list) {
+      if (!p.name) continue;
+      const final = 'game_final' in p ? p.game_final === true : false;
+      const done = final || ('ruled_out' in p && p.ruled_out === true) || p.projection?.status === 'bye_week';
+      swingInputs.push({ playerId: p.player_id, name: p.name, position: p.position, team: p.team, tier: p.tier, low: p.projection?.low ?? null, high: p.projection?.high ?? null, done, side });
+      if (side === 'mine') playersLeft = (playersLeft ?? 0) + (done ? 0 : 1);
+    }
+  }
+  const model = matchupCardModel({
     week: matchup.week,
-    myName: mine.team_name,
+    live: matchup.game_state === 'live',
+    final: matchup.game_state === 'final',
+    myName: 'You',
     opponentName: opponent.team_name,
     myScore: mine.has_live_data ? mine.real_points : null,
     opponentScore: opponent.has_live_data ? opponent.real_points : null,
@@ -441,12 +491,12 @@ function MatchupHero({ matchup, mine, opponent }: { matchup: MatchupResponse; mi
     opponentProjected,
     winPercent: myPct,
     kickedOff: hasKickedOff(matchup),
-    live: matchup.game_state === 'live',
-    final: matchup.game_state === 'final',
+    playersLeft: hasKickedOff(matchup) ? playersLeft : null,
+    swing: matchupSwingPlayers(swingInputs, opponent.team_name),
   });
   return (
     <>
-      <Hero label={model.label} value={model.value} context={model.context} tone={model.tone} testID="matchup-hero" />
+      <MatchupHeroCard model={model} onOpenPlayer={onOpenPlayer} action={<Button label="Open lineup" onPress={onOpenLineup} />} testID="matchup-hero" />
       {myPct == null ? <AppText style={styles.oddsUnavailable}>{winProbabilityUnavailableMessage(matchup)}</AppText> : null}
     </>
   );

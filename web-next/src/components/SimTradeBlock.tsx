@@ -12,6 +12,7 @@ import { SkeletonCard } from "@/components/Skeleton";
 import { ToneBadge } from "@/components/ToneBadge";
 import { api } from "@/lib/api";
 import { simListStats } from "@/lib/simDraft";
+import { simGradeCompare } from "@/lib/simGrade";
 import { simIsPick, simPicksOf, type SimBlockResponse, type SimGamePlayer, type SimPickAsset, type SimPos, type SimTradeAsset } from "@/lib/simGame";
 
 type Hint = SimPos | "any";
@@ -78,7 +79,7 @@ export function SimBlockView({ ctx, onMakeOffer }: { ctx: SimCtx; onMakeOffer: (
   );
 
   const onIds = useMemo(() => new Set((block?.mine ?? []).map((m) => m.asset.id)), [block]);
-  const candidates = useMemo(() => roster.filter((p) => !onIds.has(p.id) && p.pos !== "K" && p.pos !== "DEF").sort((a, b) => b.value - a.value), [roster, onIds]);
+  const candidates = useMemo(() => roster.filter((p) => !onIds.has(p.id) && p.pos !== "K" && p.pos !== "DEF").sort((a, b) => simGradeCompare(a, b) || (b.ros_mean ?? 0) - (a.ros_mean ?? 0)), [roster, onIds]);
   const myPicks = simPicksOf(picks, teamId).filter((p) => !onIds.has(p.id));
 
   if (failed) return <EmptyState title="Could not load your block" subtitle="Check your connection and try again." actionLabel="Try again" onAction={() => { setFailed(false); setAttempt((n) => n + 1); }} />;

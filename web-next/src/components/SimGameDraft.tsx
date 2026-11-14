@@ -6,6 +6,7 @@ import { AccentCard } from "@/components/AccentCard";
 import { Button } from "@/components/Button";
 import { EmptyState } from "@/components/EmptyState";
 import { PillRow } from "@/components/PillRow";
+import { useBottomPillContext } from "@/lib/useBottomPillContext";
 import { SectionHeading } from "@/components/SectionHeading";
 import { SimDraftBoard } from "@/components/SimDraftBoard";
 import { SimDraftGlyph } from "@/components/SimDraftGlyphs";
@@ -15,14 +16,18 @@ import { SimIconButton, SimPlayerChip, SimPlayerLine, SimStat, SimToneBadge, use
 import { SkeletonCard } from "@/components/Skeleton";
 import { ToneBadge } from "@/components/ToneBadge";
 import { CompactModule } from "@/components/ui/CompactModule";
+import { SimDraftBar } from "@/components/SimDraftBar";
 import { api } from "@/lib/api";
-import { simDraftNeedPills, simDraftSummaryParts } from "@/lib/simDraft";
+import { simDraftBarModel, simDraftNeedPills, simDraftSummaryParts } from "@/lib/simDraft";
+import { simGradeOf } from "@/lib/simGrade";
+import { LetterGrade } from "@/components/ui/LetterGrade";
 import {
   SIM_QUEUE_MAX,
   simFmtPts,
   simProjText,
   simQueueReducer,
   simFilterPositionsFor,
+  simAutoPickConfirmText,
   simPositionsFor,
   simRosterNeeds,
   simValueOverAdpLabel,
@@ -98,6 +103,22 @@ export function SimGameDraft({ ctx, onComplete }: { ctx: SimCtx; onComplete: (re
     });
   }
 
+  // Best player still on the board by ADP: the bar's avatar line when the server has no pick suggestion for you.
+  const [topAvailable, setTopAvailable] = useState<SimGamePlayer | null>(null);
+  const madePicks = draft?.picks?.length ?? 0;
+  useEffect(() => {
+    if (hint || loadState !== "ready") return;
+    let cancelled = false;
+    Promise.resolve(api.getSimGamePlayers(gameId, "status=available&sort=adp&page=1&page_size=1"))
+      .then((body) => {
+        if (!cancelled) setTopAvailable(body?.items?.[0] ?? null);
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [gameId, hint, loadState, madePicks, ctx.tick]);
+
   // Persist the queue shortly after it changes (auto-pick reads it server-side).
   const saved = useRef<string>("");
   useEffect(() => {
@@ -169,6 +190,25 @@ export function SimGameDraft({ ctx, onComplete }: { ctx: SimCtx; onComplete: (re
     for (const t of draft?.teams ?? []) map[t.team_id] = t.is_you ? `${t.name} (you)` : t.name;
     return map;
   }, [draft?.teams]);
+
+  // Phones: the draft room's panel tabs live in the bottom pill (Players | Queue | Roster | Picks + Auto-pick), so the top row steps aside there.
+  const pillOwnsTabs = useBottomPillContext(
+    loadState === "ready" && draft
+      ? {
+          id: "sim-draft",
+          label: "Draft panels",
+          tabs: [
+            { key: "board", label: "Players", glyph: "players" },
+            { key: "queue", label: queue.ids.length ? `Queue ${queue.ids.length}` : "Queue", glyph: "queue" },
+            { key: "roster", label: "Roster", glyph: "roster" },
+            { key: "picks", label: "Picks", glyph: "picks" },
+          ],
+          activeKey: panel,
+          onSelect: (key) => setPanel(key as Panel),
+          primary: { key: "auto-pick", label: "Auto-pick", glyph: "recommended", disabled: draft.status === "complete" || busy === "pick", onPress: () => setConfirmAuto(true) },
+        }
+      : null,
+  );
 
   if (loadState === "loading") {
     return (
@@ -322,6 +362,8 @@ export function SimGameDraft({ ctx, onComplete }: { ctx: SimCtx; onComplete: (re
 
   const need = simDraftNeedPills(draft.your_roster, game.settings.slots);
   const draftLast = hint ? playerSurname(hint.player.name) : "";
+  // The pinned bar's second line: the server's pick for you, else the top ADP player still on the board.
+  const barPlayer = hint?.player ?? topAvailable;
   const header = (
     <CompactModule
       id="draft.clock"
@@ -331,6 +373,7 @@ export function SimGameDraft({ ctx, onComplete }: { ctx: SimCtx; onComplete: (re
       glow={onClock}
       persist={false}
       parts={simDraftSummaryParts(draft, game.settings.teams, need, { picking: Boolean(optimistic) })}
+      preview={draft.status !== "complete" && barPlayer ? <SimDraftBar model={simDraftBarModel(barPlayer, need)} onOpen={() => ctx.openPlayer(barPlayer)} grade={simGradeOf(barPlayer)} /> : undefined}
       action={
         onClock && hint ? (
           <Button size="sm" loading={busy === "pick"} onClick={() => pick(hint.player)}>
@@ -342,14 +385,14 @@ export function SimGameDraft({ ctx, onComplete }: { ctx: SimCtx; onComplete: (re
       {onClock && hint ? (
         <div className="flex flex-col gap-1 enter-rise" data-testid="draft-hint">
           <p className="text-xs" style={{ color: "var(--color-text-muted)" }}>{hint.why}</p>
-          <SimPlayerChip player={hint.player} extra={hint.player.overall != null ? <span className="text-xs" style={{ color: "var(--color-text-muted)" }}>OVR {hint.player.overall}</span> : undefined} />
+          <SimPlayerChip player={hint.player} extra={hint.player.grade ? <LetterGrade grade={simGradeOf(hint.player)} size="sm" /> : undefined} />
         </div>
       ) : null}
       <SimDraftHero gameId={gameId} draft={draft} teams={game.settings.teams} slots={game.settings.slots} positions={simPositionsFor(game.settings.slots)} tick={ctx.tick} onOpen={ctx.openPlayer} />
       <div className="flex flex-wrap items-center gap-2">
         {confirmAuto ? (
           <>
-            <span className="text-xs" style={{ color: "var(--color-text-secondary)" }}>Auto-draft the rest of your picks from your queue, then best available and need?</span>
+            <span className="text-xs" style={{ color: "var(--color-text-secondary)" }}>{simAutoPickConfirmText(game.settings)}</span>
             <Button size="sm" onClick={autoDraft}>Yes, auto-pick</Button>
             <Button size="sm" variant="ghost" onClick={() => setConfirmAuto(false)}>Cancel</Button>
           </>
@@ -375,7 +418,7 @@ export function SimGameDraft({ ctx, onComplete }: { ctx: SimCtx; onComplete: (re
     <div className="flex flex-col gap-3">
       {header}
       <SimDraftOverview draft={draft} teams={game.settings.teams} onOpen={ctx.openPlayer} />
-      <PillRow ariaLabel="Draft panels" variant="fill" options={tabs} active={activeTab} onSelect={(value) => setPanel(value as Panel)} />
+      {pillOwnsTabs ? null : <PillRow ariaLabel="Draft panels" variant="fill" options={tabs} active={activeTab} onSelect={(value) => setPanel(value as Panel)} />}
       {wide ? (
         <div className="grid gap-4" style={{ gridTemplateColumns: "minmax(0, 3fr) minmax(0, 2fr)" }}>
           <div>{board}</div>

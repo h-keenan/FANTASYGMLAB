@@ -152,10 +152,17 @@ class Verdict:
     counter_delta: dict[str, Any] | None = None
 
     def to_dict(self) -> dict[str, Any]:
+        delta = self.counter_delta
+        if delta is not None:
+            # The API never carries the model's trade-value numbers (they are the hidden rating): only the direction
+            # of the change (-1 / 0 / +1), which is all the client turns into words.
+            change = float(delta.get("user_net_change") or 0.0)
+            delta = {k: v for k, v in delta.items() if k not in ("user_net_before", "user_net_after")}
+            delta["user_net_change"] = 0 if abs(change) < 0.5 else (1 if change > 0 else -1)
         return {
             "decision": self.decision, "reason_code": self.reason_code, "reason": self.reason,
             "chips": list(self.chips), "counter": self.counter,
-            "counter_note": self.counter_note, "counter_delta": self.counter_delta,
+            "counter_note": self.counter_note, "counter_delta": delta,
         }
 
 
@@ -346,6 +353,18 @@ class TradeDesk:
             )
         return Verdict("decline", code, reason, chips=chips, margin=margin)
 
+    def user_cost(self, pid: str) -> float:
+        """What giving this asset up costs the user, for ranking a counter's candidate asks (neutral lens). hint_v 1+: public
+        information only (ADP; a pick by its round), so the choice of ask never reveals the hidden value."""
+
+        if not self.snap.settings.hint_v:
+            return self.ev.worth(USER_PARAMS, pid)
+        if is_pick_id(pid):
+            adp = (self.ev.pick_parts(pid)[1] - 1) * self.snap.settings.teams + self.snap.settings.teams / 2.0
+        else:
+            adp = self.snap.players[pid].adp
+        return 100.0 / (1.0 + adp / 24.0)
+
     def build_counter(self, ai: str, user_gives: Sequence[str], user_gets: Sequence[str], code: str = "wants_more_value") -> "Counter | None":
         """The cheapest change, for the user, that the AI will accept AND that both rosters can legally hold: ask for
         one more of the user's assets, or take one of the asked players off the table. Never the AI paying more.
@@ -373,16 +392,19 @@ class TradeDesk:
             options.append(((round(cost, 6), -round(need, 6), tag), tag, give, get, asked, removed, tag))
 
         pool = [p for p in self.tradable(user) if p not in user_gives]
-        extra = sorted(pool, key=lambda p: (-(ev.worth(params, p) - ev.worth(USER_PARAMS, p)), p))[:8]
+        if snap.settings.hint_v:  # the AI's own wants only (its private view); the user's side is ranked by public cost below
+            extra = sorted(pool, key=lambda p: (-ev.worth(params, p), p))[:8]
+        else:
+            extra = sorted(pool, key=lambda p: (-(ev.worth(params, p) - ev.worth(USER_PARAMS, p)), p))[:8]
         if need_pos:
             extra = sorted((p for p in pool if not is_pick_id(p) and snap.players[p].pos == need_pos),
                            key=lambda p: (-ev.worth(params, p), p))[:8]
         if len(user_gives) < snap.settings.policy.max_trade_side:
             for p in extra:
-                consider(tuple(user_gives) + (p,), tuple(user_gets), [p], [], ev.worth(USER_PARAMS, p), "add:" + p)
+                consider(tuple(user_gives) + (p,), tuple(user_gets), [p], [], self.user_cost(p), "add:" + p)
         if len(user_gets) > 1 and not need_pos:
             for p in user_gets:
-                consider(tuple(user_gives), tuple(x for x in user_gets if x != p), [], [p], ev.worth(USER_PARAMS, p), "drop:" + p)
+                consider(tuple(user_gives), tuple(x for x in user_gets if x != p), [], [p], self.user_cost(p), "drop:" + p)
         if not options:
             if need_pos:  # could not fix the need the way the reason claims: fall back to an honest value counter
                 return self.build_counter(ai, user_gives, user_gets, "wants_more_value")
@@ -401,7 +423,7 @@ class TradeDesk:
             return f"{p.name} ({p.pos})"
 
         def net(g: Sequence[str], r: Sequence[str]) -> float:  # the user's net trade value (neutral lens)
-            return sum(ev.worth(USER_PARAMS, p) for p in r) - sum(ev.worth(USER_PARAMS, p) for p in g)
+            return sum(self.user_cost(p) for p in r) - sum(self.user_cost(p) for p in g)
 
         pos = self.need_position(ai)[0]
         if asked:

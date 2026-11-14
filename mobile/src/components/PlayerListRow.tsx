@@ -8,6 +8,7 @@ import PlayerAvatar from './PlayerAvatar';
 import PlayerName from './PlayerName';
 import PositionBadge from './PositionBadge';
 import TapForWhy from './TapForWhy';
+import { LetterGrade } from './LetterGrade';
 import { PlayerBadges } from './PlayerBadge';
 import ToneBadge from './ToneBadge';
 import { badgeFromTag, type BadgeInput, type BadgeKind } from '../lib/playerBadges';
@@ -205,7 +206,13 @@ export default function PlayerListRow({
           <View style={styles.chipGroup} testID="list-stats">
             {slots.map((stat) =>
               stat ? (
-                stat.rating != null ? (
+                stat.grade !== undefined ? (
+                  // Fantasy Sim: the Overall is a letter grade, never the numeric gauge.
+                  <View key={stat.key} style={styles.gaugeStat}>
+                    <AppText style={styles.pillLabel}>{stat.label}</AppText>
+                    <LetterGrade grade={stat.grade} size="sm" />
+                  </View>
+                ) : stat.rating != null ? (
                   // The player's Overall is the shared OVR gauge (same ring, thresholds and colors as the Quick View hero).
                   <TapForWhy key={stat.key} metric="ovr" spoken={`Overall ${stat.rating}`}>
                     <View style={styles.gaugeStat}>

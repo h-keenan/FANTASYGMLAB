@@ -9,6 +9,7 @@ import ErrorState from './ErrorState';
 import FadeInView from './FadeInView';
 import SectionHeading from './SectionHeading';
 import SegmentedTabBar from './SegmentedTabBar';
+import { useBottomPillContext } from '../lib/useBottomPillContext.ts';
 import { SkeletonCard } from './SkeletonBlock';
 import CompactModule from './CompactModule';
 import { SimDraftBoard, SimDraftIconButton } from './SimDraftBoard';
@@ -18,7 +19,10 @@ import { SimPlayerChip, SimPlayerLine, SimPopIn, SimStat, SimToneBadge, createSi
 import ToneBadge from './ToneBadge';
 import { useThemeMode } from '../context/ThemeModeContext';
 import { api } from '../lib/api';
-import { simDraftNeedPills, simDraftSummaryParts } from '../lib/simDraft';
+import { SimDraftBar } from './SimDraftBar';
+import { simDraftBarModel, simDraftNeedPills, simDraftSummaryParts } from '../lib/simDraft';
+import { simGradeOf } from '../lib/simGrade';
+import { LetterGrade } from './LetterGrade';
 import {
   SIM_QUEUE_MAX,
   simFmtPts,
@@ -27,6 +31,7 @@ import {
   simFilterPositionsFor,
   simPositionsFor,
   simRosterNeeds,
+  simAutoPickConfirmText,
   simValueOverAdpLabel,
   simValueOverAdpTone,
   type SimDraftHint,
@@ -116,6 +121,22 @@ export function SimGameDraft({ ctx, onComplete }: { ctx: SimCtx; onComplete: (re
     return () => clearTimeout(id);
   }, [queue.ids, gameId, call]);
 
+  // Best player still on the board by ADP: the bar's avatar line when the server has no pick suggestion for you.
+  const [topAvailable, setTopAvailable] = useState<SimGamePlayer | null>(null);
+  const madePicks = draft?.picks?.length ?? 0;
+  useEffect(() => {
+    if (hint || loadState !== 'ready') return;
+    let cancelled = false;
+    Promise.resolve(api.getSimGamePlayers(gameId, 'status=available&sort=adp&page=1&page_size=1'))
+      .then((body) => {
+        if (!cancelled) setTopAvailable(body?.items?.[0] ?? null);
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [gameId, hint, loadState, madePicks, ctx.tick]);
+
   const applyResult = useCallback(
     (body: { picks?: SimDraftPick[]; draft?: Partial<SimDraftState>; completed?: boolean; recap?: SimDraftRecap | null; game?: typeof game }) => {
       const made = body.picks ?? [];
@@ -173,6 +194,25 @@ export function SimGameDraft({ ctx, onComplete }: { ctx: SimCtx; onComplete: (re
     for (const t of draft?.teams ?? []) map[t.team_id] = t.is_you ? `${t.name} (you)` : t.name;
     return map;
   }, [draft?.teams]);
+
+  // Phones: the draft room's panel tabs live in the bottom pill (web twin: SimGameDraft.tsx), so the top row steps aside there.
+  const pillOwnsTabs = useBottomPillContext(
+    loadState === 'ready' && draft
+      ? {
+          id: 'sim-draft',
+          label: 'Draft panels',
+          tabs: [
+            { key: 'board', label: 'Players', glyph: 'players' },
+            { key: 'queue', label: queue.ids.length ? `Queue ${queue.ids.length}` : 'Queue', glyph: 'queue' },
+            { key: 'roster', label: 'Roster', glyph: 'roster' },
+            { key: 'picks', label: 'Picks', glyph: 'picks' },
+          ],
+          activeKey: panel,
+          onSelect: (key) => setPanel(key as Panel),
+          primary: { key: 'auto-pick', label: 'Auto-pick', glyph: 'recommended', disabled: draft.status === 'complete' || busy === 'pick', onPress: () => setConfirmAuto(true) },
+        }
+      : null,
+  );
 
   if (loadState === 'loading') {
     return (
@@ -321,6 +361,8 @@ export function SimGameDraft({ ctx, onComplete }: { ctx: SimCtx; onComplete: (re
 
   const needPills = simDraftNeedPills(draft.your_roster, game.settings.slots);
   const hintLast = hint ? playerSurname(hint.player.name) : '';
+  // The pinned bar's second line: the server's pick for you, else the top ADP player still on the board.
+  const barPlayer = hint?.player ?? topAvailable;
   return (
     <View style={common.stack}>
       <CompactModule
@@ -330,20 +372,21 @@ export function SimGameDraft({ ctx, onComplete }: { ctx: SimCtx; onComplete: (re
         tone={onClock ? 'action' : 'accent'}
         persist={false}
         parts={simDraftSummaryParts(draft, game.settings.teams, needPills, { picking: Boolean(optimistic) })}
+        preview={draft.status !== 'complete' && barPlayer ? <SimDraftBar model={simDraftBarModel(barPlayer, needPills)} onOpen={() => ctx.openPlayer(barPlayer)} grade={simGradeOf(barPlayer)} /> : undefined}
         action={onClock && hint ? <Button size="sm" label={`Draft ${hintLast}`} loading={busy === 'pick'} onPress={() => pick(hint.player)} /> : null}
       >
         {onClock && hint ? (
           <FadeInView>
             <View style={common.tight} testID="draft-hint">
               <AppText style={common.muted}>{hint.why}</AppText>
-              <SimPlayerChip player={hint.player} extra={hint.player.overall != null ? <AppText style={common.muted}>OVR {hint.player.overall}</AppText> : undefined} />
+              <SimPlayerChip player={hint.player} extra={hint.player.grade ? <LetterGrade grade={simGradeOf(hint.player)} size="sm" /> : undefined} />
             </View>
           </FadeInView>
         ) : null}
         <SimDraftHero gameId={gameId} draft={draft} teams={game.settings.teams} slots={game.settings.slots} positions={simPositionsFor(game.settings.slots)} tick={ctx.tick} onOpen={ctx.openPlayer} />
         {confirmAuto ? (
           <View style={common.tight}>
-            <AppText style={common.small}>Auto-draft the rest of your picks from your queue, then best available and need?</AppText>
+            <AppText style={common.small}>{simAutoPickConfirmText(game.settings)}</AppText>
             <View style={common.row}>
               <Button size="sm" label="Yes, auto-pick" onPress={autoDraft} />
               <Button size="sm" variant="ghost" label="Cancel" onPress={() => setConfirmAuto(false)} />
@@ -362,6 +405,7 @@ export function SimGameDraft({ ctx, onComplete }: { ctx: SimCtx; onComplete: (re
         )}
       </CompactModule>
       <SimDraftOverview draft={draft} teams={game.settings.teams} onOpen={ctx.openPlayer} />
+      {pillOwnsTabs ? null : (
       <SegmentedTabBar<Panel>
         options={[
           { key: 'board', label: 'Players', glyph: 'players' },
@@ -372,6 +416,7 @@ export function SimGameDraft({ ctx, onComplete }: { ctx: SimCtx; onComplete: (re
         active={panel}
         onChange={setPanel}
       />
+      )}
       {panel === 'board' ? board : side()}
     </View>
   );

@@ -3,7 +3,8 @@ import { Pressable, StyleSheet, View } from 'react-native';
 import { useIsRestoring, useQuery } from '@tanstack/react-query';
 
 import CompactModule from './CompactModule';
-import { Hero, LinkModule } from './ModuleTemplates';
+import { LinkModule } from './ModuleTemplates';
+import StatusHeader from './StatusHeader';
 import AppText from './AppText';
 import { useThemeMode } from '../context/ThemeModeContext';
 import { api, type MatchupResponse, type TeamRanking, type TeamSnapshot } from '../lib/api';
@@ -17,6 +18,7 @@ import {
   type TeamStatusPosition,
 } from '../lib/teamStatus';
 import { lineupModuleParts, roomsModuleParts, standingModuleParts, teamStatusHeroModel } from '../lib/teamStatusModules';
+import { buildTodayStatusHeader, type StatusAttentionItem } from '../lib/statusHeader';
 import { openInsight } from '../lib/insightNav';
 import { radii, spacing, type ThemeColors } from '../theme';
 
@@ -37,6 +39,8 @@ export default function TeamStatusHero({
   rankings,
   standingsAvailable,
   onNavigate,
+  attention = [],
+  tradeCount = 0,
 }: {
   leagueId: string;
   leagueName: string;
@@ -45,6 +49,10 @@ export default function TeamStatusHero({
   rankings: TeamRanking[] | null;
   standingsAvailable: boolean | undefined;
   onNavigate: Navigate;
+  /** Player rows for "Needs your attention" (lineup holes + single-player items; lib/statusHeader splitTodayAttention). */
+  attention?: StatusAttentionItem[];
+  /** Trade ideas the dashboard found (a mini stat on the header). */
+  tradeCount?: number;
 }) {
   const { colors } = useThemeMode();
   const styles = useMemo(() => createStyles(colors), [colors]);
@@ -77,7 +85,7 @@ export default function TeamStatusHero({
   });
   const positions = buildTeamStatusPositions(needsQuery.data?.ok ? needsQuery.data : null);
   const weakest = positions.find((row) => row.weakest);
-  if (!matchupLine && !lineup && !standing && positions.length === 0) return null;
+  if (!matchupLine && !lineup && !standing && positions.length === 0 && attention.length === 0) return null;
 
   const fact = (label: string, value: string, tone: keyof typeof toneColor = 'neutral') => (
     <View style={styles.fact} key={label}>
@@ -91,16 +99,25 @@ export default function TeamStatusHero({
   const heroIsStanding = heroModel != null && !(matchupLine && (matchupLine.winPercent != null || matchupLine.live));
   const showStanding = standing != null && (!heroIsStanding || Boolean(standing.playoffOdds || standing.projectedRecord || standing.playoffStatus));
 
+  // Route names stand in for the web hrefs; StatusHeader hands them back through onOpen.
+  const statusModel = buildTodayStatusHeader({
+    matchup: matchupLine,
+    hero: heroModel,
+    lineup,
+    standing,
+    attention,
+    tradeCount,
+    hrefs: { matchup: 'Matchup', rankings: 'Teams', trades: 'Trades' },
+  });
+
   return (
     <View style={styles.block}>
-      {/* One Hero (the number that matters this week) then three modules that read while collapsed. Mirrors web. */}
-      {heroModel ? (
-        <Hero
-          label={heroModel.label}
-          value={heroModel.value}
-          context={heroModel.context}
-          tone={heroModel.tone}
-          onPress={() => onNavigate(matchupLine ? 'Matchup' : 'Teams', { leagueId, leagueName })}
+      {/* The players-first status header (ring, 3 mini stats, player rows, one action), then the modules that read while collapsed. Mirrors web. */}
+      {statusModel ? (
+        <StatusHeader
+          model={statusModel}
+          headerHref={matchupLine ? 'Matchup' : 'Teams'}
+          onOpen={(route) => onNavigate(route, { leagueId, leagueName })}
           testID="team-status-main"
         />
       ) : null}

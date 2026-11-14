@@ -811,7 +811,10 @@
 }
 
 /* ---- Smart pill (V2): global row <-> two icons + page segment, one row, one grid cell. Opacity/transform only. ---- */
-.bottom-tab-bar[data-has-context] { display: grid; }
+.bottom-tab-bar[data-has-context], .pill-morph[data-has-context] { display: grid; }
+.pill-morph { min-width: 0; flex: 1 1 auto; }
+.pill-morph:not([data-has-context]), .pill-morph:not([data-has-context]) > .pill-layer { display: contents; }
+.pill-morph > .pill-layer--global > :not(.pill-icon-btn) { flex: 1 1 auto; min-width: 0; }
 .pill-layer { grid-area: 1 / 1; min-width: 0; display: flex; align-items: center; }
 .pill-layer--global ul { flex: 1 1 auto; min-width: 0; }
 .pill-layer--global,
@@ -820,14 +823,16 @@
 }
 /* The folded layer: gone from view, hit-testing and the a11y tree once its fade ends. */
 .bottom-tab-bar[data-mode="context"] .pill-layer--global,
-.bottom-tab-bar[data-mode="menu"] .pill-layer--context {
+.bottom-tab-bar[data-mode="menu"] .pill-layer--context,
+.pill-morph[data-mode="context"] .pill-layer--global,
+.pill-morph[data-mode="menu"] .pill-layer--context {
   opacity: 0; visibility: hidden; pointer-events: none;
   transition: opacity var(--motion-base, 240ms) var(--ease-out, ease-out), transform var(--motion-base, 240ms) var(--ease-out, ease-out), visibility 0s var(--motion-base, 240ms);
 }
-.bottom-tab-bar[data-mode="context"] .pill-layer--global { transform: scale(0.96); }
-.bottom-tab-bar[data-mode="menu"] .pill-layer--context { transform: translateX(-10px) scale(0.97); }
+.bottom-tab-bar[data-mode="context"] .pill-layer--global, .pill-morph[data-mode="context"] .pill-layer--global { transform: scale(0.96); }
+.bottom-tab-bar[data-mode="menu"] .pill-layer--context, .pill-morph[data-mode="menu"] .pill-layer--context { transform: translateX(-10px) scale(0.97); }
 /* Menu opening: the global tabs fan out one after another. */
-.bottom-tab-bar[data-mode="menu"] .pill-layer--global li { animation: pill-fan 260ms var(--ease-out, ease-out) both; animation-delay: calc(var(--i, 0) * 30ms); }
+.bottom-tab-bar[data-mode="menu"] .pill-layer--global li, .pill-morph[data-mode="menu"] .pill-layer--global > * { animation: pill-fan 260ms var(--ease-out, ease-out) both; animation-delay: calc(var(--i, 0) * 30ms); }
 @keyframes pill-fan { from { opacity: 0; transform: translateX(-14px) scale(0.9); } to { opacity: 1; transform: none; } }
 /* Entering a page with context: the segment slides in from the right. */
 .pill-layer--context { animation: pill-context-in 260ms var(--ease-out, ease-out) both; }
@@ -887,6 +892,7 @@
   /* Crossfade only: no slide, scale, fan or pulse; the capsule jumps. */
   .pill-layer--global, .pill-layer--context { transform: none !important; }
   .bottom-tab-bar[data-mode="menu"] .pill-layer--global li,
+  .pill-morph[data-mode="menu"] .pill-layer--global > *,
   .pill-primary { animation: none; }
   .pill-layer--context { animation: pill-fade-in 180ms linear both; }
   .pill-indicator { transition: none; }

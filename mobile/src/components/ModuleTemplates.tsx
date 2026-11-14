@@ -1,10 +1,11 @@
-import React, { useMemo, type ReactNode } from 'react';
+import React, { useMemo, useState, type ReactNode } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 
 import AccentCard from './AccentCard';
 import AppText from './AppText';
 import CompactModule from './CompactModule';
 import DashboardStatRow, { type StatStripItem } from './DashboardStatRow';
+import PercentileBar from './PercentileBar';
 import TrendChart from './TrendChart';
 import { useThemeMode } from '../context/ThemeModeContext';
 import type { ChartInputPoint } from '../lib/chartSeries';
@@ -122,14 +123,19 @@ export function StatStripModule({
   title: string;
   items: StatStripItem[];
   columns?: number;
+  /** Starts with the rank bars open. */
   defaultOpen?: boolean;
   tone?: CompactTone;
   action?: ReactNode;
+  /** Accessibility summary extras (kept for call-site compatibility). */
   extraParts?: ReadonlyArray<CompactPart | null | undefined | false | ''>;
-  /** Shown under the tiles when expanded (glossary, beginner help). */
+  /** Shown under the bars when expanded (glossary, beginner help). */
   footer?: ReactNode;
   testID?: string;
 }) {
+  const { colors } = useThemeMode();
+  const styles = useMemo(() => createStyles(colors), [colors]);
+  const [open, setOpen] = useState(defaultOpen);
   const parts = compactParts([
     ...statStripParts(
       items.map((i) => ({
@@ -140,15 +146,59 @@ export function StatStripModule({
     ),
     ...(extraParts ?? []),
   ]);
+  const summary = parts.map((p) => p.text).join(' \u00b7 ');
+  const hasBars = items.some((item) => item.fill != null);
+  // COMPACT (V1): always-visible tiles (no meter; the bars live in the expanded view). Tiles tap through via `onPress`.
   const rows: StatStripItem[][] = [];
   for (let i = 0; i < items.length; i += columns) rows.push(items.slice(i, i + columns));
   return (
-    <CompactModule id={id} title={title} parts={parts} tone={tone} defaultOpen={defaultOpen} action={action} testID={testID}>
-      {rows.map((row, i) => (
-        <DashboardStatRow key={i} items={row} />
-      ))}
-      {footer}
-    </CompactModule>
+    <AccentCard accent={toneColor(tone, colors)} compact>
+      <View testID={testID ?? `stat-strip-${id}`}>
+        <View style={styles.stripHead}>
+          <AppText style={styles.stripTitle}>{title}</AppText>
+          {action}
+        </View>
+        <View accessibilityLabel={`${title}: ${summary}`} testID="stat-strip-tiles">
+          {rows.map((row, i) => (
+            <DashboardStatRow key={i} items={row.map((item) => ({ ...item, fill: null }))} />
+          ))}
+        </View>
+        <Pressable
+          accessibilityRole="button"
+          accessibilityState={{ expanded: open }}
+          onPress={() => setOpen(!open)}
+          style={styles.stripToggle}
+          testID="stat-strip-toggle"
+        >
+          <AppText style={styles.stripToggleText}>
+            {hasBars ? (open ? 'Hide rank bars' : 'Rank bars') : open ? 'Hide details' : 'Details'} {open ? '\u25b4' : '\u25be'}
+          </AppText>
+        </Pressable>
+        {open ? (
+          <View style={styles.bars} testID="stat-strip-bars">
+            {items.map((item) => {
+              const row = (
+                <View style={styles.barRow}>
+                  <AppText style={styles.barLabel} numberOfLines={1}>{item.label}</AppText>
+                  <View style={styles.barTrack}>
+                    {item.fill != null ? <PercentileBar percentile={item.fill * 100} /> : null}
+                  </View>
+                  <AppText style={styles.barValue} numberOfLines={1}>{item.value}</AppText>
+                </View>
+              );
+              return item.onPress ? (
+                <Pressable key={item.label} accessibilityRole="button" accessibilityLabel={[item.label, item.value, item.note].filter(Boolean).join(', ')} onPress={item.onPress}>
+                  {row}
+                </Pressable>
+              ) : (
+                <View key={item.label}>{row}</View>
+              );
+            })}
+            {footer}
+          </View>
+        ) : null}
+      </View>
+    </AccentCard>
   );
 }
 
@@ -197,6 +247,15 @@ export function LinkModule({
 
 function createStyles(colors: ThemeColors) {
   return StyleSheet.create({
+    stripHead: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: spacing.sm, marginBottom: spacing.sm },
+    stripTitle: { fontSize: 12, fontWeight: '800', letterSpacing: 0.8, textTransform: 'uppercase', color: colors.textTertiary },
+    stripToggle: { minHeight: 44, alignItems: 'center', justifyContent: 'center' },
+    stripToggleText: { fontSize: 13, fontWeight: '700', color: colors.accent },
+    bars: { gap: spacing.xs },
+    barRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, minHeight: 44 },
+    barLabel: { width: 104, fontSize: 14, color: colors.textSecondary },
+    barTrack: { flex: 1, minWidth: 0, justifyContent: 'center' },
+    barValue: { width: 56, textAlign: 'right', fontSize: 14, fontWeight: '800', color: colors.textPrimary },
     row: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
     label: { fontSize: 12, fontWeight: '800', textTransform: 'uppercase', letterSpacing: 0.6, color: colors.textTertiary },
     valueRow: { flexDirection: 'row', alignItems: 'flex-end', gap: spacing.md },

@@ -461,6 +461,24 @@ def start_rookie_draft(em: Emitter) -> None:
     em.emit(state.week, "engine", "rookie_draft_started", order=order, slots=slots)
 
 
+def _public_rookie(snap: GameSnapshot, state: GameState, tid: str, avail: Sequence[str]) -> str:
+    """hint_v 1+: the best rookie by ADP, a position you are thin at worth up to 4 ADP spots, the shown grade breaking ties."""
+
+    from modules.sim import game_grades as gg
+
+    roster = [snap.players[p] for p in state.rosters[tid] if p in snap.players]
+    starters = {pos: max(1, sum(1 for s in snap.settings.slots if s == pos)) for pos in ("QB", "RB", "WR", "TE")}
+    starters["QB"] += snap.settings.slots.count("SUPER_FLEX")
+
+    def key(pid: str) -> tuple:
+        p = snap.players[pid]
+        have = sum(1 for r in roster if r.pos == p.pos)
+        short = max(0.0, starters.get(p.pos, 1) + 1 - have) / (starters.get(p.pos, 1) + 1)
+        return (round((p.adp - 4.0 * short) * 2) / 2, -gg.sort_key(snap, pid, state.view_no), pid)
+
+    return min(avail[:30], key=key)
+
+
 def choose_rookie(snap: GameSnapshot, state: GameState, ev: Evaluator, tid: str, n: int, seed: int, *, human: bool = False) -> str:
     """The rookie ``tid`` takes at pick ``n``: the best by the team's own worth
     (a contender leans on projection, a rebuilder on dynasty value and youth) plus
@@ -471,6 +489,8 @@ def choose_rookie(snap: GameSnapshot, state: GameState, ev: Evaluator, tid: str,
         from modules.sim.game_types import GameError
 
         raise GameError("pool_exhausted", "No rookies left to draft.")
+    if human and snap.settings.hint_v:  # the user's auto-pick: public information only (ADP, need, shown grade)
+        return _public_rookie(snap, state, tid, avail)
     params = USER_PARAMS if human else team_params(snap, tid)
     roster = [snap.players[p] for p in state.rosters[tid] if p in snap.players]
     starters = {pos: max(1, sum(1 for s in snap.settings.slots if s == pos)) for pos in ("QB", "RB", "WR", "TE")}

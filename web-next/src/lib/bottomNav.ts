@@ -117,10 +117,10 @@ export function simOrbAriaLabel(currentLabel: string, inbox: number | null | und
 // ---- Smart pill: page context (web components/BottomPillContext.tsx + BottomTabBar; mobile components/BottomPill.tsx) ----
 
 /** One page-level tab shown in the pill's page segment (the page-family tabs: Lineup | Players | Waivers | Matchup). */
-export type PillContextTab = { key: string; label: string; glyph?: TabIconName; badge?: number };
+export type PillContextTab = { key: string; label: string; glyph?: TabIconName; badge?: number; /** Web: the tab is a route, rendered as a link (client navigation, opens in a new tab on demand). onSelect still fires. */ href?: string };
 
 /** The one primary action of a page (Auto-set, New trade, Claim). Rendered as the accent chip at the end of the segment. */
-export type PillContextAction = { key: string; label: string; glyph?: TabIconName; disabled?: boolean; busy?: boolean; onPress: () => void };
+export type PillContextAction = { key: string; label: string; glyph?: TabIconName; disabled?: boolean; busy?: boolean; onPress: () => void; /** Web: render as a link to this route (onPress still fires). */ href?: string };
 
 /**
  * What a page registers with the pill: its page tabs, which one is lit, and one primary action. The page owns the

@@ -46,6 +46,8 @@ export type PlayerAccordionRowProps = PlayerFactsInput & {
   /** Extra expanded content (reasons, notes). */
   children?: ReactNode;
   testId?: string;
+  /** Screen-reader name for the row button (defaults to the player name). */
+  ariaLabel?: string;
 };
 
 /**
@@ -55,7 +57,7 @@ export type PlayerAccordionRowProps = PlayerFactsInput & {
  * FantasyDesk (`mode="desk"`) and Fantasy Sim (`mode="sim"`: grade, ADP, projection; never OVR or trade value).
  * Mobile twin: components/PlayerAccordionRow.tsx; logic: lib/playerAnatomy.ts.
  */
-export function PlayerAccordionRow({ open, onToggle, badges = [], positionLabel, primaryAction, onOpenProfile, children, testId = "player-accordion-row", ...input }: PlayerAccordionRowProps) {
+export function PlayerAccordionRow({ open, onToggle, badges = [], positionLabel, primaryAction, onOpenProfile, children, testId = "player-accordion-row", ariaLabel, ...input }: PlayerAccordionRowProps) {
   const { player } = input;
   const model = playerRowModel(input);
   return (
@@ -80,6 +82,7 @@ export function PlayerAccordionRow({ open, onToggle, badges = [], positionLabel,
         type="button"
         onClick={onToggle}
         aria-expanded={open}
+        aria-label={ariaLabel}
         className="flex w-full min-w-0 items-center gap-2.5 text-left"
         style={{ minHeight: "var(--touch-target-min)" }}
       >

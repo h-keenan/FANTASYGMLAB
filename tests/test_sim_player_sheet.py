@@ -8,6 +8,7 @@ from __future__ import annotations
 import json
 
 from modules.sim import game_view as view
+from modules.sim.game_grades import LETTERS
 from modules.sim.game_eval import Evaluator
 from tests.test_sim_game_engine import drafted
 
@@ -46,11 +47,9 @@ def test_projection_is_not_flat_when_weeks_differ():
     assert view.projection_is_flat([]) is True
 
 
-def test_detail_carries_value_ranks_and_zero_value_is_not_hidden():
+def test_detail_carries_grade_and_attributes_never_the_hidden_rank():
     snap, state, pid, d = _detail()
     p = d["player"]
-    assert 1 <= p["value_rank"] <= len(snap.pids)
-    same = [q for q in snap.pids if snap.players[q].pos == p["pos"]]
-    assert 1 <= p["pos_value_rank"] <= len(same)
-    best = max(same, key=lambda q: (snap.players[q].value, q))
-    assert view.player_detail(snap, state, best)["player"]["pos_value_rank"] == 1
+    assert p["grade"] in LETTERS and isinstance(p["attributes"], list)
+    for banned in ("value", "overall", "value_rank", "pos_value_rank", "adp_edge"):
+        assert banned not in p
