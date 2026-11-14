@@ -62,12 +62,18 @@ export default function PlayerHero({
   onToggleExpand,
   valueChart = null,
   ovrChart = null,
+  gradeTile = null,
+  hideValue = false,
   children,
 }: {
   /** Shown in the tap-the-Value popover (for example the value history chart). */
   valueChart?: React.ReactNode;
   /** Shown in the tap-the-Player-score popover (for example the model radar). */
   ovrChart?: React.ReactNode;
+  /** Fantasy Sim: a letter-grade tile that REPLACES the Player score ring (no numeric rating in the sim). */
+  gradeTile?: React.ReactNode;
+  /** Fantasy Sim: no Value tile (the model's value is the hidden rating). */
+  hideValue?: boolean;
   playerId: string;
   /** Photo id when it differs from playerId; null = no photo exists (initials). */
   avatarId?: string | null;
@@ -164,7 +170,9 @@ export default function PlayerHero({
       </View>
 
       <View style={styles.tilesRow}>
-        {onToggleExpand && overallRating !== null ? (
+        {gradeTile ? (
+          <View style={styles.tile}>{gradeTile}</View>
+        ) : onToggleExpand && overallRating !== null ? (
           <PressableScale
             style={styles.tile}
             onPress={onToggleExpand}
@@ -180,7 +188,7 @@ export default function PlayerHero({
         ) : (
           <View style={styles.tile}>{scoreTileBody}</View>
         )}
-        {score != null ? (
+        {hideValue ? null : score != null ? (
           <TapForWhy metric={valueLabel ? 'trade_value' : 'value'} variant="tile" style={styles.tile} spoken={`${valueLabel ?? 'Value'} ${Math.round(score).toLocaleString()}`} chart={valueChart} testID="pqv-value-why">
             <AppText style={styles.tileCaption}>{(valueLabel ?? 'Value').toUpperCase()}</AppText>
             <AppText style={styles.tileValue} numberOfLines={1} adjustsFontSizeToFit>

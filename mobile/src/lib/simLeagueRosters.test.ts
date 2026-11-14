@@ -2,13 +2,13 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
-import { simBlockEntryCount, simBlockNote, simGroupBenchByPosition, simOverallLabel, simRosterEntries, simRosterPositions, simTeamChips, simTeamRecordLine, simValueLabel } from './simLeagueRosters.ts';
+import { simBlockEntryCount, simBlockNote, simGroupBenchByPosition, simRosterEntries, simRosterPositions, simTeamChips, simTeamRecordLine } from './simLeagueRosters.ts';
 import type { SimGamePlayer, SimLeagueRosterTeam } from './simGame.ts';
 
-const pl = (id: string, pos: SimGamePlayer['pos'], name: string, value: number, team = 'KC') => ({ id, pos, name, value, team, ros_mean: value / 10, projection: 10, status: 'healthy' }) as unknown as SimGamePlayer;
+const pl = (id: string, pos: SimGamePlayer['pos'], name: string, value: number, team = 'KC') => ({ id, pos, name, grade: value >= 80 ? 'A' : value >= 60 ? 'B' : 'C', team, ros_mean: value / 10, projection: 10, status: 'healthy' }) as unknown as SimGamePlayer;
 const t = (id: string, players: SimGamePlayer[]) => ({ team_id: id, name: `T${id}`, is_you: false, players }) as unknown as SimLeagueRosterTeam;
 
-test('filters by position and search and sorts best value first across teams', () => {
+test('filters by position and search and sorts best grade first across teams', () => {
   const teams = [t('1', [pl('a', 'QB', 'Alpha', 50), pl('b', 'RB', 'Bravo', 90)]), t('2', [pl('c', 'QB', 'Charlie', 70, 'BUF')])];
   assert.deepEqual(simRosterEntries(teams, 'ALL', '').map((e) => e.player.id), ['b', 'c', 'a']);
   assert.deepEqual(simRosterEntries(teams, 'QB', '').map((e) => [e.player.id, e.team.team_id]), [['c', '2'], ['a', '1']]);
@@ -21,10 +21,8 @@ test('chips, record line and value label', () => {
   assert.equal(simTeamRecordLine(rec(3, 0)), '3-0 · #2 · 10.0 PF');
   assert.equal(simTeamRecordLine(rec(0, 0)), '0-0 · Power #4');
   assert.equal(simTeamRecordLine({ record: null, power_rank: 4 }), 'Power #4');
-  assert.deepEqual([0, 0.4, 71.6, null].map(simValueLabel), ['—', '—', '72', '—']);
 });
-test('labels overall and groups the bench by position', () => {
-  assert.deepEqual([null, 0, 71.6].map(simOverallLabel), ['—', '0', '72']);
+test('groups the bench by position', () => {
   const g = simGroupBenchByPosition([pl('a', 'WR', 'A', 1), pl('b', 'QB', 'B', 1), pl('c', 'WR', 'C', 1)], ['QB', 'RB', 'WR']);
   assert.deepEqual(g.map((x) => [x.pos, x.players.length]), [['QB', 1], ['WR', 2]]);
 });

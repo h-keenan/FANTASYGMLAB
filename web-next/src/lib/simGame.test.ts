@@ -94,7 +94,7 @@ import {
 } from "./simGame";
 
 function player(id: string, pos: SimGamePlayer["pos"], projection = 10): SimGamePlayer {
-  return { id, name: `P${id}`, pos, team: "KC", age: 25, adp: 10, value: 50, projection, floor: 5, ceiling: 20, status: "healthy", out_weeks: 0, bye_week: 9 };
+  return { id, name: `P${id}`, pos, team: "KC", age: 25, adp: 10, projection, floor: 5, ceiling: 20, status: "healthy", out_weeks: 0, bye_week: 9 };
 }
 
 function game(overrides: Partial<SimGame> = {}): SimGame {

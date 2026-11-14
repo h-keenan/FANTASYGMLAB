@@ -1245,7 +1245,7 @@ def add_preview_route(router: APIRouter, ctx: GameApiCtx) -> None:
         pos = pos.upper()
         if pos and pos not in POSITIONS:
             raise HTTPException(status_code=422, detail="pos must be one of QB, RB, WR, TE, K.")
-        if sort not in ("projection", "value", "adp", "age", "name"):
+        if sort not in ("projection", "value", "adp", "age", "name"):  # "value" is accepted for old clients and now means projection
             raise HTTPException(status_code=422, detail="sort must be projection, value, adp, age or name.")
         with ctx.compute() as ok:
             if not ok:
@@ -1266,7 +1266,7 @@ def add_preview_route(router: APIRouter, ctx: GameApiCtx) -> None:
             for pid, p in players.items()
         }
         keys = {
-            "projection": lambda p: (-shown[p.pid], p.pid), "value": lambda p: (-p.value, p.pid),
+            "projection": lambda p: (-shown[p.pid], p.pid), "value": lambda p: (-shown[p.pid], p.pid),
             "adp": lambda p: (p.adp, p.pid), "age": lambda p: (p.age, p.pid), "name": lambda p: (p.name.lower(), p.pid),
         }
         rows.sort(key=keys[sort])
@@ -1279,7 +1279,7 @@ def add_preview_route(router: APIRouter, ctx: GameApiCtx) -> None:
                 "id": p.pid, "headshot_id": headshot_id(p.pid), "name": p.name, "pos": p.pos, "team": p.nfl_team,
                 "age": p.age, "projection": shown[p.pid], "if_starts": p.mean,
                 "role": _role_json(players, roles.get(p.pid)), "floor": round(max(0.0, p.mean - 0.8 * p.sd), 1),
-                "ceiling": round(p.mean + 0.8 * p.sd, 1), "value": p.value, "adp": p.adp,
+                "ceiling": round(p.mean + 0.8 * p.sd, 1), "adp": p.adp,
                 "bye_week": pool.bye_weeks.get(p.nfl_team) or None,
             } for p in chunk],
         }

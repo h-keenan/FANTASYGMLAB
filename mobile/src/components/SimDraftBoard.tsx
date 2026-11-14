@@ -284,7 +284,7 @@ export function SimDraftBoard({
           <AppText style={common.muted} accessibilityLiveRegion="polite">
             {total} player{total === 1 ? '' : 's'} left
           </AppText>
-          <AppText style={styles.scaleNote}>OVR is his rank at his position, same as everywhere. EDGE: green = steal, red = reach (the model vs ADP).</AppText>
+          <AppText style={styles.scaleNote}>Grade is the scouts' read of him against his position: a letter, not an exact number.</AppText>
           {rows.shown.map((player) => (
             <SimDraftRow key={player.id} player={player} suppressBadges={suppressed} onOpen={onOpen} week={week} drafted={draftedIds?.includes(player.id)} actions={actions ? actions(player) : null} chipsExtra={chipsExtra ? chipsExtra(player) : undefined} />
           ))}

@@ -37,7 +37,10 @@ def test_every_team_with_its_roster_needs_and_top_assets_in_one_request():
         assert len(t["players"]) >= t["roster_size"]
         assert all(p["owner"]["team_id"] == t["team_id"] and p["squad"] in ("roster", "ir", "taxi") for p in t["players"])
         assert [p["id"] for p in t["top_assets"]] == [p["id"] for p in t["players"][:3]]
-        assert [p["value"] for p in t["players"]] == sorted((p["value"] for p in t["players"]), reverse=True)
+        from modules.sim.game_grades import LETTERS
+
+        grades = [LETTERS.index(p["grade"]) if p["grade"] else -1 for p in t["players"]]
+        assert grades == sorted(grades, reverse=True)
         assert {p["pos"] for p in t["positions"]} >= {"QB", "RB", "WR", "TE"}
         assert set(t["needs"]) | set(t["strengths"]) | set(t["surplus"]) <= {p["pos"] for p in t["positions"]}
         assert not set(t["needs"]) & set(t["surplus"])  # never "needs WR" and "deep WR" on one card

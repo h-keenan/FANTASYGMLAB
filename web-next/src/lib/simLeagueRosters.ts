@@ -28,14 +28,10 @@ export function simTeamRecordLine(team: Pick<SimLeagueRosterTeam, "record" | "po
   return r.wins + r.losses + r.ties === 0 ? `${rec} · Power #${team.power_rank}` : `${rec} · #${r.rank} · ${r.pf.toFixed(1)} PF`;
 }
 
-/** The trade-value number: a value of 0 means no market value in this league, shown as a dash (never a fake 0). */
-export function simOverallLabel(overall: number | null | undefined): string {
-  return overall != null && Number.isFinite(overall) ? String(Math.round(overall)) : "—";
-}
-
-export function simValueLabel(value: number | null | undefined): string {
-  const rounded = value != null && Number.isFinite(value) ? Math.round(value) : 0;
-  return rounded > 0 ? String(rounded) : "—";
+/** 11 = A+ ... 0 = F, -1 = no grade. Local on purpose: this file runs under the app's node test runner, which cannot resolve extensionless value imports. */
+function gradeRank(grade: string | null | undefined): number {
+  const order = ["F", "D", "D+", "C-", "C", "C+", "B-", "B", "B+", "A-", "A", "A+"];
+  return grade ? order.indexOf(grade) : -1;
 }
 
 export interface SimRosterEntry {
@@ -45,7 +41,7 @@ export interface SimRosterEntry {
 
 export type SimRosterPosFilter = "ALL" | SimPos;
 
-/** Everyone on a roster, best overall first, filtered by position and a name / NFL team search. */
+/** Everyone on a roster, best grade first, filtered by position and a name / NFL team search. */
 export function simRosterEntries(teams: readonly SimLeagueRosterTeam[], pos: SimRosterPosFilter, query: string, blockOnly = false): SimRosterEntry[] {
   const needle = query.trim().toLowerCase();
   const out: SimRosterEntry[] = [];
@@ -57,7 +53,7 @@ export function simRosterEntries(teams: readonly SimLeagueRosterTeam[], pos: Sim
       out.push({ player, team: { team_id: team.team_id, name: team.name, is_you: team.is_you } });
     }
   }
-  return out.sort((a, b) => (b.player.overall ?? 0) - (a.player.overall ?? 0) || b.player.value - a.player.value || (b.player.ros_mean ?? 0) - (a.player.ros_mean ?? 0) || a.player.name.localeCompare(b.player.name));
+  return out.sort((a, b) => gradeRank(b.player.grade) - gradeRank(a.player.grade) || (b.player.ros_mean ?? 0) - (a.player.ros_mean ?? 0) || a.player.name.localeCompare(b.player.name));
 }
 
 /** Positions present in the league's rosters, in the usual order, for the filter pills. */

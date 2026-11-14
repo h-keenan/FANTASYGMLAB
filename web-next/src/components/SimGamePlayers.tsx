@@ -4,6 +4,7 @@ import { useEffect, useMemo, useReducer, useState, type ReactNode } from "react"
 
 import { simAsOfSeason } from "@/lib/simAsOf";
 import { PlayerQuickView, StatGroup, type SimPqvSections } from "@/components/PlayerQuickView";
+import { GradeBar, GradeTile } from "@/components/ui/LetterGrade";
 import { SimRealHistory } from "@/components/SimRealHistory";
 import { SimPlayerHistory } from "@/components/SimPlayerHistory";
 import { SimScoutingSections } from "@/components/SimScoutingSections";
@@ -19,7 +20,8 @@ import { SkeletonRows } from "@/components/Skeleton";
 import { api } from "@/lib/api";
 import { SIM_WINDOW_STEP, simWindow } from "@/lib/simLayout";
 import { simSuppressedBadges } from "@/lib/simDraft";
-import { simActualPoints, simAvailabilityLine, simHeaderTags, simHeroFeed, simProjectionBand, simProjectionIsFlat, simRosLine } from "@/lib/simPlayerSheet";
+import { simActualPoints, simAvailabilityLine, simHeaderTags, simHeroGrade, simProjectionBand, simProjectionIsFlat, simRosLine } from "@/lib/simPlayerSheet";
+import { simGradeText } from "@/lib/simGrade";
 import { PLAYER_SEARCH_DEBOUNCE_MS } from "@/lib/leaguePlayerSearch";
 import {
   SIM_PAGE_SIZE,
@@ -236,8 +238,6 @@ export function SimPlayerSheet({ gameId, player, onClose, actions, startYear, se
   const detail = useSimPlayerDetail(gameId, player.id);
   const live = detail.data?.player ?? player;
   const real = simHeadshotId(player);
-  // A real player's hero tiles come from the real data behind his id; only a generated player (no real data) takes the sim's own numbers.
-  const feed = real ? null : simHeroFeed(live);
   const identity: PlayerQuickViewIdentity = {
     player_id: real ?? player.id,
     name: player.name,
@@ -248,10 +248,8 @@ export function SimPlayerSheet({ gameId, player, onClose, actions, startYear, se
     sourceLabel: "Fantasy Sim",
     // The header carries the same tags the list row showed (the one injury chip, owner / Free agent, role, block).
     tags: simHeaderTags(live),
-    // The list rows' Overall also drives the hero's Player score ring (real and generated players alike), so the
-    // number never differs between a row and its quick view. The model's internal rating is never shown.
-    overall_rating: live.overall ?? null,
-    ...(feed ? { overall_rank: feed.overall_rank, position_rank: feed.position_rank } : {}),
+    // No numeric rating anywhere in the sim: the hero shows the letter grade tile (simSections.heroGrade), never a score ring,
+    // a Value tile or an overall / position rank.
   };
   return <PlayerQuickView identity={identity} onClose={onClose} remote={Boolean(real)} asOfSeason={simAsOfSeason(startYear)} simSections={simPqvSections(gameId, live, detail, actions, seasonLabel, real ? { playerId: real, asOf: simAsOfSeason(startYear) } : undefined)} />;
 }
@@ -290,6 +288,7 @@ function useSimPlayerDetail(gameId: string, playerId: string): SimPlayerDetailSt
 export function simPqvSections(gameId: string, player: SimGamePlayer, detail: SimPlayerDetailState, actions?: ReactNode, seasonLabel?: string | null, real?: { playerId: string; asOf: number }): SimPqvSections {
   return {
     overview: <SimOverviewSection player={player} detail={detail} actions={actions} seasonLabel={seasonLabel} />,
+    heroGrade: <GradeTile grade={simHeroGrade(player)} />,
     outlook: <SimOutlookSection player={player} detail={detail} seasonLabel={seasonLabel} />,
     scouting: detail.data?.scouting ? <SimScoutingSections profile={detail.data.scouting} /> : undefined,
     history: <SimPlayerHistory gameId={gameId} playerId={player.id} />,
@@ -308,8 +307,8 @@ function SimOverviewSection({ player, detail, actions, seasonLabel }: { player: 
       : null,
     { label: seasonLabel || "This season", value: simFmtPts(player.season_points ?? 0), note: `${player.games ?? 0} games${player.ppg != null ? ` · ${simFmtPts(player.ppg)} ppg` : ""}`, percentile: null },
     {
-      label: "Overall",
-      value: player.overall != null ? String(player.overall) : "—",
+      label: "Grade",
+      value: simGradeText(player),
       note: player.adp != null ? `ADP ${simFmtValue(player.adp)}` : "No ADP",
       percentile: null,
     },
@@ -332,6 +331,19 @@ function SimOverviewSection({ player, detail, actions, seasonLabel }: { player: 
         ) : null}
         {actions ? <div className="flex flex-wrap gap-2 pt-2">{actions}</div> : null}
       </section>
+      {(body?.player?.attributes ?? []).length > 0 ? (
+        <section className="pqv-stat-season" data-testid="sim-attributes">
+          <h3>Attributes</h3>
+          <div className="flex flex-col gap-2">
+            {(body?.player?.attributes ?? []).map((a) => (
+              <GradeBar key={a.key} attribute={a} />
+            ))}
+          </div>
+          <span className="text-xs" style={{ color: "var(--color-text-muted)" }}>
+            From usage and history. Graded on their own: they do not add up to the overall grade.
+          </span>
+        </section>
+      ) : null}
       {(body?.news ?? []).length > 0 ? (
         <section className="pqv-stat-season">
           <h3>Game news</h3>

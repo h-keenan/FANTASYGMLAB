@@ -5,32 +5,15 @@
 
 import { simDraftRowChips } from "./simDraft";
 import { simPlayerTags, type SimGameTone, type SimGamePlayer, type SimPlayerDetailResponse, type SimRosSummary } from "./simGame";
+import { simGradeOf, type SimGradeInput } from "./simGrade";
 import { isFlatProjection, type WeeklyActualPoint, type WeeklyProjectionPoint } from "./weeklyProjection";
 
-export interface SimHeroFeed {
-  /** Value tile number, or null (the tile shows an em dash with `valueNote`). */
-  score: number | null;
-  valueNote: string | null;
-  overall_rank: number | null;
-  position_rank: number | null;
-  /** Overall 1-99, the same number the list rows show; drives the hero's Player score ring. */
-  overall_rating: number | null;
-}
-
 /**
- * What the hero tiles get for a sim player. A value of 0 means "no market value" in this
- * league (below replacement), never a real zero: it renders as an em dash with a reason,
- * and the player still shows the sim's own value rank so the tile row is not empty.
+ * What the hero shows for a sim player: ONE letter grade (never the numeric Player score ring, the Value tile or an
+ * overall / position rank: those would hand out the model's hidden rating). Null when there is no grade.
  */
-export function simHeroFeed(player: Pick<SimGamePlayer, "value" | "value_rank" | "pos_value_rank" | "kind" | "overall">): SimHeroFeed {
-  const hasValue = typeof player.value === "number" && player.value > 0;
-  return {
-    score: hasValue ? Math.round(player.value) : null,
-    valueNote: hasValue ? null : "No market value in this league (below replacement level)",
-    overall_rank: player.value_rank ?? null,
-    position_rank: player.pos_value_rank ?? null,
-    overall_rating: player.overall ?? null,
-  };
+export function simHeroGrade(player: SimGradeInput): SimGradeInput | null {
+  return simGradeOf(player);
 }
 
 /** Did the server (or, for an older server, the weeks themselves) say the projection never changes week to week? */

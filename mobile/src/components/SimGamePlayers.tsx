@@ -4,6 +4,7 @@ import { Pressable, StyleSheet, View } from 'react-native';
 import AppText from './AppText';
 import EmptyState from './EmptyState';
 import Input from './Input';
+import { GradeBar, GradeTile } from './LetterGrade';
 import MetricCard from './MetricCard';
 import { simAsOfSeason } from '../lib/simAsOf';
 import PlayerQuickViewSheet, { Section as PqvSection, type SimPqvSections } from './PlayerQuickViewSheet';
@@ -21,7 +22,8 @@ import { api } from '../lib/api';
 import { stubPlayer } from '../lib/playerQuickView';
 import { SIM_WINDOW_STEP, simWindow } from '../lib/simLayout';
 import { simSuppressedBadges } from '../lib/simDraft';
-import { simActualPoints, simAvailabilityLine, simHeaderTags, simHeroFeed, simProjectionBand, simProjectionIsFlat, simRosLine } from '../lib/simPlayerSheet';
+import { simActualPoints, simAvailabilityLine, simHeaderTags, simHeroGrade, simProjectionBand, simProjectionIsFlat, simRosLine } from '../lib/simPlayerSheet';
+import { simGradeText } from '../lib/simGrade';
 import { PLAYER_SEARCH_DEBOUNCE_MS } from '../lib/leaguePlayerSearch';
 import {
   SIM_PAGE_SIZE,
@@ -223,15 +225,13 @@ export function SimPlayerSheet({ gameId, player, onClose, actions, startYear, se
   const detail = useSimPlayerDetail(gameId, player.id);
   const live = detail.data?.player ?? player;
   const real = simHeadshotId(player);
-  const feed = real ? null : simHeroFeed(live);
   const request = {
     player: {
       ...stubPlayer({ player_id: real ?? player.id, name: player.name, position: player.pos, team: player.team ?? null }),
       age: player.age ?? null,
       injury_status: live.status === 'out' ? 'Out' : null,
-      // The list rows' Overall also drives the hero's Player score ring, so the number never differs between a row and its quick view.
-      overall_rating: live.overall ?? null,
-      ...(feed ? { overall_rank: feed.overall_rank, position_rank: feed.position_rank } : {}),
+      // No numeric rating anywhere in the sim: the hero shows the letter grade tile (simSections.heroGrade), never a score ring,
+      // a Value tile or an overall / position rank.
     },
     league: null,
     sourceLabel: 'Fantasy Sim',
@@ -273,6 +273,7 @@ function useSimPlayerDetail(gameId: string, playerId: string): SimPlayerDetailSt
 export function simPqvSections(gameId: string, player: SimGamePlayer, detail: SimPlayerDetailState, actions?: ReactNode, seasonLabel?: string | null, real?: { playerId: string; asOf: number }): SimPqvSections {
   return {
     overview: <SimOverviewSection player={player} detail={detail} actions={actions} seasonLabel={seasonLabel} />,
+    heroGrade: <GradeTile grade={simHeroGrade(player)} />,
     outlook: <SimOutlookSection player={player} detail={detail} seasonLabel={seasonLabel} />,
     scouting: detail.data?.scouting ? <SimScoutingSections profile={detail.data.scouting} /> : undefined,
     history: <SimPlayerHistory gameId={gameId} playerId={player.id} />,
@@ -308,14 +309,24 @@ function SimOverviewSection({ player, detail, actions, seasonLabel }: { player: 
             note={`${player.games ?? 0} games${player.ppg != null ? ` · ${simFmtPts(player.ppg)} ppg` : ''}`}
           />
           <MetricCard
-            label="Overall"
-            value={player.overall != null ? String(player.overall) : null}
+            label="Grade"
+            value={player.grade ? simGradeText(player) : null}
             note={player.adp != null ? `ADP ${simFmtValue(player.adp)}` : 'No ADP'}
           />
         </View>
         {simIfStartsHint(player) ? <AppText style={common.muted} testID="sim-if-starts">{simIfStartsHint(player)}</AppText> : null}
         {actions ? <View style={common.wrapRow}>{actions}</View> : null}
       </PqvSection>
+      {(body?.player?.attributes ?? []).length > 0 ? (
+        <PqvSection title="Attributes">
+          <View style={common.stack} testID="sim-attributes">
+            {(body?.player?.attributes ?? []).map((a) => (
+              <GradeBar key={a.key} attribute={a} />
+            ))}
+          </View>
+          <AppText style={common.muted}>From usage and history. Graded on their own: they do not add up to the overall grade.</AppText>
+        </PqvSection>
+      ) : null}
       {(body?.news ?? []).length > 0 ? (
         <PqvSection title="Game news">
           <View style={common.stack}>

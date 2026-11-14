@@ -17,6 +17,7 @@ import math
 from typing import Any, Mapping, Sequence
 
 from modules.sim import game_block as blockmod
+from modules.sim import game_grades
 from modules.sim.game_actions import lineup_warnings
 from modules.sim.game_ai import ai_lineup, trade_window
 from modules.sim.game_engine import standing_rows
@@ -236,7 +237,7 @@ def league_rosters(snap: GameSnapshot, state: GameState, seed: int = 0) -> dict[
         roster = state.rosters[tid]
         held = [*roster, *state.ir.get(tid, ()), *state.taxi.get(tid, ())]
         positions = report[tid] if roster else []
-        rows_ = [player_row(snap, state, ev, pid, owners, week=week) for pid in sorted(held, key=lambda p: (-snap.players[p].value, p))]
+        rows_ = [player_row(snap, state, ev, pid, owners, week=week) for pid in sorted(held, key=lambda p: (-game_grades.sort_key(snap, p, state.view_no), -ev.ros_mean(p), p))]
         teams.append({
             "team_id": tid, "name": t.name, "owner": t.owner, "is_you": t.is_user, "persona": _persona(snap, t.persona_id),
             "record": _record(by_team[tid]) if tid in by_team else None,
@@ -616,7 +617,7 @@ def _extras(snap: GameSnapshot, state: GameState, ev: Evaluator) -> dict[str, An
         picks = sorted(state.picks_of(user))
         out["dynasty"] = {
             "season_no": state.season_no, "seasons": snap.settings.seasons,
-            "picks_held": len(picks), "picks_value": round(sum(ev.pick_value(p) for p in picks), 1),
+            "picks_held": len(picks),
             "next_pick": min(picks, key=lambda p: (p.split(":")[1], int(p.split(":")[2]))) if picks else None,
         }
     return out

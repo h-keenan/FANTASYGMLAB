@@ -88,6 +88,8 @@ const ModelRadarChart = dynamic(() => import("@/components/ModelRadarChart").the
 /** The Fantasy Sim's own tab contents inside the Player Quick View (see `simSections`). */
 export interface SimPqvSections {
   overview: ReactNode;
+  /** The hero's letter-grade tile. Present in the sim: the numeric Player score ring, Value tile and overall / position ranks never show there. */
+  heroGrade?: ReactNode;
   outlook?: ReactNode;
   scouting?: ReactNode;
   history?: ReactNode;
@@ -256,7 +258,8 @@ export function PlayerQuickView({
     label: availability ? null : injuryLabel,
     tone: waiverInjuryDisplay(identity.injury_status).tone,
   };
-  const overallRating = identity.overall_rating ?? stats?.overall_rating ?? resolved?.overall_rating ?? null;
+  // Fantasy Sim: no numeric rating of any kind (the grade tile replaces the ring); the real world's score, value and ranks never show.
+  const overallRating = isSim ? null : (identity.overall_rating ?? stats?.overall_rating ?? resolved?.overall_rating ?? null);
   const name = identity.name || resolved?.name || `Player ${identity.player_id}`;
   // What a remote tab shows instead of its content while the detail loads or when it failed (null = show the content).
   const bodyGate: ReactNode | null = loading ? (
@@ -315,7 +318,9 @@ export function PlayerQuickView({
           team={identity.team || resolved?.team}
           age={identity.age ?? resolved?.age ?? null}
           tier={identity.tier}
-          score={identity.score ?? resolved?.value_score ?? null}
+          score={isSim ? null : (identity.score ?? resolved?.value_score ?? null)}
+          gradeTile={isSim ? (sim?.heroGrade ?? null) : null}
+          hideValue={isSim}
           valueNote={identity.value_note ?? resolved?.value_note}
           valueLabel={identity.value_label ?? null}
           avatarId={remote ? identity.player_id : null}
@@ -324,12 +329,12 @@ export function PlayerQuickView({
           onByeThisWeek={realWorld.showBye ? (resolved?.on_bye_this_week ?? false) : false}
           unavailable={availability?.unavailable ?? false}
           overallRating={overallRating}
-          overallRank={identity.overall_rank}
-          positionRank={identity.position_rank}
+          overallRank={isSim ? null : identity.overall_rank}
+          positionRank={isSim ? null : identity.position_rank}
           usageTrend={model?.usage_trend ?? null}
           usageLoading={loading}
           valueChart={asOf != null ? null : <PlayerValueHistory playerId={identity.player_id} bare />}
-          ovrChart={model ? <SubRatingRow model={model} bare /> : null}
+          ovrChart={model && !isSim ? <SubRatingRow model={model} bare /> : null}
           depthChartNote={realWorld.showDepthChartNote ? model?.depth_chart_note : null}
           rookie={rookieBadge(bio)}
         />

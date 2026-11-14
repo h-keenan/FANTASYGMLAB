@@ -54,11 +54,17 @@ export function PlayerHeroHeader({
   rookie = null,
   valueChart = null,
   ovrChart = null,
+  gradeTile = null,
+  hideValue = false,
 }: {
   /** Shown in the tap-the-Value popover (for example the value history chart). */
   valueChart?: ReactNode;
   /** Shown in the tap-the-Player-score popover (for example the model radar). */
   ovrChart?: ReactNode;
+  /** Fantasy Sim: a letter-grade tile that REPLACES the Player score ring (no numeric rating in the sim). */
+  gradeTile?: ReactNode;
+  /** Fantasy Sim: no Value tile (the model's value is the hidden rating). */
+  hideValue?: boolean;
   /** ROOKIE badge from rookieBadge(bio); null for everyone else. */
   rookie?: { label: string; detail: string | null } | null;
   /** Team bye week (null when unknown / free agent). */
@@ -153,7 +159,9 @@ export function PlayerHeroHeader({
         </div>
 
         <div className="pqv-stat-tiles">
-          {overallRating != null ? (
+          {gradeTile ? (
+            gradeTile
+          ) : overallRating != null ? (
             <TapForWhy metric="ovr" variant="tile" className="pqv-stat-tile" spoken={`Player score ${overallRating}`} chart={ovrChart}>
               <OvrGauge rating={overallRating} size="lg" />
               <span className="pqv-stat-tile-caption">Player score</span>
@@ -164,6 +172,8 @@ export function PlayerHeroHeader({
               <span className="pqv-stat-tile-caption">Player score</span>
             </div>
           )}
+          {hideValue ? null : (
+          <>
           {score != null ? (
             <TapForWhy metric={valueLabel ? "trade_value" : "value"} variant="tile" className="pqv-stat-tile" spoken={`${valueLabel ?? "Value"} ${formatScore(score)}`} chart={valueChart}>
               <span className="pqv-stat-tile-value">{formatScore(score)}</span>
@@ -190,6 +200,8 @@ export function PlayerHeroHeader({
                 <span className="pqv-stat-tile-note">{valueNote || "No market value yet"}</span>
               </TapForWhy>
             )
+          )}
+          </>
           )}
           <UsageTile trend={usageTrend} loading={usageLoading} />
         </div>
