@@ -52,7 +52,7 @@ export function SimRealHistory({ playerId, asOf }: { playerId: string; asOf: num
   return (
     <View style={common.stack} testID="sim-real-history">
       {career.length > 0 ? (
-        <PqvSection title={`Career by season · through ${asOf}`}>
+        <PqvSection title={`Real career by season · through ${asOf}`}>
           {career.map((season, index) => (
             <View key={season.season}>
               <Pressable accessibilityRole="button" accessibilityState={{ expanded: open === index }} onPress={() => setOpen(open === index ? -1 : index)} style={common.rowBetween}>

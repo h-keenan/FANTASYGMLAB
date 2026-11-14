@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useQuery } from '@tanstack/react-query';
@@ -53,6 +53,7 @@ import { queryKeys } from '../lib/queryKeys';
 import { isOnWaiverList } from '../lib/waiverHighlight';
 import { playerSubRatings } from '../lib/subRatings';
 import { navigationRef } from '../navigation/navigationRef';
+import { nextSheetSnap, orderPlayerSheetTabs, type SheetSnap } from '../lib/playerAnatomy';
 import { radii, scrim, sheetHeight, spacing, type ThemeColors } from '../theme';
 
 type ExplorerTarget = { key: string; label: string };
@@ -302,9 +303,13 @@ export default function PlayerQuickViewSheet({
   const headerTags = request.tags ?? [];
   const showSignals = !!scoped.opportunityLabel || !!injury || headerTags.length > 0;
 
+  // Peek sheet (coridian_ pick 1b): opens at half height, drag the grip up (or tap it) for full; pills never move it.
+  const [snap, setSnap] = useState<SheetSnap>('peek');
+  const gripStart = useRef<{ y: number; t: number } | null>(null);
+
   const pqvTabs = useTabs({
     id: 'pqv',
-    tabs: [
+    tabs: orderPlayerSheetTabs([
     {
       key: 'overview',
       label: 'Overview',
@@ -349,15 +354,16 @@ export default function PlayerQuickViewSheet({
           },
         ]
       : []),
-    ...(remote
+    ...(remote || sim?.stats
       ? [
           {
             key: 'stats',
             label: 'Stats',
             render: () =>
-              bodyGate ?? (
+              (remote ? bodyGate : null) ?? (
                 <View style={styles.body}>
                   {sim?.stats ?? null}
+                  {!remote ? null : <>
                   <UsageBlock profile={model?.usage_profile} position={stats?.position ?? player.position} onExplore={setExplorer} />
                   <SeasonStatsRows stats={stats ?? null} usageProfile={model?.usage_profile} onExplore={setExplorer} />
                   {stats && stats.college.length > 0 ? (
@@ -370,9 +376,14 @@ export default function PlayerQuickViewSheet({
                       </View>
                     </View>
                   ) : null}
+                  </>}
                 </View>
               ),
           },
+        ]
+      : []),
+    ...(remote
+      ? [
           {
             key: 'profile',
             label: 'Profile',
@@ -400,13 +411,33 @@ export default function PlayerQuickViewSheet({
       : []),
     ...(sim?.scouting ? [{ key: 'scouting', label: 'Scouting', render: () => <>{sim.scouting}</> }] : []),
     ...(sim?.history ? [{ key: 'history', label: 'History', render: () => <>{sim.history}</> }] : []),
-    ],
+    ]),
   });
 
   return (
     <SheetModal visible transparent animationType="fade" onRequestClose={onClose}>
       <Pressable style={styles.backdrop} onPress={onClose} accessibilityLabel="Close player quick view">
-        <SwipeDismissCard style={styles.sheet} onDismiss={onClose} testID="player-quick-view">
+        <SwipeDismissCard style={[styles.sheet, snap === 'peek' ? styles.sheetPeek : styles.sheetFull]} onDismiss={onClose} testID="player-quick-view">
+          <View
+            style={styles.grip}
+            accessible
+            accessibilityRole="button"
+            accessibilityLabel={snap === 'peek' ? 'Expand player sheet' : 'Shrink player sheet'}
+            onStartShouldSetResponder={() => true}
+            onResponderGrant={(e) => {
+              gripStart.current = { y: e.nativeEvent.pageY, t: Date.now() };
+            }}
+            onResponderRelease={(e) => {
+              const start = gripStart.current;
+              gripStart.current = null;
+              if (!start) return;
+              const dy = e.nativeEvent.pageY - start.y;
+              const next = Math.abs(dy) < 6 ? (snap === 'peek' ? 'full' : 'peek') : nextSheetSnap(snap, dy, dy / Math.max(1, Date.now() - start.t));
+              if (next !== snap) setSnap(next);
+            }}
+          >
+            <View style={styles.gripBar} />
+          </View>
           <SheetScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false} stickyHeaderIndices={[2]}>
             {/* Top bar: source label left, round close right (web .pqv-topbar). */}
             <View style={styles.topBar}>
@@ -550,6 +581,10 @@ function createStyles(colors: ThemeColors) {
       minHeight: sheetHeight.min,
       maxHeight: sheetHeight.max,
     },
+    sheetPeek: { minHeight: '56%', maxHeight: '56%' },
+    sheetFull: { minHeight: '92%', maxHeight: '92%' },
+    grip: { height: 24, alignItems: 'center', justifyContent: 'center' },
+    gripBar: { width: 40, height: 4, borderRadius: 2, backgroundColor: colors.borderStrong },
     stickyTabs: { backgroundColor: colors.surface, paddingVertical: spacing.xs },
     content: { padding: spacing.lg, paddingBottom: spacing.xxl, gap: spacing.md },
     topBar: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', minHeight: 28 },

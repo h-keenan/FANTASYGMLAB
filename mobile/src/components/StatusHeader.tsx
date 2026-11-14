@@ -5,7 +5,8 @@ import Svg, { Circle } from 'react-native-svg';
 import AccentCard from './AccentCard';
 import AppText from './AppText';
 import Button from './Button';
-import PlayerIdentityRow from './PlayerIdentityRow';
+import CompactPlayerCard from './CompactPlayerCard';
+import PlayerAccordionRow from './PlayerAccordionRow';
 import { useThemeMode } from '../context/ThemeModeContext';
 import {
   statusAttentionAria,
@@ -109,38 +110,52 @@ function AttentionRow({ item, first, onOpen }: { item: StatusAttentionItem; firs
   const [open, setOpen] = useState(false);
   const href = item.href;
   const hasDetail = Boolean(item.detail);
-  const trailingValue = item.grade ?? item.stat?.value ?? null;
-  const trailingCaption = item.grade ? 'GRADE' : item.stat?.label ?? null;
-  const row = (
-    <PlayerIdentityRow
-      playerId={item.playerId}
-      name={item.name}
-      position={item.position}
-      team={item.team}
-      tier={item.tier}
-      injuryLabel={item.injuryStatus}
-      contextLine={item.meta}
-      trailingValue={trailingValue}
-      trailingCaption={trailingCaption}
-      trailingTone={item.grade || item.stat?.tone === 'success' ? 'accent' : undefined}
-      chevron={!hasDetail && Boolean(href && onOpen)}
-      onPress={hasDetail ? () => setOpen(!open) : href && onOpen ? () => onOpen(href) : undefined}
-      style={styles.rowFlex}
-    />
-  );
-  return (
-    <View style={[styles.attentionRow, !first && styles.attentionDivider]} testID="status-attention-row" accessibilityLabel={hasDetail ? `${statusAttentionAria(item)}. ${open ? 'Collapse' : 'Expand'}` : statusAttentionAria(item)} accessibilityState={hasDetail ? { expanded: open } : undefined}>
-      <View style={styles.rowMain}>{row}</View>
-      {hasDetail && open ? (
-        <View style={styles.detail}>
+  const player = { id: item.playerId, name: item.name, position: item.position, team: item.team, tier: item.tier };
+  const label = hasDetail ? `${statusAttentionAria(item)}. ${open ? 'Collapse' : 'Expand'}` : statusAttentionAria(item);
+  // The shared player anatomy: PlayerAccordionRow (avatar slot included) when there is a sentence to expand, otherwise a
+  // CompactPlayerCard that opens its href. One key figure (or one grade) sits at the right edge.
+  if (hasDetail) {
+    const trailingFact = item.grade
+      ? { key: 'grade', label: 'GRADE', value: item.grade, tone: 'accent' as const }
+      : item.stat
+        ? { key: 'stat', label: item.stat.label, value: item.stat.value, tone: item.stat.tone === 'success' ? ('success' as const) : item.stat.tone === 'danger' ? ('danger' as const) : item.stat.tone === 'warning' ? ('warning' as const) : undefined }
+        : null;
+    return (
+      <View style={[styles.attentionRow, !first && styles.attentionDivider]} testID="status-attention-row" accessibilityLabel={label}>
+        <PlayerAccordionRow player={player} mode={item.grade ? 'sim' : 'desk'} metaText={item.meta} trailingFact={trailingFact} open={open} onToggle={() => setOpen(!open)}>
           <AppText style={styles.detailText}>{item.detail}</AppText>
           {href && onOpen ? (
             <Pressable accessibilityRole="link" onPress={() => onOpen(href)} style={styles.openLink}>
               <AppText style={styles.link}>Open →</AppText>
             </Pressable>
           ) : null}
-        </View>
-      ) : null}
+        </PlayerAccordionRow>
+      </View>
+    );
+  }
+  const card = (
+    <CompactPlayerCard
+      player={player}
+      detail={item.meta}
+      trailing={
+        item.grade || item.stat ? (
+          <View style={styles.figure}>
+            <AppText style={styles.figureValue}>{item.grade ?? item.stat?.value}</AppText>
+            <AppText style={styles.figureCaption}>{item.grade ? 'GRADE' : item.stat?.label}</AppText>
+          </View>
+        ) : undefined
+      }
+    />
+  );
+  return (
+    <View style={[styles.attentionRow, !first && styles.attentionDivider]} testID="status-attention-row" accessibilityLabel={label}>
+      {href && onOpen ? (
+        <Pressable accessibilityRole="button" onPress={() => onOpen(href)} style={styles.rowMain}>
+          {card}
+        </Pressable>
+      ) : (
+        <View style={styles.rowMain}>{card}</View>
+      )}
     </View>
   );
 }
@@ -253,6 +268,9 @@ function createStyles(colors: ThemeColors) {
     context: { fontSize: 13.5, color: colors.textSecondary },
     ringCenter: { alignItems: 'center', justifyContent: 'center', paddingHorizontal: 8 },
     ringText: { fontSize: 14, fontWeight: '800', color: colors.textPrimary },
+    figure: { alignItems: 'flex-end' },
+    figureValue: { fontSize: 16, fontWeight: '800', color: colors.textPrimary },
+    figureCaption: { fontSize: 12, fontWeight: '800', color: colors.textTertiary },
     stats: { flexDirection: 'row', gap: spacing.sm },
     stat: {
       flex: 1,
