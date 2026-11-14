@@ -19,7 +19,7 @@ GOLDEN_LEGACY_DIGEST = "dedfcfec4052ddd2e0f9401b71c40b8bb35a660933be2e5ce4c63bc3
 
 
 def with_limit_v(run, v):
-    object.__setattr__(run.root, "settings", replace(run.root.settings, limit_v=v))
+    object.__setattr__(run.root, "settings", replace(run.root.settings, limit_v=v, **({"names_v": 0} if v == 0 else {})))  # a save from before limit_v also predates names_v
     run.root.__dict__.pop("_views", None)
     return run
 
@@ -46,6 +46,8 @@ def test_golden_digest_a_limit_v0_save_replays_exactly_as_before_the_soft_limit(
     # a new game (limit_v 1) that never goes over the limit is the same game event for event
     n = Run()
     assert n.root.settings.limit_v == 1 and n.root.settings.to_dict()["limit_v"] == 1
+    object.__setattr__(n.root, "settings", replace(n.root.settings, names_v=0))  # new rookie names (names_v 1) are the one other new-game difference
+    n.root.__dict__.pop("_views", None)
     n.play_season(); n.offseason(); n.play_season(); n.offseason()
     five_weeks(n)
     assert n.state.digest() == GOLDEN_LEGACY_DIGEST

@@ -93,9 +93,11 @@ export function simCompactWeek(game: { phase: string; week: number; settings?: {
   return total ? `Wk ${game.week}/${total}` : `Wk ${game.week}`;
 }
 
-/** "S1/5" season chip for dynasty games; empty for a redraft. */
-export function simCompactSeason(dynasty: { season_no: number; seasons: number } | null | undefined): string {
-  return dynasty ? `S${dynasty.season_no}/${dynasty.seasons}` : "";
+/** "S3 2028" season chip for dynasty games (the shared season label; "S3/10" when the game has no calendar year); empty for a redraft. */
+export function simCompactSeason(dynasty: { season_no: number; seasons: number; year?: number | null; season_label?: string | null } | null | undefined): string {
+  if (!dynasty) return "";
+  if (dynasty.season_label) return dynasty.season_label;
+  return dynasty.year ? `S${dynasty.season_no} ${dynasty.year}` : `S${dynasty.season_no}/${dynasty.seasons}`;
 }
 
 /** Paths whose page renders its own phone chrome (compact header plus bottom bar), so the global header and the GM orb button step aside below 768px. */

@@ -9,11 +9,11 @@ const entry = (e: Partial<SimHistoryEntry> & { kind: SimHistoryEntry["kind"] }):
 describe("sim history text", () => {
   it("dates are a season and a week, in the game's own calendar", () => {
     expect(simWhenLabel({ season: 1, year: null, week: 5, offseason: false })).toBe("Week 5");
-    expect(simWhenLabel({ season: 2, year: null, week: 5, offseason: false })).toBe("Season 2 · Week 5");
-    expect(simWhenLabel({ season: 2, year: 2028, week: 5, offseason: false })).toBe("2028 · Week 5");
-    expect(simWhenLabel({ season: 1, year: 2027, week: 0, offseason: false })).toBe("2027 draft");
+    expect(simWhenLabel({ season: 2, year: null, week: 5, offseason: false })).toBe("S2 · Week 5");
+    expect(simWhenLabel({ season: 2, year: 2028, week: 5, offseason: false })).toBe("S2 2028 · Week 5");
+    expect(simWhenLabel({ season: 1, year: 2027, week: 0, offseason: false })).toBe("S1 2027 draft");
     expect(simWhenLabel({ season: 1, year: null, week: 0, offseason: false })).toBe("Draft");
-    expect(simWhenLabel({ season: 1, year: 2027, week: 9, offseason: true })).toBe("2027 offseason");
+    expect(simWhenLabel({ season: 1, year: 2027, week: 9, offseason: true })).toBe("S1 2027 offseason");
   });
   it("draft slot and drafted sentence", () => {
     expect(simDraftSlotText(3, 31, true)).toBe("Round 3, pick 31 overall (auto)");

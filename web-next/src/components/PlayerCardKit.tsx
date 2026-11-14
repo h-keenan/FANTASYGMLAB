@@ -333,7 +333,7 @@ function MatchupCard({ model, identity, onEdit, editLabel, mirror = false, empha
             </span>
           )}
           <span className="text-[0.6875rem] uppercase font-bold" style={{ color: "var(--color-text-muted)", letterSpacing: "var(--letter-spacing-badge)" }}>
-            {head.kind === "pts" ? (model.gameStatus === "final" ? "Final pts" : "Pts") : head.kind === "proj" ? "Proj" : model.bye ? "Bye" : ""}
+            {head.kind === "pts" ? (model.gameStatus === "final" ? "Final pts" : "Pts") : head.kind === "proj" ? "Proj" : model.bye ? "Bye" : model.out ? "Out" : ""}
           </span>
           {model.projectedFinal != null ? (
             <span

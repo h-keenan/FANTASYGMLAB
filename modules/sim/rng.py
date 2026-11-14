@@ -37,6 +37,7 @@ SUBSYSTEMS = {
     "gseason": 19,
     "gblock": 21,  # which AI teams shop a trade block in a given week
     "gscout": 20,  # scouting seeds of generated rookies
+    "gnames": 22,  # rookie name tables shuffle (names_v 1+)
 }
 
 

@@ -1,18 +1,20 @@
 // Shared (web + mobile twin): plain-words presentation of the Fantasy Sim history payloads
 // (GET /players/{id}/history and /teams/{id}/history). Pure and import-free of runtime code.
 
-import type { SimHistoryAsset, SimHistoryEntry, SimTeamHistoryMove } from "./simGame";
+import { simSeasonLabel, type SimHistoryAsset, type SimHistoryEntry, type SimTeamHistoryMove } from "./simGame";
 
 interface When {
   season: number;
   year: number | null;
+  /** "S3 2028" when the server built it. */
+  season_label?: string;
   week: number;
   offseason: boolean;
 }
 
-/** "2028 · Week 5", "Week 5" (first season of a one-season game), "2027 offseason" or "Season 2 · Week 5" when the game has no calendar year. */
+/** "S3 2028 · Week 5", "Week 5" (first season of a one-season game), "S2 2027 offseason" or "S2 · Week 5" when the game has no calendar year. */
 export function simWhenLabel(w: When): string {
-  const base = w.year ? String(w.year) : w.season > 1 ? `Season ${w.season}` : "";
+  const base = w.season_label || (w.year ? simSeasonLabel(w.season, w.year) : w.season > 1 ? simSeasonLabel(w.season) : "");
   if (w.offseason) return `${base || "Offseason"}${base ? " offseason" : ""}`;
   if (w.week <= 0) return base ? `${base} draft` : "Draft";
   return base ? `${base} · Week ${w.week}` : `Week ${w.week}`;
@@ -32,7 +34,7 @@ export function simHistoryText(e: SimHistoryEntry): string {
   switch (e.kind) {
     case "drafted": {
       const slot = simDraftSlotText(e.round, e.pick, e.auto);
-      const where = e.draft === "rookie" ? `${e.class_year ? `${e.class_year} ` : ""}rookie draft` : "the league draft";
+      const where = e.draft === "rookie" ? `${e.class_season_label || e.class_year ? `${e.class_season_label || e.class_year} ` : ""}rookie draft` : "the league draft";
       return `Drafted by ${team} in ${where}${slot ? `: ${slot}` : ""}${e.via?.team_name ? ` (pick from ${e.via.team_name})` : ""}`;
     }
     case "started":

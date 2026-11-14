@@ -236,3 +236,15 @@ def test_in_progress_starter_without_projection_counts_real_points_only():
     result = compute_live_win_probability(mine, opponent, now=KICKOFF + GAME_WALL_CLOCK / 2)
     assert result["available"] is True
     assert result["my_projected_total"] == round(10.0 + 7.5 + 0.3125 + 6.0, 1)
+
+
+def test_a_starter_ruled_out_before_kickoff_adds_nothing_to_the_team_projection():
+    from modules.matchup_win_probability import starter_expected_points
+
+    out = {**_projected_starter(14.0, 8.0, 20.0), "injury_status": "Out"}
+    assert starter_expected_points(out) == 0.0
+    healthy = _projected_starter(14.0, 8.0, 20.0)
+    assert starter_expected_points(healthy) == 14.0
+    # once his game has a real score, the real score counts as before
+    scored = {**out, "actual_points": 3.0, "game_started": True, "game_final": True}
+    assert starter_expected_points(scored) == 3.0

@@ -123,6 +123,9 @@ PACE_FULL_WEIGHT_AT_ELAPSED = 0.5
 EXIT_INJURY_STATUSES = frozenset({"out", "ir", "inactive", "pup", "suspended"})
 
 
+OUT_BEFORE_KICKOFF_STATUSES = frozenset({"out", "ir", "inactive", "pup", "suspended"})
+
+
 def _has_exited(starter: dict[str, Any]) -> bool:
     if starter.get("exited_game") is True:
         return True
@@ -205,6 +208,9 @@ def _starter_distribution(starter: dict[str, Any], *, now: datetime | None = Non
     has_actual = starter.get("game_started") is True and isinstance(actual_points, (int, float))
 
     if not has_actual:
+        # Ruled out before his game: he scores nothing this week, so he adds nothing to the team total (a known zero, not an unmodeled player).
+        if str(starter.get("injury_status") or "").strip().lower() in OUT_BEFORE_KICKOFF_STATUSES:
+            return 0.0, 0.0, True
         # Not kicked off (or no real score yet): the projection alone.
         if moments is None:
             return 0.0, 0.0, False

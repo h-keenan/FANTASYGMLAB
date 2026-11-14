@@ -22,6 +22,7 @@ import ToneBadge from './ToneBadge';
 import { useThemeMode } from '../context/ThemeModeContext';
 import {
   simFmtPts,
+  simProjNote,
   simFmtRecord,
   simMarginLine,
   simPlayoffStatusLabel,
@@ -85,7 +86,7 @@ export function SimByeCard({ ctx, alerts, onTab, onClaim }: { ctx: SimCtx; alert
                 <View style={common.grow}>
                   <SimMiniPlayer player={r} onOpen={ctx.openPlayer} />
                 </View>
-                <AppText style={common.small}>{simFmtPts(r.projection)} proj</AppText>
+                <AppText style={common.small}>{simProjNote(r) ?? `${simFmtPts(r.projection)} proj`}</AppText>
                 <Button label="Claim" size="sm" onPress={() => onClaim(r)} />
               </View>
             ))

@@ -17,6 +17,7 @@ from modules.sim.game_state import GameState
 from modules.sim import game_block as blockmod
 from modules.sim.game_types import PREVIEW_PAYWALL_WEEK, GameSnapshot, headshot_id
 from modules.sim.personas import PERSONAS
+from modules.sim.season_label import season_label, season_label_for_year
 from modules.sim.types import FLEX_SLOTS, is_pick_id
 
 PAGE_MAX = 60
@@ -68,9 +69,16 @@ def player_row(
     # With team roles (player-model-3+) the shown projection is the role-resolved mean for the next game he can
     # play, so an injured starter shows what he does when back and only one backup shows the fill-in number.
     projection = ev.next_proj(pid, w) if ev.roles_on else ev.proj(pid, w)
+    # Display only: a player who is on a bye (or out) this week is not projected any points this week. The engine and the AI
+    # already treat him as 0 (``ev.proj``); only this row used to show the number he will post when he is back.
+    proj_note = ev.status(pid, w) if state.status in ("in_season", "playoffs") else "healthy"
+    next_projection = round(projection if ev.roles_on else ev.ros_mean(pid), 1)
+    if proj_note != "healthy":
+        projection = 0.0
     return {
         "id": pid, "headshot_id": headshot_id(pid), "name": p.name, "pos": p.pos, "team": p.nfl_team,
-        "age": p.age, "adp": p.adp, "value": p.value, "overall": overall_ratings(snap).get(pid), "projection": round(projection, 1), "ros_mean": round(ev.ros_mean(pid), 1),
+        "age": p.age, "adp": p.adp, "value": p.value, "overall": overall_ratings(snap).get(pid), "projection": round(projection, 1),
+        "projection_note": proj_note if proj_note != "healthy" else None, "next_projection": next_projection, "projection_week": w, "ros_mean": round(ev.ros_mean(pid), 1),
         "role": ev.role_info(pid, w),
         "floor": round(floor, 1), "ceiling": round(ceiling, 1), "status": ev.status(pid, w),
         "out_weeks": state.out.get(pid, 0), "bye_week": snap.bye_of(pid) or None,
@@ -98,8 +106,8 @@ def pick_asset(snap: GameSnapshot, state: GameState, ev: Evaluator, pid: str) ->
     hint = None if frac is None else ("early" if frac < 0.34 else "mid" if frac < 0.67 else "late")
     team = snap.team(holder) if holder else None
     return {
-        "id": pid, "kind": "pick", "headshot_id": None, "name": f"{season} Round {rnd}", "pos": "PICK", "team": "",
-        "season": season, "round": rnd, "orig_team_id": orig, "orig_team_name": snap.team(orig).name,
+        "id": pid, "kind": "pick", "headshot_id": None, "name": f"{season_label_for_year(season, snap.settings.start_year)} Round {rnd}", "pos": "PICK", "team": "",
+        "season": season, "season_label": season_label_for_year(season, snap.settings.start_year), "round": rnd, "orig_team_id": orig, "orig_team_name": snap.team(orig).name,
         "slot_hint": hint, "label": ev.pick_name(pid), "age": None, "adp": None, "value": round(ev.pick_value(pid), 1),
         "projection": 0.0, "ros_mean": 0.0, "floor": 0.0, "ceiling": 0.0, "status": "healthy", "out_weeks": 0,
         "bye_week": None, "owner": ({"type": "you" if team.is_user else "ai", "team_id": holder, "name": team.name}
@@ -398,6 +406,7 @@ def dynasty_block(snap: GameSnapshot, state: GameState) -> dict[str, Any] | None
     user = snap.user_team.tid
     return {
         "season_no": state.season_no, "seasons": S.seasons, "year": S.start_year + state.season_no - 1,
+        "season_label": season_label(state.season_no, S.start_year + state.season_no - 1 if S.start_year else None),
         "stage": (state.offseason or {}).get("stage") if state.status == "offseason" else None,
         "picks_held": len(state.picks_of(user)), "titles": sum(1 for a in state.seasons if a["champion"] and a["champion"]["is_you"]),
         "last_season": state.season_no >= S.seasons,

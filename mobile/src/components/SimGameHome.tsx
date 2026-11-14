@@ -31,6 +31,7 @@ import {
   simHomeDynastyLine,
   simChecklistTone,
   simFmtPts,
+  simProjText,
   simFmtRecord,
   simRowEdge,
   simSlotLabels,
@@ -267,7 +268,7 @@ function Side({ player, win, lose, align, ctx }: { player: SimGamePlayer | null;
   // Projection above the name so the name keeps the whole cell width (two lines allowed).
   return (
     <View style={[styles.side, end && styles.sideRight, win && { backgroundColor: colors.successMuted }]}>
-      <AppText style={[styles.sideProj, { color: player.status === 'healthy' ? tint : colors.textTertiary }]}>{simFmtPts(player.projection)}</AppText>
+      <AppText style={[styles.sideProj, { color: player.status === 'healthy' ? tint : colors.textTertiary }]}>{simProjText(player)}</AppText>
       <SimMiniPlayer player={player} align={align} onOpen={ctx.openPlayer} size={24} wrap />
     </View>
   );

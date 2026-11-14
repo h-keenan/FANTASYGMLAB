@@ -786,3 +786,28 @@ trade that would leave either team with two kickers (or two defenses) is refused
 gives its own in the same deal. The AI never initiates or counters with a K/DEF (`TradeDesk.tradable` still excludes them), so it
 cannot craft a nonsense kicker counter. A save without `kd_v` behaves exactly as before (K/DEF refused: "cannot be traded") and
 replays to the same digest.
+
+## Season labels, bye/out projections, rookie names
+
+**Season label (`S3 2028`).** One presentation rule for every place the sim names a season: season number, then
+its calendar year. `modules/sim/season_label.py` (server) and `simSeasonLabel` / `simSeasonLabelForYear` /
+`simSeasonText` in `simGame.ts` (web + app twin) are the only builders. Views carry additive `season_label`
+fields next to the existing `season` / `season_no` / `year` numbers (game `dynasty` block, offseason
+`season_label` + `last_season_label`, dynasty summary rows, league history, player/team history entries and
+rookie classes, pick assets). Stored events keep plain numbers, so old saves replay identically. A progress
+count ("3 of 10") may sit beside a label, never replace it. Stored recap pick names (`game_engine._brief`) are
+event data and stay year-based.
+
+**Bye / out projections.** Every player row (`player_row`) now carries `projection_note` (`"bye"` / `"out"` /
+`null`, in-season only), `projection_week`, and `next_projection` (what he projects for his next game). When the
+note is set, `projection` is `0.0`. Clients render "Bye" / "Out" (muted) through `simProjText` instead of a
+number. Display only: the engine, the AI and team totals already treated a bye / out player as 0 (`Evaluator.proj`),
+so no old save changes. Real FantasyDesk matchup: a player ruled out before kickoff has no projection and adds 0
+to the team total (`matchup_win_probability._starter_distribution`), same as a bye.
+
+**Rookie names (`names_v` 1).** New dynasty games carry `names_v: 1` in settings. A rookie's name is a pure
+function of `(seed, season, slot)` into a frozen 792 x 1189 first/last grid (`modules/sim/game_names.py`), a
+bijection per save: no full name repeats across any number of classes, and a first name comes back only once per
+~790 rookies. Names already worn by a veteran in the pool are skipped. Saves without `names_v` keep the original
+small tables untouched. The v1 tables are pinned by a sha256 in `tests/test_sim_rookie_names.py`; extend with a
+`names_v` 2 table set, never edit v1.

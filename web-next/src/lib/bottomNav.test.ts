@@ -43,6 +43,7 @@ describe("status chips and compact labels", () => {
     expect(simCompactWeek({ phase: "regular", week: 3, settings: { regular_weeks: 14 } })).toBe("Wk 3/14");
     expect(simCompactWeek({ phase: "playoffs", week: 15 })).toBe("Playoffs Wk 15");
     expect(simCompactSeason({ season_no: 1, seasons: 5 })).toBe("S1/5");
+    expect(simCompactSeason({ season_no: 3, seasons: 10, year: 2028 })).toBe("S3 2028");
     expect(simCompactSeason(null)).toBe("");
   });
 });

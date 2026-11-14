@@ -24,7 +24,7 @@ export function SimDynastyStrip({ years }: { years: SimDynastyYear[] }) {
     <section aria-label="Your seasons so far" data-testid="dynasty-strip">
       <ol className="flex gap-2 overflow-x-auto pb-1">
         {views.map((v) => (
-          <li key={v.year} className="shrink-0">
+          <li key={v.label} className="shrink-0">
             <div
               className="flex min-w-[5.5rem] flex-col gap-0.5 px-2 py-1.5"
               style={{
@@ -35,7 +35,7 @@ export function SimDynastyStrip({ years }: { years: SimDynastyYear[] }) {
               }}
             >
               <span className="flex items-center gap-1 text-xs font-extrabold">
-                {v.year}
+                {v.label}
                 {v.youWon ? <ReviewGlyphIcon glyph="trophy" size={12} /> : null}
               </span>
               <span className="text-xs tabular-nums" style={{ color: "var(--color-text-secondary)" }}>
@@ -56,7 +56,7 @@ function YearRow({ v }: { v: SimDynastyYearView }) {
   return (
     <li className="flex flex-col gap-1 py-2" style={{ borderBottom: "var(--border-width-default) solid var(--color-border)" }} data-testid="dynasty-year">
       <div className="flex items-center justify-between gap-2">
-        <span className="text-sm font-extrabold">{v.year}</span>
+        <span className="text-sm font-extrabold">{v.label}</span>
         <span className="flex flex-wrap items-center justify-end gap-2">
           <span className="text-sm font-bold tabular-nums">{v.record}</span>
           <SimToneBadge label={`${v.finish} place`} tone="muted" />
@@ -128,7 +128,7 @@ export function SimDynastyResult({ summary, onNewGame, onHub }: { summary: SimDy
         ) : (
           <ol className="flex flex-col">
             {view.years.map((v) => (
-              <YearRow key={v.year} v={v} />
+              <YearRow key={v.label} v={v} />
             ))}
           </ol>
         )}

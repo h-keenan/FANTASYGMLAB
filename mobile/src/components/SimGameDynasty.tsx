@@ -31,7 +31,7 @@ export function SimDynastyStrip({ years }: { years: SimDynastyYear[] }) {
       {views.map((v) => (
         <View key={v.year} style={[styles.cell, { borderTopColor: v.youWon ? colors.success : simToneColor(v.resultTone, colors) }]}>
           <View style={styles.cellTop}>
-            <AppText style={styles.cellYear}>{v.year}</AppText>
+            <AppText style={styles.cellYear}>{v.label}</AppText>
             {v.youWon ? <ReviewGlyphChip glyph="trophy" tone="success" size={18} /> : null}
           </View>
           <AppText style={styles.cellRecord}>{v.record}</AppText>
@@ -50,7 +50,7 @@ function YearRow({ v }: { v: SimDynastyYearView }) {
   return (
     <View style={[common.tight, common.divider, { paddingVertical: spacing.sm }]} testID="dynasty-year">
       <View style={common.rowBetween}>
-        <AppText style={common.bodyStrong}>{v.year}</AppText>
+        <AppText style={common.bodyStrong}>{v.label}</AppText>
         <View style={[common.wrapRow, { justifyContent: 'flex-end', flexShrink: 1 }]}>
           <AppText style={common.bodyStrong}>{v.record}</AppText>
           <SimToneBadge label={`${v.finish} place`} tone="muted" />

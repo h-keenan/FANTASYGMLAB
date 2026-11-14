@@ -6,7 +6,7 @@ import { Button } from "@/components/Button";
 import type { SimCtx } from "@/components/SimGameParts";
 import { api } from "@/lib/api";
 import { simTabAfterStageAction, type SimStageAction } from "@/lib/simScroll";
-import { simOffseasonCta, simOffseasonStageLabel, type SimOffseason, type SimOffseasonResponse } from "@/lib/simGame";
+import { simOffseasonCta, simOffseasonStageLabel, simSeasonLabel, type SimOffseason, type SimOffseasonResponse } from "@/lib/simGame";
 
 /**
  * The one persistent primary action for every offseason tab (Offseason, Team,
@@ -62,7 +62,7 @@ export function SimOffseasonBar({ ctx, onTab, orb }: { ctx: SimCtx; onTab?: (tab
     } else if (off.stage === "rookie_draft") {
       setConfirmAuto(true);
     } else {
-      void run(async () => (await api.startSimSeason(gameId)) as SimOffseasonResponse, () => `Season ${off.season_no + 1} is on.`, "start_season");
+      void run(async () => (await api.startSimSeason(gameId)) as SimOffseasonResponse, () => `${off.season_label || simSeasonLabel(off.season_no + 1, off.year)} is on.`, "start_season");
     }
   }
 

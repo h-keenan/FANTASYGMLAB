@@ -29,6 +29,7 @@ import {
   simFilterQuery,
   simFilterReducer,
   simFmtPts,
+  simProjText,
   simFmtValue,
   simHeadshotId,
   simIfStartsHint,
@@ -228,7 +229,7 @@ export function SimPlayerBrowser({
  * sim season's actual points, the rest-of-season band when it truly varies by
  * week, and a one-line summary when it does not.
  */
-export function SimPlayerSheet({ gameId, player, onClose, actions, startYear }: { gameId: string; player: SimGamePlayer; onClose: () => void; actions?: ReactNode; /** game.settings.start_year: drives the as-of cut of real data. */ startYear?: number | null }) {
+export function SimPlayerSheet({ gameId, player, onClose, actions, startYear, seasonLabel }: { /** The sim's current season, "S3 2028": names the season tile and the week-by-week header. */ seasonLabel?: string | null; gameId: string; player: SimGamePlayer; onClose: () => void; actions?: ReactNode; /** game.settings.start_year: drives the as-of cut of real data. */ startYear?: number | null }) {
   const detail = useSimPlayerDetail(gameId, player.id);
   const live = detail.data?.player ?? player;
   const real = simHeadshotId(player);
@@ -249,7 +250,7 @@ export function SimPlayerSheet({ gameId, player, onClose, actions, startYear }: 
     overall_rating: live.overall ?? null,
     ...(feed ? { overall_rank: feed.overall_rank, position_rank: feed.position_rank } : {}),
   };
-  return <PlayerQuickView identity={identity} onClose={onClose} remote={Boolean(real)} asOfSeason={simAsOfSeason(startYear)} simSections={simPqvSections(gameId, live, detail, actions, real ? { playerId: real, asOf: simAsOfSeason(startYear) } : undefined)} />;
+  return <PlayerQuickView identity={identity} onClose={onClose} remote={Boolean(real)} asOfSeason={simAsOfSeason(startYear)} simSections={simPqvSections(gameId, live, detail, actions, seasonLabel, real ? { playerId: real, asOf: simAsOfSeason(startYear) } : undefined)} />;
 }
 
 interface SimPlayerDetailState {
@@ -283,26 +284,26 @@ function useSimPlayerDetail(gameId: string, playerId: string): SimPlayerDetailSt
  * (generated rookies) and History (draft slot, moves, seasons; derived from the event log). Same section shell
  * (`pqv-stat-season`), same stat tiles (`StatGroup`) and the same weekly chart the real Player Quick View uses.
  */
-export function simPqvSections(gameId: string, player: SimGamePlayer, detail: SimPlayerDetailState, actions?: ReactNode, real?: { playerId: string; asOf: number }): SimPqvSections {
+export function simPqvSections(gameId: string, player: SimGamePlayer, detail: SimPlayerDetailState, actions?: ReactNode, seasonLabel?: string | null, real?: { playerId: string; asOf: number }): SimPqvSections {
   return {
-    overview: <SimOverviewSection player={player} detail={detail} actions={actions} />,
-    outlook: <SimOutlookSection player={player} detail={detail} />,
+    overview: <SimOverviewSection player={player} detail={detail} actions={actions} seasonLabel={seasonLabel} />,
+    outlook: <SimOutlookSection player={player} detail={detail} seasonLabel={seasonLabel} />,
     scouting: detail.data?.scouting ? <SimScoutingSections profile={detail.data.scouting} /> : undefined,
     history: <SimPlayerHistory gameId={gameId} playerId={player.id} />,
     stats: real ? <SimRealHistory playerId={real.playerId} asOf={real.asOf} /> : undefined,
   };
 }
 
-function SimOverviewSection({ player, detail, actions }: { player: SimGamePlayer; detail: SimPlayerDetailState; actions?: ReactNode }) {
+function SimOverviewSection({ player, detail, actions, seasonLabel }: { player: SimGamePlayer; detail: SimPlayerDetailState; actions?: ReactNode; seasonLabel?: string | null }) {
   const body = detail.data;
   const status = simPlayerStatusLabel(player);
   const ros = body?.ros ?? null;
   const tiles = [
-    { label: "This week", value: simFmtPts(player.projection), note: status ? status.label : `${simFmtPts(player.floor)}-${simFmtPts(player.ceiling)}`, percentile: null },
+    { label: "This week", value: simProjText(player), note: status ? status.label : `${simFmtPts(player.floor)}-${simFmtPts(player.ceiling)}`, percentile: null },
     ros
       ? { label: "Rest of season", value: `${simFmtPts(ros.mean)} ppg`, note: `${simFmtPts(ros.floor)}-${simFmtPts(ros.ceiling)}`, percentile: null }
       : null,
-    { label: "This season", value: simFmtPts(player.season_points ?? 0), note: `${player.games ?? 0} games${player.ppg != null ? ` · ${simFmtPts(player.ppg)} ppg` : ""}`, percentile: null },
+    { label: seasonLabel || "This season", value: simFmtPts(player.season_points ?? 0), note: `${player.games ?? 0} games${player.ppg != null ? ` · ${simFmtPts(player.ppg)} ppg` : ""}`, percentile: null },
     {
       label: "Overall",
       value: player.overall != null ? String(player.overall) : "—",
@@ -348,7 +349,7 @@ function SimOverviewSection({ player, detail, actions }: { player: SimGamePlayer
   );
 }
 
-function SimOutlookSection({ player, detail }: { player: SimGamePlayer; detail: SimPlayerDetailState }) {
+function SimOutlookSection({ player, detail, seasonLabel }: { player: SimGamePlayer; detail: SimPlayerDetailState; seasonLabel?: string | null }) {
   const body = detail.data;
   if (detail.failed) return <p className="pqv-status-text">Could not load the full outlook.</p>;
   if (!body) return <SkeletonRows count={2} />;
@@ -360,7 +361,7 @@ function SimOutlookSection({ player, detail }: { player: SimGamePlayer; detail: 
   if (!(actual.length > 0 || band || ros)) return <p className="pqv-status-text">No outlook yet.</p>;
   return (
     <section className="pqv-stat-season" data-testid="sim-weekly">
-      <h3>Week by Week · This sim season</h3>
+      <h3>Week by Week · {seasonLabel || "This sim season"}</h3>
       {actual.length > 0 || band ? (
         <WeeklyPointsPanel
           name={player.name}

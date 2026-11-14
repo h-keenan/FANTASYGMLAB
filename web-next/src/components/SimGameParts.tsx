@@ -22,7 +22,7 @@ import { ReviewGlyphIcon } from "@/components/SimReviewGlyph";
 import { PositionBadge } from "@/components/PositionBadge";
 import { ToneBadge } from "@/components/ToneBadge";
 import {
-  simFmtPts,
+  simProjText,
   simTrendText,
   simPlayerSubline,
   simGamePreviewLine,
@@ -388,7 +388,7 @@ export function SimIconButton({
 
 /** Projection + range stat for trailing slots. */
 export function SimProjection({ player }: { player: SimGamePlayer }) {
-  return <SimStat label="Proj" value={simFmtPts(player.projection)} />;
+  return <SimStat label="Proj" value={simProjText(player)} />;
 }
 
 /**

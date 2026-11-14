@@ -23,7 +23,7 @@ describe("SimGameHeader", () => {
     const onMore = vi.fn();
     render(<SimGameHeader game={game} onHub={onHub} onTeam={onTeam} onMore={onMore} />);
     expect(screen.getByTestId("game-heading-phone")).toHaveTextContent("Wk 3/14");
-    expect(screen.getByTestId("dynasty-progress-phone")).toHaveTextContent("S1/5");
+    expect(screen.getByTestId("dynasty-progress-phone")).toHaveTextContent("S1 2026");
     fireEvent.click(screen.getByRole("button", { name: "Back to all games" }));
     expect(onHub).toHaveBeenCalled();
     fireEvent.click(screen.getByTestId("sim-team-chip"));
