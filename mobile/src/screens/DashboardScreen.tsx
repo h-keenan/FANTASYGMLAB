@@ -1,6 +1,7 @@
 import FirstValueOfferCard from '../components/FirstValueOfferCard';
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
+import { ScrollView, StyleSheet, View } from 'react-native';
+import PressableScale from '../components/PressableScale';
 import AppText from '../components/AppText';
 import ValueStat from '../components/ValueStat';
 import EmptyState from '../components/EmptyState';
@@ -485,9 +486,9 @@ export default function DashboardScreen({ route, navigation }: Props) {
         tradePending={false}
         onNavigate={navigate}
         right={
-          <TouchableOpacity onPress={() => navigation.navigate('GmPlan', { leagueId, leagueName })} hitSlop={LINK_HIT_SLOP}>
+          <PressableScale onPress={() => navigation.navigate('GmPlan', { leagueId, leagueName })} hitSlop={LINK_HIT_SLOP}>
             <AppText style={styles.viewAll}>Full GM Plan ›</AppText>
-          </TouchableOpacity>
+          </PressableScale>
         }
         renderCard={(item, index) => (
           <BriefingCard
@@ -1186,9 +1187,9 @@ export function WatchlistAlertsSection({
           highlights: [items[0]?.headline ?? (showHealth ? 'Key injuries on your roster' : null)],
         })}
         action={
-          <TouchableOpacity onPress={() => navigation.navigate('Alerts', { leagueId, leagueName })} hitSlop={LINK_HIT_SLOP} style={{ minHeight: 44, justifyContent: 'center' }}>
+          <PressableScale onPress={() => navigation.navigate('Alerts', { leagueId, leagueName })} hitSlop={LINK_HIT_SLOP} style={{ minHeight: 44, justifyContent: 'center' }}>
             <AppText style={styles.viewAll}>All ›</AppText>
-          </TouchableOpacity>
+          </PressableScale>
         }
       >
       {richItems.map((item, index) => (
@@ -1346,11 +1347,10 @@ function MoreMovesRow({ hidden, onUpgrade }: { hidden: number; onUpgrade: () => 
     trackUse('more_next_moves', 'gate_seen', { tier: 'free' });
   }, []);
   return (
-    <TouchableOpacity
+    <PressableScale
       accessibilityRole="button"
       accessibilityLabel={`${hidden} more move${hidden === 1 ? '' : 's'} on Pro. Upgrade`}
       onPress={onUpgrade}
-      activeOpacity={0.8}
       style={{
         flexDirection: 'row',
         alignItems: 'center',
@@ -1368,6 +1368,6 @@ function MoreMovesRow({ hidden, onUpgrade }: { hidden: number; onUpgrade: () => 
         {hidden} more move{hidden === 1 ? '' : 's'} on Pro
       </AppText>
       <AppText style={{ color: colors.premium, fontWeight: '700' }}>Upgrade ›</AppText>
-    </TouchableOpacity>
+    </PressableScale>
   );
 }

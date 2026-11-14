@@ -1,6 +1,7 @@
 import GlossaryNote from '../components/GlossaryNote';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { FlatList, StyleSheet, TouchableOpacity, View } from 'react-native';
+import { FlatList, StyleSheet, View } from 'react-native';
+import PressableScale from '../components/PressableScale';
 import AppText from '../components/AppText';
 import ErrorState from '../components/ErrorState';
 import { useNavigation } from '@react-navigation/native';
@@ -345,15 +346,15 @@ export default function PortfolioScreen() {
                     releases the leagues below the fold and opens the preview
                     as soon as they have all loaded. */}
                 {composed.leagues.length > 0 ? (
-                  <TouchableOpacity style={styles.shareButton} onPress={requestShare} hitSlop={8}>
+                  <PressableScale style={styles.shareButton} onPress={requestShare} hitSlop={8}>
                     <Ionicons name="share-outline" size={14} color={colors.textSecondary} />
                     <AppText style={styles.shareButtonText}>Share</AppText>
-                  </TouchableOpacity>
+                  </PressableScale>
                 ) : null}
               </View>
-              <TouchableOpacity onPress={() => navigation.navigate('Home')} hitSlop={8} accessibilityRole="link">
+              <PressableScale onPress={() => navigation.navigate('Home')} hitSlop={8} accessibilityRole="link">
                 <AppText style={styles.linkText}>+ Add a league</AppText>
-              </TouchableOpacity>
+              </PressableScale>
             </View>
             <GlossaryNote terms={['rosterPower']} label="What is Roster Power?" />
             {draftingLeagues.length > 0 ? (
@@ -425,9 +426,9 @@ function DraftingLeaguesNote({
             <AppText style={styles.failedNoteText} numberOfLines={1}>
               {league.league_name}
             </AppText>
-            <TouchableOpacity onPress={() => onOpen(league)} hitSlop={8} accessibilityRole="link">
+            <PressableScale onPress={() => onOpen(league)} hitSlop={8} accessibilityRole="link">
               <AppText style={styles.linkTextSmall}>Watch live draft →</AppText>
-            </TouchableOpacity>
+            </PressableScale>
           </View>
         ))}
       </View>
@@ -460,9 +461,9 @@ function EspnLeaguesNote({
             <AppText style={styles.failedNoteText} numberOfLines={1}>
               {league.league_name}
             </AppText>
-            <TouchableOpacity onPress={() => onOpen(league)} hitSlop={8} accessibilityRole="link">
+            <PressableScale onPress={() => onOpen(league)} hitSlop={8} accessibilityRole="link">
               <AppText style={styles.linkTextSmall}>Open My Team →</AppText>
-            </TouchableOpacity>
+            </PressableScale>
           </View>
         ))}
       </View>
@@ -493,7 +494,7 @@ function FailedLeaguesNote({
         ? leagues
             .filter((league) => league.reason === 'unavailable')
             .map((league) => (
-              <TouchableOpacity
+              <PressableScale
                 key={league.league_id}
                 onPress={() => onRetry(league.league_id)}
                 hitSlop={8}
@@ -501,7 +502,7 @@ function FailedLeaguesNote({
                 accessibilityLabel={`Retry ${league.league_name}`}
               >
                 <AppText style={[styles.failedNoteText, { color: colors.accent, fontWeight: '700' }]}>Retry</AppText>
-              </TouchableOpacity>
+              </PressableScale>
             ))
         : null}
     </View>
@@ -559,9 +560,9 @@ function PortfolioLeagueSkeleton({
       {slow && league && onRetry ? (
         <View style={styles.slowRow}>
           <AppText style={styles.slowText}>Taking longer than usual…</AppText>
-          <TouchableOpacity onPress={() => onRetry(league.league_id)} accessibilityRole="button" accessibilityLabel={`Retry ${league.league_name}`}>
+          <PressableScale onPress={() => onRetry(league.league_id)} accessibilityRole="button" accessibilityLabel={`Retry ${league.league_name}`}>
             <AppText style={styles.slowRetry}>Retry</AppText>
-          </TouchableOpacity>
+          </PressableScale>
         </View>
       ) : null}
     </View>
@@ -602,7 +603,7 @@ function PortfolioLeagueCard({
   return (
     <FadeInView>
       <View style={[styles.row, isFirst && styles.rowFirst, isLast && styles.rowLast, !isLast && styles.rowDivider]}>
-        <TouchableOpacity activeOpacity={0.7} onPress={onPress} accessibilityRole="button">
+        <PressableScale onPress={onPress} accessibilityRole="button">
           <View style={styles.headerRow}>
             {/* Same Sleeper team avatar the website's league card shows. */}
             <TeamAvatar avatarId={league.team_avatar_url} name={league.team_name} size={32} />
@@ -620,7 +621,7 @@ function PortfolioLeagueCard({
           {showHealthFlag ? (
             <ToneBadge label={league.health_flag} color={colors.warning} style={styles.healthBadge} />
           ) : null}
-        </TouchableOpacity>
+        </PressableScale>
         {signals.length > 0 ? (
           <View>
             {signals.map((item, index) => (
@@ -643,11 +644,11 @@ function PortfolioLeagueCard({
         ) : (
           <AppText style={styles.emptySignals}>Open this league to see what to do today.</AppText>
         )}
-        <TouchableOpacity onPress={onPress} hitSlop={8} accessibilityRole="link" style={styles.openLink}>
+        <PressableScale onPress={onPress} hitSlop={8} accessibilityRole="link" style={styles.openLink}>
           <AppText style={styles.linkText} numberOfLines={1}>
             Open {league.league_name} Dashboard →
           </AppText>
-        </TouchableOpacity>
+        </PressableScale>
       </View>
     </FadeInView>
   );

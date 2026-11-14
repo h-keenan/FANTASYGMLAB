@@ -1,5 +1,6 @@
 import React, { useMemo, useState } from 'react';
-import { StyleSheet, TouchableOpacity, View } from 'react-native';
+import { StyleSheet, View } from 'react-native';
+import PressableScale from './PressableScale';
 
 import { Ionicons } from '@expo/vector-icons';
 
@@ -157,16 +158,16 @@ function SwapBody({ suggestion, drop, alternatives }: { suggestion: DropSuggesti
           ))}
         </View>
       ) : null}
-      <TouchableOpacity onPress={() => setShowWhy((v) => !v)} accessibilityRole="button" accessibilityState={{ expanded: showWhy }} style={{ minHeight: 32, justifyContent: 'center' }}>
+      <PressableScale onPress={() => setShowWhy((v) => !v)} accessibilityRole="button" accessibilityState={{ expanded: showWhy }} style={{ minHeight: 32, justifyContent: 'center' }}>
         <AppText style={[styles.meta, { color: colors.accent, fontWeight: '700' }]}>{showWhy ? 'Hide details' : 'Why this cut'}</AppText>
-      </TouchableOpacity>
+      </PressableScale>
       {showWhy ? <DropPlayerLine player={selected} lead={selected === drop ? 'Best cut:' : 'Drop'} swap maxReasons={6} /> : null}
       {others.length > 0 ? (
         <View style={styles.alts} testID="swap-alternatives">
           <AppText style={styles.kicker}>OR CUT INSTEAD</AppText>
           <View style={styles.pillRow}>
             {others.map((alt) => (
-              <TouchableOpacity
+              <PressableScale
                 key={alt.player_id}
                 style={styles.altChip}
                 onPress={() => setSelectedId(alt.player_id === drop.player_id ? null : alt.player_id)}
@@ -176,7 +177,7 @@ function SwapBody({ suggestion, drop, alternatives }: { suggestion: DropSuggesti
                 <PlayerAvatar playerId={alt.player_id} size={28} />
                 <PlayerName name={alt.name} style={[styles.meta, { color: colors.textPrimary, fontWeight: '700', maxWidth: 110 }]} />
                 <PositionBadge position={alt.position} />
-              </TouchableOpacity>
+              </PressableScale>
             ))}
           </View>
         </View>
@@ -207,7 +208,7 @@ function CompactSuggestedDrop({ suggestion }: { suggestion: DropSuggestion }) {
   const label = drop ? drop.name : suggestion.drop_required === false ? 'No drop needed' : '';
   return (
     <View testID="suggested-drop-compact" style={styles.compactWrap}>
-      <TouchableOpacity
+      <PressableScale
         style={styles.compactRow}
         onPress={() => setOpen((v) => !v)}
         accessibilityRole="button"
@@ -225,7 +226,7 @@ function CompactSuggestedDrop({ suggestion }: { suggestion: DropSuggestion }) {
         )}
         {drop ? <PositionBadge position={drop.position} /> : null}
         <AppText style={[styles.meta, { color: colors.accent, fontWeight: '700' }]}>{open ? 'Hide' : 'Why'}</AppText>
-      </TouchableOpacity>
+      </PressableScale>
       {open ? (
         <View style={styles.compactDetails} testID="suggested-drop-details">
           {drop ? (

@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useState, useSyncExternalStore } from 'react';
-import { StyleSheet, TouchableOpacity, View } from 'react-native';
+import { StyleSheet, View } from 'react-native';
+import PressableScale from './PressableScale';
 
 import AnimatedCard from './AnimatedCard';
 import AppText from './AppText';
@@ -45,14 +46,14 @@ export default function LiveFeedPanel({ feedKey, live }: { feedKey: string; live
 
   return (
     <AnimatedCard style={styles.card} testID="live-feed">
-      <TouchableOpacity onPress={toggle} accessibilityRole="button" accessibilityState={{ expanded: open }} style={styles.header}>
+      <PressableScale onPress={toggle} accessibilityRole="button" accessibilityState={{ expanded: open }} style={styles.header}>
         <View style={styles.titleRow}>
           <AppText style={styles.title}>LIVE FEED</AppText>
           {live ? <ToneBadge size="xs" label="● LIVE" color={colors.successBright} /> : null}
           {!open && unseen > 0 ? <ToneBadge size="xs" label={`${unseen} new`} color={colors.accent} /> : null}
         </View>
         <AppText style={styles.toggle}>{open ? 'Hide' : `Show${events.length ? ` (${events.length})` : ''}`}</AppText>
-      </TouchableOpacity>
+      </PressableScale>
       {open ? (
         <View style={{ gap: spacing.md }} accessibilityLiveRegion="polite">
           {events.length === 0 ? (

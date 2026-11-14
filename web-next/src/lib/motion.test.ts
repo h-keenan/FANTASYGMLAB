@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { COUNT_MS, MAX_ANIMATED_ROWS, MAX_STAGGER_MS, MOTION_MS, confettiAllowed, confettiPieces, countUpValue, easeCss, flashDirection, motionMs, shouldAnimateList, staggerDelay } from "./motion";
+import { COUNT_MS, MAX_ANIMATED_ROWS, MAX_STAGGER_MS, MOTION_MS, confettiAllowed, confettiPieces, PRESS, TRANSITION_MS, countUpValue, easeCss, pressFeedback, flashDirection, motionMs, shouldAnimateList, staggerDelay } from "./motion";
 
 describe("motion vocabulary", () => {
   it("keeps every duration in the 120-300ms band, ascending", () => {
@@ -46,5 +46,19 @@ describe("motion vocabulary", () => {
     expect(confettiAllowed({ wonTitle: false, reduced: false })).toBe(false);
     expect(confettiPieces(24)).toEqual(confettiPieces(24));
     expect(confettiPieces(12)).toHaveLength(12);
+  });
+});
+
+describe("press feedback (the one press)", () => {
+  it("shrinks and fades while pressed, nothing when idle or disabled", () => {
+    expect(pressFeedback(true, false)).toEqual({ scale: PRESS.scale, opacity: PRESS.opacity });
+    expect(pressFeedback(false, false)).toEqual({ scale: 1, opacity: 1 });
+    expect(pressFeedback(true, false, true)).toEqual({ scale: 1, opacity: 1 });
+  });
+  it("reduced motion keeps the fade but never moves", () => {
+    expect(pressFeedback(true, true)).toEqual({ scale: 1, opacity: PRESS.opacity });
+  });
+  it("every transition duration is one of the shared durations", () => {
+    for (const ms of Object.values(TRANSITION_MS)) expect(Object.values(MOTION_MS)).toContain(ms);
   });
 });

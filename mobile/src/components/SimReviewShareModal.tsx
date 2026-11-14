@@ -1,5 +1,6 @@
 import React, { useMemo, useRef, useState } from 'react';
-import { Pressable, Share, StyleSheet, TouchableOpacity, View } from 'react-native';
+import { Pressable, Share, StyleSheet, View } from 'react-native';
+import PressableScale from './PressableScale';
 import { captureRef } from 'react-native-view-shot';
 import * as Sharing from 'expo-sharing';
 
@@ -61,12 +62,12 @@ export default function SimReviewShareModal({
             </View>
           </View>
           <Button label="Share image" onPress={onShareImage} loading={capturing} style={styles.primary} />
-          <TouchableOpacity style={styles.secondary} onPress={onShareText}>
+          <PressableScale style={styles.secondary} onPress={onShareText}>
             <AppText style={styles.secondaryText}>Share as text instead</AppText>
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.secondary} onPress={onClose}>
+          </PressableScale>
+          <PressableScale style={styles.secondary} onPress={onClose}>
             <AppText style={styles.closeText}>Cancel</AppText>
-          </TouchableOpacity>
+          </PressableScale>
         </SwipeDismissCard>
       </Pressable>
     </SheetModal>

@@ -1,5 +1,6 @@
 import React, { useMemo, useState, type ReactNode } from 'react';
-import { Pressable, StyleSheet, View } from 'react-native';
+import { StyleSheet, View } from 'react-native';
+import PressableScale from './PressableScale';
 
 import AppText from './AppText';
 import { Sheet } from './Sheet';
@@ -82,16 +83,16 @@ export default function StructuredRow({ lead, title, chip, pills = [], reason, h
   return (
     <>
       {tappable ? (
-        <Pressable
+        <PressableScale
           accessibilityRole="button"
           accessibilityLabel={spoken ?? title}
           accessibilityHint={detail ? 'Opens details' : undefined}
           onPress={() => (onOpen ? onOpen() : setOpen(true))}
-          style={({ pressed }) => [styles.row, highlight && styles.me, pressed && styles.pressed]}
+          style={[styles.row, highlight && styles.me]}
           testID={testID}
         >
           {body}
-        </Pressable>
+        </PressableScale>
       ) : (
         <View style={[styles.row, highlight && styles.me]} testID={testID}>
           {body}
@@ -129,14 +130,14 @@ export function StructuredRowList<T>({
         <View key={index}>{renderRow(item, index)}</View>
       ))}
       {more ? (
-        <Pressable
+        <PressableScale
           accessibilityRole="button"
           accessibilityState={{ expanded }}
           onPress={() => setExpanded((value) => !value)}
           style={styles.more}
         >
           <AppText style={styles.moreText}>{expanded ? 'Show less' : more}</AppText>
-        </Pressable>
+        </PressableScale>
       ) : null}
     </View>
   );
@@ -158,7 +159,6 @@ function createStyles(colors: ThemeColors) {
       backgroundColor: colors.glassInset,
     },
     me: { borderColor: colors.premium },
-    pressed: { opacity: 0.8 },
     lead: { width: 36, height: 36, alignItems: 'center', justifyContent: 'center' },
     main: { flex: 1, minWidth: 0, gap: 3 },
     line: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, minWidth: 0 },

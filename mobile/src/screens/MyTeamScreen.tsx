@@ -1,6 +1,7 @@
 import GlossaryNote from '../components/GlossaryNote';
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
+import { ScrollView, StyleSheet, View } from 'react-native';
+import PressableScale from '../components/PressableScale';
 import { Ionicons } from '@expo/vector-icons';
 import AppText from '../components/AppText';
 import BeginnerHelp from '../components/BeginnerHelp';
@@ -441,10 +442,9 @@ function TeamAnalysisRows({ rows }: { rows: TeamAnalysisRow[] }) {
         const isOpen = open === row.position;
         return (
           <View key={row.position} style={index < rows.length - 1 ? styles.compactDivider : undefined}>
-            <TouchableOpacity
+            <PressableScale
               style={styles.analysisRow}
               onPress={() => setOpen(isOpen ? null : row.position)}
-              activeOpacity={0.7}
               accessibilityRole="button"
               accessibilityState={{ expanded: isOpen }}
             >
@@ -464,7 +464,7 @@ function TeamAnalysisRows({ rows }: { rows: TeamAnalysisRow[] }) {
                 </View>
               </View>
               <Ionicons name={isOpen ? 'chevron-down' : 'chevron-forward'} size={16} color={colors.textTertiary} />
-            </TouchableOpacity>
+            </PressableScale>
             {isOpen ? <AppText style={styles.analysisBody}>{row.body}</AppText> : null}
           </View>
         );

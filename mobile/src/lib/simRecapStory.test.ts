@@ -2,7 +2,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
-import { simLeagueHighlights, simNextWeekModel, simPositionTotals, simRecapInjuryModel, simRecapPageKeys, simRecapProj, simRecapResultModel } from './simRecapStory.ts';
+import { simLeagueHighlights, simNextWeekModel, simPositionTotals, simRecapInjuryModel, simRecapOutcome, simRecapPageKeys, simRecapProj, simRecapResultModel, simRecapSeasonModel } from './simRecapStory.ts';
 
 const p = (id: string, name: string, pos: string) => ({ id, name, pos, projection: 10 });
 const st = (slot: string, player: ReturnType<typeof p> | null, pts: number, flag: string | null = null) => ({ slot, player, pts, flag });
@@ -40,4 +40,32 @@ test("matchup row PROJ is the projection the server stamped for that week, never
   assert.equal(simRecapProj({}), null); // a recap saved before the server sent it
   assert.equal(simRecapProj({ proj: null }), null);
   assert.equal(simRecapProj({ proj: Number.NaN }), null);
+});
+
+test('result variants: regular, playoff advance/eliminated/bye, champion and runner-up', () => {
+  const g = (result: string) => ({ ...recap.your_game, result });
+  assert.equal(simRecapOutcome(recap, '9').variant, 'win');
+  assert.equal(simRecapOutcome({ ...recap, your_game: g('loss') }, '9').variant, 'loss');
+  const po = { ...recap, kind: 'playoff', round: 1 };
+  assert.deepEqual([simRecapOutcome(po, '9').variant, simRecapOutcome(po, '9').trophy, simRecapOutcome(po, '9').celebrate], ['advance', true, false]);
+  assert.equal(simRecapOutcome({ ...po, your_game: g('loss') }, '9').variant, 'eliminated');
+  assert.equal(simRecapOutcome({ ...po, your_game: null }, '9').variant, 'playoff_bye');
+  const final = { ...po, season_complete: true, next_week: null, champion: '9' };
+  assert.deepEqual([simRecapOutcome(final, '9').variant, simRecapOutcome(final, '9').celebrate], ['champion', true]);
+  assert.equal(simRecapOutcome({ ...final, champion: '7', your_game: g('loss') }, '9').variant, 'runner_up');
+  assert.equal(simRecapOutcome({ ...recap, season_complete: true, champion: '9' }, '9').celebrate, false);
+});
+
+test('season page: last, champion/finish/record, and injuries carry one marker per player', () => {
+  const rows = [
+    { rank: 1, team_id: '9', name: 'You', is_you: true, wins: 11, losses: 3, ties: 0, pf: 1800.4, pa: 1500 },
+    { rank: 2, team_id: '7', name: 'Rats', is_you: false, wins: 10, losses: 4, ties: 0, pf: 1900.2, pa: 1400 },
+  ];
+  const done = { ...recap, kind: 'playoff', season_complete: true, next_week: null, champion: '7', standings: rows, your_game: { ...recap.your_game, result: 'loss' } };
+  assert.equal(simRecapPageKeys(done, facts).at(-1), 'season');
+  const m = simRecapSeasonModel(done, { ...facts, names: { '7': 'Rats' } });
+  assert.deepEqual([m.finish, m.record, m.championName], ['Runner-up', '11-3', 'Rats']);
+  assert.deepEqual(m.items.map((i) => i.key), ['champion', 'record', 'top']);
+  const inj = simRecapInjuryModel({ ...recap, injuries: [{ player: p('a', 'Alf', 'WR'), weeks: 4, team_id: '9', is_yours: true }] });
+  assert.equal(inj.items[0].detail, '4 weeks · yours');
 });

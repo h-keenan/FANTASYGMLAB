@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { ActivityIndicator, AppState, Pressable, StyleSheet, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, AppState, Pressable, StyleSheet, View } from 'react-native';
+import PressableScale from './PressableScale';
 import AppText from './AppText';
 
 import { api, type PendingTradeOutcome, type TradeOutcomeAnswer } from '../lib/api';
@@ -91,26 +92,26 @@ export default function TradeOutcomePrompt() {
           ) : (
             <>
               <View style={styles.row}>
-                <TouchableOpacity style={[styles.button, styles.yesButton]} onPress={() => void answer('yes')}>
+                <PressableScale style={[styles.button, styles.yesButton]} onPress={() => void answer('yes')}>
                   <AppText style={styles.yesButtonText}>Yes, it happened</AppText>
-                </TouchableOpacity>
-                <TouchableOpacity style={[styles.button, styles.noButton]} onPress={() => void answer('no')}>
+                </PressableScale>
+                <PressableScale style={[styles.button, styles.noButton]} onPress={() => void answer('no')}>
                   <AppText style={styles.noButtonText}>No</AppText>
-                </TouchableOpacity>
+                </PressableScale>
               </View>
               <View style={styles.row}>
-                <TouchableOpacity
+                <PressableScale
                   style={[styles.button, styles.secondaryButton]}
                   onPress={() => void answer('still_pending')}
                 >
                   <AppText style={styles.secondaryButtonText}>Still pending</AppText>
-                </TouchableOpacity>
-                <TouchableOpacity
+                </PressableScale>
+                <PressableScale
                   style={[styles.button, styles.secondaryButton]}
                   onPress={() => void answer('didnt_send')}
                 >
                   <AppText style={styles.secondaryButtonText}>Didn't send</AppText>
-                </TouchableOpacity>
+                </PressableScale>
               </View>
             </>
           )}

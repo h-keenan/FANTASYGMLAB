@@ -368,7 +368,7 @@ export function SimIconButton({
         event.stopPropagation();
         void run(onClick);
       }}
-      className="inline-flex shrink-0 items-center justify-center active:scale-95"
+      className="inline-flex shrink-0 items-center justify-center"
       style={{
         width: width ?? size,
         height: size,
