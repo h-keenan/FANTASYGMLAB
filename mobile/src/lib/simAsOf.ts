@@ -18,3 +18,24 @@ export function simAsOfSeason(startYear?: number | null, today: Date = new Date(
 export function rowsAsOf<T extends { season: number | null }>(rows: readonly T[], asOf: number): T[] {
   return rows.filter((r) => r.season != null && r.season <= asOf);
 }
+
+/** Real career seasons the sim's player sheet may show: up to the as-of season, newest first. The season in progress never shows. */
+export function simCareerAsOf<T extends { season: number }>(seasons: readonly T[], asOf: number): T[] {
+  return seasons.filter((s) => s.season <= asOf).sort((a, b) => b.season - a.season);
+}
+
+export interface SimGameLogSummary<T> {
+  weeks: T[];
+  games: number;
+  total: number;
+  avg: number | null;
+  best: T | null;
+}
+
+/** The real game log of the last finished season: weeks he scored in, ascending, with games / total / average / best week. */
+export function simGameLog<T extends { week: number; fantasy_points_ppr: number | null }>(weeks: readonly T[]): SimGameLogSummary<T> {
+  const played = weeks.filter((w) => w.week > 0 && w.fantasy_points_ppr != null).sort((a, b) => a.week - b.week);
+  const total = played.reduce((sum, w) => sum + (w.fantasy_points_ppr ?? 0), 0);
+  const best = played.reduce<T | null>((top, w) => (top == null || (w.fantasy_points_ppr ?? 0) > (top.fantasy_points_ppr ?? 0) ? w : top), null);
+  return { weeks: played, games: played.length, total, avg: played.length ? total / played.length : null, best };
+}

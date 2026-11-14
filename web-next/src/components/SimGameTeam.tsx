@@ -18,6 +18,8 @@ import { SkeletonCard } from "@/components/Skeleton";
 import { api } from "@/lib/api";
 import {
   simAssignSlot,
+  simBenchOffersReserveMove,
+  simBenchSwapTargets,
   simOptimisticClaim,
   simWithout,
   simFmtPts,
@@ -51,6 +53,7 @@ export function SimTeamTab({ ctx, onTrade }: { ctx: SimCtx; onTrade: () => void 
   const [lineup, setLineup] = useState<SimLineupResponse | null>(null);
   const [state, setState] = useState<"loading" | "ready" | "error">("loading");
   const [pickSlot, setPickSlot] = useState<number | null>(null);
+  const [swapIn, setSwapIn] = useState<SimGamePlayer | null>(null);
   const [cutting, setCutting] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [attempt, setAttempt] = useState(0);
@@ -239,7 +242,10 @@ export function SimTeamTab({ ctx, onTrade }: { ctx: SimCtx; onTrade: () => void 
                   </>
                 ) : (
                   <>
-                    {reservesOn ? <SimReserveButton player={player} onOpen={setMoving} /> : null}
+                    {reservesOn && simBenchOffersReserveMove(player, reserveState) ? <SimReserveButton player={player} onOpen={setMoving} /> : null}
+                    <SimIconButton disabled={lineup.locked} label={`Swap ${player.name} into your lineup`} onClick={() => setSwapIn(player)}>
+                      <SimGlyph name="trade" size={16} />
+                    </SimIconButton>
                     <Button size="sm" variant={overLimit ? "dangerOutline" : "ghost"} aria-label={`Cut ${player.name}`} onClick={() => setCutting(player.id)}>
                       Cut
                     </Button>
@@ -274,6 +280,34 @@ export function SimTeamTab({ ctx, onTrade }: { ctx: SimCtx; onTrade: () => void 
             void refreshGame();
           }}
         />
+      ) : null}
+
+      {swapIn ? (
+        <SimSheet title={`Swap ${swapIn.name} in`} onClose={() => setSwapIn(null)}>
+          <p className="text-lg font-extrabold pr-10">Swap {swapIn.name} in</p>
+          <div className="flex flex-col pt-2" data-testid="bench-swap-targets">
+            {simBenchSwapTargets(swapIn, slots, labels).length === 0 ? (
+              <p className="text-sm" style={{ color: "var(--color-text-muted)" }}>No lineup slot fits this position.</p>
+            ) : (
+              simBenchSwapTargets(swapIn, slots, labels).map((target) => (
+                <div key={target.index} className="flex items-center gap-2" style={{ minHeight: 52, borderBottom: "var(--border-width-default) solid var(--color-border)" }}>
+                  <span className="flex justify-center" style={{ width: "3.25rem" }}><PositionBadge position={slots[target.index].slot} label={target.label} /></span>
+                  <span className="min-w-0 flex-1 truncate text-sm font-semibold">{target.current ? `Replaces ${target.current.name}` : "Empty slot"}</span>
+                  <Button
+                    size="sm"
+                    onClick={() => {
+                      const next = simAssignSlot({ slots, bench }, target.index, swapIn);
+                      setSwapIn(null);
+                      void save(next.slots, next.bench);
+                    }}
+                  >
+                    Swap
+                  </Button>
+                </div>
+              ))
+            )}
+          </div>
+        </SimSheet>
       ) : null}
 
       {pickSlot != null ? (

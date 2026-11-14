@@ -40,6 +40,8 @@ export interface PlayerQuickViewIdentity {
   position_rank?: number | null;
   rank_unavailable_reason?: string | null;
   opportunity_label?: string | null;
+  /** Status tags for the header (Fantasy Sim: the same tags the list row shows). When present they replace the separate "Health" chip, so an injury shows once. */
+  tags?: { key: string; label: string; tone: "success" | "accent" | "warning" | "danger" | "muted" }[];
   overall_rating?: number | null;
   /** Where this open came from (e.g. "My Team", "Trade Hub") — shown as a
    * small source label, same provenance app.py's open_player_quick_view

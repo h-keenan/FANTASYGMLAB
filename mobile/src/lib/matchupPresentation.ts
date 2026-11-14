@@ -30,7 +30,7 @@ export function formatSigned(value: number): string {
 export function slotDisplayLabel(slot: string | null | undefined): string {
   const label = (slot ?? "").toUpperCase();
   if (label === "SUPER_FLEX") return "SF";
-  if (label === "WR/RB") return "W/R";
+  if (label === "WR/RB" || label === "WRRB_FLEX") return "W/R";
   if (label === "REC_FLEX") return "W/T";
   if (label === "IDP_FLEX") return "IDP";
   return label || "—";

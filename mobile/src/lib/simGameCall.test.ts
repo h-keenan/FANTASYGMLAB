@@ -40,6 +40,15 @@ test('flag-off and conflicts keep their gates', async () => {
   assert.deepEqual(conflict.log.gates, ['conflict']);
 });
 
+test('a raced write (409) is retried once silently, so one tap applies; a second conflict is still reported', async () => {
+  const { log, h } = handlers();
+  let calls = 0;
+  const body = await runSimGameCall(async () => (++calls === 1 ? { reason: 'conflict' } : { reason: '', executed: true }), h);
+  assert.deepEqual(body, { reason: '', executed: true });
+  assert.equal(calls, 2);
+  assert.deepEqual(log, { gates: [], errors: [] });
+});
+
 test('Add to trade seeds: mine go on the give side, an AI team\'s player picks that partner, free agents cannot be traded; adding is idempotent', () => {
   assert.equal(simTradeSeedFor({ id: 'f', owner: { type: 'free_agent' } }), null);
   assert.deepEqual(simTradeSeedFor({ id: 'm', owner: { type: 'you', team_id: '3' } }), { partner: '', give: 'm' });
