@@ -1338,4 +1338,3 @@ function createStyles(colors: ThemeColors) {
   notReadyText: { textAlign: 'center', color: colors.textSecondary, lineHeight: 20 },
   });
 }
-
