@@ -1,6 +1,7 @@
 import ConfirmInPlace from './ConfirmInPlace';
 import React, { useMemo, useState } from 'react';
-import { ActivityIndicator, StyleSheet, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, StyleSheet, View } from 'react-native';
+import PressableScale from './PressableScale';
 
 import AppText from './AppText';
 import Input from './Input';
@@ -59,9 +60,9 @@ export function EspnLoginPanel({
     <View>
       <AppText style={styles.title}>This league is private. Connect your ESPN login to read it.</AppText>
       <AppText style={styles.hint}>{ESPN_LOGIN_WHY}</AppText>
-      <TouchableOpacity onPress={() => setShowSteps((value) => !value)} accessibilityRole="button" hitSlop={8}>
+      <PressableScale onPress={() => setShowSteps((value) => !value)} accessibilityRole="button" hitSlop={8}>
         <AppText style={styles.link}>{showSteps ? 'Hide steps' : 'How to find espn_s2 and SWID'}</AppText>
-      </TouchableOpacity>
+      </PressableScale>
       {showSteps ? (
         <View style={styles.steps}>
           {ESPN_COOKIE_STEPS.map((step, index) => (
@@ -92,13 +93,13 @@ export function EspnLoginPanel({
         accessibilityLabel="SWID"
       />
       {message ? <AppText style={styles.error}>{message}</AppText> : null}
-      <TouchableOpacity style={styles.primaryButton} disabled={busy} onPress={() => void submit()}>
+      <PressableScale style={styles.primaryButton} disabled={busy} onPress={() => void submit()}>
         {busy ? (
           <ActivityIndicator size="small" color={colors.onAccent} />
         ) : (
           <AppText style={styles.primaryText}>{leagueId ? 'Test on my league and connect' : 'Save ESPN login'}</AppText>
         )}
-      </TouchableOpacity>
+      </PressableScale>
     </View>
   );
 }

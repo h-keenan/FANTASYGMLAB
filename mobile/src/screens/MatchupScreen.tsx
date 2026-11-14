@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { AppState, RefreshControl, ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
+import { AppState, RefreshControl, ScrollView, StyleSheet, View } from 'react-native';
+import PressableScale from '../components/PressableScale';
 import AppText from '../components/AppText';
 import PageTitle from '../components/PageTitle';
 import ErrorState from '../components/ErrorState';
@@ -316,7 +317,7 @@ export default function MatchupScreen({ route, navigation }: Props) {
             <AppText style={{ color: colors.textSecondary, fontSize: 12.5 }}>
               {freshnessLabel(dataAgeSeconds(matchup.as_of_age_seconds, matchupQuery.dataUpdatedAt, nowMs))}
             </AppText>
-            <TouchableOpacity
+            <PressableScale
               onPress={() => void matchupQuery.refetch()}
               disabled={matchupQuery.isFetching}
               accessibilityRole="button"
@@ -325,7 +326,7 @@ export default function MatchupScreen({ route, navigation }: Props) {
               <AppText style={{ color: colors.accent, fontSize: 12.5 }}>
                 {matchupQuery.isFetching ? 'Refreshing…' : 'Refresh'}
               </AppText>
-            </TouchableOpacity>
+            </PressableScale>
           </View>
         ) : null}
 
@@ -737,9 +738,9 @@ function MoveCard({ move, slotLabel, leagueId, leagueName }: { move: MatchupSugg
           {move.range.lean.why}
         </AppText>
       ) : null}
-      <TouchableOpacity onPress={() => setShowRange((open) => !open)} accessibilityRole="button" accessibilityState={{ expanded: showRange }}>
+      <PressableScale onPress={() => setShowRange((open) => !open)} accessibilityRole="button" accessibilityState={{ expanded: showRange }}>
         <AppText style={styles.rangeToggle}>{showRange ? 'Hide weekly range' : 'Weekly range'}</AppText>
-      </TouchableOpacity>
+      </PressableScale>
       {showRange ? (
         <RangeCompare
           rows={rangeDisplayRows(
@@ -774,17 +775,17 @@ function SuggestedMoves({ matchup, leagueId, leagueName }: { matchup: MatchupRes
         title="Suggested Moves"
         icon="swap-horizontal-outline"
         right={
-          <TouchableOpacity onPress={() => setOpen((value) => !value)} accessibilityRole="button" accessibilityState={{ expanded: open }}>
+          <PressableScale onPress={() => setOpen((value) => !value)} accessibilityRole="button" accessibilityState={{ expanded: open }}>
             <AppText style={styles.viewAll}>{open ? 'Hide' : moves ? `Show (${moves.length})` : 'Show'}</AppText>
-          </TouchableOpacity>
+          </PressableScale>
         }
       />
       {!open ? null : (
         <>
       {hasMore ? (
-        <TouchableOpacity onPress={() => setExpanded((value) => !value)} accessibilityRole="button" style={{ alignSelf: 'flex-start' }}>
+        <PressableScale onPress={() => setExpanded((value) => !value)} accessibilityRole="button" style={{ alignSelf: 'flex-start' }}>
           <AppText style={styles.viewAll}>{expanded ? 'Show fewer' : `View all (${moves!.length})`}</AppText>
-        </TouchableOpacity>
+        </PressableScale>
       ) : null}
       {moves === null ? (
         <AppText style={styles.emptyNote}>Suggested moves appear once Sleeper has your lineup for this week.</AppText>

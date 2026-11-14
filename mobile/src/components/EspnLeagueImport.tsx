@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { ActivityIndicator, ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, ScrollView, StyleSheet, View } from 'react-native';
+import PressableScale from './PressableScale';
 import { Ionicons } from '@expo/vector-icons';
 
 import AppText from './AppText';
@@ -178,7 +179,7 @@ export default function EspnLeagueImport({
               {(preview.teams ?? []).map((team) => {
                 const selected = team.roster_id === rosterId;
                 return (
-                  <TouchableOpacity
+                  <PressableScale
                     key={team.roster_id}
                     style={styles.teamRow}
                     onPress={() => setRosterId(team.roster_id)}
@@ -196,7 +197,7 @@ export default function EspnLeagueImport({
                       size={20}
                       color={selected ? colors.accent : colors.textTertiary}
                     />
-                  </TouchableOpacity>
+                  </PressableScale>
                 );
               })}
             </ScrollView>
@@ -214,7 +215,7 @@ export default function EspnLeagueImport({
         </View>
         {message ? <AppText style={styles.error}>{message}</AppText> : null}
         <View style={styles.actions}>
-          <TouchableOpacity
+          <PressableScale
             style={styles.cancelButton}
             disabled={busy}
             onPress={() => {
@@ -224,15 +225,15 @@ export default function EspnLeagueImport({
             }}
           >
             <AppText style={styles.cancelText}>Back</AppText>
-          </TouchableOpacity>
+          </PressableScale>
           {preview.ok ? (
-            <TouchableOpacity
+            <PressableScale
               style={[styles.primaryButton, !rosterId && styles.primaryButtonDisabled]}
               disabled={busy || !rosterId}
               onPress={() => void save()}
             >
               {busy ? <ActivityIndicator size="small" color={colors.onAccent} /> : <AppText style={styles.primaryText}>Add league</AppText>}
-            </TouchableOpacity>
+            </PressableScale>
           ) : null}
         </View>
       </View>
@@ -252,9 +253,9 @@ export default function EspnLeagueImport({
           }}
         />
         <View style={styles.actions}>
-          <TouchableOpacity style={styles.cancelButton} onPress={() => setCanConnect(false)}>
+          <PressableScale style={styles.cancelButton} onPress={() => setCanConnect(false)}>
             <AppText style={styles.cancelText}>Use a different league</AppText>
-          </TouchableOpacity>
+          </PressableScale>
         </View>
       </View>
     );
@@ -283,17 +284,17 @@ export default function EspnLeagueImport({
       />
       {message ? <AppText style={styles.error}>{message}</AppText> : null}
       {isPrivate ? (
-        <TouchableOpacity onPress={() => void findLeague()} disabled={busy} accessibilityRole="button" accessibilityLabel="Retry">
+        <PressableScale onPress={() => void findLeague()} disabled={busy} accessibilityRole="button" accessibilityLabel="Retry">
           <AppText style={styles.retryText}>Retry</AppText>
-        </TouchableOpacity>
+        </PressableScale>
       ) : null}
       <View style={styles.actions}>
-        <TouchableOpacity style={styles.cancelButton} onPress={onCancel} disabled={busy}>
+        <PressableScale style={styles.cancelButton} onPress={onCancel} disabled={busy}>
           <AppText style={styles.cancelText}>Cancel</AppText>
-        </TouchableOpacity>
-        <TouchableOpacity style={styles.primaryButton} onPress={() => void findLeague()} disabled={busy}>
+        </PressableScale>
+        <PressableScale style={styles.primaryButton} onPress={() => void findLeague()} disabled={busy}>
           {busy ? <ActivityIndicator size="small" color={colors.onAccent} /> : <AppText style={styles.primaryText}>Find league</AppText>}
-        </TouchableOpacity>
+        </PressableScale>
       </View>
     </View>
   );

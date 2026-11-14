@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { FlatList, Linking, RefreshControl, StyleSheet, TouchableOpacity, View } from 'react-native';
+import { FlatList, Linking, RefreshControl, StyleSheet, View } from 'react-native';
+import PressableScale from '../components/PressableScale';
 import AppText from '../components/AppText';
 import BrandHeaderBar from '../components/BrandHeaderBar';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
@@ -370,10 +371,9 @@ function AlertRow({
   const opensLink = Boolean(alert.link);
 
   return (
-    <TouchableOpacity accessibilityRole="button"
+    <PressableScale accessibilityRole="button"
       style={[styles.row, showDivider && styles.rowDivider, alert.read && styles.rowRead]}
       onPress={onPress}
-      activeOpacity={0.7}
     >
       <View style={styles.metaRow}>
         {!alert.read ? <View style={styles.unreadDot} /> : null}
@@ -417,7 +417,7 @@ function AlertRow({
       ) : null}
       {alert.speculative ? <AppText style={styles.speculative}>Unconfirmed / speculative</AppText> : null}
       {sourceBit ? <AppText style={styles.footerMeta}>{sourceBit}</AppText> : null}
-    </TouchableOpacity>
+    </PressableScale>
   );
 }
 

@@ -3,12 +3,12 @@ import {
   Image,
   ScrollView,
   StyleSheet,
-  TouchableOpacity,
   View,
   useWindowDimensions,
   type NativeScrollEvent,
   type NativeSyntheticEvent,
 } from 'react-native';
+import PressableScale from '../components/PressableScale';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import Animated, {
@@ -313,7 +313,7 @@ export default function OnboardingScreen({ navigation, route }: Props) {
           <View style={styles.valueControls}>
             <View style={styles.dotsRow} accessibilityLabel="Preview screens">
               {VALUE_SLIDES.map((s, i) => (
-                <TouchableOpacity
+                <PressableScale
                   key={s.key}
                   onPress={() => {
                     setValueSlide(i);
@@ -326,18 +326,18 @@ export default function OnboardingScreen({ navigation, route }: Props) {
                   style={styles.valueDotHit}
                 >
                   <View style={[styles.dot, i === valueSlide && styles.dotActive]} />
-                </TouchableOpacity>
+                </PressableScale>
               ))}
             </View>
             {!reduceMotion ? (
-              <TouchableOpacity
+              <PressableScale
                 onPress={() => setValuePaused((p) => !p)}
                 hitSlop={8}
                 accessibilityRole="button"
                 accessibilityLabel={valuePaused ? 'Play previews' : 'Pause previews'}
               >
                 <AppText style={styles.backText}>{valuePaused ? 'Play previews' : 'Pause previews'}</AppText>
-              </TouchableOpacity>
+              </PressableScale>
             ) : null}
           </View>
         </>
@@ -376,7 +376,7 @@ export default function OnboardingScreen({ navigation, route }: Props) {
               {LEVEL_OPTIONS.map((option) => {
                 const selected = level === option.value;
                 return (
-                  <TouchableOpacity
+                  <PressableScale
                     key={option.value}
                     onPress={() => {
                       setLevel(option.value);
@@ -384,7 +384,6 @@ export default function OnboardingScreen({ navigation, route }: Props) {
                     }}
                     accessibilityRole="radio"
                     accessibilityState={{ selected }}
-                    activeOpacity={0.85}
                   >
                     <GlassPanel style={selected ? [styles.pickCard, styles.pickCardSelected] : styles.pickCard}>
                       <View style={styles.pickHeader}>
@@ -393,7 +392,7 @@ export default function OnboardingScreen({ navigation, route }: Props) {
                       </View>
                       <AppText style={styles.rowBody}>{option.body}</AppText>
                     </GlassPanel>
-                  </TouchableOpacity>
+                  </PressableScale>
                 );
               })}
             </View>
@@ -402,16 +401,15 @@ export default function OnboardingScreen({ navigation, route }: Props) {
               {GOAL_OPTIONS.map((option) => {
                 const selected = goal === option.value;
                 return (
-                  <TouchableOpacity
+                  <PressableScale
                     key={option.value}
                     onPress={() => setGoal((current) => (current === option.value ? null : option.value))}
                     accessibilityRole="button"
                     accessibilityState={{ selected }}
-                    activeOpacity={0.85}
                     style={[styles.goalChip, selected && styles.goalChipSelected]}
                   >
                     <AppText style={[styles.goalChipLabel, selected && styles.goalChipLabelSelected]}>{option.label}</AppText>
-                  </TouchableOpacity>
+                  </PressableScale>
                 );
               })}
             </View>
@@ -433,9 +431,9 @@ export default function OnboardingScreen({ navigation, route }: Props) {
             <ProgressDot key={key} active={i === index} color={colors.border} activeColor={colors.accent} />
           ))}
         </View>
-        <TouchableOpacity onPress={onSkip} hitSlop={12} accessibilityRole="button" accessibilityLabel={isLevelStep ? 'Decide later' : 'Skip tutorial'}>
+        <PressableScale onPress={onSkip} hitSlop={12} accessibilityRole="button" accessibilityLabel={isLevelStep ? 'Decide later' : 'Skip tutorial'}>
           <AppText style={styles.skipText}>{isLevelStep ? 'Decide later' : 'Skip'}</AppText>
-        </TouchableOpacity>
+        </PressableScale>
       </View>
 
       <ScrollView
@@ -463,14 +461,14 @@ export default function OnboardingScreen({ navigation, route }: Props) {
       <View style={[styles.footer, { paddingBottom: insets.bottom + spacing.lg }]}>
         <View style={styles.controlsRow}>
           {index > 0 ? (
-            <TouchableOpacity
+            <PressableScale
               style={styles.backButton}
               onPress={() => goTo(index - 1)}
               accessibilityRole="button"
               accessibilityLabel="Previous slide"
             >
               <AppText style={styles.backText}>Back</AppText>
-            </TouchableOpacity>
+            </PressableScale>
           ) : null}
           <Button
             label={primaryLabel}

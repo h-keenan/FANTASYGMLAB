@@ -1,5 +1,6 @@
 import React, { useMemo } from 'react';
-import { StyleProp, StyleSheet, TouchableOpacity, View, ViewStyle } from 'react-native';
+import { StyleProp, StyleSheet, View, ViewStyle } from 'react-native';
+import PressableScale from './PressableScale';
 import { Ionicons } from '@expo/vector-icons';
 
 import AppText from './AppText';
@@ -137,9 +138,9 @@ export default function MetricCard({
   );
   if (onPress) {
     return (
-      <TouchableOpacity style={[styles.card, style]} onPress={onPress} activeOpacity={0.7}>
+      <PressableScale style={[styles.card, style]} onPress={onPress}>
         {content}
-      </TouchableOpacity>
+      </PressableScale>
     );
   }
   return <View style={[styles.card, style]}>{content}</View>;

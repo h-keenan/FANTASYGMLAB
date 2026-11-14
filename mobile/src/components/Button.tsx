@@ -1,5 +1,6 @@
 import React, { useMemo } from 'react';
-import { ActivityIndicator, StyleProp, StyleSheet, TouchableOpacity, ViewStyle } from 'react-native';
+import { ActivityIndicator, StyleProp, StyleSheet, ViewStyle } from 'react-native';
+import PressableScale from './PressableScale';
 
 import AppText from './AppText';
 import PremiumGlow from './PremiumGlow';
@@ -52,7 +53,7 @@ export default function Button({
           : colors.accent;
   const inkColor = showDisabled ? colors.textTertiary : liveInk;
   const button = (
-    <TouchableOpacity
+    <PressableScale
       accessibilityRole="button"
       style={[
         styles.base,
@@ -63,14 +64,13 @@ export default function Button({
         variant !== 'premium' && style]}
       onPress={onPress}
       disabled={disabled || loading}
-      activeOpacity={0.8}
     >
       {loading ? (
         <ActivityIndicator color={inkColor} />
       ) : (
         <AppText style={[styles.text, size === 'sm' && styles.textSm, { color: inkColor }]}>{label}</AppText>
       )}
-    </TouchableOpacity>
+    </PressableScale>
   );
   if (variant !== 'premium') return button;
   // The glow wraps the button; layout props (alignSelf/margin/flex) go on the wrapper so it sizes the same.

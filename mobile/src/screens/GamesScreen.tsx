@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
+import { ScrollView, StyleSheet, View } from 'react-native';
+import PressableScale from '../components/PressableScale';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { useHeaderHeight } from '@react-navigation/elements';
 
@@ -449,7 +450,7 @@ function Pickem({ leagueId, colors, styles, navigation }: Shared) {
                 const picked = matchup.my_pick === team.roster_id;
                 const won = matchup.winner_roster_id === team.roster_id;
                 return (
-                  <TouchableOpacity
+                  <PressableScale
                     key={team.roster_id}
                     accessibilityRole="button"
                     accessibilityState={{ selected: picked, disabled: phase !== 'open' }}
@@ -464,7 +465,7 @@ function Pickem({ leagueId, colors, styles, navigation }: Shared) {
                     {phase !== 'open' ? (
                       <AppText style={[styles.muted, won && { color: colors.success }]}>{team.points.toFixed(1)}</AppText>
                     ) : null}
-                  </TouchableOpacity>
+                  </PressableScale>
                 );
               })}
             </View>

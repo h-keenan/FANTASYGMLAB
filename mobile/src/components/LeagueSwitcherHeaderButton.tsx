@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { Pressable, StyleSheet, TouchableOpacity, View } from 'react-native';
+import { Pressable, StyleSheet, View } from 'react-native';
+import PressableScale from './PressableScale';
 import AppText from './AppText';
 import { Ionicons } from '@expo/vector-icons';
 import { StackActions } from '@react-navigation/routers';
@@ -69,9 +70,9 @@ export default function LeagueSwitcherHeaderButton({
 
   return (
     <>
-      <TouchableOpacity style={styles.button} onPress={() => setOpen(true)} hitSlop={8} accessibilityRole="button" accessibilityLabel="Switch league">
+      <PressableScale style={styles.button} onPress={() => setOpen(true)} hitSlop={8} accessibilityRole="button" accessibilityLabel="Switch league">
         <Ionicons name="swap-vertical" size={18} color={colors.textPrimary} />
-      </TouchableOpacity>
+      </PressableScale>
       <SheetModal visible={open} transparent animationType="fade" onRequestClose={() => setOpen(false)}>
         <Pressable style={styles.backdrop} onPress={() => setOpen(false)}>
           <SwipeDismissCard style={styles.sheet} onDismiss={() => setOpen(false)}>
@@ -80,7 +81,7 @@ export default function LeagueSwitcherHeaderButton({
               {savedLeagues.map((row) => {
                 const active = row.league_id === leagueId;
                 return (
-                  <TouchableOpacity
+                  <PressableScale
                     key={row.id}
                     style={styles.optionRow}
                     onPress={() => switchToLeague(row)}
@@ -95,11 +96,11 @@ export default function LeagueSwitcherHeaderButton({
                     <AppText style={[styles.optionText, active && styles.optionTextActive]} numberOfLines={1}>
                       {row.league_name || row.league_id}
                     </AppText>
-                  </TouchableOpacity>
+                  </PressableScale>
                 );
               })}
             </SheetScrollView>
-            <TouchableOpacity
+            <PressableScale
               style={styles.addRow}
               onPress={() => {
                 setOpen(false);
@@ -112,7 +113,7 @@ export default function LeagueSwitcherHeaderButton({
             >
               <Ionicons name="add" size={18} color={colors.accentOnTint} style={styles.optionIcon} />
               <AppText style={[styles.optionText, styles.optionTextActive]}>Add a league</AppText>
-            </TouchableOpacity>
+            </PressableScale>
           </SwipeDismissCard>
         </Pressable>
       </SheetModal>

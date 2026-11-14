@@ -1,5 +1,6 @@
 import React, { useMemo, useState } from 'react';
-import { StyleSheet, TouchableOpacity, View } from 'react-native';
+import { StyleSheet, View } from 'react-native';
+import PressableScale from './PressableScale';
 import { useQuery } from '@tanstack/react-query';
 
 import AppText from './AppText';
@@ -83,9 +84,8 @@ export default function ValueSignalsCard({ leagueId, leagueName }: { leagueId: s
             <AppText style={styles.note}>Nobody currently clears both the value-trend and production bars.</AppText>
           ) : (
             items.map((item) => (
-              <TouchableOpacity
+              <PressableScale
                 key={item.player_id}
-                activeOpacity={0.7}
                 style={styles.row}
                 onPress={() => openPlayer(toRankedPlayer(item), { leagueId, leagueName })}
               >
@@ -104,7 +104,7 @@ export default function ValueSignalsCard({ leagueId, leagueName }: { leagueId: s
                 >
                   {formatRatingDelta(item.rating_change)}
                 </AppText>
-              </TouchableOpacity>
+              </PressableScale>
             ))
           )}
           {data.method ? (

@@ -1,6 +1,7 @@
 import React, { useMemo } from 'react';
 import { Ionicons } from '@expo/vector-icons';
-import { StyleProp, StyleSheet, TouchableOpacity, View, ViewStyle } from 'react-native';
+import { StyleProp, StyleSheet, View, ViewStyle } from 'react-native';
+import PressableScale from './PressableScale';
 
 import AppText from './AppText';
 import OverallRatingBadge from './OverallRatingBadge';
@@ -245,10 +246,9 @@ export default function PlayerIdentityRow({
   if (layout === 'grid') {
     const showSlot = !!slot && !slotRedundant;
     return (
-      <TouchableOpacity
+      <PressableScale
         style={[styles.gridCard, style]}
         onPress={onPress}
-        activeOpacity={onPress ? 0.7 : 1}
         disabled={!onPress}
       >
         {showSlot || injuryLabel ? (
@@ -334,15 +334,14 @@ export default function PlayerIdentityRow({
             ) : null}
           </View>
         ) : null}
-      </TouchableOpacity>
+      </PressableScale>
     );
   }
 
   return (
-    <TouchableOpacity
+    <PressableScale
       style={[styles.row, showDivider && styles.divider, style]}
       onPress={onPress}
-      activeOpacity={onPress ? 0.7 : 1}
       disabled={!onPress}
     >
       {slot && !slotRedundant ? (
@@ -443,7 +442,7 @@ export default function PlayerIdentityRow({
       {chevron ? (
         <Ionicons name="chevron-forward" size={16} color={colors.textTertiary} style={styles.chevron} />
       ) : null}
-    </TouchableOpacity>
+    </PressableScale>
   );
 }
 

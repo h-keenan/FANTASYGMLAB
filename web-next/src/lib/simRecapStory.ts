@@ -2,11 +2,11 @@
 //
 // Which pages the weekly-recap story shows and what goes on each one: pure selection logic, no React.
 // Every page is glanceable by construction: a hero number plus at most STORY_ITEMS supporting items.
-import type { SimRecapScore, SimRecapStarter, SimWeekRecap } from "./simGame";
+import type { SimGamePlayer, SimRecapScore, SimRecapStarter, SimWeekRecap } from "./simGame";
 
 export const STORY_ITEMS = 3;
 
-export type SimRecapPageKey = "result" | "matchup" | "injuries" | "league" | "next";
+export type SimRecapPageKey = "result" | "matchup" | "injuries" | "league" | "season" | "next";
 
 export interface SimRecapFacts {
   youId?: string | null;
@@ -26,7 +26,7 @@ export interface SimRecapFacts {
 
 const fmt = (n: number) => (Math.round(n * 10) / 10).toFixed(1);
 
-/** The page order: Result, Matchup, Injuries and lineup, Around the league, Next week. Pages with nothing to say are dropped. */
+/** The page order: Result, Matchup, Injuries and lineup, Around the league, Season (the final week only), Next week. Pages with nothing to say are dropped. */
 export function simRecapPageKeys(recap: SimWeekRecap, facts: SimRecapFacts): SimRecapPageKey[] {
   const keys: SimRecapPageKey[] = ["result"];
   if (recap.your_game && recap.your_game.result !== "bye" && recap.your_game.starters.length > 0) keys.push("matchup");
@@ -34,6 +34,7 @@ export function simRecapPageKeys(recap: SimWeekRecap, facts: SimRecapFacts): Sim
   const flagged = (recap.your_game?.starters ?? []).some((s) => s.flag != null);
   if (hurt || flagged || facts.lineupWarnings > 0) keys.push("injuries");
   if (recap.scores.length > 0) keys.push("league");
+  if (recap.season_complete) keys.push("season");
   if (!recap.season_complete && recap.next_week != null) keys.push("next");
   return keys;
 }
@@ -46,8 +47,8 @@ export interface SimRecapResultModel {
   theirs: number;
   /** "Won by 18.7", "Lost by 4.2", "Tied". */
   margin: string;
-  best: { name: string; pts: number } | null;
-  worst: { name: string; pts: number } | null;
+  best: { name: string; pts: number; player: SimGamePlayer | null } | null;
+  worst: { name: string; pts: number; player: SimGamePlayer | null } | null;
 }
 
 export function simRecapResultModel(recap: SimWeekRecap): SimRecapResultModel {
@@ -58,10 +59,82 @@ export function simRecapResultModel(recap: SimWeekRecap): SimRecapResultModel {
   const margin = diff === 0 ? "Tied" : diff > 0 ? `Won by ${fmt(diff)}` : `Lost by ${fmt(-diff)}`;
   const played = g.starters.filter((s) => s.player && s.flag == null);
   const sorted = [...played].sort((a, b) => b.pts - a.pts);
-  const best = recap.mvp ? { name: recap.mvp.player.name, pts: recap.mvp.pts } : sorted[0]?.player ? { name: sorted[0].player.name, pts: sorted[0].pts } : null;
+  const best = recap.mvp ? { name: recap.mvp.player.name, pts: recap.mvp.pts, player: recap.mvp.player } : sorted[0]?.player ? { name: sorted[0].player.name, pts: sorted[0].pts, player: sorted[0].player } : null;
   const last = sorted[sorted.length - 1];
-  const worst = recap.bust ? { name: recap.bust.player.name, pts: recap.bust.pts } : last?.player ? { name: last.player.name, pts: last.pts } : null;
+  const worst = recap.bust ? { name: recap.bust.player.name, pts: recap.bust.pts, player: recap.bust.player } : last?.player ? { name: last.player.name, pts: last.pts, player: last.player } : null;
   return { kind: "game", result: g.result, opponent: g.opponent_name, yours: g.your_pts, theirs: g.opp_pts, margin, best, worst };
+}
+
+export type SimRecapVariant = "win" | "loss" | "tie" | "bye" | "advance" | "eliminated" | "playoff_bye" | "champion" | "runner_up";
+
+export interface SimRecapOutcome {
+  variant: SimRecapVariant;
+  /** The big word on the result hero: "Victory", "Champions", "Eliminated", "Playoff bye". */
+  headline: string;
+  /** A short line under it ("You are through to the next round"). */
+  sub: string;
+  /** Which fixed semantic colour the page glows with. */
+  tone: "success" | "danger" | "warning" | "accent" | "premium";
+  /** Show the trophy mark (every playoff page, in gold only for the champion). */
+  trophy: boolean;
+  /** One-shot confetti: the title, and nothing else. */
+  celebrate: boolean;
+}
+
+/**
+ * What the result page is about: a regular-season win/loss/tie/bye, or a playoff round (advance, eliminated, playoff bye) or the
+ * championship game (champion crowned, runner-up). Pure: the same recap always gives the same outcome.
+ */
+export function simRecapOutcome(recap: SimWeekRecap, youId?: string | null): SimRecapOutcome {
+  const g = recap.your_game;
+  const playoff = recap.kind === "playoff";
+  const final = playoff && recap.season_complete;
+  const champion = final && recap.champion != null && recap.champion === youId;
+  if (champion) return { variant: "champion", headline: "Champions", sub: "You won the title. The trophy is yours.", tone: "premium", trophy: true, celebrate: true };
+  if (!g || g.result === "bye") {
+    return playoff
+      ? { variant: "playoff_bye", headline: "Playoff bye", sub: "You skip this round and wait for the winner.", tone: "accent", trophy: true, celebrate: false }
+      : { variant: "bye", headline: "Bye week", sub: "You had a bye this week.", tone: "accent", trophy: false, celebrate: false };
+  }
+  if (final && g.result === "loss") return { variant: "runner_up", headline: "Runner-up", sub: "So close. You lost the championship game.", tone: "premium", trophy: true, celebrate: false };
+  if (playoff && g.result === "loss") return { variant: "eliminated", headline: "Eliminated", sub: "Your title run ends here.", tone: "danger", trophy: true, celebrate: false };
+  if (playoff && g.result === "win") return { variant: "advance", headline: "Advancing", sub: "You are through to the next round.", tone: "success", trophy: true, celebrate: false };
+  if (g.result === "win") return { variant: "win", headline: "Win", sub: "", tone: "success", trophy: false, celebrate: false };
+  if (g.result === "loss") return { variant: "loss", headline: "Loss", sub: "", tone: "danger", trophy: false, celebrate: false };
+  return { variant: "tie", headline: "Tie", sub: "", tone: "warning", trophy: false, celebrate: false };
+}
+
+export interface SimRecapSeasonModel {
+  championName: string | null;
+  youChampion: boolean;
+  /** "Champions", "Runner-up" or "3rd of 12". */
+  finish: string;
+  record: string | null;
+  items: { key: string; label: string; detail: string }[];
+}
+
+const ordinal = (n: number) => {
+  const r = n % 100;
+  if (r >= 11 && r <= 13) return `${n}th`;
+  return `${n}${["th", "st", "nd", "rd"][n % 10 > 3 ? 0 : n % 10]}`;
+};
+
+/** The season-complete page: who won it, where you finished, and the awards the standings can back up (at most STORY_ITEMS). */
+export function simRecapSeasonModel(recap: SimWeekRecap, facts: SimRecapFacts): SimRecapSeasonModel {
+  const rows = recap.standings ?? [];
+  const you = rows.find((r) => r.team_id === facts.youId || r.is_you) ?? null;
+  const championName = recap.champion ? facts.names[recap.champion] ?? rows.find((r) => r.team_id === recap.champion)?.name ?? null : null;
+  const outcome = simRecapOutcome(recap, facts.youId);
+  const youChampion = outcome.variant === "champion";
+  const finish = youChampion ? "Champions" : outcome.variant === "runner_up" ? "Runner-up" : you ? `${ordinal(you.rank)} of ${rows.length}` : "Season complete";
+  const record = you ? `${you.wins}-${you.losses}${you.ties ? `-${you.ties}` : ""}` : null;
+  const items: SimRecapSeasonModel["items"] = [];
+  if (championName && !youChampion) items.push({ key: "champion", label: "Champion", detail: championName });
+  if (you) items.push({ key: "record", label: "Your record", detail: `${record} · ${fmt(you.pf)} PF` });
+  const top = [...rows].sort((a, b) => b.pf - a.pf)[0];
+  if (top) items.push({ key: "top", label: "Highest scoring team", detail: `${top.name} · ${fmt(top.pf)} PF${top.is_you ? " (you)" : ""}` });
+  if (recap.mvp && items.length < STORY_ITEMS) items.push({ key: "mvp", label: "Final week MVP", detail: `${recap.mvp.player.name} · ${fmt(recap.mvp.pts)}` });
+  return { championName, youChampion, finish, record, items: items.slice(0, STORY_ITEMS) };
 }
 
 export interface SimPositionTotal {
@@ -107,14 +180,18 @@ export function simRecapProj(s: Pick<SimRecapStarter, "proj">): number | null {
 export interface SimRecapInjuryModel {
   yours: number;
   /** Your hurt players first, then the biggest names elsewhere, at most STORY_ITEMS. */
-  items: NonNullable<SimWeekRecap["injuries"]>;
+  items: (NonNullable<SimWeekRecap["injuries"]>[number] & { detail: string })[];
   /** Starters who scored 0 because of a bye or injury. */
   zeroStarters: { name: string; flag: "bye" | "out" }[];
 }
 
 export function simRecapInjuryModel(recap: SimWeekRecap): SimRecapInjuryModel {
   const all = recap.injuries ?? [];
-  const items = [...all].sort((a, b) => Number(b.is_yours) - Number(a.is_yours) || b.weeks - a.weeks).slice(0, STORY_ITEMS);
+  // ONE marker per player: the row's chip already says OUT, so the trailing text is only how long ("4 weeks"), never "Out 4w" again.
+  const items = [...all]
+    .sort((a, b) => Number(b.is_yours) - Number(a.is_yours) || b.weeks - a.weeks)
+    .slice(0, STORY_ITEMS)
+    .map((i) => ({ ...i, detail: `${i.weeks} ${i.weeks === 1 ? "week" : "weeks"}${i.is_yours ? " · yours" : ""}` }));
   const zeroStarters = (recap.your_game?.starters ?? []).filter((s) => s.player && s.flag).map((s) => ({ name: s.player!.name, flag: s.flag as "bye" | "out" }));
   return { yours: all.filter((i) => i.is_yours).length, items, zeroStarters };
 }

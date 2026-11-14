@@ -1,5 +1,6 @@
 import React, { useMemo, useState, type ReactNode } from 'react';
-import { Pressable, StyleSheet, View, type StyleProp, type ViewStyle } from 'react-native';
+import { StyleSheet, View, type StyleProp, type ViewStyle } from 'react-native';
+import PressableScale from './PressableScale';
 
 import AppText from './AppText';
 import { Sheet } from './Sheet';
@@ -44,7 +45,7 @@ export default function TapForWhy({ metric, children, spoken, variant = 'inline'
   const sentences = [...entry.sentences, ...(extra ?? [])];
   return (
     <>
-      <Pressable
+      <PressableScale
         accessibilityRole="button"
         accessibilityLabel={whyTriggerLabel(metric, spoken)}
         accessibilityHint="Opens a short explanation"
@@ -54,11 +55,11 @@ export default function TapForWhy({ metric, children, spoken, variant = 'inline'
           setOpen(true);
           trackUse(`why_${metric}`, 'opened');
         }}
-        style={({ pressed }) => [variant === 'tile' && styles.tile, style, pressed && styles.pressed]}
+        style={[variant === 'tile' && styles.tile, style]}
         testID={testID}
       >
         {children}
-      </Pressable>
+      </PressableScale>
       <Sheet open={open} onClose={() => setOpen(false)} title={title ?? entry.title} size="sm" testID={testID ? `${testID}-sheet` : undefined}>
         <View style={styles.body}>
           {sentences.map((sentence) => (
@@ -68,7 +69,7 @@ export default function TapForWhy({ metric, children, spoken, variant = 'inline'
           ))}
           {chart ? <View style={styles.chart}>{chart}</View> : null}
           {onLearnMore && entry.learnMoreHref ? (
-            <Pressable
+            <PressableScale
               accessibilityRole="link"
               onPress={() => {
                 setOpen(false);
@@ -77,7 +78,7 @@ export default function TapForWhy({ metric, children, spoken, variant = 'inline'
               style={styles.learn}
             >
               <AppText style={styles.learnText}>{entry.learnMoreLabel ?? 'Learn more'}</AppText>
-            </Pressable>
+            </PressableScale>
           ) : null}
         </View>
       </Sheet>
@@ -88,7 +89,6 @@ export default function TapForWhy({ metric, children, spoken, variant = 'inline'
 function createStyles(colors: ThemeColors) {
   return StyleSheet.create({
     tile: { alignSelf: 'stretch' },
-    pressed: { opacity: 0.7, transform: [{ scale: 0.98 }] },
     body: { gap: spacing.md },
     sentence: { fontSize: 15, lineHeight: 22, color: colors.textSecondary },
     chart: { paddingVertical: spacing.sm },

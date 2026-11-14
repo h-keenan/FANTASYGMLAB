@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { Animated, Easing, ScrollView, StyleSheet, TouchableOpacity, View, type LayoutChangeEvent } from 'react-native';
+import { Animated, Easing, ScrollView, StyleSheet, View, type LayoutChangeEvent } from 'react-native';
+import PressableScale from './PressableScale';
 import { useReducedMotion } from 'react-native-reanimated';
 
 import AppText from './AppText';
@@ -80,12 +81,11 @@ export default function SegmentedTabBar<T extends string>({
         const isActive = option.key === active;
         const iconColor = isActive ? colors.accent : colors.textTertiary;
         return (
-          <TouchableOpacity
+          <PressableScale
             key={option.key}
             style={[styles.segment, scrollable && styles.segmentScroll, dense && styles.segmentDense, isActive && !target && (slim ? styles.segmentActiveSlim : styles.segmentActive)]}
             onPress={() => onChange(option.key)}
             onLayout={onSegmentLayout(option.key)}
-            activeOpacity={0.75}
             accessibilityRole="tab"
             accessibilityState={{ selected: isActive }}
             accessibilityLabel={option.label}
@@ -107,7 +107,7 @@ export default function SegmentedTabBar<T extends string>({
                 </View>
               ) : null}
             </View>
-          </TouchableOpacity>
+          </PressableScale>
         );
       })}
     </View>

@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { ActivityIndicator, AppState, Pressable, TouchableOpacity, View, StyleSheet } from 'react-native';
+import { ActivityIndicator, AppState, Pressable, View, StyleSheet } from 'react-native';
+import PressableScale from './PressableScale';
 
 import AppText from './AppText';
 import PlayerAvatar from './PlayerAvatar';
@@ -140,9 +141,9 @@ export default function GuessThePlayerNameMatchPrompt() {
               <AppText style={styles.kicker}>Name Match</AppText>
               <AppText style={styles.title}>Who Is Who?</AppText>
             </View>
-            <TouchableOpacity onPress={dismiss} hitSlop={8} accessibilityLabel="Dismiss Name Match">
+            <PressableScale onPress={dismiss} hitSlop={8} accessibilityLabel="Dismiss Name Match">
               <AppText style={styles.closeGlyph}>{'✕'}</AppText>
-            </TouchableOpacity>
+            </PressableScale>
           </View>
 
           <View style={styles.identitiesRow}>
@@ -183,7 +184,7 @@ export default function GuessThePlayerNameMatchPrompt() {
               }
               const faded = Boolean(reveal) && !isCorrectSlot && !isWrongSelection;
               return (
-                <TouchableOpacity
+                <PressableScale
                   key={slot}
                   disabled={Boolean(reveal) || submitting}
                   onPress={() => void handleGuess(slot)}
@@ -205,7 +206,7 @@ export default function GuessThePlayerNameMatchPrompt() {
                       <AppText style={styles.metaText}>Fantasy Points (PPR)</AppText>
                     </AppText>
                   </View>
-                </TouchableOpacity>
+                </PressableScale>
               );
             })}
           </View>

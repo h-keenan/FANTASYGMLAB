@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { StyleSheet, TouchableOpacity, View } from 'react-native';
+import { StyleSheet, View } from 'react-native';
+import PressableScale from './PressableScale';
 
 import AppText from './AppText';
 import SectionHeading from './SectionHeading';
@@ -85,7 +86,7 @@ export default function PlayerTrendsPanel({
       {yearOptions.length > 1 ? (
         <View style={styles.yearRow}>
           {yearOptions.map((year) => (
-            <TouchableOpacity
+            <PressableScale
               key={year}
               style={[styles.yearPill, selectedYear === year && styles.yearPillActive]}
               onPress={() => setSelectedYear(year)}
@@ -93,7 +94,7 @@ export default function PlayerTrendsPanel({
               accessibilityLabel={`Season ${year}`}
             >
               <AppText style={[styles.yearPillText, selectedYear === year && styles.yearPillTextActive]}>{year}</AppText>
-            </TouchableOpacity>
+            </PressableScale>
           ))}
         </View>
       ) : null}

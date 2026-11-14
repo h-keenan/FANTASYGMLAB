@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo } from 'react';
-import { StyleSheet, TouchableOpacity, View } from 'react-native';
+import { StyleSheet, View } from 'react-native';
+import PressableScale from './PressableScale';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 
@@ -64,7 +65,7 @@ export default function FirstValueOfferCard({ isPremium }: { isPremium: boolean 
             navigation.navigate('Paywall');
           }}
         />
-        <TouchableOpacity
+        <PressableScale
           accessibilityRole="button"
           onPress={() => {
             trackUse('paywall', 'offer_dismissed', { tier: 'free', props: { source_surface: SURFACE } });
@@ -73,7 +74,7 @@ export default function FirstValueOfferCard({ isPremium }: { isPremium: boolean 
           hitSlop={LINK_HIT_SLOP}
         >
           <AppText style={styles.dismiss}>{TRIAL_OFFER_DISMISS}</AppText>
-        </TouchableOpacity>
+        </PressableScale>
       </View>
     </AccentCard>
   );

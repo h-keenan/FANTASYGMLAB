@@ -1,5 +1,6 @@
 import React, { useMemo, useState } from 'react';
-import { Pressable, StyleSheet, TouchableOpacity, View } from 'react-native';
+import { Pressable, StyleSheet, View } from 'react-native';
+import PressableScale from './PressableScale';
 import AppText from './AppText';
 import { Ionicons } from '@expo/vector-icons';
 
@@ -41,12 +42,12 @@ export default function EvaluationLensHeaderButton({ leagueId }: { leagueId: str
 
   return (
     <>
-      <TouchableOpacity style={styles.button} onPress={() => setOpen(true)} hitSlop={8}>
+      <PressableScale style={styles.button} onPress={() => setOpen(true)} hitSlop={8}>
         <AppText style={styles.buttonText} numberOfLines={1}>
           {current?.label ?? 'Dynasty'}
         </AppText>
         <Ionicons name="chevron-down" size={12} color={colors.premium} />
-      </TouchableOpacity>
+      </PressableScale>
       <SheetModal visible={open} transparent animationType="fade" onRequestClose={() => setOpen(false)}>
         <Pressable style={styles.backdrop} onPress={() => setOpen(false)}>
           <SwipeDismissCard style={styles.sheet} onDismiss={() => setOpen(false)}>
@@ -57,7 +58,7 @@ export default function EvaluationLensHeaderButton({ leagueId }: { leagueId: str
             {LENS_OPTIONS.map((option) => {
               const active = option.value === lens;
               return (
-                <TouchableOpacity
+                <PressableScale
                   key={option.value}
                   style={styles.optionRow}
                   onPress={() => {
@@ -70,7 +71,7 @@ export default function EvaluationLensHeaderButton({ leagueId }: { leagueId: str
                     <AppText style={styles.optionHint}>{option.hint}</AppText>
                   </View>
                   {active ? <Ionicons name="checkmark-circle" size={18} color={colors.premium} /> : null}
-                </TouchableOpacity>
+                </PressableScale>
               );
             })}
           </SwipeDismissCard>

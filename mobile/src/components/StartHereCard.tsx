@@ -1,6 +1,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import React, { useEffect, useMemo, useState } from 'react';
-import { Pressable, StyleSheet, TouchableOpacity, View } from 'react-native';
+import { Pressable, StyleSheet, View } from 'react-native';
+import PressableScale from './PressableScale';
 
 import AccentCard from './AccentCard';
 import AppText from './AppText';
@@ -70,7 +71,7 @@ export default function StartHereCard({
       <SectionHeading
         title={START_HERE_TITLE}
         right={
-          <TouchableOpacity
+          <PressableScale
             accessibilityRole="button"
             accessibilityLabel="Hide the Start here checklist"
             onPress={() => update({ ...state, dismissed: true })}
@@ -78,7 +79,7 @@ export default function StartHereCard({
             style={styles.hide}
           >
             <AppText style={styles.hideText}>Hide</AppText>
-          </TouchableOpacity>
+          </PressableScale>
         }
       />
       <AccentCard accent={colors.accent} compact>

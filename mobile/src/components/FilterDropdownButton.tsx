@@ -1,5 +1,6 @@
 import React, { useMemo, useState } from 'react';
-import { Modal, Pressable, StyleSheet, TouchableOpacity } from 'react-native';
+import { Modal, Pressable, StyleSheet, } from 'react-native';
+import PressableScale from './PressableScale';
 import { Ionicons } from '@expo/vector-icons';
 import AppText from './AppText';
 
@@ -47,10 +48,9 @@ export default function FilterDropdownButton<T extends string>({
 
   return (
     <>
-      <TouchableOpacity
+      <PressableScale
         style={[styles.button, isActive && styles.buttonActive]}
         onPress={() => setOpen(true)}
-        activeOpacity={0.7}
         accessibilityRole="button"
         accessibilityLabel={`${label} filter${isActive ? `, ${value}` : ', all'}`}
       >
@@ -58,7 +58,7 @@ export default function FilterDropdownButton<T extends string>({
           {isActive ? `${label}: ${value}` : label}
         </AppText>
         <Ionicons name="chevron-down" size={12} color={isActive ? colors.accentOnTint : colors.textTertiary} />
-      </TouchableOpacity>
+      </PressableScale>
       <SheetModal visible={open} transparent animationType="fade" onRequestClose={() => setOpen(false)}>
         <Pressable style={styles.backdrop} onPress={() => setOpen(false)}>
           <SwipeDismissCard style={styles.sheet} onDismiss={() => setOpen(false)}>
@@ -66,7 +66,7 @@ export default function FilterDropdownButton<T extends string>({
             {options.map((option) => {
               const active = option === value;
               return (
-                <TouchableOpacity
+                <PressableScale
                   key={option}
                   style={styles.optionRow}
                   onPress={() => {
@@ -76,7 +76,7 @@ export default function FilterDropdownButton<T extends string>({
                 >
                   <AppText style={[styles.optionText, active && styles.optionTextActive]}>{option}</AppText>
                   {active ? <Ionicons name="checkmark-circle" size={18} color={colors.accent} /> : null}
-                </TouchableOpacity>
+                </PressableScale>
               );
             })}
           </SwipeDismissCard>

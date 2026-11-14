@@ -1,5 +1,6 @@
 import React, { useMemo } from 'react';
-import { StyleSheet, TouchableOpacity, View } from 'react-native';
+import { StyleSheet, View } from 'react-native';
+import PressableScale from './PressableScale';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useQuery } from '@tanstack/react-query';
@@ -71,11 +72,11 @@ export default function TradeOddsEffect({
   if (!response) return null;
   if (response.reason === 'premium_required') {
     return (
-      <TouchableOpacity activeOpacity={0.7} onPress={() => navigation.navigate('Paywall')} testID="trade-odds-upsell">
+      <PressableScale onPress={() => navigation.navigate('Paywall')} testID="trade-odds-upsell">
         <AppText style={styles.caption}>
           {response.upsell?.title ?? 'See how a trade moves your odds'}. <AppText style={styles.upgrade}>Pro</AppText>
         </AppText>
-      </TouchableOpacity>
+      </PressableScale>
     );
   }
   const view = tradeOddsView(response.reason ? null : response.results[0]);

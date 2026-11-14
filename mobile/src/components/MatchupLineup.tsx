@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { Animated, StyleSheet, TouchableOpacity, View } from 'react-native';
+import { Animated, StyleSheet, View } from 'react-native';
+import PressableScale from './PressableScale';
 
 import AppText from './AppText';
 import PlayerName from './PlayerName';
@@ -167,7 +168,7 @@ function CompactSide({
   const align = mirror ? 'flex-end' : 'flex-start';
   const trendColor = trend ? (trend.dir === 'up' ? colors.successBright : trend.dir === 'down' ? colors.danger : colors.textTertiary) : colors.textSecondary;
   return (
-    <TouchableOpacity
+    <PressableScale
       style={[
         styles.flex,
         styles.side,
@@ -213,7 +214,7 @@ function CompactSide({
           ) : null}
         </View>
       </View>
-    </TouchableOpacity>
+    </PressableScale>
   );
 }
 
@@ -268,7 +269,7 @@ export function SlotRow({
           pulseKey={pulse(slot.mine)}
           onPress={onEditMine ?? (slot.mine.kind === 'player' ? () => onPressPlayer((slot.mine as { source: LineupPlayer }).source) : undefined)}
         />
-        <TouchableOpacity
+        <PressableScale
           style={styles.compactCenter}
           onPress={onToggle}
           accessibilityRole="button"
@@ -283,7 +284,7 @@ export function SlotRow({
             {slot.leader == null ? '—' : slot.leader === 'tie' ? 'Even' : formatSigned(lead)}
             {open ? ' ▴' : ' ▾'}
           </AppText>
-        </TouchableOpacity>
+        </PressableScale>
         <CompactSide
           cell={slot.opponent}
           mirror
