@@ -7,6 +7,9 @@ import { Button } from "@/components/Button";
 import { EmptyState } from "@/components/EmptyState";
 import { PillRow } from "@/components/PillRow";
 import { SimDraftRow } from "@/components/SimDraftBoard";
+import { SimRookieOverview } from "@/components/SimDraftOverview";
+import { CompactModule } from "@/components/ui/CompactModule";
+import { simRookieSummaryParts } from "@/lib/simDraft";
 import { SimDraftGlyph } from "@/components/SimDraftGlyphs";
 import { SimDynastyStrip } from "@/components/SimGameDynasty";
 import { SimCollapse, SimGeneratedChip, SimGeneratedNoticeSheet, SimPickLine, SimPlayerChips, SimRookieNoticeGate, useSimPicks } from "@/components/SimGameDynastyParts";
@@ -316,33 +319,47 @@ function RookieStage({
   const mine = off.your_picks_this_draft ?? [];
   const made = d.order.filter((o) => o.made);
   const classChip = simRookieClassChip(off);
+  const toMake = mine.filter((m) => !m.made).length;
   const [notice, setNotice] = useState(false);
   return (
     <>
       {classChip ? <SimRookieNoticeGate gameId={ctx.gameId} /> : null}
       {notice ? <SimGeneratedNoticeSheet onClose={() => setNotice(false)} /> : null}
-      <AccentCard accent={d.your_turn ? "var(--color-action)" : "var(--color-accent)"} compact as="section" glow={d.your_turn}>
-        <p className="text-sm font-bold" role="status" data-testid="rookie-clock">{simRookieClockLine(d)}</p>
+      <p className="sr-only" role="status" data-testid="rookie-clock">{simRookieClockLine(d)}</p>
+      <CompactModule
+        id="rookie.clock"
+        title="Rookie draft"
+        testId="rookie-clock-module"
+        tone={d.your_turn ? "action" : "accent"}
+        glow={d.your_turn}
+        persist={false}
+        parts={simRookieSummaryParts(d, toMake)}
+        action={
+          d.your_turn && d.available[0] ? (
+            <Button size="sm" loading={busy === "pick"} disabled={busy !== null && busy !== "pick"} onClick={() => onPick(d.available[0])}>
+              Draft {d.available[0].name.split(" ").slice(-1)[0]}
+            </Button>
+          ) : null
+        }
+      >
         {classChip ? <div><SimGeneratedChip label={classChip} onInfo={() => setNotice(true)} /></div> : null}
-        <p className="text-xs" style={{ color: "var(--color-text-muted)" }}>
-          {d.available_count} rookie{d.available_count === 1 ? "" : "s"} left. {mine.filter((m) => !m.made).length} pick{mine.filter((m) => !m.made).length === 1 ? "" : "s"} still to make.
-        </p>
-      </AccentCard>
-
-      <SimCollapse title="Your picks" summary={`${mine.filter((m) => m.made).length} of ${mine.length} made`} defaultOpen testId="rookie-mine">
-        {mine.length === 0 ? (
-          <p className="text-xs" style={{ color: "var(--color-text-muted)" }}>You have no picks in this draft.</p>
-        ) : (
-          <ul className="flex flex-col">
-            {mine.map((row) => (
-              <li key={row.pick} className="flex items-center justify-between gap-2 py-2" style={{ borderBottom: "var(--border-width-default) solid var(--color-border)" }}>
-                <span className="text-sm font-bold">{simRookiePickLine(row)}</span>
-                {row.made ? <SimToneBadge label={row.made.pos} tone="success" /> : d.on_clock?.pick === row.pick ? <SimToneBadge label="On the clock" tone="accent" /> : null}
-              </li>
-            ))}
-          </ul>
-        )}
-      </SimCollapse>
+        <div data-testid="rookie-mine">
+          <p className="text-xs font-bold" style={{ color: "var(--color-text-muted)" }}>Your picks: {mine.filter((m) => m.made).length} of {mine.length} made</p>
+          {mine.length === 0 ? (
+            <p className="text-xs" style={{ color: "var(--color-text-muted)" }}>You have no picks in this draft.</p>
+          ) : (
+            <ul className="flex flex-col">
+              {mine.map((row) => (
+                <li key={row.pick} className="flex items-center justify-between gap-2 py-2" style={{ borderBottom: "var(--border-width-default) solid var(--color-border)" }}>
+                  <span className="text-sm font-bold">{simRookiePickLine(row)}</span>
+                  {row.made ? <SimToneBadge label={row.made.pos} tone="success" /> : d.on_clock?.pick === row.pick ? <SimToneBadge label="On the clock" tone="accent" /> : null}
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      </CompactModule>
+      <SimRookieOverview order={d.order} onClockPick={d.on_clock?.pick} round={d.on_clock?.round ?? 1} made={made.length} total={d.total} />
 
       <section className="flex flex-col gap-2" aria-label="Available rookies">
         <PillRow
@@ -362,6 +379,7 @@ function RookieStage({
                 player={player}
                 onOpen={ctx.openPlayer}
                 onGeneratedInfo={() => setNotice(true)}
+                hideRookie
                 actions={
                   d.your_turn ? (
                     <SimIconButton size={44} width={48} primary label={`Draft ${player.name}`} busy={busy === "pick"} disabled={busy !== null && busy !== "pick"} onClick={() => onPick(player)}>

@@ -7,7 +7,8 @@ import Button from './Button';
 import ErrorState from './ErrorState';
 import PositionBadge from './PositionBadge';
 import SimGlyph from './SimGlyph';
-import Collapsible from './Collapsible';
+import CompactModule from './CompactModule';
+import { simLeagueParts } from '../lib/simSummaries';
 import { SkeletonCard } from './SkeletonBlock';
 import {
   SimByeCard,
@@ -129,11 +130,11 @@ export function SimHomeTab({ ctx, setClaims, onTab }: { ctx: SimCtx; setClaims: 
       <SimByeCard ctx={ctx} alerts={home.bye_alerts ?? []} onTab={onTab} onClaim={claim} />
       <SimInjuriesCard ctx={ctx} injuries={home.injuries ?? []} />
       {/* One scroll: the old "This week | League" tabs are gone; the league cards sit in a collapsed section. */}
-      <Collapsible id="home.league" title="League" defaultOpen={false} testID="home-league-section" summary={<AppText style={common.muted}>Standings, hot and cold, moves</AppText>}>
+      <CompactModule id="home.league" title="League" testID="home-league-section" parts={simLeagueParts(home.standings, home.league?.recent.length ?? 0, home.hot_cold ? { hot: home.hot_cold.hot.length, cold: home.hot_cold.cold.length } : undefined)}>
         <SimStandingsCard standings={home.standings} onTab={onTab} />
         <SimHotColdCard ctx={ctx} hotCold={home.hot_cold} onClaim={claim} />
         <SimLeagueMovesCard league={home.league} names={names} onTab={onTab} />
-      </Collapsible>
+      </CompactModule>
       {claiming ? (
         <ClaimSheet
           ctx={ctx}

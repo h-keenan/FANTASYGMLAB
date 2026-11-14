@@ -20,7 +20,7 @@ from modules.sim.personas import PERSONAS
 from modules.sim.types import FLEX_SLOTS, is_pick_id
 
 PAGE_MAX = 60
-SORTS = ("projection", "value", "adp", "age", "name", "last_week", "season")
+SORTS = ("projection", "value", "overall", "adp", "age", "name", "last_week", "season")
 
 
 def preview_block(is_pro: bool, state: GameState | None) -> dict[str, Any] | None:
@@ -209,10 +209,15 @@ def players_page(
             continue
         pids.append(pid)
 
+    overall_by_pid = overall_ratings(snap) if sort == "overall" else {}
+
     def key(pid: str):
         p = snap.players[pid]
         if sort == "value":
             return (-p.value, pid)
+        if sort == "overall":
+            # The shown OVR rating, never the model's internal trade value (that number is not shown in the UI).
+            return (-(overall_by_pid.get(pid) or 0), -p.value, pid)
         if sort == "adp":
             return (p.adp, pid)
         if sort == "age":

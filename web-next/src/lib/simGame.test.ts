@@ -261,9 +261,9 @@ describe("player filter reducer", () => {
     f = simFilterReducer(f, { type: "pos", value: "RB" });
     expect(f).toMatchObject({ pos: "RB", page: 1 });
     f = simFilterReducer(f, { type: "page", value: 2 });
-    f = simFilterReducer(f, { type: "sort", value: "value" });
+    f = simFilterReducer(f, { type: "sort", value: "overall" });
     expect(f.page).toBe(1);
-    expect(simFilterReducer(f, { type: "sort", value: "value" })).toBe(f);
+    expect(simFilterReducer(f, { type: "sort", value: "overall" })).toBe(f);
     expect(simFilterReducer(f, { type: "page", value: -4 }).page).toBe(1);
   });
 
@@ -776,9 +776,10 @@ describe("action deltas and optimistic updates", () => {
 });
 
 describe("simCounterDeltaLine", () => {
-  it("states the value change in labeled terms and both rosters after", () => {
+  it("describes the deal in plain words (never the model's number) and both rosters after", () => {
     const line = simCounterDeltaLine({ user_net_before: 5.2, user_net_after: 1, user_net_change: -4.2, asked: ["a"], removed: [], your_roster_after: 17, their_roster_after: 18, roster_limit: 18 });
-    expect(line).toBe("Trade value for you: -4.2 (net +5.2 before, +1.0 now). Rosters after: you 17/18, them 18/18.");
+    expect(line).toBe("A worse deal for you than your offer. Rosters after: you 17/18, them 18/18.");
+    expect(simCounterDeltaLine({ user_net_before: 1, user_net_after: 3, user_net_change: 2, asked: [], removed: [], your_roster_after: 17, their_roster_after: 18, roster_limit: 18 })).toMatch(/^A better deal for you/);
     expect(simCounterDeltaLine(null)).toBeNull();
   });
 

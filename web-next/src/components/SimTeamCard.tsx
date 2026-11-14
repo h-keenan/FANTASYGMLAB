@@ -7,7 +7,7 @@ import { SimCrest } from "@/components/SimCrest";
 import { simToneColor } from "@/components/SimGameParts";
 import { ToneBadge } from "@/components/ToneBadge";
 import type { SimLeagueRosterTeam } from "@/lib/simGame";
-import { simOverallLabel, simTeamChips, simTeamRecordLine, simValueLabel } from "@/lib/simLeagueRosters";
+import { simOverallLabel, simTeamChips, simTeamRecordLine } from "@/lib/simLeagueRosters";
 
 /**
  * THE Fantasy Sim team card: who a team is and who it has, at a glance. Used by the League tab's Teams view and
@@ -22,7 +22,6 @@ export function SimTeamCard({
   openLabel,
   compact = false,
   trailing,
-  valueMode = "overall",
 }: {
   team: SimLeagueRosterTeam;
   onOpen?: (teamId: string) => void;
@@ -31,8 +30,6 @@ export function SimTeamCard({
   /** Hide the top assets (the partner card once a partner is chosen). */
   compact?: boolean;
   trailing?: React.ReactNode;
-  /** League lists show the player's Overall; trade screens show the labeled Trade value (never both). */
-  valueMode?: "overall" | "trade";
 }) {
   const chips = simTeamChips(team);
   const accent = selected || team.is_you ? "var(--color-accent)" : team.power_rank <= 3 ? "var(--color-success)" : "var(--color-border-strong)";
@@ -61,7 +58,7 @@ export function SimTeamCard({
               <PositionBadge position={p.pos} />
               <PlayerName name={p.name} className="min-w-0 flex-1 truncate font-bold" />
               <span className="shrink-0 tabular-nums" style={{ color: "var(--color-text-muted)" }}>
-                {valueMode === "trade" ? "Trade value" : "OVR"} <strong style={{ color: "var(--color-text-primary)" }}>{valueMode === "trade" ? simValueLabel(p.value) : simOverallLabel(p.overall)}</strong>
+                OVR <strong style={{ color: "var(--color-text-primary)" }}>{simOverallLabel(p.overall)}</strong>
               </span>
             </li>
           ))}

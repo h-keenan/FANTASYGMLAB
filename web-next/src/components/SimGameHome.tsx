@@ -17,7 +17,8 @@ import {
   SimWaiverCard,
 } from "@/components/SimGameHomeCards";
 import { SimMiniPlayer, SimSectionTitle, SimTeamLink, SimToneBadge, simToneColor, useSimWide, type SimCtx } from "@/components/SimGameParts";
-import { Collapsible } from "@/components/Collapsible";
+import { CompactModule } from "@/components/ui/CompactModule";
+import { simLeagueParts } from "@/lib/simSummaries";
 import { useSimAutoSet } from "@/components/useSimAutoSet";
 import { ClaimSheet } from "@/components/SimGameTeam";
 import { SkeletonCard } from "@/components/Skeleton";
@@ -140,13 +141,13 @@ export function SimHomeTab({
         <SimWaiverCard ctx={ctx} suggestions={home.waiver_suggestions ?? []} onClaim={claim} onTab={onTab} />
         <SimByeCard ctx={ctx} alerts={home.bye_alerts ?? []} onTab={onTab} onClaim={claim} />
         <SimInjuriesCard ctx={ctx} injuries={home.injuries ?? []} />
-        <Collapsible id="home.league" testId="home-league-section" title="League" defaultOpen={false}>
+        <CompactModule id="home.league" testId="home-league-section" title="League" parts={simLeagueParts(home.standings, home.league?.recent.length ?? 0, home.hot_cold ? { hot: home.hot_cold.hot.length, cold: home.hot_cold.cold.length } : undefined)}>
           <div className="flex flex-col gap-3">
             <SimStandingsCard standings={home.standings} onTab={onTab} />
             <SimHotColdCard ctx={ctx} hotCold={home.hot_cold} onClaim={claim} />
             <SimLeagueMovesCard league={home.league} names={names} onTab={onTab} />
           </div>
-        </Collapsible>
+        </CompactModule>
         {sheet}
       </div>
     );

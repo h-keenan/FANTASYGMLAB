@@ -74,4 +74,12 @@ describe("PillRow", () => {
     render(<PillRow sticky fullWidth options={[{ label: "Hub", value: "hub", glyph: "hub" }, { label: "Finder", value: "finder", glyph: "finder" }]} active="hub" />);
     expect(screen.getAllByRole("tab")[0].style.minHeight).toBe("var(--segmented-height)");
   });
+
+  it("scroll variant: a short row shares its width (no empty bordered box after the last tab) and still scrolls when it overflows", () => {
+    render(<PillRow variant="scroll" options={[{ label: "All", value: "" }, { label: "QB", value: "qb" }, { label: "K", value: "k" }]} active="" />);
+    for (const tab of screen.getAllByRole("tab")) {
+      expect(tab.className).toContain("flex-1");
+      expect(tab.className).toContain("shrink-0");
+    }
+  });
 });

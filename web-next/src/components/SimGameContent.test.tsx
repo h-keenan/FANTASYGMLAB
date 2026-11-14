@@ -515,7 +515,15 @@ describe("SimGameContent", () => {
     });
     render(<SimGameContent />);
     await openFirstGame();
-    expect(await screen.findByText("You are on the clock.")).toBeInTheDocument();
+    // Collapsed, the clock module is a dense status line with the pick action (not an empty header), and the draft
+    // overview (recent picks + mini board) is on the page without opening a tab.
+    expect(await within(await screen.findByTestId("draft-clock-module")).findByTestId("compact-summary")).toHaveTextContent(/R1 P3 · You pick now/);
+    expect(screen.getByTestId("draft-overview")).toBeInTheDocument();
+    expect(screen.getByTestId("mini-board")).toBeInTheDocument();
+    expect(screen.getAllByRole("tab").map((t) => t.textContent)).toEqual(expect.arrayContaining(["Players", "Roster", "Picks"]));
+    expect(screen.queryByRole("tab", { name: "Board" })).toBeNull();
+    expect(screen.getByTestId("draft-filters")).toBeInTheDocument();
+    expect(screen.queryByText(/trade value/i)).toBeNull();
     const draftButton = await screen.findByRole("button", { name: "Draft Rory Runner" });
     // A double tap in the same frame still submits once, carrying the pick the client believes is on the clock.
     fireEvent.click(draftButton);

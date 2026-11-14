@@ -15,9 +15,6 @@ import type { WhyMetricId } from '../lib/tapForWhyContent';
 import {
   PLAYER_LIST_DENSITY,
   PLAYER_LIST_LONG_NAME,
-  PLAYER_LIST_ALIGNED_WIDTH,
-  playerListSlotWidth,
-  PLAYER_LIST_STAT_WIDTH,
   limitPlayerListTags,
   orderPlayerListStats,
   type PlayerListDensity,
@@ -47,6 +44,8 @@ export interface PlayerListRowProps {
   stats?: PlayerListStat[];
   tags?: PlayerListTag[];
   extra?: ReactNode;
+  /** Small inline controls at the end of the chips line (e.g. a Queue toggle), so the trailing slot stays ONE action. */
+  chipsExtra?: ReactNode;
   actions?: ReactNode;
   onOpen?: () => void;
   openLabel?: string;
@@ -89,6 +88,7 @@ export default function PlayerListRow({
   stats = [],
   tags = [],
   extra,
+  chipsExtra,
   actions,
   onOpen,
   openLabel,
@@ -98,7 +98,6 @@ export default function PlayerListRow({
   onSimInfo,
   testID = 'player-list-row',
   selected = false,
-  alignColumns = false,
 }: PlayerListRowProps) {
   const { colors, isDark } = useThemeMode();
   const styles = useMemo(() => createStyles(colors), [colors]);
@@ -183,45 +182,42 @@ export default function PlayerListRow({
           <View style={styles.actions}>{actions}</View>
         ) : null}
       </View>
-      {slots.length > 0 || shown.length > 0 ? (
-        <View style={styles.line3}>
-          <View style={styles.tags} testID="list-tags">
+      {slots.length > 0 || shown.length > 0 || chipsExtra ? (
+        <View style={[styles.chips, { paddingLeft: 34 + dims.avatar + spacing.sm * 2 }]} testID="list-chips">
+          <View style={styles.chipGroup} testID="list-stats">
+            {slots.map((stat) =>
+              stat ? (
+                stat.rating != null ? (
+                  // The player's Overall is the shared OVR gauge (same ring, thresholds and colors as the Quick View hero).
+                  <TapForWhy key={stat.key} metric="ovr" spoken={`Overall ${stat.rating}`}>
+                    <View style={styles.gaugeStat}>
+                      <AppText style={styles.pillLabel}>{stat.label}</AppText>
+                      <OvrGauge rating={stat.rating} size="xs" />
+                    </View>
+                  </TapForWhy>
+                ) : stat.why ? (
+                  <TapForWhy key={stat.key} metric={stat.why as WhyMetricId} spoken={`${stat.label} ${stat.value}`}>
+                    <View style={styles.pill}>
+                      <AppText style={styles.pillLabel}>{stat.label}</AppText>
+                      <AppText style={styles.pillValue}>{stat.value}</AppText>
+                    </View>
+                  </TapForWhy>
+                ) : (
+                  <View key={stat.key} style={styles.pill}>
+                    <AppText style={styles.pillLabel}>{stat.label}</AppText>
+                    <AppText style={[styles.pillValue, stat.tone && { color: toneColor(stat.tone, colors, colors.textPrimary) }]}>{stat.value}</AppText>
+                  </View>
+                )
+              ) : null,
+            )}
+          </View>
+          <View style={styles.chipGroup} testID="list-tags">
             {shown.map((tag) => (
               <ToneBadge key={tag.key} label={tag.label} color={toneColor(tag.tone, colors, colors.textSecondary)} size="xs" />
             ))}
             {moreTags > 0 ? <AppText style={styles.more}>+{moreTags}</AppText> : null}
           </View>
-          <View style={[styles.stats, alignColumns && { justifyContent: 'flex-start', minWidth: PLAYER_LIST_ALIGNED_WIDTH }]} testID="list-stats">
-            {slots.map((stat, i) =>
-              stat ? (
-                <View key={stat.key} style={{ minWidth: PLAYER_LIST_STAT_WIDTH[stat.key] ?? 66, alignItems: 'flex-end' }}>
-                  {stat.rating != null ? (
-                    // The player's Overall is the shared OVR gauge (same ring, thresholds and colors as the Quick View hero).
-                    <TapForWhy metric="ovr" spoken={`Overall ${stat.rating}`}>
-                      <View style={styles.gaugeStat}>
-                        <AppText style={styles.pillLabel}>{stat.label}</AppText>
-                        <OvrGauge rating={stat.rating} size="xs" />
-                      </View>
-                    </TapForWhy>
-                  ) : stat.why ? (
-                    <TapForWhy metric={stat.why as WhyMetricId} spoken={`${stat.label} ${stat.value}`}>
-                      <View style={styles.pill}>
-                        <AppText style={styles.pillLabel}>{stat.label}</AppText>
-                        <AppText style={styles.pillValue}>{stat.value}</AppText>
-                      </View>
-                    </TapForWhy>
-                  ) : (
-                    <View style={styles.pill}>
-                      <AppText style={styles.pillLabel}>{stat.label}</AppText>
-                      <AppText style={[styles.pillValue, stat.tone && { color: toneColor(stat.tone, colors, colors.textPrimary) }]}>{stat.value}</AppText>
-                    </View>
-                  )}
-                </View>
-              ) : (
-                <View key={`empty-${i}`} style={{ minWidth: playerListSlotWidth(i, alignColumns) }} />
-              ),
-            )}
-          </View>
+          {chipsExtra}
         </View>
       ) : null}
     </Animated.View>
@@ -250,10 +246,9 @@ function createStyles(colors: ThemeColors) {
     actions: { flexShrink: 0, flexDirection: 'row', alignItems: 'center', gap: 6 },
     simInfo: { width: 28, height: 28, alignItems: 'center', justifyContent: 'center' },
     doneText: { fontSize: 12, fontWeight: '800', color: colors.accent, paddingRight: 4 },
-    line3: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8, paddingBottom: 2 },
-    tags: { flex: 1, minWidth: 0, flexDirection: 'row', alignItems: 'center', gap: 4, overflow: 'hidden' },
+    chips: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', columnGap: 6, rowGap: 4, paddingTop: 2, paddingBottom: 4 },
+    chipGroup: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', columnGap: 6, rowGap: 4 },
     more: { fontSize: 12, fontWeight: '700', color: colors.textTertiary },
-    stats: { flexShrink: 0, flexDirection: 'row', alignItems: 'center', justifyContent: 'flex-end', columnGap: 2 },
     gaugeStat: { flexDirection: 'row', alignItems: 'center', gap: 4 },
     pill: { flexDirection: 'row', alignItems: 'baseline', gap: 4, borderRadius: radii.pill, paddingHorizontal: 6, backgroundColor: colors.glassInput },
     pillLabel: { fontSize: 12, lineHeight: 16, fontWeight: '600', color: colors.textTertiary },

@@ -226,12 +226,10 @@ export function SimPlayerSheet({ gameId, player, onClose, actions, startYear }: 
       injury_status: live.status === 'out' ? 'Out' : null,
       // The list rows' Overall also drives the hero's Player score ring, so the number never differs between a row and its quick view.
       overall_rating: live.overall ?? null,
-      ...(feed ? { score: feed.score, overall_rank: feed.overall_rank, position_rank: feed.position_rank } : {}),
+      ...(feed ? { overall_rank: feed.overall_rank, position_rank: feed.position_rank } : {}),
     },
     league: null,
     sourceLabel: 'Fantasy Sim',
-    valueNote: feed?.valueNote ?? null,
-    valueLabel: feed ? 'Trade value' : null,
   };
   return <PlayerQuickViewSheet request={request} onClose={onClose} remote={Boolean(real)} asOfSeason={simAsOfSeason(startYear)} simSections={simPqvSections(gameId, live, detail, actions)} />;
 }
@@ -281,7 +279,6 @@ function SimOverviewSection({ player, detail, actions }: { player: SimGamePlayer
   const body = detail.data;
   const status = simPlayerStatusLabel(player);
   const ros = body?.ros ?? null;
-  const hero = simHeroFeed(player);
   return (
     <View style={styles.overlay} testID="sim-player-overlay">
       <PqvSection
@@ -303,9 +300,9 @@ function SimOverviewSection({ player, detail, actions }: { player: SimGamePlayer
             note={`${player.games ?? 0} games${player.ppg != null ? ` · ${simFmtPts(player.ppg)} ppg` : ''}`}
           />
           <MetricCard
-            label="Trade value rank"
-            value={player.value_rank ? `#${player.value_rank}` : hero.score != null ? String(hero.score) : null}
-            note={hero.score != null ? `Trade value ${hero.score}${player.adp != null ? ` · ADP ${simFmtValue(player.adp)}` : ''}` : 'No trade value'}
+            label="Overall"
+            value={player.overall != null ? String(player.overall) : null}
+            note={player.adp != null ? `ADP ${simFmtValue(player.adp)}` : 'No ADP'}
           />
         </View>
         {simIfStartsHint(player) ? <AppText style={common.muted} testID="sim-if-starts">{simIfStartsHint(player)}</AppText> : null}
