@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, within } from "@testing-library/react";
 import { beforeEach, describe, expect, it } from "vitest";
 
 import { collapsedModuleProblems } from "@/components/ui/assertCompactInformative";
@@ -146,7 +146,7 @@ describe("MyTeamContent need links", () => {
 
   it("makes every Team Snapshot tile a link to the rank board that explains it, Avg Age included", () => {
     render(<MyTeamContent leagueId="L1" leagueName="My League" myTeam={MY_TEAM} needs={NEEDS} teamRanking={TEAM_RANKING} leagueSize={10} />);
-    open("Team Snapshot");
+    // The compact tiles are links without expanding anything.
     expect(screen.getByRole("link", { name: /Avg Age.*open the Roster Age rankings/ })).toHaveAttribute("href", "/league-rankings/L1?name=My%20League#board-age");
     expect(screen.getByRole("link", { name: /Record.*open your league standing/ })).toHaveAttribute("href", "/league-rankings/L1?name=My%20League#your-standing");
     expect(screen.getByRole("link", { name: /Bench Strength.*Bench Depth rankings/ })).toBeInTheDocument();
@@ -240,12 +240,14 @@ describe("MyTeamContent", () => {
   it("shows the snapshot tiles and the real team value total", () => {
     render(<MyTeamContent leagueName="Dynasty Overlords" myTeam={MY_TEAM} needs={NEEDS} teamRanking={TEAM_RANKING} leagueSize={10} />);
 
-    open("Team Snapshot");
+    fireEvent.click(screen.getByTestId("stat-strip-toggle"));
     expect(screen.getByText("Starter Strength")).toBeInTheDocument();
     expect(screen.getByText("Bench Strength")).toBeInTheDocument();
     expect(screen.getByText("Win-Now Contender")).toBeInTheDocument();
     // 4 players x 2000
-    expect(screen.getByText("8,000")).toBeInTheDocument();
+    expect(screen.getByTestId("team-hero")).toHaveTextContent("Team Value 8,000");
+    // The ring is the league percentile, with its sentence as the accessible name.
+    expect(within(screen.getByTestId("team-hero")).getByTestId("status-ring")).toHaveAttribute("aria-label", expect.stringContaining("Team value percentile"));
   });
 
   it("builds Roster Composition from real values and omits Taxi when there is none", () => {

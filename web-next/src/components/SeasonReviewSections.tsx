@@ -8,6 +8,8 @@ import { PositionBadge } from "@/components/PositionBadge";
 import { SectionHeading } from "@/components/SectionHeading";
 import { ReviewGlyphIcon } from "@/components/SimReviewGlyph";
 import { CompactModule } from "@/components/ui/CompactModule";
+import { RecapCard } from "@/components/ui/RecapCard";
+import { RECAP_CARD_ROWS, recapCardModel } from "@/lib/recapCard";
 import { SimPlayerChip as BaseChip, simToneColor, useSimWide } from "@/components/SimGameParts";
 import { ToneBadge } from "@/components/ToneBadge";
 import type { SimPlayerRef } from "@/lib/simGame";
@@ -110,14 +112,17 @@ export function ReviewCardView({ card }: { card: ReviewCard }) {
   );
 }
 
-function StatTile({ stat }: { stat: ReviewStat }) {
-  const color = stat.tone === "muted" ? "var(--color-text-primary)" : simToneColor(stat.tone);
+/** The stats as recap cards: three label/value rows per card (7b V2), every stat kept, a player chip under its row. */
+function ReviewStatCards({ section }: { section: Extract<ReviewSection, { kind: "stats" }> }) {
+  const groups: ReviewStat[][] = [];
+  for (let i = 0; i < section.items.length; i += RECAP_CARD_ROWS) groups.push(section.items.slice(i, i + RECAP_CARD_ROWS));
   return (
-    <div className="glass-surface flex min-w-0 flex-col gap-0.5 p-3" data-testid="review-stat">
-      <span className="text-xs uppercase font-extrabold" style={{ color: "var(--color-text-muted)", letterSpacing: "var(--letter-spacing-badge)" }}>{stat.label}</span>
-      <span className="text-xl font-extrabold tabular-nums break-words" style={{ color }}>{stat.value}</span>
-      {stat.sub ? <span className="text-xs" style={{ color: "var(--color-text-muted)" }}>{stat.sub}</span> : null}
-      {stat.player ? <SimPlayerChip player={stat.player} size={28} /> : null}
+    <div className="grid grid-cols-1 gap-2 md:grid-cols-2" data-testid="review-stat-cards">
+      {groups.map((group, g) => {
+        const rows = group.map((s, i) => ({ key: `${g}-${i}`, label: s.label, value: s.value, sub: s.sub ?? null, tone: s.tone }));
+        const extras = Object.fromEntries(group.map((s, i) => [`${g}-${i}`, s.player ? <SimPlayerChip key={i} player={s.player} size={28} /> : null]));
+        return <RecapCard key={g} model={recapCardModel({ kicker: g === 0 ? section.title : `${section.title} (${g + 1})`, rows })} extras={extras} testId="review-stat" />;
+      })}
     </div>
   );
 }
@@ -230,7 +235,7 @@ const CAROUSEL_ITEM = "flex w-[84%] shrink-0 snap-start flex-col md:w-auto [&>*]
 function SectionBody({ section }: { section: ReviewSection }): ReactNode {
   switch (section.kind) {
     case "stats":
-      return <div className="grid grid-cols-2 gap-2 md:grid-cols-4">{section.items.map((s, i) => <StatTile key={i} stat={s} />)}</div>;
+      return <ReviewStatCards section={section} />;
     case "cards":
       return <div className={CAROUSEL}>{section.cards.map((c) => <div key={c.id} className={CAROUSEL_ITEM}><ReviewCardView card={c} /></div>)}</div>;
     case "path":

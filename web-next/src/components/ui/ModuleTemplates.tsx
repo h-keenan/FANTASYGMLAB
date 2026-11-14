@@ -1,13 +1,14 @@
 "use client";
 
 import Link from "next/link";
-import type { ReactNode } from "react";
+import { useId, useState, type ReactNode } from "react";
 
 import { AccentCard } from "@/components/AccentCard";
-import { StatStrip, type StatStripItem } from "@/components/StatStrip";
-import { CompactModule } from "@/components/ui/CompactModule";
+import { FillBar } from "@/components/SnapshotTile";
+import type { StatStripItem } from "@/components/StatStrip";
+import { InsightLink } from "@/components/ui/InsightLink";
 import { TrendChart } from "@/components/ui/TrendChart";
-import { compactAriaLabel, compactParts, type CompactPart, type CompactTone } from "@/lib/compactModule";
+import { compactAriaLabel, compactParts, compactSummaryText, type CompactPart, type CompactTone } from "@/lib/compactModule";
 import type { ChartInputPoint } from "@/lib/chartSeries";
 import { heroParts, statStripParts, trendModel, type TrendModel } from "@/lib/moduleTemplates";
 
@@ -113,7 +114,13 @@ export function Hero({
   );
 }
 
-/** Stat tiles as a module: collapsed shows "Power #3 · Starters #5 · Age 26.1", expanded the full tiles. */
+/**
+ * THE stat strip (docs/ui-patterns.md, "Stat strip"). COMPACT (V1): the stats as one row of small glass tiles, each
+ * with its value and a caption, always visible, each a link to the page that explains it (InsightLink destinations).
+ * EXPANDED (V2): one tap on "Rank bars" turns the same stats into labelled standing bars (rank position or win share
+ * as a bar, with the value). Items with no honest relative scale (average age) list their value without a bar.
+ * Shared by FantasyDesk (My Team, Today) and the Fantasy Sim franchise page; mobile twin is `StatStripModule`.
+ */
 export function StatStripModule({
   id,
   title,
@@ -123,7 +130,6 @@ export function StatStripModule({
   defaultOpen = false,
   tone = "accent",
   action,
-  extraParts,
   footer,
   testId,
 }: {
@@ -132,25 +138,102 @@ export function StatStripModule({
   items: StatStripItem[];
   league?: { id: string; name: string };
   columns?: 3 | 4;
+  /** Starts with the rank bars open. */
   defaultOpen?: boolean;
   tone?: CompactTone;
   action?: ReactNode;
-  /** Parts appended after the stat summary (e.g. an "Injured: 2" warning). */
-  extraParts?: ReadonlyArray<CompactPart | null | undefined | false | "">;
-  /** Shown under the tiles when expanded (glossary, beginner help). */
+  /** Shown under the bars when expanded (glossary, beginner help). */
   footer?: ReactNode;
   testId?: string;
 }) {
-  const parts = compactParts([...statStripParts(items.map((i) => ({ label: shortLabel(i.label), value: i.value, tone: i.tone === "risk" ? "danger" : i.tone === "positive" ? "success" : undefined }))), ...(extraParts ?? [])]);
-  const rows: StatStripItem[][] = [];
-  for (let i = 0; i < items.length; i += columns) rows.push(items.slice(i, i + columns));
+  const [open, setOpen] = useState(defaultOpen);
+  const bodyId = useId();
+  const hasBars = items.some((item) => item.fill != null);
+  const expandable = true;
+  const summary = compactSummaryText(statStripParts(items.map((i) => ({ label: shortLabel(i.label), value: i.value }))));
+  const cols = Math.min(items.length, columns) || 1;
   return (
-    <CompactModule id={id} title={title} parts={parts} tone={tone} defaultOpen={defaultOpen} action={action} testId={testId}>
-      {rows.map((row, i) => (
-        <StatStrip key={i} items={row} columns={columns} league={league} />
-      ))}
-      {footer}
-    </CompactModule>
+    <AccentCard accent={TONE_COLOR[tone]} as="section" compact data-testid={testId ?? `stat-strip-${id}`}>
+      <div className="flex items-center justify-between gap-2">
+        <h3 className="m-0 text-[0.6875rem] font-extrabold uppercase" style={{ color: "var(--color-text-muted)", letterSpacing: "var(--letter-spacing-badge)" }}>
+          {title}
+        </h3>
+        {action}
+      </div>
+      <div className="grid gap-2" style={{ gridTemplateColumns: `repeat(${cols}, minmax(0, 1fr))` }} role="group" aria-label={`${title}: ${summary}`} data-testid="stat-strip-tiles">
+        {items.map(({ insight, ...item }) => {
+          const tile = <StatStripTile key={item.label} item={item} />;
+          if (!insight || !league) return tile;
+          return (
+            <InsightLink key={item.label} insight={insight} league={league} spoken={[item.label, item.value, item.note]} noChevron>
+              {tile}
+            </InsightLink>
+          );
+        })}
+      </div>
+      {expandable ? (
+        <button
+          type="button"
+          className="tap-link flex items-center justify-center gap-1 self-stretch text-xs font-bold"
+          style={{ minHeight: "var(--touch-target-min)", color: "var(--color-accent)" }}
+          aria-expanded={open}
+          aria-controls={bodyId}
+          onClick={() => setOpen(!open)}
+          data-testid="stat-strip-toggle"
+        >
+          {hasBars ? (open ? "Hide rank bars" : "Rank bars") : open ? "Hide details" : "Details"}
+          <span aria-hidden="true">{open ? "▴" : "▾"}</span>
+        </button>
+      ) : null}
+      {open ? (
+        <div id={bodyId} className="flex flex-col gap-2" data-testid="stat-strip-bars">
+          {
+            <ul className="m-0 flex list-none flex-col gap-1 p-0">
+              {items.map(({ insight, ...item }) => {
+                const row = (
+                  <span className="grid min-h-[var(--touch-target-min)] grid-cols-[6.5rem_minmax(0,1fr)_3.5rem] items-center gap-2 text-sm">
+                    <span style={{ color: "var(--color-text-secondary)" }}>{item.label}</span>
+                    {item.fill != null ? <FillBar fill={item.fill} label={item.label} /> : <span aria-hidden="true" />}
+                    <span className="text-right font-extrabold tabular-nums">{item.value}</span>
+                  </span>
+                );
+                return (
+                  <li key={item.label}>
+                    {insight && league ? (
+                      <InsightLink insight={insight} league={league} spoken={[item.label, item.value, item.note]} noChevron>
+                        {row}
+                      </InsightLink>
+                    ) : (
+                      row
+                    )}
+                  </li>
+                );
+              })}
+            </ul>
+          }
+          {footer}
+        </div>
+      ) : null}
+    </AccentCard>
+  );
+}
+
+function StatStripTile({ item }: { item: Omit<StatStripItem, "insight"> }) {
+  const color = item.tone === "risk" ? "var(--color-danger)" : item.tone === "positive" ? "var(--color-success)" : item.tone === "premium" ? "var(--color-premium)" : "var(--color-text-primary)";
+  return (
+    <span className="glass-surface flex min-w-0 flex-col items-center gap-0.5 px-1.5 py-2 text-center" style={{ borderColor: item.tone === "premium" ? "var(--color-premium)" : undefined }} data-testid="stat-strip-tile">
+      <span className="max-w-full truncate text-[0.6875rem] font-extrabold uppercase" style={{ color: "var(--color-text-muted)", letterSpacing: "var(--letter-spacing-badge)" }}>
+        {shortLabel(item.label)}
+      </span>
+      <span className="max-w-full truncate text-lg font-extrabold tabular-nums leading-tight" style={{ color }}>
+        {item.value}
+      </span>
+      {item.note ? (
+        <span className="text-[0.6875rem] leading-tight" style={{ color: "var(--color-text-muted)" }}>
+          {item.note}
+        </span>
+      ) : null}
+    </span>
   );
 }
 
