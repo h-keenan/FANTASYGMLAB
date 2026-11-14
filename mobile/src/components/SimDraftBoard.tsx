@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useReducer, useRef, useState, type ReactNode } from 'react';
-import { StyleSheet, View } from 'react-native';
+import { Pressable, StyleSheet, View } from 'react-native';
 import PressableScale from './PressableScale';
 import * as Haptics from 'expo-haptics';
 import { Ionicons } from '@expo/vector-icons';
@@ -9,14 +9,13 @@ import EmptyState from './EmptyState';
 import Input from './Input';
 import SegmentedTabBar from './SegmentedTabBar';
 import { SkeletonCard } from './SkeletonBlock';
-import { SimPager, createSimStyles, useSimDebounced } from './SimGameParts';
+import { SimPager, SimPlayerLine, createSimStyles, useSimDebounced } from './SimGameParts';
 import { useThemeMode } from '../context/ThemeModeContext';
 import { api } from '../lib/api';
 import { PLAYER_SEARCH_DEBOUNCE_MS } from '../lib/leaguePlayerSearch';
-import PlayerListRow from './PlayerListRow';
-import type { PlayerListDensity, PlayerListTag } from '../lib/playerListRow';
+import type { PlayerListTag } from '../lib/playerListRow';
 import type { BadgeKind } from '../lib/playerBadges';
-import { SIM_DRAFT_SORTS, simCycleSort, simDraftMeta, simDraftRowChips, simListStats, simRowBadges, simSuppressedBadges } from '../lib/simDraft';
+import { SIM_DRAFT_SORTS, simCycleSort, simSuppressedBadges } from '../lib/simDraft';
 import { SIM_WINDOW_STEP, simWindow } from '../lib/simLayout';
 import {
   SIM_PAGE_SIZE,
@@ -116,7 +115,6 @@ export function SimDraftRow({
   suppressBadges,
   extra,
   chipsExtra,
-  density,
 }: {
   player: SimGamePlayer;
   onOpen?: (player: SimGamePlayer) => void;
@@ -133,32 +131,32 @@ export function SimDraftRow({
   extra?: ReactNode;
   /** Small inline controls at the end of the chips line (a Queue toggle). */
   chipsExtra?: ReactNode;
-  density?: PlayerListDensity;
 }) {
-  const [chip] = simDraftRowChips(player);
+  const { colors } = useThemeMode();
+  const info = onGeneratedInfo && simPlayerIsGenerated(player) ? onGeneratedInfo : undefined;
   return (
-    <PlayerListRow
-      testID="draft-row"
-      name={player.name}
-      position={player.pos}
-      headshotId={simHeadshotId(player)}
-      fallbackLabel={simPlayerInitials(player)}
-      meta={simDraftMeta(player, week)}
-      chip={chip ? { label: chip.label, tone: chip.tone } : null}
-      hurt={player.status === 'out'}
-      stats={simListStats(player)}
-      tags={tags}
-      badges={simRowBadges(player)}
-      suppressBadges={suppressBadges}
-      extra={extra}
-      chipsExtra={chipsExtra}
-      actions={actions}
-      density={density}
-      done={drafted}
-      onSimInfo={onGeneratedInfo && simPlayerIsGenerated(player) ? onGeneratedInfo : undefined}
-      onOpen={onOpen ? () => onOpen(player) : undefined}
-      openLabel={`${player.name}, ${player.pos}. Open player details`}
-    />
+    <View testID={drafted ? 'draft-row-drafted' : undefined}>
+      <SimPlayerLine
+        testID="draft-row"
+        player={player}
+        week={week}
+        tags={tags}
+        suppressBadges={suppressBadges}
+        extra={extra}
+        onOpen={onOpen}
+        trailing={drafted ? <AppText style={{ fontSize: 12, fontWeight: '800', color: colors.accent }} accessibilityRole="alert">Drafted ✓</AppText> : actions}
+        expandedExtra={
+          <>
+            {chipsExtra}
+            {info ? (
+              <Pressable accessibilityRole="button" accessibilityLabel="About simulated players" onPress={info} style={{ minHeight: 32, justifyContent: 'center' }}>
+                <AppText style={{ fontSize: 12, fontWeight: '800', color: colors.accent }}>ⓘ Simulated player</AppText>
+              </Pressable>
+            ) : null}
+          </>
+        }
+      />
+    </View>
   );
 }
 

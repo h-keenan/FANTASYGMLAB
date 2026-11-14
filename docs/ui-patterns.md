@@ -755,9 +755,12 @@ and it works"), so the sim shows **letter grades** like Madden / 2K. Trades desc
   keeps the primary text colour (lightly mixed with the tone) so contrast holds in both themes. A "?" marks a scouting estimate (rookies);
   `size="lg"` also prints the range ("B-/B+"). The accessible name is the full read: "Grade B plus, strong starter. Scouts are unsure: B to
   A minus." No grade renders an invisible placeholder with the same footprint so list columns align.
-- **`PlayerListRow`**: a stat with `grade` (even `null`) renders `LetterGrade` instead of the `OvrGauge` ring; the Sim reaches it only through
-  `simListStats` (PROJ, GRD, ADP; the EDGE chip is gone: it compared model value rank with ADP). The real FantasyDesk keeps `OvrGauge` and its
-  numbers.
+- **Sim rows** (`SimPlayerLine` / `SimRosterLine` / `SimDraftRow`) are `PlayerAccordionRow mode="sim"` (see "Sim roster rows: one Move
+  button" below). The grade is `LetterGrade size="xs"`: a small rounded tile at the END OF THE STATS LINE ("LAR · Age 31 · Bye 11 · PROJ 17.7
+  [A-]"), no "GRADE" word, the scouting "?" a dim superscript ("B+" with a small "?"), never "A-?" in a capsule. Chosen over a corner badge on
+  the avatar (it covers the photo and is hard to scan) in the 2026-11 mockup (`grade-variants.png`: right-edge tile vs avatar corner; the right
+  edge itself is now the Move button's slot). `PlayerListRow`'s `grade` stat (capsule) remains for the lists that still use it. The real
+  FantasyDesk keeps `OvrGauge` and its numbers.
 - **`GradeBar`**: one position attribute (label, coarse bar tinted by the grade tone, letter), in the sim quick view's "Attributes" section
   with the line "From usage and history. Graded on their own: they do not add up to the overall grade."
 - **`GradeLegendSheet` / `GradeLegendButton`**: every band and what it means, what "?" means, what the attributes are. The hero `GradeTile`
@@ -768,6 +771,27 @@ and it works"), so the sim shows **letter grades** like Madden / 2K. Trades desc
   players, carousel rows, the draft hint, team cards (top assets), the quick view hero.
 - Tests: `lib/simGrade.test.ts` (web vitest + app node:test), `ui/LetterGrade.test.tsx`, `SimPhoneLayout.test.tsx`, `SimPlayerSheet.test.tsx`;
   server: `tests/test_sim_grades.py` (including "no API response contains the raw overall"). Calibration: `docs/audits/2026-11-sim-letter-grades.md`.
+
+### Sim roster rows: one Move button (web + app, 2026-11)
+
+coridian_: "there should not be 3 buttons next to the player. It should be one button, and if we need more buttons, it should expand."
+
+- A roster row (lineup starter, bench, IR, taxi, offseason cut-down) has ONE always-visible trailing control: the Move button (`SimMoveButton`,
+  an icon, `aria-expanded`). The whole row is also a tap target. Both toggle the same in-place expansion (the shared accordion state:
+  `SimRowAccordion` wraps the game screen, so ONE row is open at a time). No "+", no swap arrows, no "Cut" text link beside the player.
+- The open row shows the facts (GRADE, ADP, PROJ) and the inline **strip** (`SimMoveStrip`, `lib/simMove.ts` decides the actions): only
+  what is possible now, one primary (Swap in / Activate / Promote / To IR / To taxi, first that applies), then Block, Profile, and Cut last
+  (danger, asks "Cut Surname?" with Cut / Keep). Swap in reveals slot chips ("WR2 for Smith", "FLEX empty"); a starter gets "Change WR1"
+  (opens the slot's candidate sheet, since choosing a player needs a list). A full taxi squad offers "Swap onto taxi" with the taxi players
+  as chips. A move the rules forbid is NOT drawn as a disabled button; a short muted note appears when the player would expect it
+  ("Activate needs an open roster spot: cut or move someone first."). A move the server refuses shows its message under the strip.
+- Expansion animates height + opacity (web: `.row-expand` CSS grid keyframes, none under `prefers-reduced-motion`; app: `LayoutAnimation`
+  skipped when reduce-motion is on). Collapse is instant on web.
+- Rows whose trailing slot is not a move keep exactly one control: Draft (draft board / queue; the queue's up / down / remove moved into
+  the open tile), Start (slot picker), Block / Remove (trade block). Draft-board Queue and the "simulated player" note live in the open tile.
+- `extra` info (owner on league lists, "Starting elsewhere") and non-status tags are in the open tile, so every row stays two lines.
+- Tests: `lib/simMove.test.ts`, `SimMoveRow.test.tsx` (exactly one trailing control, strip lists only possible actions),
+  `SimGameDynasty.test.tsx` (IR / taxi via the strip).
 
 ## Notice toast (auto-dismiss)
 
