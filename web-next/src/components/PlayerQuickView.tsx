@@ -4,7 +4,7 @@ import { ToneBadge } from "@/components/ToneBadge";
 import { ExplorerLeagueProvider } from "@/context/ExplorerLeagueContext";
 import dynamic from "next/dynamic";
 import { usePathname } from "next/navigation";
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react";
 
 import { api, type PlayerAward, type PlayerNewsResponse, type QuickViewResponse } from "@/lib/api";
 import type { PlayerQuickViewIdentity } from "@/context/PlayerQuickViewContext";
@@ -23,6 +23,7 @@ import { SheetHandle } from "@/components/SheetHandle";
 import { usePlayerQuickView } from "@/context/PlayerQuickViewContext";
 import { explorerStatKey } from "@/lib/percentileExplorer";
 import { CHART_HEIGHT } from "@/components/weeklyPointsChartHeight";
+import { chromeDock } from "@/lib/sheetTabs";
 import { OverlayBack } from "@/components/OverlayBack";
 import { useOverlay } from "@/lib/useOverlay";
 import { useSheetDragDismiss } from "@/lib/useSheetDragDismiss";
@@ -145,6 +146,19 @@ export function PlayerQuickView({
   const pathname = usePathname();
   const dialogRef = useRef<HTMLDivElement | null>(null);
   const closeButtonRef = useRef<HTMLButtonElement | null>(null);
+  const scrollRef = useRef<HTMLDivElement | null>(null);
+  // The close X floats over the top of the scroll area; the sticky tab strip docks just below it (see .tabs-sticky).
+  useLayoutEffect(() => {
+    const scroll = scrollRef.current;
+    const close = closeButtonRef.current;
+    if (!scroll || !close) return;
+    const measure = () => scroll.style.setProperty("--tabs-dock", `${chromeDock(close.getBoundingClientRect().bottom, scroll.getBoundingClientRect().top)}px`);
+    measure();
+    if (typeof ResizeObserver === "undefined") return;
+    const ro = new ResizeObserver(measure);
+    ro.observe(scroll);
+    return () => ro.disconnect();
+  });
   const [legendOpen, setLegendOpen] = useState(false);
   const [detail, setDetail] = useState<QuickViewResponse | null>(null);
   const [awards, setAwards] = useState<PlayerAward[]>([]);
@@ -309,7 +323,7 @@ export function PlayerQuickView({
           ×
         </button>
 
-        <div className="pqv-scroll">
+        <div className="pqv-scroll" ref={scrollRef}>
 
         <PlayerHeroHeader
           playerId={identity.player_id}

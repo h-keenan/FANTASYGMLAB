@@ -768,6 +768,14 @@ through `useOverlay` / `PopupShell` / `Sheet`, so the one-pop-up-at-a-time, Back
   child of its `SheetScrollView` and pins it with `stickyHeaderIndices` (Player Quick View: index 2 = top bar, hero,
   strip), or puts the bar above its ScrollView (Manager profile) so only the panel scrolls. `<Tabs>` is the unpinned
   stack of the same two pieces.
+- **Docking (bug fix 2026-11)**: a sticky `top` is measured from the scroll container's CONTENT edge, so `top: 0` in a
+  padded sheet floated the strip a padding-height below the header with scrolled content showing in the gap. `Tabs`
+  now measures the real scroll container (`stickyTabsOffset` in `lib/sheetTabs.ts`: `top = dock - paddingTop`) and the
+  sheet may set `--tabs-dock` on that container for chrome floating over it (PQV: the close X, via `chromeDock`).
+  The backing is opaque and `::before` extends it up to the container edge. Geometry guard:
+  `scripts/sim_layout_playwright/sheet_tabs_dock.mjs` (strip top == chrome bottom within 1px, no content above it, at
+  peek and full heights; fails on the old `top: 0`) plus `tabsStickyCss.test.ts`. On the app, RN pins sticky headers
+  to the ScrollView edge (no padding offset) and the strip backing is already opaque.
 - **No layout jump**: the panel keeps the tallest height it has shown as its minimum (`nextPanelMinHeight`), so a short
   tab after a long one never pulls the sheet or the strip.
 - **State**: the open tab is remembered per surface id for the session (`lib/sessionTab.ts`); anything that must survive a
