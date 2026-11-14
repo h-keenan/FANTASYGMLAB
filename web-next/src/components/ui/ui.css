@@ -874,11 +874,12 @@
   transform: translateX(var(--ind-x, 0px));
   background: color-mix(in srgb, #fff 10%, transparent);
   box-shadow: inset 0 1px 0 color-mix(in srgb, #fff 14%, transparent);
-  transition: transform var(--motion-base, 240ms) var(--ease-out, ease-out), width var(--motion-base, 240ms) var(--ease-out, ease-out);
+  transition: transform 180ms var(--ease-out, ease-out), width 180ms var(--ease-out, ease-out); will-change: transform, width;
 }
 .pill-tabs:not([data-measured]) .pill-indicator { visibility: hidden; }
 .pill-tab {
-  position: relative; flex: 0 0 auto; min-height: var(--bar-button-min-height); margin: 0; padding: 0 10px;
+  position: relative; flex: 1 0 auto; display: inline-flex; align-items: center; justify-content: center; box-sizing: border-box;
+  height: var(--bar-button-min-height); min-height: var(--bar-button-min-height); margin: 0; padding: 0 10px; text-decoration: none;
   -webkit-appearance: none; appearance: none; background: transparent; border: 0; border-radius: 999px; cursor: pointer;
   font-family: inherit; font-size: 0.75rem; font-weight: 700; line-height: 1; white-space: nowrap; color: var(--color-text-muted);
   -webkit-tap-highlight-color: transparent; transition: color 180ms ease;
