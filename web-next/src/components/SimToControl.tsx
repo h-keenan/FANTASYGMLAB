@@ -63,10 +63,7 @@ function writePrefs(prefs: SimToPrefs) {
 export function SimToSheet({ ctx, open, onClose, onRun }: { ctx: SimCtx; open: boolean; onClose: () => void; onRun: (request: SimToRequest) => void }) {
   const [options, setOptions] = useState<SimToOption[] | null>(null);
   const [failed, setFailed] = useState(false);
-  const [prefs, setPrefs] = useState<SimToPrefs>(SIM_TO_DEFAULT_PREFS);
-  useEffect(() => {
-    if (open) setPrefs(readPrefs());
-  }, [open]);
+  const [prefs, setPrefs] = useState<SimToPrefs>(() => (typeof window === "undefined" ? SIM_TO_DEFAULT_PREFS : readPrefs()));
   const update = (next: SimToPrefs) => {
     setPrefs(next);
     writePrefs(next);
