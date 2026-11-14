@@ -521,7 +521,7 @@ def validate_offer(snap: GameSnapshot, state: GameState, partner: str, give: Seq
             for pos in SINGLETON_POSITIONS:
                 held = sum(1 for p in state.holdings(tid) if snap.players[p].pos == pos and p not in leaving)
                 coming = sum(1 for p in arriving if not is_pick_id(p) and snap.players[p].pos == pos)
-                if held + coming > 1:
+                if coming and held + coming > 1:  # only a trade that ADDS one is refused (a roster already over, e.g. mid-offseason, is not blocked)
                     who = "You" if tid == user else "They"
                     raise GameError("singleton_limit", f"{who} would end up with two {'kickers' if pos == 'K' else 'defenses'}. Trade yours away in the same deal.")
 
