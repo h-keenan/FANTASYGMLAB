@@ -9,6 +9,7 @@ import { useThemeMode } from '../context/ThemeModeContext';
 import { compactAriaLabel, compactParts, type CompactPart, type CompactTone } from '../lib/compactModule';
 import { simOpenKey, simParseOpen } from '../lib/simLayout';
 import { spacing, type ThemeColors } from '../theme';
+import Money from './Money';
 
 function toneColor(tone: CompactTone | undefined, colors: ThemeColors): string {
   switch (tone) {
@@ -112,7 +113,7 @@ export default function CompactModule({
                 {shown.map((part, i) => (
                   <AppText key={part.key} style={[styles.part, part.tone ? { color: toneColor(part.tone, colors) } : null, part.strong ? { fontWeight: '800' } : null]}>
                     {i > 0 ? <AppText style={styles.sep}>{' · '}</AppText> : null}
-                    {part.text}
+                    <Money>{part.text}</Money>
                   </AppText>
                 ))}
               </AppText>

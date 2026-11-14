@@ -8,6 +8,7 @@ import PercentileBar from './PercentileBar';
 import { useThemeMode } from '../context/ThemeModeContext';
 import { percentileColor, percentileLabel, percentileTrendIcon } from '../lib/percentile';
 import { radii, spacing, type ThemeColors } from '../theme';
+import Money from './Money';
 
 type IoniconName = React.ComponentProps<typeof Ionicons>['name'];
 
@@ -118,7 +119,7 @@ export default function MetricCard({
         adjustsFontSizeToFit={centered}
         minimumFontScale={centered ? 0.6 : undefined}
       >
-        {display}
+        {typeof display === 'string' ? <Money>{display}</Money> : display}
       </AppText>
       {pctl && trendIcon ? (
         <View style={styles.pctlRow}>
@@ -129,7 +130,7 @@ export default function MetricCard({
         </View>
       ) : note ? (
         <AppText style={[styles.noteText, { color: valueColor ?? colors.textTertiary }]} numberOfLines={1}>
-          {note}
+          <Money>{note}</Money>
         </AppText>
       ) : null}
       <PercentileBar percentile={percentile} />

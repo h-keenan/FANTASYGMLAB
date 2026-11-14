@@ -69,6 +69,7 @@ DESIGN_TOKEN_CSS = """
     --color-accent-strong: #22d3ee;
     --color-accent-soft: rgba(103, 232, 249, 0.14);
     --color-success: #22c55e;
+    --color-money: #4ade80;
     --color-opportunity: #14b8a6;
     --color-action: #facc15;
     --color-warning: #f59e0b;
@@ -298,6 +299,7 @@ LIGHT_MODE_TOKENS: dict[str, str] = {
     "--color-accent-strong": "#08616E",  # from #22d3ee; 6.34-7.56:1
     "--color-accent-soft": "rgba(6, 110, 124, 0.16)",
     "--color-success": "#147337",  # from #22c55e; 5.02-6.63:1
+    "--color-money": "#0B6A2C",  # money text; >=5.5:1 on light surfaces
     "--color-opportunity": "#0C7065",  # from #14b8a6; 5.04-6.82:1
     "--color-action": "#796103",  # from #facc15; 5.04-6.78:1
     "--color-warning": "#8A5906",  # from #f59e0b; 5.05-6.98:1

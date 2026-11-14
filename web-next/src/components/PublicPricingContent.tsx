@@ -10,6 +10,7 @@ import { SectionHeading } from "@/components/SectionHeading";
 import type { BillingPlan } from "@/lib/api";
 import { FALLBACK_PUBLIC_PLANS, fetchPublicBillingPlans } from "@/lib/publicPricing";
 import { storeCurrentPathForReturnAfterSignIn } from "@/lib/protectedRouteReturn";
+import { Money } from "@/components/Money";
 
 const TIER_LABELS: Record<BillingPlan["tier"], string> = {
   pro: "Pro",
@@ -80,7 +81,7 @@ export function PublicPricingContent() {
                 {TIER_LABELS[plan.tier]} — {plan.label}
               </span>
               <span style={{ font: "var(--type-primary-metric)" }}>
-                {plan.price} <span className="text-sm font-normal">{plan.cadence}</span>
+                <Money all>{plan.price}</Money> <span className="text-sm font-normal">{plan.cadence}</span>
               </span>
               {sharedFeatures ? null : <FeatureList features={plan.features} />}
             </div>

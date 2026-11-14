@@ -47,6 +47,8 @@ import { PlayerName } from "@/components/PlayerName";
 import { LeagueRoundupTab } from "@/components/LeagueRoundupTab";
 import type { RecapsTab } from "@/lib/pageTabs";
 import { ErrorState } from "@/components/ErrorState";
+import { Money } from "@/components/Money";
+import { formatMoney } from "@/lib/money";
 
 /**
  * Ports modules/league_recaps_ui.py + modules/league_history_ui.py for
@@ -134,7 +136,7 @@ function RecapStoryCard({
             {story.metric_label || "Recorded"}
           </span>
           <strong className={`${lead ? "text-2xl" : "text-lg"} font-extrabold`} style={{ color: accent }}>
-            {story.metric_value}
+            <Money>{story.metric_value}</Money>
           </strong>
         </div>
       ) : null}
@@ -384,9 +386,9 @@ function TradePickLine({ picks }: { picks: HistoryTransaction["draft_picks"] }) 
 
 function faabLine(side: HistorySide, txType: string): string {
   const bits: string[] = [];
-  if (side.faab_spent !== null && side.faab_spent > 0) bits.push(`FAAB $${side.faab_spent}`);
+  if (side.faab_spent !== null && side.faab_spent > 0) bits.push(`FAAB ${formatMoney(side.faab_spent)}`);
   else if (txType === "waiver" && side.faab_spent === 0) bits.push("No FAAB");
-  if (side.faab_received !== null && side.faab_received > 0) bits.push(`Received FAAB $${side.faab_received}`);
+  if (side.faab_received !== null && side.faab_received > 0) bits.push(`Received FAAB ${formatMoney(side.faab_received)}`);
   return bits.join(" · ");
 }
 
@@ -465,7 +467,7 @@ function HistorySideBlock({ side, txType }: { side: HistorySide; txType: string 
       )}
       {faab ? (
         <span className="text-xs uppercase" style={{ color: "var(--color-text-muted)", letterSpacing: "var(--letter-spacing-badge)" }}>
-          {faab}
+          <Money>{faab}</Money>
         </span>
       ) : null}
     </div>
@@ -931,7 +933,7 @@ function StorylinesTab({
           </div>
         ) : null}
         <span className="text-lg font-extrabold" style={{ color: "var(--color-text-primary)" }}>
-          ${faab.amount}
+          <Money all>{formatMoney(faab.amount)}</Money>
         </span>
         {faab.when ? (
           <span className="text-xs" style={{ color: "var(--color-text-muted)" }}>

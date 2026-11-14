@@ -1,5 +1,6 @@
 import { compactValueFontSize } from "@/lib/snapshotTileSizing";
 import { SnapshotTileGlyph, type SnapshotGlyphName } from "@/components/SnapshotTileGlyph";
+import { Money } from "@/components/Money";
 
 function formatRank(rank: number | null, tied: boolean): string {
   if (rank === null || rank === undefined) return "—";
@@ -118,12 +119,12 @@ export function SnapshotTile({
         className={compact ? "flex h-6 max-w-full items-center justify-center overflow-hidden text-ellipsis whitespace-nowrap tabular-nums" : undefined}
         style={{ font: "var(--type-primary-metric)", color: toneColor, ...(compact ? { fontSize: compactValueFontSize(value) } : {}) }}
       >
-        {value}
+        <Money>{value}</Money>
       </span>
       {fill !== null && fill !== undefined ? <FillBar fill={fill} label={label} /> : null}
       {note ? (
         <span className={compact ? "text-xs text-center" : "text-xs"} style={{ color: "var(--color-text-muted)" }}>
-          {note}
+          <Money>{note}</Money>
         </span>
       ) : null}
     </div>
