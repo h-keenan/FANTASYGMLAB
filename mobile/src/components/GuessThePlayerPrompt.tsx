@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { ActivityIndicator, AppState, Pressable, TouchableOpacity, View, StyleSheet, DeviceEventEmitter } from 'react-native';
+import { ActivityIndicator, AppState, Pressable, View, StyleSheet, DeviceEventEmitter } from 'react-native';
+import PressableScale from './PressableScale';
 import { OPEN_GUESS_EVENT } from '../lib/orbEvents';
 
 import AppText from './AppText';
@@ -152,9 +153,9 @@ export default function GuessThePlayerPrompt() {
               <AppText style={styles.kicker}>Guess the Player</AppText>
               <AppText style={styles.title}>Whose stats are these?</AppText>
             </View>
-            <TouchableOpacity onPress={dismiss} hitSlop={8} accessibilityLabel="Dismiss Guess the Player">
+            <PressableScale onPress={dismiss} hitSlop={8} accessibilityLabel="Dismiss Guess the Player">
               <AppText style={styles.closeGlyph}>{'✕'}</AppText>
-            </TouchableOpacity>
+            </PressableScale>
           </View>
 
           <View style={styles.identityRow}>
@@ -205,7 +206,7 @@ export default function GuessThePlayerPrompt() {
               }
               const faded = Boolean(reveal) && !isCorrectOption && !isWrongSelection;
               return (
-                <TouchableOpacity
+                <PressableScale
                   key={option.player_id}
                   disabled={Boolean(reveal) || submitting}
                   onPress={() => void handleGuess(option)}
@@ -214,7 +215,7 @@ export default function GuessThePlayerPrompt() {
                   accessibilityState={{ selected: isSelected }}
                 >
                   <AppText style={styles.optionText}>{option.name}</AppText>
-                </TouchableOpacity>
+                </PressableScale>
               );
             })}
           </View>

@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { StyleSheet, TouchableOpacity, View } from 'react-native';
+import { StyleSheet, View } from 'react-native';
+import PressableScale from './PressableScale';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { Ionicons } from '@expo/vector-icons';
@@ -249,9 +250,8 @@ function GlanceCard({
   return (
     <View style={[styles.card, compact && styles.cardCompact]}>
       <View style={styles.cardHeader}>
-        <TouchableOpacity
+        <PressableScale
           style={styles.identity}
-          activeOpacity={0.7}
           onPress={() => onOpen(league, 'record')}
           accessibilityRole="button"
           accessibilityLabel={`Open ${league.league_name} dashboard`}
@@ -275,8 +275,8 @@ function GlanceCard({
               {league.record.playoff_status}
             </AppText>
           ) : null}
-        </TouchableOpacity>
-        <TouchableOpacity
+        </PressableScale>
+        <PressableScale
           style={[styles.newsBadge, { backgroundColor: `${badgeColor}1F` }]}
           onPress={() => onOpen(league, 'news')}
           hitSlop={8}
@@ -285,7 +285,7 @@ function GlanceCard({
         >
           <Ionicons name={badge.tone === 'risk' ? 'medkit-outline' : 'newspaper-outline'} size={12} color={badgeColor} />
           <AppText style={[styles.newsBadgeText, { color: badgeColor }]}>{badge.count}</AppText>
-        </TouchableOpacity>
+        </PressableScale>
       </View>
       {rows.length > 0 ? (
         rows.map(({ key, ...row }, index) => <InsightRow key={key} {...row} last={index === rows.length - 1} />)

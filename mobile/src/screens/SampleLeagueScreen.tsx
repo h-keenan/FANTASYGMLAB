@@ -1,5 +1,6 @@
 import React, { useMemo, useState } from 'react';
-import { ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
+import { ScrollView, StyleSheet, View } from 'react-native';
+import PressableScale from '../components/PressableScale';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { useHeaderHeight } from '@react-navigation/elements';
 
@@ -102,14 +103,14 @@ export default function SampleLeagueScreen({ navigation }: Props) {
                 <AppText style={styles.kicker}>{item.kicker}</AppText>
                 <AppText style={styles.cardTitle}>{item.headline}</AppText>
                 <AppText style={styles.muted}>{item.reason}</AppText>
-                <TouchableOpacity
+                <PressableScale
                   accessibilityRole="button"
                   onPress={() => setTab(item.cta === 'trade' ? 'trade' : 'roster')}
                 >
                   <AppText style={styles.link}>
                     {item.cta === 'trade' ? 'Open sample trade' : 'Open sample roster'} →
                   </AppText>
-                </TouchableOpacity>
+                </PressableScale>
               </AccentCard>
             ))}
           </>

@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import PressableScale from '../components/PressableScale';
 import AppText from '../components/AppText';
 import PlayerName from '../components/PlayerName';
 import GlassCard from '../components/GlassCard';
@@ -463,10 +464,10 @@ export default function PlayerCompareScreen({ route, navigation }: Props) {
           <>
             {sides ? (
               <View style={styles.topActionsRow}>
-                <TouchableOpacity style={styles.compareShareButton} onPress={() => setShareOpen(true)} hitSlop={8} accessibilityRole="button" accessibilityLabel="Share this comparison">
+                <PressableScale style={styles.compareShareButton} onPress={() => setShareOpen(true)} hitSlop={8} accessibilityRole="button" accessibilityLabel="Share this comparison">
                   <Ionicons name="share-outline" size={18} color={colors.textSecondary} />
                   <AppText style={styles.changeButtonText}>Share</AppText>
-                </TouchableOpacity>
+                </PressableScale>
               </View>
             ) : null}
             {loadingCompare && !sides ? <BrandedSpinner style={styles.center} /> : null}

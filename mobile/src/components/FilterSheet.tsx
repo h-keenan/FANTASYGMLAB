@@ -1,5 +1,6 @@
 import React, { useMemo, useState } from 'react';
-import { Pressable, StyleSheet, View } from 'react-native';
+import { StyleSheet, View } from 'react-native';
+import PressableScale from './PressableScale';
 import { Ionicons } from '@expo/vector-icons';
 
 import AppText from './AppText';
@@ -54,7 +55,7 @@ export default function FilterSheet({ title = 'Filters', groups, values, onApply
   return (
     <View style={styles.wrap} testID={testID}>
       <View style={styles.bar}>
-        <Pressable
+        <PressableScale
           accessibilityRole="button"
           accessibilityLabel={filterTriggerAria(count)}
           accessibilityHint="Opens filter options"
@@ -62,7 +63,7 @@ export default function FilterSheet({ title = 'Filters', groups, values, onApply
             setDraft(values);
             setOpen(true);
           }}
-          style={({ pressed }) => [styles.trigger, count > 0 && styles.triggerOn, pressed && styles.pressed]}
+          style={[styles.trigger, count > 0 && styles.triggerOn]}
         >
           <Ionicons name="options-outline" size={16} color={count > 0 ? colors.accent : colors.textSecondary} />
           <AppText style={[styles.triggerText, count > 0 && { color: colors.accent }]}>Filters</AppText>
@@ -71,9 +72,9 @@ export default function FilterSheet({ title = 'Filters', groups, values, onApply
               <AppText style={styles.badgeText}>{count}</AppText>
             </View>
           ) : null}
-        </Pressable>
+        </PressableScale>
         {chips.map((chip) => (
-          <Pressable
+          <PressableScale
             key={`${chip.groupId}:${chip.value}`}
             accessibilityRole="button"
             accessibilityLabel={`Remove ${chip.groupLabel} filter: ${chip.label}`}
@@ -83,7 +84,7 @@ export default function FilterSheet({ title = 'Filters', groups, values, onApply
           >
             <AppText style={styles.activeText}>{chip.label}</AppText>
             <Ionicons name="close" size={14} color={colors.accent} />
-          </Pressable>
+          </PressableScale>
         ))}
       </View>
       <Sheet
@@ -115,7 +116,7 @@ export default function FilterSheet({ title = 'Filters', groups, values, onApply
               {group.options.map((option) => {
                 const selected = isChipSelected(group, draft, option.value);
                 return (
-                  <Pressable
+                  <PressableScale
                     key={option.value}
                     accessibilityRole={group.multi ? 'button' : 'radio'}
                     accessibilityState={group.multi ? { selected } : { checked: selected }}
@@ -123,7 +124,7 @@ export default function FilterSheet({ title = 'Filters', groups, values, onApply
                     style={[styles.option, selected && styles.optionOn]}
                   >
                     <AppText style={[styles.optionText, selected && { color: colors.accent }]}>{option.label}</AppText>
-                  </Pressable>
+                  </PressableScale>
                 );
               })}
             </View>
@@ -152,7 +153,6 @@ function createStyles(colors: ThemeColors) {
     triggerText: { fontSize: 14, fontWeight: '700', color: colors.textPrimary },
     badge: { minWidth: 20, height: 20, paddingHorizontal: 4, borderRadius: radii.pill, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.accent },
     badgeText: { fontSize: 12, fontWeight: '800', color: colors.onAccent },
-    pressed: { opacity: 0.7 },
     active: {
       flexDirection: 'row',
       alignItems: 'center',

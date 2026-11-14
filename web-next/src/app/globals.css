@@ -4451,6 +4451,21 @@ main > header:has(> h1.sr-only:only-child) {
   animation: motion-sweep 600ms var(--ease-in-out) both;
 }
 
+/* Press feedback: THE one press for every tappable (lib/motion.ts PRESS). Zero specificity (:where) so a component's own
+   :active still wins; `scale` is its own property so it never fights a component's `transform`. Opt out: data-no-press. */
+:root { --press-scale: 0.97; --press-opacity: 0.88; }
+:where(button, [role="button"], [role="tab"], [role="menuitem"], summary, a[href], label[for], [data-press]):not(:disabled):not([aria-disabled="true"]):not([data-no-press]) {
+  transition: scale var(--motion-instant) var(--ease-out), opacity var(--motion-instant) var(--ease-out);
+}
+:where(button, [role="button"], [role="tab"], [role="menuitem"], summary, a[href], label[for], [data-press]):not(:disabled):not([aria-disabled="true"]):not([data-no-press]):active {
+  scale: var(--press-scale);
+  opacity: var(--press-opacity);
+}
+
+/* Success pulse (a saved / added / claimed confirmation): one soft scale up and back. Reuse .motion-pulse for counts. */
+@keyframes motion-success { 0% { transform: scale(1); } 45% { transform: scale(1.08); } 100% { transform: scale(1); } }
+.motion-success { animation: motion-success var(--motion-slow) var(--ease-out) both; }
+
 /* Title confetti. */
 .motion-confetti { position: fixed; left: 50%; top: 38%; width: 0; height: 0; pointer-events: none; z-index: 95; }
 @keyframes motion-confetti { from { opacity: 1; transform: translate(0, 0) rotate(0); } to { opacity: 0; transform: translate(var(--x), calc(var(--y) + 80px)) rotate(var(--r)); } }
@@ -4462,7 +4477,9 @@ main > header:has(> h1.sr-only:only-child) {
 
 @media (prefers-reduced-motion: reduce) {
   .motion-in[data-motion="pending"] { opacity: 1; }
-  .motion-in[data-motion="in"], .motion-pulse, .motion-sweep::after, .motion-confetti-piece { animation: none; }
+  .motion-in[data-motion="in"], .motion-pulse, .motion-success, .motion-sweep::after, .motion-confetti-piece { animation: none; }
+  /* Press keeps its fade but never moves. */
+  :root { --press-scale: 1; }
   /* The flash stays (a colour change, nothing moves) but is shorter. */
   .motion-flash-up, .motion-flash-down { animation-duration: 600ms; }
 }

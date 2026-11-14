@@ -1,5 +1,6 @@
 import React, { useMemo } from 'react';
-import { StyleProp, StyleSheet, TouchableOpacity, View, ViewStyle } from 'react-native';
+import { StyleProp, StyleSheet, View, ViewStyle } from 'react-native';
+import PressableScale from './PressableScale';
 
 import AppText from './AppText';
 import PlayerName from './PlayerName';
@@ -66,7 +67,7 @@ export default function CompactPlayerModule({
 }: CompactPlayerModuleProps) {
   const { colors } = useThemeMode();
   const styles = useMemo(() => createStyles(colors), [colors]);
-  const Wrapper = onPress ? TouchableOpacity : View;
+  const Wrapper = onPress ? PressableScale : View;
   const hasValue = value != null && Number.isFinite(value);
 
   return (

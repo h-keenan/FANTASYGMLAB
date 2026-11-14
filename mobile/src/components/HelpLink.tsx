@@ -1,5 +1,6 @@
 import React from 'react';
-import { Linking, StyleSheet, TouchableOpacity, type StyleProp, type ViewStyle } from 'react-native';
+import { Linking, StyleSheet, type StyleProp, type ViewStyle } from 'react-native';
+import PressableScale from './PressableScale';
 
 import AppText from './AppText';
 import { useThemeMode } from '../context/ThemeModeContext';
@@ -21,7 +22,7 @@ export default function HelpLink({
 }) {
   const { colors } = useThemeMode();
   return (
-    <TouchableOpacity
+    <PressableScale
       accessibilityRole="link"
       accessibilityLabel={label}
       hitSlop={LINK_HIT_SLOP}
@@ -29,7 +30,7 @@ export default function HelpLink({
       style={[styles.hit, style]}
     >
       <AppText style={[styles.text, { color: colors.textTertiary }]}>{label}</AppText>
-    </TouchableOpacity>
+    </PressableScale>
   );
 }
 

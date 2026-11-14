@@ -1,5 +1,6 @@
 import React, { useMemo } from 'react';
-import { StyleSheet, TouchableOpacity, View } from 'react-native';
+import { StyleSheet, View } from 'react-native';
+import PressableScale from './PressableScale';
 
 import AppText from './AppText';
 import { useThemeMode } from '../context/ThemeModeContext';
@@ -33,7 +34,7 @@ export default function PlatformPicker({
         {MAIN_PLATFORMS.map((option) => {
           const selected = active === option.key;
           return (
-            <TouchableOpacity
+            <PressableScale
               key={option.key}
               style={[styles.card, selected && styles.cardSelected]}
               onPress={() => onChange(option.key)}
@@ -46,14 +47,14 @@ export default function PlatformPicker({
               </View>
               <AppText style={styles.cardTitle}>{option.label}</AppText>
               <AppText style={styles.cardBlurb}>{option.blurb}</AppText>
-            </TouchableOpacity>
+            </PressableScale>
           );
         })}
       </View>
       <View style={styles.otherRow}>
         <AppText style={styles.otherLabel}>Also:</AppText>
         {OTHER_PLATFORMS.map((option) => (
-          <TouchableOpacity
+          <PressableScale
             key={option.key}
             onPress={() => onChange(option.key)}
             hitSlop={8}
@@ -61,7 +62,7 @@ export default function PlatformPicker({
             accessibilityLabel={option.label}
           >
             <AppText style={[styles.otherLink, active === option.key && styles.otherLinkActive]}>{option.label}</AppText>
-          </TouchableOpacity>
+          </PressableScale>
         ))}
       </View>
     </View>

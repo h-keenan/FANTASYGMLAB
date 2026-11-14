@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { StyleSheet, TouchableOpacity, View } from 'react-native';
+import { StyleSheet, View } from 'react-native';
+import PressableScale from './PressableScale';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useQuery } from '@tanstack/react-query';
@@ -140,7 +141,7 @@ export default function PortfolioExposurePanel() {
                     }
                   />
                 </View>
-                <TouchableOpacity
+                <PressableScale
                   onPress={() => setExpanded(open ? null : player.player_id)}
                   hitSlop={8}
                   accessibilityRole="button"
@@ -149,7 +150,7 @@ export default function PortfolioExposurePanel() {
                   style={styles.countPill}
                 >
                   <AppText style={styles.countText}>{`${player.leagues_owned}/${exposure.league_count} ${open ? '▴' : '▾'}`}</AppText>
-                </TouchableOpacity>
+                </PressableScale>
               </View>
               {open ? (
                 <View style={styles.leagueList}>

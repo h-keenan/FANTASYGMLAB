@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { FlatList, ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
+import { FlatList, ScrollView, StyleSheet, View } from 'react-native';
+import PressableScale from '../components/PressableScale';
 import AppText from '../components/AppText';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { Ionicons } from '@expo/vector-icons';
@@ -599,10 +600,9 @@ function IdeaSummaryRow({
         {tiles.map((tile) => {
           const isActive = tile.key === 'total' ? activeFilter === null : activeFilter === tile.key;
           return (
-            <TouchableOpacity
+            <PressableScale
               key={tile.key}
               style={[styles.summaryTile, isActive && styles.summaryTileActive]}
-              activeOpacity={0.75}
               onPress={() =>
                 onToggleFilter(
                   tile.key === 'total' ? null : activeFilter === tile.key ? null : (tile.key as ImpactTagKey),
@@ -615,7 +615,7 @@ function IdeaSummaryRow({
               <Ionicons name={tile.icon} size={16} color={tile.color} />
               <AppText style={styles.summaryValue}>{tile.value}</AppText>
               <AppText style={styles.summaryLabel} numberOfLines={1}>{tile.label}</AppText>
-            </TouchableOpacity>
+            </PressableScale>
           );
         })}
       </View>

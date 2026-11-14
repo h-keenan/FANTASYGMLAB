@@ -6,9 +6,9 @@ import {
   Linking,
   ScrollView,
   StyleSheet,
-  TouchableOpacity,
   View,
 } from 'react-native';
+import PressableScale from '../components/PressableScale';
 import AppText from '../components/AppText';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { useHeaderHeight } from '@react-navigation/elements';
@@ -119,14 +119,14 @@ function NewsImpactBadge({ items, onPress }: { items: NewsItem[]; onPress: () =>
   // that more clearly than the newspaper glyph confirmed news items keep.
   const icon: IoniconName = pending ? 'time-outline' : 'newspaper-outline';
   return (
-    <TouchableOpacity
+    <PressableScale
       style={[styles.newsImpactBadge, { borderColor: color, backgroundColor: `${color}1F` }]}
       onPress={onPress}
     >
       <Ionicons name={icon} size={13} color={color} />
       <AppText style={[styles.newsImpactText, { color }]}>{label}</AppText>
       <Ionicons name="chevron-forward" size={13} color={color} />
-    </TouchableOpacity>
+    </PressableScale>
   );
 }
 
@@ -147,13 +147,13 @@ function NewsImpactModal({
         <SwipeDismissCard style={styles.modalCard} onDismiss={onClose}>
           <View style={styles.modalHeaderRow}>
             <AppText style={styles.modalTitle}>In The News</AppText>
-            <TouchableOpacity onPress={onClose} hitSlop={8} accessibilityRole="button" accessibilityLabel="Close">
+            <PressableScale onPress={onClose} hitSlop={8} accessibilityRole="button" accessibilityLabel="Close">
               <Ionicons name="close" size={22} color={colors.textSecondary} />
-            </TouchableOpacity>
+            </PressableScale>
           </View>
           <SheetScrollView style={styles.modalScroll}>
             {items.map((item, index) => (
-              <TouchableOpacity
+              <PressableScale
                 key={item.link ?? `${item.title}-${index}`}
                 style={styles.modalArticle}
                 onPress={() => {
@@ -164,7 +164,7 @@ function NewsImpactModal({
                 <AppText style={styles.modalArticleTitle}>{item.title}</AppText>
                 {item.summary ? <AppText style={styles.modalArticleSummary}>{item.summary}</AppText> : null}
                 {item.source ? <AppText style={styles.modalArticleSource}>Source: {item.source}</AppText> : null}
-              </TouchableOpacity>
+              </PressableScale>
             ))}
           </SheetScrollView>
         </SwipeDismissCard>
@@ -469,10 +469,10 @@ function CareerSeasonCard({
   const label = `${season.season} ${season.current_season ? 'Regular Season (in progress)' : 'Regular Season'}`;
   return (
     <GlassCard radius="md" padding="lg" style={[styles.cardSpaced]}>
-      <TouchableOpacity style={styles.seasonCardHeader} onPress={onToggle} activeOpacity={0.7}>
+      <PressableScale style={styles.seasonCardHeader} onPress={onToggle}>
         <SectionHeading title={label} icon="calendar-outline" />
         <Ionicons name={expanded ? 'chevron-up' : 'chevron-down'} size={16} color={colors.textTertiary} />
-      </TouchableOpacity>
+      </PressableScale>
       {expanded ? (
         season.key_stats.length > 0 ? (
           <StatGrid items={season.key_stats.map((item) => ({ label: item.label, value: item.value || null }))} />
@@ -1277,7 +1277,7 @@ export default function PlayerDetailScreen({ route, navigation }: Props) {
       ) : null}
       <View style={styles.playerShareRow}>
         <PlayerTags tags={tags} />
-        <TouchableOpacity
+        <PressableScale
           style={styles.playerShareButton}
           onPress={() => setShareOpen(true)}
           hitSlop={8}
@@ -1285,7 +1285,7 @@ export default function PlayerDetailScreen({ route, navigation }: Props) {
           accessibilityLabel={`Share ${player.name ?? 'this player'}'s card`}
         >
           <Ionicons name="share-outline" size={18} color={colors.textSecondary} />
-        </TouchableOpacity>
+        </PressableScale>
       </View>
       {rosterRec ? (
         <InsightRow
@@ -1303,7 +1303,7 @@ export default function PlayerDetailScreen({ route, navigation }: Props) {
       ) : null}
       {hasWatchControls ? (
         <View style={styles.actionRow}>
-          <TouchableOpacity
+          <PressableScale
             style={[styles.watchButton, watching && styles.watchButtonActive]}
             onPress={toggleWatch}
             disabled={watchBusy}
@@ -1311,9 +1311,9 @@ export default function PlayerDetailScreen({ route, navigation }: Props) {
             <AppText style={[styles.watchButtonText, watching && styles.watchButtonTextActive]}>
               {watching ? '★ Watching' : '☆ Add to GM Targets'}
             </AppText>
-          </TouchableOpacity>
+          </PressableScale>
           {watching ? (
-            <TouchableOpacity
+            <PressableScale
               style={[styles.untouchableButton, untouchable && styles.untouchableButtonActive]}
               onPress={toggleUntouchable}
               disabled={untouchableBusy}
@@ -1324,20 +1324,20 @@ export default function PlayerDetailScreen({ route, navigation }: Props) {
                 size={16}
                 color={untouchable ? colors.background : colors.textSecondary}
               />
-            </TouchableOpacity>
+            </PressableScale>
           ) : null}
-          <TouchableOpacity
+          <PressableScale
             style={styles.compareButton}
             onPress={() => navigation.navigate('PlayerCompare', { player, leagueId, leagueName })}
           >
             <Ionicons name="swap-vertical-outline" size={14} color={colors.accent} />
             <AppText style={styles.compareButtonText}>Compare</AppText>
-          </TouchableOpacity>
+          </PressableScale>
         </View>
       ) : null}
       {tradeShortcuts.canAddToTrade ? (
         <View style={styles.actionRow}>
-          <TouchableOpacity
+          <PressableScale
             style={styles.compareButton}
             onPress={() =>
               navigation.push('Trades', { leagueId, leagueName, initialTab: 'make', tradePlayer: player })
@@ -1347,9 +1347,9 @@ export default function PlayerDetailScreen({ route, navigation }: Props) {
           >
             <Ionicons name="swap-horizontal-outline" size={14} color={colors.accent} />
             <AppText style={styles.compareButtonText}>Add to Trade</AppText>
-          </TouchableOpacity>
+          </PressableScale>
           {!tradeShortcuts.canFindTrades ? (
-            <TouchableOpacity
+            <PressableScale
               style={styles.compareButton}
               onPress={() => navigation.push('TradeOffer', { leagueId, leagueName, playerId: player.player_id })}
               accessibilityRole="button"
@@ -1357,10 +1357,10 @@ export default function PlayerDetailScreen({ route, navigation }: Props) {
             >
               <Ionicons name="hammer-outline" size={14} color={colors.accent} />
               <AppText style={styles.compareButtonText}>Build an offer</AppText>
-            </TouchableOpacity>
+            </PressableScale>
           ) : null}
           {tradeShortcuts.canFindTrades ? (
-            <TouchableOpacity
+            <PressableScale
               style={styles.compareButton}
               onPress={() =>
                 navigation.push('Trades', { leagueId, leagueName, initialTab: 'search', tradePlayer: player })
@@ -1370,7 +1370,7 @@ export default function PlayerDetailScreen({ route, navigation }: Props) {
             >
               <Ionicons name="search-outline" size={14} color={colors.accent} />
               <AppText style={styles.compareButtonText}>Find trades</AppText>
-            </TouchableOpacity>
+            </PressableScale>
           ) : null}
         </View>
       ) : null}

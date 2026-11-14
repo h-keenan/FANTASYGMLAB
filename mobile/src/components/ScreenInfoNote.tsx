@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
-import { Pressable, StyleSheet, TouchableOpacity, View } from 'react-native';
+import { Pressable, StyleSheet, View } from 'react-native';
+import PressableScale from './PressableScale';
 import { Ionicons } from '@expo/vector-icons';
 
 import AppText from './AppText';
@@ -43,10 +44,10 @@ export default function ScreenInfoNote({
   const [open, setOpen] = useState(false);
   return (
     <>
-      <TouchableOpacity style={styles.row} onPress={() => setOpen(true)} hitSlop={{ top: 14, bottom: 14, left: 10, right: 10 }}>
+      <PressableScale style={styles.row} onPress={() => setOpen(true)} hitSlop={{ top: 14, bottom: 14, left: 10, right: 10 }}>
         <Ionicons name="information-circle-outline" size={15} color={colors.textTertiary} />
         <AppText style={styles.label}>{label}</AppText>
-      </TouchableOpacity>
+      </PressableScale>
       <SheetModal visible={open} transparent animationType="fade" onRequestClose={() => setOpen(false)}>
         <Pressable style={styles.backdrop} onPress={() => setOpen(false)}>
           <SwipeDismissCard style={styles.sheet} onDismiss={() => setOpen(false)}>

@@ -1,5 +1,6 @@
 import React, { useMemo, useState } from 'react';
-import { Pressable, StyleSheet, TouchableOpacity, View, type StyleProp, type ViewStyle } from 'react-native';
+import { Pressable, StyleSheet, View, type StyleProp, type ViewStyle } from 'react-native';
+import PressableScale from './PressableScale';
 import Animated, {
   Easing,
   ReduceMotion,
@@ -233,7 +234,7 @@ export default function PlayerCard({
           exposes the exact same action via `accessibilityActions` above;
           this stays a plain touch target for sighted/pointer users. */}
       {onOpenDetail ? (
-        <TouchableOpacity
+        <PressableScale
           onPress={(event) => {
             event.stopPropagation?.();
             onOpenDetail();
@@ -244,7 +245,7 @@ export default function PlayerCard({
           importantForAccessibility="no-hide-descendants"
         >
           <Ionicons name="open-outline" size={13} color={colors.textPrimary} />
-        </TouchableOpacity>
+        </PressableScale>
       ) : null}
     </AnimatedPressable>
   );

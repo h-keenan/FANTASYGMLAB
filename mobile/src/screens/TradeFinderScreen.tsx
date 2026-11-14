@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { FlatList, StyleSheet, TouchableOpacity, View } from 'react-native';
+import { FlatList, StyleSheet, View } from 'react-native';
+import PressableScale from '../components/PressableScale';
 import AppText from '../components/AppText';
 import SectionHeading from '../components/SectionHeading';
 import { useFocusEffect } from '@react-navigation/native';
@@ -177,7 +178,7 @@ function SelectableRow({
         disabled && styles.rosterRowDisabled,
       ]}
     >
-      <TouchableOpacity
+      <PressableScale
         onPress={onToggle}
         disabled={disabled}
         hitSlop={8}
@@ -189,7 +190,7 @@ function SelectableRow({
         <View style={[styles.checkbox, selected && styles.checkboxChecked]}>
           {selected ? <Ionicons name="checkmark" size={14} color={colors.onAccent} /> : null}
         </View>
-      </TouchableOpacity>
+      </PressableScale>
       <View style={styles.rosterIdentity}>{children}</View>
     </View>
   );

@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { Alert, ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
+import { Alert, ScrollView, StyleSheet, View } from 'react-native';
+import PressableScale from '../components/PressableScale';
 import { useHeaderHeight } from '@react-navigation/elements';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { useIsRestoring, useQuery } from '@tanstack/react-query';
@@ -69,12 +70,11 @@ export default function FeaturesScreen({ navigation, route }: Props) {
             <SectionHeading title={group.title} topGap={groupIndex === 0 ? 0 : spacing.md} />
             <AnimatedCard style={styles.groupCard}>
               {FEATURE_ITEMS.filter((item) => item.group === group.id).map((item, index) => (
-                <TouchableOpacity
+                <PressableScale
                   key={item.id}
                   accessibilityRole="button"
                   accessibilityLabel={item.name}
                   accessibilityHint={item.line}
-                  activeOpacity={0.7}
                   onPress={() => {
                     const target = featureTarget(item, league);
                     if (!target) {
@@ -95,7 +95,7 @@ export default function FeaturesScreen({ navigation, route }: Props) {
                     {item.extra && showPro ? <AppText style={styles.extra}>{item.extra}</AppText> : null}
                   </View>
                   <AppText style={styles.chevron}>{'›'}</AppText>
-                </TouchableOpacity>
+                </PressableScale>
               ))}
             </AnimatedCard>
           </View>

@@ -1,5 +1,6 @@
 import React, { useMemo } from 'react';
-import { StyleSheet, TouchableOpacity, View } from 'react-native';
+import { StyleSheet, View } from 'react-native';
+import PressableScale from './PressableScale';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
@@ -39,14 +40,14 @@ export default function CollegeFootballInterestPrompt() {
 
   return (
     <View style={styles.card}>
-      <TouchableOpacity
+      <PressableScale
         style={styles.dismiss}
         onPress={dismiss}
         hitSlop={8}
         accessibilityLabel="Dismiss"
       >
         <Ionicons name="close" size={16} color={colors.textTertiary} />
-      </TouchableOpacity>
+      </PressableScale>
       <View style={styles.textCol}>
         <AppText style={styles.title}>Do you follow college football?</AppText>
         <AppText style={styles.subtitle}>
@@ -55,12 +56,12 @@ export default function CollegeFootballInterestPrompt() {
         </AppText>
       </View>
       <View style={styles.actions}>
-        <TouchableOpacity style={[styles.button, styles.yesButton]} onPress={handleYes}>
+        <PressableScale style={[styles.button, styles.yesButton]} onPress={handleYes}>
           <AppText style={styles.yesButtonText}>Yes, I'm in</AppText>
-        </TouchableOpacity>
-        <TouchableOpacity style={[styles.button, styles.noButton]} onPress={() => respond(false)}>
+        </PressableScale>
+        <PressableScale style={[styles.button, styles.noButton]} onPress={() => respond(false)}>
           <AppText style={styles.noButtonText}>Not for me</AppText>
-        </TouchableOpacity>
+        </PressableScale>
       </View>
     </View>
   );

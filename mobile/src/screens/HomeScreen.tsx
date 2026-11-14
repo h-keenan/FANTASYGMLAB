@@ -11,9 +11,9 @@ import {
   RefreshControl,
   SectionList,
   StyleSheet,
-  TouchableOpacity,
   View,
 } from 'react-native';
+import PressableScale from '../components/PressableScale';
 import AppText from '../components/AppText';
 import SectionHeading from '../components/SectionHeading';
 import ToneBadge from '../components/ToneBadge';
@@ -474,7 +474,7 @@ export default function HomeScreen({ navigation, route }: Props) {
                 <ConfirmInPlace label="Sign out" buttonVariant="ghost" size="sm" onConfirm={() => signOut()} />
               </View>
               {me ? (
-                <TouchableOpacity accessibilityRole="button"
+                <PressableScale accessibilityRole="button"
                   disabled={me.entitlement === 'premium'}
                   onPress={() => (me.profile_status === 'error' ? void load() : navigation.navigate('Paywall'))}
                   style={[
@@ -494,7 +494,7 @@ export default function HomeScreen({ navigation, route }: Props) {
                         ? 'Pro'
                         : 'Free — Upgrade'}
                   </AppText>
-                </TouchableOpacity>
+                </PressableScale>
               ) : null}
             </GlassPanel>
 
@@ -533,7 +533,7 @@ export default function HomeScreen({ navigation, route }: Props) {
             <View style={styles.sectionHeader}>
               <View style={styles.sectionTitleWrap}><SectionHeading title="Your leagues" /></View>
               {atLeagueCap ? null : (
-                <TouchableOpacity accessibilityRole="button"
+                <PressableScale accessibilityRole="button"
                   style={styles.addLeagueButton}
                   onPress={() => {
                     setAddQuery(me?.sleeper_username ?? '');
@@ -543,7 +543,7 @@ export default function HomeScreen({ navigation, route }: Props) {
                 >
                   <Ionicons name="add" size={16} color={colors.accent} />
                   <AppText style={styles.addLeagueLabel}>Add league</AppText>
-                </TouchableOpacity>
+                </PressableScale>
               )}
             </View>
             {!atLeagueCap && me ? (
@@ -624,8 +624,7 @@ export default function HomeScreen({ navigation, route }: Props) {
           const isFirst = index === 0;
           const isLast = index === (leagues?.length ?? 0) - 1;
           return (
-            <TouchableOpacity accessibilityRole="button"
-              activeOpacity={0.7}
+            <PressableScale accessibilityRole="button"
               style={[
                 styles.leagueRow,
                 isFirst && styles.leagueRowFirst,
@@ -649,7 +648,7 @@ export default function HomeScreen({ navigation, route }: Props) {
                   stand-in, and rename prefills from it — saving would write
                   the fake name back into saved_leagues for real. */}
               {showcaseMode ? null : (
-                <TouchableOpacity accessibilityRole="button"
+                <PressableScale accessibilityRole="button"
                   hitSlop={8}
                   style={styles.renameButton}
                   onPress={() => {
@@ -658,10 +657,10 @@ export default function HomeScreen({ navigation, route }: Props) {
                   }}
                 >
                   <Ionicons name="pencil-outline" size={16} color={colors.textSecondary} />
-                </TouchableOpacity>
+                </PressableScale>
               )}
               <Ionicons name="chevron-forward" size={18} color={colors.textTertiary} />
-            </TouchableOpacity>
+            </PressableScale>
           );
         }}
       />
@@ -729,7 +728,7 @@ export default function HomeScreen({ navigation, route }: Props) {
                 all — not only shown reactively after a failed search (see
                 findLeagues' auto-expand above), since someone might never
                 attempt a search in the first place without this nudge. */}
-            <TouchableOpacity accessibilityRole="button"
+            <PressableScale accessibilityRole="button"
               onPress={() => setShowNoLeagueHelp((value) => !value)}
               hitSlop={8}
               style={styles.noLeagueToggle}
@@ -740,7 +739,7 @@ export default function HomeScreen({ navigation, route }: Props) {
                 size={14}
                 color={colors.textSecondary}
               />
-            </TouchableOpacity>
+            </PressableScale>
             {showNoLeagueHelp ? (
               <View style={styles.noLeagueCard}>
                 <AppText style={styles.noLeagueText}>
@@ -748,13 +747,13 @@ export default function HomeScreen({ navigation, route }: Props) {
                   doesn't create or host leagues itself. Create a free league in the Sleeper app
                   (or at sleeper.com), then come back here and search your Sleeper username.
                 </AppText>
-                <TouchableOpacity accessibilityRole="button"
+                <PressableScale accessibilityRole="button"
                   style={styles.noLeagueButton}
                   onPress={() => void Linking.openURL('https://sleeper.com')}
                 >
                   <AppText style={styles.noLeagueButtonText}>Open Sleeper</AppText>
                   <Ionicons name="open-outline" size={14} color={colors.accent} />
-                </TouchableOpacity>
+                </PressableScale>
               </View>
             ) : null}
 
@@ -800,7 +799,7 @@ export default function HomeScreen({ navigation, route }: Props) {
                     <SectionHeading title={`${section.title} season`} topGap={spacing.sm} />
                   )}
                   renderItem={({ item }) => (
-                    <TouchableOpacity accessibilityRole="button"
+                    <PressableScale accessibilityRole="button"
                       style={styles.addOptionRow}
                       disabled={addBusy}
                       onPress={() =>
@@ -822,7 +821,7 @@ export default function HomeScreen({ navigation, route }: Props) {
                         </AppText>
                       </View>
                       <Ionicons name="chevron-forward" size={16} color={colors.textTertiary} />
-                    </TouchableOpacity>
+                    </PressableScale>
                   )}
                 />
               </View>

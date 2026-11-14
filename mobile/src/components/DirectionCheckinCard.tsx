@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useReducer } from 'react';
-import { StyleSheet, TouchableOpacity, View } from 'react-native';
+import { StyleSheet, View } from 'react-native';
+import PressableScale from './PressableScale';
 
 import AccentCard from './AccentCard';
 import AppText from './AppText';
@@ -91,7 +92,7 @@ export default function DirectionCheckinCard({ leagueId, onChanged }: { leagueId
           <AppText style={styles.title}>{prompt.headline}</AppText>
           <AppText style={styles.body}>{prompt.body}</AppText>
         </View>
-        <TouchableOpacity
+        <PressableScale
           onPress={() => void answer('dismissed')}
           disabled={saving}
           accessibilityRole="button"
@@ -99,7 +100,7 @@ export default function DirectionCheckinCard({ leagueId, onChanged }: { leagueId
           hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
         >
           <AppText style={styles.close}>✕</AppText>
-        </TouchableOpacity>
+        </PressableScale>
       </View>
       <View style={styles.actions}>
         <Button size="sm" label={prompt.keepLabel} loading={saving} disabled={saving} onPress={() => void answer('kept')} />

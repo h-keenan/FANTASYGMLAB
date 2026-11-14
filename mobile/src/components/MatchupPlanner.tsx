@@ -1,6 +1,7 @@
 import ConfirmInPlace from './ConfirmInPlace';
 import React, { useCallback, useMemo, useRef, useState } from 'react';
-import { Linking, Pressable, StyleSheet, TouchableOpacity, View } from 'react-native';
+import { Linking, Pressable, StyleSheet, View } from 'react-native';
+import PressableScale from './PressableScale';
 import { Ionicons } from '@expo/vector-icons';
 
 import AppText from './AppText';
@@ -240,9 +241,9 @@ export function SwapSheet({
         <SwipeDismissCard style={styles.sheet} onDismiss={onClose}>
           <View style={styles.sheetHeader}>
             <AppText style={styles.sheetTitle}>{slotDisplayLabel(slot)} options</AppText>
-            <TouchableOpacity onPress={onClose} hitSlop={8} accessibilityLabel="Close">
+            <PressableScale onPress={onClose} hitSlop={8} accessibilityLabel="Close">
               <Ionicons name="close" size={20} color={colors.textSecondary} />
-            </TouchableOpacity>
+            </PressableScale>
           </View>
           <SheetScrollView style={styles.sheetBody}>
             {sheet.error ? (
@@ -312,13 +313,13 @@ export function PlannerBar({
         <ConfirmInPlace label="Reset to suggested" buttonVariant="secondary" disabled={busy} onConfirm={onReset} style={styles.barButton} />
         <Button label="Done" variant="ghost" onPress={onDone} />
       </View>
-      <TouchableOpacity
+      <PressableScale
         onPress={() => void Linking.openURL(sleeperLeagueUrl(leagueId))}
         accessibilityRole="link"
         accessibilityLabel="Open in Sleeper"
       >
         <AppText style={styles.link}>Open in Sleeper</AppText>
-      </TouchableOpacity>
+      </PressableScale>
       {error ? (
         <AppText style={[styles.barNote, { color: colors.danger }]}>{error}</AppText>
       ) : changed ? (

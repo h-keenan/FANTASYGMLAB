@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
+import { ScrollView, StyleSheet, View } from 'react-native';
+import PressableScale from '../components/PressableScale';
 import AppText from '../components/AppText';
 import ErrorState from '../components/ErrorState';
 import BrandHeaderBar from '../components/BrandHeaderBar';
@@ -296,13 +297,13 @@ export default function RecapScreen({ route, navigation }: Props) {
         {Array.from({ length: maxCompletedWeek }, (_, i) => i + 1).map((weekNum) => {
           const active = (selectedWeek ?? maxCompletedWeek) === weekNum;
           return (
-            <TouchableOpacity accessibilityRole="button"
+            <PressableScale accessibilityRole="button"
               key={weekNum}
               style={[styles.weekPill, active && styles.weekPillActive]}
               onPress={() => setSelectedWeek(weekNum)}
             >
               <AppText style={[styles.weekPillText, active && styles.weekPillTextActive]}>Wk {weekNum}</AppText>
-            </TouchableOpacity>
+            </PressableScale>
           );
         })}
       </ScrollView>
@@ -358,10 +359,10 @@ export default function RecapScreen({ route, navigation }: Props) {
           <AppText style={styles.headline}>{recap.headline}</AppText>
         </View>
         {!recap.incomplete ? (
-          <TouchableOpacity accessibilityRole="button" style={styles.shareButton} onPress={() => setShareOpen(true)} hitSlop={8}>
+          <PressableScale accessibilityRole="button" style={styles.shareButton} onPress={() => setShareOpen(true)} hitSlop={8}>
             <Ionicons name="share-outline" size={16} color={colors.textSecondary} />
             <AppText style={styles.shareButtonText}>Share</AppText>
-          </TouchableOpacity>
+          </PressableScale>
         ) : null}
       </View>
       {recap.incomplete ? (
@@ -623,11 +624,10 @@ function FeaturedStoryRow({
   const showMetric = Boolean(story.metric_label) && !isMatchup;
 
   return (
-    <TouchableOpacity accessibilityRole="button"
+    <PressableScale accessibilityRole="button"
       style={[styles.featuredRow, { backgroundColor: `${meta.color}14` }, showDivider && styles.rowDivider]}
       onPress={onPress}
       disabled={!onPress}
-      activeOpacity={0.7}
     >
       <View style={styles.rowHeaderRow}>
         <IconCircle
@@ -703,7 +703,7 @@ function FeaturedStoryRow({
       ) : null}
 
       <AppText style={styles.featuredSummary}>{story.summary}</AppText>
-    </TouchableOpacity>
+    </PressableScale>
   );
 }
 
@@ -733,11 +733,10 @@ function StoryRow({
   const isTrade = story.story_type === 'trade';
 
   return (
-    <TouchableOpacity accessibilityRole="button"
+    <PressableScale accessibilityRole="button"
       style={[styles.row, showDivider && styles.rowDivider]}
       onPress={onPress}
       disabled={!onPress}
-      activeOpacity={0.7}
     >
       <View style={styles.rowHeaderRow}>
         <IconCircle name={meta.icon} color={meta.color} size={28} iconSize={13} />
@@ -795,7 +794,7 @@ function StoryRow({
       <AppText style={styles.storySummary} numberOfLines={2}>
         {story.summary}
       </AppText>
-    </TouchableOpacity>
+    </PressableScale>
   );
 }
 

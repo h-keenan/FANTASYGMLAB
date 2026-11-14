@@ -1,11 +1,11 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { DeviceEventEmitter } from 'react-native';
+import PressableScale from './PressableScale';
 import {
   Dimensions,
   Pressable,
   StyleSheet,
   TextInput,
-  TouchableOpacity,
   useWindowDimensions,
   View,
 } from 'react-native';
@@ -260,7 +260,7 @@ function NavRow({
   const { colors } = useThemeMode();
   const styles = useMemo(() => createStyles(colors), [colors]);
   return (
-    <TouchableOpacity
+    <PressableScale
       style={[
         styles.destRow,
         isCurrent && styles.destRowCurrent,
@@ -298,7 +298,7 @@ function NavRow({
       ) : (
         <Ionicons name="chevron-forward" size={16} color={colors.textTertiary} />
       )}
-    </TouchableOpacity>
+    </PressableScale>
   );
 }
 
@@ -385,7 +385,7 @@ function LeagueSwitcher({
         // which one is "current."
         const active = row.league_id === league?.leagueId;
         return (
-          <TouchableOpacity
+          <PressableScale
             key={row.id}
             style={styles.leagueAltRow}
             onPress={() => onSwitch(row)}
@@ -402,7 +402,7 @@ function LeagueSwitcher({
             <AppText style={[styles.leagueAltRowText, active && styles.leagueAltRowTextActive]} numberOfLines={1}>
               {row.league_name || row.league_id}
             </AppText>
-          </TouchableOpacity>
+          </PressableScale>
         );
       })}
     </NavSection>
@@ -745,12 +745,11 @@ export default function GmOrb() {
       <View style={[styles.orbWrap, { bottom: insets.bottom }]}>
         <GestureDetector gesture={dragGesture}>
           <Animated.View style={orbAnimatedStyle}>
-            <TouchableOpacity
+            <PressableScale
               style={styles.orb}
               onPress={openSheet}
               accessibilityLabel="Open GM menu"
               accessibilityHint="Double tap to open. Touch and hold, then drag, to move it."
-              activeOpacity={0.85}
               // ORB_SIZE (48) already meets both platforms' stated minimum
               // touch target (44pt iOS, 48dp Android) with zero margin —
               // hitSlop gives real headroom above the bare minimum rather
@@ -763,7 +762,7 @@ export default function GmOrb() {
               {/* The orb was a bare logo; the visible GM matches its accessibility
                   label ("Open GM menu"). */}
               <AppText style={styles.orbLabel}>GM</AppText>
-            </TouchableOpacity>
+            </PressableScale>
           </Animated.View>
         </GestureDetector>
       </View>

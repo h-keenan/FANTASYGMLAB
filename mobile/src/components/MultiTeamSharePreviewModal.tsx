@@ -1,5 +1,6 @@
 import React, { useMemo, useRef, useState } from 'react';
-import { Pressable, ScrollView, Share, StyleSheet, TouchableOpacity, View } from 'react-native';
+import { Pressable, ScrollView, Share, StyleSheet, View } from 'react-native';
+import PressableScale from './PressableScale';
 import { captureRef } from 'react-native-view-shot';
 import * as Sharing from 'expo-sharing';
 
@@ -80,12 +81,12 @@ export default function MultiTeamSharePreviewModal({
           </ScrollView>
           <AppText style={styles.note}>Written for the other managers. It shows every team&apos;s real value change.</AppText>
           <Button label="Share image" onPress={onShareImage} loading={capturing} style={styles.primary} />
-          <TouchableOpacity style={styles.secondary} onPress={onShareText} accessibilityRole="button">
+          <PressableScale style={styles.secondary} onPress={onShareText} accessibilityRole="button">
             <AppText style={styles.secondaryText}>Share as text instead</AppText>
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.close} onPress={onClose} accessibilityRole="button">
+          </PressableScale>
+          <PressableScale style={styles.close} onPress={onClose} accessibilityRole="button">
             <AppText style={styles.closeText}>Cancel</AppText>
-          </TouchableOpacity>
+          </PressableScale>
         </SwipeDismissCard>
       </Pressable>
     </SheetModal>

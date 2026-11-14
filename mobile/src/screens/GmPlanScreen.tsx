@@ -2,7 +2,8 @@ import { useUndoableRemoval } from '../components/UndoToast';
 import type { TabIconName } from '../lib/tabIcons';
 import FreeLimitNote from '../components/FreeLimitNote';
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { ActivityIndicator, RefreshControl, ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, RefreshControl, ScrollView, StyleSheet, View } from 'react-native';
+import PressableScale from '../components/PressableScale';
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect } from '@react-navigation/native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
@@ -348,7 +349,7 @@ export default function GmPlanScreen({ route, navigation }: Props) {
         />
       </View>
       <OverallRatingBadge rating={ranked.get(player.player_id)?.overall_rating ?? null} />
-      <TouchableOpacity accessibilityRole="button"
+      <PressableScale accessibilityRole="button"
         style={[styles.tag, protectedIds.has(player.player_id) && styles.tagActive]}
         onPress={() => onToggleProtect(player.player_id, !protectedIds.has(player.player_id))}
         disabled={busyPlayerId === player.player_id}
@@ -361,12 +362,12 @@ export default function GmPlanScreen({ route, navigation }: Props) {
             {protectedIds.has(player.player_id) ? 'Protected' : 'Protect'}
           </AppText>
         )}
-      </TouchableOpacity>
+      </PressableScale>
     </View>
   );
 
   const rosterLine = (
-    <TouchableOpacity accessibilityRole="button"
+    <PressableScale accessibilityRole="button"
       style={styles.moreRow}
       onPress={() => {
         setTab('core');
@@ -377,13 +378,13 @@ export default function GmPlanScreen({ route, navigation }: Props) {
         {otherRows.length} more player{otherRows.length === 1 ? '' : 's'} on your roster
       </AppText>
       <Ionicons name="chevron-forward" size={16} color={colors.textSecondary} />
-    </TouchableOpacity>
+    </PressableScale>
   );
 
   const link = (label: string, onPress: () => void) => (
-    <TouchableOpacity accessibilityRole="button" onPress={onPress} hitSlop={LINK_HIT_SLOP}>
+    <PressableScale accessibilityRole="button" onPress={onPress} hitSlop={LINK_HIT_SLOP}>
       <AppText style={styles.link}>{label}</AppText>
-    </TouchableOpacity>
+    </PressableScale>
   );
 
   return (
@@ -409,7 +410,7 @@ export default function GmPlanScreen({ route, navigation }: Props) {
                   const active = stance === option.value;
                   const look = stanceLook(option.value, colors);
                   return (
-                    <TouchableOpacity
+                    <PressableScale
                       accessibilityRole="tab"
                       accessibilityLabel={option.label}
                       key={option.value}
@@ -425,7 +426,7 @@ export default function GmPlanScreen({ route, navigation }: Props) {
                       <Ionicons name={look.icon} size={18} color={active ? look.color : colors.textSecondary} />
                       <AppText style={[styles.stanceLabel, active && { color: look.color }]}>{option.label}</AppText>
                       <AppText style={styles.stanceTagline}>{look.tagline}</AppText>
-                    </TouchableOpacity>
+                    </PressableScale>
                   );
                 })}
               </View>
@@ -438,14 +439,14 @@ export default function GmPlanScreen({ route, navigation }: Props) {
                 <AppText style={styles.caption}>Pick the stance that fits your team right now.</AppText>
               )}
               {weekAhead !== null ? (
-                <TouchableOpacity accessibilityRole="button" style={styles.banner} onPress={openTradeHub}>
+                <PressableScale accessibilityRole="button" style={styles.banner} onPress={openTradeHub}>
                   <ToneBadge label={`Week ${weekAhead}`} color={colors.accent} />
                   <View style={styles.bannerText}>
                     <AppText style={styles.bannerTitle}>Trade deadline: Week {weekAhead}</AppText>
                     <AppText style={styles.caption}>Declaring a stance sharpens your recommendations.</AppText>
                   </View>
                   <Ionicons name="chevron-forward" size={16} color={colors.accent} />
-                </TouchableOpacity>
+                </PressableScale>
               ) : pastDeadline ? (
                 <IconRow icon="clock" color={colors.textTertiary} textStyle={styles.caption}>
                   Past the trade deadline
@@ -494,7 +495,7 @@ export default function GmPlanScreen({ route, navigation }: Props) {
 
             <SectionHeading title="Season outlook" icon="flask-outline" />
             <AnimatedCard style={styles.listCard}>
-              <TouchableOpacity
+              <PressableScale
                 accessibilityRole="button"
                 accessibilityLabel="See your season forecast"
                 onPress={() => navigation.navigate('FantasySim', { leagueId, leagueName })}
@@ -507,7 +508,7 @@ export default function GmPlanScreen({ route, navigation }: Props) {
                   </AppText>
                 </View>
                 <AppText style={styles.link}>Open</AppText>
-              </TouchableOpacity>
+              </PressableScale>
             </AnimatedCard>
           </>
         ) : null}
@@ -599,19 +600,19 @@ export default function GmPlanScreen({ route, navigation }: Props) {
                         <OverallRatingBadge rating={player?.overall_rating} positionRank={player?.position_rank} />
                       </View>
                       <View style={styles.actions}>
-                        <TouchableOpacity accessibilityRole="button"
+                        <PressableScale accessibilityRole="button"
                           style={styles.action}
                           disabled={!player}
                           onPress={() => player && navigation.navigate('PlayerCompare', { player, leagueId, leagueName })}
                         >
                           <AppText style={styles.actionText}>Compare</AppText>
-                        </TouchableOpacity>
-                        <TouchableOpacity accessibilityRole="button" style={styles.action} onPress={() => onToggleProtect(target.player_id, true)}>
+                        </PressableScale>
+                        <PressableScale accessibilityRole="button" style={styles.action} onPress={() => onToggleProtect(target.player_id, true)}>
                           <AppText style={styles.actionText}>Mark untouchable</AppText>
-                        </TouchableOpacity>
-                        <TouchableOpacity accessibilityRole="button" style={[styles.action, styles.actionDanger]} onPress={() => onRemoveTarget(target.player_id)}>
+                        </PressableScale>
+                        <PressableScale accessibilityRole="button" style={[styles.action, styles.actionDanger]} onPress={() => onRemoveTarget(target.player_id)}>
                           <AppText style={[styles.actionText, { color: colors.danger }]}>Remove</AppText>
-                        </TouchableOpacity>
+                        </PressableScale>
                       </View>
                     </AnimatedCard>
                   );
@@ -716,9 +717,9 @@ function TradeIdeaCard({ item, onViewDetails }: { item: GmPlanTradeItem; onViewD
         <AppText style={[styles.caption, styles.flex]}>
           {showExplanations ? item.rationale || item.trade_confidence_label : item.trade_confidence_label}
         </AppText>
-        <TouchableOpacity accessibilityRole="button" style={styles.action} onPress={onViewDetails}>
+        <PressableScale accessibilityRole="button" style={styles.action} onPress={onViewDetails}>
           <AppText style={styles.actionText}>View details</AppText>
-        </TouchableOpacity>
+        </PressableScale>
       </View>
     </AccentCard>
   );

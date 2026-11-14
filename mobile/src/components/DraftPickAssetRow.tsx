@@ -1,5 +1,6 @@
 import React, { useMemo } from 'react';
-import { StyleProp, StyleSheet, TouchableOpacity, View, ViewStyle } from 'react-native';
+import { StyleProp, StyleSheet, View, ViewStyle } from 'react-native';
+import PressableScale from './PressableScale';
 import { Ionicons } from '@expo/vector-icons';
 
 import AppText from './AppText';
@@ -92,10 +93,9 @@ export default function DraftPickAssetRow({
   const metaLine = [projectedRange, pickTier].filter(Boolean).join(' · ');
 
   return (
-    <TouchableOpacity
+    <PressableScale
       style={[styles.row, showDivider && styles.divider, style]}
       onPress={onPress}
-      activeOpacity={onPress ? 0.7 : 1}
       disabled={!onPress}
     >
       <PickPlate round={round} pickNo={pickNo} />
@@ -129,7 +129,7 @@ export default function DraftPickAssetRow({
       {showChevron ? (
         <Ionicons name="chevron-forward" size={16} color={colors.textTertiary} style={styles.chevron} />
       ) : null}
-    </TouchableOpacity>
+    </PressableScale>
   );
 }
 

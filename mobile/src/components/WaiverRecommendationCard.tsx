@@ -1,5 +1,6 @@
 import React, { useMemo } from 'react';
-import { StyleSheet, TouchableOpacity, View } from 'react-native';
+import { StyleSheet, View } from 'react-native';
+import PressableScale from './PressableScale';
 import { Ionicons } from '@expo/vector-icons';
 
 import AnimatedCard from './AnimatedCard';
@@ -277,16 +278,15 @@ export default function WaiverRecommendationCard({
           ) : (
             <View style={styles.confidenceMeter} />
           )}
-          <TouchableOpacity
+          <PressableScale
             style={styles.detailsButton}
             onPress={onPress}
-            activeOpacity={0.8}
             accessibilityRole="button"
             accessibilityLabel={`View details for ${player.name ?? 'player'}`}
           >
             <AppText style={styles.detailsButtonText}>View details</AppText>
             <Ionicons name="arrow-forward" size={14} color={colors.accent} />
-          </TouchableOpacity>
+          </PressableScale>
         </View>
         {player.confidence_label ? <BeginnerHelp term="waiverConfidence" style={styles.beginnerHelp} /> : null}
       </AnimatedCard>
@@ -295,7 +295,7 @@ export default function WaiverRecommendationCard({
 
   return (
     <View style={[styles.compactRow, showDivider && styles.compactDivider]}>
-    <TouchableOpacity style={styles.compactPress} onPress={onPress} activeOpacity={0.7}>
+    <PressableScale style={styles.compactPress} onPress={onPress}>
       {/* Line 1: identity (rank slot, name, team/opponent) gets the full row
           width so names never truncate; then reason chips; then value, ring,
           bid and the chevron that opens the player. */}
@@ -314,7 +314,7 @@ export default function WaiverRecommendationCard({
         </View>
         <Ionicons name="chevron-forward" size={16} color={colors.accentSoft} />
       </View>
-    </TouchableOpacity>
+    </PressableScale>
     {player.drop_suggestion ? <SuggestedDrop suggestion={player.drop_suggestion} compact /> : null}
     </View>
   );

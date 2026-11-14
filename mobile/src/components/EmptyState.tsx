@@ -1,5 +1,6 @@
 import React, { useMemo } from 'react';
-import { StyleSheet, TouchableOpacity, View } from 'react-native';
+import { StyleSheet, View } from 'react-native';
+import PressableScale from './PressableScale';
 import AppText from './AppText';
 import { Ionicons } from '@expo/vector-icons';
 
@@ -55,9 +56,9 @@ export default function EmptyState({
           <Button label={actionLabel} onPress={onPressAction} variant={actionVariant} size="sm" style={styles.button} />
         ) : null}
         {secondaryLabel && onPressSecondary ? (
-          <TouchableOpacity onPress={onPressSecondary} hitSlop={8} style={styles.secondaryLink}>
+          <PressableScale onPress={onPressSecondary} hitSlop={8} style={styles.secondaryLink}>
             <AppText style={styles.secondaryLinkText}>{secondaryLabel}</AppText>
-          </TouchableOpacity>
+          </PressableScale>
         ) : null}
         {helpTopic ? <HelpLink context={{ topic: helpTopic }} style={{ alignSelf: 'flex-start' }} /> : null}
       </View>

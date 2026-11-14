@@ -1,5 +1,6 @@
 import React, { useMemo, useState } from 'react';
-import { ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
+import { ScrollView, StyleSheet, View } from 'react-native';
+import PressableScale from '../components/PressableScale';
 import { useQuery } from '@tanstack/react-query';
 import { useHeaderHeight } from '@react-navigation/elements';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
@@ -223,9 +224,9 @@ function TeamCard({
               {INTERPRETATION_LABEL[team.interpretation]} · {CONFIDENCE_LABEL[team.confidence]}
             </AppText>
           ) : null}
-          <TouchableOpacity onPress={() => setOpen((v) => !v)} accessibilityRole="button" accessibilityState={{ expanded: open }}>
+          <PressableScale onPress={() => setOpen((v) => !v)} accessibilityRole="button" accessibilityState={{ expanded: open }}>
             <AppText style={styles.link}>{open ? 'Hide the evidence' : 'Show the evidence'}</AppText>
-          </TouchableOpacity>
+          </PressableScale>
           {open ? (
             <>
               <Bullets title="Evidence" items={team.evidence.map((e) => e.text)} styles={styles} icon="alert" color={toneColor(team.band)} />
@@ -311,9 +312,9 @@ function IntegrityBody({
                   {restSummary(data.teams, flagged.length)}
                 </IconRow>
               </View>
-              <TouchableOpacity onPress={() => setShowRest((v) => !v)} accessibilityRole="button" accessibilityState={{ expanded: showRest }}>
+              <PressableScale onPress={() => setShowRest((v) => !v)} accessibilityRole="button" accessibilityState={{ expanded: showRest }}>
                 <AppText style={styles.link}>{showRest ? 'Hide teams' : `Show ${rest.length} team${rest.length === 1 ? '' : 's'}`}</AppText>
-              </TouchableOpacity>
+              </PressableScale>
             </View>
           </AccentCard>
           {showRest
