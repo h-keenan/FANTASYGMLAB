@@ -425,6 +425,7 @@ def pending_block(snap: GameSnapshot, state: GameState, ev: Evaluator | None = N
         "lineup_warnings": len(lineup_warnings(ev, state.lineups[user], max(state.week, 1))) if live else 0,
         "roster_size": len(user_roster), "roster_limit": snap.settings.roster_limit,
         "cuts_needed": max(0, len(user_roster) - snap.settings.roster_limit),
+        "limit_blocks": not snap.settings.soft_limit,  # limit_v 0 saves: over the limit blocks Advance; newer: it only blocks adding players
     }
 
 

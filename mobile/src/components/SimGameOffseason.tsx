@@ -42,6 +42,8 @@ import {
   type SimPos,
   type SimTeamRosterResponse,
   simSeasonText,
+  simLimitBlocks,
+  simOverLimitNote,
 } from '../lib/simGame';
 
 type Busy = 'start' | 'pick' | 'auto' | 'season' | null;
@@ -443,15 +445,16 @@ function CutdownStage({ off, ctx, onTrade, onTeam }: { off: SimOffseason; ctx: S
   }
 
   const over = r.cuts_needed > 0;
+  const blocks = over && simLimitBlocks(r);
   const players = roster?.players ?? [];
   const reservesOn = simReservesOn(game.settings, roster?.reserves ?? r.reserves);
   const reserveState = { reserves: roster?.reserves ?? r.reserves, rosterSize: r.size, rosterLimit: r.limit };
   const myPicks = simPicksOf(picks, teamId);
   return (
     <>
-      <AccentCard accent={over ? colors.danger : colors.success} compact>
-        <AppText style={common.bodyStrong} accessibilityRole={over ? 'alert' : undefined} testID="roster-check">
-          {over ? `Cut ${r.cuts_needed} player${r.cuts_needed === 1 ? '' : 's'} to start the season.` : 'Your roster is ready for the season.'}
+      <AccentCard accent={blocks ? colors.danger : over ? colors.warning : colors.success} compact>
+        <AppText style={common.bodyStrong} accessibilityRole={blocks ? 'alert' : undefined} testID="roster-check">
+          {blocks ? `Cut ${r.cuts_needed} player${r.cuts_needed === 1 ? '' : 's'} to start the season.` : over ? simOverLimitNote(r.cuts_needed) : 'Your roster is ready for the season.'}
         </AppText>
         <AppText style={common.muted}>
           {r.size} of {r.limit} roster spots. IR and taxi players do not count.
@@ -462,7 +465,7 @@ function CutdownStage({ off, ctx, onTrade, onTeam }: { off: SimOffseason; ctx: S
         </View>
       </AccentCard>
 
-      <SimCollapse title="Your roster" summary={`${r.size} of ${r.limit}${over ? `, cut ${r.cuts_needed}` : ''}`} tone={over ? 'danger' : 'muted'} defaultOpen={over} testID="cutdown-roster">
+      <SimCollapse title="Your roster" summary={`${r.size} of ${r.limit}${over ? `, over by ${r.cuts_needed}` : ''}`} tone={blocks ? 'danger' : over ? 'warning' : 'muted'} defaultOpen={blocks} testID="cutdown-roster">
         {players.length === 0 ? (
           <AppText style={common.muted}>Loading your roster.</AppText>
         ) : (

@@ -400,6 +400,8 @@ describe("SimGameContent", () => {
     expect(screen.getByTestId("game-heading")).toHaveTextContent("Week 5 of 14");
   });
 
+  const ALL_STOPS_ON = { offers: true, injuries: true, starters: true, deadline: true, roster: true };
+
   const simToSummary = {
     weeks: [
       { week: 4, kind: "regular", round: null, result: "w", your_pts: 128.4, opp_pts: 109.7, opponent: "Rivals", auto_filled: [] },
@@ -419,17 +421,18 @@ describe("SimGameContent", () => {
     await openFirstGame();
     fireEvent.click(await screen.findByTestId("sim-to-button"));
     expect(await screen.findByRole("button", { name: "Trade deadline (week 10)" })).toBeInTheDocument();
-    expect(screen.getByRole("checkbox", { name: "Auto-set my lineup each week" })).not.toBeChecked(); // off by default
-    fireEvent.click(screen.getByRole("checkbox", { name: "Auto-set my lineup each week" }));
+    expect(screen.getByRole("switch", { name: "Auto-set my lineup each week" })).toBeChecked(); // on by default (Madden / 2K style auto-play)
+    expect(screen.getByTestId("sim-to-stops")).toHaveTextContent("5 of 5 on");
     fireEvent.click(screen.getByRole("button", { name: "Trade deadline (week 10)" }));
     const result = await screen.findByTestId("sim-to-result");
     expect(mocked.simToGame).toHaveBeenCalledTimes(1);
-    expect(mocked.simToGame).toHaveBeenCalledWith("g1", { target: "trade_deadline", weeks: undefined, auto_set: true, force_first: undefined });
+    expect(mocked.simToGame).toHaveBeenCalledWith("g1", { target: "trade_deadline", weeks: undefined, auto_set: true, force_first: undefined, stops: ALL_STOPS_ON });
     expect(result).toHaveTextContent("Simmed 2 weeks (Weeks 4-5)");
     expect(result).toHaveTextContent("2-1 to 3-2 · #4 to #5");
     expect(screen.getByTestId("sim-to-stop")).toHaveTextContent("Stopped at Week 6: your QB is out");
     expect(within(result).getByRole("button", { name: "Fix lineup" })).toBeInTheDocument();
-    expect(within(result).queryByRole("button", { name: "Sim anyway" })).toBeNull(); // weeks were played: nothing to force
+    expect(within(result).queryByRole("button", { name: "Sim anyway" })).toBeNull(); // weeks were played: it is "Keep simming" now
+    expect(within(result).getByRole("button", { name: "Keep simming" })).toBeInTheDocument();
     expect(result).toHaveTextContent("Hurt Harry (RB), out 3 weeks");
     expect(result).toHaveTextContent("W 128.4-109.7 vs Rivals");
     expect(screen.getByTestId("game-heading")).toHaveTextContent("Week 6 of 14");
@@ -456,7 +459,7 @@ describe("SimGameContent", () => {
     expect(within(result).queryByRole("button", { name: "Undo this sim" })).toBeNull();
     fireEvent.click(within(result).getByRole("button", { name: "Sim anyway" }));
     await waitFor(() => expect(mocked.simToGame).toHaveBeenCalledTimes(2));
-    expect(mocked.simToGame).toHaveBeenLastCalledWith("g1", { target: "weeks", weeks: 1, auto_set: false, force_first: true });
+    expect(mocked.simToGame).toHaveBeenLastCalledWith("g1", { target: "weeks", weeks: 1, auto_set: true, force_first: true, stops: ALL_STOPS_ON });
     expect(await screen.findByTestId("sim-to-result")).toHaveTextContent("Simmed Week 4");
   });
 

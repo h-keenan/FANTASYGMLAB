@@ -365,7 +365,7 @@ function SimOutlookSection({ player, detail, seasonLabel }: { player: SimGamePla
           season={0}
           projection={band}
           pointsLabel="pts"
-          gradientId="sim-weekly-fill"
+          byeWeeks={ros?.bye_week ? [ros.bye_week] : []}
         />
       ) : null}
       {flat && ros ? (

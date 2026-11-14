@@ -94,7 +94,6 @@ export function SimScoutingSections({ profile }: { profile: SimScoutingProfile }
             projection={simCurveBand(dev)}
             pointsLabel="ppg"
             xLabel="Year"
-            gradientId="sim-dev-fill"
           />
           <p className="pqv-status-text">
             <strong>{simCurveCaption(dev)}</strong> · {dev.note}

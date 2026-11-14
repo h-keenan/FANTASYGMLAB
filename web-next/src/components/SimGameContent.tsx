@@ -94,7 +94,7 @@ import {
   simSeasonText,
 } from "@/lib/simGame";
 import { simScrollKey, simShouldScrollTop } from "@/lib/simScroll";
-import { simToProgressLabel } from "@/lib/simTo";
+import { simToProgressLabel, simToRemaining } from "@/lib/simTo";
 import { SIM_FLOW_INITIAL, SIM_TABS, simFlowReducer, simRecapsFromAdvance, type SimTab } from "@/lib/simGameFlow";
 import { useSimDeltaReload, useSimGameCall } from "@/lib/useSimGameCall";
 import { useSimLeagueTeams } from "@/lib/useSimLeagueTeams";
@@ -333,7 +333,7 @@ export function SimGameContent() {
     setSimToRequest(request);
     setSimToBusy(request.option.label);
     setNotice(null);
-    const res = await call(() => api.simToGame(game.id, { target: request.option.id, weeks: request.option.weeks, auto_set: request.autoSet, force_first: request.forceFirst }));
+    const res = await call(() => api.simToGame(game.id, { target: request.option.id, weeks: request.option.weeks, auto_set: request.autoSet, force_first: request.forceFirst, stops: request.stops }));
     setAdvancing(false);
     setSimToBusy(null);
     if (!res) return;
@@ -443,7 +443,7 @@ export function SimGameContent() {
           simToResult={simToResult}
           simToBusy={simToBusy}
           onSimToDone={() => setSimToResult(null)}
-          onSimToForce={() => { if (simToRequest) { setSimToResult(null); void runSimTo({ ...simToRequest, forceFirst: true }); } }}
+          onSimToForce={() => { if (simToRequest) { const played = simToResult?.weeks_played ?? 0; setSimToResult(null); void runSimTo({ ...simToRequest, option: simToRemaining(simToRequest.option, played), forceFirst: true }); } }}
           onSimToUndo={undoSimTo}
           onSimToGoPro={() => dispatch({ type: "gate", gate: { kind: "premium", upsell: null, preview } })}
           onTab={(tab) => dispatch({ type: "tab", tab })}

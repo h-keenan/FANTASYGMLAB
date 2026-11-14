@@ -345,7 +345,7 @@ function SimOutlookSection({ player, detail, seasonLabel }: { player: SimGamePla
     <View style={styles.overlay}>
       <PqvSection title={`Week by Week · ${seasonLabel || "This sim season"}`}>
         {actual.length > 0 || band ? (
-          <WeeklyPointsChart weeks={actual.map((a) => ({ week: a.week, fantasy_points_ppr: a.points, snap_share: null }))} projection={band} pointsLabel="pts" />
+          <WeeklyPointsChart weeks={actual.map((a) => ({ week: a.week, fantasy_points_ppr: a.points, snap_share: null }))} projection={band} pointsLabel="pts" byeWeeks={ros?.bye_week ? [ros.bye_week] : []} />
         ) : null}
         {flat && ros ? (
           <AppText style={common.small} testID="sim-ros-line">

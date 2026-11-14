@@ -584,7 +584,7 @@ def start_next_season(em: Emitter, seed: int) -> None:
     if state.status != "offseason" or off is None or off["stage"] != "cutdown":
         raise GameError("wrong_phase", "The offseason is not ready to end.", phase=state.status)
     over = len(state.rosters[snap.user_team.tid]) - snap.settings.roster_limit
-    if over > 0:
+    if over > 0 and not snap.settings.soft_limit:
         raise GameError("roster_over_limit", f"Cut {over} player(s) before the season starts.", cuts_needed=over)
     ev = Evaluator(snap, state)
     for tid in snap.tids:
