@@ -25,7 +25,7 @@ const TONE_COLOR: Record<SimGradeTone, string> = {
   danger: "var(--color-danger)",
 };
 
-const SIZE = { sm: { h: 24, min: 34, font: "0.8125rem" }, md: { h: 32, min: 44, font: "1rem" }, lg: { h: 48, min: 64, font: "1.5rem" } } as const;
+const SIZE = { xs: { h: 18, min: 24, font: "0.75rem" }, sm: { h: 24, min: 34, font: "0.8125rem" }, md: { h: 32, min: 44, font: "1rem" }, lg: { h: 48, min: 64, font: "1.5rem" } } as const;
 
 /**
  * The Fantasy Sim's overall: a Madden / 2K style letter grade instead of the numeric OVR gauge
@@ -42,6 +42,8 @@ export function LetterGrade({ grade, size = "sm", testId = "letter-grade" }: { g
   const color = TONE_COLOR[simGradeTone(grade.grade)];
   const label = simGradeAria(grade);
   const range = simGradeRangeText(grade);
+  // xs is the inline tile of a row's stats line: a small rounded square, the scouting "?" a dim superscript (never "A-?" in a capsule).
+  const tile = size === "xs";
   return (
     <span
       role="img"
@@ -53,15 +55,22 @@ export function LetterGrade({ grade, size = "sm", testId = "letter-grade" }: { g
       style={{
         minWidth: spec.min,
         height: spec.h,
-        padding: "0 8px",
-        borderRadius: "var(--radius-pill)",
+        padding: tile ? "0 5px" : "0 8px",
+        borderRadius: tile ? "6px" : "var(--radius-pill)",
         fontSize: spec.font,
         background: `color-mix(in srgb, ${color} var(--chip-fill-pct, 15%), transparent)`,
         boxShadow: `inset 0 0 0 1.5px color-mix(in srgb, ${color} 55%, transparent)`,
         color: `color-mix(in srgb, ${color} 55%, var(--color-text-primary))`,
       }}
     >
-      <span aria-hidden="true">{simGradeText(grade)}</span>
+      {tile && grade.grade_uncertain ? (
+        <span aria-hidden="true">
+          {grade.grade}
+          <sup style={{ fontSize: "0.5625rem", opacity: 0.65, marginLeft: 1, fontWeight: 700 }}>?</sup>
+        </span>
+      ) : (
+        <span aria-hidden="true">{simGradeText(grade)}</span>
+      )}
       {size === "lg" && range ? (
         <span aria-hidden="true" className="mt-0.5 text-[0.6875rem] font-bold" style={{ color: "var(--color-text-muted)" }}>
           {range}

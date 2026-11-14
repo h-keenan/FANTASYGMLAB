@@ -2,27 +2,22 @@
 
 import { useState } from "react";
 
-import { Button } from "@/components/Button";
-import { SimCollapse, SimPlayerChips } from "@/components/SimGameDynastyParts";
-import { SimGlyph } from "@/components/SimGlyph";
-import { SimIconButton, SimRosterLine, SimSheet, type SimCtx } from "@/components/SimGameParts";
+import { SimCollapse } from "@/components/SimGameDynastyParts";
+import { SimRosterLine, type SimCtx } from "@/components/SimGameParts";
+import type { SimMoveHandle } from "@/components/SimMoveStrip";
 import { api } from "@/lib/api";
 import {
-  simFmtPts,
   simGameGate,
-  simReserveActions,
-  simReserveButtonLabel,
-  simTaxiSwapCandidates,
   simReserveReasonText,
   simReserveUsedLine,
   type SimGamePlayer,
+  type SimSwapTarget,
   type SimLineupResponse,
   type SimMoveContext,
-  type SimReserveAction,
   type SimReserveMoveTo,
   type SimReserves,
 } from "@/lib/simGame";
-import { playerSurname } from "@/lib/playerNameDisplay";
+import { simMoveSpecs, type SimMoveKind } from "@/lib/simMove";
 
 /** Everything the move menu needs to know about the squads. */
 export interface SimReserveState {
@@ -35,43 +30,68 @@ function moveContext(state: SimReserveState): SimMoveContext {
   return { reserves: state.reserves, rosterSize: state.rosterSize, rosterLimit: state.rosterLimit };
 }
 
+/** What a screen tells the row about the lineup: which slots the player fits, or that he is a starter changing his own slot. */
+export interface SimRowMoveOptions {
+  swapTargets?: readonly SimSwapTarget[] | null;
+  changeSlot?: string | null;
+  lineupLocked?: boolean;
+  onSwapTo?: (index: number) => void | Promise<unknown>;
+  onChangeSlot?: () => void;
+  /** Hide the trade block action (an incoming / non-tradable context). */
+  noBlock?: boolean;
+  /** Starters cannot be cut from the lineup (bench, IR and taxi can). */
+  noCut?: boolean;
+}
+
 /**
- * The per-player move menu as a sheet: Move to IR, Move to taxi, Activate or
- * Promote. A move the rules already forbid is disabled with its reason under
- * it; one the backend refuses shows the backend's message inline (the sheet
- * stays open so the player can try something else).
+ * The runtime behind every roster row's Move strip: IR / taxi / activate / taxi swap through the one move endpoint (a move the
+ * backend refuses shows its message under that row's strip), the trade block toggle, cut and swap through the screen's own
+ * handlers. `handleFor(player, options)` returns what SimPlayerLine's `move` prop takes: the possible specs and one `run`.
  */
-export function SimReserveSheet({
+export function useSimRosterMoves({
   ctx,
-  player,
   state,
   taxi = [],
-  onClose,
   onMoved,
+  onCut,
 }: {
   ctx: SimCtx;
-  player: SimGamePlayer;
   state: SimReserveState;
-  /** Players on the taxi squad, for the "Taxi full - swap with..." shortcut. */
   taxi?: SimGamePlayer[];
-  onClose: () => void;
   onMoved: (body: SimLineupResponse, player: SimGamePlayer, to: SimReserveMoveTo) => void;
+  onCut?: (player: SimGamePlayer) => void | Promise<unknown>;
 }) {
-  const [busy, setBusy] = useState<SimReserveMoveTo | null>(null);
-  const [refusal, setRefusal] = useState<string | null>(null);
-  const actions = simReserveActions(player, moveContext(state));
+  const [refusal, setRefusal] = useState<{ id: string; message: string } | null>(null);
+  const reservesOn = Boolean(state.reserves?.enabled);
+  const blocksOn = (ctx.game.settings.block_v ?? 0) >= 1;
 
-  const [swapOpen, setSwapOpen] = useState(false);
+  async function reserveMove(player: SimGamePlayer, to: SimReserveMoveTo): Promise<boolean> {
+    setRefusal(null);
+    try {
+      const body = await api.moveSimPlayer(ctx.gameId, { player_id: player.id, to });
+      const gate = simGameGate(body);
+      if (gate.kind === "ready") {
+        onMoved(body, player, to);
+        return true;
+      }
+      if (gate.kind === "blocked") setRefusal({ id: player.id, message: simReserveReasonText(gate.reason, body.message) });
+      else await ctx.call(async () => body); // paywall, conflict and busy go through the one shared call path
+    } catch (error) {
+      const status = (error as { status?: number } | null)?.status;
+      if (status === 409 || status === 503 || status === 404) await ctx.call(async () => Promise.reject(error));
+      else setRefusal({ id: player.id, message: error instanceof Error && error.message ? error.message : "Could not move him. Try again." });
+    }
+    return false;
+  }
 
-  async function swap(other: SimGamePlayer) {
+  async function swapOnto(player: SimGamePlayer, other: SimGamePlayer) {
     // Promote the taxi player first (that frees the taxi slot), then move him in.
-    setBusy("taxi");
     setRefusal(null);
     try {
       const freed = await api.moveSimPlayer(ctx.gameId, { player_id: other.id, to: "roster" });
       const gate = simGameGate(freed);
       if (gate.kind === "blocked") {
-        setRefusal(simReserveReasonText(gate.reason, freed.message));
+        setRefusal({ id: player.id, message: simReserveReasonText(gate.reason, freed.message) });
         return;
       }
       if (gate.kind !== "ready") {
@@ -79,127 +99,64 @@ export function SimReserveSheet({
         return;
       }
     } catch {
-      setRefusal("Could not swap. Try again.");
+      setRefusal({ id: player.id, message: "Could not swap. Try again." });
       return;
-    } finally {
-      setBusy(null);
     }
-    await go({ to: "taxi", label: "Move to taxi", check: { ok: true } });
+    await reserveMove(player, "taxi");
   }
 
-  async function go(action: SimReserveAction) {
-    setBusy(action.to);
-    setRefusal(null);
-    try {
-      const body = await api.moveSimPlayer(ctx.gameId, { player_id: player.id, to: action.to });
-      const gate = simGameGate(body);
-      if (gate.kind === "ready") {
-        onMoved(body, player, action.to);
-        return;
-      }
-      if (gate.kind === "blocked") {
-        setRefusal(simReserveReasonText(gate.reason, body.message));
-      } else {
-        // Paywall, conflict and busy are handled by the one shared call path.
-        await ctx.call(async () => body);
-      }
-    } catch (error) {
-      const status = (error as { status?: number } | null)?.status;
-      if (status === 409 || status === 503 || status === 404) await ctx.call(async () => Promise.reject(error));
-      else setRefusal(error instanceof Error && error.message ? error.message : "Could not move him. Try again.");
-    } finally {
-      setBusy(null);
+  async function toggleBlock(player: SimGamePlayer) {
+    const on = Boolean(player.block?.mine);
+    const res = await ctx.call(() => api.putSimBlock(ctx.gameId, { asset_id: player.id, on: !on }));
+    if (res && !res.reason) {
+      ctx.bump();
+      ctx.notify(!on ? `${player.name} is on your block.` : `${player.name} is off your block.`, "success");
     }
   }
 
-  return (
-    <SimSheet title={`Move ${player.name}`} onClose={onClose}>
-      <p className="pr-10 text-lg font-extrabold">
-        {player.name}
-      </p>
-      <div className="flex items-center gap-2 pt-1 text-xs" style={{ color: "var(--color-text-muted)" }}>
-        <span>{player.pos}{player.team ? ` · ${player.team}` : ""}</span>
-        <SimPlayerChips player={player} />
-      </div>
-      <ul className="flex flex-col gap-2 pt-3" aria-label="Moves">
-        {actions.map((action) => {
-          const swaps = simTaxiSwapCandidates(player, action, taxi);
-          return (
-            <li key={action.to} className="flex flex-col gap-1">
-              <Button
-                fullWidth
-                variant={action.check.ok ? "primary" : "secondary"}
-                disabled={!action.check.ok || busy !== null}
-                loading={busy === action.to}
-                onClick={() => void go(action)}
-                data-testid={action.check.ok ? undefined : `reserve-hint-${action.to}`}
-              >
-                {simReserveButtonLabel(action)}
-              </Button>
-              {swaps.length > 0 ? (
-                <>
-                  <Button fullWidth variant="ghost" disabled={busy !== null} aria-expanded={swapOpen} onClick={() => setSwapOpen((v) => !v)}>
-                    Taxi full — swap with…
-                  </Button>
-                  {swapOpen ? (
-                    <ul className="flex flex-col gap-1" aria-label="Swap with a taxi player">
-                      {swaps.map((other) => (
-                        <li key={other.id}>
-                          <Button fullWidth size="sm" variant="secondary" disabled={busy !== null} onClick={() => void swap(other)}>
-                            Swap with {other.name}
-                          </Button>
-                        </li>
-                      ))}
-                    </ul>
-                  ) : null}
-                </>
-              ) : null}
-            </li>
-          );
-        })}
-      </ul>
-      {refusal ? (
-        <p className="pt-2 text-sm font-semibold" role="alert" style={{ color: "var(--color-warning)" }} data-testid="reserve-refusal">
-          {refusal}
-        </p>
-      ) : null}
-    </SimSheet>
-  );
-}
-
-/** The "Move" button for a roster row; opens the sheet through `onOpen`. */
-export function SimReserveButton({ player, onOpen }: { player: SimGamePlayer; onOpen: (player: SimGamePlayer) => void }) {
-  // A compact icon (not a text button) so the player's name keeps the row width.
-  return (
-    <SimIconButton label={`Move ${player.name} to IR, taxi or roster`} onClick={() => onOpen(player)}>
-      <SimGlyph name="injury" size={16} />
-    </SimIconButton>
-  );
+  return function handleFor(player: SimGamePlayer, o: SimRowMoveOptions = {}): SimMoveHandle {
+    const specs = simMoveSpecs({
+      player,
+      reserve: reservesOn ? moveContext(state) : null,
+      taxi,
+      swapTargets: o.swapTargets,
+      changeSlot: o.changeSlot,
+      lineupLocked: o.lineupLocked,
+      canCut: Boolean(onCut) && !o.noCut,
+      block: blocksOn && !o.noBlock && player.pos !== "K" && player.pos !== "DEF" ? { on: Boolean(player.block?.mine) } : null,
+      profile: true,
+    });
+    const run = async (kind: SimMoveKind, key?: string) => {
+      if (kind === "swap") return key != null ? o.onSwapTo?.(Number(key)) : o.onChangeSlot?.();
+      if (kind === "roster" || kind === "ir" || kind === "taxi") return reserveMove(player, kind);
+      if (kind === "taxi_swap") {
+        const other = taxi.find((t) => t.id === key);
+        return other ? swapOnto(player, other) : undefined;
+      }
+      if (kind === "block") return toggleBlock(player);
+      if (kind === "cut") return onCut?.(player);
+      return undefined;
+    };
+    return { specs, run, refusal: refusal?.id === player.id ? refusal.message : null };
+  };
 }
 
 /**
- * IR and Taxi groups for the Team tab, below the bench: a summary line with
- * used / slots first, each group collapsible, every row with chips and Move.
+ * IR and Taxi groups for the Team tab, below the bench: a summary line with used / slots first, each group collapsible,
+ * every row the same single-Move row (Activate / Promote, Swap onto taxi, Cut, Profile).
  */
 export function SimReserveGroups({
   ir,
   taxi,
   state,
-  onOpen,
   openPlayer,
-  cutting = null,
-  onAskCut,
-  onCut,
+  handleFor,
 }: {
   ir: SimGamePlayer[];
   taxi: SimGamePlayer[];
   state: SimReserveState;
-  onOpen: (player: SimGamePlayer) => void;
   openPlayer: (player: SimGamePlayer) => void;
-  /** Id awaiting a cut confirmation, and the handlers: IR and taxi players can be released like anyone else (Sleeper rules). */
-  cutting?: string | null;
-  onAskCut?: (id: string | null) => void;
-  onCut?: (player: SimGamePlayer) => void;
+  handleFor: (player: SimGamePlayer, o?: SimRowMoveOptions) => SimMoveHandle;
 }) {
   const r = state.reserves;
   if (!r) return null;
@@ -218,29 +175,10 @@ export function SimReserveGroups({
           {g.players.length === 0 ? (
             <p className="text-xs" style={{ color: "var(--color-text-muted)" }}>{g.empty}</p>
           ) : (
-            g.players.map((player) => (
-              <SimRosterLine
-                key={player.id}
-                player={{ ...player, squad: g.kind }}
-                suppressBadges={[g.kind]}
-                onOpen={openPlayer}
-                trailing={
-                  cutting === player.id && onCut ? (
-                    <>
-                      <Button size="sm" variant="danger" onClick={() => onCut(player)}>Cut {playerSurname(player.name)}</Button>
-                      <Button size="sm" variant="ghost" onClick={() => onAskCut?.(null)}>Keep</Button>
-                    </>
-                  ) : (
-                    <>
-                      <SimReserveButton player={{ ...player, squad: g.kind }} onOpen={onOpen} />
-                      {onCut && onAskCut ? (
-                        <Button size="sm" variant="ghost" aria-label={`Cut ${player.name}`} onClick={() => onAskCut(player.id)}>Cut</Button>
-                      ) : null}
-                    </>
-                  )
-                }
-              />
-            ))
+            g.players.map((player) => {
+              const p = { ...player, squad: g.kind };
+              return <SimRosterLine key={player.id} player={p} suppressBadges={[g.kind]} onOpen={openPlayer} move={handleFor(p, { noBlock: true })} />;
+            })
           )}
         </SimCollapse>
       ))}

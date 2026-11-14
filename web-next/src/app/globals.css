@@ -4578,3 +4578,10 @@ main > header:has(> h1.sr-only:only-child) {
 @media (min-width: 1024px) {
   .matchup-grid { grid-template-columns: minmax(0, 2fr) minmax(0, 3fr); grid-template-rows: min-content min-content 1fr; align-items: start; }
 }
+
+/* Player row expand (PlayerAccordionRow / the sim's Move strip): the body grows from 0 to its height and fades in.
+   Reduced motion: it simply appears. */
+.row-expand { display: grid; grid-template-rows: 1fr; animation: row-expand-in 180ms ease-out; }
+.row-expand-inner { min-height: 0; overflow: hidden; }
+@keyframes row-expand-in { from { grid-template-rows: 0fr; opacity: 0; } to { grid-template-rows: 1fr; opacity: 1; } }
+@media (prefers-reduced-motion: reduce) { .row-expand { animation: none; } }

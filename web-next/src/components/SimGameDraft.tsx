@@ -12,7 +12,7 @@ import { SimDraftBoard } from "@/components/SimDraftBoard";
 import { SimDraftGlyph } from "@/components/SimDraftGlyphs";
 import { SimDraftOverview } from "@/components/SimDraftOverview";
 import { SimDraftHero } from "@/components/SimDraftHero";
-import { SimIconButton, SimPlayerChip, SimPlayerLine, SimStat, SimToneBadge, useSimWide, type SimCtx } from "@/components/SimGameParts";
+import { SimIconButton, SimPlayerChip, SimPlayerLine, SimToneBadge, useSimWide, type SimCtx } from "@/components/SimGameParts";
 import { SkeletonCard } from "@/components/Skeleton";
 import { ToneBadge } from "@/components/ToneBadge";
 import { CompactModule } from "@/components/ui/CompactModule";
@@ -24,7 +24,6 @@ import { LetterGrade } from "@/components/ui/LetterGrade";
 import {
   SIM_QUEUE_MAX,
   simFmtPts,
-  simProjText,
   simQueueReducer,
   simFilterPositionsFor,
   simAutoPickConfirmText,
@@ -283,7 +282,15 @@ export function SimGameDraft({ ctx, onComplete }: { ctx: SimCtx; onComplete: (re
                 player={player}
                 onOpen={ctx.openPlayer}
                 trailing={
-                  <div className="flex items-center gap-1">
+                  onClock ? (
+                    <Button size="sm" loading={busy === "pick"} onClick={() => pick(player)} aria-label={`Draft ${player.name}`}>
+                      <SimDraftGlyph name="draft" />
+                      <span className="ml-1">Draft</span>
+                    </Button>
+                  ) : undefined
+                }
+                expandedExtra={
+                  <div className="flex items-center gap-1" data-testid="queue-controls">
                     <Button size="sm" variant="ghost" aria-label={`Move ${player.name} up`} disabled={index === 0} onClick={() => dispatchQueue({ type: "move", id: player.id, delta: -1 })}>
                       <SimDraftGlyph name="up" />
                     </Button>
@@ -293,12 +300,6 @@ export function SimGameDraft({ ctx, onComplete }: { ctx: SimCtx; onComplete: (re
                     <Button size="sm" variant="ghost" aria-label={`Remove ${player.name}`} onClick={() => dispatchQueue({ type: "remove", id: player.id })}>
                       <SimDraftGlyph name="remove" />
                     </Button>
-                    {onClock ? (
-                      <Button size="sm" loading={busy === "pick"} onClick={() => pick(player)} aria-label={`Draft ${player.name}`}>
-                        <SimDraftGlyph name="draft" />
-                        <span className="ml-1">Draft</span>
-                      </Button>
-                    ) : null}
                   </div>
                 }
               />
@@ -325,7 +326,7 @@ export function SimGameDraft({ ctx, onComplete }: { ctx: SimCtx; onComplete: (re
             <EmptyState title="No picks yet" subtitle="Your drafted players show up here." />
           ) : (
             draft.your_roster.map((player) => (
-              <SimPlayerLine key={player.id} player={player} onOpen={ctx.openPlayer} trailing={<SimStat label="Proj" value={simProjText(player)} />} />
+              <SimPlayerLine key={player.id} player={player} onOpen={ctx.openPlayer} />
             ))
           )}
         </section>

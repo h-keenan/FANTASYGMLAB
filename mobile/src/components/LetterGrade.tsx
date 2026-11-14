@@ -30,7 +30,7 @@ function toneColor(tone: SimGradeTone, colors: ThemeColors): string {
   }
 }
 
-const SIZE = { sm: { h: 24, min: 34, font: 13 }, md: { h: 32, min: 44, font: 16 }, lg: { h: 48, min: 64, font: 24 } } as const;
+const SIZE = { xs: { h: 18, min: 24, font: 12 }, sm: { h: 24, min: 34, font: 13 }, md: { h: 32, min: 44, font: 16 }, lg: { h: 48, min: 64, font: 24 } } as const;
 
 /**
  * The Fantasy Sim's overall: a Madden / 2K style letter grade instead of the numeric OVR gauge. Tinted capsule (same recipe as
@@ -49,9 +49,16 @@ export function LetterGrade({ grade, size = 'sm', testID = 'letter-grade' }: { g
       accessibilityRole="image"
       accessibilityLabel={simGradeAria(grade)}
       testID={testID}
-      style={[styles.capsule, { minWidth: spec.min, height: spec.h, backgroundColor: withAlpha(color, 0.15), borderColor: withAlpha(color, 0.55) }]}
+      style={[styles.capsule, size === 'xs' && { borderRadius: 6, paddingHorizontal: 5 }, { minWidth: spec.min, height: spec.h, backgroundColor: withAlpha(color, 0.15), borderColor: withAlpha(color, 0.55) }]}
     >
-      <AppText style={{ fontSize: spec.font, fontWeight: '800', lineHeight: spec.font + 2, color: colors.textPrimary }} importantForAccessibility="no">{simGradeText(grade)}</AppText>
+      {size === 'xs' && grade.grade_uncertain ? (
+        <AppText style={{ fontSize: spec.font, fontWeight: '800', lineHeight: spec.font + 2, color: colors.textPrimary }} importantForAccessibility="no">
+          {grade.grade}
+          <AppText style={{ fontSize: 9, fontWeight: '700', color: colors.textTertiary }} importantForAccessibility="no">?</AppText>
+        </AppText>
+      ) : (
+        <AppText style={{ fontSize: spec.font, fontWeight: '800', lineHeight: spec.font + 2, color: colors.textPrimary }} importantForAccessibility="no">{simGradeText(grade)}</AppText>
+      )}
       {size === 'lg' && range ? <AppText style={{ fontSize: 12, fontWeight: '700', color: colors.textTertiary }} importantForAccessibility="no">{range}</AppText> : null}
     </View>
   );
