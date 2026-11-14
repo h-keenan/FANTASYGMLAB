@@ -71,6 +71,11 @@ describe("playerCard model", () => {
     expect(headlinePoints(bye).value).toBeNull();
     const out = playerCardFromStarter({ ...base, injury_label: "Out", game_status: "scheduled" });
     expect(playerStatusChips(out).map((chip) => chip.kind)).toEqual(["out"]);
+    // A player ruled out is not projected any points, same as a bye.
+    const outWithProjection = playerCardFromStarter({ ...base, injury_label: "Out", game_status: "scheduled", projection: { status: "ok", point_estimate: 14.2 } });
+    expect(outWithProjection.projection).toBeNull();
+    expect(outWithProjection.expectedFinal).toBe(0);
+    expect(headlinePoints(outWithProjection).value).toBeNull();
     const questionable = playerCardFromStarter({ ...base, injury_label: "Questionable", game_status: "scheduled" });
     expect(playerStatusChips(questionable).map((chip) => chip.kind)).toEqual(["upcoming", "questionable"]);
   });

@@ -22,7 +22,6 @@ import { ReviewGlyphIcon } from "@/components/SimReviewGlyph";
 import { PositionBadge } from "@/components/PositionBadge";
 import { ToneBadge } from "@/components/ToneBadge";
 import {
-  simFmtPts,
   simProjText,
   simTrendText,
   simPlayerSubline,

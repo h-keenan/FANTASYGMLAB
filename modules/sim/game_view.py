@@ -72,7 +72,7 @@ def player_row(
     # Display only: a player who is on a bye (or out) this week is not projected any points this week. The engine and the AI
     # already treat him as 0 (``ev.proj``); only this row used to show the number he will post when he is back.
     proj_note = ev.status(pid, w) if state.status in ("in_season", "playoffs") else "healthy"
-    next_projection = round(projection, 1)
+    next_projection = round(projection if ev.roles_on else ev.ros_mean(pid), 1)
     if proj_note != "healthy":
         projection = 0.0
     return {

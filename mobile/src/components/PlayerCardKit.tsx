@@ -240,7 +240,7 @@ function MatchupCard({ model, onPress, editing, mirror = false, emphasis = 'even
   const unavailable = model.bye || model.out;
   const align = mirror ? 'flex-end' : 'flex-start';
   const pointsLabel =
-    head.kind === 'pts' ? (model.gameStatus === 'final' ? 'FINAL PTS' : 'PTS') : head.kind === 'proj' ? 'PROJ' : model.bye ? 'BYE' : '';
+    head.kind === 'pts' ? (model.gameStatus === 'final' ? 'FINAL PTS' : 'PTS') : head.kind === 'proj' ? 'PROJ' : model.bye ? 'BYE' : model.out ? 'OUT' : '';
   return (
     <View
       style={[

@@ -32,7 +32,6 @@ import { selectedItems } from '../lib/tradeSheetPicker';
 import TradePickerSheet, { TradeSideSummary } from './TradePickerSheet';
 import {
   SIM_TRADE_EMPTY,
-  simFmtPts,
   simProjText,
   simIsPick,
   simIsPickId,

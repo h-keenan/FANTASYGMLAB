@@ -29,7 +29,6 @@ import {
   SIM_TRADE_EMPTY,
   simGameReasonMessage,
   type SimTradeSeed,
-  simFmtPts,
   simProjText,
   simIsPick,
   simIsPickId,

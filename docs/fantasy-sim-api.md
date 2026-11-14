@@ -758,3 +758,28 @@ it always did (the empty block is also left out of the state digest). The user's
 - Rows carry `block: {by, mine, looking_for, why}` when on a block (players list, `/players/{id}`, `/teams/{id}`, `/league/rosters`); `GET /players?status=block`
   lists everything on any block; each team in `/league/rosters` has `block` (its shelf) next to `needs`.
 - Harness: `PYTHONPATH=. python tests/test_sim_block_harness.py [seeds]` (offers per week with and without a block, block share, accepted-and-legal, shelves per week).
+
+## Season labels, bye/out projections, rookie names
+
+**Season label (`S3 2028`).** One presentation rule for every place the sim names a season: season number, then
+its calendar year. `modules/sim/season_label.py` (server) and `simSeasonLabel` / `simSeasonLabelForYear` /
+`simSeasonText` in `simGame.ts` (web + app twin) are the only builders. Views carry additive `season_label`
+fields next to the existing `season` / `season_no` / `year` numbers (game `dynasty` block, offseason
+`season_label` + `last_season_label`, dynasty summary rows, league history, player/team history entries and
+rookie classes, pick assets). Stored events keep plain numbers, so old saves replay identically. A progress
+count ("3 of 10") may sit beside a label, never replace it. Stored recap pick names (`game_engine._brief`) are
+event data and stay year-based.
+
+**Bye / out projections.** Every player row (`player_row`) now carries `projection_note` (`"bye"` / `"out"` /
+`null`, in-season only), `projection_week`, and `next_projection` (what he projects for his next game). When the
+note is set, `projection` is `0.0`. Clients render "Bye" / "Out" (muted) through `simProjText` instead of a
+number. Display only: the engine, the AI and team totals already treated a bye / out player as 0 (`Evaluator.proj`),
+so no old save changes. Real FantasyDesk matchup: a player ruled out before kickoff has no projection and adds 0
+to the team total (`matchup_win_probability._starter_distribution`), same as a bye.
+
+**Rookie names (`names_v` 1).** New dynasty games carry `names_v: 1` in settings. A rookie's name is a pure
+function of `(seed, season, slot)` into a frozen 792 x 1189 first/last grid (`modules/sim/game_names.py`), a
+bijection per save: no full name repeats across any number of classes, and a first name comes back only once per
+~790 rookies. Names already worn by a veteran in the pool are skipped. Saves without `names_v` keep the original
+small tables untouched. The v1 tables are pinned by a sha256 in `tests/test_sim_rookie_names.py`; extend with a
+`names_v` 2 table set, never edit v1.
