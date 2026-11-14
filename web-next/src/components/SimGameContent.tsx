@@ -18,6 +18,7 @@ import { SimLeagueTab } from "@/components/SimGameLeague";
 import { SimGameOffseason } from "@/components/SimGameOffseason";
 import { SimHomeTab } from "@/components/SimGameHome";
 import { SimPlayerSheet } from "@/components/SimGamePlayers";
+import { SimPillHost } from "@/components/SimPillHost";
 import { SimActionBar } from "@/components/SimActionBar";
 import { SimGameHeader, SimStatusChips } from "@/components/SimGameHeader";
 import { SimGameOrb } from "@/components/SimGameOrb";
@@ -1144,6 +1145,7 @@ function GameScreen({
         </>
       )}
       <div className="bottom-stack" data-testid="sim-bottom-stack">
+        <SimPillHost standalone={!showBar && !showOffBar} />
         {showOffBar ? <SimOffseasonBar ctx={ctx} onTab={onTab} orb={orbNode} /> : null}
         {showBar ? <SimActionBar ctx={ctx} paywalled={paywalled} advancing={advancing} onAdvance={onAdvance} onSimTo={onSimTo} onTab={onTab} orb={orbNode} /> : null}
       </div>

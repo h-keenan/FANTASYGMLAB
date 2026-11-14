@@ -146,7 +146,7 @@ export function BottomTabBar({
         </ul>
       </div>
       {context ? (
-        <ContextLayer
+        <PillContextLayer
           key={context.id}
           context={context}
           hidden={mode === "menu"}
@@ -161,7 +161,7 @@ export function BottomTabBar({
   );
 }
 
-function ContextLayer({
+export function PillContextLayer({
   context,
   hidden,
   section,
@@ -169,14 +169,18 @@ function ContextLayer({
   menuBtnRef,
   onMenu,
   onSection,
+  noMenu,
 }: {
   context: PillContext;
   hidden: boolean;
-  section: BottomTab | undefined;
+  /** The section icon (site shell). Omitted in the Fantasy Sim bar, where the orb is the navigator. */
+  section?: BottomTab | undefined;
   menuOpen: boolean;
   menuBtnRef: React.RefObject<HTMLButtonElement | null>;
   onMenu: () => void;
-  onSection: () => void;
+  onSection?: () => void;
+  /** No menu button (a context with no row to unfold back to). */
+  noMenu?: boolean;
 }) {
   const listRef = useRef<HTMLDivElement>(null);
   const idx = pillActiveIndex(context);
@@ -199,16 +203,16 @@ function ContextLayer({
   const sectionProps = { className: "pill-icon-btn pill-icon-btn--section", "aria-label": section?.label ?? "Section", "data-testid": "pill-section" };
   return (
     <div className="pill-layer pill-layer--context" inert={hidden} data-testid="pill-context-layer">
-      {section?.href ? (
-        <Link href={section.href} {...sectionProps} onClick={onSection}>
+      {!section ? null : section.href ? (
+        <Link href={section.href} {...sectionProps} onClick={() => onSection?.()}>
           {sectionBody}
         </Link>
       ) : (
-        <button type="button" {...sectionProps} onClick={onSection}>
+        <button type="button" {...sectionProps} onClick={() => onSection?.()}>
           {sectionBody}
         </button>
       )}
-      <button
+      {noMenu ? null : <button
         ref={menuBtnRef}
         type="button"
         className="pill-icon-btn pill-icon-btn--menu"
@@ -218,7 +222,7 @@ function ContextLayer({
         onClick={onMenu}
       >
         <TabGlyph name="more" size={22} />
-      </button>
+      </button>}
       <span className="pill-divider" aria-hidden="true" />
       <div ref={listRef} role="tablist" aria-label={context.label} className="pill-tabs" data-testid="pill-tabs">
         {idx >= 0 ? <span className="pill-indicator" aria-hidden="true" /> : null}
@@ -226,16 +230,16 @@ function ContextLayer({
           const on = t.key === context.activeKey;
           const badge = bottomTabBadgeText(t.badge);
           return (
-            <button
+            <PillTabEl
               key={t.key}
-              type="button"
+              href={t.href}
+              className="pill-tab"
               role="tab"
               aria-selected={on}
               tabIndex={on ? 0 : -1}
-              className="pill-tab"
               data-tab={t.key}
               onClick={() => context.onSelect(t.key)}
-              onKeyDown={(e) => {
+              onKeyDown={(e: React.KeyboardEvent) => {
                 const dir = e.key === "ArrowRight" ? 1 : e.key === "ArrowLeft" ? -1 : 0;
                 if (!dir) return;
                 const next = context.tabs[(idx + dir + context.tabs.length) % context.tabs.length];
@@ -247,14 +251,14 @@ function ContextLayer({
             >
               {t.label}
               {badge ? <span className="pill-tab-badge" aria-label={`${badge} new`}>{badge}</span> : null}
-            </button>
+            </PillTabEl>
           );
         })}
       </div>
       {primary ? (
-        <button
+        <PillTabEl
           key={`${context.id}:${primary.key}`}
-          type="button"
+          href={primary.disabled || primary.busy ? undefined : primary.href}
           className="pill-primary"
           data-compact={primary.glyph && context.tabs.length >= 4 ? "" : undefined}
           aria-label={primary.label}
@@ -265,8 +269,18 @@ function ContextLayer({
         >
           {primary.glyph ? <TabGlyph name={primary.glyph} size={16} /> : null}
           <span className="pill-primary-label">{primary.label}</span>
-        </button>
+        </PillTabEl>
       ) : null}
     </div>
+  );
+}
+
+/** A pill control: a client-navigation link when it has an href (a route), otherwise a button. */
+function PillTabEl({ href, children, ...rest }: { href?: string; children: React.ReactNode } & Record<string, unknown>) {
+  if (href) return <Link href={href} {...(rest as Record<string, unknown>)}>{children}</Link>;
+  return (
+    <button type="button" {...(rest as Record<string, unknown>)}>
+      {children}
+    </button>
   );
 }

@@ -24,3 +24,8 @@ export function useBottomPillContext(ctx: PillContext | null): boolean {
   const state = useSyncExternalStore(subscribePill, getPillState, getServerPillState);
   return Boolean(ctx && state.barPresent && state.ctx && state.ctx.id === ctx.id);
 }
+
+/** The pill's current state (registered context + whether a phone pill is on screen), for hosts that render it (the Fantasy Sim bars). */
+export function usePillState() {
+  return useSyncExternalStore(subscribePill, getPillState, getServerPillState);
+}
