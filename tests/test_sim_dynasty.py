@@ -45,7 +45,12 @@ class Run:
 
     def __init__(self, seed=SEED, **kw):
         self.seed = seed
+        econ = kw.pop("econ_v", None)  # pin econ_v before the draft (a save from before it) rather than after it
         self.root = new_snapshot(seed, **kw)
+        if econ is not None:
+            from dataclasses import replace as _replace
+
+            object.__setattr__(self.root, "settings", _replace(self.root.settings, econ_v=econ))
         self.state = GameState(self.root)
         self.em = Emitter(self.state, self.root)
         ctx = draft.DraftContext(self.root, self.state)
