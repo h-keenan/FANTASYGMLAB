@@ -58,8 +58,7 @@ export default function SimGameOrb({
         hitSlop={{ top: 4, bottom: 4, left: 4, right: 4 }}
         testID="sim-game-orb"
       >
-        <BrandMark width={22} height={15} />
-        <AppText style={styles.label} importantForAccessibility="no" accessibilityElementsHidden>{currentTab.label}</AppText>
+        <BrandMark width={26} height={18} />
         {badge ? (
           <View style={[styles.badge, styles.orbBadge]} testID="sim-game-orb-badge" importantForAccessibility="no" accessibilityElementsHidden>
             <AppText style={styles.badgeText}>{badge}</AppText>
@@ -168,7 +167,6 @@ function createStyles(colors: ThemeColors) {
       borderColor: colors.accent,
       backgroundColor: colors.backgroundElevated,
     },
-    label: { fontSize: 11, fontWeight: '800', letterSpacing: 0.2, textTransform: 'uppercase', color: colors.accent },
     badge: {
       minWidth: 18,
       height: 18,
