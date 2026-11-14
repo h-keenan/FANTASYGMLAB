@@ -42,7 +42,7 @@ export function PlayerValueHistory({ playerId, bare = false }: { playerId: strin
   return (
     <section className={bare ? "flex flex-col gap-2" : "pqv-model-row"} aria-label="Value history" data-testid="player-value-history">
       {bare ? null : <h3>Value history</h3>}
-      {caption.chart ? <RatingHistoryChart points={history.points} gradientId={`rh-${playerId}`} /> : null}
+      {caption.chart ? <RatingHistoryChart points={history.points} /> : null}
       {caption.changes.length ? (
         <p className="text-sm font-bold" style={{ color: "var(--color-text-primary)" }}>
           {caption.changes.map((text, i) => (

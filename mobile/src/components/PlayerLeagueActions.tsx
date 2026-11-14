@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { Alert, StyleSheet, TouchableOpacity, View } from 'react-native';
+import { Alert, StyleSheet, View } from 'react-native';
+import PressableScale from './PressableScale';
 import { Ionicons } from '@expo/vector-icons';
 
 import AppText from './AppText';
@@ -105,7 +106,7 @@ export default function PlayerLeagueActions({
   return (
     <View style={styles.row}>
       {showBuildOffer ? (
-        <TouchableOpacity
+        <PressableScale
           style={styles.chip}
           onPress={goBuildOffer}
           accessibilityRole="button"
@@ -113,10 +114,10 @@ export default function PlayerLeagueActions({
         >
           <Ionicons name="hammer-outline" size={14} color={colors.accent} />
           <AppText style={styles.chipText}>Build an offer</AppText>
-        </TouchableOpacity>
+        </PressableScale>
       ) : null}
       {showAddToTrade ? (
-        <TouchableOpacity
+        <PressableScale
           style={styles.chip}
           onPress={() => goTrades('make')}
           accessibilityRole="button"
@@ -124,10 +125,10 @@ export default function PlayerLeagueActions({
         >
           <Ionicons name="swap-horizontal-outline" size={14} color={colors.accent} />
           <AppText style={styles.chipText}>Add to Trade</AppText>
-        </TouchableOpacity>
+        </PressableScale>
       ) : null}
       {shortcuts.canFindTrades ? (
-        <TouchableOpacity
+        <PressableScale
           style={styles.chip}
           onPress={() => goTrades('search')}
           accessibilityRole="button"
@@ -135,17 +136,17 @@ export default function PlayerLeagueActions({
         >
           <Ionicons name="search-outline" size={14} color={colors.accent} />
           <AppText style={styles.chipText}>Find trades</AppText>
-        </TouchableOpacity>
+        </PressableScale>
       ) : null}
       {watching !== null ? (
-        <TouchableOpacity
+        <PressableScale
           style={[styles.chip, watching && styles.chipActive]}
           onPress={toggleWatch}
           disabled={busy}
           accessibilityRole="button"
         >
           <AppText style={styles.chipText}>{watching ? '★ Watching' : '☆ Add to GM Targets'}</AppText>
-        </TouchableOpacity>
+        </PressableScale>
       ) : null}
     </View>
   );

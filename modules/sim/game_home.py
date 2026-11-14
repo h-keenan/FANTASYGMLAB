@@ -548,7 +548,10 @@ def _checklist(
     alerts: Sequence[Mapping[str, Any]], inbox: int, cuts: int, window: str | None,
 ) -> list[dict[str, Any]]:
     items: list[dict[str, Any]] = []
-    if cuts:
+    if cuts and snap.settings.soft_limit:  # limit_v 1+: a note, never a blocker
+        items.append({"id": "cuts", "label": f"Over the limit by {cuts}", "target": "team", "done": False,
+                      "severity": "warning", "detail": "Cut or trade to add players. You can still advance."})
+    elif cuts:
         items.append({"id": "cuts", "label": f"Cut {cuts} player{'s' if cuts != 1 else ''}", "target": "team", "done": False,
                       "severity": "danger", "detail": "Your roster is over the limit; you cannot advance until you cut."})
     n = len(warnings)

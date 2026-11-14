@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { InteractionManager, TouchableOpacity, View } from 'react-native';
+import { InteractionManager, View } from 'react-native';
+import PressableScale from '../components/PressableScale';
 import AppBackground from '../components/AppBackground';
 import { DarkTheme, DefaultTheme, NavigationContainer, type Theme } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
@@ -367,12 +368,12 @@ export default function RootNavigator() {
               ),
               headerRight: () => (
                 <View style={{ flexDirection: 'row', gap: 16 }}>
-                  <TouchableOpacity onPress={() => navigation.navigate('News')} hitSlop={8} accessibilityRole="button" accessibilityLabel="News">
+                  <PressableScale onPress={() => navigation.navigate('News')} hitSlop={8} accessibilityRole="button" accessibilityLabel="News">
                     <Ionicons name="globe-outline" size={22} color={colors.textSecondary} />
-                  </TouchableOpacity>
-                  <TouchableOpacity onPress={() => navigation.navigate('More')} hitSlop={8} accessibilityRole="button" accessibilityLabel="Account">
+                  </PressableScale>
+                  <PressableScale onPress={() => navigation.navigate('More')} hitSlop={8} accessibilityRole="button" accessibilityLabel="Account">
                     <Ionicons name="ellipsis-horizontal-outline" size={22} color={colors.textSecondary} />
-                  </TouchableOpacity>
+                  </PressableScale>
                 </View>
               ),
             })}

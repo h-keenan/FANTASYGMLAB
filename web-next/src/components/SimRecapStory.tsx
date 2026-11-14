@@ -1,22 +1,30 @@
 "use client";
 
-import { useMemo, useState, type ReactNode } from "react";
+import { useMemo, useState, type CSSProperties, type ReactNode } from "react";
 
 import { Button } from "@/components/Button";
-import { SimPlayerChip, SimPlayerLine, SimToneBadge, simToneColor, type SimCtx } from "@/components/SimGameParts";
+import { CountUp, Confetti, MotionIn } from "@/components/Motion";
+import { TeamAvatar } from "@/components/TeamAvatar";
+import { TrophyIcon } from "@/components/TrophyIcon";
+import { ValueRing } from "@/components/ValueRing";
+import { SimPlayerChip, SimPlayerLine, type SimCtx } from "@/components/SimGameParts";
 import { SimWeekRecapView } from "@/components/SimGameRecap";
 import { StoryCarousel, type StoryPage } from "@/components/ui/StoryCarousel";
-import { simListStats } from "@/lib/simDraft";
-import { simFmtPts, simPlayoffRoundLabel, simResultLabel, simResultTone, simTeamNameMap, type SimWeekRecap } from "@/lib/simGame";
+import { positionColorVar } from "@/lib/playerPresentation";
+import { simFmtPts, simPlayoffRoundLabel, simTeamNameMap, type SimGamePlayer, type SimWeekRecap } from "@/lib/simGame";
 import {
   simLeagueHighlights,
   simNextWeekModel,
   simPositionTotals,
   simRecapInjuryModel,
+  simRecapOutcome,
   simRecapPageKeys,
+  simRecapProj,
   simRecapResultModel,
+  simRecapSeasonModel,
   simTopStarters,
   type SimRecapFacts,
+  type SimRecapOutcome,
   type SimRecapPageKey,
 } from "@/lib/simRecapStory";
 
@@ -25,26 +33,63 @@ const KICKER: Record<SimRecapPageKey, string> = {
   matchup: "Matchup breakdown",
   injuries: "Injuries and lineup",
   league: "Around the league",
+  season: "Season complete",
   next: "Next week",
 };
+
+const toneVar = (tone: SimRecapOutcome["tone"]) => `var(--color-${tone})`;
+
+/** A page: the hero zone (fills the top of the screen, centered, with a one-shot accent glow) then the supporting rows. */
+function Page({ tone = "accent", children }: { tone?: SimRecapOutcome["tone"]; children: ReactNode }) {
+  return (
+    <div className="ui-recap" style={{ "--recap-tone": toneVar(tone) } as CSSProperties}>
+      {children}
+    </div>
+  );
+}
+
+function HeroZone({ children, glow = true }: { children: ReactNode; glow?: boolean }) {
+  return (
+    <div className="ui-recap-hero">
+      {glow ? <span className="ui-recap-glow" aria-hidden="true" data-testid="recap-glow" /> : null}
+      {children}
+    </div>
+  );
+}
 
 function Hero({ value, caption, color }: { value: ReactNode; caption?: string; color?: string }) {
   return (
     <div className="flex flex-col items-center gap-1 text-center">
-      <span className="text-5xl font-extrabold tabular-nums leading-none" style={{ color: color ?? "var(--color-text-primary)" }}>{value}</span>
+      <span className="text-6xl font-extrabold tabular-nums leading-none" style={{ color: color ?? "var(--color-text-primary)" }}>{value}</span>
       {caption ? <span className="text-sm font-semibold" style={{ color: "var(--color-text-secondary)" }}>{caption}</span> : null}
     </div>
   );
 }
 
-function Fact({ label, children }: { label: string; children: ReactNode }) {
+function Fact({ label, children, accent }: { label: string; children: ReactNode; accent?: string }) {
   return (
-    <div className="flex items-center justify-between gap-3 rounded-xl px-3 py-2" style={{ background: "var(--glass-input-bg)" }}>
+    <div className="ui-recap-fact" style={accent ? ({ "--accent": accent } as CSSProperties) : undefined}>
       <span className="text-xs font-extrabold uppercase" style={{ color: "var(--color-text-muted)", letterSpacing: "var(--letter-spacing-badge)" }}>{label}</span>
       <span className="min-w-0 text-right text-sm font-bold">{children}</span>
     </div>
   );
 }
+
+/** A glass ring with the efficiency percentage (the same ValueRing the OVR gauge is made of), filling from 0 on arrival. */
+function EfficiencyRing({ efficiency }: { efficiency: number }) {
+  const pct = Math.round(efficiency * 100);
+  return <ValueRing percent={pct} tint="var(--color-accent)" display={`${pct}%`} ariaLabel={`${pct}% lineup efficiency`} size="lg" />;
+}
+
+const performer = (label: string, p: { name: string; pts: number; player: SimGamePlayer | null }, ctx: SimCtx, accent: string) =>
+  p.player ? (
+    <MotionIn key={label}>
+      <p className="mb-0.5 text-xs font-extrabold uppercase" style={{ color: accent, letterSpacing: "var(--letter-spacing-badge)" }}>{label}</p>
+      <SimPlayerLine player={p.player} stats={[{ key: "pts", label: "Pts", value: simFmtPts(p.pts), tone: label === "Best performer" ? "success" : undefined }, { key: "ovr", label: "OVR", value: "", rating: p.player.overall ?? null }]} onOpen={ctx.openPlayer} />
+    </MotionIn>
+  ) : (
+    <Fact key={label} label={label} accent={accent}>{p.name} · {simFmtPts(p.pts)}</Fact>
+  );
 
 export function recapFacts(recap: SimWeekRecap, ctx: SimCtx): SimRecapFacts {
   const g = ctx.game;
@@ -97,100 +142,171 @@ export function SimWeekRecapStory({
   );
 
   const result = simRecapResultModel(recap);
+  const outcome = simRecapOutcome(recap, facts.youId);
   const game = recap.your_game;
-  const tone = simResultTone(game?.result);
+  const youName = (facts.youId && facts.names[facts.youId]) || ctx.game.you?.name || "You";
+  const posChip = (pos: string, children: ReactNode) => (
+    <li key={pos} className="ui-recap-chip" style={{ "--pos": `var(${positionColorVar(pos) ?? "--color-text-secondary"})` } as CSSProperties}>
+      {children}
+    </li>
+  );
   const pageFor = (key: SimRecapPageKey): ReactNode => {
     if (key === "result") {
-      return result.kind === "bye" ? (
-        <Hero value="Bye" caption="You had a bye this week." />
-      ) : (
-        <>
-          <div className="flex items-center justify-center gap-2">
-            <SimToneBadge label={simResultLabel(game?.result)} tone={tone} size="sm" />
-            <span className="text-xs" style={{ color: "var(--color-text-muted)" }}>vs {result.opponent}</span>
-          </div>
-          <div className="flex items-baseline justify-center gap-3" aria-label={`You ${simFmtPts(result.yours)}, ${result.opponent} ${simFmtPts(result.theirs)}`}>
-            <span className="text-6xl font-extrabold tabular-nums leading-none" style={{ color: simToneColor(tone) }}>{simFmtPts(result.yours)}</span>
-            <span style={{ color: "var(--color-text-muted)" }}>to</span>
-            <span className="text-4xl font-bold tabular-nums" style={{ color: "var(--color-text-secondary)" }}>{simFmtPts(result.theirs)}</span>
-          </div>
-          <p className="text-center text-base font-bold">{result.margin}</p>
-          <div className="flex flex-col gap-2">
-            {result.best ? <Fact label="Best performer">{result.best.name} · {simFmtPts(result.best.pts)}</Fact> : null}
-            {result.worst ? <Fact label="Worst performer">{result.worst.name} · {simFmtPts(result.worst.pts)}</Fact> : null}
-          </div>
-        </>
+      const label = outcome.headline;
+      return (
+        <Page tone={outcome.tone}>
+          <HeroZone>
+            <Confetti wonTitle={outcome.celebrate} />
+            {outcome.trophy ? (
+              <span className="ui-recap-trophy enter-pop" data-testid="recap-trophy">
+                <TrophyIcon size={outcome.celebrate ? 88 : 64} color={toneVar(outcome.celebrate || outcome.variant === "runner_up" ? "premium" : outcome.tone)} label={outcome.headline} />
+              </span>
+            ) : null}
+            <MotionIn>
+              <p className="ui-recap-headline" data-testid="recap-headline">{label}</p>
+            </MotionIn>
+            {outcome.sub ? <p className="ui-recap-sub">{outcome.sub}</p> : null}
+            {result.kind === "game" ? (
+              <div className="ui-recap-versus" aria-label={`${youName} ${simFmtPts(result.yours)}, ${result.opponent} ${simFmtPts(result.theirs)}`}>
+                <div className="ui-recap-team">
+                  <TeamAvatar name={youName} size={56} ringColor={toneVar(outcome.tone)} />
+                  <span>{youName}</span>
+                </div>
+                <div className="ui-recap-score">
+                  <CountUp value={result.yours} className="text-5xl font-extrabold leading-none" style={{ color: toneVar(outcome.tone) }} />
+                  <span style={{ color: "var(--color-text-muted)" }}>-</span>
+                  <CountUp value={result.theirs} className="text-3xl font-bold" style={{ color: "var(--color-text-secondary)" }} />
+                </div>
+                <div className="ui-recap-team">
+                  <TeamAvatar name={result.opponent} size={56} />
+                  <span>{result.opponent}</span>
+                </div>
+              </div>
+            ) : null}
+            {result.kind === "game" ? <p className="text-base font-bold">{result.margin}</p> : null}
+          </HeroZone>
+          {result.kind === "game" ? (
+            <div className="ui-recap-rows">
+              {result.best ? performer("Best performer", result.best, ctx, "var(--color-success)") : null}
+              {result.worst ? performer("Worst performer", result.worst, ctx, "var(--color-danger)") : null}
+            </div>
+          ) : null}
+        </Page>
       );
     }
     if (key === "matchup" && game) {
       const totals = simPositionTotals(game.starters);
+      const top = simTopStarters(game.starters);
       return (
-        <>
-          <Hero value={game.efficiency != null ? `${Math.round(game.efficiency * 100)}%` : simFmtPts(game.your_pts)} caption={game.optimal_pts != null ? `Lineup efficiency. Best possible: ${simFmtPts(game.optimal_pts)}` : "Your lineup"} color="var(--color-accent)" />
-          <ul className="flex flex-wrap justify-center gap-2" aria-label="Points by position">
-            {totals.map((t) => (
-              <li key={t.pos} className="rounded-full px-2.5 py-1 text-xs font-bold tabular-nums" style={{ background: "var(--glass-input-bg)" }}>
-                <span style={{ color: "var(--color-text-muted)" }}>{t.pos}</span> {simFmtPts(t.pts)}
-              </li>
-            ))}
-          </ul>
+        <Page>
+          <HeroZone>
+            {game.efficiency != null ? <EfficiencyRing efficiency={game.efficiency} /> : <Hero value={<CountUp value={game.your_pts} />} color="var(--color-accent)" />}
+            <p className="text-sm font-semibold" style={{ color: "var(--color-text-secondary)" }}>
+              {game.optimal_pts != null ? `Lineup efficiency. Best possible: ${simFmtPts(game.optimal_pts)}` : "Your lineup"}
+            </p>
+            <ul className="flex flex-wrap justify-center gap-2" aria-label="Points by position">
+              {totals.map((t) => posChip(t.pos, <><span>{t.pos}</span> <b>{simFmtPts(t.pts)}</b></>))}
+            </ul>
+          </HeroZone>
           <div className="flex flex-col">
-            {simTopStarters(game.starters).map((s, i) => (
-              <SimPlayerLine key={`${s.slot}-${i}`} player={s.player!} stats={[{ key: "pts", label: "Pts", value: simFmtPts(s.pts), tone: s.pts >= s.player!.projection ? "success" : undefined }, ...simListStats(s.player!, { adp: false }).slice(0, 1)]} onOpen={ctx.openPlayer} />
+            {top.map((s, i) => (
+              <MotionIn key={`${s.slot}-${i}`} index={i} count={top.length}>
+                <SimPlayerLine
+                  player={s.player!}
+                  stats={[
+                    { key: "pts", label: "Pts", value: simFmtPts(s.pts), tone: simRecapProj(s) != null && s.pts >= simRecapProj(s)! ? "success" : undefined },
+                    { key: "proj", label: "Proj", value: simFmtPts(simRecapProj(s)) },
+                    { key: "ovr", label: "OVR", value: "", rating: s.player!.overall ?? null },
+                  ]}
+                  onOpen={ctx.openPlayer}
+                />
+              </MotionIn>
             ))}
           </div>
-        </>
+        </Page>
       );
     }
     if (key === "injuries") {
       const m = simRecapInjuryModel(recap);
       const hero = m.yours > 0 ? `${m.yours}` : m.items.length > 0 ? `${m.items.length} hurt` : `${facts.lineupWarnings}`;
+      const bad = m.yours > 0 || facts.lineupWarnings > 0;
       return (
-        <>
-          <Hero value={hero} caption={m.yours > 0 ? "of your players got hurt" : m.items.length > 0 ? "injuries around the league" : "lineup issues to fix"} color={m.yours > 0 || facts.lineupWarnings > 0 ? "var(--color-danger)" : undefined} />
-          <ul className="flex flex-col gap-2">
+        <Page tone={bad ? "danger" : "accent"}>
+          <HeroZone>
+            <Hero value={hero} caption={m.yours > 0 ? "of your players got hurt" : m.items.length > 0 ? "injuries around the league" : "lineup issues to fix"} color={bad ? "var(--color-danger)" : undefined} />
+          </HeroZone>
+          <ul className="ui-recap-rows">
             {m.items.map((inj, i) => (
-              <li key={i} className="flex items-center justify-between gap-2">
-                <SimPlayerChip player={{ ...inj.player, status: "out", out_weeks: inj.weeks }} onOpen={ctx.openPlayer} />
-                <span className="shrink-0 text-xs font-bold" style={{ color: "var(--color-danger)" }}>Out {inj.weeks}w{inj.is_yours ? " · yours" : ""}</span>
-              </li>
+              <MotionIn key={i} as="li" index={i} count={m.items.length}>
+                <div className="ui-recap-fact" style={{ "--accent": inj.is_yours ? "var(--color-danger)" : "var(--color-border-strong)" } as CSSProperties}>
+                  {/* ONE marker per player: the chip says OUT, the trailing text only how long. */}
+                  <SimPlayerChip player={{ ...inj.player, status: "out", out_weeks: inj.weeks }} onOpen={ctx.openPlayer} />
+                  <span className="shrink-0 text-xs font-bold" style={{ color: inj.is_yours ? "var(--color-danger)" : "var(--color-text-secondary)" }}>{inj.detail}</span>
+                </div>
+              </MotionIn>
             ))}
           </ul>
           {m.zeroStarters.length > 0 ? <p className="text-center text-sm" style={{ color: "var(--color-warning)" }}>{m.zeroStarters.map((z) => `${z.name} (${z.flag})`).slice(0, 3).join(", ")} scored 0.</p> : null}
           {facts.lineupWarnings > 0 ? <p className="text-center text-sm font-semibold" style={{ color: "var(--color-warning)" }}>{facts.lineupWarnings} lineup issue{facts.lineupWarnings === 1 ? "" : "s"} for next week.</p> : null}
-        </>
+        </Page>
       );
     }
     if (key === "league") {
       const h = simLeagueHighlights(recap, facts.names);
       return (
-        <>
-          <Hero value={h.hero?.value ?? ""} caption={h.hero?.who ? `Top score: ${h.hero.who}` : undefined} color="var(--color-success)" />
-          <div className="flex flex-col gap-2">
+        <Page tone="success">
+          <HeroZone>
+            <p className="text-xs font-extrabold uppercase" style={{ color: "var(--color-text-muted)", letterSpacing: "var(--letter-spacing-badge)" }}>Top score of the week</p>
+            <Hero value={h.hero?.value ? <CountUp value={Number(h.hero.value)} /> : ""} caption={h.hero?.who ? `Top score: ${h.hero.who}` : undefined} color="var(--color-success)" />
+            {h.hero?.who ? <TeamAvatar name={h.hero.who} size={44} ringColor="var(--color-success)" /> : null}
+          </HeroZone>
+          <div className="ui-recap-rows">
             {h.items.map((it) => (
-              <Fact key={it.key} label={it.label}>{it.detail}</Fact>
+              <Fact key={it.key} label={it.label} accent={it.key === "closest" ? "var(--color-warning)" : it.key === "blowout" ? "var(--color-danger)" : "var(--color-accent)"}>{it.detail}</Fact>
             ))}
           </div>
-        </>
+        </Page>
+      );
+    }
+    if (key === "season") {
+      const m = simRecapSeasonModel(recap, facts);
+      return (
+        <Page tone={m.youChampion || outcome.variant === "runner_up" ? "premium" : "accent"}>
+          <HeroZone>
+            <span className="ui-recap-trophy enter-pop"><TrophyIcon size={72} color="var(--color-premium)" /></span>
+            <p className="text-xs font-extrabold uppercase" style={{ color: "var(--color-text-muted)", letterSpacing: "var(--letter-spacing-badge)" }}>{m.youChampion ? "Your finish" : "Champion"}</p>
+            <p className="ui-recap-headline" data-testid="season-headline">{m.youChampion ? "Champions" : m.championName ?? "Season complete"}</p>
+            {m.championName && !m.youChampion ? <TeamAvatar name={m.championName} size={48} ringColor="var(--color-premium)" /> : null}
+            <p className="ui-recap-sub">{m.youChampion ? `${youName} won it all.` : `You finished ${m.finish}.`}</p>
+          </HeroZone>
+          <div className="ui-recap-rows">
+            {m.items.map((it) => (
+              <Fact key={it.key} label={it.label} accent={it.key === "champion" ? "var(--color-premium)" : "var(--color-accent)"}>{it.detail}</Fact>
+            ))}
+          </div>
+        </Page>
       );
     }
     if (key === "next") {
       const n = simNextWeekModel(recap, facts);
       return (
-        <>
-          <Hero value={n.opponent ?? `Week ${n.week ?? ""}`} caption={n.week != null ? `Week ${n.week}${n.opponent ? " opponent" : ""}` : undefined} />
-          {n.yours != null && n.theirs != null ? (
-            <p className="text-center text-lg font-bold tabular-nums">
-              <span style={{ color: "var(--color-accent)" }}>{simFmtPts(n.yours)}</span> <span style={{ color: "var(--color-text-muted)" }}>proj vs</span> {simFmtPts(n.theirs)}
-            </p>
-          ) : null}
-          {n.edge ? <p className="text-center text-sm font-semibold" style={{ color: "var(--color-text-secondary)" }}>{n.edge}</p> : null}
-          <div className="flex flex-col gap-2">
+        <Page>
+          <HeroZone>
+            {n.opponent ? <TeamAvatar name={n.opponent} size={56} /> : null}
+            <Hero value={n.opponent ?? `Week ${n.week ?? ""}`} caption={n.week != null ? `Week ${n.week}${n.opponent ? " opponent" : ""}` : undefined} />
+            {n.yours != null && n.theirs != null ? (
+              <p className="text-lg font-bold tabular-nums">
+                <span style={{ color: "var(--color-accent)" }}>{simFmtPts(n.yours)}</span> <span style={{ color: "var(--color-text-muted)" }}>proj vs</span> {simFmtPts(n.theirs)}
+              </p>
+            ) : null}
+            {n.edge ? <p className="text-sm font-semibold" style={{ color: "var(--color-text-secondary)" }}>{n.edge}</p> : null}
+          </HeroZone>
+          <div className="ui-recap-rows">
             {n.notes.map((note) => (
-              <Fact key={note.label} label={note.label}>{note.text}</Fact>
+              <Fact key={note.label} label={note.label} accent={note.label === "Lineup" ? "var(--color-warning)" : "var(--color-accent)"}>{note.text}</Fact>
             ))}
           </div>
-        </>
+        </Page>
       );
     }
     return null;

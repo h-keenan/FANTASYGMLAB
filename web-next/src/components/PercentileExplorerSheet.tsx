@@ -28,6 +28,8 @@ import {
 } from "@/lib/percentileExplorer";
 import { ordinal, statPercentileBand } from "@/lib/playerQuickViewPresentation";
 import { PopupShell } from "@/components/PopupShell";
+import { Tabs } from "@/components/Tabs";
+import { percentileTabs } from "@/lib/sheetTabs";
 
 const LANE_STEP = 74;
 const BAR_H = 88;
@@ -354,7 +356,17 @@ export function PercentileExplorerSheet({
                 <p className="pe-hint">MY = a player on your roster</p>
               ) : null}
 
-              {focusBin >= 0 && hasFullPool ? (
+              <Tabs
+                id="percentile"
+                ariaLabel="Percentile lists"
+                tabs={percentileTabs({ hasFullPool, mineCount: mine.length }).map((tab) => ({
+                  key: tab.key,
+                  label: tab.label,
+                  render: () =>
+                    tab.key === "bucket" ? (
+                focusBin < 0 ? (
+                <p className="pe-hint">Drag across the chart or tap a bar to list the players in that bucket.</p>
+                ) : (
                 <section className="pe-bucket" data-testid="pe-bucket" aria-label="Players in this bucket">
                   <header className="pe-section-head">
                     <span>
@@ -373,9 +385,8 @@ export function PercentileExplorerSheet({
                   )}
                   {bucket.length > LIST_CAP ? <p className="pe-hint">Showing the top {LIST_CAP}. Search to find anyone else.</p> : null}
                 </section>
-              ) : null}
-
-              {hasFullPool ? (
+                )
+                    ) : tab.key === "find" ? (
                 <section className="pe-search" aria-label="Add a player to the chart">
                   <Input
                     type="search"
@@ -397,9 +408,7 @@ export function PercentileExplorerSheet({
                     )
                   ) : null}
                 </section>
-              ) : null}
-
-              {mine.length > 0 ? (
+                    ) : (
                 <section className="pe-mine" aria-label="Your roster">
                   <header className="pe-section-head">
                     <span>Your roster here</span>
@@ -407,7 +416,9 @@ export function PercentileExplorerSheet({
                   </header>
                   <PlayerList players={mine.slice(0, LIST_CAP)} format={data.format} meId={me.player_id} comparisonId={comparison?.player_id} rosterIds={rosterIds} onPick={pick} />
                 </section>
-              ) : null}
+                    ),
+                }))}
+              />
             </>
           ) : (
             <EmptyState {...explorerEmptyCopy(data?.reason ?? "no_data", positionLabel)} />

@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { FlatList, StyleSheet, TouchableOpacity, View } from 'react-native';
+import { FlatList, StyleSheet, View } from 'react-native';
+import PressableScale from '../components/PressableScale';
 import AppText from '../components/AppText';
 import ToneBadge from '../components/ToneBadge';
 import BrandHeaderBar from '../components/BrandHeaderBar';
@@ -557,8 +558,7 @@ function TeamRowCard({
   const rankColor = isChampion ? colors.premium : percentileColor(rankPercentile, colors);
 
   return (
-    <TouchableOpacity
-      activeOpacity={0.7}
+    <PressableScale
       onPress={onPress}
       style={[
         styles.row,
@@ -622,7 +622,7 @@ function TeamRowCard({
           </View>
         ) : null}
       </View>
-      <TouchableOpacity
+      <PressableScale
         onPress={onOpenProfile}
         hitSlop={8}
         accessibilityRole="button"
@@ -630,7 +630,7 @@ function TeamRowCard({
         style={{ paddingHorizontal: spacing.xs }}
       >
         <Ionicons name="information-circle-outline" size={18} color={colors.textSecondary} />
-      </TouchableOpacity>
+      </PressableScale>
       {item.metricRank != null ? (
         <View style={[styles.rankPill, isChampion && styles.rankPillFirst, { borderColor: `${rankColor}80` }]}>
           {isChampion ? (
@@ -650,7 +650,7 @@ function TeamRowCard({
           <AppText style={styles.count}>{item.playerIds.length}</AppText>
         </View>
       )}
-    </TouchableOpacity>
+    </PressableScale>
   );
 }
 

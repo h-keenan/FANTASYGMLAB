@@ -23,7 +23,7 @@ import { ReviewGlyphIcon } from "@/components/SimReviewGlyph";
 import { PositionBadge } from "@/components/PositionBadge";
 import { ToneBadge } from "@/components/ToneBadge";
 import {
-  simFmtPts,
+  simProjText,
   simTrendText,
   simPlayerSubline,
   simGamePreviewLine,
@@ -377,7 +377,7 @@ export function SimIconButton({
         event.stopPropagation();
         void run(onClick);
       }}
-      className="inline-flex shrink-0 items-center justify-center active:scale-95"
+      className="inline-flex shrink-0 items-center justify-center"
       style={{
         width: width ?? size,
         height: size,
@@ -397,7 +397,7 @@ export function SimIconButton({
 
 /** Projection + range stat for trailing slots. */
 export function SimProjection({ player }: { player: SimGamePlayer }) {
-  return <SimStat label="Proj" value={simFmtPts(player.projection)} />;
+  return <SimStat label="Proj" value={simProjText(player)} />;
 }
 
 /**

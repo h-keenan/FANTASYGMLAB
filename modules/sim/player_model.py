@@ -43,7 +43,10 @@ from typing import Any, Mapping
 
 import numpy as np
 
-MODEL_VERSION = "player-model-5"
+MODEL_VERSION = "player-model-6"
+# player-model-6 (frozen predecessor: player_model_v5.py): the SINGLE-GAME tail. Season totals, weekly means and typical weeks are player-model-5's;
+# only a stat line that no NFL game has ever produced is bounded (``STAT_CAPS``, ``cap_stats``). v5 let a WR post 9 touchdowns, 377 or 448 receiving
+# yards or a 94-point game (coridian_: "62.3 points from one WR"); the real 2021-25 record is 55.6. See docs/audits/2026-11-sim-single-game-tail.md.
 # player-model-5 adds only the in-season path tilt (PATH_TILT below); everything else is player-model-4.
 # player-model-3 (frozen in player_model_v3.py) = player-model-2 + team-level role coupling (a multiplier on the hidden
 # season mean). player-model-4 fixes the unbounded tails that composition made (a 0.6 ppg depth WR filling in for a
@@ -66,6 +69,25 @@ PATH_TILT = {"elite": 0.005, "starter": 0.005, "flex": 0.001, "depth": 0.0}
 PATH_CENTER = 8
 PATH_POS_SCALE = {"QB": 0.3, "K": 0.0, "DEF": 0.0}  # quarterbacks rarely change roles (the model's own role_qb), kickers and defenses never do
 SEASON_WEEKS = 17
+# player-model-6: real-world per-game limits on each stat line component. Counts are hard limits (all-time NFL single-game records, rounded: 7 passing
+# TDs, 6 rushing, 5 receiving; 23 catches); yardage saturates smoothly above a knee toward a cap just under the all-time record (rec 336, rush 296, pass
+# 554), so normal games are untouched and the extreme of a heavy-tailed yards-per-unit draw is squeezed rather than clipped into a spike.
+# Format: stat -> ("hard", limit) | ("soft", knee, cap).
+STAT_CAPS: dict[str, dict[str, tuple]] = {
+    "QB": {"pass_att": ("hard", 70), "pass_yd": ("soft", 420.0, 540.0), "pass_td": ("hard", 7), "pass_int": ("hard", 6),
+           "rush_yd": ("soft", 110.0, 190.0), "rush_td": ("hard", 4)},
+    "RB": {"rush_att": ("hard", 45), "rush_yd": ("soft", 160.0, 290.0), "rush_td": ("hard", 5),
+           "rec_tgt": ("hard", 20), "rec": ("hard", 18), "rec_yd": ("soft", 130.0, 230.0), "rec_td": ("hard", 4)},
+    "WR": {"rec_tgt": ("hard", 28), "rec": ("hard", 21), "rec_yd": ("soft", 190.0, 320.0), "rec_td": ("hard", 5),
+           "rush_yd": ("soft", 60.0, 120.0), "rush_td": ("hard", 2)},
+    "TE": {"rec_tgt": ("hard", 24), "rec": ("hard", 20), "rec_yd": ("soft", 150.0, 260.0), "rec_td": ("hard", 4)},
+}
+# player-model-6: smooth saturation of the PPR points of one game above a per-position knee, p' = K + C tanh((p - K) / C) (never above K + C).
+# Component caps alone leave the sum of volume x yards x touchdowns about 1.4x too frequent at 40+ and 2x at 50+ against the real 2021-25 panel
+# (docs/audits/2026-11-sim-single-game-tail.md); the knee sits above the 99th percentile so typical and boom weeks are untouched. The excess is
+# taken out of the yardage of the line (scoring-agnostic: yards are scaled by one factor), never out of touchdown or reception counts.
+TAIL_SQUEEZE = {"QB": (36.0, 22.0), "RB": (33.0, 24.0), "WR": (33.0, 24.0), "TE": (30.0, 20.0)}
+_YARD_KEYS = ("pass_yd", "rush_yd", "rec_yd")
 # Smooth ceilings (PPR points per game). Best real season PPG (8+ games) 2021-25: QB 26.7, RB 25.3, WR 25.8, TE 19.2, K 11.8;
 # best 6-game stretch: QB 31.6, RB 30.7, WR 31.4, TE 24.1, K 16.5. A mean can approach but never pass these.
 SEASON_CEIL = {"QB": 27.0, "RB": 25.5, "WR": 26.0, "TE": 19.5, "K": 12.0}
@@ -906,6 +928,48 @@ def _draw_stat_line(
     return out
 
 
+def _soft_cap(y: float, knee: float, cap: float) -> float:
+    if y <= knee:
+        return y
+    span = cap - knee
+    return knee + span * math.tanh((y - knee) / span)
+
+
+def cap_stats(pos: str, stats: dict[str, float]) -> dict[str, float]:
+    """Bound every component of a drawn stat line by what an NFL game can produce (``STAT_CAPS``)."""
+
+    for k, rule in STAT_CAPS.get(pos, {}).items():
+        v = stats.get(k)
+        if v is None:
+            continue
+        if rule[0] == "hard":
+            stats[k] = min(v, rule[1])
+        elif v > rule[1]:
+            stats[k] = round(_soft_cap(v, rule[1], rule[2]))
+    return stats
+
+
+def squeeze_tail(pos: str, stats: dict[str, float]) -> dict[str, float]:
+    """Saturate the PPR points of a stat line above ``TAIL_SQUEEZE[pos]`` by shrinking its yardage (see the constant)."""
+
+    kc = TAIL_SQUEEZE.get(pos)
+    if kc is None:
+        return stats
+    knee, span = kc
+    ppr = sum(PPR_WEIGHTS.get(k, 0.0) * v for k, v in stats.items())
+    if ppr <= knee:
+        return stats
+    excess = ppr - (knee + span * math.tanh((ppr - knee) / span))
+    ypts = sum(PPR_WEIGHTS.get(k, 0.0) * stats.get(k, 0.0) for k in _YARD_KEYS)
+    if ypts <= 0.0 or excess <= 0.0:
+        return stats
+    q = max(0.0, 1.0 - excess / ypts)
+    for k in _YARD_KEYS:
+        if k in stats:
+            stats[k] = round(stats[k] * q)
+    return stats
+
+
 def _components(stats: Mapping[str, float], pos: str, scoring: Mapping[str, Any] | None) -> dict[str, float]:
     w = weights_for(scoring, pos)
     comp = {"passing": 0.0, "rushing": 0.0, "receiving": 0.0, "kicking": 0.0, "turnovers": 0.0}
@@ -961,7 +1025,7 @@ def _draw_week_points(
                           expected_points=round(mean, 2))
     w = weights_for(scoring, gpos)
     rho = _solve_rho(gpos, mean * fraction, style, w, scoring)
-    stats = _draw_stat_line(gpos, rho, style, profile.volatility, rng, z_team)
+    stats = squeeze_tail(gpos, cap_stats(gpos, _draw_stat_line(gpos, rho, style, profile.volatility, rng, z_team)))
     pts = score_stat_line(stats, gpos, scoring)
     return WeekResult(
         points=round(pts, 2), stats={k: float(v) for k, v in stats.items()}, active=True,
@@ -988,5 +1052,5 @@ __all__ = [
     "ARCHETYPES", "ENV_SD", "InjuryEvent", "InSeasonParams", "MODEL_VERSION", "RoleChange", "SEASON_WEEKS", "SeasonParams",
     "SeasonProfile", "WeekResult", "apply_depth_coupling", "default_bye_week", "draw_season_profile", "draw_week_points",
     "draw_environment", "expected_week_points", "normalize_player", "profile_rng", "score_stat_line", "simulate_season",
-    "team_week_shock", "week_rng", "weights_for", "TEAM_ROLES", "ROLE_MODE", "with_role", "with_role_multiplier", "soft_ceiling", "SEASON_CEIL", "WEEK_CEIL",
+    "team_week_shock", "week_rng", "weights_for", "TEAM_ROLES", "ROLE_MODE", "with_role", "with_role_multiplier", "cap_stats", "squeeze_tail", "TAIL_SQUEEZE", "STAT_CAPS", "soft_ceiling", "SEASON_CEIL", "WEEK_CEIL",
 ]

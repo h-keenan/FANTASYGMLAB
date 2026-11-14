@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useReducer, useRef, useState, type ReactNode } from 'react';
-import { Pressable, StyleSheet, View } from 'react-native';
+import { StyleSheet, View } from 'react-native';
+import PressableScale from './PressableScale';
 import * as Haptics from 'expo-haptics';
 import { Ionicons } from '@expo/vector-icons';
 
@@ -79,21 +80,21 @@ export function SimDraftIconButton({
     }
   };
   return (
-    <Pressable
+    <PressableScale
       onPress={run}
       disabled={off}
       accessibilityRole="button"
       accessibilityLabel={label}
       accessibilityState={{ disabled: off, selected: active, busy: pending }}
-      style={({ pressed }) => [
+      style={[
         styles.iconButton,
-        { width: width ?? size, height: size, opacity: pressed ? 0.7 : 1, transform: [{ scale: pressed ? 0.95 : 1 }] },
+        { width: width ?? size, height: size },
         active && { backgroundColor: colors.accentMuted },
         primary && { backgroundColor: colors.accent },
       ]}
     >
       <Ionicons name={pending ? 'hourglass-outline' : icon} size={20} color={tint} />
-    </Pressable>
+    </PressableScale>
   );
 }
 
@@ -253,7 +254,7 @@ export function SimDraftBoard({
             onChange={(key) => dispatch({ type: 'pos', value: key as SimPosFilter | '' })}
           />
         </View>
-        <Pressable
+        <PressableScale
           onPress={() => dispatch({ type: 'sort', value: simCycleSort(filter.sort) })}
           accessibilityRole="button"
           accessibilityLabel={`Sort players, now ${SIM_DRAFT_SORTS.find((o) => o.value === filter.sort)?.label ?? 'ADP'}. Tap to change`}
@@ -261,7 +262,7 @@ export function SimDraftBoard({
         >
           <AppText style={styles.sortText}>{SIM_DRAFT_SORTS.find((o) => o.value === filter.sort)?.label ?? 'ADP'}</AppText>
           <Ionicons name="swap-vertical" size={14} color={colors.textSecondary} />
-        </Pressable>
+        </PressableScale>
       </View>
       {state === 'loading' && items.length === 0 ? (
         <SkeletonCard rows={6} />
@@ -288,11 +289,11 @@ export function SimDraftBoard({
             <SimDraftRow key={player.id} player={player} suppressBadges={suppressed} onOpen={onOpen} week={week} drafted={draftedIds?.includes(player.id)} actions={actions ? actions(player) : null} chipsExtra={chipsExtra ? chipsExtra(player) : undefined} />
           ))}
           {rows.remaining > 0 ? (
-            <Pressable onPress={() => setWin({ key: windowKey, n: visible + SIM_WINDOW_STEP })} accessibilityRole="button" style={styles.showMore}>
+            <PressableScale onPress={() => setWin({ key: windowKey, n: visible + SIM_WINDOW_STEP })} accessibilityRole="button" style={styles.showMore}>
               <AppText style={styles.showMoreText}>
                 Show {Math.min(SIM_WINDOW_STEP, rows.remaining)} more on this page ({rows.remaining} left)
               </AppText>
-            </Pressable>
+            </PressableScale>
           ) : null}
         </View>
       )}

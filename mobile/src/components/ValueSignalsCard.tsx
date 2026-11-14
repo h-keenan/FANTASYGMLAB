@@ -1,10 +1,12 @@
 import React, { useMemo, useState } from 'react';
-import { StyleSheet, TouchableOpacity, View } from 'react-native';
+import { StyleSheet, View } from 'react-native';
+import PressableScale from './PressableScale';
 import { useQuery } from '@tanstack/react-query';
 
 import AppText from './AppText';
 import PlayerIdentityRow from './PlayerIdentityRow';
-import SectionHeading from './SectionHeading';
+import CompactModule from './CompactModule';
+import { listSummaryParts } from '../lib/moduleTemplates';
 import SegmentedTabBar from './SegmentedTabBar';
 import { api, type RankedPlayer, type ValueSignalItem } from '../lib/api';
 import { queryKeys } from '../lib/queryKeys';
@@ -56,16 +58,34 @@ export default function ValueSignalsCard({ leagueId, leagueName }: { leagueId: s
   if (!status && data.buy_low.length === 0 && data.sell_high.length === 0) {
     return (
       <View style={styles.wrap} testID="value-signals">
-        <SectionHeading title="Buy low / Sell high" />
-        <AppText style={styles.note} testID="value-signals-none">
-          No buy-low or sell-high candidates right now. Nobody clears both the value-trend and production bars.
-        </AppText>
+        <CompactModule
+          id="trades.signals"
+          title="Buy low / Sell high"
+          parts={[{ key: 'none', text: 'No buy-low or sell-high candidates' }]}
+        >
+          <AppText style={styles.note} testID="value-signals-none">
+            No buy-low or sell-high candidates right now. Nobody clears both the value-trend and production bars.
+          </AppText>
+        </CompactModule>
       </View>
     );
   }
   return (
     <View style={styles.wrap} testID="value-signals">
-      <SectionHeading title="Buy low / Sell high" />
+      <CompactModule
+        id="trades.signals"
+        title="Buy low / Sell high"
+        parts={
+          status
+            ? [{ key: 's', text: status }]
+            : listSummaryParts({
+                count: data.buy_low.length + data.sell_high.length,
+                noun: 'signal',
+                highlights: [`${data.buy_low.length} buy low`, `${data.sell_high.length} sell high`, data.buy_low[0]?.name ?? data.sell_high[0]?.name],
+                maxHighlights: 3,
+              })
+        }
+      >
       <AppText style={styles.note}>Value rating trend against this season's production.</AppText>
       {status ? (
         <AppText style={styles.note}>{status}</AppText>
@@ -83,9 +103,8 @@ export default function ValueSignalsCard({ leagueId, leagueName }: { leagueId: s
             <AppText style={styles.note}>Nobody currently clears both the value-trend and production bars.</AppText>
           ) : (
             items.map((item) => (
-              <TouchableOpacity
+              <PressableScale
                 key={item.player_id}
-                activeOpacity={0.7}
                 style={styles.row}
                 onPress={() => openPlayer(toRankedPlayer(item), { leagueId, leagueName })}
               >
@@ -104,7 +123,7 @@ export default function ValueSignalsCard({ leagueId, leagueName }: { leagueId: s
                 >
                   {formatRatingDelta(item.rating_change)}
                 </AppText>
-              </TouchableOpacity>
+              </PressableScale>
             ))
           )}
           {data.method ? (
@@ -114,6 +133,7 @@ export default function ValueSignalsCard({ leagueId, leagueName }: { leagueId: s
           ) : null}
         </>
       )}
+      </CompactModule>
     </View>
   );
 }

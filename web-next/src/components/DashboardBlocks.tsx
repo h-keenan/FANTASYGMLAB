@@ -1,11 +1,13 @@
 import Link from "next/link";
-import { useState, type ReactNode } from "react";
+import type { ReactNode } from "react";
 
 import type { BriefingItem, DashboardResponse } from "@/lib/api";
 import { AccentCard } from "@/components/AccentCard";
 import { ToneBadge } from "@/components/ToneBadge";
 import { BeginnerHelp } from "@/components/BeginnerHelp";
 import { SectionHeading } from "@/components/SectionHeading";
+import { CompactModule } from "@/components/ui/CompactModule";
+import { LinkModule } from "@/components/ui/ModuleTemplates";
 import {
   deadlineChip,
   tradeIdeasLine,
@@ -111,57 +113,41 @@ export function DashboardTradesBlock({
   const goalLine = isBeginner ? tradesGoalLine(goal) : "";
   // The one home for the deadline: here, not also as a chip.
   const deadline = deadlineInAttention ? null : deadlineChip(data.trade_window);
+  const stateTone = deadlinePassed ? "muted" : tradeItems.length > 0 ? "action" : "muted";
   return (
-    <section className="flex flex-col gap-3" aria-labelledby="trades-heading" data-testid="dashboard-trades-block">
-      <SectionHeading
-        id="trades-heading"
-        size="compact"
-        help={
-          isBeginner ? (
-            <BeginnerHelp popover label="trade ideas" text={`${TRADES_BLOCK_COPY.beginnerExplainer}${goalLine ? ` ${goalLine}` : ""}`} />
-          ) : undefined
-        }
-      >
-        {TRADES_BLOCK_COPY.title}
-      </SectionHeading>
-      <Link
+    <section className="flex flex-col gap-2" data-testid="dashboard-trades-block">
+      <LinkModule
+        title={TRADES_BLOCK_COPY.title}
         href={`/trade-hub/${id}${query}`}
-        className="glass-surface flex items-center justify-between gap-2 px-3 py-2 text-sm font-bold"
-        style={{ minHeight: "var(--touch-target-min)", color: "inherit", textDecoration: "none" }}
-      >
-        <span className="min-w-0 flex flex-col">
-          <span style={{ color: tradeItems.length > 0 && !deadlinePassed ? "var(--color-text-primary)" : "var(--color-text-secondary)" }}>
-            {tradeIdeasLine(tradeItems.length, deadlinePassed, pending)}
-          </span>
-          {deadline ? (
-            <span className="text-xs font-normal" style={{ color: deadline.tone === "risk" ? "var(--color-danger)" : "var(--color-text-muted)" }}>
-              Trade deadline: {deadline.value}
-            </span>
-          ) : null}
-        </span>
-        <span className="shrink-0" style={{ color: "var(--color-accent)" }}>{TRADES_BLOCK_COPY.link} →</span>
-      </Link>
+        tone="action"
+        parts={[
+          { key: "ideas", text: tradeIdeasLine(tradeItems.length, deadlinePassed, pending), tone: stateTone, strong: tradeItems.length > 0 && !deadlinePassed },
+          deadline ? { key: "deadline", text: `Deadline ${deadline.value}`, tone: deadline.tone === "risk" ? "danger" : "muted" } : null,
+          { key: "link", text: TRADES_BLOCK_COPY.link, tone: "accent" },
+        ]}
+      />
+      {isBeginner ? (
+        <BeginnerHelp popover label="trade ideas" text={`${TRADES_BLOCK_COPY.beginnerExplainer}${goalLine ? ` ${goalLine}` : ""}`} />
+      ) : null}
     </section>
   );
 }
 
-/** Secondary modules, collapsed by default (native disclosure: no JS state). */
+/** Secondary modules (league activity, the mini-games, league type), one compact module, mounted only when opened. */
 export function DashboardMore({ children }: { children: ReactNode }) {
-  // Collapsed content is mounted on first open, so its self-fetching cards
-  // (daily games) cost nothing for the many visits that never expand it.
-  const [opened, setOpened] = useState(false);
   return (
-    <details className="glass-surface" data-testid="dashboard-more" onToggle={(event) => event.currentTarget.open && setOpened(true)}>
-      <summary
-        className="flex items-center justify-between gap-3 px-4 text-sm font-bold uppercase cursor-pointer"
-        style={{ minHeight: "var(--touch-target-min)", letterSpacing: "0.02em" }}
-      >
-        <span className="shrink-0">More</span>
-        <span className="min-w-0 truncate text-xs font-normal normal-case" style={{ color: "var(--color-text-muted)" }}>
-          League activity, games, settings
-        </span>
-      </summary>
-      <div className="flex flex-col gap-5 px-4 pb-4 pt-2">{opened ? children : null}</div>
-    </details>
+    <CompactModule
+      id="today.more"
+      title="More"
+      testId="dashboard-more"
+      tone="muted"
+      parts={[
+        { key: "a", text: "League activity" },
+        { key: "g", text: "2 mini-games" },
+        { key: "t", text: "League type" },
+      ]}
+    >
+      {children}
+    </CompactModule>
   );
 }

@@ -12,9 +12,9 @@ import {
   Platform,
   ScrollView,
   StyleSheet,
-  TouchableOpacity,
   View,
 } from 'react-native';
+import PressableScale from '../components/PressableScale';
 import PostureChip from '../components/PostureChip';
 import AppText from '../components/AppText';
 import ToneBadge, { withAlpha } from '../components/ToneBadge';
@@ -546,16 +546,16 @@ export default function TradeAnalyzerScreen({ leagueId, leagueName, navigation, 
         <View style={styles.partnerBlock}>
           <AppText style={styles.partnerLabel}>TRADING WITH</AppText>
           <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.partnerRow} keyboardShouldPersistTaps="handled">
-            <TouchableOpacity
+            <PressableScale
               accessibilityRole="button"
               accessibilityState={{ selected: selectedTeamId === ALL_TEAMS_ID }}
               style={[styles.pill, selectedTeamId === ALL_TEAMS_ID && styles.pillActive]}
               onPress={() => setSelectedTeamId(ALL_TEAMS_ID)}
             >
               <AppText style={[styles.pillText, selectedTeamId === ALL_TEAMS_ID && styles.pillTextActive]}>Any team</AppText>
-            </TouchableOpacity>
+            </PressableScale>
             {otherTeams.map((team) => (
-              <TouchableOpacity
+              <PressableScale
                 accessibilityRole="button"
                 accessibilityState={{ selected: selectedTeamId === team.rosterId }}
                 key={team.rosterId}
@@ -566,7 +566,7 @@ export default function TradeAnalyzerScreen({ leagueId, leagueName, navigation, 
                 <AppText style={[styles.pillText, selectedTeamId === team.rosterId && styles.pillTextActive]} numberOfLines={1}>
                   {team.ownerName}
                 </AppText>
-              </TouchableOpacity>
+              </PressableScale>
             ))}
           </ScrollView>
         </View>
@@ -875,10 +875,10 @@ function VerdictCard({
         <AppText style={[styles.verdictBand, isExtreme && styles.verdictBandExtreme, { color: toneColor }]}>
           {verdict.band}
         </AppText>
-        <TouchableOpacity accessibilityRole="button" style={styles.shareButton} onPress={() => setShareOpen(true)} hitSlop={8}>
+        <PressableScale accessibilityRole="button" style={styles.shareButton} onPress={() => setShareOpen(true)} hitSlop={8}>
           <Ionicons name="share-outline" size={16} color={colors.textSecondary} />
           <AppText style={styles.shareButtonText}>Share</AppText>
-        </TouchableOpacity>
+        </PressableScale>
       </View>
       {verdict.posture ? <PostureChip posture={verdict.posture} /> : null}
       {verdictCautions(verdict).map((caution) => (
@@ -990,12 +990,12 @@ function VerdictCard({
         </AppText>
       ) : null}
       {verdict.counter_action ? (
-        <TouchableOpacity accessibilityRole="button" style={styles.counterButton} onPress={onBuildCounter}>
+        <PressableScale accessibilityRole="button" style={styles.counterButton} onPress={onBuildCounter}>
           <Ionicons name="swap-horizontal" size={16} color={colors.accent} />
           <AppText style={styles.counterButtonText}>Build the counter</AppText>
-        </TouchableOpacity>
+        </PressableScale>
       ) : null}
-      <TouchableOpacity
+      <PressableScale
         accessibilityRole="button"
         accessibilityState={{ expanded: readMore }}
         testID="verdict-read-more"
@@ -1003,7 +1003,7 @@ function VerdictCard({
         hitSlop={8}
       >
         <AppText style={styles.lineupModelLabel}>{readMore ? 'READ LESS' : 'READ MORE'}</AppText>
-      </TouchableOpacity>
+      </PressableScale>
       {readMore ? (
         <>
           {rationaleRest ? <AppText style={[styles.verdictText, styles.verdictRationale]}>{rationaleRest}</AppText> : null}

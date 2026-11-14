@@ -1,6 +1,7 @@
 import FirstValueOfferCard from '../components/FirstValueOfferCard';
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
+import { ScrollView, StyleSheet, View } from 'react-native';
+import PressableScale from '../components/PressableScale';
 import AppText from '../components/AppText';
 import ValueStat from '../components/ValueStat';
 import EmptyState from '../components/EmptyState';
@@ -57,6 +58,8 @@ import ScreenInfoNote from '../components/ScreenInfoNote';
 import FreeLimitNote from '../components/FreeLimitNote';
 import GlossaryNote from '../components/GlossaryNote';
 import SectionHeading from '../components/SectionHeading';
+import CompactModule from '../components/CompactModule';
+import { listSummaryParts } from '../lib/moduleTemplates';
 import BriefingItemPlayers from '../components/BriefingItemPlayers';
 import LeaguePulseCard from '../components/LeaguePulseCard';
 import { leaguePulseHighlights } from '../lib/leaguePulse';
@@ -483,9 +486,9 @@ export default function DashboardScreen({ route, navigation }: Props) {
         tradePending={false}
         onNavigate={navigate}
         right={
-          <TouchableOpacity onPress={() => navigation.navigate('GmPlan', { leagueId, leagueName })} hitSlop={LINK_HIT_SLOP}>
+          <PressableScale onPress={() => navigation.navigate('GmPlan', { leagueId, leagueName })} hitSlop={LINK_HIT_SLOP}>
             <AppText style={styles.viewAll}>Full GM Plan ›</AppText>
-          </TouchableOpacity>
+          </PressableScale>
         }
         renderCard={(item, index) => (
           <BriefingCard
@@ -544,15 +547,14 @@ export default function DashboardScreen({ route, navigation }: Props) {
 
       {teamSnapshot ? (
         <View style={styles.snapshotSection}>
-          <SectionHeading
-            title="My Team"
-            right={
-              <TouchableOpacity onPress={() => navigation.navigate('MyTeam', { leagueId, leagueName })} hitSlop={LINK_HIT_SLOP}>
-                <AppText style={styles.viewAll}>Open ›</AppText>
-              </TouchableOpacity>
-            }
+          <DashboardTeamStats
+            snapshot={teamSnapshot}
+            teams={teamRankings}
+            leagueId={leagueId}
+            leagueName={leagueName}
+            onNavigate={navigate}
+            onOpen={() => navigation.navigate('MyTeam', { leagueId, leagueName })}
           />
-          <DashboardTeamStats snapshot={teamSnapshot} teams={teamRankings} leagueId={leagueId} leagueName={leagueName} onNavigate={navigate} />
         </View>
       ) : null}
 
@@ -1173,14 +1175,23 @@ export function WatchlistAlertsSection({
 
   return (
     <View style={styles.groupSection}>
-      <SectionHeading
+      <CompactModule
+        id="today.watchlist"
         title="Watchlist & Alerts"
-        right={
-          <TouchableOpacity onPress={() => navigation.navigate('Alerts', { leagueId, leagueName })} hitSlop={LINK_HIT_SLOP}>
-            <AppText style={styles.viewAll}>View All ›</AppText>
-          </TouchableOpacity>
+        label="Watchlist and alerts"
+        testID="dashboard-watchlist"
+        tone="warning"
+        parts={listSummaryParts({
+          count: items.length + (showHealth ? 1 : 0),
+          noun: 'alert',
+          highlights: [items[0]?.headline ?? (showHealth ? 'Key injuries on your roster' : null)],
+        })}
+        action={
+          <PressableScale onPress={() => navigation.navigate('Alerts', { leagueId, leagueName })} hitSlop={LINK_HIT_SLOP} style={{ minHeight: 44, justifyContent: 'center' }}>
+            <AppText style={styles.viewAll}>All ›</AppText>
+          </PressableScale>
         }
-      />
+      >
       {richItems.map((item, index) => (
         <TopPriorityTradeCard
           key={`watch-trade-${index}`}
@@ -1231,6 +1242,7 @@ export function WatchlistAlertsSection({
           ))}
         </AnimatedCard>
       ) : null}
+      </CompactModule>
     </View>
   );
 }
@@ -1335,11 +1347,10 @@ function MoreMovesRow({ hidden, onUpgrade }: { hidden: number; onUpgrade: () => 
     trackUse('more_next_moves', 'gate_seen', { tier: 'free' });
   }, []);
   return (
-    <TouchableOpacity
+    <PressableScale
       accessibilityRole="button"
       accessibilityLabel={`${hidden} more move${hidden === 1 ? '' : 's'} on Pro. Upgrade`}
       onPress={onUpgrade}
-      activeOpacity={0.8}
       style={{
         flexDirection: 'row',
         alignItems: 'center',
@@ -1357,6 +1368,6 @@ function MoreMovesRow({ hidden, onUpgrade }: { hidden: number; onUpgrade: () => 
         {hidden} more move{hidden === 1 ? '' : 's'} on Pro
       </AppText>
       <AppText style={{ color: colors.premium, fontWeight: '700' }}>Upgrade ›</AppText>
-    </TouchableOpacity>
+    </PressableScale>
   );
 }

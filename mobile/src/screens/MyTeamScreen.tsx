@@ -1,27 +1,26 @@
 import GlossaryNote from '../components/GlossaryNote';
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
+import { ScrollView, StyleSheet, View } from 'react-native';
+import PressableScale from '../components/PressableScale';
 import { Ionicons } from '@expo/vector-icons';
 import AppText from '../components/AppText';
-import ValueStat from '../components/ValueStat';
 import BeginnerHelp from '../components/BeginnerHelp';
 import NextSteps from '../components/NextSteps';
-import SectionHeading from '../components/SectionHeading';
 import { useFocusEffect } from '@react-navigation/native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { useHeaderHeight } from '@react-navigation/elements';
 import { useIsRestoring, useQuery, useQueryClient } from '@tanstack/react-query';
 
 import AnimatedCard from '../components/AnimatedCard';
-import EmptyState from '../components/EmptyState';
 import ErrorState from '../components/ErrorState';
 import EvaluationLensHeaderButton from '../components/EvaluationLensHeaderButton';
 import GmStanceHeaderButton from '../components/GmStanceHeaderButton';
 import LeagueSwitcherHeaderButton from '../components/LeagueSwitcherHeaderButton';
 import BrandHeaderBar from '../components/BrandHeaderBar';
-import CircularProgressRing from '../components/CircularProgressRing';
 import GridBackground from '../components/GridBackground';
-import DashboardStatRow from '../components/DashboardStatRow';
+import CompactModule from '../components/CompactModule';
+import { Hero, StatStripModule } from '../components/ModuleTemplates';
+import { listSummaryParts } from '../lib/moduleTemplates';
 import PositionBadge from '../components/PositionBadge';
 import PlayerIdentityRow from '../components/PlayerIdentityRow';
 import { SkeletonCard, SkeletonRows } from '../components/SkeletonBlock';
@@ -35,7 +34,7 @@ import { buildRosterComposition, buildTeamAnalysisRows, type CompositionSegment,
 import { toUserErrorMessage } from '../lib/errorMessages';
 import { isByeOnlyLabel, lineupStatusLabel, openSlotsMessage } from '../lib/lineupAvailability';
 import { useOrbClearance } from '../lib/orbLayout';
-import { formatRank, percentileColor, percentileFromRank } from '../lib/percentile';
+import { formatRank, percentileFromRank } from '../lib/percentile';
 import { queryKeys } from '../lib/queryKeys';
 import { useScreenHeaderTitle } from '../lib/useScreenHeaderTitle';
 import { useThemeMode } from '../context/ThemeModeContext';
@@ -106,7 +105,6 @@ export default function MyTeamScreen({ route, navigation }: Props) {
   const styles = useMemo(() => createStyles(colors), [colors]);
   const { leagueId, leagueName } = route.params;
   const [rosterTab, setRosterTab] = useState<RosterTabKey>('starters');
-  const [showFullAnalysis, setShowFullAnalysis] = useState(false);
   const queryClient = useQueryClient();
   // Gates the queries below until the persisted AsyncStorage cache has
   // finished hydrating back into the in-memory QueryClient.
@@ -264,7 +262,6 @@ export default function MyTeamScreen({ route, navigation }: Props) {
   // IDP leagues only: rostered defenders (model value); absent otherwise.
   const idpRoster = myTeamData?.idp_players ?? [];
   if (idpRoster.length > 0) rosterTabs.push({ key: 'idp', label: 'IDP', players: idpRoster });
-  const currentTab = rosterTabs.find((tab) => tab.key === rosterTab) ?? rosterTabs[0];
 
   return (
     <View style={styles.root}>
@@ -274,86 +271,110 @@ export default function MyTeamScreen({ route, navigation }: Props) {
 
         <BeginnerHelp term="myTeamIntro" />
         <BeginnerHelp term="myTeamValueTiers" />
-        <SectionHeading title="Team Snapshot" topGap={12} />
-        <TeamSnapshot team={myTeam} leagueSize={leagueSize} teamValue={teamValue} open={(key) => openInsight(navigation.navigate as never, key, leagueId, leagueName)} />
+        <TeamHero team={myTeam} leagueSize={leagueSize} teamValue={teamValue} startersValue={bestBall ? 0 : startersValue} />
+        <TeamSnapshotModule team={myTeam} open={(key) => openInsight(navigation.navigate as never, key, leagueId, leagueName)} />
         {myTeam && hasRosterAnalysis(myTeam) ? (
-          <TouchableOpacity
-            style={styles.headerLink}
-            onPress={() => setShowFullAnalysis((v) => !v)}
-            activeOpacity={0.7}
-            hitSlop={6}
+          <CompactModule
+            id="team.analytics"
+            title="Team Analytics"
+            tone="muted"
+            parts={listSummaryParts({
+              count: analysisRows.length,
+              noun: 'position room',
+              none: 'Roster analysis ready',
+              highlights: analysisRows.slice(0, 2).map((row) => `${row.position} ${row.status}`),
+            })}
           >
-            <AppText style={styles.linkRowText}>{showFullAnalysis ? 'Hide team analytics' : 'Team analytics'}</AppText>
-            <Ionicons name={showFullAnalysis ? 'chevron-up' : 'chevron-forward'} size={13} color={colors.accent} />
-          </TouchableOpacity>
-        ) : null}
-        {showFullAnalysis && myTeam ? (
-          <TeamAnalysisPanel
-            team={myTeam}
-            leagueSize={leagueSize}
-            showExplanations={false}
-            onOpenTeams={() => navigation.navigate('Teams', { leagueId, leagueName })}
-            onOpenFranchise={() => navigation.navigate('Teams', { leagueId, leagueName, metric: 'franchise' })}
-            onOpenDraftCenter={() => navigation.navigate('DraftCenter', { leagueId, leagueName })}
-            onOpenStarters={() => setRosterTab('starters')}
-            onOpenBench={() => setRosterTab('bench')}
-            onOpenAge={() => navigation.navigate('Teams', { leagueId, leagueName, metric: 'age' })}
-          />
+            <TeamAnalysisPanel
+              team={myTeam}
+              leagueSize={leagueSize}
+              showExplanations={false}
+              onOpenTeams={() => navigation.navigate('Teams', { leagueId, leagueName })}
+              onOpenFranchise={() => navigation.navigate('Teams', { leagueId, leagueName, metric: 'franchise' })}
+              onOpenDraftCenter={() => navigation.navigate('DraftCenter', { leagueId, leagueName })}
+              onOpenStarters={() => setRosterTab('starters')}
+              onOpenBench={() => setRosterTab('bench')}
+              onOpenAge={() => navigation.navigate('Teams', { leagueId, leagueName, metric: 'age' })}
+            />
+          </CompactModule>
         ) : null}
 
         {analysisRows.length > 0 ? (
-          <>
-            <SectionHeading title="Team Analysis" topGap={12} />
+          <CompactModule
+            id="team.analysis"
+            title="Team Analysis"
+            tone="accent"
+            parts={[
+              ...analysisRows.slice(0, 4).map((row) => ({
+                key: row.position,
+                text: `${row.position} ${row.status}`,
+                tone: row.tone === 'success' ? ('success' as const) : row.tone === 'danger' ? ('danger' as const) : row.tone === 'warning' ? ('warning' as const) : undefined,
+              })),
+            ]}
+          >
             <TeamAnalysisRows rows={analysisRows} />
             {needsQuery.data && needsQuery.data.weaknesses.length > 0 ? (
               <NextSteps title="Act on a need" steps={['waivers', 'trade-hub']} leagueId={leagueId} leagueName={leagueName} />
             ) : null}
-          </>
+          </CompactModule>
         ) : null}
 
-        <SectionHeading
-          title="Your Roster"
-          topGap={12}
-          right={
-            !bestBall && startersValue > 0 ? (
-              <AppText style={styles.sectionTotal}>{`Starters Value ${Math.round(startersValue).toLocaleString()}`}</AppText>
-            ) : undefined
-          }
-        />
         {bestBall && myTeamData?.lineup_advice_message ? (
           <AppText style={styles.bestBallNote}>{myTeamData.lineup_advice_message}</AppText>
         ) : null}
-        <View style={styles.tabBar}>
-          <SegmentedTabBar options={rosterTabs} active={currentTab.key} onChange={setRosterTab} />
-        </View>
-        {currentTab.key === 'starters' && !bestBall && openSlotsMessage(myTeamData?.open_slots) ? (
-          <AppText style={[styles.disclaimer, { color: colors.premium }]}>{openSlotsMessage(myTeamData?.open_slots)}</AppText>
-        ) : null}
-        {currentTab.players.length === 0 ? (
-          <AppText style={styles.rosterEmpty}>
-            {currentTab.key === 'starters' ? 'No suggested starters yet.' : 'Nobody here yet.'}
-          </AppText>
-        ) : (
-          <AnimatedCard style={styles.groupCard}>
-            {currentTab.players.map((player, index) => (
-              <LineupRow
-                key={player.player_id}
-                player={player}
-                keeper={keepers?.players?.[player.player_id]}
-                showDivider={index < currentTab.players.length - 1}
-                onPress={() => goToPlayer(player)}
-                muted={currentTab.key !== 'starters'}
-              />
-            ))}
-          </AnimatedCard>
-        )}
+        {/* The roster as sections, not tabs: each group reads collapsed ("9 players · Value 6,120 · Gibbs, Chase"). */}
+        {rosterTabs.map((tab, index) => {
+          const names = tab.players.slice(0, 3).map((p) => (p.name || '').split(' ').slice(-1)[0]).filter(Boolean);
+          const total = tab.players.reduce((sum, p) => sum + (p.score ?? 0), 0);
+          const emptyText = tab.key === 'starters' ? 'No suggested starters yet.' : 'Nobody here yet.';
+          return (
+            <CompactModule
+              key={`${tab.key}-${rosterTab === tab.key ? 'focus' : 'idle'}`}
+              id={`team.roster.${tab.key}`}
+              title={tab.label}
+              tone={tab.key === 'starters' ? 'accent' : 'muted'}
+              persist={false}
+              defaultOpen={index === 0 || rosterTab === tab.key}
+              parts={listSummaryParts({
+                count: tab.players.length,
+                noun: 'player',
+                none: emptyText,
+                highlights: [total > 0 ? `Value ${Math.round(total).toLocaleString()}` : null, names.length > 0 ? names.join(', ') : null],
+              })}
+            >
+              {tab.key === 'starters' && !bestBall && openSlotsMessage(myTeamData?.open_slots) ? (
+                <AppText style={[styles.disclaimer, { color: colors.premium }]}>{openSlotsMessage(myTeamData?.open_slots)}</AppText>
+              ) : null}
+              {tab.players.length === 0 ? (
+                <AppText style={styles.rosterEmpty}>{emptyText}</AppText>
+              ) : (
+                <AnimatedCard style={styles.groupCard}>
+                  {tab.players.map((player, i) => (
+                    <LineupRow
+                      key={player.player_id}
+                      player={player}
+                      keeper={keepers?.players?.[player.player_id]}
+                      showDivider={i < tab.players.length - 1}
+                      onPress={() => goToPlayer(player)}
+                      muted={tab.key !== 'starters'}
+                    />
+                  ))}
+                </AnimatedCard>
+              )}
+            </CompactModule>
+          );
+        })}
         <KeeperCandidatesSection keepers={keepers} leagueId={leagueId} />
 
         {composition.length > 0 ? (
-          <>
-            <SectionHeading title="Roster Composition" topGap={12} />
+          <CompactModule
+            id="team.composition"
+            title="Roster Composition"
+            tone="muted"
+            parts={composition.map((segment) => ({ key: segment.key, text: `${segment.label} ${segment.percent}%` }))}
+          >
             <RosterCompositionBar segments={composition} />
-          </>
+          </CompactModule>
         ) : null}
         <ValuesCredit />
       </ScrollView>
@@ -361,66 +382,52 @@ export default function MyTeamScreen({ route, navigation }: Props) {
   );
 }
 
-/** Ring + archetype pill + Team Value total, then the six rank tiles. */
-function TeamSnapshot({
-  team,
-  leagueSize,
-  teamValue,
-  open,
-}: {
-  team: TeamRanking | null;
-  leagueSize: number;
-  teamValue: number;
-  /** onPress for a tile's destination (lib/insightLinks.ts). */
-  open: (key: InsightKey) => () => void;
-}) {
+/** The Hero: Team Value as the one big number, percentile of the league as the context line, archetype as the badge. */
+function TeamHero({ team, leagueSize, teamValue, startersValue }: { team: TeamRanking | null; leagueSize: number; teamValue: number; startersValue: number }) {
   const { colors } = useThemeMode();
-  const styles = useMemo(() => createStyles(colors), [colors]);
   const valuePercentile = team ? percentileFromRank(team.power_rank, leagueSize) : null;
   const outlook = team ? team.archetype_label || team.strategy_label : null;
-  const ringColor = valuePercentile != null ? percentileColor(valuePercentile, colors) : colors.accent;
-  const record = team
-    ? `${team.wins ?? 0}-${team.losses ?? 0}${team.ties ? `-${team.ties}` : ''}`
-    : '—';
-  const rank = (value: number | null | undefined, tied: boolean | undefined) =>
-    value != null ? formatRank(value, Boolean(tied)) : '—';
+  const context = [
+    valuePercentile != null ? `${ordinal(valuePercentile)} percentile of ${leagueSize} teams` : null,
+    startersValue > 0 ? `Starters ${Math.round(startersValue).toLocaleString()}` : null,
+  ]
+    .filter(Boolean)
+    .join(' · ');
   return (
-    <AnimatedCard>
-      <View style={styles.analyticsHeaderRow}>
-        <CircularProgressRing
-          percent={valuePercentile ?? 0}
-          size={84}
-          strokeWidth={8}
-          color={ringColor}
-          valueLabel={valuePercentile != null ? String(valuePercentile) : '—'}
-        />
-        <View style={styles.analyticsHeaderText}>
-          {outlook ? (
-            <ToneBadge solid label={outlook} color={colors.accent} textColor={colors.onAccent} style={styles.outlookBadge} />
-          ) : null}
-          <ValueStat label="Team value" value={teamValue > 0 ? teamValue : '—'} size="lg" />
-        </View>
-      </View>
-      <View style={styles.analyticsMetricsRow}>
-        <DashboardStatRow
-          items={[
-            { label: 'Record', icon: 'ribbon-outline', value: record, onPress: open('record') },
-            { label: 'Power Rank', icon: 'flash-outline', value: rank(team?.power_rank, team?.power_rank_tied), onPress: open('power') },
-            { label: 'Franchise Rank', icon: 'star-outline', value: rank(team?.franchise_rank, team?.franchise_rank_tied), onPress: open('franchise') },
-          ]}
-        />
-      </View>
-      <DashboardStatRow
-        items={[
-          { label: 'Starter Strength', icon: 'american-football-outline', value: rank(team?.starter_rank, team?.starter_rank_tied), onPress: open('starter') },
-          { label: 'Bench Strength', icon: 'people-outline', value: rank(team?.bench_rank, team?.bench_rank_tied), onPress: open('bench') },
-          { label: 'Avg Age', icon: 'hourglass-outline', value: team?.average_age != null ? team.average_age.toFixed(1) : '—', onPress: open('age') },
-        ]}
-      />
-      <GlossaryNote
-        terms={['powerRank', 'franchiseRank', 'starterStrength', 'benchStrength', 'averageAge', 'draftPicks', 'pqv', 'superflex', 'tep']}
-      />
-    </AnimatedCard>
+    <Hero
+      label="Team Value"
+      value={teamValue > 0 ? Math.round(teamValue).toLocaleString() : '—'}
+      context={context || null}
+      badge={outlook ? <ToneBadge solid label={outlook} color={colors.accent} textColor={colors.onAccent} /> : undefined}
+      testID="team-hero"
+    />
+  );
+}
+
+function ordinal(n: number): string {
+  const v = n % 100;
+  const suffix = v >= 11 && v <= 13 ? 'th' : ({ 1: 'st', 2: 'nd', 3: 'rd' } as Record<number, string>)[n % 10] ?? 'th';
+  return `${n}${suffix}`;
+}
+
+/** The six rank tiles as a StatStripModule: collapsed "Record 3-5 · Power #3 · Franchise #5 · Starters #2". */
+function TeamSnapshotModule({ team, open }: { team: TeamRanking | null; open: (key: InsightKey) => () => void }) {
+  const record = team ? `${team.wins ?? 0}-${team.losses ?? 0}${team.ties ? `-${team.ties}` : ''}` : '—';
+  const rank = (value: number | null | undefined, tied: boolean | undefined) => (value != null ? formatRank(value, Boolean(tied)) : '—');
+  return (
+    <StatStripModule
+      id="team.snapshot"
+      title="Team Snapshot"
+      items={[
+        { label: 'Record', icon: 'ribbon-outline', value: record, onPress: open('record') },
+        { label: 'Power Rank', icon: 'flash-outline', value: rank(team?.power_rank, team?.power_rank_tied), onPress: open('power') },
+        { label: 'Franchise Rank', icon: 'star-outline', value: rank(team?.franchise_rank, team?.franchise_rank_tied), onPress: open('franchise') },
+        { label: 'Starter Strength', icon: 'american-football-outline', value: rank(team?.starter_rank, team?.starter_rank_tied), onPress: open('starter') },
+        { label: 'Bench Strength', icon: 'people-outline', value: rank(team?.bench_rank, team?.bench_rank_tied), onPress: open('bench') },
+        { label: 'Avg Age', icon: 'hourglass-outline', value: team?.average_age != null ? team.average_age.toFixed(1) : '—', onPress: open('age') },
+      ]}
+      footer={<GlossaryNote terms={['powerRank', 'franchiseRank', 'starterStrength', 'benchStrength', 'averageAge', 'draftPicks', 'pqv', 'superflex', 'tep']} />}
+    />
   );
 }
 
@@ -435,10 +442,9 @@ function TeamAnalysisRows({ rows }: { rows: TeamAnalysisRow[] }) {
         const isOpen = open === row.position;
         return (
           <View key={row.position} style={index < rows.length - 1 ? styles.compactDivider : undefined}>
-            <TouchableOpacity
+            <PressableScale
               style={styles.analysisRow}
               onPress={() => setOpen(isOpen ? null : row.position)}
-              activeOpacity={0.7}
               accessibilityRole="button"
               accessibilityState={{ expanded: isOpen }}
             >
@@ -458,7 +464,7 @@ function TeamAnalysisRows({ rows }: { rows: TeamAnalysisRow[] }) {
                 </View>
               </View>
               <Ionicons name={isOpen ? 'chevron-down' : 'chevron-forward'} size={16} color={colors.textTertiary} />
-            </TouchableOpacity>
+            </PressableScale>
             {isOpen ? <AppText style={styles.analysisBody}>{row.body}</AppText> : null}
           </View>
         );
@@ -603,8 +609,19 @@ function KeeperCandidatesSection({ keepers, leagueId }: { keepers: KeepersRespon
   const candidates = keepers?.candidates ?? [];
   if (!keepers || candidates.length === 0) return null;
   return (
-    <View>
-      <SectionHeading title="Keeper candidates" topGap={12} />
+    <CompactModule
+      id="team.keepers"
+      title="Keeper candidates"
+      tone="success"
+      parts={listSummaryParts({
+        count: candidates.length,
+        noun: 'candidate',
+        highlights: [
+          keepers.keep_count != null ? `Keep up to ${keepers.keep_count}` : null,
+          (keepers.recommended_ids?.length ?? 0) > 0 ? `${keepers.recommended_ids?.length} recommended` : null,
+        ],
+      })}
+    >
       <AppText style={styles.disclaimer}>
         {`Keep up to ${keepers.keep_count} ${KEEPER_BASIS_LABEL[keepers.keep_count_basis ?? ''] ?? ''}. Rounds and surplus are estimates.`}
       </AppText>
@@ -636,7 +653,7 @@ function KeeperCandidatesSection({ keepers, leagueId }: { keepers: KeepersRespon
           </View>
         ))}
       </AnimatedCard>
-    </View>
+    </CompactModule>
   );
 }
 

@@ -15,9 +15,9 @@ import {
   RefreshControl,
   ScrollView,
   StyleSheet,
-  TouchableOpacity,
   View,
 } from 'react-native';
+import PressableScale from '../components/PressableScale';
 import AppText from '../components/AppText';
 import GridBackground from '../components/GridBackground';
 import SectionHeading from '../components/SectionHeading';
@@ -328,9 +328,9 @@ export default function PaywallScreen({ navigation, route }: Props) {
         />
       }
     >
-      <TouchableOpacity accessibilityRole="button" style={styles.closeButton} onPress={exit} hitSlop={LINK_HIT_SLOP}>
+      <PressableScale accessibilityRole="button" style={styles.closeButton} onPress={exit} hitSlop={LINK_HIT_SLOP}>
         <AppText style={styles.closeButtonText}>{fromOnboarding ? 'Skip' : 'Close'}</AppText>
-      </TouchableOpacity>
+      </PressableScale>
 
       {/* Headline/subtitle match web-next: OnboardingPaywall ("Start your
           7-day free trial" / "Full access to the GM toolkit...") when a real
@@ -355,7 +355,7 @@ export default function PaywallScreen({ navigation, route }: Props) {
           </View>
         ))}
       </View>
-      <TouchableOpacity
+      <PressableScale
         accessibilityRole="button"
         accessibilityState={{ expanded: showAllRows }}
         onPress={() => setShowAllRows((v) => !v)}
@@ -364,7 +364,7 @@ export default function PaywallScreen({ navigation, route }: Props) {
       >
         <AppText style={styles.compareToggleText}>{PAYWALL_COMPARISON_TITLE}</AppText>
         <Ionicons name={showAllRows ? 'chevron-up' : 'chevron-down'} size={18} color={colors.textSecondary} />
-      </TouchableOpacity>
+      </PressableScale>
       {showAllRows ? (
         <View style={styles.featuresCard} accessibilityLabel="Free compared with Pro">
           <View style={[styles.compareRow, styles.compareHeaderRow]}>
@@ -387,7 +387,7 @@ export default function PaywallScreen({ navigation, route }: Props) {
       ) : loadError ? (
         <View style={styles.loadErrorBlock}>
           <AppText style={styles.error}>{loadError}</AppText>
-          <TouchableOpacity accessibilityRole="button"
+          <PressableScale accessibilityRole="button"
             style={[styles.retryButton, retrying && styles.primaryButtonDisabled]}
             onPress={onRetry}
             disabled={retrying}
@@ -397,7 +397,7 @@ export default function PaywallScreen({ navigation, route }: Props) {
             ) : (
               <AppText style={styles.retryButtonText}>Retry</AppText>
             )}
-          </TouchableOpacity>
+          </PressableScale>
         </View>
       ) : packages.length === 0 ? (
         <AppText style={styles.error}>No subscription plans are available right now.</AppText>
@@ -522,9 +522,9 @@ export default function PaywallScreen({ navigation, route }: Props) {
       <Button variant="premiumOutline" label="Restore purchases" onPress={onRestore} loading={restoring} />
 
       {fromOnboarding ? (
-        <TouchableOpacity accessibilityRole="button" onPress={exit} style={styles.skipFree} hitSlop={LINK_HIT_SLOP}>
+        <PressableScale accessibilityRole="button" onPress={exit} style={styles.skipFree} hitSlop={LINK_HIT_SLOP}>
           <AppText style={styles.skipFreeText}>Skip for now — continue free</AppText>
-        </TouchableOpacity>
+        </PressableScale>
       ) : null}
 
       <HelpLink context={{ topic: 'paywall' }} />

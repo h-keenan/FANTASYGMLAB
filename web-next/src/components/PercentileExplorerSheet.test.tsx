@@ -60,6 +60,7 @@ function renderSheet(onOpenPlayer = vi.fn()) {
 
 describe("PercentileExplorerSheet", () => {
   beforeEach(() => {
+    window.sessionStorage.clear();
     mocked.mockReset();
   });
 
@@ -156,6 +157,7 @@ describe("PercentileExplorerSheet", () => {
     mocked.mockResolvedValue(response({ pool_players: pool, nearby: [p("a", "Peer Lamb", 13.6, 74)] }));
     renderSheet();
     await waitFor(() => screen.getByTestId("pe-chart"));
+    fireEvent.click(await screen.findByRole("tab", { name: "Find a player" }));
     fireEvent.change(screen.getByLabelText("Search players to add to the chart"), { target: { value: "zed" } });
     fireEvent.click(screen.getByRole("button", { name: "Compare with Zed Low" }));
     expect(screen.getByTestId("pe-compare").textContent).toContain("Z. Low");

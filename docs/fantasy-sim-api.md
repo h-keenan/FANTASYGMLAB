@@ -299,8 +299,14 @@ tiebreakers, playoff seeding, waivers that resolve in priority order.
   then the week is scored. A slot nobody can fill scores 0 (`starters[].flag:
   "empty"`). So a user whose WRs are all hurt can claim a free agent this week
   and have him play this week. The API never rejects Advance for an empty slot
-  (only `roster_over_limit`, `drafting`, `offseason`, `complete`), and cuts are
-  always allowed, so an over-limit roster is always fixable. Rule (kept
+  (only `roster_over_limit` in saves from before `limit_v` 1, `drafting`, `offseason`, `complete`), and cuts are
+  always allowed, so an over-limit roster is always fixable. Roster limit rule (`settings.limit_v` 1+, every new game): being over the
+  limit never blocks Advance or Start season (the engine scores the lineup as usual; AI teams still auto-trim). It only blocks ACQUIRING:
+  a waiver claim without a drop, a trade that adds more active players than it sends (and ends over the limit), an IR/taxi activation, all
+  refused with `roster_full` and `over_by`. Rookie-draft picks are the cause of the overage and always go through; cuts, IR/taxi moves, swaps
+  and trades that do not grow the roster stay allowed. Only ACTIVE players count (IR, taxi and picks never do), on server and client alike
+  (`TradeDesk.roster_size_after`, `simTradeFit`). `pending`, the offseason `roster` and the trade response carry `cuts_needed` (the overage)
+  and `limit_blocks` (false = soft). A save without `limit_v` keeps the original hard stop and replays exactly as before. Rule (kept
   claims-only, no instant free-agent signing, matching the engine and keeping AI
   teams on the same waiver path): clients warn on an empty slot ("WR2 is empty
   and will score 0 unless a healthy bench player fits. Advance anyway?") with
@@ -358,7 +364,8 @@ or other user's game / malformed id; 422 bad input `{"ok": false, "error"}`; 503
 | `wrong_phase` | e.g. draft call after the draft, lineup call during the draft; body has `phase` |
 | `not_your_turn` | `draft/pick` while an AI team is on the clock (cannot normally happen; picks auto-resolve) |
 | `player_taken` | player already drafted / rostered |
-| `roster_over_limit` | `advance` with more than 16 players; body has `cuts_needed` |
+| `roster_over_limit` | `advance` / `start-season` over the limit in a save without `limit_v`; body has `cuts_needed` |
+| `roster_full` | adding a player (claim without a drop, trade that grows the roster, IR/taxi activation) while at or over the limit; body has `over_by` |
 | `trade_deadline_passed` / `trades_closed` | after week 10 / in the playoffs |
 | `duplicate_offer` | the same package to the same team already tried this week |
 | `partner_trade_limit` | that AI team hit its season trade cap |
@@ -674,7 +681,7 @@ players are aged one year (position age curves calibrated on the player-model pa
 `GET /games/{id}/offseason` returns the stage (`review` -> `rookie_draft` -> `cutdown`), last season's
 archive, retirees, the aging report for your roster, the draft board and the roster check.
 `POST /offseason/rookie-draft/start`, `/rookie-draft/pick {player_id}`, `/rookie-draft/auto` and
-`POST /offseason/start-season` (refused with `roster_over_limit` until you cut). Trades and cuts are open
+`POST /offseason/start-season` (refused with `roster_over_limit` until you cut, only in saves without `limit_v`). Trades and cuts are open
 in the offseason (not for the current year's picks once the draft is under way). The last season ends in
 `status: "complete"`; `GET /games/{id}/dynasty` (and `/result`) return the summary: titles, finish by year.
 
@@ -732,11 +739,17 @@ Rules, pinned by `tests/test_sim_trade_counters.py`:
 ## Sim to... (several weeks in one request)
 
 `GET /v1/sim/games/{id}/sim-to/options` lists the milestones that make sense now (`weeks` 1 / 4, `trade_deadline`,
-`playoffs_start`, `season_end`). `POST /v1/sim/games/{id}/sim-to` `{target, weeks?, auto_set?, force_first?}` plays weeks in ONE request
+`playoffs_start`, `season_end`). `POST /v1/sim/games/{id}/sim-to` `{target, weeks?, auto_set?, force_first?, stops?}` plays weeks in ONE request
 (`modules/sim/game_simto.py`; `target` must be one of the listed milestones and `weeks` 1-30, else 422): it is the same `advance` repeated on one Emitter, so the events, replayed state and digest equal that many
 manual Advances (plus a `lineup_set` before each week when `auto_set`, exactly what Auto-set emits). Before each week it stops with
-`stopped: {code, week, message, fix}` for: roster over the limit (hard), a starter out / on a bye / an empty slot, trade offers expiring this
-week, the free-preview paywall; `force_first` plays past a soft stop for the first week ("Sim anyway"). A 25 s budget pauses with
+`stopped: {code, week, message, fix}` for: roster over the limit (hard, only in saves without `limit_v`), the free-preview paywall, and the
+per-run `stops` toggles (all on when omitted; unknown or non-boolean keys are a 422): `deadline` (`trade_deadline`: the last week trades are
+allowed, only mid-run), `injuries` (`starter_injured`: one of your starters got hurt the week before), `starters` (`starter_out` /
+`starter_bye` / `empty_slot` that nothing can fix; with `auto_set` the lineup is re-set first), `offers` (`trade_offers`: an offer arrived
+during the run, or one expires this week), `roster` (`waiver_issue`: a queued claim that cannot go through). The clients persist the toggles
+per device (web localStorage, app AsyncStorage) and default `auto_set` on; the API default is `auto_set` false. `summary` also reads out
+`auto_set`, `lineup_changes` (`[{week, slot, out, in}]`), `offers_pending`, `offers_new` and `roster {size, limit, over}`.
+`force_first` plays past a soft stop for the first week ("Sim anyway" / "Keep simming"); `force_first` plays past a soft stop for the first week ("Sim anyway"). A 25 s budget pauses with
 `time_budget`. Response: `weeks_played`, `stopped`, `from_seq`, `summary` (per-week results, record and rank change, your injuries and claims,
 AI trades, standings, champion) and the last week's full `recap`, plus `game`. `POST /v1/sim/games/{id}/undo-sim {from_seq}` takes the run
 back (deletes events and later checkpoints from `from_seq`, which must be an `advance` / `lineup_set` event, then replays).
@@ -766,3 +779,35 @@ PUT, auto-set, waiver start slot, AI lineups, draft needs, player-list `pos=` fi
 `FLEX_SLOTS` in `modules/sim/types.py`, so the new slot needs no per-site rule. Replay safety: `flex_type` is serialized in
 settings ONLY when it is not the default, so every save made before the option (and every default-flex save) has
 byte-identical settings and replays to the same digest (pinned by `test_old_save_replays_to_the_same_digest`).
+
+## Kickers and defenses in trades (`kd_v`)
+New games (settings `kd_v` 1, serialized only when set) let the user trade K and DEF like any player. Rules: one per roster, so a
+trade that would leave either team with two kickers (or two defenses) is refused with reason `singleton_limit` unless that team
+gives its own in the same deal. The AI never initiates or counters with a K/DEF (`TradeDesk.tradable` still excludes them), so it
+cannot craft a nonsense kicker counter. A save without `kd_v` behaves exactly as before (K/DEF refused: "cannot be traded") and
+replays to the same digest.
+
+## Season labels, bye/out projections, rookie names
+
+**Season label (`S3 2028`).** One presentation rule for every place the sim names a season: season number, then
+its calendar year. `modules/sim/season_label.py` (server) and `simSeasonLabel` / `simSeasonLabelForYear` /
+`simSeasonText` in `simGame.ts` (web + app twin) are the only builders. Views carry additive `season_label`
+fields next to the existing `season` / `season_no` / `year` numbers (game `dynasty` block, offseason
+`season_label` + `last_season_label`, dynasty summary rows, league history, player/team history entries and
+rookie classes, pick assets). Stored events keep plain numbers, so old saves replay identically. A progress
+count ("3 of 10") may sit beside a label, never replace it. Stored recap pick names (`game_engine._brief`) are
+event data and stay year-based.
+
+**Bye / out projections.** Every player row (`player_row`) now carries `projection_note` (`"bye"` / `"out"` /
+`null`, in-season only), `projection_week`, and `next_projection` (what he projects for his next game). When the
+note is set, `projection` is `0.0`. Clients render "Bye" / "Out" (muted) through `simProjText` instead of a
+number. Display only: the engine, the AI and team totals already treated a bye / out player as 0 (`Evaluator.proj`),
+so no old save changes. Real FantasyDesk matchup: a player ruled out before kickoff has no projection and adds 0
+to the team total (`matchup_win_probability._starter_distribution`), same as a bye.
+
+**Rookie names (`names_v` 1).** New dynasty games carry `names_v: 1` in settings. A rookie's name is a pure
+function of `(seed, season, slot)` into a frozen 792 x 1189 first/last grid (`modules/sim/game_names.py`), a
+bijection per save: no full name repeats across any number of classes, and a first name comes back only once per
+~790 rookies. Names already worn by a veteran in the pool are skipped. Saves without `names_v` keep the original
+small tables untouched. The v1 tables are pinned by a sha256 in `tests/test_sim_rookie_names.py`; extend with a
+`names_v` 2 table set, never edit v1.

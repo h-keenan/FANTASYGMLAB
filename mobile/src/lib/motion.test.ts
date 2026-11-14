@@ -2,7 +2,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
-import { COUNT_MS, MAX_ANIMATED_ROWS, MAX_STAGGER_MS, MOTION_MS, confettiAllowed, countUpValue, flashDirection, motionMs, shouldAnimateList, staggerDelay } from './motion.ts';
+import { COUNT_MS, PRESS, TRANSITION_MS, pressFeedback, MAX_ANIMATED_ROWS, MAX_STAGGER_MS, MOTION_MS, confettiAllowed, countUpValue, flashDirection, motionMs, shouldAnimateList, staggerDelay } from './motion.ts';
 
 test('durations stay in 120-300ms and reduced motion zeroes them', () => {
   const all = Object.values(MOTION_MS);
@@ -24,4 +24,12 @@ test('stagger is capped, long lists do not animate, flash and count-up rules', (
   assert.ok(countUpValue(0, 100, 0.5) > 50);
   assert.equal(confettiAllowed({ wonTitle: true, reduced: true }), false);
   assert.equal(confettiAllowed({ wonTitle: true, reduced: false }), true);
+});
+
+test('press feedback: shrink and fade pressed, fade only under reduced motion, nothing idle or disabled', () => {
+  assert.deepEqual(pressFeedback(true, false), { scale: PRESS.scale, opacity: PRESS.opacity });
+  assert.deepEqual(pressFeedback(false, false), { scale: 1, opacity: 1 });
+  assert.deepEqual(pressFeedback(true, false, true), { scale: 1, opacity: 1 });
+  assert.deepEqual(pressFeedback(true, true), { scale: 1, opacity: PRESS.opacity });
+  for (const ms of Object.values(TRANSITION_MS)) assert.ok(Object.values(MOTION_MS).includes(ms as never));
 });

@@ -114,12 +114,14 @@ export function playerCardFromStarter(source: PlayerCardSource): PlayerCardModel
   const started = status === "in_progress" || status === "final" || source.game_started === true;
   const projectionRow = source.projection ?? null;
   const bye = projectionRow?.status === "bye_week";
-  const projection = projectionRow?.status === "ok" ? num(projectionRow.point_estimate) : null;
+  // A player ruled out is not projected any points this week, same as a bye (he only has points if his game already started).
+  const startedNow = status === "in_progress" || status === "final" || source.game_started === true;
+  const projection = projectionRow?.status === "ok" && !(flags.out && !startedNow) ? num(projectionRow.point_estimate) : null;
   const actual = num(source.actual_points);
   const points = started && actual != null ? actual : null;
   const projectedFinal = status === "in_progress" ? num(source.projected_final) : null;
   let expectedFinal: number | null;
-  if (bye) expectedFinal = 0;
+  if (bye || (flags.out && !startedNow)) expectedFinal = 0;
   else if (status === "final") expectedFinal = points;
   else if (status === "in_progress") expectedFinal = projectedFinal ?? points ?? projection;
   else expectedFinal = projection;

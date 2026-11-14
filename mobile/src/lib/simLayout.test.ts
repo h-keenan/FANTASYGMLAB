@@ -59,7 +59,7 @@ test('trade picker groups, filters and fit', () => {
   assert.deepEqual(groups.map((g) => [g.key, g.items.length]), [['QB', 1], ['RB', 2]]);
   assert.deepEqual(simFilterGroups(groups, SIM_ASSET_ALL, 'rush').map((g) => g.items[0].id), ['3']);
   assert.deepEqual(simSideSummary(roster.slice(0, 2)), { count: 2, value: 140 });
-  assert.deepEqual(simTradeFit(16, 16, 1, 3), { after: 18, room: 0, over: 2 });
+  assert.deepEqual(simTradeFit(16, 16, 1, 3), { after: 18, room: 0, over: 2, blocked: false });
 });
 
 test('auto-set message and advance state', () => {

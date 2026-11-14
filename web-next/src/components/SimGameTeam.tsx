@@ -23,6 +23,7 @@ import {
   simOptimisticClaim,
   simWithout,
   simFmtPts,
+  simProjText,
   simClaimPayload,
   simLineupPayload,
   simMatchupLine,
@@ -42,6 +43,8 @@ import {
   type SimPickAsset,
   type SimSlot,
   type SimWaiverClaim,
+  simLimitBlocks,
+  simOverLimitNote,
 } from "@/lib/simGame";
 
 /** Lineup, bench and this week's matchup. Every change saves at once (PUT /lineup). */
@@ -142,6 +145,7 @@ export function SimTeamTab({ ctx, onTrade }: { ctx: SimCtx; onTrade: () => void 
   const labels = simSlotLabels(slots);
   const week = game.this_week;
   const overLimit = (game.pending?.cuts_needed ?? 0) > 0;
+  const limitBlocks = simLimitBlocks(game.pending);
   const warnings = lineup.warnings ?? [];
   const playerById = Object.fromEntries([...slots.map((s) => s.player), ...bench].filter(Boolean).map((p) => [p!.id, p!]));
   const candidates = pickSlot != null ? simSlotCandidates(slots[pickSlot].slot, slots, bench) : [];
@@ -170,11 +174,13 @@ export function SimTeamTab({ ctx, onTrade }: { ctx: SimCtx; onTrade: () => void 
       ) : null}
 
       {overLimit ? (
-        <AccentCard accent="var(--color-danger)" compact as="div">
+        <AccentCard accent={limitBlocks ? "var(--color-danger)" : "var(--color-warning)"} compact as="div">
           <div className="flex items-start gap-2">
-            <ReviewGlyphChip glyph="injury" tone="danger" size={24} />
-            <p className="text-sm font-bold flex-1 min-w-0" role="alert">
-              Roster over the limit: cut {game.pending?.cuts_needed} player{game.pending?.cuts_needed === 1 ? "" : "s"} from your bench before you advance.
+            <ReviewGlyphChip glyph="injury" tone={limitBlocks ? "danger" : "warning"} size={24} />
+            <p className={limitBlocks ? "text-sm font-bold flex-1 min-w-0" : "text-xs font-bold flex-1 min-w-0"} role={limitBlocks ? "alert" : "status"} data-testid="over-limit-note">
+              {limitBlocks
+                ? `Roster over the limit: cut ${game.pending?.cuts_needed} player${game.pending?.cuts_needed === 1 ? "" : "s"} from your bench before you advance.`
+                : simOverLimitNote(game.pending?.cuts_needed ?? 0)}
             </p>
           </div>
         </AccentCard>
@@ -413,7 +419,7 @@ export function ClaimSheet({
             <option value="">{mustDrop ? "Choose a player to drop" : "No drop"}</option>
             {roster.map((p) => (
               <option key={p.id} value={p.id}>
-                {p.name} ({p.pos}) {simFmtPts(p.projection)}
+                {p.name} ({p.pos}) {simProjText(p)}
               </option>
             ))}
           </Select>
@@ -621,7 +627,7 @@ export function SimYourPicks({ picks, draftYear }: { picks: SimPickAsset[]; draf
       ) : (
         groups.map((group) => (
           <div key={group.season} className="flex flex-col">
-            <p className="pt-1 text-xs font-bold" style={{ color: "var(--color-text-secondary)" }}>{group.season}</p>
+            <p className="pt-1 text-xs font-bold" style={{ color: "var(--color-text-secondary)" }}>{group.label}</p>
             {group.rounds.flatMap((r) => r.picks).map((pick) => (
               <SimPickLine key={pick.id} pick={pick} draftYear={draftYear} />
             ))}

@@ -39,7 +39,6 @@ import {
   type SimGameTone,
 } from '../lib/simGame';
 import { simSeeAllLabel } from '../lib/simLayout';
-import TapForWhy from './TapForWhy';
 import { radii, scrim, sheetHeight, spacing, type ThemeColors } from '../theme';
 
 /** Semantic theme color for a presentation tone (never a raw hex). */

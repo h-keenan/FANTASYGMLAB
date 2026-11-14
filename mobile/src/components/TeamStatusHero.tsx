@@ -1,13 +1,10 @@
 import React, { useMemo } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
 import { useIsRestoring, useQuery } from '@tanstack/react-query';
 
-import AccentCard from './AccentCard';
+import CompactModule from './CompactModule';
+import { Hero, LinkModule } from './ModuleTemplates';
 import AppText from './AppText';
-import SectionHeading from './SectionHeading';
-import TeamAvatar from './TeamAvatar';
-import ToneBadge from './ToneBadge';
 import { useThemeMode } from '../context/ThemeModeContext';
 import { api, type MatchupResponse, type TeamRanking, type TeamSnapshot } from '../lib/api';
 import { queryKeys } from '../lib/queryKeys';
@@ -19,6 +16,7 @@ import {
   buildTeamStatusStanding,
   type TeamStatusPosition,
 } from '../lib/teamStatus';
+import { lineupModuleParts, roomsModuleParts, standingModuleParts, teamStatusHeroModel } from '../lib/teamStatusModules';
 import { openInsight } from '../lib/insightNav';
 import { radii, spacing, type ThemeColors } from '../theme';
 
@@ -89,127 +87,84 @@ export default function TeamStatusHero({
       </AppText>
     </View>
   );
-  const row = (label: string, to: string, children: React.ReactNode, first = false) => (
-    <Pressable
-      accessibilityRole="link"
-      accessibilityLabel={label}
-      onPress={() => onNavigate(to, { leagueId, leagueName })}
-      style={[styles.row, !first && styles.rowDivider]}
-    >
-      <View style={styles.rowBody}>{children}</View>
-      <Ionicons name="chevron-forward" size={16} color={colors.accent} />
-    </Pressable>
-  );
-  const lineupColor = lineup?.tone === 'risk' ? colors.danger : lineup?.tone === 'positive' ? colors.successBright : colors.textTertiary;
-  let first = true;
-  const takeFirst = () => {
-    const was = first;
-    first = false;
-    return was;
-  };
+  const heroModel = teamStatusHeroModel(matchupLine, standing);
+  const heroIsStanding = heroModel != null && !(matchupLine && (matchupLine.winPercent != null || matchupLine.live));
+  const showStanding = standing != null && (!heroIsStanding || Boolean(standing.playoffOdds || standing.projectedRecord || standing.playoffStatus));
 
   return (
     <View style={styles.block}>
-      <SectionHeading title="Your team right now" />
-      <AccentCard accent={colors.accent} compact glow>
-        {matchupLine
-          ? row(
-              "This week's matchup, open Matchup",
-              'Matchup',
-              <>
-                <View style={styles.matchupHead}>
-                  <TeamAvatar avatarId={matchupLine.myAvatar} name={matchupLine.myName} size={32} />
-                  <AppText style={styles.vs}>VS</AppText>
-                  <TeamAvatar avatarId={matchupLine.opponentAvatar} name={matchupLine.opponentName} size={32} />
-                  <View style={styles.flex}>
-                    <AppText style={styles.muted}>
-                      {matchupLine.week != null ? `Week ${matchupLine.week} matchup` : "This week's matchup"}
-                      {matchupLine.stateLabel ? ` · ${matchupLine.stateLabel}` : ''}
-                    </AppText>
-                    <AppText style={styles.strong} numberOfLines={1}>vs {matchupLine.opponentName}</AppText>
-                  </View>
-                </View>
-                <View style={styles.facts}>
-                  {matchupLine.winPercent != null
-                    ? fact('Your win chance', `${matchupLine.winPercent}%`, matchupLine.winPercent >= 55 ? 'positive' : matchupLine.winPercent <= 45 ? 'risk' : 'neutral')
-                    : null}
-                  {matchupLine.myProjected != null && matchupLine.opponentProjected != null
-                    ? fact('Projected points (you - them)', `${matchupLine.myProjected.toFixed(1)} - ${matchupLine.opponentProjected.toFixed(1)}`)
-                    : null}
-                  {matchupLine.live
-                    ? fact('Score so far (you - them)', `${matchupLine.live.mine.toFixed(1)} - ${matchupLine.live.opponent.toFixed(1)}`)
-                    : null}
-                </View>
-              </>,
-              takeFirst(),
-            )
-          : null}
+      {/* One Hero (the number that matters this week) then three modules that read while collapsed. Mirrors web. */}
+      {heroModel ? (
+        <Hero
+          label={heroModel.label}
+          value={heroModel.value}
+          context={heroModel.context}
+          tone={heroModel.tone}
+          onPress={() => onNavigate(matchupLine ? 'Matchup' : 'Teams', { leagueId, leagueName })}
+          testID="team-status-main"
+        />
+      ) : null}
 
-        {lineup
-          ? row(
-              'Lineup health, open Matchup',
-              'Matchup',
-              <>
-                <View style={styles.lineupHead}>
-                  <ToneBadge label="Lineup" color={lineupColor} />
-                  <AppText style={[styles.strong, styles.flex]}>{lineup.headline}</AppText>
-                </View>
-                {lineup.detail ? <AppText style={styles.secondary}>{lineup.detail}</AppText> : null}
-              </>,
-              takeFirst(),
-            )
-          : null}
+      {lineup ? (
+        <LinkModule
+          title="Lineup"
+          tone={lineup.tone === 'risk' ? 'danger' : lineup.tone === 'positive' ? 'success' : 'accent'}
+          parts={lineupModuleParts(lineup)}
+          onPress={() => onNavigate('Matchup', { leagueId, leagueName })}
+          testID="team-status-lineup"
+        />
+      ) : null}
 
-        {standing
-          ? row(
-              'Season standing, open League Rankings',
-              'Teams',
-              <>
-                <View style={styles.facts}>
-                  {standing.record ? fact('Record', standing.record) : null}
-                  {standing.place ? fact('Standing', standing.place) : null}
-                  {standing.playoffOdds ? fact('Playoff odds', standing.playoffOdds, standing.tone) : null}
-                  {standing.projectedRecord ? fact('Proj. record', standing.projectedRecord) : null}
-                </View>
-                {standing.playoffOdds && simQuery.data?.weeks_remaining ? (
-                  <AppText style={styles.muted}>
-                    Odds from a rest-of-season simulation: {simQuery.data.weeks_remaining} weeks left.
-                  </AppText>
-                ) : null}
-                {standing.playoffStatus ? <AppText style={styles.secondary}>{standing.playoffStatus}</AppText> : null}
-              </>,
-              takeFirst(),
-            )
-          : null}
-
-        {positions.length > 0 ? (
-          <View style={[styles.positions, !first && styles.rowDivider]}>
-            <AppText style={styles.muted}>Position rooms vs the league. Tap a room for the detail ›</AppText>
-            <View style={styles.chips}>
-              {positions.map((position: TeamStatusPosition) => {
-                const color = toneColor[position.tone];
-                return (
-                  <Pressable
-                    key={position.position}
-                    accessibilityRole="button"
-                    accessibilityLabel={`${position.position}: ${position.label}${position.weakest ? ', weakest room' : ''}, open Team Analysis on My Team`}
-                    onPress={openInsight(onNavigate, 'position_room', leagueId, leagueName)}
-                    style={[styles.chip, position.weakest && { borderColor: color }]}
-                  >
-                    <AppText style={styles.chipPos}>{position.position}</AppText>
-                    <AppText style={[styles.chipLabel, { color }]}>{position.label}</AppText>
-                  </Pressable>
-                );
-              })}
-            </View>
-            {weakest ? (
-              <Pressable accessibilityRole="link" onPress={() => onNavigate('Trades', { leagueId, leagueName })}>
-                <AppText style={styles.link}>Improve {weakest.position} first: see Trade Hub ideas ›</AppText>
-              </Pressable>
-            ) : null}
+      {standing && showStanding ? (
+        <CompactModule
+          id="today.standing"
+          title="Standing"
+          tone={standing.tone === 'risk' ? 'danger' : standing.tone === 'positive' ? 'success' : 'accent'}
+          parts={standingModuleParts(standing)}
+        >
+          <View style={styles.facts}>
+            {standing.record ? fact('Record', standing.record) : null}
+            {standing.place ? fact('Standing', standing.place) : null}
+            {standing.playoffOdds ? fact('Playoff odds', standing.playoffOdds, standing.tone) : null}
+            {standing.projectedRecord ? fact('Proj. record', standing.projectedRecord) : null}
           </View>
-        ) : null}
-      </AccentCard>
+          {standing.playoffOdds && simQuery.data?.weeks_remaining ? (
+            <AppText style={styles.muted}>Odds from a rest-of-season simulation: {simQuery.data.weeks_remaining} weeks left.</AppText>
+          ) : null}
+          {standing.playoffStatus ? <AppText style={styles.secondary}>{standing.playoffStatus}</AppText> : null}
+          <Pressable accessibilityRole="link" onPress={() => onNavigate('Teams', { leagueId, leagueName })} style={{ minHeight: 44, justifyContent: 'center' }}>
+            <AppText style={styles.link}>Open League Rankings ›</AppText>
+          </Pressable>
+        </CompactModule>
+      ) : null}
+
+      {positions.length > 0 ? (
+        <CompactModule id="today.rooms" title="Position rooms" tone={weakest ? 'warning' : 'accent'} parts={roomsModuleParts(positions)}>
+          <AppText style={styles.muted}>Position rooms vs the league. Tap a room for the detail ›</AppText>
+          <View style={styles.chips}>
+            {positions.map((position: TeamStatusPosition) => {
+              const color = toneColor[position.tone];
+              return (
+                <Pressable
+                  key={position.position}
+                  accessibilityRole="button"
+                  accessibilityLabel={`${position.position}: ${position.label}${position.weakest ? ', weakest room' : ''}, open Team Analysis on My Team`}
+                  onPress={openInsight(onNavigate, 'position_room', leagueId, leagueName)}
+                  style={[styles.chip, position.weakest && { borderColor: color }]}
+                >
+                  <AppText style={styles.chipPos}>{position.position}</AppText>
+                  <AppText style={[styles.chipLabel, { color }]}>{position.label}</AppText>
+                </Pressable>
+              );
+            })}
+          </View>
+          {weakest ? (
+            <Pressable accessibilityRole="link" onPress={() => onNavigate('Trades', { leagueId, leagueName })} style={{ minHeight: 44, justifyContent: 'center' }}>
+              <AppText style={styles.link}>Improve {weakest.position} first: see Trade Hub ideas ›</AppText>
+            </Pressable>
+          ) : null}
+        </CompactModule>
+      ) : null}
     </View>
   );
 }

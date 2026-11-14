@@ -1,5 +1,6 @@
 import React, { useMemo } from 'react';
-import { StyleSheet, TouchableOpacity, View } from 'react-native';
+import { StyleSheet, View } from 'react-native';
+import PressableScale from './PressableScale';
 import { Ionicons } from '@expo/vector-icons';
 
 import AppText from './AppText';
@@ -74,7 +75,7 @@ export default function InsightRow({
 }) {
   const { colors } = useThemeMode();
   const styles = useMemo(() => createStyles(colors), [colors]);
-  const Wrapper = onPress ? TouchableOpacity : View;
+  const Wrapper = onPress ? PressableScale : View;
 
   return (
     <Wrapper
@@ -102,9 +103,9 @@ export default function InsightRow({
         {children}
       </View>
       {actionLabel && onActionPress ? (
-        <TouchableOpacity style={styles.actionChip} onPress={onActionPress} hitSlop={6}>
+        <PressableScale style={styles.actionChip} onPress={onActionPress} hitSlop={6}>
           <AppText style={styles.actionChipText}>{actionLabel.toUpperCase()}</AppText>
-        </TouchableOpacity>
+        </PressableScale>
       ) : onPress ? (
         <Ionicons name="chevron-forward" size={16} color={colors.textTertiary} />
       ) : null}

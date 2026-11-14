@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo } from 'react';
-import { StyleSheet, TouchableOpacity, View } from 'react-native';
+import { StyleSheet, View } from 'react-native';
+import PressableScale from './PressableScale';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useQuery } from '@tanstack/react-query';
@@ -50,7 +51,7 @@ export default function ManagerTendenciesChips({
 
   if (!data.is_premium) {
     return (
-      <TouchableOpacity
+      <PressableScale
         onPress={() => {
           trackUse('manager_tendencies', 'upsell_tapped', { leagueId, tier: 'free' });
           navigation.navigate('Paywall');
@@ -62,7 +63,7 @@ export default function ManagerTendenciesChips({
         <Ionicons name="lock-closed-outline" size={14} color={colors.premium} />
         <AppText style={styles.upsell}>How this manager trades</AppText>
         <ToneBadge label="Pro" color={colors.premium} size="xs" />
-      </TouchableOpacity>
+      </PressableScale>
     );
   }
   const chips = headlineChips(findManagerRow(data, teamName, rosterId)?.headline);

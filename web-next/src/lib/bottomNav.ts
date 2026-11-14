@@ -54,6 +54,18 @@ export function simGameBottomTabs(opts: { offseason?: boolean; inbox?: number })
   ];
 }
 
+export type SimNavTone = "accent" | "success" | "warning" | "danger" | "premium";
+
+/** One-line description and accent tone per game page, so the game menu rows read like FantasyDesk's More sheet (glyph tinted, label over a subtitle). Tones are existing semantic colors on both platforms. */
+export const SIM_NAV_META: Record<string, { subtitle: string; tone: SimNavTone }> = {
+  home: { subtitle: "This week's to-dos and the league pulse", tone: "accent" },
+  team: { subtitle: "Lineup, bench, and roster moves", tone: "success" },
+  players: { subtitle: "Free agents, rankings, and waivers", tone: "warning" },
+  trades: { subtitle: "Offers, ideas, and the trade inbox", tone: "danger" },
+  league: { subtitle: "Standings, scores, and every team", tone: "premium" },
+  more: { subtitle: "Rules, reset the week, or leave this game", tone: "accent" },
+};
+
 /** Which tab is lit: unknown keys fall back to the first tab. */
 export function activeBottomTab(tabs: BottomTab[], active: string): string {
   return tabs.some((t) => t.key === active) ? active : (tabs[0]?.key ?? "");
@@ -81,9 +93,11 @@ export function simCompactWeek(game: { phase: string; week: number; settings?: {
   return total ? `Wk ${game.week}/${total}` : `Wk ${game.week}`;
 }
 
-/** "S1/5" season chip for dynasty games; empty for a redraft. */
-export function simCompactSeason(dynasty: { season_no: number; seasons: number } | null | undefined): string {
-  return dynasty ? `S${dynasty.season_no}/${dynasty.seasons}` : "";
+/** "S3 2028" season chip for dynasty games (the shared season label; "S3/10" when the game has no calendar year); empty for a redraft. */
+export function simCompactSeason(dynasty: { season_no: number; seasons: number; year?: number | null; season_label?: string | null } | null | undefined): string {
+  if (!dynasty) return "";
+  if (dynasty.season_label) return dynasty.season_label;
+  return dynasty.year ? `S${dynasty.season_no} ${dynasty.year}` : `S${dynasty.season_no}/${dynasty.seasons}`;
 }
 
 /** Paths whose page renders its own phone chrome (compact header plus bottom bar), so the global header and the GM orb button step aside below 768px. */

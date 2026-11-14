@@ -29,6 +29,7 @@ export default function GlassCard({
   padding,
   radius = 'lg',
   style,
+  testID,
 }: {
   children: React.ReactNode;
   compact?: boolean;
@@ -36,11 +37,12 @@ export default function GlassCard({
   padding?: 'sm' | 'md' | 'lg';
   radius?: 'md' | 'lg';
   style?: StyleProp<ViewStyle>;
+  testID?: string;
 }) {
   const { colors } = useThemeMode();
   const styles = useMemo(() => createStyles(colors), [colors]);
   const pad = padding ?? (compact ? 'sm' : 'md');
-  return <View style={[styles.card, radius === 'md' && styles.radiusMd, styles[pad], style]}>{children}</View>;
+  return <View testID={testID} style={[styles.card, radius === 'md' && styles.radiusMd, styles[pad], style]}>{children}</View>;
 }
 
 function createStyles(colors: ThemeColors) {

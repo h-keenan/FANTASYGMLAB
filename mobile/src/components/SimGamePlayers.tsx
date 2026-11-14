@@ -32,6 +32,7 @@ import {
   simFilterQuery,
   simFilterReducer,
   simFmtPts,
+  simProjText,
   simFmtValue,
   simHeadshotId,
   simIfStartsHint,
@@ -218,7 +219,7 @@ export function SimPlayerBrowser({
  * take the sim's own value and ranks), plus sim sections rendered with the
  * quick view's own section shell, tiles and weekly chart.
  */
-export function SimPlayerSheet({ gameId, player, onClose, actions, startYear }: { gameId: string; player: SimGamePlayer; onClose: () => void; actions?: ReactNode; /** game.settings.start_year: drives the as-of cut of real data. */ startYear?: number | null }) {
+export function SimPlayerSheet({ gameId, player, onClose, actions, startYear, seasonLabel }: { /** The sim's current season, "S3 2028": names the season tile and the week-by-week header. */ seasonLabel?: string | null; gameId: string; player: SimGamePlayer; onClose: () => void; actions?: ReactNode; /** game.settings.start_year: drives the as-of cut of real data. */ startYear?: number | null }) {
   const detail = useSimPlayerDetail(gameId, player.id);
   const live = detail.data?.player ?? player;
   const real = simHeadshotId(player);
@@ -236,10 +237,8 @@ export function SimPlayerSheet({ gameId, player, onClose, actions, startYear }: 
     sourceLabel: 'Fantasy Sim',
     // The header carries the same tags the list row showed (the one injury chip, owner / Free agent, role, block).
     tags: simHeaderTags(live),
-    valueNote: feed?.valueNote ?? null,
-    valueLabel: feed ? 'Trade value' : null,
   };
-  return <PlayerQuickViewSheet request={request} onClose={onClose} remote={Boolean(real)} asOfSeason={simAsOfSeason(startYear)} simSections={simPqvSections(gameId, live, detail, actions, real ? { playerId: real, asOf: simAsOfSeason(startYear) } : undefined)} />;
+  return <PlayerQuickViewSheet request={request} onClose={onClose} remote={Boolean(real)} asOfSeason={simAsOfSeason(startYear)} simSections={simPqvSections(gameId, live, detail, actions, seasonLabel, real ? { playerId: real, asOf: simAsOfSeason(startYear) } : undefined)} />;
 }
 
 interface SimPlayerDetailState {
@@ -271,17 +270,17 @@ function useSimPlayerDetail(gameId: string, playerId: string): SimPlayerDetailSt
  * The sim-only sections of the player detail, split by tab of the shared Player Quick View: Overview, Outlook, Scouting
  * (generated rookies) and History (derived from the event log), in the quick view's own section shell, tiles and chart.
  */
-export function simPqvSections(gameId: string, player: SimGamePlayer, detail: SimPlayerDetailState, actions?: ReactNode, real?: { playerId: string; asOf: number }): SimPqvSections {
+export function simPqvSections(gameId: string, player: SimGamePlayer, detail: SimPlayerDetailState, actions?: ReactNode, seasonLabel?: string | null, real?: { playerId: string; asOf: number }): SimPqvSections {
   return {
-    overview: <SimOverviewSection player={player} detail={detail} actions={actions} />,
-    outlook: <SimOutlookSection player={player} detail={detail} />,
+    overview: <SimOverviewSection player={player} detail={detail} actions={actions} seasonLabel={seasonLabel} />,
+    outlook: <SimOutlookSection player={player} detail={detail} seasonLabel={seasonLabel} />,
     scouting: detail.data?.scouting ? <SimScoutingSections profile={detail.data.scouting} /> : undefined,
     history: <SimPlayerHistory gameId={gameId} playerId={player.id} />,
     stats: real ? <SimRealHistory playerId={real.playerId} asOf={real.asOf} /> : undefined,
   };
 }
 
-function SimOverviewSection({ player, detail, actions }: { player: SimGamePlayer; detail: SimPlayerDetailState; actions?: ReactNode }) {
+function SimOverviewSection({ player, detail, actions, seasonLabel }: { player: SimGamePlayer; detail: SimPlayerDetailState; actions?: ReactNode; seasonLabel?: string | null }) {
   const { colors } = useThemeMode();
   const common = useMemo(() => createSimStyles(colors), [colors]);
   const styles = useMemo(() => createStyles(), []);
@@ -301,10 +300,10 @@ function SimOverviewSection({ player, detail, actions }: { player: SimGamePlayer
         }
       >
         <View style={styles.tileGrid}>
-          <MetricCard label="This week" value={simFmtPts(player.projection)} note={status ? status.label : `${simFmtPts(player.floor)}-${simFmtPts(player.ceiling)}`} />
+          <MetricCard label="This week" value={simProjText(player)} note={status ? status.label : `${simFmtPts(player.floor)}-${simFmtPts(player.ceiling)}`} />
           {ros ? <MetricCard label="Rest of season" value={`${simFmtPts(ros.mean)} ppg`} note={`${simFmtPts(ros.floor)}-${simFmtPts(ros.ceiling)}`} /> : null}
           <MetricCard
-            label="This season"
+            label={seasonLabel || "This season"}
             value={simFmtPts(player.season_points ?? 0)}
             note={`${player.games ?? 0} games${player.ppg != null ? ` · ${simFmtPts(player.ppg)} ppg` : ''}`}
           />
@@ -336,7 +335,7 @@ function SimOverviewSection({ player, detail, actions }: { player: SimGamePlayer
   );
 }
 
-function SimOutlookSection({ player, detail }: { player: SimGamePlayer; detail: SimPlayerDetailState }) {
+function SimOutlookSection({ player, detail, seasonLabel }: { player: SimGamePlayer; detail: SimPlayerDetailState; seasonLabel?: string | null }) {
   const { colors } = useThemeMode();
   const common = useMemo(() => createSimStyles(colors), [colors]);
   const styles = useMemo(() => createStyles(), []);
@@ -351,9 +350,9 @@ function SimOutlookSection({ player, detail }: { player: SimGamePlayer; detail: 
   if (!(actual.length > 0 || band || ros)) return <AppText style={common.small}>No outlook yet.</AppText>;
   return (
     <View style={styles.overlay}>
-      <PqvSection title="Week by Week · This sim season">
+      <PqvSection title={`Week by Week · ${seasonLabel || "This sim season"}`}>
         {actual.length > 0 || band ? (
-          <WeeklyPointsChart weeks={actual.map((a) => ({ week: a.week, fantasy_points_ppr: a.points, snap_share: null }))} projection={band} pointsLabel="pts" />
+          <WeeklyPointsChart weeks={actual.map((a) => ({ week: a.week, fantasy_points_ppr: a.points, snap_share: null }))} projection={band} pointsLabel="pts" byeWeeks={ros?.bye_week ? [ros.bye_week] : []} />
         ) : null}
         {flat && ros ? (
           <AppText style={common.small} testID="sim-ros-line">

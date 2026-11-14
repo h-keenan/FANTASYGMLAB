@@ -1,5 +1,6 @@
 import React, { useMemo } from 'react';
-import { StyleSheet, TouchableOpacity, View } from 'react-native';
+import { StyleSheet, View } from 'react-native';
+import PressableScale from './PressableScale';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
@@ -45,19 +46,19 @@ export default function BrandHeaderBar({
         <PageTitle>{title}</PageTitle>
         <View style={[styles.side, styles.actions]}>
           {onSearch ? (
-            <TouchableOpacity style={styles.iconButton} hitSlop={8} onPress={onSearch} accessibilityLabel="Search players and pages">
+            <PressableScale style={styles.iconButton} hitSlop={8} onPress={onSearch} accessibilityLabel="Search players and pages">
               <Ionicons name="search-outline" size={19} color={colors.textPrimary} />
-            </TouchableOpacity>
+            </PressableScale>
           ) : null}
           {leagueId && leagueName ? (
-            <TouchableOpacity
+            <PressableScale
               style={styles.iconButton}
               hitSlop={8}
               onPress={() => navigation.navigate('Alerts', { leagueId, leagueName })}
               accessibilityLabel="Alerts"
             >
               <Ionicons name="notifications-outline" size={19} color={colors.textPrimary} />
-            </TouchableOpacity>
+            </PressableScale>
           ) : null}
         </View>
       </View>
@@ -76,7 +77,7 @@ export default function BrandHeaderBar({
       </View>
       <View style={[styles.side, styles.actions]}>
         {leagueId && leagueName ? (
-          <TouchableOpacity
+          <PressableScale
             style={styles.iconButton}
             hitSlop={8}
             onPress={() => navigation.navigate('GmPlan', { leagueId, leagueName, initialTab: 'watching' })}
@@ -84,11 +85,11 @@ export default function BrandHeaderBar({
             accessibilityLabel="GM Targets"
           >
             <Ionicons name="star-outline" size={17} color={colors.accent} />
-          </TouchableOpacity>
+          </PressableScale>
         ) : null}
-        <TouchableOpacity style={styles.iconButton} hitSlop={8} onPress={() => navigation.navigate('More')} accessibilityRole="button" accessibilityLabel="More">
+        <PressableScale style={styles.iconButton} hitSlop={8} onPress={() => navigation.navigate('More')} accessibilityRole="button" accessibilityLabel="More">
           <Ionicons name="ellipsis-horizontal" size={17} color={colors.textPrimary} />
-        </TouchableOpacity>
+        </PressableScale>
       </View>
     </View>
   );

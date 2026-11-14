@@ -115,3 +115,13 @@ describe("Season in review on a phone", () => {
     expect(screen.getByLabelText("Final standings")).toBeInTheDocument();
   });
 });
+
+describe("SimDraftRow in a rookie-only draft", () => {
+  it("drops the redundant Rookie badge there, keeps it everywhere else", () => {
+    const rookie = player({ age: 21 });
+    const { rerender } = render(<SimDraftRow player={rookie} />);
+    expect(screen.getByRole("img", { name: "Rookie" })).toBeInTheDocument();
+    rerender(<SimDraftRow player={rookie} suppressBadges={["rookie"]} />);
+    expect(screen.queryByRole("img", { name: "Rookie" })).toBeNull();
+  });
+});

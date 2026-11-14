@@ -25,12 +25,13 @@ import { simTeamsByPower } from "@/lib/simLeagueRosters";
 import { simGroupsToSheetItems } from "@/lib/simTradeSheet";
 import { useSimLeagueRosters } from "@/lib/useSimLeagueRosters";
 import { selectedItems } from "@/lib/tradeSheetPicker";
+import { TapForWhyOff } from "@/components/ui/TapForWhy";
 import { TradePickerSheet, TradeSideSummary } from "@/components/TradePickerSheet";
 import {
   SIM_TRADE_EMPTY,
   simGameReasonMessage,
   type SimTradeSeed,
-  simFmtPts,
+  simProjText,
   simIsPick,
   simIsPickId,
   simPickLabelText,
@@ -38,7 +39,7 @@ import {
   simHeadshotId,
   simPositionsFor,
   simTradeMaxPerSide,
-  simTradable,
+  simTradableIn,
   simTradeClosedReason,
   simCounterDeltaLine,
   simTradeDecisionLabel,
@@ -85,7 +86,7 @@ function PlayerList({ players }: { players: SimTradeAsset[] }) {
           ) : (
             <div className="flex items-center justify-between gap-2 py-1">
               <SimPlayerChip player={p} size={28} quick className="min-w-0 flex-1" />
-              <SimStat label="Proj" value={simFmtPts(p.projection)} />
+              <SimStat label="Proj" value={simProjText(p)} />
             </div>
           )}
         </li>
@@ -347,16 +348,18 @@ function Builder({ ctx, seed, onSeedUsed }: { ctx: SimCtx; seed: SimTradeSeed | 
   const theirPicks = simPicksOf(picks, partner?.team_id);
   const giveSelected: SimTradeAsset[] = [...mine, ...myPicks].filter((p) => draft.give.includes(p.id));
   const getSelected: SimTradeAsset[] = [...partnerRoster, ...theirPicks].filter((p) => draft.get.includes(p.id));
-  const fit = simTradeFit(mine.length, game.settings.roster_limit, giveSelected.filter((p) => !simIsPick(p)).length, getSelected.filter((p) => !simIsPick(p)).length);
+  const soft = (game.settings.limit_v ?? 0) >= 1; // the soft roster limit: over the limit only blocks adding players
+  // Only the active roster counts toward the limit: IR and taxi players neither fill a spot nor free one when traded away.
+  const fit = simTradeFit(mine.filter((p) => (p.squad ?? "roster") === "roster").length, game.settings.roster_limit, giveSelected.filter((p) => !simIsPick(p) && (p.squad ?? "roster") === "roster").length, getSelected.filter((p) => !simIsPick(p)).length, soft);
   // The picker's groups: players by position, then a Picks group; the same shape feeds the page summaries.
   const groupsFor = (players: SimGamePlayer[], pickList: SimPickAsset[]): SimAssetGroup<SimTradeAsset>[] => {
-    const groups: SimAssetGroup<SimTradeAsset>[] = simGroupByPosition(players.filter((p) => simTradable(p.pos)), simPositionsFor(game.settings.slots));
+    const groups: SimAssetGroup<SimTradeAsset>[] = simGroupByPosition(players.filter((p) => simTradableIn(game.settings, p.pos)), simPositionsFor(game.settings.slots));
     if (pickList.length > 0) groups.push({ key: "PICK", label: "Picks", kind: "pick", items: pickList });
     return groups;
   };
   const describePick = (p: SimTradeAsset) => {
     const pick = p as SimPickAsset;
-    return { label: `${simPickLabelText(pick)}${pick.own === false ? ` via ${pick.orig_team_name}` : ""}`, detail: null, round: pick.round, group: `${pick.season} picks` };
+    return { label: `${simPickLabelText(pick)}${pick.own === false ? ` via ${pick.orig_team_name}` : ""}`, detail: null, round: pick.round, group: `${pick.season_label || pick.season} picks` };
   };
   const toItems = (groups: SimAssetGroup<SimTradeAsset>[]) => simGroupsToSheetItems(groups, simHeadshotId, describePick);
   const sheetItems = sheetSide ? toItems(groupsFor(sheetSide === "give" ? mine : partnerRoster, sheetSide === "give" ? myPicks : theirPicks)) : [];
@@ -394,9 +397,9 @@ function Builder({ ctx, seed, onSeedUsed }: { ctx: SimCtx; seed: SimTradeSeed | 
             <TradeSideSummary testId="trade-side-give" label="You send" tone="danger" items={sideItems(giveSelected)} onOpen={() => setSheetSide("give")} onRemove={(key) => dispatch({ type: "toggle", side: "give", id: key.slice(key.indexOf(":") + 1), max: maxPerSide })} hint={picks?.you?.length ? "Add players or picks from your team" : "Add from your roster"} />
             <TradeSideSummary testId="trade-side-get" label="You receive" tone="success" items={sideItems(getSelected)} onOpen={() => setSheetSide("get")} onRemove={(key) => dispatch({ type: "toggle", side: "get", id: key.slice(key.indexOf(":") + 1), max: maxPerSide })} hint={`Add from ${partner.name}`} />
           </section>
-          <p className="text-xs" style={{ color: fit.over ? "var(--color-danger)" : "var(--color-text-muted)" }} data-testid="trade-fit">
+          <p className="text-xs" style={{ color: fit.blocked || (fit.over && !soft) ? "var(--color-danger)" : "var(--color-text-muted)" }} data-testid="trade-fit">
             Your roster after: {fit.after}/{game.settings.roster_limit}
-            {fit.over ? ` (cut ${fit.over} after the trade)` : fit.room ? ` (${fit.room} open)` : ""}
+            {fit.blocked ? ": roster is full, so cut or trade someone first to add players" : fit.over ? (soft ? ` (over by ${fit.over})` : ` (cut ${fit.over} after the trade)`) : fit.room ? ` (${fit.room} open)` : ""}
           </p>
         </>
       ) : null}
@@ -416,7 +419,7 @@ function Builder({ ctx, seed, onSeedUsed }: { ctx: SimCtx; seed: SimTradeSeed | 
                 }}
               />
               {verdict.decision === "accept" ? (
-                <Button loading={sending} onClick={() => { const payload = simTradePayload(draft); if (payload) void send(payload); }}>
+                <Button loading={sending} disabled={fit.blocked} onClick={() => { const payload = simTradePayload(draft); if (payload) void send(payload); }}>
                   Send offer
                 </Button>
               ) : null}
@@ -494,6 +497,7 @@ export function SimTradesTab({
   }
   const hasBlock = (ctx.game.settings.block_v ?? 0) >= 1;
   return (
+    <TapForWhyOff>
     <div className="flex flex-col gap-3">
       <PillRow
         ariaLabel="Trades view"
@@ -515,6 +519,7 @@ export function SimTradesTab({
         <Builder ctx={ctx} seed={blockSeed ?? seed} onSeedUsed={() => { setBlockSeed(null); onSeedUsed(); }} />
       )}
     </div>
+    </TapForWhyOff>
   );
 }
 

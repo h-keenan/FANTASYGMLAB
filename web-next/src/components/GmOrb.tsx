@@ -154,7 +154,7 @@ export function GmOrb() {
           the drift from window.visualViewport; that was removed because it
           could disagree with the sticky/fixed elements it sat next to. The
           rail's parent (body) has no overflow/transform, which sticky needs. */}
-      <div className="md:hidden" style={{ position: "sticky", bottom: 0, height: 0, zIndex: 40 }}>
+      <div className="bottom-rail md:hidden">
       <button
         type="button"
         onClick={() => {

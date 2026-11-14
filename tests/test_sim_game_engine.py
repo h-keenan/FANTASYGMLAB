@@ -38,8 +38,10 @@ def make_snapshot(seed=11, **settings):
     return build_snapshot(ROWS, BYES, GameSettings.parse(opts), seed, scoring_model=game_scoring.default_model().model_id)
 
 
-def drafted(seed=11, **settings):
+def drafted(seed=11, limit_v=None, **settings):
     snap = make_snapshot(seed, **settings)
+    if limit_v is not None:  # flip the roster-limit gate (0 = a save from before the soft limit)
+        object.__setattr__(snap, "settings", dataclasses.replace(snap.settings, limit_v=limit_v))
     state = GameState(snap)
     em = Emitter(state, snap)
     ctx = DraftContext(snap, state)
@@ -438,7 +440,8 @@ def test_byes_and_injuries_zero_out_a_player_and_flag_him():
 
 
 def test_roster_limit_blocks_advance_and_cut_fixes_it():
-    snap, state, em = drafted(11)
+    """An old save (limit_v 0): over the limit hard-stops Advance. New saves only block adding (test_sim_roster_limit)."""
+    snap, state, em = drafted(11, limit_v=0)
     user = snap.user_team.tid
     for pid in state.free_agents(snap)[:4]:
         state.rosters[user].append(pid)  # simulate trades that overfilled the roster
@@ -665,8 +668,9 @@ def test_ai_never_takes_a_lopsided_loss_and_kickers_are_not_tradable():
         assert v.decision != "accept", (team, v)
     kicker = next(p for p in state.rosters[user] if snap.players[p].pos == "K")
     other = next(t for t in snap.tids if t != user)
+    old = dataclasses.replace(snap, settings=dataclasses.replace(snap.settings, kd_v=0))  # a save from before kd_v
     with pytest.raises(ValueError):
-        validate_offer(snap, state, other, [kicker], [state.rosters[other][0]])
+        validate_offer(old, state, other, [kicker], [state.rosters[other][0]])
 
 
 def test_trade_rules_deadline_duplicates_caps_and_playoffs():

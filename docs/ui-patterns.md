@@ -103,8 +103,14 @@ const pages: StoryPage[] = [
   between pages that is off under `prefers-reduced-motion` (app: `useReducedMotion`), no horizontal
   overflow (every column is `min-w-0`).
 - **Reuse**: a story is `{ title, pages[], onClose }`. First user: the Fantasy Sim weekly recap
-  (`SimRecapStory`: Result, Matchup breakdown, Injuries and lineup, Around the league, Next week; a
-  "Full details" button opens the classic recap). Meant for the season recap, draft recap and offseason
+  (`SimRecapStory`: Result, Matchup breakdown, Injuries and lineup, Around the league, Season complete (final week only), Next week; a
+  "Full details" button opens the classic recap).
+- **Recap page anatomy** (web `ui-recap*` classes in `ui.css`, app `HeroZone`): a hero zone that fills the top of the screen (min 34dvh, centered, a
+  one-shot accent glow `HERO_GLOW`, never looping), then at most three supporting rows. Result: team avatars both sides, score with `CountUp`, tone glow,
+  best/worst as `SimPlayerLine` rows (avatar, position badge, OVR gauge). Playoffs and the championship: trophy mark (`TrophyIcon`), headline from
+  `simRecapOutcome` (Advancing / Eliminated / Playoff bye / Runner-up / Champions), `Confetti` only for the title and never under reduced motion.
+  Matchup: efficiency ring, position-coloured chips (`positionColorVar`), top starters with OVR. Injuries: ONE marker per player (the OUT chip; the trailing text is
+  only the duration). Season: champion crowned, your finish, awards the standings can back up. All variant logic is pure and tested in `lib/simRecapStory.ts`. Meant for the season recap, draft recap and offseason
   review next; those are not built yet.
 ## Motion
 
@@ -129,6 +135,12 @@ pure tokens and rules in `lib/motion.ts` (byte-identical twin), web CSS variable
   `.sim-row-drafted` (existing: results landing, a drafted/claimed row sliding away), skeleton shimmer, Tabs slide, toast.
 - **Where it is applied**: Scores cards (stagger, count-up, week sweep), recap hero score (count-up) and title confetti, trade
   offers (capped stagger in, verdict pop), tab count badges (pulse), hero OVR rings (fill), TickNumber everywhere it is used.
+- **The ONE press feedback**: `PRESS` in `lib/motion.ts` (3% shrink, slight fade, 120ms; reduced motion keeps only the fade). Web: a single
+  zero-specificity rule in `globals.css` ("Press feedback") covers every `button`, `[role=button|tab|menuitem]`, `summary`, `a[href]` and `[data-press]`;
+  opt out with `data-no-press` only where a control animates itself. App: `components/PressableScale` is THE tappable (drop-in for
+  `TouchableOpacity`; do not use `activeOpacity` or a hand-rolled `pressed` style). `AnimatedCard` already matches (.97 spring).
+- **Transitions by surface**: `TRANSITION_MS` (page 240, sheet 300, tab 180, toast 240, list 180, press 120). **Success pulse**: `.motion-success` /
+  `SUCCESS_PULSE` for a saved/added/claimed confirmation, `PulseOnIncrease` for counts. **Count-up**: `CountUp`. **Hero glow**: `HERO_GLOW`.
 - **Adding motion**: use a class/hook above, never a new keyframe with its own duration; check the reduced-motion test
   (`components/Motion.test.tsx`) still describes your component's behaviour, and keep it off long lists.
 
@@ -595,6 +607,43 @@ get a check, the current step is ringed), then modules with a header icon and a 
 your turn), `Draft log`, `Roster` (14/12 spots · cut 2 · QB2 RB5, with a trade icon action), `Future picks`. The rookie board has no
 Rookie badge (context suppression). The summary builders are the lib twin `simOffseasonSummary.ts`; `SimCollapse` is now a thin
 adapter over `CompactModule`, so the Team tab and dynasty screens got the same module for free.
+## Module templates (the catalog every page is built from)
+
+Direction (coridian_): the data points exist; the problem is how they are represented. Every page is a short stack of a
+small set of templates, and the Fantasy Sim uses the same templates through thin adapters. No module may be an empty
+header when collapsed. The catalog lives in code, `lib/moduleTemplates.ts` (byte-identical web + app twin, listed in
+`IDENTICAL` in `scripts/check_lib_twins.mjs`): `MODULE_TEMPLATES` (purpose, required props, collapsed-form rule, density
+tier, min/max height, web and app component) and `SIM_TEMPLATE_ADAPTERS`.
+
+| Template | Web | App | Collapsed form must show | Tier / height |
+|---|---|---|---|---|
+| Hero | `ui/ModuleTemplates#Hero` | `ModuleTemplates#Hero` | always open: big value + one context line + signed trend (sparkline from 2+ points, none otherwise) | T2, 88-120 |
+| CompactModule / CompactSummary (the base) | `ui/CompactModule` | `CompactModule` | title + 1-2 line summary (`parts`), optional one action | T0, 56-96 |
+| StatStrip | `StatStrip` inside `ui/ModuleTemplates#StatStripModule` | `DashboardStatRow` inside `StatStripModule` | "Power #3 · Starters #5 · Age 26.1" built by `statStripParts` | T3 |
+| LinkModule (a CompactSummary that navigates) | `ui/ModuleTemplates#LinkModule` | `LinkModule` | same summary, arrow instead of +/- | T0 |
+| Row (player / team / pick / trade asset) | `PlayerListRow`, `PickRow`, `StructuredRow` | `PlayerListRow`, `DraftPickAssetRow` | name + chip line; right edge = one action or number | T1, 56-72 |
+| Section header | `SectionHeading` | `SectionHeading` | title + count/context; never alone | T0 |
+| ActionBar | `SimActionBar`, `.bottom-stack` | `QuickActionsGrid` | max 3 labelled 44px actions; hidden if none | T0 |
+| List + FilterRow | `PillRow` + `ui/FilterSheet` | `FilterSheet` | ONE 44px control row; the rest behind Filters | T0 |
+| TabPage shell | `PageTabBar` | `SegmentedTabBar` | one tab row, 2-5 tabs, never a second | T0 |
+| Empty / Error / Loading | `EmptyState`, `ErrorState`, `Skeleton` | `EmptyState`, `ErrorState` | title + reason + one next step | T1 |
+| TrendChart usage | `ui/TrendChart` | `TrendChart` | `variant="compact"` sparkline beside a number | T2 |
+| InsightLink | `ui/InsightLink` | `InsightRow` | the stat itself, tappable | T0 |
+
+Pure builders in the lib twin keep the two platforms identical: `statStripParts`, `listSummaryParts` ("3 alerts · Gibbs out"),
+`trendModel` (delta, direction, tone; `higherIsBetter=false` for ranks), `heroParts`, `collapsedVerdict`.
+
+**The collapsed-form rule (lint-style, enforced).** A collapsed module renders at least `MIN_COLLAPSED_CHARS` (12) characters of
+real data; placeholders ("—", "Loading…") do not count and a title never counts. Enforced three ways:
+`collapsedVerdict` (lib), `collapsedModuleProblems(container)` in `ui/assertCompactInformative.ts` (page tests assert
+`expect(collapsedModuleProblems(container)).toEqual([])` on Today and My Team), and a source scan in
+`ui/ModuleTemplates.test.tsx` that fails if any `<CompactModule>` in `web-next/src` or `mobile/src` lacks `parts`/`summary`.
+
+**Fantasy Sim adapters** (no template of their own): SimFold (CompactModule + `simSummaries`), SimDraftHero (Hero + bar),
+SimDraftRow / SimPlayerLine / SimRosterLine (Row), SimDraftBoard filters (List + FilterRow), SimActionBar (ActionBar),
+SimNotice (state), SimGameHome modules (CompactModule via `simInboxParts` etc.), SimGameTeamSheet / SimPlayerSheet (Sheet tabs).
+
+Rollout status per page: `docs/audits/2026-11-module-templates-rollout.md`.
 
 ## Player row anatomy (shared by FantasyDesk and the Fantasy Sim)
 
@@ -621,3 +670,68 @@ after ~7s, an error never (`noticeDismissMs` in `lib/compactModule.ts`, same on 
 A page has ONE tab row. `PillRow variant="scroll"` shares a short row's width equally (no empty bordered box after the
 last tab) and scrolls only when its labels overflow; the app's `SegmentedTabBar scrollable` does the same. Filters and sort
 share one compact row (`draft-filters`: position pills plus a sort control), never one strip each.
+
+## Page tab families and glass chrome (2026-11)
+
+Related pages are tabs of one page family (`lib/pageFamilies.ts`: Trades, Team, League), rendered by `PageTabBar` over
+`PillRow glass` (sticky, scroll-snap, cyan glass active pill). Each tab keeps its route. The phone footer
+(`BottomTabBar`) uses the same glass tokens. Plan: `docs/audits/2026-11-menu-consolidation.md`.
+
+## Sheet tabs (quick views that would otherwise scroll long)
+
+Rule: a pop-up that scrolls past about one and a half screens groups its content under the shared `Tabs`
+(`components/Tabs.tsx`, app `components/Tabs.tsx`), never one long page. The pop-up shell is unchanged (it still goes
+through `useOverlay` / `PopupShell` / `Sheet`, so the one-pop-up-at-a-time, Back and X rules in "Overlays" hold).
+
+- **Plans live in a lib twin**: `lib/sheetTabs.ts` (byte-identical web + app, listed in `IDENTICAL` in
+  `scripts/check_lib_twins.mjs`) decides which tabs a real-league sheet has, so both platforms group the same content
+  under the same names. A tab with nothing to show is dropped; the first tab always exists and carries loading /
+  upsell / empty states. Tests: `lib/sheetTabs.test.ts` (both trees), `Tabs.test.tsx`,
+  `ManagerProfileSheetTrades.test.tsx`, `PercentileExplorerSheet.test.tsx`.
+- **Sticky strip**: web `Tabs` wraps the strip in `.tabs-sticky` (position sticky, top 0, frosted glass, so content slides
+  under it). Opt out with `sticky={false}`. App: `useTabs()` returns `{ bar, panel }`; a sheet makes the bar a direct
+  child of its `SheetScrollView` and pins it with `stickyHeaderIndices` (Player Quick View: index 2 = top bar, hero,
+  strip), or puts the bar above its ScrollView (Manager profile) so only the panel scrolls. `<Tabs>` is the unpinned
+  stack of the same two pieces.
+- **No layout jump**: the panel keeps the tallest height it has shown as its minimum (`nextPanelMinHeight`), so a short
+  tab after a long one never pulls the sheet or the strip.
+- **State**: the open tab is remembered per surface id for the session (`lib/sessionTab.ts`); anything that must survive a
+  tab switch (search text, scrubbed bucket, selection) lives in the sheet's own state, not inside a panel, because panels
+  are lazy and unmount when hidden. The slide between panels is off under reduced motion (CSS media query / OS setting).
+  Swipe-to-dismiss is untouched (a drag still starts from the handle, or the body only at scroll top); tabs are tapped,
+  not swiped, so they never fight it.
+- **Fantasy Sim isolation**: sim sheets (SimPlayerSheet, SimGameTeamSheet, sim sections of the PQV) keep their own plans;
+  `sheetTabs.ts` knows nothing about the sim and the sim tabs never render real news.
+
+| Sheet | Tabs | Web | App |
+|---|---|---|---|
+| Player Quick View (real) | Overview, Outlook, Stats, Profile | yes | yes (sticky strip) |
+| Player Quick View (sim) | Overview, Outlook, Scouting, History, plus Stats/Profile for real-backed | yes | yes |
+| Sim team sheet | Overview and more | yes | yes |
+| Manager profile | Overview, Tendencies, Trades | yes | yes (strip pinned above the scroll) |
+| Percentile explorer | chart + comparison stay on top; tabs In this bucket, Find a player, My roster | yes | yes |
+
+Left as they are (short or already segmented): trade picker (Players / Picks segmented control), Matchup swap sheet,
+share previews, filter sheets, alerts dropdown.
+
+## Charts: one module (web `ui/TrendChart` + mobile `TrendChart` + `lib/chartSeries.ts` twin)
+
+Every line / area chart goes through `TrendChart`; never hand-roll an SVG path or add a charting library for a trend.
+Data rules live in `lib/chartSeries.ts` (byte-identical twin, tested in `chartSeries.test.ts`):
+- A bye / missed / injured week is a gap row (`y: null`, optional `gap`): the line breaks, a dashed bridge crosses it and a
+  muted hollow marker sits on it (tap for "Bye week"). Never a blank hole.
+- One played point renders a labelled stat with a mini bar ("Not enough weeks yet for a trend"), not a lone dot; no data
+  renders a short sentence. 2-3 points get value labels and bigger dots.
+- Axes: nice ticks, optional zero baseline, `clamp` (ratings 0-99), exact `yDomain` + `invertY` for ranks; monotone smoothing.
+- `variant="compact"` is the axis-free sparkline for compact modules. Tap / hover / focus a point for the tooltip.
+- Draw-in animation only under `prefers-reduced-motion: no-preference`. Tokens only.
+Adapters: `WeeklyPointsChart` (weekly points, optional projection band), `RatingHistoryChart`, the season-review rank journey.
+Not trend charts (left as is): `ModelRadarChart` (radar), `CircularProgressRing`, progress bars.
+
+## Bottom chrome: one sticky mechanism
+
+Everything pinned to the bottom of a phone screen (tab bar + action strip, Fantasy Sim bar + orb, GM orb) is an in-flow
+`position: sticky; bottom: 0` element: `.bottom-stack` (full-width) or `.bottom-rail` (zero-height rail, orb absolute in it).
+Never `position: fixed`, never JS-placed. Sticky is clamped to its parent's box, so the parent must span the whole document:
+html/body never get a fixed height (body is `min-height: 100dvh`), and the column chain uses `flex-auto`, not `flex-1`/`min-h-0`.
+`lib/bottomChrome.test.ts` guards this; `scripts/sim_layout_playwright/footer_pin.mjs` checks it in a browser.

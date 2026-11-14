@@ -1,5 +1,6 @@
 import React, { useMemo, useRef, useState } from 'react';
-import { Pressable, Share, StyleSheet, TouchableOpacity, View } from 'react-native';
+import { Pressable, Share, StyleSheet, View } from 'react-native';
+import PressableScale from './PressableScale';
 import AppText from './AppText';
 import Button from './Button';
 import { captureRef } from 'react-native-view-shot';
@@ -73,12 +74,12 @@ export default function RecapSharePreviewModal({ visible, onClose, leagueName, r
             </View>
           </View>
           <Button label="Share image" onPress={onShareImage} loading={capturing} style={styles.primaryButton} />
-          <TouchableOpacity style={styles.secondaryButton} onPress={onShareText}>
+          <PressableScale style={styles.secondaryButton} onPress={onShareText}>
             <AppText style={styles.secondaryButtonText}>Share as text instead</AppText>
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.closeButton} onPress={onClose}>
+          </PressableScale>
+          <PressableScale style={styles.closeButton} onPress={onClose}>
             <AppText style={styles.closeButtonText}>Cancel</AppText>
-          </TouchableOpacity>
+          </PressableScale>
         </SwipeDismissCard>
       </Pressable>
     </SheetModal>

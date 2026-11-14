@@ -1,21 +1,21 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useState, type ReactNode } from "react";
 
 import { Button } from "@/components/Button";
 import type { SimCtx } from "@/components/SimGameParts";
 import { api } from "@/lib/api";
 import { simTabAfterStageAction, type SimStageAction } from "@/lib/simScroll";
-import { simOffseasonCta, simOffseasonStageLabel, type SimOffseason, type SimOffseasonResponse } from "@/lib/simGame";
+import { simOffseasonCta, simOffseasonStageLabel, simSeasonLabel, type SimOffseason, type SimOffseasonResponse } from "@/lib/simGame";
 
 /**
  * The one persistent primary action for every offseason tab (Offseason, Team,
  * Trades, League): Start rookie draft, Auto-draft the rest (asks first), then
- * "Finish cut-down" (disabled, with the reason) until the roster is legal and
- * Start season N. A floating glass pill above the bottom tab bar on phones (no orb), sticky on desktop, same frame as SimActionBar. It reads the offseason
+ * Start season N (saves from before the soft roster limit show "Finish cut-down", disabled with the reason, until the roster is legal;
+ * newer saves only show a compact over-the-limit note: you can start the season over the limit, you just cannot add players). A floating glass pill above the bottom tab bar on phones (no orb), sticky on desktop, same frame as SimActionBar. It reads the offseason
  * itself, so any tab can mount it. Mobile twin: mobile/src/components/SimOffseasonBar.tsx.
  */
-export function SimOffseasonBar({ ctx, onTab }: { ctx: SimCtx; onTab?: (tab: "home") => void }) {
+export function SimOffseasonBar({ ctx, onTab, orb }: { ctx: SimCtx; onTab?: (tab: "home") => void; orb?: ReactNode }) {
   const { gameId, call } = ctx;
   const [off, setOff] = useState<SimOffseason | null>(null);
   const [busy, setBusy] = useState(false);
@@ -62,7 +62,7 @@ export function SimOffseasonBar({ ctx, onTab }: { ctx: SimCtx; onTab?: (tab: "ho
     } else if (off.stage === "rookie_draft") {
       setConfirmAuto(true);
     } else {
-      void run(async () => (await api.startSimSeason(gameId)) as SimOffseasonResponse, () => `Season ${off.season_no + 1} is on.`, "start_season");
+      void run(async () => (await api.startSimSeason(gameId)) as SimOffseasonResponse, () => `${off.season_label || simSeasonLabel(off.season_no + 1, off.year)} is on.`, "start_season");
     }
   }
 
@@ -82,14 +82,18 @@ export function SimOffseasonBar({ ctx, onTab }: { ctx: SimCtx; onTab?: (tab: "ho
           </div>
         </div>
       ) : null}
+      {cta.note ? (
+        <p className="px-4 pt-1.5 text-center text-xs font-bold" style={{ color: "var(--color-warning)" }} role="status" data-testid="offseason-over-note">{cta.note}</p>
+      ) : null}
       {cta.blocked ? (
         <p id={reasonId} className="px-4 pt-1.5 text-center text-xs font-bold" style={{ color: "var(--color-warning)" }} role="status">{cta.blocked}</p>
       ) : null}
-      <div className="mx-auto grid max-w-3xl grid-cols-[1fr_1.4fr] items-center gap-2 p-1 md:grid-cols-[1fr_auto]">
-        <span className="min-w-0 text-xs font-bold" style={{ color: "var(--color-text-muted)" }}>
+      <div className="mx-auto flex max-w-3xl items-center gap-2 p-1 md:grid md:grid-cols-[1fr_auto]">
+        {orb}
+        <span className="min-w-0 text-xs font-bold max-md:hidden" style={{ color: "var(--color-text-muted)" }}>
           {simOffseasonStageLabel(off.stage)}
         </span>
-        <Button className={`whitespace-nowrap ${cta.blocked ? "ring-1 ring-[var(--color-border-strong)]" : ""}`} fullWidth loading={busy && !confirmAuto} disabled={Boolean(cta.blocked) || confirmAuto} onClick={press} aria-describedby={cta.blocked ? reasonId : undefined}>
+        <Button className={`min-w-0 whitespace-nowrap max-md:flex-1 ${cta.blocked ? "ring-1 ring-[var(--color-border-strong)]" : ""}`} fullWidth loading={busy && !confirmAuto} disabled={Boolean(cta.blocked) || confirmAuto} onClick={press} aria-describedby={cta.blocked ? reasonId : undefined}>
           {cta.label}
         </Button>
       </div>

@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { Linking, RefreshControl, SectionList, StyleSheet, TouchableOpacity, View } from 'react-native';
+import { Linking, RefreshControl, SectionList, StyleSheet, View } from 'react-native';
+import PressableScale from '../components/PressableScale';
 import AppText from '../components/AppText';
 import { useHeaderHeight } from '@react-navigation/elements';
 
@@ -260,12 +261,11 @@ export function NewsRow({
   const identities = newsPlayerIdentities(item);
 
   return (
-    <TouchableOpacity accessibilityRole="button"
+    <PressableScale accessibilityRole="button"
       style={[styles.row, hero && styles.rowHero, showDivider && styles.rowDivider]}
       onPress={() => {
         if (item.link) void Linking.openURL(item.link);
       }}
-      activeOpacity={item.link ? 0.7 : 1}
       disabled={!item.link}
     >
       {showEventTag && item.event_type ? (
@@ -312,7 +312,7 @@ export function NewsRow({
       ) : null}
       {alsoReportedLine(item) ? <AppText style={styles.footerMeta}>{alsoReportedLine(item)}</AppText> : null}
       {footerBits.length > 0 ? <AppText style={styles.footerMeta}>{footerBits.join(' · ')}</AppText> : null}
-    </TouchableOpacity>
+    </PressableScale>
   );
 }
 

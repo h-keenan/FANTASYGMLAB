@@ -338,8 +338,8 @@
   outline-offset: 2px;
 }
 .ui-why:active {
-  opacity: 0.7;
-  transform: scale(0.98);
+  scale: var(--press-scale);
+  opacity: var(--press-opacity);
 }
 .ui-why-body {
   display: flex;
@@ -363,11 +363,6 @@
   font-size: 0.85rem;
   font-weight: 700;
   color: var(--color-accent);
-}
-@media (prefers-reduced-motion: reduce) {
-  .ui-why:active {
-    transform: none;
-  }
 }
 
 /* ---------- StructuredRow ---------- */
@@ -398,7 +393,8 @@
   border-color: var(--color-border-strong);
 }
 .ui-srow-tap:active {
-  opacity: 0.8;
+  scale: var(--press-scale);
+  opacity: var(--press-opacity);
 }
 .ui-srow-me {
   border-color: var(--color-premium);
@@ -607,6 +603,14 @@
   align-items: center;
   gap: var(--space-sm);
 }
+/* ONE mechanism for everything pinned to the bottom of a phone screen (tab bar + page action strip, Fantasy Sim bar and
+   orb, the GM orb): an in-flow `position: sticky; bottom: 0` element, never position:fixed and never JS-placed.
+     .bottom-stack  a full-width stack at the end of the app column (footer, sim action bar)
+     .bottom-rail   a zero-height rail at the end of <body> whose child (the GM orb) is absolutely placed in it
+   Sticky is clamped to its parent's box, so the parent must span the whole document: html/body have no fixed height
+   (globals.css), the column chain uses flex-auto, never flex-1 (basis 0) or min-h-0. lib/bottomChrome.test.ts guards
+   all of this; scripts/sim_layout_playwright/footer_pin.mjs checks it in a real browser (WebKit, iPhone viewport). */
+.bottom-rail { position: sticky; bottom: 0; z-index: 40; height: 0; }
 /* Phone bottom tab bar (components/ui/BottomTabBar.tsx) and the sticky stack
    that holds it with the page's action strip. NOT position:fixed and not
    JS-positioned: the stack is `position: sticky; bottom: 0` at the end of a
@@ -633,14 +637,8 @@
   padding-bottom: env(safe-area-inset-bottom, 0px);
 }
 .bottom-stack[data-bare] { margin-inline: 0; }
-/* The game's navigation orb docks to the stack (absolute inside the sticky stack, not fixed), bottom-right, just above the Advance pill. */
-.game-orb-dock {
-  position: absolute;
-  right: var(--bar-side-inset);
-  bottom: calc(100% + var(--bar-orb-gap));
-  pointer-events: none;
-}
-.game-orb-dock > * { pointer-events: auto; }
+/* The game's navigation orb is a slot inside the action bar's one row (Sim to | orb | Advance), in flow: nothing overlaps content or clips. */
+.game-orb-slot { display: flex; flex: 0 0 auto; align-items: center; justify-content: center; }
 .game-orb {
   position: relative;
   display: flex;
@@ -651,12 +649,14 @@
   justify-content: center;
   gap: 1px;
   border-radius: 50%;
-  background: var(--color-bg);
+  background: linear-gradient(165deg, color-mix(in srgb, var(--color-accent) 20%, var(--color-bg)), var(--color-bg));
   border: 1.5px solid var(--color-accent);
-  box-shadow: var(--shadow-card);
+  box-shadow: var(--shadow-card), 0 0 14px color-mix(in srgb, var(--color-accent) 30%, transparent);
   color: var(--color-accent);
   -webkit-tap-highlight-color: transparent;
 }
+/* In the bar the orb matches the 44px buttons beside it. */
+.game-orb--bar { width: var(--bar-orb-bar-size, 48px); height: var(--bar-orb-bar-size, 48px); }
 .game-orb-label {
   font-size: 0.5625rem;
   font-weight: 800;
@@ -666,8 +666,9 @@
 }
 .game-orb-badge {
   position: absolute;
-  top: -2px;
-  right: -2px;
+  top: 0;
+  right: 0;
+  transform: translate(35%, -35%);
   min-width: 18px;
   height: 18px;
   padding: 0 4px;
@@ -700,48 +701,72 @@
   background: color-mix(in srgb, var(--color-accent) 12%, transparent);
 }
 .bottom-tab-bar {
-  background: color-mix(in srgb, var(--color-bg) 93%, transparent);
-  -webkit-backdrop-filter: blur(18px) saturate(160%);
-  backdrop-filter: blur(18px) saturate(160%);
+  /* Frosted glass over the page background: translucent surface tint, strong blur, a lit top hairline. */
+  background:
+    linear-gradient(180deg, color-mix(in srgb, var(--color-surface-raised, var(--color-surface)) 46%, transparent), color-mix(in srgb, var(--color-bg) 70%, transparent));
+  -webkit-backdrop-filter: blur(24px) saturate(180%);
+  backdrop-filter: blur(24px) saturate(180%);
   border-top: var(--border-width-default) solid var(--glass-border, var(--color-border));
-  padding-bottom: env(safe-area-inset-bottom, 0px);
+  box-shadow: inset 0 1px 0 color-mix(in srgb, #fff 10%, transparent), 0 -6px 24px color-mix(in srgb, var(--color-accent) 7%, transparent);
+  padding: 4px 6px env(safe-area-inset-bottom, 0px);
 }
-.bottom-tab-bar ul { display: flex; margin: 0; padding: 0; list-style: none; }
+.bottom-tab-bar ul { display: flex; gap: 4px; margin: 0; padding: 0; list-style: none; }
 .bottom-tab-bar li { flex: 1 1 0; min-width: 0; }
 .bottom-tab {
   position: relative;
   display: flex;
   width: 100%;
-  min-height: var(--bar-tab-height);
+  min-height: calc(var(--bar-tab-height) - 4px);
+  box-sizing: border-box;
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 2px;
-  padding: 6px 2px;
+  gap: 3px;
+  margin: 0;
+  padding: 5px 2px;
+  font-family: inherit; /* <button> tabs (More) do not inherit the font by default; links do */
   font-size: 0.6875rem;
   font-weight: 700;
   line-height: 1;
+  letter-spacing: 0.01em;
+  text-align: center;
+  white-space: nowrap;
   color: var(--color-text-muted);
+  /* One backing for links and buttons alike: explicit transparent + a transparent border so More matches the rest. */
+  -webkit-appearance: none;
+  appearance: none;
   background: transparent;
-  border: 0;
+  border: var(--border-width-default) solid transparent;
+  border-radius: var(--radius-pill, 999px);
   text-decoration: none;
+  cursor: pointer;
   -webkit-tap-highlight-color: transparent;
+  transition: background-color 180ms ease, border-color 180ms ease, box-shadow 180ms ease, color 180ms ease, scale 120ms ease, opacity 120ms ease;
 }
-.bottom-tab[aria-current="page"] { color: var(--color-accent); }
+.bottom-tab-icon { display: inline-flex; width: 24px; height: 24px; align-items: center; justify-content: center; flex-shrink: 0; }
+.bottom-tab-label { display: block; max-width: 100%; overflow: hidden; text-overflow: ellipsis; }
+/* Active: a cyan glass pill with a soft glow and a gold hairline highlight along its top edge. */
+.bottom-tab[aria-current="page"] {
+  color: var(--color-accent);
+  background: linear-gradient(180deg, color-mix(in srgb, var(--color-accent) 22%, transparent), color-mix(in srgb, var(--color-accent) 9%, transparent));
+  border-color: color-mix(in srgb, var(--color-accent) 40%, transparent);
+  box-shadow: inset 0 1px 0 color-mix(in srgb, #fff 18%, transparent), 0 0 16px color-mix(in srgb, var(--color-accent) 26%, transparent);
+}
 .bottom-tab[aria-current="page"]::before {
   content: "";
   position: absolute;
-  top: 0;
-  left: 28%;
-  right: 28%;
+  top: -1px;
+  left: 24%;
+  right: 24%;
   height: 2px;
   border-radius: 2px;
-  background: var(--color-accent);
+  background: var(--color-premium, var(--color-accent));
+  box-shadow: 0 0 8px color-mix(in srgb, var(--color-premium, var(--color-accent)) 70%, transparent);
 }
-.bottom-tab:focus-visible { outline: 2px solid var(--color-accent); outline-offset: -3px; border-radius: var(--radius-control); }
+.bottom-tab:focus-visible { outline: 2px solid var(--color-accent); outline-offset: -3px; }
 .bottom-tab-badge {
   position: absolute;
-  top: 4px;
+  top: 2px;
   left: calc(50% + 6px);
   min-width: 16px;
   height: 16px;
@@ -769,7 +794,6 @@
 @media (min-width: 768px) {
   .bottom-stack { display: contents; }
   .bottom-tab-bar { display: none; }
-  .game-orb-dock { display: none; }
 }
 @media (prefers-reduced-motion: reduce) {
   .bottom-tab { transition: none; }
@@ -821,7 +845,7 @@
   width: 100%;
   background: var(--color-accent);
   transform-origin: left center;
-  transition: transform 260ms cubic-bezier(0.2, 0.9, 0.3, 1);
+  transition: transform var(--motion-slow) var(--ease-out);
 }
 .ui-story-seg[data-fill="0"] > span {
   transform: scaleX(0);
@@ -862,9 +886,9 @@
   flex-direction: column;
   justify-content: center;
   gap: var(--space-md);
-  padding: var(--space-md) var(--space-lg) 10dvh;
+  padding: var(--space-sm) var(--space-lg) var(--space-md);
   overflow: hidden;
-  animation: ui-story-in-next 240ms cubic-bezier(0.2, 0.9, 0.3, 1);
+  animation: ui-story-in-next var(--motion-base) var(--ease-out) both;
 }
 .ui-story-page[data-dir="prev"] {
   animation-name: ui-story-in-prev;
@@ -897,16 +921,106 @@
   padding: var(--space-sm) var(--space-lg) var(--space-lg);
 }
 @keyframes ui-story-in-next {
-  from { opacity: 0; transform: translateX(28px); }
+  from { opacity: 0; transform: translateX(28px) scale(0.985); }
   to { opacity: 1; transform: none; }
 }
 @keyframes ui-story-in-prev {
-  from { opacity: 0; transform: translateX(-28px); }
+  from { opacity: 0; transform: translateX(-28px) scale(0.985); }
   to { opacity: 1; transform: none; }
 }
 @media (prefers-reduced-motion: reduce) {
   .ui-story-page { animation: none; }
   .ui-story-seg > span { transition: none; }
+}
+
+/* ---------- Fantasy Sim recap pages (SimRecapStory): a hero zone that fills the screen, then the supporting rows ---------- */
+.ui-recap {
+  --recap-tone: var(--color-accent);
+  flex: 1 1 auto;
+  min-height: 0;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-evenly;
+  gap: var(--space-md);
+}
+.ui-recap-hero {
+  position: relative;
+  flex: 1 1 auto;
+  min-height: 34dvh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-sm);
+  text-align: center;
+}
+.ui-recap-hero > * { position: relative; z-index: 1; }
+/* One-shot accent glow behind the hero: it fades in and rests, it never loops. */
+.ui-recap-glow {
+  position: absolute !important;
+  z-index: 0 !important;
+  inset: 0;
+  margin: auto;
+  width: min(86vw, 24rem);
+  aspect-ratio: 1;
+  max-height: 100%;
+  border-radius: 50%;
+  background: radial-gradient(circle, color-mix(in srgb, var(--recap-tone) 40%, transparent), transparent 68%);
+  opacity: 0.55;
+  pointer-events: none;
+  animation: ui-recap-glow 600ms var(--ease-out) both;
+}
+@keyframes ui-recap-glow { from { opacity: 0; transform: scale(0.8); } to { opacity: 0.55; transform: none; } }
+.ui-recap-headline {
+  font-size: 2.5rem;
+  font-weight: 800;
+  line-height: 1.05;
+  letter-spacing: -0.01em;
+  color: var(--recap-tone);
+}
+.ui-recap-sub { font-size: 0.875rem; font-weight: 600; color: var(--color-text-secondary); }
+.ui-recap-trophy { display: inline-flex; filter: drop-shadow(0 6px 18px color-mix(in srgb, var(--recap-tone) 45%, transparent)); }
+.ui-recap-versus {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  align-items: center;
+  gap: var(--space-sm);
+  width: 100%;
+}
+.ui-recap-team { display: flex; min-width: 0; flex-direction: column; align-items: center; gap: 6px; }
+.ui-recap-team > span:last-child { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 0.75rem; font-weight: 700; color: var(--color-text-secondary); }
+.ui-recap-score { display: flex; align-items: baseline; justify-content: center; gap: 10px; font-variant-numeric: tabular-nums; }
+.ui-recap-chip {
+  --pos: var(--color-text-secondary);
+  display: inline-flex;
+  align-items: baseline;
+  gap: 6px;
+  padding: 5px 12px;
+  border-radius: var(--radius-pill);
+  font-size: 0.75rem;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  color: var(--pos);
+  background: color-mix(in srgb, var(--pos) 14%, transparent);
+  border: var(--border-width-default) solid color-mix(in srgb, var(--pos) 42%, transparent);
+}
+.ui-recap-chip b { color: var(--color-text-primary); font-weight: 800; }
+.ui-recap-fact {
+  --accent: var(--color-border-strong);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-sm);
+  min-width: 0;
+  padding: 8px 12px;
+  border-radius: var(--radius-card, 12px);
+  background: var(--glass-input-bg);
+  border-left: 3px solid var(--accent);
+}
+.ui-recap-rows { display: flex; flex-direction: column; gap: var(--space-sm); }
+@media (prefers-reduced-motion: reduce) {
+  .ui-recap-glow { animation: none; }
 }
 
 /* ---------- InsightLink (tappable stat / insight card) ---------- */
@@ -932,7 +1046,8 @@
   outline-offset: 2px;
 }
 .ui-insight:active {
-  opacity: 0.8;
+  scale: var(--press-scale);
+  opacity: var(--press-opacity);
 }
 .ui-insight-chevron {
   position: absolute;
@@ -947,4 +1062,42 @@
   .ui-insight > .glass-surface {
     transition: none;
   }
+}
+
+/* ---------- TrendChart (components/ui/TrendChart.tsx) ---------- */
+.trend-chart { position: relative; width: 100%; min-width: 0; }
+.trend-chart svg { display: block; overflow: visible; }
+.trend-hit { fill: transparent; cursor: pointer; outline: none; -webkit-tap-highlight-color: transparent; }
+.trend-hit:focus-visible { stroke: var(--color-accent); stroke-width: 2; }
+.trend-tooltip {
+  position: absolute;
+  z-index: 2;
+  pointer-events: none;
+  max-width: 12rem;
+  padding: 4px 8px;
+  border-radius: var(--radius-control);
+  border: var(--border-width-default) solid var(--glass-border, var(--color-border));
+  background: color-mix(in srgb, var(--color-surface-secondary) 86%, transparent);
+  -webkit-backdrop-filter: blur(14px) saturate(160%);
+  backdrop-filter: blur(14px) saturate(160%);
+  color: var(--color-text-primary);
+  font-size: 0.75rem;
+  font-weight: 700;
+  line-height: 1.25;
+  white-space: nowrap;
+}
+.trend-stat {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 10px 12px;
+  border-radius: var(--radius-control);
+  border: var(--border-width-default) solid var(--glass-border, var(--color-border));
+  background: color-mix(in srgb, var(--color-surface-secondary) 55%, transparent);
+}
+.trend-stat-track { height: 6px; border-radius: 999px; background: var(--color-border); overflow: hidden; }
+.trend-stat-fill { height: 100%; border-radius: 999px; background: var(--color-accent); }
+@media (prefers-reduced-motion: no-preference) {
+  .trend-draw { stroke-dasharray: 1; stroke-dashoffset: 1; animation: trend-draw 600ms ease-out forwards; }
+  @keyframes trend-draw { to { stroke-dashoffset: 0; } }
 }

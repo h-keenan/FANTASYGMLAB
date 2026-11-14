@@ -1,5 +1,6 @@
 import React, { useMemo, useState } from 'react';
-import { Pressable, StyleSheet, TouchableOpacity, View } from 'react-native';
+import { Pressable, StyleSheet, View } from 'react-native';
+import PressableScale from './PressableScale';
 import AppText from './AppText';
 import { Ionicons } from '@expo/vector-icons';
 
@@ -41,12 +42,12 @@ export default function GmStanceHeaderButton({ leagueId }: { leagueId: string })
 
   return (
     <>
-      <TouchableOpacity style={styles.button} onPress={() => setOpen(true)} hitSlop={8}>
+      <PressableScale style={styles.button} onPress={() => setOpen(true)} hitSlop={8}>
         <AppText style={styles.buttonText} numberOfLines={1}>
           {isSet ? current?.label ?? 'Balanced' : 'Balanced'}
         </AppText>
         <Ionicons name="chevron-down" size={12} color={colors.accent} />
-      </TouchableOpacity>
+      </PressableScale>
       <SheetModal visible={open} transparent animationType="fade" onRequestClose={() => setOpen(false)}>
         <Pressable style={styles.backdrop} onPress={() => setOpen(false)}>
           <SwipeDismissCard style={styles.sheet} onDismiss={() => setOpen(false)}>
@@ -59,7 +60,7 @@ export default function GmStanceHeaderButton({ leagueId }: { leagueId: string })
             {TEAM_STANCE_OPTIONS.map((option) => {
               const active = isSet && option.value === stance;
               return (
-                <TouchableOpacity
+                <PressableScale
                   key={option.value}
                   style={styles.optionRow}
                   onPress={() => {
@@ -72,7 +73,7 @@ export default function GmStanceHeaderButton({ leagueId }: { leagueId: string })
                     <AppText style={styles.optionHint}>{option.description}</AppText>
                   </View>
                   {active ? <Ionicons name="checkmark-circle" size={18} color={colors.accent} /> : null}
-                </TouchableOpacity>
+                </PressableScale>
               );
             })}
           </SwipeDismissCard>

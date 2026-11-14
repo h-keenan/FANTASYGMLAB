@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from 'react';
-import { ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
+import { ScrollView, StyleSheet, View } from 'react-native';
 import { keepPreviousData, useIsRestoring, useQuery } from '@tanstack/react-query';
 
 import AccentCard from './AccentCard';

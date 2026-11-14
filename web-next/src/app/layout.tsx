@@ -54,11 +54,11 @@ export default function RootLayout({ children }: { children: ReactNode }) {
   return (
     // suppressHydrationWarning: the boot script below may set data-theme on
     // <html> (a forced Day/Night choice) before React hydrates.
-    <html lang="en" className="h-full antialiased" suppressHydrationWarning>
+    <html lang="en" className="antialiased" suppressHydrationWarning>
       <head>
         <script dangerouslySetInnerHTML={{ __html: THEME_BOOT_SCRIPT }} />
       </head>
-      <body className="min-h-full flex flex-col">
+      <body className="min-h-dvh flex flex-col">
         {/* coridian_, 2026-10-18: "Add that moving background from signup
             to be throughout the app" — same animated texture the landing
             page/onboarding carousel use, fixed behind every page via CSS

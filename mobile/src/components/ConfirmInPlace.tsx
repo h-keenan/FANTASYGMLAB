@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useReducer, useState, type ReactNode } from 'react';
-import { AccessibilityInfo, Pressable, StyleSheet, View, type LayoutChangeEvent, type StyleProp, type ViewStyle } from 'react-native';
+import { AccessibilityInfo, StyleSheet, View, type LayoutChangeEvent, type StyleProp, type ViewStyle } from 'react-native';
+import PressableScale from './PressableScale';
 import { Ionicons } from '@expo/vector-icons';
 
 import AppText from './AppText';
@@ -118,32 +119,31 @@ export default function ConfirmInPlace({
 
   const trigger =
     variant === 'icon' ? (
-      <Pressable
+      <PressableScale
         accessibilityRole="button"
         accessibilityLabel={label}
         accessibilityState={{ disabled: disabled || busy, expanded: showPanel }}
         disabled={disabled || busy}
         onPress={onTrigger}
-        style={({ pressed }) => [styles.icon, pressed && styles.pressed, (disabled || busy) && styles.dim]}
+        style={[styles.icon, (disabled || busy) && styles.dim]}
         testID={testID ? `${testID}-trigger` : undefined}
       >
         {icon ?? <Ionicons name="trash-outline" size={18} color={colors.danger} />}
-      </Pressable>
+      </PressableScale>
     ) : resolvedMode === 'tap-again' ? (
-      <Pressable
+      <PressableScale
         accessibilityRole="button"
         accessibilityLabel={armedTapAgain ? `Tap again to confirm: ${label}` : (ariaLabel ?? label)}
         accessibilityState={{ disabled: disabled || busy, busy, expanded: armedTapAgain }}
         disabled={disabled || busy}
         onPress={onTrigger}
-        style={({ pressed }) => [
+        style={[
           styles.tapAgain,
           size === 'sm' && styles.tapAgainSm,
           buttonVariant === 'secondary' && styles.tapAgainSecondary,
           buttonVariant === 'ghost' && styles.tapAgainGhost,
           armedTapAgain && styles.tapAgainArmed,
           variant === 'row' && styles.fill,
-          pressed && styles.pressed,
           (disabled || busy) && styles.dim,
         ]}
         testID={testID ? `${testID}-trigger` : undefined}
@@ -158,7 +158,7 @@ export default function ConfirmInPlace({
         >
           {armedTapAgain ? 'Tap again to confirm' : label}
         </AppText>
-      </Pressable>
+      </PressableScale>
     ) : (
       <Button label={label} variant={buttonVariant === 'ghost' ? 'ghost' : buttonVariant} size={size} disabled={disabled} onPress={onTrigger} />
     );
@@ -168,7 +168,7 @@ export default function ConfirmInPlace({
       <AppText style={styles.panelText} numberOfLines={2} accessibilityRole="alert">
         {phase === 'error' ? errorText : prompt}
       </AppText>
-      <Pressable
+      <PressableScale
         accessibilityRole="button"
         accessibilityLabel={phase === 'error' ? 'Cancel' : keepLabel}
         disabled={busy}
@@ -176,7 +176,7 @@ export default function ConfirmInPlace({
         style={[styles.keep, busy && styles.dim]}
       >
         <AppText style={styles.keepText}>{phase === 'error' ? 'Cancel' : keepLabel}</AppText>
-      </Pressable>
+      </PressableScale>
       <Button label={phase === 'error' ? 'Retry' : confirmText} variant="danger" size="sm" loading={busy} onPress={() => void run()} />
     </View>
   );
@@ -253,7 +253,6 @@ function createStyles(colors: ThemeColors) {
     panelText: { flex: 1, minWidth: 0, fontSize: 13.5, fontWeight: '700', color: colors.textPrimary },
     keep: { minHeight: 44, paddingHorizontal: spacing.sm, alignItems: 'center', justifyContent: 'center' },
     keepText: { fontSize: 13.5, fontWeight: '800', color: colors.textSecondary },
-    pressed: { opacity: 0.7 },
     dim: { opacity: disabledOpacity },
   });
 }

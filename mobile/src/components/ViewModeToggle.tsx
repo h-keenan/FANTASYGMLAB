@@ -1,5 +1,6 @@
 import React, { useMemo } from 'react';
-import { StyleSheet, TouchableOpacity, View } from 'react-native';
+import { StyleSheet, View } from 'react-native';
+import PressableScale from './PressableScale';
 import { Ionicons } from '@expo/vector-icons';
 
 import { useThemeMode } from '../context/ThemeModeContext';
@@ -26,10 +27,9 @@ export default function ViewModeToggle({
   const styles = useMemo(() => createStyles(colors), [colors]);
   return (
     <View style={styles.track} accessibilityRole="tablist">
-      <TouchableOpacity
+      <PressableScale
         style={[styles.segment, value === 'list' && styles.segmentActive]}
         onPress={() => onChange('list')}
-        activeOpacity={0.75}
         accessibilityRole="tab"
         accessibilityState={{ selected: value === 'list' }}
         accessibilityLabel="List view"
@@ -40,11 +40,10 @@ export default function ViewModeToggle({
           size={16}
           color={value === 'list' ? colors.accentOnTint : colors.textSecondary}
         />
-      </TouchableOpacity>
-      <TouchableOpacity
+      </PressableScale>
+      <PressableScale
         style={[styles.segment, value === 'grid' && styles.segmentActive]}
         onPress={() => onChange('grid')}
-        activeOpacity={0.75}
         accessibilityRole="tab"
         accessibilityState={{ selected: value === 'grid' }}
         accessibilityLabel="Grid view"
@@ -55,7 +54,7 @@ export default function ViewModeToggle({
           size={15}
           color={value === 'grid' ? colors.accentOnTint : colors.textSecondary}
         />
-      </TouchableOpacity>
+      </PressableScale>
     </View>
   );
 }

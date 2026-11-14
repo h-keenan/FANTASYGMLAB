@@ -3,7 +3,7 @@ import { describe, expect, it, vi } from "vitest";
 
 import { WHY_REGISTRY } from "@/lib/tapForWhyContent";
 
-import { TapForWhy } from "./TapForWhy";
+import { TapForWhy, TapForWhyOff } from "./TapForWhy";
 
 vi.mock("@/lib/analytics", () => ({ trackUse: vi.fn() }));
 
@@ -54,5 +54,17 @@ describe("TapForWhy", () => {
       expect(entry.sentences.length).toBeLessThanOrEqual(3);
       expect(entry.title.length).toBeGreaterThan(0);
     }
+  });
+
+  it("TapForWhyOff (the sim trade window) leaves the pill as plain text: nothing to tap, no sheet", () => {
+    render(
+      <TapForWhyOff>
+        <TapForWhy metric="value" spoken="Value 82">
+          <span>82</span>
+        </TapForWhy>
+      </TapForWhyOff>,
+    );
+    expect(screen.getByText("82")).toBeInTheDocument();
+    expect(screen.queryByRole("button")).toBeNull();
   });
 });

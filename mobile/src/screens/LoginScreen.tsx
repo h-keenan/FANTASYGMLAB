@@ -5,9 +5,9 @@ import {
   Platform,
   Pressable,
   StyleSheet,
-  TouchableOpacity,
   View,
 } from 'react-native';
+import PressableScale from '../components/PressableScale';
 import AppText from '../components/AppText';
 import Button from '../components/Button';
 import * as AppleAuthentication from 'expo-apple-authentication';
@@ -147,7 +147,7 @@ export default function LoginScreen() {
         ) : null}
 
         {!resetMode && google.available ? (
-          <TouchableOpacity accessibilityRole="button"
+          <PressableScale accessibilityRole="button"
             style={[styles.socialButton, !google.ready && styles.buttonDisabled]}
             onPress={() => void google.signIn()}
             disabled={!google.ready || google.submitting}
@@ -157,7 +157,7 @@ export default function LoginScreen() {
             ) : (
               <AppText style={styles.socialButtonText}>Continue with Google</AppText>
             )}
-          </TouchableOpacity>
+          </PressableScale>
         ) : null}
 
         {!resetMode && (appleAvailable || google.available) ? (
@@ -202,7 +202,7 @@ export default function LoginScreen() {
           <>
             <Button label="Send reset link" onPress={onResetPasswordPress} disabled={!email} loading={resetSubmitting} style={styles.button} />
 
-            <TouchableOpacity accessibilityRole="button"
+            <PressableScale accessibilityRole="button"
               onPress={() => {
                 setResetMode(false);
                 setError(null);
@@ -210,14 +210,14 @@ export default function LoginScreen() {
               }}
             >
               <AppText style={styles.switchMode}>Back to sign in</AppText>
-            </TouchableOpacity>
+            </PressableScale>
           </>
         ) : (
           <>
             <Button label={mode === 'signIn' ? 'Sign in' : 'Sign up'} onPress={submit} disabled={!email || !password} loading={submitting} style={styles.button} />
 
             {mode === 'signIn' ? (
-              <TouchableOpacity accessibilityRole="button"
+              <PressableScale accessibilityRole="button"
                 hitSlop={{ top: 16, bottom: 16, left: 24, right: 24 }}
                 onPress={() => {
                   setResetMode(true);
@@ -226,10 +226,10 @@ export default function LoginScreen() {
                 }}
               >
                 <AppText style={styles.forgotPassword}>Forgot password?</AppText>
-              </TouchableOpacity>
+              </PressableScale>
             ) : null}
 
-            <TouchableOpacity accessibilityRole="button"
+            <PressableScale accessibilityRole="button"
               onPress={() => setMode(mode === 'signIn' ? 'signUp' : 'signIn')}
             >
               <AppText style={styles.switchMode}>
@@ -237,7 +237,7 @@ export default function LoginScreen() {
                   ? "Don't have an account? Sign up"
                   : 'Already have an account? Sign in'}
               </AppText>
-            </TouchableOpacity>
+            </PressableScale>
           </>
         )}
 

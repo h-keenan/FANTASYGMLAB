@@ -174,7 +174,7 @@ export function SimPickGroup({
       <AppText style={styles.groupKicker}>{side === 'give' ? 'Your picks' : 'Their picks'}</AppText>
       {groups.map((group) => (
         <View key={group.season}>
-          <AppText style={styles.yearLabel}>{group.season}</AppText>
+          <AppText style={styles.yearLabel}>{group.label}</AppText>
           {group.rounds
             .flatMap((r) => r.picks)
             .map((pick) => {

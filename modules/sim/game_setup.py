@@ -12,11 +12,14 @@ from typing import Any, Iterable, Mapping
 
 
 from modules.sim.game_mode import DEFAULT_ROOKIE_ROUNDS, DEFAULT_SEASONS, DYNASTY_VERSION, PICK_YEARS
+from modules.sim.game_names import NAMES_VERSION
 from modules.sim.game_types import (
     FLEX_SHARE,
     BLOCK_VERSION,
+    LIMIT_VERSION,
     RESERVE_VERSION,
     POOL_CAPS,
+    KD_VERSION,
     SINGLETON_POSITIONS,
     START_LEAGUE,
     GamePlayer,
@@ -282,12 +285,12 @@ def league_settings(
     dyn = {}
     if dynasty:
         dyn = dict(
-            mode="dynasty", seasons=seasons, dynasty_v=DYNASTY_VERSION, pick_years=PICK_YEARS,
+            mode="dynasty", seasons=seasons, dynasty_v=DYNASTY_VERSION, names_v=NAMES_VERSION, pick_years=PICK_YEARS,
             start_year=start_year or imported.start_year or imported_year(imported),
             rookie_rounds=max(2, min(5, imported.rookie_rounds or DEFAULT_ROOKIE_ROUNDS)),
         )
     return GameSettings(
-        reserve_v=RESERVE_VERSION, block_v=BLOCK_VERSION, ir_slots=min(ir, 8), taxi_slots=min(taxi, 12), taxi_years=imported.taxi_years, **dyn,
+        reserve_v=RESERVE_VERSION, block_v=BLOCK_VERSION, kd_v=KD_VERSION, limit_v=LIMIT_VERSION, ir_slots=min(ir, 8), taxi_slots=min(taxi, 12), taxi_years=imported.taxi_years, **dyn,
         teams=n, scoring=scoring_label(scoring), difficulty=difficulty, user_slot=user, auto_lineup=auto_lineup,
         slots=imported.slots, rounds=0, roster_limit=limit, regular_weeks=regular_weeks,
         playoff_teams=max(2, min(imported.playoff_teams, n)), trade_deadline_week=trade_deadline_week,

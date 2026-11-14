@@ -8,7 +8,9 @@ import Button from './Button';
 import EmptyState from './EmptyState';
 import ErrorState from './ErrorState';
 import SegmentedTabBar from './SegmentedTabBar';
+import CompactModule from './CompactModule';
 import { SimDraftIconButton, SimDraftRow } from './SimDraftBoard';
+import { SimRookieOverview } from './SimDraftOverview';
 import { SkeletonCard } from './SkeletonBlock';
 import { SimDynastyStrip } from './SimGameDynasty';
 import { SimCollapse, SimGeneratedChip, SimGeneratedNoticeSheet, SimPickLine, SimRookieNoticeGate, useSimPicks } from './SimGameDynastyParts';
@@ -16,10 +18,9 @@ import { SimRosterLine, SimToneBadge, createSimStyles, simToneColor, type SimCtx
 import { SimReserveButton, SimReserveGroups, SimReserveSheet } from './SimGameReserves';
 import { useThemeMode } from '../context/ThemeModeContext';
 import { api } from '../lib/api';
-import { simSuppressedBadges } from '../lib/simDraft';
+import { simRookieSummaryParts, simSuppressedBadges } from '../lib/simDraft';
 import {
   offseasonAgingParts,
-  offseasonClockParts,
   offseasonLogParts,
   offseasonPickCountParts,
   offseasonPicksParts,
@@ -50,6 +51,9 @@ import {
   type SimOffseasonResponse,
   type SimPos,
   type SimTeamRosterResponse,
+  simSeasonText,
+  simLimitBlocks,
+  simOverLimitNote,
 } from '../lib/simGame';
 
 type Busy = 'start' | 'pick' | 'auto' | 'season' | null;
@@ -173,7 +177,6 @@ export function SimGameOffseason({ ctx, onTrade, onTeam }: { ctx: SimCtx; onTrad
   );
 }
 
-
 // ---------------------------------------------------------------------------
 // Hero: the one big thing on the page. Heading + a compact icon stepper, nothing else.
 
@@ -241,7 +244,7 @@ function ReviewStage({ off, ctx, years }: { off: SimOffseason; ctx: SimCtx; year
       {notice ? <SimGeneratedNoticeSheet onClose={() => setNotice(false)} /> : null}
       {last && lastYear ? (
         <SimCollapse
-          title={`${last.year} season`}
+          title={simSeasonText(last)}
           icon="season"
           parts={offseasonSeasonParts(lastYear, last.champion)}
           tone={last.champion?.is_you ? 'success' : 'accent'}
@@ -375,30 +378,36 @@ function RookieStage({
     <>
       {classChip ? <SimRookieNoticeGate gameId={ctx.gameId} /> : null}
       {notice ? <SimGeneratedNoticeSheet onClose={() => setNotice(false)} /> : null}
-      <SimCollapse title="On the clock" icon="draft" tone={d.your_turn ? 'success' : 'accent'} parts={offseasonClockParts(d)} testID="rookie-clock-module">
-        {classChip ? <SimGeneratedChip label={classChip} onInfo={() => setNotice(true)} /> : null}
-      </SimCollapse>
-      <AppText style={{ position: 'absolute', width: 1, height: 1, opacity: 0 }} accessibilityLiveRegion="polite" testID="rookie-clock">
-        {simRookieClockLine(d)}
-      </AppText>
-
-      <SimCollapse
-        title="Your picks"
-        icon="picks"
-        parts={mine.length === 0 ? [{ key: 'n', text: 'No picks this draft', tone: 'muted' }] : [{ key: 'm', text: `${mine.filter((m) => m.made).length} of ${mine.length} made`, strong: true }, ...(toMake ? [{ key: 't', text: `${toMake} to go`, tone: 'muted' as const }] : [])]}
-        testID="rookie-mine"
+      <AppText style={{ position: 'absolute', width: 1, height: 1, opacity: 0 }} accessibilityLiveRegion="polite" testID="rookie-clock">{simRookieClockLine(d)}</AppText>
+      <CompactModule
+        id="rookie.clock"
+        title="Rookie draft"
+        testID="rookie-clock-module"
+        tone={d.your_turn ? 'action' : 'accent'}
+        persist={false}
+        parts={simRookieSummaryParts(d, toMake)}
+        action={
+          d.your_turn && d.available[0] ? (
+            <Button size="sm" label={`Draft ${d.available[0].name.split(' ').slice(-1)[0]}`} loading={busy === 'pick'} disabled={busy !== null && busy !== 'pick'} onPress={() => onPick(d.available[0])} />
+          ) : null
+        }
       >
-        {mine.length === 0 ? (
-          <AppText style={common.muted}>You have no picks in this draft.</AppText>
-        ) : (
-          mine.map((row) => (
-            <View key={row.pick} style={[common.rowBetween, common.divider, { paddingVertical: 8 }]}>
-              <AppText style={[common.bodyStrong, common.grow]}>{simRookiePickLine(row)}</AppText>
-              {row.made ? <SimToneBadge label={row.made.pos} tone="success" /> : d.on_clock?.pick === row.pick ? <SimToneBadge label="Now" tone="accent" /> : null}
-            </View>
-          ))
-        )}
-      </SimCollapse>
+        {classChip ? <SimGeneratedChip label={classChip} onInfo={() => setNotice(true)} /> : null}
+        <View testID="rookie-mine">
+          <AppText style={common.muted}>Your picks: {mine.filter((m) => m.made).length} of {mine.length} made</AppText>
+          {mine.length === 0 ? (
+            <AppText style={common.muted}>You have no picks in this draft.</AppText>
+          ) : (
+            mine.map((row) => (
+              <View key={row.pick} style={[common.rowBetween, common.divider, { paddingVertical: 8 }]}>
+                <AppText style={[common.bodyStrong, common.grow]}>{simRookiePickLine(row)}</AppText>
+                {row.made ? <SimToneBadge label={row.made.pos} tone="success" /> : d.on_clock?.pick === row.pick ? <SimToneBadge label="On the clock" tone="accent" /> : null}
+              </View>
+            ))
+          )}
+        </View>
+      </CompactModule>
+      <SimRookieOverview order={d.order} onClockPick={d.on_clock?.pick} round={d.on_clock?.round ?? 1} made={made.length} total={d.total} />
 
       <View style={common.stack}>
         <SegmentedTabBar<string>
@@ -415,9 +424,9 @@ function RookieStage({
               <SimDraftRow
                 key={player.id}
                 player={player}
-                suppressBadges={suppressed}
                 onOpen={ctx.openPlayer}
                 onGeneratedInfo={() => setNotice(true)}
+                suppressBadges={suppressed}
                 actions={d.your_turn ? <SimDraftIconButton icon="checkmark" size={44} width={48} primary label={`Draft ${player.name}`} disabled={busy !== null} onPress={() => onPick(player)} /> : null}
               />
             ))}
@@ -487,6 +496,7 @@ function CutdownStage({ off, ctx, onTrade, onTeam }: { off: SimOffseason; ctx: S
   }
 
   const over = r.cuts_needed > 0;
+  const blocks = over && simLimitBlocks(r);
   const players = roster?.players ?? [];
   const reservesOn = simReservesOn(game.settings, roster?.reserves ?? r.reserves);
   const reserveState = { reserves: roster?.reserves ?? r.reserves, rosterSize: r.size, rosterLimit: r.limit };
@@ -494,14 +504,14 @@ function CutdownStage({ off, ctx, onTrade, onTeam }: { off: SimOffseason; ctx: S
   const rosterSuppressed = simSuppressedBadges(players);
   return (
     <>
-      <AppText style={{ position: 'absolute', width: 1, height: 1, opacity: 0 }} accessibilityRole={over ? 'alert' : undefined} testID="roster-check">
-        {over ? `Cut ${r.cuts_needed} player${r.cuts_needed === 1 ? '' : 's'} to start the season.` : 'Your roster is ready for the season.'} {r.size} of {r.limit} roster spots. IR and taxi players do not count.
+      <AppText style={{ position: 'absolute', width: 1, height: 1, opacity: 0 }} accessibilityRole={blocks ? 'alert' : undefined} testID="roster-check">
+        {blocks ? `Cut ${r.cuts_needed} player${r.cuts_needed === 1 ? '' : 's'} to start the season.` : over ? simOverLimitNote(r.cuts_needed) : 'Your roster is ready for the season.'} {r.size} of {r.limit} roster spots. IR and taxi players do not count.
       </AppText>
       <SimCollapse
         title="Roster"
         icon="roster"
-        tone={over ? 'danger' : 'success'}
-        defaultOpen={over}
+        tone={blocks ? 'danger' : over ? 'warning' : 'success'}
+        defaultOpen={blocks}
         parts={offseasonRosterParts(r, players)}
         action={
           off.can_trade ? (

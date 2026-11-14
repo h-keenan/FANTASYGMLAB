@@ -25,6 +25,7 @@ import {
   simBenchSwapTargets,
   simClaimPayload,
   simFmtPts,
+  simProjText,
   simHeadshotId,
   simPlayerInitials,
   simSlotRepeatsPosition,
@@ -48,6 +49,8 @@ import {
   type SimWaiverClaim,
   simOptimisticClaim,
   simWithout,
+  simLimitBlocks,
+  simOverLimitNote,
 } from '../lib/simGame';
 import { positionColor, radii, spacing, type ThemeColors } from '../theme';
 
@@ -161,6 +164,7 @@ export function SimTeamTab({ ctx, onTrade }: { ctx: SimCtx; onTrade: () => void 
   const labels = simSlotLabels(slots);
   const week = game.this_week;
   const overLimit = (game.pending?.cuts_needed ?? 0) > 0;
+  const limitBlocks = simLimitBlocks(game.pending);
   const warnings = lineup.warnings ?? [];
   const playerById = Object.fromEntries([...slots.map((s) => s.player), ...bench].filter(Boolean).map((p) => [p!.id, p!]));
   const candidates = pickSlot != null ? simSlotCandidates(slots[pickSlot].slot, slots, bench) : [];
@@ -191,11 +195,13 @@ export function SimTeamTab({ ctx, onTrade }: { ctx: SimCtx; onTrade: () => void 
       ) : null}
 
       {overLimit ? (
-        <AccentCard accent={colors.danger} compact>
+        <AccentCard accent={limitBlocks ? colors.danger : colors.warning} compact>
           <View style={common.row}>
-            <ReviewGlyphChip glyph="injury" tone="danger" size={24} />
-            <AppText style={[common.bodyStrong, common.grow]} accessibilityRole="alert">
-              Roster over the limit: cut {game.pending?.cuts_needed} player{game.pending?.cuts_needed === 1 ? '' : 's'} from your bench before you advance.
+            <ReviewGlyphChip glyph="injury" tone={limitBlocks ? 'danger' : 'warning'} size={24} />
+            <AppText style={[limitBlocks ? common.bodyStrong : common.small, common.grow]} accessibilityRole={limitBlocks ? 'alert' : undefined} testID="over-limit-note">
+              {limitBlocks
+                ? `Roster over the limit: cut ${game.pending?.cuts_needed} player${game.pending?.cuts_needed === 1 ? '' : 's'} from your bench before you advance.`
+                : simOverLimitNote(game.pending?.cuts_needed ?? 0)}
             </AppText>
           </View>
         </AccentCard>
@@ -370,7 +376,7 @@ export function SimYourPicks({ picks, draftYear }: { picks: SimPickAsset[]; draf
       ) : (
         groups.map((group) => (
           <View key={group.season}>
-            <AppText style={[common.small, { fontWeight: '700', paddingTop: spacing.xs }]}>{group.season}</AppText>
+            <AppText style={[common.small, { fontWeight: '700', paddingTop: spacing.xs }]}>{group.label}</AppText>
             {group.rounds
               .flatMap((r) => r.picks)
               .map((pick) => (
@@ -445,7 +451,7 @@ export function ClaimSheet({
             selected={dropId === p.id}
             trailing={
               <>
-                <SimStat label="Proj" value={simFmtPts(p.projection)} />
+                <SimStat label="Proj" value={simProjText(p)} />
                 <Button size="sm" variant={dropId === p.id ? 'primary' : 'secondary'} label={dropId === p.id ? 'Dropping' : 'Drop'} onPress={() => setDropId(dropId === p.id ? '' : p.id)} />
               </>
             }

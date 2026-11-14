@@ -19,6 +19,7 @@ import { ToneBadge } from "@/components/ToneBadge";
 import { useState } from "react";
 import {
   simFmtPts,
+  simProjNote,
   simFmtRecord,
   simMarginLine,
   simPlayoffStatusLabel,
@@ -79,7 +80,7 @@ export function SimByeCard({ ctx, alerts, onTab, onClaim }: { ctx: SimCtx; alert
                   <li key={r.id} className="flex items-center justify-between gap-2">
                     <SimMiniPlayer player={r} onOpen={ctx.openPlayer} />
                     <span className="flex shrink-0 items-center gap-2">
-                      <span className="text-xs font-bold tabular-nums">{simFmtPts(r.projection)} proj</span>
+                      <span className="text-xs font-bold tabular-nums">{simProjNote(r) ?? `${simFmtPts(r.projection)} proj`}</span>
                       <Button size="sm" onClick={() => onClaim(r)} aria-label={`Claim ${r.name}`}>Claim</Button>
                     </span>
                   </li>

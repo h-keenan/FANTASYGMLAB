@@ -4,21 +4,15 @@ import { useCallback, useEffect, useState } from "react";
 
 import { AccentCard } from "@/components/AccentCard";
 import { OffseasonGlyph } from "@/components/OffseasonGlyph";
+import { Button } from "@/components/Button";
 import { EmptyState } from "@/components/EmptyState";
 import { PillRow } from "@/components/PillRow";
 import { SimDraftRow } from "@/components/SimDraftBoard";
-import { SimDraftGlyph } from "@/components/SimDraftGlyphs";
-import { SimDynastyStrip } from "@/components/SimGameDynasty";
-import { SimCollapse, SimGeneratedChip, SimGeneratedNoticeSheet, SimPickLine, SimRookieNoticeGate, useSimPicks } from "@/components/SimGameDynastyParts";
-import { SimIconButton, SimRosterLine, SimToneBadge, simToneColor, type SimCtx } from "@/components/SimGameParts";
-import { SimReserveButton, SimReserveGroups, SimReserveSheet } from "@/components/SimGameReserves";
-import { SkeletonCard } from "@/components/Skeleton";
-import { Button } from "@/components/Button";
-import { api } from "@/lib/api";
-import { simSuppressedBadges } from "@/lib/simDraft";
+import { SimRookieOverview } from "@/components/SimDraftOverview";
+import { CompactModule } from "@/components/ui/CompactModule";
+import { simRookieSummaryParts, simSuppressedBadges } from "@/lib/simDraft";
 import {
   offseasonAgingParts,
-  offseasonClockParts,
   offseasonLogParts,
   offseasonPickCountParts,
   offseasonPicksParts,
@@ -28,6 +22,13 @@ import {
   offseasonStepper,
   type OffseasonStepperItem,
 } from "@/lib/simOffseasonSummary";
+import { SimDraftGlyph } from "@/components/SimDraftGlyphs";
+import { SimDynastyStrip } from "@/components/SimGameDynasty";
+import { SimCollapse, SimGeneratedChip, SimGeneratedNoticeSheet, SimPickLine, SimRookieNoticeGate, useSimPicks } from "@/components/SimGameDynastyParts";
+import { SimIconButton, SimRosterLine, SimToneBadge, simToneColor, type SimCtx } from "@/components/SimGameParts";
+import { SimReserveButton, SimReserveGroups, SimReserveSheet } from "@/components/SimGameReserves";
+import { SkeletonCard } from "@/components/Skeleton";
+import { api } from "@/lib/api";
 import {
   simArchiveToYear,
   simFmtPts,
@@ -49,6 +50,9 @@ import {
   type SimOffseasonResponse,
   type SimPos,
   type SimTeamRosterResponse,
+  simSeasonText,
+  simLimitBlocks,
+  simOverLimitNote,
 } from "@/lib/simGame";
 
 type Busy = "start" | "pick" | "auto" | "season" | null;
@@ -161,7 +165,6 @@ export function SimGameOffseason({ ctx, onTrade, onTeam }: { ctx: SimCtx; onTrad
   );
 }
 
-
 // ---------------------------------------------------------------------------
 // Hero: the one big thing on the page. Heading + a compact icon stepper, nothing else.
 
@@ -223,7 +226,7 @@ function ReviewStage({ off, ctx, years }: { off: SimOffseason; ctx: SimCtx; year
       {notice ? <SimGeneratedNoticeSheet onClose={() => setNotice(false)} /> : null}
       {last && lastYear ? (
         <SimCollapse
-          title={`${last.year} season`}
+          title={simSeasonText(last)}
           icon="season"
           parts={offseasonSeasonParts(lastYear, last.champion)}
           tone={last.champion?.is_you ? "success" : "accent"}
@@ -358,45 +361,50 @@ function RookieStage({
   const d = off.draft;
   const positions = simPositionsFor(ctx.game.settings.slots);
   const mine = off.your_picks_this_draft ?? [];
-  const suppressed = simSuppressedBadges(d.available);
   const made = d.order.filter((o) => o.made);
   const classChip = simRookieClassChip(off);
+  const toMake = mine.filter((m) => !m.made).length;
+  const suppressed = simSuppressedBadges(d.available);
   const [notice, setNotice] = useState(false);
   return (
     <>
       {classChip ? <SimRookieNoticeGate gameId={ctx.gameId} /> : null}
       {notice ? <SimGeneratedNoticeSheet onClose={() => setNotice(false)} /> : null}
-      <SimCollapse
-        title="On the clock"
-        icon="draft"
-        tone={d.your_turn ? "success" : "accent"}
-        glow={d.your_turn}
-        parts={offseasonClockParts(d)}
-        testId="rookie-clock-module"
-      >
-        {classChip ? <SimGeneratedChip label={classChip} onInfo={() => setNotice(true)} /> : null}
-      </SimCollapse>
       <p className="sr-only" role="status" data-testid="rookie-clock">{simRookieClockLine(d)}</p>
-
-      <SimCollapse
-        title="Your picks"
-        icon="picks"
-        parts={mine.length === 0 ? [{ key: "n", text: "No picks this draft", tone: "muted" }] : [{ key: "m", text: `${mine.filter((m) => m.made).length} of ${mine.length} made`, strong: true }, ...(mine.filter((m) => !m.made).length ? [{ key: "t", text: `${mine.filter((m) => !m.made).length} to go`, tone: "muted" as const }] : [])]}
-        testId="rookie-mine"
+      <CompactModule
+        id="rookie.clock"
+        title="Rookie draft"
+        testId="rookie-clock-module"
+        tone={d.your_turn ? "action" : "accent"}
+        glow={d.your_turn}
+        persist={false}
+        parts={simRookieSummaryParts(d, toMake)}
+        action={
+          d.your_turn && d.available[0] ? (
+            <Button size="sm" loading={busy === "pick"} disabled={busy !== null && busy !== "pick"} onClick={() => onPick(d.available[0])}>
+              Draft {d.available[0].name.split(" ").slice(-1)[0]}
+            </Button>
+          ) : null
+        }
       >
-        {mine.length === 0 ? (
-          <p className="text-xs" style={{ color: "var(--color-text-muted)" }}>You have no picks in this draft.</p>
-        ) : (
-          <ul className="flex flex-col">
-            {mine.map((row) => (
-              <li key={row.pick} className="flex items-center justify-between gap-2 py-2" style={{ borderBottom: "var(--border-width-default) solid var(--color-border)" }}>
-                <span className="text-sm font-bold">{simRookiePickLine(row)}</span>
-                {row.made ? <SimToneBadge label={row.made.pos} tone="success" /> : d.on_clock?.pick === row.pick ? <SimToneBadge label="Now" tone="accent" /> : null}
-              </li>
-            ))}
-          </ul>
-        )}
-      </SimCollapse>
+        {classChip ? <div><SimGeneratedChip label={classChip} onInfo={() => setNotice(true)} /></div> : null}
+        <div data-testid="rookie-mine">
+          <p className="text-xs font-bold" style={{ color: "var(--color-text-muted)" }}>Your picks: {mine.filter((m) => m.made).length} of {mine.length} made</p>
+          {mine.length === 0 ? (
+            <p className="text-xs" style={{ color: "var(--color-text-muted)" }}>You have no picks in this draft.</p>
+          ) : (
+            <ul className="flex flex-col">
+              {mine.map((row) => (
+                <li key={row.pick} className="flex items-center justify-between gap-2 py-2" style={{ borderBottom: "var(--border-width-default) solid var(--color-border)" }}>
+                  <span className="text-sm font-bold">{simRookiePickLine(row)}</span>
+                  {row.made ? <SimToneBadge label={row.made.pos} tone="success" /> : d.on_clock?.pick === row.pick ? <SimToneBadge label="On the clock" tone="accent" /> : null}
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      </CompactModule>
+      <SimRookieOverview order={d.order} onClockPick={d.on_clock?.pick} round={d.on_clock?.round ?? 1} made={made.length} total={d.total} />
 
       <section className="flex flex-col gap-2" aria-label="Available rookies">
         <PillRow
@@ -489,6 +497,7 @@ function CutdownStage({ off, ctx, onTrade, onTeam }: { off: SimOffseason; ctx: S
   }
 
   const over = r.cuts_needed > 0;
+  const blocks = over && simLimitBlocks(r);
   const players = roster?.players ?? [];
   const reservesOn = simReservesOn(game.settings, roster?.reserves ?? r.reserves);
   const reserveState = { reserves: roster?.reserves ?? r.reserves, rosterSize: r.size, rosterLimit: r.limit };
@@ -496,15 +505,15 @@ function CutdownStage({ off, ctx, onTrade, onTeam }: { off: SimOffseason; ctx: S
   const rosterSuppressed = simSuppressedBadges(players);
   return (
     <>
-      <p className="sr-only" role={over ? "alert" : "status"} data-testid="roster-check">
-        {over ? `Cut ${r.cuts_needed} player${r.cuts_needed === 1 ? "" : "s"} to start the season.` : "Your roster is ready for the season."} {r.size} of {r.limit} roster spots. IR and taxi players do not count.
+      <p className="sr-only" role={blocks ? "alert" : "status"} data-testid="roster-check">
+        {blocks ? `Cut ${r.cuts_needed} player${r.cuts_needed === 1 ? "" : "s"} to start the season.` : over ? simOverLimitNote(r.cuts_needed) : "Your roster is ready for the season."} {r.size} of {r.limit} roster spots. IR and taxi players do not count.
       </p>
       <SimCollapse
         title="Roster"
         icon="roster"
-        tone={over ? "danger" : "success"}
-        glow={over}
-        defaultOpen={over}
+        tone={blocks ? "danger" : over ? "warning" : "success"}
+        glow={Boolean(blocks)}
+        defaultOpen={Boolean(blocks)}
         parts={offseasonRosterParts(r, players)}
         action={
           off.can_trade ? (
@@ -544,7 +553,7 @@ function CutdownStage({ off, ctx, onTrade, onTeam }: { off: SimOffseason; ctx: S
                 ) : (
                   <>
                     {reservesOn ? <SimReserveButton player={player} onOpen={setMoving} /> : null}
-                    <Button size="sm" variant={over ? "dangerOutline" : "ghost"} aria-label={`Cut ${player.name}`} onClick={() => setCutting(player.id)}>
+                    <Button size="sm" variant={blocks ? "dangerOutline" : "ghost"} aria-label={`Cut ${player.name}`} onClick={() => setCutting(player.id)}>
                       Cut
                     </Button>
                   </>

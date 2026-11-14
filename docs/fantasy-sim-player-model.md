@@ -719,3 +719,9 @@ measurables from the combine, and `analytics` percentiles from the same pool the
 
 Tests: `tests/test_sim_rookie_scouting.py` (determinism, version gate, per-position distributions, archetype mix, progression
 equals the stored curve, displayed curve converges to it, payload), `tests/test_sim_player_sheet.py` (flat-projection flag).
+
+## 1f. player-model-6: the single-game tail
+
+player-model-5 is frozen in `player_model_v5.py` (sha256 and golden digests pinned). player-model-6 bounds the stat line of one game: `STAT_CAPS` (hard NFL single-game record limits on counts, smooth caps on yardage) and
+`TAIL_SQUEEZE` (smooth saturation of a game's PPR points above a per-position knee, taken out of yardage only). v5 produced 60+ point WR/RB games at 3-4 per 1000 player-seasons and maxima of 94; real
+2021-25 has none above 55.6; v6 max is 54-56 in every position with p99, sd and season totals unchanged. See `docs/audits/2026-11-sim-single-game-tail.md`. Recap rows also carry the week's `proj`.

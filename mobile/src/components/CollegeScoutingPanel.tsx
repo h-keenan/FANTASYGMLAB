@@ -1,5 +1,6 @@
 import React, { useCallback, useMemo, useState } from 'react';
-import { StyleSheet, TouchableOpacity, View } from 'react-native';
+import { StyleSheet, View } from 'react-native';
+import PressableScale from './PressableScale';
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect } from '@react-navigation/native';
 
@@ -81,17 +82,17 @@ function ProspectRow({
 
   if (grid) {
     return (
-      <TouchableOpacity style={styles.gridCell} onPress={onPress} activeOpacity={0.7}>
+      <PressableScale style={styles.gridCell} onPress={onPress}>
         <View style={styles.gridTopRow}>
           <PositionBadge position={prospect.position} />
-          <TouchableOpacity
+          <PressableScale
             style={styles.starButton}
             onPress={onToggleWatchlist}
             hitSlop={8}
             accessibilityLabel={starLabel}
           >
             <Ionicons name={starIcon} size={17} color={starColor} />
-          </TouchableOpacity>
+          </PressableScale>
         </View>
         <PlayerName name={prospect.name} style={styles.gridName} />
         <AppText style={styles.meta} numberOfLines={1}>
@@ -108,15 +109,14 @@ function ProspectRow({
             </AppText>
           ) : null}
         </View>
-      </TouchableOpacity>
+      </PressableScale>
     );
   }
 
   return (
-    <TouchableOpacity
+    <PressableScale
       style={[styles.row, isFirst && styles.rowFirst, isLast && styles.rowLast, !isLast && styles.rowDivider]}
       onPress={onPress}
-      activeOpacity={0.7}
     >
       <PositionBadge position={prospect.position} />
       <View style={styles.identity}>
@@ -134,10 +134,10 @@ function ProspectRow({
           <AppText style={styles.myGrade}>Your grade: {prospect.my_report.grade}/5</AppText>
         ) : null}
       </View>
-      <TouchableOpacity style={styles.starButton} onPress={onToggleWatchlist} hitSlop={8} accessibilityLabel={starLabel}>
+      <PressableScale style={styles.starButton} onPress={onToggleWatchlist} hitSlop={8} accessibilityLabel={starLabel}>
         <Ionicons name={starIcon} size={18} color={starColor} />
-      </TouchableOpacity>
-    </TouchableOpacity>
+      </PressableScale>
+    </PressableScale>
   );
 }
 

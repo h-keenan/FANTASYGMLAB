@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { StyleSheet, TouchableOpacity, View } from 'react-native';
+import { StyleSheet, View } from 'react-native';
+import PressableScale from './PressableScale';
 
 import AnimatedCard from './AnimatedCard';
 import AppText from './AppText';
@@ -101,7 +102,7 @@ export default function NotificationControls({ savedLeagues }: Props) {
     <View style={styles.stepper}>
       <AppText style={styles.rowLabel}>{label}</AppText>
       <View style={styles.stepperControls}>
-        <TouchableOpacity
+        <PressableScale
           accessibilityRole="button"
           accessibilityLabel={`${label}, earlier`}
           disabled={saving}
@@ -109,9 +110,9 @@ export default function NotificationControls({ savedLeagues }: Props) {
           style={styles.stepButton}
         >
           <AppText style={styles.stepGlyph}>{'−'}</AppText>
-        </TouchableOpacity>
+        </PressableScale>
         <AppText style={styles.stepValue}>{hourLabel(value)}</AppText>
-        <TouchableOpacity
+        <PressableScale
           accessibilityRole="button"
           accessibilityLabel={`${label}, later`}
           disabled={saving}
@@ -119,7 +120,7 @@ export default function NotificationControls({ savedLeagues }: Props) {
           style={styles.stepButton}
         >
           <AppText style={styles.stepGlyph}>+</AppText>
-        </TouchableOpacity>
+        </PressableScale>
       </View>
     </View>
   );
@@ -185,7 +186,7 @@ export default function NotificationControls({ savedLeagues }: Props) {
         {data.cap_presets.map((preset) => {
           const active = capKey === preset.key;
           return (
-            <TouchableOpacity
+            <PressableScale
               key={preset.key}
               accessibilityRole="button"
               accessibilityState={{ selected: active }}
@@ -197,7 +198,7 @@ export default function NotificationControls({ savedLeagues }: Props) {
             >
               <AppText style={[styles.chipLabel, active && styles.chipLabelActive]}>{preset.label}</AppText>
               <AppText style={styles.chipDescription}>{`Up to ${preset.cap} a week`}</AppText>
-            </TouchableOpacity>
+            </PressableScale>
           );
         })}
       </View>
@@ -245,7 +246,7 @@ export default function NotificationControls({ savedLeagues }: Props) {
                   {LEAGUE_MODE_OPTIONS.map((option) => {
                     const active = mode === option.value;
                     return (
-                      <TouchableOpacity
+                      <PressableScale
                         key={option.value}
                         accessibilityRole="button"
                         accessibilityState={{ selected: active }}
@@ -264,7 +265,7 @@ export default function NotificationControls({ savedLeagues }: Props) {
                         }}
                       >
                         <AppText style={[styles.chipLabel, active && styles.chipLabelActive]}>{option.label}</AppText>
-                      </TouchableOpacity>
+                      </PressableScale>
                     );
                   })}
                 </View>

@@ -400,6 +400,8 @@ describe("SimGameContent", () => {
     expect(screen.getByTestId("game-heading")).toHaveTextContent("Week 5 of 14");
   });
 
+  const ALL_STOPS_ON = { offers: true, injuries: true, starters: true, deadline: true, roster: true };
+
   const simToSummary = {
     weeks: [
       { week: 4, kind: "regular", round: null, result: "w", your_pts: 128.4, opp_pts: 109.7, opponent: "Rivals", auto_filled: [] },
@@ -419,17 +421,18 @@ describe("SimGameContent", () => {
     await openFirstGame();
     fireEvent.click(await screen.findByTestId("sim-to-button"));
     expect(await screen.findByRole("button", { name: "Trade deadline (week 10)" })).toBeInTheDocument();
-    expect(screen.getByRole("checkbox", { name: "Auto-set my lineup each week" })).not.toBeChecked(); // off by default
-    fireEvent.click(screen.getByRole("checkbox", { name: "Auto-set my lineup each week" }));
+    expect(screen.getByRole("switch", { name: "Auto-set my lineup each week" })).toBeChecked(); // on by default (Madden / 2K style auto-play)
+    expect(screen.getByTestId("sim-to-stops")).toHaveTextContent("5 of 5 on");
     fireEvent.click(screen.getByRole("button", { name: "Trade deadline (week 10)" }));
     const result = await screen.findByTestId("sim-to-result");
     expect(mocked.simToGame).toHaveBeenCalledTimes(1);
-    expect(mocked.simToGame).toHaveBeenCalledWith("g1", { target: "trade_deadline", weeks: undefined, auto_set: true, force_first: undefined });
+    expect(mocked.simToGame).toHaveBeenCalledWith("g1", { target: "trade_deadline", weeks: undefined, auto_set: true, force_first: undefined, stops: ALL_STOPS_ON });
     expect(result).toHaveTextContent("Simmed 2 weeks (Weeks 4-5)");
     expect(result).toHaveTextContent("2-1 to 3-2 · #4 to #5");
     expect(screen.getByTestId("sim-to-stop")).toHaveTextContent("Stopped at Week 6: your QB is out");
     expect(within(result).getByRole("button", { name: "Fix lineup" })).toBeInTheDocument();
-    expect(within(result).queryByRole("button", { name: "Sim anyway" })).toBeNull(); // weeks were played: nothing to force
+    expect(within(result).queryByRole("button", { name: "Sim anyway" })).toBeNull(); // weeks were played: it is "Keep simming" now
+    expect(within(result).getByRole("button", { name: "Keep simming" })).toBeInTheDocument();
     expect(result).toHaveTextContent("Hurt Harry (RB), out 3 weeks");
     expect(result).toHaveTextContent("W 128.4-109.7 vs Rivals");
     expect(screen.getByTestId("game-heading")).toHaveTextContent("Week 6 of 14");
@@ -456,7 +459,7 @@ describe("SimGameContent", () => {
     expect(within(result).queryByRole("button", { name: "Undo this sim" })).toBeNull();
     fireEvent.click(within(result).getByRole("button", { name: "Sim anyway" }));
     await waitFor(() => expect(mocked.simToGame).toHaveBeenCalledTimes(2));
-    expect(mocked.simToGame).toHaveBeenLastCalledWith("g1", { target: "weeks", weeks: 1, auto_set: false, force_first: true });
+    expect(mocked.simToGame).toHaveBeenLastCalledWith("g1", { target: "weeks", weeks: 1, auto_set: true, force_first: true, stops: ALL_STOPS_ON });
     expect(await screen.findByTestId("sim-to-result")).toHaveTextContent("Simmed Week 4");
   });
 
@@ -472,7 +475,7 @@ describe("SimGameContent", () => {
     render(<SimGameContent />);
     await openFirstGame();
     fireEvent.click(await screen.findByRole("tab", { name: /Trades/ }));
-    expect(await screen.findByText("Your block")).toBeInTheDocument();
+    expect(await screen.findByRole("img", { name: /On the trade block: yours/ })).toBeInTheDocument();
     fireEvent.click(await screen.findByRole("tab", { name: "My block" }));
     expect(await screen.findByTestId("sim-block-summary")).toHaveTextContent("1 offer from your block this week");
   });
@@ -561,12 +564,14 @@ describe("SimGameContent", () => {
       mocked.listSimGames.mockResolvedValue({ ok: true, reason: "", games: [] });
       render(<SimGameContent />);
       fireEvent.click(await screen.findByRole("button", { name: "New game" }));
-      await screen.findByText("Quick start is 12 teams, half PPR and a standard lineup. You can change nothing after the game starts.");
+      await screen.findByTestId("sim-setup-hero");
     }
 
-    it("quick start: advanced options start collapsed and the defaults are 12 teams, half PPR, standard lineup", async () => {
+    it("quick start: opens on Quick start with a live summary; the defaults are 12 teams, half PPR, standard lineup", async () => {
       await openSetup();
-      expect(screen.getByTestId("sim-advanced")).not.toHaveAttribute("open");
+      expect(screen.getByRole("tab", { name: "Quick start" })).toHaveAttribute("aria-selected", "true");
+      expect(screen.queryByTestId("sim-setup-card-league")).not.toBeInTheDocument();
+      expect(screen.getByTestId("sim-setup-hero")).toHaveTextContent("12 teams, half PPR, standard lineup + K");
       expect(screen.getByTestId("sim-setup-summary")).toHaveTextContent("12 teams, 14-round snake draft. Starters: QB, RB, RB, WR, WR, TE, FLEX, K. Roster 16.");
       mocked.createSimGame.mockResolvedValue({ ok: true, reason: "premium_required", is_premium: true });
       fireEvent.click(screen.getByRole("button", { name: "Start the draft" }));
@@ -577,14 +582,17 @@ describe("SimGameContent", () => {
       });
     });
 
-    it("advanced options change the league and the derived draft length", async () => {
+    it("customize changes the league and the derived draft length, and the live summary follows", async () => {
       await openSetup();
+      fireEvent.click(screen.getByRole("tab", { name: "Customize" }));
       fireEvent.click(screen.getByRole("switch", { name: "Superflex" }));
       fireEvent.click(screen.getByRole("switch", { name: "Defense (DEF)" }));
       fireEvent.click(screen.getByRole("tab", { name: "14 teams" }));
       fireEvent.click(screen.getByRole("tab", { name: "Standard" }));
       expect(screen.getByTestId("sim-setup-summary")).toHaveTextContent("14 teams, 16-round snake draft. Starters: QB, RB, RB, WR, WR, TE, FLEX, SUPER_FLEX, K, DEF. Roster 18.");
-      expect(screen.getByText(/Advanced options \(4 changed\)/)).toBeInTheDocument();
+      expect(screen.getByRole("tab", { name: /Customize/ })).toHaveTextContent("4");
+      expect(screen.getByTestId("sim-setup-hero")).toHaveTextContent("14 teams, standard, superflex lineup + K + DEF");
+      expect(screen.getByTestId("sim-setup-summary-league")).toHaveTextContent("14 teams, Standard, Superflex lineup + K + DEF");
       mocked.createSimGame.mockResolvedValue({ ok: true, reason: "premium_required", is_premium: true });
       fireEvent.click(screen.getByRole("button", { name: "Start the draft" }));
       await waitFor(() => expect(mocked.createSimGame).toHaveBeenCalled());
@@ -594,7 +602,8 @@ describe("SimGameContent", () => {
     it("start from one of my leagues: Sleeper leagues only, hides the league-shape options, sends league_id", async () => {
       await openSetup();
       fireEvent.click(screen.getByRole("tab", { name: "My league" }));
-      // The league decides size, scoring and lineup; only the reserve squads stay in Advanced.
+      // The league decides size, scoring and lineup; only the reserve squads stay in Customize.
+      fireEvent.click(screen.getByRole("tab", { name: "Customize" }));
       expect(screen.queryByRole("tablist", { name: "League size" })).not.toBeInTheDocument();
       expect(screen.queryByRole("tablist", { name: "Scoring" })).not.toBeInTheDocument();
       const pick = await screen.findByRole("combobox", { name: "League to start from" });

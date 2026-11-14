@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
+import { ScrollView, StyleSheet, View } from 'react-native';
+import PressableScale from '../components/PressableScale';
 import AppText from '../components/AppText';
 import ValueStat from '../components/ValueStat';
 import SectionHeading from '../components/SectionHeading';
@@ -377,10 +378,9 @@ function RosterPlayerRow({
   const styles = useMemo(() => createStyles(colors), [colors]);
   const injury = waiverInjuryDisplay(player.injury_status);
   return (
-    <TouchableOpacity accessibilityRole="button"
+    <PressableScale accessibilityRole="button"
       style={[styles.compactRow, showDivider && styles.compactDivider]}
       onPress={onPress}
-      activeOpacity={0.7}
     >
       <View style={styles.compactIdentity}>
         <PlayerIdentityRow
@@ -401,7 +401,7 @@ function RosterPlayerRow({
         <ValueStat value={player.score != null ? player.score : '—'} />
         <OverallRatingBadge rating={player.overall_rating} />
       </View>
-    </TouchableOpacity>
+    </PressableScale>
   );
 }
 

@@ -1,5 +1,6 @@
-import React, { useMemo, useState, type ReactNode } from 'react';
-import { Pressable, StyleSheet, View, type StyleProp, type ViewStyle } from 'react-native';
+import React, { createContext, useContext, useMemo, useState, type ReactNode } from 'react';
+import { StyleSheet, View, type StyleProp, type ViewStyle } from 'react-native';
+import PressableScale from './PressableScale';
 
 import AppText from './AppText';
 import { Sheet } from './Sheet';
@@ -7,6 +8,13 @@ import { useThemeMode } from '../context/ThemeModeContext';
 import { trackUse } from '../lib/analytics';
 import { whyEntry, whyTriggerLabel, type WhyMetricId } from '../lib/tapForWhyContent';
 import { spacing, type ThemeColors } from '../theme';
+
+const TapForWhyOffContext = createContext(false);
+
+/** Turns every TapForWhy underneath into plain, untappable content (Fantasy Sim's trade window: a stat pill must never open a sheet over the trade). Twin of web's TapForWhyOff. */
+export function TapForWhyOff({ children }: { children: ReactNode }) {
+  return <TapForWhyOffContext.Provider value>{children}</TapForWhyOffContext.Provider>;
+}
 
 export type TapForWhyProps = {
   /** Registry key (lib/tapForWhyContent.ts), the same table web uses. */
@@ -40,11 +48,13 @@ export default function TapForWhy({ metric, children, spoken, variant = 'inline'
   const { colors } = useThemeMode();
   const styles = useMemo(() => createStyles(colors), [colors]);
   const [open, setOpen] = useState(false);
+  const off = useContext(TapForWhyOffContext);
   const entry = whyEntry(metric);
   const sentences = [...entry.sentences, ...(extra ?? [])];
+  if (off) return <>{children}</>;
   return (
     <>
-      <Pressable
+      <PressableScale
         accessibilityRole="button"
         accessibilityLabel={whyTriggerLabel(metric, spoken)}
         accessibilityHint="Opens a short explanation"
@@ -54,11 +64,11 @@ export default function TapForWhy({ metric, children, spoken, variant = 'inline'
           setOpen(true);
           trackUse(`why_${metric}`, 'opened');
         }}
-        style={({ pressed }) => [variant === 'tile' && styles.tile, style, pressed && styles.pressed]}
+        style={[variant === 'tile' && styles.tile, style]}
         testID={testID}
       >
         {children}
-      </Pressable>
+      </PressableScale>
       <Sheet open={open} onClose={() => setOpen(false)} title={title ?? entry.title} size="sm" testID={testID ? `${testID}-sheet` : undefined}>
         <View style={styles.body}>
           {sentences.map((sentence) => (
@@ -68,7 +78,7 @@ export default function TapForWhy({ metric, children, spoken, variant = 'inline'
           ))}
           {chart ? <View style={styles.chart}>{chart}</View> : null}
           {onLearnMore && entry.learnMoreHref ? (
-            <Pressable
+            <PressableScale
               accessibilityRole="link"
               onPress={() => {
                 setOpen(false);
@@ -77,7 +87,7 @@ export default function TapForWhy({ metric, children, spoken, variant = 'inline'
               style={styles.learn}
             >
               <AppText style={styles.learnText}>{entry.learnMoreLabel ?? 'Learn more'}</AppText>
-            </Pressable>
+            </PressableScale>
           ) : null}
         </View>
       </Sheet>
@@ -88,7 +98,6 @@ export default function TapForWhy({ metric, children, spoken, variant = 'inline'
 function createStyles(colors: ThemeColors) {
   return StyleSheet.create({
     tile: { alignSelf: 'stretch' },
-    pressed: { opacity: 0.7, transform: [{ scale: 0.98 }] },
     body: { gap: spacing.md },
     sentence: { fontSize: 15, lineHeight: 22, color: colors.textSecondary },
     chart: { paddingVertical: spacing.sm },

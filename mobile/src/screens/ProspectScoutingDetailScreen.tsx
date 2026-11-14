@@ -1,6 +1,7 @@
 import ConfirmInPlace from '../components/ConfirmInPlace';
 import React, { useMemo, useState } from 'react';
-import { ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
+import { ScrollView, StyleSheet, View } from 'react-native';
+import PressableScale from '../components/PressableScale';
 import { Ionicons } from '@expo/vector-icons';
 import AppText from '../components/AppText';
 import Input from '../components/Input';
@@ -126,7 +127,7 @@ export default function ProspectScoutingDetailScreen({ route, navigation }: Prop
                 {prospect.draft_year ? ` · ${prospect.draft_year} class` : ''}
               </AppText>
             </View>
-            <TouchableOpacity accessibilityRole="button"
+            <PressableScale accessibilityRole="button"
               style={styles.watchlistButton}
               onPress={() => void toggleWatchlist()}
               hitSlop={8}
@@ -137,7 +138,7 @@ export default function ProspectScoutingDetailScreen({ route, navigation }: Prop
                 size={22}
                 color={onWatchlist ? colors.premium : colors.textSecondary}
               />
-            </TouchableOpacity>
+            </PressableScale>
           </View>
           <View style={styles.aggregateRow}>
             <AppText style={styles.aggregateLabel}>Shared scouting signal</AppText>
@@ -156,13 +157,13 @@ export default function ProspectScoutingDetailScreen({ route, navigation }: Prop
           <AppText style={styles.fieldLabel}>Overall grade (1 = pass, 5 = elite)</AppText>
           <View style={styles.pillRow}>
             {GRADE_OPTIONS.map((value) => (
-              <TouchableOpacity accessibilityRole="button"
+              <PressableScale accessibilityRole="button"
                 key={value}
                 style={[styles.pill, grade === value && styles.pillActive]}
                 onPress={() => setGrade(value)}
               >
                 <AppText style={[styles.pillText, grade === value && styles.pillTextActive]}>{value}</AppText>
-              </TouchableOpacity>
+              </PressableScale>
             ))}
           </View>
 
@@ -171,7 +172,7 @@ export default function ProspectScoutingDetailScreen({ route, navigation }: Prop
           </AppText>
           <View style={styles.pillRow}>
             {ROUND_OPTIONS.map((value) => (
-              <TouchableOpacity accessibilityRole="button"
+              <PressableScale accessibilityRole="button"
                 key={value}
                 style={[styles.pill, roundProjection === value && styles.pillActive]}
                 onPress={() => setRoundProjection(roundProjection === value ? null : value)}
@@ -179,7 +180,7 @@ export default function ProspectScoutingDetailScreen({ route, navigation }: Prop
                 <AppText style={[styles.pillText, roundProjection === value && styles.pillTextActive]}>
                   {value}
                 </AppText>
-              </TouchableOpacity>
+              </PressableScale>
             ))}
           </View>
 

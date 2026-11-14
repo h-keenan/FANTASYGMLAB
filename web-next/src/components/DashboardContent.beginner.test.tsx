@@ -1,4 +1,5 @@
 import { fireEvent, render, screen } from "@testing-library/react";
+import { beforeEach } from "vitest";
 import { describe, expect, it, vi } from "vitest";
 
 import { DashboardContent } from "./DashboardContent";
@@ -63,8 +64,10 @@ function expandHelp() {
 }
 
 describe("DashboardContent for a beginner", () => {
+  beforeEach(() => window.localStorage.clear());
   it("explains rank terms in short lines under the strip, not inside the 4-column tiles", () => {
     render(<DashboardContent leagueId="abc" leagueName="Dynasty Overlords" data={FIXTURE} />);
+    fireEvent.click(screen.getByRole("button", { name: /^My Team/ }));
     expandHelp();
     const strip = screen.getByLabelText("Team summary");
     const lines = Array.from(strip.querySelectorAll("[data-beginner-help] p")).map((p) => p.textContent);

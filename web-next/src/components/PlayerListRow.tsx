@@ -239,7 +239,7 @@ export function PlayerListRow({
             {doneLabel}
           </span>
         ) : actions ? (
-          <div className="flex shrink-0 items-center gap-1.5">{actions}</div>
+          <div className="flex shrink-0 items-center gap-1.5" data-testid="list-actions">{actions}</div>
         ) : null}
       </div>
       {hasLine3 ? (

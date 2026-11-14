@@ -52,10 +52,14 @@ const IDEA = {
 } as unknown as MultiTeamIdea;
 
 function renderSection() {
-  return render(<MultiTeamIdeasSection leagueId="league-1" leagueName="Dynasty Overlords" lens="Dynasty" />);
+  const view = render(<MultiTeamIdeasSection leagueId="league-1" leagueName="Dynasty Overlords" lens="Dynasty" />);
+  // A compact module: it reads "Looking for 3-team deals" / "2 3-team deals" collapsed; open it to see the ideas.
+  fireEvent.click(screen.getByRole("button", { name: /^3-team ideas:/ }));
+  return view;
 }
 
 describe("MultiTeamIdeasSection", () => {
+  beforeEach(() => window.localStorage.clear());
   beforeEach(() => {
     getIdeas.mockReset();
   });
@@ -101,11 +105,11 @@ describe("MultiTeamIdeasSection", () => {
   it("says so plainly when no deal works, and when trading is closed", async () => {
     getIdeas.mockResolvedValue({ ideas: [], idea_count: 0, locked: false, reason: "no_fit" });
     const first = renderSection();
-    expect(await screen.findByText("No 3-team deals right now")).toBeInTheDocument();
+    expect((await screen.findAllByText("No 3-team deals right now")).length).toBeGreaterThan(0);
     first.unmount();
     getIdeas.mockResolvedValue({ ideas: [], idea_count: 0, locked: false, reason: "trade_deadline_passed", message: "Your league's trade deadline has passed." });
     renderSection();
-    expect(await screen.findByText("Trading is closed")).toBeInTheDocument();
+    expect((await screen.findAllByText("Trading is closed")).length).toBeGreaterThan(0);
   });
 
   it("shows a friendly busy error and retries from the Try again button", async () => {

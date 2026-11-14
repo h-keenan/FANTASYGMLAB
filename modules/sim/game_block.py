@@ -64,7 +64,7 @@ def set_block(em: Emitter, asset_id: str, on: bool, looking_for: str | None = No
                 raise ValueError("You can only block picks you own.")
         elif asset_id not in snap.players or asset_id not in state.holdings(user):
             raise ValueError("You can only put your own players on the block.")
-        elif snap.players[asset_id].pos in NON_TRADABLE:
+        elif snap.players[asset_id].pos in NON_TRADABLE:  # the block stays K/DEF-free: AI offers around it never involve them
             raise ValueError("Kickers and defenses cannot be traded.")
         if asset_id not in user_block(snap, state) and len(user_block(snap, state)) >= MAX_BLOCK_ITEMS:
             raise GameError("block_full", f"Your block holds {MAX_BLOCK_ITEMS} assets at most. Take one off first.")

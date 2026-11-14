@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { FlatList, ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
+import { FlatList, ScrollView, StyleSheet, View } from 'react-native';
+import PressableScale from '../components/PressableScale';
 import AppText from '../components/AppText';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { Ionicons } from '@expo/vector-icons';
@@ -28,6 +29,7 @@ import TradeSharePreviewModal from '../components/TradeSharePreviewModal';
 import TradeValueBar from '../components/TradeValueBar';
 import TradeValueHero from '../components/TradeValueHero';
 import ValueSignalsCard from '../components/ValueSignalsCard';
+import { Hero } from '../components/ModuleTemplates';
 import ValuesCredit from '../components/ValuesCredit';
 import {
   type AllTradesEntitlement,
@@ -43,6 +45,7 @@ import {
   type ValuationLens,
 } from '../lib/api';
 import { api } from '../lib/api';
+import { formatTradeGain } from '../lib/liveDraft';
 import { trackUse } from '../lib/analytics';
 import { toUserErrorMessage } from '../lib/errorMessages';
 import { adsAvailable, showRewardedAd } from '../lib/ads';
@@ -313,6 +316,15 @@ export default function TradeHubScreen({ leagueId, leagueName, navigation }: Pro
               total={entitlement.approved_count}
               shown={entitlement.visible_count}
               isPremium={entitlement.is_premium}
+            />
+          ) : null}
+          {isForYou && !activeLoading && !activeError && !notReadyReason && ideas && ideas.length > 0 ? (
+            <Hero
+              label="Trade ideas"
+              value={String(ideas.length)}
+              context={`Top: ${ideas[0].partner_team_name} · ${formatTradeGain(ideas[0].trade_gain)}`}
+              tone="action"
+              testID="trade-hub-hero"
             />
           ) : null}
           {isForYou && !activeLoading && !activeError && !notReadyReason && ideas ? (
@@ -599,10 +611,9 @@ function IdeaSummaryRow({
         {tiles.map((tile) => {
           const isActive = tile.key === 'total' ? activeFilter === null : activeFilter === tile.key;
           return (
-            <TouchableOpacity
+            <PressableScale
               key={tile.key}
               style={[styles.summaryTile, isActive && styles.summaryTileActive]}
-              activeOpacity={0.75}
               onPress={() =>
                 onToggleFilter(
                   tile.key === 'total' ? null : activeFilter === tile.key ? null : (tile.key as ImpactTagKey),
@@ -615,7 +626,7 @@ function IdeaSummaryRow({
               <Ionicons name={tile.icon} size={16} color={tile.color} />
               <AppText style={styles.summaryValue}>{tile.value}</AppText>
               <AppText style={styles.summaryLabel} numberOfLines={1}>{tile.label}</AppText>
-            </TouchableOpacity>
+            </PressableScale>
           );
         })}
       </View>

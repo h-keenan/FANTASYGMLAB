@@ -1,17 +1,9 @@
-import { PillRow } from "@/components/PillRow";
-import type { TabIconName } from "@/lib/tabIcons";
+import { PageTabBar } from "@/components/PageTabBar";
 
 /**
- * The Trade Hub / Trade Finder / Trade Analyzer tri-tab switcher — mirrors
- * app.py's TRADES_TAB_ROUTE_ORDER / TRADES_TAB_LABELS (the single segmented
- * control Streamlit shows above all three tabs, and mobile's
- * TradesScreen.tsx tab labels: Hub / Finder / Analyzer, pinned by lib/tradesTabs.test.ts). All
- * three tabs now have a real Next.js page (Trade Finder joined Trade Hub
- * and Trade Analyzer in Revision 17) — none of them deep-link out to
- * Streamlit anymore.
- *
- * Trade History is a pill in the same row, linking out to its own
- * league-independent page. The bar is sticky and compact.
+ * The Trades family tab strip (Hub / Finder / Analyzer / History). Kept as the stable name the trade pages import;
+ * the tabs, glyphs and routes now come from lib/pageFamilies.ts through the shared PageTabBar (sticky glass top tabs).
+ * Mirrors app.py's TRADES_TAB_ROUTE_ORDER and mobile's TradesScreen tabs (lib/tradesTabs.test.ts).
  */
 export function TradesTabBar({
   leagueId,
@@ -20,19 +12,7 @@ export function TradesTabBar({
 }: {
   leagueId: string;
   leagueName: string;
-  active: "trade_hub" | "trade_finder" | "trade_analyzer";
+  active: "trade_hub" | "trade_finder" | "trade_analyzer" | "trade_history";
 }) {
-  const suffix = `?name=${encodeURIComponent(leagueName)}`;
-  const id = encodeURIComponent(leagueId);
-  // Short labels: the page <h1> carries the full name, and four pills have to
-  // fit one phone-width row. Trade History is a destination pill in the same
-  // row (it is not part of TRADES_TAB_ROUTE_ORDER) and is never "active" here.
-  const tabs: { label: string; value: string; href: string; glyph: TabIconName }[] = [
-    { value: "trade_hub", label: "Hub", glyph: "hub", href: `/trade-hub/${id}${suffix}` },
-    { value: "trade_finder", label: "Finder", glyph: "finder", href: `/trade-finder/${id}${suffix}` },
-    { value: "trade_analyzer", label: "Analyzer", glyph: "analyzer", href: `/trade-analyzer/${id}${suffix}` },
-    { value: "trade_history", label: "History", glyph: "history", href: `/trade-history?league=${id}&name=${encodeURIComponent(leagueName)}` },
-  ];
-
-  return <PillRow sticky fullWidth ariaLabel="Trades section" options={tabs} active={active} />;
+  return <PageTabBar family="trades" active={active} leagueId={leagueId} leagueName={leagueName} />;
 }

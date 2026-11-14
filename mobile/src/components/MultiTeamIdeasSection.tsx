@@ -22,6 +22,8 @@ import {
   type MultiTeamIdea,
   type MultiTeamIdeasResponse,
 } from '../lib/multiTeamIdeas';
+import CompactModule from './CompactModule';
+import { compactCount } from '../lib/compactModule';
 import { buildShareModel, toneSemantic, type SemanticTone } from '../lib/multiTeamTrade';
 import { useThemeMode } from '../context/ThemeModeContext';
 import { spacing, type ThemeColors } from '../theme';
@@ -70,9 +72,18 @@ export default function MultiTeamIdeasSection({
   }, [leagueId, lens, attempt]);
 
   const section = response ? ideasSection(response) : null;
+  const parts = error
+    ? [{ key: 'e', text: "Couldn't load 3-team ideas", tone: 'danger' as const }]
+    : !section
+      ? [{ key: 'l', text: 'Looking for 3-team deals' }]
+      : section.kind === 'ideas'
+        ? [{ key: 'n', text: compactCount(section.ideas.length, '3-team deal'), strong: true }, { key: 'f', text: 'fair for every team' }]
+        : section.kind === 'locked'
+          ? [{ key: 'n', text: lockedTeaserTitle(section.count), strong: true }, { key: 'p', text: 'Pro', tone: 'action' as const }]
+          : [{ key: 'm', text: section.kind === 'closed' ? 'Trading is closed' : 'No 3-team deals right now' }];
   return (
     <View style={styles.root} testID="multi-team-ideas">
-      <AppText style={styles.title}>3-team ideas</AppText>
+      <CompactModule id="trades.multi" title="3-team ideas" tone="action" parts={parts}>
       <AppText style={styles.secondary}>
         Three-way deals where your surplus players and picks fill one team&apos;s need, theirs fills another&apos;s, and every team still comes out fair.
       </AppText>
@@ -102,6 +113,7 @@ export default function MultiTeamIdeasSection({
           <IdeaCard key={idea.id} idea={idea} leagueId={leagueId} leagueName={leagueName} navigation={navigation} />
         ))
       )}
+      </CompactModule>
     </View>
   );
 }

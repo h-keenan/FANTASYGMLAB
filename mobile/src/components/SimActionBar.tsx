@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { Alert, StyleSheet, View } from 'react-native';
+import { Alert, Pressable, StyleSheet, View } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 
 import AppText from './AppText';
 import Button from './Button';
@@ -15,9 +16,9 @@ import { radii, spacing, type ThemeColors } from '../theme';
  * SimActionBar): Advance week ("Week 4 -> 5", disabled only when a cut is owed;
  * an empty slot warns and asks to confirm). ADVANCE ONLY: Auto-set lives on Home,
  * "What to do this week". An in-flow glass pill: the screen's bottom stack docks
- * it at the bottom with the game orb right above it, and pads the content to match.
+ * it at the bottom with the game orb inside its one row (Sim to | orb | Advance), and pads the content to match.
  */
-export default function SimActionBar({ ctx, paywalled, advancing, onAdvance, onSimTo, onGoPro, onTab }: { ctx: SimCtx; paywalled: boolean; advancing: boolean; onAdvance: () => void; onSimTo?: () => void; onGoPro: () => void; onTab?: (tab: 'team' | 'players') => void }) {
+export default function SimActionBar({ ctx, paywalled, advancing, onAdvance, onSimTo, onGoPro, onTab, orb }: { ctx: SimCtx; paywalled: boolean; advancing: boolean; onAdvance: () => void; onSimTo?: () => void; onGoPro: () => void; onTab?: (tab: 'team' | 'players') => void; orb?: React.ReactNode }) {
   const { colors } = useThemeMode();
   const styles = useMemo(() => createStyles(colors), [colors]);
   const { gameId, game } = ctx;
@@ -58,7 +59,12 @@ export default function SimActionBar({ ctx, paywalled, advancing, onAdvance, onS
         </AppText>
       ) : null}
       <View style={styles.row}>
-        {onSimTo && !paywalled ? <Button label="Sim to..." variant="secondary" size="sm" disabled={advancing} onPress={onSimTo} /> : null}
+        {onSimTo && !paywalled ? (
+          <Pressable onPress={onSimTo} disabled={advancing} accessibilityRole="button" accessibilityLabel="Sim to..." style={[styles.simTo, advancing && { opacity: 0.5 }]} testID="sim-to-button">
+            <Ionicons name="play-forward-outline" size={20} color={colors.textPrimary} />
+          </Pressable>
+        ) : null}
+        {orb}
         <View style={styles.advance}>
           {paywalled ? (
             <Button label="Go Pro to continue" variant="premium" size="sm" onPress={onGoPro} />
@@ -91,7 +97,8 @@ function createStyles(colors: ThemeColors) {
       backgroundColor: colors.backgroundElevated,
     },
     row: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: spacing.md },
-    advance: { flex: 1 },
+    advance: { flex: 1, minWidth: 0 },
+    simTo: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center', borderRadius: radii.pill, borderWidth: 1, borderColor: colors.borderStrong ?? colors.border },
     reason: { fontSize: 12, fontWeight: '700', color: colors.warning, textAlign: 'center' },
     srOnly: { height: 0, width: 0, opacity: 0 },
   });

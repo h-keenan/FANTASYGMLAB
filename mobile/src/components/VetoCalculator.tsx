@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { StyleSheet, TouchableOpacity, View } from 'react-native';
+import { StyleSheet, View } from 'react-native';
+import PressableScale from './PressableScale';
 import { useMutation } from '@tanstack/react-query';
 
 import AccentCard from './AccentCard';
@@ -180,9 +181,9 @@ function VetoResult({ result, styles }: { result: VetoCheckResponse; styles: Sty
       ) : null}
       {result.limits?.length ? (
         <View style={styles.bullets}>
-          <TouchableOpacity onPress={() => setShowLimits((v) => !v)} accessibilityRole="button" accessibilityState={{ expanded: showLimits }}>
+          <PressableScale onPress={() => setShowLimits((v) => !v)} accessibilityRole="button" accessibilityState={{ expanded: showLimits }}>
             <AppText style={styles.link}>{showLimits ? 'Hide how this is calculated' : 'How this is calculated'}</AppText>
-          </TouchableOpacity>
+          </PressableScale>
           {showLimits
             ? result.limits.map((limit) => (
                 <AppText key={limit} style={styles.muted}>

@@ -1,5 +1,6 @@
 import React, { useMemo } from 'react';
-import { StyleSheet, TouchableOpacity, View } from 'react-native';
+import { StyleSheet, View } from 'react-native';
+import PressableScale from './PressableScale';
 import { Ionicons } from '@expo/vector-icons';
 
 import AppText from './AppText';
@@ -165,15 +166,14 @@ export default function PlayerHero({
 
       <View style={styles.tilesRow}>
         {onToggleExpand && overallRating !== null ? (
-          <TouchableOpacity
+          <PressableScale
             style={styles.tile}
             onPress={onToggleExpand}
-            activeOpacity={0.7}
             accessibilityRole="button"
             accessibilityLabel={`Player score ${overallRating}. ${expanded ? 'Hide' : 'Show'} value snapshot`}
           >
             {scoreTileBody}
-          </TouchableOpacity>
+          </PressableScale>
         ) : overallRating !== null ? (
           <TapForWhy metric="ovr" variant="tile" style={styles.tile} spoken={`Player score ${overallRating}`} chart={ovrChart} testID="pqv-ovr-why">
             {scoreTileBody}

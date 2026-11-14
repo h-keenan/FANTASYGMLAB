@@ -1,5 +1,6 @@
 import React, { useMemo, useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import PressableScale from './PressableScale';
 import { Ionicons } from '@expo/vector-icons';
 
 import AppText from './AppText';
@@ -83,7 +84,7 @@ function AwardChip({ award, onPress }: { award: PlayerAward; onPress: () => void
   const styles = useMemo(() => createStyles(colors), [colors]);
   const tierColor = awardTierColor(award.tier, isDark, colors.accentSoft);
   return (
-    <TouchableOpacity style={[styles.chip, { borderLeftColor: tierColor }]} onPress={onPress}>
+    <PressableScale style={[styles.chip, { borderLeftColor: tierColor }]} onPress={onPress}>
       <View style={[styles.medal, { backgroundColor: `${tierColor}26` }]}>
         <Ionicons name={awardIconName(award.family)} size={16} color={tierColor} />
       </View>
@@ -94,7 +95,7 @@ function AwardChip({ award, onPress }: { award: PlayerAward; onPress: () => void
         </AppText>
         {award.season ? <AppText style={styles.chipSeason}>{award.season}</AppText> : null}
       </View>
-    </TouchableOpacity>
+    </PressableScale>
   );
 }
 
@@ -121,12 +122,12 @@ export default function AwardsStrip({ awards }: { awards: PlayerAward[] }) {
           <AppText style={styles.title}>Awards</AppText>
         </View>
         {awards.length > VIEW_ALL_THRESHOLD ? (
-          <TouchableOpacity onPress={() => setViewAllOpen(true)} hitSlop={8}>
+          <PressableScale onPress={() => setViewAllOpen(true)} hitSlop={8}>
             <View style={styles.viewAllRow}>
               <AppText style={styles.viewAllText}>View All</AppText>
               <Ionicons name="chevron-forward" size={13} color={colors.accent} />
             </View>
-          </TouchableOpacity>
+          </PressableScale>
         ) : null}
       </View>
       <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.scrollRow}>
@@ -142,15 +143,15 @@ export default function AwardsStrip({ awards }: { awards: PlayerAward[] }) {
           <SwipeDismissCard style={styles.listSheet} onDismiss={() => setViewAllOpen(false)}>
             <View style={styles.listSheetHeaderRow}>
               <AppText style={styles.sheetTitle}>All Awards</AppText>
-              <TouchableOpacity onPress={() => setViewAllOpen(false)} hitSlop={8}>
+              <PressableScale onPress={() => setViewAllOpen(false)} hitSlop={8}>
                 <Ionicons name="close" size={22} color={colors.textSecondary} />
-              </TouchableOpacity>
+              </PressableScale>
             </View>
             <SheetScrollView style={styles.listScroll}>
               {awards.map((award) => {
                 const tierColor = awardTierColor(award.tier, isDark, colors.accentSoft);
                 return (
-                  <TouchableOpacity
+                  <PressableScale
                     key={award.badge_id}
                     style={styles.listRow}
                     onPress={() => {
@@ -168,7 +169,7 @@ export default function AwardsStrip({ awards }: { awards: PlayerAward[] }) {
                       </AppText>
                       {award.season ? <AppText style={styles.chipSeason}>{award.season}</AppText> : null}
                     </View>
-                  </TouchableOpacity>
+                  </PressableScale>
                 );
               })}
             </SheetScrollView>

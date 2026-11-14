@@ -1,3 +1,4 @@
+import { PageTabBar } from "@/components/PageTabBar";
 import type { TabIconName } from "@/lib/tabIcons";
 import { isEspnLeagueId } from "@/lib/leaguePlatform";
 import { sleeperLeagueUrl } from "@/lib/matchupPlanner";
@@ -529,6 +530,7 @@ export function WaiversContent({
 
   return (
     <main className="page-shell">
+      {leagueId ? <PageTabBar family="team" active="waivers" leagueId={leagueId} leagueName={leagueName} /> : null}
       <header className="flex flex-wrap items-center justify-between gap-2">
         <div className="flex flex-col gap-1">
           <PageTitle page="Waivers" leagueName={leagueName} info={helpInfo} />
