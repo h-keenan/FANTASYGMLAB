@@ -335,9 +335,47 @@ export interface SimGame {
   trade_deadline_week: number;
   /** Dynasty games only (null or absent otherwise). */
   dynasty?: SimDynastyBlock | null;
+  /** The Realism update state: what is in force, what an update would switch on, the settings history (absent on an older server). */
+  rules?: SimRealismInfo | null;
   grade_letter: string | null;
   created_at: string;
   updated_at: string;
+}
+
+/** When a rule from a Realism update takes effect: "now" (decisions after the update), "week" (the next simulated week), "season" (the next offseason). */
+export type SimRealismBoundary = "now" | "week" | "season";
+
+export interface SimRealismFlag {
+  flag: string;
+  value: number;
+  label: string;
+  body: string;
+  boundary: SimRealismBoundary;
+  /** Server copy for the boundary: "Right away", "From the next simulated week", "From the next offseason". */
+  when: string;
+  /** Scheduled rules only: the first dynasty season built under it. */
+  from_view?: number;
+}
+
+export interface SimRealismInfo {
+  /** 0 = the game as it was created; +1 per Realism update. */
+  rules_version: number;
+  /** True while at least one rule is off and the game is not finished: the update is on offer. */
+  eligible: boolean;
+  pending: SimRealismFlag[];
+  /** Rules an update already scheduled for a later season (not yet in force). */
+  scheduled: SimRealismFlag[];
+  in_force: Record<string, number>;
+  history: { seq: number; week: number; season_no: number; flags: string[] }[];
+  note: string;
+}
+
+export interface SimRealismResponse extends SimGameEnvelope {
+  /** False when the game was already current (nothing was appended). */
+  upgraded: boolean;
+  flags: string[];
+  settings: SimGameSettings;
+  rules: SimRealismInfo;
 }
 
 /** The slice of `SimGame` a small action can change, returned with the action's own response so the
@@ -2167,6 +2205,7 @@ export function simTransactionText(row: SimTransaction): string {
 /** Glyph + tone for a league transaction row: trade accent swap, waiver add green, drop red, injury red cross. */
 export function simTransactionGlyph(row: Pick<SimTransaction, "type" | "kind">): { glyph: ReviewGlyph; tone: SimGameTone } {
   const kind = `${row.type ?? row.kind ?? ""}`.toLowerCase();
+  if (kind === "rules") return { glyph: "stats", tone: "accent" };
   if (kind.includes("trade")) return { glyph: "trade", tone: "accent" };
   if (kind.includes("injur")) return { glyph: "injury", tone: "danger" };
   if (kind.includes("drop") || kind.includes("cut") || kind.includes("release")) return { glyph: "bust", tone: "danger" };

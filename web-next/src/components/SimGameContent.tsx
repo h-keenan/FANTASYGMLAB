@@ -36,6 +36,7 @@ import { CompactModule } from "@/components/ui/CompactModule";
 import { SimNotice, SimOpenPlayerContext, SimPreviewBanner, SimProgressBar, SimRowAccordion, SimTeamLink, SimTeamOpenContext, simToneColor, type SimCtx } from "@/components/SimGameParts";
 import { SimBlockToggle } from "@/components/SimTradeBlock";
 import { SimTeamSheet } from "@/components/SimGameTeamSheet";
+import { SimRealismModule } from "@/components/SimRealism";
 import { SimToResultView, SimToSheet, type SimToRequest } from "@/components/SimToControl";
 import { SimFinalView } from "@/components/SimGameRecap";
 import { SimWeekRecapStory } from "@/components/SimRecapStory";
@@ -1204,6 +1205,8 @@ function SimMoreTab({ ctx, onDeleted, onHub }: { ctx: SimCtx; onDeleted: () => v
         <p className="text-sm">Undo this week&apos;s lineup edits, claims, cuts and trades back to how the week started. You cannot undo a week you already advanced.</p>
         <ConfirmInPlace label="Reset this week" buttonVariant="secondary" size="sm" onConfirm={revert} />
       </CompactModule>
+
+      <SimRealismModule ctx={ctx} />
 
       <CompactModule id="sim.menu.rules" title="League rules" parts={simRulesParts(s)} tone="muted" defaultOpen>
         <ul className="flex flex-col gap-2 text-sm">

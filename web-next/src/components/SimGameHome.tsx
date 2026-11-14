@@ -26,6 +26,7 @@ import { buildSimStatusHeader, simHomeAttentionItems } from "@/lib/statusHeader"
 import { simLeagueParts } from "@/lib/simSummaries";
 import { useSimAutoSet } from "@/components/useSimAutoSet";
 import { ClaimSheet } from "@/components/SimGameTeam";
+import { SimRealismBanner } from "@/components/SimRealism";
 import { SkeletonCard } from "@/components/Skeleton";
 import { ToneBadge } from "@/components/ToneBadge";
 import { api } from "@/lib/api";
@@ -140,6 +141,7 @@ export function SimHomeTab({
   if (!wide) {
     return (
       <div className="flex flex-col gap-3" data-testid="sim-home">
+        <SimRealismBanner ctx={ctx} />
         {header}
         {home.matchup ? <SimMatchupCard ctx={ctx} matchup={home.matchup} onTab={onTab} /> : null}
         <SimChecklistCard home={home} onTab={onTab} onAuto={home.matchup && !home.matchup.bye ? auto.run : undefined} autoBusy={auto.busy} optimal={auto.optimal} />
@@ -163,6 +165,7 @@ export function SimHomeTab({
   return (
     <div className="flex flex-col gap-4 lg:grid lg:grid-cols-2 lg:items-start" data-testid="sim-home">
       <div className="flex flex-col gap-4">
+        <SimRealismBanner ctx={ctx} />
         {header}
         {home.matchup ? <SimMatchupCard ctx={ctx} matchup={home.matchup} onTab={onTab} /> : null}
         <SimReservesStrip home={home} onTab={onTab} />

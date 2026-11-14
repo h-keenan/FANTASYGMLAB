@@ -798,6 +798,51 @@ per device (web localStorage, app AsyncStorage) and default `auto_set` on; the A
 AI trades, standings, champion) and the last week's full `recap`, plus `game`. `POST /v1/sim/games/{id}/undo-sim {from_seq}` takes the run
 back (deletes events and later checkpoints from `from_seq`, which must be an `advance` / `lineup_set` event, then replays).
 
+## Realism update (`realism_upgrade`): newer rules for an existing save
+
+A game's settings are frozen at creation and every rule generation is a gate in them (`ai_v`, `hint_v`, `limit_v`, `kd_v`, `world_v`,
+`aging_v`, `names_v`, ...), so a save from before a gate keeps playing the old way and replays byte-identically. The Realism update is the one
+sanctioned way to move such a save forward. It is **event-sourced** (code: `modules/sim/game_rules.py`):
+
+- `POST /v1/sim/games/{id}/realism-upgrade` (premium rules as every sim action; same `_mutate` path) appends ONE `realism_upgrade` event
+  `{flags: {name: target}, bounds: {name: boundary}}` for every registered flag the game is missing, and returns
+  `{"upgraded": bool, "flags": [names], "settings": <effective settings>, "rules": <rules block>, "delta": ...}`. Idempotent: a current game appends
+  nothing (`upgraded: false`). A finished game (`complete`) answers `reason: "wrong_phase"`.
+- The fold records the event in `state.rules` (the game's settings history; one row `{seq, week, season_no, status, view_from, flags, bounds}` per
+  update, a pure function of the event and the state it lands on). `state.rules` is left out of the digest while empty, so **a log without the event replays
+  and fingerprints exactly as before** (golden digests pinned in `tests/test_sim_realism_update.py`, captured on origin/main before this change).
+- Everything that reads a setting afterwards gets the settings in force at that point of the log: `GameSnapshot.view_for(state)` =
+  `under(state.rules).season_view(state.view_no)`. With no rules it is the very snapshot the game always used; with rules it is a memoized
+  derived snapshot (settings overlaid, same players) so per-snapshot caches never mix two rule sets. `Emitter.snap` is refreshed at the event.
+- `GET /games/{id}` carries `settings` (the CURRENT effective settings) and a new `rules` block:
+  `{"rules_version": 0, "eligible": bool, "pending": [{flag, value, label, body, boundary, when}], "scheduled": [... + from_view],
+  "in_force": {flag: value}, "history": [{seq, week, season_no, flags}], "note": "Past results stay as they were; new rules apply going forward."}`.
+  `rules_version` counts updates (0 = the game as created). `eligible` is true while some registered, applicable flag is still off.
+
+### Boundaries (declared per flag in `UPGRADABLE_FLAGS = {name: (target_value, boundary)}`)
+
+| boundary | meaning | flags |
+| --- | --- | --- |
+| `now` | decisions after the event (trade verdicts, hints, roster-limit checks); nothing already recorded changes | `hint_v`, `limit_v`, `kd_v` (and `econ_v`, see below) |
+| `week` | the next simulated week and after (a pending week is always unsimulated, so this is the same instant as `now` for the weekly engine); the dynasty pool generator gets it from the next season built | `world_v` |
+| `season` | the next offseason/season boundary: only dynasty seasons *generated* after the event (retirement, aging curves, rookie class and names) | `aging_v`, `names_v` |
+
+`aging_v` / `names_v` apply to multi-season dynasty games only; a redraft game is never offered them. Seasons already built are history: a
+season view generated before the event keeps its old settings and pool exactly (`generation_settings` / `decision_settings` in `game_rules.py`), and
+`view_from = view_no + 1` at the event (an offseason update therefore waits one more season: that offseason's aging and rookie class are already built).
+The boundary is stored in the event, so re-timing a flag in the registry later never changes an old log.
+
+### Undo
+`revert-week` deletes the week's pending decisions, an update made this week included; `undo-sim {from_seq}` before the event deletes it too, and the
+flags revert with it (the API reloads the state and rebuilds the snapshot from the log). Checkpoints taken before the event stay valid; caches are keyed
+by the log version, which the event bumps. The activity feed (`league.transactions`) gets a `type: "rules"` row ("Rules updated: ... Past results stay as
+they were.") and the notifications a `rules` item.
+
+### Adding a gate
+Add `name: (target, boundary)` to `UPGRADABLE_FLAGS`, a `FLAGS` entry (label, one-sentence body, `dynasty_only`), and read the gate through
+`snap.settings` (decisions) or `snap.generation_root(season).settings` (dynasty pool generation). `econ_v` (consensus-anchored economy, branch
+`feat/sim-realism-audit-3`) is registered as a TODO in `game_rules.py`: add `"econ_v": (ECON_VERSION, NOW)` once it is on main.
+
 ## Trade block (block_v 1+)
 
 Version gate: `settings.block_v` (2 on every new game, 1 on saves made before the block forgot assets, absent on older saves). Without it there is no block anywhere: the endpoints say
