@@ -1,6 +1,5 @@
 "use client";
 
-import { SectionHeading } from "@/components/SectionHeading";
 import { useMemo, useState, type ReactNode } from "react";
 
 import { InsightLink } from "@/components/ui/InsightLink";

@@ -16,7 +16,6 @@ import { ConfidenceMeter } from "@/components/ConfidenceMeter";
 import { HighlightTarget } from "@/components/HighlightTarget";
 import { InfoTip } from "@/components/InfoTip";
 import { OvrGauge } from "@/components/OvrGauge";
-import { PillRow } from "@/components/PillRow";
 import { FilterSheet } from "@/components/ui/FilterSheet";
 import { ViewSelect } from "@/components/ui/ViewSelect";
 import { singleValue, valuesFromSingles, type FilterGroup, type FilterValues } from "@/lib/filterSheet";

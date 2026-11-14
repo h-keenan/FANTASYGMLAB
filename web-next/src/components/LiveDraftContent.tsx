@@ -3,7 +3,6 @@
 import { EmptyState } from "@/components/EmptyState";
 import { PlayerIdentity } from "@/components/PlayerRow";
 import { ValueStat } from "@/components/ValueStat";
-import { SectionHeading } from "@/components/SectionHeading";
 import { CompactModule } from "@/components/ui/CompactModule";
 import { abbreviatePlayerName } from "@/lib/formatPlayerName";
 import { useMemo, useState } from "react";

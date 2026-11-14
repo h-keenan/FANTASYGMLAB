@@ -4,7 +4,6 @@ import Link from "next/link";
 import { BeginnerHelp } from "@/components/BeginnerHelp";
 import { InfoTip } from "@/components/InfoTip";
 import { IconRow } from "@/components/IconRow";
-import { SectionHeading } from "@/components/SectionHeading";
 import { CompactModule } from "@/components/ui/CompactModule";
 import { statStripParts } from "@/lib/moduleTemplates";
 import { ToneBadge } from "@/components/ToneBadge";
