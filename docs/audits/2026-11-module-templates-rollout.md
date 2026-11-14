@@ -111,3 +111,13 @@ Heights from `module_scan.mjs` (390 / 1440, fixtures, same script run on `origin
 - [x] Trade idea cards as CompactModules, App family tab strip (see Rollout 3). Still open: League Recaps bodies, app Analyzer / Finder / History / Draft inner sections.
 - [ ] Roster rows inside a module truncate long names on a 390 px phone ("T. ..." in the scan); row width inside modules needs a pass.
 - [ ] No on-device check of the app screens (tsc, node tests and twin check only).
+
+## Player anatomy rollout (2026-11-14, variant picks 1a / 1b / 4 / 5)
+
+- [x] Shared lib twin `playerAnatomy.ts`, templates `PlayerAvatarSlot`, `PlayerAccordionRow`, `CompactPlayerCard`, `TradeCompactCard`, `RankRow` (web + app).
+- [x] Web: Players rows, My Team roster rows, Trade idea cards (Hub, Finder, GM Plan via `TradeIdeaCardView`), Waivers recommended rows (bar), player sheet peek / full + pill order.
+- [x] App: Players list layout, My Team roster rows, `TradeIdeaCard`, player sheet peek / full grip + pill order.
+- [x] Avatar rule enforcement (`lib/playerAvatarRule.test.ts`) and per-template tests.
+- [ ] Waivers app add rows (bar) and web Explore tiles, Standings (`RankRow`), Live Draft, News, Trade Analyzer pickers, Draft Center, Matchup lineup, Recaps, Manager / Opponent profile.
+- [ ] Fantasy Sim: `SimDraftRow` / `SimPlayerLine` / `SimRosterLine` onto `PlayerAccordionRow mode="sim"`, trade inbox / offers onto `TradeCompactCard mode="sim"`, sim PQV grade in place of the value ring.
+- [ ] No on-device check of the app screens (tsc, node tests and twin check only).

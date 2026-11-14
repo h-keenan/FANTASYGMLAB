@@ -73,6 +73,13 @@ const DATA: LeagueRankingsResponse = {
   ],
 };
 
+
+/** Rows are inline accordions: open every row (one at a time is the user rule, so this clicks each in turn and keeps the last open). */
+function expandRow(index = 0) {
+  const rows = screen.getAllByTestId("player-accordion-row");
+  fireEvent.click(rows[index].querySelector("button[aria-expanded]") as HTMLElement);
+}
+
 describe("PlayersContent", () => {
   it("renders every player in the pool by default", () => {
     render(<PlayersContent leagueId="league1" leagueName="Dynasty Overlords" data={DATA} />);
@@ -106,7 +113,8 @@ describe("PlayersContent", () => {
   it("links each row's Compare CTA into Player Compare with the right player id", () => {
     render(<PlayersContent leagueId="league1" leagueName="Dynasty Overlords" data={DATA} />);
 
-    const links = screen.getAllByRole("link", { name: "Compare" });
+    expandRow(0);
+    const links = screen.getAllByRole("link", { name: /Compare/ });
     expect(links[0]).toHaveAttribute("href", "/player-compare/league1?a=a&name=Dynasty%20Overlords");
   });
 
@@ -239,8 +247,10 @@ describe("PlayersContent", () => {
       // Value score — the stat sort, not the server's default order, wins.
       const rows = screen.getAllByText(/Receiver$/).map((el) => el.textContent);
       expect(rows).toEqual(["Beta Receiver", "Alpha Receiver"]);
-      expect(screen.getByText("600")).toBeInTheDocument();
+      expandRow(0);
       expect(screen.getByText("1400")).toBeInTheDocument();
+      expandRow(1);
+      expect(screen.getByText("600")).toBeInTheDocument();
     });
 
     it("switches to percentile mode and re-sorts/re-displays by the stat's position-group percentile", () => {
@@ -249,7 +259,9 @@ describe("PlayersContent", () => {
       fireEvent.change(selectWithOption("Rec Yards"), { target: { value: "rec_yards" } });
       fireEvent.click(screen.getByText("Percentile"));
 
+      expandRow(0);
       expect(screen.getByText("97th")).toBeInTheDocument();
+      expandRow(1);
       expect(screen.getByText("35th")).toBeInTheDocument();
     });
   });
@@ -258,7 +270,8 @@ describe("PlayersContent", () => {
     it("deep-links each row into Trade Analyzer with ?playerId=, same convention as Waivers/Trade Hub", () => {
       render(<PlayersContent leagueId="league1" leagueName="Dynasty Overlords" data={DATA} />);
 
-      const links = screen.getAllByRole("link", { name: "Add to Trade" });
+      expandRow(0);
+      const links = screen.getAllByRole("link", { name: "Trade ideas" });
       expect(links[0]).toHaveAttribute(
         "href",
         "/trade-analyzer/league1?name=Dynasty+Overlords&playerId=a",
@@ -328,6 +341,7 @@ describe("PlayersContent", () => {
       expect(screen.getByText("Edge Rusher")).toBeInTheDocument();
       expect(screen.queryByText("Thumper Backer")).not.toBeInTheDocument();
       expect(screen.queryByText("Alpha Receiver")).not.toBeInTheDocument();
+      expandRow(0);
       expect(screen.getByText("Solid sample")).toBeInTheDocument();
       expect(screen.getByText(/not market prices/)).toBeInTheDocument();
       expect(screen.getByText(/bonus_def_int_td_50p/)).toBeInTheDocument();

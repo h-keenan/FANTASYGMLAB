@@ -1906,6 +1906,18 @@ a {
     border-bottom-width: 0;
     padding-bottom: env(safe-area-inset-bottom, 0px);
   }
+  /* Peek / full (coridian_ pick 1b): peek is one fixed height, so switching pills never moves the sheet; the handle drags to full. */
+  .pqv-modal[data-snap="peek"] {
+    height: calc(56dvh - var(--kb-inset, 0px));
+    max-height: calc(56dvh - var(--kb-inset, 0px));
+  }
+  .pqv-modal[data-snap="full"] {
+    min-height: calc(92dvh - var(--kb-inset, 0px));
+    max-height: calc(92dvh - var(--kb-inset, 0px));
+  }
+  @media (prefers-reduced-motion: no-preference) {
+    .pqv-modal { transition: max-height 240ms var(--ease-out, ease-out), height 240ms var(--ease-out, ease-out); }
+  }
   .pqv-modal > .pqv-scroll {
     flex: 1 1 auto;
     min-height: 0;

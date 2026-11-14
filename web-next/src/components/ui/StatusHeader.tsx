@@ -1,11 +1,12 @@
 "use client";
 
 import Link from "next/link";
-import { useId, useState, type ReactNode } from "react";
+import { useState, type ReactNode } from "react";
 
 import { AccentCard } from "@/components/AccentCard";
 import { ButtonLink, Button } from "@/components/Button";
-import { PlayerRow } from "@/components/PlayerRow";
+import { CompactPlayerCard } from "@/components/ui/CompactPlayerCard";
+import { PlayerAccordionRow } from "@/components/ui/PlayerAccordionRow";
 import {
   statusAttentionAria,
   statusHeaderModel,
@@ -115,66 +116,51 @@ function RowFigure({ item }: { item: StatusAttentionItem }) {
 
 function AttentionRow({ item, first }: { item: StatusAttentionItem; first: boolean }) {
   const [open, setOpen] = useState(false);
-  const panel = useId();
-  const row = (
-    <PlayerRow
-      playerId={item.playerId}
-      name={item.name}
-      position={item.position}
-      tier={item.tier}
-      injuryStatus={item.injuryStatus}
-      avatarSize={36}
-      fallbackLabel={item.name.trim().slice(0, 1)}
-      disableQuickView
-      className="min-w-0 flex-1"
-      trailing={<RowFigure item={item} />}
-    >
-      {item.meta}
-    </PlayerRow>
-  );
   const border = first ? undefined : { borderTop: "var(--border-width-default) solid var(--color-border)" };
+  const player = { id: item.playerId, name: item.name, position: item.position, team: item.team, tier: item.tier };
+  // The shared player anatomy: the row is a PlayerAccordionRow (avatar slot included) when it has a sentence to
+  // expand, otherwise a CompactPlayerCard that links out. One key figure (or one grade) sits at the right edge.
   if (item.detail) {
+    const trailingFact = item.grade
+      ? { key: "grade", label: "GRADE", value: item.grade, tone: "accent" as const }
+      : item.stat
+        ? { key: "stat", label: item.stat.label, value: item.stat.value, tone: item.stat.tone === "success" ? ("success" as const) : item.stat.tone === "danger" ? ("danger" as const) : item.stat.tone === "warning" ? ("warning" as const) : undefined }
+        : null;
     return (
       <li style={border} data-testid="status-attention-row">
-        <button
-          type="button"
-          className="flex w-full items-center gap-1 text-left"
-          style={{ minHeight: "var(--touch-target-min)", color: "inherit" }}
-          aria-expanded={open}
-          aria-controls={panel}
-          aria-label={`${statusAttentionAria(item)}. ${open ? "Collapse" : "Expand"}`}
-          onClick={() => setOpen(!open)}
+        <PlayerAccordionRow
+          player={player}
+          mode={item.grade ? "sim" : "desk"}
+          metaText={item.meta}
+          trailingFact={trailingFact}
+          open={open}
+          onToggle={() => setOpen(!open)}
+          ariaLabel={`${statusAttentionAria(item)}. ${open ? "Collapse" : "Expand"}`}
+          testId="status-attention-accordion"
         >
-          {row}
-          <span aria-hidden="true" className="shrink-0 text-xs" style={{ color: "var(--color-text-muted)" }}>
-            {open ? "▴" : "▾"}
-          </span>
-        </button>
-        {open ? (
-          <div id={panel} className="flex flex-col gap-1 pb-2 pl-1 text-sm" style={{ color: "var(--color-text-secondary)" }}>
-            <p className="m-0">{item.detail}</p>
-            {item.href ? (
-              <Link href={item.href} className="tap-link text-xs font-bold" style={{ color: "var(--color-accent)", textDecoration: "none" }}>
-                Open →
-              </Link>
-            ) : null}
-          </div>
-        ) : null}
+          <p className="m-0 text-sm" style={{ color: "var(--color-text-secondary)" }}>{item.detail}</p>
+          {item.href ? (
+            <Link href={item.href} className="tap-link text-xs font-bold" style={{ color: "var(--color-accent)", textDecoration: "none" }}>
+              Open →
+            </Link>
+          ) : null}
+        </PlayerAccordionRow>
       </li>
     );
   }
+  const card = <CompactPlayerCard player={player} detail={item.meta} trailing={<RowFigure item={item} />} />;
   return (
     <li style={border} data-testid="status-attention-row">
       {item.href ? (
         <Link href={item.href} className="flex w-full items-center gap-1" style={{ minHeight: "var(--touch-target-min)", color: "inherit", textDecoration: "none" }} aria-label={statusAttentionAria(item)}>
-          {row}
+          <span className="min-w-0 flex-1">{card}</span>
           <span aria-hidden="true" data-row-arrow style={{ color: "var(--color-accent)" }}>
             →
           </span>
         </Link>
       ) : (
         <div className="flex w-full items-center" style={{ minHeight: "var(--touch-target-min)" }} aria-label={statusAttentionAria(item)}>
-          {row}
+          <span className="min-w-0 flex-1">{card}</span>
         </div>
       )}
     </li>

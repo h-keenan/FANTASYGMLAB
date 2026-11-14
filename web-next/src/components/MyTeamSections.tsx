@@ -3,11 +3,10 @@
 import { useId, useState, type ReactNode } from "react";
 
 import { HighlightTarget } from "@/components/HighlightTarget";
-import { OvrGauge } from "@/components/OvrGauge";
-import { PlayerRow } from "@/components/PlayerRow";
+import { PlayerAccordionRow, usePlayerAccordion } from "@/components/ui/PlayerAccordionRow";
+import { badgeFromInjury, type BadgeInput } from "@/lib/playerBadges";
 import { PositionBadge } from "@/components/PositionBadge";
 import { ToneBadge } from "@/components/ToneBadge";
-import { ValueStat } from "@/components/ValueStat";
 import { usePlayerQuickView } from "@/context/PlayerQuickViewContext";
 import type { KeeperPlayerInfo, LineupPlayer } from "@/lib/api";
 import type { CompositionSegment, TeamAnalysisRow } from "@/lib/myTeamAnalysis";
@@ -120,11 +119,15 @@ function RosterRow({
   keeper,
   muted,
   showSlot,
+  open,
+  onToggle,
 }: {
   player: LineupPlayer;
   keeper?: KeeperPlayerInfo;
   muted: boolean;
   showSlot: boolean;
+  open: boolean;
+  onToggle: () => void;
 }) {
   const { openPlayer } = usePlayerQuickView();
   const identity = { ...player, sourceLabel: "My Team" };
@@ -132,48 +135,32 @@ function RosterRow({
   const isTeamDefense = (player.position || "").toUpperCase() === "DEF";
   const ineligibleTag = lineupIneligibleTag(player);
   const surplus = surplusText(keeper);
+  const injuryKind = badgeFromInjury(player.injury_label);
   return (
-    <PlayerRow
-      bordered
-      identity={isTeamDefense ? undefined : identity}
-      playerId={player.player_id}
-      name={player.name || "Unknown player"}
-      position={badgeLabel(player, showSlot)}
-      tier={player.tier}
-      injuryStatus={player.injury_label}
-      muted={muted}
-      className="flex-1 min-w-0"
-      trailing={
-        <>
-          <OvrGauge rating={player.overall_rating} size="sm" />
-          <ValueStat value={player.score != null ? Math.round(player.score) : "—"} />
-          {isTeamDefense ? null : (
-            <button
-              type="button"
-              aria-label={`Open ${player.name || "player"}`}
-              onClick={() => openPlayer(identity)}
-              className="inline-flex items-center justify-center -my-3 min-w-[var(--touch-target-min)] min-h-[var(--touch-target-min)]"
-              style={{ background: "none", border: "none", cursor: "pointer" }}
-            >
-              <Chevron />
-            </button>
-          )}
-        </>
-      }
+    <PlayerAccordionRow
+      player={{ id: isTeamDefense ? null : player.player_id, name: player.name || "Unknown player", position: player.position, team: player.team || "FA", age: player.age, tier: player.tier }}
+      mode="desk"
+      value={player.score ?? null}
+      ovr={isTeamDefense ? null : player.overall_rating}
+      positionLabel={badgeLabel(player, showSlot)}
+      badges={injuryKind ? [{ kind: injuryKind, detail: player.injury_label } as BadgeInput] : []}
+      open={open}
+      onToggle={onToggle}
+      onOpenProfile={isTeamDefense ? undefined : () => openPlayer(identity)}
+      testId={muted ? "roster-row-muted" : "roster-row"}
     >
-      {player.team || "FA"} · {player.position}
-      {ineligibleTag ? (
-        <span className="font-bold" style={{ color: "var(--color-warning)" }}>
-          {` · ${ineligibleTag}`}
-        </span>
+      {ineligibleTag || keeper?.is_keeper || surplus ? (
+        <p className="text-xs" style={{ color: "var(--color-text-secondary)" }}>
+          {ineligibleTag ? <span className="font-bold" style={{ color: "var(--color-warning)" }}>{ineligibleTag}</span> : null}
+          {keeper?.is_keeper ? (
+            <span className="ml-1">
+              <ToneBadge label="Keeper" color="var(--color-information)" />
+            </span>
+          ) : null}
+          {surplus ? ` ${surplus}` : ""}
+        </p>
       ) : null}
-      {keeper?.is_keeper ? (
-        <span className="ml-1">
-          <ToneBadge label="Keeper" color="var(--color-information)" />
-        </span>
-      ) : null}
-      {surplus ? ` · ${surplus}` : ""}
-    </PlayerRow>
+    </PlayerAccordionRow>
   );
 }
 
@@ -204,6 +191,7 @@ export function RosterSections({
   emptyText: string;
   topNote?: ReactNode;
 }) {
+  const accordion = usePlayerAccordion();
   const highlighted = tabs.find((tab) => highlightPlayerId && tab.players.some((p) => p.player_id === highlightPlayerId))?.value;
   return (
     <div className="flex flex-col gap-2">
@@ -233,7 +221,7 @@ export function RosterSections({
               <div className="flex flex-col px-1">
                 {tab.players.map((player) => (
                   <HighlightTarget key={player.player_id} active={player.player_id === highlightPlayerId}>
-                    <RosterRow player={player} keeper={keepers?.[player.player_id]} muted={tab.muted ?? false} showSlot={tab.showSlot ?? false} />
+                    <RosterRow player={player} keeper={keepers?.[player.player_id]} muted={tab.muted ?? false} showSlot={tab.showSlot ?? false} open={accordion.isOpen(player.player_id)} onToggle={() => accordion.toggle(player.player_id)} />
                   </HighlightTarget>
                 ))}
               </div>

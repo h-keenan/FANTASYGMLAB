@@ -20,6 +20,9 @@ import GmStanceHeaderButton from '../components/GmStanceHeaderButton';
 import LeagueSwitcherHeaderButton from '../components/LeagueSwitcherHeaderButton';
 import OverallRatingBadge from '../components/OverallRatingBadge';
 import PlayerIdentityRow from '../components/PlayerIdentityRow';
+import PlayerAccordionRow, { usePlayerAccordion } from '../components/PlayerAccordionRow';
+import type { PlayerFact } from '../lib/playerAnatomy';
+import { badgeFromInjury } from '../lib/playerBadges';
 import ScreenInfoNote from '../components/ScreenInfoNote';
 import UsageTrendPill from '../components/UsageTrendPill';
 import ValuesCredit from '../components/ValuesCredit';
@@ -150,7 +153,11 @@ function PlayerRankRow({
   onAddToTrade,
   onFindTrades,
   idpConfidence,
+  open = false,
+  onToggle = () => {},
 }: {
+  open?: boolean;
+  onToggle?: () => void;
   /** Set only for IDP rows: shows the projection basis instead of OVR. */
   idpConfidence?: string;
   player: RankedPlayer;
@@ -218,54 +225,27 @@ function PlayerRankRow({
     );
   }
 
+  // List layout: the shared inline-accordion player row (compact two-line row, one open at a time, swells into a tile).
+  const extraFacts: PlayerFact[] = [];
+  if (player.position && player.position_rank) extraFacts.push({ key: 'posrank', label: 'POS RANK', value: `${player.position}${player.position_rank}` });
+  if (idpConfidence) extraFacts.push({ key: 'basis', label: 'BASIS', value: IDP_CONFIDENCE_LABEL[idpConfidence] ?? idpConfidence });
+  if (player.usage_trend) extraFacts.push({ key: 'usage', label: 'USAGE', value: player.usage_trend.label ?? 'Trending' });
+  const injuryKind = badgeFromInjury(injury.label);
   return (
-    <View
-      style={[
-        styles.playerRow,
-        isFirst && styles.playerRowFirst,
-        isLast && styles.playerRowLast,
-        !isLast && styles.playerRowDivider,
-      ]}
-    >
-      <View style={styles.playerIdentity}>
-        <PlayerIdentityRow
-          playerId={player.player_id}
-          name={player.name}
-          position={player.position}
-          team={player.team}
-          tier={player.tier}
-          slot={player.overall_rank != null ? String(player.overall_rank) : '—'}
-          opportunityLabel={player.opportunity_label}
-          injuryLabel={injury.label}
-          injuryTone={injury.tone}
-          ruledOut={injury.ruledOut}
-          wrapName
-          onPress={onPress}
-          showDivider={false}
-        />
-      </View>
-      <PressableScale onPress={onPress} style={styles.playerTrailing}>
-        <AppText style={styles.playerScore}>{scoreText}</AppText>
-        <View style={styles.playerTrailingChips}>
-          {player.position && player.position_rank ? (
-            <View style={styles.positionRankPill}>
-              <AppText style={styles.positionRankText}>
-                {player.position}
-                {player.position_rank}
-              </AppText>
-            </View>
-          ) : null}
-          {idpConfidence ? (
-            <View style={styles.positionRankPill}>
-              <AppText style={styles.positionRankText}>{IDP_CONFIDENCE_LABEL[idpConfidence] ?? idpConfidence}</AppText>
-            </View>
-          ) : (
-            <OverallRatingBadge rating={player.overall_rating} positionRank={player.position_rank} />
-          )}
-          {player.usage_trend ? <UsageTrendPill trend={player.usage_trend} /> : null}
-        </View>
-      </PressableScale>
-      {tradeActions}
+    <View style={[isFirst && styles.playerRowFirst, isLast && styles.playerRowLast]}>
+      <PlayerAccordionRow
+        player={{ id: player.player_id, name: player.name ?? 'Player', position: player.position, team: player.team, age: player.age, tier: player.tier }}
+        mode="desk"
+        value={player.score ?? null}
+        ovr={idpConfidence ? null : player.overall_rating ?? null}
+        extraFacts={extraFacts}
+        badges={injuryKind ? [{ kind: injuryKind, detail: injury.label }] : []}
+        open={open}
+        onToggle={onToggle}
+        onOpenProfile={onPress}
+      >
+        {tradeActions}
+      </PlayerAccordionRow>
     </View>
   );
 }
@@ -290,6 +270,7 @@ export default function PlayersScreen({ route, navigation }: Props) {
   const [reloadToken, setReloadToken] = useState(0);
   const { viewMode, setViewMode } = usePlayerListViewMode('players');
   const ownership = useRosterOwnership(leagueId);
+  const accordion = usePlayerAccordion();
 
   useScreenHeaderTitle(navigation, 'Players', leagueName);
 
@@ -440,6 +421,7 @@ export default function PlayersScreen({ route, navigation }: Props) {
           key={viewMode}
           data={filtered}
           keyExtractor={(item) => item.player_id}
+          extraData={accordion.openId}
           numColumns={viewMode === 'grid' ? 2 : 1}
           columnWrapperStyle={viewMode === 'grid' ? styles.gridRow : undefined}
           contentContainerStyle={[styles.listContent, { paddingBottom: orbClearance }]}
@@ -458,6 +440,8 @@ export default function PlayersScreen({ route, navigation }: Props) {
                 isFirst={index === 0}
                 isLast={index === filtered.length - 1}
                 grid={viewMode === 'grid'}
+                open={accordion.isOpen(item.player_id)}
+                onToggle={() => accordion.toggle(item.player_id)}
                 onPress={() => openQuickView(item, { leagueId, leagueName })}
                 onAddToTrade={
                   shortcuts.canAddToTrade

@@ -1,10 +1,11 @@
 "use client";
 
 import { PageTabBar } from "@/components/PageTabBar";
-import { PositionBadge } from "@/components/PositionBadge";
 import { EmptyState } from "@/components/EmptyState";
-import { PlayerIdentity } from "@/components/PlayerRow";
-import { ValueStat } from "@/components/ValueStat";
+import { PlayerAccordionRow, usePlayerAccordion } from "@/components/ui/PlayerAccordionRow";
+import { usePlayerQuickView } from "@/context/PlayerQuickViewContext";
+import type { PlayerFact } from "@/lib/playerAnatomy";
+import { badgeFromInjury, type BadgeInput } from "@/lib/playerBadges";
 import { useMemo, useState } from "react";
 import { mergeSearchMatches, useLeaguePlayerSearch } from "@/lib/leaguePlayerSearch";
 
@@ -16,7 +17,6 @@ import {
   isIdpPositionFilter,
   playersPositionOptions,
 } from "@/lib/idpPresentation";
-import { OvrGauge } from "@/components/OvrGauge";
 import { PickRow, draftPickRowProps } from "@/components/PickRow";
 import { PillRow } from "@/components/PillRow";
 import { CompactModule } from "@/components/ui/CompactModule";
@@ -25,7 +25,7 @@ import { FilterSheet } from "@/components/ui/FilterSheet";
 import { singleValue, valuesFromSingles, type FilterGroup, type FilterValues } from "@/lib/filterSheet";
 import { groupPicksBySeason, visibleDraftPicks } from "@/lib/draftCenterPresentation";
 import { gamePlanTileHref } from "@/lib/gamePlanPresentation";
-import { waiverInjuryDisplay, formatWaiverScore } from "@/lib/waiversPresentation";
+import { waiverInjuryDisplay } from "@/lib/waiversPresentation";
 import {
   OVERALL_RATING_SORT_KEY,
   PLAYERS_AGE_FILTERS,
@@ -106,61 +106,14 @@ import { PageTitle } from "@/components/PageTitle";
 const PREVIEW_ROWS = 60;
 
 
-/** The selected sort column's value for this player, Madden-style — hidden
- * entirely for the two baseline sort keys (Value/OVR already render their
- * own tile below) and for a stat this player simply has no value for (a
- * missing stat already sorts them to the bottom; showing nothing here is
- * the same fail-open choice, not a "—" that reads as broken). `sortMode`
- * picks raw value vs. this stat's own position-group percentile, matching
- * whatever the board is actually sorted by. */
-function SortedStatTile({
-  player,
-  sortOption,
-  sortMode,
-}: {
-  player: RankedPlayer;
-  sortOption: PlayersSortOption;
-  sortMode: PlayersSortMode;
-}) {
+/** The selected sort column's value for this player, Madden-style, as an expanded-tile fact. Hidden for the two
+ * baseline sort keys (Value/OVR are already facts) and for a stat this player has no value for. */
+function sortedStatFact(player: RankedPlayer, sortOption: PlayersSortOption, sortMode: PlayersSortMode): PlayerFact | null {
   if (sortOption.key === VALUE_SORT_KEY || sortOption.key === OVERALL_RATING_SORT_KEY) return null;
   const stat = findPlayersStat(player, sortOption.key);
   if (!stat) return null;
-  const display =
-    sortMode === "percentile"
-      ? stat.percentile != null
-        ? formatPlayersPercentile(stat.percentile)
-        : "—"
-      : formatPlayersStatValue(stat);
-  return (
-    <div className="flex flex-col items-end gap-0.5">
-      <span className="text-[0.6875rem] uppercase font-bold" style={{ color: "var(--color-text-muted)" }}>
-        {stat.label}
-        {sortMode === "percentile" ? " pct" : ""}
-      </span>
-      <span className="text-sm font-extrabold" style={{ color: "var(--color-text-secondary)" }}>
-        {display}
-      </span>
-    </div>
-  );
-}
-
-/** Icon-only row actions (compare / add to trade): labelled via aria-label + title on the link. */
-function RowActionGlyph({ name }: { name: "compare" | "trade" }) {
-  return (
-    <svg width={18} height={18} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.9} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-      {name === "compare" ? (
-        <>
-          <path d="M8 4v16M4 8l4-4 4 4" />
-          <path d="M16 20V4M12 16l4 4 4-4" />
-        </>
-      ) : (
-        <>
-          <path d="M4 8h13M13 4l4 4-4 4" />
-          <path d="M20 16H7M11 12l-4 4 4 4" />
-        </>
-      )}
-    </svg>
-  );
+  const display = sortMode === "percentile" ? (stat.percentile != null ? formatPlayersPercentile(stat.percentile) : "—") : formatPlayersStatValue(stat);
+  return { key: `stat-${stat.label}`, label: `${stat.label}${sortMode === "percentile" ? " pct" : ""}`.toUpperCase(), value: display };
 }
 
 function PlayerRow({
@@ -170,6 +123,8 @@ function PlayerRow({
   sortOption,
   sortMode,
   idpConfidence,
+  open,
+  onToggle,
 }: {
   player: RankedPlayer;
   leagueId: string;
@@ -180,82 +135,48 @@ function PlayerRow({
    * rank/OVR, and skip Compare / Add to Trade (those engines do not value
    * defenders yet). */
   idpConfidence?: string;
+  open: boolean;
+  onToggle: () => void;
 }) {
+  const { openPlayer } = usePlayerQuickView();
   const injury = waiverInjuryDisplay(player.injury_status);
+  const extraFacts: PlayerFact[] = [];
+  const sorted = sortedStatFact(player, sortOption, sortMode);
+  if (sorted) extraFacts.push(sorted);
+  if (player.position && player.position_rank) extraFacts.push({ key: "posrank", label: "POS RANK", value: `${player.position}${player.position_rank}` });
+  if (idpConfidence) extraFacts.push({ key: "basis", label: "BASIS", value: IDP_CONFIDENCE_LABEL[idpConfidence] ?? idpConfidence });
+  const trade = idpConfidence ? null : gamePlanTileHref("trade-analyzer", leagueId, leagueName, player.player_id);
+  // coridian_, 2026-10-20: "a way when searching for players to quickly add that player to a trade" (Trade Analyzer
+  // ?playerId= deep link). It is the tile's one primary action; Compare is the secondary link.
   return (
-    <div
-      className="flex flex-wrap items-center justify-between gap-x-3 gap-y-3 py-3"
-      style={{ borderBottom: "var(--border-width-default) solid var(--color-border)" }}
+    <PlayerAccordionRow
+      player={{ id: player.player_id, name: player.name || `Player ${player.player_id}`, position: player.position, team: player.team, age: player.age, tier: player.tier }}
+      mode="desk"
+      value={player.score ?? null}
+      ovr={idpConfidence ? null : player.overall_rating ?? null}
+      extraFacts={extraFacts}
+      badges={injury.label ? (() => { const kind = badgeFromInjury(injury.label); return kind ? [{ kind, detail: injury.label } as BadgeInput] : []; })() : []}
+      open={open}
+      onToggle={onToggle}
+      onOpenProfile={() => openPlayer({ ...player, name: player.name || `Player ${player.player_id}`, sourceLabel: "Players", leagueId, leagueName })}
+      primaryAction={
+        trade ? (
+          <a href={trade} className="inline-flex items-center justify-center px-3 text-sm font-extrabold" style={{ minHeight: "var(--touch-target-min)", background: "var(--color-action)", color: "#1a1300", borderRadius: "var(--radius-control)" }}>
+            Trade ideas
+          </a>
+        ) : null
+      }
     >
-      <PlayerIdentity
-        identity={{ ...player, sourceLabel: "Players", leagueId, leagueName }}
-        playerId={player.player_id}
-        name={player.name || `Player ${player.player_id}`}
-        position={player.position}
-        tier={player.tier}
-        injuryStatus={injury.label}
-        className="flex-1 basis-full sm:basis-48 min-w-0"
-      >
-        {player.team || "—"}
-      </PlayerIdentity>
-      <div className="flex flex-wrap items-center gap-2 min-w-0 max-w-full">
-        <SortedStatTile player={player} sortOption={sortOption} sortMode={sortMode} />
-        {/* coridian_, 2026-10-19: "anywhere theres a value of a player it
-            should say in small print value above it so its not glaring
-            but its there in case someone gets confused" */}
-        <ValueStat value={formatWaiverScore(player.score)} />
-        {idpConfidence ? (
-          <span
-            className="px-1.5 py-0.5 text-xs font-bold"
-            style={{ background: "var(--color-surface-muted)", color: "var(--color-text-secondary)" }}
-            title="How much real defensive play the projection rests on."
-          >
-            {IDP_CONFIDENCE_LABEL[idpConfidence] ?? idpConfidence}
-          </span>
-        ) : (
-          <OvrGauge rating={player.overall_rating ?? null} size="sm" />
-        )}
-        {player.position && player.position_rank ? (
-          <PositionBadge position={player.position} rank={player.position_rank} title={`Ranked #${player.position_rank} among all ${player.position}s — overall, not just this league or your roster.`} />
-        ) : null}
-        {idpConfidence ? null : (
-          <a
-            href={`/player-compare/${encodeURIComponent(leagueId)}?a=${encodeURIComponent(player.player_id)}&name=${encodeURIComponent(leagueName)}`}
-            aria-label="Compare"
-            title="Compare"
-            className="inline-flex items-center justify-center min-h-[var(--touch-target-min)] min-w-[var(--touch-target-min)]"
-            style={{ color: "var(--color-text-secondary)", border: "var(--border-width-default) solid var(--color-border)", borderRadius: "var(--radius-control)" }}
-          >
-            <RowActionGlyph name="compare" />
-          </a>
-        )}
-        {/* coridian_, 2026-10-20: "a way when searching for players to
-            quickly add that player to a trade, where it inputs it into the
-            trade hub into the appropriate section" — deep-links to Trade
-            Analyzer (the manual send/receive builder, not Trade Hub's
-            AI-suggested ideas) with ?playerId=, the same deep-link
-            convention gamePlanTileHref already establishes for Waivers/
-            Trade Hub. TradeAnalyzerContent reads it on mount, finds which
-            roster owns this player, and pre-populates the builder — see
-            that component's own docstring. */}
-        {idpConfidence ? null : (
-          <a
-            href={gamePlanTileHref("trade-analyzer", leagueId, leagueName, player.player_id)}
-            aria-label="Add to Trade"
-            title="Add to Trade"
-            className="inline-flex items-center justify-center min-h-[var(--touch-target-min)] min-w-[var(--touch-target-min)]"
-            style={{
-              color: "var(--color-accent)",
-              border: "var(--border-width-default) solid var(--color-accent)",
-              borderRadius: "var(--radius-control)",
-              background: "color-mix(in srgb, var(--color-accent) 12%, transparent)",
-            }}
-          >
-            <RowActionGlyph name="trade" />
-          </a>
-        )}
-      </div>
-    </div>
+      {idpConfidence ? null : (
+        <a
+          href={`/player-compare/${encodeURIComponent(leagueId)}?a=${encodeURIComponent(player.player_id)}&name=${encodeURIComponent(leagueName)}`}
+          className="text-xs font-bold"
+          style={{ color: "var(--color-accent)" }}
+        >
+          Compare with another player
+        </a>
+      )}
+    </PlayerAccordionRow>
   );
 }
 
@@ -279,6 +200,7 @@ export function PlayersContent({
   /** Valuation lens the `data` rankings were fetched under; used for name search. */
   lens?: string;
 }) {
+  const accordion = usePlayerAccordion();
   const [search, setSearch] = useState("");
   const [position, setPosition] = useState("ALL");
   const [ageFilter, setAgeFilter] = useState<PlayersAgeFilter>("ALL");
@@ -478,6 +400,8 @@ export function PlayersContent({
               {visible.map((player) => (
                 <PlayerRow
                   key={player.player_id}
+                  open={accordion.isOpen(player.player_id)}
+                  onToggle={() => accordion.toggle(player.player_id)}
                   player={player}
                   leagueId={leagueId}
                   leagueName={leagueName}
