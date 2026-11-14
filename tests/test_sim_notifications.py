@@ -57,7 +57,7 @@ def test_items_have_a_screen_to_open_and_a_week():
     gid = _game(c)
     c.post(f"/v1/sim/games/{gid}/advance", headers=H)
     for item in _get(c, gid)["items"]:
-        assert item["target"]["screen"] in ("trades", "team", "home", "players", "league", "draft")
+        assert item["target"]["screen"] in ("trades", "team", "home", "players", "league", "draft", "achievements")
         assert isinstance(item["week"], int) and item["icon"] and item["headline"]
 
 

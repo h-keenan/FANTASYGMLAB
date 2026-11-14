@@ -342,7 +342,7 @@ def add_routes(router: APIRouter, ctx: GameApiCtx) -> None:
     ach_cache: "OrderedDict[tuple, dict[str, Any]]" = OrderedDict()
     ach_lock = threading.Lock()
 
-    def _ach_ledgers(store, uid: str, gid: str, snap, state, new_events=None) -> list[dict[str, Any]]:
+    def _ach_ledgers(store, uid: str, gid: str, snap, state, new_events=None, read_log: bool = False) -> list[dict[str, Any]]:
         root = snap.root
         n_past = max(0, int(state.season_no) - 1)
         akey = repr([(a.get("season_no"), (a.get("you") or {}).get("wins"), (a.get("you") or {}).get("pf"),
@@ -353,11 +353,17 @@ def add_routes(router: APIRouter, ctx: GameApiCtx) -> None:
         if entry is not None and (entry["n_past"] != n_past or entry["akey"] != akey or entry["seq"] > int(state.seq)):
             entry = None
         if entry is not None and entry["seq"] < int(state.seq):
+            user = root.user_team.tid
             if new_events and int(new_events[0]["seq"]) == entry["seq"] and int(new_events[-1]["seq"]) + 1 == int(state.seq):
                 fresh = list(new_events)
-            else:
+            elif read_log:
                 fresh = store.load_events(uid, gid, entry["seq"])
-            user = root.user_team.tid
+            else:
+                # A plain view never reads the log (a warm read is the version check and nothing else): the moves the state
+                # still remembers are merged in, and the next advance catches the cache up exactly.
+                seen = {json.dumps(m, sort_keys=True) for m in entry["moves"]}
+                extra = [m for m in ach._moves_from_transactions(state, user) if json.dumps(m, sort_keys=True) not in seen]
+                return [*entry["past"], ach.ledger_from_state(root, state, entry["moves"] + extra)]
             entry = {**entry, "moves": entry["moves"] + [m for m in (ach.event_move(e, user) for e in fresh) if m], "seq": int(state.seq)}
         if entry is None:
             ledgers, moves = ach.fold_ledgers(root, store.load_events(uid, gid, 0))
@@ -371,11 +377,11 @@ def add_routes(router: APIRouter, ctx: GameApiCtx) -> None:
                 ach_cache.popitem(last=False)
         return [*entry["past"], ach.ledger_from_state(root, state, entry["moves"])]
 
-    def _ach(store, uid: str, gid: str, snap, state, *, new_events=None, weeks: tuple[int, int] | None = None) -> dict[str, Any]:
+    def _ach(store, uid: str, gid: str, snap, state, *, new_events=None, read_log: bool = False, weeks: tuple[int, int] | None = None) -> dict[str, Any]:
         """``{"items", "counts"}`` plus, with ``weeks``, ``new`` / ``milestones`` for those weeks of the season. Never raises."""
 
         try:
-            ledgers = _ach_ledgers(store, uid, gid, snap, state, new_events)
+            ledgers = _ach_ledgers(store, uid, gid, snap, state, new_events, read_log)
             out = ach.build(snap.root, ledgers)
             if weeks is not None:
                 out = {**out, **ach.week_view(ledgers, out["items"], weeks[0], weeks[1])}
@@ -1005,7 +1011,7 @@ def add_routes(router: APIRouter, ctx: GameApiCtx) -> None:
             snap = snap.season_view(state.view_no)  # the season may have ended into the offseason
             out = {**_env(pro, state), "recap": recaps[0], "also_played": recaps[1:], "replayed": False,
                    "game": game_json({**row, "status": state.status}, snap, state, pro),
-                   "achievements": _ach(store, uid, gid, snap, state, new_events=em.events, weeks=(int(recaps[0]["week"]), int(recaps[-1]["week"])))}
+                   "achievements": _ach(store, uid, gid, snap, state, new_events=em.events, read_log=True, weeks=(int(recaps[0]["week"]), int(recaps[-1]["week"])))}
             pending.finish()
             return out
 
@@ -1046,7 +1052,7 @@ def add_routes(router: APIRouter, ctx: GameApiCtx) -> None:
             pending = commit(store, uid, gid, snap, state, em, checkpoint=True, defer=True)
             snap = snap.season_view(state.view_no)
             out = {**_env(pro, state), **result, "game": game_json({**row, "status": state.status}, snap, state, pro),
-                   "achievements": _ach(store, uid, gid, snap, state, new_events=em.events, weeks=(first_week, max(first_week, int(state.week) - 1)))}
+                   "achievements": _ach(store, uid, gid, snap, state, new_events=em.events, read_log=True, weeks=(first_week, max(first_week, int(state.week) - 1)))}
             pending.finish()
             return out
 
