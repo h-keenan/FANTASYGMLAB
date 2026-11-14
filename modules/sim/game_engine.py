@@ -15,7 +15,7 @@ Engine events: ``waiver_result``, ``trade`` (source ``ai_ai``), ``drop``,
 
 from __future__ import annotations
 
-from typing import Any, Sequence
+from typing import Any, Callable, Sequence
 
 from modules.sim import game_dynasty as dyn
 from modules.sim.game_actions import ai_manage_reserves, execute_trade
@@ -494,13 +494,15 @@ def _team_score(lineup: Sequence[Sequence[Any]], pts: dict[str, float]) -> float
 
 def _lineup_rows(
     snap: GameSnapshot, status_of: dict[str, str], lineup: Sequence[Sequence[Any]], roster: Sequence[str],
-    played: dict[str, PlayerWeek], with_bench: bool,
+    played: dict[str, PlayerWeek], with_bench: bool, proj_of: Callable[[str], float] | None = None,
 ) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
     def row(slot: str | None, pid: str) -> dict[str, Any]:
         pw = played.get(pid)
         status = status_of[pid]
         return {
             "slot": slot, "player": _brief(snap, pid), "pts": round(pw.points, 2) if pw else 0.0,
+            # the projection the game showed for this week (what the lineup was set against), so a recap row never has to guess
+            "proj": round(proj_of(pid), 2) if proj_of else None,
             "stats": dict(pw.stats) if pw and pw.stats else None,
             "flag": status if status != "healthy" else (None if pw else "inactive"),
         }
@@ -515,7 +517,8 @@ def _lineup_rows(
 
 def _your_game(snap, ev, state, user, games, lineups, played, pts, status_of, ros_before, alive_before, kind, auto_filled):
     mine = next((g for g in games if user in (g["home"], g["away"])), None)
-    starters, bench = _lineup_rows(snap, status_of, lineups[user], state.rosters[user], played, True)
+    proj_of = lambda pid: ev.proj(pid, state.week)  # noqa: E731  (ev is the pre-week evaluator: the number shown going into the week)
+    starters, bench = _lineup_rows(snap, status_of, lineups[user], state.rosters[user], played, True, proj_of)
     if mine is None:
         if kind == "playoff" and user in alive_before:
             return {"result": "bye", "starters": starters, "bench": bench[:10]}
@@ -528,7 +531,7 @@ def _your_game(snap, ev, state, user, games, lineups, played, pts, status_of, ro
         result = "win" if mine["winner"] == user else "loss"
     else:
         result = "win" if you_pts > opp_pts + 1e-9 else "loss" if you_pts < opp_pts - 1e-9 else "tie"
-    o_starters, _ = _lineup_rows(snap, status_of, lineups[opp], state.rosters[opp], played, False)
+    o_starters, _ = _lineup_rows(snap, status_of, lineups[opp], state.rosters[opp], played, False, proj_of)
     out = {
         "opponent_id": opp, "opponent_name": snap.team(opp).name, "your_pts": you_pts,
         "opp_pts": opp_pts, "result": result, "starters": starters, "bench": bench[:10],

@@ -6,7 +6,6 @@ import { Button } from "@/components/Button";
 import { SimPlayerChip, SimPlayerLine, SimToneBadge, simToneColor, type SimCtx } from "@/components/SimGameParts";
 import { SimWeekRecapView } from "@/components/SimGameRecap";
 import { StoryCarousel, type StoryPage } from "@/components/ui/StoryCarousel";
-import { simListStats } from "@/lib/simDraft";
 import { simFmtPts, simPlayoffRoundLabel, simResultLabel, simResultTone, simTeamNameMap, type SimWeekRecap } from "@/lib/simGame";
 import {
   simLeagueHighlights,
@@ -14,6 +13,7 @@ import {
   simPositionTotals,
   simRecapInjuryModel,
   simRecapPageKeys,
+  simRecapProj,
   simRecapResultModel,
   simTopStarters,
   type SimRecapFacts,
@@ -136,7 +136,7 @@ export function SimWeekRecapStory({
           </ul>
           <div className="flex flex-col">
             {simTopStarters(game.starters).map((s, i) => (
-              <SimPlayerLine key={`${s.slot}-${i}`} player={s.player!} stats={[{ key: "pts", label: "Pts", value: simFmtPts(s.pts), tone: s.pts >= s.player!.projection ? "success" : undefined }, ...simListStats(s.player!, { adp: false }).slice(0, 1)]} onOpen={ctx.openPlayer} />
+              <SimPlayerLine key={`${s.slot}-${i}`} player={s.player!} stats={[{ key: "pts", label: "Pts", value: simFmtPts(s.pts), tone: simRecapProj(s) != null && s.pts >= simRecapProj(s)! ? "success" : undefined }, { key: "proj", label: "Proj", value: simFmtPts(simRecapProj(s)) }]} onOpen={ctx.openPlayer} />
             ))}
           </div>
         </>

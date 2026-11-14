@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import type { SimGamePlayer, SimWeekRecap } from "./simGame";
-import { STORY_ITEMS, simLeagueHighlights, simNextWeekModel, simPositionTotals, simRecapInjuryModel, simRecapPageKeys, simRecapResultModel, simTopStarters } from "./simRecapStory";
+import { STORY_ITEMS, simLeagueHighlights, simNextWeekModel, simPositionTotals, simRecapInjuryModel, simRecapPageKeys, simRecapProj, simRecapResultModel, simTopStarters } from "./simRecapStory";
 
 const p = (id: string, name: string, pos: string, projection = 10) => ({ id, name, pos, projection }) as unknown as SimGamePlayer;
 const starter = (slot: string, player: SimGamePlayer | null, pts: number, flag: "bye" | "out" | null = null) => ({ slot, player, pts, flag }) as never;
@@ -58,6 +58,13 @@ describe("page models", () => {
     expect(simPositionTotals(g.starters).map((r) => [r.pos, r.pts, r.count])).toEqual([["QB", 25, 1], ["RB", 28, 2], ["WR", 0, 1]]);
     expect(simTopStarters(g.starters).map((s) => s.player!.name)).toEqual(["Quinn", "Ross", "Wade"]);
     expect(simTopStarters(g.starters, 2)).toHaveLength(2);
+  });
+  it("matchup: the row's PROJ is the projection the server stamped for that week, never a guess", () => {
+    expect(simRecapProj({ proj: 14.23 })).toBe(14.23);
+    expect(simRecapProj({ proj: 0 })).toBe(0);
+    expect(simRecapProj({})).toBeNull(); // a recap saved before the server sent it
+    expect(simRecapProj({ proj: null })).toBeNull();
+    expect(simRecapProj({ proj: Number.NaN })).toBeNull();
   });
   it("injuries: yours first, capped; zero starters named", () => {
     const hurt = (id: string, mine: boolean, weeks: number) => ({ player: p(id, id, "RB"), weeks, team_id: "x", is_yours: mine });
