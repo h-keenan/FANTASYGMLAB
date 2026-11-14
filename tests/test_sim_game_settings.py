@@ -731,7 +731,10 @@ def test_too_long_team_name_is_rejected():
 
 # ------------------------------------------------------------------ flex eligibility (RB/WR/TE default, RB/WR alternative)
 
-OLD_SAVE_MODEL = "player-model-5"  # the model the golden save was created under; saves record their model id, so it replays on v5 forever
+# The model id a save records is "player_model-<generation>"; a bare "player-model-5" is not an id, resolves to the CURRENT default
+# and silently plays on whatever model is newest (that was the whole drift from 1c4fc89f to 228f0621: model 6 became the default).
+OLD_SAVE_MODEL = "player_model-player-model-5"
+OLD_SAVE_DIGEST = "1c4fc89f0f26d9a75c02265a03c0b7252ab92a0a511ead91893a2e0110471fec"  # captured on main before flex_type / kd_v / limit_v / names_v / model 6
 
 
 def _played_digest(snap):
@@ -747,7 +750,7 @@ def _golden_snapshot():
 
 def _as_old_save(snap):
     """The same game as a save from before flex_type / kd_v: its settings carry neither key."""
-    raw = {k: v for k, v in snap.settings.to_dict().items() if k not in ("flex_type", "kd_v")}
+    raw = {k: v for k, v in snap.settings.to_dict().items() if k not in ("flex_type", "kd_v", "limit_v", "names_v")}
     return dataclasses.replace(snap, settings=GameSettings.from_dict(raw))
 
 
@@ -762,6 +765,9 @@ def test_old_save_replays_identically_to_a_game_with_the_new_flags():
     old = _as_old_save(_golden_snapshot())
     assert "flex_type" not in old.settings.to_dict() and "kd_v" not in old.settings.to_dict()
     assert old.settings.non_tradable == ("K", "DEF")
+    assert old.settings.limit_v == 0 and old.settings.names_v == 0 and old.settings.kd_v == 0 and old.scoring_model == OLD_SAVE_MODEL
+    # Explicit old settings on the old model reproduce the digest captured before any of the new flags or model 6 existed.
+    assert _played_digest(old) == OLD_SAVE_DIGEST
     # A new game (flex_type default, kd_v 1) on the same model plays identically to the save without the keys: the flags change
     # nothing until used. (Not an absolute pin: any engine change on main legitimately moves a digest; verified equal to
     # origin/main's own digest for this save when this PR was cut.)
