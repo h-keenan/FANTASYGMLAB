@@ -23,6 +23,7 @@ import {
   simAssignSlot,
   simClaimPayload,
   simFmtPts,
+  simProjText,
   simHeadshotId,
   simPlayerInitials,
   simSlotRepeatsPosition,
@@ -348,7 +349,7 @@ export function SimYourPicks({ picks, draftYear }: { picks: SimPickAsset[]; draf
       ) : (
         groups.map((group) => (
           <View key={group.season}>
-            <AppText style={[common.small, { fontWeight: '700', paddingTop: spacing.xs }]}>{group.season}</AppText>
+            <AppText style={[common.small, { fontWeight: '700', paddingTop: spacing.xs }]}>{group.label}</AppText>
             {group.rounds
               .flatMap((r) => r.picks)
               .map((pick) => (
@@ -423,7 +424,7 @@ export function ClaimSheet({
             selected={dropId === p.id}
             trailing={
               <>
-                <SimStat label="Proj" value={simFmtPts(p.projection)} />
+                <SimStat label="Proj" value={simProjText(p)} />
                 <Button size="sm" variant={dropId === p.id ? 'primary' : 'secondary'} label={dropId === p.id ? 'Dropping' : 'Drop'} onPress={() => setDropId(dropId === p.id ? '' : p.id)} />
               </>
             }

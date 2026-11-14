@@ -9,7 +9,7 @@ import { SimSectionTitle } from "@/components/SimGameParts";
 import { SkeletonCard } from "@/components/Skeleton";
 import { ToneBadge } from "@/components/ToneBadge";
 import { api } from "@/lib/api";
-import type { SimTeamHistoryPick, SimTeamHistoryResponse } from "@/lib/simGame";
+import { simSeasonText, type SimTeamHistoryPick, type SimTeamHistoryResponse } from "@/lib/simGame";
 import { simDraftSlotText, simSeasonRecord, simTeamMoveText, simWhenLabel } from "@/lib/simHistory";
 
 function PickRow({ pick }: { pick: SimTeamHistoryPick }) {
@@ -75,7 +75,7 @@ export function SimTeamHistory({ gameId, teamId }: { gameId: string; teamId: str
               <li key={s.season}>
                 <AccentCard accent={s.champion ? "var(--color-premium)" : "var(--color-border-strong)"} compact as="div">
                   <div className="flex items-center justify-between gap-2">
-                    <span className="text-sm font-extrabold">{s.year ?? `Season ${s.season}`}</span>
+                    <span className="text-sm font-extrabold">{simSeasonText(s) || `Season ${s.season}`}</span>
                     <span className="flex items-center gap-2">
                       {s.champion ? <ToneBadge label="Champion" color="var(--color-premium)" size="xs" /> : null}
                       <span className="text-sm font-bold tabular-nums">{simSeasonRecord(s)}</span>
@@ -97,8 +97,8 @@ export function SimTeamHistory({ gameId, teamId }: { gameId: string; teamId: str
       ) : null}
 
       {classes.map((c) => (
-        <section key={c.year ?? "rookies"} className="flex flex-col gap-1" aria-label={`${c.year ?? ""} rookie draft`}>
-          <SimSectionTitle glyph="spark" tone="accent">{c.year ? `${c.year} rookie draft` : "Rookie draft"}</SimSectionTitle>
+        <section key={c.year ?? "rookies"} className="flex flex-col gap-1" aria-label={`${c.season_label || c.year || ""} rookie draft`}>
+          <SimSectionTitle glyph="spark" tone="accent">{c.year ? `${c.season_label || c.year} rookie draft` : "Rookie draft"}</SimSectionTitle>
           <ul>{c.picks.map((p) => <PickRow key={p.id} pick={p} />)}</ul>
         </section>
       ))}

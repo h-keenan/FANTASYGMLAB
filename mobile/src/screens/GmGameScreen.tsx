@@ -95,6 +95,7 @@ import {
   simTradeSeedFor,
   type SimTradeSeed,
   type SimToResponse,
+  simSeasonText,
 } from '../lib/simGame';
 import { simToProgressLabel, simToRemaining } from '../lib/simTo';
 import { simScrollKey, simShouldScrollTop } from '../lib/simScroll';
@@ -601,6 +602,7 @@ export default function GmGameScreen({ navigation }: Props) {
           <SimPlayerSheet
             gameId={game.id}
             startYear={game.settings.start_year}
+            seasonLabel={game.dynasty ? simSeasonText(game.dynasty) : null}
             player={sheetPlayer}
             onClose={() => setSheetPlayer(null)}
             actions={

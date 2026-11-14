@@ -11,7 +11,7 @@ import { SimSectionTitle, createSimStyles } from './SimGameParts';
 import ToneBadge from './ToneBadge';
 import { useThemeMode } from '../context/ThemeModeContext';
 import { api } from '../lib/api';
-import type { SimTeamHistoryPick, SimTeamHistoryResponse } from '../lib/simGame';
+import { simSeasonText, type SimTeamHistoryPick, type SimTeamHistoryResponse } from '../lib/simGame';
 import { simDraftSlotText, simSeasonRecord, simTeamMoveText, simWhenLabel } from '../lib/simHistory';
 
 function PickRow({ pick }: { pick: SimTeamHistoryPick }) {
@@ -82,7 +82,7 @@ export function SimTeamHistory({ gameId, teamId }: { gameId: string; teamId: str
           {seasons.map((s) => (
             <AccentCard key={s.season} accent={s.champion ? colors.premium : colors.borderStrong} compact>
               <View style={common.rowBetween}>
-                <AppText style={common.bodyStrong}>{s.year ?? `Season ${s.season}`}</AppText>
+                <AppText style={common.bodyStrong}>{simSeasonText(s) || `Season ${s.season}`}</AppText>
                 <View style={common.row}>
                   {s.champion ? <ToneBadge label="Champion" color={colors.premium} size="xs" /> : null}
                   <AppText style={common.bodyStrong}>{simSeasonRecord(s)}</AppText>
@@ -106,8 +106,8 @@ export function SimTeamHistory({ gameId, teamId }: { gameId: string; teamId: str
       ) : null}
 
       {classes.map((c) => (
-        <View key={c.year ?? 'rookies'} style={common.tight} accessibilityLabel={`${c.year ?? ''} rookie draft`}>
-          <SimSectionTitle glyph="spark" title={c.year ? `${c.year} rookie draft` : 'Rookie draft'} />
+        <View key={c.year ?? 'rookies'} style={common.tight} accessibilityLabel={`${c.season_label || c.year || ''} rookie draft`}>
+          <SimSectionTitle glyph="spark" title={c.year ? `${c.season_label || c.year} rookie draft` : 'Rookie draft'} />
           {c.picks.map((p) => (
             <PickRow key={p.id} pick={p} />
           ))}

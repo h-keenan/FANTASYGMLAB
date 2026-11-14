@@ -35,6 +35,7 @@ def test_old_dynasty_saves_keep_their_length_and_version():
     s = GameSettings.parse({"mode": "dynasty", "seasons": 4})
     raw = s.to_dict()
     raw["dynasty_v"] = 2
+    raw.pop("names_v", None)
     old = GameSettings.from_dict(raw)
     assert old.seasons == 4 and old.dynasty_v == 2 and not old.league_anchor and old.dynasty
 
@@ -44,7 +45,7 @@ def _golden(seed, seasons):
 
     def v2(seed=base.SEED, **kw):
         snap = orig(seed, **kw)
-        object.__setattr__(snap, "settings", replace(snap.settings, dynasty_v=2, ai_v=0))
+        object.__setattr__(snap, "settings", replace(snap.settings, dynasty_v=2, ai_v=0, names_v=0))
         return snap
 
     base.new_snapshot = v2

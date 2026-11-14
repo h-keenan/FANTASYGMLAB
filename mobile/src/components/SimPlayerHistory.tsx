@@ -11,7 +11,7 @@ import { createSimStyles } from './SimGameParts';
 import ToneBadge from './ToneBadge';
 import { useThemeMode } from '../context/ThemeModeContext';
 import { api } from '../lib/api';
-import type { SimPlayerHistoryResponse } from '../lib/simGame';
+import { simSeasonText, type SimPlayerHistoryResponse } from '../lib/simGame';
 import { simDraftSlotText, simHistoryText, simWhenLabel } from '../lib/simHistory';
 
 /**
@@ -103,7 +103,7 @@ export function SimPlayerHistory({ gameId, playerId }: { gameId: string; playerI
             {seasons.map((s) => (
               <AccentCard key={s.season} accent={colors.borderStrong} compact>
                 <View style={common.rowBetween}>
-                  <AppText style={common.bodyStrong}>{s.year ?? `Season ${s.season}`}</AppText>
+                  <AppText style={common.bodyStrong}>{simSeasonText(s) || `Season ${s.season}`}</AppText>
                   <AppText style={common.muted}>
                     {s.games} games · {s.points.toFixed(1)} pts{s.ppg != null ? ` · ${s.ppg.toFixed(1)} ppg` : ''}
                   </AppText>

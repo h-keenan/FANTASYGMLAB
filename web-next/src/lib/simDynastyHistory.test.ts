@@ -19,7 +19,7 @@ const history = {
 describe("long dynasty league history", () => {
   it("lists champions newest first, marks you, and gives leaders and records", () => {
     const v = simDynastyHistoryView(history);
-    expect(v.champions.map((c) => c.label)).toEqual(["2028: Rivals", "2027: My Team (you)", "2026: Rivals"]);
+    expect(v.champions.map((c) => c.label)).toEqual(["S3 2028: Rivals", "S2 2027: My Team (you)", "S1 2026: Rivals"]);
     expect(v.champions[1].you).toBe(true);
     expect(v.leaders).toEqual(["Rivals 2 titles", "My Team (you) 1 title"]);
     expect(v.records).toEqual(["Best record: Rivals 14-0 (2028)", "Most points: My Team 2101 (2027)"]);

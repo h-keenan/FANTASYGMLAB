@@ -14,6 +14,7 @@ from __future__ import annotations
 from typing import Any, Iterable, Mapping
 
 from modules.sim.game_types import GameSnapshot
+from modules.sim.season_label import season_label, season_label_for_year
 from modules.sim.types import is_pick_id
 
 
@@ -30,7 +31,7 @@ class _Names:
             return hit
         out: dict[str, Any] = {"id": pid, "name": pid, "pos": None}
         if is_pick_id(pid):
-            out = {"id": pid, "name": _pick_label(pid), "pos": None, "pick": True}
+            out = {"id": pid, "name": _pick_label(pid, int(self.root.settings.start_year or 0)), "pos": None, "pick": True}
         else:
             for season in range(1, max(1, int(self.root.settings.seasons)) + 1):
                 p = self.root.season_view(season).players.get(pid)
@@ -49,10 +50,10 @@ class _Names:
             return None
 
 
-def _pick_label(pick_id: str) -> str:
+def _pick_label(pick_id: str, start_year: int = 0) -> str:
     parts = pick_id.split(":")
     try:
-        return f"{parts[1]} round {parts[2]} pick"
+        return f"{season_label_for_year(int(parts[1]), start_year)} round {parts[2]} pick"
     except IndexError:
         return "Draft pick"
 
@@ -79,7 +80,7 @@ class _Clock:
 
 
 def _when(clock: _Clock, ev: Mapping[str, Any], *, offseason: bool = False) -> dict[str, Any]:
-    return {"season": clock.season_no, "year": clock.year, "week": int(ev.get("week") or 0), "offseason": offseason}
+    return {"season": clock.season_no, "year": clock.year, "season_label": season_label(clock.season_no, clock.year), "week": int(ev.get("week") or 0), "offseason": offseason}
 
 
 def _asset_names(names: _Names, pids: Iterable[str]) -> list[dict[str, Any]]:
@@ -120,7 +121,7 @@ def player_history(root: GameSnapshot, events: Iterable[Mapping[str, Any]], pid:
         elif kind == "rookie_pick" and p["pid"] == pid:
             holder = p["team"]
             origin = add("drafted", ev, holder, offseason=True, round=int(p["round"]), pick=int(p["n"]) + 1, auto=bool(p.get("auto")), draft="rookie",
-                         class_year=clock.offseason_year, via=team_ref(p.get("orig")) if p.get("orig") != holder else None)
+                         class_year=clock.offseason_year, class_season_label=season_label_for_year(clock.offseason_year, clock.start_year), via=team_ref(p.get("orig")) if p.get("orig") != holder else None)
         elif kind == "waiver_result" and p.get("ok"):
             if p.get("drop") == pid:
                 add("dropped", ev, p["team"], reason="waiver_drop")
@@ -146,7 +147,7 @@ def player_history(root: GameSnapshot, events: Iterable[Mapping[str, Any]], pid:
         elif kind == "week_scored":
             pts = p["points"].get(pid)
             if pts is not None and holder is not None:
-                line = seasons.setdefault(clock.season_no, {"season": clock.season_no, "year": clock.year, "games": 0, "points": 0.0, "teams": {}})
+                line = seasons.setdefault(clock.season_no, {"season": clock.season_no, "year": clock.year, "season_label": season_label(clock.season_no, clock.year), "games": 0, "points": 0.0, "teams": {}})
                 line["games"] += 1
                 line["points"] += float(pts)
                 t = line["teams"].setdefault(holder, {"team_id": holder, "team_name": names.team(holder), "games": 0, "points": 0.0})
@@ -157,7 +158,7 @@ def player_history(root: GameSnapshot, events: Iterable[Mapping[str, Any]], pid:
     season_rows = []
     for line in sorted(seasons.values(), key=lambda s: s["season"]):
         teams = [{**t, "points": round(t["points"], 1), "ppg": round(t["points"] / t["games"], 1)} for t in line["teams"].values()]
-        season_rows.append({"season": line["season"], "year": line["year"], "games": line["games"], "points": round(line["points"], 1),
+        season_rows.append({"season": line["season"], "year": line["year"], "season_label": line["season_label"], "games": line["games"], "points": round(line["points"], 1),
                             "ppg": round(line["points"] / line["games"], 1) if line["games"] else None, "teams": teams})
     return {"pid": pid, "name": names.player(pid)["name"], "origin": origin, "current_team": team_ref(holder) if holder else None,
             "entries": entries, "seasons": season_rows}
@@ -178,7 +179,7 @@ def team_history(root: GameSnapshot, events: Iterable[Mapping[str, Any]], tid: s
     moves: list[dict[str, Any]] = []
 
     def rec(season: int) -> dict[str, Any]:
-        return records.setdefault(season, {"season": season, "year": None, "wins": 0, "losses": 0, "ties": 0, "pf": 0.0, "pa": 0.0})
+        return records.setdefault(season, {"season": season, "year": None, "season_label": "", "wins": 0, "losses": 0, "ties": 0, "pf": 0.0, "pa": 0.0})
 
     for ev in events:
         kind, p = ev["type"], ev["payload"]
@@ -196,6 +197,7 @@ def team_history(root: GameSnapshot, events: Iterable[Mapping[str, Any]], tid: s
                 mine, theirs = (g["home_pts"], g["away_pts"]) if g["home"] == tid else (g["away_pts"], g["home_pts"])
                 r = rec(clock.season_no)
                 r["year"] = clock.year
+                r["season_label"] = season_label(clock.season_no, clock.year)
                 r["pf"] += float(mine)
                 r["pa"] += float(theirs)
                 r["wins" if mine > theirs else "losses" if mine < theirs else "ties"] += 1
@@ -216,7 +218,7 @@ def team_history(root: GameSnapshot, events: Iterable[Mapping[str, Any]], tid: s
     for s in sorted(records):
         r = records[s]
         seasons.append({**r, "pf": round(r["pf"], 1), "pa": round(r["pa"], 1), "champion": champions.get(s) == tid})
-    classes = [{"year": y or None, "picks": picks} for y, picks in sorted(rookie.items())]
+    classes = [{"year": y or None, "season_label": season_label_for_year(y, int(root.settings.start_year or 0)) if y else "", "picks": picks} for y, picks in sorted(rookie.items())]
     return {"team_id": tid, "team_name": names.team(tid), "draft": draft, "rookie_drafts": classes, "seasons": seasons, "moves": list(reversed(moves))}
 
 

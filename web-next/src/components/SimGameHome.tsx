@@ -30,6 +30,7 @@ import {
   simHomeDynastyLine,
   simChecklistTone,
   simFmtPts,
+  simProjText,
   simFmtRecord,
   simRowEdge,
   simSlotLabels,
@@ -289,7 +290,7 @@ function Side({ player, win, lose, align, ctx }: { player: SimGamePlayer | null;
       className={`flex min-w-0 flex-col gap-0.5 px-1.5 py-1 ${end ? "items-end" : "items-start"}`}
       style={{ borderRadius: "var(--radius-card, 12px)", background: win ? "color-mix(in srgb, var(--color-success) 9%, transparent)" : undefined }}
     >
-      <span className="text-sm font-extrabold tabular-nums leading-none" style={{ color: player.status === "healthy" ? tint : "var(--color-text-muted)" }}>{simFmtPts(player.projection)}</span>
+      <span className="text-sm font-extrabold tabular-nums leading-none" style={{ color: player.status === "healthy" ? tint : "var(--color-text-muted)" }}>{simProjText(player)}</span>
       <div className="w-full min-w-0"><SimMiniPlayer player={player} align={align} onOpen={ctx.openPlayer} size={24} wrap /></div>
     </div>
   );

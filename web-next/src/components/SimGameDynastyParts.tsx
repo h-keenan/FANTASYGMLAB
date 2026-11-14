@@ -178,7 +178,7 @@ export function SimPickGroup({
       {groups.map((group) => (
         <div key={group.season} className="flex flex-col">
           <p className="pt-1 text-xs font-bold" style={{ color: "var(--color-text-secondary)" }}>
-            {group.season}
+            {group.label}
           </p>
           {group.rounds.flatMap((r) => r.picks).map((pick) => {
             const on = selected.includes(pick.id);

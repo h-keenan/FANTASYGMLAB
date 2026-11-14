@@ -111,6 +111,10 @@ export interface SimGamePlayer {
   adp_edge?: number | null;
   /** Expected per-game points for the next game he can play, given his NFL team's depth chart and who is out. */
   projection: number;
+  /** "bye" or "out" when he is not projected any points this week (projection is then 0); null when he plays. In-season only. */
+  projection_note?: "bye" | "out" | null;
+  /** What he projects for his next game (shown nowhere as "this week" while he is on a bye or out). */
+  next_projection?: number;
   /** Per-game mean when healthy (the projection is 0.0 for an injured player this week). */
   ros_mean?: number | null;
   /** Team-level role (new games only): one fill-in per injured starter; the other backups show baseline numbers. */
@@ -197,6 +201,8 @@ export interface SimPickAsset extends Omit<SimGamePlayer, "pos" | "kind" | "squa
   slot_hint: SimPickSlotHint | null;
   /** The engine's own name for the pick, e.g. "2027 Round 1 (early)". */
   label?: string;
+  /** The season the pick's rookies play their first year in, "S2 2027". */
+  season_label?: string;
   /** Set on GET /picks rows: true when the holder is also the original owner. */
   own?: boolean;
 }
@@ -667,6 +673,8 @@ export interface SimHistoryEntry extends SimHistoryTeamRef {
   kind: SimHistoryKind;
   season: number;
   year: number | null;
+  /** "S3 2028" (server-built; older servers omit it). */
+  season_label?: string;
   week: number;
   offseason: boolean;
   /** drafted: 1-based round and overall pick; `draft` says league (the opening draft) or rookie; `via` is the original pick owner. */
@@ -675,6 +683,7 @@ export interface SimHistoryEntry extends SimHistoryTeamRef {
   auto?: boolean;
   draft?: "league" | "rookie";
   class_year?: number | null;
+  class_season_label?: string;
   via?: SimHistoryTeamRef | null;
   /** claimed: who was dropped to make room. */
   dropped?: string | null;
@@ -697,6 +706,7 @@ export interface SimHistorySeasonTeam {
 export interface SimHistorySeason {
   season: number;
   year: number | null;
+  season_label?: string;
   games: number;
   points: number;
   ppg: number | null;
@@ -726,6 +736,7 @@ export interface SimTeamHistoryMove {
   kind: "trade" | "claim" | "cut" | "drop";
   season: number;
   year: number | null;
+  season_label?: string;
   week: number;
   offseason: boolean;
   with_team?: SimHistoryTeamRef;
@@ -741,8 +752,8 @@ export interface SimTeamHistoryResponse extends SimGameEnvelope {
   team_id?: string;
   team_name?: string | null;
   draft?: SimTeamHistoryPick[];
-  rookie_drafts?: { year: number | null; picks: SimTeamHistoryPick[] }[];
-  seasons?: { season: number; year: number | null; wins: number; losses: number; ties: number; pf: number; pa: number; champion: boolean }[];
+  rookie_drafts?: { year: number | null; season_label?: string; picks: SimTeamHistoryPick[] }[];
+  seasons?: { season: number; year: number | null; season_label?: string; wins: number; losses: number; ties: number; pf: number; pa: number; champion: boolean }[];
   /** Newest first. */
   moves?: SimTeamHistoryMove[];
 }
@@ -1864,6 +1875,43 @@ export function simFmtPts(value: number | null | undefined): string {
   return value.toFixed(1);
 }
 
+/** "Bye" / "Out" when the player is not projected any points this week, else null. */
+export function simProjNote(player: { projection_note?: "bye" | "out" | null } | null | undefined): "Bye" | "Out" | null {
+  const note = player?.projection_note;
+  return note === "bye" ? "Bye" : note === "out" ? "Out" : null;
+}
+
+/** A projection for display: "Bye" / "Out" instead of a number he will not post this week. */
+export function simProjText(player: { projection: number | null | undefined; projection_note?: "bye" | "out" | null } | null | undefined): string {
+  return simProjNote(player) ?? simFmtPts(player?.projection);
+}
+
+/** True when the player counts toward a team projection this week (not on a bye, not out). */
+export function simIsProjected(player: { projection_note?: "bye" | "out" | null } | null | undefined): boolean {
+  return simProjNote(player) == null;
+}
+
+// --- season labels: "S3 2028" everywhere a season is named (server twin: modules/sim/season_label.py)
+
+/** "S3 2028"; "S3" when the game has no calendar year; the bare year when only that is known; "" when neither. */
+export function simSeasonLabel(seasonNo: number | null | undefined, year?: number | null): string {
+  const n = seasonNo == null ? 0 : Math.floor(seasonNo);
+  if (n < 1) return year ? String(year) : "";
+  return year ? `S${n} ${year}` : `S${n}`;
+}
+
+/** The label of the season played in `year` of a game that began in `startYear` (season 1); the bare year without a start year. */
+export function simSeasonLabelForYear(year: number | null | undefined, startYear: number | null | undefined): string {
+  if (!year) return "";
+  if (!startYear) return String(year);
+  return simSeasonLabel(year - startYear + 1, year);
+}
+
+/** Prefer the label the server already built, else build it from the numbers. */
+export function simSeasonText(item: { season_label?: string | null; season_no?: number | null; season?: number | null; year?: number | null }): string {
+  return item.season_label || simSeasonLabel(item.season_no ?? item.season ?? null, item.year ?? null);
+}
+
 export function simFmtRecord(line: { wins: number; losses: number; ties: number }): string {
   return line.ties ? `${line.wins}-${line.losses}-${line.ties}` : `${line.wins}-${line.losses}`;
 }
@@ -1879,7 +1927,9 @@ export function simFmtAge(age: number | null | undefined): string {
 }
 
 /** Projection range text: "17.4 (9.1-27.7)". */
-export function simFmtProjection(player: Pick<SimGamePlayer, "projection" | "floor" | "ceiling">): string {
+export function simFmtProjection(player: Pick<SimGamePlayer, "projection" | "floor" | "ceiling"> & { projection_note?: "bye" | "out" | null }): string {
+  const note = simProjNote(player as { projection_note?: "bye" | "out" | null });
+  if (note) return note;
   return `${simFmtPts(player.projection)} (${simFmtPts(player.floor)}-${simFmtPts(player.ceiling)})`;
 }
 
@@ -2702,7 +2752,7 @@ export interface SimHomeResponse extends SimGameEnvelope {
   /** IR / taxi usage (reserve games only). */
   reserves?: { ir_used: number; ir_slots: number; taxi_used: number; taxi_slots: number };
   /** Dynasty games only: where you are and what you hold. `next_pick` is a pick id "season:round:team". */
-  dynasty?: { season_no: number; seasons: number; picks_held: number; picks_value: number; next_pick: string | null };
+  dynasty?: { season_no: number; seasons: number; year?: number; season_label?: string; picks_held: number; picks_value: number; next_pick: string | null };
   /** Cards the server could not build (card name to error class); the rest of the page is valid. */
   errors?: Record<string, string>;
 }
@@ -2712,7 +2762,7 @@ export function simHomeDynastyLine(home: Pick<SimHomeResponse, "reserves" | "dyn
   if (!home) return null;
   const parts: string[] = [];
   if (home.dynasty) {
-    parts.push(`Season ${home.dynasty.season_no} of ${home.dynasty.seasons}`);
+    parts.push(`${simSeasonText(home.dynasty)} (${home.dynasty.season_no} of ${home.dynasty.seasons})`);
     parts.push(`${home.dynasty.picks_held} pick${home.dynasty.picks_held === 1 ? "" : "s"}`);
   }
   if (home.reserves) {
@@ -2977,6 +3027,9 @@ export interface SimOffseason {
   year: number;
   /** The season just finished (the next one is season_no + 1). */
   season_no: number;
+  /** The season about to start, "S3 2028", and the one just finished. */
+  season_label?: string;
+  last_season_label?: string;
   seasons: number;
   next_year?: number;
   last_season: SimSeasonArchive | null;
@@ -3021,6 +3074,7 @@ export interface SimOffseasonResponse extends SimGameEnvelope {
 export interface SimDynastyYear {
   season_no: number;
   year: number;
+  season_label?: string;
   rank: number;
   record: string;
   pf: number;
@@ -3041,19 +3095,19 @@ export interface SimDynastySummary {
   avg_finish: number | null;
   wins: number;
   losses: number;
-  best_season: { year: number; rank: number; record: string } | null;
+  best_season: { year: number; season_label?: string; rank: number; record: string } | null;
   by_year: SimDynastyYear[];
-  rookie_drafts?: { year: number; picks: unknown[] }[];
+  rookie_drafts?: { year: number; season_label?: string; picks: unknown[] }[];
   picks_held: number;
   /** Long dynasties (dynasty_v 3): the whole league's story, a few KB however many seasons were played. */
   history?: SimDynastyHistory;
 }
 
 export interface SimDynastyHistory {
-  champions: { season_no: number; year: number; team_id: string; name: string; is_you: boolean }[];
+  champions: { season_no: number; year: number; season_label?: string; team_id: string; name: string; is_you: boolean }[];
   title_leaders: { team_id: string; name: string; titles: number; is_you: boolean }[];
-  best_record: { year: number; team_id: string; name: string; record: string } | null;
-  most_points: { year: number; team_id: string; name: string; pf: number } | null;
+  best_record: { year: number; season_label?: string; team_id: string; name: string; record: string } | null;
+  most_points: { year: number; season_label?: string; team_id: string; name: string; pf: number } | null;
 }
 
 export interface SimDynastyResponse extends SimGameEnvelope {
@@ -3082,23 +3136,23 @@ export function simParsePickId(id: string): { season: number; round: number; ori
 const HINT_WORD: Record<SimPickSlotHint, string> = { early: "early", mid: "mid", late: "late" };
 
 /** "2027 Round 1 (early)": the slot hint is only known for the next draft. */
-export function simPickLabelText(pick: Pick<SimPickAsset, "id"> & Partial<Pick<SimPickAsset, "season" | "round" | "slot_hint">>): string {
+export function simPickLabelText(pick: Pick<SimPickAsset, "id"> & Partial<Pick<SimPickAsset, "season" | "round" | "slot_hint" | "season_label">>): string {
   const parsed = simParsePickId(pick.id);
   const season = pick.season ?? parsed?.season;
   const round = pick.round ?? parsed?.round;
   if (season == null || round == null) return "Draft pick";
   const hint = pick.slot_hint ? ` (${HINT_WORD[pick.slot_hint]})` : "";
-  return `${season} Round ${round}${hint}`;
+  return `${pick.season_label || season} Round ${round}${hint}`;
 }
 
 /** "2029 R3 (early)": the compact form for a trade-side chip, where the full label gets cut off at phone width. */
-export function simPickChipText(pick: Pick<SimPickAsset, "id"> & Partial<Pick<SimPickAsset, "season" | "round" | "slot_hint">>): string {
+export function simPickChipText(pick: Pick<SimPickAsset, "id"> & Partial<Pick<SimPickAsset, "season" | "round" | "slot_hint" | "season_label">>): string {
   const parsed = simParsePickId(pick.id);
   const season = pick.season ?? parsed?.season;
   const round = pick.round ?? parsed?.round;
   if (season == null || round == null) return "Draft pick";
   const hint = pick.slot_hint ? ` (${HINT_WORD[pick.slot_hint]})` : "";
-  return `${season} R${round}${hint}`;
+  return `${pick.season_label || season} R${round}${hint}`;
 }
 
 /** Plain explanation of the early / mid / late hint ("Projected near the top of the round"). */
@@ -3120,6 +3174,8 @@ export function simPickViaLine(pick: Pick<SimPickAsset, "orig_team_id" | "orig_t
 
 export interface SimPickYearGroup {
   season: number;
+  /** "S3 2028" when the server named it, else the bare year. */
+  label: string;
   rounds: { round: number; picks: SimPickAsset[] }[];
   count: number;
 }
@@ -3127,7 +3183,9 @@ export interface SimPickYearGroup {
 /** Picks grouped by year, then round (oldest year first, round 1 first). */
 export function simPickGroups(picks: SimPickAsset[] | null | undefined): SimPickYearGroup[] {
   const byYear = new Map<number, Map<number, SimPickAsset[]>>();
+  const labels = new Map<number, string>();
   for (const pick of picks ?? []) {
+    if (pick.season_label) labels.set(pick.season, pick.season_label);
     const rounds = byYear.get(pick.season) ?? new Map<number, SimPickAsset[]>();
     rounds.set(pick.round, [...(rounds.get(pick.round) ?? []), pick]);
     byYear.set(pick.season, rounds);
@@ -3136,7 +3194,7 @@ export function simPickGroups(picks: SimPickAsset[] | null | undefined): SimPick
     .sort((a, b) => a[0] - b[0])
     .map(([season, rounds]) => {
       const list = [...rounds.entries()].sort((a, b) => a[0] - b[0]).map(([round, ps]) => ({ round, picks: ps }));
-      return { season, rounds: list, count: list.reduce((n, r) => n + r.picks.length, 0) };
+      return { season, label: labels.get(season) ?? String(season), rounds: list, count: list.reduce((n, r) => n + r.picks.length, 0) };
     });
 }
 
@@ -3152,7 +3210,7 @@ export function simPicksSummaryLine(picks: SimPickAsset[] | null | undefined): s
   const groups = simPickGroups(picks);
   const total = groups.reduce((n, g) => n + g.count, 0);
   if (total === 0) return "No picks";
-  return `${total} pick${total === 1 ? "" : "s"}: ${groups.map((g) => `${g.season} (${g.count})`).join(", ")}`;
+  return `${total} pick${total === 1 ? "" : "s"}: ${groups.map((g) => `${g.label} (${g.count})`).join(", ")}`;
 }
 
 /** Display fields for any trade asset (player or pick) in a chip or list. */
@@ -3326,7 +3384,7 @@ export interface SimOffseasonCta {
 }
 
 /** The one big button for the current stage. */
-export function simOffseasonCta(off: Pick<SimOffseason, "stage" | "season_no" | "roster"> | null | undefined): SimOffseasonCta {
+export function simOffseasonCta(off: Pick<SimOffseason, "stage" | "season_no" | "roster"> & Partial<Pick<SimOffseason, "season_label" | "year">> | null | undefined): SimOffseasonCta {
   if (!off) return { action: null, label: "", blocked: null };
   if (off.stage === "review") return { action: "start_rookie_draft", label: "Start rookie draft", blocked: null };
   if (off.stage === "rookie_draft") return { action: "finish_draft", label: "Auto-draft the rest", blocked: null };
@@ -3337,24 +3395,24 @@ export function simOffseasonCta(off: Pick<SimOffseason, "stage" | "season_no" | 
   }
   return {
     action: "start_season",
-    label: cuts > 0 ? "Finish cut-down" : `Start season ${off.season_no + 1}`,
+    label: cuts > 0 ? "Finish cut-down" : `Start ${off.season_label || simSeasonLabel(off.season_no + 1, off.year)}`,
     blocked: cuts > 0 ? `Cut ${cuts} player${cuts === 1 ? "" : "s"} to get to the roster limit first.` : null,
     note: null,
   };
 }
 
 /** "Offseason after 2026" heading for the screen. */
-export function simOffseasonHeading(off: Pick<SimOffseason, "last_season" | "season_no" | "seasons"> | null | undefined): string {
+export function simOffseasonHeading(off: Pick<SimOffseason, "last_season" | "season_no" | "seasons"> & Partial<Pick<SimOffseason, "last_season_label">> | null | undefined): string {
   if (!off) return "Offseason";
-  const year = off.last_season?.year;
-  return year ? `Offseason after ${year}` : `Offseason after season ${off.season_no}`;
+  const label = off.last_season_label || simSeasonLabel(off.season_no, off.last_season?.year);
+  return `Offseason after ${label}`;
 }
 
 /** "Season 2 of 5 is next" style line. */
-export function simOffseasonProgressLine(off: Pick<SimOffseason, "season_no" | "seasons" | "year"> | null | undefined): string {
+export function simOffseasonProgressLine(off: Pick<SimOffseason, "season_no" | "seasons" | "year"> & Partial<Pick<SimOffseason, "season_label">> | null | undefined): string {
   if (!off) return "";
   const next = off.season_no + 1;
-  return `Season ${next} of ${off.seasons} is next (${off.year}).`;
+  return `${off.season_label || simSeasonLabel(next, off.year)} is next (${next} of ${off.seasons}).`;
 }
 
 /** The draft clock as a banner line. */
@@ -3404,13 +3462,15 @@ export function simOrdinal(n: number): string {
 }
 
 /** "5 of 5 seasons" style progress for a dynasty game. */
-export function simDynastyProgressLine(d: Pick<SimDynastyBlock, "season_no" | "seasons" | "year"> | null | undefined): string {
+export function simDynastyProgressLine(d: Pick<SimDynastyBlock, "season_no" | "seasons" | "year"> & { season_label?: string } | null | undefined): string {
   if (!d) return "";
-  return `Season ${d.season_no} of ${d.seasons} (${d.year})`;
+  return `${d.season_label || simSeasonLabel(d.season_no, d.year)} (${d.season_no} of ${d.seasons})`;
 }
 
 export interface SimDynastyYearView {
   year: number;
+  /** "S3 2028": what the row is headed with. */
+  label: string;
   seasonNo: number;
   record: string;
   finish: string;
@@ -3426,6 +3486,7 @@ export function simDynastyYearView(y: SimDynastyYear): SimDynastyYearView {
   const youWon = Boolean(y.champion?.is_you);
   return {
     year: y.year,
+    label: simSeasonText(y),
     seasonNo: y.season_no,
     record: y.record,
     finish: simOrdinal(y.rank),
@@ -3450,7 +3511,7 @@ export interface SimDynastySummaryView {
 }
 
 export interface SimDynastyHistoryView {
-  /** Newest first: "2031: Rivals" / "2030: My Team (you)". */
+  /** Newest first: "S6 2031: Rivals" / "S5 2030: My Team (you)". */
   champions: { key: string; label: string; you: boolean }[];
   /** "Rivals 4 titles" ... */
   leaders: string[];
@@ -3463,11 +3524,11 @@ export interface SimDynastyHistoryView {
 export function simDynastyHistoryView(h: SimDynastyHistory | null | undefined): SimDynastyHistoryView {
   const champions = [...(h?.champions ?? [])]
     .sort((a, b) => b.season_no - a.season_no)
-    .map((c) => ({ key: `${c.season_no}`, label: `${c.year}: ${c.name}${c.is_you ? " (you)" : ""}`, you: Boolean(c.is_you) }));
+    .map((c) => ({ key: `${c.season_no}`, label: `${simSeasonText(c)}: ${c.name}${c.is_you ? " (you)" : ""}`, you: Boolean(c.is_you) }));
   const leaders = (h?.title_leaders ?? []).map((t) => `${t.name}${t.is_you ? " (you)" : ""} ${t.titles} title${t.titles === 1 ? "" : "s"}`);
   const records: string[] = [];
-  if (h?.best_record) records.push(`Best record: ${h.best_record.name} ${h.best_record.record} (${h.best_record.year})`);
-  if (h?.most_points) records.push(`Most points: ${h.most_points.name} ${Math.round(h.most_points.pf)} (${h.most_points.year})`);
+  if (h?.best_record) records.push(`Best record: ${h.best_record.name} ${h.best_record.record} (${h.best_record.season_label || h.best_record.year})`);
+  if (h?.most_points) records.push(`Most points: ${h.most_points.name} ${Math.round(h.most_points.pf)} (${h.most_points.season_label || h.most_points.year})`);
   return { champions, leaders, records, summary: champions.length ? `${champions.length} champion${champions.length === 1 ? "" : "s"}` : "No champions yet" };
 }
 
@@ -3479,7 +3540,7 @@ export function simDynastySummaryView(d: SimDynastySummary | null | undefined): 
     titles,
     titlesLine: titles === 0 ? "No titles yet" : `${titles} title${titles === 1 ? "" : "s"}`,
     avgFinish: d?.avg_finish != null ? d.avg_finish.toFixed(1) : "-",
-    bestSeason: d?.best_season ? `${d.best_season.year}: ${simOrdinal(d.best_season.rank)} at ${d.best_season.record}` : "-",
+    bestSeason: d?.best_season ? `${d.best_season.season_label || d.best_season.year}: ${simOrdinal(d.best_season.rank)} at ${d.best_season.record}` : "-",
     trips: d ? `${d.playoff_trips} of ${d.seasons_played}` : "-",
     record: d ? `${d.wins}-${d.losses}` : "-",
     years,
@@ -3494,6 +3555,7 @@ export function simArchiveToYear(a: SimSeasonArchive): SimDynastyYear {
   return {
     season_no: a.season_no,
     year: a.year,
+    season_label: simSeasonLabel(a.season_no, a.year),
     rank: you.rank,
     record: `${you.wins}-${you.losses}${you.ties ? `-${you.ties}` : ""}`,
     pf: you.pf,

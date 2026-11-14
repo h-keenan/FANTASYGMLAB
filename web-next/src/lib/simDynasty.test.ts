@@ -233,7 +233,7 @@ describe("offseason", () => {
     expect(cut).toMatchObject({ action: "start_season", label: "Finish cut-down" });
     expect(cut.blocked).toMatch(/Cut 2 players/);
     expect(simOffseasonCta({ ...(off as object), stage: "cutdown", roster: { size: 16, limit: 16, cuts_needed: 0 } } as never).blocked).toBeNull();
-    expect(simOffseasonCta({ ...(off as object), stage: "cutdown", roster: { size: 16, limit: 16, cuts_needed: 0 } } as never).label).toBe("Start season 3");
+    expect(simOffseasonCta({ ...(off as object), stage: "cutdown", roster: { size: 16, limit: 16, cuts_needed: 0 } } as never).label).toBe("Start S3 2028");
     expect(simOffseasonCta(null).action).toBeNull();
   });
 

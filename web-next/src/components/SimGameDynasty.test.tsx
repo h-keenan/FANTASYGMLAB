@@ -210,7 +210,7 @@ describe("offseason", () => {
     await openOffseason(off());
     expect(screen.getByTestId("game-heading")).toHaveTextContent("Offseason");
     expect(screen.queryByRole("button", { name: /Advance/ })).not.toBeInTheDocument();
-    expect(screen.getByTestId("dynasty-progress")).toHaveTextContent("Season 2 of 5 (2027)");
+    expect(screen.getByTestId("dynasty-progress")).toHaveTextContent("S2 2027 (2 of 5)");
     expect(screen.getByTestId("off-last-season")).toHaveTextContent("9-5, 3rd");
     expect(screen.getByTestId("off-retired")).toHaveTextContent("2 retired, 1 yours");
     expect(screen.getByText("Old Otto")).toBeInTheDocument();
