@@ -95,9 +95,9 @@ def cost_probe(root, snap, state, events) -> dict[str, Any]:
     return probe
 
 
-def play(seed: int, seasons: int, model_id: str, rows, byes, teams: int = 12, probes: tuple[int, ...] = (), dynasty_v: int | None = None) -> dict[str, Any]:
+def play(seed: int, seasons: int, model_id: str, rows, byes, teams: int = 12, probes: tuple[int, ...] = (), dynasty_v: int | None = None, aging_v: int | None = None) -> dict[str, Any]:
     base = GameSettings.parse({"mode": "dynasty", "teams": teams, "user_slot": 3, "start_year": 2026, "seasons": 5, "rookie_rounds": 3, "scoring": "ppr"})
-    settings = replace(base, seasons=seasons, **({} if dynasty_v is None else {"dynasty_v": dynasty_v}))
+    settings = replace(base, seasons=seasons, **({} if dynasty_v is None else {"dynasty_v": dynasty_v}), **({} if aging_v is None else {"aging_v": aging_v}))
     root = build_snapshot(rows, byes, settings, seed, scoring_model=model_id)
     state = GameState(root)
     em = Emitter(state, root)
@@ -185,6 +185,7 @@ def main(argv: list[str] | None = None) -> None:
     ap.add_argument("--seasons", type=int, default=20)
     ap.add_argument("--probes", default="1,5,10,20", help="seasons at which to measure payload and replay cost ('' = none)")
     ap.add_argument("--dynasty-v", type=int, default=None, help="2 = the dynasty engine before the talent equilibrium (for before/after runs)")
+    ap.add_argument("--aging-v", type=int, default=None, help="0 = the retirement curves before position hazards (for before/after runs)")
     ap.add_argument("--json", default="")
     args = ap.parse_args(argv)
     from modules.sim import game_scoring
@@ -192,7 +193,7 @@ def main(argv: list[str] | None = None) -> None:
     model_id = game_scoring.default_model().model_id
     pool, byes = tail_report.pool_from_panel(dataset.load_panel())
     probes = tuple(int(x) for x in args.probes.split(",") if x)
-    res = {"model": model_id, "games": [play(s, args.seasons, model_id, pool, byes, probes=probes, dynasty_v=args.dynasty_v) for s in range(1, args.seeds + 1)]}
+    res = {"model": model_id, "games": [play(s, args.seasons, model_id, pool, byes, probes=probes, dynasty_v=args.dynasty_v, aging_v=args.aging_v) for s in range(1, args.seeds + 1)]}
     text = json.dumps(res, indent=1)
     if args.json:
         open(args.json, "w").write(text)

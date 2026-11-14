@@ -103,12 +103,12 @@ def retire_prob(pos: str, age: float, quality: float) -> float:
 # Logistic hazard per offseason, centred at HAZ_MID[pos] (years) with width HAZ_SCALE[pos]; a starter's centre sits ROLE_YEARS above
 # and a deep reserve's ROLE_YEARS below the neutral one, a falling production level (this offseason's PPG ratio) pulls it earlier,
 # stars (market) play a little longer. No hard age cutoff: every age has a nonzero chance, no age a certainty.
-HAZ_MID = {"QB": 36.0, "RB": 30.2, "WR": 33.9, "TE": 36.3, "K": 37.7, "DEF": 99.0}
-HAZ_SCALE = {"QB": 2.5, "RB": 1.7, "WR": 1.9, "TE": 1.9, "K": 1.5, "DEF": 1.0}
-ROLE_YEARS = {"QB": 2.0, "RB": 2.5, "WR": 2.5, "TE": 2.5, "K": 1.5}
+HAZ_MID = {"QB": 36.0, "RB": 30.2, "WR": 33.9, "TE": 36.3, "K": 37.5, "DEF": 99.0}
+HAZ_SCALE = {"QB": 2.5, "RB": 1.7, "WR": 1.9, "TE": 1.9, "K": 1.3, "DEF": 1.0}
+ROLE_YEARS = {"QB": 2.0, "RB": 2.5, "WR": 2.5, "TE": 2.5, "K": 1.2}
 DECLINE_YEARS = {"K": 1.0}  # years earlier per 20% production drop (capped at 2 x); default 3.0
 STAR_YEARS = 1.0
-INJURY_FLOOR = {"QB": 0.008, "RB": 0.022, "WR": 0.012, "TE": 0.014, "K": 0.004, "DEF": 0.0}  # career-ending injury, per offseason
+INJURY_FLOOR = {"QB": 0.008, "RB": 0.022, "WR": 0.012, "TE": 0.014, "K": 0.002, "DEF": 0.0}  # career-ending injury, per offseason
 
 
 def retire_prob_v1(pos: str, age: float, role: float, quality: float, ratio: float = 1.0) -> float:
