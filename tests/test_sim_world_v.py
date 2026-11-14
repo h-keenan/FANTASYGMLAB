@@ -42,11 +42,8 @@ def _settings(world: bool, **extra) -> GameSettings:
     d = s.to_dict()
     if not world:
         d.pop("world_v", None)  # a save from before world_v
-<<<<<<< HEAD
         d.pop("econ_v", None)  # ... and before econ_v (the goldens below predate both)
-=======
         d.pop("aging_v", None)  # ... and before aging_v
->>>>>>> origin/main
     return GameSettings.from_dict(d)
 
 
