@@ -18,6 +18,7 @@ import { InfoTip } from "@/components/InfoTip";
 import { OvrGauge } from "@/components/OvrGauge";
 import { PillRow } from "@/components/PillRow";
 import { FilterSheet } from "@/components/ui/FilterSheet";
+import { ViewSelect } from "@/components/ui/ViewSelect";
 import { singleValue, valuesFromSingles, type FilterGroup, type FilterValues } from "@/lib/filterSheet";
 import { PlayerAvatar } from "@/components/PlayerAvatar";
 import { PlayerIdentityTrigger } from "@/components/PlayerIdentityTrigger";
@@ -607,19 +608,11 @@ export function WaiversContent({
       </header>
 
       <div className="flex flex-wrap items-center gap-2" data-testid="waiver-controls">
-        <select
-          aria-label="View"
+        <ViewSelect
           value={tab}
-          onChange={(event) => setTab(event.target.value as WaiverTab)}
-          className="filter-input px-3 text-sm font-bold"
-          style={{ minHeight: "2.75rem" }}
-        >
-          {TAB_OPTIONS.map((option) => (
-            <option key={option.value} value={option.value}>
-              {option.label}
-            </option>
-          ))}
-        </select>
+          options={TAB_OPTIONS.map((option) => ({ value: option.value, label: option.label }))}
+          onChange={(value) => setTab(value as WaiverTab)}
+        />
         {tab === "recommended" && secondaryPriority.length > 0 ? (
           <select
             aria-label="Recommendation filter"
