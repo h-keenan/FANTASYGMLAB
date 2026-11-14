@@ -14,7 +14,7 @@ from modules.sim import aging
 from modules.sim.game_scoring import team_roles_mode
 from modules.sim.game_state import GameState
 from modules.sim.game_types import GameSnapshot, slot_positions
-from modules.sim.picks import FUTURE_SLOT_FRAC, pick_label, pick_market_value
+from modules.sim.picks import FUTURE_SLOT_FRAC, pick_label, pick_market_value, pick_market_value_v2
 from modules.sim.lineup import Assignment, SlotPlan, carry_lineup, pick_lineup
 from modules.sim.personas import PERSONAS, TeamParams
 from modules.sim import team_roles as tr
@@ -386,6 +386,8 @@ class Evaluator:
 
         season, rnd, orig = self.pick_parts(pid)
         years_out = max(0, season - self.draft_year_now())
+        if self.snap.settings.econ_v:  # econ_v 1: the value of the rookie the pick becomes (average over the round when the slot is unknown)
+            return pick_market_value_v2(rnd, self.pick_slot_frac(orig) if years_out == 0 else None, years_out, len(self.snap.teams))
         frac = self.pick_slot_frac(orig) if years_out == 0 else FUTURE_SLOT_FRAC
         return pick_market_value(rnd, frac, years_out, len(self.snap.teams))
 
@@ -406,12 +408,22 @@ class Evaluator:
         p = self.snap.players[pid]
         h = self.horizon_now(params)
         now = min(100.0, self.now_scale[p.pos] * self.ros_mean(pid))
-        now *= 1.0 - min(self.state.out.get(pid, 0), 6) / 10.0
+        out = self.state.out.get(pid, 0)
+        keep = 1.0
+        if self.snap.settings.econ_v:  # econ_v 1: an injury costs the share of the season he misses (the old cap: 6 weeks, 60% of the "now" half)
+            weeks_left = self.snap.settings.regular_weeks if self.state.status == "offseason" else max(1, self.snap.settings.regular_weeks - self.state.week + 1)
+            keep = 1.0 - min(out, weeks_left) / weeks_left
+            now *= keep
+        else:
+            now *= 1.0 - min(out, 6) / 10.0
         age_factor = (
             1.0 if (self.policy.season_valuation or self.policy.dynasty)
             else max(0.4, 1.0 - (1.0 - h) * params.age_penalty * max(0.0, p.age - 26.0))
         )
-        value = h * now + (1.0 - h) * self.base_value(pid) * age_factor
+        base = self.base_value(pid)
+        if keep < 1.0:  # econ_v 1: a one-season valuation loses the missed share outright; a dynasty one only a sliver (he is back next year)
+            base *= keep if self.policy.season_valuation and not self.policy.dynasty else 1.0 - 0.15 * (1.0 - keep)
+        value = h * now + (1.0 - h) * base * age_factor
         return value * (1.0 + params.pos_bias.get(p.pos, 0.0))
 
 

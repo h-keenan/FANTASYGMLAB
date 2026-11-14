@@ -50,6 +50,14 @@ def floor_tolerance(params: TeamParams) -> float:
     return min(FLOOR_MAX, FLOOR_BASE + 0.5 * params.noise_sd)
 
 
+# econ_v 1: the consensus anchor. A manager who is asked for a trade by someone else sanity-checks it against what the league thinks the assets
+# are worth (the neutral lens), not only against his own taste: personas disagree about picks (x0.76 for a contender, x1.32 for a youth hoarder)
+# and about injuries, and a user who can probe unlimited offers harvests that disagreement as pure profit (2.2 more wins a season in the audit).
+CONSENSUS_TOL_BASE = 2.0  # worth units of the league's lens a manager will lose in a deal ...
+CONSENSUS_TOL_FRAC = 0.05  # ... plus this share of what he gives up ...
+CONSENSUS_TOL_NOISE = 0.5  # ... plus half his persona noise (a wildcard shrugs at odd deals)
+
+
 # ------------------------------------------------------------------ lineups
 
 
@@ -255,8 +263,25 @@ class TradeDesk:
         util, dval, need = self.utility(ai, user_gets, user_gives)
         loss = self.linear_loss(ai, user_gets, user_gives)
         margin = util + self.noise(ai) - params.accept_threshold
-        ok = margin >= 0 and loss <= floor_tolerance(params)
+        ok = margin >= 0 and loss <= floor_tolerance(params) and not self.below_market(ai, user_gives, user_gets)
         return ok, margin, dval, need, loss
+
+    def consensus_loss(self, ai: str, user_gives: Sequence[str], user_gets: Sequence[str]) -> tuple[float, float]:
+        """(what ``ai`` loses in the league's neutral lens, what it is willing to lose): sent minus received, and the tolerance."""
+
+        ev = self.ev
+        sent = sum(ev.worth(USER_PARAMS, p) for p in user_gets)
+        received = sum(ev.worth(USER_PARAMS, p) for p in user_gives)
+        tol = CONSENSUS_TOL_BASE + CONSENSUS_TOL_FRAC * sent + CONSENSUS_TOL_NOISE * self.params(ai).noise_sd
+        return sent - received, tol
+
+    def below_market(self, ai: str, user_gives: Sequence[str], user_gets: Sequence[str]) -> bool:
+        """econ_v 1+: the deal sells assets below the league's consensus value by more than the manager tolerates."""
+
+        if not self.snap.settings.econ_v:
+            return False
+        lost, tol = self.consensus_loss(ai, user_gives, user_gets)
+        return lost > tol
 
     def tradable(self, tid: str) -> list[str]:
         """What the AI itself puts in or asks for in a trade (its own offers, AI-AI deals, counters): every player it owns
@@ -320,7 +345,7 @@ class TradeDesk:
         _, margin, dval, need, loss = self.ai_accepts(ai, user_gives, user_gets)
         pos, ratio = self.need_position(ai)
         incoming = {snap.players[p].pos for p in user_gives if not is_pick_id(p)}
-        if loss > floor_tolerance(params):
+        if loss > floor_tolerance(params) or self.below_market(ai, user_gives, user_gets):
             return "fair_floor", "They will not give up that much value in one deal.", ["too lopsided"]
         value_alone_passes = (margin - need) >= 0
         if value_alone_passes and need < 0:
