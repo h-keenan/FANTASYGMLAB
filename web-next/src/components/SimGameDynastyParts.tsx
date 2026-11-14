@@ -3,11 +3,16 @@
 import { useEffect, useState, type ReactNode } from "react";
 
 import { Button } from "@/components/Button";
-import { Collapsible } from "@/components/Collapsible";
-import { SimPlayerLine, SimSheet, SimToneBadge, simToneColor, type SimCtx } from "@/components/SimGameParts";
+import { OffseasonGlyph } from "@/components/OffseasonGlyph";
+import { CompactModule } from "@/components/ui/CompactModule";
+import type { CompactPart } from "@/lib/compactModule";
+import type { OffseasonIcon } from "@/lib/simOffseasonSummary";
+import { SimPlayerLine, SimSheet, type SimCtx } from "@/components/SimGameParts";
 import { ToneBadge } from "@/components/ToneBadge";
 import { api } from "@/lib/api";
 import { isSimRookieNoticeSeen, setSimRookieNoticeSeen } from "@/lib/simRookieNotice";
+import { PlayerBadges } from "@/components/ui/PlayerBadge";
+import { simRowBadges } from "@/lib/simDraft";
 import {
   SIM_GENERATED_CLASS_LABEL,
   SIM_GENERATED_CLASS_NOTICE,
@@ -16,7 +21,6 @@ import {
   simPickLabelText,
   simPickSlotHint,
   simPickViaLine,
-  simPlayerChips,
   type SimGamePlayer,
   type SimGameTone,
   type SimPickAsset,
@@ -25,59 +29,63 @@ import {
 } from "@/lib/simGame";
 
 /**
- * A collapsible block for the dynasty screens: a thin adapter over the shared
- * Collapsible (the one the whole game uses), so the Team tab, the offseason
- * screens and the dynasty result open, close and remember their state the
- * same way as every other fold. Collapsed by default so a phone screen shows
- * the summary first.
+ * A collapsible block for the dynasty screens, now a thin adapter over the shared CompactModule (docs/ui-patterns.md): the
+ * Team tab, the offseason steps and the dynasty result are one stack of compact modules with a header icon and a dense
+ * collapsed summary (`parts`, else the plain `summary` text), never an empty header. State is remembered per id.
  */
 export function SimCollapse({
   title,
   summary,
+  parts,
+  icon,
+  action,
   defaultOpen = false,
   tone = "muted",
   badge,
   children,
   testId,
+  glow = false,
 }: {
   title: string;
   summary?: string;
+  /** The collapsed summary line (lib/simOffseasonSummary builders); wins over `summary`. */
+  parts?: ReadonlyArray<CompactPart | null | undefined | false | "">;
+  icon?: OffseasonIcon;
+  /** One trailing icon action, usable while collapsed. */
+  action?: ReactNode;
   defaultOpen?: boolean;
   tone?: SimGameTone;
   badge?: ReactNode;
   children: ReactNode;
   testId?: string;
+  glow?: boolean;
 }) {
   return (
-    <Collapsible
+    <CompactModule
       id={`dyn.${testId ?? title}`}
       testId={testId}
-      accent={simToneColor(tone === "muted" ? "accent" : tone)}
+      tone={tone === "muted" ? "accent" : tone}
       defaultOpen={defaultOpen}
+      glow={glow}
+      action={action}
+      label={title}
+      parts={parts ?? (summary ? [{ key: "s", text: summary }] : [])}
       title={
-        <span className="inline-flex items-center gap-2">
+        <span className="inline-flex items-center gap-1.5">
+          {icon ? <OffseasonGlyph name={icon} size={14} /> : null}
           {title}
           {badge}
         </span>
       }
-      summary={summary ? <span className="text-xs font-normal normal-case" style={{ color: "var(--color-text-muted)" }}>{summary}</span> : undefined}
     >
       {children}
-    </Collapsible>
+    </CompactModule>
   );
 }
 
-/** IR / TAXI / ROOKIE / OUT n wks chips for one roster row. */
+/** IR / Taxi / Rookie glyph badges for one roster player (the move sheet header); rows get the same strip from SimPlayerLine. */
 export function SimPlayerChips({ player }: { player: Pick<SimGamePlayer, "squad" | "rookie" | "status" | "out_weeks"> }) {
-  const chips = simPlayerChips(player);
-  if (chips.length === 0) return null;
-  return (
-    <span className="inline-flex flex-wrap items-center gap-1">
-      {chips.map((chip) => (
-        <SimToneBadge key={chip.key} label={chip.label} tone={chip.tone} />
-      ))}
-    </span>
-  );
+  return <PlayerBadges badges={simRowBadges(player)} />;
 }
 
 /** One draft pick as a list row: "2027 Round 1 (early)", where it came from, and its value. */

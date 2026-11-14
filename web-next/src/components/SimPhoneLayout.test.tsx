@@ -83,7 +83,7 @@ describe("SimDraftRow bye, injury and drafted states", () => {
   });
   it("marks an injured player with the OUT chip and a note, and never dims the row", () => {
     render(<SimDraftRow player={player({ status: "out", out_weeks: 4, ros_mean: 15, projection: 0 })} actions={<button>Draft</button>} />);
-    expect(screen.getByText("OUT 4W")).toBeInTheDocument();
+    expect(screen.getByRole("img", { name: "Out: 4 wks" })).toBeInTheDocument();
     const row = screen.getByTestId("draft-row");
     expect(row.style.opacity).toBe("");
     expect(screen.getByRole("button", { name: "Draft" })).toBeEnabled();
@@ -117,11 +117,11 @@ describe("Season in review on a phone", () => {
 });
 
 describe("SimDraftRow in a rookie-only draft", () => {
-  it("drops the redundant Rookie tag there, keeps it everywhere else", () => {
+  it("drops the redundant Rookie badge there, keeps it everywhere else", () => {
     const rookie = player({ age: 21 });
     const { rerender } = render(<SimDraftRow player={rookie} />);
-    expect(screen.getByTestId("list-meta")).toHaveTextContent("Rookie");
-    rerender(<SimDraftRow player={rookie} hideRookie />);
-    expect(screen.getByTestId("list-meta")).not.toHaveTextContent("Rookie");
+    expect(screen.getByRole("img", { name: "Rookie" })).toBeInTheDocument();
+    rerender(<SimDraftRow player={rookie} suppressBadges={["rookie"]} />);
+    expect(screen.queryByRole("img", { name: "Rookie" })).toBeNull();
   });
 });

@@ -1,6 +1,8 @@
 import type { CSSProperties, ReactNode } from "react";
 
 import { ToneBadge } from "@/components/ToneBadge";
+import { PlayerBadge } from "@/components/ui/PlayerBadge";
+import { badgeFromInjury } from "@/lib/playerBadges";
 import { injuryAbbreviation, injuryTone } from "@/lib/myTeamPresentation";
 
 /**
@@ -22,6 +24,9 @@ import { injuryAbbreviation, injuryTone } from "@/lib/myTeamPresentation";
 export function PlayerInjuryBadge({ status }: { status: string | null | undefined }) {
   const label = (status || "").trim();
   if (!label) return null;
+  // Statuses the badge system knows (Out, Doubtful, Questionable, IR) draw as the shared glyph badge; anything else keeps the pill.
+  const kind = badgeFromInjury(label);
+  if (kind) return <PlayerBadge kind={kind} testId="player-injury-badge" />;
   const tone = injuryTone(label);
   const color =
     tone === "danger"

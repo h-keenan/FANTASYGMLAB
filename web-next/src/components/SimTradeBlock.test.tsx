@@ -39,7 +39,7 @@ describe("Trades > My block", () => {
     render(<SimBlockView ctx={ctx()} onMakeOffer={vi.fn()} />);
     expect(await screen.findByTestId("sim-block-summary")).toHaveTextContent("1 of 8 on your block · 1 offer from your block this week");
     const mine = screen.getByRole("region", { name: "My block" });
-    expect(within(mine).getAllByText("Your block").length).toBeGreaterThan(0); // the shared row's block chip
+    expect(within(mine).getAllByRole("img", { name: /On the trade block: yours/ }).length).toBeGreaterThan(0); // the shared row's block glyph badge
     expect(within(mine).getByText("Blocked Ben")).toBeInTheDocument();
     const league = screen.getByRole("region", { name: "Around the league" });
     expect(league).toHaveTextContent("Rival Rovers");
@@ -47,7 +47,7 @@ describe("Trades > My block", () => {
     expect(league).toHaveTextContent("Wants QB");
     expect(league).toHaveTextContent("Needs QB, TE");
     expect(league).toHaveTextContent("Selling a veteran");
-    expect(within(league).getAllByText("On block").length).toBeGreaterThan(0);
+    expect(within(league).getAllByRole("img", { name: "On the trade block" }).length).toBeGreaterThan(0);
   });
 
   it("adds and removes assets and sets the looking-for position through the API; kickers are not offered", async () => {

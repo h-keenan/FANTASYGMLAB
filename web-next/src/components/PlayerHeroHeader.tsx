@@ -3,6 +3,7 @@ import type { CSSProperties, ReactNode } from "react";
 import type { UsageTrend } from "@/lib/api";
 import { OvrGauge } from "@/components/OvrGauge";
 import { PlayerAvatar } from "@/components/PlayerAvatar";
+import { PlayerBadge } from "@/components/ui/PlayerBadge";
 import { ToneBadge } from "@/components/ToneBadge";
 import { PositionBadge } from "@/components/PositionBadge";
 import { formatRank, formatScore } from "@/lib/leagueRankingsPresentation";
@@ -133,7 +134,7 @@ export function PlayerHeroHeader({
               <span>Age {age ?? (loadingIdentity ? "—" : "N/A")}</span>
             </span>
             {rookie ? (
-              <ToneBadge label={rookie.label} color="var(--color-accent)" title={rookie.detail ?? undefined} testId="pqv-rookie-badge" />
+              <span data-testid="pqv-rookie-badge" title={rookie.detail ?? undefined}><PlayerBadge kind="rookie" detail={rookie.detail} /></span>
             ) : null}
             {byeWeek != null ? (
               <span className="pqv-meta-pill" data-testid="pqv-bye-pill">

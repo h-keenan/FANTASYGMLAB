@@ -153,7 +153,7 @@ describe("PlayerHeroHeader bye week", () => {
 describe("PlayerHeroHeader rookie badge", () => {
   it("shows the ROOKIE badge and a detail line only from real data", () => {
     renderHero({ rookie: { label: "ROOKIE", detail: "2026 · Round 1 · Pick 12" } });
-    expect(screen.getByTestId("pqv-rookie-badge").textContent).toBe("ROOKIE");
+    expect(screen.getByTestId("pqv-rookie-badge").querySelector("[data-badge=rookie]")?.getAttribute("aria-label")).toBe("Rookie: 2026 · Round 1 · Pick 12");
     expect(screen.getByTestId("pqv-rookie-line").textContent).toContain("2026 · Round 1 · Pick 12");
   });
 

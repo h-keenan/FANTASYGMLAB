@@ -1,8 +1,9 @@
 // Pure presentation helpers for the Fantasy Sim draft room. Byte-identical in
 // web-next/src/lib and mobile/src/lib (scripts/check_lib_twins.mjs IDENTICAL).
 import { compactParts, type CompactPart } from "./compactModule";
+import { badgeFromTag, contextSuppressed, type BadgeInput, type BadgeKind } from "./playerBadges";
 import type { PlayerListStat } from "./playerListRow";
-import { simFmtPts, simFmtValue, simRosterNeeds, type SimDraftPick, type SimDraftState, type SimGamePlayer, type SimGameTone, type SimPlayerSort, type SimPos, type SimSlot } from "./simGame";
+import { simPlayerTags, simFmtPts, simFmtValue, simRosterNeeds, type SimDraftPick, type SimDraftState, type SimGamePlayer, type SimGameTone, type SimPlayerSort, type SimPos, type SimSlot } from "./simGame";
 
 export interface SimDraftProgress {
   round: number;
@@ -139,9 +140,9 @@ export function simDraftRowChips(player: Pick<SimGamePlayer, "status" | "out_wee
 export const SIM_BYE_SOON_WEEKS = 3;
 
 export interface SimDraftMetaPart {
-  key: "team" | "age" | "bye" | "rookie";
+  key: "team" | "age" | "bye";
   text: string;
-  /** "warning" = a bye inside the next SIM_BYE_SOON_WEEKS weeks; "accent" = rookie. An injury is the OUT chip, not meta text. */
+  /** "warning" = a bye inside the next SIM_BYE_SOON_WEEKS weeks; An injury is the OUT chip, not meta text. */
   tone?: SimGameTone;
 }
 
@@ -163,8 +164,22 @@ export function simDraftMeta(player: Pick<SimGamePlayer, "team" | "age" | "bye_w
     const soon = week != null && player.bye_week >= from && player.bye_week < from + SIM_BYE_SOON_WEEKS;
     parts.push({ key: "bye", text: `Bye ${player.bye_week}`, tone: soon ? "warning" : undefined });
   }
-  if (player.age != null && player.age <= 21.99) parts.push({ key: "rookie", text: "Rookie", tone: "accent" });
+  // Rookie is a glyph badge now (simRowBadges), not a word in this line.
   return parts;
+}
+
+/**
+ * The squad / experience badges of a sim row: Rookie (the rookie flag, or a player 21 or younger), IR, Taxi. The injury
+ * is the row's chip (simDraftRowChips, which becomes the Out badge), Free agent / On block / role come from the tags, so each
+ * fact has one owner. Lists pass `contextSuppressed` over these so a rookie draft does not tag every row Rookie.
+ */
+export function simRowBadges(player: { rookie?: boolean; age?: number | null; squad?: string | null; status?: string | null }): BadgeInput[] {
+  const out: BadgeInput[] = [];
+  if (player.status === "bye") out.push({ kind: "bye" });
+  if (player.squad === "ir") out.push({ kind: "ir" });
+  if (player.squad === "taxi") out.push({ kind: "taxi" });
+  if (player.rookie === true || (player.age != null && player.age <= 21.99)) out.push({ kind: "rookie" });
+  return out;
 }
 
 /**
@@ -326,6 +341,23 @@ export function simDraftMiniWindow<T>(rows: readonly T[][], currentRound: number
   const span = Math.min(size, n);
   const start = Math.max(0, Math.min(n - span, currentRound - 2));
   return { rows: rows.slice(start, start + span) as T[][], from: start + 1, to: start + span };
+}
+
+/**
+ * The badge kinds to leave off every row of a list because they are true of the whole list: a rookie draft board is all
+ * Rookie, a free-agent board is all Free agent (coridian_: "a rookie draft should not even have a rookie tag because it's
+ * obvious"). Health badges are never suppressed (contextSuppressed).
+ */
+export function simSuppressedBadges(players: ReadonlyArray<Parameters<typeof simRowBadges>[0] & Parameters<typeof simPlayerTags>[0]>): BadgeKind[] {
+  return contextSuppressed(
+    players.map((p) => [
+      ...simRowBadges(p).map((b) => b.kind),
+      ...(simPlayerTags(p) ?? []).flatMap((t) => {
+        const b = badgeFromTag(t);
+        return b ? [b.kind] : [];
+      }),
+    ]),
+  );
 }
 
 /** The rookie draft's collapsed clock line: "R1 P4 · You pick now · 31 rookies left · 2 picks to make". */

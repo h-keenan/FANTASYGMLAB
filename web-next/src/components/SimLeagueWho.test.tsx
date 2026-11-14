@@ -66,8 +66,8 @@ describe("league Players view (find a player, position by position)", () => {
     expect(rows[0]).toHaveTextContent("Proj");
     expect(rows[0]).toHaveTextContent("OVR");
     expect(rows[0]).toHaveTextContent("Bench Mob");
-        expect(rows[3]).toHaveTextContent("Your team");
-    expect(rows[2]).toHaveTextContent("OUT");
+    expect(within(rows[3]).getByRole("img", { name: "Your player" })).toBeInTheDocument();
+    expect(within(rows[2]).getByRole("img", { name: /^Out/ })).toBeInTheDocument();
   });
 
   it("position pills show all QBs (or any position) with their owners", () => {
@@ -109,7 +109,7 @@ describe("league Players view: On the block", () => {
     const rows = screen.getAllByTestId("sim-player-line");
     expect(rows).toHaveLength(1);
     expect(rows[0]).toHaveTextContent(/Vince/i);
-    expect(rows[0]).toHaveTextContent("On block"); // the shared row's chip
+    expect(within(rows[0]).getByRole("img", { name: /On the trade block/ })).toBeInTheDocument(); // the shared row's glyph badge
     expect(screen.getByTestId("block-note")).toHaveTextContent("Selling a veteran · looking for WR · needs TE");
     expect(screen.getByText(/1 player on a trade block/)).toBeInTheDocument();
   });

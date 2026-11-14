@@ -12,7 +12,8 @@ import { api } from "@/lib/api";
 import { PLAYER_SEARCH_DEBOUNCE_MS } from "@/lib/leaguePlayerSearch";
 import { PlayerListRow } from "@/components/PlayerListRow";
 import type { PlayerListDensity, PlayerListTag } from "@/lib/playerListRow";
-import { SIM_DRAFT_SORTS, simDraftMeta, simDraftRowChips, simListStats } from "@/lib/simDraft";
+import type { BadgeKind } from "@/lib/playerBadges";
+import { SIM_DRAFT_SORTS, simDraftMeta, simDraftRowChips, simListStats, simRowBadges, simSuppressedBadges } from "@/lib/simDraft";
 import { SIM_WINDOW_STEP, simWindow } from "@/lib/simLayout";
 import {
   SIM_PAGE_SIZE,
@@ -43,10 +44,10 @@ export function SimDraftRow({
   week = 0,
   drafted = false,
   tags,
+  suppressBadges,
   extra,
   chipsExtra,
   density,
-  hideRookie = false,
 }: {
   player: SimGamePlayer;
   onOpen?: (player: SimGamePlayer) => void;
@@ -59,12 +60,12 @@ export function SimDraftRow({
   drafted?: boolean;
   /** Page-specific tags (at most two shown plus "+N"). */
   tags?: PlayerListTag[];
+  /** Badge kinds true for the whole list (simSuppressedBadges), so they are not drawn on each row. */
+  suppressBadges?: BadgeKind[];
   extra?: ReactNode;
   /** Small inline controls at the end of the chips line (a Queue toggle). */
   chipsExtra?: ReactNode;
   density?: PlayerListDensity;
-  /** A rookie-only draft: every player is a rookie, so the "Rookie" tag adds nothing. */
-  hideRookie?: boolean;
 }) {
   const [chip] = simDraftRowChips(player);
   return (
@@ -74,11 +75,13 @@ export function SimDraftRow({
       position={player.pos}
       headshotId={simHeadshotId(player)}
       fallbackLabel={simPlayerInitials(player)}
-      meta={simDraftMeta(player, week).filter((m) => !(hideRookie && m.key === "rookie"))}
+      meta={simDraftMeta(player, week)}
       chip={chip ? { label: chip.label, tone: chip.tone } : null}
       hurt={player.status === "out"}
       stats={simListStats(player)}
       tags={tags}
+      badges={simRowBadges(player)}
+      suppressBadges={suppressBadges}
       extra={extra}
       chipsExtra={chipsExtra}
       actions={actions}
@@ -157,6 +160,7 @@ export function SimDraftBoard({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [gameId, query, refreshKey, attempt]);
 
+  const suppressed = simSuppressedBadges(items);
   const rows = simWindow(items, wide ? items.length : visible);
   return (
     <section className="flex flex-col gap-3" aria-label="Players">
@@ -206,7 +210,7 @@ export function SimDraftBoard({
             {total} player{total === 1 ? "" : "s"} left
           </p>
           {rows.shown.map((player) => (
-            <SimDraftRow key={player.id} player={player} onOpen={onOpen} week={week} drafted={draftedIds?.includes(player.id)} actions={actions ? actions(player) : null} chipsExtra={chipsExtra ? chipsExtra(player) : undefined} />
+            <SimDraftRow key={player.id} player={player} suppressBadges={suppressed} onOpen={onOpen} week={week} drafted={draftedIds?.includes(player.id)} actions={actions ? actions(player) : null} chipsExtra={chipsExtra ? chipsExtra(player) : undefined} />
           ))}
           {rows.remaining > 0 ? (
             <button

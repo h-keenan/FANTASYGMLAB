@@ -20,6 +20,7 @@ import { useThemeMode } from '../context/ThemeModeContext';
 import { api } from '../lib/api';
 import { stubPlayer } from '../lib/playerQuickView';
 import { SIM_WINDOW_STEP, simWindow } from '../lib/simLayout';
+import { simSuppressedBadges } from '../lib/simDraft';
 import { simActualPoints, simAvailabilityLine, simHeaderTags, simHeroFeed, simProjectionBand, simProjectionIsFlat, simRosLine } from '../lib/simPlayerSheet';
 import { PLAYER_SEARCH_DEBOUNCE_MS } from '../lib/leaguePlayerSearch';
 import {
@@ -101,6 +102,7 @@ export function SimPlayerBrowser({
   const windowKey = [filter.page, filter.pos, filter.sort, filter.q, filter.status].join('|');
   const [win, setWin] = useState({ key: windowKey, n: SIM_WINDOW_STEP });
   const visible = win.key === windowKey ? win.n : SIM_WINDOW_STEP;
+  const suppressed = simSuppressedBadges(items);
   const rows = simWindow(items, visible);
 
   useEffect(() => {
@@ -187,6 +189,7 @@ export function SimPlayerBrowser({
           {rows.shown.map((player) => (
             <SimDraftRow
               key={player.id}
+              suppressBadges={suppressed}
               player={player}
               week={week}
               onOpen={onOpen}
