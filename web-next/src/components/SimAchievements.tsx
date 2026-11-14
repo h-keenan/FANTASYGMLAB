@@ -59,7 +59,7 @@ function Row({ a }: { a: SimAchievement }) {
       >
         <SimAchievementBadge a={a} />
         <span className="flex min-w-0 flex-1 flex-col">
-          <span className="truncate text-sm font-extrabold" style={{ color: a.unlocked ? "var(--color-text-primary)" : "var(--color-text-secondary)" }}>{a.name}</span>
+          <span className="break-words text-sm font-extrabold" style={{ color: a.unlocked ? "var(--color-text-primary)" : "var(--color-text-secondary)" }}>{a.name}</span>
           <span className="truncate text-xs" style={{ color: "var(--color-text-muted)" }}>
             {a.unlocked ? date : a.progress ? a.progress.text : "Locked"}
           </span>

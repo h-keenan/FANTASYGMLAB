@@ -70,7 +70,7 @@ function Row({ a }: { a: SimAchievement }) {
       >
         <SimAchievementBadge a={a} />
         <View style={{ flex: 1, minWidth: 0 }}>
-          <AppText numberOfLines={1} style={[common.bodyStrong, { color: a.unlocked ? colors.textPrimary : colors.textSecondary }]}>{a.name}</AppText>
+          <AppText style={[common.bodyStrong, { color: a.unlocked ? colors.textPrimary : colors.textSecondary }]}>{a.name}</AppText>
           <AppText numberOfLines={1} style={common.muted}>{a.unlocked ? simAchievementDate(a) : a.progress ? a.progress.text : 'Locked'}</AppText>
         </View>
         <ToneBadge label={simAchievementRarityLabel(a.rarity)} color={a.unlocked ? color : colors.textTertiary} size="xs" />

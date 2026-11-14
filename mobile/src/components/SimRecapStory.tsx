@@ -285,7 +285,7 @@ export default function SimWeekRecapStory({
                 <View style={[common.rowBetween, styles.fact, { borderLeftColor: colorOf(a), backgroundColor: colors.backgroundElevated ?? 'transparent' }]}>
                   <View style={[common.row, { flex: 1, minWidth: 0 }]}>
                     <SimAchievementBadge a={a} size={28} />
-                    <AppText numberOfLines={1} style={[common.bodyStrong, { flexShrink: 1 }]}>{a.name}</AppText>
+                    <AppText style={[common.bodyStrong, { flexShrink: 1 }]}>{a.name}</AppText>
                   </View>
                   <AppText style={common.muted}>{simAchievementDate(a)}</AppText>
                 </View>

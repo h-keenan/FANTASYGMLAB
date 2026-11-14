@@ -268,7 +268,7 @@ export function SimWeekRecapStory({
                 <div className="ui-recap-fact" style={{ "--accent": simAchievementColor(a) } as CSSProperties}>
                   <span className="inline-flex min-w-0 items-center gap-2">
                     <SimAchievementBadge a={a} size={28} />
-                    <span className="truncate text-sm font-extrabold">{a.name}</span>
+                    <span className="min-w-0 break-words text-sm font-extrabold">{a.name}</span>
                   </span>
                   <span className="shrink-0 text-xs font-bold" style={{ color: "var(--color-text-secondary)" }}>{simAchievementDate(a)}</span>
                 </div>
