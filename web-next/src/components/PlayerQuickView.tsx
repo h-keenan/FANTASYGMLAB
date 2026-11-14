@@ -20,6 +20,7 @@ import { PlayerValueHistory } from "@/components/PlayerValueHistory";
 import { PlayerTrendsPanel } from "@/components/PlayerTrendsPanel";
 import { PercentileExplorerSheet } from "@/components/PercentileExplorerSheet";
 import { SheetHandle } from "@/components/SheetHandle";
+import { orderPlayerSheetTabs, type SheetSnap } from "@/lib/playerAnatomy";
 import { usePlayerQuickView } from "@/context/PlayerQuickViewContext";
 import { explorerStatKey } from "@/lib/percentileExplorer";
 import { CHART_HEIGHT } from "@/components/weeklyPointsChartHeight";
@@ -144,6 +145,8 @@ export function PlayerQuickView({
   const dialogRef = useRef<HTMLDivElement | null>(null);
   const closeButtonRef = useRef<HTMLButtonElement | null>(null);
   const [legendOpen, setLegendOpen] = useState(false);
+  // Peek sheet (coridian_ pick 1b): opens half height with the header and pills, drag the handle up for full.
+  const [snap, setSnap] = useState<SheetSnap>("peek");
   const [detail, setDetail] = useState<QuickViewResponse | null>(null);
   const [awards, setAwards] = useState<PlayerAward[]>([]);
   const [loading, setLoading] = useState(remote);
@@ -282,6 +285,7 @@ export function PlayerQuickView({
           sheetRef.current = node;
         }}
         className="pqv-modal"
+        data-snap={snap}
         role="dialog"
         aria-modal="true"
         aria-labelledby="pqv-name"
@@ -294,7 +298,7 @@ export function PlayerQuickView({
             layer (which sits behind this modal's own opaque background). */}
         <div className="pqv-field" aria-hidden="true" />
         <div className="pqv-sweep" aria-hidden="true" />
-        <SheetHandle />
+        <SheetHandle snap={snap} onSnap={setSnap} />
         <OverlayBack overlay={overlay} />
         <button
           ref={closeButtonRef}
@@ -385,7 +389,7 @@ export function PlayerQuickView({
           <Tabs
             id="pqv"
             ariaLabel="Player sections"
-            tabs={[
+            tabs={orderPlayerSheetTabs([
               {
                 key: "overview",
                 label: "Overview",
@@ -469,7 +473,7 @@ export function PlayerQuickView({
                 : []),
               ...(sim?.scouting ? [{ key: "scouting", label: "Scouting", render: () => <>{sim.scouting}</> }] : []),
               ...(sim?.history ? [{ key: "history", label: "History", render: () => <>{sim.history}</> }] : []),
-            ]}
+            ])}
           />
         </ExplorerLeagueProvider>
 

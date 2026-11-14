@@ -24,6 +24,8 @@ import { Hero, StatStripModule } from '../components/ModuleTemplates';
 import { listSummaryParts } from '../lib/moduleTemplates';
 import PositionBadge from '../components/PositionBadge';
 import PlayerIdentityRow from '../components/PlayerIdentityRow';
+import PlayerAccordionRow, { usePlayerAccordion } from '../components/PlayerAccordionRow';
+import { badgeFromInjury } from '../lib/playerBadges';
 import { SkeletonCard, SkeletonRows } from '../components/SkeletonBlock';
 import SegmentedTabBar from '../components/SegmentedTabBar';
 import TeamAnalysisPanel, { hasRosterAnalysis } from '../components/TeamAnalysisPanel';
@@ -104,6 +106,7 @@ export default function MyTeamScreen({ route, navigation }: Props) {
   const orbClearance = useOrbClearance();
   const headerHeight = useHeaderHeight();
   const { colors } = useThemeMode();
+  const accordion = usePlayerAccordion();
   const styles = useMemo(() => createStyles(colors), [colors]);
   const { leagueId, leagueName } = route.params;
   const [rosterTab, setRosterTab] = useState<RosterTabKey>('starters');
@@ -360,6 +363,8 @@ export default function MyTeamScreen({ route, navigation }: Props) {
                       showDivider={i < tab.players.length - 1}
                       onPress={() => goToPlayer(player)}
                       muted={tab.key !== 'starters'}
+                      open={accordion.isOpen(player.player_id)}
+                      onToggle={() => accordion.toggle(player.player_id)}
                     />
                   ))}
                 </AnimatedCard>
@@ -537,7 +542,11 @@ function LineupRow({
   showDivider,
   muted = false,
   keeper,
+  open,
+  onToggle,
 }: {
+  open: boolean;
+  onToggle: () => void;
   keeper?: KeeperPlayerInfo;
   player: LineupPlayer;
   onPress: () => void;
@@ -550,40 +559,34 @@ function LineupRow({
   // "Bye" pill in the calmer watch tone; a real injury label always wins.
   // A team defense has no player record behind it: not tappable.
   const isTeamDefense = (player.position ?? '').toUpperCase() === 'DEF';
-  const injuryTone = isByeOnlyLabel(player) ? 'watch' : waiverInjuryDisplay(player.injury_status).tone;
+  const statusLabel = lineupStatusLabel(player);
+  const kind = badgeFromInjury(statusLabel) ?? (statusLabel === 'Bye' ? 'bye' : null);
+  const slotLabel = player.slot === 'BENCH' ? player.position : player.slot;
+  const surplus =
+    keeper?.surplus != null && keeper.cost_round != null
+      ? `${keeper.kept_round ? 'R' : '~R'}${keeper.cost_round} ${keeper.surplus > 0 ? '+' : ''}${keeper.surplus}`
+      : null;
+  // The shared inline-accordion player row (compact two-line row; swells into a tile; one open at a time).
   return (
-    <PlayerIdentityRow
-      playerId={player.player_id}
-      name={player.name}
-      position={player.position}
-      team={player.team}
-      tier={player.tier}
-      overallRating={player.overall_rating}
-      slot={player.slot === 'BENCH' ? player.position : player.slot}
-      opportunityLabel={player.opportunity_label}
-      // injury_label, not injury_status: IR/PUP/season-ending arrives on
-      // `status` with `injury_status` blank, and an injury_status-driven
-      // pill hides exactly those players. See LineupPlayer.injury_label.
-      injuryLabel={lineupStatusLabel(player)}
-      ruledOut={player.ruled_out}
-      injuryTone={injuryTone}
-      trailingValue={player.score != null ? String(Math.round(player.score)) : '\u2014'}
-      trailingCaption="VALUE"
-      trailingTone={muted ? 'muted' : 'accent'}
-      trailingExtra={
-        <>
+    <PlayerAccordionRow
+      player={{ id: isTeamDefense ? null : player.player_id, name: player.name ?? 'Player', position: player.position, team: player.team, age: player.age, tier: player.tier }}
+      mode="desk"
+      value={player.score ?? null}
+      ovr={isTeamDefense ? null : player.overall_rating}
+      positionLabel={slotLabel}
+      badges={kind ? [{ kind, detail: statusLabel }] : []}
+      open={open}
+      onToggle={onToggle}
+      onOpenProfile={isTeamDefense ? undefined : onPress}
+      testID={muted ? 'roster-row-muted' : 'roster-row'}
+    >
+      {keeper?.is_keeper || surplus ? (
+        <View style={styles.keeperLine}>
           {keeper?.is_keeper ? <ToneBadge label="Keeper" color={colors.accent} /> : null}
-          {keeper?.surplus != null && keeper.cost_round != null ? (
-            <AppText style={styles.valueLabel}>
-              {`${keeper.kept_round ? 'R' : '~R'}${keeper.cost_round} ${keeper.surplus > 0 ? '+' : ''}${keeper.surplus}`}
-            </AppText>
-          ) : null}
-        </>
-      }
-      chevron={!isTeamDefense}
-      showDivider={showDivider}
-      onPress={isTeamDefense ? undefined : onPress}
-    />
+          {surplus ? <AppText style={styles.valueLabel}>{surplus}</AppText> : null}
+        </View>
+      ) : null}
+    </PlayerAccordionRow>
   );
 }
 
@@ -737,6 +740,7 @@ function createStyles(colors: ThemeColors) {
   },
   compactDivider: { borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border },
   compactIdentity: { flex: 1 },
+  keeperLine: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   valueLabel: { fontSize: 12, fontWeight: '700', color: colors.textTertiary, letterSpacing: 0.4 },
   linkRowText: { fontSize: 14.5, fontWeight: '700', color: colors.accent },
   notice: { textAlign: 'center', color: colors.textSecondary, lineHeight: 20 },

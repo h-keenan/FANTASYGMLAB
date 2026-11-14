@@ -5,11 +5,10 @@ import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { Ionicons } from '@expo/vector-icons';
 
 import AppText from './AppText';
-import CompactModule from './CompactModule';
+import TradeCompactCard, { type TradeCardAsset } from './TradeCompactCard';
 import BeginnerHelp from './BeginnerHelp';
 import MeterRow, { CONFIDENCE_LEVELS } from './ConfidenceMeter';
 import ManagerTendenciesChips from './ManagerTendenciesChips';
-import ExchangeSide from './ExchangeSide';
 import TeamAvatar from './TeamAvatar';
 import Button from './Button';
 import ToneBadge from './ToneBadge';
@@ -24,8 +23,7 @@ import { useExperienceCopy } from '../context/ExperienceLevelContext';
 import { useDensity } from '../context/DensityContext';
 import { useThemeMode } from '../context/ThemeModeContext';
 import { useValuationLens } from '../context/ValuationLensContext';
-import { abbreviatePlayerName } from '../lib/formatPlayerName';
-import { tradeIdeaSummaryParts } from '../lib/tradeIdeaSummary';
+import { tradeIdeaGainText } from '../lib/tradeIdeaSummary';
 import type { DraftPickAsset, PresentationAsset, RankedPlayer, TradeIdea, TradeVerdict } from '../lib/api';
 import { radii, spacing, type ThemeColors, scrim } from '../theme';
 import type { RootStackParamList } from '../navigation/RootNavigator';
@@ -290,25 +288,29 @@ export default function TradeIdeaCard({
     .map((playerId) => idea.package.receive.find((asset) => asset.player_id === playerId)?.name)
     .filter((name): name is string => Boolean(name));
 
-  // Collapsed: the partner and a real summary (balance, swap, fairness, confidence); the whole former card is the
-  // expanded body, so nothing is removed (docs/ui-patterns.md "Module templates"). Web twin: ui/CompactModule in TradeIdeaCard.
-  const summaryParts = tradeIdeaSummaryParts({
-    gain: idea.trade_gain,
-    sendNames: idea.package.send.map((asset) => abbreviatePlayerName(asset.name)),
-    receiveNames: idea.package.receive.map((asset) => abbreviatePlayerName(asset.name)),
-    band: idea.value_edge_band,
-    confidenceLabel: idea.confidence_label,
-  });
-  const moduleId = `trade.idea.${leagueId}.${idea.package.send.map((a) => a.player_id).join('-')}.${idea.package.receive.map((a) => a.player_id).join('-')}`;
+  // Always-visible compact card: the partner, a compact player card per asset on the send and get sides (avatar
+  // included), a fairness meter; the former card body is the expand-in-place details. Web twin: ui/TradeCompactCard.
+  const toCardAsset = (asset: PresentationAsset, index: number): TradeCardAsset =>
+    asset.asset_type === 'pick'
+      ? { key: `pick-${index}`, pickLabel: asset.label || 'Draft pick', value: asset.score ?? null, onPress: () => openPick(asset) }
+      : {
+          key: asset.player_id ?? `p-${index}`,
+          player: { id: asset.player_id ?? null, name: asset.name || 'Player', position: asset.position, team: asset.team, age: asset.age, tier: asset.tier },
+          detail: [asset.team, asset.age ? `Age ${asset.age}` : null].filter(Boolean).join(' · ') || null,
+          value: asset.score ?? null,
+          ovr: asset.overall_rating ?? null,
+          onPress: () => openPlayer(asset),
+        };
 
   return (
-    <CompactModule
-      id={moduleId}
-      title={idea.partner_team_name}
-      parts={summaryParts}
-      accent={categoryAccent}
-      persist={false}
+    <TradeCompactCard
       testID="trade-idea-card"
+      mode="desk"
+      title={`${idea.partner_team_name}  ${tradeIdeaGainText(idea.trade_gain)}`}
+      give={idea.package.send.map(toCardAsset)}
+      get={idea.package.receive.map(toCardAsset)}
+      verdictLabel={idea.value_edge_band || null}
+      meta={[`${idea.confidence_label} confidence`]}
     >
       {idea.category || idea.impact_tag ? (
         <View style={[styles.categoryRow, styles.categoryRowSpread]}>
@@ -445,30 +447,6 @@ export default function TradeIdeaCard({
         valuationLens={lens}
       />
 
-      <View style={styles.exchangeRow}>
-        <ExchangeSide
-          side="send"
-          total={idea.send_score}
-          assets={idea.package.send}
-          onPressPlayer={openPlayer}
-          onPressPick={openPick}
-          style={styles.exchangeSide}
-        />
-        <View style={styles.exchangeGutter}>
-          <View style={styles.swapDisc}>
-            <Ionicons name="swap-horizontal" size={16} color={colors.accent} />
-          </View>
-        </View>
-        <ExchangeSide
-          side="get"
-          total={idea.receive_score}
-          assets={idea.package.receive}
-          onPressPlayer={openPlayer}
-          onPressPick={openPick}
-          style={styles.exchangeSide}
-        />
-      </View>
-
       {showExplanations && idea.rationale ? (
         <PressableScale onPress={() => setRationaleOpen(true)}>
           <AppText style={styles.rationaleLabel}>Why this works</AppText>
@@ -519,7 +497,7 @@ export default function TradeIdeaCard({
           full-width, clearly-labeled primary affordance at the natural end
           of the card, after the reasoning that justifies it. */}
       <Button label="Share to Propose" onPress={() => setShareOpen(true)} style={styles.proposeButton} />
-    </CompactModule>
+    </TradeCompactCard>
   );
 }
 

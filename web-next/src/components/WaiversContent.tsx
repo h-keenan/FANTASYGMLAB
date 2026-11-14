@@ -20,6 +20,8 @@ import { FilterSheet } from "@/components/ui/FilterSheet";
 import { ViewSelect } from "@/components/ui/ViewSelect";
 import { singleValue, valuesFromSingles, type FilterGroup, type FilterValues } from "@/lib/filterSheet";
 import { PlayerAvatar } from "@/components/PlayerAvatar";
+import { PlayerAvatarSlot } from "@/components/ui/PlayerAvatarSlot";
+import { barFractions } from "@/lib/playerAnatomy";
 import { PlayerIdentityTrigger } from "@/components/PlayerIdentityTrigger";
 import { PlayerMetaLine } from "@/components/PlayerInjuryBadge";
 import { PositionBadge } from "@/components/PositionBadge";
@@ -292,9 +294,12 @@ function RecommendedRow({
   sharedDropId,
   open,
   onToggle,
+  barFraction = 0,
 }: {
   player: WaiverPriorityAdd;
   rank: number;
+  /** Bid (or value) as a 0..1 share of the biggest in the list: the bar row's mini bar. */
+  barFraction?: number;
   showDivider: boolean;
   sharedDropId: string | null;
   open: boolean;
@@ -322,7 +327,7 @@ function RecommendedRow({
             {rank}
           </span>
           <PositionBadge position={player.position} />
-          <PlayerAvatar playerId={player.player_id} tier={player.tier} size={32} />
+          <PlayerAvatarSlot player={{ id: player.player_id, name: player.name || "Unknown player", position: player.position, tier: player.tier }} tier="row" />
           <span className="flex flex-col min-w-0 flex-1">
             <PlayerName name={player.name || "Unknown player"} className="text-sm font-bold" style={{ color: "var(--color-text-primary)" }} />
             <PlayerMetaLine injuryStatus={injury.label}>
@@ -337,6 +342,9 @@ function RecommendedRow({
           >
             {primary}
           </span>
+        </span>
+        <span className="ml-[3.75rem] block h-1.5 overflow-hidden rounded-full" style={{ background: "rgba(255,255,255,0.1)" }} role="img" aria-label={`Bid size ${Math.round(barFraction * 100)}% of the largest`} data-testid="waiver-bid-bar">
+          <span className="block h-full rounded-full" style={{ width: `${Math.round(barFraction * 100)}%`, background: "var(--color-accent-strong, var(--color-accent))" }} />
         </span>
         <span className="flex flex-wrap items-center gap-1 pl-[3.75rem] w-full empty:hidden">
           {chips.map((chip) => (
@@ -506,6 +514,7 @@ export function WaiversContent({
   const topPriority = priorityAdds[0] ?? null;
   const secondaryPriority = priorityAdds.length > 1 ? priorityAdds.slice(1) : [];
   const visibleSecondary = filterByRecommendation(secondaryPriority, recFilter);
+  const secondaryBarFractions = barFractions(visibleSecondary.map((p) => (faabIsBid(p.faab) ? p.faab!.high_bid : p.score ?? 0)));
   const sharedDrop = sharedDropCandidate(visibleSecondary);
   const bidNote = sharedBidNote(visibleSecondary);
 
@@ -740,6 +749,7 @@ export function WaiversContent({
                       <RecommendedRow
                         player={player}
                         rank={index + 2}
+                        barFraction={secondaryBarFractions[index] ?? 0}
                         showDivider={index < visibleSecondary.length - 1}
                         sharedDropId={sharedDrop?.playerId ?? null}
                         open={openRowId === player.player_id}

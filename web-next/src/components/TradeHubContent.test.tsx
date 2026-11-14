@@ -94,8 +94,10 @@ describe("TradeHubContent", () => {
 
     expect(screen.getByRole("heading", { name: "Trade Hub" })).toBeInTheDocument();
     expect(screen.getByText("Rival GM")).toBeInTheDocument();
-    // Collapsed summary: balance, swap (short names), fairness, confidence.
-    expect(screen.getByRole("button", { name: /Rival GM: \+800 · .*Favorable/ })).toBeInTheDocument();
+    // Always-visible card: balance in the title, compact player cards for both sides, fairness meter, confidence.
+    expect(screen.getByTestId("trade-idea-card")).toHaveTextContent("+800");
+    expect(screen.getAllByTestId("compact-player-card").length).toBeGreaterThanOrEqual(2);
+    expect(screen.getByTestId("fairness-meter")).toHaveTextContent("Favorable");
     openIdeaCards();
     expect(screen.getAllByText("Favorable").length).toBe(2);
     expect(screen.getByText("My Running Back")).toBeInTheDocument();
@@ -108,7 +110,7 @@ describe("TradeHubContent", () => {
     const lowConfidence: TradeHubResponse = { ...RESPONSE, ideas: [idea({ confidence_label: "Low" })] };
     render(<TradeHubContent leagueId="123" leagueName="Dynasty Overlords" data={lowConfidence} />);
 
-    expect(screen.getByRole("button", { name: /Low confidence/ })).toBeInTheDocument();
+    expect(screen.getByText("Low confidence")).toBeInTheDocument();
     openIdeaCards();
     expect(screen.getByText("More dependent on partner preference and market fit.")).toBeInTheDocument();
     expect(screen.queryByText("Why this works")).not.toBeInTheDocument();

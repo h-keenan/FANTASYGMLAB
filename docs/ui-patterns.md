@@ -22,6 +22,7 @@ Ground rules for every pattern here:
 | `InsightLink` | `ui/InsightLink.tsx` (+ `StatStrip` `insight`/`league`) | `MetricCard` `onPress` via `lib/insightNav.ts` | `insightLinks.ts` | built; every stat about your league/team must resolve here, see `docs/audits/2026-11-navigation-audit.md` |
 | `UndoToast` | `ui/UndoToast.tsx` | `UndoToast.tsx` | `confirmInPlace.ts` (timing) | built; used by GM targets |
 | `PlayerBadge` | `ui/PlayerBadge.tsx` | `PlayerBadge.tsx` | `playerBadges.ts` | built; every player row tag, PQV header and Sim roster/draft list routes through it |
+| Player anatomy (`PlayerAccordionRow`, `CompactPlayerCard`, `TradeCompactCard`, `RankRow`, `PlayerAvatarSlot`) | `ui/PlayerAccordionRow.tsx` etc. | same names in `components/` | `playerAnatomy.ts` | built; see "Player anatomy" |
 | `CompactModule` | `ui/CompactModule.tsx` | `CompactModule.tsx` | `compactModule.ts` (+ `simSummaries.ts`, `simDraft.ts`) | built (Phase 1 of `docs/audits/2026-11-information-architecture.md`); Sim home folds and the Sim draft room use it; `Collapsible` is superseded (SimFold renders CompactModule) |
 
 ## Sheet
@@ -657,6 +658,48 @@ verdict blocks, Games league odds / what-if / leaderboard, Draft Center posture 
 the same rule.
 
 Rollout status per page: `docs/audits/2026-11-module-templates-rollout.md`.
+
+## Player anatomy (2026-11-14: row, compact card, trade card, bar row, peek sheet)
+
+coridian_ picked these from `docs/audits/2026-11-module-variant-sheets.md` (sheets 1 and 3). One set of templates serves
+FantasyDesk (`mode="desk"`) and Fantasy Sim (`mode="sim"`); the logic is the byte-identical lib twin `lib/playerAnatomy.ts`
+(`playerRowModel`, `fairnessMeter`, `barFractions`, `nextOpenId`, `nextSheetSnap`, `orderPlayerSheetTabs`, `AVATAR_SIZE`).
+
+| Template | Web (`components/ui/`) | App (`components/`) | Where it is used |
+|---|---|---|---|
+| `PlayerAvatarSlot` | `PlayerAvatarSlot.tsx` | `PlayerAvatarSlot.tsx` | inside every template below; never placed by hand |
+| `PlayerAccordionRow` + `usePlayerAccordion` | `PlayerAccordionRow.tsx` | `PlayerAccordionRow.tsx` | Players, My Team roster (web + app) |
+| `CompactPlayerCard` | `CompactPlayerCard.tsx` | `CompactPlayerCard.tsx` | trade sides, bar rows |
+| `TradeCompactCard` | `TradeCompactCard.tsx` | `TradeCompactCard.tsx` | Trade Hub, Trade Finder, GM Plan ideas (`TradeIdeaCardView` web, `TradeIdeaCard` app) |
+| `RankRow` (bar row) | `RankRow.tsx` | `RankRow.tsx` | Waivers add rows (web bar), standings next |
+| Peek sheet (PQV) | `PlayerQuickView` + `SheetHandle snap/onSnap` | `PlayerQuickViewSheet` grip | every player sheet |
+
+- **Compact row (V1 inline accordion)**: two lines. Line 1: avatar, name, position pill, glyph badges. Line 2 (muted): TEAM · Age · BYE. Trailing: ONE
+  key number (PROJ, else VALUE) or the sim letter grade. No chevron: the whole row is the tap target (Row rule).
+- **Expanded (V2 tile)**: the tapped row swells in place into a glass tile (cyan border for the selection, no gold) with PROJ / VALUE / TREND /
+  OVR / page facts, then actions. Gold only on the single primary action (`primaryAction`); the secondary is "Open profile" (the PQV). **One open at a time**
+  (`usePlayerAccordion`, `nextOpenId`). Never remove information: anything the old row showed (OVR, position rank, sorted stat, IDP basis, compare link)
+  is in the tile.
+- **Sim**: `mode="sim"` shows GRADE / ADP / PROJ only. The sim branch of `playerRowModel` has no path to a numeric OVR or the trade value (unit-tested), and
+  trade cards use plain words (`fairnessMeter(..., "sim")`: "A better deal for you").
+- **Trade card**: title (partner + balance), a compact player card per asset on a give and a get side (avatar included, tap opens the sheet), a fairness
+  meter row (marker on a centre-anchored track, label from the server band or the meter), details ("Show details") expand in place.
+- **Bar rows**: `barFractions` turns bids / points-for into 0..1 shares of the largest, drawn as a mini bar under the row; one trailing number.
+- **Peek sheet (1b)**: the player sheet opens at half height (`SHEET_SNAP_PCT.peek` 56%) with the header and the pill row; dragging the handle up
+  (or tapping it) goes full (92%); a fixed height means switching pills never moves the sheet. Pills are the one `Tabs` row in the order Overview, Stats,
+  Outlook, History, Scouting (then Profile) via `orderPlayerSheetTabs`; sim hides Scouting when it has none. Sticky tabs and the min-height rule of
+  "Sheet tabs" are unchanged; drag-down from peek is still the dismiss gesture.
+
+**The avatar is REQUIRED (coridian_: "properly implemented, not a band-aid").** A template takes a `player` (`PlayerRef`) and draws the avatar itself in
+`PlayerAvatarSlot`: always the first, leading slot, sized by tier (`AVATAR_SIZE`: dense 28, row 36, card 44, sheet 56), tier ring, and initials when
+there is no photo or it fails to load (generated Fantasy Sim players have none). No module may render `<PlayerName>` outside a template that provides the
+avatar. Enforced by `lib/playerAvatarRule.test.ts` (source scan of web and app: a file that renders `PlayerName` must reference an avatar template, or be
+on the explicit allowlist; an allowlist entry that now has an avatar fails so the list only shrinks) and `ui/PlayerTemplates.test.tsx` (each template renders the slot).
+Allowlist kinds: TEXT (a sentence, headline or tooltip where a picture makes no sense) and TODO (not yet on the templates).
+
+Not yet on the templates (TODO allowlist plus pages): Waivers app add rows and web Explore tiles, Live Draft rows, News, Trade Analyzer pickers (`TradePickerSheet`),
+Draft Center, League Recaps, Matchup lineup, Standings (RankRow exists, page not yet moved), Sim roster / draft board / inbox (`SimDraftRow`, `SimPlayerLine`, `SimRosterLine`
+should become `PlayerAccordionRow mode="sim"`, and the Sim trade inbox `TradeCompactCard mode="sim"`), Manager profile, Opponent profile, Sim team card / history / draft grid.
 
 ## Player row anatomy (shared by FantasyDesk and the Fantasy Sim)
 

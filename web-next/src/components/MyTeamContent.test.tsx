@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, within } from "@testing-library/react";
 import { beforeEach, describe, expect, it } from "vitest";
 
 import { collapsedModuleProblems } from "@/components/ui/assertCompactInformative";
@@ -130,6 +130,11 @@ const TEAM_RANKING: TeamRanking = {
 };
 
 /** Open a CompactModule by its collapsed header. */
+/** Rows are inline accordions: expand each visible row so its tile facts (OVR, bye, value) are on screen. */
+function expandRows() {
+  for (const btn of Array.from(document.querySelectorAll("[data-testid^=roster-row] button[aria-expanded=false]"))) fireEvent.click(btn);
+}
+
 function open(title: string) {
   fireEvent.click(screen.getByRole("button", { name: new RegExp(`^${title}:`) }));
 }
@@ -183,21 +188,22 @@ describe("MyTeamContent", () => {
     // Circular OVR gauges render a real rating, never a fabricated one for
     // the null case (the IR tight end's overall_rating is null above).
 
-    expect(screen.getByText("95")).toBeInTheDocument();
-    expect(screen.getByText("88")).toBeInTheDocument();
+    // Rows are accordions: the QB's tile (one open at a time) carries its real OVR.
+    const qb = screen.getAllByTestId("roster-row").find((r) => r.textContent?.includes("Test Quarterback"))!;
+    fireEvent.click(qb.querySelector("button[aria-expanded]")!);
+    expect(within(qb).getByText("95")).toBeInTheDocument();
   });
 
   // coridian_, 2026-10-18, screenshot: a row with no OVR rating left its
   // value/"VALUE" column shifted out of alignment with rows that do have
   // one. OvrGauge now reserves the same space either way — not a
   // fabricated number, just a same-size invisible placeholder.
-  it("reserves the OVR gauge's width even when a player has no rating", () => {
-    const { container } = render(
-      <MyTeamContent leagueName="Dynasty Overlords" myTeam={MY_TEAM} needs={NEEDS} teamRanking={TEAM_RANKING} leagueSize={10} />,
-    );
+  it("never fabricates an OVR for an unrated player (the tile simply has no OVR fact)", () => {
+    render(<MyTeamContent leagueName="Dynasty Overlords" myTeam={MY_TEAM} needs={NEEDS} teamRanking={TEAM_RANKING} leagueSize={10} />);
 
     open("IR");
-    expect(container.querySelector(".value-ring-placeholder")).toBeInTheDocument();
+    expandRows();
+    expect(document.querySelector("[data-testid=row-expanded] [data-fact=ovr]")).toBeNull();
   });
 
   // coridian_, 2026-10-18, screenshot: "the bench should be in order so.
@@ -359,7 +365,8 @@ describe("MyTeamContent", () => {
     render(<MyTeamContent leagueName="Dynasty Overlords" myTeam={weekly} needs={NEEDS} teamRanking={TEAM_RANKING} leagueSize={10} />);
 
     open("Bench");
-    expect(screen.getByText("· BYE")).toBeInTheDocument();
+    expandRows();
+    expect(screen.getAllByText(/BYE/).length).toBeGreaterThan(0);
     expect(screen.getByRole("status")).toHaveTextContent("Open slot this week: TE");
     expect(screen.getByText(/Week 7\. This week's lineup/)).toBeInTheDocument();
   });
@@ -417,8 +424,13 @@ describe("MyTeamContent best ball", () => {
       <MyTeamContent leagueName="L" myTeam={{ ...MY_TEAM, starters: [...MY_TEAM.starters, dst] }} needs={NEEDS} teamRanking={TEAM_RANKING} leagueSize={12} />,
     );
     expect(screen.getByText("49ers D/ST")).toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "Open 49ers D/ST" })).not.toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Open Test Quarterback" })).toBeInTheDocument();
+    const rows = screen.getAllByTestId("roster-row");
+    const dstRow = rows.find((r) => r.textContent?.includes("49ers D/ST"))!;
+    fireEvent.click(dstRow.querySelector("button[aria-expanded]")!);
+    expect(within(dstRow).queryByRole("button", { name: "Open profile" })).not.toBeInTheDocument();
+    const qbRow = rows.find((r) => r.textContent?.includes("Test Quarterback"))!;
+    fireEvent.click(qbRow.querySelector("button[aria-expanded]")!);
+    expect(within(qbRow).getByRole("button", { name: "Open profile" })).toBeInTheDocument();
   });
 
   it("shows no IDP tab in a non-IDP league", () => {

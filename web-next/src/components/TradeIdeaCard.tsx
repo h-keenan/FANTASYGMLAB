@@ -1,12 +1,10 @@
 import { BEGINNER_HELP } from "@/lib/experienceCopy";
-import { CompactModule } from "@/components/ui/CompactModule";
-import { abbreviatePlayerName } from "@/lib/formatPlayerName";
-import { tradeIdeaSummaryParts } from "@/lib/tradeIdeaSummary";
+import { TradeCompactCard, type TradeCardAsset } from "@/components/ui/TradeCompactCard";
+import { tradeIdeaGainText } from "@/lib/tradeIdeaSummary";
 import { ManagerTendenciesCard } from "@/components/ManagerTendenciesCard";
 import { useEffect, useRef, useState } from "react";
-import { api, type TradeIdea } from "@/lib/api";
+import { api, type TradeAsset, type TradeIdea } from "@/lib/api";
 import { BeginnerHelp } from "@/components/BeginnerHelp";
-import { ExchangeSide } from "@/components/TradeAssetExchange";
 import { ToneBadge } from "@/components/ToneBadge";
 import { IdeaPosture } from "@/components/IdeaPosture";
 import { RosterOverflowNote } from "@/components/SuggestedDrop";
@@ -25,7 +23,6 @@ import { trackUse } from "@/lib/analytics";
 import { ideaTags, shortReason } from "@/lib/tradeHubFilters";
 import {
   LOW_CONFIDENCE_USER_NOTE,
-  categoryColor,
   confidenceLevel,
   fairnessBandColor,
   formatTradeGain,
@@ -34,6 +31,7 @@ import {
   tradeIdeaShareText,
 } from "@/lib/tradeHubPresentation";
 import { PlayerName } from "@/components/PlayerName";
+import { usePlayerQuickView } from "@/context/PlayerQuickViewContext";
 
 /**
  * Shares the branded trade card PNG (app/share-card/trade, drawn by
@@ -157,6 +155,20 @@ export function ReasoningTags({ tags }: { tags: string[] }) {
   );
 }
 
+function tradeCardAsset(asset: TradeAsset, index: number, open?: (asset: TradeAsset) => void): TradeCardAsset {
+  if (asset.asset_type === "pick") {
+    return { key: `pick-${index}`, pickLabel: asset.label || [asset.season, asset.round ? `R${asset.round}` : null].filter(Boolean).join(" ") || "Draft pick", value: asset.score ?? null };
+  }
+  return {
+    key: asset.player_id ?? `p-${index}`,
+    player: { id: asset.player_id ?? null, name: asset.name || "Player", position: asset.position, team: asset.team, age: asset.age, tier: asset.tier },
+    detail: [asset.team, asset.age ? `Age ${asset.age}` : null].filter(Boolean).join(" · ") || null,
+    value: asset.score ?? null,
+    ovr: asset.overall_rating ?? null,
+    onOpen: open && asset.player_id ? () => open(asset) : undefined,
+  };
+}
+
 export function TradeIdeaCardView({
   idea,
   leagueId,
@@ -176,6 +188,10 @@ export function TradeIdeaCardView({
   highlighted?: boolean;
 }) {
   const ref = useRef<HTMLDivElement>(null);
+  const { openPlayer } = usePlayerQuickView();
+  const openAsset = (asset: TradeAsset) => {
+    if (asset.player_id) openPlayer({ ...asset, player_id: asset.player_id, sourceLabel: "Trade Board", leagueId });
+  };
   useEffect(() => {
     if (highlighted && ref.current && typeof ref.current.scrollIntoView === "function") {
       ref.current.scrollIntoView({ behavior: "smooth", block: "center" });
@@ -184,7 +200,6 @@ export function TradeIdeaCardView({
   const gain = idea.trade_gain;
   const deltaText = formatTradeGain(gain);
   const deltaColor = gain > 0 ? "var(--color-success)" : gain < 0 ? "var(--color-danger)" : "var(--color-text-secondary)";
-  const accent = categoryColor(idea.category);
   const isLowConfidence = idea.confidence_label.trim().toLowerCase() === "low";
   const landedNames = (idea.landed_gm_target_player_ids || [])
     .map((playerId) => idea.package.receive.find((asset) => asset.player_id === playerId)?.name)
@@ -198,19 +213,6 @@ export function TradeIdeaCardView({
   const tags = ideaTags(idea);
   const reason = shortReason(idea.rationale);
   const moreReason = (idea.rationale || "").trim().slice(reason.length).trim();
-  const sendTotal = Math.round(idea.send_score || 0).toLocaleString();
-  const receiveTotal = Math.round(idea.receive_score || 0).toLocaleString();
-
-  // Collapsed: partner as the title and a real summary (balance, swap, fairness, confidence). The whole former card
-  // is the expanded body, so nothing is removed, only folded (docs/ui-patterns.md "Module templates").
-  const summaryParts = tradeIdeaSummaryParts({
-    gain,
-    sendNames: idea.package.send.map((asset) => abbreviatePlayerName(asset.name)),
-    receiveNames: idea.package.receive.map((asset) => abbreviatePlayerName(asset.name)),
-    band: idea.value_edge_band,
-    confidenceLabel: idea.confidence_label,
-  });
-  const moduleId = `trade.idea.${leagueId ?? "x"}.${idea.package.send.map((a) => a.player_id).join("-")}.${idea.package.receive.map((a) => a.player_id).join("-")}`;
 
   return (
     <div
@@ -218,20 +220,21 @@ export function TradeIdeaCardView({
       data-highlighted={highlighted ? "true" : undefined}
       style={highlighted ? { outline: "2px solid var(--color-accent)", outlineOffset: "2px" } : undefined}
     >
-    <CompactModule
-      id={moduleId}
+    <TradeCompactCard
+      testId="trade-idea-card"
+      mode="desk"
       title={
         <span className="flex items-center gap-2 min-w-0">
           <TeamAvatar avatarUrl={idea.partner_team_avatar_url} size={24} />
-          <span className="min-w-0 break-words">{idea.partner_team_name}</span>
+          <span className="min-w-0 flex-1 break-words">{idea.partner_team_name}</span>
+          <span className="shrink-0 font-black" style={{ color: deltaColor }}>{tradeIdeaGainText(gain)}</span>
         </span>
       }
-      label={idea.partner_team_name}
-      parts={summaryParts}
-      accent={accent}
+      give={idea.package.send.map((a, i) => tradeCardAsset(a, i, openAsset))}
+      get={idea.package.receive.map((a, i) => tradeCardAsset(a, i, openAsset))}
+      verdictLabel={idea.value_edge_band || null}
+      meta={[`${idea.confidence_label} confidence`]}
       defaultOpen={highlighted}
-      persist={false}
-      testId="trade-idea-card"
     >
     <div className="flex flex-col gap-3">
       {tags.length > 0 || copy.impactTagHelp(idea.impact_tag) ? (
@@ -304,23 +307,6 @@ export function TradeIdeaCardView({
       </div>
       <ManagerTendenciesCard leagueId={leagueId} teamName={idea.partner_team_name} />
 
-      {/* Width-fill fix (PR #1050, reconfirmed here): minmax(0,1fr) on both
-          exchange columns, never max-content/auto-sized. */}
-      <div className="grid grid-cols-1 sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)] gap-3 items-start">
-        <ExchangeSide
-          label="You send"
-          dotColor="var(--color-danger)"
-          assets={idea.package.send}
-          total={{ text: sendTotal, color: "var(--color-text-secondary)" }}
-        />
-        <ExchangeSide
-          label="You get"
-          dotColor="var(--color-success)"
-          assets={idea.package.receive}
-          total={{ text: receiveTotal, color: "var(--color-text-secondary)" }}
-        />
-      </div>
-
       <div className="flex items-baseline gap-2">
         <span className="text-xs uppercase font-bold" style={{ color: "var(--color-text-muted)", letterSpacing: "var(--letter-spacing-badge)" }}>
           Balance
@@ -374,7 +360,7 @@ export function TradeIdeaCardView({
           <ReasoningTags tags={idea.reasoning_tags} />
         </div>
     </div>
-    </CompactModule>
+    </TradeCompactCard>
     </div>
   );
 }
