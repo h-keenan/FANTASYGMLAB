@@ -240,6 +240,7 @@ describe("TradeFinderContent", () => {
     expect(button).toBeDisabled();
     fireEvent.click(screen.getByText("2027 Round 1"));
     expect(button).not.toBeDisabled();
+    fireEvent.click(screen.getByRole("button", { name: /What you want back/ }));
     fireEvent.click(screen.getByRole("tab", { name: "Picks back" }));
 
     await act(async () => {

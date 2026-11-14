@@ -1,8 +1,13 @@
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 
 import { TradeHistoryContent } from "./TradeHistoryContent";
 import type { PastTradeOutcome, TradeOutcomeHistoryResponse } from "@/lib/api";
+
+/** Each trade is a CompactModule (partner + a real summary); open them to assert on the package and verdict. */
+function expandAll() {
+  for (const b of document.querySelectorAll('button[aria-expanded="false"][aria-label$=". Expand"]')) fireEvent.click(b);
+}
 
 function outcome(overrides: Partial<PastTradeOutcome>): PastTradeOutcome {
   return {
@@ -29,6 +34,7 @@ describe("TradeHistoryContent", () => {
   it("shows the no-history empty state", () => {
     const data: TradeOutcomeHistoryResponse = { ok: true, outcomes: [] };
     render(<TradeHistoryContent data={data} />);
+    expandAll();
 
     expect(screen.getByText("No trade history yet. Confirm a trade to see it here.")).toBeInTheDocument();
   });
@@ -36,6 +42,7 @@ describe("TradeHistoryContent", () => {
   it("renders a confirmed trade's partner, date, and send/receive assets", () => {
     const data: TradeOutcomeHistoryResponse = { ok: true, outcomes: [outcome({})] };
     render(<TradeHistoryContent data={data} />);
+    expandAll();
 
     expect(screen.getByText("The Gridiron Gurus")).toBeInTheDocument();
     expect(screen.getByText("Made it")).toBeInTheDocument();
@@ -45,6 +52,7 @@ describe("TradeHistoryContent", () => {
 
   it("shows no verdict section for a confirmed trade with no computed result yet", () => {
     render(<TradeHistoryContent data={{ ok: true, outcomes: [outcome({ result_summary: null })] }} />);
+    expandAll();
 
     expect(screen.queryByText(/edge since the trade/)).not.toBeInTheDocument();
   });
@@ -67,6 +75,7 @@ describe("TradeHistoryContent", () => {
         }}
       />,
     );
+    expandAll();
 
     expect(screen.queryByText(/edge since the trade/)).not.toBeInTheDocument();
   });
@@ -93,8 +102,9 @@ describe("TradeHistoryContent", () => {
         }}
       />,
     );
+    expandAll();
 
-    expect(screen.getByText("This trade has worked out")).toBeInTheDocument();
+    expect(screen.getAllByText("This trade has worked out").length).toBeGreaterThan(0);
     expect(screen.getByText("+4.2 PPR pts/wk edge since the trade · +12% value trend edge")).toBeInTheDocument();
   });
 
@@ -119,6 +129,7 @@ describe("TradeHistoryContent", () => {
         }}
       />,
     );
+    expandAll();
 
     expect(screen.getByText("Didn't make it")).toBeInTheDocument();
     expect(screen.queryByText("This trade has worked out")).not.toBeInTheDocument();

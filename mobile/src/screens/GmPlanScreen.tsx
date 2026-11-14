@@ -73,12 +73,6 @@ const TABS: Array<{ key: Tab; label: string; glyph: TabIconName }> = [
   { key: 'watching', label: 'Watching', glyph: 'watching' },
 ];
 
-const FOCUS_META: Record<string, { icon: IconName }> = {
-  standing: { icon: 'stats-chart-outline' },
-  trade_opportunities: { icon: 'swap-horizontal-outline' },
-  roster_construction: { icon: 'layers-outline' },
-};
-
 const TILE_ICON: Record<PlanSnapshotTile['key'], IconName> = {
   power: 'stats-chart-outline',
   capital: 'layers-outline',
