@@ -450,7 +450,7 @@ export function PlayerQuickView({
                     },
                   ]
                 : []),
-              ...(remote
+              ...(remote || sim?.stats
                 ? [
                     {
                       key: "stats",
@@ -458,7 +458,7 @@ export function PlayerQuickView({
                       render: () => (
                         <div className="pqv-body">
                           {sim?.stats ?? null}
-                          {bodyGate ?? (
+                          {!remote ? null : bodyGate ?? (
                             <>
                               <PlayerUsageBlock profile={model?.usage_profile} position={stats?.position ?? identity.position} playerId={identity.player_id} />
                               <SeasonStatsRows stats={stats ?? null} usageProfile={model?.usage_profile} playerId={identity.player_id} />
@@ -473,6 +473,10 @@ export function PlayerQuickView({
                         </div>
                       ),
                     },
+                  ]
+                : []),
+              ...(remote
+                ? [
                     {
                       key: "profile",
                       label: "Profile",

@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import type { SimHistoryEntry, SimTeamHistoryMove } from "./simGame";
-import { simDraftSlotText, simHistoryText, simSeasonRecord, simTeamMoveText, simWhenLabel } from "./simHistory";
+import { simCareerSeasonParts, simCareerSeasonTitle, simDraftSlotText, simHistoryText, simSeasonRecord, simTeamMoveText, simWhenLabel } from "./simHistory";
 
 const base = { season: 1, year: null, week: 5, offseason: false, team_id: "3", team_name: "Bench Mob" };
 const entry = (e: Partial<SimHistoryEntry> & { kind: SimHistoryEntry["kind"] }): SimHistoryEntry => ({ ...base, ...e }) as SimHistoryEntry;
@@ -33,5 +33,15 @@ describe("sim history text", () => {
     expect(simTeamMoveText(move({ kind: "drop", player: { id: "b", name: "Bo", pos: "RB" }, reason: "roster_limit" }))).toBe("Dropped Bo (roster limit)");
     expect(simSeasonRecord({ wins: 9, losses: 5, ties: 0 })).toBe("9-5");
     expect(simSeasonRecord({ wins: 9, losses: 4, ties: 1 })).toBe("9-4-1");
+  });
+});
+
+describe("sim career season summary", () => {
+  it("reads 'S3 2028 · 14 g · 212.4 pts · 15.2 avg · WR12' and drops what it does not know", () => {
+    const base = { season: 3, year: 2028, season_label: "S3 2028", games: 14, points: 212.4, ppg: 15.2, pos: "WR", pos_rank: 12 };
+    expect(simCareerSeasonTitle(base)).toBe("S3 2028");
+    expect(simCareerSeasonParts(base).map((p) => p.text).join(" · ")).toBe("14 g · 212.4 pts · 15.2 avg · WR12");
+    expect(simCareerSeasonParts({ ...base, pos: null, pos_rank: null, ppg: null }).map((p) => p.text)).toEqual(["14 g", "212.4 pts"]);
+    expect(simCareerSeasonTitle({ season: 2, year: 2027 })).toBe("S2 2027");
   });
 });
