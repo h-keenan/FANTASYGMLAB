@@ -312,6 +312,15 @@ describe("SimGameContent", () => {
     expect(await screen.findByText("No games yet")).toBeInTheDocument();
   });
 
+  it("the hub has a phone exit (the sim hides the global header, orb and bar, so it needs its own way out)", async () => {
+    mocked.listSimGames.mockResolvedValue({ ok: true, reason: "", games: [] });
+    render(<SimGameContent />);
+    expect(await screen.findByText("No games yet")).toBeInTheDocument();
+    const bar = screen.getByRole("navigation", { name: "Leave Fantasy Sim" });
+    expect(within(bar).getByRole("button", { name: /Back/ })).toBeInTheDocument();
+    expect(within(bar).getByRole("link", { name: "Home" })).toHaveAttribute("href", "/");
+  });
+
   it("Free past week 3: Advance becomes Go Pro, never calls the API, and reads still render", async () => {
     mocked.getSimGameOptions.mockResolvedValue(options({ is_premium: false, max_games: 1, preview: { weeks_left: 0, paywall_week: 4, paywalled: true } }));
     mocked.listSimGames.mockResolvedValue({ ok: true, reason: "", games: [lite(game())] });

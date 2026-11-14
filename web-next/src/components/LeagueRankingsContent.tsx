@@ -11,7 +11,6 @@ import { api, type LeagueTeamRankingsResponse, type PlayoffOddsResponse, type Pl
 import {
   boardSecondaryParts,
   formatRank,
-  formatScore,
   metricToneColor,
   percentileFromRank,
   playoffOddsReasonMessage,
@@ -21,6 +20,7 @@ import {
   teamBadgeTone,
   teamRankingsReasonMessage,
   type RankBoardKey,
+  boardScoreText,
 } from "@/lib/leagueRankingsPresentation";
 import { ManagerProfileSheet } from "@/components/ManagerProfileSheet";
 import { SectionHeading } from "@/components/SectionHeading";
@@ -30,6 +30,7 @@ import { ToneBadge } from "@/components/ToneBadge";
 import { NextSteps } from "@/components/NextSteps";
 import { ValuesCredit } from "@/components/ValuesCredit";
 import { EmptyState } from "@/components/EmptyState";
+import { rankBoardAnchor } from "@/lib/insightLinks";
 import { PageTitle } from "@/components/PageTitle";
 
 /**
@@ -168,7 +169,7 @@ function YourStandingCard({ teams, myRosterId }: { teams: TeamRanking[]; myRoste
     { key: "bench", label: "Bench" },
   ];
   return (
-    <section aria-label="Your standing" data-testid="your-standing">
+    <section id="your-standing" className="scroll-mt-4" aria-label="Your standing" data-testid="your-standing">
     <AccentCard accent="var(--color-accent)" as="div">
       <div className="flex items-center gap-3">
         <ValueRing
@@ -406,7 +407,7 @@ function RankBoardSection({ board, teams, myRosterId, onOpenManager }: { board: 
     : ordered.filter((team, index) => index < BOARD_PREVIEW_COUNT || team.roster_id === myRosterId);
 
   return (
-    <section className="flex flex-col gap-3">
+    <section id={rankBoardAnchor(board)} className="flex flex-col gap-3 scroll-mt-4" data-testid={`rank-board-${board}`}>
       <SectionHeading kicker={config.kicker} note={config.note}>{config.title}</SectionHeading>
       <div className="glass-surface flex flex-col">
         {visible.map((team) => {
@@ -427,7 +428,7 @@ function RankBoardSection({ board, teams, myRosterId, onOpenManager }: { board: 
               teamName={team.team_name || "Team"}
               avatarUrl={team.avatar_url}
               ownerName={team.owner_name}
-              primaryMetric={formatScore(score)}
+              primaryMetric={boardScoreText(board, score)}
               metricLabel={config.scoreLabel}
               toneColor={metricToneColor(percentile)}
               isCurrent={team.roster_id === myRosterId}
@@ -492,6 +493,7 @@ export function LeagueRankingsContent({
           <RankBoardSection board="draft_capital" teams={data.teams} myRosterId={myRosterId} onOpenManager={openManager} />
           <RankBoardSection board="starter" teams={data.teams} myRosterId={myRosterId} onOpenManager={openManager} />
           <RankBoardSection board="bench" teams={data.teams} myRosterId={myRosterId} onOpenManager={openManager} />
+          <RankBoardSection board="age" teams={data.teams} myRosterId={myRosterId} onOpenManager={openManager} />
         </>
       )}
       {profile ? (

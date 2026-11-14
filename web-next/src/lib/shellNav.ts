@@ -37,6 +37,16 @@ export function shellNavQueryToStore(queryNav: string | null | undefined): "bott
 
 export type ShellContext = { leagueId: string | null; leagueName: string };
 
+/**
+ * The league the shell should treat as current. League pages carry it in the path (`/x/[leagueId]`); the
+ * few account-wide pages reached from inside a league (Trade History) carry it as `?league=` so the bar,
+ * title and back target stay in the league instead of silently switching to the outside-league tabs.
+ */
+export function shellLeagueContext(pathLeagueId: string | null | undefined, search: { get(key: string): string | null }, unnamed: string): ShellContext {
+  const leagueId = pathLeagueId || search.get("league") || null;
+  return { leagueId, leagueName: search.get("name") || (leagueId ? unnamed : "") };
+}
+
 /** League context: Today / Team / Trades / League / More. Outside a league: Home / Portfolio / Fantasy Sim / News / More. */
 export function shellTabs(ctx: ShellContext): BottomTab[] {
   if (ctx.leagueId) {
@@ -115,6 +125,7 @@ const PARENT_SEGMENT: Record<string, string> = {
   "trade-offer": "trade-hub",
   "fantasy-sim": "gm-plan",
   "player-compare": "players",
+  "trade-history": "trade-hub",
 };
 
 /** The standard header's back target: the parent page's name, so "Players" is said on a player page. Null on a tab root. */

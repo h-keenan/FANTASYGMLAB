@@ -1,3 +1,5 @@
+import { openInsight } from '../lib/insightNav';
+import type { InsightKey } from '../lib/insightLinks';
 import React, { useMemo, useState } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
@@ -166,11 +168,11 @@ export function DashboardTeamStats({
   onNavigate: Navigate;
 }) {
   const copy = useExperienceCopy();
-  const goToTeams = () => onNavigate('Teams', { leagueId, leagueName });
+  const open = (key: InsightKey) => openInsight(onNavigate, key, leagueId, leagueName);
   const injured = snapshot.injured_starters != null && snapshot.injured_starters > 0 ? snapshot.injured_starters : 0;
   const ofTeams = teams && teams.length > 1 ? `of ${teams.length} teams` : null;
   const leagueAge = leagueAverageAge(teams);
-  const rank = (label: string, icon: StatStripItem['icon'], value: number | null | undefined, tied: boolean, onPress?: () => void): StatStripItem => ({
+  const rank = (label: string, icon: StatStripItem['icon'], value: number | null | undefined, tied: boolean, onPress: () => void): StatStripItem => ({
     label,
     icon,
     value: value != null ? formatRank(value, tied) : '—',
@@ -178,21 +180,23 @@ export function DashboardTeamStats({
     onPress,
   });
   const items: StatStripItem[] = [
-    rank('Power Rank', 'trophy-outline', snapshot.power_rank, !!snapshot.power_rank_tied, goToTeams),
-    rank('Franchise Rank', 'shield-outline', snapshot.franchise_rank, !!snapshot.franchise_rank_tied, goToTeams),
-    rank('Starter Strength', 'link-outline', snapshot.starter_rank, !!snapshot.starter_rank_tied),
-    rank('Bench Strength', 'layers-outline', snapshot.bench_rank, !!snapshot.bench_rank_tied),
+    rank('Power Rank', 'trophy-outline', snapshot.power_rank, !!snapshot.power_rank_tied, open('power')),
+    rank('Franchise Rank', 'shield-outline', snapshot.franchise_rank, !!snapshot.franchise_rank_tied, open('franchise')),
+    rank('Starter Strength', 'link-outline', snapshot.starter_rank, !!snapshot.starter_rank_tied, open('starter')),
+    rank('Bench Strength', 'layers-outline', snapshot.bench_rank, !!snapshot.bench_rank_tied, open('bench')),
     {
       label: copy.label('averageAge', 'Avg Age'),
       icon: 'hourglass-outline',
       value: snapshot.average_age != null ? snapshot.average_age.toFixed(1) : '—',
       note: snapshot.average_age != null && leagueAge ? `League avg ${leagueAge}` : null,
+      onPress: open('age'),
     },
     {
       label: 'Injured starters',
       icon: 'medkit-outline',
       value: injured > 0 ? String(injured) : 'None',
       tone: injured > 0 ? 'risk' : 'positive',
+      onPress: open('injury'),
     },
   ];
   return (

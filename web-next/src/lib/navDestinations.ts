@@ -70,7 +70,7 @@ const TAB_PATHS: Record<string, Record<string, (c: TabPathContext) => string>> =
     Hub: ({ id, query }) => `/trade-hub/${id}${query}`,
     Finder: ({ id, query }) => `/trade-finder/${id}${query}`,
     Analyzer: ({ id, query }) => `/trade-analyzer/${id}${query}`,
-    History: () => "/trade-history",
+    History: ({ id, query }) => (id ? `/trade-history?league=${id}${query.replace("?", "&")}` : "/trade-history"),
   },
   "gm-plan": {
     // Its own route (the sim page), reached from GM Plan; no top-level menu row.

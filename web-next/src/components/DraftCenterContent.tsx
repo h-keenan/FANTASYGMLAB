@@ -1,7 +1,10 @@
 "use client";
 
 import { SectionHeading } from "@/components/SectionHeading";
-import { useMemo, useState } from "react";
+import { useMemo, useState, type ReactNode } from "react";
+
+import { InsightLink } from "@/components/ui/InsightLink";
+import type { InsightKey } from "@/lib/insightLinks";
 
 import type { PositionNeedGroup, DraftCard, DraftCenterResponse, DraftPickAsset } from "@/lib/api";
 import { PickRow, draftPickRowProps } from "@/components/PickRow";
@@ -44,6 +47,7 @@ export function parseDraftCenterTab(value: string | null | undefined): DraftCent
 }
 
 export function DraftCenterContent({
+  leagueId,
   leagueName,
   data,
   picks,
@@ -52,6 +56,8 @@ export function DraftCenterContent({
   onTabChange,
   needGroups = null,
 }: {
+  /** With it, the posture cells link to the rankings / plan that explain them. */
+  leagueId?: string;
   leagueName: string;
   data: DraftCenterResponse;
   picks: DraftPickAsset[];
@@ -60,6 +66,7 @@ export function DraftCenterContent({
   onTabChange?: (tab: DraftCenterTab) => void;
   needGroups?: PositionNeedGroup[] | null;
 }) {
+  const league = leagueId ? { id: leagueId, name: leagueName } : null;
   const [tab, setTab] = useState<DraftCenterTab>(initialTab);
   // The GM orb can pick another Draft Center tab while this page is mounted.
   const [seenInitialTab, setSeenInitialTab] = useState(initialTab);
@@ -127,6 +134,8 @@ export function DraftCenterContent({
             </p>
             <div className="grid grid-cols-1 min-[420px]:grid-cols-3 gap-2">
               <CapitalCell
+                insight="draft_capital"
+                league={league}
                 label="Draft Capital"
                 rank={posture.draft_capital_rank}
                 tied={posture.draft_capital_rank_tied}
@@ -135,6 +144,8 @@ export function DraftCenterContent({
                 glyph="franchise"
               />
               <CapitalCell
+                insight="future_capital"
+                league={league}
                 label="Future Capital"
                 rank={posture.future_draft_capital_rank}
                 tied={posture.future_draft_capital_rank_tied}
@@ -146,6 +157,7 @@ export function DraftCenterContent({
                 }
                 glyph="bench"
               />
+              <MaybeInsight insight="strategy" league={league} spoken={["Strategy", posture.strategy_display]}>
               <div className="glass-surface flex flex-col gap-1 p-3 min-w-0">
                 <span className="flex items-center gap-1 text-xs" style={{ color: "var(--color-text-muted)" }}>
                   <SnapshotTileGlyph name="power" />
@@ -161,6 +173,7 @@ export function DraftCenterContent({
                   )}`}
                 </span>
               </div>
+              </MaybeInsight>
             </div>
           </AccentCard>
         ) : (
@@ -226,7 +239,18 @@ function ringTone(percent: number): "low" | "mid" | "high" {
 }
 
 /** One capital metric: rank as the headline, a percentile ring when the league size is known. */
+function MaybeInsight({ insight, league, spoken, children }: { insight: InsightKey; league: { id: string; name: string } | null; spoken: ReadonlyArray<string | null | undefined>; children: ReactNode }) {
+  if (!league) return <>{children}</>;
+  return (
+    <InsightLink insight={insight} league={league} spoken={spoken}>
+      {children}
+    </InsightLink>
+  );
+}
+
 function CapitalCell({
+  insight,
+  league,
   label,
   rank,
   tied,
@@ -234,6 +258,8 @@ function CapitalCell({
   note,
   glyph,
 }: {
+  insight: InsightKey;
+  league: { id: string; name: string } | null;
   label: string;
   rank: number | null;
   tied: boolean;
@@ -244,6 +270,7 @@ function CapitalCell({
   const percentile = leagueSize ? percentileFromRank(rank, leagueSize) : null;
   const percent = percentile === null ? null : Math.round(percentile);
   return (
+    <MaybeInsight insight={insight} league={league} spoken={[label, formatRank(rank, tied), note]}>
     <div className="glass-surface flex items-center gap-2 p-3 min-w-0" style={rank === 1 ? { borderColor: "var(--color-premium)" } : undefined}>
       <div className="flex flex-col gap-1 min-w-0 flex-1">
         <span className="flex items-center gap-1 text-xs" style={{ color: "var(--color-text-muted)" }}>
@@ -269,6 +296,7 @@ function CapitalCell({
         />
       ) : null}
     </div>
+    </MaybeInsight>
   );
 }
 

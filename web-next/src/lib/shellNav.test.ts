@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { shellActiveTab, shellBarVisible, shellNavEnabled, shellNavQueryToStore, shellParent, shellTabs } from "./shellNav";
+import { shellActiveTab, shellBarVisible, shellNavEnabled, shellNavQueryToStore, shellLeagueContext, shellParent, shellTabs } from "./shellNav";
 
 describe("shellNavEnabled (feature flag)", () => {
   it("defaults to founder-only", () => {
@@ -88,5 +88,20 @@ describe("shellParent (back label)", () => {
     expect(shellParent("/dashboard/L1", ctx)).toBeNull();
     expect(shellParent("/trade-hub/L1", ctx)).toBeNull();
     expect(shellParent("/gm-game", { leagueId: null, leagueName: "" })).toBeNull();
+  });
+});
+
+describe("league context for account-wide pages reached from a league (Trade History)", () => {
+  it("takes the league from ?league= when the path has none, so the bar and back target stay in the league", () => {
+    const ctx = shellLeagueContext(null, new URLSearchParams("league=L1&name=My%20League"), "League");
+    expect(ctx).toEqual({ leagueId: "L1", leagueName: "My League" });
+    expect(shellActiveTab("/trade-history", true)).toBe("trades");
+    expect(shellParent("/trade-history", ctx)).toEqual({ label: "Trade Hub", href: "/trade-hub/L1?name=My%20League" });
+    expect(shellTabs(ctx).map((tab) => tab.key)).toEqual(["today", "team", "trades", "league", "more"]);
+  });
+  it("prefers the path league and stays outside a league when neither is given", () => {
+    expect(shellLeagueContext("P1", new URLSearchParams("league=Q&name=N"), "League").leagueId).toBe("P1");
+    expect(shellLeagueContext(null, new URLSearchParams(""), "League")).toEqual({ leagueId: null, leagueName: "" });
+    expect(shellParent("/trade-history", { leagueId: null, leagueName: "" })).toEqual({ label: "Home", href: "/" });
   });
 });

@@ -11,7 +11,7 @@ import { Sheet } from "@/components/ui/Sheet";
 import { useAuth } from "@/context/AuthContext";
 import { useDisplayPreferences } from "@/context/DisplayPreferencesContext";
 import { FOUNDER_DESTINATION, isFounderSession, useNavDestinations, type NavDestination } from "@/lib/navDestinations";
-import { shellActiveTab, shellTabs, SHELL_ACTION_SLOT_ID } from "@/lib/shellNav";
+import { shellActiveTab, shellLeagueContext, shellTabs, SHELL_ACTION_SLOT_ID } from "@/lib/shellNav";
 import { useSearchParams } from "@/lib/useSearchParams";
 import { useShellNav } from "@/lib/useShellNav";
 import { useIsPro } from "@/lib/useIsPro";
@@ -39,8 +39,7 @@ function ShellBarInner() {
   const pathname = usePathname();
   const params = useParams<{ leagueId?: string }>();
   const searchParams = useSearchParams();
-  const leagueId = params?.leagueId ? decodeURIComponent(params.leagueId) : null;
-  const leagueName = searchParams.get("name") || (leagueId ? UNNAMED_LEAGUE : "");
+  const { leagueId, leagueName } = shellLeagueContext(params?.leagueId ? decodeURIComponent(params.leagueId) : null, searchParams, UNNAMED_LEAGUE);
   const tabs = shellTabs({ leagueId, leagueName });
   const active = shellActiveTab(pathname, Boolean(leagueId));
   const [moreOpen, setMoreOpen] = useState(false);

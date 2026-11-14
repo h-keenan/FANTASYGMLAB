@@ -95,6 +95,11 @@ describe("TeamStatusHero on the Dashboard", () => {
     expect(within(hero).getByTestId("team-status-position-RB")).toHaveAttribute("data-weakest", "true");
     expect(within(hero).getByTestId("team-status-position-QB")).not.toHaveAttribute("data-weakest");
     expect(within(hero).getByRole("link", { name: /Improve RB first/ })).toHaveAttribute("href", "/trade-hub/abc?name=L");
+    // Every position room is a link to the analysis that explains it.
+    expect(within(hero).getByRole("link", { name: /RB room, Needs help, open Team Analysis on My Team/ })).toHaveAttribute("href", "/my-team/abc?name=L#team-analysis-heading");
+    // Every dashboard stat tile opens the page that explains it (central map: lib/insightLinks.ts).
+    expect(screen.getByRole("link", { name: /Power Rank.*open the Roster Power rankings/ })).toHaveAttribute("href", "/league-rankings/abc?name=L#board-power");
+    expect(screen.getByRole("link", { name: /Injured starters.*open Alerts/ })).toHaveAttribute("href", "/alerts/abc?name=L");
     // Tiles carry their own context from the same rankings response.
     await waitFor(() => expect(screen.getAllByText("of 3 teams").length).toBeGreaterThan(0));
     expect(screen.getByText("League avg 26.0")).toBeInTheDocument();

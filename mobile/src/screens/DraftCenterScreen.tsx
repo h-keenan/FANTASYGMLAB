@@ -2,7 +2,7 @@ import StructuredRow, { StructuredRowList } from '../components/StructuredRow';
 import TeamAvatar from '../components/TeamAvatar';
 import { cardRows, signalPills, signalSpokenLabel, strategyTone } from '../lib/draftSignals';
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { ScrollView, StyleSheet, View } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import AppText from '../components/AppText';
 import ErrorState from '../components/ErrorState';
 import SectionHeading from '../components/SectionHeading';
@@ -37,6 +37,7 @@ import { useScreenHeaderTitle } from '../lib/useScreenHeaderTitle';
 import { useThemeMode } from '../context/ThemeModeContext';
 import PremiumLock from '../components/PremiumLock';
 import { radii, spacing, type ThemeColors } from '../theme';
+import { openInsight } from '../lib/insightNav';
 import type { RootStackParamList } from '../navigation/RootNavigator';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'DraftCenter'>;
@@ -256,6 +257,7 @@ export default function DraftCenterScreen({ route, navigation }: Props) {
             <View style={styles.tileRow}>
               <CapitalCell
                 label="Draft Capital"
+                onPress={openInsight(navigation.navigate as never, 'draft_capital', leagueId, leagueName)}
                 icon="trophy-outline"
                 rank={posture.draft_capital_rank}
                 tied={posture.draft_capital_rank_tied}
@@ -264,6 +266,7 @@ export default function DraftCenterScreen({ route, navigation }: Props) {
               />
               <CapitalCell
                 label="Future Capital"
+                onPress={openInsight(navigation.navigate as never, 'future_capital', leagueId, leagueName)}
                 icon="calendar-outline"
                 rank={posture.future_draft_capital_rank}
                 tied={posture.future_draft_capital_rank_tied}
@@ -272,6 +275,7 @@ export default function DraftCenterScreen({ route, navigation }: Props) {
               />
               <PostureTile
                 label="Strategy"
+                onPress={openInsight(navigation.navigate as never, 'strategy', leagueId, leagueName)}
                 value={posture.strategy_display || '—'}
                 note={`Roster Power ${formatRank(posture.power_rank, posture.power_rank_tied)} · Franchise ${formatRank(posture.franchise_rank, posture.franchise_rank_tied)}`}
               />
@@ -367,14 +371,15 @@ export default function DraftCenterScreen({ route, navigation }: Props) {
   );
 }
 
-function PostureTile({ label, value, note }: { label: string; value: string; note: string }) {
+function PostureTile({ label, value, note, onPress }: { label: string; value: string; note: string; onPress?: () => void }) {
   const { colors } = useThemeMode();
   const styles = useMemo(() => createStyles(colors), [colors]);
   return (
-    <View style={styles.tile}>
+    <TileShell style={styles.tile} onPress={onPress} accessibilityLabel={`${label}, ${value}`}>
       <View style={styles.tileLabelRow}>
         <Ionicons name="flash-outline" size={11} color={colors.accent} />
         <AppText style={styles.tileLabel}>{label}</AppText>
+        {onPress ? <Ionicons name="chevron-forward" size={12} color={colors.textTertiary} style={styles.tileChevron} /> : null}
       </View>
       <AppText style={styles.tileValue} numberOfLines={1}>
         {value}
@@ -384,7 +389,27 @@ function PostureTile({ label, value, note }: { label: string; value: string; not
           {note}
         </AppText>
       ) : null}
-    </View>
+    </TileShell>
+  );
+}
+
+/** A posture tile: a plain view, or a pressable one when it has a destination (chevron drawn by the caller). */
+function TileShell({
+  style,
+  onPress,
+  accessibilityLabel,
+  children,
+}: {
+  style: object | object[];
+  onPress?: () => void;
+  accessibilityLabel: string;
+  children: React.ReactNode;
+}) {
+  if (!onPress) return <View style={style}>{children}</View>;
+  return (
+    <Pressable style={style} onPress={onPress} accessibilityRole="button" accessibilityLabel={accessibilityLabel}>
+      {children}
+    </Pressable>
   );
 }
 
@@ -396,7 +421,9 @@ function CapitalCell({
   tied,
   leagueSize,
   note,
+  onPress,
 }: {
+  onPress?: () => void;
   label: string;
   icon: React.ComponentProps<typeof Ionicons>['name'];
   rank: number | null;
@@ -410,10 +437,11 @@ function CapitalCell({
   const first = rank === 1;
   const ringColor = percentile === null ? colors.accent : percentile < 34 ? colors.danger : percentile < 67 ? colors.warning : colors.success;
   return (
-    <View style={[styles.tile, first && styles.tileFirst]}>
+    <TileShell style={[styles.tile, first && styles.tileFirst]} onPress={onPress} accessibilityLabel={`${label}, ${formatRank(rank, tied)}${note ? `, ${note}` : ''}`}>
       <View style={styles.tileLabelRow}>
         <Ionicons name={icon} size={11} color={first ? colors.premium : colors.accent} />
         <AppText style={styles.tileLabel}>{label}</AppText>
+        {onPress ? <Ionicons name="chevron-forward" size={12} color={colors.textTertiary} style={styles.tileChevron} /> : null}
       </View>
       <View style={styles.capitalValueRow}>
         <AppText style={[styles.tileValue, first && styles.tileValueFirst]} numberOfLines={1}>
@@ -428,7 +456,7 @@ function CapitalCell({
           {note}
         </AppText>
       ) : null}
-    </View>
+    </TileShell>
   );
 }
 
@@ -521,6 +549,7 @@ function createStyles(colors: ThemeColors) {
     marginBottom: spacing.sm,
   },
   tileRow: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
+  tileChevron: { marginLeft: 'auto' },
   tile: {
     flexBasis: '30%',
     flexGrow: 1,

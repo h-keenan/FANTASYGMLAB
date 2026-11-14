@@ -19,6 +19,7 @@ import {
   buildTeamStatusStanding,
   type TeamStatusPosition,
 } from '../lib/teamStatus';
+import { openInsight } from '../lib/insightNav';
 import { radii, spacing, type ThemeColors } from '../theme';
 
 type Navigate = (name: string, params?: object) => void;
@@ -183,19 +184,21 @@ export default function TeamStatusHero({
 
         {positions.length > 0 ? (
           <View style={[styles.positions, !first && styles.rowDivider]}>
-            <AppText style={styles.muted}>Position rooms vs the league</AppText>
+            <AppText style={styles.muted}>Position rooms vs the league. Tap a room for the detail ›</AppText>
             <View style={styles.chips}>
               {positions.map((position: TeamStatusPosition) => {
                 const color = toneColor[position.tone];
                 return (
-                  <View
+                  <Pressable
                     key={position.position}
-                    accessibilityLabel={`${position.position}: ${position.label}${position.weakest ? ', weakest room' : ''}`}
+                    accessibilityRole="button"
+                    accessibilityLabel={`${position.position}: ${position.label}${position.weakest ? ', weakest room' : ''}, open Team Analysis on My Team`}
+                    onPress={openInsight(onNavigate, 'position_room', leagueId, leagueName)}
                     style={[styles.chip, position.weakest && { borderColor: color }]}
                   >
                     <AppText style={styles.chipPos}>{position.position}</AppText>
                     <AppText style={[styles.chipLabel, { color }]}>{position.label}</AppText>
-                  </View>
+                  </Pressable>
                 );
               })}
             </View>
