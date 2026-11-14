@@ -173,18 +173,43 @@ class GameState:
             del raw["season_no"]
         if raw["offseason"] is None:
             del raw["offseason"]
-        # ``proj`` on a recap row is display-only (the projection shown going into the week, added after player-model-5 shipped):
-        # it is not part of the fingerprint, so every older game keeps its digest.
+        # Display-only recap fields are not part of the fingerprint, so every older game keeps its digest: ``proj`` on a
+        # recap row (the projection shown going into the week), the letter grade on a recap player brief
+        # (``grade`` / ``grade_range`` / ``grade_uncertain``) and ``rank_prev`` / ``rank_delta`` on a standings row.
         recaps = raw.get("recaps")
         if recaps:
-            raw["recaps"] = {
-                wk: {**rc, "your_game": {**rc["your_game"], **{part: [{k: v for k, v in r.items() if k != "proj"} for r in rc["your_game"][part]]
-                                                               for part in ("starters", "bench", "opp_starters") if rc["your_game"].get(part)}}}
-                if isinstance(rc, dict) and isinstance(rc.get("your_game"), dict) else rc
-                for wk, rc in recaps.items()
-            }
+            raw["recaps"] = {wk: _digest_recap(rc) if isinstance(rc, dict) else rc for wk, rc in recaps.items()}
         blob = json.dumps(raw, sort_keys=True, separators=(",", ":"), default=str)
         return hashlib.sha256(blob.encode()).hexdigest()
+
+
+_DISPLAY_ROW_KEYS = ("proj",)
+_DISPLAY_PLAYER_KEYS = ("grade", "grade_range", "grade_uncertain")
+_DISPLAY_STANDING_KEYS = ("rank_prev", "rank_delta")
+
+
+def _plain_player(p: Any) -> Any:
+    return {k: v for k, v in p.items() if k not in _DISPLAY_PLAYER_KEYS} if isinstance(p, dict) else p
+
+
+def _digest_recap(rc: dict[str, Any]) -> dict[str, Any]:
+    """A recap without its display-only fields (see ``GameState.digest``)."""
+    out = dict(rc)
+    g = rc.get("your_game")
+    if isinstance(g, dict):
+        g = dict(g)
+        for part in ("starters", "bench", "opp_starters"):
+            if g.get(part):
+                g[part] = [{**{k: v for k, v in r.items() if k not in _DISPLAY_ROW_KEYS}, **({"player": _plain_player(r["player"])} if "player" in r else {})} for r in g[part]]
+        for key in ("mvp", "bust"):
+            if isinstance(g.get(key), dict) and "player" in g[key]:
+                g[key] = {**g[key], "player": _plain_player(g[key]["player"])}
+        out["your_game"] = g
+    if rc.get("injuries"):
+        out["injuries"] = [{**i, "player": _plain_player(i.get("player"))} if isinstance(i, dict) else i for i in rc["injuries"]]
+    if rc.get("standings"):
+        out["standings"] = [{k: v for k, v in r.items() if k not in _DISPLAY_STANDING_KEYS} if isinstance(r, dict) else r for r in rc["standings"]]
+    return out
 
 
 def make_event(state: GameState, week: int, actor: str, etype: str, /, **payload: Any) -> dict[str, Any]:
