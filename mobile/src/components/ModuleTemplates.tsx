@@ -12,6 +12,7 @@ import type { ChartInputPoint } from '../lib/chartSeries';
 import { compactAriaLabel, compactParts, type CompactPart, type CompactTone } from '../lib/compactModule';
 import { heroParts, statStripParts, trendModel, type TrendModel } from '../lib/moduleTemplates';
 import { spacing, type ThemeColors } from '../theme';
+import Money from './Money';
 
 /**
  * The module template components (mirrors web-next/src/components/ui/ModuleTemplates.tsx; catalog in
@@ -234,7 +235,7 @@ export function LinkModule({
             {shown.map((part, i) => (
               <AppText key={part.key} style={[styles.part, part.tone ? { color: toneColor(part.tone, colors) } : null, part.strong ? { fontWeight: '800' } : null]}>
                 {i > 0 ? <AppText style={styles.sep}>{' · '}</AppText> : null}
-                {part.text}
+                <Money>{part.text}</Money>
               </AppText>
             ))}
           </AppText>

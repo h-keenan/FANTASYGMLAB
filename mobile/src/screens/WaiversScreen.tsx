@@ -73,6 +73,8 @@ import { useValuationLens } from '../context/ValuationLensContext';
 import { radii, spacing, type ThemeColors } from '../theme';
 import type { RootStackParamList } from '../navigation/RootNavigator';
 import { usePlayerQuickView } from '../context/PlayerQuickViewContext';
+import Money from '../components/Money';
+import { formatMoney } from '../lib/money';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Waivers'>;
 
@@ -211,7 +213,7 @@ export default function WaiversScreen({ route, navigation }: Props) {
             available: result.available_count ?? result.players.length,
             ...(result.faab_enabled === false
               ? { faab: result.waiver_mode === 'reverse_standings' ? 'Reverse' : 'Rolling', faabLabel: 'Waivers' }
-              : { faab: result.faab_remaining != null ? `$${result.faab_remaining}` : '—', faabLabel: 'FAAB' }),
+              : { faab: result.faab_remaining != null ? formatMoney(result.faab_remaining) : '—', faabLabel: 'FAAB' }),
           });
           setNotice(result.reason ? reasonMessage(result.reason) : null);
         } catch (err) {
@@ -543,9 +545,9 @@ export default function WaiversScreen({ route, navigation }: Props) {
                       <AnimatedCard style={styles.compactGroupCard}>
                         {sharedDrop ? <SharedDropNote drop={sharedDrop.first.drop_suggestion!.drop!} count={sharedDrop.count} /> : null}
                         {bidNote ? (
-                          <AppText style={styles.secondaryCaption} testID="waiver-bid-note">
+                          <Money style={styles.secondaryCaption} testID="waiver-bid-note">
                             {`Bid ranges are ${bidNote}. Tap a row for its value, why and roster move.`}
-                          </AppText>
+                          </Money>
                         ) : null}
                         {visibleSecondary.map((player, index) => (
                           <HighlightFrame

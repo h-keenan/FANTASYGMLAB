@@ -1,4 +1,5 @@
 import type { WaiverFaabGuidance } from './api';
+import { formatMoney, formatMoneyRange } from './money.ts';
 
 /**
  * Display text for a waiver recommendation's FAAB guidance. Mirrors
@@ -24,7 +25,7 @@ export function faabDisplayText(faab: WaiverFaabGuidance | null | undefined): {
   const hasDollars = faab.dollars_known && faab.remaining != null;
   return {
     isBid: true,
-    primary: hasDollars ? `$${faab.low_bid}–$${faab.high_bid}` : `${faab.pct_low}–${faab.pct_high}%`,
-    secondary: hasDollars ? `of $${faab.remaining} remaining` : 'of remaining FAAB',
+    primary: hasDollars ? formatMoneyRange(faab.low_bid, faab.high_bid) : `${faab.pct_low}–${faab.pct_high}%`,
+    secondary: hasDollars && faab.remaining != null ? `of ${formatMoney(faab.remaining)} remaining` : 'of remaining FAAB',
   };
 }

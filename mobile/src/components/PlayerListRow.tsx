@@ -26,6 +26,7 @@ import {
   type PlayerListTag,
 } from '../lib/playerListRow';
 import { positionColor, radii, spacing, type ThemeColors } from '../theme';
+import Money from './Money';
 
 /**
  * THE player-list row (native twin of web-next/src/components/PlayerListRow.tsx):
@@ -159,7 +160,7 @@ export default function PlayerListRow({
             {meta.map((part, i) => (
               <AppText key={part.key} style={[styles.meta, part.tone && { color: toneColor(part.tone, colors, colors.textTertiary) }, part.tone === 'warning' && { fontWeight: '700' }]}>
                 {i > 0 ? ' · ' : ''}
-                {part.text}
+                <Money>{part.text}</Money>
               </AppText>
             ))}
           </AppText>

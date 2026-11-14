@@ -23,6 +23,7 @@ import {
 } from "@/lib/playerListRow";
 import { badgeFromTag, type BadgeInput, type BadgeKind } from "@/lib/playerBadges";
 import { positionColorVar } from "@/lib/playerPresentation";
+import { Money } from "@/components/Money";
 
 /**
  * THE player-list row: the `list` variant of the player card system
@@ -202,7 +203,7 @@ export function PlayerListRow({
             {meta.map((part, i) => (
               <span key={part.key}>
                 {i > 0 ? " · " : ""}
-                <span style={{ color: part.tone ? TONE_COLOR[part.tone] : undefined, fontWeight: part.tone === "warning" ? 700 : undefined }}>{part.text}</span>
+                <span style={{ color: part.tone ? TONE_COLOR[part.tone] : undefined, fontWeight: part.tone === "warning" ? 700 : undefined }}><Money>{part.text}</Money></span>
               </span>
             ))}
           </p>

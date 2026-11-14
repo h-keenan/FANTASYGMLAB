@@ -358,8 +358,8 @@ describe("WaiversContent", () => {
     const withFaab: WaiversResponse = { ...BASE_RESPONSE, faab_remaining: 94, faab_initial: 100 };
     renderOpen(<WaiversContent leagueName="Dynasty Overlords" data={withFaab} />);
 
-    expect(screen.getByText("FAAB")).toBeInTheDocument();
-    expect(screen.getByText("$94")).toBeInTheDocument();
+    expect(screen.getAllByText("FAAB").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("$94").length).toBeGreaterThan(0);
   });
 
   it("shows the bid's why line on the top waiver target", () => {

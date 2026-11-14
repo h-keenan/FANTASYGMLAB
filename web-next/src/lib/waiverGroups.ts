@@ -1,6 +1,7 @@
+import { formatMoney } from "./money";
 /**
  * Waiver list grouping (docs/ui-patterns.md "Module templates", Row): facts that every row of a list repeats are
- * said once for the group instead. Import-free, byte-identical twin of mobile/src/lib/waiverGroups.ts.
+ * said once for the group instead. Byte-identical twin of mobile/src/lib/waiverGroups.ts.
  */
 
 /**
@@ -40,7 +41,7 @@ export function sharedBidNote(players: readonly { faab?: FaabLike | null }[]): s
   for (const player of players) {
     const faab = player.faab;
     if (faab == null || faab.applicable === false) return null;
-    notes.add(faab.dollars_known && faab.remaining != null ? `of $${faab.remaining} remaining` : "of remaining FAAB");
+    notes.add(faab.dollars_known && faab.remaining != null ? `of ${formatMoney(faab.remaining)} remaining` : "of remaining FAAB");
   }
   return notes.size === 1 ? [...notes][0] : null;
 }

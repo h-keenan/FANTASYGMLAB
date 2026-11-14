@@ -18,6 +18,7 @@ import { faabDisplayText } from '../lib/faabDisplay';
 import PositionBadge from './PositionBadge';
 import { injuryTone } from '../lib/injuryDisplay';
 import { radii, spacing, type ThemeColors } from '../theme';
+import Money from './Money';
 
 
 /** Same risk-vs-watch split WaiversScreen has always used, just relocated
@@ -251,9 +252,9 @@ export default function WaiverRecommendationCard({
         {/* Evidence-backed "why" for the bid (or the claim guidance in
             non-FAAB leagues) — modules/faab.py FaabGuidance.why. */}
         {player.faab?.why ? (
-          <AppText style={styles.faabWhy} numberOfLines={3}>
+          <Money style={styles.faabWhy} numberOfLines={3}>
             {player.faab.why}
-          </AppText>
+          </Money>
         ) : null}
         {/* Display-only role flag (modules/usage_trends.py): never feeds the
             score, rank or bid. Same copy as web's Top Waiver Target card. */}
@@ -329,9 +330,9 @@ export default function WaiverRecommendationCard({
       >
         <View style={styles.compactTop}>
           <View style={styles.compactIdentity}>{identity}</View>
-          <AppText style={[styles.compactBid, { color: isBid ? colors.successBright : colors.textSecondary }]} numberOfLines={1} testID="waiver-bid">
+          <Money all={isBid} style={[styles.compactBid, !isBid && { color: colors.textSecondary }]} numberOfLines={1} testID="waiver-bid">
             {primary}
-          </AppText>
+          </Money>
         </View>
         <View style={chipStyles.row}>
           {chips.map((chip) => pill(chip, chip, colors.accent, 'flash'))}
@@ -352,7 +353,7 @@ export default function WaiverRecommendationCard({
               <FAABGuidance faab={player.faab} size="compact" />
             </View>
           </View>
-          {player.faab?.why ? <AppText style={styles.faabWhy}>{player.faab.why}</AppText> : null}
+          {player.faab?.why ? <Money style={styles.faabWhy}>{player.faab.why}</Money> : null}
           {flag ? (
             <AppText style={styles.faabWhy}>
               <AppText style={{ fontWeight: '700', color: flag.tone === 'positive' ? colors.success : colors.danger }}>{flag.label}: </AppText>

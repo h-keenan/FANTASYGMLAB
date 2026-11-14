@@ -60,7 +60,7 @@ export const IDENTICAL = [
   "liveScores.ts",
   "matchupPlanner.ts",
   "matchupModules.ts",
-  "waiverGroups.ts",
+  "money.ts",
   "playersModules.ts",
   "playerAnatomy.ts",
   "multiTeamIdeas.ts",
@@ -111,6 +111,7 @@ export const IDENTICAL = [
 
 // Same code, differing only in comments / import specifiers / quote style.
 export const MIRRORED = [
+  "waiverGroups.ts", // imports ./money (mobile needs the .ts extension for node strip-types tests)
   "pickBadge.ts",
   "waiversHeader.ts",
   "playerNameFit.ts",
