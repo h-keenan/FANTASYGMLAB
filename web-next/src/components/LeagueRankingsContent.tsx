@@ -2,7 +2,7 @@
 
 import { PageTabBar } from "@/components/PageTabBar";
 import { BEGINNER_HELP } from "@/lib/experienceCopy";
-import { useEffect, useState } from "react";
+import { useState, useSyncExternalStore } from "react";
 
 import { AccentCard } from "@/components/AccentCard";
 import { BeginnerHelp } from "@/components/BeginnerHelp";
@@ -418,10 +418,14 @@ function RankBoardSection({ board, teams, myRosterId, onOpenManager }: { board: 
   // A rank board is a compact module: collapsed it names the leader and where you sit; the Roster Power board (and any
   // board an insight link targets with #board-x) opens by default.
   const anchor = rankBoardAnchor(board);
-  const [hashOpen, setHashOpen] = useState(false);
-  useEffect(() => {
-    if (typeof window !== "undefined" && window.location.hash === `#${anchor}`) setHashOpen(true);
-  }, [anchor]);
+  const hashOpen = useSyncExternalStore(
+    (notify) => {
+      window.addEventListener("hashchange", notify);
+      return () => window.removeEventListener("hashchange", notify);
+    },
+    () => window.location.hash === `#${anchor}`,
+    () => false,
+  );
   const leader = ordered[0];
   const mine = ordered.find((team) => team.roster_id === myRosterId);
   const mineRank = mine ? (mine[config.rankField] as number | null) : null;

@@ -182,7 +182,7 @@ describe("MyTeamContent", () => {
 
     // Circular OVR gauges render a real rating, never a fabricated one for
     // the null case (the IR tight end's overall_rating is null above).
-    
+
     expect(screen.getByText("95")).toBeInTheDocument();
     expect(screen.getByText("88")).toBeInTheDocument();
   });
