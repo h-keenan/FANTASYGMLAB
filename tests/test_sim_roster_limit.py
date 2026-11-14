@@ -39,13 +39,13 @@ def five_weeks(run):
 
 
 def test_golden_digest_a_limit_v0_save_replays_exactly_as_before_the_soft_limit():
-    r = with_limit_v(Run(), 0)
+    r = with_limit_v(Run(econ_v=0), 0)
     assert "limit_v" not in r.root.settings.to_dict() and not r.root.settings.soft_limit
     r.play_season(); r.offseason(); r.play_season(); r.offseason()
     five_weeks(r)
     assert r.state.digest() == GOLDEN_LEGACY_DIGEST and r.state.season_no == 3
     # a new game (limit_v 1) that never goes over the limit is the same game event for event
-    n = Run()
+    n = Run(econ_v=0)
     assert n.root.settings.limit_v == 1 and n.root.settings.to_dict()["limit_v"] == 1
     object.__setattr__(n.root, "settings", replace(n.root.settings, names_v=0, hint_v=0, world_v=0, econ_v=0))  # new rookie names (names_v 1) are the one other new-game difference
     n.root.__dict__.pop("_views", None)
