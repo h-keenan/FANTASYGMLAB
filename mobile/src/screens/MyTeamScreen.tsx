@@ -40,6 +40,8 @@ import { queryKeys } from '../lib/queryKeys';
 import { useScreenHeaderTitle } from '../lib/useScreenHeaderTitle';
 import { useThemeMode } from '../context/ThemeModeContext';
 import { spacing, type ThemeColors } from '../theme';
+import { openInsight } from '../lib/insightNav';
+import type { InsightKey } from '../lib/insightLinks';
 import type { RootStackParamList } from '../navigation/RootNavigator';
 import { usePlayerQuickView } from '../context/PlayerQuickViewContext';
 
@@ -273,7 +275,7 @@ export default function MyTeamScreen({ route, navigation }: Props) {
         <BeginnerHelp term="myTeamIntro" />
         <BeginnerHelp term="myTeamValueTiers" />
         <SectionHeading title="Team Snapshot" topGap={12} />
-        <TeamSnapshot team={myTeam} leagueSize={leagueSize} teamValue={teamValue} />
+        <TeamSnapshot team={myTeam} leagueSize={leagueSize} teamValue={teamValue} open={(key) => openInsight(navigation.navigate as never, key, leagueId, leagueName)} />
         {myTeam && hasRosterAnalysis(myTeam) ? (
           <TouchableOpacity
             style={styles.headerLink}
@@ -364,10 +366,13 @@ function TeamSnapshot({
   team,
   leagueSize,
   teamValue,
+  open,
 }: {
   team: TeamRanking | null;
   leagueSize: number;
   teamValue: number;
+  /** onPress for a tile's destination (lib/insightLinks.ts). */
+  open: (key: InsightKey) => () => void;
 }) {
   const { colors } = useThemeMode();
   const styles = useMemo(() => createStyles(colors), [colors]);
@@ -399,17 +404,17 @@ function TeamSnapshot({
       <View style={styles.analyticsMetricsRow}>
         <DashboardStatRow
           items={[
-            { label: 'Record', icon: 'ribbon-outline', value: record },
-            { label: 'Power Rank', icon: 'flash-outline', value: rank(team?.power_rank, team?.power_rank_tied) },
-            { label: 'Franchise Rank', icon: 'star-outline', value: rank(team?.franchise_rank, team?.franchise_rank_tied) },
+            { label: 'Record', icon: 'ribbon-outline', value: record, onPress: open('record') },
+            { label: 'Power Rank', icon: 'flash-outline', value: rank(team?.power_rank, team?.power_rank_tied), onPress: open('power') },
+            { label: 'Franchise Rank', icon: 'star-outline', value: rank(team?.franchise_rank, team?.franchise_rank_tied), onPress: open('franchise') },
           ]}
         />
       </View>
       <DashboardStatRow
         items={[
-          { label: 'Starter Strength', icon: 'american-football-outline', value: rank(team?.starter_rank, team?.starter_rank_tied) },
-          { label: 'Bench Strength', icon: 'people-outline', value: rank(team?.bench_rank, team?.bench_rank_tied) },
-          { label: 'Avg Age', icon: 'hourglass-outline', value: team?.average_age != null ? team.average_age.toFixed(1) : '—' },
+          { label: 'Starter Strength', icon: 'american-football-outline', value: rank(team?.starter_rank, team?.starter_rank_tied), onPress: open('starter') },
+          { label: 'Bench Strength', icon: 'people-outline', value: rank(team?.bench_rank, team?.bench_rank_tied), onPress: open('bench') },
+          { label: 'Avg Age', icon: 'hourglass-outline', value: team?.average_age != null ? team.average_age.toFixed(1) : '—', onPress: open('age') },
         ]}
       />
       <GlossaryNote

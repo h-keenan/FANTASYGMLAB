@@ -1,5 +1,7 @@
 "use client";
 
+import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useLayoutEffect, useMemo, useReducer, useRef, useState, useSyncExternalStore } from "react";
 
 import { AccentCard } from "@/components/AccentCard";
@@ -571,9 +573,35 @@ function Shell({ children, wide = false, game = false }: { children: React.React
     // `game`: on phones the in-game screen owns the whole viewport (its own compact header on top, bottom tab bar
     // in flow at the bottom of a 100dvh column), so no outer padding or gap.
     <main className={`sim-root flex-1 flex flex-col gap-3 px-4 py-3 w-full mx-auto ${game ? "max-md:min-h-dvh max-md:pt-0 max-md:pb-0 max-md:gap-0" : ""} ${wide ? "max-w-5xl xl:max-w-[1200px]" : "max-w-3xl"}`}>
+      {game ? null : <SimExitBar />}
       <PageTitle page="Fantasy Sim" />
       {children}
     </main>
+  );
+}
+
+/**
+ * Phone-only way out of the Fantasy Sim's hub, setup and error screens. The sim owns the phone chrome
+ * (lib/bottomNav pathOwnsPhoneChrome hides the global header, GM orb and shell bar for the whole /gm-game
+ * path), but only the in-game screen draws its own header and orb, so these screens had no navigation at
+ * all. Back returns to wherever the user came from (a league page, More, Portfolio), else Home.
+ */
+function SimExitBar() {
+  const router = useRouter();
+  return (
+    <nav className="md:hidden flex items-center justify-between gap-2" aria-label="Leave Fantasy Sim" data-testid="sim-exit-bar">
+      <button
+        type="button"
+        className="tap-link text-sm font-bold"
+        style={{ color: "var(--color-accent)", minHeight: 44 }}
+        onClick={() => (typeof window !== "undefined" && window.history.length > 1 ? router.back() : router.push("/"))}
+      >
+        ‹ Back
+      </button>
+      <Link href="/" className="tap-link text-sm font-bold" style={{ color: "var(--color-accent)", minHeight: 44, display: "inline-flex", alignItems: "center" }}>
+        Home
+      </Link>
+    </nav>
   );
 }
 

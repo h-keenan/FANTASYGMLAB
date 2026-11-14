@@ -82,6 +82,12 @@ describe("DraftCenterContent", () => {
     expect(screen.queryByText("2027 1st (Rival)")).not.toBeInTheDocument();
   });
 
+  it("posture tiles link to the rankings and plan that explain them when the league is known", () => {
+    render(<DraftCenterContent leagueId="L1" leagueName="Test League" data={BASE_RESPONSE} picks={PICKS} myRosterId="1" />);
+    expect(screen.getByRole("link", { name: /Draft Capital.*open the Draft Capital rankings/ })).toHaveAttribute("href", "/league-rankings/L1?name=Test%20League#board-draft_capital");
+    expect(screen.getByRole("link", { name: /Strategy.*open your GM Plan/ })).toHaveAttribute("href", "/gm-plan/L1?name=Test%20League");
+  });
+
   it("switches to League scope and shows every pick, with owner context", () => {
     render(
       <DraftCenterContent leagueName="Test League" data={BASE_RESPONSE} picks={PICKS} myRosterId="1" initialTab="picks" />,

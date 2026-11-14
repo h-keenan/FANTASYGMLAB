@@ -87,6 +87,8 @@ import { buildNeedsAttention, isTradeItem, itemsAfterAttention, weekRowsAfterAtt
 import BeginnerHelp from '../components/BeginnerHelp';
 import { useThemeMode } from '../context/ThemeModeContext';
 import { LINK_HIT_SLOP, radii, spacing, type ThemeColors } from '../theme';
+import { openInsight } from '../lib/insightNav';
+import type { InsightKey } from '../lib/insightLinks';
 import type { RootStackParamList } from '../navigation/RootNavigator';
 import { usePlayerQuickView } from '../context/PlayerQuickViewContext';
 
@@ -762,9 +764,8 @@ function DestinationButton({
  * Dashboard-only tile style — these five metrics are ranks/counts, not
  * percentiles, so MetricCard's percentile prop is simply omitted (it
  * already renders fine as plain label+value in that case). Roster Power/Franchise
- * stay tappable through to Teams; Injuries stays deliberately non-tappable
- * (the Needs Attention section below already carries "the why" when there
- * is one), and gets `valueColor` emphasis when non-zero instead of a
+ * are tappable through to the matching rank board (lib/insightLinks.ts); Injuries
+ * and Roster Age are too (every stat opens its explanation), and Injuries gets `valueColor` emphasis when non-zero instead of a
  * one-off danger tile.
  */
 export function DashboardStatStrip({
@@ -785,7 +786,7 @@ export function DashboardStatStrip({
     snapshot.wins != null && snapshot.losses != null
       ? `${snapshot.wins}-${snapshot.losses}${snapshot.ties ? `-${snapshot.ties}` : ''}`
       : '—';
-  const goToTeams = () => navigation.navigate('Teams', { leagueId, leagueName });
+  const open = (key: InsightKey) => openInsight(navigation.navigate as never, key, leagueId, leagueName);
   const copy = useExperienceCopy();
   const averageAgeLabel = copy.label('averageAge', 'Avg Age');
   // Beginner-only term explanations (lib/experienceCopy.ts): empty for
@@ -806,25 +807,27 @@ export function DashboardStatStrip({
             icon: 'ribbon-outline',
             value: record,
             fill: winShare(snapshot.wins, snapshot.losses, snapshot.ties),
+            onPress: open('record'),
           },
           {
             label: 'Power Rank',
             icon: 'trophy-outline',
             value: formatRank(snapshot.power_rank, snapshot.power_rank_tied),
             fill: rankFill(snapshot.power_rank, leagueSize),
-            onPress: goToTeams,
+            onPress: open('power'),
           },
           {
             label: 'Franchise',
             icon: 'shield-outline',
             value: formatRank(snapshot.franchise_rank, snapshot.franchise_rank_tied),
             fill: rankFill(snapshot.franchise_rank, leagueSize),
-            onPress: goToTeams,
+            onPress: open('franchise'),
           },
           {
             label: averageAgeLabel,
             icon: 'hourglass-outline',
             value: snapshot.average_age != null ? snapshot.average_age.toFixed(1) : '—',
+            onPress: open('age'),
           },
         ]}
       />

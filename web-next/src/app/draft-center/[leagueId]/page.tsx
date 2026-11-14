@@ -129,6 +129,7 @@ export default function DraftCenterPage() {
 
   return (
     <DraftCenterContent
+      leagueId={leagueId}
       leagueName={leagueName}
       data={draftCenter}
       picks={picks}

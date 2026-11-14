@@ -104,15 +104,25 @@ describe("LeagueRankingsContent", () => {
 
   it("opens each rank board on the top three and expands on tap", () => {
     const teams = Array.from({ length: 8 }, (_, i) =>
-      team({ roster_id: String(i + 1), team_name: `Team ${i + 1}`, power_rank: i + 1, franchise_rank: i + 1, draft_capital_rank: i + 1, starter_rank: i + 1, bench_rank: i + 1, standing_rank: i + 1 }),
+      team({ roster_id: String(i + 1), team_name: `Team ${i + 1}`, power_rank: i + 1, franchise_rank: i + 1, draft_capital_rank: i + 1, starter_rank: i + 1, bench_rank: i + 1, age_rank: i + 1, average_age: 24 + i, standing_rank: i + 1 }),
     );
     render(<LeagueRankingsContent leagueId="L1" leagueName="My League" data={{ ...BASE_RESPONSE, teams }} />);
     const buttons = screen.getAllByRole("button", { name: "Show all 8 teams" });
-    expect(buttons).toHaveLength(5);
+    expect(buttons).toHaveLength(6);
     expect(screen.getAllByText("Team 8")).toHaveLength(1); // standings only
     fireEvent.click(buttons[0]);
     expect(screen.getAllByText("Team 8")).toHaveLength(2);
     expect(screen.getByRole("button", { name: "Show top 3" })).toBeInTheDocument();
+  });
+
+  it("has an anchored Roster Age board (the target of every Avg Age tile) with ages to one decimal", () => {
+    const teams = Array.from({ length: 4 }, (_, i) => team({ roster_id: String(i + 1), team_name: `Team ${i + 1}`, age_rank: i + 1, average_age: 24.25 + i }));
+    render(<LeagueRankingsContent leagueId="L1" leagueName="My League" data={{ ...BASE_RESPONSE, teams }} myRosterId="1" />);
+    const board = screen.getByTestId("rank-board-age");
+    expect(board).toHaveAttribute("id", "board-age");
+    expect(board).toHaveTextContent("Roster Age");
+    expect(board).toHaveTextContent("24.3");
+    expect(document.getElementById("your-standing")).not.toBeNull();
   });
 
   it("ends with next-step links instead of a dead end", () => {

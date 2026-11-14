@@ -31,7 +31,7 @@ export function TradesTabBar({
     { value: "trade_hub", label: "Hub", glyph: "hub", href: `/trade-hub/${id}${suffix}` },
     { value: "trade_finder", label: "Finder", glyph: "finder", href: `/trade-finder/${id}${suffix}` },
     { value: "trade_analyzer", label: "Analyzer", glyph: "analyzer", href: `/trade-analyzer/${id}${suffix}` },
-    { value: "trade_history", label: "History", glyph: "history", href: "/trade-history" },
+    { value: "trade_history", label: "History", glyph: "history", href: `/trade-history?league=${id}&name=${encodeURIComponent(leagueName)}` },
   ];
 
   return <PillRow sticky fullWidth ariaLabel="Trades section" options={tabs} active={active} />;

@@ -44,7 +44,7 @@ export function formatScore(value: number | null | undefined): string {
   return Math.round(value).toLocaleString();
 }
 
-export type RankBoardKey = "power" | "franchise" | "draft_capital" | "starter" | "bench";
+export type RankBoardKey = "power" | "franchise" | "draft_capital" | "starter" | "bench" | "age";
 
 /** Which other ranks to show as a board row's secondary context line —
  * byte-for-byte port of league_workspace_ui._board_secondary_parts
@@ -70,6 +70,9 @@ export function boardSecondaryParts(board: RankBoardKey, team: TeamRanking): str
       `Franchise ${franchise}`,
       firsts ? `${firsts} firsts` : `Picks ${team.pick_count ?? 0}`,
     ];
+  }
+  if (board === "age") {
+    return [`Roster Power ${power}`, `Franchise ${franchise}`, `Starter ${starter}`];
   }
   // starter / bench
   return [`Roster Power ${power}`, `Franchise ${franchise}`, `Starter ${starter}`, `Bench ${bench}`, `Draft ${draft}`];
@@ -124,7 +127,22 @@ export const RANK_BOARD_CONFIG: Record<
     tiedField: "bench_rank_tied",
     scoreField: "bench_score",
   },
+  age: {
+    title: "Roster Age",
+    kicker: "Who is youngest",
+    note: "Average age of each team's starters. #1 is the youngest roster, the longest window.",
+    scoreLabel: "Avg Starter Age",
+    rankField: "age_rank",
+    tiedField: "age_rank_tied",
+    scoreField: "average_age",
+  },
 };
+
+/** The board's headline number as text: ages keep one decimal, scores are whole numbers. */
+export function boardScoreText(board: RankBoardKey, value: number | null | undefined): string {
+  if (board === "age") return value == null || !Number.isFinite(value) ? "-" : value.toFixed(1);
+  return formatScore(value);
+}
 
 /** Sort a copy of `teams` by the given board's rank (ascending), tie-broken
  * by score descending — same ordering league_workspace_ui.

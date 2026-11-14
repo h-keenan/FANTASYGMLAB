@@ -135,6 +135,13 @@ describe("MyTeamContent need links", () => {
     expect(screen.getByRole("link", { name: /See trade ideas/ })).toHaveAttribute("href", "/trade-hub/L1?name=Dynasty%20Overlords");
   });
 
+  it("makes every Team Snapshot tile a link to the rank board that explains it, Avg Age included", () => {
+    render(<MyTeamContent leagueId="L1" leagueName="My League" myTeam={MY_TEAM} needs={NEEDS} teamRanking={TEAM_RANKING} leagueSize={10} />);
+    expect(screen.getByRole("link", { name: /Avg Age.*open the Roster Age rankings/ })).toHaveAttribute("href", "/league-rankings/L1?name=My%20League#board-age");
+    expect(screen.getByRole("link", { name: /Record.*open your league standing/ })).toHaveAttribute("href", "/league-rankings/L1?name=My%20League#your-standing");
+    expect(screen.getByRole("link", { name: /Bench Strength.*Bench Depth rankings/ })).toBeInTheDocument();
+  });
+
   it("shows no links without a league id", () => {
     render(<MyTeamContent leagueName="Dynasty Overlords" myTeam={MY_TEAM} needs={NEEDS} teamRanking={TEAM_RANKING} leagueSize={10} />);
     expect(screen.queryByRole("link", { name: /Find a waiver add/ })).toBeNull();

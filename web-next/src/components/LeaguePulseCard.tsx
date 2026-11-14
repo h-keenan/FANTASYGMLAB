@@ -1,6 +1,6 @@
 "use client";
 
-import Link from "next/link";
+import { InsightLink } from "@/components/ui/InsightLink";
 import { useEffect, useState } from "react";
 
 import { api, type LeagueTeamRankingsResponse, type TeamRanking } from "@/lib/api";
@@ -125,16 +125,13 @@ export function LeaguePulseCard({
   if (!highlights || highlights.length === 0) return null;
 
   return (
+    <InsightLink insight="league_activity" league={{ id: leagueId, name: leagueName }} spoken={["League Activity", ...highlights.map((h) => `${h.label} ${h.team.team_name || "Team"} ${h.metric}`)]} noChevron testId="league-pulse-link">
     <article className="glass-surface flex flex-col gap-3 p-4" data-testid="league-pulse-card">
       <div className="flex items-center justify-between gap-2">
         <h3 style={{ font: "var(--font-card-title)" }}>League Activity</h3>
-        <Link
-          href={`/league-recaps/${encodeURIComponent(leagueId)}${leagueName ? `?name=${encodeURIComponent(leagueName)}` : ""}`}
-          aria-label="Open League Recaps"
-          style={{ color: "var(--color-accent)" }}
-        >
+        <span aria-hidden="true" style={{ color: "var(--color-accent)" }}>
           ›
-        </Link>
+        </span>
       </div>
       <div className="flex flex-col gap-2.5">
         {highlights.map((highlight) => (
@@ -158,5 +155,6 @@ export function LeaguePulseCard({
         ))}
       </div>
     </article>
+    </InsightLink>
   );
 }

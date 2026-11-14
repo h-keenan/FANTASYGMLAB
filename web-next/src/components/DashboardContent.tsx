@@ -204,7 +204,7 @@ export function DashboardContent({
           </SectionHeading>
           {teamStats ? (
             <>
-              <StatStrip columns={3} items={teamStats.main} />
+              <StatStrip columns={3} items={teamStats.main} league={{ id: leagueId, name: leagueName }} />
             </>
           ) : null}
           <GlossaryNote terms={["powerRank", "franchiseRank", "averageAge", "starterStrength", "benchStrength"]} />
@@ -252,8 +252,9 @@ function buildTeamStats(
 ): { main: StatStripItem[] } {
   const injured = snapshot.injured_starters && snapshot.injured_starters > 0 ? snapshot.injured_starters : 0;
   const ofTeams = context.teamCount ? `of ${context.teamCount} teams` : undefined;
-  const rank = (glyph: StatStripItem["glyph"], label: string, value: number | null, tied: boolean, note?: string): StatStripItem => ({
+  const rank = (glyph: "power" | "franchise" | "starter" | "bench", label: string, value: number | null, tied: boolean, note?: string): StatStripItem => ({
     glyph,
+    insight: glyph,
     label,
     value: formatRank(value, tied),
     tone: value === 1 ? "premium" : "neutral",
@@ -266,12 +267,14 @@ function buildTeamStats(
     rank("bench", "Bench Strength", snapshot.bench_rank, snapshot.bench_rank_tied, ofTeams),
     {
       glyph: "age",
+      insight: "age",
       label: ageLabel,
       value: snapshot.average_age !== null ? snapshot.average_age.toFixed(1) : "—",
       note: snapshot.average_age !== null && context.leagueAge ? `League avg ${context.leagueAge}` : undefined,
     },
     {
       glyph: "injury",
+      insight: "injury",
       label: "Injured starters",
       value: injured > 0 ? String(injured) : "None",
       tone: injured > 0 ? "risk" : "positive",

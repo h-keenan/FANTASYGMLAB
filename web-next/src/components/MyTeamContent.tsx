@@ -202,20 +202,21 @@ export function MyTeamContent({
     ? `${teamRanking.wins ?? 0}-${teamRanking.losses ?? 0}${teamRanking.ties ? `-${teamRanking.ties}` : ""}`
     : "—";
   const snapshotItems: StatStripItem[] = [
-    { glyph: "record", label: "Record", value: record },
-    { glyph: "power", label: "Power Rank", value: formatRank(teamRanking?.power_rank ?? null, teamRanking?.power_rank_tied ?? false) },
+    { glyph: "record", insight: "record", label: "Record", value: record },
+    { glyph: "power", insight: "power", label: "Power Rank", value: formatRank(teamRanking?.power_rank ?? null, teamRanking?.power_rank_tied ?? false) },
     ...(showFranchiseConstruction
       ? [
           {
             glyph: "franchise" as const,
+            insight: "franchise" as const,
             label: "Franchise Rank",
             value: formatRank(teamRanking?.franchise_rank ?? null, teamRanking?.franchise_rank_tied ?? false),
           },
         ]
       : []),
-    { glyph: "starter", label: "Starter Strength", value: formatRank(teamRanking?.starter_rank ?? null, teamRanking?.starter_rank_tied ?? false) },
-    { glyph: "bench", label: "Bench Strength", value: formatRank(teamRanking?.bench_rank ?? null, teamRanking?.bench_rank_tied ?? false) },
-    { glyph: "age", label: "Avg Age", value: teamRanking?.average_age != null ? teamRanking.average_age.toFixed(1) : "—" },
+    { glyph: "starter", insight: "starter", label: "Starter Strength", value: formatRank(teamRanking?.starter_rank ?? null, teamRanking?.starter_rank_tied ?? false) },
+    { glyph: "bench", insight: "bench", label: "Bench Strength", value: formatRank(teamRanking?.bench_rank ?? null, teamRanking?.bench_rank_tied ?? false) },
+    { glyph: "age", insight: "age", label: "Avg Age", value: teamRanking?.average_age != null ? teamRanking.average_age.toFixed(1) : "—" },
   ];
 
   return (
@@ -255,8 +256,8 @@ export function MyTeamContent({
             <span style={{ font: "var(--type-primary-metric)" }}>{formatScore(teamTotalValue)}</span>
           </div>
         </div>
-        <StatStrip items={snapshotItems.slice(0, 3)} columns={3} />
-        <StatStrip items={snapshotItems.slice(3)} columns={3} />
+        <StatStrip items={snapshotItems.slice(0, 3)} columns={3} league={{ id: leagueId, name: leagueName }} />
+        <StatStrip items={snapshotItems.slice(3)} columns={3} league={{ id: leagueId, name: leagueName }} />
         <GlossaryNote
           terms={
             showFranchiseConstruction

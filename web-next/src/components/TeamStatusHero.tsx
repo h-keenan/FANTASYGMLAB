@@ -1,5 +1,6 @@
 "use client";
 
+import { InsightLink } from "@/components/ui/InsightLink";
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { SkeletonCard } from "@/components/Skeleton";
@@ -94,9 +95,10 @@ function RowLink({ href, label, children }: { href: string; label: string; child
   );
 }
 
-function PositionChip({ row }: { row: TeamStatusPosition }) {
+function PositionChip({ row, league }: { row: TeamStatusPosition; league: { id: string; name: string } }) {
   const color = TONE_COLOR[row.tone];
   return (
+    <InsightLink insight="position_room" league={league} spoken={[`${row.position} room`, row.label]} noChevron testId={`team-status-position-link-${row.position}`}>
     <span
       className="flex flex-col items-center px-1 py-1.5 min-w-0"
       data-testid={`team-status-position-${row.position}`}
@@ -112,6 +114,7 @@ function PositionChip({ row }: { row: TeamStatusPosition }) {
         {row.label}
       </span>
     </span>
+    </InsightLink>
   );
 }
 
@@ -241,11 +244,11 @@ export function TeamStatusHero({
         {positions.length > 0 ? (
           <div className="flex flex-col gap-2 pt-2.5" style={{ borderTop: "1px solid var(--color-border)" }} data-testid="team-status-positions">
             <span className="text-xs" style={{ color: "var(--color-text-muted)" }}>
-              Position rooms vs the league
+              Position rooms vs the league. Tap a room for the detail ›
             </span>
             <span className="grid grid-cols-4 gap-2">
               {positions.map((row) => (
-                <PositionChip key={row.position} row={row} />
+                <PositionChip key={row.position} row={row} league={{ id: leagueId, name: leagueName }} />
               ))}
             </span>
             {weakest ? (

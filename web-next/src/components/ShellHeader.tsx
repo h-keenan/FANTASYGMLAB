@@ -7,7 +7,7 @@ import type { ReactNode } from "react";
 
 import { SHELL_PAGE_INFO_SLOT_ID } from "@/components/PageTitle";
 import { PAGE_TITLE_BY_SEGMENT } from "@/lib/navDestinations";
-import { shellParent } from "@/lib/shellNav";
+import { shellLeagueContext, shellParent } from "@/lib/shellNav";
 import { useSearchParams } from "@/lib/useSearchParams";
 import { useShellNav } from "@/lib/useShellNav";
 import { UNNAMED_LEAGUE } from "@/lib/leagueName";
@@ -25,8 +25,7 @@ export function ShellHeader({ leagueControls, actions }: { leagueControls: React
   const params = useParams<{ leagueId?: string }>();
   const searchParams = useSearchParams();
   if (!barVisible) return null;
-  const leagueId = params?.leagueId ? decodeURIComponent(params.leagueId) : null;
-  const leagueName = searchParams.get("name") || (leagueId ? UNNAMED_LEAGUE : "");
+  const { leagueId, leagueName } = shellLeagueContext(params?.leagueId ? decodeURIComponent(params.leagueId) : null, searchParams, UNNAMED_LEAGUE);
   const segment = (pathname || "").split("/").filter(Boolean)[0] ?? "";
   const title = segment ? PAGE_TITLE_BY_SEGMENT[segment] ?? "" : "Home";
   const parent = shellParent(pathname, { leagueId, leagueName });
