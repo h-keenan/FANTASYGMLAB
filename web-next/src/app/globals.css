@@ -1921,12 +1921,15 @@ a {
   /* Compact header at peek (coridian_ "PQV glitch", 2026-11-14): 56px avatar, name + meta + a one-line summary of the three
      tiles, signals; the pill row follows at once. The big avatar, the tiles and the explainers belong to the full snap.
      Everything animates between the two (height / size / opacity), nothing jumps. */
-  .pqv-modal .pqv-avatar-glow { width: 112px; height: 112px; transition: width 240ms var(--ease-out, ease-out), height 240ms var(--ease-out, ease-out), box-shadow 240ms var(--ease-out, ease-out); }
-  .pqv-modal .pqv-avatar-glow > * { transform-origin: 0 0; transition: transform 240ms var(--ease-out, ease-out); }
+  /* The wrapper is the ONLY node that changes size (width and height together, so it is a circle at every frame); the headshot
+     / initials circle inside simply fills it. Never scale the child: a transformed 112px child in a 56px flex item got squeezed
+     into a narrow oval with a ghost ring behind it (coridian_, "still glitched pqv", 2026-11-14). */
+  .pqv-modal .pqv-avatar-glow { flex: none; width: 112px; height: 112px; aspect-ratio: 1 / 1; transition: width 240ms var(--ease-out, ease-out), height 240ms var(--ease-out, ease-out), box-shadow 240ms var(--ease-out, ease-out); }
+  .pqv-modal .pqv-avatar-glow > * { box-sizing: border-box; flex: none; width: 100% !important; height: 100% !important; aspect-ratio: 1 / 1; min-width: 0; object-fit: cover; transition: border-width 240ms var(--ease-out, ease-out); }
   .pqv-modal .pqv-peek-fold { max-height: 14rem; opacity: 1; transition: max-height 240ms var(--ease-out, ease-out), opacity 180ms linear, margin 240ms var(--ease-out, ease-out); }
   .pqv-modal .pqv-hero { transition: row-gap 240ms var(--ease-out, ease-out); }
   .pqv-modal[data-snap="peek"] .pqv-avatar-glow { width: 56px; height: 56px; box-shadow: 0 0 13px color-mix(in srgb, var(--color-accent) 28%, transparent); }
-  .pqv-modal[data-snap="peek"] .pqv-avatar-glow > * { transform: scale(0.5); }
+  .pqv-modal[data-snap="peek"] .pqv-avatar-glow > * { border-width: 3px !important; }
   .pqv-modal[data-snap="peek"] .pqv-peek-fold { max-height: 0; opacity: 0; margin-top: 0; margin-bottom: 0; padding-top: 0; padding-bottom: 0; overflow: hidden; pointer-events: none; }
   .pqv-modal[data-snap="peek"] .pqv-hero { row-gap: 0; }
   .pqv-modal[data-snap="peek"] .pqv-peek-summary { display: block; animation: pqv-peek-in 240ms var(--ease-out, ease-out) both; }

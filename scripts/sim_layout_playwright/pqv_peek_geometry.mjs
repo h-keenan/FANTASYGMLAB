@@ -66,22 +66,32 @@ const measure = () => {
   const tabs = [...modal.querySelectorAll('[role="tab"]')];
   const hit = tabs.map((t) => { const r = t.getBoundingClientRect(); const e = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2); return { label: t.textContent, top: r.top - m.top, bottom: m.bottom - inset - r.bottom, left: r.left, right: innerWidth - r.right, tappable: !!e && (e === t || t.contains(e)) }; });
   const av = modal.querySelector(".pqv-avatar-glow")?.getBoundingClientRect();
+  const avImg = modal.querySelector(".pqv-avatar-glow > *")?.getBoundingClientRect();
   const tiles = modal.querySelector(".pqv-stat-tiles"), tr = tiles && tiles.getBoundingClientRect();
   const strip = modal.querySelector(".tabs-sticky")?.getBoundingClientRect();
-  return { snap: modal.dataset.snap, modalH: m.height, modalBottom: m.bottom, vh: innerHeight, inset, tabs: hit, avatar: av ? av.width : null, tilesVisible: !!tr && tr.height > 4 && getComputedStyle(tiles.parentElement).opacity !== "0", stripBottom: strip ? strip.bottom - m.top : null, peekVar: modal.style.getPropertyValue("--pqv-peek-h") };
+  return { avImg: avImg ? { w: avImg.width, h: avImg.height } : null, avBox: av ? { w: av.width, h: av.height } : null, snap: modal.dataset.snap, modalH: m.height, modalBottom: m.bottom, vh: innerHeight, inset, tabs: hit, avatar: av ? av.width : null, tilesVisible: !!tr && tr.height > 4 && getComputedStyle(tiles.parentElement).opacity !== "0", stripBottom: strip ? strip.bottom - m.top : null, peekVar: modal.style.getPropertyValue("--pqv-peek-h") };
 };
 
 let bad = 0; const rows = [];
-for (const [w, h] of [[390, 844], [360, 640]]) {
+const shapeProblems = (when, m) => {
+  const out = [];
+  for (const [what, r] of [["avatar wrapper", m.avBox], ["avatar image", m.avImg]]) if (r && Math.abs(r.w - r.h) > 0.6) out.push(`${what} not a circle ${when}: ${r.w.toFixed(1)}x${r.h.toFixed(1)}`);
+  if (m.avBox && m.avImg && (Math.abs(m.avBox.w - m.avImg.w) > 0.6 || Math.abs(m.avBox.h - m.avImg.h) > 0.6)) out.push(`avatar image ${m.avImg.w.toFixed(1)}x${m.avImg.h.toFixed(1)} disagrees with its wrapper ${m.avBox.w.toFixed(1)}x${m.avBox.h.toFixed(1)} ${when}`);
+  return out;
+};
+const PX = Buffer.from("R0lGODlhAQABAIAAAAUEBAAAACwAAAAAAQABAAACAkQBADs=", "base64");
+for (const [w, h, photo] of [[390, 844, false], [360, 640, false], [390, 844, true], [360, 640, true]]) {
   const ctx = await browser.newContext({ ...devices["iPhone 14"], viewport: { width: w, height: h } });
   const page = await ctx.newPage();
   if (process.env.DEBUG_PAGE) page.on("pageerror", (e) => console.log("pageerror", e.message)).on("console", (m) => m.type() === "error" && console.log("console", m.text().slice(0, 300)));
-  await page.goto(base, { waitUntil: "load" });
+  if (photo) { await page.route("**/sleepercdn.com/**", (r) => r.fulfill({ status: 200, contentType: "image/gif", body: PX })); await page.route("http://localhost:1/**", (r) => r.abort()); }
+  await page.goto(base + (photo ? "?photo=1" : ""), { waitUntil: "load" });
   await page.evaluate(() => document.fonts.ready);
   await sleep(900);
   const peek = await page.evaluate(measure);
   if (process.env.SHOT_DIR) await page.screenshot({ path: path.join(process.env.SHOT_DIR, `pqv-peek-${w}.jpg`), type: "jpeg", quality: 60 });
   const problems = [];
+  problems.push(...shapeProblems("at peek", peek));
   if (peek.snap !== "peek") problems.push(`opened at ${peek.snap}`);
   if (!peek.tabs.length) problems.push("no pill tabs");
   for (const t of peek.tabs) {
@@ -96,12 +106,13 @@ for (const [w, h] of [[390, 844], [360, 640]]) {
   // expand: tap the grip, sample the avatar through the animation
   await page.evaluate(() => document.querySelector(".pqv-modal .sheet-handle").dispatchEvent(new MouseEvent("click", { bubbles: true })));
   const samples = [];
-  for (let i = 0; i < 12; i++) { samples.push(await page.evaluate(() => document.querySelector(".pqv-avatar-glow").getBoundingClientRect().width)); await sleep(30); }
+  for (let i = 0; i < 14; i++) { const m = await page.evaluate(measure); samples.push(m.avBox.w); problems.push(...shapeProblems(`mid-transition #${i}`, m)); await sleep(25); }
   await sleep(500);
   const full = await page.evaluate(measure);
   if (process.env.SHOT_DIR) await page.screenshot({ path: path.join(process.env.SHOT_DIR, `pqv-full-${w}.jpg`), type: "jpeg", quality: 60 });
   if (full.snap !== "full") problems.push(`did not expand (${full.snap})`);
   if (Math.abs(full.avatar - 112) > 1) problems.push(`full avatar ${full.avatar}px, want 112`);
+  problems.push(...shapeProblems("at full", full));
   if (!full.tilesVisible) problems.push("stat tiles missing at full");
   if (!samples.some((s) => s > 58 && s < 110)) problems.push(`avatar jumped (samples ${samples.map(Math.round).join(",")})`);
   // and back
@@ -110,7 +121,7 @@ for (const [w, h] of [[390, 844], [360, 640]]) {
   const back = await page.evaluate(measure);
   for (const t of back.tabs) if (t.bottom < -0.5 || !t.tappable) problems.push(`after full -> peek: tab ${t.label} clipped/covered`);
   if (problems.length) bad++;
-  rows.push({ viewport: `${w}x${h}`, peekH: Math.round(peek.modalH), peekPct: +(peek.modalH / peek.vh * 100).toFixed(1), tabsBottomGap: peek.tabs.length ? +Math.min(...peek.tabs.map((t) => t.bottom)).toFixed(1) : null, stripBottom: Math.round(peek.stripBottom), avatarPeek: peek.avatar, avatarFull: full.avatar, problems });
+  rows.push({ viewport: `${w}x${h}${photo ? " photo" : ""}`, peekH: Math.round(peek.modalH), peekPct: +(peek.modalH / peek.vh * 100).toFixed(1), tabsBottomGap: peek.tabs.length ? +Math.min(...peek.tabs.map((t) => t.bottom)).toFixed(1) : null, stripBottom: Math.round(peek.stripBottom), avatarPeek: peek.avatar, avatarFull: full.avatar, problems });
   await ctx.close();
 }
 console.log(JSON.stringify(rows, null, 1));

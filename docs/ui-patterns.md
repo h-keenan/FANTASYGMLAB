@@ -729,7 +729,7 @@ FantasyDesk (`mode="desk"`) and Fantasy Sim (`mode="sim"`); the logic is the byt
   `playerAnatomy.ts`) = pill-row bottom + one content line (`PEEK_FIRST_LINE_PX` 52) + bottom inset, clamped to 40-70% of the screen. Web
   measures the pill row into `--pqv-peek-h` (CSS keeps 56dvh as first-paint fallback); app measures the sticky strip's `onLayout`. Guard:
   `scripts/sim_layout_playwright/pqv_peek_geometry.mjs` (real `PlayerQuickView` at 390x844 and 360x640: every tab inside the sheet's visible
-  area and tappable, 56px avatar at peek, 112px at full, an in-between size observed while expanding) plus `playerAnatomy` unit tests.
+  area and tappable, 56px avatar at peek, 112px at full, an in-between size observed while expanding). The avatar resizes on ONE node (`.pqv-avatar-glow` width/height; the headshot fills it at 100% and is never scaled): Tailwind preflight's `img { max-width: 100% }` once squeezed a scaled 112px photo into a 28x56 oval at peek (coridian_ 2026-11-14), so the guard asserts wrapper and image are the same square at peek, full and every mid-transition frame, with a photo and with initials, under preflight rules plus `playerAnatomy` unit tests.
 
 **The avatar is REQUIRED (coridian_: "properly implemented, not a band-aid").** A template takes a `player` (`PlayerRef`) and draws the avatar itself in
 `PlayerAvatarSlot`: always the first, leading slot, sized by tier (`AVATAR_SIZE`: dense 28, row 36, card 44, sheet 56), tier ring, and initials when
