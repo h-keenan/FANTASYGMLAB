@@ -3,13 +3,13 @@
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
 
-import { AccentCard } from "@/components/AccentCard";
 import { ButtonLink } from "@/components/Button";
 import { EmptyState } from "@/components/EmptyState";
+import { TradeCompactCard } from "@/components/ui/TradeCompactCard";
+import { tradeCardAsset } from "@/components/TradeIdeaCard";
 import { LoadingScreen } from "@/components/LoadingScreen";
 import { PageTitle } from "@/components/PageTitle";
 import { PremiumUpsellCard } from "@/components/PremiumUpsellCard";
-import { ExchangeSide } from "@/components/TradeAssetExchange";
 import { ToneBadge } from "@/components/ToneBadge";
 import { api, type TradeTargetOffer, type TradeTargetResponse } from "@/lib/api";
 import { trackFeatureUse } from "@/lib/analytics";
@@ -20,10 +20,6 @@ const ACCEPT_COLOR: Record<TradeTargetOffer["acceptance"]["label"], string> = {
   Possible: "var(--color-warning)",
   "Long shot": "var(--color-danger)",
 };
-
-function formatValue(n: number): string {
-  return Math.round(n).toLocaleString("en-US");
-}
 
 /**
  * "Build an offer": the user picked a player on ANOTHER team and the engine
@@ -125,32 +121,24 @@ export function TradeOfferContent({
 }
 
 export function OfferCard({ offer, leagueId, leagueName }: { offer: TradeTargetOffer; leagueId: string; leagueName: string }) {
+  const give = offer.package.send.map((a, i) => tradeCardAsset(a, i));
+  const get = offer.package.receive.map((a, i) => tradeCardAsset(a, i));
   return (
-    <AccentCard accent="var(--color-accent)" data-testid="offer-card">
-      <div className="flex items-center justify-between gap-2">
-        <span className="text-sm font-bold">
-          Offer {offer.rank}: {offer.title}
+    <TradeCompactCard
+      testId="offer-card"
+      defaultOpen
+      title={
+        <span className="flex items-center justify-between gap-2">
+          <span className="min-w-0 text-sm font-bold">
+            Offer {offer.rank}: {offer.title}
+          </span>
+          <ToneBadge label={`${offer.acceptance.label} to accept`} color={ACCEPT_COLOR[offer.acceptance.label]} title={offer.acceptance.reason} />
         </span>
-        <ToneBadge
-          label={`${offer.acceptance.label} to accept`}
-          color={ACCEPT_COLOR[offer.acceptance.label]}
-          title={offer.acceptance.reason}
-        />
-      </div>
-      <div className="grid grid-cols-1 sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)] gap-3 items-start">
-        <ExchangeSide
-          label="You send"
-          dotColor="var(--color-danger)"
-          assets={offer.package.send}
-          total={{ text: formatValue(offer.send_value), color: "var(--color-text-secondary)" }}
-        />
-        <ExchangeSide
-          label="You get"
-          dotColor="var(--color-success)"
-          assets={offer.package.receive}
-          total={{ text: formatValue(offer.receive_value), color: "var(--color-text-secondary)" }}
-        />
-      </div>
+      }
+      give={give}
+      get={get}
+      netValue={offer.receive_value - offer.send_value}
+    >
       {offer.price_note ? (
         <p className="text-sm font-semibold" data-testid="offer-price-note">
           {offer.price_note}
@@ -172,6 +160,6 @@ export function OfferCard({ offer, leagueId, leagueName }: { offer: TradeTargetO
       >
         Open in Trade Analyzer
       </ButtonLink>
-    </AccentCard>
+    </TradeCompactCard>
   );
 }
