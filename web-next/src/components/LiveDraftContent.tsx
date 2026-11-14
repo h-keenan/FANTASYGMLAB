@@ -4,6 +4,8 @@ import { EmptyState } from "@/components/EmptyState";
 import { PlayerIdentity } from "@/components/PlayerRow";
 import { ValueStat } from "@/components/ValueStat";
 import { SectionHeading } from "@/components/SectionHeading";
+import { CompactModule } from "@/components/ui/CompactModule";
+import { abbreviatePlayerName } from "@/lib/formatPlayerName";
 import { useMemo, useState } from "react";
 
 import type {
@@ -287,11 +289,17 @@ function RankingsBoard({
   const visible = filtered.slice(0, 60);
 
   return (
-    <section className="flex flex-col gap-3" aria-labelledby="live-draft-rankings-heading">
-      <div className="flex items-center justify-between gap-3">
-        <SectionHeading id="live-draft-rankings-heading">
-          Available Player Rankings
-        </SectionHeading>
+    <CompactModule
+      id="live-draft.rankings"
+      title="Available Player Rankings"
+      persist={false}
+      parts={[
+        { key: "n", text: `${rows.length} available`, strong: true },
+        rows[0] ? { key: "top", text: `Top: ${abbreviatePlayerName(rows[0].name)}${rows[0].position ? ` (${rows[0].position})` : ""}` } : null,
+        { key: "f", text: `${filter} view`, tone: "muted" },
+      ]}
+    >
+      <div className="flex items-center justify-end gap-3">
         <select aria-label="Position filter"
           value={options.includes(filter) ? filter : "Overall"}
           onChange={(event) => setFilter(event.target.value as LiveDraftRankFilter)}
@@ -321,7 +329,7 @@ function RankingsBoard({
           Showing the top {visible.length} of {filtered.length} ranked players.
         </p>
       ) : null}
-    </section>
+    </CompactModule>
   );
 }
 
@@ -464,13 +472,19 @@ export function LiveDraftContent({
                 </p>
               ) : null}
 
-              <section
-                className="flex flex-col gap-2 p-4"
-                style={{
-                  background: state.is_my_pick ? "var(--color-accent-soft)" : "var(--color-surface-secondary)",
-                  border: `var(--border-width-default) solid ${state.is_my_pick ? "var(--color-accent)" : "var(--color-border)"}`,
-                }}
+              <CompactModule
+                id="live-draft.clock"
+                title="On the clock"
+                persist={false}
+                defaultOpen
+                tone={state.is_my_pick ? "action" : "accent"}
+                parts={[
+                  { key: "pick", text: `Pick ${state.current_pick} · Round ${state.current_round}`, strong: true },
+                  { key: "mgr", text: state.current_team_name || state.current_manager_name },
+                  { key: "away", text: state.is_my_pick ? "You are on the clock" : state.picks_until_mine !== null ? `${state.picks_until_mine} picks away` : "Slot unavailable", tone: state.is_my_pick ? "action" : "muted" },
+                ]}
               >
+                <div className="flex flex-col gap-2">
                 <span className="text-xs font-bold uppercase" style={{ color: "var(--color-text-muted)" }}>
                   On The Clock
                 </span>
@@ -487,12 +501,24 @@ export function LiveDraftContent({
                   </span>
                   <span>Recent run: {state.positional_run}</span>
                 </div>
-              </section>
+                </div>
+              </CompactModule>
 
-              <section className="flex flex-col gap-3" aria-labelledby="live-draft-recs-heading">
-                <SectionHeading id="live-draft-recs-heading">
-                  Who should I draft next?
-                </SectionHeading>
+              <CompactModule
+                id="live-draft.recs"
+                title="Who should I draft next?"
+                persist={false}
+                defaultOpen
+                parts={
+                  state.recommendations.length > 0
+                    ? [
+                        { key: "top", text: `Draft ${abbreviatePlayerName(state.recommendations[0].name)}`, strong: true },
+                        { key: "pos", text: [state.recommendations[0].position, state.recommendations[0].team].filter(Boolean).join(" · ") },
+                        state.recommendations.length > 1 ? { key: "alt", text: `${state.recommendations.length - 1} also consider`, tone: "muted" } : null,
+                      ]
+                    : [{ key: "none", text: "No recommendations are available yet.", tone: "muted" }]
+                }
+              >
                 {state.recommendations.length === 0 ? (
                   <EmptyState title="No recommendations are available yet." />
                 ) : (
@@ -512,14 +538,24 @@ export function LiveDraftContent({
                     ) : null}
                   </div>
                 )}
-              </section>
+              </CompactModule>
 
               <RankingsBoard rows={state.rankings} leagueId={leagueId} leagueName={leagueName} />
 
-              <section className="flex flex-col gap-3" aria-labelledby="live-draft-teams-heading">
-                <SectionHeading id="live-draft-teams-heading">
-                  Live Team Rankings
-                </SectionHeading>
+              <CompactModule
+                id="live-draft.teams"
+                title="Live Team Rankings"
+                persist={false}
+                parts={
+                  state.team_rankings.length > 0
+                    ? [
+                        { key: "n", text: `${state.team_rankings.length} teams`, strong: true },
+                        { key: "lead", text: `Leader: ${state.team_rankings[0].team_name}` },
+                        state.team_rankings.find((row) => row.is_mine) ? { key: "you", text: `You #${state.team_rankings.find((row) => row.is_mine)!.team_rank}`, tone: "accent" } : { key: "how", text: "reranked on every pick", tone: "muted" },
+                      ]
+                    : [{ key: "none", text: "Team rankings will appear when draft rosters are available.", tone: "muted" }]
+                }
+              >
                 <p className="text-xs" style={{ color: "var(--color-text-muted)" }}>
                   Every fantasy roster reranked as Sleeper reports each pick: 60% starter strength, 30% total roster
                   value, 7% usable depth, 3% lineup coverage.
@@ -535,12 +571,22 @@ export function LiveDraftContent({
                     ))}
                   </div>
                 )}
-              </section>
+              </CompactModule>
 
-              <section className="flex flex-col gap-3" aria-labelledby="live-draft-board-heading">
-                <SectionHeading id="live-draft-board-heading">
-                  Draft Board
-                </SectionHeading>
+              <CompactModule
+                id="live-draft.board"
+                title="Draft Board"
+                persist={false}
+                parts={
+                  state.pick_rows.length > 0
+                    ? [
+                        { key: "n", text: `${state.pick_rows.length} picks logged`, strong: true },
+                        { key: "last", text: `Latest: ${state.pick_rows[state.pick_rows.length - 1].round_pick} ${abbreviatePlayerName(state.pick_rows[state.pick_rows.length - 1].player_name)}` },
+                        state.pick_rows.some((row) => row.is_mine) ? { key: "mine", text: `${state.pick_rows.filter((row) => row.is_mine).length} yours`, tone: "accent" } : null,
+                      ]
+                    : [{ key: "none", text: "No picks have been logged yet.", tone: "muted" }]
+                }
+              >
                 <p className="text-xs" style={{ color: "var(--color-text-muted)" }}>
                   Latest pick and your picks are highlighted.
                 </p>
@@ -553,7 +599,7 @@ export function LiveDraftContent({
                     ))}
                   </div>
                 )}
-              </section>
+              </CompactModule>
 
               {state.status === "drafting" || state.status === "paused" ? (
                 <LiveDraftTradeEvaluator

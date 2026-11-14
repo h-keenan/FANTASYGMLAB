@@ -12,6 +12,7 @@ import { PickGroupList } from "@/components/PickGroupList";
 import { DraftScoutingTab } from "@/components/DraftScoutingTab";
 import { pickProvenance } from "@/lib/pickGroups";
 import { PillRow } from "@/components/PillRow";
+import { CompactModule } from "@/components/ui/CompactModule";
 import { formatRank } from "@/components/SnapshotTile";
 import { SnapshotTileGlyph, type SnapshotGlyphName } from "@/components/SnapshotTileGlyph";
 import { AccentCard } from "@/components/AccentCard";
@@ -116,10 +117,24 @@ export function DraftCenterContent({
       />
 
       {tab === "overview" ? (
-      <section className="flex flex-col gap-3" aria-labelledby="posture-heading">
-        <SectionHeading id="posture-heading">
-          Your Draft Posture
-        </SectionHeading>
+      <CompactModule
+        id="draft.posture"
+        title="Your Draft Posture"
+        persist={false}
+        defaultOpen
+        tone={posture ? "accent" : "muted"}
+        accent={posture ? draftToneColor(posture.tone) : undefined}
+        parts={
+          posture
+            ? [
+                { key: "label", text: posture.label, strong: true },
+                { key: "firsts", text: `${posture.first_rounders ?? 0} firsts` },
+                { key: "picks", text: `${posture.pick_count ?? 0} picks` },
+                posture.draft_capital_rank ? { key: "cap", text: `Capital ${formatRank(posture.draft_capital_rank, posture.draft_capital_rank_tied)}` } : null,
+              ]
+            : [{ key: "none", text: POSTURE_REASON_MESSAGE[postureReason] ?? "Your draft posture isn't available right now.", tone: "muted" }]
+        }
+      >
         {posture ? (
           <AccentCard accent={draftToneColor(posture.tone)} as="div">
             <div className="flex flex-wrap items-center gap-2">
@@ -179,14 +194,21 @@ export function DraftCenterContent({
         ) : (
           <EmptyState title={POSTURE_REASON_MESSAGE[postureReason] ?? "Your draft posture isn't available right now."} />
         )}
-      </section>
+      </CompactModule>
       ) : null}
 
       {tab === "picks" ? (
-        <section className="flex flex-col gap-3" aria-labelledby="pick-values-heading">
-          <SectionHeading id="pick-values-heading">
-            Pick Values
-          </SectionHeading>
+        <CompactModule
+          id="draft.pick-values"
+          title="Pick Values"
+          persist={false}
+          defaultOpen
+          parts={[
+            { key: "n", text: `${visiblePicks.length} ${pickScope === "league" ? "league " : ""}pick${visiblePicks.length === 1 ? "" : "s"}`, strong: true },
+            visiblePicks[0] ? { key: "first", text: [visiblePicks[0].season, visiblePicks[0].round ? `Rd ${visiblePicks[0].round}` : null].filter(Boolean).join(" ") || "Top pick listed first" } : null,
+            { key: "scope", text: pickScope === "mine" ? "Your picks" : "Whole league", tone: "muted" },
+          ]}
+        >
           {myRosterId ? (
             <PillRow
               options={[
@@ -217,7 +239,7 @@ export function DraftCenterContent({
               }
             />
           )}
-        </section>
+        </CompactModule>
       ) : null}
 
       {tab === "overview" ? (
@@ -308,10 +330,15 @@ function CapitalCell({
 function DraftCardSection({ id, title, cards, myRosterId }: { id: string; title: string; cards: DraftCard[]; myRosterId: string }) {
   if (cards.length === 0) return null;
   return (
-    <section className="flex flex-col gap-3" aria-labelledby={id}>
-      <SectionHeading id={id}>
-        {title}
-      </SectionHeading>
+    <CompactModule
+      id={`draft.${id}`}
+      title={title}
+      persist={false}
+      parts={[
+        { key: "n", text: `${cards.length} signal${cards.length === 1 ? "" : "s"}`, strong: true },
+        { key: "labels", text: cards.slice(0, 2).map((card) => card.label).join(", ") },
+      ]}
+    >
       <div className="flex flex-col gap-3">
         {cards.map((card) => {
           const color = draftToneColor(card.tone);
@@ -348,7 +375,7 @@ function DraftCardSection({ id, title, cards, myRosterId }: { id: string; title:
           );
         })}
       </div>
-    </section>
+    </CompactModule>
   );
 }
 
