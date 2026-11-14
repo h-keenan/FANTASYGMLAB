@@ -153,6 +153,17 @@ class PlayerModelAdapter(ScoringModel):
     def profile(self, player, rng):
         return self._m.draw_season_profile(player, rng)
 
+    def expected(self, player, profile, week, role_mult=None) -> float:
+        """The model's hidden expected points for this player this week (with a team role when given). The engine's usage cap reads
+        it; it never reaches a view. No random draw."""
+
+        if role_mult is not None and self.team_roles:
+            if self.role_mode == "additive":
+                profile = self._m.with_role(profile, week, role_mult[0], role_mult[1])
+            else:
+                profile = self._m.with_role_multiplier(profile, week, role_mult)
+        return float(self._m.expected_week_points(player, profile, week))
+
     def week(self, player, profile, week, rng, scoring, role_mult=None):
         if role_mult is not None and self.team_roles:
             if self.role_mode == "additive":

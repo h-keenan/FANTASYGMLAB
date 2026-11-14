@@ -34,6 +34,7 @@ from modules.sim.game_draft import draft_recap
 from modules.sim.game_eval import Evaluator, team_params
 from modules.sim.game_scoring import PlayerWeek, ScoringModel, get_model
 from modules.sim.game_state import Emitter, GameState
+from modules.sim.game_usage import group_factors
 from modules.sim.game_types import GameError, GameSnapshot, headshot_id, slot_positions
 from modules.sim.lineup import pick_lineup
 from modules.sim.rng import WorldRng
@@ -81,6 +82,12 @@ class ScoringSession:
         if role_mult is not None and self.model.team_roles:
             return self.model.week(self._mapping(pid), self.profile(pid), week, rng, self.scoring, role_mult=role_mult)
         return self.model.week(self._mapping(pid), self.profile(pid), week, rng, self.scoring)
+
+    def expected(self, pid: str, week: int, role: Any) -> float:
+        """Hidden expected points for the week under ``role`` (world_v usage cap only; adapter models that give it)."""
+
+        fn = getattr(self.model, "expected", None)
+        return float(fn(self._mapping(pid), self.profile(pid), week, role)) if fn else 0.0
 
     def weeks_out(self, pid: str, week: int, res: PlayerWeek) -> int:
         """Injury length: the player model's own decision when it gives one; the legacy
@@ -609,10 +616,24 @@ def run_week(em: Emitter, snap: GameSnapshot, state: GameState, seed: int) -> di
     session = session_for(snap, seed)
     played: dict[str, PlayerWeek] = {}
     hurt: list[list] = []
+    world = bool(S.world_v and ev.roles_on and ev.additive)  # world_v 1+: bench QBs sit, a team's RB/WR/TE group cannot run far past its baseline
+    cut: dict[str, float] = {}
+    if world:
+        cut = group_factors(
+            ev.book, snap.players, lambda p: ev.status(p, W) == "healthy", lambda p: ev.role_param(p, W), lambda p, role: session.expected(p, W, role),
+        )
     for pid in snap.pids:
         if ev.status(pid, W) != "healthy":
             continue
-        res = session.week(pid, W, ev.role_param(pid, W) if ev.roles_on else None)
+        role = ev.role_param(pid, W) if ev.roles_on else None
+        if world:
+            r = ev.role(pid, W)
+            if r is not None and r.kind == "backup":  # a healthy quarterback behind the one who plays does not play
+                continue
+            f = cut.get(pid)
+            if f is not None and role is not None:
+                role = (role[0] * f, role[1] * f)
+        res = session.week(pid, W, role)
         if not res.active:
             continue
         played[pid] = PlayerWeek(round(max(0.0, res.points), 2), res.stats, True, res.newly_injured)

@@ -179,8 +179,13 @@ def main(argv: list[str] | None = None) -> None:
     ap.add_argument("--copies", type=int, default=3)
     ap.add_argument("--model", default="")
     ap.add_argument("--skip-player", action="store_true")
+    ap.add_argument("--world-v", type=int, default=None, help="0 = the NFL world before usage conservation (for before/after runs); default = the current WORLD_VERSION")
     ap.add_argument("--json", default="")
     args = ap.parse_args(argv)
+    if args.world_v is not None:
+        from modules.sim import game_types
+
+        game_types.WORLD_VERSION = args.world_v
     from modules.sim import game_scoring
 
     model_id = args.model or game_scoring.default_model().model_id
