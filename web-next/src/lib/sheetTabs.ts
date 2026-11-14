@@ -54,3 +54,22 @@ export function nextPanelMinHeight(previous: number, measured: number): number {
   if (!Number.isFinite(measured) || measured <= 0) return previous;
   return Math.max(previous, Math.ceil(measured));
 }
+
+/**
+ * Where a sticky tab strip docks inside a scroll container. Browsers measure a sticky `top` from the container's
+ * CONTENT edge (its padding is skipped), so `top: 0` in a padded sheet leaves a padding-sized gap above the strip with
+ * scrolled content showing in it. `top` therefore subtracts the container's top padding, and `dock` (how far the
+ * sheet's own overlapping chrome, such as the close X, reaches into the scroll area) is added so the strip sits
+ * directly under that chrome. `mask` is how far the strip's opaque backing extends upward to hide content above it.
+ */
+export function stickyTabsOffset(paddingTop: number, dock: number): { top: number; mask: number } {
+  const pad = Number.isFinite(paddingTop) && paddingTop > 0 ? paddingTop : 0;
+  const d = Number.isFinite(dock) && dock > 0 ? dock : 0;
+  return { top: d - pad, mask: d };
+}
+
+/** How far chrome whose bottom edge is `chromeBottom` reaches into a scroll area starting at `scrollTop` (both viewport y). */
+export function chromeDock(chromeBottom: number, scrollTop: number, gap = 4): number {
+  const reach = chromeBottom - scrollTop;
+  return Number.isFinite(reach) && reach > 0 ? Math.ceil(reach + gap) : 0;
+}
