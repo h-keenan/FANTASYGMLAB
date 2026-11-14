@@ -60,6 +60,7 @@ import {
   simWithout,
 } from '../lib/simGame';
 import type { ThemeColors } from '../theme';
+import { playerSurname } from '../lib/playerNameDisplay';
 
 /** "Scout" button for the partner list: opens the team's scouting sheet without picking it as the partner. */
 function ScoutButton({ teamId, name }: { teamId: string; name: string }) {
@@ -169,7 +170,7 @@ function OfferCard({ item, defaultOpen, busy, canTrade, onRespond }: { item: Sim
   const { colors } = useThemeMode();
   const common = useMemo(() => createSimStyles(colors), [colors]);
   const [open, setOpen] = useState(defaultOpen);
-  const names = (list: SimTradeAsset[]) => list.map((p) => (simIsPick(p) ? simPickLabelText(p) : p.name.split(' ').slice(-1)[0])).join(', ');
+  const names = (list: SimTradeAsset[]) => list.map((p) => (simIsPick(p) ? simPickLabelText(p) : playerSurname(p.name))).join(', ');
   return (
     <FadeInView>
       <AccentCard accent={colors.premium} compact>

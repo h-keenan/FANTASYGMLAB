@@ -361,9 +361,7 @@ export default function PlayerIdentityRow({
            * across My Team/Waivers/Trade Hub/Matchup/etc., so the fix here
            * covers every consumer at once. */}
           {wrapName ? (
-            <AppText style={styles.name} numberOfLines={2}>
-              {name ?? 'Unknown player'}
-            </AppText>
+            <PlayerName name={name ?? 'Unknown player'} style={styles.name} />
           ) : (
             <PlayerName name={name ?? 'Unknown player'} style={styles.name} />
           )}

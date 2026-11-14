@@ -43,6 +43,7 @@ import { openInsight } from '../lib/insightNav';
 import type { InsightKey } from '../lib/insightLinks';
 import type { RootStackParamList } from '../navigation/RootNavigator';
 import { usePlayerQuickView } from '../context/PlayerQuickViewContext';
+import { playerSurname } from '../lib/playerNameDisplay';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'MyTeam'>;
 
@@ -324,7 +325,7 @@ export default function MyTeamScreen({ route, navigation }: Props) {
         ) : null}
         {/* The roster as sections, not tabs: each group reads collapsed ("9 players · Value 6,120 · Gibbs, Chase"). */}
         {rosterTabs.map((tab, index) => {
-          const names = tab.players.slice(0, 3).map((p) => (p.name || '').split(' ').slice(-1)[0]).filter(Boolean);
+          const names = tab.players.slice(0, 3).map((p) => playerSurname(p.name || '')).filter(Boolean);
           const total = tab.players.reduce((sum, p) => sum + (p.score ?? 0), 0);
           const emptyText = tab.key === 'starters' ? 'No suggested starters yet.' : 'Nobody here yet.';
           return (

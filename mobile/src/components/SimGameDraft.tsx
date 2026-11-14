@@ -36,6 +36,7 @@ import {
   type SimGamePlayer,
 } from '../lib/simGame';
 import { spacing, type ThemeColors } from '../theme';
+import { playerSurname } from '../lib/playerNameDisplay';
 
 type Panel = 'board' | 'queue' | 'roster' | 'picks';
 
@@ -319,7 +320,7 @@ export function SimGameDraft({ ctx, onComplete }: { ctx: SimCtx; onComplete: (re
   };
 
   const needPills = simDraftNeedPills(draft.your_roster, game.settings.slots);
-  const hintLast = hint ? hint.player.name.split(' ').slice(-1)[0] : '';
+  const hintLast = hint ? playerSurname(hint.player.name) : '';
   return (
     <View style={common.stack}>
       <CompactModule

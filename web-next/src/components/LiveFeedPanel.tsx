@@ -4,6 +4,7 @@ import { useEffect, useState, useSyncExternalStore } from "react";
 
 import { PositionBadge } from "@/components/PositionBadge";
 import { ToneBadge } from "@/components/ToneBadge";
+import { PlayerName } from "@/components/PlayerName";
 import {
   feedAgeLabel,
   feedPointsLabel,
@@ -109,9 +110,7 @@ function FeedItem({ event, now, isNew }: { event: FeedEvent; now: number; isNew:
       <PositionBadge position={event.position} />
       <span className="flex flex-col min-w-0 flex-1">
         <span className="flex items-baseline gap-1.5 min-w-0">
-          <span className="text-[13px] font-bold truncate" style={{ color: "var(--color-text-primary)" }}>
-            {event.name}
-          </span>
+          <PlayerName name={event.name} className="text-[13px] font-bold" style={{ color: "var(--color-text-primary)" }} />
           <span className="text-[13px] font-extrabold tabular-nums shrink-0" style={{ color: tone }}>
             {feedPointsLabel(event.points)}
           </span>

@@ -24,6 +24,7 @@ import type { OpponentTradeTarget } from '../lib/opponentProfile';
 import { useThemeMode } from '../context/ThemeModeContext';
 import { radii, spacing, type ThemeColors, scrim } from '../theme';
 import type { RootStackParamList } from '../navigation/RootNavigator';
+import PlayerName from './PlayerName';
 
 interface Props {
   visible: boolean;
@@ -162,10 +163,14 @@ export default function ManagerProfileModal({ visible, onClose, leagueId, league
                           <PositionBadge position={asset.position} />
                         </View>
                       )}
-                      <AppText style={styles.assetName} numberOfLines={2}>
-                        {asset.kind === 'pick' ? asset.label || 'Draft pick' : asset.name}
-                        {asset.kind === 'player' && asset.team ? `  ${asset.team}` : ''}
-                      </AppText>
+                      {asset.kind === 'pick' ? (
+                        <AppText style={styles.assetName}>{asset.label || 'Draft pick'}</AppText>
+                      ) : (
+                        <View style={{ flex: 1, minWidth: 0, flexDirection: 'row', flexWrap: 'wrap', alignItems: 'baseline', columnGap: 6 }}>
+                          <PlayerName name={asset.name} style={styles.assetName} />
+                          {asset.team ? <AppText style={styles.assetName}>{asset.team}</AppText> : null}
+                        </View>
+                      )}
                     </View>
                   ))}
                 </View>

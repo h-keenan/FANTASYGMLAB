@@ -56,7 +56,7 @@ export function SimTeamCard({
           {team.top_assets.map((p) => (
             <li key={p.id} className="flex items-center gap-2 text-xs">
               <PositionBadge position={p.pos} />
-              <PlayerName name={p.name} className="min-w-0 flex-1 truncate font-bold" />
+              <PlayerName name={p.name} className="min-w-0 flex-1 font-bold" />
               <span className="shrink-0 tabular-nums" style={{ color: "var(--color-text-muted)" }}>
                 OVR <strong style={{ color: "var(--color-text-primary)" }}>{simOverallLabel(p.overall)}</strong>
               </span>

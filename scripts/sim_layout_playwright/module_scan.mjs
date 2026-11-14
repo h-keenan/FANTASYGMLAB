@@ -82,6 +82,21 @@ const PAGE_CHECK = () => {
     out.summaries.push(`${title}: ${summary.slice(0, 60)}`);
     if (summary.trim().length < 12) out.emptyHeaders.push({ title, chars: summary.trim().length });
   }
+  // Page tab strip geometry (PillRow glass): must be full-bleed (0..W), tabs evenly spread and centred, strip backing opaque.
+  const strip = document.querySelector(".pill-row-glass");
+  if (strip) {
+    const r = strip.getBoundingClientRect();
+    const tabs = [...strip.querySelectorAll('[role="tab"]')].map((t) => t.getBoundingClientRect());
+    const hdr = document.querySelector(".shell-header");
+    const m = getComputedStyle(strip).backgroundColor.match(/rgba?\(([^)]+)\)/);
+    const parts = m ? m[1].split(/[,/ ]+/).filter(Boolean).map(parseFloat) : [];
+    const alphas = [parts.length > 3 ? parts[3] : m ? 1 : 0];
+    out.strip = {
+      left: Math.round(r.left * 10) / 10, right: Math.round((W - r.right) * 10) / 10, top: Math.round(r.top), headerBottom: hdr ? Math.round(hdr.getBoundingClientRect().bottom) : null,
+      tabLeft: Math.round(tabs[0].left * 10) / 10, tabRight: Math.round((W - tabs[tabs.length - 1].right) * 10) / 10,
+      widths: tabs.map((t) => Math.round(t.width)), minAlpha: alphas.length ? Math.min(...alphas) : 1,
+    };
+  }
   out.tablists = [...document.querySelectorAll('[role="tablist"]')].filter((el) => el.getBoundingClientRect().height > 0).length;
   return out;
 };
@@ -127,10 +142,18 @@ for (const r of results) {
   if (r.error) problems.push(`error ${r.error}`);
   if (r.overflow) problems.push(`overflow ${r.overflow.scrollWidth}>${r.overflow.width}`);
   if (r.emptyHeaders?.length) problems.push(`empty collapsed headers: ${r.emptyHeaders.map((h) => h.title).join(", ")}`);
+  if (r.strip) {
+    const s = r.strip, spread = Math.max(...s.widths) - Math.min(...s.widths);
+    if (Math.abs(s.left) > 0.5 || Math.abs(s.right) > 0.5) problems.push(`tab strip not full-bleed (left ${s.left}, right gap ${s.right})`);
+    if (Math.abs(s.tabLeft - s.tabRight) > 2) problems.push(`tabs not centred (left ${s.tabLeft}, right ${s.tabRight})`);
+    if (spread > 8) problems.push(`tab widths uneven ${s.widths}`);
+    if (s.minAlpha < 0.9) problems.push(`tab strip backing see-through (alpha ${s.minAlpha})`);
+    if (s.headerBottom != null && Math.abs(s.top - s.headerBottom) > 1) problems.push(`tab strip top ${s.top} != header bottom ${s.headerBottom}`);
+  }
   if ((r.tablists ?? 0) > 1) problems.push(`${r.tablists} tab rows`);
   if (r.modules === 0) problems.push("no compact modules rendered (fixtures not applied?)");
   if (problems.length) bad += 1;
-  console.log(`${problems.length ? "FAIL" : "ok  "} ${r.page}@${r.width}: modules=${r.modules} heroes=${r.heroes} tablists=${r.tablists} height=${r.height}${problems.length ? "  " + problems.join("; ") : ""}`);
+  console.log(`${problems.length ? "FAIL" : "ok  "} ${r.page}@${r.width}: modules=${r.modules} heroes=${r.heroes} strip=${JSON.stringify(r.strip)} tablists=${r.tablists} height=${r.height}${problems.length ? "  " + problems.join("; ") : ""}`);
 }
 console.log(bad ? `${bad} page(s) with problems` : "module scan clean");
 process.exit(bad ? 1 : 0);

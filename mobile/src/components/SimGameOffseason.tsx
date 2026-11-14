@@ -45,6 +45,7 @@ import {
   simLimitBlocks,
   simOverLimitNote,
 } from '../lib/simGame';
+import { playerSurname } from '../lib/playerNameDisplay';
 
 type Busy = 'start' | 'pick' | 'auto' | 'season' | null;
 
@@ -337,7 +338,7 @@ function RookieStage({
         parts={simRookieSummaryParts(d, toMake)}
         action={
           d.your_turn && d.available[0] ? (
-            <Button size="sm" label={`Draft ${d.available[0].name.split(' ').slice(-1)[0]}`} loading={busy === 'pick'} disabled={busy !== null && busy !== 'pick'} onPress={() => onPick(d.available[0])} />
+            <Button size="sm" label={`Draft ${playerSurname(d.available[0].name)}`} loading={busy === 'pick'} disabled={busy !== null && busy !== 'pick'} onPress={() => onPick(d.available[0])} />
           ) : null
         }
       >

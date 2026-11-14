@@ -36,7 +36,7 @@ describe("PlayerName", () => {
     expect(el.getAttribute("title")).toBe("Saquon Barkley");
     // WCAG 2.5.3: sighted users see the short form, assistive tech reads the full name.
     expect(screen.getByText("Saquon Barkley")).toHaveClass("sr-only");
-    expect(el.className).toContain("truncate");
+    expect(el.className).not.toContain("truncate");
   });
 
   it("keeps suffixes and multi-word surnames when shortening", () => {
@@ -58,5 +58,16 @@ describe("PlayerName", () => {
     setWidths(0, 0);
     const { container } = render(<PlayerName name={null} />);
     expect(container.textContent).toBe("");
+  });
+
+  it("when even the short form overflows it steps the font down, then wraps; it never truncates", () => {
+    setWidths(300, 40);
+    render(<PlayerName name="Jonathan Brisker" />);
+    const short = screen.getByText("J. Brisker");
+    const el = short.closest("[data-player-name-stage]") as HTMLElement;
+    expect(el.getAttribute("data-player-name-stage")).toBe("4");
+    expect(el.className).toContain("whitespace-normal");
+    expect(el.className).not.toMatch(/truncate|ellipsis|line-clamp/);
+    expect(short.getAttribute("style")).toContain("font-size: 0.85em");
   });
 });

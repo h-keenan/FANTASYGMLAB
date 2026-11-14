@@ -73,3 +73,12 @@ export function fitPlayerName(full: string | null | undefined, maxChars: number)
   const trimmed = (full ?? "").replace(/\s+/g, " ").trim();
   return trimmed.length > maxChars ? shortPlayerName(trimmed) : trimmed;
 }
+
+/**
+ * The surname alone, for the few strings that have no room for an initial ("Draft Brisker", "Gibbs, Chase, Metcalf").
+ * Suffixes are dropped ("Penix Jr." -> "Penix", never the "Jr." that `split(" ").pop()` returned) and multi-word
+ * surnames stay whole ("St. Brown"). A mononym or team defense is returned as is.
+ */
+export function playerSurname(full: string | null | undefined): string {
+  return splitPlayerName(full).surname;
+}
