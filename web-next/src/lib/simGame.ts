@@ -61,6 +61,8 @@ export interface SimGameEnvelope {
   phase?: string;
   /** On `roster_over_limit`. */
   cuts_needed?: number;
+  /** On `roster_full` (adding while over the limit): how many players over. */
+  over_by?: number;
 }
 
 export interface SimPlayerOwner {
@@ -225,6 +227,8 @@ export interface SimGameSettings {
   playoff_weeks: number;
   trade_deadline_week: number;
   roster_limit: number;
+  /** Roster-limit rule generation: 1+ = the soft limit (over the limit only blocks adding players); absent = a save from before it. */
+  limit_v?: number;
   rounds: number;
   slots: SimSlot[];
   user_slot: number;
@@ -268,7 +272,20 @@ export interface SimGamePending {
   lineup_warnings: number;
   roster_size: number;
   roster_limit: number;
+  /** Players beyond the limit. Whether that blocks Advance depends on `limit_blocks`. */
   cuts_needed: number;
+  /** False in saves with the soft roster limit: over the limit only blocks adding players. Absent (old server) means it blocks. */
+  limit_blocks?: boolean;
+}
+
+/** True when being over the limit stops Advance / Start season (a save from before the soft limit); false when it only blocks adding players. */
+export function simLimitBlocks(x: { limit_blocks?: boolean } | null | undefined): boolean {
+  return x?.limit_blocks !== false;
+}
+
+/** The compact, non-blocking note for a roster over the limit (soft-limit saves). */
+export function simOverLimitNote(over: number): string {
+  return `Over the limit by ${over}: cut or trade to add players.`;
 }
 
 export interface SimGame {
@@ -953,7 +970,33 @@ export interface SimToOption {
   weeks?: number;
 }
 
-export type SimToStopCode = "roster_over_limit" | "starter_out" | "starter_bye" | "empty_slot" | "trade_offers" | "premium_required" | "time_budget";
+export type SimToStopCode =
+  | "roster_over_limit"
+  | "starter_out"
+  | "starter_bye"
+  | "empty_slot"
+  | "trade_offers"
+  | "premium_required"
+  | "time_budget"
+  | "trade_deadline"
+  | "starter_injured"
+  | "waiver_issue";
+
+/** The per-run stop toggles (all on by default). Sent as `stops` on POST /sim-to; the server falls back to all on. */
+export interface SimToStops {
+  offers: boolean;
+  injuries: boolean;
+  starters: boolean;
+  deadline: boolean;
+  roster: boolean;
+}
+
+export interface SimToLineupChange {
+  week: number;
+  slot: string;
+  out: string | null;
+  in: string | null;
+}
 
 export interface SimToStop {
   code: SimToStopCode;
@@ -990,6 +1033,13 @@ export interface SimToSummary {
   standings: SimStandingRow[];
   champion: string | null;
   season_complete: boolean;
+  /** Auto-set lineup was on for this run, and what it changed (only slots that actually changed). */
+  auto_set?: boolean;
+  lineup_changes?: SimToLineupChange[];
+  /** Offers waiting in your inbox now, and how many arrived during the run. */
+  offers_pending?: number;
+  offers_new?: number;
+  roster?: { size: number; limit: number; over: number } | null;
 }
 
 export interface SimToResponse extends SimGameEnvelope {
@@ -1185,7 +1235,7 @@ const REASON_COPY: Record<string, string> = {
   ir_ineligible: "Only an injured (out) player on your active roster can go on IR.",
   taxi_full: "Your taxi squad is full.",
   taxi_ineligible: "Only rookies and young players can go on the taxi squad.",
-  roster_full: "Your roster is full. Cut someone first.",
+  roster_full: "Your roster is full: cut or trade someone to add players.",
   reserves_unavailable: "This game has no IR or taxi squad.",
   not_dynasty: "That is only in dynasty games.",
   pool_exhausted: "No rookies are left to draft.",
@@ -1204,6 +1254,7 @@ const REASON_COPY: Record<string, string> = {
 /** User-facing sentence for a backend `reason` (empty string for success). */
 export function simGameReasonMessage(reason: string | undefined | null, body?: SimGameEnvelope | null): string {
   if (!reason) return "";
+  if (reason === "roster_full" && body?.over_by) return simOverLimitNote(body.over_by);
   if (reason === "roster_over_limit" && body?.cuts_needed) {
     const n = body.cuts_needed;
     return `Cut ${n} player${n === 1 ? "" : "s"} to get back to the roster limit before you advance.`;
@@ -1338,7 +1389,7 @@ export function simAdvanceBlockers(game: SimGame | null | undefined, preview?: S
     out.push({ code: "paywalled", message: "Free preview is over. Go Pro to keep playing." });
   }
   const cuts = game.pending?.cuts_needed ?? 0;
-  if (cuts > 0) {
+  if (cuts > 0 && simLimitBlocks(game.pending)) {
     out.push({ code: "cuts", message: simGameReasonMessage("roster_over_limit", { cuts_needed: cuts }) });
   }
   return out;
@@ -2910,6 +2961,7 @@ export interface SimOffseasonRoster {
   size: number;
   limit: number;
   cuts_needed: number;
+  limit_blocks?: boolean;
   ir: SimGamePlayer[];
   taxi: SimGamePlayer[];
   reserves: SimReserves;
@@ -3267,6 +3319,8 @@ export interface SimOffseasonCta {
   label: string;
   /** Plain reason the button is disabled. */
   blocked: string | null;
+  /** A non-blocking heads-up shown next to the button (over the limit in a soft-limit save). */
+  note?: string | null;
 }
 
 /** The one big button for the current stage. */
@@ -3275,10 +3329,15 @@ export function simOffseasonCta(off: Pick<SimOffseason, "stage" | "season_no" | 
   if (off.stage === "review") return { action: "start_rookie_draft", label: "Start rookie draft", blocked: null };
   if (off.stage === "rookie_draft") return { action: "finish_draft", label: "Auto-draft the rest", blocked: null };
   const cuts = off.roster?.cuts_needed ?? 0;
+  if (cuts > 0 && !simLimitBlocks(off.roster)) {
+    // Madden / 2K rule: no deadline to get under the limit, you just cannot add anyone until you are.
+    return { action: "start_season", label: `Start season ${off.season_no + 1}`, blocked: null, note: simOverLimitNote(cuts) };
+  }
   return {
     action: "start_season",
     label: cuts > 0 ? "Finish cut-down" : `Start season ${off.season_no + 1}`,
     blocked: cuts > 0 ? `Cut ${cuts} player${cuts === 1 ? "" : "s"} to get to the roster limit first.` : null,
+    note: null,
   };
 }
 

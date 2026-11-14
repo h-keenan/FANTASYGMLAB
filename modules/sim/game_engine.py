@@ -229,7 +229,7 @@ def check_can_advance(snap: GameSnapshot, state: GameState) -> None:
     if state.status == "offseason":
         raise GameError("wrong_phase", "The season is over: finish the offseason first.", phase="offseason")
     over = len(state.rosters[snap.user_team.tid]) - snap.settings.roster_limit
-    if over > 0:
+    if over > 0 and not snap.settings.soft_limit:  # limit_v 1+: over the limit only blocks adding players (game_actions.roster_room)
         raise GameError("roster_over_limit", f"Cut {over} player(s) before advancing.", cuts_needed=over)
 
 
@@ -287,8 +287,9 @@ def _resolve_waivers(em: Emitter, snap: GameSnapshot, state: GameState, seed: in
                 reason = "taken"
             elif drop is not None and drop not in roster:
                 reason = "drop_not_owned"
-            elif len(roster) - (1 if drop else 0) + 1 > limit:
-                reason = "roster_full"
+            elif len(roster) - (1 if drop else 0) + 1 > limit and not (
+                    snap.settings.soft_limit and len(roster) - (1 if drop else 0) + 1 <= len(roster)):
+                reason = "roster_full"  # limit_v 1+: an add that does not grow an over-full roster (a swap) is fine
             start = c.get("start_slot")
             if start and snap.players[add].pos not in slot_positions(start):
                 start = None

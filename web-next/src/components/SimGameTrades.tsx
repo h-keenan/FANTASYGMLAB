@@ -346,7 +346,8 @@ function Builder({ ctx, seed, onSeedUsed }: { ctx: SimCtx; seed: SimTradeSeed | 
   const theirPicks = simPicksOf(picks, partner?.team_id);
   const giveSelected: SimTradeAsset[] = [...mine, ...myPicks].filter((p) => draft.give.includes(p.id));
   const getSelected: SimTradeAsset[] = [...partnerRoster, ...theirPicks].filter((p) => draft.get.includes(p.id));
-  const fit = simTradeFit(mine.length, game.settings.roster_limit, giveSelected.filter((p) => !simIsPick(p)).length, getSelected.filter((p) => !simIsPick(p)).length);
+  const soft = (game.settings.limit_v ?? 0) >= 1; // the soft roster limit: over the limit only blocks adding players
+  const fit = simTradeFit(mine.length, game.settings.roster_limit, giveSelected.filter((p) => !simIsPick(p)).length, getSelected.filter((p) => !simIsPick(p)).length, soft);
   // The picker's groups: players by position, then a Picks group; the same shape feeds the page summaries.
   const groupsFor = (players: SimGamePlayer[], pickList: SimPickAsset[]): SimAssetGroup<SimTradeAsset>[] => {
     const groups: SimAssetGroup<SimTradeAsset>[] = simGroupByPosition(players.filter((p) => simTradable(p.pos)), simPositionsFor(game.settings.slots));
@@ -393,9 +394,9 @@ function Builder({ ctx, seed, onSeedUsed }: { ctx: SimCtx; seed: SimTradeSeed | 
             <TradeSideSummary testId="trade-side-give" label="You send" tone="danger" items={sideItems(giveSelected)} onOpen={() => setSheetSide("give")} onRemove={(key) => dispatch({ type: "toggle", side: "give", id: key.slice(key.indexOf(":") + 1), max: maxPerSide })} hint={picks?.you?.length ? "Add players or picks from your team" : "Add from your roster"} />
             <TradeSideSummary testId="trade-side-get" label="You receive" tone="success" items={sideItems(getSelected)} onOpen={() => setSheetSide("get")} onRemove={(key) => dispatch({ type: "toggle", side: "get", id: key.slice(key.indexOf(":") + 1), max: maxPerSide })} hint={`Add from ${partner.name}`} />
           </section>
-          <p className="text-xs" style={{ color: fit.over ? "var(--color-danger)" : "var(--color-text-muted)" }} data-testid="trade-fit">
+          <p className="text-xs" style={{ color: fit.blocked || (fit.over && !soft) ? "var(--color-danger)" : "var(--color-text-muted)" }} data-testid="trade-fit">
             Your roster after: {fit.after}/{game.settings.roster_limit}
-            {fit.over ? ` (cut ${fit.over} after the trade)` : fit.room ? ` (${fit.room} open)` : ""}
+            {fit.blocked ? ": cut or trade someone first to add players" : fit.over ? (soft ? ` (over by ${fit.over})` : ` (cut ${fit.over} after the trade)`) : fit.room ? ` (${fit.room} open)` : ""}
           </p>
         </>
       ) : null}
@@ -415,7 +416,7 @@ function Builder({ ctx, seed, onSeedUsed }: { ctx: SimCtx; seed: SimTradeSeed | 
                 }}
               />
               {verdict.decision === "accept" ? (
-                <Button loading={sending} onClick={() => { const payload = simTradePayload(draft); if (payload) void send(payload); }}>
+                <Button loading={sending} disabled={fit.blocked} onClick={() => { const payload = simTradePayload(draft); if (payload) void send(payload); }}>
                   Send offer
                 </Button>
               ) : null}

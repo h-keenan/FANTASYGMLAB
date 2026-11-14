@@ -40,6 +40,8 @@ import {
   type SimOffseasonResponse,
   type SimPos,
   type SimTeamRosterResponse,
+  simLimitBlocks,
+  simOverLimitNote,
 } from "@/lib/simGame";
 
 type Busy = "start" | "pick" | "auto" | "season" | null;
@@ -452,15 +454,16 @@ function CutdownStage({ off, ctx, onTrade, onTeam }: { off: SimOffseason; ctx: S
   }
 
   const over = r.cuts_needed > 0;
+  const blocks = over && simLimitBlocks(r);
   const players = roster?.players ?? [];
   const reservesOn = simReservesOn(game.settings, roster?.reserves ?? r.reserves);
   const reserveState = { reserves: roster?.reserves ?? r.reserves, rosterSize: r.size, rosterLimit: r.limit };
   const myPicks = simPicksOf(picks, teamId);
   return (
     <>
-      <AccentCard accent={over ? "var(--color-danger)" : "var(--color-success)"} compact as="section">
-        <p className="text-sm font-bold" role={over ? "alert" : "status"} data-testid="roster-check">
-          {over ? `Cut ${r.cuts_needed} player${r.cuts_needed === 1 ? "" : "s"} to start the season.` : "Your roster is ready for the season."}
+      <AccentCard accent={blocks ? "var(--color-danger)" : over ? "var(--color-warning)" : "var(--color-success)"} compact as="section">
+        <p className="text-sm font-bold" role={blocks ? "alert" : "status"} data-testid="roster-check">
+          {blocks ? `Cut ${r.cuts_needed} player${r.cuts_needed === 1 ? "" : "s"} to start the season.` : over ? simOverLimitNote(r.cuts_needed) : "Your roster is ready for the season."}
         </p>
         <p className="text-xs" style={{ color: "var(--color-text-muted)" }}>
           {r.size} of {r.limit} roster spots. IR and taxi players do not count.
@@ -471,7 +474,7 @@ function CutdownStage({ off, ctx, onTrade, onTeam }: { off: SimOffseason; ctx: S
         </div>
       </AccentCard>
 
-      <SimCollapse title="Your roster" summary={`${r.size} of ${r.limit}${over ? `, cut ${r.cuts_needed}` : ""}`} tone={over ? "danger" : "muted"} defaultOpen={over} testId="cutdown-roster">
+      <SimCollapse title="Your roster" summary={`${r.size} of ${r.limit}${over ? `, over by ${r.cuts_needed}` : ""}`} tone={blocks ? "danger" : over ? "warning" : "muted"} defaultOpen={blocks} testId="cutdown-roster">
         {players.length === 0 ? (
           <p className="text-xs" style={{ color: "var(--color-text-muted)" }}>Loading your roster.</p>
         ) : (
@@ -490,7 +493,7 @@ function CutdownStage({ off, ctx, onTrade, onTeam }: { off: SimOffseason; ctx: S
                 ) : (
                   <>
                     {reservesOn ? <SimReserveButton player={player} onOpen={setMoving} /> : null}
-                    <Button size="sm" variant={over ? "dangerOutline" : "ghost"} aria-label={`Cut ${player.name}`} onClick={() => setCutting(player.id)}>
+                    <Button size="sm" variant={blocks ? "dangerOutline" : "ghost"} aria-label={`Cut ${player.name}`} onClick={() => setCutting(player.id)}>
                       Cut
                     </Button>
                   </>

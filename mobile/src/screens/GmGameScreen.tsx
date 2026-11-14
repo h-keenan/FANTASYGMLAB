@@ -96,7 +96,7 @@ import {
   type SimTradeSeed,
   type SimToResponse,
 } from '../lib/simGame';
-import { simToProgressLabel } from '../lib/simTo';
+import { simToProgressLabel, simToRemaining } from '../lib/simTo';
 import { simScrollKey, simShouldScrollTop } from '../lib/simScroll';
 import { SIM_FLOW_INITIAL, simFlowReducer, simRecapsFromAdvance, type SimTab } from '../lib/simGameFlow';
 import { useSimGameRequest } from '../lib/useSimGameRequest';
@@ -361,7 +361,7 @@ export default function GmGameScreen({ navigation }: Props) {
     setSimToRequest(request);
     setSimToBusy(request.option.label);
     setNotice(null);
-    const res = await call(() => api.simToGame(game.id, { target: request.option.id, weeks: request.option.weeks, auto_set: request.autoSet, force_first: request.forceFirst }));
+    const res = await call(() => api.simToGame(game.id, { target: request.option.id, weeks: request.option.weeks, auto_set: request.autoSet, force_first: request.forceFirst, stops: request.stops }));
     setAdvancing(false);
     setSimToBusy(null);
     if (!res) return;
@@ -561,8 +561,9 @@ export default function GmGameScreen({ navigation }: Props) {
         onSimToDone={() => setSimToResult(null)}
         onSimToForce={() => {
           if (simToRequest) {
+            const played = simToResult?.weeks_played ?? 0;
             setSimToResult(null);
-            void runSimTo({ ...simToRequest, forceFirst: true });
+            void runSimTo({ ...simToRequest, option: simToRemaining(simToRequest.option, played), forceFirst: true });
           }
         }}
         onSimToUndo={undoSimTo}

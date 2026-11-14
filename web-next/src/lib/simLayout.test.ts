@@ -46,8 +46,8 @@ describe("simLayout", () => {
     expect(simGroupByPosition([{ pos: "DEF", name: "x" }], ["QB"])[0].key).toBe("OTHER");
   });
   it("computes roster room after a trade", () => {
-    expect(simTradeFit(16, 16, 2, 1)).toEqual({ after: 15, room: 1, over: 0 });
-    expect(simTradeFit(16, 16, 1, 3)).toEqual({ after: 18, room: 0, over: 2 });
+    expect(simTradeFit(16, 16, 2, 1)).toEqual({ after: 15, room: 1, over: 0, blocked: false });
+    expect(simTradeFit(16, 16, 1, 3)).toEqual({ after: 18, room: 0, over: 2, blocked: false });
   });
   it("describes what an auto-set changed", () => {
     const a = (id: string, name: string) => ({ id, name });

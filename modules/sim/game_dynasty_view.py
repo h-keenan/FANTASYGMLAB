@@ -89,7 +89,7 @@ def offseason_view(snap: GameSnapshot, state: GameState, *, pos: str = "", limit
             "on_clock": clock, "your_turn": bool(clock and clock["is_yours"]),
             "available": [player_row(snap, state, ev, p, owners) for p in avail[:limit]], "available_count": len(avail),
         },
-        "roster": {"size": len(state.rosters[user]), "limit": S.roster_limit, "cuts_needed": over,
+        "roster": {"size": len(state.rosters[user]), "limit": S.roster_limit, "cuts_needed": over, "limit_blocks": not S.soft_limit,
                    **reserve_block(snap, state, ev, user, owners, 1)},
         "can_trade": trade_window(snap, state) is None,
         "next": {"review": "start_rookie_draft", "rookie_draft": "finish_draft", "cutdown": "start_season"}.get(stage or ""),

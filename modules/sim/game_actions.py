@@ -31,6 +31,32 @@ from modules.sim.types import is_pick_id
 from modules.sim.game_types import NON_TRADABLE, GameError, GameSnapshot, slot_positions
 
 
+def over_by(snap: GameSnapshot, state: GameState, tid: str) -> int:
+    """How many active players ``tid`` carries beyond the roster limit (IR and taxi never count)."""
+
+    return max(0, len(state.rosters[tid]) - snap.settings.roster_limit)
+
+
+def over_limit_message(over: int) -> str:
+    return f"Over the limit by {over}: cut or trade to add players."
+
+
+def check_roster_room(snap: GameSnapshot, state: GameState, tid: str, give: Sequence[str], get: Sequence[str]) -> None:
+    """limit_v 1+: a trade may not take the user past the limit while adding to the active roster. An exchange that ends within
+    the limit, or leaves the roster no fuller than it is (picks never count), is always fine. Older saves are not checked."""
+
+    S = snap.settings
+    if not S.soft_limit:
+        return
+    give_set = set(give)
+    kept = sum(1 for p in state.rosters[tid] if p not in give_set)
+    after = kept + sum(1 for p in get if not is_pick_id(p))
+    if after > S.roster_limit and after > len(state.rosters[tid]):
+        over = over_by(snap, state, tid)
+        raise GameError("roster_full", over_limit_message(over) if over else "That trade would add players to a full roster: cut or trade someone first.",
+                        over_by=over)
+
+
 def _require_season(state: GameState, *, offseason_ok: bool = False) -> None:
     if state.status == "drafting":
         raise GameError("wrong_phase", "Finish the draft first.", phase="draft")
@@ -117,6 +143,8 @@ def queue_claim(em: Emitter, add: str, drop: str | None, start_slot: str | None)
         raise ValueError("You already have a claim on that player.")
     if drop is not None and any(c.get("drop") == drop for c in state.claims):
         raise ValueError("That player is already being dropped by another claim.")
+    if snap.settings.soft_limit and drop is None and over_by(snap, state, user) > 0:
+        raise GameError("roster_full", over_limit_message(over_by(snap, state, user)), over_by=over_by(snap, state, user))
     cid = f"c{state.seq}"
     em.emit(state.week, "user", "waiver_claim", id=cid, team=user, add=add, drop=drop, start_slot=start_slot)
     return next(c for c in state.claims if c["id"] == cid)
@@ -190,7 +218,8 @@ def check_move(snap: GameSnapshot, state: GameState, tid: str, pid: str, dst: st
             raise GameError("taxi_ineligible", "Kickers and defenses cannot go on the taxi squad.")
     else:  # activate / promote
         if len(state.rosters[tid]) >= S.roster_limit:
-            raise GameError("roster_full", "Open a roster spot first: cut or move a player.")
+            over = over_by(snap, state, tid)
+            raise GameError("roster_full", over_limit_message(over) if over else "Open a roster spot first: cut or move a player.", over_by=over)
     return src
 
 
@@ -326,6 +355,7 @@ def preview_trade(desk: TradeDesk, partner: str, give: Sequence[str], get: Seque
     snap, state = desk.snap, desk.state
     validate_offer(snap, state, partner, give, get)
     _gate_trade(snap, state, partner)
+    check_roster_room(snap, state, snap.user_team.tid, give, get)
     return desk.verdict(partner, give, get)
 
 
@@ -335,6 +365,7 @@ def send_trade(
     snap, state = desk.snap, desk.state
     validate_offer(snap, state, partner, give, get)
     _gate_trade(snap, state, partner)
+    check_roster_room(snap, state, snap.user_team.tid, give, get)
     key = offer_key(partner, give, get)
     if key in state.offer_keys:
         raise GameError("duplicate_offer", "You already made that offer this week.")
@@ -374,11 +405,12 @@ def respond_offer(em: Emitter, desk: TradeDesk, offer_id: str, action: str) -> d
 
     if not all(owns(ai, p) for p in ai_gives) or not all(owns(user, p) for p in ai_gets):
         raise GameError("offer_invalid", "Those players have moved, so the offer is off.")
+    check_roster_room(snap, state, user, ai_gets, ai_gives)
     em.emit(state.week, "user", "inbox_response", id=offer_id, action="accept")
     return execute_trade(em, ai, user, ai_gives, ai_gets, key="", source="ai_offer")
 
 
 __all__ = [
     "validate_lineup", "set_lineup", "auto_lineup", "lineup_warnings", "queue_claim", "cancel_claim",
-    "cut_player", "preview_trade", "send_trade", "respond_offer", "execute_trade", "enforce_roster_cap",
+    "cut_player", "over_by", "check_roster_room", "preview_trade", "send_trade", "respond_offer", "execute_trade", "enforce_roster_cap",
 ]
