@@ -13,6 +13,7 @@ import { useThemeMode } from '../context/ThemeModeContext';
 import { api } from '../lib/api';
 import { simSeasonText, type SimTeamHistoryPick, type SimTeamHistoryResponse } from '../lib/simGame';
 import { simDraftSlotText, simSeasonRecord, simTeamMoveText, simWhenLabel } from '../lib/simHistory';
+import PlayerName from './PlayerName';
 
 function PickRow({ pick }: { pick: SimTeamHistoryPick }) {
   const { colors } = useThemeMode();
@@ -20,9 +21,7 @@ function PickRow({ pick }: { pick: SimTeamHistoryPick }) {
   return (
     <View style={[common.row, common.divider, { paddingVertical: 6 }]}>
       <PositionBadge position={pick.pos} />
-      <AppText style={[common.bodyStrong, common.grow]} numberOfLines={1}>
-        {pick.name}
-      </AppText>
+      <View style={{ flex: 1, minWidth: 0 }}><PlayerName name={pick.name} style={common.bodyStrong} /></View>
       <AppText style={common.muted}>{simDraftSlotText(pick.round, pick.pick, pick.auto)}</AppText>
     </View>
   );

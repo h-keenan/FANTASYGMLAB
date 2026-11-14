@@ -19,6 +19,7 @@ import {
   type OpponentTradeTarget,
 } from '../lib/opponentProfile';
 import { spacing, type ThemeColors } from '../theme';
+import PlayerName from './PlayerName';
 
 /** Opponent profile card (League Rankings manager profile): strongest/weakest
  * room, starter strength vs. bench depth, surplus and needs, pick capital,
@@ -111,10 +112,10 @@ export default function OpponentProfileCard({
             <>
               <View style={styles.inline}>
                 <PositionBadge position={angle.target.position} />
-                <AppText style={[styles.value, styles.targetName]} numberOfLines={2}>
-                  {angle.target.name}
-                  {angle.target.team ? `  ${angle.target.team}` : ''}
-                </AppText>
+                <View style={{ flex: 1, minWidth: 0, flexDirection: 'row', flexWrap: 'wrap', alignItems: 'baseline', columnGap: 6 }}>
+                  <PlayerName name={angle.target.name} style={[styles.value, styles.targetName]} />
+                  {angle.target.team ? <AppText style={[styles.value, styles.targetName]}>{angle.target.team}</AppText> : null}
+                </View>
               </View>
               <AppText style={styles.muted}>{offerCaption(angle.target)}</AppText>
               <View style={styles.cta}>

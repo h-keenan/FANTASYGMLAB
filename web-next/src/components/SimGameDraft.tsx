@@ -33,6 +33,7 @@ import {
   type SimDraftState,
   type SimGamePlayer,
 } from "@/lib/simGame";
+import { playerSurname } from "@/lib/playerNameDisplay";
 
 type Panel = "board" | "queue" | "roster" | "picks";
 
@@ -320,7 +321,7 @@ export function SimGameDraft({ ctx, onComplete }: { ctx: SimCtx; onComplete: (re
   };
 
   const need = simDraftNeedPills(draft.your_roster, game.settings.slots);
-  const draftLast = hint ? hint.player.name.split(" ").slice(-1)[0] : "";
+  const draftLast = hint ? playerSurname(hint.player.name) : "";
   const header = (
     <CompactModule
       id="draft.clock"

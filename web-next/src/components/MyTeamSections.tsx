@@ -15,6 +15,7 @@ import { CompactModule } from "@/components/ui/CompactModule";
 import { listSummaryParts } from "@/lib/moduleTemplates";
 import { formatScore, lineupIneligibleTag, sumScore } from "@/lib/myTeamPresentation";
 import { EmptyState } from "@/components/EmptyState";
+import { playerSurname } from "@/lib/playerNameDisplay";
 
 const TONE_VAR: Record<TeamAnalysisRow["tone"], string> = {
   success: "var(--color-success)",
@@ -207,7 +208,7 @@ export function RosterSections({
   return (
     <div className="flex flex-col gap-2">
       {tabs.map((tab, index) => {
-        const names = tab.players.slice(0, 3).map((p) => (p.name || "").split(" ").slice(-1)[0]).filter(Boolean);
+        const names = tab.players.slice(0, 3).map((p) => playerSurname(p.name || "")).filter(Boolean);
         const total = sumScore(tab.players);
         return (
           <CompactModule

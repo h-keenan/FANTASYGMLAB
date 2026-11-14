@@ -13,6 +13,7 @@ import { colors, radii, spacing } from '../theme';
 import { resolvePlayerTier } from '../lib/playerTier';
 import { overallRatingColor } from '../lib/percentile';
 import CircularProgressRing from './CircularProgressRing';
+import PlayerName from './PlayerName';
 
 // Same safety net as TradeShareCard's AVATAR_READY_TIMEOUT_MS — not the
 // fix, just a floor so a single hung headshot request can't leave the
@@ -103,9 +104,7 @@ const PlayerShareCard = forwardRef<View, {
         ) : null}
       </View>
 
-      <AppText style={styles.name} numberOfLines={2}>
-        {name}
-      </AppText>
+      <PlayerName name={name} style={styles.name} />
       <View style={styles.metaRow}>
         <PositionBadge position={position} size="md" />
         {team ? (

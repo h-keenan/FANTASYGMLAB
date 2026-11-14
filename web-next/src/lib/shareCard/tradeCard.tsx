@@ -152,7 +152,7 @@ function AssetRow({ asset, side, size, headshot, compact, tall }: { asset: Trade
         <div
           style={
             compact
-              ? { display: "block", fontSize: nameSize, fontWeight: 800, lineHeight: 1.1, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }
+              ? { display: "block", fontSize: nameSize, fontWeight: 800, lineHeight: 1.1 } /* a player name wraps, it is never ellipsized */
               : { display: "block", fontSize: nameSize, fontWeight: 800, lineHeight: 1.1, lineClamp: 2 }
           }
         >

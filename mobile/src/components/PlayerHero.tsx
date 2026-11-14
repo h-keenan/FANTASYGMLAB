@@ -17,6 +17,7 @@ import { heroInitials } from '../lib/playerQuickViewPresentation';
 import { byePillText } from '../lib/playerAvailability';
 import { sentenceCase, usageConfidenceBars, usageTrendTone } from '../lib/usageTrendPresentation';
 import { radii, spacing, type ThemeColors } from '../theme';
+import PlayerName from './PlayerName';
 
 /**
  * Player Detail's identity header, rebuilt from the owner's Player Quick
@@ -142,9 +143,7 @@ export default function PlayerHero({
           ) : null}
         </View>
         <View style={styles.infoCol}>
-          <AppText style={styles.name} numberOfLines={2}>
-            {name}
-          </AppText>
+          <PlayerName name={name} style={styles.name} />
           <View style={styles.metaRow}>
             <PositionBadge position={position} size="md" />
             <View style={styles.metaPill}>

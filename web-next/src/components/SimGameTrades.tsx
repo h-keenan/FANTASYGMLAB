@@ -56,6 +56,7 @@ import {
   type SimTradeDraft,
   type SimTradeVerdict,
 } from "@/lib/simGame";
+import { playerSurname } from "@/lib/playerNameDisplay";
 
 /** "Scout" button for the partner list: opens the team's scouting sheet without picking it as the partner. */
 function SimTeamScout({ teamId, name }: { teamId: string; name: string }) {
@@ -150,7 +151,7 @@ function Inbox({ ctx }: { ctx: SimCtx }) {
 /** One AI offer as a compact card: who, what moves and when it expires; tap to expand the players and the Accept / Decline buttons. */
 function OfferCard({ item, index, count, defaultOpen, busy, canTrade, onRespond }: { item: SimInboxItem; index: number; count: number; defaultOpen: boolean; busy: boolean; canTrade: boolean; onRespond: (item: SimInboxItem, action: "accept" | "decline") => void }) {
   const [open, setOpen] = useState(defaultOpen);
-  const names = (list: SimTradeAsset[]) => list.map((p) => (simIsPick(p) ? simPickLabelText(p) : p.name.split(" ").slice(-1)[0])).join(", ");
+  const names = (list: SimTradeAsset[]) => list.map((p) => (simIsPick(p) ? simPickLabelText(p) : playerSurname(p.name))).join(", ");
   return (
     <li className="enter-rise" style={shouldAnimateList(count) ? { animationDelay: `${staggerDelay(index, count)}ms` } : undefined}>
       <AccentCard accent="var(--color-premium)" compact as="div">

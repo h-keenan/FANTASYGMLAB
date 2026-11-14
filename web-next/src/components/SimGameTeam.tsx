@@ -46,6 +46,7 @@ import {
   simLimitBlocks,
   simOverLimitNote,
 } from "@/lib/simGame";
+import { playerSurname } from "@/lib/playerNameDisplay";
 
 /** Lineup, bench and this week's matchup. Every change saves at once (PUT /lineup). */
 export function SimTeamTab({ ctx, onTrade }: { ctx: SimCtx; onTrade: () => void }) {
@@ -236,7 +237,7 @@ export function SimTeamTab({ ctx, onTrade }: { ctx: SimCtx; onTrade: () => void 
               trailing={
                 cutting === player.id ? (
                   <>
-                    <Button size="sm" variant="danger" onClick={() => cut(player)}>Cut {player.name.split(" ").slice(-1)[0]}</Button>
+                    <Button size="sm" variant="danger" onClick={() => cut(player)}>Cut {playerSurname(player.name)}</Button>
                     <Button size="sm" variant="ghost" onClick={() => setCutting(null)}>Keep</Button>
                   </>
                 ) : (
