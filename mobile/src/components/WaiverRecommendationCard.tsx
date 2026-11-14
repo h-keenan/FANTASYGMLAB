@@ -311,7 +311,7 @@ export default function WaiverRecommendationCard({
   const pill = (key: string, label: string, tint: string, icon: 'flash' | 'trending-up' | 'trending-down') => (
     <View key={key} style={[chipStyles.chip, compactChip.chip, { backgroundColor: `${tint}1F` }]} testID="waiver-reason">
       <Ionicons name={icon} size={10} color={tint} />
-      <AppText style={[chipStyles.text, { color: tint }]} numberOfLines={1}>
+      <AppText style={[chipStyles.text, { color: tint }]}>
         {label}
       </AppText>
     </View>

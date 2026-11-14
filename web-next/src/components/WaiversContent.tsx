@@ -273,7 +273,7 @@ function ReasonPill({ label, kind, tone }: { label: string; kind: ReasonIconKind
       <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" className="shrink-0">
         <path d={path} />
       </svg>
-      <span className="truncate">{label}</span>
+      <span className="break-words">{label}</span>
     </span>
   );
 }
