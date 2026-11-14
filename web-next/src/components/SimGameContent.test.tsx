@@ -601,9 +601,11 @@ describe("SimGameContent", () => {
 
     it("start from one of my leagues: Sleeper leagues only, hides the league-shape options, sends league_id", async () => {
       await openSetup();
-      fireEvent.click(screen.getByRole("tab", { name: "My league" }));
-      // The league decides size, scoring and lineup; only the reserve squads stay in Customize.
+      // The optional choice lives in Customize; Quick start never mentions a league.
+      expect(screen.queryByRole("tab", { name: "Use my league" })).not.toBeInTheDocument();
       fireEvent.click(screen.getByRole("tab", { name: "Customize" }));
+      fireEvent.click(screen.getByRole("tab", { name: "Use my league" }));
+      // The league decides size, scoring and lineup; only the reserve squads stay in Customize.
       expect(screen.queryByRole("tablist", { name: "League size" })).not.toBeInTheDocument();
       expect(screen.queryByRole("tablist", { name: "Scoring" })).not.toBeInTheDocument();
       const pick = await screen.findByRole("combobox", { name: "League to start from" });
@@ -629,9 +631,58 @@ describe("SimGameContent", () => {
       expect(mocked.createSimGame.mock.calls[0][0]).toEqual({ difficulty: "normal", auto_lineup: false, tiebreaker: "points_for", start: "league", league_id: "111", roster_id: "2" });
     });
 
+    it("start from my league: 'Start from' defaults to the preseason and sends start_point only for the current point", async () => {
+      await openSetup();
+      fireEvent.click(screen.getByRole("tab", { name: "Customize" }));
+      fireEvent.click(screen.getByRole("tab", { name: "Use my league" }));
+      const pick = await screen.findByRole("combobox", { name: "League to start from" });
+      await screen.findByRole("option", { name: "Dynasty Dogs" });
+      expect(screen.queryByRole("tablist", { name: "Start from" })).not.toBeInTheDocument(); // only once a league is picked
+      mocked.getSimLeagueTeams.mockResolvedValue({
+        ok: true, reason: "", league_id: "111", you_roster_id: "2",
+        teams: [{ roster_id: "2", team_name: "Mine", owner_name: "me", wins: 3, losses: 4, ties: 0, points_for: 600, rank: 4, is_you: true }],
+      });
+      fireEvent.change(pick, { target: { value: "111" } });
+      const startFrom = await screen.findByRole("tablist", { name: "Start from" });
+      expect(within(startFrom).getByRole("tab", { name: "Preseason", selected: true })).toBeInTheDocument();
+      expect(screen.getByText(/Current point in the season opens at your league's real week/)).toBeInTheDocument();
+      fireEvent.click(within(startFrom).getByRole("tab", { name: "Current point" }));
+      mocked.createSimGame.mockResolvedValue({ ok: true, reason: "premium_required", is_premium: true });
+      await waitFor(() => expect(screen.getByRole("button", { name: "Start the season" })).not.toBeDisabled());
+      fireEvent.click(screen.getByRole("button", { name: "Start the season" }));
+      await waitFor(() => expect(mocked.createSimGame).toHaveBeenCalled());
+      expect(mocked.createSimGame.mock.calls[0][0]).toMatchObject({ start: "league", league_id: "111", start_point: "current" });
+    });
+
+    it("with no saved league, the connect link appears only inside the Use my league option", async () => {
+      const keep = savedLeagues.splice(0);
+      try {
+        await openSetup();
+        expect(screen.queryByTestId("sim-connect-in-option")).not.toBeInTheDocument();
+        fireEvent.click(screen.getByRole("tab", { name: "Customize" }));
+        fireEvent.click(screen.getByRole("tab", { name: "Use my league" }));
+        const box = await screen.findByTestId("sim-connect-in-option");
+        expect(box).toHaveTextContent("Only this option needs one; starting a new league does not.");
+        expect(within(box).getByRole("link", { name: "Connect a Sleeper league" })).toHaveAttribute("href", "/connect-league");
+        fireEvent.click(screen.getByRole("tab", { name: "Start a new league" }));
+        expect(screen.queryByTestId("sim-connect-in-option")).not.toBeInTheDocument();
+      } finally {
+        savedLeagues.push(...keep);
+      }
+    });
+
+    it("the sim never asks to connect a league outside the Use my league option", async () => {
+      mocked.listSimGames.mockResolvedValue({ ok: true, reason: "", games: [] });
+      await openSetup();
+      expect(screen.queryByText(/connect/i)).not.toBeInTheDocument();
+      expect(screen.queryByTestId("sim-connect-in-option")).not.toBeInTheDocument();
+      expect(screen.getByRole("button", { name: "Start the draft" })).toBeEnabled();
+    });
+
     it("start from a league: no auto-match means the player must pick a team; ESPN-style errors are explained", async () => {
       await openSetup();
-      fireEvent.click(screen.getByRole("tab", { name: "My league" }));
+      fireEvent.click(screen.getByRole("tab", { name: "Customize" }));
+      fireEvent.click(screen.getByRole("tab", { name: "Use my league" }));
       const pick = await screen.findByRole("combobox", { name: "League to start from" });
       await screen.findByRole("option", { name: "Dynasty Dogs" });
       mocked.getSimLeagueTeams.mockResolvedValue({
@@ -649,7 +700,8 @@ describe("SimGameContent", () => {
 
     it("start from a league: a league the game cannot read shows why and blocks starting", async () => {
       await openSetup();
-      fireEvent.click(screen.getByRole("tab", { name: "My league" }));
+      fireEvent.click(screen.getByRole("tab", { name: "Customize" }));
+      fireEvent.click(screen.getByRole("tab", { name: "Use my league" }));
       const pick = await screen.findByRole("combobox", { name: "League to start from" });
       await screen.findByRole("option", { name: "Dynasty Dogs" });
       mocked.getSimLeagueTeams.mockResolvedValue({ ok: true, reason: "league_platform_unsupported" });
@@ -677,7 +729,8 @@ describe("SimGameContent", () => {
       render(<SimGameContent />);
       fireEvent.click(await screen.findByRole("button", { name: "New game" }));
       await screen.findByText(/Quick start is/);
-      expect(screen.queryByRole("tab", { name: "My league" })).not.toBeInTheDocument();
+      fireEvent.click(screen.getByRole("tab", { name: "Customize" }));
+      expect(screen.queryByRole("tab", { name: "Use my league" })).not.toBeInTheDocument();
     });
   });
 });

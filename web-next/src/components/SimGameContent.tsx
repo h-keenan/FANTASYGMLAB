@@ -66,9 +66,16 @@ import {
   simSetupModes,
   simSetupSummary,
   simSetupTaxiDefault,
+  simStartNotice,
   simTeamNameChoices,
   simWeekHeading,
   SIM_NAME_CUSTOM,
+  SIM_START_CONNECT_NOTE,
+  SIM_START_LEAGUE_LABEL,
+  SIM_START_LEAGUE_NOTE,
+  SIM_START_NEW_LABEL,
+  SIM_START_POINT_LABELS,
+  SIM_START_POINT_NOTE,
   SIM_TEAM_NAME_MAX,
   SIM_TE_PREMIUM_LABELS,
   type SimDifficulty,
@@ -88,6 +95,7 @@ import {
   type SimGameTone,
   type SimScoring,
   type SimSetupState,
+  type SimStartPoint,
   type SimWaiverClaim,
   simGradeTone,
   simTradeSeedFor,
@@ -290,6 +298,8 @@ export function SimGameContent() {
       setClaims([]);
       dispatch({ type: "open", game: res.game });
       void refreshList();
+      const heads = simStartNotice(res.game, body);
+      if (heads) notify(heads);
     }
   }
 
@@ -676,22 +686,28 @@ function SetupForm({
       />
       <SetupSummaryCard headline={simSetupHeadline(state)} chips={simSetupChips(state)} detail={detail} testId="sim-setup-summary" />
       <SetupCard id="start" summary={summaries.start} index={0} count={cardCount}>
-        {canImport ? (
-          <SetupField label="How to start">
+        {canImport && (custom || league) ? (
+          <SetupField label="Starting point" note={league ? SIM_START_LEAGUE_NOTE : undefined}>
             <PillRow
-              ariaLabel="How to start"
+              ariaLabel="Starting point"
               variant="fill"
-              options={[{ label: "Fresh league", value: "fresh" }, { label: "My league", value: "league" }]}
+              options={[{ label: SIM_START_NEW_LABEL, value: "fresh" }, { label: SIM_START_LEAGUE_LABEL, value: "league" }]}
               active={state.start}
               onSelect={(value) => set("start", value as SimSetupState["start"])}
             />
           </SetupField>
         ) : null}
-        {league ? (
+        {league && leagues !== null && leagues.length === 0 ? (
+          <div className="flex flex-col gap-2 items-start" data-testid="sim-connect-in-option">
+            <SetupNote>{SIM_START_CONNECT_NOTE}</SetupNote>
+            <ButtonLink href="/connect-league" variant="secondary" size="sm">Connect a Sleeper league</ButtonLink>
+          </div>
+        ) : null}
+        {league && (leagues === null || leagues.length > 0) ? (
           <label className="flex flex-col gap-2 text-sm font-bold">
-            Start from
+            Your league
             <Select value={state.leagueId} onChange={(event) => setState((prev) => ({ ...prev, leagueId: event.target.value, rosterId: "" }))} aria-label="League to start from" disabled={leagues === null}>
-              <option value="">{leagues === null ? "Loading your leagues..." : leagues.length ? "Choose a league" : "No Sleeper leagues saved"}</option>
+              <option value="">{leagues === null ? "Loading your leagues..." : "Choose a league"}</option>
               {(leagues ?? []).map((row) => (
                 <option key={row.league_id} value={row.league_id}>{row.league_name || row.league_id}</option>
               ))}
@@ -726,6 +742,15 @@ function SetupForm({
             ) : leagueTeams.status === "ready" && !leagueTeams.youRosterId ? (
               <SetupNote>We could not tell which team is yours from your Sleeper link. Pick it from the list.</SetupNote>
             ) : null}
+            <SetupField label="Start from" note={SIM_START_POINT_NOTE}>
+              <PillRow
+                ariaLabel="Start from"
+                variant="fill"
+                options={(opts?.start_point?.values ?? ["preseason", "current"]).map((v) => ({ label: SIM_START_POINT_LABELS[v], value: v }))}
+                active={state.startPoint}
+                onSelect={(value) => set("startPoint", value as SimStartPoint)}
+              />
+            </SetupField>
           </div>
         ) : null}
         {!league ? (

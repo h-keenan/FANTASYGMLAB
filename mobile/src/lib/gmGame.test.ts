@@ -12,7 +12,7 @@ import { runSimGameCall } from './simGameCall.ts';
 import { ROUTE_BY_PAGE } from './orbTabs.ts';
 import { NAV_PAGES } from './navCatalog.ts';
 import { paidPreview } from './paidPreviews.ts';
-import { simApplyDelta, simOptimisticClaim, simWithout, simGameDeleteConfirm, simGameDeleteFailure, simHeadshotId, simNewGameBlock, simPlayerInitials, simSlotRepeatsPosition } from './simGame.ts';
+import { simSetupBody, simSetupDefaults, simStartNotice, simApplyDelta, simOptimisticClaim, simWithout, simGameDeleteConfirm, simGameDeleteFailure, simHeadshotId, simNewGameBlock, simPlayerInitials, simSlotRepeatsPosition } from './simGame.ts';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const read = (...p: string[]) => readFileSync(join(here, '..', ...p), 'utf8');
@@ -174,4 +174,21 @@ test('deltas apply to the game header only for the same week and phase; optimist
   assert.equal(simWithout(items, 'zzz'), items);
   const claim = simOptimisticClaim({ id: '1' } as never, null, null);
   assert.equal(claim.id, 'pending-1');
+});
+
+test('the sim is standalone: a connect-league link exists only inside the Use my league option; Start from is optional and league-only', () => {
+  const screen = read('screens', 'GmGameScreen.tsx');
+  assert.equal((screen.match(/Connect a Sleeper league/g) ?? []).length, 1);
+  assert.match(screen, /canImport && \(custom \|\| league\)/); // the choice is in Customize (or already chosen), never in Quick start
+  assert.match(screen, /leagues !== null && leagues\.length === 0 \? \(\s*<>\s*<SetupNote>\{SIM_START_CONNECT_NOTE\}/);
+  assert.match(screen, /label="Start from" note=\{SIM_START_POINT_NOTE\}/);
+  const defaults = simSetupDefaults(null);
+  const league = { ...defaults, start: 'league' as const, leagueId: '1', rosterId: '2' };
+  assert.equal('start_point' in simSetupBody(league), false);
+  assert.equal((simSetupBody({ ...league, startPoint: 'current' }) as { start_point?: string }).start_point, 'current');
+  assert.equal('start_point' in simSetupBody({ ...defaults, startPoint: 'current' }), false);
+  const ask = { start: 'league', start_point: 'current' } as const;
+  assert.match(simStartNotice({ settings: { start_week: 6 } as never }, ask) ?? '', /Started at Week 6/);
+  assert.match(simStartNotice({ settings: {} as never }, ask) ?? '', /Week 1 of the preseason/);
+  assert.equal(simStartNotice({ settings: {} as never }, { start: 'league' }), null);
 });

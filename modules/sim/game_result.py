@@ -318,7 +318,7 @@ def build_result(
     """The stored end-of-season result. ``explain`` runs the counterfactual
     replays (about one season-sim each)."""
 
-    draft = next((e["payload"]["recap"] for e in events if e["type"] in ("draft_complete", "league_start")), None)
+    draft = next((e["payload"]["recap"] for e in events if e["type"] in ("draft_complete", "league_start", "midseason_start")), None)
     if draft is None:
         draft = _draft_from_state(snap, final)
     efficiency, worst = _efficiency(final)

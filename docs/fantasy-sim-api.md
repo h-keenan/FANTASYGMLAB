@@ -268,7 +268,9 @@ isolation rules, same auth as everything above. The world/auto-GM endpoints
 (`/v1/sim/worlds*`) are unchanged.
 
 ## What the game is
-A standalone, turn-based GM game that is NOT tied to a Sleeper league: a
+A standalone, turn-based GM game that needs no Sleeper league, account link or import: "Start a new league" is the
+default and complete path. Starting from one of your own Sleeper leagues is an optional, advanced choice
+("Use my league", below); it is the only place a client may ask a user to connect a league. A
 12-team snake startup draft of the whole NFL player pool (QB/RB/WR/TE/K) against
 11 AI managers with personas, then a 14-week regular season and a real playoff
 bracket, then a season grade. Every week the user sets a lineup, works the
@@ -439,6 +441,44 @@ username cannot identify the team. Extra `reason` codes: `team_not_found`, `leag
 `def_unavailable` / `k_unavailable` (the league plays one but the pool has none). Rostered players the pool cannot
 project (IDP, retired, unmatched) are dropped from their team and counted in the game's notes. IR counts as
 roster, taxi does not, and `roster_limit` is raised to the largest roster so nothing has to be cut.
+
+**Start from: preseason or the current point in the season** (`start_point`, league starts only; options key
+`options.start_point = {"values": ["preseason", "current"], "default": "preseason"}`). `"preseason"` (default, the
+behaviour above, never serialized) plays a new 14-week season from week 1. `"current"` sends
+`league_import(..., current=True)` and opens the game at the real league's current week `N` (`settings.start_week = N`,
+`game.week = N`, `status: "in_season"`):
+
+- **From the league (Sleeper, read-only):** `settings.leg` is the current week; the regular-season length
+  (`playoff_week_start - 1`) and `trade_deadline` replace the 14 / 10 defaults; the played weeks 1..N-1 come from the league's own
+  matchup history (every game's score, and each player's points: they seed the players' game logs and form); the standings are
+  the league's own `wins/losses/ties/fpts/fpts_against` (not the sum of the weeks: commissioner edits, forfeits and medians
+  stay as they are), with head-to-head records and streaks derived from the played weeks; the pairings for every week are the
+  real ones; each team's lineup is its real `starters` laid onto the game's slots; rosters, IR and taxi are the current
+  ones. Everything is frozen into the snapshot (`mid_start`) and the opening events, so the save replays without Sleeper.
+- **Then the sim engine** plays weeks N..end exactly like any other game (waivers worst-record-first off the real
+  standings, AI trades until the real deadline, injuries from the pool's current statuses, byes from the NFL schedule), with
+  playoffs and later dynasty seasons following normally. Played weeks have a minimal recap (opponent, scores, result; no
+  box score) so `POST /advance {"week": w}` for `w < N` replays it, and a week with no recap answers `week_mismatch`.
+- **Falls back to the preseason** (a normal week-1 game, note `start_fell_back_to_preseason:<reason>`) when the league is
+  not in its regular season: `offseason` (status not `in_season`: pre-draft, drafting, complete), `playoffs` (current week
+  past the regular season) or `season_not_started` (week 1: nothing to pick up). Clients tell the user (`simStartNotice`).
+- **Notes** (in `game.notes`): `trade_deadline_passed` (real deadline before week N: trades are closed from the first
+  week), `schedule_estimated_weeks:<w,..>` (a future week Sleeper did not return as one game per team keeps a generated
+  pairing), `played_weeks_unavailable:<w,..>` (a played week Sleeper did not return: absent from results, the league's own
+  record still applies), `records_unavailable` (no league records: the standings are summed from the played weeks),
+  `lineups_auto_set:<n>` (a real lineup that does not fit the game's slots, or is incomplete, is auto-set for that team).
+- **Free accounts** are paywalled from week 4 (`PREVIEW_PAYWALL_WEEK`), so a current-point start at week 4+ answers
+  `premium_required` instead of creating a game that opens already paywalled.
+- **Approximations:** bye-week players and in-progress games of week N are not read (week N is simulated whole);
+  waiver priority/FAAB balances and pending claims are not read (priority follows the standings, claims start empty);
+  IDP and median-game scoring are not modeled (the league's record still counts them); the playoff bracket is the
+  game's seeded bracket, not the league's custom format; per-player box-score stats of played weeks are not stored (only
+  points); a roster over the limit stays over (`limit_v` soft limit: it only blocks adding players).
+- **Versioning:** `settings.start_week` and `snapshot.mid_start` are serialized only when the game started mid-season. Every
+  other save (including league imports from the preseason) serializes, fingerprints and replays byte-identically; this is
+  pinned by `tests/test_sim_midseason_start.py` (digests pinned from `origin/main`) and the existing golden digests.
+  Engine events: `league_midseason` (played weeks and standings), `lineup_set` x teams, `midseason_start` (closes the start
+  and opens the week; counts as the "draft recap" event for grading).
 
 **"Start of this season" rosters** (`start_modes[].id == "season_start"`) are reported unavailable
 (`no_roster_history`): we store no per-week roster snapshots, so there is nothing to start from.
