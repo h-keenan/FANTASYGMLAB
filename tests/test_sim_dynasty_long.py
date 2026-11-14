@@ -46,7 +46,7 @@ def _golden(seed, seasons):
 
     def v2(seed=base.SEED, **kw):
         snap = orig(seed, **kw)
-        object.__setattr__(snap, "settings", replace(snap.settings, dynasty_v=2, ai_v=0, names_v=0, hint_v=0))
+        object.__setattr__(snap, "settings", replace(snap.settings, dynasty_v=2, ai_v=0, names_v=0, hint_v=0, aging_v=0))
         return snap
 
     base.new_snapshot = v2
