@@ -15,4 +15,10 @@ describe("prestige avatar glow", () => {
     expect(frames).toMatch(/box-shadow: 0 0 var\(--glow-min/);
     expect(frames).toMatch(/box-shadow: 0 0 var\(--glow-max/);
   });
+  it("PQV hero glow has no zero-blur spread ring", () => {
+    const rule = css.match(/\.pqv-avatar-glow\s*\{[^}]*\}/)?.[0] ?? "";
+    expect(rule).toMatch(/box-shadow/);
+    expect(rule).not.toMatch(/0 0 0 \d+px/);
+    expect(rule).not.toMatch(/border:/);
+  });
 });
