@@ -37,6 +37,7 @@ from typing import Any, Iterable, Mapping, Sequence
 from modules.sim.game_names import NAMES_VERSION
 from modules.sim.game_types import (
     AGING_VERSION,
+    ECON_VERSION,
     HINT_VERSION,
     KD_VERSION,
     LIMIT_VERSION,
@@ -55,9 +56,7 @@ UPGRADABLE_FLAGS: dict[str, tuple[int, str]] = {
     "world_v": (WORLD_VERSION, WEEK),
     "aging_v": (AGING_VERSION, SEASON),
     "names_v": (NAMES_VERSION, SEASON),
-    # TODO(econ_v): register ``"econ_v": (ECON_VERSION, NOW)`` here (and give it a FLAGS entry) once the consensus-anchored
-    # economy (branch feat/sim-realism-audit-3) is on main. It is a "now" flag: AI managers stop selling below the market for
-    # decisions after the event. That branch's one-off ``econ_upgrade`` event / ``state.econ_up`` should then be folded into this.
+    "econ_v": (ECON_VERSION, NOW),
 }
 
 # What the UI shows for each flag: a short label, one sentence of what changes, and whether it needs a dynasty with offseasons.
@@ -86,6 +85,11 @@ FLAGS: dict[str, dict[str, Any]] = {
         "label": "Realistic aging and retirement",
         "body": "Retirement follows position, age, role and production (a 33-year-old starting QB is not retired by default), and aging curves are flatter for QBs and kickers.",
         "dynasty_only": True,
+    },
+    "econ_v": {
+        "label": "Fair trades",
+        "body": "AI managers stop selling stars below market value: draft picks are priced like the rookies they become, injuries cost the share of the season missed, and a player no better than the waiver wire is worth nothing in a trade.",
+        "dynasty_only": False,
     },
     "names_v": {
         "label": "Fresh rookie names",

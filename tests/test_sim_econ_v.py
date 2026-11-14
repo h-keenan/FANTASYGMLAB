@@ -313,3 +313,53 @@ def test_econ_v_is_a_pure_function_of_the_settings_at_each_decision_point():
     assert not ev.econ and TradeDesk(ev, sd, state.week).cover() == [] and not TradeDesk(ev, sd, state.week).below_market("1", [], [])
     object.__setattr__(snap, "settings", replace(snap.settings, econ_v=1))
     assert Evaluator(snap, state).econ
+
+
+def test_a_save_without_econ_v_is_upgraded_mid_game_and_the_unfair_trade_flips_with_strict_replay():
+    from modules.sim import game_actions as act
+    from modules.sim import game_rules as rules
+    from modules.sim.game_state import fold
+
+    assert rules.UPGRADABLE_FLAGS["econ_v"] == (ECON_VERSION, rules.NOW) and "econ_v" in rules.FLAGS
+    snap = build_snapshot(ROWS, BYES, _settings(False, mode="dynasty", seasons=3, start_year=2026, rookie_rounds=2, scoring="ppr"), SEED,
+                          scoring_model="player_model-player-model-6")
+    state = GameState(snap)
+    em = Emitter(state, snap)
+    auto_for_user(DraftContext(snap, state), em, SEED)
+    finish_draft(em, snap, state, SEED)
+    sd = dyn.season_seed(SEED, state.view_no)
+    em.snap = snap.under(state.rules).season_view(state.view_no)
+    for _ in range(2):
+        advance(em, em.snap, state, sd)
+    user = snap.user_team.tid
+
+    def below_but_accepted(s):
+        """An offer the old economy accepts that the anchor would refuse: a mid starter + late picks for the league's best QB, or any such deal."""
+        ev = Evaluator(s, state)
+        desk = TradeDesk(ev, sd, state.week)
+        owner = state.owner_map()
+        qbs = sorted((p for p in s.pids if p in owner and owner[p] != user and s.players[p].pos == "QB"), key=lambda p: -ev.base_value(p))
+        mine = sorted(state.holdings(user), key=lambda p: ev.base_value(p))
+        late = [p for p in state.picks_of(user) if ev.pick_parts(p)[1] >= 2]
+        import dataclasses
+
+        fair = dataclasses.replace(s, settings=dataclasses.replace(s.settings, econ_v=1))  # the same game under the new economy, to find a deal that flips
+        fdesk = TradeDesk(Evaluator(fair, state), sd, state.week)
+        stars = qbs[:4] + sorted((p for p in s.pids if p in owner and owner[p] != user), key=lambda p: -ev.base_value(p))[:16]
+        for star in stars:
+            for g in mine:
+                for k in range(0, 3):
+                    gives = [g, *late[:k]]
+                    if desk.ai_accepts(owner[star], gives, [star])[0] and fdesk.below_market(owner[star], gives, [star]):
+                        return owner[star], gives, star
+        return None
+
+    found = below_but_accepted(em.snap)
+    assert found, "the old economy sells an elite quarterback for a mid starter and late picks"
+    ai, gives, star = found
+    assert TradeDesk(Evaluator(em.snap, state), sd, state.week).verdict(ai, gives, [star]).decision == "accept"
+    assert act.upgrade_realism(em).get("econ_v") == ECON_VERSION
+    after = TradeDesk(Evaluator(em.snap, state), sd, state.week)
+    assert after.verdict(ai, gives, [star]).decision != "accept"
+    # strict replay: folding the whole log (the upgrade event included) on a fresh state lands on the same digest
+    assert fold(snap, em.events).digest() == state.digest()

@@ -60,6 +60,7 @@ settings at every decision point (no state captured at creation, test included),
 ### Remaining (PR2)
 Rookie hit rates / UDFA (6), QB wave (7, with the aging work), K/DEF tails (8), draft adherence and the kicker run (9), no persona age preference in dynasty (12).
 
-### Follow-up (after PR #1921 lands)
-Register `"econ_v": (ECON_VERSION, NOW)` in `game_rules.UPGRADABLE_FLAGS` (+ the FLAGS copy entry) and add the test that upgrades a save without econ_v mid-game via the realism-upgrade event and shows the
-Brissett + R3 + R4 for an elite QB trade flip from accept to decline/counter, with strict replay. This PR ships econ_v for new games only (a pure function of `settings.econ_v`).
+### Existing saves (done)
+`econ_v` is registered in `game_rules.UPGRADABLE_FLAGS` as `(ECON_VERSION, NOW)` ("Fair trades" in `FLAGS`), so the Realism update (PR #1921) switches it on mid-game by event; it is read from the
+effective settings of the snapshot at every decision point. `test_a_save_without_econ_v_is_upgraded_mid_game_and_the_unfair_trade_flips_with_strict_replay` shows an accepted below-market deal flipping
+to not-accept after the event, with `fold` replay equal to the live digest.
