@@ -71,7 +71,9 @@ import {
   SIM_TE_PREMIUM_LABELS,
   type SimDifficulty,
   type SimMode,
+  type SimFlexType,
   type SimTiebreaker,
+  SIM_FLEX_TYPE_LABELS,
   SIM_TIEBREAKER_LABELS,
   type SimDraftRecap,
   type SimGame,
@@ -876,6 +878,15 @@ function SetupForm({
                 />
               </View>
               <SetupToggle styles={styles} label="Superflex" note="A second quarterback can start in an extra flex slot." value={state.superflex} onChange={(v) => set('superflex', v)} />
+              <View style={styles.tight}>
+                <AppText style={styles.label}>Flex spot</AppText>
+                <SegmentedTabBar<string>
+                  options={(opts?.flex_type?.values ?? ['flex', 'rb_wr']).map((v) => ({ key: v, label: SIM_FLEX_TYPE_LABELS[v] }))}
+                  active={state.flexType}
+                  onChange={(key) => set('flexType', key as SimFlexType)}
+                />
+                <AppText style={styles.muted}>Who can start in the FLEX slot. RB / WR / TE is the standard.</AppText>
+              </View>
               <SetupToggle styles={styles} label="Kicker" note="Start a K." value={state.includeK} onChange={(v) => set('includeK', v)} />
               <SetupToggle styles={styles} label="Defense (DEF)" note="Start a team defense (estimated from points allowed)." value={state.includeDef} onChange={(v) => set('includeDef', v)} />
               <View style={styles.tight}>

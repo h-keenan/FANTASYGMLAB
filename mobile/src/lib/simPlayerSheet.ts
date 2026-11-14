@@ -3,7 +3,8 @@
 // these values to the same quick view (hero tiles, weekly chart, trends) and the same
 // section components, so the two can not drift apart.
 
-import type { SimGamePlayer, SimPlayerDetailResponse, SimRosSummary } from "./simGame";
+import { simDraftRowChips } from "./simDraft";
+import { simPlayerTags, type SimGameTone, type SimGamePlayer, type SimPlayerDetailResponse, type SimRosSummary } from "./simGame";
 import { isFlatProjection, type WeeklyActualPoint, type WeeklyProjectionPoint } from "./weeklyProjection";
 
 export interface SimHeroFeed {
@@ -67,4 +68,21 @@ export function simProjectionBand(detail: Pick<SimPlayerDetailResponse, "weeks" 
   if (simProjectionIsFlat(detail)) return null;
   const pts = (detail.weeks ?? []).filter((w) => !w.bye && !w.out).map((w) => ({ week: w.week, mean: w.projection, floor: w.floor, ceiling: w.ceiling }));
   return pts.length > 0 ? pts : null;
+}
+
+export interface SimHeaderTag {
+  key: string;
+  label: string;
+  tone: SimGameTone;
+}
+
+/**
+ * The tags the Player Quick View header shows for a sim player: exactly the ones his list row shows (the single injury chip,
+ * then block / owner (Free agent, Your team, an AI team) / role), so opening a tag you could not read on the list tells you what it
+ * was (coridian_, 2026-11-14: "the tag is not there whatsoever, and it should also have the Free agent tag"). One owner for the
+ * injury: the header does not add a second "Health: Out" chip next to it.
+ */
+export function simHeaderTags(player: SimGamePlayer): SimHeaderTag[] {
+  const injury = simDraftRowChips(player).map((c) => ({ key: c.key, label: c.label, tone: c.tone }));
+  return [...injury, ...(simPlayerTags(player) ?? [])];
 }

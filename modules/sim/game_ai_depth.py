@@ -54,8 +54,13 @@ def slot_need(ev: Evaluator) -> dict[str, int]:
     return need
 
 
-def flex_slots(ev: Evaluator) -> int:
-    return sum(1 for s in ev.snap.settings.slots if len(slot_positions(s)) > 1 and s != "SUPER_FLEX")
+def flex_slots(ev: Evaluator, pos: str | None = None) -> int:
+    """Non-super flex slots. With ``pos``, an RB/WR-only flex (WRRB_FLEX) does not count toward a TE's depth."""
+
+    return sum(
+        1 for s in ev.snap.settings.slots
+        if len(slot_positions(s)) > 1 and s != "SUPER_FLEX" and (pos is None or s != "WRRB_FLEX" or pos in slot_positions(s))
+    )
 
 
 def insurance(ev: Evaluator, roster: Iterable[str], need: dict[str, int]) -> float:
@@ -110,7 +115,7 @@ def _cap(ev: Evaluator, pos: str, need: dict[str, int]) -> int:
 
     if pos in SINGLETON_POSITIONS:
         return 1
-    flex = flex_slots(ev) if pos in ("RB", "WR", "TE") else 0
+    flex = flex_slots(ev, pos) if pos in ("RB", "WR", "TE") else 0
     extra = 1 if pos in ("QB", "TE") else 2
     return need.get(pos, 0) + flex + extra
 

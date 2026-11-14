@@ -324,6 +324,7 @@ const POSITION_LANE: Record<string, string> = {
   SUPERFLEX: 'FLEX',
   REC_FLEX: 'FLEX',
   'WR/RB': 'FLEX',
+  WRRB_FLEX: 'FLEX',
   'WR/TE': 'FLEX',
   'RB/WR/TE': 'FLEX',
   IDP_FLEX: 'FLEX',
@@ -342,7 +343,7 @@ function positionLane(position: string | null | undefined): string {
 export function positionBadgeLabel(position: string): string {
   const label = position.trim().toUpperCase();
   if (label === 'SUPER_FLEX' || label === 'SUPERFLEX') return 'SF';
-  if (label === 'WR/RB') return 'W/R';
+  if (label === 'WR/RB' || label === 'WRRB_FLEX') return 'W/R';
   if (label === 'REC_FLEX') return 'W/T';
   if (label === 'IDP_FLEX') return 'IDP';
   if (label === 'DST' || label === 'D/ST') return 'DEF';
@@ -501,6 +502,9 @@ export const spacing = {
 // cornerless identity together, toward rounded, layered-glass surfaces.
 // `tile` (card corners) maps to web's --radius-panel; `input` maps to
 // --radius-control; `sm`/`md`/`lg` follow the same 10/14/20 scale directly.
+/** One open height for every bottom sheet (PQV, percentile explorer, share previews, the sim's sheets): never up under the header, steady while content loads. */
+export const sheetHeight = { min: '56%', max: '80%' } as const;
+
 export const radii = {
   sm: 10,
   md: 14,

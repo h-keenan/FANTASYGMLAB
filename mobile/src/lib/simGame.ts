@@ -23,7 +23,7 @@ export type SimDifficulty = "easy" | "normal" | "hard";
 export type SimTiebreaker = "points_for" | "head_to_head";
 export const SIM_TIEBREAKER_LABELS: Record<SimTiebreaker, string> = { points_for: "Points for", head_to_head: "Head-to-head" };
 export type SimPos = "QB" | "RB" | "WR" | "TE" | "K" | "DEF";
-export type SimSlot = "QB" | "RB" | "WR" | "TE" | "FLEX" | "REC_FLEX" | "SUPER_FLEX" | "K" | "DEF";
+export type SimSlot = "QB" | "RB" | "WR" | "TE" | "FLEX" | "WRRB_FLEX" | "REC_FLEX" | "SUPER_FLEX" | "K" | "DEF";
 /** League mode: redraft (one season) or dynasty (several seasons with an offseason, rookie draft and picks). */
 export type SimMode = "redraft" | "dynasty";
 /** How a new game starts: a fresh draft, or a real league's rosters (read-only import). */
@@ -233,6 +233,8 @@ export interface SimGameSettings {
   mode?: SimMode;
   te_premium?: number;
   superflex?: boolean;
+  /** Flex eligibility; omitted on every save made with the standard RB/WR/TE flex. */
+  flex_type?: SimFlexType;
   include_k?: boolean;
   include_def?: boolean;
   bench?: number;
@@ -368,6 +370,7 @@ export interface SimGameOptionsResponse extends SimGameEnvelope {
     scoring: { values: SimScoring[]; default: SimScoring };
     te_premium?: { values: number[]; default: number };
     superflex?: { default: boolean };
+    flex_type?: { values: SimFlexType[]; default: SimFlexType; slots?: Record<SimFlexType, SimSlot> };
     include_k?: { default: boolean };
     include_def?: { default: boolean };
     bench?: { min: number; max: number; default: number };
@@ -427,6 +430,7 @@ export interface SimGameCreateBody {
   scoring?: SimScoring;
   te_premium?: number;
   superflex?: boolean;
+  flex_type?: SimFlexType;
   include_k?: boolean;
   include_def?: boolean;
   bench?: number;
@@ -1368,9 +1372,9 @@ export const SIM_QUEUE_MAX = 30;
 export const SIM_POSITIONS: SimPos[] = ["QB", "RB", "WR", "TE", "K", "DEF"];
 
 /** A position filter value: a real position or a flex eligibility group (server: game_view.players_page). */
-export type SimPosFilter = SimPos | "FLEX" | "SUPER_FLEX";
+export type SimPosFilter = SimPos | "FLEX" | "WRRB_FLEX" | "SUPER_FLEX";
 /** Positions a flex filter covers, from the game's lineup slot definitions (modules/sim/types.py FLEX_SLOTS). */
-export const SIM_FLEX_GROUPS: Record<"FLEX" | "SUPER_FLEX", SimPos[]> = { FLEX: ["RB", "WR", "TE"], SUPER_FLEX: ["QB", "RB", "WR", "TE"] };
+export const SIM_FLEX_GROUPS: Record<"FLEX" | "WRRB_FLEX" | "SUPER_FLEX", SimPos[]> = { FLEX: ["RB", "WR", "TE"], WRRB_FLEX: ["RB", "WR"], SUPER_FLEX: ["QB", "RB", "WR", "TE"] };
 
 /**
  * Pills for a player-list position filter, in order QB RB WR TE FLEX SUPER_FLEX K DEF.
@@ -1382,6 +1386,7 @@ export function simFilterPositionsFor(slots: SimSlot[] | undefined): { label: st
   const has = (s: SimSlot) => list.includes(s);
   const out: { label: string; value: SimPosFilter }[] = (["QB", "RB", "WR", "TE"] as SimPos[]).map((p) => ({ label: p, value: p }));
   if (has("FLEX") || has("REC_FLEX") || has("SUPER_FLEX")) out.push({ label: "FLEX", value: "FLEX" });
+  else if (has("WRRB_FLEX")) out.push({ label: "FLEX", value: "WRRB_FLEX" }); // an RB/WR-only flex: its pill must not match tight ends
   if (has("SUPER_FLEX")) out.push({ label: "SUPERFLEX", value: "SUPER_FLEX" });
   if (has("K")) out.push({ label: "K", value: "K" });
   if (has("DEF")) out.push({ label: "DEF", value: "DEF" });
@@ -1391,7 +1396,7 @@ export function simFilterPositionsFor(slots: SimSlot[] | undefined): { label: st
 /** Does a player's position pass a position filter value (client-side twin of the server rule)? */
 export function simPosMatches(pos: SimPos, filter: SimPosFilter | ""): boolean {
   if (!filter) return true;
-  if (filter === "FLEX" || filter === "SUPER_FLEX") return SIM_FLEX_GROUPS[filter].includes(pos);
+  if (filter === "FLEX" || filter === "WRRB_FLEX" || filter === "SUPER_FLEX") return SIM_FLEX_GROUPS[filter].includes(pos);
   return pos === filter;
 }
 
@@ -1583,6 +1588,7 @@ export type SimGameTone = "success" | "accent" | "warning" | "danger" | "muted";
 /** Positions each flex slot accepts (mirrors modules/sim/types.py FLEX_SLOTS). */
 const SIM_FLEX_ELIGIBLE: Partial<Record<SimSlot, SimPos[]>> = {
   REC_FLEX: ["WR", "TE"],
+  WRRB_FLEX: ["RB", "WR"],
   FLEX: ["RB", "WR", "TE"],
   SUPER_FLEX: ["QB", "RB", "WR", "TE"],
 };
@@ -2089,6 +2095,7 @@ export const SIM_SETUP_FALLBACK = {
   scoring: "half" as SimScoring,
   te_premium: 0,
   superflex: false,
+  flex_type: "flex" as SimFlexType,
   include_k: true,
   include_def: false,
   tiebreaker: "points_for" as SimTiebreaker,
@@ -2098,6 +2105,10 @@ export const SIM_SETUP_FALLBACK = {
 
 export const SIM_TE_PREMIUM_LABELS: Record<number, string> = { 0: "Off", 0.5: "+0.5 per catch", 1: "+1 per catch" };
 
+/** Which positions the FLEX slot takes: "flex" = RB/WR/TE (default), "rb_wr" = RB/WR only (server: flex_type). */
+export type SimFlexType = "flex" | "rb_wr";
+export const SIM_FLEX_TYPE_LABELS: Record<SimFlexType, string> = { flex: "RB / WR / TE", rb_wr: "RB / WR" };
+
 export interface SimSetupState {
   start: SimStartKind;
   /** Chosen real league (start === "league"). */
@@ -2106,6 +2117,8 @@ export interface SimSetupState {
   scoring: SimScoring;
   tePremium: number;
   superflex: boolean;
+  /** Flex eligibility: "flex" = RB/WR/TE (default), "rb_wr" = RB/WR only. */
+  flexType: SimFlexType;
   includeK: boolean;
   includeDef: boolean;
   tiebreaker: SimTiebreaker;
@@ -2148,6 +2161,7 @@ export function simSetupDefaults(options: SimGameOptionsResponse | null | undefi
     scoring: o?.scoring.default ?? SIM_SETUP_FALLBACK.scoring,
     tePremium: o?.te_premium?.default ?? SIM_SETUP_FALLBACK.te_premium,
     superflex: o?.superflex?.default ?? SIM_SETUP_FALLBACK.superflex,
+    flexType: o?.flex_type?.default ?? SIM_SETUP_FALLBACK.flex_type,
     includeK: o?.include_k?.default ?? SIM_SETUP_FALLBACK.include_k,
     includeDef: o?.include_def?.default ?? SIM_SETUP_FALLBACK.include_def,
     tiebreaker: o?.tiebreaker?.default ?? SIM_SETUP_FALLBACK.tiebreaker,
@@ -2170,7 +2184,7 @@ export function simSetupDefaults(options: SimGameOptionsResponse | null | undefi
 /** True when any "Advanced options" field differs from its default (so a collapsed section can say so). */
 export function simSetupAdvancedChanged(state: SimSetupState, defaults: SimSetupState): number {
   const keys: (keyof SimSetupState)[] = [
-    "scoring", "tePremium", "superflex", "includeK", "includeDef", "tiebreaker", "bench", "teams",
+    "scoring", "tePremium", "superflex", "flexType", "includeK", "includeDef", "tiebreaker", "bench", "teams",
     "mode", "seasons", "rookieRounds", "irSlots", "taxiSlots", "taxiYears",
   ];
   return keys.filter((key) => state[key] !== defaults[key]).length;
@@ -2183,11 +2197,11 @@ export function simSetupAdvancedChanged(state: SimSetupState, defaults: SimSetup
  * bench; the draft leaves `spare` spots open for the wire.
  */
 export function simDeriveLayout(
-  s: Pick<SimSetupState, "superflex" | "includeK" | "includeDef" | "bench">,
+  s: Pick<SimSetupState, "superflex" | "includeK" | "includeDef" | "bench"> & Partial<Pick<SimSetupState, "flexType">>,
   baseSlots: SimSlot[] = ["QB", "RB", "RB", "WR", "WR", "TE", "FLEX"],
   spare: number = SIM_SETUP_FALLBACK.draftSpareSpots,
 ): { slots: SimSlot[]; rosterLimit: number; rounds: number } {
-  const slots: SimSlot[] = [...baseSlots];
+  const slots: SimSlot[] = baseSlots.map((slot) => (slot === "FLEX" && s.flexType === "rb_wr" ? "WRRB_FLEX" : slot));
   if (s.superflex) slots.push("SUPER_FLEX");
   if (s.includeK) slots.push("K");
   if (s.includeDef) slots.push("DEF");
@@ -2235,6 +2249,7 @@ export function simSetupBody(state: SimSetupState): SimGameCreateBody {
     scoring: state.scoring,
     te_premium: state.tePremium,
     superflex: state.superflex,
+    ...(state.flexType !== "flex" ? { flex_type: state.flexType } : {}), // the default is never sent, like the server never saves it
     include_k: state.includeK,
     include_def: state.includeDef,
     bench: state.bench,
@@ -2296,6 +2311,7 @@ export function simSettingsSummary(settings: Partial<SimGameSettings> | undefine
   if (settings.scoring) parts.push(SIM_SCORING_LABELS[settings.scoring] ?? settings.scoring);
   if (settings.te_premium) parts.push(`TE premium +${settings.te_premium}`);
   if (settings.superflex) parts.push("Superflex");
+  if (settings.flex_type === "rb_wr") parts.push("RB/WR flex");
   if (settings.include_def) parts.push("DEF");
   if (settings.include_k === false) parts.push("No kickers");
   if (settings.tiebreaker === "head_to_head") parts.push("Head-to-head tiebreak");
@@ -3159,6 +3175,37 @@ export function simCanMoveToRoster(player: Pick<SimGamePlayer, "squad">, ctx: Si
   return { ok: true };
 }
 
+export interface SimSwapTarget {
+  index: number;
+  label: string;
+  /** Who starts there now (null = an empty slot). */
+  current: SimGamePlayer | null;
+}
+
+/**
+ * Where a bench player can start: every lineup slot his position fits, with who holds it now. The bench's swap control
+ * (the same two arrows the lineup rows use) lists these; picking one is `simAssignSlot`. A slot already holding him is skipped.
+ */
+export function simBenchSwapTargets(player: Pick<SimGamePlayer, "id" | "pos">, slots: SimLineupSlot[], labels: string[]): SimSwapTarget[] {
+  const out: SimSwapTarget[] = [];
+  slots.forEach((s, index) => {
+    if (s.player?.id === player.id || !simSlotAccepts(s.slot, player.pos)) return;
+    out.push({ index, label: labels[index] ?? s.slot, current: s.player ?? null });
+  });
+  return out;
+}
+
+/**
+ * Whether a bench row offers the IR / taxi move at all. It used to show on every bench row as a "+" nobody could explain;
+ * now only a player who could actually go to IR (out) or the taxi squad has it.
+ */
+export function simBenchOffersReserveMove(
+  player: Pick<SimGamePlayer, "squad" | "status" | "out_weeks" | "pos" | "taxi_eligible">,
+  ctx: SimMoveContext,
+): boolean {
+  return simCanMoveToIr(player, ctx).ok || simCanMoveToTaxi(player, ctx).ok;
+}
+
 export type SimReserveMoveTo = "roster" | "ir" | "taxi";
 
 export interface SimReserveAction {
@@ -3222,19 +3269,22 @@ export function simReserveUsedLine(kind: "ir" | "taxi", reserves: SimReserves | 
 }
 
 export interface SimPlayerChipSpec {
-  key: "ir" | "taxi" | "rookie" | "out";
+  key: "ir" | "taxi" | "rookie";
   label: string;
   tone: SimGameTone;
 }
 
-/** Status chips for a roster row: IR, TAXI, ROOKIE, OUT n wks. */
+/**
+ * Squad chips for a roster row: IR, TAXI, ROOKIE. The injury ("Out 2w") is NOT here: SimPlayerLine already shows it
+ * as its one status chip (simDraftRowChips), and a second "OUT 2 WKS" chip next to it read as a duplicate tag
+ * (coridian_, 2026-11-14: "why are there two tags saying that he's out"). One owner, one chip.
+ */
 export function simPlayerChips(player: Pick<SimGamePlayer, "squad" | "rookie" | "status" | "out_weeks">): SimPlayerChipSpec[] {
   const chips: SimPlayerChipSpec[] = [];
   const squad = squadOf(player);
   if (squad === "ir") chips.push({ key: "ir", label: "IR", tone: "danger" });
   if (squad === "taxi") chips.push({ key: "taxi", label: "TAXI", tone: "accent" });
   if (player.rookie) chips.push({ key: "rookie", label: "ROOKIE", tone: "success" });
-  if (player.out_weeks > 0) chips.push({ key: "out", label: `OUT ${player.out_weeks} ${player.out_weeks === 1 ? "wk" : "wks"}`, tone: "danger" });
   return chips;
 }
 
