@@ -104,4 +104,39 @@ describe("Fantasy Sim player sheet is the real Player Quick View", () => {
     expect(screen.getByRole("region", { name: "Seasons" })).toHaveTextContent("8 games · 121.4 pts · 15.2 ppg");
     expect(api.getSimPlayerHistory).toHaveBeenCalledWith("g1", "R2027-001");
   });
+
+  it("header carries the list row's tags once: the injury chip, Free agent, and no separate Health chip", async () => {
+    const hurt = player({ status: "out", out_weeks: 3, owner: { type: "free_agent" } as SimGamePlayer["owner"] });
+    vi.mocked(api.getSimGamePlayer).mockResolvedValue(detail({ player: hurt }));
+    render(<SimPlayerSheet gameId="g1" player={hurt} onClose={() => {}} />);
+    const tags = await screen.findAllByTestId("pqv-tag");
+    expect(tags.map((t) => t.textContent)).toEqual(["Out 3w", "Free agent"]);
+    expect(screen.queryByText(/Health:/)).toBeNull();
+  });
+
+  it("a real player's Stats tab shows prior seasons up to the as-of season and that season's game log, never the one in progress", async () => {
+    const real = player({ id: "4046", headshot_id: "4046", name: "Real Guy", pos: "QB" });
+    vi.mocked(api.getSimGamePlayer).mockResolvedValue(detail({ player: real }));
+    vi.mocked(api.getPlayerQuickView).mockResolvedValue({ ok: true } as never);
+    vi.mocked(api.getPlayerAwards).mockResolvedValue({ ok: true, awards: [] } as never);
+    vi.mocked(api.getPlayerNews).mockResolvedValue({ ok: true, items: [] } as never);
+    vi.mocked(api.getPlayerWeeklyStats).mockResolvedValue({ ok: true, season: 2025, weeks: [{ week: 1, fantasy_points_ppr: 21.5, snap_share: null }, { week: 2, fantasy_points_ppr: 9, snap_share: null }] });
+    const career = vi.spyOn(api, "getPlayerCareer").mockResolvedValue({
+      ok: true,
+      seasons: [
+        { season: 2026, age: 29, games: 4, current_season: true, key_stats: [{ label: "Pass TD", value: "9" }] },
+        { season: 2025, age: 28, games: 17, current_season: false, key_stats: [{ label: "Pass TD", value: "31" }] },
+        { season: 2024, age: 27, games: 16, current_season: false, key_stats: [] },
+      ],
+    });
+    render(<SimPlayerSheet gameId="g1" player={real} onClose={() => {}} startYear={2026} />);
+    fireEvent.click(await screen.findByRole("tab", { name: "Stats" }));
+    const careerBlock = await screen.findByTestId("sim-career");
+    expect(careerBlock).toHaveTextContent("2025 · 17 games");
+    expect(careerBlock).toHaveTextContent("2024 · 16 games");
+    expect(careerBlock).not.toHaveTextContent("2026");
+    expect(await screen.findByTestId("sim-game-log")).toHaveTextContent("2 games");
+    expect(api.getPlayerWeeklyStats).toHaveBeenCalledWith("4046", 2025);
+    career.mockRestore();
+  });
 });

@@ -21,6 +21,8 @@ import { useThemeMode } from '../context/ThemeModeContext';
 import { api } from '../lib/api';
 import {
   simAssignSlot,
+  simBenchOffersReserveMove,
+  simBenchSwapTargets,
   simClaimPayload,
   simFmtPts,
   simHeadshotId,
@@ -58,6 +60,7 @@ export function SimTeamTab({ ctx, onTrade }: { ctx: SimCtx; onTrade: () => void 
   const [lineup, setLineup] = useState<SimLineupResponse | null>(null);
   const [state, setState] = useState<'loading' | 'ready' | 'error'>('loading');
   const [pickSlot, setPickSlot] = useState<number | null>(null);
+  const [swapIn, setSwapIn] = useState<SimGamePlayer | null>(null);
   const [cutting, setCutting] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [attempt, setAttempt] = useState(0);
@@ -256,7 +259,8 @@ export function SimTeamTab({ ctx, onTrade }: { ctx: SimCtx; onTrade: () => void 
                   </>
                 ) : (
                   <>
-                    {reservesOn ? <SimReserveButton player={player} onOpen={setMoving} /> : null}
+                    {reservesOn && simBenchOffersReserveMove(player, reserveState) ? <SimReserveButton player={player} onOpen={setMoving} /> : null}
+                    <SimIconButton disabled={lineup.locked} label={`Swap ${player.name} into your lineup`} glyph="trade" onPress={() => setSwapIn(player)} />
                     <Button size="sm" variant={overLimit ? 'dangerOutline' : 'ghost'} label="Cut" onPress={() => setCutting(player.id)} />
                   </>
                 )
@@ -284,6 +288,30 @@ export function SimTeamTab({ ctx, onTrade }: { ctx: SimCtx; onTrade: () => void 
             void refreshGame();
           }}
         />
+      ) : null}
+
+      {swapIn ? (
+        <SimSheet title={`Swap ${swapIn.name} in`} onClose={() => setSwapIn(null)}>
+          {simBenchSwapTargets(swapIn, slots, labels).length === 0 ? (
+            <AppText style={common.small}>No lineup slot fits this position.</AppText>
+          ) : (
+            simBenchSwapTargets(swapIn, slots, labels).map((target) => (
+              <View key={target.index} style={common.row}>
+                <PositionBadge position={slots[target.index].slot} label={target.label} />
+                <AppText style={[common.bodyStrong, common.grow]} numberOfLines={1}>{target.current ? `Replaces ${target.current.name}` : 'Empty slot'}</AppText>
+                <Button
+                  size="sm"
+                  label="Swap"
+                  onPress={() => {
+                    const next = simAssignSlot({ slots, bench }, target.index, swapIn);
+                    setSwapIn(null);
+                    void save(next.slots, next.bench);
+                  }}
+                />
+              </View>
+            ))
+          )}
+        </SimSheet>
       ) : null}
 
       {pickSlot != null ? (

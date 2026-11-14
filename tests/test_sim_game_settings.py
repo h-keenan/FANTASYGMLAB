@@ -471,6 +471,7 @@ def test_options_expose_quick_start_defaults_advanced_options_and_start_modes():
     assert (o["bench"]["min"], o["bench"]["max"], o["bench"]["default"]) == (4, 10, 8)
     assert o["superflex"]["default"] is False and o["include_k"]["default"] is True and o["include_def"]["default"] is False
     assert data["layout"] == {"base_slots": ["QB", "RB", "RB", "WR", "WR", "TE", "FLEX"], "draft_spare_spots": 2}
+    assert o["flex_type"] == {"values": ["flex", "rb_wr"], "default": "flex", "slots": {"flex": "FLEX", "rb_wr": "WRRB_FLEX"}}
     modes = {m["id"]: m for m in data["start_modes"]}
     assert modes["fresh"]["available"] and modes["league"]["available"]
     assert modes["season_start"] == {"id": "season_start", "available": False, "reason": "no_roster_history"}
@@ -725,3 +726,58 @@ def test_too_long_team_name_is_rejected():
     game_api.clear_pool_cache()
     client, _ = make_app(Inputs(imported_league()))
     assert client.post("/v1/sim/games", json={"team_name": "x" * 41}, headers=H).status_code == 422
+
+
+# ------------------------------------------------------------------ flex eligibility (RB/WR/TE default, RB/WR alternative)
+
+OLD_SAVE_DIGEST = "1c4fc89f0f26d9a75c02265a03c0b7252ab92a0a511ead91893a2e0110471fec"  # captured on main before flex_type existed
+
+
+def test_default_flex_is_unchanged_and_never_serialized():
+    s = GameSettings.parse({})
+    assert s.flex_type == "flex" and "FLEX" in s.slots and "WRRB_FLEX" not in s.slots
+    assert "flex_type" not in s.to_dict()
+    assert GameSettings.from_dict(s.to_dict()) == s
+
+
+def test_old_save_replays_to_the_same_digest():
+    snap = snapshot(seed=11, superflex=True)
+    state, em = play_draft(snap)
+    for _ in range(6):
+        advance(em, snap, state, 11)
+    assert state.digest() == OLD_SAVE_DIGEST
+    assert "flex_type" not in snap.settings.to_dict()
+
+
+def test_rb_wr_flex_option_changes_only_the_flex_slot_and_round_trips():
+    s = GameSettings.parse({"flex_type": "rb_wr"})
+    assert s.slots == ("QB", "RB", "RB", "WR", "WR", "TE", "WRRB_FLEX", "K")
+    assert (s.roster_limit, s.rounds) == (16, 14)
+    assert s.to_dict()["flex_type"] == "rb_wr"
+    assert GameSettings.from_dict(s.to_dict()) == s
+    with pytest.raises(ValueError):
+        GameSettings.parse({"flex_type": "te_only"})
+
+
+def test_rb_wr_flex_never_starts_a_tight_end_and_lineup_rules_enforce_it():
+    from modules.sim.game_types import slot_positions
+    from modules.sim.lineup import SlotPlan, pick_lineup
+
+    assert slot_positions("WRRB_FLEX") == frozenset({"RB", "WR"})
+    plan = SlotPlan(("QB", "TE", "WRRB_FLEX"))
+    entries = [(20.0, "q", "QB"), (9.0, "t1", "TE"), (15.0, "t2", "TE"), (4.0, "r1", "RB")]
+    assignment, _ = pick_lineup(plan, entries)
+    assert dict(assignment)["WRRB_FLEX"] == "r1"  # the better TE is not eligible
+    std, _ = pick_lineup(SlotPlan(("QB", "TE", "FLEX")), entries)
+    assert dict(std)["FLEX"] == "t1"  # the standard flex may take a TE (lineup TE is the 15, flex the 9)
+
+
+def test_rb_wr_flex_league_plays_a_full_game_and_replays():
+    snap = snapshot(seed=11, flex_type="rb_wr")
+    state, em = play_draft(snap)
+    for _ in range(4):
+        advance(em, snap, state, 11)
+    assert replay_game(snap, 11, em.events, strict=True).digest() == state.digest()
+    for tid, row in state.lineups.items():
+        slot_pos = {s: snap.players[p].pos for s, p in row if p}
+        assert slot_pos.get("WRRB_FLEX") in (None, "RB", "WR")

@@ -16,6 +16,7 @@ export function ToneBadge({
   srLabel,
   testId,
   wrap = false,
+  truncate = false,
 }: {
   label: string;
   color: string;
@@ -27,12 +28,17 @@ export function ToneBadge({
   testId?: string;
   /** Let a long sentence-style label wrap inside its container instead of widening the page. Multi-word labels wrap on their own (200% text, narrow rows). */
   wrap?: boolean;
+  /**
+   * One line that ends in an ellipsis when the container is narrower than the label (list-row tags: a long team name used to be
+   * cut mid-letter by the row's overflow clip). The full text stays in the tooltip. Takes over from `wrap`.
+   */
+  truncate?: boolean;
 }) {
   return (
     <span
       data-testid={testId}
-      title={title}
-      className={`${size === "xs" ? "px-1.5 text-[0.6875rem] leading-4 inline-flex items-center" : "px-1.5 py-0.5 text-xs"} font-extrabold uppercase ${wrap || label.includes(" ") ? "min-w-0 max-w-full break-words" : label.length <= 4 ? "whitespace-nowrap shrink-0" : "min-w-0 max-w-full [overflow-wrap:anywhere]"}`}
+      title={title ?? (truncate ? label : undefined)}
+      className={`${size === "xs" ? "px-1.5 text-[0.6875rem] leading-4 inline-flex items-center" : "px-1.5 py-0.5 text-xs"} font-extrabold uppercase ${truncate ? "block min-w-0 max-w-full overflow-hidden text-ellipsis whitespace-nowrap" : wrap || label.includes(" ") ? "min-w-0 max-w-full break-words" : label.length <= 4 ? "whitespace-nowrap shrink-0" : "min-w-0 max-w-full [overflow-wrap:anywhere]"}`}
       style={{
         borderRadius: "var(--radius-pill)",
         background: `color-mix(in srgb, ${color} var(--chip-fill-pct, 15%), transparent)`,

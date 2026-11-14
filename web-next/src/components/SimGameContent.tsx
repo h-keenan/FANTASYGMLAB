@@ -71,7 +71,9 @@ import {
   SIM_TE_PREMIUM_LABELS,
   type SimDifficulty,
   type SimMode,
+  type SimFlexType,
   type SimTiebreaker,
+  SIM_FLEX_TYPE_LABELS,
   SIM_TIEBREAKER_LABELS,
   type SimDraftRecap,
   type SimGame,
@@ -812,6 +814,17 @@ function SetupForm({
               />
             </div>
             <SetupToggle label="Superflex" note="A second quarterback can start in an extra flex slot." checked={state.superflex} onChange={(v) => set("superflex", v)} />
+            <div className="flex flex-col gap-1">
+              <span className="text-sm font-semibold">Flex spot</span>
+              <PillRow
+                ariaLabel="Flex spot"
+                variant="fill"
+                options={(opts?.flex_type?.values ?? ["flex", "rb_wr"]).map((v) => ({ label: SIM_FLEX_TYPE_LABELS[v], value: v }))}
+                active={state.flexType}
+                onSelect={(value) => set("flexType", value as SimFlexType)}
+              />
+              <p className="text-xs" style={{ color: "var(--color-text-muted)" }}>Who can start in the FLEX slot. RB / WR / TE is the standard.</p>
+            </div>
             <SetupToggle label="Kicker" note="Start a K." checked={state.includeK} onChange={(v) => set("includeK", v)} />
             <SetupToggle label="Defense (DEF)" note="Start a team defense (estimated from points allowed)." checked={state.includeDef} onChange={(v) => set("includeDef", v)} />
             <div className="flex flex-col gap-1">

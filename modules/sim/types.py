@@ -13,12 +13,14 @@ from typing import Any, Mapping
 STRICT_SLOTS = ("QB", "RB", "WR", "TE", "K")
 FLEX_SLOTS = {
     "REC_FLEX": frozenset({"WR", "TE"}),
+    # RB/WR-only flex (no TE): the alternative to the standard RB/WR/TE flex, picked at league setup (settings.flex_type "rb_wr").
+    "WRRB_FLEX": frozenset({"RB", "WR"}),
     "FLEX": frozenset({"RB", "WR", "TE"}),
     "SUPER_FLEX": frozenset({"QB", "RB", "WR", "TE"}),
 }
 # Fill the most restrictive flex first so a super-flex never steals a player a
 # narrower slot needs.
-FLEX_ORDER = ("REC_FLEX", "FLEX", "SUPER_FLEX")
+FLEX_ORDER = ("REC_FLEX", "WRRB_FLEX", "FLEX", "SUPER_FLEX")
 POSITIONS = ("QB", "RB", "WR", "TE", "K")
 # The interactive GM game also plays team defenses. The season simulator never
 # sees DEF (``inputs.normalize_slots`` keeps only STRICT_SLOTS), so these stay

@@ -230,7 +230,7 @@ export function PlayerListRow({
         <div className="flex items-center justify-between gap-2 pb-0.5">
           <div className="flex min-w-0 flex-1 items-center gap-1 overflow-hidden whitespace-nowrap" data-testid="list-tags">
             {shown.map((tag) => (
-              <ToneBadge key={tag.key} label={tag.label} color={tag.tone ? TONE_COLOR[tag.tone] : "var(--color-text-secondary)"} size="xs" />
+              <ToneBadge key={tag.key} label={tag.label} color={tag.tone ? TONE_COLOR[tag.tone] : "var(--color-text-secondary)"} size="xs" truncate />
             ))}
             {moreTags > 0 ? (
               <span className="text-[0.6875rem] font-bold" style={{ color: "var(--color-text-muted)" }}>

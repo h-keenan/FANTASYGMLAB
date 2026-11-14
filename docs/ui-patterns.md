@@ -24,6 +24,8 @@ Ground rules for every pattern here:
 
 ## Sheet
 
+Open height (2026-11-14): every bottom sheet on a phone opens between 56% and 80% of the screen (web `.pqv-modal` in the 480px query, app `sheetHeight` in `mobile/src/theme.ts`), so it never opens up under the page header and does not jump while content loads. Chips in dense list rows use `ToneBadge truncate` (web) / `shrink` (app) so a long tag ends in an ellipsis instead of being clipped.
+
 One bottom sheet on a phone and a centred dialog from 768px up. Replaces the hand-rolled copies of
 `.pqv-backdrop` + `.pqv-modal` + `SheetHandle` + `useSheetDragDismiss`.
 

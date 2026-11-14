@@ -38,7 +38,7 @@ import {
 } from '../lib/simGame';
 import { simSeeAllLabel } from '../lib/simLayout';
 import TapForWhy from './TapForWhy';
-import { radii, scrim, spacing, type ThemeColors } from '../theme';
+import { radii, scrim, sheetHeight, spacing, type ThemeColors } from '../theme';
 
 /** Semantic theme color for a presentation tone (never a raw hex). */
 export function simToneColor(tone: SimGameTone, colors: ThemeColors): string {
@@ -483,7 +483,8 @@ function createStyles(colors: ThemeColors) {
       borderTopRightRadius: radii.lg,
       borderWidth: 1,
       borderColor: colors.border,
-      maxHeight: '92%',
+      minHeight: sheetHeight.min,
+      maxHeight: sheetHeight.max,
     },
     sheetContent: { padding: spacing.lg, paddingBottom: spacing.xxl, gap: spacing.md },
     sheetTop: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: spacing.sm, minHeight: 28 },

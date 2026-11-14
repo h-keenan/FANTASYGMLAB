@@ -8,6 +8,7 @@ import MetricCard from './MetricCard';
 import { simAsOfSeason } from '../lib/simAsOf';
 import PlayerQuickViewSheet, { Section as PqvSection, type SimPqvSections } from './PlayerQuickViewSheet';
 import { SimPlayerHistory } from './SimPlayerHistory';
+import { SimRealHistory } from './SimRealHistory';
 import SimScoutingSections from './SimScoutingSections';
 import WeeklyPointsChart from './WeeklyPointsChart';
 import { ReviewGlyphChip } from './SeasonReviewSections';
@@ -19,7 +20,7 @@ import { useThemeMode } from '../context/ThemeModeContext';
 import { api } from '../lib/api';
 import { stubPlayer } from '../lib/playerQuickView';
 import { SIM_WINDOW_STEP, simWindow } from '../lib/simLayout';
-import { simActualPoints, simAvailabilityLine, simHeroFeed, simProjectionBand, simProjectionIsFlat, simRosLine } from '../lib/simPlayerSheet';
+import { simActualPoints, simAvailabilityLine, simHeaderTags, simHeroFeed, simProjectionBand, simProjectionIsFlat, simRosLine } from '../lib/simPlayerSheet';
 import { PLAYER_SEARCH_DEBOUNCE_MS } from '../lib/leaguePlayerSearch';
 import {
   SIM_PAGE_SIZE,
@@ -230,10 +231,12 @@ export function SimPlayerSheet({ gameId, player, onClose, actions, startYear }: 
     },
     league: null,
     sourceLabel: 'Fantasy Sim',
+    // The header carries the same tags the list row showed (the one injury chip, owner / Free agent, role, block).
+    tags: simHeaderTags(live),
     valueNote: feed?.valueNote ?? null,
     valueLabel: feed ? 'Trade value' : null,
   };
-  return <PlayerQuickViewSheet request={request} onClose={onClose} remote={Boolean(real)} asOfSeason={simAsOfSeason(startYear)} simSections={simPqvSections(gameId, live, detail, actions)} />;
+  return <PlayerQuickViewSheet request={request} onClose={onClose} remote={Boolean(real)} asOfSeason={simAsOfSeason(startYear)} simSections={simPqvSections(gameId, live, detail, actions, real ? { playerId: real, asOf: simAsOfSeason(startYear) } : undefined)} />;
 }
 
 interface SimPlayerDetailState {
@@ -265,12 +268,13 @@ function useSimPlayerDetail(gameId: string, playerId: string): SimPlayerDetailSt
  * The sim-only sections of the player detail, split by tab of the shared Player Quick View: Overview, Outlook, Scouting
  * (generated rookies) and History (derived from the event log), in the quick view's own section shell, tiles and chart.
  */
-export function simPqvSections(gameId: string, player: SimGamePlayer, detail: SimPlayerDetailState, actions?: ReactNode): SimPqvSections {
+export function simPqvSections(gameId: string, player: SimGamePlayer, detail: SimPlayerDetailState, actions?: ReactNode, real?: { playerId: string; asOf: number }): SimPqvSections {
   return {
     overview: <SimOverviewSection player={player} detail={detail} actions={actions} />,
     outlook: <SimOutlookSection player={player} detail={detail} />,
     scouting: detail.data?.scouting ? <SimScoutingSections profile={detail.data.scouting} /> : undefined,
     history: <SimPlayerHistory gameId={gameId} playerId={player.id} />,
+    stats: real ? <SimRealHistory playerId={real.playerId} asOf={real.asOf} /> : undefined,
   };
 }
 

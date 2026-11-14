@@ -51,6 +51,9 @@ from modules.sim.game_mode import DEFAULT_ROOKIE_ROUNDS, DEFAULT_SEASONS, PICK_Y
 from modules.sim.game_types import (
     BENCH_RANGE,
     DEFAULT_BENCH,
+    DEFAULT_FLEX_TYPE,
+    FLEX_SLOT_FOR_TYPE,
+    FLEX_TYPES,
     DEFAULT_SCORING,
     DEFAULT_TEAMS,
     DEFAULT_TIEBREAKER,
@@ -405,6 +408,8 @@ def add_routes(router: APIRouter, ctx: GameApiCtx) -> None:
                 "scoring": {"values": list(SCORING_NAMES), "default": DEFAULT_SCORING},
                 "te_premium": {"values": list(TE_PREMIUMS), "default": 0.0},
                 "superflex": {"default": False},
+                # Flex eligibility: "flex" = RB/WR/TE (default), "rb_wr" = RB/WR only (no TE).
+                "flex_type": {"values": list(FLEX_TYPES), "default": DEFAULT_FLEX_TYPE, "slots": dict(FLEX_SLOT_FOR_TYPE)},
                 "include_k": {"default": True},
                 "include_def": {"default": False},
                 "bench": {"min": BENCH_RANGE[0], "max": BENCH_RANGE[1], "default": DEFAULT_BENCH},
@@ -675,7 +680,7 @@ def add_routes(router: APIRouter, ctx: GameApiCtx) -> None:
         _, _, row, snap, state = load(user, _gid(game_id))
         pos = pos.upper()
         if pos and pos not in GAME_POSITIONS and pos not in FLEX_SLOTS:
-            raise ValueError("pos must be one of QB, RB, WR, TE, K, DEF, FLEX, REC_FLEX, SUPER_FLEX.")
+            raise ValueError("pos must be one of QB, RB, WR, TE, K, DEF, FLEX, WRRB_FLEX, REC_FLEX, SUPER_FLEX.")
         if status not in ("", "available", "rostered", "mine", "injured", "bye", "block"):
             raise ValueError("status must be available, rostered, mine, injured, bye or block.")
         if sort not in view.SORTS:

@@ -1,5 +1,6 @@
 "use client";
 
+import { ToneBadge } from "@/components/ToneBadge";
 import { ExplorerLeagueProvider } from "@/context/ExplorerLeagueContext";
 import dynamic from "next/dynamic";
 import { usePathname } from "next/navigation";
@@ -88,7 +89,17 @@ export interface SimPqvSections {
   outlook?: ReactNode;
   scouting?: ReactNode;
   history?: ReactNode;
+  /** Real-NFL record cut to the as-of season (career + game log), shown first in the Stats tab. */
+  stats?: ReactNode;
 }
+
+const TAG_TONE_COLOR = {
+  success: "var(--color-success)",
+  accent: "var(--color-accent)",
+  warning: "var(--color-warning)",
+  danger: "var(--color-danger)",
+  muted: "var(--color-text-secondary)",
+} as const;
 
 export function PlayerQuickView({
   identity,
@@ -322,7 +333,11 @@ export function PlayerQuickView({
 
         <div className="pqv-signal-row">
           {identity.opportunity_label ? <span className="pqv-chip">{identity.opportunity_label}</span> : null}
-          {injury.label ? (
+          {identity.tags?.length ? (
+            identity.tags.map((tag) => (
+              <ToneBadge key={tag.key} label={tag.label} color={TAG_TONE_COLOR[tag.tone]} size="xs" truncate testId="pqv-tag" />
+            ))
+          ) : injury.label ? (
             <span className={`pqv-chip pqv-chip--${injury.tone}`}>Health: {injury.label}</span>
           ) : null}
         </div>
@@ -406,6 +421,7 @@ export function PlayerQuickView({
                       label: "Stats",
                       render: () => (
                         <div className="pqv-body">
+                          {sim?.stats ?? null}
                           {bodyGate ?? (
                             <>
                               <PlayerUsageBlock profile={model?.usage_profile} position={stats?.position ?? identity.position} playerId={identity.player_id} />

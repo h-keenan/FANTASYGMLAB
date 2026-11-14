@@ -20,6 +20,8 @@ export interface QuickViewRequest {
   valueNote?: string | null;
   /** Caption for the Value tile when it is not the real market value (Fantasy Sim: "Trade value"). */
   valueLabel?: string | null;
+  /** Status tags for the header (Fantasy Sim: the same tags the list row shows). When present they replace the separate "Health" chip, so an injury shows once. */
+  tags?: { key: string; label: string; tone: 'success' | 'accent' | 'warning' | 'danger' | 'muted' }[];
 }
 
 export function buildQuickViewRequest(

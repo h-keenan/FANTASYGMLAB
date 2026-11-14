@@ -51,11 +51,26 @@ import { queryKeys } from '../lib/queryKeys';
 import { isOnWaiverList } from '../lib/waiverHighlight';
 import { playerSubRatings } from '../lib/subRatings';
 import { navigationRef } from '../navigation/navigationRef';
-import { radii, scrim, spacing, type ThemeColors } from '../theme';
+import { radii, scrim, sheetHeight, spacing, type ThemeColors } from '../theme';
 
 type ExplorerTarget = { key: string; label: string };
 
 /** One web-PQV section: hairline top rule, small caps heading. */
+function tagToneColor(tone: 'success' | 'accent' | 'warning' | 'danger' | 'muted', colors: ThemeColors): string {
+  switch (tone) {
+    case 'success':
+      return colors.success;
+    case 'accent':
+      return colors.accent;
+    case 'warning':
+      return colors.warning;
+    case 'danger':
+      return colors.danger;
+    default:
+      return colors.textSecondary;
+  }
+}
+
 export function Section({ title, icon, right, children }: { title: string; icon?: React.ComponentProps<typeof SectionHeading>['icon']; right?: React.ReactNode; children: React.ReactNode }) {
   const { colors } = useThemeMode();
   const styles = useMemo(() => createStyles(colors), [colors]);
@@ -86,6 +101,8 @@ export interface SimPqvSections {
   outlook?: React.ReactNode;
   scouting?: React.ReactNode;
   history?: React.ReactNode;
+  /** Real-NFL record cut to the as-of season (career + game log), shown first in the Stats tab. */
+  stats?: React.ReactNode;
 }
 
 export default function PlayerQuickViewSheet({
@@ -274,7 +291,8 @@ export default function PlayerQuickViewSheet({
   const ranks = rankLine(position, scoped.overallRank, scoped.positionRank);
   const subRatings = model ? playerSubRatings(model) : [];
   const hasSubRatings = subRatings.some((item) => item.rating != null);
-  const showSignals = !!scoped.opportunityLabel || !!injury;
+  const headerTags = request.tags ?? [];
+  const showSignals = !!scoped.opportunityLabel || !!injury || headerTags.length > 0;
 
   return (
     <SheetModal visible transparent animationType="fade" onRequestClose={onClose}>
@@ -339,7 +357,11 @@ export default function PlayerQuickViewSheet({
                   {scoped.opportunityLabel ? (
                     <ToneBadge label={scoped.opportunityLabel} color={colors.textSecondary} size="xs" />
                   ) : null}
-                  {injury ? (
+                  {headerTags.length > 0 ? (
+                    headerTags.map((tag) => (
+                      <ToneBadge key={tag.key} label={tag.label} color={tagToneColor(tag.tone, colors)} size="xs" shrink />
+                    ))
+                  ) : injury ? (
                     <ToneBadge
                       label={`Health: ${injury}`}
                       color={injuryTone(player.injury_status) === 'danger' ? colors.danger : colors.warning}
@@ -407,6 +429,7 @@ export default function PlayerQuickViewSheet({
                         render: () =>
                           bodyGate ?? (
                             <View style={styles.body}>
+                              {sim?.stats ?? null}
                               <UsageBlock profile={model?.usage_profile} position={stats?.position ?? player.position} onExplore={setExplorer} />
                               <SeasonStatsRows stats={stats ?? null} usageProfile={model?.usage_profile} onExplore={setExplorer} />
                               {stats && stats.college.length > 0 ? (
@@ -502,7 +525,8 @@ function createStyles(colors: ThemeColors) {
       borderTopRightRadius: radii.lg,
       borderWidth: 1,
       borderColor: colors.border,
-      maxHeight: '92%',
+      minHeight: sheetHeight.min,
+      maxHeight: sheetHeight.max,
     },
     content: { padding: spacing.lg, paddingBottom: spacing.xxl, gap: spacing.md },
     topBar: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', minHeight: 28 },
