@@ -42,6 +42,7 @@ export default function CompactModule({
   expandIn = 'inline',
   children,
   testID,
+  preview,
 }: {
   id: string;
   title: ReactNode;
@@ -58,6 +59,8 @@ export default function CompactModule({
   expandIn?: 'inline' | 'sheet';
   children?: ReactNode;
   testID?: string;
+  /** Always-visible line under the header (collapsed AND expanded): the pinned draft bar's best-available player. Sits outside the toggle, so interactive content is fine. */
+  preview?: ReactNode;
 }) {
   const { colors } = useThemeMode();
   const styles = useMemo(() => createStyles(colors), [colors]);
@@ -119,6 +122,7 @@ export default function CompactModule({
         </Pressable>
         {action ? <View style={styles.action}>{action}</View> : null}
       </View>
+      {preview ? <View testID="compact-preview">{preview}</View> : null}
       {expandIn === 'inline' ? (
         open && hasBody ? <View style={{ gap: spacing.md }}>{children}</View> : null
       ) : (

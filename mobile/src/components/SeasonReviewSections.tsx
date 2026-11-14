@@ -7,6 +7,8 @@ import TrendChart from './TrendChart';
 import AppText from './AppText';
 import CompactModule from './CompactModule';
 import PositionBadge from './PositionBadge';
+import RecapCard from './RecapCard';
+import { RECAP_CARD_ROWS, recapCardModel } from '../lib/recapCard';
 import { SimPlayerChip as BaseChip, createSimStyles, simToneColor } from './SimGameParts';
 import ToneBadge from './ToneBadge';
 import { useThemeMode } from '../context/ThemeModeContext';
@@ -115,19 +117,6 @@ export function ReviewCardView({ card }: { card: ReviewCard }) {
       })}
       {card.detail ? <AppText style={common.small}>{card.detail}</AppText> : null}
     </AccentCard>
-  );
-}
-
-function StatTile({ stat }: { stat: ReviewStat }) {
-  const { colors } = useThemeMode();
-  const color = stat.tone === 'muted' ? colors.textPrimary : simToneColor(stat.tone, colors);
-  return (
-    <View style={[styles.tile, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-      <AppText style={[styles.kind, { color: colors.textTertiary }]}>{stat.label}</AppText>
-      <AppText style={[styles.tileValue, { color }]}>{stat.value}</AppText>
-      {stat.sub ? <AppText style={{ fontSize: 12, color: colors.textTertiary }}>{stat.sub}</AppText> : null}
-      {stat.player ? <SimPlayerChip player={stat.player} size={28} /> : null}
-    </View>
   );
 }
 
@@ -260,12 +249,29 @@ function Carousel({ children, label }: { children: React.ReactNode[]; label: str
   );
 }
 
+/** The stats as recap cards: three label/value rows per card (mirrors web ReviewStatCards), every stat kept, a player chip under its row. */
+function ReviewStatCards({ section }: { section: Extract<ReviewSection, { kind: 'stats' }> }) {
+  const { colors } = useThemeMode();
+  const common = useMemo(() => createSimStyles(colors), [colors]);
+  const groups: ReviewStat[][] = [];
+  for (let i = 0; i < section.items.length; i += RECAP_CARD_ROWS) groups.push(section.items.slice(i, i + RECAP_CARD_ROWS));
+  return (
+    <View style={common.stack} testID="review-stat-cards">
+      {groups.map((group, g) => {
+        const rows = group.map((s, i) => ({ key: `${g}-${i}`, label: s.label, value: s.value, sub: s.sub ?? null, tone: s.tone }));
+        const extras = Object.fromEntries(group.map((s, i) => [`${g}-${i}`, s.player ? <SimPlayerChip key={i} player={s.player} size={28} /> : null]));
+        return <RecapCard key={g} model={recapCardModel({ kicker: g === 0 ? section.title : `${section.title} (${g + 1})`, rows })} extras={extras} testID="review-stat" />;
+      })}
+    </View>
+  );
+}
+
 function SectionBody({ section }: { section: ReviewSection }) {
   const { colors } = useThemeMode();
   const common = useMemo(() => createSimStyles(colors), [colors]);
   switch (section.kind) {
     case 'stats':
-      return <View style={styles.grid}>{section.items.map((s, i) => <View key={i} style={styles.half}><StatTile stat={s} /></View>)}</View>;
+      return <ReviewStatCards section={section} />;
     case 'cards':
       return <Carousel label={section.title}>{section.cards.map((c) => <ReviewCardView key={c.id} card={c} />)}</Carousel>;
     case 'path':

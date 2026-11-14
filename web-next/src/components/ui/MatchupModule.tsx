@@ -51,7 +51,7 @@ export function MatchupHeroCard({
           <span className="text-3xl font-extrabold tabular-nums leading-none" data-testid="matchup-my-score">
             {model.mine.score}
           </span>
-          <span className="truncate text-sm" style={{ color: "var(--color-text-secondary)" }}>
+          <span className="break-words text-sm" style={{ color: "var(--color-text-secondary)" }}>
             {model.mine.name}
           </span>
         </span>
@@ -62,7 +62,7 @@ export function MatchupHeroCard({
           <span className="text-3xl font-extrabold tabular-nums leading-none" style={{ color: "var(--color-text-secondary)" }} data-testid="matchup-opp-score">
             {model.opponent.score}
           </span>
-          <span className="max-w-full truncate text-sm" style={{ color: "var(--color-text-secondary)" }}>
+          <span className="max-w-full break-words text-sm" style={{ color: "var(--color-text-secondary)" }}>
             {model.opponent.name}
           </span>
         </span>
@@ -92,7 +92,7 @@ export function MatchupHeroCard({
                   <PlayerAvatar playerId={p.playerId} tier={p.tier} size={36} fallbackLabel={p.name.trim().slice(0, 1)} />
                   <span className="flex min-w-0 flex-col text-left">
                     <span className="flex items-center gap-1">
-                      <span className="truncate text-sm font-bold">{playerSurname(p.name) || p.name}</span>
+                      <span className="min-w-0 break-words text-sm font-bold">{playerSurname(p.name) || p.name}</span>
                       {p.position ? <PositionBadge position={p.position} /> : null}
                     </span>
                     <span className="text-xs font-bold" style={{ color: p.side === "mine" ? "var(--color-accent)" : "var(--color-text-secondary)" }}>

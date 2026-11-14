@@ -15,6 +15,9 @@ export type DensityTier = "T0" | "T1" | "T2" | "T3" | "T4";
 
 export type TemplateId =
   | "hero"
+  | "statusHeader"
+  | "matchup"
+  | "recapCard"
   | "compactModule"
   | "statStrip"
   | "row"
@@ -59,6 +62,45 @@ export const MODULE_TEMPLATES: readonly ModuleTemplateSpec[] = [
     summarised: true,
   },
   {
+    id: "statusHeader",
+    name: "StatusHeader (players-first)",
+    purpose: "Top of Today, My Team and Sim Home: status ring + three mini stats, a 'Needs your attention' list of player rows with avatars, the one cyan primary action, optional CompactModules.",
+    required: ["kicker", "headline", "attention"],
+    collapsed: "Always open: ring, headline, context, at most 3 stats and 3 player rows; hidden when there is nothing to say.",
+    tier: "T2",
+    minHeight: 120,
+    maxHeight: 420,
+    web: "components/ui/StatusHeader.tsx",
+    app: "components/StatusHeader.tsx",
+    summarised: true,
+  },
+  {
+    id: "matchup",
+    name: "Matchup hero / ticker",
+    purpose: "One matchup model, two forms: the page hero (score, win chance, bar, swing players with avatars) and the one-line ticker for stacks.",
+    required: ["scores", "winChance"],
+    collapsed: "Ticker: 'WK 7 · You 112.4 - 98.1 Mike · 71%'; the hero is always open.",
+    tier: "T2",
+    minHeight: 48,
+    maxHeight: 320,
+    web: "components/ui/MatchupModule.tsx",
+    app: "components/MatchupModule.tsx",
+    summarised: true,
+  },
+  {
+    id: "recapCard",
+    name: "RecapCard",
+    purpose: "A story page or review block as one card: kicker, optional grade/finish badge, three label/value rows (more behind a tap).",
+    required: ["kicker", "rows"],
+    collapsed: "Always shows its three rows; extra rows sit behind 'More'.",
+    tier: "T1",
+    minHeight: 120,
+    maxHeight: 260,
+    web: "components/ui/RecapCard.tsx",
+    app: "components/RecapCard.tsx",
+    summarised: true,
+  },
+  {
     id: "compactModule",
     name: "CompactModule / CompactSummary",
     purpose: "The base card for every dense block: informative while collapsed, tap to expand inline or into a Sheet.",
@@ -74,9 +116,9 @@ export const MODULE_TEMPLATES: readonly ModuleTemplateSpec[] = [
   {
     id: "statStrip",
     name: "StatStrip",
-    purpose: "Equal-column stat tiles (rank, record, age). In a page it lives inside a StatStripModule, never bare.",
+    purpose: "One row of small glass tiles (rank, record, age), each a link to what explains it; one tap on 'Rank bars' expands the same stats into labelled standing bars.",
     required: ["items"],
-    collapsed: "Collapsed it is the module summary built from the tiles: 'Power #3 · Starters #5 · Age 26.1'.",
+    collapsed: "The tiles are always visible (never an empty header): 'Power #3 · Starters #5 · Age 26.1'; expanded adds rank bars.",
     tier: "T3",
     minHeight: 64,
     maxHeight: null,
@@ -193,7 +235,8 @@ export const MODULE_TEMPLATES: readonly ModuleTemplateSpec[] = [
 /** Fantasy Sim modules are thin adapters over the templates above (no template of their own). */
 export const SIM_TEMPLATE_ADAPTERS: ReadonlyArray<{ module: string; template: TemplateId; note: string }> = [
   { module: "SimFold", template: "compactModule", note: "CompactModule with sim parts (simSummaries.ts)" },
-  { module: "SimDraftHero", template: "hero", note: "on-the-clock Hero + CompactModule bar (simDraft.ts)" },
+  { module: "SimDraftHero", template: "hero", note: "on-the-clock Hero + CompactModule bar (simDraft.ts); the bar's `preview` line is SimDraftBar (best-available avatar, position, letter grade)" },
+  { module: "SimStatusHeader", template: "statusHeader", note: "Home: ring = win chance, injuries/waiver/bye player rows (projection and ADP only)" },
   { module: "SimDraftRow / SimPlayerLine / SimRosterLine", template: "row", note: "PlayerListRow with sim chips (PROJ / OVR / ADP)" },
   { module: "SimDraftBoard filters", template: "listFilter", note: "one control row: position pills + sort" },
   { module: "SimActionBar", template: "actionBar", note: "sticky sim actions" },

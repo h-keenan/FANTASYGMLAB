@@ -18,7 +18,7 @@ export function SimDraftBar({ model, onOpen, grade }: { model: SimDraftBarModel;
           Best available
         </span>
         <span className="flex items-center gap-1.5">
-          <span className="truncate text-sm font-bold">{model.name}</span>
+          <span className="min-w-0 break-words text-sm font-bold">{model.name}</span>
           <PositionBadge position={model.position} />
         </span>
         {model.adp || model.fit ? (

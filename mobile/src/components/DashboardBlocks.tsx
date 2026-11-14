@@ -16,7 +16,7 @@ import SectionHeading from './SectionHeading';
 import { useThemeMode } from '../context/ThemeModeContext';
 import type { DashboardItem, DashboardResponse, TeamRanking, TeamSnapshot } from '../lib/api';
 import { useExperienceCopy } from '../context/ExperienceLevelContext';
-import { formatRank } from '../lib/percentile';
+import { formatRank, rankFill } from '../lib/percentile';
 import { leagueAverageAge } from '../lib/teamStatus';
 import {
   deadlineChip,
@@ -178,6 +178,7 @@ export function DashboardTeamStats({
     icon,
     value: value != null ? formatRank(value, tied) : '—',
     note: value != null ? ofTeams : null,
+    fill: rankFill(value, teams && teams.length > 1 ? teams.length : null),
     onPress,
   });
   const items: StatStripItem[] = [
