@@ -2,9 +2,10 @@
 // web-next/src/lib and mobile/src/lib (scripts/check_lib_twins.mjs IDENTICAL).
 import { compactParts, type CompactPart } from "./compactModule";
 import { badgeFromTag, contextSuppressed, type BadgeInput, type BadgeKind } from "./playerBadges";
+import { playerSurname } from "./playerNameDisplay";
 import type { PlayerListStat } from "./playerListRow";
 import { simGradeOf, simGradeText, type SimGradeInput } from "./simGrade";
-import { simPlayerTags, simFmtPts, simFmtValue, simRosterNeeds, type SimDraftPick, type SimDraftState, type SimGamePlayer, type SimGameTone, type SimPlayerSort, type SimPos, type SimSlot } from "./simGame";
+import { simHeadshotId, simPlayerTags, simFmtPts, simFmtValue, simRosterNeeds, type SimDraftPick, type SimDraftState, type SimGamePlayer, type SimGameTone, type SimPlayerSort, type SimPos, type SimSlot } from "./simGame";
 
 export interface SimDraftProgress {
   round: number;
@@ -421,4 +422,136 @@ export function simDraftBarModel(
     grade: player.grade ?? null,
     fit: need ? `Fills your ${need.pos} need` : null,
   };
+}
+
+/**
+ * One card of the recent-picks strip in the pinned clock area: the player (avatar + name + position + letter grade) and the team
+ * that took him (its generated logo via SimTeamIdentity). Public facts only: no rating, no value.
+ */
+export interface SimRecentPickCard {
+  key: string;
+  pickNo: number;
+  /** "#12" (redraft) or the rookie slot label. */
+  pickLabel: string;
+  player: { id: string; name: string; position: string; team: string | null; headshotId: string | null };
+  grade: SimGradeInput | null;
+  /** The picking team's name (for its logo), or null when the source does not say. */
+  teamName: string | null;
+  isYou: boolean;
+  aria: string;
+}
+
+/** The last `count` picks of the redraft, newest first, with the team that made each one. */
+export function simRecentPickCards(draft: Pick<SimDraftState, "picks" | "teams">, count = 6): SimRecentPickCard[] {
+  const teams = new Map((draft.teams ?? []).map((t) => [t.team_id, t]));
+  return simDraftRecentPicks(draft.picks, count).map((pk) => {
+    const team = teams.get(pk.team_id);
+    return {
+      key: String(pk.pick_no),
+      pickNo: pk.pick_no,
+      pickLabel: `#${pk.pick_no}`,
+      player: { id: pk.player.id, name: pk.player.name, position: pk.player.pos, team: pk.player.team ?? null, headshotId: simHeadshotId(pk.player) },
+      grade: simGradeOf(pk.player),
+      teamName: team?.name ?? null,
+      isYou: Boolean(team?.is_you),
+      aria: `Pick ${pk.pick_no}: ${pk.player.name}, ${pk.player.pos}${team ? `, taken by ${team.name}` : ""}. Open player details`,
+    };
+  });
+}
+
+/** The last rookie-draft picks as the same cards (the rookie order names the player but not the team or a grade). */
+export function simRookieRecentCards(order: readonly SimRookieOrderLike[], count = 6): SimRecentPickCard[] {
+  return order
+    .filter((o) => o.made)
+    .sort((a, b) => b.n - a.n)
+    .slice(0, count)
+    .map((o) => ({
+      key: o.pick,
+      pickNo: o.n,
+      pickLabel: o.pick || `#${o.n}`,
+      player: { id: o.made!.id, name: o.made!.name, position: o.made!.pos, team: null, headshotId: /^\d+$/.test(o.made!.id) ? o.made!.id : null },
+      grade: null,
+      teamName: null,
+      isYou: o.is_yours,
+      aria: `Pick ${o.pick}: ${o.made!.name}, ${o.made!.pos}`,
+    }));
+}
+
+export interface SimSurvivalEntry {
+  name: string;
+  pos: string;
+  /** His position is a starter slot you have not filled. */
+  need: boolean;
+}
+
+export interface SimSurvival {
+  /** Your next pick number and how many picks come before it. */
+  nextPickNo: number;
+  picksAway: number;
+  /** Public ADP says he is normally off the board by then. */
+  gone: SimSurvivalEntry[];
+  /** Close to the line: could go either way. */
+  toss: SimSurvivalEntry[];
+  /** ADP says he should still be there. */
+  there: SimSurvivalEntry[];
+  /** A position that is running (3+ of the last 6 picks), which makes its players less likely to last. */
+  run: { pos: string; count: number } | null;
+  /** One sentence for the module. */
+  text: string;
+}
+
+/**
+ * "Who survives to my pick": from PUBLIC information only. Factors: your next pick and how many picks come first, each
+ * target's public ADP against that line, a position run in the last six picks (the AI is taking that position now), and
+ * which positions you still need (needs come first). It never reads the model's value or rating. Null when there is
+ * nothing honest to say (you are on the clock, the draft is over, you have no pick left, or no target has an ADP).
+ */
+export function simDraftSurvival(
+  draft: Pick<SimDraftState, "status" | "pick_no" | "your_pick_numbers" | "on_the_clock" | "picks">,
+  targets: ReadonlyArray<Pick<SimGamePlayer, "name" | "pos" | "adp">>,
+  needs: readonly SimDraftNeed[],
+  opts: { max?: number } = {},
+): SimSurvival | null {
+  const max = opts.max ?? 3;
+  if (draft.status !== "in_progress" || draft.on_the_clock?.is_you) return null;
+  const nextPickNo = [...(draft.your_pick_numbers ?? [])].sort((a, b) => a - b).find((n) => n > draft.pick_no) ?? null;
+  if (nextPickNo == null) return null;
+  const picksAway = nextPickNo - draft.pick_no;
+  const recent = simDraftRecentPicks(draft.picks, 6);
+  const counts = new Map<string, number>();
+  for (const pk of recent) counts.set(pk.player.pos, (counts.get(pk.player.pos) ?? 0) + 1);
+  const top = [...counts.entries()].sort((a, b) => b[1] - a[1])[0];
+  const run = top && top[1] >= 3 ? { pos: top[0], count: top[1] } : null;
+  const needy = new Set(needs.filter((n) => n.starters > 0 && n.have < n.starters).map((n) => n.pos));
+  const seen = new Set<string>();
+  const entries: { entry: SimSurvivalEntry; adp: number }[] = [];
+  for (const t of targets) {
+    if (t.adp == null || Number.isNaN(t.adp) || seen.has(t.name)) continue;
+    seen.add(t.name);
+    entries.push({ entry: { name: playerSurname(t.name), pos: t.pos, need: needy.has(t.pos) }, adp: t.adp });
+  }
+  if (entries.length === 0) return null;
+  // Needs first, then the better ADP.
+  entries.sort((a, b) => Number(b.entry.need) - Number(a.entry.need) || a.adp - b.adp);
+  const picked = entries.slice(0, max);
+  const gone: SimSurvivalEntry[] = [];
+  const toss: SimSurvivalEntry[] = [];
+  const there: SimSurvivalEntry[] = [];
+  for (const { entry, adp } of picked) {
+    // A running position makes its players go about three picks ahead of their ADP.
+    const effective = adp - (run && run.pos === entry.pos ? 3 : 0);
+    const line = nextPickNo - 1;
+    if (effective <= line - 2) gone.push(entry);
+    else if (effective <= line + 3) toss.push(entry);
+    else there.push(entry);
+  }
+  const names = (xs: SimSurvivalEntry[]) => xs.map((x) => `${x.name} (${x.pos})`).join(", ");
+  const bits = [
+    gone.length ? `likely gone: ${names(gone)}` : null,
+    toss.length ? `could go either way: ${names(toss)}` : null,
+    there.length ? `likely there: ${names(there)}` : null,
+  ].filter(Boolean);
+  const head = `${picksAway} pick${picksAway === 1 ? "" : "s"} before your #${nextPickNo}`;
+  const runBit = run ? ` ${run.pos} run: ${run.count} of the last ${recent.length}.` : "";
+  return { nextPickNo, picksAway, gone, toss, there, run, text: `${head}, ${bits.join("; ")}.${runBit}` };
 }

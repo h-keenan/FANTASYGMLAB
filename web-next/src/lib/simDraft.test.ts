@@ -23,6 +23,9 @@ import {
   simDraftRowChips,
   simListStats,
   simDraftTeamEmblem,
+  simDraftSurvival,
+  simRecentPickCards,
+  simRookieRecentCards,
 } from "./simDraft";
 import type { SimDraftPick, SimGamePlayer } from "./simGame";
 
@@ -196,5 +199,59 @@ describe("simDraftBarModel (pinned bar with the best-available avatar)", () => {
   it("no grade and no need stay null instead of being invented", () => {
     const model = simDraftBarModel({ name: "Q", pos: "QB", team: null, adp: null }, needs);
     expect(model).toMatchObject({ playerId: null, adp: null, grade: null, fit: null });
+  });
+});
+
+describe("recent pick cards and who survives to your pick", () => {
+  const mk = (n: number, pos: SimGamePlayer["pos"], team = "t2"): SimDraftPick => ({ pick_no: n, round: 1, team_id: team, player: p(`p${n}`, pos, { name: `First Last${n}`, grade: "B+" as SimGamePlayer["grade"] }), adp: n, value_over_adp: 0, auto: true });
+  const teams = [{ team_id: "t1", name: "Me", is_you: true }, { team_id: "t2", name: "Rivals", is_you: false }];
+
+  it("builds newest-first cards with the picking team, avatar id and letter grade, no number", () => {
+    const cards = simRecentPickCards({ picks: [mk(1, "RB"), mk(2, "WR", "t1"), mk(3, "QB")], teams }, 2);
+    expect(cards.map((c) => c.pickLabel)).toEqual(["#3", "#2"]);
+    expect(cards[1].isYou).toBe(true);
+    expect(cards[1].teamName).toBe("Me");
+    expect(cards[0].grade?.grade).toBe("B+");
+    expect(JSON.stringify(cards)).not.toMatch(/value|overall/i);
+  });
+
+  it("rookie cards come from the made slots, newest first", () => {
+    const order = [
+      { n: 1, round: 1, pick: "1.01", is_yours: false, made: { id: "9", name: "A B", pos: "WR" } },
+      { n: 2, round: 1, pick: "1.02", is_yours: true, made: { id: "x", name: "C D", pos: "RB" } },
+      { n: 3, round: 1, pick: "1.03", is_yours: false, made: null },
+    ];
+    const cards = simRookieRecentCards(order);
+    expect(cards.map((c) => c.pickLabel)).toEqual(["1.02", "1.01"]);
+    expect(cards[1].player.headshotId).toBe("9");
+    expect(cards[0].player.headshotId).toBeNull();
+  });
+
+  const base = { status: "in_progress" as const, pick_no: 4, your_pick_numbers: [12], on_the_clock: { team_id: "t2", name: "Rivals", is_you: false }, picks: [] as SimDraftPick[] };
+  const needs = [{ pos: "RB", have: 0, starters: 2 }, { pos: "WR", have: 2, starters: 2 }] as unknown as ReturnType<typeof simDraftNeedPills>;
+
+  it("sorts targets by public ADP against your next pick, needs first", () => {
+    const s = simDraftSurvival(base, [p("a", "WR", { name: "Aa Wide", adp: 6 }), p("b", "RB", { name: "Bb Back", adp: 9 }), p("c", "RB", { name: "Cc Back", adp: 30 })], needs)!;
+    expect(s.picksAway).toBe(8);
+    expect(s.gone.map((x) => x.name)).toContain("Back");
+    expect(s.there.map((x) => x.name)).toContain("Back");
+    expect(s.text).toMatch(/8 picks before your #12/);
+  });
+
+  it("a position run moves its players toward gone", () => {
+    const picks = [mk(1, "RB"), mk(2, "RB"), mk(3, "RB")];
+    const quiet = simDraftSurvival({ ...base, picks: [] }, [p("a", "RB", { name: "Aa Back", adp: 10 })], needs)!;
+    const run = simDraftSurvival({ ...base, picks }, [p("a", "RB", { name: "Aa Back", adp: 10 })], needs)!;
+    expect(quiet.toss.length).toBe(1);
+    expect(run.gone.length).toBe(1);
+    expect(run.run).toEqual({ pos: "RB", count: 3 });
+  });
+
+  it("says nothing when you are on the clock, the draft is done, you have no pick left or no ADP is known", () => {
+    const t = [p("a", "RB", { adp: 10 })];
+    expect(simDraftSurvival({ ...base, on_the_clock: { team_id: "t1", name: "Me", is_you: true } }, t, needs)).toBeNull();
+    expect(simDraftSurvival({ ...base, status: "complete" }, t, needs)).toBeNull();
+    expect(simDraftSurvival({ ...base, pick_no: 13 }, t, needs)).toBeNull();
+    expect(simDraftSurvival(base, [p("a", "RB", { adp: null })], needs)).toBeNull();
   });
 });
