@@ -112,7 +112,7 @@ function createStyles(colors: ThemeColors) {
     meta: { fontSize: 12, color: colors.textTertiary },
     trailing: { alignItems: 'flex-end' },
     trailingValue: { fontSize: 16, fontWeight: '800' },
-    label: { fontSize: 10, fontWeight: '800', letterSpacing: 0.6, color: colors.textTertiary },
+    label: { fontSize: 11, fontWeight: '800', letterSpacing: 0.6, color: colors.textTertiary },
     body: { gap: spacing.sm, paddingTop: spacing.xs },
     facts: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.lg },
     fact: { minWidth: 56 },

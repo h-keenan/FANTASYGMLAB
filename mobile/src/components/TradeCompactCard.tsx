@@ -122,7 +122,7 @@ function createStyles(colors: ThemeColors) {
     title: { fontSize: 15, fontWeight: '800', color: colors.textPrimary },
     meta: { fontSize: 12, color: colors.textTertiary },
     side: { gap: 2 },
-    kicker: { fontSize: 10, fontWeight: '800', letterSpacing: 0.6, color: colors.textTertiary, textTransform: 'uppercase' },
+    kicker: { fontSize: 11, fontWeight: '800', letterSpacing: 0.6, color: colors.textTertiary, textTransform: 'uppercase' },
     value: { fontSize: 14, fontWeight: '800', color: colors.textPrimary },
     pick: { minHeight: 44, fontSize: 14, fontWeight: '700', color: colors.textPrimary },
     meterRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
