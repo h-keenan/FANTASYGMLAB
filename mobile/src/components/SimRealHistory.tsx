@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { Pressable, View } from 'react-native';
 
 import AppText from './AppText';
+import ErrorState from './ErrorState';
 import { Section as PqvSection } from './PlayerQuickViewSheet';
 import { createSimStyles } from './SimGameParts';
 import { useThemeMode } from '../context/ThemeModeContext';
@@ -44,7 +45,7 @@ export function SimRealHistory({ playerId, asOf }: { playerId: string; asOf: num
     };
   }, [playerId, asOf]);
 
-  if (failed) return <AppText style={common.small}>Could not load past seasons right now.</AppText>;
+  if (failed) return <ErrorState title="Past seasons did not load" message="Check your connection and try again." />;
   if (career == null) return <AppText style={common.small}>Loading past seasons…</AppText>;
   const summary = simGameLog(log ?? []);
   if (career.length === 0 && summary.games === 0) return <AppText style={common.small}>No NFL seasons on file before this one.</AppText>;
