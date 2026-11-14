@@ -12,7 +12,6 @@ import type { ChipTone } from "@/lib/playerCard";
 import type { WhyMetricId } from "@/lib/tapForWhyContent";
 import {
   PLAYER_LIST_DENSITY,
-  PLAYER_LIST_LONG_NAME,
   limitPlayerListTags,
   orderPlayerListStats,
   type PlayerListDensity,
