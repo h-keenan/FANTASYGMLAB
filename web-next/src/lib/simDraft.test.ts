@@ -4,6 +4,9 @@ import { compactSummaryText } from "./compactModule";
 import {
   SIM_DRAFT_SORTS,
   simCycleSort,
+  simRookieMiniBoard,
+  simRookieRecentChips,
+  simRookieSummaryParts,
   simDraftMiniBoard,
   simDraftMiniWindow,
   simDraftSummaryParts,
@@ -161,5 +164,23 @@ describe("draft summary line, mini board and sorts", () => {
     expect(SIM_DRAFT_SORTS.map((s) => s.label)).toEqual(["ADP", "Proj", "OVR"]);
     expect(simCycleSort("adp")).toBe("projection");
     expect(simCycleSort("overall")).toBe("adp");
+  });
+});
+
+describe("rookie draft summary, mini board and recent chips", () => {
+  const row = (n: number, round: number, made: boolean, yours = false) => ({ n, round, pick: `p${n}`, is_yours: yours, made: made ? { id: `i${n}`, name: `Zed Name${n}`, pos: "WR" } : null });
+  it("collapsed clock line", () => {
+    const clock = { round: 1, n: 4, team_name: "Rivals" };
+    expect(compactSummaryText(simRookieSummaryParts({ on_clock: clock, your_turn: true, total: 48, pick_index: 3, available_count: 31 }, 2))).toBe("R1 P4/48 · You pick now · 31 rookies left · 2 picks to make");
+    expect(compactSummaryText(simRookieSummaryParts({ on_clock: clock, your_turn: false, total: 48, pick_index: 3, available_count: 1 }, 0))).toBe("R1 P4/48 · Rivals is up · 1 rookie left");
+    expect(compactSummaryText(simRookieSummaryParts({ on_clock: null, your_turn: false, total: 48, pick_index: 48, available_count: 0 }, 0))).toBe("Rookie draft complete");
+  });
+  it("mini board groups by round and rings the pick on the clock; recent chips are newest first", () => {
+    const order = [row(1, 1, true), row(2, 1, false, true), row(3, 2, false)];
+    const board = simRookieMiniBoard(order, "p2");
+    expect(board.map((r) => r.length)).toEqual([2, 1]);
+    expect(board[0][0].pos).toBe("WR");
+    expect(board[0][1]).toMatchObject({ clock: true, you: true });
+    expect(simRookieRecentChips(order)).toEqual([{ key: "p1", label: "#1 Name1 WR", pos: "WR" }]);
   });
 });

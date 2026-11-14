@@ -115,3 +115,13 @@ describe("Season in review on a phone", () => {
     expect(screen.getByLabelText("Final standings")).toBeInTheDocument();
   });
 });
+
+describe("SimDraftRow in a rookie-only draft", () => {
+  it("drops the redundant Rookie tag there, keeps it everywhere else", () => {
+    const rookie = player({ age: 21 });
+    const { rerender } = render(<SimDraftRow player={rookie} />);
+    expect(screen.getByTestId("list-meta")).toHaveTextContent("Rookie");
+    rerender(<SimDraftRow player={rookie} hideRookie />);
+    expect(screen.getByTestId("list-meta")).not.toHaveTextContent("Rookie");
+  });
+});

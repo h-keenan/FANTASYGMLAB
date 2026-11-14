@@ -46,6 +46,7 @@ export function SimDraftRow({
   extra,
   chipsExtra,
   density,
+  hideRookie = false,
 }: {
   player: SimGamePlayer;
   onOpen?: (player: SimGamePlayer) => void;
@@ -62,6 +63,8 @@ export function SimDraftRow({
   /** Small inline controls at the end of the chips line (a Queue toggle). */
   chipsExtra?: ReactNode;
   density?: PlayerListDensity;
+  /** A rookie-only draft: every player is a rookie, so the "Rookie" tag adds nothing. */
+  hideRookie?: boolean;
 }) {
   const [chip] = simDraftRowChips(player);
   return (
@@ -71,7 +74,7 @@ export function SimDraftRow({
       position={player.pos}
       headshotId={simHeadshotId(player)}
       fallbackLabel={simPlayerInitials(player)}
-      meta={simDraftMeta(player, week)}
+      meta={simDraftMeta(player, week).filter((m) => !(hideRookie && m.key === "rookie"))}
       chip={chip ? { label: chip.label, tone: chip.tone } : null}
       hurt={player.status === "out"}
       stats={simListStats(player)}

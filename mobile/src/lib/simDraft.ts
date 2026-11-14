@@ -327,3 +327,48 @@ export function simDraftMiniWindow<T>(rows: readonly T[][], currentRound: number
   const start = Math.max(0, Math.min(n - span, currentRound - 2));
   return { rows: rows.slice(start, start + span) as T[][], from: start + 1, to: start + span };
 }
+
+/** The rookie draft's collapsed clock line: "R1 P4 · You pick now · 31 rookies left · 2 picks to make". */
+export function simRookieSummaryParts(
+  d: { on_clock: { round: number; n: number; team_name: string | null } | null; your_turn: boolean; total: number; pick_index: number; available_count: number },
+  picksToMake: number,
+): CompactPart[] {
+  if (!d.on_clock) return [{ key: "done", text: d.pick_index >= d.total && d.total > 0 ? "Rookie draft complete" : "Rookie draft not started", tone: d.pick_index >= d.total ? "success" : "muted", strong: true }];
+  return compactParts([
+    { key: "rp", text: `R${d.on_clock.round} P${d.on_clock.n}/${d.total}`, strong: true },
+    d.your_turn ? { key: "state", text: "You pick now", tone: "action", strong: true } : { key: "state", text: `${d.on_clock.team_name ?? "An AI team"} is up` },
+    { key: "left", text: `${d.available_count} rookie${d.available_count === 1 ? "" : "s"} left` },
+    picksToMake > 0 ? { key: "mine", text: `${picksToMake} pick${picksToMake === 1 ? "" : "s"} to make`, tone: "warning" } : null,
+  ]);
+}
+
+interface SimRookieOrderLike {
+  n: number;
+  round: number;
+  pick: string;
+  is_yours: boolean;
+  made: { id: string; name: string; pos: string } | null;
+}
+
+/** The rookie draft as the same mini board cells (rounds of picks; the pick on the clock ringed). */
+export function simRookieMiniBoard(order: readonly SimRookieOrderLike[], onClockPick: string | null | undefined): SimMiniCell[][] {
+  const rounds = new Map<number, SimMiniCell[]>();
+  for (const row of order) {
+    const cells = rounds.get(row.round) ?? [];
+    cells.push({ key: row.pick, pos: row.made?.pos ?? null, you: row.is_yours, clock: !row.made && row.pick === onClockPick, pickNo: row.n });
+    rounds.set(row.round, cells);
+  }
+  return [...rounds.entries()].sort((a, b) => a[0] - b[0]).map(([, cells]) => cells);
+}
+
+/** Latest made rookie picks as recent-strip chips, newest first. */
+export function simRookieRecentChips(order: readonly SimRookieOrderLike[], count = 8): { key: string; label: string; pos: string }[] {
+  return order
+    .filter((o) => o.made)
+    .sort((a, b) => b.n - a.n)
+    .slice(0, count)
+    .map((o) => {
+      const parts = o.made!.name.trim().split(/\s+/);
+      return { key: o.pick, label: `#${o.n} ${parts[parts.length - 1]} ${o.made!.pos}`, pos: o.made!.pos };
+    });
+}
