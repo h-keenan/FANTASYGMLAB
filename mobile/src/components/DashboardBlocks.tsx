@@ -1,13 +1,15 @@
 import { openInsight } from '../lib/insightNav';
 import type { InsightKey } from '../lib/insightLinks';
-import React, { useMemo, useState } from 'react';
+import React, { useMemo } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 
 import AccentCard from './AccentCard';
 import AppText from './AppText';
 import BeginnerHelp from './BeginnerHelp';
-import DashboardStatRow, { type StatStripItem } from './DashboardStatRow';
+import CompactModule from './CompactModule';
+import { type StatStripItem } from './DashboardStatRow';
+import { LinkModule, StatStripModule } from './ModuleTemplates';
 import GlossaryNote from './GlossaryNote';
 import ToneBadge from './ToneBadge';
 import SectionHeading from './SectionHeading';
@@ -119,30 +121,22 @@ export function DashboardTradesBlock({
   const goalLine = isBeginner ? tradesGoalLine(goal) : '';
   // The one home for the deadline: here, not also as a chip.
   const deadline = deadlineInAttention ? null : deadlineChip(data.trade_window);
+  const stateTone = deadlinePassed || tradeItems.length === 0 ? ('muted' as const) : ('action' as const);
   return (
     <View style={styles.block}>
-      <SectionHeading title={TRADES_BLOCK_COPY.title} />
+      <LinkModule
+        title={TRADES_BLOCK_COPY.title}
+        tone="action"
+        onPress={() => onNavigate('Trades', { leagueId, leagueName })}
+        parts={[
+          { key: 'ideas', text: tradeIdeasLine(tradeItems.length, deadlinePassed, pending), tone: stateTone, strong: tradeItems.length > 0 && !deadlinePassed },
+          deadline ? { key: 'deadline', text: `Deadline ${deadline.value}`, tone: deadline.tone === 'risk' ? ('danger' as const) : ('muted' as const) } : null,
+          { key: 'link', text: TRADES_BLOCK_COPY.link, tone: 'accent' as const },
+        ]}
+      />
       {isBeginner ? (
         <BeginnerHelp text={`${TRADES_BLOCK_COPY.beginnerExplainer}${goalLine ? ` ${goalLine}` : ''}`} />
       ) : null}
-      <Pressable
-        accessibilityRole="link"
-        accessibilityLabel={`${tradeIdeasLine(tradeItems.length, deadlinePassed, pending)}. Open ${TRADES_BLOCK_COPY.link}`}
-        onPress={() => onNavigate('Trades', { leagueId, leagueName })}
-        style={styles.tradeLine}
-      >
-        <View style={styles.tradeLineTextGroup}>
-          <AppText style={styles.tradeLineText} numberOfLines={2}>
-            {tradeIdeasLine(tradeItems.length, deadlinePassed, pending)}
-          </AppText>
-          {deadline ? (
-            <AppText style={[styles.deadlineNote, deadline.tone === 'risk' && { color: colors.danger }]} numberOfLines={1}>
-              Trade deadline: {deadline.value}
-            </AppText>
-          ) : null}
-        </View>
-        <AppText style={styles.link} numberOfLines={1}>{TRADES_BLOCK_COPY.link} ›</AppText>
-      </Pressable>
     </View>
   );
 }
@@ -160,13 +154,17 @@ export function DashboardTeamStats({
   leagueId,
   leagueName,
   onNavigate,
+  onOpen,
 }: {
   snapshot: TeamSnapshot;
   teams: TeamRanking[] | null;
   leagueId: string;
   leagueName: string;
   onNavigate: Navigate;
+  /** Trailing "Open ›" link to the My Team screen. */
+  onOpen?: () => void;
 }) {
+  const { colors } = useThemeMode();
   const copy = useExperienceCopy();
   const open = (key: InsightKey) => openInsight(onNavigate, key, leagueId, leagueName);
   const injured = snapshot.injured_starters != null && snapshot.injured_starters > 0 ? snapshot.injured_starters : 0;
@@ -200,34 +198,36 @@ export function DashboardTeamStats({
     },
   ];
   return (
-    <View>
-      <DashboardStatRow items={items.slice(0, 3)} />
-      <DashboardStatRow items={items.slice(3)} />
-      <GlossaryNote terms={['powerRank', 'franchiseRank', 'averageAge', 'starterStrength', 'benchStrength']} />
-    </View>
+    <StatStripModule
+      id="today.team"
+      title="My Team"
+      items={items}
+      action={onOpen ? (
+        <Pressable accessibilityRole="link" accessibilityLabel="Open My Team" onPress={onOpen} hitSlop={8} style={{ minHeight: 44, justifyContent: 'center' }}>
+          <AppText style={{ fontWeight: '700', color: colors.accent }}>Open ›</AppText>
+        </Pressable>
+      ) : undefined}
+      footer={<GlossaryNote terms={['powerRank', 'franchiseRank', 'averageAge', 'starterStrength', 'benchStrength']} />}
+    />
   );
 }
 
-/** Secondary modules, collapsed by default. Mirrors web DashboardMore (<details>). */
+/** Secondary modules (league activity, mini-games, league type): one compact module, mounted only when opened. */
 export function DashboardMore({ children }: { children: React.ReactNode }) {
-  const { colors } = useThemeMode();
-  const styles = useMemo(() => createStyles(colors), [colors]);
-  const [open, setOpen] = useState(false);
   return (
-    <View>
-      <Pressable
-        accessibilityRole="button"
-        accessibilityState={{ expanded: open }}
-        accessibilityLabel="More"
-        onPress={() => setOpen((value) => !value)}
-        style={styles.moreHeader}
-      >
-        <AppText style={styles.moreTitle}>MORE</AppText>
-        <AppText style={styles.moreHint} numberOfLines={1}>League activity, games, settings</AppText>
-        <Ionicons name={open ? 'chevron-up' : 'chevron-down'} size={16} color={colors.textSecondary} />
-      </Pressable>
-      {open ? <View style={styles.moreBody}>{children}</View> : null}
-    </View>
+    <CompactModule
+      id="today.more"
+      title="More"
+      testID="dashboard-more"
+      tone="muted"
+      parts={[
+        { key: 'a', text: 'League activity' },
+        { key: 'g', text: '2 mini-games' },
+        { key: 't', text: 'League type' },
+      ]}
+    >
+      {children}
+    </CompactModule>
   );
 }
 

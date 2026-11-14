@@ -15,6 +15,8 @@ import { TradeIdeaCardView } from "@/components/TradeIdeaCard";
 import { MultiTeamIdeasSection } from "@/components/MultiTeamIdeasSection";
 import { isEspnLeagueId } from "@/lib/leaguePlatform";
 import { TradesTabBar } from "@/components/TradesTabBar";
+import { Hero } from "@/components/ui/ModuleTemplates";
+import { formatTradeGain } from "@/lib/tradeHubPresentation";
 import { tradeHubReasonMessage } from "@/lib/tradeHubPresentation";
 import { ValueSignalsCard } from "@/components/ValueSignalsCard";
 import { ValuesCredit } from "@/components/ValuesCredit";
@@ -112,6 +114,15 @@ export function TradeHubContent({
         leagueName={leagueName}
         info={<TradeHubInfo sentence={data.posture_sentence} />}
       />
+      {data.ideas.length > 0 ? (
+        <Hero
+          label="Trade ideas"
+          value={String(data.ideas.length)}
+          context={`Top: ${data.ideas[0].partner_team_name} · ${formatTradeGain(data.ideas[0].trade_gain)}${data.team_strategy ? ` · ${data.team_strategy} posture` : ""}`}
+          tone="action"
+          testId="trade-hub-hero"
+        />
+      ) : null}
       {data.ideas.length > 0 ? <TradeHubFilters ideas={data.ideas} filter={filter} onChange={setFilter} /> : null}
 
 

@@ -4,7 +4,6 @@ import { useId, useState, type ReactNode } from "react";
 
 import { HighlightTarget } from "@/components/HighlightTarget";
 import { OvrGauge } from "@/components/OvrGauge";
-import { PillRow } from "@/components/PillRow";
 import { PlayerRow } from "@/components/PlayerRow";
 import { PositionBadge } from "@/components/PositionBadge";
 import { ToneBadge } from "@/components/ToneBadge";
@@ -12,7 +11,9 @@ import { ValueStat } from "@/components/ValueStat";
 import { usePlayerQuickView } from "@/context/PlayerQuickViewContext";
 import type { KeeperPlayerInfo, LineupPlayer } from "@/lib/api";
 import type { CompositionSegment, TeamAnalysisRow } from "@/lib/myTeamAnalysis";
-import { lineupIneligibleTag } from "@/lib/myTeamPresentation";
+import { CompactModule } from "@/components/ui/CompactModule";
+import { listSummaryParts } from "@/lib/moduleTemplates";
+import { formatScore, lineupIneligibleTag, sumScore } from "@/lib/myTeamPresentation";
 import { EmptyState } from "@/components/EmptyState";
 
 const TONE_VAR: Record<TeamAnalysisRow["tone"], string> = {
@@ -184,7 +185,12 @@ export interface RosterTab {
   muted?: boolean;
 }
 
-export function RosterTabs({
+/**
+ * The roster as sections, not tabs (IA rule R1: the page's only tab row is the family strip). Each group is a
+ * CompactModule that reads while collapsed ("9 players · Value 6,120 · Gibbs, Chase") and opens inline into the rows.
+ * Starters opens by default; the group holding `highlightPlayerId` (a deep link) opens too.
+ */
+export function RosterSections({
   tabs,
   keepers,
   highlightPlayerId,
@@ -197,36 +203,43 @@ export function RosterTabs({
   emptyText: string;
   topNote?: ReactNode;
 }) {
-  const initial =
-    tabs.find((tab) => highlightPlayerId && tab.players.some((p) => p.player_id === highlightPlayerId))?.value ??
-    tabs[0]?.value;
-  const [active, setActive] = useState<string>(initial ?? "starters");
-  const current = tabs.find((tab) => tab.value === active) ?? tabs[0];
+  const highlighted = tabs.find((tab) => highlightPlayerId && tab.players.some((p) => p.player_id === highlightPlayerId))?.value;
   return (
-    <div className="flex flex-col gap-3">
-      <PillRow
-        options={tabs.map((tab) => ({ label: tab.label, value: tab.value }))}
-        active={current?.value ?? ""}
-        onSelect={setActive}
-        fullWidth
-      />
-      {topNote}
-      {!current || current.players.length === 0 ? (
-        <EmptyState title={emptyText} />
-      ) : (
-        <div className="glass-surface flex flex-col px-3">
-          {current.players.map((player) => (
-            <HighlightTarget key={player.player_id} active={player.player_id === highlightPlayerId}>
-              <RosterRow
-                player={player}
-                keeper={keepers?.[player.player_id]}
-                muted={current.muted ?? false}
-                showSlot={current.showSlot ?? false}
-              />
-            </HighlightTarget>
-          ))}
-        </div>
-      )}
+    <div className="flex flex-col gap-2">
+      {tabs.map((tab, index) => {
+        const names = tab.players.slice(0, 3).map((p) => (p.name || "").split(" ").slice(-1)[0]).filter(Boolean);
+        const total = sumScore(tab.players);
+        return (
+          <CompactModule
+            key={tab.value}
+            id={`team.roster.${tab.value}`}
+            title={tab.label}
+            testId={`roster-section-${tab.value}`}
+            tone={tab.muted ? "muted" : "accent"}
+            defaultOpen={highlighted ? highlighted === tab.value : index === 0}
+            parts={listSummaryParts({
+              count: tab.players.length,
+              noun: "player",
+              none: emptyText,
+              highlights: [total > 0 ? `Value ${formatScore(total)}` : null, names.length > 0 ? names.join(", ") : null],
+              maxHighlights: 2,
+            })}
+          >
+            {index === 0 ? topNote : null}
+            {tab.players.length === 0 ? (
+              <EmptyState title={emptyText} />
+            ) : (
+              <div className="flex flex-col px-1">
+                {tab.players.map((player) => (
+                  <HighlightTarget key={player.player_id} active={player.player_id === highlightPlayerId}>
+                    <RosterRow player={player} keeper={keepers?.[player.player_id]} muted={tab.muted ?? false} showSlot={tab.showSlot ?? false} />
+                  </HighlightTarget>
+                ))}
+              </div>
+            )}
+          </CompactModule>
+        );
+      })}
     </div>
   );
 }

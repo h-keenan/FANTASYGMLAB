@@ -5,7 +5,8 @@ import { useEffect, useState } from "react";
 import { EmptyState } from "@/components/EmptyState";
 import { PillRow } from "@/components/PillRow";
 import { PlayerIdentity } from "@/components/PlayerRow";
-import { SectionHeading } from "@/components/SectionHeading";
+import { CompactModule } from "@/components/ui/CompactModule";
+import { listSummaryParts } from "@/lib/moduleTemplates";
 import { SkeletonBlock } from "@/components/Skeleton";
 import { api, type ValueSignalItem, type ValueSignalsResponse } from "@/lib/api";
 import { formatRatingDelta, signalReason, signalsStatusMessage } from "@/lib/valueHistoryPresentation";
@@ -40,11 +41,18 @@ export function ValueSignalsCard({ leagueId }: { leagueId: string }) {
   if (data.status === "unavailable") return null;
   const status = signalsStatusMessage(data);
   const items = tab === "buy_low" ? data.buy_low : data.sell_high;
+  const parts = status
+    ? [{ key: "s", text: status }]
+    : listSummaryParts({
+        count: data.buy_low.length + data.sell_high.length,
+        noun: "signal",
+        none: "No buy-low or sell-high candidates",
+        highlights: [`${data.buy_low.length} buy low`, `${data.sell_high.length} sell high`, data.buy_low[0]?.name ?? data.sell_high[0]?.name],
+        maxHighlights: 3,
+      });
   return (
-    <section className="flex flex-col gap-3" aria-labelledby="value-signals-heading" data-testid="value-signals">
-      <SectionHeading id="value-signals-heading" note="Value rating trend against this season's production.">
-        Buy low / Sell high
-      </SectionHeading>
+    <CompactModule id="trades.signals" title="Buy low / Sell high" testId="value-signals" tone="accent" parts={parts}>
+      <p className="text-xs" style={{ color: "var(--color-text-muted)" }}>Value rating trend against this season&apos;s production.</p>
       {!status && data.buy_low.length === 0 && data.sell_high.length === 0 ? (
         <p className="text-sm" style={{ color: "var(--color-text-muted)" }} data-testid="value-signals-none">
           No buy-low or sell-high candidates right now. Nobody clears both the value-trend and production bars.
@@ -84,7 +92,7 @@ export function ValueSignalsCard({ leagueId }: { leagueId: string }) {
           ) : null}
         </>
       )}
-    </section>
+    </CompactModule>
   );
 }
 
