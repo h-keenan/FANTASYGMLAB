@@ -4544,6 +4544,12 @@ main > header:has(> h1.sr-only:only-child) {
 @media (min-width: 1024px) {
   .page-shell-wide { max-width: 72rem; }
 }
+/* Sample league (public demo): one column on phone; from lg the view plus a sticky right rail, so the page uses the width. */
+.sample-grid { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--page-gap); }
+@media (min-width: 1024px) {
+  .sample-grid { grid-template-columns: minmax(0, 2fr) minmax(16rem, 1fr); align-items: start; }
+  .sample-rail { position: sticky; top: 4.5rem; display: flex; flex-direction: column; gap: var(--page-gap); }
+}
 .matchup-grid { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--page-gap); }
 @media (min-width: 1024px) {
   .matchup-grid { grid-template-columns: minmax(0, 2fr) minmax(0, 3fr); grid-template-rows: min-content min-content 1fr; align-items: start; }

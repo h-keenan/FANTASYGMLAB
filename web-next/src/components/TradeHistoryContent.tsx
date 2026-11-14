@@ -3,9 +3,10 @@ import { InfoTip } from "@/components/InfoTip";
 import { PageTitle } from "@/components/PageTitle";
 import type { PastTradeOutcome, TradeOutcomeHistoryResponse } from "@/lib/api";
 import { ExchangeSide } from "@/components/TradeAssetExchange";
-import { ToneBadge } from "@/components/ToneBadge";
-import { AccentCard } from "@/components/AccentCard";
-import { NetEdgeBar, TradeSwapGlyph } from "@/components/TradeOutcomeHeader";
+import { CompactModule } from "@/components/ui/CompactModule";
+import { abbreviatePlayerName } from "@/lib/formatPlayerName";
+import { tradeIdeaNamesText } from "@/lib/tradeIdeaSummary";
+import { NetEdgeBar } from "@/components/TradeOutcomeHeader";
 import { VerdictCallout } from "@/components/VerdictCallout";
 import {
   formatTradeHistoryDate,
@@ -52,23 +53,23 @@ function TradeHistoryRow({ outcome }: { outcome: PastTradeOutcome }) {
   const accent = verdict ? verdictToneColorVar(verdict) : outcomeToneColorVar(outcome.outcome);
   const netPct = result && result.status === "ready" ? (result.value?.net_delta_pct ?? null) : null;
 
-  return (
-    <AccentCard accent={accent} className="gap-2">
-      <div className="flex items-start gap-3">
-        <TradeSwapGlyph color={accent} />
-        <div className="flex flex-col min-w-0 flex-1">
-          <h3 className="break-words" style={{ font: "var(--font-card-title)" }}>
-            {partner}
-          </h3>
-          {date ? (
-            <span className="text-xs mt-1" style={{ color: "var(--color-text-muted)" }}>
-              {date}
-            </span>
-          ) : null}
-        </div>
-        <ToneBadge label={outcomeLabel(outcome.outcome)} color={outcomeToneColorVar(outcome.outcome)} />
-      </div>
+  const sent = tradeIdeaNamesText(toTradeAssets(summary.send).map((asset) => abbreviatePlayerName(asset.name)));
+  const received = tradeIdeaNamesText(toTradeAssets(summary.receive).map((asset) => abbreviatePlayerName(asset.name)));
 
+  return (
+    <CompactModule
+      id={`trade-history.${outcome.id}`}
+      title={partner}
+      accent={accent}
+      persist={false}
+      parts={[
+        { key: "outcome", text: outcomeLabel(outcome.outcome), strong: true },
+        verdict && result ? { key: "verdict", text: result.verdict_label ?? "" } : null,
+        netPct !== null ? { key: "net", text: `${netPct > 0 ? "+" : ""}${Math.round(netPct)}% net` } : null,
+        sent && received ? { key: "swap", text: `${sent} for ${received}` } : null,
+        date ? { key: "date", text: date, tone: "muted" } : null,
+      ]}
+    >
       {verdict && result ? (
         <VerdictCallout color={verdictToneColorVar(verdict)} label={result.verdict_label} detail={detailText} />
       ) : null}
@@ -88,7 +89,7 @@ function TradeHistoryRow({ outcome }: { outcome: PastTradeOutcome }) {
         <ExchangeSide label="You sent" dotColor="var(--color-danger)" assets={toTradeAssets(summary.send)} />
         <ExchangeSide label="You received" dotColor="var(--color-success)" assets={toTradeAssets(summary.receive)} />
       </div>
-    </AccentCard>
+    </CompactModule>
   );
 }
 

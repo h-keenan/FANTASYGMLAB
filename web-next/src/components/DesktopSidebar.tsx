@@ -3,7 +3,10 @@
 import Image from "next/image";
 import Link from "next/link";
 import { usePathname, useParams } from "next/navigation";
+import { useEffect, useState } from "react";
 import { useSearchParams } from "@/lib/useSearchParams";
+import { SAMPLE_ACTIVE_EVENT, SAMPLE_SELECT_EVENT, demoUsableDestinations, isSamplePath } from "@/lib/sampleSidebar";
+import { SAMPLE_CONNECT_ROUTE, SAMPLE_CTA_LABEL, SAMPLE_LEAGUE_NAME, SAMPLE_TABS, type SampleTab } from "@/lib/sampleLeague";
 
 import { useAuth } from "@/context/AuthContext";
 import { useDisplayPreferences } from "@/context/DisplayPreferencesContext";
@@ -34,6 +37,14 @@ export function DesktopSidebar() {
   const leagueName = searchParams.get("name") || (leagueId ? UNNAMED_LEAGUE : "");
   const { coreLeagueDestinations, gmToolsDestinations, generalDestinations, accountDestinations } = useNavDestinations(leagueId, leagueName, collegeInterest);
   const showProMarkers = useIsPro() === false;
+  const sample = isSamplePath(pathname);
+  const [sampleActive, setSampleActive] = useState<SampleTab>("dashboard");
+  useEffect(() => {
+    if (!sample) return;
+    const onActive = (event: Event) => setSampleActive((event as CustomEvent<SampleTab>).detail);
+    window.addEventListener(SAMPLE_ACTIVE_EVENT, onActive);
+    return () => window.removeEventListener(SAMPLE_ACTIVE_EVENT, onActive);
+  }, [sample]);
 
   if (!session) return null;
   // Founder-only (app_metadata.founder_ops); session is already resolved
@@ -59,7 +70,30 @@ export function DesktopSidebar() {
         <Image src="/brand-mark.png" alt="" width={24} height={24} className="brand-mark-icon" style={{ objectFit: "contain" }} />
       </Link>
 
-      {leagueId ? (
+      {sample ? (
+        <div className="flex flex-col gap-1" data-testid="sample-sidebar-views">
+          <span className="text-xs font-bold uppercase px-1" style={{ color: "var(--color-text-secondary)", letterSpacing: "0.04em" }}>
+            {SAMPLE_LEAGUE_NAME}
+          </span>
+          {SAMPLE_TABS.map((tab) => (
+            <button
+              key={tab.value}
+              type="button"
+              onClick={() => window.dispatchEvent(new CustomEvent(SAMPLE_SELECT_EVENT, { detail: tab.value }))}
+              aria-current={sampleActive === tab.value ? "page" : undefined}
+              className="flex items-center gap-2.5 px-1 py-2 text-left"
+              style={{ background: sampleActive === tab.value ? "var(--color-surface-raised)" : "transparent" }}
+            >
+              <span className="text-sm font-bold" style={{ color: sampleActive === tab.value ? "var(--color-text-primary)" : "var(--color-text-secondary)" }}>
+                {tab.label}
+              </span>
+            </button>
+          ))}
+          <Link href={SAMPLE_CONNECT_ROUTE} className="px-1 py-2 text-sm font-bold" style={{ color: "var(--color-accent)" }}>
+            {SAMPLE_CTA_LABEL}
+          </Link>
+        </div>
+      ) : leagueId ? (
         <SidebarSection label={leagueName || "League"} destinations={coreLeagueDestinations} pathname={pathname} showPro={showProMarkers} />
       ) : (
         <p className="text-xs px-1" style={{ color: "var(--color-text-muted)" }}>
@@ -71,9 +105,9 @@ export function DesktopSidebar() {
         <SidebarSection label="GM Tools" destinations={gmToolsDestinations} pathname={pathname} showPro={showProMarkers} />
       ) : null}
 
-      <SidebarSection label="General" destinations={generalDestinations} pathname={pathname} showPro={showProMarkers} />
+      <SidebarSection label="General" destinations={sample ? demoUsableDestinations(generalDestinations) : generalDestinations} pathname={pathname} showPro={showProMarkers} />
 
-      <SidebarSection label="Account" destinations={accountDestinations} pathname={pathname} showPro={showProMarkers} />
+      <SidebarSection label="Account" destinations={sample ? demoUsableDestinations(accountDestinations) : accountDestinations} pathname={pathname} showPro={showProMarkers} />
 
       {founderCapable ? (
         <SidebarSection label="Founder" destinations={[FOUNDER_DESTINATION]} pathname={pathname} showPro={showProMarkers} />

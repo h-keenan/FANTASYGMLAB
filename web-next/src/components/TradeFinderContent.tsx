@@ -14,6 +14,8 @@ import {
 } from "@/lib/api";
 import { OvrGauge } from "@/components/OvrGauge";
 import { PillRow } from "@/components/PillRow";
+import { CompactModule } from "@/components/ui/CompactModule";
+import { abbreviatePlayerName } from "@/lib/formatPlayerName";
 import { PremiumUpsellCard } from "@/components/PremiumUpsellCard";
 import { TradeAssetRow } from "@/components/TradeAssetExchange";
 import {
@@ -382,13 +384,20 @@ export function TradeFinderContent({
         <EmptyState title="No eligible roster players are available for Trade Finder right now." />
       ) : (
         <>
-          <section className="flex flex-col gap-2">
-            <span
-              className="text-xs uppercase font-bold"
-              style={{ color: "var(--color-text-muted)", letterSpacing: "var(--letter-spacing-badge)" }}
-            >
-              Players you&apos;d trade away
-            </span>
+          <CompactModule
+            id="trade-finder.players"
+            title="Players you'd trade away"
+            persist={false}
+            defaultOpen
+            parts={[
+              selectedIds.size > 0
+                ? { key: "sel", text: `${selectedIds.size} selected`, strong: true, tone: "accent" }
+                : { key: "sel", text: `Pick from ${roster.length} players`, tone: "muted" },
+              selectedIds.size > 0
+                ? { key: "names", text: roster.filter((p) => selectedIds.has(p.player_id)).slice(0, 3).map((p) => abbreviatePlayerName(p.name)).join(", ") }
+                : null,
+            ]}
+          >
             <div className="flex flex-col" style={{ border: "var(--border-width-default) solid var(--color-border)" }}>
               {roster.map((player) => (
                 <RosterPickRow
@@ -399,16 +408,21 @@ export function TradeFinderContent({
                 />
               ))}
             </div>
-          </section>
+          </CompactModule>
 
           {ownedPicks.length > 0 ? (
-            <section className="flex flex-col gap-2">
-              <span
-                className="text-xs uppercase font-bold"
-                style={{ color: "var(--color-text-muted)", letterSpacing: "var(--letter-spacing-badge)" }}
-              >
-                Picks you&apos;d trade away
-              </span>
+            <CompactModule
+              id="trade-finder.picks"
+              title="Picks you'd trade away"
+              persist={false}
+              defaultOpen
+              parts={[
+                selectedPickIds.size > 0
+                  ? { key: "sel", text: `${selectedPickIds.size} selected`, strong: true, tone: "accent" }
+                  : { key: "sel", text: `${ownedPicks.length} picks you own`, tone: "muted" },
+                { key: "max", text: `Up to ${TRADE_FINDER_MAX_PICKS} per search` },
+              ]}
+            >
               <PickGroupList
                 picks={ownedPicks}
                 selectedIds={selectedPickIds}
@@ -424,17 +438,17 @@ export function TradeFinderContent({
               <p className="text-xs" style={{ color: "var(--color-text-muted)" }}>
                 Up to {TRADE_FINDER_MAX_PICKS} picks per search.
               </p>
-            </section>
+            </CompactModule>
           ) : null}
 
-          <section className="flex flex-col gap-2">
-            <span
-              className="text-xs uppercase font-bold"
-              style={{ color: "var(--color-text-muted)", letterSpacing: "var(--letter-spacing-badge)" }}
-            >
-              What you want back
-            </span>
+          <CompactModule
+            id="trade-finder.return"
+            title="What you want back"
+            persist={false}
+            parts={[{ key: "scope", text: returnScope === "picks" ? "Picks back" : returnScope === "players" ? "Players back" : "Any return", strong: true }, { key: "hint", text: "Tap to change", tone: "muted" }]}
+          >
             <PillRow
+              ariaLabel="What you want back"
               options={[
                 { label: "Any return", value: "any" },
                 { label: "Picks back", value: "picks" },
@@ -447,7 +461,7 @@ export function TradeFinderContent({
                 setSearchError(null);
               }}
             />
-          </section>
+          </CompactModule>
 
           <Button onClick={search} disabled={selectionCount === 0} loading={searching}>
             {searching ? "Searching…" : `Find Realistic Trades${selectionCount > 0 ? ` (${selectionCount})` : ""}`}

@@ -105,6 +105,8 @@ export interface SimPqvSections {
   outlook?: React.ReactNode;
   scouting?: React.ReactNode;
   history?: React.ReactNode;
+  /** The two hero tiles shown in place of Value and Usage (the sim never shows the model's value). */
+  heroTiles?: { label: string; value: string; note: string }[];
   /** Real-NFL record cut to the as-of season (career + game log), shown first in the Stats tab. */
   stats?: React.ReactNode;
 }
@@ -434,7 +436,6 @@ export default function PlayerQuickViewSheet({
               age={age}
               score={isSim ? null : (player.score ?? resolved?.value_score ?? null)}
               gradeTile={isSim ? (sim?.heroGrade ?? null) : null}
-              hideValue={isSim}
               valueNote={request.valueNote ?? resolved?.value_note}
               valueLabel={request.valueLabel ?? null}
               byeWeek={realWorld.showBye ? (resolved?.bye_week ?? null) : null}
@@ -444,6 +445,7 @@ export default function PlayerQuickViewSheet({
               overallRating={overallRating}
               ringColor={overallRating != null ? overallRatingColor(overallRating, colors) : colors.accent}
               usageTrend={model?.usage_trend ?? null}
+              simTiles={sim?.heroTiles ?? null}
               usageLoading={loading}
               valueChart={asOf == null && historyQuery.data && ratingHistoryCaption(historyQuery.data) ? <PlayerValueHistory history={historyQuery.data} /> : null}
               ovrChart={

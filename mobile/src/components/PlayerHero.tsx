@@ -51,6 +51,7 @@ export default function PlayerHero({
   overallRating,
   ringColor,
   usageTrend,
+  simTiles = null,
   usageLoading = false,
   valueNote,
   valueLabel,
@@ -63,17 +64,16 @@ export default function PlayerHero({
   valueChart = null,
   ovrChart = null,
   gradeTile = null,
-  hideValue = false,
   children,
 }: {
   /** Shown in the tap-the-Value popover (for example the value history chart). */
+  /** Fantasy Sim: replaces the Value and Usage tiles (the sim shows neither the model's value nor a real usage feed). */
+  simTiles?: { label: string; value: string; note: string }[] | null;
   valueChart?: React.ReactNode;
   /** Shown in the tap-the-Player-score popover (for example the model radar). */
   ovrChart?: React.ReactNode;
   /** Fantasy Sim: a letter-grade tile that REPLACES the Player score ring (no numeric rating in the sim). */
   gradeTile?: React.ReactNode;
-  /** Fantasy Sim: no Value tile (the model's value is the hidden rating). */
-  hideValue?: boolean;
   playerId: string;
   /** Photo id when it differs from playerId; null = no photo exists (initials). */
   avatarId?: string | null;
@@ -188,7 +188,17 @@ export default function PlayerHero({
         ) : (
           <View style={styles.tile}>{scoreTileBody}</View>
         )}
-        {hideValue ? null : score != null ? (
+        {simTiles && simTiles.length > 0 ? (
+          simTiles.map((t) => (
+            <View key={t.label} style={styles.tile} testID="pqv-sim-tile">
+              <AppText style={styles.tileCaption}>{t.label.toUpperCase()}</AppText>
+              <AppText style={styles.tileValue} numberOfLines={1} adjustsFontSizeToFit>{t.value}</AppText>
+              <AppText style={styles.tileNote}>{t.note}</AppText>
+            </View>
+          ))
+        ) : (
+          <>
+        {score != null ? (
           <TapForWhy metric={valueLabel ? 'trade_value' : 'value'} variant="tile" style={styles.tile} spoken={`${valueLabel ?? 'Value'} ${Math.round(score).toLocaleString()}`} chart={valueChart} testID="pqv-value-why">
             <AppText style={styles.tileCaption}>{(valueLabel ?? 'Value').toUpperCase()}</AppText>
             <AppText style={styles.tileValue} numberOfLines={1} adjustsFontSizeToFit>
@@ -218,6 +228,8 @@ export default function PlayerHero({
           )
         )}
         <UsageTile trend={usageTrend} loading={usageLoading} />
+          </>
+        )}
       </View>
       {children}
     </View>

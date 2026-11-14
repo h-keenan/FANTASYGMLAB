@@ -119,6 +119,16 @@ export function useSimDebounced<T>(value: T, delayMs: number): T {
   return debounced;
 }
 
+/** The one thin progress bar of the game screens (checklist, saved-game season progress). `done` of `total` segments, tone-coloured. */
+export function SimProgressBar({ done, total, tone = "accent", label }: { done: number; total: number; tone?: SimGameTone; label?: string }) {
+  const pct = total > 0 ? Math.max(0, Math.min(100, (done / total) * 100)) : 0;
+  return (
+    <div className="h-1.5 w-full overflow-hidden" style={{ borderRadius: "var(--radius-pill)", background: "var(--color-surface-muted)" }} role="img" aria-label={label ?? `${done} of ${total}`}>
+      <div className="h-full" style={{ width: `${pct}%`, background: simToneColor(tone), transition: "width var(--motion-list, 180ms) ease" }} />
+    </div>
+  );
+}
+
 /** A label over a value: the one small stat used in every game screen. */
 export function SimStat({ label, value, tone = "muted" }: { label: string; value: ReactNode; tone?: SimGameTone }) {
   return (

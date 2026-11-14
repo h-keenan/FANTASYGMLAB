@@ -20,9 +20,9 @@ describe("SeasonReviewSections", () => {
     });
     render(<SeasonReviewSections sections={sections} />);
     expect(screen.getAllByTestId("review-card")).toHaveLength(2);
-    const delta = screen.getByText("+12.5 pts");
+    const delta = screen.getAllByText("+12.5 pts").find((el) => el.getAttribute("style")?.includes("var(--color-success)"))!; // the section summary repeats the text un-styled
     expect(delta.getAttribute("style")).toContain("var(--color-success)");
-    expect(screen.getByText("-49.9 pts").getAttribute("style")).toContain("var(--color-danger)");
+    expect(screen.getAllByText("-49.9 pts").some((el) => el.getAttribute("style")?.includes("var(--color-danger)"))).toBe(true);
     expect(screen.getByTestId("review-path")).toBeTruthy();
     expect(screen.getByTestId("review-journey")).toBeTruthy();
     expect(screen.getByTestId("review-leaders")).toBeTruthy();

@@ -651,6 +651,12 @@ surface is tappable has no chevron.
 **Phone-only chrome.** `md:hidden` is guarded globally in `globals.css` (an unlayered `display` rule used to beat the Tailwind utility and showed
 the phone header on desktop, stacked above the real one).
 
+**Trade ideas** (Trade Hub, Trade Finder, GM Plan) are `CompactModule`s: the partner is the title, the summary is
+`lib/tradeIdeaSummary.ts` ("+450 · J. Gibbs for C. Olave +2 · Fair · High confidence", names already `J. Surname`), and the
+former card (tags, posture, package, odds, meters, share) is the expanded body. Trade History rows, Trade Analyzer's secondary
+verdict blocks, Games league odds / what-if / leaderboard, Draft Center posture / picks / signals and the Live Draft sections follow
+the same rule.
+
 Rollout status per page: `docs/audits/2026-11-module-templates-rollout.md`.
 
 ## Player row anatomy (shared by FantasyDesk and the Fantasy Sim)
@@ -700,10 +706,19 @@ A page has ONE tab row. `PillRow variant="scroll"` shares a short row's width eq
 last tab) and scrolls only when its labels overflow; the app's `SegmentedTabBar scrollable` does the same. Filters and sort
 share one compact row (`draft-filters`: position pills plus a sort control), never one strip each.
 
+**One tab row, one control row (2026-11 pass 3).** When a page already shows its family strip, the page's own views
+(Waivers: Recommended / Explore / Watchlist; Games: Season Outlook / Pick'em; Recaps: Recaps / Roundup / History / Storylines)
+are a `ui/ViewSelect` (a 44px native select) in ONE compact control row together with that view's filters (Waivers: the
+All/Add/Stash/Watch select, or search + Filters), never a second tab row. App twin: `FilterDropdownButton` labelled "View"
+(+ "Show" / `FilterSheet`) in a `controlRow`. Pages with no family strip (Draft Center, GM Plan) keep their one `PillRow`.
+
 ## Page tab families and glass chrome (2026-11)
 
 Related pages are tabs of one page family (`lib/pageFamilies.ts`: Trades, Team, League), rendered by `PageTabBar` over
-`PillRow glass` (sticky, scroll-snap, cyan glass active pill). Each tab keeps its route. The phone footer
+`PillRow glass` (sticky, scroll-snap, cyan glass active pill). Each tab keeps its route. App: `components/PageFamilyTabs`
+(SegmentedTabBar scrollable over the same `lib/pageFamilies.ts`; `lib/pageFamilyRoutes.ts` maps a tab to its screen, imported
+leagues only get the tabs they can open) on MyTeam, Players, Waivers, Matchup, Trades (Hub/Finder/Analyzer switch in place,
+History opens its screen), Teams, Recap and Games. The phone footer
 (`BottomTabBar`) uses the same glass tokens. Plan: `docs/audits/2026-11-menu-consolidation.md`.
 
 ## Sheet tabs (quick views that would otherwise scroll long)
@@ -764,3 +779,11 @@ Everything pinned to the bottom of a phone screen (tab bar + action strip, Fanta
 Never `position: fixed`, never JS-placed. Sticky is clamped to its parent's box, so the parent must span the whole document:
 html/body never get a fixed height (body is `min-height: 100dvh`), and the column chain uses `flex-auto`, not `flex-1`/`min-h-0`.
 `lib/bottomChrome.test.ts` guards this; `scripts/sim_layout_playwright/footer_pin.mjs` checks it in a browser.
+
+## Fantasy Sim UI pass (2026-11-14)
+
+Audit and status: `docs/audits/2026-11-sim-ui-pass.md`. New shared pieces: `SimProgressBar` (web + app `SimGameParts`), `lib/simHub.ts`
+(saved-game rows), `reviewSectionParts` (every Season in Review section is a `CompactModule`, never a bare header), `simHeroTiles` /
+`simOutlookTiles` / `simProfileRead` (the sim player sheet: the hero shows This week + ADP, never Value or Usage; Outlook tiles + an
+always-drawn projection chart; a "Scouting read" for players without a generated scouting report), `simLineupParts` / `simBenchParts` /
+`simStandingHero` / `simMenuHero` / `simRulesParts` (Team tab, Standings hero, Game menu), and `SimTeamCard dense` for pickers.

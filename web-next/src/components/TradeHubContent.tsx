@@ -162,7 +162,7 @@ export function TradeHubContent({
           onAction={() => setFilter({ impact: null, position: null })}
         />
       ) : (
-        <div className="flex flex-col gap-4">
+        <div className="grid grid-cols-[minmax(0,1fr)] items-start gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
           {visibleIdeas.map((idea, index) => {
             const highlighted = Boolean(
               highlightPlayerId &&

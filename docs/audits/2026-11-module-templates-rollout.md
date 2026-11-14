@@ -45,7 +45,7 @@ Reachability: every tile, insight link, alert, trade link and mini-game is still
 - [x] `Hero` "Trade ideas": count + top idea (partner, gain) when there are ideas (web + app).
 - [x] 3-team ideas and Buy low / Sell high are `CompactModule`s whose collapsed form is built from the loaded data ("2 3-team deals · fair for every team", "3 signals · 2 buy low · 1 sell high · Name"); loading and error states have a real sentence too (web + app).
 - [x] One tab row: the Trades family strip (web).
-- [ ] Idea cards (`TradeIdeaCardView`, app `TradeIdeaCard`) are already tap-to-expand but are bespoke, not CompactModule; Analyzer, Finder, History not migrated.
+- [x] Idea cards (`TradeIdeaCardView`, app `TradeIdeaCard`) are CompactModules (rollout 3); Finder, History, Analyzer verdict migrated on web.
 
 ## League (`/league-rankings`, app `TeamsScreen`)
 
@@ -66,9 +66,29 @@ Root cause of the doubled desktop header (coridian_ Matchup screenshot, "Today >
 Reachability: nothing removed; every Matchup block, waiver value/gauge/why/usage/drop and every pick is one tap away. Scan (`module_scan.mjs`, 390 and 1440, fixtures for Matchup/Waivers/Players): clean; Matchup is 1140 px wide at 1440, a Waivers recommended row is 77 px at 390 (was about 150).
 
 Still open from this pass:
-- [ ] Waivers still has two tab rows (family strip + Recommended / Explore / Watchlist) and the All/Add/Stash/Watch filter row: the IA plan's single View selector needs the shared tab strip work (another agent owns `PillRow`/`PageTabBar`).
+- [x] Waivers: ONE tab row (family strip) + ONE control row (`ViewSelect` + the view's filters), web and app (rollout 3, below).
 - [ ] Row highlight deep link does not auto-expand the app row (web does).
-- [ ] GM Plan, Trade Analyzer, Finder, History headers not migrated.
+
+## Rollout 3 (2026-11-14): waivers, app family strip, trade pages, GM Plan, league pages, desktop
+
+Heights from `module_scan.mjs` (390 / 1440, fixtures, same script run on `origin/main` before and on this branch after):
+
+| Page | Before | After | Change |
+|---|---|---|---|
+| Trades (`/trade-hub`, 3 ideas) | 2737 / 2442 | 1070 / 959 | [x] idea cards are CompactModules, collapsed 3 ideas fit one screen |
+| Waivers | 2064 / 2204, 2 tab rows | 2008 / 2205, 1 tab row | [x] family strip + one control row |
+| GM Plan | 1588 / 1728 | 1284 / 1236 | [x] Team Situation, Plan Snapshot, Trade ideas, Protected Core, focus areas = CompactModule; Season outlook = LinkModule; trade opportunity cards use the idea summary |
+| Games | 1545 / 1808, 2 tab rows | 844 / 900, 1 tab row | [x] `ViewSelect`; league odds, What-if, Pick'em leaderboard = CompactModule |
+| Draft Center | 1071 / 930 | 951 / 900 | [x] posture, pick values, signal sections = CompactModule |
+| Sample league | main 840 px at 1440 | main 1140 px, two columns from lg | [x] `.sample-grid` + sticky right rail (connect CTA); sidebar shows the sample views, News, Fantasy Sim, Community, Pro, Account (founder item kept) |
+| Trade Finder | 1238 / 1292, 3 tab rows | 1487 / 1409, 2 | [~] sections are CompactModules (players/picks open, "what you want back" collapsed); heights are higher only because the baseline run had not finished loading the roster |
+
+- [x] Web: Trade Finder, Trade History (each trade a module: outcome · verdict · net · swap), Trade Analyzer verdict (lineup and odds / next move / confidence and risk are modules; verdict, matchup and balance stay open), League Recaps view selector, Live Draft (on the clock, recommendations, rankings, team rankings, board).
+- [x] App: `PageFamilyTabs` (+ `lib/pageFamilyRoutes.ts`) on MyTeam, Players, Waivers, Matchup, Trades, Teams, Recap, Games; Teams / Recap / Games inner views and Teams "Rank by" are `FilterDropdownButton`s; Waivers control row; `TradeIdeaCard` and GM Plan sections are CompactModules.
+- [~] Desktop: sample league uses the width; Trade Hub idea cards are two columns from lg. The Trade Hub filter row overflows 4 px at 1140 px (`-mx-4` scroller), so `page-shell-wide` stays off it.
+- [ ] Not migrated: League Recaps story cards / History / Storylines bodies, Live Draft trade evaluator, Draft Center scouting tab, Trade Analyzer multi-team builder, app Trade Analyzer / Finder / History / Draft Center / Live Draft inner sections (only the family strip and dropdowns landed there), app Players position pills (a filter row, not a tab row).
+- [ ] Teams (app) has "View" and "Rank by" dropdowns in two places (header and panel); merge into one row when the panels are hoisted.
+- [ ] `Hero` for the Games odds and the Live Draft clock (they stay bespoke cards; tests pin their testids).
 
 ## Enforcement and verification
 
@@ -78,7 +98,6 @@ Still open from this pass:
 
 ## Remains
 
-- [ ] Trade idea cards as CompactModules (Trades page is 2046 px tall with 3 ideas; cards dominate). Analyzer, Finder, History, GM Plan inner tabs, League Recaps/Games/Draft/Pick'em.
-- [ ] App family tab strip: `lib/pageFamilies.ts` has no mobile twin on main, so the app screens cannot show the single family tab row yet.
+- [x] Trade idea cards as CompactModules, App family tab strip (see Rollout 3). Still open: League Recaps bodies, app Analyzer / Finder / History / Draft inner sections.
 - [ ] Roster rows inside a module truncate long names on a 390 px phone ("T. ..." in the scan); row width inside modules needs a pass.
 - [ ] No on-device check of the app screens (tsc, node tests and twin check only).

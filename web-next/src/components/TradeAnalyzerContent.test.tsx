@@ -152,6 +152,14 @@ function addVia(side: "You send" | "You receive", ...names: string[]) {
   fireEvent.click(within(dialog).getByRole("button", { name: /^(Add \d+ to trade|Update trade|Done)/ }));
 }
 
+/** The verdict's secondary blocks are CompactModules; open them all once the verdict is on screen. */
+async function openVerdictModules() {
+  await screen.findByText("Reviewed package");
+  for (let pass = 0; pass < 2; pass += 1) {
+    for (const b of document.querySelectorAll('button[aria-expanded="false"][aria-label$=". Expand"]')) fireEvent.click(b);
+  }
+}
+
 describe("TradeAnalyzerContent", () => {
   it("shows the not-ready message instead of the builder when the roster can't be resolved", () => {
     render(
@@ -266,6 +274,7 @@ describe("TradeAnalyzerContent", () => {
     );
 
     expect(await screen.findByText("Reviewed package")).toBeInTheDocument();
+    await openVerdictModules();
     expect(screen.getAllByText("ACCEPT").length).toBeGreaterThan(0);
 
     // The exact bug fixed three times tonight: the give/receive matchup grid
@@ -277,7 +286,7 @@ describe("TradeAnalyzerContent", () => {
     expect(document.querySelectorAll(".lean-bar-track").length).toBe(1);
 
     expect(screen.getByRole("img", { name: "Confidence: High confidence" })).toBeInTheDocument();
-    expect(screen.getByText("Minimal injury risk on either side.")).toBeInTheDocument();
+    expect(screen.getAllByText("Minimal injury risk on either side.").length).toBeGreaterThan(0);
     expect(screen.getByText("Ask for a sweetener too")).toBeInTheDocument();
 
     // The verdict is no longer a dead end: other packages live in Trade Finder.
@@ -365,6 +374,7 @@ describe("TradeAnalyzerContent", () => {
       fireEvent.click(screen.getByRole("button", { name: /^Analyze Trade/ }));
     });
 
+    await openVerdictModules();
     const block = await screen.findByTestId("lineup-model");
     expect(block).toHaveTextContent("-76 lineup pts over Weeks 8-17 (-6 this week)");
     // Secondary copy sits behind a default-collapsed "Read more".
@@ -487,6 +497,7 @@ describe("TradeAnalyzerContent", () => {
         },
       ],
     });
+    await openVerdictModules();
     expect(await screen.findByText("Try this instead")).toBeInTheDocument();
     expect(screen.getByText("Counter Send")).toBeInTheDocument();
     expect(screen.getByText("Counter Get")).toBeInTheDocument();
@@ -498,6 +509,7 @@ describe("TradeAnalyzerContent", () => {
       alternate_packages: [],
       counter_search: { status: "none", message: "No better package found from the assets on both rosters." },
     });
+    await openVerdictModules();
     expect(await screen.findByTestId("no-counter-found")).toHaveTextContent("No better package found");
   });
 

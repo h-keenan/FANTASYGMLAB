@@ -26,7 +26,8 @@ describe("Fantasy Sim grids cannot widen the page on phones", () => {
 
   it("the Team tab's lineup/bench grid and its sections can shrink below their content", () => {
     const src = readFileSync(join(dir, "SimGameTeam.tsx"), "utf8");
-    expect(src).toContain('grid grid-cols-[minmax(0,1fr)] gap-4 lg:grid-cols-2');
-    expect(src).toContain('<section className="flex min-w-0 flex-col gap-1" aria-label="Starting lineup">');
+    expect(src).toContain('grid grid-cols-[minmax(0,1fr)] gap-2 lg:grid-cols-2');
+    expect(src).toContain('id="sim.team.lineup"');
+    expect(src).toContain('<div className="flex min-w-0 flex-col gap-1">');
   });
 });

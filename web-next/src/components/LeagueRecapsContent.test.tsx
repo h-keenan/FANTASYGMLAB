@@ -261,7 +261,7 @@ describe("LeagueRecapsContent", () => {
 
     render(<LeagueRecapsContent leagueId="league-1" leagueName="Dynasty Overlords" initialRecap={BASE_RECAP} />);
 
-    fireEvent.click(screen.getByRole("tab", { name: "Storylines" }));
+    fireEvent.change(screen.getByLabelText("League memory view"), { target: { value: "Storylines" } });
 
     expect(api.getLeagueStorylines).toHaveBeenCalledWith("league-1");
     await waitFor(() => expect(screen.getByText("2026 storylines")).toBeInTheDocument());

@@ -42,7 +42,8 @@ describe("Fantasy Sim player sheet is the real Player Quick View", () => {
     expect(screen.queryByLabelText("Week-by-week projection")).toBeNull();
     expect(screen.queryByText("W3")).toBeNull();
     expect(screen.queryByText(/results so far/i)).toBeNull();
-    expect(screen.queryByTestId("weekly-chart")).toBeNull(); // nothing played and a flat projection: no chart
+    expect(screen.getByTestId("weekly-chart")).toBeInTheDocument(); // nothing played yet: the flat projection still draws (mean line + floor/ceiling band)
+    expect(screen.getByText("Per game")).toBeInTheDocument();
     expect(screen.getByText("BB")).toBeInTheDocument(); // initials, same fallback as the real PQV
     expect(api.getPlayerQuickView).not.toHaveBeenCalled(); // a generated player has no real data
   });
@@ -51,6 +52,7 @@ describe("Fantasy Sim player sheet is the real Player Quick View", () => {
     vi.mocked(api.getSimGamePlayer).mockResolvedValue(detail({ player: player({ grade: "B+", grade_range: ["B", "A-"], grade_uncertain: true, attributes: [{ key: "volume", label: "Workload", grade: "B" }, { key: "durability", label: "Durability", grade: "C+", uncertain: true }] }) }));
     render(<SimPlayerSheet gameId="g1" player={player({ grade: "B+", grade_range: ["B", "A-"], grade_uncertain: true })} onClose={() => {}} />);
     const tile = await screen.findByTestId("hero-grade");
+    expect(await screen.findAllByTestId("pqv-sim-tile")).toHaveLength(2); // This week + ADP
     expect(tile).toHaveTextContent("B+?");
     expect(screen.queryByTestId("pqv-value-empty")).toBeNull();
     expect(screen.queryByText(/Player score/)).toBeNull();
@@ -66,7 +68,7 @@ describe("Fantasy Sim player sheet is the real Player Quick View", () => {
     fireEvent.click(await screen.findByRole("tab", { name: "Outlook" }));
     const flat = await screen.findByTestId("weekly-chart");
     expect(flat).toHaveAttribute("data-weeks", "2");
-    expect(flat).toHaveAttribute("data-band", "0");
+    expect(Number(flat.getAttribute("data-band"))).toBeGreaterThan(0); // flat still draws as a steady band
     unmount();
 
     const varied = weeks(3).map((w, i) => ({ ...w, projection: 8 + i }));

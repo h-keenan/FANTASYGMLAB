@@ -1,5 +1,7 @@
 import { BEGINNER_HELP } from "@/lib/experienceCopy";
-import { AccentCard } from "@/components/AccentCard";
+import { CompactModule } from "@/components/ui/CompactModule";
+import { abbreviatePlayerName } from "@/lib/formatPlayerName";
+import { tradeIdeaSummaryParts } from "@/lib/tradeIdeaSummary";
 import { ManagerTendenciesCard } from "@/components/ManagerTendenciesCard";
 import { useEffect, useRef, useState } from "react";
 import { api, type TradeIdea } from "@/lib/api";
@@ -173,8 +175,7 @@ export function TradeIdeaCardView({
    * user to find it among every other idea on the board. */
   highlighted?: boolean;
 }) {
-  const [expanded, setExpanded] = useState(highlighted);
-  const ref = useRef<HTMLElement>(null);
+  const ref = useRef<HTMLDivElement>(null);
   useEffect(() => {
     if (highlighted && ref.current && typeof ref.current.scrollIntoView === "function") {
       ref.current.scrollIntoView({ behavior: "smooth", block: "center" });
@@ -200,13 +201,39 @@ export function TradeIdeaCardView({
   const sendTotal = Math.round(idea.send_score || 0).toLocaleString();
   const receiveTotal = Math.round(idea.receive_score || 0).toLocaleString();
 
+  // Collapsed: partner as the title and a real summary (balance, swap, fairness, confidence). The whole former card
+  // is the expanded body, so nothing is removed, only folded (docs/ui-patterns.md "Module templates").
+  const summaryParts = tradeIdeaSummaryParts({
+    gain,
+    sendNames: idea.package.send.map((asset) => abbreviatePlayerName(asset.name)),
+    receiveNames: idea.package.receive.map((asset) => abbreviatePlayerName(asset.name)),
+    band: idea.value_edge_band,
+    confidenceLabel: idea.confidence_label,
+  });
+  const moduleId = `trade.idea.${leagueId ?? "x"}.${idea.package.send.map((a) => a.player_id).join("-")}.${idea.package.receive.map((a) => a.player_id).join("-")}`;
+
   return (
-    <AccentCard
-      accent={accent}
+    <div
       ref={ref}
       data-highlighted={highlighted ? "true" : undefined}
       style={highlighted ? { outline: "2px solid var(--color-accent)", outlineOffset: "2px" } : undefined}
     >
+    <CompactModule
+      id={moduleId}
+      title={
+        <span className="flex items-center gap-2 min-w-0">
+          <TeamAvatar avatarUrl={idea.partner_team_avatar_url} size={24} />
+          <span className="min-w-0 break-words">{idea.partner_team_name}</span>
+        </span>
+      }
+      label={idea.partner_team_name}
+      parts={summaryParts}
+      accent={accent}
+      defaultOpen={highlighted}
+      persist={false}
+      testId="trade-idea-card"
+    >
+    <div className="flex flex-col gap-3">
       {tags.length > 0 || copy.impactTagHelp(idea.impact_tag) ? (
         <div className="flex items-center gap-2 flex-wrap">
           {tags.map((tag) => (
@@ -253,24 +280,16 @@ export function TradeIdeaCardView({
         </div>
       ) : null}
 
-      <div className="flex flex-wrap items-start justify-between gap-2">
-        <div className="flex flex-col min-w-0 flex-1 basis-48 gap-0.5">
-          <div className="flex items-center gap-2 min-w-0">
-            <TeamAvatar avatarUrl={idea.partner_team_avatar_url} size={24} />
-            <h3 className="text-lg font-extrabold break-words min-w-0" style={{ color: "var(--color-text-primary)" }}>
-              {idea.partner_team_name}
-            </h3>
-          </div>
+      {idea.partner_team_archetype_label || idea.value_edge_band ? (
+        <div className="flex flex-wrap items-center justify-between gap-2">
           {idea.partner_team_archetype_label ? (
             <span className="text-xs" style={{ color: "var(--color-text-muted)" }}>
               {idea.partner_team_archetype_label}
             </span>
           ) : null}
+          {idea.value_edge_band ? <ToneBadge label={idea.value_edge_band} color={fairnessBandColor(idea.value_edge_band)} /> : null}
         </div>
-        {idea.value_edge_band ? (
-          <ToneBadge label={idea.value_edge_band} color={fairnessBandColor(idea.value_edge_band)} />
-        ) : null}
-      </div>
+      ) : null}
       {showExplanations && reason ? (
         <p
           className="text-sm pl-3"
@@ -318,25 +337,10 @@ export function TradeIdeaCardView({
       ) : null}
 
       <div className="flex gap-2">
-        <button
-          type="button"
-          onClick={() => setExpanded((value) => !value)}
-          className="inline-flex flex-1 items-center justify-center px-3 text-sm font-bold"
-          style={{
-            color: "var(--color-accent)",
-            border: "1px solid var(--color-accent)",
-            background: "color-mix(in srgb, var(--color-accent) 10%, transparent)",
-            minHeight: "2.75rem",
-          }}
-          aria-expanded={expanded}
-        >
-          {expanded ? "Hide details" : "View details"}
-        </button>
         <ShareTradeButton idea={idea} leagueId={leagueId} strategy={strategy} lens={lens} />
       </div>
 
-      {expanded ? (
-        <div className="flex flex-col gap-3 pt-2" style={{ borderTop: "var(--border-width-default) solid var(--color-border)" }}>
+      <div className="flex flex-col gap-3 pt-2" style={{ borderTop: "var(--border-width-default) solid var(--color-border)" }}>
           {showExplanations && moreReason ? (
             <div className="flex flex-col gap-1">
               <span className="text-xs uppercase font-bold" style={{ color: "var(--color-information)" }}>
@@ -369,7 +373,8 @@ export function TradeIdeaCardView({
           <BeginnerHelp label="confidence and realism" lines={[BEGINNER_HELP.ideaConfidence, BEGINNER_HELP.ideaRealism]} />
           <ReasoningTags tags={idea.reasoning_tags} />
         </div>
-      ) : null}
-    </AccentCard>
+    </div>
+    </CompactModule>
+    </div>
   );
 }

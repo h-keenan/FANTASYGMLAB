@@ -93,6 +93,8 @@ export interface SimPqvSections {
   outlook?: ReactNode;
   scouting?: ReactNode;
   history?: ReactNode;
+  /** The two hero tiles shown in place of Value and Usage (the sim never shows the model's value). */
+  heroTiles?: { label: string; value: string; note: string }[];
   /** Real-NFL record cut to the as-of season (career + game log), shown first in the Stats tab. */
   stats?: ReactNode;
 }
@@ -320,7 +322,6 @@ export function PlayerQuickView({
           tier={identity.tier}
           score={isSim ? null : (identity.score ?? resolved?.value_score ?? null)}
           gradeTile={isSim ? (sim?.heroGrade ?? null) : null}
-          hideValue={isSim}
           valueNote={identity.value_note ?? resolved?.value_note}
           valueLabel={identity.value_label ?? null}
           avatarId={remote ? identity.player_id : null}
@@ -332,6 +333,7 @@ export function PlayerQuickView({
           overallRank={isSim ? null : identity.overall_rank}
           positionRank={isSim ? null : identity.position_rank}
           usageTrend={model?.usage_trend ?? null}
+          simTiles={sim?.heroTiles ?? null}
           usageLoading={loading}
           valueChart={asOf != null ? null : <PlayerValueHistory playerId={identity.player_id} bare />}
           ovrChart={model && !isSim ? <SubRatingRow model={model} bare /> : null}
@@ -375,9 +377,9 @@ export function PlayerQuickView({
             circles when collapsed). */}
         <BeginnerHelp
           className="mt-1"
-          label="What do Value, Overall and Tier mean?"
+          label={isSim ? "What do Overall and Tier mean?" : "What do Value, Overall and Tier mean?"}
           lines={[
-            identity.score != null ? BEGINNER_HELP.playerValue : null,
+            identity.score != null && !isSim ? BEGINNER_HELP.playerValue : null,
             overallRating != null ? BEGINNER_HELP.overallRating : null,
             identity.tier ? BEGINNER_HELP.playerTier : null,
           ]}

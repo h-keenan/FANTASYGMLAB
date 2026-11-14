@@ -5,6 +5,7 @@ import AppText from '../components/AppText';
 import GlassCard from '../components/GlassCard';
 import Input from '../components/Input';
 import BrandHeaderBar from '../components/BrandHeaderBar';
+import PageFamilyTabs from '../components/PageFamilyTabs';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { Ionicons } from '@expo/vector-icons';
 import { useHeaderHeight } from '@react-navigation/elements';
@@ -386,6 +387,7 @@ export default function PlayersScreen({ route, navigation }: Props) {
     <View style={[styles.container, { paddingTop: headerHeight }]}>
       <GridBackground />
       <BrandHeaderBar leagueId={leagueId} leagueName={leagueName} />
+      <PageFamilyTabs family="team" active="players" leagueId={leagueId} leagueName={leagueName} />
       <ScreenInfoNote text="Ranked by value for this league's scoring, roster, and format settings. OVR percentiles a player against others at their position — tap any player for the full breakdown." />
 
       {error ? <ErrorState compact title="Couldn't load players" message={error} onRetry={() => setReloadToken((n) => n + 1)} /> : null}

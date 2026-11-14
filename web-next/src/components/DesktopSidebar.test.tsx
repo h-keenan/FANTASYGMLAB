@@ -34,3 +34,27 @@ describe("DesktopSidebar founder entry", () => {
     expect(screen.getByText("Founder Analytics").closest("a")).toHaveAttribute("href", "/founder-analytics");
   });
 });
+
+describe("DesktopSidebar on the sample league", () => {
+  it("shows the sample views and only destinations that work without a league", async () => {
+    vi.resetModules();
+    vi.doMock("next/navigation", () => ({
+      usePathname: () => "/sample-league",
+      useParams: () => ({}),
+      useSearchParams: () => new URLSearchParams(),
+    }));
+    const { DesktopSidebar: Sidebar } = await import("./DesktopSidebar");
+    const { useAuth: auth } = await import("@/context/AuthContext");
+    vi.mocked(auth).mockReturnValue({ session: { user: { id: "f1", app_metadata: { founder_ops: true } } }, loading: false } as never);
+    render(<Sidebar />);
+    expect(screen.getByTestId("sample-sidebar-views")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Trade" })).toBeInTheDocument();
+    expect(screen.queryByText(/Open a league from Home/)).not.toBeInTheDocument();
+    expect(screen.queryByText("Portfolio")).not.toBeInTheDocument();
+    expect(screen.queryByText("Home")).not.toBeInTheDocument();
+    expect(screen.getByText("News")).toBeInTheDocument();
+    expect(screen.getAllByText("Account").length).toBeGreaterThan(0);
+    // The founder keeps the founder entry.
+    expect(screen.getByText("Founder Analytics")).toBeInTheDocument();
+  });
+});

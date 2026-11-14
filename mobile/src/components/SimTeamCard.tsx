@@ -10,6 +10,7 @@ import { createSimStyles, simToneColor } from './SimGameParts';
 import ToneBadge from './ToneBadge';
 import { useThemeMode } from '../context/ThemeModeContext';
 import type { SimLeagueRosterTeam } from '../lib/simGame';
+import { playerSurname } from '../lib/playerNameDisplay';
 import { simTeamChips, simTeamRecordLine } from '../lib/simLeagueRosters';
 import { simGradeOf } from '../lib/simGrade';
 import { LetterGrade } from './LetterGrade';
@@ -27,6 +28,7 @@ export default function SimTeamCard({
   openLabel,
   compact = false,
   trailing,
+  dense = false,
 }: {
   team: SimLeagueRosterTeam;
   onOpen?: (teamId: string) => void;
@@ -35,6 +37,8 @@ export default function SimTeamCard({
   /** Hide the top assets. */
   compact?: boolean;
   trailing?: ReactNode;
+  /** Pickers: the top assets run in one wrapping strip (position, surname, OVR) instead of one row each. */
+  dense?: boolean;
 }) {
   const { colors } = useThemeMode();
   const common = useMemo(() => createSimStyles(colors), [colors]);
@@ -59,8 +63,14 @@ export default function SimTeamCard({
         </View>
       </View>
       {compact ? null : (
-        <View style={common.tight} accessibilityLabel={`${team.name} top assets`}>
-          {team.top_assets.map((p) => (
+        <View style={dense ? { flexDirection: 'row', flexWrap: 'wrap', columnGap: 12, rowGap: 4 } : common.tight} accessibilityLabel={`${team.name} top assets`}>
+          {team.top_assets.map((p) => dense ? (
+            <View key={p.id} style={[common.row, { gap: 4 }]}>
+              <PositionBadge position={p.pos} />
+              <AppText style={{ fontSize: 13, fontWeight: '700', color: colors.textPrimary }}>{playerSurname(p.name)}</AppText>
+              <LetterGrade grade={simGradeOf(p)} size="sm" />
+            </View>
+          ) : (
             <View key={p.id} style={common.row}>
               <PositionBadge position={p.pos} />
               <View style={common.grow}>

@@ -72,6 +72,14 @@ const RESPONSE: TradeHubResponse = {
   team_strategy: "retool",
 };
 
+/** Idea cards are CompactModules: collapsed they show the partner + a summary; open them to reach the package. */
+function openIdeaCards() {
+  for (const card of screen.getAllByTestId("trade-idea-card")) {
+    const header = card.querySelector("button[aria-expanded=false]");
+    if (header) fireEvent.click(header);
+  }
+}
+
 describe("TradeHubContent", () => {
   it("shows the 3-team ideas section for the league and lens, but not for imported leagues", () => {
     const { unmount } = render(<TradeHubContent leagueId="123" leagueName="Dynasty Overlords" data={RESPONSE} lens="Rebuild" />);
@@ -86,27 +94,31 @@ describe("TradeHubContent", () => {
 
     expect(screen.getByRole("heading", { name: "Trade Hub" })).toBeInTheDocument();
     expect(screen.getByText("Rival GM")).toBeInTheDocument();
-    expect(screen.getByText("Favorable")).toBeInTheDocument();
-    expect(screen.getByText("+800")).toBeInTheDocument();
+    // Collapsed summary: balance, swap (short names), fairness, confidence.
+    expect(screen.getByRole("button", { name: /Rival GM: \+800 · .*Favorable/ })).toBeInTheDocument();
+    openIdeaCards();
+    expect(screen.getAllByText("Favorable").length).toBe(2);
     expect(screen.getByText("My Running Back")).toBeInTheDocument();
     expect(screen.getByText("Opp Wide Receiver")).toBeInTheDocument();
     // Circular OVR gauge renders the real rating.
     expect(screen.getAllByText("88").length).toBeGreaterThan(0);
   });
 
-  it("shows the low-confidence note on the card face without opening details", () => {
+  it("shows low confidence in the collapsed summary and the full note once opened", () => {
     const lowConfidence: TradeHubResponse = { ...RESPONSE, ideas: [idea({ confidence_label: "Low" })] };
     render(<TradeHubContent leagueId="123" leagueName="Dynasty Overlords" data={lowConfidence} />);
 
+    expect(screen.getByRole("button", { name: /Low confidence/ })).toBeInTheDocument();
+    openIdeaCards();
     expect(screen.getByText("More dependent on partner preference and market fit.")).toBeInTheDocument();
     expect(screen.queryByText("Why this works")).not.toBeInTheDocument();
   });
 
-  it("reveals the full rationale and confidence/realism meters only after View details is clicked", () => {
+  it("reveals the full rationale and confidence/realism meters only after the idea is opened", () => {
     render(<TradeHubContent leagueId="123" leagueName="Dynasty Overlords" data={RESPONSE} />);
 
     expect(screen.queryByRole("img", { name: "Confidence: High" })).not.toBeInTheDocument();
-    fireEvent.click(screen.getByRole("button", { name: /View details/ }));
+    openIdeaCards();
     expect(screen.getByRole("img", { name: "Confidence: High" })).toBeInTheDocument();
     expect(screen.getByRole("img", { name: "Realism: Realistic" })).toBeInTheDocument();
   });

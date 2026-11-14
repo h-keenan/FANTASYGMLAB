@@ -15,6 +15,13 @@ import type {
 import { api } from "@/lib/api";
 import { trackFeatureUse } from "@/lib/analytics";
 
+/** Modules are collapsed with a real summary; open every one (nested too) to assert on the bodies. */
+function expandAll() {
+  for (let pass = 0; pass < 3; pass += 1) {
+    for (const b of document.querySelectorAll('button[aria-expanded="false"][aria-label$=". Expand"]')) fireEvent.click(b);
+  }
+}
+
 vi.mock("next/navigation", () => ({
   useRouter: () => ({ push: vi.fn(), replace: vi.fn() }),
 }));
@@ -212,6 +219,7 @@ describe("GmPlanContent", () => {
 
   it("renders a trade opportunity's give/get player identity and value delta", () => {
     render(<GmPlanContent leagueName="Dynasty Overlords" data={BASE_RESPONSE} />);
+    expandAll();
 
     expect(screen.getByText("Rival GM")).toBeInTheDocument();
     expect(screen.getByText("My Running Back")).toBeInTheDocument();
@@ -230,6 +238,7 @@ describe("GmPlanContent", () => {
       ),
     };
     render(<GmPlanContent leagueName="Dynasty Overlords" data={textOnly} />);
+    expandAll();
 
     expect(screen.getByText("My Running Back → Opp Wide Receiver")).toBeInTheDocument();
   });
@@ -252,8 +261,9 @@ describe("GmPlanContent", () => {
       ),
     };
     render(<GmPlanContent initialTab="trades" leagueName="Dynasty Overlords" data={noSignal} />);
+    expandAll();
 
-    expect(screen.getByText("No specific trade opportunities surfaced this week.")).toBeInTheDocument();
+    expect(screen.getAllByText("No specific trade opportunities surfaced this week.").length).toBeGreaterThan(0);
   });
 
   it("shows the link-account message instead of an empty plan when `reason` is set", () => {
@@ -310,6 +320,7 @@ describe("GmPlanContent", () => {
           rankings={{ ok: true, players: [] }}
         />,
       );
+      expandAll();
 
       expect(screen.getByRole("tab", { name: /^Rebuilding/, selected: true })).toBeInTheDocument();
       expect(screen.getByText("Prioritize youth and future draft capital")).toBeInTheDocument();
@@ -327,6 +338,7 @@ describe("GmPlanContent", () => {
           rankings={{ ok: true, players: [] }}
         />,
       );
+      expandAll();
 
       fireEvent.click(screen.getByRole("tab", { name: /^Competing/ }));
 
@@ -572,13 +584,15 @@ describe("GmPlanContent concept structure", () => {
 
   it("shows the trade deadline banner with the real week before the deadline", () => {
     render(<GmPlanContent leagueName="L" data={withWindow(WINDOW)} {...props} />);
+    expandAll();
     expect(screen.getByTestId("deadline-banner")).toHaveTextContent("Trade deadline: Week 11");
   });
 
   it("drops the banner after the deadline", () => {
     render(<GmPlanContent leagueName="L" data={withWindow({ ...WINDOW, trade_deadline_passed: true })} {...props} />);
     expect(screen.queryByTestId("deadline-banner")).not.toBeInTheDocument();
-    expect(screen.getByText("Past the trade deadline")).toBeInTheDocument();
+    // Summary line says it too; the body only shows once opened.
+    expect(screen.getAllByText("Past the trade deadline").length).toBeGreaterThan(0);
   });
 
   it("renders snapshot tiles with progress bars and a playoff ring, and no tiles without data", () => {
@@ -587,6 +601,7 @@ describe("GmPlanContent concept structure", () => {
       { key: "odds" as const, label: "Playoff Odds", value: "55%", fill: 0.55, note: "Proj. 6-seed" },
     ];
     const { unmount } = render(<GmPlanContent leagueName="L" data={BASE_RESPONSE} snapshot={snapshot} {...props} />);
+    expandAll();
     expect(screen.getByRole("progressbar", { name: "Roster Power" })).toHaveAttribute("aria-valuenow", "83");
     expect(screen.getByRole("img", { name: "Playoff Odds 55%" })).toBeInTheDocument();
     expect(screen.getByText("Proj. 6-seed")).toBeInTheDocument();
@@ -597,12 +612,14 @@ describe("GmPlanContent concept structure", () => {
 
   it("links trade ideas to Trade Hub", () => {
     render(<GmPlanContent leagueName="L" data={BASE_RESPONSE} {...props} />);
+    expandAll();
     expect(screen.getAllByRole("link", { name: "View details" })[0].getAttribute("href")).toContain("/trade-hub/league-1");
   });
 
   it("keeps Free locked while Team Situation stays open", () => {
     const locked: GmPlanResponse = { ok: true, quiet: true, reason: "", focus_areas: [], is_premium: false, upsell: { title: "Locked plan", body: "Upgrade." } };
     render(<GmPlanContent leagueName="L" data={locked} {...props} />);
+    expandAll();
     expect(screen.getAllByRole("heading", { name: "Locked plan" }).length).toBeGreaterThan(0);
     expect(screen.getByRole("tab", { name: /^Competing/ })).toBeInTheDocument();
   });
