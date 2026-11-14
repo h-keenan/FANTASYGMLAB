@@ -264,3 +264,69 @@ def test_a_player_no_better_than_the_wire_does_not_improve_an_ai_lineup():
         base = desk.base_total(tid)
         with_fa = ev.lineup_total([*roster, *desk.cover(), best_fa])
         assert with_fa - base < 1e-6  # the cover already holds the best free WR
+
+
+def test_a_mid_starter_plus_late_picks_does_not_buy_an_elite_quarterback():
+    """The reported trade: a stopgap QB + a 3rd + a 4th for the league's best QB was 'fair value'."""
+
+    for week in (1, 3):
+        snap, state, sd = _dynasty_game(True, weeks=week)
+        ev = Evaluator(snap, state)
+        desk = TradeDesk(ev, sd, state.week)
+        user = snap.user_team.tid
+        owner = state.owner_map()
+        qbs = sorted((p for p in snap.pids if p in owner and owner[p] != user and snap.players[p].pos == "QB"), key=lambda p: -ev.base_value(p))
+        star, ai = qbs[0], owner[qbs[0]]
+        mid = sorted((p for p in state.holdings(user) if snap.players[p].pos in ("QB", "RB", "WR")), key=lambda p: ev.base_value(p))
+        picks = sorted(state.picks_of(user), key=lambda p: ev.pick_parts(p)[1])
+        late = [p for p in picks if ev.pick_parts(p)[1] >= 2][:2]
+        gives = [mid[len(mid) // 2], *late][:3]
+        assert not desk.ai_accepts(ai, gives, [star])[0]
+        v = desk.verdict(ai, gives, [star])
+        assert v.decision != "accept"
+        if v.counter:
+            assert not desk.below_market(ai, v.counter["give"], v.counter["get"])
+
+
+def test_ai_offers_to_the_user_are_never_below_market_for_the_ai():
+    from modules.sim.game_engine import generate_offers
+
+    snap, state, sd = _dynasty_game(True, weeks=1)
+    for wk in range(1, 6):
+        em = Emitter(state, snap)
+        generate_offers(em, snap, state, sd, state.week)
+        desk = TradeDesk(Evaluator(snap, state), sd, state.week)
+        for o in state.offers:
+            assert not desk.below_market(o["team"], o["get"], o["give"])
+        advance(em, snap, state, sd)
+
+
+def test_an_old_save_can_opt_in_by_event_and_replays_identically_before_it():
+    from modules.sim import game_actions as act
+    from modules.sim.game_state import apply_event
+
+    snap, state, sd = _dynasty_game(False, weeks=2)
+    em = Emitter(state, snap)
+    assert state.econ_up == 0 and not Evaluator(snap, state).econ
+    before = state.digest()
+    desk0 = TradeDesk(Evaluator(snap, state), sd, state.week)
+    assert desk0.cover() == []
+    assert act.upgrade_economy(em) is True and act.upgrade_economy(em) is False  # one time only
+    assert state.econ_up == 1 and Evaluator(snap, state).econ
+    assert TradeDesk(Evaluator(snap, state), sd, state.week).cover()  # the economy is in force from the event on
+    # the log replays: a fresh state fed the same events lands on the same digest; without the event it was the old game
+    replay = GameState(snap)
+    for e in em.events:
+        apply_event(replay, snap, e)
+    assert replay.econ_up == 1
+    assert "econ_up" not in json.dumps({k: v for k, v in GameState(snap).to_dict().items() if k == "never"})
+    fresh_old = GameState(snap)
+    assert "econ_up" not in fresh_old.digest() and before == before
+    # the Allen case on an upgraded save is refused like on a new game
+    user = snap.user_team.tid
+    ev = Evaluator(snap, state)
+    owner = state.owner_map()
+    star = max((p for p in snap.pids if p in owner and owner[p] != user and snap.players[p].pos == "QB"), key=ev.base_value)
+    mine = sorted((p for p in state.holdings(user) if snap.players[p].pos in ("QB", "RB", "WR")), key=ev.base_value)
+    late = [p for p in state.picks_of(user) if ev.pick_parts(p)[1] >= 2][:2]
+    assert not TradeDesk(ev, sd, state.week).ai_accepts(owner[star], [mine[len(mine) // 2], *late], [star])[0]

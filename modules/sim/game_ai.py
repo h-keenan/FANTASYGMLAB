@@ -209,7 +209,7 @@ class TradeDesk:
         filled from the wire; handing a team a player no better than the wire's does not improve its lineup). Empty for older saves."""
 
         if self._cover is None:
-            self._cover = self.ev.cover() if self.snap.settings.econ_v else []
+            self._cover = self.ev.cover() if self.ev.econ else []
         return self._cover
 
     def base_total(self, tid: str) -> float:
@@ -287,7 +287,7 @@ class TradeDesk:
     def below_market(self, ai: str, user_gives: Sequence[str], user_gets: Sequence[str]) -> bool:
         """econ_v 1+: the deal sells assets below the league's consensus value by more than the manager tolerates."""
 
-        if not self.snap.settings.econ_v:
+        if not self.ev.econ:
             return False
         lost, tol = self.consensus_loss(ai, user_gives, user_gets)
         return lost > tol
@@ -526,6 +526,8 @@ class TradeDesk:
                 uj, _, _ = self.utility(partner, get, give)
                 if to_user:
                     if uj < OFFER_USER_FLOOR or self.linear_loss(partner, get, give) > 4.0:
+                        continue
+                    if self.below_market(proposer, get, give):  # econ_v 1: an AI never gifts the user value either
                         continue
                 elif uj + self.noise(partner) < pparams.accept_threshold or self.linear_loss(partner, get, give) > floor_tolerance(pparams):
                     continue

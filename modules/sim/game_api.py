@@ -1032,6 +1032,16 @@ def add_routes(router: APIRouter, ctx: GameApiCtx) -> None:
 
         return _mutate(user, game_id, run)
 
+    @router.post("/games/{game_id}/fair-trades")
+    @guarded
+    def post_fair_trades(game_id: str, user: dict[str, Any] = Depends(require_user)):
+        """One-time opt-in for a game made before 'fair trades v2' (econ_v 1): AI managers stop selling stars below market from now on."""
+
+        def run(em, snap, state, row, seed):
+            return {"upgraded": act.upgrade_economy(em), "fair_trades": True}
+
+        return _mutate(user, game_id, run)
+
     @router.post("/games/{game_id}/revert-week")
     @guarded
     def revert_week(game_id: str, user: dict[str, Any] = Depends(require_user)):

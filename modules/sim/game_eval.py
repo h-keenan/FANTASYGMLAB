@@ -72,10 +72,12 @@ class Evaluator:
         self.additive = getattr(snapshot, "_role_mode", "") == "additive"
         self._level: dict[str, float] = {}
         self._repl: dict[str, float] | None = None
-        scale = getattr(snapshot, "_now_scale", None)
+        self.econ = bool(snapshot.settings.econ_v or getattr(state, "econ_up", 0))  # econ_v 1 rules in force (new game, or a save upgraded by an event)
+        attr = "_now_scale_econ" if self.econ else "_now_scale"
+        scale = getattr(snapshot, attr, None)
         if scale is None:  # frozen snapshot: memoize on the instance
             scale = self._compute_now_scale()
-            object.__setattr__(snapshot, "_now_scale", scale)
+            object.__setattr__(snapshot, attr, scale)
         self.now_scale = scale
 
     def base_value(self, pid: str) -> float:
@@ -90,7 +92,7 @@ class Evaluator:
     def _compute_now_scale(self) -> dict[str, float]:
         scale: dict[str, float] = {}
         base = (lambda p: p.value) if self.policy.season_valuation else (lambda p: p.market)
-        econ = bool(self.snap.settings.econ_v)
+        econ = self.econ
         repl0 = self._static_replacement() if econ else {}
         for pos in GAME_POSITIONS:
             rows = sorted(
@@ -442,7 +444,7 @@ class Evaluator:
 
         season, rnd, orig = self.pick_parts(pid)
         years_out = max(0, season - self.draft_year_now())
-        if self.snap.settings.econ_v:  # econ_v 1: the value of the rookie the pick becomes (average over the round when the slot is unknown)
+        if self.econ:  # econ_v 1: the value of the rookie the pick becomes (average over the round when the slot is unknown)
             return pick_market_value_v2(rnd, self.pick_slot_frac(orig) if years_out == 0 else None, years_out, len(self.snap.teams))
         frac = self.pick_slot_frac(orig) if years_out == 0 else FUTURE_SLOT_FRAC
         return pick_market_value(rnd, frac, years_out, len(self.snap.teams))
@@ -465,13 +467,13 @@ class Evaluator:
             return self.pick_worth(params, pid)
         p = self.snap.players[pid]
         h = self.horizon_now(params)
-        if self.snap.settings.econ_v:  # econ_v 1: only production above the free-agent level is worth anything
+        if self.econ:  # econ_v 1: only production above the free-agent level is worth anything
             now = min(100.0, self.now_scale[p.pos] * max(0.0, self.ros_mean(pid) - self.replacement(p.pos)))
         else:
             now = min(100.0, self.now_scale[p.pos] * self.ros_mean(pid))
         out = 0 if healthy else self.state.out.get(pid, 0)
         keep = 1.0
-        if self.snap.settings.econ_v:  # econ_v 1: an injury costs the share of the season he misses (the old cap: 6 weeks, 60% of the "now" half)
+        if self.econ:  # econ_v 1: an injury costs the share of the season he misses (the old cap: 6 weeks, 60% of the "now" half)
             weeks_left = self.snap.settings.regular_weeks if self.state.status == "offseason" else max(1, self.snap.settings.regular_weeks - self.state.week + 1)
             keep = 1.0 - min(out, weeks_left) / weeks_left
             now *= keep
