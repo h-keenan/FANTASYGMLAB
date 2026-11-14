@@ -39,8 +39,16 @@ describe("SimGameOrb", () => {
     fireEvent.click(screen.getByRole("button", { name: /All games/ }));
     expect(onHub).toHaveBeenCalled();
     fireEvent.click(screen.getByTestId("sim-game-orb"));
-    fireEvent.click(screen.getByRole("button", { name: /More: rules/ }));
+    fireEvent.click(screen.getByRole("button", { name: /More.*Rules/ }));
     expect(onMore).toHaveBeenCalled();
+  });
+
+  it("styles the menu rows like the FantasyDesk More sheet: tinted glyph, label over a subtitle", () => {
+    render(<SimGameOrb {...base} />);
+    fireEvent.click(screen.getByTestId("sim-game-orb"));
+    const nav = screen.getByTestId("sim-game-nav");
+    expect(nav).toHaveTextContent("Lineup, bench, and roster moves");
+    expect(nav.querySelectorAll(".game-nav-row span.shrink-0").length).toBeGreaterThanOrEqual(6);
   });
 
   it("drops Players in the offseason", () => {

@@ -6,7 +6,7 @@ import { useState } from "react";
 
 import { TabGlyph } from "@/components/TabGlyph";
 import { Sheet } from "@/components/ui/Sheet";
-import { bottomTabBadgeText, simGameBottomTabs, simOrbAriaLabel, activeBottomTab } from "@/lib/bottomNav";
+import { bottomTabBadgeText, simGameBottomTabs, simOrbAriaLabel, activeBottomTab, SIM_NAV_META } from "@/lib/bottomNav";
 import { OPEN_SEARCH_EVENT } from "@/lib/orbSearch";
 import type { SimTab } from "@/lib/simGameFlow";
 
@@ -17,9 +17,10 @@ import type { SimTab } from "@/lib/simGameFlow";
  * (Home, Team, Players, Trades, League, More) with the current page lit, plus
  * All games, Home and search; one tap to go, from anywhere in the scroll.
  *
- * Placement: rendered inside the game's in-flow sticky `.bottom-stack`
- * (`.game-orb-dock`, absolute inside the stack, never position:fixed or
- * JS-positioned), docked bottom-right directly above the Advance pill.
+ * Placement: a slot inside the action bar's one row (Sim to | orb | Advance),
+ * centered like FantasyDesk's orb, in flow inside the sticky `.bottom-stack`
+ * (never position:fixed or JS-positioned), so it can neither overlap content
+ * nor clip. The menu rows reuse the More sheet's look (tinted glyph, subtitle).
  * Mobile twin: mobile/src/components/SimGameOrb.tsx.
  */
 export function SimGameOrb({
@@ -46,8 +47,8 @@ export function SimGameOrb({
 
   return (
     <>
-      <div className="game-orb-dock" data-testid="sim-game-orb-dock">
-        <button type="button" className="game-orb" onClick={() => setOpen(true)} aria-haspopup="dialog" aria-label={simOrbAriaLabel(currentTab.label, inbox)} data-testid="sim-game-orb">
+      <div className="game-orb-slot md:hidden" data-testid="sim-game-orb-dock">
+        <button type="button" className="game-orb game-orb--bar" onClick={() => setOpen(true)} aria-haspopup="dialog" aria-label={simOrbAriaLabel(currentTab.label, inbox)} data-testid="sim-game-orb">
           <Image src="/brand-mark.png" alt="" width={18} height={18} className="brand-mark-icon" style={{ objectFit: "contain" }} />
           <span className="game-orb-label" aria-hidden="true">{currentTab.label}</span>{badge ? " " : null}
           {badge ? <span className="game-orb-badge" aria-hidden="true" data-testid="sim-game-orb-badge">{badge}</span> : null}
@@ -68,10 +69,15 @@ export function SimGameOrb({
                   onTab(t.key as SimTab);
                 }}
               >
-                <TabGlyph name={t.glyph} size={22} />
-                <span className="flex-1">{t.label}</span>
+                <span className="shrink-0" style={{ color: `var(--color-${SIM_NAV_META[t.key]?.tone ?? "accent"})` }}>
+                  <TabGlyph name={t.glyph} size={22} />
+                </span>
+                <span className="flex min-w-0 flex-1 flex-col">
+                  <span className="text-sm font-bold">{t.label}</span>
+                  <span className="truncate text-xs font-normal" style={{ color: "var(--color-text-muted)" }}>{SIM_NAV_META[t.key]?.subtitle}</span>
+                </span>
                 {count ? (
-                  <span className="game-orb-badge" style={{ position: "static" }} aria-label={`${t.badge} new`}>
+                  <span className="game-orb-badge" style={{ position: "static", transform: "none" }} aria-label={`${t.badge} new`}>
                     {count}
                   </span>
                 ) : null}
@@ -79,24 +85,29 @@ export function SimGameOrb({
             );
           })}
           <button type="button" className="game-nav-row" onClick={() => { close(); onMore(); }}>
-            <TabGlyph name="more" size={22} />
-            <span className="flex-1">More: rules, reset week, delete</span>
+            <span className="shrink-0" style={{ color: "var(--color-accent)" }}>
+              <TabGlyph name="more" size={22} />
+            </span>
+            <span className="flex min-w-0 flex-1 flex-col">
+              <span className="text-sm font-bold">More</span>
+              <span className="truncate text-xs font-normal" style={{ color: "var(--color-text-muted)" }}>{SIM_NAV_META.more.subtitle}</span>
+            </span>
           </button>
         </nav>
         <div className="mt-3 flex flex-col gap-1 border-t pt-3" style={{ borderColor: "var(--color-border)" }}>
           <button type="button" className="game-nav-row" onClick={() => { close(); window.setTimeout(() => window.dispatchEvent(new Event(OPEN_SEARCH_EVENT)), 0); }}>
-            <svg width={22} height={22} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+            <svg width={22} height={22} viewBox="0 0 24 24" fill="none" stroke="var(--color-diagnostic)" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" className="shrink-0">
               <circle cx="11" cy="11" r="7" />
               <path d="m20 20-3.5-3.5" />
             </svg>
             <span className="flex-1">Search players and pages</span>
           </button>
           <button type="button" className="game-nav-row" onClick={() => { close(); onHub(); }}>
-            <TabGlyph name="league" size={22} />
+            <span className="shrink-0" style={{ color: "var(--color-premium)" }}><TabGlyph name="league" size={22} /></span>
             <span className="flex-1">All games</span>
           </button>
           <Link href="/" className="game-nav-row" onClick={close}>
-            <TabGlyph name="home" size={22} />
+            <span className="shrink-0" style={{ color: "var(--color-accent)" }}><TabGlyph name="home" size={22} /></span>
             <span className="flex-1">Back to FantasyDesk home</span>
           </Link>
         </div>

@@ -439,6 +439,17 @@ export default function GmGameScreen({ navigation }: Props) {
     setGameState(null);
     void refreshList();
   };
+  const orbNode = game ? (
+            <SimGameOrb
+              tab={flow.tab}
+              offseason={showOffBar}
+              inbox={game.pending?.inbox ?? 0}
+              onTab={(tab) => dispatch({ type: 'tab', tab })}
+              onMore={() => dispatch({ type: 'tab', tab: 'more' })}
+              onHub={goHub}
+              onAppHome={() => navigation.navigate('Home')}
+            />
+  ) : null;
   const shell = (children: React.ReactNode, sheet?: React.ReactNode) => (
     <View style={styles.root}>
       <GridBackground />
@@ -454,29 +465,18 @@ export default function GmGameScreen({ navigation }: Props) {
         {children}
       </ScrollView>
       {anyBar && game && ctx ? (
-        // Bottom stack: the orb docks right-aligned directly above the Advance pill; both are in flow
-        // inside one absolute container, so the orb can never overlap the pill (the content pads by its measured height).
+        // Bottom stack: ONE bar (Sim to | orb | Advance), in flow inside one absolute container, so nothing overlaps or
+        // clips (the content pads by its measured height).
         <View
           style={[styles.bottomStack, { paddingBottom: Math.max(insets.bottom, spacing.sm) }]}
           pointerEvents="box-none"
           onLayout={(e) => setStackHeight(Math.ceil(e.nativeEvent.layout.height))}
           testID="sim-bottom-stack"
         >
-          <View style={styles.orbDock} pointerEvents="box-none">
-            <SimGameOrb
-              tab={flow.tab}
-              offseason={showOffBar}
-              inbox={game.pending?.inbox ?? 0}
-              onTab={(tab) => dispatch({ type: 'tab', tab })}
-              onMore={() => dispatch({ type: 'tab', tab: 'more' })}
-              onHub={goHub}
-              onAppHome={() => navigation.navigate('Home')}
-            />
-          </View>
           {showBar ? (
-            <SimActionBar ctx={ctx} paywalled={simGamePaywalled(preview)} advancing={advancing} onAdvance={advance} onSimTo={() => setSimToOpen(true)} onGoPro={goPaywall} onTab={(tab) => dispatch({ type: 'tab', tab })} />
+            <SimActionBar orb={orbNode} ctx={ctx} paywalled={simGamePaywalled(preview)} advancing={advancing} onAdvance={advance} onSimTo={() => setSimToOpen(true)} onGoPro={goPaywall} onTab={(tab) => dispatch({ type: 'tab', tab })} />
           ) : (
-            <SimOffseasonBar ctx={ctx} onTab={(tab) => dispatch({ type: 'tab', tab })} />
+            <SimOffseasonBar orb={orbNode} ctx={ctx} onTab={(tab) => dispatch({ type: 'tab', tab })} />
           )}
         </View>
       ) : null}
@@ -1161,7 +1161,6 @@ function createStyles(colors: ThemeColors) {
     rowBetween: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: spacing.md },
     grow: { flex: 1, minWidth: 0 },
     bottomStack: { position: 'absolute', left: 0, right: 0, bottom: 0, paddingHorizontal: spacing.md, gap: spacing.sm },
-    orbDock: { alignItems: 'flex-end' },
     start: { alignSelf: 'flex-start' },
     kicker: { fontSize: 12.5, fontWeight: '800', letterSpacing: 0.8, textTransform: 'uppercase', color: colors.textTertiary },
     heroTitle: { fontSize: 22, fontWeight: '800', color: colors.textPrimary },

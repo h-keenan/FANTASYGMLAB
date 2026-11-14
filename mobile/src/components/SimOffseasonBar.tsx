@@ -18,7 +18,7 @@ import { radii, spacing, type ThemeColors } from '../theme';
  * offseason itself so any tab can mount it. An in-flow glass pill like
  * SimActionBar: the screen's bottom stack docks it with the game orb above it.
  */
-export default function SimOffseasonBar({ ctx, onTab }: { ctx: SimCtx; onTab?: (tab: 'home') => void }) {
+export default function SimOffseasonBar({ ctx, onTab, orb }: { ctx: SimCtx; onTab?: (tab: 'home') => void; orb?: React.ReactNode }) {
   const { colors } = useThemeMode();
   const styles = useMemo(() => createStyles(colors), [colors]);
   const { gameId, call } = ctx;
@@ -97,9 +97,7 @@ export default function SimOffseasonBar({ ctx, onTab }: { ctx: SimCtx; onTab?: (
         </AppText>
       ) : null}
       <View style={styles.row}>
-        <AppText style={styles.step} numberOfLines={1}>
-          {simOffseasonStageLabel(off.stage)}
-        </AppText>
+        {orb}
         <View style={[styles.cta, cta.blocked ? styles.ctaBlocked : null]}>
           <Button label={cta.label} loading={busy && !confirmAuto} disabled={Boolean(cta.blocked) || confirmAuto} onPress={press} />
         </View>
@@ -121,7 +119,7 @@ function createStyles(colors: ThemeColors) {
     },
     row: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: spacing.md },
     step: { flex: 1, minWidth: 0, fontSize: 12.5, fontWeight: '700', color: colors.textTertiary },
-    cta: { flexShrink: 0 },
+    cta: { flex: 1, minWidth: 0 },
     ctaBlocked: { borderWidth: 1, borderColor: colors.borderStrong ?? colors.border, borderRadius: radii.md },
     reason: { fontSize: 12, fontWeight: '700', color: colors.warning, textAlign: 'center' },
     confirm: { fontSize: 14, color: colors.textPrimary },
