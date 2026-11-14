@@ -496,3 +496,41 @@ from the trade picker replaces it and Back returns with the selection intact; th
 Related pages are tabs of one page family (`lib/pageFamilies.ts`: Trades, Team, League), rendered by `PageTabBar` over
 `PillRow glass` (sticky, scroll-snap, cyan glass active pill). Each tab keeps its route. The phone footer
 (`BottomTabBar`) uses the same glass tokens. Plan: `docs/audits/2026-11-menu-consolidation.md`.
+=======
+## Sheet tabs (quick views that would otherwise scroll long)
+
+Rule: a pop-up that scrolls past about one and a half screens groups its content under the shared `Tabs`
+(`components/Tabs.tsx`, app `components/Tabs.tsx`), never one long page. The pop-up shell is unchanged (it still goes
+through `useOverlay` / `PopupShell` / `Sheet`, so the one-pop-up-at-a-time, Back and X rules in "Overlays" hold).
+
+- **Plans live in a lib twin**: `lib/sheetTabs.ts` (byte-identical web + app, listed in `IDENTICAL` in
+  `scripts/check_lib_twins.mjs`) decides which tabs a real-league sheet has, so both platforms group the same content
+  under the same names. A tab with nothing to show is dropped; the first tab always exists and carries loading /
+  upsell / empty states. Tests: `lib/sheetTabs.test.ts` (both trees), `Tabs.test.tsx`,
+  `ManagerProfileSheetTrades.test.tsx`, `PercentileExplorerSheet.test.tsx`.
+- **Sticky strip**: web `Tabs` wraps the strip in `.tabs-sticky` (position sticky, top 0, frosted glass, so content slides
+  under it). Opt out with `sticky={false}`. App: `useTabs()` returns `{ bar, panel }`; a sheet makes the bar a direct
+  child of its `SheetScrollView` and pins it with `stickyHeaderIndices` (Player Quick View: index 2 = top bar, hero,
+  strip), or puts the bar above its ScrollView (Manager profile) so only the panel scrolls. `<Tabs>` is the unpinned
+  stack of the same two pieces.
+- **No layout jump**: the panel keeps the tallest height it has shown as its minimum (`nextPanelMinHeight`), so a short
+  tab after a long one never pulls the sheet or the strip.
+- **State**: the open tab is remembered per surface id for the session (`lib/sessionTab.ts`); anything that must survive a
+  tab switch (search text, scrubbed bucket, selection) lives in the sheet's own state, not inside a panel, because panels
+  are lazy and unmount when hidden. The slide between panels is off under reduced motion (CSS media query / OS setting).
+  Swipe-to-dismiss is untouched (a drag still starts from the handle, or the body only at scroll top); tabs are tapped,
+  not swiped, so they never fight it.
+- **Fantasy Sim isolation**: sim sheets (SimPlayerSheet, SimGameTeamSheet, sim sections of the PQV) keep their own plans;
+  `sheetTabs.ts` knows nothing about the sim and the sim tabs never render real news.
+
+| Sheet | Tabs | Web | App |
+|---|---|---|---|
+| Player Quick View (real) | Overview, Outlook, Stats, Profile | yes | yes (sticky strip) |
+| Player Quick View (sim) | Overview, Outlook, Scouting, History, plus Stats/Profile for real-backed | yes | yes |
+| Sim team sheet | Overview and more | yes | yes |
+| Manager profile | Overview, Tendencies, Trades | yes | yes (strip pinned above the scroll) |
+| Percentile explorer | chart + comparison stay on top; tabs In this bucket, Find a player, My roster | yes | yes |
+
+Left as they are (short or already segmented): trade picker (Players / Picks segmented control), Matchup swap sheet,
+share previews, filter sheets, alerts dropdown.
+>>>>>>> origin/main

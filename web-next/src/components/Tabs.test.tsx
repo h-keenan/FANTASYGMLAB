@@ -62,4 +62,22 @@ describe("shared Tabs", () => {
     fireEvent.keyDown(screen.getByRole("tablist"), { key: "ArrowRight" });
     expect(screen.getByRole("tab", { name: "Stats" })).toHaveAttribute("aria-selected", "true");
   });
+
+  it("pins the strip (sticky) by default and keeps the tallest panel height so tabs do not jump", () => {
+    const heights = [200, 80];
+    const spy = vi.spyOn(HTMLElement.prototype, "scrollHeight", "get").mockImplementation(function (this: HTMLElement) {
+      return this.getAttribute("role") === "tabpanel" ? (this.textContent?.includes("Overview") ? heights[0] : heights[1]) : 0;
+    });
+    render(<Tabs id="jump" tabs={make()} />);
+    expect(document.querySelector(".tabs-sticky")).not.toBeNull();
+    expect(screen.getByRole("tabpanel").style.minHeight).toBe("200px");
+    fireEvent.click(screen.getByRole("tab", { name: "Stats" }));
+    expect(screen.getByRole("tabpanel").style.minHeight).toBe("200px");
+    spy.mockRestore();
+  });
+
+  it("can opt out of the sticky strip", () => {
+    render(<Tabs id="nosticky" tabs={make()} sticky={false} />);
+    expect(document.querySelector(".tabs-sticky")).toBeNull();
+  });
 });
