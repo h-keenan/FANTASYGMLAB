@@ -196,14 +196,14 @@ export default function SimWeekRecapStory({
               {r.status === 'bubble' ? <SimToneBadge label="Bubble" tone="warning" /> : null}
               <View style={{ alignItems: 'flex-end' }}>
                 <AppText style={{ fontSize: 13, fontWeight: '700', color: colors.textPrimary }}>{r.record}</AppText>
-                <AppText style={[common.muted, { fontSize: 11 }]}>{`${simFmtPts(r.pf)} PF`}</AppText>
+                <AppText style={[common.muted, { fontSize: 12 }]}>{`${simFmtPts(r.pf)} PF`}</AppText>
               </View>
               <AppText style={{ minWidth: 36, textAlign: 'right', fontSize: 13, fontWeight: '800', color: moveColor }}>{simMovementText(r.delta)}</AppText>
             </View>
             {spots > 0 && r.rank === spots && rows[i + 1] ? (
               <View style={styles.cut} accessibilityLabel="Playoff cut line">
                 <View style={[styles.cutLine, { borderColor: colors.warning }]} />
-                <AppText style={[common.muted, { color: colors.warning, fontWeight: '800', textTransform: 'uppercase', fontSize: 11 }]}>Playoff cut</AppText>
+                <AppText style={[common.muted, { color: colors.warning, fontWeight: '800', textTransform: 'uppercase', fontSize: 12 }]}>Playoff cut</AppText>
                 <View style={[styles.cutLine, { borderColor: colors.warning }]} />
               </View>
             ) : null}
