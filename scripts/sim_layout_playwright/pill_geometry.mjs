@@ -93,7 +93,7 @@ const measure = () => {
   return { dbg: strip ? { strip: strip.clientWidth, tabs: [...strip.querySelectorAll(".pill-tab")].map((e) => Math.round(e.getBoundingClientRect().width)), layer: layer.getBoundingClientRect().width, kids: [...layer.children].map((k) => Math.round(k.getBoundingClientRect().width)) } : null, clip, scrolls: strip ? strip.scrollWidth > strip.clientWidth + 1 : false, fade: strip ? !!strip.dataset.fade : false, primW: prim ? prim.getBoundingClientRect().width : 0, pillH: pr.height, items, capsule, padL: first.left - lr.left, padR: lr.right - last.right, stripPad, overflowX: document.documentElement.scrollWidth - innerWidth };
 };
 
-const cases = [["draft 4 + Auto-pick", "?family=draft"], ["draft 5 + Auto-pick", "?family=draft&draft=5"], ["trades + New trade", "?family=trades&primary=1"], ["team", "?family=team"], ["team + primary", "?family=team&primary=1"], ["trades", "?family=trades"], ["league", "?family=league"], ["sim bar", "?family=team&sim=1"]];
+const cases = [["draft 4 + Auto-pick", "?family=draft"], ["draft 5 + Auto-pick", "?family=draft&draft=5"], ["team", "?family=team"], ["team + primary", "?family=team&primary=1"], ["trades", "?family=trades"], ["league", "?family=league"], ["sim bar", "?family=team&sim=1"]];
 const rows = [];
 let bad = 0;
 for (const w of [390, 360]) {
@@ -113,6 +113,8 @@ for (const w of [390, 360]) {
     const clipped = m.clip.filter((c) => c.left < -0.5 || c.right < -0.5 || c.overChip);
     // Up to 4 tabs at 390 must all fit; 5 tabs, or 360, may scroll (with the edge fade on) as long as the lit tab is fully shown.
     if (clipped.length && ((w >= 390 && m.clip.length <= 4) || !m.scrolls || !m.fade || clipped.some((c) => c.active))) problems.push(`label clipped: ${clipped.map((c) => `${c.label} (L${c.left.toFixed(1)} R${c.right.toFixed(1)}${c.overChip ? " under chip" : ""})`).join(", ")}`);
+    if (name === "trades" && m.primW > 0) problems.push("Trades must have no lone glyph chip (it duplicated the Analyzer tab)");
+    if (m.items.filter((i) => i.what === "pill-icon-btn--menu").length !== (name.startsWith("draft") ? 0 : 1) && !name.startsWith("sim") && !name.startsWith("draft")) problems.push("expected exactly ONE merged section/menu button");
     if (m.overflowX > 0) problems.push(`page scrolls sideways by ${m.overflowX}px`);
     if (problems.length) bad++;
     rows.push({ w, case: name, dbg: m.dbg, scrolls: m.scrolls, primW: Math.round(m.primW), pillH: Math.round(m.pillH), worstDy: +worst.toFixed(2), capsule: m.capsule && { dy: +m.capsule.dy.toFixed(2), dx: +m.capsule.dx.toFixed(2) }, padL: +m.padL.toFixed(1), padR: +m.padR.toFixed(1), stripPad: m.stripPad, problems });
