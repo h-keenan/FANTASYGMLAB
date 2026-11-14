@@ -237,7 +237,7 @@ export const SIM_TEMPLATE_ADAPTERS: ReadonlyArray<{ module: string; template: Te
   { module: "SimFold", template: "compactModule", note: "CompactModule with sim parts (simSummaries.ts)" },
   { module: "SimDraftHero", template: "hero", note: "on-the-clock Hero + CompactModule bar (simDraft.ts); the bar's `preview` line is SimDraftBar (best-available avatar, position, letter grade)" },
   { module: "SimStatusHeader", template: "statusHeader", note: "Home: ring = win chance, injuries/waiver/bye player rows (projection and ADP only)" },
-  { module: "SimDraftRow / SimPlayerLine / SimRosterLine", template: "row", note: "PlayerListRow with sim chips (PROJ / OVR / ADP)" },
+  { module: "SimDraftRow / SimPlayerLine / SimRosterLine", template: "row", note: "PlayerAccordionRow mode=sim: stats line with PROJ and a grade tile, one Move button that expands the row into an action strip" },
   { module: "SimDraftBoard filters", template: "listFilter", note: "one control row: position pills + sort" },
   { module: "SimActionBar", template: "actionBar", note: "sticky sim actions" },
   { module: "SimNotice", template: "state", note: "auto-dismiss notice toast (noticeDismissMs)" },

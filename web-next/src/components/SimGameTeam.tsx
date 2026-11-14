@@ -12,7 +12,8 @@ import { PositionBadge } from "@/components/PositionBadge";
 import { SimGlyph } from "@/components/SimGlyph";
 import { SimPlayerBrowser } from "@/components/SimGamePlayers";
 import { SimPickLine, useSimPicks } from "@/components/SimGameDynastyParts";
-import { SimReserveButton, SimReserveGroups, SimReserveSheet } from "@/components/SimGameReserves";
+import { SimReserveGroups, useSimRosterMoves, type SimRowMoveOptions } from "@/components/SimGameReserves";
+import type { SimMoveHandle } from "@/components/SimMoveStrip";
 import { SimFold, SimIconButton, SimPlayerChip, SimRosterLine, SimSectionTitle, SimSheet, SimToneBadge, type SimCtx } from "@/components/SimGameParts";
 import { ReviewGlyphChip } from "@/components/SeasonReviewSections";
 import { CompactModule } from "@/components/ui/CompactModule";
@@ -22,7 +23,6 @@ import { SkeletonCard } from "@/components/Skeleton";
 import { api } from "@/lib/api";
 import {
   simAssignSlot,
-  simBenchOffersReserveMove,
   simBenchSwapTargets,
   simOptimisticClaim,
   simWithout,
@@ -50,7 +50,6 @@ import {
   simLimitBlocks,
   simOverLimitNote,
 } from "@/lib/simGame";
-import { playerSurname } from "@/lib/playerNameDisplay";
 
 /** Lineup, bench and this week's matchup. Every change saves at once (PUT /lineup). */
 export function SimTeamTab({ ctx, onTrade }: { ctx: SimCtx; onTrade: () => void }) {
@@ -58,11 +57,8 @@ export function SimTeamTab({ ctx, onTrade }: { ctx: SimCtx; onTrade: () => void 
   const [lineup, setLineup] = useState<SimLineupResponse | null>(null);
   const [state, setState] = useState<"loading" | "ready" | "error">("loading");
   const [pickSlot, setPickSlot] = useState<number | null>(null);
-  const [swapIn, setSwapIn] = useState<SimGamePlayer | null>(null);
-  const [cutting, setCutting] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [attempt, setAttempt] = useState(0);
-  const [moving, setMoving] = useState<SimGamePlayer | null>(null);
   const picks = useSimPicks(ctx);
   // Phones: Auto-set (the lineup action) lives in the bottom pill on this page; it has no tab row of its own to move.
   useBottomPillContext({
@@ -126,7 +122,6 @@ export function SimTeamTab({ ctx, onTrade }: { ctx: SimCtx; onTrade: () => void 
   }
 
   async function cut(player: SimGamePlayer) {
-    setCutting(null);
     const body = await call(() => api.cutSimPlayer(gameId, player.id));
     if (!body) {
       // The server may have finished the cut even though this call reported a failure (lost response, retry):
@@ -141,6 +136,19 @@ export function SimTeamTab({ ctx, onTrade }: { ctx: SimCtx; onTrade: () => void 
       await refreshGame();
     }
   }
+
+  const handleFor = useSimRosterMoves({
+    ctx,
+    state: { reserves: lineup?.reserves, rosterSize: lineup?.roster_size, rosterLimit: lineup?.roster_limit },
+    taxi: lineup?.taxi ?? [],
+    onCut: cut,
+    onMoved: (body, player, to) => {
+      setLineup(body);
+      ctx.notify(`${player.name} ${to === "ir" ? "is on IR" : to === "taxi" ? "is on the taxi squad" : "is back on your roster"}.`, "success");
+      ctx.bump();
+      void refreshGame();
+    },
+  });
 
   if (state === "loading") {
     return (
@@ -226,7 +234,7 @@ export function SimTeamTab({ ctx, onTrade }: { ctx: SimCtx; onTrade: () => void 
       >
         <div className="flex min-w-0 flex-col gap-1">
         {slots.map((slot, index) => (
-          <LineupRow key={`${slot.slot}-${index}`} week={game.week} slotLabel={labels[index]} slot={slot.slot} player={slot.player} locked={lineup.locked} onOpen={ctx.openPlayer} onPick={() => setPickSlot(index)} onMove={reservesOn && slot.player?.status === "out" ? setMoving : undefined} />
+          <LineupRow key={`${slot.slot}-${index}`} week={game.week} slotLabel={labels[index]} slot={slot.slot} player={slot.player} locked={lineup.locked} onOpen={ctx.openPlayer} onPick={() => setPickSlot(index)} handleFor={handleFor} />
         ))}
         </div>
       </CompactModule>
@@ -250,24 +258,14 @@ export function SimTeamTab({ ctx, onTrade }: { ctx: SimCtx; onTrade: () => void 
               player={player}
               week={game.week}
               onOpen={ctx.openPlayer}
-              trailing={
-                cutting === player.id ? (
-                  <>
-                    <Button size="sm" variant="danger" onClick={() => cut(player)}>Cut {playerSurname(player.name)}</Button>
-                    <Button size="sm" variant="ghost" onClick={() => setCutting(null)}>Keep</Button>
-                  </>
-                ) : (
-                  <>
-                    {reservesOn && simBenchOffersReserveMove(player, reserveState) ? <SimReserveButton player={player} onOpen={setMoving} /> : null}
-                    <SimIconButton disabled={lineup.locked} label={`Swap ${player.name} into your lineup`} onClick={() => setSwapIn(player)}>
-                      <SimGlyph name="trade" size={16} />
-                    </SimIconButton>
-                    <Button size="sm" variant={overLimit ? "dangerOutline" : "ghost"} aria-label={`Cut ${player.name}`} onClick={() => setCutting(player.id)}>
-                      Cut
-                    </Button>
-                  </>
-                )
-              }
+              move={handleFor(player, {
+                swapTargets: simBenchSwapTargets(player, slots, labels),
+                lineupLocked: lineup.locked,
+                onSwapTo: (index) => {
+                  const next = simAssignSlot({ slots, bench }, index, player);
+                  void save(next.slots, next.bench);
+                },
+              })}
             />
           ))
         )}
@@ -275,57 +273,12 @@ export function SimTeamTab({ ctx, onTrade }: { ctx: SimCtx; onTrade: () => void 
           <Button size="sm" variant="ghost" onClick={onTrade}>Shop a trade</Button>
         ) : null}
         {reservesOn ? (
-          <SimReserveGroups ir={lineup.ir ?? []} taxi={lineup.taxi ?? []} state={reserveState} onOpen={setMoving} openPlayer={ctx.openPlayer} cutting={cutting} onAskCut={setCutting} onCut={cut} />
+          <SimReserveGroups ir={lineup.ir ?? []} taxi={lineup.taxi ?? []} state={reserveState} openPlayer={ctx.openPlayer} handleFor={handleFor} />
         ) : null}
         {game.settings.mode === "dynasty" && picks ? <SimYourPicks picks={myPicks} draftYear={picks.draft_year} /> : null}
         </div>
       </CompactModule>
       </div>
-
-      {moving ? (
-        <SimReserveSheet
-          ctx={ctx}
-          player={moving}
-          state={reserveState}
-          taxi={lineup.taxi ?? []}
-          onClose={() => setMoving(null)}
-          onMoved={(body, player, to) => {
-            setMoving(null);
-            setLineup(body);
-            ctx.notify(`${player.name} ${to === "ir" ? "is on IR" : to === "taxi" ? "is on the taxi squad" : "is back on your roster"}.`, "success");
-            ctx.bump();
-            void refreshGame();
-          }}
-        />
-      ) : null}
-
-      {swapIn ? (
-        <SimSheet title={`Swap ${swapIn.name} in`} onClose={() => setSwapIn(null)}>
-          <p className="text-lg font-extrabold pr-10">Swap {swapIn.name} in</p>
-          <div className="flex flex-col pt-2" data-testid="bench-swap-targets">
-            {simBenchSwapTargets(swapIn, slots, labels).length === 0 ? (
-              <p className="text-sm" style={{ color: "var(--color-text-muted)" }}>No lineup slot fits this position.</p>
-            ) : (
-              simBenchSwapTargets(swapIn, slots, labels).map((target) => (
-                <div key={target.index} className="flex items-center gap-2" style={{ minHeight: 52, borderBottom: "var(--border-width-default) solid var(--color-border)" }}>
-                  <span className="flex justify-center" style={{ width: "3.25rem" }}><PositionBadge position={slots[target.index].slot} label={target.label} /></span>
-                  <span className="min-w-0 flex-1 truncate text-sm font-semibold">{target.current ? `Replaces ${target.current.name}` : "Empty slot"}</span>
-                  <Button
-                    size="sm"
-                    onClick={() => {
-                      const next = simAssignSlot({ slots, bench }, target.index, swapIn);
-                      setSwapIn(null);
-                      void save(next.slots, next.bench);
-                    }}
-                  >
-                    Swap
-                  </Button>
-                </div>
-              ))
-            )}
-          </div>
-        </SimSheet>
-      ) : null}
 
       {pickSlot != null ? (
         <SimSheet title={`Choose a ${labels[pickSlot]}`} onClose={() => setPickSlot(null)}>
@@ -604,12 +557,7 @@ export function SimPlayersTab({
  * where the slot does not already say it (FLEX, SUPERFLEX), as a small dot
  * inside the subline, so rows keep identical height at 390px.
  */
-function LineupRow({ slotLabel, slot, player, locked, week, onOpen, onPick, onMove }: { slotLabel: string; slot: SimSlot; player: SimGamePlayer | null; locked?: boolean; week?: number | null; onOpen: (p: SimGamePlayer) => void; onPick: () => void; onMove?: (p: SimGamePlayer) => void }) {
-  const swap = (
-    <SimIconButton disabled={locked} label={player ? `Change ${slotLabel}` : `Fill ${slotLabel}`} primary={!player} onClick={onPick}>
-      <SimGlyph name={player ? "trade" : "check"} size={16} />
-    </SimIconButton>
-  );
+function LineupRow({ slotLabel, slot, player, locked, week, onOpen, onPick, handleFor }: { slotLabel: string; slot: SimSlot; player: SimGamePlayer | null; locked?: boolean; week?: number | null; onOpen: (p: SimGamePlayer) => void; onPick: () => void; handleFor: (p: SimGamePlayer, o?: SimRowMoveOptions) => SimMoveHandle }) {
   if (player) {
     return (
       <SimRosterLine
@@ -617,12 +565,7 @@ function LineupRow({ slotLabel, slot, player, locked, week, onOpen, onPick, onMo
         slot={{ slot, label: slotLabel }}
         week={week}
         onOpen={onOpen}
-        trailing={
-          <>
-            {onMove ? <SimReserveButton player={player} onOpen={onMove} /> : null}
-            {swap}
-          </>
-        }
+        move={handleFor(player, { changeSlot: slotLabel, lineupLocked: locked, onChangeSlot: onPick, noCut: true })}
       />
     );
   }
@@ -630,7 +573,9 @@ function LineupRow({ slotLabel, slot, player, locked, week, onOpen, onPick, onMo
     <div className="flex items-center gap-2" style={{ minHeight: 52, borderBottom: "var(--border-width-default) solid var(--color-border)" }} data-testid="lineup-row">
       <span className="flex justify-center" style={{ width: "3.25rem" }}><PositionBadge position={slot} label={slotLabel} /></span>
       <span className="min-w-0 flex-1 text-sm" style={{ color: "var(--color-warning)" }}>Empty slot</span>
-      {swap}
+      <SimIconButton disabled={locked} label={`Fill ${slotLabel}`} primary onClick={onPick}>
+        <SimGlyph name="check" size={16} />
+      </SimIconButton>
     </div>
   );
 }

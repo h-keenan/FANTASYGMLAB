@@ -1,13 +1,15 @@
 "use client";
 
-import { useCallback, useState, type ReactNode } from "react";
+import { Fragment, useCallback, useState, type ReactNode } from "react";
 
 import { PlayerName } from "@/components/PlayerName";
 import { PositionBadge } from "@/components/PositionBadge";
+import { LetterGrade } from "@/components/ui/LetterGrade";
 import { PlayerBadges } from "@/components/ui/PlayerBadge";
 import { PlayerAvatarSlot } from "@/components/ui/PlayerAvatarSlot";
 import { nextOpenId, playerRowModel, type FactTone, type PlayerFactsInput, type PlayerFact } from "@/lib/playerAnatomy";
 import type { BadgeInput } from "@/lib/playerBadges";
+import type { SimGradeInput } from "@/lib/simGrade";
 
 const TONE: Record<FactTone, string> = {
   success: "var(--color-success)",
@@ -48,6 +50,17 @@ export type PlayerAccordionRowProps = PlayerFactsInput & {
   testId?: string;
   /** Screen-reader name for the row button (defaults to the player name). */
   ariaLabel?: string;
+  /** Sim: the letter grade, drawn as a small tile at the end of the stats line (never a "GRADE" word, never in the trailing slot). */
+  gradeTile?: SimGradeInput | null;
+  /** Replaces the TEAM · Age · Bye line (the caller's parts, with the bye-soon tone and PROJ); one line, truncated. */
+  metaParts?: { key: string; text: string; tone?: FactTone }[];
+  /** Drop the position pill when a slot label column already says it. */
+  hidePosition?: boolean;
+  /**
+   * THE one trailing control of the row (the sim's Move button): a sibling of the row button, never nested in it. The row
+   * itself stays one tap target that expands in place, so a row has one always-visible control and no more.
+   */
+  trailingAction?: ReactNode;
 };
 
 /**
@@ -57,9 +70,10 @@ export type PlayerAccordionRowProps = PlayerFactsInput & {
  * FantasyDesk (`mode="desk"`) and Fantasy Sim (`mode="sim"`: grade, ADP, projection; never OVR or trade value).
  * Mobile twin: components/PlayerAccordionRow.tsx; logic: lib/playerAnatomy.ts.
  */
-export function PlayerAccordionRow({ open, onToggle, badges = [], positionLabel, primaryAction, onOpenProfile, children, testId = "player-accordion-row", ariaLabel, ...input }: PlayerAccordionRowProps) {
+export function PlayerAccordionRow({ open, onToggle, badges = [], positionLabel, primaryAction, onOpenProfile, children, testId = "player-accordion-row", ariaLabel, gradeTile, metaParts, hidePosition = false, trailingAction, ...input }: PlayerAccordionRowProps) {
   const { player } = input;
   const model = playerRowModel(input);
+  const metaLine: { key: string; text: string; tone?: FactTone }[] = metaParts ?? model.meta.map((text, i) => ({ key: `m${i}`, text }));
   return (
     <div
       className="min-w-0"
@@ -78,34 +92,47 @@ export function PlayerAccordionRow({ open, onToggle, badges = [], positionLabel,
           : { borderBottom: "1px solid color-mix(in srgb, var(--color-border) 55%, transparent)", padding: "0.125rem 0.5rem" }
       }
     >
-      <button
-        type="button"
-        onClick={onToggle}
-        aria-expanded={open}
-        aria-label={ariaLabel}
-        className="flex w-full min-w-0 items-center gap-2.5 text-left"
-        style={{ minHeight: "var(--touch-target-min)" }}
-      >
-        <PlayerAvatarSlot player={player} tier="row" />
-        <span className="flex min-w-0 flex-1 flex-col">
-          <span className="flex min-w-0 items-center gap-1.5">
-            <PlayerName name={player.name} className="min-w-0 text-sm font-bold" style={{ color: "var(--color-text-primary)" }} />
-            <PositionBadge position={player.position} label={positionLabel ?? undefined} />
-            <PlayerBadges badges={badges} />
+      <div className="flex min-w-0 items-center gap-1.5">
+        <button
+          type="button"
+          onClick={onToggle}
+          aria-expanded={open}
+          aria-label={ariaLabel}
+          className="flex min-w-0 flex-1 items-center gap-2.5 text-left"
+          style={{ minHeight: "var(--touch-target-min)" }}
+        >
+          <PlayerAvatarSlot player={player} tier="row" />
+          <span className="flex min-w-0 flex-1 flex-col">
+            <span className="flex min-w-0 items-center gap-1.5">
+              <PlayerName name={player.name} className="min-w-0 text-sm font-bold" style={{ color: "var(--color-text-primary)" }} />
+              {hidePosition ? null : <PositionBadge position={player.position} label={positionLabel ?? undefined} />}
+              <PlayerBadges badges={badges} />
+            </span>
+            {metaLine.length > 0 || gradeTile ? (
+              <span className="flex min-w-0 items-center gap-1.5 text-xs leading-4" style={{ color: "var(--color-text-muted)" }} data-testid="row-meta">
+                <span className="min-w-0 truncate">
+                  {metaLine.map((part, i) => (
+                    <Fragment key={part.key}>
+                      {i > 0 ? " · " : ""}
+                      <span style={{ color: part.tone ? TONE[part.tone] : undefined, fontWeight: part.tone === "warning" || part.key === "proj" ? 700 : undefined }}>{part.text}</span>
+                    </Fragment>
+                  ))}
+                </span>
+                {gradeTile ? <LetterGrade grade={gradeTile} size="xs" testId="row-grade" /> : null}
+              </span>
+            ) : null}
           </span>
-          {model.meta.length > 0 ? (
-            <span className="text-xs leading-4" style={{ color: "var(--color-text-muted)" }} data-testid="row-meta">{model.meta.join(" · ")}</span>
+          {model.trailing && input.mode !== "sim" ? (
+            <span className="flex shrink-0 flex-col items-end" data-testid="row-trailing">
+              <span className="text-base font-extrabold tabular-nums leading-5" style={{ color: model.trailing.tone ? TONE[model.trailing.tone] : "var(--color-text-primary)" }}>{model.trailing.value}</span>
+              <span className="text-[0.6875rem] font-extrabold uppercase" style={{ color: "var(--color-text-muted)", letterSpacing: "var(--letter-spacing-badge)" }}>{model.trailing.label}</span>
+            </span>
           ) : null}
-        </span>
-        {model.trailing ? (
-          <span className="flex shrink-0 flex-col items-end" data-testid="row-trailing">
-            <span className="text-base font-extrabold tabular-nums leading-5" style={{ color: model.trailing.tone ? TONE[model.trailing.tone] : "var(--color-text-primary)" }}>{model.trailing.value}</span>
-            <span className="text-[0.6875rem] font-extrabold uppercase" style={{ color: "var(--color-text-muted)", letterSpacing: "var(--letter-spacing-badge)" }}>{model.trailing.label}</span>
-          </span>
-        ) : null}
-      </button>
+        </button>
+        {trailingAction ? <span className="flex shrink-0 items-center" data-testid="row-action">{trailingAction}</span> : null}
+      </div>
       {open ? (
-        <div className="flex flex-col gap-2.5 pt-1" data-testid="row-expanded">
+        <div className="row-expand"><div className="row-expand-inner flex flex-col gap-2.5 pt-1" data-testid="row-expanded">
           {model.facts.length > 0 ? (
             <div className="grid gap-2" style={{ gridTemplateColumns: `repeat(${Math.min(4, model.facts.length)}, minmax(0, 1fr))` }}>
               {model.facts.map((fact) => <Fact key={fact.key} fact={fact} />)}
@@ -127,7 +154,7 @@ export function PlayerAccordionRow({ open, onToggle, badges = [], positionLabel,
               ) : null}
             </div>
           ) : null}
-        </div>
+        </div></div>
       ) : null}
     </div>
   );

@@ -82,7 +82,7 @@ instead. The "TapForWhy" affordance from the Wave 0 pattern components plugs in 
 | Trade builder summary assets | `compact` | follow-up |
 | Players list / rankings | `compact` (replaces PlayerRow identity half) | follow-up |
 | Dashboard lists (needs attention, opportunities) | `compact` (replaces CompactPlayerModule) | follow-up |
-| Fantasy Sim lists (draft Players/Board/Queue, rookie draft, Players, Waivers, roster / bench pickers, trade rows, inbox) | `list` via SimDraftRow / SimPlayerLine | done (web + app) |
+| Fantasy Sim lists (draft Players/Board/Queue, rookie draft, Players, Waivers, roster / bench pickers, trade rows, inbox) | `PlayerAccordionRow mode=sim` via SimDraftRow / SimPlayerLine (one Move button; see ui-patterns.md) | done (web + app) |
 | Real app Waivers, Players, My Team roster | `list` (add `tags` for waiver target / trending / hot streak) | follow-up: each page has its own row today (`PlayerRow`, `CompactPlayerModule`); swap them to `PlayerListRow` one page at a time |
 | Fantasy Sim headers / chips (`SimPlayerChip` in cards) | `compact` | follow-up |
 

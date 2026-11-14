@@ -29,7 +29,7 @@ import SimOffseasonBar from '../components/SimOffseasonBar';
 import { SimGameOffseason } from '../components/SimGameOffseason';
 import { SimHomeTab } from '../components/SimGameHome';
 import { SimPlayerSheet } from '../components/SimGamePlayers';
-import { SimNotice, SimOpenPlayerContext, SimPreviewBanner, SimProgressBar, SimTeamOpenContext, createSimStyles, simToneColor, type SimCtx } from '../components/SimGameParts';
+import { SimNotice, SimOpenPlayerContext, SimPreviewBanner, SimProgressBar, SimRowAccordion, SimTeamOpenContext, createSimStyles, simToneColor, type SimCtx } from '../components/SimGameParts';
 import SimGlyph from '../components/SimGlyph';
 import { simHubRow } from '../lib/simHub';
 import { simMenuHero, simRulesParts } from '../lib/simSummaries';
@@ -1112,6 +1112,7 @@ function GameScreen({
   return (
     <SimTeamOpenContext.Provider value={ctx.openTeam}>
     <SimOpenPlayerContext.Provider value={ctx.openPlayer}>
+    <SimRowAccordion>
     <View style={styles.stack}>
       <SimGameHeader game={game} onHub={onHub} onTeam={ctx.openTeam} onMore={() => onTab('more')} bell={<SimNotificationBell notif={notif} onOpenTab={onTab} />} />
       {inSeason && !recap && !paywalled ? <SimStatusChips game={game} onTab={onTab} /> : null}
@@ -1161,6 +1162,7 @@ function GameScreen({
         </>
       )}
     </View>
+    </SimRowAccordion>
     </SimOpenPlayerContext.Provider>
     </SimTeamOpenContext.Provider>
   );

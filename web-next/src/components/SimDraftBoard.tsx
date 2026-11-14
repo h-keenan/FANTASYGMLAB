@@ -6,23 +6,20 @@ import { EmptyState } from "@/components/EmptyState";
 import { Input, Select } from "@/components/Input";
 import { PillRow } from "@/components/PillRow";
 import { SimDraftGlyph } from "@/components/SimDraftGlyphs";
-import { SimPager, useSimDebounced, useSimWide } from "@/components/SimGameParts";
+import { SimPager, SimPlayerLine, useSimDebounced, useSimWide } from "@/components/SimGameParts";
 import { SkeletonRows } from "@/components/Skeleton";
 import { api } from "@/lib/api";
 import { PLAYER_SEARCH_DEBOUNCE_MS } from "@/lib/leaguePlayerSearch";
-import { PlayerListRow } from "@/components/PlayerListRow";
-import type { PlayerListDensity, PlayerListTag } from "@/lib/playerListRow";
 import type { BadgeKind } from "@/lib/playerBadges";
-import { SIM_DRAFT_SORTS, simDraftMeta, simDraftRowChips, simListStats, simRowBadges, simSuppressedBadges } from "@/lib/simDraft";
+import type { PlayerListTag } from "@/lib/playerListRow";
+import { SIM_DRAFT_SORTS, simSuppressedBadges } from "@/lib/simDraft";
 import { SIM_WINDOW_STEP, simWindow } from "@/lib/simLayout";
 import {
   SIM_PAGE_SIZE,
   simDefaultFilter,
   simFilterQuery,
   simFilterReducer,
-  simHeadshotId,
   simPageCount,
-  simPlayerInitials,
   simPlayerIsGenerated,
   type SimGamePlayer,
   type SimPlayerSort,
@@ -47,7 +44,6 @@ export function SimDraftRow({
   suppressBadges,
   extra,
   chipsExtra,
-  density,
 }: {
   player: SimGamePlayer;
   onOpen?: (player: SimGamePlayer) => void;
@@ -65,32 +61,37 @@ export function SimDraftRow({
   extra?: ReactNode;
   /** Small inline controls at the end of the chips line (a Queue toggle). */
   chipsExtra?: ReactNode;
-  density?: PlayerListDensity;
 }) {
-  const [chip] = simDraftRowChips(player);
+  const info = onGeneratedInfo && simPlayerIsGenerated(player) ? onGeneratedInfo : undefined;
   return (
-    <PlayerListRow
-      testId="draft-row"
-      name={player.name}
-      position={player.pos}
-      headshotId={simHeadshotId(player)}
-      fallbackLabel={simPlayerInitials(player)}
-      meta={simDraftMeta(player, week)}
-      chip={chip ? { label: chip.label, tone: chip.tone } : null}
-      hurt={player.status === "out"}
-      stats={simListStats(player)}
-      tags={tags}
-      badges={simRowBadges(player)}
-      suppressBadges={suppressBadges}
-      extra={extra}
-      chipsExtra={chipsExtra}
-      actions={actions}
-      density={density}
-      done={drafted}
-      onSimInfo={onGeneratedInfo && simPlayerIsGenerated(player) ? onGeneratedInfo : undefined}
-      onOpen={onOpen ? () => onOpen(player) : undefined}
-      openLabel="Open player details"
-    />
+    <div className={drafted ? "sim-row-drafted" : undefined} data-drafted={drafted ? "true" : undefined}>
+      <SimPlayerLine
+        testId="draft-row"
+        player={player}
+        week={week}
+        tags={tags}
+        suppressBadges={suppressBadges}
+        extra={extra}
+        onOpen={onOpen}
+        trailing={
+          drafted ? (
+            <span className="shrink-0 pr-1 text-xs font-extrabold" style={{ color: "var(--color-accent)" }} role="status">Drafted ✓</span>
+          ) : (
+            actions
+          )
+        }
+        expandedExtra={
+          <>
+            {chipsExtra}
+            {info ? (
+              <button type="button" onClick={info} className="inline-flex items-center gap-1 text-xs font-bold" style={{ color: "var(--color-accent)", minHeight: 28 }} aria-label="About simulated players">
+                <span aria-hidden="true">ⓘ</span> Simulated player
+              </button>
+            ) : null}
+          </>
+        }
+      />
+    </div>
   );
 }
 

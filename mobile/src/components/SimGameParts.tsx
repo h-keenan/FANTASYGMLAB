@@ -3,7 +3,9 @@ import { AccessibilityInfo, Animated, Pressable, StyleSheet, View, type StylePro
 import { Ionicons } from '@expo/vector-icons';
 
 import AccentCard from './AccentCard';
-import PlayerListRow from './PlayerListRow';
+import PlayerAccordionRow, { usePlayerAccordion } from './PlayerAccordionRow';
+import { SimMoveButton, SimMoveStrip, type SimMoveHandle } from './SimMoveStrip';
+import { simAccordionRowModel, simHasMove } from '../lib/simMove';
 import AppText from './AppText';
 import PlayerName from './PlayerName';
 import Button from './Button';
@@ -16,10 +18,9 @@ import SectionHeading from './SectionHeading';
 import SimCrest from './SimCrest';
 import { SIM_GLYPH_ICONS } from './SimGlyph';
 import { SheetModal, SheetScrollView, SwipeDismissCard } from './SwipeDismissSheet';
-import ToneBadge from './ToneBadge';
+import ToneBadge, { withAlpha } from './ToneBadge';
 import type { PlayerListStat, PlayerListTag } from '../lib/playerListRow';
 import type { BadgeKind } from '../lib/playerBadges';
-import { simDraftMeta, simDraftRowChips, simListStats, simRowBadges } from '../lib/simDraft';
 import { useThemeMode } from '../context/ThemeModeContext';
 import {
   simGamePreviewLine,
@@ -225,12 +226,21 @@ export function SimPlayerChip({
   );
 }
 
+/** One open row at a time across the whole game screen: the Move strip, the stats tile and the profile all live in the open row. */
+const SimRowAccordionContext = createContext<{ isOpen: (id: string) => boolean; toggle: (id: string) => void } | null>(null);
+
+export function SimRowAccordion({ children }: { children: ReactNode }) {
+  const acc = usePlayerAccordion();
+  const value = useMemo(() => ({ isOpen: acc.isOpen, toggle: acc.toggle }), [acc.openId]); // eslint-disable-line react-hooks/exhaustive-deps
+  return <SimRowAccordionContext.Provider value={value}>{children}</SimRowAccordionContext.Provider>;
+}
+
 /**
- * One player row for every game list (board, roster, waivers, trades,
- * search): the shared avatar and position badge, name, subline, with a
- * trailing slot. Sim players are not real-league players, so there is no
- * quick view; the identity block is one tap target that opens the game's own
- * player sheet.
+ * One player row for every game list (board, roster, waivers, trades, search): the shared PlayerAccordionRow in `sim` mode
+ * (avatar slot with initials fallback, name, position + badges, one stats line "TEAM · Age · Bye · PROJ" ending in the
+ * letter-grade tile; ADP, grade and projection again in the open tile). The whole row is one tap target that expands in
+ * place. The only always-visible trailing control is `trailing` (a primary like Draft) or, for a roster player, the single
+ * Move button whose expansion is the inline action strip (`move`). Twin of web SimPlayerLine.
  */
 export function SimPlayerLine({
   player,
@@ -243,6 +253,9 @@ export function SimPlayerLine({
   stats,
   week = null,
   suppressBadges,
+  move,
+  expandedExtra,
+  testID = 'sim-player-line',
 }: {
   player: SimGamePlayer;
   trailing?: ReactNode;
@@ -250,52 +263,81 @@ export function SimPlayerLine({
   /** Kept for callers that dimmed bench rows; a list row is never dimmed. */
   muted?: boolean;
   selected?: boolean;
+  /** Extra info (an owner badge, "Starting elsewhere"): shown inside the open tile so the row stays two lines. */
   extra?: ReactNode;
   hidePosition?: boolean;
   tags?: PlayerListTag[];
-  /** Labeled stat pills (PROJ / VAL ...); see simListStats. */
+  /** Legacy list stats: PROJ / grade / ADP come from the player; any other stat (Pts) rides the stats line. */
   stats?: PlayerListStat[];
   /** Current game week, to flag a bye that is close. Omit when unknown (the bye still shows). */
   week?: number | null;
   /** Badge kinds true for the whole list (a rookie board is all Rookie, the IR group is all IR): not drawn. */
   suppressBadges?: BadgeKind[];
+  /** Roster actions: shows the one Move button; the open row shows the strip of possible actions. */
+  move?: SimMoveHandle;
+  /** More controls for the open tile (a queue's up / down / remove). */
+  expandedExtra?: ReactNode;
+  testID?: string;
 }) {
-  const [chip] = simDraftRowChips(player);
-  const blockTag = simBlockTag(player);
+  const { colors } = useThemeMode();
+  const acc = useContext(SimRowAccordionContext);
+  const [localOpen, setLocalOpen] = useState(false);
+  const open = acc ? acc.isOpen(player.id) : localOpen;
+  const toggle = () => (acc ? acc.toggle(player.id) : setLocalOpen((v) => !v));
+  const model = simAccordionRowModel(player, { week, stats: stats?.map((x) => ({ key: x.key, label: x.label, value: x.value })), tags });
+  const badges = suppressBadges ? model.badges.filter((b) => !suppressBadges.includes(b.kind)) : model.badges;
+  const hasMove = move ? simHasMove(move.specs) : false;
+  const moveWithProfile = move && onOpen && !move.specs.some((s) => s.kind === 'profile') ? { ...move, specs: [...move.specs, { kind: 'profile' as const, label: 'Profile' }] } : move;
+  const strip =
+    moveWithProfile && moveWithProfile.specs.length > 0 && hasMove ? (
+      <SimMoveStrip
+        specs={moveWithProfile.specs}
+        refusal={moveWithProfile.refusal}
+        notes={moveWithProfile.notes}
+        run={(kind, key) => (kind === 'profile' ? onOpen?.(player) : moveWithProfile.run(kind, key))}
+      />
+    ) : null;
   return (
-    <PlayerListRow
-      testID="sim-player-line"
-      name={player.name}
-      position={hidePosition ? null : player.pos}
-      headshotId={simHeadshotId(player)}
-      fallbackLabel={simPlayerInitials(player)}
-      meta={simDraftMeta(player, week)}
-      chip={chip ? { label: chip.label, tone: chip.tone } : null}
-      hurt={player.status === 'out'}
-      tags={blockTag ? [blockTag, ...(tags ?? [])] : tags}
-      stats={stats}
-      badges={simRowBadges(player)}
-      suppressBadges={suppressBadges}
-      alignColumns={stats !== undefined}
-      extra={extra}
-      actions={trailing}
-      selected={selected}
-      onOpen={onOpen ? () => onOpen(player) : undefined}
-      openLabel={`${player.name}, ${player.pos}. Open player details`}
-    />
+    <View style={selected ? { backgroundColor: withAlpha(colors.accent, 0.12) } : undefined} testID={testID}>
+      <PlayerAccordionRow
+        mode="sim"
+        open={open}
+        onToggle={toggle}
+        player={{ id: player.id, name: player.name, position: player.pos, team: player.team ?? null, age: player.age ?? null, headshotId: simHeadshotId(player) }}
+        hidePosition={hidePosition}
+        badges={badges}
+        metaParts={model.metaParts}
+        gradeTile={model.gradeTile}
+        grade={model.gradeText}
+        adp={model.adp}
+        proj={model.proj}
+        trailingAction={hasMove ? <SimMoveButton name={player.name} open={open} onToggle={toggle} /> : trailing}
+        onOpenProfile={strip || !onOpen ? undefined : () => onOpen(player)}
+      >
+        {extra || model.textTags.length > 0 || expandedExtra ? (
+          <View style={{ flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: 6 }} testID="row-extra">
+            {extra}
+            {model.textTags.map((tag) => (
+              <ToneBadge key={tag.key} label={tag.label} color={colors.textSecondary} size="xs" />
+            ))}
+            {expandedExtra}
+          </View>
+        ) : null}
+        {strip}
+      </PlayerAccordionRow>
+    </View>
   );
 }
 
 /**
- * THE roster row (lineup starters, bench, IR, taxi): one component, one info set. Age, bye, injury chip,
- * labeled PROJ and OVR, tags and tap-to-open all come from SimPlayerLine + simListStats, so a starter shows
- * exactly what a bench player shows. `slot` adds the leading slot-label column (QB, RB1, FLEX ...); a
- * flex-type slot also keeps the player's own position pill, since the slot label no longer says it.
+ * THE roster row (lineup starters, bench, IR, taxi): one component, one info set. `slot` adds the leading slot-label column
+ * (QB, RB1, FLEX ...). `move` is the single Move button + inline strip (swap in, IR / taxi, cut, block, profile).
  */
 export function SimRosterLine({
   player,
   slot,
   trailing,
+  move,
   onOpen,
   extra,
   week = null,
@@ -304,6 +346,7 @@ export function SimRosterLine({
   player: SimGamePlayer;
   slot?: { slot: SimSlot; label: string };
   trailing?: ReactNode;
+  move?: SimMoveHandle;
   onOpen?: (player: SimGamePlayer) => void;
   extra?: ReactNode;
   week?: number | null;
@@ -313,10 +356,10 @@ export function SimRosterLine({
     <SimPlayerLine
       player={player}
       week={week}
-      stats={simListStats(player, { adp: false })}
       hidePosition={slot ? simSlotRepeatsPosition(slot.slot, player.pos) : false}
       extra={extra}
       trailing={trailing}
+      move={move}
       onOpen={onOpen}
       suppressBadges={suppressBadges}
     />

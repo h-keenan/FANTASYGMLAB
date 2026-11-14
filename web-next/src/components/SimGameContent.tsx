@@ -32,7 +32,7 @@ import { simHubRow } from "@/lib/simHub";
 import { simMenuHero, simRulesParts } from "@/lib/simSummaries";
 import { Hero } from "@/components/ui/ModuleTemplates";
 import { CompactModule } from "@/components/ui/CompactModule";
-import { SimNotice, SimOpenPlayerContext, SimPreviewBanner, SimProgressBar, SimTeamLink, SimTeamOpenContext, simToneColor, type SimCtx } from "@/components/SimGameParts";
+import { SimNotice, SimOpenPlayerContext, SimPreviewBanner, SimProgressBar, SimRowAccordion, SimTeamLink, SimTeamOpenContext, simToneColor, type SimCtx } from "@/components/SimGameParts";
 import { SimBlockToggle } from "@/components/SimTradeBlock";
 import { SimTeamSheet } from "@/components/SimGameTeamSheet";
 import { SimToResultView, SimToSheet, type SimToRequest } from "@/components/SimToControl";
@@ -1046,6 +1046,7 @@ function GameScreen({
   return (
     <SimTeamOpenContext.Provider value={ctx.openTeam}>
     <SimOpenPlayerContext.Provider value={ctx.openPlayer}>
+    <SimRowAccordion>
     {/* Phones: a 100dvh flex column. Compact header on top, content flex-1, and the action pill + bottom tab bar as an in-flow
         sticky footer (no position:fixed, no JS placement), so iOS Safari viewport quirks cannot float it. */}
     <div className={`flex flex-auto flex-col gap-3 max-md:gap-2 ${showBar || showOffBar ? "pb-3 max-md:pb-[var(--bottom-clearance,0px)]" : "pb-6 max-md:pb-[calc(var(--bottom-clearance,0px)+1.5rem)]"} md:pb-3`}>
@@ -1161,6 +1162,7 @@ function GameScreen({
         <SimMoreTab ctx={ctx} onDeleted={() => { setMoreOpen(false); onDeleted(); }} onHub={() => { setMoreOpen(false); onHub(); }} />
       </Sheet>
     </div>
+    </SimRowAccordion>
     </SimOpenPlayerContext.Provider>
     </SimTeamOpenContext.Provider>
   );

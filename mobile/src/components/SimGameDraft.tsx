@@ -290,12 +290,12 @@ export function SimGameDraft({ ctx, onComplete }: { ctx: SimCtx; onComplete: (re
                 key={player.id}
                 player={player}
                 onOpen={ctx.openPlayer}
-                trailing={
-                  <View style={common.wrapRow}>
+                trailing={onClock ? <SimDraftIconButton icon="checkmark-circle" primary label={`Draft ${player.name}`} disabled={busy === 'pick'} onPress={() => pick(player)} /> : undefined}
+                expandedExtra={
+                  <View style={common.wrapRow} testID="queue-controls">
                     <SimDraftIconButton icon="chevron-up" label={`Move ${player.name} up`} disabled={index === 0} onPress={() => dispatchQueue({ type: 'move', id: player.id, delta: -1 })} />
                     <SimDraftIconButton icon="chevron-down" label={`Move ${player.name} down`} disabled={index === queued.length - 1} onPress={() => dispatchQueue({ type: 'move', id: player.id, delta: 1 })} />
                     <SimDraftIconButton icon="close" label={`Remove ${player.name}`} onPress={() => dispatchQueue({ type: 'remove', id: player.id })} />
-                    {onClock ? <SimDraftIconButton icon="checkmark-circle" primary label={`Draft ${player.name}`} disabled={busy === 'pick'} onPress={() => pick(player)} /> : null}
                   </View>
                 }
               />
@@ -322,7 +322,7 @@ export function SimGameDraft({ ctx, onComplete }: { ctx: SimCtx; onComplete: (re
             <EmptyState icon="people-outline" title="No picks yet" subtitle="Your drafted players show up here." />
           ) : (
             draft.your_roster.map((player) => (
-              <SimPlayerLine key={player.id} player={player} onOpen={ctx.openPlayer} trailing={<SimStat label="Proj" value={simProjText(player)} />} />
+              <SimPlayerLine key={player.id} player={player} onOpen={ctx.openPlayer} />
             ))
           )}
         </View>

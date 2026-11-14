@@ -26,7 +26,7 @@ import { SimDraftGlyph } from "@/components/SimDraftGlyphs";
 import { SimDynastyStrip } from "@/components/SimGameDynasty";
 import { SimCollapse, SimGeneratedChip, SimGeneratedNoticeSheet, SimPickLine, SimRookieNoticeGate, useSimPicks } from "@/components/SimGameDynastyParts";
 import { SimIconButton, SimRosterLine, SimToneBadge, simToneColor, type SimCtx } from "@/components/SimGameParts";
-import { SimReserveButton, SimReserveGroups, SimReserveSheet } from "@/components/SimGameReserves";
+import { SimReserveGroups, useSimRosterMoves } from "@/components/SimGameReserves";
 import { SkeletonCard } from "@/components/Skeleton";
 import { api } from "@/lib/api";
 import {
@@ -466,8 +466,6 @@ function CutdownStage({ off, ctx, onTrade, onTeam }: { off: SimOffseason; ctx: S
   const { gameId, game, call } = ctx;
   const teamId = game.you?.team_id;
   const [roster, setRoster] = useState<SimTeamRosterResponse | null>(null);
-  const [cutting, setCutting] = useState<string | null>(null);
-  const [moving, setMoving] = useState<SimGamePlayer | null>(null);
   const picks = useSimPicks(ctx);
   const r = off.roster;
 
@@ -488,7 +486,6 @@ function CutdownStage({ off, ctx, onTrade, onTeam }: { off: SimOffseason; ctx: S
   }, [gameId, teamId, ctx.tick]);
 
   async function cut(player: SimGamePlayer) {
-    setCutting(null);
     const body = await call(() => api.cutSimPlayer(gameId, player.id));
     if (body) {
       ctx.notify(`Cut ${player.name}.`, "success");
@@ -502,6 +499,16 @@ function CutdownStage({ off, ctx, onTrade, onTeam }: { off: SimOffseason; ctx: S
   const players = roster?.players ?? [];
   const reservesOn = simReservesOn(game.settings, roster?.reserves ?? r.reserves);
   const reserveState = { reserves: roster?.reserves ?? r.reserves, rosterSize: r.size, rosterLimit: r.limit };
+  const handleFor = useSimRosterMoves({
+    ctx,
+    state: reserveState,
+    taxi: roster?.taxi ?? r.taxi ?? [],
+    onCut: cut,
+    onMoved: (_, player, to) => {
+      ctx.notify(`${player.name} ${to === "ir" ? "is on IR" : to === "taxi" ? "is on the taxi squad" : "is back on your roster"}.`, "success");
+      ctx.bump();
+    },
+  });
   const myPicks = simPicksOf(picks, teamId);
   const rosterSuppressed = simSuppressedBadges(players);
   return (
@@ -545,28 +552,14 @@ function CutdownStage({ off, ctx, onTrade, onTeam }: { off: SimOffseason; ctx: S
               player={player}
               suppressBadges={rosterSuppressed}
               onOpen={ctx.openPlayer}
-              trailing={
-                cutting === player.id ? (
-                  <>
-                    <Button size="sm" variant="danger" aria-label={`Cut ${player.name}`} onClick={() => void cut(player)}>Cut</Button>
-                    <Button size="sm" variant="ghost" onClick={() => setCutting(null)}>Keep</Button>
-                  </>
-                ) : (
-                  <>
-                    {reservesOn ? <SimReserveButton player={player} onOpen={setMoving} /> : null}
-                    <Button size="sm" variant={blocks ? "dangerOutline" : "ghost"} aria-label={`Cut ${player.name}`} onClick={() => setCutting(player.id)}>
-                      Cut
-                    </Button>
-                  </>
-                )
-              }
+              move={handleFor(player, { noBlock: true })}
             />
           ))
         )}
       </SimCollapse>
 
       {reservesOn ? (
-        <SimReserveGroups ir={roster?.ir ?? r.ir ?? []} taxi={roster?.taxi ?? r.taxi ?? []} state={reserveState} onOpen={setMoving} openPlayer={ctx.openPlayer} cutting={cutting} onAskCut={setCutting} onCut={(p) => void cut(p)} />
+        <SimReserveGroups ir={roster?.ir ?? r.ir ?? []} taxi={roster?.taxi ?? r.taxi ?? []} state={reserveState} openPlayer={ctx.openPlayer} handleFor={handleFor} />
       ) : null}
 
       {game.settings.mode === "dynasty" && myPicks.length > 0 ? (
@@ -577,19 +570,6 @@ function CutdownStage({ off, ctx, onTrade, onTeam }: { off: SimOffseason; ctx: S
         </SimCollapse>
       ) : null}
 
-      {moving ? (
-        <SimReserveSheet
-          ctx={ctx}
-          player={moving}
-          state={reserveState}
-          onClose={() => setMoving(null)}
-          onMoved={(_, player, to) => {
-            setMoving(null);
-            ctx.notify(`${player.name} ${to === "ir" ? "is on IR" : to === "taxi" ? "is on the taxi squad" : "is back on your roster"}.`, "success");
-            ctx.bump();
-          }}
-        />
-      ) : null}
     </>
   );
 }

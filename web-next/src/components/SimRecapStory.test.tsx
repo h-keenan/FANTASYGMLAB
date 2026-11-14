@@ -44,7 +44,8 @@ describe("SimWeekRecapStory", () => {
     const dialog = screen.getByRole("dialog");
     fireEvent.keyDown(dialog, { key: "ArrowRight" });
     expect(screen.getByText("96%")).toBeInTheDocument();
-    fireEvent.click(screen.getByRole("button", { name: /Quinn Moore.*Open player details/ }));
+    fireEvent.click(screen.getByRole("button", { name: /Quinn Moore.*show details/ }));
+    fireEvent.click(screen.getByRole("button", { name: "Open profile" }));
     expect(openPlayer).toHaveBeenCalledTimes(1);
     fireEvent.keyDown(dialog, { key: "ArrowRight" });
     fireEvent.click(screen.getByRole("button", { name: "Fix lineup" }));
