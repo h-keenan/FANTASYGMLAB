@@ -57,7 +57,7 @@ function Column({
             type="button"
             tabIndex={editing && !full ? 0 : -1}
             onClick={() => onAdd(side)}
-            aria-label={assets.length ? `Add more to ${label.toLowerCase()}` : `Add to ${label.toLowerCase()}${addHint ? `: ${addHint}` : ""}`}
+            aria-label={assets.length ? `${label}: add more` : `${label}: add players or picks${addHint ? ` (${addHint})` : ""}`}
             className="flex w-full flex-col items-center justify-center text-sm font-extrabold"
             style={{ minHeight: assets.length ? "var(--touch-target-min)" : 64, border: "1px dashed var(--color-accent)", borderRadius: "var(--radius-control)", color: "var(--color-accent)", background: "transparent" }}
             data-testid={`scale-add-${side}`}
@@ -97,6 +97,7 @@ export function TradeScale({
   sending = false,
   sendLabel = "Send offer",
   footer,
+  buildingAction,
   testId = "trade-scale",
 }: {
   give: TradeCardAsset[];
@@ -121,6 +122,8 @@ export function TradeScale({
   sendLabel?: string;
   /** Small line under the meter (roster after the trade, notes). */
   footer?: ReactNode;
+  /** Shown while the offer is still being built (one side empty), e.g. the Analyzer's one-sided "Analyze" button. */
+  buildingAction?: ReactNode;
   testId?: string;
 }) {
   const [tweaking, setTweaking] = useState(false);
@@ -140,6 +143,7 @@ export function TradeScale({
         <FairnessMeterRow meter={shown} />
         {footer}
       </div>
+      {(phase === "building" || phase === "empty") && buildingAction ? <div className="flex flex-col gap-2" data-testid="scale-building-action">{buildingAction}</div> : null}
       {phase === "review" || phase === "tweak" ? (
         <div className="enter-rise flex flex-col gap-2" key={phase} data-testid="scale-actions">
           {phase === "review" ? verdict : null}
