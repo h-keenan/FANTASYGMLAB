@@ -924,3 +924,52 @@ season). All of it is folded from the `week_scored` events, so it needs no engin
 yards, ...), which exist only for the user's own recap games; the view therefore shows points / games / average / best week / rank and never
 invents components. The Stats tab shows these under the real career (badges "Real" and "Sim"); a generated rookie has sim seasons only.
 Not covered: league leaders by past season (the season review ranks the season just finished) and a past season's weekly chart.
+
+## Achievements and milestones (derived at view time, nothing stored)
+
+`modules/sim/game_achievements.py` is the single source of truth. Every badge is **presentation derived from the saved game**
+(its event log and the state folded from it), so old saves get them too and nothing is added to `GameState`, the events, the
+checkpoints or `GameState.digest()` (golden digests are unchanged). A season's *ledger* (`ledger_from_state`) reads that season's
+`history`, `recaps`, `stand`, `playoff`, `points` and rookie log; `fold_ledgers` replays the events through `apply_event` and
+snapshots a ledger just before each `season_started`; `evaluate` turns the ordered ledgers into the list; `week_view` slices out
+what the weeks just played unlocked plus the milestone banners. The route layer keeps a small per-game cache (finished seasons'
+ledgers + the open season's user moves, followed incrementally from the event seq; undo / revert-week drops it), so a view costs
+one cold fold per process and only the new events after that.
+
+The additive `achievements` field (older clients ignore it) rides on:
+`POST /advance` (also the replayed-week branch) and `POST /sim-to` (`new` + `milestones` for the weeks just played), `GET /home`,
+`GET /dynasty`, `GET /result` (both branches; it is **not** stored inside `result`), `GET /teams/{your team}/history`, and
+`GET /players/{id}/history` (only the items that name that player). The bell (`GET /notifications`) adds
+`kind: "achievement"` items (icon `trophy`, `target.screen: "achievements"`, stable ids) for unlocks of the season in progress,
+dated to the week boundary that reached them.
+
+```
+achievements: {
+  items: [ { id, key, scope: "season"|"career", rarity: "common"|"rare"|"epic", tone: "good"|"bad"|"neutral", icon, name, detail,
+             unlocked, season_no, year, season_label ("S3 2028"), week, at (season_no*100+week), progress: {current,target,text}|null,
+             tier, player: {id,name,pos}|null } ],     // unlocked first (newest first), then locked with progress
+  counts: { unlocked, epic, rare, common, locked },
+  new?: [...],         // advance / sim-to: items unlocked in the weeks just played (each has its own week)
+  milestones?: [ { kind: "perfect_run"|"win_number"|"winless_watch", tone, icon, confetti, headline, sub } ]  // banners of the first week played
+}
+```
+
+**Season badges** (key, rarity): `perfect_season` (epic: no loss in the regular season or playoffs, champion), `undefeated_regular`
+(epic), `unbeaten_regular` (rare: no losses but ties), `winless` (rare, bad), `tank_commander` (rare: winless and you hold the #1
+rookie pick), `champion` (rare), `back_to_back` / `three_peat` (epic), `underdog` (epic: lowest playoff seed wins the title),
+`heartbreaker` (rare, bad: lost the title game by under 3), `worst_to_first` (epic), `first_to_worst` (rare, bad),
+`comeback_year` (+4 wins rare, +6 epic), `free_fall` (-4 wins, common, bad), `win_streak` (5/8/10 = common/rare/epic),
+`loss_streak` (5/8/10, bad), `blowout` (30/60/80 pts), `closest_win` (3/1/0.1 pts), `record_week` (epic: the most any team has scored
+in the league's history so far, at least 4 earlier league weeks), `record_season` (epic: highest-scoring team ever), `perfect_lineup`
+(1/3/5 weeks with zero points left on the bench), `mvp_season` (rare: the league's top scorer is yours), `roy` (rare: you drafted the
+top-scoring rookie), `trade_shark` (net points gained by one trade, 40/80/140), `waiver_wizard` (points from one claim, 60/100/150;
+both dated to the week the running total reached the tier). **Career ladders** (each tier unlocked and dated, the next one
+locked with progress): `career_wins` (10/25/50/100), `career_seasons` (3/5/10), `dynasty` (3/5 titles), `playoff_streak` (3/5/8).
+Locked season items with progress: `perfect_season` ("11-0, 3 games left"), `back_to_back` / `three_peat` while defending, `worst_to_first`.
+
+Edge rules: a bye is never a game or a streak break; a tie breaks a win streak and makes a season "unbeaten", not "undefeated";
+season-end badges (`perfect_season`, `winless`, `mvp_season`, `champion`, ...) never appear before their season ends; season-over-
+season badges need the previous season's regular season to be finished in a league of the same size; the redraft mode has one
+season (no previous season, no rookies) and gets the same single-season badges. Thresholds live at the top of the module.
+Known limit: the open season's user trades / claims come from the incremental cache (exact after one cold fold); a fresh
+process without the cache reads the log once.
