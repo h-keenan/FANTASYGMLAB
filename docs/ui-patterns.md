@@ -490,3 +490,9 @@ Tests: `lib/overlayStack.test.ts`, `lib/overlayHistory.test.ts`, `components/Ove
 selection survives, X), `components/OverlayRuntime.test.tsx` (the one scroll lock). Real-browser check:
 `scripts/sim_layout_playwright/overlay_back.mjs` (browser Back closes a pop-up without leaving the page; a card opened
 from the trade picker replaces it and Back returns with the selection intact; the X closes everything).
+
+## Page tab families and glass chrome (2026-11)
+
+Related pages are tabs of one page family (`lib/pageFamilies.ts`: Trades, Team, League), rendered by `PageTabBar` over
+`PillRow glass` (sticky, scroll-snap, cyan glass active pill). Each tab keeps its route. The phone footer
+(`BottomTabBar`) uses the same glass tokens. Plan: `docs/audits/2026-11-menu-consolidation.md`.
