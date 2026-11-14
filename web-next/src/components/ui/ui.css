@@ -607,6 +607,14 @@
   align-items: center;
   gap: var(--space-sm);
 }
+/* ONE mechanism for everything pinned to the bottom of a phone screen (tab bar + page action strip, Fantasy Sim bar and
+   orb, the GM orb): an in-flow `position: sticky; bottom: 0` element, never position:fixed and never JS-placed.
+     .bottom-stack  a full-width stack at the end of the app column (footer, sim action bar)
+     .bottom-rail   a zero-height rail at the end of <body> whose child (the GM orb) is absolutely placed in it
+   Sticky is clamped to its parent's box, so the parent must span the whole document: html/body have no fixed height
+   (globals.css), the column chain uses flex-auto, never flex-1 (basis 0) or min-h-0. lib/bottomChrome.test.ts guards
+   all of this; scripts/sim_layout_playwright/footer_pin.mjs checks it in a real browser (WebKit, iPhone viewport). */
+.bottom-rail { position: sticky; bottom: 0; z-index: 40; height: 0; }
 /* Phone bottom tab bar (components/ui/BottomTabBar.tsx) and the sticky stack
    that holds it with the page's action strip. NOT position:fixed and not
    JS-positioned: the stack is `position: sticky; bottom: 0` at the end of a
@@ -969,4 +977,42 @@
   .ui-insight > .glass-surface {
     transition: none;
   }
+}
+
+/* ---------- TrendChart (components/ui/TrendChart.tsx) ---------- */
+.trend-chart { position: relative; width: 100%; min-width: 0; }
+.trend-chart svg { display: block; overflow: visible; }
+.trend-hit { fill: transparent; cursor: pointer; outline: none; -webkit-tap-highlight-color: transparent; }
+.trend-hit:focus-visible { stroke: var(--color-accent); stroke-width: 2; }
+.trend-tooltip {
+  position: absolute;
+  z-index: 2;
+  pointer-events: none;
+  max-width: 12rem;
+  padding: 4px 8px;
+  border-radius: var(--radius-control);
+  border: var(--border-width-default) solid var(--glass-border, var(--color-border));
+  background: color-mix(in srgb, var(--color-surface-secondary) 86%, transparent);
+  -webkit-backdrop-filter: blur(14px) saturate(160%);
+  backdrop-filter: blur(14px) saturate(160%);
+  color: var(--color-text-primary);
+  font-size: 0.75rem;
+  font-weight: 700;
+  line-height: 1.25;
+  white-space: nowrap;
+}
+.trend-stat {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 10px 12px;
+  border-radius: var(--radius-control);
+  border: var(--border-width-default) solid var(--glass-border, var(--color-border));
+  background: color-mix(in srgb, var(--color-surface-secondary) 55%, transparent);
+}
+.trend-stat-track { height: 6px; border-radius: 999px; background: var(--color-border); overflow: hidden; }
+.trend-stat-fill { height: 100%; border-radius: 999px; background: var(--color-accent); }
+@media (prefers-reduced-motion: no-preference) {
+  .trend-draw { stroke-dasharray: 1; stroke-dashoffset: 1; animation: trend-draw 600ms ease-out forwards; }
+  @keyframes trend-draw { to { stroke-dashoffset: 0; } }
 }
