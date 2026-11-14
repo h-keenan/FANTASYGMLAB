@@ -3,6 +3,7 @@ import { View } from 'react-native';
 
 import AccentCard from './AccentCard';
 import AppText from './AppText';
+import { OffseasonGlyph } from './OffseasonGlyph';
 import Button from './Button';
 import EmptyState from './EmptyState';
 import ErrorState from './ErrorState';
@@ -10,19 +11,30 @@ import SegmentedTabBar from './SegmentedTabBar';
 import { SimDraftIconButton, SimDraftRow } from './SimDraftBoard';
 import { SkeletonCard } from './SkeletonBlock';
 import { SimDynastyStrip } from './SimGameDynasty';
-import { SimCollapse, SimGeneratedChip, SimGeneratedNoticeSheet, SimPickLine, SimPlayerChips, SimRookieNoticeGate, useSimPicks } from './SimGameDynastyParts';
+import { SimCollapse, SimGeneratedChip, SimGeneratedNoticeSheet, SimPickLine, SimRookieNoticeGate, useSimPicks } from './SimGameDynastyParts';
 import { SimRosterLine, SimToneBadge, createSimStyles, simToneColor, type SimCtx } from './SimGameParts';
 import { SimReserveButton, SimReserveGroups, SimReserveSheet } from './SimGameReserves';
 import { useThemeMode } from '../context/ThemeModeContext';
 import { api } from '../lib/api';
+import { simSuppressedBadges } from '../lib/simDraft';
+import {
+  offseasonAgingParts,
+  offseasonClockParts,
+  offseasonLogParts,
+  offseasonPickCountParts,
+  offseasonPicksParts,
+  offseasonRetireParts,
+  offseasonRosterParts,
+  offseasonSeasonParts,
+  offseasonStepper,
+  type OffseasonStepperItem,
+} from '../lib/simOffseasonSummary';
 import {
   simArchiveToYear,
   simFmtPts,
   simMoverText,
   simOffseasonHeading,
-  simOffseasonProgressLine,
   simOffseasonSteps,
-  simOrdinal,
   simPicksOf,
   simPlayoffOutcomeTone,
   simPlayoffResultLabel,
@@ -137,19 +149,11 @@ export function SimGameOffseason({ ctx, onTrade, onTeam }: { ctx: SimCtx; onTrad
     );
   }
 
-  const steps = simOffseasonSteps(off.stage);
+  const steps = offseasonStepper(simOffseasonSteps(off.stage));
 
   return (
     <View style={common.stack} testID="offseason">
-      <AccentCard accent={colors.accent} compact>
-        <AppText style={{ fontSize: 12.5, fontWeight: '800', letterSpacing: 0.8, textTransform: 'uppercase', color: colors.textTertiary }}>{simOffseasonHeading(off)}</AppText>
-        <View style={common.wrapRow} accessibilityLabel="Offseason steps">
-          {steps.map((step) => (
-            <SimToneBadge key={step.key} label={step.label} tone={step.state === 'current' ? 'accent' : step.state === 'done' ? 'success' : 'muted'} />
-          ))}
-        </View>
-        <AppText style={common.small}>{simOffseasonProgressLine(off)}</AppText>
-      </AccentCard>
+      <OffseasonHero off={off} steps={steps} />
 
       {years.length > 0 && off.stage === 'review' ? <SimDynastyStrip years={years} /> : null}
 
@@ -169,6 +173,54 @@ export function SimGameOffseason({ ctx, onTrade, onTeam }: { ctx: SimCtx; onTrad
   );
 }
 
+
+// ---------------------------------------------------------------------------
+// Hero: the one big thing on the page. Heading + a compact icon stepper, nothing else.
+
+function OffseasonHero({ off, steps }: { off: SimOffseason; steps: OffseasonStepperItem[] }) {
+  const { colors } = useThemeMode();
+  return (
+    <AccentCard accent={colors.accent} compact>
+      <View style={{ flexDirection: 'row', alignItems: 'baseline', justifyContent: 'space-between', gap: 8 }}>
+        <AppText style={{ flexShrink: 1, fontSize: 14, fontWeight: '800', color: colors.textPrimary }} numberOfLines={1}>{simOffseasonHeading(off)}</AppText>
+        <AppText style={{ fontSize: 12, color: colors.textTertiary }}>
+          Next: season {off.season_no + 1}/{off.seasons} · {off.year}
+        </AppText>
+      </View>
+      <View style={{ flexDirection: 'row', alignItems: 'center' }} accessibilityLabel="Offseason steps" testID="offseason-stepper">
+        {steps.map((step, i) => {
+          const color = step.state === 'current' ? colors.accent : step.state === 'done' ? colors.success : colors.textTertiary;
+          return (
+            <View key={step.key} style={{ flexDirection: 'row', alignItems: 'center', flex: i === steps.length - 1 ? 0 : 1 }} accessible accessibilityLabel={step.aria}>
+              <View style={{ alignItems: 'center', minWidth: 52, gap: 2 }}>
+                <View
+                  style={{
+                    width: 28,
+                    height: 28,
+                    borderRadius: 14,
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    backgroundColor: `${color}22`,
+                    borderWidth: step.state === 'current' ? 2 : 1,
+                    borderColor: color,
+                    opacity: step.state === 'todo' ? 0.8 : 1,
+                  }}
+                >
+                  {step.state === 'done' ? <OffseasonGlyph name="draft" size={14} color={color} /> : <OffseasonGlyph name={step.icon} size={14} color={color} />}
+                </View>
+                <AppText style={{ fontSize: 12, fontWeight: '700', color: step.state === 'todo' ? colors.textTertiary : colors.textPrimary }} importantForAccessibility="no">
+                  {step.short}
+                </AppText>
+              </View>
+              {i < steps.length - 1 ? <View style={{ flex: 1, height: 1, marginHorizontal: 4, marginBottom: 14, backgroundColor: step.state === 'done' ? colors.success : colors.borderStrong, opacity: step.state === 'done' ? 0.7 : 0.4 }} /> : null}
+            </View>
+          );
+        })}
+      </View>
+    </AccentCard>
+  );
+}
+
 // ---------------------------------------------------------------------------
 // Review
 
@@ -180,8 +232,6 @@ function ReviewStage({ off, ctx, years }: { off: SimOffseason; ctx: SimCtx; year
   const retired = simRetireesSorted(off.retired);
   const yours = retired.filter((r) => r.is_yours);
   const movers = off.movers ?? [];
-  const rose = movers.filter((m) => m.delta >= 0.5).length;
-  const fell = movers.filter((m) => m.delta <= -0.5).length;
   const mine = off.your_picks_this_draft ?? [];
   const titles = ctx.game.dynasty?.titles ?? years.filter((y) => y.champion?.is_you).length;
   const classChip = simRookieClassChip(off);
@@ -192,7 +242,8 @@ function ReviewStage({ off, ctx, years }: { off: SimOffseason; ctx: SimCtx; year
       {last && lastYear ? (
         <SimCollapse
           title={`${last.year} season`}
-          summary={`${lastYear.record}, ${simOrdinal(lastYear.rank)} · ${simPlayoffResultLabel(lastYear.playoff_result)}`}
+          icon="season"
+          parts={offseasonSeasonParts(lastYear, last.champion)}
           tone={last.champion?.is_you ? 'success' : 'accent'}
           defaultOpen
           testID="off-last-season"
@@ -212,7 +263,8 @@ function ReviewStage({ off, ctx, years }: { off: SimOffseason; ctx: SimCtx; year
 
       <SimCollapse
         title="Retirements"
-        summary={retired.length === 0 ? 'Nobody retired' : `${retired.length} retired${yours.length ? `, ${yours.length} yours` : ''}`}
+        icon="retire"
+        parts={offseasonRetireParts(retired)}
         tone={yours.length ? 'danger' : 'muted'}
         defaultOpen={yours.length > 0}
         testID="off-retired"
@@ -235,7 +287,7 @@ function ReviewStage({ off, ctx, years }: { off: SimOffseason; ctx: SimCtx; year
         )}
       </SimCollapse>
 
-      <SimCollapse title="Aging report" summary={movers.length === 0 ? 'No change to report' : `${rose} up, ${fell} down on your roster`} defaultOpen={movers.length > 0} testID="off-aging">
+      <SimCollapse title="Aging" icon="aging" parts={offseasonAgingParts(movers)} defaultOpen={movers.length > 0} testID="off-aging">
         {movers.length === 0 ? (
           <AppText style={common.muted}>Your roster held steady.</AppText>
         ) : (
@@ -270,8 +322,9 @@ function ReviewStage({ off, ctx, years }: { off: SimOffseason; ctx: SimCtx; year
         </View>
       ) : null}
       <SimCollapse
-        title="Your rookie picks"
-        summary={mine.length === 0 ? 'You hold no picks this year' : `${mine.length} pick${mine.length === 1 ? '' : 's'} in a ${off.draft.round_count}-round draft`}
+        title="Your picks"
+        icon="picks"
+        parts={offseasonPicksParts(mine, off.draft.round_count)}
         defaultOpen={mine.length > 0}
         testID="off-picks"
       >
@@ -315,30 +368,33 @@ function RookieStage({
   const mine = off.your_picks_this_draft ?? [];
   const made = d.order.filter((o) => o.made);
   const toMake = mine.filter((m) => !m.made).length;
+  const suppressed = simSuppressedBadges(d.available);
   const classChip = simRookieClassChip(off);
   const [notice, setNotice] = useState(false);
   return (
     <>
       {classChip ? <SimRookieNoticeGate gameId={ctx.gameId} /> : null}
       {notice ? <SimGeneratedNoticeSheet onClose={() => setNotice(false)} /> : null}
-      <AccentCard accent={d.your_turn ? colors.accent : colors.borderStrong} compact glow={d.your_turn}>
-        <AppText style={common.bodyStrong} accessibilityLiveRegion="polite" testID="rookie-clock">
-          {simRookieClockLine(d)}
-        </AppText>
-        <AppText style={common.muted}>
-          {d.available_count} rookie{d.available_count === 1 ? '' : 's'} left. {toMake} pick{toMake === 1 ? '' : 's'} still to make.
-        </AppText>
+      <SimCollapse title="On the clock" icon="draft" tone={d.your_turn ? 'success' : 'accent'} parts={offseasonClockParts(d)} testID="rookie-clock-module">
         {classChip ? <SimGeneratedChip label={classChip} onInfo={() => setNotice(true)} /> : null}
-      </AccentCard>
+      </SimCollapse>
+      <AppText style={{ position: 'absolute', width: 1, height: 1, opacity: 0 }} accessibilityLiveRegion="polite" testID="rookie-clock">
+        {simRookieClockLine(d)}
+      </AppText>
 
-      <SimCollapse title="Your picks" summary={`${mine.filter((m) => m.made).length} of ${mine.length} made`} defaultOpen testID="rookie-mine">
+      <SimCollapse
+        title="Your picks"
+        icon="picks"
+        parts={mine.length === 0 ? [{ key: 'n', text: 'No picks this draft', tone: 'muted' }] : [{ key: 'm', text: `${mine.filter((m) => m.made).length} of ${mine.length} made`, strong: true }, ...(toMake ? [{ key: 't', text: `${toMake} to go`, tone: 'muted' as const }] : [])]}
+        testID="rookie-mine"
+      >
         {mine.length === 0 ? (
           <AppText style={common.muted}>You have no picks in this draft.</AppText>
         ) : (
           mine.map((row) => (
             <View key={row.pick} style={[common.rowBetween, common.divider, { paddingVertical: 8 }]}>
               <AppText style={[common.bodyStrong, common.grow]}>{simRookiePickLine(row)}</AppText>
-              {row.made ? <SimToneBadge label={row.made.pos} tone="success" /> : d.on_clock?.pick === row.pick ? <SimToneBadge label="On the clock" tone="accent" /> : null}
+              {row.made ? <SimToneBadge label={row.made.pos} tone="success" /> : d.on_clock?.pick === row.pick ? <SimToneBadge label="Now" tone="accent" /> : null}
             </View>
           ))
         )}
@@ -359,6 +415,7 @@ function RookieStage({
               <SimDraftRow
                 key={player.id}
                 player={player}
+                suppressBadges={suppressed}
                 onOpen={ctx.openPlayer}
                 onGeneratedInfo={() => setNotice(true)}
                 actions={d.your_turn ? <SimDraftIconButton icon="checkmark" size={44} width={48} primary label={`Draft ${player.name}`} disabled={busy !== null} onPress={() => onPick(player)} /> : null}
@@ -368,7 +425,7 @@ function RookieStage({
         )}
       </View>
 
-      <SimCollapse title="Draft log" summary={`${made.length} of ${d.total} picks made`} testID="rookie-log">
+      <SimCollapse title="Draft log" icon="log" parts={offseasonLogParts(made.length, d.total)} testID="rookie-log">
         {made.length === 0 ? (
           <AppText style={common.muted}>No picks yet.</AppText>
         ) : (
@@ -434,22 +491,32 @@ function CutdownStage({ off, ctx, onTrade, onTeam }: { off: SimOffseason; ctx: S
   const reservesOn = simReservesOn(game.settings, roster?.reserves ?? r.reserves);
   const reserveState = { reserves: roster?.reserves ?? r.reserves, rosterSize: r.size, rosterLimit: r.limit };
   const myPicks = simPicksOf(picks, teamId);
+  const rosterSuppressed = simSuppressedBadges(players);
   return (
     <>
-      <AccentCard accent={over ? colors.danger : colors.success} compact>
-        <AppText style={common.bodyStrong} accessibilityRole={over ? 'alert' : undefined} testID="roster-check">
-          {over ? `Cut ${r.cuts_needed} player${r.cuts_needed === 1 ? '' : 's'} to start the season.` : 'Your roster is ready for the season.'}
-        </AppText>
-        <AppText style={common.muted}>
-          {r.size} of {r.limit} roster spots. IR and taxi players do not count.
-        </AppText>
-        <View style={common.wrapRow}>
-          {off.can_trade ? <Button size="sm" variant="secondary" label="Shop a trade" onPress={onTrade} /> : null}
-          <Button size="sm" variant="ghost" label="Open Team tab" onPress={onTeam} />
-        </View>
-      </AccentCard>
-
-      <SimCollapse title="Your roster" summary={`${r.size} of ${r.limit}${over ? `, cut ${r.cuts_needed}` : ''}`} tone={over ? 'danger' : 'muted'} defaultOpen={over} testID="cutdown-roster">
+      <AppText style={{ position: 'absolute', width: 1, height: 1, opacity: 0 }} accessibilityRole={over ? 'alert' : undefined} testID="roster-check">
+        {over ? `Cut ${r.cuts_needed} player${r.cuts_needed === 1 ? '' : 's'} to start the season.` : 'Your roster is ready for the season.'} {r.size} of {r.limit} roster spots. IR and taxi players do not count.
+      </AppText>
+      <SimCollapse
+        title="Roster"
+        icon="roster"
+        tone={over ? 'danger' : 'success'}
+        defaultOpen={over}
+        parts={offseasonRosterParts(r, players)}
+        action={
+          off.can_trade ? (
+            <SimDraftIconButton icon="swap-horizontal" size={44} width={44} label="Shop a trade" onPress={onTrade} />
+          ) : (
+            <SimDraftIconButton icon="shirt-outline" size={44} width={44} label="Open Team tab" onPress={onTeam} />
+          )
+        }
+        testID="cutdown-roster"
+      >
+        {off.can_trade ? (
+          <View style={{ alignItems: 'flex-end' }}>
+            <SimDraftIconButton icon="shirt-outline" size={36} width={36} label="Open Team tab" onPress={onTeam} />
+          </View>
+        ) : null}
         {players.length === 0 ? (
           <AppText style={common.muted}>Loading your roster.</AppText>
         ) : (
@@ -457,8 +524,8 @@ function CutdownStage({ off, ctx, onTrade, onTeam }: { off: SimOffseason; ctx: S
             <SimRosterLine
               key={player.id}
               player={player}
+              suppressBadges={rosterSuppressed}
               onOpen={ctx.openPlayer}
-              extra={<SimPlayerChips player={player} />}
               trailing={
                 cutting === player.id ? (
                   <>
@@ -480,7 +547,7 @@ function CutdownStage({ off, ctx, onTrade, onTeam }: { off: SimOffseason; ctx: S
       {reservesOn ? <SimReserveGroups ir={roster?.ir ?? r.ir ?? []} taxi={roster?.taxi ?? r.taxi ?? []} state={reserveState} onOpen={setMoving} openPlayer={ctx.openPlayer} cutting={cutting} onAskCut={setCutting} onCut={(p) => void cut(p)} /> : null}
 
       {game.settings.mode === 'dynasty' && myPicks.length > 0 ? (
-        <SimCollapse title="Your future picks" summary={`${myPicks.length} pick${myPicks.length === 1 ? '' : 's'}`} testID="cutdown-picks">
+        <SimCollapse title="Future picks" icon="picks" parts={offseasonPickCountParts(myPicks.length)} testID="cutdown-picks">
           {myPicks.map((pick) => (
             <SimPickLine key={pick.id} pick={pick} draftYear={picks?.draft_year} />
           ))}

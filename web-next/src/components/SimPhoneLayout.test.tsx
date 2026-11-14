@@ -83,7 +83,7 @@ describe("SimDraftRow bye, injury and drafted states", () => {
   });
   it("marks an injured player with the OUT chip and a note, and never dims the row", () => {
     render(<SimDraftRow player={player({ status: "out", out_weeks: 4, ros_mean: 15, projection: 0 })} actions={<button>Draft</button>} />);
-    expect(screen.getByText("OUT 4W")).toBeInTheDocument();
+    expect(screen.getByRole("img", { name: "Out: 4 wks" })).toBeInTheDocument();
     const row = screen.getByTestId("draft-row");
     expect(row.style.opacity).toBe("");
     expect(screen.getByRole("button", { name: "Draft" })).toBeEnabled();

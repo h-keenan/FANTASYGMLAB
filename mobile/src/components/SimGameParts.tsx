@@ -18,7 +18,8 @@ import { SIM_GLYPH_ICONS } from './SimGlyph';
 import { SheetModal, SheetScrollView, SwipeDismissCard } from './SwipeDismissSheet';
 import ToneBadge from './ToneBadge';
 import type { PlayerListStat, PlayerListTag } from '../lib/playerListRow';
-import { simDraftMeta, simDraftRowChips, simListStats } from '../lib/simDraft';
+import type { BadgeKind } from '../lib/playerBadges';
+import { simDraftMeta, simDraftRowChips, simListStats, simRowBadges } from '../lib/simDraft';
 import { useThemeMode } from '../context/ThemeModeContext';
 import {
   simGamePreviewLine,
@@ -231,6 +232,7 @@ export function SimPlayerLine({
   tags,
   stats,
   week = null,
+  suppressBadges,
 }: {
   player: SimGamePlayer;
   trailing?: ReactNode;
@@ -245,6 +247,8 @@ export function SimPlayerLine({
   stats?: PlayerListStat[];
   /** Current game week, to flag a bye that is close. Omit when unknown (the bye still shows). */
   week?: number | null;
+  /** Badge kinds true for the whole list (a rookie board is all Rookie, the IR group is all IR): not drawn. */
+  suppressBadges?: BadgeKind[];
 }) {
   const [chip] = simDraftRowChips(player);
   const blockTag = simBlockTag(player);
@@ -260,6 +264,8 @@ export function SimPlayerLine({
       hurt={player.status === 'out'}
       tags={blockTag ? [blockTag, ...(tags ?? [])] : tags}
       stats={stats}
+      badges={simRowBadges(player)}
+      suppressBadges={suppressBadges}
       alignColumns={stats !== undefined}
       extra={extra}
       actions={trailing}
@@ -283,6 +289,7 @@ export function SimRosterLine({
   onOpen,
   extra,
   week = null,
+  suppressBadges,
 }: {
   player: SimGamePlayer;
   slot?: { slot: SimSlot; label: string };
@@ -290,6 +297,7 @@ export function SimRosterLine({
   onOpen?: (player: SimGamePlayer) => void;
   extra?: ReactNode;
   week?: number | null;
+  suppressBadges?: BadgeKind[];
 }) {
   const line = (
     <SimPlayerLine
@@ -300,6 +308,7 @@ export function SimRosterLine({
       extra={extra}
       trailing={trailing}
       onOpen={onOpen}
+      suppressBadges={suppressBadges}
     />
   );
   if (!slot) return line;

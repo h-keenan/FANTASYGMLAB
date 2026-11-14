@@ -16,6 +16,7 @@ import { SimBlockView } from "@/components/SimTradeBlock";
 import { SimTeamCard } from "@/components/SimTeamCard";
 import { SkeletonCard, SkeletonRows } from "@/components/Skeleton";
 import { ToneBadge } from "@/components/ToneBadge";
+import { PlayerBadge } from "@/components/ui/PlayerBadge";
 import { api } from "@/lib/api";
 import { shouldAnimateList, staggerDelay } from "@/lib/motion";
 import { simGroupByPosition, simTradeFit, type SimAssetGroup } from "@/lib/simLayout";
@@ -165,7 +166,7 @@ function OfferCard({ item, index, count, defaultOpen, busy, canTrade, onRespond 
               <span className="min-w-0 truncate text-sm font-bold">{item.from.name}</span>
             </span>
             <span className="flex shrink-0 items-center gap-2">
-              {item.via_block ? <ToneBadge label="Your block" color="var(--color-accent)" size="xs" /> : null}
+              {item.via_block ? <PlayerBadge kind="block" detail="yours" /> : null}
               <ToneBadge label={`Wk ${item.expires_week}`} color="var(--color-warning)" size="xs" />
               <span aria-hidden="true" className="text-xs" style={{ color: "var(--color-text-muted)" }}>{open ? "\u2212" : "+"}</span>
             </span>

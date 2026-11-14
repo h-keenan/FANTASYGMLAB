@@ -10,7 +10,7 @@ import { PillRow } from "@/components/PillRow";
 import { PositionBadge } from "@/components/PositionBadge";
 import { SimGlyph } from "@/components/SimGlyph";
 import { SimPlayerBrowser } from "@/components/SimGamePlayers";
-import { SimPlayerChips, SimPickLine, useSimPicks } from "@/components/SimGameDynastyParts";
+import { SimPickLine, useSimPicks } from "@/components/SimGameDynastyParts";
 import { SimReserveButton, SimReserveGroups, SimReserveSheet } from "@/components/SimGameReserves";
 import { SimFold, SimIconButton, SimPlayerChip, SimRosterLine, SimSectionTitle, SimSheet, SimTeamLink, SimToneBadge, simToneColor, type SimCtx } from "@/components/SimGameParts";
 import { ReviewGlyphChip } from "@/components/SeasonReviewSections";
@@ -227,7 +227,6 @@ export function SimTeamTab({ ctx, onTrade }: { ctx: SimCtx; onTrade: () => void 
               player={player}
               week={game.week}
               onOpen={ctx.openPlayer}
-              extra={<SimPlayerChips player={player} />}
               trailing={
                 cutting === player.id ? (
                   <>

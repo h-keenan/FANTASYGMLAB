@@ -4,12 +4,17 @@ import { Ionicons } from '@expo/vector-icons';
 
 import AppText from './AppText';
 import Button from './Button';
-import Collapsible from './Collapsible';
+import CompactModule from './CompactModule';
+import { OffseasonGlyph } from './OffseasonGlyph';
+import type { CompactPart } from '../lib/compactModule';
+import type { OffseasonIcon } from '../lib/simOffseasonSummary';
 import { SimPlayerLine, SimSheet, SimToneBadge, createSimStyles, simToneColor, type SimCtx } from './SimGameParts';
 import ToneBadge from './ToneBadge';
 import { useThemeMode } from '../context/ThemeModeContext';
 import { api } from '../lib/api';
 import { isSimRookieNoticeSeen, setSimRookieNoticeSeen } from '../lib/simRookieNotice';
+import { PlayerBadges } from './PlayerBadge';
+import { simRowBadges } from '../lib/simDraft';
 import {
   SIM_GENERATED_CLASS_LABEL,
   SIM_GENERATED_CLASS_NOTICE,
@@ -18,7 +23,6 @@ import {
   simPickLabelText,
   simPickSlotHint,
   simPickViaLine,
-  simPlayerChips,
   type SimGamePlayer,
   type SimGameTone,
   type SimPickAsset,
@@ -36,6 +40,9 @@ import { spacing, type ThemeColors } from '../theme';
 export function SimCollapse({
   title,
   summary,
+  parts,
+  icon,
+  action,
   defaultOpen = false,
   tone = 'muted',
   badge,
@@ -44,44 +51,46 @@ export function SimCollapse({
 }: {
   title: string;
   summary?: string;
+  /** The collapsed summary line (lib/simOffseasonSummary builders); wins over `summary`. */
+  parts?: ReadonlyArray<CompactPart | null | undefined | false | ''>;
+  icon?: OffseasonIcon;
+  /** One trailing icon action, usable while collapsed. */
+  action?: ReactNode;
   defaultOpen?: boolean;
   tone?: SimGameTone;
   badge?: ReactNode;
   children: ReactNode;
   testID?: string;
+  /** Web draws the premium glow; the app's CompactModule has none, so this is accepted and ignored. */
+  glow?: boolean;
 }) {
   const { colors } = useThemeMode();
   const styles = useMemo(() => createStyles(colors), [colors]);
   return (
-    <Collapsible
+    <CompactModule
       id={`dyn.${testID ?? title}`}
       testID={testID}
-      accent={simToneColor(tone === 'muted' ? 'accent' : tone, colors)}
+      tone={tone === 'muted' ? 'accent' : tone}
       defaultOpen={defaultOpen}
+      action={action}
+      label={title}
+      parts={parts ?? (summary ? [{ key: 's', text: summary }] : [])}
       title={
         <View style={styles.collapseTitleRow}>
+          {icon ? <OffseasonGlyph name={icon} size={14} color={colors.textTertiary} /> : null}
           <AppText style={styles.collapseTitle}>{title}</AppText>
           {badge}
         </View>
       }
-      summary={summary ? <AppText style={styles.collapseSummary}>{summary}</AppText> : undefined}
     >
       {children}
-    </Collapsible>
+    </CompactModule>
   );
 }
 
-/** IR / TAXI / ROOKIE / OUT n wks chips for one roster row. */
+/** IR / Taxi / Rookie glyph badges for one roster player (the move sheet header); rows get the same strip from SimPlayerLine. */
 export function SimPlayerChips({ player }: { player: Pick<SimGamePlayer, 'squad' | 'rookie' | 'status' | 'out_weeks'> }) {
-  const chips = simPlayerChips(player);
-  if (chips.length === 0) return null;
-  return (
-    <>
-      {chips.map((chip) => (
-        <SimToneBadge key={chip.key} label={chip.label} tone={chip.tone} />
-      ))}
-    </>
-  );
+  return <PlayerBadges badges={simRowBadges(player)} />;
 }
 
 /** One draft pick as a list row: "2027 Round 1 (early)", where it came from, and its value. */

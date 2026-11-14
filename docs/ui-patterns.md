@@ -21,6 +21,7 @@ Ground rules for every pattern here:
 | `StoryCarousel` | `ui/StoryCarousel.tsx` | `StoryCarousel.tsx` | `storyCarousel.ts` | built; first user: Fantasy Sim weekly recap |
 | `InsightLink` | `ui/InsightLink.tsx` (+ `StatStrip` `insight`/`league`) | `MetricCard` `onPress` via `lib/insightNav.ts` | `insightLinks.ts` | built; every stat about your league/team must resolve here, see `docs/audits/2026-11-navigation-audit.md` |
 | `UndoToast` | `ui/UndoToast.tsx` | `UndoToast.tsx` | `confirmInPlace.ts` (timing) | built; used by GM targets |
+| `PlayerBadge` | `ui/PlayerBadge.tsx` | `PlayerBadge.tsx` | `playerBadges.ts` | built; every player row tag, PQV header and Sim roster/draft list routes through it |
 | `CompactModule` | `ui/CompactModule.tsx` | `CompactModule.tsx` | `compactModule.ts` (+ `simSummaries.ts`, `simDraft.ts`) | built (Phase 1 of `docs/audits/2026-11-information-architecture.md`); Sim home folds and the Sim draft room use it; `Collapsible` is superseded (SimFold renders CompactModule) |
 
 ## Sheet
@@ -522,6 +523,78 @@ status, and an optional single trailing `action` (a button such as "Draft Gibbs"
 - Mobile twin: same props (`testID` instead of `testId`); tone colours come from the theme.
 
 Not-yet-migrated pages keep working; migrate one page per PR (the plan's later phases). `SimFold` already renders it.
+
+## PlayerBadge (symbols, not words)
+
+coridian_ (phone, 2026-11-14): *"why is there only one rookie tag on one player, even though this is a fully rookie draft... I don't
+think a rookie draft should even have a rookie tag because it's obvious; if they do need tags we need some sort of symbol like Sleeper
+has (a purple R). We need symbols so we can stop using full words that take up all the space."*
+
+Every status a player can carry is ONE glyph on a 20px tinted circle (capsule for two characters), never a word chip. Web
+`ui/PlayerBadge.tsx` (`PlayerBadge`, `PlayerBadges`, `BadgeLegendSheet`, `BadgeLegendButton`), app `components/PlayerBadge.tsx`, rules and
+registry in the byte-identical twin `lib/playerBadges.ts`.
+
+| Glyph | Kind | Tone | Glyph | Kind | Tone |
+|---|---|---|---|---|---|
+| O | Out | danger | FA | Free agent | success |
+| IR | Injured reserve | danger | $ | On the trade block | action |
+| D | Doubtful | danger | ◎ | Trade target | accent |
+| Q | Questionable | warning | C | Captain | action |
+| T | Taxi squad | warning | ★ | Your player | accent |
+| By | On bye | muted | S / F | Starter / Fill-in | success / accent |
+| R | Rookie | accent | BN / BU | Bench / Backup | muted |
+| N | New | action | | | |
+
+- **Tones are the six existing tokens** (success, danger, warning, muted, accent, action). Same tint recipe as `ToneBadge`; no new colour.
+- **Accessible name**: each badge is `role="img"` with `aria-label` and `title` (the long-press / hover tooltip) = the full word
+  ("Out: 2 wks"). The visible glyph is `aria-hidden`. Weeks and other detail show **only** in the quick view header
+  (`showDetail`) or the tooltip, never in a list row.
+- **Legend**: `BadgeLegendSheet` lists every symbol and what it means. A strip that is not inside a tappable row takes
+  `onLegend` (the PQV header: 44px tap target); list headers can place a `BadgeLegendButton` ("ⓘ Key").
+- **Context suppression** (`contextSuppressed`, `simSuppressedBadges`): a kind that EVERY row of the list carries (3+ rows) is not
+  drawn. A rookie draft board shows no Rookie badge, a free-agent board no FA, the IR group no IR. Health badges (Out, D, Q) are
+  never suppressed. A mixed list (a startup draft with vets and rookies) still tags rookies.
+- **Cap**: at most `BADGE_MAX` (3) per row in severity order (health, reserve, bye, rookie/new, ownership, role), the rest as "+n"
+  (named in the strip's aria-label). The quick view header allows 6.
+- **One strip**: `PlayerListRow` merges its `chip`, its status-like `tags` (Free agent, On block, Your team, fill-in, IR...) and its
+  `badges` into one strip after the name; only non-status tags (an AI team's name, "Hot streak") remain text pills on line 3.
+  `badgeFromTag` is the bridge, so existing callers did not change.
+- **Routed through it**: `PlayerListRow` (all of FantasyDesk and Sim lists), `SimDraftRow` / `SimPlayerLine` / `SimRosterLine`,
+  Sim roster, IR/taxi groups and move sheet (`SimPlayerChips`), the Sim Players / draft / rookie-draft lists, the Player Quick View
+  header tags and Health chip, the hero ROOKIE badge, the Sim trade "Your block" mark, and web `PlayerInjuryBadge`.
+- **Not yet routed** (follow-ups, listed so they are not forgotten): app `PlayerIdentityRow` injury pill and `PlayerCard` injury
+  dot (already short-code pills, solid when ruled out), `WeatherReasonChip`, trade-asset rows, waiver/briefing chips that use `PlayerInjuryBadge` on the real side (web done, app not).
+
+## Visual identity
+
+Not a new look: the liquid-glass style we already have, written down so every page reads as one product. Apply it page by page
+(first: the Fantasy Sim offseason). A page that cannot name its hero or its modules is not done.
+
+1. **Rhythm: one hero, then dense modules.** Each page has exactly one hero (the thing the user came for: a draft clock, a score,
+   the stepper) and below it a short stack of `CompactModule`s (`gap-2`, 8px, on a phone). No stand-alone prose cards. A module
+   is informative collapsed (summary line of counts and status) and may carry one icon action.
+2. **Glass surfaces with a subtle accent**: `AccentCard` / `glass-surface` only, the 3px left rail carries the module's tone (or the
+   position colour on a player). Surfaces never get a second border style or a new fill.
+3. **Section headers carry an icon**: 14px line glyph + small uppercase title (the `CompactModule` title). A page's step names are
+   never repeated as module titles (the stepper says "Draft", the module says "On the clock").
+4. **Symbols over words** for status (PlayerBadge); counts over sentences in summaries (`14/12 spots · cut 2 · QB2 RB5`).
+5. **Avatar and OVR are one thing everywhere**: `PlayerAvatar` + `OvrGauge` (`PlayerListRow` stat), same size per density; a player
+   never gets a second rating number.
+6. **Spacing scale** (`--space-*`, mobile `spacing`): 4 / 8 / 12 / 16 / 24. 8 between modules, 12 inside a card, 16 page gutter. No dead
+   space: a card with one line of text becomes a module summary.
+7. **Actions**: the obvious ones are 44px icon buttons with an `aria-label` (trade, open team, draft), words only where the action
+   is not guessable ("Cut"). One primary action per module.
+8. **Motion** is the existing vocabulary only (`lib/motion.ts`): rise on entrance, count-up on numbers, nothing on lists over 24 rows.
+
+### Applied: Fantasy Sim offseason (`SimGameOffseason`, app twin)
+
+Before: a flat header card (kicker, three word chips REVIEW / ROOKIE DRAFT / ROSTER CHECK, a sentence), then full-height cards of prose,
+IR / ROOKIE / OUT chips on every row and two text buttons. After: one hero (heading + 3-node icon stepper with a connector, done steps
+get a check, the current step is ringed), then modules with a header icon and a counts summary: `2026 season` (9-5 · 3rd · Semifinal),
+`Retirements` (2 retired · 1 yours), `Aging` (3 up · 2 down), `Your picks`, `On the clock` (R2 P5 · You pick now · 38 left, glows on
+your turn), `Draft log`, `Roster` (14/12 spots · cut 2 · QB2 RB5, with a trade icon action), `Future picks`. The rookie board has no
+Rookie badge (context suppression). The summary builders are the lib twin `simOffseasonSummary.ts`; `SimCollapse` is now a thin
+adapter over `CompactModule`, so the Team tab and dynasty screens got the same module for free.
 
 ## Player row anatomy (shared by FantasyDesk and the Fantasy Sim)
 

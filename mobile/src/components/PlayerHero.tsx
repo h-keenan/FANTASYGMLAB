@@ -7,6 +7,7 @@ import OvrGauge from './OvrGauge';
 import PlayerAvatar from './PlayerAvatar';
 import PositionBadge from './PositionBadge';
 import TapForWhy from './TapForWhy';
+import { PlayerBadge } from './PlayerBadge';
 import ToneBadge from './ToneBadge';
 import { useThemeMode } from '../context/ThemeModeContext';
 import type { UsageTrend } from '../lib/api';
@@ -150,7 +151,7 @@ export default function PlayerHero({
               <AppText style={styles.metaPillDot}>•</AppText>
               <AppText style={styles.metaPillText}>Age {age ?? (usageLoading ? '—' : 'N/A')}</AppText>
             </View>
-            {rookie ? <ToneBadge label={rookie.label} color={colors.accent} /> : null}
+            {rookie ? <PlayerBadge kind="rookie" detail={rookie.detail} /> : null}
             {bye.label ? (
               <View style={styles.metaPill} testID="pqv-bye-pill">
                 <AppText style={styles.metaPillText}>{byeWeek != null ? byePillText(byeWeek, onByeThisWeek === true, unavailable) : bye.label}</AppText>

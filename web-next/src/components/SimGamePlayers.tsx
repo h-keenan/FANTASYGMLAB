@@ -18,6 +18,7 @@ import { SimPager, SimToneBadge, useSimDebounced, useSimWide } from "@/component
 import { SkeletonRows } from "@/components/Skeleton";
 import { api } from "@/lib/api";
 import { SIM_WINDOW_STEP, simWindow } from "@/lib/simLayout";
+import { simSuppressedBadges } from "@/lib/simDraft";
 import { simActualPoints, simAvailabilityLine, simHeaderTags, simHeroFeed, simProjectionBand, simProjectionIsFlat, simRosLine } from "@/lib/simPlayerSheet";
 import { PLAYER_SEARCH_DEBOUNCE_MS } from "@/lib/leaguePlayerSearch";
 import {
@@ -124,6 +125,7 @@ export function SimPlayerBrowser({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [gameId, query, refreshKey, attempt]);
 
+  const suppressed = simSuppressedBadges(items);
   const rows = simWindow(items, wide ? items.length : visible);
   return (
     <section className="flex flex-col gap-3" aria-label="Players">
@@ -194,6 +196,7 @@ export function SimPlayerBrowser({
           {rows.shown.map((player) => (
             <SimDraftRow
               key={player.id}
+              suppressBadges={suppressed}
               player={player}
               week={week}
               onOpen={onOpen}

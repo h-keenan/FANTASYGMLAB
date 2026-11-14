@@ -23,7 +23,9 @@ import { SheetModal, SheetScrollView, SwipeDismissCard } from './SwipeDismissShe
 import PlayerValueHistory from './PlayerValueHistory';
 import { ratingHistoryCaption } from '../lib/valueHistoryPresentation';
 import SubRatingRow from './SubRatingRow';
+import { BadgeLegendSheet, PlayerBadges } from './PlayerBadge';
 import ToneBadge from './ToneBadge';
+import { badgeFromInjury, badgeFromTag } from '../lib/playerBadges';
 import SeasonStatsRows from './SeasonStatsRows';
 import { HeadlineTiles } from './StatRows';
 import UsageBlock from './UsageBlock';
@@ -133,6 +135,7 @@ export default function PlayerQuickViewSheet({
   const realWorld = pqvRealWorld(isSim);
   const { player } = request;
   const [explorer, setExplorer] = useState<ExplorerTarget | null>(null);
+  const [legendOpen, setLegendOpen] = useState(false);
   const scoped = leagueScopedIdentity(request);
 
   const detailQuery = useQuery({
@@ -358,16 +361,24 @@ export default function PlayerQuickViewSheet({
                     <ToneBadge label={scoped.opportunityLabel} color={colors.textSecondary} size="xs" />
                   ) : null}
                   {headerTags.length > 0 ? (
-                    headerTags.map((tag) => (
-                      <ToneBadge key={tag.key} label={tag.label} color={tagToneColor(tag.tone, colors)} size="xs" shrink />
-                    ))
+                    <>
+                      <PlayerBadges badges={headerTags.map((tag) => badgeFromTag(tag))} max={6} showDetail onLegend={() => setLegendOpen(true)} />
+                      {headerTags.filter((tag) => !badgeFromTag(tag)).map((tag) => (
+                        <ToneBadge key={tag.key} label={tag.label} color={tagToneColor(tag.tone, colors)} size="xs" shrink />
+                      ))}
+                    </>
                   ) : injury ? (
-                    <ToneBadge
-                      label={`Health: ${injury}`}
-                      color={injuryTone(player.injury_status) === 'danger' ? colors.danger : colors.warning}
-                      size="xs"
-                    />
+                    badgeFromInjury(injury) ? (
+                      <PlayerBadges badges={[{ kind: badgeFromInjury(injury)!, detail: injury }]} showDetail onLegend={() => setLegendOpen(true)} />
+                    ) : (
+                      <ToneBadge
+                        label={`Health: ${injury}`}
+                        color={injuryTone(player.injury_status) === 'danger' ? colors.danger : colors.warning}
+                        size="xs"
+                      />
+                    )
                   ) : null}
+                  <BadgeLegendSheet open={legendOpen} onClose={() => setLegendOpen(false)} />
                 </View>
               ) : null}
               {mismatch ? <AppText style={styles.note}>{mismatch}</AppText> : null}

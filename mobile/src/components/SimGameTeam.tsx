@@ -13,7 +13,7 @@ import SimGlyph from './SimGlyph';
 import { ReviewGlyphChip } from './SeasonReviewSections';
 import SegmentedTabBar from './SegmentedTabBar';
 import { SkeletonCard } from './SkeletonBlock';
-import { SimPickLine, SimPlayerChips, useSimPicks } from './SimGameDynastyParts';
+import { SimPickLine, useSimPicks } from './SimGameDynastyParts';
 import { SimPlayerBrowser } from './SimGamePlayers';
 import { SimReserveButton, SimReserveGroups, SimReserveSheet } from './SimGameReserves';
 import { SimFold, SimIconButton, SimPlayerChip, SimPlayerLine, SimRosterLine, SimSectionTitle, SimSheet, SimStat, SimTeamLink, SimToneBadge, createSimStyles, simToneColor, type SimCtx } from './SimGameParts';
@@ -250,7 +250,6 @@ export function SimTeamTab({ ctx, onTrade }: { ctx: SimCtx; onTrade: () => void 
               player={player}
               week={game.week}
               onOpen={ctx.openPlayer}
-              extra={<SimPlayerChips player={player} />}
               trailing={
                 cutting === player.id ? (
                   <>

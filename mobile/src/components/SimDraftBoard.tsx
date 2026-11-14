@@ -14,7 +14,8 @@ import { api } from '../lib/api';
 import { PLAYER_SEARCH_DEBOUNCE_MS } from '../lib/leaguePlayerSearch';
 import PlayerListRow from './PlayerListRow';
 import type { PlayerListDensity, PlayerListTag } from '../lib/playerListRow';
-import { SIM_DRAFT_SORTS, simCycleSort, simDraftMeta, simDraftRowChips, simListStats } from '../lib/simDraft';
+import type { BadgeKind } from '../lib/playerBadges';
+import { SIM_DRAFT_SORTS, simCycleSort, simDraftMeta, simDraftRowChips, simListStats, simRowBadges, simSuppressedBadges } from '../lib/simDraft';
 import { SIM_WINDOW_STEP, simWindow } from '../lib/simLayout';
 import {
   SIM_PAGE_SIZE,
@@ -111,6 +112,7 @@ export function SimDraftRow({
   week = 0,
   drafted = false,
   tags,
+  suppressBadges,
   extra,
   chipsExtra,
   density,
@@ -125,6 +127,8 @@ export function SimDraftRow({
   /** Optimistic: just picked; the row slides out while the server confirms. */
   drafted?: boolean;
   tags?: PlayerListTag[];
+  /** Badge kinds true for the whole list (simSuppressedBadges), so they are not drawn on each row. */
+  suppressBadges?: BadgeKind[];
   extra?: ReactNode;
   /** Small inline controls at the end of the chips line (a Queue toggle). */
   chipsExtra?: ReactNode;
@@ -143,6 +147,8 @@ export function SimDraftRow({
       hurt={player.status === 'out'}
       stats={simListStats(player)}
       tags={tags}
+      badges={simRowBadges(player)}
+      suppressBadges={suppressBadges}
       extra={extra}
       chipsExtra={chipsExtra}
       actions={actions}
@@ -193,6 +199,7 @@ export function SimDraftBoard({
   const windowKey = [filter.page, filter.pos, filter.sort, filter.q, filter.status].join('|');
   const [win, setWin] = useState({ key: windowKey, n: SIM_WINDOW_STEP });
   const visible = win.key === windowKey ? win.n : SIM_WINDOW_STEP;
+  const suppressed = simSuppressedBadges(items);
   const rows = simWindow(items, visible);
 
   useEffect(() => {
@@ -278,7 +285,7 @@ export function SimDraftBoard({
           </AppText>
           <AppText style={styles.scaleNote}>OVR is his rank at his position, same as everywhere. EDGE: green = steal, red = reach (the model vs ADP).</AppText>
           {rows.shown.map((player) => (
-            <SimDraftRow key={player.id} player={player} onOpen={onOpen} week={week} drafted={draftedIds?.includes(player.id)} actions={actions ? actions(player) : null} chipsExtra={chipsExtra ? chipsExtra(player) : undefined} />
+            <SimDraftRow key={player.id} player={player} suppressBadges={suppressed} onOpen={onOpen} week={week} drafted={draftedIds?.includes(player.id)} actions={actions ? actions(player) : null} chipsExtra={chipsExtra ? chipsExtra(player) : undefined} />
           ))}
           {rows.remaining > 0 ? (
             <Pressable onPress={() => setWin({ key: windowKey, n: visible + SIM_WINDOW_STEP })} accessibilityRole="button" style={styles.showMore}>
