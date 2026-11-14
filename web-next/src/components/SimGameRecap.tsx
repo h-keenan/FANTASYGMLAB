@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 
 import { AccentCard } from "@/components/AccentCard";
 import { Confetti, CountUp } from "@/components/Motion";
+import { BottomDock } from "@/components/ui/BottomDock";
 import { Button } from "@/components/Button";
 import { EmptyState } from "@/components/EmptyState";
 import { PositionBadge } from "@/components/PositionBadge";
@@ -189,7 +190,7 @@ export function SimWeekRecapView({
       </div>
 
       {/* Phones: the same in-flow sticky bottom stack + glass pill as the Advance bar (no orb here, so nothing overlaps it). */}
-      <div className="bottom-stack">
+      <BottomDock>
       <div className="sim-recap-cta action-pill flex gap-2 p-1 md:sticky md:bottom-4 md:p-2">
         {!last ? (
           <Button fullWidth onClick={onNext}>Next round</Button>
@@ -197,7 +198,7 @@ export function SimWeekRecapView({
           <Button fullWidth onClick={onClose}>{recap.season_complete ? (ctx.game.status === "offseason" ? "Go to the offseason" : ctx.game.settings.mode === "dynasty" ? "See your dynasty review" : "See your final grade") : "Back to your team"}</Button>
         )}
       </div>
-      </div>
+      </BottomDock>
     </div>
   );
 }

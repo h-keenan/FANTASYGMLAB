@@ -138,3 +138,167 @@ export function movesParts(moves: ReadonlyArray<{ startName: string; gain: numbe
     { key: "top", text: top.gain != null ? `Start ${top.startName} ${signedPoints(top.gain)} pts` : `Start ${top.startName}`, tone: top.gain != null && top.gain >= 0.05 ? "success" : "muted" },
   ];
 }
+
+// ---------------------------------------------------------------------------------------------------------------------
+// Matchup hero card (V1) and ticker. The same model feeds the FantasyDesk Matchup page, the Fantasy Sim Home card and
+// the compact ticker on stacks. Structural inputs only; the sim adapter never carries a rating, only projection range.
+// ---------------------------------------------------------------------------------------------------------------------
+
+export interface MatchupSwingInput {
+  playerId: string | null;
+  name: string;
+  position: string | null;
+  team: string | null;
+  tier?: string | null;
+  /** The projection's low / high for the week (the sim's floor / ceiling). */
+  low: number | null;
+  high: number | null;
+  /** His game is over (or he cannot play): nothing left to swing. */
+  done: boolean;
+  side: "mine" | "opponent";
+}
+
+export interface MatchupSwingPlayer {
+  key: string;
+  side: "mine" | "opponent";
+  playerId: string | null;
+  name: string;
+  position: string | null;
+  team: string | null;
+  tier: string | null;
+  /** Half the width of his projection range: how far he can move the score either way. */
+  swing: number;
+  /** "±9 either way" for your player, "±9 for Mike" for theirs. */
+  label: string;
+}
+
+/** The widest-range player still to play on each side (yours first). A player with a range under 1 point is not a swing. */
+export function matchupSwingPlayers(inputs: ReadonlyArray<MatchupSwingInput>, opponentName: string): MatchupSwingPlayer[] {
+  const best = (side: "mine" | "opponent"): MatchupSwingPlayer | null => {
+    let pick: MatchupSwingPlayer | null = null;
+    for (const p of inputs) {
+      if (p.side !== side || p.done || p.low == null || p.high == null) continue;
+      const swing = Math.round(((p.high - p.low) / 2) * 10) / 10;
+      if (swing < 1 || (pick && swing <= pick.swing)) continue;
+      pick = {
+        key: `${side}-${p.playerId ?? p.name}`,
+        side,
+        playerId: p.playerId,
+        name: p.name,
+        position: p.position,
+        team: p.team,
+        tier: p.tier ?? null,
+        swing,
+        label: side === "mine" ? `±${Math.round(swing)} either way` : `±${Math.round(swing)} for ${opponentName}`,
+      };
+    }
+    return pick;
+  };
+  return [best("mine"), best("opponent")].filter((p): p is MatchupSwingPlayer => p != null);
+}
+
+export interface MatchupCardInput {
+  week: number | null;
+  /** "Week 7 playoffs" style prefix is the caller's; this builds "WEEK 7 · LIVE". */
+  live: boolean;
+  final: boolean;
+  myName: string;
+  opponentName: string;
+  /** Real points once games started, else null. */
+  myScore: number | null;
+  opponentScore: number | null;
+  myProjected: number | null;
+  opponentProjected: number | null;
+  /** 0-100, null when not modeled. */
+  winPercent: number | null;
+  kickedOff: boolean;
+  playersLeft: number | null;
+  swing: MatchupSwingPlayer[];
+}
+
+export interface MatchupCardModel {
+  kicker: string;
+  win: { pct: number; label: string; tone: "success" | "danger" | "accent" } | null;
+  mine: { name: string; score: string };
+  opponent: { name: string; score: string };
+  /** Which numbers the big scores are: "points" (live/final) or "projected". */
+  basis: "points" | "projected";
+  /** 0-100 fill of the win bar; null when not modeled. */
+  bar: number | null;
+  detail: string | null;
+  swing: MatchupSwingPlayer[];
+}
+
+export function matchupCardModel(input: MatchupCardInput): MatchupCardModel {
+  const state = input.final ? "FINAL" : input.live ? "LIVE" : null;
+  const kicker = [input.week != null ? `WEEK ${input.week}` : "THIS WEEK", state].filter(Boolean).join(" · ");
+  const wp = input.winPercent != null ? Math.round(input.winPercent) : null;
+  const win = wp != null ? { pct: wp, label: `${wp}% win`, tone: (wp >= 55 ? "success" : wp <= 45 ? "danger" : "accent") as "success" | "danger" | "accent" } : null;
+  const useReal = input.kickedOff && input.myScore != null && input.opponentScore != null;
+  const mineScore = useReal ? fixed(input.myScore) : fixed(input.myProjected);
+  const oppScore = useReal ? fixed(input.opponentScore) : fixed(input.opponentProjected);
+  const proj = fixed(input.myProjected) && fixed(input.opponentProjected) ? `${useReal && !input.final ? "Proj final" : "Projected"} ${fixed(input.myProjected)} - ${fixed(input.opponentProjected)}` : null;
+  const left = input.playersLeft != null && input.playersLeft > 0 && !input.final ? `${input.playersLeft} ${input.playersLeft === 1 ? "player" : "players"} left` : null;
+  return {
+    kicker,
+    win,
+    mine: { name: input.myName, score: mineScore ?? "-" },
+    opponent: { name: input.opponentName, score: oppScore ?? "-" },
+    basis: useReal ? "points" : "projected",
+    bar: wp,
+    detail: [useReal ? proj : null, left].filter(Boolean).join(" · ") || null,
+    swing: input.swing,
+  };
+}
+
+/** The compact ticker's collapsed line: "WK 7 · You 112.4 - 98.1 Mike · 71%". Used where matchup is one module in a stack. */
+export function matchupTickerParts(model: MatchupCardModel, week: number | null): CompactPart[] {
+  const tone: CompactTone | undefined = model.win ? (model.win.tone === "success" ? "success" : model.win.tone === "danger" ? "danger" : "accent") : undefined;
+  return [
+    { key: "wk", text: week != null ? `WK ${week}` : "THIS WEEK", tone: "muted" },
+    { key: "score", text: `${model.mine.name} ${model.mine.score} - ${model.opponent.score} ${model.opponent.name}`, strong: true },
+    ...(model.win ? [{ key: "win", text: `${model.win.pct}%`, tone }] : []),
+  ];
+}
+
+/** Fantasy Sim: the Home matchup card from the weekly head-to-head (projection and floor/ceiling only). */
+export interface SimMatchupCardInput {
+  week: number;
+  playoff: boolean;
+  opponentName: string;
+  youName: string;
+  youProjection: number | null;
+  oppProjection: number | null;
+  /** 0-1 */
+  winProb: number | null;
+  rows: ReadonlyArray<{
+    you: { id: string; headshot_id?: string | null; name: string; pos: string; team: string | null; floor: number; ceiling: number; status?: string } | null;
+    opp: { id: string; headshot_id?: string | null; name: string; pos: string; team: string | null; floor: number; ceiling: number; status?: string } | null;
+  }>;
+}
+
+export function simMatchupCardModel(input: SimMatchupCardInput): MatchupCardModel {
+  const swingInputs: MatchupSwingInput[] = [];
+  for (const row of input.rows) {
+    for (const [side, p] of [["mine", row.you], ["opponent", row.opp]] as const) {
+      if (!p) continue;
+      swingInputs.push({ playerId: p.headshot_id ?? null, name: p.name, position: p.pos, team: p.team, low: p.floor, high: p.ceiling, done: p.status === "out" || p.status === "bye", side });
+    }
+  }
+  const model = matchupCardModel({
+    week: input.week,
+    live: false,
+    final: false,
+    myName: input.youName,
+    opponentName: input.opponentName,
+    myScore: null,
+    opponentScore: null,
+    myProjected: input.youProjection,
+    opponentProjected: input.oppProjection,
+    winPercent: input.winProb != null ? Math.min(99, Math.max(1, Math.round(input.winProb * 100))) : null,
+    kickedOff: false,
+    playersLeft: null,
+    swing: matchupSwingPlayers(swingInputs, input.opponentName),
+  });
+  return { ...model, kicker: `${input.playoff ? "PLAYOFFS" : "WEEK"} ${input.week}` };
+}

@@ -4,7 +4,7 @@ import { useEffect, useId, useLayoutEffect, useRef, useState, type ReactNode } f
 
 import { PillRow } from "@/components/PillRow";
 import { readSavedTab, resolveTab, saveTab, tabDirection } from "@/lib/sessionTab";
-import { nextPanelMinHeight } from "@/lib/sheetTabs";
+import { nextPanelMinHeight, stickyTabsOffset } from "@/lib/sheetTabs";
 import type { TabIconName } from "@/lib/tabIcons";
 
 export interface TabItem {
@@ -83,10 +83,37 @@ export function Tabs({
     });
   });
 
+  // Dock the strip flush under the sheet's chrome: measured from the real scroll container (its padding and the
+  // --tabs-dock the sheet sets), not assumed, so it can never float below the header or leave a gap above itself.
+  const stripRef = useRef<HTMLDivElement>(null);
+  useLayoutEffect(() => {
+    const el = stripRef.current;
+    if (!el || !sticky) return;
+    let scroller: HTMLElement | null = el.parentElement;
+    while (scroller && scroller !== document.body) {
+      const oy = getComputedStyle(scroller).overflowY;
+      if (oy === "auto" || oy === "scroll") break;
+      scroller = scroller.parentElement;
+    }
+    if (!scroller || scroller === document.body) return;
+    const target = scroller;
+    function apply() {
+      const cs = getComputedStyle(target);
+      const { top, mask } = stickyTabsOffset(parseFloat(cs.paddingTop), parseFloat(cs.getPropertyValue("--tabs-dock")));
+      el!.style.setProperty("--tabs-top", `${top}px`);
+      el!.style.setProperty("--tabs-mask", `${mask}px`);
+    }
+    apply();
+    if (typeof ResizeObserver === "undefined") return;
+    const ro = new ResizeObserver(apply);
+    ro.observe(target);
+    return () => ro.disconnect();
+  }, [sticky]);
+
   const tab = tabs.find((t) => t.key === current);
   return (
     <div className="flex flex-col gap-3" data-testid="tabs">
-      <div className={sticky ? "tabs-sticky" : undefined} data-sticky={sticky ? "true" : undefined}>
+      <div ref={stripRef} className={sticky ? "tabs-sticky" : undefined} data-sticky={sticky ? "true" : undefined}>
       <PillRow
         slim
         variant="scroll"

@@ -254,7 +254,7 @@ describe("MatchupContent", () => {
     openModule("Teams & values");
 
     expect(screen.getByLabelText("Games in progress")).toBeInTheDocument();
-    expect(screen.getByText("42.3")).toBeInTheDocument();
+    expect(screen.getAllByText("42.3").length).toBeGreaterThan(0);
     expect(screen.getByText("Proj 124.8")).toBeInTheDocument();
     expect(screen.getAllByText("64%").length).toBeGreaterThan(0);
     expect(screen.getByText("36%")).toBeInTheDocument();

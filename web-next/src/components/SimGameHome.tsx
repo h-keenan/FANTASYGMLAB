@@ -18,6 +18,10 @@ import {
 } from "@/components/SimGameHomeCards";
 import { SimMiniPlayer, SimSectionTitle, SimTeamLink, SimToneBadge, simToneColor, useSimWide, type SimCtx } from "@/components/SimGameParts";
 import { CompactModule } from "@/components/ui/CompactModule";
+import { StatusHeader } from "@/components/ui/StatusHeader";
+import { MatchupHeroCard } from "@/components/ui/MatchupModule";
+import { simMatchupCardModel } from "@/lib/matchupModules";
+import { buildSimStatusHeader, simHomeAttentionItems } from "@/lib/statusHeader";
 import { simLeagueParts } from "@/lib/simSummaries";
 import { useSimAutoSet } from "@/components/useSimAutoSet";
 import { ClaimSheet } from "@/components/SimGameTeam";
@@ -29,13 +33,11 @@ import {
   simChecklistTarget,
   simHomeDynastyLine,
   simChecklistTone,
-  simFmtPts,
   simProjText,
   simFmtRecord,
   simRowEdge,
+  simSeasonText,
   simSlotLabels,
-  simWinChanceLabel,
-  simWinChanceTone,
   type SimGamePlayer,
   type SimHomeMatchup,
   type SimHomeResponse,
@@ -130,11 +132,14 @@ export function SimHomeTab({
     <ClaimSheet ctx={ctx} player={claiming.player} roster={claiming.roster} onClose={() => setClaiming(null)} onClaimed={(next) => { setClaims(next); ctx.bump(); }} />
   ) : null;
 
+  const header = <SimStatusHeader home={home} onTab={onTab} />;
+
   // Phones: one scrolling column. This week's cards first, then a collapsed "League" section (standings, hot/cold,
   // league moves), so there is no second tab strip under the bottom bar's tabs. Desktop keeps one two-column page.
   if (!wide) {
     return (
       <div className="flex flex-col gap-3" data-testid="sim-home">
+        {header}
         {home.matchup ? <SimMatchupCard ctx={ctx} matchup={home.matchup} onTab={onTab} /> : null}
         <SimChecklistCard home={home} onTab={onTab} onAuto={home.matchup && !home.matchup.bye ? auto.run : undefined} autoBusy={auto.busy} optimal={auto.optimal} />
         <SimReservesStrip home={home} onTab={onTab} />
@@ -156,6 +161,7 @@ export function SimHomeTab({
   return (
     <div className="flex flex-col gap-4 lg:grid lg:grid-cols-2 lg:items-start" data-testid="sim-home">
       <div className="flex flex-col gap-4">
+        {header}
         {home.matchup ? <SimMatchupCard ctx={ctx} matchup={home.matchup} onTab={onTab} /> : null}
         <SimReservesStrip home={home} onTab={onTab} />
         <SimInjuriesCard ctx={ctx} injuries={home.injuries ?? []} />
@@ -174,6 +180,34 @@ export function SimHomeTab({
   );
 }
 
+/**
+ * The players-first status header on Home (ring = this week's win chance, record, three mini stats, the starters and
+ * targets that need you as player rows, the first unfinished checklist step as the one action). The cards below keep
+ * every detail. Projection and ADP only; the sim never shows its internal rating.
+ */
+function SimStatusHeader({ home, onTab }: { home: SimHomeResponse; onTab: (tab: SimTab) => void }) {
+  const mine = home.standings?.rows.find((r) => r.is_you);
+  const record = home.matchup?.you_record ?? (mine ? { wins: mine.wins, losses: mine.losses, ties: mine.ties } : null);
+  const next = (home.checklist ?? []).find((item) => !item.done && simChecklistTarget(item));
+  const model = buildSimStatusHeader({
+    week: home.week ?? home.matchup?.week ?? null,
+    seasonLabel: home.dynasty ? simSeasonText(home.dynasty) : null,
+    record: record ? simFmtRecord(record) : null,
+    rank: home.standings?.your_rank ?? mine?.rank ?? null,
+    teams: home.standings?.rows.length ?? null,
+    inPlayoffs: home.standings ? home.standings.in_playoffs : null,
+    opponentName: home.matchup?.opponent?.name ?? null,
+    winProb: home.matchup && !home.matchup.bye ? (home.matchup.win_prob ?? null) : null,
+    bye: Boolean(home.matchup?.bye),
+    injuredCount: (home.injuries ?? []).length,
+    offers: home.inbox?.count ?? 0,
+    waiverTargets: (home.waiver_suggestions ?? []).length,
+    attention: simHomeAttentionItems(home),
+    next: next ? { label: next.label, actionKey: simChecklistTarget(next) as string } : null,
+  });
+  return <StatusHeader model={model} attentionTitle="Needs your attention" onAction={(key) => onTab(key as SimTab)} testId="sim-status-header" />;
+}
+
 function SimMatchupCard({ ctx, matchup, onTab }: { ctx: SimCtx; matchup: SimHomeMatchup; onTab: (tab: SimTab) => void }) {
   const opp = matchup.opponent;
   const week = matchup.week;
@@ -186,52 +220,48 @@ function SimMatchupCard({ ctx, matchup, onTab }: { ctx: SimCtx; matchup: SimHome
     );
   }
   const prob = matchup.win_prob ?? 0.5;
-  const tone = simWinChanceTone(prob);
   const youProj = matchup.you_projection ?? 0;
   const oppProj = matchup.opp_projection ?? 0;
   const labels = simSlotLabels(matchup.rows);
   const flagged = (matchup.you_flagged ?? 0) + (matchup.opp_flagged ?? 0);
-  return <MatchupBody ctx={ctx} matchup={matchup} onTab={onTab} prob={prob} tone={tone} youProj={youProj} oppProj={oppProj} labels={labels} flagged={flagged} />;
+  return <MatchupBody ctx={ctx} matchup={matchup} onTab={onTab} prob={prob} youProj={youProj} oppProj={oppProj} labels={labels} flagged={flagged} />;
 }
 
-function MatchupBody({ ctx, matchup, onTab, prob, tone, youProj, oppProj, labels, flagged }: { ctx: SimCtx; matchup: SimHomeMatchup; onTab: (tab: SimTab) => void; prob: number; tone: ReturnType<typeof simWinChanceTone>; youProj: number; oppProj: number; labels: string[]; flagged: number }) {
+function MatchupBody({ ctx, matchup, onTab, prob, youProj, oppProj, labels, flagged }: { ctx: SimCtx; matchup: SimHomeMatchup; onTab: (tab: SimTab) => void; prob: number; youProj: number; oppProj: number; labels: string[]; flagged: number }) {
   const you = ctx.game.you;
   const opp = matchup.opponent!;
-  const week = matchup.week;
   const wide = useSimWide();
   const [showLineups, setShowLineups] = useState<boolean | null>(null);
   const lineupsOpen = showLineups ?? wide;
+  const cardModel = simMatchupCardModel({
+    week: matchup.week,
+    playoff: matchup.kind === "playoff",
+    opponentName: opp.name,
+    youName: "You",
+    youProjection: youProj,
+    oppProjection: oppProj,
+    winProb: prob,
+    rows: matchup.rows,
+  });
   return (
-    <AccentCard accent="var(--color-accent)" glow as="section" className="min-w-0">
-      <div className="flex items-center justify-between gap-2">
-        <SimSectionTitle glyph="matchup" tone="accent">{matchup.kind === "playoff" ? "Playoff matchup" : `Week ${week} matchup`}</SimSectionTitle>
-        <Button size="sm" variant="secondary" onClick={() => onTab("team")}>Set lineup</Button>
-      </div>
-
-      <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-2">
+    <MatchupHeroCard
+      model={cardModel}
+      testId="sim-matchup-hero"
+      onOpenPlayer={(p) => {
+        const hit = matchup.rows.flatMap((r) => [r.you, r.opp]).find((pl) => pl && pl.name === p.name);
+        if (hit) ctx.openPlayer(hit);
+      }}
+      action={<Button fullWidth onClick={() => onTab("team")}>Set lineup</Button>}
+    >
+      <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-2 text-xs" style={{ color: "var(--color-text-muted)" }}>
         <div className="flex min-w-0 flex-col items-center gap-1 text-center">
-          <SimTeamLink teamId={you?.team_id} name={you?.name ?? "You"} isYou size={36} stacked />
-          <span className="text-xs" style={{ color: "var(--color-text-muted)" }}>{matchup.you_record ? simFmtRecord(matchup.you_record) : ""}</span>
+          <SimTeamLink teamId={you?.team_id} name={you?.name ?? "You"} isYou size={28} stacked />
+          <span>{matchup.you_record ? simFmtRecord(matchup.you_record) : ""}</span>
         </div>
-        <span className="text-xs font-extrabold" style={{ color: "var(--color-text-muted)" }}>VS</span>
+        <span className="font-extrabold">VS</span>
         <div className="flex min-w-0 flex-col items-center gap-1 text-center">
-          <SimTeamLink teamId={opp.team_id} name={opp.name} size={36} stacked />
-          <span className="text-xs" style={{ color: "var(--color-text-muted)" }}>{opp.record ? simFmtRecord(opp.record) : ""} · {opp.persona.label}</span>
-        </div>
-      </div>
-
-      <div className="flex flex-col gap-1" data-testid="win-chance">
-        <div className="flex items-end justify-between gap-2">
-          <span className="text-xs" style={{ color: "var(--color-text-muted)" }}>Your win chance</span>
-          <span className="text-2xl font-extrabold tabular-nums leading-none" style={{ color: simToneColor(tone) }}>{simWinChanceLabel(prob)}</span>
-        </div>
-        <div className="h-2 w-full overflow-hidden" style={{ borderRadius: "var(--radius-pill)", background: "color-mix(in srgb, var(--color-danger) 28%, var(--color-surface-muted))" }} role="img" aria-label={`Win chance ${simWinChanceLabel(prob)}`}>
-          <div className="h-full" style={{ width: `${Math.round(prob * 100)}%`, background: "var(--color-success)" }} />
-        </div>
-        <div className="flex items-center justify-between text-sm font-extrabold tabular-nums" data-testid="matchup-projections">
-          <span style={{ color: youProj >= oppProj ? "var(--color-success)" : "var(--color-text-primary)" }} data-testid="your-projection">{simFmtPts(youProj)}</span>
-          <span className="text-xs font-normal" style={{ color: "var(--color-text-muted)" }}>projected points</span>
-          <span style={{ color: oppProj > youProj ? "var(--color-danger)" : "var(--color-text-primary)" }}>{simFmtPts(oppProj)}</span>
+          <SimTeamLink teamId={opp.team_id} name={opp.name} size={28} stacked />
+          <span>{opp.record ? simFmtRecord(opp.record) : ""} · {opp.persona.label}</span>
         </div>
       </div>
 
@@ -274,7 +304,7 @@ function MatchupBody({ ctx, matchup, onTab, prob, tone, youProj, oppProj, labels
           <p className="text-xs" style={{ color: "var(--color-text-muted)" }}>Their lineup is what their manager will start. Projections update when injuries or byes change.</p>
         </div>
       ) : null}
-    </AccentCard>
+    </MatchupHeroCard>
   );
 }
 

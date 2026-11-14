@@ -148,3 +148,33 @@ def test_history_is_memoized_per_save_version_and_refolds_after_any_write(monkey
     advance(client, gid)  # any write moves the version
     client.get(url, headers=hdr())
     assert len(reads) == 2
+
+
+def test_every_played_season_carries_its_game_log_best_week_and_position_rank():
+    """The Stats tab shows the sim's own seasons: points per game of every season played (S1, S2 ...), not just the current one.
+    Built from the week_scored events alone, so a save made before this view existed gets it too (no state or engine change)."""
+    run = played()
+    events = run.em.events
+    # a player who scored in both seasons
+    scored = {}
+    for ev in events:
+        if ev["type"] == "week_scored":
+            season = 2 if any(e["type"] == "season_started" for e in events[: events.index(ev)]) else 1
+            for pid, pts in ev["payload"]["points"].items():
+                if pts is not None:
+                    scored.setdefault(pid, set()).add(season)
+    pid = next(p for p, seasons in sorted(scored.items()) if seasons == {1, 2})
+    h = hist.player_history(run.root, events, pid)
+    assert [s["season"] for s in h["seasons"]] == [1, 2]
+    for s in h["seasons"]:
+        assert len(s["weeks"]) == s["games"] > 0
+        assert s["points"] == pytest.approx(sum(w["points"] for w in s["weeks"]), abs=0.2)
+        assert s["best_week"]["points"] == max(w["points"] for w in s["weeks"])
+        assert s["pos"] == run.root.season_view(s["season"]).players[pid].pos
+        assert isinstance(s["pos_rank"], int) and s["pos_rank"] >= 1
+    # An old save's events carry no `roles` (the role behind each score) and nothing else the view needs: same seasons, byte for byte.
+    old = copy.deepcopy(events)
+    for ev in old:
+        if ev["type"] == "week_scored":
+            ev["payload"].pop("roles", None)
+    assert hist.player_history(run.root, old, pid)["seasons"] == h["seasons"]

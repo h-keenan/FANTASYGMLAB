@@ -34,7 +34,7 @@ export function AppContentShell({ children }: { children: ReactNode }) {
   const espnLeagueId = espnUnavailableLeagueId(pathname);
   const { barVisible } = useShellNav();
   return (
-    <div className={`flex flex-col flex-auto ${session ? `md:pl-60 md:pb-0 ${pathOwnsPhoneChrome(pathname) || barVisible ? "" : "pb-12"}` : ""}`}>
+    <div className={`flex flex-col flex-auto ${session ? `md:pl-60 md:pb-0 ${pathOwnsPhoneChrome(pathname) ? "" : barVisible ? "max-md:pb-[var(--bottom-clearance,4.5rem)]" : "pb-12"}` : ""}`}>
       {espnLeagueId ? (
         // EspnUnavailableState reads ?name= (useSearchParams), which Next
         // requires to sit under a Suspense boundary.
@@ -44,7 +44,7 @@ export function AppContentShell({ children }: { children: ReactNode }) {
       ) : (
         children
       )}
-      {/* Phone bottom bar (flag-gated): last child of the app column, sticky at its end. */}
+      {/* Phone bottom pill (flag-gated): a fixed dock portaled to <body> (ui/BottomDock); the column pads by --bottom-clearance. */}
       <Suspense fallback={null}>
         <AppShellBar />
       </Suspense>

@@ -70,8 +70,10 @@ export interface PlayerFactsInput {
   status?: string | null;
   /** Page-specific extra facts for the expanded tile (a sorted stat, a position rank). Desk only. */
   extraFacts?: PlayerFact[];
-  /** Replaces the trailing key number (e.g. the column the list is sorted by). Desk only. */
+  /** Replaces the trailing key number (e.g. the column the list is sorted by, or a status header's gain figure). */
   trailingFact?: PlayerFact | null;
+  /** Replaces the muted second line with ready-made text ("HOU · 12% rostered"). */
+  metaText?: string | null;
 }
 
 export interface PlayerRowModel {
@@ -101,18 +103,19 @@ export function playerRowModel(input: PlayerFactsInput): PlayerRowModel {
   if (input.bye != null) meta.push(`BYE ${input.bye}`);
   const proj = num(input.proj);
   const adp = num(input.adp);
+  if (input.metaText) meta.splice(0, meta.length, input.metaText);
   if (mode === "sim") {
     const facts: PlayerFact[] = [];
     if (input.grade) facts.push({ key: "grade", label: "GRADE", value: input.grade, tone: "accent" });
     if (adp) facts.push({ key: "adp", label: "ADP", value: adp });
     if (proj) facts.push({ key: "proj", label: "PROJ", value: proj });
-    const trailing = input.grade
+    const trailing: PlayerFact | null = input.trailingFact ?? (input.grade
       ? { key: "grade", label: "GRADE", value: input.grade, tone: "accent" as const }
       : adp
         ? { key: "adp", label: "ADP", value: adp }
         : proj
           ? { key: "proj", label: "PROJ", value: proj }
-          : null;
+          : null);
     return { meta, trailing, facts };
   }
   const facts: PlayerFact[] = [];

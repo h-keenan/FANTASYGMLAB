@@ -1,7 +1,7 @@
 // Shared (web + mobile twin): plain-words presentation of the Fantasy Sim history payloads
 // (GET /players/{id}/history and /teams/{id}/history). Pure and import-free of runtime code.
 
-import { simSeasonLabel, type SimHistoryAsset, type SimHistoryEntry, type SimTeamHistoryMove } from "./simGame";
+import { simSeasonLabel, type SimHistoryAsset, type SimHistoryEntry, type SimHistorySeason, type SimTeamHistoryMove } from "./simGame";
 
 interface When {
   season: number;
@@ -75,4 +75,22 @@ export function simTeamMoveText(m: SimTeamHistoryMove): string {
 /** "9-5", "9-5-1" */
 export function simSeasonRecord(s: { wins: number; losses: number; ties: number }): string {
   return s.ties ? `${s.wins}-${s.losses}-${s.ties}` : `${s.wins}-${s.losses}`;
+}
+
+/**
+ * One sim season of a player's career, collapsed: "S3 2028 · 14 g · 212.4 pts · 15.2 avg · WR12". Points, games, average and
+ * position rank are what the engine stores per player per game (component stats are not kept league-wide), so that is all it says.
+ */
+export function simCareerSeasonParts(s: Pick<SimHistorySeason, "season" | "year" | "season_label" | "games" | "points" | "ppg" | "pos" | "pos_rank">): { key: string; text: string; strong?: boolean }[] {
+  return [
+    { key: "games", text: `${s.games} g` },
+    { key: "pts", text: `${s.points.toFixed(1)} pts` },
+    s.ppg != null ? { key: "avg", text: `${s.ppg.toFixed(1)} avg` } : { key: "avg", text: "" },
+    s.pos && s.pos_rank ? { key: "rank", text: `${s.pos}${s.pos_rank}`, strong: true } : { key: "rank", text: "" },
+  ].filter((p) => p.text);
+}
+
+/** The title of a sim season module: the shared season label ("S3 2028"). */
+export function simCareerSeasonTitle(s: Pick<SimHistorySeason, "season" | "year" | "season_label">): string {
+  return s.season_label || simSeasonLabel(s.season, s.year);
 }

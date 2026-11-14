@@ -389,3 +389,36 @@ export function simRookieRecentChips(order: readonly SimRookieOrderLike[], count
       return { key: o.pick, label: `#${o.n} ${parts[parts.length - 1]} ${o.made!.pos}`, pos: o.made!.pos };
     });
 }
+
+/**
+ * The pinned draft bar's second line (V1 with the avatar): the best available player with his avatar, position and
+ * letter grade. Never a number for the model's rating: the grade is a letter, ADP and projection are the only figures.
+ */
+export interface SimDraftBarModel {
+  playerId: string | null;
+  name: string;
+  position: string;
+  team: string | null;
+  /** "ADP 5" or null. */
+  adp: string | null;
+  /** A letter ("A-"), or null when the game has no grade for him. */
+  grade: string | null;
+  /** "Fills your RB need" when his position is a starter slot you have not filled. */
+  fit: string | null;
+}
+
+export function simDraftBarModel(
+  player: Pick<SimGamePlayer, "name" | "pos" | "team" | "adp"> & { headshot_id?: string | null; grade?: string | null },
+  needs: readonly SimDraftNeed[],
+): SimDraftBarModel {
+  const need = needs.find((n) => n.pos === player.pos && n.starters > 0 && n.have < n.starters);
+  return {
+    playerId: player.headshot_id ?? null,
+    name: player.name,
+    position: player.pos,
+    team: player.team,
+    adp: player.adp != null && !Number.isNaN(player.adp) ? `ADP ${simFmtValue(player.adp)}` : null,
+    grade: player.grade ?? null,
+    fit: need ? `Fills your ${need.pos} need` : null,
+  };
+}

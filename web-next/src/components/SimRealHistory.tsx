@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 
+import { ToneBadge } from "@/components/ToneBadge";
 import { api, type CareerSeason, type WeeklyStatPoint } from "@/lib/api";
 import { simCareerAsOf, simGameLog } from "@/lib/simAsOf";
 
@@ -48,7 +49,7 @@ export function SimRealHistory({ playerId, asOf }: { playerId: string; asOf: num
     <div className="flex flex-col gap-3" data-testid="sim-real-history">
       {career.length > 0 ? (
         <section className="pqv-stat-season" data-testid="sim-career">
-          <h3>Career by season · through {asOf}</h3>
+          <h3 className="flex items-center gap-2">Career by season · through {asOf} <ToneBadge label="Real" color="var(--color-text-secondary)" size="xs" /></h3>
           {career.map((season, index) => (
             <div key={season.season} style={{ borderTop: index ? "var(--border-width-default) solid var(--color-border)" : undefined, paddingTop: index ? "0.5rem" : 0 }}>
               <button

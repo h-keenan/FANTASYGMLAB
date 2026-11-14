@@ -610,7 +610,7 @@
    Sticky is clamped to its parent's box, so the parent must span the whole document: html/body have no fixed height
    (globals.css), the column chain uses flex-auto, never flex-1 (basis 0) or min-h-0. lib/bottomChrome.test.ts guards
    all of this; scripts/sim_layout_playwright/footer_pin.mjs checks it in a real browser (WebKit, iPhone viewport). */
-.bottom-rail { position: sticky; bottom: 0; z-index: 40; height: 0; }
+.bottom-rail { position: fixed; left: 0; right: 0; bottom: 0; z-index: 40; height: 0; }
 /* Phone bottom tab bar (components/ui/BottomTabBar.tsx) and the sticky stack
    that holds it with the page's action strip. NOT position:fixed and not
    JS-positioned: the stack is `position: sticky; bottom: 0` at the end of a
@@ -628,15 +628,26 @@
   --bar-header-height: 52px;
 }
 .bottom-stack {
+  /* Inline fallback (before hydration, md+): sticky at the end of the column. On phones BottomDock portals it to <body> and
+     [data-dock="fixed"] below pins it to the viewport. */
   position: sticky;
   bottom: 0;
   z-index: 30;
   display: flex;
   flex-direction: column;
-  margin-inline: -1rem;
   padding-bottom: env(safe-area-inset-bottom, 0px);
 }
-.bottom-stack[data-bare] { margin-inline: 0; }
+.bottom-stack[data-dock="fixed"] {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  /* Takes no taps in the gaps beside the pill; its children opt back in. A compositor layer keeps it glued during iOS toolbar resizes. */
+  pointer-events: none;
+  transform: translateZ(0);
+  will-change: transform;
+}
+.bottom-stack[data-dock="fixed"] > * { pointer-events: auto; }
 /* The game's navigation orb is a slot inside the action bar's one row (Sim to | orb | Advance), in flow: nothing overlaps content or clips. */
 .game-orb-slot { display: flex; flex: 0 0 auto; align-items: center; justify-content: center; }
 .game-orb {
@@ -863,11 +874,12 @@
   transform: translateX(var(--ind-x, 0px));
   background: color-mix(in srgb, #fff 10%, transparent);
   box-shadow: inset 0 1px 0 color-mix(in srgb, #fff 14%, transparent);
-  transition: transform var(--motion-base, 240ms) var(--ease-out, ease-out), width var(--motion-base, 240ms) var(--ease-out, ease-out);
+  transition: transform 180ms var(--ease-out, ease-out), width 180ms var(--ease-out, ease-out); will-change: transform, width;
 }
 .pill-tabs:not([data-measured]) .pill-indicator { visibility: hidden; }
 .pill-tab {
-  position: relative; flex: 0 0 auto; min-height: var(--bar-button-min-height); margin: 0; padding: 0 10px;
+  position: relative; flex: 1 0 auto; display: inline-flex; align-items: center; justify-content: center; box-sizing: border-box;
+  height: var(--bar-button-min-height); min-height: var(--bar-button-min-height); margin: 0; padding: 0 10px; text-decoration: none;
   -webkit-appearance: none; appearance: none; background: transparent; border: 0; border-radius: 999px; cursor: pointer;
   font-family: inherit; font-size: 0.75rem; font-weight: 700; line-height: 1; white-space: nowrap; color: var(--color-text-muted);
   -webkit-tap-highlight-color: transparent; transition: color 180ms ease;

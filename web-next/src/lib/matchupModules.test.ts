@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import { collapsedVerdict } from "./moduleTemplates";
 import { compactSummaryText, type CompactPart } from "./compactModule";
-import { edgeChips, insightsParts, lineupParts, matchupHeroModel, movesParts, teamsValuesParts } from "./matchupModules";
+import { edgeChips, insightsParts, lineupParts, matchupCardModel, matchupHeroModel, matchupSwingPlayers, matchupTickerParts, movesParts, simMatchupCardModel, teamsValuesParts } from "./matchupModules";
 import { picksSummaryParts } from "./playersModules";
 
 const base = {
@@ -77,5 +77,41 @@ describe("edgeChips", () => {
     const chips = edgeChips([{ position: "K", edge: -0.7 }, { position: "RB", edge: 16.7 }, { position: "QB", edge: 0 }]);
     expect(chips.map((c) => c.label)).toEqual(["RB +16.7", "K -0.7", "QB 0.0"]);
     expect(chips.map((c) => c.tone)).toEqual(["success", "danger", "muted"]);
+  });
+});
+
+describe("matchup hero card and ticker", () => {
+  const swing = (side: "mine" | "opponent", name: string, low: number | null, high: number | null, done = false) => ({ playerId: name, name, position: "WR", team: "CIN", low, high, done, side });
+  it("picks the widest projection range still to play on each side", () => {
+    const picks = matchupSwingPlayers([swing("mine", "Chase", 8, 26), swing("mine", "Tiny", 8, 9), swing("opponent", "Cook", 4, 12), swing("opponent", "Done", 0, 40, true)], "Mike");
+    expect(picks.map((p) => p.name)).toEqual(["Chase", "Cook"]);
+    expect(picks[0].label).toBe("±9 either way");
+    expect(picks[1].label).toBe("±4 for Mike");
+    expect(matchupSwingPlayers([swing("mine", "NoRange", null, null)], "Mike")).toEqual([]);
+  });
+  const base = { week: 7, live: true, final: false, myName: "You", opponentName: "Mike", myScore: 112.4, opponentScore: 98.1, myProjected: 131.2, opponentProjected: 124, winPercent: 71, kickedOff: true, playersLeft: 3, swing: [] };
+  it("live: real points big, projection and players left under them", () => {
+    const model = matchupCardModel(base);
+    expect(model.kicker).toBe("WEEK 7 · LIVE");
+    expect(model.win).toMatchObject({ pct: 71, label: "71% win", tone: "success" });
+    expect(model.mine.score).toBe("112.4");
+    expect(model.detail).toBe("Proj final 131.2 - 124.0 · 3 players left");
+    expect(matchupTickerParts(model, 7).map((p) => p.text)).toEqual(["WK 7", "You 112.4 - 98.1 Mike", "71%"]);
+  });
+  it("before kickoff: projections are the scores and nothing is invented", () => {
+    const model = matchupCardModel({ ...base, live: false, kickedOff: false, myScore: null, opponentScore: null, playersLeft: null, winPercent: null });
+    expect(model.basis).toBe("projected");
+    expect(model.mine.score).toBe("131.2");
+    expect(model.win).toBeNull();
+    expect(model.bar).toBeNull();
+    expect(model.detail).toBeNull();
+  });
+  it("sim: floor and ceiling make the swing, an out player never swings, no rating leaks", () => {
+    const p = (id: string, floor: number, ceiling: number, status = "healthy") => ({ id, headshot_id: `h${id}`, name: `P${id}`, pos: "RB", team: "DET", floor, ceiling, status });
+    const model = simMatchupCardModel({ week: 4, playoff: false, opponentName: "Titans", youName: "You", youProjection: 120, oppProjection: 110, winProb: 0.62, rows: [{ you: p("1", 5, 25), opp: p("2", 0, 30, "out") }, { you: p("3", 9, 13), opp: p("4", 6, 18) }] });
+    expect(model.kicker).toBe("WEEK 4");
+    expect(model.swing.map((s) => s.name)).toEqual(["P1", "P4"]);
+    expect(model.swing[0].playerId).toBe("h1");
+    expect(JSON.stringify(model)).not.toMatch(/overall|value_rank/);
   });
 });

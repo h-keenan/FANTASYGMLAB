@@ -4,7 +4,7 @@ import { ToneBadge } from "@/components/ToneBadge";
 import { ExplorerLeagueProvider } from "@/context/ExplorerLeagueContext";
 import dynamic from "next/dynamic";
 import { usePathname } from "next/navigation";
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react";
 
 import { api, type PlayerAward, type PlayerNewsResponse, type QuickViewResponse } from "@/lib/api";
 import type { PlayerQuickViewIdentity } from "@/context/PlayerQuickViewContext";
@@ -24,6 +24,7 @@ import { orderPlayerSheetTabs, type SheetSnap } from "@/lib/playerAnatomy";
 import { usePlayerQuickView } from "@/context/PlayerQuickViewContext";
 import { explorerStatKey } from "@/lib/percentileExplorer";
 import { CHART_HEIGHT } from "@/components/weeklyPointsChartHeight";
+import { chromeDock } from "@/lib/sheetTabs";
 import { OverlayBack } from "@/components/OverlayBack";
 import { useOverlay } from "@/lib/useOverlay";
 import { useSheetDragDismiss } from "@/lib/useSheetDragDismiss";
@@ -146,6 +147,19 @@ export function PlayerQuickView({
   const pathname = usePathname();
   const dialogRef = useRef<HTMLDivElement | null>(null);
   const closeButtonRef = useRef<HTMLButtonElement | null>(null);
+  const scrollRef = useRef<HTMLDivElement | null>(null);
+  // The close X floats over the top of the scroll area; the sticky tab strip docks just below it (see .tabs-sticky).
+  useLayoutEffect(() => {
+    const scroll = scrollRef.current;
+    const close = closeButtonRef.current;
+    if (!scroll || !close) return;
+    const measure = () => scroll.style.setProperty("--tabs-dock", `${chromeDock(close.getBoundingClientRect().bottom, scroll.getBoundingClientRect().top)}px`);
+    measure();
+    if (typeof ResizeObserver === "undefined") return;
+    const ro = new ResizeObserver(measure);
+    ro.observe(scroll);
+    return () => ro.disconnect();
+  });
   const [legendOpen, setLegendOpen] = useState(false);
   // Peek sheet (coridian_ pick 1b): opens half height with the header and pills, drag the handle up for full.
   const [snap, setSnap] = useState<SheetSnap>("peek");
@@ -313,7 +327,7 @@ export function PlayerQuickView({
           ×
         </button>
 
-        <div className="pqv-scroll">
+        <div className="pqv-scroll" ref={scrollRef}>
 
         <PlayerHeroHeader
           playerId={identity.player_id}
@@ -436,7 +450,7 @@ export function PlayerQuickView({
                     },
                   ]
                 : []),
-              ...(remote
+              ...(remote || sim?.stats
                 ? [
                     {
                       key: "stats",
@@ -444,7 +458,7 @@ export function PlayerQuickView({
                       render: () => (
                         <div className="pqv-body">
                           {sim?.stats ?? null}
-                          {bodyGate ?? (
+                          {!remote ? null : bodyGate ?? (
                             <>
                               <PlayerUsageBlock profile={model?.usage_profile} position={stats?.position ?? identity.position} playerId={identity.player_id} />
                               <SeasonStatsRows stats={stats ?? null} usageProfile={model?.usage_profile} playerId={identity.player_id} />
@@ -459,6 +473,10 @@ export function PlayerQuickView({
                         </div>
                       ),
                     },
+                  ]
+                : []),
+              ...(remote
+                ? [
                     {
                       key: "profile",
                       label: "Profile",

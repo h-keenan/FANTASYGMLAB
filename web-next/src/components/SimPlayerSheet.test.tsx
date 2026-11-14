@@ -14,7 +14,7 @@ vi.mock("@/components/WeeklyPointsChartLazy", () => ({
 }));
 vi.mock("@/lib/api", async () => {
   const actual = await vi.importActual<typeof import("@/lib/api")>("@/lib/api");
-  return { ...actual, api: { ...actual.api, getSimGamePlayer: vi.fn(), getSimPlayerHistory: vi.fn(), getPlayerQuickView: vi.fn(), getPlayerAwards: vi.fn(), getPlayerWeeklyStats: vi.fn(), getPlayerNews: vi.fn() } };
+  return { ...actual, api: { ...actual.api, getSimGamePlayer: vi.fn(), getSimPlayerHistory: vi.fn(), getPlayerCareer: vi.fn(), getPlayerQuickView: vi.fn(), getPlayerAwards: vi.fn(), getPlayerWeeklyStats: vi.fn(), getPlayerNews: vi.fn() } };
 });
 
 const player = (over: Partial<SimGamePlayer> = {}): SimGamePlayer => ({
@@ -78,12 +78,13 @@ describe("Fantasy Sim player sheet is the real Player Quick View", () => {
     expect((await screen.findByTestId("weekly-chart")).getAttribute("data-band")).toBe("3");
   });
 
-  it("is a tabbed sheet: Overview, Outlook and History for a generated player (no real Stats / Profile), Scouting for a rookie", async () => {
+  it("is a tabbed sheet: Overview, Outlook and History for a generated player (Stats = sim seasons only, no real Profile), Scouting for a rookie", async () => {
     vi.mocked(api.getSimGamePlayer).mockResolvedValue(detail({ scouting: { version: 1, source: "generated", label: "Generated prospect", school: "Summit Tech", class_year: 2027, position_word: "running back", draft: { round: 1, pick: 12, class_rank: 5, class_size: 60, basis: "" }, measurables: [], college: { columns: [], seasons: [], career: {}, percentiles: {}, final: { season: 2026, team: "Summit Tech", games: 13, stats: {} } }, analytics: [], tags: [], blurb: "A prospect.", development: { base_year: 1, points: [], confidence: 0.4, confidence_label: "Medium", archetype: null, archetype_label: null, revealed: false, note: "" } } } as never));
     render(<SimPlayerSheet gameId="g1" player={player()} onClose={() => {}} />);
     const tabs = await screen.findAllByRole("tab");
     expect(tabs.map((t) => t.textContent)).toEqual(expect.arrayContaining(["Overview", "Outlook", "History"]));
-    expect(screen.queryByRole("tab", { name: "Stats" })).toBeNull();
+    expect(screen.getByRole("tab", { name: "Stats" })).toBeInTheDocument(); // the sim seasons he has played (no real data)
+    expect(screen.queryByRole("tab", { name: "Profile" })).toBeNull();
     expect(await screen.findByRole("tab", { name: "Scouting" })).toBeInTheDocument();
     expect(screen.getByRole("tab", { name: "Overview" })).toHaveAttribute("aria-selected", "true");
     expect(screen.getByTestId("sim-in-game")).toBeInTheDocument();
@@ -144,5 +145,24 @@ describe("Fantasy Sim player sheet is the real Player Quick View", () => {
     expect(await screen.findByTestId("sim-game-log")).toHaveTextContent("2 games");
     expect(api.getPlayerWeeklyStats).toHaveBeenCalledWith("4046", 2025);
     career.mockRestore();
+  });
+
+  it("Stats tab shows the sim's own played seasons, collapsed with points / average / position rank, for a rookie with no real data", async () => {
+    vi.mocked(api.getSimGamePlayer).mockResolvedValue(detail());
+    vi.mocked(api.getSimPlayerHistory).mockResolvedValue({
+      ok: true, reason: "", is_premium: true, upsell: null,
+      seasons: [
+        { season: 2, year: 2027, season_label: "S2 2027", games: 14, points: 140, ppg: 10, teams: [{ team_id: "1", team_name: "Titans", games: 14, points: 140, ppg: 10 }], weeks: [{ week: 1, points: 12.5 }], best_week: { week: 1, points: 12.5 }, pos: "RB", pos_rank: 18 },
+        { season: 3, year: 2028, season_label: "S3 2028", games: 14, points: 212.4, ppg: 15.2, teams: [], weeks: [{ week: 1, points: 20 }, { week: 2, points: 4.4 }], best_week: { week: 1, points: 20 }, pos: "RB", pos_rank: 12 },
+      ],
+    } as never);
+    render(<SimPlayerSheet gameId="g1" player={player()} onClose={() => {}} startYear={2026} />);
+    fireEvent.click(await screen.findByRole("tab", { name: "Stats" }));
+    const modules = await screen.findAllByTestId("sim-season-module");
+    expect(modules).toHaveLength(2);
+    expect(modules[0]).toHaveTextContent("S3 2028");
+    expect(modules[0]).toHaveTextContent("14 g · 212.4 pts · 15.2 avg · RB12");
+    expect(modules[1]).toHaveTextContent("S2 2027");
+    expect(api.getPlayerCareer).not.toHaveBeenCalled(); // a rookie has sim seasons only
   });
 });

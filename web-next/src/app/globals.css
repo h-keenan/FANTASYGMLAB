@@ -4363,17 +4363,29 @@ main > header:has(> h1.sr-only:only-child) {
 
 /* Shared Tabs (components/Tabs.tsx): the active panel slides in a short distance from the side of the tab that was
    picked (~160ms, opacity + transform only, so layout never moves). Off under prefers-reduced-motion. */
-/* Sticky tab strip: pinned to the top of the sheet's scroll area, in the same glass as the sheet so content slides
-   under it (no opaque band). A small negative margin + padding keeps the strip from clipping its underline glow. */
+/* Sticky tab strip: docks flush at the top of the sheet's scroll area, directly under the sheet's own chrome.
+   --tabs-top / --tabs-mask are measured by Tabs from the real scroll container (sticky `top` is measured from the
+   container's content edge, so its top padding must be subtracted, else the strip floats that far below the header and
+   scrolled content shows in the gap). The backing is OPAQUE and ::before extends it up over the gap/chrome zone so no
+   content shows above or through it. */
 .tabs-sticky {
   position: sticky;
-  top: 0;
+  top: var(--tabs-top, 0px);
   z-index: 3;
   padding: 4px 0;
   margin: -4px 0;
-  background: linear-gradient(180deg, color-mix(in srgb, var(--color-surface-primary) 88%, transparent), color-mix(in srgb, var(--color-surface-primary) 70%, transparent));
-  backdrop-filter: blur(14px) saturate(150%);
-  -webkit-backdrop-filter: blur(14px) saturate(150%);
+  background: var(--color-surface-primary);
+  box-shadow: 0 1px 0 var(--color-border);
+}
+.tabs-sticky::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 100%;
+  height: var(--tabs-mask, 0px);
+  background: var(--color-surface-primary);
+  pointer-events: none;
 }
 .tabs-panel[data-dir="1"] {
   animation: tabs-slide-from-right 160ms ease-out;
