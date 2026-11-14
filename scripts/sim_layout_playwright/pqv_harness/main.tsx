@@ -13,4 +13,4 @@ const identity = {
   tags: [{ key: "a", label: "Contributor", tone: "accent" as const }, { key: "b", label: "Aging", tone: "warning" as const }],
   injury_status: "Questionable",
 };
-createRoot(document.getElementById("root")!).render(<PlayerQuickView identity={identity} onClose={() => {}} remote={false} />);
+createRoot(document.getElementById("root")!).render(<PlayerQuickView identity={identity} onClose={() => {}} remote={q.get("photo") === "1"} />);
