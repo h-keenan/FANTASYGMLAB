@@ -1,5 +1,6 @@
 import Link from "next/link";
 
+import { CompactPlayerCard } from "@/components/ui/CompactPlayerCard";
 import { trendLabel } from "@/lib/seo/content";
 import type { PublicPlayer } from "@/lib/seo/publicValues";
 import { PLAYER_PATH } from "@/lib/seo/site";
@@ -66,14 +67,14 @@ export function ValueTable({
                 <td className="px-3 py-2 align-top font-bold">{rank}</td>
                 <td className="px-2 py-2">
                   {slug ? (
-                    <Link href={PLAYER_PATH(slug)} className="font-bold underline" style={{ color: "var(--color-text-primary)" }}>
-                      {player.name}
+                    <Link href={PLAYER_PATH(slug)} className="block font-bold underline" style={{ color: "var(--color-text-primary)" }} aria-label={player.name}>
+                      <CompactPlayerCard player={{ id: player.player_id, name: player.name, position: player.position, team: player.team, age: player.age }} testId="value-table-player" />
                     </Link>
                   ) : (
-                    <span className="font-bold">{player.name}</span>
+                    <CompactPlayerCard player={{ id: player.player_id, name: player.name, position: player.position, team: player.team, age: player.age }} testId="value-table-player" />
                   )}
                   <span className="block text-xs" style={{ color: "var(--color-text-muted)" }}>
-                    {player.position} · {meta}
+                    {meta}
                     {trend ? (
                       <>
                         {" · "}

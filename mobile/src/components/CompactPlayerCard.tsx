@@ -32,7 +32,7 @@ function createStyles(colors: ThemeColors) {
   return StyleSheet.create({
     row: { minHeight: 44, flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
     main: { flex: 1, minWidth: 0 },
-    line: { flexDirection: 'row', alignItems: 'center', gap: 6, flexWrap: 'wrap' },
+    line: { flexDirection: 'row', alignItems: 'center', gap: 6 },
     name: { fontSize: 14, fontWeight: '700', color: colors.textPrimary, flexShrink: 1 },
     detail: { fontSize: 12, color: colors.textTertiary },
     trailing: { flexShrink: 0, flexDirection: 'row', alignItems: 'center', gap: 6 },

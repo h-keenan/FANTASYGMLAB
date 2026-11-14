@@ -13,6 +13,7 @@ import { PillRow } from "@/components/PillRow";
 import { SimDraftRow } from "@/components/SimDraftBoard";
 import { SimRookieOverview } from "@/components/SimDraftOverview";
 import { CompactModule } from "@/components/ui/CompactModule";
+import { CompactPlayerCard } from "@/components/ui/CompactPlayerCard";
 import { simRookieSummaryParts, simSuppressedBadges } from "@/lib/simDraft";
 import {
   offseasonAgingParts,
@@ -44,6 +45,7 @@ import {
   simPlayoffResultLabel,
   simPositionsFor,
   simReservesOn,
+  simPlayerAnatomyRef,
   simRetireesSorted,
   simRookieClassChip,
   simRookieClockLine,
@@ -275,9 +277,8 @@ function ReviewStage({ off, ctx, years }: { off: SimOffseason; ctx: SimCtx; year
           <ul className="flex flex-col">
             {retired.map((r) => (
               <li key={r.id} className="flex items-center justify-between gap-2 py-2" style={{ borderBottom: "var(--border-width-default) solid var(--color-border)" }}>
-                <span className="flex min-w-0 flex-col leading-tight">
-                  <span className="text-sm font-bold">{r.name}</span>
-                  <span className="text-xs" style={{ color: "var(--color-text-muted)" }}>{r.pos}{r.age != null ? ` · age ${r.age}` : ""}</span>
+                <span className="min-w-0 flex-1">
+                  <CompactPlayerCard player={simPlayerAnatomyRef(r)} detail={r.age != null ? `age ${r.age}` : null} testId="retiree-player" />
                 </span>
                 {r.is_yours ? <SimToneBadge label="Yours" tone="danger" /> : null}
               </li>

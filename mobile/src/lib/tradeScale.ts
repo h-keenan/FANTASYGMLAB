@@ -40,7 +40,7 @@ export type SimScaleDecision = "accept" | "counter" | "decline";
  */
 export function simAcceptanceMeter(decision: SimScaleDecision | null): FairnessMeter {
   if (decision === "accept") return { position: 0.83, edge: 0, label: "They would accept", description: "Their answer: they would accept this offer", tone: "success" };
-  if (decision === "counter") return { position: 0.5, edge: 0, label: "They would counter", description: "Their answer: they would counter this offer", tone: "warning" };
+  if (decision === "counter") return { position: 0.5, edge: 0, label: "They would counter", description: "Their answer: they would counter this offer", tone: "accent" };
   if (decision === "decline") return { position: 0.17, edge: 0, label: "They would decline", description: "Their answer: they would decline this offer", tone: "danger" };
   return { position: 0.5, edge: 0, label: "Checking their answer", description: "Their answer is loading", tone: "muted" };
 }

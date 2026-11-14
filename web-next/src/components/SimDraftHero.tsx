@@ -2,7 +2,9 @@
 
 import { useEffect, useState } from "react";
 
+import { PlayerName } from "@/components/PlayerName";
 import { PositionBadge } from "@/components/PositionBadge";
+import { PlayerAvatarSlot } from "@/components/ui/PlayerAvatarSlot";
 import { simToneColor } from "@/components/SimGameParts";
 import { api } from "@/lib/api";
 import {
@@ -11,12 +13,7 @@ import {
   simDraftProgress,
   simDraftTeamEmblem,
 } from "@/lib/simDraft";
-import { simFmtValue, type SimDraftState, type SimGamePlayer, type SimPos, type SimSlot } from "@/lib/simGame";
-
-function lastName(name: string): string {
-  const parts = name.trim().split(/\s+/);
-  return parts.length > 1 ? parts[parts.length - 1] : name;
-}
+import { simFmtValue, simPlayerAnatomyRef, type SimDraftState, type SimGamePlayer, type SimPos, type SimSlot } from "@/lib/simGame";
 
 const LABEL_STYLE = { color: "var(--color-text-muted)", letterSpacing: "var(--letter-spacing-badge)" } as const;
 
@@ -122,12 +119,13 @@ export function SimDraftHero({
                   disabled={!player}
                   onClick={() => player && onOpen(player)}
                   className="flex items-center gap-1.5 px-2 text-left"
-                  style={{ height: 44, minWidth: 96, borderRadius: "var(--radius-control)", background: "var(--color-surface-muted)", opacity: player ? 1 : 0.5 }}
+                  style={{ height: 44, minWidth: 128, borderRadius: "var(--radius-control)", background: "var(--color-surface-muted)", opacity: player ? 1 : 0.5 }}
                   aria-label={player ? `Best available ${pos}: ${player.name}` : `No ${pos} left`}
                 >
+                  {player ? <PlayerAvatarSlot player={simPlayerAnatomyRef(player)} tier="dense" /> : null}
                   <PositionBadge position={pos} />
-                  <span className="flex flex-col leading-tight">
-                    <span className="text-xs font-bold">{player ? lastName(player.name) : "-"}</span>
+                  <span className="flex min-w-0 flex-col leading-tight">
+                    {player ? <PlayerName name={player.name} className="text-xs font-bold" /> : <span className="text-xs font-bold">-</span>}
                     <span className="text-[0.6875rem]" style={{ color: "var(--color-text-muted)" }}>ADP {simFmtValue(player?.adp)}</span>
                   </span>
                 </button>

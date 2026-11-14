@@ -66,7 +66,8 @@ export default function SimActionBar({ ctx, paywalled, advancing, onAdvance, onS
       <View style={styles.row}>
         {onSimTo && !paywalled ? (
           <Pressable onPress={onSimTo} disabled={advancing} accessibilityRole="button" accessibilityLabel="Sim to..." style={[styles.simTo, advancing && { opacity: 0.5 }]} testID="sim-to-button">
-            <Ionicons name="play-forward-outline" size={20} color={colors.textPrimary} />
+            <Ionicons name="play-forward-outline" size={18} color={colors.textPrimary} />
+            <AppText style={styles.simToLabel}>Sim to</AppText>
           </Pressable>
         ) : null}
         {orb}
@@ -110,7 +111,8 @@ function createStyles(colors: ThemeColors) {
     },
     row: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: spacing.md },
     advance: { flex: 1, minWidth: 0 },
-    simTo: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center', borderRadius: radii.pill, borderWidth: 1, borderColor: colors.borderStrong ?? colors.border },
+    simToLabel: { fontSize: 12, lineHeight: 14, fontWeight: '700', color: colors.textSecondary },
+    simTo: { minWidth: 52, height: 48, paddingHorizontal: 6, alignItems: 'center', justifyContent: 'center', borderRadius: radii.pill, borderWidth: 1, borderColor: colors.borderStrong ?? colors.border },
     reason: { fontSize: 12, fontWeight: '700', color: colors.warning, textAlign: 'center' },
     srOnly: { height: 0, width: 0, opacity: 0 },
   });

@@ -6,11 +6,12 @@ import EmptyState from './EmptyState';
 import { SimDraftEmblem } from './SimDraftHero';
 import { useThemeMode } from '../context/ThemeModeContext';
 import { simDraftBoardGrid } from '../lib/simDraft';
-import type { SimDraftState, SimGamePlayer } from '../lib/simGame';
+import { simPlayerAnatomyRef, type SimDraftState, type SimGamePlayer } from '../lib/simGame';
 import { positionColor, spacing, type ThemeColors } from '../theme';
+import PlayerAvatarSlot from './PlayerAvatarSlot';
 import PlayerName from './PlayerName';
 
-const COL = 76;
+const COL = 112;
 const ROUND_W = 32;
 
 /**
@@ -55,10 +56,13 @@ export function SimDraftGrid({ draft, teams, onOpen }: { draft: SimDraftState; t
                       accessibilityLabel={`Pick ${cell.pick.pick_no}: ${cell.pick.player.name}, ${cell.pick.player.pos}`}
                       style={[styles.cell, { borderLeftWidth: 3, borderLeftColor: tint ?? colors.borderStrong, backgroundColor: colors.glass }]}
                     >
-                      <PlayerName name={cell.pick.player.name} style={styles.cellName} />
-                      <AppText style={styles.cellMeta}>
-                        {cell.pick.player.pos} · #{cell.pick.pick_no}
-                      </AppText>
+                      <PlayerAvatarSlot player={simPlayerAnatomyRef(cell.pick.player)} tier="dense" />
+                      <View style={styles.cellText}>
+                        <PlayerName name={cell.pick.player.name} style={styles.cellName} />
+                        <AppText style={styles.cellMeta}>
+                          {cell.pick.player.pos} · #{cell.pick.pick_no}
+                        </AppText>
+                      </View>
                     </Pressable>
                   ) : (
                     <View style={[styles.cell, styles.empty, clock && { borderColor: colors.accent, borderWidth: 2, borderStyle: 'solid' }]}>
@@ -84,8 +88,9 @@ function createStyles(colors: ThemeColors) {
     round: { width: ROUND_W, alignItems: 'center', justifyContent: 'center' },
     roundText: { fontSize: 12, fontWeight: '800', color: colors.textTertiary },
     cellWrap: { width: COL, padding: 2 },
-    cell: { height: 44, borderRadius: 8, justifyContent: 'center', paddingHorizontal: 4 },
-    empty: { alignItems: 'center', borderWidth: StyleSheet.hairlineWidth, borderColor: colors.border, borderStyle: 'dashed' },
+    cell: { height: 44, borderRadius: 8, flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 4 },
+    cellText: { flex: 1, minWidth: 0 },
+    empty: { justifyContent: 'center', alignItems: 'center', borderWidth: StyleSheet.hairlineWidth, borderColor: colors.border, borderStyle: 'dashed' },
     cellName: { fontSize: 12, fontWeight: '700', color: colors.textPrimary },
     cellMeta: { fontSize: 12, color: colors.textTertiary },
   });

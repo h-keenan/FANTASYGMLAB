@@ -15,22 +15,14 @@ import { describe, expect, it } from "vitest";
 const WEB_ALLOW: Record<string, string> = {
   "components/GmOrb.tsx": "TEXT: names inside the assistant's spoken sentences",
   "components/LiveFeedPanel.tsx": "TEXT: names inside a news headline",
-  "components/seo/PublicTradeAnalyzer.tsx": "TODO: public marketing analyzer, move onto TradeCompactCard",
-  "components/ManagerProfileSheet.tsx": "TODO: manager trade history lines",
-  "components/OpponentProfileCard.tsx": "TODO: opponent profile target lines",
-  "components/SampleLeagueContent.tsx": "TODO: sample league roster rows",
-  "components/SimDraftGrid.tsx": "TODO: draft grid cells (name only in a tight grid)",
-  "components/SimTeamCard.tsx": "TODO: sim team card key players",
-  "components/SimTeamHistory.tsx": "TODO: sim history award lines",
+  "components/SimToControl.tsx": "TEXT: injury names inside a sentence",
+  "components/SimRecapStory.tsx": "TEXT: top-scorer name inside a fact line",
+  "components/SimGameTeam.tsx": "TEXT: a native <option> and a sheet title sentence",
 };
 const APP_ALLOW: Record<string, string> = {
   "components/LiveFeedPanel.tsx": "TEXT: names inside a news headline",
   "components/RoundupPanel.tsx": "TEXT: names inside roundup sentences",
-  "components/ManagerProfileModal.tsx": "TODO: manager trade history lines",
-  "components/OpponentProfileCard.tsx": "TODO: opponent profile target lines",
-  "components/SimDraftGrid.tsx": "TODO: draft grid cells",
-  "components/SimTeamCard.tsx": "TODO: sim team card key players",
-  "components/SimTeamHistory.tsx": "TODO: sim history award lines",
+  "components/SimToControl.tsx": "TEXT: injury names inside a sentence",
 };
 
 function walk(dir: string, out: string[] = []): string[] {
@@ -43,7 +35,19 @@ function walk(dir: string, out: string[] = []): string[] {
   return out;
 }
 
-const AVATAR = /PlayerAvatar|CompactPlayerCard|PlayerAccordionRow|PlayerListRow|PlayerIdentity|PlayerCardKit|PlayerCard/;
+/**
+ * The second blind spot closed: a name rendered as a bare JSX expression (`{player.name}`, `{i.player.name}`) with no
+ * <PlayerName>. Template literals (aria labels, toasts, sentences built in code) and attribute values are stripped first,
+ * so only a name drawn as visible text counts. Exported shape is tested below.
+ */
+const NAME_ID = "(?:player|p|pl|pick|prospect|asset|mover|retiree|target|[a-z]\\.player)";
+const BARE_NAME = new RegExp(`\\{\\s*${NAME_ID}\\??\\.(?:name|player_name|full_name)\\b[^{}]*\\}`);
+export function rendersBareName(src: string): boolean {
+  const stripped = src.replace(/`[^`]*`/g, "``").replace(/[\w-]+=\{[^{}]*(?:\{[^{}]*\}[^{}]*)*\}/g, "");
+  return /<PlayerName\b/.test(stripped) || BARE_NAME.test(stripped);
+}
+
+const AVATAR = /PlayerAvatar|CompactPlayerCard|PlayerAccordionRow|PlayerListRow|PlayerIdentity(?!Trigger)|PlayerCardKit|PlayerCard/;
 
 function check(root: string, allow: Record<string, string>) {
   const offenders: string[] = [];
@@ -51,7 +55,7 @@ function check(root: string, allow: Record<string, string>) {
   for (const file of walk(root)) {
     const rel = path.relative(root, file).split(path.sep).join("/");
     const src = readFileSync(file, "utf8");
-    if (!/<PlayerName\b/.test(src)) continue;
+    if (!rendersBareName(src)) continue;
     const hasAvatar = AVATAR.test(src);
     if (hasAvatar) continue;
     seen.add(rel);
@@ -75,6 +79,15 @@ describe("player avatar rule", () => {
     const { offenders, stale } = check(appRoot, APP_ALLOW);
     expect(offenders).toEqual([]);
     expect(stale).toEqual([]);
+  });
+
+  it("the scan sees a bare {player.name} but not a sentence, an aria label or an attribute", () => {
+    expect(rendersBareName("<span>{player.name}</span>")).toBe(true);
+    expect(rendersBareName("<li>{i.player.name} ({i.player.pos})</li>")).toBe(true);
+    expect(rendersBareName("<PlayerName name={x} />")).toBe(true);
+    expect(rendersBareName("<Button aria-label={`Claim ${player.name}`}>Claim</Button>")).toBe(false);
+    expect(rendersBareName("<Row name={player.name} />")).toBe(false);
+    expect(rendersBareName("<span>{team.name}</span>")).toBe(false);
   });
 
   it("the templates draw the avatar themselves", () => {

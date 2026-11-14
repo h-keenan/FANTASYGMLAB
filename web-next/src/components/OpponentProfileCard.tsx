@@ -15,7 +15,7 @@ import {
   rankText,
   type OpponentProfileResponse,
 } from "@/lib/opponentProfile";
-import { PlayerName } from "@/components/PlayerName";
+import { CompactPlayerCard } from "@/components/ui/CompactPlayerCard";
 
 const LABEL_STYLE = { color: "var(--color-text-muted)", letterSpacing: "var(--letter-spacing-badge)" } as const;
 
@@ -124,15 +124,11 @@ export function OpponentProfileCard({
           </Row>
           {angle.target ? (
             <>
-              <div className="flex items-center gap-2 min-w-0">
-                <PositionBadge position={angle.target.position} />
-                <PlayerName name={angle.target.name} className="text-sm font-bold" />
-                {angle.target.team ? (
-                  <span className="text-xs" style={{ color: "var(--color-text-muted)" }}>
-                    {angle.target.team}
-                  </span>
-                ) : null}
-              </div>
+              <CompactPlayerCard
+                player={{ id: angle.target.player_id, name: angle.target.name, position: angle.target.position, team: angle.target.team ?? null }}
+                detail={angle.target.team}
+                testId="opponent-target-player"
+              />
               <span className="text-xs" style={{ color: "var(--color-text-muted)" }}>
                 {offerCaption(angle.target)}
               </span>

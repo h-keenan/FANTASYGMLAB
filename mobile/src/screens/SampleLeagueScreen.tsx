@@ -7,7 +7,7 @@ import { useHeaderHeight } from '@react-navigation/elements';
 import AccentCard from '../components/AccentCard';
 import AppText from '../components/AppText';
 import GridBackground from '../components/GridBackground';
-import PositionBadge from '../components/PositionBadge';
+import CompactPlayerCard from '../components/CompactPlayerCard';
 import SampleDashboard from '../components/SampleDashboard';
 import SampleLeagueBanner, { SampleConnectModule } from '../components/SampleLeagueBanner';
 import SectionHeading from '../components/SectionHeading';
@@ -49,14 +49,9 @@ export default function SampleLeagueScreen({ navigation }: Props) {
 
   const playerRow = (player: SamplePlayer) => (
     <View key={player.id} style={styles.playerRow}>
-      <View style={styles.badgeSlot}>
-        <PositionBadge position={player.position} />
-      </View>
       <View style={styles.playerText}>
-        <AppText style={styles.playerName}>{player.name}</AppText>
-        <AppText style={styles.muted}>
-          Age {player.age} · {player.note}
-        </AppText>
+        {/* Fictional players have no photo: id null keeps the avatar on initials. */}
+        <CompactPlayerCard player={{ id: null, name: player.name, position: player.position, age: player.age }} detail={`Age ${player.age} · ${player.note}`} testID="sample-player" />
       </View>
       <ValueStat value={player.value} />
     </View>
@@ -153,10 +148,8 @@ function createStyles(colors: ThemeColors) {
     kicker: { fontSize: 12.5, fontWeight: '800', letterSpacing: 0.8, textTransform: 'uppercase', color: colors.accent },
     cardTitle: { fontSize: 18, fontWeight: '700', color: colors.textPrimary },
     link: { fontSize: 15.5, fontWeight: '700', color: colors.accent },
-    badgeSlot: { width: 40, alignItems: 'flex-start' },
     playerRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, paddingVertical: spacing.sm },
     playerText: { flex: 1 },
-    playerName: { fontSize: 15.5, fontWeight: '700', color: colors.textPrimary },
     verdictRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, flexWrap: 'wrap' },
   });
 }

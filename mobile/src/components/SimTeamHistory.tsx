@@ -7,24 +7,27 @@ import { simTeamBadges, simTeamTrophies } from '../lib/simAchievements';
 import AppText from './AppText';
 import Button from './Button';
 import ErrorState from './ErrorState';
-import PositionBadge from './PositionBadge';
 import { SkeletonCard } from './SkeletonBlock';
 import { SimSectionTitle, createSimStyles } from './SimGameParts';
 import ToneBadge from './ToneBadge';
 import { useThemeMode } from '../context/ThemeModeContext';
 import { api } from '../lib/api';
-import { simSeasonText, type SimTeamHistoryPick, type SimTeamHistoryResponse } from '../lib/simGame';
+import { simPlayerAnatomyRef, simSeasonText, type SimTeamHistoryPick, type SimTeamHistoryResponse } from '../lib/simGame';
 import { simDraftSlotText, simSeasonRecord, simTeamMoveText, simWhenLabel } from '../lib/simHistory';
-import PlayerName from './PlayerName';
+import CompactPlayerCard from './CompactPlayerCard';
 
 function PickRow({ pick }: { pick: SimTeamHistoryPick }) {
   const { colors } = useThemeMode();
   const common = useMemo(() => createSimStyles(colors), [colors]);
   return (
     <View style={[common.row, common.divider, { paddingVertical: 6 }]}>
-      <PositionBadge position={pick.pos} />
-      <View style={{ flex: 1, minWidth: 0 }}><PlayerName name={pick.name} style={common.bodyStrong} /></View>
-      <AppText style={common.muted}>{simDraftSlotText(pick.round, pick.pick, pick.auto)}</AppText>
+      <View style={{ flex: 1, minWidth: 0 }}>
+        <CompactPlayerCard
+          player={simPlayerAnatomyRef(pick)}
+          testID="history-pick-player"
+          trailing={<AppText style={common.muted}>{simDraftSlotText(pick.round, pick.pick, pick.auto)}</AppText>}
+        />
+      </View>
     </View>
   );
 }

@@ -738,9 +738,9 @@ avatar. Enforced by `lib/playerAvatarRule.test.ts` (source scan of web and app: 
 on the explicit allowlist; an allowlist entry that now has an avatar fails so the list only shrinks) and `ui/PlayerTemplates.test.tsx` (each template renders the slot).
 Allowlist kinds: TEXT (a sentence, headline or tooltip where a picture makes no sense) and TODO (not yet on the templates).
 
-Not yet on the templates (TODO allowlist plus pages): Waivers app add rows and web Explore tiles, Live Draft rows, News, Trade Analyzer pickers (`TradePickerSheet`),
+Not yet on the templates (the TODO allowlist is now empty; these are pages the source scan cannot see): Waivers app add rows and web Explore tiles, Live Draft rows, News, Trade Analyzer pickers (`TradePickerSheet`),
 Draft Center, League Recaps, Matchup lineup, Standings (RankRow exists, page not yet moved), Sim roster / draft board / inbox (`SimDraftRow`, `SimPlayerLine`, `SimRosterLine`
-should become `PlayerAccordionRow mode="sim"`, and the Sim trade inbox `TradeCompactCard mode="sim"`), Manager profile, Opponent profile, Sim team card / history / draft grid.
+should become `PlayerAccordionRow mode="sim"`, and the Sim trade inbox `TradeCompactCard mode="sim"`). Done in the avatar sweep: Manager/Opponent profile, Sim team card / history / draft grid / retirements, sample league, public trade analyzer.
 
 ## Player row anatomy (shared by FantasyDesk and the Fantasy Sim)
 

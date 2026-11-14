@@ -122,11 +122,11 @@ export default function TradeScale({
             <View style={styles.actions}>
               {phase === 'review' ? (
                 <>
-                  {onSend ? <Button label={sendLabel} loading={sending} disabled={!canSend} onPress={onSend} /> : null}
-                  <Button label="Tweak" variant="secondary" onPress={() => setTweak(true)} />
+                  {onSend ? <View style={styles.action}><Button label={sendLabel} loading={sending} disabled={!canSend} onPress={onSend} /></View> : null}
+                  <View style={styles.action}><Button label="Tweak" variant="secondary" onPress={() => setTweak(true)} /></View>
                 </>
               ) : (
-                <Button label="Review" variant="secondary" onPress={() => setTweak(false)} />
+                <View style={styles.action}><Button label="Review" variant="secondary" onPress={() => setTweak(false)} /></View>
               )}
             </View>
           </View>
@@ -152,6 +152,7 @@ function createStyles(colors: ThemeColors) {
     addPlus: { fontSize: 16, fontWeight: '800', color: colors.accent },
     addHint: { fontSize: 12, fontWeight: '700', color: colors.textTertiary, textAlign: 'center', paddingHorizontal: 4 },
     meterCard: { gap: 4, padding: spacing.sm, backgroundColor: colors.glass, borderColor: colors.glassBorder, borderWidth: 1, borderRadius: radii.tile },
-    actions: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm, alignItems: 'center' },
+    actions: { flexDirection: 'row', gap: spacing.sm, alignItems: 'center' },
+    action: { flex: 1, minWidth: 0 },
   });
 }
