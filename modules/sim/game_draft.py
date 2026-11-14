@@ -245,14 +245,79 @@ def user_pick(ctx: DraftContext, em: Emitter, pid: str, seed: int, *, auto: bool
     return made
 
 
+# --- public-information helper (hint_v 1+) ----------------------------------------------------------------------------
+# The hint and Auto-pick never read the hidden value. They take the best player by ADP (a public number every player is
+# shown with) after three visible adjustments, measured in ADP spots: a position you still need is worth up to
+# NEED_SPOTS, a player whose bye week your same-position starters already share is docked BYE_SPOTS each, and the shown
+# letter grade breaks ties. The same legality rules as everyone's pick (no early K, position caps) apply.
+NEED_SPOTS = 0.8  # ADP spots per unit of the existing need bonus (0..10, damped in the early rounds): at most 8 spots
+BYE_SPOTS = 2.0  # ADP spots docked per same-position teammate sharing the candidate's bye week (at most two count)
+
+
+def _bye_overlap(snap: GameSnapshot, state: GameState, tid: str, pid: str) -> int:
+    bye = snap.bye_of(pid)
+    if not bye or snap.players[pid].pos in SINGLETON_POSITIONS:
+        return 0
+    pos = snap.players[pid].pos
+    return min(2, sum(1 for r in state.rosters[tid] if snap.players[r].pos == pos and snap.bye_of(r) == bye))
+
+
+def public_scores(ctx: DraftContext, tid: str, n: int) -> list[tuple[tuple[float, int, str], str]]:
+    """Legal candidates ranked best first by the public rule: (need/bye-adjusted ADP, shown grade, id)."""
+
+    from modules.sim import game_grades as gg  # grades derive from the hidden value but are the noisy, shown quantity
+
+    snap, state = ctx.snap, ctx.state
+    rnd = pick_round(snap, n)
+    counts = ctx.counts(tid)
+    rows = []
+    for pid in _candidates(ctx, tid, n):
+        p = snap.players[pid]
+        adj = p.adp - NEED_SPOTS * _need_bonus(snap.settings.slots, counts, p.pos, rnd) + BYE_SPOTS * _bye_overlap(snap, state, tid, pid)
+        rows.append(((round(adj * 2) / 2, -gg.sort_key(snap, pid, state.view_no), pid), pid))
+    rows.sort(key=lambda r: r[0])
+    return rows
+
+
+def choose_public(ctx: DraftContext, tid: str, n: int) -> str:
+    rows = public_scores(ctx, tid, n)
+    if rows:
+        return rows[0][1]
+    taken = ctx.taken()  # nothing passed the rules (tiny pool): best remaining by ADP
+    left = [p for p in ctx.by_adp if p not in taken][:1]
+    if not left:
+        raise GameError("pool_exhausted", "No players left to draft.")
+    return left[0]
+
+
+def hint_reason(ctx: DraftContext, pid: str) -> str:
+    """Plain words for why the hint is this player. Only public inputs are named."""
+
+    snap, state = ctx.snap, ctx.state
+    if pid in state.queue:
+        return "Next on your queue"
+    user = snap.user_team.tid
+    p = snap.players[pid]
+    counts = ctx.counts(user)
+    if _need_bonus(snap.settings.slots, counts, p.pos, pick_round(snap, state.pick_index)) >= 4.0:
+        base = f"Best available at your {p.pos} need, by ADP"
+    else:
+        base = "Best available by ADP"
+    if _bye_overlap(snap, state, user, pid):
+        base += f" (shares a bye with your {p.pos}s)"
+    return base
+
+
 def best_for_user(ctx: DraftContext, seed: int) -> str:
-    """Queue first, else best value for need."""
+    """Queue first, else best value for need (hint_v 1+: best ADP for need, public information only)."""
 
     taken = ctx.taken()
     for pid in ctx.state.queue:
         if pid in ctx.snap.players and pid not in taken:
             return pid
     user = ctx.snap.user_team.tid
+    if ctx.snap.settings.hint_v:
+        return choose_public(ctx, user, ctx.state.pick_index)
     return choose_pick(ctx, user, ctx.state.pick_index, seed, human=True)
 
 
@@ -302,7 +367,8 @@ def draft_recap(snap: GameSnapshot, state: GameState) -> dict[str, Any]:
             "value_over_adp": round((p["n"] + 1) - player.adp, 1), "auto": p["auto"],
         })
     totals = {t.tid: ev.lineup_total(state.rosters[t.tid]) for t in snap.teams}
-    depth = {t.tid: sum(snap.players[p].value for p in state.rosters[t.tid]) for t in snap.teams}
+    # hint_v 1+: the tiebreak depth is the public projection, not the hidden value (a team grade must not reveal it)
+    depth = {t.tid: sum((snap.players[p].mean * 5.0 if snap.settings.hint_v else snap.players[p].value) for p in state.rosters[t.tid]) for t in snap.teams}
     ranked = sorted(snap.tids, key=lambda t: (-(totals[t] + 0.02 * depth[t]), t))
     def with_player(pick: dict[str, Any] | None) -> dict[str, Any] | None:
         # The UI reads ``pick.player`` (same brief shape as the recap's other player mentions).
@@ -331,5 +397,5 @@ def draft_recap(snap: GameSnapshot, state: GameState) -> dict[str, Any]:
 
 __all__ = [
     "DraftContext", "choose_pick", "run_ai_picks", "user_pick", "auto_for_user", "best_for_user",
-    "set_queue", "draft_recap", "starter_shortage",
+    "set_queue", "draft_recap", "choose_public", "public_scores", "hint_reason", "starter_shortage",
 ]

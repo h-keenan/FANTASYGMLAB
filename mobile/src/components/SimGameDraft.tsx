@@ -30,6 +30,7 @@ import {
   simFilterPositionsFor,
   simPositionsFor,
   simRosterNeeds,
+  simAutoPickConfirmText,
   simValueOverAdpLabel,
   simValueOverAdpTone,
   type SimDraftHint,
@@ -365,7 +366,7 @@ export function SimGameDraft({ ctx, onComplete }: { ctx: SimCtx; onComplete: (re
         <SimDraftHero gameId={gameId} draft={draft} teams={game.settings.teams} slots={game.settings.slots} positions={simPositionsFor(game.settings.slots)} tick={ctx.tick} onOpen={ctx.openPlayer} />
         {confirmAuto ? (
           <View style={common.tight}>
-            <AppText style={common.small}>Auto-draft the rest of your picks from your queue, then best available and need?</AppText>
+            <AppText style={common.small}>{simAutoPickConfirmText(game.settings)}</AppText>
             <View style={common.row}>
               <Button size="sm" label="Yes, auto-pick" onPress={autoDraft} />
               <Button size="sm" variant="ghost" label="Cancel" onPress={() => setConfirmAuto(false)} />

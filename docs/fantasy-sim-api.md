@@ -517,7 +517,7 @@ game = {
            "picks": [{"pick_no": 1, "round": 1, "team_id": "5", "player": {player}, "adp": 3.0, "value_over_adp": 2.0, "auto": false}],
            "queue": ["pid"], "your_roster": [player], "teams": [{"team_id","name","persona_id","is_you"}]},
  "available": {"items": [player], "total": 520, "page": 1, "page_size": 40},
- "hint": {"player": player, "why": "Best available for your need: RB"} | null}
+ "hint": {"player": player, "why": "Best available at your RB need, by ADP"} | null}  // hint_v 0 saves: "Best available for your need: RB"
 ```
 `POST .../draft/pick` `{"player_id": "..."}` -> `{"picks": [pick, ...] /* yours + every AI pick until your next turn */, "draft": {...same as above without order/picks lists}, "completed": false, "recap": null}`.
 When the last pick lands `completed: true`, the game moves to week 1 and
@@ -889,5 +889,25 @@ player, `0.07 + 0.17 * (1 - scouting confidence)` for a rookie (so a fresh rooki
 never exposed, not even as a sort (a deliberate departure from "keep a server-side sort by the true number": sorting by it is the leak).
 Roster / top-asset lists order the same way.
 
-**Still true, by design**: ADP, the public preseason projection, floor / ceiling and ros_mean are public numbers a real manager sees; the draft
-"hint" and Auto-pick still use the engine's own value (changing them would change old saves).
+**Still true, by design**: ADP, the public preseason projection, floor / ceiling and ros_mean are public numbers a real manager sees. The
+helpers that used to pick with the engine's own value are public-information only from `settings.hint_v` 1 (next section).
+
+## Public-information helpers (`hint_v` 1+)
+
+A clickable hint that picks by the hidden value is an oracle (about +0.7 wins / +40 PF over the public baseline in the bot study,
+`docs/audits/2026-11-sim-hidden-value-oracles.md`). Every new game carries `settings.hint_v: 1` (serialized only when non-zero, so a save
+from before it has no key and keeps today's helpers and replays identically; golden digest `OLD_SAVE_DIGEST` in
+`tests/test_sim_game_settings.py`, explicit model id `player_model-player-model-5`). With `hint_v` 1:
+
+- **Draft hint, `POST /draft/auto` and the Draft button**: one rule, `game_draft.choose_public`. Your queue first, else the legal candidate
+  (same legality as everyone: no early K/DEF, position caps) with the best ADP after three visible adjustments in ADP spots: a position you
+  still need is worth up to 8 spots (damped in rounds 1 to 4), a player who shares his bye with two or more same-position players you hold is docked 2 spots each, and the
+  shown letter grade breaks ties. `hint.why` says so in plain words: "Best available at your RB need, by ADP", "Best available by ADP",
+  "... (shares a bye with your WRs)", "Next on your queue". No value, rank or score field is returned.
+- **Rookie auto-pick (`POST /offseason/rookie-draft/auto`)**: best rookie ADP, a thin position worth up to 4 spots, shown grade as tie-break.
+- **Trade counters**: the AI still decides with its own private valuation (it is the opponent). Which asset the counter asks for is ranked by
+  a public cost (ADP; a pick by its round), never the user-side hidden worth; `counter_delta.user_net_change` stays a direction only.
+- **Home trade spotlight** "X is the centerpiece" and the **draft recap team grade** tie-break use the public projection.
+
+A save with `hint_v` 0 keeps the value-for-need hint ("Best available for your need: RB"). Clients show `hint.why` verbatim and pick the Auto-pick
+confirmation copy with `simAutoPickConfirmText(settings)` (web + app lib twins).
