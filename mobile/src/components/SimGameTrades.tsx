@@ -8,7 +8,6 @@ import Button from './Button';
 import EmptyState from './EmptyState';
 import ErrorState from './ErrorState';
 import FadeInView from './FadeInView';
-import { ReviewGlyphChip } from './SeasonReviewSections';
 import SectionHeading from './SectionHeading';
 import SegmentedTabBar from './SegmentedTabBar';
 import { SkeletonCard } from './SkeletonBlock';
@@ -19,7 +18,7 @@ import { TapForWhyOff } from './TapForWhy';
 import { SimBlockView } from './SimTradeBlock';
 import SimTeamCard from './SimTeamCard';
 import { SimPickLine, useSimPicks } from './SimGameDynastyParts';
-import { SimPlayerChip, SimPlayerLine, SimPopIn, SimSideLabel, SimStat, SimTeamOpenContext, SimToneBadge, createSimStyles, simToneColor, type SimCtx } from './SimGameParts';
+import { SimPlayerChip, SimPlayerLine, SimPopIn, SimSideLabel, SimStat, SimTeamOpenContext, createSimStyles, type SimCtx } from './SimGameParts';
 import { PlayerBadge } from './PlayerBadge';
 import ToneBadge from './ToneBadge';
 import { useThemeMode } from '../context/ThemeModeContext';
@@ -31,7 +30,10 @@ import { simGroupsToSheetItems } from '../lib/simTradeSheet';
 import { useSimLeagueRosters } from '../lib/useSimLeagueRosters';
 import { SimPlayerSheet } from './SimGamePlayers';
 import { selectedItems } from '../lib/tradeSheetPicker';
-import TradePickerSheet, { TradeSideSummary } from './TradePickerSheet';
+import TradePickerSheet from './TradePickerSheet';
+import TradeScale from './TradeScale';
+import type { TradeCardAsset } from './TradeCompactCard';
+import { simAcceptanceMeter, simScaleAsset } from '../lib/tradeScale';
 import {
   SIM_TRADE_EMPTY,
   simProjText,
@@ -47,11 +49,8 @@ import {
   simTradableIn,
   simTradeClosedReason,
   simCounterDeltaLine,
-  simTradeDecisionLabel,
-  simTradeDecisionTone,
   simTradeKey,
   simTradePayload,
-  simTradeReady,
   simTradeReducer,
   type SimGamePlayer,
   type SimInboxItem,
@@ -221,44 +220,34 @@ function OfferCard({ item, defaultOpen, busy, canTrade, onRespond }: { item: Sim
   );
 }
 
+/** The sim verdict under the scale: their reason in plain words, chips, and a counter when they would make one. Their decision itself is the scale's meter. */
 function VerdictCard({ verdict, onSendCounter, busy }: { verdict: SimTradeVerdict; onSendCounter: () => void; busy: boolean }) {
   const { colors } = useThemeMode();
   const common = useMemo(() => createSimStyles(colors), [colors]);
-  const styles = useMemo(() => createStyles(colors), [colors]);
-  const tone = simTradeDecisionTone(verdict.decision);
   return (
     <SimPopIn>
-      <AccentCard accent={simToneColor(tone, colors)} glow>
-        <View testID="trade-verdict" style={common.stack} accessibilityLiveRegion="polite">
-          <View style={common.rowBetween}>
-            <View style={[common.row, common.grow]}>
-              <ReviewGlyphChip glyph="trade" tone={tone} size={28} />
-              <AppText style={common.title}>{simTradeDecisionLabel(verdict.decision)}</AppText>
-            </View>
-            <SimToneBadge tone={tone} label={verdict.decision} />
+      <View testID="trade-verdict" style={common.stack} accessibilityLiveRegion="polite">
+        <AppText style={common.body}>{verdict.reason}</AppText>
+        {(verdict.chips ?? []).length > 0 ? (
+          <View style={common.wrapRow}>
+            {verdict.chips!.map((chip) => (
+              <ToneBadge key={chip} label={chip} color={colors.textSecondary} size="xs" />
+            ))}
           </View>
-          <AppText style={common.body}>{verdict.reason}</AppText>
-          {(verdict.chips ?? []).length > 0 ? (
-            <View style={common.wrapRow}>
-              {verdict.chips!.map((chip) => (
-                <ToneBadge key={chip} label={chip} color={colors.textSecondary} size="xs" />
-              ))}
-            </View>
-          ) : null}
-          {verdict.decision === 'counter' && verdict.counter ? (
-            <View style={common.stack}>
-              <AppText style={[common.bodyStrong, { color: colors.accent }]}>Their counter</AppText>
-              {verdict.counter_note ? <AppText style={common.body} testID="counter-note">{verdict.counter_note}</AppText> : null}
-              {simCounterDeltaLine(verdict.counter_delta) ? <AppText style={common.muted} testID="counter-delta">{simCounterDeltaLine(verdict.counter_delta)}</AppText> : null}
-              <SimSideLabel side="give" />
-              <PlayerList players={verdict.counter.give} />
-              <SimSideLabel side="get" />
-              <PlayerList players={verdict.counter.get} />
-              <Button size="sm" label="Take their counter" loading={busy} onPress={onSendCounter} />
-            </View>
-          ) : null}
-        </View>
-      </AccentCard>
+        ) : null}
+        {verdict.decision === 'counter' && verdict.counter ? (
+          <View style={common.stack}>
+            <AppText style={[common.bodyStrong, { color: colors.accent }]}>Their counter</AppText>
+            {verdict.counter_note ? <AppText style={common.body} testID="counter-note">{verdict.counter_note}</AppText> : null}
+            {simCounterDeltaLine(verdict.counter_delta) ? <AppText style={common.muted} testID="counter-delta">{simCounterDeltaLine(verdict.counter_delta)}</AppText> : null}
+            <SimSideLabel side="give" />
+            <PlayerList players={verdict.counter.give} />
+            <SimSideLabel side="get" />
+            <PlayerList players={verdict.counter.get} />
+            <Button size="sm" label="Take their counter" loading={busy} onPress={onSendCounter} />
+          </View>
+        ) : null}
+      </View>
     </SimPopIn>
   );
 }
@@ -361,7 +350,6 @@ function Builder({ ctx, seed, onSeedUsed }: { ctx: SimCtx; seed: SimTradeSeed | 
   }
 
   const partner = teams?.find((t) => t.team_id === draft.partner) ?? null;
-  const ready = simTradeReady(draft);
   const teamOptions = useMemo(() => simTeamsByPower(teams ?? []), [teams]);
 
   if (closed) {
@@ -395,11 +383,10 @@ function Builder({ ctx, seed, onSeedUsed }: { ctx: SimCtx; seed: SimTradeSeed | 
   };
   const toItems = (groups: SimAssetGroup<SimTradeAsset>[]) => simGroupsToSheetItems(groups, simHeadshotId, describePick);
   const sheetItems = sheetSide ? toItems(groupsFor(sheetSide === 'give' ? mine : partnerRoster, sheetSide === 'give' ? myPicks : theirPicks)) : [];
-  const sideItems = (assets: SimTradeAsset[]) =>
-    toItems([
-      ...simGroupByPosition(assets.filter((a): a is SimGamePlayer => !simIsPick(a)), simPositionsFor(game.settings.slots)),
-      ...(assets.some(simIsPick) ? [{ key: 'PICK', label: 'Picks', kind: 'pick' as const, items: assets.filter(simIsPick) }] : []),
-    ]);
+  const toScaleAsset = (asset: SimTradeAsset): TradeCardAsset => {
+    const a = simScaleAsset(asset);
+    return { key: a.key, player: a.player, pickLabel: a.pickLabel, detail: a.detail, onPress: a.source ? () => setViewing(a.source!) : undefined };
+  };
 
   return (
     <View style={common.stack}>
@@ -424,45 +411,51 @@ function Builder({ ctx, seed, onSeedUsed }: { ctx: SimCtx; seed: SimTradeSeed | 
 
       {partner ? (
         <>
-          <View style={{ flexDirection: 'column', gap: 8 }} accessibilityLabel="Offer">
-            <TradeSideSummary testID="trade-side-give" label="You send" tone="danger" items={sideItems(giveSelected)} onOpen={() => setSheetSide('give')} onRemove={(key) => dispatch({ type: 'toggle', side: 'give', id: key.slice(key.indexOf(':') + 1), max: maxPerSide })} hint="Add from your team" />
-            <TradeSideSummary testID="trade-side-get" label="You receive" tone="success" items={sideItems(getSelected)} onOpen={() => setSheetSide('get')} onRemove={(key) => dispatch({ type: 'toggle', side: 'get', id: key.slice(key.indexOf(':') + 1), max: maxPerSide })} hint={`Add from ${partner.name}`} />
-          </View>
-          <AppText style={[common.muted, fit.blocked || (fit.over && !soft) ? { color: colors.danger } : null]} testID="trade-fit">
-            Your roster after: {fit.after}/{game.settings.roster_limit}
-            {fit.blocked ? ': roster is full, so cut or trade someone first to add players' : fit.over ? (soft ? ` (over by ${fit.over})` : ` (cut ${fit.over} after the trade)`) : fit.room ? ` (${fit.room} open)` : ''}
-          </AppText>
-        </>
-      ) : null}
-
-      {ready ? (
-        <View style={common.stack} accessibilityLiveRegion="polite" accessibilityLabel="Verdict">
-          {previewing && !verdict ? <SkeletonCard rows={2} /> : null}
-          {verdict ? (
-            <>
-              <VerdictCard
-                key={`${key}-${verdict.decision}`}
-                verdict={verdict}
-                busy={sending}
-                onSendCounter={() => {
-                  if (!verdict.counter || !draft.partner) return;
-                  void send({ partner: draft.partner, give: verdict.counter.give.map((p) => p.id), get: verdict.counter.get.map((p) => p.id) });
-                }}
-              />
-              {verdict.decision === 'accept' ? (
-                <Button
-                  label="Send offer"
-                  loading={sending}
-                  disabled={fit.blocked}
-                  onPress={() => {
+          <TradeScale
+            giveLabel="You send"
+            getLabel="You receive"
+            mode="sim"
+            max={maxPerSide}
+            give={giveSelected.map(toScaleAsset)}
+            get={getSelected.map(toScaleAsset)}
+            meter={simAcceptanceMeter(verdict?.decision ?? null)}
+            addHint={{ give: picks?.you?.length ? 'Players or picks from your team' : 'From your roster', get: `From ${partner.name}` }}
+            onAdd={(side) => setSheetSide(side)}
+            onRemove={(side, assetKey) => dispatch({ type: 'toggle', side, id: assetKey, max: maxPerSide })}
+            footer={
+              <AppText style={[common.muted, fit.blocked || (fit.over && !soft) ? { color: colors.danger } : null]} testID="trade-fit">
+                Your roster after: {fit.after}/{game.settings.roster_limit}
+                {fit.blocked ? ': roster is full, so cut or trade someone first to add players' : fit.over ? (soft ? ` (over by ${fit.over})` : ` (cut ${fit.over} after the trade)`) : fit.room ? ` (${fit.room} open)` : ''}
+              </AppText>
+            }
+            verdict={
+              <View accessibilityLiveRegion="polite">
+                {previewing && !verdict ? <SkeletonCard rows={2} /> : null}
+                {verdict ? (
+                  <VerdictCard
+                    key={`${key}-${verdict.decision}`}
+                    verdict={verdict}
+                    busy={sending}
+                    onSendCounter={() => {
+                      if (!verdict.counter || !draft.partner) return;
+                      void send({ partner: draft.partner, give: verdict.counter.give.map((p) => p.id), get: verdict.counter.get.map((p) => p.id) });
+                    }}
+                  />
+                ) : null}
+              </View>
+            }
+            onSend={
+              verdict?.decision === 'accept'
+                ? () => {
                     const payload = simTradePayload(draft);
                     if (payload) void send(payload);
-                  }}
-                />
-              ) : null}
-            </>
-          ) : null}
-        </View>
+                  }
+                : undefined
+            }
+            canSend={!fit.blocked}
+            sending={sending}
+          />
+        </>
       ) : null}
 
       {partner && sheetSide ? (
