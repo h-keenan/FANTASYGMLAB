@@ -59,7 +59,7 @@ export const IDENTICAL = [
   "playerCard.ts",
   "playerListRow.ts",
   "playerNameDisplay.ts",
-  "playerNameFit.ts",
+  "rowAffordance.ts",
   "pqvContext.ts",
   "sampleLeague.ts",
   "sessionTab.ts",
@@ -95,6 +95,7 @@ export const IDENTICAL = [
 
 // Same code, differing only in comments / import specifiers / quote style.
 export const MIRRORED = [
+  "playerNameFit.ts",
   "bottomNav.ts",
   "bottomBarMetrics.ts",
   "dropsPresentation.ts",

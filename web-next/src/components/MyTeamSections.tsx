@@ -8,7 +8,6 @@ import { PlayerRow } from "@/components/PlayerRow";
 import { PositionBadge } from "@/components/PositionBadge";
 import { ToneBadge } from "@/components/ToneBadge";
 import { ValueStat } from "@/components/ValueStat";
-import { usePlayerQuickView } from "@/context/PlayerQuickViewContext";
 import type { KeeperPlayerInfo, LineupPlayer } from "@/lib/api";
 import type { CompositionSegment, TeamAnalysisRow } from "@/lib/myTeamAnalysis";
 import { CompactModule } from "@/components/ui/CompactModule";
@@ -126,7 +125,6 @@ function RosterRow({
   muted: boolean;
   showSlot: boolean;
 }) {
-  const { openPlayer } = usePlayerQuickView();
   const identity = { ...player, sourceLabel: "My Team" };
   // A team defense has no player record behind it: no Quick View, no OVR.
   const isTeamDefense = (player.position || "").toUpperCase() === "DEF";
@@ -147,17 +145,6 @@ function RosterRow({
         <>
           <OvrGauge rating={player.overall_rating} size="sm" />
           <ValueStat value={player.score != null ? Math.round(player.score) : "—"} />
-          {isTeamDefense ? null : (
-            <button
-              type="button"
-              aria-label={`Open ${player.name || "player"}`}
-              onClick={() => openPlayer(identity)}
-              className="inline-flex items-center justify-center -my-3 min-w-[var(--touch-target-min)] min-h-[var(--touch-target-min)]"
-              style={{ background: "none", border: "none", cursor: "pointer" }}
-            >
-              <Chevron />
-            </button>
-          )}
         </>
       }
     >

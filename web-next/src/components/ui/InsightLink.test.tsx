@@ -8,7 +8,7 @@ import { InsightLink } from "./InsightLink";
 const league = { id: "42", name: "Dynasty Dudes" };
 
 describe("InsightLink", () => {
-  it("renders a real link with the destination in its accessible name and a visible chevron", () => {
+  it("renders a real link with the destination in its accessible name and no chevron (the whole tile is the affordance)", () => {
     render(
       <InsightLink insight="age" league={league} spoken={["Avg Age", "24.1"]}>
         <div className="glass-surface">24.1</div>
@@ -16,7 +16,8 @@ describe("InsightLink", () => {
     );
     const link = screen.getByRole("link", { name: "Avg Age, 24.1, open the Roster Age rankings" });
     expect(link).toHaveAttribute("href", "/league-rankings/42?name=Dynasty%20Dudes#board-age");
-    expect(link.querySelector(".ui-insight-chevron")).not.toBeNull();
+    expect(link.querySelector(".ui-insight-chevron")).toBeNull();
+    expect(link.textContent).toBe("24.1");
   });
 });
 

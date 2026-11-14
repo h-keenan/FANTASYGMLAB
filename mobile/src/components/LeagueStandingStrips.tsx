@@ -125,7 +125,6 @@ export default function LeagueStandingStrips({
             <AppText style={styles.stripTextGroup2}>{oddsLine.headline}</AppText>
             {oddsLine.caption ? <AppText style={styles.oddsCaption}>{oddsLine.caption}</AppText> : null}
           </View>
-          <Ionicons name="chevron-forward" size={18} color={colors.textTertiary} />
         </AnimatedCard>
       ) : null}
     </>

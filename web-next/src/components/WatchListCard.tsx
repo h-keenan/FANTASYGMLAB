@@ -97,9 +97,6 @@ export function WatchListCard({
                 </span>
               ) : null}
             </span>
-            <span aria-hidden="true" className="shrink-0 text-lg" style={{ color: "var(--color-accent)" }}>
-              ›
-            </span>
           </>
         );
         const className = "flex items-center gap-3 px-3 py-2.5";

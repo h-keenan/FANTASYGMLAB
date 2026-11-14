@@ -598,7 +598,6 @@ export function GmPlanContent({
       <span>
         {otherRows.length} more player{otherRows.length === 1 ? "" : "s"} on your roster
       </span>
-      <span aria-hidden="true">›</span>
     </button>
   );
 

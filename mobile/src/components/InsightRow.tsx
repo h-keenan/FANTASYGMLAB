@@ -106,8 +106,6 @@ export default function InsightRow({
         <PressableScale style={styles.actionChip} onPress={onActionPress} hitSlop={6}>
           <AppText style={styles.actionChipText}>{actionLabel.toUpperCase()}</AppText>
         </PressableScale>
-      ) : onPress ? (
-        <Ionicons name="chevron-forward" size={16} color={colors.textTertiary} />
       ) : null}
     </Wrapper>
   );

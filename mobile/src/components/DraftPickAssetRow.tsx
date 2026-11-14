@@ -39,10 +39,6 @@ export interface DraftPickAssetRowProps {
   /** One short line under `trailingValue`, e.g. "74% conf". Ignored when
    * `trailingValue` is absent. */
   trailingCaption?: string | null;
-  /** Renders a chevron-forward affordance after the trailing value block —
-   * opt-in so existing non-navigating callers are unaffected. Defaults to
-   * false. */
-  showChevron?: boolean;
   onPress?: () => void;
   /** Renders a hairline divider under the row — set false on the last row
    * of a group so the group's own bottom edge stays clean. */
@@ -70,7 +66,7 @@ export interface DraftPickAssetRowProps {
  * PlayerIdentityRow.
  *
  * Draft Center's Pick Values list also renders through this row (with
- * `trailingValue`/`trailingCaption`/`showChevron`, which Trade Hub's
+ * `trailingValue`/`trailingCaption`, which Trade Hub's
  * exchange rows leave unset) — see DraftCenterScreen's `pickSeasons`
  * rendering.
  */
@@ -83,7 +79,6 @@ export default function DraftPickAssetRow({
   contextLine,
   trailingValue,
   trailingCaption,
-  showChevron = false,
   onPress,
   showDivider = false,
   style,
@@ -126,9 +121,6 @@ export default function DraftPickAssetRow({
           ) : null}
         </View>
       ) : null}
-      {showChevron ? (
-        <Ionicons name="chevron-forward" size={16} color={colors.textTertiary} style={styles.chevron} />
-      ) : null}
     </PressableScale>
   );
 }
@@ -144,6 +136,5 @@ function createStyles(colors: ThemeColors) {
     trailingBlock: { alignItems: 'flex-end', marginLeft: spacing.sm },
     trailingValue: { fontSize: 16.5, fontWeight: '700', color: colors.textPrimary },
     trailingCaption: { fontSize: 12, color: colors.textTertiary, marginTop: 1 },
-    chevron: { marginLeft: spacing.xs },
   });
 }

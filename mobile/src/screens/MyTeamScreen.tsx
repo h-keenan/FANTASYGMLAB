@@ -578,7 +578,6 @@ function LineupRow({
           ) : null}
         </>
       }
-      chevron={!isTeamDefense}
       showDivider={showDivider}
       onPress={isTeamDefense ? undefined : onPress}
     />

@@ -26,7 +26,7 @@ export type StructuredRowProps = {
   /** What a screen reader hears for the row button. */
   spoken?: string;
   detailTitle?: string;
-  /** Sheet body. Without `detail` and `onOpen` the row is not tappable and shows no chevron. */
+  /** Sheet body. Without `detail` and `onOpen` the row is not tappable. A tappable row has no chevron (the whole row is the target). */
   detail?: ReactNode;
   onOpen?: () => void;
   testID?: string;
@@ -34,7 +34,7 @@ export type StructuredRowProps = {
 
 /**
  * Twin of web-next's components/ui/StructuredRow.tsx: crest + name + status
- * chip + metric pills + one short reason + chevron; tap opens a detail Sheet.
+ * chip + metric pills + one short reason; tap opens a detail Sheet.
  * The replacement for delimiter-joined strings and generated sentences.
  */
 export default function StructuredRow({ lead, title, chip, pills = [], reason, highlight = false, spoken, detailTitle, detail, onOpen, testID }: StructuredRowProps) {
@@ -76,7 +76,6 @@ export default function StructuredRow({ lead, title, chip, pills = [], reason, h
           </View>
         ) : null}
       </View>
-      {tappable ? <AppText style={styles.chevron}>›</AppText> : null}
     </>
   );
 
@@ -169,7 +168,6 @@ function createStyles(colors: ThemeColors) {
     chip: { paddingHorizontal: 7, paddingVertical: 0, borderRadius: radii.pill, borderWidth: 1 },
     chipText: { fontSize: 12, fontWeight: '800' },
     reason: { flex: 1, minWidth: 0, fontSize: 13, color: colors.textTertiary },
-    chevron: { fontSize: 22, color: colors.textTertiary },
     more: { alignSelf: 'flex-start', minHeight: 44, justifyContent: 'center', paddingHorizontal: spacing.sm },
     moreText: { fontSize: 14, fontWeight: '800', color: colors.accent },
   });

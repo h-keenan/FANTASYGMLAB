@@ -100,7 +100,7 @@ function RowLink({ href, label, children }: { href: string; label: string; child
 function PositionChip({ row, league }: { row: TeamStatusPosition; league: { id: string; name: string } }) {
   const color = TONE_COLOR[row.tone];
   return (
-    <InsightLink insight="position_room" league={league} spoken={[`${row.position} room`, row.label]} noChevron testId={`team-status-position-link-${row.position}`}>
+    <InsightLink insight="position_room" league={league} spoken={[`${row.position} room`, row.label]} testId={`team-status-position-link-${row.position}`}>
     <span
       className="flex flex-col items-center px-1 py-1.5 min-w-0"
       data-testid={`team-status-position-${row.position}`}

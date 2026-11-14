@@ -295,9 +295,6 @@ function RecommendedRow({ player, rank, showDivider }: { player: WaiverPriorityA
         <span className="ml-auto">
           <FaabRange player={player} />
         </span>
-        <span aria-hidden="true" style={{ color: "var(--color-text-muted)" }}>
-          ›
-        </span>
       </span>
     </button>
     {player.drop_suggestion ? (

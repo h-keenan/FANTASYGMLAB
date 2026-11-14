@@ -603,6 +603,43 @@ Related pages are tabs of one page family (`lib/pageFamilies.ts`: Trades, Team, 
 `PillRow glass` (sticky, scroll-snap, cyan glass active pill). Each tab keeps its route. The phone footer
 (`BottomTabBar`) uses the same glass tokens. Plan: `docs/audits/2026-11-menu-consolidation.md`.
 
+## Rows: one tap target, no redundant arrow, one compact right edge (2026-11, coridian_)
+
+Rule (lib twin `lib/rowAffordance.ts`, tests `rowAffordance.test.ts` incl. a source scan):
+1. A **fully tappable row / tile / module has no chevron**. The whole row is the affordance: link/button role, a press state
+   (web: `.row-hit` stretches the single trigger over the row with `::after`, `.row-hit-scope:active` washes the row; app:
+   `PressableScale`), and an accessible name that says where it goes. Nothing is removed: the same tap, one fewer glyph.
+2. A chevron is allowed **only for a separate secondary target** that leads somewhere other than the row's own action
+   (`rowAffordance({ rowAction, secondaryAction }).chevron`). Expand/collapse indicators (rotating chevron, +/-) are state, not
+   navigation, and stay.
+3. The **right edge is one compact thing**: a number with a tiny unit caption (`ValueStat`: "3,213 value", full "Trade value
+   3,213" in the accessible name and tooltip), or one action. Never a labelled two-line block plus an arrow: it squeezed the
+   name column ("J. Bris...").
+4. Applied: web `PlayerRow` (roster Starters/Bench/IR/Taxi/IDP rows), `ValueStat`, `InsightLink` (stat tiles), `StructuredRow`,
+   `LeaguePulseCard`, `WatchListCard`, GM plan "more players", Waivers row; app `MetricCard`, `InsightRow`, `PlayerInsightRow`,
+   `PlayerIdentityRow` (`chevron` prop removed), `DraftPickAssetRow` (`showChevron` removed), `StructuredRow`, `LeagueStandingStrips`,
+   `LeaguePulseCard`. Kept: the app bid row (`WaiverRecommendationCard`, a separate target), menus/pickers, carousel arrows.
+   Follow-up: app screen files still on the allowlist in `rowAffordance.test.ts` are not audited line by line.
+
+## Player names: never ellipsized (2026-11, "fifth time")
+
+`lib/playerNameFit.ts` (twin) is the ladder, `PlayerName` (web + app) is the renderer: full name, then first initial + WHOLE
+surname ("J. Brisker"; suffix kept "M. Penix Jr."; "A. St. Brown", "J. Smith-Njigba"; mononyms, team defenses and "T.J." initials
+untouched), then one font step smaller (0.92), two steps (0.85), then the name WRAPS instead of being cut. There is no `truncate`,
+`text-ellipsis`, `line-clamp` or `numberOfLines` on a person name anywhere. A surname alone (button labels, summaries) is
+`playerSurname()` (drops "Jr."; the old `split(" ").pop()` returned "Jr."). Guard: `lib/playerNameTruncation.test.ts` scans web and
+app source (truncating element around a name expression, a truncating class on `<PlayerName>`, hand-cut surnames,
+ellipsis inside PlayerName itself). Team and manager names are the explicit allowlist in that test.
+
+## Page tab strip (PillRow glass): full-bleed, equal tabs, solid glass
+
+Root cause of "the tabs are not centred" (measured at 390px with `scripts/sim_layout_playwright/module_scan.mjs`): the strip was
+`width: 100%` of the padded page column with negative side margins, so it was shifted left by the gutter and stopped 32px short
+of the right edge; its scroller was a shrink-wrapped flex row, so tabs packed left (right slack 61-148px); and the backing was a
+46-78% translucent tint. Now `.pill-row-glass` is `calc(100% + 2 * gutter)` wide, the scroller is a grid with
+`minmax(max-content, 1fr)` columns (equal and centred when they fit, scrolls only on overflow) and the base is opaque
+`--color-bg`. `pageTabStripCss.test.ts` pins the CSS; `module_scan.mjs` fails on edges, centring, spread or alpha.
+
 ## Sheet tabs (quick views that would otherwise scroll long)
 
 Rule: a pop-up that scrolls past about one and a half screens groups its content under the shared `Tabs`

@@ -6,6 +6,7 @@ import { PlayerIdentityTrigger } from "@/components/PlayerIdentityTrigger";
 import { PlayerMetaLine } from "@/components/PlayerInjuryBadge";
 import { PositionBadge } from "@/components/PositionBadge";
 import { PlayerName } from "@/components/PlayerName";
+import { rowAffordance } from "@/lib/rowAffordance";
 
 /**
  * The standard left half of every player row: position badge, 40px avatar,
@@ -29,6 +30,7 @@ export function PlayerIdentity({
   leading,
   after,
   className = "min-w-0",
+  rowHit = false,
   children,
 }: {
   /** Quick View payload. Omit for a non-interactive identity. */
@@ -50,6 +52,8 @@ export function PlayerIdentity({
   after?: ReactNode;
   /** Wrapper classes; pass "flex-1 min-w-0" to make the identity fill the row. */
   className?: string;
+  /** Stretch the Quick View trigger over the whole row (PlayerRow sets this): no chevron needed, see lib/rowAffordance.ts. */
+  rowHit?: boolean;
   /** Subline content ("MIA · Age 23"). */
   children?: ReactNode;
 }) {
@@ -72,7 +76,7 @@ export function PlayerIdentity({
   );
   if (identity && !disableQuickView) {
     return (
-      <PlayerIdentityTrigger identity={identity} className={`flex items-center gap-3 ${className}`}>
+      <PlayerIdentityTrigger identity={identity} className={`flex items-center gap-3 ${rowHit ? "row-hit " : ""}${className}`.trim()} noPress={rowHit}>
         {body}
       </PlayerIdentityTrigger>
     );
@@ -95,12 +99,14 @@ export function PlayerRow({
   bordered?: boolean;
   className?: string;
 }) {
+  // With a Quick View identity the whole row is the target (rule: lib/rowAffordance.ts). No chevron.
+  const whole = rowAffordance({ rowAction: identityProps.identity && !identityProps.disableQuickView ? "player" : null }).wholeRow;
   return (
     <div
-      className={`flex items-center justify-between gap-3 py-2 ${className}`.trim()}
+      className={`flex items-center justify-between gap-3 py-2 ${whole ? "row-hit-scope " : ""}${className}`.trim()}
       style={bordered ? { borderBottom: "var(--border-width-default) solid var(--color-border)" } : undefined}
     >
-      <PlayerIdentity {...identityProps} />
+      <PlayerIdentity {...identityProps} rowHit={whole} />
       {trailing ? <div className="flex items-center gap-2 shrink-0">{trailing}</div> : null}
     </div>
   );

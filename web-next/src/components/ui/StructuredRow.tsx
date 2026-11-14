@@ -26,7 +26,7 @@ export type StructuredRowProps = {
   spoken?: string;
   /** Sheet heading for the detail. */
   detailTitle?: string;
-  /** Sheet body. Without `detail` and `onOpen` the row is not tappable and shows no chevron. */
+  /** Sheet body. Without `detail` and `onOpen` the row is not tappable. A tappable row has no chevron (the whole row is the target). */
   detail?: ReactNode;
   /** Custom handler instead of the built-in detail sheet. */
   onOpen?: () => void;
@@ -35,7 +35,7 @@ export type StructuredRowProps = {
 
 /**
  * One row of a signal list: crest/avatar + name + status chip + metric pills +
- * one short reason + chevron; tapping opens a detail Sheet. It is the
+ * one short reason; tapping opens a detail Sheet. It is the
  * replacement for delimiter-joined strings ("Team | Retool | Draft #10 | ...")
  * and generated sentences: every part is its own field, so nothing repeats and
  * nothing is parsed back out of text.
@@ -74,11 +74,6 @@ export function StructuredRow({ lead, title, chip, pills = [], reason, highlight
           </span>
         ) : null}
       </span>
-      {tappable ? (
-        <span className="ui-srow-chevron" aria-hidden="true">
-          ›
-        </span>
-      ) : null}
     </>
   );
   const className = `ui-srow${highlight ? " ui-srow-me" : ""}${tappable ? " ui-srow-tap" : ""}`;

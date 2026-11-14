@@ -33,7 +33,6 @@ export default function LeaguePulseCard({
     <AnimatedCard style={styles.card} onPress={onPress} accessibilityLabel="League activity, open league recap">
       <View style={styles.header}>
         <AppText style={styles.title}>League Activity</AppText>
-        <Ionicons name="chevron-forward" size={16} color={colors.accent} />
       </View>
       {highlights.map((h) => (
         <View key={h.key} style={styles.row}>

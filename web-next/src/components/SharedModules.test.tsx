@@ -29,11 +29,14 @@ describe("shared UI modules", () => {
     expect(onAction).toHaveBeenCalled();
   });
 
-  it("ValueStat puts the Value caption above the number", () => {
+  it("ValueStat is one compact line: the number with a tiny unit caption, full label for assistive tech", () => {
     render(<ValueStat value={1234} />);
     const stat = screen.getByTestId("value-stat");
-    expect(stat.firstElementChild?.textContent).toBe("Trade value");
-    expect(stat.lastElementChild?.textContent).toBe("1,234");
+    expect(stat.className).toContain("inline-flex");
+    expect(stat.firstElementChild?.textContent).toBe("Trade value 1,234");
+    expect(stat.lastElementChild?.textContent).toBe("value");
+    expect(stat.lastElementChild).toHaveAttribute("aria-hidden", "true");
+    expect(stat.getAttribute("title")).toBe("Trade value 1,234");
   });
 
   it("ToneBadge is a rounded pill", () => {

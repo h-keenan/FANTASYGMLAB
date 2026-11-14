@@ -1,8 +1,17 @@
 /**
- * A trade/dynasty value number with its small "Value" caption above it
- * (owner decision: the label is small, above the number, everywhere).
- * `label` can be swapped for another caption that follows the same stack.
+ * A trade/dynasty value number on a row's right edge: ONE compact line, the number with a tiny unit caption after it
+ * ("3,213 value"). It used to be a two-line block with a big uppercase "TRADE VALUE" label above the number, which
+ * squeezed the name column ("J. Bris...") and sat next to a chevron. The full label stays available as the accessible
+ * name and tooltip. `label` can be swapped for another caption ("Score", "Waiver").
+ * Rule: lib/rowAffordance.ts (rule 4).
  */
+function unitCaption(label: string): string {
+  const text = label.trim();
+  if (/^trade value$/i.test(text) || /^value$/i.test(text)) return "value";
+  const first = text.split(/\s+/)[0] ?? text;
+  return (text.length <= 7 ? text : first).toLowerCase();
+}
+
 export function ValueStat({
   value,
   label = "Trade value",
@@ -16,19 +25,22 @@ export function ValueStat({
   children?: React.ReactNode;
 }) {
   if (!children && (value === null || value === undefined || value === "")) return null;
+  const shown = typeof value === "number" ? Math.round(value).toLocaleString() : value;
   return (
-    <span className={`flex flex-col shrink-0 ${align === "right" ? "items-end" : align === "center" ? "items-center" : "items-start"}`} data-testid="value-stat">
-      <span
-        className="uppercase font-bold"
-        style={{ font: "var(--type-supporting-metadata)", color: "var(--color-text-muted)", letterSpacing: "var(--letter-spacing-badge)" }}
-      >
-        {label}
-      </span>
+    <span
+      className={`inline-flex shrink-0 items-baseline gap-1 whitespace-nowrap ${align === "right" ? "justify-end" : align === "center" ? "justify-center" : "justify-start"}`}
+      data-testid="value-stat"
+      title={children ? label : `${label} ${shown}`}
+    >
       {children ?? (
-        <span className="text-sm font-extrabold" style={{ color: "var(--color-text-primary)" }}>
-          {typeof value === "number" ? Math.round(value).toLocaleString() : value}
+        <span className="text-sm font-extrabold tabular-nums" style={{ color: "var(--color-text-primary)" }}>
+          <span className="sr-only">{label} </span>
+          {shown}
         </span>
       )}
+      <span aria-hidden="true" className="text-[0.6875rem] font-bold uppercase" style={{ color: "var(--color-text-muted)", letterSpacing: "var(--letter-spacing-badge)" }}>
+        {unitCaption(label)}
+      </span>
     </span>
   );
 }

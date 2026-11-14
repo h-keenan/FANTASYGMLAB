@@ -96,20 +96,14 @@ export default function MetricCard({
             {label}
           </AppText>
         </View>
-        {/* Same chevron-forward + textTertiary affordance InsightRow/
-         * AwardsStrip/WaiverRecommendationCard already use to mark a row as
-         * tappable — reused here rather than inventing a card-specific
-         * tappability indicator, so every MetricCard with an `onPress`
-         * (Dashboard's Roster Power/Franchise tiles included) now signals it the
-         * same way the rest of the app does. */}
+        {/* A tappable tile has no arrow: the whole tile is the affordance (press state via the card,
+         * lib/rowAffordance.ts rule 1). */}
         {periodLabel ? (
           <View style={styles.periodTag}>
             <AppText style={styles.periodTagText} numberOfLines={1}>
               {periodLabel}
             </AppText>
           </View>
-        ) : onPress ? (
-          <Ionicons name="chevron-forward" size={12} color={colors.textTertiary} />
         ) : null}
       </View>
       <AppText

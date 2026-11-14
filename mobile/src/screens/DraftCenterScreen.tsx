@@ -325,7 +325,6 @@ export default function DraftCenterScreen({ route, navigation }: Props) {
                       contextLine={pickProvenance(pick, { showOwner: pickScope === 'league' })}
                       trailingValue={pick.score != null ? String(Math.round(pick.score)) : '—'}
                       trailingCaption={confidence !== null ? `${Math.round(confidence * 100)}% conf` : null}
-                      showChevron
                       onPress={() => navigation.navigate('PickDetail', { pick, leagueId, leagueName })}
                       showDivider={!isLast}
                     />

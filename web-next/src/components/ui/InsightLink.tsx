@@ -18,18 +18,16 @@ export type InsightLinkProps = {
   className?: string;
   style?: CSSProperties;
   testId?: string;
-  /** Hide the corner chevron when the child already draws its own arrow. */
-  noChevron?: boolean;
 };
 
 /**
  * The tappable-card wrapper for any stat, insight card or chip that states a
  * fact about the user's league or team: a real link to the page that explains
- * it, with the shared pressed/focus state and a quiet corner chevron so the
- * affordance is visible before the tap. Keeps the child's own glass look.
+ * it, with the shared pressed/focus state. NO chevron: the whole tile is the
+ * affordance (lib/rowAffordance.ts). Keeps the child's own glass look.
  * Add the fact to INSIGHT_TARGETS first; this never takes a raw href.
  */
-export function InsightLink({ insight, league, spoken, children, className = "", style, testId, noChevron }: InsightLinkProps) {
+export function InsightLink({ insight, league, spoken, children, className = "", style, testId }: InsightLinkProps) {
   return (
     <Link
       href={insightHref(insight, league)}
@@ -40,11 +38,6 @@ export function InsightLink({ insight, league, spoken, children, className = "",
       data-testid={testId}
     >
       {children}
-      {noChevron ? null : (
-        <span className="ui-insight-chevron" aria-hidden="true">
-          ›
-        </span>
-      )}
     </Link>
   );
 }

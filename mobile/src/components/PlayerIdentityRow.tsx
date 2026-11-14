@@ -122,9 +122,6 @@ export interface PlayerIdentityRowProps {
   /** Extra content stacked under the trailing block (e.g. a Keeper badge).
    * Row layout only. */
   trailingExtra?: React.ReactNode;
-  /** Show a trailing chevron (row layout) to signal the row opens a detail
-   * screen. */
-  chevron?: boolean;
   /** Let a long name wrap onto a second line instead of degrading to
    * "F. Lastname" (phone layout audit: crowded rows with trailing actions). */
   wrapName?: boolean;
@@ -196,7 +193,6 @@ export default function PlayerIdentityRow({
   secondaryTrailingCaption,
   trailingTone,
   trailingExtra,
-  chevron = false,
   wrapName = false,
   onPress,
   showDivider = false,
@@ -437,9 +433,6 @@ export default function PlayerIdentityRow({
           ) : null}
         </View>
       ) : null}
-      {chevron ? (
-        <Ionicons name="chevron-forward" size={16} color={colors.textTertiary} style={styles.chevron} />
-      ) : null}
     </PressableScale>
   );
 }
@@ -491,10 +484,10 @@ function createStyles(colors: ThemeColors) {
       paddingVertical: 1,
     },
     injuryText: { fontSize: 13, fontWeight: '800', letterSpacing: 0.3 },
-    chevron: { marginLeft: spacing.sm },
     trailingBlock: { alignItems: 'flex-end', marginLeft: spacing.sm },
     trailingValue: { fontSize: 16.5, fontWeight: '700', color: colors.textPrimary },
-    trailingCaption: { fontSize: 13, color: colors.textTertiary, marginTop: 1 },
+    // Tiny unit caption under a compact number (lib/rowAffordance.ts rule 4), never a labelled block.
+    trailingCaption: { fontSize: 12, color: colors.textTertiary, marginTop: 0, textTransform: 'uppercase', letterSpacing: 0.4 },
     // Deliberately smaller/quieter than trailingValue/trailingCaption above
     // — a supporting secondary figure (e.g. a projection next to a real
     // score), never a second equally-weighted metric on the row.

@@ -418,7 +418,8 @@ describe("MyTeamContent best ball", () => {
     );
     expect(screen.getByText("49ers D/ST")).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Open 49ers D/ST" })).not.toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Open Test Quarterback" })).toBeInTheDocument();
+    // The whole row is the Quick View trigger (no separate chevron button): the identity button carries the name.
+    expect(screen.getByRole("button", { name: /Test Quarterback/ })).toBeInTheDocument();
   });
 
   it("shows no IDP tab in a non-IDP league", () => {

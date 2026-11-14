@@ -4453,6 +4453,15 @@ main > header:has(> h1.sr-only:only-child) {
   animation: motion-sweep 600ms var(--ease-in-out) both;
 }
 
+/* Whole-row tap (PlayerRow, lib/rowAffordance.ts): the row's one trigger stretches its hit area over the entire row with
+   a pseudo-element, so there is no chevron and nothing to aim for. Interactive controls inside the row (actions, a bid
+   button) sit above it. The pressed state is a wash on the row; the trigger itself does not scale. */
+.row-hit-scope { position: relative; }
+.row-hit::after { content: ""; position: absolute; inset: 0; }
+.row-hit-scope :is(button, a[href], input, select, textarea, [role="button"]):not(.row-hit) { position: relative; z-index: 1; }
+.row-hit-scope:has(.row-hit:active) { background: color-mix(in srgb, var(--color-text-primary) 6%, transparent); }
+@media (prefers-reduced-motion: no-preference) { .row-hit-scope { transition: background-color 120ms ease; } }
+
 /* Press feedback: THE one press for every tappable (lib/motion.ts PRESS). Zero specificity (:where) so a component's own
    :active still wins; `scale` is its own property so it never fights a component's `transform`. Opt out: data-no-press. */
 :root { --press-scale: 0.97; --press-opacity: 0.88; }
