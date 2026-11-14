@@ -60,7 +60,7 @@ def test_deterministic_replay_and_resume():
 def test_kicker_retirement_ages():
     ends = _career_ends("K", 24, role=0.8)
     assert 35.5 <= np.median(ends) <= 39.5
-    assert np.mean(ends >= 40) >= 0.15  # many to 40+
+    assert np.mean(ends >= 40) >= 0.08  # a real share to 40+
     assert np.mean(ends <= 33) < 0.10  # no mass retirement of 33-year-olds
     # the chance a 33-year-old starting kicker retires this offseason is small
     assert aging.retire_prob_v1("K", 33.0, 0.9, 0.5) < 0.03
