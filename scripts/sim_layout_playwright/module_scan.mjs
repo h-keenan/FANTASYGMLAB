@@ -51,6 +51,8 @@ const FIX = {
     ],
   },
   "team-rankings": { ok: true, reason: "", season: "2026", standings_available: true, standings_message: "", week_label: "Week 9", teams: [1, 2, 3, 4, 5, 6, 7, 8].map(ranking) },
+  "value-signals": { ok: true, status: "ok", span_days: 12, method: "Method.", buy_low: [{ player_id: "9", name: "Test Receiver", position: "WR", team: "DET", age: 24, injury_status: "", signal: "buy_low", rating_change: -4, production_percentile: 80, value_percentile: 50 }], sell_high: [] },
+  multi: { ok: true, locked: false, idea_count: 0, ideas: [], reason: "no_fit" },
   "trade-hub": {
     ok: true, reason: "", team_strategy: "contender", posture_sentence: "You are contending.", hold: null,
     ideas: [1, 2, 3].map((n) => ({ partner_team_name: `Team ${n + 1}`, partner_team_avatar_url: null, rationale: "Fills your WR need with a surplus RB.", trade_gain: 400 * n, confidence_label: "High", market_realism_label: "Realistic", reasoning_tags: [], package: { send: [], receive: [] }, category: "need", value_edge_band: "Fair", impact_tag: "Lineup", landed_gm_target_player_ids: [], send_score: 1000, receive_score: 1400, recommendation_id: `idea-${n}` })),
@@ -94,7 +96,7 @@ for (const w of WIDTHS) {
     const cors = { "access-control-allow-origin": "*", "access-control-allow-headers": "*", "access-control-allow-methods": "*" };
     if (u.hostname === "localhost" && u.port === "8000") {
       if (route.request().method() === "OPTIONS") return route.fulfill({ status: 204, headers: cors });
-      const m = u.pathname.match(/\/v1\/leagues\/[^/]+\/([a-z-]+)$/);
+      const m = u.pathname.match(/\/v1\/leagues\/[^/]+\/([a-z-]+)$/) || u.pathname.match(/\/v1\/players\/(value-signals)$/) || (u.pathname.endsWith("/trade-ideas/multi") ? [0, "multi"] : null);
       const body = m && FIX[m[1]] ? FIX[m[1]] : {};
       return route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(body), headers: cors });
     }
