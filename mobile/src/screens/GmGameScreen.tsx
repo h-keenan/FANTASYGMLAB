@@ -28,7 +28,12 @@ import SimOffseasonBar from '../components/SimOffseasonBar';
 import { SimGameOffseason } from '../components/SimGameOffseason';
 import { SimHomeTab } from '../components/SimGameHome';
 import { SimPlayerSheet } from '../components/SimGamePlayers';
-import { SimNotice, SimOpenPlayerContext, SimPreviewBanner, SimTeamOpenContext, createSimStyles, type SimCtx } from '../components/SimGameParts';
+import { SimNotice, SimOpenPlayerContext, SimPreviewBanner, SimProgressBar, SimTeamOpenContext, createSimStyles, simToneColor, type SimCtx } from '../components/SimGameParts';
+import SimGlyph from '../components/SimGlyph';
+import { simHubRow } from '../lib/simHub';
+import { simMenuHero, simRulesParts } from '../lib/simSummaries';
+import CompactModule from '../components/CompactModule';
+import { Hero } from '../components/ModuleTemplates';
 import { SimTeamSheet } from '../components/SimGameTeamSheet';
 import { SimToResultView, SimToSheet, type SimToRequest } from '../components/SimToControl';
 import { SimBlockToggle } from '../components/SimTradeBlock';
@@ -698,15 +703,7 @@ export default function GmGameScreen({ navigation }: Props) {
                 disabled={deletingId !== null}
                 onConfirm={() => deleteSaved(g.id)}
                 rowContent={
-                  <AccentCard accent={g.status === 'complete' ? colors.success : colors.accent} compact onPress={() => void openGame(g.id)}>
-                    <View style={styles.rowBetween}>
-                      <AppText style={[styles.bodyStrong, styles.grow]}>{simGameLiteLine(g)}</AppText>
-                      {g.grade_letter ? <ToneBadge label={g.grade_letter} color={colors.success} size="xs" /> : <AppText style={styles.link}>Continue</AppText>}
-                    </View>
-                    <AppText style={styles.muted}>
-                      {simSettingsSummary(g.settings) || `${SIM_SCORING_LABELS[(g.settings.scoring ?? 'ppr') as SimScoring]} · ${g.settings.teams ?? 12} teams`} · {SIM_DIFFICULTY_COPY[g.difficulty]?.label ?? g.difficulty}
-                    </AppText>
-                  </AccentCard>
+                  <SavedGameCard game={g} onPress={() => void openGame(g.id)} />
                 }
               />
             </View>
@@ -714,6 +711,33 @@ export default function GmGameScreen({ navigation }: Props) {
         )}
       </View>
     </>,
+  );
+}
+
+function SavedGameCard({ game, onPress }: { game: SimGameLite; onPress: () => void }) {
+  const { colors } = useThemeMode();
+  const common = useMemo(() => createSimStyles(colors), [colors]);
+  const row = simHubRow(game);
+  const tone = row.chip.tone;
+  const done = game.status === 'complete';
+  return (
+    <AccentCard accent={done ? simToneColor(tone, colors) : colors.accent} compact onPress={onPress}>
+      <View style={common.rowBetween}>
+        <View style={[common.row, common.grow]}>
+          <SimGlyph name={done ? 'check' : game.status === 'drafting' ? 'team' : 'standings'} color={simToneColor(tone, colors)} size={16} />
+          <AppText style={[common.bodyStrong, common.grow]} numberOfLines={1}>{row.title}</AppText>
+        </View>
+        <ToneBadge label={row.chip.label} color={simToneColor(tone, colors)} size="xs" />
+      </View>
+      {row.progress ? <SimProgressBar done={row.progress.done} total={row.progress.total} tone={tone} label={`${row.progress.done} of ${row.progress.total} weeks played`} /> : null}
+      <View style={common.rowBetween}>
+        <AppText style={[common.muted, common.grow]} numberOfLines={1}>{row.meta}</AppText>
+        <AppText style={common.muted}>
+          {row.played}
+          {row.open ? <AppText style={[common.muted, { color: colors.accent, fontWeight: '700' }]}>{row.played ? ' · ' : ''}Continue</AppText> : null}
+        </AppText>
+      </View>
+    </AccentCard>
   );
 }
 
@@ -1151,14 +1175,22 @@ function SimMoreTab({ ctx, onDeleted, onHub }: { ctx: SimCtx; onDeleted: () => v
 
   return (
     <View style={styles.stack}>
-      <SectionHeading title="This week" />
-      <AccentCard accent={colors.warning} compact>
+      {(() => {
+        const h = simMenuHero(game, SIM_DIFFICULTY_COPY[s.difficulty].label, SIM_SCORING_LABELS[s.scoring] ?? String(s.scoring));
+        return <Hero label={h.label} value={h.value} context={h.context} tone="accent" testID="sim-menu-hero" />;
+      })()}
+      <CompactModule
+        id="sim.menu.week"
+        title="This week"
+        parts={[{ key: 'u', text: 'Undo lineup edits, claims, cuts and trades', strong: true }, { key: 'n', text: 'not an advanced week', tone: 'muted' }]}
+        tone="warning"
+        persist={false}
+      >
         <AppText style={styles.body}>Undo this week&apos;s lineup edits, claims, cuts and trades back to how the week started. You cannot undo a week you already advanced.</AppText>
         <ConfirmInPlace label="Reset this week" buttonVariant="secondary" size="sm" onConfirm={revert} style={styles.start} />
-      </AccentCard>
+      </CompactModule>
 
-      <SectionHeading title="League rules" />
-      <AccentCard accent={colors.borderStrong} compact>
+      <CompactModule id="sim.menu.rules" title="League rules" parts={simRulesParts(s)} tone="muted" defaultOpen>
         <AppText style={styles.body}>
           {simSettingsSummary(s)} · {SIM_DIFFICULTY_COPY[s.difficulty].label}
         </AppText>
@@ -1169,9 +1201,9 @@ function SimMoreTab({ ctx, onDeleted, onHub }: { ctx: SimCtx; onDeleted: () => v
           {s.regular_weeks}-week season, {s.playoff_teams}-team playoffs. Trade deadline: week {s.trade_deadline_week}.
         </AppText>
         <AppText style={styles.body}>Waiver claims resolve when you advance, before games are scored, worst record first.</AppText>
-      </AccentCard>
+      </CompactModule>
 
-      <SectionHeading title="Game" />
+      <CompactModule id="sim.menu.game" title="Game" parts={[{ key: 'a', text: 'All games', strong: true }, { key: 'd', text: 'Delete this game', tone: 'danger' }]} tone="danger" persist={false} defaultOpen>
       <View style={styles.wrapRow}>
         <Button size="sm" variant="secondary" label="All games" onPress={onHub} />
         <ConfirmInPlace
@@ -1185,6 +1217,7 @@ function SimMoreTab({ ctx, onDeleted, onHub }: { ctx: SimCtx; onDeleted: () => v
           onConfirm={remove}
         />
       </View>
+      </CompactModule>
     </View>
   );
 }

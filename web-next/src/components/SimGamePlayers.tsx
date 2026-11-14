@@ -19,7 +19,7 @@ import { SkeletonRows } from "@/components/Skeleton";
 import { api } from "@/lib/api";
 import { SIM_WINDOW_STEP, simWindow } from "@/lib/simLayout";
 import { simSuppressedBadges } from "@/lib/simDraft";
-import { simActualPoints, simAvailabilityLine, simHeaderTags, simHeroFeed, simProjectionBand, simProjectionIsFlat, simRosLine } from "@/lib/simPlayerSheet";
+import { simActualPoints, simAvailabilityLine, simHeaderTags, simHeroFeed, simHeroTiles, simOutlookBand, simOutlookTiles, simProfileRead, simRosLine } from "@/lib/simPlayerSheet";
 import { PLAYER_SEARCH_DEBOUNCE_MS } from "@/lib/leaguePlayerSearch";
 import {
   SIM_PAGE_SIZE,
@@ -291,6 +291,7 @@ export function simPqvSections(gameId: string, player: SimGamePlayer, detail: Si
   return {
     overview: <SimOverviewSection player={player} detail={detail} actions={actions} seasonLabel={seasonLabel} />,
     outlook: <SimOutlookSection player={player} detail={detail} seasonLabel={seasonLabel} />,
+    heroTiles: simHeroTiles(player),
     scouting: detail.data?.scouting ? <SimScoutingSections profile={detail.data.scouting} /> : undefined,
     history: <SimPlayerHistory gameId={gameId} playerId={player.id} />,
     stats: real ? <SimRealHistory playerId={real.playerId} asOf={real.asOf} /> : undefined,
@@ -348,23 +349,46 @@ function SimOverviewSection({ player, detail, actions, seasonLabel }: { player: 
           </ul>
         </section>
       ) : null}
+      {body && !body.scouting ? <SimProfileSection player={player} /> : null}
     </div>
+  );
+}
+
+function SimProfileSection({ player }: { player: SimGamePlayer }) {
+  const read = simProfileRead(player);
+  return (
+    <section className="pqv-stat-season" data-testid="sim-profile-read">
+      <div className="flex items-center justify-between gap-2 flex-wrap">
+        <h3>Scouting read</h3>
+        <span className="flex items-center gap-1 mb-2">
+          {read.phase ? <SimToneBadge label={read.phase.label} tone={read.phase.tone} /> : null}
+          {read.chips.map((c) => <SimToneBadge key={c.key} label={c.label} tone="muted" />)}
+        </span>
+      </div>
+      <StatGroup title="Scouting read" items={read.tiles} hideTitle />
+      <ul className="flex flex-col gap-1.5 pt-2">
+        {read.lines.map((line) => (
+          <li key={line} className="text-sm" style={{ color: "var(--color-text-secondary)" }}>{line}</li>
+        ))}
+      </ul>
+    </section>
   );
 }
 
 function SimOutlookSection({ player, detail, seasonLabel }: { player: SimGamePlayer; detail: SimPlayerDetailState; seasonLabel?: string | null }) {
   const body = detail.data;
-  if (detail.failed) return <p className="pqv-status-text">Could not load the full outlook.</p>;
+  if (detail.failed) return <EmptyState title="Could not load the outlook" subtitle="Close the sheet and open him again." />;
   if (!body) return <SkeletonRows count={2} />;
   const ros = body.ros ?? null;
-  const flat = simProjectionIsFlat(body);
-  const band = simProjectionBand(body);
+  const band = simOutlookBand(body);
   const actual = simActualPoints(body);
   const availability = ros ? simAvailabilityLine(ros) : null;
-  if (!(actual.length > 0 || band || ros)) return <p className="pqv-status-text">No outlook yet.</p>;
+  if (!(actual.length > 0 || band || ros)) return <EmptyState title="No outlook yet" subtitle="Projections appear once the season starts." />;
+  const tiles = simOutlookTiles(ros);
   return (
     <section className="pqv-stat-season" data-testid="sim-weekly">
       <h3>Week by Week · {seasonLabel || "This sim season"}</h3>
+      {tiles.length > 0 ? <StatGroup title="Rest of season" items={tiles} hideTitle /> : null}
       {actual.length > 0 || band ? (
         <WeeklyPointsPanel
           name={player.name}
@@ -375,13 +399,11 @@ function SimOutlookSection({ player, detail, seasonLabel }: { player: SimGamePla
           byeWeeks={ros?.bye_week ? [ros.bye_week] : []}
         />
       ) : null}
-      {flat && ros ? (
+      {ros ? (
         <p className="pqv-status-text" data-testid="sim-ros-line">
           <strong>{simRosLine(ros)}</strong>
           {availability ? <> &middot; {availability}</> : null}
         </p>
-      ) : availability ? (
-        <p className="pqv-status-text">{availability}</p>
       ) : null}
     </section>
   );

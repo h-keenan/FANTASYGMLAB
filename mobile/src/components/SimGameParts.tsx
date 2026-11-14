@@ -146,6 +146,17 @@ export function SimKicker({ children }: { children: ReactNode }) {
   return <AppText style={styles.kicker}>{children}</AppText>;
 }
 
+/** The one thin progress bar of the game screens (checklist, saved-game season progress). `done` of `total` segments, tone-coloured. */
+export function SimProgressBar({ done, total, tone = 'accent', label }: { done: number; total: number; tone?: SimGameTone; label?: string }) {
+  const { colors } = useThemeMode();
+  const pct = total > 0 ? Math.max(0, Math.min(100, (done / total) * 100)) : 0;
+  return (
+    <View style={{ height: 6, borderRadius: 999, overflow: 'hidden', backgroundColor: colors.glassInset }} accessibilityRole="progressbar" accessibilityLabel={label ?? `${done} of ${total}`}>
+      <View style={{ height: 6, width: `${pct}%`, backgroundColor: simToneColor(tone, colors) }} />
+    </View>
+  );
+}
+
 /** A label over a value: the one small stat used in every game screen. */
 export function SimStat({ label, value, tone = 'muted' }: { label: string; value: ReactNode; tone?: SimGameTone }) {
   const { colors } = useThemeMode();

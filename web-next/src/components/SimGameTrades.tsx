@@ -385,7 +385,7 @@ function Builder({ ctx, seed, onSeedUsed }: { ctx: SimCtx; seed: SimTradeSeed | 
           <ul className="flex flex-col gap-2" aria-label="Teams">
             {teamOptions.map((team) => (
               <li key={team.team_id}>
-                <SimTeamCard team={team} openLabel="Trade with this team" onOpen={(id) => dispatch({ type: "partner", teamId: id })} />
+                <SimTeamCard team={team} dense openLabel="Trade with this team" onOpen={(id) => dispatch({ type: "partner", teamId: id })} />
               </li>
             ))}
           </ul>

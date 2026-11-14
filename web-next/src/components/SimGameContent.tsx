@@ -25,7 +25,12 @@ import { Sheet } from "@/components/ui/Sheet";
 import { SimNotificationBell, useSimNotifications } from "@/components/SimNotificationBell";
 import { SimOffseasonBar } from "@/components/SimOffseasonBar";
 import { ConfirmInPlace } from "@/components/ui/ConfirmInPlace";
-import { SimNotice, SimOpenPlayerContext, SimPreviewBanner, SimTeamLink, SimTeamOpenContext, simToneColor, type SimCtx } from "@/components/SimGameParts";
+import { SimGlyph } from "@/components/SimGlyph";
+import { simHubRow } from "@/lib/simHub";
+import { simMenuHero, simRulesParts } from "@/lib/simSummaries";
+import { Hero } from "@/components/ui/ModuleTemplates";
+import { CompactModule } from "@/components/ui/CompactModule";
+import { SimNotice, SimOpenPlayerContext, SimPreviewBanner, SimProgressBar, SimTeamLink, SimTeamOpenContext, simToneColor, type SimCtx } from "@/components/SimGameParts";
 import { SimBlockToggle } from "@/components/SimTradeBlock";
 import { SimTeamSheet } from "@/components/SimGameTeamSheet";
 import { SimToResultView, SimToSheet, type SimToRequest } from "@/components/SimToControl";
@@ -97,7 +102,6 @@ import {
   type SimSetupState,
   type SimStartPoint,
   type SimWaiverClaim,
-  simGradeTone,
   simTradeSeedFor,
   type SimTradeSeed,
   type SimToResponse,
@@ -554,15 +558,7 @@ export function SimGameContent() {
             <div key={g.id} className="flex flex-col gap-1.5">
               <div className="relative flex items-stretch gap-2">
                 <button type="button" className="flex-1 min-w-0 text-left" onClick={() => void openGame(g.id)} aria-label={`Open game: ${simGameLiteLine(g)}`}>
-                  <AccentCard accent={g.status === "complete" ? "var(--color-success)" : "var(--color-accent)"} compact as="div">
-                    <div className="flex items-center justify-between gap-2">
-                      <span className="text-sm font-bold">{simGameLiteLine(g)}</span>
-                      {g.grade_letter ? <ToneBadge label={g.grade_letter} color={simToneColor(simGradeTone(g.grade_letter))} size="xs" /> : <span className="text-xs" style={{ color: "var(--color-accent)" }}>Continue</span>}
-                    </div>
-                    <p className="text-xs" style={{ color: "var(--color-text-muted)" }}>
-                      {simSettingsSummary(g.settings) || `${SIM_SCORING_LABELS[(g.settings.scoring ?? "ppr") as SimScoring]} · ${g.settings.teams ?? 12} teams`} · {SIM_DIFFICULTY_COPY[g.difficulty]?.label ?? g.difficulty}
-                    </p>
-                  </AccentCard>
+                  <SavedGameCard game={g} />
                 </button>
                 <ConfirmInPlace
                   variant="icon"
@@ -581,6 +577,28 @@ export function SimGameContent() {
         )}
       </section>
     </Shell>
+  );
+}
+
+function SavedGameCard({ game }: { game: SimGameLite }) {
+  const row = simHubRow(game);
+  const tone = row.chip.tone;
+  const done = game.status === "complete";
+  return (
+    <AccentCard accent={done ? simToneColor(tone) : "var(--color-accent)"} compact as="div">
+      <div className="flex items-center justify-between gap-2">
+        <span className="inline-flex min-w-0 items-center gap-2">
+          <span style={{ color: simToneColor(tone) }}><SimGlyph name={done ? "check" : game.status === "drafting" ? "team" : "standings"} size={16} /></span>
+          <span className="text-sm font-bold truncate">{row.title}</span>
+        </span>
+        <ToneBadge label={row.chip.label} color={simToneColor(tone)} size="xs" />
+      </div>
+      {row.progress ? <SimProgressBar done={row.progress.done} total={row.progress.total} tone={tone} label={`${row.progress.done} of ${row.progress.total} weeks played`} /> : null}
+      <div className="flex items-center justify-between gap-2 text-xs" style={{ color: "var(--color-text-muted)" }}>
+        <span className="min-w-0 truncate">{row.meta}</span>
+        <span className="shrink-0">{row.played}{row.open ? <span className="font-bold" style={{ color: "var(--color-accent)" }}>{row.played ? " · " : ""}Continue</span> : null}</span>
+      </div>
+    </AccentCard>
   );
 }
 
@@ -1165,15 +1183,23 @@ function SimMoreTab({ ctx, onDeleted, onHub }: { ctx: SimCtx; onDeleted: () => v
   }
 
   return (
-    <div className="flex flex-col gap-3">
-      <SectionHeading>This week</SectionHeading>
-      <AccentCard accent="var(--color-warning)" compact as="div">
+    <div className="flex flex-col gap-2">
+      {(() => {
+        const h = simMenuHero(game, SIM_DIFFICULTY_COPY[s.difficulty].label, SIM_SCORING_LABELS[s.scoring] ?? String(s.scoring));
+        return <Hero label={h.label} value={h.value} context={h.context} tone="accent" testId="sim-menu-hero" />;
+      })()}
+      <CompactModule
+        id="sim.menu.week"
+        title="This week"
+        parts={[{ key: "u", text: "Undo lineup edits, claims, cuts and trades", strong: true }, { key: "n", text: "not an advanced week", tone: "muted" }]}
+        tone="warning"
+        persist={false}
+      >
         <p className="text-sm">Undo this week&apos;s lineup edits, claims, cuts and trades back to how the week started. You cannot undo a week you already advanced.</p>
         <ConfirmInPlace label="Reset this week" buttonVariant="secondary" size="sm" onConfirm={revert} />
-      </AccentCard>
+      </CompactModule>
 
-      <SectionHeading>League rules</SectionHeading>
-      <AccentCard accent="var(--color-border-strong)" compact as="div">
+      <CompactModule id="sim.menu.rules" title="League rules" parts={simRulesParts(s)} tone="muted" defaultOpen>
         <ul className="flex flex-col gap-2 text-sm">
           {([
             ["stats", "accent", `${simSettingsSummary(s)} · ${SIM_DIFFICULTY_COPY[s.difficulty].label}`],
@@ -1187,9 +1213,9 @@ function SimMoreTab({ ctx, onDeleted, onHub }: { ctx: SimCtx; onDeleted: () => v
             </li>
           ))}
         </ul>
-      </AccentCard>
+      </CompactModule>
 
-      <SectionHeading>Game</SectionHeading>
+      <CompactModule id="sim.menu.game" title="Game" parts={[{ key: "a", text: "All games", strong: true }, { key: "d", text: "Delete this game", tone: "danger" as const }]} tone="danger" persist={false} defaultOpen>
       <div className="flex flex-wrap gap-2">
         <Button size="sm" variant="secondary" onClick={onHub}>All games</Button>
         <ConfirmInPlace
@@ -1203,6 +1229,7 @@ function SimMoreTab({ ctx, onDeleted, onHub }: { ctx: SimCtx; onDeleted: () => v
           onConfirm={remove}
         />
       </div>
+      </CompactModule>
     </div>
   );
 }

@@ -1,5 +1,6 @@
 "use client";
 
+import { playerSurname } from "@/lib/playerNameDisplay";
 import { AccentCard } from "@/components/AccentCard";
 import { PlayerName } from "@/components/PlayerName";
 import { PositionBadge } from "@/components/PositionBadge";
@@ -22,6 +23,7 @@ export function SimTeamCard({
   openLabel,
   compact = false,
   trailing,
+  dense = false,
 }: {
   team: SimLeagueRosterTeam;
   onOpen?: (teamId: string) => void;
@@ -30,6 +32,8 @@ export function SimTeamCard({
   /** Hide the top assets (the partner card once a partner is chosen). */
   compact?: boolean;
   trailing?: React.ReactNode;
+  /** Pickers: the top assets run in one wrapping strip (position, surname, OVR) instead of one row each. */
+  dense?: boolean;
 }) {
   const chips = simTeamChips(team);
   const accent = selected || team.is_you ? "var(--color-accent)" : team.power_rank <= 3 ? "var(--color-success)" : "var(--color-border-strong)";
@@ -52,8 +56,14 @@ export function SimTeamCard({
         </span>
       </div>
       {compact ? null : (
-        <ul className="flex flex-col gap-1" aria-label={`${team.name} top assets`}>
-          {team.top_assets.map((p) => (
+        <ul className={dense ? "flex flex-wrap gap-x-3 gap-y-1" : "flex flex-col gap-1"} aria-label={`${team.name} top assets`}>
+          {team.top_assets.map((p) => dense ? (
+            <li key={p.id} className="flex items-center gap-1 text-xs">
+              <PositionBadge position={p.pos} />
+              <span className="font-bold">{playerSurname(p.name)}</span>
+              <strong className="tabular-nums" style={{ color: "var(--color-text-secondary)" }}>{simOverallLabel(p.overall)}</strong>
+            </li>
+          ) : (
             <li key={p.id} className="flex items-center gap-2 text-xs">
               <PositionBadge position={p.pos} />
               <PlayerName name={p.name} className="min-w-0 flex-1 font-bold" />

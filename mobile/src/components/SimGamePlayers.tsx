@@ -21,7 +21,7 @@ import { api } from '../lib/api';
 import { stubPlayer } from '../lib/playerQuickView';
 import { SIM_WINDOW_STEP, simWindow } from '../lib/simLayout';
 import { simSuppressedBadges } from '../lib/simDraft';
-import { simActualPoints, simAvailabilityLine, simHeaderTags, simHeroFeed, simProjectionBand, simProjectionIsFlat, simRosLine } from '../lib/simPlayerSheet';
+import { simActualPoints, simAvailabilityLine, simHeaderTags, simHeroFeed, simHeroTiles, simOutlookBand, simOutlookTiles, simProfileRead, simRosLine } from '../lib/simPlayerSheet';
 import { PLAYER_SEARCH_DEBOUNCE_MS } from '../lib/leaguePlayerSearch';
 import {
   SIM_PAGE_SIZE,
@@ -274,6 +274,7 @@ export function simPqvSections(gameId: string, player: SimGamePlayer, detail: Si
   return {
     overview: <SimOverviewSection player={player} detail={detail} actions={actions} seasonLabel={seasonLabel} />,
     outlook: <SimOutlookSection player={player} detail={detail} seasonLabel={seasonLabel} />,
+    heroTiles: simHeroTiles(player),
     scouting: detail.data?.scouting ? <SimScoutingSections profile={detail.data.scouting} /> : undefined,
     history: <SimPlayerHistory gameId={gameId} playerId={player.id} />,
     stats: real ? <SimRealHistory playerId={real.playerId} asOf={real.asOf} /> : undefined,
@@ -331,6 +332,34 @@ function SimOverviewSection({ player, detail, actions, seasonLabel }: { player: 
           </View>
         </PqvSection>
       ) : null}
+      {body && !body.scouting ? <SimProfileSection player={player} /> : null}
+    </View>
+  );
+}
+
+function SimProfileSection({ player }: { player: SimGamePlayer }) {
+  const { colors } = useThemeMode();
+  const common = useMemo(() => createSimStyles(colors), [colors]);
+  const styles = useMemo(() => createStyles(), []);
+  const read = simProfileRead(player);
+  return (
+    <View style={styles.overlay} testID="sim-profile-read">
+      <PqvSection
+        title="Scouting read"
+        right={
+          <View style={common.wrapRow}>
+            {read.phase ? <SimToneBadge label={read.phase.label} tone={read.phase.tone} /> : null}
+            {read.chips.map((c) => <SimToneBadge key={c.key} label={c.label} tone="muted" />)}
+          </View>
+        }
+      >
+        <View style={styles.tileGrid}>
+          {read.tiles.map((t) => <MetricCard key={t.label} label={t.label} value={t.value} note={t.note} />)}
+        </View>
+        <View style={common.stack}>
+          {read.lines.map((line) => <AppText key={line} style={common.body}>{line}</AppText>)}
+        </View>
+      </PqvSection>
     </View>
   );
 }
@@ -340,27 +369,30 @@ function SimOutlookSection({ player, detail, seasonLabel }: { player: SimGamePla
   const common = useMemo(() => createSimStyles(colors), [colors]);
   const styles = useMemo(() => createStyles(), []);
   const body = detail.data;
-  if (detail.failed) return <AppText style={common.small}>The full outlook is unavailable right now.</AppText>;
+  if (detail.failed) return <EmptyState icon="alert-circle-outline" title="Could not load the outlook" subtitle="Close the sheet and open him again." />;
   if (!body) return <SkeletonCard rows={2} />;
   const ros = body.ros ?? null;
-  const flat = simProjectionIsFlat(body);
-  const band = simProjectionBand(body);
+  const band = simOutlookBand(body);
   const actual = simActualPoints(body);
   const availability = ros ? simAvailabilityLine(ros) : null;
-  if (!(actual.length > 0 || band || ros)) return <AppText style={common.small}>No outlook yet.</AppText>;
+  if (!(actual.length > 0 || band || ros)) return <EmptyState icon="trending-up-outline" title="No outlook yet" subtitle="Projections appear once the season starts." />;
+  const tiles = simOutlookTiles(ros);
   return (
     <View style={styles.overlay}>
       <PqvSection title={`Week by Week · ${seasonLabel || "This sim season"}`}>
+        {tiles.length > 0 ? (
+          <View style={styles.tileGrid}>
+            {tiles.map((t) => <MetricCard key={t.label} label={t.label} value={t.value} note={t.note} />)}
+          </View>
+        ) : null}
         {actual.length > 0 || band ? (
           <WeeklyPointsChart weeks={actual.map((a) => ({ week: a.week, fantasy_points_ppr: a.points, snap_share: null }))} projection={band} pointsLabel="pts" byeWeeks={ros?.bye_week ? [ros.bye_week] : []} />
         ) : null}
-        {flat && ros ? (
+        {ros ? (
           <AppText style={common.small} testID="sim-ros-line">
             <AppText style={common.bodyStrong}>{simRosLine(ros)}</AppText>
             {availability ? ` · ${availability}` : ''}
           </AppText>
-        ) : availability ? (
-          <AppText style={common.small}>{availability}</AppText>
         ) : null}
       </PqvSection>
     </View>

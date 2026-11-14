@@ -16,6 +16,9 @@ import { SkeletonCard } from './SkeletonBlock';
 import { SimPickLine, useSimPicks } from './SimGameDynastyParts';
 import { SimPlayerBrowser } from './SimGamePlayers';
 import { SimReserveButton, SimReserveGroups, SimReserveSheet } from './SimGameReserves';
+import CompactModule from './CompactModule';
+import { Hero } from './ModuleTemplates';
+import { simBenchParts, simLineupParts } from '../lib/simSummaries';
 import { SimFold, SimIconButton, SimPlayerChip, SimPlayerLine, SimRosterLine, SimSectionTitle, SimSheet, SimStat, SimTeamLink, SimToneBadge, createSimStyles, simToneColor, type SimCtx } from './SimGameParts';
 import { useThemeMode } from '../context/ThemeModeContext';
 import { api } from '../lib/api';
@@ -176,23 +179,13 @@ export function SimTeamTab({ ctx, onTrade }: { ctx: SimCtx; onTrade: () => void 
   return (
     <View style={common.stack}>
       {week ? (
-        <AccentCard accent={simToneColor(simMatchupTone(week), colors)} compact>
-          <View style={common.rowBetween}>
-            <View style={[common.row, common.grow]}>
-              <ReviewGlyphChip glyph="game" tone={simMatchupTone(week)} size={24} />
-              <AppText style={styles.kicker}>Week {week.week}</AppText>
-              {week.opponent ? <SimTeamLink teamId={week.opponent.team_id} name={week.opponent.name} size={24} /> : <AppText style={common.bodyStrong}>Bye week</AppText>}
-            </View>
-            <View style={common.row}>
-              <AppText style={[styles.projection, week.opponent && week.your_projection >= week.opponent_projection && { color: colors.success }]} testID="your-projection">
-                {simFmtPts(week.your_projection)}
-              </AppText>
-              {week.opponent ? <AppText style={common.muted}>vs</AppText> : null}
-              {week.opponent ? <AppText style={[styles.projection, week.opponent_projection > week.your_projection && { color: colors.danger }]}>{simFmtPts(week.opponent_projection)}</AppText> : null}
-            </View>
-          </View>
-          <AppText style={[common.small, { color: simToneColor(simMatchupTone(week), colors), fontWeight: '600' }]}>{simMatchupLine(week)} The full head-to-head is on Home.</AppText>
-        </AccentCard>
+        <Hero
+          label={week.opponent ? `Week ${week.week} vs ${week.opponent.name}` : `Week ${week.week} · Bye week`}
+          value={simFmtPts(week.your_projection)}
+          context={`${week.opponent ? `Opponent ${simFmtPts(week.opponent_projection)}. ` : ''}${simMatchupLine(week)} The full head-to-head is on Home.`}
+          tone={simMatchupTone(week) as 'success' | 'danger' | 'warning' | 'muted' | 'accent'}
+          testID="sim-team-hero"
+        />
       ) : null}
 
       {overLimit ? (
@@ -222,32 +215,42 @@ export function SimTeamTab({ ctx, onTrade }: { ctx: SimCtx; onTrade: () => void 
         </AccentCard>
       ) : null}
 
-      <View>
-        <SimSectionTitle
-          glyph="team"
-          title="Lineup"
-          caption={`Projected ${simFmtPts(lineup.projected_total)} points`}
-          right={
-            <Pressable
-              onPress={auto}
-              disabled={saving || lineup.locked}
-              accessibilityRole="button"
-              accessibilityLabel="Auto-set best lineup"
-              accessibilityState={{ disabled: saving || lineup.locked, busy: saving }}
-              style={{ flexDirection: 'row', alignItems: 'center', gap: 6, minHeight: 36, paddingHorizontal: spacing.md, borderRadius: radii.pill, borderWidth: 1, borderColor: colors.borderStrong ?? colors.border, opacity: saving || lineup.locked ? 0.6 : 1 }}
-            >
-              <SimGlyph name="spark" color={colors.accent} size={14} />
-              <AppText style={{ fontSize: 12.5, fontWeight: '800', color: colors.textPrimary }}>{saving ? 'Setting...' : 'Auto-set'}</AppText>
-            </Pressable>
-          }
-        />
+      <CompactModule
+        id="sim.team.lineup"
+        testID="sim-lineup-module"
+        label="Lineup"
+        title={<View style={common.row}><SimGlyph name="team" color={colors.accent} size={14} /><AppText style={styles.kicker}>Lineup</AppText></View>}
+        parts={simLineupParts({ slots, projected_total: lineup.projected_total, warnings })}
+        tone={warnings.length > 0 ? 'warning' : 'accent'}
+        defaultOpen
+        action={
+          <Pressable
+            onPress={auto}
+            disabled={saving || lineup.locked}
+            accessibilityRole="button"
+            accessibilityLabel="Auto-set best lineup"
+            accessibilityState={{ disabled: saving || lineup.locked, busy: saving }}
+            style={{ flexDirection: 'row', alignItems: 'center', gap: 6, minHeight: 36, paddingHorizontal: spacing.md, borderRadius: radii.pill, borderWidth: 1, borderColor: colors.borderStrong ?? colors.border, opacity: saving || lineup.locked ? 0.6 : 1 }}
+          >
+            <SimGlyph name="spark" color={colors.accent} size={14} />
+            <AppText style={{ fontSize: 12.5, fontWeight: '800', color: colors.textPrimary }}>{saving ? 'Setting...' : 'Auto-set'}</AppText>
+          </Pressable>
+        }
+      >
         {slots.map((slot, index) => (
           <LineupRow key={`${slot.slot}-${index}`} week={game.week} slotLabel={labels[index]} slot={slot.slot} player={slot.player} locked={lineup.locked} onOpen={ctx.openPlayer} onPick={() => setPickSlot(index)} onMove={reservesOn && slot.player?.status === 'out' ? setMoving : undefined} />
         ))}
-      </View>
+      </CompactModule>
 
-      <View>
-        <SimSectionTitle glyph="bye" tone="muted" title="Bench" caption={`${lineup.roster_size ?? 0} of ${lineup.roster_limit ?? 16} roster spots`} />
+      <CompactModule
+        id="sim.team.bench"
+        testID="sim-bench-module"
+        label="Bench"
+        title={<View style={common.row}><SimGlyph name="bye" color={colors.textTertiary} size={14} /><AppText style={styles.kicker}>Bench</AppText></View>}
+        parts={simBenchParts(bench, lineup.roster_size, lineup.roster_limit)}
+        tone={overLimit ? 'danger' : 'muted'}
+        defaultOpen
+      >
         {bench.length === 0 ? (
           <EmptyState icon="albums-outline" title="Empty bench" subtitle="Add free agents from the Players tab." />
         ) : (
@@ -277,7 +280,7 @@ export function SimTeamTab({ ctx, onTrade }: { ctx: SimCtx; onTrade: () => void 
         {game.can_trade ? <Button size="sm" variant="ghost" label="Shop a trade" onPress={onTrade} style={styles.shop} /> : null}
         {reservesOn ? <SimReserveGroups ir={lineup.ir ?? []} taxi={lineup.taxi ?? []} state={reserveState} onOpen={setMoving} openPlayer={ctx.openPlayer} cutting={cutting} onAskCut={setCutting} onCut={cut} /> : null}
         {game.settings.mode === 'dynasty' && picks ? <SimYourPicks picks={myPicks} draftYear={picks.draft_year} /> : null}
-      </View>
+      </CompactModule>
 
       {moving ? (
         <SimReserveSheet

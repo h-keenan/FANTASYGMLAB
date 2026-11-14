@@ -548,3 +548,79 @@ export function buildReviewShareModel(input: {
     stats,
   };
 }
+
+// ---------------------------------------------------------------------------
+// Collapsed summaries (CompactModule `parts`): a review section is never an empty header on a phone.
+
+export interface ReviewSummaryPart {
+  key: string;
+  text: string;
+  tone?: "success" | "danger" | "warning" | "muted" | "accent" | "action";
+  strong?: boolean;
+}
+
+function clip(text: string, max: number): string {
+  const t = text.trim();
+  return t.length > max ? `${t.slice(0, max - 1).trimEnd()}…` : t;
+}
+
+/** The dense collapsed line of one section: counts and the headline fact, e.g. "Peak #1 · Low #8 · #6 → #3". */
+export function reviewSectionParts(section: ReviewSection): ReviewSummaryPart[] {
+  switch (section.kind) {
+    case "stats": {
+      const shown = section.items.slice(0, 3).map((s, i): ReviewSummaryPart => ({
+        key: `s${i}`,
+        text: `${s.label} ${s.value}${s.sub && section.id !== "grade" ? ` ${s.sub}` : ""}`,
+        tone: s.tone === "muted" ? undefined : s.tone,
+        strong: i === 0,
+      }));
+      const more = section.items.length - shown.length;
+      return more > 0 ? [...shown, { key: "more", text: `+${more} more`, tone: "muted" }] : shown;
+    }
+    case "cards": {
+      const first = section.cards[0];
+      const out: ReviewSummaryPart[] = [{ key: "n", text: `${section.cards.length} ${section.cards.length === 1 ? "item" : "items"}`, strong: true }];
+      if (first) out.push({ key: "head", text: clip(first.headline, 44) });
+      if (first?.delta) out.push({ key: "delta", text: first.delta.text, tone: first.delta.tone === "muted" ? undefined : first.delta.tone });
+      if (section.note && section.id === "injuries") out.push({ key: "note", text: clip(section.note, 60), tone: "danger" });
+      return out;
+    }
+    case "path": {
+      const wins = section.steps.filter((s) => s.result === "win").length;
+      const losses = section.steps.filter((s) => s.result === "loss").length;
+      const bye = section.steps.some((s) => s.result === "bye");
+      const out: ReviewSummaryPart[] = [{ key: "res", text: `${wins}-${losses}${bye ? " after a bye" : ""}`, strong: true, tone: losses > 0 ? "danger" : "success" }];
+      out.push({ key: "rounds", text: `${section.steps.length} ${section.steps.length === 1 ? "round" : "rounds"}` });
+      if (section.caption) out.push({ key: "cap", text: clip(section.caption, 44), tone: "muted" });
+      return out;
+    }
+    case "journey": {
+      const ranks = section.points.map((p) => p.rank);
+      const first = ranks[0];
+      const last = ranks[ranks.length - 1];
+      const best = Math.min(...ranks);
+      const worst = Math.max(...ranks);
+      return [
+        { key: "arc", text: `#${first} → #${last}`, strong: true, tone: last < first ? "success" : last > first ? "danger" : undefined },
+        { key: "peak", text: `Peak #${best}`, tone: "success" },
+        { key: "low", text: `Low #${worst}`, tone: "danger" },
+        { key: "wk", text: `${section.points.length} weeks`, tone: "muted" },
+      ];
+    }
+    case "leaders": {
+      const lead = section.groups.slice(0, 3).map((g, i): ReviewSummaryPart => ({
+        key: `g${i}`,
+        text: `${g.title} ${clip(g.rows[0]?.player.name ?? "", 18)}`.trim(),
+        strong: i === 0,
+      }));
+      const more = section.groups.length - lead.length;
+      return more > 0 ? [...lead, { key: "more", text: `+${more} more`, tone: "muted" }] : lead;
+    }
+    case "games": {
+      const first = section.rows[0];
+      const out: ReviewSummaryPart[] = [{ key: "n", text: `${section.rows.length} ${section.rows.length === 1 ? "game" : "games"}`, strong: true }];
+      if (first) out.push({ key: "top", text: `${clip(first.label, 34)} ${first.score}` });
+      return out;
+    }
+  }
+}

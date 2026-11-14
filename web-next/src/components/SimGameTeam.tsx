@@ -12,8 +12,11 @@ import { SimGlyph } from "@/components/SimGlyph";
 import { SimPlayerBrowser } from "@/components/SimGamePlayers";
 import { SimPickLine, useSimPicks } from "@/components/SimGameDynastyParts";
 import { SimReserveButton, SimReserveGroups, SimReserveSheet } from "@/components/SimGameReserves";
-import { SimFold, SimIconButton, SimPlayerChip, SimRosterLine, SimSectionTitle, SimSheet, SimTeamLink, SimToneBadge, simToneColor, type SimCtx } from "@/components/SimGameParts";
+import { SimFold, SimIconButton, SimPlayerChip, SimRosterLine, SimSectionTitle, SimSheet, SimToneBadge, type SimCtx } from "@/components/SimGameParts";
 import { ReviewGlyphChip } from "@/components/SeasonReviewSections";
+import { CompactModule } from "@/components/ui/CompactModule";
+import { Hero } from "@/components/ui/ModuleTemplates";
+import { simBenchParts, simLineupParts } from "@/lib/simSummaries";
 import { SkeletonCard } from "@/components/Skeleton";
 import { api } from "@/lib/api";
 import {
@@ -157,21 +160,13 @@ export function SimTeamTab({ ctx, onTrade }: { ctx: SimCtx; onTrade: () => void 
   return (
     <div className="flex flex-col gap-3">
       {week ? (
-        <AccentCard accent={simToneColor(simMatchupTone(week))} compact as="section">
-          <div className="flex flex-wrap items-center justify-between gap-x-2 gap-y-1">
-            <span className="flex min-w-0 flex-1 basis-40 items-center gap-2">
-              <ReviewGlyphChip glyph="game" tone={simMatchupTone(week)} size={24} />
-              <span className="text-xs uppercase font-extrabold shrink-0" style={{ color: "var(--color-text-muted)", letterSpacing: "var(--letter-spacing-badge)" }}>Week {week.week}</span>
-              {week.opponent ? <SimTeamLink teamId={week.opponent.team_id} name={week.opponent.name} size={24} /> : <span className="text-sm font-bold">Bye week</span>}
-            </span>
-            <span className="flex shrink-0 items-baseline gap-2 text-sm font-extrabold tabular-nums">
-              <span data-testid="your-projection" style={{ color: week.opponent && week.your_projection >= week.opponent_projection ? "var(--color-success)" : undefined }}>{simFmtPts(week.your_projection)}</span>
-              {week.opponent ? <span className="text-xs font-normal" style={{ color: "var(--color-text-muted)" }}>vs</span> : null}
-              {week.opponent ? <span style={{ color: week.opponent_projection > week.your_projection ? "var(--color-danger)" : undefined }}>{simFmtPts(week.opponent_projection)}</span> : null}
-            </span>
-          </div>
-          <p className="text-xs font-semibold" style={{ color: simToneColor(simMatchupTone(week)) }}>{simMatchupLine(week)} The full head-to-head is on Home.</p>
-        </AccentCard>
+        <Hero
+          label={week.opponent ? `Week ${week.week} vs ${week.opponent.name}` : `Week ${week.week} · Bye week`}
+          value={simFmtPts(week.your_projection)}
+          context={`${week.opponent ? `Opponent ${simFmtPts(week.opponent_projection)}. ` : ""}${simMatchupLine(week)} The full head-to-head is on Home.`}
+          tone={simMatchupTone(week) as "success" | "danger" | "warning" | "muted" | "accent"}
+          testId="sim-team-hero"
+        />
       ) : null}
 
       {overLimit ? (
@@ -203,28 +198,39 @@ export function SimTeamTab({ ctx, onTrade }: { ctx: SimCtx; onTrade: () => void 
         </AccentCard>
       ) : null}
 
-      <div className="grid grid-cols-[minmax(0,1fr)] gap-4 lg:grid-cols-2 lg:items-start">
-      <section className="flex min-w-0 flex-col gap-1" aria-label="Starting lineup">
-        <SimSectionTitle
-          glyph="team"
-          tone="accent"
-          action={
-            <Button size="sm" variant="secondary" loading={saving} disabled={lineup.locked} onClick={auto} className="rounded-full">
-              <SimGlyph name="spark" size={14} />
-              <span className="ml-1.5">Auto-set</span>
-            </Button>
-          }
-          note={`Projected ${simFmtPts(lineup.projected_total)} points`}
-        >
-          Lineup
-        </SimSectionTitle>
+      <div className="grid grid-cols-[minmax(0,1fr)] gap-2 lg:grid-cols-2 lg:items-start">
+      <CompactModule
+        id="sim.team.lineup"
+        testId="sim-lineup-module"
+        label="Lineup"
+        title={<span className="inline-flex items-center gap-2"><SimGlyph name="team" size={14} />Lineup</span>}
+        parts={simLineupParts({ slots, projected_total: lineup.projected_total, warnings })}
+        tone={warnings.length > 0 ? "warning" : "accent"}
+        defaultOpen
+        action={
+          <Button size="sm" variant="secondary" loading={saving} disabled={lineup.locked} onClick={auto} className="rounded-full">
+            <SimGlyph name="spark" size={14} />
+            <span className="ml-1.5">Auto-set</span>
+          </Button>
+        }
+      >
+        <div className="flex min-w-0 flex-col gap-1">
         {slots.map((slot, index) => (
           <LineupRow key={`${slot.slot}-${index}`} week={game.week} slotLabel={labels[index]} slot={slot.slot} player={slot.player} locked={lineup.locked} onOpen={ctx.openPlayer} onPick={() => setPickSlot(index)} onMove={reservesOn && slot.player?.status === "out" ? setMoving : undefined} />
         ))}
-      </section>
+        </div>
+      </CompactModule>
 
-      <section className="flex min-w-0 flex-col gap-1" aria-label="Bench">
-        <SimSectionTitle glyph="bye" tone="muted" note={`${lineup.roster_size ?? 0} of ${lineup.roster_limit ?? 16} roster spots`}>Bench</SimSectionTitle>
+      <CompactModule
+        id="sim.team.bench"
+        testId="sim-bench-module"
+        label="Bench"
+        title={<span className="inline-flex items-center gap-2"><SimGlyph name="bye" size={14} />Bench</span>}
+        parts={simBenchParts(bench, lineup.roster_size, lineup.roster_limit)}
+        tone={overLimit ? "danger" : "muted"}
+        defaultOpen
+      >
+        <div className="flex min-w-0 flex-col gap-1">
         {bench.length === 0 ? (
           <EmptyState title="Empty bench" subtitle="Add free agents from the Players tab." />
         ) : (
@@ -262,7 +268,8 @@ export function SimTeamTab({ ctx, onTrade }: { ctx: SimCtx; onTrade: () => void 
           <SimReserveGroups ir={lineup.ir ?? []} taxi={lineup.taxi ?? []} state={reserveState} onOpen={setMoving} openPlayer={ctx.openPlayer} cutting={cutting} onAskCut={setCutting} onCut={cut} />
         ) : null}
         {game.settings.mode === "dynasty" && picks ? <SimYourPicks picks={myPicks} draftYear={picks.draft_year} /> : null}
-      </section>
+        </div>
+      </CompactModule>
       </div>
 
       {moving ? (
