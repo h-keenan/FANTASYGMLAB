@@ -171,7 +171,7 @@ function createStyles(colors: ThemeColors) {
     facts: { color: colors.textTertiary, fontSize: 12, fontWeight: '700' },
     stat: { alignItems: 'flex-end' },
     statValue: { fontSize: 14, fontWeight: '800' },
-    statLabel: { fontSize: 11, fontWeight: '800', color: colors.textTertiary },
+    statLabel: { fontSize: 12, fontWeight: '800', color: colors.textTertiary },
     upsell: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: spacing.sm, minHeight: 44, paddingHorizontal: spacing.md, borderRadius: radii.md, borderWidth: 1, borderColor: colors.premium, backgroundColor: colors.surface },
     upsellText: { color: colors.textPrimary, fontWeight: '700', flexShrink: 1 },
     upsellCta: { color: colors.premium, fontWeight: '700' },

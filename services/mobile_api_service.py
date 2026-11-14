@@ -1912,6 +1912,12 @@ def lookup_sleeper_leagues(
                 "name": str(league.get("name") or ""),
                 "season": str(league.get("season") or ""),
                 "total_rosters": int(league.get("total_rosters") or 0),
+                # Additive: Sleeper's league avatar id as a CDN thumbnail ("" when the league has none).
+                "avatar_url": (
+                    f"https://sleepercdn.com/avatars/thumbs/{str(league.get('avatar')).strip()}"
+                    if str(league.get("avatar") or "").strip()
+                    else ""
+                ),
             }
             for league in result.leagues
             if str(league.get("league_id") or "")

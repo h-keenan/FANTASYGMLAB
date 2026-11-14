@@ -304,6 +304,8 @@ export interface SleeperLeagueSummary {
   name: string;
   season: string;
   total_rosters: number;
+  /** Sleeper's league avatar thumbnail; empty when the league has none. */
+  avatar_url?: string;
 }
 
 export interface SleeperLeaguesResponse {

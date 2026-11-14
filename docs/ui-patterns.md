@@ -926,6 +926,28 @@ Nothing is dropped: an entry leaves the plain "Needs attention" card only when a
 the Lineup / Standing / Position rooms modules stay under the header. Rows reuse the existing `PlayerRow`; when the compact
 V1/V2 `PlayerRow` lands, swap it inside `AttentionRow` only.
 
+### Decision Queue (Today, 2026-11-14, UI pass 3 sheet 1 topic 1 V1)
+Today leads with ONE next action (the `StatusHeader` headline + primary button are the top decision) and a **Decision Queue**
+of at most **3** ranked decisions, each a `CompactModule` (kicker, title + one-line reason collapsed, one cyan primary action,
+the first decision player as a shared `CompactPlayerCard` with avatar in `preview`); "See all (N)" opens the rest in place
+(`MotionIn` rows) and "Show top 3" folds them back. Web `components/DecisionQueue.tsx`, app `components/DecisionQueue.tsx`;
+the logic is the byte-identical twin `lib/decisionQueue.ts` (`buildDecisionQueue`).
+
+- **Decision types and urgency** (`DECISION_URGENCY`): live draft 100, lineup holes (bye / out starters, open slots) 90, trade
+  deadline this week 88 or next week 78 (carries the trade-idea count), injury item 76, waivers 74 on Tue/Wed else 62, draft
+  prep 58, other top-priority item 52. Order: urgency desc, impact desc (summed swap gain, item score), kind order, key.
+- **Dedupe (the lineup issue appears once)**: moves, the lineup risk row, open slots, and injury alerts about a lineup-hole
+  player are one lineup decision; the waiver row plus waiver briefing items are one waiver decision; the same alert title never
+  repeats. Plain trade ideas stay in the Trade ideas module (they enter the queue only inside the deadline decision).
+- **Nothing is removed**: the expanded row carries the reasons, every player, and (for item decisions) the full `GamePlanCard`;
+  what the queue does not take (lineup-is-set row, later-this-week rows, trade-pending space) stays in the "This week" module;
+  Standing, Position rooms, Trade ideas, My Team, Watchlist & Alerts and More are unchanged collapsed modules below.
+- **Empty**: `queue.empty` = "Nothing needs you this week" + "Next up: Week N vs Opponent" (only what is known), shown with the
+  shared `EmptyState`; the hero keeps its normal headline then.
+- **Free vs Pro** is unchanged: the server still caps the items; `proUpsell` ("N more moves on Pro", premium colour) appears
+  when `hiddenCount > 0` for a Free account, otherwise the same `FreeLimitNote`.
+- Reuse: Sim Home "Do next" can take the same `Decision` shape (not wired yet).
+
 ### Stat strip (V1 compact + V2 expanded)
 `StatStripModule` (web `ui/ModuleTemplates`, app `ModuleTemplates`): compact = one row of small glass tiles always visible,
 each an `InsightLink` to what explains it; "Rank bars" expands the same stats into labelled `FillBar` rows (`fill` 0..1 from
@@ -1029,3 +1051,22 @@ only). The client adds the Grade stat only when a grade exists (`gradeStat` in `
 - **Waivers header** is ONE `CompactModule` ("Waivers": "394 available · $81 FAAB · Need QB", Sleeper link as its action). The
   stat tiles, ranking explainer, needs sentence + badges, breakdown, limited-data note, beginner help and claim disclosure are
   its body (`lib/waiversHeader.ts`). The tab strip and filter row stay visible above the list.
+
+## One-field connect (2026-11-14, UI pass 3 sheet 1 topic 2 V1)
+The landing hero for a signed-out visitor IS the connect form: a Sleeper username, one **Connect** button, one trust line
+("Read-only. We never ask for your Sleeper password or change your lineup."), then the instant league list. Copy, defaults and
+save rules are the byte-identical twin `lib/connectFlow.ts`.
+
+- **League list**: newest season first, each row a shared `TeamAvatar` (league avatar from the additive `avatar_url` on
+  `/v1/sleeper/leagues`, initials fallback), name + "2026 · 12 teams", and a checkbox. The newest season's first league is
+  preselected so one tap on Connect finishes; "Connect N leagues" saves the checked ones newest first, opens the first that
+  saved, and a plan-cap refusal never blocks the one that did save (Pro card plus "Continue to ..."). Exactly one league
+  connects immediately, as before.
+- **More ways to connect** (collapsed row): ESPN / Fleaflicker / MFL (same `EspnImportForm`), Sign in or create an account
+  (`SignInForm`, web landing only), and Try the sample league. "What is Sleeper?" holds the longer explanation and the
+  sleeper.com link. Nothing was removed.
+- **No account first**: Connect creates a disposable guest session (as the old "Try without an account" path did) and the form
+  stays mounted (no carousel, no saved-league redirect) until the league opens; the account can be created later from More ways
+  or the Account page. A returning guest with saved leagues is still redirected.
+- **States**: lookup shows `SkeletonRows` (never "Loading..."), a network failure is the shared `ErrorState` with Try again,
+  user-not-found / no-leagues are `EmptyState` with the sample link. Mobile twin: the Add a league sheet in `HomeScreen`.

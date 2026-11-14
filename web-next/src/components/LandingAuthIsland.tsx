@@ -63,6 +63,9 @@ export function LandingAuthSlotPlaceholder() {
  */
 export function LandingAuthIsland() {
   const { session, loading } = useAuth();
+  // True once Connect started a disposable guest session on THIS page view: the connect form stays mounted (no carousel,
+  // no saved-leagues redirect) so the one-field flow finishes in place. A returning guest still gets the redirect.
+  const [guestFlow, setGuestFlow] = useState(false);
   const router = useRouter();
   const searchParams = useSearchParams();
   const [accountReady, setAccountReady] = useState(false);
@@ -123,14 +126,14 @@ export function LandingAuthIsland() {
   // zero saved leagues falls through to the normal sign-in flow below.
   // Only applies once, on load — never re-triggers mid-flow.
   // Signed in => onboarding view: hide the marketing blocks (CSS keys off this).
-  const signedIn = !!session || accountReady;
+  const signedIn = (!!session || accountReady) && !guestFlow;
   useLayoutEffect(() => {
     if (loading) return;
     setLandingSignedIn(signedIn);
   }, [loading, signedIn]);
 
   useEffect(() => {
-    if (loading || !session || skippedExistingSession.current) return;
+    if (loading || !session || skippedExistingSession.current || guestFlow) return;
     skippedExistingSession.current = true;
     savedLeaguesCheck.current = "pending";
     setAccountReady(true);
@@ -193,7 +196,7 @@ export function LandingAuthIsland() {
         setCheckingSavedLeagues(false);
       }
     })();
-  }, [loading, session, router]);
+  }, [loading, session, router, guestFlow]);
 
   // Fires `landing_viewed` exactly once per visitor, only once we're sure
   // they're actually looking at the sign-in form / onboarding carousel /
@@ -247,41 +250,66 @@ export function LandingAuthIsland() {
   // Funnel: the connect step was shown (connect rate = connect step_viewed ->
   // league_import_completed -> first_league_view).
   const stage = firstRunStage({ signedIn: accountReady, introSeen: carouselSeen, leagueCount: 0 });
+  // Signed out (or in the middle of the guest connect): the landing IS the one-field connect form.
+  const showHero = !session || guestFlow;
+  const connectViewed = stage === "connect" || showHero;
   useEffect(() => {
-    if (stage === "connect") trackOnboardingStepViewed("connect", funnelStepIndex("connect"));
-  }, [stage]);
+    if (connectViewed) trackOnboardingStepViewed("connect", funnelStepIndex("connect"));
+  }, [connectViewed]);
 
   if (loading || checkingSavedLeagues) {
     return <LandingAuthSlotPlaceholder />;
   }
 
-  return stage !== "sign_in" ? (
-    stage === "intro" ? (
-      <OnboardingCarousel
-        onDone={() => {
-          markOnboardingStepCompleted(userId, "carousel");
-          setCarouselDone(true);
-        }}
-      />
-    ) : (
-      <OnboardingShell footer={<SampleLeagueButton surface="connect_step" />}>
-        <div className="onboarding-connect" data-testid="connect-first-heading">
-          {returnedFromCheckout ? (
-            <p role="status" className="text-sm font-bold text-center" style={{ color: "var(--color-success)" }}>
-              {/* One umbrella completion message for the paid tier (the site says "Pro"
-                  everywhere, 2026-11-03); tier-agnostic by design. */}
-              You&apos;re in. Pro is unlocked. Connect your league to get started.
-            </p>
-          ) : null}
-          <header className="flex flex-col gap-1">
-            <h1 className="onboarding-headline onboarding-headline--sm">Connect your league</h1>
-            <p className="onboarding-body">Pick where your league lives. We read your real roster and build your first Today briefing.</p>
-          </header>
-          <SleeperImportForm sampleCtaBelow onLeagueChosen={handleLeagueChosen} />
-        </div>
-      </OnboardingShell>
-    )
+  if (showHero) {
+    return (
+      <div className="onboarding-connect flex flex-col gap-3" data-testid="connect-hero">
+        <header className="flex flex-col gap-1">
+          <h1 className="onboarding-headline onboarding-headline--sm">Connect your league</h1>
+          <p className="onboarding-body">Type your Sleeper username. We read your real roster and build your first Today briefing. No account needed to start.</p>
+        </header>
+        <SleeperImportForm
+          sampleCtaBelow
+          onLeagueChosen={handleLeagueChosen}
+          onStartSession={() => {
+            setGuestFlow(true);
+          }}
+          accountSlot={
+            <SignInForm
+              onSignedIn={() => {
+                setGuestFlow(false);
+                setAccountReady(true);
+              }}
+            />
+          }
+        />
+      </div>
+    );
+  }
+
+  return stage === "intro" ? (
+    <OnboardingCarousel
+      onDone={() => {
+        markOnboardingStepCompleted(userId, "carousel");
+        setCarouselDone(true);
+      }}
+    />
   ) : (
-    <SignInForm onSignedIn={() => setAccountReady(true)} />
+    <OnboardingShell footer={<SampleLeagueButton surface="connect_step" />}>
+      <div className="onboarding-connect" data-testid="connect-first-heading">
+        {returnedFromCheckout ? (
+          <p role="status" className="text-sm font-bold text-center" style={{ color: "var(--color-success)" }}>
+            {/* One umbrella completion message for the paid tier (the site says "Pro"
+                everywhere, 2026-11-03); tier-agnostic by design. */}
+            You&apos;re in. Pro is unlocked. Connect your league to get started.
+          </p>
+        ) : null}
+        <header className="flex flex-col gap-1">
+          <h1 className="onboarding-headline onboarding-headline--sm">Connect your league</h1>
+          <p className="onboarding-body">Type your Sleeper username. We read your real roster and build your first Today briefing.</p>
+        </header>
+        <SleeperImportForm onLeagueChosen={handleLeagueChosen} />
+      </div>
+    </OnboardingShell>
   );
 }

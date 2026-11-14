@@ -7,6 +7,7 @@ export interface SeasonGroupableLeague {
   name: string;
   season: string;
   total_rosters: number;
+  avatar_url?: string | null;
 }
 
 export interface LeagueSeasonGroup {
