@@ -1,9 +1,18 @@
+import type React from "react";
 import { fireEvent, render, screen, within } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
 import { WaiversContent } from "./WaiversContent";
 import { api } from "@/lib/api";
 import type { DropSuggestion, NeedsModel, WaiverPlayer, WaiverPriorityAdd, WaiversResponse } from "@/lib/api";
+
+/** The header module is collapsed by default (summary only); tests that read its body expand it first. */
+function renderOpen(ui: React.ReactElement) {
+  const view = render(ui);
+  const toggle = screen.queryByRole("button", { name: /^Waivers:/ });
+  if (toggle && toggle.getAttribute("aria-expanded") !== "true") fireEvent.click(toggle);
+  return view;
+}
 
 function player(overrides: Partial<WaiverPlayer>): WaiverPlayer {
   return {
@@ -112,12 +121,12 @@ describe("WaiversContent", () => {
     );
     expect(screen.getAllByText("Bigger than your need: +1.8 pts/wk")).toHaveLength(1);
     unmount();
-    render(<WaiversContent leagueName="L" data={BASE_RESPONSE} />);
+    renderOpen(<WaiversContent leagueName="L" data={BASE_RESPONSE} />);
     expect(screen.queryByText(/Bigger than your need/)).toBeNull();
   });
 
   it("renders the league name, stat tiles, and the top Priority Add with FAAB range and confidence", () => {
-    render(<WaiversContent leagueName="Dynasty Overlords" data={BASE_RESPONSE} />);
+    renderOpen(<WaiversContent leagueName="Dynasty Overlords" data={BASE_RESPONSE} />);
 
     expect(screen.getByRole("heading", { name: "Waivers" })).toBeInTheDocument();
     expect(screen.getByText("42")).toBeInTheDocument();
@@ -127,7 +136,7 @@ describe("WaiversContent", () => {
   });
 
   it("preserves the exact waiver-claim disclosure", () => {
-    render(<WaiversContent leagueName="Dynasty Overlords" data={BASE_RESPONSE} />);
+    renderOpen(<WaiversContent leagueName="Dynasty Overlords" data={BASE_RESPONSE} />);
 
     expect(screen.getByText("Place claims in Sleeper — we don't submit them.")).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: /How Priority Adds rank/ }));
@@ -139,18 +148,18 @@ describe("WaiversContent", () => {
   });
 
   it("links a Sleeper league straight to Sleeper so the claim is one tap away, and omits it for imported leagues", () => {
-    const { unmount } = render(<WaiversContent leagueId="1312141796616187904" leagueName="L" data={BASE_RESPONSE} />);
+    const { unmount } = renderOpen(<WaiversContent leagueId="1312141796616187904" leagueName="L" data={BASE_RESPONSE} />);
     expect(screen.getByRole("link", { name: /Open your league in Sleeper/ })).toHaveAttribute(
       "href",
       "https://sleeper.com/leagues/1312141796616187904",
     );
     unmount();
-    render(<WaiversContent leagueId="espn:42654852:2026" leagueName="L" data={BASE_RESPONSE} />);
+    renderOpen(<WaiversContent leagueId="espn:42654852:2026" leagueName="L" data={BASE_RESPONSE} />);
     expect(screen.queryByRole("link", { name: /Open your league in Sleeper/ })).toBeNull();
   });
 
   it("shows the Current need framing from needed_positions", () => {
-    render(<WaiversContent leagueName="Dynasty Overlords" data={BASE_RESPONSE} />);
+    renderOpen(<WaiversContent leagueName="Dynasty Overlords" data={BASE_RESPONSE} />);
 
     expect(screen.getByText(/Current need: RB \/ QB\./)).toBeInTheDocument();
   });
@@ -162,7 +171,7 @@ describe("WaiversContent", () => {
       needs_model: null,
       model_status: { degraded: true, reasons: [{ code: "need_model_failed", message: "Needs could not be fully modeled." }] },
     };
-    render(<WaiversContent leagueName="Dynasty Overlords" data={noNeed} />);
+    renderOpen(<WaiversContent leagueName="Dynasty Overlords" data={noNeed} />);
 
     expect(screen.getByTestId("needs-headline")).toHaveTextContent(/could not be fully modeled/);
     expect(screen.getByTestId("limited-data-note")).toHaveTextContent(/Limited data/);
@@ -171,7 +180,7 @@ describe("WaiversContent", () => {
 
   it("surfaces the model's weakest position with the numbers behind it", () => {
     const withModel: WaiversResponse = { ...BASE_RESPONSE, needs_model: NEEDS_MODEL };
-    render(<WaiversContent leagueName="Dynasty Overlords" data={withModel} />);
+    renderOpen(<WaiversContent leagueName="Dynasty Overlords" data={withModel} />);
 
     expect(screen.getByTestId("needs-headline")).toHaveTextContent("Biggest need: WR — your WR3 is 8th of 12.");
     fireEvent.click(screen.getByRole("button", { name: /How we read your needs/ }));
@@ -184,7 +193,7 @@ describe("WaiversContent", () => {
       ...BASE_RESPONSE,
       needs_model: { ...NEEDS_MODEL, biggest_need: null, no_need: true, needed_positions: [], headline: "No urgent need — your weakest spot is TE1 (3rd of 12)." },
     };
-    render(<WaiversContent leagueName="Dynasty Overlords" data={covered} />);
+    renderOpen(<WaiversContent leagueName="Dynasty Overlords" data={covered} />);
 
     expect(screen.getByText("Covered")).toBeInTheDocument();
     expect(screen.getByTestId("needs-headline")).toHaveTextContent(/^No urgent need/);
@@ -195,7 +204,7 @@ describe("WaiversContent", () => {
       ...BASE_RESPONSE,
       priority_adds: [priorityAdd({ drop_suggestion: DROP_SUGGESTION })],
     };
-    render(<WaiversContent leagueName="Dynasty Overlords" data={data} />);
+    renderOpen(<WaiversContent leagueName="Dynasty Overlords" data={data} />);
 
     const box = screen.getByTestId("suggested-drop");
     expect(box).toHaveTextContent("Add Test Free Agent, drop Dead Weight");
@@ -224,7 +233,7 @@ describe("WaiversContent", () => {
         priorityAdd({ player_id: "p3", name: "Third Add", drop_suggestion: { ...DROP_SUGGESTION, add: { ...DROP_SUGGESTION.add, name: "Third Add" } } }),
       ],
     };
-    render(<WaiversContent leagueName="Dynasty Overlords" data={data} />);
+    renderOpen(<WaiversContent leagueName="Dynasty Overlords" data={data} />);
 
     // Two rows share the cut: one group note, no per-row copy while collapsed.
     const note = screen.getByTestId("shared-drop-note");
@@ -259,7 +268,7 @@ describe("WaiversContent", () => {
         priorityAdd({ player_id: "p4", name: "Fourth Add", drop_suggestion: { ...DROP_SUGGESTION, drop: other } }),
       ],
     };
-    render(<WaiversContent leagueName="Dynasty Overlords" data={data} />);
+    renderOpen(<WaiversContent leagueName="Dynasty Overlords" data={data} />);
     const rows = screen.getAllByTestId("waiver-rec-row");
     expect(rows[0]).not.toHaveTextContent("Drop ");
     expect(rows[2]).toHaveTextContent("Drop Other Cut");
@@ -274,7 +283,7 @@ describe("WaiversContent", () => {
         total: 1, protected_count: 3, candidates_checked: 5, locked_count: 0,
       },
     };
-    render(<WaiversContent leagueName="Dynasty Overlords" data={data} />);
+    renderOpen(<WaiversContent leagueName="Dynasty Overlords" data={data} />);
 
     const section = screen.getByTestId("droppable-players");
     expect(section).toHaveTextContent("Dead Weight");
@@ -291,7 +300,7 @@ describe("WaiversContent", () => {
         }),
       ],
     };
-    render(<WaiversContent leagueName="Dynasty Overlords" data={data} />);
+    renderOpen(<WaiversContent leagueName="Dynasty Overlords" data={data} />);
 
     const box = screen.getByTestId("suggested-drop");
     expect(box).toHaveTextContent("No good drop");
@@ -303,7 +312,7 @@ describe("WaiversContent", () => {
       ...BASE_RESPONSE,
       droppable_players: { players: [DROP_SUGGESTION.drop!], total: 3, protected_count: 12, candidates_checked: 8, locked_count: 2 },
     };
-    render(<WaiversContent leagueName="Dynasty Overlords" data={data} />);
+    renderOpen(<WaiversContent leagueName="Dynasty Overlords" data={data} />);
 
     const section = screen.getByTestId("droppable-players");
     expect(section).toHaveTextContent("Dead Weight");
@@ -312,7 +321,7 @@ describe("WaiversContent", () => {
 
   it("shows the Pro upsell instead of the secondary board when not premium", () => {
     const free: WaiversResponse = { ...BASE_RESPONSE, entitlement: { is_premium: false } };
-    render(<WaiversContent leagueName="Dynasty Overlords" data={free} />);
+    renderOpen(<WaiversContent leagueName="Dynasty Overlords" data={free} />);
 
     expect(screen.getByText("Full waiver board and FAAB shortlist")).toBeInTheDocument();
   });
@@ -322,7 +331,7 @@ describe("WaiversContent", () => {
       ...BASE_RESPONSE,
       stash_candidates: [player({ player_id: "stash1", name: "Stash Target" })],
     };
-    render(<WaiversContent leagueName="Dynasty Overlords" data={premium} />);
+    renderOpen(<WaiversContent leagueName="Dynasty Overlords" data={premium} />);
 
     expect(screen.getByText("Top Stash Candidates")).toBeInTheDocument();
     expect(screen.getByText("Stash Target")).toBeInTheDocument();
@@ -330,14 +339,14 @@ describe("WaiversContent", () => {
 
   it("shows the roster-not-ready message instead of the board when `reason` is set", () => {
     const notReady: WaiversResponse = { ...BASE_RESPONSE, reason: "empty_roster", players: [], priority_adds: [] };
-    render(<WaiversContent leagueName="Dynasty Overlords" data={notReady} />);
+    renderOpen(<WaiversContent leagueName="Dynasty Overlords" data={notReady} />);
 
     expect(screen.getByText(/there's nothing to weigh adds against yet/)).toBeInTheDocument();
   });
 
   it("shows the no-priority-adds fallback when the board is empty for a real reason-less roster", () => {
     const empty: WaiversResponse = { ...BASE_RESPONSE, priority_adds: [] };
-    render(<WaiversContent leagueName="Dynasty Overlords" data={empty} />);
+    renderOpen(<WaiversContent leagueName="Dynasty Overlords" data={empty} />);
 
     expect(screen.getByText(/No waiver option clearly helps/)).toBeInTheDocument();
   });
@@ -347,7 +356,7 @@ describe("WaiversContent", () => {
   // computed server-side but never surfaced as its own field.
   it("shows a Your FAAB tile when the backend reports a remaining balance", () => {
     const withFaab: WaiversResponse = { ...BASE_RESPONSE, faab_remaining: 94, faab_initial: 100 };
-    render(<WaiversContent leagueName="Dynasty Overlords" data={withFaab} />);
+    renderOpen(<WaiversContent leagueName="Dynasty Overlords" data={withFaab} />);
 
     expect(screen.getByText("FAAB")).toBeInTheDocument();
     expect(screen.getByText("$94")).toBeInTheDocument();
@@ -372,7 +381,7 @@ describe("WaiversContent", () => {
         }),
       ],
     };
-    render(<WaiversContent leagueName="Dynasty Overlords" data={withWhy} />);
+    renderOpen(<WaiversContent leagueName="Dynasty Overlords" data={withWhy} />);
     expect(screen.getByText("$12–$18")).toBeInTheDocument();
     expect(screen.getByText("3 teams need a RB and 2 of them have more FAAB than you.")).toBeInTheDocument();
   });
@@ -392,11 +401,11 @@ describe("WaiversContent", () => {
         }),
       ],
     };
-    const { unmount } = render(<WaiversContent leagueName="Dynasty Overlords" data={flagged} />);
+    const { unmount } = renderOpen(<WaiversContent leagueName="Dynasty Overlords" data={flagged} />);
     expect(screen.getByTestId("waiver-usage-flag")).toHaveTextContent("Role expanding");
     expect(screen.getByText(/snap share is 70% over the last 4 games/)).toBeInTheDocument();
     unmount();
-    render(<WaiversContent leagueName="Dynasty Overlords" data={BASE_RESPONSE} />);
+    renderOpen(<WaiversContent leagueName="Dynasty Overlords" data={BASE_RESPONSE} />);
     expect(screen.queryByTestId("waiver-usage-flag")).not.toBeInTheDocument();
   });
 
@@ -424,7 +433,7 @@ describe("WaiversContent", () => {
         priorityAdd({ player_id: "p2", name: "No Bid Player", faab: null }),
       ],
     };
-    const { container } = render(<WaiversContent leagueName="Dynasty Overlords" data={rolling} />);
+    const { container } = renderOpen(<WaiversContent leagueName="Dynasty Overlords" data={rolling} />);
     expect(screen.getAllByText("Waiver claim").length).toBe(2);
     expect(screen.getByText("Rolling")).toBeInTheDocument();
     expect(container.textContent).not.toMatch(/\$\d/);
@@ -432,7 +441,7 @@ describe("WaiversContent", () => {
   });
 
   it("omits the FAAB balance when the backend has no balance to report", () => {
-    render(<WaiversContent leagueName="Dynasty Overlords" data={BASE_RESPONSE} />);
+    renderOpen(<WaiversContent leagueName="Dynasty Overlords" data={BASE_RESPONSE} />);
 
     expect(screen.queryByText("$94")).not.toBeInTheDocument();
   });
@@ -448,7 +457,7 @@ describe("WaiversContent", () => {
     };
 
     it("marks no row as highlighted without a highlightPlayerId (current/before behavior)", () => {
-      const { container } = render(<WaiversContent leagueName="Dynasty Overlords" data={withStash} />);
+      const { container } = renderOpen(<WaiversContent leagueName="Dynasty Overlords" data={withStash} />);
       expect(container.querySelector('[data-highlighted="true"]')).toBeNull();
     });
 
@@ -475,7 +484,7 @@ describe("WaiversContent", () => {
       const targeted = player({ player_id: "deep1", name: "Deep Cut" });
       const withDeepTarget: WaiversResponse = { ...BASE_RESPONSE, players: [...manyAgents, targeted] };
 
-      render(<WaiversContent leagueName="Dynasty Overlords" data={withDeepTarget} highlightPlayerId="deep1" />);
+      renderOpen(<WaiversContent leagueName="Dynasty Overlords" data={withDeepTarget} highlightPlayerId="deep1" />);
 
       expect(screen.getByText("Deep Cut")).toBeInTheDocument();
     });
@@ -490,7 +499,7 @@ describe("WaiversContent", () => {
   });
 
   it("has one control row (view selector + filters) and no second tab row", () => {
-    render(<WaiversContent leagueName="Dynasty Overlords" data={BASE_RESPONSE} />);
+    renderOpen(<WaiversContent leagueName="Dynasty Overlords" data={BASE_RESPONSE} />);
     expect(screen.queryAllByRole("tablist").length).toBeLessThanOrEqual(1);
     expect(screen.queryByRole("tab", { name: "Explore" })).not.toBeInTheDocument();
     const row = screen.getByTestId("waiver-controls");
@@ -498,7 +507,7 @@ describe("WaiversContent", () => {
   });
 
   it("Explore tab shows the searchable free-agent list", () => {
-    render(<WaiversContent leagueName="Dynasty Overlords" data={BASE_RESPONSE} />);
+    renderOpen(<WaiversContent leagueName="Dynasty Overlords" data={BASE_RESPONSE} />);
     expect(screen.queryByPlaceholderText("Search free agents")).not.toBeInTheDocument();
     fireEvent.change(screen.getByLabelText("View"), { target: { value: "explore" } });
     expect(screen.getByPlaceholderText("Search free agents")).toBeInTheDocument();
@@ -513,7 +522,7 @@ describe("WaiversContent", () => {
       ...BASE_RESPONSE,
       players: [player({ player_id: "fa1", name: "Target Guy" }), player({ player_id: "fa2", name: "Other Guy" })],
     };
-    render(<WaiversContent leagueName="Dynasty Overlords" data={data} leagueId="L1" />);
+    renderOpen(<WaiversContent leagueName="Dynasty Overlords" data={data} leagueId="L1" />);
     fireEvent.change(screen.getByLabelText("View"), { target: { value: "watchlist" } });
     expect(await screen.findByText("Target Guy")).toBeInTheDocument();
     expect(screen.queryByText("Other Guy")).not.toBeInTheDocument();
@@ -522,7 +531,7 @@ describe("WaiversContent", () => {
 
   it("Explore lists free-agent defenders under DL/LB/DB only in IDP leagues", () => {
     const idp = [player({ player_id: "dl9", name: "Free Edge", position: "DL", score: 640, overall_rating: null })];
-    const { unmount } = render(<WaiversContent leagueName="IDP" data={{ ...BASE_RESPONSE, idp_players: idp }} />);
+    const { unmount } = renderOpen(<WaiversContent leagueName="IDP" data={{ ...BASE_RESPONSE, idp_players: idp }} />);
     fireEvent.change(screen.getByLabelText("View"), { target: { value: "explore" } });
     expect(screen.queryByText("Free Edge")).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: /^Filters/ }));
@@ -531,7 +540,7 @@ describe("WaiversContent", () => {
     expect(screen.getByText("Free Edge")).toBeInTheDocument();
     unmount();
 
-    render(<WaiversContent leagueName="Std" data={BASE_RESPONSE} />);
+    renderOpen(<WaiversContent leagueName="Std" data={BASE_RESPONSE} />);
     fireEvent.change(screen.getByLabelText("View"), { target: { value: "explore" } });
     expect(screen.queryByRole("option", { name: "DL" })).not.toBeInTheDocument();
   });

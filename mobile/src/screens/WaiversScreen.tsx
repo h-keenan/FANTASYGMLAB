@@ -41,6 +41,7 @@ import PositionBadge from '../components/PositionBadge';
 import PremiumLock from '../components/PremiumLock';
 import DashboardStatRow from '../components/DashboardStatRow';
 import PlayerAvatar from '../components/PlayerAvatar';
+import CompactModule from '../components/CompactModule';
 import ScreenInfoNote from '../components/ScreenInfoNote';
 import BeginnerHelp from '../components/BeginnerHelp';
 import ViewModeToggle from '../components/ViewModeToggle';
@@ -53,6 +54,7 @@ import WaiverRecommendationCard, {
 } from '../components/WaiverRecommendationCard';
 import { api, type DroppablePlayers, type ModelStatus, type NeedsModel, type WaiverPlayer, type WaiverPriorityAdd } from '../lib/api';
 import { DroppablePlayersSection, SharedDropNote, needsBreakdownText } from '../components/SuggestedDrop';
+import { waiversHeaderParts } from '../lib/waiversHeader';
 import { limitedDataNote, needsHeadline, teamNeedStat } from '../lib/dropsPresentation';
 import { bestAvailableCardVisual } from '../lib/bestAvailableCardVisual';
 import { toUserErrorMessage } from '../lib/errorMessages';
@@ -376,43 +378,69 @@ export default function WaiversScreen({ route, navigation }: Props) {
     <View style={[styles.container, { paddingTop: headerHeight }]}>
       <GridBackground />
       <BrandHeaderBar leagueId={leagueId} leagueName={leagueName} />
-      {/* Recommendation-clarity audit (product-owner ask, this pass): Waivers
-          has no in-app waiver-claim/add API (deliberately, see PR #747), so
-          "what should I do about this" wasn't answered anywhere on screen —
-          a user could reasonably look for an ADD button and not find one.
-          Extended this note's body (still tucked behind the ⓘ tap, per brief
-          item 17: stays secondary, doesn't interrupt the workflow) to state
-          the actual action model once: tap a recommendation for the full
-          breakdown, then place the claim in Sleeper — this app never submits
-          it for you. */}
-      <ScreenInfoNote
-        label="How waivers are ranked"
-        text={`Free agents ranked for your roster — ordered by fit for ${
-          neededPositions.length > 0 ? `your needs at ${neededPositions.join(', ')}` : 'your team'
-        }, not just raw value. Tap any recommendation for the full breakdown — that's where you decide. FantasyDesk doesn't submit waiver claims for you; place the claim from your Sleeper league once you've decided.`}
-      />
-      <View style={styles.headerRow}>
-        <AppText style={styles.headerSubtitle}>Ranked by fit for your team.</AppText>
-        {!isEspnLeagueId(leagueId) ? (
-          <PressableScale
-            onPress={() => void Linking.openURL(sleeperLeagueUrl(leagueId))}
-            accessibilityRole="link"
-            accessibilityLabel="Open your league in Sleeper to place a claim"
-            hitSlop={{ top: 12, bottom: 12, left: 8, right: 8 }}
-          >
-            <AppText style={styles.sleeperLink}>Open your league in Sleeper ↗</AppText>
-          </PressableScale>
-        ) : null}
+      {/* ONE compact header module (summary: available, FAAB, team need). The explainer, the ranking note, the stat
+          tiles, the beginner intro, the needs sentence + position badges and the Sleeper link all sit in its body, one
+          tap away; the Sleeper link is also the module's action. Nothing was removed (coridian_: "look how much space is
+          wasted"). Web twin: WaiversContent's waivers-header module. */}
+      <View style={styles.headerModule}>
+        <CompactModule
+          id="waivers.header"
+          testID="waivers-header-module"
+          title="Waivers"
+          tone="accent"
+          parts={waiversHeaderParts({
+            available: stats.available,
+            faabLabel: stats.faabLabel,
+            faab: stats.faab,
+            need: teamNeedStat({ needs_model: needsModel, needed_positions: neededPositions }),
+          })}
+          action={
+            !isEspnLeagueId(leagueId) ? (
+              <PressableScale
+                onPress={() => void Linking.openURL(sleeperLeagueUrl(leagueId))}
+                accessibilityRole="link"
+                accessibilityLabel="Open your league in Sleeper to place a claim"
+                hitSlop={{ top: 12, bottom: 12, left: 8, right: 8 }}
+              >
+                <AppText style={styles.sleeperLink}>Sleeper ↗</AppText>
+              </PressableScale>
+            ) : undefined
+          }
+        >
+          <View style={styles.headerBody}>
+            <AppText style={styles.headerSubtitle}>Ranked by fit for your team.</AppText>
+            <AppText style={styles.headerSubtitle}>
+              {`Free agents ranked for your roster — ordered by fit for ${
+                neededPositions.length > 0 ? `your needs at ${neededPositions.join(', ')}` : 'your team'
+              }, not just raw value. Tap any recommendation for the full breakdown — that's where you decide. FantasyDesk doesn't submit waiver claims for you; place the claim from your Sleeper league once you've decided.`}
+            </AppText>
+            <DashboardStatRow
+              items={[
+                { label: 'Available', value: stats.available != null ? String(stats.available) : '—' },
+                { label: stats.faabLabel, value: stats.faab },
+                { label: 'Team need', value: teamNeedStat({ needs_model: needsModel, needed_positions: neededPositions }) },
+              ]}
+            />
+            <AppText style={styles.needsHeadline} testID="needs-headline">
+              {needsHeadline({ needs_model: needsModel, needed_positions: neededPositions })}
+            </AppText>
+            {neededPositions.length > 0 ? (
+              <View style={styles.needsRow}>
+                {neededPositions.map((pos) => (
+                  <PositionBadge key={pos} position={pos} />
+                ))}
+              </View>
+            ) : null}
+            {needsModel ? <ScreenInfoNote label="How we read your needs" text={needsBreakdownText(needsModel)} /> : null}
+            {limitedDataNote(modelStatus) ? (
+              <AppText style={styles.limitedNote} testID="limited-data-note">
+                {limitedDataNote(modelStatus)}
+              </AppText>
+            ) : null}
+            <BeginnerHelp term="waiversIntro" />
+          </View>
+        </CompactModule>
       </View>
-      <DashboardStatRow
-        style={styles.statRow}
-        items={[
-          { label: 'Available', value: stats.available != null ? String(stats.available) : '—' },
-          { label: stats.faabLabel, value: stats.faab },
-          { label: 'Team need', value: teamNeedStat({ needs_model: needsModel, needed_positions: neededPositions }) },
-        ]}
-      />
-      <BeginnerHelp term="waiversIntro" style={styles.beginnerIntro} />
 
       {deepLinkMissing ? (
         <AppText style={styles.notice}>That player isn&apos;t on your waiver list right now.</AppText>
@@ -492,22 +520,6 @@ export default function WaiversScreen({ route, navigation }: Props) {
           ListHeaderComponent={
             tab === 'recommended' ? (
               <View>
-                <View style={styles.needsRow}>
-                  <AppText style={styles.needsHeadline} testID="needs-headline">
-                    {needsHeadline({ needs_model: needsModel, needed_positions: neededPositions })}
-                  </AppText>
-                  {neededPositions.map((pos) => (
-                    <PositionBadge key={pos} position={pos} />
-                  ))}
-                </View>
-                {needsModel ? (
-                  <ScreenInfoNote label="How we read your needs" text={needsBreakdownText(needsModel)} />
-                ) : null}
-                {limitedDataNote(modelStatus) ? (
-                  <AppText style={styles.limitedNote} testID="limited-data-note">
-                    {limitedDataNote(modelStatus)}
-                  </AppText>
-                ) : null}
                 {topPriority ? (
                   <View style={styles.sectionBlock}>
                     <SectionHeading title="Top Waiver Target" caption={priorityCaption} />
@@ -1020,6 +1032,8 @@ function createStyles(colors: ThemeColors) {
   freeAgentTrailing: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, paddingLeft: spacing.xs, paddingBottom: spacing.xs },
   freeAgentValue: { fontSize: 17, fontWeight: '700', color: colors.accent },
   beginnerIntro: { paddingHorizontal: spacing.lg, marginBottom: spacing.sm },
+  headerModule: { paddingHorizontal: spacing.lg, marginBottom: spacing.sm },
+  headerBody: { gap: spacing.sm },
   headerRow: {
     flexDirection: 'row',
     flexWrap: 'wrap',
