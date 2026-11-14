@@ -20,6 +20,8 @@ import ToneBadge from './ToneBadge';
 import { useThemeMode } from '../context/ThemeModeContext';
 import { api } from '../lib/api';
 import { simDraftNeedPills, simDraftSummaryParts } from '../lib/simDraft';
+import { simGradeOf } from '../lib/simGrade';
+import { LetterGrade } from './LetterGrade';
 import {
   SIM_QUEUE_MAX,
   simFmtPts,
@@ -356,7 +358,7 @@ export function SimGameDraft({ ctx, onComplete }: { ctx: SimCtx; onComplete: (re
           <FadeInView>
             <View style={common.tight} testID="draft-hint">
               <AppText style={common.muted}>{hint.why}</AppText>
-              <SimPlayerChip player={hint.player} extra={hint.player.overall != null ? <AppText style={common.muted}>OVR {hint.player.overall}</AppText> : undefined} />
+              <SimPlayerChip player={hint.player} extra={hint.player.grade ? <LetterGrade grade={simGradeOf(hint.player)} size="sm" /> : undefined} />
             </View>
           </FadeInView>
         ) : null}

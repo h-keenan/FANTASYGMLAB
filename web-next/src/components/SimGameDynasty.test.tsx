@@ -21,7 +21,7 @@ vi.mock("@/lib/api", async () => {
 const mocked = api as unknown as Record<string, ReturnType<typeof vi.fn>>;
 
 const player = (id: string, pos: SimGamePlayer["pos"], name: string, over: Partial<SimGamePlayer> = {}): SimGamePlayer => ({
-  id, name, pos, team: "KC", age: 22, adp: 5, value: 80, projection: 14.2, floor: 7, ceiling: 24, status: "healthy", out_weeks: 0, bye_week: 9,
+  id, name, pos, team: "KC", age: 22, adp: 5, projection: 14.2, floor: 7, ceiling: 24, status: "healthy", out_weeks: 0, bye_week: 9,
   owner: { type: "you" }, kind: "player", squad: "roster", taxi_eligible: true, rookie: false, ...over,
 });
 
@@ -286,7 +286,7 @@ describe("dynasty result", () => {
 describe("picks in trades", () => {
   const pk = (id: string, season: number, round: number, orig: string, holder: string, hint: "early" | "mid" | "late" | null = null) => ({
     id, kind: "pick" as const, name: `${season} Round ${round}`, pos: "PICK" as const, team: "", season, round, orig_team_id: orig, orig_team_name: `Team ${orig}`, slot_hint: hint,
-    age: null, adp: null, value: 40 + round, projection: 0, floor: 0, ceiling: 0, status: "healthy" as const, out_weeks: 0, bye_week: null, owner: { type: holder === "3" ? "you" as const : "ai" as const, team_id: holder, name: "x" },
+    age: null, adp: null, projection: 0, floor: 0, ceiling: 0, status: "healthy" as const, out_weeks: 0, bye_week: null, owner: { type: holder === "3" ? "you" as const : "ai" as const, team_id: holder, name: "x" },
   });
 
   async function openTrades() {
@@ -297,8 +297,8 @@ describe("picks in trades", () => {
     mocked.getSimPicks.mockResolvedValue({
       ok: true, reason: "", enabled: true, draft_year: 2027, rounds: 4, years: 3, you: [pk("pick:2027:1:3", 2027, 1, "3", "3", "early")],
       teams: [
-        { team_id: "3", name: "My Team", is_you: true, picks: [pk("pick:2027:1:3", 2027, 1, "3", "3", "early")], total_value: 41 },
-        { team_id: "7", name: "Rivals", is_you: false, picks: [pk("pick:2028:2:7", 2028, 2, "7", "7"), pk("pick:2027:2:9", 2027, 2, "9", "7", "late")], total_value: 82 },
+        { team_id: "3", name: "My Team", is_you: true, picks: [pk("pick:2027:1:3", 2027, 1, "3", "3", "early")] },
+        { team_id: "7", name: "Rivals", is_you: false, picks: [pk("pick:2028:2:7", 2028, 2, "7", "7"), pk("pick:2027:2:9", 2027, 2, "9", "7", "late")] },
       ],
     });
     mocked.getSimLineup.mockResolvedValue({ ok: true, reason: "", slots: [], bench: [] });

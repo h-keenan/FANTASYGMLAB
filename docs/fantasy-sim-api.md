@@ -533,10 +533,11 @@ already landed answers `reason: "player_taken"`; reload the draft.
 `GET .../players?q=&pos=&status=&team=&sort=&page=&page_size=` -> `{"items": [player], "total", "page", "page_size"}`.
 `pos`: QB|RB|WR|TE|K. `status`: `available` (free agents), `rostered`, `mine`,
 `injured`, `bye`. `team`: roster owner team id. `sort`: `projection` (default),
-`value`, `adp`, `age`, `name`, `last_week`, `season`.
+`overall` (the shown grade, a coarse band, then projection), `adp`, `age`, `name`, `last_week`, `season`. `value` is accepted for old clients and
+means the same as `overall`: NO sort order is the model's hidden rating (see "Letter grades" below).
 ```jsonc
 player = {"id": "9509", "name": "...", "pos": "RB", "team": "ATL" /* NFL */, "age": 24.0,
-          "adp": 3.0, "value": 91.2, "overall": 97, "projection": 17.4, "floor": 9.1, "ceiling": 27.7,
+          "adp": 3.0, "grade": "A", "grade_range": null /* ["B","A-"] when scouts are unsure */, "grade_uncertain": false, "projection": 17.4, "floor": 9.1, "ceiling": 27.7,
           "status": "healthy|out|bye", "out_weeks": 0, "bye_week": 9,
           "owner": {"type": "you|ai|free_agent", "team_id": "3", "name": "..."},
           "last_week": 12.4, "season_points": 51.0, "games": 3, "ppg": 17.0}
@@ -576,7 +577,7 @@ player of the right position (listed in the recap's `auto_filled_slots`), else t
 {"verdict": {"decision": "accept|counter|decline",
              "reason_code": "fits_need|wants_more_value|needs_position|fair_floor|roster_fit|...",
              "reason": "Needs a RB", "chips": ["needs RB"],
-             "counter_note": "They want a TE: asking for Dalton Kincaid (TE).", "counter_delta": {"user_net_before": 5.2, "user_net_after": 1.0, "user_net_change": -4.2, "asked": ["pid"], "removed": [], "your_roster_after": 17, "their_roster_after": 18, "roster_limit": 18}, "counter": {"give": [player], "get": [player]} | null},   // set when decision = counter
+             "counter_note": "They want a TE: asking for Dalton Kincaid (TE).", "counter_delta": {"user_net_change": -1 /* direction only: -1 | 0 | 1 */, "asked": ["pid"], "removed": [], "your_roster_after": 17, "their_roster_after": 18, "roster_limit": 18}, "counter": {"give": [player], "get": [player]} | null},   // set when decision = counter
  "executed": false, "trade": null}
 ```
 `preview` never changes anything. `trades` returns the same verdict (identical to
@@ -737,7 +738,7 @@ Reasons: `ir_full`, `ir_ineligible`, `taxi_full`, `taxi_ineligible`, `roster_ful
 
 `GET /v1/sim/games/{id}/players/{pid}` now also returns: `ros` (`mean`, `floor`, `ceiling`, `weeks_left`, `playable_weeks`,
 `bye_week`, `out_weeks`), `projection_flat` (every playable week carries the same projection: clients show one
-"Rest of season" line, never a week-by-week list), `player.overall` (1-99, null for a position pool under 10 players), `player.value_rank` / `player.pos_value_rank`, and for generated rookies
+"Rest of season" line, never a week-by-week list), `player.grade` / `grade_range` / `grade_uncertain` and `player.attributes` (see "Letter grades"), and for generated rookies
 `scouting` (see `docs/fantasy-sim-player-model.md` section 8).
 
 ## League rosters (who has who)
@@ -851,3 +852,42 @@ bijection per save: no full name repeats across any number of classes, and a fir
 ~790 rookies. Names already worn by a veteran in the pool are skipped. Saves without `names_v` keep the original
 small tables untouched. The v1 tables are pinned by a sha256 in `tests/test_sim_rookie_names.py`; extend with a
 `names_v` 2 table set, never edit v1.
+
+
+## Letter grades (no numeric rating, ever)
+
+coridian_ (2026-11-14): a numeric OVR, or any rank taken from the model's hidden rating, is a tell ("I just draft the highest value
+players and it works"). The sim therefore sends **grades, never the number** (`modules/sim/game_grades.py`, presentation only:
+it reads a frozen snapshot, draws no engine randomness and writes no state, so every old save replays identically).
+
+**Removed from every sim response**: `player.value`, `player.overall`, `value_rank`, `pos_value_rank`, `adp_edge` (the EDGE chip is gone
+from the clients too), pick `value`, `picks[].total_value`, `dynasty.picks_value`, `retired[].market`, and the trade counter's
+`user_net_before` / `user_net_after` (`user_net_change` is now only -1 / 0 / +1). `GET /preview/players` carries no `value`. A test
+(`tests/test_sim_grades.py::test_no_sim_api_response_contains_the_raw_rating`) walks the real responses and fails on any of these keys.
+
+**Added to every player row** (picks carry `grade: null`):
+
+| Field | Meaning |
+| --- | --- |
+| `grade` | `A+ A A- B+ B B- C+ C C- D+ D F` (12 bands) or `null` (a pick, or a position pool under 10 players) |
+| `grade_range` | `[low, high]` when scouts are unsure (rookies with low scouting confidence), else `null` |
+| `grade_uncertain` | `true` = show a "?" |
+
+**Player detail** (`GET /players/{pid}`) also carries `player.attributes`: `[{key, label, grade, uncertain?}]`, per position
+(QB Production / Efficiency / Volume / Consistency / Durability / Prime; RB Workload ...; WR and TE Targets ...; K Scoring / Accuracy /
+Role / Durability / Prime; DEF Scoring / Consistency). They are built from observable inputs only (usage shares, projection and its spread,
+age curve, injury history) and never from the hidden value, each with its own noise, so they do not add up to the overall. The names say
+what the input is (the sim has no route-running or hands data and does not pretend to).
+
+**How a grade is made.** `latent` = the player's value percentile within his position pool. `estimate = latent + sigma * z`, where `z` is
+a deterministic normal from `sha256(save seed | player | season | tag)` (NOT the engine's RNG) and `sigma` is 0.08 for an established
+player, `0.07 + 0.17 * (1 - scouting confidence)` for a rookie (so a fresh rookie is ~0.19: two to three bands wide). The estimate is bucketed with fixed cuts
+(F < 12% ... A+ >= 98.5% of the position). The grade moves each season (new noise), never inside one. A rookie's `grade_range` is
+`estimate +/- 0.9 sigma`.
+
+**Sorting.** `sort=overall` (and the legacy `sort=value`) order by the SHOWN grade, then the public projection. The model's own order is
+never exposed, not even as a sort (a deliberate departure from "keep a server-side sort by the true number": sorting by it is the leak).
+Roster / top-asset lists order the same way.
+
+**Still true, by design**: ADP, the public preseason projection, floor / ceiling and ros_mean are public numbers a real manager sees; the draft
+"hint" and Auto-pick still use the engine's own value (changing them would change old saves).

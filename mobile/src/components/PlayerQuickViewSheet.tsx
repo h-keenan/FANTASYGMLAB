@@ -100,6 +100,8 @@ function insideTradeAnalyzer(): boolean {
 /** The Fantasy Sim's own tab contents inside the Player Quick View (see `simSections`). */
 export interface SimPqvSections {
   overview: React.ReactNode;
+  /** The hero's letter-grade tile. Present in the sim: the numeric Player score ring, Value tile and overall / position ranks never show there. */
+  heroGrade?: React.ReactNode;
   outlook?: React.ReactNode;
   scouting?: React.ReactNode;
   history?: React.ReactNode;
@@ -220,7 +222,8 @@ export default function PlayerQuickViewSheet({
   const position = player.position || resolved?.position || null;
   const team = player.team || resolved?.team || null;
   const age = player.age ?? resolved?.age ?? null;
-  const overallRating = player.overall_rating ?? stats?.overall_rating ?? resolved?.overall_rating ?? null;
+  // Fantasy Sim: no numeric rating of any kind (the grade tile replaces the ring); the real world's score, value and ranks never show.
+  const overallRating = isSim ? null : (player.overall_rating ?? stats?.overall_rating ?? resolved?.overall_rating ?? null);
   // The server's availability block wins; the row's raw status only drives
   // the chip (with a clean label) until it arrives.
   const availability = realWorld.showAvailability ? (resolved?.availability ?? null) : null;
@@ -293,7 +296,7 @@ export default function PlayerQuickViewSheet({
   const tierIdentity = resolvePlayerTier(scoped.tier, isDark);
   const mismatch = tierOpportunityMismatchCaption(scoped.tier, scoped.opportunityLabel);
   const usageCaption = opportunityUsageCaption(scoped.opportunityLabel, model?.usage_trend ?? null);
-  const ranks = rankLine(position, scoped.overallRank, scoped.positionRank);
+  const ranks = isSim ? null : rankLine(position, scoped.overallRank, scoped.positionRank);
   const subRatings = model ? playerSubRatings(model) : [];
   const hasSubRatings = subRatings.some((item) => item.rating != null);
   const headerTags = request.tags ?? [];
@@ -431,7 +434,8 @@ export default function PlayerQuickViewSheet({
               position={position}
               team={team}
               age={age}
-              score={player.score ?? resolved?.value_score ?? null}
+              score={isSim ? null : (player.score ?? resolved?.value_score ?? null)}
+              gradeTile={isSim ? (sim?.heroGrade ?? null) : null}
               valueNote={request.valueNote ?? resolved?.value_note}
               valueLabel={request.valueLabel ?? null}
               byeWeek={realWorld.showBye ? (resolved?.bye_week ?? null) : null}
@@ -445,7 +449,7 @@ export default function PlayerQuickViewSheet({
               usageLoading={loading}
               valueChart={asOf == null && historyQuery.data && ratingHistoryCaption(historyQuery.data) ? <PlayerValueHistory history={historyQuery.data} /> : null}
               ovrChart={
-                hasSubRatings ? (
+                hasSubRatings && !isSim ? (
                   <>
                     <ModelRadarChart ratings={subRatings} />
                     {subRatings.every((item) => item.rating != null) ? null : <SubRatingRow ratings={subRatings} size="md" />}

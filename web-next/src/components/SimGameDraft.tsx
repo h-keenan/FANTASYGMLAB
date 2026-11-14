@@ -18,6 +18,8 @@ import { ToneBadge } from "@/components/ToneBadge";
 import { CompactModule } from "@/components/ui/CompactModule";
 import { api } from "@/lib/api";
 import { simDraftNeedPills, simDraftSummaryParts } from "@/lib/simDraft";
+import { simGradeOf } from "@/lib/simGrade";
+import { LetterGrade } from "@/components/ui/LetterGrade";
 import {
   SIM_QUEUE_MAX,
   simFmtPts,
@@ -362,7 +364,7 @@ export function SimGameDraft({ ctx, onComplete }: { ctx: SimCtx; onComplete: (re
       {onClock && hint ? (
         <div className="flex flex-col gap-1 enter-rise" data-testid="draft-hint">
           <p className="text-xs" style={{ color: "var(--color-text-muted)" }}>{hint.why}</p>
-          <SimPlayerChip player={hint.player} extra={hint.player.overall != null ? <span className="text-xs" style={{ color: "var(--color-text-muted)" }}>OVR {hint.player.overall}</span> : undefined} />
+          <SimPlayerChip player={hint.player} extra={hint.player.grade ? <LetterGrade grade={simGradeOf(hint.player)} size="sm" /> : undefined} />
         </div>
       ) : null}
       <SimDraftHero gameId={gameId} draft={draft} teams={game.settings.teams} slots={game.settings.slots} positions={simPositionsFor(game.settings.slots)} tick={ctx.tick} onOpen={ctx.openPlayer} />
