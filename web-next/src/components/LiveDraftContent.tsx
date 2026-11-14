@@ -17,7 +17,6 @@ import type {
 } from "@/lib/api";
 import { OvrGauge } from "@/components/OvrGauge";
 import { PlayerIdentityTrigger } from "@/components/PlayerIdentityTrigger";
-import { PositionBadge } from "@/components/PositionBadge";
 import { tierTextLabel } from "@/lib/playerTier";
 import { PickPlate } from "@/components/PickRow";
 import { PremiumUpsellCard } from "@/components/PremiumUpsellCard";
@@ -31,7 +30,7 @@ import {
 } from "@/lib/liveDraftPresentation";
 import { ValuesCredit } from "@/components/ValuesCredit";
 import { PageTitle } from "@/components/PageTitle";
-import { PlayerName } from "@/components/PlayerName";
+import { CompactPlayerCard } from "@/components/ui/CompactPlayerCard";
 
 /**
  * Live Draft (Revision 21) — the last page on the original migration punch
@@ -68,14 +67,12 @@ function RecommendationCard({ rec, primary }: { rec: LiveDraftRecommendation; pr
     >
       <div className="flex items-center justify-between gap-3">
         <PlayerIdentityTrigger identity={{ ...rec, sourceLabel: "Live Draft" }} className="flex items-center gap-3 min-w-0">
-          <PositionBadge position={rec.position} />
-          <div className="flex flex-col min-w-0">
-            <span className="text-sm font-bold break-words" style={{ color: "var(--color-text-primary)" }}>
-              {rec.name || `Player ${rec.player_id}`}
-            </span>
-            <span className="text-xs break-words" style={{ color: "var(--color-text-muted)" }}>
-              {rec.team || "—"} · {tierTextLabel(rec.tier) ?? (rec.tier || "Board Value")}
-            </span>
+          <div className="min-w-0 flex-1">
+            <CompactPlayerCard
+              player={{ id: rec.player_id, name: rec.name || `Player ${rec.player_id}`, position: rec.position, team: rec.team, tier: rec.tier }}
+              detail={`${rec.team || "—"} · ${tierTextLabel(rec.tier) ?? (rec.tier || "Board Value")}`}
+              testId="live-draft-rec-player"
+            />
           </div>
         </PlayerIdentityTrigger>
         <div className="flex items-center gap-2 shrink-0">
@@ -260,11 +257,13 @@ function PickRowView({ row }: { row: LiveDraftPickRow }) {
         className="flex items-center gap-2 min-w-0"
       >
         <PickPlate round={row.round} pickNo={row.pick_no} />
-        <PositionBadge position={row.position} />
-        <PlayerName name={row.player_name} className="text-sm font-bold" style={{ color: "var(--color-text-primary)" }} />
-        <span className="text-xs break-words" style={{ color: "var(--color-text-muted)" }}>
-          {row.team}
-        </span>
+        <div className="min-w-0 flex-1">
+          <CompactPlayerCard
+            player={{ id: row.player_id, name: row.player_name, position: row.position, team: row.team }}
+            detail={row.team}
+            testId="live-draft-pick-player"
+          />
+        </div>
       </PlayerIdentityTrigger>
       <span className="text-xs shrink-0" style={{ color: "var(--color-text-muted)" }}>
         {row.fantasy_team}

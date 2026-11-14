@@ -6,7 +6,7 @@ import { useHeaderHeight } from '@react-navigation/elements';
 
 import AnimatedCard from '../components/AnimatedCard';
 import AppText from '../components/AppText';
-import PlayerName from '../components/PlayerName';
+import CompactPlayerCard from '../components/CompactPlayerCard';
 import BrandedSpinner from '../components/BrandedSpinner';
 import BrandHeaderBar from '../components/BrandHeaderBar';
 import Button from '../components/Button';
@@ -18,7 +18,6 @@ import GridBackground from '../components/GridBackground';
 import LiveDraftTradeEvaluator from '../components/LiveDraftTradeEvaluator';
 import PickPlate from '../components/PickPlate';
 import PlayerIdentityRow from '../components/PlayerIdentityRow';
-import PositionBadge from '../components/PositionBadge';
 import PremiumLock from '../components/PremiumLock';
 import SectionHeading from '../components/SectionHeading';
 import ToneBadge from '../components/ToneBadge';
@@ -481,12 +480,12 @@ function DraftBoard({
                 style={[styles.pickRow, row.is_mine && styles.mineBg, index < all.length - 1 && styles.divider]}
               >
                 <PickPlate round={row.round} pickNo={row.pick_no} />
-                <PositionBadge position={row.position} />
                 <View style={styles.flex}>
-                  <PlayerName name={row.player_name} style={styles.rowName} />
-                  <AppText style={styles.muted} numberOfLines={1}>
-                    {row.team} · {row.fantasy_team}
-                  </AppText>
+                  <CompactPlayerCard
+                    player={{ id: row.player_id, name: row.player_name, position: row.position, team: row.team }}
+                    detail={`${row.team} · ${row.fantasy_team}`}
+                    testID="live-draft-pick-player"
+                  />
                 </View>
               </Pressable>
             ))}

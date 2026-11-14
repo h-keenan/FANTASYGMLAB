@@ -11,7 +11,7 @@ import { PillRow } from "@/components/PillRow";
 import { ConfirmInPlace } from "@/components/ui/ConfirmInPlace";
 import { ToneBadge } from "@/components/ToneBadge";
 import { prospectFit, rankByFit, type ScoutingLens } from "@/lib/scoutingLens";
-import { PositionBadge } from "@/components/PositionBadge";
+import { CompactPlayerCard } from "@/components/ui/CompactPlayerCard";
 import { confidenceColor } from "@/lib/waiversPresentation";
 import { aggregateText, classLabel, scoutingConfidenceLabel } from "@/lib/collegeScoutingPresentation";
 
@@ -94,14 +94,13 @@ function ProspectCard({
       className="glass-surface flex flex-col gap-2 p-3"
     >
       <div className="flex items-center gap-2">
-        <PositionBadge position={prospect.position} />
-        <div className="flex flex-col min-w-0 flex-1">
-          <span className="text-sm font-bold break-words" style={{ color: "var(--color-text-primary)" }}>
-            {prospect.name}
-          </span>
-          <span className="text-xs break-words" style={{ color: "var(--color-text-muted)" }}>
-            {classLabel(prospect.school, prospect.draft_year)}
-          </span>
+        <div className="min-w-0 flex-1">
+          {/* Prospects have no NFL headshot yet: id null keeps the avatar on initials. */}
+          <CompactPlayerCard
+            player={{ id: null, name: prospect.name, position: prospect.position }}
+            detail={classLabel(prospect.school, prospect.draft_year)}
+            testId="prospect-player"
+          />
         </div>
         {fit && (fit.needsPosition || fit.pickNote) ? (
           <span className="flex flex-wrap justify-end gap-1">
