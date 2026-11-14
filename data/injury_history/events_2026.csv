@@ -241,3 +241,13 @@ captured_at,season,week,player_id,team,position,status,injury_status,body_part,p
 2026-11-14T02:58:13Z,2026,10,7571,BAL,WR,Active,,,,,sleeper_live
 2026-11-14T02:58:13Z,2026,10,8917,DAL,WR,Active,,,,,sleeper_live
 2026-11-14T16:41:21Z,2026,10,8151,KC,RB,Active,Out,Groin,,,sleeper_live
+2026-11-14T21:14:54Z,2026,10,10212,GB,TE,Active,IR,Concussion,,,sleeper_live
+2026-11-14T21:14:54Z,2026,10,10220,IND,TE,Active,Out,Hamstring,,,sleeper_live
+2026-11-14T21:14:54Z,2026,10,11370,GB,RB,Inactive,Questionable,Ankle,,,sleeper_live
+2026-11-14T21:14:54Z,2026,10,11626,CAR,WR,Active,Questionable,Knee,,,sleeper_live
+2026-11-14T21:14:54Z,2026,10,4054,IND,TE,Inactive,IR,Groin,,,sleeper_live
+2026-11-14T21:14:54Z,2026,10,5892,HOU,RB,Active,Out,Groin,,,sleeper_live
+2026-11-14T21:14:54Z,2026,10,7543,NO,RB,Active,IR,Hamstring,,,sleeper_live
+2026-11-14T21:14:54Z,2026,10,7600,PIT,TE,Active,Questionable,Illness,,,sleeper_live
+2026-11-14T21:14:54Z,2026,10,8168,GB,WR,Inactive,Questionable,Ankle,,,sleeper_live
+2026-11-14T21:14:54Z,2026,10,8207,DAL,RB,Inactive,IR,Knee - ACL + MCL,,,sleeper_live
