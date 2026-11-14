@@ -27,10 +27,10 @@ import "./ui.css";
  *
  * - No page context: the global tabs. The lit tab expands to icon + label in a cyan capsule, the rest are icon-only
  *   (aria-label names them), 44px+ targets, a count badge.
- * - With a page `context` (useBottomPillContext): ONE row. The global tabs fold into two icon buttons (the section you
- *   are in + a menu button, aria-expanded) and the page segment (page tabs as a tablist, one primary chip) takes the
- *   rest. The menu button unfolds the full global row in the same pill; picking a tab (or Escape / tapping outside)
- *   folds it back. The lit page tab is one capsule that slides between tabs.
+ * - With a page `context` (useBottomPillContext): ONE row. The global tabs fold into ONE icon button (it shows the
+ *   glyph of the section you are in, aria-expanded) and the page segment (page tabs as a tablist, one primary chip)
+ *   takes the rest. That button unfolds the full global row (every section + More) in the same pill; picking a tab (or
+ *   Escape / tapping outside) folds it back. The lit page tab is one capsule that slides between tabs.
  *
  * Meant to live inside a `.bottom-stack` (sticky, in flow), never position:fixed; both layers share one grid cell so
  * the pill is one row tall in every mode (clearance = the stack height). Hidden from 768px up. Motion is opacity and
@@ -157,7 +157,6 @@ export function BottomTabBar({
           menuOpen={menuOpen}
           menuBtnRef={menuBtnRef}
           onMenu={() => setMenuOpen((o) => !o)}
-          onSection={() => activeTab && onSelect?.(activeTab.key)}
         />
       ) : null}
     </nav>
@@ -171,7 +170,6 @@ export function PillContextLayer({
   menuOpen,
   menuBtnRef,
   onMenu,
-  onSection,
   noMenu,
 }: {
   context: PillContext;
@@ -181,7 +179,6 @@ export function PillContextLayer({
   menuOpen: boolean;
   menuBtnRef: React.RefObject<HTMLButtonElement | null>;
   onMenu: () => void;
-  onSection?: () => void;
   /** No menu button (a context with no row to unfold back to). */
   noMenu?: boolean;
 }) {
@@ -230,29 +227,21 @@ export function PillContextLayer({
   }, [context.tabs]);
 
   const primary = context.primary;
-  const sectionBody = section ? <TabGlyph name={section.glyph} size={22} /> : null;
-  const sectionProps = { className: "pill-icon-btn pill-icon-btn--section", "aria-label": section?.label ?? "Section", "data-testid": "pill-section" };
+  // ONE entry point: the lit glyph is the section you are in; tapping it unfolds the global row (sections + More).
+  const menuGlyph = section ? section.glyph : "more";
   return (
     <div ref={layerRef} className="pill-layer pill-layer--context" inert={hidden} data-testid="pill-context-layer">
-      {!section ? null : section.href ? (
-        <Link href={section.href} {...sectionProps} onClick={() => onSection?.()}>
-          {sectionBody}
-        </Link>
-      ) : (
-        <button type="button" {...sectionProps} onClick={() => onSection?.()}>
-          {sectionBody}
-        </button>
-      )}
       {noMenu ? null : <button
         ref={menuBtnRef}
         type="button"
         className="pill-icon-btn pill-icon-btn--menu"
-        aria-label={PILL_MENU_LABEL}
+        aria-label={section ? `${section.label}, ${PILL_MENU_LABEL}` : PILL_MENU_LABEL}
         aria-expanded={menuOpen}
+        data-section={section ? "" : undefined}
         data-testid="pill-menu"
         onClick={onMenu}
       >
-        <TabGlyph name="more" size={22} />
+        <TabGlyph name={menuGlyph} size={22} />
       </button>}
       <span className="pill-divider" aria-hidden="true" />
       <div ref={listRef} role="tablist" aria-label={context.label} className="pill-tabs" data-dense={context.tabs.length >= 4 ? "" : undefined} data-testid="pill-tabs">

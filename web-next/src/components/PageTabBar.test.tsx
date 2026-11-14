@@ -29,7 +29,7 @@ describe("PageTabBar", () => {
     render(<PageTabBar family="trades" active="trade_finder" leagueId="9" leagueName="L" />);
     expect(getPillState().ctx).toMatchObject({ id: "family:trades", activeKey: "trade_finder" });
     expect(getPillState().ctx?.tabs.map((t) => t.label)).toEqual(["Hub", "Finder", "Analyzer", "History"]);
-    expect(getPillState().ctx?.primary?.label).toBe("New trade");
+    expect(getPillState().ctx?.primary).toBeUndefined();
     expect(screen.getAllByRole("tab")).toHaveLength(4); // strip still here: no pill on screen
     act(() => setPillBarPresent(true));
     expect(screen.queryAllByRole("tab")).toHaveLength(0); // the pill owns the tabs now
