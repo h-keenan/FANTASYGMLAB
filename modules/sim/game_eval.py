@@ -72,7 +72,7 @@ class Evaluator:
         self.additive = getattr(snapshot, "_role_mode", "") == "additive"
         self._level: dict[str, float] = {}
         self._repl: dict[str, float] | None = None
-        self.econ = bool(snapshot.settings.econ_v or getattr(state, "econ_up", 0))  # econ_v 1 rules in force (new game, or a save upgraded by an event)
+        self.econ = bool(snapshot.settings.econ_v)  # a pure function of the settings (read again at every decision point)
         attr = "_now_scale_econ" if self.econ else "_now_scale"
         scale = getattr(snapshot, attr, None)
         if scale is None:  # frozen snapshot: memoize on the instance

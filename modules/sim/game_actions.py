@@ -150,16 +150,6 @@ def queue_claim(em: Emitter, add: str, drop: str | None, start_slot: str | None)
     return next(c for c in state.claims if c["id"] == cid)
 
 
-def upgrade_economy(em: Emitter) -> bool:
-    """One-time opt-in for a save made before econ_v: the consensus-anchored economy applies from now on. Returns False if already in force."""
-
-    state, snap = em.state, em.snap
-    if snap.settings.econ_v or state.econ_up:
-        return False
-    em.emit(state.week, "user", "econ_upgrade")
-    return True
-
-
 def cancel_claim(em: Emitter, claim_id: str) -> None:
     state = em.state
     _require_season(state)

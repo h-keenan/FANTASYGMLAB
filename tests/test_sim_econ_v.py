@@ -301,32 +301,14 @@ def test_ai_offers_to_the_user_are_never_below_market_for_the_ai():
         advance(em, snap, state, sd)
 
 
-def test_an_old_save_can_opt_in_by_event_and_replays_identically_before_it():
-    from modules.sim import game_actions as act
-    from modules.sim.game_state import apply_event
 
-    snap, state, sd = _dynasty_game(False, weeks=2)
-    em = Emitter(state, snap)
-    assert state.econ_up == 0 and not Evaluator(snap, state).econ
-    before = state.digest()
-    desk0 = TradeDesk(Evaluator(snap, state), sd, state.week)
-    assert desk0.cover() == []
-    assert act.upgrade_economy(em) is True and act.upgrade_economy(em) is False  # one time only
-    assert state.econ_up == 1 and Evaluator(snap, state).econ
-    assert TradeDesk(Evaluator(snap, state), sd, state.week).cover()  # the economy is in force from the event on
-    # the log replays: a fresh state fed the same events lands on the same digest; without the event it was the old game
-    replay = GameState(snap)
-    for e in em.events:
-        apply_event(replay, snap, e)
-    assert replay.econ_up == 1
-    assert "econ_up" not in json.dumps({k: v for k, v in GameState(snap).to_dict().items() if k == "never"})
-    fresh_old = GameState(snap)
-    assert "econ_up" not in fresh_old.digest() and before == before
-    # the Allen case on an upgraded save is refused like on a new game
-    user = snap.user_team.tid
+def test_econ_v_is_a_pure_function_of_the_settings_at_each_decision_point():
+    from dataclasses import replace
+
+    snap, state, sd = _dynasty_game(True, weeks=2)
+    assert Evaluator(snap, state).econ and TradeDesk(Evaluator(snap, state), sd, state.week).cover()
+    object.__setattr__(snap, "settings", replace(snap.settings, econ_v=0))  # flipping the setting flips every rule, nothing was captured at creation
     ev = Evaluator(snap, state)
-    owner = state.owner_map()
-    star = max((p for p in snap.pids if p in owner and owner[p] != user and snap.players[p].pos == "QB"), key=ev.base_value)
-    mine = sorted((p for p in state.holdings(user) if snap.players[p].pos in ("QB", "RB", "WR")), key=ev.base_value)
-    late = [p for p in state.picks_of(user) if ev.pick_parts(p)[1] >= 2][:2]
-    assert not TradeDesk(ev, sd, state.week).ai_accepts(owner[star], [mine[len(mine) // 2], *late], [star])[0]
+    assert not ev.econ and TradeDesk(ev, sd, state.week).cover() == [] and not TradeDesk(ev, sd, state.week).below_market("1", [], [])
+    object.__setattr__(snap, "settings", replace(snap.settings, econ_v=1))
+    assert Evaluator(snap, state).econ

@@ -417,7 +417,6 @@ def pending_block(snap: GameSnapshot, state: GameState, ev: Evaluator | None = N
         "roster_size": len(user_roster), "roster_limit": snap.settings.roster_limit,
         "cuts_needed": max(0, len(user_roster) - snap.settings.roster_limit),
         "limit_blocks": not snap.settings.soft_limit,  # limit_v 0 saves: over the limit blocks Advance; newer: it only blocks adding players
-        "fair_trades": bool(snap.settings.econ_v or state.econ_up),  # econ_v 1 economy in force (false on an older save until the user opts in)
     }
 
 

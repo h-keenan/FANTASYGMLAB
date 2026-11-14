@@ -54,9 +54,8 @@ about break-even by year 5 with the old trade desk, -0.6 per season after econ_v
 kicker sweetener margin 7.5 -> 3.0. Residual: the farmer still wins about +0.6..0.9 a season (season 5 up to +3 in one run): the AIs' convex star premium vs linear lineup scoring; left as skill edge.
 
 ### Existing saves
-`econ_v` absent = byte-identical replay (golden digests with trade verdicts pinned in `tests/test_sim_econ_v.py`, captured on main before the change). A save can opt in with
-`POST /v1/sim/games/{id}/fair-trades`: one `econ_upgrade` event sets `state.econ_up`, in force from that event on (the log before it replays as before; replay == resume tested; the flag is out of
-the digest while 0). `home.flags.fair_trades` tells the client whether it is on. Client opt-in button (web + app) is not in this PR.
+`econ_v` absent = byte-identical replay (golden digests with trade verdicts pinned in `tests/test_sim_econ_v.py`, captured on main before the change). `econ_v` is read from the
+settings at every decision point (no state captured at creation, test included), so the generic "upgrade existing games" event being built separately can flip it mid-game.
 
 ### Remaining (PR2)
 Rookie hit rates / UDFA (6), QB wave (7, with the aging work), K/DEF tails (8), draft adherence and the kicker run (9), no persona age preference in dynasty (12).

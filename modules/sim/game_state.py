@@ -83,8 +83,6 @@ class GameState:
         self.retired: list[str] = []
         # Trade block (block_v 1+): the user's blocked assets, {asset_id: {"looking_for": pos | None, "week": n}}. Inert (and out of the digest) while empty.
         self.block: dict[str, dict[str, Any]] = {}
-        # Fair trades v2 on a save made before econ_v: set by the user's one-time "econ_upgrade" event, in force from then on (0 = never; out of the digest).
-        self.econ_up = 0
 
     # --------------------------------------------------------------- views
 
@@ -168,7 +166,7 @@ class GameState:
         for key in ("ir", "taxi"):
             if not any(raw[key].values()):
                 del raw[key]
-        for key in ("pick_owner", "created_picks", "spent_picks", "seasons", "rookie_log", "retired", "role_hist", "block", "econ_up"):
+        for key in ("pick_owner", "created_picks", "spent_picks", "seasons", "rookie_log", "retired", "role_hist", "block"):
             if not raw[key]:
                 del raw[key]
         if raw["season_no"] == 1:
@@ -417,12 +415,6 @@ def _block_set(state, snap, week, p):
         state.block.pop(pid, None)
 
 
-def _econ_upgrade(state, snap, week, p):
-    """The league economy of econ_v 1 applies from this event on (a save made before it; the log before the event replays as it always did)."""
-
-    state.econ_up = 1
-
-
 def _inbox_offer(state, snap, week, p):
     state.offers.append(dict(p))
 
@@ -628,7 +620,7 @@ _HANDLERS = {
     "inbox_response": _inbox_response, "injury": _injury, "week_scored": _week_scored,
     "playoff_seeded": _playoff_seeded, "season_complete": _season_complete,
     "week_advanced": _week_advanced, "advance": _advance_requested,
-    "slot_move": _slot_move, "block_set": _block_set, "econ_upgrade": _econ_upgrade, "rookie_draft_started": _rookie_draft_started, "rookie_pick": _rookie_pick,
+    "slot_move": _slot_move, "block_set": _block_set, "rookie_draft_started": _rookie_draft_started, "rookie_pick": _rookie_pick,
     "rookie_draft_complete": _rookie_draft_complete, "season_started": _season_started,
 }
 
