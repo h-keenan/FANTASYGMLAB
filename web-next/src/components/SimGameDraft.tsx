@@ -25,6 +25,7 @@ import {
   simProjText,
   simQueueReducer,
   simFilterPositionsFor,
+  simAutoPickConfirmText,
   simPositionsFor,
   simRosterNeeds,
   simValueOverAdpLabel,
@@ -351,7 +352,7 @@ export function SimGameDraft({ ctx, onComplete }: { ctx: SimCtx; onComplete: (re
       <div className="flex flex-wrap items-center gap-2">
         {confirmAuto ? (
           <>
-            <span className="text-xs" style={{ color: "var(--color-text-secondary)" }}>Auto-draft the rest of your picks from your queue, then best available and need?</span>
+            <span className="text-xs" style={{ color: "var(--color-text-secondary)" }}>{simAutoPickConfirmText(game.settings)}</span>
             <Button size="sm" onClick={autoDraft}>Yes, auto-pick</Button>
             <Button size="sm" variant="ghost" onClick={() => setConfirmAuto(false)}>Cancel</Button>
           </>

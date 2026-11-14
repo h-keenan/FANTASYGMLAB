@@ -247,6 +247,8 @@ export interface SimGameSettings {
   roster_limit: number;
   /** Roster-limit rule generation: 1+ = the soft limit (over the limit only blocks adding players); absent = a save from before it. */
   limit_v?: number;
+  /** Helper generation: 1+ = the draft hint and Auto-pick use public information only (ADP, need, byes, shown grade); absent = a save from before it. */
+  hint_v?: number;
   rounds: number;
   slots: SimSlot[];
   user_slot: number;
@@ -904,6 +906,13 @@ export interface SimCounterDelta {
 export function simDealWords(change: number): string {
   if (Math.abs(change) < 0.5) return "About the same for you as your offer";
   return change > 0 ? "A better deal for you than your offer" : "A worse deal for you than your offer";
+}
+
+/** The Auto-pick confirmation: names the rule the helper really uses (public ADP for new games, the older value-for-need pick for saves from before hint_v). */
+export function simAutoPickConfirmText(settings: { hint_v?: number } | null | undefined): string {
+  return (settings?.hint_v ?? 0) >= 1
+    ? "Auto-draft the rest of your picks from your queue, then the best available by ADP for your needs (and bye weeks)?"
+    : "Auto-draft the rest of your picks from your queue, then best available and need?";
 }
 
 export function simCounterDeltaLine(delta: SimCounterDelta | null | undefined): string | null {

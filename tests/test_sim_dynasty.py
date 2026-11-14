@@ -29,10 +29,11 @@ ROWS, BYES = build_synthetic_pool(7)
 SEED = 4242
 
 
-def settings(**kw):
+def settings(hint_v=0, **kw):
+    """hint_v 0 by default: these seeded-world tests predate the public-information helpers (tests/test_sim_hint_v.py covers hint_v 1)."""
     raw = {"mode": "dynasty", "teams": 8, "user_slot": 3, "start_year": 2026, "seasons": 3, "rookie_rounds": 3}
     raw.update(kw)
-    return GameSettings.parse(raw)
+    return replace(GameSettings.parse(raw), hint_v=hint_v)
 
 
 def new_snapshot(seed=SEED, **kw):

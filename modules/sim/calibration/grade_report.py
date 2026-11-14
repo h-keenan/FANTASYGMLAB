@@ -3,7 +3,7 @@
 
     python -m modules.sim.calibration.grade_report dist     [--seeds 4]            # grade histogram per position
     python -m modules.sim.calibration.grade_report corr     [--seeds 6]            # Spearman: grade vs season ppg, vs hidden rating, vs projection
-    python -m modules.sim.calibration.grade_report bots     [--seeds 12]           # draft bots: highest grade vs ADP+need vs oracle
+    python -m modules.sim.calibration.grade_report bots     [--seeds 12] [--only hint_new,value_only]  # draft bots: grade vs ADP+need vs hint vs oracle
     python -m modules.sim.calibration.grade_report all      [--seeds 8] [--json out.json]
 
 Pure stdlib + numpy + modules.sim. Never touches data/players.db (pool from the committed calibration panel).
@@ -22,7 +22,7 @@ from modules.sim import game_grades as gg
 from modules.sim import game_scoring
 from modules.sim.calibration import dataset, tail_report
 from modules.sim.calibration.realism_sweep import spearman
-from modules.sim.game_draft import DraftContext, _candidates, choose_pick, run_ai_picks, user_pick
+from modules.sim.game_draft import DraftContext, _candidates, choose_pick, choose_public, run_ai_picks, user_pick
 from modules.sim.game_engine import advance, finish_draft, rank_teams
 from modules.sim.game_setup import build_snapshot
 from modules.sim.game_state import Emitter, GameState
@@ -71,7 +71,32 @@ def bot_oracle(ctx: DraftContext, tid: str, n: int) -> str:
     return choose_pick(ctx, tid, n, 0, human=True)
 
 
-BOTS: dict[str, Bot] = {"grade": bot_grade, "grade_near_adp": bot_grade_near_adp, "adp_need": bot_adp_need, "oracle": bot_oracle}
+def bot_hint(ctx: DraftContext, tid: str, n: int) -> str:
+    """hint_v 1: always take the hint / Auto-pick (public ADP + need + bye overlap, shown grade breaking ties)."""
+    return choose_public(ctx, tid, n)
+
+
+def bot_value_only(ctx: DraftContext, tid: str, n: int) -> str:
+    """Hidden value alone among the legal candidates, no need bonus: isolates what the hidden number adds."""
+    snap = ctx.snap
+    return max(_candidates(ctx, tid, n), key=lambda p: (snap.players[p].value, p))
+
+
+def _with_spots(need: float, bye: float) -> Bot:
+    from modules.sim import game_draft as gd
+
+    def bot(ctx: DraftContext, tid: str, n: int) -> str:
+        old = gd.NEED_SPOTS, gd.BYE_SPOTS
+        gd.NEED_SPOTS, gd.BYE_SPOTS = need, bye
+        try:
+            return choose_public(ctx, tid, n)
+        finally:
+            gd.NEED_SPOTS, gd.BYE_SPOTS = old
+    return bot
+
+
+BOTS: dict[str, Bot] = {"grade": bot_grade, "grade_near_adp": bot_grade_near_adp, "adp_need": bot_adp_need, "hint_new": bot_hint, "oracle": bot_oracle,
+    "value_only": bot_value_only, "hint_need_only": _with_spots(0.8, 0.0), "hint_bye_only": _with_spots(0.0, 2.0)}
 
 
 def play(pool, byes, seed: int, bot: Bot | None, model_id: str) -> dict[str, Any]:
@@ -91,7 +116,16 @@ def play(pool, byes, seed: int, bot: Bot | None, model_id: str) -> dict[str, Any
         advance(em, snap, state, seed)
     ranks = rank_teams(snap, state)
     st = state.stand[user]
-    return {"snap": snap, "state": state, "wins": st["w"] + 0.5 * st["t"], "pf": st["pf"], "rank": ranks.index(user) + 1 if user in ranks else None,
+    mine = [p for p in state.picks if p["team"] == user]
+    shape = {
+        "reach": float(np.mean([snap.players[p["pid"]].adp - (p["n"] + 1) for p in mine])),  # > 0: took players before their ADP
+        "max_reach": float(max(snap.players[p["pid"]].adp - (p["n"] + 1) for p in mine)),
+        "pos": dict(Counter(snap.players[p["pid"]].pos for p in mine)),
+        "first_k": min((p["round"] for p in mine if snap.players[p["pid"]].pos == "K"), default=None),
+        "first_def": min((p["round"] for p in mine if snap.players[p["pid"]].pos == "DEF"), default=None),
+        "top_adp_hits": sum(1 for p in mine if p["round"] <= 4 and snap.players[p["pid"]].pos in ("RB", "WR")),
+    }
+    return {"shape": shape, "snap": snap, "state": state, "wins": st["w"] + 0.5 * st["t"], "pf": st["pf"], "rank": ranks.index(user) + 1 if user in ranks else None,
             "champion": state.champion == user}
 
 
@@ -170,22 +204,31 @@ def distribution(seeds: int) -> dict[str, Any]:
 # ------------------------------------------------------------------------------------ bots
 
 
-def bot_compare(seeds: int) -> dict[str, Any]:
+def bot_compare(seeds: int, only: tuple[str, ...] = ()) -> dict[str, Any]:
     pool, byes = _pool()
     model_id = game_scoring.default_model().model_id
     res: dict[str, Any] = {}
     for name, bot in BOTS.items():
+        if only and name not in only and name != "adp_need":
+            continue
         runs = [play(pool, byes, s, bot, model_id) for s in range(1, seeds + 1)]
         res[name] = {
             "wins": [r["wins"] for r in runs], "pf": [round(r["pf"], 1) for r in runs], "rank": [r["rank"] for r in runs],
             "champs": sum(1 for r in runs if r["champion"]),
+            "shape": {k: (round(float(np.mean([r["shape"][k] for r in runs])), 2)) for k in ("reach", "max_reach", "top_adp_hits")}
+            | {"pos": {pos: round(float(np.mean([r["shape"]["pos"].get(pos, 0) for r in runs])), 2) for pos in ("QB", "RB", "WR", "TE", "K", "DEF")},
+               "first_k_round": round(float(np.mean([r["shape"]["first_k"] or 0 for r in runs])), 1)},
         }
     summary = {}
     for name, r in res.items():
         w, pf, rk = np.array(r["wins"], float), np.array(r["pf"], float), np.array(r["rank"], float)
         summary[name] = {"mean_wins": round(float(w.mean()), 2), "mean_pf": round(float(pf.mean()), 1), "mean_rank": round(float(rk.mean()), 2), "champs": r["champs"], "n": len(w)}
     base = np.array(res["adp_need"]["wins"], float)
-    for name in ("grade", "grade_near_adp", "oracle"):
+    for name, r in res.items():
+        summary[name]["draft_shape"] = r["shape"]
+    for name in ("grade", "grade_near_adp", "hint_new", "oracle", "value_only", "hint_need_only", "hint_bye_only"):
+        if name not in res:
+            continue
         d = np.array(res[name]["wins"], float) - base
         se = float(d.std(ddof=1) / np.sqrt(len(d))) if len(d) > 1 else 0.0
         summary[name]["wins_vs_adp_need"] = {"diff": round(float(d.mean()), 2), "se": round(se, 2)}
@@ -199,6 +242,7 @@ def main(argv: list[str] | None = None) -> None:
     ap.add_argument("cmd", choices=["dist", "corr", "bots", "all"])
     ap.add_argument("--seeds", type=int, default=6)
     ap.add_argument("--json", default="")
+    ap.add_argument("--only", default="", help="bots: comma list of bot names to run besides the adp_need baseline")
     a = ap.parse_args(argv)
     res: dict[str, Any] = {}
     if a.cmd in ("dist", "all"):
@@ -206,7 +250,7 @@ def main(argv: list[str] | None = None) -> None:
     if a.cmd in ("corr", "all"):
         res["correlations"] = correlations(a.seeds)
     if a.cmd in ("bots", "all"):
-        res["bots"] = bot_compare(a.seeds)
+        res["bots"] = bot_compare(a.seeds, tuple(x for x in a.only.split(",") if x))
     text = json.dumps(res, indent=1)
     if a.json:
         open(a.json, "w").write(text)
