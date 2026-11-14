@@ -22,6 +22,7 @@ import { simDraftNeedPills, simDraftSummaryParts } from '../lib/simDraft';
 import {
   SIM_QUEUE_MAX,
   simFmtPts,
+  simProjText,
   simQueueReducer,
   simFilterPositionsFor,
   simPositionsFor,
@@ -280,7 +281,7 @@ export function SimGameDraft({ ctx, onComplete }: { ctx: SimCtx; onComplete: (re
             <EmptyState icon="people-outline" title="No picks yet" subtitle="Your drafted players show up here." />
           ) : (
             draft.your_roster.map((player) => (
-              <SimPlayerLine key={player.id} player={player} onOpen={ctx.openPlayer} trailing={<SimStat label="Proj" value={simFmtPts(player.projection)} />} />
+              <SimPlayerLine key={player.id} player={player} onOpen={ctx.openPlayer} trailing={<SimStat label="Proj" value={simProjText(player)} />} />
             ))
           )}
         </View>

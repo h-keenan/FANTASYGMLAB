@@ -21,6 +21,7 @@ import {
   simOptimisticClaim,
   simWithout,
   simFmtPts,
+  simProjText,
   simClaimPayload,
   simLineupPayload,
   simMatchupLine,
@@ -380,7 +381,7 @@ export function ClaimSheet({
             <option value="">{mustDrop ? "Choose a player to drop" : "No drop"}</option>
             {roster.map((p) => (
               <option key={p.id} value={p.id}>
-                {p.name} ({p.pos}) {simFmtPts(p.projection)}
+                {p.name} ({p.pos}) {simProjText(p)}
               </option>
             ))}
           </Select>
@@ -588,7 +589,7 @@ export function SimYourPicks({ picks, draftYear }: { picks: SimPickAsset[]; draf
       ) : (
         groups.map((group) => (
           <div key={group.season} className="flex flex-col">
-            <p className="pt-1 text-xs font-bold" style={{ color: "var(--color-text-secondary)" }}>{group.season}</p>
+            <p className="pt-1 text-xs font-bold" style={{ color: "var(--color-text-secondary)" }}>{group.label}</p>
             {group.rounds.flatMap((r) => r.picks).map((pick) => (
               <SimPickLine key={pick.id} pick={pick} draftYear={draftYear} />
             ))}

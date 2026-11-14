@@ -16,6 +16,7 @@ from modules.sim.game_actions import lineup_warnings
 from modules.sim.game_eval import Evaluator
 from modules.sim.game_state import GameState
 from modules.sim.game_types import GameSnapshot
+from modules.sim.season_label import season_label, season_label_for_year
 from modules.sim.types import is_pick_id
 
 MAX_ITEMS = 40
@@ -25,9 +26,17 @@ EVENT_WINDOW = 400  # how many recent events are read per request
 def _asset(snap: GameSnapshot, pid: str) -> str:
     if is_pick_id(pid):
         _, season, rnd, _orig = pid.split(":", 3)
-        return f"{season} round {rnd} pick"
+        return f"{season_label_for_year(int(season), snap.settings.start_year)} round {rnd} pick"
     p = snap.players.get(pid)
     return p.name if p else "a player"
+
+
+def _season_over(snap: GameSnapshot, payload: Mapping[str, Any], week: int) -> str:
+    """"S3 2028 is over" (a game with no calendar year says "Season over")."""
+
+    archive = payload.get("archive") or {}
+    label = season_label(archive.get("season_no"), archive.get("year")) if archive.get("season_no") else ""
+    return f"{label} is over" if label else "Season over"
 
 
 def _names(snap: GameSnapshot, pids: Sequence[str]) -> str:
@@ -81,7 +90,7 @@ def derive(
             boundaries.append((seq, week))
             items.append(_item(seq, 0, week, "recap", "matchup", f"Week {week} recap is ready", "home"))
         elif typ == "season_complete" and p.get("champion"):
-            items.append(_item(seq, 1, week, "title", "check", f"Season over: {_team(snap, p['champion'])} won it all", "league"))
+            items.append(_item(seq, 1, week, "title", "check", f"{_season_over(snap, p, week)}: {_team(snap, p['champion'])} won it all", "league"))
     # Offers that left the inbox without an answer expired at the first boundary after their week.
     live_ids = {o["id"] for o in state.offers}
     for oid, info in offers.items():

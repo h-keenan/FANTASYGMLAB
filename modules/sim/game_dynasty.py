@@ -20,6 +20,7 @@ from typing import Any, Mapping, Sequence
 
 from modules.sim import aging, scouting
 from modules.sim.game_names import rookie_name
+from modules.sim.season_label import season_label, season_label_for_year
 from modules.sim.game_eval import USER_PARAMS, Evaluator, team_params
 from modules.sim.game_setup import value_pool
 from modules.sim.game_state import Emitter, GameState
@@ -368,14 +369,14 @@ def league_history(snap: GameSnapshot, state: GameState) -> dict[str, Any]:
     for a in state.seasons:
         champ = a.get("champion")
         if champ:
-            champions.append({"season_no": a["season_no"], "year": a["year"], "team_id": champ["team_id"], "name": champ["name"], "is_you": bool(champ.get("is_you"))})
+            champions.append({"season_no": a["season_no"], "year": a["year"], "season_label": season_label(a["season_no"], a["year"]), "team_id": champ["team_id"], "name": champ["name"], "is_you": bool(champ.get("is_you"))})
             titles[champ["team_id"]] = titles.get(champ["team_id"], 0) + 1
         for r in a.get("standings", ()):
             rec = (r["wins"], -r["losses"], r["pf"])
             if best_record is None or rec > best_record[0]:
-                best_record = (rec, {"year": a["year"], "team_id": r["team_id"], "name": r["name"], "record": f"{r['wins']}-{r['losses']}" + (f"-{r['ties']}" if r["ties"] else "")})
+                best_record = (rec, {"year": a["year"], "season_label": season_label(a["season_no"], a["year"]), "team_id": r["team_id"], "name": r["name"], "record": f"{r['wins']}-{r['losses']}" + (f"-{r['ties']}" if r["ties"] else "")})
             if best_pf is None or r["pf"] > best_pf[0]:
-                best_pf = (r["pf"], {"year": a["year"], "team_id": r["team_id"], "name": r["name"], "pf": r["pf"]})
+                best_pf = (r["pf"], {"year": a["year"], "season_label": season_label(a["season_no"], a["year"]), "team_id": r["team_id"], "name": r["name"], "pf": r["pf"]})
     names = {t.tid: t.name for t in snap.teams}
     leaders = sorted(titles.items(), key=lambda kv: (-kv[1], kv[0]))[:5]
     return {
@@ -400,15 +401,15 @@ def dynasty_summary(snap: GameSnapshot, state: GameState) -> dict[str, Any]:
         "mode": "dynasty", "seasons_total": S.seasons, "seasons_played": len(seasons), "start_year": S.start_year,
         "complete": state.status == "complete", "titles": titles, "playoff_trips": sum(1 for a in seasons if a["you"]["made_playoffs"]),
         "avg_finish": round(sum(finishes) / len(finishes), 2) if finishes else None, "wins": wins, "losses": losses,
-        "best_season": {"year": best["year"], "rank": best["you"]["rank"], "record": f"{best['you']['wins']}-{best['you']['losses']}"} if best else None,
+        "best_season": {"year": best["year"], "season_label": season_label(best["season_no"], best["year"]), "rank": best["you"]["rank"], "record": f"{best['you']['wins']}-{best['you']['losses']}"} if best else None,
         "by_year": [{
-            "season_no": a["season_no"], "year": a["year"], "rank": a["you"]["rank"], "record": f"{a['you']['wins']}-{a['you']['losses']}" + (f"-{a['you']['ties']}" if a["you"]["ties"] else ""),
+            "season_no": a["season_no"], "year": a["year"], "season_label": season_label(a["season_no"], a["year"]), "rank": a["you"]["rank"], "record": f"{a['you']['wins']}-{a['you']['losses']}" + (f"-{a['you']['ties']}" if a["you"]["ties"] else ""),
             "pf": a["you"]["pf"], "playoff_result": a["you"]["playoff_result"], "champion": a["champion"], "avg_age": a["you"]["avg_age"],
             "top_scorers": a["you"]["top_scorers"],
             **({} if snap.settings.league_anchor else {"standings": a["standings"]}),  # v3: the league view carries history; no per-year table
         } for a in seasons],
         **({"history": league_history(snap, state)} if snap.settings.league_anchor else {}),
-        "rookie_drafts": [{"year": d["year"], "picks": [x for x in d["picks"] if x["team"] == snap.user_team.tid]} for d in state.rookie_log],
+        "rookie_drafts": [{"year": d["year"], "season_label": season_label_for_year(d["year"], S.start_year), "picks": [x for x in d["picks"] if x["team"] == snap.user_team.tid]} for d in state.rookie_log],
         "picks_held": len(state.picks_of(snap.user_team.tid)),
     }
 

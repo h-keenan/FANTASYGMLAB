@@ -41,6 +41,7 @@ import {
   type SimOffseasonResponse,
   type SimPos,
   type SimTeamRosterResponse,
+  simSeasonText,
 } from '../lib/simGame';
 
 type Busy = 'start' | 'pick' | 'auto' | 'season' | null;
@@ -194,7 +195,7 @@ function ReviewStage({ off, ctx, years }: { off: SimOffseason; ctx: SimCtx; year
       {notice ? <SimGeneratedNoticeSheet onClose={() => setNotice(false)} /> : null}
       {last && lastYear ? (
         <SimCollapse
-          title={`${last.year} season`}
+          title={simSeasonText(last)}
           summary={`${lastYear.record}, ${simOrdinal(lastYear.rank)} · ${simPlayoffResultLabel(lastYear.playoff_result)}`}
           tone={last.champion?.is_you ? 'success' : 'accent'}
           defaultOpen

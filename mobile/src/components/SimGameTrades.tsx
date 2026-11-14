@@ -33,6 +33,7 @@ import TradePickerSheet, { TradeSideSummary } from './TradePickerSheet';
 import {
   SIM_TRADE_EMPTY,
   simFmtPts,
+  simProjText,
   simIsPick,
   simIsPickId,
   simPickLabelText,
@@ -85,7 +86,7 @@ function PlayerList({ players }: { players: SimTradeAsset[] }) {
             <View style={{ flex: 1, minWidth: 0 }}>
               <SimPlayerChip player={p} size={28} quick />
             </View>
-            <SimStat label="Proj" value={simFmtPts(p.projection)} />
+            <SimStat label="Proj" value={simProjText(p)} />
           </View>
         ),
       )}
@@ -390,7 +391,7 @@ function Builder({ ctx, seed, onSeedUsed }: { ctx: SimCtx; seed: SimTradeSeed | 
   };
   const describePick = (p: SimTradeAsset) => {
     const pick = p as SimPickAsset;
-    return { label: `${simPickLabelText(pick)}${pick.own === false ? ` via ${pick.orig_team_name}` : ""}`, detail: null, round: pick.round, group: `${pick.season} picks` };
+    return { label: `${simPickLabelText(pick)}${pick.own === false ? ` via ${pick.orig_team_name}` : ""}`, detail: null, round: pick.round, group: `${pick.season_label || pick.season} picks` };
   };
   const toItems = (groups: SimAssetGroup<SimTradeAsset>[]) => simGroupsToSheetItems(groups, simHeadshotId, describePick);
   const sheetItems = sheetSide ? toItems(groupsFor(sheetSide === 'give' ? mine : partnerRoster, sheetSide === 'give' ? myPicks : theirPicks)) : [];

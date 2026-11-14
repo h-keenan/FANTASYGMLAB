@@ -13,6 +13,7 @@ from modules.sim.game_dynasty import class_strength, dynasty_summary, rookies_av
 from modules.sim.game_eval import Evaluator
 from modules.sim.game_state import GameState
 from modules.sim.game_types import GameSnapshot
+from modules.sim.season_label import season_label
 from modules.sim.game_view import pick_asset, player_row, reserve_block
 
 
@@ -80,6 +81,8 @@ def offseason_view(snap: GameSnapshot, state: GameState, *, pos: str = "", limit
     return {
         "stage": stage, "year": off.get("year"), "season_no": state.season_no, "seasons": S.seasons,
         "next_year": off.get("year"), "last_season": last,
+        "season_label": season_label(state.season_no + 1, off.get("year")),  # the season about to start, "S3 2028"
+        "last_season_label": season_label(state.season_no, S.start_year + state.season_no - 1 if S.start_year else None),
         # The incoming class is simulated (names and talent generated, scaled to this league's pool).
         "rookie_class": {"generated": True, "strength": class_strength(snap.root, state.view_no)[1],
                          "size": len([1 for p in snap.players.values() if p.extra.get("draft_year") == float(off.get("year") or 0)])},

@@ -8,7 +8,7 @@ import { SimCrest } from "@/components/SimCrest";
 import { SkeletonRows } from "@/components/Skeleton";
 import { ToneBadge } from "@/components/ToneBadge";
 import { api } from "@/lib/api";
-import type { SimPlayerHistoryResponse } from "@/lib/simGame";
+import { simSeasonText, type SimPlayerHistoryResponse } from "@/lib/simGame";
 import { simDraftSlotText, simHistoryText, simWhenLabel } from "@/lib/simHistory";
 
 /**
@@ -100,7 +100,7 @@ export function SimPlayerHistory({ gameId, playerId }: { gameId: string; playerI
               <li key={s.season}>
                 <AccentCard accent="var(--color-border-strong)" compact as="div">
                   <div className="flex items-center justify-between gap-2">
-                    <span className="text-sm font-extrabold">{s.year ?? `Season ${s.season}`}</span>
+                    <span className="text-sm font-extrabold">{simSeasonText(s) || `Season ${s.season}`}</span>
                     <span className="text-xs tabular-nums" style={{ color: "var(--color-text-secondary)" }}>
                       {s.games} games · {s.points.toFixed(1)} pts{s.ppg != null ? ` · ${s.ppg.toFixed(1)} ppg` : ""}
                     </span>
