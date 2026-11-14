@@ -2,10 +2,12 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 
 import AppText from './AppText';
+import BottomPill from './BottomPill';
 import Button from './Button';
 import type { SimCtx } from './SimGameParts';
 import { useThemeMode } from '../context/ThemeModeContext';
 import { api } from '../lib/api';
+import { usePillState } from '../lib/useBottomPillContext.ts';
 import { simTabAfterStageAction, type SimStageAction } from '../lib/simScroll';
 import { simOffseasonCta, simOffseasonStageLabel, simSeasonLabel, type SimOffseason, type SimOffseasonResponse } from '../lib/simGame';
 import { BAR_METRICS } from '../lib/bottomBarMetrics';
@@ -20,6 +22,7 @@ import { radii, spacing, type ThemeColors } from '../theme';
  * SimActionBar: the screen's bottom stack docks it with the game orb above it.
  */
 export default function SimOffseasonBar({ ctx, onTab, orb }: { ctx: SimCtx; onTab?: (tab: 'home') => void; orb?: React.ReactNode }) {
+  const pill = usePillState();
   const { colors } = useThemeMode();
   const styles = useMemo(() => createStyles(colors), [colors]);
   const { gameId, call } = ctx;
@@ -102,12 +105,14 @@ export default function SimOffseasonBar({ ctx, onTab, orb }: { ctx: SimCtx; onTa
           {cta.blocked}
         </AppText>
       ) : null}
-      <View style={styles.row}>
+      <BottomPill bare context={pill.barPresent ? pill.ctx : null}>
+        <View style={styles.row}>
         {orb}
         <View style={[styles.cta, cta.blocked ? styles.ctaBlocked : null]}>
           <Button label={cta.label} loading={busy && !confirmAuto} disabled={Boolean(cta.blocked) || confirmAuto} onPress={press} />
         </View>
-      </View>
+        </View>
+      </BottomPill>
     </View>
   );
 }

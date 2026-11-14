@@ -19,7 +19,7 @@ import { radii, type ThemeColors } from '../theme';
  * the UI thread; under OS Reduce Motion it is a crossfade only. Stays an in-flow block in the screen's bottom stack
  * (never absolutely positioned to the screen), so useOrbClearance / content padding rules are unchanged.
  */
-export default function BottomPill({ children, context: rawContext, style, testID }: { children: React.ReactNode; context?: PillContext | null; style?: StyleProp<ViewStyle>; testID?: string }) {
+export default function BottomPill({ children, context: rawContext, style, testID, bare, contextOnly }: { children: React.ReactNode; context?: PillContext | null; style?: StyleProp<ViewStyle>; testID?: string; /** Already inside a glass pill (the Sim bars): draw no chrome of its own. */ bare?: boolean; /** No row to fold back to (the draft room has no action bar): show the page segment alone, no menu. */ contextOnly?: boolean }) {
   const { colors } = useThemeMode();
   const styles = useMemo(() => createStyles(colors), [colors]);
   const context = normalizePillContext(rawContext);
@@ -28,7 +28,7 @@ export default function BottomPill({ children, context: rawContext, style, testI
   const t = useSharedValue(0); // 0 = context segment, 1 = default row
   const hasContext = Boolean(context);
   const contextId = context?.id ?? null;
-  const folded = hasContext && !open;
+  const folded = hasContext && (!open || Boolean(contextOnly));
   useEffect(() => setOpen(false), [contextId]);
   useEffect(() => {
     t.value = withTiming(folded ? 0 : 1, { duration: reduced ? MOTION_MS.fast : MOTION_MS.base, easing: Easing.bezier(...EASE.out) });
@@ -38,12 +38,12 @@ export default function BottomPill({ children, context: rawContext, style, testI
   const defaultStyle = useAnimatedStyle(() => ({ opacity: t.value, transform: [{ translateX: shift * (1 - t.value) }] }));
 
   return (
-    <View style={[styles.pill, style]} testID={testID}>
+    <View style={[bare ? styles.bare : styles.pill, style]} testID={testID}>
       {context ? (
         <Animated.View style={[styles.layer, contextStyle, !folded && styles.layerOff]} pointerEvents={folded ? 'auto' : 'none'} accessibilityElementsHidden={!folded} importantForAccessibility={folded ? 'auto' : 'no-hide-descendants'}>
-          <PressableScale accessibilityRole="button" accessibilityLabel={PILL_MENU_LABEL} accessibilityState={{ expanded: open }} onPress={() => setOpen(true)} style={styles.iconBtn} testID="pill-menu">
+          {contextOnly ? null : <PressableScale accessibilityRole="button" accessibilityLabel={PILL_MENU_LABEL} accessibilityState={{ expanded: open }} onPress={() => setOpen(true)} style={styles.iconBtn} testID="pill-menu">
             <TabIcon name="more" color={colors.textSecondary} size={22} />
-          </PressableScale>
+          </PressableScale>}
           <View style={styles.divider} />
           <View accessibilityRole="tablist" accessibilityLabel={context.label} style={styles.tabs}>
             {context.tabs.map((tab, i) => {
@@ -66,14 +66,14 @@ export default function BottomPill({ children, context: rawContext, style, testI
           ) : null}
         </Animated.View>
       ) : null}
-      <Animated.View style={[styles.layer, hasContext ? defaultStyle : null, hasContext && folded && styles.layerOff]} pointerEvents={hasContext && folded ? 'none' : 'auto'} accessibilityElementsHidden={hasContext && folded} importantForAccessibility={hasContext && folded ? 'no-hide-descendants' : 'auto'}>
+      {contextOnly ? null : <Animated.View style={[styles.layer, hasContext ? defaultStyle : null, hasContext && folded && styles.layerOff]} pointerEvents={hasContext && folded ? 'none' : 'auto'} accessibilityElementsHidden={hasContext && folded} importantForAccessibility={hasContext && folded ? 'no-hide-descendants' : 'auto'}>
         {hasContext ? (
           <PressableScale accessibilityRole="button" accessibilityLabel="Back to page actions" accessibilityState={{ expanded: true }} onPress={() => setOpen(false)} style={styles.iconBtn} testID="pill-menu-close">
             <TabIcon name="more" color={colors.accent} size={22} />
           </PressableScale>
         ) : null}
-        {children}
-      </Animated.View>
+        <View style={styles.fill}>{children}</View>
+      </Animated.View>}
     </View>
   );
 }
@@ -95,8 +95,10 @@ function createStyles(colors: ThemeColors) {
       shadowOffset: { width: 0, height: 6 },
       elevation: 6,
     },
+    fill: { flex: 1, minWidth: 0 },
+    bare: { minHeight: target },
     layer: { flexDirection: 'row', alignItems: 'center', gap: 8, minHeight: target },
-    layerOff: { position: 'absolute', left: BAR_METRICS.pillPadding, right: BAR_METRICS.pillPadding, top: BAR_METRICS.pillPadding },
+    layerOff: { position: 'absolute', left: 0, right: 0, top: 0 },
     iconBtn: { width: target, height: target, alignItems: 'center', justifyContent: 'center', borderRadius: radii.pill },
     divider: { width: 1, height: 24, backgroundColor: colors.glassBorder },
     tabs: { flex: 1, minWidth: 0, flexDirection: 'row', alignItems: 'center', gap: 2 },

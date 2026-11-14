@@ -9,6 +9,7 @@ import ErrorState from './ErrorState';
 import FadeInView from './FadeInView';
 import SectionHeading from './SectionHeading';
 import SegmentedTabBar from './SegmentedTabBar';
+import { useBottomPillContext } from '../lib/useBottomPillContext.ts';
 import { SkeletonCard } from './SkeletonBlock';
 import CompactModule from './CompactModule';
 import { SimDraftBoard, SimDraftIconButton } from './SimDraftBoard';
@@ -173,6 +174,25 @@ export function SimGameDraft({ ctx, onComplete }: { ctx: SimCtx; onComplete: (re
     for (const t of draft?.teams ?? []) map[t.team_id] = t.is_you ? `${t.name} (you)` : t.name;
     return map;
   }, [draft?.teams]);
+
+  // Phones: the draft room's panel tabs live in the bottom pill (web twin: SimGameDraft.tsx), so the top row steps aside there.
+  const pillOwnsTabs = useBottomPillContext(
+    loadState === 'ready' && draft
+      ? {
+          id: 'sim-draft',
+          label: 'Draft panels',
+          tabs: [
+            { key: 'board', label: 'Players', glyph: 'players' },
+            { key: 'queue', label: queue.ids.length ? `Queue ${queue.ids.length}` : 'Queue', glyph: 'queue' },
+            { key: 'roster', label: 'Roster', glyph: 'roster' },
+            { key: 'picks', label: 'Picks', glyph: 'picks' },
+          ],
+          activeKey: panel,
+          onSelect: (key) => setPanel(key as Panel),
+          primary: { key: 'auto-pick', label: 'Auto-pick', glyph: 'recommended', disabled: draft.status === 'complete' || busy === 'pick', onPress: () => setConfirmAuto(true) },
+        }
+      : null,
+  );
 
   if (loadState === 'loading') {
     return (
@@ -362,6 +382,7 @@ export function SimGameDraft({ ctx, onComplete }: { ctx: SimCtx; onComplete: (re
         )}
       </CompactModule>
       <SimDraftOverview draft={draft} teams={game.settings.teams} onOpen={ctx.openPlayer} />
+      {pillOwnsTabs ? null : (
       <SegmentedTabBar<Panel>
         options={[
           { key: 'board', label: 'Players', glyph: 'players' },
@@ -372,6 +393,7 @@ export function SimGameDraft({ ctx, onComplete }: { ctx: SimCtx; onComplete: (re
         active={panel}
         onChange={setPanel}
       />
+      )}
       {panel === 'board' ? board : side()}
     </View>
   );
