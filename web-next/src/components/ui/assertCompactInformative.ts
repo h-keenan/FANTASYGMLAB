@@ -22,13 +22,37 @@ export function collapsedModuleProblems(root: ParentNode, min: number = MIN_COLL
 
 /** Every `<CompactModule` JSX opening tag in `source`, as its props text (brace-aware, so `=>` and `{}` are skipped). */
 export function compactModuleOpeningTags(source: string): string[] {
+  return openingTags(source, "CompactModule");
+}
+
+/**
+ * The Row template's right-edge rule (docs/ui-patterns.md): the trailing slot of a list row holds ONE action or ONE
+ * number, never a cluster. Returns problems for a rendered `[data-testid="list-actions"]` that holds more than one
+ * interactive element, or an interactive element beside a number.
+ */
+export function rowRightEdgeProblems(root: ParentNode): string[] {
+  const problems: string[] = [];
+  for (const slot of Array.from(root.querySelectorAll<HTMLElement>('[data-testid="list-actions"]'))) {
+    const interactive = slot.querySelectorAll("button, a[href], [role='button'], input, select").length;
+    const label = (slot.textContent ?? "").trim().slice(0, 30);
+    if (interactive > 1) problems.push(`trailing slot has ${interactive} controls ("${label}")`);
+  }
+  return problems;
+}
+
+/** Every `<Name` JSX opening tag in `source` (brace-aware). */
+export function openingTags(source: string, name: string): string[] {
   const tags: string[] = [];
   let from = 0;
   for (;;) {
-    const at = source.indexOf("<CompactModule", from);
+    const at = source.indexOf(`<${name}`, from);
     if (at === -1) return tags;
+    if (/[A-Za-z0-9]/.test(source[at + name.length + 1] ?? "")) {
+      from = at + 1;
+      continue;
+    }
     let depth = 0;
-    let i = at + "<CompactModule".length;
+    let i = at + name.length + 1;
     let quote: string | null = null;
     for (; i < source.length; i += 1) {
       const c = source[i];

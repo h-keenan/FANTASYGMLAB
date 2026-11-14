@@ -16,7 +16,8 @@ import {
   statStripParts,
   trendModel,
 } from "@/lib/moduleTemplates";
-import { collapsedModuleProblems, compactModuleOpeningTags } from "./assertCompactInformative";
+import { PlayerListRow } from "@/components/PlayerListRow";
+import { collapsedModuleProblems, compactModuleOpeningTags, openingTags, rowRightEdgeProblems } from "./assertCompactInformative";
 
 beforeEach(() => window.localStorage.clear());
 
@@ -124,6 +125,38 @@ describe("source scan: no CompactModule without a summary (web and app)", () => 
         }
       }
       expect(seen).toBeGreaterThan(0);
+      expect(offenders).toEqual([]);
+    });
+  }
+});
+
+describe("Row template: the right edge is one action or one number", () => {
+  it("passes a row with one trailing action and flags a cluster", () => {
+    const { container, rerender } = render(<PlayerListRow name="Jahmyr Gibbs" position="RB" stats={[{ key: "p", label: "Proj", value: "12.1" }]} actions={<button>Draft</button>} />);
+    expect(rowRightEdgeProblems(container)).toEqual([]);
+    rerender(
+      <PlayerListRow
+        name="Jahmyr Gibbs"
+        position="RB"
+        actions={
+          <>
+            <button>Queue</button>
+            <button>Draft</button>
+          </>
+        }
+      />,
+    );
+    expect(rowRightEdgeProblems(container)).toHaveLength(1);
+  });
+
+  for (const root of [path.resolve(__dirname, "../.."), path.resolve(__dirname, "../../../../mobile/src")]) {
+    it(`no <PlayerListRow actions={<>...</>}> fragment under ${root.includes("mobile") ? "app" : "web"}`, () => {
+      const offenders: string[] = [];
+      for (const file of sourceFiles(root)) {
+        for (const tag of openingTags(readFileSync(file, "utf8"), "PlayerListRow")) {
+          if (/\bactions=\{\s*<>/.test(tag)) offenders.push(path.relative(root, file));
+        }
+      }
       expect(offenders).toEqual([]);
     });
   }

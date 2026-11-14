@@ -84,14 +84,23 @@ describe("TeamStatusHero on the Dashboard", () => {
     vi.spyOn(api, "getGamesSeasonSim").mockRejectedValue(new Error("offseason"));
     render(<DashboardContent leagueId="abc" leagueName="L" data={DATA} />);
     const hero = await screen.findByTestId("team-status-hero");
-    await waitFor(() => expect(within(hero).getByText("vs Rival FC")).toBeInTheDocument());
+    window.localStorage.clear();
+    // The Hero: one big number (win chance) with the matchup as its one context line.
+    await waitFor(() => expect(within(hero).getByTestId("hero-value")).toHaveTextContent("63%"));
     expect(within(hero).getByText("Your win chance")).toBeInTheDocument();
-    expect(within(hero).getByText("63%")).toBeInTheDocument();
-    expect(within(hero).getByText("101.3 - 96.0")).toBeInTheDocument();
-    expect(within(hero).getByText("1 starter can't play (bye or out)")).toBeInTheDocument();
-    expect(within(hero).getByText("Best swap: start Backup Back over Hurt Back (+6.2 pts)")).toBeInTheDocument();
-    expect(within(hero).getByText("3rd of 3")).toBeInTheDocument();
-    expect(within(hero).getByText("3-5")).toBeInTheDocument();
+    expect(within(hero).getByTestId("hero-context")).toHaveTextContent("vs Rival FC");
+    expect(within(hero).getByTestId("hero-context")).toHaveTextContent("Proj 101.3 - 96.0");
+    // Lineup is a link module: the headline and best swap read without any tap.
+    const lineup = within(hero).getByTestId("team-status-lineup");
+    expect(lineup).toHaveTextContent("1 starter can't play (bye or out)");
+    expect(lineup).toHaveTextContent("Best swap: start Backup Back over Hurt Back (+6.2 pts)");
+    expect(within(lineup).getByRole("link")).toHaveAttribute("href", "/matchup/abc?name=L");
+    // Standing and Position rooms are collapsed modules that already say the numbers.
+    const standingBtn = within(hero).getByRole("button", { name: /^Standing: 3rd of 3 · 3-5/ });
+    expect(within(hero).getByRole("button", { name: /^Position rooms: RB Needs help/ })).toBeInTheDocument();
+    fireEvent.click(standingBtn);
+    expect(within(hero).getByText("Open League Rankings →")).toBeInTheDocument();
+    fireEvent.click(within(hero).getByRole("button", { name: /^Position rooms:/ }));
     expect(within(hero).getByTestId("team-status-position-RB")).toHaveAttribute("data-weakest", "true");
     expect(within(hero).getByTestId("team-status-position-QB")).not.toHaveAttribute("data-weakest");
     expect(within(hero).getByRole("link", { name: /Improve RB first/ })).toHaveAttribute("href", "/trade-hub/abc?name=L");
@@ -117,5 +126,6 @@ describe("TeamStatusHero on the Dashboard", () => {
     expect(screen.queryByTestId("team-status-hero")).toBeNull();
     expect(screen.queryByText("Your win chance")).toBeNull();
     expect(screen.queryByTestId("team-status-positions")).toBeNull();
+    expect(screen.queryByTestId("team-status-main")).toBeNull();
   });
 });

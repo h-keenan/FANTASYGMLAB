@@ -2,7 +2,7 @@
 
 import { PageTabBar } from "@/components/PageTabBar";
 import { BEGINNER_HELP } from "@/lib/experienceCopy";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 import { AccentCard } from "@/components/AccentCard";
 import { BeginnerHelp } from "@/components/BeginnerHelp";
@@ -25,6 +25,7 @@ import {
 } from "@/lib/leagueRankingsPresentation";
 import { ManagerProfileSheet } from "@/components/ManagerProfileSheet";
 import { SectionHeading } from "@/components/SectionHeading";
+import { CompactModule } from "@/components/ui/CompactModule";
 import { TeamAvatar } from "@/components/TeamAvatar";
 import { PremiumUpsellCard } from "@/components/PremiumUpsellCard";
 import { ToneBadge } from "@/components/ToneBadge";
@@ -247,15 +248,21 @@ function StandingsSection({ data, myRosterId, onOpenManager }: { data: LeagueTea
   }
 
   const ordered = sortByStanding(data.teams);
+  const first = ordered[0];
+  const me = ordered.find((team) => team.roster_id === myRosterId);
+  const recordOf = (team: TeamRanking) => `${team.wins ?? 0}-${team.losses ?? 0}${team.ties ? `-${team.ties}` : ""}`;
+  const standingParts = [
+    first ? { key: "first", text: `1. ${first.team_name || "Team"} ${recordOf(first)}`, strong: true } : null,
+    me && me.standing_rank != null ? { key: "you", text: `You ${formatRank(me.standing_rank, false)} · ${recordOf(me)}`, tone: "accent" as const } : null,
+    { key: "n", text: `${ordered.length} teams` },
+  ];
 
   return (
-    <section className="flex flex-col gap-3">
-      <SectionHeading
-        kicker="Where you stand"
-        note={`${data.week_label ? `${data.week_label} — ` : ""}Actual results from league matchups — separate from Roster Power strength.`}
-      >
-        {title}
-      </SectionHeading>
+    <section>
+      <CompactModule id="league.standings" title={title} parts={standingParts}>
+      <p className="text-xs" style={{ color: "var(--color-text-muted)" }}>
+        {`${data.week_label ? `${data.week_label} — ` : ""}Actual results from league matchups — separate from Roster Power strength.`}
+      </p>
       <div className="glass-surface flex flex-col">
         {ordered.map((team) => {
           const percentile = percentileFromRank(team.standing_rank, ordered.length);
@@ -290,6 +297,7 @@ function StandingsSection({ data, myRosterId, onOpenManager }: { data: LeagueTea
           );
         })}
       </div>
+      </CompactModule>
     </section>
   );
 }
@@ -407,9 +415,25 @@ function RankBoardSection({ board, teams, myRosterId, onOpenManager }: { board: 
     ? ordered
     : ordered.filter((team, index) => index < BOARD_PREVIEW_COUNT || team.roster_id === myRosterId);
 
+  // A rank board is a compact module: collapsed it names the leader and where you sit; the Roster Power board (and any
+  // board an insight link targets with #board-x) opens by default.
+  const anchor = rankBoardAnchor(board);
+  const [hashOpen, setHashOpen] = useState(false);
+  useEffect(() => {
+    if (typeof window !== "undefined" && window.location.hash === `#${anchor}`) setHashOpen(true);
+  }, [anchor]);
+  const leader = ordered[0];
+  const mine = ordered.find((team) => team.roster_id === myRosterId);
+  const mineRank = mine ? (mine[config.rankField] as number | null) : null;
+  const parts = [
+    leader ? { key: "leader", text: `1. ${leader.team_name || "Team"}`, strong: true } : null,
+    mine && mineRank != null ? { key: "you", text: `You ${formatRank(mineRank, Boolean(mine[config.tiedField]))}`, tone: "accent" as const } : null,
+    { key: "count", text: `${ordered.length} teams` },
+  ];
   return (
-    <section id={rankBoardAnchor(board)} className="flex flex-col gap-3 scroll-mt-4" data-testid={`rank-board-${board}`}>
-      <SectionHeading kicker={config.kicker} note={config.note}>{config.title}</SectionHeading>
+    <section id={anchor} className="scroll-mt-4" data-testid={`rank-board-${board}`}>
+      <CompactModule key={hashOpen ? "hash" : "idle"} id={`league.board.${board}`} title={config.title} parts={parts} defaultOpen={hashOpen || board === "power"} persist={!hashOpen}>
+      <p className="text-xs" style={{ color: "var(--color-text-muted)" }}>{config.note}</p>
       <div className="glass-surface flex flex-col">
         {visible.map((team) => {
           const rank = team[config.rankField] as number | null;
@@ -452,6 +476,7 @@ function RankBoardSection({ board, teams, myRosterId, onOpenManager }: { board: 
           </button>
         ) : null}
       </div>
+      </CompactModule>
     </section>
   );
 }

@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { ValueSignalsCard } from "@/components/ValueSignalsCard";
@@ -30,14 +30,19 @@ const item = (over: Partial<ValueSignalItem> = {}): ValueSignalItem => ({
 });
 
 describe("ValueSignalsCard", () => {
-  beforeEach(() => vi.restoreAllMocks());
+  beforeEach(() => {
+    vi.restoreAllMocks();
+    window.localStorage.clear();
+  });
 
   it("lists buy-low players with both halves of the reason", async () => {
     vi.spyOn(api, "getPlayerValueSignals").mockResolvedValue({
       ok: true, status: "ok", span_days: 12, method: "Method.", buy_low: [item()], sell_high: [],
     });
     render(<ValueSignalsCard leagueId="L" />);
-    await waitFor(() => expect(screen.getByText("Test Receiver")).toBeTruthy());
+    // Collapsed it already says "1 signal · 1 buy low · 0 sell high · Test Receiver"; open for the reasons.
+    fireEvent.click(await screen.findByRole("button", { name: /^Buy low \/ Sell high: 1 signal/ }));
+    await waitFor(() => expect(screen.getAllByText("Test Receiver").length).toBeGreaterThan(0));
     expect(screen.getByText(/production 80th pct vs value 50th/)).toBeTruthy();
     expect(screen.getByText(/12 days of stored value history/)).toBeTruthy();
   });
@@ -47,7 +52,7 @@ describe("ValueSignalsCard", () => {
       ok: true, status: "history_building", span_days: 3, min_span_days: 7, buy_low: [], sell_high: [],
     });
     render(<ValueSignalsCard leagueId="L" />);
-    await waitFor(() => expect(screen.getByText(/3 days stored so far, 7 needed/)).toBeTruthy());
+    await waitFor(() => expect(screen.getAllByText(/3 days stored so far, 7 needed/).length).toBeGreaterThan(0));
   });
 
   it("renders nothing when value history is unavailable", async () => {

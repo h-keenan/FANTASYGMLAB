@@ -29,6 +29,7 @@ import TradeSharePreviewModal from '../components/TradeSharePreviewModal';
 import TradeValueBar from '../components/TradeValueBar';
 import TradeValueHero from '../components/TradeValueHero';
 import ValueSignalsCard from '../components/ValueSignalsCard';
+import { Hero } from '../components/ModuleTemplates';
 import ValuesCredit from '../components/ValuesCredit';
 import {
   type AllTradesEntitlement,
@@ -44,6 +45,7 @@ import {
   type ValuationLens,
 } from '../lib/api';
 import { api } from '../lib/api';
+import { formatTradeGain } from '../lib/liveDraft';
 import { trackUse } from '../lib/analytics';
 import { toUserErrorMessage } from '../lib/errorMessages';
 import { adsAvailable, showRewardedAd } from '../lib/ads';
@@ -314,6 +316,15 @@ export default function TradeHubScreen({ leagueId, leagueName, navigation }: Pro
               total={entitlement.approved_count}
               shown={entitlement.visible_count}
               isPremium={entitlement.is_premium}
+            />
+          ) : null}
+          {isForYou && !activeLoading && !activeError && !notReadyReason && ideas && ideas.length > 0 ? (
+            <Hero
+              label="Trade ideas"
+              value={String(ideas.length)}
+              context={`Top: ${ideas[0].partner_team_name} · ${formatTradeGain(ideas[0].trade_gain)}`}
+              tone="action"
+              testID="trade-hub-hero"
             />
           ) : null}
           {isForYou && !activeLoading && !activeError && !notReadyReason && ideas ? (

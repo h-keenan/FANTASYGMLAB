@@ -11,6 +11,8 @@ import { PitchShareButton } from "@/components/MultiTeamPitchButton";
 import { PremiumUpsellCard } from "@/components/PremiumUpsellCard";
 import { SkeletonCard } from "@/components/Skeleton";
 import { ToneBadge } from "@/components/ToneBadge";
+import { CompactModule } from "@/components/ui/CompactModule";
+import { compactCount } from "@/lib/compactModule";
 import { trackUse } from "@/lib/analytics";
 import { api } from "@/lib/api";
 import {
@@ -64,14 +66,21 @@ export function MultiTeamIdeasSection({ leagueId, leagueName, lens }: { leagueId
     };
   }, [leagueId, lens, attempt]);
 
+  const section = response ? ideasSection(response) : null;
+  const parts = error
+    ? [{ key: "e", text: "Couldn't load 3-team ideas", tone: "danger" as const }]
+    : !section
+      ? [{ key: "l", text: "Looking for 3-team deals" }]
+      : section.kind === "ideas"
+        ? [{ key: "n", text: compactCount(section.ideas.length, "3-team deal"), strong: true }, { key: "f", text: "fair for every team" }]
+        : section.kind === "locked"
+          ? [{ key: "n", text: lockedTeaserTitle(section.count), strong: true }, { key: "p", text: "Pro", tone: "action" as const }]
+          : [{ key: "m", text: section.kind === "closed" ? "Trading is closed" : "No 3-team deals right now" }];
   return (
-    <section className="flex flex-col gap-3" aria-label="3-team trade ideas" data-testid="multi-team-ideas">
-      <header className="flex flex-col gap-1">
-        <h2 className="text-lg font-black m-0">3-team ideas</h2>
-        <p className="text-sm m-0" style={{ color: "var(--color-text-secondary)" }}>
-          Three-way deals where your surplus players and picks fill one team&apos;s need, theirs fills another&apos;s, and every team still comes out fair.
-        </p>
-      </header>
+    <CompactModule id="trades.multi" title="3-team ideas" testId="multi-team-ideas" tone="action" parts={parts}>
+      <p className="text-sm m-0" style={{ color: "var(--color-text-secondary)" }}>
+        Three-way deals where your surplus players and picks fill one team&apos;s need, theirs fills another&apos;s, and every team still comes out fair.
+      </p>
       <IdeasBody
         leagueId={leagueId}
         leagueName={leagueName}
@@ -79,7 +88,7 @@ export function MultiTeamIdeasSection({ leagueId, leagueName, lens }: { leagueId
         error={error}
         onRetry={() => setAttempt((n) => n + 1)}
       />
-    </section>
+    </CompactModule>
   );
 }
 
