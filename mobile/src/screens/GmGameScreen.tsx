@@ -117,6 +117,7 @@ import {
 } from '../lib/simGame';
 import { simToProgressLabel, simToRemaining } from '../lib/simTo';
 import { simScrollKey, simShouldScrollTop } from '../lib/simScroll';
+import { simAttachAchievements } from '../lib/simAchievements';
 import { SIM_FLOW_INITIAL, simFlowReducer, simRecapsFromAdvance, type SimTab } from '../lib/simGameFlow';
 import { useSimGameRequest } from '../lib/useSimGameRequest';
 import { useSimLeagueTeams } from '../lib/useSimLeagueTeamPicker';
@@ -365,7 +366,7 @@ export default function GmGameScreen({ navigation }: Props) {
       setGameState(res.game);
       if (res.preview !== undefined) setPreview(res.preview ?? null);
       setClaims([]);
-      dispatch({ type: 'advanced', recaps: simRecapsFromAdvance(res.recap, res.also_played), game: res.game });
+      dispatch({ type: 'advanced', recaps: simAttachAchievements(simRecapsFromAdvance(res.recap, res.also_played), res.achievements), game: res.game });
       setTick((n) => n + 1);
       void refreshList();
     }

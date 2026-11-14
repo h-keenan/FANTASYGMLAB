@@ -2,6 +2,8 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { View } from 'react-native';
 
 import AccentCard from './AccentCard';
+import { SimBadgeChips, SimTrophyRow } from './SimAchievements';
+import { simTeamBadges, simTeamTrophies } from '../lib/simAchievements';
 import AppText from './AppText';
 import Button from './Button';
 import ErrorState from './ErrorState';
@@ -75,6 +77,13 @@ export function SimTeamHistory({ gameId, teamId }: { gameId: string; teamId: str
   const shown = allMoves ? moves : moves.slice(0, 8);
   return (
     <>
+      <SimTrophyRow rows={simTeamTrophies(seasons)} />
+      {simTeamBadges(data.achievements).length > 0 ? (
+        <View style={common.stack} accessibilityLabel="Your achievements">
+          <SimSectionTitle glyph="trophy" title="Achievements" />
+          <SimBadgeChips items={simTeamBadges(data.achievements)} />
+        </View>
+      ) : null}
       {seasons.length > 0 ? (
         <View style={common.stack} accessibilityLabel="Record by season">
           <SimSectionTitle glyph="standings" title="Record by season" />

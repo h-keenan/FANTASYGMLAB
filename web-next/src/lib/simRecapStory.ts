@@ -2,7 +2,6 @@
 //
 // Which pages the weekly-recap story shows and what goes on each one: pure selection logic, no React.
 // Every page is glanceable by construction: a hero number plus at most STORY_ITEMS supporting items.
-import { simRecapHasAchievements } from "./simAchievements";
 import type { SimGamePlayer, SimRecapScore, SimRecapStarter, SimWeekRecap } from "./simGame";
 
 export const STORY_ITEMS = 3;
@@ -32,7 +31,8 @@ const fmt = (n: number) => (Math.round(n * 10) / 10).toFixed(1);
 /** The page order: Result, Achievements (only when the week unlocked a badge or hit a milestone), Matchup, Injuries and lineup, Around the league, Standings (regular season), Season (the final week only), Next week. Pages with nothing to say are dropped. */
 export function simRecapPageKeys(recap: SimWeekRecap, facts: SimRecapFacts): SimRecapPageKey[] {
   const keys: SimRecapPageKey[] = ["result"];
-  if (simRecapHasAchievements(recap.achievements)) keys.push("achievements");
+  // (inline, not imported: the app runs these libs under node:test, which needs no runtime import between twins)
+  if (recap.achievements && (recap.achievements.new.length > 0 || recap.achievements.milestones.length > 0)) keys.push("achievements");
   if (recap.your_game && recap.your_game.result !== "bye" && recap.your_game.starters.length > 0) keys.push("matchup");
   const hurt = (recap.injuries ?? []).length > 0;
   const flagged = (recap.your_game?.starters ?? []).some((s) => s.flag != null);

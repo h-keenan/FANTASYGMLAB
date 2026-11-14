@@ -1,3 +1,4 @@
+import { SimAchievementsModule } from './SimAchievements';
 import React, { useEffect, useMemo, useState } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 
@@ -136,6 +137,7 @@ export function SimHomeTab({ ctx, setClaims, onTab }: { ctx: SimCtx; setClaims: 
       <SimWaiverCard ctx={ctx} suggestions={home.waiver_suggestions ?? []} onClaim={claim} onTab={onTab} />
       <SimByeCard ctx={ctx} alerts={home.bye_alerts ?? []} onTab={onTab} onClaim={claim} />
       <SimInjuriesCard ctx={ctx} injuries={home.injuries ?? []} />
+      <SimAchievementsModule payload={home.achievements} seasonNo={ctx.game.dynasty?.season_no ?? 1} />
       {/* One scroll: the old "This week | League" tabs are gone; the league cards sit in a collapsed section. */}
       <CompactModule id="home.league" title="League" testID="home-league-section" parts={simLeagueParts(home.standings, home.league?.recent.length ?? 0, home.hot_cold ? { hot: home.hot_cold.hot.length, cold: home.hot_cold.cold.length } : undefined)}>
         <SimStandingsCard standings={home.standings} onTab={onTab} />
