@@ -47,6 +47,7 @@ function ShellBarInner() {
   const pill = useSyncExternalStore(subscribePill, getPillState, getServerPillState);
   // Tell pages the pill is on screen (phones only) so they drop their own page-tab row only then.
   useEffect(() => {
+    if (typeof window.matchMedia !== "function") return; // no media queries (tests, very old browsers): the in-page tabs stay
     const mq = window.matchMedia("(max-width: 767px)");
     const sync = () => setPillBarPresent(mq.matches);
     sync();
