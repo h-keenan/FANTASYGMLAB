@@ -10,6 +10,11 @@ import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { useHeaderHeight } from '@react-navigation/elements';
 
 import AccentCard from '../components/AccentCard';
+import CompactModule from '../components/CompactModule';
+import { LinkModule } from '../components/ModuleTemplates';
+import { listSummaryParts, statStripParts } from '../lib/moduleTemplates';
+import { abbreviatePlayerName } from '../lib/formatPlayerName';
+import { tradeIdeaSummaryParts } from '../lib/tradeIdeaSummary';
 import AnimatedCard from '../components/AnimatedCard';
 import AppText from '../components/AppText';
 import BrandHeaderBar from '../components/BrandHeaderBar';
@@ -94,6 +99,8 @@ const TILE_ICON: Record<PlanSnapshotTile['key'], IconName> = {
  * section with no data is omitted or says so honestly. Mirrors web-next's
  * GmPlanContent.
  */
+const SNAPSHOT_SHORT: Record<string, string> = { power: 'Power', capital: 'Capital', odds: 'Odds', record: 'Record', starter: 'Starters', bench: 'Bench', age: 'Age' };
+
 export default function GmPlanScreen({ route, navigation }: Props) {
   const { openPlayer: openQuickView } = usePlayerQuickView();
   const orbClearance = useOrbClearance();
@@ -306,6 +313,19 @@ export default function GmPlanScreen({ route, navigation }: Props) {
     </AnimatedCard>
   ) : null;
 
+  const tradeIdeasParts = () =>
+    gateNotice
+      ? [{ key: 'gate', text: 'Locked until GM Plan is available for this league', tone: 'muted' as const }]
+      : listSummaryParts({
+          count: tradeItems.length,
+          noun: 'trade idea',
+          none: 'No trade ideas right now',
+          highlights:
+            tradeItems.length > 0
+              ? tradeItems.slice(0, 2).map((item) => `${item.partner_team_name || 'Trade idea'}${item.trade_gain != null ? ` ${item.trade_gain > 0 ? '+' : ''}${Math.round(item.trade_gain).toLocaleString()}` : ''}`)
+              : [tradeArea?.watch_for],
+        });
+
   const tradeCards = (limit?: number) =>
     gateNotice ??
     (tradeItems.length === 0 ? (
@@ -403,8 +423,20 @@ export default function GmPlanScreen({ route, navigation }: Props) {
 
         {tab === 'overview' ? (
           <>
-            <SectionHeading title="Team Situation" icon="compass-outline" />
-            <AnimatedCard style={styles.situation}>
+            <CompactModule
+              id="gmplan.situation"
+              title="Team Situation"
+              tone="action"
+              defaultOpen={!TEAM_STANCE_OPTIONS.find((o) => o.value === stance)}
+              parts={[
+                TEAM_STANCE_OPTIONS.find((o) => o.value === stance)
+                  ? { key: 'stance', text: TEAM_STANCE_OPTIONS.find((o) => o.value === stance)!.label, strong: true, tone: 'action' }
+                  : { key: 'stance', text: 'Not set yet', tone: 'warning' },
+                stance ? { key: 'tag', text: stanceLook(stance as TeamStance, colors).tagline } : { key: 'tag', text: 'Pick the stance that fits your team' },
+                weekAhead !== null ? { key: 'deadline', text: `Trade deadline Wk ${weekAhead}` } : pastDeadline ? { key: 'deadline', text: 'Past the trade deadline', tone: 'muted' } : null,
+              ]}
+            >
+            <View style={styles.situation}>
               <View style={styles.stanceRow} accessibilityRole="tablist">
                 {TEAM_STANCE_OPTIONS.map((option) => {
                   const active = stance === option.value;
@@ -452,21 +484,22 @@ export default function GmPlanScreen({ route, navigation }: Props) {
                   Past the trade deadline
                 </IconRow>
               ) : null}
-            </AnimatedCard>
+            </View>
+            </CompactModule>
 
             {snapshot.length > 0 ? (
-              <>
-                <SectionHeading
-                  title="Plan Snapshot"
-                  icon="speedometer-outline"
-                  right={link('Full analysis', () => navigation.navigate('MyTeam', { leagueId, leagueName }))}
-                />
+              <CompactModule
+                id="gmplan.snapshot"
+                title="Plan Snapshot"
+                parts={statStripParts(snapshot.map((tile) => ({ label: SNAPSHOT_SHORT[tile.key] ?? tile.label, value: tile.value })), 4)}
+                action={link('Full analysis', () => navigation.navigate('MyTeam', { leagueId, leagueName }))}
+              >
                 <View style={styles.grid}>
                   {snapshot.map((tile) => (
                     <SnapshotCell key={tile.key} tile={tile} styles={styles} colors={colors} />
                   ))}
                 </View>
-              </>
+              </CompactModule>
             ) : null}
 
             {!gateNotice && (plan?.season_phase_label || plan?.headline) ? (
@@ -478,45 +511,51 @@ export default function GmPlanScreen({ route, navigation }: Props) {
               </AnimatedCard>
             ) : null}
 
-            <SectionHeading title="Trade ideas" icon="swap-horizontal-outline" right={link('View all', openTradeHub)} />
-            {tradeCards(2)}
+            <CompactModule id="gmplan.overview.trades" title="Trade ideas" parts={tradeIdeasParts()} action={link('View all', openTradeHub)} defaultOpen>
+              {tradeCards(2)}
+            </CompactModule>
 
             {roster.length > 0 ? (
-              <>
-                <SectionHeading title="Protected Core" icon="lock-closed-outline" right={link('View all', () => setTab('core'))} />
+              <CompactModule
+                id="gmplan.overview.core"
+                title="Protected Core"
+                parts={listSummaryParts({
+                  count: protectedRows.length,
+                  noun: 'protected player',
+                  none: 'No protected players yet',
+                  highlights: [
+                    protectedRows.length > 0 ? protectedRows.slice(0, 3).map((p) => abbreviatePlayerName(p.name)).join(', ') : null,
+                    otherRows.length > 0 ? `${otherRows.length} more on your roster` : null,
+                  ],
+                })}
+                action={link('View all', () => setTab('core'))}
+              >
                 {protectedRows.length > 0 ? (
                   <AnimatedCard style={styles.listCard}>
                     {protectedRows.slice(0, 3).map((p, i, arr) => protectRow(p, i === arr.length - 1))}
                   </AnimatedCard>
                 ) : null}
                 {otherRows.length > 0 ? rosterLine : null}
-              </>
+              </CompactModule>
             ) : null}
 
-            <SectionHeading title="Season outlook" icon="flask-outline" />
-            <AnimatedCard style={styles.listCard}>
-              <PressableScale
-                accessibilityRole="button"
-                accessibilityLabel="See your season forecast"
-                onPress={() => navigation.navigate('FantasySim', { leagueId, leagueName })}
-                style={styles.outlookRow}
-              >
-                <View style={styles.outlookText}>
-                  <AppText style={styles.outlookTitle}>See your season forecast</AppText>
-                  <AppText style={styles.outlookBody}>
-                    One tap: playoff odds, projected record and finish, title odds and what swings them. Pro.
-                  </AppText>
-                </View>
-                <AppText style={styles.link}>Open</AppText>
-              </PressableScale>
-            </AnimatedCard>
+            <LinkModule
+              title="Season outlook"
+              onPress={() => navigation.navigate('FantasySim', { leagueId, leagueName })}
+              parts={[
+                { key: 'a', text: 'Season forecast', strong: true },
+                { key: 'b', text: 'playoff odds, record, title odds, what swings them' },
+                { key: 'c', text: 'Pro', tone: 'action' },
+              ]}
+            />
           </>
         ) : null}
 
         {tab === 'trades' ? (
           <>
-            <SectionHeading title="Trade ideas" icon="swap-horizontal-outline" right={link('View all', openTradeHub)} />
-            {tradeCards()}
+            <CompactModule id="gmplan.trades.ideas" title="Trade ideas" parts={tradeIdeasParts()} action={link('View all', openTradeHub)} defaultOpen>
+              {tradeCards()}
+            </CompactModule>
             {!gateNotice ? otherAreas.map((area) => <FocusAreaSection key={area.key} focusArea={area} />) : null}
           </>
         ) : null}
@@ -690,19 +729,20 @@ function TradeIdeaCard({ item, onViewDetails }: { item: GmPlanTradeItem; onViewD
   const gain = item.trade_gain;
   const send = item.send_assets ?? [];
   const receive = item.receive_assets ?? [];
+  const summary = tradeIdeaSummaryParts({
+    gain: gain ?? 0,
+    sendNames: send.length > 0 ? send.map((asset) => abbreviatePlayerName(asset.name)) : [abbreviatePlayerName(item.my_player)],
+    receiveNames: receive.length > 0 ? receive.map((asset) => abbreviatePlayerName(asset.name)) : [abbreviatePlayerName(item.their_player)],
+    confidenceLabel: item.trade_confidence_label,
+  }).filter((part) => gain != null || part.key !== 'gain');
   return (
-    <AccentCard accent={injury ? colors.danger : colors.accent}>
-      <View style={styles.tradeHeader}>
-        <AppText style={styles.tradeTitle} numberOfLines={1}>
-          {item.partner_team_name || 'Trade idea'}
-        </AppText>
-        {gain != null ? (
-          <AppText style={[styles.gain, { color: gain > 0 ? colors.success : gain < 0 ? colors.danger : colors.textSecondary }]}>
-            {gain > 0 ? '+' : ''}
-            {Math.round(gain).toLocaleString()}
-          </AppText>
-        ) : null}
-      </View>
+    <CompactModule
+      id={`gmplan.trade.${item.my_player_id}.${item.their_player_id}`}
+      title={item.partner_team_name || 'Trade idea'}
+      parts={summary}
+      accent={injury ? colors.danger : colors.accent}
+      persist={false}
+    >
       {send.length > 0 || receive.length > 0 ? (
         <View style={styles.stack}>
           <ExchangeSide side="send" assets={send} />
@@ -721,18 +761,22 @@ function TradeIdeaCard({ item, onViewDetails }: { item: GmPlanTradeItem; onViewD
           <AppText style={styles.actionText}>View details</AppText>
         </PressableScale>
       </View>
-    </AccentCard>
+    </CompactModule>
   );
 }
 
 function FocusAreaSection({ focusArea }: { focusArea: GmPlanFocusArea }) {
   const { colors } = useThemeMode();
   const styles = useMemo(() => createStyles(colors), [colors]);
-  const icon = FOCUS_META[focusArea.key]?.icon ?? 'ellipse-outline';
+
+  const names = focusArea.items.filter((i): i is GmPlanTradeItem => 'partner_team_name' in i).map((i) => i.partner_team_name).filter(Boolean);
+  const parts =
+    focusArea.status === 'no_signal'
+      ? [{ key: 'none', text: focusArea.watch_for || 'Nothing to flag right now.', tone: 'muted' as const }]
+      : listSummaryParts({ count: focusArea.items.length, noun: 'signal', highlights: names.length > 0 ? [names.join(', ')] : [focusArea.framing] });
 
   return (
-    <View style={styles.section}>
-      <SectionHeading title={focusArea.title} icon={icon} />
+    <CompactModule id={`gmplan.area.${focusArea.key}`} title={focusArea.title} parts={parts} defaultOpen={focusArea.status !== 'no_signal'}>
       {focusArea.framing ? <AppText style={styles.caption}>{focusArea.framing}</AppText> : null}
 
       {focusArea.status === 'no_signal' ? (
@@ -804,7 +848,7 @@ function FocusAreaSection({ focusArea }: { focusArea: GmPlanFocusArea }) {
           })}
         </AnimatedCard>
       )}
-    </View>
+    </CompactModule>
   );
 }
 
