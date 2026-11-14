@@ -185,8 +185,9 @@ def test_the_engine_honors_every_setting_from_draft_through_the_playoffs(opts):
     assert fold(snap, em.events).digest() == state.digest()
 
 
-def test_kickers_and_defenses_cannot_be_traded():
+def test_kickers_and_defenses_cannot_be_traded_on_an_old_save():
     snap = snapshot(3, include_def=True)
+    snap = dataclasses.replace(snap, settings=dataclasses.replace(snap.settings, kd_v=0))  # a save from before kd_v
     state, _ = play_draft(snap, 3)
     user = snap.user_team.tid
     partner = next(t for t in snap.tids if t != user)
@@ -471,6 +472,7 @@ def test_options_expose_quick_start_defaults_advanced_options_and_start_modes():
     assert (o["bench"]["min"], o["bench"]["max"], o["bench"]["default"]) == (4, 10, 8)
     assert o["superflex"]["default"] is False and o["include_k"]["default"] is True and o["include_def"]["default"] is False
     assert data["layout"] == {"base_slots": ["QB", "RB", "RB", "WR", "WR", "TE", "FLEX"], "draft_spare_spots": 2}
+    assert o["flex_type"] == {"values": ["flex", "rb_wr"], "default": "flex", "slots": {"flex": "FLEX", "rb_wr": "WRRB_FLEX"}}
     modes = {m["id"]: m for m in data["start_modes"]}
     assert modes["fresh"]["available"] and modes["league"]["available"]
     assert modes["season_start"] == {"id": "season_start", "available": False, "reason": "no_roster_history"}
@@ -725,3 +727,134 @@ def test_too_long_team_name_is_rejected():
     game_api.clear_pool_cache()
     client, _ = make_app(Inputs(imported_league()))
     assert client.post("/v1/sim/games", json={"team_name": "x" * 41}, headers=H).status_code == 422
+
+
+# ------------------------------------------------------------------ flex eligibility (RB/WR/TE default, RB/WR alternative)
+
+# The model id a save records is "player_model-<generation>"; a bare "player-model-5" is not an id, resolves to the CURRENT default
+# and silently plays on whatever model is newest (that was the whole drift from 1c4fc89f to 228f0621: model 6 became the default).
+OLD_SAVE_MODEL = "player_model-player-model-5"
+OLD_SAVE_DIGEST = "1c4fc89f0f26d9a75c02265a03c0b7252ab92a0a511ead91893a2e0110471fec"  # captured on main before flex_type / kd_v / limit_v / names_v / model 6
+
+
+def _played_digest(snap):
+    state, em = play_draft(snap)
+    for _ in range(6):
+        advance(em, snap, state, 11)
+    return state.digest()
+
+
+def _golden_snapshot():
+    return build_snapshot(ROWS, BYES, GameSettings.parse({"user_slot": 4, "superflex": True}), 11, scoring_model=OLD_SAVE_MODEL)
+
+
+def _as_old_save(snap):
+    """The same game as a save from before flex_type / kd_v: its settings carry neither key."""
+    raw = {k: v for k, v in snap.settings.to_dict().items() if k not in ("flex_type", "kd_v", "limit_v", "names_v")}
+    return dataclasses.replace(snap, settings=GameSettings.from_dict(raw))
+
+
+def test_default_flex_is_unchanged_and_never_serialized():
+    s = GameSettings.parse({})
+    assert s.flex_type == "flex" and "FLEX" in s.slots and "WRRB_FLEX" not in s.slots
+    assert "flex_type" not in s.to_dict()
+    assert GameSettings.from_dict(s.to_dict()) == s
+
+
+def test_old_save_replays_identically_to_a_game_with_the_new_flags():
+    old = _as_old_save(_golden_snapshot())
+    assert "flex_type" not in old.settings.to_dict() and "kd_v" not in old.settings.to_dict()
+    assert old.settings.non_tradable == ("K", "DEF")
+    assert old.settings.limit_v == 0 and old.settings.names_v == 0 and old.settings.kd_v == 0 and old.scoring_model == OLD_SAVE_MODEL
+    # Explicit old settings on the old model reproduce the digest captured before any of the new flags or model 6 existed.
+    assert _played_digest(old) == OLD_SAVE_DIGEST
+    # A new game (flex_type default, kd_v 1) on the same model plays identically to the save without the keys: the flags change
+    # nothing until used. (Not an absolute pin: any engine change on main legitimately moves a digest; verified equal to
+    # origin/main's own digest for this save when this PR was cut.)
+    assert _played_digest(old) == _played_digest(_golden_snapshot())
+
+
+def test_rb_wr_flex_option_changes_only_the_flex_slot_and_round_trips():
+    s = GameSettings.parse({"flex_type": "rb_wr"})
+    assert s.slots == ("QB", "RB", "RB", "WR", "WR", "TE", "WRRB_FLEX", "K")
+    assert (s.roster_limit, s.rounds) == (16, 14)
+    assert s.to_dict()["flex_type"] == "rb_wr"
+    assert GameSettings.from_dict(s.to_dict()) == s
+    with pytest.raises(ValueError):
+        GameSettings.parse({"flex_type": "te_only"})
+
+
+def test_rb_wr_flex_never_starts_a_tight_end_and_lineup_rules_enforce_it():
+    from modules.sim.game_types import slot_positions
+    from modules.sim.lineup import SlotPlan, pick_lineup
+
+    assert slot_positions("WRRB_FLEX") == frozenset({"RB", "WR"})
+    plan = SlotPlan(("QB", "TE", "WRRB_FLEX"))
+    entries = [(20.0, "q", "QB"), (9.0, "t1", "TE"), (15.0, "t2", "TE"), (4.0, "r1", "RB")]
+    assignment, _ = pick_lineup(plan, entries)
+    assert dict(assignment)["WRRB_FLEX"] == "r1"  # the better TE is not eligible
+    std, _ = pick_lineup(SlotPlan(("QB", "TE", "FLEX")), entries)
+    assert dict(std)["FLEX"] == "t1"  # the standard flex may take a TE (lineup TE is the 15, flex the 9)
+
+
+def test_rb_wr_flex_league_plays_a_full_game_and_replays():
+    snap = snapshot(seed=11, flex_type="rb_wr")
+    state, em = play_draft(snap)
+    for _ in range(4):
+        advance(em, snap, state, 11)
+    assert replay_game(snap, 11, em.events, strict=True).digest() == state.digest()
+    for tid, row in state.lineups.items():
+        slot_pos = {s: snap.players[p].pos for s, p in row if p}
+        assert slot_pos.get("WRRB_FLEX") in (None, "RB", "WR")
+
+
+# ------------------------------------------------------------------ kickers and defenses in trades (kd_v)
+
+
+def _kd_world():
+    snap = snapshot(seed=11)
+    state, em = play_draft(snap)
+    advance(em, snap, state, 11)
+    return snap, state, em
+
+
+def test_kd_v_is_set_on_new_games_serialized_and_absent_on_old_saves():
+    s = GameSettings.parse({})
+    assert s.kd_v == 1 and s.non_tradable == () and s.to_dict()["kd_v"] == 1
+    old = GameSettings.from_dict({k: v for k, v in s.to_dict().items() if k != "kd_v"})
+    assert old.kd_v == 0 and old.non_tradable == ("K", "DEF") and "kd_v" not in old.to_dict()
+
+
+def test_old_save_without_kd_v_still_refuses_a_kicker_trade():
+    from modules.sim.game_ai import validate_offer
+    snap, state, em = _kd_world()
+    old_snap = dataclasses.replace(snap, settings=dataclasses.replace(snap.settings, kd_v=0))
+    user = snap.user_team.tid
+    partner = next(t for t in snap.tids if t != user)
+    k = next(p for p in state.rosters[user] if snap.players[p].pos == "K")
+    their_k = next(p for p in state.rosters[partner] if snap.players[p].pos == "K")
+    with pytest.raises(ValueError, match="cannot be traded"):
+        validate_offer(old_snap, state, partner, [k], [their_k])
+    validate_offer(snap, state, partner, [k], [their_k])  # a new game allows the swap
+
+
+def test_kicker_swap_is_accepted_and_executes_but_a_second_kicker_is_refused():
+    from modules.sim.game_ai import TradeDesk, validate_offer
+    from modules.sim.game_types import GameError
+    snap, state, em = _kd_world()
+    user = snap.user_team.tid
+    partner = next(t for t in snap.tids if t != user)
+    k = next(p for p in state.rosters[user] if snap.players[p].pos == "K")
+    their_k = next(p for p in state.rosters[partner] if snap.players[p].pos == "K")
+    with pytest.raises(GameError) as err:  # asking for a kicker without giving yours leaves you with two
+        validate_offer(snap, state, partner, [next(p for p in state.rosters[user] if snap.players[p].pos == "WR")], [their_k])
+    assert err.value.code == "singleton_limit"
+    desk = TradeDesk(Evaluator(snap, state), 11)
+    # A kicker-for-kicker swap with a sweetener the AI likes: find one it accepts, then send it.
+    sweeteners = [[]] + [[p] for p in state.rosters[user] if snap.players[p].pos in ("RB", "WR", "TE", "QB")]
+    chosen = next((give for give in ([k] + extra for extra in sweeteners) if desk.verdict(partner, give, [their_k]).decision == "accept"), None)
+    assert chosen is not None
+    trade = act.send_trade(em, desk, partner, chosen, [their_k])[1]
+    assert trade is not None
+    assert k in state.rosters[partner] and their_k in state.rosters[user]
+    assert replay_game(snap, 11, em.events, strict=True).digest() == state.digest()

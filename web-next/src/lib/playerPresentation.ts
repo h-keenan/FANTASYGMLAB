@@ -35,6 +35,7 @@ export const POSITION_COLOR_VAR: Record<string, string> = {
   SUPERFLEX: "--color-position-flex",
   REC_FLEX: "--color-position-flex",
   "WR/RB": "--color-position-flex",
+  WRRB_FLEX: "--color-position-flex",
   "WR/TE": "--color-position-flex",
   "RB/WR/TE": "--color-position-flex",
   IDP_FLEX: "--color-position-flex",
@@ -49,7 +50,7 @@ export const POSITION_COLOR_VAR: Record<string, string> = {
 export function positionBadgeLabel(position: string): string {
   const label = position.trim().toUpperCase();
   if (label === "SUPER_FLEX" || label === "SUPERFLEX") return "SF";
-  if (label === "WR/RB") return "W/R";
+  if (label === "WR/RB" || label === "WRRB_FLEX") return "W/R";
   if (label === "REC_FLEX") return "W/T";
   if (label === "IDP_FLEX") return "IDP";
   if (label === "DST" || label === "D/ST") return "DEF";

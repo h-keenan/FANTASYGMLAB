@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useReducer, useRef, useState } from 'react';
-import { FlatList, Pressable, StyleSheet, View } from 'react-native';
+import { FlatList, Keyboard, Pressable, StyleSheet, useWindowDimensions, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useReducedMotion } from 'react-native-reanimated';
 
@@ -96,6 +97,13 @@ export default function TradePickerSheet<T = unknown>({
 }) {
   const { colors } = useThemeMode();
   const styles = useMemo(() => createStyles(colors), [colors]);
+  // The sheet is sized from the real window and the top safe area, never from a percentage of a container that a keyboard or a
+  // re-presented Modal can leave shifted: it always sits on the bottom edge and its top never goes under the status bar.
+  const { height: windowHeight } = useWindowDimensions();
+  const insets = useSafeAreaInsets();
+  const sheetHeight = Math.min(Math.round(windowHeight * 0.9), windowHeight - insets.top - 8);
+  // A keyboard left open by the search box must not outlive the sheet (or its hidden state): it shoved the Modal's layout up.
+  const closeKeyboard = () => Keyboard.dismiss();
   const reduceMotion = useReducedMotion();
   const [state, dispatch] = useReducer(sheetReducer, undefined, () => {
     const kinds = initialSelected.map((key) => items.find((i) => i.key === key)?.kind);
@@ -137,8 +145,8 @@ export default function TradePickerSheet<T = unknown>({
 
   return (
     <SheetModal visible={!hidden && !hiddenExternal} transparent animationType={reduceMotion ? 'none' : 'slide'} onRequestClose={() => (filtersOpen ? dispatch({ type: 'closeFilters' }) : onClose())}>
-      <Pressable style={styles.backdrop} onPress={onClose} accessibilityLabel={`Close ${title}`}>
-        <SwipeDismissCard style={styles.sheet} onDismiss={onClose} handleOnly testID="trade-picker">
+      <Pressable style={styles.backdrop} onPress={() => { closeKeyboard(); onClose(); }} accessibilityLabel={`Close ${title}`}>
+        <SwipeDismissCard style={[styles.sheet, { height: sheetHeight }]} onDismiss={() => { closeKeyboard(); onClose(); }} handleOnly testID="trade-picker">
           <View style={styles.header}>
             <View style={[styles.dot, { backgroundColor: toneColor }]} />
             <View style={styles.headerText}>
@@ -420,9 +428,8 @@ export function TradeSideSummary({
 
 function createStyles(colors: ThemeColors) {
   return StyleSheet.create({
-    backdrop: { flex: 1, backgroundColor: scrim, justifyContent: 'flex-end' },
+    backdrop: { ...StyleSheet.absoluteFillObject, backgroundColor: scrim, justifyContent: 'flex-end' },
     sheet: {
-      height: '90%',
       backgroundColor: colors.surface,
       borderTopLeftRadius: radii.lg,
       borderTopRightRadius: radii.lg,

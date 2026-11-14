@@ -35,7 +35,7 @@ import {
   type PercentileExplorerResponse,
 } from '../lib/percentileExplorer';
 import { ordinal, percentileColor } from '../lib/percentile';
-import { radii, scrim, spacing, type ThemeColors } from '../theme';
+import { radii, scrim, sheetHeight, spacing, type ThemeColors } from '../theme';
 import ErrorState from './ErrorState';
 
 const LANE_STEP = 74;
@@ -519,7 +519,8 @@ function createStyles(colors: ThemeColors) {
       borderTopRightRadius: radii.lg,
       borderWidth: 1,
       borderColor: colors.cardBorder,
-      maxHeight: '92%',
+      minHeight: sheetHeight.min,
+      maxHeight: sheetHeight.max,
       padding: spacing.lg,
     },
     scroll: { flexGrow: 0, flexShrink: 1 },

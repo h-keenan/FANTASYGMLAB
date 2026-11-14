@@ -45,6 +45,12 @@ export async function runSimGameCall<T extends SimGameEnvelope>(fn: () => Promis
         return null;
       }
     }
+    // A raced write (409) was rejected, nothing was saved: the server re-reads the newest game on the retry, so one silent retry applies
+    // the tap instead of a "Try again" message the player may never see. A second conflict is reported as before.
+    if (gate.kind === 'conflict' && attempt === 0) {
+      await new Promise((resolve) => setTimeout(resolve, handlers.retryMs ?? 150));
+      continue;
+    }
     if (simIsTransientGate(gate)) {
       if (attempt === 0) {
         await new Promise((resolve) => setTimeout(resolve, handlers.retryMs ?? SIM_CALL_RETRY_MS));

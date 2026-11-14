@@ -401,7 +401,7 @@ the client hides the rest behind a collapsed "Advanced options".
              "teams": {"values": [8, 10, 12, 14], "default": 12},
              "scoring": {"values": ["ppr", "half", "std"], "default": "half"},
              "te_premium": {"values": [0.0, 0.5, 1.0], "default": 0.0},
-             "superflex": {"default": false}, "include_k": {"default": true}, "include_def": {"default": false}, "tiebreaker": {"values": ["points_for", "head_to_head"], "default": "points_for"},
+             "superflex": {"default": false}, "flex_type": {"values": ["flex", "rb_wr"], "default": "flex", "slots": {"flex": "FLEX", "rb_wr": "WRRB_FLEX"}}, "include_k": {"default": true}, "include_def": {"default": false}, "tiebreaker": {"values": ["points_for", "head_to_head"], "default": "points_for"},
              "bench": {"min": 4, "max": 10, "default": 8},
              "difficulty": {"values": ["easy", "normal", "hard"], "default": "normal"},
              "user_slot": {"min": 1, "max": 14, "default": null},
@@ -421,7 +421,7 @@ plays every week. Settings are stored inside the existing `sim_games.settings`
 and `snapshot` JSON, so there is no SQL migration for them.
 
 ### `POST /v1/sim/games`
-Body (all optional): `{"teams": 12, "scoring": "half", "te_premium": 0, "superflex": false, "include_k": true,
+Body (all optional): `{"teams": 12, "scoring": "half", "te_premium": 0, "superflex": false, "flex_type": "flex", "include_k": true,
 "include_def": false, "tiebreaker": "points_for", "bench": 8, "mode": "redraft", "difficulty": "normal", "user_slot": null, "auto_lineup": false,
 "team_name": "My Team"}`.
 Builds the frozen pool (projected in this league's scoring, TE premium included), the AI
@@ -771,6 +771,21 @@ it always did (the empty block is also left out of the state digest). The user's
 - Rows carry `block: {by, mine, looking_for, why}` when on a block (players list, `/players/{id}`, `/teams/{id}`, `/league/rosters`); `GET /players?status=block`
   lists everything on any block; each team in `/league/rosters` has `block` (its shelf) next to `needs`.
 - Harness: `PYTHONPATH=. python tests/test_sim_block_harness.py [seeds]` (offers per week with and without a block, block share, accepted-and-legal, shelves per week).
+
+## Flex eligibility (`flex_type`)
+League setup option (fresh leagues only; a league import keeps its own slots). `"flex"` (default) is the standard RB/WR/TE
+FLEX slot. `"rb_wr"` swaps it for a `WRRB_FLEX` slot that only takes RB or WR (no TE). Every eligibility check (lineup
+PUT, auto-set, waiver start slot, AI lineups, draft needs, player-list `pos=` filter) reads the slot's position set from
+`FLEX_SLOTS` in `modules/sim/types.py`, so the new slot needs no per-site rule. Replay safety: `flex_type` is serialized in
+settings ONLY when it is not the default, so every save made before the option (and every default-flex save) has
+byte-identical settings and replays to the same digest (pinned by `test_old_save_replays_to_the_same_digest`).
+
+## Kickers and defenses in trades (`kd_v`)
+New games (settings `kd_v` 1, serialized only when set) let the user trade K and DEF like any player. Rules: one per roster, so a
+trade that would leave either team with two kickers (or two defenses) is refused with reason `singleton_limit` unless that team
+gives its own in the same deal. The AI never initiates or counters with a K/DEF (`TradeDesk.tradable` still excludes them), so it
+cannot craft a nonsense kicker counter. A save without `kd_v` behaves exactly as before (K/DEF refused: "cannot be traded") and
+replays to the same digest.
 
 ## Season labels, bye/out projections, rookie names
 

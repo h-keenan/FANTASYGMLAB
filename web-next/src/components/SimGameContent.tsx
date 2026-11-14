@@ -73,7 +73,9 @@ import {
   SIM_TE_PREMIUM_LABELS,
   type SimDifficulty,
   type SimMode,
+  type SimFlexType,
   type SimTiebreaker,
+  SIM_FLEX_TYPE_LABELS,
   SIM_TIEBREAKER_LABELS,
   type SimDraftRecap,
   type SimGame,
@@ -806,6 +808,15 @@ function SetupForm({
                     options={(opts?.te_premium?.values ?? [0, 0.5, 1]).map((v) => ({ label: SIM_TE_PREMIUM_LABELS[v] ?? `+${v}`, value: String(v) }))}
                     active={String(state.tePremium)}
                     onSelect={(value) => set("tePremium", Number(value))}
+                  />
+                </SetupField>
+                <SetupField label="Flex spot" note="Who can start in the FLEX slot. RB / WR / TE is the standard.">
+                  <PillRow
+                    ariaLabel="Flex spot"
+                    variant="fill"
+                    options={(opts?.flex_type?.values ?? ["flex", "rb_wr"]).map((v) => ({ label: SIM_FLEX_TYPE_LABELS[v], value: v }))}
+                    active={state.flexType}
+                    onSelect={(value) => set("flexType", value as SimFlexType)}
                   />
                 </SetupField>
                 <SetupToggleGroup>

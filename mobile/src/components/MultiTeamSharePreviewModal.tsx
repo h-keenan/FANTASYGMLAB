@@ -13,7 +13,7 @@ import { trackUse } from '../lib/analytics';
 import { buildShareText, type ShareModel } from '../lib/multiTeamTrade';
 import { shareLink } from '../lib/shareLinks';
 import { useThemeMode } from '../context/ThemeModeContext';
-import { radii, scrim, spacing, type ThemeColors } from '../theme';
+import { radii, scrim, sheetHeight, spacing, type ThemeColors } from '../theme';
 
 const PREVIEW_SCALE = 0.7;
 
@@ -105,7 +105,8 @@ function createStyles(colors: ThemeColors) {
       alignItems: 'center',
       width: '100%',
       maxWidth: 400,
-      maxHeight: '92%',
+      minHeight: sheetHeight.min,
+      maxHeight: sheetHeight.max,
     },
     title: { fontSize: 16, fontWeight: '700', color: colors.textPrimary, marginBottom: spacing.md },
     previewScroll: { flexGrow: 0, maxHeight: 420 },

@@ -4,6 +4,7 @@ import { useEffect, useMemo, useReducer, useState, type ReactNode } from "react"
 
 import { simAsOfSeason } from "@/lib/simAsOf";
 import { PlayerQuickView, StatGroup, type SimPqvSections } from "@/components/PlayerQuickView";
+import { SimRealHistory } from "@/components/SimRealHistory";
 import { SimPlayerHistory } from "@/components/SimPlayerHistory";
 import { SimScoutingSections } from "@/components/SimScoutingSections";
 import { WeeklyPointsPanel } from "@/components/WeeklyPointsChartLazy";
@@ -17,7 +18,7 @@ import { SimPager, SimToneBadge, useSimDebounced, useSimWide } from "@/component
 import { SkeletonRows } from "@/components/Skeleton";
 import { api } from "@/lib/api";
 import { SIM_WINDOW_STEP, simWindow } from "@/lib/simLayout";
-import { simActualPoints, simAvailabilityLine, simHeroFeed, simProjectionBand, simProjectionIsFlat, simRosLine } from "@/lib/simPlayerSheet";
+import { simActualPoints, simAvailabilityLine, simHeaderTags, simHeroFeed, simProjectionBand, simProjectionIsFlat, simRosLine } from "@/lib/simPlayerSheet";
 import { PLAYER_SEARCH_DEBOUNCE_MS } from "@/lib/leaguePlayerSearch";
 import {
   SIM_PAGE_SIZE,
@@ -242,12 +243,14 @@ export function SimPlayerSheet({ gameId, player, onClose, actions, startYear, se
     age: player.age ?? null,
     injury_status: live.status === "out" ? "Out" : null,
     sourceLabel: "Fantasy Sim",
+    // The header carries the same tags the list row showed (the one injury chip, owner / Free agent, role, block).
+    tags: simHeaderTags(live),
     // The list rows' Overall also drives the hero's Player score ring (real and generated players alike), so the
     // number never differs between a row and its quick view. The model's internal rating is never shown.
     overall_rating: live.overall ?? null,
     ...(feed ? { overall_rank: feed.overall_rank, position_rank: feed.position_rank } : {}),
   };
-  return <PlayerQuickView identity={identity} onClose={onClose} remote={Boolean(real)} asOfSeason={simAsOfSeason(startYear)} simSections={simPqvSections(gameId, live, detail, actions, seasonLabel)} />;
+  return <PlayerQuickView identity={identity} onClose={onClose} remote={Boolean(real)} asOfSeason={simAsOfSeason(startYear)} simSections={simPqvSections(gameId, live, detail, actions, seasonLabel, real ? { playerId: real, asOf: simAsOfSeason(startYear) } : undefined)} />;
 }
 
 interface SimPlayerDetailState {
@@ -281,12 +284,13 @@ function useSimPlayerDetail(gameId: string, playerId: string): SimPlayerDetailSt
  * (generated rookies) and History (draft slot, moves, seasons; derived from the event log). Same section shell
  * (`pqv-stat-season`), same stat tiles (`StatGroup`) and the same weekly chart the real Player Quick View uses.
  */
-export function simPqvSections(gameId: string, player: SimGamePlayer, detail: SimPlayerDetailState, actions?: ReactNode, seasonLabel?: string | null): SimPqvSections {
+export function simPqvSections(gameId: string, player: SimGamePlayer, detail: SimPlayerDetailState, actions?: ReactNode, seasonLabel?: string | null, real?: { playerId: string; asOf: number }): SimPqvSections {
   return {
     overview: <SimOverviewSection player={player} detail={detail} actions={actions} seasonLabel={seasonLabel} />,
     outlook: <SimOutlookSection player={player} detail={detail} seasonLabel={seasonLabel} />,
     scouting: detail.data?.scouting ? <SimScoutingSections profile={detail.data.scouting} /> : undefined,
     history: <SimPlayerHistory gameId={gameId} playerId={player.id} />,
+    stats: real ? <SimRealHistory playerId={real.playerId} asOf={real.asOf} /> : undefined,
   };
 }
 

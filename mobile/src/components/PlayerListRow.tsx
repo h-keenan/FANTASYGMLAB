@@ -213,7 +213,7 @@ export default function PlayerListRow({
           </View>
           <View style={styles.chipGroup} testID="list-tags">
             {shown.map((tag) => (
-              <ToneBadge key={tag.key} label={tag.label} color={toneColor(tag.tone, colors, colors.textSecondary)} size="xs" />
+              <ToneBadge key={tag.key} label={tag.label} color={toneColor(tag.tone, colors, colors.textSecondary)} size="xs" shrink />
             ))}
             {moreTags > 0 ? <AppText style={styles.more}>+{moreTags}</AppText> : null}
           </View>

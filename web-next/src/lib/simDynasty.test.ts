@@ -46,6 +46,7 @@ import {
   type SimReserves,
   type SimSeasonArchive,
 } from "./simGame";
+import { simDraftRowChips } from "./simDraft";
 
 const reserves = (over: Partial<SimReserves> = {}): SimReserves => ({ enabled: true, ir_slots: 2, taxi_slots: 4, taxi_years: 2, ir_used: 0, taxi_used: 0, ...over });
 
@@ -208,9 +209,13 @@ describe("IR and taxi legality", () => {
     expect(simReservesOn({})).toBe(false);
     expect(simReservesOn({}, reserves())).toBe(true);
     expect(simReservesOn({}, reserves({ enabled: false }))).toBe(false);
-    expect(simPlayerChips(row({ squad: "ir", status: "out", out_weeks: 5, rookie: true })).map((c) => c.label)).toEqual(["IR", "ROOKIE", "OUT 5 wks"]);
-    expect(simPlayerChips(row({ squad: "taxi", status: "out", out_weeks: 1 })).map((c) => c.label)).toEqual(["TAXI", "OUT 1 wk"]);
+    expect(simPlayerChips(row({ squad: "ir", status: "out", out_weeks: 5, rookie: true })).map((c) => c.label)).toEqual(["IR", "ROOKIE"]);
+    expect(simPlayerChips(row({ squad: "taxi", status: "out", out_weeks: 1 })).map((c) => c.label)).toEqual(["TAXI"]);
     expect(simPlayerChips(row())).toEqual([]);
+    // One injury tag per row: the row's own chip (simDraftRowChips) is the only one; the squad chips never add a second.
+    const hurtIr = row({ squad: "ir", status: "out", out_weeks: 7 });
+    const all = [...simDraftRowChips(hurtIr), ...simPlayerChips(hurtIr)].map((c) => c.label);
+    expect(all.filter((l) => /out/i.test(l))).toEqual(["Out 7w"]);
   });
 
   it("turns the backend reasons into copy", () => {

@@ -168,6 +168,7 @@ export function simLineupDiff(before: readonly SimLineupDiffSlot[], after: reado
 export function simSlotNeed(label: string): string {
   const base = label.replace(/\d+$/, "");
   if (base === "FLEX") return "RB, WR or TE";
+  if (base === "WRRB_FLEX") return "RB or WR";
   if (base === "SUPERFLEX") return "QB, RB, WR or TE";
   return base;
 }

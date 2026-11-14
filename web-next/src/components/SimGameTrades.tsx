@@ -24,6 +24,7 @@ import { simTeamsByPower } from "@/lib/simLeagueRosters";
 import { simGroupsToSheetItems } from "@/lib/simTradeSheet";
 import { useSimLeagueRosters } from "@/lib/useSimLeagueRosters";
 import { selectedItems } from "@/lib/tradeSheetPicker";
+import { TapForWhyOff } from "@/components/ui/TapForWhy";
 import { TradePickerSheet, TradeSideSummary } from "@/components/TradePickerSheet";
 import {
   SIM_TRADE_EMPTY,
@@ -37,7 +38,7 @@ import {
   simHeadshotId,
   simPositionsFor,
   simTradeMaxPerSide,
-  simTradable,
+  simTradableIn,
   simTradeClosedReason,
   simCounterDeltaLine,
   simTradeDecisionLabel,
@@ -352,7 +353,7 @@ function Builder({ ctx, seed, onSeedUsed }: { ctx: SimCtx; seed: SimTradeSeed | 
   const fit = simTradeFit(mine.filter((p) => (p.squad ?? "roster") === "roster").length, game.settings.roster_limit, giveSelected.filter((p) => !simIsPick(p) && (p.squad ?? "roster") === "roster").length, getSelected.filter((p) => !simIsPick(p)).length, soft);
   // The picker's groups: players by position, then a Picks group; the same shape feeds the page summaries.
   const groupsFor = (players: SimGamePlayer[], pickList: SimPickAsset[]): SimAssetGroup<SimTradeAsset>[] => {
-    const groups: SimAssetGroup<SimTradeAsset>[] = simGroupByPosition(players.filter((p) => simTradable(p.pos)), simPositionsFor(game.settings.slots));
+    const groups: SimAssetGroup<SimTradeAsset>[] = simGroupByPosition(players.filter((p) => simTradableIn(game.settings, p.pos)), simPositionsFor(game.settings.slots));
     if (pickList.length > 0) groups.push({ key: "PICK", label: "Picks", kind: "pick", items: pickList });
     return groups;
   };
@@ -496,6 +497,7 @@ export function SimTradesTab({
   }
   const hasBlock = (ctx.game.settings.block_v ?? 0) >= 1;
   return (
+    <TapForWhyOff>
     <div className="flex flex-col gap-3">
       <PillRow
         ariaLabel="Trades view"
@@ -517,6 +519,7 @@ export function SimTradesTab({
         <Builder ctx={ctx} seed={blockSeed ?? seed} onSeedUsed={() => { setBlockSeed(null); onSeedUsed(); }} />
       )}
     </div>
+    </TapForWhyOff>
   );
 }
 

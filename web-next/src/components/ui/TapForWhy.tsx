@@ -1,13 +1,24 @@
 "use client";
 
 import Link from "next/link";
-import { useState, type ReactNode } from "react";
+import { createContext, useContext, useState, type ReactNode } from "react";
 
 import { Sheet } from "@/components/ui/Sheet";
 import { trackUse } from "@/lib/analytics";
 import { whyEntry, whyTriggerLabel, type WhyMetricId } from "@/lib/tapForWhyContent";
 
 import "./ui.css";
+
+const TapForWhyOffContext = createContext(false);
+
+/**
+ * Turns every TapForWhy underneath into plain, untappable content. Fantasy Sim's trade window wraps itself in this: a stat pill
+ * (OVR gauge, projection) opened an explainer sheet over the picker, which replaced the trade you were building
+ * (coridian_, 2026-11-14: "I have accidentally tapped on the trade value pill more times than I can think of ... it takes you out of the trade window").
+ */
+export function TapForWhyOff({ children }: { children: ReactNode }) {
+  return <TapForWhyOffContext.Provider value>{children}</TapForWhyOffContext.Provider>;
+}
 
 export type TapForWhyProps = {
   /** Registry key (lib/tapForWhyContent.ts). Copy lives there so web and app never disagree. */
@@ -49,7 +60,9 @@ export type TapForWhyProps = {
  */
 export function TapForWhy({ metric, children, spoken, variant = "inline", title, chart, extra, className = "", testId, dataAttrs }: TapForWhyProps) {
   const [open, setOpen] = useState(false);
+  const off = useContext(TapForWhyOffContext);
   const entry = whyEntry(metric);
+  if (off) return <>{children}</>;
   const sentences = [...entry.sentences, ...(extra ?? [])];
   return (
     <>
