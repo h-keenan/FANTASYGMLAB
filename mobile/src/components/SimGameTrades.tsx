@@ -381,7 +381,8 @@ function Builder({ ctx, seed, onSeedUsed }: { ctx: SimCtx; seed: SimTradeSeed | 
   const giveSelected: SimTradeAsset[] = [...mine, ...myPicks].filter((p) => draft.give.includes(p.id));
   const getSelected: SimTradeAsset[] = [...partnerRoster, ...theirPicks].filter((p) => draft.get.includes(p.id));
   const soft = (game.settings.limit_v ?? 0) >= 1; // the soft roster limit: over the limit only blocks adding players
-  const fit = simTradeFit(mine.length, game.settings.roster_limit, giveSelected.filter((p) => !simIsPick(p)).length, getSelected.filter((p) => !simIsPick(p)).length, soft);
+  // Only the active roster counts toward the limit: IR and taxi players neither fill a spot nor free one when traded away.
+  const fit = simTradeFit(mine.filter((p) => (p.squad ?? "roster") === "roster").length, game.settings.roster_limit, giveSelected.filter((p) => !simIsPick(p) && (p.squad ?? "roster") === "roster").length, getSelected.filter((p) => !simIsPick(p)).length, soft);
   // The picker's groups: players by position, then a Picks group; the same shape feeds the page summaries.
   const groupsFor = (players: SimGamePlayer[], pickList: SimPickAsset[]): SimAssetGroup<SimTradeAsset>[] => {
     const groups: SimAssetGroup<SimTradeAsset>[] = simGroupByPosition(players.filter((p) => simTradable(p.pos)), simPositionsFor(game.settings.slots));
@@ -429,7 +430,7 @@ function Builder({ ctx, seed, onSeedUsed }: { ctx: SimCtx; seed: SimTradeSeed | 
           </View>
           <AppText style={[common.muted, fit.blocked || (fit.over && !soft) ? { color: colors.danger } : null]} testID="trade-fit">
             Your roster after: {fit.after}/{game.settings.roster_limit}
-            {fit.blocked ? ': cut or trade someone first to add players' : fit.over ? (soft ? ` (over by ${fit.over})` : ` (cut ${fit.over} after the trade)`) : fit.room ? ` (${fit.room} open)` : ''}
+            {fit.blocked ? ': roster is full, so cut or trade someone first to add players' : fit.over ? (soft ? ` (over by ${fit.over})` : ` (cut ${fit.over} after the trade)`) : fit.room ? ` (${fit.room} open)` : ''}
           </AppText>
         </>
       ) : null}

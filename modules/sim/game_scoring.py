@@ -32,7 +32,8 @@ _MODEL_MODULES = {
     "player-model-2": "modules.sim.player_model_v2",  # frozen copy: games created under it never change
     "player-model-3": "modules.sim.player_model_v3",  # frozen copy: + team-level role coupling (multiplicative)
     "player-model-4": "modules.sim.player_model_v4",  # frozen copy: bounded tails, additive team roles, robust projections
-    "player-model-5": "modules.sim.player_model",  # + flat in-season path (PATH_TILT)
+    "player-model-5": "modules.sim.player_model_v5",  # frozen copy: + flat in-season path (PATH_TILT)
+    "player-model-6": "modules.sim.player_model",  # + bounded single-game tail (STAT_CAPS, TAIL_SQUEEZE)
 }
 
 
