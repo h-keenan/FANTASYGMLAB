@@ -97,9 +97,9 @@ describe("TradeHubContent", () => {
     // Always-visible card: balance in the title, compact player cards for both sides, fairness meter, confidence.
     expect(screen.getByTestId("trade-idea-card")).toHaveTextContent("+800");
     expect(screen.getAllByTestId("compact-player-card").length).toBeGreaterThanOrEqual(2);
-    expect(screen.getByTestId("fairness-meter")).toHaveTextContent("Favorable");
+    expect(screen.getByTestId("fairness-meter")).toHaveTextContent("You win by ~");
     openIdeaCards();
-    expect(screen.getAllByText("Favorable").length).toBe(2);
+    expect(screen.getAllByText("Favorable").length).toBe(1);
     expect(screen.getByText("My Running Back")).toBeInTheDocument();
     expect(screen.getByText("Opp Wide Receiver")).toBeInTheDocument();
     // Circular OVR gauge renders the real rating.

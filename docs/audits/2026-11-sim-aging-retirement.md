@@ -7,7 +7,7 @@ Ask (coridian_): "we need better curves for retiring players ... I just had a ki
 - Retirement was a single logistic in age per position, centred at `RETIRE_AGE` (QB 38, RB 31, WR 34, TE 34.5, K 41, +2 for a star), with no
   input from role or production: a starting WR and a deep reserve of the same age retired at the same rate, and nobody left for injury.
 - That put the medians in the wrong places in both directions: kickers retired around 40 (47% at 40+) and quarterbacks at 37 (too late),
-  but also running backs at 30, wrists/wide receivers at 33 and tight ends at 33 (all 1-3 years later than the NFL). A 33-year-old kicker
+  but also running backs at 30, wide receivers at 33 and tight ends at 33 (all 1-3 years later than the NFL). A 33-year-old kicker
   retired about 1% of the time, so the reported case is rare in this model (1.8% of kicker retirements are at 33 or younger); the visible
   problems are the shape (a wall of kickers at 40+, no career-ending injuries, no bench-vs-starter gap) and the skill-position medians.
 - Skill: kickers compounded to 0.98 at 35 and 0.90 at 38; quarterbacks 0.94 at 33 and 0.88 at 36.

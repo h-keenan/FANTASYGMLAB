@@ -582,11 +582,16 @@ def main(argv: list[str] | None = None) -> None:
     ap.add_argument("cmd", choices=["seasons", "dynasty", "real", "exploit", "exploit20"])
     ap.add_argument("--seeds", type=int, default=3)
     ap.add_argument("--shapes", default="")
+    ap.add_argument("--world-v", type=int, default=None, help="0 = the NFL world before usage conservation (for before/after runs); default = the current WORLD_VERSION")
     ap.add_argument("--json", default="")
     ap.add_argument("--aging-v", type=int, default=None, help="dynasty command: force the aging generation (0 = before position hazard curves)")
     args = ap.parse_args(argv)
     global AGING_V
     AGING_V = args.aging_v
+    if args.world_v is not None:
+        from modules.sim import game_types
+
+        game_types.WORLD_VERSION = args.world_v
     if args.cmd == "real":
         res = real_yardsticks()
     elif args.cmd == "exploit20":

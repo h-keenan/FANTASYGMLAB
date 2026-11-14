@@ -1,31 +1,10 @@
 import type { DraftPickAsset } from "@/lib/api";
+import { PickAvatar } from "@/components/PickAvatar";
 import { ValueStat } from "@/components/ValueStat";
 
-/**
- * The square draft-pick plate ("R1" over "#3"). Shows the round alone when
- * there is no pick number; nothing is invented.
- */
-export function PickPlate({ round, pickNo }: { round?: number | string | null; pickNo?: number | string | null }) {
-  const top = round ? `R${round}` : pickNo ? `#${pickNo}` : "PICK";
-  const bottom = round && pickNo ? `#${pickNo}` : null;
-  return (
-    <div
-      className="flex flex-col items-center justify-center font-extrabold uppercase leading-none"
-      style={{
-        width: "2.25rem",
-        height: "2.25rem",
-        flex: "0 0 2.25rem",
-        fontSize: "0.6875rem",
-        gap: 2,
-        background: "var(--color-surface-muted)",
-        border: "var(--border-width-default) solid var(--color-border)",
-        color: "var(--color-accent)",
-      }}
-    >
-      <span>{top}</span>
-      {bottom ? <span>{bottom}</span> : null}
-    </div>
-  );
+/** Draft-pick avatar ("R1" over "#3") in the round player-photo slot. Kept under its old name for existing callers; see PickAvatar. */
+export function PickPlate({ round, pickNo, size = 36 }: { round?: number | string | null; pickNo?: number | string | null; size?: number }) {
+  return <PickAvatar round={round} pickNo={pickNo} size={size} />;
 }
 
 /**

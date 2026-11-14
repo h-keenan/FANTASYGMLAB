@@ -257,7 +257,10 @@ def rookie_class(
                     used.add(name)
                     break
         extra = {"is_rookie": 1.0, "years_exp": 0.0, "draft_year": float(year)}
-        nfl_team = teams[int(gen.integers(0, len(teams)))] if teams else "FA"  # draw order is part of the saved world: team, then age
+        if s.world_v and teams:  # world_v 1+: rookies land where there is need (one draw, like the uniform pick, so the rest of the class is stable)
+            nfl_team = _need_team(gen, teams, pos, vets, rows, ref12.get(pos, 0.0))
+        else:
+            nfl_team = teams[int(gen.integers(0, len(teams)))] if teams else "FA"  # draw order is part of the saved world: team, then age
         if s.aging_curves and pos == "K":
             age = K_ROOKIE_AGES[int(gen.choice(len(K_ROOKIE_AGES), p=K_ROOKIE_AGE_P))]
         else:
@@ -294,6 +297,53 @@ def _roles(prev: GameSnapshot) -> dict[str, float]:
     return out
 
 
+_NEED_SLOTS = {"QB": 1, "RB": 2, "WR": 3, "TE": 1}
+
+
+def _need_team(gen, teams: Sequence[str], pos: str, vets: Mapping[str, Mapping[str, Any]], class_rows: Sequence[Mapping[str, Any]], ref: float) -> str:
+    """world_v 1+: a rookie's NFL team, drawn with weight exp(-strength / reference), where strength is the sum of the means of the team's top
+    ``_NEED_SLOTS`` players at his position (veterans and already placed rookies of this class). A team with nobody gets weight 1, a team
+    with its starters in place far less; the real draft is close to this (needy teams pick QBs, loaded teams do not). Exactly one draw."""
+
+    slots = _NEED_SLOTS.get(pos)
+    if slots is None or ref <= 0.0:
+        return teams[int(gen.integers(0, len(teams)))]
+    strength = {t: [] for t in teams}
+    for r in vets.values():
+        if r["pos"] == pos and r["nfl_team"] in strength:
+            strength[r["nfl_team"]].append(float(r["mean"]))
+    for r in class_rows:
+        if r["pos"] == pos and r["nfl_team"] in strength:
+            strength[r["nfl_team"]].append(float(r["mean"]))
+    w = []
+    for t in teams:
+        top = sorted(strength[t], reverse=True)[:slots]
+        w.append(math.exp(-sum(top) / (slots * ref)))
+    total = sum(w)
+    draw = float(gen.random()) * total
+    for t, x in zip(teams, w):
+        draw -= x
+        if draw <= 0.0:
+            return t
+    return teams[-1]
+
+
+def refresh_depth_charts(rows: dict[str, dict[str, Any]]) -> None:
+    """world_v 1+: the depth chart of every NFL team and position follows the (aged) projections, rookies included. A static chart left a
+    drafted star on the bench for years and a retired starter's backup behind a rookie forever."""
+
+    groups: dict[tuple[str, str], list[dict[str, Any]]] = {}
+    for r in rows.values():
+        if r["pos"] in _NEED_SLOTS and r["nfl_team"] not in ("", "FA"):
+            groups.setdefault((r["nfl_team"], r["pos"]), []).append(r)
+    for rs in groups.values():
+        rs.sort(key=lambda r: (-float(r["mean"]), -float(r["market"]), r["pid"]))
+        for i, r in enumerate(rs, 1):
+            extra = dict(r.get("extra") or {})
+            extra["depth_chart_order"] = float(i)
+            r["extra"] = extra
+
+
 def season_snapshot(root: GameSnapshot, season: int) -> GameSnapshot:
     """Season ``season`` (>= 2) of a dynasty game: last season's pool aged one
     year, retirees gone, the new rookie class added, values and ADP recomputed,
@@ -326,6 +376,8 @@ def season_snapshot(root: GameSnapshot, season: int) -> GameSnapshot:
         }
     for row in rookie_class(root, rows, season):
         rows[row["pid"]] = row
+    if root.settings.world_v:
+        refresh_depth_charts(rows)
     players = value_pool(list(rows.values()), root.settings)
     order = [t.tid for t in root.teams]
     perm = WorldRng(root.seed).stream(season, "gseason", 0).permutation(len(order))

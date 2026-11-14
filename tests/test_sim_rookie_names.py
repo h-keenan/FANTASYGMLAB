@@ -26,7 +26,7 @@ def test_new_dynasty_games_carry_names_v1_and_old_saves_default_to_zero():
 
 def test_old_saves_keep_their_names_exactly():
     snap = new_snapshot()
-    old = replace(snap, settings=replace(snap.settings, names_v=0))
+    old = replace(snap, settings=replace(snap.settings, names_v=0, world_v=0))
     names = [r["name"] for r in dyn.rookie_class(old, _vets(old), 2)][:6]
     # golden: what the pre-names_v generator produced for this seed
     assert names == ["Preston Doyle", "Isaiah Briggs", "Darius Ingram", "Roman Whitaker", "Cade Pryor", "Darius Forbes"]

@@ -174,7 +174,7 @@ describe("TradeFinderContent", () => {
     expect(api.getTradeFinderIdeas).toHaveBeenCalledWith("123", ["p1"], "retool", "Dynasty", { pickIds: [], returnPicks: false, returnPlayers: false });
     expect(screen.getByText("Rival GM")).toBeInTheDocument();
     openIdeaCards();
-    expect(screen.getAllByText("Favorable").length).toBe(2);
+    expect(screen.getAllByText("Favorable").length).toBe(1);
     expect(screen.getByText("Opp Wide Receiver")).toBeInTheDocument();
   });
 
