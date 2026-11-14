@@ -877,6 +877,7 @@
   transition: transform 180ms var(--ease-out, ease-out), width 180ms var(--ease-out, ease-out); will-change: transform, width;
 }
 .pill-tabs:not([data-measured]) .pill-indicator { visibility: hidden; }
+.pill-tab-text { display: inline-block; white-space: nowrap; }
 .pill-tab {
   position: relative; flex: 1 0 auto; display: inline-flex; align-items: center; justify-content: center; box-sizing: border-box;
   height: var(--bar-button-min-height); min-height: var(--bar-button-min-height); margin: 0; padding: 0 10px; text-decoration: none;
@@ -894,9 +895,15 @@
   -webkit-tap-highlight-color: transparent;
 }
 /* Four or more page tabs: the primary keeps its icon and gives the label to the strip (aria-label still names it). */
-.pill-primary[data-compact] { width: var(--bar-button-min-height); padding: 0; justify-content: center; }
+.pill-primary[data-compact] { width: 40px; min-width: 40px; height: 40px; min-height: 40px; padding: 0; justify-content: center; }
 .pill-primary[data-compact] .pill-primary-label { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
-.pill-tabs { -webkit-mask-image: linear-gradient(90deg, #000 calc(100% - 14px), transparent); mask-image: linear-gradient(90deg, #000 calc(100% - 14px), transparent); }
+/* Four or more page tabs: tighter type and padding so they fit one 390px row as short labels; at 360 the strip scrolls. */
+.pill-tabs[data-dense] { gap: 1px; }
+.pill-tabs[data-dense] .pill-tab { padding: 0 5px; font-size: 0.6875rem; }
+/* Edge fades only where more tabs are hidden behind the edge (never over a label that fits). */
+.pill-tabs[data-fade="end"] { -webkit-mask-image: linear-gradient(90deg, #000 calc(100% - 16px), transparent); mask-image: linear-gradient(90deg, #000 calc(100% - 16px), transparent); }
+.pill-tabs[data-fade="start"] { -webkit-mask-image: linear-gradient(270deg, #000 calc(100% - 16px), transparent); mask-image: linear-gradient(270deg, #000 calc(100% - 16px), transparent); }
+.pill-tabs[data-fade="both"] { -webkit-mask-image: linear-gradient(90deg, transparent, #000 16px, #000 calc(100% - 16px), transparent); mask-image: linear-gradient(90deg, transparent, #000 16px, #000 calc(100% - 16px), transparent); }
 .pill-primary:disabled { opacity: 0.5; cursor: default; }
 @keyframes pill-pulse { 0% { transform: scale(0.92); } 60% { transform: scale(1.08); } 100% { transform: scale(1); } }
 .pill-icon-btn:focus-visible, .pill-tab:focus-visible, .pill-primary:focus-visible { outline: 2px solid var(--color-accent); outline-offset: -3px; }

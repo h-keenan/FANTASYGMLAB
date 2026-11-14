@@ -140,7 +140,8 @@ def test_history_is_memoized_per_save_version_and_refolds_after_any_write(monkey
     pid = next(s["player"]["id"] for s in mine["slots"] if s["player"])
     reads = []
     real = GameStore.load_events
-    monkeypatch.setattr(GameStore, "load_events", lambda self, *a, **k: reads.append(1) or real(self, *a, **k))
+    # Count the history fold's own whole-log reads (uid, gid); the achievements cache reads from an explicit seq.
+    monkeypatch.setattr(GameStore, "load_events", lambda self, *a, **k: (reads.append(1) if len(a) == 2 else None) or real(self, *a, **k))
     url = f"/v1/sim/games/{gid}/players/{pid}/history"
     first = client.get(url, headers=hdr()).json()
     again = client.get(url, headers=hdr()).json()

@@ -110,6 +110,12 @@ export function SimGlyph({ name, size = 16 }: { name: SimGlyphName; size?: numbe
           <path d="M8 1.5l1.6 4.4 4.4 1.6-4.4 1.6L8 13.5 6.4 9.1 2 7.5l4.4-1.6z" />
         </svg>
       );
+    case "trophy":
+      return (
+        <svg {...common}>
+          <path d="M5 2.5h6v3.5a3 3 0 0 1-6 0zM5 3.5H2.5v1a2.2 2.2 0 0 0 2.6 2.1M11 3.5h2.5v1a2.2 2.2 0 0 1-2.6 2.1M8 9v2.5M5.5 13.5h5" />
+        </svg>
+      );
     default:
       return null;
   }

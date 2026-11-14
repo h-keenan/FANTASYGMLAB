@@ -470,7 +470,7 @@ Layout rule (immune to iOS Safari fixed-position drift): nothing here is `positi
 - **Look**: a detached glass capsule 12px off the screen edges and above the safe-area inset (`--bar-side-inset`, `--bar-pill-bottom-gap` + `env(safe-area-inset-bottom)`), frosted glass tokens only (translucent surface, blur, lit top hairline, soft shadow). The Fantasy Sim bar (`.action-pill`, `SimActionBar` / `SimOffseasonBar`) uses the same glass and capsule radius so the two chromes match; the orb badge hugs the orb.
 - **No page context**: the global tabs. The lit tab expands to icon + label in the cyan glass capsule (gold hairline), the rest are icon-only with `aria-label`s, 44px+ targets.
 - **With page context** (V2): ONE row. The global tabs fold into two icon buttons (the section you are in + a menu button, `aria-expanded`); the page segment (page tabs as a `tablist`, one primary chip) takes the rest. The menu button unfolds the full global row (Today / Team / Trades / League / More) in the same pill; picking a tab, Escape or tapping outside folds it back. The lit page tab is one capsule that slides between tabs (transform + width, measured). More still opens the shared sheet.
-- **API**: a page calls `useBottomPillContext({ id, label, tabs, activeKey, onSelect, primary })` (`lib/useBottomPillContext.ts`, store `lib/bottomPillStore.ts`, types and `normalizePillContext` in the `lib/bottomNav.ts` twin) and drops its own page-tab row only when the hook returns true (the pill is on screen and showing that context). Consolidate, never remove: desktop, the flag off and signed-out pages keep the in-page tabs. At most `PILL_MAX_TABS` (5) tabs; one primary; the tab strip scrolls inside the pill if it must.
+- **API**: a page calls `useBottomPillContext({ id, label, tabs, activeKey, onSelect, primary })` (`lib/useBottomPillContext.ts`, store `lib/bottomPillStore.ts`, types and `normalizePillContext` in the `lib/bottomNav.ts` twin) and drops its own page-tab row only when the hook returns true (the pill is on screen and showing that context). Consolidate, never remove: desktop, the flag off and signed-out pages keep the in-page tabs. At most `PILL_MAX_TABS` (5) tabs; one primary; the tab strip scrolls inside the pill if it must. **Tab overflow rule (2026-11-14, Trade Finder "History" cut off by the New trade chip): the page segment never clips a label.** Tabs use their `short` label where defined (`History` -> "Hist.", full label stays the accessible name; `pillTabText`), 4+ tabs use the dense type, and share the row equally when they fit (4 tabs fit at 390). When they cannot (5 tabs, 360) the strip scrolls with an edge fade only on the side that has more, and the lit tab is scrolled fully into view (`pillScrollTarget`). The primary chip collapses to a 40px icon-only button in its own slot with 4+ tabs or when a text chip would not fit (`pillPrimaryCompact`; a chip without a glyph keeps its text). Web `BottomTabBar`, app `BottomPill` (twin helpers in `lib/bottomNav.ts`). Guard: `scripts/sim_layout_playwright/pill_geometry.mjs` (label rect inside the segment, clear of the chip, at 390 and 360 for Team, Trades + New trade, League, sim draft 4 and 5 tabs).
 - **Motion** (lib/motion.ts tokens, opacity/transform only): entering a page slides the segment in; the menu cross-fades the layers and fans the global tabs out; the primary chip pulses once on mount. Reduced motion: crossfade only (no slide, scale, fan or pulse).
 - **One sticky mechanism**: both layers share one grid cell, so the pill is one row tall in every mode and the stack height is the content clearance. Never `position: fixed`. Guards: `lib/bottomChrome.test.ts`, `lib/bottomBarMetrics.test.ts`, `components/ui/BottomTabBar.test.tsx`, `scripts/sim_layout_playwright/footer_pin.mjs`.
 - **Wired contexts**: `PageTabBar` (every Team / Trades / League page: Team = Roster | Players | Waivers | Matchup, Trades = Hub | Finder | Analyzer | History + primary "New trade", League = Rankings | Recaps | Games) registers its family as `family:<key>`; each tab is a route (`PillContextTab.href`, rendered as a link) and the strip steps aside only while the pill is on screen. Fantasy Sim: the draft room (`sim-draft`: Players | Queue | Roster | Picks + Auto-pick) and Sim Team (`sim-team`: Auto-set). In the game `SimPillHost` marks the pill present and `PillMorph` (in `SimActionBar` / `SimOffseasonBar`) folds Sim to | orb | Advance into the page segment; with no bar mounted (the draft) `PillContextOnly` shows the segment alone. A page swap keeps the context for `PILL_CLEAR_DELAY_MS` so the global tabs never flash between two pages of one family. Not moved yet: the Waivers filter sheet (it owns its own open state), real-league Roster has no auto-set action to promote.
@@ -721,6 +721,15 @@ FantasyDesk (`mode="desk"`) and Fantasy Sim (`mode="sim"`); the logic is the byt
   (or tapping it) goes full (92%); a fixed height means switching pills never moves the sheet. Pills are the one `Tabs` row in the order Overview, Stats,
   Outlook, History, Scouting (then Profile) via `orderPlayerSheetTabs`; sim hides Scouting when it has none. Sticky tabs and the min-height rule of
   "Sheet tabs" are unchanged; drag-down from peek is still the dismiss gesture.
+  **Peek is compact (coridian_ "PQV glitch", 2026-11-14: the pill row sat clipped under a hero-sized header).** At the peek snap the header is
+  compact: 56px avatar, name, position / team / age pills, ONE summary line standing in for the three tiles ("Score 64 · Value 60 · ▼ 22%"),
+  the signal chips on one line; the archetype pill, tiles, rank line, depth-chart / mismatch notes and the "what do Value, Overall and Tier
+  mean" row belong to the full snap. Moving between snaps animates (web: height / avatar size / opacity transitions, off under reduced
+  motion; app: `LayoutAnimation`), nothing jumps. The peek HEIGHT is computed from the content, not a fixed 56%: `peekSheetHeight` (lib twin
+  `playerAnatomy.ts`) = pill-row bottom + one content line (`PEEK_FIRST_LINE_PX` 52) + bottom inset, clamped to 40-70% of the screen. Web
+  measures the pill row into `--pqv-peek-h` (CSS keeps 56dvh as first-paint fallback); app measures the sticky strip's `onLayout`. Guard:
+  `scripts/sim_layout_playwright/pqv_peek_geometry.mjs` (real `PlayerQuickView` at 390x844 and 360x640: every tab inside the sheet's visible
+  area and tappable, 56px avatar at peek, 112px at full, an in-between size observed while expanding). The avatar resizes on ONE node (`.pqv-avatar-glow` width/height; the headshot fills it at 100% and is never scaled): Tailwind preflight's `img { max-width: 100% }` once squeezed a scaled 112px photo into a 28x56 oval at peek (coridian_ 2026-11-14), so the guard asserts wrapper and image are the same square at peek, full and every mid-transition frame, with a photo and with initials, under preflight rules plus `playerAnatomy` unit tests.
 
 **The avatar is REQUIRED (coridian_: "properly implemented, not a band-aid").** A template takes a `player` (`PlayerRef`) and draws the avatar itself in
 `PlayerAvatarSlot`: always the first, leading slot, sized by tier (`AVATAR_SIZE`: dense 28, row 36, card 44, sheet 56), tier ring, and initials when
@@ -958,6 +967,27 @@ in-place scroll). Movement is server data (`standings[].rank_prev` / `rank_delta
 old saves derive it from the stored previous week in `ensure_rank_movement`); null (week 1) shows no chip. Clinched / eliminated badges
 are not shown (needs per-setting tiebreaker math). The Season in Review "Standings journey" note states the net spots gained or lost.
 
+## Achievements (Fantasy Sim, web + app)
+
+One pure lib twin, `lib/simAchievements.ts` (byte-identical web/app, `check_lib_twins` IDENTICAL), presents the server's
+`achievements` payload (`docs/fantasy-sim-api.md`, "Achievements and milestones"): the client never derives a badge, it renders.
+- **Recap**: `simAttachAchievements` gives each badge to its week's recap and the milestone banners to the first one; when a recap has
+  either, `simRecapPageKeys` adds an `achievements` page right after Result (the existing `StoryCarousel`, `TrophyIcon`, `Confetti`,
+  `MotionIn`). `simRecapAchievementModel` picks the hero (Perfect Season > Three-peat > Back-to-Back > Champion > Undefeated ...). Confetti
+  only for perfect / undefeated / title-run badges and never under reduced motion; a winless season is sympathetic ("Winless... the #1
+  pick is yours": danger tone, no confetti, no trophy); "WIN #10, still perfect" is a milestone banner, not a stored badge.
+- **Module**: `SimAchievementsModule` (web `SimAchievements.tsx`, app `SimAchievements.tsx`) is a `SimFold` (CompactModule) on Home, the
+  offseason review and the final Season in Review: collapsed `parts` ("4 unlocked · 1 epic · next: Perfect Season (11-0, 3 games left)"),
+  groups This season / Earlier seasons / Career / Still to earn, tap a row to open its detail, locked rows show a progress bar.
+- **Badge**: a round rarity ring around a `SimGlyph` (`trophy` joined the glyph set; `simAchievementGlyph` maps the server icon keys). Dates
+  are the shared season label plus week ("S3 2028 · Wk 14").
+- **Rarity colours** (`simAchievementColor`, semantic tokens only): epic good = `--color-premium` (gold is for epic only), rare / neutral =
+  accent, common good = success, any bad-luck badge = danger, locked = muted.
+- **Notifications**: the bell shows `Achievement unlocked: <name> (S3 2028)` (icon `trophy`, opens Home).
+- **Team and player pages**: the team History tab opens with a champion trophy row (`SimTrophyRow`, gold) and, on your own team, the
+  latest badges (`SimBadgeChips`); a player's History tab shows the badges that name him (League MVP, Rookie of the Year, the trade or
+  claim that landed him).
+
 ## Team identity (Fantasy Sim)
 A sim team is its generated logo (`SimCrest`, shape/pattern/colours seeded from the name, `lib/simCrest.ts`) plus its name, rendered ONLY
 through `components/SimTeamIdentity.tsx` (web + app): `SimTeamIdentity` = logo + name (`stacked`, `hideName`, `isYou`), `SimTeamLogo` = the
@@ -999,3 +1029,37 @@ only). The client adds the Grade stat only when a grade exists (`gradeStat` in `
 - **Waivers header** is ONE `CompactModule` ("Waivers": "394 available · $81 FAAB · Need QB", Sleeper link as its action). The
   stat tiles, ranking explainer, needs sentence + badges, breakdown, limited-data note, beginner help and claim disclosure are
   its body (`lib/waiversHeader.ts`). The tab strip and filter row stay visible above the list.
+
+## Trade builder "two-column scale" and the draft room's pinned clock (2026-11-14, ui-pass-3 topics 3 and 4, coridian_ picks V1)
+
+Audit: `docs/audits/2026-11-ui-pass-3.md` findings 3 and 7; sheet: `docs/audits/ui-pass-3/sheet-2-trade-draft.html`. Logic is the byte-identical lib twins
+`lib/tradeScale.ts` (new) and `lib/simDraft.ts`; every piece below has a web and an app twin.
+
+**Trade builder (`ui/TradeScale`, app `TradeScale`).** Give and Get sit side by side (two columns even at phone width) as `TradeAssetCard`s (the
+`CompactPlayerCard` with its required avatar, or a pick row with `PickAvatar`; tap a card = the PQV peek). Under them a glass card holds the
+`FairnessMeterRow` (the one meter, shared with `TradeCompactCard`; marker and fill glide between values, reduced motion snaps) and a footer line
+(roster after the trade). A dashed cyan "+" tile at the end of each column opens the existing `TradePickerSheet`; it hides at the per-side cap. The
+phase comes from `tradeScalePhase`: `empty` / `building` (meter says what is missing: "Add something you get"), `review` (both sides filled: the "+" tiles
+collapse away and the verdict plus **Send / Tweak** take their place), `tweak` (tiles and remove buttons return, "Review" goes back).
+- **Sim** (`SimGameTrades` Builder, web + app): `mode="sim"`, the meter is `simAcceptanceMeter(verdict.decision)` = the AI manager's public answer in three coarse
+  plain-word steps ("They would decline / counter / accept", "Checking their answer" while the preview loads). No value, no percentage, no number; the verdict
+  card under it is only the reason, chips and the counter ("Take their counter"). Send shows only when they would accept.
+- **Trade Analyzer** (`TradeAnalyzerContent`, `TradeAnalyzerScreen`): the same scale with the live market-value meter (`fairnessMeter`, values from the assets);
+  Analyze is the scale's primary action (`buildingAction` for a one-sided "what is this worth" check, Send-style button in review). Analyze failures use the shared
+  `ErrorState` with Try again. Notes, league settings, picks, saved trades, share and Send to Sleeper stay in the verdict/expanders below it.
+- **Build an offer** (`OfferCard` / `TradeOfferScreen`): each built offer is a `TradeCompactCard` (open) with `netValue` from the server's send/receive values.
+- Not changed: the 3-team `MultiTeamTradeContent` (three sides do not fit two columns; it already uses the shared picker) and the Sim inbox offer cards (still a
+  collapsed summary plus `SimPlayerChip` lists; next: `TradeCompactCard mode="sim"`).
+
+**Sim draft room: pinned clock + list (V1) with the recent picks.** The clock `CompactModule`'s always-visible `preview` is now three lines: best available
+(`SimDraftBar`), the **Just drafted strip** (`SimRecentStrip`: the last 6 picks as cards with pick number, the picking team's logo through `SimTeamIdentity`
+(`hideName`), avatar, `J. Surname`, position and letter grade; yours is cyan-outlined; a card opens the player; "Full board" opens the whole grid sheet via
+`SimFullBoardSheet`, which the page owns) and the **survival line** (`SimSurvivalLine`). The mini board stays its own module under the clock. The rookie draft
+uses the same strip (`simRookieRecentCards`; the rookie order carries no team or grade, so those parts are absent). Models: `simRecentPickCards`, `simRookieRecentCards`.
+- **Who survives to your pick** (`simDraftSurvival`): public information only. Factors: your next pick and how many picks come before it, each target's public ADP against
+  that line (gone / could go either way / still there), a position **run** in the last six picks (3+ of one position pulls its players about three picks earlier), and your
+  open starter needs (needs first). Targets are your queue first, then the best-ADP available players the board has loaded. Silent when you are on the clock, the draft is
+  over, you have no later pick, or no target has an ADP. It never reads the model's value or rating. Not modelled: other teams' needs (the client has no AI roster needs, only
+  their picks so far); the run signal is the public proxy.
+- The player list (`SimDraftBoard` -> `SimDraftRow` -> `SimPlayerLine`) was already `PlayerAccordionRow mode="sim"`; the Full board grid (`SimDraftGrid`) stays a dense grid of
+  position-tinted pick cells (a board, not a list).

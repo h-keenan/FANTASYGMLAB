@@ -4,6 +4,7 @@ import { Fragment, useMemo, useState, type CSSProperties, type ReactNode } from 
 
 import { Button } from "@/components/Button";
 import { CountUp, Confetti, MotionIn } from "@/components/Motion";
+import { SimAchievementBadge } from "@/components/SimAchievements";
 import { TrophyIcon } from "@/components/TrophyIcon";
 import { ValueRing } from "@/components/ValueRing";
 import { SimPlayerChip, SimPlayerLine, SimSheet, SimToneBadge, type SimCtx } from "@/components/SimGameParts";
@@ -13,9 +14,11 @@ import { RecapCard } from "@/components/ui/RecapCard";
 import { recapCardModel, recapRowsFromItems } from "@/lib/recapCard";
 import { StoryCarousel, type StoryPage } from "@/components/ui/StoryCarousel";
 import { positionColorVar } from "@/lib/playerPresentation";
+import { simAchievementColor, simAchievementDate, simRecapAchievementModel } from "@/lib/simAchievements";
 import { simFmtPts, simPlayoffRoundLabel, simTeamNameMap, type SimGamePlayer, type SimWeekRecap } from "@/lib/simGame";
 import { simGradeOf } from "@/lib/simGrade";
 import {
+  STORY_ITEMS,
   simLeagueHighlights,
   simNextWeekModel,
   simPositionTotals,
@@ -37,6 +40,7 @@ import {
 
 const KICKER: Record<SimRecapPageKey, string> = {
   result: "Result",
+  achievements: "Achievement unlocked",
   matchup: "Matchup breakdown",
   injuries: "Injuries and lineup",
   league: "Around the league",
@@ -234,6 +238,48 @@ export function SimWeekRecapStory({
               {result.worst ? performer("Worst performer", result.worst, ctx, "var(--color-danger)") : null}
             </div>
           ) : null}
+        </Page>
+      );
+    }
+    if (key === "achievements") {
+      const m = simRecapAchievementModel(recap.achievements);
+      if (!m) return null;
+      const hero = m.items[0];
+      return (
+        <Page tone={m.tone}>
+          <HeroZone>
+            <Confetti wonTitle={m.celebrate} />
+            {m.trophy ? (
+              <span className="ui-recap-trophy enter-pop" data-testid="recap-achievement-trophy">
+                <TrophyIcon size={m.celebrate ? 88 : 64} color={toneVar(m.tone)} label={m.headline} />
+              </span>
+            ) : hero ? (
+              <span className="enter-pop"><SimAchievementBadge a={hero} size={64} /></span>
+            ) : null}
+            <p className="text-xs font-extrabold uppercase" style={{ color: "var(--color-text-muted)", letterSpacing: "var(--letter-spacing-badge)" }}>{m.eyebrow}</p>
+            <MotionIn>
+              <p className="ui-recap-headline" data-testid="recap-achievement-headline">{m.headline}</p>
+            </MotionIn>
+            {m.sub ? <p className="ui-recap-sub">{m.sub}</p> : null}
+          </HeroZone>
+          <ul className="ui-recap-rows">
+            {m.items.slice(1, 1 + STORY_ITEMS).map((a, i, rows) => (
+              <MotionIn key={a.id} as="li" index={i} count={rows.length}>
+                <div className="ui-recap-fact" style={{ "--accent": simAchievementColor(a) } as CSSProperties}>
+                  <span className="inline-flex min-w-0 items-center gap-2">
+                    <SimAchievementBadge a={a} size={28} />
+                    <span className="min-w-0 break-words text-sm font-extrabold">{a.name}</span>
+                  </span>
+                  <span className="shrink-0 text-xs font-bold" style={{ color: "var(--color-text-secondary)" }}>{simAchievementDate(a)}</span>
+                </div>
+              </MotionIn>
+            ))}
+            {m.banners.slice(0, 2).map((b) => (
+              <li key={b.kind}>
+                <Fact label={b.headline} accent={simAchievementColor({ rarity: "common", tone: b.tone, unlocked: true })}>{b.sub}</Fact>
+              </li>
+            ))}
+          </ul>
         </Page>
       );
     }

@@ -117,7 +117,7 @@ export function simOrbAriaLabel(currentLabel: string, inbox: number | null | und
 // ---- Smart pill: page context (web components/BottomPillContext.tsx + BottomTabBar; mobile components/BottomPill.tsx) ----
 
 /** One page-level tab shown in the pill's page segment (the page-family tabs: Lineup | Players | Waivers | Matchup). */
-export type PillContextTab = { key: string; label: string; glyph?: TabIconName; badge?: number; /** Web: the tab is a route, rendered as a link (client navigation, opens in a new tab on demand). onSelect still fires. */ href?: string };
+export type PillContextTab = { key: string; label: string; /** Short form for the tight pill ("Hist."); the full label stays the accessible name. */ short?: string; glyph?: TabIconName; badge?: number; /** Web: the tab is a route, rendered as a link (client navigation, opens in a new tab on demand). onSelect still fires. */ href?: string };
 
 /** The one primary action of a page (Auto-set, New trade, Claim). Rendered as the accent chip at the end of the segment. */
 export type PillContextAction = { key: string; label: string; glyph?: TabIconName; disabled?: boolean; busy?: boolean; onPress: () => void; /** Web: render as a link to this route (onPress still fires). */ href?: string };
@@ -160,6 +160,50 @@ export function pillMode(hasContext: boolean, menuOpen: boolean): PillMode {
 /** Index of the lit page tab (for the sliding capsule); -1 when none. */
 export function pillActiveIndex(ctx: Pick<PillContext, "tabs" | "activeKey">): number {
   return ctx.tabs.findIndex((t) => t.key === ctx.activeKey);
+}
+
+/** The label a pill tab shows: the short form where one is defined ("Hist."), else the label. The accessible name stays the full label. */
+export function pillTabText(t: Pick<PillContextTab, "label" | "short">): string {
+  return t.short || t.label;
+}
+
+/** Side margin kept clear of the fade when a scrolled tab is brought into view. */
+export const PILL_SCROLL_MARGIN = 18;
+
+/**
+ * Where to scroll the page-tab strip so the lit tab is fully visible (clear of the edge fades), moving as little as
+ * possible. Returns the new scrollLeft, clamped to the content.
+ */
+export function pillScrollTarget(tabX: number, tabW: number, viewW: number, scrollX: number, contentW: number): number {
+  const max = Math.max(0, contentW - viewW);
+  const m = Math.min(PILL_SCROLL_MARGIN, Math.max(0, (viewW - tabW) / 2));
+  let next = scrollX;
+  if (tabX - m < scrollX) next = tabX - m;
+  else if (tabX + tabW + m > scrollX + viewW) next = tabX + tabW + m - viewW;
+  return Math.max(0, Math.min(max, Math.round(next)));
+}
+
+/** Rough width of a bold 11-12px label: estimate used only to decide the primary chip's form before anything is measured. */
+export function pillTextWidth(text: string): number {
+  return Math.ceil(text.length * 6.6);
+}
+/** Width of the primary chip as a text chip (label + glyph + padding) and as the icon-only button. */
+export const PILL_CHIP_ICON_W = 40;
+export function pillChipTextWidth(label: string, hasGlyph: boolean): number {
+  return pillTextWidth(label) + 28 + (hasGlyph ? 21 : 0) + 4;
+}
+
+/**
+ * Whether the primary chip must collapse to the icon-only 40px button so no tab label is covered. It does when there
+ * are four or more tabs, or when the tabs plus a text chip would not fit the width the segment has (`segmentW`: the row
+ * minus the icon buttons and divider). A chip with no glyph has no icon form and stays text.
+ */
+export function pillPrimaryCompact(ctx: Pick<PillContext, "tabs" | "primary">, segmentW: number): boolean {
+  const p = ctx.primary;
+  if (!p || !p.glyph) return false;
+  if (ctx.tabs.length >= 4) return true;
+  const tabsW = ctx.tabs.reduce((n, t) => n + pillTextWidth(pillTabText(t)) + 16, 0) + Math.max(0, ctx.tabs.length - 1) * 2;
+  return tabsW + pillChipTextWidth(p.label, true) > segmentW;
 }
 
 /** Accessible name of the menu button. */

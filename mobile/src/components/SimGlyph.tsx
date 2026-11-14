@@ -21,6 +21,7 @@ export const SIM_GLYPH_ICONS: Record<SimGlyphName, IconName> = {
   check: 'checkmark',
   alert: 'warning-outline',
   spark: 'sparkles',
+  trophy: 'trophy-outline',
 };
 
 export default function SimGlyph({ name, color, size = 16 }: { name: SimGlyphName; color: string; size?: number }) {

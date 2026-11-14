@@ -29,11 +29,11 @@ ROWS, BYES = build_synthetic_pool(7)
 SEED = 4242
 
 
-def settings(hint_v=0, **kw):
-    """hint_v 0 by default: these seeded-world tests predate the public-information helpers (tests/test_sim_hint_v.py covers hint_v 1)."""
+def settings(hint_v=0, aging_v=0, **kw):
+    """hint_v 0 by default: these seeded-world tests predate the public-information helpers (tests/test_sim_hint_v.py covers hint_v 1); aging_v 0 likewise (tests/test_sim_aging.py covers aging_v 1)."""
     raw = {"mode": "dynasty", "teams": 8, "user_slot": 3, "start_year": 2026, "seasons": 3, "rookie_rounds": 3}
     raw.update(kw)
-    return replace(GameSettings.parse(raw), hint_v=hint_v)
+    return replace(GameSettings.parse(raw), hint_v=hint_v, aging_v=aging_v)
 
 
 def new_snapshot(seed=SEED, **kw):
@@ -586,6 +586,14 @@ def test_api_dynasty_end_to_end():
     resumed = store.load_state("pro", gid, snap)
     replayed = store.load_state("pro", gid, snap, use_checkpoint=False)
     assert resumed.digest() == replayed.digest() and replayed.status == "complete" and replayed.season_no == 3
+    # achievements are presentation: the served list equals a cold fold of the log, across all three seasons, and the dynasty/result
+    # payloads carry it without touching the stored state
+    from modules.sim import game_achievements as ga
+
+    cold = ga.build(snap, ga.fold_ledgers(snap, store.load_events("pro", gid, 0))[0])
+    served = c.get(f"/v1/sim/games/{gid}/dynasty", headers=H).json()["achievements"]
+    assert served == cold and [l["season_no"] for l in ga.fold_ledgers(snap, store.load_events("pro", gid, 0))[0]] == [1, 2, 3]
+    assert res["achievements"] == cold
     cp = store.latest_checkpoint("pro", gid)
     assert cp["week"] >= 200  # the checkpoint key is season-aware (weeks restart every season)
     again = c.get(f"/v1/sim/games/{gid}", headers=H).json()["game"]

@@ -145,6 +145,12 @@ function renderPage() {
 }
 
 /** The sheet-picker flow: tap a side, tap the rows, then the sticky "Add N to trade" button. */
+/** Both sides filled shows Send / Tweak; Tweak brings the remove buttons back. */
+function openTweak() {
+  const tweak = screen.queryByRole("button", { name: "Tweak" });
+  if (tweak) fireEvent.click(tweak);
+}
+
 function addVia(side: "You send" | "You receive", ...names: string[]) {
   fireEvent.click(screen.getByRole("button", { name: new RegExp(`^${side}`) }));
   const dialog = screen.getByRole("dialog");
@@ -573,6 +579,7 @@ describe("TradeAnalyzerContent", () => {
         />,
       );
 
+      openTweak();
       expect(screen.getByRole("button", { name: "Remove My RB" })).toBeInTheDocument();
       expect(screen.queryByRole("button", { name: "Remove Their WR" })).not.toBeInTheDocument();
       // The empty receive side is one tap away, drawing from every other team.
@@ -612,10 +619,33 @@ describe("TradeAnalyzerContent", () => {
           offerPrefill={{ send: ["send-1", "gone-player"], receive: ["receive-1"], sendPicks: ["2027:1:1"], receivePicks: ["2099:9:9"] }}
         />,
       );
+      openTweak();
       expect(screen.getByRole("button", { name: "Remove My RB" })).toBeInTheDocument();
       expect(screen.getByRole("button", { name: "Remove Their WR" })).toBeInTheDocument();
       expect(screen.getByRole("button", { name: "Remove 2027 Round 1" })).toBeInTheDocument();
       expect(screen.queryByText(/gone-player/)).not.toBeInTheDocument();
+    });
+
+    it("shows both sides as scale cards with the live fairness meter and Send-style Analyze / Tweak actions", () => {
+      render(
+        <TradeAnalyzerContent
+          leagueId="league-1"
+          leagueName="Dynasty Overlords"
+          myRoster={MY_ROSTER}
+          rankings={RANKINGS}
+          picks={[]}
+          rosters={ROSTERS}
+          teamProfiles={TEAM_PROFILES}
+          offerPrefill={{ send: ["send-1"], receive: ["receive-1"], sendPicks: [], receivePicks: [] }}
+        />,
+      );
+      expect(screen.getByTestId("trade-scale")).toHaveAttribute("data-phase", "review");
+      expect(screen.getByTestId("scale-give")).toBeInTheDocument();
+      expect(screen.getByTestId("scale-get")).toBeInTheDocument();
+      expect(screen.getAllByTestId("player-avatar-slot").length).toBeGreaterThanOrEqual(2);
+      expect(screen.getByTestId("fairness-label").textContent).not.toMatch(/^Add /);
+      expect(screen.getByRole("button", { name: /^Analyze Trade \(1 for 1\)/ })).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: "Tweak" })).toBeInTheDocument();
     });
   });
 
@@ -636,6 +666,7 @@ describe("TradeAnalyzerContent", () => {
 
     it("loads the entered trade into both sides and picks the partner", () => {
       renderBridge({ a: ["send-1"], b: ["receive-1"] });
+      openTweak();
       expect(screen.getByRole("button", { name: "Remove My RB" })).toBeInTheDocument();
       expect(screen.getByRole("button", { name: "Remove Their WR" })).toBeInTheDocument();
       expect(screen.getByTestId("bridge-notice")).toHaveTextContent("Your public trade is loaded (2 players)");

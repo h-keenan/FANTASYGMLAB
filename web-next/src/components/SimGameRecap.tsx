@@ -1,5 +1,8 @@
 "use client";
 
+import { SimAchievementsModule } from "@/components/SimAchievements";
+import type { SimAchievementsPayload } from "@/lib/simAchievements";
+
 import { useEffect, useState } from "react";
 
 import { AccentCard } from "@/components/AccentCard";
@@ -207,6 +210,7 @@ export function SimWeekRecapView({
 export function SimFinalView({ ctx, onNewGame, onHub }: { ctx: SimCtx; onNewGame: () => void; onHub: () => void }) {
   const { gameId, game } = ctx;
   const [result, setResult] = useState<SimGameResult | null>(null);
+  const [achievements, setAchievements] = useState<SimAchievementsPayload | null>(null);
   const [failed, setFailed] = useState(false);
   const [failMessage, setFailMessage] = useState("");
   const [attempt, setAttempt] = useState(0);
@@ -219,8 +223,10 @@ export function SimFinalView({ ctx, onNewGame, onHub }: { ctx: SimCtx; onNewGame
       .getSimGameResult(gameId)
       .then((body) => {
         if (cancelled) return;
-        if (body.result) setResult(body.result);
-        else {
+        if (body.result) {
+          setResult(body.result);
+          setAchievements(body.achievements ?? null);
+        } else {
           setFailMessage(simGameReasonMessage(body.reason, body));
           setFailed(true);
         }
@@ -322,6 +328,8 @@ export function SimFinalView({ ctx, onNewGame, onHub }: { ctx: SimCtx; onNewGame
         </div>
       </AccentCard>
       )}
+
+      <SimAchievementsModule payload={achievements} seasonNo={game.dynasty?.season_no ?? 1} id="final.achievements" openOnPhone />
 
       {dynasty ? standingsSection : wide ? (
         <>

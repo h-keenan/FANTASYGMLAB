@@ -24,6 +24,7 @@ import { SimActionBar } from "@/components/SimActionBar";
 import { SimGameHeader, SimStatusChips } from "@/components/SimGameHeader";
 import { SimGameOrb } from "@/components/SimGameOrb";
 import { Sheet } from "@/components/ui/Sheet";
+import { simAttachAchievements } from "@/lib/simAchievements";
 import { SimNotificationBell, useSimNotifications } from "@/components/SimNotificationBell";
 import { SimOffseasonBar } from "@/components/SimOffseasonBar";
 import { ConfirmInPlace } from "@/components/ui/ConfirmInPlace";
@@ -334,7 +335,7 @@ export function SimGameContent() {
       setGameState(res.game);
       if (res.preview !== undefined) setPreview(res.preview ?? null);
       setClaims([]);
-      dispatch({ type: "advanced", recaps: simRecapsFromAdvance(res.recap, res.also_played), game: res.game });
+      dispatch({ type: "advanced", recaps: simAttachAchievements(simRecapsFromAdvance(res.recap, res.also_played), res.achievements), game: res.game });
       setTick((n) => n + 1);
       void refreshList();
     }

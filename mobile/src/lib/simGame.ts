@@ -12,6 +12,7 @@
  */
 
 import type { SimAttributeGrade, SimGradeLetter } from "./simGrade";
+import type { SimAchievementsPayload, SimRecapAchievements } from "./simAchievements";
 import type { ReviewGlyph } from "./simReview";
 
 // ---------------------------------------------------------------------------
@@ -747,6 +748,8 @@ export interface SimHistorySeason {
 }
 
 export interface SimPlayerHistoryResponse extends SimGameEnvelope {
+  /** The badges that name this player (League MVP, Rookie of the Year, ...). */
+  achievements?: SimAchievementsPayload["items"];
   pid?: string;
   name?: string;
   origin?: SimHistoryEntry | null;
@@ -782,6 +785,8 @@ export interface SimTeamHistoryMove {
 }
 
 export interface SimTeamHistoryResponse extends SimGameEnvelope {
+  /** Your own team's page only. */
+  achievements?: SimAchievementsPayload;
   team_id?: string;
   team_name?: string | null;
   draft?: SimTeamHistoryPick[];
@@ -1003,6 +1008,8 @@ export interface SimWeekRecap {
   season_complete: boolean;
   champion: string | null;
   next_week: number | null;
+  /** Client-attached (simAttachAchievements): the badges this week unlocked and its milestone banners. Never sent by the server inside a recap. */
+  achievements?: SimRecapAchievements;
 }
 
 export interface SimAdvanceResponse extends SimGameEnvelope {
@@ -1010,6 +1017,8 @@ export interface SimAdvanceResponse extends SimGameEnvelope {
   also_played?: SimWeekRecap[];
   replayed?: boolean;
   game?: SimGame;
+  /** Season and career badges (older servers omit it); `new` / `milestones` are what the played weeks unlocked. */
+  achievements?: SimAchievementsPayload;
 }
 
 // ---------------------------------------------------------------------------
@@ -1096,6 +1105,8 @@ export interface SimToSummary {
 }
 
 export interface SimToResponse extends SimGameEnvelope {
+  /** What the weeks just played unlocked (`new`) plus the season's badges. */
+  achievements?: SimAchievementsPayload;
   target?: SimToTarget;
   weeks_played?: number;
   stopped?: SimToStop | null;
@@ -1259,6 +1270,7 @@ export function normalizeSimResult(raw: SimGameResult | null | undefined): SimGa
 }
 
 export interface SimGameResultResponse extends SimGameEnvelope {
+  achievements?: SimAchievementsPayload;
   result?: SimGameResult;
 }
 
@@ -2822,6 +2834,7 @@ export interface SimHomeSpotlight {
 }
 
 export interface SimHomeResponse extends SimGameEnvelope {
+  achievements?: SimAchievementsPayload;
   week?: number;
   phase?: "regular_season" | "playoffs";
   matchup?: SimHomeMatchup | null;
@@ -2871,7 +2884,8 @@ export type SimGlyphName =
   | "team"
   | "check"
   | "alert"
-  | "spark";
+  | "spark"
+  | "trophy";
 
 export function simWinChanceLabel(prob: number | null | undefined): string {
   if (prob == null || Number.isNaN(prob)) return "-";
@@ -3193,6 +3207,7 @@ export interface SimDynastyHistory {
 }
 
 export interface SimDynastyResponse extends SimGameEnvelope {
+  achievements?: SimAchievementsPayload;
   dynasty?: SimDynastySummary;
   game?: SimGame;
 }

@@ -11,6 +11,9 @@ import {
   normalizePillContext,
   pillActiveIndex,
   pillMode,
+  pillPrimaryCompact,
+  pillScrollTarget,
+  pillTabText,
   PILL_MENU_LABEL,
   type BottomTab,
   type PillContext,
@@ -188,6 +191,9 @@ export function PillContextLayer({
   // unfolding the menu never remounts it, so those are transition-only.
 
   // The lit capsule is one element that slides: measure the lit tab, move by transform/width (no layout of siblings).
+  // The strip scrolls (never clips a label): the lit tab is brought fully into view, clear of the edge fades.
+  const [segW, setSegW] = useState(0);
+  const layerRef = useRef<HTMLDivElement>(null);
   useLayoutEffect(() => {
     const list = listRef.current;
     const el = list?.querySelectorAll<HTMLElement>('[role="tab"]')[idx];
@@ -195,14 +201,39 @@ export function PillContextLayer({
     list.style.setProperty("--ind-x", `${el.offsetLeft}px`);
     list.style.setProperty("--ind-w", `${el.offsetWidth}px`);
     list.dataset.measured = "";
-    el.scrollIntoView?.({ inline: "nearest", block: "nearest" });
-  }, [idx, context.tabs]);
+    const to = pillScrollTarget(el.offsetLeft, el.offsetWidth, list.clientWidth, list.scrollLeft, list.scrollWidth);
+    if (Math.abs(to - list.scrollLeft) > 1) list.scrollTo?.({ left: to });
+  }, [idx, context.tabs, segW]);
+  // Fade only the edge that has more tabs behind it; the primary chip's form follows the width the segment really has.
+  useLayoutEffect(() => {
+    const list = listRef.current;
+    const layer = layerRef.current;
+    if (!list || !layer) return;
+    const update = () => {
+      const more = list.scrollWidth > list.clientWidth + 1;
+      const start = more && list.scrollLeft > 1;
+      const end = more && list.scrollLeft + list.clientWidth < list.scrollWidth - 1;
+      list.dataset.fade = start && end ? "both" : start ? "start" : end ? "end" : "";
+      const taken = [...layer.children].reduce((n, k) => (k === list || (k as HTMLElement).classList.contains("pill-primary") ? n : n + (k as HTMLElement).offsetWidth), 0);
+      setSegW(Math.max(0, layer.clientWidth - taken - 8));
+    };
+    update();
+    list.addEventListener("scroll", update, { passive: true });
+    if (typeof ResizeObserver === "undefined") return () => list.removeEventListener("scroll", update);
+    const ro = new ResizeObserver(update);
+    ro.observe(layer);
+    ro.observe(list);
+    return () => {
+      list.removeEventListener("scroll", update);
+      ro.disconnect();
+    };
+  }, [context.tabs]);
 
   const primary = context.primary;
   const sectionBody = section ? <TabGlyph name={section.glyph} size={22} /> : null;
   const sectionProps = { className: "pill-icon-btn pill-icon-btn--section", "aria-label": section?.label ?? "Section", "data-testid": "pill-section" };
   return (
-    <div className="pill-layer pill-layer--context" inert={hidden} data-testid="pill-context-layer">
+    <div ref={layerRef} className="pill-layer pill-layer--context" inert={hidden} data-testid="pill-context-layer">
       {!section ? null : section.href ? (
         <Link href={section.href} {...sectionProps} onClick={() => onSection?.()}>
           {sectionBody}
@@ -224,7 +255,7 @@ export function PillContextLayer({
         <TabGlyph name="more" size={22} />
       </button>}
       <span className="pill-divider" aria-hidden="true" />
-      <div ref={listRef} role="tablist" aria-label={context.label} className="pill-tabs" data-testid="pill-tabs">
+      <div ref={listRef} role="tablist" aria-label={context.label} className="pill-tabs" data-dense={context.tabs.length >= 4 ? "" : undefined} data-testid="pill-tabs">
         {idx >= 0 ? <span className="pill-indicator" aria-hidden="true" /> : null}
         {context.tabs.map((t) => {
           const on = t.key === context.activeKey;
@@ -238,6 +269,7 @@ export function PillContextLayer({
               aria-selected={on}
               tabIndex={on ? 0 : -1}
               data-tab={t.key}
+              aria-label={t.short ? t.label : undefined}
               onClick={() => context.onSelect(t.key)}
               onKeyDown={(e: React.KeyboardEvent) => {
                 const dir = e.key === "ArrowRight" ? 1 : e.key === "ArrowLeft" ? -1 : 0;
@@ -249,7 +281,7 @@ export function PillContextLayer({
                 requestAnimationFrame(() => listRef.current?.querySelector<HTMLElement>(`[data-tab="${next.key}"]`)?.focus());
               }}
             >
-              {t.label}
+              <span className="pill-tab-text">{pillTabText(t)}</span>
               {badge ? <span className="pill-tab-badge" aria-label={`${badge} new`}>{badge}</span> : null}
             </PillTabEl>
           );
@@ -260,7 +292,7 @@ export function PillContextLayer({
           key={`${context.id}:${primary.key}`}
           href={primary.disabled || primary.busy ? undefined : primary.href}
           className="pill-primary"
-          data-compact={primary.glyph && context.tabs.length >= 4 ? "" : undefined}
+          data-compact={pillPrimaryCompact(context, segW) ? "" : undefined}
           aria-label={primary.label}
           disabled={primary.disabled || primary.busy}
           aria-busy={primary.busy || undefined}

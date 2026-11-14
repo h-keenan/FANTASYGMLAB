@@ -20,7 +20,7 @@ import { PlayerValueHistory } from "@/components/PlayerValueHistory";
 import { PlayerTrendsPanel } from "@/components/PlayerTrendsPanel";
 import { PercentileExplorerSheet } from "@/components/PercentileExplorerSheet";
 import { SheetHandle } from "@/components/SheetHandle";
-import { orderPlayerSheetTabs, type SheetSnap } from "@/lib/playerAnatomy";
+import { orderPlayerSheetTabs, peekSheetHeight, type SheetSnap } from "@/lib/playerAnatomy";
 import { usePlayerQuickView } from "@/context/PlayerQuickViewContext";
 import { explorerStatKey } from "@/lib/percentileExplorer";
 import { CHART_HEIGHT } from "@/components/weeklyPointsChartHeight";
@@ -170,6 +170,32 @@ export function PlayerQuickView({
   // not loaded (or failed -> section renders nothing).
   const [news, setNews] = useState<PlayerNewsResponse | null>(null);
   const [newsLoading, setNewsLoading] = useState(remote && realWorld.fetchNews);
+  // Peek height from the content: compact header + pill row + one content line (--pqv-peek-h; CSS keeps 56dvh as the fallback).
+  // Measured with the header in its compact state only (never mid-transition), re-measured when the content above the pills resizes.
+  useLayoutEffect(() => {
+    const modal = dialogRef.current;
+    const scroll = scrollRef.current;
+    if (!modal || !scroll || snap !== "peek") return;
+    let timer: ReturnType<typeof setTimeout> | null = null;
+    const measure = () => {
+      if (!window.matchMedia?.("(max-width: 480px)")?.matches) { modal.style.removeProperty("--pqv-peek-h"); return; }
+      const strip = scroll.querySelector<HTMLElement>(".tabs-sticky");
+      if (!strip || scroll.scrollTop > 0) return;
+      const bottomInset = parseFloat(getComputedStyle(modal).paddingBottom) || 0;
+      const anchorBottom = strip.getBoundingClientRect().bottom - modal.getBoundingClientRect().top;
+      const viewportH = window.visualViewport?.height ?? window.innerHeight;
+      modal.style.setProperty("--pqv-peek-h", `${peekSheetHeight({ anchorBottom, viewportH, bottomInset })}px`);
+    };
+    const later = (ms: number) => { if (timer) clearTimeout(timer); timer = setTimeout(measure, ms); };
+    measure();
+    later(300); // after the expand -> peek header transition settles
+    if (typeof ResizeObserver === "undefined") return () => { if (timer) clearTimeout(timer); };
+    const ro = new ResizeObserver(() => later(300));
+    scroll.querySelectorAll(".pqv-hero-shell, .pqv-signal-row, .tabs-sticky").forEach((el) => ro.observe(el));
+    const onResize = () => later(100);
+    window.addEventListener("resize", onResize);
+    return () => { ro.disconnect(); window.removeEventListener("resize", onResize); if (timer) clearTimeout(timer); };
+  }, [snap, loading, detail]);
 
   // Swipe-down-to-dismiss on touch devices: the shared sheet gesture (see
   // lib/useSheetDragDismiss.ts). Only closes when the body is scrolled to
@@ -377,6 +403,7 @@ export function PlayerQuickView({
           ) : null}
           <BadgeLegendSheet open={legendOpen} onClose={() => setLegendOpen(false)} />
         </div>
+        <div className="pqv-peek-fold">
         {/* coridian_, 2026-10-19 (screenshot): "the contributor tag doesnt
             make sense if he hasnt been playing much" — tier (season-long
             value) and opportunity_label (right-now depth-chart read) can
@@ -402,6 +429,7 @@ export function PlayerQuickView({
             identity.tier ? BEGINNER_HELP.playerTier : null,
           ]}
         />
+        </div>
 
         <ExplorerLeagueProvider leagueId={identity.leagueId}>
           <Tabs

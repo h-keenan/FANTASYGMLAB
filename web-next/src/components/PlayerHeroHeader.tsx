@@ -101,6 +101,15 @@ export function PlayerHeroHeader({
   depthChartNote?: string | null;
 }) {
   const Heading = headingLevel === 1 ? "h1" : "h2";
+  // One-line stand-in for the tiles at peek: "Score 64 · Value 60 · ▼ 22%". Sim shows its own tiles' values only.
+  const summaryBits = simTiles && simTiles.length > 0
+    ? [...(gradeTile ? [] : overallRating != null ? [`Score ${overallRating}`] : []), ...simTiles.map((t) => `${t.label} ${t.value}`)]
+    : [
+        overallRating != null ? `Score ${overallRating}` : null,
+        score != null ? `${valueLabel ?? "Value"} ${formatScore(score)}` : null,
+        usageTrend ? `${usageTrend.arrow} ${Math.abs(usageTrend.trend_pct)}%` : null,
+      ].filter((b): b is string => b != null);
+  const compactSummary = summaryBits.length > 0 ? summaryBits.join(" · ") : null;
   const tierIdentity = tier ? resolvePlayerTier(tier) : null;
   const rankBits = [
     overallRank ? `Overall ${formatRank(overallRank)}` : null,
@@ -119,7 +128,7 @@ export function PlayerHeroHeader({
           </span>
           {tier ? (
             <span
-              className="pqv-archetype-pill"
+              className="pqv-archetype-pill pqv-peek-fold"
               style={{ "--archetype-color": tierIdentity ? `var(${tierIdentity.colorVar})` : undefined } as ArchetypeStyle}
             >
               <PersonGlyph />
@@ -151,14 +160,16 @@ export function PlayerHeroHeader({
               <ToneBadge label="On bye this week" color="var(--color-warning)" />
             ) : null}
           </div>
+          {/* Peek (phone sheet at half height): the three stat tiles collapse to this one dense line; the tiles come back at full. */}
+          {compactSummary ? <p className="pqv-peek-summary" data-testid="pqv-peek-summary">{compactSummary}</p> : null}
           {rookie?.detail ? (
-            <p className="pqv-rookie-line" data-testid="pqv-rookie-line">
+            <p className="pqv-rookie-line pqv-peek-fold" data-testid="pqv-rookie-line">
               Rookie · {rookie.detail}
             </p>
           ) : null}
         </div>
 
-        <div className="pqv-stat-tiles">
+        <div className="pqv-peek-fold pqv-fold--tiles"><div className="pqv-stat-tiles">
           {gradeTile ? (
             gradeTile
           ) : overallRating != null ? (
@@ -212,10 +223,10 @@ export function PlayerHeroHeader({
           <UsageTile trend={usageTrend} loading={usageLoading} />
             </>
           )}
-        </div>
+        </div></div>
 
         {rankBits.length > 0 || depthChartNote ? (
-          <div className="pqv-hero-footnote">
+          <div className="pqv-hero-footnote pqv-peek-fold">
             {rankBits.length > 0 ? <p className="pqv-rank-line">{rankBits.join(" · ")}</p> : null}
             {/* coridian_, 2026-10-19: a depth-chart move is a leading
                 indicator games-played/injury signals can't catch. */}

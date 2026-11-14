@@ -3,12 +3,11 @@ import { ScrollView, StyleSheet, View } from 'react-native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { useHeaderHeight } from '@react-navigation/elements';
 
-import AccentCard from '../components/AccentCard';
 import AppText from '../components/AppText';
 import BrandedSpinner from '../components/BrandedSpinner';
 import Button from '../components/Button';
 import EmptyState from '../components/EmptyState';
-import ExchangeSide from '../components/ExchangeSide';
+import TradeCompactCard, { type TradeCardAsset } from '../components/TradeCompactCard';
 import GridBackground from '../components/GridBackground';
 import PremiumLock from '../components/PremiumLock';
 import ToneBadge from '../components/ToneBadge';
@@ -24,6 +23,20 @@ import { spacing, type ThemeColors } from '../theme';
 import type { RootStackParamList } from '../navigation/RootNavigator';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'TradeOffer'>;
+
+/** A package asset as a trade-card asset (avatar fields, market value for the live meter). Same mapping as TradeIdeaCard. */
+function toCardAsset(asset: TradeTargetOffer['package']['send'][number], index: number): TradeCardAsset {
+  if (asset.asset_type === 'pick') {
+    return { key: `pick-${index}`, pickLabel: asset.label || 'Draft pick', value: asset.score ?? null };
+  }
+  return {
+    key: asset.player_id ?? `p-${index}`,
+    player: { id: asset.player_id ?? null, name: asset.name || 'Player', position: asset.position, team: asset.team, age: asset.age, tier: asset.tier },
+    detail: [asset.team, asset.age ? `Age ${asset.age}` : null].filter(Boolean).join(' · ') || null,
+    value: asset.score ?? null,
+    ovr: asset.overall_rating ?? null,
+  };
+}
 
 /**
  * "Build an offer" (web twin: TradeOfferContent.tsx). The user picked a player
@@ -103,15 +116,22 @@ export default function TradeOfferScreen({ route, navigation }: Props) {
           <>
             <AppText style={styles.headline}>{result.headline}</AppText>
             {result.offers.map((offer) => (
-              <AccentCard key={offer.rank} accent={colors.accent}>
-                <View style={styles.titleRow}>
-                  <AppText style={styles.offerTitle} numberOfLines={2}>
-                    Offer {offer.rank}: {offer.title}
-                  </AppText>
-                  <ToneBadge label={`${offer.acceptance.label} to accept`} color={acceptColor(offer.acceptance.label)} />
-                </View>
-                <ExchangeSide side="send" assets={offer.package.send} total={offer.send_value} />
-                <ExchangeSide side="get" assets={offer.package.receive} total={offer.receive_value} />
+              <TradeCompactCard
+                key={offer.rank}
+                testID="offer-card"
+                defaultOpen
+                title={
+                  <View style={styles.titleRow}>
+                    <AppText style={styles.offerTitle} numberOfLines={2}>
+                      Offer {offer.rank}: {offer.title}
+                    </AppText>
+                    <ToneBadge label={`${offer.acceptance.label} to accept`} color={acceptColor(offer.acceptance.label)} />
+                  </View>
+                }
+                give={offer.package.send.map(toCardAsset)}
+                get={offer.package.receive.map(toCardAsset)}
+                netValue={offer.receive_value - offer.send_value}
+              >
                 {offer.price_note ? <AppText style={styles.priceNote}>{offer.price_note}</AppText> : null}
                 {offer.why.map((line) => (
                   <AppText key={line} style={styles.why}>
@@ -121,7 +141,7 @@ export default function TradeOfferScreen({ route, navigation }: Props) {
                 ))}
                 <AppText style={styles.acceptReason}>{offer.acceptance.reason}</AppText>
                 <Button label="Open in Trade Analyzer" onPress={() => openInAnalyzer(offer)} />
-              </AccentCard>
+              </TradeCompactCard>
             ))}
           </>
         ) : (
