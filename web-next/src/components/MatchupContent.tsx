@@ -29,8 +29,9 @@ import { playerCardFromStarter } from "@/lib/playerCard";
 import { PositionBadge } from "@/components/PositionBadge";
 import { StatStrip } from "@/components/StatStrip";
 import { CompactModule } from "@/components/ui/CompactModule";
-import { Hero } from "@/components/ui/ModuleTemplates";
-import { edgeChips, insightsParts, lineupParts, matchupHeroModel, movesParts, teamsValuesParts } from "@/lib/matchupModules";
+import { MatchupHeroCard } from "@/components/ui/MatchupModule";
+import { usePlayerQuickView } from "@/context/PlayerQuickViewContext";
+import { edgeChips, insightsParts, lineupParts, matchupCardModel, matchupSwingPlayers, movesParts, teamsValuesParts, type MatchupSwingInput } from "@/lib/matchupModules";
 import { TeamAvatar } from "@/components/TeamAvatar";
 import { ToneBadge } from "@/components/ToneBadge";
 import { freshnessLabel } from "@/lib/liveScores";
@@ -149,14 +150,32 @@ function scoreboardFacts(matchup: MatchupResponse) {
   return { hasOdds, myPct, myProjected, opponentProjected, projectedMargin };
 }
 
-/** Hero: this week's win chance (or the score) with both teams in the context line. */
+/**
+ * Hero (V1): week + live state, win chance, both scores, the win bar, projection / players left, and the swing player on
+ * each side (widest projection range still to play) with their avatars. "Open lineup" jumps to the lineup comparison.
+ */
 function MatchupHero({ matchup }: { matchup: MatchupResponse }) {
   const mine = matchup.my_team!;
   const opponent = matchup.opponent!;
+  const { openPlayer } = usePlayerQuickView();
   const { myPct, myProjected, opponentProjected } = scoreboardFacts(matchup);
-  const model = matchupHeroModel({
+  const swingInputs: MatchupSwingInput[] = [];
+  let playersLeft: number | null = null;
+  for (const [side, team] of [["mine", mine], ["opponent", opponent]] as const) {
+    const list = team.has_live_data ? team.real_starters : team.starters;
+    for (const p of list) {
+      if (!p.name) continue;
+      const final = "game_final" in p ? p.game_final === true : false;
+      const done = final || ("ruled_out" in p && p.ruled_out === true) || p.projection?.status === "bye_week";
+      swingInputs.push({ playerId: p.player_id, name: p.name, position: p.position, team: p.team, tier: p.tier, low: p.projection?.low ?? null, high: p.projection?.high ?? null, done, side });
+      if (side === "mine") playersLeft = (playersLeft ?? 0) + (done ? 0 : 1);
+    }
+  }
+  const model = matchupCardModel({
     week: matchup.week,
-    myName: mine.team_name,
+    live: matchup.game_state === "live",
+    final: matchup.game_state === "final",
+    myName: "You",
     opponentName: opponent.team_name,
     myScore: mine.has_live_data ? mine.real_points : null,
     opponentScore: opponent.has_live_data ? opponent.real_points : null,
@@ -164,12 +183,24 @@ function MatchupHero({ matchup }: { matchup: MatchupResponse }) {
     opponentProjected,
     winPercent: myPct,
     kickedOff: hasKickedOff(matchup),
-    live: matchup.game_state === "live",
-    final: matchup.game_state === "final",
+    playersLeft: hasKickedOff(matchup) ? playersLeft : null,
+    swing: matchupSwingPlayers(swingInputs, opponent.team_name),
   });
   return (
     <>
-      <Hero label={model.label} value={model.value} context={model.context} tone={model.tone} testId="matchup-hero" />
+      <MatchupHeroCard
+        model={model}
+        onOpenPlayer={(p) => p.playerId && openPlayer({ player_id: p.playerId, name: p.name, position: p.position, team: p.team, tier: p.tier })}
+        action={
+          <Button
+            fullWidth
+            onClick={() => document.querySelector('[data-testid="matchup-lineup"]')?.scrollIntoView({ behavior: "smooth", block: "start" })}
+            data-testid="matchup-open-lineup"
+          >
+            Open lineup
+          </Button>
+        }
+      />
       {myPct == null ? (
         <p className="m-0 text-xs" style={{ color: "var(--color-text-muted)" }}>
           {winProbabilityUnavailableMessage(matchup)}

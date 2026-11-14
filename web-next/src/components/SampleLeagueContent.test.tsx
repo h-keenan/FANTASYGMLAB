@@ -21,7 +21,7 @@ describe("SampleLeagueContent", () => {
     expect(screen.getByRole("heading", { name: /This week/ })).toBeTruthy();
     expect(screen.getAllByText(/Sell Casey Placeholder/).length).toBeGreaterThan(0);
     // My Team and Watchlist are compact modules: informative collapsed, tiles/cards on tap.
-    fireEvent.click(screen.getByRole("button", { name: /^My Team/ }));
+    fireEvent.click(screen.getByTestId("stat-strip-toggle"));
     expect(screen.getByText("Power Rank")).toBeTruthy();
     fireEvent.click(screen.getByRole("button", { name: /^Watchlist/ }));
     expect(screen.getByTestId("watchlist-alerts")).toBeTruthy();

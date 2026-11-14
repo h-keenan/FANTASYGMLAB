@@ -35,6 +35,13 @@ const ATTENTION_ROUTE: Record<string, string> = {
   my_team: 'MyTeam',
 };
 
+/** Which screen a "Needs attention" entry opens (shared by the card and the status header's player rows). */
+export function attentionEntryRoute(entry: DashboardAttentionEntry<DashboardItem>): string {
+  if (entry.target === 'matchup') return 'Matchup';
+  if (entry.target === 'gm_plan' || !entry.item) return 'GmPlan';
+  return ATTENTION_ROUTE[entry.item.destination] ?? 'GmPlan';
+}
+
 /**
  * "Needs attention": the few urgent items, one line each, each opening where it
  * is handled. Urgency is read only from existing fields
@@ -54,11 +61,7 @@ export function DashboardNeedsAttention({
   const { colors } = useThemeMode();
   const styles = useMemo(() => createStyles(colors), [colors]);
   if (entries.length === 0) return null;
-  const routeFor = (entry: DashboardAttentionEntry<DashboardItem>): string => {
-    if (entry.target === 'matchup') return 'Matchup';
-    if (entry.target === 'gm_plan' || !entry.item) return 'GmPlan';
-    return ATTENTION_ROUTE[entry.item.destination] ?? 'GmPlan';
-  };
+  const routeFor = attentionEntryRoute;
   return (
     <View style={styles.block}>
       <SectionHeading title="Needs attention" />

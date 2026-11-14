@@ -15,8 +15,9 @@ import { SimIconButton, SimPlayerChip, SimPlayerLine, SimStat, SimToneBadge, use
 import { SkeletonCard } from "@/components/Skeleton";
 import { ToneBadge } from "@/components/ToneBadge";
 import { CompactModule } from "@/components/ui/CompactModule";
+import { SimDraftBar } from "@/components/SimDraftBar";
 import { api } from "@/lib/api";
-import { simDraftNeedPills, simDraftSummaryParts } from "@/lib/simDraft";
+import { simDraftBarModel, simDraftNeedPills, simDraftSummaryParts } from "@/lib/simDraft";
 import {
   SIM_QUEUE_MAX,
   simFmtPts,
@@ -97,6 +98,22 @@ export function SimGameDraft({ ctx, onComplete }: { ctx: SimCtx; onComplete: (re
       return next;
     });
   }
+
+  // Best player still on the board by ADP: the bar's avatar line when the server has no pick suggestion for you.
+  const [topAvailable, setTopAvailable] = useState<SimGamePlayer | null>(null);
+  const madePicks = draft?.picks?.length ?? 0;
+  useEffect(() => {
+    if (hint || loadState !== "ready") return;
+    let cancelled = false;
+    Promise.resolve(api.getSimGamePlayers(gameId, "status=available&sort=adp&page=1&page_size=1"))
+      .then((body) => {
+        if (!cancelled) setTopAvailable(body?.items?.[0] ?? null);
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [gameId, hint, loadState, madePicks, ctx.tick]);
 
   // Persist the queue shortly after it changes (auto-pick reads it server-side).
   const saved = useRef<string>("");
@@ -322,6 +339,8 @@ export function SimGameDraft({ ctx, onComplete }: { ctx: SimCtx; onComplete: (re
 
   const need = simDraftNeedPills(draft.your_roster, game.settings.slots);
   const draftLast = hint ? playerSurname(hint.player.name) : "";
+  // The pinned bar's second line: the server's pick for you, else the top ADP player still on the board.
+  const barPlayer = hint?.player ?? topAvailable;
   const header = (
     <CompactModule
       id="draft.clock"
@@ -331,6 +350,7 @@ export function SimGameDraft({ ctx, onComplete }: { ctx: SimCtx; onComplete: (re
       glow={onClock}
       persist={false}
       parts={simDraftSummaryParts(draft, game.settings.teams, need, { picking: Boolean(optimistic) })}
+      preview={draft.status !== "complete" && barPlayer ? <SimDraftBar model={simDraftBarModel(barPlayer, need)} onOpen={() => ctx.openPlayer(barPlayer)} /> : undefined}
       action={
         onClock && hint ? (
           <Button size="sm" loading={busy === "pick"} onClick={() => pick(hint.player)}>

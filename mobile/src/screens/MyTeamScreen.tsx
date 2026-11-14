@@ -20,7 +20,9 @@ import BrandHeaderBar from '../components/BrandHeaderBar';
 import PageFamilyTabs from '../components/PageFamilyTabs';
 import GridBackground from '../components/GridBackground';
 import CompactModule from '../components/CompactModule';
-import { Hero, StatStripModule } from '../components/ModuleTemplates';
+import { StatStripModule } from '../components/ModuleTemplates';
+import StatusHeader from '../components/StatusHeader';
+import { buildTeamStatusHeader, rosterAttentionItems } from '../lib/statusHeader';
 import { listSummaryParts } from '../lib/moduleTemplates';
 import PositionBadge from '../components/PositionBadge';
 import PlayerIdentityRow from '../components/PlayerIdentityRow';
@@ -274,7 +276,16 @@ export default function MyTeamScreen({ route, navigation }: Props) {
 
         <BeginnerHelp term="myTeamIntro" />
         <BeginnerHelp term="myTeamValueTiers" />
-        <TeamHero team={myTeam} leagueSize={leagueSize} teamValue={teamValue} startersValue={bestBall ? 0 : startersValue} />
+        <TeamHero
+          team={myTeam}
+          leagueSize={leagueSize}
+          teamValue={teamValue}
+          startersValue={bestBall ? 0 : startersValue}
+          starters={starters}
+          openSlotCount={bestBall ? 0 : (myTeamData?.open_slots ?? []).length}
+          bestBall={bestBall}
+          onOpenLineup={() => navigation.navigate('Matchup', { leagueId, leagueName })}
+        />
         <TeamSnapshotModule team={myTeam} open={(key) => openInsight(navigation.navigate as never, key, leagueId, leagueName)} />
         {myTeam && hasRosterAnalysis(myTeam) ? (
           <CompactModule
@@ -385,8 +396,30 @@ export default function MyTeamScreen({ route, navigation }: Props) {
   );
 }
 
-/** The Hero: Team Value as the one big number, percentile of the league as the context line, archetype as the badge. */
-function TeamHero({ team, leagueSize, teamValue, startersValue }: { team: TeamRanking | null; leagueSize: number; teamValue: number; startersValue: number }) {
+/**
+ * The status header (twin of web MyTeamContent): ring = how high the roster's value sits in the league, Team Value in
+ * the headline (or the roster hole), holes / injuries as mini stats, the starters who cannot play as player rows,
+ * archetype as the badge. A best-ball roster has no lineup to fix, so no holes or rows.
+ */
+function TeamHero({
+  team,
+  leagueSize,
+  teamValue,
+  startersValue,
+  starters,
+  openSlotCount,
+  bestBall,
+  onOpenLineup,
+}: {
+  team: TeamRanking | null;
+  leagueSize: number;
+  teamValue: number;
+  startersValue: number;
+  starters: LineupPlayer[];
+  openSlotCount: number;
+  bestBall: boolean;
+  onOpenLineup: () => void;
+}) {
   const { colors } = useThemeMode();
   const valuePercentile = team ? percentileFromRank(team.power_rank, leagueSize) : null;
   const outlook = team ? team.archetype_label || team.strategy_label : null;
@@ -395,13 +428,24 @@ function TeamHero({ team, leagueSize, teamValue, startersValue }: { team: TeamRa
     startersValue > 0 ? `Starters ${Math.round(startersValue).toLocaleString()}` : null,
   ]
     .filter(Boolean)
-    .join(' · ');
+    .join(' \u00b7 ');
+  const model = buildTeamStatusHeader({
+    teamValue: teamValue > 0 ? Math.round(teamValue).toLocaleString() : '\u2014',
+    valuePercentile,
+    leagueSize: leagueSize > 0 ? leagueSize : null,
+    context: context || null,
+    record: team ? `${team.wins ?? 0}-${team.losses ?? 0}${team.ties ? `-${team.ties}` : ''}` : null,
+    openSlots: openSlotCount,
+    flaggedStarters: bestBall ? 0 : starters.filter((p) => p.ruled_out || p.start_ineligible_reason).length,
+    injuredStarters: bestBall ? 0 : starters.filter((p) => p.injury_label && p.injury_label.trim()).length,
+    attention: bestBall ? [] : rosterAttentionItems(starters, 3, 'Matchup'),
+    hrefs: { lineup: 'Matchup' },
+  });
   return (
-    <Hero
-      label="Team Value"
-      value={teamValue > 0 ? Math.round(teamValue).toLocaleString() : '—'}
-      context={context || null}
+    <StatusHeader
+      model={model}
       badge={outlook ? <ToneBadge solid label={outlook} color={colors.accent} textColor={colors.onAccent} /> : undefined}
+      onOpen={() => onOpenLineup()}
       testID="team-hero"
     />
   );

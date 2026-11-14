@@ -69,8 +69,8 @@ describe("DashboardContent", () => {
     expect(screen.getByText("Trade for a top-12 RB before the deadline")).toBeInTheDocument();
 
     // My Team is one compact module: its collapsed summary carries the ranks; the tiles open on tap.
-    expect(screen.getByRole("button", { name: /^My Team: .*Power/ })).toBeInTheDocument();
-    expandModule("My Team");
+    expect(screen.getByRole("group", { name: /^My Team: .*Power/ })).toBeInTheDocument();
+    fireEvent.click(screen.getByTestId("stat-strip-toggle"));
     // Record lives once, in the "Your team right now" hero, not repeated in the tiles.
     expect(screen.getByRole("heading", { name: "Your team right now" })).toBeInTheDocument();
     expect(await screen.findAllByText("Record")).toHaveLength(1);
@@ -78,9 +78,9 @@ describe("DashboardContent", () => {
     expect(screen.getByText("Starter Strength")).toBeInTheDocument();
     expect(screen.getByText("Bench Strength")).toBeInTheDocument();
     expect(screen.getByText("Injured starters")).toBeInTheDocument();
-    expect(screen.getByText("7-6")).toBeInTheDocument();
-    expect(screen.getByText("#2")).toBeInTheDocument(); // power rank
-    expect(screen.getByText("T-1")).toBeInTheDocument(); // franchise rank, tied
+    expect(screen.getAllByText("7-6").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("#2").length).toBeGreaterThan(0); // power rank
+    expect(screen.getAllByText("T-1").length).toBeGreaterThan(0); // franchise rank, tied
 
     expect(screen.getByText(/2 more moves? on Pro/)).toBeInTheDocument();
   });
@@ -259,7 +259,7 @@ describe("DashboardContent", () => {
 
   it("offers one shared glossary for the rank labels", () => {
     render(<DashboardContent leagueId="abc" leagueName="Dynasty Overlords" data={FIXTURE} />);
-    expandModule("My Team");
+    fireEvent.click(screen.getByTestId("stat-strip-toggle"));
     expect(screen.getAllByRole("button", { name: /what do these mean/i })).toHaveLength(1);
   });
 

@@ -29,6 +29,8 @@ import { fileURLToPath } from "node:url";
 // Byte-identical in both trees (generated files and imports-free pure modules).
 export const IDENTICAL = [
   "compactModule.ts",
+  "statusHeader.ts",
+  "recapCard.ts",
   "playerBadges.ts",
   "moduleTemplates.ts",
   "tradeIdeaSummary.ts",

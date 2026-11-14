@@ -13,6 +13,7 @@ import {
   simBoardEdge,
   simBoardProjection,
   simDraftAdpDelta,
+  simDraftBarModel,
   simDraftBestByPosition,
   simDraftBoardGrid,
   simDraftNeedPills,
@@ -182,5 +183,18 @@ describe("rookie draft summary, mini board and recent chips", () => {
     expect(board[0][0].pos).toBe("WR");
     expect(board[0][1]).toMatchObject({ clock: true, you: true });
     expect(simRookieRecentChips(order)).toEqual([{ key: "p1", label: "#1 Name1 WR", pos: "WR" }]);
+  });
+});
+
+describe("simDraftBarModel (pinned bar with the best-available avatar)", () => {
+  const needs = [{ pos: "RB" as const, have: 0, starters: 2, tone: "danger" as const }, { pos: "QB" as const, have: 1, starters: 1, tone: "success" as const }];
+  it("carries avatar id, position, ADP and the letter grade, never a rating", () => {
+    const model = simDraftBarModel({ name: "Jahmyr Gibbs", pos: "RB", team: "DET", adp: 5.1, headshot_id: "9509", grade: "A-" }, needs);
+    expect(model).toMatchObject({ playerId: "9509", position: "RB", adp: "ADP 5", grade: "A-", fit: "Fills your RB need" });
+    expect(JSON.stringify(model)).not.toMatch(/overall|value/i);
+  });
+  it("no grade and no need stay null instead of being invented", () => {
+    const model = simDraftBarModel({ name: "Q", pos: "QB", team: null, adp: null }, needs);
+    expect(model).toMatchObject({ playerId: null, adp: null, grade: null, fit: null });
   });
 });

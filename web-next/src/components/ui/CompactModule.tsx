@@ -49,6 +49,7 @@ export function CompactModule({
   children,
   testId,
   glow = false,
+  preview,
 }: {
   /** Stable key for remembering the open state, e.g. "draft.clock". */
   id: string;
@@ -70,6 +71,8 @@ export function CompactModule({
   children?: ReactNode;
   testId?: string;
   glow?: boolean;
+  /** Always-visible line under the header (collapsed AND expanded): the pinned draft bar's best-available player. Interactive content is fine, it sits outside the toggle button. */
+  preview?: ReactNode;
 }) {
   const key = simOpenKey(id);
   const bodyId = useId();
@@ -142,6 +145,7 @@ export function CompactModule({
         </button>
         {action ? <div className="shrink-0">{action}</div> : null}
       </div>
+      {preview ? <div data-testid="compact-preview">{preview}</div> : null}
       {expandIn === "inline" ? (
         <div id={bodyId} hidden={!open} className="flex flex-col gap-3 pt-1">
           {open ? children : null}

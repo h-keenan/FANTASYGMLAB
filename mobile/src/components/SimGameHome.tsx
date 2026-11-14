@@ -7,6 +7,8 @@ import Button from './Button';
 import ErrorState from './ErrorState';
 import PositionBadge from './PositionBadge';
 import SimGlyph from './SimGlyph';
+import StatusHeader from './StatusHeader';
+import { buildSimStatusHeader, simHomeAttentionItems } from '../lib/statusHeader';
 import CompactModule from './CompactModule';
 import { simLeagueParts } from '../lib/simSummaries';
 import { SkeletonCard } from './SkeletonBlock';
@@ -34,6 +36,7 @@ import {
   simProjText,
   simFmtRecord,
   simRowEdge,
+  simSeasonText,
   simSlotLabels,
   simWinChanceLabel,
   simWinChanceTone,
@@ -123,6 +126,7 @@ export function SimHomeTab({ ctx, setClaims, onTab }: { ctx: SimCtx; setClaims: 
   const names = Object.fromEntries((home.standings?.rows ?? []).map((r) => [r.team_id, r.name]));
   return (
     <View style={common.stack} testID="sim-home">
+      <SimStatusHeader home={home} onTab={onTab} />
       {home.matchup ? <SimMatchupCard ctx={ctx} matchup={home.matchup} onTab={onTab} /> : null}
       <SimChecklistCard home={home} onTab={onTab} onAuto={home.matchup && !home.matchup.bye ? auto.run : undefined} autoBusy={auto.busy} optimal={auto.optimal} />
       <SimReservesStrip home={home} onTab={onTab} />
@@ -275,6 +279,34 @@ function Side({ player, win, lose, align, ctx }: { player: SimGamePlayer | null;
 }
 
 /** One tappable line for dynasty / IR games (season, picks, IR and taxi use); nothing in redraft. */
+/**
+ * The players-first status header on Home (ring = this week's win chance, record, three mini stats, the starters and
+ * targets that need you as player rows, the first unfinished checklist step as the one action). The cards below keep
+ * every detail. Projection and ADP only; the sim never shows its internal rating. Mirrors web SimStatusHeader.
+ */
+function SimStatusHeader({ home, onTab }: { home: SimHomeResponse; onTab: (tab: SimTab) => void }) {
+  const mine = home.standings?.rows.find((r) => r.is_you);
+  const record = home.matchup?.you_record ?? (mine ? { wins: mine.wins, losses: mine.losses, ties: mine.ties } : null);
+  const next = (home.checklist ?? []).find((item) => !item.done && simChecklistTarget(item));
+  const model = buildSimStatusHeader({
+    week: home.week ?? home.matchup?.week ?? null,
+    seasonLabel: home.dynasty ? simSeasonText(home.dynasty) : null,
+    record: record ? simFmtRecord(record) : null,
+    rank: home.standings?.your_rank ?? mine?.rank ?? null,
+    teams: home.standings?.rows.length ?? null,
+    inPlayoffs: home.standings ? home.standings.in_playoffs : null,
+    opponentName: home.matchup?.opponent?.name ?? null,
+    winProb: home.matchup && !home.matchup.bye ? (home.matchup.win_prob ?? null) : null,
+    bye: Boolean(home.matchup?.bye),
+    injuredCount: (home.injuries ?? []).length,
+    offers: home.inbox?.count ?? 0,
+    waiverTargets: (home.waiver_suggestions ?? []).length,
+    attention: simHomeAttentionItems(home),
+    next: next ? { label: next.label, actionKey: simChecklistTarget(next) as string } : null,
+  });
+  return <StatusHeader model={model} onAction={(key) => onTab(key as SimTab)} testID="sim-status-header" />;
+}
+
 function SimReservesStrip({ home, onTab }: { home: SimHomeResponse; onTab: (tab: SimTab) => void }) {
   const { colors } = useThemeMode();
   const line = simHomeDynastyLine(home);
