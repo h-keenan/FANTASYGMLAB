@@ -30,6 +30,11 @@ describe("bottom bar metrics (shared with mobile)", () => {
     expect(globals.match(/min-height: var\(--bar-header-height\)/g)?.length).toBeGreaterThanOrEqual(1);
   });
 
+  it("the pill reads its inset, gap and tap height from the shared variables", () => {
+    expect(css).toContain("margin: 0 var(--bar-side-inset) calc(var(--bar-pill-bottom-gap) + env(safe-area-inset-bottom");
+    expect(css).toContain("width: var(--bar-button-min-height)");
+  });
+
   it("derived heights add up and every button is a real tap target", () => {
     expect(BAR_PILL_HEIGHT).toBe(54);
     expect(BAR_REGION_HEIGHT).toBe(62);

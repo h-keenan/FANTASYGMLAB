@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useParams, usePathname } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useState, useSyncExternalStore } from "react";
 
 import { NavDestinationGlyph } from "@/components/NavDestinationGlyph";
 import { NavProMarker } from "@/components/NavProMarker";
@@ -11,6 +11,7 @@ import { Sheet } from "@/components/ui/Sheet";
 import { useAuth } from "@/context/AuthContext";
 import { useDisplayPreferences } from "@/context/DisplayPreferencesContext";
 import { FOUNDER_DESTINATION, isFounderSession, useNavDestinations, type NavDestination } from "@/lib/navDestinations";
+import { getPillState, getServerPillState, setPillBarPresent, subscribePill } from "@/lib/bottomPillStore";
 import { shellActiveTab, shellLeagueContext, shellTabs, SHELL_ACTION_SLOT_ID } from "@/lib/shellNav";
 import { useSearchParams } from "@/lib/useSearchParams";
 import { useShellNav } from "@/lib/useShellNav";
@@ -43,6 +44,19 @@ function ShellBarInner() {
   const tabs = shellTabs({ leagueId, leagueName });
   const active = shellActiveTab(pathname, Boolean(leagueId));
   const [moreOpen, setMoreOpen] = useState(false);
+  const pill = useSyncExternalStore(subscribePill, getPillState, getServerPillState);
+  // Tell pages the pill is on screen (phones only) so they drop their own page-tab row only then.
+  useEffect(() => {
+    if (typeof window.matchMedia !== "function") return; // no media queries (tests, very old browsers): the in-page tabs stay
+    const mq = window.matchMedia("(max-width: 767px)");
+    const sync = () => setPillBarPresent(mq.matches);
+    sync();
+    mq.addEventListener("change", sync);
+    return () => {
+      mq.removeEventListener("change", sync);
+      setPillBarPresent(false);
+    };
+  }, []);
   return (
     <>
       <div className="bottom-stack md:hidden" data-bare data-testid="shell-bottom-stack">
@@ -52,6 +66,7 @@ function ShellBarInner() {
           tabs={tabs}
           active={active}
           testId="shell-tab-bar"
+          context={pill.ctx}
           onSelect={(key) => {
             if (key === "more") setMoreOpen(true);
           }}
