@@ -94,7 +94,7 @@ def pool_from_panel(rows: list[dict], season: int = 2025):
     return out, synthetic_byes(teams, 14, 3)
 
 
-def _run_game(rows, byes, model_id: str, seed: int, ceil_check) -> dict[str, Any]:
+def _run_game(rows, byes, model_id: str, seed: int, ceil_check, difficulty: str = "normal") -> dict[str, Any]:
     from dataclasses import replace
 
     from modules.sim.game_draft import DraftContext, auto_for_user, run_ai_picks
@@ -104,7 +104,7 @@ def _run_game(rows, byes, model_id: str, seed: int, ceil_check) -> dict[str, Any
     from modules.sim.game_state import Emitter, GameState
     from modules.sim.game_types import GameSettings
 
-    settings = replace(GameSettings.parse({"user_slot": 4, "scoring": "ppr"}), reserve_v=0, ir_slots=0)
+    settings = replace(GameSettings.parse({"user_slot": 4, "scoring": "ppr", "difficulty": difficulty}), reserve_v=0, ir_slots=0)
     snap = build_snapshot(rows, byes, settings, seed, scoring_model=model_id)
     state = GameState(snap)
     em = Emitter(state, snap)

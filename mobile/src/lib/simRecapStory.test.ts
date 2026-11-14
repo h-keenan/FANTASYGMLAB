@@ -2,7 +2,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
-import { simLeagueHighlights, simNextWeekModel, simPositionTotals, simRecapInjuryModel, simRecapPageKeys, simRecapResultModel } from './simRecapStory.ts';
+import { simLeagueHighlights, simNextWeekModel, simPositionTotals, simRecapInjuryModel, simRecapPageKeys, simRecapProj, simRecapResultModel } from './simRecapStory.ts';
 
 const p = (id: string, name: string, pos: string) => ({ id, name, pos, projection: 10 });
 const st = (slot: string, player: ReturnType<typeof p> | null, pts: number, flag: string | null = null) => ({ slot, player, pts, flag });
@@ -32,4 +32,12 @@ test('page models: result margin, positions, injuries, league and next week', ()
   const n = simNextWeekModel(recap, { ...facts, lineupWarnings: 1, offers: 2, nextOpponent: 'Titans', nextProjection: { yours: 121.4, theirs: 117.9 }, tradeDeadlineWeek: 10 });
   assert.equal(n.edge, 'You are favored by 3.5');
   assert.deepEqual(n.notes.map((x) => x.label), ['Lineup', 'Offers', 'Deadline']);
+});
+
+test("matchup row PROJ is the projection the server stamped for that week, never a guess", () => {
+  assert.equal(simRecapProj({ proj: 14.23 }), 14.23);
+  assert.equal(simRecapProj({ proj: 0 }), 0);
+  assert.equal(simRecapProj({}), null); // a recap saved before the server sent it
+  assert.equal(simRecapProj({ proj: null }), null);
+  assert.equal(simRecapProj({ proj: Number.NaN }), null);
 });

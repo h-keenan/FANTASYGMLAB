@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import numpy as np
 
-from modules.sim import player_model as v5
+from modules.sim import player_model_v5 as v5
 from modules.sim import player_model_v4 as v4
 
 

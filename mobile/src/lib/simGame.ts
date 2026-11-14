@@ -893,6 +893,8 @@ export interface SimRecapStarter {
   slot: SimSlot;
   player: SimGamePlayer | null;
   pts: number;
+  /** The projection shown for this player going into the week (absent on recaps saved before the server sent it). */
+  proj?: number | null;
   flag: "bye" | "out" | null;
   stats?: Record<string, number> | null;
 }

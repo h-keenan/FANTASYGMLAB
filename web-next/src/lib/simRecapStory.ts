@@ -95,6 +95,15 @@ export function simTopStarters(starters: readonly SimRecapStarter[], n = STORY_I
   return starters.filter((s) => s.player).sort((a, b) => b.pts - a.pts).slice(0, n);
 }
 
+/**
+ * The PROJ shown on a recap matchup row: the projection the game displayed going into that week (the server stamps it on the row as
+ * `proj`; the row's player brief carries no projection of its own, which is why every row used to read "PROJ -"). Null for a recap saved
+ * before the server sent it: shown as "-", never a guess.
+ */
+export function simRecapProj(s: Pick<SimRecapStarter, "proj">): number | null {
+  return typeof s.proj === "number" && Number.isFinite(s.proj) ? s.proj : null;
+}
+
 export interface SimRecapInjuryModel {
   yours: number;
   /** Your hurt players first, then the biggest names elsewhere, at most STORY_ITEMS. */
