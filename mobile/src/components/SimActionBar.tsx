@@ -9,6 +9,7 @@ import { useThemeMode } from '../context/ThemeModeContext';
 import { api } from '../lib/api';
 import { simAdvanceLabel } from '../lib/simGame';
 import { simAdvanceState, simLineupIssues, type SimZeroStarter } from '../lib/simLayout';
+import { BAR_METRICS } from '../lib/bottomBarMetrics';
 import { radii, spacing, type ThemeColors } from '../theme';
 
 /**
@@ -88,13 +89,19 @@ export default function SimActionBar({ ctx, paywalled, advancing, onAdvance, onS
 function createStyles(colors: ThemeColors) {
   return StyleSheet.create({
     bar: {
-      paddingVertical: spacing.sm,
-      paddingHorizontal: spacing.md,
+      // The shared floating glass pill (BottomPill / web .action-pill): translucent glass fill, lit rim, capsule radius.
+      paddingVertical: BAR_METRICS.pillPadding,
+      paddingHorizontal: BAR_METRICS.pillPadding + spacing.xs,
       gap: spacing.xs,
-      borderRadius: radii.lg,
+      borderRadius: 28,
       borderWidth: 1,
-      borderColor: colors.border,
-      backgroundColor: colors.backgroundElevated,
+      borderColor: colors.glassBorder,
+      backgroundColor: colors.glass,
+      shadowColor: '#000',
+      shadowOpacity: 0.4,
+      shadowRadius: 12,
+      shadowOffset: { width: 0, height: 6 },
+      elevation: 6,
     },
     row: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: spacing.md },
     advance: { flex: 1, minWidth: 0 },

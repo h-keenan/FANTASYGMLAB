@@ -461,7 +461,17 @@ Phase A of `docs/mobile-ux-plan-2026-11.md`. In the game on phones (`/gm-game`, 
 
 Layout rule (immune to iOS Safari fixed-position drift): nothing here is `position: fixed` or JS-positioned. The game is a `min-height: 100dvh` flex column and the footer is a `position: sticky; bottom: 0` `.bottom-stack` at the end of it with `env(safe-area-inset-bottom)` padding. The orb is `position: absolute` inside that stack (`.game-orb-dock`), so it can never disagree with the pill.
 
-`BottomTabBar` (`components/ui/BottomTabBar.tsx`, lib twin `lib/bottomNav.ts`) is the 5-tab bar the site shell (Phase B) uses; it lives inside the same `.bottom-stack`. It is not used in the game.
+`BottomTabBar` (`components/ui/BottomTabBar.tsx`, lib twin `lib/bottomNav.ts`) is the site shell's footer (Phase B); it lives inside the same `.bottom-stack`. It is not used in the game.
+
+### The smart floating pill (approved: option B base + variant V2, `docs/audits/2026-11-footer-options.html`, `2026-11-smart-pill-options.html`)
+
+- **Look**: a detached glass capsule 12px off the screen edges and above the safe-area inset (`--bar-side-inset`, `--bar-pill-bottom-gap` + `env(safe-area-inset-bottom)`), frosted glass tokens only (translucent surface, blur, lit top hairline, soft shadow). The Fantasy Sim bar (`.action-pill`, `SimActionBar` / `SimOffseasonBar`) uses the same glass and capsule radius so the two chromes match; the orb badge hugs the orb.
+- **No page context**: the global tabs. The lit tab expands to icon + label in the cyan glass capsule (gold hairline), the rest are icon-only with `aria-label`s, 44px+ targets.
+- **With page context** (V2): ONE row. The global tabs fold into two icon buttons (the section you are in + a menu button, `aria-expanded`); the page segment (page tabs as a `tablist`, one primary chip) takes the rest. The menu button unfolds the full global row (Today / Team / Trades / League / More) in the same pill; picking a tab, Escape or tapping outside folds it back. The lit page tab is one capsule that slides between tabs (transform + width, measured). More still opens the shared sheet.
+- **API**: a page calls `useBottomPillContext({ id, label, tabs, activeKey, onSelect, primary })` (`lib/useBottomPillContext.ts`, store `lib/bottomPillStore.ts`, types and `normalizePillContext` in the `lib/bottomNav.ts` twin) and drops its own page-tab row only when the hook returns true (the pill is on screen and showing that context). Consolidate, never remove: desktop, the flag off and signed-out pages keep the in-page tabs. At most `PILL_MAX_TABS` (5) tabs; one primary; the tab strip scrolls inside the pill if it must.
+- **Motion** (lib/motion.ts tokens, opacity/transform only): entering a page slides the segment in; the menu cross-fades the layers and fans the global tabs out; the primary chip pulses once on mount. Reduced motion: crossfade only (no slide, scale, fan or pulse).
+- **One sticky mechanism**: both layers share one grid cell, so the pill is one row tall in every mode and the stack height is the content clearance. Never `position: fixed`. Guards: `lib/bottomChrome.test.ts`, `lib/bottomBarMetrics.test.ts`, `components/ui/BottomTabBar.test.tsx`, `scripts/sim_layout_playwright/footer_pin.mjs`.
+- **App**: no tab bar (GM orb + More), so `components/BottomPill.tsx` hosts the screen's action row (Sim to | orb | Advance) and morphs to the page segment (Reanimated, `useReducedMotion`); the Sim bars use the same glass. `lib/bottomPillStore.ts` / `useBottomPillContext.ts` are mirrored twins.
 
 ## Phone site shell (Phase B, flagged)
 
