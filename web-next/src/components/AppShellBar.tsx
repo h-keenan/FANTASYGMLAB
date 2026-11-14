@@ -6,6 +6,7 @@ import { useEffect, useState, useSyncExternalStore } from "react";
 
 import { NavDestinationGlyph } from "@/components/NavDestinationGlyph";
 import { NavProMarker } from "@/components/NavProMarker";
+import { BottomDock } from "@/components/ui/BottomDock";
 import { BottomTabBar } from "@/components/ui/BottomTabBar";
 import { Sheet } from "@/components/ui/Sheet";
 import { useAuth } from "@/context/AuthContext";
@@ -60,7 +61,7 @@ function ShellBarInner() {
   }, []);
   return (
     <>
-      <div className="bottom-stack md:hidden" data-bare data-testid="shell-bottom-stack">
+      <BottomDock className="md:hidden" testId="shell-bottom-stack">
         <div id={SHELL_ACTION_SLOT_ID} className="shell-action-slot empty:hidden" />
         <BottomTabBar
           ariaLabel={leagueId ? "League sections" : "Main sections"}
@@ -73,7 +74,7 @@ function ShellBarInner() {
             if (key === "more") setMoreOpen(true);
           }}
         />
-      </div>
+      </BottomDock>
       <ShellMoreSheet open={moreOpen} onClose={() => setMoreOpen(false)} leagueId={leagueId} leagueName={leagueName} />
     </>
   );
