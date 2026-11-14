@@ -35,23 +35,21 @@ describe("bottom chrome: one sticky mechanism over a document-tall ancestor chai
     expect(sim).not.toMatch(/className=\{`flex flex-1 flex-col gap-3/);
     expect(sim).not.toMatch(/data-testid="sim-bottom-stack"[\s\S]{0,0}min-h-0/);
   });
-  it("the stack and the rail are sticky, bottom 0, in flow; nothing bottom-pinned is position: fixed", () => {
+  it("the dock is a portaled fixed element on phones, in flow before hydration; the rail is fixed", () => {
     const css = read("components/ui/ui.css");
-    for (const sel of [".bottom-stack", ".bottom-rail"]) {
-      const r = rule(css, sel);
-      expect(r, sel).toContain("position: sticky");
-      expect(r, sel).toContain("bottom: 0");
-      expect(r, sel).not.toMatch(/position:\s*fixed/);
-    }
+    expect(rule(css, ".bottom-rail")).toContain("position: fixed");
+    expect(rule(css, ".bottom-rail")).toContain("bottom: 0");
+    expect(css).toContain('.bottom-stack[data-dock="fixed"]');
+    const dock = read("components/ui/BottomDock.tsx");
+    expect(dock).toContain("createPortal");
+    expect(dock).toContain("--bottom-clearance");
     const orb = read("components/GmOrb.tsx");
     expect(orb).toContain('className="bottom-rail md:hidden"');
-    expect(orb).not.toMatch(/position:\s*"fixed"/);
     expect(orb).not.toMatch(/visualViewport\??\./);
   });
   it("the smart pill is margin inside the sticky stack: both layers share one grid cell, nothing fixed or absolute-to-viewport", () => {
     const css = read("components/ui/ui.css");
     expect(rule(css, ".bottom-tab-bar")).toContain("margin: 0 var(--bar-side-inset)");
-    expect(rule(css, ".bottom-tab-bar")).not.toMatch(/position:\s*fixed/);
     expect(css).toMatch(/\n\.pill-layer \{ grid-area: 1 \/ 1;/);
     expect(css).not.toMatch(/\.(pill-layer|pill-tabs|pill-indicator|pill-primary)[^{]*\{[^}]*position:\s*fixed/);
     const bar = read("components/ui/BottomTabBar.tsx");
