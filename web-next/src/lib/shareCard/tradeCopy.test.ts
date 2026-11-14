@@ -13,8 +13,8 @@ function block(source: string): string {
 describe("trade share card copy", () => {
   it("uses the in-app Trade Hub wording", () => {
     const card = readFileSync(path.resolve(__dirname, "../../components/TradeIdeaCard.tsx"), "utf8");
-    expect(card).toContain(`label="${TRADE_SHARE_COPY.send}"`);
-    expect(card).toContain(`label="${TRADE_SHARE_COPY.get}"`);
+    expect(card).toContain(`giveLabel="${TRADE_SHARE_COPY.send}"`);
+    expect(card).toContain(`getLabel="${TRADE_SHARE_COPY.get}"`);
     expect(card).toContain(TRADE_SHARE_COPY.balance);
   });
 

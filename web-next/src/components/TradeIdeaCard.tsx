@@ -223,6 +223,8 @@ export function TradeIdeaCardView({
     <TradeCompactCard
       testId="trade-idea-card"
       mode="desk"
+      giveLabel="You send"
+      getLabel="You get"
       title={
         <span className="flex items-center gap-2 min-w-0">
           <TeamAvatar avatarUrl={idea.partner_team_avatar_url} size={24} />
