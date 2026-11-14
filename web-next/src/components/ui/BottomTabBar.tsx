@@ -38,8 +38,10 @@ export function BottomTabBar({
           const badge = bottomTabBadgeText(tab.badge);
           const body = (
             <>
-              <TabGlyph name={tab.glyph} size={22} />
-              <span>{tab.label}</span>
+              <span className="bottom-tab-icon" aria-hidden="true">
+                <TabGlyph name={tab.glyph} size={22} />
+              </span>
+              <span className="bottom-tab-label">{tab.label}</span>
               {badge ? (
                 <span className="bottom-tab-badge" aria-hidden="true" data-testid={`bottom-tab-badge-${tab.key}`}>
                   {badge}

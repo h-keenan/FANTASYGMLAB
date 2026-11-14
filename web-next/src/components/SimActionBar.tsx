@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 
 import { Button, ButtonLink } from "@/components/Button";
 import { SimGlyph } from "@/components/SimGlyph";
@@ -15,9 +15,9 @@ import { simAdvanceState, simLineupIssues, type SimZeroStarter } from "@/lib/sim
  * ("Week 4 -> 5", disabled only when a cut is owed; an empty slot warns and
  * asks to confirm) and a secondary Auto-set pill. On phones it is an Advance-only floating glass pill
  * (.action-pill; Auto-set lives on Home "What to do this week") docked at the bottom of the game's in-flow
- * sticky `.bottom-stack` (no orb, no position:fixed); sticky inside the page on desktop. Mobile twin: mobile/src/components/SimActionBar.tsx.
+ * sticky `.bottom-stack` (one row: icon-only Sim to, the game orb, Advance; no position:fixed); sticky inside the page on desktop. Mobile twin: mobile/src/components/SimActionBar.tsx.
  */
-export function SimActionBar({ ctx, paywalled, advancing, onAdvance, onSimTo, onTab }: { ctx: SimCtx; paywalled: boolean; advancing: boolean; onAdvance: () => void; onSimTo?: () => void; onTab?: (tab: "team" | "players") => void }) {
+export function SimActionBar({ ctx, paywalled, advancing, onAdvance, onSimTo, onTab, orb }: { ctx: SimCtx; paywalled: boolean; advancing: boolean; onAdvance: () => void; onSimTo?: () => void; onTab?: (tab: "team" | "players") => void; orb?: ReactNode }) {
   const { gameId, game } = ctx;
   const [issues, setIssues] = useState<{ empty: string[]; zero: SimZeroStarter[] }>({ empty: [], zero: [] });
   const [confirming, setConfirming] = useState(false);
@@ -79,13 +79,14 @@ export function SimActionBar({ ctx, paywalled, advancing, onAdvance, onSimTo, on
           <span style={{ color: auto.optimal ? "var(--color-success)" : undefined }}>{auto.optimal ? "Lineup optimal" : "Lineup can improve"}</span>
         </p>
       )}
-      <div className={`mx-auto grid max-w-3xl ${onSimTo && !paywalled ? "grid-cols-[auto_minmax(0,1fr)]" : "grid-cols-1"} items-center gap-2 p-1 md:mx-0 md:flex md:max-w-none md:flex-none md:gap-2 md:p-0`}>
+      <div className="mx-auto flex max-w-3xl items-center gap-2 p-1 md:mx-0 md:max-w-none md:flex-none md:gap-2 md:p-0">
         {onSimTo && !paywalled ? (
-          <Button variant="secondary" size="sm" className="min-w-0" disabled={advancing} onClick={onSimTo} aria-label="Sim to..." data-testid="sim-to-button">
+          <Button variant="secondary" size="sm" className="min-w-0 shrink-0" disabled={advancing} onClick={onSimTo} aria-label="Sim to..." data-testid="sim-to-button">
             <SimGlyph name="matchup" size={16} />
-            <span className="ml-1.5">Sim to...</span>
+            <span className="ml-1.5 max-md:hidden">Sim to...</span>
           </Button>
         ) : null}
+        {orb}
         <Button className="max-md:hidden" variant="secondary" size="sm" loading={auto.busy} disabled={auto.optimal || paywalled} onClick={auto.run} aria-label={auto.optimal ? "Lineup is optimal" : "Auto-set best lineup"}>
           <SimGlyph name={auto.optimal ? "check" : "spark"} size={16} />
           <span className="ml-1.5">{auto.optimal ? "Optimal" : "Auto-set"}</span>
@@ -93,7 +94,7 @@ export function SimActionBar({ ctx, paywalled, advancing, onAdvance, onSimTo, on
         {paywalled ? (
           <ButtonLink href="/premium" variant="premium" size="sm">Go Pro to continue</ButtonLink>
         ) : (
-          <Button className="min-w-0 max-md:w-full" loading={advancing} disabled={state.blocked} onClick={tapAdvance} aria-label={`${advanceText}. ${simAdvanceLabel(game)}`} aria-describedby={state.reason ? reasonId : undefined}>
+          <Button className="min-w-0 max-md:flex-1" loading={advancing} disabled={state.blocked} onClick={tapAdvance} aria-label={`${advanceText}. ${simAdvanceLabel(game)}`} aria-describedby={state.reason ? reasonId : undefined}>
             {advanceText}
           </Button>
         )}

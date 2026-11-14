@@ -71,11 +71,12 @@ describe("dynasty setup", () => {
     mocked.listSimGames.mockResolvedValue({ ok: true, reason: "", games: [] });
     render(<SimGameContent />);
     fireEvent.click(await screen.findByRole("button", { name: "New game" }));
-    await screen.findByText(/Quick start is 12 teams/);
+    await screen.findByTestId("sim-setup-hero");
   }
 
-  it("Advanced options pick Dynasty, seasons and rookie rounds, and send them", async () => {
+  it("Customize picks Dynasty, seasons and rookie rounds, and sends them", async () => {
     await openSetup();
+    fireEvent.click(screen.getByRole("tab", { name: "Customize" }));
     expect(screen.queryByRole("tablist", { name: "Seasons" })).not.toBeInTheDocument();
     fireEvent.click(within(screen.getByRole("tablist", { name: "Game mode" })).getByRole("tab", { name: "Dynasty" }));
     expect(within(screen.getByRole("tablist", { name: "Seasons" })).getByRole("tab", { name: "5" })).toHaveAttribute("aria-selected", "true");
@@ -94,6 +95,7 @@ describe("dynasty setup", () => {
   it("a league import as dynasty carries mode and says what comes along", async () => {
     await openSetup();
     fireEvent.click(screen.getByRole("tab", { name: "My league" }));
+    fireEvent.click(screen.getByRole("tab", { name: "Customize" }));
     fireEvent.click(within(screen.getByRole("tablist", { name: "Game mode" })).getByRole("tab", { name: "Dynasty" }));
     expect(screen.getByTestId("sim-dynasty-note")).toHaveTextContent("picks, taxi squad and IR");
     mocked.getSimLeagueTeams.mockResolvedValue({ ok: true, reason: "", league_id: "111", you_roster_id: "2", teams: [{ roster_id: "2", team_name: "Me", owner_name: "me", wins: 0, losses: 0, ties: 0, points_for: 0, rank: 1, is_you: true }] });

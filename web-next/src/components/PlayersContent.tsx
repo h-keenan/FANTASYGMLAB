@@ -1,5 +1,6 @@
 "use client";
 
+import { PageTabBar } from "@/components/PageTabBar";
 import { PositionBadge } from "@/components/PositionBadge";
 import { EmptyState } from "@/components/EmptyState";
 import { PlayerIdentity } from "@/components/PlayerRow";
@@ -382,6 +383,7 @@ export function PlayersContent({
 
   return (
     <main className="page-shell">
+      {leagueId ? <PageTabBar family="team" active="players" leagueId={leagueId} leagueName={leagueName} /> : null}
       <header className="flex flex-col gap-1">
         <PageTitle page="Players" leagueName={leagueName} />
       </header>

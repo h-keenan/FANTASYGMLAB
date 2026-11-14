@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useState, type ReactNode } from "react";
 
 import { Button } from "@/components/Button";
 import type { SimCtx } from "@/components/SimGameParts";
@@ -15,7 +15,7 @@ import { simOffseasonCta, simOffseasonStageLabel, type SimOffseason, type SimOff
  * Start season N. A floating glass pill above the bottom tab bar on phones (no orb), sticky on desktop, same frame as SimActionBar. It reads the offseason
  * itself, so any tab can mount it. Mobile twin: mobile/src/components/SimOffseasonBar.tsx.
  */
-export function SimOffseasonBar({ ctx, onTab }: { ctx: SimCtx; onTab?: (tab: "home") => void }) {
+export function SimOffseasonBar({ ctx, onTab, orb }: { ctx: SimCtx; onTab?: (tab: "home") => void; orb?: ReactNode }) {
   const { gameId, call } = ctx;
   const [off, setOff] = useState<SimOffseason | null>(null);
   const [busy, setBusy] = useState(false);
@@ -85,11 +85,12 @@ export function SimOffseasonBar({ ctx, onTab }: { ctx: SimCtx; onTab?: (tab: "ho
       {cta.blocked ? (
         <p id={reasonId} className="px-4 pt-1.5 text-center text-xs font-bold" style={{ color: "var(--color-warning)" }} role="status">{cta.blocked}</p>
       ) : null}
-      <div className="mx-auto grid max-w-3xl grid-cols-[1fr_1.4fr] items-center gap-2 p-1 md:grid-cols-[1fr_auto]">
-        <span className="min-w-0 text-xs font-bold" style={{ color: "var(--color-text-muted)" }}>
+      <div className="mx-auto flex max-w-3xl items-center gap-2 p-1 md:grid md:grid-cols-[1fr_auto]">
+        {orb}
+        <span className="min-w-0 text-xs font-bold max-md:hidden" style={{ color: "var(--color-text-muted)" }}>
           {simOffseasonStageLabel(off.stage)}
         </span>
-        <Button className={`whitespace-nowrap ${cta.blocked ? "ring-1 ring-[var(--color-border-strong)]" : ""}`} fullWidth loading={busy && !confirmAuto} disabled={Boolean(cta.blocked) || confirmAuto} onClick={press} aria-describedby={cta.blocked ? reasonId : undefined}>
+        <Button className={`min-w-0 whitespace-nowrap max-md:flex-1 ${cta.blocked ? "ring-1 ring-[var(--color-border-strong)]" : ""}`} fullWidth loading={busy && !confirmAuto} disabled={Boolean(cta.blocked) || confirmAuto} onClick={press} aria-describedby={cta.blocked ? reasonId : undefined}>
           {cta.label}
         </Button>
       </div>

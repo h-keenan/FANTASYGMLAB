@@ -1,5 +1,6 @@
 "use client";
 
+import { PageTabBar } from "@/components/PageTabBar";
 import { BEGINNER_HELP } from "@/lib/experienceCopy";
 import { useState } from "react";
 
@@ -477,6 +478,7 @@ export function LeagueRankingsContent({
 
   return (
     <main className="page-shell">
+      {leagueId ? <PageTabBar family="league" active="rankings" leagueId={leagueId} leagueName={leagueName} /> : null}
       <header className="flex flex-col gap-1">
         <PageTitle page="League Rankings" leagueName={leagueName} />
       </header>

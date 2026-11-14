@@ -1,5 +1,6 @@
 "use client";
 
+import { PageTabBar } from "@/components/PageTabBar";
 import { PageTitle } from "@/components/PageTitle";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState } from "react";
@@ -63,6 +64,7 @@ export function GamesContent({ leagueId, leagueName, initialTab }: { leagueId: s
   }
   return (
     <main className="page-shell">
+      {leagueId ? <PageTabBar family="league" active="games" leagueId={leagueId} leagueName={leagueName} /> : null}
       <header className="flex flex-col gap-1">
         <PageTitle page="Games" leagueName={leagueName} />
       </header>

@@ -53,6 +53,7 @@ describe("TradesTabBar", () => {
     expect(screen.getAllByRole("tab").map((tab) => tab.textContent)).toEqual(["Hub", "Finder", "Analyzer", "History"]);
     expect(screen.getByRole("tab", { name: "Finder" })).toHaveAttribute("aria-selected", "true");
     expect(screen.getByRole("tab", { name: "Hub" })).toHaveAttribute("href", "/trade-hub/1?name=L");
+    expect(screen.getByRole("tab", { name: "History" })).toHaveAttribute("href", "/trade-history?league=1&name=L");
   });
 });
 

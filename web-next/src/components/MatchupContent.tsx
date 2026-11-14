@@ -1,5 +1,6 @@
 "use client";
 
+import { PageTabBar } from "@/components/PageTabBar";
 import { BEGINNER_HELP } from "@/lib/experienceCopy";
 import { RangeCompare } from "@/components/RangeCompare";
 import { RANGE_CAPTION, leanLabel, rangeDisplayRows } from "@/lib/startSitRange";
@@ -716,6 +717,7 @@ export function MatchupContent({
 
   return (
     <main className="page-shell">
+      {leagueId ? <PageTabBar family="team" active="matchup" leagueId={leagueId} leagueName={leagueName} /> : null}
       <MatchupHeader week={matchup.week} live={matchup.game_state === "live"} leagueName={leagueName} />
       {onRefresh ? (
         <div className="flex items-center gap-2 text-xs" style={{ color: "var(--color-text-muted)" }} data-testid="matchup-freshness">

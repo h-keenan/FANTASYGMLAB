@@ -18,6 +18,13 @@ import { onTradeOutcomeAnswered } from "@/lib/tradeOutcomeEvents";
 // anywhere in the call.
 export default function TradeHistoryPage() {
   const router = useRouter();
+  // League context (?league=&name=) read once on the client: useSearchParams would force a Suspense boundary around
+  // the page. The first render shows only the loading screen, so there is no visible mismatch.
+  const [league] = useState(() => {
+    if (typeof window === "undefined") return { id: null as string | null, name: undefined as string | undefined };
+    const params = new URLSearchParams(window.location.search);
+    return { id: params.get("league"), name: params.get("name") ?? undefined };
+  });
   const { session, loading: authLoading } = useAuth();
 
   const [data, setData] = useState<TradeOutcomeHistoryResponse | null>(null);
@@ -70,5 +77,5 @@ export default function TradeHistoryPage() {
     );
   }
 
-  return <TradeHistoryContent data={data} />;
+  return <TradeHistoryContent data={data} leagueId={league.id} leagueName={league.name} />;
 }
