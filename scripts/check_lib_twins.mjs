@@ -104,6 +104,8 @@ export const IDENTICAL = [
 export const MIRRORED = [
   "playerNameFit.ts",
   "bottomNav.ts",
+  "bottomPillStore.ts",
+  "useBottomPillContext.ts",
   "bottomBarMetrics.ts",
   "dropsPresentation.ts",
   "experienceCopy.ts",

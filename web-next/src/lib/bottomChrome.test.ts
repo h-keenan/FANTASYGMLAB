@@ -48,4 +48,20 @@ describe("bottom chrome: one sticky mechanism over a document-tall ancestor chai
     expect(orb).not.toMatch(/position:\s*"fixed"/);
     expect(orb).not.toMatch(/visualViewport\??\./);
   });
+  it("the smart pill is margin inside the sticky stack: both layers share one grid cell, nothing fixed or absolute-to-viewport", () => {
+    const css = read("components/ui/ui.css");
+    expect(rule(css, ".bottom-tab-bar")).toContain("margin: 0 var(--bar-side-inset)");
+    expect(rule(css, ".bottom-tab-bar")).not.toMatch(/position:\s*fixed/);
+    expect(rule(css, ".pill-layer")).toContain("grid-area: 1 / 1");
+    expect(css).not.toMatch(/\.(pill-layer|pill-tabs|pill-indicator|pill-primary)[^{]*\{[^}]*position:\s*fixed/);
+    const bar = read("components/ui/BottomTabBar.tsx");
+    expect(bar).not.toContain("visualViewport");
+    expect(bar).not.toMatch(/position:\s*"fixed"/);
+  });
+  it("the pill's motion honors reduced motion", () => {
+    const css = read("components/ui/ui.css");
+    const rm = css.slice(css.lastIndexOf("@media (prefers-reduced-motion: reduce) {\n  /* Crossfade only"));
+    expect(rm).toContain("transform: none");
+    expect(rm).toContain("animation: none");
+  });
 });

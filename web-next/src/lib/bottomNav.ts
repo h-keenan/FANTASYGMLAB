@@ -113,3 +113,54 @@ export function simOrbAriaLabel(currentLabel: string, inbox: number | null | und
   const shown = n > 9 ? "9+" : String(n);
   return n > 0 ? `${currentLabel} ${shown}. Game menu, ${n} trade offer${n === 1 ? "" : "s"} waiting` : `${currentLabel}. Game menu`;
 }
+
+// ---- Smart pill: page context (web components/BottomPillContext.tsx + BottomTabBar; mobile components/BottomPill.tsx) ----
+
+/** One page-level tab shown in the pill's page segment (the page-family tabs: Lineup | Players | Waivers | Matchup). */
+export type PillContextTab = { key: string; label: string; glyph?: TabIconName; badge?: number };
+
+/** The one primary action of a page (Auto-set, New trade, Claim). Rendered as the accent chip at the end of the segment. */
+export type PillContextAction = { key: string; label: string; glyph?: TabIconName; disabled?: boolean; busy?: boolean; onPress: () => void };
+
+/**
+ * What a page registers with the pill: its page tabs, which one is lit, and one primary action. The page owns the
+ * state; the pill only renders it. A page that registers no context leaves the pill as the plain global tabs.
+ */
+export type PillContext = {
+  /** Stable id of the page ("team", "trades", "sim-draft"): a change replays the entrance, the same id does not. */
+  id: string;
+  /** Accessible name of the page-tab group ("Team sections"). */
+  label: string;
+  tabs: PillContextTab[];
+  activeKey: string;
+  onSelect: (key: string) => void;
+  primary?: PillContextAction;
+};
+
+/** At most this many page tabs fit one row next to the two icon buttons and the primary chip. */
+export const PILL_MAX_TABS = 5;
+
+/** The context the pill may render: tabs capped, unnamed ones dropped, a context with nothing to show is null. */
+export function normalizePillContext(ctx: PillContext | null | undefined): PillContext | null {
+  if (!ctx) return null;
+  const tabs = ctx.tabs.filter((t) => t.key && t.label).slice(0, PILL_MAX_TABS);
+  if (tabs.length === 0 && !ctx.primary) return null;
+  const activeKey = tabs.some((t) => t.key === ctx.activeKey) ? ctx.activeKey : (tabs[0]?.key ?? "");
+  return { ...ctx, tabs, activeKey };
+}
+
+export type PillMode = "global" | "context" | "menu";
+
+/** global: the full tab row (no page context). context: two icons + the page segment. menu: the page segment folded away, the full tab row fanned out. */
+export function pillMode(hasContext: boolean, menuOpen: boolean): PillMode {
+  if (!hasContext) return "global";
+  return menuOpen ? "menu" : "context";
+}
+
+/** Index of the lit page tab (for the sliding capsule); -1 when none. */
+export function pillActiveIndex(ctx: Pick<PillContext, "tabs" | "activeKey">): number {
+  return ctx.tabs.findIndex((t) => t.key === ctx.activeKey);
+}
+
+/** Accessible name of the menu button. */
+export const PILL_MENU_LABEL = "Sections menu";

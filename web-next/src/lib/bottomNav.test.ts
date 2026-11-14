@@ -67,3 +67,23 @@ describe("game orb label", () => {
     expect(simOrbAriaLabel("Home", 12)).toBe("Home 9+. Game menu, 12 trade offers waiting");
   });
 });
+
+describe("smart pill context helpers", () => {
+  const base = { id: "t", label: "T", activeKey: "a", onSelect: () => {} };
+  it("normalizes: caps tabs, drops unnamed, falls back to the first tab, null when empty", async () => {
+    const { normalizePillContext, PILL_MAX_TABS } = await import("./bottomNav");
+    const many = Array.from({ length: 9 }, (_, i) => ({ key: `k${i}`, label: `L${i}` }));
+    expect(normalizePillContext({ ...base, tabs: many, activeKey: "k1" })?.tabs).toHaveLength(PILL_MAX_TABS);
+    expect(normalizePillContext({ ...base, tabs: [{ key: "x", label: "X" }], activeKey: "zzz" })?.activeKey).toBe("x");
+    expect(normalizePillContext({ ...base, tabs: [{ key: "", label: "" }] })).toBeNull();
+    expect(normalizePillContext(null)).toBeNull();
+    expect(normalizePillContext({ ...base, tabs: [], primary: { key: "p", label: "Go", onPress: () => {} } })).not.toBeNull();
+  });
+  it("modes and active index", async () => {
+    const { pillMode, pillActiveIndex } = await import("./bottomNav");
+    expect(pillMode(false, true)).toBe("global");
+    expect(pillMode(true, false)).toBe("context");
+    expect(pillMode(true, true)).toBe("menu");
+    expect(pillActiveIndex({ tabs: [{ key: "a", label: "A" }, { key: "b", label: "B" }], activeKey: "b" })).toBe(1);
+  });
+});
