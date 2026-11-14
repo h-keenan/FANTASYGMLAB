@@ -120,4 +120,17 @@ describe("BottomTabBar smart pill (page context)", () => {
     render(<BottomTabBar ariaLabel="x" tabs={tabs} active="team" context={ctx({ tabs: [], primary: undefined })} />);
     expect(screen.getByTestId("bottom-tab-bar")).toHaveAttribute("data-mode", "global");
   });
+
+  it("route tabs and a route primary render as links (client navigation)", () => {
+    render(
+      <BottomTabBar
+        ariaLabel="x"
+        tabs={tabs}
+        active="team"
+        context={ctx({ tabs: [{ key: "hub", label: "Hub", href: "/trade-hub/1" }, { key: "finder", label: "Finder", href: "/trade-finder/1" }], activeKey: "hub", primary: { key: "new", label: "New trade", href: "/trade-analyzer/1", onPress: () => {} } })}
+      />,
+    );
+    expect(screen.getByRole("tab", { name: "Finder" })).toHaveAttribute("href", "/trade-finder/1");
+    expect(screen.getByTestId("pill-primary")).toHaveAttribute("href", "/trade-analyzer/1");
+  });
 });

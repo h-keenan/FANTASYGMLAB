@@ -17,6 +17,7 @@ import Input from '../components/Input';
 import PremiumLock from '../components/PremiumLock';
 import SectionHeading from '../components/SectionHeading';
 import SegmentedTabBar from '../components/SegmentedTabBar';
+import BottomPill from '../components/BottomPill';
 import SimActionBar from '../components/SimActionBar';
 import { SimGameHeader, SimStatusChips } from '../components/SimGameHeader';
 import { SimNotificationBell, useSimNotifications } from '../components/SimNotificationBell';
@@ -47,7 +48,9 @@ import { DifficultyTiles, SetupCard, SetupField, SetupNote, SetupStickyBar, Setu
 import ToneBadge from '../components/ToneBadge';
 import { useThemeMode } from '../context/ThemeModeContext';
 import { api } from '../lib/api';
+import { setPillBarPresent } from '../lib/bottomPillStore.ts';
 import { useOrbClearance } from '../lib/orbLayout';
+import { usePillState } from '../lib/useBottomPillContext.ts';
 import { SIM_DIFFICULTY_FOOTNOTE, SIM_SETUP_TABS, simSetupCardSummaries, simSetupChips, simSetupHeadline, type SimSetupTab } from '../lib/simSetupView';
 import { simGameChrome } from '../lib/simGameChrome';
 import {
@@ -447,6 +450,15 @@ export default function GmGameScreen({ navigation }: Props) {
     flow.view === 'game' && Boolean(game) && (flow.stage === 'week' || flow.stage === 'playoffs') && !draftRecap && !flow.recaps[flow.recapIndex] && !simToResult;
   const showOffBar = flow.view === 'game' && Boolean(game) && flow.stage === 'offseason' && !draftRecap && !flow.recaps[flow.recapIndex];
   const anyBar = showBar || showOffBar;
+  // Smart pill: the game is its phone host. Pages (draft room, team) register page tabs / a primary action; an action bar hosts them,
+  // and with no bar (the draft) the page segment shows alone in the same stack.
+  const pill = usePillState();
+  useEffect(() => {
+    setPillBarPresent(true);
+    return () => setPillBarPresent(false);
+  }, []);
+  const pillOnly = !anyBar && Boolean(pill.ctx);
+  const hasStack = anyBar || pillOnly;
   // The game draws its own orb above the Advance pill, so the global GM orb steps aside while it is up.
   useEffect(() => {
     simGameChrome.set(anyBar);
@@ -476,13 +488,13 @@ export default function GmGameScreen({ navigation }: Props) {
         style={styles.container}
         contentContainerStyle={[
           styles.content,
-          { paddingBottom: anyBar ? stackHeight + spacing.xl : orbClearance, paddingTop: headerHeight + spacing.sm },
+          { paddingBottom: hasStack ? stackHeight + spacing.xl : orbClearance, paddingTop: headerHeight + spacing.sm },
         ]}
         keyboardShouldPersistTaps="handled"
       >
         {children}
       </ScrollView>
-      {anyBar && game && ctx ? (
+      {hasStack && game && ctx ? (
         // Bottom stack: ONE bar (Sim to | orb | Advance), in flow inside one absolute container, so nothing overlaps or
         // clips (the content pads by its measured height).
         <View
@@ -491,7 +503,9 @@ export default function GmGameScreen({ navigation }: Props) {
           onLayout={(e) => setStackHeight(Math.ceil(e.nativeEvent.layout.height))}
           testID="sim-bottom-stack"
         >
-          {showBar ? (
+          {pillOnly ? (
+            <BottomPill contextOnly context={pill.ctx}>{null}</BottomPill>
+          ) : showBar ? (
             <SimActionBar orb={orbNode} ctx={ctx} paywalled={simGamePaywalled(preview)} advancing={advancing} onAdvance={advance} onSimTo={() => setSimToOpen(true)} onGoPro={goPaywall} onTab={(tab) => dispatch({ type: 'tab', tab })} />
           ) : (
             <SimOffseasonBar orb={orbNode} ctx={ctx} onTab={(tab) => dispatch({ type: 'tab', tab })} />
