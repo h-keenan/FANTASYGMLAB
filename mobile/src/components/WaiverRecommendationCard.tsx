@@ -14,6 +14,8 @@ import { useThemeMode } from '../context/ThemeModeContext';
 import type { WaiverPriorityAdd } from '../lib/api';
 import { SuggestedDrop } from './SuggestedDrop';
 import { waiverReasonChips } from '../lib/waiverChips';
+import { faabDisplayText } from '../lib/faabDisplay';
+import PositionBadge from './PositionBadge';
 import { injuryTone } from '../lib/injuryDisplay';
 import { radii, spacing, type ThemeColors } from '../theme';
 
@@ -186,6 +188,9 @@ export default function WaiverRecommendationCard({
   variant = 'compact',
   showDivider = false,
   rank,
+  open = false,
+  onToggle,
+  sharedDropId = null,
 }: {
   player: WaiverPriorityAdd;
   onPress: () => void;
@@ -193,6 +198,11 @@ export default function WaiverRecommendationCard({
   showDivider?: boolean;
   /** Position in the recommendation list (compact rows: 2, 3, ...). */
   rank?: number;
+  /** Compact rows expand in place: the whole row is the control (no chevron). */
+  open?: boolean;
+  onToggle?: () => void;
+  /** The drop player the whole list shares (shown once above the list); a row only names its cut when it differs. */
+  sharedDropId?: string | null;
 }) {
   const { colors } = useThemeMode();
   const styles = useMemo(() => createStyles(colors), [colors]);
@@ -293,32 +303,81 @@ export default function WaiverRecommendationCard({
     );
   }
 
+  const { isBid, primary, secondary } = faabDisplayText(player.faab);
+  const chips = waiverReasonChips(player);
+  const flag = player.usage_flag;
+  const ownDrop = player.drop_suggestion?.drop ?? null;
+  const differentDrop = sharedDropId != null && ownDrop != null && ownDrop.player_id !== sharedDropId ? ownDrop : null;
+  const pill = (key: string, label: string, tint: string, icon: 'flash' | 'trending-up' | 'trending-down') => (
+    <View key={key} style={[chipStyles.chip, compactChip.chip, { backgroundColor: `${tint}1F` }]} testID="waiver-reason">
+      <Ionicons name={icon} size={10} color={tint} />
+      <AppText style={[chipStyles.text, { color: tint }]}>
+        {label}
+      </AppText>
+    </View>
+  );
+  // Row anatomy (module templates): name/position/team + ONE compact bid at the right; reasons as one line of icon pills;
+  // the row itself expands (no chevron). The value, ring, bid context, why and roster move live in the expanded body.
   return (
-    <View style={[styles.compactRow, showDivider && styles.compactDivider]}>
-    <PressableScale style={styles.compactPress} onPress={onPress}>
-      {/* Line 1: identity (rank slot, name, team/opponent) gets the full row
-          width so names never truncate; then reason chips; then value, ring,
-          bid and the chevron that opens the player. */}
-      <View style={styles.compactIdentity}>{identity}</View>
-      <ReasonChips player={player} />
-        <UsageFlagChip player={player} />
-      <View style={styles.compactMetaRow}>
-        <View style={styles.scoreBlock}>
-          <AppText style={styles.scoreLabel}>VALUE</AppText>
-          <AppText style={styles.scoreNumberCompact}>{player.score != null ? Math.round(player.score) : '—'}</AppText>
+    <View style={[styles.compactRow, showDivider && styles.compactDivider]} testID="waiver-rec-row">
+      <PressableScale
+        style={styles.compactPress}
+        onPress={onToggle ?? onPress}
+        accessibilityRole="button"
+        accessibilityState={{ expanded: open }}
+        accessibilityLabel={`${player.name ?? 'Player'}, bid ${primary} ${secondary}, ${open ? 'hide' : 'show'} details`}
+      >
+        <View style={styles.compactTop}>
+          <View style={styles.compactIdentity}>{identity}</View>
+          <AppText style={[styles.compactBid, { color: isBid ? colors.successBright : colors.textSecondary }]} numberOfLines={1} testID="waiver-bid">
+            {primary}
+          </AppText>
         </View>
-        <OverallRatingBadge rating={player.overall_rating} positionRank={player.position_rank} />
-        <View style={styles.metricsDivider} />
-        <View style={styles.compactSpacer}>
-          <FAABGuidance faab={player.faab} size="compact" />
+        <View style={chipStyles.row}>
+          {chips.map((chip) => pill(chip, chip, colors.accent, 'flash'))}
+          {flag ? pill('flag', flag.label, flag.tone === 'positive' ? colors.success : colors.danger, flag.tone === 'positive' ? 'trending-up' : 'trending-down') : null}
+          {differentDrop ? pill('drop', `Drop ${differentDrop.name}`, colors.danger, 'trending-down') : null}
         </View>
-        <Ionicons name="chevron-forward" size={16} color={colors.accentSoft} />
-      </View>
-    </PressableScale>
-    {player.drop_suggestion ? <SuggestedDrop suggestion={player.drop_suggestion} compact /> : null}
+      </PressableScale>
+      {open ? (
+        <View style={styles.compactDetails} testID="waiver-rec-details">
+          <View style={styles.compactMetaRow}>
+            <View style={styles.scoreBlock}>
+              <AppText style={styles.scoreLabel}>VALUE</AppText>
+              <AppText style={styles.scoreNumberCompact}>{player.score != null ? Math.round(player.score) : '—'}</AppText>
+            </View>
+            <OverallRatingBadge rating={player.overall_rating} positionRank={player.position_rank} />
+            <View style={styles.metricsDivider} />
+            <View style={styles.compactSpacer}>
+              <FAABGuidance faab={player.faab} size="compact" />
+            </View>
+          </View>
+          {player.faab?.why ? <AppText style={styles.faabWhy}>{player.faab.why}</AppText> : null}
+          {flag ? (
+            <AppText style={styles.faabWhy}>
+              <AppText style={{ fontWeight: '700', color: flag.tone === 'positive' ? colors.success : colors.danger }}>{flag.label}: </AppText>
+              {flag.explanation}
+            </AppText>
+          ) : null}
+          {player.drop_suggestion ? <SuggestedDrop suggestion={player.drop_suggestion} compact /> : null}
+          <PressableScale
+            style={styles.detailsButton}
+            onPress={onPress}
+            accessibilityRole="button"
+            accessibilityLabel={`View details for ${player.name ?? 'player'}`}
+          >
+            <AppText style={styles.detailsButtonText}>Player details</AppText>
+            <Ionicons name="arrow-forward" size={14} color={colors.accent} />
+          </PressableScale>
+        </View>
+      ) : null}
     </View>
   );
 }
+
+const compactChip = StyleSheet.create({
+  chip: { flexDirection: 'row', alignItems: 'center', gap: 4, borderWidth: 0, paddingVertical: 1 },
+});
 
 function createStyles(colors: ThemeColors) {
   return StyleSheet.create({
@@ -382,9 +441,12 @@ function createStyles(colors: ThemeColors) {
       borderRadius: radii.md,
       backgroundColor: colors.backgroundElevated,
     },
+    compactTop: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
+    compactBid: { fontSize: 14.5, fontWeight: '800' },
+    compactDetails: { gap: spacing.sm, paddingBottom: spacing.sm },
     compactSpacer: { flex: 1, alignItems: 'flex-end' },
     compactDivider: { borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border },
-    compactIdentity: { alignSelf: 'stretch' },
+    compactIdentity: { flex: 1, minWidth: 0 },
     // A bare chevron read as an unlabeled affordance — the concept image
     // and the redesign brief (§7: "Preserve the current Full Breakdown
     // functionality... treat it as a secondary detail action rather than a

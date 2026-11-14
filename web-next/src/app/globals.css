@@ -4503,3 +4503,20 @@ main > header:has(> h1.sr-only:only-child) {
 @keyframes value-ring-fill { from { --value-ring-pct: 0; } }
 .value-ring--md, .value-ring--lg { animation: value-ring-fill var(--motion-slow) var(--ease-out) both; }
 @media (prefers-reduced-motion: reduce) { .value-ring--md, .value-ring--lg { animation: none; } }
+
+/* `md:hidden` is a Tailwind v4 utility (@layer utilities); any unlayered component rule that sets `display`
+   (.shell-header, .bottom-stack, .sim-game-header...) beats it, so phone-only chrome rendered on desktop:
+   coridian_ 2026-11-14 Matchup screenshot showed the phone ShellHeader stacked above the desktop Header.
+   One guard fixes the whole class at the source instead of re-layering each component rule. */
+@media (min-width: 768px) {
+  .md\:hidden { display: none !important; }
+}
+
+/* Wide page shell (Matchup): two columns from lg, one column on phone. */
+@media (min-width: 1024px) {
+  .page-shell-wide { max-width: 72rem; }
+}
+.matchup-grid { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--page-gap); }
+@media (min-width: 1024px) {
+  .matchup-grid { grid-template-columns: minmax(0, 2fr) minmax(0, 3fr); grid-template-rows: min-content min-content 1fr; align-items: start; }
+}

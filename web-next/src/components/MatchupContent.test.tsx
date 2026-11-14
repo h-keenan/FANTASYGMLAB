@@ -1,5 +1,5 @@
 import { fireEvent, render, screen, within } from "@testing-library/react";
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("next/navigation", () => ({
   useRouter: () => ({ push: vi.fn(), replace: vi.fn() }),
@@ -199,13 +199,21 @@ function liveResponse(overrides: Partial<MatchupResponse> = {}): MatchupResponse
   };
 }
 
+/** Open a collapsed CompactModule by its title (its button name is "Title: summary. Expand"). */
+function openModule(title: string) {
+  fireEvent.click(screen.getByRole("button", { name: new RegExp(`^${title}: .*Expand$`) }));
+}
+
 describe("MatchupContent", () => {
+  beforeEach(() => window.localStorage.clear());
+
   it("renders the header with the week and no LIVE badge before games start", () => {
     render(<MatchupContent leagueName="My League" matchup={PREGAME} />);
 
     expect(screen.getByRole("heading", { name: "Matchup", level: 1 })).toBeInTheDocument();
     expect(screen.getByText("Week 7")).toBeInTheDocument();
     expect(screen.queryByLabelText("Games in progress")).not.toBeInTheDocument();
+    openModule("Teams & values");
     expect(screen.getAllByText("Dynasty Overlords").length).toBeGreaterThan(0);
     expect(screen.getAllByText("Rival Squad").length).toBeGreaterThan(0);
   });
@@ -215,7 +223,7 @@ describe("MatchupContent", () => {
 
     expect(screen.getByRole("tab", { name: "Suggested" })).toHaveAttribute("aria-selected", "true");
     expect(screen.getByText("Win probability appears once Sleeper posts both lineups.")).toBeInTheDocument();
-    fireEvent.click(screen.getByRole("button", { name: "Show" }));
+    openModule("Suggested Moves");
     expect(screen.getByText("Suggested moves appear once Sleeper has your lineup for this week.")).toBeInTheDocument();
     expect(screen.getByText(/projections for each team's suggested lineup/)).toBeInTheDocument();
     // Suggested starters show their projection in the table.
@@ -227,26 +235,31 @@ describe("MatchupContent", () => {
 
   it("shows the symmetric stat tiles from real season value and projections", () => {
     render(<MatchupContent leagueName="My League" matchup={liveResponse()} />);
+    openModule("Teams & values");
 
     expect(screen.getByText("Your value")).toBeInTheDocument();
     expect(screen.getByText("8,200")).toBeInTheDocument();
     expect(screen.getByText("Their value")).toBeInTheDocument();
     expect(screen.getByText("7,600")).toBeInTheDocument();
     // 124.8 - 116.2
-    expect(screen.getByText("+8.6")).toBeInTheDocument();
-    expect(screen.getByText("+600")).toBeInTheDocument();
+    expect(screen.getAllByText("+8.6").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("+600").length).toBeGreaterThan(0);
   });
 
   it("live: LIVE badge, real score with projection under it, win probability split", () => {
     const { container } = render(<MatchupContent leagueName="My League" matchup={liveResponse()} />);
+    // The Hero carries the win chance and score; the teams module holds the split bar.
+    expect(screen.getByTestId("matchup-hero")).toHaveTextContent("64%");
+    expect(screen.getByTestId("matchup-hero")).toHaveTextContent("42.3");
+    openModule("Teams & values");
 
     expect(screen.getByLabelText("Games in progress")).toBeInTheDocument();
     expect(screen.getByText("42.3")).toBeInTheDocument();
     expect(screen.getByText("Proj 124.8")).toBeInTheDocument();
-    expect(screen.getByText("64%")).toBeInTheDocument();
+    expect(screen.getAllByText("64%").length).toBeGreaterThan(0);
     expect(screen.getByText("36%")).toBeInTheDocument();
-    expect(container.querySelector(".winprob-bar-fill")).toHaveStyle({ width: "64%" });
-    expect(screen.getByText("You're on track to win.")).toBeInTheDocument();
+    expect(container.querySelector("[aria-label^='Win probability: you'] .winprob-bar-fill")).toHaveStyle({ width: "64%" });
+    expect(screen.getByText("You're on track to win")).toBeInTheDocument();
   });
 
   it("between games: no LIVE badge even though the week has started", () => {
@@ -256,14 +269,14 @@ describe("MatchupContent", () => {
 
   it("final: reads the real result", () => {
     render(<MatchupContent leagueName="My League" matchup={liveResponse({ game_state: "final" })} />);
-    expect(screen.getByText("You won this week.")).toBeInTheDocument();
+    expect(screen.getByText("You won this week")).toBeInTheDocument();
     expect(screen.queryByLabelText("Games in progress")).not.toBeInTheDocument();
   });
 
   it("insights: verdict plus an explanation built from the real position edges", () => {
     render(<MatchupContent leagueName="My League" matchup={liveResponse({ game_state: "pregame" })} />);
 
-    expect(screen.getByText("You're favored to win.")).toBeInTheDocument();
+    expect(screen.getByText("You're favored to win")).toBeInTheDocument();
     expect(
       screen.getByText("Your WRs (+12.4) and TE (+4.8) give you an edge, but your RBs (-8.2) and QB (-2.1) could be a problem."),
     ).toBeInTheDocument();
@@ -356,7 +369,7 @@ describe("MatchupContent", () => {
     render(<MatchupContent leagueName="My League" matchup={liveResponse({ suggested_moves: [MOVES[0], ...many] })} />);
     // Collapsed by default.
     expect(screen.queryByText("Aaron Jones Sr.")).not.toBeInTheDocument();
-    fireEvent.click(screen.getByRole("button", { name: "Show (6)" }));
+    openModule("Suggested Moves");
     expect(screen.getByText("Aaron Jones Sr.")).toBeInTheDocument();
     expect(screen.getAllByText("Over Tyrone Tracy Jr. (Proj 7.4)").length).toBeGreaterThan(0);
     expect(screen.getByText("+8.3")).toBeInTheDocument();
@@ -370,7 +383,7 @@ describe("MatchupContent", () => {
 
   it("suggested moves: says so when the Sleeper lineup already matches", () => {
     render(<MatchupContent leagueName="My League" matchup={liveResponse({ suggested_moves: [] })} />);
-    fireEvent.click(screen.getByRole("button", { name: "Show (0)" }));
+    openModule("Suggested Moves");
     expect(screen.getByText("Your Sleeper lineup already matches our suggested lineup.")).toBeInTheDocument();
   });
 
@@ -384,7 +397,7 @@ describe("MatchupContent", () => {
       />,
     );
     expect(screen.getByText("Win probability needs projections for more of each lineup.")).toBeInTheDocument();
-    expect(screen.getByText("Not enough projections yet to call it.")).toBeInTheDocument();
+    expect(screen.getByText("Not enough projections yet to call it")).toBeInTheDocument();
   });
 
   it("bye week: header plus the matchup-specific message", () => {

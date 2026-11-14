@@ -350,6 +350,44 @@ export function SuggestedDrop({ suggestion, compact = false }: { suggestion: Dro
   );
 }
 
+/**
+ * One group-level "Drop candidate" for a list whose rows all name the same cut (lib/waiversPresentation
+ * sharedDropCandidate). One line (badge, avatar, name, position, "for N adds"), the why one tap away. Rows with a
+ * different cut keep their own note.
+ */
+export function SharedDropNote({ drop, count }: { drop: DropPlayer; count: number }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <div className="flex flex-col gap-1.5" data-testid="shared-drop-note">
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        aria-expanded={open}
+        className="flex items-center gap-2 text-left w-full"
+        style={{ background: "none", border: "none", padding: 0, cursor: "pointer", minHeight: "var(--touch-target-min)" }}
+      >
+        <ToneBadge label="Drop candidate" color="var(--color-danger)" />
+        <PlayerAvatar playerId={drop.player_id} size={24} />
+        <span className="text-sm font-bold flex-1 min-w-0 break-words flex items-center gap-1.5 flex-wrap" style={{ color: "var(--color-text-primary)" }}>
+          {drop.name}
+          <PositionBadge position={drop.position} />
+          <span className="text-xs font-semibold" style={{ color: "var(--color-text-muted)" }}>
+            for {count} adds below
+          </span>
+        </span>
+        <span className="text-xs font-semibold shrink-0" style={{ color: "var(--color-accent)" }}>
+          {open ? "Hide" : "Why"}
+        </span>
+      </button>
+      {open ? (
+        <div className="pl-1" data-testid="shared-drop-details">
+          <DropPlayerLine player={drop} maxReasons={6} />
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
 const FREE_LOCK_NOTE = "more with Pro";
 
 export function DroppablePlayersSection({ data }: { data: DroppablePlayers | null | undefined }) {

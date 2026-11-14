@@ -643,6 +643,13 @@ real data; placeholders ("—", "Loading…") do not count and a title never cou
 SimDraftRow / SimPlayerLine / SimRosterLine (Row), SimDraftBoard filters (List + FilterRow), SimActionBar (ActionBar),
 SimNotice (state), SimGameHome modules (CompactModule via `simInboxParts` etc.), SimGameTeamSheet / SimPlayerSheet (Sheet tabs).
 
+**Row rule for repeated facts.** A fact every row of a list repeats (the same drop candidate, the same "of $81 remaining") is said once
+for the group (`lib/waiverGroups.ts`: `sharedDropCandidate`, `sharedBidNote`), and a row only states it when it differs. A row whose whole
+surface is tappable has no chevron.
+
+**Phone-only chrome.** `md:hidden` is guarded globally in `globals.css` (an unlayered `display` rule used to beat the Tailwind utility and showed
+the phone header on desktop, stacked above the real one).
+
 Rollout status per page: `docs/audits/2026-11-module-templates-rollout.md`.
 
 ## Player row anatomy (shared by FantasyDesk and the Fantasy Sim)

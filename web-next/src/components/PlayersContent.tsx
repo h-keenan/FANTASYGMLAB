@@ -19,6 +19,8 @@ import {
 import { OvrGauge } from "@/components/OvrGauge";
 import { PickRow, draftPickRowProps } from "@/components/PickRow";
 import { PillRow } from "@/components/PillRow";
+import { CompactModule } from "@/components/ui/CompactModule";
+import { picksSummaryParts } from "@/lib/playersModules";
 import { FilterSheet } from "@/components/ui/FilterSheet";
 import { singleValue, valuesFromSingles, type FilterGroup, type FilterValues } from "@/lib/filterSheet";
 import { groupPicksBySeason, visibleDraftPicks } from "@/lib/draftCenterPresentation";
@@ -103,7 +105,6 @@ import { PageTitle } from "@/components/PageTitle";
  */
 const PREVIEW_ROWS = 60;
 
-type PlayersView = "players" | "picks";
 
 /** The selected sort column's value for this player, Madden-style — hidden
  * entirely for the two baseline sort keys (Value/OVR already render their
@@ -278,7 +279,6 @@ export function PlayersContent({
   /** Valuation lens the `data` rankings were fetched under; used for name search. */
   lens?: string;
 }) {
-  const [view, setView] = useState<PlayersView>("players");
   const [search, setSearch] = useState("");
   const [position, setPosition] = useState("ALL");
   const [ageFilter, setAgeFilter] = useState<PlayersAgeFilter>("ALL");
@@ -388,20 +388,7 @@ export function PlayersContent({
         <PageTitle page="Players" leagueName={leagueName} />
       </header>
 
-      {picks.length > 0 ? (
-        <PillRow
-          options={[
-            { label: "Players", value: "players", glyph: "players" },
-            { label: "Picks", value: "picks", glyph: "picks" },
-          ]}
-          active={view}
-          onSelect={(value) => setView(value as PlayersView)}
-          fullWidth
-        />
-      ) : null}
-
-      {view === "players" ? (
-        <>
+      <>
           <div className="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap">
             <input
               type="text"
@@ -421,7 +408,7 @@ export function PlayersContent({
                 onSelect={setPosition}
               />
             </div>
-            <div className="col-span-2 sm:col-span-1">
+            <div className="col-span-1">
               <FilterSheet
                 groups={filterGroups}
                 values={filterValues}
@@ -435,9 +422,8 @@ export function PlayersContent({
                 }}
               />
             </div>
-          </div>
-
-          {/* Madden-style stat sort (Revision 20): Sort By picks the column
+            {/* One control row: Filters and Sort sit together (was a second row).
+             Madden-style stat sort (Revision 20): Sort By picks the column
               (Value/OVR, always present, plus whatever position-relevant
               raw stats the current filter's pool carries — see
               buildPlayersSortOptions), and the Raw/Percentile toggle picks
@@ -445,7 +431,7 @@ export function PlayersContent({
               position-group percentile. The toggle only matters for a real
               stat column, so it's hidden for Value/OVR rather than shown
               disabled and confusing. */}
-          <div className="flex flex-wrap items-center gap-2">
+          <div className="col-span-2 sm:col-span-1 flex flex-wrap items-center gap-2">
             <span className="text-xs font-bold uppercase" style={{ color: "var(--color-text-muted)" }}>
               Sort by
             </span>
@@ -470,6 +456,7 @@ export function PlayersContent({
                 onSelect={(value) => setSortMode(value as PlayersSortMode)}
               />
             ) : null}
+          </div>
           </div>
 
           {visible.length === 0 ? (
@@ -516,30 +503,34 @@ export function PlayersContent({
               {filtered.length} matching player{filtered.length === 1 ? "" : "s"}.
             </p>
           )}
-        </>
-      ) : pickSeasons.length === 0 ? (
-        <EmptyState title="No draft-pick assets are available for this league yet." />
-      ) : (
-        <div className="flex flex-col gap-4">
-          {pickSeasons.map(([season, seasonPicks]) => (
-            <div key={season} className="flex flex-col gap-2">
-              <span
-                className="text-xs font-bold uppercase"
-                style={{ color: "var(--color-text-secondary)", letterSpacing: "0.04em" }}
-              >
-                {season || "Future"}
-              </span>
-              <div
-                className="glass-surface"
-              >
-                {seasonPicks.map((pick, index) => (
-                  <PickRow key={pick.pick_id} {...draftPickRowProps(pick, true)} showDivider={index < seasonPicks.length - 1} />
-                ))}
-              </div>
+      </>
+      {picks.length > 0 ? (
+        <CompactModule
+          id="players.picks"
+          title="Draft picks"
+          testId="players-picks"
+          parts={picksSummaryParts(picks.map((pick) => ({ label: pick.label, season: pick.season ?? null, score: pick.score ?? null })))}
+        >
+          {pickSeasons.length === 0 ? (
+            <EmptyState title="No draft-pick assets are available for this league yet." />
+          ) : (
+            <div className="flex flex-col gap-4">
+              {pickSeasons.map(([season, seasonPicks]) => (
+                <div key={season} className="flex flex-col gap-2">
+                  <span className="text-xs font-bold uppercase" style={{ color: "var(--color-text-secondary)", letterSpacing: "0.04em" }}>
+                    {season || "Future"}
+                  </span>
+                  <div className="glass-surface">
+                    {seasonPicks.map((pick, index) => (
+                      <PickRow key={pick.pick_id} {...draftPickRowProps(pick, true)} showDivider={index < seasonPicks.length - 1} />
+                    ))}
+                  </div>
+                </div>
+              ))}
             </div>
-          ))}
-        </div>
-      )}
+          )}
+        </CompactModule>
+      ) : null}
       <ValuesCredit />
     </main>
   );

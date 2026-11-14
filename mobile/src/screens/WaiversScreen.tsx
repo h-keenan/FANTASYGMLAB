@@ -16,6 +16,7 @@ import { isEspnLeagueId } from '../lib/leaguePlatform';
 import { sleeperLeagueUrl } from '../lib/matchupPlanner';
 import GlassCard from '../components/GlassCard';
 import Input from '../components/Input';
+import { sharedBidNote, sharedDropCandidate } from '../lib/waiverGroups';
 import SectionHeading from '../components/SectionHeading';
 import { useFocusEffect } from '@react-navigation/native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
@@ -50,7 +51,7 @@ import WaiverRecommendationCard, {
   waiverTrendingAddLabel,
 } from '../components/WaiverRecommendationCard';
 import { api, type DroppablePlayers, type ModelStatus, type NeedsModel, type WaiverPlayer, type WaiverPriorityAdd } from '../lib/api';
-import { DroppablePlayersSection, needsBreakdownText } from '../components/SuggestedDrop';
+import { DroppablePlayersSection, SharedDropNote, needsBreakdownText } from '../components/SuggestedDrop';
 import { limitedDataNote, needsHeadline, teamNeedStat } from '../lib/dropsPresentation';
 import { bestAvailableCardVisual } from '../lib/bestAvailableCardVisual';
 import { toUserErrorMessage } from '../lib/errorMessages';
@@ -129,6 +130,7 @@ export default function WaiversScreen({ route, navigation }: Props) {
   const scrollY = useRef(0);
   const handledDeepLink = useRef<string | null>(null);
   const [highlightId, setHighlightId] = useState<string | null>(null);
+  const [openRowId, setOpenRowId] = useState<string | null>(null);
   const [deepLinkMissing, setDeepLinkMissing] = useState(false);
   const { lens } = useValuationLens(leagueId);
   const [freeAgents, setFreeAgents] = useState<WaiverPlayer[] | null>(null);
@@ -362,6 +364,8 @@ export default function WaiversScreen({ route, navigation }: Props) {
   const topPriority = priorityAdds[0] ?? null;
   const secondaryPriority = priorityAdds.length > 1 ? priorityAdds.slice(1) : [];
   const visibleSecondary = filterByRecommendation(secondaryPriority, recFilter);
+  const sharedDrop = sharedDropCandidate(visibleSecondary);
+  const bidNote = sharedBidNote(visibleSecondary);
   const priorityCaption =
     neededPositions.length > 0
       ? `Personalized for your needs at ${neededPositions.join(', ')}`
@@ -498,6 +502,12 @@ export default function WaiversScreen({ route, navigation }: Props) {
                       <AppText style={styles.secondaryCaption}>None in this group.</AppText>
                     ) : (
                       <AnimatedCard style={styles.compactGroupCard}>
+                        {sharedDrop ? <SharedDropNote drop={sharedDrop.first.drop_suggestion!.drop!} count={sharedDrop.count} /> : null}
+                        {bidNote ? (
+                          <AppText style={styles.secondaryCaption} testID="waiver-bid-note">
+                            {`Bid ranges are ${bidNote}. Tap a row for its value, why and roster move.`}
+                          </AppText>
+                        ) : null}
                         {visibleSecondary.map((player, index) => (
                           <HighlightFrame
                             key={player.player_id}
@@ -510,6 +520,9 @@ export default function WaiversScreen({ route, navigation }: Props) {
                               rank={index + 2}
                               showDivider={index < visibleSecondary.length - 1}
                               onPress={() => openPlayer(player)}
+                              open={openRowId === player.player_id}
+                              onToggle={() => setOpenRowId((id) => (id === player.player_id ? null : player.player_id))}
+                              sharedDropId={sharedDrop?.playerId ?? null}
                             />
                           </HighlightFrame>
                         ))}

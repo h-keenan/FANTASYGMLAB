@@ -215,24 +215,54 @@ describe("WaiversContent", () => {
     expect(screen.getByTestId("swap-alternatives")).toHaveTextContent("Dead Weight");
   });
 
-  it("collapses repeated drops to one line on the list rows, details one tap away", () => {
+  it("shows a repeated cut once as a group note, not on every row; details one tap away", () => {
     const data: WaiversResponse = {
       ...BASE_RESPONSE,
       priority_adds: [
         priorityAdd({ drop_suggestion: DROP_SUGGESTION }),
         priorityAdd({ player_id: "p2", name: "Second Add", drop_suggestion: { ...DROP_SUGGESTION, add: { ...DROP_SUGGESTION.add, name: "Second Add" } } }),
+        priorityAdd({ player_id: "p3", name: "Third Add", drop_suggestion: { ...DROP_SUGGESTION, add: { ...DROP_SUGGESTION.add, name: "Third Add" } } }),
       ],
     };
     render(<WaiversContent leagueName="Dynasty Overlords" data={data} />);
 
-    const compact = screen.getByTestId("suggested-drop-compact");
-    expect(compact).toHaveTextContent("Drop");
-    expect(compact).toHaveTextContent("Dead Weight");
-    expect(compact).toHaveTextContent("WR");
-    expect(screen.queryByTestId("suggested-drop-details")).not.toBeInTheDocument();
-    fireEvent.click(within(compact).getByRole("button", { name: /Why/ }));
-    expect(screen.getByTestId("suggested-drop-details")).toHaveTextContent("never starts in your best lineup");
+    // Two rows share the cut: one group note, no per-row copy while collapsed.
+    const note = screen.getByTestId("shared-drop-note");
+    expect(note).toHaveTextContent("Drop candidate");
+    expect(note).toHaveTextContent("Dead Weight");
+    expect(note).toHaveTextContent("for 2 adds");
+    expect(screen.queryByTestId("suggested-drop-compact")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("shared-drop-details")).not.toBeInTheDocument();
+    fireEvent.click(within(note).getByRole("button", { name: /Why/ }));
+    expect(screen.getByTestId("shared-drop-details")).toHaveTextContent("never starts in your best lineup");
+
+    // The row is one tap target with no chevron; expanding reveals value, why and its own roster move.
+    const rows = screen.getAllByTestId("waiver-rec-row");
+    expect(rows[0]).not.toHaveTextContent("›");
+    expect(within(rows[0]).queryByTestId("waiver-rec-details")).not.toBeInTheDocument();
+    fireEvent.click(within(rows[0]).getByRole("button", { name: /show details/ }));
+    const details = within(rows[0]).getByTestId("waiver-rec-details");
+    expect(details).toHaveTextContent("Value");
+    expect(within(details).getByTestId("suggested-drop-compact")).toHaveTextContent("Dead Weight");
+    fireEvent.click(within(details).getByRole("button", { name: /Why/ }));
     expect(screen.getByTestId("suggested-drop-details")).toHaveTextContent("Add Second Add, drop Dead Weight");
+  });
+
+  it("a row whose cut differs from the group's says so on its own line", () => {
+    const other = { ...DROP_SUGGESTION.drop!, player_id: "d9", name: "Other Cut" };
+    const data: WaiversResponse = {
+      ...BASE_RESPONSE,
+      priority_adds: [
+        priorityAdd({ drop_suggestion: DROP_SUGGESTION }),
+        priorityAdd({ player_id: "p2", name: "Second Add", drop_suggestion: DROP_SUGGESTION }),
+        priorityAdd({ player_id: "p3", name: "Third Add", drop_suggestion: DROP_SUGGESTION }),
+        priorityAdd({ player_id: "p4", name: "Fourth Add", drop_suggestion: { ...DROP_SUGGESTION, drop: other } }),
+      ],
+    };
+    render(<WaiversContent leagueName="Dynasty Overlords" data={data} />);
+    const rows = screen.getAllByTestId("waiver-rec-row");
+    expect(rows[0]).not.toHaveTextContent("Drop ");
+    expect(rows[2]).toHaveTextContent("Drop Other Cut");
   });
 
   it("lists the same cut the cards name, with the adds it is the cut for", () => {

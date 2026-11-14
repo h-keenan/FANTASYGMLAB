@@ -53,6 +53,23 @@ Reachability: every tile, insight link, alert, trade link and mini-game is still
 - [x] App: already one board at a time via the metric segmented control, which is the plan's target. Left as is.
 - [ ] Playoff Odds and "Your standing" card are bespoke; Recaps, Games, Draft, Pick'em not migrated.
 
+## Matchup, Waivers, Players (pass 2, 2026-11-14)
+
+Root cause of the doubled desktop header (coridian_ Matchup screenshot, "Today > Matchup" bar above the "FANTASYDESK MATCHUP" bar): `ShellHeader` is `.shell-header md:hidden`, but `.shell-header { display: flex }` is unlayered CSS and Tailwind v4 utilities live in `@layer utilities`, so the component rule won and the phone header rendered on desktop above the real `Header` on EVERY page under the shell flag. Fixed at the source with one `@media (min-width: 768px) { .md\:hidden { display: none !important } }` guard in `globals.css` (it also covers `.bottom-stack` and `.sim-game-header`, same bug class). Test: `app/phoneChromeCss.test.ts`; scan: desktop fails if the ShellHeader is visible or more than one header bar shows.
+
+| Page | Before | Now |
+|---|---|---|
+| Matchup (`/matchup`, app `MatchupScreen`) | 48rem column, scoreboard card, Insights card with the position list far from its sentence, Lineup card, Moves toggle | [x] `Hero` (win chance, else score, else projections; both teams in the context line), `CompactModule` Insights (open: sentence + edge chips right beside it; collapsed "You're favored · RB +16.7 · WR -4.6"), Lineup Comparison (open; collapsed "Suggested · 118.3 vs 109.7 · +8.6 · 9 slots"), Teams & values (avatars, split bar, value tiles; collapsed "Value 45,719 vs 48,673 · -2,954 · Proj margin +8.6"), Suggested Moves (collapsed "3 moves · Start Gibbs +4.2 pts"). `page-shell-wide` (72rem) and a two-column `matchup-grid` from lg (Insights + Teams + Moves left, Lineup right); one column on phone. Pure model `lib/matchupModules.ts` (twin). Web + app |
+| Waivers "More recommended adds" | per row: Value + gauge, bid + "of $81 remaining" + chevron, 2-3 loud chips, "DROP X" block | [x] row = name / position / team + ONE bid number at the right, reasons as one line of small icon pills, whole row is the tap target (expands in place, no chevron). Expanded: Value + gauge, bid context, why, usage, this add's roster move, Player details. The cut shared by the group is one "Drop candidate" note above the list (`SharedDropNote`), a row names its cut only when it differs; "Bid ranges are of $81 remaining" once. `lib/waiverGroups.ts` (twin). Web + app |
+| Players | Players / Picks pill row (second tab row) + Sort row under the filter row | [x] web: Picks is a `CompactModule` under the list ("12 picks · 2026-2028 · Top 2026 1st"), Sort sits in the Filters row. App already has one control row and no Picks view (nothing to migrate) |
+
+Reachability: nothing removed; every Matchup block, waiver value/gauge/why/usage/drop and every pick is one tap away. Scan (`module_scan.mjs`, 390 and 1440, fixtures for Matchup/Waivers/Players): clean; Matchup is 1140 px wide at 1440, a Waivers recommended row is 77 px at 390 (was about 150).
+
+Still open from this pass:
+- [ ] Waivers still has two tab rows (family strip + Recommended / Explore / Watchlist) and the All/Add/Stash/Watch filter row: the IA plan's single View selector needs the shared tab strip work (another agent owns `PillRow`/`PageTabBar`).
+- [ ] Row highlight deep link does not auto-expand the app row (web does).
+- [ ] GM Plan, Trade Analyzer, Finder, History headers not migrated.
+
 ## Enforcement and verification
 
 - [x] Row rule: `rowRightEdgeProblems` (trailing `list-actions` slot holds at most one control) + source scan that no `PlayerListRow actions={<>...</>}` exists on web or app (`ui/ModuleTemplates.test.tsx`). Number-vs-action mixing is not machine-checkable and stays a review rule.
@@ -61,7 +78,7 @@ Reachability: every tile, insight link, alert, trade link and mini-game is still
 
 ## Remains
 
-- [ ] Trade idea cards as CompactModules (Trades page is 2046 px tall with 3 ideas; cards dominate). Analyzer, Finder, History, Matchup, Players, Waivers (control row), GM Plan inner tabs, League Recaps/Games/Draft/Pick'em.
+- [ ] Trade idea cards as CompactModules (Trades page is 2046 px tall with 3 ideas; cards dominate). Analyzer, Finder, History, GM Plan inner tabs, League Recaps/Games/Draft/Pick'em.
 - [ ] App family tab strip: `lib/pageFamilies.ts` has no mobile twin on main, so the app screens cannot show the single family tab row yet.
 - [ ] Roster rows inside a module truncate long names on a 390 px phone ("T. ..." in the scan); row width inside modules needs a pass.
 - [ ] No on-device check of the app screens (tsc, node tests and twin check only).
