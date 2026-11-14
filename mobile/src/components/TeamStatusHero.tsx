@@ -41,6 +41,7 @@ export default function TeamStatusHero({
   onNavigate,
   attention = [],
   tradeCount = 0,
+  queue,
 }: {
   leagueId: string;
   leagueName: string;
@@ -53,6 +54,8 @@ export default function TeamStatusHero({
   attention?: StatusAttentionItem[];
   /** Trade ideas the dashboard found (a mini stat on the header). */
   tradeCount?: number;
+  /** The Decision Queue's lead: becomes the hero's one next action (see buildTodayStatusHeader). */
+  queue?: Parameters<typeof buildTodayStatusHeader>[0]['queue'];
 }) {
   const { colors } = useThemeMode();
   const styles = useMemo(() => createStyles(colors), [colors]);
@@ -107,6 +110,7 @@ export default function TeamStatusHero({
     standing,
     attention,
     tradeCount,
+    queue,
     hrefs: { matchup: 'Matchup', rankings: 'Teams', trades: 'Trades' },
   });
 

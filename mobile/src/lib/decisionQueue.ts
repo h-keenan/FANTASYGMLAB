@@ -89,7 +89,7 @@ export interface DecisionItem {
   route_player_team: string;
   route_player_tier: string;
   route_player_score: number | null;
-  route_player_injury_status: string;
+  route_player_injury_status?: string;
   mentioned_players?: ReadonlyArray<{ player_id: string }> | null;
   presentation?: { trade_package?: unknown } | null;
 }
@@ -421,7 +421,7 @@ export function buildDecisionQueue<T extends DecisionItem>(input: DecisionInput<
     takenTitles.add(title);
     const injured = Boolean(item.route_player_injury_status && item.route_player_injury_status.trim());
     const kind: DecisionKind = injured ? "injury" : "item";
-    const player = itemPlayer(item, injured ? item.route_player_injury_status : null);
+    const player = itemPlayer(item, injured ? (item.route_player_injury_status ?? null) : null);
     out.push({
       key: `item-${out.length}-${title.replace(/ /g, "-").slice(0, 40)}`,
       kind,

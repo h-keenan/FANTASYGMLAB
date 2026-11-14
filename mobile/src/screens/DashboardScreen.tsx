@@ -85,9 +85,10 @@ import { toUserErrorMessage } from '../lib/errorMessages';
 import { isInSeason } from '../lib/seasonPhase';
 import { useDensity } from '../context/DensityContext';
 import { useExperienceCopy, useExperienceLevel } from '../context/ExperienceLevelContext';
-import { attentionEntryRoute, DashboardMore, DashboardNeedsAttention, DashboardTeamStats, DashboardTradesBlock } from '../components/DashboardBlocks';
-import { splitTodayAttention } from '../lib/statusHeader';
-import { buildNeedsAttention, isTradeItem, itemsAfterAttention, weekRowsAfterAttention } from '../lib/dashboardLayout';
+import { DashboardMore, DashboardTeamStats, DashboardTradesBlock } from '../components/DashboardBlocks';
+import DecisionQueue, { decisionRoute } from '../components/DecisionQueue';
+import { buildDecisionQueue } from '../lib/decisionQueue';
+import { isTradeItem } from '../lib/dashboardLayout';
 import BeginnerHelp from '../components/BeginnerHelp';
 import { useThemeMode } from '../context/ThemeModeContext';
 import { LINK_HIT_SLOP, radii, spacing, type ThemeColors } from '../theme';
@@ -427,30 +428,37 @@ export default function DashboardScreen({ route, navigation }: Props) {
   // The trade idea lives in the Trades block and a "lineup set" row in the Now
   // strip, so the Next moves list never repeats them (lib/dashboardLayout.ts).
   const tradeItems = grouped.topPriority.filter(isTradeItem);
-  // Urgent items sit once in "Needs attention" (buildNeedsAttention reads only
-  // existing fields); "This week" keeps what is left.
-  const attention = buildNeedsAttention(
-    dashboardData?.this_week?.rows,
-    dashboardData?.trade_window,
-    grouped.topPriority,
-  );
-  // The status header shows lineup holes and single-player items as player rows; the "Needs attention" card keeps the rest.
-  // Until the matchup read has settled the header is still forming, so nothing moves out of the card yet.
-  const wrappedAttention = attention.map((entry) => ({
-    source: entry.source,
-    item: entry.item ? { ...entry.item, route_player_injury_status: entry.item.route_player_injury_status ?? '' } : undefined,
-    entry,
-  }));
-  const split = !matchupQuery.isPending
-    ? splitTodayAttention(wrappedAttention, matchup?.suggested_moves, (wrapped) => attentionEntryRoute(wrapped.entry), 'Matchup')
-    : { rows: [], remaining: wrappedAttention };
-  const statusAttention = { rows: split.rows, remaining: split.remaining.map((wrapped) => wrapped.entry) };
-  const nonTradeTopPriority = itemsAfterAttention(
-    grouped.topPriority.filter((item) => !isTradeItem(item)),
-    attention,
-  );
+  // The Decision Queue (lib/decisionQueue.ts): one ranked, deduped list of what needs a decision. The hero leads with its top
+  // decision; what the queue did not take stays in "This week" and the modules below.
+  const matchupLine = buildTeamStatusMatchup(matchup);
+  const queue = buildDecisionQueue<DashboardItem>({
+    now: new Date(),
+    moves: matchup?.suggested_moves,
+    openSlots: matchup?.open_slots?.length ?? 0,
+    thisWeek: dashboardData?.this_week,
+    items: grouped.topPriority,
+    tradeWindow: dashboardData?.trade_window,
+    tradeIdeaCount: tradeItems.length,
+    entitlement: entitlement ? { isPremium: entitlement.is_premium, hiddenCount: entitlement.hidden_count } : null,
+    nextGame: matchupLine ? { week: matchupLine.week, opponentName: matchupLine.opponentName } : dashboardData?.this_week?.week ? { week: dashboardData.this_week.week, opponentName: '' } : null,
+  });
+  // Holds the place only while the queue would otherwise read "nothing needs you" before the matchup has said otherwise.
+  const queuePending = matchupQuery.isPending && queue.total === 0;
+  const hasKind = (kind: string) => queue.all.some((d) => d.kind === kind);
+  const heroQueue = queuePending
+    ? undefined
+    : { next: queue.next ? { title: queue.next.title, label: queue.next.primary.label, href: decisionRoute(queue.next) } : null, nothing: null };
   const nextMovesThisWeek = dashboardData?.this_week
-    ? { ...dashboardData.this_week, rows: weekRowsAfterAttention(dashboardData.this_week.rows, attention) }
+    ? {
+        ...dashboardData.this_week,
+        rows: dashboardData.this_week.rows.filter(
+          (row) => row.key !== 'trade' && !(row.key === 'lineup' && (hasKind('lineup') || row.tone !== 'risk')) && !(row.key === 'waiver' && hasKind('waiver')),
+        ),
+        next_action:
+          dashboardData.this_week.next_action && (dashboardData.this_week.next_action.route === 'trade_hub' || dashboardData.this_week.next_action.route === 'connect_league')
+            ? dashboardData.this_week.next_action
+            : null,
+      }
     : dashboardData?.this_week;
   return (
     <View style={styles.root}>
@@ -480,33 +488,25 @@ export default function DashboardScreen({ route, navigation }: Props) {
         rankings={teamRankings}
         standingsAvailable={teamRankingsQuery.data?.standings_available}
         onNavigate={navigate}
-        attention={statusAttention.rows}
+        attention={[]}
         tradeCount={tradeItems.length}
+        queue={heroQueue}
       />
 
       {/* A few times a season: does the declared direction still fit? Server-decided,
           dismissible, once per moment (modules/direction_checkin.py). Same slot on web. */}
       <DirectionCheckinCard leagueId={leagueId} />
 
-      <DashboardNeedsAttention entries={statusAttention.remaining} leagueId={leagueId} leagueName={leagueName} onNavigate={navigate} />
-
-      {/* Next moves: what is left of the week's plan once the trade idea (Trades
-          block) and a "lineup set" row (Now strip) are shown where they belong. */}
-      <TodayHero
-        thisWeek={nextMovesThisWeek}
-        items={nonTradeTopPriority}
+      <DecisionQueue
+        queue={queue}
         leagueId={leagueId}
         leagueName={leagueName}
-        tradePending={false}
         onNavigate={navigate}
-        right={
-          <PressableScale onPress={() => navigation.navigate('GmPlan', { leagueId, leagueName })} hitSlop={LINK_HIT_SLOP}>
-            <AppText style={styles.viewAll}>Full GM Plan ›</AppText>
-          </PressableScale>
-        }
-        renderCard={(item, index) => (
+        pending={queuePending}
+        entitlement={entitlement}
+        emptyOverride={quietReason || undefined}
+        renderItemCard={(item) => (
           <BriefingCard
-            key={`top-priority-${index}`}
             item={item}
             leagueId={leagueId}
             leagueName={leagueName}
@@ -515,32 +515,17 @@ export default function DashboardScreen({ route, navigation }: Props) {
             showExplanations={showExplanations}
           />
         )}
-        empty={
-          attention.length > 0 ? undefined : (
-          <View style={styles.emptyCard}>
-            <BrandMark width={120} height={82} />
-            <AppText style={styles.emptyText}>
-              {quietReason || 'Nothing urgent right now — your roster looks steady.'}
-            </AppText>
-            {!quietReason ? <BeginnerHelp term="dashboardNothingUrgent" /> : null}
-          </View>
-          )
-        }
       />
 
-      {entitlement && !entitlement.is_premium && entitlement.hidden_count > 0 ? (
-        // One compact line instead of the free-limit note plus a full locked card.
-        <MoreMovesRow hidden={entitlement.hidden_count} onUpgrade={() => navigate('Paywall')} />
-      ) : entitlement ? (
-        <FreeLimitNote
-          kind="window"
-          noun="next moves"
-          limit={entitlement.free_limit}
-          total={entitlement.visible_count + entitlement.hidden_count}
-          shown={entitlement.visible_count}
-          isPremium={entitlement.is_premium}
-        />
-      ) : null}
+      {/* What the queue did not take: the lineup-is-set row, later-this-week rows, the trade-pending space. */}
+      <TodayHero
+        thisWeek={nextMovesThisWeek}
+        items={[]}
+        leagueId={leagueId}
+        leagueName={leagueName}
+        tradePending={false}
+        onNavigate={navigate}
+      />
 
       {/* First-run trial offer, after the person has seen their own Today
           briefing (paywall after connect). Dismissible; nothing is gated. */}
@@ -554,7 +539,7 @@ export default function DashboardScreen({ route, navigation }: Props) {
           leagueName={leagueName}
           isBeginner={experienceCopy.isBeginner}
           goal={goal}
-          deadlineInAttention={attention.some((entry) => entry.source === 'deadline')}
+          deadlineInAttention={hasKind('deadline')}
           onNavigate={navigate}
         />
       ) : null}
@@ -1354,34 +1339,3 @@ function createStyles(colors: ThemeColors) {
   });
 }
 
-/** Free-tier upsell for withheld "next moves": a single tappable line, never a locked card. */
-function MoreMovesRow({ hidden, onUpgrade }: { hidden: number; onUpgrade: () => void }) {
-  const { colors } = useThemeMode();
-  useEffect(() => {
-    trackUse('more_next_moves', 'gate_seen', { tier: 'free' });
-  }, []);
-  return (
-    <PressableScale
-      accessibilityRole="button"
-      accessibilityLabel={`${hidden} more move${hidden === 1 ? '' : 's'} on Pro. Upgrade`}
-      onPress={onUpgrade}
-      style={{
-        flexDirection: 'row',
-        alignItems: 'center',
-        justifyContent: 'space-between',
-        gap: spacing.sm,
-        minHeight: 44,
-        paddingHorizontal: spacing.md,
-        borderRadius: radii.md,
-        borderWidth: 1,
-        borderColor: colors.premium,
-        backgroundColor: colors.surface,
-      }}
-    >
-      <AppText style={{ color: colors.textPrimary, fontWeight: '700', flexShrink: 1 }}>
-        {hidden} more move{hidden === 1 ? '' : 's'} on Pro
-      </AppText>
-      <AppText style={{ color: colors.premium, fontWeight: '700' }}>Upgrade ›</AppText>
-    </PressableScale>
-  );
-}
