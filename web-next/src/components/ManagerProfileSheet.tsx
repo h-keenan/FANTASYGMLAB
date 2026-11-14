@@ -18,6 +18,8 @@ import { PickPlate } from "@/components/PickRow";
 import { OpponentProfileCard } from "@/components/OpponentProfileCard";
 import type { OpponentProfileResponse } from "@/lib/opponentProfile";
 import { PlayerName } from "@/components/PlayerName";
+import { Tabs } from "@/components/Tabs";
+import { managerProfileTabs } from "@/lib/sheetTabs";
 
 function TradeAssetLine({ asset }: { asset: ManagerRecentTradeAsset }) {
   if (asset.kind === "pick") {
@@ -144,6 +146,90 @@ export function ManagerProfileSheet({
   const sample = data?.manager?.sample ?? null;
   const rows = TENDENCY_SIGNALS.filter(([key]) => signals[key]?.status === "ok");
 
+  const premiumReady = Boolean(data?.is_premium) && rows.length > 0;
+  const overviewPanel = (
+    <>
+      <OpponentProfileCard profile={profile} leagueId={leagueId} leagueName={leagueName} />
+      {failed ? (
+        <p className="text-sm" style={{ color: "var(--color-text-muted)" }}>
+          Couldn&apos;t load this profile.
+        </p>
+      ) : !data ? (
+        <p className="text-sm" style={{ color: "var(--color-text-muted)" }}>
+          Loading…
+        </p>
+      ) : !data.is_premium ? (
+        <div className="flex flex-col gap-2">
+          <p className="text-sm font-bold">{data.upsell?.title ?? "Manager Tendencies"}</p>
+          <ButtonLink href="/premium" variant="premium" size="sm">
+            Upgrade →
+          </ButtonLink>
+        </div>
+      ) : rows.length === 0 ? (
+        <p className="text-sm" style={{ color: "var(--color-text-muted)" }}>
+          Not enough trade history yet.
+        </p>
+      ) : sample ? (
+        <StatStrip
+          columns={3}
+          items={[
+            { glyph: "record", label: "Trades", value: String(sample.trades), tone: "positive" },
+            { glyph: "power", label: "Wire moves", value: String(sample.wire_moves) },
+            { glyph: "age", label: "Seasons", value: String(sample.seasons) },
+          ]}
+        />
+      ) : null}
+    </>
+  );
+  const tendenciesPanel = premiumReady ? (
+    <div className="flex flex-col gap-3">
+      <SectionHeading>Tendencies</SectionHeading>
+      <ul className="flex flex-col gap-2">
+        {rows.map(([key, title]) => {
+          const signal = signals[key];
+          const tone = `var(--color-${tendencyTone(signal.label)})`;
+          const badge = tendencyBadgeText(signal.label);
+          return (
+            <li key={key}>
+              <AccentCard accent={tone} compact as="div">
+                <div className="flex items-center justify-between gap-2">
+                  <span
+                    className="text-xs uppercase font-extrabold"
+                    style={{ color: "var(--color-text-muted)", letterSpacing: "var(--letter-spacing-badge)" }}
+                  >
+                    {title}
+                  </span>
+                  {badge ? <ToneBadge label={badge} color={tone} /> : null}
+                </div>
+                <span className="text-sm font-semibold">{signal.summary}</span>
+                <div className="flex items-center gap-2">
+                  <div
+                    className="flex-1 h-1 overflow-hidden"
+                    style={{ background: "var(--color-surface-muted)", borderRadius: "var(--radius-pill)" }}
+                    role="presentation"
+                  >
+                    <div
+                      className="h-full"
+                      style={{
+                        width: `${Math.round(sampleFill(signal.sample_size, signal.min_sample) * 100)}%`,
+                        background: tone,
+                        borderRadius: "var(--radius-pill)",
+                      }}
+                    />
+                  </div>
+                  <span className="text-xs" style={{ color: "var(--color-text-muted)" }}>
+                    {signal.sample_size} trade{signal.sample_size === 1 ? "" : "s"}
+                  </span>
+                </div>
+              </AccentCard>
+            </li>
+          );
+        })}
+      </ul>
+    </div>
+  ) : null;
+  const tradesPanel = premiumReady && data?.recent_trades && data.recent_trades.length > 0 ? <RecentTrades trades={data.recent_trades} /> : null;
+
   return (
     <PopupShell title={teamName || "Manager profile"} onClose={onClose} labelledBy="mgr-profile-name" closeLabel="Close manager profile" portal={false}>
         <div className="pqv-scroll">
@@ -160,86 +246,19 @@ export function ManagerProfileSheet({
               ) : null}
             </div>
           </div>
-          <OpponentProfileCard profile={profile} leagueId={leagueId} leagueName={leagueName} />
-          {failed ? (
-            <p className="text-sm" style={{ color: "var(--color-text-muted)" }}>
-              Couldn&apos;t load this profile.
-            </p>
-          ) : !data ? (
-            <p className="text-sm" style={{ color: "var(--color-text-muted)" }}>
-              Loading…
-            </p>
-          ) : !data.is_premium ? (
-            <div className="flex flex-col gap-2">
-              <p className="text-sm font-bold">{data.upsell?.title ?? "Manager Tendencies"}</p>
-              <ButtonLink href="/premium" variant="premium" size="sm">
-                Upgrade →
-              </ButtonLink>
-            </div>
-          ) : rows.length === 0 ? (
-            <p className="text-sm" style={{ color: "var(--color-text-muted)" }}>
-              Not enough trade history yet.
-            </p>
-          ) : (
-            <div className="flex flex-col gap-3">
-              {sample ? (
-                <StatStrip
-                  columns={3}
-                  items={[
-                    { glyph: "record", label: "Trades", value: String(sample.trades), tone: "positive" },
-                    { glyph: "power", label: "Wire moves", value: String(sample.wire_moves) },
-                    { glyph: "age", label: "Seasons", value: String(sample.seasons) },
-                  ]}
-                />
-              ) : null}
-              <SectionHeading>Tendencies</SectionHeading>
-              <ul className="flex flex-col gap-2">
-                {rows.map(([key, title]) => {
-                  const signal = signals[key];
-                  const tone = `var(--color-${tendencyTone(signal.label)})`;
-                  const badge = tendencyBadgeText(signal.label);
-                  return (
-                    <li key={key}>
-                      <AccentCard accent={tone} compact as="div">
-                        <div className="flex items-center justify-between gap-2">
-                          <span
-                            className="text-xs uppercase font-extrabold"
-                            style={{ color: "var(--color-text-muted)", letterSpacing: "var(--letter-spacing-badge)" }}
-                          >
-                            {title}
-                          </span>
-                          {badge ? <ToneBadge label={badge} color={tone} /> : null}
-                        </div>
-                        <span className="text-sm font-semibold">{signal.summary}</span>
-                        <div className="flex items-center gap-2">
-                          <div
-                            className="flex-1 h-1 overflow-hidden"
-                            style={{ background: "var(--color-surface-muted)", borderRadius: "var(--radius-pill)" }}
-                            role="presentation"
-                          >
-                            <div
-                              className="h-full"
-                              style={{
-                                width: `${Math.round(sampleFill(signal.sample_size, signal.min_sample) * 100)}%`,
-                                background: tone,
-                                borderRadius: "var(--radius-pill)",
-                              }}
-                            />
-                          </div>
-                          <span className="text-xs" style={{ color: "var(--color-text-muted)" }}>
-                            {signal.sample_size} trade{signal.sample_size === 1 ? "" : "s"}
-                          </span>
-                        </div>
-                      </AccentCard>
-                    </li>
-                  );
-                })}
-              </ul>
-              {data.recent_trades && data.recent_trades.length > 0 ? (
-                <RecentTrades trades={data.recent_trades} />
-              ) : null}
-            </div>
-          )}
+          <Tabs
+            id="manager-profile"
+            ariaLabel="Manager sections"
+            tabs={managerProfileTabs({
+              hasProfile: profile != null,
+              tendencyCount: data?.is_premium ? rows.length : 0,
+              tradeCount: data?.is_premium ? data.recent_trades?.length ?? 0 : 0,
+            }).map((tab) => ({
+              key: tab.key,
+              label: tab.label,
+              render: () => (tab.key === "tendencies" ? tendenciesPanel : tab.key === "trades" ? tradesPanel : overviewPanel),
+            }))}
+          />
         </div>
     </PopupShell>
   );
