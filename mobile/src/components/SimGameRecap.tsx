@@ -3,6 +3,8 @@ import { StyleSheet, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 
 import AccentCard from './AccentCard';
+import { SimAchievementsModule } from './SimAchievements';
+import type { SimAchievementsPayload } from '../lib/simAchievements';
 import AppText from './AppText';
 import Button from './Button';
 import ErrorState from './ErrorState';
@@ -221,6 +223,7 @@ export function SimFinalView({ ctx, onNewGame, onHub }: { ctx: SimCtx; onNewGame
   const [attempt, setAttempt] = useState(0);
   const [sharing, setSharing] = useState(false);
   const [tab, setTab] = useState<SimReviewView>('overview');
+  const [achievements, setAchievements] = useState<SimAchievementsPayload | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -228,8 +231,10 @@ export function SimFinalView({ ctx, onNewGame, onHub }: { ctx: SimCtx; onNewGame
       .getSimGameResult(gameId)
       .then((body) => {
         if (cancelled) return;
-        if (body.result) setResult(body.result);
-        else {
+        if (body.result) {
+          setResult(body.result);
+          setAchievements(body.achievements ?? null);
+        } else {
           setFailMessage(simGameReasonMessage(body.reason, body));
           setFailed(true);
         }
@@ -318,6 +323,8 @@ export function SimFinalView({ ctx, onNewGame, onHub }: { ctx: SimCtx; onNewGame
         </View>
       </AccentCard>
       )}
+
+      <SimAchievementsModule payload={achievements} seasonNo={game.dynasty?.season_no ?? 1} id="final.achievements" openOnPhone />
 
       {dynasty ? null : <SegmentedTabBar options={SIM_REVIEW_VIEWS.map((v) => ({ key: v.value, label: v.label, glyph: v.glyph }))} active={tab} onChange={setTab} />}
       {dynasty || tab === 'standings' ? (

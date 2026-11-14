@@ -12,6 +12,8 @@ import { SimTeamIdentity, SimTeamLogo } from './SimTeamIdentity';
 import RecapCard from './RecapCard';
 import { recapCardModel, recapRowsFromItems } from '../lib/recapCard';
 import TrophyIcon from './TrophyIcon';
+import { SimAchievementBadge, useAchievementColor } from './SimAchievements';
+import { simAchievementDate, simRecapAchievementModel } from '../lib/simAchievements';
 import { useThemeMode } from '../context/ThemeModeContext';
 import { EASE, HERO_GLOW } from '../lib/motion';
 import { simGradeOf } from '../lib/simGrade';
@@ -19,6 +21,7 @@ import { simFmtPts, simPlayoffRoundLabel, simTeamNameMap, type SimGamePlayer, ty
 import { useReducedMotion } from '../lib/useMotion';
 import { positionColor, spacing } from '../theme';
 import {
+  STORY_ITEMS,
   simLeagueHighlights,
   simNextWeekModel,
   simPositionTotals,
@@ -40,6 +43,7 @@ import {
 
 const KICKER: Record<SimRecapPageKey, string> = {
   result: 'Result',
+  achievements: 'Achievement unlocked',
   matchup: 'Matchup breakdown',
   injuries: 'Injuries and lineup',
   league: 'Around the league',
@@ -148,6 +152,7 @@ export default function SimWeekRecapStory({
   const toneColor = (t: SimRecapOutcome['tone']) => colors[t];
   const tc = toneColor(outcome.tone);
   const gold = colors.premium;
+  const colorOf = useAchievementColor();
 
   const HeroZone = ({ tone = colors.accent, glow = true, children }: { tone?: string; glow?: boolean; children: ReactNode }) => (
     <View style={styles.hero}>
@@ -247,6 +252,49 @@ export default function SimWeekRecapStory({
               {result.worst ? performer('Worst performer', result.worst, colors.danger) : null}
             </View>
           ) : null}
+        </>
+      );
+    }
+    if (key === 'achievements') {
+      const m = simRecapAchievementModel(recap.achievements);
+      if (!m) return null;
+      const hero = m.items[0];
+      const mc = colors[m.tone];
+      return (
+        <>
+          <HeroZone tone={mc}>
+            <Confetti wonTitle={m.celebrate} />
+            {m.trophy ? (
+              <MotionIn>
+                <TrophyIcon size={m.celebrate ? 88 : 64} color={mc} label={m.headline} />
+              </MotionIn>
+            ) : hero ? (
+              <MotionIn>
+                <SimAchievementBadge a={hero} size={64} />
+              </MotionIn>
+            ) : null}
+            <AppText style={[common.muted, { fontWeight: '800', textTransform: 'uppercase', textAlign: 'center' }]}>{m.eyebrow}</AppText>
+            <MotionIn>
+              <AppText style={{ fontSize: 34, lineHeight: 40, fontWeight: '800', color: mc, textAlign: 'center' }} testID="recap-achievement-headline">{m.headline}</AppText>
+            </MotionIn>
+            {m.sub ? <AppText style={[common.bodyStrong, { textAlign: 'center', color: colors.textSecondary }]}>{m.sub}</AppText> : null}
+          </HeroZone>
+          <View style={{ gap: 8 }}>
+            {m.items.slice(1, 1 + STORY_ITEMS).map((a, i, rows) => (
+              <MotionIn key={a.id} index={i} count={rows.length}>
+                <View style={[common.rowBetween, styles.fact, { borderLeftColor: colorOf(a), backgroundColor: colors.backgroundElevated ?? 'transparent' }]}>
+                  <View style={[common.row, { flex: 1, minWidth: 0 }]}>
+                    <SimAchievementBadge a={a} size={28} />
+                    <AppText style={[common.bodyStrong, { flexShrink: 1 }]}>{a.name}</AppText>
+                  </View>
+                  <AppText style={common.muted}>{simAchievementDate(a)}</AppText>
+                </View>
+              </MotionIn>
+            ))}
+            {m.banners.slice(0, 2).map((b) => (
+              <Fact key={b.kind} label={b.headline} accent={colorOf({ rarity: 'common', tone: b.tone, unlocked: true })}>{b.sub}</Fact>
+            ))}
+          </View>
         </>
       );
     }

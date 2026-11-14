@@ -58,7 +58,8 @@ def _item(seq: int, n: int, week: int, kind: str, icon: str, headline: str, scre
 
 
 def derive(
-    snap: GameSnapshot, state: GameState, events: Sequence[Mapping[str, Any]], since: int = 0, limit: int = MAX_ITEMS
+    snap: GameSnapshot, state: GameState, events: Sequence[Mapping[str, Any]], since: int = 0, limit: int = MAX_ITEMS,
+    achievements: Sequence[Mapping[str, Any]] | None = None,
 ) -> dict[str, Any]:
     user = snap.user_team.tid
     items: list[dict[str, Any]] = []
@@ -91,6 +92,17 @@ def derive(
             items.append(_item(seq, 0, week, "recap", "matchup", f"Week {week} recap is ready", "home"))
         elif typ == "season_complete" and p.get("champion"):
             items.append(_item(seq, 1, week, "title", "check", f"{_season_over(snap, p, week)}: {_team(snap, p['champion'])} won it all", "league"))
+    # Achievements unlocked in the season in progress, dated to the week boundary (week_advanced event) that reached them.
+    # Derived at view time from the same log (nothing stored); an older season's unlocks fall outside the event window.
+    if achievements:
+        boundary_of = {w: s for s, w in boundaries}  # the latest event of each week wins (the current season's)
+        for n, a in enumerate(sorted(achievements, key=lambda x: x["id"])):
+            if not a.get("unlocked") or a.get("season_no") != state.season_no or a.get("week") not in boundary_of:
+                continue
+            seq = boundary_of[a["week"]]
+            items.append(_item(seq, 10 + n, int(a["week"]), "achievement", "trophy",
+                               f"Achievement unlocked: {a['name']}" + (f" ({a['season_label']})" if a.get("season_label") else ""), "achievements",
+                               achievement_id=a["id"], rarity=a["rarity"]))
     # Offers that left the inbox without an answer expired at the first boundary after their week.
     live_ids = {o["id"] for o in state.offers}
     for oid, info in offers.items():

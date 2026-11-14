@@ -967,6 +967,27 @@ in-place scroll). Movement is server data (`standings[].rank_prev` / `rank_delta
 old saves derive it from the stored previous week in `ensure_rank_movement`); null (week 1) shows no chip. Clinched / eliminated badges
 are not shown (needs per-setting tiebreaker math). The Season in Review "Standings journey" note states the net spots gained or lost.
 
+## Achievements (Fantasy Sim, web + app)
+
+One pure lib twin, `lib/simAchievements.ts` (byte-identical web/app, `check_lib_twins` IDENTICAL), presents the server's
+`achievements` payload (`docs/fantasy-sim-api.md`, "Achievements and milestones"): the client never derives a badge, it renders.
+- **Recap**: `simAttachAchievements` gives each badge to its week's recap and the milestone banners to the first one; when a recap has
+  either, `simRecapPageKeys` adds an `achievements` page right after Result (the existing `StoryCarousel`, `TrophyIcon`, `Confetti`,
+  `MotionIn`). `simRecapAchievementModel` picks the hero (Perfect Season > Three-peat > Back-to-Back > Champion > Undefeated ...). Confetti
+  only for perfect / undefeated / title-run badges and never under reduced motion; a winless season is sympathetic ("Winless... the #1
+  pick is yours": danger tone, no confetti, no trophy); "WIN #10, still perfect" is a milestone banner, not a stored badge.
+- **Module**: `SimAchievementsModule` (web `SimAchievements.tsx`, app `SimAchievements.tsx`) is a `SimFold` (CompactModule) on Home, the
+  offseason review and the final Season in Review: collapsed `parts` ("4 unlocked · 1 epic · next: Perfect Season (11-0, 3 games left)"),
+  groups This season / Earlier seasons / Career / Still to earn, tap a row to open its detail, locked rows show a progress bar.
+- **Badge**: a round rarity ring around a `SimGlyph` (`trophy` joined the glyph set; `simAchievementGlyph` maps the server icon keys). Dates
+  are the shared season label plus week ("S3 2028 · Wk 14").
+- **Rarity colours** (`simAchievementColor`, semantic tokens only): epic good = `--color-premium` (gold is for epic only), rare / neutral =
+  accent, common good = success, any bad-luck badge = danger, locked = muted.
+- **Notifications**: the bell shows `Achievement unlocked: <name> (S3 2028)` (icon `trophy`, opens Home).
+- **Team and player pages**: the team History tab opens with a champion trophy row (`SimTrophyRow`, gold) and, on your own team, the
+  latest badges (`SimBadgeChips`); a player's History tab shows the badges that name him (League MVP, Rookie of the Year, the trade or
+  claim that landed him).
+
 ## Team identity (Fantasy Sim)
 A sim team is its generated logo (`SimCrest`, shape/pattern/colours seeded from the name, `lib/simCrest.ts`) plus its name, rendered ONLY
 through `components/SimTeamIdentity.tsx` (web + app): `SimTeamIdentity` = logo + name (`stacked`, `hideName`, `isYou`), `SimTeamLogo` = the

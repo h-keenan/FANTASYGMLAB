@@ -1,5 +1,8 @@
 "use client";
 
+import { SimBadgeChips, SimTrophyRow } from "@/components/SimAchievements";
+import { simTeamBadges, simTeamTrophies } from "@/lib/simAchievements";
+
 import { useEffect, useState } from "react";
 
 import { AccentCard } from "@/components/AccentCard";
@@ -66,8 +69,17 @@ export function SimTeamHistory({ gameId, teamId }: { gameId: string; teamId: str
   const classes = data.rookie_drafts ?? [];
   const moves = data.moves ?? [];
   const shown = allMoves ? moves : moves.slice(0, 8);
+  const trophies = simTeamTrophies(seasons);
+  const badges = simTeamBadges(data.achievements);
   return (
     <>
+      <SimTrophyRow rows={trophies} />
+      {badges.length > 0 ? (
+        <section className="flex flex-col gap-2" aria-label="Your achievements">
+          <SimSectionTitle glyph="trophy" tone="warning">Achievements</SimSectionTitle>
+          <SimBadgeChips items={badges} />
+        </section>
+      ) : null}
       {seasons.length > 0 ? (
         <section className="flex flex-col gap-2" aria-label="Record by season">
           <SimSectionTitle glyph="standings" tone="success">Record by season</SimSectionTitle>

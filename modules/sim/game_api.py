@@ -32,6 +32,7 @@ from modules.sim import game_draft as draft
 from modules.sim import game_block as blockmod
 from modules.sim import game_history as hist
 from modules.sim import game_simto as simto
+from modules.sim import game_achievements as ach
 from modules.sim import game_home as home
 from modules.sim import game_notifications as notif
 from modules.sim import game_view as view
@@ -335,6 +336,63 @@ def add_routes(router: APIRouter, ctx: GameApiCtx) -> None:
             while len(history_cache) > 64:
                 history_cache.popitem(last=False)
         return out
+
+    # Achievements (presentation derived at view time; nothing stored). Finished seasons' ledgers and the open season's
+    # user moves are kept per game so a view folds only the events it has not seen; undo/redo drops the entry.
+    ach_cache: "OrderedDict[tuple, dict[str, Any]]" = OrderedDict()
+    ach_lock = threading.Lock()
+
+    def _ach_ledgers(store, uid: str, gid: str, snap, state, new_events=None, read_log: bool = False) -> list[dict[str, Any]]:
+        root = snap.root
+        n_past = max(0, int(state.season_no) - 1)
+        akey = repr([(a.get("season_no"), (a.get("you") or {}).get("wins"), (a.get("you") or {}).get("pf"),
+                      (a.get("champion") or {}).get("team_id")) for a in state.seasons[:n_past]])
+        ck = (uid, gid)
+        with ach_lock:
+            entry = ach_cache.get(ck)
+        if entry is not None and (entry["n_past"] != n_past or entry["akey"] != akey or entry["seq"] > int(state.seq)):
+            entry = None
+        if entry is not None and entry["seq"] < int(state.seq):
+            user = root.user_team.tid
+            if new_events and int(new_events[0]["seq"]) == entry["seq"] and int(new_events[-1]["seq"]) + 1 == int(state.seq):
+                fresh = list(new_events)
+            elif read_log:
+                fresh = store.load_events(uid, gid, entry["seq"])
+            else:
+                # A plain view never reads the log (a warm read is the version check and nothing else): the moves the state
+                # still remembers are merged in, and the next advance catches the cache up exactly.
+                seen = {json.dumps(m, sort_keys=True) for m in entry["moves"]}
+                extra = [m for m in ach._moves_from_transactions(state, user) if json.dumps(m, sort_keys=True) not in seen]
+                return [*entry["past"], ach.ledger_from_state(root, state, entry["moves"] + extra)]
+            entry = {**entry, "moves": entry["moves"] + [m for m in (ach.event_move(e, user) for e in fresh) if m], "seq": int(state.seq)}
+        if entry is None:
+            ledgers, moves = ach.fold_ledgers(root, store.load_events(uid, gid, 0))
+            entry = {"n_past": n_past, "akey": akey, "seq": int(state.seq), "moves": moves, "past": ledgers[:-1] if len(ledgers) == n_past + 1 else []}
+            if len(ledgers) != n_past + 1:
+                return ledgers  # the log and the state disagree (should not happen): serve the fold, do not cache it
+        with ach_lock:
+            ach_cache[ck] = entry
+            ach_cache.move_to_end(ck)
+            while len(ach_cache) > 16:
+                ach_cache.popitem(last=False)
+        return [*entry["past"], ach.ledger_from_state(root, state, entry["moves"])]
+
+    def _ach(store, uid: str, gid: str, snap, state, *, new_events=None, read_log: bool = False, weeks: tuple[int, int] | None = None) -> dict[str, Any]:
+        """``{"items", "counts"}`` plus, with ``weeks``, ``new`` / ``milestones`` for those weeks of the season. Never raises."""
+
+        try:
+            ledgers = _ach_ledgers(store, uid, gid, snap, state, new_events, read_log)
+            out = ach.build(snap.root, ledgers)
+            if weeks is not None:
+                out = {**out, **ach.week_view(ledgers, out["items"], weeks[0], weeks[1])}
+            return out
+        except Exception:  # noqa: BLE001 - a view never breaks for a badge
+            _log.warning("sim achievements failed game=%s", gid, exc_info=True)
+            return {"items": [], "counts": {}}
+
+    def _ach_drop(uid: str, gid: str) -> None:
+        with ach_lock:
+            ach_cache.pop((uid, gid), None)
 
     def load(user: dict[str, Any], game_id: str, *, write: bool = False):
         """Row (the version check), frozen snapshot and folded state. The state is a shared read-only
@@ -721,7 +779,8 @@ def add_routes(router: APIRouter, ctx: GameApiCtx) -> None:
         root = snap.root
         if not any(pid in root.season_view(n).players for n in range(1, max(1, int(root.settings.seasons)) + 1)):
             raise HTTPException(status_code=404, detail="Player not found.")
-        return {**_env(pro, state), **_history(store, uid, _gid(game_id), row, "p", pid, lambda ev: hist.player_history(root, ev, pid))}
+        mine = [i for i in _ach(store, uid, _gid(game_id), snap, state).get("items", []) if i["unlocked"] and (i.get("player") or {}).get("id") == pid]
+        return {**_env(pro, state), **_history(store, uid, _gid(game_id), row, "p", pid, lambda ev: hist.player_history(root, ev, pid)), "achievements": mine}
 
     @router.get("/games/{game_id}/teams/{team_id}/history")
     @guarded
@@ -730,7 +789,10 @@ def add_routes(router: APIRouter, ctx: GameApiCtx) -> None:
         store, uid, row, snap, state = load(user, _gid(game_id))
         if team_id not in snap.tids:
             raise HTTPException(status_code=404, detail="Team not found.")
-        return {**_env(pro, state), **_history(store, uid, _gid(game_id), row, "t", team_id, lambda ev: hist.team_history(snap.root, ev, team_id))}
+        extra = {}
+        if team_id == snap.user_team.tid:
+            extra["achievements"] = _ach(store, uid, _gid(game_id), snap, state)
+        return {**_env(pro, state), **_history(store, uid, _gid(game_id), row, "t", team_id, lambda ev: hist.team_history(snap.root, ev, team_id)), **extra}
 
     @router.get("/games/{game_id}/teams/{team_id}")
     @guarded
@@ -747,11 +809,12 @@ def add_routes(router: APIRouter, ctx: GameApiCtx) -> None:
     @guarded
     def get_home(game_id: str, user: dict[str, Any] = Depends(require_user)):
         pro = ctx.is_pro(user)
-        _, _, row, snap, state = load(user, _gid(game_id))
+        store, uid, row, snap, state = load(user, _gid(game_id))
         if state.status not in ("in_season", "playoffs"):
             return {**_env(pro, state, "wrong_phase"),
                     "phase": {"drafting": "draft", "offseason": "offseason"}.get(state.status, "complete")}
-        return {**_env(pro, state), **home.home_view(snap, state, seedof(row, state))}
+        return {**_env(pro, state), **home.home_view(snap, state, seedof(row, state)),
+                "achievements": _ach(store, uid, _gid(game_id), snap, state)}
 
     # ---------------------------------------------------------------- lineup
 
@@ -898,7 +961,8 @@ def add_routes(router: APIRouter, ctx: GameApiCtx) -> None:
         gid = _gid(game_id)
         store, uid, _, snap, state = load(user, gid)
         events = store.load_events(uid, gid, max(0, int(state.seq) - notif.EVENT_WINDOW))
-        return {**_env(pro, state), **notif.derive(snap, state, events, max(0, int(since)))}
+        items = _ach(store, uid, gid, snap, state).get("items")
+        return {**_env(pro, state), **notif.derive(snap, state, events, max(0, int(since)), achievements=items)}
 
     @router.post("/games/{game_id}/inbox/{item_id}/respond")
     @guarded
@@ -929,7 +993,8 @@ def add_routes(router: APIRouter, ctx: GameApiCtx) -> None:
             store, uid, row, snap, state = load(user, gid)
             if want is not None and want < state.week and str(want) in state.recaps:
                 return {**_env(pro, state), "recap": ensure_rank_movement(state.recaps[str(want)], state), "also_played": [],
-                        "replayed": True, "game": game_json(row, snap, state, pro)}
+                        "replayed": True, "game": game_json(row, snap, state, pro),
+                        "achievements": _ach(store, uid, gid, snap, state, weeks=(int(want), int(want)))}
             if want is not None and want < state.week and snap.settings.mid_season and str(want) not in state.recaps:
                 raise GameError("week_mismatch", "That week was played in the real league before this game began.", current_week=state.week)
             if want is not None and want > state.week:
@@ -945,7 +1010,8 @@ def add_routes(router: APIRouter, ctx: GameApiCtx) -> None:
             pending = commit(store, uid, gid, snap, state, em, checkpoint=True, defer=True)
             snap = snap.season_view(state.view_no)  # the season may have ended into the offseason
             out = {**_env(pro, state), "recap": recaps[0], "also_played": recaps[1:], "replayed": False,
-                   "game": game_json({**row, "status": state.status}, snap, state, pro)}
+                   "game": game_json({**row, "status": state.status}, snap, state, pro),
+                   "achievements": _ach(store, uid, gid, snap, state, new_events=em.events, read_log=True, weeks=(int(recaps[0]["week"]), int(recaps[-1]["week"])))}
             pending.finish()
             return out
 
@@ -972,6 +1038,7 @@ def add_routes(router: APIRouter, ctx: GameApiCtx) -> None:
             store, uid, row, snap, state = load(user, gid)
             if view.paywalled(pro, state):
                 return _premium(state)
+            first_week = int(state.week)
             state = state.clone()
             em = Emitter(state, snap)
             with ctx.compute() as ok:
@@ -984,7 +1051,8 @@ def add_routes(router: APIRouter, ctx: GameApiCtx) -> None:
                         "summary": None, "recap": None, "game": game_json(row, snap, state, pro)}
             pending = commit(store, uid, gid, snap, state, em, checkpoint=True, defer=True)
             snap = snap.season_view(state.view_no)
-            out = {**_env(pro, state), **result, "game": game_json({**row, "status": state.status}, snap, state, pro)}
+            out = {**_env(pro, state), **result, "game": game_json({**row, "status": state.status}, snap, state, pro),
+                   "achievements": _ach(store, uid, gid, snap, state, new_events=em.events, read_log=True, weeks=(first_week, max(first_week, int(state.week) - 1)))}
             pending.finish()
             return out
 
@@ -1007,6 +1075,7 @@ def add_routes(router: APIRouter, ctx: GameApiCtx) -> None:
                 raise GameError("bad_seq", "You can only go back to the start of a week you simulated.")
             store.delete_checkpoints_after(uid, gid, body.from_seq)
             store.delete_events_from(uid, gid, body.from_seq)
+            _ach_drop(uid, gid)
             state = store.load_state(uid, gid, snap)
             store.touch(uid, gid, status=state.status, week=state.week, event_count=state.seq)
             snap = snap.season_view(state.view_no)
@@ -1049,6 +1118,7 @@ def add_routes(router: APIRouter, ctx: GameApiCtx) -> None:
                 # would describe events that are about to be deleted: drop it first, as undo-sim does.
                 store.delete_checkpoints_after(uid, gid, state.boundary_seq)
                 store.delete_events_from(uid, gid, state.boundary_seq)
+                _ach_drop(uid, gid)
                 state = store.load_state(uid, gid, snap)
                 store.touch(uid, gid, status=state.status, week=state.week, event_count=state.seq)
             return {**_env(pro, state), "reverted": max(0, reverted), "game": game_json(row, snap, state, pro)}
@@ -1147,10 +1217,11 @@ def add_routes(router: APIRouter, ctx: GameApiCtx) -> None:
     @guarded
     def get_dynasty(game_id: str, user: dict[str, Any] = Depends(require_user)):
         pro = ctx.is_pro(user)
-        _, _, row, snap, state = load(user, _gid(game_id))
+        store, uid, row, snap, state = load(user, _gid(game_id))
         if not snap.settings.dynasty:
             return _env(pro, state, "not_dynasty")
-        return {**_env(pro, state), "dynasty": dview.summary_view(snap, state), "game": game_json(row, snap, state, pro)}
+        return {**_env(pro, state), "dynasty": dview.summary_view(snap, state), "game": game_json(row, snap, state, pro),
+                "achievements": _ach(store, uid, _gid(game_id), snap, state)}
 
     # --------------------------------------------------------- league / result
 
@@ -1189,7 +1260,8 @@ def add_routes(router: APIRouter, ctx: GameApiCtx) -> None:
                     "champion": last["champion"] if last else None, "final_standings": last["standings"] if last else [],
                     "grade": None, "decisions_that_mattered": [], "review": None, "weeks": [],
                 }
-                return {**_env(pro, state), "result": result, "game": game_json(row, snap, state, pro)}
+                return {**_env(pro, state), "result": result, "game": game_json(row, snap, state, pro),
+                        "achievements": _ach(store, uid, gid, snap, state)}
             result = store.get_result(uid, gid)
             if result is None:
                 with ctx.compute() as ok:
@@ -1221,7 +1293,7 @@ def add_routes(router: APIRouter, ctx: GameApiCtx) -> None:
                     _log.warning("sim review backfill failed game=%s", gid, exc_info=True)
             letter = (result.get("grade") or {}).get("letter")
             return {**_env(pro, state), "result": result, "game": game_json(
-                {**row, "grade_letter": letter}, snap, state, pro)}
+                {**row, "grade_letter": letter}, snap, state, pro), "achievements": _ach(store, uid, gid, snap, state)}
 
 
 def _role_json(players, role) -> dict[str, Any] | None:

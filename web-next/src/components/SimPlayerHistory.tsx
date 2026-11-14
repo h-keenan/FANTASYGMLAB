@@ -1,5 +1,8 @@
 "use client";
 
+import { SimBadgeChips } from "@/components/SimAchievements";
+import { simPlayerBadges } from "@/lib/simAchievements";
+
 import { useEffect, useState } from "react";
 
 import { AccentCard } from "@/components/AccentCard";
@@ -52,6 +55,7 @@ export function SimPlayerHistory({ gameId, playerId }: { gameId: string; playerI
   const seasons = data.seasons ?? [];
   return (
     <div className="flex flex-col gap-3" data-testid="sim-player-history">
+      {simPlayerBadges(data.achievements, playerId).length > 0 ? <SimBadgeChips items={simPlayerBadges(data.achievements, playerId)} /> : null}
       <section className="pqv-stat-season" aria-label="Origin">
         <h3>Origin</h3>
         {origin ? (

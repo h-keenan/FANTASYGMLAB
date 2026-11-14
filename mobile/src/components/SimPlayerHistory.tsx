@@ -2,6 +2,8 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { View } from 'react-native';
 
 import AccentCard from './AccentCard';
+import { SimBadgeChips } from './SimAchievements';
+import { simPlayerBadges } from '../lib/simAchievements';
 import AppText from './AppText';
 import ErrorState from './ErrorState';
 import { Section as PqvSection } from './PlayerQuickViewSheet';
@@ -61,6 +63,7 @@ export function SimPlayerHistory({ gameId, playerId }: { gameId: string; playerI
   const seasons = data.seasons ?? [];
   return (
     <View style={common.stack} testID="sim-player-history">
+      <SimBadgeChips items={simPlayerBadges(data.achievements, playerId)} />
       <PqvSection title="Origin">
         {origin ? (
           <AccentCard accent={colors.accent} compact>
