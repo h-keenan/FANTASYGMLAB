@@ -1,8 +1,8 @@
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { NewsContent } from "./NewsContent";
-import type { NewsItem, NewsResponse } from "@/lib/api";
+import type { AlertsResponse, NewsItem, NewsResponse } from "@/lib/api";
 
 // A real Date.now()-relative published_ts ("1 hour ago") plus the
 // component's own default `nowMs` (also real Date.now(), see
@@ -146,5 +146,25 @@ describe("NewsContent", () => {
 
     expect(screen.getByText(/News is warming up/)).toBeInTheDocument();
     expect(screen.getByText(/loading for the first time/)).toBeInTheDocument();
+  });
+
+  it("roster first: your players' rows with verdict chips come before a collapsed league module; tapping a row expands what it means", () => {
+    const data: NewsResponse = { ok: true, items: [newsItem({ title: "Backup QB signs", link: "https://example.com/g" })] };
+    const alerts: AlertsResponse = {
+      ok: true,
+      reason: "",
+      items: [
+        { ...newsItem({ title: "Gibbs expects 22 touches", summary: null, event_type: "role/depth chart", link: "https://example.com/a" }), alert_key: "k1", read: false, matched_player: "Jahmyr Gibbs", matched_player_id: "9", matched_player_position: "RB", matched_player_team: "DET", matched_player_tier: null, relevance_reason: null, roster_relationship: "starter" as const },
+      ],
+    };
+    render(<NewsContent data={data} alerts={alerts} />);
+    expect(screen.getByText("Your players · 1")).toBeInTheDocument();
+    expect(screen.getByText("1 affect your lineup")).toBeInTheDocument();
+    expect(screen.getByTestId("news-verdict")).toHaveTextContent("Start");
+    expect(screen.getByTestId("news-strip")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Around the NFL/ })).toHaveAttribute("aria-expanded", "false");
+    expect(screen.queryByText("Backup QB signs")).toBeInTheDocument();
+    fireEvent.click(screen.getByTestId("news-row").querySelector("button")!);
+    expect(screen.getByText("What it means")).toBeInTheDocument();
   });
 });

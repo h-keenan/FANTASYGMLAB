@@ -62,6 +62,8 @@ export type PlayerAccordionRowProps = PlayerFactsInput & {
    * itself stays one tap target that expands in place, so a row has one always-visible control and no more.
    */
   trailingAction?: ReactNode;
+  /** A short sentence under the meta line (News: the headline), wrapping to two lines. Names never take this slot. */
+  headline?: string | null;
 };
 
 /**
@@ -71,7 +73,7 @@ export type PlayerAccordionRowProps = PlayerFactsInput & {
  * FantasyDesk (`mode="desk"`) and Fantasy Sim (`mode="sim"`: grade, ADP, projection; never OVR or trade value).
  * Mobile twin: components/PlayerAccordionRow.tsx; logic: lib/playerAnatomy.ts.
  */
-export function PlayerAccordionRow({ open, onToggle, badges = [], positionLabel, primaryAction, onOpenProfile, children, testId = "player-accordion-row", ariaLabel, gradeTile, metaParts, hidePosition = false, trailingAction, ...input }: PlayerAccordionRowProps) {
+export function PlayerAccordionRow({ open, onToggle, badges = [], positionLabel, primaryAction, onOpenProfile, children, testId = "player-accordion-row", ariaLabel, gradeTile, metaParts, hidePosition = false, trailingAction, headline, ...input }: PlayerAccordionRowProps) {
   const { player } = input;
   const model = playerRowModel(input);
   const metaLine: { key: string; text: string; tone?: FactTone }[] = metaParts ?? model.meta.map((text, i) => ({ key: `m${i}`, text }));
@@ -121,6 +123,9 @@ export function PlayerAccordionRow({ open, onToggle, badges = [], positionLabel,
                 </span>
                 {gradeTile ? <LetterGrade grade={gradeTile} size="xs" testId="row-grade" /> : null}
               </span>
+            ) : null}
+            {headline ? (
+              <span className="text-[0.8125rem] leading-snug" style={{ color: "var(--color-text-secondary)", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden" }} data-testid="row-headline">{headline}</span>
             ) : null}
           </span>
           {model.trailing && input.mode !== "sim" ? (

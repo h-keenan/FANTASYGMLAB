@@ -51,6 +51,8 @@ export type PlayerAccordionRowProps = PlayerFactsInput & {
   hidePosition?: boolean;
   /** THE one trailing control (the sim's Move button): a sibling of the row Pressable, never nested in it. */
   trailingAction?: ReactNode;
+  /** A short sentence under the meta line (News: the headline), wrapping to two lines. Names never take this slot. */
+  headline?: string | null;
 };
 
 let reduceMotion = false;
@@ -72,7 +74,7 @@ export function animateRowExpand() {
  * whole row is the tap target). Tapped it swells in place into a glass tile with the facts and the actions.
  * `mode="sim"` shows grade / ADP / projection, never OVR or trade value.
  */
-export default function PlayerAccordionRow({ open, onToggle, badges = [], positionLabel, primaryAction, onOpenProfile, children, testID = 'player-accordion-row', gradeTile, metaParts, hidePosition = false, trailingAction, ...input }: PlayerAccordionRowProps) {
+export default function PlayerAccordionRow({ open, onToggle, badges = [], positionLabel, primaryAction, onOpenProfile, children, testID = 'player-accordion-row', gradeTile, metaParts, hidePosition = false, trailingAction, headline, ...input }: PlayerAccordionRowProps) {
   const { colors } = useThemeMode();
   const styles = useMemo(() => createStyles(colors), [colors]);
   const { player } = input;
@@ -106,6 +108,7 @@ export default function PlayerAccordionRow({ open, onToggle, badges = [], positi
                 {gradeTile ? <LetterGrade grade={gradeTile} size="xs" testID="row-grade" /> : null}
               </View>
             ) : null}
+            {headline ? <AppText style={styles.headline} numberOfLines={2} testID="row-headline">{headline}</AppText> : null}
           </View>
           {model.trailing && input.mode !== 'sim' ? (
             <View style={styles.trailing}>
@@ -147,6 +150,7 @@ export default function PlayerAccordionRow({ open, onToggle, badges = [], positi
 
 function createStyles(colors: ThemeColors) {
   return StyleSheet.create({
+    headline: { fontSize: 13, lineHeight: 18, color: colors.textSecondary },
     row: { paddingHorizontal: spacing.sm, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border },
     tile: { paddingHorizontal: spacing.sm, paddingBottom: spacing.md, marginVertical: spacing.xs, backgroundColor: colors.glass, borderWidth: 1, borderColor: colors.accent, borderRadius: radii.tile },
     headRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
