@@ -1,10 +1,11 @@
 "use client";
 
-import Image from "next/image";
 import Link from "next/link";
 import { useState } from "react";
 
 import { TabGlyph } from "@/components/TabGlyph";
+import { PillOrb } from "@/components/ui/PillOrb";
+import { SimGlyph } from "@/components/SimGlyph";
 import { Sheet } from "@/components/ui/Sheet";
 import { bottomTabBadgeText, simGameBottomTabs, simOrbAriaLabel, activeBottomTab, SIM_NAV_META } from "@/lib/bottomNav";
 import { OPEN_SEARCH_EVENT } from "@/lib/orbSearch";
@@ -15,7 +16,7 @@ import type { SimTab } from "@/lib/simGameFlow";
  * inside the game: same brand mark, but it names the page you are on and
  * carries a badge for pending trade offers. One tap opens the game navigator
  * (Home, Team, Players, Trades, League, More) with the current page lit, plus
- * All games, Home and search; one tap to go, from anywhere in the scroll.
+ * Sim to, All games, Home and search; one tap to go, from anywhere in the scroll.
  *
  * Placement: a slot inside the action bar's one row (Sim to | orb | Advance),
  * centered like FantasyDesk's orb, in flow inside the sticky `.bottom-stack`
@@ -30,6 +31,7 @@ export function SimGameOrb({
   onTab,
   onMore,
   onHub,
+  onSimTo,
 }: {
   tab: SimTab;
   offseason: boolean;
@@ -37,22 +39,19 @@ export function SimGameOrb({
   onTab: (tab: SimTab) => void;
   onMore: () => void;
   onHub: () => void;
+  /** Sim to... (only when the game can sim ahead). The footer folds the button away on pages with their own action; the menu always has it. */
+  onSimTo?: () => void;
 }) {
   const [open, setOpen] = useState(false);
   const tabs = simGameBottomTabs({ offseason, inbox });
   const current = activeBottomTab(tabs, tab);
   const currentTab = tabs.find((t) => t.key === current) ?? tabs[0];
-  const badge = bottomTabBadgeText(inbox);
   const close = () => setOpen(false);
 
   return (
     <>
       <div className="game-orb-slot md:hidden" data-testid="sim-game-orb-dock">
-        <button type="button" className="game-orb game-orb--bar" onClick={() => setOpen(true)} aria-haspopup="dialog" aria-label={simOrbAriaLabel(currentTab.label, inbox)} data-testid="sim-game-orb">
-          {/* Brand mark only (same as the app): a page name in 9px caps ("TRADES", "PLAYERS") is wider than a 48px circle and clipped on its rim, and the sheet it opens marks the current page. The accessible name still carries it. */}
-          <Image src="/brand-mark.png" alt="" width={26} height={26} className="brand-mark-icon" style={{ objectFit: "contain" }} />
-          {badge ? <span className="game-orb-badge" aria-hidden="true" data-testid="sim-game-orb-badge">{badge}</span> : null}
-        </button>
+        <PillOrb label={simOrbAriaLabel(currentTab.label, inbox)} badge={inbox} popup onClick={() => setOpen(true)} testId="sim-game-orb" badgeTestId="sim-game-orb-badge" />
       </div>
       <Sheet open={open} onClose={close} title="Fantasy Sim" description="Jump to any page of this game.">
         <nav aria-label="Game pages" className="flex flex-col gap-1" data-testid="sim-game-nav">
@@ -95,6 +94,12 @@ export function SimGameOrb({
           </button>
         </nav>
         <div className="mt-3 flex flex-col gap-1 border-t pt-3" style={{ borderColor: "var(--color-border)" }}>
+          {onSimTo ? (
+            <button type="button" className="game-nav-row" data-testid="sim-game-nav-sim-to" onClick={() => { close(); onSimTo(); }}>
+              <span className="shrink-0" style={{ color: "var(--color-accent)" }}><SimGlyph name="matchup" size={22} /></span>
+              <span className="flex-1">Sim to...</span>
+            </button>
+          ) : null}
           <button type="button" className="game-nav-row" onClick={() => { close(); window.setTimeout(() => window.dispatchEvent(new Event(OPEN_SEARCH_EVENT)), 0); }}>
             <svg width={22} height={22} viewBox="0 0 24 24" fill="none" stroke="var(--color-diagnostic)" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" className="shrink-0">
               <circle cx="11" cy="11" r="7" />

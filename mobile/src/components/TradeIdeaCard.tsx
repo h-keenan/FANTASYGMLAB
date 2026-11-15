@@ -158,7 +158,7 @@ function categoryColors(colors: ThemeColors): Record<string, string> {
   return {
     'Headline Recommendation': colors.accent,
     'Health Relief': colors.danger,
-    'Draft Capital': colors.premium,
+    'Draft Capital': colors.accent,
     'Age Optimization': colors.violet,
     Rebuild: colors.violet,
     Contender: colors.success,
@@ -194,7 +194,7 @@ export function impactTagConfig(
   return {
     high_impact: { label: 'High Impact', icon: 'flash', color: colors.accent },
     buy_low: { label: 'Buy Low', icon: 'trending-down', color: colors.success },
-    sell_high: { label: 'Sell High', icon: 'trending-up', color: colors.premium },
+    sell_high: { label: 'Sell High', icon: 'trending-up', color: colors.accent },
   };
 }
 
@@ -333,7 +333,7 @@ export default function TradeIdeaCard({
         <View style={styles.contextBlock}>
           {landedTargetNames.length > 0 ? (
             <View style={styles.landedTargetRow}>
-              <Ionicons name="locate" size={13} color={colors.premium} />
+              <Ionicons name="locate" size={13} color={colors.accent} />
               <AppText style={styles.landedTargetText} numberOfLines={1}>
                 Lands your target: {landedTargetNames.join(', ')}
               </AppText>
@@ -390,12 +390,12 @@ export default function TradeIdeaCard({
               <Ionicons
                 name={idea.partner_trade_tendency === 'Seller' ? 'trending-down' : 'trending-up'}
                 size={10}
-                color={idea.partner_trade_tendency === 'Seller' ? colors.accentSoft : colors.premium}
+                color={idea.partner_trade_tendency === 'Seller' ? colors.accentSoft : colors.accent}
               />
               <AppText
                 style={[
                   styles.tendencyChipText,
-                  { color: idea.partner_trade_tendency === 'Seller' ? colors.accentSoft : colors.premium },
+                  { color: idea.partner_trade_tendency === 'Seller' ? colors.accentSoft : colors.accent },
                 ]}
                 numberOfLines={1}
               >
@@ -475,7 +475,7 @@ export default function TradeIdeaCard({
             label={copy.label('ideaRealism', 'REALISM').toUpperCase()}
             value={idea.market_realism_label}
             level={realismLevel}
-            color={colors.premium}
+            color={colors.accent}
           />
         ) : null}
       </View>
@@ -517,7 +517,7 @@ function createStyles(colors: ThemeColors) {
   contextBlock: { paddingHorizontal: spacing.md, paddingTop: spacing.xs, gap: 2 },
   landedTargetRow: { flexDirection: 'row', alignItems: 'center', gap: 4 },
   postureBlock: { paddingHorizontal: spacing.md, paddingTop: spacing.xs },
-  landedTargetText: { fontSize: 12.5, fontWeight: '600', color: colors.premium, flexShrink: 1 },
+  landedTargetText: { fontSize: 12.5, fontWeight: '600', color: colors.accent, flexShrink: 1 },
   sourceTeamLabel: { fontSize: 12, fontWeight: '700', color: colors.textTertiary, letterSpacing: 0.6 },
   categoryBadge: {
     alignSelf: 'flex-start',

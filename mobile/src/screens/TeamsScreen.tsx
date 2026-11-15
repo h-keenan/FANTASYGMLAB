@@ -607,12 +607,12 @@ function TeamRowCard({
                 <Ionicons
                   name={item.tradeTendency === 'Seller' ? 'trending-down' : 'trending-up'}
                   size={11}
-                  color={item.tradeTendency === 'Seller' ? colors.accentSoft : colors.premium}
+                  color={item.tradeTendency === 'Seller' ? colors.accentSoft : colors.accent}
                 />
                 <AppText
                   style={[
                     styles.tendencyText,
-                    { color: item.tradeTendency === 'Seller' ? colors.accentSoft : colors.premium },
+                    { color: item.tradeTendency === 'Seller' ? colors.accentSoft : colors.accent },
                   ]}
                   numberOfLines={1}
                 >
@@ -826,7 +826,7 @@ function createStyles(colors: ThemeColors) {
   // the standard accent — a leaderboard's top spot should read as "the"
   // rank at a glance, not just another pill in the same color scheme as
   // the rest of the pack.
-  rankPillFirst: { backgroundColor: `${colors.premium}1F` },
+  rankPillFirst: { backgroundColor: `${colors.accent}1F` },
   rankTrophy: { marginBottom: 1 },
   countPill: {
     backgroundColor: colors.background,

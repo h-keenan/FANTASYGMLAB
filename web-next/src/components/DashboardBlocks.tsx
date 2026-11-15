@@ -47,7 +47,7 @@ export function DashboardNeedsAttention({
   const hrefFor = (entry: DashboardAttentionEntry<BriefingItem>): string => attentionEntryHref(entry, leagueId, leagueName);
   return (
     <section className="flex flex-col gap-3" aria-labelledby="needs-attention-heading" data-testid="dashboard-needs-attention">
-      <SectionHeading id="needs-attention-heading" size="compact">
+      <SectionHeading id="needs-attention-heading">
         Needs attention
       </SectionHeading>
       <AccentCard accent="var(--color-danger)" compact>

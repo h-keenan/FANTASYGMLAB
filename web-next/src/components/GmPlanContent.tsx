@@ -1,7 +1,7 @@
 "use client";
 
+import { ModuleMore } from "@/components/ui/ModuleMore";
 import { FreeLimitNote } from "@/components/FreeLimitNote";
-import Link from "next/link";
 import { ButtonLink } from "@/components/Button";
 import { EmptyState } from "@/components/EmptyState";
 import { AccentCard } from "@/components/AccentCard";
@@ -330,9 +330,9 @@ function ProtectPlayerRow({
         style={
           isProtected
             ? {
-                background: "var(--color-premium)",
-                color: "var(--color-brand-mark-ink)",
-                border: "var(--border-width-default) solid var(--color-premium)",
+                background: "var(--color-accent-strong)",
+                color: "var(--color-on-accent)",
+                border: "var(--border-width-default) solid var(--color-accent-strong)",
               }
             : { color: "var(--color-text-secondary)", border: "var(--border-width-default) solid var(--color-border)" }
         }
@@ -399,7 +399,7 @@ function TargetRowView({
           className="px-2 py-1 text-xs font-bold"
           style={
             target.untouchable
-              ? { background: "var(--color-premium)", color: "var(--color-brand-mark-ink)", border: "var(--border-width-default) solid var(--color-premium)" }
+              ? { background: "var(--color-accent-strong)", color: "var(--color-on-accent)", border: "var(--border-width-default) solid var(--color-accent-strong)" }
               : { color: "var(--color-text-secondary)", border: "var(--border-width-default) solid var(--color-border)" }
           }
         >
@@ -651,13 +651,6 @@ export function GmPlanContent({
     </div>
   );
 
-  const linkAction = (label: string, href?: string) =>
-    href ? (
-      <Link href={href} className="text-xs font-bold" style={{ color: "var(--color-accent)" }}>
-        {label}
-      </Link>
-    ) : undefined;
-
   const tradesBlock = (items: GmPlanTradeItem[], limit?: number) =>
     planGate ? (
       planGate
@@ -725,8 +718,8 @@ export function GmPlanContent({
                   <span
                     className="px-1.5 py-0.5 uppercase text-xs font-extrabold"
                     style={{
-                      color: "var(--color-premium)",
-                      background: "var(--color-action-soft)",
+                      color: "var(--color-accent)",
+                      background: "var(--color-accent-soft)",
                       letterSpacing: "var(--letter-spacing-badge)",
                     }}
                   >
@@ -746,10 +739,10 @@ export function GmPlanContent({
             id="gmplan.overview.trades"
             title="Trade ideas"
             parts={tradeIdeasParts(tradeItems, Boolean(planGate), tradeArea?.watch_for)}
-            action={tradeHubHref ? linkAction("View all", tradeHubHref) : undefined}
             defaultOpen
           >
             {tradesBlock(tradeItems, 2)}
+            {tradeHubHref ? <ModuleMore href={tradeHubHref}>View all trade ideas</ModuleMore> : null}
           </CompactModule>
 
           {myTeam && leagueId && !noRoster ? (
@@ -757,14 +750,10 @@ export function GmPlanContent({
               id="gmplan.overview.core"
               title="Protected Core"
               parts={coreParts(protectedRows, otherRows)}
-              action={
-                <button type="button" onClick={() => setTab("core")} className="text-xs font-bold px-2" style={{ color: "var(--color-accent)", minHeight: "var(--touch-target-min)" }}>
-                  View all
-                </button>
-              }
             >
               {protectedRows.length > 0 ? protectedList(protectedRows.slice(0, 3)) : null}
               {otherRows.length > 0 ? rosterLine : null}
+              <ModuleMore onClick={() => setTab("core")}>View protected core</ModuleMore>
             </CompactModule>
           ) : null}
 
@@ -788,10 +777,10 @@ export function GmPlanContent({
             id="gmplan.trades.ideas"
             title="Trade ideas"
             parts={tradeIdeasParts(tradeItems, Boolean(planGate), tradeArea?.watch_for)}
-            action={tradeHubHref ? linkAction("View all", tradeHubHref) : undefined}
             defaultOpen
           >
             {tradesBlock(tradeItems)}
+            {tradeHubHref ? <ModuleMore href={tradeHubHref}>View all trade ideas</ModuleMore> : null}
           </CompactModule>
           {!planGate ? (
             <div className="flex flex-col gap-6">

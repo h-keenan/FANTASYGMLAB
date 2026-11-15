@@ -122,7 +122,6 @@ export function DecisionQueue({
     <section className="flex flex-col gap-2" aria-labelledby="decision-queue-heading" data-testid="decision-queue" data-fgl-dashboard-useful="true" data-fgl-this-week="true">
       <SectionHeading
         id="decision-queue-heading"
-        size="compact"
         help={<BeginnerHelp popover label="your game plan" term="dashboardGamePlan" />}
         action={
           <Link href={`/gm-plan/${encodeURIComponent(leagueId)}?name=${encodeURIComponent(leagueName)}`} aria-label="Open the full GM Plan" className="tap-link text-sm font-bold shrink-0" style={{ color: "var(--color-accent)" }}>

@@ -3,9 +3,11 @@
 import { useEffect, useState, type ReactNode } from "react";
 
 import { PillMorph } from "@/components/ui/PillMorph";
+import { simPillPlan } from "@/lib/bottomNav";
 import { usePillState } from "@/lib/useBottomPillContext";
 import { Button, ButtonLink } from "@/components/Button";
 import { SimGlyph } from "@/components/SimGlyph";
+import { TabGlyph } from "@/components/TabGlyph";
 import type { SimCtx } from "@/components/SimGameParts";
 import { useSimAutoSet } from "@/components/useSimAutoSet";
 import { api } from "@/lib/api";
@@ -50,6 +52,7 @@ export function SimActionBar({ ctx, paywalled, advancing, onAdvance, onSimTo, on
       onAdvance();
     }
   };
+  const plan = simPillPlan({ context: pill.barPresent ? pill.ctx : null, simToAvailable: Boolean(onSimTo), paywalled });
   const reasonId = "sim-advance-reason";
   // The accessible name starts with the visible text (WCAG 2.5.3), then adds the plain-language detail.
   const advanceText = confirming ? "Advance anyway" : game.phase === "playoffs" ? "Play round" : `Advance ${state.label}`;
@@ -82,15 +85,20 @@ export function SimActionBar({ ctx, paywalled, advancing, onAdvance, onSimTo, on
           <span style={{ color: auto.optimal ? "var(--color-success)" : undefined }}>{auto.optimal ? "Lineup optimal" : "Lineup can improve"}</span>
         </p>
       )}
-      <PillMorph context={pill.barPresent ? pill.ctx : null}>
-      <div className="mx-auto flex max-w-3xl items-center gap-2 p-1 md:mx-0 md:max-w-none md:flex-none md:gap-2 md:p-0">
-        {onSimTo && !paywalled ? (
+      <PillMorph segment={plan.segment} orb={orb}>
+      <div className="mx-auto flex max-w-3xl items-center gap-2 max-md:p-0 md:mx-0 md:max-w-none md:flex-none md:gap-2 md:p-0">
+        {plan.simTo ? (
           <Button variant="secondary" size="sm" className="min-w-0 shrink-0 max-md:flex-col max-md:gap-0 max-md:self-stretch max-md:px-2" disabled={advancing} onClick={onSimTo} aria-label="Sim to..." data-testid="sim-to-button">
             <SimGlyph name="matchup" size={16} />
             <span className="text-xs leading-4 md:ml-1.5">Sim to<span className="max-md:hidden">...</span></span>
           </Button>
         ) : null}
-        {orb}
+        {plan.inlineAction ? (
+          <Button variant="secondary" size="sm" className="pill-inline-action min-w-0 shrink-0 max-md:self-stretch" loading={plan.inlineAction.busy} disabled={plan.inlineAction.disabled} onClick={plan.inlineAction.onPress} aria-label={plan.inlineAction.label} data-testid="pill-inline-action">
+            {plan.inlineAction.glyph ? <TabGlyph name={plan.inlineAction.glyph} size={16} /> : null}
+            <span className="pill-inline-label ml-1.5">{plan.inlineAction.label}</span>
+          </Button>
+        ) : null}
         <Button className="max-md:hidden" variant="secondary" size="sm" loading={auto.busy} disabled={auto.optimal || paywalled} onClick={auto.run} aria-label={auto.optimal ? "Lineup is optimal" : "Auto-set best lineup"}>
           <SimGlyph name={auto.optimal ? "check" : "spark"} size={16} />
           <span className="ml-1.5">{auto.optimal ? "Optimal" : "Auto-set"}</span>
@@ -98,7 +106,7 @@ export function SimActionBar({ ctx, paywalled, advancing, onAdvance, onSimTo, on
         {paywalled ? (
           <ButtonLink href="/premium" variant="premium" size="sm">Go Pro to continue</ButtonLink>
         ) : (
-          <Button className="min-w-0 max-md:flex-1 max-md:self-stretch" loading={advancing} disabled={state.blocked} onClick={tapAdvance} aria-label={`${advanceText}. ${simAdvanceLabel(game)}`} aria-describedby={state.reason ? reasonId : undefined}>
+          <Button className="min-w-0 whitespace-nowrap max-md:flex-1 max-md:self-stretch" loading={advancing} disabled={state.blocked} onClick={tapAdvance} aria-label={`${advanceText}. ${simAdvanceLabel(game)}`} aria-describedby={state.reason ? reasonId : undefined}>
             {advanceText}
           </Button>
         )}

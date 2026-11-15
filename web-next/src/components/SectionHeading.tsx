@@ -9,6 +9,9 @@ import type { ReactNode } from "react";
  * those copies: a bare `<h2>` when there is no kicker/note, otherwise the
  * kicker/title/note column LeagueRankingsContent used.
  *
+ * One scale (coridian_ 2026-11-14, UI pass 5 D2): `--type-app-section-title`, 18px / 800, the app's heading size. The old big
+ * 21.6px / 900 default is gone; public SEO pages keep `--type-section-title` for their own h2s.
+ *
  * See docs/ui-module-inventory.md: sentence-case section titles (Dashboard,
  * Draft Center, Live Draft, GM Plan) are a separate, still-undecided
  * variant and deliberately not folded in here.
@@ -21,7 +24,6 @@ export function SectionHeading({
   className = "flex flex-col gap-1",
   action,
   help,
-  size = "default",
 }: {
   children: ReactNode;
   /** Small accent label above the title (e.g. "Head-to-Head"). */
@@ -35,13 +37,8 @@ export function SectionHeading({
   action?: ReactNode;
   /** Inline help (<BeginnerHelp popover label=...>) placed directly after the title it explains, never at the far edge. */
   help?: ReactNode;
-  /** "compact" uses the existing --font-size-section-title / --font-weight-title tokens (the Dashboard's calmer in-page headings; matches the app's 17px). */
-  size?: "default" | "compact";
 }) {
-  const font =
-    size === "compact"
-      ? "var(--font-weight-title) var(--font-size-section-title) / var(--line-height-title) var(--font-family-sans)"
-      : "var(--type-section-title)";
+  const font = "var(--type-app-section-title)";
   const title = (
     <h2 id={id} className="uppercase" style={{ font, letterSpacing: "0.02em" }}>
       {children}
