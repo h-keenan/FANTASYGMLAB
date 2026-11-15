@@ -9,7 +9,7 @@ import AppText from './AppText';
 import PlayerIdentityRow from './PlayerIdentityRow';
 import PremiumLock from './PremiumLock';
 import SegmentedTabBar from './SegmentedTabBar';
-import SkeletonBlock from './SkeletonBlock';
+import SkeletonBlock from './Skeleton';
 import DashboardStatRow from './DashboardStatRow';
 import { useThemeMode } from '../context/ThemeModeContext';
 import { api } from '../lib/api';

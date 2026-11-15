@@ -6,7 +6,7 @@ import ErrorState from '../components/ErrorState';
 import { useFocusEffect } from '@react-navigation/native';
 
 import BeginnerHelp from '../components/BeginnerHelp';
-import BrandedSpinner from '../components/BrandedSpinner';
+import { SkeletonText } from '../components/Skeleton';
 import GridBackground from '../components/GridBackground';
 import ScreenInfoNote from '../components/ScreenInfoNote';
 import TeamAvatar from '../components/TeamAvatar';
@@ -80,7 +80,7 @@ export default function PlayoffOddsPanel({ leagueId, leagueName }: { leagueId: s
   );
 
   if (loading) {
-    return <BrandedSpinner style={styles.center} />;
+    return <SkeletonText label="playoff odds" lines={3} />;
   }
 
   if (error) {

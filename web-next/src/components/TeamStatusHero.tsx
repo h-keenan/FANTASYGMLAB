@@ -3,7 +3,7 @@
 import { InsightLink } from "@/components/ui/InsightLink";
 import Link from "next/link";
 import { useEffect, useState } from "react";
-import { SkeletonCard } from "@/components/Skeleton";
+import { SkeletonHero } from "@/components/Skeleton";
 
 import { CompactModule } from "@/components/ui/CompactModule";
 import { LinkModule } from "@/components/ui/ModuleTemplates";
@@ -159,7 +159,7 @@ export function TeamStatusHero({
             standing and position rooms: ~324 px with its heading). A shorter
             placeholder made everything below it jump ~136 px when the data
             landed (dashboard CLS 0.11, measured). */}
-        <SkeletonCard lines={5} style={{ minHeight: 290 }} />
+        <SkeletonHero minHeight={290} />
       </section>
     );
   }

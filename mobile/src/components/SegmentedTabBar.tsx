@@ -6,6 +6,8 @@ import { useReducedMotion } from 'react-native-reanimated';
 import AppText from './AppText';
 import { PulseOnIncrease } from './Motion';
 import TabIcon from './TabIcon';
+import { SkeletonTabs } from './Skeleton';
+import { pageTabFamily, type PageTabFamilyKey } from '../lib/pageFamilies';
 import type { TabIconName } from '../lib/tabIcons';
 import { useThemeMode } from '../context/ThemeModeContext';
 import { radii, spacing, type ThemeColors } from '../theme';
@@ -173,4 +175,9 @@ function createStyles(colors: ThemeColors) {
     // contrast (color-system audit, 2026-09-25 — see theme.ts).
     labelActive: { color: colors.accentOnTint, fontWeight: '700' },
   });
+}
+
+/** The loading silhouette of the family tab strip (same count of tabs as the family). */
+export function SegmentedTabBarSkeleton({ family }: { family: PageTabFamilyKey }) {
+  return <SkeletonTabs count={pageTabFamily(family).tabs.length} />;
 }

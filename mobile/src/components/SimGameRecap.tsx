@@ -12,7 +12,7 @@ import { Confetti, CountUp } from './Motion';
 import PositionBadge from './PositionBadge';
 import SectionHeading from './SectionHeading';
 import SegmentedTabBar from './SegmentedTabBar';
-import { SkeletonCard } from './SkeletonBlock';
+import { SkeletonCard } from './Skeleton';
 import { SimDynastyResult } from './SimGameDynasty';
 import { SimStandingsList } from './SimGameLeague';
 import { SimPlayerChip, SimPlayerLine, SimPopIn, SimStat, SimToneBadge, createSimStyles, simToneColor, type SimCtx } from './SimGameParts';

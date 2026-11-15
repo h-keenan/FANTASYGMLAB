@@ -28,7 +28,7 @@ import PositionBadge from '../components/PositionBadge';
 import PlayerIdentityRow from '../components/PlayerIdentityRow';
 import PlayerAccordionRow, { usePlayerAccordion } from '../components/PlayerAccordionRow';
 import { badgeFromInjury } from '../lib/playerBadges';
-import { SkeletonCard, SkeletonRows } from '../components/SkeletonBlock';
+import { SkeletonCard, SkeletonRows } from '../components/Skeleton';
 import SegmentedTabBar from '../components/SegmentedTabBar';
 import TeamAnalysisPanel, { hasRosterAnalysis } from '../components/TeamAnalysisPanel';
 import ToneBadge from '../components/ToneBadge';

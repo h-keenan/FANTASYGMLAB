@@ -4,6 +4,7 @@ import { useState } from "react";
 
 import { trackFeatureUse } from "@/lib/analytics";
 import type { ReferralStatusResponse } from "@/lib/api";
+import { SkeletonText } from "@/components/Skeleton";
 
 /**
  * Account page (2026-10-19) — the referral program's own invite surface.
@@ -72,9 +73,7 @@ export function ReferralCard({
           </button>
         </>
       ) : !referral ? (
-        <p className="text-sm" style={{ color: "var(--color-text-secondary)" }}>
-          Loading your invite link…
-        </p>
+        <SkeletonText label="your invite link" lines={2} />
       ) : (
         <>
           <p className="text-sm" style={{ color: "var(--color-text-secondary)" }}>

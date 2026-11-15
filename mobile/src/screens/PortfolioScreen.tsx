@@ -10,7 +10,6 @@ import { useHeaderHeight } from '@react-navigation/elements';
 import { Ionicons } from '@expo/vector-icons';
 import { useIsRestoring, useQuery, useQueryClient } from '@tanstack/react-query';
 
-import BrandedSpinner from '../components/BrandedSpinner';
 import FadeInView from '../components/FadeInView';
 import EmptyState from '../components/EmptyState';
 import PercentileBar from '../components/PercentileBar';
@@ -23,7 +22,7 @@ import SectionHeading from '../components/SectionHeading';
 import PortfolioExposurePanel from '../components/PortfolioExposurePanel';
 import PortfolioSharePreviewModal from '../components/PortfolioSharePreviewModal';
 import SegmentedTabBar from '../components/SegmentedTabBar';
-import SkeletonBlock from '../components/SkeletonBlock';
+import SkeletonBlock, { SkeletonPage } from '../components/Skeleton';
 import {
   api,
   type DashboardItem,
@@ -236,7 +235,7 @@ export default function PortfolioScreen() {
   // goes away the moment the index arrives.
   const showSplash = useDelayedFlag(loading, PORTFOLIO_SPLASH_DELAY_MS);
   if (loading) {
-    if (showSplash) return <BrandedSpinner style={[styles.center, { paddingTop: headerHeight }]} />;
+    if (showSplash) return <SkeletonPage label="Portfolio" layout="dashboard" topInset={headerHeight} />;
     return (
       <View style={[styles.root, { paddingTop: headerHeight }]} testID="portfolio-shell">
         <GridBackground />

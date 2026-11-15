@@ -7,7 +7,7 @@ import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 
 import AccentCard from '../components/AccentCard';
 import AppText from '../components/AppText';
-import BrandedSpinner from '../components/BrandedSpinner';
+import { SkeletonList } from '../components/Skeleton';
 import BrandHeaderBar from '../components/BrandHeaderBar';
 import CircularProgressRing from '../components/CircularProgressRing';
 import EmptyState from '../components/EmptyState';
@@ -82,7 +82,7 @@ export default function CommissionerScreen({ route, navigation }: Props) {
 
   let body: React.ReactNode;
   if (query.isLoading) {
-    body = <BrandedSpinner style={styles.center} />;
+    body = <SkeletonList label="league integrity" count={5} />;
   } else if (query.error || !data) {
     body = <ErrorState title="Couldn't load League integrity" message={toUserErrorMessage(query.error, 'Failed to load League integrity.')} />;
   } else if (data.is_premium === false) {

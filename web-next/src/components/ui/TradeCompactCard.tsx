@@ -6,6 +6,7 @@ import { OvrGauge } from "@/components/OvrGauge";
 import { CompactPlayerCard } from "@/components/ui/CompactPlayerCard";
 import { PickAvatar } from "@/components/PickAvatar";
 import { FairnessMeterRow } from "@/components/ui/FairnessMeterRow";
+import { SkeletonTradeCard } from "@/components/Skeleton";
 import { avatarSize, fairnessMeter, type FairnessMeter, type PlayerMode, type PlayerRef } from "@/lib/playerAnatomy";
 
 export interface TradeCardAsset {
@@ -141,4 +142,9 @@ export function TradeCompactCard({
       ) : null}
     </section>
   );
+}
+
+/** The loading silhouette of a `TradeCompactCard` (title, give and get avatar rows, meter). */
+export function TradeCompactCardSkeleton({ assets = 2 }: { assets?: number }) {
+  return <SkeletonTradeCard assets={assets} />;
 }

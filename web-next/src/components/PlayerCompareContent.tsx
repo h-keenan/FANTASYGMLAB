@@ -36,6 +36,7 @@ import { mergeSearchMatches, useLeaguePlayerSearch } from "@/lib/leaguePlayerSea
 import { ValuesCredit } from "@/components/ValuesCredit";
 import { PageTitle } from "@/components/PageTitle";
 import { PlayerName } from "@/components/PlayerName";
+import { SkeletonText } from "@/components/Skeleton";
 
 /**
  * Head-to-head Player Compare (Revision 12) — ports app.py's CURRENT,
@@ -525,9 +526,7 @@ export function PlayerCompareContent({
         ) : (
           <>
             {loadingModels ? (
-              <p className="text-sm" style={{ color: "var(--color-text-muted)" }}>
-                Loading the full breakdown…
-              </p>
+              <SkeletonText label="the full breakdown" lines={3} />
             ) : null}
 
             <section className="flex flex-col gap-2" aria-label="Head-to-head">

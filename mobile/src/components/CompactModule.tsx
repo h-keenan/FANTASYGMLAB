@@ -10,6 +10,7 @@ import { compactAriaLabel, compactParts, type CompactPart, type CompactTone } fr
 import { simOpenKey, simParseOpen } from '../lib/simLayout';
 import { spacing, type ThemeColors } from '../theme';
 import Money from './Money';
+import { SkeletonModule, SkeletonRegion } from './Skeleton';
 
 let reduceMotion = false;
 try {
@@ -52,6 +53,7 @@ export default function CompactModule({
   children,
   testID,
   preview,
+  loading = false,
 }: {
   id: string;
   title: ReactNode;
@@ -70,6 +72,8 @@ export default function CompactModule({
   testID?: string;
   /** Always-visible line under the header (collapsed AND expanded): the pinned draft bar's best-available player. Sits outside the toggle, so interactive content is fine. */
   preview?: ReactNode;
+  /** The data behind it is still loading: draws the module's own silhouette (SkeletonModule) so the page does not jump when it lands. */
+  loading?: boolean;
 }) {
   const { colors } = useThemeMode();
   const styles = useMemo(() => createStyles(colors), [colors]);
@@ -100,6 +104,14 @@ export default function CompactModule({
     setTouched(true);
     setOpen(next);
     if (persist && expandIn === 'inline') AsyncStorage.setItem(simOpenKey(id), next ? '1' : '0').catch(() => {});
+  }
+
+  if (loading) {
+    return (
+      <SkeletonRegion label={name}>
+        <SkeletonModule lines={preview ? 2 : 1} />
+      </SkeletonRegion>
+    );
   }
 
   return (

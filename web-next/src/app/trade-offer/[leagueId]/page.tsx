@@ -24,6 +24,6 @@ export default function TradeOfferPage() {
     if (!authLoading && !session) router.replace("/");
   }, [authLoading, session, router]);
 
-  if (authLoading || !session) return <LoadingScreen status="Loading…" />;
+  if (authLoading || !session) return <LoadingScreen label="Loading" layout="cards" />;
   return <TradeOfferContent leagueId={leagueId} leagueName={leagueName} playerId={playerId} lens={lens} />;
 }

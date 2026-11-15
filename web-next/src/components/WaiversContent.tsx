@@ -53,6 +53,7 @@ import { EmptyState } from "@/components/EmptyState";
 import { PlayerName } from "@/components/PlayerName";
 import { Money } from "@/components/Money";
 import { formatMoney } from "@/lib/money";
+import { SkeletonList } from "@/components/Skeleton";
 
 /**
  * Waivers page, laid out as: compact header + 3-stat strip, a
@@ -877,9 +878,7 @@ export function WaiversContent({
               Couldn&apos;t load your GM Targets.
             </p>
           ) : targetIds === null ? (
-            <p className="text-sm" style={{ color: "var(--color-text-muted)" }}>
-              Loading…
-            </p>
+            <SkeletonList label="GM Targets" count={3} />
           ) : watchlistPlayers.length === 0 ? (
             <EmptyState title="None of your GM Targets are free agents right now." />
           ) : (

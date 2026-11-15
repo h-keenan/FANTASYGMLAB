@@ -136,7 +136,7 @@ describe("PlayerQuickView", () => {
     render(<PlayerQuickView identity={identity()} onClose={vi.fn()} />);
 
     expect(screen.getByText("Player One")).toBeInTheDocument();
-    expect(screen.getByText(/Loading player detail/)).toBeInTheDocument();
+    expect(screen.getByRole("status", { name: /Loading player detail/ })).toBeInTheDocument();
   });
 
   // coridian_, 2026-10-20: "it expands the background of the PQV as those
@@ -200,7 +200,7 @@ describe("PlayerQuickView", () => {
     await waitFor(() => expect(api.getPlayerQuickView).toHaveBeenCalledWith("p1"));
     await waitFor(() => expect(api.getPlayerAwards).toHaveBeenCalledWith("p1"));
 
-    await waitFor(() => expect(screen.queryByText(/Loading player detail/)).not.toBeInTheDocument());
+    await waitFor(() => expect(screen.queryByRole("status", { name: /Loading player detail/ })).not.toBeInTheDocument());
 
     expect(screen.getByText(/Market value \(92nd percentile at WR\)/)).toBeInTheDocument();
     // All 5 Model ratings present -> the radar chart renders (coridian_,
@@ -257,7 +257,7 @@ describe("PlayerQuickView", () => {
 
     render(<PlayerQuickView identity={identity()} onClose={vi.fn()} />);
 
-    await waitFor(() => expect(screen.queryByText(/Loading player detail/)).not.toBeInTheDocument());
+    await waitFor(() => expect(screen.queryByRole("status", { name: /Loading player detail/ })).not.toBeInTheDocument());
     expect(screen.getByText("Moved up 1 spot on the depth chart since last week.")).toBeInTheDocument();
   });
 
@@ -276,12 +276,12 @@ describe("PlayerQuickView", () => {
     const { container } = render(<PlayerQuickView identity={identity()} onClose={vi.fn()} />);
     fireEvent.click(await screen.findByRole("tab", { name: "Outlook" }));
 
-    await waitFor(() => expect(screen.queryByText(/Loading player detail/)).not.toBeInTheDocument());
+    await waitFor(() => expect(screen.queryByRole("status", { name: /Loading player detail/ })).not.toBeInTheDocument());
 
     const trendsChartSkeleton = Array.from(container.querySelectorAll<HTMLElement>(".pqv-skeleton-line")).find((el) => el.style.height === "160px") ?? null;
     expect(trendsChartSkeleton).toBeInTheDocument();
     expect(trendsChartSkeleton?.style.height).toBe("160px");
-    expect(screen.getByText(/Loading weekly trends/)).toBeInTheDocument();
+    expect(screen.getByRole("status", { name: /Loading weekly trends/ })).toBeInTheDocument();
   });
 
   it("shows the week-by-week points chart once weekly stats load", async () => {
@@ -320,7 +320,7 @@ describe("PlayerQuickView", () => {
     render(<PlayerQuickView identity={identity()} onClose={vi.fn()} />);
     fireEvent.click(await screen.findByRole("tab", { name: "Outlook" }));
 
-    await waitFor(() => expect(screen.queryByText(/Loading player detail/)).not.toBeInTheDocument());
+    await waitFor(() => expect(screen.queryByRole("status", { name: /Loading player detail/ })).not.toBeInTheDocument());
     expect(await screen.findByText("Week by Week · 2026")).toBeInTheDocument();
     expect(screen.getByText(/No weekly fantasy points are recorded for the 2026 season yet/)).toBeInTheDocument();
   });
@@ -357,7 +357,7 @@ describe("PlayerQuickView", () => {
     const onClose = vi.fn();
 
     render(<PlayerQuickView identity={identity()} onClose={onClose} />);
-    await waitFor(() => expect(screen.queryByText(/Loading player detail/)).not.toBeInTheDocument());
+    await waitFor(() => expect(screen.queryByRole("status", { name: /Loading player detail/ })).not.toBeInTheDocument());
 
     fireEvent.keyDown(screen.getByRole("dialog"), { key: "Escape" });
     expect(onClose).toHaveBeenCalledTimes(1);
@@ -371,7 +371,7 @@ describe("PlayerQuickView", () => {
     vi.mocked(api.getPlayerAwards).mockResolvedValue({ ok: true, awards: [], reason: "not_found" });
 
     render(<PlayerQuickView identity={identity()} onClose={vi.fn()} />);
-    await waitFor(() => expect(screen.queryByText(/Loading player detail/)).not.toBeInTheDocument());
+    await waitFor(() => expect(screen.queryByRole("status", { name: /Loading player detail/ })).not.toBeInTheDocument());
 
     expect(screen.queryByText("Awards")).not.toBeInTheDocument();
     expect(screen.queryByText("Model")).not.toBeInTheDocument();
@@ -383,7 +383,7 @@ describe("PlayerQuickView", () => {
     vi.mocked(api.getPlayerAwards).mockResolvedValue(awardsResult());
 
     const { rerender } = render(<PlayerQuickView identity={identity()} onClose={vi.fn()} />);
-    await waitFor(() => expect(screen.queryByText(/Loading player detail/)).not.toBeInTheDocument());
+    await waitFor(() => expect(screen.queryByRole("status", { name: /Loading player detail/ })).not.toBeInTheDocument());
     expect(screen.queryByText("Compare this player")).not.toBeInTheDocument();
 
     rerender(
@@ -403,7 +403,7 @@ describe("PlayerQuickView", () => {
     vi.mocked(api.getPlayerAwards).mockResolvedValue(awardsResult());
 
     const { rerender } = render(<PlayerQuickView identity={identity()} onClose={vi.fn()} />);
-    await waitFor(() => expect(screen.queryByText(/Loading player detail/)).not.toBeInTheDocument());
+    await waitFor(() => expect(screen.queryByRole("status", { name: /Loading player detail/ })).not.toBeInTheDocument());
     expect(screen.queryByText("Open Full Profile")).not.toBeInTheDocument();
 
     rerender(
@@ -447,7 +447,7 @@ describe("PlayerQuickView", () => {
 
       render(<PlayerQuickView identity={identity({ injury_status: "Out" })} onClose={vi.fn()} simOverlay={<p>Sim overlay: Out 2 weeks (sim world)</p>} />);
 
-      await waitFor(() => expect(screen.queryByText(/Loading player detail/)).not.toBeInTheDocument());
+      await waitFor(() => expect(screen.queryByRole("status", { name: /Loading player detail/ })).not.toBeInTheDocument());
       await screen.findByText("Sim overlay: Out 2 weeks (sim world)");
       expect(api.getPlayerNews).not.toHaveBeenCalled();
       for (const real of [/REAL HEADLINE/, /REAL SUMMARY/, /REAL depth chart/, /REAL return note/, /REAL contract/, /Week 8 \(real\)/, /Latest news/i, /No recent news/, /Latest injury report/, /Hamstring/, /Injured Reserve/]) {
@@ -500,7 +500,7 @@ describe("PlayerQuickView", () => {
 
       render(<PlayerQuickView identity={identity()} onClose={vi.fn()} asOfSeason={2025} simOverlay={<p>Sim overlay</p>} />);
 
-      await waitFor(() => expect(screen.queryByText(/Loading player detail/)).not.toBeInTheDocument());
+      await waitFor(() => expect(screen.queryByRole("status", { name: /Loading player detail/ })).not.toBeInTheDocument());
       fireEvent.click(screen.getByRole("tab", { name: "Stats" }));
       expect(screen.getAllByText(/2025 Regular Season/).length).toBeGreaterThan(0);
       expect(screen.getAllByText(/2024 Regular Season/).length).toBeGreaterThan(0);
@@ -521,7 +521,7 @@ describe("PlayerQuickView", () => {
       vi.mocked(api.getPlayerQuickView).mockResolvedValue(quickView({ stats: { ...base.stats!, seasons: [season(2026, "CURRENT-2026-TARGETS"), season(2025, "PRIOR-2025-TARGETS")] } }));
       vi.mocked(api.getPlayerAwards).mockResolvedValue(awardsResult());
       render(<PlayerQuickView identity={identity()} onClose={vi.fn()} />);
-      await waitFor(() => expect(screen.queryByText(/Loading player detail/)).not.toBeInTheDocument());
+      await waitFor(() => expect(screen.queryByRole("status", { name: /Loading player detail/ })).not.toBeInTheDocument());
       fireEvent.click(screen.getByRole("tab", { name: "Stats" }));
       expect(screen.getAllByText(/2026 Regular Season/).length).toBeGreaterThan(0);
     });
@@ -639,7 +639,7 @@ describe("PlayerQuickView", () => {
       vi.mocked(api.getPlayerAwards).mockResolvedValue(awardsResult());
       vi.mocked(api.getPlayerNews).mockReturnValue(new Promise(() => {}));
       const { unmount } = render(<PlayerQuickView identity={identity()} onClose={vi.fn()} />);
-      await waitFor(() => expect(screen.queryByText(/Loading player detail/)).not.toBeInTheDocument());
+      await waitFor(() => expect(screen.queryByRole("status", { name: /Loading player detail/ })).not.toBeInTheDocument());
       expect(screen.getByTestId("pqv-news-skeleton")).toBeInTheDocument();
       expect(screen.getByText("Decision Fit")).toBeInTheDocument();
       unmount();

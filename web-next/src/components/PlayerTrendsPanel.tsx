@@ -84,13 +84,10 @@ export function PlayerTrendsPanel({
     // grow the modal a second time once the outer loading gate has
     // already resolved — see globals.css's .pqv-skeleton-chart comment.
     return (
-      <section className="pqv-stat-season" aria-busy="true">
+      <section className="pqv-stat-season" aria-busy="true" role="status" aria-label="Loading weekly trends">
         <SkeletonBlock width="35%" height="0.6rem" />
         <SkeletonBlock height={CHART_HEIGHT} />
         <SkeletonBlock width="45%" height="0.7rem" style={{ alignSelf: "center" }} />
-        <p className="sr-only" role="status">
-          Loading weekly trends…
-        </p>
       </section>
     );
   }

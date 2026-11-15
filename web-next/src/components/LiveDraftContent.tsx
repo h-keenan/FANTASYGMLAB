@@ -31,6 +31,7 @@ import {
 import { ValuesCredit } from "@/components/ValuesCredit";
 import { PageTitle } from "@/components/PageTitle";
 import { CompactPlayerCard } from "@/components/ui/CompactPlayerCard";
+import { SkeletonList } from "@/components/Skeleton";
 
 /**
  * Live Draft (Revision 21) — the last page on the original migration punch
@@ -429,9 +430,7 @@ export function LiveDraftContent({
           ) : null}
 
           {!state ? (
-            <p className="text-sm" style={{ color: "var(--color-text-muted)" }}>
-              Loading the live draft board…
-            </p>
+            <SkeletonList label="the live draft board" count={6} />
           ) : (
             <>
               <div className="flex flex-wrap gap-2">

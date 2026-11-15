@@ -19,6 +19,7 @@ import type { OpponentProfileResponse } from "@/lib/opponentProfile";
 import { CompactPlayerCard } from "@/components/ui/CompactPlayerCard";
 import { Tabs } from "@/components/Tabs";
 import { managerProfileTabs } from "@/lib/sheetTabs";
+import { SkeletonText } from "@/components/Skeleton";
 
 function TradeAssetLine({ asset }: { asset: ManagerRecentTradeAsset }) {
   if (asset.kind === "pick") {
@@ -150,9 +151,7 @@ export function ManagerProfileSheet({
           Couldn&apos;t load this profile.
         </p>
       ) : !data ? (
-        <p className="text-sm" style={{ color: "var(--color-text-muted)" }}>
-          Loading…
-        </p>
+        <SkeletonText label="manager profile" lines={3} />
       ) : !data.is_premium ? (
         <div className="flex flex-col gap-2">
           <p className="text-sm font-bold">{data.upsell?.title ?? "Manager Tendencies"}</p>

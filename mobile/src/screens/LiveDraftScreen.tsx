@@ -7,7 +7,7 @@ import { useHeaderHeight } from '@react-navigation/elements';
 import AnimatedCard from '../components/AnimatedCard';
 import AppText from '../components/AppText';
 import CompactPlayerCard from '../components/CompactPlayerCard';
-import BrandedSpinner from '../components/BrandedSpinner';
+import { SkeletonPage, SkeletonList } from '../components/Skeleton';
 import BrandHeaderBar from '../components/BrandHeaderBar';
 import Button from '../components/Button';
 import EmptyState from '../components/EmptyState';
@@ -193,7 +193,7 @@ export default function LiveDraftScreen({ route, navigation }: Props) {
     openQuickView(leanPlayer(row), { leagueId, leagueName });
 
   if (!discovery && !discoveryError) {
-    return <BrandedSpinner style={[styles.center, { paddingTop: headerHeight }]} />;
+    return <SkeletonPage label="Live Draft" layout="list" topInset={headerHeight} />;
   }
   if (discoveryError || !discovery) {
     return (
@@ -305,7 +305,7 @@ export default function LiveDraftScreen({ route, navigation }: Props) {
             ) : null}
 
             {!state && !stateError ? (
-              <BrandedSpinner style={styles.inlineSpinner} />
+              <SkeletonList label="the draft board" count={5} />
             ) : state && state.is_premium ? (
               <DraftBoard
                 state={state}

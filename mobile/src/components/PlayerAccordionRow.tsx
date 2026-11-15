@@ -13,6 +13,7 @@ import type { BadgeInput } from '../lib/playerBadges';
 import type { SimGradeInput } from '../lib/simGrade';
 import { radii, spacing, type ThemeColors } from '../theme';
 import Money from './Money';
+import { SkeletonPlayerRow } from './Skeleton';
 
 function toneColor(tone: FactTone | undefined, colors: ThemeColors): string {
   switch (tone) {
@@ -168,4 +169,9 @@ function createStyles(colors: ThemeColors) {
     secondary: { minHeight: 44, paddingHorizontal: spacing.md, justifyContent: 'center', borderWidth: 1, borderColor: colors.borderStrong, borderRadius: radii.input },
     secondaryText: { fontSize: 14, fontWeight: '700', color: colors.textPrimary },
   });
+}
+
+/** The loading silhouette of a `PlayerAccordionRow` (same avatar tier, two text lines, trailing number). Use for a list whose players have not arrived. */
+export function PlayerAccordionRowSkeleton({ trailing = true }: { trailing?: boolean }) {
+  return <SkeletonPlayerRow trailing={trailing} />;
 }

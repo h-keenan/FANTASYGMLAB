@@ -25,6 +25,7 @@ import {
   toggleKey,
 } from '../lib/liveDraft';
 import { spacing, type ThemeColors } from '../theme';
+import { SkeletonText } from './Skeleton';
 
 /**
  * Hypothetical mid-draft Trade Evaluator (port of web-next's
@@ -267,7 +268,7 @@ export default function LiveDraftTradeEvaluator({
         />
         {open ? (
           loadingOptions ? (
-            <AppText style={styles.muted}>Loading remaining picks...</AppText>
+            <SkeletonText label="remaining picks" lines={3} />
           ) : optionsError ? (
             <ErrorState
               compact

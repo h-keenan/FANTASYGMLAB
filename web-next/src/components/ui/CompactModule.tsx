@@ -7,6 +7,7 @@ import { Sheet } from "@/components/ui/Sheet";
 import { compactAriaLabel, compactParts, type CompactPart, type CompactTone } from "@/lib/compactModule";
 import { simOpenKey, simParseOpen } from "@/lib/simLayout";
 import { Money } from "@/components/Money";
+import { SkeletonModule, SkeletonRegion } from "@/components/Skeleton";
 
 const OPEN_EVENT = "fgl:sim-open-change";
 
@@ -51,6 +52,7 @@ export function CompactModule({
   testId,
   glow = false,
   preview,
+  loading = false,
 }: {
   /** Stable key for remembering the open state, e.g. "draft.clock". */
   id: string;
@@ -74,6 +76,8 @@ export function CompactModule({
   glow?: boolean;
   /** Always-visible line under the header (collapsed AND expanded): the pinned draft bar's best-available player. Interactive content is fine, it sits outside the toggle button. */
   preview?: ReactNode;
+  /** The data behind it is still loading: draws the module's own silhouette (SkeletonModule) instead of a placeholder line, so the page does not jump when it lands. */
+  loading?: boolean;
 }) {
   const key = simOpenKey(id);
   const bodyId = useId();
@@ -105,6 +109,14 @@ export function CompactModule({
     } catch {
       /* storage blocked: the override keeps this session consistent */
     }
+  }
+
+  if (loading) {
+    return (
+      <SkeletonRegion label={name} className="min-w-0">
+        <SkeletonModule lines={preview ? 2 : 1} />
+      </SkeletonRegion>
+    );
   }
 
   return (

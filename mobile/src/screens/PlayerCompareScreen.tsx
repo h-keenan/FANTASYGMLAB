@@ -10,7 +10,7 @@ import { Ionicons } from '@expo/vector-icons';
 
 import AnalyticsSection from '../components/AnalyticsSection';
 import ValueStat from '../components/ValueStat';
-import BrandedSpinner from '../components/BrandedSpinner';
+import { SkeletonText } from '../components/Skeleton';
 import OvrGauge from '../components/OvrGauge';
 import CompareSharePreviewModal from '../components/CompareSharePreviewModal';
 import EvaluationLensHeaderButton from '../components/EvaluationLensHeaderButton';
@@ -468,7 +468,7 @@ export default function PlayerCompareScreen({ route, navigation }: Props) {
                 </PressableScale>
               </View>
             ) : null}
-            {loadingCompare && !sides ? <BrandedSpinner style={styles.center} /> : null}
+            {loadingCompare && !sides ? <SkeletonText label="the comparison" lines={3} /> : null}
             <GlassCard style={styles.gridCard}>
               <View style={styles.row}>
                 <PlayerName name={playerA.name} style={styles.gridName} />

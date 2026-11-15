@@ -153,7 +153,7 @@ export default function PortfolioPage() {
   const waiting = authLoading || (!index && !error);
   const showSplash = useDelayedFlag(waiting, PORTFOLIO_SPLASH_DELAY_MS);
   if (waiting) {
-    return showSplash ? <LoadingScreen status="Loading Portfolio…" /> : <PortfolioShell />;
+    return showSplash ? <LoadingScreen label="Portfolio" layout="dashboard" /> : <PortfolioShell />;
   }
 
   if (error || !index) {

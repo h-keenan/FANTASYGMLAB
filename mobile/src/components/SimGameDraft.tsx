@@ -10,7 +10,7 @@ import FadeInView from './FadeInView';
 import SectionHeading from './SectionHeading';
 import SegmentedTabBar from './SegmentedTabBar';
 import { useBottomPillContext } from '../lib/useBottomPillContext.ts';
-import { SkeletonCard } from './SkeletonBlock';
+import { SkeletonCard } from './Skeleton';
 import CompactModule from './CompactModule';
 import { SimDraftBoard, SimDraftIconButton } from './SimDraftBoard';
 import { SimDraftOverview, SimFullBoardSheet, SimRecentStrip, SimSurvivalLine } from './SimDraftOverview';

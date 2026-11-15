@@ -124,7 +124,7 @@ export default function TradeAnalyzerPage() {
 
   if (authLoading || (!data && !error)) {
     return (
-      <LoadingScreen status="Loading Trade Analyzer…" />
+      <LoadingScreen label="Trade Analyzer" layout="detail" family="trades" />
     );
   }
 

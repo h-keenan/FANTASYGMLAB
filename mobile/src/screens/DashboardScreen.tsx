@@ -14,7 +14,7 @@ import { useIsRestoring, useQuery, useQueryClient } from '@tanstack/react-query'
 import AccentCard from '../components/AccentCard';
 import AnimatedCard from '../components/AnimatedCard';
 import Button from '../components/Button';
-import SkeletonBlock, { SkeletonCard } from '../components/SkeletonBlock';
+import SkeletonBlock, { SkeletonCard } from '../components/Skeleton';
 import ErrorState from '../components/ErrorState';
 import PushPermissionPrompt from '../components/PushPermissionPrompt';
 import CollegeFootballInterestPrompt from '../components/CollegeFootballInterestPrompt';

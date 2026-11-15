@@ -6,7 +6,7 @@ import EmptyState from './EmptyState';
 import ErrorState from './ErrorState';
 import Input from './Input';
 import SegmentedTabBar from './SegmentedTabBar';
-import { SkeletonCard } from './SkeletonBlock';
+import { SkeletonCard } from './Skeleton';
 import { SimTeamLogo } from './SimTeamIdentity';
 import { SimPlayerLine, SimSectionTitle, createSimStyles, type SimCtx } from './SimGameParts';
 import SimTeamCard from './SimTeamCard';

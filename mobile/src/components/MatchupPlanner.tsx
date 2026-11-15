@@ -32,6 +32,7 @@ import { slotDisplayLabel } from '../lib/matchupPresentation';
 import { trackUse } from '../lib/analytics';
 import { radii, scrim, spacing, type ThemeColors } from '../theme';
 import ErrorState from './ErrorState';
+import { SkeletonText } from './Skeleton';
 
 /**
  * Lineup swap planner for Matchup (same flow as web-next's MatchupPlanner).
@@ -249,7 +250,7 @@ export function SwapSheet({
             {sheet.error ? (
               <ErrorState compact title="Couldn't load options" message={sheet.error} onRetry={onRetry} />
             ) : !sheet.data ? (
-              <AppText style={styles.muted}>Loading…</AppText>
+              <SkeletonText label="swap options" lines={3} />
             ) : sheet.data.slot_locked ? (
               <AppText style={styles.muted}>This player’s game has started, so the slot is locked.</AppText>
             ) : candidates.length === 0 ? (

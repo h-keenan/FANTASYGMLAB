@@ -61,7 +61,7 @@ export default function NewsPage() {
 
   if (authLoading || (!data && !error)) {
     return (
-      <LoadingScreen status="Loading News…" />
+      <LoadingScreen label="News" layout="list" />
     );
   }
 

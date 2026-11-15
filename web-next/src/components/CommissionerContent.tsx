@@ -396,7 +396,7 @@ export function CommissionerContent({ leagueId, leagueName, lens }: { leagueId: 
         <PageTitle page="Commissioner" leagueName={leagueName} />
       </header>
       {!ready ? (
-        <LoadingScreen status="Reading the league’s weekly lineups…" />
+        <LoadingScreen label="league lineups" layout="list" />
       ) : state.error || !data ? (
         <ErrorState message={state.error || "Could not load League integrity."} onRetry={() => { setState({ key: "", data: null, error: null }); setAttempt((n) => n + 1); }} />
       ) : data.is_premium === false ? (

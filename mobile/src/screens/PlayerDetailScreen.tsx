@@ -33,7 +33,7 @@ import PlayerSnapshotCard, { type SnapshotItem } from '../components/PlayerSnaps
 import PlayerTags, { type PlayerTagSpec } from '../components/PlayerTags';
 import SectionHeading from '../components/SectionHeading';
 import SegmentedTabBar from '../components/SegmentedTabBar';
-import SkeletonBlock, { SkeletonCard, SkeletonRow } from '../components/SkeletonBlock';
+import SkeletonBlock, { SkeletonCard, SkeletonRow } from '../components/Skeleton';
 import SubRatingRow from '../components/SubRatingRow';
 import UsageBlock from '../components/UsageBlock';
 import SeasonStatsRows from '../components/SeasonStatsRows';

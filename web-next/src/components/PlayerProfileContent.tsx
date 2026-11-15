@@ -29,6 +29,7 @@ import { ValuesCredit } from "@/components/ValuesCredit";
 import { BRAND_NAME } from "@/lib/brand";
 import { useShareImage } from "@/lib/useShareImage";
 import { trackUse } from "@/lib/analytics";
+import { SkeletonText } from "@/components/Skeleton";
 
 /**
  * Player Profile — the real, full "Open Profile" destination
@@ -232,7 +233,7 @@ export function PlayerProfileContent({
 
       <div className="pqv-body">
         {loading ? (
-          <p className="pqv-status-text">Loading player profile…</p>
+          <SkeletonText label="player profile" lines={5} />
         ) : loadError ? (
           <p className="pqv-status-text" role="alert">
             Couldn&apos;t load this player&apos;s profile right now.

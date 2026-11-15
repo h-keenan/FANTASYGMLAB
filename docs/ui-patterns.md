@@ -25,6 +25,27 @@ Ground rules for every pattern here:
 | Player anatomy (`PlayerAccordionRow`, `CompactPlayerCard`, `TradeCompactCard`, `RankRow`, `PlayerAvatarSlot`) | `ui/PlayerAccordionRow.tsx` etc. | same names in `components/` | `playerAnatomy.ts` | built; see "Player anatomy" |
 | `LetterGrade` / `GradeBar` / `GradeLegendSheet` | `ui/LetterGrade.tsx` | `LetterGrade.tsx` | `simGrade.ts` | built; the Fantasy Sim's overall (replaces the OVR gauge there only), see "Fantasy Sim letter grades" |
 | `CompactModule` | `ui/CompactModule.tsx` | `CompactModule.tsx` | `compactModule.ts` (+ `simSummaries.ts`, `simDraft.ts`) | built (Phase 1 of `docs/audits/2026-11-information-architecture.md`); Sim home folds and the Sim draft room use it; `Collapsible` is superseded (SimFold renders CompactModule) |
+| `Skeleton` set | `components/Skeleton.tsx` (+ `LoadingScreen`) | `components/Skeleton.tsx` (+ `screens/LoadingScreen.tsx`) | none (visual only) | built; see "Loading identity" |
+
+## Loading identity
+
+Every loading state is a content-shaped skeleton from ONE set, never a splash, a spinner on an empty screen or a "Loading..." line.
+Web `components/Skeleton.tsx`, app `components/Skeleton.tsx` (same names, same silhouettes). Shimmer is the glass-token gradient
+(`.pqv-skeleton-line`, app: opacity pulse), stopped under `prefers-reduced-motion` / OS Reduce Motion.
+
+- **Primitives**: `SkeletonBlock`, `SkeletonAvatar` (density tier sizes), `SkeletonHeader`, `SkeletonHero`, `SkeletonTabs`, `SkeletonModule`,
+  `SkeletonPlayerRow(s)`, `SkeletonTradeCard`, `SkeletonStatusHeader`; plus `SkeletonText` / `SkeletonList` (a small region that names
+  itself once) and `SkeletonPage` (`layout`: `dashboard` | `list` | `cards` | `detail`, `family` for the tab strip).
+- **Templates own their loading state**: `CompactModule loading`, `PlayerAccordionRowSkeleton`, `TradeCompactCardSkeleton`,
+  `StatusHeaderSkeleton`, `PageTabBarSkeleton` (app: `SegmentedTabBarSkeleton`). A page that is loading shows the silhouette of the page
+  it will become, so nothing jumps when the data lands. The family tab strip skeleton is hidden on phones, like the real strip (its tabs live in the bottom pill).
+- **Pages**: `LoadingScreen label layout family` (web and app) replaces the old branded splash and `BrandedSpinner`. `label` is the page name and
+  becomes the single screen-reader status ("Loading Players"). Inline regions use `SkeletonText` / `SkeletonList`.
+- **Allowed spinners**: only inline busy states of an action (a button, a row's trailing control). The guard
+  `scripts/check_skeleton_identity.mjs` (run by both `npm test`s) fails on visible "Loading..."-style text, a bare app `ActivityIndicator`
+  outside its allowlist, `BrandedSpinner` and `<LoadingScreen status=...>`. Add to its allowlist only with a reason.
+- **Sample league** (`/sample-league`, app `SampleLeagueScreen`) uses the shipped stack: Roster is a `CompactModule` of `PlayerAccordionRow`s, Top moves a
+  `StatusHeader` + `CompactModule`s, Trade a `TradeCompactCard`; every player has the shared avatar slot (fictional players show initials).
 
 ## Sheet
 

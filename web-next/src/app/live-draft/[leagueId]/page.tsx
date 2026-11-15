@@ -158,7 +158,7 @@ export default function LiveDraftPage() {
 
   if (authLoading || (!discovery && !discoveryError)) {
     return (
-      <LoadingScreen status="Loading Live Draft…" />
+      <LoadingScreen label="Live Draft" layout="list" />
     );
   }
 

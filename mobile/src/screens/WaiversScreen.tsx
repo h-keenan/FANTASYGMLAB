@@ -25,7 +25,7 @@ import { useHeaderHeight } from '@react-navigation/elements';
 import AnimatedCard from '../components/AnimatedCard';
 import EmptyState from '../components/EmptyState';
 import ErrorState from '../components/ErrorState';
-import { SkeletonRows } from '../components/SkeletonBlock';
+import { SkeletonRows, SkeletonList } from '../components/Skeleton';
 import EvaluationLensHeaderButton from '../components/EvaluationLensHeaderButton';
 import FilterSheet from '../components/FilterSheet';
 import FilterDropdownButton from '../components/FilterDropdownButton';
@@ -620,7 +620,7 @@ export default function WaiversScreen({ route, navigation }: Props) {
               <View>
                 <SectionHeading title="Your GM Targets on the wire" />
                 {targetsFailed ? <AppText style={styles.secondaryCaption}>Couldn't load your GM Targets.</AppText> : null}
-                {!targetsFailed && targetIds === null ? <AppText style={styles.secondaryCaption}>Loading…</AppText> : null}
+                {!targetsFailed && targetIds === null ? <SkeletonList label="GM Targets" count={3} /> : null}
               </View>
             )
           }

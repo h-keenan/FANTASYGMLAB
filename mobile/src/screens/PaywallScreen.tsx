@@ -51,6 +51,7 @@ import { freeTrialForUser, thenPriceLine, trialCtaLabel, type IntroEligibility }
 import { disabledOpacity, LINK_HIT_SLOP, radii, spacing, type ThemeColors } from '../theme';
 import type { RootStackParamList } from '../navigation/RootNavigator';
 import Money from '../components/Money';
+import { SkeletonList } from '../components/Skeleton';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Paywall'>;
 
@@ -384,7 +385,7 @@ export default function PaywallScreen({ navigation, route }: Props) {
       ) : null}
 
       {loading ? (
-        <ActivityIndicator style={styles.loadingIndicator} color={colors.accent} />
+        <SkeletonList label="plans" count={3} tier="card" />
       ) : loadError ? (
         <View style={styles.loadErrorBlock}>
           <AppText style={styles.error}>{loadError}</AppText>

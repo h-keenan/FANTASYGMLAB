@@ -1563,11 +1563,13 @@ a {
 .pqv-skeleton-line,
 .pqv-skeleton-chart,
 .pqv-skeleton-chip {
+  /* Glass-look fill: a soft ink tint with one cyan sweep, visible on both the dark and the light page (the old
+     surface-muted ramp vanished on the dark background). */
   background: linear-gradient(
     100deg,
-    var(--color-surface-muted) 30%,
-    var(--color-border) 50%,
-    var(--color-surface-muted) 70%
+    color-mix(in srgb, var(--color-text-primary) 8%, transparent) 30%,
+    color-mix(in srgb, var(--color-accent) 18%, transparent) 50%,
+    color-mix(in srgb, var(--color-text-primary) 8%, transparent) 70%
   );
   background-size: 200% 100%;
   animation: pqv-skeleton-shimmer 1.6s ease-in-out infinite;
@@ -4623,7 +4625,7 @@ main > header:has(> h1.sr-only:only-child) {
 /* CompactModule inline body: grows from 0 to its height and fades in (the same motion as .row-expand). The inner box only clips
    while the animation runs, so popovers and focus rings are never cut off once it settles. Reduced motion: it simply appears. */
 .module-expand { display: grid; grid-template-rows: 1fr; animation: row-expand-in 200ms ease-out; }
-.module-expand-inner { min-height: 0; animation: module-expand-clip 200ms; }
+.module-expand-inner { min-height: 0; min-width: 0; animation: module-expand-clip 200ms; }
 @keyframes module-expand-clip { from, to { overflow: hidden; } }
 @media (prefers-reduced-motion: reduce) { .module-expand, .module-expand-inner { animation: none; } }
 

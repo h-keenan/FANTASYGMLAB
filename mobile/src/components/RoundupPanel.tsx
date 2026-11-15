@@ -9,7 +9,7 @@ import ErrorState from './ErrorState';
 import PositionBadge from './PositionBadge';
 import PremiumLock from './PremiumLock';
 import SegmentedTabBar from './SegmentedTabBar';
-import SkeletonBlock from './SkeletonBlock';
+import SkeletonBlock from './Skeleton';
 import { api, type RoundupResponse, type RoundupSwap, type WeeklyRoundup } from '../lib/api';
 import { accentTokenColor } from '../lib/destinationAccent';
 import { toUserErrorMessage } from '../lib/errorMessages';

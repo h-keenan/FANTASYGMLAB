@@ -12,7 +12,7 @@ import PositionBadge from './PositionBadge';
 import SimGlyph from './SimGlyph';
 import { ReviewGlyphChip } from './SeasonReviewSections';
 import SegmentedTabBar from './SegmentedTabBar';
-import { SkeletonCard } from './SkeletonBlock';
+import { SkeletonCard } from './Skeleton';
 import { SimPickLine, useSimPicks } from './SimGameDynastyParts';
 import { useBottomPillContext } from '../lib/useBottomPillContext.ts';
 import { SimPlayerBrowser } from './SimGamePlayers';

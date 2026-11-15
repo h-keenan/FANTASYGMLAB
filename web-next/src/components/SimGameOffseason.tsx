@@ -32,7 +32,7 @@ import { SimCollapse, SimGeneratedChip, SimGeneratedNoticeSheet, SimPickLine, Si
 import { SimTeamIdentity } from "@/components/SimTeamIdentity";
 import { SimIconButton, SimRosterLine, SimToneBadge, simToneColor, type SimCtx } from "@/components/SimGameParts";
 import { SimReserveGroups, useSimRosterMoves } from "@/components/SimGameReserves";
-import { SkeletonCard } from "@/components/Skeleton";
+import { SkeletonCard, SkeletonList } from "@/components/Skeleton";
 import { api } from "@/lib/api";
 import {
   simArchiveToYear,
@@ -555,7 +555,7 @@ function CutdownStage({ off, ctx, onTrade, onTeam }: { off: SimOffseason; ctx: S
           </div>
         ) : null}
         {players.length === 0 ? (
-          <p className="text-xs" style={{ color: "var(--color-text-muted)" }}>Loading your roster.</p>
+          <SkeletonList label="your roster" count={5} />
         ) : (
           players.map((player) => (
             <SimRosterLine

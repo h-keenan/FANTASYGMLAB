@@ -63,7 +63,7 @@ export default function FounderAnalyticsPage() {
   }, [authLoading, session, founderCapable, router, windowKey, retryToken]);
 
   if (authLoading || !session || !founderCapable) {
-    return <LoadingScreen status="Loading…" />;
+    return <LoadingScreen label="Loading" layout="dashboard" />;
   }
 
   if (error) {
@@ -79,7 +79,7 @@ export default function FounderAnalyticsPage() {
   }
 
   if (!data) {
-    return <LoadingScreen status="Loading Founder Analytics…" />;
+    return <LoadingScreen label="Founder Analytics" layout="dashboard" />;
   }
 
   return <FounderAnalyticsContent data={data.report} windowKey={windowKey} onWindowChange={setWindowKey} />;

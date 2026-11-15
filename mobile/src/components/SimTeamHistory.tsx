@@ -7,7 +7,7 @@ import { simTeamBadges, simTeamTrophies } from '../lib/simAchievements';
 import AppText from './AppText';
 import Button from './Button';
 import ErrorState from './ErrorState';
-import { SkeletonCard } from './SkeletonBlock';
+import { SkeletonCard } from './Skeleton';
 import { SimSectionTitle, createSimStyles } from './SimGameParts';
 import ToneBadge from './ToneBadge';
 import { useThemeMode } from '../context/ThemeModeContext';
