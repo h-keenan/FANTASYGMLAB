@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, within } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 
 import { SimAchievementsModule, SimBadgeChips, SimTrophyRow } from "./SimAchievements";
@@ -30,14 +30,14 @@ describe("SimAchievementsModule", () => {
     expect(screen.getByRole("progressbar", { name: "50 Career Wins progress" }).getAttribute("aria-valuenow")).toBe("60");
   });
 
-  it("opens a badge's detail on tap and closes it again", () => {
+  it("opens a badge's detail on tap and closes it again", async () => {
     render(<SimAchievementsModule payload={payload} seasonNo={3} openOnPhone />);
     const row = screen.getAllByTestId("achievement-row")[0];
     expect(screen.queryByTestId("achievement-detail")).toBeNull();
     fireEvent.click(row);
     expect(screen.getByTestId("achievement-detail").textContent).toContain("14-0 and the title");
     fireEvent.click(row);
-    expect(screen.queryByTestId("achievement-detail")).toBeNull();
+    await waitFor(() => expect(screen.queryByTestId("achievement-detail")).toBeNull());
   });
 
   it("renders nothing for an older server and an empty hint for a fresh game", () => {

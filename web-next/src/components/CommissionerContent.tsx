@@ -35,6 +35,7 @@ import {
   type IntegrityInactiveManager,
   type IntegrityTeam,
 } from "@/lib/commissionerIntegrity";
+import { Collapse } from "@/components/ui/Presence";
 
 /**
  * Commissioner: league integrity for any Pro user who can open the league
@@ -164,13 +165,13 @@ export function IntegrityTeamCard({ team }: { team: IntegrityTeam }) {
           >
             {open ? "Hide the evidence" : "Show the evidence"}
           </button>
-          {open ? (
+          <Collapse open={open}>
             <>
               <Bullets title="Evidence" items={team.evidence.map((e) => e.text)} icon="alert" color={bandColor(team.band)} />
               <EfficiencyBars team={team} />
               <Bullets title="Could be innocent" items={team.innocent_explanations} icon="info" color={INNOCENT_COLOR} />
             </>
-          ) : null}
+          </Collapse>
         </>
       ) : null}
     </AccentCard>

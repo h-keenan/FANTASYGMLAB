@@ -29,6 +29,7 @@ import {
   simMovementText,
   simRecapOutcome,
   simRecapPageKeys,
+  simRecapStoryActions,
   simRecapPageTitle,
   simRecapStandingsModel,
   type SimStandingsRow,
@@ -134,6 +135,8 @@ export default function SimWeekRecapStory({
   const facts = useMemo(() => recapFacts(recap, ctx), [recap, ctx]);
   const keys = useMemo(() => simRecapPageKeys(recap, facts), [recap, facts]);
   const last = index + 1 >= total;
+  // Advance (button) vs dismiss (X, swipe down, Back): dismiss closes the whole flow, never shows the next recap.
+  const actions = simRecapStoryActions(last, { onNext, onClose });
   const title = recap.kind === 'playoff' ? `${simPlayoffRoundLabel(recap.week, ctx.game.settings)} recap` : `Week ${recap.week} recap`;
 
   if (detail) return <SimWeekRecapView recap={recap} index={index} total={total} ctx={ctx} onNext={onNext} onClose={onClose} />;
@@ -141,7 +144,7 @@ export default function SimWeekRecapStory({
   const finishLabel = !last ? 'Next round' : recap.season_complete ? (ctx.game.status === 'offseason' ? 'Go to the offseason' : ctx.game.settings.mode === 'dynasty' ? 'See your dynasty review' : 'See your final grade') : 'Back to your team';
   const finish = (
     <>
-      <Button label={finishLabel} onPress={last ? onClose : onNext} />
+      <Button label={finishLabel} onPress={actions.finish} />
       <Button label="Full details" variant="ghost" onPress={() => setDetail(true)} />
     </>
   );
@@ -452,5 +455,5 @@ export default function SimWeekRecapStory({
         <Button label="Fix lineup" variant="secondary" onPress={onFixLineup} />
       ) : undefined,
   }));
-  return <StoryCarousel key={`${recap.week}-${recap.kind}`} title={title} pages={pages} onClose={last ? onClose : onNext} testID="week-recap-story" />;
+  return <StoryCarousel key={`${recap.week}-${recap.kind}`} title={title} pages={pages} onClose={actions.dismiss} testID="week-recap-story" />;
 }

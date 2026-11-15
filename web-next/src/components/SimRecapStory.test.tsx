@@ -1,5 +1,5 @@
-import { fireEvent, render, screen } from "@testing-library/react";
-import { describe, expect, it, vi } from "vitest";
+import { act, fireEvent, render, screen } from "@testing-library/react";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { SimWeekRecapStory } from "@/components/SimRecapStory";
 import type { SimCtx } from "@/components/SimGameParts";
@@ -121,5 +121,70 @@ describe("SimWeekRecapStory", () => {
     fireEvent.keyDown(dialog, { key: "ArrowRight" });
     expect(screen.getByText("4 weeks · yours")).toBeInTheDocument();
     expect(screen.queryByText(/Out 4w/)).not.toBeInTheDocument();
+  });
+
+  describe("queued recaps: advance vs dismiss", () => {
+    beforeEach(() => vi.useFakeTimers());
+    afterEach(() => vi.useRealTimers());
+
+    const queued = (onNext: () => void, onClose: () => void) =>
+      render(<SimWeekRecapStory recap={recap} index={0} total={3} ctx={ctx} onNext={onNext} onClose={onClose} onFixLineup={() => {}} />);
+    const swipeDown = (el: Element, ys: number[]) => {
+      fireEvent.touchStart(el, { touches: [{ clientX: 200, clientY: ys[0] }] });
+      for (const y of ys.slice(1)) fireEvent.touchMove(el, { touches: [{ clientX: 202, clientY: y }] });
+      fireEvent.touchEnd(el, { touches: [] });
+      act(() => vi.advanceTimersByTime(400));
+    };
+
+    it("the footer 'Next round' button advances to the next queued recap and does not close the flow", () => {
+      const onNext = vi.fn();
+      const onClose = vi.fn();
+      queued(onNext, onClose);
+      const dialog = screen.getByRole("dialog");
+      for (let i = 0; i < 5; i += 1) fireEvent.keyDown(dialog, { key: "ArrowRight" });
+      fireEvent.click(screen.getByRole("button", { name: "Next round" }));
+      expect(onNext).toHaveBeenCalledTimes(1);
+      expect(onClose).not.toHaveBeenCalled();
+    });
+
+    it("swiping down closes the whole recap flow, it never advances to the next queued recap", () => {
+      const onNext = vi.fn();
+      const onClose = vi.fn();
+      queued(onNext, onClose);
+      swipeDown(screen.getByTestId("story-stage"), [300, 330, 380, 440, 500]);
+      expect(onClose).toHaveBeenCalledTimes(1);
+      expect(onNext).not.toHaveBeenCalled();
+    });
+
+    it("the X closes the whole flow too, not the next recap", () => {
+      const onNext = vi.fn();
+      const onClose = vi.fn();
+      queued(onNext, onClose);
+      fireEvent.click(screen.getByRole("button", { name: /^Close / }));
+      expect(onClose).toHaveBeenCalledTimes(1);
+      expect(onNext).not.toHaveBeenCalled();
+    });
+
+    it("a sloppy diagonal swipe down (drifting 40px sideways) still dismisses with the forgiving story profile", () => {
+      const onNext = vi.fn();
+      const onClose = vi.fn();
+      queued(onNext, onClose);
+      const el = screen.getByTestId("story-stage");
+      fireEvent.touchStart(el, { touches: [{ clientX: 180, clientY: 300 }] });
+      for (const [x, y] of [[182, 314], [190, 335], [200, 372], [212, 410], [220, 440]]) fireEvent.touchMove(el, { touches: [{ clientX: x, clientY: y }] });
+      fireEvent.touchEnd(el, { touches: [] });
+      act(() => vi.advanceTimersByTime(400));
+      expect(onClose).toHaveBeenCalledTimes(1);
+      expect(onNext).not.toHaveBeenCalled();
+    });
+
+    it("a tiny accidental pull does not close or advance", () => {
+      const onNext = vi.fn();
+      const onClose = vi.fn();
+      queued(onNext, onClose);
+      swipeDown(screen.getByTestId("story-stage"), [300, 308, 318, 322]);
+      expect(onClose).not.toHaveBeenCalled();
+      expect(onNext).not.toHaveBeenCalled();
+    });
   });
 });

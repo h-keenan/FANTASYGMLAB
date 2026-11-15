@@ -21,6 +21,7 @@ import {
   type SimAchievementsPayload,
   type SimTrophyRow,
 } from '../lib/simAchievements';
+import { Collapse } from './Presence';
 
 /** The lib names web CSS tokens; the app resolves the same semantic tokens from its theme. */
 export function useAchievementColor() {
@@ -80,12 +81,12 @@ function Row({ a }: { a: SimAchievement }) {
           <View style={{ width: `${pct}%`, height: 4, backgroundColor: color, opacity: 0.8 }} />
         </View>
       ) : null}
-      {open ? (
+      <Collapse open={open}>
         <AppText style={[common.muted, { marginLeft: 48, marginBottom: 8, color: colors.textSecondary }]} testID="achievement-detail">
           {simAchievementLine(a)}
           {a.unlocked && a.player ? ` (${a.player.name})` : ''}
         </AppText>
-      ) : null}
+      </Collapse>
     </View>
   );
 }

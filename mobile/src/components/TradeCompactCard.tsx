@@ -10,6 +10,7 @@ import FairnessMeterRow from './FairnessMeterRow';
 import { SkeletonTradeCard } from './Skeleton';
 import { avatarSize, fairnessMeter, type FairnessMeter, type PlayerMode, type PlayerRef } from '../lib/playerAnatomy';
 import { radii, spacing, type ThemeColors } from '../theme';
+import { Collapse } from './Presence';
 
 export interface TradeCardAsset {
   key: string;
@@ -115,7 +116,9 @@ export default function TradeCompactCard({
           <Pressable accessibilityRole="button" accessibilityState={{ expanded: open }} onPress={() => setOpen((v) => !v)} style={styles.toggle}>
             <AppText style={styles.toggleText}>{open ? 'Hide details' : 'Show details'}</AppText>
           </Pressable>
-          {open ? <View style={{ gap: spacing.md }}>{children}</View> : null}
+          <Collapse open={open}>
+            <View style={{ gap: spacing.md }}>{children}</View>
+          </Collapse>
         </>
       ) : null}
     </View>

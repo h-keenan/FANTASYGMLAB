@@ -59,6 +59,7 @@ import { pickToSheetItem, playerToSheetItem } from '../lib/tradeSheetItems';
 import { selectedItems, type SheetItem } from '../lib/tradeSheetPicker';
 import { useThemeMode } from '../context/ThemeModeContext';
 import { radii, scrim, spacing, type ThemeColors } from '../theme';
+import { Collapse } from './Presence';
 
 /**
  * Multi-team (3 to 6 team) Trade Analyzer, the app twin of web-next's
@@ -662,12 +663,12 @@ function RankedRow({
         <AppText style={styles.strong}>{formatSigned(team.market_delta)}</AppText>
         <ToneBadge label={verdictChipLabel(team)} color={tone} />
       </PressableScale>
-      {open ? (
+      <Collapse open={open}>
         <View style={styles.expanded}>
           <TeamStats team={team} styles={styles} />
           <TeamResultBody team={team} vetoLocked={vetoLocked} toneColor={toneColor} styles={styles} />
         </View>
-      ) : null}
+      </Collapse>
     </AccentCard>
   );
 }

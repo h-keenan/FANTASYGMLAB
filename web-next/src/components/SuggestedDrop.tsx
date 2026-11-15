@@ -15,6 +15,7 @@ import {
   weakestSlotText,
 } from "@/lib/dropsPresentation";
 import { PlayerName } from "@/components/PlayerName";
+import { Collapse } from "@/components/ui/Presence";
 
 /**
  * Suggested drops (modules/drop_candidates.py), shared by the Waivers cards and
@@ -230,11 +231,11 @@ function SwapBody({ suggestion, drop, alternatives }: { suggestion: DropSuggesti
       >
         {showWhy ? "Hide details" : "Why this cut"}
       </button>
-      {showWhy ? (
+      <Collapse open={showWhy}>
         <div className="flex flex-col gap-1" data-testid="swap-why">
           <DropPlayerLine player={selected} lead={selected === drop ? "Best cut:" : "Drop"} swap maxReasons={6} />
         </div>
-      ) : null}
+      </Collapse>
       {others.length > 0 ? (
         <div className="flex flex-col gap-1.5 pt-2" data-testid="swap-alternatives" style={{ borderTop: "var(--border-width-default) solid var(--color-border)" }}>
           <span className="text-[0.6875rem] uppercase font-bold" style={{ color: "var(--color-text-muted)" }}>
@@ -299,7 +300,7 @@ function CompactSuggestedDrop({ suggestion }: { suggestion: DropSuggestion }) {
           {open ? "Hide" : "Why"}
         </span>
       </button>
-      {open ? (
+      <Collapse open={open}>
         <div className="flex flex-col gap-2 pl-1" data-testid="suggested-drop-details">
           {drop ? (
             <SwapBody suggestion={suggestion} drop={drop} alternatives={alternatives} />
@@ -312,7 +313,7 @@ function CompactSuggestedDrop({ suggestion }: { suggestion: DropSuggestion }) {
             </>
           )}
         </div>
-      ) : null}
+      </Collapse>
     </div>
   );
 }
@@ -379,11 +380,11 @@ export function SharedDropNote({ drop, count }: { drop: DropPlayer; count: numbe
           {open ? "Hide" : "Why"}
         </span>
       </button>
-      {open ? (
+      <Collapse open={open}>
         <div className="pl-1" data-testid="shared-drop-details">
           <DropPlayerLine player={drop} maxReasons={6} />
         </div>
-      ) : null}
+      </Collapse>
     </div>
   );
 }

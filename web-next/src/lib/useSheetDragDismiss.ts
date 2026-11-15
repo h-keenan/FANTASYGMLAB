@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties }
 
 import {
   SHEET_DRAG_IDLE,
+  SHEET_PROFILE,
   nearestStopIndex,
   sheetDragEnd,
   sheetDragMove,
@@ -11,6 +12,7 @@ import {
   sheetDragStart,
   sheetStops,
   type SheetDragState,
+  type SheetGestureProfile,
 } from "@/lib/sheetGesture";
 
 const SNAP_BACK_TRANSITION = "transform 260ms cubic-bezier(0.2, 0.9, 0.3, 1.15), opacity 200ms ease-out";
@@ -58,6 +60,8 @@ export interface SheetDragOptions {
    * fades as it is pulled away (the weekly recap StoryCarousel).
    */
   effect?: "sheet" | "story";
+  /** Threshold bundle (lib/sheetGesture.ts). Default: the standard sheet rules; the recap story passes STORY_PROFILE. */
+  profile?: SheetGestureProfile;
 }
 
 /**
@@ -85,6 +89,7 @@ export function useSheetDragDismiss<T extends HTMLElement = HTMLDivElement>({
   snap,
   onSnapChange,
   effect = "sheet",
+  profile = SHEET_PROFILE,
 }: SheetDragOptions): {
   sheetRef: React.RefObject<T | null>;
   sheetStyle: CSSProperties;
@@ -202,6 +207,7 @@ export function useSheetDragDismiss<T extends HTMLElement = HTMLDivElement>({
         height,
         stops,
         stopIndex: nearestStopIndex(stops, own),
+        profile,
       });
     }
 
@@ -295,7 +301,7 @@ export function useSheetDragDismiss<T extends HTMLElement = HTMLDivElement>({
       if (settleTimer) clearTimeout(settleTimer);
       applyRef.current = () => {};
     };
-  }, [enabled, effect]);
+  }, [enabled, effect, profile]);
 
   // A controlled `snap` moves the sheet when it changes.
   useEffect(() => {

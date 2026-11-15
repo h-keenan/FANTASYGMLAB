@@ -3,6 +3,7 @@ import { AccessibilityInfo, Animated, Pressable, StyleSheet, View, type StylePro
 import { Ionicons } from '@expo/vector-icons';
 
 import AccentCard from './AccentCard';
+import { Presence } from './Presence';
 import PlayerAccordionRow, { usePlayerAccordion } from './PlayerAccordionRow';
 import { SimMoveButton, SimMoveStrip, type SimMoveHandle } from './SimMoveStrip';
 import { simAccordionRowModel, simHasMove } from '../lib/simMove';
@@ -409,16 +410,19 @@ export function SimPreviewBanner({ preview }: { preview: SimGamePreview | null |
   const { colors } = useThemeMode();
   const styles = useMemo(() => createStyles(colors), [colors]);
   const line = simGamePreviewLine(preview);
-  if (!line) return null;
   return (
-    <AccentCard accent={colors.premium} compact>
-      <View style={styles.previewRow}>
-        <ToneBadge label="Free preview" color={colors.premium} size="xs" />
-        <AppText style={styles.previewText} testID="sim-preview-line">
-          {line}
-        </AppText>
-      </View>
-    </AccentCard>
+    <Presence show={Boolean(line)} variant="collapse">
+      {line ? (
+        <AccentCard accent={colors.premium} compact>
+          <View style={styles.previewRow}>
+            <ToneBadge label="Free preview" color={colors.premium} size="xs" />
+            <AppText style={styles.previewText} testID="sim-preview-line">
+              {line}
+            </AppText>
+          </View>
+        </AccentCard>
+      ) : null}
+    </Presence>
   );
 }
 
@@ -453,8 +457,9 @@ export function SimNotice({ message, tone = 'warning', onDismiss }: { message: s
   useNoticeAutoDismiss(message, tone, onDismiss);
   const { colors } = useThemeMode();
   const styles = useMemo(() => createStyles(colors), [colors]);
-  if (!message) return null;
+  // Always mounted: an empty message is the hidden state, so a notice grows in and a dismissed / timed-out one collapses away.
   return (
+    <Presence show={Boolean(message)} variant="collapse" testID="sim-notice">
     <AccentCard accent={simToneColor(tone, colors)} compact>
       <View style={styles.noticeRow} accessibilityRole={tone === 'danger' ? 'alert' : undefined} accessibilityLiveRegion="polite">
         <Ionicons name={NOTICE_ICON[tone]} size={18} color={simToneColor(tone, colors)} style={styles.noticeIcon} />
@@ -466,6 +471,7 @@ export function SimNotice({ message, tone = 'warning', onDismiss }: { message: s
         ) : null}
       </View>
     </AccentCard>
+    </Presence>
   );
 }
 

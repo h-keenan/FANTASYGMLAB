@@ -61,6 +61,7 @@ import { LINK_HIT_SLOP, radii, spacing, type ThemeColors } from '../theme';
 import type { RootStackParamList } from '../navigation/RootNavigator';
 import { usePlayerQuickView } from '../context/PlayerQuickViewContext';
 import GlassCard from '../components/GlassCard';
+import { PresenceList } from '../components/Presence';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'GmPlan'>;
 type IconName = React.ComponentProps<typeof Ionicons>['name'];
@@ -610,10 +611,14 @@ export default function GmPlanScreen({ route, navigation }: Props) {
               />
             ) : (
               <View style={styles.stack}>
-                {watching.map((target) => {
+                {/* A removed target collapses out in place (and an Undo grows it back) instead of popping. */}
+                <PresenceList
+                  items={watching}
+                  getKey={(t) => t.player_id}
+                  render={(target) => {
                   const player = ranked.get(target.player_id) ?? null;
                   return (
-                    <AnimatedCard key={target.player_id} style={styles.watchCard}>
+                    <AnimatedCard style={styles.watchCard}>
                       <PlayerIdentityRow
                         playerId={target.player_id}
                         name={player?.name ?? `Player ${target.player_id}`}
@@ -649,7 +654,8 @@ export default function GmPlanScreen({ route, navigation }: Props) {
                       </View>
                     </AnimatedCard>
                   );
-                })}
+                  }}
+                />
               </View>
             )}
           </>

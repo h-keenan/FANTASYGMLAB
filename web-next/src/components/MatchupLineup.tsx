@@ -22,6 +22,7 @@ import type { MatchupSide, MatchupWinProbability } from "@/lib/api";
 import { changedPlayerIds, slotTotals, sortSlots, type SlotComparison, type SlotSortMode } from "@/lib/lineupSlots";
 import { freshnessLabel } from "@/lib/liveScores";
 import { formatSigned } from "@/lib/matchupPresentation";
+import { Collapse } from "@/components/ui/Presence";
 
 /**
  * Two-sided, slot-by-slot lineup comparison: my player card and the
@@ -372,7 +373,7 @@ export function CompactSlotRow({
         </button>
         <CompactSide cell={slot.opponent} mirror emphasis={emphasis("opponent")} pulseKey={pulse(slot.opponent)} />
       </div>
-      {open ? (
+      <Collapse open={open}>
         <div className="flex flex-col gap-1.5 pt-1.5 pb-1" data-testid="slot-expanded">
           {([["mine", slot.mine], ["opponent", slot.opponent]] as const).map(([side, cell]) =>
             cell.kind === "player" ? (
@@ -387,7 +388,7 @@ export function CompactSlotRow({
             ) : null,
           )}
         </div>
-      ) : null}
+      </Collapse>
     </li>
   );
 }

@@ -10,6 +10,7 @@ import { fairnessBandColor, formatTradeGain } from "@/lib/tradeHubPresentation";
 import { liveDraftAssetToTradeAsset, liveDraftDraftedPlayerOptions } from "@/lib/liveDraftPresentation";
 import { ErrorState } from "@/components/ErrorState";
 import { SkeletonText } from "@/components/Skeleton";
+import { Collapse } from "@/components/ui/Presence";
 
 /**
  * Hypothetical mid-draft Trade Evaluator — the last of the 4 deferred
@@ -251,8 +252,8 @@ export function LiveDraftTradeEvaluator({
         </button>
       </div>
 
-      {open ? (
-        loadingOptions ? (
+      <Collapse open={open}>
+        {loadingOptions ? (
           <SkeletonText label="remaining picks" lines={3} />
         ) : optionsError ? (
           <ErrorState
@@ -375,8 +376,8 @@ export function LiveDraftTradeEvaluator({
               </div>
             ) : null}
           </>
-        )
-      ) : null}
+        )}
+      </Collapse>
     </section>
   );
 }

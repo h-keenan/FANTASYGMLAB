@@ -26,6 +26,7 @@ import {
 } from '../lib/liveDraft';
 import { spacing, type ThemeColors } from '../theme';
 import { SkeletonText } from './Skeleton';
+import { Collapse } from './Presence';
 
 /**
  * Hypothetical mid-draft Trade Evaluator (port of web-next's
@@ -266,8 +267,8 @@ export default function LiveDraftTradeEvaluator({
           variant={open ? 'secondary' : 'primary'}
           onPress={() => setOpen((value) => !value)}
         />
-        {open ? (
-          loadingOptions ? (
+        <Collapse open={open}>
+          {loadingOptions ? (
             <SkeletonText label="remaining picks" lines={3} />
           ) : optionsError ? (
             <ErrorState
@@ -350,8 +351,8 @@ export default function LiveDraftTradeEvaluator({
                 </View>
               ) : null}
             </>
-          )
-        ) : null}
+          )}
+        </Collapse>
       </AnimatedCard>
     </View>
   );

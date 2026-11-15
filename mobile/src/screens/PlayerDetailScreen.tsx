@@ -71,6 +71,7 @@ import { radii, spacing, type ThemeColors, scrim } from '../theme';
 import type { RootStackParamList } from '../navigation/RootNavigator';
 import { SheetModal, SheetScrollView, SwipeDismissCard } from '../components/SwipeDismissSheet';
 import GlassCard from '../components/GlassCard';
+import { Collapse } from '../components/Presence';
 
 export type DetailTab = 'stats' | 'trends' | 'schedule' | 'career' | 'model' | 'news';
 const TABS: Array<{ key: DetailTab; label: string; glyph: TabIconName }> = [
@@ -473,13 +474,13 @@ function CareerSeasonCard({
         <SectionHeading title={label} icon="calendar-outline" />
         <Ionicons name={expanded ? 'chevron-up' : 'chevron-down'} size={16} color={colors.textTertiary} />
       </PressableScale>
-      {expanded ? (
-        season.key_stats.length > 0 ? (
+      <Collapse open={expanded}>
+        {season.key_stats.length > 0 ? (
           <StatGrid items={season.key_stats.map((item) => ({ label: item.label, value: item.value || null }))} />
         ) : (
           <AppText style={styles.notice}>No stats recorded for this season.</AppText>
-        )
-      ) : null}
+        )}
+      </Collapse>
     </GlassCard>
   );
 }

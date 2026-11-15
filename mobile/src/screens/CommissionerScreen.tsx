@@ -48,6 +48,7 @@ import { queryKeys } from '../lib/queryKeys';
 import { useScreenHeaderTitle } from '../lib/useScreenHeaderTitle';
 import { spacing, type ThemeColors } from '../theme';
 import type { RootStackParamList } from '../navigation/RootNavigator';
+import { Collapse } from '../components/Presence';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Commissioner'>;
 
@@ -227,13 +228,13 @@ function TeamCard({
           <PressableScale onPress={() => setOpen((v) => !v)} accessibilityRole="button" accessibilityState={{ expanded: open }}>
             <AppText style={styles.link}>{open ? 'Hide the evidence' : 'Show the evidence'}</AppText>
           </PressableScale>
-          {open ? (
+          <Collapse open={open}>
             <>
               <Bullets title="Evidence" items={team.evidence.map((e) => e.text)} styles={styles} icon="alert" color={toneColor(team.band)} />
               <EfficiencyBars team={team} colors={colors} styles={styles} />
               <Bullets title="Could be innocent" items={team.innocent_explanations} styles={styles} icon="info" color={colors.accent} />
             </>
-          ) : null}
+          </Collapse>
         </>
       ) : null}
     </AccentCard>

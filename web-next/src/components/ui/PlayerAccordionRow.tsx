@@ -12,6 +12,7 @@ import type { BadgeInput } from "@/lib/playerBadges";
 import type { SimGradeInput } from "@/lib/simGrade";
 import { Money } from "@/components/Money";
 import { SkeletonPlayerRow } from "@/components/Skeleton";
+import { Collapse } from "@/components/ui/Presence";
 
 const TONE: Record<FactTone, string> = {
   success: "var(--color-success)",
@@ -138,8 +139,8 @@ export function PlayerAccordionRow({ open, onToggle, badges = [], positionLabel,
         </button>
         {trailingAction ? <span className="flex shrink-0 items-center" data-testid="row-action">{trailingAction}</span> : null}
       </div>
-      {open ? (
-        <div className="row-expand"><div className="row-expand-inner flex flex-col gap-2.5 pt-1" data-testid="row-expanded">
+      <Collapse open={open}>
+        <div className="flex flex-col gap-2.5 pt-1" data-testid="row-expanded">
           {model.facts.length > 0 ? (
             <div className="grid gap-2" style={{ gridTemplateColumns: `repeat(${Math.min(4, model.facts.length)}, minmax(0, 1fr))` }}>
               {model.facts.map((fact) => <Fact key={fact.key} fact={fact} />)}
@@ -161,8 +162,8 @@ export function PlayerAccordionRow({ open, onToggle, badges = [], positionLabel,
               ) : null}
             </div>
           ) : null}
-        </div></div>
-      ) : null}
+        </div>
+      </Collapse>
     </div>
   );
 }

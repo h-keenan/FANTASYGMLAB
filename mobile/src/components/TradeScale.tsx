@@ -11,6 +11,7 @@ import { useThemeMode } from '../context/ThemeModeContext';
 import { fairnessMeter, type FairnessMeter, type PlayerMode } from '../lib/playerAnatomy';
 import { tradeScaleCount, tradeScaleMissing, tradeScalePhase } from '../lib/tradeScale';
 import { radii, spacing, type ThemeColors } from '../theme';
+import { PresenceList } from './Presence';
 
 export type TradeScaleSide = 'give' | 'get';
 
@@ -34,20 +35,23 @@ function Column({ side, label, assets, mode, max, editing, addHint, onAdd, onRem
         <View style={[styles.dot, { backgroundColor: side === 'give' ? colors.danger : colors.success }]} />
         <AppText style={styles.kicker}>{label} {tradeScaleCount(assets.length, max)}</AppText>
       </View>
-      {assets.map((a, i) => (
-        <MotionIn key={a.key} index={i} count={assets.length}>
+      {/* Rows added or removed grow in / collapse out in place (Presence); the rows already there are simply there. */}
+      <PresenceList
+        items={assets}
+        getKey={(a) => a.key}
+        render={(a) => (
           <View style={styles.assetRow} testID="scale-asset">
             <View style={styles.assetMain}>
               <TradeAssetCard asset={a} mode={mode} />
             </View>
             {editing && onRemove ? (
-              <Pressable accessibilityRole="button" accessibilityLabel={`Remove ${a.player?.name ?? a.pickLabel ?? 'asset'}`} onPress={() => { animateRowExpand(); onRemove(side, a.key); }} style={styles.remove} hitSlop={6}>
+              <Pressable accessibilityRole="button" accessibilityLabel={`Remove ${a.player?.name ?? a.pickLabel ?? 'asset'}`} onPress={() => onRemove(side, a.key)} style={styles.remove} hitSlop={6}>
                 <AppText style={styles.removeText}>×</AppText>
               </Pressable>
             ) : null}
           </View>
-        </MotionIn>
-      ))}
+        )}
+      />
       {editing && !full ? (
         <Pressable
           accessibilityRole="button"

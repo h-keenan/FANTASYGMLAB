@@ -49,6 +49,7 @@ import type { InsightKey } from '../lib/insightLinks';
 import type { RootStackParamList } from '../navigation/RootNavigator';
 import { usePlayerQuickView } from '../context/PlayerQuickViewContext';
 import { playerSurname } from '../lib/playerNameDisplay';
+import { Collapse } from '../components/Presence';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'MyTeam'>;
 
@@ -517,7 +518,9 @@ function TeamAnalysisRows({ rows }: { rows: TeamAnalysisRow[] }) {
               </View>
               <Ionicons name={isOpen ? 'chevron-down' : 'chevron-forward'} size={16} color={colors.textTertiary} />
             </PressableScale>
-            {isOpen ? <AppText style={styles.analysisBody}>{row.body}</AppText> : null}
+            <Collapse open={isOpen}>
+              <AppText style={styles.analysisBody}>{row.body}</AppText>
+            </Collapse>
           </View>
         );
       })}

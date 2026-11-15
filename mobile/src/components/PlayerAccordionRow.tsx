@@ -14,6 +14,7 @@ import type { SimGradeInput } from '../lib/simGrade';
 import { radii, spacing, type ThemeColors } from '../theme';
 import Money from './Money';
 import { SkeletonPlayerRow } from './Skeleton';
+import { Collapse } from './Presence';
 
 function toneColor(tone: FactTone | undefined, colors: ThemeColors): string {
   switch (tone) {
@@ -81,14 +82,10 @@ export default function PlayerAccordionRow({ open, onToggle, badges = [], positi
   const { player } = input;
   const model = playerRowModel(input);
   const metaLine: { key: string; text: string; tone?: FactTone }[] = metaParts ?? model.meta.map((text, i) => ({ key: `m${i}`, text }));
-  const toggle = () => {
-    animateRowExpand();
-    onToggle();
-  };
   return (
     <View style={open ? styles.tile : styles.row} testID={testID}>
       <View style={styles.headRow}>
-        <Pressable accessibilityRole="button" accessibilityState={{ expanded: open }} accessibilityLabel={`${player.name}, ${open ? 'hide' : 'show'} details`} onPress={toggle} style={styles.head}>
+        <Pressable accessibilityRole="button" accessibilityState={{ expanded: open }} accessibilityLabel={`${player.name}, ${open ? 'hide' : 'show'} details`} onPress={onToggle} style={styles.head}>
           <PlayerAvatarSlot player={player} tier="row" />
           <View style={styles.main}>
             <View style={styles.line}>
@@ -120,7 +117,7 @@ export default function PlayerAccordionRow({ open, onToggle, badges = [], positi
         </Pressable>
         {trailingAction ? <View style={styles.action} testID="row-action">{trailingAction}</View> : null}
       </View>
-      {open ? (
+      <Collapse open={open}>
         <View style={styles.body}>
           {model.facts.length > 0 ? (
             <View style={styles.facts}>
@@ -144,7 +141,7 @@ export default function PlayerAccordionRow({ open, onToggle, badges = [], positi
             </View>
           ) : null}
         </View>
-      ) : null}
+      </Collapse>
     </View>
   );
 }

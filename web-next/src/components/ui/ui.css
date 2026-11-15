@@ -136,8 +136,7 @@
 }
 @media (prefers-reduced-motion: reduce) {
   .ui-sheet,
-  .ui-confirm-panel,
-  .ui-toast {
+  .ui-confirm-panel {
     animation: none !important;
   }
   .ui-confirm-timer {
@@ -252,12 +251,18 @@
 }
 
 /* ---------- UndoToast ---------- */
-.ui-toast {
+/* The slot is the fixed, centred layer the Presence animation (rise + fade) runs on; the toast inside is plain. */
+.ui-toast-slot {
   position: fixed;
-  left: 50%;
+  left: 0;
+  right: 0;
+  margin-inline: auto;
+  width: fit-content;
+  max-width: min(420px, calc(100vw - 32px));
   bottom: calc(var(--space-lg) + env(safe-area-inset-bottom, 0px) + 56px);
-  transform: translateX(-50%);
   z-index: 80;
+}
+.ui-toast {
   display: flex;
   align-items: center;
   gap: var(--space-md);
@@ -268,7 +273,6 @@
   background: linear-gradient(165deg, rgba(50, 54, 60, 0.9), rgba(24, 26, 30, 0.95));
   box-shadow: var(--shadow-overlay);
   color: var(--color-text-primary);
-  animation: ui-sheet-rise 200ms ease-out;
 }
 :where(:root[data-theme="light"]) .ui-toast {
   background: rgba(255, 255, 255, 0.95);
@@ -841,6 +845,9 @@
 /* Entering a page with context: the segment slides in from the right. */
 .pill-layer--context { animation: pill-context-in 260ms var(--ease-out, ease-out) both; }
 @keyframes pill-context-in { from { opacity: 0; transform: translateX(18px); } to { opacity: 1; transform: none; } }
+/* Leaving the page: the segment slides back out while the global tabs fade in (Presence exit, lib/presence.ts). */
+.pill-layer--context[data-leaving] { animation: pill-context-out var(--motion-fast, 180ms) var(--ease-in, ease-in) both; pointer-events: none; }
+@keyframes pill-context-out { from { opacity: 1; transform: none; } to { opacity: 0; transform: translateX(18px); } }
 
 .pill-icon-btn {
   position: relative; flex: 0 0 var(--bar-button-min-height); width: var(--bar-button-min-height); height: var(--bar-button-min-height);
@@ -912,6 +919,7 @@
   .pill-morph[data-mode="menu"] .pill-layer--global > *,
   .pill-primary { animation: none; }
   .pill-layer--context { animation: pill-fade-in 180ms linear both; }
+  .pill-layer--context[data-leaving] { animation: none; }
   .pill-indicator { transition: none; }
 }
 @keyframes pill-fade-in { from { opacity: 0; } to { opacity: 1; } }
@@ -939,7 +947,10 @@
   backdrop-filter: blur(24px) saturate(160%);
   -webkit-backdrop-filter: blur(24px) saturate(160%);
   overflow: hidden;
-  touch-action: pan-y;
+  /* The whole card is one drag surface (swipe down to leave) and pages never scroll: take every gesture from the browser so a
+     sloppy diagonal pull is not stolen as a scroll/overscroll. Horizontal page swipes and taps run on pointer events. */
+  touch-action: none;
+  overscroll-behavior: contain;
   outline: none;
 }
 .ui-story[hidden] {
