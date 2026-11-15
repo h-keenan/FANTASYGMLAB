@@ -19,3 +19,7 @@ Bugs and inconsistencies noticed while working on other tasks, with file refs. N
 | 2026-11-14 | Waivers header module titled "Waivers" under a header and pill that also say Waivers | `WaiversContent.tsx` | Fixed ("Free agents") |
 | 2026-11-14 | A 55-char league name needs 3-4 lines at 320px (header 86px) | `ShellHeader.tsx` | Open (edge case; cap at 2 lines with the full name in the sheet if it shows up in practice) |
 | 2026-11-15 | Sim game header 97px at every width (icon row + full-width team row) | `SimGameHeader.tsx` web + app | Fixed (header phase 5: 52px row + folding ribbon) |
+| 2026-11-15 | Trade Hub filter chips 40px tall (under the 44px target); Matchup "?" help button 22px and "Refresh" link 16px; Trade Finder pick-group headers 36px with a `+`/`-` glyph | `TradeHubFilters.tsx`, `MatchupContent.tsx`, `PickGroupList.tsx` | Fixed (44px targets, rotating chevron) |
+| 2026-11-15 | `module_scan.mjs` now lists every visible control under 43px per page (`census.small`) so the next sweep is one command | `scripts/sim_layout_playwright/module_scan.mjs` | Fixed |
+| 2026-11-15 | Labelled inline `BeginnerHelp` rows ("? waiver value", "? playoff odds", "? this matchup page") are 16px-tall targets | `WaiversContent.tsx`, `LeagueRankingsContent.tsx`, `MatchupContent.tsx` | Open (goes away with #1954, D3) |
+| 2026-11-15 | Smart pill + footer + Sim footer geometry (`pill_geometry.mjs`, `footer_sheet_audit.mjs`) pass at 320/360/390/430 | harnesses | Checked, no findings |

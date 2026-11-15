@@ -9,7 +9,7 @@ function chipStyle(active: boolean) {
     border: `1px solid ${active ? "var(--color-accent)" : "var(--color-border)"}`,
     background: active ? "var(--pill-active-bg, color-mix(in srgb, var(--color-accent) 12%, transparent))" : "var(--color-surface-muted)",
     borderRadius: "var(--radius-pill)",
-    minHeight: "2.5rem",
+    minHeight: "var(--touch-target-min)",
   } as const;
 }
 
