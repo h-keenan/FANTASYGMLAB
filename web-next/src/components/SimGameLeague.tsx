@@ -33,6 +33,7 @@ import {
   type SimRecapScore,
   type SimStandingRow,
 } from "@/lib/simGame";
+import { PresenceSwap } from "@/components/ui/Presence";
 
 type View = "standings" | "scores" | "feed" | "teams" | "players";
 
@@ -250,6 +251,8 @@ export function SimLeagueTab({ ctx }: { ctx: SimCtx }) {
         active={view}
         onSelect={(value) => setView(value as View)}
       />
+      {/* The view body swaps with a fade-out then a rise-in (Presence), not one frame. */}
+      <PresenceSwap swapKey={view}>
       {view === "standings" ? (
         <section className="flex flex-col gap-2">
           {(() => {
@@ -294,6 +297,7 @@ export function SimLeagueTab({ ctx }: { ctx: SimCtx }) {
       ) : null}
       {view === "teams" ? <SimLeagueTeamsView ctx={ctx} state={rosters} onRetry={() => setRosterAttempt((n) => n + 1)} /> : null}
       {view === "players" ? <SimLeaguePlayersView ctx={ctx} state={rosters} onRetry={() => setRosterAttempt((n) => n + 1)} /> : null}
+      </PresenceSwap>
     </div>
   );
 }

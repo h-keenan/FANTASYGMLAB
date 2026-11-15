@@ -4,6 +4,7 @@ import { useId, useState, useSyncExternalStore, type ReactNode } from "react";
 
 import { AccentCard } from "@/components/AccentCard";
 import { simOpenKey, simParseOpen } from "@/lib/simLayout";
+import { Collapse } from "@/components/ui/Presence";
 
 const OPEN_EVENT = "fgl:sim-open-change";
 
@@ -88,9 +89,9 @@ export function Collapsible({
           {open ? "−" : "+"}
         </span>
       </button>
-      <div id={bodyId} hidden={!open} className="flex flex-col gap-3 pt-1">
-        {open ? children : null}
-      </div>
+      <Collapse open={open} id={bodyId} className="flex flex-col gap-3 pt-1">
+        {children}
+      </Collapse>
     </AccentCard>
   );
 }

@@ -72,7 +72,7 @@ describe("SimRealism UI", () => {
     expect(upgrade).not.toHaveBeenCalled();
   });
 
-  it("the Home banner shows for an old save, opens the sheet and can be dismissed for good", () => {
+  it("the Home banner shows for an old save, opens the sheet and can be dismissed for good", async () => {
     const { ctx } = makeCtx(rules());
     const { unmount } = render(<SimRealismBanner ctx={ctx} />);
     const banner = screen.getByTestId("sim-realism-banner");
@@ -81,7 +81,8 @@ describe("SimRealism UI", () => {
     expect(screen.getByTestId("sim-realism-sheet")).toBeInTheDocument();
     fireEvent.click(screen.getByText("Not now"));
     fireEvent.click(screen.getByLabelText("Dismiss"));
-    expect(screen.queryByTestId("sim-realism-banner")).toBeNull();
+    // Dismissing collapses the banner away (it plays its exit), then it is gone.
+    await waitFor(() => expect(screen.queryByTestId("sim-realism-banner")).toBeNull());
     unmount();
     render(<SimRealismBanner ctx={ctx} />);
     expect(screen.queryByTestId("sim-realism-banner")).toBeNull(); // still dismissed on the next visit

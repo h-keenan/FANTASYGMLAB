@@ -17,6 +17,7 @@ import { freshnessLabel } from '../lib/liveScores';
 import { formatSigned, type LineupPlayer } from '../lib/matchupPresentation';
 import { headlinePoints, playerCardAriaLabel, playerStatusChips, trendVsProjection, type ChipTone } from '../lib/playerCard';
 import { radii, spacing, type ThemeColors } from '../theme';
+import { Collapse } from './Presence';
 
 /**
  * Two-sided, slot-by-slot lineup comparison for phones: my player card, a
@@ -293,7 +294,7 @@ export function SlotRow({
           onPress={slot.opponent.kind === 'player' ? () => onPressPlayer((slot.opponent as { source: LineupPlayer }).source) : undefined}
         />
       </View>
-      {open ? (
+      <Collapse open={open}>
         <View style={{ gap: 6, paddingTop: 6 }} testID="slot-expanded">
           {([['mine', slot.mine], ['opponent', slot.opponent]] as const).map(([side, cell]) =>
             cell.kind === 'player' ? (
@@ -308,7 +309,7 @@ export function SlotRow({
             ) : null,
           )}
         </View>
-      ) : null}
+      </Collapse>
     </View>
   );
 }

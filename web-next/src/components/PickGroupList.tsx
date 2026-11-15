@@ -6,6 +6,7 @@ import type { DraftPickAsset } from "@/lib/api";
 import { PillRow } from "@/components/PillRow";
 import { ToneBadge } from "@/components/ToneBadge";
 import { groupPicksForList, roundGroupDefaultOpen } from "@/lib/pickGroups";
+import { Collapse } from "@/components/ui/Presence";
 
 /**
  * The one grouped draft-pick list. Year pills on top, then one collapsible
@@ -76,13 +77,13 @@ export function PickGroupList({
                   {open ? "−" : "+"}
                 </span>
               </button>
-              {open ? (
+              <Collapse open={open}>
                 <div style={{ borderTop: "var(--border-width-default) solid var(--color-border)" }}>
                   {group.picks.map((pick) => (
                     <div key={pick.pick_id}>{renderPick(pick)}</div>
                   ))}
                 </div>
-              ) : null}
+              </Collapse>
             </section>
           );
         })}

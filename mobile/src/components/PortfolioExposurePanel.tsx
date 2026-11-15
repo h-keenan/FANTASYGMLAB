@@ -20,6 +20,7 @@ import { radii, spacing, type ThemeColors } from '../theme';
 import type { RootStackParamList } from '../navigation/RootNavigator';
 import { usePlayerQuickView } from '../context/PlayerQuickViewContext';
 import ErrorState from './ErrorState';
+import { Collapse } from './Presence';
 
 type SortKey = ExposureSortKey;
 
@@ -152,7 +153,7 @@ export default function PortfolioExposurePanel() {
                   <AppText style={styles.countText}>{`${player.leagues_owned}/${exposure.league_count} ${open ? '▴' : '▾'}`}</AppText>
                 </PressableScale>
               </View>
-              {open ? (
+              <Collapse open={open}>
                 <View style={styles.leagueList}>
                   {player.league_names.map((name) => (
                     <AppText key={name} style={styles.muted}>
@@ -160,7 +161,7 @@ export default function PortfolioExposurePanel() {
                     </AppText>
                   ))}
                 </View>
-              ) : null}
+              </Collapse>
             </View>
           );
         })}

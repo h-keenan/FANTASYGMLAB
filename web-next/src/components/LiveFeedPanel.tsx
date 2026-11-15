@@ -12,6 +12,7 @@ import {
   liveFeedStore,
   type FeedEvent,
 } from "@/lib/liveFeed";
+import { Collapse } from "@/components/ui/Presence";
 
 /**
  * Collapsible "Live feed": scoring events derived by diffing polled snapshots
@@ -64,7 +65,7 @@ export function LiveFeedPanel({ feedKey, live }: { feedKey: string; live: boolea
           {open ? "Hide" : `Show${events.length ? ` (${events.length})` : ""}`}
         </span>
       </button>
-      {open ? (
+      <Collapse open={open}>
         <div id="live-feed-body" className="flex flex-col gap-3" role="log" aria-live="polite" aria-label="Scoring updates">
           {events.length === 0 ? (
             <p className="m-0 text-xs" style={{ color: "var(--color-text-muted)" }}>
@@ -89,7 +90,7 @@ export function LiveFeedPanel({ feedKey, live }: { feedKey: string; live: boolea
             Built from score changes between refreshes, so times are when we noticed (not the play clock) and busy drives may be combined (&ldquo;approx.&rdquo;).
           </p>
         </div>
-      ) : null}
+      </Collapse>
     </section>
   );
 }

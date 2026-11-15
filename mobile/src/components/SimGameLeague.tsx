@@ -36,6 +36,7 @@ import { simStandingHero } from '../lib/simSummaries';
 import { simMatchupMargin, simMatchupStatus, simPreview, simScoreboardLabel } from '../lib/simLayout';
 import { useSimLeagueRosters } from '../lib/useSimLeagueRosters';
 import { spacing } from '../theme';
+import { PresenceSwap } from './Presence';
 
 type View_ = 'standings' | 'scores' | 'feed' | 'teams' | 'players';
 
@@ -249,6 +250,8 @@ export function SimLeagueTab({ ctx }: { ctx: SimCtx }) {
         active={view}
         onChange={setView}
       />
+      {/* The view body swaps with a fade-out then a rise-in (Presence), not one frame. */}
+      <PresenceSwap swapKey={view}>
       {view === 'standings' ? (
         <View style={common.stack}>
           {(() => {
@@ -289,6 +292,7 @@ export function SimLeagueTab({ ctx }: { ctx: SimCtx }) {
       ) : null}
       {view === 'teams' ? <SimLeagueTeamsView ctx={ctx} state={rosters} onRetry={() => setRosterAttempt((n) => n + 1)} /> : null}
       {view === 'players' ? <SimLeaguePlayersView ctx={ctx} state={rosters} onRetry={() => setRosterAttempt((n) => n + 1)} /> : null}
+      </PresenceSwap>
     </View>
   );
 }

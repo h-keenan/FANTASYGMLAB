@@ -51,6 +51,7 @@ import { groupTargetRows, targetContextLine, type GmTargetRow } from "@/lib/gmTa
 import { formatWaiverScore, waiverInjuryDisplay } from "@/lib/waiversPresentation";
 import { ValuesCredit } from "@/components/ValuesCredit";
 import { PageTitle } from "@/components/PageTitle";
+import { PresenceList } from "@/components/ui/Presence";
 
 /**
  * Ports modules/gm_plan_ui.py's render_gm_plan_workspace / mobile's
@@ -862,16 +863,20 @@ export function GmPlanContent({
             />
           ) : (
             <div className="glass-surface flex flex-col px-3">
-              {watching.map((row) => (
-                <TargetRowView
-                  key={row.target.player_id}
-                  row={row}
-                  leagueId={leagueId}
-                  leagueName={leagueName}
-                  onToggleUntouchable={toggleUntouchable}
-                  onRemove={removeTarget}
-                />
-              ))}
+              {/* A removed target collapses out in place (and an Undo grows it back) instead of popping. */}
+              <PresenceList
+                items={watching}
+                getKey={(row) => row.target.player_id}
+                render={(row) => (
+                  <TargetRowView
+                    row={row}
+                    leagueId={leagueId}
+                    leagueName={leagueName}
+                    onToggleUntouchable={toggleUntouchable}
+                    onRemove={removeTarget}
+                  />
+                )}
+              />
             </div>
           )}
         </section>

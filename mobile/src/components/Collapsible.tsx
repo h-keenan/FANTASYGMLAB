@@ -7,6 +7,7 @@ import AppText from './AppText';
 import { useThemeMode } from '../context/ThemeModeContext';
 import { simOpenKey, simParseOpen } from '../lib/simLayout';
 import { spacing } from '../theme';
+import { Collapse } from './Presence';
 
 /**
  * The one collapsible card (mirrors web-next's Collapsible): a header
@@ -67,7 +68,9 @@ export default function Collapsible({
         <View style={styles.summary}>{summary}</View>
         <AppText style={styles.chevron}>{open ? '−' : '+'}</AppText>
       </Pressable>
-      {open ? <View style={{ gap: spacing.md }}>{children}</View> : null}
+      <Collapse open={open}>
+        <View style={{ gap: spacing.md }}>{children}</View>
+      </Collapse>
     </AccentCard>
   );
 }

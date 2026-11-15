@@ -1,6 +1,6 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import React, { useEffect, useMemo, useState, type ReactNode } from 'react';
-import { AccessibilityInfo, LayoutAnimation, Platform, Pressable, StyleSheet, UIManager, View } from 'react-native';
+import { Pressable, StyleSheet, View } from 'react-native';
 
 import AccentCard from './AccentCard';
 import AppText from './AppText';
@@ -10,14 +10,7 @@ import { compactAriaLabel, compactParts, type CompactPart, type CompactTone } fr
 import { simOpenKey, simParseOpen } from '../lib/simLayout';
 import { spacing, type ThemeColors } from '../theme';
 import Money from './Money';
-
-let reduceMotion = false;
-try {
-  void Promise.resolve(AccessibilityInfo.isReduceMotionEnabled?.()).then((v) => { reduceMotion = Boolean(v); }).catch(() => {});
-} catch {
-  /* keep the animation */
-}
-if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) UIManager.setLayoutAnimationEnabledExperimental(true);
+import { Collapse } from './Presence';
 
 function toneColor(tone: CompactTone | undefined, colors: ThemeColors): string {
   switch (tone) {
@@ -95,8 +88,7 @@ export default function CompactModule({
 
   function toggle() {
     const next = !open;
-    // The body grows in and fades (twin of web's .module-expand); reduced motion: it simply appears.
-    if (!reduceMotion && expandIn === 'inline') LayoutAnimation.configureNext(LayoutAnimation.create(200, LayoutAnimation.Types.easeInEaseOut, LayoutAnimation.Properties.opacity));
+    // The inline body animates itself (Collapse: measured height + opacity; none under Reduce Motion).
     setTouched(true);
     setOpen(next);
     if (persist && expandIn === 'inline') AsyncStorage.setItem(simOpenKey(id), next ? '1' : '0').catch(() => {});
@@ -135,7 +127,9 @@ export default function CompactModule({
       </View>
       {preview ? <View testID="compact-preview">{preview}</View> : null}
       {expandIn === 'inline' ? (
-        open && hasBody ? <View style={{ gap: spacing.md }}>{children}</View> : null
+        <Collapse open={open && hasBody}>
+          <View style={{ gap: spacing.md }}>{children}</View>
+        </Collapse>
       ) : (
         <Sheet open={open} onClose={() => setOpen(false)} title={name}>
           {children}

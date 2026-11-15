@@ -13,6 +13,7 @@ import { compactAriaLabel, compactParts, type CompactPart, type CompactTone } fr
 import { heroParts, statStripParts, trendModel, type TrendModel } from '../lib/moduleTemplates';
 import { spacing, type ThemeColors } from '../theme';
 import Money from './Money';
+import { Collapse } from './Presence';
 
 /**
  * The module template components (mirrors web-next/src/components/ui/ModuleTemplates.tsx; catalog in
@@ -175,7 +176,7 @@ export function StatStripModule({
             {hasBars ? (open ? 'Hide rank bars' : 'Rank bars') : open ? 'Hide details' : 'Details'} {open ? '\u25b4' : '\u25be'}
           </AppText>
         </Pressable>
-        {open ? (
+        <Collapse open={open}>
           <View style={styles.bars} testID="stat-strip-bars">
             {items.map((item) => {
               const row = (
@@ -197,7 +198,7 @@ export function StatStripModule({
             })}
             {footer}
           </View>
-        ) : null}
+        </Collapse>
       </View>
     </AccentCard>
   );

@@ -7,6 +7,7 @@ import { Sheet } from "@/components/ui/Sheet";
 import { compactAriaLabel, compactParts, type CompactPart, type CompactTone } from "@/lib/compactModule";
 import { simOpenKey, simParseOpen } from "@/lib/simLayout";
 import { Money } from "@/components/Money";
+import { Collapse } from "@/components/ui/Presence";
 
 const OPEN_EVENT = "fgl:sim-open-change";
 
@@ -148,13 +149,9 @@ export function CompactModule({
       </div>
       {preview ? <div data-testid="compact-preview">{preview}</div> : null}
       {expandIn === "inline" ? (
-        <div id={bodyId} hidden={!open} className="pt-1">
-          {open ? (
-            <div className="module-expand">
-              <div className="module-expand-inner flex flex-col gap-3">{children}</div>
-            </div>
-          ) : null}
-        </div>
+        <Collapse open={open} id={bodyId} className="pt-1">
+          <div className="flex flex-col gap-3">{children}</div>
+        </Collapse>
       ) : (
         <Sheet open={open} onClose={() => setOverride(false)} title={name}>
           {children}

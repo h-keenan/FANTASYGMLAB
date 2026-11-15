@@ -24,6 +24,7 @@ import {
   type PlayerCardVariant,
 } from '../lib/playerCard';
 import { positionColor, radii, spacing, type ThemeColors } from '../theme';
+import { Collapse } from './Presence';
 
 /**
  * THE player card (docs/player-card.md); twin of web-next's PlayerCardKit.
@@ -350,7 +351,9 @@ function MatchupCard({ model, onPress, editing, mirror = false, emphasis = 'even
         <Ionicons name={open ? 'chevron-up' : 'chevron-down'} size={12} color={colors.textTertiary} />
         <AppText style={styles.expandText}>{open ? 'Less' : 'Details'}</AppText>
       </PressableScale>
-      {open ? <View>{detail ?? <PlayerCardDetail model={model} />}</View> : null}
+      <Collapse open={open}>
+        <View>{detail ?? <PlayerCardDetail model={model} />}</View>
+      </Collapse>
     </View>
   );
 }

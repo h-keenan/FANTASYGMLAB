@@ -2,6 +2,7 @@
 // Mocks /v1/sim/games against `next dev -p 3187` (web-next/.env.local with dummy Supabase vars), opens a player
 // sheet on the draft board, and drags it with real CDP touch events: from the handle, from the header area, and a
 // short drag that must spring back. Prints PASS/FAIL per case and exits 1 on any failure.
+// The full-screen weekly recap story has its own harness: story_swipe.mjs (STORY_PROFILE thresholds, close-vs-advance).
 // Usage: CHROME_PATH=/path/to/chrome node sheet_drag.mjs   (or: BROWSER=webkit node sheet_drag.mjs)
 import { chromium, webkit } from "playwright-core";
 import { createMock } from "./simmock.mjs";

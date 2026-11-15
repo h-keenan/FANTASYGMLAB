@@ -9,6 +9,7 @@ import { ExchangeSide } from "@/components/TradeAssetExchange";
 import { fairnessBandColor, formatTradeGain } from "@/lib/tradeHubPresentation";
 import { liveDraftAssetToTradeAsset, liveDraftDraftedPlayerOptions } from "@/lib/liveDraftPresentation";
 import { ErrorState } from "@/components/ErrorState";
+import { Collapse } from "@/components/ui/Presence";
 
 /**
  * Hypothetical mid-draft Trade Evaluator — the last of the 4 deferred
@@ -250,8 +251,8 @@ export function LiveDraftTradeEvaluator({
         </button>
       </div>
 
-      {open ? (
-        loadingOptions ? (
+      <Collapse open={open}>
+        {loadingOptions ? (
           <p className="text-sm" style={{ color: "var(--color-text-muted)" }}>
             Loading remaining picks…
           </p>
@@ -376,8 +377,8 @@ export function LiveDraftTradeEvaluator({
               </div>
             ) : null}
           </>
-        )
-      ) : null}
+        )}
+      </Collapse>
     </section>
   );
 }

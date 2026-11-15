@@ -53,6 +53,7 @@ import { EmptyState } from "@/components/EmptyState";
 import { PlayerName } from "@/components/PlayerName";
 import { Money } from "@/components/Money";
 import { formatMoney } from "@/lib/money";
+import { Collapse } from "@/components/ui/Presence";
 
 /**
  * Waivers page, laid out as: compact header + 3-stat strip, a
@@ -358,7 +359,7 @@ function RecommendedRow({
           {differentDrop ? <ReasonPill label={`Drop ${differentDrop.name}`} kind="down" tone="danger" /> : null}
         </span>
       </button>
-      {open ? (
+      <Collapse open={open}>
         <div className="flex flex-col gap-2 pb-3 pl-[3.75rem]" data-testid="waiver-rec-details">
           <div className="flex items-center justify-between gap-3">
             <ValueWithRing player={player} />
@@ -381,7 +382,7 @@ function RecommendedRow({
             <ViewDetailsButton player={player} />
           </div>
         </div>
-      ) : null}
+      </Collapse>
     </div>
   );
 }

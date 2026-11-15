@@ -22,6 +22,7 @@ import {
   weakestSlotText,
 } from '../lib/dropsPresentation';
 import { radii, spacing, type ThemeColors } from '../theme';
+import { Collapse } from './Presence';
 
 /**
  * Suggested drops (modules/drop_candidates.py). Mirrors web-next's
@@ -161,7 +162,9 @@ function SwapBody({ suggestion, drop, alternatives }: { suggestion: DropSuggesti
       <PressableScale onPress={() => setShowWhy((v) => !v)} accessibilityRole="button" accessibilityState={{ expanded: showWhy }} style={{ minHeight: 32, justifyContent: 'center' }}>
         <AppText style={[styles.meta, { color: colors.accent, fontWeight: '700' }]}>{showWhy ? 'Hide details' : 'Why this cut'}</AppText>
       </PressableScale>
-      {showWhy ? <DropPlayerLine player={selected} lead={selected === drop ? 'Best cut:' : 'Drop'} swap maxReasons={6} /> : null}
+      <Collapse open={showWhy}>
+        <DropPlayerLine player={selected} lead={selected === drop ? 'Best cut:' : 'Drop'} swap maxReasons={6} />
+      </Collapse>
       {others.length > 0 ? (
         <View style={styles.alts} testID="swap-alternatives">
           <AppText style={styles.kicker}>OR CUT INSTEAD</AppText>
@@ -227,7 +230,7 @@ function CompactSuggestedDrop({ suggestion }: { suggestion: DropSuggestion }) {
         {drop ? <PositionBadge position={drop.position} /> : null}
         <AppText style={[styles.meta, { color: colors.accent, fontWeight: '700' }]}>{open ? 'Hide' : 'Why'}</AppText>
       </PressableScale>
-      {open ? (
+      <Collapse open={open}>
         <View style={styles.compactDetails} testID="suggested-drop-details">
           {drop ? (
             <SwapBody suggestion={suggestion} drop={drop} alternatives={alternatives} />
@@ -238,7 +241,7 @@ function CompactSuggestedDrop({ suggestion }: { suggestion: DropSuggestion }) {
             </>
           )}
         </View>
-      ) : null}
+      </Collapse>
     </View>
   );
 }
@@ -270,11 +273,11 @@ export function SharedDropNote({ drop, count }: { drop: DropPlayer; count: numbe
         </View>
         <AppText style={[styles.meta, { color: colors.accent, fontWeight: '700' }]}>{open ? 'Hide' : 'Why'}</AppText>
       </PressableScale>
-      {open ? (
+      <Collapse open={open}>
         <View style={styles.compactDetails} testID="shared-drop-details">
           <DropPlayerLine player={drop} maxReasons={6} />
         </View>
-      ) : null}
+      </Collapse>
     </View>
   );
 }

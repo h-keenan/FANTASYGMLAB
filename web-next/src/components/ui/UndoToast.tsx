@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 
+import { Presence } from "@/components/ui/Presence";
 import { UNDO_TOAST_MS } from "@/lib/confirmInPlace";
 
 import "./ui.css";
@@ -27,6 +28,19 @@ export function UndoToast({ message, onUndo, onDone, durationMs = UNDO_TOAST_MS 
         Undo
       </button>
     </div>
+  );
+}
+
+/**
+ * Where a toast lives: a fixed, centred slot above the bottom chrome that every toast rises into and fades out of
+ * (components/ui/Presence.tsx), so a toast never pops in or vanishes between frames. Children are kept on screen during
+ * the exit, so pass the toast while it is showing and nothing after.
+ */
+export function ToastSlot({ show, children }: { show: boolean; children?: ReactNode }) {
+  return (
+    <Presence show={show} variant="rise" appear className="ui-toast-slot" testId="toast-slot">
+      {children}
+    </Presence>
   );
 }
 
@@ -74,8 +88,9 @@ export function useUndoableRemoval<T>({
     [flush],
   );
 
-  const toast =
-    pending !== null ? (
+  const toast = (
+    <ToastSlot show={pending !== null}>
+      {pending !== null ? (
       <UndoToast
         key={pending.seq}
         message={message(pending.item)}
@@ -91,7 +106,9 @@ export function useUndoableRemoval<T>({
           setPending(null);
         }}
       />
-    ) : null;
+      ) : null}
+    </ToastSlot>
+  );
 
   return { schedule, toast };
 }

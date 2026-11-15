@@ -15,6 +15,7 @@ import { listSummaryParts } from "@/lib/moduleTemplates";
 import { formatScore, lineupIneligibleTag, sumScore } from "@/lib/myTeamPresentation";
 import { EmptyState } from "@/components/EmptyState";
 import { playerSurname } from "@/lib/playerNameDisplay";
+import { Collapse } from "@/components/ui/Presence";
 
 const TONE_VAR: Record<TeamAnalysisRow["tone"], string> = {
   success: "var(--color-success)",
@@ -91,11 +92,11 @@ export function TeamAnalysisList({ rows }: { rows: TeamAnalysisRow[] }) {
               </span>
               <Chevron open={open} />
             </button>
-            {open ? (
+            <Collapse open={open}>
               <p id={panelId} className="px-3 pb-3 text-sm" style={{ color: "var(--color-text-secondary)" }}>
                 {row.body}
               </p>
-            ) : null}
+            </Collapse>
           </div>
         );
       })}

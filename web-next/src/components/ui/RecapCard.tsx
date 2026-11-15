@@ -6,6 +6,7 @@ import { LetterGrade } from "@/components/ui/LetterGrade";
 import { simGradeIndex, type SimGradeLetter } from "@/lib/simGrade";
 import { AccentCard } from "@/components/AccentCard";
 import type { RecapCardModel, RecapCardRow, RecapTone } from "@/lib/recapCard";
+import { Collapse } from "@/components/ui/Presence";
 
 /**
  * THE recap card (7b V2): a glass card with the page kicker, an optional grade/finish badge and three label/value rows;
@@ -72,13 +73,13 @@ export function RecapCard({ model, extras, testId = "recap-card" }: { model: Rec
           <button type="button" data-story-interactive aria-expanded={open} aria-controls={id} onClick={() => setOpen(!open)} className="tap-link self-stretch text-xs font-bold" style={{ minHeight: "var(--touch-target-min)", color: "var(--color-accent)" }}>
             {open ? "Less" : `More (${model.more.length})`}
           </button>
-          {open ? (
+          <Collapse open={open}>
             <div id={id} className="flex flex-col gap-2" style={{ borderTop: "var(--border-width-default) solid var(--color-border)", paddingTop: 8 }}>
               {model.more.map((row) => (
                 <Row key={row.key} row={row} extra={extras?.[row.key]} />
               ))}
             </div>
-          ) : null}
+          </Collapse>
         </>
       ) : null}
     </AccentCard>
