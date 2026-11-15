@@ -1,4 +1,5 @@
-import { fireEvent, render, screen } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { useState } from "react";
 import { describe, expect, it, vi } from "vitest";
 
 import { SimNotice } from "../SimGameParts";
@@ -26,7 +27,7 @@ describe("CompactModule", () => {
     expect(screen.queryByText("expanded body")).toBeNull();
   });
 
-  it("expands on tap and collapses again", () => {
+  it("expands on tap and collapses again (the body plays its exit, then leaves)", async () => {
     render(
       <CompactModule id="test.toggle" title="Board" persist={false} parts={[{ key: "a", text: "1/192 picks" }]}>
         <p>expanded body</p>
@@ -38,7 +39,7 @@ describe("CompactModule", () => {
     expect(screen.getByText("expanded body")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /Collapse/ })).toHaveAttribute("aria-expanded", "true");
     fireEvent.click(screen.getByRole("button", { name: /Collapse/ }));
-    expect(screen.queryByText("expanded body")).toBeNull();
+    await waitFor(() => expect(screen.queryByText("expanded body")).toBeNull());
   });
 });
 
@@ -58,6 +59,31 @@ describe("SimNotice toast", () => {
     render(<SimNotice message="Could not trade." tone="danger" onDismiss={onDismiss} />);
     vi.advanceTimersByTime(60000);
     expect(onDismiss).not.toHaveBeenCalled();
+    vi.useRealTimers();
+  });
+  it("Trade completed: it enters, auto-dismisses after ~4s, then plays its exit and unmounts (never pops)", () => {
+    vi.useFakeTimers();
+    function Host() {
+      const [notice, setNotice] = useState<{ message: string; tone: "success" } | null>(null);
+      return (
+        <>
+          <button type="button" onClick={() => setNotice({ message: "Trade done.", tone: "success" })}>trigger</button>
+          <SimNotice message={notice?.message ?? ""} tone={notice?.tone} onDismiss={() => setNotice(null)} />
+        </>
+      );
+    }
+    render(<Host />);
+    expect(screen.queryByTestId("sim-notice")).toBeNull();
+    fireEvent.click(screen.getByText("trigger"));
+    expect(screen.getByTestId("sim-notice")).toHaveAttribute("data-presence", "entering");
+    act(() => vi.advanceTimersByTime(300));
+    expect(screen.getByTestId("sim-notice")).toHaveAttribute("data-presence", "entered");
+    act(() => vi.advanceTimersByTime(4000));
+    // Timed out: still on screen, but leaving, with its text intact.
+    expect(screen.getByTestId("sim-notice")).toHaveAttribute("data-presence", "exiting");
+    expect(screen.getByText("Trade done.")).toBeInTheDocument();
+    act(() => vi.advanceTimersByTime(200));
+    expect(screen.queryByTestId("sim-notice")).toBeNull();
     vi.useRealTimers();
   });
 });

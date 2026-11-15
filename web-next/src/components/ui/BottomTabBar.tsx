@@ -20,6 +20,7 @@ import {
 } from "@/lib/bottomNav";
 
 import "./ui.css";
+import { usePresence } from "@/lib/usePresence";
 
 /**
  * Phone bottom pill (approved: option B + the V2 "smart pill", docs/audits/2026-11-smart-pill-options.html).
@@ -60,6 +61,7 @@ export function BottomTabBar({
   const menuOpen = menuState.open && menuState.id === contextId;
   const setMenuOpen = useCallback((v: boolean | ((o: boolean) => boolean)) => setMenuState((s) => ({ id: contextId, open: typeof v === "function" ? v(s.open && s.id === contextId) : v })), [contextId]);
   const mode = pillMode(Boolean(context), menuOpen);
+  const layer = usePillContextLayer(rawContext);
   const navRef = useRef<HTMLElement>(null);
   const menuBtnRef = useRef<HTMLButtonElement>(null);
   const globalRef = useRef<HTMLUListElement>(null);
@@ -148,10 +150,11 @@ export function BottomTabBar({
           })}
         </ul>
       </div>
-      {context ? (
+      {layer ? (
         <PillContextLayer
-          key={context.id}
-          context={context}
+          key={layer.context.id}
+          context={layer.context}
+          leaving={layer.leaving}
           hidden={mode === "menu"}
           section={activeTab}
           menuOpen={menuOpen}
@@ -163,8 +166,24 @@ export function BottomTabBar({
   );
 }
 
+/**
+ * The page segment's presence: while a page has a context it is shown; when the context goes away (leaving the page, a
+ * family swap that clears) the last one stays mounted for its exit (the segment slides out while the global tabs fade
+ * back in) and is then removed. `leaving` is true during that exit. Reduced motion: it simply goes (lib/presence.ts).
+ */
+export function usePillContextLayer(rawContext: PillContext | null | undefined): { context: PillContext; leaving: boolean } | null {
+  const live = normalizePillContext(rawContext);
+  const [keptRaw, setKeptRaw] = useState<PillContext | null>(rawContext ?? null);
+  if (rawContext && rawContext !== keptRaw) setKeptRaw(rawContext);
+  const presence = usePresence(Boolean(live));
+  const shown = live ?? normalizePillContext(keptRaw);
+  if (!presence.mounted || !shown) return null;
+  return { context: shown, leaving: presence.phase === "exiting" };
+}
+
 export function PillContextLayer({
   context,
+  leaving,
   hidden,
   section,
   menuOpen,
@@ -173,6 +192,8 @@ export function PillContextLayer({
   noMenu,
 }: {
   context: PillContext;
+  /** The page left: play the exit (the segment slides out); the host removes it when it ends. */
+  leaving?: boolean;
   hidden: boolean;
   /** The section icon (site shell). Omitted in the Fantasy Sim bar, where the orb is the navigator. */
   section?: BottomTab | undefined;
@@ -230,7 +251,7 @@ export function PillContextLayer({
   // ONE entry point: the lit glyph is the section you are in; tapping it unfolds the global row (sections + More).
   const menuGlyph = section ? section.glyph : "more";
   return (
-    <div ref={layerRef} className="pill-layer pill-layer--context" inert={hidden} data-testid="pill-context-layer">
+    <div ref={layerRef} className="pill-layer pill-layer--context" inert={hidden || leaving} data-leaving={leaving ? "" : undefined} data-testid="pill-context-layer">
       {noMenu ? null : <button
         ref={menuBtnRef}
         type="button"

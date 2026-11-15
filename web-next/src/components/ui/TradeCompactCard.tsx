@@ -7,6 +7,7 @@ import { CompactPlayerCard } from "@/components/ui/CompactPlayerCard";
 import { PickAvatar } from "@/components/PickAvatar";
 import { FairnessMeterRow } from "@/components/ui/FairnessMeterRow";
 import { avatarSize, fairnessMeter, type FairnessMeter, type PlayerMode, type PlayerRef } from "@/lib/playerAnatomy";
+import { Collapse } from "@/components/ui/Presence";
 
 export interface TradeCardAsset {
   key: string;
@@ -136,7 +137,9 @@ export function TradeCompactCard({
           >
             {open ? "Hide details" : "Show details"}
           </button>
-          <div id={bodyId} hidden={!open} className="flex flex-col gap-3">{open ? children : null}</div>
+          <Collapse open={open} id={bodyId}>
+            <div className="flex flex-col gap-3">{children}</div>
+          </Collapse>
         </>
       ) : null}
     </section>

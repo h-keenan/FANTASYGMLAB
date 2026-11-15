@@ -372,3 +372,13 @@ export function simRecapStandingsModel(recap: SimWeekRecap, facts: Pick<SimRecap
   }
   return { rows, compact, spots, you, caption };
 }
+
+/**
+ * What each way out of the weekly recap does when several recaps are queued (a catch-up sim, a playoff run).
+ * ADVANCE (the footer's "Next round" button) moves to the next queued recap; on the last one it finishes. DISMISS
+ * (the X, a swipe down, Escape / Back) always closes the WHOLE recap flow: it must never be wired to `onNext`, or each
+ * swipe-down just shows the next recap instead of leaving (the bug this exists to prevent). Both platforms use it.
+ */
+export function simRecapStoryActions<T>(last: boolean, handlers: { onNext: T; onClose: T }): { finish: T; dismiss: T } {
+  return { finish: last ? handlers.onClose : handlers.onNext, dismiss: handlers.onClose };
+}

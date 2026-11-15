@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import type { SimGamePlayer, SimWeekRecap } from "./simGame";
-import { STORY_ITEMS, simLeagueHighlights, simNextWeekModel, simPositionTotals, simRecapInjuryModel, simRecapOutcome, simRecapPageKeys, simRecapProj, simRecapResultModel, simRecapSeasonModel, simTopStarters } from "./simRecapStory";
+import { STORY_ITEMS, simLeagueHighlights, simNextWeekModel, simPositionTotals, simRecapInjuryModel, simRecapOutcome, simRecapPageKeys, simRecapProj, simRecapResultModel, simRecapSeasonModel, simRecapStoryActions, simTopStarters } from "./simRecapStory";
 
 const p = (id: string, name: string, pos: string, projection = 10) => ({ id, name, pos, projection }) as unknown as SimGamePlayer;
 const starter = (slot: string, player: SimGamePlayer | null, pts: number, flag: "bye" | "out" | null = null) => ({ slot, player, pts, flag }) as never;
@@ -148,5 +148,18 @@ describe("injuries: one marker per player", () => {
     const m = simRecapInjuryModel(recap({ injuries: [{ player: p("a", "Alf", "WR"), weeks: 4, team_id: "9", is_yours: true }, { player: p("b", "Bo", "RB"), weeks: 1, team_id: "2", is_yours: false }] as never }));
     expect(m.items.map((i) => i.detail)).toEqual(["4 weeks · yours", "1 week"]);
     expect(m.items.every((i) => !/out/i.test(i.detail))).toBe(true);
+  });
+});
+
+describe("simRecapStoryActions: advance vs dismiss", () => {
+  const onNext = "next";
+  const onClose = "close";
+  it("dismiss (X, swipe down, Esc/Back) is always the whole-flow close, on every queued recap", () => {
+    expect(simRecapStoryActions(false, { onNext, onClose }).dismiss).toBe("close");
+    expect(simRecapStoryActions(true, { onNext, onClose }).dismiss).toBe("close");
+  });
+  it("the finish button advances while recaps are queued and closes on the last one", () => {
+    expect(simRecapStoryActions(false, { onNext, onClose }).finish).toBe("next");
+    expect(simRecapStoryActions(true, { onNext, onClose }).finish).toBe("close");
   });
 });

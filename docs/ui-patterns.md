@@ -85,11 +85,24 @@ directive; both run the same `sheetGesture.test.ts` cases, including simulated t
   the sheet that stay visible; `snapTo(f)` from code). The sheet is laid out full height and translated to its rest
   offset. Down from the lowest point dismisses; a flick from full lands on the peek first; below full a pull up from
   anywhere expands (the content is not scrollable until full). Pure side: `sheetStops`, `resolveSheetRelease`.
-- **Story effect**: `effect: "story"` (full-screen card): translate + scale to 0.9 + fade to 0.45 with the pull.
+- **Profiles (2026-11-14)**: every threshold above is one named bundle, `SheetGestureProfile` in `lib/sheetGesture.ts`, passed as
+  `profile` (web `useSheetDragDismiss({ profile })`, app `useSheetDismissGesture({ profile })`; default `SHEET_PROFILE` = exactly the rules above, so
+  nothing else changed). `STORY_PROFILE` is the forgiving one the full-screen recap story uses: **12px slop**, no diagonal dead zone
+  (a pull at least as vertical as horizontal is claimed; more sideways stays a page swipe), release at **12% of the height clamped to
+  56-100px** (counted from where the pull was claimed, so ~110px of finger travel on a phone), flick **>= 0.4px/ms over >= 32px**, and 0.15px/ms of upward
+  jitter at lift-off still counts as rest (a real pull back up still cancels). Why a profile and not looser global constants: a sheet shares its
+  surface with scroll areas, tab strips and chip rows, where a loose lock steals scrolls; the story has no scrolling content, so it can afford to be
+  forgiving. Tests: `lib/storyGesture.test.ts` (both trees) runs seeded noisy trials: sloppy slow pulls with diagonal drift and jitter and quick flicks
+  must dismiss; jitter, short pulls, pulls brought back up, horizontal swipes and upward pulls must not.
+- **Story effect**: `effect: "story"` (full-screen card): translate + scale to 0.9 + fade to 0.45 with the pull. Web adds `touch-action: none` and
+  `overscroll-behavior: contain` on `.ui-story` (the whole card is the drag surface; horizontal page swipes and tap zones run on pointer events, which
+  keep firing under `touch-action: none`).
 - **Dismissal path**: `onDismiss` must close like the X. The story passes `overlay.closeAll` so the overlay stack pops
   its history entry. Under reduced motion it still follows the finger and closes, with no slide-out or spring.
 - Opt a region out with `data-sheet-no-drag`. Touch only (mouse/keyboard keep X, Esc, backdrop).
-- Check: `scripts/sim_layout_playwright/sheet_drag.mjs` (real CDP touches).
+- Check: `scripts/sim_layout_playwright/sheet_drag.mjs` (sheets, real CDP touches) and `story_swipe.mjs` (the weekly recap story at 390px with 3 queued
+  recaps: a sloppy diagonal pull and a flick close the whole flow, 14px of jitter and a sideways swipe do not, "Next round" advances, the X and a swipe on the
+  second recap close everything). `presence_toast.mjs` shows the notice entering, auto-dismissing and leaving.
 
 ## StoryCarousel
 
@@ -114,6 +127,11 @@ const pages: StoryPage[] = [
   the page-progress segments (tap one to jump), desktop arrow buttons. Taps on a button, link or
   anything marked `data-story-interactive` never flip the page. The last page has no forward action:
   its `footer` is the finish CTA.
+- **Close vs advance (never the same handler)**: `onClose` is DISMISS only: the X, a swipe down, Escape / Back (web and app). It must always leave the
+  whole story and, for the weekly recap, the whole queued flow. Advancing to the next queued recap belongs to the page's own `footer` button ("Next round").
+  `SimWeekRecapStory` gets both from `simRecapStoryActions(last, { onNext, onClose })` (`lib/simRecapStory.ts`, tested on both platforms): `dismiss` is always
+  `onClose`, `finish` is `onNext` until the last recap. (Before 2026-11-14 the carousel got `last ? onClose : onNext`, so every swipe-down just showed the
+  next recap.) The carousel uses `STORY_PROFILE` (see "Gestures").
 - **Close and the overlay rule**: it registers with THE overlay stack (`useOverlay` on web, `overlayStack` in the
   app; see "Overlays"), so only one pop-up is ever on screen: a player card (PQV) opened from a page REPLACES the
   story (it stays mounted/hidden with its page) and its "‹ Back to ..." returns to the same page. The X (top right)
@@ -163,8 +181,54 @@ pure tokens and rules in `lib/motion.ts` (byte-identical twin), web CSS variable
   `TouchableOpacity`; do not use `activeOpacity` or a hand-rolled `pressed` style). `AnimatedCard` already matches (.97 spring).
 - **Transitions by surface**: `TRANSITION_MS` (page 240, sheet 300, tab 180, toast 240, list 180, press 120). **Success pulse**: `.motion-success` /
   `SUCCESS_PULSE` for a saved/added/claimed confirmation, `PulseOnIncrease` for counts. **Count-up**: `CountUp`. **Hero glow**: `HERO_GLOW`.
+- **Appear / disappear**: `Presence` (see "Presence"): the one exception to "opacity and transform only" is its `collapse` variant's measured height.
 - **Adding motion**: use a class/hook above, never a new keyframe with its own duration; check the reduced-motion test
   (`components/Motion.test.tsx`) still describes your component's behaviour, and keep it off long lists.
+
+## Presence (appear / disappear / collapse: one primitive)
+
+Nothing pops. Anything that appears or disappears (a toast, a banner, an expander body, a list row, a pill layer, a swapped body) goes through ONE
+primitive instead of `cond && <X />` (coridian_: smooth, universal, web + app). Pure rules in the byte-identical twin `lib/presence.ts` (durations clamped to
+120-300ms, defaults enter 240 / exit 180, reduced motion = 0, the `exited / entering / entered / exiting` phase machine, frames per variant, the keep-while-leaving
+merge for list rows); the hook `lib/usePresence.ts` (mirrored twin); web `components/ui/Presence.tsx`, app `components/Presence.tsx`.
+
+```tsx
+<Presence show={!!notice} variant="rise">{notice ? <Banner .../> : null}</Presence>   // mounts, enters; on hide exits, THEN unmounts
+<Collapse open={open} id={bodyId}>{body}</Collapse>                                  // expander body: measured height + opacity
+<PresenceList items={rows} getKey={(r) => r.id} render={(r) => <Row {...r} />} />    // rows added / removed
+<PresenceSwap swapKey={tab}>{tabBody}</PresenceSwap>                                  // sheet / stepper body swap: old out, new in
+const p = usePresence(show)                                                           // the hook, when the element carries its own layout (the pill layer)
+```
+
+- **Variants**: `fade`, `rise` (+ 8px lift: toasts, banners), `pop` (+ scale .94), `collapse` (measured height + opacity: written as inline px by the
+  component, `auto` at rest so popovers and focus rings are never clipped). Opacity, transform and that one measured height only.
+- **Keeps the last children while leaving**, so the caller can render `null` the moment the state flips; `onExited` fires once after unmount.
+  Re-showing mid-exit reverses without a remount. Present on first render = simply there unless `appear`; rows added later enter.
+- **Lists** past 24 rows (`MAX_PRESENCE_ROWS`) do not animate: a removed row is gone at once.
+- **Reduced motion**: both durations are 0, so it appears / disappears at once (no phase, no timer). Web also has the `prefers-reduced-motion` CSS block;
+  app reads `useReducedMotion`.
+- **Toasts**: `ToastSlot` (`ui/UndoToast`, app twin) is the fixed, centred slot every toast rises into; the toast inside is plain. A transformed
+  wrapper becomes the containing block of `position: fixed` children, so the fixed class lives on the slot itself.
+  `SimNotice` is always mounted with an empty message as its hidden state: "Trade done" grows in, auto-dismisses after ~4s (`noticeDismissMs`), and
+  collapses away.
+- **Migrated** (web + app twins): `UndoToast` (`ToastSlot`) and `SimNotice`; the SimRealism and free-preview banners (dismissed / Pro = collapse away);
+  expander bodies in `CompactModule`, `PlayerAccordionRow`, `Collapsible`, `RecapCard`, `TradeCompactCard`, the `ModuleTemplates` stat strip, `PlayerCardKit`
+  detail, `SuggestedDrop` (3), the waiver recommendation, pick groups, commissioner evidence, the live-draft evaluator and score breakdown, the live feed,
+  multi-team result rows, portfolio exposure, trade offer rows, achievements, matchup slot rows, career season rows and My Team analysis rows; list rows
+  that are added / removed (`TradeScale` assets, GM Plan "Watching" targets via `PresenceList`, with the undo toast); the pill's page layer
+  (`usePillContextLayer` + `PillContextLayer` web, `BottomPill` app: the segment slides out while the global tabs return); and the Fantasy Sim League
+  view swap (`PresenceSwap`). Sheet tab panels (`Tabs`) already slide the incoming panel in with a minimum height, so they were left as they are.
+  Not migrated on purpose (allowlist, with reasons, in `scripts/check_presence_usage.mjs`): popovers and dropdowns anchored to a trigger (a transformed
+  wrapper would re-anchor them), sheet / modal mounts (the shell animates itself), and `ConfirmInPlace` (its own panel).
+- **Guard**: `scripts/check_presence_usage.mjs` (run by `lib/presenceScan.test.ts` in web-next and the app's `lib/presenceScan.test.ts`) fails on a NEW
+  hand-rolled expander body (`{open ? (`, `{expanded && <`, `{showWhy ? <` ...) or a stray `LayoutAnimation.configureNext` outside its allowlist; new
+  expanders use `Collapse`. The allowlist only shrinks.
+- Old one-offs (`.row-expand`, `.module-expand`, the app's LayoutAnimation toggles in `PlayerAccordionRow` / `CompactModule`) are gone;
+  `animateRowExpand` stays for the Move strip, the fairness meter and the trade tweak toggle. `.scale-collapse` (trade scale "+" tile) is the same idea
+  with its own CSS and stays until that tile is moved.
+- Tests: `lib/presence.test.ts` (both trees: durations clamped 120-300, reduced motion, phase machine, frames, list merge), `ui/Presence.test.tsx`
+  (enter / exit-then-unmount, appear, reversal, reduced motion, measured collapse height, list add / remove, swap), `ui/CompactModule.test.tsx`
+  ("Trade done" auto-dismisses at ~4s then exits and unmounts).
 
 ## ConfirmInPlace
 
@@ -795,8 +859,7 @@ coridian_: "there should not be 3 buttons next to the player. It should be one b
   (opens the slot's candidate sheet, since choosing a player needs a list). A full taxi squad offers "Swap onto taxi" with the taxi players
   as chips. A move the rules forbid is NOT drawn as a disabled button; a short muted note appears when the player would expect it
   ("Activate needs an open roster spot: cut or move someone first."). A move the server refuses shows its message under the strip.
-- Expansion animates height + opacity (web: `.row-expand` CSS grid keyframes, none under `prefers-reduced-motion`; app: `LayoutAnimation`
-  skipped when reduce-motion is on). Collapse is instant on web.
+- Expansion and collapse animate height + opacity through the shared `Collapse` (see "Presence"; measured height, none under reduced motion, web and app).
 - Rows whose trailing slot is not a move keep exactly one control: Draft (draft board / queue; the queue's up / down / remove moved into
   the open tile), Start (slot picker), Block / Remove (trade block). Draft-board Queue and the "simulated player" note live in the open tile.
 - `extra` info (owner on league lists, "Starting elsewhere") and non-status tags are in the open tile, so every row stays two lines.

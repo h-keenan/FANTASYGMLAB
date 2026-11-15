@@ -4562,6 +4562,22 @@ main > header:has(> h1.sr-only:only-child) {
   opacity: var(--press-opacity);
 }
 
+/* Presence (components/ui/Presence.tsx, lib/presence.ts): THE appear / disappear motion. Durations come from the inline
+   --presence-enter / --presence-exit (120-300ms, clamped in JS). Opacity and transform only; "collapse" also animates a measured
+   height, written by the component. Reduced motion: no animation (JS also drops the durations to 0, so nothing lingers). */
+@keyframes presence-in { from { opacity: 0; transform: translate3d(0, var(--presence-dy, 0px), 0) scale(var(--presence-scale, 1)); } to { opacity: 1; transform: none; } }
+@keyframes presence-out { from { opacity: 1; transform: none; } to { opacity: 0; transform: translate3d(0, var(--presence-dy, 0px), 0) scale(var(--presence-scale, 1)); } }
+.presence[data-variant="rise"] { --presence-dy: 8px; }
+.presence[data-variant="pop"] { --presence-scale: 0.94; }
+.presence[data-variant="fade"][data-presence="entering"],
+.presence[data-variant="rise"][data-presence="entering"],
+.presence[data-variant="pop"][data-presence="entering"] { animation: presence-in var(--presence-enter, 240ms) var(--ease-out) both; }
+.presence[data-variant="fade"][data-presence="exiting"],
+.presence[data-variant="rise"][data-presence="exiting"],
+.presence[data-variant="pop"][data-presence="exiting"] { animation: presence-out var(--presence-exit, 180ms) var(--ease-in) both; }
+.presence[data-presence="exiting"] { pointer-events: none; }
+@media (prefers-reduced-motion: reduce) { .presence { animation: none !important; transition: none !important; } }
+
 /* Success pulse (a saved / added / claimed confirmation): one soft scale up and back. Reuse .motion-pulse for counts. */
 @keyframes motion-success { 0% { transform: scale(1); } 45% { transform: scale(1.08); } 100% { transform: scale(1); } }
 .motion-success { animation: motion-success var(--motion-slow) var(--ease-out) both; }
@@ -4612,20 +4628,6 @@ main > header:has(> h1.sr-only:only-child) {
 @media (min-width: 1024px) {
   .matchup-grid { grid-template-columns: minmax(0, 2fr) minmax(0, 3fr); grid-template-rows: min-content min-content 1fr; align-items: start; }
 }
-
-/* Player row expand (PlayerAccordionRow / the sim's Move strip): the body grows from 0 to its height and fades in.
-   Reduced motion: it simply appears. */
-.row-expand { display: grid; grid-template-rows: 1fr; animation: row-expand-in 180ms ease-out; }
-.row-expand-inner { min-height: 0; overflow: hidden; }
-@keyframes row-expand-in { from { grid-template-rows: 0fr; opacity: 0; } to { grid-template-rows: 1fr; opacity: 1; } }
-@media (prefers-reduced-motion: reduce) { .row-expand { animation: none; } }
-
-/* CompactModule inline body: grows from 0 to its height and fades in (the same motion as .row-expand). The inner box only clips
-   while the animation runs, so popovers and focus rings are never cut off once it settles. Reduced motion: it simply appears. */
-.module-expand { display: grid; grid-template-rows: 1fr; animation: row-expand-in 200ms ease-out; }
-.module-expand-inner { min-height: 0; animation: module-expand-clip 200ms; }
-@keyframes module-expand-clip { from, to { overflow: hidden; } }
-@media (prefers-reduced-motion: reduce) { .module-expand, .module-expand-inner { animation: none; } }
 
 /* Trade scale (ui/TradeScale): the "+" tile collapses away when the offer is ready for Send / Tweak and grows back on Tweak.
    Reduced motion: it simply appears or disappears. */

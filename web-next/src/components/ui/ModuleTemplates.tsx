@@ -12,6 +12,7 @@ import { compactAriaLabel, compactParts, compactSummaryText, type CompactPart, t
 import type { ChartInputPoint } from "@/lib/chartSeries";
 import { heroParts, statStripParts, trendModel, type TrendModel } from "@/lib/moduleTemplates";
 import { Money } from "@/components/Money";
+import { Collapse } from "@/components/ui/Presence";
 
 /**
  * The module template components (docs/ui-patterns.md, "Module templates"; catalog in lib/moduleTemplates.ts).
@@ -186,7 +187,7 @@ export function StatStripModule({
           <span aria-hidden="true">{open ? "▴" : "▾"}</span>
         </button>
       ) : null}
-      {open ? (
+      <Collapse open={open}>
         <div id={bodyId} className="flex flex-col gap-2" data-testid="stat-strip-bars">
           {
             <ul className="m-0 flex list-none flex-col gap-1 p-0">
@@ -214,7 +215,7 @@ export function StatStripModule({
           }
           {footer}
         </div>
-      ) : null}
+      </Collapse>
     </AccentCard>
   );
 }

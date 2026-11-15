@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 
 import { api, type CareerSeason } from "@/lib/api";
+import { Collapse } from "@/components/ui/Presence";
 
 /**
  * Career tab (ports mobile's PlayerDetailScreen CareerSection,
@@ -48,8 +49,8 @@ function CareerSeasonCard({
           {expanded ? "▲" : "▼"}
         </span>
       </button>
-      {expanded ? (
-        season.key_stats.length > 0 ? (
+      <Collapse open={expanded}>
+        {season.key_stats.length > 0 ? (
           <div className="pqv-stat-grid">
             {season.key_stats.map((item) => (
               <div key={item.label} className="pqv-stat-row">
@@ -60,8 +61,8 @@ function CareerSeasonCard({
           </div>
         ) : (
           <p className="pqv-status-text">No stats recorded for this season.</p>
-        )
-      ) : null}
+        )}
+      </Collapse>
     </div>
   );
 }

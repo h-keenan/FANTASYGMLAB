@@ -3,7 +3,7 @@
 import { useCallback, useRef, useState, type ReactNode } from "react";
 
 import { TabGlyph } from "@/components/TabGlyph";
-import { PillContextLayer } from "@/components/ui/BottomTabBar";
+import { PillContextLayer, usePillContextLayer } from "@/components/ui/BottomTabBar";
 import { normalizePillContext, pillMode, PILL_MENU_LABEL, type PillContext } from "@/lib/bottomNav";
 
 import "./ui.css";
@@ -23,6 +23,7 @@ export function PillMorph({ context: rawContext, children }: { context?: PillCon
   const toggle = useCallback(() => setMenuState((s) => ({ id: contextId, open: !(s.open && s.id === contextId) })), [contextId]);
   const menuBtnRef = useRef<HTMLButtonElement>(null);
   const mode = pillMode(Boolean(context), menuOpen);
+  const layer = usePillContextLayer(rawContext);
   return (
     <div className="pill-morph" data-mode={mode} data-has-context={context ? "" : undefined} data-testid="pill-morph">
       <div className="pill-layer pill-layer--global" inert={mode === "context"}>
@@ -33,19 +34,19 @@ export function PillMorph({ context: rawContext, children }: { context?: PillCon
         ) : null}
         {children}
       </div>
-      {context ? <PillContextLayer key={context.id} context={context} hidden={mode === "menu"} menuOpen={menuOpen} menuBtnRef={menuBtnRef} onMenu={toggle} /> : null}
+      {layer ? <PillContextLayer key={layer.context.id} context={layer.context} leaving={layer.leaving} hidden={mode === "menu"} menuOpen={menuOpen} menuBtnRef={menuBtnRef} onMenu={toggle} /> : null}
     </div>
   );
 }
 
 /** The page segment alone (no row to fold back to): the Fantasy Sim draft room, where no action bar is mounted. */
 export function PillContextOnly({ context: rawContext }: { context: PillContext | null }) {
-  const context = normalizePillContext(rawContext);
   const ref = useRef<HTMLButtonElement>(null);
-  if (!context) return null;
+  const layer = usePillContextLayer(rawContext);
+  if (!layer) return null;
   return (
     <div className="pill-morph" data-mode="context" data-has-context="" data-testid="pill-context-only">
-      <PillContextLayer key={context.id} context={context} hidden={false} menuOpen={false} menuBtnRef={ref} onMenu={() => {}} noMenu />
+      <PillContextLayer key={layer.context.id} context={layer.context} leaving={layer.leaving} hidden={false} menuOpen={false} menuBtnRef={ref} onMenu={() => {}} noMenu />
     </div>
   );
 }

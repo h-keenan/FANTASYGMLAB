@@ -7,6 +7,7 @@ import { FairnessMeterRow } from "@/components/ui/FairnessMeterRow";
 import { TradeAssetCard, type TradeCardAsset } from "@/components/ui/TradeCompactCard";
 import { fairnessMeter, type FairnessMeter, type PlayerMode } from "@/lib/playerAnatomy";
 import { tradeScaleCount, tradeScaleMissing, tradeScalePhase } from "@/lib/tradeScale";
+import { PresenceList } from "@/components/ui/Presence";
 
 export type TradeScaleSide = "give" | "get";
 
@@ -39,18 +40,23 @@ function Column({
         {label}
         <span className="tabular-nums">{tradeScaleCount(assets.length, max)}</span>
       </span>
-      {assets.map((a) => (
-        <div key={a.key} className="enter-rise flex min-w-0 items-center gap-1" data-testid="scale-asset">
-          <div className="min-w-0 flex-1">
-            <TradeAssetCard asset={a} mode={mode} />
+      {/* Rows added or removed grow in / collapse out in place (Presence); the rows already there are simply there. */}
+      <PresenceList
+        items={assets}
+        getKey={(a) => a.key}
+        render={(a) => (
+          <div className="flex min-w-0 items-center gap-1" data-testid="scale-asset">
+            <div className="min-w-0 flex-1">
+              <TradeAssetCard asset={a} mode={mode} />
+            </div>
+            {editing && onRemove ? (
+              <button type="button" aria-label={`Remove ${a.player?.name ?? a.pickLabel ?? "asset"}`} onClick={() => onRemove(side, a.key)} className="inline-flex shrink-0 items-center justify-center text-base font-bold" style={{ width: 32, minHeight: "var(--touch-target-min)", color: "var(--color-text-muted)" }}>
+                ×
+              </button>
+            ) : null}
           </div>
-          {editing && onRemove ? (
-            <button type="button" aria-label={`Remove ${a.player?.name ?? a.pickLabel ?? "asset"}`} onClick={() => onRemove(side, a.key)} className="inline-flex shrink-0 items-center justify-center text-base font-bold" style={{ width: 32, minHeight: "var(--touch-target-min)", color: "var(--color-text-muted)" }}>
-              ×
-            </button>
-          ) : null}
-        </div>
-      ))}
+        )}
+      />
       <div className="scale-collapse" data-open={editing && !full ? "true" : "false"} aria-hidden={editing && !full ? undefined : true}>
         <div className="scale-collapse-inner">
           <button

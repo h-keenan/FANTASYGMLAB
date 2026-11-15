@@ -7,6 +7,7 @@ import { createPortal } from "react-dom";
 import { AccentCard } from "@/components/AccentCard";
 import { Button } from "@/components/Button";
 import { CompactModule } from "@/components/ui/CompactModule";
+import { Presence } from "@/components/ui/Presence";
 import { noticeDismissMs, type CompactPart, type NoticeToastTone } from "@/lib/compactModule";
 import { PlayerAvatar } from "@/components/PlayerAvatar";
 import { PlayerAccordionRow, usePlayerAccordion } from "@/components/ui/PlayerAccordionRow";
@@ -526,16 +527,19 @@ export function SimSheet({ title, onClose, children, labelledBy = "sim-sheet-tit
 /** The free-preview strip over a game; nothing for Pro. */
 export function SimPreviewBanner({ preview }: { preview: SimGamePreview | null | undefined }) {
   const line = simGamePreviewLine(preview);
-  if (!line) return null;
   return (
-    <AccentCard accent="var(--color-premium)" compact as="div">
-      <div className="flex items-center gap-2">
-        <ToneBadge label="Free preview" color="var(--color-premium)" size="xs" />
-        <p className="text-xs flex-1 min-w-0" data-testid="sim-preview-line" style={{ color: "var(--color-text-secondary)" }}>
-          {line}
-        </p>
-      </div>
-    </AccentCard>
+    <Presence show={Boolean(line)} variant="collapse">
+      {line ? (
+        <AccentCard accent="var(--color-premium)" compact as="div">
+          <div className="flex items-center gap-2">
+            <ToneBadge label="Free preview" color="var(--color-premium)" size="xs" />
+            <p className="text-xs flex-1 min-w-0" data-testid="sim-preview-line" style={{ color: "var(--color-text-secondary)" }}>
+              {line}
+            </p>
+          </div>
+        </AccentCard>
+      ) : null}
+    </Presence>
   );
 }
 
@@ -561,19 +565,22 @@ function useNoticeAutoDismiss(message: string, tone: SimGameTone, onDismiss?: ()
 /** A transient or blocking one-line message inside a game (role=status/alert). */
 export function SimNotice({ message, tone = "warning", onDismiss }: { message: string; tone?: SimGameTone; onDismiss?: () => void }) {
   useNoticeAutoDismiss(message, tone, onDismiss);
-  if (!message) return null;
+  // Always mounted: an empty message is the hidden state, so a notice that arrives grows in and one that is dismissed (or times
+  // out, e.g. "Trade done") collapses away instead of popping.
   return (
-    <AccentCard accent={simToneColor(tone)} compact as="div" className="enter-rise">
-      <div className="flex items-start gap-2" role={tone === "danger" ? "alert" : "status"}>
-        <ReviewGlyphChip glyph={simNoticeGlyph(tone)} tone={tone} size={24} />
-        <p className="text-sm flex-1 min-w-0">{message}</p>
-        {onDismiss ? (
-          <button type="button" className="tap-link text-xs font-bold" style={{ color: "var(--color-accent)" }} onClick={onDismiss}>
-            Dismiss
-          </button>
-        ) : null}
-      </div>
-    </AccentCard>
+    <Presence show={Boolean(message)} variant="collapse" testId="sim-notice">
+      <AccentCard accent={simToneColor(tone)} compact as="div">
+        <div className="flex items-start gap-2" role={tone === "danger" ? "alert" : "status"}>
+          <ReviewGlyphChip glyph={simNoticeGlyph(tone)} tone={tone} size={24} />
+          <p className="text-sm flex-1 min-w-0">{message}</p>
+          {onDismiss ? (
+            <button type="button" className="tap-link text-xs font-bold" style={{ color: "var(--color-accent)" }} onClick={onDismiss}>
+              Dismiss
+            </button>
+          ) : null}
+        </div>
+      </AccentCard>
+    </Presence>
   );
 }
 

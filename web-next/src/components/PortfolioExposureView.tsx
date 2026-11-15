@@ -14,6 +14,7 @@ import { PremiumUpsellCard } from "@/components/PremiumUpsellCard";
 import { StatStrip } from "@/components/StatStrip";
 import { ValueStat } from "@/components/ValueStat";
 import { SkeletonBlock } from "@/components/Skeleton";
+import { Collapse } from "@/components/ui/Presence";
 
 type SortKey = "leagues" | "value";
 
@@ -79,7 +80,7 @@ function ExposureRow({
           .filter(Boolean)
           .join(" · ")}
       </PlayerRow>
-      {open ? (
+      <Collapse open={open}>
         <ul
           className="flex flex-col gap-1 pb-2 pl-14 text-sm"
           style={{
@@ -92,7 +93,7 @@ function ExposureRow({
             <li key={name}>{name}</li>
           ))}
         </ul>
-      ) : null}
+      </Collapse>
     </div>
   );
 }

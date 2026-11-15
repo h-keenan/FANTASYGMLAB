@@ -14,7 +14,7 @@ import Animated, {
 
 import { useThemeMode } from '../context/ThemeModeContext';
 import { useOverlay } from '../lib/useOverlay';
-import { SHEET_SCROLL_TOP_TOLERANCE_PX, classifySheetGesture, resolveSheetRelease, sheetDragPosition } from '../lib/sheetGesture';
+import { SHEET_PROFILE, SHEET_SCROLL_TOP_TOLERANCE_PX, classifySheetGesture, resolveSheetRelease, sheetDragPosition, type SheetGestureProfile } from '../lib/sheetGesture';
 import { radii, spacing } from '../theme';
 
 /**
@@ -72,6 +72,7 @@ export function useSheetDismissGesture({
   enabled = true,
   slideOut = true,
   handleOnly = false,
+  profile = SHEET_PROFILE,
 }: {
   translateY: SharedValue<number>;
   sheetHeight: SharedValue<number>;
@@ -82,6 +83,8 @@ export function useSheetDismissGesture({
    * scrolling content can't be a SheetScrollView (e.g. a SectionList), so
    * scrolling it can never be mistaken for a dismiss. */
   handleOnly?: boolean;
+  /** Threshold bundle (lib/sheetGesture.ts). Default: the standard sheet rules; the recap story passes STORY_PROFILE. */
+  profile?: SheetGestureProfile;
 }): { gesture: ReturnType<typeof Gesture.Pan>; scrollContext: SheetScrollContextValue } {
   const scrollY = useSharedValue(0);
   const startX = useSharedValue(0);
@@ -128,12 +131,13 @@ export function useSheetDismissGesture({
             dx: touch.absoluteX - startX.value,
             dy: touch.absoluteY - startY.value,
             canStartDrag: startedOnHandle.value || (!handleOnly && contentAtTop),
+            profile,
           });
           if (decision === 'drag') manager.activate();
           else if (decision === 'ignore') manager.fail();
         })
         .onUpdate((event) => {
-          translateY.value = sheetDragPosition({ base: 0, delta: event.translationY, stops: [0], height: sheetHeight.value });
+          translateY.value = sheetDragPosition({ base: 0, delta: event.translationY, stops: [0], height: sheetHeight.value, profile });
         })
         .onEnd((event) => {
           // Gesture handler reports px/s; the shared rules use px/ms.
@@ -142,6 +146,7 @@ export function useSheetDismissGesture({
             velocity: event.velocityY / 1000,
             height: sheetHeight.value,
             stops: [0],
+            profile,
           });
           if (release.type !== 'dismiss') {
             translateY.value = reduceMotion ? withTiming(0, { duration: 0 }) : withSpring(0, SNAP_BACK_SPRING);
@@ -155,7 +160,7 @@ export function useSheetDismissGesture({
             if (finished) runOnJS(dismiss)();
           });
         }),
-    [enabled, slideOut, reduceMotion, handleOnly, nativeScroll, dismiss, scrollY, startX, startY, startedOnHandle, startScrollY, translateY, sheetHeight],
+    [enabled, slideOut, reduceMotion, handleOnly, profile, nativeScroll, dismiss, scrollY, startX, startY, startedOnHandle, startScrollY, translateY, sheetHeight],
   );
 
   const scrollContext = useMemo(() => ({ scrollY, nativeScroll }), [scrollY, nativeScroll]);

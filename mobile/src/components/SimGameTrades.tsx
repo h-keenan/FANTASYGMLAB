@@ -60,6 +60,7 @@ import {
 } from '../lib/simGame';
 import type { ThemeColors } from '../theme';
 import { playerSurname } from '../lib/playerNameDisplay';
+import { Collapse } from './Presence';
 
 /** "Scout" button for the partner list: opens the team's scouting sheet without picking it as the partner. */
 function ScoutButton({ teamId, name }: { teamId: string; name: string }) {
@@ -194,7 +195,7 @@ function OfferCard({ item, defaultOpen, busy, canTrade, onRespond }: { item: Sim
             <AppText style={{ fontWeight: '800', color: colors.success, fontSize: 13 }}>Get</AppText> {names(item.you_get)}
           </AppText>
         </Pressable>
-        {open ? (
+        <Collapse open={open}>
           <View style={common.stack}>
             {item.message ? <AppText style={common.small}>{item.message}</AppText> : null}
             <View>
@@ -210,7 +211,7 @@ function OfferCard({ item, defaultOpen, busy, canTrade, onRespond }: { item: Sim
               <View style={{ flex: 1 }}><Button size="sm" variant="secondary" label="Decline" disabled={busy} onPress={() => onRespond(item, 'decline')} /></View>
             </View>
           </View>
-        ) : null}
+        </Collapse>
       </AccentCard>
     </FadeInView>
   );

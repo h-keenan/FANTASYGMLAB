@@ -54,7 +54,7 @@ describe("a roster row with Move", () => {
     await waitFor(() => expect(run).toHaveBeenCalledWith("cut", undefined));
     // tapping Move again collapses it
     fireEvent.click(screen.getByRole("button", { name: "Move Pat Nacua" }));
-    expect(screen.queryByTestId("move-strip")).toBeNull();
+    await waitFor(() => expect(screen.queryByTestId("move-strip")).toBeNull());
   });
 
   it("Profile in the strip opens the player; a row without Move has no trailing control", () => {

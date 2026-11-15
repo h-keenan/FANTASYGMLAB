@@ -170,10 +170,11 @@ describe("IR and taxi on the Team tab", () => {
     fireEvent.click(screen.getByRole("button", { name: "Move Rookie Ray" }));
     expect(screen.getAllByTestId("move-strip")).toHaveLength(1);
     fireEvent.click(screen.getByRole("button", { name: "Move Hurt Hank" }));
-    expect(screen.getAllByTestId("move-strip")).toHaveLength(1);
+    // The first row's strip plays its exit before it leaves.
+    await waitFor(() => expect(screen.getAllByTestId("move-strip")).toHaveLength(1));
     expect(within(screen.getByTestId("move-strip")).getByRole("button", { name: "To IR" })).toBeEnabled();
     fireEvent.click(screen.getByRole("button", { name: "Move Hurt Hank" }));
-    expect(screen.queryByTestId("move-strip")).toBeNull();
+    await waitFor(() => expect(screen.queryByTestId("move-strip")).toBeNull());
   });
 
   it("shows the backend reason inline when a move is refused", async () => {

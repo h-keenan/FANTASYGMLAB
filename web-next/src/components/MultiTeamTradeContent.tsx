@@ -58,6 +58,7 @@ import {
 import { pickToSheetItem, pickToTradeAsset, playerToSheetItem, playerToTradeAsset } from "@/lib/tradeAnalyzerPresentation";
 import { selectedItems, type SheetItem } from "@/lib/tradeSheetPicker";
 import { PopupShell } from "@/components/PopupShell";
+import { Collapse } from "@/components/ui/Presence";
 
 /**
  * Multi-team (3 to 6 team) Trade Analyzer. Two separate surfaces:
@@ -220,12 +221,12 @@ function RankedRow({ team, rank, vetoLocked }: { team: MultiTeamResult; rank: nu
         </span>
         <ToneBadge label={verdictChipLabel(team)} color={tone} />
       </button>
-      {open ? (
+      <Collapse open={open}>
         <div className="flex flex-col gap-3 pt-2">
           <TeamStats team={team} />
           <TeamResultBody team={team} vetoLocked={vetoLocked} />
         </div>
-      ) : null}
+      </Collapse>
     </AccentCard>
   );
 }
