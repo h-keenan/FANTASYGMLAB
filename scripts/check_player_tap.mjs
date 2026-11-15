@@ -34,6 +34,8 @@ const TEMPLATE_FILES = [
 ];
 // Files allowed to render a raw <PlayerAvatar>/<PlayerName>: path (relative to repo root) -> reason.
 export const RAW_ALLOWLIST = {
+  "web-next/src/components/NewsDigest.tsx": "exempt: the player chips are filter toggles that select a player to filter by (picker rule); the story rows use PlayerAccordionRow, tappable by default",
+  "mobile/src/components/NewsDigest.tsx": "exempt: the player chips are filter toggles that select a player to filter by (picker rule); the story rows use PlayerAccordionRow, tappable by default",
   "mobile/src/components/CollegeScoutingPanel.tsx": "draws its own identity markup and wires its own tap (PlayerTap, PlayerIdentityTrigger or the PQV opener), audited in the 2026-11-14 tap sweep",
   "mobile/src/components/CompactPlayerModule.tsx": "draws its own identity markup and wires its own tap (PlayerTap, PlayerIdentityTrigger or the PQV opener), audited in the 2026-11-14 tap sweep",
   "mobile/src/components/CompareShareCard.tsx": "exempt: a rendered share-card image, not interactive UI",
