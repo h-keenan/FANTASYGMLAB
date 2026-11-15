@@ -7,7 +7,7 @@ import { simPlayerBadges } from '../lib/simAchievements';
 import AppText from './AppText';
 import ErrorState from './ErrorState';
 import { Section as PqvSection } from './PlayerQuickViewSheet';
-import { SkeletonCard } from './SkeletonBlock';
+import { SkeletonCard } from './Skeleton';
 import { SimTeamIdentity, SimTeamLogo } from './SimTeamIdentity';
 import { createSimStyles } from './SimGameParts';
 import ToneBadge from './ToneBadge';

@@ -58,7 +58,7 @@ export default function AlertsPage() {
 
   if (authLoading || (!alerts && !error)) {
     return (
-      <LoadingScreen status="Loading Alerts…" />
+      <LoadingScreen label="Alerts" layout="list" />
     );
   }
 

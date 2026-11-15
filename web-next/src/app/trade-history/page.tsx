@@ -67,7 +67,7 @@ export default function TradeHistoryPage() {
 
   if (authLoading || (!data && !error)) {
     return (
-      <LoadingScreen status="Loading Trade History…" />
+      <LoadingScreen label="Trade History" layout="cards" family="trades" />
     );
   }
 

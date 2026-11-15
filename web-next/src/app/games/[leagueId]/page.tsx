@@ -23,6 +23,6 @@ export default function GamesPage() {
     if (!authLoading && !session) router.replace("/");
   }, [authLoading, session, router]);
 
-  if (authLoading || !session) return <LoadingScreen status="Loading Games…" />;
+  if (authLoading || !session) return <LoadingScreen label="Games" layout="cards" family="league" />;
   return <GamesContent leagueId={leagueId} leagueName={leagueName} initialTab={parseGamesTab(searchParams.get("tab"))} />;
 }

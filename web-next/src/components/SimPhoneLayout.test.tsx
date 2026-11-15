@@ -35,11 +35,13 @@ describe("Collapsible", () => {
 });
 
 describe("SimPlayerChip quick", () => {
-  it("is not interactive by default and opens the game's player detail when quick", () => {
+  it("opens the game's player detail by default and stays plain with a nonInteractive reason", () => {
     const open = vi.fn();
     const { rerender } = render(
       <SimOpenPlayerContext.Provider value={open}><SimPlayerChip player={player()} /></SimOpenPlayerContext.Provider>,
     );
+    expect(screen.getByRole("button", { name: /Pat Mahomes/ })).toBeInTheDocument();
+    rerender(<SimOpenPlayerContext.Provider value={open}><SimPlayerChip player={player()} nonInteractive="sits inside a row that already opens the player" /></SimOpenPlayerContext.Provider>);
     expect(screen.queryByRole("button")).toBeNull();
     rerender(<SimOpenPlayerContext.Provider value={open}><SimPlayerChip player={player()} quick /></SimOpenPlayerContext.Provider>);
     fireEvent.click(screen.getByRole("button", { name: /Pat Mahomes.*Open player details/ }));

@@ -43,7 +43,7 @@ export default function PremiumPage() {
   }, [authLoading, session]);
 
   if (authLoading) {
-    return <LoadingScreen status="Loading Pro…" />;
+    return <LoadingScreen label="Pro" layout="detail" />;
   }
 
   // P0 UX audit, 2026-10-27: this used to `router.replace("/")` a signed-out
@@ -56,7 +56,7 @@ export default function PremiumPage() {
   }
 
   if (!me && !plans && !error) {
-    return <LoadingScreen status="Loading Pro…" />;
+    return <LoadingScreen label="Pro" layout="detail" />;
   }
 
   if (error || !me || !plans) {

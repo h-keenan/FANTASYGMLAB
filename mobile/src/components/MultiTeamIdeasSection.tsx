@@ -10,7 +10,7 @@ import ErrorState from './ErrorState';
 import { multiFailureMessage } from './MultiTeamTradePanel';
 import MultiTeamSharePreviewModal from './MultiTeamSharePreviewModal';
 import PremiumLock from './PremiumLock';
-import SkeletonBlock from './SkeletonBlock';
+import SkeletonBlock from './Skeleton';
 import ToneBadge from './ToneBadge';
 import { api, type ValuationLens } from '../lib/api';
 import { trackUse } from '../lib/analytics';

@@ -31,6 +31,7 @@ import {
 import { ValuesCredit } from "@/components/ValuesCredit";
 import { PageTitle } from "@/components/PageTitle";
 import { CompactPlayerCard } from "@/components/ui/CompactPlayerCard";
+import { SkeletonList } from "@/components/Skeleton";
 import { Collapse } from "@/components/ui/Presence";
 
 /**
@@ -430,9 +431,7 @@ export function LiveDraftContent({
           ) : null}
 
           {!state ? (
-            <p className="text-sm" style={{ color: "var(--color-text-muted)" }}>
-              Loading the live draft board…
-            </p>
+            <SkeletonList label="the live draft board" count={6} />
           ) : (
             <>
               <div className="flex flex-wrap gap-2">
@@ -487,7 +486,7 @@ export function LiveDraftContent({
                 <span className="text-xs font-bold uppercase" style={{ color: "var(--color-text-muted)" }}>
                   On The Clock
                 </span>
-                <span style={{ font: "var(--type-section-title)" }}>
+                <span style={{ font: "var(--type-app-section-title)" }}>
                   Pick {state.current_pick} · Round {state.current_round}
                 </span>
                 <span className="text-sm" style={{ color: "var(--color-text-secondary)" }}>

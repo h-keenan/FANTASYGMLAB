@@ -120,9 +120,9 @@ export function SimWaiverCard({ ctx, suggestions, onClaim, onTab }: { ctx: SimCt
         shown.map((s) => (
           <View key={s.player.id} style={common.tight} testID="waiver-suggestion">
             <View style={common.rowBetween}>
-              <Pressable style={common.grow} onPress={() => ctx.openPlayer(s.player)} accessibilityRole="button" accessibilityLabel={`${s.player.name}, ${s.player.pos}. Open player details`}>
+              <View style={common.grow}>
                 <SimPlayerChip player={s.player} size={32} />
-              </Pressable>
+              </View>
               <View style={{ alignItems: 'flex-end' }}>
                 <SimTrend delta={Math.max(s.gain_now, s.gain_ros)} />
                 <AppText style={common.muted}>{s.gain_now >= s.gain_ros ? 'this week' : 'per week'}</AppText>
@@ -212,9 +212,9 @@ export function SimInjuriesCard({ ctx, injuries }: { ctx: SimCtx; injuries: SimH
       ) : (
         list.map((i) => (
           <View key={i.player.id} style={common.rowBetween} testID="home-injury">
-            <Pressable style={common.grow} onPress={() => ctx.openPlayer(i.player)} accessibilityRole="button" accessibilityLabel={`${i.player.name}, ${i.player.pos}. Open player details`}>
+            <View style={common.grow}>
               <SimPlayerChip player={i.player} size={28} />
-            </Pressable>
+            </View>
             <View style={{ alignItems: 'flex-end', gap: 2 }}>
               <SimToneBadge label={`Out ${i.out_weeks} wk`} tone="danger" />
               <AppText style={[common.muted, i.starting && { color: colors.warning }]}>{i.starting ? 'In your lineup' : i.note}</AppText>

@@ -43,7 +43,7 @@ export function rankFill(rank: number | null | undefined, size: number | null | 
 // the FantasyDesk visual-identity mockup's per-tile snapshot coloring.
 const GLYPH_ACCENT: Record<SnapshotGlyphName, string> = {
   record: "var(--color-accent)",
-  power: "var(--color-premium)",
+  power: "var(--color-accent)",
   franchise: "var(--color-diagnostic)",
   starter: "var(--color-success)",
   bench: "var(--color-opportunity)",
@@ -96,13 +96,13 @@ export function SnapshotTile({
       : tone === "positive"
         ? "var(--color-success)"
         : tone === "premium"
-          ? "var(--color-premium)"
+          ? "var(--color-accent)"
           : "var(--color-text-primary)";
 
   return (
     <div
       className={`glass-surface flex flex-col gap-1 ${compact ? "px-1.5 py-2 min-w-0 items-center text-center" : `p-3 min-w-[7rem]${note && wrapNote ? " max-w-[16rem]" : ""}`}`}
-      style={tone === "premium" ? { borderColor: "var(--color-premium)" } : undefined}
+      style={tone === "premium" ? { borderColor: "var(--color-accent)" } : undefined}
     >
       <span
         className={compact ? "flex flex-col items-center gap-0.5 text-[0.6875rem] leading-tight text-center min-w-0 max-w-full" + (reserveLabelLines ? " min-h-[3.25rem]" : "") : "flex items-center gap-1 text-xs"}

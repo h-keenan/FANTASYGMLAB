@@ -1,5 +1,6 @@
 "use client";
 
+import { Select } from "@/components/Input";
 import { useEffect, useState } from "react";
 
 import { api, type WeeklyStatPoint } from "@/lib/api";
@@ -84,13 +85,10 @@ export function PlayerTrendsPanel({
     // grow the modal a second time once the outer loading gate has
     // already resolved — see globals.css's .pqv-skeleton-chart comment.
     return (
-      <section className="pqv-stat-season" aria-busy="true">
+      <section className="pqv-stat-season" aria-busy="true" role="status" aria-label="Loading weekly trends">
         <SkeletonBlock width="35%" height="0.6rem" />
         <SkeletonBlock height={CHART_HEIGHT} />
         <SkeletonBlock width="45%" height="0.7rem" style={{ alignSelf: "center" }} />
-        <p className="sr-only" role="status">
-          Loading weekly trends…
-        </p>
       </section>
     );
   }
@@ -100,23 +98,18 @@ export function PlayerTrendsPanel({
       <div className="flex items-center justify-between gap-2 flex-wrap">
         <h3>Week by Week · {weeklyStats.season}</h3>
         {seasonOptions.length > 1 ? (
-          <select
+          <Select
             aria-label="Season"
             value={selectedSeason ?? currentSeasonAnchor ?? ""}
             onChange={(event) => setSelectedSeason(Number(event.target.value))}
-            className="text-xs px-2 py-1"
-            style={{
-              background: "var(--color-surface-muted)",
-              color: "var(--color-text-secondary)",
-              border: "var(--border-width-default) solid var(--color-border)",
-            }}
+            className="text-xs"
           >
             {seasonOptions.map((season) => (
               <option key={season} value={season}>
                 {season}
               </option>
             ))}
-          </select>
+          </Select>
         ) : null}
       </div>
       <WeeklyPointsPanel name={name} weeks={weeklyStats.weeks} season={weeklyStats.season} gradientId={gradientId} />

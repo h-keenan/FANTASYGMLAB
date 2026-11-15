@@ -24,7 +24,7 @@ export default function TradeHubHoldCard({ hold, ideaCount }: { hold: TradeHubHo
     if (factor === 'context') return { color: colors.accent, icon: 'pulse-outline' };
     if (factor === 'ideas') return { color: colors.success, icon: 'bulb-outline' };
     if (factor === 'competition') return { color: colors.warning, icon: 'people-outline' };
-    if (factor === 'posture') return { color: colors.premium, icon: 'shield-outline' };
+    if (factor === 'posture') return { color: colors.accent, icon: 'shield-outline' };
     return { color: colors.textTertiary, icon: 'ellipse-outline' };
   };
   return (

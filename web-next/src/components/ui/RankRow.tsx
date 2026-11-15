@@ -41,7 +41,7 @@ export function RankRow({
         {rank != null ? <span className="w-5 shrink-0 text-xs font-extrabold tabular-nums" style={{ color: "var(--color-text-muted)" }}>{rank}</span> : null}
         <div className="min-w-0 flex-1">
           {player ? (
-            <CompactPlayerCard player={player} detail={detail} trailing={trailing} />
+            <CompactPlayerCard player={player} detail={detail} trailing={trailing} nonInteractive={onClick ? "the whole row is one button that runs onClick" : undefined} />
           ) : (
             <div className="flex min-w-0 items-center gap-2" style={{ minHeight: 40 }}>
               {leading}

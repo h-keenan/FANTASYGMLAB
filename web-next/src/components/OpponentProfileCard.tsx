@@ -64,7 +64,7 @@ export function OpponentProfileCard({
                   .join(" · ")}
               </span>
               {tendency ? (
-                <ToneBadge label={`${tendency.label} in trades`} color="var(--color-premium)" />
+                <ToneBadge label={`${tendency.label} in trades`} color="var(--color-accent)" />
               ) : null}
             </div>
           </Row>

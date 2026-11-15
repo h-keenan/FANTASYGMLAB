@@ -11,7 +11,7 @@ import { useHeaderHeight } from '@react-navigation/elements';
 import AnalyticsSection from '../components/AnalyticsSection';
 import AnimatedCard from '../components/AnimatedCard';
 import BrandHeaderBar from '../components/BrandHeaderBar';
-import BrandedSpinner from '../components/BrandedSpinner';
+import { SkeletonPage } from '../components/Skeleton';
 import EmptyState from '../components/EmptyState';
 import EvaluationLensHeaderButton from '../components/EvaluationLensHeaderButton';
 import GmStanceHeaderButton from '../components/GmStanceHeaderButton';
@@ -197,7 +197,7 @@ export default function TeamRosterScreen({ route, navigation }: Props) {
   }, [players]);
 
   if (loading) {
-    return <BrandedSpinner style={[styles.center, { paddingTop: headerHeight }]} />;
+    return <SkeletonPage label="your roster" layout="list" family="team" topInset={headerHeight} />;
   }
 
   if (error) {
@@ -394,6 +394,7 @@ function RosterPlayerRow({
           injuryLabel={injury.label}
           injuryTone={injury.tone}
           ruledOut={injury.ruledOut}
+          nonInteractive="The whole row is a button that already opens the player"
           showDivider={false}
         />
       </View>

@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useState, type ReactNode } from 'react';
+import { PickTap } from './PlayerOpenContext';
 import { Pressable, StyleSheet, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 
@@ -102,12 +103,16 @@ export function SimPickLine({ pick, trailing, selected = false, draftYear }: { p
   const sub = [via, simPickSlotHint(pick, draftYear)].filter(Boolean).join(' · ');
   return (
     <View style={[styles.pickLine, selected && styles.pickSelected]} testID="pick-row">
-      <View style={[common.row, styles.pickMain]}>
-        <ToneBadge label={`R${pick.round}`} color={colors.accent} size="xs" />
-        <View style={common.grow}>
-          <AppText style={common.bodyStrong}>{simPickLabelText(pick)}</AppText>
-          {sub ? <AppText style={common.muted}>{sub}</AppText> : null}
+      <View style={styles.pickMain}>
+      <PickTap id={pick.id} label={simPickLabelText(pick)} detail={sub || null}>
+        <View style={common.row}>
+          <ToneBadge label={`R${pick.round}`} color={colors.accent} size="xs" />
+          <View style={common.grow}>
+            <AppText style={common.bodyStrong}>{simPickLabelText(pick)}</AppText>
+            {sub ? <AppText style={common.muted}>{sub}</AppText> : null}
+          </View>
         </View>
+      </PickTap>
       </View>
       <View style={styles.pickTrailing}>
         {trailing}

@@ -4,7 +4,7 @@ import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { useHeaderHeight } from '@react-navigation/elements';
 
 import AppText from '../components/AppText';
-import BrandedSpinner from '../components/BrandedSpinner';
+import { SkeletonPage } from '../components/Skeleton';
 import Button from '../components/Button';
 import EmptyState from '../components/EmptyState';
 import TradeCompactCard, { type TradeCardAsset } from '../components/TradeCompactCard';
@@ -91,7 +91,7 @@ export default function TradeOfferScreen({ route, navigation }: Props) {
       </View>
     );
   }
-  if (!result) return <BrandedSpinner style={[styles.center, { paddingTop: headerHeight }]} />;
+  if (!result) return <SkeletonPage label="your offers" layout="cards" topInset={headerHeight} />;
 
   if (result.status === 'locked') {
     return (

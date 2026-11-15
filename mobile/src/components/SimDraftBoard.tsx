@@ -8,7 +8,7 @@ import AppText from './AppText';
 import EmptyState from './EmptyState';
 import Input from './Input';
 import SegmentedTabBar from './SegmentedTabBar';
-import { SkeletonCard } from './SkeletonBlock';
+import { SkeletonCard } from './Skeleton';
 import { SimPager, SimPlayerLine, createSimStyles, useSimDebounced } from './SimGameParts';
 import { useThemeMode } from '../context/ThemeModeContext';
 import { api } from '../lib/api';

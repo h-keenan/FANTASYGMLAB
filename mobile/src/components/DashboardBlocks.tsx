@@ -1,4 +1,5 @@
 import { openInsight } from '../lib/insightNav';
+import ModuleMore from './ModuleMore';
 import type { InsightKey } from '../lib/insightLinks';
 import React, { useMemo } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
@@ -206,12 +207,12 @@ export function DashboardTeamStats({
       id="today.team"
       title="My Team"
       items={items}
-      action={onOpen ? (
-        <Pressable accessibilityRole="link" accessibilityLabel="Open My Team" onPress={onOpen} hitSlop={8} style={{ minHeight: 44, justifyContent: 'center' }}>
-          <AppText style={{ fontWeight: '700', color: colors.accent }}>Open ›</AppText>
-        </Pressable>
-      ) : undefined}
-      footer={<GlossaryNote terms={['powerRank', 'franchiseRank', 'averageAge', 'starterStrength', 'benchStrength']} />}
+      footer={
+        <>
+          {onOpen ? <ModuleMore label="Open My Team" onPress={onOpen} /> : null}
+          <GlossaryNote terms={['powerRank', 'franchiseRank', 'averageAge', 'starterStrength', 'benchStrength']} />
+        </>
+      }
     />
   );
 }

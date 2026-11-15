@@ -583,7 +583,7 @@ export function PlayerQuickView({
 export function PqvBodySkeleton() {
   return (
     <>
-      <div aria-hidden="true">
+      <div role="status" aria-busy="true" aria-label="Loading player detail">
         <div className="pqv-skeleton-section">
           <SkeletonBlock height="0.7rem" />
           <SkeletonBlock width="70%" height="0.7rem" />
@@ -614,9 +614,6 @@ export function PqvBodySkeleton() {
           </div>
         </div>
       </div>
-      <p className="sr-only" role="status">
-        Loading player detail…
-      </p>
     </>
   );
 }

@@ -6,7 +6,9 @@ import CompactPlayerCard from './CompactPlayerCard';
 import OvrGauge from './OvrGauge';
 import { useThemeMode } from '../context/ThemeModeContext';
 import PickAvatar from './PickAvatar';
+import { PickTap } from './PlayerOpenContext';
 import FairnessMeterRow from './FairnessMeterRow';
+import { SkeletonTradeCard } from './Skeleton';
 import { avatarSize, fairnessMeter, type FairnessMeter, type PlayerMode, type PlayerRef } from '../lib/playerAnatomy';
 import { radii, spacing, type ThemeColors } from '../theme';
 import { Collapse } from './Presence';
@@ -20,8 +22,14 @@ export interface TradeCardAsset {
   value?: number | null;
   /** Desk only. */
   ovr?: number | null;
-  /** Tap the card to open the player sheet. */
+  /** Overrides the default tap (the shared opener: Desk quick view, or the sim's sheet inside Fantasy Sim). */
   onPress?: () => void;
+  /** A pick: its id (the sim pick sheet), detail line and an override opener. */
+  pickId?: string;
+  pickDetail?: string | null;
+  onOpenPick?: () => void;
+  /** Opt out of the tap, with the reason (a picker row that selects). */
+  nonInteractive?: string;
 }
 
 /** One asset as a compact player card (avatar included, tap opens the sheet) or a pick row with the round pick avatar. Shared by the trade card and the builder. */
@@ -30,27 +38,29 @@ export function TradeAssetCard({ asset: a, mode }: { asset: TradeCardAsset; mode
   const styles = useMemo(() => createStyles(colors), [colors]);
   if (a.player) {
     return (
-      <Pressable accessibilityRole={a.onPress ? 'button' : undefined} accessibilityLabel={a.onPress ? `Open ${a.player.name}` : undefined} disabled={!a.onPress} onPress={a.onPress}>
-        <CompactPlayerCard
-          player={a.player}
-          detail={a.detail}
-          trailing={
-            mode === 'desk' && (a.value != null || a.ovr != null) ? (
-              <>
-                {a.ovr != null ? <OvrGauge rating={a.ovr} size="sm" /> : null}
-                {a.value != null ? <AppText style={styles.value}>{Math.round(a.value).toLocaleString('en-US')}</AppText> : null}
-              </>
-            ) : undefined
-          }
-        />
-      </Pressable>
+      <CompactPlayerCard
+        player={a.player}
+        onOpen={a.onPress}
+        nonInteractive={a.nonInteractive}
+        detail={a.detail}
+        trailing={
+          mode === 'desk' && (a.value != null || a.ovr != null) ? (
+            <>
+              {a.ovr != null ? <OvrGauge rating={a.ovr} size="sm" /> : null}
+              {a.value != null ? <AppText style={styles.value}>{Math.round(a.value).toLocaleString('en-US')}</AppText> : null}
+            </>
+          ) : undefined
+        }
+      />
     );
   }
   return (
-    <View style={styles.pickRow} testID="trade-pick-row">
-      <PickAvatar label={a.pickLabel} size={avatarSize('row')} />
-      <AppText style={styles.pick}>{a.pickLabel}</AppText>
-    </View>
+    <PickTap label={a.pickLabel ?? ''} id={a.pickId} detail={a.pickDetail} onOpen={a.onOpenPick} nonInteractive={a.nonInteractive}>
+      <View style={styles.pickRow} testID="trade-pick-row">
+        <PickAvatar label={a.pickLabel} size={avatarSize('row')} />
+        <AppText style={styles.pick}>{a.pickLabel}</AppText>
+      </View>
+    </PickTap>
   );
 }
 
@@ -137,4 +147,9 @@ function createStyles(colors: ThemeColors) {
     toggle: { minHeight: 44, justifyContent: 'center', alignSelf: 'flex-start' },
     toggleText: { fontSize: 12, fontWeight: '700', color: colors.accent },
   });
+}
+
+/** The loading silhouette of a `TradeCompactCard` (title, give and get avatar rows, meter). */
+export function TradeCompactCardSkeleton({ assets = 2 }: { assets?: number }) {
+  return <SkeletonTradeCard assets={assets} />;
 }

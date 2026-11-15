@@ -33,6 +33,7 @@ import {
   type VetoSide,
 } from "@/lib/commissionerIntegrity";
 import { pickToTradeAsset, playerToTradeAsset } from "@/lib/tradeAnalyzerPresentation";
+import { SkeletonText } from "@/components/Skeleton";
 
 /**
  * Commissioner: Trade veto calculator. The commissioner enters a proposed
@@ -484,9 +485,7 @@ function VetoBuilder({ leagueId, lens, pool }: { leagueId: string; lens: string;
       )}
 
       {checking ? (
-        <p className="text-sm" style={{ color: "var(--color-text-muted)" }} role="status">
-          Checking both rosters…
-        </p>
+        <SkeletonText label="both rosters" lines={3} />
       ) : failure ? (
         <ErrorState message={failure} onRetry={check} />
       ) : result ? (
@@ -561,9 +560,7 @@ export function VetoCalculator({ leagueId, lens = "Dynasty" }: { leagueId: strin
           Check a proposed trade
         </Button>
       ) : loading || (!pool && !error) ? (
-        <p className="text-sm" style={{ color: "var(--color-text-muted)" }} role="status">
-          Loading the league&rsquo;s teams…
-        </p>
+        <SkeletonText label="the league’s teams" lines={2} />
       ) : error || !pool ? (
         <ErrorState message={error || "Could not load the league's teams."} onRetry={() => void load()} />
       ) : pool.teams.length < 2 ? (

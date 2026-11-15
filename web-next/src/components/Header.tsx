@@ -171,7 +171,7 @@ function LensMenuItems({ lens, setLens, onDone }: { lens: ValuationLens; setLens
                 className="flex flex-col px-3 py-2 text-left"
                 style={{ borderBottom: "var(--border-width-default) solid var(--color-border)" }}
               >
-                <span className="text-xs font-bold" style={{ color: option.value === lens ? "var(--color-premium)" : "var(--color-text-primary)" }}>
+                <span className="text-xs font-bold" style={{ color: option.value === lens ? "var(--color-accent)" : "var(--color-text-primary)" }}>
                   {option.label}
                 </span>
                 <span className="text-xs" style={{ color: "var(--color-text-muted)" }}>
@@ -210,7 +210,7 @@ export function EvaluationLensButton({ leagueId }: { leagueId: string }) {
         aria-expanded={open}
         aria-haspopup="menu"
         className={`${HEADER_CHIP_CLASS} shrink-0`}
-        style={{ color: "var(--color-premium)", border: "var(--border-width-default) solid var(--color-premium)" }}
+        style={{ color: "var(--color-accent)", border: "var(--border-width-default) solid var(--color-accent)" }}
       >
         <span>{current?.label ?? "Dynasty"}</span>
         <span aria-hidden>▾</span>
@@ -254,7 +254,7 @@ export function LeagueLensPicker({ leagueId, leagueName, leagues }: { leagueId: 
         {/* League over lens: one compact "League · Lens ▾" chip that still fits beside the page name. */}
         <span className="flex flex-col min-w-0 leading-tight" style={{ fontSize: "0.6875rem" }}>
           <span className="truncate">{leagueName || "Switch league"}</span>
-          <span className="break-words" style={{ color: "var(--color-premium)" }}>
+          <span className="break-words" style={{ color: "var(--color-text-muted)" }}>
             <span aria-hidden style={{ color: "var(--color-text-muted)" }}>· </span>
             {current?.label ?? "Dynasty"}
           </span>
@@ -265,7 +265,14 @@ export function LeagueLensPicker({ leagueId, leagueName, leagues }: { leagueId: 
       {open ? (
         <>
           <button type="button" aria-hidden tabIndex={-1} className="fixed inset-0" style={{ background: "transparent", zIndex: 40 }} onClick={done} />
-          <div role="menu" className="glass-surface absolute right-0 top-full mt-1 flex flex-col py-1 w-64" style={{ zIndex: 50, maxWidth: "calc(100vw - 2rem)" }}>
+          {/* Phones: a panel pinned under the header (never off the left edge at 320px) that scrolls inside the space above the bottom
+              pill, so 10+ leagues plus the lens list stay reachable (header audit 2026-11-14: the old absolute menu was 775px tall,
+              left -38px at 320, and its last lens options sat under the pill). */}
+          <div
+            role="menu"
+            className="glass-surface absolute right-0 top-full mt-1 flex flex-col py-1 w-64 max-md:fixed max-md:left-2 max-md:right-2 max-md:top-[calc(var(--bar-header-height,52px)+0.25rem)] max-md:mt-0 max-md:w-auto"
+            style={{ zIndex: 50, maxWidth: "calc(100vw - 1rem)", maxHeight: "calc(100dvh - var(--bar-header-height, 52px) - 6.5rem)", overflowY: "auto", overscrollBehavior: "contain" }}
+          >
             <LeagueMenuItems leagueId={leagueId} leagues={leagues} onDone={done} />
             <span className="px-3 pt-3 pb-1 text-xs font-bold uppercase" style={{ color: "var(--color-text-muted)", borderTop: "var(--border-width-default) solid var(--color-border)" }}>
               Evaluation lens

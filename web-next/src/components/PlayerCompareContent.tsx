@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 
 import { TradePickerSheet } from "@/components/TradePickerSheet";
+import { PlayerTap } from "@/components/ui/PlayerOpenContext";
 import { PlayerAvatar } from "@/components/PlayerAvatar";
 import { usePlayerQuickView } from "@/context/PlayerQuickViewContext";
 
@@ -36,6 +37,7 @@ import { mergeSearchMatches, useLeaguePlayerSearch } from "@/lib/leaguePlayerSea
 import { ValuesCredit } from "@/components/ValuesCredit";
 import { PageTitle } from "@/components/PageTitle";
 import { PlayerName } from "@/components/PlayerName";
+import { SkeletonText } from "@/components/Skeleton";
 
 /**
  * Head-to-head Player Compare (Revision 12) — ports app.py's CURRENT,
@@ -282,7 +284,7 @@ function OpponentChips({ label, players, onPick }: { label: string; players: Ran
             >
               <PlayerAvatar playerId={p.player_id} tier={p.tier} size={32} fallbackLabel={(p.name ?? "").split(" ").map((w) => w[0]).slice(0, 2).join("")} />
               <span className="flex flex-col leading-tight">
-                <span className="text-sm font-bold">{p.name}</span>
+                <PlayerName name={p.name} className="text-sm font-bold" />
                 <span className="text-xs tabular-nums" style={{ color: "var(--color-text-muted)" }}>
                   {p.position} · {p.score != null ? Math.round(p.score).toLocaleString() : "—"}
                 </span>
@@ -525,17 +527,19 @@ export function PlayerCompareContent({
         ) : (
           <>
             {loadingModels ? (
-              <p className="text-sm" style={{ color: "var(--color-text-muted)" }}>
-                Loading the full breakdown…
-              </p>
+              <SkeletonText label="the full breakdown" lines={3} />
             ) : null}
 
             <section className="flex flex-col gap-2" aria-label="Head-to-head">
               <div className="glass-surface flex flex-col px-3 py-1" data-testid="compare-grid">
                 <div className={`${GRID_COLS} pt-2 text-center text-xs font-extrabold`} style={{ color: "var(--color-text-secondary)" }}>
-                  <PlayerName name={playerA.name} />
+                  <PlayerTap player={{ id: playerA.player_id, name: playerA.name ?? "Player", position: playerA.position, team: playerA.team, tier: playerA.tier }} className="flex w-full min-w-0 items-center justify-center text-center">
+                    <PlayerName name={playerA.name} />
+                  </PlayerTap>
                   <span aria-hidden="true" />
-                  <PlayerName name={playerB.name} />
+                  <PlayerTap player={{ id: playerB.player_id, name: playerB.name ?? "Player", position: playerB.position, team: playerB.team, tier: playerB.tier }} className="flex w-full min-w-0 items-center justify-center text-center">
+                    <PlayerName name={playerB.name} />
+                  </PlayerTap>
                 </div>
                 {headlineRows.map((row, index) => (
                   <CompareRowView key={row.label} row={row} isLast={index === headlineRows.length - 1 && headlineTextRows.length === 0} />

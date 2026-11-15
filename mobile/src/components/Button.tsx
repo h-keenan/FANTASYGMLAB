@@ -12,7 +12,7 @@ import { disabledOpacity, radii, spacing, type ThemeColors } from '../theme';
  * dark-theme cyan; never a hard-coded white), `secondary` is outlined,
  * `ghost` is a text action, `premium` is dark ink on the gold fill with a soft
  * pulsing gold glow (EVERY premium-related control), `premiumOutline` its
- * gold-outline sibling (Restore purchases), `danger` / `dangerOutline` are the destructive
+ * gold-outline sibling (Restore purchases), `accentOutline` the cyan-outline secondary call to action ("View details", "Compare"), `danger` / `dangerOutline` are the destructive
  * fill and outline, `loading` swaps the label for a spinner. Mirrors web-next's components/Button.tsx.
  */
 export default function Button({
@@ -26,7 +26,7 @@ export default function Button({
 }: {
   label: string;
   onPress: () => void;
-  variant?: 'primary' | 'secondary' | 'ghost' | 'danger' | 'dangerOutline' | 'premium' | 'premiumOutline';
+  variant?: 'primary' | 'secondary' | 'ghost' | 'danger' | 'dangerOutline' | 'premium' | 'premiumOutline' | 'accentOutline';
   disabled?: boolean;
   loading?: boolean;
   /** `sm` mirrors web's size="sm" (compact padding, 12px label). */
@@ -101,13 +101,16 @@ function createStyles(colors: ThemeColors, isDark: boolean) {
     premiumOutline: { backgroundColor: 'transparent', borderWidth: 1, borderColor: colors.premium },
     danger: { backgroundColor: colors.danger },
     dangerOutline: { backgroundColor: 'transparent', borderWidth: 1, borderColor: colors.danger },
-    primaryDisabled: { backgroundColor: mutedFill },
-    premiumDisabled: { backgroundColor: mutedFill },
-    dangerDisabled: { backgroundColor: mutedFill },
+    accentOutline: { backgroundColor: 'transparent', borderWidth: 1, borderColor: colors.accent },
+    // Hairline so a disabled filled button never reads as a loose label (web: inset box-shadow).
+    primaryDisabled: { backgroundColor: mutedFill, borderWidth: 1, borderColor: colors.borderStrong },
+    premiumDisabled: { backgroundColor: mutedFill, borderWidth: 1, borderColor: colors.borderStrong },
+    dangerDisabled: { backgroundColor: mutedFill, borderWidth: 1, borderColor: colors.borderStrong },
     secondaryDisabled: {},
     ghostDisabled: {},
     premiumOutlineDisabled: { borderColor: colors.borderStrong },
     dangerOutlineDisabled: { borderColor: colors.borderStrong },
+    accentOutlineDisabled: { borderColor: colors.borderStrong },
     disabled: { opacity: disabledOpacity },
     text: { fontSize: 16.5, fontWeight: '700' },
     textSm: { fontSize: 14.5 },

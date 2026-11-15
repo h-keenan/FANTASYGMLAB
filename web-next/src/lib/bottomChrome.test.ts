@@ -47,6 +47,14 @@ describe("bottom chrome: one sticky mechanism over a document-tall ancestor chai
     expect(orb).toContain('className="bottom-rail md:hidden"');
     expect(orb).not.toMatch(/visualViewport\??\./);
   });
+  it("the dock is pure CSS with one self-healing custom property: no layer promotion, a 0 default, the anchor hook mounted", () => {
+    const css = read("components/ui/ui.css");
+    const fixed = rule(css, '.bottom-stack[data-dock="fixed"]');
+    expect(fixed).toContain("bottom: 0");
+    expect(fixed).toContain("translateY(var(--dock-shift, 0px))");
+    expect(fixed).not.toMatch(/will-change|translateZ/);
+    expect(read("components/ui/BottomDock.tsx")).toContain("useFixedBottomAnchor");
+  });
   it("the smart pill is margin inside the sticky stack: both layers share one grid cell, nothing fixed or absolute-to-viewport", () => {
     const css = read("components/ui/ui.css");
     expect(rule(css, ".bottom-tab-bar")).toContain("margin: 0 var(--bar-side-inset)");

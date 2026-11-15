@@ -61,7 +61,7 @@ export default function TradeAnalyzerBridgePage() {
     };
   }, [loading, session, trade, router]);
 
-  if (loading || !session || !trade || !leagues) return <LoadingScreen />;
+  if (loading || !session || !trade || !leagues) return <LoadingScreen label="trade" layout="detail" />;
 
   return (
     <main className="flex-1 flex flex-col items-center px-4 py-12 gap-6">

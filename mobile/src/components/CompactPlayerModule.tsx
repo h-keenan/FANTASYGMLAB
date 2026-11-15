@@ -8,6 +8,8 @@ import PlayerAvatar from './PlayerAvatar';
 import PositionBadge from './PositionBadge';
 import { useThemeMode } from '../context/ThemeModeContext';
 import { spacing, type ThemeColors } from '../theme';
+import { usePlayerOpener } from './PlayerOpenContext';
+import { canOpenPlayer } from '../lib/playerTap';
 
 export interface CompactPlayerModuleProps {
   playerId: string | null | undefined;
@@ -33,6 +35,8 @@ export interface CompactPlayerModuleProps {
   /** Lines the context line may wrap to before truncating (default 1). */
   contextLines?: number;
   onPress?: () => void;
+  /** Opt out of the default tap that opens the player quick view (reason sentence; only inside another Pressable that already acts). */
+  nonInteractive?: string;
   style?: StyleProp<ViewStyle>;
 }
 
@@ -62,10 +66,14 @@ export default function CompactPlayerModule({
   valueLabel,
   contextLine,
   contextLines = 1,
-  onPress,
+  onPress: onPressProp,
+  nonInteractive,
   style,
 }: CompactPlayerModuleProps) {
   const { colors } = useThemeMode();
+  const openPlayer = usePlayerOpener();
+  const onPress =
+    onPressProp ?? (!nonInteractive && canOpenPlayer({ id: playerId, name: name ?? '' }) ? () => openPlayer({ id: playerId, name: name ?? 'Player', position, team, tier }) : undefined);
   const styles = useMemo(() => createStyles(colors), [colors]);
   const Wrapper = onPress ? PressableScale : View;
   const hasValue = value != null && Number.isFinite(value);

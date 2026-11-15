@@ -37,7 +37,7 @@ afterEach(() => {
 describe("ReferralCard", () => {
   it("shows a loading message while the referral status hasn't loaded yet", () => {
     render(<ReferralCard referral={null} error={null} onRetry={vi.fn()} />);
-    expect(screen.getByText("Loading your invite link…")).toBeInTheDocument();
+    expect(screen.getByRole("status", { name: "Loading your invite link" })).toBeInTheDocument();
   });
 
   it("shows the error message and a Try again button that calls onRetry", () => {

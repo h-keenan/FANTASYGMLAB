@@ -36,14 +36,21 @@ await page.getByTestId("sim-game-nav").getByText("Players", { exact: true }).cli
 // parent, so a one-viewport-tall body or a shrunk flex column makes the bar scroll away mid-page.
 const probe = () => page.evaluate(() => {
   const docH = document.documentElement.scrollHeight;
-  const bars = [...document.querySelectorAll("*")].filter((e) => { const cs = getComputedStyle(e); return cs.position === "sticky" && cs.bottom !== "auto"; });
-  return { scrollY: Math.round(scrollY), docH, vh: innerHeight, bars: bars.map((e) => { const r = e.getBoundingClientRect(), p = e.parentElement.getBoundingClientRect(); return { el: `${e.tagName}.${String(e.className).split(" ")[0]}`, bottomGap: Math.round(innerHeight - r.bottom), parentEndsAt: Math.round(p.bottom + scrollY) }; }) };
+  // The dock is portaled to <body> and position:fixed; bottom:0. Its bottom edge must equal the visual viewport bottom.
+  const bars = [...document.querySelectorAll(".bottom-stack")].map((e) => { const r = e.getBoundingClientRect(), vv = window.visualViewport; const vb = vv ? vv.offsetTop + vv.height : innerHeight; return { el: `${e.tagName}.${e.className.split(" ")[0]}`, pos: getComputedStyle(e).position, bottomGap: Math.round(vb - r.bottom), parent: e.parentElement.tagName }; });
+  return { scrollY: Math.round(scrollY), docH, vh: innerHeight, bars };
 });
 const rows = [];
 const max = await page.evaluate(() => document.documentElement.scrollHeight - innerHeight);
-for (const y of [0, 0.25, 0.5, 0.75, 1]) { await page.evaluate((v) => scrollTo(0, v), Math.round(max * y)); await sleep(300); rows.push(await probe()); if (process.env.SHOTS) await page.screenshot({ path: `${process.env.SHOTS}/pin-${Math.round(y*100)}.png` }); }
+for (const y of [0, 0.1, 0.25, 0.4, 0.5, 0.6, 0.75, 0.9, 1]) { await page.evaluate((v) => scrollTo(0, v), Math.round(max * y)); await sleep(300); rows.push(await probe()); if (process.env.SHOTS) await page.screenshot({ path: `${process.env.SHOTS}/pin-${Math.round(y*100)}.png` }); }
+// iOS Safari's toolbars collapse and expand while scrolling: the layout viewport changes height under a scrolled page.
+for (const h of [844, 664, 760, 664]) { await page.setViewportSize({ width: 390, height: h }); await sleep(300); await page.evaluate(() => scrollTo(0, 500)); await sleep(200); rows.push(await probe()); }
+// iOS WebKit's failure mode: the fixed layer parked at a stale viewport bottom (here: forced 220px up). The anchor hook must pull it back.
+await page.evaluate(() => { document.querySelector(".bottom-stack").style.bottom = "220px"; scrollTo(0, 400); });
+await sleep(1200);
+const healed = await probe(); healed.scenario = "stale-parked-220px"; rows.push(healed);
 console.log(JSON.stringify(rows, null, 1));
-const bad = rows.filter((r) => r.bars.length === 0 || r.bars.some((b) => Math.abs(b.bottomGap) > 1 || b.parentEndsAt < r.docH - 1));
+const bad = rows.filter((r) => r.bars.length !== 1 || r.bars.some((b) => Math.abs(b.bottomGap) > 1 || b.pos !== 'fixed' || b.parent !== 'BODY'));
 console.log(bad.length ? `FAIL ${bad.length}/${rows.length}` : "PASS");
 await browser.close();
 process.exit(bad.length ? 1 : 0);

@@ -1,5 +1,6 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import React, { useEffect, useMemo, useState, type ReactNode } from 'react';
+import { Ionicons } from '@expo/vector-icons';
 import { Pressable, StyleSheet, View } from 'react-native';
 
 import AccentCard from './AccentCard';
@@ -10,6 +11,7 @@ import { compactAriaLabel, compactParts, type CompactPart, type CompactTone } fr
 import { simOpenKey, simParseOpen } from '../lib/simLayout';
 import { spacing, type ThemeColors } from '../theme';
 import Money from './Money';
+import { SkeletonModule, SkeletonRegion } from './Skeleton';
 import { Collapse } from './Presence';
 
 function toneColor(tone: CompactTone | undefined, colors: ThemeColors): string {
@@ -45,6 +47,7 @@ export default function CompactModule({
   children,
   testID,
   preview,
+  loading = false,
   summaryWhenCollapsed = false,
 }: {
   id: string;
@@ -64,6 +67,8 @@ export default function CompactModule({
   testID?: string;
   /** Always-visible line under the header (collapsed AND expanded): the pinned draft bar's best-available player. Sits outside the toggle, so interactive content is fine. */
   preview?: ReactNode;
+  /** The data behind it is still loading: draws the module's own silhouette (SkeletonModule) so the page does not jump when it lands. */
+  loading?: boolean;
   /** Show the summary line only while collapsed (its text repeats inside the body, e.g. a feed's newest headline). */
   summaryWhenCollapsed?: boolean;
 }) {
@@ -97,6 +102,14 @@ export default function CompactModule({
     if (persist && expandIn === 'inline') AsyncStorage.setItem(simOpenKey(id), next ? '1' : '0').catch(() => {});
   }
 
+  if (loading) {
+    return (
+      <SkeletonRegion label={name}>
+        <SkeletonModule lines={preview ? 2 : 1} />
+      </SkeletonRegion>
+    );
+  }
+
   return (
     <AccentCard accent={accent ?? toneColor(tone, colors)} compact>
       <View style={styles.head}>
@@ -124,7 +137,7 @@ export default function CompactModule({
               </AppText>
             ) : null}
           </View>
-          {hasBody ? <AppText style={styles.chevron}>{open && expandIn === 'inline' ? '−' : '+'}</AppText> : null}
+          {hasBody ? <Ionicons name={open && expandIn === 'inline' ? 'chevron-up' : 'chevron-down'} size={16} color={colors.textTertiary} /> : null}
         </Pressable>
         {action ? <View style={styles.action}>{action}</View> : null}
       </View>
@@ -153,7 +166,6 @@ function createStyles(colors: ThemeColors) {
     parts: { fontSize: 14, lineHeight: 19, color: colors.textPrimary },
     part: { fontSize: 14, fontWeight: '600', color: colors.textPrimary },
     sep: { color: colors.textTertiary, fontWeight: '400' },
-    chevron: { width: 14, textAlign: 'center', color: colors.textTertiary, fontSize: 14 },
     action: { flexShrink: 0 },
   });
 }

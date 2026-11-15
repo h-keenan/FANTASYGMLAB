@@ -78,7 +78,7 @@ export default function PlayerComparePage() {
 
   if (authLoading || (!rankings && !error)) {
     return (
-      <LoadingScreen status="Loading Player Compare…" />
+      <LoadingScreen label="Player Compare" layout="detail" />
     );
   }
 

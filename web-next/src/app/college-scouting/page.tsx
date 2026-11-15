@@ -58,7 +58,7 @@ export default function CollegeScoutingPage() {
 
   if (authLoading || defaultLeague === null || defaultLeague.only || (!data && !error)) {
     return (
-      <LoadingScreen status="Loading College Scouting…" />
+      <LoadingScreen label="College Scouting" layout="list" />
     );
   }
 

@@ -68,7 +68,7 @@ export function ValueTable({
                 <td className="px-2 py-2">
                   {slug ? (
                     <Link href={PLAYER_PATH(slug)} className="block font-bold underline" style={{ color: "var(--color-text-primary)" }} aria-label={player.name}>
-                      <CompactPlayerCard player={{ id: player.player_id, name: player.name, position: player.position, team: player.team, age: player.age }} testId="value-table-player" />
+                      <CompactPlayerCard player={{ id: player.player_id, name: player.name, position: player.position, team: player.team, age: player.age }} nonInteractive="inside a link to the player's public page" testId="value-table-player" />
                     </Link>
                   ) : (
                     <CompactPlayerCard player={{ id: player.player_id, name: player.name, position: player.position, team: player.team, age: player.age }} testId="value-table-player" />

@@ -41,11 +41,11 @@ describe("StatusHeader", () => {
   it("a row with a detail expands inline and offers the open link", () => {
     render(<StatusHeader model={MODEL} />);
     const [first] = screen.getAllByTestId("status-attention-row");
-    const toggle = within(first).getByRole("button");
+    const toggle = within(first).getByRole("button", { name: /Expand/ });
     expect(toggle).toHaveAttribute("aria-expanded", "false");
     fireEvent.click(toggle);
     expect(within(first).getByText("He is open on the wire.")).toBeInTheDocument();
-    expect(within(first).getByRole("link", { name: "Open →" })).toHaveAttribute("href", "/waivers/x");
+    expect(within(first).getByRole("link", { name: "Open" })).toHaveAttribute("href", "/waivers/x");
   });
 
   it("uses cyan for the one action and never gold", () => {

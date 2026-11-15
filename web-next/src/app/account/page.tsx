@@ -132,7 +132,7 @@ export default function AccountPage() {
   }, [signOut, router]);
 
   if (authLoading || (!me && !error)) {
-    return <LoadingScreen status="Loading your account…" />;
+    return <LoadingScreen label="account" layout="detail" />;
   }
 
   if (error || !me) {

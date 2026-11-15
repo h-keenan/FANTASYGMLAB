@@ -27,6 +27,7 @@ export default function SimGameOrb({
   onTab,
   onMore,
   onHub,
+  onSimTo,
   onAppHome,
 }: {
   tab: SimTab;
@@ -35,6 +36,8 @@ export default function SimGameOrb({
   onTab: (tab: SimTab) => void;
   onMore: () => void;
   onHub: () => void;
+  /** Sim to... (only when the game can sim ahead): the footer folds the button away on pages with their own action; the menu always has it. */
+  onSimTo?: () => void;
   onAppHome: () => void;
 }) {
   const { colors } = useThemeMode();
@@ -112,6 +115,21 @@ export default function SimGameOrb({
           </Pressable>
         </View>
         <View style={styles.footer}>
+          {onSimTo ? (
+            <Pressable
+              onPress={() => {
+                close();
+                setTimeout(onSimTo, 250);
+              }}
+              accessibilityRole="button"
+              accessibilityLabel="Sim to..."
+              style={styles.row}
+              testID="sim-game-nav-sim-to"
+            >
+              <Ionicons name="play-forward-outline" size={22} color={colors.accent} />
+              <AppText style={styles.rowLabel}>Sim to...</AppText>
+            </Pressable>
+          ) : null}
           <Pressable
             onPress={() => {
               close();

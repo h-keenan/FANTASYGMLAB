@@ -10,24 +10,23 @@ import { trackFeatureUse } from "@/lib/analytics";
 import { api, type KeepersResponse, type MyTeamNeedsResponse, type MyTeamResponse, type TeamRanking } from "@/lib/api";
 import { MyTeamContent } from "@/components/MyTeamContent";
 import { ErrorState, reloadPage } from "@/components/ErrorState";
-import { SkeletonBlock } from "@/components/Skeleton";
+import { SkeletonModule, SkeletonRegion, SkeletonStatusHeader } from "@/components/Skeleton";
 import { PageTitle } from "@/components/PageTitle";
 import { UNNAMED_LEAGUE } from "@/lib/leagueName";
 
 /** Reserves the final page's block heights so the content doesn't jump. */
 function MyTeamSkeleton({ leagueName }: { leagueName: string }) {
-  const block = (height: number, key: string) => (
-    <SkeletonBlock key={key} height={height} />
-  );
   return (
     <main className="page-shell" aria-busy="true">
       <header className="flex flex-col gap-1">
         <PageTitle page="My Team" leagueName={leagueName} />
       </header>
-      <span className="sr-only" role="status">
-        Loading My Team
-      </span>
-      {[block(190, "snapshot"), block(230, "analysis"), block(420, "roster"), block(110, "composition")]}
+      <SkeletonRegion label="My Team" className="flex flex-col gap-[var(--page-gap)]">
+        <SkeletonStatusHeader />
+        <SkeletonModule />
+        <SkeletonModule />
+        <SkeletonModule />
+      </SkeletonRegion>
     </main>
   );
 }

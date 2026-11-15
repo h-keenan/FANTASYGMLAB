@@ -11,8 +11,7 @@ import { Sheet } from "@/components/ui/Sheet";
 import "./tw.css";
 import "./tokens.css";
 
-// Harness for scripts/sim_layout_playwright/footer_sheet_audit.mjs: the REAL Fantasy Sim bar markup (SimActionBar's one row: Sim to |
-// orb | Advance, inside .action-pill in a docked .bottom-stack), the real SimGameOrb + Sheet + OverlayRuntime over a long page.
+// Harness for scripts/sim_layout_playwright/footer_sheet_audit.mjs: the REAL Fantasy Sim bar markup (SimActionBar's one row: orb | Sim to | Advance, inside .action-pill in a docked .bottom-stack), the real SimGameOrb + Sheet + OverlayRuntime over a long page.
 // ?inbox=3 (badge), ?tab=trades|players|..., ?sheet=search (a Sheet with a text field), ?big=1 (huge text).
 const q = new URLSearchParams(location.search);
 const tab = (q.get("tab") || "trades") as any;
@@ -33,14 +32,13 @@ function App() {
       </Sheet>
       <div className="bottom-stack md:hidden" data-dock="fixed" data-testid="stack" style={{ paddingBottom: "env(safe-area-inset-bottom, 0px)" }}>
         <div className="sim-action-bar action-pill" data-testid="sim-action-bar">
-          <PillMorph context={null}>
-            <div className="mx-auto flex max-w-3xl items-center gap-2 p-1" style={{ display: "flex", alignItems: "center", gap: 8, padding: 4 }}>
+          <PillMorph segment={null} orb={<SimGameOrb tab={tab} offseason={false} inbox={Number(q.get("inbox") ?? 3)} onTab={() => {}} onMore={() => {}} onHub={() => {}} onSimTo={() => {}} />}>
+            <div className="mx-auto flex max-w-3xl items-center gap-2 max-md:p-0" style={{ display: "flex", alignItems: "center", gap: 8 }}>
               <Button variant="secondary" size="sm" className="min-w-0 shrink-0 max-md:flex-col max-md:gap-0 max-md:self-stretch max-md:px-2" aria-label="Sim to..." data-testid="sim-to-button">
                 <SimGlyph name="matchup" size={16} />
                 <span className="text-xs leading-4 md:ml-1.5">Sim to</span>
               </Button>
-              <SimGameOrb tab={tab} offseason={false} inbox={Number(q.get("inbox") ?? 3)} onTab={() => {}} onMore={() => {}} onHub={() => {}} />
-              <Button className="min-w-0 max-md:flex-1 max-md:self-stretch" data-testid="advance">Advance Wk 1 &rarr; 2</Button>
+              <Button className="min-w-0 whitespace-nowrap max-md:flex-1 max-md:self-stretch" data-testid="advance">Advance Wk 1 &rarr; 2</Button>
             </div>
           </PillMorph>
         </div>

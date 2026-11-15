@@ -11,7 +11,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useHeaderHeight } from '@react-navigation/elements';
 
 import EmptyState from '../components/EmptyState';
-import BrandedSpinner from '../components/BrandedSpinner';
+import { SkeletonList } from '../components/Skeleton';
 import FilterSheet from '../components/FilterSheet';
 import { singleValue, valuesFromSingles, type FilterGroup, type FilterValues } from '../lib/filterSheet';
 import GridBackground from '../components/GridBackground';
@@ -411,7 +411,7 @@ export default function PlayersScreen({ route, navigation }: Props) {
       </GlassCard>
 
       {loading ? (
-        <BrandedSpinner style={styles.loading} />
+        <SkeletonList label="players" count={7} />
       ) : (
         <FlatList
           // Forces a clean remount on toggle — RN's FlatList explicitly does

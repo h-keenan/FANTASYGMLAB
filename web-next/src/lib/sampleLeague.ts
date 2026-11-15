@@ -56,6 +56,8 @@ export const SAMPLE_ROSTER: SamplePlayer[] = [
 
 export interface SampleGamePlanItem {
   kicker: string;
+  /** The roster player (SAMPLE_ROSTER id) this move is about; it drives the avatar row in the shared StatusHeader. */
+  playerId: string;
   headline: string;
   reason: string;
   cta: "roster" | "trade";
@@ -64,6 +66,7 @@ export interface SampleGamePlanItem {
 export const SAMPLE_GAME_PLAN: SampleGamePlanItem[] = [
   {
     kicker: "Top priority",
+    playerId: "s3",
     headline: "Sell Casey Placeholder before his value drops further",
     reason:
       "Sample reasoning: he is 29 with a falling role, and contenders still pay for him. Weighing age, your RB depth and how many teams need a back.",
@@ -71,12 +74,14 @@ export const SAMPLE_GAME_PLAN: SampleGamePlanItem[] = [
   },
   {
     kicker: "Watch",
+    playerId: "s5",
     headline: "Taylor Exampleton is trending up",
     reason: "Sample reasoning: snap share is climbing. Hold unless an offer clears his current value.",
     cta: "roster",
   },
   {
     kicker: "Waiver opportunity",
+    playerId: "s2",
     headline: "Add a handcuff for Riley Demoway",
     reason: "Sample reasoning: your RB1 carries most of the workload and the backup is unrostered.",
     cta: "roster",

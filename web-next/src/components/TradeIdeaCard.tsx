@@ -1,3 +1,4 @@
+import { Button } from "@/components/Button";
 import { BEGINNER_HELP } from "@/lib/experienceCopy";
 import { TradeCompactCard, type TradeCardAsset } from "@/components/ui/TradeCompactCard";
 import { tradeIdeaGainText } from "@/lib/tradeIdeaSummary";
@@ -10,6 +11,7 @@ import { IdeaPosture } from "@/components/IdeaPosture";
 import { RosterOverflowNote } from "@/components/SuggestedDrop";
 import { LeanBarMeter } from "@/components/LeanBarMeter";
 import { TradeOddsEffect } from "@/components/TradeOddsEffect";
+import { PlayerTap } from "@/components/ui/PlayerOpenContext";
 import { PlayerAvatar } from "@/components/PlayerAvatar";
 import { TeamAvatar } from "@/components/TeamAvatar";
 import { TradeCategoryGlyph } from "@/components/TradeCategoryGlyph";
@@ -89,23 +91,14 @@ export function ShareTradeButton({
 
   return (
     <>
-    <button
+    <Button
       ref={observe}
-      type="button"
+      variant="accentOutline"
       onClick={onShare}
       disabled={preparingImage}
-      // coridian_, 2026-10-18: "The share trade button is still just
-      // text" — plain colored text with no button chrome at all (no
-      // border/background), indistinguishable from a navigation link.
-      // Same small bordered-pill treatment the value-edge badge right
-      // beside it already uses in this row.
-      className="inline-flex flex-1 items-center justify-center gap-1.5 px-3 text-sm font-bold"
-      style={{
-        color: "var(--color-accent)",
-        border: "1px solid var(--color-accent)",
-        background: "transparent",
-        minHeight: "2.75rem",
-      }}
+      // coridian_, 2026-10-18: "The share trade button is still just text": it is a real bordered button now,
+      // and since the UI consistency audit 4 it is the shared accentOutline Button, not a hand-rolled copy.
+      className="flex-1 gap-1.5"
     >
       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
         <path d="M4 12v7a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-7" />
@@ -113,7 +106,7 @@ export function ShareTradeButton({
         <path d="M12 2v13" />
       </svg>
       {copied ? "Copied!" : label("Share Trade")}
-    </button>
+    </Button>
     {status ? (
       <p role="status" className="basis-full w-full text-xs" style={{ color: "var(--color-text-muted)" }}>
         {status}
@@ -267,7 +260,7 @@ export function TradeIdeaCardView({
 
       {landedNames.length > 0 ? (
         <div className="flex items-center gap-1.5 flex-wrap" data-testid="lands-target">
-          <span className="text-xs font-bold" style={{ color: "var(--color-premium)" }}>
+          <span className="text-xs font-bold" style={{ color: "var(--color-accent)" }}>
             Lands your target:
           </span>
           {(idea.landed_gm_target_player_ids || []).map((playerId) => {
@@ -276,10 +269,12 @@ export function TradeIdeaCardView({
               <span
                 key={playerId}
                 className="inline-flex items-center gap-1 pr-2 text-xs font-bold"
-                style={{ border: "var(--border-width-default) solid var(--color-premium)", borderRadius: "var(--radius-pill)", color: "var(--color-text-primary)" }}
+                style={{ border: "var(--border-width-default) solid var(--color-accent)", borderRadius: "var(--radius-pill)", color: "var(--color-text-primary)" }}
               >
-                <PlayerAvatar playerId={playerId} size={22} />
-                <PlayerName name={asset.name} className="max-w-[9rem]" />
+                <PlayerTap player={{ id: playerId, name: asset.name ?? "Player", position: asset.position, team: asset.team }} className="inline-flex items-center gap-1 text-left">
+                  <PlayerAvatar playerId={playerId} size={22} />
+                  <PlayerName name={asset.name} className="max-w-[9rem]" />
+                </PlayerTap>
               </span>
             ) : null;
           })}

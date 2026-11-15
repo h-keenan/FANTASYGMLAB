@@ -105,7 +105,7 @@ export default function CommunityPage() {
   }, []);
 
   if (authLoading || (!data && !error)) {
-    return <LoadingScreen status="Loading the Community feed…" />;
+    return <LoadingScreen label="Community feed" layout="list" />;
   }
 
   if (error || !data) {

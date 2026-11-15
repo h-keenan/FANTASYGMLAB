@@ -7,7 +7,7 @@ import Button from './Button';
 import EmptyState from './EmptyState';
 import ErrorState from './ErrorState';
 import SegmentedTabBar from './SegmentedTabBar';
-import { SkeletonCard } from './SkeletonBlock';
+import { SkeletonCard } from './Skeleton';
 import { SimPickLine, useSimPicks } from './SimGameDynastyParts';
 import { SimPlayerLine, SimSectionTitle, SimTeamLink, createSimStyles, type SimCtx } from './SimGameParts';
 import ToneBadge from './ToneBadge';

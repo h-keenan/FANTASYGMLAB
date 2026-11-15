@@ -21,14 +21,17 @@ import SimActionBar from '../components/SimActionBar';
 import { SimGameHeader, SimStatusChips } from '../components/SimGameHeader';
 import { SimNotificationBell, useSimNotifications } from '../components/SimNotificationBell';
 import SimGameOrb from '../components/SimGameOrb';
-import { SkeletonCard } from '../components/SkeletonBlock';
+import { SkeletonCard, SkeletonText } from '../components/Skeleton';
 import { SimDraftRecapView, SimGameDraft } from '../components/SimGameDraft';
 import { SimLeagueTab } from '../components/SimGameLeague';
 import SimOffseasonBar from '../components/SimOffseasonBar';
 import { SimGameOffseason } from '../components/SimGameOffseason';
 import { SimHomeTab } from '../components/SimGameHome';
 import { SimPlayerSheet } from '../components/SimGamePlayers';
-import { SimNotice, SimOpenPlayerContext, SimPreviewBanner, SimRowAccordion, SimTeamOpenContext, createSimStyles, type SimCtx } from '../components/SimGameParts';
+import { SimPickSheet } from '../components/SimPickSheet';
+import { PickOpenContext, PlayerOpenContext, type PickTapRef } from '../components/PlayerOpenContext';
+import type { PlayerRef } from '../lib/playerAnatomy';
+import { simPlayerFromRef, SimNotice, SimOpenPlayerContext, SimPreviewBanner, SimRowAccordion, SimTeamOpenContext, createSimStyles, type SimCtx } from '../components/SimGameParts';
 import SimHub from '../components/SimHub';
 import { simMenuHero, simRulesParts } from '../lib/simSummaries';
 import CompactModule from '../components/CompactModule';
@@ -153,6 +156,7 @@ export default function GmGameScreen({ navigation }: Props) {
   const [attempt, setAttempt] = useState(0);
   const [sheetPlayer, setSheetPlayer] = useState<SimGamePlayer | null>(null);
   const [sheetTeam, setSheetTeam] = useState<string | null>(null);
+  const [sheetPick, setSheetPick] = useState<PickTapRef | null>(null);
   const [draftRecap, setDraftRecap] = useState<{ recap: SimDraftRecap | null } | null>(null);
   const [simToOpen, setSimToOpen] = useState(false);
   const [simToResult, setSimToResult] = useState<SimToResponse | null>(null);
@@ -428,6 +432,7 @@ export default function GmGameScreen({ navigation }: Props) {
             bump: () => setTick((n) => n + 1),
             openPlayer: setSheetPlayer,
             openTeam: setSheetTeam,
+            openPick: setSheetPick,
           }
         : null,
     [game, preview, call, setGame, reloadGame, notify, tick],
@@ -456,13 +461,15 @@ export default function GmGameScreen({ navigation }: Props) {
     setPillBarPresent(true);
     return () => setPillBarPresent(false);
   }, []);
-  const pillOnly = !anyBar && Boolean(pill.ctx);
+  // The draft has no action bar: the pill is the orb + the page segment (an orb-only pill while the room loads).
+  const draftStage = flow.view === 'game' && Boolean(game) && flow.stage === 'draft' && !draftRecap && !flow.recaps[flow.recapIndex];
+  const pillOnly = !anyBar && draftStage;
   const hasStack = anyBar || pillOnly;
   // The game draws its own orb above the Advance pill, so the global GM orb steps aside while it is up.
   useEffect(() => {
-    simGameChrome.set(anyBar);
+    simGameChrome.set(hasStack);
     return () => simGameChrome.set(false);
-  }, [anyBar]);
+  }, [hasStack]);
   const goHub = () => {
     dispatch({ type: 'hub' });
     setGameState(null);
@@ -476,6 +483,7 @@ export default function GmGameScreen({ navigation }: Props) {
               onTab={(tab) => dispatch({ type: 'tab', tab })}
               onMore={() => dispatch({ type: 'tab', tab: 'more' })}
               onHub={goHub}
+              onSimTo={showBar && !simGamePaywalled(preview) ? () => setSimToOpen(true) : undefined}
               onAppHome={() => navigation.navigate('Home')}
             />
   ) : null;
@@ -503,7 +511,7 @@ export default function GmGameScreen({ navigation }: Props) {
           testID="sim-bottom-stack"
         >
           {pillOnly ? (
-            <BottomPill contextOnly context={pill.ctx}>{null}</BottomPill>
+            <BottomPill contextOnly segment={pill.ctx} orb={orbNode}>{null}</BottomPill>
           ) : showBar ? (
             <SimActionBar orb={orbNode} ctx={ctx} paywalled={simGamePaywalled(preview)} advancing={advancing} onAdvance={advance} onSimTo={() => setSimToOpen(true)} onGoPro={goPaywall} onTab={(tab) => dispatch({ type: 'tab', tab })} />
           ) : (
@@ -658,6 +666,7 @@ export default function GmGameScreen({ navigation }: Props) {
             }
           />
         ) : null}
+        {sheetPick ? <SimPickSheet pick={sheetPick} onClose={() => setSheetPick(null)} /> : null}
         {sheetTeam ? (
           <SimTeamSheet
             ctx={ctx}
@@ -782,7 +791,7 @@ function SetupForm({
           ) : null}
           {league ? (
             <SetupField label="Your league">
-              {leagues === null ? <SetupNote>Loading your leagues...</SetupNote> : null}
+              {leagues === null ? <SkeletonText label="your leagues" lines={1} /> : null}
               {leagues !== null && leagues.length === 0 ? (
                 <>
                   <SetupNote>{SIM_START_CONNECT_NOTE}</SetupNote>
@@ -802,7 +811,7 @@ function SetupForm({
           ) : null}
           {league && state.leagueId ? (
             <SetupField label="Your team">
-              {leagueTeams.status === 'loading' ? <SetupNote>Loading teams...</SetupNote> : null}
+              {leagueTeams.status === 'loading' ? <SkeletonText label="teams" lines={1} /> : null}
               {leagueTeams.status === 'error' ? <SetupNote>{leagueTeams.message}</SetupNote> : null}
               {leagueTeams.status === 'ready' && !leagueTeams.youRosterId ? (
                 <SetupNote>We could not tell which team is yours from your Sleeper link. Pick it from the list.</SetupNote>
@@ -1056,10 +1065,13 @@ function GameScreen({
   const stage = flow.stage;
   const recap = flow.recaps[flow.recapIndex];
   const inSeason = (stage === 'week' || stage === 'playoffs') && !draftRecap;
+  const simPlayerOpener = useCallback((ref: PlayerRef) => ctx.openPlayer(simPlayerFromRef(ref)), [ctx]);
 
   return (
     <SimTeamOpenContext.Provider value={ctx.openTeam}>
     <SimOpenPlayerContext.Provider value={ctx.openPlayer}>
+    <PlayerOpenContext.Provider value={simPlayerOpener}>
+    <PickOpenContext.Provider value={ctx.openPick}>
     <SimRowAccordion>
     <View style={styles.stack}>
       <SimGameHeader game={game} onHub={onHub} onTeam={ctx.openTeam} onMore={() => onTab('more')} bell={<SimNotificationBell notif={notif} onOpenTab={onTab} />} />
@@ -1111,6 +1123,8 @@ function GameScreen({
       )}
     </View>
     </SimRowAccordion>
+    </PickOpenContext.Provider>
+    </PlayerOpenContext.Provider>
     </SimOpenPlayerContext.Provider>
     </SimTeamOpenContext.Provider>
   );

@@ -11,7 +11,7 @@ import FreeLimitNote from './FreeLimitNote';
 import { MotionIn } from './Motion';
 import PressableScale from './PressableScale';
 import SectionHeading from './SectionHeading';
-import { SkeletonCard } from './SkeletonBlock';
+import { SkeletonCard } from './Skeleton';
 import { useThemeMode } from '../context/ThemeModeContext';
 import type { DashboardEntitlementInfo, DashboardItem } from '../lib/api';
 import { trackUse } from '../lib/analytics';
