@@ -55,6 +55,7 @@ import {
   type SimTradeVerdict,
 } from "@/lib/simGame";
 import { playerSurname } from "@/lib/playerNameDisplay";
+import { Collapse } from "@/components/ui/Presence";
 
 /** "Scout" button for the partner list: opens the team's scouting sheet without picking it as the partner. */
 function SimTeamScout({ teamId, name }: { teamId: string; name: string }) {
@@ -173,7 +174,7 @@ function OfferCard({ item, index, count, defaultOpen, busy, canTrade, onRespond 
             <span className="font-bold" style={{ color: "var(--color-success)" }}>Get</span> {names(item.you_get)}
           </span>
         </button>
-        {open ? (
+        <Collapse open={open}>
           <div className="flex flex-col gap-2">
             {item.message ? <p className="text-xs" style={{ color: "var(--color-text-secondary)" }}>{item.message}</p> : null}
             <div className="grid grid-cols-[minmax(0,1fr)] gap-2 md:grid-cols-2">
@@ -191,7 +192,7 @@ function OfferCard({ item, index, count, defaultOpen, busy, canTrade, onRespond 
               <Button size="sm" fullWidth variant="secondary" disabled={busy} onClick={() => onRespond(item, "decline")}>Decline</Button>
             </div>
           </div>
-        ) : null}
+        </Collapse>
       </AccentCard>
     </li>
   );

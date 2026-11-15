@@ -31,6 +31,7 @@ import {
 import { ValuesCredit } from "@/components/ValuesCredit";
 import { PageTitle } from "@/components/PageTitle";
 import { CompactPlayerCard } from "@/components/ui/CompactPlayerCard";
+import { Collapse } from "@/components/ui/Presence";
 
 /**
  * Live Draft (Revision 21) — the last page on the original migration punch
@@ -188,7 +189,7 @@ function RankingRowView({ row, leagueId, leagueName }: { row: LiveDraftRankingRo
           </a>
         </div>
       </div>
-      {showBreakdown ? (
+      <Collapse open={showBreakdown}>
         <div className="flex flex-wrap gap-x-3 gap-y-1 mt-2 pl-11 text-xs" style={{ color: "var(--color-text-secondary)" }}>
           {SCORE_BREAKDOWN_FIELDS.map(({ key, label }) => (
             <span key={key}>
@@ -196,7 +197,7 @@ function RankingRowView({ row, leagueId, leagueName }: { row: LiveDraftRankingRo
             </span>
           ))}
         </div>
-      ) : null}
+      </Collapse>
     </div>
   );
 }

@@ -50,6 +50,7 @@ import { useScreenHeaderTitle } from '../lib/useScreenHeaderTitle';
 import { radii, spacing, type ThemeColors } from '../theme';
 import type { RootStackParamList } from '../navigation/RootNavigator';
 import { usePlayerQuickView } from '../context/PlayerQuickViewContext';
+import { Collapse } from '../components/Presence';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'LiveDraft'>;
 
@@ -630,7 +631,7 @@ function RankingsBoard({
                     {open ? 'Hide score breakdown' : 'Score breakdown'}
                   </AppText>
                 </Pressable>
-                {open ? (
+                <Collapse open={open}>
                   <View style={styles.breakdown}>
                     <View style={styles.chipRow}>
                       {SCORE_BREAKDOWN_FIELDS.map(({ key, label }) => (
@@ -644,7 +645,7 @@ function RankingsBoard({
                     </View>
                     <Button label="Compare" variant="secondary" onPress={() => onCompare(row)} style={styles.compareBtn} />
                   </View>
-                ) : null}
+                </Collapse>
               </View>
             );
           })}

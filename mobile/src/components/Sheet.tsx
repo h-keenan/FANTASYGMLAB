@@ -1,5 +1,5 @@
 import React, { useMemo, type ReactNode } from 'react';
-import { Pressable, StyleSheet, View } from 'react-native';
+import { KeyboardAvoidingView, Platform, Pressable, StyleSheet, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -52,6 +52,8 @@ export function Sheet({ open, onClose, title, description, children, footer, hid
   return (
     <SheetModal unmanaged visible={!hidden} transparent animationType="slide" onRequestClose={onClose} statusBarTranslucent>
       <Pressable style={styles.backdrop} onPress={onClose} accessibilityLabel={`Close ${title}`} accessibilityRole="button">
+        {/* iOS: lift the card above the keyboard (a sheet with a search field used to be covered by it); Android's window resizes itself. */}
+        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={styles.avoid} pointerEvents="box-none">
         <SwipeDismissCard style={styles.sheet} onDismiss={onClose} testID={testID}>
           {backTitle ? (
             <Pressable onPress={onClose} accessibilityRole="button" accessibilityLabel={`Back to ${backTitle}`} style={styles.back} hitSlop={8} testID="overlay-back">
@@ -82,6 +84,7 @@ export function Sheet({ open, onClose, title, description, children, footer, hid
           </SheetScrollView>
           {footer ? <View style={[styles.footer, { paddingBottom: spacing.md + insets.bottom }]}>{footer}</View> : null}
         </SwipeDismissCard>
+        </KeyboardAvoidingView>
       </Pressable>
     </SheetModal>
   );
@@ -90,6 +93,7 @@ export function Sheet({ open, onClose, title, description, children, footer, hid
 function createStyles(colors: ThemeColors) {
   return StyleSheet.create({
     backdrop: { flex: 1, backgroundColor: scrim, justifyContent: 'flex-end' },
+    avoid: { flex: 1, justifyContent: 'flex-end' },
     sheet: {
       backgroundColor: colors.surface,
       borderTopLeftRadius: radii.lg,

@@ -2,7 +2,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
-import { simLeagueHighlights, simNextWeekModel, simPositionTotals, simRecapInjuryModel, simRecapOutcome, simRecapPageKeys, simRecapProj, simRecapResultModel, simRecapSeasonModel } from './simRecapStory.ts';
+import { simLeagueHighlights, simNextWeekModel, simPositionTotals, simRecapInjuryModel, simRecapOutcome, simRecapPageKeys, simRecapProj, simRecapResultModel, simRecapSeasonModel, simRecapStoryActions } from './simRecapStory.ts';
 
 const p = (id: string, name: string, pos: string) => ({ id, name, pos, projection: 10 });
 const st = (slot: string, player: ReturnType<typeof p> | null, pts: number, flag: string | null = null) => ({ slot, player, pts, flag });
@@ -68,4 +68,14 @@ test('season page: last, champion/finish/record, and injuries carry one marker p
   assert.deepEqual(m.items.map((i) => i.key), ['champion', 'record', 'top']);
   const inj = simRecapInjuryModel({ ...recap, injuries: [{ player: p('a', 'Alf', 'WR'), weeks: 4, team_id: '9', is_yours: true }] });
   assert.equal(inj.items[0].detail, '4 weeks · yours');
+});
+
+test('simRecapStoryActions: dismiss (X, swipe down, Android back) is always the whole-flow close, on every queued recap', () => {
+  assert.equal(simRecapStoryActions(false, { onNext: 'next', onClose: 'close' }).dismiss, 'close');
+  assert.equal(simRecapStoryActions(true, { onNext: 'next', onClose: 'close' }).dismiss, 'close');
+});
+
+test('simRecapStoryActions: the finish button advances while recaps are queued and closes on the last one', () => {
+  assert.equal(simRecapStoryActions(false, { onNext: 'next', onClose: 'close' }).finish, 'next');
+  assert.equal(simRecapStoryActions(true, { onNext: 'next', onClose: 'close' }).finish, 'close');
 });

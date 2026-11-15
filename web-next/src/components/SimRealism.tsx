@@ -28,6 +28,7 @@ import {
   simRealismToast,
   simRealismWhen,
 } from "@/lib/simRealism";
+import { Presence } from "@/components/ui/Presence";
 
 function readDismissed(key: string): boolean {
   try {
@@ -148,9 +149,11 @@ export function SimRealismBanner({ ctx }: { ctx: SimCtx }) {
   const [open, setOpen] = useState(false);
   const dismissed = gone === key || (typeof window !== "undefined" && readDismissed(key));
   const banner = simRealismBanner(ctx.game, dismissed);
-  if (!banner) return null;
   return (
     <>
+      {/* Dismissing collapses it away (Presence keeps the last banner on screen while it leaves). */}
+      <Presence show={Boolean(banner)} variant="collapse">
+      {banner ? (
       <AccentCard accent="var(--color-accent)" compact as="div" data-testid="sim-realism-banner">
         <div className="flex items-center gap-2">
           <div className="flex-1 min-w-0">
@@ -171,6 +174,8 @@ export function SimRealismBanner({ ctx }: { ctx: SimCtx }) {
           </Button>
         </div>
       </AccentCard>
+      ) : null}
+      </Presence>
       {open ? <SimRealismSheet ctx={ctx} open={open} onClose={() => setOpen(false)} /> : null}
     </>
   );

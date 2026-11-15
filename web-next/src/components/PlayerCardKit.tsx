@@ -23,6 +23,7 @@ import {
   type PlayerCardVariant,
 } from "@/lib/playerCard";
 import { positionColorVar } from "@/lib/playerPresentation";
+import { Collapse } from "@/components/ui/Presence";
 
 /**
  * THE player card (docs/player-card.md). One props-driven component with three
@@ -380,7 +381,9 @@ function MatchupCard({ model, identity, onEdit, editLabel, mirror = false, empha
         </svg>
         {open ? "Less" : "Details"}
       </button>
-      {open ? <div data-testid="player-card-detail">{detail ?? <PlayerCardDetail model={model} />}</div> : null}
+      <Collapse open={open}>
+        <div data-testid="player-card-detail">{detail ?? <PlayerCardDetail model={model} />}</div>
+      </Collapse>
     </div>
   );
 }

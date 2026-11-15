@@ -30,6 +30,7 @@ import {
   simRealismWhen,
 } from '../lib/simRealism';
 import { spacing, type ThemeColors } from '../theme';
+import { Presence } from './Presence';
 
 /**
  * The Realism update: confirm sheet, More / Game menu entry and the one-time Home banner for a save made before newer rules.
@@ -135,9 +136,11 @@ export function SimRealismBanner({ ctx }: { ctx: SimCtx }) {
     };
   }, [key]);
   const banner = simRealismBanner(ctx.game, dismissed);
-  if (!banner) return null;
   return (
     <>
+      {/* Dismissing collapses it away (Presence keeps the last banner on screen while it leaves). */}
+      <Presence show={Boolean(banner)} variant="collapse">
+      {banner ? (
       <AccentCard accent={colors.accent} compact>
         <View style={styles.row} testID="sim-realism-banner">
           <View style={styles.grow}>
@@ -156,6 +159,8 @@ export function SimRealismBanner({ ctx }: { ctx: SimCtx }) {
           />
         </View>
       </AccentCard>
+      ) : null}
+      </Presence>
       {open ? <SimRealismSheet ctx={ctx} onClose={() => setOpen(false)} /> : null}
     </>
   );

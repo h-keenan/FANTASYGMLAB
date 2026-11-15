@@ -20,6 +20,7 @@ import {
   type SimAchievementsPayload,
   type SimTrophyRow,
 } from "@/lib/simAchievements";
+import { Collapse } from "@/components/ui/Presence";
 
 /** The round badge: a rarity-coloured ring around the glyph (muted and dashed while locked). Decorative; the row carries the name. */
 export function SimAchievementBadge({ a, size = 36 }: { a: Pick<SimAchievement, "icon" | "rarity" | "tone" | "unlocked">; size?: number }) {
@@ -71,12 +72,12 @@ function Row({ a }: { a: SimAchievement }) {
           <div style={{ width: `${pct}%`, height: "100%", background: color, opacity: 0.8 }} />
         </div>
       ) : null}
-      {open ? (
+      <Collapse open={open}>
         <p className="mb-2 ml-12 text-xs" style={{ color: "var(--color-text-secondary)" }} data-testid="achievement-detail">
           {simAchievementLine(a)}
           {a.unlocked && a.player ? <>{" ("}<SimPlayerNameTap player={a.player}>{a.player.name}</SimPlayerNameTap>{")"}</> : null}
         </p>
-      ) : null}
+      </Collapse>
     </li>
   );
 }

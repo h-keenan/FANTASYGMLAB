@@ -10,6 +10,7 @@ import { SheetModal, useSheetDismissGesture } from './SwipeDismissSheet';
 import { useThemeMode } from '../context/ThemeModeContext';
 import { EASE, MOTION_MS } from '../lib/motion';
 import { overlayStack } from '../lib/overlayStack';
+import { STORY_PROFILE } from '../lib/sheetGesture';
 import { storyInitial, storyIsLast, storyReducer, storySegmentFill, storySwipeAction, storyTapAction } from '../lib/storyCarousel';
 import { spacing, type ThemeColors } from '../theme';
 
@@ -48,6 +49,7 @@ export default function StoryCarousel({
 }: {
   title: string;
   pages: StoryPage[];
+  /** DISMISS: the X, a swipe down, Android back. Always leaves the story; never wire it to "next". Advancing (a footer CTA) belongs to the page's own `footer`. */
   onClose: () => void;
   initialIndex?: number;
   testID?: string;
@@ -88,7 +90,7 @@ export default function StoryCarousel({
   // conflict with.
   const pullY = useSharedValue(0);
   const screenHeight = useSharedValue(0);
-  const { gesture: pullGesture } = useSheetDismissGesture({ translateY: pullY, sheetHeight: screenHeight, onDismiss: () => overlayStack.closeAll(), enabled: !hidden });
+  const { gesture: pullGesture } = useSheetDismissGesture({ translateY: pullY, sheetHeight: screenHeight, onDismiss: () => overlayStack.closeAll(), enabled: !hidden, profile: STORY_PROFILE });
   const pullStyle = useAnimatedStyle(() => {
     const progress = screenHeight.value > 0 ? Math.min(1, Math.max(0, pullY.value / screenHeight.value)) : 0;
     return { opacity: 1 - 0.55 * progress, transform: [{ translateY: pullY.value }, { scale: 1 - 0.1 * progress }] };

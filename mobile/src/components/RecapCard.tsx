@@ -8,6 +8,7 @@ import AppText from './AppText';
 import { useThemeMode } from '../context/ThemeModeContext';
 import type { RecapCardModel, RecapCardRow, RecapTone } from '../lib/recapCard';
 import { spacing, type ThemeColors } from '../theme';
+import { Collapse } from './Presence';
 
 /**
  * THE recap card (mirrors web-next/src/components/ui/RecapCard.tsx): a glass card with the page kicker, an optional
@@ -66,13 +67,13 @@ export default function RecapCard({ model, extras, testID = 'recap-card' }: { mo
             <Pressable accessibilityRole="button" accessibilityState={{ expanded: open }} onPress={() => setOpen(!open)} style={styles.moreBtn}>
               <AppText style={styles.moreText}>{open ? 'Less' : `More (${model.more.length})`}</AppText>
             </Pressable>
-            {open ? (
+            <Collapse open={open}>
               <View style={[styles.stack, styles.moreBody]}>
                 {model.more.map((row) => (
                   <Row key={row.key} row={row} extra={extras?.[row.key]} />
                 ))}
               </View>
-            ) : null}
+            </Collapse>
           </>
         ) : null}
       </View>

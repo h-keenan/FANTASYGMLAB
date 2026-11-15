@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 
 import { CompactPlayerCard } from "@/components/ui/CompactPlayerCard";
@@ -57,13 +57,14 @@ describe("player templates always draw the avatar", () => {
 });
 
 describe("PlayerAccordionRow", () => {
-  it("opens one row at a time in place", () => {
+  it("opens one row at a time in place", async () => {
     render(<List />);
     const [a, b] = screen.getAllByRole("button", { expanded: false });
     fireEvent.click(a);
     expect(screen.getAllByTestId("row-expanded")).toHaveLength(1);
     fireEvent.click(b);
-    expect(screen.getAllByTestId("row-expanded")).toHaveLength(1);
+    // The first row's body collapses out (plays its exit) while the second opens.
+    await waitFor(() => expect(screen.getAllByTestId("row-expanded")).toHaveLength(1));
     expect(screen.getAllByTestId("player-accordion-row")[1]).toHaveAttribute("data-open", "true");
   });
   it("desk tile shows PROJ / VALUE / TREND / OVR; sim tile shows GRADE / ADP / PROJ and never value or OVR", () => {

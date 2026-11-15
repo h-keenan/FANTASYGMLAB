@@ -14,6 +14,7 @@ import { prospectFit, rankByFit, type ScoutingLens } from "@/lib/scoutingLens";
 import { CompactPlayerCard } from "@/components/ui/CompactPlayerCard";
 import { confidenceColor } from "@/lib/waiversPresentation";
 import { aggregateText, classLabel, scoutingConfidenceLabel } from "@/lib/collegeScoutingPresentation";
+import { Collapse } from "@/components/ui/Presence";
 
 /**
  * Ports modules/college_scouting_ui.py's render_college_scouting_workspace /
@@ -151,7 +152,7 @@ function ProspectCard({
         </button>
       </div>
 
-      {expanded ? (
+      <Collapse open={expanded}>
         <div className="flex flex-col gap-3 pt-2" style={{ borderTop: "var(--border-width-default) solid var(--color-border)" }}>
           {flash ? (
             <p
@@ -246,7 +247,7 @@ function ProspectCard({
             ) : null}
           </div>
         </div>
-      ) : null}
+      </Collapse>
     </article>
   );
 }

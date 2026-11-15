@@ -11,6 +11,7 @@ import { feedAgeLabel, feedPointsLabel, groupFeedByGame, liveFeedStore, type Fee
 import { radii, spacing, type ThemeColors } from '../theme';
 import PlayerName from './PlayerName';
 import { PlayerTap } from './PlayerOpenContext';
+import { Collapse } from './Presence';
 
 /**
  * Collapsible "Live feed": scoring events derived by diffing polled snapshots
@@ -56,7 +57,7 @@ export default function LiveFeedPanel({ feedKey, live }: { feedKey: string; live
         </View>
         <AppText style={styles.toggle}>{open ? 'Hide' : `Show${events.length ? ` (${events.length})` : ''}`}</AppText>
       </PressableScale>
-      {open ? (
+      <Collapse open={open}>
         <View style={{ gap: spacing.md }} accessibilityLiveRegion="polite">
           {events.length === 0 ? (
             <AppText style={styles.muted}>Scoring changes appear here as they happen while this screen is open.</AppText>
@@ -77,7 +78,7 @@ export default function LiveFeedPanel({ feedKey, live }: { feedKey: string; live
             Built from score changes between refreshes, so times are when we noticed (not the play clock) and busy drives may be combined (“approx.”).
           </AppText>
         </View>
-      ) : null}
+      </Collapse>
     </AnimatedCard>
   );
 }

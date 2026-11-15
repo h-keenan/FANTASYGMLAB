@@ -5,6 +5,7 @@ import { createPortal } from "react-dom";
 
 import { OverlayBack } from "@/components/OverlayBack";
 import { useOverlay } from "@/lib/useOverlay";
+import { STORY_PROFILE } from "@/lib/sheetGesture";
 import { useSheetDragDismiss } from "@/lib/useSheetDragDismiss";
 import { storyInitial, storyIsLast, storyKeyAction, storyReducer, storySegmentFill, storySwipeAction, storyTapAction } from "@/lib/storyCarousel";
 
@@ -51,6 +52,7 @@ export function StoryCarousel({
 }: {
   title: string;
   pages: StoryPage[];
+  /** DISMISS: the X, a swipe down, Escape / browser Back. Always leaves the story; never wire it to "next". Advancing (a footer CTA) belongs to the page's own `footer`. */
   onClose: () => void;
   initialIndex?: number;
   testId?: string;
@@ -71,7 +73,7 @@ export function StoryCarousel({
   // Swipe down to leave (like every sheet): the whole card follows the finger, shrinks and fades, then closes through
   // the same path as the X (closeAll: overlay stack + history entry). Starts only on a vertical pull that is not
   // scrolling page content; horizontal swipes and tap zones are untouched (lib/useSheetDragDismiss.ts).
-  const { sheetRef } = useSheetDragDismiss<HTMLDivElement>({ onDismiss: overlay.closeAll, enabled: !hidden, effect: "story" });
+  const { sheetRef } = useSheetDragDismiss<HTMLDivElement>({ onDismiss: overlay.closeAll, enabled: !hidden, effect: "story", profile: STORY_PROFILE });
   useEffect(() => {
     const previousFocus = document.activeElement as HTMLElement | null;
     return () => previousFocus?.focus?.({ preventScroll: true });
@@ -80,7 +82,7 @@ export function StoryCarousel({
     if (!hidden) rootRef.current?.focus({ preventScroll: true });
   }, [hidden]);
 
-  const next = useCallback(() => (storyIsLast(state) ? overlay.closeAll() : dispatch({ type: "next" })), [state, overlay]);
+  const next = useCallback(() => dispatch({ type: "next" }), []);
 
   function onKeyDown(event: KeyboardEvent<HTMLDivElement>) {
     const action = storyKeyAction(event.key);

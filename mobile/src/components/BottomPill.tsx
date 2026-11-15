@@ -11,6 +11,7 @@ import { normalizePillContext, pillActiveIndex, pillPrimaryCompact, pillScrollTa
 import { BAR_METRICS } from '../lib/bottomBarMetrics';
 import { EASE, MOTION_MS } from '../lib/motion';
 import { radii, type ThemeColors } from '../theme';
+import { usePresence } from '../lib/usePresence';
 
 /**
  * The app's floating glass pill (twin of web-next components/ui/BottomTabBar.tsx, approved option B + the V2 smart pill).
@@ -23,12 +24,18 @@ import { radii, type ThemeColors } from '../theme';
 export default function BottomPill({ children, context: rawContext, style, testID, bare, contextOnly }: { children: React.ReactNode; context?: PillContext | null; style?: StyleProp<ViewStyle>; testID?: string; /** Already inside a glass pill (the Sim bars): draw no chrome of its own. */ bare?: boolean; /** No row to fold back to (the draft room has no action bar): show the page segment alone, no menu. */ contextOnly?: boolean }) {
   const { colors } = useThemeMode();
   const styles = useMemo(() => createStyles(colors), [colors]);
-  const context = normalizePillContext(rawContext);
+  const live = normalizePillContext(rawContext);
+  // The page segment stays mounted for its exit when the page's context goes away (it fades out as the default row fades
+  // in, t -> 1) and is then removed (lib/presence.ts); with Reduce Motion it simply goes.
+  const presence = usePresence(Boolean(live), { exitMs: MOTION_MS.base });
+  const [keptRaw, setKeptRaw] = useState<PillContext | null>(rawContext ?? null);
+  if (rawContext && rawContext !== keptRaw) setKeptRaw(rawContext);
+  const context = live ?? (presence.mounted ? normalizePillContext(keptRaw) : null);
   const reduced = useReducedMotion();
   const [open, setOpen] = useState(false); // true: the default row is showing although a context exists
   const t = useSharedValue(0); // 0 = context segment, 1 = default row
-  const hasContext = Boolean(context);
-  const contextId = context?.id ?? null;
+  const hasContext = Boolean(live);
+  const contextId = live?.id ?? null;
   const folded = hasContext && (!open || Boolean(contextOnly));
   useEffect(() => setOpen(false), [contextId]);
   useEffect(() => {
@@ -110,7 +117,7 @@ export default function BottomPill({ children, context: rawContext, style, testI
           ) : null}
         </Animated.View>
       ) : null}
-      {contextOnly ? null : <Animated.View style={[styles.layer, hasContext ? defaultStyle : null, hasContext && folded && styles.layerOff]} pointerEvents={hasContext && folded ? 'none' : 'auto'} accessibilityElementsHidden={hasContext && folded} importantForAccessibility={hasContext && folded ? 'no-hide-descendants' : 'auto'}>
+      {contextOnly ? null : <Animated.View style={[styles.layer, context ? defaultStyle : null, hasContext && folded && styles.layerOff]} pointerEvents={hasContext && folded ? 'none' : 'auto'} accessibilityElementsHidden={hasContext && folded} importantForAccessibility={hasContext && folded ? 'no-hide-descendants' : 'auto'}>
         {hasContext ? (
           <PressableScale accessibilityRole="button" accessibilityLabel="Back to page actions" accessibilityState={{ expanded: true }} onPress={() => setOpen(false)} style={styles.iconBtn} testID="pill-menu-close">
             <TabIcon name="more" color={colors.accent} size={22} />

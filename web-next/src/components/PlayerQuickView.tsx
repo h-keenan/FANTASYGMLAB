@@ -170,7 +170,7 @@ export function PlayerQuickView({
   // not loaded (or failed -> section renders nothing).
   const [news, setNews] = useState<PlayerNewsResponse | null>(null);
   const [newsLoading, setNewsLoading] = useState(remote && realWorld.fetchNews);
-  // Peek height from the content: compact header + pill row + one content line (--pqv-peek-h; CSS keeps 50dvh as the fallback).
+  // Peek height from the content: compact header + pill row + one content line (--pqv-peek-h; CSS keeps 65dvh as the fallback).
   // Measured with the header in its compact state only (never mid-transition), re-measured when the content above the pills resizes.
   useLayoutEffect(() => {
     const modal = dialogRef.current;
@@ -183,7 +183,8 @@ export function PlayerQuickView({
       if (!strip || scroll.scrollTop > 0) return;
       const bottomInset = parseFloat(getComputedStyle(modal).paddingBottom) || 0;
       const anchorBottom = strip.getBoundingClientRect().bottom - modal.getBoundingClientRect().top;
-      const viewportH = window.visualViewport?.height ?? window.innerHeight;
+      // The layout viewport minus a REAL keyboard (--kb-inset is 0 unless a field is focused): never the raw visualViewport height, which iOS can leave stale-small and made the peek open tiny.
+      const viewportH = window.innerHeight - (parseFloat(getComputedStyle(document.documentElement).getPropertyValue("--kb-inset")) || 0);
       modal.style.setProperty("--pqv-peek-h", `${peekSheetHeight({ anchorBottom, viewportH, bottomInset })}px`);
     };
     const later = (ms: number) => { if (timer) clearTimeout(timer); timer = setTimeout(measure, ms); };

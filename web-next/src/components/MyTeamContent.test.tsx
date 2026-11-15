@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, within } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { beforeEach, describe, expect, it } from "vitest";
 
 import { collapsedModuleProblems } from "@/components/ui/assertCompactInformative";
@@ -198,12 +198,13 @@ describe("MyTeamContent", () => {
   // value/"VALUE" column shifted out of alignment with rows that do have
   // one. OvrGauge now reserves the same space either way — not a
   // fabricated number, just a same-size invisible placeholder.
-  it("never fabricates an OVR for an unrated player (the tile simply has no OVR fact)", () => {
+  it("never fabricates an OVR for an unrated player (the tile simply has no OVR fact)", async () => {
     render(<MyTeamContent leagueName="Dynasty Overlords" myTeam={MY_TEAM} needs={NEEDS} teamRanking={TEAM_RANKING} leagueSize={10} />);
 
     open("IR");
     expandRows();
-    expect(document.querySelector("[data-testid=row-expanded] [data-fact=ovr]")).toBeNull();
+    // Rows that closed because another opened (one at a time) finish their exit first.
+    await waitFor(() => expect(document.querySelector("[data-testid=row-expanded] [data-fact=ovr]")).toBeNull());
   });
 
   // coridian_, 2026-10-18, screenshot: "the bench should be in order so.

@@ -1,6 +1,7 @@
 "use client";
 
 import { useId, useState, type ReactNode } from "react";
+import { Collapse } from "@/components/ui/Presence";
 
 /**
  * Shared "short label + ⓘ" affordance. Replaces always-visible explanatory
@@ -35,11 +36,11 @@ export function InfoTip({
         <span aria-hidden="true">ⓘ</span>
         {label}
       </button>
-      {expanded ? (
+      <Collapse open={expanded}>
         <p id={id} className="text-xs" style={{ color: "var(--color-text-secondary)" }}>
           {children}
         </p>
-      ) : null}
+      </Collapse>
     </div>
   );
 }

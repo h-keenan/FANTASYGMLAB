@@ -447,7 +447,7 @@ export function SimGameContent() {
     return (
       <Shell>
         {flow.paywall ? <PaywallCard flow={flow} onDismiss={() => dispatch({ type: "dismiss_paywall" })} /> : null}
-        {notice ? <SimNotice message={notice.message} tone={notice.tone} onDismiss={() => setNotice(null)} /> : null}
+        <SimNotice message={notice?.message ?? ""} tone={notice?.tone} onDismiss={() => setNotice(null)} />
         <SetupForm options={options} creating={creating} initial={setupSeed} onCreate={createGame} onBack={() => { setSetupSeed(null); dispatch({ type: "hub" }); }} />
       </Shell>
     );
@@ -543,7 +543,7 @@ export function SimGameContent() {
     <Shell>
       <SimPreviewBanner preview={preview} />
       {flow.paywall ? <PaywallCard flow={flow} onDismiss={() => dispatch({ type: "dismiss_paywall" })} /> : null}
-      {notice ? <SimNotice message={notice.message} tone={notice.tone} onDismiss={() => setNotice(null)} /> : null}
+      <SimNotice message={notice?.message ?? ""} tone={notice?.tone} onDismiss={() => setNotice(null)} />
       <SimHub
         games={games}
         options={options}
@@ -1036,7 +1036,7 @@ function GameScreen({
 
       <SimPreviewBanner preview={preview} />
       {flow.paywall ? <PaywallCard flow={flow} onDismiss={onDismissPaywall} /> : null}
-      {notice ? <SimNotice message={notice.message} tone={notice.tone} onDismiss={clearNotice} /> : null}
+      <SimNotice message={notice?.message ?? ""} tone={notice?.tone} onDismiss={clearNotice} />
       {inSeason && !recap && !paywalled && warnings.length > 0 ? (
         <ul className="hidden flex-col gap-0.5 text-xs md:flex" style={{ color: "var(--color-text-muted)" }} aria-label="Before you advance">
           {warnings.map((w) => (

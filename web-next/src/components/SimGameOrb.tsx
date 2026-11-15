@@ -49,8 +49,8 @@ export function SimGameOrb({
     <>
       <div className="game-orb-slot md:hidden" data-testid="sim-game-orb-dock">
         <button type="button" className="game-orb game-orb--bar" onClick={() => setOpen(true)} aria-haspopup="dialog" aria-label={simOrbAriaLabel(currentTab.label, inbox)} data-testid="sim-game-orb">
-          <Image src="/brand-mark.png" alt="" width={18} height={18} className="brand-mark-icon" style={{ objectFit: "contain" }} />
-          <span className="game-orb-label" aria-hidden="true">{currentTab.label}</span>{badge ? " " : null}
+          {/* Brand mark only (same as the app): a page name in 9px caps ("TRADES", "PLAYERS") is wider than a 48px circle and clipped on its rim, and the sheet it opens marks the current page. The accessible name still carries it. */}
+          <Image src="/brand-mark.png" alt="" width={26} height={26} className="brand-mark-icon" style={{ objectFit: "contain" }} />
           {badge ? <span className="game-orb-badge" aria-hidden="true" data-testid="sim-game-orb-badge">{badge}</span> : null}
         </button>
       </div>

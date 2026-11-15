@@ -575,7 +575,7 @@ export default function GmGameScreen({ navigation }: Props) {
         top={
           <>
             {flow.paywall ? <PaywallCard flow={flow} onDismiss={() => dispatch({ type: 'dismiss_paywall' })} /> : null}
-            {notice ? <SimNotice message={notice.message} tone={notice.tone} onDismiss={() => setNotice(null)} /> : null}
+            <SimNotice message={notice?.message ?? ''} tone={notice?.tone} onDismiss={() => setNotice(null)} />
           </>
         }
       />
@@ -686,7 +686,7 @@ export default function GmGameScreen({ navigation }: Props) {
     <>
       <SimPreviewBanner preview={preview} />
       {flow.paywall ? <PaywallCard flow={flow} onDismiss={() => dispatch({ type: 'dismiss_paywall' })} /> : null}
-      {notice ? <SimNotice message={notice.message} tone={notice.tone} onDismiss={() => setNotice(null)} /> : null}
+      <SimNotice message={notice?.message ?? ''} tone={notice?.tone} onDismiss={() => setNotice(null)} />
       <SimHub
         games={games}
         options={options}
@@ -1076,7 +1076,7 @@ function GameScreen({
 
       <SimPreviewBanner preview={preview} />
       {flow.paywall ? <PaywallCard flow={flow} onDismiss={onDismissPaywall} /> : null}
-      {notice ? <SimNotice message={notice.message} tone={notice.tone} onDismiss={clearNotice} /> : null}
+      <SimNotice message={notice?.message ?? ''} tone={notice?.tone} onDismiss={clearNotice} />
       {stage === 'draft' ? (
         <SimGameDraft ctx={ctx} onComplete={onDraftComplete} />
       ) : draftRecap ? (

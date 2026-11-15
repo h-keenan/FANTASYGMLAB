@@ -34,13 +34,57 @@ export const SHEET_SNAP_FLICK_VELOCITY = 0.35;
 /** A scrollTop this close to 0 still counts as the top (Android reports fractional scroll offsets). */
 export const SHEET_SCROLL_TOP_TOLERANCE_PX = 1;
 
+/** Every threshold a drag-to-dismiss uses, as one named bundle. `SHEET_PROFILE` is what every sheet and pop-up
+ * uses (the constants above and the quarter-height rule). `STORY_PROFILE` is the forgiving one for the full-screen
+ * recap story (owner: a swipe down that was clearly meant to close it kept not closing it): a wider 12px slop, no
+ * diagonal dead zone (anything at least as vertical as horizontal is a pull), release at 12% of the height clamped
+ * to 56-100px, a lighter 0.4px/ms flick. A swipe that is more sideways than vertical still hands the gesture back,
+ * so the story's horizontal page swipes keep working. Opt in per surface, never globally. */
+export interface SheetGestureProfile {
+  slopPx: number;
+  axisRatio: number;
+  ambiguousLimitPx: number;
+  dismissFraction: number;
+  dismissMinPx: number;
+  dismissMaxPx: number;
+  flickVelocity: number;
+  flickMinDistancePx: number;
+  /** px/ms of upward velocity at release that is still treated as rest (finger jitter as it lifts). Beyond it the
+   * release is a deliberate pull back up and never dismisses. */
+  backTolerance: number;
+}
+
+export const SHEET_PROFILE: SheetGestureProfile = {
+  slopPx: SHEET_DRAG_SLOP_PX,
+  axisRatio: SHEET_AXIS_RATIO,
+  ambiguousLimitPx: SHEET_AMBIGUOUS_LIMIT_PX,
+  dismissFraction: 0.25,
+  dismissMinPx: 80,
+  dismissMaxPx: 160,
+  flickVelocity: SHEET_FLICK_VELOCITY,
+  flickMinDistancePx: SHEET_FLICK_MIN_DISTANCE_PX,
+  backTolerance: 0,
+};
+
+export const STORY_PROFILE: SheetGestureProfile = {
+  slopPx: 12,
+  axisRatio: 1,
+  ambiguousLimitPx: SHEET_AMBIGUOUS_LIMIT_PX,
+  dismissFraction: 0.12,
+  dismissMinPx: 56,
+  dismissMaxPx: 100,
+  flickVelocity: 0.4,
+  flickMinDistancePx: 32,
+  backTolerance: 0.15,
+};
+
 /** Distance threshold: a quarter of the sheet's height, clamped so a tiny
  * sheet still needs a deliberate pull and a tall one doesn't need a
  * half-screen drag. */
-export function sheetDismissDistance(sheetHeight: number): number {
+export function sheetDismissDistance(sheetHeight: number, profile: SheetGestureProfile = SHEET_PROFILE): number {
   'worklet';
-  const quarter = sheetHeight > 0 ? sheetHeight * 0.25 : 120;
-  return Math.min(160, Math.max(80, quarter));
+  const share = sheetHeight > 0 ? sheetHeight * profile.dismissFraction : 120;
+  return Math.min(profile.dismissMaxPx, Math.max(profile.dismissMinPx, share));
 }
 
 /** Whether a released drag closes the sheet: pulled past the distance
@@ -50,7 +94,9 @@ export function shouldDismissSheet({
   offset,
   velocity,
   sheetHeight,
+  profile = SHEET_PROFILE,
 }: {
+  profile?: SheetGestureProfile;
   /** Current downward offset (px) of the sheet. */
   offset: number;
   /** Release velocity (px/ms); positive is downward. */
@@ -59,9 +105,9 @@ export function shouldDismissSheet({
 }): boolean {
   'worklet';
   if (offset <= 0) return false;
-  if (velocity < 0) return false;
-  if (offset >= sheetDismissDistance(sheetHeight)) return true;
-  return velocity >= SHEET_FLICK_VELOCITY && offset >= SHEET_FLICK_MIN_DISTANCE_PX;
+  if (velocity < -profile.backTolerance) return false;
+  if (offset >= sheetDismissDistance(sheetHeight, profile)) return true;
+  return velocity >= profile.flickVelocity && offset >= profile.flickMinDistancePx;
 }
 
 /** iOS-style rubber band: the further past the edge, the less the sheet
@@ -76,10 +122,10 @@ export function rubberBand(distance: number, dimension: number, constant = 0.55)
  * finger 1:1 up to the dismiss distance, then with rubber-band resistance,
  * so crossing the threshold is felt. Upward (past the sheet's resting
  * position) only gives a small rubber-band stretch. */
-export function sheetDragOffset(delta: number, sheetHeight: number): number {
+export function sheetDragOffset(delta: number, sheetHeight: number, profile: SheetGestureProfile = SHEET_PROFILE): number {
   'worklet';
   if (delta < 0) return -rubberBand(-delta, 40);
-  const threshold = sheetDismissDistance(sheetHeight);
+  const threshold = sheetDismissDistance(sheetHeight, profile);
   if (delta <= threshold) return delta;
   return threshold + rubberBand(delta - threshold, Math.max(sheetHeight, threshold * 2));
 }
@@ -94,7 +140,9 @@ export function classifySheetGesture({
   dy,
   canStartDrag,
   canDragUp = false,
+  profile = SHEET_PROFILE,
 }: {
+  profile?: SheetGestureProfile;
   dx: number;
   dy: number;
   canStartDrag: boolean;
@@ -103,9 +151,9 @@ export function classifySheetGesture({
   'worklet';
   const ax = Math.abs(dx);
   const ay = Math.abs(dy);
-  if (ax < SHEET_DRAG_SLOP_PX && ay < SHEET_DRAG_SLOP_PX) return null;
+  if (ax < profile.slopPx && ay < profile.slopPx) return null;
   if (ax > ay) return 'ignore';
-  if (ay < ax * SHEET_AXIS_RATIO) return ay >= SHEET_AMBIGUOUS_LIMIT_PX ? 'ignore' : null;
+  if (ay < ax * profile.axisRatio) return ay >= profile.ambiguousLimitPx ? 'ignore' : null;
   if (dy > 0) return canStartDrag ? 'drag' : 'ignore';
   return canDragUp ? 'drag' : 'ignore';
 }
@@ -164,7 +212,9 @@ export function sheetDragPosition({
   stops,
   height,
   dismissible = true,
+  profile = SHEET_PROFILE,
 }: {
+  profile?: SheetGestureProfile;
   base: number;
   delta: number;
   stops: readonly number[];
@@ -176,7 +226,7 @@ export function sheetDragPosition({
   const bottom = stops[stops.length - 1] ?? 0;
   const raw = base + delta;
   if (raw < top) return top - rubberBand(top - raw, 40);
-  const free = dismissible ? sheetDismissDistance(Math.max(0, height - bottom)) : 0;
+  const free = dismissible ? sheetDismissDistance(Math.max(0, height - bottom), profile) : 0;
   if (raw <= bottom + free) return raw;
   return bottom + free + rubberBand(raw - bottom - free, Math.max(height - bottom, free * 2, 1));
 }
@@ -204,7 +254,9 @@ export function resolveSheetRelease({
   height,
   stops,
   dismissible = true,
+  profile = SHEET_PROFILE,
 }: {
+  profile?: SheetGestureProfile;
   position: number;
   velocity: number;
   height: number;
@@ -214,9 +266,9 @@ export function resolveSheetRelease({
   'worklet';
   const bottom = stops[stops.length - 1] ?? 0;
   const moved = position - bottom;
-  if (dismissible && moved > 0 && velocity >= 0) {
-    if (moved >= sheetDismissDistance(Math.max(0, height - bottom))) return { type: 'dismiss' };
-    if (velocity >= SHEET_FLICK_VELOCITY && moved >= SHEET_FLICK_MIN_DISTANCE_PX) return { type: 'dismiss' };
+  if (dismissible && moved > 0 && velocity >= -profile.backTolerance) {
+    if (moved >= sheetDismissDistance(Math.max(0, height - bottom), profile)) return { type: 'dismiss' };
+    if (velocity >= profile.flickVelocity && moved >= profile.flickMinDistancePx) return { type: 'dismiss' };
   }
   if (Math.abs(velocity) >= SHEET_SNAP_FLICK_VELOCITY && stops.length > 1) {
     if (velocity > 0) {
@@ -243,6 +295,7 @@ export interface SheetDragState {
   stops: number[];
   height: number;
   dismissible: boolean;
+  profile: SheetGestureProfile;
   samples: { y: number; t: number }[];
 }
 
@@ -258,6 +311,7 @@ export const SHEET_DRAG_IDLE: SheetDragState = {
   stops: [0],
   height: 0,
   dismissible: true,
+  profile: SHEET_PROFILE,
   samples: [],
 };
 
@@ -273,6 +327,7 @@ export function sheetDragStart(input: {
   stops?: readonly number[];
   stopIndex?: number;
   dismissible?: boolean;
+  profile?: SheetGestureProfile;
 }): SheetDragState {
   'worklet';
   const stops = input.stops && input.stops.length > 0 ? [...input.stops] : [0];
@@ -290,6 +345,7 @@ export function sheetDragStart(input: {
     stops,
     height: input.height,
     dismissible: input.dismissible ?? true,
+    profile: input.profile ?? SHEET_PROFILE,
     samples: [{ y: input.y, t: input.t }],
   };
 }
@@ -305,6 +361,7 @@ export function sheetDragMove(state: SheetDragState, point: { x: number; y: numb
       dy: point.y - state.startY,
       canStartDrag: state.canDown,
       canDragUp: state.canUp,
+      profile: state.profile,
     });
     if (decision === null) return state;
     if (decision === 'ignore') return { ...state, phase: 'ignored' };
@@ -314,7 +371,7 @@ export function sheetDragMove(state: SheetDragState, point: { x: number; y: numb
   return {
     ...state,
     samples,
-    position: sheetDragPosition({ base: state.base, delta: point.y - state.anchorY, stops: state.stops, height: state.height, dismissible: state.dismissible }),
+    position: sheetDragPosition({ base: state.base, delta: point.y - state.anchorY, stops: state.stops, height: state.height, dismissible: state.dismissible, profile: state.profile }),
   };
 }
 
@@ -328,5 +385,6 @@ export function sheetDragEnd(state: SheetDragState, t: number): SheetRelease | n
     height: state.height,
     stops: state.stops,
     dismissible: state.dismissible,
+    profile: state.profile,
   });
 }

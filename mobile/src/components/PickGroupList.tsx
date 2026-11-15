@@ -9,6 +9,7 @@ import ToneBadge from './ToneBadge';
 import { useThemeMode } from '../context/ThemeModeContext';
 import { groupPicksForList, roundGroupDefaultOpen, type GroupablePick } from '../lib/pickGroups';
 import { radii, spacing, type ThemeColors } from '../theme';
+import { Collapse } from './Presence';
 
 /**
  * The one grouped draft-pick list: year tabs on top, then a collapsible group
@@ -72,13 +73,13 @@ export default function PickGroupList<T extends GroupablePick>({
                 style={styles.chevron}
               />
             </PressableScale>
-            {open ? (
+            <Collapse open={open}>
               <View style={styles.body}>
                 {group.picks.map((pick, i) => (
                   <React.Fragment key={pick.pick_id}>{renderPick(pick, i === group.picks.length - 1)}</React.Fragment>
                 ))}
               </View>
-            ) : null}
+            </Collapse>
           </View>
         );
       })}

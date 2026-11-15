@@ -110,10 +110,12 @@ export const IDENTICAL = [
   "tradeCautions.ts",
   "tradeValueBands.generated.ts",
   "verdictText.ts",
+  "presence.ts",
 ];
 
 // Same code, differing only in comments / import specifiers / quote style.
 export const MIRRORED = [
+  "usePresence.ts",
   "waiverGroups.ts", // imports ./money (mobile needs the .ts extension for node strip-types tests)
   "pickBadge.ts",
   "waiversHeader.ts",

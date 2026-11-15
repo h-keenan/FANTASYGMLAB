@@ -19,6 +19,7 @@ import PositionBadge from './PositionBadge';
 import { injuryTone } from '../lib/injuryDisplay';
 import { radii, spacing, type ThemeColors } from '../theme';
 import Money from './Money';
+import { Collapse } from './Presence';
 
 
 /** Same risk-vs-watch split WaiversScreen has always used, just relocated
@@ -341,7 +342,7 @@ export default function WaiverRecommendationCard({
           {differentDrop ? pill('drop', `Drop ${differentDrop.name}`, colors.danger, 'trending-down') : null}
         </View>
       </PressableScale>
-      {open ? (
+      <Collapse open={open}>
         <View style={styles.compactDetails} testID="waiver-rec-details">
           <View style={styles.compactMetaRow}>
             <View style={styles.scoreBlock}>
@@ -372,7 +373,7 @@ export default function WaiverRecommendationCard({
             <Ionicons name="arrow-forward" size={14} color={colors.accent} />
           </PressableScale>
         </View>
-      ) : null}
+      </Collapse>
     </View>
   );
 }

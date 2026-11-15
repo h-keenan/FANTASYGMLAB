@@ -3,6 +3,7 @@ import { AccessibilityInfo, Pressable, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import AppText from './AppText';
+import { Presence } from './Presence';
 import { useThemeMode } from '../context/ThemeModeContext';
 import { UNDO_TOAST_MS } from '../lib/confirmInPlace';
 import { radii, shadows, spacing, type ThemeColors } from '../theme';
@@ -15,7 +16,6 @@ import { radii, shadows, spacing, type ThemeColors } from '../theme';
 export function UndoToast({ message, onUndo, onDone, durationMs = UNDO_TOAST_MS }: { message: string; onUndo: () => void; onDone: () => void; durationMs?: number }) {
   const { colors } = useThemeMode();
   const styles = useMemo(() => createStyles(colors), [colors]);
-  const insets = useSafeAreaInsets();
   const doneRef = useRef(onDone);
   useEffect(() => {
     doneRef.current = onDone;
@@ -26,18 +26,32 @@ export function UndoToast({ message, onUndo, onDone, durationMs = UNDO_TOAST_MS 
     return () => clearTimeout(timer);
   }, [durationMs, message]);
   return (
-    <View style={[styles.wrap, { bottom: spacing.lg + insets.bottom + 56 }]} pointerEvents="box-none">
-      <View style={styles.toast} accessibilityLiveRegion="polite">
-        <AppText style={styles.text} numberOfLines={2}>
-          {message}
-        </AppText>
-        <Pressable accessibilityRole="button" accessibilityLabel="Undo" onPress={onUndo} style={styles.undo} hitSlop={8}>
-          <AppText style={styles.undoText}>Undo</AppText>
-        </Pressable>
-      </View>
+    <View style={styles.toast} accessibilityLiveRegion="polite">
+      <AppText style={styles.text} numberOfLines={2}>
+        {message}
+      </AppText>
+      <Pressable accessibilityRole="button" accessibilityLabel="Undo" onPress={onUndo} style={styles.undo} hitSlop={8}>
+        <AppText style={styles.undoText}>Undo</AppText>
+      </Pressable>
     </View>
   );
 }
+
+/**
+ * Where a toast lives (twin of web's ToastSlot): an absolute, centred slot above the bottom chrome that every toast rises
+ * into and fades out of (components/Presence.tsx), so a toast never pops in or vanishes between frames. Children are kept
+ * on screen during the exit, so pass the toast while it is showing and nothing after.
+ */
+export function ToastSlot({ show, children }: { show: boolean; children?: ReactNode }) {
+  const insets = useSafeAreaInsets();
+  return (
+    <Presence show={show} variant="rise" appear style={[slotStyle, { bottom: spacing.lg + insets.bottom + 56 }]} testID="toast-slot">
+      {children}
+    </Presence>
+  );
+}
+
+const slotStyle = { position: 'absolute', left: spacing.lg, right: spacing.lg, alignItems: 'center' } as const;
 
 /**
  * Deferred-commit removal (same contract as web). `schedule(item)` shows the
@@ -81,8 +95,9 @@ export function useUndoableRemoval<T>({
     [flush],
   );
 
-  const toast =
-    pending !== null ? (
+  const toast = (
+    <ToastSlot show={pending !== null}>
+      {pending !== null ? (
       <UndoToast
         key={pending.seq}
         message={message(pending.item)}
@@ -98,14 +113,15 @@ export function useUndoableRemoval<T>({
           setPending(null);
         }}
       />
-    ) : null;
+      ) : null}
+    </ToastSlot>
+  );
 
   return { schedule, toast };
 }
 
 function createStyles(colors: ThemeColors) {
   return StyleSheet.create({
-    wrap: { position: 'absolute', left: spacing.lg, right: spacing.lg, alignItems: 'center' },
     toast: {
       flexDirection: 'row',
       alignItems: 'center',
