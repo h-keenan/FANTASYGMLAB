@@ -22,7 +22,7 @@ describe("PlayerAvatar", () => {
   it("titles the no-photo fallback ring too", () => {
     const { container } = render(<PlayerAvatar playerId={null} tier="impact_starter" />);
 
-    expect(container.querySelector("span")).toHaveAttribute("title", "Impact Starter");
+    expect(container.querySelector("[data-avatar-fallback]")).toHaveAttribute("title", "Impact Starter");
   });
 
   // coridian_, 2026-10-18: "The prestige ring is still too small around
@@ -39,19 +39,19 @@ describe("PlayerAvatar", () => {
   // coridian_, 2026-10-19 (queued cosmetic): only the top three tiers glow.
   it("glows the top three tiers, not starter and below", () => {
     const generational = render(<PlayerAvatar playerId="p1" tier="generational" />);
-    expect(generational.container.querySelector("img")?.className).toContain("prestige-glow");
+    expect(generational.container.querySelector(".prestige-glow > img")).not.toBeNull();
 
     const elite = render(<PlayerAvatar playerId="p1" tier="elite" />);
-    expect(elite.container.querySelector("img")?.className).toContain("prestige-glow");
+    expect(elite.container.querySelector(".prestige-glow > img")).not.toBeNull();
 
     const impactStarter = render(<PlayerAvatar playerId="p1" tier="impact_starter" />);
-    expect(impactStarter.container.querySelector("img")?.className).toContain("prestige-glow");
+    expect(impactStarter.container.querySelector(".prestige-glow > img")).not.toBeNull();
 
     const starter = render(<PlayerAvatar playerId="p1" tier="starter" />);
-    expect(starter.container.querySelector("img")?.className).not.toContain("prestige-glow");
+    expect(starter.container.querySelector(".prestige-glow")).toBeNull();
 
     const noTier = render(<PlayerAvatar playerId="p1" />);
-    expect(noTier.container.querySelector("img")?.className).not.toContain("prestige-glow");
+    expect(noTier.container.querySelector(".prestige-glow")).toBeNull();
   });
 
   // coridian_, "pqv still opens wrong" (2026-11-14): the PQV shell resizes the circle with CSS (112px full, 56px peek), and an
