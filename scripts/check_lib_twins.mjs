@@ -33,6 +33,7 @@ export const IDENTICAL = [
   "statusHeader.ts",
   "connectFlow.ts",
   "recapCard.ts",
+  "recapPage.ts",
   "simTeamIdentity.ts",
   "playerBadges.ts",
   "moduleTemplates.ts",

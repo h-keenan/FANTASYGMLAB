@@ -516,3 +516,22 @@ def test_waiver_low_story_roster_id_matches_cheapest_claim():
     )
     low = next(story for story in recap["stories"] if story["story_type"] == league_recaps.STORY_WAIVER_LOW)
     assert low["primary_roster_id"] == "1"
+
+
+def test_matchup_stories_carry_recorded_scores_and_waivers_carry_the_added_player():
+    recap = league_recaps.build_weekly_recap(
+        league_id="L1",
+        season="2025",
+        week=7,
+        transactions=[_waiver(bid=11)],
+        matchups=_matchups(),
+        profiles=PROFILES,
+    )
+    by_type = {story["story_type"]: story for story in recap["stories"]}
+    big = by_type[league_recaps.STORY_MATCHUP]
+    assert big["winner_points"] == 148.4
+    assert big["loser_points"] == 110.2
+    close = by_type[league_recaps.STORY_MATCHUP_CLOSE]
+    assert close["winner_points"] >= close["loser_points"]
+    waiver = by_type[league_recaps.STORY_WAIVER]
+    assert [asset["player_id"] for asset in waiver["player_assets"]] == ["p3"]

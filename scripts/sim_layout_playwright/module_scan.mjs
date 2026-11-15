@@ -89,6 +89,22 @@ FIX["games/season-sim"] = { ok: true, reason: "", is_premium: true, upsell: null
 FIX["draft-center"] = { ok: true, reason: "", posture: { label: "Pick-Rich Rebuilder", note: "Rebuild path already has strong pick insulation.", tone: "opportunity", draft_capital_rank: 1, draft_capital_rank_tied: false, draft_capital: 4200, future_draft_capital_rank: 2, future_draft_capital_rank_tied: false, future_draft_capital: 2000, first_rounders: 3, pick_count: 9, strategy_display: "Rebuild", power_rank: 5, power_rank_tied: false, franchise_rank: 4, franchise_rank_tied: false }, posture_reason: "", decision_cards: [{ label: "Best Pick Buyers", title: "Who will pay for picks", tone: "opportunity", items: ["Team 2 needs RB depth."] }], partner_cards: [{ label: "Pick-Rich Teams", title: "Teams with extra firsts", tone: "neutral", items: ["Team 4 holds 4 firsts."] }], is_premium: true, upsell: null };
 FIX["draft-picks"] = { ok: true, reason: "", picks: [1, 2, 3].flatMap((r) => [2026, 2027].map((y) => ({ pick_id: `${y}-${r}`, label: `${y} Round ${r}`, score: 900 - r * 200, season: y, round: r, original_roster_id: "1", owner_roster_id: "1", original_team_name: "Team 1", owner_team_name: "Team 1", pick_tier: "Early", projected_pick_range: "1.03-1.06" }))) };
 FIX["my-roster"] = { ok: true, roster: { roster_id: "1" } };
+
+// Weekly recap fixture (League > Recaps): every story type, a long team name, a 3-team trade is covered by the unit tests.
+const rTeams = ["Epstein's List", "The tickle monster", "Revivalry Dynasty Superfans Of The Capital", "Not Your Dad's Dih", "Shiesty"];
+const rAsset = (id, name, position, team) => ({ kind: "player", name, player_id: id, position, team });
+FIX["team-profiles"] = { ok: true, profiles: Object.fromEntries(rTeams.map((t, i) => [String(i + 1), { team_name: t, owner_name: `Owner ${i + 1}`, username: `o${i + 1}`, avatar_id: "", avatar_url: "", roster_id: i + 1, owner_id: `u${i + 1}` }])) };
+const rStory = (o) => ({ story_type: "performance", title: "Week's scoring leader", summary: "The clearest scoring week belonged to Epstein's List: 183.4.", glyph: "x", primary_team: rTeams[0], secondary_team: "", primary_roster_id: "1", secondary_roster_id: "", players: [], metric_label: "Points", metric_value: "183.4", history_week: 9, confidence: "recorded", editorial_label: "", history_filter: "", ...o });
+FIX.recap = { ok: true, reason: "", max_completed_week: 9, my_roster_id: "3", recap: { recap_id: "r9", league_id: LID, season: "2026", week: 9, headline: "League memory - Week 9", incomplete: false, empty_reason: "", stories: [
+  rStory({}),
+  rStory({ story_type: "performance_low", title: "The week's toughest scoreline", summary: "The toughest scoring week belonged to The tickle monster: 57.9.", primary_team: rTeams[1], primary_roster_id: "2", metric_value: "57.9" }),
+  rStory({ story_type: "matchup", title: "Biggest matchup", summary: "Revivalry Dynasty Superfans Of The Capital defeated Shiesty 150.2-109.7 (margin 40.5).", primary_team: rTeams[2], primary_roster_id: "3", secondary_team: rTeams[4], secondary_roster_id: "5", metric_label: "Margin", metric_value: "40.5", winner_points: 150.2, loser_points: 109.7, history_filter: "" }),
+  rStory({ story_type: "matchup_close", title: "Down to the wire", summary: "Not Your Dad's Dih edged The tickle monster 101.3-100.5 (margin 0.8).", primary_team: rTeams[3], primary_roster_id: "4", secondary_team: rTeams[1], secondary_roster_id: "2", metric_label: "Margin", metric_value: "0.8", winner_points: 101.3, loser_points: 100.5 }),
+  rStory({ story_type: "waiver", title: "Waiver winner", summary: "Revivalry Dynasty Superfans Of The Capital spent $14 FAAB to add Jalen Nailor.", primary_team: rTeams[2], primary_roster_id: "3", players: ["Jalen Nailor"], metric_label: "FAAB", metric_value: "$14", history_filter: "Waivers", player_assets: [rAsset("9001", "Jalen Nailor", "WR", "LV")] }),
+  rStory({ story_type: "waiver_low", title: "Cheapest add", summary: "Shiesty added Coleman Owen for just $1 FAAB.", primary_team: rTeams[4], primary_roster_id: "5", players: ["Coleman Owen"], metric_label: "FAAB", metric_value: "$1", history_filter: "Waivers", player_assets: [rAsset("9002", "Coleman Owen", "WR", "GB")] }),
+  rStory({ story_type: "trade", title: "Trade of the week", summary: "Epstein's List received Aaron Jones and a 2027 R2; Shiesty received Tyrone Tracy.", primary_team: rTeams[0], secondary_team: rTeams[4], primary_roster_id: "1", secondary_roster_id: "5", players: ["Aaron Jones", "Tyrone Tracy"], metric_label: "", metric_value: "", history_filter: "Trades", editorial_label: "Too Early to Tell", value_lenses: [{ lens: "now", label: "Current market", note: "Current values only." }], sides: [{ team_name: rTeams[0], roster_id: "1", assets: [rAsset("9003", "Aaron Jones", "RB", "MIN"), { kind: "pick", name: "2027 R2", label: "2027 Round 2", season: "2027", round: 2 }] }, { team_name: rTeams[4], roster_id: "5", assets: [rAsset("9004", "Tyrone Tracy", "RB", "NYG")] }] }),
+  rStory({ story_type: "activity", title: "Most active desk", summary: "Not Your Dad's Dih made 6 moves.", primary_team: rTeams[3], primary_roster_id: "4", metric_label: "Moves", metric_value: "6", history_filter: "All" }),
+] } };
 const ROUTES = [
   { name: "today", path: `/dashboard/${LID}?name=Donk`, family: "none" },
   { name: "team", path: `/my-team/${LID}?name=Donk`, family: "team" },
@@ -101,7 +117,7 @@ const ROUTES = [
   { name: "trade-analyzer", path: `/trade-analyzer/${LID}?name=Donk`, family: "trades", maxTablists: 2, noModules: true },
   { name: "gm-plan", path: `/gm-plan/${LID}?name=Donk`, family: "none", maxTablists: 2 },
   { name: "games", path: `/games/${LID}?name=Donk`, family: "league" },
-  { name: "recaps", path: `/league-recaps/${LID}?name=Donk`, family: "league", maxTablists: 2, noModules: true },
+  { name: "recaps", path: `/league-recaps/${LID}?name=Donk`, family: "league", maxTablists: 3, expandAll: true, noTruncate: true },
   { name: "draft-center", path: `/draft-center/${LID}?name=Donk`, family: "none" },
   { name: "sample-league", path: `/sample-league`, family: "none", maxTablists: 2, noAuth: true },
 ];
@@ -139,6 +155,14 @@ const PAGE_CHECK = () => {
   const vis = (el) => { const r = el.getBoundingClientRect(); return r.height > 0 && r.width > 0 && getComputedStyle(el).display !== "none"; };
   out.headerBars = [...document.querySelectorAll("body header")].filter((h) => vis(h) && h.getBoundingClientRect().top < 120 && !h.closest("main") && !h.closest("section")).length;
   out.shellHeaderVisible = [...document.querySelectorAll('[data-testid="shell-header"]')].some(vis);
+  // Names are never ellipsized: any clipped text inside the recap's identity blocks (the row meta line of a shared player row is the template's own one-line truncation).
+  out.truncated = [];
+  for (const el of document.querySelectorAll('[data-testid="recap-story"] *, [data-testid="recap-leader"] *, [data-testid="recap-trade-card"] *, [data-testid="status-headline"], [data-testid="status-context"]')) {
+    if (el.children.length || !el.textContent.trim() || el.closest('[data-testid="row-meta"]')) continue;
+    const cs = getComputedStyle(el);
+    if (cs.textOverflow === "ellipsis" && el.scrollWidth > el.clientWidth + 1) out.truncated.push(el.textContent.trim().slice(0, 40));
+    if (el.scrollWidth > el.clientWidth + 1 && cs.overflowX !== "visible") out.truncated.push("clipped:" + el.textContent.trim().slice(0, 40));
+  }
   const main = document.querySelector("main");
   out.mainWidth = main ? Math.round(main.getBoundingClientRect().width) : 0;
   out.recRows = document.querySelectorAll('[data-testid="waiver-rec-row"]').length;
@@ -191,11 +215,28 @@ for (const w of WIDTHS) {
   const page = await ctx.newPage();
   page.on("pageerror", () => {});
   for (const r of ROUTES) {
+    if (process.env.ONLY && !process.env.ONLY.split(",").includes(r.name)) continue;
     try {
       await page.goto(`${BASE}${r.path}`, { waitUntil: "domcontentloaded", timeout: 90000 });
       await page.addStyleTag({ content: "nextjs-portal,[data-nextjs-toast]{display:none!important}" }).catch(() => {});
       await sleep(r.name === "today" && w === WIDTHS[0] ? 12000 : 5000);
       const res = await page.evaluate(PAGE_CHECK);
+      if (r.expandAll) {
+        // Open every collapsed module and the first player row, so the scan covers the bodies, then pick another week from the strip.
+        for (let pass = 0; pass < 8; pass += 1) {
+          const closed = page.locator('main button[aria-expanded="false"][aria-label$=". Expand"]').first();
+          if (!(await closed.count())) break;
+          await closed.click().catch(() => {});
+          await sleep(250);
+        }
+        await page.locator('[data-testid="recap-waiver-row"] [data-row-toggle="true"]').first().click().catch(() => {});
+        await sleep(400);
+        const open = await page.evaluate(PAGE_CHECK);
+        res.overflow = res.overflow || open.overflow;
+        res.truncated = [...(res.truncated || []), ...(open.truncated || [])];
+        res.openHeight = open.height;
+        await page.screenshot({ path: `${OUT}/${r.name}-open-${w}.png`, fullPage: true });
+      }
       if (METRICS) res.census = await page.evaluate(CENSUS);
       results.push({ page: r.name, width: w, maxTablists: r.maxTablists ?? 1, noModules: Boolean(r.noModules), expect: r.expect ? await page.locator(`[data-testid="${r.expect}"]`).count() : null, ...res });
       if (r.expect === "waiver-rec-row") await page.locator(`[data-testid="${r.expect}"]`).first().scrollIntoViewIfNeeded().catch(() => {});
@@ -222,6 +263,7 @@ for (const r of results) {
     if (s.minAlpha < 0.9) problems.push(`tab strip backing see-through (alpha ${s.minAlpha})`);
     if (s.headerBottom != null && Math.abs(s.top - s.headerBottom) > 1) problems.push(`tab strip top ${s.top} != header bottom ${s.headerBottom}`);
   }
+  if (r.truncated?.length) problems.push(`ellipsized/clipped names: ${r.truncated.slice(0, 4).join(" | ")}`);
   if ((r.tablists ?? 0) > (r.maxTablists ?? 1)) problems.push(`${r.tablists} tab rows`);
   if (r.width >= 768 && r.shellHeaderVisible) problems.push("phone ShellHeader visible on desktop (double header)");
   if (r.width >= 768 && r.headerBars > 1) problems.push(`${r.headerBars} header bars on desktop`);

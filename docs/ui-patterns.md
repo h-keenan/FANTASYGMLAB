@@ -1248,3 +1248,28 @@ uses the same strip (`simRookieRecentCards`; the rookie order carries no team or
 - **D2 one section title**: `SectionHeading` is 18px / 800 uppercase (`--type-app-section-title`); the `size` prop is gone. Public SEO pages keep `--type-section-title` for their own h2s.
 - **D5 gold = premium + the one primary action**: the lens name in the header is muted, rank/"best" tiles, posture and stance chips, Draft Capital, Sell High, waiver tones and protect/untouchable toggles are cyan (`--color-accent`). `--color-premium` remains for Pro markers, upgrade prompts, trophies/champion and Fantasy Sim prestige.
 - **D6 one trailing control**: a `CompactModule` that expands shows one rotating chevron (web SVG, app Ionicons); a module that navigates is a `LinkModule` (whole row taps, trailing arrow). No `+` / `-` glyphs and no "Open ->" / "All ->" / "View all" in the header next to a chevron: the destination of an expandable module is `ModuleMore` (web `ui/ModuleMore.tsx`, app `ModuleMore.tsx`) at the end of its expanded body.
+
+
+## Weekly recap page (League > Recaps)
+
+Rebuilt 2026-11-14 from the shared templates (coridian_: "this page is also very weak and those tabs don't look consistent"). Web
+`components/RecapWeekView.tsx`, app `screens/RecapScreen.tsx`; the model is the byte-identical twin `lib/recapPage.ts`.
+
+- **One week control**: the shared `PillRow variant="scroll" snap` (app: `SegmentedTabBar scrollable snap`) with every completed week as a
+  chip, newest first, the active week centred. No "More weeks" select. `snap` is new on both primitives (scroll-snap centre + auto-centre).
+  Root-cause fix in `PillRow`: scroll-variant tabs were `flex-1` (basis 0) with an explicit min-width, so once the strip overflowed every
+  tab collapsed to 44px and the labels spilled over each other ("S WEEK W9EEK 8"); they are now `flex-auto`.
+- **View switch** (Recaps / Roundup / History / Storylines) is a `PillRow`, not a dropdown (app: `SegmentedTabBar`).
+- **StatusHeader** states the week once: kicker "Week 9 recap", headline from the recorded scoring leader, an optional "you" line when a
+  story names the signed-in roster (`GET .../recap?me=true` adds `my_roster_id`), three mini stats (top, low, closest), and the scoring leader
+  as the ONE gold highlight (gold crest ring). App adds "Share recap" as the primary action.
+- **CompactModules** per story kind (Scoring, Matchups, Waivers, Trades, League activity): collapsed they show the key numbers, expanded
+  they hold team rows (shared `TeamAvatar` crest, full name, "You" chip, tap opens the manager profile), matchup scorelines, waiver pickups
+  as `PlayerAccordionRow` with `PlayerAvatar` and green FAAB, and the trade as `TradeCompactCard` (3+ team trades stack each side). Every
+  story's title, summary, editorial label and history deep link stay reachable inside.
+- **Data**: nothing invented. Backend additions (additive): matchup stories carry `winner_points` / `loser_points`, waiver stories carry
+  `player_assets` (player_id, position, team). Standings movement and playoff odds are NOT in the recap payload (`movement` is never passed
+  to the builder), so they are not shown here; they live on League > Rankings.
+- **Loading**: week switches show a `SkeletonStatusHeader` + `SkeletonModule`s; the body swaps with `PresenceSwap`.
+- **Scan**: `module_scan.mjs` (`ONLY=recaps`) runs the page at 320/360/390/430 with a fixture, expands every module, and fails on horizontal
+  overflow or any ellipsized / clipped name inside the recap.

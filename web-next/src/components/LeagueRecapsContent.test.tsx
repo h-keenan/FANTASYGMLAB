@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
 import { LeagueRecapsContent } from "./LeagueRecapsContent";
@@ -14,6 +14,7 @@ vi.mock("@/lib/api", async () => {
       getLeagueRecap: vi.fn(),
       getLeagueHistory: vi.fn(),
       getLeagueStorylines: vi.fn(),
+      getLeagueTeamProfiles: vi.fn().mockResolvedValue({ ok: true, profiles: { "1": { team_name: "Dynasty Overlords", owner_name: "GM", username: "gm", avatar_id: "", avatar_url: "", roster_id: "1", owner_id: "u1" } } }),
     },
   };
 });
@@ -210,27 +211,33 @@ const BASE_STORYLINES: StorylinesResponse = {
 };
 
 describe("LeagueRecapsContent", () => {
-  it("colors each recap story's title by its category, not a flat/uniform color", () => {
+  it("builds the week as one status header over compact modules, with no redundant headings or extra week controls", () => {
     render(<LeagueRecapsContent leagueId="league-1" leagueName="Dynasty Overlords" initialRecap={BASE_RECAP} />);
 
     expect(screen.getByRole("heading", { name: "League Recaps" })).toBeInTheDocument();
+    // One headline: the week result, not three stacked headings.
+    expect(screen.getByTestId("status-headline")).toHaveTextContent("Dynasty Overlords led the week with 142.6");
+    expect(screen.queryByText("League Memory")).not.toBeInTheDocument();
     expect(screen.getByText("Week 5 recap")).toBeInTheDocument();
+    // The week strip is the single week control: every week is a chip, no "More weeks" select.
+    const weeks = screen.getByRole("tablist", { name: "Recap week" });
+    expect(weeks.querySelectorAll('[role="tab"]')).toHaveLength(5);
+    expect(screen.queryByLabelText("More weeks")).not.toBeInTheDocument();
+    // One compact module per kind of story.
+    for (const key of ["scoring", "matchups", "waivers", "trades"]) expect(screen.getByTestId(`recap-section-${key}`)).toBeInTheDocument();
+    // The scoring module is open and shows the leader with points.
+    expect(screen.getByText("Highest team score")).toBeInTheDocument();
+    expect(screen.getByTestId("recap-leader")).toHaveTextContent("Scoring leader");
+    // Collapsed modules still say something (a summary line), they are not empty headers.
+    expect(within(screen.getByTestId("recap-section-waivers")).getByTestId("compact-summary").textContent?.length).toBeGreaterThan(8);
+  });
 
-    const performanceTitle = screen.getByText("Highest team score");
-    const matchupTitle = screen.getByText("Nail-biter of the week");
-    const tradeTitle = screen.getByText("Blockbuster trade");
-    const waiverTitle = screen.getByText("Waiver steal");
-
-    expect(performanceTitle).toHaveStyle({ color: "var(--color-prestige-elite)" });
-    expect(matchupTitle).toHaveStyle({ color: "var(--color-danger)" });
-    expect(tradeTitle).toHaveStyle({ color: "var(--color-accent)" });
-    expect(waiverTitle).toHaveStyle({ color: "var(--color-success)" });
-
-    // None of the four should collapse onto the same flat color.
-    const colors = new Set(
-      [performanceTitle, matchupTitle, tradeTitle, waiverTitle].map((node) => node.style.color),
-    );
-    expect(colors.size).toBe(4);
+  it("opens a past week from the week strip", async () => {
+    (api.getLeagueRecap as unknown as ReturnType<typeof vi.fn>).mockResolvedValue({ ...BASE_RECAP, recap: { ...BASE_RECAP.recap!, week: 3, stories: [story({ story_type: "performance", title: "Week 3 high score", metric_value: "130.0" })] } });
+    render(<LeagueRecapsContent leagueId="league-1" leagueName="Dynasty Overlords" initialRecap={BASE_RECAP} />);
+    fireEvent.click(screen.getByRole("tab", { name: "Wk 3" }));
+    await waitFor(() => expect(api.getLeagueRecap).toHaveBeenCalledWith("league-1", 3, true));
+    await waitFor(() => expect(screen.getByText("Week 3 recap")).toBeInTheDocument());
   });
 
   it("loads History lazily and routes a story's deep link into the right filter", async () => {
@@ -240,6 +247,7 @@ describe("LeagueRecapsContent", () => {
 
     expect(api.getLeagueHistory).not.toHaveBeenCalled();
 
+    fireEvent.click(within(screen.getByTestId("recap-section-waivers")).getByRole("button", { name: /Waivers/ }));
     fireEvent.click(screen.getByText(/View waiver history/));
 
     await waitFor(() => expect(api.getLeagueHistory).toHaveBeenCalledTimes(1));
@@ -261,7 +269,7 @@ describe("LeagueRecapsContent", () => {
 
     render(<LeagueRecapsContent leagueId="league-1" leagueName="Dynasty Overlords" initialRecap={BASE_RECAP} />);
 
-    fireEvent.change(screen.getByLabelText("League memory view"), { target: { value: "Storylines" } });
+    fireEvent.click(within(screen.getByRole("tablist", { name: "League memory view" })).getByRole("tab", { name: "Storylines" }));
 
     expect(api.getLeagueStorylines).toHaveBeenCalledWith("league-1");
     await waitFor(() => expect(screen.getByText("2026 storylines")).toBeInTheDocument());

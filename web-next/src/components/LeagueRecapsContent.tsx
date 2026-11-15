@@ -1,9 +1,6 @@
 "use client";
 
-import { Select } from "@/components/Input";
 import { PageTabBar } from "@/components/PageTabBar";
-import { EmptyState } from "@/components/EmptyState";
-import { SectionHeading } from "@/components/SectionHeading";
 import { useEffect, useState, type ReactNode } from "react";
 
 import { api } from "@/lib/api";
@@ -13,13 +10,12 @@ import type {
   HistorySide,
   HistoryTransaction,
   RecapResponse,
-  RecapStory,
   StorylineLeader,
   StorylineTeam,
   StorylinesResponse,
 } from "@/lib/api";
 import { PillRow, TabStack } from "@/components/PillRow";
-import { ViewSelect } from "@/components/ui/ViewSelect";
+import { RecapWeekView } from "@/components/RecapWeekView";
 import { PlayerAvatar } from "@/components/PlayerAvatar";
 import { PlayerIdentityTrigger } from "@/components/PlayerIdentityTrigger";
 import { PositionBadge } from "@/components/PositionBadge";
@@ -30,18 +26,12 @@ import {
   FILTER_TRADES,
   FILTER_WIRE,
   HISTORY_FILTERS,
-  type RecapStoryGroup,
-  buildRecapArchive,
   emptyFilterNote,
   formatHistoryWhen,
   gradeToneColorVar,
-  groupRecapStories,
-  historyDeepLinkLabel,
   historyFilterToPill,
   matchesHistoryFilter,
   pickLabel,
-  recapCategoryColorVar,
-  recapStoryCategory,
 } from "@/lib/leagueRecapsPresentation";
 import { PageTitle } from "@/components/PageTitle";
 import { PlayerName } from "@/components/PlayerName";
@@ -90,226 +80,6 @@ const MEMORY_VIEWS: MemoryView[] = ["Recaps", "Roundup", "History", "Storylines"
 
 
 const VIEW_BY_TAB: Record<RecapsTab, MemoryView> = { recaps: "Recaps", history: "History", storylines: "Storylines", roundup: "Roundup" };
-
-function RecapStoryCard({
-  story,
-  lead,
-  onOpenHistory,
-}: {
-  story: RecapStory;
-  lead: boolean;
-  onOpenHistory: (filter: string) => void;
-}) {
-  const accent = recapCategoryColorVar(recapStoryCategory(story.story_type));
-  const deepLinkLabel = historyDeepLinkLabel(story);
-  const identity = (story.sides?.length ?? 0) > 2
-    ? story.sides!.map((side) => side.team_name).join(" vs ")
-    : story.secondary_team
-    ? story.primary_team
-      ? `${story.primary_team} vs ${story.secondary_team}`
-      : story.secondary_team
-    : story.primary_team;
-
-  const body = (
-    <>
-      <h3
-        className={`uppercase font-extrabold ${lead ? "text-lg" : "text-sm"}`}
-        style={{ color: accent, letterSpacing: "var(--letter-spacing-badge)" }}
-      >
-        {story.title}
-      </h3>
-      {identity ? (
-        <p className="text-sm font-extrabold" style={{ color: "var(--color-text-primary)" }}>
-          {identity}
-        </p>
-      ) : null}
-      <p
-        className="text-sm"
-        style={{ color: lead ? "var(--color-text-primary)" : "var(--color-text-secondary)" }}
-      >
-        {story.summary}
-      </p>
-      {story.metric_value ? (
-        <div className="grid gap-0.5 mt-1">
-          <span
-            className="text-xs uppercase"
-            style={{ color: "var(--color-text-muted)", letterSpacing: "var(--letter-spacing-badge)" }}
-          >
-            {story.metric_label || "Recorded"}
-          </span>
-          <strong className={`${lead ? "text-2xl" : "text-lg"} font-extrabold`} style={{ color: accent }}>
-            <Money>{story.metric_value}</Money>
-          </strong>
-        </div>
-      ) : null}
-      {story.players?.length ? (
-        <div className="flex flex-wrap gap-2 mt-1">
-          {story.players.map((name) => (
-            <span
-              key={name}
-              className="inline-flex items-center gap-1.5 text-xs font-bold px-2 py-1"
-              style={{
-                borderRadius: "var(--radius-pill)",
-                background: `color-mix(in srgb, ${accent} 12%, transparent)`,
-                boxShadow: `inset 0 0 0 1px color-mix(in srgb, ${accent} 30%, transparent)`,
-                color: "var(--color-text-primary)",
-              }}
-            >
-              <span aria-hidden="true" style={{ width: 6, height: 6, borderRadius: "50%", background: accent }} />
-              {name}
-            </span>
-          ))}
-        </div>
-      ) : null}
-      {story.editorial_label ? (
-        <p className="text-sm font-extrabold mt-1" style={{ color: "var(--color-text-primary)" }}>
-          {story.editorial_label}
-        </p>
-      ) : null}
-      {deepLinkLabel ? (
-        <p className="text-xs uppercase mt-1" style={{ color: "var(--color-accent)", letterSpacing: "var(--letter-spacing-badge)" }}>
-          {deepLinkLabel} &rsaquo;
-        </p>
-      ) : null}
-    </>
-  );
-
-  if (deepLinkLabel) {
-    return (
-      <AccentCard accent={accent} compact={!lead} glow={lead} as="div">
-        <div
-          role="button"
-          tabIndex={0}
-          onClick={() => onOpenHistory(story.history_filter || FILTER_ALL)}
-          onKeyDown={(event) => {
-            if (event.key === "Enter" || event.key === " ") onOpenHistory(story.history_filter || FILTER_ALL);
-          }}
-          className="grid gap-1 cursor-pointer"
-        >
-          {body}
-        </div>
-      </AccentCard>
-    );
-  }
-
-  return (
-    <AccentCard accent={accent} compact={!lead} glow={lead}>
-      <div className="grid gap-1">{body}</div>
-    </AccentCard>
-  );
-}
-
-function RecapGroupSection({ group, onOpenHistory }: { group: RecapStoryGroup; onOpenHistory: (filter: string) => void }) {
-  const accent = recapCategoryColorVar(group.category);
-  return (
-    <section className="flex flex-col gap-2">
-      <div className="flex items-center gap-2">
-        <span className="inline-block" style={{ width: "3px", height: "0.8rem", background: accent }} />
-        <span className="uppercase text-xs font-extrabold" style={{ color: accent, letterSpacing: "var(--letter-spacing-badge)" }}>
-          {group.label}
-        </span>
-      </div>
-      <div className="flex flex-col gap-2">
-        {group.stories.map((story, index) => (
-          <RecapStoryCard
-            key={`${story.story_type}-${story.title}-${index}`}
-            story={story}
-            lead={false}
-            onOpenHistory={onOpenHistory}
-          />
-        ))}
-      </div>
-    </section>
-  );
-}
-
-function RecapsTab({ leagueId, initial, onOpenHistory }: { leagueId: string; initial: RecapResponse; onOpenHistory: (filter: string) => void }) {
-  const [data, setData] = useState<RecapResponse>(initial);
-  const [selectedWeek, setSelectedWeek] = useState<number>(initial.recap?.week ?? initial.max_completed_week);
-  const [loading, setLoading] = useState(false);
-
-  const loadWeek = (week: number) => {
-    setSelectedWeek(week);
-    setLoading(true);
-    api
-      .getLeagueRecap(leagueId, week)
-      .then((response) => setData(response))
-      .finally(() => setLoading(false));
-  };
-
-  if (data.reason === "no_completed_week" || !data.recap) {
-    return (
-      <EmptyState
-        title="No recap yet"
-        subtitle="No completed week is ready for a recap yet. Open History for the recorded transaction timeline."
-        actionLabel="Open History"
-        onAction={() => onOpenHistory("")}
-      />
-    );
-  }
-
-  const archive = buildRecapArchive(data.max_completed_week);
-  const stories = data.recap.stories || [];
-  const lead = stories[0];
-  const groups = groupRecapStories(stories.slice(1));
-
-  return (
-    <div className="flex flex-col gap-4">
-      {archive.pills.length > 0 ? (
-        <TabStack>
-          <PillRow
-            ariaLabel="Recap week"
-            variant="scroll"
-            options={archive.pills.map((pill) => ({ label: pill.label, value: String(pill.week) }))}
-            active={String(selectedWeek)}
-            onSelect={(value) => loadWeek(Number(value))}
-          />
-          {archive.overflow.length > 0 ? (
-            <Select aria-label="More weeks"
-              className="text-xs"
-              value={archive.overflow.some((o) => o.week === selectedWeek) ? String(selectedWeek) : ""}
-              onChange={(event) => {
-                if (event.target.value) loadWeek(Number(event.target.value));
-              }}
-            >
-              <option value="">More weeks...</option>
-              {archive.overflow.map((o) => (
-                <option key={o.week} value={o.week}>
-                  {o.label}
-                </option>
-              ))}
-            </Select>
-          ) : null}
-        </TabStack>
-      ) : null}
-
-      <header className="flex flex-col gap-1" style={{ opacity: loading ? 0.6 : 1 }}>
-        <span className="text-xs uppercase" style={{ color: "var(--color-text-muted)", letterSpacing: "var(--letter-spacing-badge)" }}>
-          League Memory
-        </span>
-        <SectionHeading>
-          Week {data.recap.week} recap
-        </SectionHeading>
-        <p className="text-sm" style={{ color: "var(--color-text-secondary)" }}>
-          {data.recap.headline}
-        </p>
-      </header>
-
-      {stories.length === 0 ? (
-        <p className="text-sm" style={{ color: "var(--color-text-muted)" }}>
-          Not enough historical data for a recap this week.
-        </p>
-      ) : (
-        <div className="flex flex-col gap-5" style={{ opacity: loading ? 0.6 : 1 }}>
-          <RecapStoryCard story={lead} lead onOpenHistory={onOpenHistory} />
-          {groups.map((group, index) => (
-            <RecapGroupSection key={`${group.category}-${index}`} group={group} onOpenHistory={onOpenHistory} />
-          ))}
-        </div>
-      )}
-    </div>
-  );
-}
 
 function AssetChip({ asset }: { asset: HistoryTransaction["draft_picks"][number] }) {
   if (asset.kind === "pick") {
@@ -1072,7 +842,7 @@ export function LeagueRecapsContent({
   };
 
   let body: ReactNode;
-  if (view === "Recaps") body = <RecapsTab leagueId={leagueId} initial={initialRecap} onOpenHistory={openHistory} />;
+  if (view === "Recaps") body = <RecapWeekView leagueId={leagueId} leagueName={leagueName} initial={initialRecap} onOpenHistory={openHistory} />;
   else if (view === "History")
     body = (
       <HistoryTab
@@ -1101,7 +871,7 @@ export function LeagueRecapsContent({
       </header>
       <div className="flex flex-col gap-4">
         <div className="flex flex-wrap items-center gap-2" data-testid="recaps-controls">
-          <ViewSelect label="League memory view" value={view} options={MEMORY_VIEWS.map((v) => ({ value: v, label: v }))} onChange={(value) => setView(value as MemoryView)} />
+          <PillRow ariaLabel="League memory view" variant="scroll" options={MEMORY_VIEWS.map((v) => ({ value: v, label: v }))} active={view} onSelect={(value) => setView(value as MemoryView)} />
         </div>
         {body}
       </div>
