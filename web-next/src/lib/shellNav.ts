@@ -16,18 +16,20 @@ export const SHELL_NAV_STORAGE_KEY = "fgl:nav";
  *  1. env NEXT_PUBLIC_BOTTOM_NAV=off is the kill switch: off for everyone, no override.
  *  2. ?nav=bottom turns it on, ?nav=off turns it off; either is remembered (localStorage "fgl:nav").
  *  3. a remembered choice.
- *  4. env NEXT_PUBLIC_BOTTOM_NAV=on turns it on for every signed-in user; otherwise ("founder", the default)
- *     it is on for the founder/owner account only.
+ *  4. otherwise ON for every signed-in user (coridian_ 2026-11-14, UI pass 5 D4: the shell is the phone header + pill for
+ *     everyone; the legacy header wrapped its icons onto a second row on Trade Hub and League Rankings). The old staged
+ *     rollout is still available as NEXT_PUBLIC_BOTTOM_NAV=founder (founder/owner account only).
+ *  The legacy header + orb are reachable only through the switch: env off (everyone), or ?nav=off (that browser).
  */
 export function shellNavEnabled(opts: { env?: string | null; queryNav?: string | null; stored?: string | null; isFounder: boolean }): boolean {
-  const env = (opts.env ?? "founder").toLowerCase();
+  const env = (opts.env ?? "on").toLowerCase();
   if (env === "off" || env === "0" || env === "false") return false;
   if (opts.queryNav === "bottom") return true;
   if (opts.queryNav === "off") return false;
   if (opts.stored === "bottom") return true;
   if (opts.stored === "off") return false;
-  if (env === "on" || env === "1" || env === "true") return true;
-  return opts.isFounder;
+  if (env === "founder") return opts.isFounder;
+  return true;
 }
 
 /** Whether a query value should be remembered (only the two real choices). */

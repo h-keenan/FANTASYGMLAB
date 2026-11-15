@@ -461,13 +461,15 @@ export default function GmGameScreen({ navigation }: Props) {
     setPillBarPresent(true);
     return () => setPillBarPresent(false);
   }, []);
-  const pillOnly = !anyBar && Boolean(pill.ctx);
+  // The draft has no action bar: the pill is the orb + the page segment (an orb-only pill while the room loads).
+  const draftStage = flow.view === 'game' && Boolean(game) && flow.stage === 'draft' && !draftRecap && !flow.recaps[flow.recapIndex];
+  const pillOnly = !anyBar && draftStage;
   const hasStack = anyBar || pillOnly;
   // The game draws its own orb above the Advance pill, so the global GM orb steps aside while it is up.
   useEffect(() => {
-    simGameChrome.set(anyBar);
+    simGameChrome.set(hasStack);
     return () => simGameChrome.set(false);
-  }, [anyBar]);
+  }, [hasStack]);
   const goHub = () => {
     dispatch({ type: 'hub' });
     setGameState(null);
@@ -481,6 +483,7 @@ export default function GmGameScreen({ navigation }: Props) {
               onTab={(tab) => dispatch({ type: 'tab', tab })}
               onMore={() => dispatch({ type: 'tab', tab: 'more' })}
               onHub={goHub}
+              onSimTo={showBar && !simGamePaywalled(preview) ? () => setSimToOpen(true) : undefined}
               onAppHome={() => navigation.navigate('Home')}
             />
   ) : null;
@@ -508,7 +511,7 @@ export default function GmGameScreen({ navigation }: Props) {
           testID="sim-bottom-stack"
         >
           {pillOnly ? (
-            <BottomPill contextOnly context={pill.ctx}>{null}</BottomPill>
+            <BottomPill contextOnly segment={pill.ctx} orb={orbNode}>{null}</BottomPill>
           ) : showBar ? (
             <SimActionBar orb={orbNode} ctx={ctx} paywalled={simGamePaywalled(preview)} advancing={advancing} onAdvance={advance} onSimTo={() => setSimToOpen(true)} onGoPro={goPaywall} onTab={(tab) => dispatch({ type: 'tab', tab })} />
           ) : (

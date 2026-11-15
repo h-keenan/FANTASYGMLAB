@@ -56,7 +56,7 @@ export default function OpponentProfileCard({
             <AppText style={styles.label}>Direction</AppText>
             <View style={styles.inline}>
               <ToneBadge label={direction.label} color={colors.accent} />
-              {tendency ? <ToneBadge label={`${tendency.label} in trades`} color={colors.premium} /> : null}
+              {tendency ? <ToneBadge label={`${tendency.label} in trades`} color={colors.accent} /> : null}
             </View>
             {directionMeta ? <AppText style={styles.muted}>{directionMeta}</AppText> : null}
           </View>

@@ -486,7 +486,7 @@ export function LiveDraftContent({
                 <span className="text-xs font-bold uppercase" style={{ color: "var(--color-text-muted)" }}>
                   On The Clock
                 </span>
-                <span style={{ font: "var(--type-section-title)" }}>
+                <span style={{ font: "var(--type-app-section-title)" }}>
                   Pick {state.current_pick} · Round {state.current_round}
                 </span>
                 <span className="text-sm" style={{ color: "var(--color-text-secondary)" }}>

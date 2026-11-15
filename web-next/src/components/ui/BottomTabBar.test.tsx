@@ -81,7 +81,7 @@ describe("BottomTabBar smart pill (page context)", () => {
     expect(screen.queryByTestId("pill-context-layer")).toBeNull();
   });
 
-  it("with context: one merged section/menu button, a page tablist and one primary", () => {
+  it("with context: ONE orb (the menu), a page tablist and one primary", () => {
     const onSelect = vi.fn();
     const onPress = vi.fn();
     render(<BottomTabBar ariaLabel="x" tabs={tabs} active="team" context={ctx({ onSelect, primary: { key: "auto", label: "Auto-set", onPress } })} />);
@@ -93,16 +93,18 @@ describe("BottomTabBar smart pill (page context)", () => {
     expect(onSelect).toHaveBeenCalledWith("players");
     fireEvent.click(screen.getByTestId("pill-primary"));
     expect(onPress).toHaveBeenCalled();
-    // ONE merged button: it carries the section name and is the menu (no separate section link + "..." button).
-    expect(screen.getByTestId("pill-menu")).toHaveAttribute("aria-label", expect.stringContaining("Team"));
+    // ONE orb is the menu: no separate section glyph button and no "..." button.
+    expect(screen.getByTestId("pill-orb")).toHaveAttribute("aria-label", expect.stringMatching(/^Menu/));
+    expect(document.querySelectorAll("[data-pill-orb]")).toHaveLength(1);
+    expect(screen.queryByTestId("pill-menu")).toBeNull();
     expect(screen.queryByTestId("pill-section")).toBeNull();
-    expect(screen.getAllByRole("button", { name: /Sections menu/ })).toHaveLength(1);
+    expect(document.querySelector(".pill-icon-btn")).toBeNull();
   });
 
-  it("the menu button toggles aria-expanded and the full global row; picking a tab folds it back", () => {
+  it("the orb toggles aria-expanded and the full global row; picking a tab folds it back", () => {
     const onSelect = vi.fn();
     render(<BottomTabBar ariaLabel="x" tabs={tabs} active="team" onSelect={onSelect} context={ctx()} />);
-    const menu = screen.getByTestId("pill-menu");
+    const menu = screen.getByTestId("pill-orb");
     expect(menu).toHaveAttribute("aria-expanded", "false");
     fireEvent.click(menu);
     expect(screen.getByTestId("bottom-tab-bar")).toHaveAttribute("data-mode", "menu");
@@ -114,7 +116,7 @@ describe("BottomTabBar smart pill (page context)", () => {
 
   it("Escape folds the menu", () => {
     render(<BottomTabBar ariaLabel="x" tabs={tabs} active="team" context={ctx()} />);
-    fireEvent.click(screen.getByTestId("pill-menu"));
+    fireEvent.click(screen.getByTestId("pill-orb"));
     fireEvent.keyDown(document, { key: "Escape" });
     expect(screen.getByTestId("bottom-tab-bar")).toHaveAttribute("data-mode", "context");
   });

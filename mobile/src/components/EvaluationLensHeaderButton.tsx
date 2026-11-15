@@ -46,7 +46,7 @@ export default function EvaluationLensHeaderButton({ leagueId }: { leagueId: str
         <AppText style={styles.buttonText} numberOfLines={1}>
           {current?.label ?? 'Dynasty'}
         </AppText>
-        <Ionicons name="chevron-down" size={12} color={colors.premium} />
+        <Ionicons name="chevron-down" size={12} color={colors.accent} />
       </PressableScale>
       <SheetModal visible={open} transparent animationType="fade" onRequestClose={() => setOpen(false)}>
         <Pressable style={styles.backdrop} onPress={() => setOpen(false)}>
@@ -70,7 +70,7 @@ export default function EvaluationLensHeaderButton({ leagueId }: { leagueId: str
                     <AppText style={[styles.optionText, active && styles.optionTextActive]}>{option.label}</AppText>
                     <AppText style={styles.optionHint}>{option.hint}</AppText>
                   </View>
-                  {active ? <Ionicons name="checkmark-circle" size={18} color={colors.premium} /> : null}
+                  {active ? <Ionicons name="checkmark-circle" size={18} color={colors.accent} /> : null}
                 </PressableScale>
               );
             })}
@@ -87,7 +87,7 @@ function createStyles(colors: ThemeColors) {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 4,
-    backgroundColor: colors.premiumMuted,
+    backgroundColor: colors.accentMuted,
     borderRadius: radii.pill,
     paddingHorizontal: spacing.sm,
     paddingVertical: 5,
@@ -95,7 +95,7 @@ function createStyles(colors: ThemeColors) {
     justifyContent: 'center',
     maxWidth: 110,
   },
-  buttonText: { fontSize: 13.5, fontWeight: '700', color: colors.premium, flexShrink: 1 },
+  buttonText: { fontSize: 13.5, fontWeight: '700', color: colors.textSecondary, flexShrink: 1 },
   backdrop: {
     flex: 1,
     backgroundColor: scrim,
@@ -121,7 +121,7 @@ function createStyles(colors: ThemeColors) {
   },
   optionTextGroup: { flexShrink: 1, paddingRight: spacing.sm },
   optionText: { fontSize: 16.5, fontWeight: '600', color: colors.textPrimary },
-  optionTextActive: { color: colors.premium },
+  optionTextActive: { color: colors.accent },
   optionHint: { fontSize: 13.5, color: colors.textTertiary, marginTop: 2 },
   });
 }

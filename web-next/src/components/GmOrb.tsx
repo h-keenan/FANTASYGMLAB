@@ -242,7 +242,7 @@ export function GmOrb() {
                 <span className="text-xs font-bold uppercase" style={{ color: "var(--color-accent)", letterSpacing: "0.03em" }}>
                   {BRAND_NAME}
                 </span>
-                <span style={{ font: "var(--type-section-title)" }}>Where to go</span>
+                <span style={{ font: "var(--type-app-section-title)" }}>Where to go</span>
               </div>
 
               <input

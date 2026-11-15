@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
+import { useNotice } from '../components/NoticeToast';
 import {
   ActivityIndicator,
   Alert,
@@ -106,6 +107,7 @@ const PUSH_CATEGORY_LABELS: Array<{ value: PushCategory; label: string; descript
 ];
 
 export default function MoreScreen({ navigation }: Props) {
+  const notify = useNotice();
   const orbClearance = useOrbClearance();
   const headerHeight = useHeaderHeight();
   const [sendingTestPush, setSendingTestPush] = useState(false);
@@ -215,10 +217,10 @@ export default function MoreScreen({ navigation }: Props) {
               if (result.ok) {
                 setSavedLeagues((prev) => prev.filter((row) => row.league_id !== league.league_id));
               } else {
-                Alert.alert('Could not remove league', 'Please try again in a moment.');
+                notify.alert('Could not remove league', 'Please try again in a moment.');
               }
             } catch {
-              Alert.alert('Could not remove league', 'Please try again in a moment.');
+              notify.alert('Could not remove league', 'Please try again in a moment.');
             } finally {
               setRemovingLeagueId(null);
             }
@@ -312,17 +314,14 @@ export default function MoreScreen({ navigation }: Props) {
       await syncPushToken();
       const result = await api.sendTestPush();
       if (result.ok) {
-        Alert.alert('Test notification sent', 'It should arrive shortly.');
+        notify.alert('Test notification sent', 'It should arrive shortly.');
       } else if (result.reason === 'no_registered_tokens') {
-        Alert.alert(
-          'No device registered yet',
-          "We couldn't find a push token for this device. Make sure notifications are allowed for this app in Settings, then try again.",
-        );
+        notify.alert('No device registered yet', "We couldn't find a push token for this device. Make sure notifications are allowed for this app in Settings, then try again.");
       } else {
-        Alert.alert('Could not send test notification', 'Please try again in a moment.');
+        notify.alert('Could not send test notification', 'Please try again in a moment.');
       }
     } catch {
-      Alert.alert('Could not send test notification', 'Please try again in a moment.');
+      notify.alert('Could not send test notification', 'Please try again in a moment.');
     } finally {
       setSendingTestPush(false);
     }
@@ -360,7 +359,7 @@ export default function MoreScreen({ navigation }: Props) {
         await Share.share({ title: 'My FantasyDesk data', message: json });
       }
     } catch {
-      Alert.alert('Could not export your data', 'Please try again in a moment.');
+      notify.alert('Could not export your data', 'Please try again in a moment.');
     } finally {
       setExporting(false);
     }
@@ -375,7 +374,7 @@ export default function MoreScreen({ navigation }: Props) {
   const onOpenTeamStance = () => {
     const league = currentLeagueContext();
     if (!league) {
-      Alert.alert('Select a league first', 'Open a league from Home, then come back to open your GM Plan.');
+      notify.alert('Select a league first', 'Open a league from Home, then come back to open your GM Plan.');
       return;
     }
     navigation.navigate('GmPlan', { ...league, initialTab: 'overview' });
@@ -386,7 +385,7 @@ export default function MoreScreen({ navigation }: Props) {
   const onOpenLeagueScreen = (screen: 'LiveDraft' | 'GuessThePlayerLeaderboard', purpose: string) => {
     const league = currentLeagueContext();
     if (!league) {
-      Alert.alert('Select a league first', `Open a league from Home, then come back ${purpose}.`);
+      notify.alert('Select a league first', `Open a league from Home, then come back ${purpose}.`);
       return;
     }
     navigation.navigate(screen, league);

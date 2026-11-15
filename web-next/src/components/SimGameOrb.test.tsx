@@ -51,6 +51,18 @@ describe("SimGameOrb", () => {
     expect(nav.querySelectorAll(".game-nav-row span.shrink-0").length).toBeGreaterThanOrEqual(6);
   });
 
+  it("lists Sim to... in the menu only when the game can sim ahead", () => {
+    const onSimTo = vi.fn();
+    const { unmount } = render(<SimGameOrb {...base} onSimTo={onSimTo} />);
+    fireEvent.click(screen.getByTestId("sim-game-orb"));
+    fireEvent.click(screen.getByTestId("sim-game-nav-sim-to"));
+    expect(onSimTo).toHaveBeenCalled();
+    unmount();
+    render(<SimGameOrb {...base} />);
+    fireEvent.click(screen.getByTestId("sim-game-orb"));
+    expect(screen.queryByTestId("sim-game-nav-sim-to")).toBeNull();
+  });
+
   it("drops Players in the offseason", () => {
     render(<SimGameOrb {...base} offseason />);
     fireEvent.click(screen.getByTestId("sim-game-orb"));

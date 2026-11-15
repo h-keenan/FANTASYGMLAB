@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { Alert, StyleSheet, View } from 'react-native';
+import { useNotice } from './NoticeToast';
+import { StyleSheet, View } from 'react-native';
 import PressableScale from './PressableScale';
 import { Ionicons } from '@expo/vector-icons';
 
@@ -35,6 +36,7 @@ export default function PlayerLeagueActions({
   /** Quick view opened inside the Trade Analyzer itself. */
   hideAddToTrade?: boolean;
 }) {
+  const notify = useNotice();
   const { colors } = useThemeMode();
   const styles = useMemo(() => createStyles(colors), [colors]);
   const ownership = useRosterOwnership(leagueId);
@@ -82,14 +84,11 @@ export default function PlayerLeagueActions({
         const result = await api.addGmTarget(leagueId, player.player_id, 'player_quick_view');
         if (result.ok) setWatching(true);
         else if (result.reason === 'at_cap') {
-          Alert.alert(
-            'GM Targets is full',
-            `You've hit the cap for this league (${result.cap ?? 'limit reached'}). Remove a target before adding another.`,
-          );
-        } else Alert.alert('Could not update GM Targets', 'Please try again in a moment.');
+          notify.alert('GM Targets is full', `You've hit the cap for this league (${result.cap ?? 'limit reached'}). Remove a target before adding another.`);
+        } else notify.alert('Could not update GM Targets', 'Please try again in a moment.');
       }
     } catch {
-      Alert.alert('Could not update GM Targets', 'Please try again in a moment.');
+      notify.alert('Could not update GM Targets', 'Please try again in a moment.');
     } finally {
       setBusy(false);
     }
