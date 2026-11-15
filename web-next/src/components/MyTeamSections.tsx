@@ -237,7 +237,7 @@ export function RosterSections({
 const COMPOSITION_COLOR: Record<string, string> = {
   starters: "var(--color-information)",
   roster: "var(--color-information)",
-  bench: "var(--color-premium)",
+  bench: "var(--color-accent)",
   ir: "var(--color-danger)",
   taxi: "var(--color-warning)",
 };

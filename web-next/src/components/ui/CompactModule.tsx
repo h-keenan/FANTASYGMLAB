@@ -155,9 +155,9 @@ export function CompactModule({
             ) : null}
           </span>
           {hasBody ? (
-            <span aria-hidden="true" className="shrink-0 text-xs" style={{ color: "var(--color-text-muted)", width: 12, textAlign: "center" }}>
-              {open && expandIn === "inline" ? "−" : "+"}
-            </span>
+            <svg aria-hidden="true" width={14} height={14} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.4} strokeLinecap="round" strokeLinejoin="round" className="shrink-0" data-testid="compact-chevron" data-open={open && expandIn === "inline" ? "true" : "false"} style={{ color: "var(--color-text-muted)", transform: open && expandIn === "inline" ? "rotate(180deg)" : "none", transition: "transform var(--motion-fast, 160ms) ease" }}>
+              <path d="m6 9 6 6 6-6" />
+            </svg>
           ) : null}
         </button>
         {action ? <div className="shrink-0">{action}</div> : null}

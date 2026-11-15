@@ -151,6 +151,9 @@ export function PillRow({
   const mask = `linear-gradient(to right, ${fade.left ? "transparent 0, #000 var(--space-xl)" : "#000 0"}, ${
     fade.right ? "#000 calc(100% - var(--space-xl)), transparent 100%" : "#000 100%"
   })`;
+  // Pill track (coridian_ 2026-11-14, UI pass 5 D1): every inline segmented control is one rounded glass track with a cyan
+  // glass pill on the active segment, the same shape as the app's SegmentedTabBar. `slim` (in-sheet) and `glass` (page tabs) keep their own looks.
+  const track = !glass && !slim;
   const anyIcon = options.some((option) => option.icon || option.glyph);
   // Five or more icon tabs in a fill row split the width equally (min-w-0) so they fit a phone.
   const equalFit = mode === "fill" && anyIcon && options.length >= 5;
@@ -172,7 +175,13 @@ export function PillRow({
           ? undefined
           : slim
           ? { borderBottom: "var(--border-width-default) solid var(--color-border)", background: "transparent", ...(sticky ? { top: 0 } : null) }
-          : { border: "var(--border-width-default) solid var(--color-border)", background: "var(--color-surface-muted)", ...(sticky ? { top: 0 } : null) }
+          : {
+              border: "var(--border-width-default) solid var(--glass-border, var(--color-border))",
+              background: "var(--glass-input-bg, var(--color-surface-muted))",
+              borderRadius: "var(--radius-segment)",
+              padding: "var(--space-xs)",
+              ...(sticky ? { top: 0 } : null),
+            }
       }
     >
       <div
@@ -183,7 +192,7 @@ export function PillRow({
         onScroll={measure}
         className={`relative flex min-w-0 overflow-x-auto ${mode === "fill" ? "w-full" : ""}${glass ? " pill-row-glass-scroller" : ""}`}
         style={{
-          gap: "var(--segmented-gap)",
+          gap: track ? "var(--space-xs)" : "var(--segmented-gap)",
           scrollbarWidth: "none",
           WebkitMaskImage: fade.left || fade.right ? mask : undefined,
           maskImage: fade.left || fade.right ? mask : undefined,
@@ -201,11 +210,12 @@ export function PillRow({
             minHeight: (sticky || slim) && !anyIcon ? "var(--segmented-height-compact)" : "var(--segmented-height)",
             padding: slim ? "0 var(--space-sm)" : equalFit ? "0 var(--space-xs)" : mode === "fill" ? "0 min(var(--segmented-padding-x), 0.5rem)" : "0 var(--segmented-padding-x)",
             letterSpacing: "var(--letter-spacing-tight)",
-            background: isActive && !slim && !glass ? "var(--segmented-active-bg, var(--color-information-soft))" : "transparent",
-            color: glass ? undefined : isActive ? "var(--segmented-active-fg, var(--color-text-primary))" : "var(--color-text-secondary)",
-            // The sliding underline replaces the static one once measured.
-            boxShadow: isActive && !indicator && !glass ? "inset 0 -2px 0 var(--color-information)" : "none",
-            borderLeft: index === 0 || slim || glass ? "none" : "var(--border-width-default) solid var(--color-border)",
+            background: track ? (isActive ? "color-mix(in srgb, var(--color-accent) 16%, transparent)" : "transparent") : isActive && !slim && !glass ? "var(--segmented-active-bg, var(--color-information-soft))" : "transparent",
+            color: glass ? undefined : track ? (isActive ? "var(--color-accent)" : "var(--color-text-secondary)") : isActive ? "var(--segmented-active-fg, var(--color-text-primary))" : "var(--color-text-secondary)",
+            // The sliding underline replaces the static one once measured (not drawn on the pill track).
+            boxShadow: isActive && !indicator && !glass && !track ? "inset 0 -2px 0 var(--color-information)" : "none",
+            borderLeft: index === 0 || slim || glass || track ? "none" : "var(--border-width-default) solid var(--color-border)",
+            ...(track ? { borderRadius: "var(--radius-segment)", border: `var(--border-width-default) solid ${isActive ? "color-mix(in srgb, var(--color-accent) 42%, transparent)" : "transparent"}` } : null),
           } as const;
           const common = {
             id: tabIdPrefix ? `${tabIdPrefix}-tab-${option.value}` : undefined,
@@ -262,7 +272,7 @@ export function PillRow({
             </button>
           );
         })}
-        {indicator && !glass ? (
+        {indicator && !glass && !track ? (
           <span
             aria-hidden="true"
             className="tab-indicator"

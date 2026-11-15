@@ -103,7 +103,7 @@ export function waiverTrendingAddLabel(player: {
 // bid amount), cyan for "information" (analytical/GM-intelligence, e.g.
 // "Stash"), and neutral slate as the fallback (e.g. "Watch").
 function recommendationToneColor(tone: string, colors: ThemeColors): string {
-  if (tone === 'opportunity') return colors.premium;
+  if (tone === 'opportunity') return colors.accent;
   if (tone === 'information') return colors.accent;
   return colors.textSecondary;
 }
@@ -236,7 +236,7 @@ export default function WaiverRecommendationCard({
     return (
       <AnimatedCard glow style={styles.primaryCard} onPress={onPress}>
         <View style={styles.actionRow}>
-          <Ionicons name="swap-horizontal-outline" size={13} color={colors.premium} />
+          <Ionicons name="swap-horizontal-outline" size={13} color={colors.accent} />
           <AppText style={styles.actionLabel}>{player.recommendation_label} · Top Waiver Target</AppText>
         </View>
         <View style={styles.identityWrap}>{identity}</View>
@@ -285,7 +285,7 @@ export default function WaiverRecommendationCard({
                 label="CONFIDENCE"
                 value={player.confidence_label}
                 level={confidenceLevelFor(player.confidence_label)}
-                color={colors.premium}
+                color={colors.accent}
               />
             </View>
           ) : (
@@ -389,7 +389,7 @@ function createStyles(colors: ThemeColors) {
     actionLabel: {
       fontSize: 12.5,
       fontWeight: '700',
-      color: colors.premium,
+      color: colors.accent,
       textTransform: 'uppercase',
       letterSpacing: 0.5,
     },

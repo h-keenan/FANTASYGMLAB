@@ -83,7 +83,7 @@ function WaiverSuggestionCard({ player, onPress }: { player: WaiverPriorityAdd; 
             label="CONFIDENCE"
             value={player.confidence_label}
             level={confidenceLevelFor(player.confidence_label)}
-            color={colors.premium}
+            color={colors.accent}
           />
         ) : null}
       </View>

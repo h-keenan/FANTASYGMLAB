@@ -1241,3 +1241,10 @@ uses the same strip (`simRookieRecentCards`; the rookie order carries no team or
   their picks so far); the run signal is the public proxy.
 - The player list (`SimDraftBoard` -> `SimDraftRow` -> `SimPlayerLine`) was already `PlayerAccordionRow mode="sim"`; the Full board grid (`SimDraftGrid`) stays a dense grid of
   position-tinted pick cells (a board, not a list).
+
+## UI pass 5 picks (coridian_, 2026-11-14; `docs/audits/ui-pass-5/`, guard `lib/uiPass5Guard.test.ts`)
+
+- **D1 pill track**: every inline segmented control (`PillRow` default, about 70 uses) is one rounded glass track (`--radius-segment`) with a cyan glass pill on the active segment, the same shape as the app's `SegmentedTabBar`. No sliding underline on the track; `glass` (page tabs) and `slim` (in-sheet) keep their looks.
+- **D2 one section title**: `SectionHeading` is 18px / 800 uppercase (`--type-app-section-title`); the `size` prop is gone. Public SEO pages keep `--type-section-title` for their own h2s.
+- **D5 gold = premium + the one primary action**: the lens name in the header is muted, rank/"best" tiles, posture and stance chips, Draft Capital, Sell High, waiver tones and protect/untouchable toggles are cyan (`--color-accent`). `--color-premium` remains for Pro markers, upgrade prompts, trophies/champion and Fantasy Sim prestige.
+- **D6 one trailing control**: a `CompactModule` that expands shows one rotating chevron (web SVG, app Ionicons); a module that navigates is a `LinkModule` (whole row taps, trailing arrow). No `+` / `-` glyphs and no "Open ->" / "All ->" / "View all" in the header next to a chevron: the destination of an expandable module is `ModuleMore` (web `ui/ModuleMore.tsx`, app `ModuleMore.tsx`) at the end of its expanded body.
