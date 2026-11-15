@@ -468,17 +468,15 @@ function LineupComparison({
           aria-label={helpOpen ? "Hide explanation" : "How this works"}
           aria-expanded={helpOpen}
           onClick={() => setHelpOpen((v) => !v)}
-          className="inline-flex items-center justify-center font-bold shrink-0 text-xs"
-          style={{
-            width: 22,
-            height: 22,
-            borderRadius: 9999,
-            border: "var(--border-width-default) solid var(--color-border)",
-            color: "var(--color-accent)",
-            lineHeight: 1,
-          }}
+          className="inline-flex items-center justify-center shrink-0"
+          style={{ width: "var(--touch-target-min)", height: "var(--touch-target-min)" }}
         >
-          ?
+          <span
+            className="inline-flex items-center justify-center font-bold text-xs"
+            style={{ width: 22, height: 22, borderRadius: 9999, border: "var(--border-width-default) solid var(--color-border)", color: "var(--color-accent)", lineHeight: 1 }}
+          >
+            ?
+          </span>
         </button>
       </div>
       {helpOpen ? (
@@ -798,8 +796,8 @@ export function MatchupContent({
             type="button"
             onClick={onRefresh}
             disabled={refreshing}
-            className="underline"
-            style={{ color: "var(--color-accent)" }}
+            className="inline-flex items-center underline"
+            style={{ color: "var(--color-accent)", minHeight: "var(--touch-target-min)", padding: "0 0.5rem" }}
           >
             {refreshing ? "Refreshing…" : "Refresh"}
           </button>

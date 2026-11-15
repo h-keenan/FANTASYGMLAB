@@ -11,3 +11,7 @@ Bugs and inconsistencies noticed while working on other tasks, with file refs. N
 | 2026-11-14 | League switcher menu off-screen at 320px, 775px tall, no scroll | `Header.tsx LeagueLensPicker` | Fixed (#1957) |
 | 2026-11-14 | Trade Finder names wrapped inside words | `TradeFinderContent.tsx` | Fixed (#1939, #1954) |
 | 2026-11-14 | Mobile screens report failures with native `Alert.alert` | many | Fixed (#1952, `NoticeProvider`) |
+| 2026-11-15 | Trade Hub filter chips 40px tall (under the 44px target); Matchup "?" help button 22px and "Refresh" link 16px; Trade Finder pick-group headers 36px with a `+`/`-` glyph | `TradeHubFilters.tsx`, `MatchupContent.tsx`, `PickGroupList.tsx` | Fixed (44px targets, rotating chevron) |
+| 2026-11-15 | `module_scan.mjs` now lists every visible control under 43px per page (`census.small`) so the next sweep is one command | `scripts/sim_layout_playwright/module_scan.mjs` | Fixed |
+| 2026-11-15 | Labelled inline `BeginnerHelp` rows ("? waiver value", "? playoff odds", "? this matchup page") are 16px-tall targets | `WaiversContent.tsx`, `LeagueRankingsContent.tsx`, `MatchupContent.tsx` | Open (goes away with #1954, D3) |
+| 2026-11-15 | Smart pill + footer + Sim footer geometry (`pill_geometry.mjs`, `footer_sheet_audit.mjs`) pass at 320/360/390/430 | harnesses | Checked, no findings |
