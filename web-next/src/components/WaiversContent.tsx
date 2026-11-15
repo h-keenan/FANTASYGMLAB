@@ -12,6 +12,9 @@ import type { WaiverTab } from "@/lib/pageTabs";
 import { api, type WaiverPlayer, type WaiverPriorityAdd, type WaiversResponse } from "@/lib/api";
 import { BeginnerHelp } from "@/components/BeginnerHelp";
 import { PageTitle } from "@/components/PageTitle";
+import { AccentCard } from "@/components/AccentCard";
+import { abbreviatePlayerName } from "@/lib/formatPlayerName";
+import type { CompactPart } from "@/lib/compactModule";
 import { ConfidenceMeter } from "@/components/ConfidenceMeter";
 import { HighlightTarget } from "@/components/HighlightTarget";
 import { InfoTip } from "@/components/InfoTip";
@@ -209,52 +212,56 @@ function ViewDetailsButton({ player }: { player: WaiverPlayer }) {
   );
 }
 
+/**
+ * The top waiver target on the Hero/StatusHeader anatomy (coridian_ 2026-11-14, UI pass 5 D8): a cyan-rail card with the
+ * kicker, who, reasons, Value and bid, and the ONE primary action ("Review add" opens the player). Everything that used to
+ * stack under it (why, usage, this add's roster move, confidence, the two explainers) lives in one CompactModule below, so the
+ * top of the page is short and gold is gone.
+ */
 function TopWaiverTargetCard({ player }: { player: WaiverPriorityAdd }) {
+  const { openPlayer } = usePlayerQuickView();
+  const moveParts: CompactPart[] = [
+    { key: "move", text: player.drop_suggestion?.drop ? `Add ${abbreviatePlayerName(player.name)}, drop ${abbreviatePlayerName(player.drop_suggestion.drop.name)}` : "Roster move and reasoning", strong: true },
+    ...(player.confidence_label ? [{ key: "conf", text: `${player.confidence_label} confidence` }] : []),
+  ];
   return (
-    <article className="glass-surface flex flex-col gap-3 p-4" style={{ borderColor: "var(--color-premium)" }}>
-      <div className="flex items-center justify-between gap-2">
-        <span
-          className="text-xs font-extrabold uppercase"
-          style={{ color: "var(--color-premium)", letterSpacing: "var(--letter-spacing-badge)" }}
-        >
-          ★ Top Waiver Target
+    <div className="flex flex-col gap-3" data-testid="top-waiver-target">
+      <AccentCard accent="var(--color-accent)" as="article">
+        <span className="text-[0.6875rem] font-extrabold uppercase" style={{ color: "var(--color-accent)", letterSpacing: "var(--letter-spacing-badge)" }}>
+          Top waiver target · {player.recommendation_label} #1
         </span>
-        <ToneBadge label={`${player.recommendation_label} · #1`} color="var(--color-premium)" />
-      </div>
-      <WaiverIdentity player={player} avatarSize={56} />
-      <ReasonChips chips={waiverReasonChips(player)} />
-      <UsageFlagChip player={player} />
-      <div
-        className="flex items-center justify-between gap-3 pt-3"
-        style={{ borderTop: "var(--border-width-default) solid var(--color-border)" }}
-      >
-        <ValueWithRing player={player} big />
-        <FaabRange player={player} prominent />
-      </div>
-      {player.faab?.why ? (
-        <p className="text-xs" style={{ color: "var(--color-text-secondary)" }}>
-          <span className="font-bold">Why: </span>
-          <Money>{player.faab.why}</Money>
-        </p>
-      ) : null}
-      {player.usage_flag ? (
-        <p className="text-xs" style={{ color: "var(--color-text-secondary)" }}>
-          <span className="font-bold">Usage: </span>
-          {player.usage_flag.explanation}
-        </p>
-      ) : null}
-      {player.drop_suggestion ? <SuggestedDrop suggestion={player.drop_suggestion} /> : null}
-      <BeginnerHelp label="waiver value" term="waiverValue" />
-      <div className="flex flex-wrap items-center justify-between gap-3">
+        <WaiverIdentity player={player} avatarSize={48} />
+        <ReasonChips chips={waiverReasonChips(player)} />
+        <UsageFlagChip player={player} />
+        <div className="flex items-center justify-between gap-3">
+          <ValueWithRing player={player} big />
+          <FaabRange player={player} prominent />
+        </div>
+        <Button fullWidth onClick={() => openPlayer({ ...player, sourceLabel: "Waivers" })}>
+          Review add
+        </Button>
+      </AccentCard>
+      <CompactModule id="waivers.top.detail" title="Why and roster move" parts={moveParts}>
+        {player.faab?.why ? (
+          <p className="text-xs" style={{ color: "var(--color-text-secondary)" }}>
+            <span className="font-bold">Why: </span>
+            <Money>{player.faab.why}</Money>
+          </p>
+        ) : null}
+        {player.usage_flag ? (
+          <p className="text-xs" style={{ color: "var(--color-text-secondary)" }}>
+            <span className="font-bold">Usage: </span>
+            {player.usage_flag.explanation}
+          </p>
+        ) : null}
+        {player.drop_suggestion ? <SuggestedDrop suggestion={player.drop_suggestion} /> : null}
+        <BeginnerHelp label="waiver value" term="waiverValue" />
         {player.confidence_label ? (
           <ConfidenceMeter label="Confidence" value={player.confidence_label} color={confidenceColor(player.confidence_label)} />
-        ) : (
-          <span />
-        )}
-        <ViewDetailsButton player={player} />
-      </div>
-      {player.confidence_label ? <BeginnerHelp label="waiver confidence" term="waiverConfidence" /> : null}
-    </article>
+        ) : null}
+        {player.confidence_label ? <BeginnerHelp label="waiver confidence" term="waiverConfidence" /> : null}
+      </CompactModule>
+    </div>
   );
 }
 

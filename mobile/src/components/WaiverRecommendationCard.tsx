@@ -4,6 +4,10 @@ import PressableScale from './PressableScale';
 import { Ionicons } from '@expo/vector-icons';
 
 import AnimatedCard from './AnimatedCard';
+import Button from './Button';
+import CompactModule from './CompactModule';
+import { abbreviatePlayerName } from '../lib/formatPlayerName';
+import type { CompactPart } from '../lib/compactModule';
 import AppText from './AppText';
 import BeginnerHelp from './BeginnerHelp';
 import MeterRow, { confidenceLevelFor } from './ConfidenceMeter';
@@ -232,12 +236,18 @@ export default function WaiverRecommendationCard({
     />
   );
 
+  const moveParts: CompactPart[] = [
+    { key: 'move', text: player.drop_suggestion?.drop ? `Add ${abbreviatePlayerName(player.name)}, drop ${abbreviatePlayerName(player.drop_suggestion.drop.name)}` : 'Roster move and reasoning', strong: true },
+    ...(player.confidence_label ? [{ key: 'conf', text: `${player.confidence_label} confidence` }] : []),
+  ];
+
   if (isPrimary) {
     return (
-      <AnimatedCard glow style={styles.primaryCard} onPress={onPress}>
+      <View style={styles.primaryStack}>
+      <AnimatedCard style={styles.primaryCard} onPress={onPress}>
         <View style={styles.actionRow}>
           <Ionicons name="swap-horizontal-outline" size={13} color={colors.accent} />
-          <AppText style={styles.actionLabel}>{player.recommendation_label} · Top Waiver Target</AppText>
+          <AppText style={styles.actionLabel}>Top waiver target · {player.recommendation_label} #1</AppText>
         </View>
         <View style={styles.identityWrap}>{identity}</View>
         <ReasonChips player={player} />
@@ -251,6 +261,9 @@ export default function WaiverRecommendationCard({
           <View style={styles.metricsDivider} />
           <FAABGuidance faab={player.faab} size="prominent" />
         </View>
+        <Button label="Review add" onPress={onPress} />
+      </AnimatedCard>
+        <CompactModule id="waivers.top.detail" title="Why and roster move" parts={moveParts}>
         {/* Evidence-backed "why" for the bid (or the claim guidance in
             non-FAAB leagues) — modules/faab.py FaabGuidance.why. */}
         {player.faab?.why ? (
@@ -291,18 +304,10 @@ export default function WaiverRecommendationCard({
           ) : (
             <View style={styles.confidenceMeter} />
           )}
-          <PressableScale
-            style={styles.detailsButton}
-            onPress={onPress}
-            accessibilityRole="button"
-            accessibilityLabel={`View details for ${player.name ?? 'player'}`}
-          >
-            <AppText style={styles.detailsButtonText}>View details</AppText>
-            <Ionicons name="arrow-forward" size={14} color={colors.accent} />
-          </PressableScale>
         </View>
         {player.confidence_label ? <BeginnerHelp term="waiverConfidence" style={styles.beginnerHelp} /> : null}
-      </AnimatedCard>
+        </CompactModule>
+      </View>
     );
   }
 
@@ -384,7 +389,8 @@ const compactChip = StyleSheet.create({
 
 function createStyles(colors: ThemeColors) {
   return StyleSheet.create({
-    primaryCard: { padding: spacing.lg },
+    primaryStack: { gap: spacing.md },
+    primaryCard: { padding: spacing.lg, gap: spacing.sm },
     actionRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: spacing.xs },
     actionLabel: {
       fontSize: 12.5,

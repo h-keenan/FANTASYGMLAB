@@ -11,6 +11,9 @@ function renderOpen(ui: React.ReactElement) {
   const view = render(ui);
   const toggle = screen.queryByRole("button", { name: /^Free agents:/ });
   if (toggle && toggle.getAttribute("aria-expanded") !== "true") fireEvent.click(toggle);
+  // The top target's why / usage / roster move live in their own collapsed module (UI pass 5 D8).
+  const detail = screen.queryByRole("button", { name: /^Why and roster move:/ });
+  if (detail && detail.getAttribute("aria-expanded") !== "true") fireEvent.click(detail);
   return view;
 }
 
