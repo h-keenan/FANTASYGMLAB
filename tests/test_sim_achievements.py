@@ -371,7 +371,14 @@ def test_replayed_week_reports_only_that_weeks_unlocks_and_undo_rebuilds_the_cac
     advance(client, gid)
     advance(client, gid)
     again = advance(client, gid, week=1)
-    assert again["replayed"] and again["achievements"]["new"] == [i for i in first["achievements"]["new"] if i["week"] == 1]
+    assert again["replayed"]
+    # "Best so far" badges (Blowout, Closest win ...) move to a later week when it beats week 1's, and the game's seed is random, so week 1's
+    # own unlocks are read off the same cumulative items the replay returns, not off what week 1 showed three advances ago.
+    rarity = {"epic": 0, "rare": 1, "common": 2}
+    want = sorted((i for i in again["achievements"]["items"] if i["unlocked"] and i["season_no"] == 1 and i["week"] == 1),
+                  key=lambda i: (i["week"], rarity[i["rarity"]], i["id"]))
+    assert again["achievements"]["new"] == want
+    assert all(i["week"] == 1 for i in again["achievements"]["new"])
     assert client.post(f"/v1/sim/games/{gid}/revert-week", headers=hdr()).json()["reverted"] == 0
     nxt = advance(client, gid)
     assert {k: v for k, v in nxt["achievements"].items() if k in ("items", "counts")} == _cold(backend, gid)
