@@ -45,7 +45,7 @@ function LeaderboardRow({ entry }: { entry: GuessThePlayerLeaderboardEntry }) {
     >
       <span
         className="text-sm font-extrabold shrink-0 text-center"
-        style={{ color: entry.rank === 1 ? "var(--color-premium)" : "var(--color-text-muted)", minWidth: "2.25rem" }}
+        style={{ color: entry.rank === 1 ? "var(--color-accent)" : "var(--color-text-muted)", minWidth: "2.25rem" }}
       >
         {entry.rank}
       </span>

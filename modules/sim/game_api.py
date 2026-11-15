@@ -14,6 +14,8 @@ import functools
 from collections import OrderedDict
 import json
 import logging
+import os
+import weakref
 import secrets
 import threading
 import time
@@ -220,6 +222,32 @@ def _fast_json(payload: Any) -> Any:
         return payload
 
 
+# Read views are pure functions of (frozen snapshot, folded state, query). The state cache hands out one shared, never
+# mutated GameState per game version (a write publishes a NEW instance), so a view memoised against that instance can
+# never go stale: it is dropped with the instance. Weak keys: nothing outlives the state cache's own eviction.
+_VIEW_MEMO_ON = os.environ.get("SIM_VIEW_MEMO", "1").strip().lower() not in {"0", "false", "no", "off"}
+_VIEW_MEMO: "weakref.WeakKeyDictionary[Any, dict[tuple, Any]]" = weakref.WeakKeyDictionary()
+_VIEW_MEMO_LOCK = threading.Lock()
+VIEW_MEMO_PER_STATE = 48
+
+
+def _memo_view(state: Any, key: tuple, build: Callable[[], Any]) -> Any:
+    if not _VIEW_MEMO_ON:
+        return build()
+    with _VIEW_MEMO_LOCK:
+        bucket = _VIEW_MEMO.get(state)
+        if bucket is None:
+            bucket = _VIEW_MEMO[state] = {}
+        hit = bucket.get(key)
+    if hit is not None:
+        return hit
+    out = build()
+    with _VIEW_MEMO_LOCK:
+        if len(bucket) < VIEW_MEMO_PER_STATE:
+            bucket[key] = out
+    return out
+
+
 def _gid(raw: str) -> str:
     try:
         return str(uuid.UUID(raw))
@@ -298,8 +326,12 @@ def add_routes(router: APIRouter, ctx: GameApiCtx) -> None:
 
         @functools.wraps(fn)
         def wrapper(*args: Any, **kwargs: Any) -> Any:
+            started = time.perf_counter()
             try:
-                return _fast_json(fn(*args, **kwargs))
+                out = _fast_json(fn(*args, **kwargs))
+                if isinstance(out, JSONResponse):  # visible in the browser network panel and in access logs
+                    out.headers["Server-Timing"] = f"sim;dur={(time.perf_counter() - started) * 1000:.1f}"
+                return out
             except SimStoreError as exc:
                 return unavailable(exc)
             except GameConflict:
@@ -759,8 +791,9 @@ def add_routes(router: APIRouter, ctx: GameApiCtx) -> None:
             raise ValueError("status must be available, rostered, mine, injured, bye or block.")
         if sort not in view.SORTS:
             raise ValueError("sort must be one of: " + ", ".join(view.SORTS))
-        return {**_env(pro, state), **view.players_page(
-            snap, state, q=q, pos=pos, status=status, team=team, sort=sort, page=page, page_size=page_size, seed=seedof(row, state))}
+        body = _memo_view(state, ("players", q, pos, status, team, sort, page, page_size), lambda: view.players_page(
+            snap, state, q=q, pos=pos, status=status, team=team, sort=sort, page=page, page_size=page_size, seed=seedof(row, state)))
+        return {**_env(pro, state), **body}
 
     @router.get("/games/{game_id}/players/{pid}")
     @guarded
@@ -769,7 +802,7 @@ def add_routes(router: APIRouter, ctx: GameApiCtx) -> None:
         _, _, row, snap, state = load(user, _gid(game_id))
         if pid not in snap.players:
             raise HTTPException(status_code=404, detail="Player not found.")
-        return {**_env(pro, state), **view.player_detail(snap, state, pid, seed=seedof(row, state))}
+        return {**_env(pro, state), **_memo_view(state, ("player", pid), lambda: view.player_detail(snap, state, pid, seed=seedof(row, state)))}
 
     @router.get("/games/{game_id}/players/{pid}/history")
     @guarded
@@ -802,7 +835,7 @@ def add_routes(router: APIRouter, ctx: GameApiCtx) -> None:
         _, _, row, snap, state = load(user, _gid(game_id))
         if team_id not in snap.tids:
             raise HTTPException(status_code=404, detail="Team not found.")
-        return {**_env(pro, state), **home.team_detail(snap, state, team_id, seedof(row, state))}
+        return {**_env(pro, state), **_memo_view(state, ("team", team_id), lambda: home.team_detail(snap, state, team_id, seedof(row, state)))}
 
     # ------------------------------------------------------------------ home
 
@@ -814,7 +847,7 @@ def add_routes(router: APIRouter, ctx: GameApiCtx) -> None:
         if state.status not in ("in_season", "playoffs"):
             return {**_env(pro, state, "wrong_phase"),
                     "phase": {"drafting": "draft", "offseason": "offseason"}.get(state.status, "complete")}
-        return {**_env(pro, state), **home.home_view(snap, state, seedof(row, state)),
+        return {**_env(pro, state), **_memo_view(state, ("home",), lambda: home.home_view(snap, state, seedof(row, state))),
                 "achievements": _ach(store, uid, _gid(game_id), snap, state)}
 
     # ---------------------------------------------------------------- lineup
@@ -826,7 +859,7 @@ def add_routes(router: APIRouter, ctx: GameApiCtx) -> None:
         _, _, _, snap, state = load(user, _gid(game_id))
         if state.status == "drafting":
             return {**_env(pro, state, "wrong_phase"), "phase": "draft"}
-        return {**_env(pro, state), **view.lineup_view(snap, state)}
+        return {**_env(pro, state), **_memo_view(state, ("lineup",), lambda: view.lineup_view(snap, state))}
 
     def _mutate(user, game_id, action, *, checkpoint=False, respond=None):
         """Load, gate, run ``action(em, snap, state, row, seed)``, persist, reply."""
@@ -1248,7 +1281,7 @@ def add_routes(router: APIRouter, ctx: GameApiCtx) -> None:
         _, _, _, snap, state = load(user, _gid(game_id))
         if state.status == "drafting":
             return {**_env(pro, state, "wrong_phase"), "phase": "draft"}
-        return {**_env(pro, state), **view.league_view(snap, state)}
+        return {**_env(pro, state), **_memo_view(state, ("league",), lambda: view.league_view(snap, state))}
 
     @router.get("/games/{game_id}/league/rosters")
     @guarded
@@ -1257,7 +1290,7 @@ def add_routes(router: APIRouter, ctx: GameApiCtx) -> None:
         _, _, row, snap, state = load(user, _gid(game_id))
         if state.status == "drafting":
             return {**_env(pro, state, "wrong_phase"), "phase": "draft"}
-        return {**_env(pro, state), **home.league_rosters(snap, state, seedof(row, state))}
+        return {**_env(pro, state), **_memo_view(state, ("league_rosters",), lambda: home.league_rosters(snap, state, seedof(row, state)))}
 
     @router.get("/games/{game_id}/result")
     @guarded

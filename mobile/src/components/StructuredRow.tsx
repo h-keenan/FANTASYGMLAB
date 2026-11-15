@@ -158,7 +158,7 @@ function createStyles(colors: ThemeColors) {
       borderColor: colors.glassBorder,
       backgroundColor: colors.glassInset,
     },
-    me: { borderColor: colors.premium },
+    me: { borderColor: colors.accent },
     lead: { width: 36, height: 36, alignItems: 'center', justifyContent: 'center' },
     main: { flex: 1, minWidth: 0, gap: 3 },
     line: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, minWidth: 0 },

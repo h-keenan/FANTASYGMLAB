@@ -102,9 +102,10 @@ function createStyles(colors: ThemeColors, isDark: boolean) {
     danger: { backgroundColor: colors.danger },
     dangerOutline: { backgroundColor: 'transparent', borderWidth: 1, borderColor: colors.danger },
     accentOutline: { backgroundColor: 'transparent', borderWidth: 1, borderColor: colors.accent },
-    primaryDisabled: { backgroundColor: mutedFill },
-    premiumDisabled: { backgroundColor: mutedFill },
-    dangerDisabled: { backgroundColor: mutedFill },
+    // Hairline so a disabled filled button never reads as a loose label (web: inset box-shadow).
+    primaryDisabled: { backgroundColor: mutedFill, borderWidth: 1, borderColor: colors.borderStrong },
+    premiumDisabled: { backgroundColor: mutedFill, borderWidth: 1, borderColor: colors.borderStrong },
+    dangerDisabled: { backgroundColor: mutedFill, borderWidth: 1, borderColor: colors.borderStrong },
     secondaryDisabled: {},
     ghostDisabled: {},
     premiumOutlineDisabled: { borderColor: colors.borderStrong },

@@ -368,7 +368,7 @@ function ResultCard({
 
       <View style={styles.footerRow}>
         <MeterRow label="CONFIDENCE" value={idea.confidence_label} level={confidenceLevel} color={colors.accent} />
-        <MeterRow label="REALISM" value={idea.market_realism_label} level={realismLevel} color={colors.premium} />
+        <MeterRow label="REALISM" value={idea.market_realism_label} level={realismLevel} color={colors.accent} />
       </View>
     </AnimatedCard>
   );

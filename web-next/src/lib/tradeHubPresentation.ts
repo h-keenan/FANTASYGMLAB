@@ -102,7 +102,7 @@ export function leanBar(sendScore: number, receiveScore: number): LeanBar {
 const CATEGORY_COLOR_VAR: Record<string, string> = {
   "Headline Recommendation": "var(--color-accent)",
   "Health Relief": "var(--color-danger)",
-  "Draft Capital": "var(--color-premium)",
+  "Draft Capital": "var(--color-accent)",
   "Age Optimization": "var(--color-diagnostic)",
   Rebuild: "var(--color-diagnostic)",
   Contender: "var(--color-success)",
@@ -124,7 +124,7 @@ export interface ImpactTagConfig {
 const IMPACT_TAG_CONFIG: Record<string, ImpactTagConfig> = {
   high_impact: { label: "High Impact", color: "var(--color-accent)" },
   buy_low: { label: "Buy Low", color: "var(--color-success)" },
-  sell_high: { label: "Sell High", color: "var(--color-premium)" },
+  sell_high: { label: "Sell High", color: "var(--color-accent)" },
 };
 
 export function impactTagConfig(tag: string | null | undefined): ImpactTagConfig | null {

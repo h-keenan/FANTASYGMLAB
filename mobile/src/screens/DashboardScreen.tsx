@@ -686,19 +686,19 @@ function quickActions(
   color: string;
 }> {
   return [
-    { label: 'Trade Hub', route: 'Trades', icon: 'shuffle-outline', color: colors.premium },
+    { label: 'Trade Hub', route: 'Trades', icon: 'shuffle-outline', color: colors.accent },
     { label: 'Players', route: 'Players', icon: 'people-outline', color: colors.violet },
     { label: 'Waivers', route: 'Waivers', icon: 'swap-horizontal-outline', color: colors.success },
     inSeason
       ? { label: 'My Team', route: 'MyTeam', icon: 'shirt-outline', color: colors.success }
-      : { label: 'Draft Picks', route: 'DraftCenter', icon: 'albums-outline', color: colors.premium },
+      : { label: 'Draft Picks', route: 'DraftCenter', icon: 'albums-outline', color: colors.accent },
     // Second row: the League Overview shortcuts (Matchup, Alerts, Teams) now
     // live here, plus the one GM Plan entry. Same icon/color per destination
     // as GmOrb.
     { label: 'Matchup', route: 'Matchup', icon: 'american-football-outline', color: colors.success },
     { label: 'Alerts', route: 'Alerts', icon: 'notifications-outline', color: colors.danger },
     { label: 'League Rankings', route: 'Teams', icon: 'people-circle-outline', color: colors.violet },
-    { label: 'GM Plan', route: 'GmPlan', icon: 'map-outline', color: colors.premium },
+    { label: 'GM Plan', route: 'GmPlan', icon: 'map-outline', color: colors.accent },
   ];
 }
 
