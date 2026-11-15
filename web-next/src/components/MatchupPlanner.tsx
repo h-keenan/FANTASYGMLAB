@@ -28,6 +28,7 @@ import {
 } from "@/lib/matchupPlanner";
 import { slotDisplayLabel } from "@/lib/matchupPresentation";
 import { rangeDisplayRows } from "@/lib/startSitRange";
+import { SkeletonText } from "@/components/Skeleton";
 
 /**
  * Lineup swap planner for Matchup. Planner only: FantasyDesk can't change a
@@ -283,9 +284,7 @@ export function SwapSheet({
               {sheet.error}
             </p>
           ) : !sheet.data ? (
-            <p className="text-sm" style={{ color: "var(--color-text-muted)" }}>
-              Loading…
-            </p>
+            <SkeletonText label="swap options" lines={3} />
           ) : sheet.data.slot_locked ? (
             <p className="text-sm" style={{ color: "var(--color-text-muted)" }}>
               This player&apos;s game has started, so the slot is locked.

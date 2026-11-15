@@ -25,6 +25,6 @@ export default function CommissionerPage() {
     if (!authLoading && !session) router.replace("/");
   }, [authLoading, session, router]);
 
-  if (authLoading || !session) return <LoadingScreen status="Loading League integrity…" />;
+  if (authLoading || !session) return <LoadingScreen label="League integrity" layout="dashboard" />;
   return <CommissionerContent leagueId={leagueId} leagueName={leagueName} lens={lens} />;
 }

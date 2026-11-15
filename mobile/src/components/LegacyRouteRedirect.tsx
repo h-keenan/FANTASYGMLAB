@@ -2,7 +2,7 @@ import React, { useEffect } from 'react';
 import { View } from 'react-native';
 import { useHeaderHeight } from '@react-navigation/elements';
 
-import BrandedSpinner from './BrandedSpinner';
+import { SkeletonPage } from './Skeleton';
 import { resolveLegacyRedirect } from '../lib/homeRedirects';
 
 /**
@@ -25,7 +25,7 @@ export function createLegacyRedirectScreen(routeName: string): React.ComponentTy
     }, []);
     return (
       <View style={{ flex: 1, paddingTop: headerHeight }}>
-        <BrandedSpinner />
+        <SkeletonPage label="your page" layout="dashboard" />
       </View>
     );
   }

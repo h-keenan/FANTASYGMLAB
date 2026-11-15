@@ -11,7 +11,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useIsRestoring, useQuery, useQueryClient } from '@tanstack/react-query';
 
 import AccentCard from '../components/AccentCard';
-import BrandedSpinner from '../components/BrandedSpinner';
+import { SkeletonPage } from '../components/Skeleton';
 import CircularProgressRing from '../components/CircularProgressRing';
 import EvaluationLensHeaderButton from '../components/EvaluationLensHeaderButton';
 import GmStanceHeaderButton from '../components/GmStanceHeaderButton';
@@ -447,7 +447,7 @@ function RankingsPanel({
   const rankedTeamCount = useMemo(() => teams.filter((team) => team.metricRank != null).length, [teams]);
 
   if (loading) {
-    return <BrandedSpinner style={styles.center} />;
+    return <SkeletonPage label="your team" layout="list" family="team" />;
   }
 
   if (error) {

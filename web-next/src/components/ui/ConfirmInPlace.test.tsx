@@ -63,7 +63,7 @@ describe("ConfirmInPlace ask (icon / row)", () => {
     expect(screen.queryByRole("group")).toBeNull();
   });
 
-  it("shows an error with Retry when the action fails, and retries", async () => {
+  it("shows an error with Try again when the action fails, and retries", async () => {
     const onConfirm = vi.fn().mockRejectedValueOnce(new Error("x")).mockResolvedValueOnce(undefined);
     render(<ConfirmInPlace variant="row" label="Remove" prompt="Remove it?" errorText="Could not remove." onConfirm={onConfirm} />);
     fireEvent.click(screen.getByRole("button", { name: "Remove" }));
@@ -72,7 +72,7 @@ describe("ConfirmInPlace ask (icon / row)", () => {
     });
     expect(screen.getAllByText("Could not remove.").length).toBeGreaterThan(0);
     await act(async () => {
-      fireEvent.click(screen.getByRole("button", { name: "Retry" }));
+      fireEvent.click(screen.getByRole("button", { name: "Try again" }));
     });
     expect(onConfirm).toHaveBeenCalledTimes(2);
     expect(screen.queryByRole("group")).toBeNull();
@@ -89,7 +89,7 @@ describe("ConfirmInPlace ask (icon / row)", () => {
     await act(async () => {
       fireEvent.click(screen.getAllByRole("button", { name: "Remove" }).at(-1)!);
     });
-    expect(screen.getByRole("button", { name: "Retry" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Try again" })).toBeInTheDocument();
   });
 
   it("plain ask mode renders a bare text trigger with the caller's own look", () => {

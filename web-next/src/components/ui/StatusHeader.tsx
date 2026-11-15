@@ -5,6 +5,7 @@ import { useState, type ReactNode } from "react";
 
 import { AccentCard } from "@/components/AccentCard";
 import { ButtonLink, Button } from "@/components/Button";
+import { SkeletonRegion, SkeletonStatusHeader } from "@/components/Skeleton";
 import { CompactPlayerCard } from "@/components/ui/CompactPlayerCard";
 import { PlayerAccordionRow } from "@/components/ui/PlayerAccordionRow";
 import {
@@ -152,12 +153,12 @@ function AttentionRow({ item, first }: { item: StatusAttentionItem; first: boole
   return (
     <li style={border} data-testid="status-attention-row">
       {item.href ? (
-        <Link href={item.href} className="flex w-full items-center gap-1" style={{ minHeight: "var(--touch-target-min)", color: "inherit", textDecoration: "none" }} aria-label={statusAttentionAria(item)}>
+        <div className="flex w-full items-center gap-1" style={{ minHeight: "var(--touch-target-min)" }}>
           <span className="min-w-0 flex-1">{card}</span>
-          <span aria-hidden="true" data-row-arrow style={{ color: "var(--color-accent)" }}>
-            →
-          </span>
-        </Link>
+          <Link href={item.href} aria-label={statusAttentionAria(item)} data-row-arrow className="tap-link inline-flex shrink-0 items-center justify-center" style={{ color: "var(--color-accent)", textDecoration: "none", minWidth: "var(--touch-target-min)", minHeight: "var(--touch-target-min)" }}>
+            <span aria-hidden="true">→</span>
+          </Link>
+        </div>
       ) : (
         <div className="flex w-full items-center" style={{ minHeight: "var(--touch-target-min)" }} aria-label={statusAttentionAria(item)}>
           <span className="min-w-0 flex-1">{card}</span>
@@ -256,5 +257,14 @@ export function StatusHeader({
       </AccentCard>
       {children}
     </section>
+  );
+}
+
+/** The loading silhouette of `StatusHeader` (ring + headline, three stats, attention rows, primary button). */
+export function StatusHeaderSkeleton({ label = "status", rows = 3 }: { label?: string; rows?: number }) {
+  return (
+    <SkeletonRegion label={label}>
+      <SkeletonStatusHeader rows={rows} />
+    </SkeletonRegion>
   );
 }

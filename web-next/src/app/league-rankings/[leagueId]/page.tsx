@@ -67,7 +67,7 @@ export default function LeagueRankingsPage() {
 
   if (authLoading || (!rankings && !error)) {
     return (
-      <LoadingScreen status="Loading League Rankings…" />
+      <LoadingScreen label="League Rankings" layout="list" family="league" />
     );
   }
 

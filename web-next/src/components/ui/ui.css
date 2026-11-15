@@ -646,10 +646,11 @@
   left: 0;
   right: 0;
   bottom: 0;
-  /* Takes no taps in the gaps beside the pill; its children opt back in. A compositor layer keeps it glued during iOS toolbar resizes. */
+  /* Takes no taps in the gaps beside the pill; its children opt back in. --dock-shift is 0 unless useFixedBottomAnchor finds
+     iOS WebKit parked the layer at a stale viewport bottom; no forced compositor-layer promotion (it pinned the layer
+     to the stale rect on iOS). */
   pointer-events: none;
-  transform: translateZ(0);
-  will-change: transform;
+  transform: translateY(var(--dock-shift, 0px));
 }
 .bottom-stack[data-dock="fixed"] > * { pointer-events: auto; }
 /* The game's navigation orb is a slot inside the action bar's one row (Sim to | orb | Advance), in flow: nothing overlaps content or clips. */

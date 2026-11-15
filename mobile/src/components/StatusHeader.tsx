@@ -7,6 +7,7 @@ import AppText from './AppText';
 import Button from './Button';
 import CompactPlayerCard from './CompactPlayerCard';
 import PlayerAccordionRow from './PlayerAccordionRow';
+import { SkeletonRegion, SkeletonStatusHeader } from './Skeleton';
 import { useThemeMode } from '../context/ThemeModeContext';
 import {
   statusAttentionAria,
@@ -295,4 +296,13 @@ function createStyles(colors: ThemeColors) {
     openLink: { minHeight: 44, justifyContent: 'center' },
     link: { fontSize: 13.5, fontWeight: '700', color: colors.accent },
   });
+}
+
+/** The loading silhouette of `StatusHeader` (ring + headline, three stats, attention rows, primary button). */
+export function StatusHeaderSkeleton({ label = 'status', rows = 3 }: { label?: string; rows?: number }) {
+  return (
+    <SkeletonRegion label={label}>
+      <SkeletonStatusHeader rows={rows} />
+    </SkeletonRegion>
+  );
 }

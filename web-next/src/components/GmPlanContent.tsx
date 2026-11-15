@@ -2,6 +2,7 @@
 
 import { FreeLimitNote } from "@/components/FreeLimitNote";
 import Link from "next/link";
+import { ButtonLink } from "@/components/Button";
 import { EmptyState } from "@/components/EmptyState";
 import { AccentCard } from "@/components/AccentCard";
 import { CompactModule } from "@/components/ui/CompactModule";
@@ -217,13 +218,9 @@ function TradeOpportunityCard({ item, detailsHref }: { item: GmPlanTradeItem; de
           {item.rationale || item.trade_confidence_label}
         </p>
         {detailsHref ? (
-          <Link
-            href={detailsHref}
-            className="inline-flex items-center px-3 text-xs font-bold shrink-0"
-            style={{ color: "var(--color-accent)", border: "1px solid var(--color-accent)", minHeight: "2.25rem" }}
-          >
+          <ButtonLink href={detailsHref} variant="accentOutline" size="sm" className="shrink-0">
             View details
-          </Link>
+          </ButtonLink>
         ) : null}
       </div>
     </CompactModule>

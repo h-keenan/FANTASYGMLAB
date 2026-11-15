@@ -25,6 +25,27 @@ Ground rules for every pattern here:
 | Player anatomy (`PlayerAccordionRow`, `CompactPlayerCard`, `TradeCompactCard`, `RankRow`, `PlayerAvatarSlot`) | `ui/PlayerAccordionRow.tsx` etc. | same names in `components/` | `playerAnatomy.ts` | built; see "Player anatomy" |
 | `LetterGrade` / `GradeBar` / `GradeLegendSheet` | `ui/LetterGrade.tsx` | `LetterGrade.tsx` | `simGrade.ts` | built; the Fantasy Sim's overall (replaces the OVR gauge there only), see "Fantasy Sim letter grades" |
 | `CompactModule` | `ui/CompactModule.tsx` | `CompactModule.tsx` | `compactModule.ts` (+ `simSummaries.ts`, `simDraft.ts`) | built (Phase 1 of `docs/audits/2026-11-information-architecture.md`); Sim home folds and the Sim draft room use it; `Collapsible` is superseded (SimFold renders CompactModule) |
+| `Skeleton` set | `components/Skeleton.tsx` (+ `LoadingScreen`) | `components/Skeleton.tsx` (+ `screens/LoadingScreen.tsx`) | none (visual only) | built; see "Loading identity" |
+
+## Loading identity
+
+Every loading state is a content-shaped skeleton from ONE set, never a splash, a spinner on an empty screen or a "Loading..." line.
+Web `components/Skeleton.tsx`, app `components/Skeleton.tsx` (same names, same silhouettes). Shimmer is the glass-token gradient
+(`.pqv-skeleton-line`, app: opacity pulse), stopped under `prefers-reduced-motion` / OS Reduce Motion.
+
+- **Primitives**: `SkeletonBlock`, `SkeletonAvatar` (density tier sizes), `SkeletonHeader`, `SkeletonHero`, `SkeletonTabs`, `SkeletonModule`,
+  `SkeletonPlayerRow(s)`, `SkeletonTradeCard`, `SkeletonStatusHeader`; plus `SkeletonText` / `SkeletonList` (a small region that names
+  itself once) and `SkeletonPage` (`layout`: `dashboard` | `list` | `cards` | `detail`, `family` for the tab strip).
+- **Templates own their loading state**: `CompactModule loading`, `PlayerAccordionRowSkeleton`, `TradeCompactCardSkeleton`,
+  `StatusHeaderSkeleton`, `PageTabBarSkeleton` (app: `SegmentedTabBarSkeleton`). A page that is loading shows the silhouette of the page
+  it will become, so nothing jumps when the data lands. The family tab strip skeleton is hidden on phones, like the real strip (its tabs live in the bottom pill).
+- **Pages**: `LoadingScreen label layout family` (web and app) replaces the old branded splash and `BrandedSpinner`. `label` is the page name and
+  becomes the single screen-reader status ("Loading Players"). Inline regions use `SkeletonText` / `SkeletonList`.
+- **Allowed spinners**: only inline busy states of an action (a button, a row's trailing control). The guard
+  `scripts/check_skeleton_identity.mjs` (run by both `npm test`s) fails on visible "Loading..."-style text, a bare app `ActivityIndicator`
+  outside its allowlist, `BrandedSpinner` and `<LoadingScreen status=...>`. Add to its allowlist only with a reason.
+- **Sample league** (`/sample-league`, app `SampleLeagueScreen`) uses the shipped stack: Roster is a `CompactModule` of `PlayerAccordionRow`s, Top moves a
+  `StatusHeader` + `CompactModule`s, Trade a `TradeCompactCard`; every player has the shared avatar slot (fictional players show initials).
 
 ## Sheet
 
@@ -537,6 +558,7 @@ Layout rule (immune to iOS Safari fixed-position drift): nothing here is `positi
 - **With page context** (V2): ONE row. The global tabs fold into ONE icon button (2026-11-14, coridian_: the section icon and the "..." were redundant): it shows the glyph of the section you are in, carries `aria-expanded`, and unfolds the global row; the page segment (page tabs as a `tablist`, one primary chip) takes the rest. That button unfolds the full global row (Today / Team / Trades / League / More) in the same pill; picking a tab, Escape or tapping outside folds it back. The lit page tab is one capsule that slides between tabs (transform + width, measured). More still opens the shared sheet.
 - **API**: a page calls `useBottomPillContext({ id, label, tabs, activeKey, onSelect, primary })` (`lib/useBottomPillContext.ts`, store `lib/bottomPillStore.ts`, types and `normalizePillContext` in the `lib/bottomNav.ts` twin) and drops its own page-tab row only when the hook returns true (the pill is on screen and showing that context). Consolidate, never remove: desktop, the flag off and signed-out pages keep the in-page tabs. At most `PILL_MAX_TABS` (5) tabs; one primary; the tab strip scrolls inside the pill if it must. **Tab overflow rule (2026-11-14, Trade Finder "History" cut off by the New trade chip): the page segment never clips a label.** Tabs use their `short` label where defined (`History` -> "Hist.", full label stays the accessible name; `pillTabText`), 4+ tabs use the dense type, and share the row equally when they fit (4 tabs fit at 390). When they cannot (5 tabs, 360) the strip scrolls with an edge fade only on the side that has more, and the lit tab is scrolled fully into view (`pillScrollTarget`). The primary chip collapses to a 40px icon-only button in its own slot with 4+ tabs or when a text chip would not fit (`pillPrimaryCompact`; a chip without a glyph keeps its text). Web `BottomTabBar`, app `BottomPill` (twin helpers in `lib/bottomNav.ts`). Guard: `scripts/sim_layout_playwright/pill_geometry.mjs` (label rect inside the segment, clear of the chip, exactly one section/menu button, no glyph chip on Trades, at 390 and 360 for Team, Trades, League, sim draft 4 and 5 tabs).
 - **Motion** (lib/motion.ts tokens, opacity/transform only): entering a page slides the segment in; the menu cross-fades the layers and fans the global tabs out; the primary chip pulses once on mount. Reduced motion: crossfade only (no slide, scale, fan or pulse).
+- **Floating footer, round 3 (2026-11-14, coridian_ iPhone PWA: pill ~58% down while scrolling My Team, content visible under it).** Not reproducible in WebKit (Playwright, iPhone viewport, scroll at 9 offsets, viewport resized 844/664/760/664 mid-scroll: the fixed portaled dock sat at gap 0 every time), so the structure was already right (body-level portal, `position: fixed; bottom: 0`, no ancestor transform/overflow, html/body not scroll containers). The screenshot shows the scroll indicator mid-gesture and the pill bottom at ~537 of 874 css px, i.e. a layer parked at a stale layout-viewport bottom (about a keyboard's height short), which only iOS WebKit does (after a keyboard/toolbar change, bfcache restore, orientation). Two changes: (1) the dock no longer forces its own compositor layer (`translateZ(0)` + `will-change: transform` were added for toolbar resizes and are the one thing that pins an iOS fixed layer to a stale rect); it carries `transform: translateY(var(--dock-shift, 0px))` instead; (2) `useFixedBottomAnchor` (`lib/fixedAnchor.ts`) re-measures on scroll / resize / visualViewport / orientation / pageshow / focusout (rAF + 150ms + 600ms settle) and writes ONLY `--dock-shift` when the dock's bottom disagrees with the visible bottom (largest of innerHeight, clientHeight, visualViewport bottom; skipped while a field is focused or pinch-zoomed). Healthy state: shift stays 0, no JS positioning. Guard: `footer_pin.mjs` (WebKit; also parks the dock 220px up and asserts it is pulled back) and `lib/fixedAnchor.test.ts`. If it still floats on a device, the next step is a real-device `visualViewport` / `innerHeight` / `getBoundingClientRect` log from the floating state.
 - **One sticky mechanism**: both layers share one grid cell, so the pill is one row tall in every mode and the stack height is the content clearance. Never `position: fixed`. Guards: `lib/bottomChrome.test.ts`, `lib/bottomBarMetrics.test.ts`, `components/ui/BottomTabBar.test.tsx`, `scripts/sim_layout_playwright/footer_pin.mjs`.
 - **Wired contexts**: `PageTabBar` (every Team / Trades / League page: Team = Roster | Players | Waivers | Matchup, Trades = Hub | Finder | Analyzer | History, no primary chip (the old lone-glyph "New trade" chip only linked to the Analyzer tab, so it was dropped; the segment is text-only, scroll-snapped, with an edge fade when it overflows), League = Rankings | Recaps | Games) registers its family as `family:<key>`; each tab is a route (`PillContextTab.href`, rendered as a link) and the strip steps aside only while the pill is on screen. Fantasy Sim: the draft room (`sim-draft`: Players | Queue | Roster | Picks + Auto-pick) and Sim Team (`sim-team`: Auto-set). In the game `SimPillHost` marks the pill present and `PillMorph` (in `SimActionBar` / `SimOffseasonBar`) folds Sim to | orb | Advance into the page segment; with no bar mounted (the draft) `PillContextOnly` shows the segment alone. A page swap keeps the context for `PILL_CLEAR_DELAY_MS` so the global tabs never flash between two pages of one family. Not moved yet: the Waivers filter sheet (it owns its own open state), real-league Roster has no auto-set action to promote.
 - **App**: no tab bar (GM orb + More), so `components/BottomPill.tsx` hosts the screen's action row (Sim to | orb | Advance) and morphs to the page segment (Reanimated, `useReducedMotion`); the Sim bars use the same glass. `lib/bottomPillStore.ts` / `useBottomPillContext.ts` are mirrored twins.
@@ -806,6 +828,38 @@ Allowlist kinds: TEXT (a sentence, headline or tooltip where a picture makes no 
 Not yet on the templates (the TODO allowlist is now empty; these are pages the source scan cannot see): Waivers app add rows and web Explore tiles, Live Draft rows, News, Trade Analyzer pickers (`TradePickerSheet`),
 Draft Center, League Recaps, Matchup lineup, Standings (RankRow exists, page not yet moved), Sim roster / draft board / inbox (`SimDraftRow`, `SimPlayerLine`, `SimRosterLine`
 should become `PlayerAccordionRow mode="sim"`, and the Sim trade inbox `TradeCompactCard mode="sim"`). Done in the avatar sweep: Manager/Opponent profile, Sim team card / history / draft grid / retirements, sample league, public trade analyzer.
+
+## Every player and pick is tappable (2026-11-14, coridian_: "why can't I tap on the player")
+
+Standing rule: a player (name, avatar, row) or a pick shown **anywhere** opens the shared quick view on tap: the Player Quick
+View peek sheet for a player (Fantasy Sim opens the sim PQV by the sim player id, FantasyDesk the real one) and the pick
+detail for a pick (Fantasy Sim: `SimPickSheet`). It is built into the templates, so a screen cannot forget it.
+
+- **Default, not opt-in.** `CompactPlayerCard`, `PlayerAvatarSlot`, `TradeAssetCard` (a `TradeCardAsset` player or pick),
+  `PlayerAccordionRow` and `SimPlayerChip` are tappable out of the box: a real button (role button, 44px / 44pt minimum, the
+  shared press feedback: the global button rule on web, `PressableScale` on the app) labelled "Open <name>". Web:
+  `components/ui/PlayerOpenContext.tsx` (`PlayerTap`, `PickTap`); app: `components/PlayerOpenContext.tsx`; pure rule in the
+  `lib/playerTap.ts` twin (`canOpenPlayer`, `playerOpenLabel`, `isValidNonInteractiveReason`).
+- **Who opens what.** `usePlayerOpener()` resolves, in order: an explicit `onOpen` on the call, the nearest `PlayerOpenContext`
+  provider, then the real Desk PQV. The Fantasy Sim game screen provides `PlayerOpenContext` (maps the ref to the sim sheet) and
+  `PickOpenContext` (the pick sheet), so every shared template inside the game opens the sim views with no per-call wiring.
+  A player with no id (generated rookies, sample rows, prospects) stays plain text. Desk picks have no detail screen on web and
+  stay plain.
+- **Opt out only with a reason.** `nonInteractive="the row button around it already opens the player"` (a real sentence, 12+
+  characters) is for a template inside another tap target that already does something (a picker row that selects, a card that is
+  one button, a link to the player's public page). A nested tap target inside another is a bug: `TapScopeContext` makes a nested
+  `PlayerTap` render plain, and the source scan fails a template placed inside a `<button>` / `<Link>` / `<Pressable>` without
+  `nonInteractive`.
+- **A row that both expands and links** (`PlayerAccordionRow`, the waiver recommendation row): the **avatar and the name line open
+  the PQV**, **everything else in the row (stats line, trailing figure, padding) expands it in place.** On web the expand control
+  is a full-row button underneath the content (`pointer-events-none` content, `pointer-events-auto` on the avatar and name); on
+  the app the avatar / name `Pressable`s sit inside the row `Pressable` and win the touch. Never put a second tap target in the
+  trailing slot; use `trailingAction`.
+- **Guard.** `scripts/check_player_tap.mjs` (CI job `lib-twins`, also run by `web-next/src/lib/playerTap.test.ts` and
+  `mobile/src/lib/playerTap.test.ts`) fails on a `nonInteractive` without a reason, a template nested in another tap target, a
+  template file that stopped routing through `PlayerTap` / `PickTap`, and any **new file that draws a bare `<PlayerAvatar>` or
+  `<PlayerName>`** outside the `RAW_ALLOWLIST` (each entry says why that file is exempt or wires its own tap). Use a template
+  instead. Unit tests: `ui/PlayerTap.test.tsx`; browser checks: `scripts/sim_layout_playwright/player_tap.mjs`.
 
 ## Player row anatomy (shared by FantasyDesk and the Fantasy Sim)
 

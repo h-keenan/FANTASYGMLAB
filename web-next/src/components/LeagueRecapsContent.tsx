@@ -49,6 +49,7 @@ import type { RecapsTab } from "@/lib/pageTabs";
 import { ErrorState } from "@/components/ErrorState";
 import { Money } from "@/components/Money";
 import { formatMoney } from "@/lib/money";
+import { SkeletonRegion, SkeletonModule } from "@/components/Skeleton";
 
 /**
  * Ports modules/league_recaps_ui.py + modules/league_history_ui.py for
@@ -656,9 +657,7 @@ function HistoryTab({
 
   if (!data && !error) {
     return (
-      <p className="text-sm" style={{ color: "var(--color-text-muted)" }}>
-        Loading league history…
-      </p>
+      <SkeletonRegion label="league history" className="flex flex-col gap-3"><SkeletonModule /><SkeletonModule /><SkeletonModule /></SkeletonRegion>
     );
   }
   if (error) {
@@ -828,9 +827,7 @@ function StorylinesTab({
 
   if (!data && !error) {
     return (
-      <p className="text-sm" style={{ color: "var(--color-text-muted)" }}>
-        Loading league storylines…
-      </p>
+      <SkeletonRegion label="league storylines" className="flex flex-col gap-3"><SkeletonModule /><SkeletonModule /></SkeletonRegion>
     );
   }
   if (error) {

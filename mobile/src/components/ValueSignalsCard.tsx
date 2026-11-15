@@ -116,6 +116,7 @@ export default function ValueSignalsCard({ leagueId, leagueName }: { leagueId: s
                     team={item.team}
                     injuryLabel={item.injury_status}
                     contextLine={signalReason(item)}
+                    nonInteractive="The whole row is a button that already opens the player quick view"
                   />
                 </View>
                 <AppText

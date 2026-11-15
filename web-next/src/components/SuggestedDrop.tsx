@@ -15,6 +15,7 @@ import {
   weakestSlotText,
 } from "@/lib/dropsPresentation";
 import { PlayerName } from "@/components/PlayerName";
+import { PlayerTap } from "@/components/ui/PlayerOpenContext";
 import { Collapse } from "@/components/ui/Presence";
 
 /**
@@ -46,13 +47,15 @@ function DropPlayerLine({
   return (
     <div className="flex flex-col gap-1" data-testid="drop-player">
       <span className="flex items-center gap-2 min-w-0">
-        <PlayerAvatar playerId={player.player_id} size={32} />
-        {lead ? (
-          <span className="text-sm font-bold shrink-0" style={{ color: "var(--color-text-primary)" }}>
-            {lead}{" "}
-          </span>
-        ) : null}
-        <PlayerName name={player.name} className="text-sm font-bold" style={{ color: "var(--color-text-primary)" }} />
+        <PlayerTap player={{ id: player.player_id, name: player.name, position: player.position, team: player.team }} className="pointer-events-auto flex items-center gap-2 min-w-0 text-left">
+          <PlayerAvatar playerId={player.player_id} size={32} />
+          {lead ? (
+            <span className="text-sm font-bold shrink-0" style={{ color: "var(--color-text-primary)" }}>
+              {lead}{" "}
+            </span>
+          ) : null}
+          <PlayerName name={player.name} className="text-sm font-bold" style={{ color: "var(--color-text-primary)" }} />
+        </PlayerTap>
         <PositionBadge position={player.position} />
         <span className="text-xs font-semibold" style={{ color: "var(--color-text-muted)" }}>
           {[player.team, player.age ? Math.round(player.age) : null].filter(Boolean).join(" · ")}
@@ -150,8 +153,10 @@ function SwapTile({ side, player, name, playerId, position, team }: { side: "add
       }}
     >
       <ToneBadge label={label} color={color} size="xs" />
-      <PlayerAvatar playerId={playerId} size={44} />
-      <PlayerName name={name} className="text-sm font-bold leading-tight w-full" style={{ color: "var(--color-text-primary)" }} />
+      <PlayerTap player={{ id: playerId, name, position, team }} className="pointer-events-auto flex w-full min-w-0 flex-col items-center gap-1 text-center">
+        <PlayerAvatar playerId={playerId} size={44} />
+        <PlayerName name={name} className="text-sm font-bold leading-tight w-full" style={{ color: "var(--color-text-primary)" }} />
+      </PlayerTap>
       <span className="flex items-center justify-center gap-1 flex-wrap">
         <PositionBadge position={position} />
         {team ? (
@@ -277,19 +282,26 @@ function CompactSuggestedDrop({ suggestion }: { suggestion: DropSuggestion }) {
   const badge = dropBadge(suggestion);
   return (
     <div className="flex flex-col gap-1.5" data-testid="suggested-drop-compact">
+      <div className="relative">
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
         aria-expanded={open}
-        className="flex items-center gap-2 text-left w-full"
-        style={{ background: "none", border: "none", padding: 0, cursor: "pointer", minHeight: "var(--touch-target-min)" }}
-      >
+        aria-label={`${open ? "Hide" : "Why"}: ${drop ? drop.name : "drop suggestion"}`}
+        className="absolute inset-0 w-full"
+        style={{ background: "none", border: "none", padding: 0, cursor: "pointer" }}
+      />
+      <div className="pointer-events-none relative flex items-center gap-2 text-left w-full" style={{ minHeight: "var(--touch-target-min)" }}>
         <ToneBadge label={badge.label} color={badge.color} />
-        {drop ? <PlayerAvatar playerId={drop.player_id} size={24} /> : null}
+        {drop ? (
+          <PlayerTap player={{ id: drop.player_id, name: drop.name, position: drop.position }} className="pointer-events-auto flex items-center gap-2 min-w-0 text-left">
+            <PlayerAvatar playerId={drop.player_id} size={24} />
+            <span className="text-sm font-bold break-words" style={{ color: "var(--color-text-primary)" }}>{drop.name}</span>
+          </PlayerTap>
+        ) : null}
         <span className="text-sm font-bold flex-1 min-w-0 break-words flex items-center gap-1.5 flex-wrap" style={{ color: "var(--color-text-primary)" }}>
           {drop ? (
             <>
-              {drop.name}
               <PositionBadge position={drop.position} />
             </>
           ) : suggestion.drop_required === false ? (
@@ -299,7 +311,8 @@ function CompactSuggestedDrop({ suggestion }: { suggestion: DropSuggestion }) {
         <span className="text-xs font-semibold shrink-0" style={{ color: "var(--color-accent)" }}>
           {open ? "Hide" : "Why"}
         </span>
-      </button>
+      </div>
+      </div>
       <Collapse open={open}>
         <div className="flex flex-col gap-2 pl-1" data-testid="suggested-drop-details">
           {drop ? (
@@ -360,17 +373,22 @@ export function SharedDropNote({ drop, count }: { drop: DropPlayer; count: numbe
   const [open, setOpen] = useState(false);
   return (
     <div className="flex flex-col gap-1.5" data-testid="shared-drop-note">
+      <div className="relative">
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
         aria-expanded={open}
-        className="flex items-center gap-2 text-left w-full"
-        style={{ background: "none", border: "none", padding: 0, cursor: "pointer", minHeight: "var(--touch-target-min)" }}
-      >
+        aria-label={`${open ? "Hide" : "Why"}: shared drop candidate ${drop.name}`}
+        className="absolute inset-0 w-full"
+        style={{ background: "none", border: "none", padding: 0, cursor: "pointer" }}
+      />
+      <div className="pointer-events-none relative flex items-center gap-2 text-left w-full" style={{ minHeight: "var(--touch-target-min)" }}>
         <ToneBadge label="Drop candidate" color="var(--color-danger)" />
-        <PlayerAvatar playerId={drop.player_id} size={24} />
+        <PlayerTap player={{ id: drop.player_id, name: drop.name, position: drop.position }} className="pointer-events-auto flex items-center gap-2 min-w-0 text-left">
+          <PlayerAvatar playerId={drop.player_id} size={24} />
+          <span className="text-sm font-bold break-words" style={{ color: "var(--color-text-primary)" }}>{drop.name}</span>
+        </PlayerTap>
         <span className="text-sm font-bold flex-1 min-w-0 break-words flex items-center gap-1.5 flex-wrap" style={{ color: "var(--color-text-primary)" }}>
-          {drop.name}
           <PositionBadge position={drop.position} />
           <span className="text-xs font-semibold" style={{ color: "var(--color-text-muted)" }}>
             for {count} adds below
@@ -379,7 +397,8 @@ export function SharedDropNote({ drop, count }: { drop: DropPlayer; count: numbe
         <span className="text-xs font-semibold shrink-0" style={{ color: "var(--color-accent)" }}>
           {open ? "Hide" : "Why"}
         </span>
-      </button>
+      </div>
+      </div>
       <Collapse open={open}>
         <div className="pl-1" data-testid="shared-drop-details">
           <DropPlayerLine player={drop} maxReasons={6} />

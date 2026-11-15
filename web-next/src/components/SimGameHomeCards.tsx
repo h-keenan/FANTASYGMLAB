@@ -7,6 +7,7 @@ import {
   SimFold,
   SimMiniPlayer,
   SimPlayerChip,
+  SimPlayerNameTap,
   SimSeeAll,
   SimSectionTitle,
   SimTeamLink,
@@ -116,9 +117,9 @@ export function SimWaiverCard({ ctx, suggestions, onClaim, onTab }: { ctx: SimCt
           {shown.map((s) => (
             <li key={s.player.id} className="flex flex-col gap-1" data-testid="waiver-suggestion">
               <div className="flex items-center justify-between gap-2">
-                <button type="button" className="min-w-0 flex-1 text-left" style={{ minHeight: "var(--touch-target-min)" }} onClick={() => ctx.openPlayer(s.player)}>
+                <div className="min-w-0 flex-1">
                   <SimPlayerChip player={s.player} size={32} />
-                <span className="sr-only">. Open player details</span></button>
+                </div>
                 <span className="flex shrink-0 flex-col items-end leading-tight">
                   <SimTrend delta={Math.max(s.gain_now, s.gain_ros)} />
                   <span className="text-[0.6875rem]" style={{ color: "var(--color-text-muted)" }}>{s.gain_now >= s.gain_ros ? "this week" : "per week"}</span>
@@ -135,7 +136,7 @@ export function SimWaiverCard({ ctx, suggestions, onClaim, onTab }: { ctx: SimCt
                 {s.drop ? (
                   <li className="flex items-start gap-1.5 text-xs" style={{ color: "var(--color-text-muted)" }}>
                     <span aria-hidden="true" style={{ color: "var(--color-danger)" }}>-</span>
-                    <span className="min-w-0">Your roster is full: drop {s.drop.name} ({s.drop.pos})</span>
+                    <span className="min-w-0">Your roster is full: drop <SimPlayerNameTap player={s.drop}>{s.drop.name}</SimPlayerNameTap> ({s.drop.pos})</span>
                   </li>
                 ) : null}
               </ul>
@@ -155,7 +156,13 @@ export function SimInboxCard({ inbox, onTab }: { ctx?: SimCtx; inbox: SimHomeRes
   if (!inbox || !inbox.open) return null;
   const { count, items } = inbox;
   const { shown, hidden } = simPreview(items, all, 2);
-  const names = (list: SimGamePlayer[]) => list.map((p) => p.name).join(", ");
+  const names = (list: SimGamePlayer[]) =>
+    list.map((p, i) => (
+      <span key={`${p.id}-${i}`}>
+        {i > 0 ? ", " : ""}
+        <SimPlayerNameTap player={p}>{p.name}</SimPlayerNameTap>
+      </span>
+    ));
   return (
     <SimFold
       id="home.inbox"
@@ -207,9 +214,9 @@ export function SimInjuriesCard({ ctx, injuries }: { ctx: SimCtx; injuries: SimH
         <ul className="flex flex-col gap-2" aria-label="Injuries on your roster">
           {list.map((i) => (
             <li key={i.player.id} className="flex items-center justify-between gap-2" data-testid="home-injury">
-              <button type="button" className="min-w-0 flex-1 text-left" style={{ minHeight: "var(--touch-target-min)" }} onClick={() => ctx.openPlayer(i.player)}>
+              <div className="min-w-0 flex-1">
                 <SimPlayerChip player={i.player} size={28} />
-              <span className="sr-only">. Open player details</span></button>
+              </div>
               <span className="flex shrink-0 flex-col items-end gap-1">
                 <SimToneBadge label={`Out ${i.out_weeks} wk`} tone="danger" />
                 <span className="text-[0.6875rem]" style={{ color: i.starting ? "var(--color-warning)" : "var(--color-text-muted)" }}>{i.starting ? "In your lineup" : i.note}</span>

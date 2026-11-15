@@ -3,6 +3,7 @@
 import type { CSSProperties, ReactNode } from "react";
 
 import { OvrGauge } from "@/components/OvrGauge";
+import { PlayerTap } from "@/components/ui/PlayerOpenContext";
 import { PlayerAvatar } from "@/components/PlayerAvatar";
 import { PlayerName } from "@/components/PlayerName";
 import { PositionBadge } from "@/components/PositionBadge";
@@ -232,7 +233,9 @@ export function PlayerListRow({
             {identity}
           <span className="sr-only">. {openLabel ?? "Open player details"}</span></button>
         ) : (
-          identity
+          <PlayerTap player={{ id: headshotId, name, position }} className="flex min-w-0 flex-1 items-center text-left" style={{ minHeight: dims.minHeight }}>
+            {identity}
+          </PlayerTap>
         )}
         {onSimInfo && !done ? (
           <button

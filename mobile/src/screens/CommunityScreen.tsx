@@ -4,7 +4,7 @@ import { useHeaderHeight } from '@react-navigation/elements';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 
 import AppText from '../components/AppText';
-import BrandedSpinner from '../components/BrandedSpinner';
+import { SkeletonPage } from '../components/Skeleton';
 import EmptyState from '../components/EmptyState';
 import GridBackground from '../components/GridBackground';
 import ScreenInfoNote from '../components/ScreenInfoNote';
@@ -55,7 +55,7 @@ export default function CommunityScreen({ navigation }: Props) {
   }, [load]);
 
   if (!shared && !failed) {
-    return <BrandedSpinner style={[styles.center, { paddingTop: headerHeight }]} />;
+    return <SkeletonPage label="the Community feed" layout="list" topInset={headerHeight} />;
   }
 
   return (

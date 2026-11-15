@@ -44,6 +44,7 @@ import {
 } from "@/lib/gamesPresentation";
 import { formatRank, metricToneColor } from "@/lib/leagueRankingsPresentation";
 import { PLAYER_SEARCH_MAX_RESULTS, useLeaguePlayerSearch } from "@/lib/leaguePlayerSearch";
+import { SkeletonModule, SkeletonRegion } from "@/components/Skeleton";
 
 /**
  * Games: the Season Simulator (the shared playoff-odds Monte Carlo, plus a
@@ -98,9 +99,11 @@ function ReasonState({ reason }: { reason: string }) {
 
 function Loading({ label }: { label: string }) {
   return (
-    <p className="text-sm" style={{ color: "var(--color-text-muted)" }} role="status">
-      {label}
-    </p>
+    <SkeletonRegion label={label} className="flex flex-col gap-3">
+      <SkeletonModule />
+      <SkeletonModule />
+      <SkeletonModule />
+    </SkeletonRegion>
   );
 }
 
@@ -128,7 +131,7 @@ function SeasonSimPanel({ leagueId }: { leagueId: string }) {
   }, [leagueId]);
 
   if (error) return <ErrorState message={error} onRetry={() => window.location.reload()} />;
-  if (!data) return <Loading label="Running the simulation…" />;
+  if (!data) return <Loading label="the simulation" />;
   if (data.reason || !data.my_team) return <ReasonState reason={data.reason || "unavailable"} />;
 
   const mine = data.my_team;
@@ -296,6 +299,7 @@ function WhatIfSection({ leagueId, data }: { leagueId: string; data: GamesSeason
         {adds.map((player) => (
           <PlayerRow
             key={player.player_id}
+            identity={{ player_id: player.player_id, name: player.name ?? "Player", position: player.position, team: player.team, tier: player.tier, sourceLabel: "Games" }}
             playerId={player.player_id}
             name={player.name ?? "Player"}
             position={player.position}
@@ -323,6 +327,7 @@ function WhatIfSection({ leagueId, data }: { leagueId: string; data: GamesSeason
             {matches.map((player) => (
               <PlayerRow
                 key={player.player_id}
+                identity={{ player_id: player.player_id, name: player.name ?? "Player", position: player.position, team: player.team, tier: player.tier, sourceLabel: "Games" }}
                 playerId={player.player_id}
                 name={player.name ?? "Player"}
                 position={player.position}
@@ -374,6 +379,7 @@ function RosterPickRow({
   return (
     <PlayerRow
       bordered
+      identity={{ player_id: player.player_id, name: player.name ?? "Player", position: player.position, team: player.team, tier: player.tier, sourceLabel: "Games" }}
       playerId={player.player_id}
       name={player.name ?? "Player"}
       position={player.position}
@@ -452,7 +458,7 @@ function PickemPanel({ leagueId }: { leagueId: string }) {
   }, [load]);
 
   if (error) return <ErrorState message={error} onRetry={() => window.location.reload()} />;
-  if (!data) return <Loading label="Loading Pick'em…" />;
+  if (!data) return <Loading label="Pick'em" />;
   if (!data.available) {
     return (
       <EmptyState

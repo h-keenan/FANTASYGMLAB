@@ -33,7 +33,7 @@ export default function MatchupPage() {
 
   if (authLoading || (!matchup && !error)) {
     return (
-      <LoadingScreen status="Loading Matchup…" />
+      <LoadingScreen label="Matchup" layout="detail" family="team" />
     );
   }
 

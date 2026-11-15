@@ -14,7 +14,7 @@ import { SimPlayerBrowser } from "@/components/SimGamePlayers";
 import { SimPickLine, useSimPicks } from "@/components/SimGameDynastyParts";
 import { SimReserveGroups, useSimRosterMoves, type SimRowMoveOptions } from "@/components/SimGameReserves";
 import type { SimMoveHandle } from "@/components/SimMoveStrip";
-import { SimFold, SimIconButton, SimPlayerChip, SimRosterLine, SimSectionTitle, SimSheet, SimToneBadge, type SimCtx } from "@/components/SimGameParts";
+import { SimFold, SimIconButton, SimPlayerChip, SimPlayerNameTap, SimRosterLine, SimSectionTitle, SimSheet, SimToneBadge, type SimCtx } from "@/components/SimGameParts";
 import { ReviewGlyphChip } from "@/components/SeasonReviewSections";
 import { CompactModule } from "@/components/ui/CompactModule";
 import { Hero } from "@/components/ui/ModuleTemplates";
@@ -510,7 +510,7 @@ export function SimPlayersTab({
                     <ReviewGlyphChip glyph="waiver" tone="success" size={24} />
                     <SimPlayerChip player={claim.add} />
                   </div>
-                  {claim.drop ? <span className="text-xs font-semibold" style={{ color: "var(--color-danger)" }}>Drops {claim.drop.name} ({claim.drop.pos})</span> : null}
+                  {claim.drop ? <span className="text-xs font-semibold" style={{ color: "var(--color-danger)" }}>Drops <SimPlayerNameTap player={claim.drop}>{claim.drop.name}</SimPlayerNameTap> ({claim.drop.pos})</span> : null}
                   {claim.start_slot ? <span className="text-xs font-semibold" style={{ color: "var(--color-success)" }}>Starts at {claim.start_slot}</span> : null}
                 </div>
                 <Button size="sm" variant="ghost" onClick={() => cancel(claim)}>Cancel</Button>

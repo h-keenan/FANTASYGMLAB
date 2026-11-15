@@ -5,7 +5,7 @@ import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { useHeaderHeight } from '@react-navigation/elements';
 
 import AppText from '../components/AppText';
-import BrandedSpinner from '../components/BrandedSpinner';
+import { SkeletonPage } from '../components/Skeleton';
 import BrandHeaderBar from '../components/BrandHeaderBar';
 import Button from '../components/Button';
 import EmptyState from '../components/EmptyState';
@@ -139,7 +139,7 @@ function SeasonSim({ leagueId, colors, styles, navigation }: Shared) {
   }, [leagueId]);
 
   if (error) return <ErrorState title="Couldn't load the simulator" message={error} />;
-  if (!data) return <BrandedSpinner />;
+  if (!data) return <SkeletonPage label="Games" layout="cards" family="league" />;
   if (data.reason || !data.my_team) return <ReasonState reason={data.reason || 'unavailable'} navigation={navigation} />;
 
   const mine = data.my_team;
@@ -380,7 +380,7 @@ function Pickem({ leagueId, colors, styles, navigation }: Shared) {
   }, [load]);
 
   if (error) return <ErrorState title="Couldn't load Pick'em" message={error} />;
-  if (!data) return <BrandedSpinner />;
+  if (!data) return <SkeletonPage label="Pick'em" layout="cards" family="league" />;
   if (!data.available) {
     return (
       <EmptyState

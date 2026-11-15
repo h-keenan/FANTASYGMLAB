@@ -61,7 +61,7 @@ export function SimDraftGrid({ draft, teams, onOpen }: { draft: SimDraftState; t
                           }}
                           aria-label={`Pick ${cell.pick.pick_no}: ${cell.pick.player.name}, ${cell.pick.player.pos}`}
                         >
-                          <PlayerAvatarSlot player={simPlayerAnatomyRef(cell.pick.player)} tier="dense" />
+                          <PlayerAvatarSlot player={simPlayerAnatomyRef(cell.pick.player)} tier="dense" nonInteractive="the pick button around it opens the player" />
                           <span className="flex min-w-0 flex-1 flex-col">
                             <PlayerName name={cell.pick.player.name} className="w-full text-[0.6875rem] font-bold" />
                             <span className="text-[0.6875rem]" style={{ color: "var(--color-text-muted)" }}>{cell.pick.player.pos} · #{cell.pick.pick_no}</span>

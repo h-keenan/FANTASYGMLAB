@@ -6,7 +6,7 @@ import AppText from './AppText';
 import Button from './Button';
 import ErrorState from './ErrorState';
 import SectionHeading from './SectionHeading';
-import SkeletonBlock from './SkeletonBlock';
+import SkeletonBlock from './Skeleton';
 import ToneBadge from './ToneBadge';
 import { useThemeMode } from '../context/ThemeModeContext';
 import { api, type ReferralStatusResponse } from '../lib/api';

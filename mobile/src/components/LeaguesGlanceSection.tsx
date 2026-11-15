@@ -8,7 +8,7 @@ import { Ionicons } from '@expo/vector-icons';
 import AppText from './AppText';
 import InsightRow from './InsightRow';
 import PremiumLock from './PremiumLock';
-import SkeletonBlock from './SkeletonBlock';
+import SkeletonBlock from './Skeleton';
 import { api } from '../lib/api';
 import { toUserErrorMessage } from '../lib/errorMessages';
 import { setLastLeague } from '../lib/lastLeague';

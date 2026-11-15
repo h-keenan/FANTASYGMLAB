@@ -34,6 +34,7 @@ import { ValuesCredit } from "@/components/ValuesCredit";
 import { EmptyState } from "@/components/EmptyState";
 import { rankBoardAnchor } from "@/lib/insightLinks";
 import { PageTitle } from "@/components/PageTitle";
+import { SkeletonText } from "@/components/Skeleton";
 
 /**
  * Ports app.py's "League Rankings" page (current_page == "rankings",
@@ -370,9 +371,7 @@ function PlayoffOddsSection({ leagueId, leagueName, myRosterId, myTeam }: { leag
         </Button>
       ) : null}
       {state === "loading" ? (
-        <p className="text-sm" style={{ color: "var(--color-text-muted)" }}>
-          Running thousands of simulated outcomes…
-        </p>
+        <SkeletonText label="simulated outcomes" lines={2} />
       ) : null}
       {state === "error" ? (
         <p className="text-sm" role="alert" style={{ color: "var(--color-danger)" }}>

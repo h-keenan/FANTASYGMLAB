@@ -39,6 +39,7 @@ export function SimTeamCard({
   /** Pickers: the top assets run in one wrapping strip (position, surname, OVR) instead of one row each. */
   dense?: boolean;
 }) {
+  const assetOff = onOpen ? "the whole team card is one tap target that opens the team" : undefined;
   const chips = simTeamChips(team);
   const accent = selected || team.is_you ? "var(--color-accent)" : team.power_rank <= 3 ? "var(--color-success)" : "var(--color-border-strong)";
   const body = (
@@ -63,14 +64,14 @@ export function SimTeamCard({
         <ul className={dense ? "flex flex-wrap gap-x-3 gap-y-1" : "flex flex-col gap-1"} aria-label={`${team.name} top assets`}>
           {team.top_assets.map((p) => dense ? (
             <li key={p.id} className="flex items-center gap-1 text-xs">
-              <PlayerAvatarSlot player={simPlayerAnatomyRef(p)} tier="dense" />
+              <PlayerAvatarSlot player={simPlayerAnatomyRef(p)} tier="dense" nonInteractive={assetOff ?? "dense strip: the avatar sits beside a surname, tapped via the card"} />
               <PositionBadge position={p.pos} />
               <span className="font-bold">{playerSurname(p.name)}</span>
               <LetterGrade grade={simGradeOf(p)} size="sm" />
             </li>
           ) : (
             <li key={p.id} className="text-xs">
-              <CompactPlayerCard player={simPlayerAnatomyRef(p)} testId="sim-team-asset" trailing={<LetterGrade grade={simGradeOf(p)} size="sm" />} />
+              <CompactPlayerCard player={simPlayerAnatomyRef(p)} nonInteractive={assetOff} testId="sim-team-asset" trailing={<LetterGrade grade={simGradeOf(p)} size="sm" />} />
             </li>
           ))}
         </ul>

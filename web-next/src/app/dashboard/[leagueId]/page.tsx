@@ -11,7 +11,7 @@ import { api, type DashboardResponse, type LeagueTeamRankingsResponse } from "@/
 import { DashboardContent } from "@/components/DashboardContent";
 import { ErrorState } from "@/components/ErrorState";
 import { LoadingScreen } from "@/components/LoadingScreen";
-import { SkeletonBlock, SkeletonCard } from "@/components/Skeleton";
+import { SkeletonModule, SkeletonRegion, SkeletonStatusHeader } from "@/components/Skeleton";
 import { UNNAMED_LEAGUE } from "@/lib/leagueName";
 
 export default function DashboardPage() {
@@ -107,7 +107,7 @@ export default function DashboardPage() {
   }, [authLoading, session, leagueId, lens, lensReady, router, retryToken]);
 
   if (authLoading) {
-    return <LoadingScreen status="Loading Today…" />;
+    return <LoadingScreen label="Today" layout="dashboard" />;
   }
 
   if (!data && !error) {
@@ -117,17 +117,13 @@ export default function DashboardPage() {
     return (
       <main className="page-shell" aria-busy="true">
         <h1 className="sr-only">{leagueName}</h1>
-        {/* Same shape and order as the loaded page (Now strip, Trades, Next
-            moves, My Team, More) so nothing jumps when the data lands. */}
-        <div className="grid grid-cols-2 gap-2">
-          {[0, 1, 2, 3].map((index) => (
-            <SkeletonBlock key={index} height={52} radius="var(--radius-card, 12px)" />
-          ))}
-        </div>
-        <SkeletonCard lines={5} />
-        <SkeletonCard lines={4} />
-        <SkeletonCard lines={3} />
-        <SkeletonBlock height={44} radius="var(--radius-card, 12px)" />
+        {/* Same shape and order as the loaded page (status header, then compact modules) so nothing jumps when the data lands. */}
+        <SkeletonRegion label="Today" className="flex flex-col gap-[var(--page-gap)]">
+          <SkeletonStatusHeader />
+          <SkeletonModule />
+          <SkeletonModule />
+          <SkeletonModule />
+        </SkeletonRegion>
       </main>
     );
   }

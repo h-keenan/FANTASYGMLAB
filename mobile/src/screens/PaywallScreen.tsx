@@ -51,6 +51,7 @@ import { freeTrialForUser, thenPriceLine, trialCtaLabel, type IntroEligibility }
 import { disabledOpacity, LINK_HIT_SLOP, radii, spacing, type ThemeColors } from '../theme';
 import type { RootStackParamList } from '../navigation/RootNavigator';
 import Money from '../components/Money';
+import { SkeletonList } from '../components/Skeleton';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Paywall'>;
 
@@ -384,21 +385,11 @@ export default function PaywallScreen({ navigation, route }: Props) {
       ) : null}
 
       {loading ? (
-        <ActivityIndicator style={styles.loadingIndicator} color={colors.accent} />
+        <SkeletonList label="plans" count={3} tier="card" />
       ) : loadError ? (
         <View style={styles.loadErrorBlock}>
           <AppText style={styles.error}>{loadError}</AppText>
-          <PressableScale accessibilityRole="button"
-            style={[styles.retryButton, retrying && styles.primaryButtonDisabled]}
-            onPress={onRetry}
-            disabled={retrying}
-          >
-            {retrying ? (
-              <ActivityIndicator color={colors.accent} />
-            ) : (
-              <AppText style={styles.retryButtonText}>Retry</AppText>
-            )}
-          </PressableScale>
+          <Button variant="accentOutline" label="Try again" loading={retrying} onPress={onRetry} style={styles.retryButton} />
         </View>
       ) : packages.length === 0 ? (
         <AppText style={styles.error}>No subscription plans are available right now.</AppText>
@@ -697,15 +688,7 @@ function createStyles(colors: ThemeColors) {
   disclosureLink: { color: colors.accent, fontWeight: '600' },
   error: { color: colors.danger, marginBottom: spacing.md },
   loadErrorBlock: { marginBottom: spacing.md },
-  retryButton: {
-    alignSelf: 'flex-start',
-    paddingVertical: spacing.sm,
-    paddingHorizontal: spacing.md,
-    borderRadius: radii.sm,
-    borderWidth: 1,
-    borderColor: colors.accent,
-  },
-  retryButtonText: { color: colors.accent, fontSize: 15.5, fontWeight: '600' },
+  retryButton: { alignSelf: 'flex-start' },
   successIcon: { marginBottom: spacing.md },
   successTitle: { fontSize: 25, fontWeight: '700', color: colors.textPrimary, marginBottom: spacing.sm },
   successSubtitle: {

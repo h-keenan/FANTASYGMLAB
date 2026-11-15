@@ -95,7 +95,7 @@ export function SimRecentStrip({ cards, onOpenPlayer, onFullBoard }: { cards: Si
                   <AppText style={styles.pickNo}>{card.pickLabel}</AppText>
                   {card.teamName ? <SimTeamIdentity name={card.teamName} size="chip" hideName /> : null}
                 </View>
-                <CompactPlayerCard player={card.player} testID="recent-pick-player" trailing={card.grade ? <LetterGrade grade={card.grade} size="xs" /> : undefined} />
+                <CompactPlayerCard player={card.player} nonInteractive="the surrounding card button already opens this player" testID="recent-pick-player" trailing={card.grade ? <LetterGrade grade={card.grade} size="xs" /> : undefined} />
               </Pressable>
             </MotionIn>
           ))

@@ -70,7 +70,7 @@ export function TradeOfferContent({
       </main>
     );
   }
-  if (!result) return <LoadingScreen status="Building your offers…" />;
+  if (!result) return <LoadingScreen label="your offers" layout="cards" />;
 
   if (result.status === "locked") {
     return (

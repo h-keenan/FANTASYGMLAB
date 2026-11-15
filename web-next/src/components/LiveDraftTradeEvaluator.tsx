@@ -9,6 +9,7 @@ import { ExchangeSide } from "@/components/TradeAssetExchange";
 import { fairnessBandColor, formatTradeGain } from "@/lib/tradeHubPresentation";
 import { liveDraftAssetToTradeAsset, liveDraftDraftedPlayerOptions } from "@/lib/liveDraftPresentation";
 import { ErrorState } from "@/components/ErrorState";
+import { SkeletonText } from "@/components/Skeleton";
 import { Collapse } from "@/components/ui/Presence";
 
 /**
@@ -253,9 +254,7 @@ export function LiveDraftTradeEvaluator({
 
       <Collapse open={open}>
         {loadingOptions ? (
-          <p className="text-sm" style={{ color: "var(--color-text-muted)" }}>
-            Loading remaining picks…
-          </p>
+          <SkeletonText label="remaining picks" lines={3} />
         ) : optionsError ? (
           <ErrorState
             bare

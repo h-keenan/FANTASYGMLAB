@@ -5,7 +5,7 @@ import AccentCard from './AccentCard';
 import AppText from './AppText';
 import Button from './Button';
 import SectionHeading from './SectionHeading';
-import SkeletonBlock from './SkeletonBlock';
+import SkeletonBlock from './Skeleton';
 import ToneBadge from './ToneBadge';
 import { useThemeMode } from '../context/ThemeModeContext';
 import type { DashboardItem, ThisWeek, ThisWeekRow } from '../lib/api';

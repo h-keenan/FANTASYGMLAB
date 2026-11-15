@@ -23,5 +23,5 @@ export default function TeamSituationRedirectPage() {
     router.replace(`/gm-plan/${encodeURIComponent(leagueId)}${name ? `?name=${encodeURIComponent(name)}` : ""}`);
   }, [leagueId, name, router]);
 
-  return <LoadingScreen status="Redirecting to GM Plan…" />;
+  return <LoadingScreen label="GM Plan" layout="dashboard" />;
 }

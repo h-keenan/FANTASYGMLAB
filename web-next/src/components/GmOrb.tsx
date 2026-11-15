@@ -25,6 +25,7 @@ import { SheetHandle } from "@/components/SheetHandle";
 import { PLAYER_SEARCH_MAX_RESULTS, PLAYER_SEARCH_MIN_CHARS, useLeaguePlayerSearchState } from "@/lib/leaguePlayerSearch";
 import { PlayerName } from "@/components/PlayerName";
 import { UNNAMED_LEAGUE } from "@/lib/leagueName";
+import { SkeletonText } from "@/components/Skeleton";
 
 /**
  * web-next's counterpart to mobile's GmOrb.tsx and the Streamlit web app's
@@ -293,9 +294,7 @@ export function GmOrb() {
                     ) : null}
                   </>
                 ) : wantsPlayers && playerSearch.pending ? (
-                  <p className="text-sm" style={{ color: "var(--color-text-muted)" }}>
-                    Searching players…
-                  </p>
+                  <SkeletonText label="players" lines={2} />
                 ) : (
                   <p className="text-sm" style={{ color: "var(--color-text-muted)" }}>
                     {leagueId ? "No destinations or players match" : "No destinations match"} &ldquo;{query.trim()}&rdquo;.

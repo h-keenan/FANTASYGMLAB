@@ -1128,6 +1128,7 @@ a {
 .filter-input,
 .filter-select {
   min-height: var(--touch-target-min);
+  border-radius: var(--radius-control); /* the same corner as <Input>/<Select> (.glass-input); these two used to be square */
   background: var(--color-surface-primary);
   border: var(--border-width-default) solid var(--color-border);
   color: var(--color-text-primary);
@@ -1563,11 +1564,13 @@ a {
 .pqv-skeleton-line,
 .pqv-skeleton-chart,
 .pqv-skeleton-chip {
+  /* Glass-look fill: a soft ink tint with one cyan sweep, visible on both the dark and the light page (the old
+     surface-muted ramp vanished on the dark background). */
   background: linear-gradient(
     100deg,
-    var(--color-surface-muted) 30%,
-    var(--color-border) 50%,
-    var(--color-surface-muted) 70%
+    color-mix(in srgb, var(--color-text-primary) 8%, transparent) 30%,
+    color-mix(in srgb, var(--color-accent) 18%, transparent) 50%,
+    color-mix(in srgb, var(--color-text-primary) 8%, transparent) 70%
   );
   background-size: 200% 100%;
   animation: pqv-skeleton-shimmer 1.6s ease-in-out infinite;

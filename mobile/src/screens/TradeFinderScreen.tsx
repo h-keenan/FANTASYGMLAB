@@ -9,7 +9,7 @@ import { Ionicons } from '@expo/vector-icons';
 
 import Button from '../components/Button';
 import AnimatedCard from '../components/AnimatedCard';
-import BrandedSpinner from '../components/BrandedSpinner';
+import { SkeletonPage } from '../components/Skeleton';
 import DraftPickAssetRow from '../components/DraftPickAssetRow';
 import PickGroupList from '../components/PickGroupList';
 import EmptyState from '../components/EmptyState';
@@ -516,7 +516,7 @@ export default function TradeFinderScreen({ leagueId, leagueName, navigation, pr
     navigation.navigate('PickDetail', { pick: assetToDraftPick(asset), leagueId, leagueName });
 
   if (loadingRoster) {
-    return <BrandedSpinner style={[styles.center]} />;
+    return <SkeletonPage label="Trade Finder" layout="cards" family="trades" />;
   }
 
   if (rosterNotice) {

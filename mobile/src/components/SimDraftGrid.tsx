@@ -56,7 +56,7 @@ export function SimDraftGrid({ draft, teams, onOpen }: { draft: SimDraftState; t
                       accessibilityLabel={`Pick ${cell.pick.pick_no}: ${cell.pick.player.name}, ${cell.pick.player.pos}`}
                       style={[styles.cell, { borderLeftWidth: 3, borderLeftColor: tint ?? colors.borderStrong, backgroundColor: colors.glass }]}
                     >
-                      <PlayerAvatarSlot player={simPlayerAnatomyRef(cell.pick.player)} tier="dense" />
+                      <PlayerAvatarSlot player={simPlayerAnatomyRef(cell.pick.player)} tier="dense" nonInteractive="the pick button around it opens the player" />
                       <View style={styles.cellText}>
                         <PlayerName name={cell.pick.player.name} style={styles.cellName} />
                         <AppText style={styles.cellMeta}>

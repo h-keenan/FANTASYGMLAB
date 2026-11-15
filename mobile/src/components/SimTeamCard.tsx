@@ -41,6 +41,7 @@ export default function SimTeamCard({
   /** Pickers: the top assets run in one wrapping strip (position, surname, OVR) instead of one row each. */
   dense?: boolean;
 }) {
+  const assetOff = onOpen ? 'the whole team card is one tap target that opens the team' : undefined;
   const { colors } = useThemeMode();
   const common = useMemo(() => createSimStyles(colors), [colors]);
   const chips = simTeamChips(team);
@@ -67,13 +68,13 @@ export default function SimTeamCard({
         <View style={dense ? { flexDirection: 'row', flexWrap: 'wrap', columnGap: 12, rowGap: 4 } : common.tight} accessibilityLabel={`${team.name} top assets`}>
           {team.top_assets.map((p) => dense ? (
             <View key={p.id} style={[common.row, { gap: 4 }]}>
-              <PlayerAvatarSlot player={simPlayerAnatomyRef(p)} tier="dense" />
+              <PlayerAvatarSlot player={simPlayerAnatomyRef(p)} tier="dense" nonInteractive={assetOff ?? 'dense strip: the avatar sits beside a surname, tapped via the card'} />
               <PositionBadge position={p.pos} />
               <AppText style={{ fontSize: 13, fontWeight: '700', color: colors.textPrimary }}>{playerSurname(p.name)}</AppText>
               <LetterGrade grade={simGradeOf(p)} size="sm" />
             </View>
           ) : (
-            <CompactPlayerCard key={p.id} player={simPlayerAnatomyRef(p)} testID="sim-team-asset" trailing={<LetterGrade grade={simGradeOf(p)} size="sm" />} />
+            <CompactPlayerCard key={p.id} player={simPlayerAnatomyRef(p)} nonInteractive={assetOff} testID="sim-team-asset" trailing={<LetterGrade grade={simGradeOf(p)} size="sm" />} />
           ))}
         </View>
       )}

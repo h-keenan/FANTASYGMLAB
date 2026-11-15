@@ -285,7 +285,7 @@ export default function EspnLeagueImport({
       {message ? <AppText style={styles.error}>{message}</AppText> : null}
       {isPrivate ? (
         <PressableScale onPress={() => void findLeague()} disabled={busy} accessibilityRole="button" accessibilityLabel="Retry">
-          <AppText style={styles.retryText}>Retry</AppText>
+          <AppText style={styles.retryText}>Try again</AppText>
         </PressableScale>
       ) : null}
       <View style={styles.actions}>

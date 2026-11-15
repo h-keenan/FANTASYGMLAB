@@ -5,7 +5,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect } from '@react-navigation/native';
 
 import AppText from './AppText';
-import BrandedSpinner from './BrandedSpinner';
+import { SkeletonList } from './Skeleton';
 import EmptyState from './EmptyState';
 import PlayerName from './PlayerName';
 import PositionBadge from './PositionBadge';
@@ -213,7 +213,7 @@ export default function CollegeScoutingPanel({
     return lens && leagueView ? rankByFit(scoped, lens) : scoped;
   }, [prospects, filter, lens, leagueView]);
 
-  if (loading) return <BrandedSpinner style={styles.center} />;
+  if (loading) return <SkeletonList label="prospects" count={6} />;
 
   if (locked) {
     return (

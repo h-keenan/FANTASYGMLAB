@@ -12,7 +12,7 @@ import { Confetti, CountUp } from './Motion';
 import PositionBadge from './PositionBadge';
 import SectionHeading from './SectionHeading';
 import SegmentedTabBar from './SegmentedTabBar';
-import { SkeletonCard } from './SkeletonBlock';
+import { SkeletonCard } from './Skeleton';
 import { SimDynastyResult } from './SimGameDynasty';
 import { SimStandingsList } from './SimGameLeague';
 import { SimPlayerChip, SimPlayerLine, SimPopIn, SimStat, SimToneBadge, createSimStyles, simToneColor, type SimCtx } from './SimGameParts';
@@ -191,7 +191,8 @@ export function SimWeekRecapView({
               <SimPlayerChip player={w.add} />
               <View style={common.wrapRow}>
                 <SimToneBadge label={w.ok ? 'Won' : 'Lost'} tone={w.ok ? 'success' : 'danger'} />
-                {w.drop ? <AppText style={[common.small, { color: colors.danger, fontWeight: '600' }]}>dropping {w.drop.name}</AppText> : null}
+                {w.drop ? <AppText style={[common.small, { color: colors.danger, fontWeight: '600' }]}>dropping</AppText> : null}
+                {w.drop ? <SimPlayerChip player={w.drop} size={24} /> : null}
                 {!w.ok && w.reason ? <AppText style={common.muted}>({w.reason.replace(/_/g, ' ')})</AppText> : null}
               </View>
             </AccentCard>

@@ -4,6 +4,8 @@ import Link from "next/link";
 
 import type { BriefingItem } from "@/lib/api";
 import { PlayerAvatar } from "@/components/PlayerAvatar";
+import { PlayerAvatarSlot } from "@/components/ui/PlayerAvatarSlot";
+import { PlayerTap } from "@/components/ui/PlayerOpenContext";
 import { PlayerInjuryBadge } from "@/components/PlayerInjuryBadge";
 import { PositionBadge } from "@/components/PositionBadge";
 import { ToneBadge } from "@/components/ToneBadge";
@@ -51,13 +53,15 @@ export function WatchListCard({
         const body = (
           <>
             {playerId ? (
-              <PlayerAvatar playerId={playerId} tier={tier} size={36} />
+              <PlayerAvatarSlot player={{ id: playerId, name: name || "this player", position, team, tier }} tier="row" className="pointer-events-auto" />
             ) : null}
             <span className="flex flex-col items-start gap-1 min-w-0 flex-1">
               <ToneBadge label={tag.label} color={tag.color} />
               <span className="flex flex-wrap items-center gap-x-2 gap-y-0.5 min-w-0">
                 {name ? (
-                  <PlayerName name={name} className="text-sm font-bold" style={{ color: "var(--color-text-primary)" }} />
+                  <PlayerTap player={{ id: playerId, name, position, team, tier }} className="pointer-events-auto block min-w-0 text-left" minHeight={28}>
+                    <PlayerName name={name} className="text-sm font-bold" style={{ color: "var(--color-text-primary)" }} />
+                  </PlayerTap>
                 ) : (
                   <span className="text-sm font-bold break-words" style={{ color: "var(--color-text-primary)" }}>
                     {watchTitle(item)}
@@ -86,13 +90,13 @@ export function WatchListCard({
               {bye && bye.suggestions.length > 0 ? (
                 <span className="flex flex-wrap items-center gap-x-3 gap-y-1" data-testid="bye-cover-fillins">
                   {bye.suggestions.map((fa) => (
-                    <span key={fa.player_id} className="flex items-center gap-1.5 min-w-0">
+                    <PlayerTap key={fa.player_id} player={{ id: fa.player_id, name: fa.name, position: fa.position, tier: fa.player_tier }} className="pointer-events-auto flex items-center gap-1.5 min-w-0 text-left">
                       <PlayerAvatar playerId={fa.player_id} tier={fa.player_tier} size={24} />
                       <span className="text-xs font-semibold" style={{ color: "var(--color-text-primary)" }}>
                         {fa.name}
                       </span>
                       <PositionBadge position={fa.position} />
-                    </span>
+                    </PlayerTap>
                   ))}
                 </span>
               ) : null}
@@ -102,11 +106,11 @@ export function WatchListCard({
             </span>
           </>
         );
-        const className = "flex items-center gap-3 px-3 py-2.5";
+        const className = "pointer-events-none relative flex items-center gap-3 px-3 py-2.5";
         const key = item.recommendation_id || item.headline;
         return (
+          <div key={key} className="relative" style={rowStyle}>
           <Link
-            key={key}
             href={gamePlanTileHref(
               internalRoute,
               leagueId,
@@ -115,11 +119,10 @@ export function WatchListCard({
               bye ? (bye.suggestions[0]?.player_id ?? "") : resolveGamePlanTargetPlayerId(item),
             )}
             aria-label={label}
-            className={className}
-            style={rowStyle}
-          >
-            {body}
-          </Link>
+            className="absolute inset-0"
+          />
+          <div className={className}>{body}</div>
+          </div>
         );
       })}
     </article>

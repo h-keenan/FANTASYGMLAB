@@ -14,11 +14,11 @@ import CompactModule from './CompactModule';
 import CompactPlayerCard from './CompactPlayerCard';
 import { SimDraftIconButton, SimDraftRow } from './SimDraftBoard';
 import { SimRookieOverview } from './SimDraftOverview';
-import { SkeletonCard } from './SkeletonBlock';
+import { SkeletonCard, SkeletonList } from './Skeleton';
 import { SimDynastyStrip } from './SimGameDynasty';
 import { SimCollapse, SimGeneratedChip, SimGeneratedNoticeSheet, SimPickLine, SimRookieNoticeGate, useSimPicks } from './SimGameDynastyParts';
 import { SimTeamIdentity } from './SimTeamIdentity';
-import { SimRosterLine, SimToneBadge, createSimStyles, simToneColor, type SimCtx } from './SimGameParts';
+import { SimPlayerChip, SimRosterLine, SimToneBadge, createSimStyles, simToneColor, type SimCtx } from './SimGameParts';
 import { SimReserveGroups, useSimRosterMoves } from './SimGameReserves';
 import { useThemeMode } from '../context/ThemeModeContext';
 import { api } from '../lib/api';
@@ -272,7 +272,14 @@ function ReviewStage({ off, ctx, years }: { off: SimOffseason; ctx: SimCtx; year
             Champion: {last.champion ? `${last.champion.name}${last.champion.is_you ? ' (you)' : ''}` : 'none'}
             {titles > 0 ? ` · ${titles} title${titles === 1 ? '' : 's'} so far` : ''}
           </AppText>
-          {lastYear.top_scorers.length > 0 ? <AppText style={common.small}>Top scorers: {lastYear.top_scorers.map((s) => `${s.name} ${s.pts.toFixed(1)}`).join(', ')}</AppText> : null}
+          {lastYear.top_scorers.length > 0 ? (
+            <View style={common.stack}>
+              <AppText style={common.small}>Top scorers</AppText>
+              {lastYear.top_scorers.map((s) => (
+                <SimPlayerChip key={s.id} player={{ id: s.id, name: s.name, pos: s.pos as SimGamePlayer['pos'] }} size={24} extra={<AppText style={common.small}>{`${s.pts.toFixed(1)} pts`}</AppText>} />
+              ))}
+            </View>
+          ) : null}
         </SimCollapse>
       ) : null}
 
@@ -543,7 +550,7 @@ function CutdownStage({ off, ctx, onTrade, onTeam }: { off: SimOffseason; ctx: S
           </View>
         ) : null}
         {players.length === 0 ? (
-          <AppText style={common.muted}>Loading your roster.</AppText>
+          <SkeletonList label="your roster" count={5} />
         ) : (
           players.map((player) => (
             <SimRosterLine

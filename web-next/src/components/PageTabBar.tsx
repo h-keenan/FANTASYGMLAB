@@ -1,5 +1,6 @@
 "use client";
 
+import { SkeletonTabs } from "@/components/Skeleton";
 import { PillRow } from "@/components/PillRow";
 import type { PillContextAction } from "@/lib/bottomNav";
 import { activePageTab, pageTabFamily, type PageTabFamilyKey } from "@/lib/pageFamilies";
@@ -43,4 +44,9 @@ export function PageTabBar({
   if (barPresent) return null;
   const options = ctx.tabs.map((tab) => ({ label: tab.label, value: tab.key, glyph: tab.glyph as TabIconName, count: tab.badge, href: tab.href as string }));
   return <PillRow glass sticky variant="scroll" ariaLabel={def.label} options={options} active={activePageTab(def, active)} />;
+}
+
+/** The loading silhouette of `PageTabBar` (same count of tabs as the family, phone-hidden like the real strip). */
+export function PageTabBarSkeleton({ family }: { family: PageTabFamilyKey }) {
+  return <SkeletonTabs count={pageTabFamily(family).tabs.length} />;
 }

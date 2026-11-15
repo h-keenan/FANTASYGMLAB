@@ -14,6 +14,9 @@ import { PremiumUpsellCard } from "@/components/PremiumUpsellCard";
 import { SectionHeading } from "@/components/SectionHeading";
 import { SimHomeTab } from "@/components/SimGameHome";
 import { SimPlayerSheet } from "@/components/SimGamePlayers";
+import { SimPickSheet } from "@/components/SimPickSheet";
+import type { PlayerRef } from "@/lib/playerAnatomy";
+import { PickOpenContext, PlayerOpenContext, type PickTapRef } from "@/components/ui/PlayerOpenContext";
 import { BottomDock } from "@/components/ui/BottomDock";
 import { SimPillHost } from "@/components/SimPillHost";
 import { SimActionBar } from "@/components/SimActionBar";
@@ -28,7 +31,7 @@ import { ConfirmInPlace } from "@/components/ui/ConfirmInPlace";
 import { simMenuHero, simRulesParts } from "@/lib/simSummaries";
 import { Hero } from "@/components/ui/ModuleTemplates";
 import { CompactModule } from "@/components/ui/CompactModule";
-import { SimNotice, SimOpenPlayerContext, SimPreviewBanner, SimRowAccordion, SimTeamLink, SimTeamOpenContext, type SimCtx } from "@/components/SimGameParts";
+import { simPlayerFromRef, SimNotice, SimOpenPlayerContext, SimPreviewBanner, SimRowAccordion, SimTeamLink, SimTeamOpenContext, type SimCtx } from "@/components/SimGameParts";
 import { SimBlockToggle } from "@/components/SimTradeBlock";
 import { SimTeamSheet } from "@/components/SimGameTeamSheet";
 import { SimRealismModule } from "@/components/SimRealism";
@@ -138,6 +141,7 @@ export function SimGameContent() {
   const [attempt, setAttempt] = useState(0);
   const [sheetPlayer, setSheetPlayer] = useState<SimGamePlayer | null>(null);
   const [sheetTeam, setSheetTeam] = useState<string | null>(null);
+  const [sheetPick, setSheetPick] = useState<PickTapRef | null>(null);
   const [draftRecap, setDraftRecap] = useState<{ recap: SimDraftRecap | null } | null>(null);
   const [claims, setClaims] = useState<SimWaiverClaim[]>([]);
   const [tradeSeed, setTradeSeed] = useState<SimTradeSeed | null>(null);
@@ -404,6 +408,7 @@ export function SimGameContent() {
             bump: () => setTick((n) => n + 1),
             openPlayer: setSheetPlayer,
             openTeam: setSheetTeam,
+            openPick: setSheetPick,
           }
         : null,
     [game, preview, call, setGame, reloadGame, notify, tick],
@@ -515,6 +520,7 @@ export function SimGameContent() {
             }
           />
         ) : null}
+        {sheetPick ? <SimPickSheet pick={sheetPick} onClose={() => setSheetPick(null)} /> : null}
         {sheetTeam ? (
           <SimTeamSheet
             ctx={ctx}
@@ -985,6 +991,7 @@ function GameScreen({
   const showBar = inSeason && !recap && !simToResult;
   const showOffBar = stage === "offseason" && !draftRecap && !recap;
   const [moreOpen, setMoreOpen] = useState(false);
+  const simPlayerOpener = useCallback((ref: PlayerRef) => ctx.openPlayer(simPlayerFromRef(ref)), [ctx]);
   // Phones: the game orb (docked above the Advance pill) is the page navigator; the top PillRows render from md up.
   const showOrb = showBar || showOffBar;
   const orbNode = showOrb ? (
@@ -1001,6 +1008,8 @@ function GameScreen({
   return (
     <SimTeamOpenContext.Provider value={ctx.openTeam}>
     <SimOpenPlayerContext.Provider value={ctx.openPlayer}>
+    <PlayerOpenContext.Provider value={simPlayerOpener}>
+    <PickOpenContext.Provider value={ctx.openPick}>
     <SimRowAccordion>
     {/* Phones: a 100dvh flex column. Compact header on top, content flex-1, and the action pill + bottom tab bar as an in-flow
         sticky footer (no position:fixed, no JS placement), so iOS Safari viewport quirks cannot float it. */}
@@ -1118,6 +1127,8 @@ function GameScreen({
       </Sheet>
     </div>
     </SimRowAccordion>
+    </PickOpenContext.Provider>
+    </PlayerOpenContext.Provider>
     </SimOpenPlayerContext.Provider>
     </SimTeamOpenContext.Provider>
   );

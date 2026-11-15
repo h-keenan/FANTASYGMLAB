@@ -17,7 +17,7 @@ import CircularProgressRing from '../components/CircularProgressRing';
 import EmptyState from '../components/EmptyState';
 import IconRow from '../components/IconRow';
 import ToneBadge from '../components/ToneBadge';
-import BrandedSpinner from '../components/BrandedSpinner';
+import { SkeletonPage } from '../components/Skeleton';
 import DraftPickAssetRow from '../components/DraftPickAssetRow';
 import EvaluationLensHeaderButton from '../components/EvaluationLensHeaderButton';
 import GmStanceHeaderButton from '../components/GmStanceHeaderButton';
@@ -186,7 +186,7 @@ export default function DraftCenterScreen({ route, navigation }: Props) {
   }, [picks]);
 
   if (loading) {
-    return <BrandedSpinner style={[styles.center, { paddingTop: headerHeight }]} />;
+    return <SkeletonPage label="Draft Center" layout="list" topInset={headerHeight} />;
   }
 
   if (error) {

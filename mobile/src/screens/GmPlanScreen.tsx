@@ -1,4 +1,5 @@
 import { useUndoableRemoval } from '../components/UndoToast';
+import Button from '../components/Button';
 import type { TabIconName } from '../lib/tabIcons';
 import FreeLimitNote from '../components/FreeLimitNote';
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
@@ -32,7 +33,7 @@ import { PLAIN_COPY } from '../lib/experienceCopy';
 import PremiumLock from '../components/PremiumLock';
 import SectionHeading from '../components/SectionHeading';
 import SegmentedTabBar from '../components/SegmentedTabBar';
-import SkeletonBlock, { SkeletonCard, SkeletonRows } from '../components/SkeletonBlock';
+import SkeletonBlock, { SkeletonCard, SkeletonRows } from '../components/Skeleton';
 import SharedTradeIdeaCard from '../components/TradeIdeaCard';
 import ExchangeSide from '../components/ExchangeSide';
 import {
@@ -638,19 +639,15 @@ export default function GmPlanScreen({ route, navigation }: Props) {
                         <OverallRatingBadge rating={player?.overall_rating} positionRank={player?.position_rank} />
                       </View>
                       <View style={styles.actions}>
-                        <PressableScale accessibilityRole="button"
-                          style={styles.action}
+                        <Button
+                          variant="accentOutline"
+                          size="sm"
+                          label="Compare"
                           disabled={!player}
                           onPress={() => player && navigation.navigate('PlayerCompare', { player, leagueId, leagueName })}
-                        >
-                          <AppText style={styles.actionText}>Compare</AppText>
-                        </PressableScale>
-                        <PressableScale accessibilityRole="button" style={styles.action} onPress={() => onToggleProtect(target.player_id, true)}>
-                          <AppText style={styles.actionText}>Mark untouchable</AppText>
-                        </PressableScale>
-                        <PressableScale accessibilityRole="button" style={[styles.action, styles.actionDanger]} onPress={() => onRemoveTarget(target.player_id)}>
-                          <AppText style={[styles.actionText, { color: colors.danger }]}>Remove</AppText>
-                        </PressableScale>
+                        />
+                        <Button variant="accentOutline" size="sm" label="Mark untouchable" onPress={() => onToggleProtect(target.player_id, true)} />
+                        <Button variant="dangerOutline" size="sm" label="Remove" onPress={() => onRemoveTarget(target.player_id)} />
                       </View>
                     </AnimatedCard>
                   );
@@ -757,9 +754,7 @@ function TradeIdeaCard({ item, onViewDetails }: { item: GmPlanTradeItem; onViewD
         <AppText style={[styles.caption, styles.flex]}>
           {showExplanations ? item.rationale || item.trade_confidence_label : item.trade_confidence_label}
         </AppText>
-        <PressableScale accessibilityRole="button" style={styles.action} onPress={onViewDetails}>
-          <AppText style={styles.actionText}>View details</AppText>
-        </PressableScale>
+        <Button variant="accentOutline" size="sm" label="View details" onPress={onViewDetails} />
       </View>
     </CompactModule>
   );
@@ -928,16 +923,6 @@ function createStyles(colors: ThemeColors) {
     tradeTitle: { flex: 1, fontSize: 17, fontWeight: '800', color: colors.textPrimary },
     gain: { fontSize: 16.5, fontWeight: '800' },
     tradeFooter: { flexDirection: 'row', alignItems: 'flex-end', gap: spacing.sm },
-    action: {
-      paddingHorizontal: spacing.md,
-      paddingVertical: spacing.sm,
-      borderRadius: radii.sm,
-      borderWidth: 1,
-      borderColor: colors.accent,
-      alignItems: 'center',
-    },
-    actionText: { fontSize: 13.5, fontWeight: '700', color: colors.accent },
-    actionDanger: { borderColor: colors.danger },
     section: { marginBottom: spacing.lg },
     listCard: { paddingVertical: spacing.xs, marginBottom: spacing.sm },
     row: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },

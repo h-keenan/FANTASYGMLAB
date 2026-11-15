@@ -12,7 +12,7 @@ import PositionBadge from './PositionBadge';
 import SimGlyph from './SimGlyph';
 import { ReviewGlyphChip } from './SeasonReviewSections';
 import SegmentedTabBar from './SegmentedTabBar';
-import { SkeletonCard } from './SkeletonBlock';
+import { SkeletonCard } from './Skeleton';
 import { SimPickLine, useSimPicks } from './SimGameDynastyParts';
 import { useBottomPillContext } from '../lib/useBottomPillContext.ts';
 import { SimPlayerBrowser } from './SimGamePlayers';
@@ -414,7 +414,7 @@ export function ClaimSheet({
 
   return (
     <SimSheet title={`Claim ${player.name}`} onClose={onClose}>
-      <SimPlayerChip player={player} size={40} />
+      <SimPlayerChip player={player} size={40} nonInteractive="Header of the claim sheet for this same player" />
       <AppText style={common.muted}>Claims resolve when you advance, before games are scored, worst record first. A claimed player can start that same week. Another team may get him first.</AppText>
       <View style={common.stack}>
         <AppText style={common.bodyStrong}>{mustDrop ? 'Drop (your roster is full)' : 'Drop (optional)'}</AppText>
@@ -529,7 +529,12 @@ export function SimPlayersTab({
                     <ReviewGlyphChip glyph="waiver" tone="success" size={24} />
                     <SimPlayerChip player={claim.add} />
                   </View>
-                  {claim.drop ? <AppText style={[common.muted, { color: colors.danger }]}>Drops {claim.drop.name} ({claim.drop.pos})</AppText> : null}
+                  {claim.drop ? (
+                    <View style={common.row}>
+                      <AppText style={[common.muted, { color: colors.danger }]}>Drops</AppText>
+                      <SimPlayerChip player={claim.drop} size={24} />
+                    </View>
+                  ) : null}
                   {claim.start_slot ? <AppText style={[common.muted, { color: colors.success }]}>Starts at {claim.start_slot}</AppText> : null}
                 </View>
                 <Button size="sm" variant="ghost" label="Cancel" onPress={() => cancel(claim)} />

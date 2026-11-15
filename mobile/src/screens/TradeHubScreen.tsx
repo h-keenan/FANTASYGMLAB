@@ -19,7 +19,7 @@ import ScreenInfoNote, { type ScreenInfoLegendItem } from '../components/ScreenI
 import FreeLimitNote from '../components/FreeLimitNote';
 import BeginnerHelp from '../components/BeginnerHelp';
 import { useExperienceCopy } from '../context/ExperienceLevelContext';
-import SkeletonBlock, { SkeletonRow } from '../components/SkeletonBlock';
+import SkeletonBlock, { SkeletonRow } from '../components/Skeleton';
 import ManagerTendenciesChips from '../components/ManagerTendenciesChips';
 import DeadlineCard from '../components/DeadlineCard';
 import TradeHubHoldCard from '../components/TradeHubHoldCard';

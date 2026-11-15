@@ -24,6 +24,7 @@ import { useThemeMode } from '../context/ThemeModeContext';
 import { radii, spacing, type ThemeColors, scrim } from '../theme';
 import type { RootStackParamList } from '../navigation/RootNavigator';
 import CompactPlayerCard from './CompactPlayerCard';
+import { SkeletonText } from './Skeleton';
 
 interface Props {
   visible: boolean;
@@ -75,7 +76,7 @@ export default function ManagerProfileModal({ visible, onClose, leagueId, league
       {query.isError ? (
         <AppText style={styles.muted}>Couldn&apos;t load this profile.</AppText>
       ) : !data ? (
-        <AppText style={styles.muted}>Loading…</AppText>
+        <SkeletonText label="manager profile" lines={3} />
       ) : !data.is_premium ? (
         <PressableScale
           onPress={() => {

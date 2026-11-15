@@ -12,7 +12,7 @@ import ErrorState from '../components/ErrorState';
 import GridBackground from '../components/GridBackground';
 import PremiumLock from '../components/PremiumLock';
 import SectionHeading from '../components/SectionHeading';
-import { SkeletonCard } from '../components/SkeletonBlock';
+import { SkeletonCard } from '../components/Skeleton';
 import ToneBadge from '../components/ToneBadge';
 import { useThemeMode } from '../context/ThemeModeContext';
 import { api } from '../lib/api';

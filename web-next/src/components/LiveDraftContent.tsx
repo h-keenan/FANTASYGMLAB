@@ -31,6 +31,7 @@ import {
 import { ValuesCredit } from "@/components/ValuesCredit";
 import { PageTitle } from "@/components/PageTitle";
 import { CompactPlayerCard } from "@/components/ui/CompactPlayerCard";
+import { SkeletonList } from "@/components/Skeleton";
 import { Collapse } from "@/components/ui/Presence";
 
 /**
@@ -430,9 +431,7 @@ export function LiveDraftContent({
           ) : null}
 
           {!state ? (
-            <p className="text-sm" style={{ color: "var(--color-text-muted)" }}>
-              Loading the live draft board…
-            </p>
+            <SkeletonList label="the live draft board" count={6} />
           ) : (
             <>
               <div className="flex flex-wrap gap-2">
