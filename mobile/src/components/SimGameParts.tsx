@@ -1,3 +1,4 @@
+import type { PickTapRef } from './PlayerOpenContext';
 import React, { createContext, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { AccessibilityInfo, Animated, Pressable, StyleSheet, View, type StyleProp, type ViewStyle } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
@@ -74,6 +75,8 @@ export interface SimCtx {
   openPlayer: (player: SimGamePlayer) => void;
   /** Open any team's scouting sheet (roster, record, strengths and needs). */
   openTeam: (teamId: string) => void;
+  /** Opens the pick detail sheet (a tapped pick anywhere in the game). */
+  openPick: (pick: PickTapRef) => void;
 }
 
 /** Shared status pill tinted from a presentation tone. */
@@ -590,6 +593,14 @@ function createStyles(colors: ThemeColors) {
 
 // ---------------------------------------------------------------------------
 // Color and glyph building blocks shared by every game screen (mirrors web)
+
+/**
+ * A minimal sim player from a shared-template player ref (id, name, position, team, age, photo id). The player sheet
+ * fetches the full detail by id, so a trade asset, a recap row or a draft cell can open it without holding the whole row.
+ */
+export function simPlayerFromRef(ref: { id?: string | null; name: string; position?: string | null; team?: string | null; age?: number | null; headshotId?: string | null }): SimGamePlayer {
+  return { id: String(ref.id ?? ''), name: ref.name, pos: (ref.position ?? 'WR') as SimGamePlayer['pos'], team: ref.team ?? null, age: ref.age ?? null, headshot_id: ref.headshotId ?? null, adp: null, projection: 0 } as SimGamePlayer;
+}
 
 /** Opens the team scouting sheet. Provided once by the game screen; a team link outside it is plain text. */
 /** Opens the game's own player detail; provided once by the game screen so a chip can use it. */

@@ -18,6 +18,7 @@ import type { BadgeKind } from "@/lib/playerBadges";
 import { ReviewGlyphChip } from "@/components/SeasonReviewSections";
 import { SectionHeading } from "@/components/SectionHeading";
 import { SheetHandle } from "@/components/SheetHandle";
+import type { PickTapRef } from "@/components/ui/PlayerOpenContext";
 import { SimTeamIdentity } from "@/components/SimTeamIdentity";
 import type { SimTeamSize } from "@/lib/simTeamIdentity";
 import { SimGlyph } from "@/components/SimGlyph";
@@ -103,6 +104,8 @@ export interface SimCtx {
   openPlayer: (player: SimGamePlayer) => void;
   /** Open any team's scouting sheet (roster, record, strengths and needs). */
   openTeam: (teamId: string) => void;
+  /** Opens the pick detail sheet (a tapped pick anywhere in the game). */
+  openPick: (pick: PickTapRef) => void;
 }
 
 /** The shared status pill tinted from a presentation tone. */
@@ -609,6 +612,14 @@ export function SimPager({ page, pages, onPage }: { page: number; pages: number;
 
 // ---------------------------------------------------------------------------
 // Color and glyph building blocks shared by every game screen
+
+/**
+ * A minimal sim player from a shared-template player ref (id, name, position, team, age, photo id). The player sheet
+ * fetches the full detail by id, so a trade asset, a recap row or a draft cell can open it without holding the whole row.
+ */
+export function simPlayerFromRef(ref: { id?: string | null; name: string; position?: string | null; team?: string | null; age?: number | null; headshotId?: string | null }): SimGamePlayer {
+  return { id: String(ref.id ?? ""), name: ref.name, pos: (ref.position ?? "WR") as SimGamePlayer["pos"], team: ref.team ?? null, age: ref.age ?? null, headshot_id: ref.headshotId ?? null, adp: null, projection: 0 } as SimGamePlayer;
+}
 
 /** Opens the game's own player sheet; provided once by the game screen so a chip can fall back to it. */
 export const SimOpenPlayerContext = createContext<((player: SimGamePlayer) => void) | null>(null);

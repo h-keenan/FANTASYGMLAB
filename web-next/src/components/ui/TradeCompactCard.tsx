@@ -4,6 +4,7 @@ import { useId, useState, type ReactNode } from "react";
 
 import { OvrGauge } from "@/components/OvrGauge";
 import { CompactPlayerCard } from "@/components/ui/CompactPlayerCard";
+import { PickTap } from "@/components/ui/PickTap";
 import { PickAvatar } from "@/components/PickAvatar";
 import { FairnessMeterRow } from "@/components/ui/FairnessMeterRow";
 import { avatarSize, fairnessMeter, type FairnessMeter, type PlayerMode, type PlayerRef } from "@/lib/playerAnatomy";
@@ -18,44 +19,43 @@ export interface TradeCardAsset {
   value?: number | null;
   /** Desk only: overall rating gauge beside the value. */
   ovr?: number | null;
-  /** Tap the card to open the player sheet. */
+  /** Overrides the default tap (the shared opener: Desk PQV, or the sim's PQV inside Fantasy Sim). */
   onOpen?: () => void;
-}
-
-function TapWrap({ onOpen, label, children }: { onOpen?: () => void; label: string; children: ReactNode }) {
-  if (!onOpen) return <>{children}</>;
-  return (
-    <button type="button" onClick={onOpen} aria-label={`Open ${label}`} className="block w-full min-w-0 text-left" style={{ background: "none", border: 0, padding: 0 }}>
-      {children}
-    </button>
-  );
+  /** A pick: its id (the sim pick sheet) and an override opener. */
+  pickId?: string;
+  pickDetail?: string | null;
+  onOpenPick?: () => void;
+  /** Opt out of the tap, with the reason (a picker row that selects). */
+  nonInteractive?: string;
 }
 
 /** One asset as a compact player card (avatar included, tap opens the sheet) or a pick row with the round pick avatar. Shared by the trade card and the builder. */
 export function TradeAssetCard({ asset: a, mode }: { asset: TradeCardAsset; mode: PlayerMode }) {
   if (a.player) {
     return (
-      <TapWrap onOpen={a.onOpen} label={a.player.name}>
-        <CompactPlayerCard
-          player={a.player}
-          detail={a.detail}
-          trailing={
-            mode === "desk" && (a.value != null || a.ovr != null) ? (
-              <span className="inline-flex items-center gap-1.5">
-                {a.ovr != null ? <OvrGauge rating={a.ovr} size="sm" /> : null}
-                {a.value != null ? Math.round(a.value).toLocaleString() : null}
-              </span>
-            ) : undefined
-          }
-        />
-      </TapWrap>
+      <CompactPlayerCard
+        player={a.player}
+        onOpen={a.onOpen}
+        nonInteractive={a.nonInteractive}
+        detail={a.detail}
+        trailing={
+          mode === "desk" && (a.value != null || a.ovr != null) ? (
+            <span className="inline-flex items-center gap-1.5">
+              {a.ovr != null ? <OvrGauge rating={a.ovr} size="sm" /> : null}
+              {a.value != null ? Math.round(a.value).toLocaleString() : null}
+            </span>
+          ) : undefined
+        }
+      />
     );
   }
   return (
-    <div className="flex items-center gap-2 text-sm font-bold" style={{ minHeight: 44 }} data-testid="trade-pick-row">
-      <PickAvatar label={a.pickLabel} size={avatarSize("row")} />
-      <span className="min-w-0 break-words">{a.pickLabel}</span>
-    </div>
+    <PickTap label={a.pickLabel ?? ""} id={a.pickId} detail={a.pickDetail} onOpen={a.onOpenPick} nonInteractive={a.nonInteractive}>
+      <div className="flex items-center gap-2 text-sm font-bold" style={{ minHeight: 44 }} data-testid="trade-pick-row">
+        <PickAvatar label={a.pickLabel} size={avatarSize("row")} />
+        <span className="min-w-0 break-words">{a.pickLabel}</span>
+      </div>
+    </PickTap>
   );
 }
 

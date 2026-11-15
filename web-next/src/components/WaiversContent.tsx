@@ -20,6 +20,7 @@ import { FilterSheet } from "@/components/ui/FilterSheet";
 import { ViewSelect } from "@/components/ui/ViewSelect";
 import { singleValue, valuesFromSingles, type FilterGroup, type FilterValues } from "@/lib/filterSheet";
 import { PlayerAvatar } from "@/components/PlayerAvatar";
+import { PlayerTap } from "@/components/ui/PlayerOpenContext";
 import { PlayerAvatarSlot } from "@/components/ui/PlayerAvatarSlot";
 import { barFractions } from "@/lib/playerAnatomy";
 import { PlayerIdentityTrigger } from "@/components/PlayerIdentityTrigger";
@@ -319,21 +320,26 @@ function RecommendedRow({
   const differentDrop = sharedDropId != null && ownDrop != null && ownDrop !== sharedDropId ? player.drop_suggestion!.drop! : null;
   return (
     <div style={showDivider ? { borderBottom: "var(--border-width-default) solid var(--color-border)" } : undefined} data-testid="waiver-rec-row">
-      <button
-        type="button"
-        onClick={onToggle}
-        aria-expanded={open}
-        aria-label={`${player.name || "Player"}, bid ${primary} ${secondary}, ${open ? "hide" : "show"} details`}
-        className="appearance-none bg-transparent border-0 p-0 m-0 text-left cursor-pointer w-full flex flex-col gap-1 py-2 min-h-[var(--touch-target-min)]"
-      >
+      <div className="relative">
+        <button
+          type="button"
+          onClick={onToggle}
+          aria-expanded={open}
+          aria-label={`${player.name || "Player"}, bid ${primary} ${secondary}, ${open ? "hide" : "show"} details`}
+          data-row-toggle="true"
+          className="absolute inset-0 w-full appearance-none bg-transparent border-0 p-0 m-0 cursor-pointer"
+        />
+        <div className="pointer-events-none relative flex flex-col gap-1 py-2 min-h-[var(--touch-target-min)]">
         <span className="flex items-center gap-2.5 min-w-0 w-full">
           <span className="text-xs font-bold w-4 text-center shrink-0" style={{ color: "var(--color-text-muted)" }}>
             {rank}
           </span>
           <PositionBadge position={player.position} />
-          <PlayerAvatarSlot player={{ id: player.player_id, name: player.name || "Unknown player", position: player.position, tier: player.tier }} tier="row" />
+          <PlayerAvatarSlot player={{ id: player.player_id, name: player.name || "Unknown player", position: player.position, tier: player.tier }} tier="row" className="pointer-events-auto" />
           <span className="flex flex-col min-w-0 flex-1">
-            <PlayerName name={player.name || "Unknown player"} className="text-sm font-bold" style={{ color: "var(--color-text-primary)" }} />
+            <PlayerTap player={{ id: player.player_id, name: player.name || "Unknown player", position: player.position, tier: player.tier }} className="pointer-events-auto block min-w-0 text-left" minHeight={28}>
+              <PlayerName name={player.name || "Unknown player"} className="text-sm font-bold" style={{ color: "var(--color-text-primary)" }} />
+            </PlayerTap>
             <PlayerMetaLine injuryStatus={injury.label}>
               {player.team || "FA"}
               {contextLine ? ` · ${contextLine}` : ""}
@@ -357,7 +363,8 @@ function RecommendedRow({
           {flag ? <ReasonPill label={flag.label} kind={flag.tone === "positive" ? "up" : "down"} tone={flag.tone === "positive" ? "success" : "danger"} /> : null}
           {differentDrop ? <ReasonPill label={`Drop ${differentDrop.name}`} kind="down" tone="danger" /> : null}
         </span>
-      </button>
+        </div>
+      </div>
       {open ? (
         <div className="flex flex-col gap-2 pb-3 pl-[3.75rem]" data-testid="waiver-rec-details">
           <div className="flex items-center justify-between gap-3">
