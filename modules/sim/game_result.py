@@ -96,6 +96,17 @@ def replay_game(
                 oid = find_offer(sig) if sig else None
                 if oid is not None:
                     act.respond_offer(em, TradeDesk(Evaluator(snap, state), seed), oid, p["action"])
+            elif kind == "slot_move":  # IR / taxi moves change who can play and who counts against the roster limit
+                act.move_player(em, p["pid"], p["dst"])
+            elif kind == "block_set":  # the user's trade block drives the AI's offers
+                from modules.sim.game_block import set_block
+
+                set_block(em, p["pid"], bool(p.get("on")), p.get("looking_for"))
+            elif kind == "realism_upgrade":
+                # The Realism update is a user command that changes the rules from here on: without it the replay (and every
+                # counterfactual built on it) plays the whole season under the old rules and no longer matches the real game.
+                act.upgrade_realism(em)
+                snap = em.snap
             elif kind == "advance":
                 advance(em, snap, state, seed)
         except (GameError, ValueError):
