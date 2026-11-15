@@ -1,6 +1,7 @@
 """Data-loading perf guards: sim read-view memo and the Server-Timing header."""
 
 import gc
+import weakref
 
 from fastapi.testclient import TestClient
 
@@ -27,9 +28,13 @@ def test_view_memo_builds_once_per_state_and_key_and_dies_with_the_state():
     other = _State()
     game_api._memo_view(other, ("home",), build)
     assert len(builds) == 3
+    ref, others_before = weakref.ref(state), {id(k) for k in game_api._VIEW_MEMO if k is not state}
     del state
     gc.collect()
-    assert len(game_api._VIEW_MEMO) == 1
+    # the memo is process-global (other tests' game states live in it): the dead state's entry is gone, every other one is untouched
+    assert ref() is None
+    assert {id(k) for k in game_api._VIEW_MEMO} == others_before
+    assert other in game_api._VIEW_MEMO
 
 
 def test_view_memo_is_bounded_per_state():
