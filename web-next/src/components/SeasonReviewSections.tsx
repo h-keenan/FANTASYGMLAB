@@ -76,10 +76,10 @@ export function ReviewDeltaText({ text, tone, size = "lg" }: { text: string; ton
 function PlayerLine({ player, showRole }: { player: ReviewPlayer; showRole: boolean }) {
   const role = showRole && player.role ? ROLE_BADGE[player.role] : undefined;
   return (
-    <div className="flex items-center justify-between gap-2 min-w-0">
-      <SimPlayerChip player={player} className="min-w-0 flex-1" />
+    <div className="flex min-w-0 flex-wrap items-center justify-between gap-x-2 gap-y-1">
+      <SimPlayerChip player={player} className="min-w-[10rem] flex-1" />
       {role ? (
-        <span className="shrink-0" style={{ minWidth: "4.5rem", textAlign: "right" }}>
+        <span className="shrink-0" style={{ textAlign: "right" }}>
           <ToneBadge label={role.label} color={simToneColor(role.tone)} size="xs" />
         </span>
       ) : null}

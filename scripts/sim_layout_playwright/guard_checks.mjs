@@ -91,10 +91,11 @@ export const GUARD = (opts) => {
     if (el.children.length > 0 && s.textOverflow === "ellipsis" && el.scrollWidth > el.clientWidth + 1 && !opts?.allowEllipsis?.some((q) => el.closest(q))) push("ellipsis", el, `"${text(el)}" scroll ${el.scrollWidth} > ${el.clientWidth}`);
     if (el.children.length > 0 && s.webkitLineClamp && s.webkitLineClamp !== "none" && el.scrollHeight > el.clientHeight + 2 && !opts?.allowEllipsis?.some((q) => el.closest(q))) push("ellipsis", el, `line-clamp cuts "${text(el)}"`);
     // A word broken across lines (a name crushed into a sliver of a column): more rendered text lines than words.
-    if (el.children.length === 0 && el.textContent.trim().length > 3) {
+    const runningText = s.display === "inline" && el.parentElement && (el.parentElement.textContent || "").trim().length > el.textContent.trim().length + 2; // a word inside a sentence that wraps is just wrapping
+    if (el.children.length === 0 && el.textContent.trim().length > 3 && !runningText) {
       const range = document.createRange();
       range.selectNodeContents(el);
-      const tops = new Set([...range.getClientRects()].filter((q) => q.width > 0).map((q) => Math.round(q.top / 4)));
+      const tops = new Set([...range.getClientRects()].filter((q) => q.width > 0).map((q) => Math.round(q.top / Math.max(6, (parseFloat(s.fontSize) || 12) * 0.8))));
       const words = el.textContent.trim().split(/[\s\-\/]+/).length;
       if (tops.size > words) push("word-break", el, `${tops.size} lines for ${words} word(s)`);
     }

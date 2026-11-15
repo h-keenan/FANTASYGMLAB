@@ -162,7 +162,7 @@ export function StatStripModule({
         </h3>
         {action}
       </div>
-      <div className="grid gap-2" style={{ gridTemplateColumns: `repeat(auto-fit, minmax(max(5rem, calc((100% - ${(cols - 1) * 0.5}rem) / ${cols})), 1fr))` }} role="group" aria-label={`${title}: ${summary}`} data-testid="stat-strip-tiles">
+      <div className="grid gap-2" style={{ gridTemplateColumns: `repeat(auto-fit, minmax(max(5.75rem, calc((100% - ${(cols - 1) * 0.5}rem) / ${cols})), 1fr))` }} role="group" aria-label={`${title}: ${summary}`} data-testid="stat-strip-tiles">
         {items.map(({ insight, ...item }) => {
           const tile = <StatStripTile key={item.label} item={item} />;
           if (!insight || !league) return tile;

@@ -179,7 +179,7 @@ function RosterPickRow({
         position={player.position}
         tier={player.tier}
         injuryStatus={player.injury_label}
-        className="flex-1 min-w-[10rem]"
+        className="flex-1 min-w-[13rem]"
       >
         {player.team || "FA"}
       </PlayerIdentity>

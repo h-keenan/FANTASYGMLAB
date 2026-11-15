@@ -92,7 +92,7 @@ export function MatchupHeroCard({
                 <>
                   <PlayerAvatar playerId={p.playerId} tier={p.tier} size={36} fallbackLabel={p.name.trim().slice(0, 1)} />
                   <span className="flex min-w-0 flex-col text-left">
-                    <span className="flex items-center gap-1">
+                    <span className="flex flex-wrap items-center gap-x-1">
                       <span className="min-w-0 break-words text-sm font-bold">{playerSurname(p.name) || p.name}</span>
                       {p.position ? <PositionBadge position={p.position} /> : null}
                     </span>
