@@ -541,6 +541,32 @@ describe("SimGameContent", () => {
     expect(await screen.findByTestId("game-heading")).toHaveTextContent("Week 1 of 14");
   });
 
+  describe("hub: New game sheet", () => {
+    it("first-timer: explainer open, nudge to New game; Start Quick creates a game from the preset", async () => {
+      mocked.getSimGameOptions.mockResolvedValue(options({}));
+      mocked.listSimGames.mockResolvedValue({ ok: true, reason: "", games: [] });
+      mocked.createSimGame.mockResolvedValue({ ok: true, reason: "", game: game() });
+      render(<SimGameContent />);
+      expect(await screen.findByText("No games yet")).toBeInTheDocument();
+      expect(screen.getByText(/Tap New game and pick Quick/)).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: /What is Fantasy Sim/ })).toHaveAttribute("aria-expanded", "true");
+      fireEvent.click(screen.getByRole("button", { name: "New game" }));
+      expect(await screen.findByTestId("sim-preset-chips")).toBeInTheDocument();
+      fireEvent.click(screen.getByRole("button", { name: "Start Quick game" }));
+      await waitFor(() => expect(mocked.createSimGame).toHaveBeenCalledTimes(1));
+      expect(mocked.createSimGame.mock.calls[0][0]).toMatchObject({ mode: "redraft", difficulty: "normal" });
+    });
+
+    it("returning: the explainer is collapsed to one line and saved games are tappable rows", async () => {
+      mocked.getSimGameOptions.mockResolvedValue(options({}));
+      mocked.listSimGames.mockResolvedValue({ ok: true, reason: "", games: [lite(game())] });
+      render(<SimGameContent />);
+      expect(await screen.findByRole("button", { name: /Open game: Week 4 of/ })).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: /What is Fantasy Sim/ })).toHaveAttribute("aria-expanded", "false");
+      expect(screen.getByText("Your games · 1")).toBeInTheDocument();
+    });
+  });
+
   describe("new game setup", () => {
     const setupOptions = () =>
       options({
@@ -567,6 +593,7 @@ describe("SimGameContent", () => {
       mocked.listSimGames.mockResolvedValue({ ok: true, reason: "", games: [] });
       render(<SimGameContent />);
       fireEvent.click(await screen.findByRole("button", { name: "New game" }));
+      fireEvent.click(await screen.findByRole("button", { name: "Customize everything" }));
       await screen.findByTestId("sim-setup-hero");
     }
 
@@ -731,6 +758,7 @@ describe("SimGameContent", () => {
       mocked.listSimGames.mockResolvedValue({ ok: true, reason: "", games: [] });
       render(<SimGameContent />);
       fireEvent.click(await screen.findByRole("button", { name: "New game" }));
+      fireEvent.click(await screen.findByRole("button", { name: "Customize everything" }));
       await screen.findByText(/Quick start is/);
       fireEvent.click(screen.getByRole("tab", { name: "Customize" }));
       expect(screen.queryByRole("tab", { name: "Use my league" })).not.toBeInTheDocument();

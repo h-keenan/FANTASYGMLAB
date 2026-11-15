@@ -71,6 +71,7 @@ describe("dynasty setup", () => {
     mocked.listSimGames.mockResolvedValue({ ok: true, reason: "", games: [] });
     render(<SimGameContent />);
     fireEvent.click(await screen.findByRole("button", { name: "New game" }));
+    fireEvent.click(await screen.findByRole("button", { name: "Customize everything" }));
     await screen.findByTestId("sim-setup-hero");
   }
 

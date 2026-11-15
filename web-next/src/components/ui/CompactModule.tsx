@@ -148,8 +148,12 @@ export function CompactModule({
       </div>
       {preview ? <div data-testid="compact-preview">{preview}</div> : null}
       {expandIn === "inline" ? (
-        <div id={bodyId} hidden={!open} className="flex flex-col gap-3 pt-1">
-          {open ? children : null}
+        <div id={bodyId} hidden={!open} className="pt-1">
+          {open ? (
+            <div className="module-expand">
+              <div className="module-expand-inner flex flex-col gap-3">{children}</div>
+            </div>
+          ) : null}
         </div>
       ) : (
         <Sheet open={open} onClose={() => setOverride(false)} title={name}>
