@@ -168,9 +168,7 @@ export function PillRow({
         : "flex-1 min-w-fit"
       : mode === "scroll"
         ? // Segments share a short row equally (no empty bordered box after the last tab) and keep their natural width, scrolling, when they overflow.
-          // flex-auto (basis auto), never flex-1 (basis 0): with an explicit min-width a zero basis collapses every tab to 44px
-          // once the row overflows and the labels spill over their neighbours.
-          "flex-auto shrink-0 min-w-[var(--touch-target-min)]"
+          "flex-[1_0_auto] min-w-[var(--touch-target-min)]" // basis auto: a bare flex-1 has basis 0, so long labels (WEEK 9) collapsed to the 44px minimum and overlapped their neighbours
         : "shrink-0 min-w-[var(--touch-target-min)]";
 
   return (

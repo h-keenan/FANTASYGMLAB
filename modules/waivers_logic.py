@@ -1,6 +1,7 @@
 import time
 from typing import Any, Mapping
 import pandas as pd
+from modules import derived_cache
 from modules import league_maturity
 from modules.frame_records import frame_records
 from modules import league_display
@@ -163,7 +164,12 @@ def build_waiver_free_agent_pool_cached(
         compute=lambda: _build_waiver_free_agent_pool_cached(*key),
         lock_timeout_seconds=_WAIVER_POOL_LOCK_TIMEOUT_SECONDS,
     )
-    return valued.copy(), free_agents.copy()
+    # Tag the copies with the exact cache entry they came from so downstream pure derivations
+    # (modules.derived_cache) can be reused under it.
+    return (
+        derived_cache.tag_frame(valued.copy(), derived_cache.fingerprint("waiver_pool.valued", cache_key)),
+        derived_cache.tag_frame(free_agents.copy(), derived_cache.fingerprint("waiver_pool.free_agents", cache_key)),
+    )
 
 
 def annotate_sleeper_trending_add(

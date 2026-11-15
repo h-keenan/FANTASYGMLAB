@@ -9,7 +9,7 @@ import type { DropSuggestion, NeedsModel, WaiverPlayer, WaiverPriorityAdd, Waive
 /** The header module is collapsed by default (summary only); tests that read its body expand it first. */
 function renderOpen(ui: React.ReactElement) {
   const view = render(ui);
-  const toggle = screen.queryByRole("button", { name: /^Waivers:/ });
+  const toggle = screen.queryByRole("button", { name: /^Free agents:/ });
   if (toggle && toggle.getAttribute("aria-expanded") !== "true") fireEvent.click(toggle);
   return view;
 }
