@@ -1,5 +1,6 @@
 "use client";
 
+import { Select } from "@/components/Input";
 import { PageTabBar } from "@/components/PageTabBar";
 import { EmptyState } from "@/components/EmptyState";
 import { SectionHeading } from "@/components/SectionHeading";
@@ -264,9 +265,8 @@ function RecapsTab({ leagueId, initial, onOpenHistory }: { leagueId: string; ini
             onSelect={(value) => loadWeek(Number(value))}
           />
           {archive.overflow.length > 0 ? (
-            <select aria-label="More weeks"
-              className="text-xs px-2 py-2"
-              style={{ background: "var(--color-surface-muted)", color: "var(--color-text-secondary)", border: "var(--border-width-default) solid var(--color-border)" }}
+            <Select aria-label="More weeks"
+              className="text-xs"
               value={archive.overflow.some((o) => o.week === selectedWeek) ? String(selectedWeek) : ""}
               onChange={(event) => {
                 if (event.target.value) loadWeek(Number(event.target.value));
@@ -278,7 +278,7 @@ function RecapsTab({ leagueId, initial, onOpenHistory }: { leagueId: string; ini
                   {o.label}
                 </option>
               ))}
-            </select>
+            </Select>
           ) : null}
         </TabStack>
       ) : null}
