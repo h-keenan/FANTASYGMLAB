@@ -1,5 +1,6 @@
 "use client";
 
+import { Select } from "@/components/Input";
 import { useEffect, useState } from "react";
 
 import { api, type WeeklyStatPoint } from "@/lib/api";
@@ -97,23 +98,18 @@ export function PlayerTrendsPanel({
       <div className="flex items-center justify-between gap-2 flex-wrap">
         <h3>Week by Week · {weeklyStats.season}</h3>
         {seasonOptions.length > 1 ? (
-          <select
+          <Select
             aria-label="Season"
             value={selectedSeason ?? currentSeasonAnchor ?? ""}
             onChange={(event) => setSelectedSeason(Number(event.target.value))}
-            className="text-xs px-2 py-1"
-            style={{
-              background: "var(--color-surface-muted)",
-              color: "var(--color-text-secondary)",
-              border: "var(--border-width-default) solid var(--color-border)",
-            }}
+            className="text-xs"
           >
             {seasonOptions.map((season) => (
               <option key={season} value={season}>
                 {season}
               </option>
             ))}
-          </select>
+          </Select>
         ) : null}
       </div>
       <WeeklyPointsPanel name={name} weeks={weeklyStats.weeks} season={weeklyStats.season} gradientId={gradientId} />

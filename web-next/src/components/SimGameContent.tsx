@@ -215,6 +215,9 @@ export function SimGameContent() {
     let cancelled = false;
     (async () => {
       try {
+        // Both reads start together (they are independent): the list used to wait for the options answer, one wasted round trip.
+        const listRequest = Promise.resolve(api.listSimGames());
+        listRequest.catch(() => undefined); // an early options failure returns before the list is awaited: never leave it unhandled
         const opts = await api.getSimGameOptions();
         if (cancelled) return;
         const gate = simGameGate(opts);
@@ -224,7 +227,7 @@ export function SimGameContent() {
         }
         setOptions(opts);
         if (opts.preview !== undefined) setPreview(opts.preview ?? null);
-        const list = await api.listSimGames();
+        const list = await listRequest;
         if (cancelled) return;
         const listGate = simGameGate(list);
         if (listGate.kind === "unavailable") {
@@ -292,6 +295,13 @@ export function SimGameContent() {
   const openGame = useCallback(
     async (id: string) => {
       setNotice(null);
+      // The Home and lineup reads only need the game id: start them with the game read instead of after it (they used to
+      // wait for the game answer and the render). The request cache hands the tabs these same answers a moment later.
+      const status = games.find((g) => g.id === id)?.status;
+      if (status === "in_season" || status === "playoffs") {
+        void Promise.resolve(api.getSimHome(id)).catch(() => undefined);
+        void Promise.resolve(api.getSimLineup(id)).catch(() => undefined);
+      }
       const body = await call(() => api.getSimGame(id));
       if (body?.game) {
         setGameState(body.game);
@@ -301,7 +311,7 @@ export function SimGameContent() {
         dispatch({ type: "open", game: body.game });
       }
     },
-    [call],
+    [call, games],
   );
 
   async function createGame(body: SimGameCreateBody) {
@@ -993,7 +1003,7 @@ function GameScreen({
   const [moreOpen, setMoreOpen] = useState(false);
   const simPlayerOpener = useCallback((ref: PlayerRef) => ctx.openPlayer(simPlayerFromRef(ref)), [ctx]);
   // Phones: the game orb (docked above the Advance pill) is the page navigator; the top PillRows render from md up.
-  const showOrb = showBar || showOffBar;
+  const showOrb = showBar || showOffBar || (stage === "draft" && !draftRecap && !recap);
   const orbNode = showOrb ? (
     <SimGameOrb
               tab={flow.tab}
@@ -1002,6 +1012,7 @@ function GameScreen({
               onTab={onTab}
               onMore={() => setMoreOpen(true)}
               onHub={onHub}
+              onSimTo={showBar && !paywalled ? onSimTo : undefined}
             />
   ) : null;
 
@@ -1111,7 +1122,7 @@ function GameScreen({
         </>
       )}
       <BottomDock testId="sim-bottom-stack">
-        <SimPillHost standalone={!showBar && !showOffBar} />
+        <SimPillHost standalone={!showBar && !showOffBar} orb={orbNode} />
         {showOffBar ? <SimOffseasonBar ctx={ctx} onTab={onTab} orb={orbNode} /> : null}
         {showBar ? <SimActionBar ctx={ctx} paywalled={paywalled} advancing={advancing} onAdvance={onAdvance} onSimTo={onSimTo} onTab={onTab} orb={orbNode} /> : null}
       </BottomDock>
