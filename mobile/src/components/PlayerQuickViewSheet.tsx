@@ -307,7 +307,7 @@ export default function PlayerQuickViewSheet({
   // Peek sheet (coridian_ pick 1b): opens at half height, drag the grip up (or tap it) for full; pills never move it.
   const [snap, setSnapRaw] = useState<SheetSnap>('peek');
   // Peek -> full animates the header (avatar, tiles) with a layout animation; nothing jumps. Peek height is computed from the
-  // content (compact header + pill row + one content line, lib/playerAnatomy peekSheetHeight), with a 50% first-paint fallback = PEEK_MIN_FRAC (no jump).
+  // content (compact header + pill row + one content line, lib/playerAnatomy peekSheetHeight), with a 65% first-paint fallback = PEEK_MIN_FRAC (no jump).
   const setSnap = (next: SheetSnap) => {
     if (Platform.OS === 'android') UIManager.setLayoutAnimationEnabledExperimental?.(true);
     LayoutAnimation.configureNext(LayoutAnimation.create(240, LayoutAnimation.Types.easeInEaseOut, LayoutAnimation.Properties.opacity));
@@ -602,7 +602,7 @@ function createStyles(colors: ThemeColors) {
       minHeight: sheetHeight.min,
       maxHeight: sheetHeight.max,
     },
-    sheetPeek: { minHeight: '50%', maxHeight: '50%' },
+    sheetPeek: { minHeight: '65%', maxHeight: '65%' },
     sheetFull: { minHeight: '92%', maxHeight: '92%' },
     grip: { height: 24, alignItems: 'center', justifyContent: 'center' },
     gripBar: { width: 40, height: 4, borderRadius: 2, backgroundColor: colors.borderStrong },
