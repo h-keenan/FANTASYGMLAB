@@ -71,6 +71,9 @@ function buttonLook(
       fontWeight: "var(--font-weight-button)",
       borderRadius: "var(--radius-control)",
       cursor: disabled ? "not-allowed" : "pointer",
+      // A disabled filled button is a muted fill on a near-black page: without an edge it reads as a loose label
+      // ("Find Realistic Trades"). A hairline keeps it a button.
+      ...(disabled && (variant === "primary" || variant === "premium" || variant === "danger") ? { boxShadow: "inset 0 0 0 var(--border-width-default) var(--color-border-strong)" } : null),
       ...style,
     } as CSSProperties,
   };
