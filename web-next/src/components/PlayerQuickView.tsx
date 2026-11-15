@@ -170,7 +170,7 @@ export function PlayerQuickView({
   // not loaded (or failed -> section renders nothing).
   const [news, setNews] = useState<PlayerNewsResponse | null>(null);
   const [newsLoading, setNewsLoading] = useState(remote && realWorld.fetchNews);
-  // Peek height from the content: compact header + pill row + one content line (--pqv-peek-h; CSS keeps 56dvh as the fallback).
+  // Peek height from the content: compact header + pill row + one content line (--pqv-peek-h; CSS keeps 50dvh as the fallback).
   // Measured with the header in its compact state only (never mid-transition), re-measured when the content above the pills resizes.
   useLayoutEffect(() => {
     const modal = dialogRef.current;
