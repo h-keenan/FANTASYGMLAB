@@ -53,4 +53,19 @@ describe("PlayerAvatar", () => {
     const noTier = render(<PlayerAvatar playerId="p1" />);
     expect(noTier.container.querySelector("img")?.className).not.toContain("prestige-glow");
   });
+
+  // coridian_, "pqv still opens wrong" (2026-11-14): the PQV shell resizes the circle with CSS (112px full, 56px peek), and an
+  // initials font computed from the `size` prop overflowed the smaller circle. The label scales with the circle's own box.
+  it("sizes fallback initials from the circle's own box (container units), never from the size prop in px", () => {
+    for (const size of [24, 56, 112]) {
+      const { container, unmount } = render(<PlayerAvatar playerId={null} size={size} fallbackLabel="JS" />);
+      const circle = container.querySelector<HTMLElement>("[data-avatar-fallback]")!;
+      const label = container.querySelector<HTMLElement>("[data-avatar-initials]")!;
+      expect(circle.style.containerType).toBe("inline-size");
+      expect(circle.style.fontSize).toBe("");
+      expect(label.getAttribute("style")).toContain("cqw");
+      expect(label.textContent).toBe("JS");
+      unmount();
+    }
+  });
 });

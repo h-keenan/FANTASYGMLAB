@@ -53,6 +53,7 @@ export function CompactModule({
   glow = false,
   preview,
   loading = false,
+  summaryWhenCollapsed = false,
 }: {
   /** Stable key for remembering the open state, e.g. "draft.clock". */
   id: string;
@@ -78,6 +79,8 @@ export function CompactModule({
   preview?: ReactNode;
   /** The data behind it is still loading: draws the module's own silhouette (SkeletonModule) instead of a placeholder line, so the page does not jump when it lands. */
   loading?: boolean;
+  /** Show the summary line only while collapsed (its text repeats inside the body, e.g. a feed's newest headline). */
+  summaryWhenCollapsed?: boolean;
 }) {
   const key = simOpenKey(id);
   const bodyId = useId();
@@ -95,7 +98,7 @@ export function CompactModule({
   );
   const [override, setOverride] = useState<boolean | null>(null);
   const open = override ?? simParseOpen(stored, defaultOpen);
-  const shown = compactParts(parts ?? []);
+  const shown = compactParts(summaryWhenCollapsed && open ? [] : (parts ?? []));
   const name = label ?? (typeof title === "string" ? title : "Details");
   const hasBody = children != null && children !== false;
 

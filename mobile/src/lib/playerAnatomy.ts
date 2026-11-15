@@ -200,7 +200,7 @@ export function barFractions(values: ReadonlyArray<number | null | undefined>): 
 
 export type SheetSnap = "peek" | "full";
 /** Open heights of the player sheet in percent of the screen. */
-export const SHEET_SNAP_PCT: Record<SheetSnap, number> = { peek: 56, full: 92 };
+export const SHEET_SNAP_PCT: Record<SheetSnap, number> = { peek: 66, full: 92 };
 
 /** Drag the handle: up past 48px or a fast flick goes full, down past 48px from full goes back to peek. Down from peek is the dismiss gesture (not handled here). */
 export function nextSheetSnap(current: SheetSnap, dragY: number, velocity = 0): SheetSnap {
@@ -210,14 +210,14 @@ export function nextSheetSnap(current: SheetSnap, dragY: number, velocity = 0): 
 }
 
 /** The first content line (one row of the open tab) that must be visible under the pills at the peek height. */
-export const PEEK_FIRST_LINE_PX = 52;
-export const PEEK_MIN_FRAC = 0.4;
-export const PEEK_MAX_FRAC = 0.7;
+export const PEEK_FIRST_LINE_PX = 150; // the first content BLOCK (a card or a few rows), not one line (coridian_ 2026-11-14: "opens too small")
+export const PEEK_MIN_FRAC = 0.65;
+export const PEEK_MAX_FRAC = 0.75;
 
 /**
  * Peek height in px, computed from the content (coridian_, 2026-11-14: the tab row sat clipped at the bottom of a fixed 56%
  * peek). `anchorBottom` is where the pill row ends, measured from the sheet's top with the compact header showing; the
- * sheet shows that plus one content line plus the bottom inset, clamped between 40% and 70% of the screen so it never
+ * sheet shows that plus one content block plus the bottom inset, clamped between 65% and 75% of the screen so it never
  * opens as a sliver or right up under the page header.
  */
 export function peekSheetHeight({ anchorBottom, viewportH, bottomInset = 0 }: { anchorBottom: number; viewportH: number; bottomInset?: number }): number {

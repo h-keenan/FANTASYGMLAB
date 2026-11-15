@@ -2,7 +2,7 @@
 // fetches) + the real globals.css rules (vite, from web-next/node_modules) and measures at 390x844 and 360x640:
 //  - at PEEK: the pill tab row (Overview / Stats / ...) is fully inside the sheet's visible area, each tab tappable
 //    (hit-test at its centre returns the tab), the avatar is the compact 56px, and the sheet is as tall as the content needs
-//    (header + tab row + one content line, 40-70% of the screen);
+//    (header + tab row + one content line, 50-70% of the screen);
 //  - at FULL: the big 112px avatar and the three stat tiles are back;
 //  - the peek -> full change animates (an in-between avatar size is observed, no jump).
 // Usage: PW=/path/to/playwright-core CHROME_PATH=/path/to/chrome node scripts/sim_layout_playwright/pqv_peek_geometry.mjs
@@ -67,30 +67,41 @@ const measure = () => {
   const hit = tabs.map((t) => { const r = t.getBoundingClientRect(); const e = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2); return { label: t.textContent, top: r.top - m.top, bottom: m.bottom - inset - r.bottom, left: r.left, right: innerWidth - r.right, tappable: !!e && (e === t || t.contains(e)) }; });
   const av = modal.querySelector(".pqv-avatar-glow")?.getBoundingClientRect();
   const avImg = modal.querySelector(".pqv-avatar-glow > *")?.getBoundingClientRect();
+  const ini = modal.querySelector("[data-avatar-initials]"), circ = modal.querySelector("[data-avatar-fallback]");
+  const initials = ini && circ ? (() => { const a = ini.getBoundingClientRect(), c = circ.getBoundingClientRect(); return { w: a.width, h: a.height, circle: c.width, fits: a.width <= c.width * 0.8 + 0.5 && a.height <= c.height * 0.8 + 0.5 && ini.scrollWidth <= ini.clientWidth + 1 && a.left >= c.left && a.right <= c.right, font: parseFloat(getComputedStyle(ini).fontSize) }; })() : null;
   const tiles = modal.querySelector(".pqv-stat-tiles"), tr = tiles && tiles.getBoundingClientRect();
   const strip = modal.querySelector(".tabs-sticky")?.getBoundingClientRect();
-  return { avImg: avImg ? { w: avImg.width, h: avImg.height } : null, avBox: av ? { w: av.width, h: av.height } : null, snap: modal.dataset.snap, modalH: m.height, modalBottom: m.bottom, vh: innerHeight, inset, tabs: hit, avatar: av ? av.width : null, tilesVisible: !!tr && tr.height > 4 && getComputedStyle(tiles.parentElement).opacity !== "0", stripBottom: strip ? strip.bottom - m.top : null, peekVar: modal.style.getPropertyValue("--pqv-peek-h") };
+  return { initials, avImg: avImg ? { w: avImg.width, h: avImg.height } : null, avBox: av ? { w: av.width, h: av.height } : null, snap: modal.dataset.snap, modalH: m.height, modalBottom: m.bottom, vh: innerHeight, inset, tabs: hit, avatar: av ? av.width : null, tilesVisible: !!tr && tr.height > 4 && getComputedStyle(tiles.parentElement).opacity !== "0", stripBottom: strip ? strip.bottom - m.top : null, peekVar: modal.style.getPropertyValue("--pqv-peek-h") };
 };
 
 let bad = 0; const rows = [];
 const shapeProblems = (when, m) => {
   const out = [];
+  if (m.initials && !m.initials.fits) out.push(`initials overflow the avatar circle ${when}: label ${m.initials.w.toFixed(1)}x${m.initials.h.toFixed(1)} (font ${m.initials.font.toFixed(1)}px) in a ${m.initials.circle.toFixed(1)}px circle`);
   for (const [what, r] of [["avatar wrapper", m.avBox], ["avatar image", m.avImg]]) if (r && Math.abs(r.w - r.h) > 0.6) out.push(`${what} not a circle ${when}: ${r.w.toFixed(1)}x${r.h.toFixed(1)}`);
   if (m.avBox && m.avImg && (Math.abs(m.avBox.w - m.avImg.w) > 0.6 || Math.abs(m.avBox.h - m.avImg.h) > 0.6)) out.push(`avatar image ${m.avImg.w.toFixed(1)}x${m.avImg.h.toFixed(1)} disagrees with its wrapper ${m.avBox.w.toFixed(1)}x${m.avBox.h.toFixed(1)} ${when}`);
   return out;
 };
 const PX = Buffer.from("R0lGODlhAQABAIAAAAUEBAAAACwAAAAAAQABAAACAkQBADs=", "base64");
-for (const [w, h, photo] of [[390, 844, false], [360, 640, false], [390, 844, true], [360, 640, true]]) {
+for (const [w, h, photo, stale] of [[390, 844, false], [430, 932, false], [360, 640, false], [390, 844, true], [360, 640, true], [390, 844, false, true]]) {
   const ctx = await browser.newContext({ ...devices["iPhone 14"], viewport: { width: w, height: h } });
   const page = await ctx.newPage();
   if (process.env.DEBUG_PAGE) page.on("pageerror", (e) => console.log("pageerror", e.message)).on("console", (m) => m.type() === "error" && console.log("console", m.text().slice(0, 300)));
+  // a stale-small visual viewport with NO keyboard (iOS leaves it after the toolbar/keyboard goes): the peek must still be 65-75% of the real screen
+  if (stale) await page.addInitScript(() => Object.defineProperty(window, "visualViewport", { value: { get height() { return innerHeight - 380; }, offsetTop: 0, scale: 1, width: innerWidth, addEventListener() {}, removeEventListener() {} }, configurable: true }));
+  if (!photo) await page.route("**/sleepercdn.com/**", (r) => r.abort());
   if (photo) { await page.route("**/sleepercdn.com/**", (r) => r.fulfill({ status: 200, contentType: "image/gif", body: PX })); await page.route("http://localhost:1/**", (r) => r.abort()); }
+  // first-paint height: the sheet must open at the peek height it settles on (no 56% -> 40% jump)
+  await page.addInitScript(() => { window.__h = []; const tick = () => { const m = document.querySelector(".pqv-modal"); if (m) window.__h.push(Math.round(m.getBoundingClientRect().height)); requestAnimationFrame(tick); }; requestAnimationFrame(tick); });
   await page.goto(base + (photo ? "?photo=1" : ""), { waitUntil: "load" });
   await page.evaluate(() => document.fonts.ready);
   await sleep(900);
   const peek = await page.evaluate(measure);
-  if (process.env.SHOT_DIR) await page.screenshot({ path: path.join(process.env.SHOT_DIR, `pqv-peek-${w}.jpg`), type: "jpeg", quality: 60 });
+  if (process.env.SHOT_DIR) await page.screenshot({ path: path.join(process.env.SHOT_DIR, `pqv-peek-${w}${stale ? "-stale" : ""}.jpg`), type: "jpeg", quality: 60 });
   const problems = [];
+  const heights = await page.evaluate(() => window.__h);
+  if (new Set(heights.filter((x) => x > 0)).size > 1) problems.push(`sheet height changed after first paint: ${[...new Set(heights)].join(" -> ")}`);
+  if (!photo && !peek.initials) problems.push("no initials fallback rendered");
   problems.push(...shapeProblems("at peek", peek));
   if (peek.snap !== "peek") problems.push(`opened at ${peek.snap}`);
   if (!peek.tabs.length) problems.push("no pill tabs");
@@ -102,7 +113,8 @@ for (const [w, h, photo] of [[390, 844, false], [360, 640, false], [390, 844, tr
   if (peek.stripBottom != null && peek.modalH - peek.inset - peek.stripBottom < 40) problems.push(`no content line under the tabs (${(peek.modalH - peek.inset - peek.stripBottom).toFixed(0)}px)`);
   if (Math.abs(peek.avatar - 56) > 1) problems.push(`compact avatar ${peek.avatar}px, want 56`);
   if (peek.tilesVisible) problems.push("stat tiles still visible at peek");
-  if (peek.modalH < peek.vh * 0.4 - 1 || peek.modalH > peek.vh * 0.7 + 1) problems.push(`peek height ${peek.modalH} outside 40-70% of ${peek.vh}`);
+  if (peek.modalH < peek.vh * 0.65 - 1 || peek.modalH > peek.vh * 0.75 + 1) problems.push(`peek height ${peek.modalH} outside 65-75% of ${peek.vh}`);
+  if (peek.stripBottom != null && peek.modalH - peek.inset - peek.stripBottom < 120) problems.push(`first content block not visible under the tabs (${(peek.modalH - peek.inset - peek.stripBottom).toFixed(0)}px < 120)`);
   // expand: tap the grip, sample the avatar through the animation
   await page.evaluate(() => document.querySelector(".pqv-modal .sheet-handle").dispatchEvent(new MouseEvent("click", { bubbles: true })));
   const samples = [];
@@ -121,7 +133,7 @@ for (const [w, h, photo] of [[390, 844, false], [360, 640, false], [390, 844, tr
   const back = await page.evaluate(measure);
   for (const t of back.tabs) if (t.bottom < -0.5 || !t.tappable) problems.push(`after full -> peek: tab ${t.label} clipped/covered`);
   if (problems.length) bad++;
-  rows.push({ viewport: `${w}x${h}${photo ? " photo" : ""}`, peekH: Math.round(peek.modalH), peekPct: +(peek.modalH / peek.vh * 100).toFixed(1), tabsBottomGap: peek.tabs.length ? +Math.min(...peek.tabs.map((t) => t.bottom)).toFixed(1) : null, stripBottom: Math.round(peek.stripBottom), avatarPeek: peek.avatar, avatarFull: full.avatar, problems });
+  rows.push({ viewport: `${w}x${h}${photo ? " photo" : ""}${stale ? " stale-vv" : ""}`, peekH: Math.round(peek.modalH), peekPct: +(peek.modalH / peek.vh * 100).toFixed(1), tabsBottomGap: peek.tabs.length ? +Math.min(...peek.tabs.map((t) => t.bottom)).toFixed(1) : null, stripBottom: Math.round(peek.stripBottom), avatarPeek: peek.avatar, avatarFull: full.avatar, problems });
   await ctx.close();
 }
 console.log(JSON.stringify(rows, null, 1));

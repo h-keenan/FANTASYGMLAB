@@ -251,3 +251,13 @@ captured_at,season,week,player_id,team,position,status,injury_status,body_part,p
 2026-11-14T21:14:54Z,2026,10,7600,PIT,TE,Active,Questionable,Illness,,,sleeper_live
 2026-11-14T21:14:54Z,2026,10,8168,GB,WR,Inactive,Questionable,Ankle,,,sleeper_live
 2026-11-14T21:14:54Z,2026,10,8207,DAL,RB,Inactive,IR,Knee - ACL + MCL,,,sleeper_live
+2026-11-15T01:14:10Z,2026,10,10212,GB,TE,Inactive,IR,Concussion,,,sleeper_live
+2026-11-15T01:14:10Z,2026,10,11370,GB,RB,Active,Questionable,Ankle,,,sleeper_live
+2026-11-15T01:14:10Z,2026,10,12529,NE,RB,Inactive,IR,Illness,,,sleeper_live
+2026-11-15T01:14:10Z,2026,10,13200,PIT,WR,Active,Out,Undisclosed,,,sleeper_live
+2026-11-15T01:14:10Z,2026,10,13380,LAC,WR,Active,Doubtful,Hamstring,,,sleeper_live
+2026-11-15T01:14:10Z,2026,10,7204,NE,RB,Active,Questionable,Knee,,,sleeper_live
+2026-11-15T01:14:10Z,2026,10,7535,ARI,TE,Active,Questionable,Knee,,,sleeper_live
+2026-11-15T01:14:10Z,2026,10,7543,NO,RB,Active,Questionable,Hamstring,,,sleeper_live
+2026-11-15T01:14:10Z,2026,10,8168,GB,WR,Active,Questionable,Ankle,,,sleeper_live
+2026-11-15T01:14:10Z,2026,10,9511,LAC,RB,Active,,,,,sleeper_live

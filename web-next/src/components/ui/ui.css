@@ -668,13 +668,6 @@
 }
 /* In the bar the orb matches the 44px buttons beside it. */
 .game-orb--bar { width: var(--bar-orb-bar-size, 48px); height: var(--bar-orb-bar-size, 48px); }
-.game-orb-label {
-  font-size: 0.5625rem;
-  font-weight: 800;
-  line-height: 1;
-  letter-spacing: 0.05em;
-  text-transform: uppercase;
-}
 .game-orb-badge {
   position: absolute;
   top: 0;

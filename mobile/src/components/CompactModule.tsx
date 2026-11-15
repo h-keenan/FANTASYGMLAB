@@ -54,6 +54,7 @@ export default function CompactModule({
   testID,
   preview,
   loading = false,
+  summaryWhenCollapsed = false,
 }: {
   id: string;
   title: ReactNode;
@@ -74,12 +75,14 @@ export default function CompactModule({
   preview?: ReactNode;
   /** The data behind it is still loading: draws the module's own silhouette (SkeletonModule) so the page does not jump when it lands. */
   loading?: boolean;
+  /** Show the summary line only while collapsed (its text repeats inside the body, e.g. a feed's newest headline). */
+  summaryWhenCollapsed?: boolean;
 }) {
   const { colors } = useThemeMode();
   const styles = useMemo(() => createStyles(colors), [colors]);
   const [open, setOpen] = useState(defaultOpen);
   const [touched, setTouched] = useState(false);
-  const shown = compactParts(parts ?? []);
+  const shown = compactParts(summaryWhenCollapsed && open ? [] : (parts ?? []));
   const name = label ?? (typeof title === 'string' ? title : 'Details');
   const hasBody = children != null && children !== false;
 

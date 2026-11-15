@@ -85,7 +85,7 @@ export function SimActionBar({ ctx, paywalled, advancing, onAdvance, onSimTo, on
       <PillMorph context={pill.barPresent ? pill.ctx : null}>
       <div className="mx-auto flex max-w-3xl items-center gap-2 p-1 md:mx-0 md:max-w-none md:flex-none md:gap-2 md:p-0">
         {onSimTo && !paywalled ? (
-          <Button variant="secondary" size="sm" className="min-w-0 shrink-0 max-md:flex-col max-md:gap-0 max-md:px-2" disabled={advancing} onClick={onSimTo} aria-label="Sim to..." data-testid="sim-to-button">
+          <Button variant="secondary" size="sm" className="min-w-0 shrink-0 max-md:flex-col max-md:gap-0 max-md:self-stretch max-md:px-2" disabled={advancing} onClick={onSimTo} aria-label="Sim to..." data-testid="sim-to-button">
             <SimGlyph name="matchup" size={16} />
             <span className="text-xs leading-4 md:ml-1.5">Sim to<span className="max-md:hidden">...</span></span>
           </Button>
@@ -98,7 +98,7 @@ export function SimActionBar({ ctx, paywalled, advancing, onAdvance, onSimTo, on
         {paywalled ? (
           <ButtonLink href="/premium" variant="premium" size="sm">Go Pro to continue</ButtonLink>
         ) : (
-          <Button className="min-w-0 max-md:flex-1" loading={advancing} disabled={state.blocked} onClick={tapAdvance} aria-label={`${advanceText}. ${simAdvanceLabel(game)}`} aria-describedby={state.reason ? reasonId : undefined}>
+          <Button className="min-w-0 max-md:flex-1 max-md:self-stretch" loading={advancing} disabled={state.blocked} onClick={tapAdvance} aria-label={`${advanceText}. ${simAdvanceLabel(game)}`} aria-describedby={state.reason ? reasonId : undefined}>
             {advanceText}
           </Button>
         )}

@@ -24,6 +24,9 @@ const GLOW_STYLE_BY_INTENSITY: Record<Exclude<TierGlowIntensity, null>, { min: s
   subtle: { min: "2px", max: "7px", duration: "2.8s" },
 };
 
+/** Initials font size as a share of the circle's inner width (the old px rule was size * 0.34 of the outer box). */
+export const INITIALS_FONT_CQW = 38;
+
 const SLEEPER_HEADSHOT_BASE = "https://sleepercdn.com/content/nfl/players";
 
 /**
@@ -102,14 +105,22 @@ export function PlayerAvatar({
           border: `${borderWidth}px solid ${ringColor}`,
           background: "var(--color-surface-muted)",
           color: "var(--color-text-muted)",
-          fontSize: Math.max(9, Math.round(size * 0.34)),
+          // The circle's own CSS box is the size reference, not the `size` prop: a shell (the PQV header) may resize the circle
+          // with CSS (112px full, 56px peek), and a font sized from the prop overflowed the smaller circle (coridian_, "pqv still
+          // opens wrong", 2026-11-14). The label is sized in container-query units of this circle (cqw = 1% of its content width).
+          containerType: "inline-size",
           fontWeight: 800,
           lineHeight: 1,
         }}
         title={title}
         aria-hidden
+        data-avatar-fallback=""
       >
-        {fallbackLabel && size >= 24 ? fallbackLabel : null}
+        {fallbackLabel && size >= 24 ? (
+          <span data-avatar-initials="" style={{ fontSize: `max(9px, ${INITIALS_FONT_CQW}cqw)`, whiteSpace: "nowrap", maxWidth: "100%", overflow: "hidden" }}>
+            {fallbackLabel}
+          </span>
+        ) : null}
       </span>
     );
   }

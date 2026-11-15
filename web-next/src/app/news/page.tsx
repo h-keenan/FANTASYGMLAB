@@ -5,20 +5,25 @@ import { useEffect, useState } from "react";
 
 import { useAuth } from "@/context/AuthContext";
 import { trackFeatureUse } from "@/lib/analytics";
-import { api, type NewsResponse } from "@/lib/api";
+import { api, type AlertsResponse, type NewsResponse } from "@/lib/api";
+import { useDefaultLeague } from "@/lib/useDefaultLeague";
 import { NewsContent } from "@/components/NewsContent";
 import { ErrorState, reloadPage } from "@/components/ErrorState";
 import { LoadingScreen } from "@/components/LoadingScreen";
 
 // Like Portfolio, News has no [leagueId] segment — GET /v1/news is a
-// general, non-roster-scoped feed for anyone, not "your team's" news (see
-// that endpoint's own docstring in services/mobile_api_service.py).
+// general, non-roster-scoped feed for anyone (see that endpoint's own docstring
+// in services/mobile_api_service.py). The roster-first digest on top comes from
+// the account's default league's alerts (the roster-matched feed), when it has one.
 export default function NewsPage() {
   const router = useRouter();
   const { session, loading: authLoading } = useAuth();
 
   const [data, setData] = useState<NewsResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [alerts, setAlerts] = useState<AlertsResponse | null>(null);
+  const defaultLeague = useDefaultLeague();
+  const rosterLeagueId = defaultLeague?.only?.leagueId ?? null;
   // /news?player=<id>&name=<name> (from the quick view's "See all news").
   // Read once from the URL on the client (useSearchParams would force a
   // Suspense boundary around the page). Both server and first client render
@@ -59,6 +64,22 @@ export default function NewsPage() {
     };
   }, [authLoading, session, router, filter]);
 
+  useEffect(() => {
+    if (!session || !rosterLeagueId) return;
+    let cancelled = false;
+    api
+      .getLeagueAlerts(rosterLeagueId, 30)
+      .then((result) => {
+        if (!cancelled) setAlerts(result);
+      })
+      .catch(() => {
+        /* the league-wide feed still loads; the digest just has no roster section */
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [session, rosterLeagueId]);
+
   if (authLoading || (!data && !error)) {
     return (
       <LoadingScreen label="News" layout="list" />
@@ -71,5 +92,5 @@ export default function NewsPage() {
     );
   }
 
-  return <NewsContent data={data} playerName={filter ? filter.name || "this player" : null} />;
+  return <NewsContent data={data} playerName={filter ? filter.name || "this player" : null} alerts={filter ? null : alerts} />;
 }
