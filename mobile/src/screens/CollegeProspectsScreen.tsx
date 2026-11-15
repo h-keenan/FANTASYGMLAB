@@ -4,7 +4,7 @@ import BrandHeaderBar from '../components/BrandHeaderBar';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { useHeaderHeight } from '@react-navigation/elements';
 
-import BrandedSpinner from '../components/BrandedSpinner';
+import { SkeletonPage } from '../components/Skeleton';
 import CollegeScoutingPanel from '../components/CollegeScoutingPanel';
 import GridBackground from '../components/GridBackground';
 import { getLastLeague } from '../lib/lastLeague';
@@ -44,7 +44,7 @@ export default function CollegeProspectsScreen({ navigation }: Props) {
     };
   }, [navigation]);
 
-  if (!resolved) return <BrandedSpinner style={[styles.center, { paddingTop: headerHeight }]} />;
+  if (!resolved) return <SkeletonPage label="College Scouting" layout="list" topInset={headerHeight} />;
 
   return (
     <View style={styles.container}>

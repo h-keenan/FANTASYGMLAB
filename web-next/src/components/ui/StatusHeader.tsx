@@ -5,6 +5,7 @@ import { useState, type ReactNode } from "react";
 
 import { AccentCard } from "@/components/AccentCard";
 import { ButtonLink, Button } from "@/components/Button";
+import { SkeletonRegion, SkeletonStatusHeader } from "@/components/Skeleton";
 import { CompactPlayerCard } from "@/components/ui/CompactPlayerCard";
 import { PlayerAccordionRow } from "@/components/ui/PlayerAccordionRow";
 import {
@@ -256,5 +257,14 @@ export function StatusHeader({
       </AccentCard>
       {children}
     </section>
+  );
+}
+
+/** The loading silhouette of `StatusHeader` (ring + headline, three stats, attention rows, primary button). */
+export function StatusHeaderSkeleton({ label = "status", rows = 3 }: { label?: string; rows?: number }) {
+  return (
+    <SkeletonRegion label={label}>
+      <SkeletonStatusHeader rows={rows} />
+    </SkeletonRegion>
   );
 }

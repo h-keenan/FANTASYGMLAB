@@ -4,16 +4,18 @@ import PressableScale from '../components/PressableScale';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { useHeaderHeight } from '@react-navigation/elements';
 
-import AccentCard from '../components/AccentCard';
 import AppText from '../components/AppText';
 import GridBackground from '../components/GridBackground';
-import CompactPlayerCard from '../components/CompactPlayerCard';
+import CompactModule from '../components/CompactModule';
+import PlayerAccordionRow, { usePlayerAccordion } from '../components/PlayerAccordionRow';
+import StatusHeader from '../components/StatusHeader';
+import TradeCompactCard, { type TradeCardAsset } from '../components/TradeCompactCard';
+import type { StatusHeaderModel } from '../lib/statusHeader';
 import SampleDashboard from '../components/SampleDashboard';
 import SampleLeagueBanner, { SampleConnectModule } from '../components/SampleLeagueBanner';
 import SectionHeading from '../components/SectionHeading';
 import SegmentedTabBar from '../components/SegmentedTabBar';
 import ToneBadge from '../components/ToneBadge';
-import ValueStat from '../components/ValueStat';
 import { useThemeMode } from '../context/ThemeModeContext';
 import {
   SAMPLE_GAME_PLAN,
@@ -47,15 +49,42 @@ export default function SampleLeagueScreen({ navigation }: Props) {
   // Home hosts the Add League sheet; openAddLeague opens it on arrival.
   const connect = () => navigation.navigate('Home', { openAddLeague: true });
 
+  const acc = usePlayerAccordion();
+  // Fictional players have no photo: id null keeps the shared avatar slot on initials.
+  const playerRef = (player: SamplePlayer) => ({ id: null, name: player.name, position: player.position, age: player.age });
   const playerRow = (player: SamplePlayer) => (
-    <View key={player.id} style={styles.playerRow}>
-      <View style={styles.playerText}>
-        {/* Fictional players have no photo: id null keeps the avatar on initials. */}
-        <CompactPlayerCard player={{ id: null, name: player.name, position: player.position, age: player.age }} detail={`Age ${player.age} · ${player.note}`} testID="sample-player" />
-      </View>
-      <ValueStat value={player.value} />
-    </View>
+    <PlayerAccordionRow
+      key={player.id}
+      player={playerRef(player)}
+      mode="desk"
+      value={player.value}
+      metaText={`Age ${player.age}`}
+      open={acc.isOpen(player.id)}
+      onToggle={() => acc.toggle(player.id)}
+      testID="sample-player"
+    >
+      <AppText style={styles.muted}>{player.note}</AppText>
+    </PlayerAccordionRow>
   );
+  const tradeAsset = (player: SamplePlayer): TradeCardAsset => ({ key: player.id, player: playerRef(player), detail: `Age ${player.age} · ${player.note}`, value: player.value });
+  const avgAge = SAMPLE_ROSTER.reduce((sum, p) => sum + p.age, 0) / SAMPLE_ROSTER.length;
+  const [firstMove, ...otherMoves] = SAMPLE_GAME_PLAN;
+  const planModel: StatusHeaderModel = {
+    kicker: firstMove.kicker,
+    headline: firstMove.headline,
+    context: 'Sample moves for Demo Squad',
+    ring: null,
+    stats: [
+      { key: 'moves', label: 'Moves', value: String(SAMPLE_GAME_PLAN.length) },
+      { key: 'sell', label: 'Sell', value: '1', tone: 'warning' },
+      { key: 'add', label: 'Add', value: '1', tone: 'success' },
+    ],
+    attention: SAMPLE_GAME_PLAN.map((item, index) => {
+      const player = SAMPLE_ROSTER.find((p) => p.id === item.playerId) ?? SAMPLE_ROSTER[0];
+      return { key: `${item.kicker}-${index}`, playerId: null, name: player.name, position: player.position, team: null, meta: item.kicker, stat: { value: String(player.value), label: 'VALUE' }, detail: item.reason };
+    }),
+    primary: { label: firstMove.cta === 'trade' ? 'Open sample trade' : 'Open sample roster', actionKey: firstMove.cta },
+  };
 
   const verdict = sampleTradeVerdict(SAMPLE_TRADE);
   const verdictColor =
@@ -86,51 +115,44 @@ export default function SampleLeagueScreen({ navigation }: Props) {
         {tab === 'roster' ? (
           <>
             <SectionHeading title="Roster" caption="Sample scores are made-up 0-100 numbers." />
-            <AccentCard accent={colors.accent} compact>
+            <CompactModule id="sample.roster" title="Roster" parts={[{ key: 'n', text: `${SAMPLE_ROSTER.length} players`, strong: true }, { key: 'age', text: `Avg age ${avgAge.toFixed(1)}` }]} defaultOpen persist={false}>
               {SAMPLE_ROSTER.map(playerRow)}
-            </AccentCard>
+            </CompactModule>
           </>
         ) : null}
 
         {tab === 'game_plan' ? (
           <>
             <SectionHeading title="Today" />
-            {SAMPLE_GAME_PLAN.map((item) => (
-              <AccentCard key={item.headline} accent={colors.accent}>
-                <AppText style={styles.kicker}>{item.kicker}</AppText>
-                <AppText style={styles.cardTitle}>{item.headline}</AppText>
-                <AppText style={styles.muted}>{item.reason}</AppText>
-                <PressableScale
-                  accessibilityRole="button"
-                  onPress={() => setTab(item.cta === 'trade' ? 'trade' : 'roster')}
-                >
-                  <AppText style={styles.link}>
-                    {item.cta === 'trade' ? 'Open sample trade' : 'Open sample roster'} →
-                  </AppText>
-                </PressableScale>
-              </AccentCard>
-            ))}
+            <StatusHeader model={planModel} attentionTitle="Top moves" onAction={(key) => setTab(key === 'trade' ? 'trade' : 'roster')}>
+              {otherMoves.map((item) => (
+                <CompactModule key={item.headline} id={`sample.plan.${item.playerId}`} title={item.kicker} parts={[{ key: 'h', text: item.headline, strong: true }]} persist={false}>
+                  <AppText style={styles.muted}>{item.reason}</AppText>
+                  <PressableScale accessibilityRole="button" onPress={() => setTab(item.cta === 'trade' ? 'trade' : 'roster')}>
+                    <AppText style={styles.link}>
+                      {item.cta === 'trade' ? 'Open sample trade' : 'Open sample roster'} →
+                    </AppText>
+                  </PressableScale>
+                </CompactModule>
+              ))}
+            </StatusHeader>
           </>
         ) : null}
 
         {tab === 'trade' ? (
           <>
             <SectionHeading title="Trade" caption={`Sample offer with ${SAMPLE_TRADE.partner}`} />
-            <AccentCard accent={verdictColor}>
-              <View style={styles.verdictRow}>
-                <ToneBadge label={verdict.label} color={verdictColor} />
-                <AppText style={styles.muted}>
-                  You send {verdict.giveTotal}, you get {verdict.getTotal}
-                </AppText>
-              </View>
-              <AppText style={styles.kicker}>You give</AppText>
-              {SAMPLE_TRADE.give.map(playerRow)}
-              <AppText style={styles.kicker}>You get</AppText>
-              {SAMPLE_TRADE.get.map(playerRow)}
+            <View style={styles.verdictRow}>
+              <ToneBadge label={verdict.label} color={verdictColor} />
+              <AppText style={styles.muted}>
+                You send {verdict.giveTotal}, you get {verdict.getTotal}
+              </AppText>
+            </View>
+            <TradeCompactCard title={`Offer with ${SAMPLE_TRADE.partner}`} give={SAMPLE_TRADE.give.map(tradeAsset)} get={SAMPLE_TRADE.get.map(tradeAsset)} netValue={verdict.gap} defaultOpen testID="sample-trade-card">
               <AppText style={styles.muted}>
                 Sample verdict: a real one weighs your roster needs, league scoring and what this manager tends to accept.
               </AppText>
-            </AccentCard>
+            </TradeCompactCard>
             <SampleConnectModule onConnect={connect} />
           </>
         ) : null}
@@ -145,11 +167,7 @@ function createStyles(colors: ThemeColors) {
     content: { paddingHorizontal: spacing.lg, gap: spacing.lg },
     title: { fontSize: 25, fontWeight: '900', color: colors.textPrimary },
     muted: { fontSize: 13.5, color: colors.textSecondary, lineHeight: 18 },
-    kicker: { fontSize: 12.5, fontWeight: '800', letterSpacing: 0.8, textTransform: 'uppercase', color: colors.accent },
-    cardTitle: { fontSize: 18, fontWeight: '700', color: colors.textPrimary },
     link: { fontSize: 15.5, fontWeight: '700', color: colors.accent },
-    playerRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, paddingVertical: spacing.sm },
-    playerText: { flex: 1 },
     verdictRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, flexWrap: 'wrap' },
   });
 }

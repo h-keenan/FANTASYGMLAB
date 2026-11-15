@@ -215,7 +215,7 @@ describe("LiveDraftContent", () => {
       />,
     );
 
-    expect(screen.getByText("Loading the live draft board…")).toBeInTheDocument();
+    expect(screen.getByRole("status", { name: "Loading the live draft board" })).toBeInTheDocument();
   });
 
   it("renders on-the-clock status, the primary recommendation, rankings, team board, and pick board", () => {

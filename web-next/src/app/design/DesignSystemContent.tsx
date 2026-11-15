@@ -945,9 +945,9 @@ export function DesignSystemContent() {
 
       {/* 10. STATES */}
       <Family id="states" title="States" note="Loading, error and empty. Skeletons reserve the real layout height.">
-        <Spec name="LoadingScreen" path="web-next/src/components/LoadingScreen.tsx" note="Branded splash with pulsing mark.">
+        <Spec name="LoadingScreen" path="web-next/src/components/LoadingScreen.tsx" note="Content-shaped page skeleton (SkeletonPage); never a splash or a Loading line.">
           <div className="glass-surface flex" style={{ minHeight: 180 }}>
-            <LoadingScreen status="Loading league…" />
+            <LoadingScreen label="league" />
           </div>
         </Spec>
         <Spec name="Skeletons" path="components/Skeleton.tsx (SkeletonBlock, SkeletonCard, SkeletonRows)" note="Every per-layout skeleton is composed from these.">

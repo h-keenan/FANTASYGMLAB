@@ -5,6 +5,7 @@ import { useEffect, useState } from "react";
 import { ToneBadge } from "@/components/ToneBadge";
 import { api, type CareerSeason, type WeeklyStatPoint } from "@/lib/api";
 import { simCareerAsOf, simGameLog } from "@/lib/simAsOf";
+import { SkeletonText } from "@/components/Skeleton";
 
 /**
  * The real-NFL record behind a Fantasy Sim player, cut to the last finished real season at the sim's start (lib/simAsOf.ts):
@@ -42,7 +43,7 @@ export function SimRealHistory({ playerId, asOf }: { playerId: string; asOf: num
   }, [playerId, asOf]);
 
   if (failed) return <p className="pqv-status-text">Could not load past seasons right now.</p>;
-  if (career == null) return <p className="pqv-status-text">Loading past seasons…</p>;
+  if (career == null) return <SkeletonText label="past seasons" lines={3} />;
   const summary = simGameLog(log ?? []);
   if (career.length === 0 && summary.games === 0) return <p className="pqv-status-text">No NFL seasons on file before this one.</p>;
   return (

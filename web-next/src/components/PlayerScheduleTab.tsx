@@ -4,6 +4,7 @@ import { ProjectionWeatherChip } from "@/components/WeatherReasonChip";
 import { useEffect, useState } from "react";
 
 import { api, type ScheduleWeek } from "@/lib/api";
+import { SkeletonList } from "@/components/Skeleton";
 
 /**
  * Schedule tab (ports mobile's PlayerDetailScreen ScheduleSection,
@@ -145,7 +146,7 @@ export function PlayerScheduleTab({ playerId }: { playerId: string }) {
   }, [playerId]);
 
   if (loadedFor !== playerId) {
-    return <p className="pqv-status-text">Loading schedule…</p>;
+    return <SkeletonList label="schedule" count={5} />;
   }
   if (loadError) {
     return (

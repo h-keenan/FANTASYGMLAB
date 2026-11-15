@@ -32,7 +32,7 @@ import { PLAIN_COPY } from '../lib/experienceCopy';
 import PremiumLock from '../components/PremiumLock';
 import SectionHeading from '../components/SectionHeading';
 import SegmentedTabBar from '../components/SegmentedTabBar';
-import SkeletonBlock, { SkeletonCard, SkeletonRows } from '../components/SkeletonBlock';
+import SkeletonBlock, { SkeletonCard, SkeletonRows } from '../components/Skeleton';
 import SharedTradeIdeaCard from '../components/TradeIdeaCard';
 import ExchangeSide from '../components/ExchangeSide';
 import {

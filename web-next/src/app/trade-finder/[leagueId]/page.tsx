@@ -54,7 +54,7 @@ export default function TradeFinderPage() {
 
   if (authLoading || (!myTeam && !error)) {
     return (
-      <LoadingScreen status="Loading Trade Finder…" />
+      <LoadingScreen label="Trade Finder" layout="cards" family="trades" />
     );
   }
 

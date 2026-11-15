@@ -6,7 +6,7 @@ import { useIsRestoring, useQuery } from '@tanstack/react-query';
 
 import AnimatedCard from '../components/AnimatedCard';
 import AppText from '../components/AppText';
-import BrandedSpinner from '../components/BrandedSpinner';
+import { SkeletonPage, SkeletonText } from '../components/Skeleton';
 import ErrorState from '../components/ErrorState';
 import GridBackground from '../components/GridBackground';
 import SectionHeading from '../components/SectionHeading';
@@ -63,7 +63,7 @@ export default function FounderAnalyticsScreen() {
     enabled: founder && !isRestoring,
   });
 
-  if (loading || !founder) return <BrandedSpinner style={[styles.center, { paddingTop: headerHeight }]} />;
+  if (loading || !founder) return <SkeletonPage label="Founder Analytics" layout="dashboard" topInset={headerHeight} />;
 
   const report = query.data?.report ?? null;
 
@@ -85,7 +85,7 @@ export default function FounderAnalyticsScreen() {
   if (query.isError && !report) {
     body = <ErrorState message={toUserErrorMessage(query.error, 'Could not load Founder Analytics.')} onRetry={() => void query.refetch()} />;
   } else if (!report) {
-    body = <BrandedSpinner style={styles.inlineSpinner} />;
+    body = <SkeletonText label="analytics" lines={3} />;
   } else {
     const storage = storageBadge(report.storage);
     const storageColor = storage.durable ? colors.success : colors.premium;

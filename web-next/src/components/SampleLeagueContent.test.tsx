@@ -79,4 +79,19 @@ describe("SampleLeagueContent", () => {
     expect(cta.textContent).toContain("Connect your league to see yours");
     expect(cta.querySelector("a")?.getAttribute("href")).toBe("/connect-league");
   });
+
+  it("builds Roster, Top moves and Trade from the shipped templates, every player with an avatar", () => {
+    render(<SampleLeagueContent />);
+    fireEvent.click(screen.getByRole("tab", { name: "Roster" }));
+    expect(screen.getAllByTestId("sample-player")).toHaveLength(8);
+    expect(screen.getAllByTestId("player-avatar-slot")).toHaveLength(8);
+    fireEvent.click(screen.getByRole("tab", { name: "Top moves" }));
+    expect(screen.getByTestId("status-header")).toBeTruthy();
+    expect(screen.getAllByTestId("status-attention-accordion").length).toBe(3);
+    expect(screen.getAllByTestId("player-avatar-slot").length).toBeGreaterThanOrEqual(3);
+    fireEvent.click(screen.getByRole("button", { name: /Open sample trade/ }));
+    expect(screen.getByTestId("sample-trade-card")).toBeTruthy();
+    // 2 players you send + 1 you get, each as a compact player card with an avatar.
+    expect(screen.getAllByTestId("player-avatar-slot")).toHaveLength(3);
+  });
 });

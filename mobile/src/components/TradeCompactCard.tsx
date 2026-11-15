@@ -8,6 +8,7 @@ import { useThemeMode } from '../context/ThemeModeContext';
 import PickAvatar from './PickAvatar';
 import { PickTap } from './PlayerOpenContext';
 import FairnessMeterRow from './FairnessMeterRow';
+import { SkeletonTradeCard } from './Skeleton';
 import { avatarSize, fairnessMeter, type FairnessMeter, type PlayerMode, type PlayerRef } from '../lib/playerAnatomy';
 import { radii, spacing, type ThemeColors } from '../theme';
 import { Collapse } from './Presence';
@@ -146,4 +147,9 @@ function createStyles(colors: ThemeColors) {
     toggle: { minHeight: 44, justifyContent: 'center', alignSelf: 'flex-start' },
     toggleText: { fontSize: 12, fontWeight: '700', color: colors.accent },
   });
+}
+
+/** The loading silhouette of a `TradeCompactCard` (title, give and get avatar rows, meter). */
+export function TradeCompactCardSkeleton({ assets = 2 }: { assets?: number }) {
+  return <SkeletonTradeCard assets={assets} />;
 }

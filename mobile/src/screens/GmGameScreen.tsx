@@ -21,7 +21,7 @@ import SimActionBar from '../components/SimActionBar';
 import { SimGameHeader, SimStatusChips } from '../components/SimGameHeader';
 import { SimNotificationBell, useSimNotifications } from '../components/SimNotificationBell';
 import SimGameOrb from '../components/SimGameOrb';
-import { SkeletonCard } from '../components/SkeletonBlock';
+import { SkeletonCard, SkeletonText } from '../components/Skeleton';
 import { SimDraftRecapView, SimGameDraft } from '../components/SimGameDraft';
 import { SimLeagueTab } from '../components/SimGameLeague';
 import SimOffseasonBar from '../components/SimOffseasonBar';
@@ -788,7 +788,7 @@ function SetupForm({
           ) : null}
           {league ? (
             <SetupField label="Your league">
-              {leagues === null ? <SetupNote>Loading your leagues...</SetupNote> : null}
+              {leagues === null ? <SkeletonText label="your leagues" lines={1} /> : null}
               {leagues !== null && leagues.length === 0 ? (
                 <>
                   <SetupNote>{SIM_START_CONNECT_NOTE}</SetupNote>
@@ -808,7 +808,7 @@ function SetupForm({
           ) : null}
           {league && state.leagueId ? (
             <SetupField label="Your team">
-              {leagueTeams.status === 'loading' ? <SetupNote>Loading teams...</SetupNote> : null}
+              {leagueTeams.status === 'loading' ? <SkeletonText label="teams" lines={1} /> : null}
               {leagueTeams.status === 'error' ? <SetupNote>{leagueTeams.message}</SetupNote> : null}
               {leagueTeams.status === 'ready' && !leagueTeams.youRosterId ? (
                 <SetupNote>We could not tell which team is yours from your Sleeper link. Pick it from the list.</SetupNote>

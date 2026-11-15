@@ -2,7 +2,6 @@
 
 import { useEffect, useState } from "react";
 
-import { AccentCard } from "@/components/AccentCard";
 import { BottomDock } from "@/components/ui/BottomDock";
 import { DashboardContent } from "@/components/DashboardContent";
 import { PillRow } from "@/components/PillRow";
@@ -10,7 +9,6 @@ import { BottomTabBar } from "@/components/ui/BottomTabBar";
 import { SampleConnectModule, SampleLeagueBanner } from "@/components/SampleLeagueBanner";
 import { SectionHeading } from "@/components/SectionHeading";
 import { ToneBadge } from "@/components/ToneBadge";
-import { ValueStat } from "@/components/ValueStat";
 import { SAMPLE_DASHBOARD_LEAGUE_ID, sampleDashboardResponse, sampleTeamRankings } from "@/lib/sampleDashboard";
 import {
   SAMPLE_BLOCKED_MESSAGE,
@@ -25,19 +23,37 @@ import {
   type SamplePlayer,
   type SampleTab,
 } from "@/lib/sampleLeague";
-import { CompactPlayerCard } from "@/components/ui/CompactPlayerCard";
+import { CompactModule } from "@/components/ui/CompactModule";
+import { PlayerAccordionRow, usePlayerAccordion } from "@/components/ui/PlayerAccordionRow";
+import { StatusHeader } from "@/components/ui/StatusHeader";
+import { TradeCompactCard, type TradeCardAsset } from "@/components/ui/TradeCompactCard";
+import type { StatusHeaderModel } from "@/lib/statusHeader";
 import { SAMPLE_ACTIVE_EVENT, SAMPLE_SELECT_EVENT } from "@/lib/sampleSidebar";
 
-function SamplePlayerRow({ player, first = false }: { player: SamplePlayer; first?: boolean }) {
+/** Fictional players have no photo: id null keeps the shared avatar slot on initials instead of a failing request. */
+function samplePlayerRef(player: SamplePlayer) {
+  return { id: null, name: player.name, position: player.position, age: player.age };
+}
+
+/** One roster row on the shipped player template (avatar, position badge, meta, trailing value; tap for the note). */
+function SamplePlayerRow({ player, acc }: { player: SamplePlayer; acc: ReturnType<typeof usePlayerAccordion> }) {
   return (
-    <li className="flex items-center gap-3 py-2 min-h-[var(--touch-target-min)]" style={first ? undefined : { borderTop: "1px solid var(--color-border)" }}>
-      <span className="min-w-0 flex-1">
-        {/* Fictional players have no photo: id null keeps the avatar on initials instead of a failing request. */}
-        <CompactPlayerCard player={{ id: null, name: player.name, position: player.position, age: player.age }} detail={`Age ${player.age} · ${player.note}`} testId="sample-player" />
-      </span>
-      <ValueStat value={player.value} />
-    </li>
+    <PlayerAccordionRow
+      player={samplePlayerRef(player)}
+      mode="desk"
+      value={player.value}
+      metaText={`Age ${player.age}`}
+      open={acc.isOpen(player.id)}
+      onToggle={() => acc.toggle(player.id)}
+      testId="sample-player"
+    >
+      <p className="m-0 text-sm" style={{ color: "var(--color-text-secondary)" }}>{player.note}</p>
+    </PlayerAccordionRow>
   );
+}
+
+function tradeAsset(player: SamplePlayer): TradeCardAsset {
+  return { key: player.id, player: samplePlayerRef(player), detail: `Age ${player.age} · ${player.note}`, value: player.value };
 }
 
 /** The real Dashboard modules fed static fictional data; links are inert. */
@@ -67,45 +83,64 @@ function DashboardTab() {
 }
 
 function RosterTab() {
+  const acc = usePlayerAccordion();
+  const avgAge = SAMPLE_ROSTER.reduce((sum, p) => sum + p.age, 0) / SAMPLE_ROSTER.length;
   return (
     <section className="flex flex-col gap-2" aria-labelledby="sample-roster-heading">
       <SectionHeading id="sample-roster-heading" note="Sample scores are made-up 0-100 numbers.">
         Roster
       </SectionHeading>
-      <AccentCard accent="var(--color-accent)" compact>
-        <ul style={{ listStyle: "none", margin: 0, padding: 0 }}>
-          {SAMPLE_ROSTER.map((player, index) => (
-            <SamplePlayerRow key={player.id} player={player} first={index === 0} />
+      <CompactModule id="sample.roster" title="Roster" parts={[{ key: "n", text: `${SAMPLE_ROSTER.length} players`, strong: true }, { key: "age", text: `Avg age ${avgAge.toFixed(1)}` }]} defaultOpen persist={false}>
+        <div className="flex min-w-0 flex-col">
+          {SAMPLE_ROSTER.map((player) => (
+            <SamplePlayerRow key={player.id} player={player} acc={acc} />
           ))}
-        </ul>
-      </AccentCard>
+        </div>
+      </CompactModule>
     </section>
   );
 }
 
 function GamePlanTab({ onNavigate }: { onNavigate: (tab: SampleTab) => void }) {
+  const [first, ...rest] = SAMPLE_GAME_PLAN;
+  const model: StatusHeaderModel = {
+    kicker: first.kicker,
+    headline: first.headline,
+    context: "Sample moves for Demo Squad",
+    ring: null,
+    stats: [
+      { key: "moves", label: "Moves", value: String(SAMPLE_GAME_PLAN.length) },
+      { key: "sell", label: "Sell", value: "1", tone: "warning" },
+      { key: "add", label: "Add", value: "1", tone: "success" },
+    ],
+    attention: SAMPLE_GAME_PLAN.map((item, index) => {
+      const player = SAMPLE_ROSTER.find((p) => p.id === item.playerId) ?? SAMPLE_ROSTER[0];
+      return {
+        key: `${item.kicker}-${index}`,
+        playerId: null,
+        name: player.name,
+        position: player.position,
+        team: null,
+        meta: item.kicker,
+        stat: { value: String(player.value), label: "VALUE" },
+        detail: item.reason,
+      };
+    }),
+    primary: { label: first.cta === "trade" ? "Open sample trade" : "Open sample roster", actionKey: first.cta },
+  };
   return (
     <section className="flex flex-col gap-2" aria-labelledby="sample-plan-heading">
       <SectionHeading id="sample-plan-heading">Today</SectionHeading>
-      {SAMPLE_GAME_PLAN.map((item) => (
-        <AccentCard key={item.headline} accent="var(--color-accent)">
-          <span className="uppercase" style={{ font: "var(--type-badge-size)", letterSpacing: "var(--letter-spacing-badge)", color: "var(--color-accent)" }}>
-            {item.kicker}
-          </span>
-          <h3 style={{ font: "var(--font-card-title)" }}>{item.headline}</h3>
-          <p className="text-sm" style={{ color: "var(--color-text-secondary)" }}>
-            {item.reason}
-          </p>
-          <button
-            type="button"
-            onClick={() => onNavigate(item.cta === "trade" ? "trade" : "roster")}
-            className="self-start text-sm font-bold mt-1 min-h-[var(--touch-target-min)]"
-            style={{ color: "var(--color-accent)" }}
-          >
-            {item.cta === "trade" ? "Open sample trade" : "Open sample roster"} →
-          </button>
-        </AccentCard>
-      ))}
+      <StatusHeader model={model} attentionTitle="Top moves" onAction={(key) => onNavigate(key === "trade" ? "trade" : "roster")}>
+        {rest.map((item) => (
+          <CompactModule key={item.headline} id={`sample.plan.${item.playerId}`} title={item.kicker} parts={[{ key: "h", text: item.headline, strong: true }]} persist={false}>
+            <p className="m-0 text-sm" style={{ color: "var(--color-text-secondary)" }}>{item.reason}</p>
+            <button type="button" onClick={() => onNavigate(item.cta === "trade" ? "trade" : "roster")} className="self-start text-sm font-bold" style={{ color: "var(--color-accent)", minHeight: "var(--touch-target-min)" }}>
+              {item.cta === "trade" ? "Open sample trade" : "Open sample roster"} →
+            </button>
+          </CompactModule>
+        ))}
+      </StatusHeader>
     </section>
   );
 }
@@ -118,32 +153,17 @@ function TradeTab() {
       <SectionHeading id="sample-trade-heading" note={`Sample offer with ${SAMPLE_TRADE.partner}`}>
         Trade
       </SectionHeading>
-      <AccentCard accent={tone}>
-        <div className="flex items-center gap-2">
-          <ToneBadge label={verdict.label} color={tone} testId="sample-verdict" />
-          <span className="text-xs" style={{ color: "var(--color-text-secondary)" }}>
-            You send {verdict.giveTotal}, you get {verdict.getTotal}
-          </span>
-        </div>
-        {[
-          { title: "You give", players: SAMPLE_TRADE.give },
-          { title: "You get", players: SAMPLE_TRADE.get },
-        ].map((side) => (
-          <div key={side.title}>
-            <p className="text-xs font-bold uppercase" style={{ color: "var(--color-text-muted)" }}>
-              {side.title}
-            </p>
-            <ul style={{ listStyle: "none", margin: 0, padding: 0 }}>
-              {side.players.map((player, index) => (
-                <SamplePlayerRow key={player.id} player={player} first={index === 0} />
-              ))}
-            </ul>
-          </div>
-        ))}
-        <p className="text-xs" style={{ color: "var(--color-text-secondary)" }}>
+      <div className="flex items-center gap-2">
+        <ToneBadge label={verdict.label} color={tone} testId="sample-verdict" />
+        <span className="text-xs" style={{ color: "var(--color-text-secondary)" }}>
+          You send {verdict.giveTotal}, you get {verdict.getTotal}
+        </span>
+      </div>
+      <TradeCompactCard title={`Offer with ${SAMPLE_TRADE.partner}`} give={SAMPLE_TRADE.give.map(tradeAsset)} get={SAMPLE_TRADE.get.map(tradeAsset)} netValue={verdict.gap} defaultOpen testId="sample-trade-card">
+        <p className="m-0 text-xs" style={{ color: "var(--color-text-secondary)" }}>
           Sample verdict: a real one weighs your roster needs, league scoring and what this manager tends to accept.
         </p>
-      </AccentCard>
+      </TradeCompactCard>
       {/* On desktop the same module lives in the right rail (SampleLeagueContent). */}
       <div className="lg:hidden">
         <SampleConnectModule />

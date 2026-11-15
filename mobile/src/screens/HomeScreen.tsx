@@ -24,7 +24,7 @@ import { useHeaderHeight } from '@react-navigation/elements';
 import { Ionicons } from '@expo/vector-icons';
 
 import AnimatedCard from '../components/AnimatedCard';
-import BrandedSpinner from '../components/BrandedSpinner';
+import { SkeletonPage } from '../components/Skeleton';
 import BrandMark from '../components/BrandMark';
 import LeagueWarmupProgress from '../components/LeagueWarmupProgress';
 import EmptyState from '../components/EmptyState';
@@ -484,7 +484,7 @@ export default function HomeScreen({ navigation, route }: Props) {
   }, [leagues, navigation]);
 
   if (loading) {
-    return <BrandedSpinner style={[styles.center, { paddingTop: headerHeight }]} />;
+    return <SkeletonPage label="your leagues" layout="dashboard" topInset={headerHeight} />;
   }
 
   const defaultLeague = leagues?.find((league) => league.is_default) ?? leagues?.[0] ?? null;

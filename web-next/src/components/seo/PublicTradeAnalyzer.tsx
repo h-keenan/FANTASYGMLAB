@@ -24,6 +24,7 @@ import {
 } from "@/lib/seo/tradeAnalyzer";
 import { shareLinkWithUtm } from "@/lib/seo/tradeShare";
 import { CompactPlayerCard } from "@/components/ui/CompactPlayerCard";
+import { SkeletonList } from "@/components/Skeleton";
 
 const FEATURE = "public_trade_analyzer";
 
@@ -499,9 +500,7 @@ export function PublicTradeAnalyzer() {
           </Button>
         </div>
       ) : !board ? (
-        <div className="glass-surface p-4 text-sm" style={{ minHeight: "22rem", color: "var(--color-text-muted)" }} aria-busy="true">
-          Loading player values...
-        </div>
+        <div className="glass-surface p-4" style={{ minHeight: "22rem" }}><SkeletonList label="player values" count={6} /></div>
       ) : (
         <>
           <div className="grid gap-4 md:grid-cols-2">

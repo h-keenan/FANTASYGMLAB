@@ -14,7 +14,7 @@ import CompactModule from './CompactModule';
 import CompactPlayerCard from './CompactPlayerCard';
 import { SimDraftIconButton, SimDraftRow } from './SimDraftBoard';
 import { SimRookieOverview } from './SimDraftOverview';
-import { SkeletonCard } from './SkeletonBlock';
+import { SkeletonCard, SkeletonList } from './Skeleton';
 import { SimDynastyStrip } from './SimGameDynasty';
 import { SimCollapse, SimGeneratedChip, SimGeneratedNoticeSheet, SimPickLine, SimRookieNoticeGate, useSimPicks } from './SimGameDynastyParts';
 import { SimTeamIdentity } from './SimTeamIdentity';
@@ -550,7 +550,7 @@ function CutdownStage({ off, ctx, onTrade, onTeam }: { off: SimOffseason; ctx: S
           </View>
         ) : null}
         {players.length === 0 ? (
-          <AppText style={common.muted}>Loading your roster.</AppText>
+          <SkeletonList label="your roster" count={5} />
         ) : (
           players.map((player) => (
             <SimRosterLine

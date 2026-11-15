@@ -8,7 +8,7 @@ import ErrorState from './ErrorState';
 import PositionBadge from './PositionBadge';
 import { SimTeamLogo } from './SimTeamIdentity';
 import { SimTeamHistory } from './SimTeamHistory';
-import { SkeletonCard } from './SkeletonBlock';
+import { SkeletonCard } from './Skeleton';
 import Tabs from './Tabs';
 import { SimPlayerChip, SimPlayerLine, SimSectionTitle, SimSheet, SimToneBadge, createSimStyles, simToneColor, type SimCtx } from './SimGameParts';
 import ToneBadge from './ToneBadge';

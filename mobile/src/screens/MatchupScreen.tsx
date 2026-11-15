@@ -19,7 +19,7 @@ import GmStanceHeaderButton from '../components/GmStanceHeaderButton';
 import LeagueSwitcherHeaderButton from '../components/LeagueSwitcherHeaderButton';
 import BrandHeaderBar from '../components/BrandHeaderBar';
 import PageFamilyTabs from '../components/PageFamilyTabs';
-import BrandedSpinner from '../components/BrandedSpinner';
+import { SkeletonPage } from '../components/Skeleton';
 import { PlannerBar, SwapSheet, useLineupPlanner } from '../components/MatchupPlanner';
 import GuillotineCard from '../components/GuillotineCard';
 import GridBackground from '../components/GridBackground';
@@ -230,7 +230,7 @@ export default function MatchupScreen({ route, navigation }: Props) {
   );
 
   if (loading) {
-    return <BrandedSpinner style={[styles.center, { paddingTop: headerHeight }]} />;
+    return <SkeletonPage label="Matchup" layout="detail" family="team" topInset={headerHeight} />;
   }
 
   if (error) {

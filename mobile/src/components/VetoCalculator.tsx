@@ -5,7 +5,7 @@ import { useMutation } from '@tanstack/react-query';
 
 import AccentCard from './AccentCard';
 import AppText from './AppText';
-import BrandedSpinner from './BrandedSpinner';
+import { SkeletonText } from './Skeleton';
 import Button from './Button';
 import DashboardStatRow from './DashboardStatRow';
 import DraftPickAssetRow from './DraftPickAssetRow';
@@ -317,7 +317,7 @@ function VetoBuilder({ leagueId, lens, pool, styles }: { leagueId: string; lens:
   const result = check.data;
   let outcome: React.ReactNode = null;
   if (check.isPending) {
-    outcome = <BrandedSpinner style={styles.spinner} />;
+    outcome = <SkeletonText label="the league’s teams" lines={3} />;
   } else if (check.error) {
     outcome = (
       <ErrorState
@@ -488,7 +488,7 @@ export default function VetoCalculator({ leagueId, lens }: { leagueId: string; l
       />
     );
   } else if (loading || !pool) {
-    body = <BrandedSpinner style={styles.spinner} />;
+    body = <SkeletonText label="both rosters" lines={3} />;
   } else if (pool.teams.length < 2) {
     body = <EmptyState icon="people-outline" title="Not enough teams" subtitle="This league needs at least two teams with rosters." />;
   } else {

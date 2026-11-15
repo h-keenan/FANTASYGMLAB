@@ -7,6 +7,7 @@ import { api, type GuessThePlayerLeaderboardEntry, type GuessThePlayerLeaderboar
 import { ToneBadge } from "@/components/ToneBadge";
 import { EmptyState } from "@/components/EmptyState";
 import { ErrorState } from "@/components/ErrorState";
+import { SkeletonList } from "@/components/Skeleton";
 
 /**
  * League-scoped leaderboard across both Guess the Player mini-games' real,
@@ -91,11 +92,7 @@ export function GuessThePlayerLeaderboardContent({ leagueId }: { leagueId: strin
 
   if (!data && !error) {
     return (
-      <main className="flex-1 flex items-center justify-center px-4 py-8" data-testid="guess-the-player-leaderboard-loading">
-        <p className="text-sm" style={{ color: "var(--color-text-muted)" }}>
-          Loading the leaderboard…
-        </p>
-      </main>
+      <main className="page-shell" data-testid="guess-the-player-leaderboard-loading"><SkeletonList label="the leaderboard" count={8} /></main>
     );
   }
 

@@ -15,7 +15,7 @@ import SimScoutingSections from './SimScoutingSections';
 import WeeklyPointsChart from './WeeklyPointsChart';
 import { ReviewGlyphChip } from './SeasonReviewSections';
 import SegmentedTabBar from './SegmentedTabBar';
-import { SkeletonCard } from './SkeletonBlock';
+import { SkeletonCard } from './Skeleton';
 import { SimDraftRow } from './SimDraftBoard';
 import { SimPager, SimToneBadge, createSimStyles, useSimDebounced } from './SimGameParts';
 import { useThemeMode } from '../context/ThemeModeContext';

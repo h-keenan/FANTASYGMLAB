@@ -5,7 +5,7 @@ import AppText from './AppText';
 import CompactModule from './CompactModule';
 import ErrorState from './ErrorState';
 import { Section as PqvSection } from './PlayerQuickViewSheet';
-import { SkeletonCard } from './SkeletonBlock';
+import { SkeletonCard } from './Skeleton';
 import { createSimStyles } from './SimGameParts';
 import ToneBadge from './ToneBadge';
 import { useThemeMode } from '../context/ThemeModeContext';

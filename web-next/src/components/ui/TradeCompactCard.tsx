@@ -7,6 +7,7 @@ import { CompactPlayerCard } from "@/components/ui/CompactPlayerCard";
 import { PickTap } from "@/components/ui/PickTap";
 import { PickAvatar } from "@/components/PickAvatar";
 import { FairnessMeterRow } from "@/components/ui/FairnessMeterRow";
+import { SkeletonTradeCard } from "@/components/Skeleton";
 import { avatarSize, fairnessMeter, type FairnessMeter, type PlayerMode, type PlayerRef } from "@/lib/playerAnatomy";
 import { Collapse } from "@/components/ui/Presence";
 
@@ -144,4 +145,9 @@ export function TradeCompactCard({
       ) : null}
     </section>
   );
+}
+
+/** The loading silhouette of a `TradeCompactCard` (title, give and get avatar rows, meter). */
+export function TradeCompactCardSkeleton({ assets = 2 }: { assets?: number }) {
+  return <SkeletonTradeCard assets={assets} />;
 }

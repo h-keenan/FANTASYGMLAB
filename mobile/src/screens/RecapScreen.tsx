@@ -11,7 +11,6 @@ import { keepPreviousData, useIsRestoring, useQuery } from '@tanstack/react-quer
 
 import AccentCard from '../components/AccentCard';
 import AnimatedCard from '../components/AnimatedCard';
-import BrandedSpinner from '../components/BrandedSpinner';
 import EmptyState from '../components/EmptyState';
 import EvaluationLensHeaderButton from '../components/EvaluationLensHeaderButton';
 import GmStanceHeaderButton from '../components/GmStanceHeaderButton';
@@ -23,7 +22,7 @@ import PageFamilyTabs from '../components/PageFamilyTabs';
 import FilterDropdownButton from '../components/FilterDropdownButton';
 import RecapSharePreviewModal from '../components/RecapSharePreviewModal';
 import RecapTradeDetailModal from '../components/RecapTradeDetailModal';
-import SkeletonBlock, { SkeletonRow } from '../components/SkeletonBlock';
+import SkeletonBlock, { SkeletonRow, SkeletonPage } from '../components/Skeleton';
 import TeamAvatar from '../components/TeamAvatar';
 import { api, type RecapStory, type WeeklyRecap } from '../lib/api';
 import { toUserErrorMessage } from '../lib/errorMessages';
@@ -283,7 +282,7 @@ export default function RecapScreen({ route, navigation }: Props) {
   }
 
   if (loading && !recap) {
-    return <BrandedSpinner style={[styles.center, { paddingTop: headerHeight }]} />;
+    return <SkeletonPage label="League Recaps" layout="detail" family="league" topInset={headerHeight} />;
   }
 
   if (error) {

@@ -13,6 +13,7 @@ import { nextOpenId, playerRowModel, type FactTone, type PlayerFactsInput, type 
 import type { BadgeInput } from "@/lib/playerBadges";
 import type { SimGradeInput } from "@/lib/simGrade";
 import { Money } from "@/components/Money";
+import { SkeletonPlayerRow } from "@/components/Skeleton";
 import { Collapse } from "@/components/ui/Presence";
 
 const TONE: Record<FactTone, string> = {
@@ -221,6 +222,15 @@ export function PlayerAccordionRow({ open, onToggle, badges = [], positionLabel,
           ) : null}
         </div>
       </Collapse>
+    </div>
+  );
+}
+
+/** The loading silhouette of a `PlayerAccordionRow` (same avatar tier, two text lines, trailing number, hairline). Use for a list whose players have not arrived. */
+export function PlayerAccordionRowSkeleton({ trailing = true }: { trailing?: boolean }) {
+  return (
+    <div style={{ borderBottom: "1px solid color-mix(in srgb, var(--color-border) 55%, transparent)" }} data-testid="player-accordion-row-skeleton">
+      <SkeletonPlayerRow trailing={trailing} />
     </div>
   );
 }

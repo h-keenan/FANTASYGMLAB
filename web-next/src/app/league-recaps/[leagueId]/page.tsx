@@ -48,7 +48,7 @@ export default function LeagueRecapsPage() {
 
   if (authLoading || (!recap && !error)) {
     return (
-      <LoadingScreen status="Loading League Recaps…" />
+      <LoadingScreen label="League Recaps" layout="detail" family="league" />
     );
   }
 

@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 
 import { api, type CareerSeason } from "@/lib/api";
+import { SkeletonList } from "@/components/Skeleton";
 import { Collapse } from "@/components/ui/Presence";
 
 /**
@@ -102,7 +103,7 @@ export function PlayerCareerTab({ playerId }: { playerId: string }) {
   }, [playerId]);
 
   if (loadedFor !== playerId) {
-    return <p className="pqv-status-text">Loading career history…</p>;
+    return <SkeletonList label="career history" count={5} />;
   }
   if (loadError) {
     return (

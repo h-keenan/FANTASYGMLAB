@@ -216,7 +216,7 @@ export default function LandingPage() {
           be redirected). After the marketing content in DOM order so a
           no-JS reader meets the real copy first. */}
       <div className="fd-landing-loader flex-1 flex-col">
-        <LoadingScreen />
+        <LoadingScreen label="your leagues" />
       </div>
     </div>
   );

@@ -7,7 +7,6 @@ import ShareToCommunityToggle from '../components/ShareToCommunityToggle';
 import type { SharedTradeAssetInput } from '../lib/sharedTrades';
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
-  ActivityIndicator,
   KeyboardAvoidingView,
   Platform,
   ScrollView,
@@ -28,7 +27,7 @@ import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { Ionicons } from '@expo/vector-icons';
 
 import AnimatedCard from '../components/AnimatedCard';
-import BrandedSpinner from '../components/BrandedSpinner';
+import { SkeletonPage } from '../components/Skeleton';
 import GridBackground from '../components/GridBackground';
 import ScreenInfoNote from '../components/ScreenInfoNote';
 import SegmentedTabBar from '../components/SegmentedTabBar';
@@ -510,7 +509,7 @@ export default function TradeAnalyzerScreen({ leagueId, leagueName, navigation, 
   };
 
   if (loading) {
-    return <BrandedSpinner style={styles.center} />;
+    return <SkeletonPage label="Trade Analyzer" layout="detail" family="trades" />;
   }
 
   if (error) {

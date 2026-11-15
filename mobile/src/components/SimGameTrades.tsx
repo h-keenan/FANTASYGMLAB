@@ -10,7 +10,7 @@ import ErrorState from './ErrorState';
 import FadeInView from './FadeInView';
 import SectionHeading from './SectionHeading';
 import SegmentedTabBar from './SegmentedTabBar';
-import { SkeletonCard } from './SkeletonBlock';
+import { SkeletonCard } from './Skeleton';
 import { MotionIn } from './Motion';
 import { SimTeamIdentity } from './SimTeamIdentity';
 import SimGlyph from './SimGlyph';

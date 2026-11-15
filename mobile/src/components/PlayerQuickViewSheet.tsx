@@ -19,7 +19,7 @@ import { pqvBioForContext, pqvRealWorld } from '../lib/pqvContext';
 import { rowsAsOf, simAsOfSeason } from '../lib/simAsOf';
 import PlayerTrendsPanel from './PlayerTrendsPanel';
 import SectionHeading from './SectionHeading';
-import SkeletonBlock, { SkeletonChart } from './SkeletonBlock';
+import SkeletonBlock, { SkeletonChart } from './Skeleton';
 import { SheetModal, SheetScrollView, SwipeDismissCard } from './SwipeDismissSheet';
 import PlayerValueHistory from './PlayerValueHistory';
 import { ratingHistoryCaption } from '../lib/valueHistoryPresentation';

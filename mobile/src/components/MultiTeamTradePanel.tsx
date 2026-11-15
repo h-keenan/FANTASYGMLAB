@@ -17,7 +17,7 @@ import MultiTeamSharePreviewModal from './MultiTeamSharePreviewModal';
 import PlayerIdentityRow from './PlayerIdentityRow';
 import PremiumLock from './PremiumLock';
 import TradePickerSheet from './TradePickerSheet';
-import SkeletonBlock from './SkeletonBlock';
+import SkeletonBlock from './Skeleton';
 import { SheetModal, SwipeDismissCard } from './SwipeDismissSheet';
 import TeamAvatar from './TeamAvatar';
 import ToneBadge from './ToneBadge';

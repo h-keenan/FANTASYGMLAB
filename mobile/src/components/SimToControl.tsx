@@ -7,7 +7,7 @@ import AppText from './AppText';
 import Button from './Button';
 import ConfirmInPlace from './ConfirmInPlace';
 import ErrorState from './ErrorState';
-import { SkeletonCard } from './SkeletonBlock';
+import { SkeletonCard } from './Skeleton';
 import { SimCollapse } from './SimGameDynastyParts';
 import { SimStandingsList } from './SimGameLeague';
 import { SetupToggleRow } from './SimSetupParts';

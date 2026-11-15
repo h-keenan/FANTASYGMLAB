@@ -14,7 +14,7 @@ import { simMatchupCardModel } from '../lib/matchupModules';
 import { buildSimStatusHeader, simHomeAttentionItems } from '../lib/statusHeader';
 import CompactModule from './CompactModule';
 import { simLeagueParts } from '../lib/simSummaries';
-import { SkeletonCard } from './SkeletonBlock';
+import { SkeletonCard } from './Skeleton';
 import {
   SimByeCard,
   SimHotColdCard,
