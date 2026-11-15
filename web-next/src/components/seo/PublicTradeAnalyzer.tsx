@@ -496,7 +496,7 @@ export function PublicTradeAnalyzer() {
               load();
             }}
           >
-            Retry
+            Try again
           </Button>
         </div>
       ) : !board ? (

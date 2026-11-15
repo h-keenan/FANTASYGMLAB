@@ -302,7 +302,7 @@ export function ConfirmInPlace({
           <span className="ui-confirm-text">{phase === "error" ? errorText : prompt}</span>
           <span className="ui-confirm-actions">
             <Button variant="danger" size="sm" loading={busy} onClick={() => void run()}>
-              {phase === "error" ? "Retry" : confirmText}
+              {phase === "error" ? "Try again" : confirmText}
             </Button>
             <button ref={keepRef} type="button" className="ui-confirm-keep" disabled={busy} onClick={() => dispatch("cancel")}>
               {phase === "error" ? "Cancel" : keepLabel}

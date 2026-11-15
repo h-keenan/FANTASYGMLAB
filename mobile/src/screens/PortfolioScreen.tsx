@@ -500,7 +500,7 @@ function FailedLeaguesNote({
                 accessibilityRole="button"
                 accessibilityLabel={`Retry ${league.league_name}`}
               >
-                <AppText style={[styles.failedNoteText, { color: colors.accent, fontWeight: '700' }]}>Retry</AppText>
+                <AppText style={[styles.failedNoteText, { color: colors.accent, fontWeight: '700' }]}>Try again</AppText>
               </PressableScale>
             ))
         : null}
@@ -560,7 +560,7 @@ function PortfolioLeagueSkeleton({
         <View style={styles.slowRow}>
           <AppText style={styles.slowText}>Taking longer than usual…</AppText>
           <PressableScale onPress={() => onRetry(league.league_id)} accessibilityRole="button" accessibilityLabel={`Retry ${league.league_name}`}>
-            <AppText style={styles.slowRetry}>Retry</AppText>
+            <AppText style={styles.slowRetry}>Try again</AppText>
           </PressableScale>
         </View>
       ) : null}

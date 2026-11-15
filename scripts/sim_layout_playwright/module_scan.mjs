@@ -14,6 +14,11 @@ const BASE = process.env.BASE || "http://localhost:3197";
 const OUT = process.env.OUT || "/private/tmp/claude-501/module-scan";
 const WIDTHS = (process.env.WIDTHS || "390,1440").split(",").map(Number);
 const LID = "1221647449446162432";
+// Audit knobs (docs/audits/2026-11-ui-consistency-audit-4.md): NAV=bottom opens every page in the phone shell (header + bottom pill) instead of the legacy
+// header + orb, FULL=1 saves full-page screenshots, METRICS=1 adds the design-token census (radii, type sizes, gold, button heights) to report.json.
+const NAV = process.env.NAV || "";
+const FULL = process.env.FULL === "1";
+const METRICS = process.env.METRICS === "1";
 fs.mkdirSync(OUT, { recursive: true });
 
 const player = (id, name, position, slot, extra = {}) => ({ player_id: id, name, position, team: "DET", age: 25, tier: "starter", score: 2000, slot, suggested_starter: slot !== "BENCH", roster_slot: slot === "BENCH" ? "bench" : "starter", overall_rating: 88, injury_label: "", opportunity_label: null, ...extra });
@@ -145,11 +150,32 @@ const PAGE_CHECK = () => {
   return out;
 };
 
+
+// Token census: what the rendered page actually uses (visible elements only), so spacing/radius/type drift shows up as numbers.
+const CENSUS = () => {
+  const hist = (m, k) => { m[k] = (m[k] || 0) + 1; };
+  const radii = {}, sizes = {}, weights = {}, btnH = {}, gold = [], pills = {};
+  const isGold = (c) => { const m = c.match(/rgba?\(([^)]+)\)/); if (!m) return false; const [r, g, b, a] = m[1].split(/[,/ ]+/).filter(Boolean).map(parseFloat); if (a === 0) return false; return r > 200 && g > 150 && b < 110 && r >= g; };
+  for (const el of document.querySelectorAll("main *, header *")) {
+    const r = el.getBoundingClientRect(); if (r.width < 2 || r.height < 2) continue;
+    const cs = getComputedStyle(el); if (cs.display === "none" || cs.visibility === "hidden") continue;
+    const rad = parseFloat(cs.borderTopLeftRadius) || 0; if (rad > 0 && r.height > 20) hist(radii, rad >= r.height / 2 - 1 ? "pill" : Math.round(rad) + "px");
+    if (el.childNodes.length && [...el.childNodes].some((n) => n.nodeType === 3 && n.textContent.trim())) { hist(sizes, parseFloat(cs.fontSize).toFixed(1).replace(/\.0$/, "")); hist(weights, cs.fontWeight);
+      if (isGold(cs.color)) gold.push((el.textContent || "").trim().slice(0, 28)); }
+    if (el.tagName === "BUTTON" || el.getAttribute("role") === "button") hist(btnH, Math.round(r.height));
+    if (isGold(cs.backgroundColor) || isGold(cs.borderTopColor) && parseFloat(cs.borderTopWidth) >= 2) gold.push("[bg/border] " + (el.getAttribute("data-testid") || el.className?.toString().slice(0, 30) || el.tagName));
+  }
+  const vis = (el) => { const r = el.getBoundingClientRect(); return r.width > 2 && r.height > 2 && getComputedStyle(el).display !== "none"; };
+  const headings = [...document.querySelectorAll("main h2, main h3, main h4, main [data-testid*='heading'], main [class*='section-heading'], main [class*='eyebrow']")].filter(vis).slice(0, 40).map((h) => { const cs = getComputedStyle(h); return `${h.tagName.toLowerCase()} ${parseFloat(cs.fontSize)}px/${cs.fontWeight}${cs.textTransform === "uppercase" ? " UP" : ""} "${(h.textContent || "").trim().slice(0, 30)}"`; });
+  const controls = [...document.querySelectorAll("main select, main input[type=search], main input[type=text], main [role=tablist], header select")].filter(vis).map((el) => { const cs = getComputedStyle(el), r = el.getBoundingClientRect(); const rad = parseFloat(cs.borderTopLeftRadius) || 0; return `${el.tagName.toLowerCase()}${el.getAttribute("role") ? "[" + el.getAttribute("role") + "]" : ""} r=${rad >= r.height / 2 - 1 ? "pill" : Math.round(rad)} h=${Math.round(r.height)} ${(el.getAttribute("aria-label") || el.getAttribute("placeholder") || "").slice(0, 24)}`; });
+  return { radii, sizes, weights, btnH, headings, controls, gold: gold.slice(0, 40), goldCount: gold.length };
+};
+
 const browser = await chromium.launch({ executablePath: process.env.CHROME || process.env.HOME + "/Library/Caches/ms-playwright/chromium_headless_shell-1248/chrome-headless-shell-mac-arm64/chrome-headless-shell" });
 const results = [];
 for (const w of WIDTHS) {
   const ctx = await browser.newContext({ viewport: { width: w, height: w >= 768 ? 900 : 844 }, hasTouch: w < 768, isMobile: w < 768 });
-  await ctx.addInitScript(([s]) => { try { localStorage.clear(); localStorage.setItem("fgl:theme-mode", "dark"); localStorage.setItem("sb-dummy-auth-token", JSON.stringify(s)); localStorage.setItem("fgl:onboarding-complete", "1"); } catch (e) {} }, [session]);
+  await ctx.addInitScript(([s, nav, theme]) => { try { localStorage.clear(); localStorage.setItem("fgl:theme-mode", theme); localStorage.setItem("sb-dummy-auth-token", JSON.stringify(s)); localStorage.setItem("fgl:onboarding-complete", "1"); if (nav) localStorage.setItem("fgl:nav", nav); } catch (e) {} }, [session, NAV, process.env.THEME || "dark"]);
   await ctx.route("**/*", async (route) => {
     const u = new URL(route.request().url());
     const cors = { "access-control-allow-origin": "*", "access-control-allow-headers": "*", "access-control-allow-methods": "*" };
@@ -170,9 +196,10 @@ for (const w of WIDTHS) {
       await page.addStyleTag({ content: "nextjs-portal,[data-nextjs-toast]{display:none!important}" }).catch(() => {});
       await sleep(r.name === "today" && w === WIDTHS[0] ? 12000 : 5000);
       const res = await page.evaluate(PAGE_CHECK);
+      if (METRICS) res.census = await page.evaluate(CENSUS);
       results.push({ page: r.name, width: w, maxTablists: r.maxTablists ?? 1, noModules: Boolean(r.noModules), expect: r.expect ? await page.locator(`[data-testid="${r.expect}"]`).count() : null, ...res });
       if (r.expect === "waiver-rec-row") await page.locator(`[data-testid="${r.expect}"]`).first().scrollIntoViewIfNeeded().catch(() => {});
-      await page.screenshot({ path: `${OUT}/${r.name}-${w}.png`, fullPage: false });
+      await page.screenshot({ path: `${OUT}/${r.name}-${w}.png`, fullPage: FULL });
     } catch (e) {
       results.push({ page: r.name, width: w, error: String(e).slice(0, 160) });
     }
