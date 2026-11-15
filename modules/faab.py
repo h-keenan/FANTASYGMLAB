@@ -1,6 +1,7 @@
 from dataclasses import dataclass
 from typing import Mapping, Sequence
 
+from modules.frame_records import frame_records
 from modules.rankings import injury_level
 from modules.semantic_glyphs import glyph_html
 
@@ -304,7 +305,7 @@ def _healthy_scores_by_position(frame, score_field: str) -> dict[str, tuple[floa
     out: dict[str, list[float]] = {}
     if frame is None or getattr(frame, "empty", True):
         return {}
-    for _, row in frame.iterrows():
+    for row in frame_records(frame):
         pos = str(row.get("position") or "").strip().upper()
         if pos not in _SKILL_POSITIONS:
             continue
@@ -377,7 +378,7 @@ def build_faab_market(
 
     wire: dict[str, list[float]] = {}
     if free_agents is not None and not getattr(free_agents, "empty", True):
-        for _, row in free_agents.iterrows():
+        for row in frame_records(free_agents):
             if bool(row.get("stale_free_agent") or False):
                 continue
             pos = str(row.get("position") or "").strip().upper()
