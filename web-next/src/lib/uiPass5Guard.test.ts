@@ -53,4 +53,15 @@ describe("ui pass 5 picks", () => {
     expect(read(WEB, "components/ui/ModuleMore.tsx")).toContain("module-more");
     expect(read(APP, "components/ModuleMore.tsx")).toContain("accessibilityRole=\"link\"");
   });
+
+  it("D8: the Top Waiver Target is the cyan hero card with one primary action, no gold", () => {
+    const web = read(WEB, "components/WaiversContent.tsx");
+    // the one gold left on the page is the real Pro upsell card
+    expect((web.match(/--color-premium/g) ?? []).length).toBeLessThanOrEqual(1);
+    expect(web).not.toContain("★ Top Waiver Target");
+    expect(web).toContain('id="waivers.top.detail"');
+    const app = read(APP, "components/WaiverRecommendationCard.tsx");
+    expect(app).toContain('id="waivers.top.detail"');
+    expect(app).not.toMatch(/<AnimatedCard glow/);
+  });
 });
