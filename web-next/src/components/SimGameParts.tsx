@@ -805,7 +805,7 @@ export function SimSectionTitle({
     </span>
   );
   return (
-    <SectionHeading id={id} size="compact" action={action} note={note}>
+    <SectionHeading id={id} action={action} note={note}>
       {title}
     </SectionHeading>
   );

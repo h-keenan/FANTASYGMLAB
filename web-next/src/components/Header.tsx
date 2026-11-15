@@ -171,7 +171,7 @@ function LensMenuItems({ lens, setLens, onDone }: { lens: ValuationLens; setLens
                 className="flex flex-col px-3 py-2 text-left"
                 style={{ borderBottom: "var(--border-width-default) solid var(--color-border)" }}
               >
-                <span className="text-xs font-bold" style={{ color: option.value === lens ? "var(--color-premium)" : "var(--color-text-primary)" }}>
+                <span className="text-xs font-bold" style={{ color: option.value === lens ? "var(--color-accent)" : "var(--color-text-primary)" }}>
                   {option.label}
                 </span>
                 <span className="text-xs" style={{ color: "var(--color-text-muted)" }}>
@@ -210,7 +210,7 @@ export function EvaluationLensButton({ leagueId }: { leagueId: string }) {
         aria-expanded={open}
         aria-haspopup="menu"
         className={`${HEADER_CHIP_CLASS} shrink-0`}
-        style={{ color: "var(--color-premium)", border: "var(--border-width-default) solid var(--color-premium)" }}
+        style={{ color: "var(--color-accent)", border: "var(--border-width-default) solid var(--color-accent)" }}
       >
         <span>{current?.label ?? "Dynasty"}</span>
         <span aria-hidden>▾</span>
@@ -254,7 +254,7 @@ export function LeagueLensPicker({ leagueId, leagueName, leagues }: { leagueId: 
         {/* League over lens: one compact "League · Lens ▾" chip that still fits beside the page name. */}
         <span className="flex flex-col min-w-0 leading-tight" style={{ fontSize: "0.6875rem" }}>
           <span className="truncate">{leagueName || "Switch league"}</span>
-          <span className="break-words" style={{ color: "var(--color-premium)" }}>
+          <span className="break-words" style={{ color: "var(--color-text-muted)" }}>
             <span aria-hidden style={{ color: "var(--color-text-muted)" }}>· </span>
             {current?.label ?? "Dynasty"}
           </span>

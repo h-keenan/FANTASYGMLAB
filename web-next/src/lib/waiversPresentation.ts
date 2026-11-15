@@ -29,7 +29,7 @@ export function waiversReasonMessage(reason: string): string | null {
  * mapping mobile's recommendationToneColor uses: amber for "Add", cyan for
  * "Stash", muted slate for "Watch"). */
 export function recommendationToneColor(tone: string | null | undefined): string {
-  if (tone === "opportunity") return "var(--color-premium)";
+  if (tone === "opportunity") return "var(--color-accent)";
   if (tone === "information") return "var(--color-accent)";
   return "var(--color-text-secondary)";
 }
@@ -40,7 +40,7 @@ export function recommendationToneColor(tone: string | null | undefined): string
  * Stash/Watch pill rather than a fourth ad hoc color. */
 export function confidenceColor(label: string | null | undefined): string {
   const normalized = (label ?? "").trim().toLowerCase();
-  if (normalized === "high") return "var(--color-premium)";
+  if (normalized === "high") return "var(--color-accent)";
   if (normalized === "low") return "var(--color-text-muted)";
   return "var(--color-accent)";
 }

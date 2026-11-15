@@ -260,7 +260,7 @@ export function TradeIdeaCardView({
 
       {landedNames.length > 0 ? (
         <div className="flex items-center gap-1.5 flex-wrap" data-testid="lands-target">
-          <span className="text-xs font-bold" style={{ color: "var(--color-premium)" }}>
+          <span className="text-xs font-bold" style={{ color: "var(--color-accent)" }}>
             Lands your target:
           </span>
           {(idea.landed_gm_target_player_ids || []).map((playerId) => {
@@ -269,7 +269,7 @@ export function TradeIdeaCardView({
               <span
                 key={playerId}
                 className="inline-flex items-center gap-1 pr-2 text-xs font-bold"
-                style={{ border: "var(--border-width-default) solid var(--color-premium)", borderRadius: "var(--radius-pill)", color: "var(--color-text-primary)" }}
+                style={{ border: "var(--border-width-default) solid var(--color-accent)", borderRadius: "var(--radius-pill)", color: "var(--color-text-primary)" }}
               >
                 <PlayerTap player={{ id: playerId, name: asset.name ?? "Player", position: asset.position, team: asset.team }} className="inline-flex items-center gap-1 text-left">
                   <PlayerAvatar playerId={playerId} size={22} />

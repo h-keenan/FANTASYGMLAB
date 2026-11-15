@@ -1697,7 +1697,7 @@ function createStyles(colors: ThemeColors) {
     alignItems: 'center',
     justifyContent: 'center',
   },
-  untouchableButtonActive: { backgroundColor: colors.premium, borderColor: colors.premium },
+  untouchableButtonActive: { backgroundColor: colors.accent, borderColor: colors.accent },
   // True secondary (ghost/no-border, lighter weight) — no longer shares the
   // primary button's chrome (same 1px cardBorder + near-equal text weight).
   compareButton: {
