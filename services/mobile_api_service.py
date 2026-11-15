@@ -4412,17 +4412,20 @@ def _resolve_my_roster(
     ):
         return None, FREE_LEAGUE_CAP_REASON
 
-    # The username -> user id lookup and the league's roster list do not depend on each other: start both together (each warms its
-    # own cache) instead of paying two Sleeper round trips back to back. The calls below are unchanged.
-    prefetch.warm_parallel(
+    # The username -> user id lookup and the league's roster list do not depend on each other: run both together instead of paying
+    # two Sleeper round trips back to back. Either one that fails is simply repeated the usual way below.
+    sleeper_user_id, rosters = prefetch.run_parallel(
         lambda: sleeper_leagues.resolve_sleeper_user_id(sleeper_username),
         lambda: sleeper.get_rosters(league_id),
     )
-    sleeper_user_id = sleeper_leagues.resolve_sleeper_user_id(sleeper_username)
+    if sleeper_user_id is prefetch.FAILED:
+        sleeper_user_id = sleeper_leagues.resolve_sleeper_user_id(sleeper_username)
     if not sleeper_user_id:
         return None, "sleeper_user_not_found"
 
-    for roster in sleeper.get_rosters(league_id):
+    if rosters is prefetch.FAILED:
+        rosters = sleeper.get_rosters(league_id)
+    for roster in rosters:
         if str(roster.get("owner_id") or "") == sleeper_user_id:
             return roster, ""
 

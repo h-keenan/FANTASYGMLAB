@@ -37,3 +37,28 @@ def _safely(call: Callable[[], object]) -> None:
         call()
     except Exception:  # the caller repeats the real call and handles/raises it itself
         logger.debug("prefetch warm-up failed", exc_info=True)
+
+
+_FAILED = object()
+
+
+def run_parallel(*calls: Callable[[], object], timeout: float = 20.0) -> list[object]:
+    """Like ``warm_parallel`` but returns each call's result in order, or ``FAILED`` where it raised or timed out, so the caller can
+    use the value (one network call, not two) and repeat only the ones that failed."""
+
+    def one(call: Callable[[], object]) -> object:
+        try:
+            return call()
+        except Exception:
+            logger.debug("prefetch call failed", exc_info=True)
+            return _FAILED
+
+    try:
+        futures = [_POOL.submit(one, call) for call in calls]
+        wait(futures, timeout=timeout)
+        return [f.result() if f.done() else _FAILED for f in futures]
+    except RuntimeError:
+        return [_FAILED for _ in calls]
+
+
+FAILED = _FAILED
