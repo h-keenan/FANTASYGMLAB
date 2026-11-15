@@ -144,16 +144,17 @@ def season_clock(today: date | None = None) -> SeasonClock:
 
     if today is not None:
         return clock_from_calendar(today)
-    fallback = clock_from_calendar(_today_utc())
+    # The calendar fallback is only needed when offline or when Sleeper's state is unavailable: computing it eagerly cost
+    # a kickoff-date calculation on every call, and per-row eligibility checks call this thousands of times a request.
     if _offline():
-        return fallback
+        return clock_from_calendar(_today_utc())
     now = time.monotonic()
     with _lock:
         cached = _cached["clock"]
         if cached is not None and now - _cached["fetched_at"] < STATE_TTL_SECONDS:
             return cached
         if _cached["failed_at"] and now - _cached["failed_at"] < FAILURE_BACKOFF_SECONDS:
-            return cached or fallback
+            return cached or clock_from_calendar(_today_utc())
     try:
         clock = clock_from_sleeper_state(_fetch_state())
     except Exception:
@@ -161,7 +162,7 @@ def season_clock(today: date | None = None) -> SeasonClock:
     with _lock:
         if clock is None:
             _cached["failed_at"] = now
-            return _cached["clock"] or fallback
+            return _cached["clock"] or clock_from_calendar(_today_utc())
         _cached.update(clock=clock, fetched_at=now, failed_at=0.0)
         return clock
 
