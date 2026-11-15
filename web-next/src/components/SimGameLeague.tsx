@@ -111,7 +111,7 @@ export function SimScoreCard({ g, names, youId, onOpen }: { g: SimRecapScore; na
   const team = (t: ReturnType<typeof side>) => (
     <span className="flex min-w-0 flex-col items-center gap-1 text-center" style={{ opacity: t.lost ? 0.7 : 1 }}>
       <SimTeamLogo name={names[t.id] ?? "Team"} size="row" />
-      <span className="text-xs leading-tight [overflow-wrap:anywhere]" style={{ fontWeight: t.won ? 800 : 600, color: "var(--color-text-primary)" }}>{names[t.id] ?? "Team"}</span>
+      <span className="text-xs leading-tight break-words" style={{ fontWeight: t.won ? 800 : 600, color: "var(--color-text-primary)" }}>{names[t.id] ?? "Team"}</span>
       {t.id === youId ? <ToneBadge label="YOU" color="var(--color-accent)" size="xs" /> : null}
     </span>
   );

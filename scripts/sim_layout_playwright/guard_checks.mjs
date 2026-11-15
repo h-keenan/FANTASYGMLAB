@@ -95,7 +95,7 @@ export const GUARD = (opts) => {
       const range = document.createRange();
       range.selectNodeContents(el);
       const tops = new Set([...range.getClientRects()].filter((q) => q.width > 0).map((q) => Math.round(q.top / 4)));
-      const words = el.textContent.trim().split(/\s+/).length;
+      const words = el.textContent.trim().split(/[\s\-\/]+/).length;
       if (tops.size > words) push("word-break", el, `${tops.size} lines for ${words} word(s)`);
     }
     // Hit target.
