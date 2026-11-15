@@ -168,7 +168,7 @@ function SwapBody({ suggestion, drop, alternatives }: { suggestion: DropSuggesti
           ))}
         </View>
       ) : null}
-      <PressableScale onPress={() => setShowWhy((v) => !v)} accessibilityRole="button" accessibilityState={{ expanded: showWhy }} style={{ minHeight: 32, justifyContent: 'center' }}>
+      <PressableScale onPress={() => setShowWhy((v) => !v)} accessibilityRole="button" accessibilityState={{ expanded: showWhy }} style={{ minHeight: 44, justifyContent: 'center' }}>
         <AppText style={[styles.meta, { color: colors.accent, fontWeight: '700' }]}>{showWhy ? 'Hide details' : 'Why this cut'}</AppText>
       </PressableScale>
       <Collapse open={showWhy}>
