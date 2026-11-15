@@ -19,14 +19,6 @@ try {
 }
 if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) UIManager.setLayoutAnimationEnabledExperimental(true);
 
-let reduceMotion = false;
-try {
-  void Promise.resolve(AccessibilityInfo.isReduceMotionEnabled?.()).then((v) => { reduceMotion = Boolean(v); }).catch(() => {});
-} catch {
-  /* keep the animation */
-}
-if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) UIManager.setLayoutAnimationEnabledExperimental(true);
-
 function toneColor(tone: CompactTone | undefined, colors: ThemeColors): string {
   switch (tone) {
     case 'success': return colors.success;
