@@ -13,9 +13,6 @@ import { PageTitle } from "@/components/PageTitle";
 import { PillRow } from "@/components/PillRow";
 import { PremiumUpsellCard } from "@/components/PremiumUpsellCard";
 import { SectionHeading } from "@/components/SectionHeading";
-import { SimDraftRecapView, SimGameDraft } from "@/components/SimGameDraft";
-import { SimLeagueTab } from "@/components/SimGameLeague";
-import { SimGameOffseason } from "@/components/SimGameOffseason";
 import { SimHomeTab } from "@/components/SimGameHome";
 import { SimPlayerSheet } from "@/components/SimGamePlayers";
 import { BottomDock } from "@/components/ui/BottomDock";
@@ -37,11 +34,20 @@ import { SimNotice, SimOpenPlayerContext, SimPreviewBanner, SimProgressBar, SimR
 import { SimBlockToggle } from "@/components/SimTradeBlock";
 import { SimTeamSheet } from "@/components/SimGameTeamSheet";
 import { SimRealismModule } from "@/components/SimRealism";
-import { SimToResultView, SimToSheet, type SimToRequest } from "@/components/SimToControl";
-import { SimFinalView } from "@/components/SimGameRecap";
-import { SimWeekRecapStory } from "@/components/SimRecapStory";
-import { SimPlayersTab, SimTeamTab } from "@/components/SimGameTeam";
-import { SimTradesTab } from "@/components/SimGameTrades";
+import { SimToSheet, type SimToRequest } from "@/components/SimToControl";
+import {
+  SimDraftRecapView,
+  SimFinalView,
+  SimGameDraft,
+  SimGameOffseason,
+  SimLeagueTab,
+  SimPlayersTab,
+  SimTeamTab,
+  SimToResultView,
+  SimTradesTab,
+  SimWeekRecapStory,
+  useSimWarmChunks,
+} from "@/components/simLazy";
 import { SkeletonCard } from "@/components/Skeleton";
 import { DifficultyTiles, SetupCard, SetupField, SetupNote, SetupStickyBar, SetupSummaryCard, SetupToggleGroup, SetupToggleRow } from "@/components/SimSetupParts";
 import { MotionIn } from "@/components/Motion";
@@ -125,6 +131,7 @@ const UPSELL_FALLBACK = {
 
 /** Fantasy Sim: the GM Game. Standalone and turn-based; see lib/simGame.ts and docs/fantasy-sim-game-design.md. */
 export function SimGameContent() {
+  useSimWarmChunks();
   const [flow, dispatch] = useReducer(simFlowReducer, SIM_FLOW_INITIAL);
   const [options, setOptions] = useState<SimGameOptionsResponse | null>(null);
   const [games, setGames] = useState<SimGameLite[]>([]);
