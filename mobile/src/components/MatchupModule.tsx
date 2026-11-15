@@ -5,6 +5,7 @@ import AccentCard from './AccentCard';
 import AppText from './AppText';
 import PlayerAvatar from './PlayerAvatar';
 import PositionBadge from './PositionBadge';
+import { PlayerTap } from './PlayerOpenContext';
 import ToneBadge from './ToneBadge';
 import { useThemeMode } from '../context/ThemeModeContext';
 import { compactSummaryText } from '../lib/compactModule';
@@ -91,14 +92,12 @@ export function MatchupHeroCard({
                     </View>
                   </>
                 );
-                return onOpenPlayer ? (
-                  <Pressable key={p.key} accessibilityRole="button" accessibilityLabel={`${p.name}, ${p.label}. Open player`} onPress={() => onOpenPlayer(p)} style={styles.swingItem} testID="matchup-swing-player">
-                    {body}
-                  </Pressable>
-                ) : (
-                  <View key={p.key} style={styles.swingItem} testID="matchup-swing-player">
-                    {body}
-                  </View>
+                return (
+                  <PlayerTap key={p.key} player={{ id: p.playerId, name: p.name, position: p.position }} onOpen={onOpenPlayer ? () => onOpenPlayer(p) : undefined} style={styles.swingItem}>
+                    <View style={styles.swingItemInner} testID="matchup-swing-player">
+                      {body}
+                    </View>
+                  </PlayerTap>
                 );
               })}
             </View>
@@ -145,6 +144,7 @@ function createStyles(colors: ThemeColors) {
     swing: { gap: spacing.xs, paddingTop: spacing.xs, borderTopWidth: 1, borderTopColor: colors.border },
     swingTitle: { fontSize: 12, fontWeight: '800', letterSpacing: 0.8, textTransform: 'uppercase', color: colors.textTertiary, paddingTop: spacing.xs },
     swingRow: { flexDirection: 'row', gap: spacing.sm },
+    swingItemInner: { flex: 1, minWidth: 0, flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
     swingItem: { flex: 1, minWidth: 0, minHeight: 44, flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
     swingText: { flex: 1, minWidth: 0 },
     swingName: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs },

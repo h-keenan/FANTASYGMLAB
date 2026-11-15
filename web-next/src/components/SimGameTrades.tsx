@@ -82,7 +82,7 @@ function SimTeamScout({ teamId, name }: { teamId: string; name: string }) {
 /** A sim player or pick as the shared trade card asset (avatar, name + position, "KC · Proj 14.2"; a pick gets the round pick avatar). */
 function tradeAsset(p: SimTradeAsset): TradeCardAsset {
   const a = simScaleAsset(p);
-  return { key: a.key, player: a.player, pickLabel: a.pickLabel, detail: a.detail };
+  return { key: a.key, player: a.player, pickLabel: a.pickLabel, detail: a.detail, pickId: a.pickLabel ? p.id : undefined };
 }
 
 /** Players and picks in an offer: the same shared asset cards the scale and the trade card use, never a bespoke row. */
@@ -360,7 +360,7 @@ function Builder({ ctx, seed, onSeedUsed }: { ctx: SimCtx; seed: SimTradeSeed | 
   const sheetItems = sheetSide ? toItems(groupsFor(sheetSide === "give" ? mine : partnerRoster, sheetSide === "give" ? myPicks : theirPicks)) : [];
   const toScaleAsset = (asset: SimTradeAsset): TradeCardAsset => {
     const a = simScaleAsset(asset);
-    return { key: a.key, player: a.player, pickLabel: a.pickLabel, detail: a.detail, onOpen: a.source ? () => ctx.openPlayer(a.source!) : undefined };
+    return { key: a.key, player: a.player, pickLabel: a.pickLabel, detail: a.detail, pickId: a.pickLabel ? asset.id : undefined, onOpen: a.source ? () => ctx.openPlayer(a.source!) : undefined };
   };
 
   return (

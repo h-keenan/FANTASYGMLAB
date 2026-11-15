@@ -113,6 +113,7 @@ export default function PlayerInsightRow({
           valueLabel={valueLabel}
           contextLine={detail}
           contextLines={detailLines}
+          nonInteractive={onPress ? 'The whole insight row is a button that already opens its detail' : undefined}
         />
         {children}
       </View>

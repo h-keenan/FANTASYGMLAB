@@ -294,6 +294,7 @@ export default function TradePickerSheet<T = unknown>({
                               tier={item.tier}
                               trailingValue={value}
                               trailingCaption={valueLabel}
+                              nonInteractive="Picker row: tapping it selects the asset for the trade"
                               showDivider={false}
                             />
                           ) : (

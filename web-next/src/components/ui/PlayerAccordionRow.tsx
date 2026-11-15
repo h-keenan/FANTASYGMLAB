@@ -7,6 +7,8 @@ import { PositionBadge } from "@/components/PositionBadge";
 import { LetterGrade } from "@/components/ui/LetterGrade";
 import { PlayerBadges } from "@/components/ui/PlayerBadge";
 import { PlayerAvatarSlot } from "@/components/ui/PlayerAvatarSlot";
+import { PlayerTap } from "@/components/ui/PlayerOpenContext";
+import { canOpenPlayer } from "@/lib/playerTap";
 import { nextOpenId, playerRowModel, type FactTone, type PlayerFactsInput, type PlayerFact } from "@/lib/playerAnatomy";
 import type { BadgeInput } from "@/lib/playerBadges";
 import type { SimGradeInput } from "@/lib/simGrade";
@@ -63,6 +65,13 @@ export type PlayerAccordionRowProps = PlayerFactsInput & {
    * itself stays one tap target that expands in place, so a row has one always-visible control and no more.
    */
   trailingAction?: ReactNode;
+  /** Opens something other than the default quick view when the avatar or name is tapped. */
+  onOpenPlayer?: () => void;
+  /**
+   * Opt out of the avatar + name tap (the whole row then only expands), with the reason. Never needed for a normal
+   * list: the rule is that the avatar and name open the quick view and the rest of the row expands in place.
+   */
+  nonInteractive?: string;
   /** A short sentence under the meta line (News: the headline), wrapping to two lines. Names never take this slot. */
   headline?: string | null;
 };
@@ -72,11 +81,14 @@ export type PlayerAccordionRowProps = PlayerFactsInput & {
  * position badge, TEAM · age · bye, one trailing key number or letter grade; no chevron because the whole row is the
  * tap target). Tapped it swells in place into a glass tile with projections / value / trend and the actions. Serves
  * FantasyDesk (`mode="desk"`) and Fantasy Sim (`mode="sim"`: grade, ADP, projection; never OVR or trade value).
- * Mobile twin: components/PlayerAccordionRow.tsx; logic: lib/playerAnatomy.ts.
+ * Tap rule: the avatar and the name line open the player quick view, everything else in the row (stats line, trailing
+ * figure, padding) expands the row. The expand control is a full-row button under the content; the avatar and name
+ * sit above it. Mobile twin: components/PlayerAccordionRow.tsx; logic: lib/playerAnatomy.ts.
  */
-export function PlayerAccordionRow({ open, onToggle, badges = [], positionLabel, primaryAction, onOpenProfile, children, testId = "player-accordion-row", ariaLabel, gradeTile, metaParts, hidePosition = false, trailingAction, headline, ...input }: PlayerAccordionRowProps) {
+export function PlayerAccordionRow({ open, onToggle, badges = [], positionLabel, primaryAction, onOpenProfile, children, testId = "player-accordion-row", ariaLabel, gradeTile, metaParts, hidePosition = false, trailingAction, headline, onOpenPlayer, nonInteractive, ...input }: PlayerAccordionRowProps) {
   const { player } = input;
   const model = playerRowModel(input);
+  const split = !nonInteractive && canOpenPlayer(player);
   const metaLine: { key: string; text: string; tone?: FactTone }[] = metaParts ?? model.meta.map((text, i) => ({ key: `m${i}`, text }));
   return (
     <div
@@ -97,21 +109,25 @@ export function PlayerAccordionRow({ open, onToggle, badges = [], positionLabel,
       }
     >
       <div className="flex min-w-0 items-center gap-1.5">
-        <button
-          type="button"
-          onClick={onToggle}
-          aria-expanded={open}
-          aria-label={ariaLabel}
-          className="flex min-w-0 flex-1 items-center gap-2.5 text-left"
-          style={{ minHeight: "var(--touch-target-min)" }}
-        >
-          <PlayerAvatarSlot player={player} tier="row" />
+        {split ? (
+        <div className="relative flex min-w-0 flex-1" style={{ minHeight: "var(--touch-target-min)" }}>
+          <button
+            type="button"
+            onClick={onToggle}
+            aria-expanded={open}
+            aria-label={ariaLabel ?? `${player.name}, ${open ? "hide" : "show"} details`}
+            data-row-toggle="true"
+            className="absolute inset-0 w-full text-left"
+            style={{ background: "none", border: 0, padding: 0 }}
+          />
+          <div className="pointer-events-none relative flex min-w-0 flex-1 items-center gap-2.5">
+            <PlayerAvatarSlot player={player} tier="row" onOpen={onOpenPlayer} className="pointer-events-auto" />
           <span className="flex min-w-0 flex-1 flex-col">
-            <span className="flex min-w-0 items-center gap-1.5">
+            <PlayerTap player={player} onOpen={onOpenPlayer} className="pointer-events-auto flex min-w-0 items-center gap-1.5 text-left" minHeight={28}>
               <PlayerName name={player.name} className="min-w-0 text-sm font-bold" style={{ color: "var(--color-text-primary)" }} />
               {hidePosition ? null : <PositionBadge position={player.position} label={positionLabel ?? undefined} />}
               <PlayerBadges badges={badges} />
-            </span>
+            </PlayerTap>
             {metaLine.length > 0 || gradeTile ? (
               <span className="flex min-w-0 items-center gap-1.5 text-xs leading-4" style={{ color: "var(--color-text-muted)" }} data-testid="row-meta">
                 <span className="min-w-0 truncate">
@@ -135,7 +151,49 @@ export function PlayerAccordionRow({ open, onToggle, badges = [], positionLabel,
               <span className="text-[0.6875rem] font-extrabold uppercase" style={{ color: "var(--color-text-muted)", letterSpacing: "var(--letter-spacing-badge)" }}>{model.trailing.label}</span>
             </span>
           ) : null}
-        </button>
+          </div>
+        </div>
+        ) : (
+        <button
+            type="button"
+            onClick={onToggle}
+            aria-expanded={open}
+            aria-label={ariaLabel}
+            className="flex min-w-0 flex-1 items-center gap-2.5 text-left"
+            style={{ minHeight: "var(--touch-target-min)" }}
+          >
+            <PlayerAvatarSlot player={player} tier="row" nonInteractive="the whole row button expands the row, no player tap" />
+            <span className="flex min-w-0 flex-1 flex-col">
+              <span className="flex min-w-0 items-center gap-1.5">
+                <PlayerName name={player.name} className="min-w-0 text-sm font-bold" style={{ color: "var(--color-text-primary)" }} />
+                {hidePosition ? null : <PositionBadge position={player.position} label={positionLabel ?? undefined} />}
+                <PlayerBadges badges={badges} />
+              </span>
+              {metaLine.length > 0 || gradeTile ? (
+                <span className="flex min-w-0 items-center gap-1.5 text-xs leading-4" style={{ color: "var(--color-text-muted)" }} data-testid="row-meta">
+                  <span className="min-w-0 truncate">
+                    {metaLine.map((part, i) => (
+                      <Fragment key={part.key}>
+                        {i > 0 ? " · " : ""}
+                        <span style={{ color: part.tone ? TONE[part.tone] : undefined, fontWeight: part.tone === "warning" || part.key === "proj" ? 700 : undefined }}><Money>{part.text}</Money></span>
+                      </Fragment>
+                    ))}
+                  </span>
+                  {gradeTile ? <LetterGrade grade={gradeTile} size="xs" testId="row-grade" /> : null}
+                </span>
+              ) : null}
+              {headline ? (
+              <span className="text-[0.8125rem] leading-snug" style={{ color: "var(--color-text-secondary)", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden" }} data-testid="row-headline">{headline}</span>
+              ) : null}
+            </span>
+            {model.trailing && input.mode !== "sim" ? (
+              <span className="flex shrink-0 flex-col items-end" data-testid="row-trailing">
+                <span className="text-base font-extrabold tabular-nums leading-5" style={{ color: model.trailing.tone ? TONE[model.trailing.tone] : "var(--color-text-primary)" }}>{model.trailing.value}</span>
+                <span className="text-[0.6875rem] font-extrabold uppercase" style={{ color: "var(--color-text-muted)", letterSpacing: "var(--letter-spacing-badge)" }}>{model.trailing.label}</span>
+              </span>
+            ) : null}
+          </button>
+        )}
         {trailingAction ? <span className="flex shrink-0 items-center" data-testid="row-action">{trailingAction}</span> : null}
       </div>
       <Collapse open={open}>

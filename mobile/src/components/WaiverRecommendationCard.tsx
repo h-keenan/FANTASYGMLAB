@@ -227,6 +227,7 @@ export default function WaiverRecommendationCard({
       contextLineColor={contextLineColor}
       trendingAddLabel={waiverTrendingAddLabel(player)}
       slot={rank != null ? String(rank) : undefined}
+      nonInteractive="The identity sits inside the card or row press target that already opens or expands the recommendation"
       showDivider={false}
     />
   );

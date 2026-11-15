@@ -485,6 +485,7 @@ function DraftBoard({
                   <CompactPlayerCard
                     player={{ id: row.player_id, name: row.player_name, position: row.position, team: row.team }}
                     detail={`${row.team} · ${row.fantasy_team}`}
+                    nonInteractive="the pick row Pressable already opens this player"
                     testID="live-draft-pick-player"
                   />
                 </View>
@@ -532,6 +533,7 @@ function RecommendationCard({
         overallRating={rec.overall_rating}
         trailingValue={formatLiveDraftScore(rec.league_adjusted_draft_score)}
         trailingTone="accent"
+        nonInteractive="The recommendation card is a button that already opens the player"
         showDivider={false}
       />
       <View style={styles.chipRow}>

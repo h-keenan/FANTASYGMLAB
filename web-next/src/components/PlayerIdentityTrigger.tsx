@@ -2,6 +2,7 @@
 
 import type { ReactNode } from "react";
 
+import { TapScopeContext } from "@/components/ui/PlayerOpenContext";
 import { usePlayerQuickView, type PlayerQuickViewIdentity } from "@/context/PlayerQuickViewContext";
 
 /**
@@ -41,7 +42,7 @@ export function PlayerIdentityTrigger({
       }}
       className={`appearance-none bg-transparent border-0 p-0 m-0 text-left cursor-pointer min-w-0 min-h-[var(--touch-target-min)] ${className}`.trim()}
     >
-      {children}
+      <TapScopeContext.Provider value>{children}</TapScopeContext.Provider>
     </button>
   );
 }

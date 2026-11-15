@@ -30,7 +30,7 @@ import { SimDraftGlyph } from "@/components/SimDraftGlyphs";
 import { SimDynastyStrip } from "@/components/SimGameDynasty";
 import { SimCollapse, SimGeneratedChip, SimGeneratedNoticeSheet, SimPickLine, SimRookieNoticeGate, useSimPicks } from "@/components/SimGameDynastyParts";
 import { SimTeamIdentity } from "@/components/SimTeamIdentity";
-import { SimIconButton, SimRosterLine, SimToneBadge, simToneColor, type SimCtx } from "@/components/SimGameParts";
+import { SimIconButton, SimRosterLine, SimToneBadge, simToneColor, type SimCtx, SimPlayerNameTap } from "@/components/SimGameParts";
 import { SimReserveGroups, useSimRosterMoves } from "@/components/SimGameReserves";
 import { SkeletonCard } from "@/components/Skeleton";
 import { api } from "@/lib/api";
@@ -257,7 +257,13 @@ function ReviewStage({ off, ctx, years }: { off: SimOffseason; ctx: SimCtx; year
           </p>
           {lastYear.top_scorers.length > 0 ? (
             <p className="text-xs" style={{ color: "var(--color-text-secondary)" }}>
-              Top scorers: {lastYear.top_scorers.map((s) => `${s.name} ${s.pts.toFixed(1)}`).join(", ")}
+              Top scorers:{" "}
+              {lastYear.top_scorers.map((s, i) => (
+                <span key={`${s.id}-${i}`}>
+                  {i > 0 ? ", " : ""}
+                  <SimPlayerNameTap player={s}>{s.name}</SimPlayerNameTap> {s.pts.toFixed(1)}
+                </span>
+              ))}
             </p>
           ) : null}
         </SimCollapse>
@@ -458,7 +464,7 @@ function RookieStage({
             {[...made].reverse().slice(0, 30).map((row) => (
               <li key={row.pick} className="flex items-center justify-between gap-2 py-1.5 text-xs" style={{ borderBottom: "var(--border-width-default) solid var(--color-border)" }}>
                 <span className="min-w-0">
-                  <span className="font-bold tabular-nums">#{row.n}</span> {row.made?.name} <span style={{ color: "var(--color-text-muted)" }}>({row.made?.pos})</span>
+                  <span className="font-bold tabular-nums">#{row.n}</span> {row.made ? <SimPlayerNameTap player={row.made}>{row.made.name}</SimPlayerNameTap> : null} <span style={{ color: "var(--color-text-muted)" }}>({row.made?.pos})</span>
                 </span>
                 <span className="shrink-0" style={{ color: row.is_yours ? "var(--color-accent)" : "var(--color-text-muted)" }}>{row.is_yours || !row.team_name ? "You" : <SimTeamIdentity name={row.team_name} size="inline" bold={false} nameClassName="text-xs" />}</span>
               </li>

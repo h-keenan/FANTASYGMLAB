@@ -19,6 +19,7 @@ import type { BadgeKind } from "@/lib/playerBadges";
 import { ReviewGlyphChip } from "@/components/SeasonReviewSections";
 import { SectionHeading } from "@/components/SectionHeading";
 import { SheetHandle } from "@/components/SheetHandle";
+import { TapScopeContext, type PickTapRef } from "@/components/ui/PlayerOpenContext";
 import { SimTeamIdentity } from "@/components/SimTeamIdentity";
 import type { SimTeamSize } from "@/lib/simTeamIdentity";
 import { SimGlyph } from "@/components/SimGlyph";
@@ -104,6 +105,8 @@ export interface SimCtx {
   openPlayer: (player: SimGamePlayer) => void;
   /** Open any team's scouting sheet (roster, record, strengths and needs). */
   openTeam: (teamId: string) => void;
+  /** Opens the pick detail sheet (a tapped pick anywhere in the game). */
+  openPick: (pick: PickTapRef) => void;
 }
 
 /** The shared status pill tinted from a presentation tone. */
@@ -162,6 +165,7 @@ export function SimPlayerChip({
   className = "min-w-0",
   onOpen,
   quick = false,
+  nonInteractive,
 }: {
   player: SimPlayerRef;
   size?: number;
@@ -180,8 +184,14 @@ export function SimPlayerChip({
    * another button.
    */
   quick?: boolean;
+  /**
+   * Opt out of the default tap, with the reason (a real sentence). Only for a chip that sits inside another button or
+   * link that already does something; every other chip opens the player sheet when the game provides one.
+   */
+  nonInteractive?: string;
 }) {
   const openSheet = useContext(SimOpenPlayerContext);
+  const inScope = useContext(TapScopeContext);
   const real = simHeadshotId(player);
   const body = (
     <PlayerIdentity
@@ -198,7 +208,8 @@ export function SimPlayerChip({
       {simPlayerSubline(player)}
     </PlayerIdentity>
   );
-  const handler = onOpen ?? (quick && openSheet ? openSheet : null);
+  void quick; // every chip is tappable by default now; kept so existing call sites compile
+  const handler = nonInteractive || inScope ? null : onOpen ?? openSheet;
   if (!handler) return body;
   return (
     <button
@@ -210,8 +221,33 @@ export function SimPlayerChip({
         handler(player as SimGamePlayer);
       }}
     >
-      {body}
+      <TapScopeContext.Provider value>{body}</TapScopeContext.Provider>
       <span className="sr-only">. Open player details</span>
+    </button>
+  );
+}
+
+/**
+ * An inline player name inside a sentence ("dropping Joe Mixon"): a real button that opens the player sheet (44px tall,
+ * underlined like a link). Plain text when the game provides no sheet or the player has no id.
+ */
+export function SimPlayerNameTap({ player, children, className = "" }: { player: { id: string; name: string; pos?: string | null }; children?: ReactNode; className?: string }) {
+  const openSheet = useContext(SimOpenPlayerContext);
+  const inScope = useContext(TapScopeContext);
+  if (!openSheet || inScope || !player.id) return <>{children ?? player.name}</>;
+  return (
+    <button
+      type="button"
+      className={`inline-flex items-center text-left underline decoration-dotted underline-offset-2 ${className}`}
+      style={{ minHeight: "var(--touch-target-min)", background: "none", border: 0, padding: 0, color: "inherit", font: "inherit" }}
+      aria-label={`Open ${player.name}`}
+      data-player-tap="true"
+      onClick={(event) => {
+        event.stopPropagation();
+        openSheet("projection" in player ? (player as SimGamePlayer) : simPlayerFromRef({ id: player.id, name: player.name, position: player.pos }));
+      }}
+    >
+      {children ?? player.name}
     </button>
   );
 }
@@ -616,6 +652,14 @@ export function SimPager({ page, pages, onPage }: { page: number; pages: number;
 
 // ---------------------------------------------------------------------------
 // Color and glyph building blocks shared by every game screen
+
+/**
+ * A minimal sim player from a shared-template player ref (id, name, position, team, age, photo id). The player sheet
+ * fetches the full detail by id, so a trade asset, a recap row or a draft cell can open it without holding the whole row.
+ */
+export function simPlayerFromRef(ref: { id?: string | null; name: string; position?: string | null; team?: string | null; age?: number | null; headshotId?: string | null }): SimGamePlayer {
+  return { id: String(ref.id ?? ""), name: ref.name, pos: (ref.position ?? "WR") as SimGamePlayer["pos"], team: ref.team ?? null, age: ref.age ?? null, headshot_id: ref.headshotId ?? null, adp: null, projection: 0 } as SimGamePlayer;
+}
 
 /** Opens the game's own player sheet; provided once by the game screen so a chip can fall back to it. */
 export const SimOpenPlayerContext = createContext<((player: SimGamePlayer) => void) | null>(null);

@@ -3,19 +3,24 @@ import { StyleSheet, View } from 'react-native';
 
 import AppText from './AppText';
 import PlayerAvatarSlot from './PlayerAvatarSlot';
+import { PlayerTap } from './PlayerOpenContext';
 import PlayerName from './PlayerName';
 import PositionBadge from './PositionBadge';
 import { useThemeMode } from '../context/ThemeModeContext';
 import type { PlayerRef } from '../lib/playerAnatomy';
 import { spacing, type ThemeColors } from '../theme';
 
-/** The compact player card used INSIDE other modules (trade sides, bar rows). Twin of ui/CompactPlayerCard.tsx. */
-export default function CompactPlayerCard({ player, detail, trailing, testID = 'compact-player-card' }: { player: PlayerRef; detail?: string | null; trailing?: ReactNode; testID?: string }) {
+/**
+ * The compact player card used INSIDE other modules (trade sides, bar rows). The whole card is the tap target and opens the
+ * quick view by default (role button, 44pt, PressableScale feedback); `onOpen` opens something else, `nonInteractive="reason"`
+ * is for a card inside a control that already acts. Twin of ui/CompactPlayerCard.tsx.
+ */
+export default function CompactPlayerCard({ player, detail, trailing, testID = 'compact-player-card', onOpen, nonInteractive }: { player: PlayerRef; detail?: string | null; trailing?: ReactNode; testID?: string; onOpen?: () => void; nonInteractive?: string }) {
   const { colors } = useThemeMode();
   const styles = useMemo(() => createStyles(colors), [colors]);
-  return (
+  const card = (
     <View style={styles.row} testID={testID}>
-      <PlayerAvatarSlot player={player} tier="dense" />
+      <PlayerAvatarSlot player={player} tier="dense" nonInteractive="the whole card is the tap target" />
       <View style={styles.main}>
         <View style={styles.line}>
           <PlayerName name={player.name} style={styles.name} />
@@ -25,6 +30,11 @@ export default function CompactPlayerCard({ player, detail, trailing, testID = '
       </View>
       {trailing ? <View style={styles.trailing}>{trailing}</View> : null}
     </View>
+  );
+  return (
+    <PlayerTap player={player} onOpen={onOpen} nonInteractive={nonInteractive}>
+      {card}
+    </PlayerTap>
   );
 }
 

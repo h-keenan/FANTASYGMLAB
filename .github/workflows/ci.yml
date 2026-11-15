@@ -78,6 +78,8 @@ jobs:
           node-version: "22"
       - name: Check web/mobile lib twins
         run: node scripts/check_lib_twins.mjs
+      - name: Check every player and pick is tappable
+        run: node scripts/check_player_tap.mjs
 
   mobile-app:
     needs: [classify]

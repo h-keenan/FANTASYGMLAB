@@ -10,6 +10,7 @@ import { IdeaPosture } from "@/components/IdeaPosture";
 import { RosterOverflowNote } from "@/components/SuggestedDrop";
 import { LeanBarMeter } from "@/components/LeanBarMeter";
 import { TradeOddsEffect } from "@/components/TradeOddsEffect";
+import { PlayerTap } from "@/components/ui/PlayerOpenContext";
 import { PlayerAvatar } from "@/components/PlayerAvatar";
 import { TeamAvatar } from "@/components/TeamAvatar";
 import { TradeCategoryGlyph } from "@/components/TradeCategoryGlyph";
@@ -278,8 +279,10 @@ export function TradeIdeaCardView({
                 className="inline-flex items-center gap-1 pr-2 text-xs font-bold"
                 style={{ border: "var(--border-width-default) solid var(--color-premium)", borderRadius: "var(--radius-pill)", color: "var(--color-text-primary)" }}
               >
-                <PlayerAvatar playerId={playerId} size={22} />
-                <PlayerName name={asset.name} className="max-w-[9rem]" />
+                <PlayerTap player={{ id: playerId, name: asset.name ?? "Player", position: asset.position, team: asset.team }} className="inline-flex items-center gap-1 text-left">
+                  <PlayerAvatar playerId={playerId} size={22} />
+                  <PlayerName name={asset.name} className="max-w-[9rem]" />
+                </PlayerTap>
               </span>
             ) : null;
           })}
