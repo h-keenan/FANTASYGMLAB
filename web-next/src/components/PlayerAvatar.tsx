@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, type CSSProperties } from "react";
+import { useState, type CSSProperties, type ReactElement } from "react";
 
 import { resolvePlayerTier, tierGlowIntensity, type TierGlowIntensity } from "@/lib/playerTier";
 
@@ -89,15 +89,23 @@ export function PlayerAvatar({
         "--glow-duration": GLOW_STYLE_BY_INTENSITY[glowIntensity].duration,
       }
     : undefined;
-  const glowClassName = glowIntensity ? " prestige-glow" : "";
+  // A glowing avatar is wrapped in a box that carries the halo (globals.css `.prestige-glow`: opacity cross-fade between two
+  // static shadows, compositor-only); the avatar itself is unchanged.
+  const wrap = (avatar: ReactElement) =>
+    glowStyle ? (
+      <span className="prestige-glow" style={{ ...dimension, ...glowStyle }}>
+        {avatar}
+      </span>
+    ) : (
+      avatar
+    );
 
   if (!playerId || failed) {
-    return (
+    return wrap(
       <span
-        className={`shrink-0${glowClassName}`}
+        className="shrink-0"
         style={{
           ...dimension,
-          ...glowStyle,
           display: "inline-flex",
           alignItems: "center",
           justifyContent: "center",
@@ -121,11 +129,11 @@ export function PlayerAvatar({
             {fallbackLabel}
           </span>
         ) : null}
-      </span>
+      </span>,
     );
   }
 
-  return (
+  return wrap(
     // eslint-disable-next-line @next/next/no-img-element
     <img
       src={`${SLEEPER_HEADSHOT_BASE}/${playerId}.jpg`}
@@ -138,9 +146,9 @@ export function PlayerAvatar({
       // so deferring the load shifts nothing.
       loading="lazy"
       decoding="async"
-      style={{ ...dimension, ...glowStyle, border: `${borderWidth}px solid ${ringColor}`, objectFit: "cover", objectPosition: "top" }}
-      className={`shrink-0${glowClassName}`}
+      style={{ ...dimension, border: `${borderWidth}px solid ${ringColor}`, objectFit: "cover", objectPosition: "top" }}
+      className="shrink-0"
       onError={() => setFailedId(playerId ?? null)}
-    />
+    />,
   );
 }

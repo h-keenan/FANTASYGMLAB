@@ -108,11 +108,11 @@ export function RankingRow({
     >
       <span
         className="text-sm font-extrabold shrink-0 text-center"
-        style={{ color: firstPlace ? "var(--color-premium)" : "var(--color-text-muted)", minWidth: "2.25rem" }}
+        style={{ color: firstPlace ? "var(--color-accent)" : "var(--color-text-muted)", minWidth: "2.25rem" }}
       >
         {rankLabel}
       </span>
-      <TeamAvatar avatarUrl={avatarUrl} size={32} ringColor={firstPlace ? "var(--color-premium)" : "var(--color-border)"} />
+      <TeamAvatar avatarUrl={avatarUrl} size={32} ringColor={firstPlace ? "var(--color-accent)" : "var(--color-border)"} />
       <div className="flex-1 flex flex-col gap-0.5 min-w-0">
         <div className="flex items-center gap-2 flex-wrap">
           <span className="text-sm font-bold [overflow-wrap:anywhere]" style={{ color: "var(--color-text-primary)" }}>

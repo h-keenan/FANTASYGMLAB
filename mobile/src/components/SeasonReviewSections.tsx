@@ -196,7 +196,7 @@ function LeaderGroup({ group }: { group: ReviewLeaderGroup }) {
       </View>
       {group.rows.map((r, i) => (
         <View key={`${r.player.id}-${i}`} style={[common.row, i ? common.divider : null, styles.leaderRow]}>
-          <AppText style={[styles.rankNum, { color: i === 0 ? colors.premium : colors.textTertiary }]}>{i + 1}</AppText>
+          <AppText style={[styles.rankNum, { color: i === 0 ? colors.accent : colors.textTertiary }]}>{i + 1}</AppText>
           <View style={common.grow}>
             <SimPlayerChip player={r.player} size={28} hidePosition={Boolean(group.pos)} />
           </View>

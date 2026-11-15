@@ -1,5 +1,6 @@
 "use client";
 
+import { ModuleMore } from "@/components/ui/ModuleMore";
 import Link from "next/link";
 import { useState, type ReactNode } from "react";
 
@@ -141,9 +142,7 @@ function AttentionRow({ item, first }: { item: StatusAttentionItem; first: boole
         >
           <p className="m-0 text-sm" style={{ color: "var(--color-text-secondary)" }}>{item.detail}</p>
           {item.href ? (
-            <Link href={item.href} className="tap-link text-xs font-bold" style={{ color: "var(--color-accent)", textDecoration: "none" }}>
-              Open →
-            </Link>
+            <ModuleMore href={item.href}>Open</ModuleMore>
           ) : null}
         </PlayerAccordionRow>
       </li>

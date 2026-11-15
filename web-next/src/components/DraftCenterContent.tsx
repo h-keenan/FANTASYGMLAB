@@ -139,7 +139,7 @@ export function DraftCenterContent({
             <div className="flex flex-wrap items-center gap-2">
               <ToneBadge label={posture.label} color={draftToneColor(posture.tone)} wrap />
               <span className="ml-auto flex flex-wrap gap-1.5">
-                <ToneBadge label={`${posture.first_rounders ?? 0} firsts`} color="var(--color-premium)" />
+                <ToneBadge label={`${posture.first_rounders ?? 0} firsts`} color="var(--color-accent)" />
                 <ToneBadge label={`${posture.pick_count ?? 0} picks`} color="var(--color-information)" />
               </span>
             </div>
@@ -292,13 +292,13 @@ function CapitalCell({
   const percent = percentile === null ? null : Math.round(percentile);
   return (
     <MaybeInsight insight={insight} league={league} spoken={[label, formatRank(rank, tied), note]}>
-    <div className="glass-surface flex items-center gap-2 p-3 min-w-0" style={rank === 1 ? { borderColor: "var(--color-premium)" } : undefined}>
+    <div className="glass-surface flex items-center gap-2 p-3 min-w-0" style={rank === 1 ? { borderColor: "var(--color-accent)" } : undefined}>
       <div className="flex flex-col gap-1 min-w-0 flex-1">
         <span className="flex items-center gap-1 text-xs" style={{ color: "var(--color-text-muted)" }}>
           <SnapshotTileGlyph name={glyph} />
           {label}
         </span>
-        <span style={{ font: "var(--type-primary-metric)", color: rank === 1 ? "var(--color-premium)" : "var(--color-text-primary)" }}>
+        <span style={{ font: "var(--type-primary-metric)", color: rank === 1 ? "var(--color-accent)" : "var(--color-text-primary)" }}>
           {formatRank(rank, tied)}
         </span>
         {note ? (

@@ -1,4 +1,5 @@
 import ConfirmInPlace from '../components/ConfirmInPlace';
+import { useNotice } from '../components/NoticeToast';
 import { funnelStepIndex } from '../lib/firstRunFlow';
 import { trackOnboarding, trackOnboardingStepViewed } from '../lib/onboardingAnalytics';
 import FreeLimitNote from '../components/FreeLimitNote';
@@ -85,6 +86,7 @@ interface SavedLeague {
 }
 
 export default function HomeScreen({ navigation, route }: Props) {
+  const notify = useNotice();
   const orbClearance = useOrbClearance();
   const headerHeight = useHeaderHeight();
   const { colors } = useThemeMode();
@@ -181,7 +183,7 @@ export default function HomeScreen({ navigation, route }: Props) {
     if (!renamingLeague) return;
     const trimmed = renameText.trim();
     if (!trimmed) {
-      Alert.alert('Name required', 'League name cannot be empty.');
+      notify.alert('Name required', 'League name cannot be empty.');
       return;
     }
     setRenameBusy(true);
@@ -191,7 +193,7 @@ export default function HomeScreen({ navigation, route }: Props) {
         .update({ league_name: trimmed })
         .eq('id', renamingLeague.id);
       if (error) {
-        Alert.alert('Could not rename league', error.message);
+        notify.alert('Could not rename league', error.message);
         return;
       }
       setLeagues((prev) =>
@@ -201,7 +203,7 @@ export default function HomeScreen({ navigation, route }: Props) {
       );
       setRenamingLeague(null);
     } catch {
-      Alert.alert('Could not rename league', 'Please try again in a moment.');
+      notify.alert('Could not rename league', 'Please try again in a moment.');
     } finally {
       setRenameBusy(false);
     }

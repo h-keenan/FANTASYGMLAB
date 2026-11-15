@@ -33,7 +33,11 @@ function signIn(entitlement: "free" | "premium") {
 }
 
 describe("nav Pro lock markers and account rows", () => {
-  beforeEach(() => vi.clearAllMocks());
+  beforeEach(() => {
+    vi.clearAllMocks();
+    // These tests cover the legacy header + orb, which is only reachable through the switch since UI pass 5 D4.
+    window.localStorage.setItem("fgl:nav", "off");
+  });
 
   it("sidebar marks the paid destinations for a Free account", async () => {
     signIn("free");

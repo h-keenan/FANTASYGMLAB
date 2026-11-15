@@ -45,7 +45,7 @@ describe("StatusHeader", () => {
     expect(toggle).toHaveAttribute("aria-expanded", "false");
     fireEvent.click(toggle);
     expect(within(first).getByText("He is open on the wire.")).toBeInTheDocument();
-    expect(within(first).getByRole("link", { name: "Open →" })).toHaveAttribute("href", "/waivers/x");
+    expect(within(first).getByRole("link", { name: "Open" })).toHaveAttribute("href", "/waivers/x");
   });
 
   it("uses cyan for the one action and never gold", () => {

@@ -138,8 +138,8 @@ export function AlertsBell({
               padding: "0 0.2rem",
               borderRadius: "999px",
               background: "var(--color-accent)",
-              color: "#fff",
-              fontSize: "0.625rem",
+              color: "var(--color-on-accent)",
+              fontSize: "0.6875rem",
             }}
           >
             {unread > 9 ? "9+" : unread}

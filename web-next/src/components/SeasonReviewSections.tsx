@@ -200,7 +200,7 @@ function LeaderGroup({ group }: { group: ReviewLeaderGroup }) {
       </div>
       {group.rows.map((r, i) => (
         <div key={`${r.player.id}-${i}`} className="flex items-center gap-2" style={{ borderTop: i ? "var(--border-width-default) solid var(--color-border)" : undefined, paddingTop: i ? "0.25rem" : 0 }}>
-          <span className="w-4 shrink-0 text-xs font-extrabold tabular-nums" style={{ color: i === 0 ? "var(--color-premium, var(--color-warning))" : "var(--color-text-muted)" }}>{i + 1}</span>
+          <span className="w-4 shrink-0 text-xs font-extrabold tabular-nums" style={{ color: i === 0 ? "var(--color-accent)" : "var(--color-text-muted)" }}>{i + 1}</span>
           <SimPlayerChip player={r.player} size={28} className="min-w-0 flex-1" hidePosition={Boolean(group.pos)} />
           <div className="flex shrink-0 flex-col items-end leading-tight">
             <span className="text-sm font-extrabold tabular-nums" style={{ color: r.highlight ? "var(--color-accent)" : "var(--color-text-primary)" }}>{r.value}</span>
@@ -267,7 +267,7 @@ export function SeasonReviewSections({
       {list.map((section) =>
         wide ? (
           <section key={section.id} className="flex flex-col gap-2" aria-label={section.title} data-testid={`review-section-${section.id}`}>
-            <SectionHeading note={section.note} size="compact">
+            <SectionHeading note={section.note}>
               <span className="inline-flex items-center gap-2">
                 <ReviewGlyphChip glyph={section.glyph} tone="accent" size={24} />
                 {section.title}
