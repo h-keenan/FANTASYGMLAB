@@ -46,4 +46,16 @@ describe("header guard", () => {
     expect(src).not.toContain("`TODAY · WEEK");
     expect(src).not.toContain('kicker: "TEAM"');
   });
+
+  it("the Sim game header is one 52px row plus a folding ribbon (web and app), never the old two-row 97px block", () => {
+    const web = read(WEB, "components/SimGameHeader.tsx");
+    expect(web).toContain("sim-game-header-row");
+    expect(web).toContain("ribbonCollapsed");
+    const css = read(WEB, "app/globals.css");
+    expect(css).toMatch(/\.sim-game-header \{[^}]*flex-direction: column/);
+    expect(css).not.toMatch(/\.sim-game-header \{[^}]*flex-wrap: wrap/);
+    const app = read(APP, "components/SimGameHeader.tsx");
+    expect(app).toContain("ribbon");
+    expect(app).not.toMatch(/width: '100%'/);
+  });
 });

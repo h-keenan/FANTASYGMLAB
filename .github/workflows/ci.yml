@@ -153,3 +153,9 @@ jobs:
           NEXT_PUBLIC_SUPABASE_URL: https://ci-placeholder.supabase.co
           NEXT_PUBLIC_SUPABASE_ANON_KEY: ci-placeholder-anon-key
         run: npm run build
+      - name: Perf budget (first-load JS per route, banned animated properties)
+        # Reads .next/diagnostics/route-bundle-stats.json from the build above and scans CSS keyframes. Reports without
+        # failing the job until the route budgets (web-next/perf-budget.json) have survived a few weeks of merges; then
+        # delete continue-on-error. See docs/perf-budget.md.
+        continue-on-error: true
+        run: node ../scripts/perf/check_perf_budget.mjs
