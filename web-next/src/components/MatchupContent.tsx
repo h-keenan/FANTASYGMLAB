@@ -468,10 +468,15 @@ function LineupComparison({
           aria-label={helpOpen ? "Hide explanation" : "How this works"}
           aria-expanded={helpOpen}
           onClick={() => setHelpOpen((v) => !v)}
-          className="inline-flex items-center justify-center font-bold shrink-0 text-xs"
-          style={{ width: "var(--touch-target-min)", height: "var(--touch-target-min)", color: "var(--color-accent)", lineHeight: 1 }}
+          className="inline-flex items-center justify-center shrink-0"
+          style={{ width: "var(--touch-target-min)", height: "var(--touch-target-min)" }}
         >
-          <span aria-hidden="true" className="inline-flex items-center justify-center" style={{ width: 22, height: 22, borderRadius: 9999, border: "var(--border-width-default) solid var(--color-border)" }}>?</span>
+          <span
+            className="inline-flex items-center justify-center font-bold text-xs"
+            style={{ width: 22, height: 22, borderRadius: 9999, border: "var(--border-width-default) solid var(--color-border)", color: "var(--color-accent)", lineHeight: 1 }}
+          >
+            ?
+          </span>
         </button>
       </div>
       {helpOpen ? (
@@ -791,9 +796,8 @@ export function MatchupContent({
             type="button"
             onClick={onRefresh}
             disabled={refreshing}
-            className="underline"
-            // 44px hit area around the 16px text without growing the row.
-            style={{ color: "var(--color-accent)", padding: "14px 6px", margin: "-14px -6px" }}
+            className="inline-flex items-center underline"
+            style={{ color: "var(--color-accent)", minHeight: "var(--touch-target-min)", padding: "0 0.5rem" }}
           >
             {refreshing ? "Refreshing…" : "Refresh"}
           </button>

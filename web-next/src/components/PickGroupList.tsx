@@ -66,16 +66,17 @@ export function PickGroupList({
                 type="button"
                 aria-expanded={open}
                 onClick={() => setToggled((prev) => ({ ...prev, [key]: !open }))}
-                className="w-full flex items-center gap-2 px-3 py-2 min-h-[var(--touch-target-min)] text-left"
+                className="w-full flex items-center gap-2 px-3 py-2 text-left"
+                style={{ minHeight: "var(--touch-target-min)" }}
               >
                 <span className="text-sm font-bold" style={{ color: "var(--color-text-primary)" }}>
                   {group.label}
                 </span>
                 <ToneBadge label={`${group.picks.length} ${group.picks.length === 1 ? "pick" : "picks"}`} color="var(--color-information)" />
                 {selectedCount > 0 ? <ToneBadge label={`${selectedCount} selected`} color="var(--color-success)" /> : null}
-                <span aria-hidden className="ml-auto text-xs" style={{ color: "var(--color-text-muted)" }}>
-                  {open ? "−" : "+"}
-                </span>
+                <svg aria-hidden="true" width={14} height={14} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.4} strokeLinecap="round" strokeLinejoin="round" className="ml-auto shrink-0" style={{ color: "var(--color-text-muted)", transform: open ? "rotate(180deg)" : "none", transition: "transform var(--motion-fast, 160ms) ease" }}>
+                  <path d="m6 9 6 6 6-6" />
+                </svg>
               </button>
               <Collapse open={open}>
                 <div style={{ borderTop: "var(--border-width-default) solid var(--color-border)" }}>
