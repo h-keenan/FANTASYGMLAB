@@ -494,13 +494,13 @@ export function SimGameContent() {
             onClose={() => setSheetPlayer(null)}
             actions={
               <>
-                {game.can_trade && !stackedUnder && simTradeSeedFor(sheetPlayer) ? (
+                {game.can_trade && !stackedUnder && simTradeSeedFor(sheetPlayer, game.settings) ? (
                 <Button
                   size="sm"
                   variant="secondary"
                   aria-label={`Add ${sheetPlayer.name} to trade`}
                   onClick={() => {
-                    const seed = simTradeSeedFor(sheetPlayer);
+                    const seed = simTradeSeedFor(sheetPlayer, game.settings);
                     if (!seed) return;
                     setTradeSeed(seed);
                     setSheetPlayer(null);

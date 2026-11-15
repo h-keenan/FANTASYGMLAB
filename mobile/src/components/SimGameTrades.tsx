@@ -24,6 +24,7 @@ import ToneBadge from './ToneBadge';
 import { useThemeMode } from '../context/ThemeModeContext';
 import { api } from '../lib/api';
 import { simGroupByPosition, simTradeFit, type SimAssetGroup } from '../lib/simLayout';
+import SimTradeWarning from './SimTradeWarning';
 import { simListStats } from '../lib/simDraft';
 import { simTeamsByPower } from '../lib/simLeagueRosters';
 import { simGroupsToSheetItems } from '../lib/simTradeSheet';
@@ -46,6 +47,9 @@ import {
   type SimTradeSeed,
   simTradeMaxPerSide,
   simTradableIn,
+  simSingletonWarnings,
+  simSingletonMessage,
+  SIM_KD_LOCKED_NOTE,
   simTradeClosedReason,
   simCounterDeltaLine,
   simTradeKey,
@@ -312,12 +316,15 @@ function Builder({ ctx, seed, onSeedUsed }: { ctx: SimCtx; seed: SimTradeSeed | 
     onSeedUsed();
   }, [seed, onSeedUsed, maxPerSide]);
 
+  // Teams keep one kicker and one defense: say so as the offer is built (only when it really causes it), and do not ask the AI about a deal that cannot be sent.
+  const singleton = (game.settings.kd_v ?? 0) >= 1 && draft.partner !== null ? simSingletonWarnings(mine, partnerRoster, draft.give, draft.get) : [];
+  const singletonMessage = singleton.length ? simSingletonMessage(singleton, (teams?.find((t) => t.team_id === draft.partner)?.name) ?? "That team") : "";
   const key = simTradeKey(draft);
   const verdict = verdictFor && verdictFor.key === key ? verdictFor.verdict : null;
   // Preview the (deterministic) verdict for the current offer.
   useEffect(() => {
     const payload = simTradePayload(draft);
-    if (!payload || closed) return;
+    if (!payload || closed || singletonMessage) return;
     let cancelled = false;
     const id = setTimeout(async () => {
       setPreviewing(true);
@@ -333,7 +340,7 @@ function Builder({ ctx, seed, onSeedUsed }: { ctx: SimCtx; seed: SimTradeSeed | 
     };
     // The key stands in for the draft contents.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [key, closed, gameId]);
+  }, [key, closed, gameId, singletonMessage]);
 
   async function send(offer: { partner: string; give: string[]; get: string[] }) {
     setSending(true);
@@ -430,9 +437,11 @@ function Builder({ ctx, seed, onSeedUsed }: { ctx: SimCtx; seed: SimTradeSeed | 
               </AppText>
             }
             verdict={
-              <View accessibilityLiveRegion="polite">
-                {previewing && !verdict ? <SkeletonCard rows={2} /> : null}
-                {verdict ? (
+              <View accessibilityLiveRegion="polite" style={common.stack}>
+                {singletonMessage ? <SimTradeWarning message={singletonMessage} /> : null}
+                {(game.settings.kd_v ?? 0) < 1 ? <AppText style={common.muted} testID="trade-kd-locked">{SIM_KD_LOCKED_NOTE}</AppText> : null}
+                {previewing && !verdict && !singletonMessage ? <SkeletonCard rows={2} /> : null}
+                {verdict && !singletonMessage ? (
                   <VerdictCard key={`${key}-${verdict.decision}`} verdict={verdict} />
                 ) : null}
               </View>
@@ -448,7 +457,7 @@ function Builder({ ctx, seed, onSeedUsed }: { ctx: SimCtx; seed: SimTradeSeed | 
                   : undefined
             }
             sendLabel={verdict?.decision === 'counter' ? 'Take their counter' : undefined}
-            canSend={!fit.blocked}
+            canSend={!fit.blocked && !singletonMessage}
             sending={sending}
           />
         </>

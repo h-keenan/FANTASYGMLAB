@@ -419,6 +419,8 @@ class TradeDesk:
         def consider(give: tuple[str, ...], get: tuple[str, ...], asked: list[str], removed: list[str], cost: float, tag: str) -> None:
             if not (self.legal_for_counter(ai, get, give) and self.legal_for_counter(user, give, get)):
                 return
+            if not snap.settings.non_tradable and singleton_violation(snap, state, ai, give, get) is not None:
+                return  # a counter is a deal the user can send: never one that leaves a team with two kickers or two defenses
             ok, margin, _, need, _ = self.ai_accepts(ai, give, get)
             if not ok:
                 return
@@ -438,7 +440,14 @@ class TradeDesk:
                 consider(tuple(user_gives) + (p,), tuple(user_gets), [p], [], self.user_cost(p), "add:" + p)
         if len(user_gets) > 1 and not need_pos:
             for p in user_gets:
-                consider(tuple(user_gives), tuple(x for x in user_gets if x != p), [], [p], self.user_cost(p), "drop:" + p)
+                give, removed = tuple(user_gives), [p]
+                if not snap.settings.non_tradable and not is_pick_id(p) and snap.players[p].pos in SINGLETON_POSITIONS:
+                    # His kicker (defense) stays home, so a one-for-one swap cannot stay half done: yours stays home with it.
+                    removed += [g for g in user_gives if not is_pick_id(g) and snap.players[g].pos == snap.players[p].pos]
+                    give = tuple(g for g in user_gives if g not in removed)
+                    if not give:
+                        continue
+                consider(give, tuple(x for x in user_gets if x != p), [], removed, sum(self.user_cost(r) for r in removed), "drop:" + p)
         if not options:
             if need_pos:  # could not fix the need the way the reason claims: fall back to an honest value counter
                 return self.build_counter(ai, user_gives, user_gets, "wants_more_value")
@@ -473,6 +482,8 @@ class TradeDesk:
         else:
             who = label(removed[0])
             note = f"They want to keep {who}: the counter leaves him out."
+            if len(removed) > 1:
+                note = f"They want to keep {who}: the counter leaves him out, and your {label(removed[1])} stays with you (one per team)."
         before, after = net(old_give, old_get), net(give, get)
         delta = {
             "user_net_before": round(before, 1), "user_net_after": round(after, 1), "user_net_change": round(after - before, 1),
@@ -575,13 +586,59 @@ def validate_offer(snap: GameSnapshot, state: GameState, partner: str, give: Seq
                 raise ValueError("Kickers and defenses cannot be traded.")
     # Kickers and defenses are one per roster: a trade may not leave either team with two of one (it can swap them one for one).
     if not snap.settings.non_tradable:
-        for tid, leaving, arriving in ((user, give, get), (partner, get, give)):
-            for pos in SINGLETON_POSITIONS:
-                held = sum(1 for p in state.holdings(tid) if snap.players[p].pos == pos and p not in leaving)
-                coming = sum(1 for p in arriving if not is_pick_id(p) and snap.players[p].pos == pos)
-                if coming and held + coming > 1:  # only a trade that ADDS one is refused (a roster already over, e.g. mid-offseason, is not blocked)
-                    who = "You" if tid == user else "They"
-                    raise GameError("singleton_limit", f"{who} would end up with two {'kickers' if pos == 'K' else 'defenses'}. Trade yours away in the same deal.")
+        hits = singleton_violations(snap, state, partner, give, get)
+        if hits:
+            raise GameError("singleton_limit", singleton_message(snap, partner, hits), singleton=singleton_detail(snap, partner, hits))
+
+
+SINGLE_NOUN = {"K": "kicker", "DEF": "defense"}
+
+
+def singleton_violations(snap: GameSnapshot, state: GameState, partner: str, give: Sequence[str], get: Sequence[str]) -> list[tuple[str, str]]:
+    """Every (team, position) a trade of ``give`` (user -> ``partner``) for ``get`` would leave with a second kicker or defense. Only a trade
+    that ADDS one is refused: a roster already over (mid-offseason, say) is not blocked by a deal that does not add to it. One rule for offers
+    (``validate_offer``) and for the counters the AI hands back, so a counter is never a deal the user cannot send. Why the rule exists: a lineup
+    has one K (and one DEF) slot and every manager (waivers, cuts, need) is built around one per roster, so a second one is a dead roster spot
+    that the AI would have to cut; the deal is refused up front, with the way out, rather than left for the AI to decline or cut."""
+
+    user = snap.user_team.tid
+    out: list[tuple[str, str]] = []
+    for tid, leaving, arriving in ((user, give, get), (partner, get, give)):
+        for pos in SINGLETON_POSITIONS:
+            held = sum(1 for p in state.holdings(tid) if snap.players[p].pos == pos and p not in leaving)
+            coming = sum(1 for p in arriving if not is_pick_id(p) and snap.players[p].pos == pos)
+            if coming and held + coming > 1:
+                out.append((tid, pos))
+    return out
+
+
+def singleton_violation(snap: GameSnapshot, state: GameState, partner: str, give: Sequence[str], get: Sequence[str]) -> tuple[str, str] | None:
+    hits = singleton_violations(snap, state, partner, give, get)
+    return hits[0] if hits else None
+
+
+def singleton_message(snap: GameSnapshot, partner: str, hits: Sequence[tuple[str, str]]) -> str:
+    """Who, what and the way out, from the user's point of view. Mirrored by ``simSingletonWarnings`` (web-next and mobile simGame.ts), which
+    shows the same words before the offer is even sent: keep the two in step."""
+
+    user = snap.user_team.tid
+    name = snap.team(partner).name
+    mine = [pos for tid, pos in hits if tid == user]
+    theirs = [pos for tid, pos in hits if tid != user]
+    parts: list[str] = []
+    if mine:
+        what = " and ".join(f"a {SINGLE_NOUN[p]}" for p in mine)
+        parts.append(f"You already have {what} and a team keeps just one. Send yours in this deal, or cut it first.")
+    if theirs:
+        what = " and ".join(f"a {SINGLE_NOUN[p]}" for p in theirs)
+        asked = " or ".join(f"their {SINGLE_NOUN[p]}" for p in theirs)
+        parts.append(f"{name} already has {what} and a team keeps just one, so they cannot take yours. Ask for {asked} back, or leave yours out.")
+    return " ".join(parts)
+
+
+def singleton_detail(snap: GameSnapshot, partner: str, hits: Sequence[tuple[str, str]]) -> dict[str, Any]:
+    user = snap.user_team.tid
+    return {"you": [pos for tid, pos in hits if tid == user], "them": [pos for tid, pos in hits if tid != user], "partner_name": snap.team(partner).name}
 
 
 def offer_key(partner: str, give: Iterable[str], get: Iterable[str]) -> str:

@@ -1342,6 +1342,7 @@ const REASON_COPY: Record<string, string> = {
   taxi_full: "Your taxi squad is full.",
   taxi_ineligible: "Only rookies and young players can go on the taxi squad.",
   roster_full: "Your roster is full: cut or trade someone to add players.",
+  singleton_limit: "A team keeps just one kicker and one defense. Swap them one for one, or leave them out of the deal.",
   reserves_unavailable: "This game has no IR or taxi squad.",
   not_dynasty: "That is only in dynasty games.",
   pool_exhausted: "No rookies are left to draft.",
@@ -1563,6 +1564,56 @@ export function simPositionsFor(slots: SimSlot[] | undefined): SimPos[] {
 export function simTradableIn(settings: Pick<SimGameSettings, "kd_v"> | undefined, pos: SimPos): boolean {
   return (settings?.kd_v ?? 0) >= 1 || simTradable(pos);
 }
+
+const SINGLE_NOUN: Record<string, string> = { K: "kicker", DEF: "defense" };
+
+export interface SimSingletonWarning {
+  /** Whose roster would end up with a second one. */
+  team: "you" | "them";
+  pos: "K" | "DEF";
+}
+
+/**
+ * Teams keep one kicker and one defense. Which side of this offer would end up with a second one? Computed on the client from the two
+ * rosters so the warning shows (and goes away) as the offer is built, and only when the offer really causes it: a team that sends its own
+ * K/DEF in the same deal is fine. Same rule as the backend's `singleton_violations`.
+ */
+export function simSingletonWarnings(
+  mine: readonly Pick<SimGamePlayer, "id" | "pos">[],
+  theirs: readonly Pick<SimGamePlayer, "id" | "pos">[],
+  give: readonly string[],
+  get: readonly string[],
+): SimSingletonWarning[] {
+  const out: SimSingletonWarning[] = [];
+  const count = (roster: readonly Pick<SimGamePlayer, "id" | "pos">[], leaving: readonly string[], arriving: readonly Pick<SimGamePlayer, "id" | "pos">[], pos: string) =>
+    [roster.filter((p) => p.pos === pos && !leaving.includes(p.id)).length, arriving.filter((p) => p.pos === pos).length] as const;
+  const sent = mine.filter((p) => give.includes(p.id));
+  const received = theirs.filter((p) => get.includes(p.id));
+  for (const pos of ["K", "DEF"] as const) {
+    const [heldYou, comingYou] = count(mine, give, received, pos);
+    if (comingYou > 0 && heldYou + comingYou > 1) out.push({ team: "you", pos });
+    const [heldThem, comingThem] = count(theirs, get, sent, pos);
+    if (comingThem > 0 && heldThem + comingThem > 1) out.push({ team: "them", pos });
+  }
+  return out;
+}
+
+/** The warning's words: who, what and the way out. Mirrors the backend's `singleton_message`. */
+export function simSingletonMessage(warnings: readonly SimSingletonWarning[], partnerName: string): string {
+  const parts: string[] = [];
+  const mine = warnings.filter((w) => w.team === "you").map((w) => `a ${SINGLE_NOUN[w.pos]}`);
+  const theirs = warnings.filter((w) => w.team === "them");
+  if (mine.length) parts.push(`You already have ${mine.join(" and ")} and a team keeps just one. Send yours in this deal, or cut it first.`);
+  if (theirs.length) {
+    const what = theirs.map((w) => `a ${SINGLE_NOUN[w.pos]}`).join(" and ");
+    const asked = theirs.map((w) => `their ${SINGLE_NOUN[w.pos]}`).join(" or ");
+    parts.push(`${partnerName} already has ${what} and a team keeps just one, so they cannot take yours. Ask for ${asked} back, or leave yours out.`);
+  }
+  return parts.join(" ");
+}
+
+/** Shown in the builder on a save from before kd_v: kickers and defenses are not offered, and why. */
+export const SIM_KD_LOCKED_NOTE = "Kickers and defenses cannot be traded in this game. To allow it, open More, then Update game rules.";
 
 /** Positions that are one-per-roster and (on older saves) never traded (kickers, defenses). */
 export function simTradable(pos: SimPos): boolean {
@@ -1895,9 +1946,10 @@ export interface SimTradeSeed {
  * team's player picks that team as the partner and goes on the get side. Free agents cannot be
  * traded, so they yield null.
  */
-export function simTradeSeedFor(player: Pick<SimGamePlayer, "id" | "owner">): SimTradeSeed | null {
+export function simTradeSeedFor(player: Pick<SimGamePlayer, "id" | "owner"> & { pos?: SimPos }, settings?: Pick<SimGameSettings, "kd_v">): SimTradeSeed | null {
   const owner = player.owner;
   if (!owner || owner.type === "free_agent") return null;
+  if (settings && player.pos && !simTradableIn(settings, player.pos)) return null; // a kicker or defense on a save from before kd_v
   if (owner.type === "you") return { partner: "", give: player.id };
   return owner.team_id ? { partner: owner.team_id, get: player.id } : null;
 }
