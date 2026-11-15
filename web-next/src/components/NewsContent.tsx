@@ -1,6 +1,8 @@
 import { EmptyState } from "@/components/EmptyState";
 import { PageTitle } from "@/components/PageTitle";
-import type { NewsItem, NewsPlayerIdentity, NewsResponse } from "@/lib/api";
+import type { AlertsResponse, NewsItem, NewsPlayerIdentity, NewsResponse } from "@/lib/api";
+import { NewsDigest } from "@/components/NewsDigest";
+import { alertsReasonMessage } from "@/lib/alertsPresentation";
 import { PlayerAvatar } from "@/components/PlayerAvatar";
 import { PlayerIdentityTrigger } from "@/components/PlayerIdentityTrigger";
 import { PositionBadge } from "@/components/PositionBadge";
@@ -209,8 +211,55 @@ export function NewsCard({
   );
 }
 
-export function NewsContent({ data, playerName }: { data: NewsResponse; playerName?: string | null }) {
+function FeedSections({ items }: { items: NewsItem[] }) {
+  const sections = groupNewsByDate(items);
+  return (
+    <div className="flex flex-col gap-6">
+      {sections.map((section) => (
+        <section key={section.bucket} className="flex flex-col gap-4">
+          <h2
+            className="uppercase font-extrabold text-xs"
+            style={{ color: "var(--color-text-muted)", letterSpacing: "var(--letter-spacing-badge)" }}
+          >
+            {section.bucket}
+          </h2>
+          {section.groups.map((group, index) => {
+            const accent = eventTypeColorVar(group.eventType);
+            return (
+              <div key={`${group.eventType ?? "other"}-${index}`} className="flex flex-col gap-2">
+                <div className="flex items-center gap-2">
+                  <EventTypePill eventType={group.eventType} label={eventTypeLabel(group.eventType)} color={accent} />
+                </div>
+                {index === 0 ? <NewsCard item={group.items[0]} hero /> : null}
+                {group.items.length > (index === 0 ? 1 : 0) ? (
+                  <div className="glass-surface px-3">
+                    {group.items.slice(index === 0 ? 1 : 0).map((item, itemIndex) => (
+                      <NewsCard key={item.link ?? `${item.title ?? "item"}-${itemIndex}`} item={item} />
+                    ))}
+                  </div>
+                ) : null}
+              </div>
+            );
+          })}
+        </section>
+      ))}
+    </div>
+  );
+}
+
+/**
+ * `alerts` is the account's league alerts (the roster-matched feed): undefined while unknown or when there is no league,
+ * so the page stays the league-wide feed with the roster digest on top only when real roster news exists. Without
+ * `playerName` the page is the roster-first digest (components/NewsDigest.tsx); with it, the one-player list.
+ */
+export function NewsContent({ data, playerName, alerts }: { data: NewsResponse; playerName?: string | null; alerts?: AlertsResponse | null }) {
   const sections = groupNewsByDate(data.items);
+  const emptyCopy = (
+    <EmptyState
+      title={playerName ? "No recent news for this player." : data.status?.state === "warming_up" ? "News is warming up." : "No news right now."}
+      subtitle={data.status?.message || "Check back later for injury, role, transaction, and off-field updates."}
+    />
+  );
 
   return (
     <main className="page-shell">
@@ -226,44 +275,18 @@ export function NewsContent({ data, playerName }: { data: NewsResponse; playerNa
         ) : null}
       </header>
 
-      {sections.length === 0 ? (
-        <EmptyState
-          title={playerName ? "No recent news for this player." : data.status?.state === "warming_up" ? "News is warming up." : "No news right now."}
-          subtitle={data.status?.message || "Check back later for injury, role, transaction, and off-field updates."}
-        />
+      {playerName ? (
+        sections.length === 0 ? emptyCopy : <FeedSections items={data.items} />
       ) : (
-        <div className="flex flex-col gap-6">
-          {sections.map((section) => (
-            <section key={section.bucket} className="flex flex-col gap-4">
-              <h2
-                className="uppercase font-extrabold text-xs"
-                style={{ color: "var(--color-text-muted)", letterSpacing: "var(--letter-spacing-badge)" }}
-              >
-                {section.bucket}
-              </h2>
-              {section.groups.map((group, index) => {
-                const accent = eventTypeColorVar(group.eventType);
-                return (
-                  <div key={`${group.eventType ?? "other"}-${index}`} className="flex flex-col gap-2">
-                    <div className="flex items-center gap-2">
-                      <EventTypePill eventType={group.eventType} label={eventTypeLabel(group.eventType)} color={accent} />
-                    </div>
-                    {index === 0 ? <NewsCard item={group.items[0]} hero /> : null}
-                    {group.items.length > (index === 0 ? 1 : 0) ? (
-                      <div className="glass-surface px-3">
-                        {group.items.slice(index === 0 ? 1 : 0).map((item, itemIndex) => (
-                          <NewsCard key={item.link ?? `${item.title ?? "item"}-${itemIndex}`} item={item} />
-                        ))}
-                      </div>
-                    ) : null}
-                  </div>
-                );
-              })}
-            </section>
-          ))}
-        </div>
+        <NewsDigest
+          alerts={alerts?.items ?? []}
+          general={data.items}
+          reasonNote={alerts && alerts.items.length === 0 ? alertsReasonMessage(alerts.reason) : null}
+          feed={(items) => (items.length === 0 ? emptyCopy : <FeedSections items={items as NewsItem[]} />)}
+        />
       )}
-      {playerName ? null : (
+      {playerName || sections.length > 0 || (alerts?.items.length ?? 0) > 0 ? null : emptyCopy}
+      {playerName || (alerts?.items.length ?? 0) > 0 ? null : (
         <div className="flex flex-col gap-2" data-testid="news-next-step">
           <p className="text-xs" style={{ color: "var(--color-text-muted)" }}>
             This is the league-wide feed. News on the players you own is in Alerts.

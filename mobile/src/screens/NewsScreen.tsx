@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { Linking, RefreshControl, SectionList, StyleSheet, View } from 'react-native';
+import { Linking, RefreshControl, ScrollView, SectionList, StyleSheet, View } from 'react-native';
 import PressableScale from '../components/PressableScale';
 import AppText from '../components/AppText';
 import { useHeaderHeight } from '@react-navigation/elements';
@@ -11,7 +11,9 @@ import EmptyState from '../components/EmptyState';
 import { EventTypePill } from '../components/EventTypeGlyph';
 import GridBackground from '../components/GridBackground';
 import ScreenInfoNote from '../components/ScreenInfoNote';
-import { api, type NewsItem, type NewsResponse } from '../lib/api';
+import NewsDigest from '../components/NewsDigest';
+import { NOT_READY_MESSAGES } from './AlertsScreen';
+import { api, type AlertsResponse, type NewsItem, type NewsResponse } from '../lib/api';
 import { toUserErrorMessage } from '../lib/errorMessages';
 import { newsPlayerIdentities } from '../lib/newsIdentity';
 import { alsoReportedLine } from '../lib/playerNews';
@@ -153,6 +155,51 @@ export default function NewsScreen({ route }: { route?: { params?: { playerId?: 
 
   const sections = useMemo(() => groupByDate(items), [items]);
   const lastLeague = useLastLeague();
+  // The roster-matched alerts of the league the person last opened: the digest's "your players" section.
+  const [alerts, setAlerts] = useState<AlertsResponse | null>(null);
+  const rosterLeagueId = lastLeague?.leagueId ?? null;
+  useEffect(() => {
+    if (playerId || !rosterLeagueId) return;
+    let cancelled = false;
+    api
+      .getLeagueAlerts(rosterLeagueId, 30)
+      .then((result) => {
+        if (!cancelled) setAlerts(result);
+      })
+      .catch(() => {
+        /* the league-wide feed still loads; the digest just has no roster section */
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [playerId, rosterLeagueId]);
+  const hasRosterNews = (alerts?.items.length ?? 0) > 0;
+
+  const renderGroup = (group: NewsGroup, index: number) => {
+    const accentColor = eventBadgeColors(colors)[group.eventType ?? ''] ?? colors.textSecondary;
+    // First story of the first cluster in each date bucket is the hero.
+    const heroItem = index === 0 ? group.items[0] : null;
+    const rest = heroItem ? group.items.slice(1) : group.items;
+    return (
+      <View style={styles.group}>
+        <View style={styles.groupHeaderRow}>
+          <EventTypePill eventType={group.eventType} label={eventTypeLabel(group.eventType)} color={accentColor} />
+        </View>
+        {heroItem ? (
+          <AccentCard accent={accentColor} compact style={rest.length > 0 ? styles.heroGap : undefined}>
+            <NewsRow item={heroItem} showDivider={false} hero />
+          </AccentCard>
+        ) : null}
+        {rest.length > 0 ? (
+          <AnimatedCard style={styles.groupCard}>
+            {rest.map((item, itemIndex) => (
+              <NewsRow key={item.link ?? `${item.title ?? 'item'}-${item.published_ts ?? 0}-${itemIndex}`} item={item} showDivider={itemIndex < rest.length - 1} />
+            ))}
+          </AnimatedCard>
+        ) : null}
+      </View>
+    );
+  };
 
   return (
     <View style={[styles.container, { paddingTop: headerHeight }]}>
@@ -167,70 +214,107 @@ export default function NewsScreen({ route }: { route?: { params?: { playerId?: 
 
       {error ? <ErrorState compact title="Couldn't load news" message={error} onRetry={() => void load()} /> : null}
 
-      <SectionList
-        sections={sections}
-        keyExtractor={(group, index) => `${group.eventType ?? 'other'}-${group.items[0]?.link ?? group.items[0]?.title ?? index}`}
-        contentContainerStyle={[styles.listContent, { paddingBottom: orbClearance }]}
-        refreshControl={<RefreshControl refreshing={loading} onRefresh={load} />}
-        stickySectionHeadersEnabled={false}
-        ListFooterComponent={
-          !playerId && lastLeague ? (
-            <NextSteps
-              title="News on your players"
-              steps={['alerts']}
-              leagueId={lastLeague.leagueId}
-              leagueName={lastLeague.leagueName}
-            />
-          ) : null
-        }
-        renderSectionHeader={({ section }) => (
-          <View style={styles.sectionHeader}>
-            <AppText style={styles.sectionHeaderText}>{section.title}</AppText>
-          </View>
-        )}
-        ListEmptyComponent={
-          !loading ? (
+      {playerId ? (
+        <SectionList
+          sections={sections}
+          keyExtractor={(group, index) => `${group.eventType ?? 'other'}-${group.items[0]?.link ?? group.items[0]?.title ?? index}`}
+          contentContainerStyle={[styles.listContent, { paddingBottom: orbClearance }]}
+          refreshControl={<RefreshControl refreshing={loading} onRefresh={load} />}
+          stickySectionHeadersEnabled={false}
+          ListFooterComponent={
+            !playerId && lastLeague ? (
+              <NextSteps
+                title="News on your players"
+                steps={['alerts']}
+                leagueId={lastLeague.leagueId}
+                leagueName={lastLeague.leagueName}
+              />
+            ) : null
+          }
+          renderSectionHeader={({ section }) => (
+            <View style={styles.sectionHeader}>
+              <AppText style={styles.sectionHeaderText}>{section.title}</AppText>
+            </View>
+          )}
+          ListEmptyComponent={
+            !loading ? (
+              <EmptyState
+                icon="newspaper-outline"
+                title={feedStatus?.state === 'warming_up' ? 'News is warming up' : 'No news right now'}
+                subtitle={feedStatus?.message || 'Check back later for injury, role, transaction, and off-field updates.'}
+              />
+            ) : null
+          }
+          renderItem={({ item: group, index }) => {
+            const accentColor = eventBadgeColors(colors)[group.eventType ?? ''] ?? colors.textSecondary;
+            // First story of the first cluster in each date bucket is the hero.
+            const heroItem = index === 0 ? group.items[0] : null;
+            const rest = heroItem ? group.items.slice(1) : group.items;
+            return (
+              <View style={styles.group}>
+                <View style={styles.groupHeaderRow}>
+                  <EventTypePill
+                    eventType={group.eventType}
+                    label={eventTypeLabel(group.eventType)}
+                    color={accentColor}
+                  />
+                </View>
+                {heroItem ? (
+                  <AccentCard accent={accentColor} compact style={rest.length > 0 ? styles.heroGap : undefined}>
+                    <NewsRow item={heroItem} showDivider={false} hero />
+                  </AccentCard>
+                ) : null}
+                {rest.length > 0 ? (
+                  <AnimatedCard style={styles.groupCard}>
+                    {rest.map((item, itemIndex) => (
+                      <NewsRow
+                        key={item.link ?? `${item.title ?? 'item'}-${item.published_ts ?? 0}-${itemIndex}`}
+                        item={item}
+                        showDivider={itemIndex < rest.length - 1}
+                      />
+                    ))}
+                  </AnimatedCard>
+                ) : null}
+              </View>
+            );
+          }}
+        />
+      ) : (
+        <ScrollView
+          contentContainerStyle={[styles.listContent, { paddingBottom: orbClearance }]}
+          refreshControl={<RefreshControl refreshing={loading} onRefresh={load} />}
+        >
+          <NewsDigest
+            alerts={alerts?.items ?? []}
+            general={items}
+            reasonNote={alerts && alerts.items.length === 0 && alerts.reason ? NOT_READY_MESSAGES[alerts.reason] ?? null : null}
+            feed={(feedItems) => (
+              <View>
+                {groupByDate(feedItems as NewsItem[]).map((section) => (
+                  <View key={section.title}>
+                    <View style={styles.sectionHeader}>
+                      <AppText style={styles.sectionHeaderText}>{section.title}</AppText>
+                    </View>
+                    {section.data.map((group, index) => (
+                      <View key={`${group.eventType ?? 'other'}-${group.items[0]?.link ?? group.items[0]?.title ?? index}`}>{renderGroup(group, index)}</View>
+                    ))}
+                  </View>
+                ))}
+              </View>
+            )}
+          />
+          {!loading && items.length === 0 && !hasRosterNews ? (
             <EmptyState
               icon="newspaper-outline"
               title={feedStatus?.state === 'warming_up' ? 'News is warming up' : 'No news right now'}
               subtitle={feedStatus?.message || 'Check back later for injury, role, transaction, and off-field updates.'}
             />
-          ) : null
-        }
-        renderItem={({ item: group, index }) => {
-          const accentColor = eventBadgeColors(colors)[group.eventType ?? ''] ?? colors.textSecondary;
-          // First story of the first cluster in each date bucket is the hero.
-          const heroItem = index === 0 ? group.items[0] : null;
-          const rest = heroItem ? group.items.slice(1) : group.items;
-          return (
-            <View style={styles.group}>
-              <View style={styles.groupHeaderRow}>
-                <EventTypePill
-                  eventType={group.eventType}
-                  label={eventTypeLabel(group.eventType)}
-                  color={accentColor}
-                />
-              </View>
-              {heroItem ? (
-                <AccentCard accent={accentColor} compact style={rest.length > 0 ? styles.heroGap : undefined}>
-                  <NewsRow item={heroItem} showDivider={false} hero />
-                </AccentCard>
-              ) : null}
-              {rest.length > 0 ? (
-                <AnimatedCard style={styles.groupCard}>
-                  {rest.map((item, itemIndex) => (
-                    <NewsRow
-                      key={item.link ?? `${item.title ?? 'item'}-${item.published_ts ?? 0}-${itemIndex}`}
-                      item={item}
-                      showDivider={itemIndex < rest.length - 1}
-                    />
-                  ))}
-                </AnimatedCard>
-              ) : null}
-            </View>
-          );
-        }}
-      />
+          ) : null}
+          {!hasRosterNews && lastLeague ? (
+            <NextSteps title="News on your players" steps={['alerts']} leagueId={lastLeague.leagueId} leagueName={lastLeague.leagueName} />
+          ) : null}
+        </ScrollView>
+      )}
     </View>
   );
 }
