@@ -250,7 +250,7 @@ export function SimTeamTab({ ctx, onTrade }: { ctx: SimCtx; onTrade: () => void 
             accessibilityRole="button"
             accessibilityLabel="Auto-set best lineup"
             accessibilityState={{ disabled: saving || lineup.locked, busy: saving }}
-            style={{ flexDirection: 'row', alignItems: 'center', gap: 6, minHeight: 36, paddingHorizontal: spacing.md, borderRadius: radii.pill, borderWidth: 1, borderColor: colors.borderStrong ?? colors.border, opacity: saving || lineup.locked ? 0.6 : 1 }}
+            style={{ flexDirection: 'row', alignItems: 'center', gap: 6, minHeight: 44, paddingHorizontal: spacing.md, borderRadius: radii.pill, borderWidth: 1, borderColor: colors.borderStrong ?? colors.border, opacity: saving || lineup.locked ? 0.6 : 1 }}
           >
             <SimGlyph name="spark" color={colors.accent} size={14} />
             <AppText style={{ fontSize: 12.5, fontWeight: '800', color: colors.textPrimary }}>{saving ? 'Setting...' : 'Auto-set'}</AppText>

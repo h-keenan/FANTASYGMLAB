@@ -154,7 +154,7 @@ export function SimNotificationBell({ notif, onOpenTab }: { notif: ReturnType<ty
 }
 
 const styles = StyleSheet.create({
-  icon: { width: 40, height: 40, alignItems: 'center', justifyContent: 'center' },
+  icon: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center' },
   badgeWrap: { position: 'absolute', top: 2, right: 0 },
   badge: { minWidth: 18, height: 18, paddingHorizontal: 5, borderRadius: 9, alignItems: 'center', justifyContent: 'center' },
   badgeText: { fontSize: 12, fontWeight: '800', lineHeight: 14 },
