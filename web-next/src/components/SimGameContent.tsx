@@ -215,6 +215,9 @@ export function SimGameContent() {
     let cancelled = false;
     (async () => {
       try {
+        // Both reads start together (they are independent): the list used to wait for the options answer, one wasted round trip.
+        const listRequest = Promise.resolve(api.listSimGames());
+        listRequest.catch(() => undefined); // an early options failure returns before the list is awaited: never leave it unhandled
         const opts = await api.getSimGameOptions();
         if (cancelled) return;
         const gate = simGameGate(opts);
@@ -224,7 +227,7 @@ export function SimGameContent() {
         }
         setOptions(opts);
         if (opts.preview !== undefined) setPreview(opts.preview ?? null);
-        const list = await api.listSimGames();
+        const list = await listRequest;
         if (cancelled) return;
         const listGate = simGameGate(list);
         if (listGate.kind === "unavailable") {
@@ -292,6 +295,13 @@ export function SimGameContent() {
   const openGame = useCallback(
     async (id: string) => {
       setNotice(null);
+      // The Home and lineup reads only need the game id: start them with the game read instead of after it (they used to
+      // wait for the game answer and the render). The request cache hands the tabs these same answers a moment later.
+      const status = games.find((g) => g.id === id)?.status;
+      if (status === "in_season" || status === "playoffs") {
+        void Promise.resolve(api.getSimHome(id)).catch(() => undefined);
+        void Promise.resolve(api.getSimLineup(id)).catch(() => undefined);
+      }
       const body = await call(() => api.getSimGame(id));
       if (body?.game) {
         setGameState(body.game);
@@ -301,7 +311,7 @@ export function SimGameContent() {
         dispatch({ type: "open", game: body.game });
       }
     },
-    [call],
+    [call, games],
   );
 
   async function createGame(body: SimGameCreateBody) {
