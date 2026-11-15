@@ -63,8 +63,9 @@ describe("PillRow", () => {
     expect(tabs).toHaveLength(6);
     for (const tab of tabs) {
       expect(tab.querySelector('svg[aria-hidden="true"]')).not.toBeNull();
-      // Six icon tabs split the width equally so the last one is never clipped on a phone.
-      expect(tab.className).toContain("min-w-0");
+      // Six icon tabs split the width equally while their labels fit and never get narrower than a label (a long one scrolls the row instead of being cut).
+      expect(tab.className).toContain("flex-1");
+      expect(tab.className).toContain("min-w-fit");
       expect(tab.style.minHeight).toBe("var(--segmented-height)");
     }
     expect(screen.getByLabelText("2 new")).toBeInTheDocument();

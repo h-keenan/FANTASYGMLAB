@@ -170,7 +170,7 @@ function PlayerRow({
       {idpConfidence ? null : (
         <a
           href={`/player-compare/${encodeURIComponent(leagueId)}?a=${encodeURIComponent(player.player_id)}&name=${encodeURIComponent(leagueName)}`}
-          className="text-xs font-bold"
+          className="tap-link text-xs font-bold"
           style={{ color: "var(--color-accent)" }}
         >
           Compare with another player

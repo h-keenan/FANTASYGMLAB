@@ -38,7 +38,7 @@ export function ToneBadge({
     <span
       data-testid={testId}
       title={title ?? (truncate ? label : undefined)}
-      className={`${size === "xs" ? "px-1.5 text-[0.6875rem] leading-4 inline-flex items-center" : "px-1.5 py-0.5 text-xs"} font-extrabold uppercase ${truncate ? "block min-w-0 max-w-full overflow-hidden text-ellipsis whitespace-nowrap" : wrap || label.includes(" ") ? "min-w-0 max-w-full break-words" : label.length <= 4 ? "whitespace-nowrap shrink-0" : "min-w-0 max-w-full [overflow-wrap:anywhere]"}`}
+      className={`${size === "xs" ? "px-1.5 text-[0.6875rem] leading-4 inline-flex items-center" : "px-1.5 py-0.5 text-xs"} font-extrabold uppercase ${truncate ? "block min-w-0 max-w-full overflow-hidden text-ellipsis whitespace-nowrap" : wrap || label.includes(" ") ? "min-w-min max-w-full break-words" : "whitespace-nowrap shrink-0"}`}
       style={{
         borderRadius: "var(--radius-pill)",
         background: `color-mix(in srgb, ${color} var(--chip-fill-pct, 15%), transparent)`,

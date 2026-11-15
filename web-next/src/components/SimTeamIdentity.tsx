@@ -40,7 +40,7 @@ export function SimTeamIdentity({
   nameClassName?: string;
   nameStyle?: CSSProperties;
 }) {
-  const fit = simTeamNameFit(name, stacked);
+  const fit = simTeamNameFit(isYou ? `${name} (you)` : name, stacked);
   const layout = stacked ? "flex-col justify-center text-center gap-1" : "items-center gap-2";
   return (
     <span className={`inline-flex min-w-0 ${layout} ${className}`} data-testid="sim-team-identity">

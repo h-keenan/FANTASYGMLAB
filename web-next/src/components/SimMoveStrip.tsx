@@ -18,7 +18,7 @@ export interface SimMoveHandle {
 }
 
 /**
- * THE one trailing control of a sim roster row: a single Move button. It toggles the row's in-place expansion (the same
+ * THE one trailing control of a sim roster row: a single compact 44px glass Move button (the one shared control, everywhere a row has Move). It toggles the row's in-place expansion (the same
  * accordion state as tapping the row) and never carries more than an icon, so a name and its stats line keep the width.
  */
 export function SimMoveButton({ name, open, onToggle }: { name: string; open: boolean; onToggle: () => void }) {
@@ -31,11 +31,11 @@ export function SimMoveButton({ name, open, onToggle }: { name: string; open: bo
       onClick={onToggle}
       className="inline-flex shrink-0 items-center justify-center"
       style={{
-        width: 40,
-        height: 40,
+        width: "var(--touch-target-min)",
+        height: "var(--touch-target-min)",
         borderRadius: "var(--radius-control)",
-        border: `var(--border-width-default) solid ${open ? "var(--color-accent)" : "transparent"}`,
-        background: open ? "var(--color-accent-soft)" : "var(--color-surface-muted)",
+        border: `var(--border-width-default) solid ${open ? "var(--color-accent)" : "var(--glass-input-border)"}`,
+        background: open ? "var(--color-accent-soft)" : "var(--glass-input-bg)",
         color: open ? "var(--color-accent)" : "var(--color-text-secondary)",
         transition: "transform 90ms ease-out",
       }}

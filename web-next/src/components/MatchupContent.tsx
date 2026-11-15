@@ -498,7 +498,7 @@ function LineupComparison({
           onDone={() => planner!.exit()}
         />
       ) : bestBall ? null : (
-        <div className="flex items-center justify-between gap-2">
+        <div className="flex flex-wrap items-center justify-between gap-2">
           <PillRow
             options={[
               { label: "Suggested", value: "suggested", glyph: "suggested" },

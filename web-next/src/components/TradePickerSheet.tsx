@@ -183,7 +183,7 @@ export function TradePickerSheet<T = unknown>({
               {title}
             </h2>
             {subtitle ? (
-              <p className="text-xs truncate" style={{ color: "var(--color-text-muted)" }}>
+              <p className="text-xs break-words" style={{ color: "var(--color-text-muted)" }}>
                 {subtitle}
               </p>
             ) : null}
@@ -197,7 +197,7 @@ export function TradePickerSheet<T = unknown>({
           <ul className="tps-chips" aria-label="Selected">
             {chosen.map((item) => (
               <li key={item.key} className="tps-chip">
-                {item.kind === "player" ? <PlayerName name={item.label} /> : <span className="truncate">{item.label}</span>}
+                {item.kind === "player" ? <PlayerName name={item.label} /> : <span className="min-w-0 break-words">{item.label}</span>}
                 <button type="button" aria-label={`Remove ${item.label}`} onClick={() => dispatch({ type: "remove", key: item.key })}>
                   ×
                 </button>
@@ -486,7 +486,7 @@ export function TradeSideSummary({
         <ul className="tps-chips tps-side-chips" aria-label={`${label} assets`}>
           {items.map((item) => (
             <li key={item.key} className="tps-chip">
-              {item.kind === "player" ? <PlayerName name={item.label} /> : <span className="truncate">{item.label}</span>}
+              {item.kind === "player" ? <PlayerName name={item.label} /> : <span className="min-w-0 break-words">{item.label}</span>}
               <button type="button" aria-label={`Remove ${item.label}`} onClick={() => onRemove(item.key)}>
                 ×
               </button>

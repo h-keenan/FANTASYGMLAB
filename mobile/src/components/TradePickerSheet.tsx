@@ -154,7 +154,7 @@ export default function TradePickerSheet<T = unknown>({
                 {title}
               </AppText>
               {subtitle ? (
-                <AppText style={styles.subtitle} numberOfLines={1}>
+                <AppText style={styles.subtitle}>
                   {subtitle}
                 </AppText>
               ) : null}

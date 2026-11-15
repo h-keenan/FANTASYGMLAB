@@ -65,7 +65,7 @@ export function SimRecentStrip({ cards, onOpenPlayer, onFullBoard }: { cards: Si
       <div className="flex items-center justify-between gap-2">
         <span className="text-[0.6875rem] font-extrabold uppercase" style={{ color: "var(--color-text-muted)", letterSpacing: "var(--letter-spacing-badge)" }}>Just drafted</span>
         {onFullBoard ? (
-          <button type="button" onClick={onFullBoard} className="tap-link text-xs font-bold" style={{ color: "var(--color-accent)", minHeight: 28 }} data-testid="recent-full-board">
+          <button type="button" onClick={onFullBoard} className="tap-link text-xs font-bold" style={{ color: "var(--color-accent)", minHeight: "var(--touch-target-min)" }} data-testid="recent-full-board">
             Full board
           </button>
         ) : null}

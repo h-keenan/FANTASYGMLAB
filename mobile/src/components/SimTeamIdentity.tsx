@@ -39,7 +39,7 @@ export function SimTeamIdentity({
 }) {
   const { colors } = useThemeMode();
   const styles = useMemo(() => createStyles(colors), [colors]);
-  const fit = simTeamNameFit(name, stacked);
+  const fit = simTeamNameFit(isYou ? `${name} (you)` : name, stacked);
   return (
     <View style={stacked ? styles.stacked : styles.row}>
       <SimTeamLogo name={name} size={size} />

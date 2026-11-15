@@ -63,7 +63,7 @@ export function PlayerTap({
   const inScope = useContext(TapScopeContext);
   if (inScope || nonInteractive || (!onOpen && !canOpenPlayer(player))) return <>{children}</>;
   return (
-    <PressableScale accessibilityRole="button" accessibilityLabel={playerOpenLabel(player.name)} onPress={() => (onOpen ? onOpen() : open(player))} style={[{ minHeight }, style]}>
+    <PressableScale accessibilityRole="button" accessibilityLabel={playerOpenLabel(player.name)} onPress={() => (onOpen ? onOpen() : open(player))} hitSlop={minHeight < PLAYER_TAP_MIN ? { top: (PLAYER_TAP_MIN - minHeight) / 2, bottom: (PLAYER_TAP_MIN - minHeight) / 2 } : undefined} style={[{ minHeight }, style]}>
       <TapScopeContext.Provider value>{children}</TapScopeContext.Provider>
     </PressableScale>
   );

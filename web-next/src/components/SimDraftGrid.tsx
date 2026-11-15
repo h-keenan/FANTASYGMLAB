@@ -31,7 +31,7 @@ export function SimDraftGrid({ draft, teams, onOpen }: { draft: SimDraftState; t
                 <th key={t.team_id} className="sticky top-0 z-10 p-1" style={{ width: COL, background: "var(--color-surface)", borderBottom: t.is_you ? "3px solid var(--color-accent)" : "var(--border-width-default) solid var(--color-border)" }}>
                   <span className="flex flex-col items-center gap-0.5">
                     <SimDraftEmblem name={t.name} you={t.is_you} />
-                    <span className="max-w-full truncate text-[0.6875rem] font-bold" style={{ color: t.is_you ? "var(--color-accent)" : "var(--color-text-muted)", width: COL - 8 }}>{t.is_you ? "You" : t.name}</span>
+                    <span className="max-w-full break-words leading-tight text-[0.6875rem] font-bold" style={{ color: t.is_you ? "var(--color-accent)" : "var(--color-text-muted)", width: COL - 8 }}>{t.is_you ? "You" : t.name}</span>
                   </span>
                 </th>
               ))}

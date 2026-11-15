@@ -28,11 +28,11 @@ export function SampleLeagueBanner() {
     <aside
       role="note"
       data-testid="sample-banner"
-      className="glass-surface sticky top-2 z-30 flex items-center gap-2 px-3 py-1.5"
+      className="glass-surface sticky top-2 z-30 flex flex-wrap items-center gap-2 px-3 py-1.5"
       style={{ borderLeft: "var(--border-width-semantic) solid var(--color-accent)" }}
     >
       <span className="shrink-0"><ToneBadge label={SAMPLE_BANNER_TITLE} color="var(--color-accent)" /></span>
-      <span className="min-w-0 flex-1 truncate text-xs max-sm:sr-only" style={{ color: "var(--color-text-secondary)" }}>
+      <span className="min-w-0 flex-1 break-words text-xs max-sm:sr-only" style={{ color: "var(--color-text-secondary)" }}>
         {SAMPLE_BANNER_BODY}
       </span>
       <ButtonLink href={SAMPLE_CONNECT_ROUTE} size="sm" className="ml-auto shrink-0">

@@ -39,14 +39,14 @@ export function SimMoveButton({ name, open, onToggle }: { name: string; open: bo
         onToggle();
       }}
       style={{
-        width: 40,
-        height: 40,
+        width: 44,
+        height: 44,
         alignItems: 'center',
         justifyContent: 'center',
         borderRadius: radii.md,
         borderWidth: 1,
-        borderColor: open ? colors.accent : 'transparent',
-        backgroundColor: open ? withAlpha(colors.accent, 0.15) : withAlpha(colors.textTertiary, 0.12),
+        borderColor: open ? colors.accent : withAlpha(colors.textPrimary, 0.14),
+        backgroundColor: open ? withAlpha(colors.accent, 0.15) : withAlpha(colors.textPrimary, 0.05),
       }}
     >
       <Ionicons name="ellipsis-horizontal" size={20} color={open ? colors.accent : colors.textSecondary} />

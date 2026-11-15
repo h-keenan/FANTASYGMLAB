@@ -1,6 +1,6 @@
 "use client";
 
-import { Fragment, useCallback, useState, type ReactNode } from "react";
+import { useCallback, useState, type ReactNode } from "react";
 
 import { PlayerName } from "@/components/PlayerName";
 import { PositionBadge } from "@/components/PositionBadge";
@@ -12,7 +12,8 @@ import { canOpenPlayer } from "@/lib/playerTap";
 import { nextOpenId, playerRowModel, type FactTone, type PlayerFactsInput, type PlayerFact } from "@/lib/playerAnatomy";
 import type { BadgeInput } from "@/lib/playerBadges";
 import type { SimGradeInput } from "@/lib/simGrade";
-import { Money } from "@/components/Money";
+import { PlayerMetaLine } from "@/components/ui/PlayerMetaLine";
+import { metaPartsFromStrings, type MetaPart } from "@/lib/playerMetaFit";
 import { SkeletonPlayerRow } from "@/components/Skeleton";
 import { Collapse } from "@/components/ui/Presence";
 
@@ -57,7 +58,7 @@ export type PlayerAccordionRowProps = PlayerFactsInput & {
   ariaLabel?: string;
   /** Sim: the letter grade, drawn as a small tile at the end of the stats line (never a "GRADE" word, never in the trailing slot). */
   gradeTile?: SimGradeInput | null;
-  /** Replaces the TEAM · Age · Bye line (the caller's parts, with the bye-soon tone and PROJ); one line, truncated. */
+  /** Replaces the TEAM · Age · Bye line (the caller's parts, with the bye-soon tone and PROJ); fitted by the ladder in lib/playerMetaFit.ts, never ellipsized. */
   metaParts?: { key: string; text: string; tone?: FactTone }[];
   /** Drop the position pill when a slot label column already says it. */
   hidePosition?: boolean;
@@ -90,7 +91,7 @@ export function PlayerAccordionRow({ open, onToggle, badges = [], positionLabel,
   const { player } = input;
   const model = playerRowModel(input);
   const split = !nonInteractive && canOpenPlayer(player);
-  const metaLine: { key: string; text: string; tone?: FactTone }[] = metaParts ?? model.meta.map((text, i) => ({ key: `m${i}`, text }));
+  const metaLine: MetaPart[] = metaParts ?? metaPartsFromStrings(model.meta);
   return (
     <div
       className="min-w-0"
@@ -124,23 +125,13 @@ export function PlayerAccordionRow({ open, onToggle, badges = [], positionLabel,
           <div className="pointer-events-none relative flex min-w-0 flex-1 items-center gap-2.5">
             <PlayerAvatarSlot player={player} tier="row" onOpen={onOpenPlayer} className="pointer-events-auto" />
           <span className="flex min-w-0 flex-1 flex-col">
-            <PlayerTap player={player} onOpen={onOpenPlayer} className="pointer-events-auto flex min-w-0 items-center gap-1.5 text-left" minHeight={28}>
+            <PlayerTap player={player} onOpen={onOpenPlayer} className="pointer-events-auto flex min-w-0 flex-wrap items-center gap-x-1.5 gap-y-0.5 text-left" minHeight={28}>
               <PlayerName name={player.name} className="min-w-0 text-sm font-bold" style={{ color: "var(--color-text-primary)" }} />
               {hidePosition ? null : <PositionBadge position={player.position} label={positionLabel ?? undefined} />}
               <PlayerBadges badges={badges} />
             </PlayerTap>
             {metaLine.length > 0 || gradeTile ? (
-              <span className="flex min-w-0 items-center gap-1.5 text-xs leading-4" style={{ color: "var(--color-text-muted)" }} data-testid="row-meta">
-                <span className="min-w-0 truncate">
-                  {metaLine.map((part, i) => (
-                    <Fragment key={part.key}>
-                      {i > 0 ? " · " : ""}
-                      <span style={{ color: part.tone ? TONE[part.tone] : undefined, fontWeight: part.tone === "warning" || part.key === "proj" ? 700 : undefined }}><Money>{part.text}</Money></span>
-                    </Fragment>
-                  ))}
-                </span>
-                {gradeTile ? <LetterGrade grade={gradeTile} size="xs" testId="row-grade" /> : null}
-              </span>
+              <PlayerMetaLine parts={metaLine} trailing={gradeTile ? <LetterGrade grade={gradeTile} size="xs" testId="row-grade" /> : null} />
             ) : null}
             {headline ? (
               <span className="text-[0.8125rem] leading-snug" style={{ color: "var(--color-text-secondary)", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden" }} data-testid="row-headline">{headline}</span>
@@ -165,23 +156,13 @@ export function PlayerAccordionRow({ open, onToggle, badges = [], positionLabel,
           >
             <PlayerAvatarSlot player={player} tier="row" nonInteractive="the whole row button expands the row, no player tap" />
             <span className="flex min-w-0 flex-1 flex-col">
-              <span className="flex min-w-0 items-center gap-1.5">
+              <span className="flex min-w-0 flex-wrap items-center gap-x-1.5 gap-y-0.5">
                 <PlayerName name={player.name} className="min-w-0 text-sm font-bold" style={{ color: "var(--color-text-primary)" }} />
                 {hidePosition ? null : <PositionBadge position={player.position} label={positionLabel ?? undefined} />}
                 <PlayerBadges badges={badges} />
               </span>
               {metaLine.length > 0 || gradeTile ? (
-                <span className="flex min-w-0 items-center gap-1.5 text-xs leading-4" style={{ color: "var(--color-text-muted)" }} data-testid="row-meta">
-                  <span className="min-w-0 truncate">
-                    {metaLine.map((part, i) => (
-                      <Fragment key={part.key}>
-                        {i > 0 ? " · " : ""}
-                        <span style={{ color: part.tone ? TONE[part.tone] : undefined, fontWeight: part.tone === "warning" || part.key === "proj" ? 700 : undefined }}><Money>{part.text}</Money></span>
-                      </Fragment>
-                    ))}
-                  </span>
-                  {gradeTile ? <LetterGrade grade={gradeTile} size="xs" testId="row-grade" /> : null}
-                </span>
+                <PlayerMetaLine parts={metaLine} trailing={gradeTile ? <LetterGrade grade={gradeTile} size="xs" testId="row-grade" /> : null} />
               ) : null}
               {headline ? (
               <span className="text-[0.8125rem] leading-snug" style={{ color: "var(--color-text-secondary)", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden" }} data-testid="row-headline">{headline}</span>

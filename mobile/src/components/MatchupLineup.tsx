@@ -78,7 +78,7 @@ export function ComparisonHeader({
     <View style={{ gap: spacing.sm }} testID="comparison-header">
       <View style={styles.headerRow}>
         <View style={styles.flex}>
-          <AppText style={[styles.teamName, { color: colors.accent }]} numberOfLines={1}>
+          <AppText style={[styles.teamName, { color: colors.accent }]}>
             {mine.team_name || 'You'}
           </AppText>
           <TickNumber value={totals.mineNow} style={styles.total} />
@@ -94,7 +94,7 @@ export function ComparisonHeader({
           />
         </View>
         <View style={[styles.flex, { alignItems: 'flex-end' }]}>
-          <AppText style={[styles.teamName, { color: colors.textPrimary }]} numberOfLines={1}>
+          <AppText style={[styles.teamName, { color: colors.textPrimary }]}>
             {opponent.team_name || 'Opponent'}
           </AppText>
           <TickNumber value={totals.opponentNow} style={styles.total} />

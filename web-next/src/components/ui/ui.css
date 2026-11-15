@@ -881,7 +881,7 @@
 .pill-tab-text { display: inline-block; white-space: nowrap; }
 .pill-tab {
   position: relative; flex: 1 0 auto; display: inline-flex; align-items: center; justify-content: center; box-sizing: border-box;
-  height: var(--bar-button-min-height); min-height: var(--bar-button-min-height); margin: 0; padding: 0 10px; text-decoration: none;
+  height: var(--bar-button-min-height); min-height: var(--bar-button-min-height); min-width: var(--touch-target-min); margin: 0; padding: 0 10px; text-decoration: none;
   -webkit-appearance: none; appearance: none; background: transparent; border: 0; border-radius: 999px; cursor: pointer;
   font-family: inherit; font-size: 0.75rem; font-weight: 700; line-height: 1; white-space: nowrap; color: var(--color-text-muted);
   -webkit-tap-highlight-color: transparent; transition: color 180ms ease;
@@ -896,7 +896,7 @@
   -webkit-tap-highlight-color: transparent;
 }
 /* Four or more page tabs: the primary keeps its icon and gives the label to the strip (aria-label still names it). */
-.pill-primary[data-compact] { width: 44px; min-width: 44px; height: 44px; min-height: 44px; padding: 0; justify-content: center; }
+.pill-primary[data-compact] { width: var(--touch-target-min); min-width: var(--touch-target-min); height: var(--touch-target-min); min-height: var(--touch-target-min); padding: 0; justify-content: center; }
 .pill-primary[data-compact] .pill-primary-label { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
 /* Four or more page tabs: tighter type and padding so they fit one 390px row as short labels; at 360 the strip scrolls. */
 .pill-tabs[data-dense] { gap: 1px; }

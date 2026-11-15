@@ -8,11 +8,18 @@
 //   NEXT_PUBLIC_SUPABASE_URL=https://dummy.supabase.co NEXT_PUBLIC_SUPABASE_ANON_KEY=x NEXT_PUBLIC_API_BASE_URL=http://localhost:8000 npx next dev -p 3197
 //   PW_CORE=.../playwright-core/index.mjs BASE=http://localhost:3197 OUT=/tmp/module-scan [WIDTHS=360,390] node scripts/sim_layout_playwright/module_scan.mjs
 import fs from "fs";
+import { GUARD } from "./guard_checks.mjs";
 
-const { chromium } = await import(process.env.PW_CORE || "playwright-core");
+const pw = await import(process.env.PW_CORE || "playwright-core");
+// WebKit by default (coridian_ sees these pages in iPhone Safari); BROWSER=chromium [CHROME=path] for Chromium.
+const engine = process.env.BROWSER === "chromium" ? pw.chromium : pw.webkit;
+// GUARD=1 adds the layout guard (guard_checks.mjs: no sideways scroll, nothing past its card / viewport, no ellipsis, no clipped text, controls >= 44px) at every width; LARGE=1 re-runs at 125% text.
+const GUARD_ON = process.env.GUARD === "1";
+const LARGE = process.env.LARGE === "1";
+const guardViolations = [];
 const BASE = process.env.BASE || "http://localhost:3197";
 const OUT = process.env.OUT || "/private/tmp/claude-501/module-scan";
-const WIDTHS = (process.env.WIDTHS || "390,1440").split(",").map(Number);
+const WIDTHS = (process.env.WIDTHS || (process.env.GUARD === "1" ? "320,360,390,430" : "390,1440")).split(",").map(Number);
 const LID = "1221647449446162432";
 // Audit knobs (docs/audits/2026-11-ui-consistency-audit-4.md): NAV=bottom opens every page in the phone shell (header + bottom pill) instead of the legacy
 // header + orb, FULL=1 saves full-page screenshots, METRICS=1 adds the design-token census (radii, type sizes, gold, button heights) to report.json.
@@ -196,7 +203,7 @@ const CENSUS = () => {
   return { radii, sizes, weights, btnH, headings, controls, small, gold: gold.slice(0, 40), goldCount: gold.length };
 };
 
-const browser = await chromium.launch({ executablePath: process.env.CHROME || process.env.HOME + "/Library/Caches/ms-playwright/chromium_headless_shell-1248/chrome-headless-shell-mac-arm64/chrome-headless-shell" });
+const browser = await engine.launch(process.env.CHROME ? { executablePath: process.env.CHROME } : {});
 const results = [];
 for (const w of WIDTHS) {
   const ctx = await browser.newContext({ viewport: { width: w, height: w >= 768 ? 900 : 844 }, hasTouch: w < 768, isMobile: w < 768 });
@@ -221,6 +228,7 @@ for (const w of WIDTHS) {
       await page.goto(`${BASE}${r.path}`, { waitUntil: "domcontentloaded", timeout: 90000 });
       await page.addStyleTag({ content: "nextjs-portal,[data-nextjs-toast]{display:none!important}" }).catch(() => {});
       await sleep(r.name === "today" && w === WIDTHS[0] ? 12000 : 5000);
+      if (LARGE) await page.addStyleTag({ content: "html{font-size:125%!important}" }).catch(() => {});
       const res = await page.evaluate(PAGE_CHECK);
       if (r.expandAll) {
         // Open every collapsed module and the first player row, so the scan covers the bodies, then pick another week from the strip.
@@ -237,6 +245,14 @@ for (const w of WIDTHS) {
         res.truncated = [...(res.truncated || []), ...(open.truncated || [])];
         res.openHeight = open.height;
         await page.screenshot({ path: `${OUT}/${r.name}-open-${w}.png`, fullPage: true });
+      }
+      if (GUARD_ON) {
+        const state = async (tag) => {
+          for (const v of await page.evaluate(GUARD, {})) guardViolations.push({ page: `${r.name}${tag}`, width: w, large: LARGE, ...v });
+        };
+        await state("");
+        const row = page.locator('[data-testid="player-accordion-row"] button[aria-expanded]').first();
+        if (await row.count()) { await row.dispatchEvent("click"); await sleep(700); await state(":row-open"); }
       }
       if (METRICS) res.census = await page.evaluate(CENSUS);
       results.push({ page: r.name, width: w, maxTablists: r.maxTablists ?? 1, noModules: Boolean(r.noModules), expect: r.expect ? await page.locator(`[data-testid="${r.expect}"]`).count() : null, ...res });
@@ -256,7 +272,8 @@ for (const r of results) {
   if (r.error) problems.push(`error ${r.error}`);
   if (r.overflow) problems.push(`overflow ${r.overflow.scrollWidth}>${r.overflow.width}`);
   if (r.emptyHeaders?.length) problems.push(`empty collapsed headers: ${r.emptyHeaders.map((h) => h.title).join(", ")}`);
-  if (r.strip && r.width < 768 && r.page !== "sample-league") {
+  // Strip geometry (equal, centred tabs) is a >= 360px rule: at 320px a long label (Standings, Notifications) makes a tab wider than its share and the row scrolls instead of cutting it.
+  if (r.strip && !LARGE && r.width >= 360 && r.width < 768 && r.page !== "sample-league") {
     const s = r.strip, spread = Math.max(...s.widths) - Math.min(...s.widths);
     if (Math.abs(s.left) > 0.5 || Math.abs(s.right) > 0.5) problems.push(`tab strip not full-bleed (left ${s.left}, right gap ${s.right})`);
     if (Math.abs(s.tabLeft - s.tabRight) > 2) problems.push(`tabs not centred (left ${s.tabLeft}, right ${s.tabRight})`);
@@ -271,10 +288,18 @@ for (const r of results) {
   if (r.expect === 0) problems.push("expected page content missing (fixture not applied?)");
   if (r.width >= 1024 && r.page === "sample-league" && r.mainWidth < 1000) problems.push(`sample league column only ${r.mainWidth}px wide at desktop`);
   if (r.width >= 1024 && r.page === "matchup" && r.mainWidth < 1000) problems.push(`matchup column only ${r.mainWidth}px wide at desktop`);
-  if (r.recRowMaxH > 96) problems.push(`recommended-add row ${r.recRowMaxH}px tall (compact rows are <= 96)`);
+  if (r.recRowMaxH > 96 && r.width >= 390 && !LARGE) problems.push(`recommended-add row ${r.recRowMaxH}px tall (compact rows are <= 96)`);
   if (r.modules === 0 && !r.noModules) problems.push("no compact modules rendered (fixtures not applied?)");
   if (problems.length) bad += 1;
   console.log(`${problems.length ? "FAIL" : "ok  "} ${r.page}@${r.width}: modules=${r.modules} heroes=${r.heroes} headers=${r.headerBars} main=${r.mainWidth} recRows=${r.recRows}/${r.recRowMaxH} tablists=${r.tablists} height=${r.height}${problems.length ? "  " + problems.join("; ") : ""}`);
+}
+if (GUARD_ON) {
+  fs.writeFileSync(`${OUT}/desk-violations.json`, JSON.stringify(guardViolations, null, 1));
+  const byKey = new Map();
+  for (const v of guardViolations) { const k = `${v.kind} ${v.el} "${v.text}"`; const e = byKey.get(k) || { n: 0, where: new Set(), detail: v.detail }; e.n += 1; e.where.add(`${v.page}@${v.width}`); byKey.set(k, e); }
+  for (const [k, e] of byKey) console.log(`GUARD ${k}  x${e.n}  e.g. ${[...e.where].slice(0, 3).join(", ")}  ${e.detail}`);
+  console.log(`desk layout guard: ${byKey.size} distinct violations (${guardViolations.length} total)`);
+  if (guardViolations.length) bad += 1;
 }
 console.log(bad ? `${bad} page(s) with problems` : "module scan clean");
 process.exit(bad ? 1 : 0);

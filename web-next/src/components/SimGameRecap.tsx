@@ -287,7 +287,7 @@ export function SimFinalView({ ctx, onNewGame, onHub }: { ctx: SimCtx; onNewGame
                 </>
               ) : (
                 <div className="flex items-center gap-2">
-                  <span className="min-w-0 flex-1 truncate text-sm font-semibold">{i + 1}. {row.name}{row.is_you ? " (you)" : ""}</span>
+                  <span className="min-w-0 flex-1 break-words text-sm font-semibold">{i + 1}. {row.name}{row.is_you ? " (you)" : ""}</span>
                   <SimToneBadge label={simPlayoffResultLabel(row.playoff_result)} tone={simPlayoffOutcomeTone(row.playoff_result)} />
                   <span className="w-10 shrink-0 text-right text-sm font-bold tabular-nums">{row.wins}-{row.losses}{row.ties ? `-${row.ties}` : ""}</span>
                 </div>

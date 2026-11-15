@@ -263,7 +263,7 @@ export default function PlayerIdentityRow({
           <View style={styles.gridTopRow}>
             {showSlot ? (
               <View style={styles.slotBadge}>
-                <AppText style={styles.slotText} numberOfLines={1}>
+                <AppText style={styles.slotText}>
                   {slot}
                 </AppText>
               </View>
@@ -280,7 +280,7 @@ export default function PlayerIdentityRow({
             <View style={styles.metaRow}>
               <PositionBadge position={position} />
               {team ? (
-                <AppText style={styles.team} numberOfLines={1}>
+                <AppText style={styles.team}>
                   {team}
                 </AppText>
               ) : null}
@@ -291,7 +291,7 @@ export default function PlayerIdentityRow({
           <View style={styles.gridChipWrap}>
             <TierBadge storedTier={tier} />
             {labelBits.length > 0 ? (
-              <AppText style={styles.label} numberOfLines={1}>
+              <AppText style={styles.label}>
                 {labelBits.join(' · ')}
               </AppText>
             ) : null}
@@ -311,7 +311,6 @@ export default function PlayerIdentityRow({
         {contextLine ? (
           <AppText
             style={[styles.context, contextLineColor ? { color: contextLineColor } : null]}
-            numberOfLines={2}
           >
             {contextLine}
           </AppText>
@@ -354,7 +353,7 @@ export default function PlayerIdentityRow({
     >
       {slot && !slotRedundant ? (
         <View style={styles.slotBadge}>
-          <AppText style={styles.slotText} numberOfLines={1}>
+          <AppText style={styles.slotText}>
             {slot}
           </AppText>
         </View>
@@ -378,7 +377,7 @@ export default function PlayerIdentityRow({
           <PositionBadge position={position} />
           <TierBadge storedTier={tier} />
           {team ? (
-            <AppText style={styles.team} numberOfLines={1}>
+            <AppText style={styles.team}>
               {team}
             </AppText>
           ) : null}
@@ -395,14 +394,13 @@ export default function PlayerIdentityRow({
           <OverallRatingBadge rating={overallRating} positionRank={positionRank} />
         </View>
         {labelBits.length > 0 ? (
-          <AppText style={styles.label} numberOfLines={1}>
+          <AppText style={styles.label}>
             {labelBits.join(' · ')}
           </AppText>
         ) : null}
         {contextLine ? (
           <AppText
             style={[styles.context, contextLineColor ? { color: contextLineColor } : null]}
-            numberOfLines={1}
           >
             {contextLine}
           </AppText>

@@ -89,13 +89,13 @@ export default function CompactPlayerModule({
         <View style={styles.metaRow}>
           <PositionBadge position={position} size="sm" />
           {team ? (
-            <AppText style={styles.team} numberOfLines={1}>
+            <AppText style={styles.team}>
               {team}
             </AppText>
           ) : null}
         </View>
         {contextLine ? (
-          <AppText style={styles.context} numberOfLines={contextLines}>
+          <AppText style={styles.context}>
             {contextLine}
           </AppText>
         ) : null}

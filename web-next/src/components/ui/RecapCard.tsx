@@ -28,7 +28,7 @@ function Row({ row, extra }: { row: RecapCardRow; extra?: ReactNode }) {
         <span className="text-xs font-extrabold uppercase" style={{ color: "var(--color-text-muted)", letterSpacing: "var(--letter-spacing-badge)" }}>
           {row.label}
         </span>
-        <span className="min-w-0 break-words text-right text-sm font-extrabold" style={{ color: TONE[row.tone ?? "muted"] }}>
+        <span className="min-w-min break-words text-right text-sm font-extrabold" style={{ color: TONE[row.tone ?? "muted"] }}>
           {row.value}
         </span>
       </div>

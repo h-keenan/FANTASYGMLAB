@@ -3588,6 +3588,20 @@ select optgroup {
   display: inline-flex;
   align-items: center;
   min-height: var(--touch-target-min);
+  min-width: var(--touch-target-min);
+}
+
+/* A player tap nested in a denser row (the name line, a chip) keeps its layout but gets a full 44px hit area from an
+   invisible overlay centred on it (docs/ui-patterns.md, "Never ellipsize, never clip"; guard_checks.mjs reads this). */
+[data-player-tap="true"]:not(.absolute):not(.fixed) { position: relative; }
+[data-player-tap="true"]::after {
+  content: "";
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: max(100%, var(--touch-target-min));
+  height: max(100%, var(--touch-target-min));
+  transform: translate(-50%, -50%);
 }
 
 /* Quick view: availability block + latest news. */
@@ -4528,7 +4542,8 @@ main > header:has(> h1.sr-only:only-child) {
 .shell-header-crest { display: inline-flex; align-items: center; justify-content: center; min-width: var(--touch-target-min); min-height: var(--touch-target-min); }
 .shell-header-ribbon { display: grid; grid-template-rows: 1fr; transition: grid-template-rows 160ms ease, opacity 160ms ease; }
 .shell-header[data-collapsed="true"] .shell-header-ribbon { grid-template-rows: 0fr; opacity: 0; pointer-events: none; }
-.shell-header-ribbon-inner { display: flex; min-height: 0; gap: 0.375rem; overflow: hidden; padding-bottom: 0.5rem; }
+.shell-header-ribbon-inner { display: flex; min-height: 0; gap: 0.375rem; overflow-x: auto; overflow-y: hidden; scrollbar-width: none; padding-bottom: 0.5rem; } /* chips that do not fit scroll, never clip */
+.shell-header-ribbon-inner::-webkit-scrollbar { display: none; }
 .shell-header-chip { display: inline-flex; align-items: center; min-height: 1.75rem; padding: 0 0.625rem; border-radius: var(--radius-pill); border: var(--border-width-default) solid var(--glass-border, var(--color-border)); background: var(--glass-input-bg, var(--color-surface-muted)); font-size: 0.75rem; font-weight: 800; white-space: nowrap; }
 @media (prefers-reduced-motion: reduce) { .shell-header-ribbon { transition: none; } }
 .shell-header-back {

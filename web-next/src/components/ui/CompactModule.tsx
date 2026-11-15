@@ -138,13 +138,13 @@ export function CompactModule({
         >
           <span className="flex min-w-0 flex-1 flex-col">
             <span className="flex items-center gap-2">
-              <span className="shrink-0 whitespace-nowrap text-[0.6875rem] font-extrabold uppercase" style={{ color: "var(--color-text-muted)", letterSpacing: "var(--letter-spacing-badge)" }}>
+              <span className="min-w-0 break-words text-[0.6875rem] font-extrabold uppercase" style={{ color: "var(--color-text-muted)", letterSpacing: "var(--letter-spacing-badge)" }}>
                 {title}
               </span>
               {shown.length === 0 && summary ? <span className="min-w-0 flex-1 text-right">{summary}</span> : null}
             </span>
             {shown.length > 0 ? (
-              <span className="text-sm leading-snug" style={{ display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden" }} data-testid="compact-summary">
+              <span className="text-sm leading-snug break-words" data-testid="compact-summary">
                 {shown.map((part, i) => (
                   <span key={part.key}>
                     {i > 0 ? <span style={{ color: "var(--color-text-muted)" }}>{" · "}</span> : null}
