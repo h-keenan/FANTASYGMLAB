@@ -163,7 +163,7 @@ describe("PublicTradeAnalyzer", () => {
     expect(await screen.findByRole("alert")).toHaveTextContent("did not load");
     mockFetch();
     await act(async () => {
-      fireEvent.click(screen.getByRole("button", { name: "Retry" }));
+      fireEvent.click(screen.getByRole("button", { name: "Try again" }));
     });
     await screen.findByLabelText("Search players for You send");
   });

@@ -238,15 +238,9 @@ function ShareVerdictButton({
 
   return (
     <span className="inline-flex flex-col items-end gap-1">
-      <button
-        type="button"
-        onClick={share.onClick}
-        disabled={share.busy}
-        className="px-1.5 py-0.5 text-xs font-bold uppercase shrink-0"
-        style={{ color: "var(--color-accent)", border: "1px solid var(--color-accent)" }}
-      >
+      <Button variant="accentOutline" size="sm" onClick={share.onClick} disabled={share.busy} className="shrink-0">
         {copied ? "Copied!" : share.label("Share")}
-      </button>
+      </Button>
       {share.status ? (
         <span role="status" className="text-xs font-normal normal-case" style={{ color: "var(--color-text-muted)" }}>
           {share.status}

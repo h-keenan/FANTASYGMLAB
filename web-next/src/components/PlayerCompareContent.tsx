@@ -284,7 +284,7 @@ function OpponentChips({ label, players, onPick }: { label: string; players: Ran
             >
               <PlayerAvatar playerId={p.player_id} tier={p.tier} size={32} fallbackLabel={(p.name ?? "").split(" ").map((w) => w[0]).slice(0, 2).join("")} />
               <span className="flex flex-col leading-tight">
-                <span className="text-sm font-bold">{p.name}</span>
+                <PlayerName name={p.name} className="text-sm font-bold" />
                 <span className="text-xs tabular-nums" style={{ color: "var(--color-text-muted)" }}>
                   {p.position} · {p.score != null ? Math.round(p.score).toLocaleString() : "—"}
                 </span>

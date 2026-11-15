@@ -1,5 +1,5 @@
 import Link from "next/link";
-import type { AnchorHTMLAttributes, ButtonHTMLAttributes, CSSProperties } from "react";
+import type { AnchorHTMLAttributes, ButtonHTMLAttributes, CSSProperties, Ref } from "react";
 
 /**
  * The one button. `primary` is dark ink on the cyan accent (the pairing
@@ -11,9 +11,10 @@ import type { AnchorHTMLAttributes, ButtonHTMLAttributes, CSSProperties } from "
  * live. Never put white text on the cyan accent. `premium` is the gold fill
  * with dark ink and a soft pulsing gold glow (the prestige-ring recipe) for
  * EVERY premium-related control (Upgrade, trial CTAs, Manage Billing);
- * `premiumOutline` is its quiet gold-outline sibling (Restore purchases).
+ * `premiumOutline` is its quiet gold-outline sibling (Restore purchases). `accentOutline` is the cyan-outline secondary call to action
+ * ("View details", "Share"): the one replacement for hand-rolled square `border: 1px solid var(--color-accent)` buttons (ui consistency audit 4).
  */
-export type ButtonVariant = "primary" | "secondary" | "ghost" | "danger" | "dangerOutline" | "premium" | "premiumOutline";
+export type ButtonVariant = "primary" | "secondary" | "ghost" | "danger" | "dangerOutline" | "premium" | "premiumOutline" | "accentOutline";
 
 type ButtonLook = { variant?: ButtonVariant; size?: "sm" | "md"; fullWidth?: boolean };
 
@@ -35,6 +36,12 @@ function palette(variant: ButtonVariant, disabled: boolean): CSSProperties {
         background: "transparent",
         color: disabled ? muted : "var(--color-premium)",
         border: `var(--border-width-default) solid ${disabled ? "var(--color-border-strong)" : "var(--color-premium)"}`,
+      };
+    case "accentOutline":
+      return {
+        background: "transparent",
+        color: disabled ? muted : "var(--color-accent)",
+        border: `var(--border-width-default) solid ${disabled ? "var(--color-border-strong)" : "var(--color-accent)"}`,
       };
     case "danger":
       return {
@@ -99,7 +106,7 @@ export function Button({
   type = "button",
   children,
   ...rest
-}: ButtonHTMLAttributes<HTMLButtonElement> & ButtonLook & { loading?: boolean }) {
+}: ButtonHTMLAttributes<HTMLButtonElement> & ButtonLook & { loading?: boolean; ref?: Ref<HTMLButtonElement> }) {
   const look = buttonLook({ variant, size, fullWidth }, Boolean(rest.disabled), className, style);
   return (
     <button
