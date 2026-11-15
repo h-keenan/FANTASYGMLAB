@@ -11369,6 +11369,14 @@ def update_notification_preferences(
     if error:
         return _notification_preferences_response({}, ok=False)
     settings = dict(current.get("settings") or {})
+    if body.prefs:
+        problem = notification_prefs.validate_patch(
+            body.prefs,
+            valid_categories=valid_categories,
+            current=notification_prefs.prefs_from_settings(settings, valid_categories=valid_categories),
+        )
+        if problem:
+            raise HTTPException(status_code=422, detail=problem)
     if body.categories:
         categories = _push_categories_from_settings(settings)
         categories.update(body.categories)
