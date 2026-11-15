@@ -5,6 +5,7 @@
 //   clipped    an element's box crosses the right/left edge of its card or clipping container
 //   ellipsis   text-overflow: ellipsis / line-clamp that is actually cutting text (player / team names, stat lines never truncate)
 //   text-clip  text wider than its overflow:hidden box without an ellipsis (a silently cut badge or label)
+//   word-break a word split across lines (a name crushed into a sliver of a column)
 //   hit-target an interactive control under 44px in either axis (inline prose links and [data-guard-ok] excepted)
 export const GUARD = (opts) => {
   const W = document.documentElement.clientWidth;
@@ -89,11 +90,23 @@ export const GUARD = (opts) => {
     // Ellipsis on a wrapper whose descendants are the text (a truncate span holding nested spans).
     if (el.children.length > 0 && s.textOverflow === "ellipsis" && el.scrollWidth > el.clientWidth + 1 && !opts?.allowEllipsis?.some((q) => el.closest(q))) push("ellipsis", el, `"${text(el)}" scroll ${el.scrollWidth} > ${el.clientWidth}`);
     if (el.children.length > 0 && s.webkitLineClamp && s.webkitLineClamp !== "none" && el.scrollHeight > el.clientHeight + 2 && !opts?.allowEllipsis?.some((q) => el.closest(q))) push("ellipsis", el, `line-clamp cuts "${text(el)}"`);
+    // A word broken across lines (a name crushed into a sliver of a column): more rendered text lines than words.
+    if (el.children.length === 0 && el.textContent.trim().length > 3) {
+      const range = document.createRange();
+      range.selectNodeContents(el);
+      const tops = new Set([...range.getClientRects()].filter((q) => q.width > 0).map((q) => Math.round(q.top / 4)));
+      const words = el.textContent.trim().split(/\s+/).length;
+      if (tops.size > words) push("word-break", el, `${tops.size} lines for ${words} word(s)`);
+    }
     // Hit target.
     if (el.matches("button,a[href],[role=button],[role=tab],[role=switch],[role=checkbox],select,input:not([type=hidden]):not([type=checkbox]):not([type=radio]),textarea") && !el.closest("[data-guard-ok]")) {
       // A link or term button inside a sentence (display: inline, with prose around it) is read as text, not a stand-alone control.
       const inProse = (el.tagName === "A" && el.closest("p,li") && el.textContent.trim().length > 12) || (s.display === "inline" && el.parentElement && (el.parentElement.textContent || "").trim().length > el.textContent.trim().length + 8);
-      if ((r.width < MIN - 0.5 || r.height < MIN - 0.5) && !inProse && !(el.closest("label") && el.matches("input"))) push("hit-target", el, `${Math.round(r.width)}x${Math.round(r.height)}`);
+      // An overlay (::after) that widens the hit area without changing the layout counts as the hit area (PlayerTap).
+      const after = getComputedStyle(el, "::after");
+      const ow = after.content !== "none" && after.position === "absolute" ? parseFloat(after.width) || 0 : 0;
+      const oh = after.content !== "none" && after.position === "absolute" ? parseFloat(after.height) || 0 : 0;
+      if ((Math.max(r.width, ow) < MIN - 0.5 || Math.max(r.height, oh) < MIN - 0.5) && !inProse && !(el.closest("label") && el.matches("input"))) push("hit-target", el, `${Math.round(r.width)}x${Math.round(r.height)}`);
     }
   }
   return out;

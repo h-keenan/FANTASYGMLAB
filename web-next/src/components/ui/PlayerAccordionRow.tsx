@@ -125,7 +125,7 @@ export function PlayerAccordionRow({ open, onToggle, badges = [], positionLabel,
           <div className="pointer-events-none relative flex min-w-0 flex-1 items-center gap-2.5">
             <PlayerAvatarSlot player={player} tier="row" onOpen={onOpenPlayer} className="pointer-events-auto" />
           <span className="flex min-w-0 flex-1 flex-col">
-            <PlayerTap player={player} onOpen={onOpenPlayer} className="pointer-events-auto flex min-w-0 items-center gap-1.5 text-left" minHeight={28}>
+            <PlayerTap player={player} onOpen={onOpenPlayer} className="pointer-events-auto flex min-w-0 flex-wrap items-center gap-x-1.5 gap-y-0.5 text-left" minHeight={28}>
               <PlayerName name={player.name} className="min-w-0 text-sm font-bold" style={{ color: "var(--color-text-primary)" }} />
               {hidePosition ? null : <PositionBadge position={player.position} label={positionLabel ?? undefined} />}
               <PlayerBadges badges={badges} />
@@ -156,7 +156,7 @@ export function PlayerAccordionRow({ open, onToggle, badges = [], positionLabel,
           >
             <PlayerAvatarSlot player={player} tier="row" nonInteractive="the whole row button expands the row, no player tap" />
             <span className="flex min-w-0 flex-1 flex-col">
-              <span className="flex min-w-0 items-center gap-1.5">
+              <span className="flex min-w-0 flex-wrap items-center gap-x-1.5 gap-y-0.5">
                 <PlayerName name={player.name} className="min-w-0 text-sm font-bold" style={{ color: "var(--color-text-primary)" }} />
                 {hidePosition ? null : <PositionBadge position={player.position} label={positionLabel ?? undefined} />}
                 <PlayerBadges badges={badges} />

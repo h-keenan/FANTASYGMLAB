@@ -3546,6 +3546,19 @@ select optgroup {
   min-width: var(--touch-target-min);
 }
 
+/* A player tap nested in a denser row (the name line, a chip) keeps its layout but gets a full 44px hit area from an
+   invisible overlay centred on it (docs/ui-patterns.md, "Never ellipsize, never clip"; guard_checks.mjs reads this). */
+[data-player-tap="true"]:not(.absolute):not(.fixed) { position: relative; }
+[data-player-tap="true"]::after {
+  content: "";
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: max(100%, var(--touch-target-min));
+  height: max(100%, var(--touch-target-min));
+  transform: translate(-50%, -50%);
+}
+
 /* Quick view: availability block + latest news. */
 .pqv-availability {
   display: flex;

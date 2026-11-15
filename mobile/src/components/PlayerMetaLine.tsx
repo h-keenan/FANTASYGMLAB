@@ -35,7 +35,7 @@ export default function PlayerMetaLine({ parts, trailing, testID = 'row-meta' }:
         {shown.map((part, i) => (
           <AppText key={part.key} style={[styles.meta, part.tone ? { color: toneColor(part.tone, colors) } : null, part.tone === 'warning' || part.key === 'proj' ? { fontWeight: '700' } : null]}>
             <Money>{part.text}</Money>
-            {i < shown.length - 1 ? <AppText style={styles.meta}>{' ·'}</AppText> : null}
+            {i < shown.length - 1 ? <AppText style={styles.meta}>{' · '}</AppText> : null}
           </AppText>
         ))}
       </View>
@@ -47,7 +47,7 @@ export default function PlayerMetaLine({ parts, trailing, testID = 'row-meta' }:
 function createStyles(colors: ThemeColors) {
   return StyleSheet.create({
     row: { flexDirection: 'row', alignItems: 'flex-start', gap: 6 },
-    parts: { flex: 1, minWidth: 0, flexDirection: 'row', flexWrap: 'wrap', columnGap: 4 },
+    parts: { flex: 1, minWidth: 0, flexDirection: 'row', flexWrap: 'wrap' },
     meta: { fontSize: 12, color: colors.textTertiary, flexShrink: 0 },
   });
 }

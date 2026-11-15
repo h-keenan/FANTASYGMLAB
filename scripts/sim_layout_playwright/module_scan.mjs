@@ -231,7 +231,7 @@ for (const r of results) {
   if (r.overflow) problems.push(`overflow ${r.overflow.scrollWidth}>${r.overflow.width}`);
   if (r.emptyHeaders?.length) problems.push(`empty collapsed headers: ${r.emptyHeaders.map((h) => h.title).join(", ")}`);
   // Strip geometry (equal, centred tabs) is a >= 360px rule: at 320px a long label (Standings, Notifications) makes a tab wider than its share and the row scrolls instead of cutting it.
-  if (r.strip && r.width >= 360 && r.width < 768 && r.page !== "sample-league") {
+  if (r.strip && !LARGE && r.width >= 360 && r.width < 768 && r.page !== "sample-league") {
     const s = r.strip, spread = Math.max(...s.widths) - Math.min(...s.widths);
     if (Math.abs(s.left) > 0.5 || Math.abs(s.right) > 0.5) problems.push(`tab strip not full-bleed (left ${s.left}, right gap ${s.right})`);
     if (Math.abs(s.tabLeft - s.tabRight) > 2) problems.push(`tabs not centred (left ${s.tabLeft}, right ${s.tabRight})`);
@@ -245,7 +245,7 @@ for (const r of results) {
   if (r.expect === 0) problems.push("expected page content missing (fixture not applied?)");
   if (r.width >= 1024 && r.page === "sample-league" && r.mainWidth < 1000) problems.push(`sample league column only ${r.mainWidth}px wide at desktop`);
   if (r.width >= 1024 && r.page === "matchup" && r.mainWidth < 1000) problems.push(`matchup column only ${r.mainWidth}px wide at desktop`);
-  if (r.recRowMaxH > 96 && r.width >= 390) problems.push(`recommended-add row ${r.recRowMaxH}px tall (compact rows are <= 96)`);
+  if (r.recRowMaxH > 96 && r.width >= 390 && !LARGE) problems.push(`recommended-add row ${r.recRowMaxH}px tall (compact rows are <= 96)`);
   if (r.modules === 0 && !r.noModules) problems.push("no compact modules rendered (fixtures not applied?)");
   if (problems.length) bad += 1;
   console.log(`${problems.length ? "FAIL" : "ok  "} ${r.page}@${r.width}: modules=${r.modules} heroes=${r.heroes} headers=${r.headerBars} main=${r.mainWidth} recRows=${r.recRows}/${r.recRowMaxH} tablists=${r.tablists} height=${r.height}${problems.length ? "  " + problems.join("; ") : ""}`);

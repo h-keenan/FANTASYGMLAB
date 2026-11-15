@@ -138,7 +138,7 @@ export function CompactModule({
         >
           <span className="flex min-w-0 flex-1 flex-col">
             <span className="flex items-center gap-2">
-              <span className="shrink-0 whitespace-nowrap text-[0.6875rem] font-extrabold uppercase" style={{ color: "var(--color-text-muted)", letterSpacing: "var(--letter-spacing-badge)" }}>
+              <span className="min-w-0 break-words text-[0.6875rem] font-extrabold uppercase" style={{ color: "var(--color-text-muted)", letterSpacing: "var(--letter-spacing-badge)" }}>
                 {title}
               </span>
               {shown.length === 0 && summary ? <span className="min-w-0 flex-1 text-right">{summary}</span> : null}

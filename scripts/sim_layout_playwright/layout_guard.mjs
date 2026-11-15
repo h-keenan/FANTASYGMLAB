@@ -54,7 +54,7 @@ async function scenario(name, mockOpts, width, large, steps) {
     const found = await page.evaluate(GUARD, {});
     checked += 1;
     for (const v of found) violations.push({ screen: state, width, large, ...v });
-    if (SHOTS || found.length) await page.screenshot({ path: `${OUT}/${state.replace(/[^a-z0-9]+/gi, "-")}-${tag}.png`, fullPage: false }).catch(() => {});
+    if (SHOTS || found.length) await page.screenshot({ path: `${OUT}/${state.replace(/[^a-z0-9]+/gi, "-")}-${tag}.png`, fullPage: SHOTS }).catch(() => {});
   };
   await page.goto(`${BASE}/gm-game`, { waitUntil: "domcontentloaded" });
   await page.addStyleTag({ content: "nextjs-portal,[data-nextjs-toast]{display:none!important}" + (large ? "html{font-size:125%!important}" : "") }).catch(() => {});

@@ -36,11 +36,11 @@ export function PlayerMetaLine({ parts, trailing, trailingPx = 0, fontPx = 12, t
   const shown = fitMetaParts(parts, width, fontPx);
   return (
     <span className="flex min-w-0 items-start gap-1.5 text-xs leading-4" style={{ color: "var(--color-text-muted)" }} data-testid={testId}>
-      <span ref={ref} className="flex min-w-0 flex-1 flex-wrap gap-x-1" data-testid="row-meta-parts">
+      <span ref={ref} className="flex min-w-0 flex-1 flex-wrap" data-testid="row-meta-parts">
         {shown.map((part, i) => (
           <span key={part.key} className="whitespace-nowrap" data-meta={part.key} style={{ color: part.tone ? TONE[part.tone as FactTone] : undefined, fontWeight: part.tone === "warning" || part.key === "proj" ? 700 : undefined }}>
             <Money>{part.text}</Money>
-            {i < shown.length - 1 ? <span style={{ color: "var(--color-text-muted)", fontWeight: 400 }}>{" ·"}</span> : null}
+            {i < shown.length - 1 ? <span style={{ color: "var(--color-text-muted)", fontWeight: 400 }}>{" · "}</span> : null}
           </span>
         ))}
       </span>
