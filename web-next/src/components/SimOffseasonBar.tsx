@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState, type ReactNode } from "react";
 
 import { PillMorph } from "@/components/ui/PillMorph";
+import { simPillPlan } from "@/lib/bottomNav";
 import { usePillState } from "@/lib/useBottomPillContext";
 import { Button } from "@/components/Button";
 import type { SimCtx } from "@/components/SimGameParts";
@@ -91,9 +92,8 @@ export function SimOffseasonBar({ ctx, onTab, orb }: { ctx: SimCtx; onTab?: (tab
       {cta.blocked ? (
         <p id={reasonId} className="px-4 pt-1.5 text-center text-xs font-bold" style={{ color: "var(--color-warning)" }} role="status">{cta.blocked}</p>
       ) : null}
-      <PillMorph context={pill.barPresent ? pill.ctx : null}>
-      <div className="mx-auto flex max-w-3xl items-center gap-2 p-1 md:grid md:grid-cols-[1fr_auto]">
-        {orb}
+      <PillMorph segment={simPillPlan({ context: pill.barPresent ? pill.ctx : null, simToAvailable: false }).segment} orb={orb}>
+      <div className="mx-auto flex max-w-3xl items-center gap-2 max-md:p-0 md:p-1 md:grid md:grid-cols-[1fr_auto]">
         <span className="min-w-0 text-xs font-bold max-md:hidden" style={{ color: "var(--color-text-muted)" }}>
           {simOffseasonStageLabel(off.stage)}
         </span>

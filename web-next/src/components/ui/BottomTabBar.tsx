@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 
 import { TabGlyph } from "@/components/TabGlyph";
+import { PillOrb } from "@/components/ui/PillOrb";
 import {
   activeBottomTab,
   bottomTabAriaLabel,
@@ -14,7 +15,8 @@ import {
   pillPrimaryCompact,
   pillScrollTarget,
   pillTabText,
-  PILL_MENU_LABEL,
+  pillOrbBadge,
+  PILL_ORB_LABEL,
   type BottomTab,
   type PillContext,
 } from "@/lib/bottomNav";
@@ -28,9 +30,9 @@ import { usePresence } from "@/lib/usePresence";
  *
  * - No page context: the global tabs. The lit tab expands to icon + label in a cyan capsule, the rest are icon-only
  *   (aria-label names them), 44px+ targets, a count badge.
- * - With a page `context` (useBottomPillContext): ONE row. The global tabs fold into ONE icon button (it shows the
- *   glyph of the section you are in, aria-expanded) and the page segment (page tabs as a tablist, one primary chip)
- *   takes the rest. That button unfolds the full global row (every section + More) in the same pill; picking a tab (or
+ * - With a page `context` (useBottomPillContext): ONE row. The global tabs fold into THE orb (brand mark + count badge,
+ *   aria-expanded; there is no separate "..." or section button) and the page segment (page tabs as a tablist, one primary
+ *   chip) takes the rest. The orb unfolds the full global row (every section + More) in the same pill; picking a tab (or
  *   Escape / tapping outside) folds it back. The lit page tab is one capsule that slides between tabs.
  *
  * Meant to live inside a `.bottom-stack` (sticky, in flow), never position:fixed; both layers share one grid cell so
@@ -96,7 +98,8 @@ export function BottomTabBar({
     };
   }, [menuOpen, closeMenu]);
 
-  const activeTab = tabs.find((t) => t.key === current) ?? tabs[0];
+  const orbBadge = pillOrbBadge(tabs);
+  const orbLabel = orbBadge > 0 ? `${PILL_ORB_LABEL}, ${orbBadge} new` : PILL_ORB_LABEL;
 
   return (
     <nav
@@ -156,10 +159,16 @@ export function BottomTabBar({
           context={layer.context}
           leaving={layer.leaving}
           hidden={mode === "menu"}
-          section={activeTab}
-          menuOpen={menuOpen}
-          menuBtnRef={menuBtnRef}
-          onMenu={() => setMenuOpen((o) => !o)}
+          orb={
+            <PillOrb
+              label={orbLabel}
+              badge={orbBadge}
+              expanded={menuOpen}
+              buttonRef={menuBtnRef}
+              testId="pill-orb"
+              onClick={() => setMenuOpen((o) => !o)}
+            />
+          }
         />
       ) : null}
     </nav>
@@ -185,23 +194,14 @@ export function PillContextLayer({
   context,
   leaving,
   hidden,
-  section,
-  menuOpen,
-  menuBtnRef,
-  onMenu,
-  noMenu,
+  orb,
 }: {
   context: PillContext;
   /** The page left: play the exit (the segment slides out); the host removes it when it ends. */
   leaving?: boolean;
   hidden: boolean;
-  /** The section icon (site shell). Omitted in the Fantasy Sim bar, where the orb is the navigator. */
-  section?: BottomTab | undefined;
-  menuOpen: boolean;
-  menuBtnRef: React.RefObject<HTMLButtonElement | null>;
-  onMenu: () => void;
-  /** No menu button (a context with no row to unfold back to). */
-  noMenu?: boolean;
+  /** The site shell's orb, leading the segment. Omitted in the Fantasy Sim bar, whose persistent orb sits outside the layers. */
+  orb?: React.ReactNode;
 }) {
   const listRef = useRef<HTMLDivElement>(null);
   const idx = pillActiveIndex(context);
@@ -248,23 +248,10 @@ export function PillContextLayer({
   }, [context.tabs]);
 
   const primary = context.primary;
-  // ONE entry point: the lit glyph is the section you are in; tapping it unfolds the global row (sections + More).
-  const menuGlyph = section ? section.glyph : "more";
   return (
     <div ref={layerRef} className="pill-layer pill-layer--context" inert={hidden || leaving} data-leaving={leaving ? "" : undefined} data-testid="pill-context-layer">
-      {noMenu ? null : <button
-        ref={menuBtnRef}
-        type="button"
-        className="pill-icon-btn pill-icon-btn--menu"
-        aria-label={section ? `${section.label}, ${PILL_MENU_LABEL}` : PILL_MENU_LABEL}
-        aria-expanded={menuOpen}
-        data-section={section ? "" : undefined}
-        data-testid="pill-menu"
-        onClick={onMenu}
-      >
-        <TabGlyph name={menuGlyph} size={22} />
-      </button>}
-      <span className="pill-divider" aria-hidden="true" />
+      {orb}
+      {orb ? <span className="pill-divider" aria-hidden="true" /> : null}
       <div ref={listRef} role="tablist" aria-label={context.label} className="pill-tabs" data-dense={context.tabs.length >= 4 ? "" : undefined} data-testid="pill-tabs">
         {idx >= 0 ? <span className="pill-indicator" aria-hidden="true" /> : null}
         {context.tabs.map((t) => {

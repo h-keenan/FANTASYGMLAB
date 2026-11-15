@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, type ReactNode } from "react";
 
 import { PillContextOnly } from "@/components/ui/PillMorph";
 import { setPillBarPresent } from "@/lib/bottomPillStore";
@@ -11,7 +11,7 @@ import { usePillState } from "@/lib/useBottomPillContext";
  * draft room drop their own tab row), and when no action bar is mounted (draft) renders the page segment alone as an
  * `.action-pill`. With an Advance / offseason bar mounted that bar hosts the segment itself (PillMorph).
  */
-export function SimPillHost({ standalone }: { standalone: boolean }) {
+export function SimPillHost({ standalone, orb }: { standalone: boolean; orb?: ReactNode }) {
   const pill = usePillState();
   useEffect(() => {
     if (typeof window.matchMedia !== "function") return; // no media queries (tests, very old browsers): the in-page tabs stay
@@ -24,10 +24,11 @@ export function SimPillHost({ standalone }: { standalone: boolean }) {
       setPillBarPresent(false);
     };
   }, []);
-  if (!standalone || !pill.barPresent || !pill.ctx) return null;
+  // Orb only (no page context yet, e.g. the draft room is still loading) is still a footer: the orb is always there.
+  if (!standalone || !pill.barPresent || !orb) return null;
   return (
-    <div className="action-pill md:hidden p-1" data-testid="sim-pill-only">
-      <PillContextOnly context={pill.ctx} />
+    <div className="action-pill md:hidden" data-testid="sim-pill-only">
+      <PillContextOnly context={pill.ctx} orb={orb} />
     </div>
   );
 }

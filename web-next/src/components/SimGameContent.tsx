@@ -993,7 +993,7 @@ function GameScreen({
   const [moreOpen, setMoreOpen] = useState(false);
   const simPlayerOpener = useCallback((ref: PlayerRef) => ctx.openPlayer(simPlayerFromRef(ref)), [ctx]);
   // Phones: the game orb (docked above the Advance pill) is the page navigator; the top PillRows render from md up.
-  const showOrb = showBar || showOffBar;
+  const showOrb = showBar || showOffBar || (stage === "draft" && !draftRecap && !recap);
   const orbNode = showOrb ? (
     <SimGameOrb
               tab={flow.tab}
@@ -1002,6 +1002,7 @@ function GameScreen({
               onTab={onTab}
               onMore={() => setMoreOpen(true)}
               onHub={onHub}
+              onSimTo={showBar && !paywalled ? onSimTo : undefined}
             />
   ) : null;
 
@@ -1111,7 +1112,7 @@ function GameScreen({
         </>
       )}
       <BottomDock testId="sim-bottom-stack">
-        <SimPillHost standalone={!showBar && !showOffBar} />
+        <SimPillHost standalone={!showBar && !showOffBar} orb={orbNode} />
         {showOffBar ? <SimOffseasonBar ctx={ctx} onTab={onTab} orb={orbNode} /> : null}
         {showBar ? <SimActionBar ctx={ctx} paywalled={paywalled} advancing={advancing} onAdvance={onAdvance} onSimTo={onSimTo} onTab={onTab} orb={orbNode} /> : null}
       </BottomDock>
