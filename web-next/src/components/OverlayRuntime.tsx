@@ -3,7 +3,7 @@
 import { usePathname } from "next/navigation";
 import { useEffect, useRef, useSyncExternalStore } from "react";
 
-import { keyboardInset, shouldScrollIntoView } from "@/lib/keyboardInset";
+import { isEditableFocus, keyboardInset, shouldScrollIntoView } from "@/lib/keyboardInset";
 import { installOverlayHistory } from "@/lib/overlayHistory";
 import { overlayStack } from "@/lib/overlayStack";
 
@@ -39,8 +39,14 @@ export function OverlayRuntime() {
   useEffect(() => {
     const vv = window.visualViewport;
     const root = document.documentElement;
-    const update = () => root.style.setProperty("--kb-inset", `${keyboardInset(window.innerHeight, vv)}px`);
+    const update = () => root.style.setProperty("--kb-inset", `${keyboardInset(window.innerHeight, vv, isEditableFocus(document.activeElement))}px`);
     update();
+    // Focus moves and the page coming back to the foreground re-read it: iOS does not always fire a visualViewport resize when the keyboard leaves.
+    const settle = () => { update(); window.setTimeout(update, 150); window.setTimeout(update, 500); };
+    document.addEventListener("focusout", settle);
+    document.addEventListener("visibilitychange", settle);
+    window.addEventListener("pageshow", settle);
+    window.addEventListener("orientationchange", settle);
     vv?.addEventListener("resize", update);
     vv?.addEventListener("scroll", update);
     const onFocus = (event: FocusEvent) => {
@@ -48,7 +54,13 @@ export function OverlayRuntime() {
       if (shouldScrollIntoView(el)) window.setTimeout(() => (el as HTMLElement).scrollIntoView({ block: "center", behavior: "auto" }), 280);
     };
     document.addEventListener("focusin", onFocus);
+    document.addEventListener("focusin", settle);
     return () => {
+      document.removeEventListener("focusout", settle);
+      document.removeEventListener("focusin", settle);
+      document.removeEventListener("visibilitychange", settle);
+      window.removeEventListener("pageshow", settle);
+      window.removeEventListener("orientationchange", settle);
       vv?.removeEventListener("resize", update);
       vv?.removeEventListener("scroll", update);
       document.removeEventListener("focusin", onFocus);

@@ -1916,10 +1916,10 @@ a {
     max-height: calc(92dvh - var(--kb-inset, 0px));
   }
   /* Peek height is computed from the content (PlayerQuickView measures the pill row and sets --pqv-peek-h; lib/playerAnatomy
-     peekSheetHeight): compact header + pill row + one content line. 50dvh (= PEEK_MIN_FRAC, what a short header measures to) is the first-paint fallback, so the open never jumps. */
+     peekSheetHeight): compact header + pill row + one content line. 65dvh (= PEEK_MIN_FRAC, what a short header measures to) is the first-paint fallback, so the open never jumps. */
   .pqv-modal[data-snap="peek"] {
-    height: var(--pqv-peek-h, calc(50dvh - var(--kb-inset, 0px)));
-    max-height: var(--pqv-peek-h, calc(50dvh - var(--kb-inset, 0px)));
+    height: var(--pqv-peek-h, calc(65dvh - var(--kb-inset, 0px)));
+    max-height: var(--pqv-peek-h, calc(65dvh - var(--kb-inset, 0px)));
     min-height: 0;
   }
   /* Compact header at peek (coridian_ "PQV glitch", 2026-11-14): 56px avatar, name + meta + a one-line summary of the three

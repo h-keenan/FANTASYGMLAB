@@ -25,11 +25,11 @@ test('one open, fairness, bars, snap, tabs', () => {
   assert.deepEqual(orderPlayerSheetTabs([{ key: 'outlook' }, { key: 'overview' }, { key: 'stats' }]).map((t) => t.key), ['overview', 'stats', 'outlook']);
 });
 
-test('peek sheet height is computed from the content and clamped to 40-70% of the screen', () => {
+test('peek sheet height is computed from the content and clamped to 65-75% of the screen', () => {
   assert.equal(peekSheetHeight({ anchorBottom: 400, viewportH: 844 }), 400 + PEEK_FIRST_LINE_PX);
-  assert.equal(peekSheetHeight({ anchorBottom: 210, viewportH: 844 }), Math.round(844 * 0.5));
-  assert.equal(peekSheetHeight({ anchorBottom: 900, viewportH: 640 }), Math.round(640 * 0.7));
-  assert.equal(peekSheetHeight({ anchorBottom: 400, viewportH: 844, bottomInset: 34 }), 486);
+  assert.equal(peekSheetHeight({ anchorBottom: 210, viewportH: 844 }), Math.round(844 * 0.65));
+  assert.equal(peekSheetHeight({ anchorBottom: 900, viewportH: 640 }), Math.round(640 * 0.75));
+  assert.equal(peekSheetHeight({ anchorBottom: 400, viewportH: 844, bottomInset: 34 }), 584);
   assert.equal(peekShowsTabs(210, peekSheetHeight({ anchorBottom: 210, viewportH: 844 })), true);
   assert.equal(peekShowsTabs(300, 250), false);
 });
