@@ -18,4 +18,3 @@ Bugs and inconsistencies noticed while working on other tasks, with file refs. N
 | 2026-11-14 | Today hero kicker "TODAY · WEEK 10" and Team kicker "TEAM" repeated the page name | `lib/statusHeader.ts` | Fixed ("THIS WEEK", "YOUR TEAM") |
 | 2026-11-14 | Waivers header module titled "Waivers" under a header and pill that also say Waivers | `WaiversContent.tsx` | Fixed ("Free agents") |
 | 2026-11-14 | A 55-char league name needs 3-4 lines at 320px (header 86px) | `ShellHeader.tsx` | Open (edge case; cap at 2 lines with the full name in the sheet if it shows up in practice) |
-
