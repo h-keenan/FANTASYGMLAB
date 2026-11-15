@@ -1,4 +1,7 @@
 import ConfirmInPlace from './ConfirmInPlace';
+import { useNavigation } from '@react-navigation/native';
+import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import type { RootStackParamList } from '../navigation/RootNavigator';
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Pressable, StyleSheet, useWindowDimensions, View } from 'react-native';
 import PressableScale from './PressableScale';
@@ -127,6 +130,7 @@ export default function MultiTeamTradePanel({
   prefill?: MultiTransfer[];
 }) {
   const { colors } = useThemeMode();
+  const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const styles = useMemo(() => createStyles(colors), [colors]);
   const { width } = useWindowDimensions();
   const wide = width >= 700;
@@ -380,6 +384,7 @@ export default function MultiTeamTradePanel({
                         round={pickById.get(asset.id)?.round}
                         label={pickById.get(asset.id)?.label}
                         projectedRange={pickById.get(asset.id)?.projected_pick_range}
+                        onPress={pickById.get(asset.id) ? () => navigation.navigate('PickDetail', { pick: pickById.get(asset.id)!, leagueId, leagueName }) : undefined}
                         showDivider={index < sends.length - 1}
                       />
                     ) : (

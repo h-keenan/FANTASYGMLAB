@@ -10,6 +10,7 @@ import { useThemeMode } from '../context/ThemeModeContext';
 import { feedAgeLabel, feedPointsLabel, groupFeedByGame, liveFeedStore, type FeedEvent } from '../lib/liveFeed';
 import { radii, spacing, type ThemeColors } from '../theme';
 import PlayerName from './PlayerName';
+import { PlayerTap } from './PlayerOpenContext';
 
 /**
  * Collapsible "Live feed": scoring events derived by diffing polled snapshots
@@ -87,7 +88,8 @@ function FeedItem({ event, now, isNew }: { event: FeedEvent; now: number; isNew:
   return (
     <View style={[styles.item, { borderLeftColor: event.side === 'mine' ? colors.accent : colors.borderStrong }]}>
       <PositionBadge position={event.position} />
-      <View style={{ flex: 1, minWidth: 0 }}>
+      <PlayerTap player={{ id: event.playerId, name: event.name, position: event.position, team: event.team }} style={{ flex: 1, minWidth: 0 }}>
+       <View>
         <View style={styles.nameRow}>
           <PlayerName name={event.name} style={styles.name} />
           <AppText style={[styles.points, { color: event.points < 0 ? colors.danger : colors.successBright }]}>
@@ -98,7 +100,8 @@ function FeedItem({ event, now, isNew }: { event: FeedEvent; now: number; isNew:
           {event.detail}
           {event.approx ? ' · approx.' : ''}
         </AppText>
-      </View>
+       </View>
+      </PlayerTap>
       <View style={{ alignItems: 'flex-end', gap: 2 }}>
         <AppText style={styles.muted}>{feedAgeLabel(event.at, now)}</AppText>
         <AppText style={[styles.side, { color: event.side === 'mine' ? colors.accent : colors.textTertiary }]}>

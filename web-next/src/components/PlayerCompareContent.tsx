@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 
 import { TradePickerSheet } from "@/components/TradePickerSheet";
+import { PlayerTap } from "@/components/ui/PlayerOpenContext";
 import { PlayerAvatar } from "@/components/PlayerAvatar";
 import { usePlayerQuickView } from "@/context/PlayerQuickViewContext";
 
@@ -533,9 +534,13 @@ export function PlayerCompareContent({
             <section className="flex flex-col gap-2" aria-label="Head-to-head">
               <div className="glass-surface flex flex-col px-3 py-1" data-testid="compare-grid">
                 <div className={`${GRID_COLS} pt-2 text-center text-xs font-extrabold`} style={{ color: "var(--color-text-secondary)" }}>
-                  <PlayerName name={playerA.name} />
+                  <PlayerTap player={{ id: playerA.player_id, name: playerA.name ?? "Player", position: playerA.position, team: playerA.team, tier: playerA.tier }} className="flex w-full min-w-0 items-center justify-center text-center">
+                    <PlayerName name={playerA.name} />
+                  </PlayerTap>
                   <span aria-hidden="true" />
-                  <PlayerName name={playerB.name} />
+                  <PlayerTap player={{ id: playerB.player_id, name: playerB.name ?? "Player", position: playerB.position, team: playerB.team, tier: playerB.tier }} className="flex w-full min-w-0 items-center justify-center text-center">
+                    <PlayerName name={playerB.name} />
+                  </PlayerTap>
                 </div>
                 {headlineRows.map((row, index) => (
                   <CompareRowView key={row.label} row={row} isLast={index === headlineRows.length - 1 && headlineTextRows.length === 0} />

@@ -296,6 +296,7 @@ function WhatIfSection({ leagueId, data }: { leagueId: string; data: GamesSeason
         {adds.map((player) => (
           <PlayerRow
             key={player.player_id}
+            identity={{ player_id: player.player_id, name: player.name ?? "Player", position: player.position, team: player.team, tier: player.tier, sourceLabel: "Games" }}
             playerId={player.player_id}
             name={player.name ?? "Player"}
             position={player.position}
@@ -323,6 +324,7 @@ function WhatIfSection({ leagueId, data }: { leagueId: string; data: GamesSeason
             {matches.map((player) => (
               <PlayerRow
                 key={player.player_id}
+                identity={{ player_id: player.player_id, name: player.name ?? "Player", position: player.position, team: player.team, tier: player.tier, sourceLabel: "Games" }}
                 playerId={player.player_id}
                 name={player.name ?? "Player"}
                 position={player.position}
@@ -374,6 +376,7 @@ function RosterPickRow({
   return (
     <PlayerRow
       bordered
+      identity={{ player_id: player.player_id, name: player.name ?? "Player", position: player.position, team: player.team, tier: player.tier, sourceLabel: "Games" }}
       playerId={player.player_id}
       name={player.name ?? "Player"}
       position={player.position}

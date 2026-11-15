@@ -742,6 +742,38 @@ Not yet on the templates (the TODO allowlist is now empty; these are pages the s
 Draft Center, League Recaps, Matchup lineup, Standings (RankRow exists, page not yet moved), Sim roster / draft board / inbox (`SimDraftRow`, `SimPlayerLine`, `SimRosterLine`
 should become `PlayerAccordionRow mode="sim"`, and the Sim trade inbox `TradeCompactCard mode="sim"`). Done in the avatar sweep: Manager/Opponent profile, Sim team card / history / draft grid / retirements, sample league, public trade analyzer.
 
+## Every player and pick is tappable (2026-11-14, coridian_: "why can't I tap on the player")
+
+Standing rule: a player (name, avatar, row) or a pick shown **anywhere** opens the shared quick view on tap: the Player Quick
+View peek sheet for a player (Fantasy Sim opens the sim PQV by the sim player id, FantasyDesk the real one) and the pick
+detail for a pick (Fantasy Sim: `SimPickSheet`). It is built into the templates, so a screen cannot forget it.
+
+- **Default, not opt-in.** `CompactPlayerCard`, `PlayerAvatarSlot`, `TradeAssetCard` (a `TradeCardAsset` player or pick),
+  `PlayerAccordionRow` and `SimPlayerChip` are tappable out of the box: a real button (role button, 44px / 44pt minimum, the
+  shared press feedback: the global button rule on web, `PressableScale` on the app) labelled "Open <name>". Web:
+  `components/ui/PlayerOpenContext.tsx` (`PlayerTap`, `PickTap`); app: `components/PlayerOpenContext.tsx`; pure rule in the
+  `lib/playerTap.ts` twin (`canOpenPlayer`, `playerOpenLabel`, `isValidNonInteractiveReason`).
+- **Who opens what.** `usePlayerOpener()` resolves, in order: an explicit `onOpen` on the call, the nearest `PlayerOpenContext`
+  provider, then the real Desk PQV. The Fantasy Sim game screen provides `PlayerOpenContext` (maps the ref to the sim sheet) and
+  `PickOpenContext` (the pick sheet), so every shared template inside the game opens the sim views with no per-call wiring.
+  A player with no id (generated rookies, sample rows, prospects) stays plain text. Desk picks have no detail screen on web and
+  stay plain.
+- **Opt out only with a reason.** `nonInteractive="the row button around it already opens the player"` (a real sentence, 12+
+  characters) is for a template inside another tap target that already does something (a picker row that selects, a card that is
+  one button, a link to the player's public page). A nested tap target inside another is a bug: `TapScopeContext` makes a nested
+  `PlayerTap` render plain, and the source scan fails a template placed inside a `<button>` / `<Link>` / `<Pressable>` without
+  `nonInteractive`.
+- **A row that both expands and links** (`PlayerAccordionRow`, the waiver recommendation row): the **avatar and the name line open
+  the PQV**, **everything else in the row (stats line, trailing figure, padding) expands it in place.** On web the expand control
+  is a full-row button underneath the content (`pointer-events-none` content, `pointer-events-auto` on the avatar and name); on
+  the app the avatar / name `Pressable`s sit inside the row `Pressable` and win the touch. Never put a second tap target in the
+  trailing slot; use `trailingAction`.
+- **Guard.** `scripts/check_player_tap.mjs` (CI job `lib-twins`, also run by `web-next/src/lib/playerTap.test.ts` and
+  `mobile/src/lib/playerTap.test.ts`) fails on a `nonInteractive` without a reason, a template nested in another tap target, a
+  template file that stopped routing through `PlayerTap` / `PickTap`, and any **new file that draws a bare `<PlayerAvatar>` or
+  `<PlayerName>`** outside the `RAW_ALLOWLIST` (each entry says why that file is exempt or wires its own tap). Use a template
+  instead. Unit tests: `ui/PlayerTap.test.tsx`; browser checks: `scripts/sim_layout_playwright/player_tap.mjs`.
+
 ## Player row anatomy (shared by FantasyDesk and the Fantasy Sim)
 
 `PlayerListRow` is THE row: line 1 name (+ the one status chip), line 2 muted meta (TEAM, age, bye), line 3 the **chips

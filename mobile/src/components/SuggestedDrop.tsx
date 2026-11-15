@@ -6,6 +6,7 @@ import { Ionicons } from '@expo/vector-icons';
 
 import AppText from './AppText';
 import PlayerName from './PlayerName';
+import { PlayerTap } from './PlayerOpenContext';
 import PlayerAvatar from './PlayerAvatar';
 import PositionBadge from './PositionBadge';
 import ToneBadge from './ToneBadge';
@@ -55,9 +56,13 @@ function DropPlayerLine({
   return (
     <View style={styles.playerLine}>
       <View style={styles.nameRow}>
-        <PlayerAvatar playerId={player.player_id} size={32} />
-        {lead ? <AppText style={styles.playerName}>{lead}</AppText> : null}
-        <PlayerName name={player.name} style={[styles.playerName, { flexShrink: 1 }]} />
+        <PlayerTap player={{ id: player.player_id, name: player.name, position: player.position, team: player.team }} style={{ flexShrink: 1 }}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm, flexShrink: 1 }}>
+            <PlayerAvatar playerId={player.player_id} size={32} />
+            {lead ? <AppText style={styles.playerName}>{lead}</AppText> : null}
+            <PlayerName name={player.name} style={[styles.playerName, { flexShrink: 1 }]} />
+          </View>
+        </PlayerTap>
         <PositionBadge position={player.position} />
         {meta ? <AppText style={styles.meta}>{meta}</AppText> : null}
       </View>
@@ -107,8 +112,12 @@ function SwapTile({ side, player, name, playerId, position, team }: { side: 'add
   return (
     <View style={[styles.tile, { borderColor: `${color}8C`, backgroundColor: `${color}14` }]} testID={`swap-${side}`}>
       <ToneBadge label={label} color={color} size="xs" />
-      <PlayerAvatar playerId={playerId} size={44} />
-      <PlayerName name={name} style={[styles.playerName, { textAlign: 'center' }]} />
+      <PlayerTap player={{ id: playerId, name, position, team }}>
+        <View style={{ alignItems: 'center', gap: spacing.xs }}>
+          <PlayerAvatar playerId={playerId} size={44} />
+          <PlayerName name={name} style={[styles.playerName, { textAlign: 'center' }]} />
+        </View>
+      </PlayerTap>
       <View style={styles.pillRow}>
         <PositionBadge position={position} />
         {team ? <AppText style={styles.meta}>{`${team}${player?.age ? ` · ${Math.round(player.age)}` : ''}`}</AppText> : null}

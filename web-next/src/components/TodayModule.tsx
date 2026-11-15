@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { PlayerAvatar } from "@/components/PlayerAvatar";
+import { PlayerAvatarSlot } from "@/components/ui/PlayerAvatarSlot";
 
 import type { BriefingItem, DashboardResponse, ThisWeekRow } from "@/lib/api";
 import { AccentCard } from "@/components/AccentCard";
@@ -106,7 +106,7 @@ export function TodayModule({
         <AccentCard accent="var(--color-accent)" compact glow>
           {"status" in nextAction ? ((row: ThisWeekRow) => (
             <div className="flex items-center gap-2">
-              {row.player_id ? <PlayerAvatar playerId={row.player_id} size={36} /> : null}
+              {row.player_id ? <PlayerAvatarSlot player={{ id: row.player_id, name: "this player" }} tier="row" /> : null}
               <ToneBadge label={row.status} color={thisWeekToneColor(row.tone)} />
             </div>
           ))(nextAction as ThisWeekRow) : null}
@@ -185,7 +185,7 @@ function MoveRows({ rows, leagueId, leagueName }: { rows: ThisWeekRow[]; leagueI
         const actionable = Boolean(row.cta_label && row.route);
         const body = (
           <>
-            {row.player_id ? <PlayerAvatar playerId={row.player_id} size={28} /> : null}
+            {row.player_id ? <PlayerAvatarSlot player={{ id: row.player_id, name: "this player" }} tier="dense" nonInteractive={actionable ? "the whole row is a link that opens the recommended screen" : undefined} /> : null}
             <span className="min-w-0 flex-1 flex flex-col items-start gap-1">
               <ToneBadge label={row.status} color={color} />
               <span className="text-sm font-bold truncate">{row.headline}</span>

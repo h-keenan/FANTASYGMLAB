@@ -394,6 +394,7 @@ function RosterPlayerRow({
           injuryLabel={injury.label}
           injuryTone={injury.tone}
           ruledOut={injury.ruledOut}
+          nonInteractive="The whole row is a button that already opens the player"
           showDivider={false}
         />
       </View>

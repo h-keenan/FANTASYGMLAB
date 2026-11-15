@@ -18,6 +18,8 @@ const WEB_ALLOW: Record<string, string> = {
   "components/SimToControl.tsx": "TEXT: injury names inside a sentence",
   "components/SimRecapStory.tsx": "TEXT: top-scorer name inside a fact line",
   "components/SimGameTeam.tsx": "TEXT: a native <option> and a sheet title sentence",
+  "components/SimAchievements.tsx": "TEXT: an inline tappable name (SimPlayerNameTap) inside an achievement sentence",
+  "components/SimGameHomeCards.tsx": "TEXT: inline tappable names (SimPlayerNameTap) inside a sentence",
 };
 const APP_ALLOW: Record<string, string> = {
   "components/LiveFeedPanel.tsx": "TEXT: names inside a news headline",

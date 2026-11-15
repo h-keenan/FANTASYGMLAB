@@ -13,6 +13,8 @@ import { useThemeMode } from '../context/ThemeModeContext';
 import { injuryAbbreviation } from '../lib/injuryDisplay';
 import { resolvePlayerTier } from '../lib/playerTier';
 import { radii, spacing, type ThemeColors } from '../theme';
+import { usePlayerOpener } from './PlayerOpenContext';
+import { canOpenPlayer } from '../lib/playerTap';
 
 export interface PlayerIdentityRowProps {
   playerId: string | null | undefined;
@@ -129,6 +131,8 @@ export interface PlayerIdentityRowProps {
    * "F. Lastname" (phone layout audit: crowded rows with trailing actions). */
   wrapName?: boolean;
   onPress?: () => void;
+  /** Opt out of the default tap that opens the player quick view (reason sentence; only where the row sits inside another Pressable that already acts). Without `onPress` a row with a player id opens the quick view. */
+  nonInteractive?: string;
   /** Renders a hairline divider under the row — set false on the last row
    * of a group so the group's own bottom edge stays clean. Ignored when
    * `layout="grid"` (a grid card has its own full border instead of a
@@ -198,12 +202,16 @@ export default function PlayerIdentityRow({
   trailingExtra,
   chevron = false,
   wrapName = false,
-  onPress,
+  onPress: onPressProp,
+  nonInteractive,
   showDivider = false,
   style,
   layout = 'row',
 }: PlayerIdentityRowProps) {
   const { colors, isDark } = useThemeMode();
+  const openPlayer = usePlayerOpener();
+  const onPress =
+    onPressProp ?? (!nonInteractive && canOpenPlayer({ id: playerId, name: name ?? '' }) ? () => openPlayer({ id: playerId, name: name ?? 'Player', position, team, tier }) : undefined);
   const styles = useMemo(() => createStyles(colors), [colors]);
   const tierIdentity = tier ? resolvePlayerTier(tier, isDark) : null;
   const isWatch = injuryTone === 'watch';

@@ -3,7 +3,7 @@
 import { useState, type CSSProperties } from "react";
 
 import { AccentCard } from "@/components/AccentCard";
-import { SimFold } from "@/components/SimGameParts";
+import { SimFold, SimPlayerNameTap } from "@/components/SimGameParts";
 import { SimGlyph } from "@/components/SimGlyph";
 import { ToneBadge } from "@/components/ToneBadge";
 import { TrophyIcon } from "@/components/TrophyIcon";
@@ -74,7 +74,7 @@ function Row({ a }: { a: SimAchievement }) {
       {open ? (
         <p className="mb-2 ml-12 text-xs" style={{ color: "var(--color-text-secondary)" }} data-testid="achievement-detail">
           {simAchievementLine(a)}
-          {a.unlocked && a.player ? ` (${a.player.name})` : ""}
+          {a.unlocked && a.player ? <>{" ("}<SimPlayerNameTap player={a.player}>{a.player.name}</SimPlayerNameTap>{")"}</> : null}
         </p>
       ) : null}
     </li>
