@@ -154,15 +154,26 @@ def apply_patch(
     return normalize_prefs(merged, valid_categories=valid_categories)
 
 
-def validate_patch(patch: Mapping[str, Any], *, valid_categories: Any) -> str:
+def validate_patch(
+    patch: Mapping[str, Any], *, valid_categories: Any, current: Mapping[str, Any] | None = None
+) -> str:
     """Return an error message for a bad user-submitted patch, "" when fine.
-    (normalize_prefs is lenient for stored data; the API is strict.)"""
+    (normalize_prefs is lenient for stored data; the API is strict.)
+
+    ``current`` is the user's stored (normalised) prefs. With it, a patch that
+    sets only one end of the quiet window is checked against the other stored
+    end: otherwise the merged window collapses to start == end and
+    ``normalize_prefs`` silently resets BOTH ends to the defaults."""
 
     for key in ("quiet_start", "quiet_end", "digest_hour"):
         if key in patch and _int_in(patch[key], 0, 23) is None:
             return f"{key} must be an hour 0-23"
-    if "quiet_start" in patch and "quiet_end" in patch and patch["quiet_start"] == patch["quiet_end"]:
-        return "quiet_start and quiet_end must differ"
+    if "quiet_start" in patch or "quiet_end" in patch:
+        base = current or {}
+        start = patch.get("quiet_start", base.get("quiet_start"))
+        end = patch.get("quiet_end", base.get("quiet_end"))
+        if start is not None and end is not None and start == end:
+            return "quiet_start and quiet_end must differ"
     for key in ("quiet_hours_enabled", "critical_breaks_quiet"):
         if key in patch and not isinstance(patch[key], bool):
             return f"{key} must be true or false"
