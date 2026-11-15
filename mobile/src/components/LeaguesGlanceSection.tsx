@@ -260,7 +260,7 @@ function GlanceCard({
             {league.league_name}
           </AppText>
           {league.team_name ? (
-            <AppText style={styles.teamName} numberOfLines={1}>
+            <AppText style={styles.teamName}>
               {league.team_name}
             </AppText>
           ) : null}

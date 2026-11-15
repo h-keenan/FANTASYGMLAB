@@ -82,7 +82,7 @@ export function ComparisonHeader({
     <div className="flex flex-col gap-2" data-testid="comparison-header">
       <div className="grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-2">
         <div className="flex flex-col min-w-0">
-          <span className="text-[11px] font-bold truncate" style={{ color: "var(--color-accent)" }}>
+          <span className="text-[11px] font-bold break-words" style={{ color: "var(--color-accent)" }}>
             {mine.team_name || "You"}
           </span>
           <TickNumber value={totals.mineNow} testId="total-mine" className="text-2xl font-extrabold leading-none" style={{ color: "var(--color-text-primary)" }} />
@@ -105,7 +105,7 @@ export function ComparisonHeader({
           />
         </div>
         <div className="flex flex-col items-end min-w-0 text-right">
-          <span className="text-[11px] font-bold truncate max-w-full" style={{ color: "var(--color-text-primary)" }}>
+          <span className="text-[11px] font-bold break-words max-w-full" style={{ color: "var(--color-text-primary)" }}>
             {opponent.team_name || "Opponent"}
           </span>
           <TickNumber value={totals.opponentNow} testId="total-opponent" className="text-2xl font-extrabold leading-none" style={{ color: "var(--color-text-primary)" }} />

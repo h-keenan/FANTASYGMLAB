@@ -66,7 +66,7 @@ export function PickGroupList({
                 type="button"
                 aria-expanded={open}
                 onClick={() => setToggled((prev) => ({ ...prev, [key]: !open }))}
-                className="w-full flex items-center gap-2 px-3 py-2 text-left"
+                className="w-full flex items-center gap-2 px-3 py-2 min-h-[var(--touch-target-min)] text-left"
               >
                 <span className="text-sm font-bold" style={{ color: "var(--color-text-primary)" }}>
                   {group.label}

@@ -81,10 +81,10 @@ function MiniStat({ stat, onOpen }: { stat: StatusMiniStat; onOpen?: (href: stri
   const styles = useMemo(() => createStyles(colors), [colors]);
   const body = (
     <>
-      <AppText style={styles.statLabel} numberOfLines={1}>
+      <AppText style={styles.statLabel}>
         {stat.label}
       </AppText>
-      <AppText style={[styles.statValue, { color: toneColor(stat.tone, colors) }]} numberOfLines={1} adjustsFontSizeToFit>
+      <AppText style={[styles.statValue, { color: toneColor(stat.tone, colors) }]}>
         {stat.value}
       </AppText>
     </>

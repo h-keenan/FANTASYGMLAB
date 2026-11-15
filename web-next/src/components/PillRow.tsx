@@ -156,9 +156,8 @@ export function PillRow({
   const equalFit = mode === "fill" && anyIcon && options.length >= 5;
   const segment =
     mode === "fill"
-      ? equalFit
-        ? "flex-1 min-w-0"
-        : "flex-1 min-w-fit"
+      ? // Equal shares while the labels fit; a tab never gets narrower than its label (a long label at 320px scrolls the row instead of being cut).
+        "flex-1 min-w-fit"
       : mode === "scroll"
         ? // Segments share a short row equally (no empty bordered box after the last tab) and keep their natural width, scrolling, when they overflow.
           "flex-1 shrink-0 min-w-[var(--touch-target-min)]"
@@ -231,7 +230,7 @@ export function PillRow({
           const iconNode = option.icon ?? (option.glyph ? <TabGlyph name={option.glyph} /> : null);
           const content: ReactNode =
             iconNode || countPill ? (
-              <span className="inline-flex min-w-0 flex-col items-center gap-0.5 sm:flex-row sm:gap-1.5">
+              <span className="inline-flex min-w-[calc(var(--touch-target-min)-2*var(--space-xs))] flex-col items-center justify-center gap-0.5 sm:flex-row sm:gap-1.5">
                 {iconNode ? (
                   <span
                     aria-hidden="true"

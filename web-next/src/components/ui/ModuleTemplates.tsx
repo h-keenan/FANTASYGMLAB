@@ -224,10 +224,10 @@ function StatStripTile({ item }: { item: Omit<StatStripItem, "insight"> }) {
   const color = item.tone === "risk" ? "var(--color-danger)" : item.tone === "positive" ? "var(--color-success)" : item.tone === "premium" ? "var(--color-premium)" : "var(--color-text-primary)";
   return (
     <span className="glass-surface flex min-w-0 flex-col items-center gap-0.5 px-1.5 py-2 text-center" style={{ borderColor: item.tone === "premium" ? "var(--color-premium)" : undefined }} data-testid="stat-strip-tile">
-      <span className="max-w-full truncate text-[0.6875rem] font-extrabold uppercase" style={{ color: "var(--color-text-muted)", letterSpacing: "var(--letter-spacing-badge)" }}>
+      <span className="max-w-full break-words text-[0.6875rem] font-extrabold uppercase" style={{ color: "var(--color-text-muted)", letterSpacing: "var(--letter-spacing-badge)" }}>
         {shortLabel(item.label)}
       </span>
-      <span className="max-w-full truncate text-lg font-extrabold tabular-nums leading-tight" style={{ color }}>
+      <span className="max-w-full break-words text-lg font-extrabold tabular-nums leading-tight" style={{ color }}>
         {item.value}
       </span>
       {item.note ? (
@@ -280,7 +280,7 @@ export function LinkModule({
           <span className="text-[0.6875rem] font-extrabold uppercase" style={{ color: "var(--color-text-muted)", letterSpacing: "var(--letter-spacing-badge)" }}>
             {title}
           </span>
-          <span className="text-sm leading-snug" data-testid="compact-summary" style={{ display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden" }}>
+          <span className="text-sm leading-snug break-words" data-testid="compact-summary">
             {shown.map((part, i) => (
               <span key={part.key}>
                 {i > 0 ? <span style={{ color: "var(--color-text-muted)" }}>{" · "}</span> : null}

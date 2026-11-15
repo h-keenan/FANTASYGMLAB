@@ -187,7 +187,7 @@ export default function EspnLeagueImport({
                     accessibilityState={{ checked: selected }}
                   >
                     <View style={styles.teamText}>
-                      <AppText style={styles.teamName} numberOfLines={1}>
+                      <AppText style={styles.teamName}>
                         {team.team_name}
                       </AppText>
                       <AppText style={styles.meta}>{team.owner_name}</AppText>

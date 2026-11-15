@@ -12,7 +12,8 @@ import { nextOpenId, playerRowModel, type FactTone, type PlayerFact, type Player
 import type { BadgeInput } from '../lib/playerBadges';
 import type { SimGradeInput } from '../lib/simGrade';
 import { radii, spacing, type ThemeColors } from '../theme';
-import Money from './Money';
+import PlayerMetaLine from './PlayerMetaLine';
+import { metaPartsFromStrings, type MetaPart } from '../lib/playerMetaFit';
 import { Collapse } from './Presence';
 
 function toneColor(tone: FactTone | undefined, colors: ThemeColors): string {
@@ -46,7 +47,7 @@ export type PlayerAccordionRowProps = PlayerFactsInput & {
   testID?: string;
   /** Sim: the letter grade, a small tile at the end of the stats line (never a "GRADE" word or the trailing slot). */
   gradeTile?: SimGradeInput | null;
-  /** Replaces the TEAM · Age · Bye line (caller's parts with the bye-soon tone and PROJ); one line, truncated. */
+  /** Replaces the TEAM · Age · Bye line (caller's parts with the bye-soon tone and PROJ); fitted by the ladder in lib/playerMetaFit.ts, never ellipsized. */
   metaParts?: { key: string; text: string; tone?: FactTone }[];
   /** Drop the position pill when a slot label column already says it. */
   hidePosition?: boolean;
@@ -80,7 +81,7 @@ export default function PlayerAccordionRow({ open, onToggle, badges = [], positi
   const styles = useMemo(() => createStyles(colors), [colors]);
   const { player } = input;
   const model = playerRowModel(input);
-  const metaLine: { key: string; text: string; tone?: FactTone }[] = metaParts ?? model.meta.map((text, i) => ({ key: `m${i}`, text }));
+  const metaLine: MetaPart[] = metaParts ?? metaPartsFromStrings(model.meta);
   return (
     <View style={open ? styles.tile : styles.row} testID={testID}>
       <View style={styles.headRow}>
@@ -93,17 +94,7 @@ export default function PlayerAccordionRow({ open, onToggle, badges = [], positi
               <PlayerBadges badges={badges} />
             </View>
             {metaLine.length > 0 || gradeTile ? (
-              <View style={styles.metaRow} testID="row-meta">
-                <AppText style={styles.meta} numberOfLines={1}>
-                  {metaLine.map((part, i) => (
-                    <AppText key={part.key} style={[styles.meta, part.tone ? { color: toneColor(part.tone, colors) } : null, part.tone === 'warning' || part.key === 'proj' ? { fontWeight: '700' } : null]}>
-                      {i > 0 ? ' · ' : ''}
-                      <Money>{part.text}</Money>
-                    </AppText>
-                  ))}
-                </AppText>
-                {gradeTile ? <LetterGrade grade={gradeTile} size="xs" testID="row-grade" /> : null}
-              </View>
+              <PlayerMetaLine parts={metaLine} trailing={gradeTile ? <LetterGrade grade={gradeTile} size="xs" testID="row-grade" /> : null} />
             ) : null}
             {headline ? <AppText style={styles.headline} numberOfLines={2} testID="row-headline">{headline}</AppText> : null}
           </View>
@@ -152,12 +143,10 @@ function createStyles(colors: ThemeColors) {
     tile: { paddingHorizontal: spacing.sm, paddingBottom: spacing.md, marginVertical: spacing.xs, backgroundColor: colors.glass, borderWidth: 1, borderColor: colors.accent, borderRadius: radii.tile },
     headRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
     head: { flex: 1, minWidth: 0, minHeight: 52, flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
-    metaRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
     action: { flexShrink: 0 },
     main: { flex: 1, minWidth: 0 },
     line: { flexDirection: 'row', alignItems: 'center', gap: 6, flexWrap: 'wrap' },
     name: { fontSize: 15, fontWeight: '700', color: colors.textPrimary, flexShrink: 1 },
-    meta: { fontSize: 12, color: colors.textTertiary, flexShrink: 1 },
     trailing: { alignItems: 'flex-end' },
     trailingValue: { fontSize: 16, fontWeight: '800' },
     label: { fontSize: 12, fontWeight: '800', letterSpacing: 0.6, color: colors.textTertiary },

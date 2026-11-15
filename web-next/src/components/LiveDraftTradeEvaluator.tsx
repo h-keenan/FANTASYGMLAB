@@ -93,7 +93,7 @@ function CheckList({
                     background: checked ? "var(--color-accent)" : "transparent",
                   }}
                 />
-                <span className="truncate font-bold">{option.label}</span>
+                <span className="min-w-0 break-words font-bold">{option.label}</span>
               </button>
             );
           })}

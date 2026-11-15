@@ -191,7 +191,7 @@ function SeasonSim({ leagueId, colors, styles, navigation }: Shared) {
             <AppText style={styles.rank}>{index + 1}</AppText>
             <TeamAvatar avatarId={team.avatar_url} name={team.team_name} size={32} />
             <View style={styles.flex}>
-              <AppText style={styles.teamName} numberOfLines={1}>
+              <AppText style={styles.teamName}>
                 {team.team_name}
               </AppText>
               <AppText style={styles.muted}>
@@ -462,7 +462,7 @@ function Pickem({ leagueId, colors, styles, navigation }: Shared) {
                     style={[styles.pickTeam, picked && styles.pickTeamOn]}
                   >
                     <TeamAvatar avatarId={team.avatar_url} name={team.team_name} size={36} />
-                    <AppText style={styles.teamName} numberOfLines={2}>
+                    <AppText style={styles.teamName}>
                       {team.team_name}
                     </AppText>
                     {phase !== 'open' ? (
@@ -493,7 +493,7 @@ function Pickem({ leagueId, colors, styles, navigation }: Shared) {
               <AppText style={styles.rank}>{row.rank}</AppText>
               <TeamAvatar avatarId={row.avatar_url} name={row.team_name} size={32} />
               <View style={styles.flex}>
-                <AppText style={styles.teamName} numberOfLines={1}>
+                <AppText style={styles.teamName}>
                   {row.team_name}
                 </AppText>
                 <AppText style={styles.muted}>{row.accuracy}%</AppText>

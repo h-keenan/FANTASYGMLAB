@@ -181,11 +181,11 @@ export function StatStripModule({
             {items.map((item) => {
               const row = (
                 <View style={styles.barRow}>
-                  <AppText style={styles.barLabel} numberOfLines={1}>{item.label}</AppText>
+                  <AppText style={styles.barLabel}>{item.label}</AppText>
                   <View style={styles.barTrack}>
                     {item.fill != null ? <PercentileBar percentile={item.fill * 100} /> : null}
                   </View>
-                  <AppText style={styles.barValue} numberOfLines={1}>{item.value}</AppText>
+                  <AppText style={styles.barValue}>{item.value}</AppText>
                 </View>
               );
               return item.onPress ? (
@@ -232,7 +232,7 @@ export function LinkModule({
       >
         <View style={{ flex: 1, minWidth: 0 }}>
           <AppText style={styles.label}>{title}</AppText>
-          <AppText style={styles.parts} numberOfLines={2} testID="compact-summary">
+          <AppText style={styles.parts} testID="compact-summary">
             {shown.map((part, i) => (
               <AppText key={part.key} style={[styles.part, part.tone ? { color: toneColor(part.tone, colors) } : null, part.strong ? { fontWeight: '800' } : null]}>
                 {i > 0 ? <AppText style={styles.sep}>{' · '}</AppText> : null}

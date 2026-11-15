@@ -40,7 +40,7 @@ export default function LeaguePulseCard({
           <TeamAvatar avatarId={h.team.avatar_url} name={h.team.team_name} size={28} />
           <View style={styles.text}>
             <AppText style={[styles.label, { color: toneColor(h.tone) }]}>{h.label.toUpperCase()}</AppText>
-            <AppText style={styles.team} numberOfLines={1}>
+            <AppText style={styles.team}>
               {h.team.team_name || 'Team'}
             </AppText>
           </View>

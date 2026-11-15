@@ -130,7 +130,7 @@ function OwnedPickRow({
       onClick={onToggle}
       aria-pressed={selected}
       disabled={disabled}
-      className="w-full flex items-center gap-3 py-1 px-2 text-left"
+      className="w-full flex items-center gap-3 py-1 px-2 min-h-[var(--touch-target-min)] text-left"
       style={{ ...selectableRowStyle(selected), opacity: disabled ? 0.5 : 1 }}
     >
       <SelectionCheck selected={selected} />
@@ -169,7 +169,7 @@ function RosterPickRow({
       type="button"
       onClick={onToggle}
       aria-pressed={selected}
-      className="w-full flex items-center gap-3 py-2 px-2 text-left"
+      className="w-full flex items-center gap-3 py-2 px-2 min-h-[var(--touch-target-min)] text-left"
       style={selectableRowStyle(selected)}
     >
       <SelectionCheck selected={selected} />

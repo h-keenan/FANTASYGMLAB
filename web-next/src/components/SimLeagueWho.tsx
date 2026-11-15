@@ -92,8 +92,8 @@ export function SimLeaguePlayersView({ ctx, state, onRetry }: { ctx: SimCtx; sta
                 trailing={
                   <button
                     type="button"
-                    className="tap-link inline-flex items-center justify-center"
-                    style={{ width: 44, height: 44 }}
+                    className="tap-link inline-flex shrink-0 items-center justify-center"
+                    style={{ width: 44, minWidth: 44, height: 44 }}
                     aria-label={`Owned by ${team.name}${team.is_you ? " (you)" : ""}. Open team`}
                     onClick={() => ctx.openTeam(team.team_id)}
                   >

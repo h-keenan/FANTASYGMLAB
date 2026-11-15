@@ -3540,6 +3540,7 @@ select optgroup {
   display: inline-flex;
   align-items: center;
   min-height: var(--touch-target-min);
+  min-width: var(--touch-target-min);
 }
 
 /* Quick view: availability block + latest news. */

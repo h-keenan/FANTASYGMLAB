@@ -310,7 +310,7 @@ export function SimPlayerLine({
           <div className="flex flex-wrap items-center gap-1.5" data-testid="row-extra">
             {extra}
             {model.textTags.map((tag) => (
-              <ToneBadge key={tag.key} label={tag.label} color="var(--color-text-secondary)" size="xs" truncate />
+              <ToneBadge key={tag.key} label={tag.label} color="var(--color-text-secondary)" size="xs" />
             ))}
             {expandedExtra}
           </div>
@@ -803,7 +803,7 @@ export function SimMiniPlayer({
       <span className="flex min-w-0 flex-1 flex-col leading-tight">
         <PlayerName name={player.name} className="text-xs font-bold" style={{ color: hurt || bye ? "var(--color-text-muted)" : undefined, textDecoration: hurt ? "line-through" : undefined }} />
         <span className={`flex items-center gap-1 text-[0.6875rem] ${align === "right" ? "justify-end" : ""}`} style={{ color: "var(--color-text-muted)" }}>
-          {hurt ? <SimToneBadge label="Out" tone="danger" /> : bye ? <SimToneBadge label="Bye" tone="warning" /> : <span className="truncate">{player.team ?? "FA"}</span>}
+          {hurt ? <SimToneBadge label="Out" tone="danger" /> : bye ? <SimToneBadge label="Bye" tone="warning" /> : <span className="min-w-0 break-words">{player.team ?? "FA"}</span>}
           {extra}
         </span>
       </span>
@@ -811,7 +811,7 @@ export function SimMiniPlayer({
   );
   if (!onOpen) return <span className="block min-w-0">{body}</span>;
   return (
-    <button type="button" className="block w-full min-w-0 text-left" onClick={() => onOpen(player)}>
+    <button type="button" className="block w-full min-w-0 text-left" style={{ minHeight: "var(--touch-target-min)" }} onClick={() => onOpen(player)}>
       {body}
       <span className="sr-only">. Open player details</span>
     </button>

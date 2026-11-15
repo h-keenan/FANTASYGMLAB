@@ -163,7 +163,7 @@ function NameBlock({ model, size }: { model: PlayerCardModel; size: PlayerCardVa
       <span className="flex items-center gap-1 flex-wrap min-w-0">
         <PositionBadge position={model.position} />
         {size === "compact" && line ? (
-          <span className="text-[11px] truncate" style={{ color: "var(--color-text-muted)" }}>
+          <span className="min-w-0 break-words text-[11px]" style={{ color: "var(--color-text-muted)" }}>
             {line}
           </span>
         ) : null}
@@ -315,7 +315,7 @@ function MatchupCard({ model, identity, onEdit, editLabel, mirror = false, empha
               <PositionBadge position={model.position} />
               <PlayerStatusChips model={model} />
             </span>
-            <span className="text-[11px] leading-tight truncate w-full" style={{ color: "var(--color-text-muted)" }} data-testid="player-card-game-line">
+            <span className="text-[11px] leading-tight break-words w-full" style={{ color: "var(--color-text-muted)" }} data-testid="player-card-game-line">
               {[model.team, playerGameLine(model)].filter(Boolean).join(" · ")}
             </span>
           </span>

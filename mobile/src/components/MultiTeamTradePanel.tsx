@@ -338,7 +338,7 @@ export default function MultiTeamTradePanel({
           <View key={rosterId} style={[styles.teamPanel, open && styles.teamPanelActive]} testID="team-panel">
             <View style={styles.teamHeader}>
               <TeamAvatar avatarId={teamById.get(rosterId)?.avatarId ?? null} size={22} />
-              <AppText style={styles.teamName} numberOfLines={1}>
+              <AppText style={styles.teamName}>
                 {nameOf(rosterId)}
                 {isMe ? '  YOU' : ''}
               </AppText>

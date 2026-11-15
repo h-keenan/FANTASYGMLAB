@@ -28,7 +28,7 @@ Ground rules for every pattern here:
 
 ## Sheet
 
-Open height (2026-11-14): every bottom sheet on a phone opens between 56% and 80% of the screen (web `.pqv-modal` in the 480px query, app `sheetHeight` in `mobile/src/theme.ts`), so it never opens up under the page header and does not jump while content loads. Chips in dense list rows use `ToneBadge truncate` (web) / `shrink` (app) so a long tag ends in an ellipsis instead of being clipped.
+Open height (2026-11-14): every bottom sheet on a phone opens between 56% and 80% of the screen (web `.pqv-modal` in the 480px query, app `sheetHeight` in `mobile/src/theme.ts`), so it never opens up under the page header and does not jump while content loads. Tags in dense list rows live in the open tile (they wrap), never ellipsized (see "Never ellipsize, never clip").
 
 One bottom sheet on a phone and a centred dialog from 768px up. Replaces the hand-rolled copies of
 `.pqv-backdrop` + `.pqv-modal` + `SheetHandle` + `useSheetDragDismiss`.
@@ -1168,3 +1168,21 @@ uses the same strip (`simRookieRecentCards`; the rookie order carries no team or
   their picks so far); the run signal is the public proxy.
 - The player list (`SimDraftBoard` -> `SimDraftRow` -> `SimPlayerLine`) was already `PlayerAccordionRow mode="sim"`; the Full board grid (`SimDraftGrid`) stays a dense grid of
   position-tinted pick cells (a board, not a list).
+
+## Never ellipsize, never clip (2026-11-14, coridian_: "clipping", "the information under the player name is truncated")
+
+One rule for every player / team row, web and app:
+
+- **The sub-line under a name** (TEAM · Age · Bye · PROJ, any caller stat) is `ui/PlayerMetaLine.tsx` / `components/PlayerMetaLine.tsx`, fitted by `lib/playerMetaFit.ts` (twin, identical). When the width is short, whole parts leave in a fixed order: **Age, then team, then a bye that is not soon**. PROJ, status, a bye that is soon (warning tone) and caller stats never leave; if only those remain and still do not fit, the line **wraps** (each part is nowrap). The grade tile sits beside the parts and is reserved first. No ellipsis, `numberOfLines`, line-clamp or `truncate` on it.
+- **Team names, stat lines and sub-lines elsewhere** (matchup header, draft grid, recap rows, trade picker labels, suggested-drop reasons, lineup team lines on the app) wrap with `break-words` / no `numberOfLines`.
+- **The row's three-dot control** is `SimMoveButton`: one 44px glass target (`--touch-target-min`, `--glass-input-*`), fixed width, the only trailing control, so it cannot push the stats off the card.
+- The ban is a test: `web-next/src/lib/ellipsisBan.test.ts` (strict files hold no truncation; no `numberOfLines` on a team / meta / context / subline style anywhere in the app; fixed share canvases excepted) next to `playerNameTruncation.test.ts` (person names).
+
+### Layout guard (the page-level twin)
+
+`scripts/sim_layout_playwright/guard_checks.mjs` is one in-page check: no sideways scroll, no element past the viewport or past the edge of its card / clipping container, no ellipsis or line-clamp actually cutting text, no silently clipped text, every interactive control >= 44px (inline prose links and `[data-guard-ok]` excepted). Two drivers share it:
+
+- `layout_guard.mjs`: every Fantasy Sim state (hub, Home, Team incl. an open row and the Move strip, Players, Trades tabs, League tabs, More, Draft, Recap, Offseason, Complete) at 320, 360, 390 and 430px, normal and 125% text.
+- `module_scan.mjs` with `GUARD=1`: every Desk page (Today, Team, Trades, League, Matchup, Waivers, Players, Trade Finder / Analyzer, GM Plan, Games, Recaps, Draft Center, sample league) and its first opened player row, same widths (`LARGE=1` for large text).
+
+Run both from `web-next/` with `npm run guard:layout` (needs `npx next dev -p 3197` with the dummy env, see the script headers, and Playwright; `BROWSER=chromium CHROME=<path>` picks the browser). Exit code 1 on any violation, with every violation listed (kind, element, text, where), so it can sit in CI next to the unit tests.

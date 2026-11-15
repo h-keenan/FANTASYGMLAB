@@ -217,7 +217,7 @@ function SwapBody({ suggestion, drop, alternatives }: { suggestion: DropSuggesti
               style={{ borderRadius: "var(--radius-pill)", background: "var(--color-surface-muted)", color: "var(--color-text-secondary)" }}
             >
               <ReasonIcon kind={reasonKind(reason)} />
-              <span className="truncate">{reason}</span>
+              <span className="min-w-0 break-words">{reason}</span>
             </span>
           ))}
         </div>

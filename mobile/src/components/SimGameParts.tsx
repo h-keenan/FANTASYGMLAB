@@ -211,7 +211,7 @@ export function SimPlayerChip({
         <PlayerName name={player.name} style={styles.playerName} />
         <View style={styles.sublineRow}>
           {hidePosition ? null : <PositionBadge position={player.pos} />}
-          <AppText style={styles.subline} numberOfLines={1}>
+          <AppText style={styles.subline}>
             {simPlayerSubline(player)}
           </AppText>
           {player.status === 'out' ? <ToneBadge label="Out" color={colors.danger} size="xs" /> : null}
@@ -772,7 +772,7 @@ export function SimMiniPlayer({
         ) : bye ? (
           <ToneBadge label="Bye" color={colors.warning} size="xs" />
         ) : (
-          <AppText style={[styles.miniSub, align === 'right' && styles.miniNameRight]} numberOfLines={1}>
+          <AppText style={[styles.miniSub, align === 'right' && styles.miniNameRight]}>
             {player.team ?? 'FA'}
           </AppText>
         )}

@@ -114,7 +114,7 @@ export default function CompactModule({
               {shown.length === 0 && summary ? <View style={styles.summary}>{summary}</View> : null}
             </View>
             {shown.length > 0 ? (
-              <AppText style={styles.parts} numberOfLines={2} testID="compact-summary">
+              <AppText style={styles.parts} testID="compact-summary">
                 {shown.map((part, i) => (
                   <AppText key={part.key} style={[styles.part, part.tone ? { color: toneColor(part.tone, colors) } : null, part.strong ? { fontWeight: '800' } : null]}>
                     {i > 0 ? <AppText style={styles.sep}>{' · '}</AppText> : null}

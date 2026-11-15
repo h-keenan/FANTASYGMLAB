@@ -656,7 +656,7 @@ export function GmPlanContent({
 
   const linkAction = (label: string, href?: string) =>
     href ? (
-      <Link href={href} className="text-xs font-bold" style={{ color: "var(--color-accent)" }}>
+      <Link href={href} className="tap-link text-xs font-bold" style={{ color: "var(--color-accent)" }}>
         {label}
       </Link>
     ) : undefined;

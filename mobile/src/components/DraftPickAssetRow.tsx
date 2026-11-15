@@ -104,12 +104,12 @@ export default function DraftPickAssetRow({
           {label || 'Draft pick'}
         </AppText>
         {metaLine ? (
-          <AppText style={styles.meta} numberOfLines={1}>
+          <AppText style={styles.meta}>
             {metaLine}
           </AppText>
         ) : null}
         {contextLine ? (
-          <AppText style={styles.context} numberOfLines={1}>
+          <AppText style={styles.context}>
             {contextLine}
           </AppText>
         ) : null}

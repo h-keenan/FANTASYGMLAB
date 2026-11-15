@@ -69,7 +69,7 @@ function MiniStat({ stat }: { stat: StatusMiniStat }) {
       <span className="text-[0.6875rem] font-extrabold uppercase" style={{ color: "var(--color-text-muted)", letterSpacing: "var(--letter-spacing-badge)" }}>
         {stat.label}
       </span>
-      <span className="truncate text-base font-extrabold tabular-nums" style={{ color: stat.tone ? TONE[stat.tone] : "var(--color-text-primary)" }}>
+      <span className="min-w-0 break-words text-base font-extrabold tabular-nums" style={{ color: stat.tone ? TONE[stat.tone] : "var(--color-text-primary)" }}>
         {stat.value}
       </span>
     </>

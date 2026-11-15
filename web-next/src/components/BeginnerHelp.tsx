@@ -123,7 +123,7 @@ export function BeginnerHelp({
         </span>
       </button>
       {!open && !popover ? (
-        <button type="button" tabIndex={-1} aria-hidden="true" onClick={() => setOpen(true)} className="font-semibold" style={{ color: "var(--color-text-muted)" }}>
+        <button type="button" tabIndex={-1} aria-hidden="true" onClick={() => setOpen(true)} className="font-semibold" style={{ color: "var(--color-text-muted)", padding: "14px 4px", margin: "-14px -4px" }}>
           {label}
         </button>
       ) : null}

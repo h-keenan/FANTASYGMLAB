@@ -552,7 +552,7 @@ export function SimPlayersTab({
 
 /**
  * One lineup row, one fixed grid for every row: slot badge (fixed width),
- * photo, name + one-line subline (truncated, never wraps), projection (fixed)
+ * photo, name + one-line subline (fitted by the PlayerMetaLine ladder, never ellipsized), projection (fixed)
  * and a 40px Change / Fill control. The player's own position shows only
  * where the slot does not already say it (FLEX, SUPERFLEX), as a small dot
  * inside the subline, so rows keep identical height at 390px.

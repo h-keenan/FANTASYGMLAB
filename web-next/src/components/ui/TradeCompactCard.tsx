@@ -26,7 +26,7 @@ export interface TradeCardAsset {
 function TapWrap({ onOpen, label, children }: { onOpen?: () => void; label: string; children: ReactNode }) {
   if (!onOpen) return <>{children}</>;
   return (
-    <button type="button" onClick={onOpen} aria-label={`Open ${label}`} className="block w-full min-w-0 text-left" style={{ background: "none", border: 0, padding: 0 }}>
+    <button type="button" onClick={onOpen} aria-label={`Open ${label}`} className="block w-full min-w-0 text-left" style={{ background: "none", border: 0, padding: 0, minHeight: "var(--touch-target-min)" }}>
       {children}
     </button>
   );

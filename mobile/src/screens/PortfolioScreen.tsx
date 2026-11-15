@@ -608,7 +608,7 @@ function PortfolioLeagueCard({
             {/* Same Sleeper team avatar the website's league card shows. */}
             <TeamAvatar avatarId={league.team_avatar_url} name={league.team_name} size={32} />
             <View style={styles.identityGroup}>
-              <AppText style={styles.teamName} numberOfLines={2}>
+              <AppText style={styles.teamName}>
                 {league.team_name || 'Unclaimed team'} — {league.league_name}
               </AppText>
               {metadata ? <AppText style={styles.record}>{metadata}</AppText> : null}

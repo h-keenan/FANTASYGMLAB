@@ -9,7 +9,7 @@ function chipStyle(active: boolean) {
     border: `1px solid ${active ? "var(--color-accent)" : "var(--color-border)"}`,
     background: active ? "var(--pill-active-bg, color-mix(in srgb, var(--color-accent) 12%, transparent))" : "var(--color-surface-muted)",
     borderRadius: "var(--radius-pill)",
-    minHeight: "2.5rem",
+    minHeight: "var(--touch-target-min)",
   } as const;
 }
 
@@ -39,7 +39,7 @@ export function TradeHubFilters({
   const positions = boardPositions(ideas);
   const allActive = !filter.impact && !filter.position;
   return (
-    <div className="flex flex-nowrap items-center gap-2 overflow-x-auto -mx-4 px-4" role="group" aria-label="Filter trade ideas">
+    <div className="flex flex-nowrap items-center gap-2 overflow-x-auto max-w-full" role="group" aria-label="Filter trade ideas">
       <button
         type="button"
         onClick={() => onChange({ impact: null, position: null })}

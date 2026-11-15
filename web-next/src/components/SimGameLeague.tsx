@@ -128,7 +128,7 @@ export function SimScoreCard({ g, names, youId, onOpen }: { g: SimRecapScore; na
       data-testid="sim-score-card"
     >
       <AccentCard accent={mine ? simToneColor(mineTone) : "var(--color-border-strong)"} compact as="div">
-        <div className="grid items-center gap-2" style={{ gridTemplateColumns: "minmax(0,1fr) 9.5rem minmax(0,1fr)" }}>
+        <div className="grid items-center gap-2" style={{ gridTemplateColumns: "minmax(0,1fr) auto minmax(0,1fr)" }}>
           {team(left)}
           <span className="flex flex-col items-center gap-1">
             <span className="flex items-baseline gap-2">{score(left)}<span aria-hidden="true" style={{ color: "var(--color-text-muted)" }}>–</span>{score(right)}</span>

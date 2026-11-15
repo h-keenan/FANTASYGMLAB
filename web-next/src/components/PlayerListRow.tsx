@@ -265,7 +265,7 @@ export function PlayerListRow({
           </div>
           <div className="contents" data-testid="list-tags">
             {shown.map((tag) => (
-              <ToneBadge key={tag.key} label={tag.label} color={tag.tone ? TONE_COLOR[tag.tone] : "var(--color-text-secondary)"} size="xs" truncate />
+              <ToneBadge key={tag.key} label={tag.label} color={tag.tone ? TONE_COLOR[tag.tone] : "var(--color-text-secondary)"} size="xs" />
             ))}
             {moreTags > 0 ? (
               <span className="text-[0.6875rem] font-bold" style={{ color: "var(--color-text-muted)" }}>

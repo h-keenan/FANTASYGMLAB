@@ -469,16 +469,9 @@ function LineupComparison({
           aria-expanded={helpOpen}
           onClick={() => setHelpOpen((v) => !v)}
           className="inline-flex items-center justify-center font-bold shrink-0 text-xs"
-          style={{
-            width: 22,
-            height: 22,
-            borderRadius: 9999,
-            border: "var(--border-width-default) solid var(--color-border)",
-            color: "var(--color-accent)",
-            lineHeight: 1,
-          }}
+          style={{ width: "var(--touch-target-min)", height: "var(--touch-target-min)", color: "var(--color-accent)", lineHeight: 1 }}
         >
-          ?
+          <span aria-hidden="true" className="inline-flex items-center justify-center" style={{ width: 22, height: 22, borderRadius: 9999, border: "var(--border-width-default) solid var(--color-border)" }}>?</span>
         </button>
       </div>
       {helpOpen ? (
@@ -500,7 +493,7 @@ function LineupComparison({
           onDone={() => planner!.exit()}
         />
       ) : bestBall ? null : (
-        <div className="flex items-center justify-between gap-2">
+        <div className="flex flex-wrap items-center justify-between gap-2">
           <PillRow
             options={[
               { label: "Suggested", value: "suggested", glyph: "suggested" },
@@ -799,7 +792,8 @@ export function MatchupContent({
             onClick={onRefresh}
             disabled={refreshing}
             className="underline"
-            style={{ color: "var(--color-accent)" }}
+            // 44px hit area around the 16px text without growing the row.
+            style={{ color: "var(--color-accent)", padding: "14px 6px", margin: "-14px -6px" }}
           >
             {refreshing ? "Refreshing…" : "Refresh"}
           </button>

@@ -8,7 +8,8 @@
     "start": "next start",
     "lint": "eslint",
     "typecheck": "tsc --noEmit",
-    "test": "vitest run"
+    "test": "vitest run",
+    "guard:layout": "node ../scripts/sim_layout_playwright/layout_guard.mjs && GUARD=1 node ../scripts/sim_layout_playwright/module_scan.mjs"
   },
   "dependencies": {
     "@sentry/browser": "^10.78.0",

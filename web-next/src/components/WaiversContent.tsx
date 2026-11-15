@@ -253,7 +253,7 @@ function TopWaiverTargetCard({ player }: { player: WaiverPriorityAdd }) {
       ) : null}
       {player.drop_suggestion ? <SuggestedDrop suggestion={player.drop_suggestion} /> : null}
       <BeginnerHelp label="waiver value" term="waiverValue" />
-      <div className="flex items-center justify-between gap-3">
+      <div className="flex flex-wrap items-center justify-between gap-3">
         {player.confidence_label ? (
           <ConfidenceMeter label="Confidence" value={player.confidence_label} color={confidenceColor(player.confidence_label)} />
         ) : (

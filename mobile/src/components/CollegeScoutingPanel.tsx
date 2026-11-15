@@ -95,7 +95,7 @@ function ProspectRow({
           </PressableScale>
         </View>
         <PlayerName name={prospect.name} style={styles.gridName} />
-        <AppText style={styles.meta} numberOfLines={1}>
+        <AppText style={styles.meta}>
           {classLabel}
         </AppText>
         {fitBadges}
@@ -121,7 +121,7 @@ function ProspectRow({
       <PositionBadge position={prospect.position} />
       <View style={styles.identity}>
         <PlayerName name={prospect.name} style={styles.name} />
-        <AppText style={styles.meta} numberOfLines={1}>
+        <AppText style={styles.meta}>
           {classLabel}
         </AppText>
         {fitBadges}
