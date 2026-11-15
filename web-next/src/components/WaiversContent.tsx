@@ -621,7 +621,7 @@ export function WaiversContent({
         <CompactModule
           id="waivers.header"
           testId="waivers-header-module"
-          title="Waivers"
+          title="Free agents"
           tone="accent"
           parts={waiversHeaderParts({ available: data.available_count ?? data.players.length, faabLabel: faabItem.label, faab: faabItem.value, need: teamNeedStat(data) })}
           action={

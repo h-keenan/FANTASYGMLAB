@@ -78,8 +78,8 @@ describe("PillRow", () => {
   it("scroll variant: a short row shares its width (no empty bordered box after the last tab) and still scrolls when it overflows", () => {
     render(<PillRow variant="scroll" options={[{ label: "All", value: "" }, { label: "QB", value: "qb" }, { label: "K", value: "k" }]} active="" />);
     for (const tab of screen.getAllByRole("tab")) {
-      expect(tab.className).toContain("flex-1");
-      expect(tab.className).toContain("shrink-0");
+      // grow to share a short row, never shrink, and size from the label (basis auto), not from 0
+      expect(tab.className).toContain("flex-[1_0_auto]");
     }
   });
 });

@@ -1,5 +1,6 @@
 "use client";
 
+import { useHeaderContext } from "@/lib/headerContext";
 import { PageTabBar } from "@/components/PageTabBar";
 import { BEGINNER_HELP } from "@/lib/experienceCopy";
 import { useState, useSyncExternalStore } from "react";
@@ -501,6 +502,17 @@ export function LeagueRankingsContent({
   myRosterId?: string;
 }) {
   const notReady = !data.ok || data.teams.length === 0;
+  const mine = myRosterId ? data.teams.find((team) => team.roster_id === myRosterId) : undefined;
+  // The header ribbon (UI pass 7): where you stand, glanceable from any scroll position.
+  useHeaderContext(
+    notReady || !mine
+      ? []
+      : [
+          { key: "power", text: `Power ${formatRank(mine.power_rank, mine.power_rank_tied)} of ${data.teams.length}` },
+          { key: "record", text: mine.record_label ? `Record ${mine.record_label}` : "" },
+          { key: "standing", text: mine.standing_rank != null ? `Standings ${formatRank(mine.standing_rank)}` : "" },
+        ],
+  );
   const [profile, setProfile] = useState<{ rosterId: string; teamName: string; ownerName: string | null; avatarUrl: string | null } | null>(null);
   const openManager: OpenManager = (rosterId, teamName, ownerName, avatarUrl) => setProfile({ rosterId, teamName, ownerName, avatarUrl });
 

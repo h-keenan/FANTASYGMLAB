@@ -20,16 +20,16 @@ const metrics = () => {
   const hdr = document.querySelector('[data-testid="shell-header"]') || document.querySelector("header");
   const r = hdr?.getBoundingClientRect();
   out.headerHeight = r ? Math.round(r.height) : null;
-  const chip = [...document.querySelectorAll("header button[aria-haspopup=menu]")].find((b) => /Dynasty|Revivalry|Switch league|Your league/.test(b.textContent));
+  const chip = document.querySelector('[data-testid="league-identity"]') || [...document.querySelectorAll("header button[aria-haspopup]")][0];
   if (chip) {
-    const c = chip.getBoundingClientRect(); const t = chip.querySelector(".truncate");
-    out.switcher = { w: Math.round(c.width), h: Math.round(c.height), text: chip.innerText.replace(/\n/g, " | "), truncated: t ? t.scrollWidth > t.clientWidth : false, right: Math.round(window.innerWidth - c.right) };
+    const c = chip.getBoundingClientRect(); const t = chip.querySelector(".truncate, .shell-header-league");
+    out.switcher = { w: Math.round(c.width), h: Math.round(c.height), text: chip.innerText.replace(/\n/g, " | "), truncated: t ? t.scrollWidth > t.clientWidth + 1 : false, lines: t ? Math.round(t.getBoundingClientRect().height / parseFloat(getComputedStyle(t).lineHeight || "16")) : null, ribbon: Boolean(document.querySelector('[data-testid="header-ribbon"]')), right: Math.round(window.innerWidth - c.right) };
   }
   const tiny = [...document.querySelectorAll("header *")].filter((e) => e.children.length === 0 && e.textContent.trim() && parseFloat(getComputedStyle(e).fontSize) < 11.5).map((e) => `${parseFloat(getComputedStyle(e).fontSize)}px "${e.textContent.trim().slice(0, 18)}"`);
   out.tinyText = tiny.slice(0, 6);
   out.targets = [...document.querySelectorAll("header button, header a")].map((e) => e.getBoundingClientRect()).filter((b) => b.width > 0 && (b.height < 43.5 || b.width < 43.5)).length;
-  const menu = document.querySelector('[role="menu"]');
-  if (menu) { const m = menu.getBoundingClientRect(); out.menu = { left: Math.round(m.left), right: Math.round(m.right), top: Math.round(m.top), bottom: Math.round(m.bottom), vh: window.innerHeight, items: menu.querySelectorAll('[role="menuitem"]').length, hasAvatar: Boolean(menu.querySelector("img,svg[data-avatar],[data-testid*=avatar]")), scrolls: menu.scrollHeight > menu.clientHeight + 1, overflowsViewport: m.bottom > window.innerHeight }; }
+  const menu = document.querySelector('[role="dialog"]') || document.querySelector('[role="menu"]');
+  if (menu) { const m = menu.getBoundingClientRect(); out.menu = { left: Math.round(m.left), right: Math.round(m.right), top: Math.round(m.top), bottom: Math.round(m.bottom), vh: window.innerHeight, items: menu.querySelectorAll('[role="menuitem"], [data-testid="league-row"]').length, search: Boolean(menu.querySelector('input[type=search]')), hasAvatar: Boolean(menu.querySelector("img,svg[data-avatar],[data-testid*=avatar]")), scrolls: menu.scrollHeight > menu.clientHeight + 1, overflowsViewport: m.bottom > window.innerHeight }; }
   return out;
 };
 async function ctxFor(w, theme, leagueRows) {
@@ -57,7 +57,7 @@ for (const theme of ["dark", "light"]) for (const w of WIDTHS) for (const [label
   await sleep(w === WIDTHS[0] && theme === "dark" && label === "long" ? 12000 : 4500);
   const closed = await page.evaluate(metrics);
   if (theme === "dark" || label === "long") await page.screenshot({ path: `${OUT}/header-${theme}-${label}-${w}.png`, clip: { x: 0, y: 0, width: w, height: 130 } });
-  await page.locator('header button[aria-haspopup="menu"]').first().click({ timeout: 4000 }).catch(() => {});
+  await page.locator('[data-testid="league-identity"], header button[aria-haspopup]').first().click({ timeout: 4000 }).catch(() => {});
   await sleep(500);
   const open = await page.evaluate(metrics);
   if (label !== "none" && theme === "dark") await page.screenshot({ path: `${OUT}/switcher-open-${label}-${w}.png` });
