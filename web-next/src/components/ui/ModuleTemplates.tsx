@@ -221,9 +221,9 @@ export function StatStripModule({
 }
 
 function StatStripTile({ item }: { item: Omit<StatStripItem, "insight"> }) {
-  const color = item.tone === "risk" ? "var(--color-danger)" : item.tone === "positive" ? "var(--color-success)" : item.tone === "premium" ? "var(--color-premium)" : "var(--color-text-primary)";
+  const color = item.tone === "risk" ? "var(--color-danger)" : item.tone === "positive" ? "var(--color-success)" : item.tone === "premium" ? "var(--color-accent)" : "var(--color-text-primary)";
   return (
-    <span className="glass-surface flex min-w-0 flex-col items-center gap-0.5 px-1.5 py-2 text-center" style={{ borderColor: item.tone === "premium" ? "var(--color-premium)" : undefined }} data-testid="stat-strip-tile">
+    <span className="glass-surface flex min-w-0 flex-col items-center gap-0.5 px-1.5 py-2 text-center" style={{ borderColor: item.tone === "premium" ? "var(--color-accent)" : undefined }} data-testid="stat-strip-tile">
       <span className="max-w-full truncate text-[0.6875rem] font-extrabold uppercase" style={{ color: "var(--color-text-muted)", letterSpacing: "var(--letter-spacing-badge)" }}>
         {shortLabel(item.label)}
       </span>

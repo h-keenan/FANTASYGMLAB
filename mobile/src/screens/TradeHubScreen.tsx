@@ -602,7 +602,7 @@ function IdeaSummaryRow({
     { key: 'total', value: counts.total, label: 'Trade Ideas', icon: 'bulb-outline', color: colors.accent },
     { key: 'high_impact', value: counts.highImpact, label: 'High Impact', icon: 'flash', color: colors.accent },
     { key: 'buy_low', value: counts.buyLow, label: 'Buy Low', icon: 'trending-down', color: colors.success },
-    { key: 'sell_high', value: counts.sellHigh, label: 'Sell High', icon: 'trending-up', color: colors.premium },
+    { key: 'sell_high', value: counts.sellHigh, label: 'Sell High', icon: 'trending-up', color: colors.accent },
   ];
 
   return (

@@ -308,7 +308,7 @@ function PortfolioLeagueCard({ league, signalsPending = false }: { league: Portf
             ) : null}
           </div>
         </div>
-        {showRankBadge ? <ToneBadge label={formatRank(league.power_rank, league.power_rank_tied)} color="var(--color-premium)" /> : null}
+        {showRankBadge ? <ToneBadge label={formatRank(league.power_rank, league.power_rank_tied)} color="var(--color-accent)" /> : null}
       </div>
 
       {winFill !== null ? (

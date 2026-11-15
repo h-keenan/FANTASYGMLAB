@@ -232,6 +232,7 @@
   --type-supporting-metadata-size: 0.6875rem;
   --type-body-explanation-size: var(--font-size-body);
   --type-badge-size: var(--font-size-badge);
+  --type-app-section-title: var(--font-weight-title) var(--font-size-section-title) / var(--line-height-title) var(--font-family-sans);
   --type-section-title: var(--font-weight-display) var(--type-section-title-size) / var(--line-height-title) var(--font-family-sans);
   /* Composite shorthands for --type-primary-metric-size/--type-supporting-
      metadata-size, ported verbatim from modules/design_tokens.py (the same

@@ -51,7 +51,7 @@ function toneColorMap(colors: ThemeColors): Record<string, string> {
     strength: colors.success,
     opportunity: colors.success,
     strategy: colors.accent,
-    franchise: colors.premium,
+    franchise: colors.accent,
     need: colors.warning,
     health: colors.warning,
     warning: colors.warning,
@@ -249,7 +249,7 @@ export default function DraftCenterScreen({ route, navigation }: Props) {
             <View style={styles.postureHead}>
               <ToneBadge label={posture.label} color={toneColorMap(colors)[posture.tone] ?? colors.accent} />
               <View style={styles.postureChips}>
-                <ToneBadge label={`${posture.first_rounders ?? 0} firsts`} color={colors.premium} />
+                <ToneBadge label={`${posture.first_rounders ?? 0} firsts`} color={colors.accent} />
                 <ToneBadge label={`${posture.pick_count ?? 0} picks`} color={colors.accent} />
               </View>
             </View>
@@ -439,7 +439,7 @@ function CapitalCell({
   return (
     <TileShell style={[styles.tile, first && styles.tileFirst]} onPress={onPress} accessibilityLabel={`${label}, ${formatRank(rank, tied)}${note ? `, ${note}` : ''}`}>
       <View style={styles.tileLabelRow}>
-        <Ionicons name={icon} size={11} color={first ? colors.premium : colors.accent} />
+        <Ionicons name={icon} size={11} color={first ? colors.accent : colors.accent} />
         <AppText style={styles.tileLabel}>{label}</AppText>
         {onPress ? <Ionicons name="chevron-forward" size={12} color={colors.textTertiary} style={styles.tileChevron} /> : null}
       </View>
@@ -566,8 +566,8 @@ function createStyles(colors: ThemeColors) {
   tileValue: { fontSize: 17, fontWeight: '800', color: colors.textPrimary },
   capitalValueRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: spacing.xs },
   // League #1 in a capital rank keeps the premium/gold treatment.
-  tileFirst: { backgroundColor: `${colors.premium}1F`, borderColor: `${colors.premium}80` },
-  tileValueFirst: { color: colors.premium },
+  tileFirst: { backgroundColor: `${colors.accent}1F`, borderColor: `${colors.accent}80` },
+  tileValueFirst: { color: colors.accent },
   tileNote: { fontSize: 12, color: colors.textSecondary },
   postureHead: { flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: spacing.sm },
   postureChips: { flexDirection: 'row', gap: spacing.xs, marginLeft: 'auto' },
