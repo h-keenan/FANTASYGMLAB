@@ -58,3 +58,27 @@ model, `box-shadow`, `filter`, `backdrop-filter`): animate `transform`/`opacity`
   Today). Nested ones blur only their parent's flat colour; removing them needs a visual A/B on a real device.
 - League rosters response is 153 KB (183 KB dynasty) uncompressed; gzip applies, field pruning has not been done.
 - Sim notifications still wait for the game read (non-critical bell); Desk real endpoints were not benchmarked here.
+
+## Round 2 findings (2026-11-14)
+
+Measured and deliberately not changed:
+
+- **Lazy sheets in the Sim hub** (player / team / pick / sim-to sheets as dynamic imports): `/gm-game` first-load JS
+  1296 -> 1261 KB, but a controlled A/B (same box, built back to back, 5 runs x 2 alternations, 4x CPU, 4G) showed no
+  gain in FCP, LCP or time of the first API request (888-1074 ms without, 1110-1291 ms with). Not shipped. Note that run-to-run
+  noise on a shared laptop was larger than this effect (one earlier pair differed by 700 ms for no code reason): always A/B on one
+  box, alternating, never compare against an old run.
+- **Supabase auth-js (30 KB gz of the 250 KB gz shell every route pays)**: it is the session source of truth for the first request;
+  deferring it means re-implementing token refresh. Not changed.
+- **Nested `backdrop-filter`**: 4 of 13 blurred elements on Sim Home are nested in another blurred element. Removing all blur
+  changed scroll-time compositor swap time by about 16% in desktop Chrome (noise level) and the main thread not at all, and an
+  inner blur can be the thing that hides text scrolling under a sticky header inside a card. Needs a real-device GPU trace; not changed.
+- **League rosters payload**: 154 KB raw but 13 KB gzipped on the wire; `top_assets` (25 KB raw) is the only duplicate. A shape
+  change that web and the app both read for about 1 KB on the wire is not worth it.
+- **Desk server endpoints** (`scripts/bench_endpoints.py`, stub Sleeper, warm p50 CPU, 200 OK): waivers 553 ms (114 KB, cold 1.3-4.3 s),
+  trade_analyzer 331 ms, matchup 65, player_search 62, rankings 55, dashboard 33, dashboard_deferred 40, my_team 30, player_quick_view
+  35, team_rankings 24, player_rank 22, gm_plan 15, trade_hub 6, leagues_glance 1.5. Waivers' per-roster work (roster value model,
+  `trade_lineup_model.run_weeks`, deep copies) is recomputed every request; its league-wide pool is already Redis single-flighted.
+  Caching it needs a key over (roster, rosters, valuation, strategy, stats freshness) to stay exact: next candidate, not done blind.
+  Dashboard and Today already load progressively and in parallel (`dashboard/[leagueId]/page.tsx`).
+- `Server-Timing: app;dur=` now covers all of these endpoints (see #1944), so production numbers will show per endpoint.
