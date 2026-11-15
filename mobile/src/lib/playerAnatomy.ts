@@ -211,13 +211,13 @@ export function nextSheetSnap(current: SheetSnap, dragY: number, velocity = 0): 
 
 /** The first content line (one row of the open tab) that must be visible under the pills at the peek height. */
 export const PEEK_FIRST_LINE_PX = 52;
-export const PEEK_MIN_FRAC = 0.4;
+export const PEEK_MIN_FRAC = 0.5;
 export const PEEK_MAX_FRAC = 0.7;
 
 /**
  * Peek height in px, computed from the content (coridian_, 2026-11-14: the tab row sat clipped at the bottom of a fixed 56%
  * peek). `anchorBottom` is where the pill row ends, measured from the sheet's top with the compact header showing; the
- * sheet shows that plus one content line plus the bottom inset, clamped between 40% and 70% of the screen so it never
+ * sheet shows that plus one content line plus the bottom inset, clamped between 50% and 70% of the screen so it never
  * opens as a sliver or right up under the page header.
  */
 export function peekSheetHeight({ anchorBottom, viewportH, bottomInset = 0 }: { anchorBottom: number; viewportH: number; bottomInset?: number }): number {

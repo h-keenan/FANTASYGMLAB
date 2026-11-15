@@ -74,10 +74,10 @@ describe("playerAnatomy", () => {
 });
 
 describe("peek sheet height (computed from content)", () => {
-  it("fits header + pill row + one content line, clamped to 40-70% of the screen", async () => {
+  it("fits header + pill row + one content line, clamped to 50-70% of the screen", async () => {
     const { peekSheetHeight, peekShowsTabs, PEEK_FIRST_LINE_PX } = await import("./playerAnatomy");
     expect(peekSheetHeight({ anchorBottom: 400, viewportH: 844, bottomInset: 0 })).toBe(400 + PEEK_FIRST_LINE_PX);
-    expect(peekSheetHeight({ anchorBottom: 210, viewportH: 844 })).toBe(Math.round(844 * 0.4)); // short header: never a sliver
+    expect(peekSheetHeight({ anchorBottom: 210, viewportH: 844 })).toBe(Math.round(844 * 0.5)); // short header: never a sliver
     expect(peekSheetHeight({ anchorBottom: 900, viewportH: 640 })).toBe(Math.round(640 * 0.7)); // never right under the page header
     expect(peekSheetHeight({ anchorBottom: 400, viewportH: 844, bottomInset: 34 })).toBe(486);
     // the 390x844 and 360x640 compact layouts (measured in pqv_peek_geometry.mjs) keep the pill row inside the peek
