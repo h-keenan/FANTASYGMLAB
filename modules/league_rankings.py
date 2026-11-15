@@ -18,6 +18,7 @@ from datetime import datetime
 from typing import Any
 
 import pandas as pd
+from modules import prefetch
 
 from modules import league_value_settings, rankings, redis_cache, sleeper, trade_ideas
 from modules.league_value_settings import _safe_float, _safe_positive_int
@@ -362,6 +363,11 @@ def _build_league_summary_and_draft_capital_cached(
     if not league:
         return pd.DataFrame(), pd.DataFrame()
     settings = league_value_settings.detect_league_value_settings_from_payload(league)
+    # The summary pass reads the league's rosters, users and traded picks one after another; they are independent, so fetch
+    # them together (each warms its own cache) and let the pass below find them cached.
+    prefetch.warm_parallel(
+        lambda: sleeper.get_rosters(league_id), lambda: sleeper.get_users(league_id), lambda: sleeper.get_traded_picks(league_id)
+    )
 
     # coridian_, 2026-10-19, performance audit (Portfolio "18+ seconds,
     # repeatable" on a real 12-team/32-roster dynasty league): this used to

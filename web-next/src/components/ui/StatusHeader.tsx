@@ -6,6 +6,8 @@ import { useState, type ReactNode } from "react";
 
 import { AccentCard } from "@/components/AccentCard";
 import { ButtonLink, Button } from "@/components/Button";
+import { chipsFromStatus } from "@/lib/appHeader";
+import { useHeaderContext } from "@/lib/headerContext";
 import { SkeletonRegion, SkeletonStatusHeader } from "@/components/Skeleton";
 import { CompactPlayerCard } from "@/components/ui/CompactPlayerCard";
 import { PlayerAccordionRow } from "@/components/ui/PlayerAccordionRow";
@@ -191,6 +193,8 @@ export function StatusHeader({
   children?: ReactNode;
 }) {
   const model = statusHeaderModel(raw);
+  // The header's context ribbon (UI pass 7): the same glanceable facts, one tap away from the top of the page on every scroll position.
+  useHeaderContext(chipsFromStatus(model));
   const top = (
     <>
       {model.ring ? <StatusRingMark ring={model.ring} /> : null}

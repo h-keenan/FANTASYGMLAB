@@ -1,4 +1,5 @@
 import { FreeLimitNote } from "@/components/FreeLimitNote";
+import { useHeaderContext } from "@/lib/headerContext";
 import Link from "next/link";
 import { ButtonLink } from "@/components/Button";
 import { useMemo, useState } from "react";
@@ -82,6 +83,8 @@ export function TradeHubContent({
 }) {
   const [filter, setFilter] = useState<{ impact: string | null; position: string | null }>({ impact: null, position: null });
   const visibleIdeas = useMemo(() => filterTradeIdeas(data.ideas, filter), [data.ideas, filter]);
+  // The header ribbon (UI pass 7): the glanceable fact of this page.
+  useHeaderContext(data.ideas.length > 0 ? [{ key: "ideas", text: `${data.ideas.length} trade ${data.ideas.length === 1 ? "idea" : "ideas"}` }] : []);
   const notice = data.reason ? tradeHubReasonMessage(data.reason) : null;
   if (notice) {
     return (
