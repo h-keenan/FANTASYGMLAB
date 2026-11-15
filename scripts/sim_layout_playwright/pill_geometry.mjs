@@ -29,6 +29,7 @@ writeFileSync(
   build: { outDir: ${JSON.stringify(path.join(out, "dist"))}, emptyOutDir: true, minify: false }, cacheDir: ${JSON.stringify(path.join(out, ".vite"))},
   resolve: { alias: [
     { find: "next/link", replacement: ${JSON.stringify(path.join(here, "pill_harness/link.tsx"))} },
+    { find: "next/image", replacement: ${JSON.stringify(path.join(here, "footer_harness/next-stubs.tsx"))} },
     { find: /^@\\//, replacement: ${JSON.stringify(path.join(web, "src") + "/")} },
     { find: /^react\\/jsx-dev-runtime$/, replacement: ${JSON.stringify(N("react/jsx-dev-runtime.js"))} },
     { find: /^react\\/jsx-runtime$/, replacement: ${JSON.stringify(N("react/jsx-runtime.js"))} },
@@ -62,7 +63,16 @@ const measure = () => {
   const midY = (inner.top + inner.bottom) / 2;
   const cy = (r) => r.top + r.height / 2;
   const items = [];
-  layer.querySelectorAll(".pill-icon-btn, .pill-primary").forEach((e) => items.push({ what: e.className.split(" ").pop(), dy: cy(e.getBoundingClientRect()) - midY }));
+  layer.querySelectorAll(".pill-primary").forEach((e) => items.push({ what: e.className.split(" ").pop(), dy: cy(e.getBoundingClientRect()) - midY }));
+  // The orb: shell = inside the context layer; Fantasy Sim = persistent, beside the layers. ONE visible orb, no "..." / icon button next to it.
+  const visibleEl = (e) => { for (let n = e; n && n !== document.body; n = n.parentElement) { const c = getComputedStyle(n); if (c.visibility === "hidden" || c.display === "none") return false; } return true; };
+  const orbs = [...pill.querySelectorAll("[data-pill-orb]")].filter(visibleEl);
+  orbs.forEach((e) => items.push({ what: "orb", dy: cy(e.getBoundingClientRect()) - midY }));
+  const extraMenu = [...pill.querySelectorAll("button, a")].filter((b) => visibleEl(b) && (b.classList.contains("pill-icon-btn") || /^(\.{3}|\u2026|\u22ef)$/.test(b.textContent.trim()) || /sections menu|more actions|back to page actions/i.test(b.getAttribute("aria-label") || "")));
+  // Legible, unclipped labels: the primary / Advance / inline action text is >= 11.5px and fits its button.
+  const labelEls = [...pill.querySelectorAll(".pill-primary-label, .advance, .pill-inline-label, .sim-to")].filter((e) => visibleEl(e) && !e.closest("[data-compact]")); // an icon-only chip keeps its text as the accessible name
+  const labels = labelEls.map((e) => { const b = e.closest("button") || e; return { text: e.textContent.trim(), px: parseFloat(getComputedStyle(e).fontSize), fits: e.scrollWidth <= e.clientWidth + 1 && b.scrollWidth <= b.clientWidth + 1 }; });
+  const hits = [...pill.querySelectorAll("button, a")].filter(visibleEl).map((b) => { const r = b.getBoundingClientRect(); return { what: b.getAttribute("aria-label") || b.textContent.trim().slice(0, 12), w: r.width, h: r.height }; }).filter((x) => x.w > 0);
   layer.querySelectorAll(".pill-tab").forEach((e) => {
     // the label text itself, not the element box: a link whose box is centered but whose text sits at the top is the bug
     const range = document.createRange(); range.selectNodeContents(e); const r = range.getBoundingClientRect();
@@ -72,9 +82,11 @@ const measure = () => {
   const act = layer.querySelector('.pill-tab[aria-selected="true"]');
   let capsule = null;
   if (ind && act) { const a = ind.getBoundingClientRect(), b = act.getBoundingClientRect(); capsule = { dy: cy(a) - midY, dx: a.left + a.width / 2 - (b.left + b.width / 2), dw: a.width - b.width }; }
-  const kids = [...layer.children].filter((k) => k.getBoundingClientRect().width > 0);
-  const lr = layer.getBoundingClientRect();
-  const first = kids[0].getBoundingClientRect(), last = kids[kids.length - 1].getBoundingClientRect();
+  // Equal insets: the leftmost and rightmost controls sit the same distance from the pill's edges (orb or first tab on the left, chip / Advance on the right).
+  const stripBox = pill.querySelector(".pill-tabs")?.getBoundingClientRect();
+  const ctl = [...pill.querySelectorAll("button, a")].filter((b) => visibleEl(b) && b.getBoundingClientRect().width > 0).map((b) => { const r = b.getBoundingClientRect(); return stripBox && b.closest(".pill-tabs") ? { left: Math.max(r.left, stripBox.left), right: Math.min(r.right, stripBox.right) } : r; });
+  const lr = pr;
+  const first = { left: Math.min(...ctl.map((c) => c.left)) }, last = { right: Math.max(...ctl.map((c) => c.right)) };
   // the tab strip: its tabs must sit centered in it (equal space either side of the run of tabs, unless it scrolls)
   const strip = layer.querySelector(".pill-tabs");
   let stripPad = null;
@@ -90,13 +102,13 @@ const measure = () => {
     const range = document.createRange(); range.selectNodeContents(e.querySelector(".pill-tab-text") || e); const r = range.getBoundingClientRect();
     return { label: e.textContent, active: e.getAttribute("aria-selected") === "true", left: r.left - sr.left, right: sr.right - r.right, overChip: prim ? r.right > prim.getBoundingClientRect().left + 0.5 : false, fullLabel: e.getAttribute("aria-label") };
   }) : [];
-  return { dbg: strip ? { strip: strip.clientWidth, tabs: [...strip.querySelectorAll(".pill-tab")].map((e) => Math.round(e.getBoundingClientRect().width)), layer: layer.getBoundingClientRect().width, kids: [...layer.children].map((k) => Math.round(k.getBoundingClientRect().width)) } : null, clip, scrolls: strip ? strip.scrollWidth > strip.clientWidth + 1 : false, fade: strip ? !!strip.dataset.fade : false, primW: prim ? prim.getBoundingClientRect().width : 0, pillH: pr.height, items, capsule, padL: first.left - lr.left, padR: lr.right - last.right, stripPad, overflowX: document.documentElement.scrollWidth - innerWidth };
+  return { orbCount: orbs.length, extraMenu: extraMenu.length, labels, hits, dbg: strip ? { strip: strip.clientWidth, tabs: [...strip.querySelectorAll(".pill-tab")].map((e) => Math.round(e.getBoundingClientRect().width)), layer: layer.getBoundingClientRect().width, kids: [...layer.children].map((k) => Math.round(k.getBoundingClientRect().width)) } : null, clip, scrolls: strip ? strip.scrollWidth > strip.clientWidth + 1 : false, fade: strip ? !!strip.dataset.fade : false, primW: prim ? prim.getBoundingClientRect().width : 0, pillH: pr.height, items, capsule, padL: first.left - lr.left, padR: lr.right - last.right, stripPad, overflowX: document.documentElement.scrollWidth - innerWidth };
 };
 
-const cases = [["draft 4 + Auto-pick", "?family=draft"], ["draft 5 + Auto-pick", "?family=draft&draft=5"], ["team", "?family=team"], ["team + primary", "?family=team&primary=1"], ["trades", "?family=trades"], ["league", "?family=league"], ["sim bar", "?family=team&sim=1"]];
+const cases = [["draft 4 + Auto-pick", "?family=draft"], ["draft 5 + Auto-pick", "?family=draft&draft=5"], ["team", "?family=team"], ["team + primary", "?family=team&primary=1"], ["trades", "?family=trades"], ["league", "?family=league"], ["sim plain", "?sim=plain"], ["sim team (Auto-set)", "?sim=team"], ["sim draft", "?sim=draft"]];
 const rows = [];
 let bad = 0;
-for (const w of [390, 360]) {
+for (const w of [430, 390, 360, 320]) {
   const ctx = await browser.newContext({ ...devices["iPhone 14"], viewport: { width: w, height: 664 } });
   const page = await ctx.newPage();
   for (const [name, qs] of cases) {
@@ -104,6 +116,7 @@ for (const w of [390, 360]) {
     await page.evaluate(() => document.fonts.ready);
     await sleep(500);
     const m = await page.evaluate(measure);
+    if (process.env.SHOT_DIR) await page.screenshot({ path: path.join(process.env.SHOT_DIR, `pill-${w}-${name.replace(/[^a-z0-9]+/gi, "_")}.png`), clip: { x: 0, y: 664 - 96, width: w, height: 96 } });
     const worst = Math.max(0, ...m.items.map((i) => Math.abs(i.dy)), m.capsule ? Math.abs(m.capsule.dy) : 0);
     const problems = [];
     if (worst > 1) problems.push(`vertical offset ${worst.toFixed(1)}px: ${m.items.filter((i) => Math.abs(i.dy) > 1).map((i) => `${i.what} ${i.dy.toFixed(1)}`).join(", ") || "capsule " + m.capsule.dy.toFixed(1)}`);
@@ -114,7 +127,10 @@ for (const w of [390, 360]) {
     // Up to 4 tabs at 390 must all fit; 5 tabs, or 360, may scroll (with the edge fade on) as long as the lit tab is fully shown.
     if (clipped.length && ((w >= 390 && m.clip.length <= 4) || !m.scrolls || !m.fade || clipped.some((c) => c.active))) problems.push(`label clipped: ${clipped.map((c) => `${c.label} (L${c.left.toFixed(1)} R${c.right.toFixed(1)}${c.overChip ? " under chip" : ""})`).join(", ")}`);
     if (name === "trades" && m.primW > 0) problems.push("Trades must have no lone glyph chip (it duplicated the Analyzer tab)");
-    if (m.items.filter((i) => i.what === "pill-icon-btn--menu").length !== (name.startsWith("draft") ? 0 : 1) && !name.startsWith("sim") && !name.startsWith("draft")) problems.push("expected exactly ONE merged section/menu button");
+    if (m.orbCount !== 1) problems.push(`expected exactly ONE orb / menu control, found ${m.orbCount}`);
+    if (m.extraMenu) problems.push(`${m.extraMenu} separate "..." / section / menu button(s) next to the orb`);
+    for (const l of m.labels) { if (l.px < 11.5) problems.push(`label "${l.text}" is ${l.px}px (too small)`); if (!l.fits) problems.push(`label "${l.text}" is clipped by its button`); }
+    for (const h of m.hits) if (h.h < 43.5 || h.w < 39.5) problems.push(`hit target "${h.what}" ${h.w.toFixed(0)}x${h.h.toFixed(0)} is under 44px`);
     if (m.overflowX > 0) problems.push(`page scrolls sideways by ${m.overflowX}px`);
     if (problems.length) bad++;
     rows.push({ w, case: name, dbg: m.dbg, scrolls: m.scrolls, primW: Math.round(m.primW), pillH: Math.round(m.pillH), worstDy: +worst.toFixed(2), capsule: m.capsule && { dy: +m.capsule.dy.toFixed(2), dx: +m.capsule.dx.toFixed(2) }, padL: +m.padL.toFixed(1), padR: +m.padR.toFixed(1), stripPad: m.stripPad, problems });

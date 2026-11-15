@@ -3,7 +3,8 @@ import { createRoot } from "react-dom/client";
 
 import { BottomTabBar } from "@/components/ui/BottomTabBar";
 import { PillMorph } from "@/components/ui/PillMorph";
-import type { PillContext } from "@/lib/bottomNav";
+import { PillOrb } from "@/components/ui/PillOrb";
+import { simPillPlan, type PillContext } from "@/lib/bottomNav";
 import { familyPillContext } from "@/lib/pageFamilyPill";
 import { shellTabs } from "@/lib/shellNav";
 
@@ -37,15 +38,23 @@ function App() {
         ))}
       </div>
       <div className="bottom-stack md:hidden" data-bare data-testid="stack">
-        {q.get("sim") === "1" ? (
+        {q.get("sim") ? (
           <div className="action-pill" data-testid="sim-pill">
-            <PillMorph context={ctx}>
-              <div style={{ display: "flex", alignItems: "center", gap: 8, padding: 4 }}>
-                <button className="pill-icon-btn">S</button>
-                <button className="pill-icon-btn">O</button>
-                <button style={{ flex: 1, minHeight: 44, borderRadius: 999 }}>Advance</button>
-              </div>
-            </PillMorph>
+            {(() => {
+              // The same plan the real Sim bar uses: ?sim=plain (orb | Sim to | Advance), ?sim=team (orb | Auto-set | Advance), ?sim=draft (orb | tabs | Auto-pick).
+              const sim = q.get("sim");
+              const pageCtx: PillContext | null = sim === "draft" ? draftCtx() : sim === "team" ? { id: "sim-team", label: "Team actions", tabs: [], activeKey: "", onSelect: () => {}, primary: { key: "auto-set", label: "Auto-set", glyph: "recommended", onPress: () => {} } } : null;
+              const plan = simPillPlan({ context: pageCtx, simToAvailable: true });
+              return (
+                <PillMorph segment={plan.segment} orb={<div className="game-orb-slot"><PillOrb label="Team. Game menu" badge={3} popup onClick={() => {}} testId="sim-game-orb" /></div>}>
+                  <div className="mx-auto flex max-w-3xl items-center gap-2 max-md:p-0" style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                    {plan.simTo ? <button className="sim-to" style={{ minHeight: 48, minWidth: 52, borderRadius: 999, fontSize: 12 }}>Sim to</button> : null}
+                    {plan.inlineAction ? <button className="pill-inline-action" style={{ minHeight: 48, minWidth: 44, borderRadius: 999, fontSize: 14, padding: "0 12px" }}><span className="pill-inline-label">{plan.inlineAction.label}</span></button> : null}
+                    <button className="advance" style={{ flex: 1, minHeight: 48, borderRadius: 999, fontSize: 14, fontWeight: 700, whiteSpace: "nowrap" }}>Advance Wk 10 &rarr; 11</button>
+                  </div>
+                </PillMorph>
+              );
+            })()}
           </div>
         ) : (
           <BottomTabBar ariaLabel="League sections" tabs={tabs} active="team" context={ctx} />

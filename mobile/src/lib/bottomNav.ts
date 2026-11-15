@@ -188,7 +188,7 @@ export function pillTextWidth(text: string): number {
   return Math.ceil(text.length * 6.6);
 }
 /** Width of the primary chip as a text chip (label + glyph + padding) and as the icon-only button. */
-export const PILL_CHIP_ICON_W = 40;
+export const PILL_CHIP_ICON_W = 44;
 export function pillChipTextWidth(label: string, hasGlyph: boolean): number {
   return pillTextWidth(label) + 28 + (hasGlyph ? 21 : 0) + 4;
 }
@@ -206,5 +206,40 @@ export function pillPrimaryCompact(ctx: Pick<PillContext, "tabs" | "primary">, s
   return tabsW + pillChipTextWidth(p.label, true) > segmentW;
 }
 
-/** Accessible name of the menu button. */
-export const PILL_MENU_LABEL = "Sections menu";
+// ---- One orb, smart footer (2026-11-14, coridian_: "the orb and the ellipsis just needs to be the orb") ----
+
+/** Accessible name of the shell pill's orb (it unfolds the section row and More). The Fantasy Sim orb names its page instead (simOrbAriaLabel). */
+export const PILL_ORB_LABEL = "Menu";
+
+/** The shell orb's count badge: new items across the global tabs (trade offers), so folding the tab row away never hides them. */
+export function pillOrbBadge(tabs: Pick<BottomTab, "badge">[]): number {
+  return tabs.reduce((n, t) => n + (t.badge && t.badge > 0 ? Math.floor(t.badge) : 0), 0);
+}
+
+/** What the Fantasy Sim footer shows right now. The orb is always there and is the only navigation control (it opens the page menu). */
+export type SimPillPlan = {
+  /** Page tabs replace the action row (the draft room): orb + tabs + its one primary. null = the action row. */
+  segment: PillContext | null;
+  /** A page action that joins the row before Advance (Team: Auto-set). null = none. */
+  inlineAction: PillContextAction | null;
+  /** The compact "Sim to" button. Folded away when a page action takes its slot, in a draft, in the offseason and when paywalled; the orb menu still lists it. */
+  simTo: boolean;
+  /** The primary advance / stage button. Hidden while a tabbed segment owns the pill (a draft has no Advance). */
+  advance: boolean;
+};
+
+/**
+ * The smart rules for the Fantasy Sim footer, in one place (docs/ui-patterns.md "Smart footer rules"):
+ *   tabbed page context (draft)      -> orb | tabs | primary            (no Advance, no Sim to)
+ *   page action only (Team)          -> orb | page action | Advance     (Sim to moves into the orb menu)
+ *   plain in-season page             -> orb | Sim to | Advance
+ *   offseason / paywalled            -> orb | the stage button / Go Pro (no Sim to)
+ * A page action that is disabled and not busy does not apply, so it is hidden rather than shown dead.
+ */
+export function simPillPlan(opts: { context: PillContext | null | undefined; simToAvailable: boolean; paywalled?: boolean }): SimPillPlan {
+  const ctx = normalizePillContext(opts.context);
+  if (ctx && ctx.tabs.length > 0) return { segment: ctx, inlineAction: null, simTo: false, advance: false };
+  const p = ctx?.primary;
+  const inlineAction = p && (!p.disabled || p.busy) ? p : null;
+  return { segment: null, inlineAction, simTo: opts.simToAvailable && !opts.paywalled && !inlineAction, advance: true };
+}
