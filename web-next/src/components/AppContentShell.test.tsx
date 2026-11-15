@@ -1,5 +1,5 @@
 import { render, screen } from "@testing-library/react";
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { AppContentShell } from "./AppContentShell";
 import { useAuth } from "@/context/AuthContext";
@@ -15,6 +15,9 @@ vi.mock("next/navigation", () => ({
 }));
 
 describe("AppContentShell", () => {
+  // The legacy chrome is only reachable through the switch since UI pass 5 D4; these cases cover it.
+  beforeEach(() => window.localStorage.setItem("fgl:nav", "off"));
+
   // coridian_, 2026-10-19, screenshot: "still weird clipping and scaling on
   // the desktop welcome page" — DesktopSidebar already renders nothing for
   // a signed-out visitor, but the content wrapper used to reserve md:pl-60
