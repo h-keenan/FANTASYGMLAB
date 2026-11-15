@@ -11323,6 +11323,11 @@ def test_waivers_endpoint_repeated_requests_hit_cache_with_correct_data(monkeypa
     from modules import player_state_authority
 
     client = _client(monkeypatch)
+    # The shared pool/valued caches are keyed by a wall-clock bucket (``int(time // 120)``). Two requests that straddle a bucket
+    # boundary (about 1 run in a hundred) are two different cache keys and legitimately both compute, which made this assertion
+    # flake in CI. Pin the bucket so "within the cache window" is actually true for both requests; the assertion is unchanged.
+    monkeypatch.setattr("modules.waivers_logic._waiver_pool_cache_bucket", lambda: 4242)
+    monkeypatch.setattr("modules.league_value_settings._valued_players_frame_cache_bucket", lambda: 4242)
     # The FAAB bid reads the caller's declared Team Situation (one Supabase
     # read per request); stub it, this test is about the pool cache only.
     monkeypatch.setattr(
