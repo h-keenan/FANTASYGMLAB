@@ -37,6 +37,8 @@ import { simMatchupMargin, simMatchupStatus, simPreview, simScoreboardLabel } fr
 import { useSimLeagueRosters } from '../lib/useSimLeagueRosters';
 import { spacing } from '../theme';
 import { PresenceSwap } from './Presence';
+import { RankChip, ReorderRow } from './Motion';
+import { MAX_FLIP_ROWS } from '../lib/motion';
 
 type View_ = 'standings' | 'scores' | 'feed' | 'teams' | 'players';
 
@@ -51,8 +53,12 @@ export function SimStandingsList({ rows, playoffTeams }: { rows: SimStandingRow[
           const inPlayoffs = index < (playoffTeams ?? 0);
           const cut = index === (playoffTeams ?? 0) - 1;
           return (
-            <View
+            <ReorderRow
               key={row.team_id}
+              animate={rows.length <= MAX_FLIP_ROWS}
+              style={undefined}
+            >
+            <View
               accessibilityHint={simPlayoffStatusLabel(row.playoff_status) || undefined}
               style={[
                 { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, minHeight: 36, paddingHorizontal: 4 },
@@ -61,12 +67,14 @@ export function SimStandingsList({ rows, playoffTeams }: { rows: SimStandingRow[
               ]}
             >
               <AppText style={{ width: 20, fontSize: 12.5, fontWeight: '800', color: inPlayoffs ? colors.success : colors.textTertiary }}>{row.rank ?? index + 1}</AppText>
-              <View style={common.grow}>
+              <View style={[common.grow, { flexDirection: 'row', alignItems: 'center', gap: 6 }]}>
                 <SimTeamLink teamId={row.team_id} name={row.name} isYou={row.is_you} size='chip' bold={row.is_you} />
+                <RankChip rank={row.rank ?? index + 1} />
               </View>
               <AppText style={{ fontSize: 12.5, fontWeight: '700', color: simToneColor(simStreakTone(row.streak ?? ''), colors) }}>{row.streak ?? ''}</AppText>
               <AppText style={[common.bodyStrong, { width: 48, textAlign: 'right' }]}>{simFmtRecord(row)}</AppText>
             </View>
+            </ReorderRow>
           );
         })}
       </View>

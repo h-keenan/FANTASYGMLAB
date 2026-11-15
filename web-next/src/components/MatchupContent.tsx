@@ -261,7 +261,7 @@ function TeamsValues({ matchup }: { matchup: MatchupResponse }) {
               role="img"
               aria-label={`Win probability: you ${myPct}%, opponent ${100 - myPct!}%.`}
             >
-              <span className="winprob-bar-fill" style={{ width: `${myPct}%` }} aria-hidden="true" />
+              <span className="winprob-bar-fill" style={{ transform: `scaleX(${(myPct ?? 0) / 100})` }} aria-hidden="true" />
             </div>
             <div className="flex items-center justify-between">
               <span className="text-base font-extrabold" style={{ color: "var(--color-success)" }}>

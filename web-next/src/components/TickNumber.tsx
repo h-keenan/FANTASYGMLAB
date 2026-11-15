@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState, type CSSProperties } from "react";
 
-import { COUNT_MS as TICK_MS, FLASH_MS, flashDirection } from "@/lib/motion";
+import { COUNT_MS as TICK_MS, FLASH_MS, acquireTween, flashDirection } from "@/lib/motion";
 
 function prefersReducedMotion(): boolean {
   return typeof window !== "undefined" && typeof window.matchMedia === "function"
@@ -41,13 +41,18 @@ export function TickNumber({
     if (target == null || from == null || from === target) return;
     let raf: number | null = null;
     let flashTimer: ReturnType<typeof setTimeout> | null = null;
-    const reduced = prefersReducedMotion();
+    // At most MAX_CONCURRENT_TWEENS number tweens run at once; past that the value just changes (the flash still plays).
+    const release = acquireTween();
+    const reduced = prefersReducedMotion() || release === null;
     const start = performance.now();
     const step = (now: number) => {
       const t = reduced ? 1 : Math.min(1, (now - start) / TICK_MS);
       const eased = 1 - (1 - t) ** 3;
       setAnim({ target, value: from + (target - from) * eased });
-      if (t === 1 || !(t < 1)) return;
+      if (t === 1 || !(t < 1)) {
+        release?.();
+        return;
+      }
       raf = requestAnimationFrame(step);
     };
     raf = requestAnimationFrame((now) => {
@@ -60,6 +65,7 @@ export function TickNumber({
     });
     return () => {
       if (raf != null) cancelAnimationFrame(raf);
+      release?.();
       if (flashTimer) clearTimeout(flashTimer);
     };
   }, [target]);

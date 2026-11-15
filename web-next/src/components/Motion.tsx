@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState, type CSSProperties, type ReactNode } from "react";
 
-import { confettiAllowed, confettiPieces, countUpValue, shouldAnimateList, staggerDelay, COUNT_MS } from "@/lib/motion";
+import { confettiAllowed, confettiPieces, countUpValue, progressScale, rankChange, shouldAnimateList, staggerDelay, COUNT_MS, RANK_CHIP_MS } from "@/lib/motion";
 import { useInView, useReducedMotion } from "@/lib/useMotion";
 
 /**
@@ -98,6 +98,62 @@ export function PulseOnIncrease({ value, children }: { value: number; children: 
   return (
     <span key={pulse} className={pulse > 0 ? "motion-pulse" : undefined} data-pulse={pulse > 0 ? "true" : undefined}>
       {children}
+    </span>
+  );
+}
+
+/**
+ * THE progress fill: a bar that grows to `percent` (0-100) when it appears and follows changes, on the compositor
+ * (`transform: scaleX`, never `width`). Put it inside a track that is `overflow: hidden` with the radius (every bar here
+ * already is); it fills the track's height. Reduced motion: the final width at once. Twin: mobile ProgressFill.
+ */
+export function ProgressFill({ percent, color, className = "", style, testId }: { percent: number | null | undefined; color: string; className?: string; style?: CSSProperties; testId?: string }) {
+  const reduced = useReducedMotion();
+  const target = progressScale(percent);
+  const [shown, setShown] = useState(reduced ? target : 0);
+  useEffect(() => {
+    // One frame at 0 so the first paint has something to grow from.
+    const raf = requestAnimationFrame(() => setShown(target));
+    return () => cancelAnimationFrame(raf);
+  }, [target]);
+  return (
+    <div
+      className={`progress-fill ${className}`.trim()}
+      data-testid={testId}
+      data-progress={Math.round(target * 100)}
+      style={{ height: "100%", width: "100%", background: color, transform: `scaleX(${reduced ? target : shown})`, ...style }}
+    />
+  );
+}
+
+/** "Up 2" / "down 1" chip that appears when a rank improves or slips and fades after a couple of seconds (never on first render). */
+export function RankChip({ rank }: { rank: number | null | undefined }) {
+  const previous = useRef(rank);
+  const [chip, setChip] = useState<{ dir: "up" | "down"; by: number } | null>(null);
+  useEffect(() => {
+    const change = rankChange(previous.current, rank);
+    previous.current = rank;
+    if (!change) return;
+    setChip(change);
+    const timer = setTimeout(() => setChip(null), RANK_CHIP_MS);
+    return () => clearTimeout(timer);
+  }, [rank]);
+  if (!chip) return null;
+  return (
+    <span className="rank-chip" data-dir={chip.dir} role="status" aria-label={`${chip.dir === "up" ? "Up" : "Down"} ${chip.by}`}>
+      <span aria-hidden="true">{chip.dir === "up" ? "▲" : "▼"}{chip.by}</span>
+    </span>
+  );
+}
+
+/** A check that draws itself inside a soft ring: the success confirmation (a claim landed, a trade was accepted). Static under reduced motion. */
+export function SuccessCheck({ size = 28, label = "Done" }: { size?: number; label?: string }) {
+  return (
+    <span className="success-check" role="img" aria-label={label} style={{ width: size, height: size }}>
+      <svg viewBox="0 0 24 24" width={size} height={size} fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+        <circle cx="12" cy="12" r="10" className="success-check-ring" />
+        <path d="M7 12.5l3.2 3.2L17 9" className="success-check-mark" pathLength={1} />
+      </svg>
     </span>
   );
 }

@@ -15,6 +15,7 @@ import { TEAM_STANCE_OPTIONS, type TeamStance } from "@/lib/api";
 import type { DeadlineBanner, PlanSnapshotTile } from "@/lib/gmPlanSnapshot";
 import { SkeletonBlock } from "@/components/Skeleton";
 import { PageTitle } from "@/components/PageTitle";
+import { ProgressFill } from "@/components/Motion";
 
 export const GM_PLAN_TABS = [
   { label: "Overview", value: "overview", glyph: "overview" },
@@ -244,7 +245,7 @@ function SnapshotCell({ tile }: { tile: PlanSnapshotTile }) {
             className="h-1.5 w-full"
             style={{ background: "var(--color-surface-muted)" }}
           >
-            <div className="h-full" style={{ width: `${percent}%`, background: "var(--color-accent)" }} />
+            <ProgressFill percent={percent} color="var(--color-accent)" />
           </div>
         ) : null}
       </div>

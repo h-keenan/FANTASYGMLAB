@@ -1,6 +1,7 @@
 import { compactValueFontSize } from "@/lib/snapshotTileSizing";
 import { SnapshotTileGlyph, type SnapshotGlyphName } from "@/components/SnapshotTileGlyph";
 import { Money } from "@/components/Money";
+import { ProgressFill } from "@/components/Motion";
 
 function formatRank(rank: number | null, tied: boolean): string {
   if (rank === null || rank === undefined) return "—";
@@ -24,7 +25,7 @@ export function FillBar({ fill, label }: { fill: number; label: string }) {
       className="h-1.5 w-full overflow-hidden"
       style={{ background: "var(--color-surface-muted)", borderRadius: "var(--radius-pill)" }}
     >
-      <div className="h-full" style={{ width: `${pct}%`, background: fillColor(fill), borderRadius: "var(--radius-pill)" }} />
+      <ProgressFill percent={pct} color={fillColor(fill)} />
     </div>
   );
 }

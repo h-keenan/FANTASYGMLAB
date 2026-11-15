@@ -365,7 +365,7 @@ function MatchupCard({ model, identity, onEdit, editLabel, mirror = false, empha
           aria-valuemax={100}
           aria-valuenow={Math.round(model.progress * 100)}
         >
-          <span style={{ width: `${Math.round(model.progress * 100)}%` }} />
+          <span style={{ transform: `scaleX(${Math.round(model.progress * 100) / 100})` }} />
         </span>
       ) : null}
       <button

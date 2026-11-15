@@ -979,9 +979,11 @@ a {
   position: absolute;
   top: 0;
   left: 0;
+  width: 100%;
   height: 100%;
   background: var(--color-success);
-  transition: width 0.2s ease-out;
+  transform-origin: left center;
+  transition: transform var(--motion-fast) var(--ease-out);
 }
 
 /* Tone-colored tiles/cards for Roster Signals, Strength and Pressure,
@@ -4103,10 +4105,10 @@ main > header:has(> h1.sr-only:only-child) {
 }
 .player-card-progress > span {
   position: absolute;
-  inset: 0 auto 0 0;
-  border-radius: inherit;
+  inset: 0;
   background: var(--color-success);
-  transition: width 0.4s ease-out;
+  transform-origin: left center;
+  transition: transform var(--motion-slow) var(--ease-out);
 }
 .player-card-progress[data-final="true"] > span {
   background: var(--color-text-muted);
@@ -4705,3 +4707,19 @@ main > header:has(> h1.sr-only:only-child) {
 .scale-collapse[data-open="true"] { grid-template-rows: 1fr; opacity: 1; }
 .scale-collapse-inner { min-height: 0; overflow: hidden; }
 @media (prefers-reduced-motion: reduce) { .scale-collapse, .fairness-glide { transition: none !important; } }
+
+/* Motion kit 2 (docs/ui-patterns.md, "Motion spec"). Compositor-only: transform and opacity. */
+.progress-fill { transform-origin: left center; transition: transform var(--motion-slow) var(--ease-out); will-change: transform; }
+.rank-chip { display: inline-flex; align-items: center; font-size: 0.6875rem; font-weight: 800; line-height: 1; padding: 0.125rem 0.3rem; border-radius: var(--radius-pill); animation: rank-chip-in var(--motion-base) var(--ease-out) both; }
+.rank-chip[data-dir="up"] { color: var(--color-success); background: color-mix(in srgb, var(--color-success) 16%, transparent); }
+.rank-chip[data-dir="down"] { color: var(--color-danger); background: color-mix(in srgb, var(--color-danger) 16%, transparent); }
+@keyframes rank-chip-in { from { opacity: 0; transform: translateY(4px) scale(0.9); } to { opacity: 1; transform: none; } }
+.success-check { display: inline-flex; color: var(--color-success); animation: motion-success var(--motion-slow) var(--ease-out) both; }
+.success-check-ring { stroke-opacity: 0.35; }
+.success-check-mark { stroke-dasharray: 1; stroke-dashoffset: 1; animation: success-check-draw var(--motion-base) var(--ease-out) 120ms forwards; }
+@keyframes success-check-draw { to { stroke-dashoffset: 0; } }
+@media (prefers-reduced-motion: reduce) {
+  .progress-fill, .winprob-bar-fill, .player-card-progress > span { transition: none; }
+  .rank-chip, .success-check { animation: none; }
+  .success-check-mark { animation: none; stroke-dashoffset: 0; }
+}

@@ -62,3 +62,46 @@ describe("press feedback (the one press)", () => {
     for (const ms of Object.values(TRANSITION_MS)) expect(Object.values(MOTION_MS)).toContain(ms);
   });
 });
+
+import { MAX_CONCURRENT_TWEENS, MAX_FLIP_ROWS, MOTION_ROLE, PROGRESS_MS, SPRING, acquireTween, activeTweenCount, flipOffset, progressScale, rankChange } from "./motion";
+
+describe("motion kit 2", () => {
+  it("maps the three roles onto existing durations", () => {
+    expect(MOTION_ROLE).toEqual({ micro: 120, standard: 180, emphasized: 300 });
+    expect(PROGRESS_MS).toBe(300);
+  });
+  it("clamps a progress percent to a 0-1 scale", () => {
+    expect(progressScale(50)).toBe(0.5);
+    expect(progressScale(140)).toBe(1);
+    expect(progressScale(-5)).toBe(0);
+    expect(progressScale(null)).toBe(0);
+    expect(progressScale(Number.NaN)).toBe(0);
+  });
+  it("computes FLIP offsets and ignores sub-visible moves", () => {
+    expect(flipOffset({ x: 0, y: 100 }, { x: 0, y: 40 })).toEqual({ dx: 0, dy: 60 });
+    expect(flipOffset({ x: 0, y: 100 }, { x: 0, y: 99 })).toBeNull();
+    expect(MAX_FLIP_ROWS).toBe(24);
+  });
+  it("reports rank movement (lower is better)", () => {
+    expect(rankChange(5, 3)).toEqual({ dir: "up", by: 2 });
+    expect(rankChange(2, 6)).toEqual({ dir: "down", by: 4 });
+    expect(rankChange(3, 3)).toBeNull();
+    expect(rankChange(null, 3)).toBeNull();
+  });
+  it("caps concurrent JS tweens and releases slots once", () => {
+    const held = Array.from({ length: MAX_CONCURRENT_TWEENS }, () => acquireTween());
+    expect(held.every(Boolean)).toBe(true);
+    expect(acquireTween()).toBeNull();
+    held[0]?.();
+    held[0]?.();
+    expect(activeTweenCount()).toBe(MAX_CONCURRENT_TWEENS - 1);
+    const again = acquireTween();
+    expect(again).not.toBeNull();
+    again?.();
+    held.slice(1).forEach((release) => release?.());
+    expect(activeTweenCount()).toBe(0);
+  });
+  it("has quick, tight press and settle springs", () => {
+    expect(SPRING.press.stiffness).toBeGreaterThan(SPRING.sheet.stiffness);
+  });
+});

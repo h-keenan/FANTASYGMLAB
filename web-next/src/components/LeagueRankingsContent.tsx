@@ -37,6 +37,7 @@ import { EmptyState } from "@/components/EmptyState";
 import { rankBoardAnchor } from "@/lib/insightLinks";
 import { PageTitle } from "@/components/PageTitle";
 import { SkeletonText } from "@/components/Skeleton";
+import { ProgressFill } from "@/components/Motion";
 
 /**
  * Ports app.py's "League Rankings" page (current_page == "rankings",
@@ -220,7 +221,7 @@ function YourStandingCard({ teams, myRosterId }: { teams: TeamRanking[]; myRoste
                 className="h-1.5 w-full"
                 style={{ background: "var(--color-surface-muted)" }}
               >
-                <div className="h-full" style={{ width: `${percentile === null ? 0 : Math.round(percentile)}%`, background: metricToneColor(percentile) }} />
+                <ProgressFill percent={percentile === null ? 0 : Math.round(percentile)} color={metricToneColor(percentile)} />
               </div>
             </div>
           );

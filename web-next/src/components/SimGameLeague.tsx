@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 import { AccentCard } from "@/components/AccentCard";
 import { Button } from "@/components/Button";
@@ -34,21 +34,27 @@ import {
   type SimStandingRow,
 } from "@/lib/simGame";
 import { PresenceSwap } from "@/components/ui/Presence";
+import { RankChip } from "@/components/Motion";
+import { useFlipList } from "@/lib/useFlipList";
 
 type View = "standings" | "scores" | "feed" | "teams" | "players";
 
 export function SimStandingsList({ rows, regularWeeks, playoffTeams }: { rows: SimStandingRow[]; regularWeeks?: number; playoffTeams?: number }) {
   const wide = useSimWide();
+  // Rows glide to their new rank when the order changes (after a week), and a row that moved shows an up/down chip.
+  const listRef = useRef<HTMLOListElement>(null);
+  useFlipList(listRef, rows.map((r) => r.team_id).join(","));
   if (!wide) {
     // Phone: one dense table-like row per team (rank, crest, name, streak, record) in a single card.
     return (
-      <ol className="glass-surface flex flex-col px-2" aria-label="Standings" data-reg-weeks={regularWeeks}>
+      <ol ref={listRef} className="glass-surface flex flex-col px-2" aria-label="Standings" data-reg-weeks={regularWeeks}>
         {rows.map((row, index) => {
           const inPlayoffs = index < (playoffTeams ?? 0);
           const label = simPlayoffStatusLabel(row.playoff_status);
           return (
             <li
               key={row.team_id}
+              data-flip-key={row.team_id}
               className="grid grid-cols-[1.25rem_minmax(0,1fr)_auto_auto] items-center gap-2"
               style={{
                 borderBottom: index === (playoffTeams ?? 0) - 1 ? "2px dashed var(--color-success)" : "var(--border-width-default) solid var(--color-border)",
@@ -56,7 +62,10 @@ export function SimStandingsList({ rows, regularWeeks, playoffTeams }: { rows: S
               }}
             >
               <span className="text-xs font-extrabold tabular-nums" style={{ color: inPlayoffs ? "color-mix(in srgb, var(--color-success) 78%, var(--color-text-primary))" : "var(--color-text-secondary)" }}>{row.rank ?? index + 1}</span>
-              <SimTeamLink teamId={row.team_id} name={row.name} isYou={row.is_you} size="chip" bold={row.is_you} />
+              <span className="flex min-w-0 items-center gap-1.5">
+                <SimTeamLink teamId={row.team_id} name={row.name} isYou={row.is_you} size="chip" bold={row.is_you} />
+                <RankChip rank={row.rank ?? index + 1} />
+              </span>
               <span className="text-xs font-bold tabular-nums" style={{ color: simToneInk(simStreakTone(row.streak ?? "")) }} title={label || undefined}>{row.streak ?? ""}</span>
               <span className="w-12 text-right text-sm font-bold tabular-nums">{simFmtRecord(row)}</span>
             </li>
@@ -66,14 +75,15 @@ export function SimStandingsList({ rows, regularWeeks, playoffTeams }: { rows: S
     );
   }
   return (
-    <ol className="flex flex-col gap-2" aria-label="Standings" data-reg-weeks={regularWeeks}>
+    <ol ref={listRef} className="flex flex-col gap-2" aria-label="Standings" data-reg-weeks={regularWeeks}>
       {rows.map((row, index) => (
-        <li key={row.team_id}>
+        <li key={row.team_id} data-flip-key={row.team_id}>
           <AccentCard accent={row.is_you ? "var(--color-accent)" : index < (playoffTeams ?? 0) ? "var(--color-success)" : "var(--color-border-strong)"} compact as="div">
             <div className="flex items-center justify-between gap-2">
               <span className="flex min-w-0 items-center gap-2">
                 <span className="text-sm font-extrabold w-5 shrink-0 tabular-nums" style={{ color: index < (playoffTeams ?? 0) ? "var(--color-success)" : "var(--color-text-muted)" }}>{row.rank ?? index + 1}</span>
                 <SimTeamLink teamId={row.team_id} name={row.name} isYou={row.is_you} size="row" />
+                <RankChip rank={row.rank ?? index + 1} />
               </span>
               <span className="flex items-center gap-2 shrink-0">
                 {simPlayoffStatusLabel(row.playoff_status) ? (

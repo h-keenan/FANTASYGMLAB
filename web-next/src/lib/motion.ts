@@ -99,3 +99,67 @@ export function confettiPieces(count = 24): { x: number; y: number; rotate: numb
     };
   });
 }
+
+// ---------------------------------------------------------------------------
+// Motion kit 2 (docs/ui-patterns.md, "Motion spec"): roles, progress, reorder, rank change, concurrency, springs.
+// ---------------------------------------------------------------------------
+
+/** The three roles every animation picks from (no new numbers): micro = a press or hover, standard = most state changes, emphasized = an entrance or a landing. */
+export const MOTION_ROLE = { micro: MOTION_MS.instant, standard: MOTION_MS.fast, emphasized: MOTION_MS.slow } as const;
+
+/** A progress fill grows over the emphasized duration. It animates `transform: scaleX`, never `width` (compositor-only). */
+export const PROGRESS_MS = MOTION_ROLE.emphasized;
+
+/** 0..1 scale of a progress fill from a 0..100 percent (NaN and out-of-range clamp). */
+export function progressScale(percent: number | null | undefined): number {
+  if (percent == null || Number.isNaN(percent)) return 0;
+  return Math.min(1, Math.max(0, percent / 100));
+}
+
+/** Rows reorder (FLIP) only up to this many; longer lists just jump (same cap as every other list animation). */
+export const MAX_FLIP_ROWS = MAX_ANIMATED_ROWS;
+
+/** The inverse offset a reordered row starts from (old position minus new), or null when it did not move enough to see. */
+export function flipOffset(from: { x: number; y: number }, to: { x: number; y: number }, minPx = 2): { dx: number; dy: number } | null {
+  const dx = from.x - to.x;
+  const dy = from.y - to.y;
+  if (Math.abs(dx) < minPx && Math.abs(dy) < minPx) return null;
+  return { dx, dy };
+}
+
+/** Rank movement for the "up 2" chip: lower rank number is better. Null for no change or a missing side. */
+export function rankChange(previous: number | null | undefined, next: number | null | undefined): { dir: "up" | "down"; by: number } | null {
+  if (previous == null || next == null || Number.isNaN(previous) || Number.isNaN(next) || previous === next) return null;
+  return next < previous ? { dir: "up", by: previous - next } : { dir: "down", by: next - previous };
+}
+
+/** How long a rank-change chip stays before it fades. */
+export const RANK_CHIP_MS = 2400;
+
+/**
+ * Performance cap: at most this many JS-driven (per-frame) animations run at once (number tweens, tick counts).
+ * Compositor-only animations (CSS transform/opacity, WAAPI, native-driver) are not counted.
+ */
+export const MAX_CONCURRENT_TWEENS = 12;
+let activeTweens = 0;
+/** Reserve a JS tween slot; returns a release function, or null when the cap is reached (the caller then just sets the value). */
+export function acquireTween(): (() => void) | null {
+  if (activeTweens >= MAX_CONCURRENT_TWEENS) return null;
+  activeTweens += 1;
+  let released = false;
+  return () => {
+    if (released) return;
+    released = true;
+    activeTweens -= 1;
+  };
+}
+export function activeTweenCount(): number {
+  return activeTweens;
+}
+
+/** App spring presets (react-native Animated.spring, native driver). Press and settle are quick and tight; sheet is the softer landing. Web never springs. */
+export const SPRING = {
+  press: { damping: 18, stiffness: 320, mass: 0.6 },
+  settle: { damping: 20, stiffness: 220, mass: 0.8 },
+  sheet: { damping: 26, stiffness: 180, mass: 1 },
+} as const;
