@@ -6,25 +6,25 @@ Classes: **1** on a shared template and compliant, **2** on a shared template wi
 
 | Platform | Templates | 1 compliant | 2 template + gaps | 3 one-off / legacy | Leaf pieces (not scored) | Total files |
 |---|---|---|---|---|---|---|
-| web | 32 | 23 | 29 | 37 | 166 | 287 |
-| app | 12 | 18 | 35 | 56 | 189 | 310 |
+| web | 33 | 25 | 29 | 37 | 167 | 291 |
+| app | 12 | 18 | 36 | 55 | 191 | 312 |
 
 ## Gap totals per column (modules where the rule applies and fails)
 
 | Rule | web | app |
 |---|---|---|
-| compact+expand | 37 | 56 |
-| PFPs | 61 | 51 |
-| names | 1 | 5 |
-| tappable | 55 | 51 |
+| compact+expand | 37 | 55 |
+| PFPs | 61 | 49 |
+| names | 0 | 4 |
+| tappable | 55 | 49 |
 | skeleton | 31 | 32 |
-| presence | 76 | 90 |
+| presence | 75 | 89 |
 | green $ | 1 | 3 |
 | gold=premium | 14 | 28 |
 | grades (Sim) | 0 | 0 |
-| chevron rule | 7 | 28 |
-| 44px | 0 | 14 |
-| web/app parity | 104 | 127 |
+| chevron rule | 6 | 27 |
+| 44px | 0 | 16 |
+| web/app parity | 106 | 127 |
 
 ## Ranked remaining work (top 10, recommended order; edit RANKED in the script)
 
@@ -41,15 +41,14 @@ Classes: **1** on a shared template and compliant, **2** on a shared template wi
 | 9 | App PlayerDetailScreen (1960 lines) | L | split into tabs/modules; PFP and gold gaps |
 | 10 | Sim tabs without CompactModule: SimGameLeague / SimGameTrades / SimGamePlayers / SimGameRecap | M | long uncollapsed lists (ui-pass-3 #9) |
 
-## Class 3: one-off / legacy (93)
+## Class 3: one-off / legacy (92)
 
 | Module | Platform | Lines | Effort | Gaps |
 |---|---|---|---|---|
-| `mobile/src/screens/PlayerDetailScreen.tsx` | app | 1960 | L | compact, pfp, gold, chevron |
-| `web-next/src/components/LeagueRecapsContent.tsx` | web | 1111 | L | compact, presence, chevron |
-| `mobile/src/screens/HomeScreen.tsx` | app | 1100 | L | compact, names, presence, gold, chevron |
-| `mobile/src/screens/MoreScreen.tsx` | app | 1007 | L | compact, pfp, tap, skeleton, presence, gold, chevron |
-| `mobile/src/screens/RecapScreen.tsx` | app | 968 | L | compact, pfp, tap, presence, gold, chevron |
+| `mobile/src/screens/PlayerDetailScreen.tsx` | app | 1958 | L | compact, pfp, gold, chevron |
+| `mobile/src/screens/HomeScreen.tsx` | app | 1102 | L | compact, names, presence, gold, chevron |
+| `mobile/src/screens/MoreScreen.tsx` | app | 1006 | L | compact, pfp, tap, skeleton, presence, gold, chevron |
+| `web-next/src/components/LeagueRecapsContent.tsx` | web | 881 | L | compact |
 | `mobile/src/screens/TeamsScreen.tsx` | app | 843 | L | compact, pfp, tap, presence, gold |
 | `mobile/src/screens/PortfolioScreen.tsx` | app | 780 | L | compact, pfp, gold |
 | `mobile/src/components/MultiTeamTradePanel.tsx` | app | 746 | L | compact, money |
@@ -120,7 +119,7 @@ Classes: **1** on a shared template and compliant, **2** on a shared template wi
 | `web-next/src/components/SimMoveStrip.tsx` | web | 129 | S | compact, presence |
 | `mobile/src/components/DirectionCheckinCard.tsx` | app | 128 | S | compact |
 | `mobile/src/components/RecapShareCard.tsx` | app | 128 | S | compact, pfp, tap |
-| `mobile/src/screens/FeaturesScreen.tsx` | app | 126 | S | compact, presence, gold, chevron |
+| `mobile/src/screens/FeaturesScreen.tsx` | app | 128 | S | compact, presence, gold, chevron |
 | `web-next/src/components/PremiumUpsellCard.tsx` | web | 126 | S | compact |
 | `mobile/src/components/PlayerTrendsPanel.tsx` | app | 124 | S | compact, presence |
 | `mobile/src/screens/CommunityScreen.tsx` | app | 122 | S | compact, presence |
@@ -139,7 +138,7 @@ Classes: **1** on a shared template and compliant, **2** on a shared template wi
 | `web-next/src/components/SinceLastVisitStrip.tsx` | web | 102 | S | compact |
 | `mobile/src/components/ModalFormCard.tsx` | app | 101 | S | compact |
 
-## Class 2: on a shared template, with gaps (64)
+## Class 2: on a shared template, with gaps (65)
 
 | Module | Platform | Lines | Gaps |
 |---|---|---|---|
@@ -152,13 +151,14 @@ Classes: **1** on a shared template and compliant, **2** on a shared template wi
 | `mobile/src/screens/GmPlanScreen.tsx` | app | 959 | skeleton, chevron |
 | `web-next/src/components/WaiversContent.tsx` | web | 910 | gold |
 | `web-next/src/components/GmPlanContent.tsx` | web | 875 | skeleton, gold, chevron |
-| `web-next/src/components/MatchupContent.tsx` | web | 860 | pfp |
+| `web-next/src/components/MatchupContent.tsx` | web | 858 | pfp |
 | `mobile/src/screens/MyTeamScreen.tsx` | app | 798 | gold, chevron |
 | `mobile/src/screens/TradeHubScreen.tsx` | app | 748 | pfp, tap, presence, gold |
 | `mobile/src/screens/LiveDraftScreen.tsx` | app | 745 | names, gold, target |
 | `mobile/src/components/TradeIdeaCard.tsx` | app | 705 | presence |
 | `mobile/src/screens/DraftCenterScreen.tsx` | app | 596 | pfp, tap, presence, chevron |
-| `web-next/src/components/LeagueRankingsContent.tsx` | web | 543 | pfp |
+| `mobile/src/screens/RecapScreen.tsx` | app | 558 | gold, target |
+| `web-next/src/components/LeagueRankingsContent.tsx` | web | 555 | pfp |
 | `web-next/src/components/TradeFinderContent.tsx` | web | 488 | skeleton |
 | `mobile/src/components/WaiverRecommendationCard.tsx` | app | 481 | target |
 | `mobile/src/screens/DesignScreen.tsx` | app | 462 | presence, gold |
@@ -183,9 +183,9 @@ Classes: **1** on a shared template and compliant, **2** on a shared template wi
 | `web-next/src/components/SimToControl.tsx` | web | 232 | pfp, tap |
 | `mobile/src/components/TeamStatusHero.tsx` | app | 227 | pfp, skeleton, chevron |
 | `mobile/src/components/SimGameOrb.tsx` | app | 208 | pfp, tap, presence |
+| `web-next/src/components/TradeHubContent.tsx` | web | 208 | pfp, tap, gold |
 | `mobile/src/components/MultiTeamIdeasSection.tsx` | app | 205 | pfp, tap |
 | `web-next/src/components/MultiTeamIdeasSection.tsx` | web | 205 | pfp, tap |
-| `web-next/src/components/TradeHubContent.tsx` | web | 205 | pfp, tap, gold |
 | `mobile/src/components/SimDraftOverview.tsx` | app | 190 | target |
 | `mobile/src/components/FilterSheet.tsx` | app | 185 | presence |
 | `web-next/src/components/SimRealism.tsx` | web | 183 | skeleton |
@@ -208,7 +208,7 @@ Classes: **1** on a shared template and compliant, **2** on a shared template wi
 | `web-next/src/components/SimSimSeasons.tsx` | web | 81 | pfp, tap |
 | `mobile/src/components/SimSimSeasons.tsx` | app | 76 | pfp, tap |
 
-## Class 1: shared template, compliant (41)
+## Class 1: shared template, compliant (43)
 
 | Module | Platform | Lines | Gaps |
 |---|---|---|---|
@@ -227,6 +227,7 @@ Classes: **1** on a shared template and compliant, **2** on a shared template wi
 | `web-next/src/components/SimGameTrades.tsx` | web | 528 | - |
 | `mobile/src/components/SimGameDraft.tsx` | app | 521 | - |
 | `web-next/src/components/SimGameDraft.tsx` | web | 505 | - |
+| `web-next/src/components/RecapWeekView.tsx` | web | 496 | - |
 | `mobile/src/components/SimRecapStory.tsx` | app | 460 | - |
 | `web-next/src/components/SimRecapStory.tsx` | web | 432 | - |
 | `web-next/src/components/MyTeamContent.tsx` | web | 429 | - |
@@ -244,6 +245,7 @@ Classes: **1** on a shared template and compliant, **2** on a shared template wi
 | `web-next/src/components/TradeOfferContent.tsx` | web | 166 | - |
 | `web-next/src/components/SimDraftOverview.tsx` | web | 164 | - |
 | `web-next/src/components/DashboardBlocks.tsx` | web | 157 | - |
+| `web-next/src/components/LeagueSwitcherSheet.tsx` | web | 152 | - |
 | `web-next/src/components/OpponentProfileCard.tsx` | web | 146 | - |
 | `mobile/src/components/OpponentProfileCard.tsx` | app | 144 | - |
 | `mobile/src/components/SimMoveStrip.tsx` | app | 132 | - |
@@ -325,6 +327,7 @@ Classes: **1** on a shared template and compliant, **2** on a shared template wi
 | `components/IdeaPosture.tsx` | a | no | - | - | - | - | - | - | - | ok | - | ok | ok | ok | L |
 | `components/Input.tsx` | a | no | - | - | - | - | - | - | - | ok | - | ok | ok | ok | L |
 | `components/InsightRow.tsx` | a | no | - | - | - | - | - | - | - | ok | - | **GAP** | ok | **GAP** | L |
+| `components/LeagueCrest.tsx` | a | no | - | - | - | - | - | - | - | ok | - | ok | ok | ok | L |
 | `components/LeaguePulseCard.tsx` | a | no | - | - | - | - | - | - | - | ok | - | **GAP** | ok | ok | L |
 | `components/LeaguesGlanceSection.tsx` | a | no | **GAP** | - | ok | - | ok | **GAP** | - | **GAP** | - | ok | ok | **GAP** | 3 |
 | `components/LeagueStandingStrips.tsx` | a | no | - | **GAP** | ok | **GAP** | - | - | - | ok | - | **GAP** | ok | **GAP** | L |
@@ -354,6 +357,7 @@ Classes: **1** on a shared template and compliant, **2** on a shared template wi
 | `components/MultiTeamTradeShareCard.tsx` | a | no | **GAP** | **GAP** | **GAP** | **GAP** | - | **GAP** | **GAP** | ok | - | ok | ok | **GAP** | 3 |
 | `components/NewsDigest.tsx` | a | yes | ok | ok | ok | ok | - | ok | - | ok | - | ok | ok | ok | 1 |
 | `components/NextSteps.tsx` | a | no | - | **GAP** | - | **GAP** | - | - | - | ok | - | ok | ok | ok | L |
+| `components/NoticeToast.tsx` | a | no | - | - | - | - | - | - | - | ok | - | ok | ok | **GAP** | L |
 | `components/NotificationControls.tsx` | a | no | - | - | - | - | **GAP** | **GAP** | - | ok | - | ok | ok | ok | L |
 | `components/OffseasonGlyph.tsx` | a | no | - | **GAP** | - | **GAP** | - | - | - | ok | - | ok | ok | ok | L |
 | `components/OnboardingAurora.tsx` | a | no | - | - | - | - | - | ok | - | ok | - | ok | ok | **GAP** | L |
@@ -379,6 +383,7 @@ Classes: **1** on a shared template and compliant, **2** on a shared template wi
 | `components/PlayerInsightRow.tsx` | a | no | - | **GAP** | ok | **GAP** | - | - | - | ok | - | **GAP** | ok | **GAP** | L |
 | `components/PlayerLeagueActions.tsx` | a | no | - | **GAP** | ok | **GAP** | **GAP** | **GAP** | - | ok | - | ok | ok | ok | L |
 | `components/PlayerListRow.tsx` | a | no | - | ok | ok | ok | - | ok | - | ok | - | ok | ok | ok | L |
+| `components/PlayerMetaLine.tsx` | a | no | - | - | - | - | - | - | - | ok | - | ok | ok | ok | L |
 | `components/PlayerName.tsx` | a | no | - | - | ok | - | - | - | - | ok | - | ok | ok | ok | L |
 | `components/PlayerNewsSection.tsx` | a | no | **GAP** | - | - | - | **GAP** | - | - | ok | - | ok | ok | **GAP** | 3 |
 | `components/PlayerOpenContext.tsx` | a | no | - | **GAP** | ok | ok | - | **GAP** | - | ok | - | ok | ok | ok | L |
@@ -408,7 +413,6 @@ Classes: **1** on a shared template and compliant, **2** on a shared template wi
 | `components/RecapReadyCard.tsx` | a | no | - | - | - | - | - | - | - | ok | - | **GAP** | ok | **GAP** | L |
 | `components/RecapShareCard.tsx` | a | no | **GAP** | **GAP** | - | **GAP** | - | - | - | ok | - | ok | ok | **GAP** | 3 |
 | `components/RecapSharePreviewModal.tsx` | a | no | - | **GAP** | - | **GAP** | - | **GAP** | - | ok | - | ok | ok | **GAP** | L |
-| `components/RecapTradeDetailModal.tsx` | a | no | - | **GAP** | **GAP** | **GAP** | - | - | - | ok | - | ok | ok | **GAP** | L |
 | `components/ReferralCard.tsx` | a | no | **GAP** | - | - | - | ok | - | - | ok | - | ok | ok | ok | 3 |
 | `components/RoundupPanel.tsx` | a | no | **GAP** | **GAP** | ok | ok | ok | - | - | ok | - | ok | ok | **GAP** | 3 |
 | `components/SampleDashboard.tsx` | a | no | - | - | - | - | - | **GAP** | - | ok | - | ok | ok | **GAP** | L |
@@ -434,7 +438,7 @@ Classes: **1** on a shared template and compliant, **2** on a shared template wi
 | `components/SimGameDraft.tsx` | a | yes | ok | ok | ok | ok | ok | ok | - | ok | ok | ok | ok | ok | 1 |
 | `components/SimGameDynasty.tsx` | a | no | - | - | - | - | - | ok | - | ok | ok | ok | ok | ok | L |
 | `components/SimGameDynastyParts.tsx` | a | yes | ok | ok | - | ok | - | ok | - | ok | ok | ok | ok | ok | 1 |
-| `components/SimGameHeader.tsx` | a | no | - | **GAP** | ok | **GAP** | - | **GAP** | - | ok | ok | ok | ok | ok | L |
+| `components/SimGameHeader.tsx` | a | no | - | **GAP** | ok | **GAP** | - | **GAP** | - | ok | ok | ok | **GAP** | ok | L |
 | `components/SimGameHome.tsx` | a | yes | ok | **GAP** | ok | ok | ok | ok | - | ok | ok | ok | **GAP** | ok | 2 |
 | `components/SimGameHomeCards.tsx` | a | yes | ok | ok | ok | ok | - | **GAP** | - | ok | ok | ok | ok | ok | 2 |
 | `components/SimGameLeague.tsx` | a | yes | ok | ok | ok | ok | ok | ok | - | ok | ok | ok | **GAP** | ok | 2 |
@@ -556,7 +560,7 @@ Classes: **1** on a shared template and compliant, **2** on a shared template wi
 | `screens/PlayoffOddsPanel.tsx` | a | no | **GAP** | **GAP** | - | **GAP** | ok | **GAP** | - | ok | - | ok | ok | **GAP** | 3 |
 | `screens/PortfolioScreen.tsx` | a | no | **GAP** | **GAP** | ok | ok | ok | ok | - | **GAP** | - | ok | ok | ok | 3 |
 | `screens/ProspectScoutingDetailScreen.tsx` | a | yes | ok | ok | ok | ok | **GAP** | **GAP** | - | **GAP** | - | ok | ok | **GAP** | 2 |
-| `screens/RecapScreen.tsx` | a | no | **GAP** | **GAP** | - | **GAP** | ok | **GAP** | - | **GAP** | - | **GAP** | ok | **GAP** | 3 |
+| `screens/RecapScreen.tsx` | a | yes | ok | ok | ok | ok | ok | ok | - | **GAP** | - | ok | **GAP** | **GAP** | 2 |
 | `screens/SampleLeagueScreen.tsx` | a | yes | ok | ok | ok | ok | - | ok | - | ok | - | ok | ok | ok | 1 |
 | `screens/TeamRosterScreen.tsx` | a | no | **GAP** | ok | ok | ok | ok | **GAP** | - | ok | - | ok | ok | **GAP** | 3 |
 | `screens/TeamsScreen.tsx` | a | no | **GAP** | **GAP** | - | **GAP** | ok | **GAP** | - | **GAP** | - | ok | ok | **GAP** | 3 |
@@ -627,11 +631,13 @@ Classes: **1** on a shared template and compliant, **2** on a shared template wi
 | `components/LandingAuthIsland.tsx` | w | no | - | **GAP** | - | **GAP** | **GAP** | **GAP** | - | ok | - | ok | ok | **GAP** | L |
 | `components/LandingScreens.tsx` | w | no | - | - | - | - | - | - | - | ok | - | ok | ok | **GAP** | L |
 | `components/LandingTrialHeadline.tsx` | w | no | - | - | - | - | - | - | - | ok | - | ok | ok | **GAP** | L |
+| `components/LeagueCrest.tsx` | w | no | - | - | - | - | - | **GAP** | - | ok | - | ok | ok | ok | L |
 | `components/LeagueLinkStep.tsx` | w | no | - | - | - | - | - | - | - | ok | - | ok | ok | **GAP** | L |
 | `components/LeaguePulseCard.tsx` | w | no | **GAP** | - | - | - | **GAP** | - | - | ok | - | ok | ok | ok | 3 |
 | `components/LeagueRankingsContent.tsx` | w | yes | ok | **GAP** | - | ok | ok | ok | - | ok | - | ok | ok | **GAP** | 2 |
-| `components/LeagueRecapsContent.tsx` | w | no | **GAP** | ok | ok | ok | ok | **GAP** | - | ok | - | **GAP** | ok | **GAP** | 3 |
+| `components/LeagueRecapsContent.tsx` | w | no | **GAP** | ok | ok | ok | ok | - | - | ok | - | ok | ok | **GAP** | 3 |
 | `components/LeagueRoundupTab.tsx` | w | no | **GAP** | **GAP** | ok | **GAP** | ok | - | - | **GAP** | - | ok | ok | **GAP** | 3 |
+| `components/LeagueSwitcherSheet.tsx` | w | yes | ok | - | - | - | ok | - | - | ok | - | ok | ok | **GAP** | 1 |
 | `components/LeagueWarmupProgress.tsx` | w | no | - | **GAP** | - | **GAP** | - | - | - | ok | - | ok | ok | ok | L |
 | `components/LeanBarMeter.tsx` | w | no | - | - | - | - | - | - | - | ok | - | ok | ok | **GAP** | L |
 | `components/LimitWall.tsx` | w | no | - | - | - | - | - | - | - | ok | - | ok | ok | ok | L |
@@ -710,6 +716,7 @@ Classes: **1** on a shared template and compliant, **2** on a shared template wi
 | `components/PublicPricingContent.tsx` | w | no | **GAP** | - | - | - | - | - | - | ok | - | ok | ok | **GAP** | 3 |
 | `components/RangeCompare.tsx` | w | no | - | **GAP** | ok | **GAP** | - | - | - | ok | - | ok | ok | ok | L |
 | `components/RatingHistoryChart.tsx` | w | no | - | - | - | - | - | - | - | ok | - | ok | ok | ok | L |
+| `components/RecapWeekView.tsx` | w | yes | ok | ok | ok | ok | ok | ok | - | ok | - | ok | ok | **GAP** | 1 |
 | `components/ReferralCard.tsx` | w | no | **GAP** | - | - | - | ok | **GAP** | - | ok | - | ok | ok | ok | 3 |
 | `components/RouteAnalytics.tsx` | w | no | - | - | - | - | - | - | - | ok | - | ok | ok | **GAP** | L |
 | `components/SampleLeagueBanner.tsx` | w | no | - | - | - | - | - | - | - | ok | - | ok | ok | ok | L |
@@ -722,7 +729,7 @@ Classes: **1** on a shared template and compliant, **2** on a shared template wi
 | `components/ShareToCommunityToggle.tsx` | w | no | - | **GAP** | ok | **GAP** | - | **GAP** | - | ok | - | ok | ok | ok | L |
 | `components/SheetHandle.tsx` | w | no | - | **GAP** | - | **GAP** | - | - | - | ok | - | ok | ok | **GAP** | L |
 | `components/ShellActionSlot.tsx` | w | no | - | - | - | - | - | - | - | ok | - | ok | ok | **GAP** | L |
-| `components/ShellHeader.tsx` | w | no | - | - | - | - | - | - | - | ok | - | ok | ok | **GAP** | L |
+| `components/ShellHeader.tsx` | w | no | - | - | - | - | - | ok | - | ok | - | ok | ok | **GAP** | L |
 | `components/SignInForm.tsx` | w | no | - | - | - | - | **GAP** | **GAP** | - | ok | - | ok | ok | **GAP** | L |
 | `components/SimAchievements.tsx` | w | yes | ok | **GAP** | ok | ok | - | ok | - | ok | ok | ok | ok | ok | 2 |
 | `components/SimActionBar.tsx` | w | no | - | **GAP** | - | **GAP** | - | **GAP** | - | ok | ok | ok | ok | ok | L |
@@ -730,14 +737,14 @@ Classes: **1** on a shared template and compliant, **2** on a shared template wi
 | `components/SimDraftBar.tsx` | w | no | - | ok | ok | ok | - | - | - | ok | ok | ok | ok | ok | L |
 | `components/SimDraftBoard.tsx` | w | no | **GAP** | ok | - | ok | ok | - | - | ok | ok | ok | ok | ok | 3 |
 | `components/SimDraftGlyphs.tsx` | w | no | - | - | - | - | - | - | - | ok | ok | ok | ok | **GAP** | L |
-| `components/SimDraftGrid.tsx` | w | no | - | ok | **GAP** | ok | - | - | - | ok | ok | ok | ok | ok | L |
+| `components/SimDraftGrid.tsx` | w | no | - | ok | ok | ok | - | - | - | ok | ok | ok | ok | ok | L |
 | `components/SimDraftHero.tsx` | w | no | - | ok | ok | ok | **GAP** | - | - | ok | ok | ok | ok | ok | L |
 | `components/SimDraftOverview.tsx` | w | yes | ok | ok | - | ok | - | ok | - | ok | ok | ok | ok | ok | 1 |
 | `components/SimGameContent.tsx` | w | yes | ok | **GAP** | ok | ok | **GAP** | ok | - | ok | ok | ok | ok | **GAP** | 2 |
 | `components/SimGameDraft.tsx` | w | yes | ok | ok | ok | ok | ok | ok | - | ok | ok | ok | ok | ok | 1 |
 | `components/SimGameDynasty.tsx` | w | no | - | - | - | - | - | ok | - | ok | ok | ok | ok | ok | L |
 | `components/SimGameDynastyParts.tsx` | w | yes | ok | ok | - | ok | - | ok | - | ok | ok | ok | ok | ok | 1 |
-| `components/SimGameHeader.tsx` | w | no | - | **GAP** | ok | **GAP** | - | **GAP** | - | ok | ok | ok | ok | ok | L |
+| `components/SimGameHeader.tsx` | w | no | - | **GAP** | ok | **GAP** | - | ok | - | ok | ok | ok | ok | ok | L |
 | `components/SimGameHome.tsx` | w | yes | ok | **GAP** | ok | ok | **GAP** | ok | - | ok | ok | ok | ok | ok | 2 |
 | `components/SimGameHomeCards.tsx` | w | yes | ok | ok | ok | ok | - | **GAP** | - | ok | ok | ok | ok | ok | 2 |
 | `components/SimGameLeague.tsx` | w | yes | ok | ok | ok | ok | ok | ok | - | ok | ok | ok | ok | ok | 1 |
@@ -828,6 +835,7 @@ Classes: **1** on a shared template and compliant, **2** on a shared template wi
 | `components/ui/PlayerAccordionRow.tsx` | w | self | ok | ok | ok | ok | ok | ok | - | ok | - | ok | ok | ok | T |
 | `components/ui/PlayerAvatarSlot.tsx` | w | self | ok | ok | ok | ok | - | - | - | ok | - | ok | ok | ok | T |
 | `components/ui/PlayerBadge.tsx` | w | self | ok | **GAP** | - | **GAP** | - | **GAP** | - | ok | - | ok | ok | ok | T |
+| `components/ui/PlayerMetaLine.tsx` | w | self | ok | - | - | - | - | - | - | ok | - | ok | ok | ok | T |
 | `components/ui/PlayerOpenContext.tsx` | w | self | ok | **GAP** | ok | ok | - | **GAP** | - | ok | - | ok | ok | ok | T |
 | `components/ui/Presence.tsx` | w | self | ok | - | - | - | - | ok | - | ok | - | ok | ok | ok | T |
 | `components/ui/RankRow.tsx` | w | self | ok | ok | - | ok | - | - | - | ok | - | ok | ok | ok | T |
