@@ -74,6 +74,12 @@ export type PlayerAccordionRowProps = PlayerFactsInput & {
    * list: the rule is that the avatar and name open the quick view and the rest of the row expands in place.
    */
   nonInteractive?: string;
+  /**
+   * Selection mode (Trade Finder, UI pass 5 D9): a leading check, `aria-pressed` instead of `aria-expanded`, and the whole row
+   * toggles the selection (`onToggle`). Needs `nonInteractive` (the row is one toggle, avatar and name do not open a sheet) and
+   * is never combined with an expanded body.
+   */
+  selected?: boolean;
   /** A short sentence under the meta line (News: the headline), wrapping to two lines. Names never take this slot. */
   headline?: string | null;
 };
@@ -87,7 +93,7 @@ export type PlayerAccordionRowProps = PlayerFactsInput & {
  * figure, padding) expands the row. The expand control is a full-row button under the content; the avatar and name
  * sit above it. Mobile twin: components/PlayerAccordionRow.tsx; logic: lib/playerAnatomy.ts.
  */
-export function PlayerAccordionRow({ open, onToggle, badges = [], positionLabel, primaryAction, onOpenProfile, children, testId = "player-accordion-row", ariaLabel, gradeTile, metaParts, hidePosition = false, trailingAction, headline, onOpenPlayer, nonInteractive, ...input }: PlayerAccordionRowProps) {
+export function PlayerAccordionRow({ open, onToggle, badges = [], positionLabel, primaryAction, onOpenProfile, children, testId = "player-accordion-row", ariaLabel, gradeTile, metaParts, hidePosition = false, trailingAction, headline, onOpenPlayer, nonInteractive, selected, ...input }: PlayerAccordionRowProps) {
   const { player } = input;
   const model = playerRowModel(input);
   const split = !nonInteractive && canOpenPlayer(player);
@@ -107,7 +113,7 @@ export function PlayerAccordionRow({ open, onToggle, badges = [], positionLabel,
               padding: "0.25rem 0.5rem 0.625rem",
               margin: "0.25rem 0",
             }
-          : { borderBottom: "1px solid color-mix(in srgb, var(--color-border) 55%, transparent)", padding: "0.125rem 0.5rem" }
+          : { borderBottom: "1px solid color-mix(in srgb, var(--color-border) 55%, transparent)", padding: "0.125rem 0.5rem", background: selected ? "var(--surface-selected)" : undefined }
       }
     >
       <div className="flex min-w-0 items-center gap-1.5">
@@ -149,11 +155,29 @@ export function PlayerAccordionRow({ open, onToggle, badges = [], positionLabel,
         <button
             type="button"
             onClick={onToggle}
-            aria-expanded={open}
+            aria-expanded={selected === undefined ? open : undefined}
+            aria-pressed={selected}
             aria-label={ariaLabel}
             className="flex min-w-0 flex-1 items-center gap-2.5 text-left"
             style={{ minHeight: "var(--touch-target-min)" }}
           >
+            {selected === undefined ? null : (
+              <span
+                aria-hidden="true"
+                data-testid="row-check"
+                className="inline-flex shrink-0 items-center justify-center text-xs font-extrabold"
+                style={{
+                  width: 22,
+                  height: 22,
+                  borderRadius: 6,
+                  border: `2px solid ${selected ? "var(--color-accent-strong)" : "var(--color-border-strong)"}`,
+                  background: selected ? "var(--color-accent-strong)" : "transparent",
+                  color: "var(--color-on-accent)",
+                }}
+              >
+                {selected ? "✓" : ""}
+              </span>
+            )}
             <PlayerAvatarSlot player={player} tier="row" nonInteractive="the whole row button expands the row, no player tap" />
             <span className="flex min-w-0 flex-1 flex-col">
               <span className="flex min-w-0 flex-wrap items-center gap-x-1.5 gap-y-0.5">

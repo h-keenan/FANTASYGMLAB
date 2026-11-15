@@ -10,7 +10,6 @@ import { useEffect, useMemo, useState } from "react";
 import type { WaiverTab } from "@/lib/pageTabs";
 
 import { api, type WaiverPlayer, type WaiverPriorityAdd, type WaiversResponse } from "@/lib/api";
-import { BeginnerHelp } from "@/components/BeginnerHelp";
 import { PageTitle } from "@/components/PageTitle";
 import { AccentCard } from "@/components/AccentCard";
 import { abbreviatePlayerName } from "@/lib/formatPlayerName";
@@ -255,11 +254,9 @@ function TopWaiverTargetCard({ player }: { player: WaiverPriorityAdd }) {
           </p>
         ) : null}
         {player.drop_suggestion ? <SuggestedDrop suggestion={player.drop_suggestion} /> : null}
-        <BeginnerHelp label="waiver value" term="waiverValue" />
         {player.confidence_label ? (
           <ConfidenceMeter label="Confidence" value={player.confidence_label} color={confidenceColor(player.confidence_label)} />
         ) : null}
-        {player.confidence_label ? <BeginnerHelp label="waiver confidence" term="waiverConfidence" /> : null}
       </CompactModule>
     </div>
   );
@@ -605,6 +602,8 @@ export function WaiversContent({
     copy.help("waiversIntro"),
     data.faab_enabled !== false ? copy.help("faab") : null,
     copy.isBeginner ? copy.help("averageWireValue") : null,
+    copy.help("waiverValue"),
+    copy.help("waiverConfidence"),
   ].filter((line): line is string => Boolean(line));
   const helpInfo =
     helpLines.length > 0 ? (

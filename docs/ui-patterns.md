@@ -1308,3 +1308,8 @@ One rule for every player / team row, web and app:
 - `module_scan.mjs` with `GUARD=1`: every Desk page (Today, Team, Trades, League, Matchup, Waivers, Players, Trade Finder / Analyzer, GM Plan, Games, Recaps, Draft Center, sample league) and its first opened player row, same widths (`LARGE=1` for large text).
 
 Run both with `npm run guard:layout` from `web-next/` (or `scripts/run_layout_guard.sh`: starts the dev server on a free port with dummy env, runs the three passes, stops it; needs Playwright via `PW_CORE`, and `BROWSER=chromium CHROME=<path>` picks the browser; each driver also runs alone against a dev server, see its header). Exit code 1 on any violation, with every violation listed (kind, element, text, where), so it can sit in CI next to the unit tests.
+
+## UI pass 5 (D): page help in the header, Trade Finder on the player row
+
+- **D3**: a page's explainer is one "?" in the header (`PageTitle info`), built with `usePageHelp(lines)` (`components/PageHelpLines.tsx`, respects the account's help level). The labelled inline `BeginnerHelp` rows on My Team, Matchup, League Rankings and Waivers ("? this matchup page", "? playoff odds", "? waiver value" ...) are gone; their lines are in the popover. App: it never had the labelled orphan rows (its `BeginnerHelp` is plain explanatory text), so no app change.
+- **D9**: the Trade Finder roster row is `PlayerAccordionRow` in selection mode (`selected` prop: leading check, `aria-pressed`, the whole row toggles, `nonInteractive`), showing TEAM · OVR in the meta line and Value at the right. App: `PlayerAccordionRow` inside the existing checkbox `SelectableRow`.

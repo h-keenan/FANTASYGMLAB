@@ -1,6 +1,5 @@
 import { EmptyState } from "@/components/EmptyState";
-import { PlayerIdentity } from "@/components/PlayerRow";
-import { ValueStat } from "@/components/ValueStat";
+import { PlayerAccordionRow } from "@/components/ui/PlayerAccordionRow";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import {
@@ -12,7 +11,6 @@ import {
   type TradeFinderClosestIdea,
   type TradeFinderSearch,
 } from "@/lib/api";
-import { OvrGauge } from "@/components/OvrGauge";
 import { PillRow } from "@/components/PillRow";
 import { CompactModule } from "@/components/ui/CompactModule";
 import { abbreviatePlayerName } from "@/lib/formatPlayerName";
@@ -153,41 +151,21 @@ function RosterPickRow({
   selected: boolean;
   onToggle: () => void;
 }) {
-  // Deliberately NOT wrapped in PlayerIdentityTrigger: this entire row's
-  // one job is a selection toggle (clicking the name/badges IS "select this
-  // player for the search", an existing, tested contract), so a tap-to-
-  // open-quick-view here would silently change what clicking a player's
-  // name does on this one page instead of adding a new capability — the
-  // same kind of surface-specific judgment call this file's own "quick-
-  // view/full-detail split" comments already make elsewhere. The OVR badge
-  // is intentionally skipped as a "safe" alternate tap target too: a
-  // second, inconsistent meaning for the same badge on one page vs. every
-  // other page would be a worse outcome than leaving this one row as a
-  // pure selection control, unlike every other page's identity rows.
+  // The approved player row (UI pass 5 D9, coridian_ 2026-11-14) in selection mode: leading check, avatar, J. Surname, position
+  // badge, TEAM . OVR, Value at the right. The whole row is the selection toggle (an existing, tested contract), so it is
+  // `nonInteractive`: the avatar and name do not open the quick view here, same judgment call as before.
   return (
-    <button
-      type="button"
-      onClick={onToggle}
-      aria-pressed={selected}
-      className="w-full flex flex-wrap items-center gap-x-3 gap-y-1 py-2 px-2 min-h-[var(--touch-target-min)] text-left"
-      style={selectableRowStyle(selected)}
-    >
-      <SelectionCheck selected={selected} />
-      <PlayerIdentity
-        playerId={player.player_id}
-        name={player.name || "Unknown player"}
-        position={player.position}
-        tier={player.tier}
-        injuryStatus={player.injury_label}
-        className="flex-1 min-w-[13rem]"
-      >
-        {player.team || "FA"}
-      </PlayerIdentity>
-      <div className="flex items-center gap-2 shrink-0">
-        <OvrGauge rating={player.overall_rating} size="sm" />
-        <ValueStat value={player.score != null ? Math.round(player.score) : "—"} />
-      </div>
-    </button>
+    <PlayerAccordionRow
+      player={{ id: player.player_id, name: player.name || "Unknown player", position: player.position, team: player.team, tier: player.tier }}
+      mode="desk"
+      metaText={[player.team || "FA", player.overall_rating != null ? `OVR ${Math.round(player.overall_rating)}` : null, player.injury_label || null].filter(Boolean).join(" · ")}
+      trailingFact={{ key: "value", label: "VALUE", value: player.score != null ? Math.round(player.score).toLocaleString() : "—" }}
+      open={false}
+      selected={selected}
+      onToggle={onToggle}
+      nonInteractive="the whole row toggles the Trade Finder selection"
+      testId="trade-finder-roster-row"
+    />
   );
 }
 
