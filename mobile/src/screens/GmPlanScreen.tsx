@@ -1,4 +1,6 @@
 import { useUndoableRemoval } from '../components/UndoToast';
+import ModuleMore from '../components/ModuleMore';
+import Button from '../components/Button';
 import type { TabIconName } from '../lib/tabIcons';
 import FreeLimitNote from '../components/FreeLimitNote';
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
@@ -32,7 +34,7 @@ import { PLAIN_COPY } from '../lib/experienceCopy';
 import PremiumLock from '../components/PremiumLock';
 import SectionHeading from '../components/SectionHeading';
 import SegmentedTabBar from '../components/SegmentedTabBar';
-import SkeletonBlock, { SkeletonCard, SkeletonRows } from '../components/SkeletonBlock';
+import SkeletonBlock, { SkeletonCard, SkeletonRows } from '../components/Skeleton';
 import SharedTradeIdeaCard from '../components/TradeIdeaCard';
 import ExchangeSide from '../components/ExchangeSide';
 import {
@@ -396,12 +398,6 @@ export default function GmPlanScreen({ route, navigation }: Props) {
     </PressableScale>
   );
 
-  const link = (label: string, onPress: () => void) => (
-    <PressableScale accessibilityRole="button" onPress={onPress} hitSlop={LINK_HIT_SLOP}>
-      <AppText style={styles.link}>{label}</AppText>
-    </PressableScale>
-  );
-
   return (
     <View style={[styles.container, { paddingTop: headerHeight }]}>
       <GridBackground />
@@ -487,13 +483,13 @@ export default function GmPlanScreen({ route, navigation }: Props) {
                 id="gmplan.snapshot"
                 title="Plan Snapshot"
                 parts={statStripParts(snapshot.map((tile) => ({ label: SNAPSHOT_SHORT[tile.key] ?? tile.label, value: tile.value })), 4)}
-                action={link('Full analysis', () => navigation.navigate('MyTeam', { leagueId, leagueName }))}
               >
                 <View style={styles.grid}>
                   {snapshot.map((tile) => (
                     <SnapshotCell key={tile.key} tile={tile} styles={styles} colors={colors} />
                   ))}
                 </View>
+                <ModuleMore label="Full analysis" onPress={() => navigation.navigate('MyTeam', { leagueId, leagueName })} />
               </CompactModule>
             ) : null}
 
@@ -506,8 +502,9 @@ export default function GmPlanScreen({ route, navigation }: Props) {
               </AnimatedCard>
             ) : null}
 
-            <CompactModule id="gmplan.overview.trades" title="Trade ideas" parts={tradeIdeasParts()} action={link('View all', openTradeHub)} defaultOpen>
+            <CompactModule id="gmplan.overview.trades" title="Trade ideas" parts={tradeIdeasParts()} defaultOpen>
               {tradeCards(2)}
+              <ModuleMore label="View all trade ideas" onPress={openTradeHub} />
             </CompactModule>
 
             {roster.length > 0 ? (
@@ -523,7 +520,6 @@ export default function GmPlanScreen({ route, navigation }: Props) {
                     otherRows.length > 0 ? `${otherRows.length} more on your roster` : null,
                   ],
                 })}
-                action={link('View all', () => setTab('core'))}
               >
                 {protectedRows.length > 0 ? (
                   <AnimatedCard style={styles.listCard}>
@@ -531,6 +527,7 @@ export default function GmPlanScreen({ route, navigation }: Props) {
                   </AnimatedCard>
                 ) : null}
                 {otherRows.length > 0 ? rosterLine : null}
+                <ModuleMore label="View protected core" onPress={() => setTab('core')} />
               </CompactModule>
             ) : null}
 
@@ -548,8 +545,9 @@ export default function GmPlanScreen({ route, navigation }: Props) {
 
         {tab === 'trades' ? (
           <>
-            <CompactModule id="gmplan.trades.ideas" title="Trade ideas" parts={tradeIdeasParts()} action={link('View all', openTradeHub)} defaultOpen>
+            <CompactModule id="gmplan.trades.ideas" title="Trade ideas" parts={tradeIdeasParts()} defaultOpen>
               {tradeCards()}
+              <ModuleMore label="View all trade ideas" onPress={openTradeHub} />
             </CompactModule>
             {!gateNotice ? otherAreas.map((area) => <FocusAreaSection key={area.key} focusArea={area} />) : null}
           </>
@@ -638,19 +636,15 @@ export default function GmPlanScreen({ route, navigation }: Props) {
                         <OverallRatingBadge rating={player?.overall_rating} positionRank={player?.position_rank} />
                       </View>
                       <View style={styles.actions}>
-                        <PressableScale accessibilityRole="button"
-                          style={styles.action}
+                        <Button
+                          variant="accentOutline"
+                          size="sm"
+                          label="Compare"
                           disabled={!player}
                           onPress={() => player && navigation.navigate('PlayerCompare', { player, leagueId, leagueName })}
-                        >
-                          <AppText style={styles.actionText}>Compare</AppText>
-                        </PressableScale>
-                        <PressableScale accessibilityRole="button" style={styles.action} onPress={() => onToggleProtect(target.player_id, true)}>
-                          <AppText style={styles.actionText}>Mark untouchable</AppText>
-                        </PressableScale>
-                        <PressableScale accessibilityRole="button" style={[styles.action, styles.actionDanger]} onPress={() => onRemoveTarget(target.player_id)}>
-                          <AppText style={[styles.actionText, { color: colors.danger }]}>Remove</AppText>
-                        </PressableScale>
+                        />
+                        <Button variant="accentOutline" size="sm" label="Mark untouchable" onPress={() => onToggleProtect(target.player_id, true)} />
+                        <Button variant="dangerOutline" size="sm" label="Remove" onPress={() => onRemoveTarget(target.player_id)} />
                       </View>
                     </AnimatedCard>
                   );
@@ -757,9 +751,7 @@ function TradeIdeaCard({ item, onViewDetails }: { item: GmPlanTradeItem; onViewD
         <AppText style={[styles.caption, styles.flex]}>
           {showExplanations ? item.rationale || item.trade_confidence_label : item.trade_confidence_label}
         </AppText>
-        <PressableScale accessibilityRole="button" style={styles.action} onPress={onViewDetails}>
-          <AppText style={styles.actionText}>View details</AppText>
-        </PressableScale>
+        <Button variant="accentOutline" size="sm" label="View details" onPress={onViewDetails} />
       </View>
     </CompactModule>
   );
@@ -858,7 +850,7 @@ function stanceLook(
 ): { color: string; icon: keyof typeof Ionicons.glyphMap; tagline: string; help: 'stanceRebuilding' | 'stanceCompeting' | 'stanceBalanced' } {
   if (stance === 'rebuilding') return { color: colors.accent, icon: 'leaf-outline', tagline: 'Youth + picks', help: 'stanceRebuilding' };
   if (stance === 'competing') return { color: colors.success, icon: 'trophy-outline', tagline: 'Win now', help: 'stanceCompeting' };
-  return { color: colors.premium, icon: 'scale-outline', tagline: 'Both ways', help: 'stanceBalanced' };
+  return { color: colors.accent, icon: 'scale-outline', tagline: 'Both ways', help: 'stanceBalanced' };
 }
 
 function createStyles(colors: ThemeColors) {
@@ -872,7 +864,7 @@ function createStyles(colors: ThemeColors) {
     flex: { flex: 1 },
     hero: { marginBottom: spacing.lg, gap: spacing.xs },
     quietText: { fontSize: 15.5, color: colors.textSecondary, lineHeight: 22 },
-    phaseLabel: { fontSize: 12.5, fontWeight: '700', letterSpacing: 0.6, color: colors.premium },
+    phaseLabel: { fontSize: 12.5, fontWeight: '700', letterSpacing: 0.6, color: colors.accent },
     headline: { fontSize: 17, fontWeight: '700', color: colors.textPrimary, lineHeight: 23 },
     caption: { fontSize: 13.5, color: colors.textSecondary },
     link: { fontSize: 13.5, fontWeight: '700', color: colors.accent },
@@ -928,16 +920,6 @@ function createStyles(colors: ThemeColors) {
     tradeTitle: { flex: 1, fontSize: 17, fontWeight: '800', color: colors.textPrimary },
     gain: { fontSize: 16.5, fontWeight: '800' },
     tradeFooter: { flexDirection: 'row', alignItems: 'flex-end', gap: spacing.sm },
-    action: {
-      paddingHorizontal: spacing.md,
-      paddingVertical: spacing.sm,
-      borderRadius: radii.sm,
-      borderWidth: 1,
-      borderColor: colors.accent,
-      alignItems: 'center',
-    },
-    actionText: { fontSize: 13.5, fontWeight: '700', color: colors.accent },
-    actionDanger: { borderColor: colors.danger },
     section: { marginBottom: spacing.lg },
     listCard: { paddingVertical: spacing.xs, marginBottom: spacing.sm },
     row: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
@@ -952,7 +934,7 @@ function createStyles(colors: ThemeColors) {
       minWidth: 78,
       alignItems: 'center',
     },
-    tagActive: { backgroundColor: colors.premium, borderColor: colors.premium },
+    tagActive: { backgroundColor: colors.accent, borderColor: colors.accent },
     tagText: { fontSize: 13.5, fontWeight: '700', color: colors.textSecondary },
     tagTextActive: { color: colors.background },
     moreRow: {

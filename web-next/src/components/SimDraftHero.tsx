@@ -122,7 +122,7 @@ export function SimDraftHero({
                   style={{ height: 44, minWidth: 128, borderRadius: "var(--radius-control)", background: "var(--color-surface-muted)", opacity: player ? 1 : 0.5 }}
                   aria-label={player ? `Best available ${pos}: ${player.name}` : `No ${pos} left`}
                 >
-                  {player ? <PlayerAvatarSlot player={simPlayerAnatomyRef(player)} tier="dense" /> : null}
+                  {player ? <PlayerAvatarSlot player={simPlayerAnatomyRef(player)} tier="dense" nonInteractive="the pick button around it opens the player" /> : null}
                   <PositionBadge position={pos} />
                   <span className="flex min-w-0 flex-col leading-tight">
                     {player ? <PlayerName name={player.name} className="text-xs font-bold" /> : <span className="text-xs font-bold">-</span>}

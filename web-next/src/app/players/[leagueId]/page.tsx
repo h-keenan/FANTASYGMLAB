@@ -71,7 +71,7 @@ export default function PlayersPage() {
 
   if (authLoading || (!data && !error)) {
     return (
-      <LoadingScreen status="Loading Players…" />
+      <LoadingScreen label="Players" layout="list" family="team" />
     );
   }
 

@@ -103,7 +103,7 @@ export default function DraftCenterPage() {
 
   if (authLoading || (!draftCenter && !error)) {
     return (
-      <LoadingScreen status="Loading Draft Center…" />
+      <LoadingScreen label="Draft Center" layout="list" />
     );
   }
 

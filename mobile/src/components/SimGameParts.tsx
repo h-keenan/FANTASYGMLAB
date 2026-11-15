@@ -1,3 +1,5 @@
+import { TapScopeContext, type PickTapRef } from './PlayerOpenContext';
+import PressableScale from './PressableScale';
 import React, { createContext, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { AccessibilityInfo, Animated, Pressable, StyleSheet, View, type StyleProp, type ViewStyle } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
@@ -75,6 +77,8 @@ export interface SimCtx {
   openPlayer: (player: SimGamePlayer) => void;
   /** Open any team's scouting sheet (roster, record, strengths and needs). */
   openTeam: (teamId: string) => void;
+  /** Opens the pick detail sheet (a tapped pick anywhere in the game). */
+  openPick: (pick: PickTapRef) => void;
 }
 
 /** Shared status pill tinted from a presentation tone. */
@@ -188,6 +192,7 @@ export function SimPlayerChip({
   hidePosition = false,
   onOpen,
   quick = false,
+  nonInteractive,
 }: {
   player: SimPlayerRef;
   size?: number;
@@ -199,11 +204,15 @@ export function SimPlayerChip({
   onOpen?: (player: SimGamePlayer) => void;
   /** Make the chip tappable with the shared default: the game's player detail (the shared Player Quick View fed by the sim row). */
   quick?: boolean;
+  /** Opt out of the default tap (reason sentence): only where the chip sits inside another Pressable that already opens or does something. */
+  nonInteractive?: string;
 }) {
   const { colors } = useThemeMode();
   const styles = useMemo(() => createStyles(colors), [colors]);
   const openSheet = useContext(SimOpenPlayerContext);
-  const handler = onOpen ?? (quick ? openSheet : null);
+  const inScope = useContext(TapScopeContext);
+  // Tappable by default whenever the sim provides the opener (the standing "every player is tappable" rule).
+  const handler = nonInteractive || inScope ? null : onOpen ?? openSheet;
   const body = (
     <View style={[styles.identity, muted && styles.muted]}>
       <PlayerAvatar playerId={simHeadshotId(player)} fallbackLabel={simPlayerInitials(player)} size={size} />
@@ -222,9 +231,9 @@ export function SimPlayerChip({
   );
   if (!handler) return body;
   return (
-    <Pressable onPress={() => handler(player as SimGamePlayer)} accessibilityRole="button" accessibilityLabel={`${player.name}, ${player.pos}. Open player details`}>
-      {body}
-    </Pressable>
+    <PressableScale onPress={() => handler(player as SimGamePlayer)} accessibilityRole="button" accessibilityLabel={`${player.name}, ${player.pos}. Open player details`} style={{ minHeight: 44, justifyContent: 'center' }}>
+      <TapScopeContext.Provider value>{body}</TapScopeContext.Provider>
+    </PressableScale>
   );
 }
 
@@ -597,6 +606,14 @@ function createStyles(colors: ThemeColors) {
 // ---------------------------------------------------------------------------
 // Color and glyph building blocks shared by every game screen (mirrors web)
 
+/**
+ * A minimal sim player from a shared-template player ref (id, name, position, team, age, photo id). The player sheet
+ * fetches the full detail by id, so a trade asset, a recap row or a draft cell can open it without holding the whole row.
+ */
+export function simPlayerFromRef(ref: { id?: string | null; name: string; position?: string | null; team?: string | null; age?: number | null; headshotId?: string | null }): SimGamePlayer {
+  return { id: String(ref.id ?? ''), name: ref.name, pos: (ref.position ?? 'WR') as SimGamePlayer['pos'], team: ref.team ?? null, age: ref.age ?? null, headshot_id: ref.headshotId ?? null, adp: null, projection: 0 } as SimGamePlayer;
+}
+
 /** Opens the team scouting sheet. Provided once by the game screen; a team link outside it is plain text. */
 /** Opens the game's own player detail; provided once by the game screen so a chip can use it. */
 export const SimOpenPlayerContext = createContext<((player: SimGamePlayer) => void) | null>(null);
@@ -750,7 +767,10 @@ export function SimMiniPlayer({
   align = 'left',
   onOpen,
   size = 28,
+  nonInteractive,
 }: {
+  /** Opt out of the default tap (reason sentence): only inside another Pressable that already does something. */
+  nonInteractive?: string;
   /** @deprecated Names never wrap: they shorten to "F. Lastname" when tight (PlayerName). */
   wrap?: boolean;
   player: SimGamePlayer;
@@ -760,6 +780,9 @@ export function SimMiniPlayer({
 }) {
   const { colors } = useThemeMode();
   const styles = useMemo(() => createStyles(colors), [colors]);
+  const openSheet = useContext(SimOpenPlayerContext);
+  const inScope = useContext(TapScopeContext);
+  const handler = nonInteractive || inScope ? null : onOpen ?? openSheet;
   const hurt = player.status === 'out';
   const bye = player.status === 'bye';
   const body = (
@@ -779,10 +802,10 @@ export function SimMiniPlayer({
       </View>
     </View>
   );
-  if (!onOpen) return body;
+  if (!handler) return body;
   return (
-    <Pressable onPress={() => onOpen(player)} accessibilityRole="button" accessibilityLabel={`${player.name}, ${player.pos}. Open player details`} style={styles.miniPress}>
-      {body}
-    </Pressable>
+    <PressableScale onPress={() => handler(player)} accessibilityRole="button" accessibilityLabel={`${player.name}, ${player.pos}. Open player details`} style={[styles.miniPress, { minHeight: 44, justifyContent: 'center' }]}>
+      <TapScopeContext.Provider value>{body}</TapScopeContext.Provider>
+    </PressableScale>
   );
 }

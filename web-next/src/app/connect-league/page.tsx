@@ -41,7 +41,7 @@ export default function ConnectLeaguePage() {
   }, [loading, session, router]);
 
   if (loading || !session) {
-    return <LoadingScreen />;
+    return <LoadingScreen label="your leagues" />;
   }
 
   return (

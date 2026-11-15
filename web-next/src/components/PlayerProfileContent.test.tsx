@@ -147,7 +147,7 @@ describe("PlayerProfileContent", () => {
     render(<PlayerProfileContent player={player()} leagueId="league-1" leagueName="My League" />);
 
     expect(screen.getByText("Player One")).toBeInTheDocument();
-    expect(screen.getByText(/Loading player profile/)).toBeInTheDocument();
+    expect(screen.getByRole("status", { name: /Loading player profile/ })).toBeInTheDocument();
   });
 
   it("opens on the News tab from ?tab=news and lists the player's stories", async () => {
@@ -182,7 +182,7 @@ describe("PlayerProfileContent", () => {
     vi.mocked(api.getPlayerAwards).mockResolvedValue(awardsResult());
 
     render(<PlayerProfileContent player={player()} leagueId="league-1" leagueName="My League" />);
-    await waitFor(() => expect(screen.queryByText(/Loading player profile/)).not.toBeInTheDocument());
+    await waitFor(() => expect(screen.queryByRole("status", { name: /Loading player profile/ })).not.toBeInTheDocument());
 
     expect(screen.getByText("Targets")).toBeInTheDocument();
     expect(screen.getByText("140")).toBeInTheDocument();
@@ -197,10 +197,10 @@ describe("PlayerProfileContent", () => {
     vi.mocked(api.getPlayerWeeklyStats).mockReturnValue(new Promise(() => {}));
 
     render(<PlayerProfileContent player={player()} leagueId="league-1" leagueName="My League" />);
-    await waitFor(() => expect(screen.queryByText(/Loading player profile/)).not.toBeInTheDocument());
+    await waitFor(() => expect(screen.queryByRole("status", { name: /Loading player profile/ })).not.toBeInTheDocument());
 
     fireEvent.click(screen.getByRole("tab", { name: "Trends" }));
-    expect(screen.getByText(/Loading weekly trends/)).toBeInTheDocument();
+    expect(screen.getByRole("status", { name: /Loading weekly trends/ })).toBeInTheDocument();
   });
 
   it("shows the Schedule tab's loading, empty, and real states", async () => {
@@ -209,10 +209,10 @@ describe("PlayerProfileContent", () => {
     vi.mocked(api.getPlayerSchedule).mockReturnValue(new Promise(() => {}));
 
     render(<PlayerProfileContent player={player()} leagueId="league-1" leagueName="My League" />);
-    await waitFor(() => expect(screen.queryByText(/Loading player profile/)).not.toBeInTheDocument());
+    await waitFor(() => expect(screen.queryByRole("status", { name: /Loading player profile/ })).not.toBeInTheDocument());
 
     fireEvent.click(screen.getByRole("tab", { name: "Schedule" }));
-    expect(screen.getByText(/Loading schedule/)).toBeInTheDocument();
+    expect(screen.getByRole("status", { name: /Loading schedule/ })).toBeInTheDocument();
 
     const emptySchedule: ScheduleResponse = { ok: true, team: "SF", weeks: [] };
     vi.mocked(api.getPlayerSchedule).mockResolvedValue(emptySchedule);
@@ -251,10 +251,10 @@ describe("PlayerProfileContent", () => {
     vi.mocked(api.getPlayerCareer).mockReturnValue(new Promise(() => {}));
 
     render(<PlayerProfileContent player={player()} leagueId="league-1" leagueName="My League" />);
-    await waitFor(() => expect(screen.queryByText(/Loading player profile/)).not.toBeInTheDocument());
+    await waitFor(() => expect(screen.queryByRole("status", { name: /Loading player profile/ })).not.toBeInTheDocument());
 
     fireEvent.click(screen.getByRole("tab", { name: "Career" }));
-    expect(screen.getByText(/Loading career history/)).toBeInTheDocument();
+    expect(screen.getByRole("status", { name: /Loading career history/ })).toBeInTheDocument();
 
     const twoSeasons: CareerResponse = {
       ok: true,
@@ -280,7 +280,7 @@ describe("PlayerProfileContent", () => {
     vi.mocked(api.getPlayerAwards).mockResolvedValue(awardsResult());
 
     render(<PlayerProfileContent player={player()} leagueId="league-1" leagueName="My League" />);
-    await waitFor(() => expect(screen.queryByText(/Loading player profile/)).not.toBeInTheDocument());
+    await waitFor(() => expect(screen.queryByRole("status", { name: /Loading player profile/ })).not.toBeInTheDocument());
 
     fireEvent.click(screen.getByRole("tab", { name: "Model" }));
     expect(screen.getByText(/No model breakdown available for this player yet/)).toBeInTheDocument();
@@ -291,7 +291,7 @@ describe("PlayerProfileContent", () => {
     vi.mocked(api.getPlayerAwards).mockResolvedValue(awardsResult());
 
     render(<PlayerProfileContent player={player()} leagueId="league-1" leagueName="My League" />);
-    await waitFor(() => expect(screen.queryByText(/Loading player profile/)).not.toBeInTheDocument());
+    await waitFor(() => expect(screen.queryByRole("status", { name: /Loading player profile/ })).not.toBeInTheDocument());
 
     const link = screen.getByText("Compare this player");
     expect(link.closest("a")).toHaveAttribute("href", "/player-compare/league-1?a=p1&name=My%20League");

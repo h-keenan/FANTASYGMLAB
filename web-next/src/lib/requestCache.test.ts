@@ -85,4 +85,12 @@ describe("requestCache", () => {
     expect(isCacheablePath("/v1/me")).toBe(false);
     expect(isCacheablePath("/v1/leagues/123/waivers")).toBe(false);
   });
+
+  it("reuses the Fantasy Sim Home and lineup reads that opening a game starts early, and nothing else under /v1/sim", () => {
+    const id = "11111111-1111-1111-1111-111111111111";
+    expect(isCacheablePath(`/v1/sim/games/${id}/home`)).toBe(true);
+    expect(isCacheablePath(`/v1/sim/games/${id}/lineup`)).toBe(true);
+    expect(isCacheablePath(`/v1/sim/games/${id}`)).toBe(false);
+    expect(isCacheablePath(`/v1/sim/games/${id}/players`)).toBe(false);
+  });
 });

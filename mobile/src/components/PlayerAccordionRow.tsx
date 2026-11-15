@@ -3,6 +3,7 @@ import { AccessibilityInfo, LayoutAnimation, Platform, Pressable, StyleSheet, UI
 
 import AppText from './AppText';
 import PlayerAvatarSlot from './PlayerAvatarSlot';
+import { PlayerTap } from './PlayerOpenContext';
 import PlayerName from './PlayerName';
 import PositionBadge from './PositionBadge';
 import { LetterGrade } from './LetterGrade';
@@ -13,6 +14,7 @@ import type { BadgeInput } from '../lib/playerBadges';
 import type { SimGradeInput } from '../lib/simGrade';
 import { radii, spacing, type ThemeColors } from '../theme';
 import Money from './Money';
+import { SkeletonPlayerRow } from './Skeleton';
 import { Collapse } from './Presence';
 
 function toneColor(tone: FactTone | undefined, colors: ThemeColors): string {
@@ -52,6 +54,10 @@ export type PlayerAccordionRowProps = PlayerFactsInput & {
   hidePosition?: boolean;
   /** THE one trailing control (the sim's Move button): a sibling of the row Pressable, never nested in it. */
   trailingAction?: ReactNode;
+  /** Opens something other than the default quick view when the avatar or name is tapped. */
+  onOpenPlayer?: () => void;
+  /** Opt out of the avatar + name tap (the whole row then only expands), with the reason. */
+  nonInteractive?: string;
   /** A short sentence under the meta line (News: the headline), wrapping to two lines. Names never take this slot. */
   headline?: string | null;
 };
@@ -72,10 +78,11 @@ export function animateRowExpand() {
 /**
  * THE player row, native twin of web-next/src/components/ui/PlayerAccordionRow.tsx (logic: lib/playerAnatomy.ts).
  * Compact: avatar, name + position badge, TEAM · age · bye, one trailing key number or letter grade (no chevron: the
- * whole row is the tap target). Tapped it swells in place into a glass tile with the facts and the actions.
+ * whole row is the tap target). Tap rule: the avatar and the name line open the player quick view; everything else in the row
+ * expands it. Tapped it swells in place into a glass tile with the facts and the actions.
  * `mode="sim"` shows grade / ADP / projection, never OVR or trade value.
  */
-export default function PlayerAccordionRow({ open, onToggle, badges = [], positionLabel, primaryAction, onOpenProfile, children, testID = 'player-accordion-row', gradeTile, metaParts, hidePosition = false, trailingAction, headline, ...input }: PlayerAccordionRowProps) {
+export default function PlayerAccordionRow({ open, onToggle, badges = [], positionLabel, primaryAction, onOpenProfile, children, testID = 'player-accordion-row', gradeTile, metaParts, hidePosition = false, trailingAction, headline, onOpenPlayer, nonInteractive, ...input }: PlayerAccordionRowProps) {
   const { colors } = useThemeMode();
   const styles = useMemo(() => createStyles(colors), [colors]);
   const { player } = input;
@@ -85,13 +92,15 @@ export default function PlayerAccordionRow({ open, onToggle, badges = [], positi
     <View style={open ? styles.tile : styles.row} testID={testID}>
       <View style={styles.headRow}>
         <Pressable accessibilityRole="button" accessibilityState={{ expanded: open }} accessibilityLabel={`${player.name}, ${open ? 'hide' : 'show'} details`} onPress={onToggle} style={styles.head}>
-          <PlayerAvatarSlot player={player} tier="row" />
+          <PlayerAvatarSlot player={player} tier="row" onOpen={onOpenPlayer} nonInteractive={nonInteractive} />
           <View style={styles.main}>
-            <View style={styles.line}>
-              <PlayerName name={player.name} style={styles.name} />
-              {hidePosition ? null : <PositionBadge position={player.position} label={positionLabel ?? undefined} />}
-              <PlayerBadges badges={badges} />
-            </View>
+            <PlayerTap player={player} onOpen={onOpenPlayer} nonInteractive={nonInteractive} minHeight={28}>
+              <View style={styles.line}>
+                <PlayerName name={player.name} style={styles.name} />
+                {hidePosition ? null : <PositionBadge position={player.position} label={positionLabel ?? undefined} />}
+                <PlayerBadges badges={badges} />
+              </View>
+            </PlayerTap>
             {metaLine.length > 0 || gradeTile ? (
               <View style={styles.metaRow} testID="row-meta">
                 <AppText style={styles.meta} numberOfLines={1}>
@@ -169,4 +178,9 @@ function createStyles(colors: ThemeColors) {
     secondary: { minHeight: 44, paddingHorizontal: spacing.md, justifyContent: 'center', borderWidth: 1, borderColor: colors.borderStrong, borderRadius: radii.input },
     secondaryText: { fontSize: 14, fontWeight: '700', color: colors.textPrimary },
   });
+}
+
+/** The loading silhouette of a `PlayerAccordionRow` (same avatar tier, two text lines, trailing number). Use for a list whose players have not arrived. */
+export function PlayerAccordionRowSkeleton({ trailing = true }: { trailing?: boolean }) {
+  return <SkeletonPlayerRow trailing={trailing} />;
 }

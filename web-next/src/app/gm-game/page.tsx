@@ -10,7 +10,7 @@ import { useAuth } from "@/context/AuthContext";
 // a standalone game that lives in the General menu and never reads a league.
 export default function GmGamePage() {
   const { session, loading } = useAuth();
-  if (loading) return <LoadingScreen status="Loading Fantasy Sim…" />;
+  if (loading) return <LoadingScreen label="Fantasy Sim" layout="dashboard" />;
   if (!session) {
     return (
       <main className="page-shell">

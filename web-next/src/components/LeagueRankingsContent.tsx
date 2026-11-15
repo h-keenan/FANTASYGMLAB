@@ -34,6 +34,7 @@ import { ValuesCredit } from "@/components/ValuesCredit";
 import { EmptyState } from "@/components/EmptyState";
 import { rankBoardAnchor } from "@/lib/insightLinks";
 import { PageTitle } from "@/components/PageTitle";
+import { SkeletonText } from "@/components/Skeleton";
 
 /**
  * Ports app.py's "League Rankings" page (current_page == "rankings",
@@ -107,11 +108,11 @@ export function RankingRow({
     >
       <span
         className="text-sm font-extrabold shrink-0 text-center"
-        style={{ color: firstPlace ? "var(--color-premium)" : "var(--color-text-muted)", minWidth: "2.25rem" }}
+        style={{ color: firstPlace ? "var(--color-accent)" : "var(--color-text-muted)", minWidth: "2.25rem" }}
       >
         {rankLabel}
       </span>
-      <TeamAvatar avatarUrl={avatarUrl} size={32} ringColor={firstPlace ? "var(--color-premium)" : "var(--color-border)"} />
+      <TeamAvatar avatarUrl={avatarUrl} size={32} ringColor={firstPlace ? "var(--color-accent)" : "var(--color-border)"} />
       <div className="flex-1 flex flex-col gap-0.5 min-w-0">
         <div className="flex items-center gap-2 flex-wrap">
           <span className="text-sm font-bold [overflow-wrap:anywhere]" style={{ color: "var(--color-text-primary)" }}>
@@ -370,9 +371,7 @@ function PlayoffOddsSection({ leagueId, leagueName, myRosterId, myTeam }: { leag
         </Button>
       ) : null}
       {state === "loading" ? (
-        <p className="text-sm" style={{ color: "var(--color-text-muted)" }}>
-          Running thousands of simulated outcomes…
-        </p>
+        <SkeletonText label="simulated outcomes" lines={2} />
       ) : null}
       {state === "error" ? (
         <p className="text-sm" role="alert" style={{ color: "var(--color-danger)" }}>

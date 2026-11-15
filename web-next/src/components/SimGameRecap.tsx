@@ -13,7 +13,7 @@ import { EmptyState } from "@/components/EmptyState";
 import { PositionBadge } from "@/components/PositionBadge";
 import { SectionHeading } from "@/components/SectionHeading";
 import { PillRow } from "@/components/PillRow";
-import { SimPlayerChip, SimPlayerLine, SimStat, SimToneBadge, simToneColor, useSimWide, type SimCtx } from "@/components/SimGameParts";
+import { SimPlayerChip, SimPlayerNameTap, SimPlayerLine, SimStat, SimToneBadge, simToneColor, useSimWide, type SimCtx } from "@/components/SimGameParts";
 import { SimDynastyResult } from "@/components/SimGameDynasty";
 import { SimStandingsList } from "@/components/SimGameLeague";
 import { SkeletonCard } from "@/components/Skeleton";
@@ -174,7 +174,7 @@ export function SimWeekRecapView({
               <SimPlayerChip player={w.add} />
               <p className="flex flex-wrap items-center gap-2 text-xs">
                 <SimToneBadge label={w.ok ? "Won" : "Lost"} tone={w.ok ? "success" : "danger"} />
-                {w.drop ? <span className="font-semibold" style={{ color: "var(--color-danger)" }}>dropping {w.drop.name}</span> : null}
+                {w.drop ? <span className="font-semibold" style={{ color: "var(--color-danger)" }}>dropping <SimPlayerNameTap player={w.drop}>{w.drop.name}</SimPlayerNameTap></span> : null}
                 {!w.ok && w.reason ? <span style={{ color: "var(--color-text-muted)" }}>({w.reason.replace(/_/g, " ")})</span> : null}
               </p>
             </AccentCard>
@@ -267,7 +267,7 @@ export function SimFinalView({ ctx, onNewGame, onHub }: { ctx: SimCtx; onNewGame
   });
   const standingsSection = (
     <section className="flex flex-col gap-2" aria-label="Final standings">
-      <SectionHeading size="compact">
+      <SectionHeading>
         <span className="inline-flex items-center gap-2"><ReviewGlyphChip glyph="rank" tone="accent" size={24} />Final standings</span>
       </SectionHeading>
       <ol className="flex flex-col gap-2">

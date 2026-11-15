@@ -7,6 +7,7 @@ import Button from './Button';
 import type { SimCtx } from './SimGameParts';
 import { useThemeMode } from '../context/ThemeModeContext';
 import { api } from '../lib/api';
+import { simPillPlan } from '../lib/bottomNav';
 import { usePillState } from '../lib/useBottomPillContext.ts';
 import { simTabAfterStageAction, type SimStageAction } from '../lib/simScroll';
 import { simOffseasonCta, simOffseasonStageLabel, simSeasonLabel, type SimOffseason, type SimOffseasonResponse } from '../lib/simGame';
@@ -105,9 +106,8 @@ export default function SimOffseasonBar({ ctx, onTab, orb }: { ctx: SimCtx; onTa
           {cta.blocked}
         </AppText>
       ) : null}
-      <BottomPill bare context={pill.barPresent ? pill.ctx : null}>
+      <BottomPill bare segment={simPillPlan({ context: pill.barPresent ? pill.ctx : null, simToAvailable: false }).segment} orb={orb}>
         <View style={styles.row}>
-        {orb}
         <View style={[styles.cta, cta.blocked ? styles.ctaBlocked : null]}>
           <Button label={cta.label} loading={busy && !confirmAuto} disabled={Boolean(cta.blocked) || confirmAuto} onPress={press} />
         </View>

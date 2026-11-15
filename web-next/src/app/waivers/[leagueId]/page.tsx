@@ -64,7 +64,7 @@ export default function WaiversPage() {
 
   if (authLoading || (!waivers && !error)) {
     return (
-      <LoadingScreen status="Loading Waivers…" />
+      <LoadingScreen label="Waivers" layout="list" family="team" />
     );
   }
 

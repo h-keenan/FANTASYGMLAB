@@ -4,7 +4,7 @@ import PressableScale from './PressableScale';
 
 import AppText from './AppText';
 import SectionHeading from './SectionHeading';
-import { SkeletonChart } from './SkeletonBlock';
+import { SkeletonChart } from './Skeleton';
 import WeeklyPointsChart from './WeeklyPointsChart';
 import { useThemeMode } from '../context/ThemeModeContext';
 import { api, type WeeklyStatPoint } from '../lib/api';

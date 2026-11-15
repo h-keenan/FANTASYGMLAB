@@ -3,6 +3,8 @@
 import { useEffect, useRef, useSyncExternalStore, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 
+import { useFixedBottomAnchor } from "@/lib/fixedAnchor";
+
 import "./ui.css";
 
 const PHONE = "(max-width: 767px)";
@@ -22,11 +24,12 @@ const phoneNow = () => typeof window.matchMedia === "function" && window.matchMe
  * a flex chain that shrinks under a min-height body (iOS Safari), a transformed or overflow ancestor. Content never hides
  * behind it: the dock publishes its measured height as `--bottom-clearance` on <html> (ResizeObserver) and the page
  * column pads by it. From 768px up (and before hydration) it renders inline, exactly as before (`display: contents`).
- * Guards: lib/bottomChrome.test.ts, scripts/sim_layout_playwright/footer_pin.mjs.
+ * iOS WebKit can still park a fixed layer at a stale layout-viewport bottom; `useFixedBottomAnchor` (lib/fixedAnchor.ts) then writes the one `--dock-shift` custom property (0 by default) that the CSS transform reads. Guards: lib/bottomChrome.test.ts, scripts/sim_layout_playwright/footer_pin.mjs.
  */
 export function BottomDock({ children, className = "", testId }: { children: ReactNode; className?: string; testId?: string }) {
   const phone = useSyncExternalStore(subscribe, phoneNow, () => false);
   const ref = useRef<HTMLDivElement>(null);
+  useFixedBottomAnchor(ref, phone);
   useEffect(() => {
     const el = ref.current;
     if (!phone || !el) return;

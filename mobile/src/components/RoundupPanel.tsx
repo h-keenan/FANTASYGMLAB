@@ -9,7 +9,7 @@ import ErrorState from './ErrorState';
 import PositionBadge from './PositionBadge';
 import PremiumLock from './PremiumLock';
 import SegmentedTabBar from './SegmentedTabBar';
-import SkeletonBlock from './SkeletonBlock';
+import SkeletonBlock from './Skeleton';
 import { api, type RoundupResponse, type RoundupSwap, type WeeklyRoundup } from '../lib/api';
 import { accentTokenColor } from '../lib/destinationAccent';
 import { toUserErrorMessage } from '../lib/errorMessages';
@@ -26,6 +26,7 @@ import {
 import { useThemeMode } from '../context/ThemeModeContext';
 import { radii, spacing, type ThemeColors } from '../theme';
 import PlayerName from './PlayerName';
+import { PlayerTap } from './PlayerOpenContext';
 
 /**
  * League Recaps > Roundup: your lineup against the best one you could have
@@ -167,18 +168,22 @@ function RoundupBody({
                     <PositionBadge position={row.slot} />
                   </View>
                   {row.actual.player_id ? (
-                    <View style={{ flex: 1, minWidth: 0 }}>
+                    <PlayerTap player={{ id: row.actual.player_id, name: row.actual.name }} style={{ flex: 1, minWidth: 0 }}>
+                     <View>
                       <PlayerName name={row.actual.name} style={[styles.lineupName, changed && styles.muted]} />
                       <AppText style={[styles.lineupName, changed && styles.muted]}>{formatPoints(row.actual.points)}</AppText>
-                    </View>
+                     </View>
+                    </PlayerTap>
                   ) : (
                     <AppText style={[styles.lineupName, changed && styles.muted]}>Empty</AppText>
                   )}
                   {row.optimal.player_id ? (
-                    <View style={{ flex: 1, minWidth: 0 }}>
+                    <PlayerTap player={{ id: row.optimal.player_id, name: row.optimal.name }} style={{ flex: 1, minWidth: 0 }}>
+                     <View>
                       <PlayerName name={row.optimal.name} style={[styles.lineupName, changed && { color: colors.success, fontWeight: '700' }]} />
                       <AppText style={[styles.lineupName, changed && { color: colors.success, fontWeight: '700' }]}>{formatPoints(row.optimal.points)}</AppText>
-                    </View>
+                     </View>
+                    </PlayerTap>
                   ) : (
                     <AppText style={[styles.lineupName, changed && { color: colors.success, fontWeight: '700' }]}>Empty</AppText>
                   )}

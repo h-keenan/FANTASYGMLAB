@@ -7,7 +7,7 @@ import AppText from './AppText';
 import Button from './Button';
 import EmptyState from './EmptyState';
 import { AvailabilityBlock } from './PlayerQuickViewNews';
-import { SkeletonRow } from './SkeletonBlock';
+import { SkeletonRow } from './Skeleton';
 import { useThemeMode } from '../context/ThemeModeContext';
 import { api, type NewsItem, type PlayerAvailability } from '../lib/api';
 import { flattenNewsPages, groupNewsByDay, PLAYER_NEWS_PAGE_SIZE, sameStory } from '../lib/playerNews';

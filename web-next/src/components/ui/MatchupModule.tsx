@@ -4,6 +4,7 @@ import Link from "next/link";
 import type { ReactNode } from "react";
 
 import { AccentCard } from "@/components/AccentCard";
+import { PlayerTap } from "@/components/ui/PlayerOpenContext";
 import { PlayerAvatar } from "@/components/PlayerAvatar";
 import { PositionBadge } from "@/components/PositionBadge";
 import { ToneBadge } from "@/components/ToneBadge";
@@ -108,9 +109,9 @@ export function MatchupHeroCard({
                       {body}
                     </button>
                   ) : (
-                    <div className="flex w-full items-center gap-2" style={{ minHeight: "var(--touch-target-min)" }}>
+                    <PlayerTap player={{ id: p.playerId, name: p.name, position: p.position, tier: p.tier }} className="flex w-full items-center gap-2">
                       {body}
-                    </div>
+                    </PlayerTap>
                   )}
                 </li>
               );

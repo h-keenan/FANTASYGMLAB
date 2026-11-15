@@ -51,15 +51,15 @@ function FeaturesPage() {
     };
   }, [authLoading, session, router, queryId]);
 
-  if (authLoading || !session) return <LoadingScreen status="Loading…" />;
+  if (authLoading || !session) return <LoadingScreen label="Loading" layout="detail" />;
   const league: FeatureLeague | null = queryId ? { id: queryId, name: queryName || queryId } : (fallback ?? null);
-  if (!queryId && fallback === undefined) return <LoadingScreen status="Loading…" />;
+  if (!queryId && fallback === undefined) return <LoadingScreen label="Loading" layout="detail" />;
   return <FeaturesContent league={league} isPro={isPro} />;
 }
 
 export default function FeaturesRoute() {
   return (
-    <Suspense fallback={<LoadingScreen status="Loading…" />}>
+    <Suspense fallback={<LoadingScreen label="Loading" layout="detail" />}>
       <FeaturesPage />
     </Suspense>
   );

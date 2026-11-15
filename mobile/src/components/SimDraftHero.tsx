@@ -101,7 +101,7 @@ export function SimDraftHero({
                 accessibilityLabel={player ? `Best available ${pos}: ${player.name}` : `No ${pos} left`}
                 style={[styles.pickChip, { minWidth: 128, opacity: player ? 1 : 0.5 }]}
               >
-                {player ? <PlayerAvatarSlot player={simPlayerAnatomyRef(player)} tier="dense" /> : null}
+                {player ? <PlayerAvatarSlot player={simPlayerAnatomyRef(player)} tier="dense" nonInteractive="the pick button around it opens the player" /> : null}
                 <PositionBadge position={pos} />
                 <View style={{ flexShrink: 1 }}>
                   {player ? <PlayerName name={player.name} style={styles.chipName} /> : <AppText style={styles.chipName}>-</AppText>}

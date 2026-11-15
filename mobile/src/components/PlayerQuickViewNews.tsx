@@ -3,7 +3,7 @@ import { Linking, Pressable, StyleSheet, View } from 'react-native';
 
 import AppText from './AppText';
 import SectionHeading from './SectionHeading';
-import SkeletonBlock from './SkeletonBlock';
+import SkeletonBlock from './Skeleton';
 import { useThemeMode } from '../context/ThemeModeContext';
 import type { NewsItem, PlayerAvailability } from '../lib/api';
 import { availabilityDetailParts, newsAgeLabel } from '../lib/playerAvailability';

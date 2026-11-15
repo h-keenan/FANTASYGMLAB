@@ -14,7 +14,7 @@ import * as AppleAuthentication from 'expo-apple-authentication';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import AgeGate from '../components/AgeGate';
-import BrandedSpinner from '../components/BrandedSpinner';
+import { SkeletonText } from '../components/Skeleton';
 import BrandMark from '../components/BrandMark';
 import ContentSections, { type ContentSection } from '../components/ContentSections';
 import GridBackground from '../components/GridBackground';
@@ -110,7 +110,7 @@ export default function LoginScreen() {
       <View style={styles.root}>
         <GridBackground />
         <View style={styles.initialLoading}>
-          <BrandedSpinner />
+          <SkeletonText label="sign in" lines={3} />
         </View>
       </View>
     );

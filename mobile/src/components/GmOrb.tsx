@@ -55,6 +55,7 @@ import { useAuth } from '../context/AuthContext';
 import { isFounderSession } from '../lib/founderAnalytics';
 import { useThemeMode } from '../context/ThemeModeContext';
 import { motion, radii, shadows, spacing, type ThemeColors } from '../theme';
+import { SkeletonText } from './Skeleton';
 
 type IconName = React.ComponentProps<typeof Ionicons>['name'];
 
@@ -857,7 +858,7 @@ export default function GmOrb() {
                 ) : null}
                 </>
               ) : playerSearchEnabled && playerSearch.pending ? (
-                <AppText style={styles.sectionNote}>Searching players…</AppText>
+                <SkeletonText label="players" lines={2} />
               ) : (
                 <AppText style={styles.sectionNote}>
                   {league ? 'No destinations or players match' : 'No destinations match'} "{searchQuery.trim()}".

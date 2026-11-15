@@ -6,7 +6,7 @@ import { useHeaderHeight } from '@react-navigation/elements';
 
 import AnimatedCard from '../components/AnimatedCard';
 import AppText from '../components/AppText';
-import BrandedSpinner from '../components/BrandedSpinner';
+import { SkeletonPage } from '../components/Skeleton';
 import BrandHeaderBar from '../components/BrandHeaderBar';
 import EmptyState from '../components/EmptyState';
 import ErrorState from '../components/ErrorState';
@@ -69,7 +69,7 @@ export default function GuessThePlayerLeaderboardScreen({ route, navigation }: P
     }, [leagueId, tick]),
   );
 
-  if (!data && !error) return <BrandedSpinner style={[styles.center, { paddingTop: headerHeight }]} />;
+  if (!data && !error) return <SkeletonPage label="the leaderboard" layout="list" topInset={headerHeight} />;
   if (error || !data) {
     return (
       <View style={[styles.center, { paddingTop: headerHeight }]}>
@@ -143,7 +143,7 @@ function LeaderboardRow({
 }) {
   return (
     <View style={[styles.row, entry.is_viewer && styles.rowMine, !last && styles.divider]}>
-      <AppText style={[styles.rank, entry.rank === 1 && { color: colors.premium }]}>{entry.rank}</AppText>
+      <AppText style={[styles.rank, entry.rank === 1 && { color: colors.accent }]}>{entry.rank}</AppText>
       <View style={styles.nameWrap}>
         <AppText style={styles.name} numberOfLines={1}>
           {entry.display_name}

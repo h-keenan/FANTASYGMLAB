@@ -4,6 +4,7 @@ import { useEffect, useState, useSyncExternalStore } from "react";
 
 import { PositionBadge } from "@/components/PositionBadge";
 import { ToneBadge } from "@/components/ToneBadge";
+import { PlayerTap } from "@/components/ui/PlayerOpenContext";
 import { PlayerName } from "@/components/PlayerName";
 import {
   feedAgeLabel,
@@ -108,19 +109,21 @@ function FeedItem({ event, now, isNew }: { event: FeedEvent; now: number; isNew:
       }}
       data-testid="live-feed-item"
     >
-      <PositionBadge position={event.position} />
-      <span className="flex flex-col min-w-0 flex-1">
-        <span className="flex items-baseline gap-1.5 min-w-0">
-          <PlayerName name={event.name} className="text-[13px] font-bold" style={{ color: "var(--color-text-primary)" }} />
-          <span className="text-[13px] font-extrabold tabular-nums shrink-0" style={{ color: tone }}>
-            {feedPointsLabel(event.points)}
+      <PlayerTap player={{ id: event.playerId, name: event.name, position: event.position, team: event.team }} className="flex min-w-0 flex-1 items-center gap-2 text-left">
+        <PositionBadge position={event.position} />
+        <span className="flex flex-col min-w-0 flex-1">
+          <span className="flex items-baseline gap-1.5 min-w-0">
+            <PlayerName name={event.name} className="text-[13px] font-bold" style={{ color: "var(--color-text-primary)" }} />
+            <span className="text-[13px] font-extrabold tabular-nums shrink-0" style={{ color: tone }}>
+              {feedPointsLabel(event.points)}
+            </span>
+          </span>
+          <span className="text-[11px]" style={{ color: "var(--color-text-secondary)" }}>
+            {event.detail}
+            {event.approx ? " · approx." : ""}
           </span>
         </span>
-        <span className="text-[11px]" style={{ color: "var(--color-text-secondary)" }}>
-          {event.detail}
-          {event.approx ? " · approx." : ""}
-        </span>
-      </span>
+      </PlayerTap>
       <span className="flex flex-col items-end shrink-0 gap-0.5">
         <span className="text-[0.6875rem]" style={{ color: "var(--color-text-muted)" }}>
           {feedAgeLabel(event.at, now)}

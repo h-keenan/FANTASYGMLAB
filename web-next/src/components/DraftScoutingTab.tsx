@@ -7,6 +7,7 @@ import { CollegeScoutingContent } from "@/components/CollegeScoutingContent";
 import { EmptyState } from "@/components/EmptyState";
 import { needPositionsFrom } from "@/lib/scoutingLens";
 import { ErrorState } from "@/components/ErrorState";
+import { SkeletonList } from "@/components/Skeleton";
 
 /**
  * Draft Center's Scouting tab: the shared college prospect board, fetched the
@@ -58,6 +59,6 @@ export function DraftScoutingTab({
       />
     );
   }
-  if (!data) return <EmptyState title="Loading prospects…" />;
+  if (!data) return <SkeletonList label="prospects" count={6} />;
   return <CollegeScoutingContent data={data} embedded lens={lens} />;
 }

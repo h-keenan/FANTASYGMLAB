@@ -1,5 +1,6 @@
 "use client";
 
+import { Select } from "@/components/Input";
 import { PageTabBar } from "@/components/PageTabBar";
 import { EmptyState } from "@/components/EmptyState";
 import { SectionHeading } from "@/components/SectionHeading";
@@ -49,6 +50,7 @@ import type { RecapsTab } from "@/lib/pageTabs";
 import { ErrorState } from "@/components/ErrorState";
 import { Money } from "@/components/Money";
 import { formatMoney } from "@/lib/money";
+import { SkeletonRegion, SkeletonModule } from "@/components/Skeleton";
 
 /**
  * Ports modules/league_recaps_ui.py + modules/league_history_ui.py for
@@ -263,9 +265,8 @@ function RecapsTab({ leagueId, initial, onOpenHistory }: { leagueId: string; ini
             onSelect={(value) => loadWeek(Number(value))}
           />
           {archive.overflow.length > 0 ? (
-            <select aria-label="More weeks"
-              className="text-xs px-2 py-2"
-              style={{ background: "var(--color-surface-muted)", color: "var(--color-text-secondary)", border: "var(--border-width-default) solid var(--color-border)" }}
+            <Select aria-label="More weeks"
+              className="text-xs"
               value={archive.overflow.some((o) => o.week === selectedWeek) ? String(selectedWeek) : ""}
               onChange={(event) => {
                 if (event.target.value) loadWeek(Number(event.target.value));
@@ -277,7 +278,7 @@ function RecapsTab({ leagueId, initial, onOpenHistory }: { leagueId: string; ini
                   {o.label}
                 </option>
               ))}
-            </select>
+            </Select>
           ) : null}
         </TabStack>
       ) : null}
@@ -656,9 +657,7 @@ function HistoryTab({
 
   if (!data && !error) {
     return (
-      <p className="text-sm" style={{ color: "var(--color-text-muted)" }}>
-        Loading league history…
-      </p>
+      <SkeletonRegion label="league history" className="flex flex-col gap-3"><SkeletonModule /><SkeletonModule /><SkeletonModule /></SkeletonRegion>
     );
   }
   if (error) {
@@ -828,9 +827,7 @@ function StorylinesTab({
 
   if (!data && !error) {
     return (
-      <p className="text-sm" style={{ color: "var(--color-text-muted)" }}>
-        Loading league storylines…
-      </p>
+      <SkeletonRegion label="league storylines" className="flex flex-col gap-3"><SkeletonModule /><SkeletonModule /></SkeletonRegion>
     );
   }
   if (error) {

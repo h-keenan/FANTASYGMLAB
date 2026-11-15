@@ -14,6 +14,7 @@ import { api, type AlertItem, type AlertsResponse } from "@/lib/api";
 import { useOverlay } from "@/lib/useOverlay";
 import { useSheetDragDismiss } from "@/lib/useSheetDragDismiss";
 import { ErrorState } from "@/components/ErrorState";
+import { SkeletonList } from "@/components/Skeleton";
 
 /**
  * The header bell. Tapping it opens a dropdown over the current page (a top
@@ -137,8 +138,8 @@ export function AlertsBell({
               padding: "0 0.2rem",
               borderRadius: "999px",
               background: "var(--color-accent)",
-              color: "#fff",
-              fontSize: "0.625rem",
+              color: "var(--color-on-accent)",
+              fontSize: "0.6875rem",
             }}
           >
             {unread > 9 ? "9+" : unread}
@@ -174,9 +175,7 @@ export function AlertsBell({
             </div>
             <div className="flex-1 overflow-y-auto px-4" style={{ minHeight: 0 }}>
               {!data && !failed ? (
-                <p className="text-sm py-4" style={{ color: "var(--color-text-muted)" }}>
-                  Loading…
-                </p>
+                <SkeletonList label="alerts" count={4} />
               ) : failed ? (
                 <ErrorState bare message="Could not load Alerts." onRetry={load} />
               ) : notice ? (

@@ -1,4 +1,4 @@
-// Footer + sheet audit (manual tool, like pill_geometry.mjs). Builds a harness of the REAL Fantasy Sim bar row (Sim to | game orb | Advance in the
+// Footer + sheet audit (manual tool, like pill_geometry.mjs). Builds a harness of the REAL Fantasy Sim bar row (orb | Sim to | Advance in the
 // docked .action-pill), SimGameOrb, the shared Sheet and OverlayRuntime (vite, from web-next/node_modules) and checks, at 430x932, 390x844, 360x640
 // and 320x568 (plus huge text), in Chromium iPhone emulation:
 //  1. ORB: the circle holds only the brand mark (no text wider than the circle: "TRADES" used to clip on its rim), is >= 44px, the badge is not
@@ -85,7 +85,11 @@ const measureBar = () => {
     adv: { w: r(adv).width, h: r(adv).height, textFits: adT.l >= -0.5 && adT.r >= -0.5 && adv.scrollWidth <= adv.clientWidth + 1 },
     rowDy: Math.max(Math.abs(midY(simTo) - midY(orb)), Math.abs(midY(adv) - midY(orb))),
     badge: badge ? { l: r(badge).left - pr.left, r: pr.right - r(badge).right, t: r(badge).top - pr.top, offR: innerWidth - r(badge).right } : null,
-    order: r(simTo).right <= orbR.left + 0.5 && orbR.right <= r(adv).left + 0.5,
+    order: orbR.right <= r(simTo).left + 0.5 && r(simTo).right <= r(adv).left + 0.5,
+    // ONE orb / menu control and no "..." or section button beside it (coridian_ 2026-11-14).
+    orbCount: document.querySelectorAll("[data-pill-orb]").length,
+    menuButtons: [...document.querySelectorAll(".action-pill button, .action-pill a")].filter((b) => /^(\.{3}|…|⋯)$/.test(b.textContent.trim()) || /sections menu|more actions|back to page actions/i.test(b.getAttribute("aria-label") || "") || b.classList.contains("pill-icon-btn")).length,
+    labelPx: parseFloat(getComputedStyle(adv).fontSize),
     overflowX: document.documentElement.scrollWidth - innerWidth,
     hit: (() => { const e = document.elementFromPoint(pr.left + pr.width / 2, pr.top + pr.height / 2); return !!e && pill.contains(e); })(),
   };
@@ -132,7 +136,10 @@ for (const [w, h] of VIEWPORTS) for (const big of [false, true]) {
   if (!bar.simTo.textFits) problems.push("Sim to label overflows its button");
   if (!bar.adv.textFits && !big) problems.push("Advance label overflows its button");
   if (bar.rowDy > 1.5) problems.push(`row not centred (orb vs neighbours ${bar.rowDy.toFixed(1)}px)`);
-  if (!bar.order) problems.push("Sim to / orb / Advance overlap or are out of order");
+  if (!bar.order) problems.push("orb / Sim to / Advance overlap or are out of order");
+  if (bar.orbCount !== 1) problems.push(`expected exactly ONE orb, found ${bar.orbCount}`);
+  if (bar.menuButtons !== 0) problems.push(`found ${bar.menuButtons} separate "..." / menu button(s) next to the orb`);
+  if (bar.labelPx < 11.5) problems.push(`Advance label ${bar.labelPx}px is too small to read`);
   if (bar.badge && (bar.badge.offR < 0 || bar.badge.t < -1 || bar.badge.r < -1)) problems.push(`orb badge pokes out of the pill/screen (${JSON.stringify(bar.badge)})`);
   if (bar.overflowX > 0) problems.push(`page scrolls sideways by ${bar.overflowX}px`);
   if (Math.abs(bar.pill.l - bar.pill.r) > 1) problems.push(`pill side insets ${bar.pill.l} vs ${bar.pill.r}`);

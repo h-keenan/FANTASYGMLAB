@@ -26,7 +26,12 @@ export const REFERENCE_TTL_MS = 10_000;
 
 /** League reference reads worth reusing across pages: pure functions of the
  * league + query string, identical for every page that asks. */
-const CACHEABLE_PATH = /^\/v1\/leagues\/[^/?]+\/(rankings|draft-picks|rosters|idp\/values)(\?|$)/;
+const CACHEABLE_PATH = new RegExp(
+  "^/v1/leagues/[^/?]+/(rankings|draft-picks|rosters|idp/values)(\\?|$)" +
+    // Fantasy Sim Home + lineup: opening a game starts them early (SimGameContent.openGame) and the tabs reuse the answer.
+    // A game only changes through a write (any non-GET clears this cache), so a few seconds of reuse is exact.
+    "|^/v1/sim/games/[0-9a-f-]{36}/(home|lineup)$",
+);
 
 const inflight = new Map<string, Promise<unknown>>();
 const recent = new Map<string, { at: number; value: unknown }>();

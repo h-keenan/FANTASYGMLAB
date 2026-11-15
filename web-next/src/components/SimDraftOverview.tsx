@@ -90,6 +90,7 @@ export function SimRecentStrip({ cards, onOpenPlayer, onFullBoard }: { cards: Si
                 </span>
                 <CompactPlayerCard
                   player={card.player}
+                  nonInteractive="the surrounding card button already opens this player"
                   testId="recent-pick-player"
                   trailing={card.grade ? <LetterGrade grade={card.grade} size="xs" /> : undefined}
                 />

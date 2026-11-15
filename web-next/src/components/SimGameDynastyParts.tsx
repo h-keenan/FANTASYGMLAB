@@ -1,5 +1,6 @@
 "use client";
 
+import { PickTap } from "@/components/ui/PickTap";
 import { useEffect, useState, type ReactNode } from "react";
 
 import { Button } from "@/components/Button";
@@ -111,14 +112,18 @@ export function SimPickLine({
         minHeight: "var(--touch-target-min)",
       }}
     >
-      <div className="flex min-w-0 flex-1 items-center gap-2" style={{ minWidth: "min(100%, 12rem)" }}>
-        <ToneBadge label={`R${pick.round}`} color="var(--color-accent)" size="xs" />
-        <span className="flex min-w-0 flex-col leading-tight">
-          <span className="text-sm font-bold">{simPickLabelText(pick)}</span>
-          <span className="text-xs" style={{ color: "var(--color-text-muted)" }}>
-            {[via, simPickSlotHint(pick, draftYear)].filter(Boolean).join(" · ")}
+      <div className="flex min-w-0 flex-1 items-center" style={{ minWidth: "min(100%, 12rem)" }}>
+        <PickTap id={pick.id} label={simPickLabelText(pick)} detail={[via, simPickSlotHint(pick, draftYear)].filter(Boolean).join(" · ") || null}>
+          <span className="flex min-w-0 items-center gap-2">
+            <ToneBadge label={`R${pick.round}`} color="var(--color-accent)" size="xs" />
+            <span className="flex min-w-0 flex-col leading-tight text-left">
+              <span className="text-sm font-bold">{simPickLabelText(pick)}</span>
+              <span className="text-xs" style={{ color: "var(--color-text-muted)" }}>
+                {[via, simPickSlotHint(pick, draftYear)].filter(Boolean).join(" · ")}
+              </span>
+            </span>
           </span>
-        </span>
+        </PickTap>
       </div>
       <div className="ml-auto flex items-center gap-2">
         {trailing}

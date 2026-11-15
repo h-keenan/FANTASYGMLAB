@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { Alert, ScrollView, StyleSheet, View } from 'react-native';
+import { useNotice } from '../components/NoticeToast';
+import { ScrollView, StyleSheet, View } from 'react-native';
 import PressableScale from '../components/PressableScale';
 import { useHeaderHeight } from '@react-navigation/elements';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
@@ -34,6 +35,7 @@ type IconName = React.ComponentProps<typeof IconCircle>['name'];
  * only for a confirmed Free plan.
  */
 export default function FeaturesScreen({ navigation, route }: Props) {
+  const notify = useNotice();
   const { colors } = useThemeMode();
   const styles = useMemo(() => createStyles(colors), [colors]);
   const orbClearance = useOrbClearance();
@@ -78,7 +80,7 @@ export default function FeaturesScreen({ navigation, route }: Props) {
                   onPress={() => {
                     const target = featureTarget(item, league);
                     if (!target) {
-                      Alert.alert('Select a league first', 'Open a league from Home, then come back to open this.');
+                      notify.alert('Select a league first', 'Open a league from Home, then come back to open this.');
                       return;
                     }
                     (navigation.navigate as (name: string, params?: object) => void)(target.name, target.params);

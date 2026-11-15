@@ -7,21 +7,23 @@ import PressableScale from './PressableScale';
 import TabIcon from './TabIcon';
 import { useThemeMode } from '../context/ThemeModeContext';
 import { LinearGradient } from 'expo-linear-gradient';
-import { normalizePillContext, pillActiveIndex, pillPrimaryCompact, pillScrollTarget, pillTabText, PILL_MENU_LABEL, type PillContext } from '../lib/bottomNav';
+import { normalizePillContext, pillActiveIndex, pillPrimaryCompact, pillScrollTarget, pillTabText, type PillContext } from '../lib/bottomNav';
 import { BAR_METRICS } from '../lib/bottomBarMetrics';
 import { EASE, MOTION_MS } from '../lib/motion';
 import { radii, type ThemeColors } from '../theme';
 import { usePresence } from '../lib/usePresence';
 
 /**
- * The app's floating glass pill (twin of web-next components/ui/BottomTabBar.tsx, approved option B + the V2 smart pill).
- * The app has no tab bar (GM orb + More), so the pill hosts the screen's bottom action row (`children`: Sim to | orb | Advance)
- * and, when a page registers a `context` (useBottomPillContext), morphs between that row and the page segment (page tabs +
- * one primary chip). The menu button (accessibilityState.expanded) flips between the two layers: 240ms opacity + slide on
- * the UI thread; under OS Reduce Motion it is a crossfade only. Stays an in-flow block in the screen's bottom stack
- * (never absolutely positioned to the screen), so useOrbClearance / content padding rules are unchanged.
+ * The app's floating glass pill (twin of web-next components/ui/PillMorph.tsx, approved option B + the V2 smart pill).
+ * ONE persistent orb (`orb`) leads the row: it is the only navigation control (it opens the game's page menu; there is no
+ * "..." or fold button). Next to it ONE cell holds either the screen's action row (`children`: [Sim to | page action] +
+ * Advance) or, when the screen registers a tabbed `segment` (the draft room), the page tabs + one primary chip. What shows
+ * when is decided by `simPillPlan` (lib/bottomNav.ts, rules table in docs/ui-patterns.md). The two layers cross-fade and
+ * slide on the UI thread (240ms; a crossfade only under OS Reduce Motion), and the segment stays mounted for its exit
+ * (lib/presence.ts). Stays an in-flow block in the screen's bottom stack (never absolutely positioned to the screen), so
+ * content padding rules are unchanged.
  */
-export default function BottomPill({ children, context: rawContext, style, testID, bare, contextOnly }: { children: React.ReactNode; context?: PillContext | null; style?: StyleProp<ViewStyle>; testID?: string; /** Already inside a glass pill (the Sim bars): draw no chrome of its own. */ bare?: boolean; /** No row to fold back to (the draft room has no action bar): show the page segment alone, no menu. */ contextOnly?: boolean }) {
+export default function BottomPill({ children, segment: rawContext, orb, style, testID, bare, contextOnly }: { children: React.ReactNode; segment?: PillContext | null; /** The persistent orb. */ orb?: React.ReactNode; style?: StyleProp<ViewStyle>; testID?: string; /** Already inside a glass pill (the Sim bars): draw no chrome of its own. */ bare?: boolean; /** No action row (the draft room has no action bar): the page segment alone. */ contextOnly?: boolean }) {
   const { colors } = useThemeMode();
   const styles = useMemo(() => createStyles(colors), [colors]);
   const live = normalizePillContext(rawContext);
@@ -32,12 +34,9 @@ export default function BottomPill({ children, context: rawContext, style, testI
   if (rawContext && rawContext !== keptRaw) setKeptRaw(rawContext);
   const context = live ?? (presence.mounted ? normalizePillContext(keptRaw) : null);
   const reduced = useReducedMotion();
-  const [open, setOpen] = useState(false); // true: the default row is showing although a context exists
   const t = useSharedValue(0); // 0 = context segment, 1 = default row
   const hasContext = Boolean(live);
-  const contextId = live?.id ?? null;
-  const folded = hasContext && (!open || Boolean(contextOnly));
-  useEffect(() => setOpen(false), [contextId]);
+  const folded = hasContext || Boolean(contextOnly);
   useEffect(() => {
     t.value = withTiming(folded ? 0 : 1, { duration: reduced ? MOTION_MS.fast : MOTION_MS.base, easing: Easing.bezier(...EASE.out) });
   }, [folded, reduced, t]);
@@ -59,16 +58,14 @@ export default function BottomPill({ children, context: rawContext, style, testI
   const contextStyle = useAnimatedStyle(() => ({ opacity: 1 - t.value, transform: [{ translateX: -shift * t.value }] }));
   const defaultStyle = useAnimatedStyle(() => ({ opacity: t.value, transform: [{ translateX: shift * (1 - t.value) }] }));
 
-  // Width the tabs and a TEXT chip would share: the row minus the menu button (when shown), the divider and the row gaps.
-  const compactChip = context ? pillPrimaryCompact(context, layerW - (contextOnly ? 0 : BAR_METRICS.buttonMinHeight + 8) - 9 - 8) : false;
+  // Width the tabs and a TEXT chip would share: the cell minus the row gaps (the orb sits outside the cell).
+  const compactChip = context ? pillPrimaryCompact(context, layerW - 8) : false;
   return (
-    <View style={[bare ? styles.bare : styles.pill, style]} testID={testID}>
+    <View style={[bare ? styles.bare : styles.pill, styles.line, style]} testID={testID}>
+      {orb}
+      <View style={styles.cells}>
       {context ? (
         <Animated.View onLayout={(e) => setLayerW(Math.round(e.nativeEvent.layout.width))} style={[styles.layer, contextStyle, !folded && styles.layerOff]} pointerEvents={folded ? 'auto' : 'none'} accessibilityElementsHidden={!folded} importantForAccessibility={folded ? 'auto' : 'no-hide-descendants'}>
-          {contextOnly ? null : <PressableScale accessibilityRole="button" accessibilityLabel={PILL_MENU_LABEL} accessibilityState={{ expanded: open }} onPress={() => setOpen(true)} style={styles.iconBtn} testID="pill-menu">
-            <TabIcon name="more" color={colors.textSecondary} size={22} />
-          </PressableScale>}
-          <View style={styles.divider} />
           <View accessibilityRole="tablist" accessibilityLabel={context.label} style={styles.tabs} onLayout={(e) => setSegW(Math.round(e.nativeEvent.layout.width))} testID="pill-tabs">
             <ScrollView
               ref={scrollRef}
@@ -117,14 +114,10 @@ export default function BottomPill({ children, context: rawContext, style, testI
           ) : null}
         </Animated.View>
       ) : null}
-      {contextOnly ? null : <Animated.View style={[styles.layer, context ? defaultStyle : null, hasContext && folded && styles.layerOff]} pointerEvents={hasContext && folded ? 'none' : 'auto'} accessibilityElementsHidden={hasContext && folded} importantForAccessibility={hasContext && folded ? 'no-hide-descendants' : 'auto'}>
-        {hasContext ? (
-          <PressableScale accessibilityRole="button" accessibilityLabel="Back to page actions" accessibilityState={{ expanded: true }} onPress={() => setOpen(false)} style={styles.iconBtn} testID="pill-menu-close">
-            <TabIcon name="more" color={colors.accent} size={22} />
-          </PressableScale>
-        ) : null}
+      {contextOnly ? null : <Animated.View style={[styles.layer, context ? defaultStyle : null, hasContext && styles.layerOff]} pointerEvents={hasContext ? 'none' : 'auto'} accessibilityElementsHidden={hasContext} importantForAccessibility={hasContext ? 'no-hide-descendants' : 'auto'}>
         <View style={styles.fill}>{children}</View>
       </Animated.View>}
+      </View>
     </View>
   );
 }
@@ -147,11 +140,11 @@ function createStyles(colors: ThemeColors) {
       elevation: 6,
     },
     fill: { flex: 1, minWidth: 0 },
+    line: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+    cells: { flex: 1, minWidth: 0 },
     bare: { minHeight: target },
     layer: { flexDirection: 'row', alignItems: 'center', gap: 8, minHeight: target },
     layerOff: { position: 'absolute', left: 0, right: 0, top: 0 },
-    iconBtn: { width: target, height: target, alignItems: 'center', justifyContent: 'center', borderRadius: radii.pill },
-    divider: { width: 1, height: 24, backgroundColor: colors.glassBorder },
     tabs: { flex: 1, minWidth: 0, overflow: 'hidden' },
     tabsContent: { flexGrow: 1, alignItems: 'center', gap: 1 },
     fadeEnd: { position: 'absolute', right: 0, top: 0, bottom: 0, width: 18 },
@@ -161,7 +154,7 @@ function createStyles(colors: ThemeColors) {
     tabText: { fontSize: 12, fontWeight: '700', color: colors.textTertiary },
     tabTextOn: { color: colors.textPrimary },
     primary: { minHeight: target, paddingHorizontal: 14, justifyContent: 'center', borderRadius: radii.pill, backgroundColor: colors.accentStrong },
-    primaryIcon: { width: 40, height: 40, minHeight: 40, paddingHorizontal: 0, alignItems: 'center' },
+    primaryIcon: { width: 44, height: 44, minHeight: 44, paddingHorizontal: 0, alignItems: 'center' },
     primaryText: { fontSize: 12, fontWeight: '800', color: colors.onAccent },
   });
 }

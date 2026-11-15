@@ -22,7 +22,7 @@ export default function GuessThePlayerLeaderboardPage() {
   }, [authLoading, session, router]);
 
   if (authLoading || !session) {
-    return <LoadingScreen status="Loading the leaderboard…" />;
+    return <LoadingScreen label="leaderboard" layout="list" />;
   }
 
   return <GuessThePlayerLeaderboardContent leagueId={leagueId} />;

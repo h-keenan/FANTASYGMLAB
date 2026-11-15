@@ -21,7 +21,7 @@ import PremiumLock from '../components/PremiumLock';
 import ScreenInfoNote from '../components/ScreenInfoNote';
 import SectionHeading from '../components/SectionHeading';
 import SegmentedTabBar from '../components/SegmentedTabBar';
-import SkeletonBlock, { SkeletonCard, SkeletonRows } from '../components/SkeletonBlock';
+import SkeletonBlock, { SkeletonCard, SkeletonRows } from '../components/Skeleton';
 import ToneBadge from '../components/ToneBadge';
 import TradeValueBar from '../components/TradeValueBar';
 import ValueStat from '../components/ValueStat';

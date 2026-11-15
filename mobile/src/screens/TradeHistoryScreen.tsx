@@ -6,7 +6,7 @@ import { useHeaderHeight } from '@react-navigation/elements';
 
 import AccentCard from '../components/AccentCard';
 import AppText from '../components/AppText';
-import BrandedSpinner from '../components/BrandedSpinner';
+import { SkeletonPage } from '../components/Skeleton';
 import CompactPlayerModule from '../components/CompactPlayerModule';
 import EmptyState from '../components/EmptyState';
 import GridBackground from '../components/GridBackground';
@@ -96,7 +96,7 @@ export default function TradeHistoryScreen({ navigation }: Props) {
   }, [load]);
 
   if (loading) {
-    return <BrandedSpinner style={[styles.center, { paddingTop: headerHeight }]} />;
+    return <SkeletonPage label="Trade History" layout="cards" family="trades" topInset={headerHeight} />;
   }
 
   return (

@@ -68,7 +68,7 @@ export default function PlayerProfilePage() {
   }, [authLoading, session, leagueId, lens, playerId, router]);
 
   if (authLoading || (!rankings && !error)) {
-    return <LoadingScreen status="Loading player profile…" />;
+    return <LoadingScreen label="player profile" layout="detail" />;
   }
 
   if (error || !rankings) {

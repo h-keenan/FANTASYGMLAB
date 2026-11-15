@@ -232,6 +232,7 @@
   --type-supporting-metadata-size: 0.6875rem;
   --type-body-explanation-size: var(--font-size-body);
   --type-badge-size: var(--font-size-badge);
+  --type-app-section-title: var(--font-weight-title) var(--font-size-section-title) / var(--line-height-title) var(--font-family-sans);
   --type-section-title: var(--font-weight-display) var(--type-section-title-size) / var(--line-height-title) var(--font-family-sans);
   /* Composite shorthands for --type-primary-metric-size/--type-supporting-
      metadata-size, ported verbatim from modules/design_tokens.py (the same
@@ -670,12 +671,13 @@ body {
   pointer-events: none;
 }
 .app-background-field {
-  inset: 0;
+  inset: 0 0 0 -480px;
   opacity: 0.4;
   background:
     repeating-linear-gradient(112deg, rgba(255, 255, 255, 0.1) 0px, rgba(255, 255, 255, 0.1) 3px, transparent 3px, transparent 96px),
     repeating-linear-gradient(112deg, rgba(255, 255, 255, 0.035) 0px, rgba(255, 255, 255, 0.035) 1.5px, transparent 1.5px, transparent 24px);
-  animation: onboarding-field-drift 14s linear infinite;
+  animation: field-drift-x 14s linear infinite;
+  will-change: transform;
 }
 .app-background-sweep {
   top: -20%;
@@ -780,12 +782,13 @@ body {
   pointer-events: none;
 }
 .gm-orb-sheet-field {
-  inset: 0;
+  inset: 0 0 0 -480px;
   opacity: 0.4;
   background:
     repeating-linear-gradient(112deg, rgba(255, 255, 255, 0.1) 0px, rgba(255, 255, 255, 0.1) 3px, transparent 3px, transparent 96px),
     repeating-linear-gradient(112deg, rgba(255, 255, 255, 0.035) 0px, rgba(255, 255, 255, 0.035) 1.5px, transparent 1.5px, transparent 24px);
-  animation: onboarding-field-drift 14s linear infinite;
+  animation: field-drift-x 14s linear infinite;
+  will-change: transform;
 }
 .gm-orb-sheet-sweep {
   top: -20%;
@@ -1128,6 +1131,7 @@ a {
 .filter-input,
 .filter-select {
   min-height: var(--touch-target-min);
+  border-radius: var(--radius-control); /* the same corner as <Input>/<Select> (.glass-input); these two used to be square */
   background: var(--color-surface-primary);
   border: var(--border-width-default) solid var(--color-border);
   color: var(--color-text-primary);
@@ -1203,12 +1207,13 @@ a {
   pointer-events: none;
 }
 .pqv-field {
-  inset: 0;
+  inset: 0 0 0 -480px;
   opacity: 0.4;
   background:
     repeating-linear-gradient(112deg, rgba(255, 255, 255, 0.1) 0px, rgba(255, 255, 255, 0.1) 3px, transparent 3px, transparent 96px),
     repeating-linear-gradient(112deg, rgba(255, 255, 255, 0.035) 0px, rgba(255, 255, 255, 0.035) 1.5px, transparent 1.5px, transparent 24px);
-  animation: onboarding-field-drift 14s linear infinite;
+  animation: field-drift-x 14s linear infinite;
+  will-change: transform;
 }
 .pqv-sweep {
   top: -20%;
@@ -1563,11 +1568,13 @@ a {
 .pqv-skeleton-line,
 .pqv-skeleton-chart,
 .pqv-skeleton-chip {
+  /* Glass-look fill: a soft ink tint with one cyan sweep, visible on both the dark and the light page (the old
+     surface-muted ramp vanished on the dark background). */
   background: linear-gradient(
     100deg,
-    var(--color-surface-muted) 30%,
-    var(--color-border) 50%,
-    var(--color-surface-muted) 70%
+    color-mix(in srgb, var(--color-text-primary) 8%, transparent) 30%,
+    color-mix(in srgb, var(--color-accent) 18%, transparent) 50%,
+    color-mix(in srgb, var(--color-text-primary) 8%, transparent) 70%
   );
   background-size: 200% 100%;
   animation: pqv-skeleton-shimmer 1.6s ease-in-out infinite;
@@ -1929,11 +1936,11 @@ a {
      / initials circle inside simply fills it. Never scale the child: a transformed 112px child in a 56px flex item got squeezed
      into a narrow oval with a ghost ring behind it (coridian_, "still glitched pqv", 2026-11-14). */
   .pqv-modal .pqv-avatar-glow { flex: none; width: 112px; height: 112px; aspect-ratio: 1 / 1; transition: width 240ms var(--ease-out, ease-out), height 240ms var(--ease-out, ease-out), box-shadow 240ms var(--ease-out, ease-out); }
-  .pqv-modal .pqv-avatar-glow > * { box-sizing: border-box; flex: none; width: 100% !important; height: 100% !important; aspect-ratio: 1 / 1; min-width: 0; object-fit: cover; transition: border-width 240ms var(--ease-out, ease-out); }
+  .pqv-modal .pqv-avatar-glow > *, .pqv-modal .pqv-avatar-glow > .prestige-glow > * { box-sizing: border-box; flex: none; width: 100% !important; height: 100% !important; aspect-ratio: 1 / 1; min-width: 0; object-fit: cover; transition: border-width 240ms var(--ease-out, ease-out); }
   .pqv-modal .pqv-peek-fold { max-height: 14rem; opacity: 1; transition: max-height 240ms var(--ease-out, ease-out), opacity 180ms linear, margin 240ms var(--ease-out, ease-out); }
   .pqv-modal .pqv-hero { transition: row-gap 240ms var(--ease-out, ease-out); }
   .pqv-modal[data-snap="peek"] .pqv-avatar-glow { width: 56px; height: 56px; box-shadow: 0 0 13px color-mix(in srgb, var(--color-accent) 28%, transparent); }
-  .pqv-modal[data-snap="peek"] .pqv-avatar-glow > * { border-width: 3px !important; }
+  .pqv-modal[data-snap="peek"] .pqv-avatar-glow > *, .pqv-modal[data-snap="peek"] .pqv-avatar-glow > .prestige-glow > * { border-width: 3px !important; }
   .pqv-modal[data-snap="peek"] .pqv-peek-fold { max-height: 0; opacity: 0; margin-top: 0; margin-bottom: 0; padding-top: 0; padding-bottom: 0; overflow: hidden; pointer-events: none; }
   .pqv-modal[data-snap="peek"] .pqv-hero { row-gap: 0; }
   .pqv-modal[data-snap="peek"] .pqv-peek-summary { display: block; animation: pqv-peek-in 240ms var(--ease-out, ease-out) both; }
@@ -1945,7 +1952,7 @@ a {
   .pqv-modal[data-snap="peek"] .pqv-scroll > .pqv-peek-fold { margin-top: calc(-1 * var(--space-sm)); }
   @keyframes pqv-peek-in { from { opacity: 0; } to { opacity: 1; } }
   @media (prefers-reduced-motion: reduce) {
-    .pqv-modal .pqv-avatar-glow, .pqv-modal .pqv-avatar-glow > *, .pqv-modal .pqv-peek-fold, .pqv-modal .pqv-hero { transition: none; }
+    .pqv-modal .pqv-avatar-glow, .pqv-modal .pqv-avatar-glow > *, .pqv-modal .pqv-avatar-glow > .prestige-glow > *, .pqv-modal .pqv-peek-fold, .pqv-modal .pqv-hero { transition: none; }
     .pqv-modal[data-snap="peek"] .pqv-peek-summary { animation: none; }
   }
   @media (prefers-reduced-motion: no-preference) {
@@ -2008,23 +2015,58 @@ a {
    intensity scales by `--glow-min`/`--glow-max`/`--glow-duration`, set
    inline per tier by PlayerAvatar.tsx, and the color is the tier's own ring
    color so a glowing avatar never introduces a second, unrelated hue. */
-@keyframes prestige-glow-pulse {
+/* Perf 2026-11: the glow used to animate box-shadow on the avatar itself, a main-thread repaint every frame per avatar
+   (30 glowing avatars cost about 2 s of main-thread time per 5 s at 4x CPU). Now PlayerAvatar wraps a glowing avatar in
+   this box and the two glow radii are static shadows on its ::before (min) and ::after (max) that cross-fade with
+   opacity, which the compositor runs. Same colors, radii and per-tier durations; the avatar itself is untouched. */
+.prestige-glow {
+  position: relative;
+  display: inline-flex;
+  flex: none;
+  border-radius: 50%;
+}
+.prestige-glow::before,
+.prestige-glow::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  pointer-events: none;
+}
+.prestige-glow::before {
+  box-shadow: 0 0 var(--glow-min, 4px) var(--glow-color, transparent);
+  animation: prestige-glow-out var(--glow-duration, 2.5s) ease-in-out infinite;
+}
+.prestige-glow::after {
+  box-shadow: 0 0 var(--glow-max, 10px) var(--glow-color, transparent);
+  opacity: 0;
+  animation: prestige-glow-in var(--glow-duration, 2.5s) ease-in-out infinite;
+}
+@keyframes prestige-glow-out {
   0%, 100% {
-    box-shadow: 0 0 var(--glow-min, 4px) var(--glow-color, transparent);
+    opacity: 1;
   }
   50% {
-    box-shadow: 0 0 var(--glow-max, 10px) var(--glow-color, transparent);
+    opacity: 0;
   }
 }
-
-.prestige-glow {
-  animation: prestige-glow-pulse var(--glow-duration, 2.5s) ease-in-out infinite;
+@keyframes prestige-glow-in {
+  0%, 100% {
+    opacity: 0;
+  }
+  50% {
+    opacity: 1;
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .prestige-glow {
+  .prestige-glow::before {
     animation: none;
-    box-shadow: 0 0 var(--glow-min, 4px) var(--glow-color, transparent);
+    opacity: 1;
+  }
+  .prestige-glow::after {
+    animation: none;
+    opacity: 0;
   }
 }
 
@@ -2213,12 +2255,13 @@ body:has(.fd-landing-dark) .brand-mark-icon {
   z-index: 0;
 }
 .fd-landing-dark .onboarding-field {
-  inset: 0;
+  inset: 0 0 0 -480px;
   opacity: 0.55;
   background:
     repeating-linear-gradient(112deg, rgba(255, 255, 255, 0.1) 0px, rgba(255, 255, 255, 0.1) 3px, transparent 3px, transparent 96px),
     repeating-linear-gradient(112deg, rgba(255, 255, 255, 0.035) 0px, rgba(255, 255, 255, 0.035) 1.5px, transparent 1.5px, transparent 24px);
-  animation: onboarding-field-drift 14s linear infinite;
+  animation: field-drift-x 14s linear infinite;
+  will-change: transform;
 }
 .fd-landing-dark .onboarding-sweep {
   top: -20%;
@@ -2306,12 +2349,16 @@ body:has(.fd-landing-dark) .brand-mark-icon {
   color: #f5f7fa;
   overflow: hidden;
 }
-@keyframes onboarding-field-drift {
-  0% {
-    background-position: 0 0, 0 0;
+/* Perf 2026-11: the drifting line field used to animate background-position, which repaints the whole viewport layer
+   every frame on the main thread (and re-blurs every glass card above it). Same drift, same distance and speed, but as
+   a compositor-only transform: the box is 480px wider on the left and slides right by 480px, so the visible texture
+   is the same moving field lines. Scoped to the always-on page field and the two clipped sheet/modal fields. */
+@keyframes field-drift-x {
+  from {
+    transform: translate3d(0, 0, 0);
   }
-  100% {
-    background-position: 480px 0, 0 0;
+  to {
+    transform: translate3d(480px, 0, 0);
   }
 }
 @keyframes onboarding-sweep {
@@ -2324,13 +2371,14 @@ body:has(.fd-landing-dark) .brand-mark-icon {
 }
 .onboarding-field {
   position: absolute;
-  inset: 0;
+  inset: 0 0 0 -480px;
   z-index: 0;
   opacity: 0.55;
   background:
     repeating-linear-gradient(112deg, rgba(255, 255, 255, 0.1) 0px, rgba(255, 255, 255, 0.1) 3px, transparent 3px, transparent 96px),
     repeating-linear-gradient(112deg, rgba(255, 255, 255, 0.035) 0px, rgba(255, 255, 255, 0.035) 1.5px, transparent 1.5px, transparent 24px);
-  animation: onboarding-field-drift 14s linear infinite;
+  animation: field-drift-x 14s linear infinite;
+  will-change: transform;
   /* coridian_, 2026-10-18: "Account creation does not work" — a real,
      severe regression from today's landing-page reuse of this class
      (#1167). position:absolute + z-index:0 sits ABOVE plain in-flow

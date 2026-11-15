@@ -25,6 +25,7 @@ import {
   toggleKey,
 } from '../lib/liveDraft';
 import { spacing, type ThemeColors } from '../theme';
+import { SkeletonText } from './Skeleton';
 import { Collapse } from './Presence';
 
 /**
@@ -268,7 +269,7 @@ export default function LiveDraftTradeEvaluator({
         />
         <Collapse open={open}>
           {loadingOptions ? (
-            <AppText style={styles.muted}>Loading remaining picks...</AppText>
+            <SkeletonText label="remaining picks" lines={3} />
           ) : optionsError ? (
             <ErrorState
               compact
