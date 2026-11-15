@@ -639,13 +639,13 @@ export default function GmGameScreen({ navigation }: Props) {
             onClose={() => setSheetPlayer(null)}
             actions={
               <>
-              {game.can_trade && simTradeSeedFor(sheetPlayer) ? (
+              {game.can_trade && simTradeSeedFor(sheetPlayer, game.settings) ? (
                 <Button
                   size="sm"
                   variant="secondary"
                   label="Add to trade"
                   onPress={() => {
-                    const seed = simTradeSeedFor(sheetPlayer);
+                    const seed = simTradeSeedFor(sheetPlayer, game.settings);
                     if (!seed) return;
                     setTradeSeed(seed);
                     setSheetPlayer(null);

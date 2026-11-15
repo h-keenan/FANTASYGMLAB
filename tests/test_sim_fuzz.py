@@ -240,8 +240,21 @@ class Fuzz:
         if self.rng.random() < 0.1:
             give.append(self.junk_id())
         give, get = [g for g in give if g], [g for g in get if g]
+        if partner in state.rosters and partner != user and self.rng.random() < 0.35:  # K/DEF-heavy: swap one for one, with sweeteners (the only legal shape)
+            kd = lambda team, pos: [p for p in state.rosters[team] if snap.players[p].pos == pos]  # noqa: E731
+            pos = self.pick(["K", "DEF"])
+            a, b = kd(user, pos), kd(partner, pos)
+            if a and b:
+                give = [a[0]] + [g for g in give if snap.players[g].pos not in ("K", "DEF")][:2] if all(not g.startswith("pick") for g in give) else [a[0]]
+                get = [b[0]] + [g for g in get if snap.players[g].pos not in ("K", "DEF")][:1] if all(not g.startswith("pick") for g in get) else [b[0]]
         if self.rng.random() < 0.4:
-            self.req("POST", "/trades/preview", {"partner": partner, "give": give, "get": get})
+            res, data = self.req("POST", "/trades/preview", {"partner": partner, "give": give, "get": get})
+            counter = ((data or {}).get("verdict") or {}).get("counter")
+            if counter and self.rng.random() < 0.7:  # "Take their counter": it must be sendable, never a singleton_limit dead end
+                cg, cr = [p["id"] for p in counter["give"]], [p["id"] for p in counter["get"]]
+                res2, data2 = self.req("POST", "/trades", {"partner": partner, "give": cg, "get": cr}, tag="POST /trades (counter)")
+                if data2.get("reason") in ("singleton_limit", "offer_invalid"):
+                    self.violations.append(f"the AI's own counter could not be sent: {data2.get('reason')} {data2.get('message')}")
             return
         res, data = self.req("POST", "/trades", {"partner": partner, "give": give, "get": get})
         if data.get("executed"):
