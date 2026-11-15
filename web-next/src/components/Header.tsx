@@ -10,8 +10,6 @@ import { Suspense, useEffect, useRef, useState } from "react";
 import { AlertsBell } from "@/components/AlertsDropdown";
 import { useAuth } from "@/context/AuthContext";
 import { BRAND_NAME } from "@/lib/brand";
-import { supabase } from "@/lib/supabase";
-import { maskSavedLeagueRows } from "@/lib/privacy";
 import { VALUATION_LENS_OPTIONS, useValuationLens, type ValuationLens } from "@/context/ValuationLensContext";
 import { swapLeagueIdInPath } from "@/lib/leagueSwitcher";
 import { PAGE_TITLE_BY_SEGMENT } from "@/lib/navDestinations";
@@ -20,6 +18,7 @@ import { ConfirmInPlace } from "@/components/ui/ConfirmInPlace";
 import { pathOwnsPhoneChrome } from "@/lib/bottomNav";
 import { ShellHeader } from "@/components/ShellHeader";
 import { useShellNav } from "@/lib/useShellNav";
+import { useSavedLeagues, type SavedLeagueRow } from "@/lib/useSavedLeagues";
 
 const LEGAL_LINKS: { pageKey: string; label: string }[] = [
   { pageKey: "about_disclaimer", label: "About / Disclaimer" },
@@ -29,10 +28,7 @@ const LEGAL_LINKS: { pageKey: string; label: string }[] = [
   { pageKey: "no_affiliation", label: "No-Affiliation Disclaimer" },
 ];
 
-export interface SavedLeagueRow {
-  league_id: string;
-  league_name: string | null;
-}
+export type { SavedLeagueRow };
 
 /** Shared look for the league / evaluation-lens chips in the header's second row. */
 const HEADER_CHIP_CLASS = "inline-flex items-center gap-1.5 px-3 text-xs font-bold min-h-[var(--touch-target-min)]";
@@ -302,29 +298,9 @@ function HeaderLeagueControls() {
   const searchParams = useSearchParams();
   const leagueId = params?.leagueId ? decodeURIComponent(params.leagueId) : null;
   const nameParam = searchParams.get("name");
-  const [savedLeagues, setSavedLeagues] = useState<SavedLeagueRow[]>([]);
-
-  // Fetches the user's saved leagues once per league-scoped page (not just
-  // lazily when the switcher dropdown opens, like before) so the header's
-  // own displayed name can resolve `leagueId` -> real league name from
-  // `saved_leagues` whenever a caller forgot to pass `?name=` on its link —
-  // the raw-league_id-in-the-header bug (coridian_ screenshot) was exactly
-  // that: `leagueName` had no fallback besides the URL query param. This
-  // also means LeagueSwitcherButton's dropdown list is ready the instant
-  // it's opened instead of flashing "No other saved leagues" first.
-  useEffect(() => {
-    if (!leagueId) return;
-    let cancelled = false;
-    supabase
-      .from("saved_leagues")
-      .select("league_id, league_name")
-      .then(({ data }) => {
-        if (!cancelled) setSavedLeagues(maskSavedLeagueRows(data ?? []));
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [leagueId]);
+  // The phone shell fetches the list itself (ShellHeader); this legacy header only needs it when the shell is off.
+  const { barVisible } = useShellNav();
+  const { rows: savedLeagues } = useSavedLeagues(Boolean(leagueId) && !barVisible);
 
   if (!leagueId) return null;
 
@@ -453,7 +429,7 @@ export function Header() {
     <>
     {barVisible ? (
       <Suspense fallback={null}>
-        <ShellHeader leagueControls={<HeaderLeagueControls />} actions={<HeaderIconActions />} />
+        <ShellHeader actions={<HeaderIconActions />} />
       </Suspense>
     ) : null}
     <header

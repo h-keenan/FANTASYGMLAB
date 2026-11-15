@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { Pressable, StyleSheet, View } from 'react-native';
+import { Pressable, StyleSheet, TextInput, View } from 'react-native';
 import PressableScale from './PressableScale';
 import AppText from './AppText';
 import { Ionicons } from '@expo/vector-icons';
@@ -9,6 +9,9 @@ import { navigationRef, switchLeagueKeepingScreen } from '../navigation/navigati
 import { setLastLeague } from '../lib/lastLeague';
 import { maskShowcaseFields } from '../lib/showcaseMode';
 import { supabase } from '../lib/supabase';
+import { filterLeagues, SWITCHER_SEARCH_FROM } from '../lib/appHeader';
+import LeagueCrest from './LeagueCrest';
+import ErrorState from './ErrorState';
 import { useThemeMode } from '../context/ThemeModeContext';
 import { radii, spacing, type ThemeColors, scrim } from '../theme';
 import { SheetModal, SheetScrollView, SwipeDismissCard } from './SwipeDismissSheet';
@@ -45,21 +48,32 @@ export default function LeagueSwitcherHeaderButton({
   const styles = useMemo(() => createStyles(colors), [colors]);
   const [open, setOpen] = useState(false);
   const [savedLeagues, setSavedLeagues] = useState<SavedLeagueRow[]>([]);
+  const [failed, setFailed] = useState(false);
+  const [attempt, setAttempt] = useState(0);
+  const [query, setQuery] = useState('');
 
   useEffect(() => {
     let cancelled = false;
     supabase
       .from('saved_leagues')
       .select('id, league_id, league_name')
-      .then(({ data }) => {
-        if (!cancelled && data) setSavedLeagues(maskShowcaseFields(data as SavedLeagueRow[]));
+      .then(({ data, error }) => {
+        if (cancelled) return;
+        if (error) {
+          setFailed(true);
+          return;
+        }
+        setFailed(false);
+        if (data) setSavedLeagues(maskShowcaseFields(data as SavedLeagueRow[]));
       });
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [attempt]);
 
-  if (savedLeagues.length < 1) return null;
+  if (savedLeagues.length < 1 && !failed) return null;
+  // UI pass 7 (web twin: LeagueSwitcherSheet): the current league first, search from 6 leagues, names wrap (never ellipsized).
+  const shownLeagues = filterLeagues(savedLeagues, query, leagueId);
 
   const switchToLeague = (row: SavedLeagueRow) => {
     setOpen(false);
@@ -76,9 +90,23 @@ export default function LeagueSwitcherHeaderButton({
       <SheetModal visible={open} transparent animationType="fade" onRequestClose={() => setOpen(false)}>
         <Pressable style={styles.backdrop} onPress={() => setOpen(false)}>
           <SwipeDismissCard style={styles.sheet} onDismiss={() => setOpen(false)}>
-            <AppText style={styles.title}>Switch League</AppText>
+            <AppText style={styles.title}>Your leagues</AppText>
+            {savedLeagues.length >= SWITCHER_SEARCH_FROM ? (
+              <TextInput
+                style={styles.search}
+                placeholder={`Search ${savedLeagues.length} leagues`}
+                placeholderTextColor={colors.textTertiary}
+                value={query}
+                onChangeText={setQuery}
+                accessibilityLabel="Search leagues"
+                autoCorrect={false}
+              />
+            ) : null}
+            {failed ? (
+              <ErrorState compact title="Your other leagues didn't load" onRetry={() => setAttempt((n) => n + 1)} />
+            ) : null}
             <SheetScrollView style={styles.list}>
-              {savedLeagues.map((row) => {
+              {shownLeagues.map((row) => {
                 const active = row.league_id === leagueId;
                 return (
                   <PressableScale
@@ -87,15 +115,14 @@ export default function LeagueSwitcherHeaderButton({
                     onPress={() => switchToLeague(row)}
                     disabled={active}
                   >
-                    <Ionicons
-                      name={active ? 'radio-button-on' : 'radio-button-off'}
-                      size={18}
-                      color={active ? colors.accent : colors.textTertiary}
-                      style={styles.optionIcon}
-                    />
-                    <AppText style={[styles.optionText, active && styles.optionTextActive]} numberOfLines={1}>
-                      {row.league_name || row.league_id}
-                    </AppText>
+                    <View style={styles.optionIcon}>
+                      <LeagueCrest leagueId={row.league_id} name={row.league_name} size={34} />
+                    </View>
+                    <View style={styles.optionBody}>
+                      <AppText style={[styles.optionText, active && styles.optionTextActive]}>{row.league_name || row.league_id}</AppText>
+                      {active ? <AppText style={styles.optionSub}>Current league</AppText> : null}
+                    </View>
+                    {active ? <Ionicons name="checkmark" size={18} color={colors.accent} /> : null}
                   </PressableScale>
                 );
               })}
@@ -113,6 +140,18 @@ export default function LeagueSwitcherHeaderButton({
             >
               <Ionicons name="add" size={18} color={colors.accentOnTint} style={styles.optionIcon} />
               <AppText style={[styles.optionText, styles.optionTextActive]}>Add a league</AppText>
+            </PressableScale>
+            <PressableScale
+              style={styles.addRow}
+              onPress={() => {
+                setOpen(false);
+                if (navigationRef.isReady()) navigationRef.dispatch(StackActions.push('SampleLeague'));
+              }}
+              accessibilityRole="button"
+              accessibilityLabel="Try the sample league"
+            >
+              <Ionicons name="star-outline" size={18} color={colors.textSecondary} style={styles.optionIcon} />
+              <AppText style={styles.optionText}>Try the sample league</AppText>
             </PressableScale>
           </SwipeDismissCard>
         </Pressable>
@@ -157,6 +196,9 @@ function createStyles(colors: ThemeColors) {
       borderBottomColor: colors.border,
     },
     optionIcon: { marginRight: spacing.sm },
+    optionBody: { flex: 1, minWidth: 0 },
+    optionSub: { fontSize: 12.5, color: colors.textTertiary },
+    search: { borderWidth: 1, borderColor: colors.border, borderRadius: radii.md, paddingHorizontal: spacing.md, paddingVertical: spacing.sm, fontSize: 16, color: colors.textPrimary, marginBottom: spacing.sm },
     addRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: spacing.sm, marginTop: spacing.xs },
     optionText: { fontSize: 16.5, fontWeight: '600', color: colors.textPrimary, flexShrink: 1 },
     // accentOnTint: plain accent measures only 4.02:1 against this sheet's
