@@ -1,8 +1,8 @@
 import type { TabIconName } from '../lib/tabIcons';
+import { useNotice } from '../components/NoticeToast';
 import { ProjectionWeatherChip } from '../components/WeatherReasonChip';
 import React, { useEffect, useMemo, useState } from 'react';
 import {
-  Alert,
   Linking,
   ScrollView,
   StyleSheet,
@@ -942,6 +942,7 @@ function statusTone(status: string | null | undefined): SnapshotItem['tone'] {
 // must never read as a confirmed "Healthy" success tone.
 
 export default function PlayerDetailScreen({ route, navigation }: Props) {
+  const notify = useNotice();
   const orbClearance = useOrbClearance();
   const headerHeight = useHeaderHeight();
   const { colors, isDark } = useThemeMode();
@@ -1155,16 +1156,13 @@ export default function PlayerDetailScreen({ route, navigation }: Props) {
         if (result.ok) {
           setWatching(true);
         } else if (result.reason === 'at_cap') {
-          Alert.alert(
-            'GM Targets is full',
-            `You've hit the cap for this league (${result.cap ?? 'limit reached'}). Remove a target before adding another.`,
-          );
+          notify.alert('GM Targets is full', `You've hit the cap for this league (${result.cap ?? 'limit reached'}). Remove a target before adding another.`);
         } else {
-          Alert.alert('Could not update GM Targets', 'Please try again in a moment.');
+          notify.alert('Could not update GM Targets', 'Please try again in a moment.');
         }
       }
     } catch {
-      Alert.alert('Could not update GM Targets', 'Please try again in a moment.');
+      notify.alert('Could not update GM Targets', 'Please try again in a moment.');
     } finally {
       setWatchBusy(false);
     }
@@ -1179,11 +1177,11 @@ export default function PlayerDetailScreen({ route, navigation }: Props) {
       const result = await api.setGmTargetUntouchable(leagueId, player.player_id, next);
       if (!result.ok) {
         setUntouchable(!next);
-        Alert.alert('Could not update untouchable', 'Please try again in a moment.');
+        notify.alert('Could not update untouchable', 'Please try again in a moment.');
       }
     } catch {
       setUntouchable(!next);
-      Alert.alert('Could not update untouchable', 'Please try again in a moment.');
+      notify.alert('Could not update untouchable', 'Please try again in a moment.');
     } finally {
       setUntouchableBusy(false);
     }

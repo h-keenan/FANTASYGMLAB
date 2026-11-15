@@ -592,7 +592,7 @@ Below 768px, for signed-in users with the flag on, the floating GM orb and the c
 - Fantasy Sim keeps its own header and game orb (`pathOwnsPhoneChrome`); the sign-in/onboarding root `/` keeps the orb where no bar can render.
 - Route to tab mapping lives in `lib/shellNav.ts` (`shellActiveTab`), covered by tests.
 
-Flag (`lib/shellNav.ts`, `lib/useShellNav.ts`): `NEXT_PUBLIC_BOTTOM_NAV` = `founder` (default: founder/owner account only), `on` (everyone), `off` (kill switch for everyone, nothing overrides it). `?nav=bottom` turns it on and `?nav=off` turns it off for that browser (remembered in localStorage `fgl:nav`). Naming: "Dashboard" is **Today** everywhere user-facing (route and code names keep `dashboard`); **Fantasy Sim** is the game; **Season Outlook** is the forecast (GM Plan and Games tab; "Season Sim" is a retired term).
+Flag (`lib/shellNav.ts`, `lib/useShellNav.ts`): `NEXT_PUBLIC_BOTTOM_NAV` = `on` (default since 2026-11-14, UI pass 5 D4: every signed-in phone user gets the shell header + pill), `founder` (the old staged rollout: founder/owner account only), `off` (kill switch for everyone, nothing overrides it). `?nav=bottom` turns it on and `?nav=off` turns it off for that browser (remembered in localStorage `fgl:nav`). Naming: "Dashboard" is **Today** everywhere user-facing (route and code names keep `dashboard`); **Fantasy Sim** is the game; **Season Outlook** is the forecast (GM Plan and Games tab; "Season Sim" is a retired term).
 
 
 ## Overlays (one pop-up at a time)
@@ -1241,3 +1241,8 @@ uses the same strip (`simRookieRecentCards`; the rookie order carries no team or
   their picks so far); the run signal is the public proxy.
 - The player list (`SimDraftBoard` -> `SimDraftRow` -> `SimPlayerLine`) was already `PlayerAccordionRow mode="sim"`; the Full board grid (`SimDraftGrid`) stays a dense grid of
   position-tinted pick cells (a board, not a list).
+
+## UI pass 5 (C): shell for everyone, in-app notice on the app
+
+- **D4**: the phone shell (header + bottom pill) is the default for every signed-in phone user. `NEXT_PUBLIC_BOTTOM_NAV=off` is the kill switch (everyone, nothing overrides it); `=founder` restores the staged rollout; `?nav=off` opts one browser out (remembered). The legacy header + orb are reachable only through those switches.
+- **D7**: the app reports failed saves and short confirmations with `NoticeProvider` / `useNotice()` (`mobile/src/components/NoticeToast.tsx`, pure rules in `lib/notice.ts`): `notify.alert(title, detail)` is the drop-in for the old two-argument `Alert.alert`, `notify(message, 'error' | 'success' | 'info')` the direct form. It rises above the pill through `ToastSlot` / `Presence`, clears itself (errors 5s, info 3.5s, success 3s) and a newer notice replaces it. Decisions that need a button (delete account, confirms) stay dialogs. The old `Alert.alert('Could not ...')` pattern is guarded by `uiPass5CGuard.test.ts`.
