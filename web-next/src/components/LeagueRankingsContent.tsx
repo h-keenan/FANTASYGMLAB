@@ -6,7 +6,7 @@ import { BEGINNER_HELP } from "@/lib/experienceCopy";
 import { useState, useSyncExternalStore } from "react";
 
 import { AccentCard } from "@/components/AccentCard";
-import { BeginnerHelp } from "@/components/BeginnerHelp";
+import { usePageHelp } from "@/components/PageHelpLines";
 import { Button } from "@/components/Button";
 import { ValueRing } from "@/components/ValueRing";
 import { api, type LeagueTeamRankingsResponse, type PlayoffOddsResponse, type PlayoffOddsTeam, type TeamRanking } from "@/lib/api";
@@ -363,9 +363,6 @@ function PlayoffOddsSection({ leagueId, leagueName, myRosterId, myTeam }: { leag
       >
         Playoff Odds
       </SectionHeading>
-      <div className="flex flex-wrap gap-2">
-        <BeginnerHelp label="playoff odds" lines={[BEGINNER_HELP.playoffOddsIntro, BEGINNER_HELP.playoffOddsTerms]} />
-      </div>
       {state === "idle" ? (
         <Button onClick={calculate} className="self-start">
           Calculate playoff odds
@@ -501,6 +498,7 @@ export function LeagueRankingsContent({
    * in that case, same as the other pages' best-effort "You" badge. */
   myRosterId?: string;
 }) {
+  const pageHelp = usePageHelp([BEGINNER_HELP.playoffOddsIntro, BEGINNER_HELP.playoffOddsTerms]);
   const notReady = !data.ok || data.teams.length === 0;
   const mine = myRosterId ? data.teams.find((team) => team.roster_id === myRosterId) : undefined;
   // The header ribbon (UI pass 7): where you stand, glanceable from any scroll position.
@@ -520,7 +518,7 @@ export function LeagueRankingsContent({
     <main className="page-shell">
       {leagueId ? <PageTabBar family="league" active="rankings" leagueId={leagueId} leagueName={leagueName} /> : null}
       <header className="flex flex-col gap-1">
-        <PageTitle page="League Rankings" leagueName={leagueName} />
+        <PageTitle page="League Rankings" leagueName={leagueName} info={pageHelp} />
       </header>
 
       {notReady ? (

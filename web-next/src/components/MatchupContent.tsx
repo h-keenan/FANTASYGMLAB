@@ -14,7 +14,7 @@ import type {
   MatchupSuggestedMove,
 } from "@/lib/api";
 import { Button } from "@/components/Button";
-import { BeginnerHelp } from "@/components/BeginnerHelp";
+import { usePageHelp } from "@/components/PageHelpLines";
 import { PageTitle } from "@/components/PageTitle";
 import { EmptyState } from "@/components/EmptyState";
 import { reloadPage } from "@/components/ErrorState";
@@ -79,9 +79,10 @@ function signedTone(value: number | null | undefined): "positive" | "risk" | "ne
 }
 
 function MatchupHeader({ week, live, leagueName }: { week: number | null; live: boolean; leagueName: string }) {
+  const pageHelp = usePageHelp([BEGINNER_HELP.matchupIntro, BEGINNER_HELP.matchupWinProbability]);
   return (
     <header className="flex items-baseline gap-3 flex-wrap">
-      <PageTitle page="Matchup" leagueName={leagueName} />
+      <PageTitle page="Matchup" leagueName={leagueName} info={pageHelp} />
       {week != null ? (
         <span className="text-sm font-bold" style={{ color: "var(--color-text-secondary)" }}>
           Week {week}
@@ -92,10 +93,6 @@ function MatchupHeader({ week, live, leagueName }: { week: number | null; live: 
           <ToneBadge label="● Live" color="var(--color-success)" />
         </span>
       ) : null}
-      <BeginnerHelp
-        label="this matchup page"
-        lines={[BEGINNER_HELP.matchupIntro, BEGINNER_HELP.matchupWinProbability]}
-      />
     </header>
   );
 }

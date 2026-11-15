@@ -15,7 +15,7 @@ import { buildRosterComposition, buildTeamAnalysisRows } from "@/lib/myTeamAnaly
 import type { ReactNode } from "react";
 import { PillRow } from "@/components/PillRow";
 import type { KeepersResponse, LineupPlayer, MyTeamNeedsResponse, MyTeamResponse, TeamRanking } from "@/lib/api";
-import { BeginnerHelp } from "@/components/BeginnerHelp";
+import { usePageHelp } from "@/components/PageHelpLines";
 import { formatRank, rankFill } from "@/components/SnapshotTile";
 import {
   buildConstructionObservations,
@@ -114,6 +114,7 @@ export function MyTeamContent({
   /** Persist the per-league keeper round penalty; omit to hide the control. */
   onKeeperRoundPenalty?: (penalty: number) => void;
 }) {
+  const pageHelp = usePageHelp([BEGINNER_HELP.myTeamIntro, BEGINNER_HELP.myTeamValueTiers]);
   const notice = myTeam.reason ? myTeamReasonMessage(myTeam.reason) : null;
   if (notice) {
     return (
@@ -268,10 +269,7 @@ export function MyTeamContent({
       {/* The page's one tab row. Everything below is a Hero plus modules that read while collapsed. */}
       {leagueId ? <PageTabBar family="team" active="roster" leagueId={leagueId} leagueName={leagueName} /> : null}
       <header className="flex flex-col gap-1">
-        <PageTitle page="My Team" leagueName={leagueName} />
-        <div className="flex flex-wrap gap-2">
-          <BeginnerHelp label="My Team and value tiers" lines={[BEGINNER_HELP.myTeamIntro, BEGINNER_HELP.myTeamValueTiers]} />
-        </div>
+        <PageTitle page="My Team" leagueName={leagueName} info={pageHelp} />
       </header>
 
       <StatusHeader

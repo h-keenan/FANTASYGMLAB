@@ -15,7 +15,7 @@ import PickGroupList from '../components/PickGroupList';
 import EmptyState from '../components/EmptyState';
 import GridBackground from '../components/GridBackground';
 import ExchangeSide from '../components/ExchangeSide';
-import PlayerIdentityRow from '../components/PlayerIdentityRow';
+import PlayerAccordionRow from '../components/PlayerAccordionRow';
 import ScreenInfoNote from '../components/ScreenInfoNote';
 import TradeFinderNoResults, {
   TradeFinderClosestSection,
@@ -255,23 +255,17 @@ function RosterRow({
       isLast={isLast}
       accessibilityLabel={player.name ?? 'Player'}
     >
-      {/* overallRating matches Players/Waivers/GM Targets' rows (coridian_:
-          player rows throughout the app need the same numeric Overall
-          badge, not just a tier ring) — `overall_rating` was already on
-          LineupPlayer, it just wasn't threaded into this row. No
-          league-wide position-rank field exists on LineupPlayer, so no
-          crown here (nothing to render honestly). */}
-      <PlayerIdentityRow
-        playerId={player.player_id}
-        name={player.name}
-        position={player.position}
-        team={player.team}
-        tier={player.tier}
-        overallRating={player.overall_rating}
-        injuryLabel={player.injury_label}
-        ruledOut={player.ruled_out}
-        onPress={onToggle}
-        showDivider={false}
+      {/* UI pass 5 D9 (coridian_ 2026-11-14): the approved player row (avatar, J. Surname, badge, TEAM · OVR, Value at the right)
+          next to the leading checkbox. The row toggles the selection, so it is nonInteractive (no quick view here). */}
+      <PlayerAccordionRow
+        player={{ id: player.player_id, name: player.name ?? 'Unknown player', position: player.position, team: player.team, tier: player.tier }}
+        mode="desk"
+        metaText={[player.team || 'FA', player.overall_rating != null ? `OVR ${Math.round(player.overall_rating)}` : null, player.injury_label || null].filter(Boolean).join(' · ')}
+        trailingFact={{ key: 'value', label: 'VALUE', value: player.score != null ? Math.round(player.score).toLocaleString() : '—' }}
+        open={false}
+        onToggle={onToggle}
+        nonInteractive="the whole row toggles the Trade Finder selection"
+        testID="trade-finder-roster-row"
       />
     </SelectableRow>
   );
