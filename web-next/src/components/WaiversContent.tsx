@@ -5,7 +5,7 @@ import { sleeperLeagueUrl } from "@/lib/matchupPlanner";
 import { PlayerIdentity } from "@/components/PlayerRow";
 import { ValueStat } from "@/components/ValueStat";
 import Link from "next/link";
-import { ButtonLink } from "@/components/Button";
+import { Button, ButtonLink } from "@/components/Button";
 import { useEffect, useMemo, useState } from "react";
 import type { WaiverTab } from "@/lib/pageTabs";
 
@@ -203,19 +203,9 @@ function ValueWithRing({ player, big = false }: { player: WaiverPlayer; big?: bo
 function ViewDetailsButton({ player }: { player: WaiverPlayer }) {
   const { openPlayer } = usePlayerQuickView();
   return (
-    <button
-      type="button"
-      onClick={() => openPlayer({ ...player, sourceLabel: "Waivers" })}
-      className="inline-flex items-center gap-1 px-3 text-xs font-bold shrink-0"
-      style={{
-        color: "var(--color-accent)",
-        border: "1px solid var(--color-accent)",
-        background: "transparent",
-        minHeight: "var(--touch-target-min)",
-      }}
-    >
+    <Button variant="accentOutline" size="sm" className="shrink-0 gap-1" onClick={() => openPlayer({ ...player, sourceLabel: "Waivers" })}>
       View details <span aria-hidden="true">→</span>
-    </button>
+    </Button>
   );
 }
 

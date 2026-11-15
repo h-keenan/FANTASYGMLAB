@@ -503,7 +503,7 @@ export function DesignSystemContent() {
               <Button loading>Working…</Button>
             </Variant>
             <Variant label="Size sm">
-              <Button size="sm">Retry</Button>
+              <Button size="sm">Try again</Button>
             </Variant>
           </div>
           <Button fullWidth>Full width primary</Button>

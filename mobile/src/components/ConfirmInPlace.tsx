@@ -177,7 +177,7 @@ export default function ConfirmInPlace({
       >
         <AppText style={styles.keepText}>{phase === 'error' ? 'Cancel' : keepLabel}</AppText>
       </PressableScale>
-      <Button label={phase === 'error' ? 'Retry' : confirmText} variant="danger" size="sm" loading={busy} onPress={() => void run()} />
+      <Button label={phase === 'error' ? 'Try again' : confirmText} variant="danger" size="sm" loading={busy} onPress={() => void run()} />
     </View>
   );
 
