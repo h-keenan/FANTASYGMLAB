@@ -670,12 +670,13 @@ body {
   pointer-events: none;
 }
 .app-background-field {
-  inset: 0;
+  inset: 0 0 0 -480px;
   opacity: 0.4;
   background:
     repeating-linear-gradient(112deg, rgba(255, 255, 255, 0.1) 0px, rgba(255, 255, 255, 0.1) 3px, transparent 3px, transparent 96px),
     repeating-linear-gradient(112deg, rgba(255, 255, 255, 0.035) 0px, rgba(255, 255, 255, 0.035) 1.5px, transparent 1.5px, transparent 24px);
-  animation: onboarding-field-drift 14s linear infinite;
+  animation: field-drift-x 14s linear infinite;
+  will-change: transform;
 }
 .app-background-sweep {
   top: -20%;
@@ -780,12 +781,13 @@ body {
   pointer-events: none;
 }
 .gm-orb-sheet-field {
-  inset: 0;
+  inset: 0 0 0 -480px;
   opacity: 0.4;
   background:
     repeating-linear-gradient(112deg, rgba(255, 255, 255, 0.1) 0px, rgba(255, 255, 255, 0.1) 3px, transparent 3px, transparent 96px),
     repeating-linear-gradient(112deg, rgba(255, 255, 255, 0.035) 0px, rgba(255, 255, 255, 0.035) 1.5px, transparent 1.5px, transparent 24px);
-  animation: onboarding-field-drift 14s linear infinite;
+  animation: field-drift-x 14s linear infinite;
+  will-change: transform;
 }
 .gm-orb-sheet-sweep {
   top: -20%;
@@ -1204,12 +1206,13 @@ a {
   pointer-events: none;
 }
 .pqv-field {
-  inset: 0;
+  inset: 0 0 0 -480px;
   opacity: 0.4;
   background:
     repeating-linear-gradient(112deg, rgba(255, 255, 255, 0.1) 0px, rgba(255, 255, 255, 0.1) 3px, transparent 3px, transparent 96px),
     repeating-linear-gradient(112deg, rgba(255, 255, 255, 0.035) 0px, rgba(255, 255, 255, 0.035) 1.5px, transparent 1.5px, transparent 24px);
-  animation: onboarding-field-drift 14s linear infinite;
+  animation: field-drift-x 14s linear infinite;
+  will-change: transform;
 }
 .pqv-sweep {
   top: -20%;
@@ -2308,6 +2311,18 @@ body:has(.fd-landing-dark) .brand-mark-icon {
   background: #000;
   color: #f5f7fa;
   overflow: hidden;
+}
+/* Perf 2026-11: the drifting line field used to animate background-position, which repaints the whole viewport layer
+   every frame on the main thread (and re-blurs every glass card above it). Same drift, same distance and speed, but as
+   a compositor-only transform: the box is 480px wider on the left and slides right by 480px, so the visible texture
+   is the same moving field lines. Scoped to the always-on page field and the two clipped sheet/modal fields. */
+@keyframes field-drift-x {
+  from {
+    transform: translate3d(0, 0, 0);
+  }
+  to {
+    transform: translate3d(480px, 0, 0);
+  }
 }
 @keyframes onboarding-field-drift {
   0% {
