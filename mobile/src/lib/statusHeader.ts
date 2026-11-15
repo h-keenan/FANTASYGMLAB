@@ -322,7 +322,7 @@ export function buildTodayStatusHeader(input: TodayStatusInput): StatusHeaderMod
   if (standing?.playoffOdds) stats.push({ key: "odds", label: "Playoffs", value: standing.playoffOdds, tone: toneOf(standing.tone), href: hrefs.rankings });
   if (tradeCount > 0) stats.push({ key: "trades", label: "Trades", value: `${tradeCount} ${tradeCount === 1 ? "idea" : "ideas"}`, href: hrefs.trades });
   return statusHeaderModel({
-    kicker: matchup?.week != null ? `TODAY · WEEK ${matchup.week}` : "TODAY",
+    kicker: "THIS WEEK",
     headline,
     context: queueNext ? (hero?.context ?? null) : queueNothing ? (queueNothing.detail ?? hero?.context ?? null) : (hero?.context ?? null),
     ring,
@@ -360,7 +360,7 @@ export function buildTeamStatusHeader(input: TeamStatusInput): StatusHeaderModel
   stats.push({ key: "holes", label: "Holes", value: String(holes), tone: holes > 0 ? "danger" : "success", href: holes > 0 ? input.hrefs.lineup : undefined });
   stats.push({ key: "injured", label: "Injured", value: String(input.injuredStarters), tone: input.injuredStarters > 0 ? "warning" : "success" });
   return statusHeaderModel({
-    kicker: "TEAM",
+    kicker: "YOUR TEAM",
     headline: holes > 0 ? `${holes} ${holes === 1 ? "hole" : "holes"} in your lineup` : `Team Value ${input.teamValue}`,
     context: holes > 0 ? [`Team Value ${input.teamValue}`, input.context].filter(Boolean).join(" · ") : input.context,
     ring,

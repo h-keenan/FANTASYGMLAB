@@ -113,7 +113,7 @@ describe("FantasyDesk adapters", () => {
     expect(model.context).toBe("Week 9 vs Rival");
     expect(model.stats.map((s) => s.key)).toEqual(["standing", "odds", "trades"]);
     expect(model.primary).toEqual({ label: "Fix lineup", href: "/m" });
-    expect(model.kicker).toBe("TODAY · WEEK 9");
+    expect(model.kicker).toBe("THIS WEEK");
   });
   it("Today: nothing to say means no header", () => {
     expect(buildTodayStatusHeader({ matchup: null, hero: null, lineup: null, standing: null, attention: [], tradeCount: 0, hrefs })).toBeNull();

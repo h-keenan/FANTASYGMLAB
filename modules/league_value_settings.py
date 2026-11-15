@@ -30,7 +30,7 @@ from typing import Any, Mapping
 import numpy as np
 import pandas as pd
 
-from modules import player_eligibility, rankings, redis_cache, sleeper
+from modules import derived_cache, player_eligibility, rankings, redis_cache, sleeper
 from modules.player_tiers import assign_player_tiers
 from modules.rankings import current_availability_multiplier
 
@@ -955,6 +955,7 @@ def build_valued_players_frame_cached(
     )
     returned = valued.copy()
     _remember_valued_frame_cache_key(returned, cache_key)
+    derived_cache.tag_frame(returned, derived_cache.fingerprint("valued_players_frame", cache_key))
     return returned
 
 

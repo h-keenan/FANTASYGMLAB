@@ -264,6 +264,9 @@ from modules import (
     weekly_box_scores,
     weekly_roundup,
 )
+from modules import derived_cache
+from modules import prefetch
+from modules.frame_records import frame_records
 from modules import player_search
 from modules.admission import AdmissionControlMiddleware
 from modules import public_dynasty_values
@@ -4409,11 +4412,20 @@ def _resolve_my_roster(
     ):
         return None, FREE_LEAGUE_CAP_REASON
 
-    sleeper_user_id = sleeper_leagues.resolve_sleeper_user_id(sleeper_username)
+    # The username -> user id lookup and the league's roster list do not depend on each other: run both together instead of paying
+    # two Sleeper round trips back to back. Either one that fails is simply repeated the usual way below.
+    sleeper_user_id, rosters = prefetch.run_parallel(
+        lambda: sleeper_leagues.resolve_sleeper_user_id(sleeper_username),
+        lambda: sleeper.get_rosters(league_id),
+    )
+    if sleeper_user_id is prefetch.FAILED:
+        sleeper_user_id = sleeper_leagues.resolve_sleeper_user_id(sleeper_username)
     if not sleeper_user_id:
         return None, "sleeper_user_not_found"
 
-    for roster in sleeper.get_rosters(league_id):
+    if rosters is prefetch.FAILED:
+        rosters = sleeper.get_rosters(league_id)
+    for roster in rosters:
         if str(roster.get("owner_id") or "") == sleeper_user_id:
             return roster, ""
 
@@ -5891,10 +5903,57 @@ class TradeAnalyzerRequest(BaseModel):
     partner_roster_id: str = ""
 
 
-def _league_waiver_pool(league_id: str, valued: pd.DataFrame) -> pd.DataFrame | None:
-    """The league's real free agents (see ``trade_grade.league_waiver_pool``)."""
+_AGE_CURVE_MEMO = derived_cache.Memo(
+    "age_curve", max_entries=24, copier=lambda frame: derived_cache.tag_frame(frame.copy(), derived_cache.frame_key(frame))
+)
 
-    return trade_grade.league_waiver_pool(sleeper.get_rosters(league_id), valued)
+
+def _strategy_adjusted_valued(valued: pd.DataFrame, strategy: str, score_field: str) -> pd.DataFrame:
+    """``trade_hub_engine.apply_strategy_age_curve`` (a pure function of frame, strategy and score field) for a frame tagged by
+    the shared valued-pool cache: the adjusted frame is reused (a private, re-tagged copy each time) instead of re-running the
+    row-wise curve every request. Any other frame is computed directly. The result carries its own content tag."""
+
+    base_key = derived_cache.frame_key(valued)
+    if not base_key:
+        return trade_hub_engine.apply_strategy_age_curve(valued, strategy, score_field)
+    try:
+        key = derived_cache.fingerprint("age_curve", base_key, strategy, score_field)
+    except derived_cache.Unfingerprintable:
+        return trade_hub_engine.apply_strategy_age_curve(valued, strategy, score_field)
+
+    def build() -> pd.DataFrame:
+        adjusted = trade_hub_engine.apply_strategy_age_curve(valued, strategy, score_field)
+        if adjusted is valued:  # already on this curve: keep a distinct object so tagging it cannot rename the caller's frame
+            adjusted = adjusted.copy()
+        return derived_cache.tag_frame(adjusted, key)
+
+    return _AGE_CURVE_MEMO.get_or_compute(key, build)
+
+
+_LEAGUE_POOL_MEMO = derived_cache.Memo(
+    "league_waiver_pool", max_entries=32, copier=lambda frame: None if frame is None else frame.copy()
+)
+
+
+def _league_waiver_pool(league_id: str, valued: pd.DataFrame) -> pd.DataFrame | None:
+    """The league's real free agents (see ``trade_grade.league_waiver_pool``).
+
+    A pure function of (rosters, valued), and the per-row eligibility pass over the whole pool is the largest single cost of a
+    Trade Analyzer request that does not depend on the package being graded, so it is reused (a private copy each time) when
+    ``valued`` is a frame tagged with its content (``modules.derived_cache``) and the league's rosters are unchanged."""
+
+    rosters = sleeper.get_rosters(league_id)
+    key: str | None = None
+    value_key = derived_cache.frame_key(valued)
+    if value_key:
+        try:
+            key = derived_cache.fingerprint("league_waiver_pool", value_key, rosters or [])
+        except derived_cache.Unfingerprintable:
+            key = None
+    pool = _LEAGUE_POOL_MEMO.get_or_compute(key, lambda: trade_grade.league_waiver_pool(rosters, valued))
+    if key is not None and pool is not None:
+        derived_cache.tag_frame(pool, derived_cache.fingerprint("league_waiver_pool.result", key))
+    return pool
 
 
 def _lineup_hole_waiver_options(
@@ -5930,6 +5989,87 @@ def _attach_projection_ppg(
     Hub / Finder gate (modules.trade_grade.attach_projection_baselines)."""
 
     return trade_grade.attach_projection_baselines(valued, pool, player_ids, score_field, lineup_settings=lineup_settings)
+
+
+def _tagged_copy(frame: pd.DataFrame | None) -> pd.DataFrame | None:
+    return None if frame is None else derived_cache.tag_frame(frame.copy(), derived_cache.frame_key(frame))
+
+
+_ATTACH_MEMO = derived_cache.Memo(
+    "attach_projection_ppg", max_entries=32, copier=lambda pair: (_tagged_copy(pair[0]), _tagged_copy(pair[1]))
+)
+
+
+def _attach_projection_ppg_memoized(
+    valued: pd.DataFrame,
+    pool: pd.DataFrame | None,
+    player_ids: set[str],
+    score_field: str,
+    lineup_settings: dict[str, Any] | None = None,
+) -> tuple[pd.DataFrame, pd.DataFrame | None]:
+    """``_attach_projection_ppg`` for frames tagged with their content: a pure function of (frame, pool, the asked-for player
+    ids, scoring settings), so an identical request reuses the answer (private, re-tagged copies). Untagged inputs compute
+    directly. The result frames carry their own content tags, which is what lets ``_league_needs_memoized`` reuse its work."""
+
+    value_key, pool_key = derived_cache.frame_key(valued), derived_cache.frame_key(pool) if pool is not None else "none"
+    key: str | None = None
+    if value_key and pool_key:
+        try:
+            key = derived_cache.fingerprint("attach", value_key, pool_key, sorted(str(p) for p in player_ids), score_field, lineup_settings or {})
+        except derived_cache.Unfingerprintable:
+            key = None
+
+    def build() -> tuple[pd.DataFrame, pd.DataFrame | None]:
+        attached_valued, attached_pool = _attach_projection_ppg(valued, pool, player_ids, score_field, lineup_settings=lineup_settings)
+        # distinct objects, so tagging them cannot rename the caller's own frames
+        attached_valued = attached_valued.copy() if attached_valued is valued else attached_valued
+        attached_pool = attached_pool.copy() if (attached_pool is pool and pool is not None) else attached_pool
+        if key is not None:
+            derived_cache.tag_frame(attached_valued, derived_cache.fingerprint(key, "valued"))
+            if attached_pool is not None:
+                derived_cache.tag_frame(attached_pool, derived_cache.fingerprint(key, "pool"))
+        return attached_valued, attached_pool
+
+    return _ATTACH_MEMO.get_or_compute(key, build)
+
+
+_LEAGUE_NEEDS_MEMO = derived_cache.Memo("league_needs", max_entries=16)
+
+
+def _league_needs_memoized(
+    *,
+    valued: pd.DataFrame,
+    rosters: list[dict[str, Any]],
+    league: dict[str, Any],
+    settings: dict[str, Any],
+    score_field: str,
+    status: dict[str, Any],
+) -> "roster_value_model.LeagueNeeds":
+    """``roster_value_model.league_needs`` (one lineup-model calibration plus an ``assess_needs`` per roster, about a fifth of a
+    Trade Analyzer request) for a frame tagged with its content: reused for the same frame, rosters, league and settings. The
+    cached run starts from an empty status; the caller's own status codes are carried over exactly as the function itself did
+    (its result's status is the caller's codes plus any it added)."""
+
+    value_key = derived_cache.frame_key(valued)
+    key: str | None = None
+    if value_key:
+        try:
+            key = derived_cache.fingerprint("league_needs", value_key, rosters, league, settings, score_field)
+        except derived_cache.Unfingerprintable:
+            key = None
+    if key is None:
+        return roster_value_model.league_needs(
+            valued=valued, rosters=rosters, league=league, settings=settings, score_field=score_field, status=status
+        )
+    needs = _LEAGUE_NEEDS_MEMO.get_or_compute(
+        key,
+        lambda: roster_value_model.league_needs(
+            valued=valued, rosters=rosters, league=league, settings=settings, score_field=score_field, status=None
+        ),
+    )
+    merged = model_status.merge(status)
+    model_status.merge_into(merged, needs.status)
+    return roster_value_model.LeagueNeeds(by_roster=needs.by_roster, status=merged)
 
 
 _STANCE_UNSET: Any = object()
@@ -6191,7 +6331,10 @@ def _compute_trade_analyzer(
     # (trade_hub_engine.generate_trade_idea_records) and the web Trade
     # Analyzer already used, so a Hub idea and an Analyzer run of the same
     # package grade identically -- see modules.trade_grade.
-    valued = trade_hub_engine.apply_strategy_age_curve(valued, strategy, score_field)
+    # Name this frame by what it is (the cached pool + a pure strategy transform) so the league-wide, package-independent
+    # pieces below can be reused. Keeper and IDP adjustments below replace the frame with an untagged one, which switches
+    # that reuse off for those leagues (they compute exactly as before).
+    valued = _strategy_adjusted_valued(valued, strategy, score_field)
     pick_score_multiplier = trade_hub_engine.strategy_adjusted_pick_score_multiplier(1.0, strategy)
 
     # Keeper leagues: fold estimated keeper surplus into player values. Missing
@@ -6250,7 +6393,7 @@ def _compute_trade_analyzer(
         waiver_pool = _league_waiver_pool(league_id, valued)
     except Exception:
         waiver_pool = None
-    valued, waiver_pool = _attach_projection_ppg(
+    valued, waiver_pool = _attach_projection_ppg_memoized(
         valued,
         waiver_pool,
         my_roster_ids
@@ -6272,7 +6415,7 @@ def _compute_trade_analyzer(
     # The one need / surplus model, for the same league frame the verdict is
     # graded on. A roster it could not model is reported (``model_status``),
     # not read as "no needs".
-    analyzer_needs = roster_value_model.league_needs(
+    analyzer_needs = _league_needs_memoized(
         valued=valued, rosters=sleeper.get_rosters(league_id), league=league, settings=settings,
         score_field=score_field, status=analyzer_status,
     )
@@ -16542,6 +16685,9 @@ def _waivers_team_defense_context(settings: dict[str, Any], roster_player_ids: A
     }
 
 
+_WAIVER_BUNDLE_MEMO = derived_cache.Memo("waiver_bundle", max_entries=48, copier=derived_cache.share)
+
+
 def _waiver_roster_value_bundle(
     *,
     user: dict[str, Any],
@@ -16561,44 +16707,66 @@ def _waiver_roster_value_bundle(
     One build, used by the need model and the drop engine so they cannot
     disagree. Expected failures (a malformed row, a failed lookup) raise the
     ``model_status`` error classes to the caller, which reports them; nothing
-    is swallowed here."""
+    is swallowed here.
 
-    status = model_status.ok()
+    The context is a pure function of its inputs and is read-only to every consumer (its own lazy caches, ``swap_cache``
+    and ``wire_cache``, are pure too), so it is memoised in-process under a key over the full content of every input:
+    the cached pool frames (by the Redis entry they came from), this roster, every roster in the league, the league
+    payload and settings, lens, the user's resolved posture and the season window. A repeat request for unchanged
+    inputs reuses the context AND everything it already evaluated (drop-for-add swaps, wire options); any change to a
+    roster, the league, the posture or the pool entry is a new key and rebuilds exactly as before. ``DERIVED_CACHE=0``
+    bypasses it."""
+
     posture = _resolve_trade_posture(user, league_id, league, my_roster, lens=lens, client_strategy="auto")
-    strategy = posture["key"]
-    model_status.merge_into(status, posture.get("model_status"))
-    valued_s = trade_hub_engine.apply_strategy_age_curve(valued, strategy, score_field)
-    my_ids = {str(pid) for pid in (my_roster.get("players") or []) if pid is not None}
-    # The waiver pool is the endpoint's own cached free-agent frame (already
-    # waiver-actionable), minus rows flagged stale/retired.
-    pool = free_agents
-    if "stale_free_agent" in pool.columns:
-        pool = pool[~pool["stale_free_agent"].fillna(False).astype(bool)]
-    pool = trade_hub_engine.apply_strategy_age_curve(pool, strategy, score_field)
-    valued_p, pool_p = _attach_projection_ppg(valued_s, pool, my_ids, score_field, lineup_settings=settings)
-    for code in model_status.frame_codes(valued_p):
-        model_status.add(status, code)
-    roster_df = valued_p[valued_p["player_id"].astype(str).isin(my_ids)].copy()
-    rostered_ids = {str(pid) for r in rosters for pid in (r.get("players") or []) if pid is not None}
-    rostered_values = pd.to_numeric(
-        valued_p[valued_p["player_id"].astype(str).isin(rostered_ids)][score_field], errors="coerce"
-    ).dropna().tolist()
     window = trade_grade.season_window(settings)
-    rvc = roster_value_model.build_context(
-        roster_df=roster_df,
-        all_players_df=valued_p,
-        pool=pool_p,
-        my_roster=my_roster,
-        league=league,
-        settings=settings,
-        score_field=score_field,
-        strategy=strategy,
-        window=window,
-        league_rostered_values=rostered_values,
-        status=status,
-    )
-    league_table = roster_value_model.league_position_table(valued_p, rosters, rvc.model_ctx)
-    return {"rvc": rvc, "league_table": league_table, "valued": valued_p, "posture": posture, "status": status}
+    key: str | None = None
+    value_key, pool_key = derived_cache.frame_key(valued), derived_cache.frame_key(free_agents)
+    if value_key and pool_key:
+        try:
+            key = derived_cache.fingerprint(
+                "waiver_bundle", value_key, pool_key, lens, score_field, my_roster, rosters, league, settings,
+                posture.get("key"), posture.get("model_status"), repr(window),
+            )
+        except derived_cache.Unfingerprintable:
+            key = None
+
+    def build() -> dict[str, Any]:
+        status = model_status.ok()
+        strategy = posture["key"]
+        model_status.merge_into(status, posture.get("model_status"))
+        valued_s = trade_hub_engine.apply_strategy_age_curve(valued, strategy, score_field)
+        my_ids = {str(pid) for pid in (my_roster.get("players") or []) if pid is not None}
+        # The waiver pool is the endpoint's own cached free-agent frame (already
+        # waiver-actionable), minus rows flagged stale/retired.
+        pool = free_agents
+        if "stale_free_agent" in pool.columns:
+            pool = pool[~pool["stale_free_agent"].fillna(False).astype(bool)]
+        pool = trade_hub_engine.apply_strategy_age_curve(pool, strategy, score_field)
+        valued_p, pool_p = _attach_projection_ppg(valued_s, pool, my_ids, score_field, lineup_settings=settings)
+        for code in model_status.frame_codes(valued_p):
+            model_status.add(status, code)
+        roster_df = valued_p[valued_p["player_id"].astype(str).isin(my_ids)].copy()
+        rostered_ids = {str(pid) for r in rosters for pid in (r.get("players") or []) if pid is not None}
+        rostered_values = pd.to_numeric(
+            valued_p[valued_p["player_id"].astype(str).isin(rostered_ids)][score_field], errors="coerce"
+        ).dropna().tolist()
+        rvc = roster_value_model.build_context(
+            roster_df=roster_df,
+            all_players_df=valued_p,
+            pool=pool_p,
+            my_roster=my_roster,
+            league=league,
+            settings=settings,
+            score_field=score_field,
+            strategy=strategy,
+            window=window,
+            league_rostered_values=rostered_values,
+            status=status,
+        )
+        league_table = roster_value_model.league_position_table(valued_p, rosters, rvc.model_ctx)
+        return {"rvc": rvc, "league_table": league_table, "valued": valued_p, "status": status}
+
+    return {**_WAIVER_BUNDLE_MEMO.get_or_compute(key, build), "posture": posture}
 
 
 def _waiver_usage_guard(
@@ -16834,7 +17002,7 @@ def get_league_waivers(
     limited = free_agents.head(max(1, min(limit, 300)))
     players = [
         _project_waiver_row(row, score_field, opponent_by_team, defense_strength_by_position)
-        for _, row in limited.iterrows()
+        for row in frame_records(limited)
     ]
 
     faab_season_stats: dict[str, Any] = {}
@@ -16891,7 +17059,7 @@ def get_league_waivers(
         faab_strategy = ""
     priority_adds: list[dict[str, Any]] = []
     is_premium = premium.is_at_least(profile.get("entitlement"), premium.PRO)
-    for _, row in priority_df.iterrows():
+    for row in frame_records(priority_df):
         guidance = faab.faab_guidance_for_free_agent(
             row,
             score_field=score_field,
@@ -16973,20 +17141,20 @@ def get_league_waivers(
     watchlist_candidates: list[dict[str, Any]] = []
     faab_targets: list[dict[str, Any]] = []
     if is_premium and not free_agents.empty:
-        priority_ids = {str(row.get("player_id")) for _, row in priority_df.iterrows()}
+        priority_ids = {str(row.get("player_id")) for row in frame_records(priority_df)}
         stash_df, watchlist_df, faab_df = _secondary_waiver_sections(free_agents, priority_ids, score_field)
 
         stash_candidates = [
             _project_waiver_row(row, score_field, opponent_by_team, defense_strength_by_position)
-            for _, row in stash_df.iterrows()
+            for row in frame_records(stash_df)
         ]
         watchlist_candidates = [
             _project_waiver_row(row, score_field, opponent_by_team, defense_strength_by_position)
-            for _, row in watchlist_df.iterrows()
+            for row in frame_records(watchlist_df)
         ]
         faab_targets = [
             _project_waiver_row(row, score_field, opponent_by_team, defense_strength_by_position)
-            for _, row in faab_df.iterrows()
+            for row in frame_records(faab_df)
         ]
 
     return {
