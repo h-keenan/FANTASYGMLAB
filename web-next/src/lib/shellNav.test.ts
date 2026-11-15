@@ -3,9 +3,14 @@ import { describe, expect, it } from "vitest";
 import { shellActiveTab, shellBarVisible, shellNavEnabled, shellNavQueryToStore, shellLeagueContext, shellParent, shellTabs } from "./shellNav";
 
 describe("shellNavEnabled (feature flag)", () => {
-  it("defaults to founder-only", () => {
+  it("defaults to on for everyone signed in (UI pass 5 D4)", () => {
     expect(shellNavEnabled({ isFounder: true })).toBe(true);
-    expect(shellNavEnabled({ isFounder: false })).toBe(false);
+    expect(shellNavEnabled({ isFounder: false })).toBe(true);
+  });
+  it("env founder keeps the staged rollout, env off is the kill switch", () => {
+    expect(shellNavEnabled({ isFounder: false, env: "founder" })).toBe(false);
+    expect(shellNavEnabled({ isFounder: true, env: "founder" })).toBe(true);
+    expect(shellNavEnabled({ isFounder: false, env: "off" })).toBe(false);
   });
   it("?nav=bottom turns it on for anyone and ?nav=off turns it off for the founder", () => {
     expect(shellNavEnabled({ isFounder: false, queryNav: "bottom" })).toBe(true);
