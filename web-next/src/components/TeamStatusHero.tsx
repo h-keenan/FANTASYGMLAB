@@ -152,7 +152,7 @@ export function TeamStatusHero({
   if (!data.settled) {
     return (
       <section className="flex flex-col gap-3" aria-labelledby="team-status-heading" aria-busy="true" data-testid="team-status-hero-loading">
-        <SectionHeading id="team-status-heading" size="compact">
+        <SectionHeading id="team-status-heading">
           Your team right now
         </SectionHeading>
         {/* Reserve the height a full in-season hero settles at (matchup, lineup,

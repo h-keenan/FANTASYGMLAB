@@ -1,5 +1,6 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import React, { useEffect, useMemo, useState, type ReactNode } from 'react';
+import { Ionicons } from '@expo/vector-icons';
 import { Pressable, StyleSheet, View } from 'react-native';
 
 import AccentCard from './AccentCard';
@@ -136,7 +137,7 @@ export default function CompactModule({
               </AppText>
             ) : null}
           </View>
-          {hasBody ? <AppText style={styles.chevron}>{open && expandIn === 'inline' ? '−' : '+'}</AppText> : null}
+          {hasBody ? <Ionicons name={open && expandIn === 'inline' ? 'chevron-up' : 'chevron-down'} size={16} color={colors.textTertiary} /> : null}
         </Pressable>
         {action ? <View style={styles.action}>{action}</View> : null}
       </View>
@@ -165,7 +166,6 @@ function createStyles(colors: ThemeColors) {
     parts: { fontSize: 14, lineHeight: 19, color: colors.textPrimary },
     part: { fontSize: 14, fontWeight: '600', color: colors.textPrimary },
     sep: { color: colors.textTertiary, fontWeight: '400' },
-    chevron: { width: 14, textAlign: 'center', color: colors.textTertiary, fontSize: 14 },
     action: { flexShrink: 0 },
   });
 }

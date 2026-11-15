@@ -820,10 +820,14 @@
 }
 
 /* ---- Smart pill (V2): global row <-> two icons + page segment, one row, one grid cell. Opacity/transform only. ---- */
-.bottom-tab-bar[data-has-context], .pill-morph[data-has-context] { display: grid; }
-.pill-morph { min-width: 0; flex: 1 1 auto; }
-.pill-morph:not([data-has-context]), .pill-morph:not([data-has-context]) > .pill-layer { display: contents; }
-.pill-morph > .pill-layer--global > :not(.pill-icon-btn) { flex: 1 1 auto; min-width: 0; }
+.bottom-tab-bar[data-has-context] { display: grid; }
+/* The Fantasy Sim pill: ONE persistent orb, then one grid cell holding the action row and the page segment (cross-faded). */
+.pill-morph { display: flex; align-items: center; gap: 8px; min-width: 0; flex: 1 1 auto; padding: 4px; }
+.pill-cells { display: grid; min-width: 0; flex: 1 1 auto; align-items: center; }
+.pill-morph > .game-orb-slot { align-self: center; }
+/* md+ has no orb and no segment: the wrappers vanish and the bar's own row lays out exactly as before. */
+@media (min-width: 768px) { .pill-morph, .pill-cells, .pill-morph .pill-layer { display: contents; } }
+.pill-morph > .pill-cells > .pill-layer--global > * { flex: 1 1 auto; min-width: 0; }
 .pill-layer { grid-area: 1 / 1; min-width: 0; display: flex; align-items: center; }
 .pill-layer--global ul { flex: 1 1 auto; min-width: 0; }
 .pill-layer--global,
@@ -833,15 +837,14 @@
 /* The folded layer: gone from view, hit-testing and the a11y tree once its fade ends. */
 .bottom-tab-bar[data-mode="context"] .pill-layer--global,
 .bottom-tab-bar[data-mode="menu"] .pill-layer--context,
-.pill-morph[data-mode="context"] .pill-layer--global,
-.pill-morph[data-mode="menu"] .pill-layer--context {
+.pill-morph[data-mode="context"] .pill-layer--global {
   opacity: 0; visibility: hidden; pointer-events: none;
   transition: opacity var(--motion-base, 240ms) var(--ease-out, ease-out), transform var(--motion-base, 240ms) var(--ease-out, ease-out), visibility 0s var(--motion-base, 240ms);
 }
 .bottom-tab-bar[data-mode="context"] .pill-layer--global, .pill-morph[data-mode="context"] .pill-layer--global { transform: scale(0.96); }
-.bottom-tab-bar[data-mode="menu"] .pill-layer--context, .pill-morph[data-mode="menu"] .pill-layer--context { transform: translateX(-10px) scale(0.97); }
+.bottom-tab-bar[data-mode="menu"] .pill-layer--context { transform: translateX(-10px) scale(0.97); }
 /* Menu opening: the global tabs fan out one after another. */
-.bottom-tab-bar[data-mode="menu"] .pill-layer--global li, .pill-morph[data-mode="menu"] .pill-layer--global > * { animation: pill-fan 260ms var(--ease-out, ease-out) both; animation-delay: calc(var(--i, 0) * 30ms); }
+.bottom-tab-bar[data-mode="menu"] .pill-layer--global li { animation: pill-fan 260ms var(--ease-out, ease-out) both; animation-delay: calc(var(--i, 0) * 30ms); }
 @keyframes pill-fan { from { opacity: 0; transform: translateX(-14px) scale(0.9); } to { opacity: 1; transform: none; } }
 /* Entering a page with context: the segment slides in from the right. */
 .pill-layer--context { animation: pill-context-in 260ms var(--ease-out, ease-out) both; }
@@ -857,16 +860,8 @@
   color: var(--color-text-muted); cursor: pointer; text-decoration: none; -webkit-tap-highlight-color: transparent;
   transition: background-color 180ms ease, color 180ms ease, box-shadow 180ms ease;
 }
-.pill-icon-btn--menu[data-section] {
-  color: var(--color-accent);
-  background: linear-gradient(180deg, color-mix(in srgb, var(--color-accent) 22%, transparent), color-mix(in srgb, var(--color-accent) 9%, transparent));
-  border-color: color-mix(in srgb, var(--color-accent) 40%, transparent);
-  box-shadow: inset 0 1px 0 color-mix(in srgb, #fff 18%, transparent), 0 0 14px color-mix(in srgb, var(--color-accent) 24%, transparent);
-}
-.pill-icon-btn--menu[data-section] svg { transition: transform var(--motion-base, 240ms) var(--ease-out, ease-out); }
-.pill-icon-btn--menu[data-section][aria-expanded="true"] svg { transform: scale(0.88) rotate(-12deg); }
-.pill-icon-btn--menu:not([data-section])[aria-expanded="true"] { color: var(--color-text-primary); background: color-mix(in srgb, #fff 10%, transparent); }
-@media (prefers-reduced-motion: reduce) { .pill-icon-btn--menu[data-section] svg { transition: none; transform: none !important; } }
+/* A page action in the Sim row (Auto-set) keeps its 44px target but drops its label below 360px so Advance never clips. */
+@media (max-width: 359px) { .pill-inline-action .pill-inline-label { display: none; } .pill-inline-action { min-width: var(--bar-button-min-height); padding-inline: 0; } }
 .pill-divider { flex: 0 0 1px; height: 24px; margin: 0 4px; background: var(--glass-border, var(--color-border)); }
 .pill-tabs {
   position: relative; flex: 1 1 0; min-width: 0; display: flex; align-items: center; gap: 2px;
@@ -917,7 +912,6 @@
   /* Crossfade only: no slide, scale, fan or pulse; the capsule jumps. */
   .pill-layer--global, .pill-layer--context { transform: none !important; }
   .bottom-tab-bar[data-mode="menu"] .pill-layer--global li,
-  .pill-morph[data-mode="menu"] .pill-layer--global > *,
   .pill-primary { animation: none; }
   .pill-layer--context { animation: pill-fade-in 180ms linear both; }
   .pill-layer--context[data-leaving] { animation: none; }

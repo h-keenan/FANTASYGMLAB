@@ -1,4 +1,5 @@
 import type { TabIconName } from "@/lib/tabIcons";
+import { ModuleMore } from "@/components/ui/ModuleMore";
 import Link from "next/link";
 
 import { BeginnerHelp } from "@/components/BeginnerHelp";
@@ -29,7 +30,7 @@ export function isGmPlanTab(value: string | null | undefined): value is GmPlanTa
 const STANCE_LOOK: Record<TeamStance, { color: string; tagline: string; help: "stanceRebuilding" | "stanceCompeting" | "stanceBalanced" }> = {
   rebuilding: { color: "var(--color-information)", tagline: "Youth + picks", help: "stanceRebuilding" },
   competing: { color: "var(--color-success)", tagline: "Win now", help: "stanceCompeting" },
-  balanced: { color: "var(--color-premium)", tagline: "Both ways", help: "stanceBalanced" },
+  balanced: { color: "var(--color-accent)", tagline: "Both ways", help: "stanceBalanced" },
 };
 
 function StanceIcon({ stance }: { stance: TeamStance }) {
@@ -262,19 +263,13 @@ export function PlanSnapshotGrid({ tiles, analysisHref }: { tiles: PlanSnapshotT
       id="gmplan.snapshot"
       title="Plan Snapshot"
       parts={statStripParts(tiles.map((tile) => ({ label: short[tile.key] ?? tile.label, value: tile.value })), 4)}
-      action={
-        analysisHref ? (
-          <Link href={analysisHref} className="px-2 text-xs font-bold" style={{ color: "var(--color-accent)", minHeight: "var(--touch-target-min)", display: "inline-flex", alignItems: "center" }}>
-            Full analysis
-          </Link>
-        ) : undefined
-      }
     >
       <div className="grid grid-cols-2 gap-2" aria-label="Plan Snapshot">
         {tiles.map((tile) => (
           <SnapshotCell key={tile.key} tile={tile} />
         ))}
       </div>
+      {analysisHref ? <ModuleMore href={analysisHref}>Full analysis</ModuleMore> : null}
     </CompactModule>
   );
 }

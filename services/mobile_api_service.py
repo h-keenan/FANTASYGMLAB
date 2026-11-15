@@ -662,8 +662,52 @@ app.add_middleware(
     allow_methods=["GET", "POST", "PATCH", "DELETE"],
     allow_headers=["Authorization", "Content-Type"],
     # Lets the browser read Retry-After on 429/503 (cross-origin hides it otherwise).
-    expose_headers=["Retry-After"],
+    expose_headers=["Retry-After", "Server-Timing"],
 )
+
+
+class _ServerTimingMiddleware:
+    """Outermost pure-ASGI timer: adds ``Server-Timing: app;dur=<ms>`` (wall time from request start to the first response byte,
+    gzip and every inner middleware included) plus ``Timing-Allow-Origin`` so the browser's Resource Timing can read it, and
+    logs any /v1 request slower than ``SLOW_REQUEST_LOG_MS`` (default 1500; 0 disables the log line) with method, path, status
+    and duration. One more header per response; no body buffering. The real production latency of each endpoint is therefore
+    visible in DevTools, in RUM (``PerformanceResourceTiming.serverTiming``) and in the logs without a profiler."""
+
+    def __init__(self, app):
+        self.app = app
+        try:
+            self.slow_ms = float(os.environ.get("SLOW_REQUEST_LOG_MS", "1500") or 0)
+        except ValueError:
+            self.slow_ms = 1500.0
+
+    async def __call__(self, scope, receive, send):
+        if scope.get("type") != "http":
+            await self.app(scope, receive, send)
+            return
+        started = time.perf_counter()
+
+        async def timed_send(message):
+            if message.get("type") == "http.response.start":
+                dur = (time.perf_counter() - started) * 1000
+                headers = list(message.get("headers") or [])
+                names = {k.lower() for k, _ in headers}
+                entry = f"app;dur={dur:.1f}".encode()
+                if b"server-timing" in names:
+                    headers = [(k, v + b", " + entry) if k.lower() == b"server-timing" else (k, v) for k, v in headers]
+                else:
+                    headers.append((b"server-timing", entry))
+                if b"timing-allow-origin" not in names:
+                    headers.append((b"timing-allow-origin", b"*"))
+                message = {**message, "headers": headers}
+                path = scope.get("path") or ""
+                if self.slow_ms and dur >= self.slow_ms and path.startswith("/v1/"):
+                    logger.warning("slow request %s %s -> %s in %.0f ms", scope.get("method"), path, message.get("status"), dur)
+            await send(message)
+
+        await self.app(scope, receive, timed_send)
+
+
+app.add_middleware(_ServerTimingMiddleware)
 
 
 @app.exception_handler(HTTPException)
@@ -11325,6 +11369,14 @@ def update_notification_preferences(
     if error:
         return _notification_preferences_response({}, ok=False)
     settings = dict(current.get("settings") or {})
+    if body.prefs:
+        problem = notification_prefs.validate_patch(
+            body.prefs,
+            valid_categories=valid_categories,
+            current=notification_prefs.prefs_from_settings(settings, valid_categories=valid_categories),
+        )
+        if problem:
+            raise HTTPException(status_code=422, detail=problem)
     if body.categories:
         categories = _push_categories_from_settings(settings)
         categories.update(body.categories)

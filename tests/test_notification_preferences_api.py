@@ -87,3 +87,25 @@ def test_opened_is_always_ok_even_without_the_table(monkeypatch):
             )
     assert response.json() == {"ok": True}
     assert mark.call_args.kwargs["user_id"] == "user-123"
+
+
+def test_post_rejects_single_end_patch_that_collapses_quiet_window(monkeypatch):
+    # Stored window is 23-7. Patching only quiet_start to 7 would make start == end,
+    # which normalize_prefs used to answer by silently resetting BOTH ends to 22/8.
+    client = _client(monkeypatch)
+    existing = {"notification_prefs": {"quiet_start": 23, "quiet_end": 7}}
+    with patch("requests.get", side_effect=[_auth(), _settings(existing)]):
+        with patch("requests.post", return_value=Mock(status_code=200)) as post:
+            response = client.post("/v1/notifications/preferences", json={"prefs": {"quiet_start": 7}}, headers=AUTH)
+    assert response.status_code == 422
+    assert "differ" in response.text
+    post.assert_not_called()
+
+
+def test_validate_patch_uses_current_window_for_single_end():
+    from modules import notification_prefs
+
+    kwargs = {"valid_categories": ()}
+    assert notification_prefs.validate_patch({"quiet_end": 22}, current={"quiet_start": 22, "quiet_end": 8}, **kwargs)
+    assert not notification_prefs.validate_patch({"quiet_end": 6}, current={"quiet_start": 22, "quiet_end": 8}, **kwargs)
+    assert not notification_prefs.validate_patch({"quiet_end": 22}, **kwargs)  # no stored window known

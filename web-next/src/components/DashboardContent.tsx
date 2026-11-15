@@ -1,4 +1,4 @@
-import Link from "next/link";
+import { ModuleMore } from "@/components/ui/ModuleMore";
 import type { MouseEvent } from "react";
 
 import type { DashboardResponse, LeagueTeamRankingsResponse } from "@/lib/api";
@@ -223,9 +223,9 @@ export function DashboardContent({
             title="My Team"
             items={teamStats.main}
             league={{ id: leagueId, name: leagueName }}
-            action={<ViewAllLink href={`/my-team/${encodeURIComponent(leagueId)}${query}`} label="Open My Team" label2="Open →" />}
             footer={
               <>
+                <ModuleMore href={`/my-team/${encodeURIComponent(leagueId)}${query}`}>Open My Team</ModuleMore>
                 <BeginnerHelp
                   popover
                   label="My Team stats"
@@ -255,9 +255,9 @@ export function DashboardContent({
           testId="dashboard-watchlist"
           tone="warning"
           parts={listSummaryParts({ count: watchItems.length, noun: "alert", highlights: [watchItems[0]?.headline] })}
-          action={<ViewAllLink href={`/alerts/${encodeURIComponent(leagueId)}${query}`} label="View all alerts" label2="All →" />}
         >
           <WatchListCard items={watchItems} leagueId={leagueId} leagueName={leagueName} />
+          <ModuleMore href={`/alerts/${encodeURIComponent(leagueId)}${query}`}>View all alerts</ModuleMore>
         </CompactModule>
       ) : null}
 
@@ -321,12 +321,4 @@ function buildTeamStats(
     },
   ];
   return { main };
-}
-
-function ViewAllLink({ href, label, label2 = "View all →" }: { href: string; label: string; label2?: string }) {
-  return (
-    <Link href={href} aria-label={label} className="tap-link text-sm font-bold shrink-0" style={{ color: "var(--color-accent)" }}>
-      {label2}
-    </Link>
-  );
 }
