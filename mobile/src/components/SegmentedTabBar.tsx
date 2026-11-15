@@ -38,6 +38,7 @@ export default function SegmentedTabBar<T extends string>({
   onChange,
   scrollable = false,
   slim = false,
+  snap = false,
 }: {
   options: Array<SegmentedTabOption<T>>;
   active: T;
@@ -47,6 +48,8 @@ export default function SegmentedTabBar<T extends string>({
   scrollable?: boolean;
   /** The sleek in-sheet look (shared Tabs): no outer box or pill, a hairline under the strip and a sliding underline. */
   slim?: boolean;
+  /** Scrollable only: the active segment is centred whenever it changes (a long, growing strip such as weeks). Twin of web PillRow `snap`. */
+  snap?: boolean;
 }) {
   const { colors } = useThemeMode();
   const styles = useMemo(() => createStyles(colors), [colors]);
@@ -70,6 +73,12 @@ export default function SegmentedTabBar<T extends string>({
     const config = { duration: 180, easing: Easing.out(Easing.cubic), useNativeDriver: false };
     Animated.parallel([Animated.timing(slideX, { toValue: target.x, ...config }), Animated.timing(slideW, { toValue: target.width, ...config })]).start();
   }, [target, reduceMotion, slideX, slideW]);
+  const scrollRef = useRef<ScrollView>(null);
+  const [viewport, setViewport] = useState(0);
+  useEffect(() => {
+    if (!snap || !scrollable || !target || !viewport) return;
+    scrollRef.current?.scrollTo({ x: Math.max(0, target.x - (viewport - target.width) / 2), animated: !reduceMotion });
+  }, [snap, scrollable, target, viewport, reduceMotion]);
   const onSegmentLayout = (key: string) => (event: LayoutChangeEvent) => {
     const { x, width } = event.nativeEvent.layout;
     setLayouts((prev) => (prev[key] && prev[key].x === x && prev[key].width === width ? prev : { ...prev, [key]: { x, width } }));
@@ -115,7 +124,14 @@ export default function SegmentedTabBar<T extends string>({
     </View>
   );
   return scrollable ? (
-    <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ flexGrow: 1 }}>
+    <ScrollView
+      ref={scrollRef}
+      horizontal
+      showsHorizontalScrollIndicator={false}
+      contentContainerStyle={{ flexGrow: 1 }}
+      decelerationRate={snap ? 'fast' : undefined}
+      onLayout={snap ? (event) => setViewport(event.nativeEvent.layout.width) : undefined}
+    >
       {body}
     </ScrollView>
   ) : (

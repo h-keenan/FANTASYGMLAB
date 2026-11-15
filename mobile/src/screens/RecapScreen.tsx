@@ -1,34 +1,37 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { ScrollView, StyleSheet, View } from 'react-native';
-import PressableScale from '../components/PressableScale';
+import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import AppText from '../components/AppText';
 import ErrorState from '../components/ErrorState';
 import BrandHeaderBar from '../components/BrandHeaderBar';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { useHeaderHeight } from '@react-navigation/elements';
-import { Ionicons } from '@expo/vector-icons';
 import { keepPreviousData, useIsRestoring, useQuery } from '@tanstack/react-query';
 
-import AccentCard from '../components/AccentCard';
-import AnimatedCard from '../components/AnimatedCard';
+import CompactModule from '../components/CompactModule';
 import EmptyState from '../components/EmptyState';
 import EvaluationLensHeaderButton from '../components/EvaluationLensHeaderButton';
 import GmStanceHeaderButton from '../components/GmStanceHeaderButton';
 import LeagueSwitcherHeaderButton from '../components/LeagueSwitcherHeaderButton';
 import GridBackground from '../components/GridBackground';
-import IconCircle from '../components/IconCircle';
+import ManagerProfileModal from '../components/ManagerProfileModal';
+import ModuleMore from '../components/ModuleMore';
+import PlayerAccordionRow, { usePlayerAccordion } from '../components/PlayerAccordionRow';
+import { PresenceSwap } from '../components/Presence';
 import RoundupPanel from '../components/RoundupPanel';
 import PageFamilyTabs from '../components/PageFamilyTabs';
-import FilterDropdownButton from '../components/FilterDropdownButton';
 import RecapSharePreviewModal from '../components/RecapSharePreviewModal';
-import RecapTradeDetailModal from '../components/RecapTradeDetailModal';
-import SkeletonBlock, { SkeletonRow, SkeletonPage } from '../components/Skeleton';
+import SegmentedTabBar from '../components/SegmentedTabBar';
+import { SkeletonModule, SkeletonPage, SkeletonRegion, SkeletonStatusHeader } from '../components/Skeleton';
+import StatusHeader from '../components/StatusHeader';
 import TeamAvatar from '../components/TeamAvatar';
-import { api, type RecapStory, type WeeklyRecap } from '../lib/api';
+import TradeCompactCard, { TradeAssetCard, type TradeCardAsset } from '../components/TradeCompactCard';
+import { api, type RecapStory, type RecapTradeAsset, type WeeklyRecap } from '../lib/api';
 import { toUserErrorMessage } from '../lib/errorMessages';
 import { markRecapOpened } from '../lib/recapSeen';
 import { useOrbClearance } from '../lib/orbLayout';
 import { queryKeys } from '../lib/queryKeys';
+import { buildRecapPage, isMatchupStory, recapFaab, recapMetric, recapScoreline, recapWeekChips, storyInvolves, type RecapSection } from '../lib/recapPage';
+import { formatMoney } from '../lib/money';
 import { useScreenHeaderTitle } from '../lib/useScreenHeaderTitle';
 import { useThemeMode } from '../context/ThemeModeContext';
 import { radii, spacing, type ThemeColors } from '../theme';
@@ -36,93 +39,15 @@ import type { RootStackParamList } from '../navigation/RootNavigator';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Recap'>;
 
-// Per-story-type glyph/color — same semantic families used everywhere else
-// (gold = achievement, red = rivalry/heat, green = value win, cyan =
-// trade/GM activity, violet = league-wide activity). Two story types can
-// share a category (see storyCategory below) while keeping a distinct icon.
-function storyMeta(colors: ThemeColors): Record<
-  string,
-  { icon: React.ComponentProps<typeof Ionicons>['name']; color: string }
-> {
-  return {
-    performance: { icon: 'trophy', color: colors.premium },
-    performance_low: { icon: 'trending-down', color: colors.premium },
-    matchup: { icon: 'flame', color: colors.danger },
-    matchup_close: { icon: 'pulse', color: colors.danger },
-    waiver: { icon: 'cash-outline', color: colors.success },
-    waiver_low: { icon: 'pricetag-outline', color: colors.success },
-    trade: { icon: 'swap-horizontal', color: colors.accent },
-    activity: { icon: 'repeat', color: colors.violet },
-    activity_low: { icon: 'moon-outline', color: colors.violet },
-    roster_riser: { icon: 'trending-up', color: colors.accent },
-  };
-}
-function defaultStoryMeta(colors: ThemeColors) {
-  return { icon: 'newspaper-outline' as const, color: colors.textSecondary };
-}
+export type RosterMap = Record<string, { playerIds: string[]; teamName: string; avatarId: string; ownerName: string }>;
 
-/** Collapses the ten backend story types into the handful of categories a
- * user actually thinks in terms of — e.g. the week's top AND bottom scorer
- * both read as "Performance". Used only to group cards (Magna Carta §12);
- * the individual story_type still drives each row's own icon/summary. */
-function storyCategory(storyType: string): string {
-  if (storyType.startsWith('performance')) return 'performance';
-  if (storyType.startsWith('matchup')) return 'matchup';
-  if (storyType.startsWith('waiver')) return 'waiver';
-  if (storyType === 'trade') return 'trade';
-  if (storyType.startsWith('activity')) return 'activity';
-  if (storyType === 'roster_riser') return 'roster';
-  return 'other';
-}
-
-function categoryMeta(colors: ThemeColors): Record<
-  string,
-  { label: string; icon: React.ComponentProps<typeof Ionicons>['name']; color: string }
-> {
-  return {
-    performance: { label: 'Performance', icon: 'trophy-outline', color: colors.premium },
-    matchup: { label: 'Matchups', icon: 'flame-outline', color: colors.danger },
-    waiver: { label: 'Waivers', icon: 'cash-outline', color: colors.success },
-    trade: { label: 'Trades', icon: 'swap-horizontal-outline', color: colors.accent },
-    activity: { label: 'League Activity', icon: 'repeat-outline', color: colors.violet },
-    roster: { label: 'Roster Watch', icon: 'trending-up-outline', color: colors.accent },
-    other: { label: 'Storylines', icon: 'newspaper-outline', color: colors.textSecondary },
-  };
-}
-
-interface StoryGroupData {
-  category: string;
-  stories: RecapStory[];
-}
-
-export type RosterMap = Record<string, { playerIds: string[]; teamName: string; avatarId: string }>;
-
-/** Sleeper avatar id for a story's team, when its roster_id resolved against
- * `rosterMap` — `TeamAvatar` already renders a graceful empty-circle
- * fallback for '' / undefined, so a miss here never blocks rendering. */
-function avatarFor(rosterMap: RosterMap, rosterId: string | undefined): string | undefined {
-  if (!rosterId) return undefined;
-  return rosterMap[rosterId]?.avatarId || undefined;
-}
-
-/** Merges consecutive same-category stories into one group, mirroring
- * AlertsScreen's adjacent-run grouping — backend story order (see
- * modules/league_recaps.py's builder list) stays intact, only genuinely
- * related storylines end up sharing one surface. */
-function groupStories(stories: RecapStory[]): StoryGroupData[] {
-  const groups: StoryGroupData[] = [];
-  for (const story of stories) {
-    const category = storyCategory(story.story_type);
-    const last = groups[groups.length - 1];
-    if (last && last.category === category) {
-      last.stories.push(story);
-    } else {
-      groups.push({ category, stories: [story] });
-    }
-  }
-  return groups;
-}
-
+/**
+ * The weekly recap, built from the shared templates (docs/ui-patterns.md, "Weekly recap page"): ONE week strip (the shared
+ * segmented control, scrolling with the active week centred), a StatusHeader with the week's result, then a CompactModule per
+ * kind of story that expands in place into team rows with crests, player rows with avatars and the shared trade card. Gold
+ * marks only the week's scoring leader. Every value comes from `GET .../recap`; the crests come from the team profiles.
+ * Twin of web-next/src/components/RecapWeekView.tsx; the model is lib/recapPage.ts.
+ */
 export default function RecapScreen({ route, navigation }: Props) {
   const orbClearance = useOrbClearance();
   const headerHeight = useHeaderHeight();
@@ -136,36 +61,24 @@ export default function RecapScreen({ route, navigation }: Props) {
   }, [initialTab]);
   const [selectedWeek, setSelectedWeek] = useState<number | null>(null);
   const [shareOpen, setShareOpen] = useState(false);
-  const [tradeStory, setTradeStory] = useState<RecapStory | null>(null);
   const [rosterMap, setRosterMap] = useState<RosterMap>({});
+  const [profile, setProfile] = useState<{ rosterId: string; teamName: string } | null>(null);
   const isRestoring = useIsRestoring();
-  // When `selectedWeek` is null (the initial, "current recap" load), this
-  // query key matches queryKeys.recap(leagueId) exactly, so it shares its
-  // cache entry with Dashboard/Alerts/LeagueDetail/GmOrb's own recap
-  // fetches. Picking a specific past week below gets its own cache entry —
-  // those screens never request a specific past week, so there's nothing
-  // to share for that case.
-  const recapQueryKey =
-    selectedWeek != null ? ([...queryKeys.recap(leagueId), 'week', selectedWeek] as const) : queryKeys.recap(leagueId);
+  // Own cache entry (the response carries `my_roster_id`, which the shared current-recap entry used by Today and Alerts does not).
   const recapQuery = useQuery({
-    queryKey: recapQueryKey,
-    queryFn: () => api.getLeagueRecap(leagueId, selectedWeek != null ? { week: selectedWeek } : undefined),
+    queryKey: [...queryKeys.recap(leagueId), 'page', selectedWeek ?? 'latest'] as const,
+    queryFn: () => api.getLeagueRecap(leagueId, { ...(selectedWeek != null ? { week: selectedWeek } : null), me: true }),
     enabled: !isRestoring,
-    // A week switch intentionally clears the prior week's recap rather than
-    // leaving it on screen as if still current (see the loading skeleton
-    // below) — but the early "not ready"/`!recap` guards below still need
-    // *some* data to read while the new week is in flight, so the previous
-    // week's response stays available as a placeholder until the new one
-    // resolves.
+    // A week switch shows the new week's skeleton; the previous response stays as placeholder so the guards below have data.
     placeholderData: keepPreviousData,
   });
   const recapData = recapQuery.data;
   const recap: WeeklyRecap | null = recapData?.recap ?? null;
   const maxCompletedWeek = recapData?.max_completed_week ?? 0;
+  const myRosterId = recapData?.my_roster_id ?? '';
   const notReady = recapData != null && !recapData.recap;
   const loading = isRestoring || recapQuery.isFetching;
-  const error =
-    recapQuery.isError && !recapData ? toUserErrorMessage(recapQuery.error, 'Failed to load recap.') : null;
+  const error = recapQuery.isError && !recapData ? toUserErrorMessage(recapQuery.error, 'Failed to load recap.') : null;
 
   useScreenHeaderTitle(navigation, 'League Recaps', leagueName);
 
@@ -179,31 +92,19 @@ export default function RecapScreen({ route, navigation }: Props) {
         </View>
       ),
     });
-  }, [navigation, leagueId, styles]);
+  }, [navigation, leagueId, leagueName, styles]);
 
-  // Marks this exact recap (by fingerprint-based recap_id, not week number)
-  // as opened on this device — see lib/recapSeen.ts. Firing this from
-  // RecapScreen itself, regardless of which entry point got the user here,
-  // is what keeps Dashboard's "new recap" module from reappearing once the
-  // recap has actually been viewed.
+  // Marks this exact recap (by fingerprint-based recap_id) as opened on this device so Today's "new recap" module goes away.
   useEffect(() => {
-    if (recap && !recap.incomplete) {
-      void markRecapOpened(leagueId, recap.recap_id);
-    }
+    if (recap && !recap.incomplete) void markRecapOpened(leagueId, recap.recap_id);
   }, [leagueId, recap]);
 
-  // Story cards navigate to TeamRoster, which (like TeamsScreen/LeagueDetailScreen)
-  // needs a pre-fetched playerIds list per roster_id — best-effort: a story
-  // card whose roster isn't found here still navigates, just with an empty
-  // roster (TeamRosterScreen renders its own "no player data" empty state).
+  // Crests and the roster ids team rows open (best effort: a miss shows the initials ring).
   useEffect(() => {
     let cancelled = false;
     (async () => {
       try {
-        const [rostersResult, profilesResult] = await Promise.all([
-          api.getLeagueRosters(leagueId),
-          api.getLeagueTeamProfiles(leagueId),
-        ]);
+        const [rostersResult, profilesResult] = await Promise.all([api.getLeagueRosters(leagueId), api.getLeagueTeamProfiles(leagueId)]);
         if (cancelled) return;
         const map: RosterMap = {};
         for (const roster of rostersResult.rosters) {
@@ -214,12 +115,12 @@ export default function RecapScreen({ route, navigation }: Props) {
             playerIds: players.map(String),
             teamName: profilesResult.profiles[rosterId]?.team_name || '',
             avatarId: profilesResult.profiles[rosterId]?.avatar_id || '',
+            ownerName: profilesResult.profiles[rosterId]?.owner_name || '',
           };
         }
         setRosterMap(map);
       } catch {
-        // Non-fatal — cards with a primary_roster_id still navigate below,
-        // TeamRosterScreen just starts from an empty roster in that case.
+        /* non-fatal */
       }
     })();
     return () => {
@@ -227,40 +128,19 @@ export default function RecapScreen({ route, navigation }: Props) {
     };
   }, [leagueId]);
 
-  // Shared by the hero story and every grouped row below: trade stories open
-  // the trade-detail modal (it already has full player_id asset lists),
-  // everything else — every non-trade story type carries primary_roster_id,
-  // see modules/league_recaps.py's `_story()` builder — navigates to that
-  // team's roster the same way TeamsScreen/LeagueDetailScreen do.
-  const resolveStoryPress = (story: RecapStory): (() => void) | undefined => {
-    if (story.story_type === 'trade') {
-      return () => setTradeStory(story);
-    }
-    if (story.primary_roster_id) {
-      const rosterId = story.primary_roster_id;
-      const rosterEntry = rosterMap[rosterId];
-      return () =>
-        navigation.navigate('TeamRoster', {
-          ownerName: rosterEntry?.teamName || story.primary_team,
-          playerIds: rosterEntry?.playerIds ?? [],
-          leagueId,
-          leagueName,
-          rosterId,
-        });
-    }
-    return undefined;
-  };
+  const openTeam = (rosterId: string, fallbackName: string) => setProfile({ rosterId, teamName: rosterMap[rosterId]?.teamName || fallbackName });
 
-  const tabBar = (
+  const viewBar = (
     <View>
       <PageFamilyTabs family="league" active="recaps" leagueId={leagueId} leagueName={leagueName} />
       <View style={styles.tabBarRow}>
-        <FilterDropdownButton<string>
-          label="View"
-          options={['Recap', 'Roundup']}
-          value={tab === 'roundup' ? 'Roundup' : 'Recap'}
-          allValue="Recap"
-          onChange={(label) => setTab(label === 'Roundup' ? 'roundup' : 'recap')}
+        <SegmentedTabBar<'recap' | 'roundup'>
+          options={[
+            { key: 'recap', label: 'Recap' },
+            { key: 'roundup', label: 'Roundup' },
+          ]}
+          active={tab}
+          onChange={setTab}
         />
       </View>
     </View>
@@ -270,13 +150,8 @@ export default function RecapScreen({ route, navigation }: Props) {
     return (
       <View style={[styles.root, { paddingTop: headerHeight }]}>
         <GridBackground />
-        {tabBar}
-        <RoundupPanel
-          leagueId={leagueId}
-          leagueName={leagueName}
-          initialWeek={requestedRoundupWeek}
-          bottomInset={orbClearance}
-        />
+        {viewBar}
+        <RoundupPanel leagueId={leagueId} leagueName={leagueName} initialWeek={requestedRoundupWeek} bottomInset={orbClearance} />
       </View>
     );
   }
@@ -293,675 +168,390 @@ export default function RecapScreen({ route, navigation }: Props) {
     );
   }
 
-  const weekPicker =
-    maxCompletedWeek > 1 ? (
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.weekPickerRow}>
-        {Array.from({ length: maxCompletedWeek }, (_, i) => i + 1).map((weekNum) => {
-          const active = (selectedWeek ?? maxCompletedWeek) === weekNum;
-          return (
-            <PressableScale accessibilityRole="button"
-              key={weekNum}
-              style={[styles.weekPill, active && styles.weekPillActive]}
-              onPress={() => setSelectedWeek(weekNum)}
-            >
-              <AppText style={[styles.weekPillText, active && styles.weekPillTextActive]}>Wk {weekNum}</AppText>
-            </PressableScale>
-          );
-        })}
-      </ScrollView>
+  const chips = recapWeekChips(maxCompletedWeek);
+  const activeWeek = String(selectedWeek ?? recap?.week ?? maxCompletedWeek);
+  const weekStrip =
+    chips.length > 1 ? (
+      <View style={styles.weekRow}>
+        <SegmentedTabBar<string> options={chips.map((c) => ({ key: c.value, label: c.label }))} active={activeWeek} scrollable snap onChange={(key) => setSelectedWeek(Number(key))} />
+      </View>
     ) : null;
 
   if (notReady || !recap) {
     return (
       <View style={[styles.root, { paddingTop: headerHeight }]}>
-        {tabBar}
-        {weekPicker}
-        <EmptyState
-          icon="newspaper-outline"
-          title="Recap not ready yet"
-          subtitle="Check back after this week's matchups finish scoring."
-        />
+        <GridBackground />
+        {viewBar}
+        {weekStrip}
+        <EmptyState icon="newspaper-outline" title="Recap not ready yet" subtitle="Check back after this week's matchups finish scoring." />
       </View>
     );
   }
 
-  const leadStory = recap.stories[0];
-  const groupedStories = recap.incomplete ? [] : groupStories(recap.stories.slice(1));
-
   return (
     <View style={[styles.root, { paddingTop: headerHeight }]}>
       <GridBackground />
-      {tabBar}
-      {weekPicker}
-      {loading ? (
-        // A week switch intentionally clears the prior week's recap rather
-        // than leaving it on screen as if still current (same clear-then-
-        // hydrate call as web's dashboard_loading_state.py) — but that used
-        // to swap the whole story list for a bare spinner centered in the
-        // now-empty scroll area. These shapes stand in for the headline +
-        // hero story card + grouped rows about to replace them instead.
-        <View style={styles.content}>
-          <View style={styles.headerRow}>
-            <View style={styles.headerTextGroup}>
-              <SkeletonBlock width={90} height={11} />
-              <SkeletonBlock width="75%" height={22} style={styles.recapSkeletonHeadline} />
-            </View>
-          </View>
-          <SkeletonBlock height={150} radius={radii.md} style={styles.leadCard} />
-          <SkeletonRow />
-          <SkeletonRow />
-          <SkeletonRow />
-        </View>
-      ) : (
+      {viewBar}
+      {weekStrip}
       <ScrollView style={styles.container} contentContainerStyle={[styles.content, { paddingBottom: orbClearance }]}>
-      <BrandHeaderBar leagueId={leagueId} leagueName={leagueName} />
-      <View style={styles.headerRow}>
-        <View style={styles.headerTextGroup}>
-          <AppText style={styles.kicker}>LEAGUE MEMORY</AppText>
-          <AppText style={styles.headline}>{recap.headline}</AppText>
-        </View>
-        {!recap.incomplete ? (
-          <PressableScale accessibilityRole="button" style={styles.shareButton} onPress={() => setShareOpen(true)} hitSlop={8}>
-            <Ionicons name="share-outline" size={16} color={colors.textSecondary} />
-            <AppText style={styles.shareButtonText}>Share</AppText>
-          </PressableScale>
-        ) : null}
-      </View>
-      {recap.incomplete ? (
-        <EmptyState
-          icon="newspaper-outline"
-          title="Not enough data yet"
-          subtitle={recap.empty_reason || 'Not enough historical data yet.'}
-        />
-      ) : (
-        <>
-          <LeadStoryCard story={leadStory} onPress={resolveStoryPress(leadStory)} rosterMap={rosterMap} />
-          {groupedStories.map((group, index) => (
-            <StoryGroup
-              key={`${group.category}-${index}`}
-              category={group.category}
-              stories={group.stories}
-              resolvePress={resolveStoryPress}
-              rosterMap={rosterMap}
-            />
-          ))}
-        </>
-      )}
+        <BrandHeaderBar leagueId={leagueId} leagueName={leagueName} />
+        {loading ? (
+          <SkeletonRegion label="Weekly recap" style={styles.stack}>
+            <SkeletonStatusHeader rows={0} />
+            <SkeletonModule lines={2} />
+            <SkeletonModule lines={2} />
+            <SkeletonModule lines={2} />
+          </SkeletonRegion>
+        ) : (
+          <PresenceSwap swapKey={`week-${recap.week}`}>
+            <RecapBody recap={recap} myRosterId={myRosterId} rosterMap={rosterMap} openTeam={openTeam} onShare={() => setShareOpen(true)} onOpenTrades={() => navigation.navigate('TradeHistory')} />
+          </PresenceSwap>
+        )}
       </ScrollView>
-      )}
-      <RecapSharePreviewModal
-        visible={shareOpen}
-        onClose={() => setShareOpen(false)}
-        leagueName={leagueName}
-        recap={recap}
-        rosterMap={rosterMap}
-      />
-      <RecapTradeDetailModal
-        visible={tradeStory != null}
-        onClose={() => setTradeStory(null)}
-        story={tradeStory}
-        primaryAvatarId={avatarFor(rosterMap, tradeStory?.primary_roster_id)}
-        secondaryAvatarId={avatarFor(rosterMap, tradeStory?.secondary_roster_id)}
-        avatarForRoster={(rosterId) => avatarFor(rosterMap, rosterId)}
-      />
-    </View>
-  );
-}
-
-/**
- * The week's lead story — always `stories[0]` (see build_weekly_recap's
- * builder priority order, the same story the headline text above is derived
- * from) — rendered as one standout glowing card instead of blending into
- * the list below it (Magna Carta §12/§15: reserve glow for the one thing on
- * a screen that genuinely matters most).
- *
- * The glow rim+shadow is tinted to the story's own category color
- * (`glowColor={meta.color}`) rather than AnimatedCard's default brand cyan —
- * this card's content (icon ring, avatar ring, tinted header panel, headline
- * number) already carries that same semantic color, and a cyan rim wrapped
- * around gold/red/green/violet content read as two unrelated accents
- * clashing rather than one cohesive highlight (coridian_, 2026-10-02: "I
- * like the color, but the two-tone does not work"). Dashboard/GmPlan/
- * Alerts/Matchup/Waiver's own `glow` cards are unaffected — they don't pass
- * `glowColor`, so they keep the universal cyan rim.
- */
-function LeadStoryCard({
-  story,
-  onPress,
-  rosterMap,
-}: {
-  story: RecapStory;
-  onPress?: () => void;
-  rosterMap: RosterMap;
-}) {
-  const { colors } = useThemeMode();
-  const styles = useMemo(() => createStyles(colors), [colors]);
-  const meta = storyMeta(colors)[story.story_type] ?? defaultStoryMeta(colors);
-  const isMatchup = story.story_type === 'matchup' || story.story_type === 'matchup_close';
-  const isTrade = story.story_type === 'trade';
-  // Matchup's own scoreboard below already gives the margin number a huge,
-  // centered focal point — showing it a second time in the header's
-  // top-right metric slot would just be noise competing with itself.
-  const showHeaderMetric = Boolean(story.metric_label) && !isMatchup;
-
-  return (
-    <AnimatedCard glow glowColor={meta.color} style={styles.leadCard} onPress={onPress}>
-      <View style={[styles.leadTintPanel, { backgroundColor: `${meta.color}17` }]}>
-        <View style={styles.leadHeaderRow}>
-          <IconCircle
-            name={meta.icon}
-            color={meta.color}
-            size={52}
-            iconSize={24}
-            style={[styles.ringedIcon, { borderColor: meta.color }]}
-          />
-          {!isMatchup && !isTrade ? (
-            <TeamAvatar
-              avatarId={avatarFor(rosterMap, story.primary_roster_id)}
-              size={44}
-              style={[styles.avatarRing, { borderColor: meta.color }]}
-            />
-          ) : null}
-          <View style={styles.storyTextGroup}>
-            <AppText style={[styles.leadKicker, { color: meta.color }]}>
-              {story.story_type.replace(/_/g, ' ').toUpperCase()}
-            </AppText>
-            <AppText style={styles.leadTitle}>{story.title}</AppText>
-          </View>
-          {showHeaderMetric ? (
-            <View style={styles.metricGroup}>
-              <AppText style={[styles.leadMetricValue, { color: meta.color }]}>{story.metric_value}</AppText>
-              <AppText style={styles.metricLabel}>{story.metric_label.toUpperCase()}</AppText>
-            </View>
-          ) : null}
-        </View>
-
-        {isMatchup ? (
-          <View style={styles.scoreboardRow}>
-            <View style={styles.scoreboardTeam}>
-              <TeamAvatar
-                avatarId={avatarFor(rosterMap, story.primary_roster_id)}
-                size={56}
-                style={[styles.avatarRing, { borderColor: meta.color }]}
-              />
-              <AppText style={styles.scoreboardTeamName} numberOfLines={1}>
-                {story.primary_team}
-              </AppText>
-            </View>
-            <View style={styles.scoreboardMetric}>
-              <AppText style={[styles.scoreboardValue, { color: meta.color }]} numberOfLines={1}>
-                {story.metric_value}
-              </AppText>
-              <AppText style={styles.metricLabel}>{(story.metric_label || '').toUpperCase()}</AppText>
-            </View>
-            <View style={styles.scoreboardTeam}>
-              <TeamAvatar
-                avatarId={avatarFor(rosterMap, story.secondary_roster_id)}
-                size={56}
-                style={styles.avatarMuted}
-              />
-              <AppText style={[styles.scoreboardTeamName, styles.scoreboardTeamMuted]} numberOfLines={1}>
-                {story.secondary_team}
-              </AppText>
-            </View>
-          </View>
-        ) : null}
-
-        {isTrade && story.secondary_team ? (
-          <View style={styles.tradeRow}>
-            <View style={styles.tradeChip}>
-              <TeamAvatar avatarId={avatarFor(rosterMap, story.primary_roster_id)} size={24} />
-              <AppText style={styles.tradeChipText} numberOfLines={1}>
-                {story.primary_team}
-              </AppText>
-            </View>
-            <Ionicons name="swap-horizontal" size={14} color={colors.textTertiary} />
-            <View style={styles.tradeChip}>
-              <TeamAvatar avatarId={avatarFor(rosterMap, story.secondary_roster_id)} size={24} />
-              <AppText style={styles.tradeChipText} numberOfLines={1}>
-                {story.secondary_team}
-              </AppText>
-            </View>
-          </View>
-        ) : null}
-      </View>
-
-      <AppText style={styles.leadSummary}>{story.summary}</AppText>
-
-      {onPress ? (
-        <View style={styles.leadFooterRow}>
-          <AppText style={[styles.leadFooterText, { color: meta.color }]}>
-            {isTrade ? 'View trade details' : 'View team'}
-          </AppText>
-          <Ionicons name="chevron-forward" size={14} color={meta.color} />
-        </View>
-      ) : null}
-    </AnimatedCard>
-  );
-}
-
-/** One grouped surface per category (Performance, Matchups, Waivers, ...)
- * containing every remaining story of that kind as compact rows separated
- * by dividers, instead of each story repeating as its own identically
- * bordered card (Magna Carta §12). */
-function StoryGroup({
-  category,
-  stories,
-  resolvePress,
-  rosterMap,
-}: {
-  category: string;
-  stories: RecapStory[];
-  resolvePress: (story: RecapStory) => (() => void) | undefined;
-  rosterMap: RosterMap;
-}) {
-  const { colors } = useThemeMode();
-  const styles = useMemo(() => createStyles(colors), [colors]);
-  const meta = categoryMeta(colors)[category] ?? categoryMeta(colors).other;
-
-  return (
-    <View style={styles.group}>
-      <View style={styles.groupHeaderRow}>
-        <View style={[styles.groupAccentBar, { backgroundColor: meta.color }]} />
-        <Ionicons name={meta.icon} size={13} color={meta.color} style={styles.groupIcon} />
-        <AppText style={[styles.groupLabel, { color: meta.color }]} numberOfLines={1}>
-          {meta.label}
-        </AppText>
-      </View>
-      <View style={styles.groupCards}>
-        {stories.map((story, index) => (
-          <AccentCard key={`${story.story_type}-${index}`} accent={meta.color} style={styles.groupCard}>
-            {index === 0 ? (
-              <FeaturedStoryRow
-                story={story}
-                showDivider={false}
-                onPress={resolvePress(story)}
-                rosterMap={rosterMap}
-                meta={meta}
-              />
-            ) : (
-              <StoryRow
-                story={story}
-                showDivider={false}
-                onPress={resolvePress(story)}
-                rosterMap={rosterMap}
-              />
-            )}
-          </AccentCard>
-        ))}
-      </View>
-    </View>
-  );
-}
-
-/**
- * The most significant story within its category — always the first story
- * of a given category in `recap.stories` (backend emits each category's
- * headline-worthy builder before its "opposite extreme"/routine counterpart,
- * e.g. the week's highest FAAB win before the cheapest waiver add; see
- * build_weekly_recap's builder order in modules/league_recaps.py). Gets a
- * category-tinted background, a thicker colored avatar/icon ring, and a
- * genuinely larger headline number — the second tier of this screen's
- * three-tier hierarchy (hero card → featured row → routine row), so a
- * category's one real storyline doesn't carry the same visual weight as its
- * routine counterpart directly beneath it.
- */
-function FeaturedStoryRow({
-  story,
-  showDivider,
-  onPress,
-  rosterMap,
-  meta,
-}: {
-  story: RecapStory;
-  showDivider: boolean;
-  onPress?: () => void;
-  rosterMap: RosterMap;
-  meta: { icon: React.ComponentProps<typeof Ionicons>['name']; color: string };
-}) {
-  const { colors } = useThemeMode();
-  const styles = useMemo(() => createStyles(colors), [colors]);
-  const isMatchup = story.story_type === 'matchup' || story.story_type === 'matchup_close';
-  const isTrade = story.story_type === 'trade';
-  const showMetric = Boolean(story.metric_label) && !isMatchup;
-
-  return (
-    <PressableScale accessibilityRole="button"
-      style={[styles.featuredRow, { backgroundColor: `${meta.color}14` }, showDivider && styles.rowDivider]}
-      onPress={onPress}
-      disabled={!onPress}
-    >
-      <View style={styles.rowHeaderRow}>
-        <IconCircle
-          name={meta.icon}
-          color={meta.color}
-          size={40}
-          iconSize={19}
-          style={[styles.ringedIconThin, { borderColor: meta.color }]}
+      <RecapSharePreviewModal visible={shareOpen} onClose={() => setShareOpen(false)} leagueName={leagueName} recap={recap} rosterMap={rosterMap} />
+      {profile ? (
+        <ManagerProfileModal
+          visible
+          onClose={() => setProfile(null)}
+          leagueId={leagueId}
+          leagueName={leagueName}
+          rosterId={profile.rosterId}
+          teamName={profile.teamName}
+          ownerName={rosterMap[profile.rosterId]?.ownerName || null}
+          avatarId={rosterMap[profile.rosterId]?.avatarId || null}
         />
-        {!isMatchup && !isTrade ? (
-          <TeamAvatar
-            avatarId={avatarFor(rosterMap, story.primary_roster_id)}
-            size={36}
-            style={[styles.avatarRingThin, { borderColor: meta.color }]}
-          />
-        ) : null}
-        <AppText style={styles.featuredTitle} numberOfLines={1}>
-          {story.title}
-        </AppText>
-        {showMetric ? (
-          <View style={styles.metricGroup}>
-            <AppText style={[styles.featuredMetricValue, { color: meta.color }]}>{story.metric_value}</AppText>
-            <AppText style={styles.metricLabel}>{story.metric_label.toUpperCase()}</AppText>
-          </View>
-        ) : null}
-        {onPress ? <Ionicons name="chevron-forward" size={16} color={colors.textTertiary} /> : null}
-      </View>
-
-      {isMatchup ? (
-        <View style={styles.scoreboardRowCompact}>
-          <View style={styles.scoreboardTeam}>
-            <TeamAvatar
-              avatarId={avatarFor(rosterMap, story.primary_roster_id)}
-              size={38}
-              style={[styles.avatarRingThin, { borderColor: meta.color }]}
-            />
-            <AppText style={styles.matchupTeam} numberOfLines={1}>
-              {story.primary_team}
-            </AppText>
-          </View>
-          <AppText style={[styles.scoreboardValueCompact, { color: meta.color }]} numberOfLines={1}>
-            {story.metric_value}
-          </AppText>
-          <View style={styles.scoreboardTeam}>
-            <TeamAvatar
-              avatarId={avatarFor(rosterMap, story.secondary_roster_id)}
-              size={38}
-              style={styles.avatarMuted}
-            />
-            <AppText style={[styles.matchupTeam, styles.matchupTeamMuted]} numberOfLines={1}>
-              {story.secondary_team}
-            </AppText>
-          </View>
-        </View>
       ) : null}
-
-      {isTrade && story.secondary_team ? (
-        <View style={styles.tradeRowCompact}>
-          <View style={styles.tradeChip}>
-            <TeamAvatar avatarId={avatarFor(rosterMap, story.primary_roster_id)} size={22} />
-            <AppText style={styles.tradeChipText} numberOfLines={1}>
-              {story.primary_team}
-            </AppText>
-          </View>
-          <Ionicons name="swap-horizontal" size={13} color={colors.textTertiary} />
-          <View style={styles.tradeChip}>
-            <TeamAvatar avatarId={avatarFor(rosterMap, story.secondary_roster_id)} size={22} />
-            <AppText style={styles.tradeChipText} numberOfLines={1}>
-              {story.secondary_team}
-            </AppText>
-          </View>
-        </View>
-      ) : null}
-
-      <AppText style={styles.featuredSummary}>{story.summary}</AppText>
-    </PressableScale>
+    </View>
   );
 }
 
-/**
- * Every other story in a category — a routine FAAB add, a quiet week, the
- * close-but-not-the-headline matchup. Deliberately quieter than
- * `FeaturedStoryRow` above it: a smaller neutral-ring icon, a secondary-tone
- * (not category-color) metric number, and a tighter two-line summary clamp
- * — real information, just not fighting the featured row for attention
- * (coridian_'s "$0 FAAB pickup shouldn't read as dramatic as a blowout").
- */
-function StoryRow({
-  story,
-  showDivider,
-  onPress,
+type OpenTeam = (rosterId: string, fallbackName: string) => void;
+
+function RecapBody({
+  recap,
+  myRosterId,
   rosterMap,
+  openTeam,
+  onShare,
+  onOpenTrades,
 }: {
-  story: RecapStory;
-  showDivider: boolean;
-  onPress?: () => void;
+  recap: WeeklyRecap;
+  myRosterId: string;
   rosterMap: RosterMap;
+  openTeam: OpenTeam;
+  onShare: () => void;
+  onOpenTrades: () => void;
 }) {
   const { colors } = useThemeMode();
   const styles = useMemo(() => createStyles(colors), [colors]);
-  const meta = storyMeta(colors)[story.story_type] ?? defaultStoryMeta(colors);
-  const isMatchup = story.story_type === 'matchup' || story.story_type === 'matchup_close';
-  const isTrade = story.story_type === 'trade';
-
+  const page = buildRecapPage(recap, myRosterId);
+  const leader = page.hero.leader;
   return (
-    <PressableScale accessibilityRole="button"
-      style={[styles.row, showDivider && styles.rowDivider]}
-      onPress={onPress}
-      disabled={!onPress}
+    <StatusHeader
+      model={{
+        kicker: page.hero.kicker,
+        headline: page.hero.headline,
+        context: page.hero.context,
+        ring: page.hero.ring,
+        stats: page.hero.stats,
+        attention: [],
+        primary: recap.incomplete ? null : { label: 'Share recap', actionKey: 'share' },
+      }}
+      onAction={() => onShare()}
+      testID="recap-status-header"
     >
-      <View style={styles.rowHeaderRow}>
-        <IconCircle name={meta.icon} color={meta.color} size={28} iconSize={13} />
-        {!isMatchup && !isTrade ? (
-          <TeamAvatar avatarId={avatarFor(rosterMap, story.primary_roster_id)} size={26} />
-        ) : null}
-        <AppText style={styles.rowTitle} numberOfLines={1}>
-          {story.title}
-        </AppText>
-        {story.metric_label ? (
-          <View style={styles.metricGroup}>
-            <AppText style={styles.metricValue}>{story.metric_value}</AppText>
-            <AppText style={styles.metricLabel}>{story.metric_label.toUpperCase()}</AppText>
-          </View>
-        ) : null}
-        {onPress ? <Ionicons name="chevron-forward" size={16} color={colors.textTertiary} /> : null}
+      {leader ? (
+        <View style={styles.leaderStrip} testID="recap-leader">
+          <TeamRow
+            name={leader.team}
+            rosterId={leader.rosterId}
+            avatarId={rosterMap[leader.rosterId]?.avatarId}
+            mine={Boolean(myRosterId) && leader.rosterId === myRosterId}
+            gold
+            sub="Scoring leader"
+            trailing={leader.points}
+            openTeam={openTeam}
+          />
+        </View>
+      ) : null}
+      {recap.incomplete || page.sections.length === 0 ? (
+        <AppText style={styles.muted}>{recap.empty_reason || 'Not enough historical data for a recap this week.'}</AppText>
+      ) : (
+        page.sections.map((section, index) => (
+          <SectionModule key={section.key} section={section} index={index} rosterMap={rosterMap} myRosterId={myRosterId} openTeam={openTeam} onOpenTrades={onOpenTrades} />
+        ))
+      )}
+    </StatusHeader>
+  );
+}
+
+function SectionModule({ section, index, rosterMap, myRosterId, openTeam, onOpenTrades }: { section: RecapSection; index: number; rosterMap: RosterMap; myRosterId: string; openTeam: OpenTeam; onOpenTrades: () => void }) {
+  const acc = usePlayerAccordion();
+  return (
+    <CompactModule id={`recap.${section.key}`} title={section.title} parts={section.parts} defaultOpen={index === 0} testID={`recap-section-${section.key}`}>
+      {section.stories.map((story, i) => (
+        <StoryBody key={`${story.story_type}-${i}`} story={story as RecapStory} idKey={`${story.story_type}-${i}`} rosterMap={rosterMap} myRosterId={myRosterId} openTeam={openTeam} acc={acc} onOpenTrades={onOpenTrades} />
+      ))}
+    </CompactModule>
+  );
+}
+
+function YouChip() {
+  const { colors } = useThemeMode();
+  const styles = useMemo(() => createStyles(colors), [colors]);
+  return (
+    <View style={styles.youChip}>
+      <AppText style={styles.youText}>YOU</AppText>
+    </View>
+  );
+}
+
+/** A team: crest, name (wraps, never cut off), an optional "You" marker and one trailing figure. Taps open the manager profile. */
+function TeamRow({
+  name,
+  rosterId,
+  avatarId,
+  mine,
+  trailing,
+  sub,
+  muted = false,
+  gold = false,
+  openTeam,
+}: {
+  name: string;
+  rosterId: string;
+  avatarId?: string;
+  mine: boolean;
+  trailing?: string;
+  sub?: string;
+  muted?: boolean;
+  gold?: boolean;
+  openTeam: OpenTeam;
+}) {
+  const { colors } = useThemeMode();
+  const styles = useMemo(() => createStyles(colors), [colors]);
+  const body = (
+    <>
+      <TeamAvatar avatarId={avatarId} name={name} size={36} style={gold ? { borderWidth: 2, borderColor: colors.premium } : undefined} />
+      <View style={styles.teamMain}>
+        <View style={styles.teamNameLine}>
+          <AppText style={[styles.teamName, muted && styles.teamNameMuted]}>{name}</AppText>
+          {mine ? <YouChip /> : null}
+        </View>
+        {sub ? <AppText style={styles.teamSub}>{sub}</AppText> : null}
       </View>
+      {trailing ? <AppText style={styles.teamFigure}>{trailing}</AppText> : null}
+    </>
+  );
+  if (!rosterId) return <View style={styles.teamRow}>{body}</View>;
+  return (
+    <Pressable accessibilityRole="button" accessibilityLabel={`${name}, open manager profile`} onPress={() => openTeam(rosterId, name)} style={styles.teamRow}>
+      {body}
+    </Pressable>
+  );
+}
 
-      {isMatchup ? (
-        <View style={styles.matchupRowCompact}>
-          <View style={styles.matchupTeamGroup}>
-            <TeamAvatar avatarId={avatarFor(rosterMap, story.primary_roster_id)} size={22} />
-            <AppText style={styles.matchupTeam} numberOfLines={1}>
-              {story.primary_team}
-            </AppText>
-          </View>
-          <AppText style={styles.matchupVs}>vs</AppText>
-          <View style={styles.matchupTeamGroup}>
-            <TeamAvatar avatarId={avatarFor(rosterMap, story.secondary_roster_id)} size={22} />
-            <AppText style={[styles.matchupTeam, styles.matchupTeamMuted]} numberOfLines={1}>
-              {story.secondary_team}
-            </AppText>
-          </View>
+function Chip({ children }: { children: string }) {
+  const { colors } = useThemeMode();
+  const styles = useMemo(() => createStyles(colors), [colors]);
+  return (
+    <View style={styles.chip}>
+      <AppText style={styles.chipText}>{children}</AppText>
+    </View>
+  );
+}
+
+function tradeAsset(asset: RecapTradeAsset, key: string): TradeCardAsset {
+  if (asset.kind === 'pick') return { key, pickLabel: asset.label || asset.name };
+  return { key, player: { id: asset.player_id || null, name: asset.name, position: asset.position ?? null, team: asset.team ?? null } };
+}
+
+function tradeSides(story: RecapStory): { team_name: string; roster_id: string; assets: RecapTradeAsset[] }[] {
+  if (story.sides && story.sides.length > 0) return story.sides.map((s) => ({ team_name: s.team_name, roster_id: s.roster_id, assets: s.assets ?? [] }));
+  return [
+    { team_name: story.primary_team, roster_id: story.primary_roster_id, assets: story.left_assets ?? [] },
+    { team_name: story.secondary_team, roster_id: story.secondary_roster_id, assets: story.right_assets ?? [] },
+  ].filter((s) => s.team_name);
+}
+
+function StoryFrame({ story, children }: { story: RecapStory; children: React.ReactNode }) {
+  const { colors } = useThemeMode();
+  const styles = useMemo(() => createStyles(colors), [colors]);
+  return (
+    <View style={styles.story} testID="recap-story">
+      <AppText style={styles.storyTitle}>{story.title}</AppText>
+      {children}
+      {story.summary ? <AppText style={styles.summary}>{story.summary}</AppText> : null}
+      {story.editorial_label ? <Chip>{story.editorial_label}</Chip> : null}
+    </View>
+  );
+}
+
+function TradeStory({ story, myRosterId, onOpenTrades }: { story: RecapStory; myRosterId: string; onOpenTrades: () => void }) {
+  const { colors } = useThemeMode();
+  const styles = useMemo(() => createStyles(colors), [colors]);
+  const sides = tradeSides(story);
+  const details = (
+    <>
+      {story.value_lenses?.map((lens) => (
+        <AppText key={lens.lens} style={styles.note}>{`${lens.label}: ${lens.note}`}</AppText>
+      ))}
+      <ModuleMore label="View trade history" onPress={onOpenTrades} />
+    </>
+  );
+  const hasAssets = sides.some((s) => s.assets.length > 0);
+  const title = `${story.title}${storyInvolves(story, myRosterId) ? ' · you' : ''}`;
+  if (hasAssets && sides.length === 2) {
+    return (
+      <TradeCompactCard
+        title={title}
+        give={sides[0].assets.map((a, i) => tradeAsset(a, `a${i}`))}
+        get={sides[1].assets.map((a, i) => tradeAsset(a, `b${i}`))}
+        giveLabel={`${sides[0].team_name} got`}
+        getLabel={`${sides[1].team_name} got`}
+        meta={[story.editorial_label ?? ''].filter(Boolean)}
+        meter={null}
+        testID="recap-trade-card"
+      >
+        {story.summary ? <AppText style={styles.summary}>{story.summary}</AppText> : null}
+        {details}
+      </TradeCompactCard>
+    );
+  }
+  return (
+    <View style={styles.tradeCard} testID="recap-trade-card">
+      <AppText style={styles.tradeTitle}>{story.title}</AppText>
+      {sides.map((side, i) => (
+        <View key={`${side.roster_id}-${i}`} style={styles.tradeSide}>
+          <AppText style={styles.tradeKicker}>{`${side.team_name} got`}</AppText>
+          {side.assets.map((a, j) => (
+            <TradeAssetCard key={j} asset={tradeAsset(a, `s${i}-${j}`)} mode="desk" />
+          ))}
+        </View>
+      ))}
+      {story.summary ? <AppText style={styles.summary}>{story.summary}</AppText> : null}
+      {details}
+    </View>
+  );
+}
+
+function StoryBody({
+  story,
+  idKey,
+  rosterMap,
+  myRosterId,
+  openTeam,
+  acc,
+  onOpenTrades,
+}: {
+  story: RecapStory;
+  idKey: string;
+  rosterMap: RosterMap;
+  myRosterId: string;
+  openTeam: OpenTeam;
+  acc: ReturnType<typeof usePlayerAccordion>;
+  onOpenTrades: () => void;
+}) {
+  const { colors } = useThemeMode();
+  const styles = useMemo(() => createStyles(colors), [colors]);
+  const mine = (rosterId: string) => Boolean(myRosterId) && rosterId === myRosterId;
+  const avatar = (rosterId: string) => rosterMap[rosterId]?.avatarId || undefined;
+  if (story.story_type === 'trade') return <TradeStory story={story} myRosterId={myRosterId} onOpenTrades={onOpenTrades} />;
+  if (story.story_type === 'waiver' || story.story_type === 'waiver_low') {
+    const asset = story.player_assets?.find((a) => a.player_id);
+    const faab = recapFaab(story);
+    if (!asset) {
+      return (
+        <StoryFrame story={story}>
+          <TeamRow name={story.primary_team} rosterId={story.primary_roster_id} avatarId={avatar(story.primary_roster_id)} mine={mine(story.primary_roster_id)} openTeam={openTeam} trailing={faab != null ? formatMoney(faab) : undefined} sub={story.players.join(', ')} />
+        </StoryFrame>
+      );
+    }
+    return (
+      <View style={styles.story} testID="recap-story">
+        <AppText style={styles.storyTitle}>{story.title}</AppText>
+        <PlayerAccordionRow
+          player={{ id: asset.player_id, name: asset.name, position: asset.position ?? null, team: asset.team ?? null }}
+          mode="desk"
+          metaText={[asset.team, 'Added'].filter(Boolean).join(' · ')}
+          trailingFact={faab != null ? { key: 'faab', label: 'FAAB', value: formatMoney(faab), tone: 'success' } : null}
+          open={acc.isOpen(idKey)}
+          onToggle={() => acc.toggle(idKey)}
+          testID="recap-waiver-row"
+        >
+          <TeamRow name={story.primary_team} rosterId={story.primary_roster_id} avatarId={avatar(story.primary_roster_id)} mine={mine(story.primary_roster_id)} openTeam={openTeam} sub="Claimed by" />
+          {story.summary ? <AppText style={styles.summary}>{story.summary}</AppText> : null}
+        </PlayerAccordionRow>
+      </View>
+    );
+  }
+  if (isMatchupStory(story)) {
+    const score = recapScoreline(story);
+    return (
+      <StoryFrame story={story}>
+        <View>
+          <TeamRow name={story.primary_team} rosterId={story.primary_roster_id} avatarId={avatar(story.primary_roster_id)} mine={mine(story.primary_roster_id)} openTeam={openTeam} trailing={score?.winner} sub="Won" />
+          <TeamRow name={story.secondary_team} rosterId={story.secondary_roster_id} avatarId={avatar(story.secondary_roster_id)} mine={mine(story.secondary_roster_id)} openTeam={openTeam} trailing={score?.loser} sub="Lost" muted />
+        </View>
+        {recapMetric(story) ? <Chip>{`${story.metric_label || 'Margin'} ${recapMetric(story)}`}</Chip> : null}
+      </StoryFrame>
+    );
+  }
+  const metric = recapMetric(story);
+  const isPoints = story.story_type.startsWith('performance');
+  return (
+    <StoryFrame story={story}>
+      <TeamRow
+        name={story.primary_team}
+        rosterId={story.primary_roster_id}
+        avatarId={avatar(story.primary_roster_id)}
+        mine={mine(story.primary_roster_id)}
+        openTeam={openTeam}
+        sub={isPoints ? 'Points' : story.metric_label || undefined}
+        trailing={metric || undefined}
+      />
+      {story.players.length > 0 ? (
+        <View style={styles.chipRow}>
+          {story.players.map((name) => (
+            <Chip key={name}>{name}</Chip>
+          ))}
         </View>
       ) : null}
-
-      {isTrade && story.secondary_team ? (
-        <View style={styles.tradeRowCompact}>
-          <View style={styles.tradeChip}>
-            <TeamAvatar avatarId={avatarFor(rosterMap, story.primary_roster_id)} size={18} />
-            <AppText style={styles.tradeChipText} numberOfLines={1}>
-              {story.primary_team}
-            </AppText>
-          </View>
-          <Ionicons name="swap-horizontal" size={13} color={colors.textTertiary} />
-          <View style={styles.tradeChip}>
-            <TeamAvatar avatarId={avatarFor(rosterMap, story.secondary_roster_id)} size={18} />
-            <AppText style={styles.tradeChipText} numberOfLines={1}>
-              {story.secondary_team}
-            </AppText>
-          </View>
-        </View>
-      ) : null}
-
-      <AppText style={styles.storySummary} numberOfLines={2}>
-        {story.summary}
-      </AppText>
-    </PressableScale>
+    </StoryFrame>
   );
 }
 
 function createStyles(colors: ThemeColors) {
   return StyleSheet.create({
-  headerButtonRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
-  root: { flex: 1, backgroundColor: 'transparent' },
-  container: { flex: 1, backgroundColor: 'transparent' },
-  content: { padding: spacing.lg, paddingBottom: spacing.xl * 4 },
-  center: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: colors.background,
-    padding: spacing.xl,
-  },
-  weekPickerRow: {
-    flexGrow: 0,
-    paddingHorizontal: spacing.lg,
-    paddingTop: spacing.sm,
-  },
-  tabBarRow: { paddingHorizontal: spacing.lg, paddingTop: spacing.sm },
-  weekPill: {
-    paddingHorizontal: spacing.md,
-    paddingVertical: 6,
-    borderRadius: radii.pill,
-    borderWidth: 1,
-    borderColor: colors.cardBorder,
-    marginRight: spacing.sm,
-  },
-  weekPillActive: { backgroundColor: colors.accentMuted, borderColor: colors.accent },
-  weekPillText: { fontSize: 13.5, fontWeight: '600', color: colors.textSecondary },
-  weekPillTextActive: { color: colors.accent },
-  recapSkeletonHeadline: { marginTop: spacing.xs },
-  headerRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
-    marginBottom: spacing.lg,
-  },
-  headerTextGroup: { flex: 1 },
-  kicker: { fontSize: 12.5, fontWeight: '700', color: colors.accent, letterSpacing: 0.8, marginBottom: 4 },
-  headline: { fontSize: 27, fontWeight: '700', color: colors.textPrimary },
-  shareButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    paddingHorizontal: spacing.sm,
-    paddingVertical: 4,
-    borderRadius: radii.pill,
-    borderWidth: 1,
-    borderColor: colors.cardBorder,
-    marginTop: 2,
-  },
-  shareButtonText: { fontSize: 13.5, fontWeight: '600', color: colors.textSecondary },
-  storyTextGroup: { flex: 1 },
-  metricGroup: { alignItems: 'flex-end' },
-  // Routine-row metric: deliberately plain textSecondary, not the category
-  // color — a $0 FAAB add shouldn't visually compete with the featured
-  // row's bold colored number directly above it in the same group.
-  metricValue: { fontSize: 16.5, fontWeight: '600', color: colors.textSecondary },
-  metricLabel: { fontSize: 12, fontWeight: '700', color: colors.textTertiary, letterSpacing: 0.4 },
-  matchupTeamGroup: { flex: 1, alignItems: 'center', gap: 4 },
-  matchupTeam: { fontSize: 15.5, fontWeight: '700', color: colors.textPrimary, textAlign: 'center' },
-  matchupTeamMuted: { color: colors.textSecondary, fontWeight: '500' },
-  matchupVs: { fontSize: 12.5, color: colors.textTertiary, fontWeight: '600' },
-  // Colored rings — a bolder presence than a flat icon/avatar, scaled down
-  // for the featured tier vs. the hero tier (Magna Carta §19/§20: one
-  // player/team-identity visual language, varied through size/weight only).
-  ringedIcon: { borderWidth: 2 },
-  ringedIconThin: { borderWidth: 1.5 },
-  avatarRing: { borderWidth: 2 },
-  avatarRingThin: { borderWidth: 1.5 },
-  avatarMuted: { opacity: 0.55 },
-  tradeChip: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.xs,
-    backgroundColor: colors.background,
-    borderRadius: radii.pill,
-    paddingHorizontal: spacing.sm,
-    paddingVertical: 6,
-  },
-  tradeChipText: { flex: 1, fontSize: 13.5, fontWeight: '600', color: colors.textPrimary },
-  error: { color: colors.danger, textAlign: 'center' },
-
-  // Lead story (hero) card — bigger type + glow, the one card on this screen
-  // allowed to visually dominate (Magna Carta §15).
-  leadCard: { marginBottom: spacing.lg },
-  // Category-tinted banner bleeding to the card's own edges (AnimatedCard's
-  // default padding is spacing.lg, so a matching negative margin + re-applied
-  // padding recreates the inset while the tint paints behind it). Square
-  // corners (radii.md === 0 app-wide) mean no corner-radius matching is
-  // needed for the bleed to look intentional rather than clipped.
-  leadTintPanel: {
-    marginTop: -spacing.lg,
-    marginHorizontal: -spacing.lg,
-    paddingTop: spacing.lg,
-    paddingHorizontal: spacing.lg,
-    paddingBottom: spacing.md,
-    marginBottom: spacing.md,
-  },
-  leadHeaderRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
-  leadKicker: { fontSize: 12.5, fontWeight: '700', letterSpacing: 0.6, marginBottom: 3 },
-  leadTitle: { fontSize: 19.5, fontWeight: '700', color: colors.textPrimary },
-  // Bumped from 24->30 — the one number on this screen allowed to read as a
-  // genuine headline stat rather than a label-adjacent figure (Magna Carta
-  // §10's "display/hero" tier, reserved here for the single most dramatic
-  // story on the whole screen).
-  leadMetricValue: { fontSize: 31, fontWeight: '800', letterSpacing: -0.5 },
-  tradeRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, marginTop: spacing.md },
-  leadSummary: { fontSize: 15.5, color: colors.textSecondary, lineHeight: 22, marginTop: spacing.md },
-  leadFooterRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    marginTop: spacing.md,
-    paddingTop: spacing.sm,
-    borderTopWidth: StyleSheet.hairlineWidth,
-    borderTopColor: colors.border,
-  },
-  leadFooterText: { fontSize: 13.5, fontWeight: '700' },
-
-  // Hero-tier matchup "scoreboard": two team avatars flanking one giant
-  // centered margin number — the number genuinely IS the story here, so it
-  // gets the biggest type on the whole screen instead of competing with the
-  // teams' names at equal weight (coridian_'s core complaint).
-  scoreboardRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, marginTop: spacing.md },
-  scoreboardTeam: { flex: 1, alignItems: 'center', gap: spacing.xs },
-  scoreboardTeamName: { fontSize: 14.5, fontWeight: '700', color: colors.textPrimary, textAlign: 'center' },
-  scoreboardTeamMuted: { color: colors.textSecondary, fontWeight: '500' },
-  scoreboardMetric: { alignItems: 'center', paddingHorizontal: spacing.xs },
-  scoreboardValue: { fontSize: 40, fontWeight: '800', letterSpacing: -1 },
-  // Featured-tier (in-group) scoreboard — same idea, smaller.
-  scoreboardRowCompact: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, marginTop: spacing.sm },
-  scoreboardValueCompact: { fontSize: 23, fontWeight: '800', letterSpacing: -0.5 },
-
-  // Grouped-story surfaces below the hero — one AnimatedCard per category
-  // with internal dividers between rows (Magna Carta §12). The card itself
-  // carries no padding so each row (featured or routine) can supply its own
-  // horizontal inset — required for the featured row's tint to bleed flush
-  // to the card's edges.
-  group: { marginBottom: spacing.md },
-  groupHeaderRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs, marginBottom: spacing.sm },
-  groupAccentBar: { width: 3, height: 14, borderRadius: radii.pill },
-  groupIcon: { marginLeft: -2 },
-  groupLabel: { flex: 1, fontSize: 13.5, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.5 },
-  groupCards: { gap: spacing.sm },
-  groupCard: { padding: 0, overflow: 'hidden' },
-  // Featured row (tier 2) — the category's one real storyline: tinted
-  // background, thicker colored rings, a larger bolded number, full summary.
-  featuredRow: { paddingHorizontal: spacing.md, paddingVertical: spacing.md },
-  featuredTitle: { flex: 1, fontSize: 16.5, fontWeight: '700', color: colors.textPrimary },
-  featuredMetricValue: { fontSize: 21, fontWeight: '800' },
-  featuredSummary: { fontSize: 14.5, color: colors.textSecondary, lineHeight: 20, marginTop: spacing.sm },
-  // Routine row (tier 3) — everything else in the category: quieter type,
-  // neutral metric color, tighter summary clamp (coridian_'s "$0 FAAB
-  // pickup" example shouldn't fight the featured row above it for attention).
-  row: { paddingHorizontal: spacing.md, paddingVertical: spacing.sm },
-  rowDivider: { borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border },
-  rowHeaderRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
-  rowTitle: { flex: 1, fontSize: 14.5, fontWeight: '500', color: colors.textSecondary },
-  matchupRowCompact: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, marginTop: spacing.sm },
-  tradeRowCompact: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, marginTop: spacing.sm },
-  storySummary: { fontSize: 13.5, color: colors.textTertiary, lineHeight: 19, marginTop: spacing.xs },
+    headerButtonRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+    root: { flex: 1, backgroundColor: 'transparent' },
+    container: { flex: 1, backgroundColor: 'transparent' },
+    content: { padding: spacing.lg, gap: spacing.md },
+    stack: { gap: spacing.sm },
+    center: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.background, padding: spacing.xl },
+    tabBarRow: { paddingHorizontal: spacing.lg, paddingTop: spacing.sm },
+    weekRow: { paddingHorizontal: spacing.lg, paddingTop: spacing.sm },
+    muted: { fontSize: 14, color: colors.textTertiary },
+    leaderStrip: { backgroundColor: colors.glass, borderColor: colors.glassBorder, borderWidth: 1, borderRadius: radii.md, paddingHorizontal: spacing.md, minHeight: 44 },
+    teamRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, minHeight: 44 },
+    teamMain: { flex: 1, minWidth: 0 },
+    teamNameLine: { flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: 6 },
+    teamName: { flexShrink: 1, fontSize: 14.5, fontWeight: '700', color: colors.textPrimary },
+    teamNameMuted: { color: colors.textSecondary },
+    teamSub: { fontSize: 12, color: colors.textTertiary },
+    teamFigure: { fontSize: 17, fontWeight: '800', color: colors.textPrimary, fontVariant: ['tabular-nums'] },
+    youChip: { height: 18, paddingHorizontal: 6, borderRadius: radii.pill, backgroundColor: colors.accentMuted, justifyContent: 'center' },
+    youText: { fontSize: 12, fontWeight: '800', color: colors.accentOnTint, letterSpacing: 0.6 },
+    story: { gap: 6 },
+    storyTitle: { fontSize: 12.5, fontWeight: '700', color: colors.textSecondary },
+    summary: { fontSize: 14, color: colors.textSecondary, lineHeight: 19 },
+    note: { fontSize: 12, color: colors.textTertiary },
+    chipRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
+    chip: { alignSelf: 'flex-start', minHeight: 24, paddingHorizontal: 8, borderRadius: radii.pill, justifyContent: 'center', backgroundColor: colors.accentMuted, borderWidth: 1, borderColor: colors.glassBorder },
+    chipText: { fontSize: 12, fontWeight: '700', color: colors.textSecondary },
+    tradeCard: { gap: spacing.sm, padding: spacing.md, backgroundColor: colors.glass, borderColor: colors.glassBorder, borderWidth: 1, borderRadius: radii.tile },
+    tradeTitle: { fontSize: 15, fontWeight: '800', color: colors.textPrimary },
+    tradeSide: { gap: 2 },
+    tradeKicker: { fontSize: 12, fontWeight: '800', letterSpacing: 0.6, color: colors.textTertiary, textTransform: 'uppercase' },
   });
 }

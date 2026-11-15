@@ -554,7 +554,12 @@ def _matchup_story(
         metric_label="Margin",
         metric_value=f"{_float(row.get('margin'), 0.0):.1f}",
         history_week=week,
-        extra={"matchup_kind": kind, "matchup_id": row.get("matchup_id")},
+        extra={
+            "matchup_kind": kind,
+            "matchup_id": row.get("matchup_id"),
+            "winner_points": round(_float(row.get("winner_points"), 0.0), 1),
+            "loser_points": round(_float(row.get("loser_points"), 0.0), 1),
+        },
     )
 
 
@@ -602,7 +607,12 @@ def _matchup_close_story(
         metric_label="Margin",
         metric_value=f"{_float(row.get('margin'), 0.0):.1f}",
         history_week=week,
-        extra={"matchup_kind": "close", "matchup_id": row.get("matchup_id")},
+        extra={
+            "matchup_kind": "close",
+            "matchup_id": row.get("matchup_id"),
+            "winner_points": round(_float(row.get("winner_points"), 0.0), 1),
+            "loser_points": round(_float(row.get("loser_points"), 0.0), 1),
+        },
     )
 
 
@@ -640,6 +650,18 @@ def _scored_waiver_claims(
     return scored
 
 
+def _waiver_player_assets(side: Mapping[str, Any], player: str) -> list[dict[str, Any]]:
+    """The added player as a slim asset view (player_id, position, team) so
+    clients can draw an avatar and open the player sheet; empty when the
+    recorded asset carries no id."""
+
+    for asset in side.get("receives") or []:
+        if isinstance(asset, Mapping) and _text(asset.get("name") or asset.get("label")) == player:
+            view = _trade_asset_view(asset)
+            return [view] if view.get("player_id") else []
+    return []
+
+
 def _waiver_story(
     transactions: Sequence[Mapping[str, Any]],
     *,
@@ -674,6 +696,7 @@ def _waiver_story(
         history_filter=history.FILTER_WAIVERS,
         history_week=week,
         source_event_ids=(_text(item.get("transaction_id")),),
+        extra={"player_assets": _waiver_player_assets(side, player)},
     )
 
 
@@ -714,6 +737,7 @@ def _waiver_low_story(
         history_filter=history.FILTER_WAIVERS,
         history_week=week,
         source_event_ids=(_text(item.get("transaction_id")),),
+        extra={"player_assets": _waiver_player_assets(side, player)},
     )
 
 

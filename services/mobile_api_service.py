@@ -7110,6 +7110,7 @@ def get_multi_team_trade_ideas(
 def get_league_recap(
     league_id: str = Depends(require_league_access),
     week: int | None = None,
+    me: bool = False,
     _user: dict[str, Any] = Depends(require_user),
 ) -> dict[str, Any]:
     """Weekly recap — shares the exact same builder as the web app's League
@@ -7123,11 +7124,23 @@ def get_league_recap(
     behavior, unchanged). Passing an explicit `week` lets the client browse
     recap history — `max_completed_week` is always returned so it can build
     a week picker without a second round trip.
+
+    `me=true` adds `my_roster_id` (the caller's roster, "" when it cannot be
+    resolved) so the page can mark "your" team; off by default so the other
+    recap readers (Today, alerts) pay no extra lookup.
     """
 
     league = sleeper.get_league(league_id)
     if not league:
         raise HTTPException(status_code=404, detail="League not found.")
+
+    my_roster_id = ""
+    if me:
+        try:
+            my_roster, _reason = _resolve_my_roster(_user, league_id)
+            my_roster_id = str((my_roster or {}).get("roster_id") or "")
+        except Exception:  # best-effort identity, never blocks the recap
+            my_roster_id = ""
 
     _, _, max_history_week = league_recaps.league_history_window(league)
     matchup_rows = league_recaps.build_matchup_history_rows(
@@ -7185,7 +7198,10 @@ def get_league_recap(
         movement=None,
         power_ranks=None,
     )
-    return {"ok": True, "recap": recap, "reason": "", "max_completed_week": completed_week}
+    payload = {"ok": True, "recap": recap, "reason": "", "max_completed_week": completed_week}
+    if me:
+        payload["my_roster_id"] = my_roster_id
+    return payload
 
 
 _ROUNDUP_UPSELL = {

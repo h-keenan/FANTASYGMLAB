@@ -46,6 +46,7 @@ export function PillRow({
   glass = false,
   tabIdPrefix,
   className: extraClass,
+  snap = false,
 }: {
   /** `icon` is an optional glyph slot rendered before the label (tab icons are added in this one place). */
   options: { label: string; value: string; href?: string; icon?: ReactNode; glyph?: TabIconName; count?: number }[];
@@ -70,6 +71,8 @@ export function PillRow({
   tabIdPrefix?: string;
   /** Extra classes on the root (e.g. `max-md:hidden` when a bottom bar replaces the strip on phones). */
   className?: string;
+  /** Scroll variant: tabs snap to the strip's centre and the active tab is centred when it changes (long, growing lists such as weeks). */
+  snap?: boolean;
 }) {
   const mode: PillRowVariant = variant ?? (fullWidth ? "fill" : "compact");
   const scrollerRef = useRef<HTMLDivElement>(null);
@@ -91,14 +94,15 @@ export function PillRow({
     if (!el) return;
     const selected = el.querySelector<HTMLElement>('[aria-selected="true"]');
     if (selected && el.scrollWidth > el.clientWidth) {
-      // Scroll the minimum needed so the selected tab is fully visible.
+      // Scroll the minimum needed so the selected tab is fully visible (centred for a snap strip).
       const left = selected.offsetLeft;
       const right = left + selected.offsetWidth;
-      if (left < el.scrollLeft) el.scrollLeft = left;
+      if (snap) el.scrollLeft = Math.max(0, left - (el.clientWidth - selected.offsetWidth) / 2);
+      else if (left < el.scrollLeft) el.scrollLeft = left;
       else if (right > el.scrollLeft + el.clientWidth) el.scrollLeft = right - el.clientWidth;
     }
     measure();
-  }, [active, options.length, measure]);
+  }, [active, options.length, measure, snap]);
 
   // Sliding underline: track the selected tab's box inside the scroller.
   const placeIndicator = useCallback(() => {
@@ -193,6 +197,7 @@ export function PillRow({
         style={{
           gap: track ? "var(--space-xs)" : "var(--segmented-gap)",
           scrollbarWidth: "none",
+          ...(snap ? { scrollSnapType: "x proximity" } : null),
           WebkitMaskImage: fade.left || fade.right ? mask : undefined,
           maskImage: fade.left || fade.right ? mask : undefined,
         }}
@@ -214,6 +219,7 @@ export function PillRow({
             // The sliding underline replaces the static one once measured (not drawn on the pill track).
             boxShadow: isActive && !indicator && !glass && !track ? "inset 0 -2px 0 var(--color-information)" : "none",
             borderLeft: index === 0 || slim || glass || track ? "none" : "var(--border-width-default) solid var(--color-border)",
+            ...(snap ? { scrollSnapAlign: "center" } : null),
             ...(track ? { borderRadius: "var(--radius-segment)", border: `var(--border-width-default) solid ${isActive ? "color-mix(in srgb, var(--color-accent) 42%, transparent)" : "transparent"}` } : null),
           } as const;
           const common = {

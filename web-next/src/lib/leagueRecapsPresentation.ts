@@ -5,103 +5,16 @@ import type { HistoryTransaction, RecapStory } from "./api";
  *
  * Reads only fields the backend already computes (modules.league_recaps /
  * modules.league_history / modules.transaction_grades) — no scoring math,
- * grading, or recap-story generation lives here, only grouping/coloring/
- * formatting, mirroring modules/league_recaps_ui.py and
+ * grading, or recap-story generation lives here, only formatting, mirroring modules/league_recaps_ui.py and
  * modules/league_history_ui.py exactly.
- *
- * The category -> color mapping below is the real fix from PR #1065
- * ("this page looks terrible" — coridian_, 2026-10-14): performance=gold,
- * matchup=red, waiver=green, trade=accent, activity=warning, roster=accent.
- * Reuses the exact same tokens modules/league_recaps_styles.py's
- * `.dg-recap-story--*` / `.dg-recap-group--*` rules use — not a new palette.
  */
 
 // modules/league_recaps.py's STORY_* constants, verbatim.
-export const STORY_PERFORMANCE = "performance";
-export const STORY_PERFORMANCE_LOW = "performance_low";
-export const STORY_MATCHUP = "matchup";
-export const STORY_MATCHUP_CLOSE = "matchup_close";
 export const STORY_WAIVER = "waiver";
 export const STORY_WAIVER_LOW = "waiver_low";
 export const STORY_TRADE = "trade";
 export const STORY_ACTIVITY = "activity";
 export const STORY_ACTIVITY_LOW = "activity_low";
-export const STORY_RISER = "roster_riser";
-
-export type RecapCategory = "performance" | "matchup" | "waiver" | "trade" | "activity" | "roster" | "other";
-
-// modules/league_recaps_ui.py's _RECAP_STORY_CATEGORIES, verbatim.
-const RECAP_STORY_CATEGORIES: Record<string, RecapCategory> = {
-  [STORY_PERFORMANCE]: "performance",
-  [STORY_PERFORMANCE_LOW]: "performance",
-  [STORY_MATCHUP]: "matchup",
-  [STORY_MATCHUP_CLOSE]: "matchup",
-  [STORY_WAIVER]: "waiver",
-  [STORY_WAIVER_LOW]: "waiver",
-  [STORY_TRADE]: "trade",
-  [STORY_ACTIVITY]: "activity",
-  [STORY_ACTIVITY_LOW]: "activity",
-  [STORY_RISER]: "roster",
-};
-
-// modules/league_recaps_ui.py's _RECAP_CATEGORY_LABELS, verbatim.
-export const RECAP_CATEGORY_LABELS: Record<RecapCategory, string> = {
-  performance: "Performance",
-  matchup: "Matchups",
-  waiver: "Waivers",
-  trade: "Trades",
-  activity: "League Activity",
-  roster: "Roster Watch",
-  other: "Storylines",
-};
-
-export function recapStoryCategory(storyType: string): RecapCategory {
-  return RECAP_STORY_CATEGORIES[storyType] ?? "other";
-}
-
-// modules/league_recaps_styles.py's .dg-recap-story--*/.dg-recap-group--*
-// category color rules, verbatim — same tokens, not a new palette.
-const RECAP_CATEGORY_COLOR_VARS: Record<RecapCategory, string> = {
-  performance: "var(--color-prestige-elite)",
-  matchup: "var(--color-danger)",
-  waiver: "var(--color-success)",
-  trade: "var(--color-accent)",
-  activity: "var(--color-warning)",
-  roster: "var(--color-accent)",
-  other: "var(--color-text-muted)",
-};
-
-export function recapCategoryColorVar(category: RecapCategory): string {
-  return RECAP_CATEGORY_COLOR_VARS[category];
-}
-
-export interface RecapStoryGroup {
-  category: RecapCategory;
-  label: string;
-  stories: RecapStory[];
-}
-
-/**
- * Buckets stories into consecutive same-category runs — mirrors
- * league_recaps_ui.py's _story_groups() / mobile RecapScreen's
- * groupStories() exactly (same "group consecutive items" idiom as
- * groupAlertsByType in alertsPresentation.ts).
- */
-export function groupRecapStories(stories: RecapStory[]): RecapStoryGroup[] {
-  const groups: RecapStoryGroup[] = [];
-  let currentCategory: RecapCategory | null = null;
-  for (const story of stories) {
-    const category = recapStoryCategory(story.story_type);
-    const last = groups[groups.length - 1];
-    if (!last || category !== currentCategory) {
-      groups.push({ category, label: RECAP_CATEGORY_LABELS[category], stories: [story] });
-      currentCategory = category;
-    } else {
-      last.stories.push(story);
-    }
-  }
-  return groups;
-}
 
 /**
  * CTA label for a story's History deep link — modules/league_recaps_ui.py's
@@ -115,38 +28,6 @@ export function historyDeepLinkLabel(story: RecapStory): string {
   if (story.story_type === STORY_WAIVER || story.story_type === STORY_WAIVER_LOW) return "View waiver history";
   if (story.story_type === STORY_ACTIVITY || story.story_type === STORY_ACTIVITY_LOW) return "Open League History";
   return "";
-}
-
-// modules/league_recaps_ui.py's MAX_RECAP_ARCHIVE_PILLS, verbatim.
-export const MAX_RECAP_ARCHIVE_PILLS = 8;
-
-export interface RecapArchiveLabel {
-  label: string;
-  week: number;
-}
-
-export interface RecapArchive {
-  pills: RecapArchiveLabel[];
-  overflow: RecapArchiveLabel[];
-}
-
-/**
- * Week picker pills — mirrors league_recaps_ui.py's render_league_recaps_page
- * archive-building block: "This week" pinned first, then the most recent
- * completed weeks as pills (modules.league_recaps.archive_weeks /
- * split_archive_pill_overflow), everything older into a "More weeks"
- * overflow list instead of one more ever-shrinking pill (#244).
- */
-export function buildRecapArchive(maxCompletedWeek: number): RecapArchive {
-  if (maxCompletedWeek <= 0) return { pills: [], overflow: [] };
-  const pills: RecapArchiveLabel[] = [{ label: `This week · ${maxCompletedWeek}`, week: maxCompletedWeek }];
-  const previousWeeks: number[] = [];
-  for (let week = maxCompletedWeek - 1; week >= 1; week -= 1) previousWeeks.push(week);
-  const pinnedBudget = Math.max(0, MAX_RECAP_ARCHIVE_PILLS - pills.length);
-  const pinned = previousWeeks.slice(0, pinnedBudget);
-  const overflow = previousWeeks.slice(pinnedBudget);
-  for (const week of pinned) pills.push({ label: `Week ${week}`, week });
-  return { pills, overflow: overflow.map((week) => ({ label: `Week ${week}`, week })) };
 }
 
 // --- History tab -----------------------------------------------------

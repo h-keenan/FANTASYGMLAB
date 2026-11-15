@@ -2273,6 +2273,11 @@ export interface RecapStory {
   value_lenses?: RecapValueLens[];
   editorial_label?: string;
   historical_value_available?: boolean;
+  // Matchup stories: the recorded final scores.
+  winner_points?: number;
+  loser_points?: number;
+  // Waiver stories: the added player (player_id, position, team), when recorded.
+  player_assets?: RecapTradeAsset[];
 }
 
 export interface WeeklyRecap {
@@ -2291,6 +2296,8 @@ export interface RecapResponse {
   recap: WeeklyRecap | null;
   reason: '' | 'no_completed_week';
   max_completed_week: number;
+  // Present when requested with `me`: the signed-in user's roster id ('' when unresolved).
+  my_roster_id?: string;
 }
 
 export interface QuickViewStatItem {
@@ -4156,9 +4163,10 @@ export const api = {
     if (options?.groupDuplicates) params.set('group_duplicates', 'true');
     return authorizedFetch<PlayerNewsResponse>(`/v1/players/${encodeURIComponent(playerId)}/news?${params.toString()}`);
   },
-  getLeagueRecap: (leagueId: string, options?: { week?: number }) => {
+  getLeagueRecap: (leagueId: string, options?: { week?: number; me?: boolean }) => {
     const params = new URLSearchParams();
     if (options?.week != null) params.set('week', String(options.week));
+    if (options?.me) params.set('me', 'true');
     const query = params.toString();
     return authorizedFetch<RecapResponse>(
       `/v1/leagues/${encodeURIComponent(leagueId)}/recap${query ? `?${query}` : ''}`,
