@@ -357,3 +357,26 @@ def test_best_ball_bid_gets_no_lineup_slot_starter_boost():
     assert any("for you" in reason for reason in normal.reasons)
     assert not any("for you" in reason for reason in best_ball.reasons)
     assert best_ball.point_bid < normal.point_bid
+
+
+def test_fractional_score_still_counts_as_clear_best_on_the_wire():
+    # The wire holds unrounded floats but the guidance gets the rounded integer
+    # score, so the player must still be recognised as himself (not a rival).
+    def guidance(score):
+        return faab.recommend_faab_guidance(
+            player_score=int(round(score)),
+            position="WR",
+            budget=100,
+            remaining_budget=100,
+            wire_scores=[score, 2000.0, 1900.0],
+        )
+
+    whole = guidance(4000.0)
+    fractional = guidance(4000.6)
+    assert "Clear best WR on the wire" in whole.reasons
+    assert "Clear best WR on the wire" in fractional.reasons
+    # Not matching himself also over-counted him as a "similar" alternative.
+    crowded = faab.recommend_faab_guidance(
+        player_score=4001, position="WR", budget=100, remaining_budget=100, wire_scores=[4000.6, 3900.0, 3800.0]
+    )
+    assert not any("similar" in reason for reason in crowded.reasons)

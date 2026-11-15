@@ -838,8 +838,11 @@ def recommend_faab_guidance(
     wire = sorted((float(v) for v in (wire_scores or ()) if v and float(v) > 0), reverse=True)
     if wire:
         others = list(wire)
+        # ``player_score`` is the rounded integer of his real score while the
+        # wire holds the unrounded floats, so match within half a point or a
+        # fractional score is never found and he competes against himself.
         for index, value in enumerate(others):
-            if abs(value - player_score) <= 1e-6:
+            if abs(value - player_score) <= 0.5 + 1e-6:
                 del others[index]  # drop this player himself, once
                 break
         best_other = others[0] if others else 0.0

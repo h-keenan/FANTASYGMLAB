@@ -153,10 +153,20 @@ class PlayerModelAdapter(ScoringModel):
     def profile(self, player, rng):
         return self._m.draw_season_profile(player, rng)
 
+    @staticmethod
+    def model_week(profile, week: int) -> int:
+        """The season profile covers the NFL's weeks only (17). A league imported with a long regular season or a big playoff field
+        plays calendar weeks past that: they reuse the last modelled week's form and availability instead of indexing past the profile
+        (an IndexError that used to stop the game at its first overflow week). Never changes a week inside the profile."""
+
+        n = len(getattr(profile, "form", ()) or ())
+        return min(week, n) if n else week
+
     def expected(self, player, profile, week, role_mult=None) -> float:
         """The model's hidden expected points for this player this week (with a team role when given). The engine's usage cap reads
         it; it never reaches a view. No random draw."""
 
+        week = self.model_week(profile, week)
         if role_mult is not None and self.team_roles:
             if self.role_mode == "additive":
                 profile = self._m.with_role(profile, week, role_mult[0], role_mult[1])
@@ -165,13 +175,15 @@ class PlayerModelAdapter(ScoringModel):
         return float(self._m.expected_week_points(player, profile, week))
 
     def week(self, player, profile, week, rng, scoring, role_mult=None):
+        overflow = week > self.model_week(profile, week)
+        week = self.model_week(profile, week)
         if role_mult is not None and self.team_roles:
             if self.role_mode == "additive":
                 profile = self._m.with_role(profile, week, role_mult[0], role_mult[1])
             else:
                 profile = self._m.with_role_multiplier(profile, week, role_mult)
         result = self._m.draw_week_points(player, profile, week, rng, scoring)
-        hurt = bool(result.injury_incurred)
+        hurt = bool(result.injury_incurred) and not overflow  # no new injury past the modelled season: the last week's one already happened
         return PlayerWeek(
             points=float(result.points), stats=_to_stats(result.stats), active=bool(result.active),
             newly_injured=hurt, out_weeks=calendar_weeks_out(profile, week) if hurt else 0,
