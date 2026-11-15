@@ -322,4 +322,3 @@ function buildTeamStats(
   ];
   return { main };
 }
-
