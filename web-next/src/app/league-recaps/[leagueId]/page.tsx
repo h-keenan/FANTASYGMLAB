@@ -33,7 +33,7 @@ export default function LeagueRecapsPage() {
     let cancelled = false;
 
     api
-      .getLeagueRecap(leagueId)
+      .getLeagueRecap(leagueId, undefined, true)
       .then((result) => {
         if (!cancelled) setRecap(result);
       })

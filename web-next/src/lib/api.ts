@@ -3011,7 +3011,27 @@ export interface RecapStory {
   history_filter?: string;
   /** Trade stories: every participating team (3+ team trades carry all). */
   team_count?: number;
-  sides?: { team_name: string; roster_id: string }[];
+  sides?: { team_name: string; roster_id: string; assets?: RecapTradeAsset[] }[];
+  /** Trade stories: the full asset lists of the first two sides (older payloads; `sides` carries every team). */
+  left_assets?: RecapTradeAsset[];
+  right_assets?: RecapTradeAsset[];
+  value_lenses?: { lens: string; label: string; note: string }[];
+  /** Matchup stories: the recorded final scores. */
+  winner_points?: number;
+  loser_points?: number;
+  /** Waiver stories: the added player (player_id, position, team) when the transaction recorded one. */
+  player_assets?: RecapTradeAsset[];
+}
+
+export interface RecapTradeAsset {
+  kind: "player" | "pick";
+  name: string;
+  player_id?: string;
+  position?: string;
+  team?: string;
+  label?: string;
+  season?: string;
+  round?: number;
 }
 
 export interface WeeklyRecap {
@@ -3030,6 +3050,8 @@ export interface RecapResponse {
   recap: WeeklyRecap | null;
   reason: "" | "no_completed_week";
   max_completed_week: number;
+  /** Present when requested with `me`: the signed-in user's roster id ("" when unresolved). */
+  my_roster_id?: string;
 }
 
 /** One side of a History transaction — modules.league_history.normalize_transaction's
@@ -4725,10 +4747,10 @@ export const api = {
   // is a new thin wrapper (GET .../history) over the same
   // modules.league_history / modules.transaction_grades the web app's
   // Streamlit History tab already used.
-  getLeagueRecap: (leagueId: string, week?: number) =>
-    authorizedRequest<RecapResponse>(
-      `/v1/leagues/${encodeURIComponent(leagueId)}/recap${week ? `?week=${week}` : ""}`,
-    ),
+  getLeagueRecap: (leagueId: string, week?: number, me = false) => {
+    const query = [week ? `week=${week}` : "", me ? "me=true" : ""].filter(Boolean).join("&");
+    return authorizedRequest<RecapResponse>(`/v1/leagues/${encodeURIComponent(leagueId)}/recap${query ? `?${query}` : ""}`);
+  },
 
   getLeagueRoundup: (leagueId: string, week?: number) =>
     authorizedRequest<RoundupResponse>(
