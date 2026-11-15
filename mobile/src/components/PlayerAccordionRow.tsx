@@ -12,6 +12,7 @@ import { nextOpenId, playerRowModel, type FactTone, type PlayerFact, type Player
 import type { BadgeInput } from '../lib/playerBadges';
 import type { SimGradeInput } from '../lib/simGrade';
 import { radii, spacing, type ThemeColors } from '../theme';
+import Money from './Money';
 
 function toneColor(tone: FactTone | undefined, colors: ThemeColors): string {
   switch (tone) {
@@ -100,7 +101,7 @@ export default function PlayerAccordionRow({ open, onToggle, badges = [], positi
                   {metaLine.map((part, i) => (
                     <AppText key={part.key} style={[styles.meta, part.tone ? { color: toneColor(part.tone, colors) } : null, part.tone === 'warning' || part.key === 'proj' ? { fontWeight: '700' } : null]}>
                       {i > 0 ? ' · ' : ''}
-                      {part.text}
+                      <Money>{part.text}</Money>
                     </AppText>
                   ))}
                 </AppText>

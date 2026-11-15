@@ -6,6 +6,7 @@ import { AccentCard } from "@/components/AccentCard";
 import { Sheet } from "@/components/ui/Sheet";
 import { compactAriaLabel, compactParts, type CompactPart, type CompactTone } from "@/lib/compactModule";
 import { simOpenKey, simParseOpen } from "@/lib/simLayout";
+import { Money } from "@/components/Money";
 
 const OPEN_EVENT = "fgl:sim-open-change";
 
@@ -134,7 +135,7 @@ export function CompactModule({
                 {shown.map((part, i) => (
                   <span key={part.key}>
                     {i > 0 ? <span style={{ color: "var(--color-text-muted)" }}>{" · "}</span> : null}
-                    <span style={{ color: part.tone ? TONE_COLOR[part.tone] : "var(--color-text-primary)", fontWeight: part.strong ? 800 : 600 }}>{part.text}</span>
+                    <span style={{ color: part.tone ? TONE_COLOR[part.tone] : "var(--color-text-primary)", fontWeight: part.strong ? 800 : 600 }}><Money>{part.text}</Money></span>
                   </span>
                 ))}
               </span>

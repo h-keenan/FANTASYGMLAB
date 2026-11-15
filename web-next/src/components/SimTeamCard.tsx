@@ -2,12 +2,14 @@
 
 import { playerSurname } from "@/lib/playerNameDisplay";
 import { AccentCard } from "@/components/AccentCard";
-import { PlayerName } from "@/components/PlayerName";
 import { PositionBadge } from "@/components/PositionBadge";
 import { SimTeamLogo } from "@/components/SimTeamIdentity";
 import { simToneColor } from "@/components/SimGameParts";
 import { ToneBadge } from "@/components/ToneBadge";
 import type { SimLeagueRosterTeam } from "@/lib/simGame";
+import { CompactPlayerCard } from "@/components/ui/CompactPlayerCard";
+import { PlayerAvatarSlot } from "@/components/ui/PlayerAvatarSlot";
+import { simPlayerAnatomyRef } from "@/lib/simGame";
 import { simTeamChips, simTeamRecordLine } from "@/lib/simLeagueRosters";
 import { simGradeOf } from "@/lib/simGrade";
 import { LetterGrade } from "@/components/ui/LetterGrade";
@@ -61,15 +63,14 @@ export function SimTeamCard({
         <ul className={dense ? "flex flex-wrap gap-x-3 gap-y-1" : "flex flex-col gap-1"} aria-label={`${team.name} top assets`}>
           {team.top_assets.map((p) => dense ? (
             <li key={p.id} className="flex items-center gap-1 text-xs">
+              <PlayerAvatarSlot player={simPlayerAnatomyRef(p)} tier="dense" />
               <PositionBadge position={p.pos} />
               <span className="font-bold">{playerSurname(p.name)}</span>
               <LetterGrade grade={simGradeOf(p)} size="sm" />
             </li>
           ) : (
-            <li key={p.id} className="flex items-center gap-2 text-xs">
-              <PositionBadge position={p.pos} />
-              <PlayerName name={p.name} className="min-w-0 flex-1 font-bold" />
-              <LetterGrade grade={simGradeOf(p)} size="sm" />
+            <li key={p.id} className="text-xs">
+              <CompactPlayerCard player={simPlayerAnatomyRef(p)} testId="sim-team-asset" trailing={<LetterGrade grade={simGradeOf(p)} size="sm" />} />
             </li>
           ))}
         </ul>

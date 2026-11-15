@@ -51,6 +51,8 @@ import { waiversHeaderParts } from "@/lib/waiversHeader";
 import { limitedDataNote, needsHeadline, teamNeedStat } from "@/lib/dropsPresentation";
 import { EmptyState } from "@/components/EmptyState";
 import { PlayerName } from "@/components/PlayerName";
+import { Money } from "@/components/Money";
+import { formatMoney } from "@/lib/money";
 
 /**
  * Waivers page, laid out as: compact header + 3-stat strip, a
@@ -125,7 +127,7 @@ function StatStrip({ items }: { items: { label: string; value: string }[] }) {
           style={index > 0 ? { borderLeft: "var(--border-width-default) solid var(--color-border)" } : undefined}
         >
           <span className="text-base font-extrabold" style={{ color: "var(--color-text-primary)" }}>
-            {item.value}
+            <Money>{item.value}</Money>
           </span>
           <span className="text-[0.6875rem] uppercase font-bold" style={{ color: "var(--color-text-muted)" }}>
             {item.label}
@@ -165,12 +167,12 @@ function FaabRange({ player, prominent = false }: { player: WaiverPriorityAdd; p
     <div className="flex flex-col items-end gap-0.5" title={player.faab?.why || undefined}>
       <span
         className={prominent ? "text-lg font-extrabold" : "text-sm font-bold"}
-        style={{ color: isBid ? "var(--color-success)" : "var(--color-text-secondary)" }}
+        style={{ color: "var(--color-text-secondary)" }}
       >
-        {primary}
+        {isBid ? <Money all>{primary}</Money> : primary}
       </span>
       <span className="text-xs" style={{ color: "var(--color-text-muted)" }}>
-        {secondary}
+        <Money>{secondary}</Money>
       </span>
     </div>
   );
@@ -239,7 +241,7 @@ function TopWaiverTargetCard({ player }: { player: WaiverPriorityAdd }) {
       {player.faab?.why ? (
         <p className="text-xs" style={{ color: "var(--color-text-secondary)" }}>
           <span className="font-bold">Why: </span>
-          {player.faab.why}
+          <Money>{player.faab.why}</Money>
         </p>
       ) : null}
       {player.usage_flag ? (
@@ -339,10 +341,10 @@ function RecommendedRow({
           </span>
           <span
             className="shrink-0 text-sm font-extrabold tabular-nums text-right"
-            style={{ color: isBid ? "var(--color-success)" : "var(--color-text-secondary)" }}
+            style={{ color: "var(--color-text-secondary)" }}
             data-testid="waiver-bid"
           >
-            {primary}
+            {isBid ? <Money all>{primary}</Money> : primary}
           </span>
         </span>
         <span className="ml-[3.75rem] block h-1.5 overflow-hidden rounded-full" style={{ background: "rgba(255,255,255,0.1)" }} role="img" aria-label={`Bid size ${Math.round(barFraction * 100)}% of the largest`} data-testid="waiver-bid-bar">
@@ -365,7 +367,7 @@ function RecommendedRow({
           {player.faab?.why ? (
             <p className="text-xs" style={{ color: "var(--color-text-secondary)" }}>
               <span className="font-bold">Why: </span>
-              {player.faab.why}
+              <Money>{player.faab.why}</Money>
             </p>
           ) : null}
           {flag ? (
@@ -584,7 +586,7 @@ export function WaiversContent({
   const faabItem =
     data.faab_enabled === false
       ? { label: "Waivers", value: data.waiver_mode === "reverse_standings" ? "Reverse" : "Rolling" }
-      : { label: "FAAB", value: data.faab_remaining != null ? `$${data.faab_remaining}` : "—" };
+      : { label: "FAAB", value: data.faab_remaining != null ? formatMoney(data.faab_remaining) : "—" };
   const stats = [
     { label: "Available", value: String(data.available_count ?? data.players.length) },
     faabItem,
@@ -765,7 +767,7 @@ export function WaiversContent({
                       {sharedDrop ? <SharedDropNote drop={sharedDrop.first.drop_suggestion!.drop!} count={sharedDrop.count} /> : null}
                       {bidNote ? (
                         <p className="m-0 text-xs pb-1" style={{ color: "var(--color-text-muted)" }} data-testid="waiver-bid-note">
-                          Bid ranges are {bidNote}. Tap a row for its value, why and roster move.
+                          Bid ranges are <Money>{bidNote}</Money>. Tap a row for its value, why and roster move.
                         </p>
                       ) : null}
                     </div>

@@ -81,7 +81,7 @@ describe("BottomTabBar smart pill (page context)", () => {
     expect(screen.queryByTestId("pill-context-layer")).toBeNull();
   });
 
-  it("with context: section icon, menu button, a page tablist and one primary", () => {
+  it("with context: one merged section/menu button, a page tablist and one primary", () => {
     const onSelect = vi.fn();
     const onPress = vi.fn();
     render(<BottomTabBar ariaLabel="x" tabs={tabs} active="team" context={ctx({ onSelect, primary: { key: "auto", label: "Auto-set", onPress } })} />);
@@ -93,7 +93,10 @@ describe("BottomTabBar smart pill (page context)", () => {
     expect(onSelect).toHaveBeenCalledWith("players");
     fireEvent.click(screen.getByTestId("pill-primary"));
     expect(onPress).toHaveBeenCalled();
-    expect(screen.getByTestId("pill-section")).toHaveAttribute("aria-label", "Team");
+    // ONE merged button: it carries the section name and is the menu (no separate section link + "..." button).
+    expect(screen.getByTestId("pill-menu")).toHaveAttribute("aria-label", expect.stringContaining("Team"));
+    expect(screen.queryByTestId("pill-section")).toBeNull();
+    expect(screen.getAllByRole("button", { name: /Sections menu/ })).toHaveLength(1);
   });
 
   it("the menu button toggles aria-expanded and the full global row; picking a tab folds it back", () => {

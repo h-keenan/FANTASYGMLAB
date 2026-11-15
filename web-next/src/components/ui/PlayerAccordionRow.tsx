@@ -10,6 +10,7 @@ import { PlayerAvatarSlot } from "@/components/ui/PlayerAvatarSlot";
 import { nextOpenId, playerRowModel, type FactTone, type PlayerFactsInput, type PlayerFact } from "@/lib/playerAnatomy";
 import type { BadgeInput } from "@/lib/playerBadges";
 import type { SimGradeInput } from "@/lib/simGrade";
+import { Money } from "@/components/Money";
 
 const TONE: Record<FactTone, string> = {
   success: "var(--color-success)",
@@ -116,7 +117,7 @@ export function PlayerAccordionRow({ open, onToggle, badges = [], positionLabel,
                   {metaLine.map((part, i) => (
                     <Fragment key={part.key}>
                       {i > 0 ? " · " : ""}
-                      <span style={{ color: part.tone ? TONE[part.tone] : undefined, fontWeight: part.tone === "warning" || part.key === "proj" ? 700 : undefined }}>{part.text}</span>
+                      <span style={{ color: part.tone ? TONE[part.tone] : undefined, fontWeight: part.tone === "warning" || part.key === "proj" ? 700 : undefined }}><Money>{part.text}</Money></span>
                     </Fragment>
                   ))}
                 </span>

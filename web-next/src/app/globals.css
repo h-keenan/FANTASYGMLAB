@@ -65,6 +65,7 @@
   --color-accent-strong: #22d3ee;
   --color-accent-soft: rgba(103, 232, 249, 0.14);
   --color-success: #22c55e;
+  --color-money: #4ade80;
   --color-opportunity: #14b8a6;
   --color-action: #facc15;
   --color-warning: #f59e0b;
@@ -289,6 +290,7 @@
     --color-on-accent: #ffffff;
     --color-accent-soft: rgba(0, 95, 112, 0.2);
     --color-success: #066626;
+    --color-money: #0b6a2c;
     --color-opportunity: #00645a;
     --color-action: #7a5200;
     --color-warning: #8f4200;
@@ -379,6 +381,7 @@
   --color-on-accent: #ffffff;
   --color-accent-soft: rgba(0, 95, 112, 0.2);
   --color-success: #066626;
+  --color-money: #0b6a2c;
   --color-opportunity: #00645a;
   --color-action: #7a5200;
   --color-warning: #8f4200;
@@ -462,6 +465,7 @@
   --color-accent: var(--color-accent);
   --color-accent-strong: var(--color-accent-strong);
   --color-success: var(--color-success);
+  --color-money: var(--color-money);
   --color-warning: var(--color-warning);
   --color-danger: var(--color-danger);
   --color-opportunity: var(--color-opportunity);
@@ -2108,6 +2112,7 @@ body:has(.fd-landing-dark) {
   --color-on-accent: #0b1220;
   --color-accent-soft: rgba(103, 232, 249, 0.14);
   --color-success: #22c55e;
+  --color-money: #4ade80;
   --color-opportunity: #14b8a6;
   --color-action: #facc15;
   --color-warning: #f59e0b;

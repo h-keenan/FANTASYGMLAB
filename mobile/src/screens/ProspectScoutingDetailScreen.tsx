@@ -10,7 +10,7 @@ import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { useHeaderHeight } from '@react-navigation/elements';
 
 import AnimatedCard from '../components/AnimatedCard';
-import PositionBadge from '../components/PositionBadge';
+import CompactPlayerCard from '../components/CompactPlayerCard';
 import SectionHeading from '../components/SectionHeading';
 import { api, MAX_GRADE, MIN_GRADE, MAX_ROUND_PROJECTION, MIN_ROUND_PROJECTION } from '../lib/api';
 import { useOrbClearance } from '../lib/orbLayout';
@@ -119,13 +119,13 @@ export default function ProspectScoutingDetailScreen({ route, navigation }: Prop
       <ScrollView contentContainerStyle={[styles.content, { paddingBottom: orbClearance }]}>
         <AnimatedCard style={styles.headerCard}>
           <View style={styles.headerRow}>
-            <PositionBadge position={prospect.position} size="md" />
             <View style={styles.headerIdentity}>
-              <AppText style={styles.name}>{prospect.name}</AppText>
-              <AppText style={styles.meta}>
-                {prospect.school}
-                {prospect.draft_year ? ` · ${prospect.draft_year} class` : ''}
-              </AppText>
+              {/* Prospects have no NFL headshot yet: id null keeps the avatar on initials. */}
+              <CompactPlayerCard
+                player={{ id: null, name: prospect.name, position: prospect.position }}
+                detail={`${prospect.school}${prospect.draft_year ? ` · ${prospect.draft_year} class` : ''}`}
+                testID="prospect-player"
+              />
             </View>
             <PressableScale accessibilityRole="button"
               style={styles.watchlistButton}

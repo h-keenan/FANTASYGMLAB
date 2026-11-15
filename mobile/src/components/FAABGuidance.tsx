@@ -7,6 +7,7 @@ import { useThemeMode } from '../context/ThemeModeContext';
 import { spacing, type ThemeColors } from '../theme';
 import type { WaiverFaabGuidance } from '../lib/api';
 import { faabDisplayText } from '../lib/faabDisplay';
+import Money from './Money';
 
 /**
  * Shared FAAB-bid treatment for waiver recommendations: a prominent bid
@@ -16,8 +17,8 @@ import { faabDisplayText } from '../lib/faabDisplay';
  * remaining budget is known, a percent-of-pool range otherwise) so this
  * never diverges from — or overstates the certainty of — the server's own
  * rule-of-thumb heuristic. Green for the headline number: coridian_ called
- * out FAAB stats/value reading as amber/yellow (screenshot, 2026-09-23) — a
- * dollar bid is a concrete, positive recommendation, not a caution flag.
+ * out FAAB stats/value reading as amber/yellow (screenshot, 2026-09-23); all
+ * money is now the one `money` green via <Money>.
  */
 export default function FAABGuidance({
   faab,
@@ -41,18 +42,19 @@ export default function FAABGuidance({
         <Ionicons
           name={isBid ? 'cash-outline' : 'swap-vertical-outline'}
           size={prominent ? 15 : 12}
-          color={isBid ? colors.success : colors.textSecondary}
+          color={isBid ? colors.money : colors.textSecondary}
         />
-        <AppText
+        <Money
+          all={isBid}
           style={[isBid ? styles.primary : styles.claim, prominent && styles.primaryProminent]}
           numberOfLines={1}
         >
           {primary}
-        </AppText>
+        </Money>
       </View>
-      <AppText style={[styles.secondary, prominent && styles.secondaryProminent]} numberOfLines={1}>
+      <Money style={[styles.secondary, prominent && styles.secondaryProminent]} numberOfLines={1}>
         {secondary}
-      </AppText>
+      </Money>
     </View>
   );
 }
@@ -61,7 +63,7 @@ function createStyles(colors: ThemeColors) {
   return StyleSheet.create({
     wrap: { alignItems: 'flex-start', gap: 1 },
     primaryRow: { flexDirection: 'row', alignItems: 'center', gap: 4 },
-    primary: { fontSize: 15.5, fontWeight: '800', color: colors.success },
+    primary: { fontSize: 15.5, fontWeight: '800' },
     primaryProminent: { fontSize: 20.5, fontWeight: '800' },
     claim: { fontSize: 15.5, fontWeight: '800', color: colors.textSecondary },
     secondary: { fontSize: 12, color: colors.textTertiary },

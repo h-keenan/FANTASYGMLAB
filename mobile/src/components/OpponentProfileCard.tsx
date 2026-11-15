@@ -19,7 +19,7 @@ import {
   type OpponentTradeTarget,
 } from '../lib/opponentProfile';
 import { spacing, type ThemeColors } from '../theme';
-import PlayerName from './PlayerName';
+import CompactPlayerCard from './CompactPlayerCard';
 
 /** Opponent profile card (League Rankings manager profile): strongest/weakest
  * room, starter strength vs. bench depth, surplus and needs, pick capital,
@@ -110,13 +110,11 @@ export default function OpponentProfileCard({
           </View>
           {angle.target ? (
             <>
-              <View style={styles.inline}>
-                <PositionBadge position={angle.target.position} />
-                <View style={{ flex: 1, minWidth: 0, flexDirection: 'row', flexWrap: 'wrap', alignItems: 'baseline', columnGap: 6 }}>
-                  <PlayerName name={angle.target.name} style={[styles.value, styles.targetName]} />
-                  {angle.target.team ? <AppText style={[styles.value, styles.targetName]}>{angle.target.team}</AppText> : null}
-                </View>
-              </View>
+              <CompactPlayerCard
+                player={{ id: angle.target.player_id, name: angle.target.name, position: angle.target.position, team: angle.target.team ?? null }}
+                detail={angle.target.team}
+                testID="opponent-target-player"
+              />
               <AppText style={styles.muted}>{offerCaption(angle.target)}</AppText>
               <View style={styles.cta}>
                 <Button label="Offer this" size="sm" onPress={() => onOffer(angle.target as OpponentTradeTarget)} />
@@ -140,7 +138,6 @@ function createStyles(colors: ThemeColors) {
     rooms: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.md },
     room: { flexDirection: 'row', alignItems: 'center', gap: 6 },
     roomRank: { fontSize: 13.5, fontWeight: '700', color: colors.textPrimary },
-    targetName: { flex: 1 },
     cta: { alignSelf: 'flex-start' },
   });
 }

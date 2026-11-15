@@ -7,23 +7,22 @@ import { useEffect, useState } from "react";
 
 import { AccentCard } from "@/components/AccentCard";
 import { Button } from "@/components/Button";
-import { PositionBadge } from "@/components/PositionBadge";
 import { SimSectionTitle } from "@/components/SimGameParts";
 import { SkeletonCard } from "@/components/Skeleton";
 import { ToneBadge } from "@/components/ToneBadge";
 import { api } from "@/lib/api";
-import { simSeasonText, type SimTeamHistoryPick, type SimTeamHistoryResponse } from "@/lib/simGame";
+import { simSeasonText, type SimTeamHistoryPick, simPlayerAnatomyRef, type SimTeamHistoryResponse } from "@/lib/simGame";
 import { simDraftSlotText, simSeasonRecord, simTeamMoveText, simWhenLabel } from "@/lib/simHistory";
-import { PlayerName } from "@/components/PlayerName";
+import { CompactPlayerCard } from "@/components/ui/CompactPlayerCard";
 
 function PickRow({ pick }: { pick: SimTeamHistoryPick }) {
   return (
-    <li className="flex items-center gap-2 py-1 text-sm" style={{ borderBottom: "var(--border-width-default) solid var(--color-border)" }}>
-      <PositionBadge position={pick.pos} />
-      <PlayerName name={pick.name} className="min-w-0 flex-1 font-bold" />
-      <span className="shrink-0 text-xs tabular-nums" style={{ color: "var(--color-text-secondary)" }}>
-        {simDraftSlotText(pick.round, pick.pick, pick.auto)}
-      </span>
+    <li className="py-1" style={{ borderBottom: "var(--border-width-default) solid var(--color-border)" }}>
+      <CompactPlayerCard
+        player={simPlayerAnatomyRef(pick)}
+        testId="history-pick-player"
+        trailing={<span className="text-xs font-normal tabular-nums" style={{ color: "var(--color-text-secondary)" }}>{simDraftSlotText(pick.round, pick.pick, pick.auto)}</span>}
+      />
     </li>
   );
 }

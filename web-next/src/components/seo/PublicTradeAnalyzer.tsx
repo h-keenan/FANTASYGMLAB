@@ -5,7 +5,6 @@ import { useCallback, useEffect, useId, useMemo, useRef, useState } from "react"
 import { ButtonLink, Button } from "@/components/Button";
 import { Input } from "@/components/Input";
 import { LeanBarMeter } from "@/components/LeanBarMeter";
-import { PositionBadge } from "@/components/PositionBadge";
 import { trackUse } from "@/lib/analytics";
 import { formatTradeGain } from "@/lib/tradeHubPresentation";
 import { storePendingBridgeTrade } from "@/lib/tradeBridge";
@@ -24,7 +23,7 @@ import {
   type TradeSettings,
 } from "@/lib/seo/tradeAnalyzer";
 import { shareLinkWithUtm } from "@/lib/seo/tradeShare";
-import { PlayerName } from "@/components/PlayerName";
+import { CompactPlayerCard } from "@/components/ui/CompactPlayerCard";
 
 const FEATURE = "public_trade_analyzer";
 
@@ -51,17 +50,13 @@ export function mergeSearch(current: string, ours: string): string {
 
 function PlayerLine({ player, settings }: { player: TradeBoardPlayer; settings: TradeSettings }) {
   return (
-    <span className="flex min-w-0 flex-1 items-center gap-2">
-      <PositionBadge position={player.pos} />
-      <span className="min-w-0 flex-1">
-        <PlayerName name={player.name} className="text-sm font-bold" />
-        <span className="block truncate text-xs" style={{ color: "var(--color-text-muted)" }}>
-          {[player.team, player.age !== null ? `age ${player.age}` : null, player.inj].filter(Boolean).join(" · ")}
-        </span>
-      </span>
-      <span className="text-sm font-bold" style={{ fontVariantNumeric: "tabular-nums" }}>
-        {valueOf(player, settings).toLocaleString()}
-      </span>
+    <span className="min-w-0 flex-1">
+      <CompactPlayerCard
+        player={{ id: player.id, name: player.name, position: player.pos, team: player.team, age: player.age }}
+        detail={[player.team, player.age !== null ? `age ${player.age}` : null, player.inj].filter(Boolean).join(" · ")}
+        trailing={valueOf(player, settings).toLocaleString()}
+        testId="public-trade-player"
+      />
     </span>
   );
 }

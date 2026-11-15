@@ -13,11 +13,10 @@ import { ToneBadge } from "@/components/ToneBadge";
 import { gradeToneColor, sampleFill, TENDENCY_SIGNALS, tendencyBadgeText, tendencyTone, tradeDateLabel } from "@/lib/managerTendencies";
 import { PopupShell } from "@/components/PopupShell";
 
-import { PositionBadge } from "@/components/PositionBadge";
 import { PickPlate } from "@/components/PickRow";
 import { OpponentProfileCard } from "@/components/OpponentProfileCard";
 import type { OpponentProfileResponse } from "@/lib/opponentProfile";
-import { PlayerName } from "@/components/PlayerName";
+import { CompactPlayerCard } from "@/components/ui/CompactPlayerCard";
 import { Tabs } from "@/components/Tabs";
 import { managerProfileTabs } from "@/lib/sheetTabs";
 
@@ -31,15 +30,11 @@ function TradeAssetLine({ asset }: { asset: ManagerRecentTradeAsset }) {
     );
   }
   return (
-    <div className="flex items-center gap-2 min-w-0">
-      <PositionBadge position={asset.position} />
-      <PlayerName name={asset.name} className="text-sm font-bold" />
-      {asset.team ? (
-        <span className="text-xs" style={{ color: "var(--color-text-muted)" }}>
-          {asset.team}
-        </span>
-      ) : null}
-    </div>
+    <CompactPlayerCard
+      player={{ id: asset.player_id ?? null, name: asset.name ?? "Player", position: asset.position ?? null, team: asset.team ?? null }}
+      detail={asset.team}
+      testId="manager-trade-player"
+    />
   );
 }
 

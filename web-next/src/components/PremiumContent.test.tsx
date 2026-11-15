@@ -59,7 +59,7 @@ describe("PremiumContent", () => {
 
     // Annual is the default, with the real saving: 1 - 59.99 / (9.99 * 12) = 50%.
     expect(screen.getByText("$59.99")).toBeInTheDocument();
-    expect(screen.getByText("About $5.00/month, billed yearly")).toBeInTheDocument();
+    expect(screen.getByText((_, el) => el?.tagName === "SPAN" && el.textContent === "About $5.00/month, billed yearly")).toBeInTheDocument();
     expect(screen.getByRole("tab", { name: /Annual · Save 50%/ })).toHaveAttribute("aria-selected", "true");
     expect(screen.queryByText("$9.99")).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole("tab", { name: "Monthly" }));
@@ -164,7 +164,7 @@ describe("PremiumContent", () => {
       <PremiumContent entitlement="free" plans={PLANS} publishableKey="pk" trial={{ days: 3, eligible: true }} />,
     );
     expect(screen.getAllByRole("button", { name: "Start 3-day free trial" })).toHaveLength(1);
-    expect(screen.getByText(/Then \$59\.99\/year\. Cancel anytime\./)).toBeInTheDocument();
+    expect(screen.getByText((_, el) => /Then \$59\.99\/year\. Cancel anytime\./.test(el?.textContent ?? "") && el?.tagName === "P")).toBeInTheDocument();
     // Front Office gets no trial.
     expect(screen.getAllByRole("button", { name: "Subscribe" })).toHaveLength(1);
   });

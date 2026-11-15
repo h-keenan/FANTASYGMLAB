@@ -9,8 +9,8 @@ import { PillRow } from "@/components/PillRow";
 import { SectionHeading } from "@/components/SectionHeading";
 import { SimTeamIdentity } from "@/components/SimTeamIdentity";
 import { SimGlyph } from "@/components/SimGlyph";
-import { SimPlayerChip, SimPlayerLine, SimSideLabel, SimStat, SimTeamOpenContext, type SimCtx } from "@/components/SimGameParts";
-import { SimPickLine, useSimPicks } from "@/components/SimGameDynastyParts";
+import { SimPlayerLine, SimSideLabel, SimTeamOpenContext, type SimCtx } from "@/components/SimGameParts";
+import { useSimPicks } from "@/components/SimGameDynastyParts";
 import { SimBlockView } from "@/components/SimTradeBlock";
 import { SimTeamCard } from "@/components/SimTeamCard";
 import { SkeletonCard, SkeletonRows } from "@/components/Skeleton";
@@ -27,13 +27,12 @@ import { selectedItems } from "@/lib/tradeSheetPicker";
 import { TapForWhyOff } from "@/components/ui/TapForWhy";
 import { TradePickerSheet } from "@/components/TradePickerSheet";
 import { TradeScale, type TradeScaleSide } from "@/components/ui/TradeScale";
-import type { TradeCardAsset } from "@/components/ui/TradeCompactCard";
+import { TradeAssetCard, TradeCompactCard, type TradeCardAsset } from "@/components/ui/TradeCompactCard";
 import { simAcceptanceMeter, simScaleAsset } from "@/lib/tradeScale";
 import {
   SIM_TRADE_EMPTY,
   simGameReasonMessage,
   type SimTradeSeed,
-  simProjText,
   simIsPick,
   simIsPickId,
   simPickLabelText,
@@ -75,20 +74,19 @@ function SimTeamScout({ teamId, name }: { teamId: string; name: string }) {
   );
 }
 
-/** Players and picks in an offer, counter or verdict: a pick renders as a pick row, never as a player. */
+/** A sim player or pick as the shared trade card asset (avatar, name + position, "KC · Proj 14.2"; a pick gets the round pick avatar). */
+function tradeAsset(p: SimTradeAsset): TradeCardAsset {
+  const a = simScaleAsset(p);
+  return { key: a.key, player: a.player, pickLabel: a.pickLabel, detail: a.detail };
+}
+
+/** Players and picks in an offer: the same shared asset cards the scale and the trade card use, never a bespoke row. */
 function PlayerList({ players }: { players: SimTradeAsset[] }) {
   return (
     <ul className="flex flex-col">
       {players.map((p) => (
         <li key={p.id}>
-          {simIsPick(p) ? (
-            <SimPickLine pick={p} />
-          ) : (
-            <div className="flex items-center justify-between gap-2 py-1">
-              <SimPlayerChip player={p} size={28} quick className="min-w-0 flex-1" />
-              <SimStat label="Proj" value={simProjText(p)} />
-            </div>
-          )}
+          <TradeAssetCard asset={tradeAsset(p)} mode="sim" />
         </li>
       ))}
     </ul>
@@ -188,9 +186,9 @@ function OfferCard({ item, index, count, defaultOpen, busy, canTrade, onRespond 
                 <PlayerList players={item.you_get} />
               </div>
             </div>
-            <div className="flex gap-2">
-              <Button size="sm" loading={busy} disabled={!canTrade} onClick={() => onRespond(item, "accept")}>Accept</Button>
-              <Button size="sm" variant="secondary" disabled={busy} onClick={() => onRespond(item, "decline")}>Decline</Button>
+            <div className="grid grid-cols-2 gap-2">
+              <Button size="sm" fullWidth loading={busy} disabled={!canTrade} onClick={() => onRespond(item, "accept")}>Accept</Button>
+              <Button size="sm" fullWidth variant="secondary" disabled={busy} onClick={() => onRespond(item, "decline")}>Decline</Button>
             </div>
           </div>
         ) : null}
@@ -199,31 +197,33 @@ function OfferCard({ item, index, count, defaultOpen, busy, canTrade, onRespond 
   );
 }
 
-/** The sim verdict under the scale: their reason in plain words, chips, and a counter when they would make one. Their decision itself is the scale's meter. */
-function VerdictCard({ verdict, onSendCounter, busy }: { verdict: SimTradeVerdict; onSendCounter: () => void; busy: boolean }) {
+/**
+ * The sim verdict under the scale: their reason in one plain line and, when they would counter, their counter as the
+ * shared trade card (what moves, roster-after as the small meta line, the explanation behind "Show details"). Their
+ * decision itself is the scale's meter and "Take their counter" is the scale's primary action, so there is no second
+ * meter, orphan pill or button here.
+ */
+function VerdictCard({ verdict }: { verdict: SimTradeVerdict }) {
+  const chips = (verdict.chips ?? []).join(" \u00b7 ");
+  const delta = simCounterDeltaLine(verdict.counter_delta);
   return (
     <div data-testid="trade-verdict" className="enter-pop flex flex-col gap-2">
-      <p className="text-sm" data-decision={verdict.decision}>{verdict.reason}</p>
-      {(verdict.chips ?? []).length > 0 ? (
-        <div className="flex flex-wrap gap-1.5">
-          {verdict.chips!.map((chip) => (
-            <ToneBadge key={chip} label={chip} color="var(--color-text-secondary)" size="xs" />
-          ))}
-        </div>
-      ) : null}
+      <p className="text-sm" data-decision={verdict.decision}>
+        {verdict.reason}
+        {chips ? <span className="ml-1.5 text-xs font-bold uppercase" style={{ color: "var(--color-text-muted)" }}>{chips}</span> : null}
+      </p>
       {verdict.decision === "counter" && verdict.counter ? (
-        <div className="flex flex-col gap-1">
-          <p className="text-xs font-bold" style={{ color: "var(--color-accent)" }}>Their counter</p>
+        <TradeCompactCard
+          title="Their counter"
+          mode="sim"
+          meter={null}
+          give={verdict.counter.give.map(tradeAsset)}
+          get={verdict.counter.get.map(tradeAsset)}
+          meta={delta ? [delta] : []}
+          testId="counter-card"
+        >
           {verdict.counter_note ? <p className="text-sm" data-testid="counter-note">{verdict.counter_note}</p> : null}
-          {simCounterDeltaLine(verdict.counter_delta) ? (
-            <p className="text-xs" style={{ color: "var(--color-text-muted)" }} data-testid="counter-delta">{simCounterDeltaLine(verdict.counter_delta)}</p>
-          ) : null}
-          <div className="grid grid-cols-[minmax(0,1fr)] gap-2 md:grid-cols-2">
-            <div><SimSideLabel side="give" /><PlayerList players={verdict.counter.give} /></div>
-            <div><SimSideLabel side="get" /><PlayerList players={verdict.counter.get} /></div>
-          </div>
-          <Button size="sm" loading={busy} onClick={onSendCounter}>Take their counter</Button>
-        </div>
+        </TradeCompactCard>
       ) : null}
     </div>
   );
@@ -401,19 +401,18 @@ function Builder({ ctx, seed, onSeedUsed }: { ctx: SimCtx; seed: SimTradeSeed | 
               <div aria-live="polite">
                 {previewing && !verdict ? <SkeletonCard lines={3} /> : null}
                 {verdict ? (
-                  <VerdictCard
-                    key={`${key}-${verdict.decision}`}
-                    verdict={verdict}
-                    busy={sending}
-                    onSendCounter={() => {
-                      if (!verdict.counter || !draft.partner) return;
-                      void send({ partner: draft.partner, give: verdict.counter.give.map((p) => p.id), get: verdict.counter.get.map((p) => p.id) });
-                    }}
-                  />
+                  <VerdictCard key={`${key}-${verdict.decision}`} verdict={verdict} />
                 ) : null}
               </div>
             }
-            onSend={verdict?.decision === "accept" ? () => { const payload = simTradePayload(draft); if (payload) void send(payload); } : undefined}
+            onSend={
+              verdict?.decision === "accept"
+                ? () => { const payload = simTradePayload(draft); if (payload) void send(payload); }
+                : verdict?.decision === "counter" && verdict.counter && draft.partner
+                  ? () => void send({ partner: draft.partner as string, give: verdict.counter!.give.map((p) => p.id), get: verdict.counter!.get.map((p) => p.id) })
+                  : undefined
+            }
+            sendLabel={verdict?.decision === "counter" ? "Take their counter" : undefined}
             canSend={!fit.blocked}
             sending={sending}
           />

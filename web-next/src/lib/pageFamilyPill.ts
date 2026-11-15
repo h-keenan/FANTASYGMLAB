@@ -27,9 +27,8 @@ export function familyPillContext(
     // Trade History is account-wide: it takes the league as `?league=` so the shell keeps the league context.
     href: tab.segment === "trade-history" ? `/trade-history?league=${id}&name=${name}` : `/${tab.segment}/${id}?name=${name}`,
   }));
-  const analyzer = options.find((o) => o.key === "trade_analyzer");
-  const primary =
-    opts.primary ?? (family === "trades" && analyzer ? ({ key: "new-trade", label: "New trade", glyph: "trades", href: analyzer.href, onPress: () => {} } as PillContextAction) : undefined);
+  // No default primary: Trades used to carry a lone glyph "New trade" chip that just linked to the Analyzer tab (a duplicate).
+  const primary = opts.primary;
   return {
     id: `family:${family}`,
     label: def.label,

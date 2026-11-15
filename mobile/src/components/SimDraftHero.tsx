@@ -2,6 +2,8 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
 
 import AppText from './AppText';
+import PlayerAvatarSlot from './PlayerAvatarSlot';
+import PlayerName from './PlayerName';
 import PositionBadge from './PositionBadge';
 import { simToneColor } from './SimGameParts';
 import { useThemeMode } from '../context/ThemeModeContext';
@@ -12,13 +14,8 @@ import {
   simDraftProgress,
   simDraftTeamEmblem,
 } from '../lib/simDraft';
-import { simFmtValue, type SimDraftState, type SimGamePlayer, type SimPos, type SimSlot } from '../lib/simGame';
+import { simFmtValue, simPlayerAnatomyRef, type SimDraftState, type SimGamePlayer, type SimPos, type SimSlot } from '../lib/simGame';
 import { radii, spacing, type ThemeColors } from '../theme';
-
-function lastName(name: string): string {
-  const parts = name.trim().split(/\s+/);
-  return parts.length > 1 ? parts[parts.length - 1] : name;
-}
 
 /** Fixed-size team emblem: initials in a ring, accented for your own team. */
 export function SimDraftEmblem({ name, you = false }: { name: string; you?: boolean }) {
@@ -102,11 +99,12 @@ export function SimDraftHero({
                 onPress={() => player && onOpen(player)}
                 accessibilityRole="button"
                 accessibilityLabel={player ? `Best available ${pos}: ${player.name}` : `No ${pos} left`}
-                style={[styles.pickChip, { minWidth: 96, opacity: player ? 1 : 0.5 }]}
+                style={[styles.pickChip, { minWidth: 128, opacity: player ? 1 : 0.5 }]}
               >
+                {player ? <PlayerAvatarSlot player={simPlayerAnatomyRef(player)} tier="dense" /> : null}
                 <PositionBadge position={pos} />
-                <View>
-                  <AppText style={styles.chipName}>{player ? lastName(player.name) : '-'}</AppText>
+                <View style={{ flexShrink: 1 }}>
+                  {player ? <PlayerName name={player.name} style={styles.chipName} /> : <AppText style={styles.chipName}>-</AppText>}
                   <AppText style={styles.chipMeta}>ADP {simFmtValue(player?.adp)}</AppText>
                 </View>
               </Pressable>

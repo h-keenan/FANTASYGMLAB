@@ -9,6 +9,15 @@ import { useThemeMode } from '../context/ThemeModeContext';
 import { compactAriaLabel, compactParts, type CompactPart, type CompactTone } from '../lib/compactModule';
 import { simOpenKey, simParseOpen } from '../lib/simLayout';
 import { spacing, type ThemeColors } from '../theme';
+import Money from './Money';
+
+let reduceMotion = false;
+try {
+  void Promise.resolve(AccessibilityInfo.isReduceMotionEnabled?.()).then((v) => { reduceMotion = Boolean(v); }).catch(() => {});
+} catch {
+  /* keep the animation */
+}
+if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) UIManager.setLayoutAnimationEnabledExperimental(true);
 
 let reduceMotion = false;
 try {
@@ -125,7 +134,7 @@ export default function CompactModule({
                 {shown.map((part, i) => (
                   <AppText key={part.key} style={[styles.part, part.tone ? { color: toneColor(part.tone, colors) } : null, part.strong ? { fontWeight: '800' } : null]}>
                     {i > 0 ? <AppText style={styles.sep}>{' · '}</AppText> : null}
-                    {part.text}
+                    <Money>{part.text}</Money>
                   </AppText>
                 ))}
               </AppText>

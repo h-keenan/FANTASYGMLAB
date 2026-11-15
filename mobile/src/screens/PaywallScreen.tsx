@@ -50,6 +50,7 @@ import { useThemeMode } from '../context/ThemeModeContext';
 import { freeTrialForUser, thenPriceLine, trialCtaLabel, type IntroEligibility } from '../lib/freeTrial';
 import { disabledOpacity, LINK_HIT_SLOP, radii, spacing, type ThemeColors } from '../theme';
 import type { RootStackParamList } from '../navigation/RootNavigator';
+import Money from '../components/Money';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Paywall'>;
 
@@ -462,7 +463,7 @@ export default function PaywallScreen({ navigation, route }: Props) {
                     </View>
                     <View style={styles.packagePriceGroup}>
                       <AppText style={styles.packagePrice}>
-                        {pack.product.priceString}
+                        <Money all>{pack.product.priceString}</Money>
                         {priceSuffix ? (
                           <AppText style={styles.packagePriceSuffix}>{priceSuffix}</AppText>
                         ) : null}
@@ -473,7 +474,7 @@ export default function PaywallScreen({ navigation, route }: Props) {
                           inventing a number RevenueCat didn't give us. */}
                       {isAnnual && pack.product.pricePerMonthString ? (
                         <AppText style={styles.packagePriceSub}>
-                          {pack.product.pricePerMonthString}/mo
+                          <Money all>{pack.product.pricePerMonthString}</Money>/mo
                         </AppText>
                       ) : null}
                     </View>
@@ -503,9 +504,9 @@ export default function PaywallScreen({ navigation, route }: Props) {
         style={styles.glowWrap}
       />
       {trial && selected ? (
-        <AppText style={styles.trialTerms}>
+        <Money style={styles.trialTerms}>
           {thenPriceLine(selected.product.priceString, packagePriceSuffix(selected.packageType))}
-        </AppText>
+        </Money>
       ) : (
         <AppText style={styles.trialTerms}>{PAYWALL_TRIAL_REASSURANCE}</AppText>
       )}

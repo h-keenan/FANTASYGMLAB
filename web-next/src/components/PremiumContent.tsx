@@ -31,6 +31,7 @@ import {
   parsePrice,
 } from "@/lib/paywallCopy";
 import type { PremiumComparisonRow } from "@/lib/premiumComparison";
+import { Money } from "@/components/Money";
 
 /** "$59.99" -> "$5.00" (the yearly price over 12 months), keeping the currency prefix. */
 function annualPerMonth(price: string): string | null {
@@ -112,11 +113,11 @@ export function PlanCheckout({
       </div>
       <div className="flex flex-col">
         <span style={{ font: "var(--type-primary-metric)" }}>
-          {plan.price} <span className="text-sm font-normal">{plan.cadence}</span>
+          <Money all>{plan.price}</Money> <span className="text-sm font-normal">{plan.cadence}</span>
         </span>
         {perMonth ? (
           <span className="text-xs" style={{ color: "var(--color-text-muted)" }}>
-            About {perMonth}/month, billed yearly
+            About <Money all>{perMonth}</Money>/month, billed yearly
           </span>
         ) : null}
       </div>
@@ -133,7 +134,7 @@ export function PlanCheckout({
         </Button>
       )}
       <p className="text-xs text-center m-0" style={{ color: "var(--color-text-muted)" }}>
-        {trialDays > 0 ? `${thenPriceLine(plan)} ${PAYWALL_CARD_NOTE}` : PAYWALL_TRIAL_REASSURANCE}
+        {trialDays > 0 ? <Money>{`${thenPriceLine(plan)} ${PAYWALL_CARD_NOTE}`}</Money> : PAYWALL_TRIAL_REASSURANCE}
       </p>
       {clientSecret ? (
         <EmbeddedCheckoutModal clientSecret={clientSecret} publishableKey={publishableKey} onClose={() => setClientSecret(null)} />

@@ -7,7 +7,6 @@ import { BottomDock } from "@/components/ui/BottomDock";
 import { DashboardContent } from "@/components/DashboardContent";
 import { PillRow } from "@/components/PillRow";
 import { BottomTabBar } from "@/components/ui/BottomTabBar";
-import { PositionBadge } from "@/components/PositionBadge";
 import { SampleConnectModule, SampleLeagueBanner } from "@/components/SampleLeagueBanner";
 import { SectionHeading } from "@/components/SectionHeading";
 import { ToneBadge } from "@/components/ToneBadge";
@@ -26,20 +25,15 @@ import {
   type SamplePlayer,
   type SampleTab,
 } from "@/lib/sampleLeague";
-import { PlayerName } from "@/components/PlayerName";
+import { CompactPlayerCard } from "@/components/ui/CompactPlayerCard";
 import { SAMPLE_ACTIVE_EVENT, SAMPLE_SELECT_EVENT } from "@/lib/sampleSidebar";
 
 function SamplePlayerRow({ player, first = false }: { player: SamplePlayer; first?: boolean }) {
   return (
     <li className="flex items-center gap-3 py-2 min-h-[var(--touch-target-min)]" style={first ? undefined : { borderTop: "1px solid var(--color-border)" }}>
-      <span className="flex w-10 shrink-0 justify-start">
-        <PositionBadge position={player.position} />
-      </span>
-      <span className="min-w-0 flex-1 flex flex-col">
-        <PlayerName name={player.name} className="text-sm font-bold" />
-        <span className="text-xs" style={{ color: "var(--color-text-secondary)" }}>
-          Age {player.age} · {player.note}
-        </span>
+      <span className="min-w-0 flex-1">
+        {/* Fictional players have no photo: id null keeps the avatar on initials instead of a failing request. */}
+        <CompactPlayerCard player={{ id: null, name: player.name, position: player.position, age: player.age }} detail={`Age ${player.age} · ${player.note}`} testId="sample-player" />
       </span>
       <ValueStat value={player.value} />
     </li>

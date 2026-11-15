@@ -10,6 +10,7 @@
  */
 
 import { injuryTone } from "./myTeamPresentation";
+import { formatMoney, formatMoneyRange } from "./money";
 import { notReadyReasonMessage } from "./notReadyMessages";
 import type { WaiverFaabGuidance, WaiverPlayer } from "./api";
 
@@ -73,8 +74,8 @@ export function faabRangeText(faab: WaiverFaabGuidance | null | undefined): { pr
   if (!faabIsBid(faab)) return waiverClaimText(faab);
   const hasDollars = faab.dollars_known && faab.remaining != null;
   return {
-    primary: hasDollars ? `$${faab.low_bid}–$${faab.high_bid}` : `${faab.pct_low}–${faab.pct_high}%`,
-    secondary: hasDollars ? `of $${faab.remaining} remaining` : "of remaining FAAB",
+    primary: hasDollars ? formatMoneyRange(faab.low_bid, faab.high_bid) : `${faab.pct_low}–${faab.pct_high}%`,
+    secondary: hasDollars && faab.remaining != null ? `of ${formatMoney(faab.remaining)} remaining` : "of remaining FAAB",
   };
 }
 

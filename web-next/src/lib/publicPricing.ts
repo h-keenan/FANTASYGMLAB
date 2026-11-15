@@ -1,5 +1,6 @@
 import type { BillingPlan } from "@/lib/api";
 import { env } from "@/lib/env";
+import { formatMoney } from "./money";
 
 /**
  * Plans for a LOGGED-OUT visitor (P0 UX audit, 2026-10-27): /premium used to
@@ -56,7 +57,7 @@ export const FALLBACK_PUBLIC_PLANS: BillingPlan[] = [
     tier: "pro",
     interval: "monthly",
     label: "Monthly",
-    price: "$3.99",
+    price: formatMoney(3.99),
     cadence: "per month",
     features: [
       "Your full Today briefing, not just the top 4",
@@ -71,7 +72,7 @@ export const FALLBACK_PUBLIC_PLANS: BillingPlan[] = [
     tier: "pro",
     interval: "annual",
     label: "Annual",
-    price: "$19.99",
+    price: formatMoney(19.99),
     cadence: "per year",
     features: [
       "Your full Today briefing, not just the top 4",

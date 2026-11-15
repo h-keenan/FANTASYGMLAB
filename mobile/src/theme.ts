@@ -112,6 +112,9 @@ const darkColors = {
   dangerMuted: 'rgba(239,68,68,0.15)',
   success: '#22c55e',
   successBright: '#4ADE80',
+  // Money text (FAAB, prices, budgets). Same green family as success but its own token so
+  // money is always green without reading as a win/healthy judgment; synced to web --color-money.
+  money: '#4ade80',
   successMuted: 'rgba(34,197,94,0.15)',
   warning: '#f59e0b',
   warningMuted: 'rgba(245,158,11,0.14)',
@@ -196,6 +199,7 @@ const lightColors = {
   dangerMuted: 'rgba(225,30,50,0.2)',
   success: '#066626',
   successBright: '#22C55E',
+  money: '#0b6a2c',
   successMuted: 'rgba(10,150,60,0.22)',
   warning: '#8f4200',
   warningMuted: 'rgba(235,110,0,0.22)',

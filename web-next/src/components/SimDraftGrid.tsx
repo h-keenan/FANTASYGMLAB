@@ -6,10 +6,11 @@ import { EmptyState } from "@/components/EmptyState";
 import { SimDraftEmblem } from "@/components/SimDraftHero";
 import { positionColorVar } from "@/lib/playerPresentation";
 import { simDraftBoardGrid } from "@/lib/simDraft";
-import type { SimDraftState, SimGamePlayer } from "@/lib/simGame";
+import { simPlayerAnatomyRef, type SimDraftState, type SimGamePlayer } from "@/lib/simGame";
 import { PlayerName } from "@/components/PlayerName";
+import { PlayerAvatarSlot } from "@/components/ui/PlayerAvatarSlot";
 
-const COL = 76;
+const COL = 112;
 
 /**
  * Rounds x teams draft board. Picks are tinted by position, your column is
@@ -51,7 +52,7 @@ export function SimDraftGrid({ draft, teams, onOpen }: { draft: SimDraftState; t
                         <button
                           type="button"
                           onClick={() => onOpen(cell.pick!.player)}
-                          className="flex w-full flex-col items-start justify-center px-1 text-left"
+                          className="flex w-full items-center gap-1.5 px-1 text-left"
                           style={{
                             height: 44,
                             borderRadius: 8,
@@ -60,8 +61,11 @@ export function SimDraftGrid({ draft, teams, onOpen }: { draft: SimDraftState; t
                           }}
                           aria-label={`Pick ${cell.pick.pick_no}: ${cell.pick.player.name}, ${cell.pick.player.pos}`}
                         >
-                          <PlayerName name={cell.pick.player.name} className="w-full text-[0.6875rem] font-bold" />
-                          <span className="text-[0.6875rem]" style={{ color: "var(--color-text-muted)" }}>{cell.pick.player.pos} · #{cell.pick.pick_no}</span>
+                          <PlayerAvatarSlot player={simPlayerAnatomyRef(cell.pick.player)} tier="dense" />
+                          <span className="flex min-w-0 flex-1 flex-col">
+                            <PlayerName name={cell.pick.player.name} className="w-full text-[0.6875rem] font-bold" />
+                            <span className="text-[0.6875rem]" style={{ color: "var(--color-text-muted)" }}>{cell.pick.player.pos} · #{cell.pick.pick_no}</span>
+                          </span>
                         </button>
                       ) : (
                         <span

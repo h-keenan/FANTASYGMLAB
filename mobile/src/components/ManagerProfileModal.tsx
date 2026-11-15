@@ -11,7 +11,6 @@ import AppText from './AppText';
 import DashboardStatRow from './DashboardStatRow';
 import OpponentProfileCard from './OpponentProfileCard';
 import PickPlate from './PickPlate';
-import PositionBadge from './PositionBadge';
 import SectionHeading from './SectionHeading';
 import TeamAvatar from './TeamAvatar';
 import ToneBadge from './ToneBadge';
@@ -24,7 +23,7 @@ import type { OpponentTradeTarget } from '../lib/opponentProfile';
 import { useThemeMode } from '../context/ThemeModeContext';
 import { radii, spacing, type ThemeColors, scrim } from '../theme';
 import type { RootStackParamList } from '../navigation/RootNavigator';
-import PlayerName from './PlayerName';
+import CompactPlayerCard from './CompactPlayerCard';
 
 interface Props {
   visible: boolean;
@@ -157,18 +156,17 @@ export default function ManagerProfileModal({ visible, onClose, leagueId, league
                   {assets.map((asset, i) => (
                     <View key={`${asset.player_id ?? asset.label}-${i}`} style={styles.assetLine}>
                       {asset.kind === 'pick' ? (
-                        <PickPlate round={asset.round} />
+                        <>
+                          <PickPlate round={asset.round} />
+                          <AppText style={styles.assetName}>{asset.label || 'Draft pick'}</AppText>
+                        </>
                       ) : (
-                        <View style={styles.badgeGap}>
-                          <PositionBadge position={asset.position} />
-                        </View>
-                      )}
-                      {asset.kind === 'pick' ? (
-                        <AppText style={styles.assetName}>{asset.label || 'Draft pick'}</AppText>
-                      ) : (
-                        <View style={{ flex: 1, minWidth: 0, flexDirection: 'row', flexWrap: 'wrap', alignItems: 'baseline', columnGap: 6 }}>
-                          <PlayerName name={asset.name} style={styles.assetName} />
-                          {asset.team ? <AppText style={styles.assetName}>{asset.team}</AppText> : null}
+                        <View style={{ flex: 1, minWidth: 0 }}>
+                          <CompactPlayerCard
+                            player={{ id: asset.player_id ?? null, name: asset.name ?? 'Player', position: asset.position ?? null, team: asset.team ?? null }}
+                            detail={asset.team}
+                            testID="manager-trade-player"
+                          />
                         </View>
                       )}
                     </View>
@@ -259,7 +257,6 @@ function createStyles(colors: ThemeColors) {
     tradeMeta: { flex: 1 },
     tradeSide: { gap: 4 },
     assetLine: { flexDirection: 'row', alignItems: 'center' },
-    badgeGap: { marginRight: 8 },
     assetName: { flex: 1, fontSize: 15.5, fontWeight: '700', color: colors.textPrimary },
     muted: { fontSize: 13.5, color: colors.textSecondary },
     upsellTitle: { fontSize: 15.5, fontWeight: '700', color: colors.textPrimary },

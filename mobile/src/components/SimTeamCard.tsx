@@ -3,13 +3,14 @@ import { Pressable, View } from 'react-native';
 
 import AccentCard from './AccentCard';
 import AppText from './AppText';
-import PlayerName from './PlayerName';
+import CompactPlayerCard from './CompactPlayerCard';
+import PlayerAvatarSlot from './PlayerAvatarSlot';
 import PositionBadge from './PositionBadge';
 import { SimTeamLogo } from './SimTeamIdentity';
 import { createSimStyles, simToneColor } from './SimGameParts';
 import ToneBadge from './ToneBadge';
 import { useThemeMode } from '../context/ThemeModeContext';
-import type { SimLeagueRosterTeam } from '../lib/simGame';
+import { simPlayerAnatomyRef, type SimLeagueRosterTeam } from '../lib/simGame';
 import { playerSurname } from '../lib/playerNameDisplay';
 import { simTeamChips, simTeamRecordLine } from '../lib/simLeagueRosters';
 import { simGradeOf } from '../lib/simGrade';
@@ -66,18 +67,13 @@ export default function SimTeamCard({
         <View style={dense ? { flexDirection: 'row', flexWrap: 'wrap', columnGap: 12, rowGap: 4 } : common.tight} accessibilityLabel={`${team.name} top assets`}>
           {team.top_assets.map((p) => dense ? (
             <View key={p.id} style={[common.row, { gap: 4 }]}>
+              <PlayerAvatarSlot player={simPlayerAnatomyRef(p)} tier="dense" />
               <PositionBadge position={p.pos} />
               <AppText style={{ fontSize: 13, fontWeight: '700', color: colors.textPrimary }}>{playerSurname(p.name)}</AppText>
               <LetterGrade grade={simGradeOf(p)} size="sm" />
             </View>
           ) : (
-            <View key={p.id} style={common.row}>
-              <PositionBadge position={p.pos} />
-              <View style={common.grow}>
-                <PlayerName name={p.name} style={{ fontSize: 13, fontWeight: '700', color: colors.textPrimary }} />
-              </View>
-              <LetterGrade grade={simGradeOf(p)} size="sm" />
-            </View>
+            <CompactPlayerCard key={p.id} player={simPlayerAnatomyRef(p)} testID="sim-team-asset" trailing={<LetterGrade grade={simGradeOf(p)} size="sm" />} />
           ))}
         </View>
       )}

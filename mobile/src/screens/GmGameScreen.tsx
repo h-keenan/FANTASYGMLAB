@@ -4,7 +4,6 @@ import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useHeaderHeight } from '@react-navigation/elements';
 
-import AccentCard from '../components/AccentCard';
 import AppText from '../components/AppText';
 import Button from '../components/Button';
 import ConfirmInPlace from '../components/ConfirmInPlace';
@@ -29,9 +28,8 @@ import SimOffseasonBar from '../components/SimOffseasonBar';
 import { SimGameOffseason } from '../components/SimGameOffseason';
 import { SimHomeTab } from '../components/SimGameHome';
 import { SimPlayerSheet } from '../components/SimGamePlayers';
-import { SimNotice, SimOpenPlayerContext, SimPreviewBanner, SimProgressBar, SimRowAccordion, SimTeamOpenContext, createSimStyles, simToneColor, type SimCtx } from '../components/SimGameParts';
-import SimGlyph from '../components/SimGlyph';
-import { simHubRow } from '../lib/simHub';
+import { SimNotice, SimOpenPlayerContext, SimPreviewBanner, SimRowAccordion, SimTeamOpenContext, createSimStyles, type SimCtx } from '../components/SimGameParts';
+import SimHub from '../components/SimHub';
 import { simMenuHero, simRulesParts } from '../lib/simSummaries';
 import CompactModule from '../components/CompactModule';
 import { Hero } from '../components/ModuleTemplates';
@@ -46,7 +44,6 @@ import { SimTradesTab } from '../components/SimGameTrades';
 import GlassCard from '../components/GlassCard';
 import { MotionIn } from '../components/Motion';
 import { DifficultyTiles, SetupCard, SetupField, SetupNote, SetupStickyBar, SetupSummaryCard, SetupToggleGroup, SetupToggleRow } from '../components/SimSetupParts';
-import ToneBadge from '../components/ToneBadge';
 import { useThemeMode } from '../context/ThemeModeContext';
 import { api } from '../lib/api';
 import { setPillBarPresent } from '../lib/bottomPillStore.ts';
@@ -61,7 +58,6 @@ import {
   simAdvanceLabel,
   simGameGate,
   simGameDeleteFailure,
-  simGameLiteLine,
   simGamePaywalled,
   simGameUnavailableCopy,
   simNewGameBlock,
@@ -168,6 +164,7 @@ export default function GmGameScreen({ navigation }: Props) {
   const [creating, setCreating] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [managing, setManaging] = useState(false);
+  const [setupSeed, setSetupSeed] = useState<SimSetupState | null>(null);
 
   const notify = useCallback((message: string, tone: SimGameTone = 'warning') => setNotice(message ? { message, tone } : null), []);
   const goPaywall = useCallback(() => navigation.navigate('Paywall'), [navigation]);
@@ -566,8 +563,9 @@ export default function GmGameScreen({ navigation }: Props) {
       <SetupForm
         options={options}
         creating={creating}
+        initial={setupSeed}
         onCreate={createGame}
-        onBack={() => dispatch({ type: 'hub' })}
+        onBack={() => { setSetupSeed(null); dispatch({ type: 'hub' }); }}
         onConnect={() => navigation.navigate('Home', { openAddLeague: true })}
         top={
           <>
@@ -683,77 +681,22 @@ export default function GmGameScreen({ navigation }: Props) {
       <SimPreviewBanner preview={preview} />
       {flow.paywall ? <PaywallCard flow={flow} onDismiss={() => dispatch({ type: 'dismiss_paywall' })} /> : null}
       {notice ? <SimNotice message={notice.message} tone={notice.tone} onDismiss={() => setNotice(null)} /> : null}
-      <FadeInView>
-        <AccentCard accent={colors.accent} glow>
-          <AppText style={styles.kicker}>Sandbox</AppText>
-          <AppText style={styles.heroTitle}>Be the GM. Win the season.</AppText>
-          <AppText style={styles.body}>
-            Draft a 12-team league against AI managers, set your lineup, work waivers and trades week by week, and take on the playoffs. At the end you get a grade. Nothing here touches your real leagues.
-          </AppText>
-          <View style={styles.wrapRow}>
-            <Button label="New game" disabled={Boolean(block)} onPress={() => dispatch({ type: 'setup' })} />
-            {block && options?.is_premium === false ? <Button label="Go Pro" variant="premiumOutline" size="sm" onPress={goPaywall} /> : null}
-            {block ? <Button label="Manage games / delete one" variant="secondary" size="sm" onPress={() => setManaging(true)} /> : null}
-          </View>
-          {block ? (
-            <AppText style={styles.muted} testID="new-game-block">
-              {block}
-            </AppText>
-          ) : null}
-        </AccentCard>
-      </FadeInView>
-      <View style={styles.stack}>
-        <SectionHeading title="Your games" caption={games.length ? (managing ? 'Tap the trash can on a game to delete it.' : undefined) : 'Your saved games show up here.'} />
-        {games.length === 0 ? (
-          <EmptyState icon="american-football-outline" title="No games yet" subtitle="Start a new game to draft your team." />
-        ) : (
-          games.map((g) => (
-            <View key={g.id} style={styles.tight}>
-              <ConfirmInPlace
-                variant="icon"
-                label={`Delete game: ${simGameLiteLine(g)}`}
-                prompt="Delete this game? It can't be undone."
-                confirmLabel="Delete"
-                keepLabel="Keep"
-                errorText="Could not delete it. Try again."
-                disabled={deletingId !== null}
-                onConfirm={() => deleteSaved(g.id)}
-                rowContent={
-                  <SavedGameCard game={g} onPress={() => void openGame(g.id)} />
-                }
-              />
-            </View>
-          ))
-        )}
-      </View>
+      <SimHub
+        games={games}
+        options={options}
+        block={block}
+        isPremium={options?.is_premium}
+        managing={managing}
+        deletingId={deletingId}
+        creating={creating}
+        onManage={() => setManaging(true)}
+        onGoPro={goPaywall}
+        onOpen={(id) => void openGame(id)}
+        onDelete={deleteSaved}
+        onStart={(body) => void createGame(body)}
+        onCustomize={(seed) => { setSetupSeed(seed); dispatch({ type: 'setup' }); }}
+      />
     </>,
-  );
-}
-
-function SavedGameCard({ game, onPress }: { game: SimGameLite; onPress: () => void }) {
-  const { colors } = useThemeMode();
-  const common = useMemo(() => createSimStyles(colors), [colors]);
-  const row = simHubRow(game);
-  const tone = row.chip.tone;
-  const done = game.status === 'complete';
-  return (
-    <AccentCard accent={done ? simToneColor(tone, colors) : colors.accent} compact onPress={onPress}>
-      <View style={common.rowBetween}>
-        <View style={[common.row, common.grow]}>
-          <SimGlyph name={done ? 'check' : game.status === 'drafting' ? 'team' : 'standings'} color={simToneColor(tone, colors)} size={16} />
-          <AppText style={[common.bodyStrong, common.grow]} numberOfLines={1}>{row.title}</AppText>
-        </View>
-        <ToneBadge label={row.chip.label} color={simToneColor(tone, colors)} size="xs" />
-      </View>
-      {row.progress ? <SimProgressBar done={row.progress.done} total={row.progress.total} tone={tone} label={`${row.progress.done} of ${row.progress.total} weeks played`} /> : null}
-      <View style={common.rowBetween}>
-        <AppText style={[common.muted, common.grow]} numberOfLines={1}>{row.meta}</AppText>
-        <AppText style={common.muted}>
-          {row.played}
-          {row.open ? <AppText style={[common.muted, { color: colors.accent, fontWeight: '700' }]}>{row.played ? ' · ' : ''}Continue</AppText> : null}
-        </AppText>
-      </View>
-    </AccentCard>
   );
 }
 
@@ -775,6 +718,7 @@ function PaywallCard({ flow, onDismiss }: { flow: FlowState; onDismiss: () => vo
 function SetupForm({
   options,
   creating,
+  initial,
   onCreate,
   onBack,
   onConnect,
@@ -782,6 +726,8 @@ function SetupForm({
 }: {
   options: SimGameOptionsResponse | null;
   creating: boolean;
+  /** A preset from the hub's New game sheet ("Customize everything"): the form opens on Customize with it applied. */
+  initial?: SimSetupState | null;
   onCreate: (body: SimGameCreateBody) => void;
   onBack: () => void;
   /** Opens the Add League sheet. Only the "Use my league" option offers it. */
@@ -794,8 +740,8 @@ function SetupForm({
   const headerHeight = useHeaderHeight();
   const opts = options?.options;
   const defaults = useMemo(() => simSetupDefaults(options), [options]);
-  const [state, setState] = useState<SimSetupState>(defaults);
-  const [tab, setTab] = useState<SimSetupTab>('quick');
+  const [state, setState] = useState<SimSetupState>(initial ?? defaults);
+  const [tab, setTab] = useState<SimSetupTab>(initial && simSetupAdvancedChanged(initial, defaults) > 0 ? 'custom' : 'quick');
   const set = <K extends keyof SimSetupState>(key: K, value: SimSetupState[K]) => setState((prev) => ({ ...prev, [key]: value }));
   const canImport = options?.start_modes?.find((m) => m.id === 'league')?.available ?? false;
   const league = state.start === 'league';

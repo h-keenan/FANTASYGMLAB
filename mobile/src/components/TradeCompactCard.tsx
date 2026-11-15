@@ -7,7 +7,7 @@ import OvrGauge from './OvrGauge';
 import { useThemeMode } from '../context/ThemeModeContext';
 import PickAvatar from './PickAvatar';
 import FairnessMeterRow from './FairnessMeterRow';
-import { avatarSize, fairnessMeter, type PlayerMode, type PlayerRef } from '../lib/playerAnatomy';
+import { avatarSize, fairnessMeter, type FairnessMeter, type PlayerMode, type PlayerRef } from '../lib/playerAnatomy';
 import { radii, spacing, type ThemeColors } from '../theme';
 
 export interface TradeCardAsset {
@@ -70,6 +70,7 @@ export default function TradeCompactCard({
   giveLabel = 'You send',
   getLabel = 'You get',
   testID = 'trade-compact-card',
+  meter: meterOverride,
 }: {
   title: ReactNode;
   give: TradeCardAsset[];
@@ -84,12 +85,14 @@ export default function TradeCompactCard({
   giveLabel?: string;
   getLabel?: string;
   testID?: string;
+  /** Replaces the computed fairness meter; null hides it (a card whose verdict is stated elsewhere, e.g. their counter). */
+  meter?: FairnessMeter | null;
 }) {
   const { colors } = useThemeMode();
   const styles = useMemo(() => createStyles(colors), [colors]);
   const [open, setOpen] = useState(defaultOpen);
   const sum = (xs: TradeCardAsset[]) => xs.reduce((n, a) => n + (a.value ?? 0), 0);
-  const meter = fairnessMeter(sum(give), sum(get), mode, netValue);
+  const meter = meterOverride === undefined ? fairnessMeter(sum(give), sum(get), mode, netValue) : meterOverride;
   const hasBody = children != null && children !== false;
   const side = (label: string, assets: TradeCardAsset[]) => (
     <View style={styles.side}>
@@ -105,7 +108,7 @@ export default function TradeCompactCard({
       {meta.length > 0 ? <AppText style={styles.meta}>{meta.join(' · ')}</AppText> : null}
       {side(giveLabel, give)}
       {side(getLabel, get)}
-      <FairnessMeterRow meter={meter} accessibilityLabel={verdictLabel && mode === 'desk' ? `${meter.description}. Market read: ${verdictLabel}` : undefined} />
+      {meter ? <FairnessMeterRow meter={meter} accessibilityLabel={verdictLabel && mode === 'desk' ? `${meter.description}. Market read: ${verdictLabel}` : undefined} /> : null}
       {hasBody ? (
         <>
           <Pressable accessibilityRole="button" accessibilityState={{ expanded: open }} onPress={() => setOpen((v) => !v)} style={styles.toggle}>
