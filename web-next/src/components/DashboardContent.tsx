@@ -1,10 +1,10 @@
+import Link from "next/link";
 import { TERMS } from "@/lib/terms";
 import { ModuleMore } from "@/components/ui/ModuleMore";
 import { useEffect, useState, type MouseEvent } from "react";
 
 import { api, type DashboardResponse, type LeagueTeamRankingsResponse } from "@/lib/api";
 import { BeginnerHelp } from "@/components/BeginnerHelp";
-import { SinceLastVisitStrip } from "@/components/SinceLastVisitStrip";
 import { DashboardAlerts } from "@/components/DashboardAlerts";
 import { DirectionCheckinCard } from "@/components/DirectionCheckinCard";
 import { FirstValueOfferCard } from "@/components/FirstValueOfferCard";
@@ -17,21 +17,22 @@ import { GuessThePlayerNameMatchCard } from "@/components/GuessThePlayerNameMatc
 import { LeaguePulseCard } from "@/components/LeaguePulseCard";
 import { formatRank, rankFill } from "@/components/SnapshotTile";
 import type { StatStripItem } from "@/components/StatStrip";
-import { CompactModule } from "@/components/ui/CompactModule";
 import { StatStripModule } from "@/components/ui/ModuleTemplates";
-import { listSummaryParts } from "@/lib/moduleTemplates";
-import { TeamStatusHero, useTeamStatusData, type TeamStatusPrefetch } from "@/components/TeamStatusHero";
+import { useTeamStatusData, type TeamStatusPrefetch } from "@/lib/useTeamStatusData";
 import { leagueAverageAge } from "@/lib/teamStatus";
-import { TodayModule } from "@/components/TodayModule";
-import { WatchListCard } from "@/components/WatchListCard";
 import { useSeasonOdds } from "@/components/DashboardOddsStrip";
-import { DashboardMore, DashboardTradesBlock } from "@/components/DashboardBlocks";
-import { DecisionQueue, decisionHref } from "@/components/DecisionQueue";
+import { DashboardMore } from "@/components/DashboardBlocks";
+import { SkeletonHero } from "@/components/Skeleton";
+import { TodayMatchupCard } from "@/components/TodayMatchupCard";
+import { TodayRooms, TodayTiles, TodayTradeIdeaCard } from "@/components/TodayGlance";
+import { GAME_PLAN_INTERNAL_ROUTES, gamePlanTileHref, resolveGamePlanTargetPlayerId } from "@/lib/gamePlanPresentation";
+import { DecisionQueue } from "@/components/DecisionQueue";
 import { buildDecisionQueue } from "@/lib/decisionQueue";
 import { notReadyReasonMessage } from "@/lib/notReadyMessages";
 import { useExperienceCopy } from "@/context/ExperienceLevelContext";
-import { isTradeItem } from "@/lib/dashboardLayout";
-import { buildTeamStatusMatchup } from "@/lib/teamStatus";
+import { deadlineChip, isTradeItem, TRADES_BLOCK_COPY, tradesStanceLine } from "@/lib/dashboardLayout";
+import { buildTeamStatusMatchup, buildTeamStatusOdds, buildTeamStatusPositions, buildTeamStatusStanding } from "@/lib/teamStatus";
+import { todayRoomChips, todayTiles, todayTradeIdea } from "@/lib/todayView";
 
 /**
  * Ports modules/dashboard_workflow.py's render_dashboard_workflow for
@@ -119,12 +120,12 @@ export function DashboardContent({
   // The season simulation is the heaviest read on this page and only feeds one
   // hero number, so it starts once the first pass has painted and the server
   // is no longer busy with the trade-idea search.
-  const { caption: oddsCaption, sim } = useSeasonOdds(leagueId, !sample && !data.trade_ideas_deferred);
+  const { sim } = useSeasonOdds(leagueId, !sample && !data.trade_ideas_deferred);
   const teamStatus = useTeamStatusData(leagueId, lens, !sample, teamRankings, prefetch);
   const teams = teamStatus.rankings?.teams ?? null;
-  // The Decision Queue (lib/decisionQueue.ts): ONE ranked, deduped list of what needs a decision (lineup holes, waivers,
-  // deadline, injuries, draft events). The hero leads with its top decision; the rest of the old modules sit below.
-  // Until the hero's reads have settled the queue is a skeleton, so nothing moves when the lineup holes land.
+  // The Decision Queue (lib/decisionQueue.ts): ONE ranked, deduped list of what needs a decision (lineup swaps, waivers,
+  // deadline, injuries, draft events). Until the matchup read has settled the queue is a skeleton, so nothing moves when
+  // the lineup problems land.
   const matchupLine = buildTeamStatusMatchup(teamStatus.matchup);
   const queue = buildDecisionQueue({
     now: new Date(),
@@ -136,26 +137,28 @@ export function DashboardContent({
     tradeIdeaCount: tradeItems.length,
     entitlement: data.entitlement ? { isPremium: data.entitlement.is_premium, hiddenCount: data.entitlement.hidden_count } : null,
     nextGame: matchupLine ? { week: matchupLine.week, opponentName: matchupLine.opponentName } : data.this_week?.week ? { week: data.this_week.week, opponentName: "" } : null,
+    injuredStarters: snapshot?.injured_starters ?? null,
   });
   // Holds the place only while the queue would otherwise read "nothing needs you" before the matchup has said otherwise.
   const queuePending = !sample && !teamStatus.settled && queue.total === 0;
-  const hasKind = (kind: string) => queue.all.some((d) => d.kind === kind);
-  const heroQueue = queuePending
-    ? undefined
-    : { next: queue.next ? { title: queue.next.title, label: queue.next.primary.label, href: decisionHref(queue.next, leagueId, leagueName) } : null, nothing: null };
-  // What the queue did not take stays in "This week" (the lineup-is-set row, later-this-week rows, the trade-pending skeleton).
-  const nextMovesData: DashboardResponse = {
-    ...data,
-    items: [],
-    this_week: data.this_week
-      ? {
-          ...data.this_week,
-          rows: data.this_week.rows.filter((row) => row.key !== "trade" && !(row.key === "lineup" && (hasKind("lineup") || row.tone !== "risk")) && !(row.key === "waiver" && hasKind("waiver"))),
-          next_action: data.this_week.next_action && (data.this_week.next_action.route === "trade_hub" || data.this_week.next_action.route === "connect_league") ? data.this_week.next_action : null,
-        }
-      : data.this_week,
-  };
-  const deadlineInAttention = hasKind("deadline");
+  // The glance modules read the standing / odds / rooms models once; each fact lives in exactly one module.
+  const standing = buildTeamStatusStanding({
+    snapshot,
+    rankings: teamStatus.rankings?.teams,
+    standingsAvailable: teamStatus.rankings?.standings_available,
+    myRosterId: teamStatus.matchup?.my_team?.roster_id,
+    odds: buildTeamStatusOdds(sim),
+  });
+  const deadlinePassed = Boolean(data.trade_window?.trade_deadline_passed);
+  const stanceLine = copy.isBeginner ? tradesStanceLine(stance) : "";
+  const tiles = todayTiles({ standing, tradeCount: tradeItems.length, tradesClosed: deadlinePassed });
+  const roomChips = todayRoomChips(buildTeamStatusPositions(teamStatus.needs));
+  const idea = tradeItems[0] ? todayTradeIdea(tradeItems[0]) : null;
+  const id = encodeURIComponent(leagueId);
+  const tradeHubHref = `/trade-hub/${id}${query}`;
+  const ideaHref = tradeItems[0]
+    ? gamePlanTileHref(GAME_PLAN_INTERNAL_ROUTES[tradeItems[0].destination] ?? "trade-hub", leagueId, leagueName, resolveGamePlanTargetPlayerId(tradeItems[0]))
+    : tradeHubHref;
   const teamStats = snapshot
     ? buildTeamStats(snapshot, copy.label("averageAge", "Avg Age"), {
         teamCount: teams && teams.length > 1 ? teams.length : null,
@@ -193,18 +196,20 @@ export function DashboardContent({
 
       {userId ? <StartHereCard userId={userId} accountCreatedAt={accountCreatedAt} leagueId={leagueId} leagueName={leagueName} /> : null}
 
-      {userId && !sample ? <SinceLastVisitStrip userId={userId} leagueId={leagueId} leagueName={leagueName} /> : null}
-
       {data.platform_notice ? (
         <p className="m-0 text-xs" style={{ color: "var(--color-text-muted)" }} data-testid="platform-notice">
           {data.platform_notice}
         </p>
       ) : null}
 
-      <TeamStatusHero leagueId={leagueId} leagueName={leagueName} snapshot={snapshot} sim={sim} oddsCaption={oddsCaption} data={teamStatus} attention={[]} tradeCount={tradeItems.length} queue={heroQueue} />
-
-      {/* F14: one first-visit orientation line under the hero (seen-once, beginners and unset only). */}
-      {sample ? null : <BeginnerHelp term="todayOrientation" label="this page" initiallyOpen />}
+      {/* This week's matchup: the one place Today states the score and the win chance (ring card, taps open the swing players). */}
+      {!teamStatus.settled ? (
+        <div aria-busy="true" data-testid="team-status-hero-loading">
+          <SkeletonHero minHeight={92} />
+        </div>
+      ) : matchupLine ? (
+        <TodayMatchupCard line={matchupLine} matchup={teamStatus.matchup} href={`/matchup/${id}${query}`} />
+      ) : null}
 
       {/* A few times a season: does the declared direction still fit? Server-decided,
           dismissible, once per moment (modules/direction_checkin.py). */}
@@ -219,21 +224,28 @@ export function DashboardContent({
         emptyOverride={data.reason ? notReadyReasonMessage(data.reason, { linkAccount: "Connect your Sleeper account to see what to do today.", emptyRoster: "Your roster doesn't have any players yet. This is expected if your draft is still in progress." }) || undefined : undefined}
       />
 
-      <TodayModule data={nextMovesData} leagueId={leagueId} leagueName={leagueName} hideEmpty omitGating />
-
       {/* First-run trial offer, after the person has seen their own Today
           briefing (paywall-after-connect). Dismissible; nothing is gated. */}
       {userId && !sample ? <FirstValueOfferCard userId={userId} isPremium={data.entitlement?.is_premium === true} /> : null}
 
-      <DashboardTradesBlock
-        data={data}
-        tradeItems={tradeItems}
-        leagueId={leagueId}
-        leagueName={leagueName}
-        isBeginner={copy.isBeginner}
-        stance={stance}
-        deadlineInAttention={deadlineInAttention}
-      />
+      {teamStatus.settled ? (
+        <>
+          <TodayTiles tiles={tiles} hrefs={{ standing: `/league-rankings/${id}${query}`, playoffs: `/league-rankings/${id}${query}`, trades: tradeHubHref }} />
+          {idea && !deadlinePassed ? <TodayTradeIdeaCard idea={idea} href={ideaHref} deadline={deadlineChip(data.trade_window)?.value} /> : null}
+          {copy.isBeginner && (idea || stanceLine) ? (
+            // Beginner help for trades, plus the league's real GM stance (what the trade advice is tuned by).
+            <div className="flex flex-wrap items-center gap-x-3 gap-y-1" data-testid="today-trade-help">
+              {idea ? <BeginnerHelp popover label="trade ideas" text={TRADES_BLOCK_COPY.beginnerExplainer} /> : null}
+              {stanceLine ? (
+                <Link href={`/gm-plan/${id}${query}`} className="text-xs" style={{ color: "var(--color-text-secondary)" }} data-testid="dashboard-stance-line">
+                  {stanceLine} <span className="font-bold" style={{ color: "var(--color-accent)" }}>{TRADES_BLOCK_COPY.changeStance}</span>
+                </Link>
+              ) : null}
+            </div>
+          ) : null}
+          <TodayRooms chips={roomChips} tradeHref={tradeHubHref} />
+        </>
+      ) : null}
 
       {snapshot && teamStats ? (
         // My Team: a StatStripModule. Collapsed it reads "This season #3 · Long term #5 · Starters #2 · Bench #7"; the tiles
@@ -271,21 +283,8 @@ export function DashboardContent({
       {/* GM Plan lives in More (the bar does not show it), so Today carries it as a standing next step. */}
       {sample ? null : <NextSteps title="Plan ahead" steps={["gm-plan", "waivers", "trade-hub"]} leagueId={leagueId} leagueName={leagueName} />}
 
-      {watchItems.length > 0 ? (
-        <CompactModule
-          id="today.watchlist"
-          title="Watchlist & Alerts"
-          label="Watchlist and alerts"
-          testId="dashboard-watchlist"
-          tone="warning"
-          parts={listSummaryParts({ count: watchItems.length, noun: "alert", highlights: [watchItems[0]?.headline] })}
-        >
-          <WatchListCard items={watchItems} leagueId={leagueId} leagueName={leagueName} />
-        </CompactModule>
-      ) : null}
-
-      {/* Alerts is a section of Today (the standalone page is retired): unread count badge, tap to expand, `#alerts` opens it. */}
-      {sample ? null : <DashboardAlerts leagueId={leagueId} leagueName={leagueName} />}
+      {/* Alerts (with the watchlist folded in) is a section of Today: avatars + newest headline collapsed, unread count badge, tap to expand, `#alerts` opens it. */}
+      {sample ? null : <DashboardAlerts leagueId={leagueId} leagueName={leagueName} watchItems={watchItems} />}
 
       {/* The sample preview has no More section, so it keeps League Activity inline. */}
       {sample ? <LeaguePulseCard leagueId={leagueId} leagueName={leagueName} teamRankings={teamRankings} /> : null}
@@ -315,7 +314,6 @@ function buildTeamStats(
   ageLabel: string,
   context: { teamCount: number | null; leagueAge: string | null },
 ): { main: StatStripItem[] } {
-  const injured = snapshot.injured_starters && snapshot.injured_starters > 0 ? snapshot.injured_starters : 0;
   const ofTeams = context.teamCount ? `of ${context.teamCount} teams` : undefined;
   const WHY_BY_GLYPH = { power: "power_rank", franchise: "franchise_rank", starter: "starter_strength", bench: "bench_strength" } as const;
   const rank = (glyph: "power" | "franchise" | "starter" | "bench", label: string, value: number | null, tied: boolean, note?: string): StatStripItem => ({
@@ -339,13 +337,6 @@ function buildTeamStats(
       label: ageLabel,
       value: snapshot.average_age !== null ? snapshot.average_age.toFixed(1) : "—",
       note: snapshot.average_age !== null && context.leagueAge ? `League avg ${context.leagueAge}` : undefined,
-    },
-    {
-      glyph: "injury",
-      insight: "injury",
-      label: "Injured starters",
-      value: injured > 0 ? String(injured) : "None",
-      tone: injured > 0 ? "risk" : "positive",
     },
   ];
   return { main };

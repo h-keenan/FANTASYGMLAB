@@ -5,8 +5,11 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { AlertsFeed } from "@/components/AlertsContent";
 import { CompactModule } from "@/components/ui/CompactModule";
 import { ErrorState } from "@/components/ErrorState";
+import { PlayerAvatarSlot } from "@/components/ui/PlayerAvatarSlot";
+import { WatchListCard } from "@/components/WatchListCard";
 import { useAuth } from "@/context/AuthContext";
-import { api, type AlertsResponse } from "@/lib/api";
+import { api, type AlertsResponse, type BriefingItem } from "@/lib/api";
+import { todayAlertsSummary } from "@/lib/todayView";
 import { overlayPendingAlertReads } from "@/lib/alertReadSync";
 import { alertsReasonMessage } from "@/lib/alertsPresentation";
 
@@ -19,7 +22,7 @@ export const ALERTS_SECTION_HASH = "alerts";
  * itself and scrolls into view when the URL carries `#alerts` (the old route redirects there, and so does the header
  * bell's "View all alerts"). Re-reads the feed when the tab becomes visible again, so a read made on the phone shows here.
  */
-export function DashboardAlerts({ leagueId, leagueName }: { leagueId: string; leagueName: string }) {
+export function DashboardAlerts({ leagueId, leagueName, watchItems = [] }: { leagueId: string; leagueName: string; /** The Dashboard's watchlist items: folded into this section (one place for "things to keep an eye on"). */ watchItems?: BriefingItem[] }) {
   const { session } = useAuth();
   const userId = session?.user?.id ?? "";
   const [data, setData] = useState<AlertsResponse | null>(null);
@@ -66,6 +69,12 @@ export function DashboardAlerts({ leagueId, leagueName }: { leagueId: string; le
   const notice = data?.reason ? alertsReasonMessage(data.reason) : null;
   const items = data && !notice ? overlayPendingAlertReads(userId, leagueId, data.items) : [];
   const unread = items.filter((item) => !item.read).length;
+  // The collapsed row: avatars of the players behind the newest alerts / watch items, then the newest headline and how many more.
+  const summary = todayAlertsSummary([
+    ...items.map((item) => ({ playerId: item.matched_player_id, name: item.matched_player, position: item.matched_player_position, team: item.matched_player_team, tier: item.matched_player_tier, title: item.title ?? "" })),
+    ...watchItems.map((item) => ({ playerId: item.route_player_id || null, name: item.route_player_name || null, position: item.route_player_position || null, team: item.route_player_team || null, tier: item.route_player_tier || null, title: item.headline })),
+  ]);
+  const total = items.length + watchItems.length;
 
   const title = (
     <span className="inline-flex items-center gap-2">
@@ -103,13 +112,26 @@ export function DashboardAlerts({ leagueId, leagueName }: { leagueId: string; le
         testId="dashboard-alerts"
         tone={unread > 0 ? "warning" : "muted"}
         loading={!data && !failed}
+        preview={
+          summary.avatars.length > 0 ? (
+            <span className="flex items-center gap-1" data-testid="dashboard-alerts-avatars">
+              {summary.avatars.map((a) => (
+                <PlayerAvatarSlot key={a.playerId} player={{ id: a.playerId, name: a.name ?? "this player", position: a.position, team: a.team, tier: a.tier }} tier="row" />
+              ))}
+            </span>
+          ) : undefined
+        }
         parts={
           data
             ? notice
               ? [{ key: "notice", text: notice }]
-              : unread > 0
-                ? [{ key: "unread", text: `${unread} unread`, strong: true }, items[0]?.title ? { key: "lead", text: items[0].title } : null]
-                : [{ key: "quiet", text: items.length > 0 ? "All caught up" : "All quiet" }]
+              : total > 0
+                ? [
+                    unread > 0 ? { key: "unread", text: `${unread} new`, strong: true } : null,
+                    summary.lead ? { key: "lead", text: summary.lead } : null,
+                    summary.more > 0 ? { key: "more", text: `+${summary.more} more`, tone: "muted" as const } : null,
+                  ]
+                : [{ key: "quiet", text: "All quiet" }]
             : []
         }
       >
@@ -119,7 +141,10 @@ export function DashboardAlerts({ leagueId, leagueName }: { leagueId: string; le
               load();
             }} />
         ) : data ? (
-          <AlertsFeed leagueId={leagueId} leagueName={leagueName} data={data} userId={userId} />
+          <>
+            {watchItems.length > 0 ? <WatchListCard items={watchItems} leagueId={leagueId} leagueName={leagueName} /> : null}
+            <AlertsFeed leagueId={leagueId} leagueName={leagueName} data={data} userId={userId} />
+          </>
         ) : null}
       </CompactModule>
     </div>

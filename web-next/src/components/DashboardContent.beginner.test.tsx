@@ -76,7 +76,7 @@ describe("DashboardContent for a beginner", () => {
     const lines = Array.from(strip.querySelectorAll("[data-beginner-help] p")).map((p) => p.textContent);
     expect(lines.some((l) => l?.startsWith("This season: "))).toBe(true);
     expect(lines.some((l) => l?.startsWith("Average Age: "))).toBe(true);
-    expect(screen.getByText(/^Today lists the roster moves/)).toBeInTheDocument();
+    expect(screen.getByText(/^Today lists the roster moves/)).toBeInTheDocument(); // the Do this now help popover
   });
 
   it("tells a beginner no move is needed when nothing is urgent", async () => {
@@ -87,14 +87,31 @@ describe("DashboardContent for a beginner", () => {
     expect(screen.getByText(/No move is needed right now/)).toBeInTheDocument();
   });
 
-  it("explains trades to a beginner, and names the league's real GM stance with a link to change it", async () => {
+  it("explains trades to a beginner under the trade idea, and names the league's real GM stance with a link to change it (no account-goal line)", async () => {
     vi.spyOn(api, "getTeamStance").mockResolvedValue({ ok: true, stance: "rebuilding" });
-    render(<DashboardContent leagueId="abc" leagueName="Dynasty Overlords" data={FIXTURE} />);
+    const withIdea: DashboardResponse = {
+      ...FIXTURE,
+      items: [
+        {
+          ...FIXTURE.items[0],
+          presentation: {
+            trade_package: {
+              send: [{ asset_type: "player", player_id: "1", name: "R. Walsh", position: "RB" }],
+              receive: [{ asset_type: "player", player_id: "2", name: "C. Murray", position: "QB" }],
+            },
+            partner_team_name: "Team Iron",
+          },
+        } as unknown as DashboardResponse["items"][number],
+      ],
+    };
+    render(<DashboardContent leagueId="abc" leagueName="Dynasty Overlords" data={withIdea} />);
+    await screen.findByTestId("today-trade-idea");
     expandHelp();
-    const block = screen.getByTestId("dashboard-trades-block");
+    const block = screen.getByTestId("today-trade-help");
     expect(block.textContent).toMatch(/who you give, who you get/);
     const line = await screen.findByTestId("dashboard-stance-line");
     expect(line.textContent).toMatch(/building future value/);
     expect(line.getAttribute("href")).toBe("/gm-plan/abc?name=Dynasty%20Overlords");
+    expect(block.textContent).not.toMatch(/Tuned for winning this season/);
   });
 });

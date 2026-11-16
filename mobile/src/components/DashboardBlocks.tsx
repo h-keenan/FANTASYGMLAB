@@ -8,25 +8,18 @@ import { Ionicons } from '@expo/vector-icons';
 
 import AccentCard from './AccentCard';
 import AppText from './AppText';
-import BeginnerHelp from './BeginnerHelp';
 import CompactModule from './CompactModule';
 import { type StatStripItem } from './DashboardStatRow';
-import { LinkModule, StatStripModule } from './ModuleTemplates';
+import { StatStripModule } from './ModuleTemplates';
 import GlossaryNote from './GlossaryNote';
 import ToneBadge from './ToneBadge';
 import SectionHeading from './SectionHeading';
 import { useThemeMode } from '../context/ThemeModeContext';
-import type { DashboardItem, DashboardResponse, TeamRanking, TeamSnapshot } from '../lib/api';
+import type { DashboardItem, TeamRanking, TeamSnapshot } from '../lib/api';
 import { useExperienceCopy } from '../context/ExperienceLevelContext';
 import { formatRank, rankFill } from '../lib/percentile';
 import { leagueAverageAge } from '../lib/teamStatus';
-import {
-  deadlineChip,
-  tradeIdeasLine,
-  tradesStanceLine,
-  TRADES_BLOCK_COPY,
-  type DashboardAttentionEntry,
-} from '../lib/dashboardLayout';
+import type { DashboardAttentionEntry } from '../lib/dashboardLayout';
 import { radii, spacing, type ThemeColors } from '../theme';
 
 type Navigate = (name: string, params?: object) => void;
@@ -96,68 +89,6 @@ export function DashboardNeedsAttention({
 }
 
 /**
- * Trade ideas on the Dashboard are one line: a count and a link. The idea cards
- * live only on GM Plan and Trade Hub. Mirrors web DashboardTradesBlock.
- */
-export function DashboardTradesBlock({
-  data,
-  tradeItems,
-  leagueId,
-  leagueName,
-  isBeginner,
-  stance,
-  deadlineInAttention = false,
-  onNavigate,
-}: {
-  data: DashboardResponse;
-  tradeItems: DashboardItem[];
-  leagueId: string;
-  leagueName: string;
-  isBeginner: boolean;
-  /** The league's GM stance (Team Situation): competing | rebuilding | balanced, '' or null when unset. */
-  stance?: string | null;
-  /** "Needs attention" already lists a near deadline: don't repeat it here. */
-  deadlineInAttention?: boolean;
-  onNavigate: Navigate;
-}) {
-  const { colors } = useThemeMode();
-  const styles = useMemo(() => createStyles(colors), [colors]);
-  const deadlinePassed = Boolean(data.trade_window?.trade_deadline_passed);
-  const pending = Boolean(data.trade_ideas_deferred) && tradeItems.length === 0;
-  const stanceLine = isBeginner ? tradesStanceLine(stance) : '';
-  // The one home for the deadline: here, not also as a chip.
-  const deadline = deadlineInAttention ? null : deadlineChip(data.trade_window);
-  const stateTone = deadlinePassed || tradeItems.length === 0 ? ('muted' as const) : ('action' as const);
-  return (
-    <View style={styles.block}>
-      <LinkModule
-        title={TRADES_BLOCK_COPY.title}
-        tone="action"
-        onPress={() => onNavigate('Trades', { leagueId, leagueName })}
-        parts={[
-          { key: 'ideas', text: tradeIdeasLine(tradeItems.length, deadlinePassed, pending), tone: stateTone, strong: tradeItems.length > 0 && !deadlinePassed },
-          deadline ? { key: 'deadline', text: `Deadline ${deadline.value}`, tone: deadline.tone === 'risk' ? ('danger' as const) : ('muted' as const) } : null,
-          { key: 'link', text: TRADES_BLOCK_COPY.link, tone: 'accent' as const },
-        ]}
-      />
-      {isBeginner ? <BeginnerHelp text={TRADES_BLOCK_COPY.beginnerExplainer} /> : null}
-      {stanceLine ? (
-        <Pressable
-          onPress={() => onNavigate('GmPlan', { leagueId, leagueName })}
-          accessibilityRole="link"
-          accessibilityLabel={`${stanceLine} ${TRADES_BLOCK_COPY.changeStance}`}
-          testID="dashboard-stance-line"
-        >
-          <AppText style={styles.stanceLine}>
-            {stanceLine} <AppText style={styles.stanceLink}>{TRADES_BLOCK_COPY.changeStance}</AppText>
-          </AppText>
-        </Pressable>
-      ) : null}
-    </View>
-  );
-}
-
-/**
  * My Team on the Dashboard: the league ranks and roster-health facts the
  * "Your team right now" hero does not carry (record, standing and odds live
  * there). Each tile adds context only when the data exists: team count and
@@ -183,7 +114,6 @@ export function DashboardTeamStats({
   const { colors } = useThemeMode();
   const copy = useExperienceCopy();
   const open = (key: InsightKey) => openInsight(onNavigate, key, leagueId, leagueName);
-  const injured = snapshot.injured_starters != null && snapshot.injured_starters > 0 ? snapshot.injured_starters : 0;
   const ofTeams = teams && teams.length > 1 ? `of ${teams.length} teams` : null;
   const leagueAge = leagueAverageAge(teams);
   const rank = (label: string, icon: StatStripItem['icon'], value: number | null | undefined, tied: boolean, onPress: () => void): StatStripItem => ({
@@ -205,13 +135,6 @@ export function DashboardTeamStats({
       value: snapshot.average_age != null ? snapshot.average_age.toFixed(1) : '—',
       note: snapshot.average_age != null && leagueAge ? `League avg ${leagueAge}` : null,
       onPress: open('age'),
-    },
-    {
-      label: 'Injured starters',
-      icon: 'medkit-outline',
-      value: injured > 0 ? String(injured) : 'None',
-      tone: injured > 0 ? 'risk' : 'positive',
-      onPress: open('injury'),
     },
   ];
   return (
@@ -251,27 +174,11 @@ export function DashboardMore({ children }: { children: React.ReactNode }) {
 function createStyles(colors: ThemeColors) {
   return StyleSheet.create({
     block: { gap: spacing.md },
-    stanceLine: { fontSize: 13, color: colors.textSecondary },
-    stanceLink: { fontSize: 13, fontWeight: '700', color: colors.accent },
     attentionRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, minHeight: 44, paddingVertical: spacing.sm },
     attentionDivider: { borderTopWidth: 1, borderTopColor: colors.border },
     attentionBadge: { width: 88, alignItems: 'flex-start' },
     attentionText: { flex: 1, minWidth: 0 },
-    tradeLine: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      justifyContent: 'space-between',
-      gap: spacing.sm,
-      minHeight: 44,
-      paddingHorizontal: spacing.md,
-      borderRadius: radii.md,
-      borderWidth: 1,
-      borderColor: colors.border,
-      backgroundColor: colors.surface,
-    },
-    tradeLineTextGroup: { flex: 1, paddingVertical: spacing.sm },
     deadlineNote: { fontSize: 13.5, color: colors.textTertiary },
-    tradeLineText: { fontSize: 15.5, fontWeight: '700', color: colors.textPrimary },
     holdHeadline: { flexShrink: 1, fontSize: 15.5, fontWeight: '700', color: colors.textPrimary },
     holdWhy: { fontSize: 13.5, color: colors.textSecondary },
     link: { fontSize: 15.5, fontWeight: '700', color: colors.accent },

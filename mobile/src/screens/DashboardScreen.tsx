@@ -33,9 +33,11 @@ import TeamHealthContextBlock, { hasHealthContext } from '../components/TeamHeal
 import GuillotineCard from '../components/GuillotineCard';
 import LeagueTypeControl from '../components/LeagueTypeControl';
 import DirectionCheckinCard from '../components/DirectionCheckinCard';
-import TeamStatusHero from '../components/TeamStatusHero';
+import TodayMatchupCard from '../components/TodayMatchupCard';
+import { TodayRooms, TodayTiles, TodayTradeIdeaCard } from '../components/TodayGlance';
 import WeeklyMatchupCard from '../components/WeeklyMatchupCard';
-import { buildTeamStatusMatchup } from '../lib/teamStatus';
+import { buildTeamStatusMatchup, buildTeamStatusOdds, buildTeamStatusPositions, buildTeamStatusStanding } from '../lib/teamStatus';
+import { todayRoomChips, todayTiles, todayTradeIdea } from '../lib/todayView';
 import StorylineSummaryCard from '../components/StorylineSummaryCard';
 import WaiverSuggestionsStrip from '../components/WaiverSuggestionsStrip';
 import LeagueStandingStrips from '../components/LeagueStandingStrips';
@@ -89,10 +91,10 @@ import { isInSeason } from '../lib/seasonPhase';
 import { useDensity } from '../context/DensityContext';
 import { useExperienceCopy } from '../context/ExperienceLevelContext';
 import { useGmStance } from '../context/GmStanceContext';
-import { DashboardMore, DashboardTeamStats, DashboardTradesBlock } from '../components/DashboardBlocks';
-import DecisionQueue, { decisionRoute } from '../components/DecisionQueue';
+import { DashboardMore, DashboardTeamStats } from '../components/DashboardBlocks';
+import DecisionQueue from '../components/DecisionQueue';
 import { buildDecisionQueue } from '../lib/decisionQueue';
-import { isTradeItem } from '../lib/dashboardLayout';
+import { deadlineChip, isTradeItem, TRADES_BLOCK_COPY, tradesStanceLine } from '../lib/dashboardLayout';
 import BeginnerHelp from '../components/BeginnerHelp';
 import { useThemeMode } from '../context/ThemeModeContext';
 import { LINK_HIT_SLOP, radii, spacing, type ThemeColors } from '../theme';
@@ -201,7 +203,6 @@ export default function DashboardScreen({ route, navigation }: Props) {
     scrollToAlerts();
   }, [scrollToAlerts]);
   const [newRecommendationIds, setNewRecommendationIds] = useState<Set<string>>(new Set());
-  const [isFirstVisit, setIsFirstVisit] = useState(true);
   const { showExplanations } = useDensity();
   const experienceCopy = useExperienceCopy();
   // The league's real GM stance (what trade advice is tuned by), shown on the trade line for beginners.
@@ -255,6 +256,17 @@ export default function DashboardScreen({ route, navigation }: Props) {
   const matchupQuery = useQuery({
     queryKey: queryKeys.matchup(leagueId),
     queryFn: () => api.getLeagueMatchup(leagueId),
+    enabled: !isRestoring,
+  });
+  // Position-room needs and the season simulation (playoff odds) feed the Today tiles and rooms chips.
+  const needsQuery = useQuery({
+    queryKey: queryKeys.myTeamNeeds(leagueId),
+    queryFn: () => api.getLeagueMyTeamNeeds(leagueId),
+    enabled: !isRestoring,
+  });
+  const simQuery = useQuery({
+    queryKey: queryKeys.seasonSim(leagueId),
+    queryFn: () => api.getGamesSeasonSim(leagueId),
     enabled: !isRestoring,
   });
   const guillotineQuery = useQuery({
@@ -339,13 +351,12 @@ export default function DashboardScreen({ route, navigation }: Props) {
     if (!dashboardData || dashboardData.reason) return;
     let cancelled = false;
     (async () => {
-      const { newIds, isFirstVisit: firstVisit } = await diffAndRecordSeen(
+      const { newIds } = await diffAndRecordSeen(
         leagueId,
         dashboardData.items.map((item) => item.recommendation_id),
       );
       if (!cancelled) {
         setNewRecommendationIds(newIds);
-        setIsFirstVisit(firstVisit);
       }
     })();
     return () => {
@@ -459,25 +470,32 @@ export default function DashboardScreen({ route, navigation }: Props) {
     tradeIdeaCount: tradeItems.length,
     entitlement: entitlement ? { isPremium: entitlement.is_premium, hiddenCount: entitlement.hidden_count } : null,
     nextGame: matchupLine ? { week: matchupLine.week, opponentName: matchupLine.opponentName } : dashboardData?.this_week?.week ? { week: dashboardData.this_week.week, opponentName: '' } : null,
+    injuredStarters: teamSnapshot?.injured_starters ?? null,
   });
   // Holds the place only while the queue would otherwise read "nothing needs you" before the matchup has said otherwise.
   const queuePending = matchupQuery.isPending && queue.total === 0;
-  const hasKind = (kind: string) => queue.all.some((d) => d.kind === kind);
-  const heroQueue = queuePending
-    ? undefined
-    : { next: queue.next ? { title: queue.next.title, label: queue.next.primary.label, href: decisionRoute(queue.next) } : null, nothing: null };
-  const nextMovesThisWeek = dashboardData?.this_week
-    ? {
-        ...dashboardData.this_week,
-        rows: dashboardData.this_week.rows.filter(
-          (row) => row.key !== 'trade' && !(row.key === 'lineup' && (hasKind('lineup') || row.tone !== 'risk')) && !(row.key === 'waiver' && hasKind('waiver')),
-        ),
-        next_action:
-          dashboardData.this_week.next_action && (dashboardData.this_week.next_action.route === 'trade_hub' || dashboardData.this_week.next_action.route === 'connect_league')
-            ? dashboardData.this_week.next_action
-            : null,
-      }
-    : dashboardData?.this_week;
+  // The glance modules read the standing / odds / rooms models once; each fact lives in exactly one module.
+  const standing = buildTeamStatusStanding({
+    snapshot: teamSnapshot,
+    rankings: teamRankings,
+    standingsAvailable: teamRankingsQuery.data?.standings_available,
+    myRosterId: matchup?.my_team?.roster_id,
+    odds: buildTeamStatusOdds(simQuery.data),
+  });
+  const deadlinePassed = Boolean(dashboardData?.trade_window?.trade_deadline_passed);
+  const stanceLine = experienceCopy.isBeginner ? tradesStanceLine(stance) : '';
+  const tiles = todayTiles({ standing, tradeCount: tradeItems.length, tradesClosed: deadlinePassed });
+  const roomChips = todayRoomChips(buildTeamStatusPositions(needsQuery.data?.ok ? needsQuery.data : null));
+  const idea = tradeItems[0] ? todayTradeIdea(tradeItems[0]) : null;
+  const watchItems = [...grouped.watch, ...grouped.opportunity];
+  const watchLines = watchItems.map((item) => ({
+    playerId: item.route_player_id || null,
+    name: item.route_player_name || null,
+    position: item.route_player_position || null,
+    team: item.route_player_team || null,
+    tier: item.route_player_tier || null,
+    title: item.headline,
+  }));
   return (
     <View style={styles.root}>
       <GridBackground />
@@ -498,21 +516,12 @@ export default function DashboardScreen({ route, navigation }: Props) {
         <AppText style={{ color: colors.textSecondary, fontSize: 13.5 }}>{dashboardData.platform_notice}</AppText>
       ) : null}
 
-      <TeamStatusHero
-        leagueId={leagueId}
-        leagueName={leagueName}
-        snapshot={teamSnapshot}
-        matchup={matchup}
-        rankings={teamRankings}
-        standingsAvailable={teamRankingsQuery.data?.standings_available}
-        onNavigate={navigate}
-        attention={[]}
-        tradeCount={tradeItems.length}
-        queue={heroQueue}
-      />
-
-      {/* F14: one first-visit orientation line under the hero (seen-once, beginners and unset only). */}
-      <BeginnerHelp term="todayOrientation" seenOnce />
+      {/* This week's matchup: the one place Today states the score and the win chance (ring card, tap expands the swing players). */}
+      {matchupQuery.isPending ? (
+        <SkeletonBlock height={92} radius={radii.md} />
+      ) : matchupLine ? (
+        <TodayMatchupCard line={matchupLine} matchup={matchup} onOpenMatchup={() => navigate('Matchup', { leagueId, leagueName })} />
+      ) : null}
 
       {/* A few times a season: does the declared direction still fit? Server-decided,
           dismissible, once per moment (modules/direction_checkin.py). Same slot on web. */}
@@ -538,32 +547,41 @@ export default function DashboardScreen({ route, navigation }: Props) {
         )}
       />
 
-      {/* What the queue did not take: the lineup-is-set row, later-this-week rows, the trade-pending space. */}
-      <TodayHero
-        thisWeek={nextMovesThisWeek}
-        items={[]}
-        leagueId={leagueId}
-        leagueName={leagueName}
-        tradePending={false}
-        onNavigate={navigate}
-      />
-
       {/* First-run trial offer, after the person has seen their own Today
           briefing (paywall after connect). Dismissible; nothing is gated. */}
       <FirstValueOfferCard isPremium={entitlement?.is_premium === true} />
 
-      {dashboardData ? (
-        <DashboardTradesBlock
-          data={dashboardData}
-          tradeItems={tradeItems}
-          leagueId={leagueId}
-          leagueName={leagueName}
-          isBeginner={experienceCopy.isBeginner}
-          stance={stance}
-          deadlineInAttention={hasKind('deadline')}
-          onNavigate={navigate}
+      <TodayTiles
+        tiles={tiles}
+        onOpen={(key) => navigate(key === 'trades' ? 'Trades' : 'Teams', { leagueId, leagueName })}
+      />
+      {idea && !deadlinePassed ? (
+        <TodayTradeIdeaCard
+          idea={idea}
+          deadline={deadlineChip(dashboardData?.trade_window)?.value}
+          onOpen={() => navigate('Trades', { leagueId, leagueName, ...(tradeItems[0]?.route_player_id ? { playerId: tradeItems[0].route_player_id } : {}) })}
         />
       ) : null}
+      {experienceCopy.isBeginner && (idea || stanceLine) ? (
+        // Beginner help for trades, plus the league's real GM stance (what the trade advice is tuned by).
+        <View style={{ gap: spacing.xs }} testID="today-trade-help">
+          {idea ? <BeginnerHelp text={TRADES_BLOCK_COPY.beginnerExplainer} /> : null}
+          {stanceLine ? (
+            <PressableScale
+              onPress={() => navigate('GmPlan', { leagueId, leagueName })}
+              accessibilityRole="link"
+              accessibilityLabel={`${stanceLine} ${TRADES_BLOCK_COPY.changeStance}`}
+              style={{ minHeight: 44, justifyContent: 'center' }}
+              testID="dashboard-stance-line"
+            >
+              <AppText style={{ fontSize: 13, color: colors.textSecondary }}>
+                {stanceLine} <AppText style={{ fontSize: 13, fontWeight: '700', color: colors.accent }}>{TRADES_BLOCK_COPY.changeStance}</AppText>
+              </AppText>
+            </PressableScale>
+          ) : null}
+        </View>
+      ) : null}
+      <TodayRooms chips={roomChips} onOpenTrades={() => navigate('Trades', { leagueId, leagueName })} />
 
       {teamSnapshot ? (
         <View style={styles.snapshotSection}>
@@ -580,32 +598,29 @@ export default function DashboardScreen({ route, navigation }: Props) {
 
       {guillotine ? <GuillotineCard data={guillotine} /> : null}
 
-      {!isFirstVisit && newRecommendationIds.size > 0 ? (
-        <View style={styles.checkInBanner}>
-          <Ionicons name="sparkles-outline" size={14} color={colors.accent} />
-          <AppText style={styles.checkInText}>
-            Since your last check-in: {newRecommendationIds.size} new {newRecommendationIds.size === 1 ? 'item' : 'items'}
-          </AppText>
-        </View>
-      ) : null}
-
-      {/* Watchlist & Alerts, then the Priority Adds the Waivers screen leads with. */}
-      <WatchlistAlertsSection
-        snapshot={teamSnapshot}
-        items={[...grouped.watch, ...grouped.opportunity]}
-        leagueId={leagueId}
-        leagueName={leagueName}
-        navigation={navigation}
-        newRecommendationIds={newRecommendationIds}
-        showExplanations={showExplanations}
-      />
       <View
         onLayout={(event) => {
           alertsY.current = event.nativeEvent.layout.y;
           scrollToAlerts();
         }}
       >
-        <AlertsSection leagueId={leagueId} leagueName={leagueName} forceOpen={focusAlerts} />
+        <AlertsSection
+          leagueId={leagueId}
+          leagueName={leagueName}
+          forceOpen={focusAlerts}
+          watchLines={watchLines}
+          watchBody={
+            <WatchlistRows
+              snapshot={null}
+              items={watchItems}
+              leagueId={leagueId}
+              leagueName={leagueName}
+              navigation={navigation}
+              newRecommendationIds={newRecommendationIds}
+              showExplanations={showExplanations}
+            />
+          }
+        />
       </View>
       <WaiverSuggestionsStrip
         adds={priorityAdds}
@@ -1181,7 +1196,7 @@ function DashboardInsightRow({
  * TRENDING / INJURY / WAIVER tag; a trend indicator on the right appears only
  * when the item has a real figure (see lib/dashboardWatch.ts).
  */
-export function WatchlistAlertsSection({
+export function WatchlistRows({
   snapshot,
   items,
   leagueId,
@@ -1190,6 +1205,7 @@ export function WatchlistAlertsSection({
   newRecommendationIds,
   showExplanations,
 }: {
+  /** The key-injuries block; null on Today, where the swap stack owns injured starters. */
   snapshot: TeamSnapshot | null;
   items: DashboardItem[];
   leagueId: string;
@@ -1210,24 +1226,7 @@ export function WatchlistAlertsSection({
   const rowItems = items.filter((item) => !item.presentation?.trade_package);
 
   return (
-    <View style={styles.groupSection}>
-      <CompactModule
-        id="today.watchlist"
-        title="Watchlist & Alerts"
-        label="Watchlist and alerts"
-        testID="dashboard-watchlist"
-        tone="warning"
-        parts={listSummaryParts({
-          count: items.length + (showHealth ? 1 : 0),
-          noun: 'alert',
-          highlights: [items[0]?.headline ?? (showHealth ? 'Key injuries on your roster' : null)],
-        })}
-        action={
-          <PressableScale onPress={() => navigation.navigate('Dashboard', { leagueId, leagueName, focus: 'alerts' })} hitSlop={LINK_HIT_SLOP} style={{ minHeight: 44, justifyContent: 'center' }}>
-            <AppText style={styles.viewAll}>All ›</AppText>
-          </PressableScale>
-        }
-      >
+    <>
       {richItems.map((item, index) => (
         <TopPriorityTradeCard
           key={`watch-trade-${index}`}
@@ -1278,6 +1277,51 @@ export function WatchlistAlertsSection({
           ))}
         </AnimatedCard>
       ) : null}
+    </>
+  );
+}
+
+/**
+ * Watchlist & Alerts (the sample preview's form): urgent risks and opportunities as one list. Folds in the team-health block
+ * (key injuries) as its leading row. On the live Today the watchlist is folded into the Alerts section instead
+ * (components/AlertsSection.tsx `watchBody`), so each thing to watch appears once.
+ */
+export function WatchlistAlertsSection({
+  snapshot,
+  items,
+  leagueId,
+  leagueName,
+  navigation,
+  newRecommendationIds,
+  showExplanations,
+}: {
+  snapshot: TeamSnapshot | null;
+  items: DashboardItem[];
+  leagueId: string;
+  leagueName: string;
+  navigation: DashboardNavigation;
+  newRecommendationIds: Set<string>;
+  showExplanations: boolean;
+}) {
+  const { colors } = useThemeMode();
+  const styles = useMemo(() => createStyles(colors), [colors]);
+  const showHealth = hasHealthContext(snapshot);
+  if (!showHealth && items.length === 0) return null;
+  return (
+    <View style={styles.groupSection}>
+      <CompactModule
+        id="today.watchlist"
+        title="Watchlist & Alerts"
+        label="Watchlist and alerts"
+        testID="dashboard-watchlist"
+        tone="warning"
+        parts={listSummaryParts({
+          count: items.length + (showHealth ? 1 : 0),
+          noun: 'alert',
+          highlights: [items[0]?.headline ?? (showHealth ? 'Key injuries on your roster' : null)],
+        })}
+      >
+        <WatchlistRows snapshot={snapshot} items={items} leagueId={leagueId} leagueName={leagueName} navigation={navigation} newRecommendationIds={newRecommendationIds} showExplanations={showExplanations} />
       </CompactModule>
     </View>
   );

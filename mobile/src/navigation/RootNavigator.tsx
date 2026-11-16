@@ -181,7 +181,8 @@ export type RootStackParamList = {
   FantasySim: { leagueId: string; leagueName: string };
   PickDetail: { pick: DraftPickAsset; leagueId: string; leagueName: string };
   MyTeam: { leagueId: string; leagueName: string };
-  Matchup: { leagueId: string; leagueName: string };
+  /** `plan`: open the lineup planner on that move (`swap`, with `out` and `in` player ids) or on every suggested move (`all`); from Today's Swap / Fix all. */
+  Matchup: { leagueId: string; leagueName: string; plan?: 'swap' | 'all'; out?: string; in?: string };
   Alerts: { leagueId: string; leagueName: string };
   // Not league-scoped — shared prospect pool + personal watchlist span every league.
   // Retired as a menu page: Players > Prospects (redirects when a league is known).

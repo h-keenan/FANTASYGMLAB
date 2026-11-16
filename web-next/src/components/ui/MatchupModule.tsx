@@ -23,6 +23,52 @@ import { playerSurname } from "@/lib/playerNameDisplay";
 
 const TONE = { success: "var(--color-success)", danger: "var(--color-danger)", accent: "var(--color-accent)" } as const;
 
+/** The widest-range player still to play on each side, with avatars; tapping one opens the player peek. Shared by the Matchup hero and Today's matchup card. */
+export function SwingPlayers({ swing, onOpenPlayer }: { swing: MatchupSwingPlayer[]; onOpenPlayer?: (player: MatchupSwingPlayer) => void }) {
+  return (
+    <>
+      {swing.length > 0 ? (
+        <div className="flex flex-col gap-1 pt-1" style={{ borderTop: "var(--border-width-default) solid var(--color-border)" }} data-testid="matchup-swing">
+          <span className="pt-2 text-[0.6875rem] font-extrabold uppercase" style={{ color: "var(--color-text-muted)", letterSpacing: "var(--letter-spacing-badge)" }}>
+            Swing players
+          </span>
+          <ul className="m-0 grid list-none grid-cols-2 gap-2 p-0">
+            {swing.map((p) => {
+              const body = (
+                <>
+                  <PlayerAvatar playerId={p.playerId} tier={p.tier} size={36} fallbackLabel={p.name.trim().slice(0, 1)} />
+                  <span className="flex min-w-0 flex-col text-left">
+                    <span className="flex flex-wrap items-center gap-x-1">
+                      <span className="min-w-0 break-words text-sm font-bold">{playerSurname(p.name) || p.name}</span>
+                      {p.position ? <PositionBadge position={p.position} /> : null}
+                    </span>
+                    <span className="text-xs font-bold" style={{ color: p.side === "mine" ? "var(--color-accent)" : "var(--color-text-secondary)" }}>
+                      {p.label}
+                    </span>
+                  </span>
+                </>
+              );
+              return (
+                <li key={p.key} className="min-w-0" data-testid="matchup-swing-player">
+                  {onOpenPlayer ? (
+                    <button type="button" className="flex w-full items-center gap-2" style={{ minHeight: "var(--touch-target-min)", color: "inherit" }} aria-label={`${p.name}, ${p.label}. Open player`} onClick={() => onOpenPlayer(p)}>
+                      {body}
+                    </button>
+                  ) : (
+                    <PlayerTap player={{ id: p.playerId, name: p.name, position: p.position, tier: p.tier }} className="flex w-full items-center gap-2">
+                      {body}
+                    </PlayerTap>
+                  )}
+                </li>
+              );
+            })}
+          </ul>
+        </div>
+      ) : null}
+    </>
+  );
+}
+
 export function MatchupHeroCard({
   model,
   onOpenPlayer,
@@ -81,44 +127,7 @@ export function MatchupHeroCard({
       <p className="m-0 text-xs" style={{ color: "var(--color-text-muted)" }} data-testid="matchup-detail">
         {[model.basis === "projected" ? "Projected points" : null, model.detail].filter(Boolean).join(" · ")}
       </p>
-      {model.swing.length > 0 ? (
-        <div className="flex flex-col gap-1 pt-1" style={{ borderTop: "var(--border-width-default) solid var(--color-border)" }} data-testid="matchup-swing">
-          <span className="pt-2 text-[0.6875rem] font-extrabold uppercase" style={{ color: "var(--color-text-muted)", letterSpacing: "var(--letter-spacing-badge)" }}>
-            Swing players
-          </span>
-          <ul className="m-0 grid list-none grid-cols-2 gap-2 p-0">
-            {model.swing.map((p) => {
-              const body = (
-                <>
-                  <PlayerAvatar playerId={p.playerId} tier={p.tier} size={36} fallbackLabel={p.name.trim().slice(0, 1)} />
-                  <span className="flex min-w-0 flex-col text-left">
-                    <span className="flex flex-wrap items-center gap-x-1">
-                      <span className="min-w-0 break-words text-sm font-bold">{playerSurname(p.name) || p.name}</span>
-                      {p.position ? <PositionBadge position={p.position} /> : null}
-                    </span>
-                    <span className="text-xs font-bold" style={{ color: p.side === "mine" ? "var(--color-accent)" : "var(--color-text-secondary)" }}>
-                      {p.label}
-                    </span>
-                  </span>
-                </>
-              );
-              return (
-                <li key={p.key} className="min-w-0" data-testid="matchup-swing-player">
-                  {onOpenPlayer ? (
-                    <button type="button" className="flex w-full items-center gap-2" style={{ minHeight: "var(--touch-target-min)", color: "inherit" }} aria-label={`${p.name}, ${p.label}. Open player`} onClick={() => onOpenPlayer(p)}>
-                      {body}
-                    </button>
-                  ) : (
-                    <PlayerTap player={{ id: p.playerId, name: p.name, position: p.position, tier: p.tier }} className="flex w-full items-center gap-2">
-                      {body}
-                    </PlayerTap>
-                  )}
-                </li>
-              );
-            })}
-          </ul>
-        </div>
-      ) : null}
+      <SwingPlayers swing={model.swing} onOpenPlayer={onOpenPlayer} />
       {action}
       {children}
     </AccentCard>

@@ -183,4 +183,38 @@ describe("Matchup lineup planner", () => {
       "https://sleeper.com/leagues/9",
     );
   });
+
+  // Today's Swap / Fix all open the Matchup page with the planner already on the move.
+  it("opens on the suggested lineup for ?plan=all (Fix all)", async () => {
+    post.mockResolvedValue(whatIf(60));
+    window.history.pushState({}, "", "/matchup/9?plan=all");
+    try {
+      render(<MatchupContent leagueName="L" leagueId="9" matchup={matchup()} />);
+      await waitFor(() => expect(post).toHaveBeenCalledTimes(1));
+      expect(post.mock.calls[0][1].lineup).toEqual([
+        { slot: "QB", player_id: "qb" },
+        { slot: "WR", player_id: "wr1" },
+      ]);
+    } finally {
+      window.history.pushState({}, "", "/");
+    }
+  });
+
+  it("opens with that one swap already made for ?plan=swap, from the real lineup", async () => {
+    post.mockResolvedValue(whatIf(66));
+    window.history.pushState({}, "", "/matchup/9?plan=swap&out=wr1&in=bench");
+    const live = matchup();
+    live.my_team!.has_live_data = true;
+    (live.my_team as unknown as { real_starters: unknown[] }).real_starters = [row("qb", "Quinn Back", "QB", 20), row("wr1", "Wes Receiver", "WR", 11)];
+    try {
+      render(<MatchupContent leagueName="L" leagueId="9" matchup={live} />);
+      await waitFor(() => expect(post).toHaveBeenCalledTimes(1));
+      expect(post.mock.calls[0][1].lineup).toEqual([
+        { slot: "QB", player_id: "qb" },
+        { slot: "WR", player_id: "bench" },
+      ]);
+    } finally {
+      window.history.pushState({}, "", "/");
+    }
+  });
 });

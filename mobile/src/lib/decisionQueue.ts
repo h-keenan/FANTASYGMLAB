@@ -119,6 +119,8 @@ export interface DecisionInput<T extends DecisionItem = DecisionItem> {
   entitlement?: { isPremium: boolean; hiddenCount: number } | null;
   /** This week's opponent, for the empty state's "next game" line. */
   nextGame?: { week: number | null; opponentName: string } | null;
+  /** The snapshot's injured-starter count: an empty queue never claims "nothing needs you" over injured starters. */
+  injuredStarters?: number | null;
 }
 
 export interface DecisionPlayer {
@@ -139,6 +141,21 @@ export interface DecisionAction {
   target: DecisionTarget;
   /** Waivers / Trade Hub open on this player when set. */
   playerId?: string;
+}
+
+/** One lineup problem with its fix: a starter who is out / on bye / injured, the best healthy bench player for the slot, and the projected gain. */
+export interface DecisionSwap {
+  key: string;
+  /** The starter with the problem; null for an empty slot. */
+  out: DecisionPlayer | null;
+  /** "OUT", "BYE", "Questionable": the short status shown beside the name. */
+  status: string;
+  /** The longer reason for the collapsed row ("On bye this week", "Ruled out this week", or the injury label). */
+  reason: string;
+  tone: "danger" | "warning";
+  /** The bench replacement (the move's `start`). */
+  replacement: DecisionPlayer | null;
+  gain: number | null;
 }
 
 export interface Decision<T extends DecisionItem = DecisionItem> {
@@ -162,6 +179,8 @@ export interface Decision<T extends DecisionItem = DecisionItem> {
   item: T | null;
   /** Extra expanded-only facts ("2 trade ideas", "Deadline Wk 12"). */
   facts: string[];
+  /** The lineup decision's one-tap fixes (empty on every other decision). Locked moves are never in here. */
+  swaps: DecisionSwap[];
 }
 
 export interface DecisionQueue<T extends DecisionItem = DecisionItem> {
@@ -242,26 +261,60 @@ function isTrade(item: DecisionItem): boolean {
   return Boolean(item.presentation && item.presentation.trade_package);
 }
 
+/** "OUT" / "BYE" / the injury label ("Questionable") for the starter being swapped out. */
+function swapStatus(m: DecisionMove): { status: string; tone: "danger" | "warning" } {
+  if (m.over_reason === "bye_week") return { status: "BYE", tone: "danger" };
+  if (m.over_reason === "ruled_out") return { status: m.over?.injury_label?.trim() || "OUT", tone: "danger" };
+  const label = m.over?.injury_label?.trim() || "Injured";
+  return { status: label, tone: /^(questionable|q)$/i.test(label) ? "warning" : "danger" };
+}
+
+/**
+ * The lineup problems that have a fix: starters who are out, on bye or injured with a healthy bench player to start
+ * instead, plus empty slots. A move whose game has started (`locked`, Sleeper locks it, see modules/lineup_lock.py) is
+ * never offered. Biggest gain first.
+ */
+export function lineupSwaps(moves: ReadonlyArray<DecisionMove> | null | undefined): DecisionSwap[] {
+  const rows: DecisionSwap[] = [];
+  for (const [i, m] of (moves ?? []).entries()) {
+    if (m.locked || !m.start.name) continue;
+    const gain = m.gain != null && m.gain > 0 ? round1(m.gain) : null;
+    const replacement = mapPlayer(m.start, null, null);
+    if (m.over_reason === "empty_slot") {
+      rows.push({ key: `slot-${i}`, out: null, status: "OPEN SLOT", reason: "Empty starter slot", tone: "warning", replacement, gain });
+      continue;
+    }
+    const hard = m.over_reason === "bye_week" || m.over_reason === "ruled_out";
+    if (!m.over || !m.over.name || !(hard || m.over.injury_label?.trim())) continue;
+    const { status, tone } = swapStatus(m);
+    const reason = m.over_reason === "bye_week" ? "On bye this week" : m.over_reason === "ruled_out" ? "Ruled out this week" : status;
+    rows.push({ key: `swap-${m.over.player_id ?? i}`, out: mapPlayer(m.over, null, null), status, reason, tone, replacement, gain });
+  }
+  return rows.sort((a, b) => (b.gain ?? 0) - (a.gain ?? 0));
+}
+
 function lineupDecision(input: DecisionInput): Decision | null {
-  const moves = (input.moves ?? []).filter((m) => !m.locked && m.over_reason !== null);
-  const holes = moves.filter((m) => m.over_reason !== "empty_slot" && m.over && m.over.name);
-  const empty = moves.filter((m) => m.over_reason === "empty_slot").length + Math.max(0, input.openSlots ?? 0);
+  const swaps = lineupSwaps(input.moves);
+  const holes = swaps.filter((s) => s.out);
+  const hard = (input.moves ?? []).filter((m) => !m.locked && (m.over_reason === "bye_week" || m.over_reason === "ruled_out") && m.over && m.over.name).length;
+  const soft = holes.length - hard;
+  const empty = swaps.filter((s) => !s.out).length + Math.max(0, input.openSlots ?? 0);
   const weekRow = (input.thisWeek?.rows ?? []).find((r) => r.key === "lineup" && r.tone === "risk") ?? null;
   if (holes.length === 0 && empty === 0 && !weekRow) return null;
 
-  const players: DecisionPlayer[] = holes.slice(0, DECISION_VISIBLE_LIMIT).map((m) => {
-    const why = m.over_reason === "bye_week" ? "On bye this week" : "Ruled out this week";
-    const swap = m.start.name ? `Start ${m.start.name} instead` : "Needs a replacement";
-    const gain = m.gain != null && m.gain > 0 ? { value: `+${round1(m.gain).toFixed(1)}`, label: "GAIN" } : null;
-    return mapPlayer(m.over as DecisionMovePlayer, `${why} · ${swap}`, gain);
-  });
-  const impact = Math.min(99, round1(holes.reduce((sum, m) => sum + Math.max(0, m.gain ?? 0), 0)));
+  const players: DecisionPlayer[] = holes.slice(0, DECISION_VISIBLE_LIMIT).map((s) => ({
+    ...(s.out as DecisionPlayer),
+    note: `${s.reason}${s.replacement?.name ? ` · Start ${s.replacement.name} instead` : " · Needs a replacement"}`,
+    stat: s.gain != null ? { value: `+${s.gain.toFixed(1)}`, label: "GAIN" } : null,
+  }));
+  const impact = Math.min(99, round1(swaps.reduce((sum, s) => sum + (s.gain ?? 0), 0)));
   const parts: string[] = [];
-  if (holes.length > 0) parts.push(`${plural(holes.length, "starter")} can't play (bye or out)`);
+  if (hard > 0) parts.push(`${plural(hard, "starter")} can't play (bye or out)`);
+  if (soft > 0) parts.push(`${plural(soft, "injured starter")}`);
   if (empty > 0) parts.push(plural(empty, "open slot"));
   const title = parts.length > 0 ? parts.join(", ") : (weekRow?.headline ?? "Fix your lineup");
-  const best = [...holes].sort((x, y) => (y.gain ?? 0) - (x.gain ?? 0))[0];
-  const swap = best && best.start.name ? `Best swap: start ${best.start.name}${best.over?.name ? ` over ${best.over.name}` : ""}${best.gain && best.gain > 0 ? ` (+${round1(best.gain)} pts)` : ""}` : null;
+  const best = holes[0];
+  const swap = best?.replacement?.name ? `Best swap: start ${best.replacement.name}${best.out?.name ? ` over ${best.out.name}` : ""}${best.gain ? ` (+${best.gain} pts)` : ""}` : null;
   const summary = swap ?? weekRow?.why ?? (parts.length > 0 ? "Fix it before lineups lock" : "A starter cannot play this week");
   const facts = holes.length > 0 && impact > 0 ? [`Swaps add about ${impact.toFixed(1)} projected points`] : [];
   return {
@@ -279,6 +332,7 @@ function lineupDecision(input: DecisionInput): Decision | null {
     primary: { label: "Fix lineup", target: "matchup" },
     item: null,
     facts,
+    swaps,
   };
 }
 
@@ -306,6 +360,7 @@ function deadlineDecision(input: DecisionInput): Decision | null {
     primary: ideas > 0 ? { label: "Review ideas", target: "trade_hub" } : { label: "Open GM Plan", target: "gm_plan" },
     item: null,
     facts: ideas > 0 ? [plural(ideas, "trade idea")] : [],
+    swaps: [],
   };
 }
 
@@ -348,6 +403,7 @@ function waiverDecision(input: DecisionInput, taken: Set<string>): Decision | nu
     primary: { label: named.length > 1 ? "Review adds" : "Claim", target: "waivers", playerId: first?.id ?? (rowPlayer || undefined) },
     item: top,
     facts: named.length > 1 ? [`${named.length} recommended adds`] : [],
+    swaps: [],
   };
 }
 
@@ -371,6 +427,7 @@ function nextActionDecision(input: DecisionInput): Decision | null {
     primary: { label: next.cta_label || (live ? "Join draft" : "Open draft"), target: live ? "live_draft" : "draft_center" },
     item: null,
     facts: [],
+    swaps: [],
   };
 }
 
@@ -386,6 +443,15 @@ function itemVerb(destination: string): string {
   if (destination === "trade_hub") return "Review";
   if (destination === "draft_center") return "Open draft";
   return "Open";
+}
+
+/** The empty queue's message. Injured starters with no better bench option say so instead of "Nothing needs you". */
+function emptyState(input: DecisionInput): { title: string; detail: string | null } {
+  const injured = Math.max(0, input.injuredStarters ?? 0);
+  if (injured > 0) {
+    return { title: "No better lineup swaps", detail: `${plural(injured, "starter")} ${injured === 1 ? "is" : "are"} injured, but no bench player projects higher.` };
+  }
+  return { title: EMPTY_TITLE, detail: nextGameLine(input.nextGame) };
 }
 
 /** Build the ordered, deduped, capped queue. */
@@ -437,6 +503,7 @@ export function buildDecisionQueue<T extends DecisionItem>(input: DecisionInput<
       primary: { label: itemVerb(item.destination), target: itemTarget(item.destination), playerId: item.route_player_id || undefined },
       item,
       facts: [],
+      swaps: [],
     });
   }
 
@@ -454,7 +521,7 @@ export function buildDecisionQueue<T extends DecisionItem>(input: DecisionInput<
     total: out.length,
     next: out[0] ?? null,
     proUpsell,
-    empty: out.length === 0 ? { title: EMPTY_TITLE, detail: nextGameLine(input.nextGame) } : null,
+    empty: out.length === 0 ? emptyState(input) : null,
   };
 }
 

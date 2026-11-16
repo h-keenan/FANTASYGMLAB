@@ -16,7 +16,7 @@ import type { PlayerRef } from "@/lib/playerAnatomy";
  * (a picker row that selects). A `trailing` that is itself a control needs `nonInteractive` on the card and its own
  * tap target beside it. Mobile twin: components/CompactPlayerCard.tsx.
  */
-export function CompactPlayerCard({ player, detail, trailing, testId = "compact-player-card", onOpen, nonInteractive }: { player: PlayerRef; detail?: string | null; trailing?: ReactNode; testId?: string; onOpen?: () => void; nonInteractive?: string }) {
+export function CompactPlayerCard({ player, detail, trailing, testId = "compact-player-card", onOpen, nonInteractive }: { player: PlayerRef; detail?: ReactNode; trailing?: ReactNode; testId?: string; onOpen?: () => void; nonInteractive?: string }) {
   const card = (
     // Principled narrow-width layout: the identity block (avatar + name + pill) keeps a 10rem floor, and the trailing
     // chips (grade ring + value) wrap onto a second line instead of squeezing the name to a sliver.

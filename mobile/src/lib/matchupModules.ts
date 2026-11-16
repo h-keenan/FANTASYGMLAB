@@ -277,6 +277,40 @@ export interface SimMatchupCardInput {
   }>;
 }
 
+/** One lineup player as the real matchup read carries him (structural: web and the app both satisfy it). */
+export interface MatchupSwingSource {
+  player_id: string | null;
+  name: string | null;
+  position: string | null;
+  team: string | null;
+  tier: string | null;
+  projection?: { low?: number | null; high?: number | null; status?: string | null } | null;
+  game_final?: boolean | null;
+  ruled_out?: boolean | null;
+}
+
+export interface MatchupSwingSide {
+  has_live_data: boolean;
+  real_starters: ReadonlyArray<MatchupSwingSource>;
+  starters: ReadonlyArray<MatchupSwingSource>;
+}
+
+/** Swing inputs (and how many of your starters still have a game to play) from the real matchup read; one rule for Today and the Matchup page. */
+export function swingInputsFromMatchup(mine: MatchupSwingSide, opponent: MatchupSwingSide): { inputs: MatchupSwingInput[]; playersLeft: number | null } {
+  const inputs: MatchupSwingInput[] = [];
+  let playersLeft: number | null = null;
+  for (const [side, team] of [["mine", mine], ["opponent", opponent]] as const) {
+    const list = team.has_live_data ? team.real_starters : team.starters;
+    for (const p of list) {
+      if (!p.name) continue;
+      const done = p.game_final === true || p.ruled_out === true || p.projection?.status === "bye_week";
+      inputs.push({ playerId: p.player_id, name: p.name, position: p.position, team: p.team, tier: p.tier, low: p.projection?.low ?? null, high: p.projection?.high ?? null, done, side });
+      if (side === "mine") playersLeft = (playersLeft ?? 0) + (done ? 0 : 1);
+    }
+  }
+  return { inputs, playersLeft };
+}
+
 export function simMatchupCardModel(input: SimMatchupCardInput): MatchupCardModel {
   const swingInputs: MatchupSwingInput[] = [];
   for (const row of input.rows) {

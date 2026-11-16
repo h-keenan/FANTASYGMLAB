@@ -8,6 +8,7 @@ import { useIsRestoring, useQuery } from '@tanstack/react-query';
 import AccentCard from './AccentCard';
 import AppText from './AppText';
 import CompactModule from './CompactModule';
+import PlayerAvatarSlot from './PlayerAvatarSlot';
 import EmptyState from './EmptyState';
 import ErrorState from './ErrorState';
 import PlayerIdentityRow from './PlayerIdentityRow';
@@ -16,6 +17,7 @@ import RecapReadyCard from './RecapReadyCard';
 import { api, type AlertItem, type RankedPlayer, type RosterRelationship, type RoundupNotice } from '../lib/api';
 import { alertReadSync, currentAlertReadUserId } from '../lib/alertReads';
 import { toUserErrorMessage } from '../lib/errorMessages';
+import { todayAlertsSummary, type TodayAlertLine } from '../lib/todayView';
 import { queryKeys } from '../lib/queryKeys';
 import { useThemeMode } from '../context/ThemeModeContext';
 import { usePlayerQuickView } from '../context/PlayerQuickViewContext';
@@ -135,10 +137,16 @@ export default function AlertsSection({
   leagueName,
   forceOpen = false,
   unreadReported,
+  watchLines = [],
+  watchBody,
 }: {
   leagueId: string;
   leagueName: string;
   forceOpen?: boolean;
+  /** The Dashboard's watchlist items, folded into this section: their players and headlines join the collapsed line. */
+  watchLines?: TodayAlertLine[];
+  /** The watchlist rows, shown at the top of the expanded section. */
+  watchBody?: React.ReactNode;
   /** Lets the host (header bell, etc.) know the unread count. */
   unreadReported?: (count: number) => void;
 }) {
@@ -221,16 +229,23 @@ export default function AlertsSection({
     openQuickView(player, { leagueId, leagueName });
   };
 
+  // The collapsed row: avatars of the players behind the newest alerts / watch items, then the newest headline and how many more.
+  const summary = todayAlertsSummary([
+    ...items.map((item) => ({ playerId: item.matched_player_id, name: item.matched_player, position: item.matched_player_position, team: item.matched_player_team, tier: item.matched_player_tier, title: item.title ?? '' })),
+    ...watchLines,
+  ]);
+  const total = items.length + watchLines.length;
   const summaryParts = notReadyReason
     ? [{ key: 'setup', text: 'Needs your Sleeper link', tone: 'muted' as const }]
     : error
       ? [{ key: 'error', text: "Couldn't load", tone: 'warning' as const }]
-      : [
-          unread > 0
-            ? { key: 'unread', text: `${unread} unread`, tone: 'danger' as const, strong: true }
-            : { key: 'quiet', text: items.length ? 'All caught up' : 'All quiet', tone: 'muted' as const },
-          items.length > 0 ? { key: 'total', text: `${items.length} recent` } : null,
-        ];
+      : total > 0
+        ? [
+            unread > 0 ? { key: 'unread', text: `${unread} new`, tone: 'danger' as const, strong: true } : null,
+            summary.lead ? { key: 'lead', text: summary.lead } : null,
+            summary.more > 0 ? { key: 'more', text: `+${summary.more} more`, tone: 'muted' as const } : null,
+          ]
+        : [{ key: 'quiet', text: 'All quiet', tone: 'muted' as const }];
 
   return (
     <CompactModule
@@ -240,7 +255,17 @@ export default function AlertsSection({
       tone={unread > 0 ? 'danger' : 'accent'}
       forceOpen={forceOpen}
       loading={loading && items.length === 0 && !error && !notReadyReason}
+      preview={
+        summary.avatars.length > 0 ? (
+          <View style={styles.avatarRow} testID="dashboard-alerts-avatars">
+            {summary.avatars.map((a) => (
+              <PlayerAvatarSlot key={a.playerId} player={{ id: a.playerId, name: a.name ?? 'this player', position: a.position, team: a.team, tier: a.tier }} tier="row" />
+            ))}
+          </View>
+        ) : undefined
+      }
     >
+      {watchBody}
       {notReadyReason ? (
         <AppText style={styles.notReadyText}>
           {NOT_READY_MESSAGES[notReadyReason] ?? "Couldn't load alerts for this league."}
@@ -409,6 +434,7 @@ function createRowStyles(colors: ThemeColors) {
 
 function createStyles(colors: ThemeColors) {
   return StyleSheet.create({
+    avatarRow: { flexDirection: 'row', alignItems: 'center', gap: 4 },
     notReadyText: { textAlign: 'center', color: colors.textSecondary, lineHeight: 20 },
     group: { marginBottom: spacing.xs },
     groupHeaderRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs, marginBottom: spacing.sm },
