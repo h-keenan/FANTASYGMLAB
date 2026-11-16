@@ -304,3 +304,24 @@ Note: the league-level rows were measured with the star-regression weight at 0.2
 Deferred: AI backup-QB planning; proper endogenous-slot pick pricing so AI-AI pick trades can return; roster age still drifts about +0.5 year over ten seasons
 (kickers and quarterbacks reach their natural older equilibrium); QB/TE pool depth beyond rank 24 still below season 1; engine realized ratios sit 0.03-0.05
 under the pool-level ones.
+
+## vorp_v 1: fair prices for backup quarterbacks (trade AI)
+
+Report: "it's almost impossible to trade for a QB, even the worst one they counter for one of my best WRs along with everything else."
+
+Root causes (synthetic pool, 4 seeds, week 3, 12 teams):
+1. `Evaluator.replacement` priced "now" value as points over the free-agent wire. Every team stocks two QBs, so the wire is bare of them (QB wire mean about 8 in 1QB, about 2 in superflex) while a QB12-QB20 scores 13-16. A bench QB therefore looked like a star (worth 45-75 of 100 to the AI, more than a 44-worth RB1).
+2. `TradeDesk.build_counter` only tried the AI's eight most wanted assets, which are by construction the user's best players, so even a small shortfall was "fixed" by asking for a star.
+
+Fix (gated, `vorp_v`, boundary NOW, absent on every older save): replacement is the larger of the wire and the **starter line** (the best player ranked just past teams x starting slots at the position; a superflex slot counts as a QB start), the "now" scale is normalised to the same line, and a counter also tries the assets that just cover the shortfall so the cheapest sufficient add wins.
+
+Measured (cheapest single user asset, neutral worth 0-100, an AI accepts for its backup QB / counters to a median-asset offer asking for a top-2 user asset):
+
+| league | cheapest accepted old -> new | counters asking a top-2 asset old -> new |
+|---|---|---|
+| redraft 1QB | 39.9 -> 19.2 | 10 of 24 -> 0 of 9 |
+| redraft superflex | 56.6 -> 14.7 | 16 of 19 -> 0 of 10 |
+| dynasty 1QB | 57.8 -> 37.9 | 0 -> 0 |
+| dynasty superflex | 61.9 -> 30.1 | 0 -> 0 |
+
+A starting QB still costs a fair amount (`tests/test_sim_vorp_v.py`): his own lineup need and his above-line production keep a good starter from going for the user's worst asset.

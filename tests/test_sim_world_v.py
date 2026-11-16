@@ -45,6 +45,7 @@ def _settings(world: bool, **extra) -> GameSettings:
         d.pop("econ_v", None)  # ... and before econ_v (the goldens below predate both)
         d.pop("aging_v", None)  # ... and before aging_v
         d.pop("stability_v", None)  # ... and before stability_v
+        d.pop("vorp_v", None)  # ... and before vorp_v
     return GameSettings.from_dict(d)
 
 

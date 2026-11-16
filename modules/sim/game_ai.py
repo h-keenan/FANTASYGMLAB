@@ -190,6 +190,7 @@ class TradeDesk:
 
     def __init__(self, ev: Evaluator, seed: int, week: int | None = None) -> None:
         self.ev = ev
+        ev.line_pricing = bool(ev.snap.settings.vorp_v)  # vorp_v 1: a trade is priced over the starter line, not the wire
         self.snap = ev.snap
         self.state = ev.state
         self.seed = seed
@@ -435,6 +436,13 @@ class TradeDesk:
         if need_pos:
             extra = sorted((p for p in pool if not is_pick_id(p) and snap.players[p].pos == need_pos),
                            key=lambda p: (-ev.worth(params, p), p))[:8]
+        if snap.settings.vorp_v:
+            # The eight assets the AI wants most are by construction the user's best players, so a small shortfall was always "fixed" with a star.
+            # Also try the assets that just cover the shortfall (the AI's own worth, nearest above the gap first) so the cheapest sufficient add can win.
+            gap = max(0.0, self.linear_loss(ai, user_gets, user_gives))
+            rest = [p for p in (pool if not need_pos else [q for q in pool if not is_pick_id(q) and snap.players[q].pos == need_pos]) if p not in extra]
+            rest.sort(key=lambda p: (abs(ev.worth(params, p) - gap) + (0.0 if ev.worth(params, p) >= gap else 25.0), p))
+            extra = extra + rest[:12]
         if len(user_gives) < snap.settings.policy.max_trade_side:
             for p in extra:
                 consider(tuple(user_gives) + (p,), tuple(user_gets), [p], [], self.user_cost(p), "add:" + p)

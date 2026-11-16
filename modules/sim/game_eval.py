@@ -72,13 +72,24 @@ class Evaluator:
         self.additive = getattr(snapshot, "_role_mode", "") == "additive"
         self._level: dict[str, float] = {}
         self._repl: dict[str, float] | None = None
+        self._line: dict[str, float] = {}
         self.econ = bool(snapshot.settings.econ_v)  # a pure function of the settings (read again at every decision point)
-        attr = "_now_scale_econ" if self.econ else "_now_scale"
-        scale = getattr(snapshot, attr, None)
-        if scale is None:  # frozen snapshot: memoize on the instance
-            scale = self._compute_now_scale()
-            object.__setattr__(snapshot, attr, scale)
-        self.now_scale = scale
+        # vorp_v 1 prices TRADES over the starter line (a TradeDesk switches this on); waiver, depth and drop choices keep the wire's level, so an AI
+        # manager still stashes the backup QB a trade would call worthless.
+        self.line_pricing = False
+        self._scales: dict[bool, dict[str, float]] = {}
+
+    @property
+    def now_scale(self) -> dict[str, float]:
+        line = self.line_pricing and self.econ
+        if line not in self._scales:
+            attr = ("_now_scale_vorp" if line else "_now_scale_econ") if self.econ else "_now_scale"
+            scale = getattr(self.snap, attr, None)
+            if scale is None:  # frozen snapshot: memoize on the instance
+                scale = self._compute_now_scale(line)
+                object.__setattr__(self.snap, attr, scale)
+            self._scales[line] = scale
+        return self._scales[line]
 
     def base_value(self, pid: str) -> float:
         """The long-run side of a player's worth: this season's settings-aware
@@ -89,11 +100,11 @@ class Evaluator:
             return aging.horizon_value(p.pos, p.age, p.market)
         return p.value if self.policy.season_valuation else p.market
 
-    def _compute_now_scale(self) -> dict[str, float]:
+    def _compute_now_scale(self, line: bool = False) -> dict[str, float]:
         scale: dict[str, float] = {}
         base = (lambda p: p.value) if self.policy.season_valuation else (lambda p: p.market)
         econ = self.econ
-        repl0 = self._static_replacement() if econ else {}
+        repl0 = self._static_replacement(line) if econ else {}
         for pos in GAME_POSITIONS:
             rows = sorted(
                 (p for p in self.snap.players.values() if p.pos == pos and p.mean > 0),
@@ -108,7 +119,7 @@ class Evaluator:
                 scale[pos] = 4.0
         return scale
 
-    def _static_replacement(self) -> dict[str, float]:
+    def _static_replacement(self, line: bool = False) -> dict[str, float]:
         """econ_v 1: the replacement level of each position from the pool alone (the wire's level before anyone has drafted): the mean of the
         player ranked 1.75 x (the league's starting slots at the position) in the pool, a typical free agent once every team is stocked."""
 
@@ -122,6 +133,10 @@ class Evaluator:
             means = sorted((p.mean for p in self.snap.players.values() if p.pos == pos), reverse=True)
             if means:
                 out[pos] = means[min(len(means) - 1, int(round(1.75 * n * starters)) - 1)]
+                if line and pos not in ("K", "DEF"):  # the scale is per point over the same line ``replacement`` uses
+                    idx = int(round(n * self.starter_count(pos)))
+                    if 0 < idx < len(means):
+                        out[pos] = max(out[pos], means[idx])
         return out
 
     def replacement(self, pos: str) -> float:
@@ -141,7 +156,34 @@ class Evaluator:
                 k = 1 if q in ("K", "DEF") else 3
                 top = sorted(vals, reverse=True)[:k]
                 self._repl[q] = sum(top) / len(top)
-        return self._repl.get(pos, 0.0)
+        wire = self._repl.get(pos, 0.0)
+        return max(wire, self.starter_line(pos)) if self.line_pricing else wire
+
+    def starter_count(self, pos: str) -> float:
+        """The league's starting slots at ``pos`` per team: strict slots plus an even share of every flex slot that takes it. A superflex slot
+        counts as a quarterback start (nearly every superflex team fills it with a QB)."""
+
+        slots = self.snap.settings.slots
+        n = float(sum(1 for sl in slots if sl == pos))
+        for sl in slots:
+            if sl in FLEX_SLOTS and pos in FLEX_SLOTS[sl]:
+                n += (1.0 if pos == "QB" else 0.0) if sl == "SUPER_FLEX" else 1.0 / len(FLEX_SLOTS[sl])
+        return n
+
+    def starter_line(self, pos: str) -> float:
+        """vorp_v 1: the weekly mean of the best player at ``pos`` who would NOT start for a typical team: ranked just past (teams x the league's
+        starting slots at the position) among every player. Production at or below it is a bench stash, worth nothing in a trade however thin the
+        wire is at that position (a one-quarterback league has twelve starting QBs and a wire bare of them, so a backup QB is no asset).
+        K and DEF: the wire alone."""
+
+        self._sync()
+        if pos in ("K", "DEF"):
+            return 0.0
+        if pos not in self._line:
+            vals = sorted((self.ros_mean(p) for p in self.snap.pids if self.snap.players[p].pos == pos), reverse=True)
+            idx = int(round(len(self.snap.teams) * self.starter_count(pos)))
+            self._line[pos] = vals[idx] if 0 < idx < len(vals) else 0.0
+        return self._line[pos]
 
     def cover(self) -> list[str]:
         """econ_v 1: the free agents any manager could add for nothing (the best three per skill position, one K, one DEF): the lineup
@@ -212,6 +254,7 @@ class Evaluator:
             return
         self._seq = seq
         self._repl = None
+        self._line.clear()
         # What the caches depend on: games played, the week, and who is out (rosters never matter: roles are NFL-level).
         key = (len(self.state.history), self.state.week, frozenset(self.state.out.items()))
         if self._ros_key != key:
