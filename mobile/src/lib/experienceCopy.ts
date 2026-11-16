@@ -58,6 +58,8 @@ export const BEGINNER_HELP = {
   // modules/league_rankings.py build_league_display_frame /
   // add_league_detail_ranks, modules/team_eval.py
   // _score_starter_weighted_roster).
+  todayOrientation:
+    "This is Today: your team's briefing for this week. Start with the top card; the round logo button opens Team, Trades, League and More.",
   dashboardGamePlan:
     "Today lists the roster moves that would help your team most right now, most urgent first.",
   dashboardNothingUrgent:

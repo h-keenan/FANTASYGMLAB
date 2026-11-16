@@ -39,6 +39,7 @@ export function BeginnerHelp({
   popover = false,
   label,
   className = "",
+  initiallyOpen = false,
 }: {
   term?: BeginnerHelpKey;
   text?: string | null;
@@ -47,12 +48,14 @@ export function BeginnerHelp({
   /** REQUIRED name of what the "?" explains ("live scoring", "Value, Overall and Tier"). It is the button's accessible name ("About <label>"), and in inline mode it is also shown as visible text so the "?" is never an orphan circle. In `popover` mode place the component directly after the title it names (SectionHeading's `help` slot), never at a row's far edge. */
   label: string;
   className?: string;
+  /** First-visit orientation lines: start expanded. "Got it" still hides the line for good. */
+  initiallyOpen?: boolean;
 }) {
   const copy = useExperienceCopy();
   const single = text !== undefined ? (copy.showsHelp ? text : null) : term ? copy.help(term) : null;
   const resolvedLines = lines ? (copy.showsHelp ? lines.filter((l): l is string => Boolean(l)) : []) : single ? [single] : [];
   const [dismissed, setDismissed] = useState(false);
-  const [open, setOpen] = useState(false);
+  const [open, setOpen] = useState(initiallyOpen);
   const seen = useSyncExternalStore(
     noopSubscribe,
     () => resolvedLines.length > 0 && resolvedLines.every(readSeen),

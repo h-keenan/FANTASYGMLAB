@@ -75,6 +75,21 @@ def test_every_no_has_an_auditable_reason(kwargs, reason):
     assert d.show is False and d.reason == reason
 
 
+@pytest.mark.parametrize("stance,expected", [
+    ("rebuilding", True), ("Competing", True), (" balanced ", True),
+    ("", False), (None, False), ("   ", False), ("unknown", False), (0, False),
+])
+def test_has_stance_only_for_a_real_declared_direction(stance, expected):
+    assert dc.has_stance(stance) is expected
+
+
+@pytest.mark.parametrize("stance", ["", None, "   ", "unknown"])
+def test_no_check_in_until_a_stance_exists_even_inside_a_moment(stance):
+    d = decide(8, stance=stance)
+    assert d.show is False and d.reason == "no_direction_set"
+    assert decide(8, stance="balanced").show is True
+
+
 def test_post_season_status_counts_as_in_season_only_inside_a_window():
     assert decide(8, status="post_season").show is True
     assert decide(16, status="post_season").reason == "no_moment"

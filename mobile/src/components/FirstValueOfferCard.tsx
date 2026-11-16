@@ -17,6 +17,7 @@ import {
 } from '../lib/firstRunFlow';
 import { trackOnboardingStepViewed } from '../lib/onboardingAnalytics';
 import { PAYWALL_HERO_SUB } from '../lib/paywallCopy';
+import { useFirstRunPrompt } from '../lib/useFirstRunPrompt';
 import { LINK_HIT_SLOP, spacing, type ThemeColors } from '../theme';
 import type { RootStackParamList } from '../navigation/RootNavigator';
 import AccentCard from './AccentCard';
@@ -44,11 +45,14 @@ export default function FirstValueOfferCard({ isPremium }: { isPremium: boolean 
     // returning users never count).
     if (trialOfferArmed) trackOnboardingStepViewed('first_league_view', funnelStepIndex('first_league_view'));
   }, [trialOfferArmed]);
+  // One first-run prompt above the fold: Start here and the direction check-in outrank the offer (lib/firstRunFlow.ts).
+  const mayShow = useFirstRunPrompt('trial_offer', visible);
+  const shown = visible && mayShow;
   useEffect(() => {
-    if (visible) trackUse('paywall', 'offer_seen', { tier: 'free', props: { source_surface: SURFACE } });
-  }, [visible]);
+    if (shown) trackUse('paywall', 'offer_seen', { tier: 'free', props: { source_surface: SURFACE } });
+  }, [shown]);
 
-  if (!visible) return null;
+  if (!shown) return null;
 
   return (
     <AccentCard accent={colors.premium} style={styles.card}>

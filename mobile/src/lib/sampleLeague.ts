@@ -24,6 +24,8 @@ export const SAMPLE_CONNECT_ROUTE = "/connect-league";
 export const SAMPLE_ENTRY_LABEL = "Explore a sample league first";
 /** Prominent button label on the landing page and the connect step / error states. */
 export const SAMPLE_TRY_LABEL = "Try a sample league";
+/** The one-line promise above the sign-in form (app LoginScreen), so a first-time visitor sees the value before an account wall. */
+export const AUTH_PROMISE_LINE = "Dynasty trades, waivers and a weekly game plan, built from your real league.";
 
 export type SampleTab = "dashboard" | "roster" | "game_plan" | "trade";
 export const SAMPLE_TABS: { value: SampleTab; label: string; glyph: TabIconName }[] = [

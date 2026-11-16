@@ -16,6 +16,7 @@ import {
   type DirectionCheckinAction,
   type DirectionCheckinOption,
 } from '../lib/directionCheckin';
+import { useFirstRunPrompt } from '../lib/useFirstRunPrompt';
 import { spacing, type ThemeColors } from '../theme';
 
 /**
@@ -48,6 +49,11 @@ export default function DirectionCheckinCard({ leagueId, onChanged }: { leagueId
       cancelled = true;
     };
   }, [leagueId]);
+
+  // One first-run prompt above the fold: yields to Start here (lib/firstRunFlow.ts).
+  const wantsSlot = state.phase === 'ready' || state.phase === 'saving' || state.phase === 'changed';
+  const mayShow = useFirstRunPrompt('direction_checkin', wantsSlot);
+  if (!mayShow) return null;
 
   if (state.phase === 'changed') {
     return (

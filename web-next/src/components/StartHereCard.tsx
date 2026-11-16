@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useCallback, useMemo, useSyncExternalStore } from "react";
 
 import { AccentCard } from "@/components/AccentCard";
@@ -19,6 +20,8 @@ import {
 } from "@/lib/startHere";
 import { featuresPageHref } from "@/lib/featureCatalog";
 import { thisWeekHref } from "@/lib/thisWeek";
+import { useFirstRunPrompt } from "@/lib/useFirstRunPrompt";
+import { StructuredRow } from "@/components/ui/StructuredRow";
 
 const startHereListeners = new Set<() => void>();
 // Only populated when a localStorage write fails, so the card still reflects
@@ -83,7 +86,11 @@ export function StartHereCard({
     [raw],
   );
 
-  if (!state || !shouldShowStartHere(state, accountCreatedAt)) return null;
+  const router = useRouter();
+  const wantsSlot = Boolean(state && shouldShowStartHere(state, accountCreatedAt));
+  // Highest priority of Today's one first-run prompt slot (lib/firstRunFlow.ts).
+  const mayShow = useFirstRunPrompt("start_here", wantsSlot);
+  if (!state || !wantsSlot || !mayShow) return null;
 
   const update = (next: StartHereState) => {
     writeState(userId, next);
@@ -144,13 +151,12 @@ export function StartHereCard({
             );
           })}
         </ul>
-        <Link
-          href={featuresPageHref({ id: leagueId, name: leagueName })}
-          className="text-sm font-bold inline-flex items-center min-h-[var(--touch-target-min)]"
-          style={{ color: "var(--color-accent)", borderTop: "1px solid var(--color-border)" }}
-        >
-          See everything FantasyDesk can do →
-        </Link>
+        <StructuredRow
+          title="See everything FantasyDesk can do"
+          wrapTitle
+          onOpen={() => router.push(featuresPageHref({ id: leagueId, name: leagueName }))}
+          testId="start-here-features"
+        />
       </AccentCard>
     </section>
   );

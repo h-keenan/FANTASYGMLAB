@@ -138,6 +138,8 @@ export const MIRRORED = [
   "playerNameFixtures.ts",
   "paywallCopy.ts",
   "firstRunFlow.ts",
+  "orbCoachmark.ts",
+  "useFirstRunPrompt.ts",
   "premiumComparison.ts",
   "sleeperConnectErrors.ts",
   "support.ts",

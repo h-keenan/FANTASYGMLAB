@@ -30,6 +30,8 @@ export type StructuredRowProps = {
   detail?: ReactNode;
   /** Custom handler instead of the built-in detail sheet. */
   onOpen?: () => void;
+  /** Let a long title wrap to a second line instead of truncating (footer links, never names). */
+  wrapTitle?: boolean;
   testId?: string;
 };
 
@@ -43,7 +45,7 @@ export type StructuredRowProps = {
  * Layout is fixed so lists scan: 36px lead, name and pills on the first line,
  * chip and reason on the second, 64px tall at most, 44px minimum tap target.
  */
-export function StructuredRow({ lead, title, chip, pills = [], reason, highlight = false, detailTitle, detail, onOpen, testId }: StructuredRowProps) {
+export function StructuredRow({ lead, title, chip, pills = [], reason, highlight = false, detailTitle, detail, onOpen, wrapTitle = false, testId }: StructuredRowProps) {
   const [open, setOpen] = useState(false);
   const tappable = Boolean(detail || onOpen);
   const body = (
@@ -51,7 +53,7 @@ export function StructuredRow({ lead, title, chip, pills = [], reason, highlight
       {lead ? <span className="ui-srow-lead" aria-hidden="true">{lead}</span> : null}
       <span className="ui-srow-main">
         <span className="ui-srow-line">
-          <span className="ui-srow-title">{title}</span>{" "}
+          <span className={`ui-srow-title${wrapTitle ? " ui-srow-title-wrap" : ""}`}>{title}</span>{" "}
           {pills.length ? (
             <span className="ui-srow-pills">
               {pills.map((pill) => (

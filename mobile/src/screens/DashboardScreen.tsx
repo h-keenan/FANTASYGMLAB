@@ -493,6 +493,9 @@ export default function DashboardScreen({ route, navigation }: Props) {
         queue={heroQueue}
       />
 
+      {/* F14: one first-visit orientation line under the hero (seen-once, beginners and unset only). */}
+      <BeginnerHelp term="todayOrientation" seenOnce />
+
       {/* A few times a season: does the declared direction still fit? Server-decided,
           dismissible, once per moment (modules/direction_checkin.py). Same slot on web. */}
       <DirectionCheckinCard leagueId={leagueId} />

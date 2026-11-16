@@ -440,6 +440,22 @@ export default function RootNavigator() {
       ) : (
         <AuthStack.Navigator screenOptions={{ headerShown: false, contentStyle: { backgroundColor: 'transparent' } }}>
           <AuthStack.Screen name="Login" component={LoginScreen} />
+          {/* The sample league needs no account: reachable from the sign-in screen (first-time-user audit F2). */}
+          <AuthStack.Screen
+            name="SampleLeague"
+            component={SampleLeagueScreen}
+            options={{
+              headerShown: true,
+              title: 'Sample league',
+              headerBackButtonDisplayMode: 'minimal',
+              headerTransparent: true,
+              headerStyle: { backgroundColor: 'transparent' },
+              headerBackground: () => <HeaderBackdrop />,
+              headerTintColor: colors.textPrimary,
+              headerShadowVisible: false,
+              headerTitleAlign: 'center',
+            }}
+          />
         </AuthStack.Navigator>
       )}
     </NavigationContainer>

@@ -9,7 +9,9 @@ import {
   firstRunStage,
   funnelStepIndex,
   shouldShowTrialOffer,
+  firstRunPromptSlot,
 } from './firstRunFlow.ts';
+import { claimFirstRunPrompt, currentFirstRunPrompt, resetFirstRunPrompts } from './useFirstRunPrompt.ts';
 
 // npm test runs from mobile/, so these are cwd-relative.
 const read = (p: string): string => readFileSync(p, { encoding: 'utf8' });
@@ -57,4 +59,25 @@ test('navigation wiring: no screen or guard puts the Paywall in the first-run pa
   assert.ok(read('src/screens/DashboardScreen.tsx').includes('<FirstValueOfferCard'));
   const card = read('src/components/FirstValueOfferCard.tsx');
   assert.ok(card.includes('TRIAL_OFFER_DISMISS') && card.includes('resolveTrialOffer'));
+});
+
+test('first-run prompt slot ranks Start here, then the direction check-in, then the trial offer', () => {
+  assert.equal(firstRunPromptSlot({ start_here: true, direction_checkin: true, trial_offer: true }), 'start_here');
+  assert.equal(firstRunPromptSlot({ direction_checkin: true, trial_offer: true }), 'direction_checkin');
+  assert.equal(firstRunPromptSlot({ trial_offer: true }), 'trial_offer');
+  assert.equal(firstRunPromptSlot({}), null);
+});
+
+test('first-run prompt store lets exactly one prompt through and hands the slot down', () => {
+  resetFirstRunPrompts();
+  claimFirstRunPrompt('trial_offer', true);
+  claimFirstRunPrompt('direction_checkin', true);
+  assert.equal(currentFirstRunPrompt(), 'direction_checkin');
+  claimFirstRunPrompt('start_here', true);
+  assert.equal(currentFirstRunPrompt(), 'start_here');
+  claimFirstRunPrompt('start_here', false);
+  claimFirstRunPrompt('direction_checkin', false);
+  assert.equal(currentFirstRunPrompt(), 'trial_offer');
+  resetFirstRunPrompts();
+  assert.equal(currentFirstRunPrompt(), null);
 });

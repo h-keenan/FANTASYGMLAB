@@ -29,6 +29,8 @@ export type StructuredRowProps = {
   /** Sheet body. Without `detail` and `onOpen` the row is not tappable and shows no chevron. */
   detail?: ReactNode;
   onOpen?: () => void;
+  /** Let a long title wrap to a second line instead of truncating (footer links, never names). */
+  wrapTitle?: boolean;
   testID?: string;
 };
 
@@ -37,7 +39,7 @@ export type StructuredRowProps = {
  * chip + metric pills + one short reason + chevron; tap opens a detail Sheet.
  * The replacement for delimiter-joined strings and generated sentences.
  */
-export default function StructuredRow({ lead, title, chip, pills = [], reason, highlight = false, spoken, detailTitle, detail, onOpen, testID }: StructuredRowProps) {
+export default function StructuredRow({ lead, title, chip, pills = [], reason, highlight = false, spoken, detailTitle, detail, onOpen, wrapTitle = false, testID }: StructuredRowProps) {
   const { colors } = useThemeMode();
   const styles = useMemo(() => createStyles(colors), [colors]);
   const [open, setOpen] = useState(false);
@@ -48,7 +50,7 @@ export default function StructuredRow({ lead, title, chip, pills = [], reason, h
       {lead ? <View style={styles.lead}>{lead}</View> : null}
       <View style={styles.main}>
         <View style={styles.line}>
-          <AppText style={styles.title} numberOfLines={1}>
+          <AppText style={styles.title} numberOfLines={wrapTitle ? undefined : 1}>
             {title}
           </AppText>
           {pills.length ? (
