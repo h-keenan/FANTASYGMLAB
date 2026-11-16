@@ -22,6 +22,7 @@ import {
   applySwap,
   blockedLabel,
   plannerBase,
+  slotsWithSwap,
   sleeperLeagueUrl,
   winPercent,
   type PlannerSource,
@@ -100,22 +101,25 @@ export function useLineupPlanner(leagueId: string, lens: string, matchup: Matchu
     [leagueId, lens],
   );
 
+  /** Opens the planner on `source`'s lineup. `swap` opens it with that one move already made (Today's "Swap"), measured against the unedited lineup. */
   const start = useCallback(
-    (source: PlannerSource) => {
+    (source: PlannerSource, swap?: { out: string; in: string }) => {
       const base = plannerBase(matchup, source);
       if (!base) return;
+      const slots = (swap ? slotsWithSwap(base.slots, swap.out, swap.in) : null) ?? base.slots;
+      const baseline = swap ? winPercent(matchup.win_probability) : undefined;
       trackUse("matchup_swap_planner", "opened", { leagueId, props: { source_surface: source } });
       setSheet(null);
       setPlan({
         source,
-        slots: base.slots,
+        slots,
         starters: base.players as MatchupStarter[],
         result: null,
-        baselinePct: null,
+        baselinePct: baseline ?? null,
         busy: true,
         error: null,
       });
-      void evaluate(base.slots, source, undefined);
+      void evaluate(slots, source, baseline);
     },
     [matchup, evaluate, leagueId],
   );

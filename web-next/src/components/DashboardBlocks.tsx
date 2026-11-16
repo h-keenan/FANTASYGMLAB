@@ -1,20 +1,12 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
 
-import type { BriefingItem, DashboardResponse } from "@/lib/api";
+import type { BriefingItem } from "@/lib/api";
 import { AccentCard } from "@/components/AccentCard";
 import { ToneBadge } from "@/components/ToneBadge";
-import { BeginnerHelp } from "@/components/BeginnerHelp";
 import { SectionHeading } from "@/components/SectionHeading";
 import { CompactModule } from "@/components/ui/CompactModule";
-import { LinkModule } from "@/components/ui/ModuleTemplates";
-import {
-  deadlineChip,
-  tradeIdeasLine,
-  tradesStanceLine,
-  TRADES_BLOCK_COPY,
-  type DashboardAttentionEntry,
-} from "@/lib/dashboardLayout";
+import type { DashboardAttentionEntry } from "@/lib/dashboardLayout";
 import { GAME_PLAN_INTERNAL_ROUTES, gamePlanTileHref, resolveGamePlanTargetPlayerId } from "@/lib/gamePlanPresentation";
 import { thisWeekHref } from "@/lib/thisWeek";
 
@@ -83,63 +75,6 @@ export function DashboardNeedsAttention({
           ))}
         </ul>
       </AccentCard>
-    </section>
-  );
-}
-
-/**
- * Trade ideas on the Dashboard are one line: a count and a link. The idea
- * cards live only on GM Plan and Trade Hub.
- */
-export function DashboardTradesBlock({
-  data,
-  tradeItems,
-  leagueId,
-  leagueName,
-  isBeginner,
-  stance,
-  deadlineInAttention = false,
-}: {
-  data: DashboardResponse;
-  tradeItems: BriefingItem[];
-  leagueId: string;
-  leagueName: string;
-  isBeginner: boolean;
-  /** The league's GM stance (Team Situation): competing | rebuilding | balanced, "" or null when unset. */
-  stance?: string | null;
-  /** "Needs attention" already lists a near deadline: don't repeat it here. */
-  deadlineInAttention?: boolean;
-}) {
-  const query = `?name=${encodeURIComponent(leagueName)}`;
-  const id = encodeURIComponent(leagueId);
-  const deadlinePassed = Boolean(data.trade_window?.trade_deadline_passed);
-  const pending = Boolean(data.trade_ideas_deferred) && tradeItems.length === 0;
-  const stanceLine = isBeginner ? tradesStanceLine(stance) : "";
-  // The one home for the deadline: here, not also as a chip.
-  const deadline = deadlineInAttention ? null : deadlineChip(data.trade_window);
-  const stateTone = deadlinePassed ? "muted" : tradeItems.length > 0 ? "action" : "muted";
-  return (
-    <section className="flex flex-col gap-2" data-testid="dashboard-trades-block">
-      <LinkModule
-        title={TRADES_BLOCK_COPY.title}
-        href={`/trade-hub/${id}${query}`}
-        tone="action"
-        parts={[
-          { key: "ideas", text: tradeIdeasLine(tradeItems.length, deadlinePassed, pending), tone: stateTone, strong: tradeItems.length > 0 && !deadlinePassed },
-          deadline ? { key: "deadline", text: `Deadline ${deadline.value}`, tone: deadline.tone === "risk" ? "danger" : "muted" } : null,
-          { key: "link", text: TRADES_BLOCK_COPY.link, tone: "accent" },
-        ]}
-      />
-      {isBeginner ? (
-        <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
-          <BeginnerHelp popover label="trade ideas" text={TRADES_BLOCK_COPY.beginnerExplainer} />
-          {stanceLine ? (
-            <Link href={`/gm-plan/${id}${query}`} className="text-xs" style={{ color: "var(--color-text-secondary)" }} data-testid="dashboard-stance-line">
-              {stanceLine} <span className="font-bold" style={{ color: "var(--color-accent)" }}>{TRADES_BLOCK_COPY.changeStance}</span>
-            </Link>
-          ) : null}
-        </div>
-      ) : null}
     </section>
   );
 }

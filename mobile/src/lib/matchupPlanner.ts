@@ -59,6 +59,17 @@ export function applySwap(
   });
 }
 
+/** `inId` placed in the slot `outId` holds; if `inId` already starts elsewhere the two trade places. Null when `outId` is not in the lineup. */
+export function slotsWithSwap(slots: MatchupWhatIfSlot[], outId: string, inId: string): MatchupWhatIfSlot[] | null {
+  const index = slots.findIndex((entry) => entry.player_id === outId);
+  if (index < 0) return null;
+  return slots.map((entry, i) => {
+    if (i === index) return { ...entry, player_id: inId };
+    if (entry.player_id === inId) return { ...entry, player_id: outId };
+    return entry;
+  });
+}
+
 export function emptySlotsOf(slots: MatchupWhatIfSlot[]): string[] {
   return slots.filter((entry) => !entry.player_id).map((entry) => entry.slot);
 }

@@ -35,7 +35,7 @@ import DashboardStatRow from '../components/DashboardStatRow';
 import CompactModule from '../components/CompactModule';
 import { MatchupHeroCard } from '../components/MatchupModule';
 import type { MatchupSwingPlayer } from '../lib/matchupModules';
-import { edgeChips, insightsParts, lineupParts, matchupCardModel, matchupSwingPlayers, movesParts, teamsValuesParts, type MatchupSwingInput } from '../lib/matchupModules';
+import { edgeChips, insightsParts, lineupParts, matchupCardModel, matchupSwingPlayers, movesParts, swingInputsFromMatchup, teamsValuesParts } from '../lib/matchupModules';
 import TeamAvatar from '../components/TeamAvatar';
 import RangeCompare from '../components/RangeCompare';
 import WeatherReasonChip from '../components/WeatherReasonChip';
@@ -69,6 +69,7 @@ import {
   type VerdictTone,
 } from '../lib/matchupPresentation';
 import { compareLineupSlots, type SlotSortMode } from '../lib/lineupSlots';
+import { parseMatchupPlan } from '../lib/todayView';
 import { emptySlotsOf, plannerBase, plannerOpponentPlayers, slotIndexFor, winPercent } from '../lib/matchupPlanner';
 import { useOrbClearance } from '../lib/orbLayout';
 import { queryKeys } from '../lib/queryKeys';
@@ -209,6 +210,16 @@ export default function MatchupScreen({ route, navigation }: Props) {
   const [view, setView] = useState<LineupView | null>(null);
   const planner = useLineupPlanner(leagueId, matchupQuery.data ?? ({ best_ball: true } as MatchupResponse));
   const edited = planner.plan?.result;
+  // Today's "Swap" / "Fix all" open this screen with the planner already on that move (route params plan/out/in).
+  const autoPlanned = useRef(false);
+  const planRequest = parseMatchupPlan({ plan: route.params.plan, out: route.params.out, in: route.params.in });
+  useEffect(() => {
+    if (autoPlanned.current || !planRequest || !matchup || !matchup.ok || !matchup.my_team) return;
+    autoPlanned.current = true;
+    const source = planRequest.kind === 'swap' && matchup.my_team.has_live_data ? 'actual' : 'suggested';
+    setView(source);
+    planner.start(source, planRequest.kind === 'swap' && source === 'actual' ? { out: planRequest.out, in: planRequest.in } : undefined);
+  }, [planRequest, matchup, planner]);
 
   useScreenHeaderTitle(navigation, 'Matchup', leagueName);
 
@@ -479,18 +490,7 @@ function MatchupHero({
   const { colors } = useThemeMode();
   const styles = useMemo(() => createStyles(colors), [colors]);
   const { myPct, myProjected, opponentProjected } = scoreboardFacts(matchup);
-  const swingInputs: MatchupSwingInput[] = [];
-  let playersLeft: number | null = null;
-  for (const [side, team] of [['mine', mine], ['opponent', opponent]] as const) {
-    const list: Array<MatchupStarter | MatchupRealStarter> = team.has_live_data ? team.real_starters : team.starters;
-    for (const p of list) {
-      if (!p.name) continue;
-      const final = 'game_final' in p ? p.game_final === true : false;
-      const done = final || ('ruled_out' in p && p.ruled_out === true) || p.projection?.status === 'bye_week';
-      swingInputs.push({ playerId: p.player_id, name: p.name, position: p.position, team: p.team, tier: p.tier, low: p.projection?.low ?? null, high: p.projection?.high ?? null, done, side });
-      if (side === 'mine') playersLeft = (playersLeft ?? 0) + (done ? 0 : 1);
-    }
-  }
+  const { inputs: swingInputs, playersLeft } = swingInputsFromMatchup(mine, opponent);
   const model = matchupCardModel({
     week: matchup.week,
     live: matchup.game_state === 'live',

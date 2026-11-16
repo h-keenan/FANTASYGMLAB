@@ -27,6 +27,46 @@ function toneColor(tone: 'success' | 'danger' | 'accent', colors: ThemeColors): 
   return tone === 'success' ? colors.success : tone === 'danger' ? colors.danger : colors.accent;
 }
 
+/** The widest-range player still to play on each side, with avatars; tapping one opens the player peek. Shared by the Matchup hero and Today's matchup card. */
+export function SwingPlayers({ swing, onOpenPlayer }: { swing: MatchupSwingPlayer[]; onOpenPlayer?: (player: MatchupSwingPlayer) => void }) {
+  const { colors } = useThemeMode();
+  const styles = useMemo(() => createStyles(colors), [colors]);
+  return (
+    <>
+        {swing.length > 0 ? (
+          <View style={styles.swing} testID="matchup-swing">
+            <AppText style={styles.swingTitle}>Swing players</AppText>
+            <View style={styles.swingRow}>
+              {swing.map((p) => {
+                const body = (
+                  <>
+                    <PlayerAvatar playerId={p.playerId} tier={p.tier} size={36} />
+                    <View style={styles.swingText}>
+                      <View style={styles.swingName}>
+                        <AppText style={styles.swingNameText}>{playerSurname(p.name) || p.name}</AppText>
+                        {p.position ? <PositionBadge position={p.position} /> : null}
+                      </View>
+                      <AppText style={[styles.swingLabel, { color: p.side === 'mine' ? colors.accent : colors.textSecondary }]} numberOfLines={1}>
+                        {p.label}
+                      </AppText>
+                    </View>
+                  </>
+                );
+                return (
+                  <PlayerTap key={p.key} player={{ id: p.playerId, name: p.name, position: p.position }} onOpen={onOpenPlayer ? () => onOpenPlayer(p) : undefined} style={styles.swingItem}>
+                    <View style={styles.swingItemInner} testID="matchup-swing-player">
+                      {body}
+                    </View>
+                  </PlayerTap>
+                );
+              })}
+            </View>
+          </View>
+        ) : null}
+    </>
+  );
+}
+
 export function MatchupHeroCard({
   model,
   onOpenPlayer,
@@ -73,36 +113,7 @@ export function MatchupHeroCard({
             {[model.basis === 'projected' ? 'Projected points' : null, model.detail].filter(Boolean).join(' · ')}
           </AppText>
         ) : null}
-        {model.swing.length > 0 ? (
-          <View style={styles.swing} testID="matchup-swing">
-            <AppText style={styles.swingTitle}>Swing players</AppText>
-            <View style={styles.swingRow}>
-              {model.swing.map((p) => {
-                const body = (
-                  <>
-                    <PlayerAvatar playerId={p.playerId} tier={p.tier} size={36} />
-                    <View style={styles.swingText}>
-                      <View style={styles.swingName}>
-                        <AppText style={styles.swingNameText}>{playerSurname(p.name) || p.name}</AppText>
-                        {p.position ? <PositionBadge position={p.position} /> : null}
-                      </View>
-                      <AppText style={[styles.swingLabel, { color: p.side === 'mine' ? colors.accent : colors.textSecondary }]} numberOfLines={1}>
-                        {p.label}
-                      </AppText>
-                    </View>
-                  </>
-                );
-                return (
-                  <PlayerTap key={p.key} player={{ id: p.playerId, name: p.name, position: p.position }} onOpen={onOpenPlayer ? () => onOpenPlayer(p) : undefined} style={styles.swingItem}>
-                    <View style={styles.swingItemInner} testID="matchup-swing-player">
-                      {body}
-                    </View>
-                  </PlayerTap>
-                );
-              })}
-            </View>
-          </View>
-        ) : null}
+        <SwingPlayers swing={model.swing} onOpenPlayer={onOpenPlayer} />
         {action}
         {children}
       </View>

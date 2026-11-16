@@ -5,6 +5,7 @@ import AppText from './AppText';
 import BeginnerHelp from './BeginnerHelp';
 import Button from './Button';
 import CompactModule from './CompactModule';
+import AccentCard from './AccentCard';
 import CompactPlayerCard from './CompactPlayerCard';
 import EmptyState from './EmptyState';
 import FreeLimitNote from './FreeLimitNote';
@@ -15,7 +16,8 @@ import { SkeletonCard } from './Skeleton';
 import { useThemeMode } from '../context/ThemeModeContext';
 import type { DashboardEntitlementInfo, DashboardItem } from '../lib/api';
 import { trackUse } from '../lib/analytics';
-import { decisionSummaryParts, seeAllLabel, type Decision, type DecisionPlayer, type DecisionQueue as Queue } from '../lib/decisionQueue';
+import { decisionSummaryParts, seeAllLabel, type Decision, type DecisionPlayer, type DecisionSwap, type DecisionQueue as Queue } from '../lib/decisionQueue';
+import { swapGainLabel, swapReplacementLine, todayFixAll } from '../lib/todayView';
 import { LINK_HIT_SLOP, radii, spacing, type ThemeColors } from '../theme';
 
 const ITEM_ROUTE: Record<string, string> = { trade_hub: 'Trades', waivers: 'Waivers', my_team: 'MyTeam', draft_center: 'DraftCenter' };
@@ -37,10 +39,75 @@ function playerRef(p: DecisionPlayer) {
   return { id: p.id, name: p.name, position: p.position, team: p.team, tier: p.tier };
 }
 
+const SWAP_VISIBLE = 4;
+
 /**
- * The Today Decision Queue (docs/ui-patterns.md, "Decision Queue"): at most three ranked decisions, each a CompactModule
- * with the shared player card, one primary action and the reasons on expand; "See all (N)" opens the rest in place.
- * Ranking and dedupe live in lib/decisionQueue.ts (byte-identical twin of web). Web twin: components/DecisionQueue.tsx.
+ * "Do this now" lineup stack (concept A): one row per lineup problem (the shared player card: avatar, status, who to start
+ * instead, the projected gain) with a one-tap Swap, plus "Fix all N · +X proj". Swap opens the Matchup screen's lineup
+ * planner already on that move (FantasyDesk plans, it cannot set a Sleeper lineup). Locked players (game started) are never
+ * in `swaps`; see lib/decisionQueue.ts lineupSwaps. Web twin: SwapStack in components/DecisionQueue.tsx.
+ */
+function SwapStack({ d, leagueId, leagueName, onNavigate }: { d: Decision<DashboardItem>; leagueId: string; leagueName: string; onNavigate: (name: string, params?: object) => void }) {
+  const { colors } = useThemeMode();
+  const styles = useMemo(() => createStyles(colors), [colors]);
+  const [all, setAll] = useState(false);
+  const shown = all ? d.swaps : d.swaps.slice(0, SWAP_VISIBLE);
+  const fixAll = todayFixAll(d.swaps);
+  const hidden = d.swaps.length - shown.length;
+  const open = (swap: DecisionSwap | null) =>
+    onNavigate('Matchup', swap?.out?.id && swap.replacement?.id ? { leagueId, leagueName, plan: 'swap', out: swap.out.id, in: swap.replacement.id } : { leagueId, leagueName, plan: 'all' });
+  return (
+    <AccentCard accent={colors.danger} compact>
+      <View testID="swap-stack">
+        {shown.map((swap, i) => {
+          const gain = swapGainLabel(swap);
+          const detail = (
+            <>
+              <AppText style={{ color: swap.tone === 'danger' ? colors.danger : colors.warning, fontWeight: '800', fontSize: 12 }}>{swap.status.toUpperCase()}</AppText>
+              {` → ${swapReplacementLine(swap)}`}
+            </>
+          );
+          const gainFigure = gain ? <AppText style={[styles.statValue, { color: colors.success }]}>{gain}</AppText> : undefined;
+          return (
+            <View key={swap.key} style={[styles.swapRow, i > 0 ? styles.swapDivider : null]} testID="swap-row">
+              <View style={styles.swapPlayer}>
+                {swap.out ? (
+                  <CompactPlayerCard player={playerRef(swap.out)} detail={detail} trailing={gainFigure} testID="swap-player" />
+                ) : (
+                  <View style={styles.emptySlot}>
+                    <View style={[styles.emptyDot, { borderColor: colors.warning }]}>
+                      <AppText style={{ color: colors.warning, fontWeight: '800' }}>+</AppText>
+                    </View>
+                    <View style={{ flex: 1 }}>
+                      <AppText style={styles.emptyTitle}>Empty starter slot</AppText>
+                      <AppText style={styles.facts}>{swapReplacementLine(swap)}</AppText>
+                    </View>
+                    {gainFigure}
+                  </View>
+                )}
+              </View>
+              <Button
+                label="Swap"
+                size="sm"
+                onPress={() => open(swap)}
+              />
+            </View>
+          );
+        })}
+        {hidden > 0 ? (
+          <Button label={`+${hidden} more`} variant="ghost" size="sm" onPress={() => setAll(true)} />
+        ) : null}
+        {fixAll ? <Button label={fixAll.label} onPress={() => open(null)} /> : null}
+      </View>
+    </AccentCard>
+  );
+}
+
+/**
+ * "Do this now" (docs/ui-patterns.md, "Decision Queue"): the lineup's swap stack first, then the other ranked decisions
+ * (waivers, deadline, draft, injuries) as compact modules, the rest behind "See all (N)". The queue says "nothing needs you"
+ * only when it has no decision at all. Ranking and dedupe live in lib/decisionQueue.ts (byte-identical twin of web).
+ * Web twin: components/DecisionQueue.tsx.
  */
 export default function DecisionQueue({
   queue,
@@ -73,6 +140,8 @@ export default function DecisionQueue({
   if (pending) return <SkeletonCard rows={3} />;
   const seeAll = seeAllLabel(queue, open);
   const shown = open ? queue.all : queue.visible;
+  // The count says how many things to do: each swap is one, every other decision is one.
+  const count = queue.all.reduce((n, d) => n + (d.swaps.length > 0 ? d.swaps.length : 1), 0);
 
   const trailing = (p: DecisionPlayer) =>
     p.stat ? (
@@ -85,7 +154,7 @@ export default function DecisionQueue({
   return (
     <View style={styles.block} testID="decision-queue">
       <SectionHeading
-        title={queue.total > 0 ? `Do next · ${queue.total}` : 'Do next'}
+        title={queue.total > 0 ? `Do this now · ${count}` : 'Do this now'}
         right={
           <PressableScale onPress={() => onNavigate('GmPlan', { leagueId, leagueName })} hitSlop={LINK_HIT_SLOP} accessibilityRole="link">
             <AppText style={styles.link}>Full GM Plan ›</AppText>
@@ -100,6 +169,13 @@ export default function DecisionQueue({
       ) : (
         shown.map((d, i) => {
           const [first, ...others] = d.players;
+          if (d.swaps.length > 0) {
+            return (
+              <MotionIn key={d.key} index={i >= 3 ? i - 3 : 0} count={Math.max(1, shown.length)}>
+                <SwapStack d={d} leagueId={leagueId} leagueName={leagueName} onNavigate={onNavigate} />
+              </MotionIn>
+            );
+          }
           return (
             <MotionIn key={d.key} index={i >= 3 ? i - 3 : 0} count={Math.max(1, shown.length)}>
               <CompactModule
@@ -169,6 +245,12 @@ function createStyles(colors: ThemeColors) {
     seeAll: { minHeight: 44, justifyContent: 'center' },
     why: { color: colors.textSecondary, fontSize: 14 },
     facts: { color: colors.textTertiary, fontSize: 12, fontWeight: '700' },
+    swapRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, paddingVertical: spacing.xs },
+    swapDivider: { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.border },
+    swapPlayer: { flex: 1, minWidth: 0 },
+    emptySlot: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, minHeight: 40 },
+    emptyDot: { width: 28, height: 28, borderRadius: 14, borderWidth: 2, borderStyle: 'dashed', alignItems: 'center', justifyContent: 'center' },
+    emptyTitle: { color: colors.textPrimary, fontWeight: '700', fontSize: 14 },
     stat: { alignItems: 'flex-end' },
     statValue: { fontSize: 14, fontWeight: '800' },
     statLabel: { fontSize: 12, fontWeight: '800', color: colors.textTertiary },

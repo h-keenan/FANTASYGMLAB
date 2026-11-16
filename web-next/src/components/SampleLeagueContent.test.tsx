@@ -30,13 +30,11 @@ describe("SampleLeagueContent", () => {
     render(<SampleLeagueContent />);
     expect(screen.getByTestId("sample-dashboard")).toBeTruthy();
     // Today hero with a top priority, rank strip, watchlist, team snapshot.
-    expect(screen.getByRole("heading", { name: /Do next/ })).toBeTruthy();
+    expect(screen.getByRole("heading", { name: /Do this now/ })).toBeTruthy();
     expect(screen.getAllByText(/Sell Casey Placeholder/).length).toBeGreaterThan(0);
-    // My Team and Watchlist are compact modules: informative collapsed, tiles/cards on tap.
+    // My Team is a compact module: informative collapsed, tiles/cards on tap.
     fireEvent.click(screen.getByTestId("stat-strip-toggle"));
     expect(screen.getAllByText("This season").length).toBeGreaterThan(0);
-    fireEvent.click(screen.getByRole("button", { name: /^Watchlist/ }));
-    expect(screen.getByTestId("watchlist-alerts")).toBeTruthy();
     // League Activity fills from the static promise.
     expect(await screen.findByTestId("league-pulse-card")).toBeTruthy();
     expect(screen.getByTestId("sample-banner")).toBeTruthy();

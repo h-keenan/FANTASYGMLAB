@@ -15,7 +15,7 @@ import { spacing, type ThemeColors } from '../theme';
  * quick view by default (role button, 44pt, PressableScale feedback); `onOpen` opens something else, `nonInteractive="reason"`
  * is for a card inside a control that already acts. Twin of ui/CompactPlayerCard.tsx.
  */
-export default function CompactPlayerCard({ player, detail, trailing, testID = 'compact-player-card', onOpen, nonInteractive }: { player: PlayerRef; detail?: string | null; trailing?: ReactNode; testID?: string; onOpen?: () => void; nonInteractive?: string }) {
+export default function CompactPlayerCard({ player, detail, trailing, testID = 'compact-player-card', onOpen, nonInteractive }: { player: PlayerRef; detail?: ReactNode; trailing?: ReactNode; testID?: string; onOpen?: () => void; nonInteractive?: string }) {
   const { colors } = useThemeMode();
   const styles = useMemo(() => createStyles(colors), [colors]);
   const card = (

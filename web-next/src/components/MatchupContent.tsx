@@ -6,7 +6,7 @@ import { RangeCompare } from "@/components/RangeCompare";
 import { RANGE_CAPTION, leanLabel, rangeDisplayRows } from "@/lib/startSitRange";
 import { useRouter } from "next/navigation";
 import dynamic from "next/dynamic";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 import type {
   MatchupPositionEdge,
@@ -32,7 +32,7 @@ import { StatStrip } from "@/components/StatStrip";
 import { CompactModule } from "@/components/ui/CompactModule";
 import { MatchupHeroCard } from "@/components/ui/MatchupModule";
 import { usePlayerQuickView } from "@/context/PlayerQuickViewContext";
-import { edgeChips, insightsParts, lineupParts, matchupCardModel, matchupSwingPlayers, movesParts, teamsValuesParts, type MatchupSwingInput } from "@/lib/matchupModules";
+import { edgeChips, insightsParts, lineupParts, matchupCardModel, matchupSwingPlayers, movesParts, swingInputsFromMatchup, teamsValuesParts } from "@/lib/matchupModules";
 import { TeamAvatar } from "@/components/TeamAvatar";
 import { ToneBadge } from "@/components/ToneBadge";
 import { freshnessLabel } from "@/lib/liveScores";
@@ -56,6 +56,7 @@ import {
 } from "@/lib/matchupPresentation";
 import { compareLineupSlots, type SlotSortMode } from "@/lib/lineupSlots";
 import { emptySlotsOf, plannerBase, plannerOpponentPlayers, slotIndexFor, winPercent } from "@/lib/matchupPlanner";
+import { parseMatchupPlan } from "@/lib/todayView";
 
 /**
  * Weekly Matchup, laid out to the owner's concept (2026-10-21): header with
@@ -168,18 +169,7 @@ function MatchupHero({ matchup }: { matchup: MatchupResponse }) {
   const opponent = matchup.opponent!;
   const { openPlayer } = usePlayerQuickView();
   const { myPct, myProjected, opponentProjected } = scoreboardFacts(matchup);
-  const swingInputs: MatchupSwingInput[] = [];
-  let playersLeft: number | null = null;
-  for (const [side, team] of [["mine", mine], ["opponent", opponent]] as const) {
-    const list = team.has_live_data ? team.real_starters : team.starters;
-    for (const p of list) {
-      if (!p.name) continue;
-      const final = "game_final" in p ? p.game_final === true : false;
-      const done = final || ("ruled_out" in p && p.ruled_out === true) || p.projection?.status === "bye_week";
-      swingInputs.push({ playerId: p.player_id, name: p.name, position: p.position, team: p.team, tier: p.tier, low: p.projection?.low ?? null, high: p.projection?.high ?? null, done, side });
-      if (side === "mine") playersLeft = (playersLeft ?? 0) + (done ? 0 : 1);
-    }
-  }
+  const { inputs: swingInputs, playersLeft } = swingInputsFromMatchup(mine, opponent);
   const model = matchupCardModel({
     week: matchup.week,
     live: matchup.game_state === "live",
@@ -757,9 +747,24 @@ export function MatchupContent({
   const guillotine = guillotineData?.is_guillotine ? guillotineData : null;
   const ready = matchup.ok && matchup.my_team && matchup.opponent && matchup.comparison;
   const defaultView: LineupView = matchup.my_team?.has_live_data ? "actual" : "suggested";
-  const [view, setView] = useState<LineupView>(defaultView);
+  // "Fix all" (?plan=all) opens on the suggested lineup; a single swap opens on the real one (defaultView).
+  const [view, setView] = useState<LineupView>(() =>
+    typeof window !== "undefined" && new URLSearchParams(window.location.search).get("plan") === "all" ? "suggested" : defaultView,
+  );
   const planner = useLineupPlanner(leagueId ?? "", lens, matchup);
   const edited = planner.plan?.result;
+  // Today's "Swap" / "Fix all" open this page with the planner already on that move (?plan=swap&out=&in= / ?plan=all).
+  const autoPlanned = useRef(false);
+  useEffect(() => {
+    if (autoPlanned.current || !ready || guillotine) return;
+    autoPlanned.current = true;
+    const params = new URLSearchParams(window.location.search);
+    const request = parseMatchupPlan({ plan: params.get("plan"), out: params.get("out"), in: params.get("in") });
+    if (!request) return;
+    const source = request.kind === "swap" && matchup.my_team?.has_live_data ? "actual" : "suggested";
+    planner.start(source, request.kind === "swap" && source === "actual" ? { out: request.out, in: request.in } : undefined);
+    requestAnimationFrame(() => document.querySelector('[data-testid="matchup-lineup"]')?.scrollIntoView?.({ behavior: "smooth", block: "start" }));
+  }, [ready, guillotine, matchup.my_team?.has_live_data, planner]);
   // While planning, the scoreboard and position edges show the edited
   // lineup (the API's numbers), everything else stays the real matchup.
   const shown = useMemo<MatchupResponse>(

@@ -149,6 +149,7 @@ export const MIRRORED = [
   "support.ts",
   "tapForWhyContent.ts",
   "teamStatus.ts",
+  "todayView.ts",
   "useDelayedFlag.ts",
   "useSimLeagueRosters.ts",
   "valueHistoryPresentation.ts",

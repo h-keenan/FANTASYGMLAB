@@ -24,6 +24,7 @@ import {
   applySwap,
   blockedLabel,
   plannerBase,
+  slotsWithSwap,
   sleeperLeagueUrl,
   winPercent,
   type PlannerSource,
@@ -101,21 +102,24 @@ export function useLineupPlanner(leagueId: string, matchup: MatchupResponse) {
   );
 
   const begin = useCallback(
-    (source: PlannerSource, keepBaseline: boolean) => {
+    (source: PlannerSource, keepBaseline: boolean, swap?: { out: string; in: string }) => {
       const base = plannerBase(matchup, source);
       if (!base) return;
+      // Today's "Swap" opens the planner with that one move already made, measured against the unedited lineup.
+      const slots = (swap ? slotsWithSwap(base.slots, swap.out, swap.in) : null) ?? base.slots;
+      const swapBaseline = swap ? winPercent(matchup.win_probability) : null;
       if (!keepBaseline) trackUse('matchup_swap_planner', 'opened', { leagueId, props: { source_surface: source } });
       setSheet(null);
       setPlan((current) => ({
         source,
-        slots: base.slots,
+        slots,
         starters: base.players as MatchupStarter[],
         result: keepBaseline ? (current?.result ?? null) : null,
-        baselinePct: keepBaseline ? (current?.baselinePct ?? null) : null,
+        baselinePct: keepBaseline ? (current?.baselinePct ?? null) : swapBaseline,
         busy: true,
         error: null,
       }));
-      void evaluate(base.slots, source);
+      void evaluate(slots, source);
     },
     [matchup, evaluate, leagueId],
   );
@@ -156,7 +160,7 @@ export function useLineupPlanner(leagueId: string, matchup: MatchupResponse) {
   return {
     plan,
     sheet,
-    start: (source: PlannerSource) => begin(source, false),
+    start: (source: PlannerSource, swap?: { out: string; in: string }) => begin(source, false, swap),
     resetToSuggested: () => begin('suggested', true),
     exit,
     openSlot,
