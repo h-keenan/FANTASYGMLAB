@@ -228,17 +228,22 @@ def test_api_sim_to_matches_manual_advances_event_for_event():
     assert strip(ev_a) == strip(ev_b)
 
 
-def test_api_free_user_stops_at_the_paywall_not_with_an_error():
-    client, _, _ = make_app()
-    gid = new_game(client, user="free")["game"]["id"]
+def test_api_free_user_sims_the_whole_season_then_stops_at_the_paywall_not_with_an_error():
+    pro = {"free"}
+    client, _, _ = make_app(pro=pro)
+    gid = new_game(client, user="free", mode="dynasty", teams=8, seasons=3, rookie_rounds=2)["game"]["id"]
     finish_draft(client, gid, user="free")
+    pro.clear()  # a Free save: its one season is the whole of season 1
+    quiet = {"offers": False, "injuries": False, "starters": False, "deadline": False, "roster": False}
     out = {}
-    for _ in range(8):  # each forced run plays at least a week; keep going until the free preview ends
-        out = client.post(f"/v1/sim/games/{gid}/sim-to", json={"target": "season_end", "force_first": True, "auto_set": True}, headers=hdr("free")).json()
-        if out.get("stopped") and out["stopped"]["code"] == "premium_required":
+    for _ in range(12):  # each forced run plays at least a week; keep going until the season is over
+        out = client.post(f"/v1/sim/games/{gid}/sim-to", json={"target": "season_end", "force_first": True, "auto_set": True, "stops": quiet}, headers=hdr("free")).json()
+        if out["reason"] == "premium_required" or (out.get("stopped") or {}).get("code") == "premium_required":
             break
-    assert out["reason"] == "" and out["stopped"]["code"] == "premium_required" and out["stopped"]["fix"] == "premium"
-    assert out["game"]["week"] == out["preview"]["paywall_week"]
+        assert out["reason"] == "", out
+    game = client.get(f"/v1/sim/games/{gid}", headers=hdr("free")).json()["game"]
+    assert game["status"] == "offseason"  # the full season, playoffs included, was played for free
+    assert out["reason"] == "premium_required" or out["stopped"]["fix"] == "premium"
     blocked = client.post(f"/v1/sim/games/{gid}/sim-to", json={"target": "weeks", "weeks": 1}, headers=hdr("free")).json()
     assert blocked["reason"] == "premium_required"
 
