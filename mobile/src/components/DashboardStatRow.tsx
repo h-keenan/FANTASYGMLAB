@@ -51,14 +51,14 @@ export default function DashboardStatRow({ items, style }: { items: StatStripIte
           onPress={item.onPress}
           centered
           style={styles.tile}
+          labelAccessory={
+            item.why ? (
+              <TapForWhy metric={item.why} spoken={item.label} variant="chip" style={styles.whyBtn} testID={`why-${item.why}`}>
+                <AppText style={styles.whyGlyph} allowFontScaling={false}>?</AppText>
+              </TapForWhy>
+            ) : undefined
+          }
         />
-        {item.why ? (
-          <View style={styles.why} pointerEvents="box-none">
-            <TapForWhy metric={item.why} spoken={item.label} variant="chip" style={styles.whyBtn} testID={`why-${item.why}`}>
-              <AppText style={styles.whyGlyph}>?</AppText>
-            </TapForWhy>
-          </View>
-        ) : null}
         </View>
       ))}
     </View>
@@ -70,8 +70,9 @@ function createStyles(colors: ThemeColors) {
     row: { flexDirection: 'row', gap: spacing.sm, marginBottom: spacing.md },
     cell: { flexBasis: 0, flexGrow: 1, minWidth: 0 },
     tile: { alignSelf: 'stretch', minWidth: 0, paddingHorizontal: spacing.sm },
-    why: { position: 'absolute', top: 0, right: 0, width: 44, height: 44, alignItems: 'flex-end' },
-    whyBtn: { width: 22, height: 22, margin: 4, borderRadius: 11, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.glassInset },
-    whyGlyph: { fontSize: 12, fontWeight: '800', color: colors.textTertiary },
+    // Inline after the label (MetricCard labelAccessory), never an absolute corner badge over the text.
+    // TapForWhy's hitSlop keeps a 44pt target without growing the row.
+    whyBtn: { width: 16, height: 16, borderRadius: 8, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.glassInset },
+    whyGlyph: { fontSize: 10, lineHeight: 12, fontWeight: '800', color: colors.textTertiary, includeFontPadding: false, textAlign: 'center' },
   });
 }

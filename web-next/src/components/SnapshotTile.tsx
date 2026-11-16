@@ -106,6 +106,7 @@ export function SnapshotTile({
       style={tone === "premium" ? { borderColor: "var(--color-accent)" } : undefined}
     >
       <span
+        data-tile-label=""
         className={compact ? "flex flex-col items-center gap-0.5 text-[0.6875rem] leading-tight text-center min-w-0 max-w-full" + (reserveLabelLines ? " min-h-[3.25rem]" : "") : "flex items-center gap-1 text-xs"}
         style={{ color: "var(--color-text-muted)" }}
       >

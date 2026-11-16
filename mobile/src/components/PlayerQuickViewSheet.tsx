@@ -450,7 +450,7 @@ export default function PlayerQuickViewSheet({
           >
             <View style={styles.gripBar} />
           </View>
-          <SheetScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false} stickyHeaderIndices={[2]}>
+          <SheetScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
             {/* Top bar: source label left, round close right (web .pqv-topbar). */}
             <View style={styles.topBar}>
               <AppText style={styles.kicker} numberOfLines={1}>
@@ -544,7 +544,7 @@ export default function PlayerQuickViewSheet({
               {usageCaption && snap === 'full' ? <AppText style={styles.note}>{usageCaption}</AppText> : null}
             </PlayerHero>
 
-            {/* Sticky tab strip: child index 2 (top bar, hero, strip), so keep those three as direct children. */}
+            {/* Tab strip (not pinned; see styles.stickyTabs). */}
             <View
               style={styles.stickyTabs}
               onLayout={(e) => {
@@ -615,7 +615,9 @@ function createStyles(colors: ThemeColors) {
     ownerLabel: { fontSize: 12, fontWeight: '800', letterSpacing: 0.6, color: colors.textTertiary },
     grip: { height: 24, alignItems: 'center', justifyContent: 'center' },
     gripBar: { width: 40, height: 4, borderRadius: 2, backgroundColor: colors.borderStrong },
-    stickyTabs: { backgroundColor: colors.surface, paddingVertical: spacing.xs },
+    // No fill: an opaque strip read as a separate box on the glass sheet ("still has that rectangle above and
+    // around the tabs", coridian_ 2026-11-16). The strip is therefore not pinned either, so nothing scrolls under it.
+    stickyTabs: { paddingVertical: spacing.xs },
     content: { padding: spacing.lg, paddingBottom: spacing.xxl, gap: spacing.md },
     topBar: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', minHeight: 28 },
     kicker: { flex: 1, fontSize: 12.5, fontWeight: '700', letterSpacing: 0.8, color: colors.textTertiary, textTransform: 'uppercase' },
