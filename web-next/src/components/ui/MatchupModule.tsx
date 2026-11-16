@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import type { ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 
 import { AccentCard } from "@/components/AccentCard";
 import { PlayerTap } from "@/components/ui/PlayerOpenContext";
@@ -11,6 +11,8 @@ import { ToneBadge } from "@/components/ToneBadge";
 import { matchupTickerParts, type MatchupCardModel, type MatchupSwingPlayer } from "@/lib/matchupModules";
 import { compactSummaryText } from "@/lib/compactModule";
 import { playerSurname } from "@/lib/playerNameDisplay";
+import type { MatchupBigPlay } from "@/lib/api";
+import { feedAgeLabel, feedPointsLabel } from "@/lib/liveFeed";
 
 /**
  * THE matchup module (docs/ui-patterns.md, "Matchup hero and ticker"). One model (`matchupCardModel`), two forms:
@@ -69,10 +71,72 @@ export function SwingPlayers({ swing, onOpenPlayer }: { swing: MatchupSwingPlaye
   );
 }
 
+/**
+ * "Latest big play" line for the live Matchup hero: avatar, description, points swing and age of the newest big play
+ * (inferred from live stat-line changes, so times are when we noticed). Green only when it is for you; the opponent's is
+ * neutral, never red. Tap expands the last 3. Renders nothing without events. Mobile twin: mobile/src/components/MatchupModule.tsx.
+ */
+export function LatestBigPlay({ plays, mineName, opponentName }: { plays: MatchupBigPlay[]; mineName: string; opponentName: string }) {
+  const [open, setOpen] = useState(false);
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    const timer = setInterval(() => setNow(Date.now()), 15_000);
+    return () => clearInterval(timer);
+  }, []);
+  if (plays.length === 0) return null;
+  const shown = open ? plays.slice(0, 3) : plays.slice(0, 1);
+  return (
+    <div className="flex flex-col gap-1 pt-1" style={{ borderTop: "var(--border-width-default) solid var(--color-border)" }} data-testid="matchup-big-play">
+      <button
+        type="button"
+        className="flex w-full items-center justify-between gap-2 pt-2 text-left"
+        style={{ color: "inherit", minHeight: "var(--touch-target-min)" }}
+        aria-expanded={open}
+        aria-label={`Latest big play. ${open ? "Collapse" : "Show last 3"}`}
+        onClick={() => setOpen((v) => !v)}
+        disabled={plays.length < 2}
+        data-testid="matchup-big-play-toggle"
+      >
+        <span className="text-[0.6875rem] font-extrabold uppercase" style={{ color: "var(--color-text-muted)", letterSpacing: "var(--letter-spacing-badge)" }}>
+          Latest big play
+        </span>
+        {plays.length > 1 ? (
+          <span className="text-xs font-bold" style={{ color: "var(--color-accent)" }} aria-hidden="true">
+            {open ? "Hide" : "More"}
+          </span>
+        ) : null}
+      </button>
+      <ul className="m-0 flex list-none flex-col gap-2 p-0">
+        {shown.map((play) => {
+          const mine = play.side === "mine";
+          return (
+            <li key={play.id} className="flex min-w-0 items-center gap-2" data-testid="matchup-big-play-item">
+              <PlayerAvatar playerId={play.player_id ?? ""} size={32} fallbackLabel={play.name.trim().slice(0, 1)} />
+              <span className="flex min-w-0 flex-1 flex-col">
+                <span className="break-words text-sm font-bold">
+                  {playerSurname(play.name) || play.name} · {play.description}
+                </span>
+                <span className="text-xs" style={{ color: "var(--color-text-muted)" }}>
+                  {feedAgeLabel(play.at, now)}
+                  {play.approx ? " · approx." : ""} · for {mine ? mineName : opponentName}
+                </span>
+              </span>
+              <span className="shrink-0 text-sm font-extrabold tabular-nums" style={{ color: mine && play.points >= 0 ? "var(--color-success)" : "var(--color-text-secondary)" }} data-testid="matchup-big-play-points">
+                {feedPointsLabel(play.points)}
+              </span>
+            </li>
+          );
+        })}
+      </ul>
+    </div>
+  );
+}
+
 export function MatchupHeroCard({
   model,
   onOpenPlayer,
   action,
+  bigPlays,
   testId = "matchup-hero",
   children,
 }: {
@@ -81,6 +145,8 @@ export function MatchupHeroCard({
   onOpenPlayer?: (player: MatchupSwingPlayer) => void;
   /** The one primary action ("Open lineup"). */
   action?: ReactNode;
+  /** Live big plays (Matchup page only); the line is hidden when empty. */
+  bigPlays?: MatchupBigPlay[];
   testId?: string;
   children?: ReactNode;
 }) {
@@ -128,6 +194,7 @@ export function MatchupHeroCard({
         {[model.basis === "projected" ? "Projected points" : null, model.detail].filter(Boolean).join(" · ")}
       </p>
       <SwingPlayers swing={model.swing} onOpenPlayer={onOpenPlayer} />
+      {bigPlays && bigPlays.length > 0 ? <LatestBigPlay plays={bigPlays} mineName={model.mine.name} opponentName={model.opponent.name} /> : null}
       {action}
       {children}
     </AccentCard>

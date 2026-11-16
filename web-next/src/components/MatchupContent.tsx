@@ -191,6 +191,7 @@ function MatchupHero({ matchup }: { matchup: MatchupResponse }) {
     <>
       <MatchupHeroCard
         model={model}
+        bigPlays={matchup.live ? matchup.big_plays : undefined}
         onOpenPlayer={(p) => p.playerId && openPlayer({ player_id: p.playerId, name: p.name, position: p.position, team: p.team, tier: p.tier })}
         action={
           <Button

@@ -1,4 +1,4 @@
-import React, { useMemo, type ReactNode } from 'react';
+import React, { useEffect, useMemo, useState, type ReactNode } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 
 import AccentCard from './AccentCard';
@@ -11,6 +11,8 @@ import { useThemeMode } from '../context/ThemeModeContext';
 import { compactSummaryText } from '../lib/compactModule';
 import { matchupTickerParts, type MatchupCardModel, type MatchupSwingPlayer } from '../lib/matchupModules';
 import { playerSurname } from '../lib/playerNameDisplay';
+import type { MatchupBigPlay } from '../lib/api';
+import { feedAgeLabel, feedPointsLabel } from '../lib/liveFeed';
 import { radii, spacing, type ThemeColors } from '../theme';
 
 /**
@@ -67,10 +69,59 @@ export function SwingPlayers({ swing, onOpenPlayer }: { swing: MatchupSwingPlaye
   );
 }
 
+/**
+ * "Latest big play" line for the live Matchup hero (mirrors web LatestBigPlay): avatar, description, points swing, age.
+ * Green only when it is for you; the opponent's is neutral, never red. Tap expands the last 3. Nothing without events.
+ */
+export function LatestBigPlay({ plays, mineName, opponentName }: { plays: MatchupBigPlay[]; mineName: string; opponentName: string }) {
+  const { colors } = useThemeMode();
+  const styles = useMemo(() => createStyles(colors), [colors]);
+  const [open, setOpen] = useState(false);
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    const timer = setInterval(() => setNow(Date.now()), 15000);
+    return () => clearInterval(timer);
+  }, []);
+  if (plays.length === 0) return null;
+  const shown = open ? plays.slice(0, 3) : plays.slice(0, 1);
+  return (
+    <View style={styles.swing} testID="matchup-big-play">
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel={`Latest big play. ${open ? 'Collapse' : 'Show last 3'}`}
+        accessibilityState={{ expanded: open }}
+        disabled={plays.length < 2}
+        onPress={() => setOpen((v) => !v)}
+        style={styles.bigHeader}
+        testID="matchup-big-play-toggle"
+      >
+        <AppText style={styles.swingTitle}>Latest big play</AppText>
+        {plays.length > 1 ? <AppText style={[styles.swingLabel, { color: colors.accent }]}>{open ? 'Hide' : 'More'}</AppText> : null}
+      </Pressable>
+      {shown.map((play) => {
+        const mine = play.side === 'mine';
+        return (
+          <View key={play.id} style={styles.bigRow} testID="matchup-big-play-item">
+            <PlayerAvatar playerId={play.player_id ?? ''} size={32} fallbackLabel={play.name.trim().slice(0, 1)} />
+            <View style={styles.swingText}>
+              <AppText style={styles.swingNameText}>{`${playerSurname(play.name) || play.name} · ${play.description}`}</AppText>
+              <AppText style={styles.detail}>{`${feedAgeLabel(play.at, now)}${play.approx ? ' · approx.' : ''} · for ${mine ? mineName : opponentName}`}</AppText>
+            </View>
+            <AppText style={[styles.bigPoints, { color: mine && play.points >= 0 ? colors.success : colors.textSecondary }]} testID="matchup-big-play-points">
+              {feedPointsLabel(play.points)}
+            </AppText>
+          </View>
+        );
+      })}
+    </View>
+  );
+}
+
 export function MatchupHeroCard({
   model,
   onOpenPlayer,
   action,
+  bigPlays,
   testID = 'matchup-hero',
   children,
 }: {
@@ -79,6 +130,8 @@ export function MatchupHeroCard({
   onOpenPlayer?: (player: MatchupSwingPlayer) => void;
   /** The one primary action ("Open lineup"). */
   action?: ReactNode;
+  /** Live big plays (Matchup screen only); the line is hidden when empty. */
+  bigPlays?: MatchupBigPlay[];
   testID?: string;
   children?: ReactNode;
 }) {
@@ -114,6 +167,7 @@ export function MatchupHeroCard({
           </AppText>
         ) : null}
         <SwingPlayers swing={model.swing} onOpenPlayer={onOpenPlayer} />
+        {bigPlays && bigPlays.length > 0 ? <LatestBigPlay plays={bigPlays} mineName={model.mine.name} opponentName={model.opponent.name} /> : null}
         {action}
         {children}
       </View>
@@ -161,6 +215,9 @@ function createStyles(colors: ThemeColors) {
     swingName: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs },
     swingNameText: { flexShrink: 1, fontSize: 14, fontWeight: '700', color: colors.textPrimary },
     swingLabel: { fontSize: 12.5, fontWeight: '700' },
+    bigHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', minHeight: 44 },
+    bigRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
+    bigPoints: { fontSize: 14, fontWeight: '800' },
     ticker: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, minHeight: 44 },
     tickerWeek: { width: 48, fontSize: 12, fontWeight: '800', color: colors.textTertiary },
     tickerScore: { flex: 1, minWidth: 0, fontSize: 14, fontWeight: '800', color: colors.textPrimary },
