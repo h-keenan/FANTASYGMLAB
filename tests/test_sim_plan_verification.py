@@ -109,6 +109,14 @@ def test_missing_column_flips_flag_only_when_fallback_works(monkeypatch):
     monkeypatch.setattr(svc, "_TRIAL_COLUMN_MISSING", False)
 
 
+def test_service_sim_is_pro_raises_on_unknown_plan(monkeypatch):
+    monkeypatch.setattr(svc, "_fetch_profile_fields", lambda *a, **k: ERROR)
+    with pytest.raises(svc._PlanUnverified):
+        svc._sim_is_pro({"id": "u1"})
+    monkeypatch.setattr(svc, "_fetch_profile_fields", lambda *a, **k: PRO_OK)
+    assert svc._sim_is_pro({"id": "u2"}) is True
+
+
 def make_client(is_pro):
     def require_user(authorization: str | None = Header(default=None)):
         return {"id": "owner", "_access_token": "tok"}

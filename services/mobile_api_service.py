@@ -7553,26 +7553,32 @@ def _is_pro_caller(user: dict[str, Any]) -> bool:
     return _manager_tendencies_gate(user)
 
 
+class _PlanUnverified(Exception):
+    """The caller's plan could not be read; Sim reports a retryable error for it."""
+
+
+def _sim_is_pro(user: dict[str, Any]) -> bool:
+    """Pro check for Fantasy Sim: a failed profile read must not look like a
+    Free account (that showed paying users the paywall), so it raises
+    _PlanUnverified and Sim answers a retryable "plan_unverified"."""
+
+    plan = _caller_plan(user)
+    if plan == "unknown":
+        raise _PlanUnverified()
+    return plan == "pro"
+
+
 # Fantasy Sim (docs/fantasy-sim-api.md): fully isolated under modules/sim, mounted
 # only when SIM_ENABLED is on (default off). The one place real code references it.
 if os.environ.get("SIM_ENABLED", "").strip().lower() in {"1", "true", "yes", "on"}:
     from modules.sim import api as sim_api
-
-    def _sim_is_pro(user: dict[str, Any]) -> bool:
-        """Pro check for Sim: a failed profile read must not look like a Free
-        account (that showed paying users the paywall), so it raises
-        PlanUnverified and the API answers a retryable "plan_unverified"."""
-
-        plan = _caller_plan(user)
-        if plan == "unknown":
-            raise sim_api.PlanUnverified()
-        return plan == "pro"
 
     sim_api.mount(
         app,
         sim_api.SimApiDeps(
             require_user=require_user,
             is_pro=_sim_is_pro,
+            plan_unverified_exc=_PlanUnverified,
             sleeper_username=lambda user: _fetch_profile_fields(
                 auth_supabase.get_supabase_config(), str(user.get("id") or ""), str(user.get("_access_token") or "")
             ).get("sleeper_username", ""),
