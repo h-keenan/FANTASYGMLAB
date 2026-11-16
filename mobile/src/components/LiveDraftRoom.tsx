@@ -1,27 +1,23 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
-import { useFocusEffect } from '@react-navigation/native';
-import type { NativeStackScreenProps } from '@react-navigation/native-stack';
-import { useHeaderHeight } from '@react-navigation/elements';
+import { Pressable, StyleSheet, View } from 'react-native';
+import { useFocusEffect, useNavigation } from '@react-navigation/native';
+import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 
-import AnimatedCard from '../components/AnimatedCard';
-import AppText from '../components/AppText';
-import CompactPlayerCard from '../components/CompactPlayerCard';
-import { SkeletonPage, SkeletonList } from '../components/Skeleton';
-import BrandHeaderBar from '../components/BrandHeaderBar';
-import Button from '../components/Button';
-import EmptyState from '../components/EmptyState';
-import ErrorState from '../components/ErrorState';
-import EvaluationLensHeaderButton from '../components/EvaluationLensHeaderButton';
-import FilterDropdownButton from '../components/FilterDropdownButton';
-import GridBackground from '../components/GridBackground';
-import LiveDraftTradeEvaluator from '../components/LiveDraftTradeEvaluator';
-import PickPlate from '../components/PickPlate';
-import PlayerIdentityRow from '../components/PlayerIdentityRow';
-import PremiumLock from '../components/PremiumLock';
-import SectionHeading from '../components/SectionHeading';
-import ToneBadge from '../components/ToneBadge';
-import ValuesCredit from '../components/ValuesCredit';
+import AnimatedCard from './AnimatedCard';
+import AppText from './AppText';
+import CompactPlayerCard from './CompactPlayerCard';
+import { SkeletonList } from './Skeleton';
+import Button from './Button';
+import EmptyState from './EmptyState';
+import ErrorState from './ErrorState';
+import FilterDropdownButton from './FilterDropdownButton';
+import LiveDraftTradeEvaluator from './LiveDraftTradeEvaluator';
+import PickPlate from './PickPlate';
+import PlayerIdentityRow from './PlayerIdentityRow';
+import PremiumLock from './PremiumLock';
+import SectionHeading from './SectionHeading';
+import ToneBadge from './ToneBadge';
+import ValuesCredit from './ValuesCredit';
 import { useThemeMode } from '../context/ThemeModeContext';
 import { useValuationLens } from '../context/ValuationLensContext';
 import {
@@ -41,18 +37,16 @@ import {
   formatLiveDraftScore,
   liveDraftRankFilterOptions,
   movementGlyph,
+  liveDraftsOf,
   ranksById,
   teamRanksById,
   type LiveDraftRankFilter,
 } from '../lib/liveDraft';
-import { useOrbClearance } from '../lib/orbLayout';
-import { useScreenHeaderTitle } from '../lib/useScreenHeaderTitle';
 import { radii, spacing, type ThemeColors } from '../theme';
 import type { RootStackParamList } from '../navigation/RootNavigator';
 import { usePlayerQuickView } from '../context/PlayerQuickViewContext';
-import { Collapse } from '../components/Presence';
+import { Collapse } from './Presence';
 
-type Props = NativeStackScreenProps<RootStackParamList, 'LiveDraft'>;
 
 // Matches modules/live_draft.py LIVE_DRAFT_POLL_INTERVAL_SECONDS and web.
 const POLL_INTERVAL_MS = 12_000;
@@ -94,13 +88,16 @@ function leanPlayer(row: {
   };
 }
 
-export default function LiveDraftScreen({ route, navigation }: Props) {
+/**
+ * The live draft room: Sleeper draft-room assistant (Best Available / Best Fit, on the clock, team board, trade
+ * evaluator). Embedded as the "Live room" tab of Draft Center (it only exists while a draft is live), so it renders
+ * its content inline and leaves the scrolling, background and header to the host screen.
+ */
+export default function LiveDraftRoom({ leagueId, leagueName }: { leagueId: string; leagueName: string }) {
+  const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const { openPlayer: openQuickView } = usePlayerQuickView();
-  const orbClearance = useOrbClearance();
-  const headerHeight = useHeaderHeight();
   const { colors } = useThemeMode();
   const styles = useMemo(() => createStyles(colors), [colors]);
-  const { leagueId, leagueName } = route.params;
   const { lens } = useValuationLens(leagueId);
 
   const [discovery, setDiscovery] = useState<LiveDraftDiscoveryResponse | null>(null);
@@ -117,11 +114,6 @@ export default function LiveDraftScreen({ route, navigation }: Props) {
   const stateRef = useRef<LiveDraftStateResponse | null>(null);
   stateRef.current = state;
 
-  useScreenHeaderTitle(navigation, 'Live Draft', leagueName);
-  useEffect(() => {
-    navigation.setOptions({ headerRight: () => <EvaluationLensHeaderButton leagueId={leagueId} /> });
-  }, [navigation, leagueId]);
-
   useEffect(() => {
     let cancelled = false;
     setDiscoveryError(null);
@@ -130,7 +122,7 @@ export default function LiveDraftScreen({ route, navigation }: Props) {
       .then((result) => {
         if (cancelled) return;
         setDiscovery(result);
-        const live = result.drafts.filter((d) => d.status === 'drafting' || d.status === 'paused');
+        const live = liveDraftsOf(result.drafts);
         setSelectedDraftId(result.active_draft_id || live[0]?.draft_id || '');
       })
       .catch((err) => {
@@ -194,13 +186,13 @@ export default function LiveDraftScreen({ route, navigation }: Props) {
     openQuickView(leanPlayer(row), { leagueId, leagueName });
 
   if (!discovery && !discoveryError) {
-    return <SkeletonPage label="Live Draft" layout="list" topInset={headerHeight} />;
+    return <SkeletonList label="the live draft room" count={5} />;
   }
   if (discoveryError || !discovery) {
     return (
-      <View style={[styles.center, { paddingTop: headerHeight }]}>
+      <View style={styles.center}>
         <ErrorState
-          title="Couldn't load Live Draft"
+          title="Couldn't load the live draft room"
           message={discoveryError}
           onRetry={() => {
             setDiscovery(null);
@@ -211,18 +203,9 @@ export default function LiveDraftScreen({ route, navigation }: Props) {
     );
   }
 
-  const header = (
-    <>
-      <BrandHeaderBar leagueId={leagueId} leagueName={leagueName} />
-    </>
-  );
-
   if (!discovery.is_premium) {
     return (
-      <View style={styles.root}>
-        <GridBackground />
-        <ScrollView contentContainerStyle={[styles.content, { paddingTop: headerHeight, paddingBottom: orbClearance }]}>
-          {header}
+      <View style={styles.content}>
           <PremiumLock
             title={discovery.upsell?.title || 'Draft with real-time recommendations'}
             description={
@@ -232,19 +215,15 @@ export default function LiveDraftScreen({ route, navigation }: Props) {
             feature="live_draft"
             leagueName={leagueName}
           />
-        </ScrollView>
       </View>
     );
   }
 
-  const liveOrPaused = discovery.drafts.filter((d) => d.status === 'drafting' || d.status === 'paused');
+  const liveOrPaused = liveDraftsOf(discovery.drafts);
   const hasCompleted = discovery.drafts.some((d) => d.status === 'complete');
 
   return (
-    <View style={styles.root}>
-      <GridBackground />
-      <ScrollView contentContainerStyle={[styles.content, { paddingTop: headerHeight, paddingBottom: orbClearance }]}>
-        {header}
+    <View style={styles.content}>
         <AppText style={styles.intro}>
           Read-only Sleeper draft-room assistant. Picks and recommendations update automatically. Nothing is
           submitted to Sleeper.
@@ -267,8 +246,6 @@ export default function LiveDraftScreen({ route, navigation }: Props) {
                   ? 'The latest Sleeper draft has ended. Live Draft activates again when a draft is in progress or paused.'
                   : 'No live Sleeper draft is active. This workspace appears only while a draft is in progress or paused.'
             }
-            actionLabel="Open Draft Center"
-            onPressAction={() => navigation.navigate('DraftCenter', { leagueId, leagueName })}
           />
         ) : (
           <>
@@ -326,7 +303,6 @@ export default function LiveDraftScreen({ route, navigation }: Props) {
           </>
         )}
         <ValuesCredit />
-      </ScrollView>
     </View>
   );
 }
@@ -698,9 +674,8 @@ function TeamRankingRow({
 
 function createStyles(colors: ThemeColors) {
   return StyleSheet.create({
-    root: { flex: 1, backgroundColor: colors.background },
-    content: { padding: spacing.lg, gap: spacing.lg },
-    center: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: spacing.xl, backgroundColor: colors.background },
+    content: { gap: spacing.lg },
+    center: { alignItems: 'center', justifyContent: 'center', padding: spacing.xl },
     flex: { flex: 1 },
     inlineSpinner: { paddingVertical: spacing.xl },
     intro: { fontSize: 14.5, color: colors.textSecondary, lineHeight: 20 },

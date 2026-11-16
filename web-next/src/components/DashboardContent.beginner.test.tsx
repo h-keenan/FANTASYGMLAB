@@ -6,6 +6,9 @@ import { DashboardContent } from "./DashboardContent";
 import type { DashboardResponse } from "@/lib/api";
 import { experienceCopy } from "@/lib/experienceCopy";
 
+// The Alerts section fetches on its own and needs the auth context; it has its own test (DashboardAlerts.test.tsx).
+vi.mock("@/components/DashboardAlerts", () => ({ DashboardAlerts: () => <div data-testid="dashboard-alerts" /> }));
+
 vi.mock("@/context/ExperienceLevelContext", () => ({
   useExperienceCopy: () => experienceCopy("beginner"),
   useExperienceLevel: () => ({ level: "beginner", goal: "win_now" }),

@@ -10,9 +10,15 @@ import CompactPlayerModule from '../components/CompactPlayerModule';
 import EmptyState from '../components/EmptyState';
 import { EventTypePill } from '../components/EventTypeGlyph';
 import GridBackground from '../components/GridBackground';
+import { SkeletonPage } from '../components/Skeleton';
 import ScreenInfoNote from '../components/ScreenInfoNote';
 import NewsDigest from '../components/NewsDigest';
-import { NOT_READY_MESSAGES } from './AlertsScreen';
+import { NOT_READY_MESSAGES } from '../components/AlertsSection';
+import LeagueRecapPanel from '../components/LeagueRecapPanel';
+import SegmentedTabBar from '../components/SegmentedTabBar';
+import { getLastLeague, type LastLeague } from '../lib/lastLeague';
+import { useNavigation } from '@react-navigation/native';
+import type { RootStackParamList } from '../navigation/RootNavigator';
 import { api, type AlertsResponse, type NewsItem, type NewsResponse } from '../lib/api';
 import { toUserErrorMessage } from '../lib/errorMessages';
 import { newsPlayerIdentities } from '../lib/newsIdentity';
@@ -123,12 +129,112 @@ function groupByDate(items: NewsItem[]): Array<{ title: string; data: NewsGroup[
   }));
 }
 
-export default function NewsScreen({ route }: { route?: { params?: { playerId?: string; playerName?: string } } }) {
+type NewsTab = 'nfl' | 'league';
+type NewsParams = RootStackParamList['News'];
+
+/**
+ * News: two tabs. NFL is the league-independent feed; My League is the weekly recap / roundup of one league (it was
+ * its own League Recaps page): the route's league, else the league last opened, else a prompt to pick one. A player
+ * filter (quick view's "See all news") is NFL news only and shows no tabs.
+ */
+export default function NewsScreen({ route }: { route?: { params?: NewsParams } }) {
+  const params = route?.params;
+  const playerId = params?.playerId;
+  const requestedTab = params?.initialTab;
+  const [tab, setTab] = useState<NewsTab>(requestedTab ?? 'nfl');
+  // Picked from the GM orb, a roundup push or an old Recaps link while News is already open.
+  useEffect(() => {
+    if (requestedTab) setTab(requestedTab);
+  }, [requestedTab]);
+  if (!playerId && tab === 'league') {
+    return (
+      <NewsShell tab={tab} onTab={setTab} showTabs>
+        <MyLeagueNews params={params} />
+      </NewsShell>
+    );
+  }
+  return <NflNews route={route} tab={tab} onTab={setTab} />;
+}
+
+function NewsShell({ tab, onTab, showTabs, children }: { tab: NewsTab; onTab: (tab: NewsTab) => void; showTabs: boolean; children: React.ReactNode }) {
+  const headerHeight = useHeaderHeight();
+  const styles = useMemo(() => createShellStyles(), []);
+  return (
+    <View style={[styles.container, { paddingTop: headerHeight }]}>
+      <GridBackground />
+      {showTabs ? (
+        <View style={styles.tabRow}>
+          <SegmentedTabBar<NewsTab>
+            options={[
+              { key: 'nfl', label: 'NFL', glyph: 'news' },
+              { key: 'league', label: 'My League', glyph: 'recaps' },
+            ]}
+            active={tab}
+            onChange={onTab}
+          />
+        </View>
+      ) : null}
+      {children}
+    </View>
+  );
+}
+
+function createShellStyles() {
+  return StyleSheet.create({
+    container: { flex: 1, backgroundColor: 'transparent', paddingTop: spacing.md },
+    tabRow: { paddingHorizontal: spacing.lg, paddingBottom: spacing.xs },
+    body: { flex: 1, paddingHorizontal: spacing.lg },
+    prompt: { paddingHorizontal: spacing.lg },
+  });
+}
+
+/** My League: the route's league, else the last-opened one, else a prompt to pick a league. */
+function MyLeagueNews({ params }: { params: NewsParams }) {
+  const navigation = useNavigation<{ navigate: (name: keyof RootStackParamList, params?: object) => void }>();
+  const styles = useMemo(() => createShellStyles(), []);
+  const [last, setLast] = useState<LastLeague | null | undefined>(undefined);
+  useEffect(() => {
+    if (params?.leagueId) return;
+    let cancelled = false;
+    void getLastLeague().then((value) => {
+      if (!cancelled) setLast(value);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [params?.leagueId]);
+  const league = params?.leagueId ? { leagueId: params.leagueId, leagueName: params.leagueName ?? 'League' } : last;
+  if (league === undefined) return <SkeletonPage label="League recap" layout="detail" style={{ paddingHorizontal: 0 }} />;
+  if (!league) {
+    return (
+      <View style={styles.prompt}>
+        <EmptyState
+          icon="newspaper-outline"
+          title="Pick a league"
+          subtitle="Your league's weekly recap, stories and lineup roundup show up here once you open a league."
+          actionLabel="Choose a league"
+          onPressAction={() => navigation.navigate('Home')}
+        />
+      </View>
+    );
+  }
+  return (
+    <View style={styles.body}>
+      <LeagueRecapPanel
+        leagueId={league.leagueId}
+        leagueName={league.leagueName}
+        initialTab={params?.recapsTab}
+        week={params?.week}
+      />
+    </View>
+  );
+}
+
+function NflNews({ route, tab, onTab }: { route?: { params?: NewsParams }; tab: NewsTab; onTab: (tab: NewsTab) => void }) {
   // Filtered to one player when opened from the quick view's "See all news".
   const playerId = route?.params?.playerId;
   const playerName = route?.params?.playerName;
   const orbClearance = useOrbClearance();
-  const headerHeight = useHeaderHeight();
   const { colors } = useThemeMode();
   const styles = useMemo(() => createStyles(colors), [colors]);
   const [items, setItems] = useState<NewsItem[]>([]);
@@ -202,8 +308,7 @@ export default function NewsScreen({ route }: { route?: { params?: { playerId?: 
   };
 
   return (
-    <View style={[styles.container, { paddingTop: headerHeight }]}>
-      <GridBackground />
+    <NewsShell tab={tab} onTab={onTab} showTabs={!playerId}>
       <ScreenInfoNote
         text={
           playerId
@@ -315,7 +420,7 @@ export default function NewsScreen({ route }: { route?: { params?: { playerId?: 
           ) : null}
         </ScrollView>
       )}
-    </View>
+    </NewsShell>
   );
 }
 

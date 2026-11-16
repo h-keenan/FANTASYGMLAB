@@ -108,7 +108,7 @@ test('glanceDestination: each module jumps straight to its own feature screen', 
   assert.deepEqual(glanceDestination('record'), { screen: 'Dashboard' });
   assert.deepEqual(glanceDestination('waiver'), { screen: 'Waivers' });
   assert.deepEqual(glanceDestination('trade'), { screen: 'Trades', initialTab: 'block' });
-  assert.deepEqual(glanceDestination('news'), { screen: 'Alerts' });
+  assert.deepEqual(glanceDestination('news'), { screen: 'Dashboard', focus: 'alerts' });
   assert.deepEqual(glanceDestination('need'), { screen: 'MyTeam' });
 });
 

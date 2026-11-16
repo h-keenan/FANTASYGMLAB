@@ -6,6 +6,9 @@ import GlassCard from '../components/GlassCard';
 import Input from '../components/Input';
 import BrandHeaderBar from '../components/BrandHeaderBar';
 import PageFamilyTabs from '../components/PageFamilyTabs';
+import SegmentedTabBar from '../components/SegmentedTabBar';
+import CollegeScoutingPanel from '../components/CollegeScoutingPanel';
+import { needPositionsFrom, type ScoutingLens } from '../lib/scoutingLens';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { Ionicons } from '@expo/vector-icons';
 import { useHeaderHeight } from '@react-navigation/elements';
@@ -29,7 +32,7 @@ import ValuesCredit from '../components/ValuesCredit';
 import ViewModeToggle from '../components/ViewModeToggle';
 import { waiverInjuryDisplay } from '../components/WaiverRecommendationCard';
 import { mergeSearchMatches, useLeaguePlayerSearch } from '../lib/leaguePlayerSearch';
-import { api, type LeagueIdpValuesResponse, type RankedPlayer, type ValuationLens } from '../lib/api';
+import { api, type DraftPickAsset, type LeagueIdpValuesResponse, type RankedPlayer, type ValuationLens } from '../lib/api';
 import {
   IDP_CONFIDENCE_LABEL,
   idpMethodNote,
@@ -51,6 +54,7 @@ import { usePlayerQuickView } from '../context/PlayerQuickViewContext';
 import ErrorState from '../components/ErrorState';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Players'>;
+type PlayersTab = 'players' | 'prospects';
 
 const POSITIONS = ['ALL', 'QB', 'RB', 'WR', 'TE'];
 const AGE_FILTERS = ['ALL', 'Under 25', '25-28', '29+'] as const;
@@ -257,7 +261,31 @@ export default function PlayersScreen({ route, navigation }: Props) {
   const { colors } = useThemeMode();
   const styles = useMemo(() => createStyles(colors), [colors]);
   const { leagueId, leagueName } = route.params;
+  // Players and Prospects tabs (College Scouting is now the Prospects tab): `tab: 'prospects'` from the orb, the Today prompt, More.
+  const requestedTab = route.params.tab;
+  const [tab, setTab] = useState<PlayersTab>(requestedTab ?? 'players');
+  useEffect(() => {
+    if (requestedTab) setTab(requestedTab);
+  }, [requestedTab]);
   const { lens } = useValuationLens(leagueId);
+  // Prospects' "For my league" overlay (needs + your pick slots), loaded the first time the tab opens; best-effort.
+  const [scoutingLens, setScoutingLens] = useState<ScoutingLens | null>(null);
+  useEffect(() => {
+    if (tab !== 'prospects' || scoutingLens) return;
+    let cancelled = false;
+    Promise.all([
+      api.getLeagueDraftPicks(leagueId).then((r) => r.picks, () => [] as DraftPickAsset[]),
+      api.getMyRoster(leagueId).then((r) => String(r?.roster?.roster_id ?? ''), () => ''),
+      api.getLeagueMyTeamNeeds(leagueId).then((r) => r?.position_groups ?? null, () => null),
+    ]).then(([picks, rosterId, needs]) => {
+      if (cancelled) return;
+      const myPicks = rosterId ? picks.filter((pick) => pick.owner_roster_id === rosterId) : [];
+      if (needs || myPicks.length) setScoutingLens({ needPositions: needPositionsFrom(needs), myPicks });
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [tab, leagueId, scoutingLens]);
   const [position, setPosition] = useState('ALL');
   const [ageFilter, setAgeFilter] = useState<AgeFilter>('ALL');
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('ALL');
@@ -369,6 +397,22 @@ export default function PlayersScreen({ route, navigation }: Props) {
       <GridBackground />
       <BrandHeaderBar leagueId={leagueId} leagueName={leagueName} />
       <PageFamilyTabs family="team" active="players" leagueId={leagueId} leagueName={leagueName} />
+      <View style={styles.tabRow}>
+        <SegmentedTabBar<PlayersTab>
+          options={[
+            { key: 'players', label: 'Players', glyph: 'players' },
+            { key: 'prospects', label: 'Prospects', glyph: 'prospects' },
+          ]}
+          active={tab}
+          onChange={setTab}
+        />
+      </View>
+      {tab === 'prospects' ? (
+        <ScrollView contentContainerStyle={[styles.prospectsContent, { paddingBottom: orbClearance }]}>
+          <CollegeScoutingPanel onOpenProspect={(prospect) => navigation.navigate('CollegeProspectDetail', { prospect })} lens={scoutingLens} />
+        </ScrollView>
+      ) : (
+      <>
       <ScreenInfoNote text="Ranked by value for this league's scoring, roster, and format settings. OVR percentiles a player against others at their position — tap any player for the full breakdown." />
 
       {error ? <ErrorState compact title="Couldn't load players" message={error} onRetry={() => setReloadToken((n) => n + 1)} /> : null}
@@ -473,6 +517,8 @@ export default function PlayersScreen({ route, navigation }: Props) {
           }
         />
       )}
+      </>
+      )}
     </View>
   );
 }
@@ -481,6 +527,8 @@ function createStyles(colors: ThemeColors) {
   return StyleSheet.create({
   headerButtonRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   container: { flex: 1, backgroundColor: 'transparent' },
+  tabRow: { paddingHorizontal: spacing.lg, marginBottom: spacing.sm },
+  prospectsContent: { paddingHorizontal: spacing.lg },
   discoveryCard: { marginHorizontal: spacing.lg, marginBottom: spacing.md, gap: spacing.sm },
   // Position/Age/Status/Availability now render as one wrapping row of
   // compact dropdown buttons (FilterDropdownButton) instead of four full

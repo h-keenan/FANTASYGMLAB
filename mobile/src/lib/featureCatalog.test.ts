@@ -7,7 +7,7 @@ import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-import { accentFor } from './destinationAccents.generated.ts';
+import { ACCENT_BY_DESTINATION, accentFor } from './destinationAccents.generated.ts';
 import { FEATURE_GROUPS, FEATURE_ITEMS, featureTarget } from './featureCatalog.ts';
 
 const here = dirname(fileURLToPath(import.meta.url));
@@ -38,11 +38,10 @@ test('items reuse the icon, accent color and Pro flag the GM orb gives the same 
     if (!page) continue; // Trade History is a Trade Hub tab, not a menu page
     // The orb takes each page's icon from ICON_BY_PAGE and its color from the shared accent map by label.
     assert.ok(orb.includes(`'${page.key}': '${item.icon}'`) || orb.includes(`  ${page.key}: '${item.icon}'`), `${item.id} icon`);
-    assert.equal(item.color, accentFor(page.label), `${item.id} color`);
+    assert.equal(item.color, accentFor(ACCENT_BY_DESTINATION[page.key] ? page.key : page.label), `${item.id} color`);
     // Trades hosts three items; only Trade Finder is Pro and the orb row is not.
     if (item.route !== 'Trades' && item.route !== 'Teams') assert.equal(Boolean(page.pro), Boolean(item.pro), `${item.id} pro`);
   }
-  assert.match(more, /icon="school-outline"[\s\S]{0,80}colors\.accent[\s\S]{0,80}label="College Scouting"/);
 });
 
 test('league items need a league; others open with no params', () => {

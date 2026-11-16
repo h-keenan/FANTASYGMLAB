@@ -11,7 +11,7 @@ import { test } from 'node:test';
  */
 const ALLOWED: Record<string, string> = {
   // Partial note inside a section whose other data is still shown.
-  'screens/PortfolioScreen.tsx': 'partial league load note, rest of the page is current',
+  'components/PortfolioStanding.tsx': 'partial league load note, rest of the page is current',
   // Secondary caption under the Waivers watchlist tab, not the page load.
   'screens/WaiversScreen.tsx': 'secondary caption for the watchlist strip',
 };

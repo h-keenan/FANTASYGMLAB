@@ -58,6 +58,7 @@ import {
 } from '../lib/connectFlow';
 import { glanceSectionState } from '../lib/leaguesGlance';
 import { useOrbClearance } from '../lib/orbLayout';
+import PortfolioStanding, { type PortfolioStandingHandle } from '../components/PortfolioStanding';
 import { lapsedTrialExpiration } from '../lib/revenuecat';
 import { getShownTrialLapseExpiration, setShownTrialLapseExpiration } from '../lib/trialLapsedSeen';
 import { maskShowcaseFields, maskShowcaseText } from '../lib/showcaseMode';
@@ -443,6 +444,8 @@ export default function HomeScreen({ navigation, route }: Props) {
   // form the server would refuse. Also stops the auto-jump below from
   // bouncing the user straight back into a league.
   const openAddLeague = route.params?.openAddLeague === true;
+  // `focus: 'standing'` (the retired Portfolio route, header links): stay on Home and scroll to the standing section.
+  const focusStanding = route.params?.focus === 'standing';
   useEffect(() => {
     if (!openAddLeague || !leagues) return;
     autoNavigated.current = true;
@@ -454,7 +457,7 @@ export default function HomeScreen({ navigation, route }: Props) {
   }, [openAddLeague, leagues]);
 
   useEffect(() => {
-    if (openAddLeague) autoNavigated.current = true;
+    if (openAddLeague || focusStanding) autoNavigated.current = true;
     if (autoNavigated.current || !leagues || leagues.length === 0) return;
     autoNavigated.current = true;
     (async () => {
@@ -472,10 +475,8 @@ export default function HomeScreen({ navigation, route }: Props) {
         return;
       }
 
-      if (leagues.length > 1) {
-        navigation.navigate('Portfolio');
-        return;
-      }
+      // Two or more leagues: stay here, the "Your standing" section below the league list is the cross-league view.
+      if (leagues.length > 1) return;
       const last = await getLastLeague();
       const target =
         (last ? leagues.find((league) => league.league_id === last.leagueId) : null) ??
@@ -486,6 +487,17 @@ export default function HomeScreen({ navigation, route }: Props) {
       }
     })();
   }, [leagues, navigation]);
+
+  // Scroll to the standing section once the list has laid it out (the footer reports its offset).
+  const listRef = useRef<FlatList<SavedLeague>>(null);
+  const standingRef = useRef<PortfolioStandingHandle>(null);
+  const standingY = useRef<number | null>(null);
+  const scrollToStanding = useCallback(() => {
+    if (focusStanding && standingY.current != null) listRef.current?.scrollToOffset({ offset: standingY.current, animated: true });
+  }, [focusStanding]);
+  useEffect(() => {
+    scrollToStanding();
+  }, [scrollToStanding, leagues]);
 
   if (loading) {
     return <SkeletonPage label="your leagues" layout="dashboard" topInset={headerHeight} />;
@@ -498,6 +510,9 @@ export default function HomeScreen({ navigation, route }: Props) {
       <GridBackground />
 
       <FlatList
+        ref={listRef}
+        onEndReached={() => standingRef.current?.unlock()}
+        onEndReachedThreshold={1.5}
         data={leagues ?? []}
         keyExtractor={(item) => item.id}
         contentContainerStyle={[styles.listContent, { paddingBottom: orbClearance, paddingTop: headerHeight }]}
@@ -616,11 +631,26 @@ export default function HomeScreen({ navigation, route }: Props) {
           </>
         }
         ListFooterComponent={
-          glanceState === 'locked' ? (
-            <View style={styles.glanceTeaser}>
-              <LeaguesGlanceSection state="locked" reloadToken={glanceReloadToken} />
-            </View>
-          ) : null
+          <>
+            {/* Portfolio, folded into Home (2026-11-16 nav consolidation): standing, exposure and free standing,
+                Pro-gated exactly as the page was. Only for people with leagues to compare. */}
+            {leagues && leagues.length > 0 ? (
+              <View
+                style={styles.standingSection}
+                onLayout={(event) => {
+                  standingY.current = event.nativeEvent.layout.y;
+                  scrollToStanding();
+                }}
+              >
+                <PortfolioStanding ref={standingRef} />
+              </View>
+            ) : null}
+            {glanceState === 'locked' ? (
+              <View style={styles.glanceTeaser}>
+                <LeaguesGlanceSection state="locked" reloadToken={glanceReloadToken} />
+              </View>
+            ) : null}
+          </>
         }
         ListEmptyComponent={
           <View>
@@ -1013,6 +1043,7 @@ function createStyles(colors: ThemeColors) {
   addLeagueLabel: { fontSize: 13.5, fontWeight: '700', color: colors.accent },
   capLock: { marginBottom: spacing.sm },
   glanceTeaser: { marginTop: spacing.xl },
+  standingSection: { marginTop: spacing.xl },
   capLockInModal: { marginTop: spacing.md },
   platformTabs: { marginBottom: spacing.md },
   addError: { fontSize: 13.5, color: colors.danger, marginTop: spacing.sm, lineHeight: 18 },

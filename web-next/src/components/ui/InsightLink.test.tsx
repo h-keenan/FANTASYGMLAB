@@ -30,7 +30,7 @@ describe("StatStrip", () => {
   it("links every tile that declares an insight when the league is known", () => {
     render(<StatStrip columns={3} items={items} league={league} />);
     expect(screen.getByRole("link", { name: /Avg Age, 24.1, League avg 25.2, open the Roster Age rankings/ })).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: /Injured starters, None, open Alerts/ })).toHaveAttribute("href", "/alerts/42?name=Dynasty%20Dudes");
+    expect(screen.getByRole("link", { name: /Injured starters, None, open Alerts/ })).toHaveAttribute("href", "/dashboard/42?name=Dynasty%20Dudes#alerts");
     expect(screen.getAllByRole("link")).toHaveLength(2);
   });
 

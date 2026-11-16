@@ -380,9 +380,9 @@ export default function MoreScreen({ navigation }: Props) {
     navigation.navigate('GmPlan', { ...league, initialTab: 'overview' });
   };
 
-  // League-scoped entry points (Live Draft, Guess the Player leaderboard)
+  // League-scoped entry point (Guess the Player leaderboard)
   // resolve the league the user last opened, same as the GM Plan row above.
-  const onOpenLeagueScreen = (screen: 'LiveDraft' | 'GuessThePlayerLeaderboard', purpose: string) => {
+  const onOpenLeagueScreen = (screen: 'GuessThePlayerLeaderboard', purpose: string) => {
     const league = currentLeagueContext();
     if (!league) {
       notify.alert('Select a league first', `Open a league from Home, then come back ${purpose}.`);
@@ -576,14 +576,6 @@ export default function MoreScreen({ navigation }: Props) {
             showDivider
           />
           <SettingsRow
-            icon="timer-outline"
-            iconColor={colors.premium}
-            label="Live Draft"
-            description="Real-time pick recommendations while your Sleeper draft is running (Pro)"
-            onPress={() => onOpenLeagueScreen('LiveDraft', 'to use Live Draft')}
-            showDivider
-          />
-          <SettingsRow
             icon="trophy-outline"
             iconColor={colors.accent}
             label="Guess the Player Leaderboard"
@@ -597,21 +589,13 @@ export default function MoreScreen({ navigation }: Props) {
           <>
             <SectionHeading title="Scouting" topGap={16} />
             <AnimatedCard style={styles.groupCard}>
-              <SettingsRow
-                icon="school-outline"
-                iconColor={colors.accent}
-                label="College Scouting"
-                description="Grade incoming prospects and follow your own watchlist"
-                onPress={() => navigation.navigate('CollegeProspects')}
-                showDivider
-              />
               {/* Web parity: Account has a College football on/off switch, so
                   the app can turn it back off too (it could only opt in). */}
               <SettingsRow
                 icon="eye-off-outline"
                 iconColor={colors.textSecondary}
                 label="Hide college scouting"
-                description="Remove College Scouting from this menu. You can turn it back on here."
+                description="Stop the college football scouting prompts. You can turn it back on here."
                 onPress={() => respondToCollegeInterest(false)}
                 showDivider={false}
               />

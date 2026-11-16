@@ -1,7 +1,7 @@
 import { fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
-import { AlertsContent } from "./AlertsContent";
+import { AlertsFeed } from "./AlertsContent";
 import type { AlertItem, AlertsResponse } from "@/lib/api";
 import { api } from "@/lib/api";
 
@@ -46,11 +46,10 @@ const BASE_RESPONSE: AlertsResponse = {
   items: [alert({})],
 };
 
-describe("AlertsContent", () => {
-  it("renders the league name, grouped event type, and the alert's headline/player identity", () => {
-    const { container } = render(<AlertsContent leagueId="league-1" leagueName="Dynasty Overlords" data={BASE_RESPONSE} />);
+describe("AlertsFeed", () => {
+  it("renders the grouped event type and the alert's headline/player identity", () => {
+    const { container } = render(<AlertsFeed leagueId="league-1" leagueName="Dynasty Overlords" data={BASE_RESPONSE} />);
 
-    expect(screen.getByRole("heading", { name: "Alerts" })).toBeInTheDocument();
     expect(screen.getByText("Injury / Status")).toBeInTheDocument();
     expect(screen.getByText("Test player ruled out for Week 7")).toBeInTheDocument();
     expect(screen.getByText("Test Player")).toBeInTheDocument();
@@ -62,7 +61,7 @@ describe("AlertsContent", () => {
   });
 
   it("marks an alert read and calls the API when the row is opened", () => {
-    render(<AlertsContent leagueId="league-1" leagueName="Dynasty Overlords" data={BASE_RESPONSE} />);
+    render(<AlertsFeed leagueId="league-1" leagueName="Dynasty Overlords" data={BASE_RESPONSE} />);
 
     fireEvent.click(screen.getByRole("link", { name: "Test player ruled out for Week 7" }));
 
@@ -73,7 +72,7 @@ describe("AlertsContent", () => {
   // compact player card)" — tapping the player chip must not also fire the
   // row's own open/read-marking handler underneath it.
   it("tapping the player chip does not also mark the alert as read", () => {
-    render(<AlertsContent leagueId="league-1" leagueName="Dynasty Overlords" data={BASE_RESPONSE} />);
+    render(<AlertsFeed leagueId="league-1" leagueName="Dynasty Overlords" data={BASE_RESPONSE} />);
 
     fireEvent.click(screen.getByRole("button", { name: /Test Player/ }));
 
@@ -85,7 +84,7 @@ describe("AlertsContent", () => {
     vi.mocked(api.markAlertRead).mockClear();
     vi.mocked(api.markAlertRead).mockResolvedValueOnce({ ok: false });
     const first = render(
-      <AlertsContent leagueId="league-1" leagueName="Dynasty Overlords" data={BASE_RESPONSE} userId="user-1" />,
+      <AlertsFeed leagueId="league-1" leagueName="Dynasty Overlords" data={BASE_RESPONSE} userId="user-1" />,
     );
     expect(screen.getByLabelText("Unread")).toBeInTheDocument();
     fireEvent.click(screen.getByRole("link", { name: "Test player ruled out for Week 7" }));
@@ -96,7 +95,7 @@ describe("AlertsContent", () => {
     // Server still says unread (the write didn't land): this browser keeps
     // showing it read and re-sends the read.
     vi.mocked(api.markAlertRead).mockResolvedValue({ ok: true });
-    render(<AlertsContent leagueId="league-1" leagueName="Dynasty Overlords" data={BASE_RESPONSE} userId="user-1" />);
+    render(<AlertsFeed leagueId="league-1" leagueName="Dynasty Overlords" data={BASE_RESPONSE} userId="user-1" />);
     expect(screen.queryByLabelText("Unread")).not.toBeInTheDocument();
     await vi.waitFor(() => expect(api.markAlertRead).toHaveBeenCalledTimes(2));
     window.localStorage.clear();
@@ -104,7 +103,7 @@ describe("AlertsContent", () => {
 
   it("shows the unconfirmed badge for speculative alerts", () => {
     render(
-      <AlertsContent
+      <AlertsFeed
         leagueId="league-1"
         leagueName="Dynasty Overlords"
         data={{ ok: true, reason: "", items: [alert({ speculative: true })] }}
@@ -115,14 +114,14 @@ describe("AlertsContent", () => {
   });
 
   it("shows the empty state when there are no alerts", () => {
-    render(<AlertsContent leagueId="league-1" leagueName="Dynasty Overlords" data={{ ok: true, reason: "", items: [] }} />);
+    render(<AlertsFeed leagueId="league-1" leagueName="Dynasty Overlords" data={{ ok: true, reason: "", items: [] }} />);
 
     expect(screen.getByText("All quiet. No relevant news for your roster right now.")).toBeInTheDocument();
   });
 
   it("shows the not-ready message instead of the feed when reason is set", () => {
     render(
-      <AlertsContent
+      <AlertsFeed
         leagueId="league-1"
         leagueName="Dynasty Overlords"
         data={{ ok: true, reason: "not_a_member_of_league", items: [] }}
@@ -134,18 +133,9 @@ describe("AlertsContent", () => {
     expect(screen.getByRole("button", { name: "Connect a league" })).toBeInTheDocument();
   });
 
-  it("ends with next-step links so the feed is never a dead end", () => {
-    render(<AlertsContent leagueId="league-1" leagueName="Dynasty Overlords" data={{ ok: true, reason: "", items: [] }} />);
-    expect(screen.getByText(/All quiet/)).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: /Find a waiver add/ })).toHaveAttribute(
-      "href",
-      "/waivers/league-1?name=Dynasty%20Overlords",
-    );
-  });
-
-  it("links the weekly roundup pointer card to League Recaps > Roundup for that week", () => {
+  it("links the weekly roundup pointer card to News > My League > Roundup for that week", () => {
     render(
-      <AlertsContent
+      <AlertsFeed
         leagueId="L 1"
         leagueName="My League"
         data={{ ...BASE_RESPONSE, roundup_notice: { week: 9, title: "Your week 9 roundup is ready", body: "See what you left on the bench." } }}
@@ -153,12 +143,12 @@ describe("AlertsContent", () => {
     );
     expect(screen.getByText("Your week 9 roundup is ready")).toBeTruthy();
     expect(screen.getByTestId("roundup-notice").getAttribute("href")).toBe(
-      "/league-recaps/L%201?name=My%20League&tab=roundup&week=9",
+      "/news?tab=league&league=L+1&name=My+League&recaps=roundup&week=9",
     );
   });
 
   it("shows no roundup card when the feed has none", () => {
-    render(<AlertsContent leagueId="L1" leagueName="My League" data={BASE_RESPONSE} />);
+    render(<AlertsFeed leagueId="L1" leagueName="My League" data={BASE_RESPONSE} />);
     expect(screen.queryByTestId("roundup-notice")).toBeNull();
   });
 });

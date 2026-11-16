@@ -10,6 +10,7 @@ import { PremiumUpsellCard } from "@/components/PremiumUpsellCard";
 import { ErrorState, reloadPage } from "@/components/ErrorState";
 import { useDefaultLeague } from "@/lib/useDefaultLeague";
 import { LoadingScreen } from "@/components/LoadingScreen";
+import { prospectsHref } from "@/lib/retiredRoutes";
 
 // Like Portfolio/News/Trade History, College Scouting has no [leagueId]
 // segment — the real current page (modules/college_scouting_ui.py) and GET
@@ -31,13 +32,13 @@ export default function CollegeScoutingPage() {
       router.replace("/");
       return;
     }
-    // College Scouting now lives in the Draft Center's Scouting tab. With a default
-    // league (the only one, or the last opened) go there; otherwise fall through and
-    // render the league-independent board right here so no league is ever required.
+    // College Scouting now lives in Players > Prospects. With a default league (the only
+    // one, or the last opened) go there; otherwise fall through and render the
+    // league-independent board right here so no league is ever required.
     if (defaultLeague === null) return;
     if (defaultLeague.only) {
       const { leagueId, leagueName } = defaultLeague.only;
-      router.replace(`/draft-center/${encodeURIComponent(leagueId)}?name=${encodeURIComponent(leagueName)}&tab=scouting`);
+      router.replace(prospectsHref(leagueId, leagueName));
       return;
     }
     let cancelled = false;

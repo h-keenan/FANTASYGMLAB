@@ -48,7 +48,7 @@ describe("feature catalog (What FantasyDesk can do)", () => {
       expect(item.color, item.id).toBe(row.color);
       expect(Boolean(item.pro), item.id).toBe(Boolean(row.pro));
     }
-    expect(matched).toBeGreaterThan(15);
+    expect(matched).toBeGreaterThan(10);
   });
 
   it("matches the mobile catalog (ids, order, names, Pro flags)", () => {

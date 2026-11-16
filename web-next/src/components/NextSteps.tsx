@@ -10,19 +10,21 @@ import { SectionHeading } from "@/components/SectionHeading";
  */
 export type NextStepKey = "matchup" | "waivers" | "trade-hub" | "trade-finder" | "trade-analyzer" | "my-team" | "alerts" | "gm-plan";
 
-const STEPS: Record<NextStepKey, { label: string; segment: string }> = {
+const STEPS: Record<NextStepKey, { label: string; segment: string; hash?: string }> = {
   matchup: { label: "Check your lineup", segment: "matchup" },
   waivers: { label: "Find a waiver add", segment: "waivers" },
   "trade-hub": { label: "See trade ideas", segment: "trade-hub" },
   "trade-analyzer": { label: "Analyze a trade", segment: "trade-analyzer" },
   "trade-finder": { label: "See other packages in Trade Finder", segment: "trade-finder" },
   "my-team": { label: "Review your roster", segment: "my-team" },
-  alerts: { label: "See news on your players", segment: "alerts" },
+  // Alerts is a section of Today (2026-11-16 nav consolidation).
+  alerts: { label: "See news on your players", segment: "dashboard", hash: "alerts" },
   "gm-plan": { label: "Open your GM Plan", segment: "gm-plan" },
 };
 
 export function nextStepHref(step: NextStepKey, leagueId: string, leagueName: string): string {
-  return `/${STEPS[step].segment}/${encodeURIComponent(leagueId)}?name=${encodeURIComponent(leagueName)}`;
+  const { segment, hash } = STEPS[step];
+  return `/${segment}/${encodeURIComponent(leagueId)}?name=${encodeURIComponent(leagueName)}${hash ? `#${hash}` : ""}`;
 }
 
 export function NextSteps({

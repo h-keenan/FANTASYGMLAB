@@ -158,10 +158,10 @@ export function glanceWaiverHeadline(waiver: LeagueGlanceWaiver): string {
 export type GlanceModule = 'record' | 'waiver' | 'trade' | 'news' | 'need';
 
 export type GlanceDestination =
-  | { screen: 'Dashboard' }
+  | { screen: 'Dashboard'; focus?: undefined }
   | { screen: 'Waivers' }
   | { screen: 'Trades'; initialTab: 'block' }
-  | { screen: 'Alerts' }
+  | { screen: 'Dashboard'; focus: 'alerts' }
   | { screen: 'MyTeam' };
 
 export function glanceDestination(module: GlanceModule): GlanceDestination {
@@ -171,7 +171,7 @@ export function glanceDestination(module: GlanceModule): GlanceDestination {
     case 'trade':
       return { screen: 'Trades', initialTab: 'block' };
     case 'news':
-      return { screen: 'Alerts' };
+      return { screen: 'Dashboard', focus: 'alerts' };
     case 'need':
       return { screen: 'MyTeam' };
     case 'record':

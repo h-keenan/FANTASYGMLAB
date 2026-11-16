@@ -5,7 +5,7 @@ import { leagueCrestColors, leagueCrestHue, leagueInitials } from "./leagueCrest
 
 describe("appHeader rules", () => {
   it("tab pages are root headers with no title; detail pages keep theirs", () => {
-    for (const p of ["/dashboard/L1", "/my-team/L1", "/trade-hub/L1", "/league-rankings/L1", "/waivers/L1", "/news", "/portfolio"]) {
+    for (const p of ["/dashboard/L1", "/my-team/L1", "/trade-hub/L1", "/league-rankings/L1", "/waivers/L1", "/news", "/portfolio", "/leagues"]) {
       expect(headerTemplateFor(p)).toBe("root");
       expect(headerShowsTitle(p)).toBe(false);
     }

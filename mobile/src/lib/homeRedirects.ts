@@ -12,19 +12,34 @@
 export type GmPlanTab = 'overview' | 'trades' | 'core' | 'watching';
 
 export interface LegacyRedirect {
-  name: 'Dashboard' | 'GmPlan' | 'Teams';
+  name: 'Dashboard' | 'GmPlan' | 'Teams' | 'DraftCenter' | 'Home' | 'News' | 'Players';
   params: Record<string, unknown>;
 }
 
-const TARGETS: Record<string, { name: 'Dashboard' | 'GmPlan' | 'Teams'; extra: Record<string, unknown> }> = {
-  LeagueDetail: { name: 'Dashboard', extra: {} },
-  GmTargets: { name: 'GmPlan', extra: { initialTab: 'watching' } },
-  TeamStance: { name: 'GmPlan', extra: { initialTab: 'overview' } },
+type RedirectParams = { leagueId: string; leagueName: string } & Record<string, unknown>;
+
+const TARGETS: Record<string, (params: RedirectParams) => LegacyRedirect> = {
+  LeagueDetail: (p) => ({ name: 'Dashboard', params: { ...p } }),
+  GmTargets: (p) => ({ name: 'GmPlan', params: { ...p, initialTab: 'watching' } }),
+  TeamStance: (p) => ({ name: 'GmPlan', params: { ...p, initialTab: 'overview' } }),
   // Playoff Odds merged into League Rankings as a tab.
-  PlayoffOdds: { name: 'Teams', extra: { initialTab: 'playoff' } },
+  PlayoffOdds: (p) => ({ name: 'Teams', params: { ...p, initialTab: 'playoff' } }),
+  // 2026-11-16 nav consolidation (18 pages -> 14): each retired page is now a tab or section of another.
+  // Alerts is a section of Today (expanded and scrolled to).
+  Alerts: (p) => ({ name: 'Dashboard', params: { ...p, focus: 'alerts' } }),
+  // The live draft room is the "Live room" tab of Draft Center (falls back to Overview when no draft is live).
+  LiveDraft: (p) => ({ name: 'DraftCenter', params: { ...p, tab: 'live' } }),
+  // Portfolio is the "Your standing" section of Home (no league needed).
+  Portfolio: () => ({ name: 'Home', params: { focus: 'standing' } }),
+  // League Recaps is News > My League; its own sub-tab (Recaps/Roundup/History/Storylines) rides along as recapsTab.
+  Recap: ({ initialTab, ...rest }) => ({
+    name: 'News',
+    params: { ...rest, initialTab: 'league', ...(initialTab ? { recapsTab: initialTab } : {}) },
+  }),
 };
 
-/** Routes that only redirect (rendered for one frame, never a real view). */
+/** Routes that only redirect (rendered for one frame, never a real view). CollegeProspects is not here: with no
+ * last league it still renders the standalone board (see CollegeProspectsScreen). */
 export const LEGACY_REDIRECT_ROUTES: readonly string[] = Object.keys(TARGETS);
 
 export function isLegacyRedirectRoute(routeName: string | null | undefined): boolean {
@@ -32,13 +47,9 @@ export function isLegacyRedirectRoute(routeName: string | null | undefined): boo
 }
 
 /** Where a legacy route lands, carrying the league params over. */
-export function resolveLegacyRedirect(
-  routeName: string,
-  params: { leagueId: string; leagueName: string } & Record<string, unknown>,
-): LegacyRedirect | null {
+export function resolveLegacyRedirect(routeName: string, params: RedirectParams): LegacyRedirect | null {
   if (!isLegacyRedirectRoute(routeName)) return null;
-  const target = TARGETS[routeName];
-  return { name: target.name, params: { ...params, ...target.extra } };
+  return TARGETS[routeName](params);
 }
 
 const GM_PLAN_TABS: readonly GmPlanTab[] = ['overview', 'trades', 'core', 'watching'];

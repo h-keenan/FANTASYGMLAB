@@ -5,6 +5,7 @@
  *
  * Each tab keeps its own route (`segment`), so every old URL keeps working and nothing needs a redirect; the strip is
  * simply rendered at the top of each member page. Platform adapters turn a tab into a URL / screen.
+ * League Recaps is no longer a League tab: it became News > My League (2026-11-16 nav consolidation).
  * Pure data, no imports.
  */
 
@@ -49,7 +50,6 @@ export const PAGE_TAB_FAMILIES: readonly PageTabFamily[] = [
   ] },
   { key: "league", label: "League section", shellTab: "league", tabs: [
     { key: "rankings", label: "Rankings", glyph: "standings", segment: "league-rankings" },
-    { key: "recaps", label: "Recaps", glyph: "recaps", segment: "league-recaps" },
     { key: "games", label: "Games", glyph: "scores", segment: "games" },
   ] },
 ];
@@ -84,7 +84,7 @@ export function barPageKeys(): ReadonlySet<string> {
 }
 
 /**
- * Splits the More sheet's pages: `lead` are the pages the bar does NOT show (Alerts, GM Plan, Draft Center, ...), listed
+ * Splits the More sheet's pages: `lead` are the pages the bar does NOT show (GM Plan, Draft, ...), listed
  * first; `sections` are the duplicates of the bar, folded into one "Sections" group. Derived from PAGE_TAB_FAMILIES, so a
  * page added to a family moves itself and the two lists cannot drift.
  */

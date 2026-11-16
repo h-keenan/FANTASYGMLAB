@@ -1,6 +1,5 @@
 "use client";
 
-import { PageTabBar } from "@/components/PageTabBar";
 import { useState, type ReactNode } from "react";
 
 
@@ -86,7 +85,10 @@ export function LeagueRecapsContent({
   initialRecap,
   initialTab,
   initialWeek,
+  embedded = false,
 }: {
+  /** Hosted inside News > My League: no page shell, title or family tabs of its own (News owns them). */
+  embedded?: boolean;
   leagueId: string;
   leagueName: string;
   initialRecap: RecapResponse;
@@ -132,18 +134,20 @@ export function LeagueRecapsContent({
       />
     );
 
+  const Shell: "main" | "div" = embedded ? "div" : "main";
   return (
-    <main className="page-shell">
-      {leagueId ? <PageTabBar family="league" active="recaps" leagueId={leagueId} leagueName={leagueName} /> : null}
-      <header className="flex flex-col gap-1">
-        <PageTitle page="League Recaps" leagueName={leagueName} />
-      </header>
+    <Shell className={embedded ? "flex flex-col gap-4" : "page-shell"}>
+      {embedded ? null : (
+        <header className="flex flex-col gap-1">
+          <PageTitle page="League Recaps" leagueName={leagueName} />
+        </header>
+      )}
       <div className="flex flex-col gap-4">
         <div className="flex flex-wrap items-center gap-2" data-testid="recaps-controls">
           <PillRow ariaLabel="League memory view" variant="scroll" options={MEMORY_VIEWS.map((v) => ({ value: v, label: v }))} active={view} onSelect={(value) => setView(value as MemoryView)} />
         </div>
         {body}
       </div>
-    </main>
+    </Shell>
   );
 }

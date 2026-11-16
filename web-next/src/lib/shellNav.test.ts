@@ -40,15 +40,15 @@ describe("shellTabs", () => {
     expect(tabs[0].href).toBe("/dashboard/L1?name=My%20League");
     expect(tabs[4].href).toBeUndefined();
   });
-  it("is Home / Portfolio / Fantasy Sim / News / More outside a league", () => {
-    expect(shellTabs({ leagueId: null, leagueName: "" }).map((t) => t.label)).toEqual(["Your leagues", "Portfolio", "Fantasy Sim", "News", "More"]);
+  it("is Home / Fantasy Sim / News / More outside a league", () => {
+    expect(shellTabs({ leagueId: null, leagueName: "" }).map((t) => t.label)).toEqual(["Your leagues", "Fantasy Sim", "News", "More"]);
   });
 });
 
 describe("route to tab mapping", () => {
   it.each([
     ["/dashboard/L1", "today"],
-    ["/alerts/L1", "more"],
+    ["/alerts/L1", "today"],
     ["/my-team/L1", "team"],
     ["/waivers/L1", "team"],
     ["/players/L1", "team"],
@@ -63,7 +63,8 @@ describe("route to tab mapping", () => {
   });
   it("maps the league-less pages", () => {
     expect(shellActiveTab("/", false)).toBe("home");
-    expect(shellActiveTab("/portfolio", false)).toBe("portfolio");
+    expect(shellActiveTab("/portfolio", false)).toBe("home");
+    expect(shellActiveTab("/leagues", false)).toBe("home");
     expect(shellActiveTab("/gm-game", false)).toBe("sim");
     expect(shellActiveTab("/news", false)).toBe("news");
     expect(shellActiveTab("/premium", false)).toBe("more");

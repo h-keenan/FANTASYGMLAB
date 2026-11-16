@@ -30,14 +30,13 @@ describe("AppShellBar", () => {
     expect(document.getElementById("shell-action-slot")).not.toBeNull();
   });
 
-  it("outside a league shows Home / Portfolio / Fantasy Sim / News / More", () => {
-    nav.pathname = "/portfolio";
+  it("outside a league shows Home / Fantasy Sim / News / More", () => {
+    nav.pathname = "/leagues";
     nav.leagueId = undefined;
     render(<AppShellBar />);
     const bar = screen.getByRole("navigation", { name: "Main sections" });
-    expect(within(bar).getAllByRole("link").map((l) => l.textContent)).toEqual(["Your leagues", "PortfolioProPro feature", "Fantasy Sim", "News"]); // Portfolio is Pro: the marker shows to a Free person
-    expect(within(bar).getByTestId("nav-pro-marker")).toBeInTheDocument();
-    expect(within(bar).getByRole("link", { name: "Portfolio, Pro feature" })).toHaveAttribute("aria-current", "page");
+    expect(within(bar).getAllByRole("link").map((l) => l.textContent)).toEqual(["Your leagues", "Fantasy Sim", "News"]);
+    expect(within(bar).getByRole("link", { name: "Your leagues" })).toHaveAttribute("aria-current", "page");
     nav.pathname = "/dashboard/league-1";
     nav.leagueId = "league-1";
   });

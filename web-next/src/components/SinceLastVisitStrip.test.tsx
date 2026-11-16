@@ -41,7 +41,7 @@ describe("SinceLastVisitStrip", () => {
     // News on rostered players lives once, in Watchlist & Alerts.
     expect(screen.queryByText("Your players")).toBeNull();
     expect(api.getLeagueAlerts).not.toHaveBeenCalled();
-    expect(screen.getByText("New trades").closest("a")).toHaveAttribute("href", "/league-recaps/L1?name=Test%20League");
+    expect(screen.getByText("New trades").closest("a")).toHaveAttribute("href", "/news?tab=league&league=L1&name=Test+League");
   });
 
   it("renders nothing when the history read fails", async () => {

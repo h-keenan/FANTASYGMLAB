@@ -39,6 +39,7 @@ import { api, type RankedPlayer } from '../lib/api';
 import { setLastLeague } from '../lib/lastLeague';
 import { isEspnLeagueId } from '../lib/leaguePlatform';
 import { accentColor } from '../lib/destinationAccent';
+import { ACCENT_BY_DESTINATION } from '../lib/destinationAccents.generated';
 import { queryKeys } from '../lib/queryKeys';
 import { TERMS } from '../lib/terms';
 import { splitMoreByBar } from '../lib/pageFamilies';
@@ -90,7 +91,6 @@ interface Destination {
 // byte-for-byte with web; the route per page is in lib/orbTabs.ts).
 const ICON_BY_PAGE: Record<string, IconName> = {
   dashboard: 'flash-outline',
-  alerts: 'notifications-outline',
   'my-team': 'shirt-outline',
   matchup: 'american-football-outline',
   waivers: 'swap-horizontal-outline',
@@ -99,11 +99,8 @@ const ICON_BY_PAGE: Record<string, IconName> = {
   'trade-hub': 'shuffle-outline',
   'gm-plan': 'map-outline',
   'draft-center': 'albums-outline',
-  'live-draft': 'timer-outline',
-  'league-recaps': 'newspaper-outline',
   games: 'dice-outline',
   commissioner: 'shield-checkmark-outline',
-  portfolio: 'layers-outline',
   'gm-game': 'game-controller-outline',
   news: 'globe-outline',
   community: 'people-circle-outline',
@@ -115,7 +112,8 @@ function destinationFor(colors: ThemeColors, page: NavCatalogPage): Destination 
     route: ROUTE_BY_PAGE[page.key],
     icon: ICON_BY_PAGE[page.key],
     needsLeague: page.leagueScoped,
-    color: accentColor(colors, page.label),
+    // The catalog key is the accent table's id where it has one (a renamed label such as Draft Center -> Draft keeps its accent).
+    color: accentColor(colors, ACCENT_BY_DESTINATION[page.key] ? page.key : page.label),
     subtitle: page.subtitle,
     pro: page.pro,
     pageKey: page.key,
@@ -152,7 +150,6 @@ function generalDestinations(colors: ThemeColors, storeSubscriber = false, found
   return [
     // The league switcher; Account (below) owns settings.
     { label: TERMS.yourLeagues, route: 'Home', icon: 'home-outline', color: colors.accent, subtitle: HOME_SUBTITLE },
-    destinationFor(colors, navPage('portfolio')),
     destinationFor(colors, navPage('gm-game')),
     ...(founder
       ? [
@@ -499,7 +496,7 @@ export default function GmOrb() {
   const normalizedQuery = searchQuery.trim().toLowerCase();
   const searchResults = useMemo(() => {
     if (!normalizedQuery) return [];
-    // Page rows plus each page's tabs ("Draft Center > Scouting"); see lib/orbTabs.ts.
+    // Page rows plus each page's tabs ("Draft > Scouting"); see lib/orbTabs.ts.
     return searchOrbDestinations(searchableDestinations, normalizedQuery);
   }, [searchableDestinations, normalizedQuery]);
 
@@ -597,7 +594,7 @@ export default function GmOrb() {
     const leagueId = league.leagueId;
     api
       .getLeagueAlerts(leagueId, 12)
-      // Same read state the Alerts screen shows: server (cross-device)
+      // Same read state the Today Alerts section shows: server (cross-device)
       // plus reads tapped on this phone that haven't synced yet.
       .then(async (result) => {
         const userId = await currentAlertReadUserId();
@@ -872,13 +869,13 @@ export default function GmOrb() {
                     destination={{ ...hit.destination, label: hit.label, subtitle: hit.subtitle, pro: hit.pro }}
                     isCurrent={!hit.tab && hit.route === currentRouteName}
                     showPro={showProTags}
-                    unreadCount={!hit.tab && hit.route === 'Alerts' ? unreadAlertCount : undefined}
+                    unreadCount={hit.route === 'Dashboard' && (!hit.tab || hit.tab.label === 'Alerts') ? unreadAlertCount : undefined}
                     hasNew={
                       hit.tab
-                        ? false
+                        ? hit.route === 'News' && hit.tab.label === 'My League' && recapReady
                         : hit.route === 'Trades'
                           ? tradeHubHasNew
-                          : hit.route === 'Recap'
+                          : hit.route === 'News'
                             ? recapReady
                             : false
                     }
@@ -931,8 +928,8 @@ export default function GmOrb() {
                             key={destination.route}
                             destination={destination}
                             isCurrent={destination.route === currentRouteName}
-                            unreadCount={destination.route === 'Alerts' ? unreadAlertCount : undefined}
-                            hasNew={destination.route === 'Trades' ? tradeHubHasNew : destination.route === 'Recap' ? recapReady : false}
+                            unreadCount={destination.route === 'Dashboard' ? unreadAlertCount : undefined}
+                            hasNew={destination.route === 'Trades' ? tradeHubHasNew : false}
                             showPro={showProTags}
                             onPress={() => go(destination)}
                           />

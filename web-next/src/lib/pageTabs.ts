@@ -2,11 +2,16 @@
 // (navDestinations.ts `tabs`). Kept out of the page components so a page
 // route can parse its param without importing the whole component.
 export type WaiverTab = "recommended" | "explore" | "watchlist";
+export type PlayersTab = "players" | "prospects";
 export type GamesTab = "sim" | "pickem";
 export type RecapsTab = "recaps" | "history" | "storylines" | "roundup";
 
 export function parseWaiverTab(value: string | null | undefined): WaiverTab | undefined {
   return value === "recommended" || value === "explore" || value === "watchlist" ? value : undefined;
+}
+
+export function parsePlayersTab(value: string | null | undefined): PlayersTab {
+  return value === "prospects" ? "prospects" : "players";
 }
 
 export function parseGamesTab(value: string | null | undefined): GamesTab | undefined {

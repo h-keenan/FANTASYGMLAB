@@ -1,44 +1,35 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
-import AppText from '../components/AppText';
-import ErrorState from '../components/ErrorState';
-import BrandHeaderBar from '../components/BrandHeaderBar';
-import type { NativeStackScreenProps } from '@react-navigation/native-stack';
-import { useHeaderHeight } from '@react-navigation/elements';
+import AppText from './AppText';
+import ErrorState from './ErrorState';
+import { useNavigation } from '@react-navigation/native';
+import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { keepPreviousData, useIsRestoring, useQuery } from '@tanstack/react-query';
 
-import CompactModule from '../components/CompactModule';
-import EmptyState from '../components/EmptyState';
-import EvaluationLensHeaderButton from '../components/EvaluationLensHeaderButton';
-import GmStanceHeaderButton from '../components/GmStanceHeaderButton';
-import LeagueSwitcherHeaderButton from '../components/LeagueSwitcherHeaderButton';
-import GridBackground from '../components/GridBackground';
-import ManagerProfileModal from '../components/ManagerProfileModal';
-import ModuleMore from '../components/ModuleMore';
-import PlayerAccordionRow, { usePlayerAccordion } from '../components/PlayerAccordionRow';
-import { PresenceSwap } from '../components/Presence';
-import RoundupPanel from '../components/RoundupPanel';
-import PageFamilyTabs from '../components/PageFamilyTabs';
-import RecapSharePreviewModal from '../components/RecapSharePreviewModal';
-import SegmentedTabBar from '../components/SegmentedTabBar';
-import { SkeletonModule, SkeletonPage, SkeletonRegion, SkeletonStatusHeader } from '../components/Skeleton';
-import StatusHeader from '../components/StatusHeader';
-import TeamAvatar from '../components/TeamAvatar';
-import TradeCompactCard, { TradeAssetCard, type TradeCardAsset } from '../components/TradeCompactCard';
+import CompactModule from './CompactModule';
+import EmptyState from './EmptyState';
+import ManagerProfileModal from './ManagerProfileModal';
+import ModuleMore from './ModuleMore';
+import PlayerAccordionRow, { usePlayerAccordion } from './PlayerAccordionRow';
+import { PresenceSwap } from './Presence';
+import RoundupPanel from './RoundupPanel';
+import RecapSharePreviewModal from './RecapSharePreviewModal';
+import SegmentedTabBar from './SegmentedTabBar';
+import { SkeletonModule, SkeletonPage, SkeletonRegion, SkeletonStatusHeader } from './Skeleton';
+import StatusHeader from './StatusHeader';
+import TeamAvatar from './TeamAvatar';
+import TradeCompactCard, { TradeAssetCard, type TradeCardAsset } from './TradeCompactCard';
 import { api, type RecapStory, type RecapTradeAsset, type WeeklyRecap } from '../lib/api';
 import { toUserErrorMessage } from '../lib/errorMessages';
 import { markRecapOpened } from '../lib/recapSeen';
 import { useOrbClearance } from '../lib/orbLayout';
 import { queryKeys } from '../lib/queryKeys';
 import { buildRecapPage, isMatchupStory, recapFaab, recapMetric, recapScoreline, recapWeekChips, storyInvolves, type RecapSection } from '../lib/recapPage';
-import Money from '../components/Money';
+import Money from './Money';
 import { formatMoney } from '../lib/money';
-import { useScreenHeaderTitle } from '../lib/useScreenHeaderTitle';
 import { useThemeMode } from '../context/ThemeModeContext';
 import { radii, spacing, type ThemeColors } from '../theme';
 import type { RootStackParamList } from '../navigation/RootNavigator';
-
-type Props = NativeStackScreenProps<RootStackParamList, 'Recap'>;
 
 export type RosterMap = Record<string, { playerIds: string[]; teamName: string; avatarId: string; ownerName: string }>;
 
@@ -49,12 +40,21 @@ export type RosterMap = Record<string, { playerIds: string[]; teamName: string; 
  * marks only the week's scoring leader. Every value comes from `GET .../recap`; the crests come from the team profiles.
  * Twin of web-next/src/components/RecapWeekView.tsx; the model is lib/recapPage.ts.
  */
-export default function RecapScreen({ route, navigation }: Props) {
+export default function LeagueRecapPanel({
+  leagueId,
+  leagueName,
+  initialTab,
+  week: requestedRoundupWeek,
+}: {
+  leagueId: string;
+  leagueName: string;
+  initialTab?: 'recap' | 'roundup';
+  week?: number;
+}) {
+  const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const orbClearance = useOrbClearance();
-  const headerHeight = useHeaderHeight();
   const { colors } = useThemeMode();
   const styles = useMemo(() => createStyles(colors), [colors]);
-  const { leagueId, leagueName, initialTab, week: requestedRoundupWeek } = route.params;
   const [tab, setTab] = useState<'recap' | 'roundup'>(initialTab ?? 'recap');
   // Picked from the GM orb or a weekly-roundup push while Recaps is already open.
   useEffect(() => {
@@ -80,20 +80,6 @@ export default function RecapScreen({ route, navigation }: Props) {
   const notReady = recapData != null && !recapData.recap;
   const loading = isRestoring || recapQuery.isFetching;
   const error = recapQuery.isError && !recapData ? toUserErrorMessage(recapQuery.error, 'Failed to load recap.') : null;
-
-  useScreenHeaderTitle(navigation, 'League Recaps', leagueName);
-
-  useEffect(() => {
-    navigation.setOptions({
-      headerRight: () => (
-        <View style={styles.headerButtonRow}>
-          <LeagueSwitcherHeaderButton leagueId={leagueId} leagueName={leagueName} />
-          <EvaluationLensHeaderButton leagueId={leagueId} />
-          <GmStanceHeaderButton leagueId={leagueId} />
-        </View>
-      ),
-    });
-  }, [navigation, leagueId, leagueName, styles]);
 
   // Marks this exact recap (by fingerprint-based recap_id) as opened on this device so Today's "new recap" module goes away.
   useEffect(() => {
@@ -133,7 +119,6 @@ export default function RecapScreen({ route, navigation }: Props) {
 
   const viewBar = (
     <View>
-      <PageFamilyTabs family="league" active="recaps" leagueId={leagueId} leagueName={leagueName} />
       <View style={styles.tabBarRow}>
         <SegmentedTabBar<'recap' | 'roundup'>
           options={[
@@ -149,8 +134,7 @@ export default function RecapScreen({ route, navigation }: Props) {
 
   if (tab === 'roundup') {
     return (
-      <View style={[styles.root, { paddingTop: headerHeight }]}>
-        <GridBackground />
+      <View style={styles.root}>
         {viewBar}
         <RoundupPanel leagueId={leagueId} leagueName={leagueName} initialWeek={requestedRoundupWeek} bottomInset={orbClearance} />
       </View>
@@ -158,12 +142,12 @@ export default function RecapScreen({ route, navigation }: Props) {
   }
 
   if (loading && !recap) {
-    return <SkeletonPage label="League Recaps" layout="detail" family="league" topInset={headerHeight} />;
+    return <SkeletonPage label="League Recaps" layout="detail" style={{ paddingHorizontal: 0 }} />;
   }
 
   if (error) {
     return (
-      <View style={[styles.center, { paddingTop: headerHeight }]}>
+      <View style={styles.center}>
         <ErrorState title="Couldn't load the recap" message={error} onRetry={() => void recapQuery.refetch()} />
       </View>
     );
@@ -180,8 +164,7 @@ export default function RecapScreen({ route, navigation }: Props) {
 
   if (notReady || !recap) {
     return (
-      <View style={[styles.root, { paddingTop: headerHeight }]}>
-        <GridBackground />
+      <View style={styles.root}>
         {viewBar}
         {weekStrip}
         <EmptyState icon="newspaper-outline" title="Recap not ready yet" subtitle="Check back after this week's matchups finish scoring." />
@@ -190,12 +173,10 @@ export default function RecapScreen({ route, navigation }: Props) {
   }
 
   return (
-    <View style={[styles.root, { paddingTop: headerHeight }]}>
-      <GridBackground />
+    <View style={styles.root}>
       {viewBar}
       {weekStrip}
       <ScrollView style={styles.container} contentContainerStyle={[styles.content, { paddingBottom: orbClearance }]}>
-        <BrandHeaderBar leagueId={leagueId} leagueName={leagueName} />
         {loading ? (
           <SkeletonRegion label="Weekly recap" style={styles.stack}>
             <SkeletonStatusHeader rows={0} />
@@ -524,14 +505,13 @@ function StoryBody({
 
 function createStyles(colors: ThemeColors) {
   return StyleSheet.create({
-    headerButtonRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
     root: { flex: 1, backgroundColor: 'transparent' },
     container: { flex: 1, backgroundColor: 'transparent' },
-    content: { padding: spacing.lg, gap: spacing.md },
+    content: { paddingTop: spacing.md, gap: spacing.md },
     stack: { gap: spacing.sm },
-    center: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.background, padding: spacing.xl },
-    tabBarRow: { paddingHorizontal: spacing.lg, paddingTop: spacing.sm },
-    weekRow: { paddingHorizontal: spacing.lg, paddingTop: spacing.sm },
+    center: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: spacing.xl },
+    tabBarRow: { paddingTop: spacing.sm },
+    weekRow: { paddingTop: spacing.sm },
     muted: { fontSize: 14, color: colors.textTertiary },
     leaderStrip: { backgroundColor: colors.glass, borderColor: colors.glassBorder, borderWidth: 1, borderRadius: radii.md, paddingHorizontal: spacing.md, minHeight: 44 },
     teamRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, minHeight: 44 },

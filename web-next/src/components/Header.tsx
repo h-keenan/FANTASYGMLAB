@@ -368,7 +368,7 @@ const ICON_BUTTON_STYLE = {
 /**
  * Search and alerts, level with the page title. Search opens the GM orb's
  * destination and player search (no second search UI); the bell opens an
- * alerts dropdown (AlertsDropdown.tsx) that links to the Alerts page. Alerts only exists inside a league, so the bell is
+ * alerts dropdown (AlertsDropdown.tsx) that links to the Alerts section of Today. Alerts only exists inside a league, so the bell is
  * hidden elsewhere. Rendered only when signed in.
  */
 function HeaderIconActions() {
@@ -379,7 +379,7 @@ function HeaderIconActions() {
   if (!session) return null;
   const name = searchParams.get("name");
   const alertsHref = leagueId
-    ? `/alerts/${encodeURIComponent(leagueId)}${name ? `?name=${encodeURIComponent(name)}` : ""}`
+    ? `/dashboard/${encodeURIComponent(leagueId)}${name ? `?name=${encodeURIComponent(name)}` : ""}#alerts`
     : null;
   const svg = { width: 18, height: 18, viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: 2, strokeLinecap: "round" as const, strokeLinejoin: "round" as const, "aria-hidden": true };
   return (
@@ -409,7 +409,7 @@ function HeaderIconActions() {
  * League switcher + evaluation lens (2026-10-17: "The header needs to have
  * a league switcher built into it, as well as the evaluation lens similar
  * to how the app is") only render on a league-scoped route — on `/` or
- * `/portfolio`/`/news`/etc. there is no league context for either to act
+ * `/leagues`/`/news`/etc. there is no league context for either to act
  * on. Real branding (2026-10-17: "The header also needs the branding") is
  * the same brand mark mobile's splash/loading screen and GM orb use
  * (public/brand-mark.png, copied from mobile/assets/splash-icon.png) — not

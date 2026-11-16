@@ -107,10 +107,10 @@ def test_deep_links_point_at_the_exact_screen():
     assert nd.deep_link_for(_item("lineup_lock", "L 1")) == "/matchup/L%201"
     assert nd.deep_link_for(_item("trade_deadline")) == "/trade-hub/L1"
     assert nd.deep_link_for(_item("waiver_reminder")) == "/waivers/L1"
-    assert nd.deep_link_for(_item("weekly_roundup", week=9)) == "/league-recaps/L1?tab=roundup&week=9"
+    assert nd.deep_link_for(_item("weekly_roundup", week=9)) == "/news?tab=league&league=L1&recaps=roundup&week=9"
     assert nd.deep_link_for(_item("injury", player_id="42")) == "/players/L1/42"
     assert nd.deep_link_for(_item("top_priority")) == "/dashboard/L1"
-    assert nd.deep_link_for({"category": "trade_followup"}) == "/alerts"
+    assert nd.deep_link_for({"category": "trade_followup"}) == "/trade-history"
     assert nd.deep_link_for({"category": "watch"}) == ""
 
 

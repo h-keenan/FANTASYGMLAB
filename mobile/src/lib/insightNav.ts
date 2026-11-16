@@ -14,13 +14,13 @@ export function insightRoute(key: InsightKey, leagueId: string, leagueName: stri
     case 'league-rankings':
       return { screen: 'Teams', params: target.metric ? { ...base, metric: target.metric } : base };
     case 'alerts':
-      return { screen: 'Alerts', params: base };
+      return { screen: 'Dashboard', params: { ...base, focus: 'alerts' } };
     case 'my-team':
       return { screen: 'MyTeam', params: base };
     case 'gm-plan':
       return { screen: 'GmPlan', params: base };
     case 'league-recaps':
-      return { screen: 'Recap', params: base };
+      return { screen: 'News', params: { ...base, initialTab: 'league' } };
   }
 }
 

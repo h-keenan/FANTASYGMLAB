@@ -13,7 +13,7 @@ test('the Roster Age insight opens the Teams screen on the age board', () => {
 });
 
 test('every insight resolves to a registered screen with league params', () => {
-  const screens = new Set(['Teams', 'Alerts', 'MyTeam', 'GmPlan', 'Recap']);
+  const screens = new Set(['Teams', 'Dashboard', 'MyTeam', 'GmPlan', 'News']);
   for (const key of Object.keys(INSIGHT_TARGETS) as InsightKey[]) {
     const route = insightRoute(key, 'L1', 'N');
     assert.ok(screens.has(route.screen), key);
@@ -24,5 +24,5 @@ test('every insight resolves to a registered screen with league params', () => {
 test('openInsight navigates when pressed', () => {
   const calls: Array<[string, object | undefined]> = [];
   openInsight((screen, params) => calls.push([screen, params]), 'injury', 'L1', 'N')();
-  assert.deepEqual(calls, [['Alerts', { leagueId: 'L1', leagueName: 'N' }]]);
+  assert.deepEqual(calls, [['Dashboard', { leagueId: 'L1', leagueName: 'N', focus: 'alerts' }]]);
 });

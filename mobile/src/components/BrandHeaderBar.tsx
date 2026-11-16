@@ -55,7 +55,7 @@ export default function BrandHeaderBar({
             <PressableScale
               style={styles.iconButton}
               hitSlop={8}
-              onPress={() => navigation.navigate('Alerts', { leagueId, leagueName })}
+              onPress={() => navigation.navigate('Dashboard', { leagueId, leagueName, focus: 'alerts' })}
               accessibilityLabel="Alerts"
             >
               <Ionicons name="notifications-outline" size={19} color={colors.textPrimary} />

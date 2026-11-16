@@ -8,7 +8,7 @@ describe("page tab families", () => {
   it("lists the consolidated tabs in order", () => {
     expect(pageTabFamily("trades").tabs.map((t) => t.label)).toEqual(["Ideas", "Finder", "Grade a trade", "History"]);
     expect(pageTabFamily("team").tabs.map((t) => t.label)).toEqual(["Roster", "Players", "Waivers", "Matchup"]);
-    expect(pageTabFamily("league").tabs.map((t) => t.label)).toEqual(["Rankings", "Recaps", "Games"]);
+    expect(pageTabFamily("league").tabs.map((t) => t.label)).toEqual(["Rankings", "Games"]);
   });
   it("never lists a segment twice", () => {
     const segments = PAGE_TAB_FAMILIES.flatMap((f) => f.tabs.map((t) => t.segment));
@@ -39,7 +39,7 @@ describe("page tab families", () => {
 
   it("More leads with the pages the bar does not show and folds the rest into Sections", () => {
     const { lead, sections } = splitMoreByBar(NAV_PAGES);
-    expect(lead.map((p) => p.key).filter((k) => ["alerts", "gm-plan", "draft-center", "live-draft", "commissioner"].includes(k))).toHaveLength(5);
+    expect(lead.map((p) => p.key).filter((k) => ["gm-plan", "draft-center", "commissioner"].includes(k))).toHaveLength(3);
     expect(sections.map((p) => p.key)).toEqual(expect.arrayContaining(["dashboard", "my-team", "waivers", "trade-hub", "league-rankings"]));
     expect(lead.length + sections.length).toBe(NAV_PAGES.length);
   });

@@ -5,10 +5,13 @@ import { useMemo, useState, type ReactNode } from "react";
 import { InsightLink } from "@/components/ui/InsightLink";
 import type { InsightKey } from "@/lib/insightLinks";
 
-import type { PositionNeedGroup, DraftCard, DraftCenterResponse, DraftPickAsset } from "@/lib/api";
+import type { PositionNeedGroup, DraftCard, DraftCenterResponse, DraftPickAsset, LiveDraftDiscoveryResponse } from "@/lib/api";
 import { PickRow, draftPickRowProps } from "@/components/PickRow";
 import { PickGroupList } from "@/components/PickGroupList";
-import { DraftScoutingTab } from "@/components/DraftScoutingTab";
+import dynamic from "next/dynamic";
+
+import { SkeletonCard } from "@/components/Skeleton";
+import { liveDraftIds } from "@/lib/liveDraftPresentation";
 import { pickProvenance } from "@/lib/pickGroups";
 import { PillRow } from "@/components/PillRow";
 import { CompactModule } from "@/components/ui/CompactModule";
@@ -33,17 +36,25 @@ import { TeamAvatar } from "@/components/TeamAvatar";
 import { cardRows, signalPills, signalSpokenLabel, strategyTone, type DraftSignalRow } from "@/lib/draftSignals";
 import { PageTitle } from "@/components/PageTitle";
 
+// The live room is only ever opened while a draft is live: its own chunk keeps it out of every Draft page visit.
+const LiveDraftRoom = dynamic(() => import("@/components/LiveDraftRoom").then((m) => m.LiveDraftRoom), {
+  loading: () => <SkeletonCard lines={4} />,
+});
+
 /**
  * Ports mobile's DraftCenterScreen.tsx (the GM_TOOLS "Draft Center" nav
  * destination) for Revision 14 — same two endpoints, same scope: your own
  * draft posture, pick values with a My Picks/League toggle, and the
- * league-wide decision/partner cards. The live draft board lives on the
- * Live Draft page and prospect scouting on College Scouting.
+ * league-wide decision/partner cards. The page is named "Draft" in the nav
+ * (2026-11-16 consolidation): the live draft room is its "Live room" tab, which
+ * exists only while a Sleeper draft is in progress or paused (the old Live Draft
+ * route redirects to ?tab=live; with no live draft it opens Overview). College
+ * prospect scouting moved to Players > Prospects (`?tab=scouting` here redirects there).
  */
-export type DraftCenterTab = "overview" | "picks" | "scouting";
+export type DraftCenterTab = "overview" | "picks" | "live";
 
 export function parseDraftCenterTab(value: string | null | undefined): DraftCenterTab {
-  return value === "picks" || value === "scouting" ? value : "overview";
+  return value === "picks" || value === "live" ? value : "overview";
 }
 
 export function DraftCenterContent({
@@ -55,6 +66,8 @@ export function DraftCenterContent({
   initialTab = "overview",
   onTabChange,
   needGroups = null,
+  liveDiscovery = null,
+  lens = "Dynasty",
 }: {
   /** With it, the posture cells link to the rankings / plan that explain them. */
   leagueId?: string;
@@ -65,9 +78,15 @@ export function DraftCenterContent({
   initialTab?: DraftCenterTab;
   onTabChange?: (tab: DraftCenterTab) => void;
   needGroups?: PositionNeedGroup[] | null;
+  /** The league's Sleeper draft discovery: the "Live room" tab shows only while it reports a drafting/paused draft. */
+  liveDiscovery?: LiveDraftDiscoveryResponse | null;
+  lens?: string;
 }) {
   const league = leagueId ? { id: leagueId, name: leagueName } : null;
-  const [tab, setTab] = useState<DraftCenterTab>(initialTab);
+  const [selectedTab, setTab] = useState<DraftCenterTab>(initialTab);
+  const liveAvailable = liveDraftIds(liveDiscovery).live.length > 0;
+  // `?tab=live` with no live draft (a stale bookmark, the retired Live Draft route) is just the Draft page.
+  const tab: DraftCenterTab = selectedTab === "live" && !liveAvailable ? "overview" : selectedTab;
   // The GM orb can pick another Draft Center tab while this page is mounted.
   const [seenInitialTab, setSeenInitialTab] = useState(initialTab);
   if (initialTab !== seenInitialTab) {
@@ -95,17 +114,17 @@ export function DraftCenterContent({
   return (
     <main className="page-shell">
       <header className="flex flex-col gap-1">
-        <PageTitle page="Draft Center" leagueName={leagueName} />
+        <PageTitle page="Draft" leagueName={leagueName} />
       </header>
 
       <PillRow
         sticky
         fullWidth
-        ariaLabel="Draft Center section"
+        ariaLabel="Draft section"
         options={[
           { label: "Overview", value: "overview", glyph: "overview" },
           { label: "Picks", value: "picks", glyph: "picks" },
-          { label: "Scouting", value: "scouting", glyph: "scouting" },
+          ...(liveAvailable ? [{ label: "Live room", value: "live", glyph: "scores" as const }] : []),
         ]}
         active={tab}
         onSelect={(value) => {
@@ -248,7 +267,7 @@ export function DraftCenterContent({
         </>
       ) : null}
 
-      {tab === "scouting" ? <DraftScoutingTab myPicks={myPicks} needGroups={needGroups} /> : null}
+      {tab === "live" && liveDiscovery && leagueId ? <LiveDraftRoom leagueId={leagueId} leagueName={leagueName} discovery={liveDiscovery} lens={lens} /> : null}
 
       <ValuesCredit />
     </main>

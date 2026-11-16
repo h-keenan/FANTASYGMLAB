@@ -1,36 +1,27 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { FlatList, Linking, RefreshControl, StyleSheet, View } from 'react-native';
-import PressableScale from '../components/PressableScale';
-import AppText from '../components/AppText';
-import BrandHeaderBar from '../components/BrandHeaderBar';
-import type { NativeStackScreenProps } from '@react-navigation/native-stack';
-import { useHeaderHeight } from '@react-navigation/elements';
+import { Linking, StyleSheet, View } from 'react-native';
+import { useNavigation } from '@react-navigation/native';
+import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { Ionicons } from '@expo/vector-icons';
 import { useIsRestoring, useQuery } from '@tanstack/react-query';
 
-import AccentCard from '../components/AccentCard';
-import EmptyState from '../components/EmptyState';
-import EvaluationLensHeaderButton from '../components/EvaluationLensHeaderButton';
-import GmStanceHeaderButton from '../components/GmStanceHeaderButton';
-import LeagueSwitcherHeaderButton from '../components/LeagueSwitcherHeaderButton';
-import GridBackground from '../components/GridBackground';
-import NextSteps from '../components/NextSteps';
-import PlayerIdentityRow from '../components/PlayerIdentityRow';
-import RecapReadyCard from '../components/RecapReadyCard';
-import ScreenInfoNote from '../components/ScreenInfoNote';
+import AccentCard from './AccentCard';
+import AppText from './AppText';
+import CompactModule from './CompactModule';
+import EmptyState from './EmptyState';
+import ErrorState from './ErrorState';
+import PlayerIdentityRow from './PlayerIdentityRow';
+import PressableScale from './PressableScale';
+import RecapReadyCard from './RecapReadyCard';
 import { api, type AlertItem, type RankedPlayer, type RosterRelationship, type RoundupNotice } from '../lib/api';
 import { alertReadSync, currentAlertReadUserId } from '../lib/alertReads';
 import { toUserErrorMessage } from '../lib/errorMessages';
-import { useOrbClearance } from '../lib/orbLayout';
 import { queryKeys } from '../lib/queryKeys';
-import { useScreenHeaderTitle } from '../lib/useScreenHeaderTitle';
 import { useThemeMode } from '../context/ThemeModeContext';
+import { usePlayerQuickView } from '../context/PlayerQuickViewContext';
 import { radii, spacing, type ThemeColors } from '../theme';
 import type { RootStackParamList } from '../navigation/RootNavigator';
-import { usePlayerQuickView } from '../context/PlayerQuickViewContext';
-import ErrorState from '../components/ErrorState';
 
-type Props = NativeStackScreenProps<RootStackParamList, 'Alerts'>;
 type IconName = React.ComponentProps<typeof Ionicons>['name'];
 
 // Semantic mapping preserved from the pre-redesign screen: red = injury/risk,
@@ -134,23 +125,34 @@ function groupAlertsByType(items: AlertItem[]): AlertGroup[] {
   return groups;
 }
 
-export default function AlertsScreen({ route, navigation }: Props) {
+/**
+ * Alerts as a section of Today (it was its own screen): roster-tied news grouped by type, as a compact tap-to-expand
+ * module whose collapsed line carries the unread count. Read state syncs through lib/alertReads (server + device).
+ * `forceOpen` expands it (and the host scrolls to it) when the route asks for focus 'alerts'.
+ */
+export default function AlertsSection({
+  leagueId,
+  leagueName,
+  forceOpen = false,
+  unreadReported,
+}: {
+  leagueId: string;
+  leagueName: string;
+  forceOpen?: boolean;
+  /** Lets the host (header bell, etc.) know the unread count. */
+  unreadReported?: (count: number) => void;
+}) {
+  const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const { openPlayer: openQuickView } = usePlayerQuickView();
-  const orbClearance = useOrbClearance();
-  const headerHeight = useHeaderHeight();
   const { colors } = useThemeMode();
   const styles = useMemo(() => createStyles(colors), [colors]);
-  const { leagueId, leagueName } = route.params;
   const [items, setItems] = useState<AlertItem[]>([]);
   const [roundupNotice, setRoundupNotice] = useState<RoundupNotice | null>(null);
   const [notReadyReason, setNotReadyReason] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const isRestoring = useIsRestoring();
-  // Shares its cache entry with Dashboard/LeagueDetail/Recap/GmOrb's own
-  // recap fetches (queryKeys.recap) — whichever screen fetches it first
-  // warms the cache for the rest, instead of each one hitting the recap
-  // endpoint independently on every visit.
+  // Shares its cache entry with Dashboard/Recap/GmOrb's own recap fetches (queryKeys.recap).
   const recapQuery = useQuery({
     queryKey: queryKeys.recap(leagueId),
     queryFn: () => api.getLeagueRecap(leagueId),
@@ -158,20 +160,6 @@ export default function AlertsScreen({ route, navigation }: Props) {
   });
   const recapReadyWeek =
     recapQuery.data?.recap && !recapQuery.data.recap.incomplete ? recapQuery.data.recap.week : null;
-
-  useScreenHeaderTitle(navigation, 'Alerts', leagueName);
-
-  useEffect(() => {
-    navigation.setOptions({
-      headerRight: () => (
-        <View style={styles.headerButtonRow}>
-          <LeagueSwitcherHeaderButton leagueId={leagueId} leagueName={leagueName} />
-          <EvaluationLensHeaderButton leagueId={leagueId} />
-          <GmStanceHeaderButton leagueId={leagueId} />
-        </View>
-      ),
-    });
-  }, [navigation, leagueId, styles]);
 
   const load = useCallback(async () => {
     setError(null);
@@ -181,8 +169,8 @@ export default function AlertsScreen({ route, navigation }: Props) {
       if (result.reason) {
         setNotReadyReason(result.reason);
       } else {
-        // `read` is the server's cross-device state (shared with the web
-        // app), overlaid with any read tapped here that hasn't synced yet.
+        // `read` is the server's cross-device state (shared with the web app), overlaid with any read tapped
+        // here that hasn't synced yet.
         const userId = await currentAlertReadUserId();
         setItems(await alertReadSync.reconcile(userId, leagueId, result.items));
         setRoundupNotice(result.roundup_notice ?? null);
@@ -198,21 +186,16 @@ export default function AlertsScreen({ route, navigation }: Props) {
     void load();
   }, [load]);
 
-  // Pull-to-refresh below refreshes both the alerts feed and the shared
-  // recap cache entry — previously one Promise.all did both, now the recap
-  // half is react-query's own refetch.
-  const onRefresh = useCallback(() => {
-    void load();
-    void recapQuery.refetch();
-  }, [load, recapQuery]);
-
   const groupedAlerts = useMemo(() => groupAlertsByType(items), [items]);
+  const unread = useMemo(() => items.filter((item) => !item.read).length, [items]);
+  useEffect(() => {
+    unreadReported?.(unread);
+  }, [unread, unreadReported]);
 
   const openAndMarkRead = (item: AlertItem) => {
     if (!item.read) {
       setItems((prev) => prev.map((row) => (row.alert_key === item.alert_key ? { ...row, read: true } : row)));
-      // Never blocks or errors the tap: remembered locally and retried on
-      // the next load if offline or the backend answers ok: false.
+      // Never blocks or errors the tap: remembered locally and retried on the next load if offline.
       void currentAlertReadUserId().then((userId) => alertReadSync.markRead(userId, leagueId, item.alert_key));
     }
     if (item.link) void Linking.openURL(item.link);
@@ -238,106 +221,86 @@ export default function AlertsScreen({ route, navigation }: Props) {
     openQuickView(player, { leagueId, leagueName });
   };
 
-  if (notReadyReason) {
-    return (
-      <View style={[styles.center, { paddingTop: headerHeight }]}>
+  const summaryParts = notReadyReason
+    ? [{ key: 'setup', text: 'Needs your Sleeper link', tone: 'muted' as const }]
+    : error
+      ? [{ key: 'error', text: "Couldn't load", tone: 'warning' as const }]
+      : [
+          unread > 0
+            ? { key: 'unread', text: `${unread} unread`, tone: 'danger' as const, strong: true }
+            : { key: 'quiet', text: items.length ? 'All caught up' : 'All quiet', tone: 'muted' as const },
+          items.length > 0 ? { key: 'total', text: `${items.length} recent` } : null,
+        ];
+
+  return (
+    <CompactModule
+      id={`dashboard.alerts.${leagueId}`}
+      title="Alerts"
+      parts={summaryParts}
+      tone={unread > 0 ? 'danger' : 'accent'}
+      forceOpen={forceOpen}
+      loading={loading && items.length === 0 && !error && !notReadyReason}
+    >
+      {notReadyReason ? (
         <AppText style={styles.notReadyText}>
           {NOT_READY_MESSAGES[notReadyReason] ?? "Couldn't load alerts for this league."}
         </AppText>
-      </View>
-    );
-  }
-
-  return (
-    <View style={[styles.container, { paddingTop: headerHeight }]}>
-      <GridBackground />
-      <BrandHeaderBar leagueId={leagueId} leagueName={leagueName} />
-      <ScreenInfoNote
-        text={`Recent news about players on your roster in ${leagueName} — injury, role, transaction, and off-field signal only.`}
-      />
-
+      ) : null}
       {error ? <ErrorState compact title="Couldn't load alerts" message={error} onRetry={() => void load()} /> : null}
-
-      <FlatList
-        data={groupedAlerts}
-        keyExtractor={(group, index) => `${group.eventType ?? 'other'}-${group.alerts[0]?.alert_key ?? index}`}
-        contentContainerStyle={[styles.listContent, { paddingBottom: orbClearance }]}
-        refreshControl={
-          <RefreshControl refreshing={loading || recapQuery.isFetching} onRefresh={onRefresh} />
-        }
-        ListHeaderComponent={
-          <>
-            {recapReadyWeek != null ? (
-              <RecapReadyCard
-                week={recapReadyWeek}
-                onPress={() => navigation.navigate('Recap', { leagueId, leagueName })}
-              />
-            ) : null}
-            {roundupNotice ? (
-              <RecapReadyCard
-                week={roundupNotice.week}
-                title={roundupNotice.title}
-                subtitle={roundupNotice.body}
-                icon="stats-chart-outline"
-                onPress={() =>
-                  navigation.navigate('Recap', {
-                    leagueId,
-                    leagueName,
-                    initialTab: 'roundup',
-                    week: roundupNotice.week,
-                  })
-                }
-              />
-            ) : null}
-          </>
-        }
-        ListFooterComponent={
-          !loading ? (
-            <NextSteps steps={['matchup', 'waivers', 'trade-hub']} leagueId={leagueId} leagueName={leagueName} />
-          ) : null
-        }
-        ListEmptyComponent={
-          !loading ? (
-            <EmptyState
-              icon="checkmark-circle-outline"
-              title="All quiet"
-              subtitle="No relevant news for your roster right now."
-            />
-          ) : null
-        }
-        renderItem={({ item: group }) => {
-          const accentColor = eventBadgeColors(colors)[group.eventType ?? ''] ?? colors.textSecondary;
-          const icon = EVENT_BADGE_ICONS[group.eventType ?? ''] ?? 'information-circle-outline';
-          return (
-            <View style={styles.group}>
-              <View style={styles.groupHeaderRow}>
-                <View style={[styles.groupAccentBar, { backgroundColor: accentColor }]} />
-                <Ionicons name={icon} size={13} color={accentColor} style={styles.groupIcon} />
-                <AppText style={[styles.groupLabel, { color: accentColor }]} numberOfLines={1}>
-                  {eventTypeLabel(group.eventType)}
-                </AppText>
-              </View>
-              <View style={styles.groupCards}>
-                {group.alerts.map((alert) => (
-                  <AccentCard
-                    key={alert.alert_key}
-                    accent={alert.read ? colors.border : accentColor}
-                    compact
-                  >
-                    <AlertRow
-                      alert={alert}
-                      showDivider={false}
-                      onPress={() => openAndMarkRead(alert)}
-                      onPressPlayer={() => openPlayer(alert)}
-                    />
-                  </AccentCard>
-                ))}
-              </View>
+      {recapReadyWeek != null ? (
+        <RecapReadyCard
+          week={recapReadyWeek}
+          onPress={() => navigation.navigate('News', { initialTab: 'league', leagueId, leagueName })}
+        />
+      ) : null}
+      {roundupNotice ? (
+        <RecapReadyCard
+          week={roundupNotice.week}
+          title={roundupNotice.title}
+          subtitle={roundupNotice.body}
+          icon="stats-chart-outline"
+          onPress={() =>
+            navigation.navigate('News', {
+              initialTab: 'league',
+              leagueId,
+              leagueName,
+              recapsTab: 'roundup',
+              week: roundupNotice.week,
+            })
+          }
+        />
+      ) : null}
+      {!loading && !error && !notReadyReason && groupedAlerts.length === 0 ? (
+        <EmptyState icon="checkmark-circle-outline" title="All quiet" subtitle="No relevant news for your roster right now." />
+      ) : null}
+      {groupedAlerts.map((group) => {
+        const accentColor = eventBadgeColors(colors)[group.eventType ?? ''] ?? colors.textSecondary;
+        const icon = EVENT_BADGE_ICONS[group.eventType ?? ''] ?? 'information-circle-outline';
+        return (
+          <View key={`${group.eventType ?? 'other'}-${group.alerts[0]?.alert_key}`} style={styles.group}>
+            <View style={styles.groupHeaderRow}>
+              <View style={[styles.groupAccentBar, { backgroundColor: accentColor }]} />
+              <Ionicons name={icon} size={13} color={accentColor} style={styles.groupIcon} />
+              <AppText style={[styles.groupLabel, { color: accentColor }]} numberOfLines={1}>
+                {eventTypeLabel(group.eventType)}
+              </AppText>
             </View>
-          );
-        }}
-      />
-    </View>
+            <View style={styles.groupCards}>
+              {group.alerts.map((alert) => (
+                <AccentCard key={alert.alert_key} accent={alert.read ? colors.border : accentColor} compact>
+                  <AlertRow
+                    alert={alert}
+                    showDivider={false}
+                    onPress={() => openAndMarkRead(alert)}
+                    onPressPlayer={() => openPlayer(alert)}
+                  />
+                </AccentCard>
+              ))}
+            </View>
+          </View>
+        );
+      })}
+    </CompactModule>
   );
 }
 
@@ -446,33 +409,12 @@ function createRowStyles(colors: ThemeColors) {
 
 function createStyles(colors: ThemeColors) {
   return StyleSheet.create({
-    headerButtonRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
-    container: { flex: 1, backgroundColor: 'transparent', paddingTop: spacing.md },
-    center: {
-      flex: 1,
-      alignItems: 'center',
-      justifyContent: 'center',
-      backgroundColor: colors.background,
-      padding: spacing.xl,
-    },
     notReadyText: { textAlign: 'center', color: colors.textSecondary, lineHeight: 20 },
-    listContent: { padding: spacing.lg, paddingTop: 0, paddingBottom: spacing.xl * 3 },
-    group: { marginBottom: spacing.md },
+    group: { marginBottom: spacing.xs },
     groupHeaderRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs, marginBottom: spacing.sm },
     groupAccentBar: { width: 3, height: 14, borderRadius: radii.pill },
     groupIcon: { marginLeft: -2 },
-    groupLabel: {
-      flex: 1,
-      fontSize: 13.5,
-      fontWeight: '700',
-      textTransform: 'uppercase',
-      letterSpacing: 0.5,
-    },
+    groupLabel: { flex: 1, fontSize: 13.5, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.5 },
     groupCards: { gap: spacing.sm },
-    error: {
-      color: colors.danger,
-      paddingHorizontal: spacing.lg,
-      marginBottom: spacing.sm,
-    },
   });
 }

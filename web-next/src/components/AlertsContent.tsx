@@ -5,7 +5,6 @@ import { useEffect, useMemo, useState } from "react";
 import type { AlertItem, AlertsResponse } from "@/lib/api";
 import { markAlertReadSynced, overlayPendingAlertReads, reconcileAlertReads } from "@/lib/alertReadSync";
 import { useRouter } from "next/navigation";
-import { NextSteps } from "@/components/NextSteps";
 import { EmptyState } from "@/components/EmptyState";
 import { PlayerAvatar } from "@/components/PlayerAvatar";
 import { PlayerIdentityTrigger } from "@/components/PlayerIdentityTrigger";
@@ -23,12 +22,12 @@ import {
   rosterRelationshipColorVar,
 } from "@/lib/alertsPresentation";
 import { trackUse } from "@/lib/analytics";
-import { PageTitle } from "@/components/PageTitle";
+import { leagueRecapsHref } from "@/lib/newsLinks";
 import Link from "next/link";
 
 /**
  * Ports mobile's AlertsScreen.tsx (mobile/src/screens) for Revision 7 —
- * the "LEAGUE" nav destination's notification/alert feed. Reads from the
+ * the notification/alert feed (now the Alerts section of Today). Reads from the
  * exact same GET .../alerts endpoint that screen already calls (see that
  * endpoint's docstring in services/mobile_api_service.py) — nothing added
  * there, every field this page uses (items, categories via `event_type`,
@@ -224,7 +223,11 @@ export function AlertRow({ alert, onOpen }: { alert: AlertItem; onOpen: (alert: 
   );
 }
 
-export function AlertsContent({
+/**
+ * The roster-news feed body (grouped by event type, unread dots, read sync). Rendered inside the Alerts section of
+ * Today (components/DashboardAlerts.tsx); the standalone Alerts page is retired and redirects there.
+ */
+export function AlertsFeed({
   leagueId,
   leagueName,
   data,
@@ -257,14 +260,12 @@ export function AlertsContent({
   const notice = data.reason ? alertsReasonMessage(data.reason) : null;
   if (notice) {
     return (
-      <main className="flex-1 flex flex-col justify-center px-4 py-3 max-w-3xl w-full mx-auto">
-        <EmptyState
-          title={data.reason === "empty_roster" ? "No players to watch yet" : "Connect a league to get alerts"}
-          subtitle={notice}
-          actionLabel={data.reason === "empty_roster" ? undefined : "Connect a league"}
-          onAction={() => router.push("/connect-league")}
-        />
-      </main>
+      <EmptyState
+        title={data.reason === "empty_roster" ? "No players to watch yet" : "Connect a league to get alerts"}
+        subtitle={notice}
+        actionLabel={data.reason === "empty_roster" ? undefined : "Connect a league"}
+        onAction={() => router.push("/connect-league")}
+      />
     );
   }
 
@@ -281,14 +282,10 @@ export function AlertsContent({
   const groups = groupAlertsByType(items);
 
   return (
-    <main className="page-shell">
-      <header className="flex flex-col gap-1">
-        <PageTitle page="Alerts" leagueName={leagueName} />
-      </header>
-
+    <div className="flex flex-col gap-3">
       {data.roundup_notice ? (
         <Link
-          href={`/league-recaps/${encodeURIComponent(leagueId)}?name=${encodeURIComponent(leagueName)}&tab=roundup&week=${data.roundup_notice.week}`}
+          href={leagueRecapsHref(leagueId, leagueName, { recaps: "roundup", week: data.roundup_notice.week })}
           onClick={() => trackUse("weekly_roundup", "alert_card_tapped", { leagueId })}
           data-testid="roundup-notice"
         >
@@ -324,7 +321,6 @@ export function AlertsContent({
           })}
         </div>
       )}
-      <NextSteps steps={["matchup", "waivers", "trade-hub"]} leagueId={leagueId} leagueName={leagueName} />
-    </main>
+    </div>
   );
 }

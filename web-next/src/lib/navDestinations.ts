@@ -1,7 +1,9 @@
 import type { NavGlyphName } from "@/components/NavDestinationGlyph";
 import type { CollegeInterest } from "@/lib/displayPreferences";
+import { ACCENT_BY_DESTINATION } from "@/lib/destinationAccents.generated";
 import { accentVar as accent } from "@/lib/destinationAccent";
-import { HOME_SUBTITLE, NAV_PAGES, navPagesIn, type NavCatalogPage } from "@/lib/navCatalog";
+import { HOME_STANDING_SUBTITLE, HOME_SUBTITLE, NAV_PAGES, navPagesIn, type NavCatalogPage } from "@/lib/navCatalog";
+import { HOME_PATH } from "@/lib/retiredRoutes";
 import { TERMS } from "@/lib/terms";
 
 export interface NavDestination {
@@ -42,7 +44,6 @@ export interface NavTab {
 
 const GLYPH_BY_PAGE: Record<string, NavGlyphName> = {
   dashboard: "dashboard",
-  alerts: "alerts",
   "my-team": "myTeam",
   matchup: "matchup",
   waivers: "waivers",
@@ -51,11 +52,8 @@ const GLYPH_BY_PAGE: Record<string, NavGlyphName> = {
   "trade-hub": "tradeHub",
   "gm-plan": "gmPlan",
   "draft-center": "draftCenter",
-  "live-draft": "liveDraft",
-  "league-recaps": "leagueRecaps",
   games: "games",
   commissioner: "commissioner",
-  portfolio: "portfolio",
   "gm-game": "games",
   news: "news",
   community: "community",
@@ -68,6 +66,20 @@ const TAB_PATHS: Record<string, Record<string, (c: TabPathContext) => string>> =
   "league-rankings": {
     Rankings: ({ id, query }) => `/league-rankings/${id}${query}`,
     "Playoff Odds": ({ id, query }) => `/league-rankings/${id}${query}#playoff-odds`,
+  },
+  dashboard: {
+    Alerts: ({ id, query }) => `/dashboard/${id}${query}#alerts`,
+  },
+  players: {
+    Prospects: ({ tabPath }) => tabPath("players", "prospects"),
+  },
+  "draft-center": {
+    "Live room": ({ tabPath }) => tabPath("draft-center", "live"),
+  },
+  news: {
+    NFL: () => "/news",
+    // News is account-wide: the league rides along as `?league=` (the shell keeps the league context from it).
+    "My League": ({ id, query }) => (id ? `/news?tab=league&league=${id}${query.replace("?", "&")}` : "/news?tab=league"),
   },
   "trade-hub": {
     Ideas: ({ id, query }) => `/trade-hub/${id}${query}`,
@@ -113,10 +125,11 @@ export function useNavDestinations(
     path: page.leagueScoped ? `/${page.key}/${id}${query}` : `/${page.key}`,
     subtitle: page.subtitle,
     glyph: GLYPH_BY_PAGE[page.key],
-    color: accent(page.label),
+    // The shared accent map is keyed by catalog id; a page whose label was renamed (Draft Center -> Draft) keeps its id.
+    color: accent(ACCENT_BY_DESTINATION[page.key] ? page.key : page.label),
     pro: page.pro,
     tabs: page.tabs
-      ?.filter((tab) => !(collegeInterest === "off" && page.key === "draft-center" && tab.label === "Scouting"))
+      ?.filter((tab) => !(collegeInterest === "off" && page.key === "players" && tab.label === "Prospects"))
       .map((tab) => ({
         label: tab.label,
         path: (TAB_PATHS[page.key]?.[tab.label] ?? (() => tabPath(page.key, tab.label.toLowerCase())))(context),
@@ -131,7 +144,15 @@ export function useNavDestinations(
 
   const generalDestinations: NavDestination[] = [
     // The league switcher; Account (below) owns settings.
-    { label: TERMS.yourLeagues, path: "/", subtitle: HOME_SUBTITLE, glyph: "home", color: "var(--color-accent)" },
+    {
+      label: TERMS.yourLeagues,
+      path: HOME_PATH,
+      subtitle: HOME_SUBTITLE,
+      glyph: "home",
+      color: "var(--color-accent)",
+      // Portfolio became a section of Home (2026-11-16 nav consolidation): your standing across every league.
+      tabs: [{ label: "Standing", path: `${HOME_PATH}#standing`, subtitle: HOME_STANDING_SUBTITLE, keywords: ["portfolio", "every league", "all leagues", "exposure"], pro: true }],
+    },
     ...navPagesIn("general").map(build),
   ];
 
@@ -206,7 +227,13 @@ export const PAGE_TITLE_BY_SEGMENT: Record<string, string> = {
   // page, or from a link): see navCatalog.ts for the tab homes.
   "fantasy-sim": "Season Outlook",
   "trade-history": "Trade History",
-  "college-scouting": "College Scouting",
+  // Retired nav rows that now redirect into a tab/section of another page (2026-11-16 consolidation).
+  alerts: "Today",
+  leagues: "Your leagues",
+  "live-draft": "Draft",
+  portfolio: "Your leagues",
+  "league-recaps": "News",
+  "college-scouting": "Players",
   "trade-analyzer": "Trade Analyzer",
   "trade-finder": "Trade Finder",
   "trade-offer": "Build an Offer",

@@ -343,6 +343,7 @@ export function LiveDraftContent({
   stateError,
   onRefresh,
   lens = "Dynasty",
+  embedded = false,
 }: {
   leagueId: string;
   leagueName: string;
@@ -353,6 +354,8 @@ export function LiveDraftContent({
   stateError: string | null;
   onRefresh: () => void;
   lens?: string;
+  /** Hosted inside the Draft page's "Live room" tab: no page shell or title of its own. */
+  embedded?: boolean;
 }) {
   const liveOrPaused = discovery.drafts.filter((draft) => draft.status === "drafting" || draft.status === "paused");
   const hasCompleted = discovery.drafts.some((draft) => draft.status === "complete");
@@ -376,11 +379,14 @@ export function LiveDraftContent({
     );
   }
 
+  const Shell: "main" | "div" = embedded ? "div" : "main";
   return (
-    <main className="page-shell">
-      <header className="flex flex-col gap-1">
-        <PageTitle page="Live Draft" leagueName={leagueName} />
-      </header>
+    <Shell className={embedded ? "flex flex-col gap-3" : "page-shell"}>
+      {embedded ? null : (
+        <header className="flex flex-col gap-1">
+          <PageTitle page="Live Draft" leagueName={leagueName} />
+        </header>
+      )}
 
       {/* coridian_, 2026-10-19: "at least put a coming soon tag on the live
           draft section for now" — this page is real and functional, but
@@ -626,6 +632,6 @@ export function LiveDraftContent({
         </>
       )}
       <ValuesCredit />
-    </main>
+    </Shell>
   );
 }

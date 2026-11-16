@@ -1,6 +1,9 @@
 "use client";
 
 import { PageTabBar } from "@/components/PageTabBar";
+import { ProspectsTab } from "@/components/ProspectsTab";
+import { useDisplayPreferences } from "@/context/DisplayPreferencesContext";
+import { parsePlayersTab, type PlayersTab } from "@/lib/pageTabs";
 import { EmptyState } from "@/components/EmptyState";
 import { PlayerAccordionRow, usePlayerAccordion } from "@/components/ui/PlayerAccordionRow";
 import { usePlayerQuickView } from "@/context/PlayerQuickViewContext";
@@ -188,9 +191,13 @@ export function PlayersContent({
   rosters = [],
   idp = null,
   lens = "Dynasty",
+  initialTab = "players",
+  onTabChange,
 }: {
   leagueId: string;
   leagueName: string;
+  initialTab?: PlayersTab;
+  onTabChange?: (tab: PlayersTab) => void;
   data: LeagueRankingsResponse;
   picks?: DraftPickAsset[];
   rosters?: Array<Record<string, unknown>>;
@@ -201,6 +208,16 @@ export function PlayersContent({
   lens?: string;
 }) {
   const accordion = usePlayerAccordion();
+  const [selectedTab, setTab] = useState<PlayersTab>(initialTab);
+  // The GM orb can pick the other tab while this page is mounted.
+  const [seenInitialTab, setSeenInitialTab] = useState(initialTab);
+  if (initialTab !== seenInitialTab) {
+    setSeenInitialTab(initialTab);
+    setTab(initialTab);
+  }
+  const { collegeInterest } = useDisplayPreferences();
+  const showProspectsTab = collegeInterest !== "off" || initialTab === "prospects";
+  const tab: PlayersTab = selectedTab === "prospects" && showProspectsTab ? "prospects" : "players";
   const [search, setSearch] = useState("");
   const [position, setPosition] = useState("ALL");
   const [ageFilter, setAgeFilter] = useState<PlayersAgeFilter>("ALL");
@@ -310,6 +327,27 @@ export function PlayersContent({
         <PageTitle page="Players" leagueName={leagueName} />
       </header>
 
+      {/* College Scouting moved here (2026-11-16 nav consolidation). The tab hides when the college-football
+          preference is off, unless a link opened it directly. */}
+      {showProspectsTab ? (
+        <PillRow
+          ariaLabel="Players section"
+          options={[
+            { label: "Players", value: "players", glyph: "players" },
+            { label: "Prospects", value: "prospects", glyph: "scouting" },
+          ]}
+          active={tab}
+          onSelect={(value) => {
+            const next = parsePlayersTab(value);
+            setTab(next);
+            onTabChange?.(next);
+          }}
+        />
+      ) : null}
+
+      {tab === "prospects" ? (
+        <ProspectsTab leagueId={leagueId} lens={lens} />
+      ) : (
       <>
           <div className="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap">
             <input
@@ -428,6 +466,7 @@ export function PlayersContent({
             </p>
           )}
       </>
+      )}
       {picks.length > 0 ? (
         <CompactModule
           id="players.picks"

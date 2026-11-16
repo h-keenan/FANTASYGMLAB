@@ -35,6 +35,7 @@
   "/player-compare/[leagueId]": 1008,
   "/players/[leagueId]": 996,
   "/players/[leagueId]/[playerId]": 1105,
+  "/leagues": 998,
   "/portfolio": 998,
   "/premium": 967,
   "/sample-league": 1134,

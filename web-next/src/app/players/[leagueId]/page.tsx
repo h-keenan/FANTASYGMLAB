@@ -11,6 +11,7 @@ import { PlayersContent } from "@/components/PlayersContent";
 import { ErrorState, reloadPage } from "@/components/ErrorState";
 import { LoadingScreen } from "@/components/LoadingScreen";
 import { UNNAMED_LEAGUE } from "@/lib/leagueName";
+import { parsePlayersTab, type PlayersTab } from "@/lib/pageTabs";
 
 interface LoadedData {
   rankings: LeagueRankingsResponse;
@@ -69,6 +70,14 @@ export default function PlayersPage() {
     };
   }, [authLoading, session, leagueId, lens, lensReady, router]);
 
+  // Keep ?tab= in the address bar so a tab is linkable/refreshable without a navigation.
+  function syncTabToUrl(tab: PlayersTab) {
+    const url = new URL(window.location.href);
+    if (tab === "players") url.searchParams.delete("tab");
+    else url.searchParams.set("tab", tab);
+    window.history.replaceState(null, "", url);
+  }
+
   if (authLoading || (!data && !error)) {
     return (
       <LoadingScreen label="Players" layout="list" family="team" />
@@ -90,6 +99,8 @@ export default function PlayersPage() {
       rosters={data.rosters}
       idp={data.idp}
       lens={lens}
+      initialTab={parsePlayersTab(searchParams.get("tab"))}
+      onTabChange={syncTabToUrl}
     />
   );
 }

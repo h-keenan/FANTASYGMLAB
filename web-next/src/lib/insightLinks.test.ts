@@ -8,9 +8,13 @@ import { RANK_BOARD_CONFIG } from "@/lib/leagueRankingsPresentation";
 describe("insight -> destination map", () => {
   it("sends every insight to a real league-scoped nav page", () => {
     for (const [key, target] of Object.entries(INSIGHT_TARGETS)) {
+      // Alerts and League Recaps retired as pages: they are a Today section and News > My League (lib/retiredRoutes.ts).
+      const retired = target.page === "alerts" || target.page === "league-recaps";
       const page = NAV_PAGES.find((candidate) => candidate.key === target.page);
-      expect(page, key).toBeDefined();
-      expect(page?.leagueScoped, key).toBe(true);
+      if (!retired) {
+        expect(page, key).toBeDefined();
+        expect(page?.leagueScoped, key).toBe(true);
+      }
       expect(target.label.length, key).toBeGreaterThan(0);
     }
   });
@@ -27,7 +31,7 @@ describe("insight -> destination map", () => {
   });
 
   it("encodes the league and omits the anchor for page-level targets", () => {
-    expect(insightHref("injury", { id: "a/b", name: "X & Y" })).toBe("/alerts/a%2Fb?name=X%20%26%20Y");
+    expect(insightHref("injury", { id: "a/b", name: "X & Y" })).toBe("/dashboard/a%2Fb?name=X%20%26%20Y#alerts");
   });
 
   it("composes a screen-reader name that states the fact then the destination", () => {

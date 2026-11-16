@@ -30,7 +30,7 @@ export type PushTapTarget =
   | { screen: 'Matchup'; leagueId: string; leagueName: string }
   | { screen: 'Waivers'; leagueId: string; leagueName: string }
   | { screen: 'Trades'; leagueId: string; leagueName: string }
-  | { screen: 'Recap'; leagueId: string; leagueName: string; initialTab: 'roundup'; week?: number }
+  | { screen: 'News'; initialTab: 'league'; leagueId: string; leagueName: string; recapsTab: 'roundup'; week?: number }
   | { screen: 'TradeHistory' }
   | null;
 
@@ -61,10 +61,11 @@ export function resolvePushTapTarget(data: unknown): PushTapTarget {
   if (category === 'weekly_roundup') {
     const week = Number(payload.week);
     return {
-      screen: 'Recap',
+      screen: 'News',
+      initialTab: 'league',
       leagueId,
       leagueName,
-      initialTab: 'roundup',
+      recapsTab: 'roundup',
       ...(Number.isInteger(week) && week > 0 ? { week } : {}),
     };
   }

@@ -1,29 +1,27 @@
-import GlossaryNote from '../components/GlossaryNote';
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { FlatList, StyleSheet, View } from 'react-native';
-import PressableScale from '../components/PressableScale';
-import AppText from '../components/AppText';
-import ErrorState from '../components/ErrorState';
+import GlossaryNote from './GlossaryNote';
+import React, { forwardRef, useCallback, useEffect, useImperativeHandle, useMemo, useRef, useState } from 'react';
+import { StyleSheet, View } from 'react-native';
+import PressableScale from './PressableScale';
+import AppText from './AppText';
+import ErrorState from './ErrorState';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import { useHeaderHeight } from '@react-navigation/elements';
 import { Ionicons } from '@expo/vector-icons';
 import { useIsRestoring, useQuery, useQueryClient } from '@tanstack/react-query';
 
-import FadeInView from '../components/FadeInView';
-import EmptyState from '../components/EmptyState';
-import PercentileBar from '../components/PercentileBar';
-import PremiumLock from '../components/PremiumLock';
-import PortfolioFreeStanding from '../components/PortfolioFreeStanding';
-import GridBackground from '../components/GridBackground';
-import BriefingItemPlayers from '../components/BriefingItemPlayers';
-import TeamAvatar from '../components/TeamAvatar';
-import ToneBadge from '../components/ToneBadge';
-import SectionHeading from '../components/SectionHeading';
-import PortfolioExposurePanel from '../components/PortfolioExposurePanel';
-import PortfolioSharePreviewModal from '../components/PortfolioSharePreviewModal';
-import SegmentedTabBar from '../components/SegmentedTabBar';
-import SkeletonBlock, { SkeletonPage } from '../components/Skeleton';
+import FadeInView from './FadeInView';
+import EmptyState from './EmptyState';
+import PercentileBar from './PercentileBar';
+import PremiumLock from './PremiumLock';
+import PortfolioFreeStanding from './PortfolioFreeStanding';
+import BriefingItemPlayers from './BriefingItemPlayers';
+import TeamAvatar from './TeamAvatar';
+import ToneBadge from './ToneBadge';
+import SectionHeading from './SectionHeading';
+import PortfolioExposurePanel from './PortfolioExposurePanel';
+import PortfolioSharePreviewModal from './PortfolioSharePreviewModal';
+import SegmentedTabBar from './SegmentedTabBar';
+import SkeletonBlock, { SkeletonPage } from './Skeleton';
 import {
   api,
   type DashboardItem,
@@ -51,7 +49,6 @@ import { ESPN_NOT_SUPPORTED } from '../lib/leaguesGlance';
 import { winShare } from '../lib/percentile';
 import { queryKeys } from '../lib/queryKeys';
 import { toUserErrorMessage } from '../lib/errorMessages';
-import { useOrbClearance } from '../lib/orbLayout';
 import { useThemeMode } from '../context/ThemeModeContext';
 import { radii, spacing, type ThemeColors } from '../theme';
 import type { RootStackParamList } from '../navigation/RootNavigator';
@@ -100,14 +97,19 @@ function recordLabel(league: PortfolioLeague): string {
  * happening. `useQuery` below gives it the exact same cache-first/
  * background-refetch treatment the rest of the app already relies on.
  */
-export default function PortfolioScreen() {
+export interface PortfolioStandingHandle {
+  /** Starts loading the leagues below the fold (the host list reached its end). */
+  unlock: () => void;
+}
+
+const PortfolioStanding = forwardRef<PortfolioStandingHandle>(function PortfolioStanding(_props, ref) {
   const { openPlayer: openQuickView } = usePlayerQuickView();
-  const orbClearance = useOrbClearance();
-  const headerHeight = useHeaderHeight();
   const navigation = useNavigation<Navigation>();
   const { colors } = useThemeMode();
   const styles = useMemo(() => createStyles(colors), [colors]);
   const [shareOpen, setShareOpen] = useState(false);
+  const unlockRef = useRef<() => void>(() => undefined);
+  useImperativeHandle(ref, () => ({ unlock: () => unlockRef.current() }), []);
   const [view, setView] = useState<'leagues' | 'exposure'>('leagues');
 
   // The persisted AsyncStorage cache restores asynchronously — gating on it
@@ -178,6 +180,7 @@ export default function PortfolioScreen() {
   }, [isRestoring, savedLeaguesKey, queryClient]);
   const retryLeague = useCallback((leagueId: string) => loaderRef.current?.retry(leagueId), []);
   const unlockMoreLeagues = useCallback(() => loaderRef.current?.unlock(), []);
+  unlockRef.current = unlockMoreLeagues;
   const [shareRequested, setShareRequested] = useState(false);
   const requestShare = useCallback(() => {
     setShareRequested(true);
@@ -236,49 +239,39 @@ export default function PortfolioScreen() {
   // goes away the moment the index arrives.
   const showSplash = useDelayedFlag(loading, PORTFOLIO_SPLASH_DELAY_MS);
   if (loading) {
-    if (showSplash) return <SkeletonPage label="Portfolio" layout="dashboard" topInset={headerHeight} />;
+    if (showSplash) return <SkeletonPage label="Your standing" layout="dashboard" style={styles.embedded} />;
     return (
-      <View style={[styles.root, { paddingTop: headerHeight }]} testID="portfolio-shell">
-        <GridBackground />
-        <View style={styles.listContent}>
-          {Array.from({ length: PORTFOLIO_SHELL_SKELETON_COUNT }, (_, position) => (
-            <PortfolioLeagueSkeleton
-              key={position}
-              isFirst={position === 0}
-              isLast={position === PORTFOLIO_SHELL_SKELETON_COUNT - 1}
-              styles={styles}
-            />
-          ))}
-        </View>
+      <View testID="portfolio-shell">
+        {Array.from({ length: PORTFOLIO_SHELL_SKELETON_COUNT }, (_, position) => (
+          <PortfolioLeagueSkeleton
+            key={position}
+            isFirst={position === 0}
+            isLast={position === PORTFOLIO_SHELL_SKELETON_COUNT - 1}
+            styles={styles}
+          />
+        ))}
       </View>
     );
   }
 
   if (error) {
-    return (
-      <View style={[styles.center, { paddingTop: headerHeight }]}>
-        <ErrorState title="Couldn't load your portfolio" message={error} onRetry={() => void indexQuery.refetch()} />
-      </View>
-    );
+    return <ErrorState compact title="Couldn't load your standing" message={error} onRetry={() => void indexQuery.refetch()} />;
   }
 
   if (!index || !composed) return null;
 
   if (!index.is_premium) {
     return (
-      <View style={[styles.root, { paddingTop: headerHeight }]}>
-        <GridBackground />
-        <View style={styles.lockWrap}>
-          <PortfolioFreeStanding />
-          <PremiumLock
-            feature="portfolio"
-            title={index.upsell?.title ?? 'Portfolio is a Pro feature'}
-            description={
-              index.upsell?.body ??
-              'Upgrade to Pro to see your standing across every saved league in one place.'
-            }
-          />
-        </View>
+      <View style={styles.lockWrap}>
+        <PortfolioFreeStanding />
+        <PremiumLock
+          feature="portfolio"
+          title={index.upsell?.title ?? 'Your standing across every league is a Pro feature'}
+          description={
+            index.upsell?.body ??
+            'Upgrade to Pro to see your standing across every saved league in one place.'
+          }
+        />
       </View>
     );
   }
@@ -299,48 +292,35 @@ export default function PortfolioScreen() {
 
   if (rows.length === 0 && composed.failedLeagues.length === 0) {
     return (
-      <View style={[styles.root, { paddingTop: headerHeight }]}>
-        <GridBackground />
-        <EmptyState
-          icon="layers-outline"
-          title="No saved leagues yet"
-          subtitle="Connect a league to see your standing, record, and top need or opportunity across every league here."
-          actionLabel="Connect a league"
-          onPressAction={() => navigation.navigate('Home', { openAddLeague: true })}
-          secondaryLabel="Explore a sample league first"
-          onPressSecondary={() => navigation.navigate('SampleLeague')}
-        />
-      </View>
+      <EmptyState
+        icon="layers-outline"
+        title="No saved leagues yet"
+        subtitle="Connect a league to see your standing, record, and top need or opportunity across every league here."
+        actionLabel="Connect a league"
+        onPressAction={() => navigation.navigate('Home', { openAddLeague: true })}
+        secondaryLabel="Explore a sample league first"
+        onPressSecondary={() => navigation.navigate('SampleLeague')}
+      />
     );
   }
 
   return (
-    <View style={[styles.root, { paddingTop: headerHeight }]}>
-      <GridBackground />
-      <FlatList
-        style={styles.list}
-        contentContainerStyle={[styles.listContent, { paddingBottom: orbClearance }]}
-        data={view === 'leagues' ? rows : []}
-        keyExtractor={(item) => item.league.league_id}
-        onEndReached={unlockMoreLeagues}
-        onEndReachedThreshold={1.5}
-        ListFooterComponent={view === 'exposure' ? <PortfolioExposurePanel /> : null}
-        ListHeaderComponent={
-          <View style={styles.infoNoteWrap}>
-            <SegmentedTabBar
-              options={[
-                { key: 'leagues', label: 'Leagues', glyph: 'leagues' as const },
-                { key: 'exposure', label: 'Exposure', glyph: 'exposure' as const },
-              ]}
-              active={view}
-              onChange={setView}
-            />
-            {view === 'leagues' ? (
-              <>
+    <View>
+      <View style={styles.infoNoteWrap}>
+        <SegmentedTabBar
+          options={[
+            { key: 'leagues', label: 'Leagues', glyph: 'leagues' as const },
+            { key: 'exposure', label: 'Exposure', glyph: 'exposure' as const },
+          ]}
+          active={view}
+          onChange={setView}
+        />
+        {view === 'leagues' ? (
+          <>
             <View style={styles.headerBlock}>
               <View style={styles.headerTop}>
                 <View style={styles.headerTitleWrap}>
-                  <SectionHeading title="Your leagues" caption="Standing, record, and top need per league." />
+                  <SectionHeading title="Your standing" caption="Standing, record, and top need per league." />
                 </View>
                 {/* Share waits for every row: a share card of a half-loaded
                     portfolio would silently leave leagues out. Tapping it
@@ -353,13 +333,10 @@ export default function PortfolioScreen() {
                   </PressableScale>
                 ) : null}
               </View>
-              <PressableScale onPress={() => navigation.navigate('Home')} hitSlop={8} accessibilityRole="link">
-                <AppText style={styles.linkText}>+ Add a league</AppText>
-              </PressableScale>
             </View>
             <GlossaryNote terms={['rosterPower']} label="What is Roster Power?" />
             {draftingLeagues.length > 0 ? (
-              <DraftingLeaguesNote leagues={draftingLeagues} colors={colors} styles={styles} onOpen={(league) => navigation.navigate('LiveDraft', { leagueId: league.league_id, leagueName: league.league_name })} />
+              <DraftingLeaguesNote leagues={draftingLeagues} colors={colors} styles={styles} onOpen={(league) => navigation.navigate('DraftCenter', { leagueId: league.league_id, leagueName: league.league_name, tab: 'live' })} />
             ) : null}
             {espnLeagues.length > 0 ? (
               <EspnLeaguesNote leagues={espnLeagues} colors={colors} styles={styles} onOpen={(league) => navigation.navigate('MyTeam', { leagueId: league.league_id, leagueName: league.league_name })} />
@@ -367,33 +344,35 @@ export default function PortfolioScreen() {
             {realFailedLeagues.length > 0 ? (
               <FailedLeaguesNote leagues={realFailedLeagues} colors={colors} styles={styles} onRetry={retryLeague} />
             ) : null}
-              </>
-            ) : null}
-          </View>
-        }
-        renderItem={({ item, index: position }) =>
-          item.kind === 'league' ? (
-            <PortfolioLeagueCard
-              league={item.league}
-              signalsPending={item.signalsPending}
-              isFirst={position === 0}
-              isLast={position === rows.length - 1}
-              colors={colors}
-              styles={styles}
-              onPress={() => openLeague(item.league)}
-              onPressPlayer={openPlayer}
-            />
-          ) : (
-            <PortfolioLeagueSkeleton
-              league={item.league}
-              isFirst={position === 0}
-              isLast={position === rows.length - 1}
-              styles={styles}
-              onRetry={retryLeague}
-            />
+          </>
+        ) : null}
+      </View>
+      {view === 'leagues'
+        ? rows.map((item, position) =>
+            item.kind === 'league' ? (
+              <PortfolioLeagueCard
+                key={item.league.league_id}
+                league={item.league}
+                signalsPending={item.signalsPending}
+                isFirst={position === 0}
+                isLast={position === rows.length - 1}
+                colors={colors}
+                styles={styles}
+                onPress={() => openLeague(item.league)}
+                onPressPlayer={openPlayer}
+              />
+            ) : (
+              <PortfolioLeagueSkeleton
+                key={item.league.league_id}
+                league={item.league}
+                isFirst={position === 0}
+                isLast={position === rows.length - 1}
+                styles={styles}
+                onRetry={retryLeague}
+              />
+            ),
           )
-        }
-      />
+        : <PortfolioExposurePanel />}
       <PortfolioSharePreviewModal
         visible={shareOpen}
         onClose={() => setShareOpen(false)}
@@ -401,7 +380,9 @@ export default function PortfolioScreen() {
       />
     </View>
   );
-}
+});
+
+export default PortfolioStanding;
 
 function DraftingLeaguesNote({
   leagues,
@@ -689,10 +670,8 @@ function PortfolioSignal({
 
 function createStyles(colors: ThemeColors) {
   return StyleSheet.create({
-    root: { flex: 1, backgroundColor: 'transparent' },
-    list: { backgroundColor: 'transparent' },
-    lockWrap: { padding: spacing.lg },
-    listContent: { padding: spacing.lg },
+    embedded: { paddingHorizontal: 0 },
+    lockWrap: { gap: spacing.md },
     infoNoteWrap: { marginBottom: spacing.md, gap: spacing.sm },
     headerBlock: { gap: spacing.xs },
     headerTop: { flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between' },
