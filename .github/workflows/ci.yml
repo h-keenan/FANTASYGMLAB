@@ -80,6 +80,8 @@ jobs:
         run: node scripts/check_lib_twins.mjs
       - name: Check every player and pick is tappable
         run: node scripts/check_player_tap.mjs
+      - name: Check the one InfoMark standard
+        run: node scripts/check_info_mark_usage.mjs
 
   mobile-app:
     needs: [classify]

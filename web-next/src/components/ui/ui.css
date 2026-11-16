@@ -345,12 +345,47 @@
   scale: var(--press-scale);
   opacity: var(--press-opacity);
 }
-/* WhyCorner: the 44px "why" target pinned inside a tappable tile (the tile link keeps the rest of the surface). */
-.ui-why-corner { position: absolute; top: 0; right: 0; width: var(--touch-target-min); height: var(--touch-target-min); display: flex; align-items: flex-start; justify-content: flex-end; pointer-events: none; }
-.ui-why-corner-btn { pointer-events: auto; width: 20px; height: 20px; margin: 4px; align-items: center; justify-content: center; border-radius: 999px; font-size: 0.6875rem; font-weight: 800; line-height: 1; color: var(--color-text-muted); background: color-mix(in srgb, var(--color-text-primary) 8%, transparent); }
-.ui-why-corner-btn::after { inset: -12px -4px -12px -12px; }
-/* The corner "?" never sits on the tile's label: the label keeps clear of it on both sides so it stays centered (coridian_ 2026-11-16). */
-.ui-why-host [data-tile-label] { padding-inline: 22px; }
+/* InfoMark: the one inline "?" (batch A). A glyph-sized box after the label it explains; the 44px hit area is an expanded ::after so it never adds height or width. */
+.ui-info-mark {
+  position: relative;
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  padding: 0;
+  margin: 0 0 0 6px;
+  border: 0;
+  border-radius: 999px;
+  background: none;
+  color: var(--color-text-muted);
+  font-size: 0.8125rem;
+  font-weight: 800;
+  line-height: 1;
+  vertical-align: middle;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+.ui-info-mark::after {
+  content: "";
+  position: absolute;
+  inset: -13px;
+}
+.ui-info-mark:hover,
+.ui-info-mark:focus-visible {
+  color: var(--color-accent);
+}
+.ui-info-mark:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 1px;
+}
+.ui-info-mark:active {
+  scale: var(--press-scale);
+  opacity: var(--press-opacity);
+}
+.ui-info-term { display: flex; flex-direction: column; gap: 2px; }
+.ui-info-term-title { margin: 0; font-size: 0.85rem; font-weight: 700; color: var(--color-text-primary); }
 .ui-why-body {
   display: flex;
   flex-direction: column;
