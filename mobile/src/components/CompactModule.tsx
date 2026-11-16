@@ -10,6 +10,7 @@ import { useThemeMode } from '../context/ThemeModeContext';
 import { compactAriaLabel, compactParts, type CompactPart, type CompactTone } from '../lib/compactModule';
 import { simOpenKey, simParseOpen } from '../lib/simLayout';
 import { spacing, type ThemeColors } from '../theme';
+import ModuleErrorBoundary from './ModuleErrorBoundary';
 import Money from './Money';
 import { SkeletonModule, SkeletonRegion } from './Skeleton';
 import { Collapse } from './Presence';
@@ -159,11 +160,11 @@ export default function CompactModule({
       {preview ? <View testID="compact-preview">{preview}</View> : null}
       {expandIn === 'inline' ? (
         <Collapse open={open && hasBody}>
-          <View style={{ gap: spacing.md }}>{children}</View>
+          <View style={{ gap: spacing.md }}><ModuleErrorBoundary name={name}>{children}</ModuleErrorBoundary></View>
         </Collapse>
       ) : (
         <Sheet open={open} onClose={() => setOpen(false)} title={name}>
-          {children}
+          <ModuleErrorBoundary name={name}>{children}</ModuleErrorBoundary>
         </Sheet>
       )}
     </AccentCard>

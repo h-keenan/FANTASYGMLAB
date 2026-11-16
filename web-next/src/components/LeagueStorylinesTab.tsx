@@ -24,6 +24,7 @@ import {
 
 
 
+import { EmptyState } from "@/components/EmptyState";
 import { ErrorState } from "@/components/ErrorState";
 import { Money } from "@/components/Money";
 import { formatMoney } from "@/lib/money";
@@ -156,11 +157,7 @@ export function StorylinesTab({
 
   const report = data.storylines;
   if (!report) {
-    return (
-      <p className="text-sm" style={{ color: "var(--color-text-muted)" }}>
-        Storylines need a loaded league.
-      </p>
-    );
+    return <EmptyState title="No storylines yet" subtitle="Storylines need a loaded league." />;
   }
 
   const cards: ReactNode[] = [];

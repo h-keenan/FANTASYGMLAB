@@ -1,4 +1,5 @@
 import type { DraftSignalRow } from './draftSignals';
+import { normalizeCollegeProspects, normalizeLeagueRankings, normalizeMe, normalizeCommissionerIntegrity, normalizeLeagueRosters, normalizeLeagueTeamProfiles, normalizeSharedCommunityTrades } from './apiDefaults';
 import type { SimNotificationsResponse } from './simNotifications';
 import { AppState } from 'react-native';
 import type { VerdictAssumptions, VerdictFeedbackReason } from './verdictTrust';
@@ -3965,7 +3966,7 @@ export const api = {
    * returns. Called by ShowcaseModeProvider — nothing else should touch it.
    */
   setShowcaseModeEnabled,
-  getMe: () => authorizedFetch<MeResponse>('/v1/me'),
+  getMe: () => authorizedFetch<MeResponse>('/v1/me').then(normalizeMe),
   /** GDPR/CCPA data-access request — every row this account owns, as JSON. */
   exportMyData: () => authorizedFetch<{ ok: true; generated_at: string; user: object; tables: object }>('/v1/me/export'),
   getLeague: (leagueId: string) =>
@@ -3977,11 +3978,11 @@ export const api = {
   getLeagueRosters: (leagueId: string) =>
     authorizedFetch<LeagueRostersResponse>(
       `/v1/leagues/${encodeURIComponent(leagueId)}/rosters`,
-    ),
+    ).then(normalizeLeagueRosters),
   getLeagueTeamProfiles: (leagueId: string) =>
     authorizedFetch<LeagueTeamProfilesResponse>(
       `/v1/leagues/${encodeURIComponent(leagueId)}/team-profiles`,
-    ),
+    ).then(normalizeLeagueTeamProfiles),
   getLeagueTeamRankings: (leagueId: string) =>
     authorizedFetch<LeagueTeamRankingsResponse>(
       `/v1/leagues/${encodeURIComponent(leagueId)}/team-rankings`,
@@ -4013,7 +4014,7 @@ export const api = {
   getCommissionerIntegrity: (leagueId: string, draftOrder: DraftOrderRule = 'unknown') =>
     authorizedFetch<CommissionerIntegrityResponse>(
       `/v1/leagues/${encodeURIComponent(leagueId)}/commissioner/integrity?draft_order=${encodeURIComponent(draftOrder)}`,
-    ),
+    ).then(normalizeCommissionerIntegrity),
   // The caller's saved draft-order rule (stored per user + league beside Team Situation).
   getDraftOrderRule: (leagueId: string) =>
     authorizedFetch<DraftOrderRuleResponse>(`/v1/leagues/${encodeURIComponent(leagueId)}/commissioner/draft-order`),
@@ -4201,7 +4202,7 @@ export const api = {
     params.set('limit', String(options?.limit ?? 300));
     return authorizedFetch<LeagueRankingsResponse>(
       `/v1/leagues/${encodeURIComponent(leagueId)}/rankings?${params.toString()}`,
-    );
+    ).then(normalizeLeagueRankings);
   },
   // Name search over the FULL valued pool (not the top-300 rankings window) so a
   // low-value rookie/backup is still findable. Same row shape as getLeagueRankings.
@@ -4213,7 +4214,7 @@ export const api = {
     params.set('limit', String(options?.limit ?? 25));
     return authorizedFetch<LeagueRankingsResponse>(
       `/v1/leagues/${encodeURIComponent(leagueId)}/players/search?${params.toString()}`,
-    );
+    ).then(normalizeLeagueRankings);
   },
   // Exact id lookup over the same full pool (max 25 ids, request order, unknown
   // ids omitted), for ids that arrive via deep links/prefills and may be ranked
@@ -4224,7 +4225,7 @@ export const api = {
     if (options?.lens) params.set('lens', options.lens);
     return authorizedFetch<LeagueRankingsResponse>(
       `/v1/leagues/${encodeURIComponent(leagueId)}/players/search?${params.toString()}`,
-    );
+    ).then(normalizeLeagueRankings);
   },
   getPlayerRankInLeague: (leagueId: string, playerId: string, options?: { lens?: ValuationLens }) => {
     const params = new URLSearchParams();
@@ -4446,7 +4447,7 @@ export const api = {
       `/v1/leagues/${encodeURIComponent(leagueId)}/gm-targets/${encodeURIComponent(playerId)}/untouchable`,
       { untouchable },
     ),
-  getCollegeProspects: () => authorizedFetch<CollegeProspectsResponse>('/v1/scouting/prospects'),
+  getCollegeProspects: () => authorizedFetch<CollegeProspectsResponse>('/v1/scouting/prospects').then(normalizeCollegeProspects),
   submitScoutingReport: (
     prospectId: string,
     body: { grade: number; round_projection?: number | null; note?: string },
@@ -4679,7 +4680,7 @@ export const api = {
     ),
   getPendingTradeOutcomes: () => authorizedFetch<PendingTradeOutcomesResponse>('/v1/trade-outcomes/pending'),
   getSharedCommunityTrades: (limit = 30) =>
-    authorizedFetch<SharedCommunityTradesResponse>(`/v1/community/shared-trades?limit=${limit}`),
+    authorizedFetch<SharedCommunityTradesResponse>(`/v1/community/shared-trades?limit=${limit}`).then(normalizeSharedCommunityTrades),
   shareCommunityTrade: (body: {
     send: unknown[];
     receive: unknown[];

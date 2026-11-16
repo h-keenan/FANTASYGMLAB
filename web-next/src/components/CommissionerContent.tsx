@@ -6,6 +6,7 @@ import { useEffect, useState } from "react";
 import { AccentCard } from "@/components/AccentCard";
 import { EmptyState } from "@/components/EmptyState";
 import { ErrorState } from "@/components/ErrorState";
+import { ModuleErrorBoundary } from "@/components/ModuleErrorBoundary";
 import { LoadingScreen } from "@/components/LoadingScreen";
 import { PillRow } from "@/components/PillRow";
 import { IconRow, type IconRowIcon } from "@/components/IconRow";
@@ -438,7 +439,9 @@ export function CommissionerContent({ leagueId, leagueName, lens }: { leagueId: 
           <CalendarCard calendar={data.calendar} />
         </>
       ) : (
-        <CommissionerView data={data} draftOrder={draftOrder ?? "unknown"} onDraftOrder={setDraftOrder} />
+        <ModuleErrorBoundary name="commissioner_integrity">
+          <CommissionerView data={data} draftOrder={draftOrder ?? "unknown"} onDraftOrder={setDraftOrder} />
+        </ModuleErrorBoundary>
       )}
       {ready && data && data.is_premium !== false ? <VetoCalculator leagueId={leagueId} lens={lens} /> : null}
     </main>

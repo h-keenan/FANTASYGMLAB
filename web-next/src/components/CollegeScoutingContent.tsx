@@ -2,6 +2,7 @@
 
 import { PageTitle } from "@/components/PageTitle";
 import { EmptyState } from "@/components/EmptyState";
+import { ModuleErrorBoundary } from "@/components/ModuleErrorBoundary";
 import { useMemo, useState, type ReactNode } from "react";
 
 import { api, type CollegeProspect, type CollegeProspectsResponse, MAX_GRADE, MAX_ROUND_PROJECTION, MIN_GRADE, MIN_ROUND_PROJECTION } from "@/lib/api";
@@ -412,8 +413,8 @@ export function CollegeScoutingContent({
           ) : (
             <div className="flex flex-col gap-3">
               {visible.map((prospect) => (
+                <ModuleErrorBoundary key={prospect.id} name="prospect_card">
                 <ProspectCard
-                  key={prospect.id}
                   prospect={prospect}
                   expanded={expandedId === prospect.id}
                   draft={drafts[prospect.id] ?? draftFromProspect(prospect)}
@@ -426,6 +427,7 @@ export function CollegeScoutingContent({
                   onRemove={() => removeReport(prospect)}
                   lens={lens && view === "league" ? lens : null}
                 />
+                </ModuleErrorBoundary>
               ))}
             </div>
           )}

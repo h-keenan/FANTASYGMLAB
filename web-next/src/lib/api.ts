@@ -1,4 +1,5 @@
 import type { DraftSignalRow } from "./draftSignals";
+import { normalizeCollegeProspects, normalizeLeagueRankings, normalizeMe, normalizeCommissionerIntegrity, normalizeCommunityTrades, normalizeLeagueRosters, normalizeLeagueTeamProfiles, normalizeSharedCommunityTrades } from "./apiDefaults";
 import type { SimNotificationsResponse } from "@/lib/simNotifications";
 import { env } from "./env";
 import type { TradeCaution } from "./tradeCautions";
@@ -4276,7 +4277,7 @@ export interface DevicePreferencesResponse {
 }
 
 export const api = {
-  getMe: () => authorizedRequest<MeResponse>("/v1/me"),
+  getMe: () => authorizedRequest<MeResponse>("/v1/me").then(normalizeMe),
 
   /** Cross-device account preferences (GET /v1/preferences). Read by
    * ExperienceLevelContext for `experience_level`. */
@@ -4516,7 +4517,7 @@ export const api = {
   getCommissionerIntegrity: (leagueId: string, draftOrder: DraftOrderRule = "unknown") =>
     authorizedRequest<CommissionerIntegrityResponse>(
       `/v1/leagues/${encodeURIComponent(leagueId)}/commissioner/integrity?draft_order=${encodeURIComponent(draftOrder)}`,
-    ),
+    ).then(normalizeCommissionerIntegrity),
 
   // The caller's saved draft-order rule (stored per user + league beside Team Situation).
   getDraftOrderRule: (leagueId: string) =>
@@ -4719,7 +4720,7 @@ export const api = {
   getLeagueRankings: (leagueId: string, lens: string = "Dynasty", limit: number = 300) =>
     authorizedRequest<LeagueRankingsResponse>(
       `/v1/leagues/${encodeURIComponent(leagueId)}/rankings?lens=${encodeURIComponent(lens)}&limit=${limit}`,
-    ),
+    ).then(normalizeLeagueRankings),
 
   // Name search over the FULL valued pool (not the top-300 /rankings window), so a
   // low-value rookie/backup (e.g. a ~rank-650 QB) is still findable. Same row shape
@@ -4727,7 +4728,7 @@ export const api = {
   searchLeaguePlayers: (leagueId: string, query: string, lens: string = "Dynasty", limit: number = 25) =>
     authorizedRequest<LeagueRankingsResponse>(
       `/v1/leagues/${encodeURIComponent(leagueId)}/players/search?q=${encodeURIComponent(query)}&lens=${encodeURIComponent(lens)}&limit=${limit}`,
-    ),
+    ).then(normalizeLeagueRankings),
 
   // Exact id lookup over the same full pool (max 25 ids, request order, unknown
   // ids omitted). For ids that arrive via URL/share links, which may be ranked
@@ -4735,7 +4736,7 @@ export const api = {
   getLeaguePlayersByIds: (leagueId: string, ids: string[], lens: string = "Dynasty") =>
     authorizedRequest<LeagueRankingsResponse>(
       `/v1/leagues/${encodeURIComponent(leagueId)}/players/search?ids=${encodeURIComponent(ids.join(","))}&lens=${encodeURIComponent(lens)}`,
-    ),
+    ).then(normalizeLeagueRankings),
 
   // Watchlist (Revision 11) — the GM_TOOLS watchlist. Reads/writes the
   // exact same durable table (modules/gm_targets.py) and endpoints mobile's
@@ -4967,11 +4968,11 @@ export const api = {
   getLeagueUsers: (leagueId: string) =>
     authorizedRequest<LeagueUsersResponse>(`/v1/leagues/${encodeURIComponent(leagueId)}/users`),
   getLeagueRosters: (leagueId: string) =>
-    authorizedRequest<LeagueRostersResponse>(`/v1/leagues/${encodeURIComponent(leagueId)}/rosters`),
+    authorizedRequest<LeagueRostersResponse>(`/v1/leagues/${encodeURIComponent(leagueId)}/rosters`).then(normalizeLeagueRosters),
   getLeagueTeamProfiles: (leagueId: string) =>
     authorizedRequest<LeagueTeamProfilesResponse>(
       `/v1/leagues/${encodeURIComponent(leagueId)}/team-profiles`,
-    ),
+    ).then(normalizeLeagueTeamProfiles),
 
   // The real accept/decline/counter verdict for a manually-built trade
   // package — same POST .../trade-analyzer mobile's "Analyze Trade" button
@@ -5079,14 +5080,14 @@ export const api = {
   // Community Trade Feed (Social/community layer) — same GET
   // /v1/community/trades every signed-in user reads (never scoped to one
   // league or gated on Premium), plus the react/opt-out mutations.
-  getCommunityTrades: () => authorizedRequest<CommunityTradesResponse>("/v1/community/trades"),
+  getCommunityTrades: () => authorizedRequest<CommunityTradesResponse>("/v1/community/trades").then((r) => normalizeCommunityTrades(r) as unknown as CommunityTradesResponse),
   reactToCommunityTrade: (outcomeId: string, emoji: string, action: "add" | "remove") =>
     authorizedRequest<{ ok: boolean; reason: string }>(
       `/v1/community/trades/${encodeURIComponent(outcomeId)}/react`,
       { method: "POST", jsonBody: { emoji, action } },
     ),
   getSharedCommunityTrades: (limit = 30) =>
-    authorizedRequest<SharedCommunityTradesResponse>(`/v1/community/shared-trades?limit=${limit}`),
+    authorizedRequest<SharedCommunityTradesResponse>(`/v1/community/shared-trades?limit=${limit}`).then(normalizeSharedCommunityTrades),
   shareCommunityTrade: (body: ShareCommunityTradeBody) =>
     authorizedRequest<{ ok: boolean; available?: boolean; trade?: SharedCommunityTrade }>(
       "/v1/community/shared-trades",
@@ -5141,7 +5142,7 @@ export const api = {
   // same regardless of which league is selected. Same five /v1/scouting/*
   // endpoints mobile's CollegeProspectsScreen.tsx / ProspectScoutingDetail
   // Screen.tsx already call; no new backend logic for this page.
-  getCollegeProspects: () => authorizedRequest<CollegeProspectsResponse>("/v1/scouting/prospects"),
+  getCollegeProspects: () => authorizedRequest<CollegeProspectsResponse>("/v1/scouting/prospects").then(normalizeCollegeProspects),
   submitScoutingReport: (
     prospectId: string,
     body: { grade: number; round_projection: number | null; note: string },

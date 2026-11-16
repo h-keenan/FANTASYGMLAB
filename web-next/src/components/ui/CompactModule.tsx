@@ -6,6 +6,7 @@ import { AccentCard } from "@/components/AccentCard";
 import { Sheet } from "@/components/ui/Sheet";
 import { compactAriaLabel, compactParts, type CompactPart, type CompactTone } from "@/lib/compactModule";
 import { simOpenKey, simParseOpen } from "@/lib/simLayout";
+import { ModuleErrorBoundary } from "@/components/ModuleErrorBoundary";
 import { Money } from "@/components/Money";
 import { SkeletonModule, SkeletonRegion } from "@/components/Skeleton";
 import { Collapse } from "@/components/ui/Presence";
@@ -165,11 +166,11 @@ export function CompactModule({
       {preview ? <div data-testid="compact-preview">{preview}</div> : null}
       {expandIn === "inline" ? (
         <Collapse open={open} id={bodyId} className="pt-1">
-          <div className="flex flex-col gap-3">{children}</div>
+          <div className="flex flex-col gap-3"><ModuleErrorBoundary name={name}>{children}</ModuleErrorBoundary></div>
         </Collapse>
       ) : (
         <Sheet open={open} onClose={() => setOverride(false)} title={name}>
-          {children}
+          <ModuleErrorBoundary name={name}>{children}</ModuleErrorBoundary>
         </Sheet>
       )}
     </AccentCard>
