@@ -2,7 +2,8 @@ import React, { useEffect, useMemo, useState, type ReactNode } from 'react';
 import { StyleSheet, View } from 'react-native';
 
 import AppText from './AppText';
-import BeginnerHelp from './BeginnerHelp';
+import InfoMark from './InfoMark';
+import { useExperienceCopy } from '../context/ExperienceLevelContext';
 import Button from './Button';
 import CompactModule from './CompactModule';
 import AccentCard from './AccentCard';
@@ -131,6 +132,7 @@ export default function DecisionQueue({
 }) {
   const { colors } = useThemeMode();
   const styles = useMemo(() => createStyles(colors), [colors]);
+  const copy = useExperienceCopy();
   const [open, setOpen] = useState(false);
   const hidden = queue.proUpsell?.hidden ?? 0;
   useEffect(() => {
@@ -155,6 +157,7 @@ export default function DecisionQueue({
     <View style={styles.block} testID="decision-queue">
       <SectionHeading
         title={queue.total > 0 ? `Do this now · ${count}` : 'Do this now'}
+        info={queue.total === 0 && !emptyOverride ? <InfoMark label="Do this now" beginnerOnly lines={[copy.help('dashboardNothingUrgent')]} /> : undefined}
         right={
           <PressableScale onPress={() => onNavigate('GmPlan', { leagueId, leagueName })} hitSlop={LINK_HIT_SLOP} accessibilityRole="link">
             <AppText style={styles.link}>Full GM Plan ›</AppText>
@@ -164,7 +167,6 @@ export default function DecisionQueue({
       {queue.total === 0 ? (
         <>
           <EmptyState icon="checkmark-circle-outline" title={emptyOverride ?? queue.empty?.title ?? 'Nothing needs you this week'} subtitle={emptyOverride ? undefined : (queue.empty?.detail ?? undefined)} />
-          {!emptyOverride ? <BeginnerHelp term="dashboardNothingUrgent" /> : null}
         </>
       ) : (
         shown.map((d, i) => {

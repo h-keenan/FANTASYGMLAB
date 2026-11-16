@@ -6,7 +6,7 @@ import { Ionicons } from '@expo/vector-icons';
 
 import AppText from './AppText';
 import TradeCompactCard, { type TradeCardAsset } from './TradeCompactCard';
-import BeginnerHelp from './BeginnerHelp';
+import InfoMark from './InfoMark';
 import MeterRow, { CONFIDENCE_LEVELS } from './ConfidenceMeter';
 import ManagerTendenciesChips from './ManagerTendenciesChips';
 import TeamAvatar from './TeamAvatar';
@@ -282,6 +282,13 @@ export default function TradeIdeaCard({
     navigation.navigate('PickDetail', { pick: assetToDraftPick(asset), leagueId, leagueName });
 
   const bandColor = valueEdgeBandColor(colors, idea.value_edge_band);
+  // One "?" per card (beginner-only): the tag, balance, confidence and acceptance explanations merged.
+  const ideaHelpLines = [
+    copy.impactTagHelp(idea.impact_tag),
+    copy.help('ideaBalance'),
+    copy.help('ideaConfidence') && `Confidence: ${copy.help('ideaConfidence')}`,
+    copy.help('ideaRealism') && `Partner acceptance: ${copy.help('ideaRealism')}`,
+  ].filter((line): line is string => Boolean(line));
 
   const categoryAccent = categoryColor(idea.category, colors);
   const impactConfig = impactTagConfig(colors)[idea.impact_tag];
@@ -315,13 +322,15 @@ export default function TradeIdeaCard({
       netValue={idea.trade_gain}
       meta={[`${idea.confidence_label} confidence`]}
     >
-      {idea.category || idea.impact_tag ? (
+      {idea.category || idea.impact_tag || ideaHelpLines.length > 0 ? (
         <View style={[styles.categoryRow, styles.categoryRowSpread]}>
           {idea.category ? <ToneBadge label={idea.category} color={categoryAccent} /> : null}
-          {impactConfig ? <ToneBadge label={impactConfig.label} color={impactConfig.color} /> : null}
+          <View style={styles.impactGroup}>
+            {impactConfig ? <ToneBadge label={impactConfig.label} color={impactConfig.color} /> : null}
+            <InfoMark label="this trade idea" beginnerOnly lines={ideaHelpLines} />
+          </View>
         </View>
       ) : null}
-      <BeginnerHelp text={copy.impactTagHelp(idea.impact_tag)} style={styles.beginnerHelp} />
       {/* Density fix (card-height audit, this pass): "Lands your target" and
           "FOR <team>" (All Trades mode only) previously each carried their
           own top padding as fully independent rows, stacking up to two
@@ -452,7 +461,6 @@ export default function TradeIdeaCard({
           same delta, same tradeValueColor mapping, just shape instead of
           just digits (UI_HIERARCHY_DIRECTIVE.md's "pair color with shape"). */}
       <TradeValueBar delta={idea.trade_gain} style={styles.valueBar} />
-      <BeginnerHelp term="ideaBalance" style={styles.beginnerHelp} />
 
       <TradeSharePreviewModal
         visible={shareOpen}
@@ -500,8 +508,6 @@ export default function TradeIdeaCard({
           />
         ) : null}
       </View>
-      <BeginnerHelp text={copy.help('ideaConfidence') && `Confidence: ${copy.help('ideaConfidence')}`} style={styles.beginnerHelp} />
-      <BeginnerHelp text={copy.help('ideaRealism') && `Partner acceptance: ${copy.help('ideaRealism')}`} style={styles.beginnerHelp} />
 
       {/* Recommendation-clarity fix (this pass): every other required field
           on this card — partner, assets, value, rationale, confidence,
@@ -526,9 +532,9 @@ export default function TradeIdeaCard({
 
 function createStyles(colors: ThemeColors) {
   return StyleSheet.create({
-    beginnerHelp: { marginBottom: spacing.xs },
   card: { padding: 0, gap: 0, marginBottom: spacing.md },
   categoryRow: { paddingHorizontal: spacing.md, paddingTop: spacing.sm },
+  impactGroup: { flexDirection: 'row', alignItems: 'center' },
   categoryRowSpread: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: spacing.sm },
   // Both concept mockups show this as a quiet, thin-bordered box (no fill,
   // no title inside) rather than the hairline-top-rule-only treatment this

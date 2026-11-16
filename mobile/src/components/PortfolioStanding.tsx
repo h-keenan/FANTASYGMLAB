@@ -1,4 +1,4 @@
-import GlossaryNote from './GlossaryNote';
+import InfoMark from './InfoMark';
 import React, { forwardRef, useCallback, useEffect, useImperativeHandle, useMemo, useRef, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 import PressableScale from './PressableScale';
@@ -320,7 +320,7 @@ const PortfolioStanding = forwardRef<PortfolioStandingHandle>(function Portfolio
             <View style={styles.headerBlock}>
               <View style={styles.headerTop}>
                 <View style={styles.headerTitleWrap}>
-                  <SectionHeading title="Your standing" caption="Standing, record, and top need per league." />
+                  <SectionHeading title="Your standing" caption="Standing, record, and top need per league." info={<InfoMark label="Roster Power" glossary={['rosterPower']} />} />
                 </View>
                 {/* Share waits for every row: a share card of a half-loaded
                     portfolio would silently leave leagues out. Tapping it
@@ -334,7 +334,6 @@ const PortfolioStanding = forwardRef<PortfolioStandingHandle>(function Portfolio
                 ) : null}
               </View>
             </View>
-            <GlossaryNote terms={['rosterPower']} label="What is Roster Power?" />
             {draftingLeagues.length > 0 ? (
               <DraftingLeaguesNote leagues={draftingLeagues} colors={colors} styles={styles} onOpen={(league) => navigation.navigate('DraftCenter', { leagueId: league.league_id, leagueName: league.league_name, tab: 'live' })} />
             ) : null}

@@ -142,7 +142,7 @@ describe("WaiversContent", () => {
     renderOpen(<WaiversContent leagueName="Dynasty Overlords" data={BASE_RESPONSE} />);
 
     expect(screen.getByText("Place claims in Sleeper — we don't submit them.")).toBeInTheDocument();
-    fireEvent.click(screen.getByRole("button", { name: /How Priority Adds rank/ }));
+    fireEvent.click(screen.getByRole("button", { name: /How Priority Adds rank/i }));
     expect(
       screen.getByText(
         /FantasyDesk does not submit waiver claims for you — place the claim in your Sleeper league once you've decided\./,
@@ -186,7 +186,7 @@ describe("WaiversContent", () => {
     renderOpen(<WaiversContent leagueName="Dynasty Overlords" data={withModel} />);
 
     expect(screen.getByTestId("needs-headline")).toHaveTextContent("Biggest need: WR — your WR3 is 8th of 12.");
-    fireEvent.click(screen.getByRole("button", { name: /How we read your needs/ }));
+    fireEvent.click(screen.getByRole("button", { name: /How we read your needs/i }));
     expect(screen.getByTestId("needs-breakdown")).toHaveTextContent(/WR3 · 8th of 12/);
     expect(screen.getByTestId("needs-breakdown")).toHaveTextContent(/Pat Wire \+1\.2 pts\/wk/);
   });

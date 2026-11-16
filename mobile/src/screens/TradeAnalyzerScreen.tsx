@@ -29,7 +29,8 @@ import { Ionicons } from '@expo/vector-icons';
 import AnimatedCard from '../components/AnimatedCard';
 import { SkeletonPage } from '../components/Skeleton';
 import GridBackground from '../components/GridBackground';
-import ScreenInfoNote from '../components/ScreenInfoNote';
+import InfoMark from '../components/InfoMark';
+import SectionHeading from '../components/SectionHeading';
 import SegmentedTabBar from '../components/SegmentedTabBar';
 import MeterRow from '../components/ConfidenceMeter';
 import TeamAvatar from '../components/TeamAvatar';
@@ -72,7 +73,6 @@ import { offerPrefillKey, resolvePrefill, type OfferPrefill } from '../lib/trade
 import { prefillKey } from '../lib/multiTeamIdeas';
 import type { MultiTransfer } from '../lib/multiTeamTrade';
 import { useExperienceCopy } from '../context/ExperienceLevelContext';
-import BeginnerHelp from '../components/BeginnerHelp';
 import ValuesCredit from '../components/ValuesCredit';
 import { useThemeMode } from '../context/ThemeModeContext';
 import { disabledOpacity, radii, spacing, type ThemeColors } from '../theme';
@@ -540,11 +540,17 @@ export default function TradeAnalyzerScreen({ leagueId, leagueName, navigation, 
 
   const header = (
     <View>
-      <ScreenInfoNote
-        text={
-          quickMode
-            ? `Raw asset value only — ${leagueName}'s "Dynasty" valuations. Doesn't yet weigh roster fit or strategy, unlike the full Trade Analyzer.`
-            : `The real accept / decline / counter verdict for ${leagueName} — weighs asset value, starting lineup impact, roster needs, age, draft capital, and injury risk.`
+      <SectionHeading
+        title={quickMode ? 'Quick Compare' : 'Trade Analyzer'}
+        info={
+          <InfoMark
+            label={quickMode ? 'Quick Compare' : 'the Trade Analyzer'}
+            lines={[
+              quickMode
+                ? `Raw asset value only — ${leagueName}'s "Dynasty" valuations. Doesn't yet weigh roster fit or strategy, unlike the full Trade Analyzer.`
+                : `The real accept / decline / counter verdict for ${leagueName} — weighs asset value, starting lineup impact, roster needs, age, draft capital, and injury risk.`,
+            ]}
+          />
         }
       />
 
@@ -890,9 +896,20 @@ function VerdictCard({
         </View>
       ) : null}
       <View style={styles.verdictHeaderRow}>
-        <AppText style={[styles.verdictBand, isExtreme && styles.verdictBandExtreme, { color: toneColor }]}>
-          {verdict.band}
-        </AppText>
+        <View style={styles.verdictBandGroup}>
+          <AppText style={[styles.verdictBand, isExtreme && styles.verdictBandExtreme, { color: toneColor }]}>
+            {verdict.band}
+          </AppText>
+          <InfoMark
+            label="this verdict"
+            beginnerOnly
+            lines={[
+              copy.verdictHelp(verdict.ui_verdict),
+              copy.help('analyzerValueBalance') && `Value balance: ${copy.help('analyzerValueBalance')}`,
+              copy.help('analyzerConfidence') && `Confidence: ${copy.help('analyzerConfidence')}`,
+            ]}
+          />
+        </View>
         <PressableScale accessibilityRole="button" style={styles.shareButton} onPress={() => setShareOpen(true)} hitSlop={8}>
           <Ionicons name="share-outline" size={16} color={colors.textSecondary} />
           <AppText style={styles.shareButtonText}>Share</AppText>
@@ -910,7 +927,6 @@ function VerdictCard({
           <AppText style={styles.lineupWarningDetail}>{cautionDetail(caution, verdict.band)}</AppText>
         </View>
       ))}
-      <BeginnerHelp text={copy.verdictHelp(verdict.ui_verdict)} style={styles.beginnerHelp} />
 
       {/* Quick visual: the same big color-coded value-change number the share
           PNG leads with, so the verdict reads at a glance without tapping
@@ -931,14 +947,6 @@ function VerdictCard({
           Hub's cards, applied to the verdict's own value_delta so the two
           surfaces agree on what a value edge looks like. */}
       <TradeValueBar delta={verdict.value_delta} style={styles.verdictValueBar} />
-      <BeginnerHelp
-        text={copy.help('analyzerValueBalance') && `Value balance: ${copy.help('analyzerValueBalance')}`}
-        style={styles.beginnerHelp}
-      />
-      <BeginnerHelp
-        text={copy.help('analyzerConfidence') && `Confidence: ${copy.help('analyzerConfidence')}`}
-        style={styles.beginnerHelp}
-      />
       {(verdict.lineup_warnings ?? []).map((warning) => (
         <View
           key={`${warning.code}-${warning.position}`}
@@ -1086,7 +1094,7 @@ function VerdictCard({
  */
 function createStyles(colors: ThemeColors) {
   return StyleSheet.create({
-    beginnerHelp: { marginBottom: spacing.xs },
+    verdictBandGroup: { flexDirection: 'row', alignItems: 'center', flexShrink: 1 },
   root: { flex: 1, backgroundColor: 'transparent' },
   container: { flex: 1, backgroundColor: 'transparent', padding: spacing.lg },
   center: {

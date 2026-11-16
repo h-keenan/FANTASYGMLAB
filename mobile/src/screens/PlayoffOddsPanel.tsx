@@ -5,16 +5,17 @@ import ToneBadge from '../components/ToneBadge';
 import ErrorState from '../components/ErrorState';
 import { useFocusEffect } from '@react-navigation/native';
 
-import BeginnerHelp from '../components/BeginnerHelp';
+import InfoMark from '../components/InfoMark';
+import SectionHeading from '../components/SectionHeading';
 import { SkeletonText } from '../components/Skeleton';
 import GridBackground from '../components/GridBackground';
-import ScreenInfoNote from '../components/ScreenInfoNote';
 import TeamAvatar from '../components/TeamAvatar';
 import { api, type PlayoffOddsTeam } from '../lib/api';
 import { toUserErrorMessage } from '../lib/errorMessages';
 import { useOrbClearance } from '../lib/orbLayout';
 import { percentileColor } from '../lib/percentile';
 import { useThemeMode } from '../context/ThemeModeContext';
+import { useExperienceCopy } from '../context/ExperienceLevelContext';
 import PremiumLock from '../components/PremiumLock';
 import { radii, spacing, type ThemeColors } from '../theme';
 
@@ -35,6 +36,7 @@ const REASON_MESSAGES: Record<string, string> = {
 export default function PlayoffOddsPanel({ leagueId, leagueName }: { leagueId: string; leagueName: string }) {
   const orbClearance = useOrbClearance();
   const { colors } = useThemeMode();
+  const copy = useExperienceCopy();
   const styles = useMemo(() => createStyles(colors), [colors]);
   const [teams, setTeams] = useState<PlayoffOddsTeam[]>([]);
   const [reason, setReason] = useState<string>('');
@@ -142,9 +144,10 @@ export default function PlayoffOddsPanel({ leagueId, leagueName }: { leagueId: s
         keyExtractor={(item) => String(item.roster_id)}
         ListHeaderComponent={
           <View style={styles.infoNoteWrap}>
-            <BeginnerHelp term="playoffOddsIntro" />
-            <BeginnerHelp term="playoffOddsTerms" />
-            <ScreenInfoNote label="How Playoff Odds works" text={methodologyNote} />
+            <SectionHeading
+              title="Playoff odds"
+              info={<InfoMark label="Playoff Odds" lines={[methodologyNote, copy.help('playoffOddsIntro'), copy.help('playoffOddsTerms')]} />}
+            />
           </View>
         }
         renderItem={({ item, index }) => (

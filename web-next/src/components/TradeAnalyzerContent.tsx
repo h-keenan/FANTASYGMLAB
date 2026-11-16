@@ -30,7 +30,7 @@ import { cautionDetail, cautionShareLine, verdictCautions } from "@/lib/tradeCau
 import { useShareImage } from "@/lib/useShareImage";
 import { isPrivacyMode } from "@/lib/privacy";
 import { shareCardCacheKey } from "@/lib/shareCard/cacheKey";
-import { BeginnerHelp } from "@/components/BeginnerHelp";
+import { InfoMark } from "@/components/ui/InfoMark";
 import { ExchangeSide } from "@/components/TradeAssetExchange";
 import { ErrorState } from "@/components/ErrorState";
 import { TradePickerSheet } from "@/components/TradePickerSheet";
@@ -291,11 +291,14 @@ function VerdictCard({
   return (
     <AccentCard accent={toneColor} as="section">
       <div className="flex items-center justify-between gap-2 flex-wrap">
-        <span
-          className="text-xs uppercase font-bold"
-          style={{ color: "var(--color-text-muted)", letterSpacing: "var(--letter-spacing-badge)" }}
-        >
-          Reviewed package
+        <span className="flex items-center">
+          <span
+            className="text-xs uppercase font-bold"
+            style={{ color: "var(--color-text-muted)", letterSpacing: "var(--letter-spacing-badge)" }}
+          >
+            Reviewed package
+          </span>
+          <InfoMark label="this verdict" lines={[copy.verdictHelp(verdict.ui_verdict), copy.help("analyzerValueBalance")]} beginnerOnly />
         </span>
         <span className="flex items-center gap-2">
           <span className="text-lg font-black uppercase" style={{ color: toneColor }}>
@@ -334,7 +337,6 @@ function VerdictCard({
           </span>
         </div>
       ))}
-      <BeginnerHelp label="this verdict" text={copy.verdictHelp(verdict.ui_verdict)} />
 
       {/* Trade zone: the actual give/receive matchup, visually separated
           from the analysis content below it via an elevated panel — the
@@ -389,7 +391,6 @@ function VerdictCard({
         {/* Single value bar — never duplicated alongside a second meter for
             the same number (PR #1057 removed Streamlit's own duplicate). */}
         <LeanBarMeter sendScore={sendTotal} receiveScore={receiveTotal} />
-        <BeginnerHelp label="value balance" term="analyzerValueBalance" />
       </div>
 
       <CompactModule
@@ -513,13 +514,15 @@ function VerdictCard({
           verdict.risk_summary ? { key: "r", text: shortSummary(verdict.risk_summary), tone: "warning" } : null,
         ]}
       >
-      <ConfidenceMeter
-        label="Confidence"
-        value={verdict.confidence_pct != null ? `${verdict.confidence} (${Math.round(verdict.confidence_pct)}%)` : verdict.confidence}
-        level={LEVEL_SEGMENTS[confidenceLvl]}
-        color={levelColor(confidenceLvl)}
-      />
-      <BeginnerHelp label="confidence" term="analyzerConfidence" />
+      <div className="flex items-center">
+        <ConfidenceMeter
+          label="Confidence"
+          value={verdict.confidence_pct != null ? `${verdict.confidence} (${Math.round(verdict.confidence_pct)}%)` : verdict.confidence}
+          level={LEVEL_SEGMENTS[confidenceLvl]}
+          color={levelColor(confidenceLvl)}
+        />
+        <InfoMark label="confidence" lines={[copy.help("analyzerConfidence")]} beginnerOnly />
+      </div>
 
       {verdict.risk_summary ? (
         <InsightRow color="var(--color-warning)" label="Risk" icon={<path d="M12 4l9 16H3L12 4zM12 10v4M12 17h.01" />}>

@@ -15,9 +15,9 @@ import DraftPickAssetRow from '../components/DraftPickAssetRow';
 import GridBackground from '../components/GridBackground';
 import SegmentedTabBar from '../components/SegmentedTabBar';
 import TeamAvatar from '../components/TeamAvatar';
-import ScreenInfoNote, { type ScreenInfoLegendItem } from '../components/ScreenInfoNote';
+import SectionHeading from '../components/SectionHeading';
+import InfoMark, { type InfoMarkLegendItem } from '../components/InfoMark';
 import FreeLimitNote from '../components/FreeLimitNote';
-import BeginnerHelp from '../components/BeginnerHelp';
 import { useExperienceCopy } from '../context/ExperienceLevelContext';
 import SkeletonBlock, { SkeletonRow } from '../components/Skeleton';
 import ManagerTendenciesChips from '../components/ManagerTendenciesChips';
@@ -107,6 +107,7 @@ export default function TradeHubScreen({ leagueId, leagueName, navigation }: Pro
   const orbClearance = useOrbClearance();
 
   const { colors } = useThemeMode();
+  const copy = useExperienceCopy();
   const styles = useMemo(() => createStyles(colors), [colors]);
   // Read-only here: the header's GmStanceHeaderButton is the only place
   // stance is changed, and a change there re-runs `load` through this.
@@ -300,13 +301,20 @@ export default function TradeHubScreen({ leagueId, leagueName, navigation }: Pro
               onChange={(key) => (key === 'for_you' ? setViewMode('for_you') : onSelectAllTrades())}
             />
           </View>
-          <ScreenInfoNote
-            text={
-              isForYou
-                ? 'Trust check: every idea is re-verified against your league’s live rosters right before it’s shown, so it can never suggest a player who’s since been traded, dropped, or picked up elsewhere.'
-                : 'Real ideas across every roster in the league, not just yours.'
+          <SectionHeading
+            title={isForYou ? 'Your trade ideas' : 'All trades'}
+            info={
+              <InfoMark
+                label={isForYou ? 'your trade ideas' : 'all trades'}
+                lines={[
+                  isForYou
+                    ? 'Trust check: every idea is re-verified against your league’s live rosters right before it’s shown, so it can never suggest a player who’s since been traded, dropped, or picked up elsewhere.'
+                    : 'Real ideas across every roster in the league, not just yours.',
+                  isForYou ? copy.help('tradeHubPosture') : null,
+                ]}
+                legend={isForYou ? impactLegend(colors) : undefined}
+              />
             }
-            legend={isForYou ? impactLegend(colors) : undefined}
           />
           {isForYou && !activeLoading && !activeError && !notReadyReason && entitlement ? (
             <FreeLimitNote
@@ -369,7 +377,6 @@ export default function TradeHubScreen({ leagueId, leagueName, navigation }: Pro
           {isForYou && !activeLoading && !activeError && postureSentence ? (
             <View style={styles.postureBlock}>
               <AppText style={styles.postureText}>{postureSentence}</AppText>
-              <BeginnerHelp term="tradeHubPosture" />
             </View>
           ) : null}
           {isForYou && !activeLoading && !activeError ? (
@@ -529,7 +536,7 @@ function TradeHubGateCard({
 // reputation, but the opportunity signal underneath is already softening).
 // Reuses impactTagConfig's exact labels/colors so the legend, the filter
 // chips below, and each card's impact pill never drift from one another.
-function impactLegend(colors: ThemeColors): ScreenInfoLegendItem[] {
+function impactLegend(colors: ThemeColors): InfoMarkLegendItem[] {
   const config = impactTagConfig(colors);
   return [
     {

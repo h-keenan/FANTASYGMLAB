@@ -1,5 +1,4 @@
 import { TradesTabBar } from "@/components/TradesTabBar";
-import { InfoTip } from "@/components/InfoTip";
 import { PageTitle } from "@/components/PageTitle";
 import type { PastTradeOutcome, TradeOutcomeHistoryResponse } from "@/lib/api";
 import { ExchangeSide } from "@/components/TradeAssetExchange";
@@ -98,14 +97,15 @@ export function TradeHistoryContent({ data, leagueId, leagueName }: { data: Trad
     <main className="page-shell">
       {leagueId ? <TradesTabBar leagueId={leagueId} leagueName={leagueName || "League"} active="trade_history" /> : null}
       <header className="flex flex-col gap-1">
-        <PageTitle page="Trade History" />
-        <div className="flex flex-col gap-1">
-          <InfoTip label="How outcomes are read">
-            Once a confirmed trade has had a few weeks to play out, we&apos;ll show a real before/after read here,
-            using actual points scored and value trend, never a guess. Nothing here changes how trades are proposed or
-            accepted.
-          </InfoTip>
-        </div>
+        <PageTitle
+          page="Trade History"
+          info={
+            <p>
+              Once a confirmed trade has had a few weeks to play out, we&apos;ll show a real before/after read here, using actual points scored and value trend,
+              never a guess. Nothing here changes how trades are proposed or accepted.
+            </p>
+          }
+        />
       </header>
 
       {data.outcomes.length === 0 ? (

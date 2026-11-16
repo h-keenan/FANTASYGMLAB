@@ -3,8 +3,8 @@ import type { TabIconName } from "@/lib/tabIcons";
 import { ModuleMore } from "@/components/ui/ModuleMore";
 import Link from "next/link";
 
-import { BeginnerHelp } from "@/components/BeginnerHelp";
-import { InfoTip } from "@/components/InfoTip";
+import { InfoMark } from "@/components/ui/InfoMark";
+import { useExperienceCopy } from "@/context/ExperienceLevelContext";
 import { IconRow } from "@/components/IconRow";
 import { CompactModule } from "@/components/ui/CompactModule";
 import { statStripParts } from "@/lib/moduleTemplates";
@@ -92,6 +92,7 @@ export function TeamSituationCard({
 }) {
   const selected = TEAM_STANCE_OPTIONS.find((option) => option.value === stance);
   const selectedLook = selected ? STANCE_LOOK[selected.value] : null;
+  const copy = useExperienceCopy();
   return (
     <CompactModule
       id="gmplan.situation"
@@ -106,11 +107,17 @@ export function TeamSituationCard({
         banner ? { key: "deadline", text: `Trade deadline Wk ${banner.week}` } : pastDeadline ? { key: "deadline", text: "Past the trade deadline", tone: "muted" } : null,
       ]}
     >
-      <div className="flex items-start justify-end gap-3">
-        <InfoTip label="How you see this team" className="items-end text-right">
-          Tell us how you see this team right now. We&apos;ll lean trade-idea language toward that stance, and use
-          it to shape your trade and lineup value adjustments too.
-        </InfoTip>
+      <div className="flex items-center">
+        <span className="text-xs font-semibold" style={{ color: "var(--color-text-muted)" }}>
+          How you see this team
+        </span>
+        <InfoMark
+          label="how you see this team"
+          lines={[
+            "Tell us how you see this team right now. We'll lean trade-idea language toward that stance, and use it to shape your trade and lineup value adjustments too.",
+            selectedLook ? copy.help(selectedLook.help) : null,
+          ]}
+        />
       </div>
       <div role="tablist" aria-label="Team stance" className="grid grid-cols-3 gap-2">
         {TEAM_STANCE_OPTIONS.map((option) => {
@@ -147,12 +154,9 @@ export function TeamSituationCard({
         })}
       </div>
       {selected && selectedLook ? (
-        <div className="flex flex-wrap items-center gap-2">
-          <p className="text-xs" style={{ color: "var(--color-text-muted)" }}>
-            {selected.description}
-          </p>
-          <BeginnerHelp label="this look" term={selectedLook.help} />
-        </div>
+        <p className="text-xs" style={{ color: "var(--color-text-muted)" }}>
+          {selected.description}
+        </p>
       ) : (
         <p className="text-xs" style={{ color: "var(--color-text-muted)" }}>
           Pick the stance that fits your team right now.

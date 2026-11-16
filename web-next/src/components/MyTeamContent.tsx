@@ -1,10 +1,9 @@
 import { TERMS } from "@/lib/terms";
 import { PageTabBar } from "@/components/PageTabBar";
 import { BEGINNER_HELP } from "@/lib/experienceCopy";
-import { GlossaryNote } from "@/components/GlossaryNote";
 import { PlayerIdentity } from "@/components/PlayerRow";
 import { ToneBadge } from "@/components/ToneBadge";
-import { InfoTip } from "@/components/InfoTip";
+import { InfoMark } from "@/components/ui/InfoMark";
 import { StatStrip, type StatStripItem } from "@/components/StatStrip";
 import { RosterCompositionBar, RosterSections, TeamAnalysisList, type RosterTab } from "@/components/MyTeamSections";
 import { CompactModule } from "@/components/ui/CompactModule";
@@ -285,14 +284,10 @@ export function MyTeamContent({
         title="Team Snapshot"
         items={snapshotItems}
         league={{ id: leagueId, name: leagueName }}
-        footer={
-          <GlossaryNote
-            terms={
-              showFranchiseConstruction
-                ? ["powerRank", "franchiseRank", "starterStrength", "benchStrength", "averageAge", "draftPicks", "pqv", "superflex", "tep"]
-                : ["powerRank", "starterStrength", "benchStrength", "averageAge"]
-            }
-          />
+        infoGlossary={
+          showFranchiseConstruction
+            ? ["powerRank", "franchiseRank", "starterStrength", "benchStrength", "averageAge", "draftPicks", "pqv", "superflex", "tep"]
+            : ["powerRank", "starterStrength", "benchStrength", "averageAge"]
         }
       />
 
@@ -300,7 +295,11 @@ export function MyTeamContent({
         <CompactModule id="team.analysis" title="Team Analysis" testId="team-analysis" parts={analysisParts}>
           <TeamAnalysisList rows={analysisRows} />
           {observations.length > 0 || needs?.biggest_need ? (
-            <InfoTip label="Roster notes">
+            <div className="flex items-center">
+              <span className="text-xs font-semibold" style={{ color: "var(--color-text-muted)" }}>
+                Roster notes
+              </span>
+              <InfoMark label="roster notes">
               <div className="flex flex-col gap-2">
                 {needs?.biggest_need ? (
                   <p>
@@ -325,7 +324,8 @@ export function MyTeamContent({
                   </p>
                 ))}
               </div>
-            </InfoTip>
+              </InfoMark>
+            </div>
           ) : null}
           {needs && needs.weaknesses.length > 0 ? (
             <NextSteps title="Act on a need" steps={["waivers", "trade-hub"]} leagueId={leagueId} leagueName={leagueName} />

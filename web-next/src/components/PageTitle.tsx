@@ -1,7 +1,9 @@
 "use client";
 
-import { useState, useSyncExternalStore, type ReactNode } from "react";
+import { useSyncExternalStore, type ReactNode } from "react";
 import { createPortal } from "react-dom";
+
+import { InfoMark } from "@/components/ui/InfoMark";
 
 const noopSubscribe = () => () => {};
 
@@ -24,7 +26,7 @@ function visibleInfoSlot(): HTMLElement | null {
  * outline still hear the page name.
  *
  * `info` is the page's one explanatory sentence (e.g. Trade Hub's posture
- * line). It renders behind a "?" next to the page name in the header row
+ * line). It renders as the shared InfoMark "?" next to the page name in the header row
  * instead of as its own row of page content. Without the header slot (tests,
  * signed-out pages) it falls back to inline.
  */
@@ -36,31 +38,7 @@ export function PageTitle({ page, info }: { page: string; leagueName?: string; i
     visibleInfoSlot,
     () => null,
   );
-  const [open, setOpen] = useState(false);
-  const button = info ? (
-    <>
-      <button
-        type="button"
-        aria-label={open ? `Hide explanation of ${page}` : `About ${page}`}
-        aria-expanded={open}
-        onClick={() => setOpen((v) => !v)}
-        className="inline-flex items-center justify-center -mx-2"
-        style={{ width: "var(--touch-target-min)", height: "var(--touch-target-min)" }}
-      >
-        <span
-          className="inline-flex items-center justify-center text-xs font-bold"
-          style={{ width: 20, height: 20, borderRadius: 9999, border: "var(--border-width-default) solid var(--color-border)", color: "var(--color-accent)", lineHeight: 1 }}
-        >
-          ?
-        </span>
-      </button>
-      {open ? (
-        <div role="note" className="glass-surface absolute left-4 right-4 top-full mt-1 p-3 text-xs" style={{ zIndex: 50, color: "var(--color-text-secondary)" }}>
-          {info}
-        </div>
-      ) : null}
-    </>
-  ) : null;
+  const button = info ? <InfoMark label={page}>{info}</InfoMark> : null;
   return (
     <>
       <h1 className="sr-only">{page}</h1>

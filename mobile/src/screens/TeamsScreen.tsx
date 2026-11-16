@@ -19,7 +19,8 @@ import GmStanceHeaderButton from '../components/GmStanceHeaderButton';
 import LeagueSwitcherHeaderButton from '../components/LeagueSwitcherHeaderButton';
 import GridBackground from '../components/GridBackground';
 import ManagerProfileModal from '../components/ManagerProfileModal';
-import ScreenInfoNote from '../components/ScreenInfoNote';
+import InfoMark from '../components/InfoMark';
+import SectionHeading from '../components/SectionHeading';
 import PageFamilyTabs from '../components/PageFamilyTabs';
 import FilterDropdownButton from '../components/FilterDropdownButton';
 import TeamAvatar from '../components/TeamAvatar';
@@ -527,7 +528,7 @@ function RankingsPanel({
         ListHeaderComponent={
           <View style={styles.infoNoteWrap}>
             {myRanking ? <YourStandingCard me={myRanking} total={teamRankingsQuery.data?.teams.length ?? 0} colors={colors} styles={styles} /> : null}
-            <ScreenInfoNote label={config.infoLabel} text={config.infoText} />
+            <SectionHeading title={config.title} info={<InfoMark label={config.infoLabel} lines={[config.infoText]} />} />
           </View>
         }
         renderItem={renderTeamItem}

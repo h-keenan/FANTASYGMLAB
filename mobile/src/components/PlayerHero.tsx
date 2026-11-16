@@ -66,6 +66,7 @@ export default function PlayerHero({
   gradeTile = null,
   compact = false,
   children,
+  info,
 }: {
   /** Shown in the tap-the-Value popover (for example the value history chart). */
   /** Fantasy Sim: replaces the Value and Usage tiles (the sim shows neither the model's value nor a real usage feed). */
@@ -114,6 +115,8 @@ export default function PlayerHero({
   /** Peek sheet: 56px avatar, no archetype pill, the three tiles collapsed into one summary line (the full snap shows them). */
   compact?: boolean;
   children?: React.ReactNode;
+  /** The hero's one InfoMark, inline directly after the player name. */
+  info?: React.ReactNode;
 }) {
   const { colors } = useThemeMode();
   const styles = useMemo(() => createStyles(colors), [colors]);
@@ -161,7 +164,10 @@ export default function PlayerHero({
           ) : null}
         </View>
         <View style={styles.infoCol}>
-          <PlayerName name={name} style={styles.name} />
+          <View style={styles.nameRow}>
+            <PlayerName name={name} style={styles.name} />
+            {info}
+          </View>
           <View style={styles.metaRow}>
             <PositionBadge position={position} size="md" />
             <View style={styles.metaPill}>
@@ -331,7 +337,8 @@ function createStyles(colors: ThemeColors) {
     archetypeText: { flexShrink: 1, fontSize: 14, fontWeight: '700', color: colors.textPrimary },
     peekSummary: { fontSize: 12.5, fontWeight: '700', color: colors.textSecondary },
     infoCol: { flex: 1, alignItems: 'flex-start', gap: spacing.sm, paddingTop: spacing.xs },
-    name: { fontSize: 29, fontWeight: '800', color: colors.textPrimary, lineHeight: 32, letterSpacing: -0.3 },
+    nameRow: { flexDirection: 'row', alignItems: 'center', alignSelf: 'stretch' },
+    name: { flexShrink: 1, fontSize: 29, fontWeight: '800', color: colors.textPrimary, lineHeight: 32, letterSpacing: -0.3 },
     rookieLine: { fontSize: 13.5, color: colors.textSecondary },
     metaRow: { flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: spacing.sm },
     metaPill: {

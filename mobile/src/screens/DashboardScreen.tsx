@@ -57,9 +57,7 @@ import { categoryMeta } from '../lib/dashboardItemPresentation';
 import MetricCard from '../components/MetricCard';
 import PremiumLock from '../components/PremiumLock';
 import QuickActionsGrid, { type QuickAction } from '../components/QuickActionsGrid';
-import ScreenInfoNote from '../components/ScreenInfoNote';
 import FreeLimitNote from '../components/FreeLimitNote';
-import GlossaryNote from '../components/GlossaryNote';
 import AlertsSection from '../components/AlertsSection';
 import SectionHeading from '../components/SectionHeading';
 import CompactModule from '../components/CompactModule';
@@ -95,7 +93,7 @@ import { DashboardMore, DashboardTeamStats } from '../components/DashboardBlocks
 import DecisionQueue from '../components/DecisionQueue';
 import { buildDecisionQueue } from '../lib/decisionQueue';
 import { deadlineChip, isTradeItem, TRADES_BLOCK_COPY, tradesStanceLine } from '../lib/dashboardLayout';
-import BeginnerHelp from '../components/BeginnerHelp';
+import InfoMark from '../components/InfoMark';
 import { useThemeMode } from '../context/ThemeModeContext';
 import { LINK_HIT_SLOP, radii, spacing, type ThemeColors } from '../theme';
 import { openInsight } from '../lib/insightNav';
@@ -557,15 +555,15 @@ export default function DashboardScreen({ route, navigation }: Props) {
       />
       {idea && !deadlinePassed ? (
         <TodayTradeIdeaCard
+          info={<InfoMark label="this trade idea" beginnerOnly lines={[TRADES_BLOCK_COPY.beginnerExplainer]} />}
           idea={idea}
           deadline={deadlineChip(dashboardData?.trade_window)?.value.replace(/\s*\(.*\)$/, '')}
           onOpen={() => navigate('Trades', { leagueId, leagueName, ...(tradeItems[0]?.route_player_id ? { playerId: tradeItems[0].route_player_id } : {}) })}
         />
       ) : null}
-      {experienceCopy.isBeginner && (idea || stanceLine) ? (
-        // Beginner help for trades, plus the league's real GM stance (what the trade advice is tuned by).
+      {experienceCopy.isBeginner && stanceLine ? (
+        // The league's real GM stance (what the trade advice is tuned by) and the link to change it.
         <View style={{ gap: spacing.xs }} testID="today-trade-help">
-          {idea ? <BeginnerHelp text={TRADES_BLOCK_COPY.beginnerExplainer} /> : null}
           {stanceLine ? (
             <PressableScale
               onPress={() => navigate('GmPlan', { leagueId, leagueName })}
@@ -651,11 +649,6 @@ export default function DashboardScreen({ route, navigation }: Props) {
             )}
           </View>
         ) : null}
-        {experienceCopy.isBeginner ? (
-          <ScreenInfoNote
-            text={`Home base for ${leagueName}: your trades, this week's moves, your team and waiver suggestions, plus quick access to everything else.`}
-          />
-        ) : null}
         {readyRecap ? (
           <View>
             <SectionHeading title="Storylines" icon="newspaper-outline" />
@@ -675,7 +668,17 @@ export default function DashboardScreen({ route, navigation }: Props) {
           />
         ) : null}
         <View>
-          <SectionHeading title="Quick Actions" icon="apps-outline" />
+          <SectionHeading
+            title="Quick Actions"
+            icon="apps-outline"
+            info={
+              <InfoMark
+                label="this screen"
+                beginnerOnly
+                lines={[`Home base for ${leagueName}: your trades, this week's moves, your team and waiver suggestions, plus quick access to everything else.`]}
+              />
+            }
+          />
           <DashboardQuickActions
             leagueId={leagueId}
             leagueName={leagueName}
@@ -840,18 +843,10 @@ export function DashboardStatStrip({
   const open = (key: InsightKey) => openInsight(navigation.navigate as never, key, leagueId, leagueName);
   const copy = useExperienceCopy();
   const averageAgeLabel = copy.label('averageAge', 'Avg Age');
-  // Beginner-only term explanations (lib/experienceCopy.ts): empty for
-  // advanced/unset accounts, so the strip stays compact.
-  const termHelp: Array<[string, string | null]> = copy.isBeginner
-    ? [
-        [TERMS.thisSeason, copy.help('powerRank')],
-        [TERMS.longTerm, copy.help('franchiseRank')],
-        [averageAgeLabel, copy.help('averageAge')],
-      ]
-    : [];
   return (
     <View>
       <DashboardStatRow
+        info={{ glossary: ['averageAge'] }}
         items={[
           {
             label: 'Record',
@@ -884,10 +879,6 @@ export function DashboardStatStrip({
           },
         ]}
       />
-      {termHelp.map(([term, help]) => (
-        <BeginnerHelp key={term} text={help ? `${term}: ${help}` : null} />
-      ))}
-      <GlossaryNote terms={['powerRank', 'franchiseRank', 'averageAge']} />
     </View>
   );
 }
@@ -897,17 +888,11 @@ export function DashboardStatStrip({
 export function TeamSnapshotRow({ snapshot, leagueSize = null }: { snapshot: TeamSnapshot; leagueSize?: number | null }) {
   const { colors } = useThemeMode();
   const styles = useMemo(() => createStyles(colors), [colors]);
-  const copy = useExperienceCopy();
   const injuredCount = snapshot.injured_starters;
-  const termHelp: Array<[string, string | null]> = copy.isBeginner
-    ? [
-        ['Starter Strength', copy.help('starterStrength')],
-        ['Bench Strength', copy.help('benchStrength')],
-      ]
-    : [];
   return (
     <View style={styles.snapshotSection}>
       <DashboardStatRow
+        info={{ glossary: ['starterStrength', 'benchStrength'] }}
         items={[
           {
             label: 'Starter Strength',
@@ -929,10 +914,6 @@ export function TeamSnapshotRow({ snapshot, leagueSize = null }: { snapshot: Tea
           },
         ]}
       />
-      {termHelp.map(([term, help]) => (
-        <BeginnerHelp key={term} text={help ? `${term}: ${help}` : null} style={styles.snapshotHelp} />
-      ))}
-      <GlossaryNote terms={['starterStrength', 'benchStrength']} />
     </View>
   );
 }
@@ -1369,7 +1350,6 @@ function createStyles(colors: ThemeColors) {
   viewAll: { fontSize: 13.5, fontWeight: '700', color: colors.accent },
   activityRow: { flexDirection: 'row', gap: spacing.sm, alignItems: 'stretch', marginBottom: spacing.md },
   activityCell: { flex: 1, minWidth: 0 },
-  snapshotHelp: { marginTop: spacing.xs },
   snapshotRow: {
     flexDirection: 'row',
     flexWrap: 'wrap',

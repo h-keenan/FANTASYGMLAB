@@ -135,10 +135,9 @@ describe("experience level copy on Dashboard", () => {
     render(withProvider(<DashboardContent leagueId="abc" leagueName="League" data={DASHBOARD} />));
     fireEvent.click(await screen.findByTestId("stat-strip-toggle"));
 
-    await expandHelp();
-    expect(await screen.findByText(`This season: ${BEGINNER_HELP.powerRank}`)).toBeInTheDocument();
-    expect(screen.getByText(`Long term: ${BEGINNER_HELP.franchiseRank}`)).toBeInTheDocument();
-    expect(screen.getByText(BEGINNER_HELP.dashboardSnapshot)).toBeInTheDocument();
+    const marks = await screen.findAllByTestId("info-mark");
+    fireEvent.click(marks.find((m) => /team/i.test(m.getAttribute("aria-label") ?? "")) ?? marks[0]);
+    expect(await screen.findByText(BEGINNER_HELP.dashboardSnapshot)).toBeInTheDocument();
     expect(screen.getByText("Average Age")).toBeInTheDocument();
     expect(screen.queryByText("Avg Age")).not.toBeInTheDocument();
   });
@@ -150,7 +149,7 @@ describe("experience level copy on Dashboard", () => {
 
     await waitFor(() => expect(api.getDevicePreferences).toHaveBeenCalled());
     expect(screen.getByText("Avg Age")).toBeInTheDocument();
-    expect(container.querySelector("[data-beginner-help]")).not.toBeNull();
+    await waitFor(() => expect(container.querySelector("[data-info-mark]")).not.toBeNull());
   });
 
   it.each([["advanced", "advanced" as const]])("renders today's terse copy for %s", async (_name, level) => {
@@ -161,7 +160,7 @@ describe("experience level copy on Dashboard", () => {
     await waitFor(() => expect(api.getDevicePreferences).toHaveBeenCalled());
     expect(screen.getByText("Avg Age")).toBeInTheDocument();
     expect(screen.queryByText(BEGINNER_HELP.powerRank)).not.toBeInTheDocument();
-    expect(container.querySelector("[data-beginner-help]")).toBeNull();
+    expect(screen.queryByText(BEGINNER_HELP.dashboardSnapshot)).not.toBeInTheDocument();
   });
 });
 
@@ -194,7 +193,7 @@ describe("experience level copy on Trade Hub idea cards", () => {
     await waitFor(() => expect(api.getDevicePreferences).toHaveBeenCalled());
     openIdeaCards();
     expect(screen.getByRole("img", { name: "Realism: Plausible" })).toBeInTheDocument();
-    expect(container.querySelector("[data-beginner-help]")).toBeNull();
+    expect(screen.queryByText(BEGINNER_HELP.dashboardSnapshot)).not.toBeInTheDocument();
   });
 });
 

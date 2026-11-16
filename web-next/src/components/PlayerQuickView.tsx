@@ -8,7 +8,7 @@ import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "re
 
 import { api, type PlayerAward, type PlayerNewsResponse, type QuickViewResponse } from "@/lib/api";
 import type { PlayerQuickViewIdentity } from "@/context/PlayerQuickViewContext";
-import { BeginnerHelp } from "@/components/BeginnerHelp";
+import { InfoMark } from "@/components/ui/InfoMark";
 import { BEGINNER_HELP } from "@/lib/experienceCopy";
 import { DecisionFitCard, PlayerHeroHeader } from "@/components/PlayerHeroHeader";
 import { PlayerUsageBlock } from "@/components/PlayerUsageBlock";
@@ -440,9 +440,8 @@ export function PlayerQuickView({
           ) : null}
           <BadgeLegendSheet open={legendOpen} onClose={() => setLegendOpen(false)} />
           {/* Beginner-only "?" for the hero's Value / Overall / Tier labels (lib/experienceCopy.ts); renders nothing for advanced/unset. Inline at the end of the chip row with its text in a popover, so it never takes a row of its own. */}
-          <BeginnerHelp
-            popover
-            className="ml-auto"
+          <InfoMark
+            beginnerOnly
             label={isSim ? "Overall and Tier" : "Value, Overall and Tier"}
             lines={[
               identity.score != null && !isSim ? BEGINNER_HELP.playerValue : null,

@@ -2,7 +2,8 @@ import type { ReactNode } from "react";
 
 import type { TradeHubHold } from "@/lib/api";
 import { AccentCard } from "@/components/AccentCard";
-import { BeginnerHelp } from "@/components/BeginnerHelp";
+import { InfoMark } from "@/components/ui/InfoMark";
+import { useExperienceCopy } from "@/context/ExperienceLevelContext";
 import { ToneBadge } from "@/components/ToneBadge";
 
 const FACTOR_LABELS: Record<string, string> = {
@@ -70,6 +71,7 @@ function FactorGlyph({ color, children }: { color: string; children: ReactNode }
  * component only renders it. Mirrors mobile's TradeHubHoldCard.
  */
 export function TradeHubHoldCard({ hold }: { hold: TradeHubHold }) {
+  const copy = useExperienceCopy();
   return (
     <AccentCard as="section" accent="var(--color-information)" data-testid="trade-hub-hold">
       <div className="flex items-center gap-3">
@@ -79,7 +81,10 @@ export function TradeHubHoldCard({ hold }: { hold: TradeHubHold }) {
         </FactorGlyph>
         <div className="flex flex-col gap-1 items-start min-w-0">
           <ToneBadge label="Hold" color="var(--color-information)" />
-          <h2 className="text-base font-bold">{hold.headline}</h2>
+          <div className="flex items-center">
+            <h2 className="text-base font-bold">{hold.headline}</h2>
+            <InfoMark label="holding" lines={[copy.help("tradeHubHold")]} beginnerOnly />
+          </div>
         </div>
       </div>
       <ul className="flex flex-col gap-3">
@@ -98,7 +103,6 @@ export function TradeHubHoldCard({ hold }: { hold: TradeHubHold }) {
           );
         })}
       </ul>
-      <BeginnerHelp label="holding" term="tradeHubHold" />
       {hold.ideas_optional ? (
         <p className="text-xs font-semibold" style={{ color: "var(--color-text-muted)" }}>
           Ideas below are optional.

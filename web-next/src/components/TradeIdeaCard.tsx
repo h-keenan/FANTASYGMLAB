@@ -6,7 +6,7 @@ import { ManagerTendenciesCard } from "@/components/ManagerTendenciesCard";
 import dynamic from "next/dynamic";
 import { useEffect, useRef, useState } from "react";
 import { api, type TradeAsset, type TradeIdea } from "@/lib/api";
-import { BeginnerHelp } from "@/components/BeginnerHelp";
+import { InfoMark } from "@/components/ui/InfoMark";
 import { ToneBadge } from "@/components/ToneBadge";
 import { IdeaPosture } from "@/components/IdeaPosture";
 import { RosterOverflowNote } from "@/components/SuggestedDrop";
@@ -253,7 +253,7 @@ export function TradeIdeaCardView({
               {tag.label}
             </span>
           ))}
-          <BeginnerHelp label="this tag" text={copy.impactTagHelp(idea.impact_tag)} />
+          <InfoMark label="this trade idea" lines={[copy.impactTagHelp(idea.impact_tag), copy.help("ideaBalance"), BEGINNER_HELP.ideaConfidence, BEGINNER_HELP.ideaRealism]} beginnerOnly />
         </div>
       ) : null}
 
@@ -356,7 +356,6 @@ export function TradeIdeaCardView({
             </div>
           ) : null}
           <LeanBarMeter sendScore={idea.send_score} receiveScore={idea.receive_score} />
-          <BeginnerHelp label="balance" term="ideaBalance" />
           {leagueId ? (
             <TradeOddsEffect leagueId={leagueId} send={idea.package.send} receive={idea.package.receive} lens={lens} />
           ) : null}
@@ -374,7 +373,6 @@ export function TradeIdeaCardView({
               color={levelColor(realismLvl)}
             />
           </div>
-          <BeginnerHelp label="confidence and realism" lines={[BEGINNER_HELP.ideaConfidence, BEGINNER_HELP.ideaRealism]} />
           <ReasoningTags tags={idea.reasoning_tags} />
         </div>
     </div>

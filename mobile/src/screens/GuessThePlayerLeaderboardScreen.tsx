@@ -11,7 +11,7 @@ import BrandHeaderBar from '../components/BrandHeaderBar';
 import EmptyState from '../components/EmptyState';
 import ErrorState from '../components/ErrorState';
 import GridBackground from '../components/GridBackground';
-import ScreenInfoNote from '../components/ScreenInfoNote';
+import InfoMark from '../components/InfoMark';
 import SectionHeading from '../components/SectionHeading';
 import SegmentedTabBar from '../components/SegmentedTabBar';
 import ToneBadge from '../components/ToneBadge';
@@ -92,12 +92,17 @@ export default function GuessThePlayerLeaderboardScreen({ route, navigation }: P
       <GridBackground />
       <ScrollView contentContainerStyle={[styles.content, { paddingTop: headerHeight, paddingBottom: orbClearance }]}>
         <BrandHeaderBar leagueId={leagueId} leagueName={leagueName} />
-        <ScreenInfoNote
-          label="How the leaderboard works"
-          text="Real, persisted streaks among the other FantasyDesk users in this league, ranked by current streak, then best streak."
-        />
         <SegmentedTabBar options={MODE_OPTIONS} active={mode} onChange={setMode} />
-        <SectionHeading title="League Leaderboard" icon="trophy-outline" />
+        <SectionHeading
+          title="League Leaderboard"
+          icon="trophy-outline"
+          info={
+            <InfoMark
+              label="the leaderboard"
+              lines={['Real, persisted streaks among the other FantasyDesk users in this league, ranked by current streak, then best streak.']}
+            />
+          }
+        />
         {!data.configured ? (
           <EmptyState
             icon="cloud-offline-outline"

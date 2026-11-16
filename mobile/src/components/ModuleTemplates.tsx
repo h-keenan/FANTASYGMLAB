@@ -5,11 +5,13 @@ import AccentCard from './AccentCard';
 import AppText from './AppText';
 import CompactModule from './CompactModule';
 import DashboardStatRow, { type StatStripItem } from './DashboardStatRow';
+import InfoMark, { type InfoMarkProps } from './InfoMark';
 import PercentileBar from './PercentileBar';
 import TrendChart from './TrendChart';
 import { useThemeMode } from '../context/ThemeModeContext';
 import type { ChartInputPoint } from '../lib/chartSeries';
 import { compactAriaLabel, compactParts, type CompactPart, type CompactTone } from '../lib/compactModule';
+import type { WhyMetricId } from '../lib/tapForWhyContent';
 import { heroParts, statStripParts, trendModel, type TrendModel } from '../lib/moduleTemplates';
 import { spacing, type ThemeColors } from '../theme';
 import Money from './Money';
@@ -117,6 +119,7 @@ export function StatStripModule({
   action,
   extraParts,
   footer,
+  info,
   testID,
 }: {
   id: string;
@@ -131,11 +134,14 @@ export function StatStripModule({
   extraParts?: ReadonlyArray<CompactPart | null | undefined | false | ''>;
   /** Shown under the bars when expanded (glossary, beginner help). */
   footer?: ReactNode;
+  /** Extra content for the module's one "?" (glossary terms, lines); the tiles' `why` metrics merge into the same InfoMark. */
+  info?: Omit<InfoMarkProps, 'label' | 'metrics'>;
   testID?: string;
 }) {
   const { colors } = useThemeMode();
   const styles = useMemo(() => createStyles(colors), [colors]);
   const [open, setOpen] = useState(defaultOpen);
+  const whyMetrics = items.map((i) => i.why).filter((w): w is WhyMetricId => Boolean(w));
   const parts = compactParts([
     ...statStripParts(
       items.map((i) => ({
@@ -155,12 +161,15 @@ export function StatStripModule({
     <AccentCard accent={toneColor(tone, colors)} compact>
       <View testID={testID ?? `stat-strip-${id}`}>
         <View style={styles.stripHead}>
-          <AppText style={styles.stripTitle}>{title}</AppText>
+          <View style={styles.stripTitleRow}>
+            <AppText style={styles.stripTitle}>{title}</AppText>
+            <InfoMark label={title} metrics={whyMetrics} {...info} />
+          </View>
           {action}
         </View>
         <View accessibilityLabel={`${title}: ${summary}`} testID="stat-strip-tiles">
           {rows.map((row, i) => (
-            <DashboardStatRow key={i} items={row.map((item) => ({ ...item, fill: null }))} />
+            <DashboardStatRow key={i} items={row.map((item) => ({ ...item, fill: null, why: undefined }))} />
           ))}
         </View>
         <Pressable
@@ -248,6 +257,7 @@ export function LinkModule({
 function createStyles(colors: ThemeColors) {
   return StyleSheet.create({
     stripHead: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: spacing.sm, marginBottom: spacing.sm },
+    stripTitleRow: { flexDirection: 'row', alignItems: 'center', flexShrink: 1 },
     stripTitle: { fontSize: 12, fontWeight: '800', letterSpacing: 0.8, textTransform: 'uppercase', color: colors.textTertiary },
     stripToggle: { minHeight: 44, alignItems: 'center', justifyContent: 'center' },
     stripToggleText: { fontSize: 13, fontWeight: '700', color: colors.accent },

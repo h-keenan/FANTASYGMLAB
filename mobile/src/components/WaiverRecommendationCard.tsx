@@ -9,7 +9,8 @@ import CompactModule from './CompactModule';
 import { abbreviatePlayerName } from '../lib/formatPlayerName';
 import type { CompactPart } from '../lib/compactModule';
 import AppText from './AppText';
-import BeginnerHelp from './BeginnerHelp';
+import InfoMark from './InfoMark';
+import { useExperienceCopy } from '../context/ExperienceLevelContext';
 import MeterRow, { confidenceLevelFor } from './ConfidenceMeter';
 import FAABGuidance from './FAABGuidance';
 import OverallRatingBadge from './OverallRatingBadge';
@@ -211,6 +212,7 @@ export default function WaiverRecommendationCard({
   sharedDropId?: string | null;
 }) {
   const { colors } = useThemeMode();
+  const copy = useExperienceCopy();
   const styles = useMemo(() => createStyles(colors), [colors]);
   const injury = waiverInjuryDisplay(player.injury_status);
   const contextLine = player.injury_replacement_fit ? player.injury_replacement_note : waiverOpponentContext(player);
@@ -248,6 +250,15 @@ export default function WaiverRecommendationCard({
         <View style={styles.actionRow}>
           <Ionicons name="swap-horizontal-outline" size={13} color={colors.accent} />
           <AppText style={styles.actionLabel}>Top waiver target · {player.recommendation_label} #1</AppText>
+          <InfoMark
+            label="this waiver target"
+            beginnerOnly
+            lines={[
+              copy.help('waiverValue'),
+              copy.help('faab'),
+              player.confidence_label ? copy.help('waiverConfidence') : null,
+            ]}
+          />
         </View>
         <View style={styles.identityWrap}>{identity}</View>
         <ReasonChips player={player} />
@@ -285,8 +296,6 @@ export default function WaiverRecommendationCard({
             for advanced/unset accounts. Primary card only, so the compact
             rows below stay as dense as before. */}
         {player.drop_suggestion ? <SuggestedDrop suggestion={player.drop_suggestion} /> : null}
-        <BeginnerHelp term="waiverValue" style={styles.beginnerHelp} />
-        <BeginnerHelp term="faab" style={styles.beginnerHelp} />
         {/* Real need-fit/standout-value confidence for this recommendation
             (modules.waivers_ui.waiver_confidence_label) — the same signals
             that ranked it into Priority Adds, shown with the exact same
@@ -305,7 +314,6 @@ export default function WaiverRecommendationCard({
             <View style={styles.confidenceMeter} />
           )}
         </View>
-        {player.confidence_label ? <BeginnerHelp term="waiverConfidence" style={styles.beginnerHelp} /> : null}
         </CompactModule>
       </View>
     );
@@ -421,7 +429,6 @@ function createStyles(colors: ThemeColors) {
       borderColor: colors.accent,
     },
     detailsButtonText: { fontSize: 14.5, fontWeight: '700', color: colors.accent },
-    beginnerHelp: { marginTop: spacing.xs },
     faabWhy: { marginTop: spacing.sm, fontSize: 13.5, lineHeight: 18, color: colors.textSecondary },
     scoreBlock: { alignItems: 'flex-start', gap: 1 },
     scoreNumberPrimary: { fontSize: 23, fontWeight: '800', color: colors.accent },

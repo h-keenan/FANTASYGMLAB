@@ -11,7 +11,8 @@ import EmptyState from '../components/EmptyState';
 import { EventTypePill } from '../components/EventTypeGlyph';
 import GridBackground from '../components/GridBackground';
 import { SkeletonPage } from '../components/Skeleton';
-import ScreenInfoNote from '../components/ScreenInfoNote';
+import InfoMark from '../components/InfoMark';
+import SectionHeading from '../components/SectionHeading';
 import NewsDigest from '../components/NewsDigest';
 import { NOT_READY_MESSAGES } from '../components/AlertsSection';
 import LeagueRecapPanel from '../components/LeagueRecapPanel';
@@ -309,11 +310,17 @@ function NflNews({ route, tab, onTab }: { route?: { params?: NewsParams }; tab: 
 
   return (
     <NewsShell tab={tab} onTab={onTab} showTabs={!playerId}>
-      <ScreenInfoNote
-        text={
-          playerId
-            ? `Recent injury, role, transaction, and off-field items that mention ${playerName || 'this player'}.`
-            : 'General NFL news — injury, role, transaction, and off-field signal only. Not filtered to your specific rosters yet.'
+      <SectionHeading
+        title={playerId ? 'Player news' : 'NFL news'}
+        info={
+          <InfoMark
+            label={playerId ? 'player news' : 'NFL news'}
+            lines={[
+              playerId
+                ? `Recent injury, role, transaction, and off-field items that mention ${playerName || 'this player'}.`
+                : 'General NFL news — injury, role, transaction, and off-field signal only. Not filtered to your specific rosters yet.',
+            ]}
+          />
         }
       />
 

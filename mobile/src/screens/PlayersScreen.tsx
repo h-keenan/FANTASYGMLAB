@@ -27,7 +27,8 @@ import PlayerIdentityRow from '../components/PlayerIdentityRow';
 import PlayerAccordionRow, { usePlayerAccordion } from '../components/PlayerAccordionRow';
 import type { PlayerFact } from '../lib/playerAnatomy';
 import { badgeFromInjury } from '../lib/playerBadges';
-import ScreenInfoNote from '../components/ScreenInfoNote';
+import InfoMark from '../components/InfoMark';
+import SectionHeading from '../components/SectionHeading';
 import UsageTrendPill from '../components/UsageTrendPill';
 import ValuesCredit from '../components/ValuesCredit';
 import ViewModeToggle from '../components/ViewModeToggle';
@@ -448,7 +449,15 @@ export default function PlayersScreen({ route, navigation }: Props) {
         </ScrollView>
       ) : (
       <>
-      <ScreenInfoNote text="Ranked by value for this league's scoring, roster, and format settings. OVR percentiles a player against others at their position — tap any player for the full breakdown." />
+      <SectionHeading
+        title="Player rankings"
+        info={
+          <InfoMark
+            label="player rankings"
+            lines={["Ranked by value for this league's scoring, roster, and format settings. OVR percentiles a player against others at their position — tap any player for the full breakdown."]}
+          />
+        }
+      />
 
       {error ? <ErrorState compact title="Couldn't load players" message={error} onRetry={() => setReloadToken((n) => n + 1)} /> : null}
 

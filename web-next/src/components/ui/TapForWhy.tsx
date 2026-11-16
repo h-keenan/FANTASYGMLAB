@@ -21,21 +21,6 @@ export function TapForWhyOff({ children }: { children: ReactNode }) {
   return <TapForWhyOffContext.Provider value>{children}</TapForWhyOffContext.Provider>;
 }
 
-/**
- * The small "why" target inside a tile that is itself a link (a rank tile: the tile opens the board, this explains the number).
- * A 44px square pinned to the tile's top-right corner with a quiet "?" glyph; one tap for everyone, whatever their experience
- * level. Place it as a sibling of the tile link inside a `relative` wrapper (a button never nests inside a link).
- */
-export function WhyCorner({ metric, spoken }: { metric: WhyMetricId; spoken?: string }) {
-  return (
-    <span className="ui-why-corner">
-      <TapForWhy metric={metric} variant="chip" spoken={spoken} testId={`why-${metric}`} className="ui-why-corner-btn">
-        <span aria-hidden="true">?</span>
-      </TapForWhy>
-    </span>
-  );
-}
-
 export type TapForWhyProps = {
   /** Registry key (lib/tapForWhyContent.ts). Copy lives there so web and app never disagree. */
   metric: WhyMetricId;

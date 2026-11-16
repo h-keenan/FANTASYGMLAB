@@ -228,6 +228,36 @@ const PAGE_CHECK = () => {
     if (cs.textOverflow === "ellipsis" && el.scrollWidth > el.clientWidth + 1) out.truncated.push(el.textContent.trim().slice(0, 40));
     if (el.scrollWidth > el.clientWidth + 1 && cs.overflowX !== "visible") out.truncated.push("clipped:" + el.textContent.trim().slice(0, 40));
   }
+  // "?" standard (docs/ui-patterns.md, One InfoMark): every explainer glyph must share its row with other content (never alone on its own row) and never overlap text.
+  // Current marker: [data-info-mark]. Legacy selectors stay so a before/after run on an older checkout measures the retired variants too.
+  out.marks = [];
+  const GLYPHS = '[data-info-mark] span, .ui-why-corner-btn span, [data-info-tip] > button > span, [data-beginner-help] > button > span, [data-glossary-note] > button > span, #page-info-slot button span, #shell-page-info-slot button span';
+  const ROOT = '[data-info-mark], .ui-why-corner-btn, [data-info-tip], [data-beginner-help], [data-glossary-note]';
+  const rects = (n) => { const r = document.createRange(); r.selectNodeContents(n); return [...r.getClientRects()]; };
+  const texts = [];
+  for (const w = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT); w.nextNode();) {
+    const n = w.currentNode;
+    const pe = n.parentElement;
+    if (!n.textContent.trim() || !pe || pe.closest("script,style,noscript,[aria-hidden=true],.sr-only,nextjs-portal")) continue;
+    const cs = getComputedStyle(pe);
+    if (cs.visibility !== "hidden" && cs.display !== "none") texts.push(n);
+  }
+  for (const g of document.querySelectorAll(GLYPHS)) {
+    const gr = g.getBoundingClientRect();
+    if (gr.width < 2 || gr.height < 2) continue;
+    const root = g.closest(ROOT) || g.parentElement;
+    let overlap = null, shares = false;
+    for (const n of texts) {
+      if (root.contains(n) || n.parentElement.closest("button") === g.closest("button")) continue;
+      for (const r of rects(n)) {
+        if (r.width < 1 || r.height < 1) continue;
+        const ix = Math.min(gr.right, r.right) - Math.max(gr.left, r.left), iy = Math.min(gr.bottom, r.bottom) - Math.max(gr.top, r.top);
+        if (ix > 1.5 && iy > 1.5) overlap = overlap || n.textContent.trim().slice(0, 30);
+        if (iy > Math.min(gr.height, r.height) * 0.5) shares = true;
+      }
+    }
+    out.marks.push({ kind: g.closest(ROOT)?.matches("[data-info-mark]") ? "InfoMark" : "legacy", glyph: Math.round(gr.width) + "x" + Math.round(gr.height), y: Math.round(gr.top + scrollY), ownRow: !shares, overlap });
+  }
   const main = document.querySelector("main");
   out.mainWidth = main ? Math.round(main.getBoundingClientRect().width) : 0;
   out.recRows = document.querySelectorAll('[data-testid="waiver-rec-row"]').length;
@@ -346,6 +376,11 @@ for (const r of results) {
     if (s.minAlpha < 0.9) problems.push(`tab strip backing see-through (alpha ${s.minAlpha})`);
     if (s.headerBottom != null && Math.abs(s.top - s.headerBottom) > 1) problems.push(`tab strip top ${s.top} != header bottom ${s.headerBottom}`);
   }
+  for (const m of r.marks ?? []) {
+    if (m.ownRow) problems.push(`"?" alone on its own row (${m.kind} y=${m.y})`);
+    if (m.overlap) problems.push(`"?" overlaps text "${m.overlap}" (${m.kind} y=${m.y})`);
+  }
+  if ((r.marks ?? []).some((m) => m.kind === "legacy")) problems.push(`${r.marks.filter((m) => m.kind === "legacy").length} retired "?" variant(s) rendered`);
   if (r.truncated?.length) problems.push(`ellipsized/clipped names: ${r.truncated.slice(0, 4).join(" | ")}`);
   if ((r.tablists ?? 0) > (r.maxTablists ?? 1)) problems.push(`${r.tablists} tab rows`);
   if (r.width >= 768 && r.shellHeaderVisible) problems.push("phone ShellHeader visible on desktop (double header)");

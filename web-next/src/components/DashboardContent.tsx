@@ -4,14 +4,12 @@ import { ModuleMore } from "@/components/ui/ModuleMore";
 import { useEffect, useState, type MouseEvent } from "react";
 
 import { api, type DashboardResponse, type LeagueTeamRankingsResponse } from "@/lib/api";
-import { BeginnerHelp } from "@/components/BeginnerHelp";
 import { DashboardAlerts } from "@/components/DashboardAlerts";
 import { DirectionCheckinCard } from "@/components/DirectionCheckinCard";
 import { FirstValueOfferCard } from "@/components/FirstValueOfferCard";
 import { NextSteps } from "@/components/NextSteps";
 import { StartHereCard } from "@/components/StartHereCard";
 import { GuillotineCard, LeagueTypeControl, useGuillotineState } from "@/components/GuillotineCard";
-import { GlossaryNote } from "@/components/GlossaryNote";
 import { GuessThePlayerCard } from "@/components/GuessThePlayerCard";
 import { GuessThePlayerNameMatchCard } from "@/components/GuessThePlayerNameMatchCard";
 import { LeaguePulseCard } from "@/components/LeaguePulseCard";
@@ -231,16 +229,13 @@ export function DashboardContent({
       {teamStatus.settled ? (
         <>
           <TodayTiles tiles={tiles} hrefs={{ standing: `/league-rankings/${id}${query}`, playoffs: `/league-rankings/${id}${query}`, trades: tradeHubHref }} />
-          {idea && !deadlinePassed ? <TodayTradeIdeaCard idea={idea} href={ideaHref} deadline={deadlineChip(data.trade_window)?.value.replace(/\s*\(.*\)$/, "")} /> : null}
-          {copy.isBeginner && (idea || stanceLine) ? (
-            // Beginner help for trades, plus the league's real GM stance (what the trade advice is tuned by).
+          {idea && !deadlinePassed ? <TodayTradeIdeaCard idea={idea} href={ideaHref} deadline={deadlineChip(data.trade_window)?.value.replace(/\s*\(.*\)$/, "")} info={copy.isBeginner ? TRADES_BLOCK_COPY.beginnerExplainer : null} /> : null}
+          {copy.isBeginner && stanceLine ? (
+            // The league's real GM stance (what the trade advice is tuned by). The trade explainer is the "?" on the idea card.
             <div className="flex flex-wrap items-center gap-x-3 gap-y-1" data-testid="today-trade-help">
-              {idea ? <BeginnerHelp popover label="trade ideas" text={TRADES_BLOCK_COPY.beginnerExplainer} /> : null}
-              {stanceLine ? (
-                <Link href={`/gm-plan/${id}${query}`} className="text-xs" style={{ color: "var(--color-text-secondary)" }} data-testid="dashboard-stance-line">
-                  {stanceLine} <span className="font-bold" style={{ color: "var(--color-accent)" }}>{TRADES_BLOCK_COPY.changeStance}</span>
-                </Link>
-              ) : null}
+              <Link href={`/gm-plan/${id}${query}`} className="text-xs" style={{ color: "var(--color-text-secondary)" }} data-testid="dashboard-stance-line">
+                {stanceLine} <span className="font-bold" style={{ color: "var(--color-accent)" }}>{TRADES_BLOCK_COPY.changeStance}</span>
+              </Link>
             </div>
           ) : null}
           <TodayRooms chips={roomChips} tradeHref={tradeHubHref} />
@@ -256,22 +251,10 @@ export function DashboardContent({
             title="My Team"
             items={teamStats.main}
             league={{ id: leagueId, name: leagueName }}
+            infoLines={[copy.help("dashboardSnapshot")]}
             footer={
               <>
                 <ModuleMore href={`/my-team/${encodeURIComponent(leagueId)}${query}`}>Open My Team</ModuleMore>
-                <BeginnerHelp
-                  popover
-                  label="My Team stats"
-                  lines={[
-                    copy.help("dashboardSnapshot"),
-                    copy.help("powerRank") ? `${TERMS.thisSeason}: ${copy.help("powerRank")}` : null,
-                    copy.help("franchiseRank") ? `${TERMS.longTerm}: ${copy.help("franchiseRank")}` : null,
-                    copy.help("averageAge") ? `Average Age: ${copy.help("averageAge")}` : null,
-                    copy.help("starterStrength") ? `Starter Strength: ${copy.help("starterStrength")}` : null,
-                    copy.help("benchStrength") ? `Bench Strength: ${copy.help("benchStrength")}` : null,
-                  ]}
-                />
-                <GlossaryNote terms={["powerRank", "franchiseRank", "averageAge", "starterStrength", "benchStrength"]} />
               </>
             }
           />

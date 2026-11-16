@@ -13,8 +13,8 @@ import { Ionicons } from '@expo/vector-icons';
 import { useIsRestoring, useQuery, useQueryClient } from '@tanstack/react-query';
 
 import Button from '../components/Button';
-import ScreenInfoNote from '../components/ScreenInfoNote';
-import BeginnerHelp from '../components/BeginnerHelp';
+import InfoMark from '../components/InfoMark';
+import { useExperienceCopy } from '../context/ExperienceLevelContext';
 import EmptyState from '../components/EmptyState';
 import EvaluationLensHeaderButton from '../components/EvaluationLensHeaderButton';
 import GmStanceHeaderButton from '../components/GmStanceHeaderButton';
@@ -354,8 +354,6 @@ export default function MatchupScreen({ route, navigation }: Props) {
           </View>
         ) : null}
 
-        <BeginnerHelp term="matchupIntro" />
-        <BeginnerHelp term="matchupWinProbability" />
         <MatchupHero
           matchup={shown}
           mine={mine}
@@ -530,6 +528,7 @@ function TeamsValues({
 }) {
   const [sheetOpen, setSheetOpen] = useState(false);
   const { colors } = useThemeMode();
+  const copy = useExperienceCopy();
   const styles = useMemo(() => createStyles(colors), [colors]);
   const comparison = matchup.comparison!;
   const { hasOdds, myPct, myProjected, opponentProjected, margin } = scoreboardFacts(matchup);
@@ -541,6 +540,7 @@ function TeamsValues({
     <CompactModule
       id="matchup.teams"
       title="Teams & values"
+      info={<InfoMark label="this matchup" beginnerOnly lines={[copy.help('matchupIntro'), copy.help('matchupWinProbability')]} />}
       testID="matchup-teams"
       parts={teamsValuesParts({
         myValue: formatSeasonValue(comparison.my_season_value),
@@ -720,6 +720,7 @@ function LineupComparison({
     <CompactModule
       id="matchup.lineup"
       title="Lineup Comparison"
+      info={<InfoMark label="Lineup Comparison" lines={[caption]} />}
       testID="matchup-lineup"
       defaultOpen
       parts={lineupParts({
@@ -730,10 +731,6 @@ function LineupComparison({
         bestBall,
       })}
     >
-      <View style={styles.lineupHeader}>
-        <View style={{ flex: 1 }} />
-        <ScreenInfoNote text={caption} label="How it works" />
-      </View>
       {plan ? (
         <PlannerBar
           editing
@@ -1006,7 +1003,6 @@ function createStyles(colors: ThemeColors) {
     footnote: { fontSize: 12.5, lineHeight: 17, color: colors.textTertiary },
     rangeToggle: { fontSize: 13.5, fontWeight: '700', color: colors.textTertiary },
     emptyNote: { fontSize: 14.5, color: colors.textTertiary, textAlign: 'center', paddingVertical: spacing.md },
-    lineupHeader: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
     lineupControls: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
     teamHeaderRow: { flexDirection: 'row', alignItems: 'center', paddingBottom: spacing.sm },
     teamHead: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: spacing.sm, minWidth: 0 },

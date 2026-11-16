@@ -16,7 +16,7 @@ import EmptyState from '../components/EmptyState';
 import GridBackground from '../components/GridBackground';
 import ExchangeSide from '../components/ExchangeSide';
 import PlayerAccordionRow from '../components/PlayerAccordionRow';
-import ScreenInfoNote from '../components/ScreenInfoNote';
+import InfoMark from '../components/InfoMark';
 import TradeFinderNoResults, {
   TradeFinderClosestSection,
   TradeFinderNoteRow,
@@ -542,8 +542,14 @@ export default function TradeFinderScreen({ leagueId, leagueName, navigation, pr
         ]}
         ListHeaderComponent={
           <View>
-            <ScreenInfoNote
-              text={`Pick the players and draft picks you'd actually consider moving — the engine searches every other roster in ${leagueName} for plausible trades built around exactly that selection.`}
+            <SectionHeading
+              title="What You'd Move"
+              info={
+                <InfoMark
+                  label="the Trade Finder"
+                  lines={[`Pick the players and draft picks you'd actually consider moving — the engine searches every other roster in ${leagueName} for plausible trades built around exactly that selection.`]}
+                />
+              }
             />
             <SectionHeading title="What You Want Back" topGap={12} />
             <SegmentedTabBar<'any' | 'picks' | 'players'>
