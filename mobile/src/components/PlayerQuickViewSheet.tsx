@@ -612,7 +612,7 @@ function createStyles(colors: ThemeColors) {
     sheetPeek: { minHeight: '88%', maxHeight: '88%' },
     sheetFull: { minHeight: '94%', maxHeight: '94%' },
     ownerTag: { flexDirection: 'row', alignItems: 'center', gap: 4, flexShrink: 1 },
-    ownerLabel: { fontSize: 11, fontWeight: '800', letterSpacing: 0.6, color: colors.textTertiary },
+    ownerLabel: { fontSize: 12, fontWeight: '800', letterSpacing: 0.6, color: colors.textTertiary },
     grip: { height: 24, alignItems: 'center', justifyContent: 'center' },
     gripBar: { width: 40, height: 4, borderRadius: 2, backgroundColor: colors.borderStrong },
     stickyTabs: { backgroundColor: colors.surface, paddingVertical: spacing.xs },
