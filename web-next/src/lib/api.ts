@@ -5080,7 +5080,7 @@ export const api = {
   // Community Trade Feed (Social/community layer) — same GET
   // /v1/community/trades every signed-in user reads (never scoped to one
   // league or gated on Premium), plus the react/opt-out mutations.
-  getCommunityTrades: () => authorizedRequest<CommunityTradesResponse>("/v1/community/trades").then(normalizeCommunityTrades),
+  getCommunityTrades: () => authorizedRequest<CommunityTradesResponse>("/v1/community/trades").then((r) => normalizeCommunityTrades(r) as unknown as CommunityTradesResponse),
   reactToCommunityTrade: (outcomeId: string, emoji: string, action: "add" | "remove") =>
     authorizedRequest<{ ok: boolean; reason: string }>(
       `/v1/community/trades/${encodeURIComponent(outcomeId)}/react`,

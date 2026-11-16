@@ -6,10 +6,17 @@
  * boundary; components keep trusting the declared types.
  * Byte-identical to mobile/src/lib/apiDefaults.ts (twin test).
  */
-import type { CollegeProspect, CollegeProspectsResponse, CommunityTradeItem, CommunityTradesResponse, LeagueRankingsResponse, LeagueRostersResponse, LeagueTeamProfilesResponse, MeResponse, SharedCommunityTradesResponse } from "./api";
+import type { CollegeProspect, CollegeProspectsResponse, LeagueRankingsResponse, LeagueRostersResponse, LeagueTeamProfilesResponse, MeResponse, SharedCommunityTradesResponse } from "./api";
 import type { CommissionerIntegrityResponse } from "./commissionerIntegrity";
 
 type Rec = Record<string, unknown>;
+
+/** GET /v1/community/trades (web only; typed structurally so the twin file compiles on both sides). */
+export interface CommunityTradesBody {
+  ok: boolean;
+  trades: Rec[];
+  reaction_emoji: string[];
+}
 
 /** The value when it is a real array, else []. */
 export function arr<T>(v: unknown): T[] {
@@ -64,24 +71,24 @@ export function normalizeCollegeProspects(raw: unknown): CollegeProspectsRespons
   } as CollegeProspectsResponse;
 }
 
-function normalizeCommunityTrade(raw: Rec): CommunityTradeItem {
+function normalizeCommunityTrade(raw: Rec): Rec {
   return {
     ...raw,
     send: rows(raw.send),
     receive: rows(raw.receive),
     reactions: rec(raw.reactions),
     my_reactions: arr<string>(raw.my_reactions),
-  } as unknown as CommunityTradeItem;
+  };
 }
 
-export function normalizeCommunityTrades(raw: unknown): CommunityTradesResponse {
+export function normalizeCommunityTrades(raw: unknown): CommunityTradesBody {
   const r = rec(raw);
   return {
     ...r,
     ok: r.ok === true,
     trades: rows<Rec>(r.trades).map(normalizeCommunityTrade),
     reaction_emoji: arr<string>(r.reaction_emoji),
-  } as CommunityTradesResponse;
+  };
 }
 
 export function normalizeSharedCommunityTrades(raw: unknown): SharedCommunityTradesResponse {
