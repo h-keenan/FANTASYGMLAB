@@ -25,8 +25,8 @@ import AppText from '../components/AppText';
 import Button from '../components/Button';
 import GlassPanel from '../components/GlassPanel';
 import OnboardingAurora from '../components/OnboardingAurora';
-import type { ExperienceGoalValue, ExperienceLevelValue } from '../lib/api';
-import { EXPERIENCE_GOAL_OPTIONS, EXPERIENCE_LEVEL_OPTIONS, PLAIN_COPY } from '../lib/experienceCopy';
+import type { ExperienceLevelValue } from '../lib/api';
+import { EXPERIENCE_LEVEL_OPTIONS, PLAIN_COPY } from '../lib/experienceCopy';
 import { useExperienceLevel } from '../context/ExperienceLevelContext';
 import { experienceBucket, trackOnboarding, trackOnboardingStepViewed } from '../lib/onboardingAnalytics';
 import { useOnboarding } from '../context/OnboardingContext';
@@ -179,9 +179,6 @@ const LEVEL_OPTIONS: { value: ExperienceLevelValue; icon: IconName; color: Color
   },
 ];
 
-const GOAL_OPTIONS: { value: ExperienceGoalValue; label: string }[] = (
-  Object.keys(EXPERIENCE_GOAL_OPTIONS) as ExperienceGoalValue[]
-).map((value) => ({ value, label: EXPERIENCE_GOAL_OPTIONS[value].label }));
 
 /**
  * First-run intro carousel, shown once after sign-in (gated by
@@ -207,7 +204,7 @@ export default function OnboardingScreen({ navigation, route }: Props) {
   // The value step adds a headline and preview controls above/below.
   const valuePhoneHeight = Math.max(200, Math.min(height * 0.44, 380));
   const { onboardingComplete, completeOnboarding, completeOnboardingViaGetStarted } = useOnboarding();
-  const { setLevel: saveExperienceLevel, setGoal: saveExperienceGoal } = useExperienceLevel();
+  const { setLevel: saveExperienceLevel } = useExperienceLevel();
   const scrollRef = useRef<ScrollView>(null);
   const [index, setIndex] = useState(0);
   const prevIndex = useRef(0);
@@ -217,7 +214,6 @@ export default function OnboardingScreen({ navigation, route }: Props) {
   }, [index]);
   const [level, setLevel] = useState<ExperienceLevelValue | null>(null);
   // Optional, skippable — never gates the primary button, unlike level.
-  const [goal, setGoal] = useState<ExperienceGoalValue | null>(null);
   const [valueSlide, setValueSlide] = useState(0);
   const [valuePaused, setValuePaused] = useState(false);
   const reduceMotion = useReducedMotion();
@@ -264,7 +260,7 @@ export default function OnboardingScreen({ navigation, route }: Props) {
     if (navigation.canGoBack()) navigation.goBack();
   };
 
-  // Saves the level (and optional goal) as soon as the first step is answered,
+  // Saves the level as soon as the first step is answered,
   // so beginner help is live for the rest of onboarding.
   const onLevelContinue = () => {
     if (!level) return;
@@ -272,7 +268,6 @@ export default function OnboardingScreen({ navigation, route }: Props) {
     // Applies the beginner/advanced copy immediately and saves it to
     // /v1/preferences in the background. Best-effort, same as web.
     saveExperienceLevel(level);
-    if (goal) saveExperienceGoal(goal);
     goTo(index + 1);
   };
 
@@ -366,11 +361,9 @@ export default function OnboardingScreen({ navigation, route }: Props) {
           <>
             <AppText style={styles.eyebrow}>One quick question</AppText>
             <AppText style={styles.headlineSm}>
-              How familiar are you with <AppText style={styles.headlineAccent}>fantasy football</AppText>?
+              Which sounds most like <AppText style={styles.headlineAccent}>you</AppText>?
             </AppText>
-            <AppText style={styles.body}>
-              Tunes how much explanation shows up alongside recommendations. Change it anytime in Settings.
-            </AppText>
+            <AppText style={styles.body}>{PLAIN_COPY.onboardingLevelBody}</AppText>
             <AppText style={styles.body}>{PLAIN_COPY.onboardingDynastyNote}</AppText>
             <View style={styles.cards}>
               {LEVEL_OPTIONS.map((option) => {
@@ -396,24 +389,6 @@ export default function OnboardingScreen({ navigation, route }: Props) {
                 );
               })}
             </View>
-            <AppText style={[styles.body, styles.goalPrompt]}>{PLAIN_COPY.experienceGoalPrompt}</AppText>
-            <View style={styles.goalChipRow}>
-              {GOAL_OPTIONS.map((option) => {
-                const selected = goal === option.value;
-                return (
-                  <PressableScale
-                    key={option.value}
-                    onPress={() => setGoal((current) => (current === option.value ? null : option.value))}
-                    accessibilityRole="button"
-                    accessibilityState={{ selected }}
-                    style={[styles.goalChip, selected && styles.goalChipSelected]}
-                  >
-                    <AppText style={[styles.goalChipLabel, selected && styles.goalChipLabelSelected]}>{option.label}</AppText>
-                  </PressableScale>
-                );
-              })}
-            </View>
-            <AppText style={styles.goalOptionalNote}>{PLAIN_COPY.experienceGoalOptionalNote}</AppText>
           </>
         );
     }
@@ -474,6 +449,7 @@ export default function OnboardingScreen({ navigation, route }: Props) {
             label={primaryLabel}
             onPress={() => (isLevelStep ? onLevelContinue() : isLast ? onFinish() : goTo(index + 1))}
             disabled={primaryDisabled}
+            disabledReason={primaryDisabled ? PLAIN_COPY.onboardingPickOne : undefined}
             style={styles.primaryButton}
           />
         </View>
@@ -561,19 +537,6 @@ function createStyles(colors: ThemeColors) {
     pickCard: { padding: spacing.md, borderWidth: 1.5, borderColor: 'transparent' },
     pickCardSelected: { borderColor: colors.accent },
     pickHeader: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, marginBottom: spacing.xs },
-    goalPrompt: { marginTop: spacing.lg, maxWidth: undefined },
-    goalChipRow: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'center', gap: spacing.sm, marginTop: spacing.sm },
-    goalChip: {
-      paddingVertical: spacing.sm,
-      paddingHorizontal: spacing.md,
-      borderRadius: radii.pill,
-      borderWidth: 1.5,
-      borderColor: colors.border,
-    },
-    goalChipSelected: { borderColor: colors.accent, backgroundColor: colors.accentMuted },
-    goalChipLabel: { fontSize: 14.5, fontWeight: '700', color: colors.textSecondary },
-    goalChipLabelSelected: { color: colors.textPrimary },
-    goalOptionalNote: { fontSize: 13.5, color: colors.textTertiary, textAlign: 'center', marginTop: spacing.xs },
     valueControls: { flexDirection: 'row', alignItems: 'center', gap: spacing.lg, marginTop: spacing.sm },
     valueDotHit: { paddingVertical: 8, paddingHorizontal: 3 },
     footer: { paddingHorizontal: spacing.xl, paddingTop: spacing.sm },

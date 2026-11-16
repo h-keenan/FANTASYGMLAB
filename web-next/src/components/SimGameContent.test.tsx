@@ -548,7 +548,7 @@ describe("SimGameContent", () => {
       mocked.createSimGame.mockResolvedValue({ ok: true, reason: "", game: game() });
       render(<SimGameContent />);
       expect(await screen.findByText("No games yet")).toBeInTheDocument();
-      expect(screen.getByText(/Tap New game and pick Quick/)).toBeInTheDocument();
+      expect(screen.getByText(/Tap New game and choose Quick/)).toBeInTheDocument();
       expect(screen.getByRole("button", { name: /What is Fantasy Sim/ })).toHaveAttribute("aria-expanded", "true");
       fireEvent.click(screen.getByRole("button", { name: "New game" }));
       expect(await screen.findByTestId("sim-preset-chips")).toBeInTheDocument();

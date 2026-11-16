@@ -4,6 +4,7 @@ import PressableScale from './PressableScale';
 
 import AppText from './AppText';
 import { Sheet } from './Sheet';
+import ShowExplanationsLink from './ShowExplanationsLink';
 import { useThemeMode } from '../context/ThemeModeContext';
 import { trackUse } from '../lib/analytics';
 import { whyEntry, whyTriggerLabel, type WhyMetricId } from '../lib/tapForWhyContent';
@@ -89,6 +90,7 @@ export default function TapForWhy({ metric, children, spoken, variant = 'inline'
               <AppText style={styles.learnText}>{entry.learnMoreLabel ?? 'Learn more'}</AppText>
             </PressableScale>
           ) : null}
+          <ShowExplanationsLink />
         </View>
       </Sheet>
     </>

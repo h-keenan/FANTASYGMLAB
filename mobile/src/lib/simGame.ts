@@ -2695,8 +2695,8 @@ export function simSavedGamesCount(gameCount: number, maxGames: number): string 
 export function simNewGameBlock(gameCount: number, maxGames: number, isPremium: boolean | undefined): string | null {
   if (gameCount < maxGames) return null;
   const count = simSavedGamesCount(gameCount, maxGames);
-  if (isPremium === false) return `${count}. Free includes ${maxGames} saved game. Delete it or go Pro for up to 3.`;
-  return `${count}, the most allowed. Delete one to start another.`;
+  if (isPremium === false) return `${count}. Free includes ${maxGames} saved game, so delete it to start another or go Pro for up to 3.`;
+  return `${count}. That is the most allowed, so delete one to start another.`;
 }
 
 /** Names a saved game in the delete confirm (the list has no team name): stage, grade, league shape. */

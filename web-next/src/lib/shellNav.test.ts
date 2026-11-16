@@ -48,7 +48,7 @@ describe("shellTabs", () => {
 describe("route to tab mapping", () => {
   it.each([
     ["/dashboard/L1", "today"],
-    ["/alerts/L1", "today"],
+    ["/alerts/L1", "more"],
     ["/my-team/L1", "team"],
     ["/waivers/L1", "team"],
     ["/players/L1", "team"],

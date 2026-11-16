@@ -14,6 +14,14 @@ export const CONNECT_MORE_LABEL = "More ways to connect";
 export const CONNECT_WHAT_IS_SLEEPER =
   "FantasyDesk connects to your existing Sleeper fantasy league: it reads your real roster, matchups and league settings to build recommendations. Sleeper is a free app and website for running a fantasy league.";
 
+/** Where the username lives. Shown under "What is Sleeper?" (web) and under the trust line in the app's add-league sheet. */
+export const CONNECT_FIND_USERNAME = "Find it in the Sleeper app: profile > your username, not your email.";
+
+/** Up-front limit for a non-Sleeper platform. Same sentence the server sends as `platform_notice` on Today (services/mobile_api_service.py). */
+export function connectPlatformNotice(platformLabel: string): string {
+  return `Waiver and trade suggestions aren't available for ${platformLabel} leagues yet, so you'll only see what your imported roster can support.`;
+}
+
 export type ConnectWayKey = "espn" | "fleaflicker" | "mfl" | "account" | "sample";
 
 export interface ConnectWay {

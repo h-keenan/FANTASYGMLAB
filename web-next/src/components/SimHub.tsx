@@ -15,7 +15,7 @@ import { LetterGrade } from "@/components/ui/LetterGrade";
 import { Sheet } from "@/components/ui/Sheet";
 import { simGameLiteLine, simSetupBody, type SimGameCreateBody, type SimGameLite, type SimGameOptionsResponse, type SimSetupState } from "@/lib/simGame";
 import { simHubRow } from "@/lib/simHub";
-import { simHubGameName, simHubMode, simHubPresetChips, simHubPresets, type SimPresetId } from "@/lib/simHubPresets";
+import { simHubEmptyHint, simHubGameName, simHubMode, simHubPresetChips, simHubPresets, type SimPresetId } from "@/lib/simHubPresets";
 import type { SimGradeInput } from "@/lib/simGrade";
 
 /**
@@ -55,6 +55,7 @@ export function SimHub({
 }) {
   const [sheetOpen, setSheetOpen] = useState(false);
   const mode = simHubMode(games.length);
+  const presetNames = useMemo(() => simHubPresets(options), [options]);
   const first = mode === "first";
   return (
     <>
@@ -64,9 +65,9 @@ export function SimHub({
       </div>
       {block ? (
         <div className="flex flex-col gap-2">
-          <p className="text-xs" style={{ color: "var(--color-text-muted)" }} data-testid="new-game-block">{block}</p>
+          <p className="text-sm" style={{ color: "var(--color-text-secondary)" }} data-testid="new-game-block">{block}</p>
           <div className="flex flex-wrap items-center gap-2">
-            {isPremium === false ? <ButtonLink href="/premium" variant="premiumOutline" size="sm">Go Pro</ButtonLink> : null}
+            {isPremium === false ? <ButtonLink href="/premium" variant="premium" size="sm">Go Pro</ButtonLink> : null}
             <Button variant="secondary" size="sm" onClick={onManage}>Manage games / delete one</Button>
           </div>
         </div>
@@ -88,7 +89,7 @@ export function SimHub({
           Your games{games.length ? ` · ${games.length}` : ""}
         </h3>
         {games.length === 0 ? (
-          <EmptyState title="No games yet" subtitle="Tap New game and pick Quick. It takes about 10 minutes." />
+          <EmptyState title="No games yet" subtitle={simHubEmptyHint(presetNames)} />
         ) : (
           <>
             {managing ? <p className="text-xs" style={{ color: "var(--color-text-muted)" }}>Tap the trash can on a game to delete it.</p> : null}

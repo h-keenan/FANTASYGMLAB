@@ -45,7 +45,7 @@ describe("OnboardingCarousel", () => {
     render(<OnboardingCarousel onDone={onDone} />);
 
     // Step 1: the question, before any jargon. No false "setup step" copy.
-    expect(screen.getByRole("heading", { name: /how familiar are you with fantasy football/i })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: /which sounds most like you/i })).toBeInTheDocument();
     expect(screen.queryByText(/one setup step/i)).toBeNull();
     expect(screen.queryByText(/last thing/i)).toBeNull();
     expect(document.querySelectorAll(".onboarding-dot")).toHaveLength(2);
@@ -61,12 +61,12 @@ describe("OnboardingCarousel", () => {
     fireEvent.click(screen.getByRole("button", { name: /new to dynasty/i }));
     expect(screen.getByRole("button", { name: /^continue$/i })).not.toBeDisabled();
 
-    // The goal chip is optional: picking a level alone is enough to continue.
-    fireEvent.click(screen.getByRole("tab", { name: /^win now$/i }));
+    // The goal pills are no longer asked here (Account > Goal): one decision on this step.
+    expect(screen.queryByRole("tab", { name: /^win now$/i })).toBeNull();
     fireEvent.click(screen.getByRole("button", { name: /^continue$/i }));
 
     await waitFor(() => expect(api.setExperienceLevel).toHaveBeenCalledWith("beginner"));
-    await waitFor(() => expect(api.setExperienceGoal).toHaveBeenCalledWith("win_now"));
+    expect(api.setExperienceGoal).not.toHaveBeenCalled();
 
     // Step 2: one value line over a screenshot with its benefit.
     expect(await screen.findByRole("heading", { name: ONBOARDING_VALUE_HEADLINE })).toBeInTheDocument();
@@ -77,7 +77,7 @@ describe("OnboardingCarousel", () => {
     expect(onDone).toHaveBeenCalledTimes(1);
   });
 
-  it("lets a brand-new fantasy player pick the most beginner level, and skips the goal chip write when none is picked", async () => {
+  it("lets a brand-new fantasy player pick the most beginner level, and never writes a goal", async () => {
     render(<OnboardingCarousel onDone={vi.fn()} />);
 
     fireEvent.click(screen.getByRole("button", { name: /new to fantasy football/i }));
@@ -87,16 +87,11 @@ describe("OnboardingCarousel", () => {
     expect(api.setExperienceGoal).not.toHaveBeenCalled();
   });
 
-  it("clears the goal chip on a second click, same as never picking one", async () => {
+  it("says why Continue is disabled until a level is picked", () => {
     render(<OnboardingCarousel onDone={vi.fn()} />);
-
+    expect(screen.getByText("Pick one to continue")).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: /new to dynasty/i }));
-    fireEvent.click(screen.getByRole("tab", { name: /^rebuilding$/i }));
-    fireEvent.click(screen.getByRole("tab", { name: /^rebuilding$/i }));
-    fireEvent.click(screen.getByRole("button", { name: /^continue$/i }));
-
-    await waitFor(() => expect(api.setExperienceLevel).toHaveBeenCalled());
-    expect(api.setExperienceGoal).not.toHaveBeenCalled();
+    expect(screen.queryByText("Pick one to continue")).toBeNull();
   });
 
   it("goes back a slide with Back, and a swipe never skips the question", async () => {
@@ -106,12 +101,12 @@ describe("OnboardingCarousel", () => {
     const content = document.querySelector(".onboarding-content") as HTMLElement;
     fireEvent.touchStart(content, { touches: [{ clientX: 300 }] });
     fireEvent.touchEnd(content, { changedTouches: [{ clientX: 100 }] });
-    expect(screen.getByRole("heading", { name: /how familiar are you/i })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: /which sounds most like you/i })).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("button", { name: /veteran dynasty manager/i }));
     fireEvent.click(screen.getByRole("button", { name: /^continue$/i }));
     fireEvent.click(await screen.findByRole("button", { name: "Back" }));
-    expect(screen.getByRole("heading", { name: /how familiar are you/i })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: /which sounds most like you/i })).toBeInTheDocument();
   });
 
   it("Decide later leaves the intro in one tap without saving a level", () => {

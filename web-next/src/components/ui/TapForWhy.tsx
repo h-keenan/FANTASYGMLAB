@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { createContext, useContext, useState, type ReactNode } from "react";
 
+import { ShowExplanationsLink } from "@/components/ShowExplanationsLink";
 import { Sheet } from "@/components/ui/Sheet";
 import { trackUse } from "@/lib/analytics";
 import { whyEntry, whyTriggerLabel, type WhyMetricId } from "@/lib/tapForWhyContent";
@@ -95,6 +96,7 @@ export function TapForWhy({ metric, children, spoken, variant = "inline", title,
               {entry.learnMoreLabel ?? "Learn more"}
             </Link>
           ) : null}
+          <ShowExplanationsLink />
         </div>
       </Sheet>
     </>

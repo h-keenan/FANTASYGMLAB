@@ -2,6 +2,7 @@
 
 import { useState, useSyncExternalStore } from "react";
 
+import { ShowExplanationsLink } from "@/components/ShowExplanationsLink";
 import { useExperienceCopy } from "@/context/ExperienceLevelContext";
 import type { BeginnerHelpKey } from "@/lib/experienceCopy";
 
@@ -84,6 +85,10 @@ export function BeginnerHelp({
               <button type="button" onClick={dismiss} className="font-bold underline" style={{ color: "var(--color-accent)" }}>
                 Got it
               </button>
+              {/* Only renders for an account that never answered (beginner-lite): one tap turns full explanations on. */}
+              <span className="ml-2">
+                <ShowExplanationsLink />
+              </span>
             </>
           ) : null}
         </p>

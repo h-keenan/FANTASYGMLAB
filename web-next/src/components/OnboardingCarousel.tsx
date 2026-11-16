@@ -7,15 +7,12 @@ import { createPortal } from "react-dom";
 import { usePortalRoot } from "@/components/OnboardingShell";
 
 import { Button } from "@/components/Button";
-import { PillRow } from "@/components/PillRow";
 import { useExperienceLevel } from "@/context/ExperienceLevelContext";
 import { ONBOARDING_FEATURES, ONBOARDING_STEP_KEYS } from "@/lib/onboardingFeatures";
 import { OnboardingValueSlides } from "@/components/OnboardingValueSlides";
 import {
-  EXPERIENCE_GOAL_OPTIONS,
   EXPERIENCE_LEVEL_OPTIONS,
   PLAIN_COPY,
-  type ExperienceGoal,
   type ExperienceLevel,
 } from "@/lib/experienceCopy";
 import { trackFeatureUse } from "@/lib/analytics";
@@ -35,10 +32,6 @@ const LEVEL_ICONS: Record<ExperienceLevel, { stroke: string; path: string }> = {
     path: "M8 21h8M12 17v4M6 4h12v3a6 6 0 0 1-12 0V4z M6 5H4a2 2 0 0 0 0 4h2M18 5h2a2 2 0 0 1 0 4h-2",
   },
 };
-const GOAL_OPTIONS = (Object.keys(EXPERIENCE_GOAL_OPTIONS) as ExperienceGoal[]).map((value) => ({
-  value,
-  label: EXPERIENCE_GOAL_OPTIONS[value].label,
-}));
 
 /**
  * Signup onboarding carousel — Zach, 2026-10-18: "we need a more
@@ -69,8 +62,6 @@ const SWIPE_THRESHOLD_PX = 50;
 export function OnboardingCarousel({ onDone, replay = false }: { onDone: () => void; replay?: boolean }) {
   const [step, setStep] = useState(0);
   const [level, setLevel] = useState<ExperienceLevel | null>(null);
-  // Optional, skippable — never gates Continue, unlike level.
-  const [goal, setGoal] = useState<ExperienceGoal | null>(null);
   const [saving, setSaving] = useState(false);
   const touchStartX = useRef<number | null>(null);
   const touchStartY = useRef<number | null>(null);
@@ -80,7 +71,7 @@ export function OnboardingCarousel({ onDone, replay = false }: { onDone: () => v
   // open every other <body> child is made inert + aria-hidden.
   const portalRoot = usePortalRoot();
   const [direction, setDirection] = useState<"next" | "back">("next");
-  const { setLevel: saveExperienceLevel, setGoal: saveExperienceGoal } = useExperienceLevel();
+  const { setLevel: saveExperienceLevel } = useExperienceLevel();
 
   const featureCount = ONBOARDING_FEATURES.length;
   // Replay (Account > "Replay the tour"): all feature slides, nothing else.
@@ -102,7 +93,7 @@ export function OnboardingCarousel({ onDone, replay = false }: { onDone: () => v
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [step]);
 
-  // Saves the level (and optional goal) as soon as the first step is
+  // Saves the level (the season goal is asked later, in Account) as soon as the first step is
   // answered, so beginner help is live for the rest of onboarding.
   const saveAnswers = async () => {
     if (!level) return;
@@ -116,13 +107,6 @@ export function OnboardingCarousel({ onDone, replay = false }: { onDone: () => v
     } catch {
       // Best-effort: a failed preference write never blocks onboarding; the
       // answer can be changed later on Account > Explanations.
-    }
-    if (goal) {
-      try {
-        await saveExperienceGoal(goal);
-      } catch {
-        // Best-effort.
-      }
     }
     setSaving(false);
     setDirection("next");
@@ -169,10 +153,6 @@ export function OnboardingCarousel({ onDone, replay = false }: { onDone: () => v
   const pickLevel = (value: ExperienceLevel) => {
     setLevel(value);
     trackOnboarding("experience_selected", { experience: experienceBucket(value) });
-  };
-  // Tapping the already-selected chip clears it (it's optional — unlike level).
-  const pickGoal = (value: string) => {
-    setGoal((current) => (current === value ? null : (value as ExperienceGoal)));
   };
 
   const onTouchEnd = (clientX: number, clientY: number) => {
@@ -247,11 +227,9 @@ export function OnboardingCarousel({ onDone, replay = false }: { onDone: () => v
           <div className="onboarding-section onboarding-section--center">
             <span className="onboarding-eyebrow">One quick question</span>
             <h1 className="onboarding-headline onboarding-headline--sm">
-              How familiar are you with <span className="onboarding-gradient">fantasy football</span>?
+              Which sounds most like <span className="onboarding-gradient">you</span>?
             </h1>
-            <p className="onboarding-body onboarding-body--center">
-              Tunes how much explanation shows up alongside recommendations. Change it anytime in Settings.
-            </p>
+            <p className="onboarding-body onboarding-body--center">{PLAIN_COPY.onboardingLevelBody}</p>
             <p className="onboarding-body onboarding-body--center">{PLAIN_COPY.onboardingDynastyNote}</p>
             <div className="onboarding-cards" style={{ marginTop: "var(--space-md)" }}>
               {(Object.keys(EXPERIENCE_LEVEL_OPTIONS) as ExperienceLevel[]).map((value) => {
@@ -274,18 +252,6 @@ export function OnboardingCarousel({ onDone, replay = false }: { onDone: () => v
                   </button>
                 );
               })}
-            </div>
-            <div className="flex flex-col gap-2 w-full" style={{ marginTop: "var(--space-lg)" }}>
-              <span className="onboarding-body onboarding-body--center">{PLAIN_COPY.experienceGoalPrompt}</span>
-              <PillRow
-                ariaLabel={PLAIN_COPY.experienceGoalPrompt}
-                options={GOAL_OPTIONS}
-                active={goal ?? ""}
-                onSelect={pickGoal}
-              />
-              <span className="text-xs onboarding-body--center" style={{ color: "var(--color-text-muted)" }}>
-                {PLAIN_COPY.experienceGoalOptionalNote}
-              </span>
             </div>
           </div>
         ) : null}
@@ -313,6 +279,7 @@ export function OnboardingCarousel({ onDone, replay = false }: { onDone: () => v
           <Button
             onClick={next}
             disabled={(step === levelStep && !level) || saving}
+            disabledReason={step === levelStep && !level ? PLAIN_COPY.onboardingPickOne : undefined}
             className="flex-1"
             style={{ alignSelf: "auto" }}
           >

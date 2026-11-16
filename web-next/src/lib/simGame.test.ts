@@ -221,7 +221,7 @@ describe("stage, headings and rounds", () => {
     expect(simNewGameBlock(1, 1, false)).toContain("Free includes 1 saved game");
     expect(simNewGameBlock(1, 1, false)).toContain("You have 1 of 1 saved game.");
     expect(simNewGameBlock(3, 3, true)).toContain("You have 3 of 3 saved games");
-    expect(simNewGameBlock(3, 3, true)).toContain("Delete one");
+    expect(simNewGameBlock(3, 3, true)).toContain("delete one");
   });
 
   it("names a game in the delete confirm and classifies delete failures", () => {

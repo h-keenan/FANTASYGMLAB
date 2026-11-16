@@ -6,6 +6,7 @@ import { experienceCopy } from "@/lib/experienceCopy";
 
 vi.mock("@/context/ExperienceLevelContext", () => ({
   useExperienceCopy: () => experienceCopy("beginner"),
+  useExperienceLevel: () => ({ level: "beginner", setLevel: async () => {}, goal: null, setGoal: async () => {} }),
 }));
 
 describe("BeginnerHelp", () => {
