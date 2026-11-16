@@ -60,7 +60,9 @@ export const TAB_ICONS = {
   // Sample league / games / portfolio / matchup
   dashboard: "speedometer-outline",
   today: "sunny-outline",
+  // Season Outlook sim inside Games (dice); the Fantasy Sim destination uses `fantasySim`.
   sim: "dice-outline",
+  fantasySim: "custom-fantasy-sim",
   pickem: "checkmark-done-outline",
   leagues: "layers-outline",
   exposure: "pie-chart-outline",
@@ -75,4 +77,29 @@ export type TabIconName = keyof typeof TAB_ICONS;
 /** The Ionicons glyph name behind a registry name (single lookup for both platforms). */
 export function tabIconGlyph(name: TabIconName): (typeof TAB_ICONS)[TabIconName] {
   return TAB_ICONS[name];
+}
+
+/**
+ * Custom (non-Ionicons) glyphs, 512 grid, 32 stroke, round caps/joins, tinted
+ * by the current color. Platform-neutral element specs: web builds SVG markup
+ * from them (components/TabGlyph.tsx), mobile draws them with react-native-svg
+ * (components/TabIcon.tsx). `fill: true` elements are solid, the rest outlined.
+ */
+export interface CustomGlyphElement {
+  tag: "rect" | "path" | "circle";
+  attrs: Record<string, string | number>;
+  fill?: boolean;
+}
+
+export const CUSTOM_TAB_GLYPHS: Record<string, CustomGlyphElement[]> = {
+  // Calendar with a play triangle: Fantasy Sim.
+  "custom-fantasy-sim": [
+    { tag: "rect", attrs: { x: 64, y: 96, width: 384, height: 352, rx: 48 } },
+    { tag: "path", attrs: { d: "M64 208h384M160 48v80M352 48v80" } },
+    { tag: "path", attrs: { d: "M224 272l96 56-96 56z" } },
+  ],
+};
+
+export function isCustomTabGlyph(glyph: string): boolean {
+  return Object.prototype.hasOwnProperty.call(CUSTOM_TAB_GLYPHS, glyph);
 }

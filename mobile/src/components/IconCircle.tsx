@@ -2,6 +2,9 @@ import React from 'react';
 import { StyleSheet, View, type StyleProp, type ViewStyle } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 
+import type { TabIconName } from '../lib/tabIcons';
+import TabIcon from './TabIcon';
+
 type IconName = React.ComponentProps<typeof Ionicons>['name'];
 
 /** Icon-in-soft-colored-circle — the FGL design-reference-sheet treatment
@@ -13,12 +16,15 @@ type IconName = React.ComponentProps<typeof Ionicons>['name'];
  * a 6-digit hex (the alpha is appended as a hex suffix). */
 export default function IconCircle({
   name,
+  tab,
   color,
   size = 32,
   iconSize,
   style,
 }: {
   name: IconName;
+  /** Custom registry glyph (lib/tabIcons.ts); wins over `name`. */
+  tab?: TabIconName;
   color: string;
   /** Disc diameter; the icon defaults to half of it. */
   size?: number;
@@ -33,7 +39,11 @@ export default function IconCircle({
         style,
       ]}
     >
-      <Ionicons name={name} size={iconSize ?? Math.round(size / 2)} color={color} />
+      {tab ? (
+        <TabIcon name={tab} size={iconSize ?? Math.round(size / 2)} color={color} />
+      ) : (
+        <Ionicons name={name} size={iconSize ?? Math.round(size / 2)} color={color} />
+      )}
     </View>
   );
 }

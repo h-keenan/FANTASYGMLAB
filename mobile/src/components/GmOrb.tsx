@@ -14,6 +14,7 @@ import AppText from './AppText';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import { Ionicons } from '@expo/vector-icons';
+import type { TabIconName } from '../lib/tabIcons';
 import * as Haptics from 'expo-haptics';
 import Animated, {
   runOnJS,
@@ -68,6 +69,8 @@ interface Destination {
   label: string;
   route: string;
   icon: IconName;
+  /** Custom registry glyph (lib/tabIcons.ts) that wins over icon. */
+  tab?: TabIconName;
   needsLeague?: boolean;
   // The destination's semantic accent, from the one map shared with web's nav,
   // sidebar and feature catalog (lib/destinationAccent.ts -> modules/
@@ -99,18 +102,22 @@ const ICON_BY_PAGE: Record<string, IconName> = {
   'trade-hub': 'shuffle-outline',
   'gm-plan': 'map-outline',
   'draft-center': 'albums-outline',
-  games: 'dice-outline',
+  games: 'game-controller-outline',
   commissioner: 'shield-checkmark-outline',
   'gm-game': 'game-controller-outline',
   news: 'globe-outline',
   community: 'people-circle-outline',
 };
 
+// Pages whose icon is a custom registry glyph rather than an Ionicons name.
+const TAB_BY_PAGE: Record<string, TabIconName | undefined> = { 'gm-game': 'fantasySim' };
+
 function destinationFor(colors: ThemeColors, page: NavCatalogPage): Destination {
   return {
     label: page.label,
     route: ROUTE_BY_PAGE[page.key],
     icon: ICON_BY_PAGE[page.key],
+    tab: TAB_BY_PAGE[page.key],
     needsLeague: page.leagueScoped,
     // The catalog key is the accent table's id where it has one (a renamed label such as Draft Center -> Draft keeps its accent).
     color: accentColor(colors, ACCENT_BY_DESTINATION[page.key] ? page.key : page.label),
@@ -224,10 +231,10 @@ const SHOW_ORB_DEBUG_OVERLAY = process.env.EXPO_PUBLIC_SHOW_ORB_DEBUG_OVERLAY ==
  * sheet) instead of a bare icon — in a 14-row destination list, a soft
  * colored backdrop per icon reads as a scannable landmark, not just a
  * decoration next to the label. */
-function DestIcon({ name, color, current }: { name: IconName; color: string; current: boolean }) {
+function DestIcon({ name, tab, color, current }: { name: IconName; tab?: TabIconName; color: string; current: boolean }) {
   const { colors } = useThemeMode();
   const styles = useMemo(() => createStyles(colors), [colors]);
-  return <IconCircle name={name} color={current ? colors.accent : color} iconSize={17} style={styles.destIconCircle} />;
+  return <IconCircle name={name} tab={tab} color={current ? colors.accent : color} iconSize={17} style={styles.destIconCircle} />;
 }
 
 /**
@@ -289,7 +296,7 @@ function NavRow({
       // for sighted users too, so it's never color-only either way.
       accessibilityState={{ selected: isCurrent }}
     >
-      <DestIcon name={destination.icon} color={destination.color} current={isCurrent} />
+      <DestIcon name={destination.icon} tab={destination.tab} color={destination.color} current={isCurrent} />
       <View style={styles.destTextGroup}>
         <View style={styles.destTitleRow}>
           <AppText style={[styles.destText, isCurrent && styles.destTextCurrent]} numberOfLines={1}>

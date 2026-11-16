@@ -66,7 +66,7 @@ export function shellTabs(ctx: ShellContext): BottomTab[] {
   }
   return [
     { key: "home", label: TERMS.yourLeagues, glyph: "home", href: HOME_PATH },
-    { key: "sim", label: "Fantasy Sim", glyph: "scores", href: "/gm-game" },
+    { key: "sim", label: "Fantasy Sim", glyph: "fantasySim", href: "/gm-game" },
     { key: "news", label: "News", glyph: "news", href: "/news" },
     { key: "more", label: "More", glyph: "more" },
   ];
