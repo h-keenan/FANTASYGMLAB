@@ -147,10 +147,12 @@ def _parse_feed(feed_url: str):
         response.raise_for_status()
         return feedparser.parse(response.content)
     except Exception as exc:  # noqa: BLE001 - any network/parse failure is a feed error
-        failed = feedparser.parse(b"")
-        failed["bozo"] = True
-        failed["bozo_exception"] = exc
-        return failed
+        # Build the fallback directly instead of mutating a parse() result,
+        # so the shape callers read (bozo/bozo_exception/entries/feed) is
+        # explicit and independent of feedparser's return type.
+        return feedparser.FeedParserDict(
+            bozo=True, bozo_exception=exc, entries=[], feed=feedparser.FeedParserDict()
+        )
 
 
 def _load_cache():
