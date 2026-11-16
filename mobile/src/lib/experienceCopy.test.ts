@@ -68,4 +68,3 @@ test('normalizeExperienceLevel only accepts the three real values', () => {
   assert.equal(normalizeExperienceLevel(null), null);
   assert.equal(normalizeExperienceLevel(undefined), null);
 });
-
