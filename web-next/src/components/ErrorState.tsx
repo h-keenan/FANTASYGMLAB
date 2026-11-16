@@ -38,7 +38,19 @@ export function looksTechnical(message: string): boolean {
  * Player Compare's "No player selected to compare."). A page whose own
  * fetch effect has no retry token can pass `reloadPage`.
  */
-export function ErrorState({ message, onRetry, bare = false }: { message: string; onRetry?: () => void; /** Render as a section inside a page that already has its own <main>. */ bare?: boolean }) {
+export function ErrorState({
+  message,
+  onRetry,
+  bare = false,
+  compact = false,
+}: {
+  message: string;
+  onRetry?: () => void;
+  /** Render as a section inside a page that already has its own <main>. */
+  bare?: boolean;
+  /** One inline row ("Couldn't load this" + Try again) for a single failed module on a page that is otherwise fine. */
+  compact?: boolean;
+}) {
   const leagueLocked = message === FREE_LEAGUE_CAP_MESSAGE;
   const technical = looksTechnical(message);
   const Wrapper = bare ? "section" : "main";
@@ -55,6 +67,27 @@ export function ErrorState({ message, onRetry, bare = false }: { message: string
         fallbackTitle="Your Free plan includes one league"
         fallbackBody={message}
       />
+    );
+  }
+  if (compact) {
+    return (
+      <section>
+        <AccentCard accent="var(--color-danger)" as="div">
+          <div className="flex items-center gap-3" data-testid="error-state-compact">
+            <StateIconRing accent="var(--color-danger)">
+              <EmptyStateGlyph name="alert" />
+            </StateIconRing>
+            <p role="alert" className="min-w-0 flex-1 text-sm font-bold" style={{ color: "var(--color-text-primary)" }}>
+              Couldn&apos;t load this
+            </p>
+            {onRetry ? (
+              <Button size="sm" onClick={onRetry}>
+                Try again
+              </Button>
+            ) : null}
+          </div>
+        </AccentCard>
+      </section>
     );
   }
   return (

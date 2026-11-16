@@ -2,6 +2,7 @@
 
 import { PageTitle } from "@/components/PageTitle";
 import { EmptyState } from "@/components/EmptyState";
+import { ModuleErrorBoundary } from "@/components/ModuleErrorBoundary";
 import { LeagueLinkStep } from "@/components/LeagueLinkStep";
 import { useState } from "react";
 
@@ -213,7 +214,9 @@ export function CommunityTradesContent({
       ) : (
         <div className="flex flex-col gap-4">
           {trades.map((item) => (
-            <CommunityTradeCard key={item.id} item={item} reactionEmoji={reactionEmoji} onReact={onReact} />
+            <ModuleErrorBoundary key={item.id} name="community_trade">
+              <CommunityTradeCard item={item} reactionEmoji={reactionEmoji} onReact={onReact} />
+            </ModuleErrorBoundary>
           ))}
         </div>
       )}

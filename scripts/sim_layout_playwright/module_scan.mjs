@@ -133,6 +133,23 @@ const NEWS_GENERAL = [
   nItem("Test Titans trade for P. Nacua in a blockbuster deal that reshapes the Supercalifragilisticexpialidocious division", "transaction", 32000),
 ];
 
+// Batch E fixtures (docs/audits/2026-11-ui-audit-e2e.md B5): Account, Commissioner, Community, Trade Analyzer and Prospects render real layouts.
+// The "-missing" routes below answer the same endpoints with {} (a partial / drifted payload) and must still render (no route error screen).
+const cTeam = (n, band) => ({ roster_id: n, team_name: `Team ${n}`, owner_name: `Owner ${n}`, band, band_label: band === "fine" ? "Looks fine" : "Worth a look", score: band === "fine" ? 10 : 62, confidence: "medium", interpretation: band === "fine" ? "none" : "possible_tanking", context: "alive", weeks: { evaluated: 9, flagged: band === "fine" ? 0 : 4, longest_streak: 2, latest_streak: 1 }, evidence: band === "fine" ? [] : [{ kind: "lineup", week: 8, text: "Left 14 projected points on the bench." }], innocent_explanations: band === "fine" ? [] : ["A late injury change can look like this."], series: [1, 2, 3, 4].map((w) => ({ week: w, actual: 100 + w, optimal: 110 + w })) });
+FIX["commissioner/integrity"] = { ok: true, reason: "", is_premium: true, draft_order_rule: "unknown", weeks_evaluated: 9, last_week: 9, week: 10, teams: [cTeam(1, "worth_a_look"), cTeam(2, "fine"), cTeam(3, "fine")], collusion: [], inactive: [{ roster_id: 4, team_name: "Team 4", owner_name: "Owner 4", evidence: ["No lineup change in 3 weeks."], innocent_explanations: ["May be on vacation."] }], summary: { fine: 2, worth_a_look: 1 }, limits: ["Prompts to check, not conclusions."], calendar: { trade_deadline_week: 11, current_week: 9, trade_deadline_passed: false, weeks_to_deadline: 2, deadline_phase: "open", playoff_week_start: 15, regular_season_weeks: 14, in_season: true } };
+FIX["draft-order"] = { ok: true, draft_order: "unknown" };
+FIX.rosters = { ok: true, rosters: [1, 2, 3, 4].map((i) => ({ roster_id: i, owner_id: `u${i}`, players: [`p${i}a`, `p${i}b`] })) };
+const sAgg = (g, n) => ({ avg_grade: g, scout_count: n, avg_round_projection: g ? 1.5 : null });
+const PROSPECTS = { ok: true, catalog_available: true, reason: "", is_premium: true, prospects: [["Test College Quarterback", "QB", "Ohio State", 82, 14], ["Test College Receiver", "WR", "Texas A&M Commerce", 74, 6], ["Test College Back", "RB", "Georgia", null, 0]].map(([name, position, school, g, n], i) => ({ id: `pr${i}`, name, position, school, draft_year: 2027, aggregate: sAgg(g, n), my_report: null, on_watchlist: i === 0 })) };
+const cAsset = (name, position) => ({ name, position, player_id: name.replace(/\s/g, ""), value_score: 1200 });
+const COMMUNITY = { ok: true, reaction_emoji: ["\u{1F525}", "\u{1F440}"], trades: [1, 2].map((n) => ({ id: `ct${n}`, send: [cAsset("Test Running Back", "RB")], receive: [cAsset("Opponent Wide Receiver", "WR"), cAsset("Test Tight End", "TE")], verdict: n === 1 ? "worked_out" : "didnt_pan_out", verdict_label: n === 1 ? "Worked out" : "Didn't pan out", confidence: "high", production: { net_points_ppr: 42.5, avg_net_per_week: 4.7, weeks_counted: 9 }, value: { sent_delta_pct: -4, received_delta_pct: 12, net_delta_pct: 8 }, occurred_at: "2026-10-01T12:00:00Z", reactions: { "\u{1F525}": 3 }, my_reactions: [] })) };
+const SHARED = { ok: true, available: true, trades: [] };
+const ME = { ok: true, user: { id: "u1", email: "t@example.com", entitlement: "premium", sleeper_username: "donk", profile_status: "ready", league_cap: 5, trial_ends_at: "" }, premium_benefits: ["Unlimited leagues"], premium_comparison: [{ key: "leagues", label: "Leagues", free: "1", pro: "Unlimited" }] };
+// path -> fixture for the non-league endpoints; league endpoints nested under /v1/leagues/<id>/ are keyed by their tail.
+const GLOBAL_FIX = { "/v1/scouting/prospects": PROSPECTS, "/v1/community/trades": COMMUNITY, "/v1/community/shared-trades": SHARED, "/v1/community/preferences": { ok: true, opted_out: false }, "/v1/me": ME };
+// "-missing" routes: the same endpoints answer {} (fixtures off).
+let MISSING = false;
+
 const ROUTES = [
   { name: "today", path: `/dashboard/${LID}?name=Donk`, family: "none" },
   { name: "team", path: `/my-team/${LID}?name=Donk`, family: "team" },
@@ -142,7 +159,7 @@ const ROUTES = [
   { name: "waivers", path: `/waivers/${LID}?name=Donk`, family: "team", expect: "waiver-rec-row", maxTablists: 2, noModules: true },
   { name: "players", path: `/players/${LID}?name=Donk`, family: "team", noModules: true },
   { name: "trade-finder", path: `/trade-finder/${LID}?name=Donk`, family: "trades", maxTablists: 2, noModules: true },
-  { name: "trade-analyzer", path: `/trade-analyzer/${LID}?name=Donk`, family: "trades", maxTablists: 2, noModules: true },
+  { name: "trade-analyzer", path: `/trade-analyzer/${LID}?name=Donk`, family: "trades", maxTablists: 2, noModules: true, expectText: "The tickle monster" },
   { name: "gm-plan", path: `/gm-plan/${LID}?name=Donk`, family: "none", maxTablists: 2 },
   { name: "games", path: `/games/${LID}?name=Donk`, family: "league" },
   { name: "recaps", path: `/league-recaps/${LID}?name=Donk`, family: "league", maxTablists: 3, expandAll: true, noTruncate: true },
@@ -155,13 +172,18 @@ const ROUTES = [
   { name: "news-league-storylines", path: `/news?tab=league&recaps=storylines&league=${LID}&name=Donk`, overflowOnly: true },
   { name: "news-league-roundup", path: `/news?tab=league&recaps=roundup&league=${LID}&name=Donk`, overflowOnly: true },
   { name: "games-pickem", path: `/games/${LID}?name=Donk&tab=pickem`, overflowOnly: true },
-  { name: "players-prospects", path: `/players/${LID}?name=Donk&tab=prospects`, overflowOnly: true },
+  { name: "players-prospects", path: `/players/${LID}?name=Donk&tab=prospects`, overflowOnly: true, expectText: "Test College Quarterback" },
   { name: "waivers-explore", path: `/waivers/${LID}?name=Donk&tab=explore`, overflowOnly: true },
   { name: "waivers-watchlist", path: `/waivers/${LID}?name=Donk&tab=watchlist`, overflowOnly: true },
-  { name: "commissioner", path: `/commissioner/${LID}?name=Donk`, overflowOnly: true },
-  { name: "community", path: `/community?league=${LID}&name=Donk`, overflowOnly: true },
+  { name: "trade-analyzer-missing", path: `/trade-analyzer/${LID}?name=Donk`, overflowOnly: true, missing: true },
+  { name: "prospects-missing", path: `/players/${LID}?name=Donk&tab=prospects`, overflowOnly: true, missing: true },
+  { name: "commissioner-missing", path: `/commissioner/${LID}?name=Donk`, overflowOnly: true, missing: true },
+  { name: "community-missing", path: `/community?league=${LID}&name=Donk`, overflowOnly: true, missing: true },
+  { name: "account-missing", path: `/account`, overflowOnly: true, missing: true },
+  { name: "commissioner", path: `/commissioner/${LID}?name=Donk`, overflowOnly: true, expectText: "Team 1" },
+  { name: "community", path: `/community?league=${LID}&name=Donk`, overflowOnly: true, expectText: "Opponent Wide Receiver" },
   { name: "fantasy-sim", path: `/fantasy-sim/${LID}?name=Donk`, overflowOnly: true },
-  { name: "account", path: `/account`, overflowOnly: true },
+  { name: "account", path: `/account`, overflowOnly: true, expectText: "t@example.com" },
   { name: "landing", path: `/`, overflowOnly: true, noAuth: true },
 ];
 const session = { access_token: "a.b.c", refresh_token: "r", token_type: "bearer", expires_in: 99999, expires_at: Math.floor(Date.now() / 1000) + 99999, user: { id: "u1", aud: "authenticated", role: "authenticated", email: "t@example.com", app_metadata: {}, user_metadata: {}, created_at: "2026-01-01T00:00:00Z" } };
@@ -258,6 +280,8 @@ const PAGE_CHECK = () => {
     }
     out.marks.push({ kind: g.closest(ROOT)?.matches("[data-info-mark]") ? "InfoMark" : "legacy", glyph: Math.round(gr.width) + "x" + Math.round(gr.height), y: Math.round(gr.top + scrollY), ownRow: !shares, overlap });
   }
+  out.crashed = /Something went wrong\. It.s been logged\./.test(document.body.innerText);
+  out.bodyText = document.body.innerText;
   const main = document.querySelector("main");
   out.mainWidth = main ? Math.round(main.getBoundingClientRect().width) : 0;
   out.recRows = document.querySelectorAll('[data-testid="waiver-rec-row"]').length;
@@ -303,8 +327,8 @@ for (const w of WIDTHS) {
       if (route.request().method() === "OPTIONS") return route.fulfill({ status: 204, headers: cors });
       if (u.pathname === "/v1/news") return route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ ok: true, items: NEWS_GENERAL }), headers: cors });
       if (/\/alerts$/.test(u.pathname)) return route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ ok: true, reason: "", items: NEWS_ALERTS }), headers: cors });
-      const m = u.pathname.match(/\/v1\/leagues\/[^/]+\/(games\/season-sim)$/) || u.pathname.match(/\/v1\/leagues\/[^/]+\/([a-z-]+)$/) || u.pathname.match(/\/v1\/players\/(value-signals)$/) || (u.pathname.endsWith("/trade-ideas/multi") ? [0, "multi"] : null);
-      const body = m && FIX[m[1]] ? FIX[m[1]] : {};
+      const m = u.pathname.match(/\/v1\/leagues\/[^/]+\/(games\/season-sim|commissioner\/integrity)$/) || u.pathname.match(/\/v1\/leagues\/[^/]+\/([a-z-]+)$/) || u.pathname.match(/\/v1\/players\/(value-signals)$/) || (u.pathname.endsWith("/trade-ideas/multi") ? [0, "multi"] : null);
+      const body = MISSING ? {} : (m && FIX[m[1]] ? FIX[m[1]] : GLOBAL_FIX[u.pathname] || {});
       return route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(body), headers: cors });
     }
     if (u.hostname === "dummy.supabase.co") return route.fulfill({ status: 200, contentType: "application/json", body: u.pathname.startsWith("/rest/v1/") ? "[]" : "{}", headers: cors });
@@ -315,6 +339,7 @@ for (const w of WIDTHS) {
   for (const r of ROUTES) {
     if (process.env.ONLY && !process.env.ONLY.split(",").includes(r.name)) continue;
     if (OVERFLOW_MODE ? false : r.overflowOnly) continue;
+    MISSING = Boolean(r.missing);
     try {
       await page.goto(`${BASE}${r.path}`, { waitUntil: "domcontentloaded", timeout: 90000 });
       await page.addStyleTag({ content: "nextjs-portal,[data-nextjs-toast]{display:none!important}" }).catch(() => {});
@@ -349,6 +374,8 @@ for (const w of WIDTHS) {
         if (await row.count()) { await row.dispatchEvent("click"); await sleep(700); await state(":row-open"); }
       }
       if (METRICS) res.census = await page.evaluate(CENSUS);
+      res.expectTextMissing = r.expectText ? !res.bodyText.includes(r.expectText) : false;
+      delete res.bodyText;
       results.push({ page: r.name, width: w, maxTablists: r.maxTablists ?? 1, noModules: Boolean(r.noModules), expect: r.expect ? await page.locator(`[data-testid="${r.expect}"]`).count() : null, ...res });
       if (r.expect === "waiver-rec-row") await page.locator(`[data-testid="${r.expect}"]`).first().scrollIntoViewIfNeeded().catch(() => {});
       await page.screenshot({ path: `${OUT}/${r.name}-${w}.png`, fullPage: FULL });
@@ -365,6 +392,8 @@ for (const r of results) {
   const problems = [];
   if (r.error) problems.push(`error ${r.error}`);
   if (r.overflow) problems.push(`overflow ${r.overflow.scrollWidth}>${r.overflow.width}${r.overflow.offenders?.length ? " culprits: " + r.overflow.offenders.join(" || ") : ""}`);
+  if (r.crashed) problems.push("route error screen (a missing or partial field blanked the page)");
+  if (r.expectTextMissing) problems.push("fixture content not rendered");
   if (OVERFLOW_MODE) { console.log(`${problems.length ? "FAIL" : "ok  "} ${r.page}@${r.width}${problems.length ? "  " + problems.join("; ") : ""}`); if (problems.length) bad += 1; continue; }
   if (r.emptyHeaders?.length) problems.push(`empty collapsed headers: ${r.emptyHeaders.map((h) => h.title).join(", ")}`);
   // Strip geometry (equal, centred tabs) is a >= 360px rule: at 320px a long label (Standings, Notifications) makes a tab wider than its share and the row scrolls instead of cutting it.
