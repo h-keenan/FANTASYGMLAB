@@ -1,6 +1,7 @@
 import React, { useMemo } from 'react';
 import { StyleSheet, View, type StyleProp, type ViewStyle } from 'react-native';
 import AppText from './AppText';
+import TickNumber from './TickNumber';
 
 import { useThemeMode } from '../context/ThemeModeContext';
 import type { ThemeColors } from '../theme';
@@ -59,13 +60,13 @@ export default function TradeValueHero({
 
   return (
     <View style={style} accessible accessibilityLabel={`${label}: ${value}`}>
-      <AppText
+      <TickNumber
+        value={delta}
+        format={(n) => tradeValueLabel(Math.round(n))}
         style={[styles.value, { color: tone, fontSize: metrics.value, letterSpacing: metrics.tracking }]}
         numberOfLines={1}
         adjustsFontSizeToFit
-      >
-        {value}
-      </AppText>
+      />
       <AppText style={[styles.label, { fontSize: metrics.label }]}>{label}</AppText>
     </View>
   );

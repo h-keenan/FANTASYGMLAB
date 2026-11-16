@@ -20,12 +20,15 @@ function prefersReducedMotion(): boolean {
 export function TickNumber({
   value,
   decimals = 1,
+  format,
   className,
   style,
   testId,
 }: {
   value: number | null | undefined;
   decimals?: number;
+  /** Formats the shown (in-between) value instead of `toFixed(decimals)` (money, signed gains). Round inside it. */
+  format?: (n: number) => string;
   className?: string;
   style?: CSSProperties;
   testId?: string;
@@ -80,7 +83,7 @@ export function TickNumber({
       className={`tick-number tabular-nums${className ? ` ${className}` : ""}`}
       style={style}
     >
-      {shown == null ? "—" : shown.toFixed(decimals)}
+      {shown == null ? "—" : format ? format(shown) : shown.toFixed(decimals)}
     </span>
   );
 }

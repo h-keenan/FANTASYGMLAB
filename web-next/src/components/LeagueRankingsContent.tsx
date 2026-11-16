@@ -4,7 +4,9 @@ import { TERMS } from "@/lib/terms";
 import { useHeaderContext } from "@/lib/headerContext";
 import { PageTabBar } from "@/components/PageTabBar";
 import { BEGINNER_HELP } from "@/lib/experienceCopy";
-import { useState, useSyncExternalStore } from "react";
+import { useRef, useState, useSyncExternalStore } from "react";
+
+import { useFlipList } from "@/lib/useFlipList";
 
 import { AccentCard } from "@/components/AccentCard";
 import { usePageHelp } from "@/components/PageHelpLines";
@@ -415,6 +417,7 @@ function RankBoardSection({ board, teams, myRosterId, onOpenManager }: { board: 
   const ordered = sortByBoard(teams, board);
   const [expanded, setExpanded] = useState(false);
   const canCollapse = ordered.length > BOARD_PREVIEW_COUNT + 1;
+  const listRef = useRef<HTMLDivElement>(null);
   // Collapsed: the top three, plus the caller's own row if they sit below it.
   const visible = !canCollapse || expanded
     ? ordered
@@ -431,6 +434,8 @@ function RankBoardSection({ board, teams, myRosterId, onOpenManager }: { board: 
     () => window.location.hash === `#${anchor}`,
     () => false,
   );
+  // Rows glide to their new rank when the board re-sorts (a refresh, a different board order); at most 24 rows.
+  useFlipList(listRef, visible.map((team) => team.roster_id).join(","));
   const leader = ordered[0];
   const mine = ordered.find((team) => team.roster_id === myRosterId);
   const mineRank = mine ? (mine[config.rankField] as number | null) : null;
@@ -443,7 +448,7 @@ function RankBoardSection({ board, teams, myRosterId, onOpenManager }: { board: 
     <section id={anchor} className="scroll-mt-4" data-testid={`rank-board-${board}`}>
       <CompactModule key={hashOpen ? "hash" : "idle"} id={`league.board.${board}`} title={config.title} parts={parts} defaultOpen={hashOpen || board === "power"} persist={!hashOpen}>
       <p className="text-xs" style={{ color: "var(--color-text-muted)" }}>{config.note}</p>
-      <div className="glass-surface flex flex-col">
+      <div ref={listRef} className="glass-surface flex flex-col">
         {visible.map((team) => {
           const rank = team[config.rankField] as number | null;
           const tied = Boolean(team[config.tiedField]);
@@ -456,8 +461,8 @@ function RankBoardSection({ board, teams, myRosterId, onOpenManager }: { board: 
           }
           (team.team_badges || []).forEach((label) => badges.push({ label, tone: teamBadgeTone(label) }));
           return (
+            <div key={team.roster_id} data-flip-key={team.roster_id}>
             <RankingRow
-              key={team.roster_id}
               rankLabel={formatRank(rank, tied)}
               teamName={team.team_name || "Team"}
               avatarUrl={team.avatar_url}
@@ -471,6 +476,7 @@ function RankBoardSection({ board, teams, myRosterId, onOpenManager }: { board: 
               badges={badges}
               onOpen={() => onOpenManager(team.roster_id, team.team_name || "Team", team.owner_name, team.avatar_url)}
             />
+            </div>
           );
         })}
         {canCollapse ? (

@@ -9,7 +9,10 @@ import { PlayerAccordionRow, usePlayerAccordion } from "@/components/ui/PlayerAc
 import { usePlayerQuickView } from "@/context/PlayerQuickViewContext";
 import type { PlayerFact } from "@/lib/playerAnatomy";
 import { badgeFromInjury, type BadgeInput } from "@/lib/playerBadges";
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
+
+import { MAX_FLIP_ROWS } from "@/lib/motion";
+import { useFlipList } from "@/lib/useFlipList";
 import { mergeSearchMatches, useLeaguePlayerSearch } from "@/lib/leaguePlayerSearch";
 
 import type { DraftPickAsset, LeagueIdpValuesResponse, LeagueRankingsResponse, RankedPlayer } from "@/lib/api";
@@ -287,6 +290,9 @@ export function PlayersContent({
     [filtered, activeSortOption.key, sortMode],
   );
   const visible = sorted.slice(0, PREVIEW_ROWS);
+  // Re-sorting / filtering glides the top rows to their new places (only the first MAX_FLIP_ROWS are marked).
+  const listRef = useRef<HTMLDivElement>(null);
+  useFlipList(listRef, visible.slice(0, MAX_FLIP_ROWS).map((player) => player.player_id).join(","));
 
   // One Filters button instead of five selects (FilterSheet): the same five
   // facets, committed together with Apply.
@@ -434,10 +440,10 @@ export function PlayersContent({
               }}
             />
           ) : (
-            <div className="flex flex-col">
-              {visible.map((player) => (
+            <div ref={listRef} className="flex flex-col">
+              {visible.map((player, index) => (
+                <div key={player.player_id} data-flip-key={index < MAX_FLIP_ROWS ? player.player_id : undefined}>
                 <PlayerRow
-                  key={player.player_id}
                   open={accordion.isOpen(player.player_id)}
                   onToggle={() => accordion.toggle(player.player_id)}
                   player={player}
@@ -447,6 +453,7 @@ export function PlayersContent({
                   sortMode={sortMode}
                   idpConfidence={idpSelected ? idpConfidenceById.get(player.player_id) ?? "low" : undefined}
                 />
+                </div>
               ))}
             </div>
           )}

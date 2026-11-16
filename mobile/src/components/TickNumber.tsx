@@ -15,11 +15,18 @@ import { COUNT_MS as TICK_MS, FLASH_MS, acquireTween, flashDirection } from '../
 export default function TickNumber({
   value,
   decimals = 1,
+  format,
+  numberOfLines,
+  adjustsFontSizeToFit,
   style,
   testID,
 }: {
   value: number | null | undefined;
   decimals?: number;
+  /** Formats the shown (in-between) value instead of `toFixed(decimals)` (money, signed gains). Round inside it. */
+  format?: (n: number) => string;
+  numberOfLines?: number;
+  adjustsFontSizeToFit?: boolean;
   style?: StyleProp<TextStyle>;
   testID?: string;
 }) {
@@ -70,9 +77,11 @@ export default function TickNumber({
   return (
     <AppText
       testID={testID}
+      numberOfLines={numberOfLines}
+      adjustsFontSizeToFit={adjustsFontSizeToFit}
       style={[{ fontVariant: ['tabular-nums'] }, style, flashing === 'up' && { color: colors.successBright }, flashing === 'down' && { color: colors.danger }]}
     >
-      {shown == null ? '—' : shown.toFixed(decimals)}
+      {shown == null ? '—' : format ? format(shown) : shown.toFixed(decimals)}
     </AppText>
   );
 }

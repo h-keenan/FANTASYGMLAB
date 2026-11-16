@@ -32,6 +32,7 @@ import { experienceBucket, trackOnboarding, trackOnboardingStepViewed } from '..
 import { useOnboarding } from '../context/OnboardingContext';
 import { useThemeMode } from '../context/ThemeModeContext';
 import { radii, spacing, typography, type ThemeColors } from '../theme';
+import { MOTION_MS } from '../lib/motion';
 import type { RootStackParamList } from '../navigation/RootNavigator';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Onboarding'>;
@@ -67,11 +68,11 @@ const VALUE_SLIDE_MS = 3600;
 const VALUE_SLIDES = VALUE_SLIDE_KEYS.map((k) => FEATURES.find((f) => f.key === k)!);
 const PHONE_ASPECT = 600 / 1298;
 
-// Web parity (globals.css onboarding-slide-next/back): 0.28s ease-out,
+// Web parity (globals.css onboarding-slide-next/back): --motion-base (240ms) ease-out,
 // opacity 0 -> 1 and a 24px horizontal nudge toward the final position.
 // Opacity/transform only, on the UI thread; skipped under reduced motion.
 const SLIDE_NUDGE_PX = 24;
-const SLIDE_MS = 280;
+const SLIDE_MS = MOTION_MS.base;
 
 function SlideIn({ active, direction, children }: { active: boolean; direction: 'next' | 'back'; children: React.ReactNode }) {
   const reduceMotion = useReducedMotion();

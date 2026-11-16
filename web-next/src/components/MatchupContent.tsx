@@ -3,6 +3,7 @@
 import { PageTabBar } from "@/components/PageTabBar";
 import { BEGINNER_HELP } from "@/lib/experienceCopy";
 import { RangeCompare } from "@/components/RangeCompare";
+import { TickNumber } from "@/components/TickNumber";
 import { RANGE_CAPTION, leanLabel, rangeDisplayRows } from "@/lib/startSitRange";
 import { useRouter } from "next/navigation";
 import dynamic from "next/dynamic";
@@ -119,8 +120,9 @@ function ScoreSide({
 }) {
   // Before any game kicks off, Sleeper's 0.0 isn't a score yet, so the
   // projection leads; once games start the real score leads.
-  const headline = kickedOff && score != null ? score.toFixed(1) : projected != null ? projected.toFixed(1) : "—";
-  const caption = kickedOff && score != null ? (projected != null ? `Proj ${projected.toFixed(1)}` : null) : "Projected";
+  const live = kickedOff && score != null;
+  const headline = live ? score : projected;
+  const caption = live ? (projected != null ? <TickNumber value={projected} format={(n) => `Proj ${n.toFixed(1)}`} /> : null) : "Projected";
   return (
     <div className="flex-1 flex flex-col items-center text-center gap-1 min-w-0">
       <TeamAvatar
@@ -140,7 +142,7 @@ function ScoreSide({
       <span className="text-xs" style={{ color: "var(--color-text-muted)" }}>
         {recordLabel(side)}
       </span>
-      <span style={{ font: "var(--type-primary-metric)", color: "var(--color-text-primary)" }}>{headline}</span>
+      <TickNumber value={headline} style={{ font: "var(--type-primary-metric)", color: "var(--color-text-primary)" }} />
       {caption ? (
         <span className="text-xs" style={{ color: "var(--color-text-muted)" }}>
           {caption}

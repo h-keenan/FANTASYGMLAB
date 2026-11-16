@@ -38,7 +38,7 @@ import { useSimLeagueRosters } from '../lib/useSimLeagueRosters';
 import { spacing } from '../theme';
 import { PresenceSwap } from './Presence';
 import { RankChip, ReorderRow } from './Motion';
-import { MAX_FLIP_ROWS } from '../lib/motion';
+import { MAX_FLIP_ROWS, staggerDelay } from '../lib/motion';
 
 type View_ = 'standings' | 'scores' | 'feed' | 'teams' | 'players';
 
@@ -56,6 +56,7 @@ export function SimStandingsList({ rows, playoffTeams }: { rows: SimStandingRow[
             <ReorderRow
               key={row.team_id}
               animate={rows.length <= MAX_FLIP_ROWS}
+              delay={staggerDelay(index, rows.length)}
               style={undefined}
             >
             <View
