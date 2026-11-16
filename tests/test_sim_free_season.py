@@ -193,3 +193,48 @@ def test_missing_slot_column_falls_back_to_the_old_insert():
     backend = NoSlotColumn()
     GameStore(backend).create_game("u", snapshot=snap, seed=1, max_games=1)
     assert len(backend.tables["sim_games"]) == 1
+
+
+class _PreMigrationBackend(InMemoryBackend):
+    """A database where docs/supabase_sim_game.sql has NOT been applied, with the error strings the real
+    Supabase backend returns: selects that name ``slot`` fail, inserts with ``slot`` fail, and the
+    ``sim_free_season_claims`` table does not exist."""
+
+    def select(self, table, *, user_id, columns="*", **kwargs):
+        if table == "sim_free_season_claims":
+            return [], "Supabase tables are not set up yet. Run docs/supabase_accounts.sql in your Supabase SQL editor."
+        if table == "sim_games" and "slot" in columns.split(","):
+            return [], "column sim_games.slot does not exist"
+        return super().select(table, user_id=user_id, columns=columns, **kwargs)
+
+    def insert_many(self, table, rows):
+        if table == "sim_free_season_claims":
+            return False, "Supabase tables are not set up yet. Run docs/supabase_accounts.sql in your Supabase SQL editor."
+        if table == "sim_games" and any("slot" in r for r in rows):
+            return False, "Supabase insert failed (400). pg=PGRST204: Could not find the 'slot' column of 'sim_games'"
+        return super().insert_many(table, rows)
+
+
+def test_games_can_still_be_created_before_the_migration_is_applied():
+    """Production regression 2026-11-16: every new game failed with store_error because the cap read
+    ``id,slot`` and the free-season check read a table that did not exist yet."""
+
+    backend = _PreMigrationBackend()
+    store = GameStore(backend)
+    assert store.free_season_claim("u") is None
+    store.create_game("u", snapshot=_snapshot(), seed=1, max_games=1)
+    assert store.claim_free_season("u", backend.tables["sim_games"][0]["id"]) is True
+    assert len(backend.tables["sim_games"]) == 1
+    with pytest.raises(GameLimitReached):  # the old count-then-insert cap still holds
+        store.create_game("u", snapshot=_snapshot(), seed=2, max_games=1)
+
+
+def test_real_outages_are_not_mistaken_for_a_missing_migration():
+    class Down(InMemoryBackend):
+        def select(self, table, **kwargs):
+            return [], "Could not reach Supabase table storage."
+
+    with pytest.raises(gs.SimStoreError):
+        GameStore(Down()).free_season_claim("u")
+    with pytest.raises(gs.SimStoreError):
+        GameStore(Down()).create_game("u", snapshot=_snapshot(), seed=1, max_games=1)

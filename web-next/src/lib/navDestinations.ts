@@ -54,7 +54,7 @@ const GLYPH_BY_PAGE: Record<string, NavGlyphName> = {
   "draft-center": "draftCenter",
   games: "games",
   commissioner: "commissioner",
-  "gm-game": "games",
+  "gm-game": "fantasySim",
   news: "news",
   community: "community",
 };

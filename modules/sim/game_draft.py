@@ -308,6 +308,124 @@ def hint_reason(ctx: DraftContext, pid: str) -> str:
     return base
 
 
+# --- multi-factor advice (advice_v 1+) ---------------------------------------------------------------------------------
+# One ranking behind the hint, Auto-pick and the "why" line. Everything is in ADP spots (a lower adjusted ADP is better):
+#   value      the player's public ADP
+#   need       a starting slot the roster still lacks (the same shortage the header's "need RB/TE" names), worth up to
+#              ADVICE_NEED_SPOTS; the same position once its starters are filled is docked ADVICE_DEPTH_SPOTS while another
+#              starter hole is open
+#   scarcity   a run on the position (3+ of the last 8 picks) or a thin tier before your next pick, only for a need
+#   bye/injury shared byes (BYE_SPOTS each) and weeks out at the start of the season (INJURY_SPOTS per week, capped)
+# A need that is worth more than the value gap wins; a bigger value gap still wins and the "why" says so.
+ADVICE_NEED_SPOTS = 1.6  # per unit of the need bonus (0..10): a full starter hole is worth 16 ADP spots late, 6.4 in rounds 1-4
+ADVICE_DEPTH_SPOTS = 3.0  # docked for stacking a position whose starters are filled while another hole is open
+ADVICE_RUN_WINDOW = 8
+ADVICE_RUN_SPOTS = 1.0  # per pick at the position beyond two in the window (capped at 2.5)
+ADVICE_THIN_SPOTS = 1.5  # fewer than two of the position will survive until your next pick
+INJURY_SPOTS = 1.0  # per week out at the start of the season (capped at 6)
+
+
+def _strict_short(snap: GameSnapshot, counts: Mapping[str, int]) -> dict[str, float]:
+    return {pos: v for pos, v in starter_shortage(snap.settings.slots, counts).items() if pos != "FLEX" and v > 0}
+
+
+def _picks_until_next(ctx: DraftContext, tid: str, n: int) -> int:
+    for i in range(n + 1, len(ctx.order)):
+        if ctx.order[i] == tid:
+            return i - n
+    return 0
+
+
+def advice_rows(ctx: DraftContext, tid: str, n: int) -> list[dict[str, Any]]:
+    """Legal candidates ranked best first, each with its adjusted ADP and the factors that moved it."""
+
+    from modules.sim import game_grades as gg
+
+    snap, state = ctx.snap, ctx.state
+    rnd = pick_round(snap, n)
+    counts = ctx.counts(tid)
+    short = _strict_short(snap, counts)
+    strict = {pos: sum(1 for s in snap.settings.slots if s == pos) for pos in GAME_POSITIONS}
+    gap = _picks_until_next(ctx, tid, n)
+    taken = ctx.taken()
+    recent = [snap.players[p["pid"]].pos for p in state.picks[-ADVICE_RUN_WINDOW:]]
+    avail_by_pos: dict[str, list[float]] = {}
+    for pid in ctx.by_adp:
+        if pid not in taken:
+            avail_by_pos.setdefault(snap.players[pid].pos, []).append(snap.players[pid].adp)
+    rows = []
+    for pid in _candidates(ctx, tid, n):
+        p = snap.players[pid]
+        pos = p.pos
+        f: dict[str, float] = {}
+        bonus = _need_bonus(snap.settings.slots, counts, pos, rnd)
+        is_need = short.get(pos, 0) > 0
+        if is_need:
+            f["need"] = -ADVICE_NEED_SPOTS * bonus
+            run = max(0, recent.count(pos) - 2)
+            if run:
+                f["run"] = -min(2.5, ADVICE_RUN_SPOTS * run)
+            horizon = n + 1 + gap
+            if gap and sum(1 for a in avail_by_pos.get(pos, []) if a <= horizon) < 2 and "run" not in f:
+                f["thin"] = -ADVICE_THIN_SPOTS
+        elif short and strict.get(pos, 0) and counts.get(pos, 0) >= strict[pos] + 1:
+            f["depth"] = ADVICE_DEPTH_SPOTS
+        bye = _bye_overlap(snap, state, tid, pid)
+        if bye:
+            f["bye"] = BYE_SPOTS * bye
+        if p.injury_weeks > 0:
+            f["injury"] = min(6.0, INJURY_SPOTS * p.injury_weeks)
+        adj = p.adp + sum(f.values())
+        rows.append({"pid": pid, "adj": adj, "factors": f, "need": is_need,
+                     "key": (round(adj * 2) / 2, -gg.sort_key(snap, pid, state.view_no), pid)})
+    rows.sort(key=lambda r: r["key"])
+    return rows
+
+
+def advice_pick(ctx: DraftContext, tid: str, n: int) -> str | None:
+    rows = advice_rows(ctx, tid, n)
+    return rows[0]["pid"] if rows else None
+
+
+def advice_reason(ctx: DraftContext, pid: str) -> str:
+    """The hint's "why": names the factors that decided it, and when value overrides a need (or need beats value) says so."""
+
+    snap, state = ctx.snap, ctx.state
+    if pid in state.queue:
+        return "Next on your queue"
+    user = snap.user_team.tid
+    rows = advice_rows(ctx, user, state.pick_index)
+    top = next((r for r in rows if r["pid"] == pid), None)
+    if top is None:
+        return "Best available by ADP"
+    p = snap.players[pid]
+    short = _strict_short(snap, ctx.counts(user))
+    need_list = "/".join(sorted(short, key=lambda k: -short[k]))
+    by_value = min(rows, key=lambda r: (snap.players[r["pid"]].adp, r["pid"]))
+    f = top["factors"]
+    notes = []
+    if "run" in f:
+        notes.append(f"{p.pos} run under way")
+    elif "thin" in f:
+        notes.append(f"few {p.pos}s will last to your next pick")
+    if "bye" in f:
+        notes.append(f"shares a bye with your {p.pos}s")
+    tail = f" ({'; '.join(notes)})" if notes else ""
+    if top["need"]:
+        if by_value["pid"] == pid:
+            return f"Best value and fills your {p.pos} need{tail}"
+        best = snap.players[by_value["pid"]]
+        spots = max(1, round(p.adp - best.adp))
+        return f"Takes your {p.pos} need over {best.name} ({best.pos}), who is only {spots} ADP spot{'s' if spots != 1 else ''} better{tail}"
+    if short:
+        near = next((r for r in rows if r["need"]), None)
+        if near is not None:
+            spots = max(1, round(snap.players[near["pid"]].adp - p.adp))
+            return f"Value override: {spots} ADP spots clear of the best {snap.players[near['pid']].pos}, worth passing on your {need_list} need{tail}"
+        return f"Best value; your {need_list} need has no good option here{tail}"
+    return f"Best available by ADP{tail}"
+
+
 def best_for_user(ctx: DraftContext, seed: int) -> str:
     """Queue first, else best value for need (hint_v 1+: best ADP for need, public information only)."""
 
@@ -316,6 +434,10 @@ def best_for_user(ctx: DraftContext, seed: int) -> str:
         if pid in ctx.snap.players and pid not in taken:
             return pid
     user = ctx.snap.user_team.tid
+    if ctx.snap.settings.advice:
+        pid = advice_pick(ctx, user, ctx.state.pick_index)
+        if pid is not None:
+            return pid
     if ctx.snap.settings.hint_v:
         return choose_public(ctx, user, ctx.state.pick_index)
     return choose_pick(ctx, user, ctx.state.pick_index, seed, human=True)
@@ -397,5 +519,5 @@ def draft_recap(snap: GameSnapshot, state: GameState) -> dict[str, Any]:
 
 __all__ = [
     "DraftContext", "choose_pick", "run_ai_picks", "user_pick", "auto_for_user", "best_for_user",
-    "set_queue", "draft_recap", "choose_public", "public_scores", "hint_reason", "starter_shortage",
+    "set_queue", "draft_recap", "choose_public", "public_scores", "hint_reason", "advice_reason", "advice_rows", "advice_pick", "starter_shortage",
 ]

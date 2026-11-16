@@ -33,7 +33,7 @@ export function StatStrip({ items, columns, league }: { items: StatStripItem[]; 
         const tile = <SnapshotTile key={item.label} compact wrapNote reserveLabelLines={columns === 4} {...item} />;
         if (!insight || !league) return tile;
         return (
-          <div key={item.label} className="relative">
+          <div key={item.label} className={why ? "relative ui-why-host" : "relative"}>
             <InsightLink insight={insight} league={league} spoken={[item.label, item.value, item.note]}>
               {tile}
             </InsightLink>

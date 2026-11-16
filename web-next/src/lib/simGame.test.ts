@@ -864,3 +864,12 @@ describe("simAutoPickConfirmText", () => {
     expect(simAutoPickConfirmText(undefined)).not.toContain("ADP");
   });
 });
+
+describe("simPickSlotText", () => {
+  it("reads as words, never a raw pick id", async () => {
+    const { simPickSlotText, simPickLabelText } = await import("./simGame");
+    expect(simPickSlotText({ season: 2027, round: 4, slot: 8 })).toBe("2027 · 4.08");
+    expect(simPickSlotText({ round: 4, slot: 8 })).toBe("R4 P8");
+    expect(simPickLabelText({ id: "pick:2027:4:8" })).not.toMatch(/pick:/);
+  });
+});

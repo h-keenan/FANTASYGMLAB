@@ -5,7 +5,7 @@ import { badgeFromTag, contextSuppressed, type BadgeInput, type BadgeKind } from
 import { playerSurname } from "./playerNameDisplay";
 import type { PlayerListStat } from "./playerListRow";
 import { simGradeOf, simGradeText, type SimGradeInput } from "./simGrade";
-import { simHeadshotId, simPlayerTags, simFmtPts, simFmtValue, simRosterNeeds, type SimDraftPick, type SimDraftState, type SimGamePlayer, type SimGameTone, type SimPlayerSort, type SimPos, type SimSlot } from "./simGame";
+import { simHeadshotId, simPlayerTags, simFmtPts, simFmtValue, simRosterNeeds, simParsePickId, simPickSlotText, type SimDraftPick, type SimDraftState, type SimGamePlayer, type SimGameTone, type SimPlayerSort, type SimPos, type SimSlot } from "./simGame";
 
 export interface SimDraftProgress {
   round: number;
@@ -461,6 +461,10 @@ export function simRecentPickCards(draft: Pick<SimDraftState, "picks" | "teams">
 
 /** The last rookie-draft picks as the same cards (the rookie order names the player but not the team or a grade). */
 export function simRookieRecentCards(order: readonly SimRookieOrderLike[], count = 6): SimRecentPickCard[] {
+  const slotLabel = (o: SimRookieOrderLike) => {
+    const inRound = order.filter((r) => r.round === o.round && r.n <= o.n).length;
+    return simPickSlotText({ season: simParsePickId(o.pick)?.season ?? null, round: o.round, slot: inRound });
+  };
   return order
     .filter((o) => o.made)
     .sort((a, b) => b.n - a.n)
@@ -468,12 +472,12 @@ export function simRookieRecentCards(order: readonly SimRookieOrderLike[], count
     .map((o) => ({
       key: o.pick,
       pickNo: o.n,
-      pickLabel: o.pick || `#${o.n}`,
+      pickLabel: slotLabel(o),
       player: { id: o.made!.id, name: o.made!.name, position: o.made!.pos, team: null, headshotId: /^\d+$/.test(o.made!.id) ? o.made!.id : null },
       grade: null,
       teamName: null,
       isYou: o.is_yours,
-      aria: `Pick ${o.pick}: ${o.made!.name}, ${o.made!.pos}`,
+      aria: `Pick ${slotLabel(o)}: ${o.made!.name}, ${o.made!.pos}`,
     }));
 }
 

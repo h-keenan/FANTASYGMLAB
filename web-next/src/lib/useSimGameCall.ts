@@ -21,10 +21,11 @@ export function useSimGameCall(
   onError: (message: string) => void,
   onConflict?: () => void,
   onDelta?: (delta: SimGameDelta) => void,
+  onVerifiedPro?: () => void,
 ) {
-  const handlers = useRef({ onGate, onError, onConflict, onDelta });
+  const handlers = useRef({ onGate, onError, onConflict, onDelta, onVerifiedPro });
   useEffect(() => {
-    handlers.current = { onGate, onError, onConflict, onDelta };
+    handlers.current = { onGate, onError, onConflict, onDelta, onVerifiedPro };
   });
   return useCallback(async function call<T extends SimGameEnvelope>(fn: () => Promise<T>): Promise<T | null> {
     // A storage hiccup or busy server on an ACTION retries once on its own, then reports
@@ -37,6 +38,8 @@ export function useSimGameCall(
         gate = simGameGate(body);
         if (gate.kind === "ready") {
         if (body.delta) handlers.current.onDelta?.(body.delta);
+        // A verified Pro answer proves any paywall still on screen is stale (a past misread): clear it.
+        if (body.is_premium === true) handlers.current.onVerifiedPro?.();
         return body;
       }
       } catch (error) {

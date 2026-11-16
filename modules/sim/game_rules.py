@@ -40,6 +40,7 @@ from modules.sim.game_types import (
     ECON_VERSION,
     STABILITY_VERSION,
     VORP_VERSION,
+    ADVICE_VERSION,
     INCUMBENT_VERSION,
     DEFENSE_VERSION,
     HINT_VERSION,
@@ -63,6 +64,7 @@ UPGRADABLE_FLAGS: dict[str, tuple[int, str]] = {
     "econ_v": (ECON_VERSION, NOW),
     "stability_v": (STABILITY_VERSION, SEASON),
     "vorp_v": (VORP_VERSION, NOW),
+    "advice_v": (ADVICE_VERSION, NOW),
     "incumbent_v": (INCUMBENT_VERSION, SEASON),
     "defense_v": (DEFENSE_VERSION, WEEK),
 }
@@ -117,6 +119,11 @@ FLAGS: dict[str, dict[str, Any]] = {
     "defense_v": {
         "label": "Matchups matter",
         "body": "Every NFL defense is stronger or weaker against the QB, RB, WR and TE, changes from season to season, and nudges a player's weekly points and projection by about 5 to 8 percent depending on who he plays.",
+        "dynasty_only": False,
+    },
+    "advice_v": {
+        "label": "Smarter draft advice",
+        "body": "The draft hint and Auto-pick weigh value against your starting-slot needs, positional runs and thin tiers, byes and injuries, and say why (for example, why a big value gap beats a need).",
         "dynasty_only": False,
     },
     "names_v": {

@@ -217,12 +217,13 @@ describe("recent pick cards and who survives to your pick", () => {
 
   it("rookie cards come from the made slots, newest first", () => {
     const order = [
-      { n: 1, round: 1, pick: "1.01", is_yours: false, made: { id: "9", name: "A B", pos: "WR" } },
-      { n: 2, round: 1, pick: "1.02", is_yours: true, made: { id: "x", name: "C D", pos: "RB" } },
-      { n: 3, round: 1, pick: "1.03", is_yours: false, made: null },
+      { n: 1, round: 1, pick: "pick:2027:1:t1", is_yours: false, made: { id: "9", name: "A B", pos: "WR" } },
+      { n: 2, round: 1, pick: "pick:2027:1:t2", is_yours: true, made: { id: "x", name: "C D", pos: "RB" } },
+      { n: 3, round: 1, pick: "pick:2027:1:t3", is_yours: false, made: null },
     ];
     const cards = simRookieRecentCards(order);
-    expect(cards.map((c) => c.pickLabel)).toEqual(["1.02", "1.01"]);
+    expect(cards.map((c) => c.pickLabel)).toEqual(["2027 · 1.02", "2027 · 1.01"]);
+    expect(JSON.stringify(cards.map((c) => [c.pickLabel, c.aria]))).not.toMatch(/pick:/);
     expect(cards[1].player.headshotId).toBe("9");
     expect(cards[0].player.headshotId).toBeNull();
   });

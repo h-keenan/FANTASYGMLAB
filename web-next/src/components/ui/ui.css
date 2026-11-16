@@ -349,6 +349,8 @@
 .ui-why-corner { position: absolute; top: 0; right: 0; width: var(--touch-target-min); height: var(--touch-target-min); display: flex; align-items: flex-start; justify-content: flex-end; pointer-events: none; }
 .ui-why-corner-btn { pointer-events: auto; width: 20px; height: 20px; margin: 4px; align-items: center; justify-content: center; border-radius: 999px; font-size: 0.6875rem; font-weight: 800; line-height: 1; color: var(--color-text-muted); background: color-mix(in srgb, var(--color-text-primary) 8%, transparent); }
 .ui-why-corner-btn::after { inset: -12px -4px -12px -12px; }
+/* The corner "?" never sits on the tile's label: the label keeps clear of it on both sides so it stays centered (coridian_ 2026-11-16). */
+.ui-why-host [data-tile-label] { padding-inline: 22px; }
 .ui-why-body {
   display: flex;
   flex-direction: column;

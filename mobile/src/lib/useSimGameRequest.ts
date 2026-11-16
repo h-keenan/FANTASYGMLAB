@@ -9,10 +9,11 @@ export function useSimGameRequest(
   onError: (message: string) => void,
   onConflict?: () => void,
   onDelta?: (delta: SimGameDelta) => void,
+  onVerifiedPro?: () => void,
 ) {
-  const handlers = useRef({ onGate, onError, onConflict, onDelta });
+  const handlers = useRef({ onGate, onError, onConflict, onDelta, onVerifiedPro });
   useEffect(() => {
-    handlers.current = { onGate, onError, onConflict, onDelta };
+    handlers.current = { onGate, onError, onConflict, onDelta, onVerifiedPro };
   });
   return useCallback(
     <T extends SimGameEnvelope>(fn: () => Promise<T>): Promise<T | null> =>
@@ -21,6 +22,7 @@ export function useSimGameRequest(
         onError: (message) => handlers.current.onError(message),
         onConflict: () => handlers.current.onConflict?.(),
         onDelta: (delta) => handlers.current.onDelta?.(delta),
+        onVerifiedPro: () => handlers.current.onVerifiedPro?.(),
       }),
     [],
   );

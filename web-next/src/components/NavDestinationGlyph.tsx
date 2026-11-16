@@ -22,6 +22,7 @@ export type NavGlyphName =
   | "teamSituation"
   | "community"
   | "games"
+  | "fantasySim"
   | "commissioner"
   | "playoffOdds"
   | "pro"
@@ -240,13 +241,22 @@ export function NavDestinationGlyph({ name, size = 18 }: { name: NavGlyphName; s
         </svg>
       );
     case "games":
-      // A simple die: rounded square with three pips.
+      // A game controller.
       return (
         <svg {...common}>
-          <rect x="64" y="64" width="384" height="384" rx="64" {...stroke} />
-          <circle cx="176" cy="176" r="16" fill="currentColor" />
-          <circle cx="256" cy="256" r="16" fill="currentColor" />
-          <circle cx="336" cy="336" r="16" fill="currentColor" />
+          <rect x="48" y="144" width="416" height="224" rx="100" {...stroke} />
+          <path d="M156 224v64M124 256h64" {...stroke} />
+          <circle cx="332" cy="236" r="16" fill="currentColor" />
+          <circle cx="380" cy="284" r="16" fill="currentColor" />
+        </svg>
+      );
+    case "fantasySim":
+      // A calendar with a play triangle: the season-long Fantasy Sim.
+      return (
+        <svg {...common}>
+          <rect x="64" y="96" width="384" height="352" rx="48" {...stroke} />
+          <path d="M64 208h384M160 48v80M352 48v80" {...stroke} />
+          <path d="M224 272l96 56-96 56z" {...stroke} />
         </svg>
       );
     case "commissioner":
