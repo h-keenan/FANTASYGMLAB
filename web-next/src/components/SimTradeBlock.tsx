@@ -122,13 +122,18 @@ export function SimBlockView({ ctx, onMakeOffer }: { ctx: SimCtx; onMakeOffer: (
               <SimPlayerLine player={p} onOpen={ctx.openPlayer} stats={simListStats(p, { adp: false })} trailing={<Button size="sm" disabled={full} loading={busy === p.id} onClick={() => toggle(p.id, true)} aria-label={`Put ${p.name} on the block`}>Block</Button>} />
             </li>
           ))}
+          {/* Right under the players it expands (coridian_ 2026-11-16: below the picks it was missed, "this isnt all my players"). */}
+          {candidates.length > 8 ? (
+            <li className="py-1">
+              <Button size="sm" variant="secondary" onClick={() => setShowAll((v) => !v)}>{showAll ? "Show fewer players" : `Show all ${candidates.length} players`}</Button>
+            </li>
+          ) : null}
           {myPicks.map((p: SimPickAsset) => (
             <li key={p.id}>
               <SimPickLine pick={p} trailing={<Button size="sm" disabled={full} loading={busy === p.id} onClick={() => toggle(p.id, true)} aria-label="Put this pick on the block">Block</Button>} />
             </li>
           ))}
         </ul>
-        {candidates.length > 8 ? <Button size="sm" variant="secondary" onClick={() => setShowAll((v) => !v)}>{showAll ? "Show fewer" : `Show all ${candidates.length}`}</Button> : null}
       </section>
 
       <section className="flex flex-col gap-2" aria-label="Around the league">
