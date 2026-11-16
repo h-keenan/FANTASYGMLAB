@@ -30,6 +30,8 @@ from __future__ import annotations
 
 from typing import Any, Mapping
 
+from modules import lineup_lock
+
 # "Heavy" underdog/favorite: this matchup's win probability at or beyond these.
 HEAVY_UNDERDOG_AT_OR_BELOW = 0.30
 HEAVY_FAVORITE_AT_OR_ABOVE = 0.70
@@ -61,7 +63,7 @@ def range_for(player: Mapping[str, Any] | None, points: float | None) -> dict[st
 
     if player is None or points is None:
         return None
-    if player.get("game_started") is True:
+    if lineup_lock.is_locked(player):
         return None  # a started game's points are partly real; the pregame range no longer applies
     projection = player.get("projection") or {}
     if projection.get("status") != "ok":
