@@ -14,14 +14,17 @@ export interface ValueBand {
 }
 
 const TABLE = {
-  "cuts": {
-    "smash": 1500,
-    "accept": 500,
-    "edge": 150,
-    "counter": -400,
-    "decline": -1200,
-    "hard": -2200
+  "shares": {
+    "smash": 0.2,
+    "accept": 0.08,
+    "edge": 0.04,
+    "counter": -0.08,
+    "decline": -0.2,
+    "hard": -0.35,
+    "close": 0.14
   },
+  "min_deal_size": 400.0,
+  "reference_deal_size": 5000.0,
   "bands": [
     {
       "id": "smash",
@@ -98,86 +101,340 @@ const TABLE = {
   ],
   "golden": [
     {
-      "score": -3000,
+      "deal_size": 500,
+      "score": -250.0,
       "id": "hard"
     },
     {
-      "score": -2200,
+      "deal_size": 500,
+      "score": -175.0,
       "id": "hard"
     },
     {
-      "score": -2199,
+      "deal_size": 500,
+      "score": -174.95,
       "id": "decline"
     },
     {
-      "score": -1200,
+      "deal_size": 500,
+      "score": -100.0,
       "id": "decline"
     },
     {
-      "score": -1199,
+      "deal_size": 500,
+      "score": -99.95,
       "id": "counter"
     },
     {
-      "score": -401,
+      "deal_size": 500,
+      "score": -50.0,
       "id": "counter"
     },
     {
-      "score": -400,
+      "deal_size": 500,
+      "score": -40.05,
       "id": "counter"
     },
     {
-      "score": -399,
+      "deal_size": 500,
+      "score": -40.0,
+      "id": "counter"
+    },
+    {
+      "deal_size": 500,
+      "score": -39.95,
       "id": "edge_them"
     },
     {
-      "score": -151,
+      "deal_size": 500,
+      "score": -20.05,
       "id": "edge_them"
     },
     {
-      "score": -150,
+      "deal_size": 500,
+      "score": -20.0,
       "id": "even"
     },
     {
+      "deal_size": 500,
       "score": 0,
       "id": "even"
     },
     {
-      "score": 150,
+      "deal_size": 500,
+      "score": 20.0,
       "id": "even"
     },
     {
-      "score": 151,
+      "deal_size": 500,
+      "score": 20.05,
       "id": "edge_you"
     },
     {
-      "score": 499,
+      "deal_size": 500,
+      "score": 39.95,
       "id": "edge_you"
     },
     {
-      "score": 500,
+      "deal_size": 500,
+      "score": 40.0,
       "id": "accept"
     },
     {
-      "score": 1499,
+      "deal_size": 500,
+      "score": 99.95,
       "id": "accept"
     },
     {
-      "score": 1500,
+      "deal_size": 500,
+      "score": 100.0,
       "id": "smash"
     },
     {
-      "score": 3000,
+      "deal_size": 500,
+      "score": 250.0,
       "id": "smash"
+    },
+    {
+      "deal_size": 5000,
+      "score": -2500.0,
+      "id": "hard"
+    },
+    {
+      "deal_size": 5000,
+      "score": -1750.0,
+      "id": "hard"
+    },
+    {
+      "deal_size": 5000,
+      "score": -1749.5,
+      "id": "decline"
+    },
+    {
+      "deal_size": 5000,
+      "score": -1000.0,
+      "id": "decline"
+    },
+    {
+      "deal_size": 5000,
+      "score": -999.5,
+      "id": "counter"
+    },
+    {
+      "deal_size": 5000,
+      "score": -500.0,
+      "id": "counter"
+    },
+    {
+      "deal_size": 5000,
+      "score": -400.5,
+      "id": "counter"
+    },
+    {
+      "deal_size": 5000,
+      "score": -400.0,
+      "id": "counter"
+    },
+    {
+      "deal_size": 5000,
+      "score": -399.5,
+      "id": "edge_them"
+    },
+    {
+      "deal_size": 5000,
+      "score": -200.5,
+      "id": "edge_them"
+    },
+    {
+      "deal_size": 5000,
+      "score": -200.0,
+      "id": "even"
+    },
+    {
+      "deal_size": 5000,
+      "score": 0,
+      "id": "even"
+    },
+    {
+      "deal_size": 5000,
+      "score": 200.0,
+      "id": "even"
+    },
+    {
+      "deal_size": 5000,
+      "score": 200.5,
+      "id": "edge_you"
+    },
+    {
+      "deal_size": 5000,
+      "score": 399.5,
+      "id": "edge_you"
+    },
+    {
+      "deal_size": 5000,
+      "score": 400.0,
+      "id": "accept"
+    },
+    {
+      "deal_size": 5000,
+      "score": 999.5,
+      "id": "accept"
+    },
+    {
+      "deal_size": 5000,
+      "score": 1000.0,
+      "id": "smash"
+    },
+    {
+      "deal_size": 5000,
+      "score": 2500.0,
+      "id": "smash"
+    },
+    {
+      "deal_size": 20000,
+      "score": -10000.0,
+      "id": "hard"
+    },
+    {
+      "deal_size": 20000,
+      "score": -7000.0,
+      "id": "hard"
+    },
+    {
+      "deal_size": 20000,
+      "score": -6998.0,
+      "id": "decline"
+    },
+    {
+      "deal_size": 20000,
+      "score": -4000.0,
+      "id": "decline"
+    },
+    {
+      "deal_size": 20000,
+      "score": -3998.0,
+      "id": "counter"
+    },
+    {
+      "deal_size": 20000,
+      "score": -2000.0,
+      "id": "counter"
+    },
+    {
+      "deal_size": 20000,
+      "score": -1602.0,
+      "id": "counter"
+    },
+    {
+      "deal_size": 20000,
+      "score": -1600.0,
+      "id": "counter"
+    },
+    {
+      "deal_size": 20000,
+      "score": -1598.0,
+      "id": "edge_them"
+    },
+    {
+      "deal_size": 20000,
+      "score": -802.0,
+      "id": "edge_them"
+    },
+    {
+      "deal_size": 20000,
+      "score": -800.0,
+      "id": "even"
+    },
+    {
+      "deal_size": 20000,
+      "score": 0,
+      "id": "even"
+    },
+    {
+      "deal_size": 20000,
+      "score": 800.0,
+      "id": "even"
+    },
+    {
+      "deal_size": 20000,
+      "score": 802.0,
+      "id": "edge_you"
+    },
+    {
+      "deal_size": 20000,
+      "score": 1598.0,
+      "id": "edge_you"
+    },
+    {
+      "deal_size": 20000,
+      "score": 1600.0,
+      "id": "accept"
+    },
+    {
+      "deal_size": 20000,
+      "score": 3998.0,
+      "id": "accept"
+    },
+    {
+      "deal_size": 20000,
+      "score": 4000.0,
+      "id": "smash"
+    },
+    {
+      "deal_size": 20000,
+      "score": 10000.0,
+      "id": "smash"
+    },
+    {
+      "deal_size": null,
+      "score": 100,
+      "id": "even"
     }
   ]
 } as const;
 
-export const TRADE_VALUE_CUTS = TABLE.cuts;
+export const TRADE_VALUE_SHARES = TABLE.shares;
+export const TRADE_VALUE_MIN_DEAL_SIZE: number = TABLE.min_deal_size;
+export const TRADE_VALUE_REFERENCE_DEAL_SIZE: number = TABLE.reference_deal_size;
 export const TRADE_VALUE_BANDS: readonly ValueBand[] = TABLE.bands as unknown as readonly ValueBand[];
-export const TRADE_VALUE_GOLDEN: ReadonlyArray<{ score: number; id: string }> = TABLE.golden;
+export const TRADE_VALUE_GOLDEN: ReadonlyArray<{ deal_size: number | null; score: number; id: string }> = TABLE.golden;
 
-export function bandForScore(score: number): ValueBand {
-  const c = TRADE_VALUE_CUTS;
+export interface ValueCuts {
+  dealSize: number;
+  smash: number;
+  accept: number;
+  edge: number;
+  counter: number;
+  decline: number;
+  hard: number;
+  close: number;
+}
+
+/** Deal size = the larger side's total value. */
+export function dealSizeFor(sendTotal: number, receiveTotal: number): number {
+  const n = (v: number) => (Number.isFinite(v) ? Math.max(0, v) : 0);
+  return Math.max(n(sendTotal), n(receiveTotal));
+}
+
+/** The ladder's cut points, in score points, for one deal (floored, scaled). */
+export function cutsFor(dealSize?: number | null): ValueCuts {
+  const raw = typeof dealSize === "number" && Number.isFinite(dealSize) ? dealSize : TRADE_VALUE_REFERENCE_DEAL_SIZE;
+  const size = Math.max(raw, TRADE_VALUE_MIN_DEAL_SIZE);
+  const s = TRADE_VALUE_SHARES;
+  return {
+    dealSize: size,
+    smash: size * s.smash,
+    accept: size * s.accept,
+    edge: size * s.edge,
+    counter: size * s.counter,
+    decline: size * s.decline,
+    hard: size * s.hard,
+    close: size * s.close,
+  };
+}
+
+export function bandForScore(score: number, dealSize?: number | null): ValueBand {
+  const c = cutsFor(dealSize);
   const pick = (id: string) => TRADE_VALUE_BANDS.find((b) => b.id === id) as ValueBand;
   if (score >= c.smash) return pick("smash");
   if (score >= c.accept) return pick("accept");
@@ -190,8 +447,8 @@ export function bandForScore(score: number): ValueBand {
 }
 
 /** The sentence under a verdict, from the same ladder as the verdict. */
-export function valueDirectionLabel(score: number): string {
-  return bandForScore(score).direction_label;
+export function valueDirectionLabel(score: number, dealSize?: number | null): string {
+  return bandForScore(score, dealSize).direction_label;
 }
 
 /** Favorable / Fair / Slight Overpay / Major Overpay -> semantic color token. */

@@ -41,12 +41,48 @@ export interface ValueBand {
 
 const TABLE = __TABLE__ as const;
 
-export const TRADE_VALUE_CUTS = TABLE.cuts;
+export const TRADE_VALUE_SHARES = TABLE.shares;
+export const TRADE_VALUE_MIN_DEAL_SIZE: number = TABLE.min_deal_size;
+export const TRADE_VALUE_REFERENCE_DEAL_SIZE: number = TABLE.reference_deal_size;
 export const TRADE_VALUE_BANDS: readonly ValueBand[] = TABLE.bands as unknown as readonly ValueBand[];
-export const TRADE_VALUE_GOLDEN: ReadonlyArray<{ score: number; id: string }> = TABLE.golden;
+export const TRADE_VALUE_GOLDEN: ReadonlyArray<{ deal_size: number | null; score: number; id: string }> = TABLE.golden;
 
-export function bandForScore(score: number): ValueBand {
-  const c = TRADE_VALUE_CUTS;
+export interface ValueCuts {
+  dealSize: number;
+  smash: number;
+  accept: number;
+  edge: number;
+  counter: number;
+  decline: number;
+  hard: number;
+  close: number;
+}
+
+/** Deal size = the larger side's total value. */
+export function dealSizeFor(sendTotal: number, receiveTotal: number): number {
+  const n = (v: number) => (Number.isFinite(v) ? Math.max(0, v) : 0);
+  return Math.max(n(sendTotal), n(receiveTotal));
+}
+
+/** The ladder's cut points, in score points, for one deal (floored, scaled). */
+export function cutsFor(dealSize?: number | null): ValueCuts {
+  const raw = typeof dealSize === "number" && Number.isFinite(dealSize) ? dealSize : TRADE_VALUE_REFERENCE_DEAL_SIZE;
+  const size = Math.max(raw, TRADE_VALUE_MIN_DEAL_SIZE);
+  const s = TRADE_VALUE_SHARES;
+  return {
+    dealSize: size,
+    smash: size * s.smash,
+    accept: size * s.accept,
+    edge: size * s.edge,
+    counter: size * s.counter,
+    decline: size * s.decline,
+    hard: size * s.hard,
+    close: size * s.close,
+  };
+}
+
+export function bandForScore(score: number, dealSize?: number | null): ValueBand {
+  const c = cutsFor(dealSize);
   const pick = (id: string) => TRADE_VALUE_BANDS.find((b) => b.id === id) as ValueBand;
   if (score >= c.smash) return pick("smash");
   if (score >= c.accept) return pick("accept");
@@ -59,8 +95,8 @@ export function bandForScore(score: number): ValueBand {
 }
 
 /** The sentence under a verdict, from the same ladder as the verdict. */
-export function valueDirectionLabel(score: number): string {
-  return bandForScore(score).direction_label;
+export function valueDirectionLabel(score: number, dealSize?: number | null): string {
+  return bandForScore(score, dealSize).direction_label;
 }
 
 /** Favorable / Fair / Slight Overpay / Major Overpay -> semantic color token. */

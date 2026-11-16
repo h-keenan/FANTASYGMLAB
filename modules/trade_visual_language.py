@@ -135,7 +135,7 @@ def parse_signed_edge(value: object) -> tuple[str, str]:
     return "Even", "even"
 
 
-def trade_value_band(value: object) -> str:
+def trade_value_band(value: object, deal_size: object = None) -> str:
     """Canonical presentation verdict for an existing delta.
 
     These labels describe, but never alter, the underlying trade value. The
@@ -143,7 +143,7 @@ def trade_value_band(value: object) -> str:
     so the badge can never disagree with the verdict band.
     """
 
-    return trade_value_bands.trade_value_band(value)
+    return trade_value_bands.trade_value_band(value, deal_size)
 
 
 def confidence_level(label: object) -> str:

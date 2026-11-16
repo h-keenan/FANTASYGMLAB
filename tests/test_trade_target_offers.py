@@ -90,6 +90,11 @@ def test_fair_packages_are_fair_for_both_sides(league):
     assert found >= 3
 
 
+def _cuts(offer):
+    """The verdict ladder's cut points at this offer's deal size."""
+    return trade_value_bands.cuts_for(trade_value_bands.deal_size_for(offer["send_value"], offer["receive_value"]))
+
+
 def _assert_fair(league, target, offers):
     assert len(offers) <= tto.MAX_OFFERS
     mine = _mine(league)
@@ -99,9 +104,9 @@ def _assert_fair(league, target, offers):
         assert all(a["id"] in mine for a in offer["send"] if a["kind"] == "player")
         # Fair to the caller (the Analyzer says so) ...
         assert offer["verdict"] in {"FAIR", "ACCEPT"}
-        assert offer["value_delta"] >= -trade_value_bands.EDGE
+        assert offer["value_delta"] >= -_cuts(offer).edge
         # ... and not a skim of the other manager.
-        assert offer["value_delta"] <= tto.PARTNER_MAX_USER_VALUE_GAIN
+        assert offer["value_delta"] <= _cuts(offer).accept
         assert offer["acceptance"]["label"] in {tto.ACCEPT_LIKELY, tto.ACCEPT_POSSIBLE, tto.ACCEPT_LONG_SHOT}
         assert offer["why"] and all(isinstance(line, str) and line for line in offer["why"])
     # No two identical packages.
@@ -114,7 +119,7 @@ def test_superstar_target_is_never_a_one_sided_junk_offer(league):
     for offer in result["offers"]:
         # Whatever is offered has to be real value, not filler for a cornerstone.
         assert offer["send_value"] >= 0.5 * offer["receive_value"]
-        assert offer["value_delta"] <= tto.PARTNER_MAX_USER_VALUE_GAIN
+        assert offer["value_delta"] <= _cuts(offer).accept
     if result["status"] != "found":
         assert result["offers"] == []
         assert result["headline"]
@@ -129,7 +134,7 @@ def test_cheap_target_does_not_make_the_user_overpay(league):
         # something back so the user is not paying a starter's price.
         returned_extra = len(offer["receive"]) > 1
         assert returned_extra or offer["send_value"] <= target_value + 1700
-        assert offer["value_delta"] >= -trade_value_bands.EDGE
+        assert offer["value_delta"] >= -_cuts(offer).edge
 
 
 def test_overpay_is_balanced_by_what_the_other_side_adds_back(league):
@@ -307,7 +312,7 @@ def test_superstar_with_enough_capital_returns_consolidation_offers():
         assert len(offer["send"]) <= tto.MAX_SEND_ASSETS
         assert all(a["id"] in mine for a in offer["send"] if a["kind"] == "player")
         # The partner is not skimmed; the user pays at most a modest premium.
-        assert offer["value_delta"] <= tto.PARTNER_MAX_USER_VALUE_GAIN
+        assert offer["value_delta"] <= _cuts(offer).accept
         assert offer["price_note"]
         assert offer["acceptance"]["label"] in {tto.ACCEPT_LIKELY, tto.ACCEPT_POSSIBLE, tto.ACCEPT_LONG_SHOT}
         assert offer["acceptance"]["reason"]
@@ -336,13 +341,15 @@ def test_priced_generator_searches_up_to_four_assets_closest_from_above():
     assert max(len(p) for p in packages) <= tto.MAX_SEND_ASSETS
     assert any(len(p) == 4 for p in packages)
     deltas = [trade_ideas.estimated_user_delta(p, [star]) for p in packages]
-    assert all(-trade_ideas.PRICED_MAX_OVERPAY <= d <= trade_value_bands.ACCEPT for d in deltas)
+    for package, d in zip(packages, deltas):
+        deal = trade_value_bands.deal_size_for(sum(a["score"] for a in package), star["score"])
+        assert -trade_ideas.PRICED_MAX_OVERPAY <= d <= trade_value_bands.cuts_for(deal).accept
     # Ordered by closeness to the price: the first package is nearer than the last.
     assert abs(deltas[0]) <= abs(deltas[-1])
 
 
 def test_no_clean_package_still_returns_the_closest_labelled_offers():
-    fx = _star_world(18000)
+    fx = _star_world(19000)
     result = _offers(fx, STAR)
     assert result["status"] == "found", result["headline"]
     assert result["diagnostics"]["tier"] == "closest"
@@ -354,7 +361,7 @@ def test_no_clean_package_still_returns_the_closest_labelled_offers():
         assert offer["price_note"]
         assert offer["acceptance"]["label"] in {tto.ACCEPT_LIKELY, tto.ACCEPT_POSSIBLE, tto.ACCEPT_LONG_SHOT}
         assert all(a["id"] in mine for a in offer["send"] if a["kind"] == "player")
-        assert offer["value_delta"] <= tto.PARTNER_MAX_USER_VALUE_GAIN
+        assert offer["value_delta"] <= _cuts(offer).accept
 
 
 def test_unaffordable_star_names_the_shortfall():
@@ -369,7 +376,7 @@ def test_unaffordable_star_names_the_shortfall():
 def test_paying_in_full_would_strip_the_lineup_is_not_offered():
     # The user can pay, but only by sending the starters the lineup needs:
     # nothing is shown and the reason says so (not "can't afford").
-    result = _offers(_star_world(19000), STAR)
+    result = _offers(_star_world(20000, scale=0.8), STAR)
     assert result["status"] == "none"
     assert "lineup" in result["headline"]
     assert "don't have enough" not in result["headline"]

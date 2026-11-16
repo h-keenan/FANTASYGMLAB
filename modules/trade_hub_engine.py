@@ -42,6 +42,7 @@ from modules import trade_hub_presentation
 from modules import trade_posture as trade_posture_module
 from modules import trade_ideas as trade_ideas_module
 from modules import trade_trust
+from modules import trade_value_bands
 from modules import trade_visual_language
 from modules import trust_enforcement
 from modules.compact_fantasy_assets import compact_package
@@ -397,7 +398,9 @@ def project_trade_idea_card(idea: Mapping[str, Any], *, is_headline: bool = Fals
         reasoning_tags=tuple(str(tag) for tag in (idea.get("reasoning_tags") or ())),
         package=package,
         category=category,
-        value_edge_band=trade_visual_language.trade_value_band(edge_label),
+        value_edge_band=trade_visual_language.trade_value_band(
+            edge_label, trade_value_bands.deal_size_for(idea.get("my_score"), idea.get("their_score"))
+        ),
         impact_tag=_classify_impact_tag(idea, confidence_label),
         landed_gm_target_player_ids=tuple(
             str(pid) for pid in (idea.get("landed_gm_target_player_ids") or ())
@@ -1255,6 +1258,11 @@ def generate_veto_check(
         pick_out = sum(int(a.get("score") or 0) for a in pick_assets.get(me, []))
         market = float(swap["raw_value_delta"]) + pick_in - pick_out
         team_score = float(swap["trade_score"]) + pick_in - pick_out
+        _score_of = lambda ids: float(  # noqa: E731
+            pd.to_numeric(frame[frame["player_id"].astype(str).isin({str(p) for p in ids})][score_field], errors="coerce")
+            .fillna(0).sum()
+        )
+        deal_size = trade_value_bands.deal_size_for(_score_of(sends[me]) + pick_out, _score_of(sends[other]) + pick_in)
         positions = swap.get("positions") or {}
         worst = min(
             ((pos, v) for pos, v in positions.items()), key=lambda kv: kv[1].get("per_week_delta", 0.0), default=None
@@ -1278,6 +1286,7 @@ def generate_veto_check(
             "receives": got_names,
             "market_delta": round(market),
             "team_score": round(team_score),
+            "deal_size": round(deal_size),
             "points_per_week": float(swap["points"]["per_week_delta"]),
             "worst_position": (
                 {"position": worst[0], "per_week_delta": float(worst[1].get("per_week_delta", 0.0))} if worst else None

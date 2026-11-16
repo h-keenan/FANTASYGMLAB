@@ -646,3 +646,26 @@ def test_join_is_player_id_only():
         "active",
         "news_updated",
     )
+
+
+def test_fingerprint_ignores_numeric_representation_of_unchanged_state():
+    frame = _refresh(_rb_room(), _sleeper_room())
+    float_frame = frame.copy()
+    float_frame["depth_chart_order"] = pd.to_numeric(
+        float_frame["depth_chart_order"], errors="coerce"
+    ).astype(float)
+    int_frame = frame.copy()
+    int_frame["depth_chart_order"] = (
+        pd.to_numeric(int_frame["depth_chart_order"], errors="coerce").fillna(0).astype(int)
+    )
+    assert spr.structured_state_fingerprint(float_frame) == spr.structured_state_fingerprint(int_frame)
+
+
+def test_fingerprint_treats_missing_and_zero_depth_order_alike_but_not_real_changes():
+    frame = _refresh(_rb_room(), _sleeper_room())
+    missing = frame.copy()
+    missing["depth_chart_order"] = float("nan")
+    zero = frame.copy()
+    zero["depth_chart_order"] = 0
+    assert spr.structured_state_fingerprint(missing) == spr.structured_state_fingerprint(zero)
+    assert spr.structured_state_fingerprint(frame) != spr.structured_state_fingerprint(zero)

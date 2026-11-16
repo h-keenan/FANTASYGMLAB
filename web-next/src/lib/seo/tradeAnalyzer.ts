@@ -15,7 +15,7 @@
  * page promotes.
  */
 import type { PublicBoard, ValueFormat } from "./publicValues";
-import { bandForScore, TRADE_VALUE_CUTS } from "../tradeValueBands.generated";
+import { bandForScore, cutsFor, dealSizeFor } from "../tradeValueBands.generated";
 import { TRADE_ANALYZER_PUBLIC_PATH } from "./site";
 
 export const TRADE_ANALYZER_PATH = TRADE_ANALYZER_PUBLIC_PATH;
@@ -214,10 +214,6 @@ const PUBLIC_BAND_BY_ID: Record<string, Exclude<TradeBand, "empty">> = {
   hard: "lopsided",
 };
 
-function bandForScoreEdge(): number {
-  return TRADE_VALUE_CUTS.edge;
-}
-
 export function evaluateTrade(
   sideA: readonly TradeBoardPlayer[],
   sideB: readonly TradeBoardPlayer[],
@@ -242,7 +238,8 @@ export function evaluateTrade(
   if (sideA.length === 0 || sideB.length === 0) return base;
 
   // Same ladder the in-app verdict is decided on, applied to the value gap.
-  const scored = bandForScore(diff);
+  const dealSize = dealSizeFor(totalA, totalB);
+  const scored = bandForScore(diff, dealSize);
   const band: TradeBand = PUBLIC_BAND_BY_ID[scored.id] ?? "fair";
   const winner: TradeWinner = scored.id === "even" ? "even" : diff > 0 ? "b" : "a";
 
@@ -260,7 +257,7 @@ export function evaluateTrade(
   const gap = Math.abs(Math.round(diff)).toLocaleString();
   const detail =
     band === "fair"
-      ? `Both sides are within ${bandForScoreEdge().toLocaleString()} points of each other (${Math.round(totalA).toLocaleString()} vs ${Math.round(totalB).toLocaleString()}).`
+      ? `Both sides are within ${Math.round(cutsFor(dealSize).edge).toLocaleString()} points of each other (${Math.round(totalA).toLocaleString()} vs ${Math.round(totalB).toLocaleString()}).`
       : `${winner === "b" ? "You get" : "They get"} ${gap} more value than ${winner === "b" ? "you send" : "they send"} (${Math.round(totalA).toLocaleString()} sent vs ${Math.round(totalB).toLocaleString()} received).`;
 
   const caveats: string[] = [];

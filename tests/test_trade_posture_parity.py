@@ -108,7 +108,7 @@ def test_hub_finder_and_dashboard_ideas_read_like_the_analyzer_for_each_posture(
             # One number: everything surfaced clears the bar the Analyzer's own
             # score sets, and the Analyzer's band is the rung of that same score.
             assert trade_grade.clears_suggestion_bar(verdict), where
-            rung = trade_value_bands.band_for_score(verdict.trade_score)
+            rung = trade_value_bands.band_for_score(verdict.trade_score, verdict.deal_size or None)
             assert (verdict.band, verdict.ui_verdict, verdict.tone) == (rung.verdict, rung.ui_verdict, rung.tone), where
             assert verdict.ui_verdict in {"FAIR", "ACCEPT"}, where
             # Dashboard: the tile's headline is one of these ideas and carries the same facts.
@@ -131,8 +131,8 @@ def test_each_posture_changes_what_a_costly_trade_grades_like_in_every_surface()
         fit, verdict = TP._higgins(key, posture=_resolved(key))
         verdicts[key] = verdict
     # No relabel: the contender's cost is in the score, so the rung is just lower.
-    assert verdicts["contender"].trade_score < trade_value_bands.ACCEPT
-    assert verdicts["contender"].band == trade_value_bands.band_for_score(verdicts["contender"].trade_score).verdict
+    assert verdicts["contender"].trade_score < trade_value_bands.cuts_for(verdicts["contender"].deal_size).accept
+    assert verdicts["contender"].band == trade_value_bands.band_for_score(verdicts["contender"].trade_score, verdicts["contender"].deal_size or None).verdict
     assert verdicts["rebuild"].ui_verdict == "ACCEPT"
     # The gate Hub, Finder and the Dashboard share drops the contender's version, keeps the rebuild's.
     for key, expected in (("contender", False), ("rebuild", True)):

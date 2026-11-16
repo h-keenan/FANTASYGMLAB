@@ -18,21 +18,23 @@ from modules import trade_grade, trade_hub_engine, trade_ideas, trade_value_band
 from tests.test_trade_hub_engine import SETTINGS, _player, _rosters
 
 
-def _verdict(ui, score, model=True):
-    return SimpleNamespace(ui_verdict=ui, trade_score=score, lineup_model={"available": True} if model else None)
+def _verdict(ui, score, model=True, deal_size=None):
+    return SimpleNamespace(
+        ui_verdict=ui, trade_score=score, deal_size=deal_size, lineup_model={"available": True} if model else None
+    )
 
 
 @pytest.mark.parametrize(
     "ui,score,expected",
     [
         ("ACCEPT", 1800, True),
-        ("ACCEPT", 500, True),
-        ("FAIR", 499, True),
-        ("FAIR", 150, True),
+        ("ACCEPT", 400, True),
+        ("FAIR", 399, True),
+        ("FAIR", 200, True),
         ("FAIR", 0, True),
-        ("FAIR", -150, True),
+        ("FAIR", -200, True),
         # "Slight value edge to them": the Analyzer's FAIR, but not a recommendation.
-        ("FAIR", -151, False),
+        ("FAIR", -201, False),
         ("FAIR", -399, False),
         ("COUNTER", -402, False),
         ("DECLINE", -1500, False),
@@ -40,24 +42,32 @@ def _verdict(ui, score, model=True):
 )
 def test_suggestion_bar_is_the_even_rung_of_the_one_score_ladder(ui, score, expected):
     assert trade_grade.clears_suggestion_bar(_verdict(ui, score)) is expected
-    # The edge is the ladder's own constant, not a number private to the gate.
-    assert trade_value_bands.band_for_score(-trade_value_bands.EDGE).id == "even"
+    # The edge is the ladder's own cut (reference deal size here), not a number private to the gate.
+    assert trade_value_bands.band_for_score(-trade_value_bands.cuts_for(None).edge).id == "even"
+
+
+@pytest.mark.parametrize("deal", [500, 5000, 20000])
+def test_suggestion_bar_scales_with_the_deal(deal):
+    edge = trade_value_bands.cuts_for(deal).edge
+    assert trade_grade.clears_suggestion_bar(_verdict("FAIR", -edge, deal_size=deal)) is True
+    assert trade_grade.clears_suggestion_bar(_verdict("FAIR", -edge - 1, deal_size=deal)) is False
 
 
 def test_with_a_lineup_model_the_bar_reads_only_the_score_and_agrees_with_its_own_rung():
     """No label check: for every score the verdict's UI rung is a function of that score, and the
     bar (score >= -EDGE) is exactly "that rung is FAIR/ACCEPT and not the edge-to-them band"."""
 
-    for score in trade_value_bands.GOLDEN_SCORES:
-        rung = trade_value_bands.band_for_score(score)
-        verdict = _verdict(rung.ui_verdict, score)
+    for case in trade_value_bands.golden_cases():
+        score, deal = case["score"], case["deal_size"]
+        rung = trade_value_bands.band_for_score(score, deal)
+        verdict = _verdict(rung.ui_verdict, score, deal_size=deal)
         assert trade_grade.clears_suggestion_bar(verdict) is (
             rung.ui_verdict in trade_grade.PASSING_UI_VERDICTS and rung.id != "edge_them"
-        ), score
+        ), (deal, score)
         # The score alone decides; whatever UI string rides along cannot change the answer.
-        assert trade_grade.clears_suggestion_bar(_verdict("ACCEPT", score)) is trade_grade.clears_suggestion_bar(
-            _verdict("DECLINE", score)
-        )
+        assert trade_grade.clears_suggestion_bar(
+            _verdict("ACCEPT", score, deal_size=deal)
+        ) is trade_grade.clears_suggestion_bar(_verdict("DECLINE", score, deal_size=deal))
 
 
 def test_legacy_verdicts_without_a_lineup_model_keep_their_own_rules():

@@ -31,9 +31,10 @@ MAX_TRANSFERS = 36
 ASSET_PLAYER = "player"
 ASSET_PICK = "pick"
 
-# Spread (best team_score minus worst) -> how balanced the whole deal reads.
-BALANCED_SPREAD = float(bands.ACCEPT)  # no team is clearly ahead of another
-TILTED_SPREAD = float(-bands.DECLINE)  # beyond this somebody is clearly being fleeced
+# Spread (best team_score minus worst) -> how balanced the whole deal reads. The
+# cut points are the verdict ladder's own at the deal's size: "balanced" below the
+# accept cut (no team clearly ahead of another), "lopsided" beyond the decline cut
+# (somebody is clearly being fleeced).
 
 ERR_SHAPE = "invalid_transfer"
 ERR_EMPTY = "empty_trade"
@@ -241,12 +242,13 @@ def outcome_for_tone(tone: str) -> str:
     return OUTCOME_BY_TONE.get(str(tone or "fair"), "even")
 
 
-def balance_for_spread(spread: float) -> tuple[str, str]:
+def balance_for_spread(spread: float, deal_size: object = None) -> tuple[str, str]:
     """(id, label) for how evenly the deal treats its teams."""
 
-    if spread < BALANCED_SPREAD:
+    cuts = bands.cuts_for(deal_size)
+    if spread < cuts.accept:
         return "balanced", "Balanced: no team is clearly ahead"
-    if spread < TILTED_SPREAD:
+    if spread < -cuts.decline:
         return "tilted", "Tilted: one team comes out clearly ahead"
     return "lopsided", "Lopsided: at least one team is giving up a lot"
 
@@ -264,7 +266,8 @@ def summarize(teams: Sequence[Mapping[str, Any]], perspective_roster_id: str = "
     ranked = sorted(teams, key=lambda t: (float(t["trade_score"]), float(t["market_delta"])), reverse=True)
     best, worst = ranked[0], ranked[-1]
     spread = float(best["trade_score"]) - float(worst["trade_score"])
-    balance_id, balance_label = balance_for_spread(spread)
+    deal_size = max((float(t.get("deal_size") or 0) for t in teams), default=0.0)
+    balance_id, balance_label = balance_for_spread(spread, deal_size)
     outcomes: dict[str, list[str]] = {"wins": [], "even": [], "gives_up": [], "loses": []}
     for t in teams:
         outcomes.setdefault(str(t.get("outcome") or "even"), []).append(str(t["roster_id"]))
@@ -272,7 +275,7 @@ def summarize(teams: Sequence[Mapping[str, Any]], perspective_roster_id: str = "
     best_name = str(best.get("team_name") or f"Team {best['roster_id']}")
     if balance_id == "balanced":
         headline = "Every team comes out in a reasonable place."
-    elif float(worst["trade_score"]) > bands.COUNTER:
+    elif float(worst["trade_score"]) > bands.cuts_for(deal_size).counter:
         headline = f"{best_name} comes out ahead, but no team is hurt badly."
     else:
         headline = f"{worst_name} is the team most hurt by this deal; {best_name} comes out ahead."

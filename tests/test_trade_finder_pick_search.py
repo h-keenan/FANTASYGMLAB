@@ -78,8 +78,12 @@ def _search(fixture, pick_ids, *, strategy="contender", return_picks=False, retu
 def test_any_single_owned_pick_finds_a_realistic_option_on_a_full_roster(strategy, season, round_num):
     fixture = _fixture(strategy)
     assert fixture["settings"]["max_roster_size"] == 26  # full roster = the normal dynasty state
-    ideas = _search(fixture, [_pick_id(fixture, season, round_num)], strategy=strategy)
-    assert ideas, (strategy, season, round_num)
+    trace = trade_ideas.FinderSearchTrace()
+    ideas = _search(fixture, [_pick_id(fixture, season, round_num)], strategy=strategy, trace=trace)
+    if not ideas:
+        # Verdict cuts are a share of the deal, so a ~500-point late pick cannot give up
+        # ~15% (a COUNTER at any deal size). The search must then say why with a closest option.
+        assert round_num >= 4 and trace.closest_ideas(), (strategy, season, round_num)
     for idea in ideas:
         assert all(a["asset_type"] == "pick" for a in idea["send_assets"])
         assert idea["analyzer_verdict"] in trade_ideas.trade_grade.PASSING_UI_VERDICTS

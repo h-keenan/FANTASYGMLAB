@@ -510,5 +510,5 @@ def find_three_team_ideas(
     if not ideas:
         search["reason"] = "no_fit"
     # Surfacing the band cut keeps the bar honest in the UI copy.
-    search["bar"] = {"tones": sorted(PASS_TONES), "min_score": bands.COUNTER}
+    search["bar"] = {"tones": sorted(PASS_TONES), "min_share_of_deal": -bands.VERDICT_SHARE}
     return {"status": "ok", "ideas": ideas[:max_ideas], "search": search}

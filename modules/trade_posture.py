@@ -379,7 +379,7 @@ def posture_sentence(posture: Mapping[str, Any], assessment: Mapping[str, Any], 
 
 
 def window_overrules_value(
-    value_delta: float, trade_score: float, assessment: Mapping[str, Any] | None
+    value_delta: float, trade_score: float, assessment: Mapping[str, Any] | None, deal_size: float | None = None
 ) -> bool:
     """True when the market value alone would say accept but the posture
     (window / direction / present) terms pulled the SAME score below an accept.
@@ -395,8 +395,8 @@ def window_overrules_value(
     if not assessment or _num(assessment.get("adjustment")) >= 0:
         return False
     return (
-        bands.band_for_score(value_delta).id in {"smash", "accept"}
-        and bands.band_for_score(trade_score).id not in {"smash", "accept"}
+        bands.band_for_score(value_delta, deal_size).id in {"smash", "accept"}
+        and bands.band_for_score(trade_score, deal_size).id not in {"smash", "accept"}
     )
 
 
