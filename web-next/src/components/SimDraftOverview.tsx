@@ -3,7 +3,9 @@
 import { SimDraftGrid } from "@/components/SimDraftGrid";
 import { Sheet } from "@/components/ui/Sheet";
 import { CompactModule } from "@/components/ui/CompactModule";
-import { CompactPlayerCard } from "@/components/ui/CompactPlayerCard";
+import { PlayerAvatarSlot } from "@/components/ui/PlayerAvatarSlot";
+import { PlayerName } from "@/components/PlayerName";
+import { PositionBadge } from "@/components/PositionBadge";
 import { LetterGrade } from "@/components/ui/LetterGrade";
 import { SimTeamIdentity } from "@/components/SimTeamIdentity";
 import { positionColorVar } from "@/lib/playerPresentation";
@@ -54,9 +56,12 @@ export function SimFullBoardSheet({ open, onClose, draft, teams, onOpen }: { ope
   );
 }
 
+const RECENT_CARD_WIDTH = 160;
+const RECENT_CARD_HEIGHT = 112;
+
 /**
  * The latest picks as a horizontally scrolling strip of compact player cards (coridian_: "the prior picks with the prior
- * players taken"): pick number, the picking team's logo (SimTeamIdentity), avatar, name, position and letter grade. A card
+ * players taken"): one fixed glass card per pick (pick number and team logo, avatar and name, position badge and letter grade, same spots on every card). A card
  * opens the player; "Full board" opens the whole board. Lives in the pinned clock area (redraft and rookie drafts).
  */
 export function SimRecentStrip({ cards, onOpenPlayer, onFullBoard }: { cards: SimRecentPickCard[]; onOpenPlayer?: (card: SimRecentPickCard) => void; onFullBoard?: () => void }) {
@@ -75,25 +80,28 @@ export function SimRecentStrip({ cards, onOpenPlayer, onFullBoard }: { cards: Si
           <li className="text-xs" style={{ color: "var(--color-text-muted)", minHeight: 40, display: "flex", alignItems: "center" }}>No picks yet. The first ones land here.</li>
         ) : (
           cards.map((card, i) => (
-            <li key={card.key} className={i === 0 ? "enter-rise shrink-0" : "shrink-0"} style={{ width: 168 }} data-testid="recent-pick-card">
+            <li key={card.key} className={i === 0 ? "enter-rise shrink-0" : "shrink-0"} style={{ width: RECENT_CARD_WIDTH }} data-testid="recent-pick-card">
               <button
                 type="button"
                 onClick={onOpenPlayer ? () => onOpenPlayer(card) : undefined}
                 disabled={!onOpenPlayer}
                 aria-label={card.aria}
-                className="flex w-full flex-col gap-1 p-2 text-left"
-                style={{ background: "var(--color-surface-muted)", borderRadius: "var(--radius-control)", border: card.isYou ? "1px solid var(--color-accent)" : "1px solid transparent", color: "inherit" }}
+                className="glass-surface flex w-full flex-col justify-between gap-1.5 p-2 text-left"
+                style={{ height: RECENT_CARD_HEIGHT, borderRadius: "var(--radius-control)", borderColor: card.isYou ? "var(--color-accent)" : undefined, color: "inherit" }}
               >
-                <span className="flex items-center justify-between gap-1 text-[0.6875rem] font-extrabold tabular-nums" style={{ color: "var(--color-text-muted)" }}>
+                {/* One fixed layout, the same on every card: pick + team, avatar + name, position + grade. */}
+                <span className="flex items-center justify-between gap-1 text-[0.6875rem] font-extrabold tabular-nums" style={{ color: "var(--color-text-muted)", minHeight: 18 }}>
                   <span>{card.pickLabel}</span>
-                  {card.teamName ? <SimTeamIdentity name={card.teamName} size="chip" hideName /> : null}
+                  {card.teamName ? <SimTeamIdentity name={card.teamName} size="chip" hideName /> : <span aria-hidden="true" />}
                 </span>
-                <CompactPlayerCard
-                  player={card.player}
-                  nonInteractive="the surrounding card button already opens this player"
-                  testId="recent-pick-player"
-                  trailing={card.grade ? <LetterGrade grade={card.grade} size="xs" /> : undefined}
-                />
+                <span className="flex min-w-0 items-center gap-2" data-testid="recent-pick-player">
+                  <PlayerAvatarSlot player={card.player} tier="dense" nonInteractive="the surrounding card button already opens this player" />
+                  <PlayerName name={card.player.name} className="min-w-0 flex-1 text-sm font-bold" style={{ color: "var(--color-text-primary)" }} />
+                </span>
+                <span className="flex items-center justify-between gap-1" style={{ minHeight: 22 }}>
+                  <PositionBadge position={card.player.position} />
+                  <LetterGrade grade={card.grade} size="xs" />
+                </span>
               </button>
             </li>
           ))

@@ -3353,6 +3353,15 @@ export function simPickChipText(pick: Pick<SimPickAsset, "id"> & Partial<Pick<Si
   return `${pick.season_label || season} R${round}${hint}`;
 }
 
+/**
+ * The ONE readable label for a pick's slot: "2027 · 4.08" (season, round, pick in the round) or "R4 P8" when the season is
+ * implied (inside that season's own draft). Never a raw "pick:2027:4:8" id: anything that shows a pick goes through here
+ * (`simPickLabelText` / `simPickChipText` for an asset without a slot, this for a made or on-the-clock pick).
+ */
+export function simPickSlotText(slot: { season?: number | null; round: number; slot: number }): string {
+  return slot.season != null ? `${slot.season} · ${slot.round}.${String(slot.slot).padStart(2, "0")}` : `R${slot.round} P${slot.slot}`;
+}
+
 /** Plain explanation of the early / mid / late hint ("Projected near the top of the round"). */
 export function simPickSlotHint(pick: Pick<SimPickAsset, "slot_hint" | "season">, draftYear?: number | null): string {
   if (pick.slot_hint === "early") return "Projected near the top of the round.";

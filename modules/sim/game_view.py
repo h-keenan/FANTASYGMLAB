@@ -11,7 +11,7 @@ from modules.sim.game_rules import FLAGS, rules_info
 from modules.sim import game_grades, scouting
 from modules.sim.game_actions import lineup_warnings
 from modules.sim.game_ai import trade_window
-from modules.sim.game_draft import DraftContext, best_for_user, hint_reason
+from modules.sim.game_draft import DraftContext, advice_reason, best_for_user, hint_reason
 from modules.sim.game_engine import rank_teams, standing_rows
 from modules.sim.game_eval import Evaluator
 from modules.sim.game_state import GameState
@@ -524,7 +524,7 @@ def draft_view(
     if state.status == "drafting" and state.pick_index < total and clock == user:
         pid = best_for_user(ctx, seed)
         hint = {"player": player_row(snap, state, ev, pid, owners),
-                "why": (hint_reason(ctx, pid) if snap.settings.hint_v else f"Best available for your need: {snap.players[pid].pos}")}
+                "why": (advice_reason(ctx, pid) if snap.settings.advice else hint_reason(ctx, pid) if snap.settings.hint_v else f"Best available for your need: {snap.players[pid].pos}")}
     return {
         "draft": draft,
         "available": {"items": [player_row(snap, state, ev, p, owners) for p in chunk], "total": len(avail),
