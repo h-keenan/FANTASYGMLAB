@@ -375,6 +375,7 @@ describe("SimGameContent", () => {
     expect(advanceBtn).not.toBeDisabled();
     fireEvent.click(advanceBtn);
     expect(await screen.findByTestId("sim-advance-confirm")).toHaveTextContent("RB is empty and will score 0");
+    expect(screen.getByTestId("sim-advance-confirm")).toHaveClass("sim-advance-confirm"); // out of flow on phones (ui.css), so opening it never resizes the dock
     expect(mocked.advanceSimGame).not.toHaveBeenCalled();
     fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
     expect(bar).toHaveTextContent("Wk 4");

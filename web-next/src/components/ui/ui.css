@@ -663,6 +663,23 @@
 }
 .bottom-stack[data-dock="fixed"] > * { pointer-events: auto; }
 /* The game's navigation orb is a slot inside the action bar's one row (Sim to | orb | Advance), in flow: nothing overlaps content or clips. */
+/* The "advance anyway?" confirm is a transient bubble above the phone pill, out of flow: the dock's height (published as --bottom-clearance and
+   measured by a ResizeObserver) never changes when it opens or closes, so the page behind and the pill itself do not jump around the Advance tap. */
+@media (max-width: 767px) {
+  .sim-action-bar .sim-advance-confirm {
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: calc(100% + 8px);
+    padding: 10px 12px;
+    border-radius: 20px;
+    border: 1px solid var(--glass-border, var(--color-border));
+    background: color-mix(in srgb, var(--color-surface-raised, var(--color-surface)) 92%, transparent);
+    -webkit-backdrop-filter: blur(24px) saturate(180%);
+    backdrop-filter: blur(24px) saturate(180%);
+    box-shadow: 0 6px 24px color-mix(in srgb, #000 40%, transparent);
+  }
+}
 .game-orb-slot { display: flex; flex: 0 0 auto; align-items: center; justify-content: center; }
 .game-orb {
   position: relative;

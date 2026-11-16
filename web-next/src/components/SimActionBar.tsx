@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 
 import { PillMorph } from "@/components/ui/PillMorph";
 import { simPillPlan } from "@/lib/bottomNav";
@@ -27,6 +27,7 @@ export function SimActionBar({ ctx, paywalled, advancing, onAdvance, onSimTo, on
   const [issues, setIssues] = useState<{ empty: string[]; zero: SimZeroStarter[] }>({ empty: [], zero: [] });
   const [confirming, setConfirming] = useState(false);
   const auto = useSimAutoSet(ctx);
+  const issuesSig = useRef("");
 
   // Empty starter slots, so Advance can say "Fill 1 empty slot" from any tab.
   useEffect(() => {
@@ -35,8 +36,13 @@ export function SimActionBar({ ctx, paywalled, advancing, onAdvance, onSimTo, on
       .getSimLineup(gameId)
       .then((body) => {
         if (cancelled) return;
-        setIssues(simLineupIssues(body.slots ?? [], body.warnings ?? []));
-        setConfirming(false); // the lineup changed (e.g. the slot was filled): ask again
+        const next = simLineupIssues(body.slots ?? [], body.warnings ?? []);
+        const sig = JSON.stringify([next.empty, next.zero]);
+        setIssues(next);
+        // Ask again only when the lineup's problems really changed (a slot was filled). A refetch that finds the same problems (every tick,
+        // and the one right after Advance) must not close the confirm or re-render the footer.
+        if (sig !== issuesSig.current) setConfirming(false);
+        issuesSig.current = sig;
       })
       .catch(() => {});
     return () => {
@@ -57,9 +63,9 @@ export function SimActionBar({ ctx, paywalled, advancing, onAdvance, onSimTo, on
   // The accessible name starts with the visible text (WCAG 2.5.3), then adds the plain-language detail.
   const advanceText = confirming ? "Advance anyway" : game.phase === "playoffs" ? "Play round" : `Advance ${state.label}`;
   return (
-    <div className="sim-action-bar action-pill md:sticky md:inset-x-auto md:bottom-4 md:mx-auto md:flex md:w-full md:items-center md:justify-between md:gap-4 md:px-4 md:py-2" data-testid="sim-action-bar">
+    <div className="sim-action-bar action-pill max-md:relative md:sticky md:inset-x-auto md:bottom-4 md:mx-auto md:flex md:w-full md:items-center md:justify-between md:gap-4 md:px-4 md:py-2" data-testid="sim-action-bar">
       {confirming && state.confirm && !paywalled ? (
-        <div className="px-4 pt-1.5 text-center text-xs font-bold md:flex-1 md:p-0 md:text-left md:text-sm" role="alertdialog" aria-label="Confirm advance" data-testid="sim-advance-confirm" style={{ color: "var(--color-warning)" }}>
+        <div className="sim-advance-confirm px-4 pt-1.5 text-center text-xs font-bold md:flex-1 md:p-0 md:text-left md:text-sm" role="alertdialog" aria-label="Confirm advance" data-testid="sim-advance-confirm" style={{ color: "var(--color-warning)" }}>
           <p>{state.confirm}</p>
           {onTab ? (
             <p className="mt-1 flex justify-center gap-3 md:justify-start">
