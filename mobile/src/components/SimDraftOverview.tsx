@@ -3,7 +3,10 @@ import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
 
 import AppText from './AppText';
 import CompactModule from './CompactModule';
-import CompactPlayerCard from './CompactPlayerCard';
+import GlassCard from './GlassCard';
+import PlayerAvatarSlot from './PlayerAvatarSlot';
+import PlayerName from './PlayerName';
+import PositionBadge from './PositionBadge';
 import { LetterGrade } from './LetterGrade';
 import { MotionIn } from './Motion';
 import { SimTeamIdentity } from './SimTeamIdentity';
@@ -88,14 +91,23 @@ export function SimRecentStrip({ cards, onOpenPlayer, onFullBoard }: { cards: Si
                 onPress={onOpenPlayer ? () => onOpenPlayer(card) : undefined}
                 accessibilityRole={onOpenPlayer ? 'button' : undefined}
                 accessibilityLabel={card.aria}
-                style={[styles.card, card.isYou && { borderColor: colors.accent }]}
                 testID="recent-pick-card"
               >
-                <View style={styles.cardTop}>
-                  <AppText style={styles.pickNo}>{card.pickLabel}</AppText>
-                  {card.teamName ? <SimTeamIdentity name={card.teamName} size="chip" hideName /> : null}
-                </View>
-                <CompactPlayerCard player={card.player} nonInteractive="the surrounding card button already opens this player" testID="recent-pick-player" trailing={card.grade ? <LetterGrade grade={card.grade} size="xs" /> : undefined} />
+                {/* One fixed layout, the same on every card: pick + team, avatar + name, position + grade. */}
+                <GlassCard radius="md" compact style={[styles.card, card.isYou && { borderColor: colors.accent }]}>
+                  <View style={styles.cardTop}>
+                    <AppText style={styles.pickNo}>{card.pickLabel}</AppText>
+                    {card.teamName ? <SimTeamIdentity name={card.teamName} size="chip" hideName /> : null}
+                  </View>
+                  <View style={styles.cardPlayer} testID="recent-pick-player">
+                    <PlayerAvatarSlot player={card.player} tier="dense" nonInteractive="the surrounding card button already opens this player" />
+                    <PlayerName name={card.player.name} style={styles.cardName} />
+                  </View>
+                  <View style={styles.cardBottom}>
+                    <PositionBadge position={card.player.position} />
+                    <LetterGrade grade={card.grade} size="xs" />
+                  </View>
+                </GlassCard>
               </Pressable>
             </MotionIn>
           ))
@@ -179,8 +191,11 @@ function createStyles(colors: ThemeColors) {
     stripHead: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
     kicker: { fontSize: 12, fontWeight: '800', letterSpacing: 0.6, textTransform: 'uppercase', color: colors.textTertiary },
     boardLink: { minHeight: 32, justifyContent: 'center' },
-    card: { width: 168, gap: 4, padding: spacing.sm, borderRadius: radii.md, backgroundColor: colors.glass, borderWidth: 1, borderColor: 'transparent' },
-    cardTop: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+    card: { width: 160, height: 112, justifyContent: 'space-between' },
+    cardTop: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', minHeight: 18 },
+    cardPlayer: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
+    cardName: { flex: 1, minWidth: 0, fontSize: 14, fontWeight: '700', color: colors.textPrimary },
+    cardBottom: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', minHeight: 22 },
     pickNo: { fontSize: 12, fontWeight: '800', color: colors.textTertiary },
     survival: { fontSize: 12.5, color: colors.textSecondary },
     fullLink: { minHeight: 44, justifyContent: 'center', alignSelf: 'flex-start' },
