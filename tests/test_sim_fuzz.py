@@ -245,8 +245,8 @@ class Fuzz:
             pos = self.pick(["K", "DEF"])
             a, b = kd(user, pos), kd(partner, pos)
             if a and b:
-                give = [a[0]] + [g for g in give if snap.players[g].pos not in ("K", "DEF")][:2] if all(not g.startswith("pick") for g in give) else [a[0]]
-                get = [b[0]] + [g for g in get if snap.players[g].pos not in ("K", "DEF")][:1] if all(not g.startswith("pick") for g in get) else [b[0]]
+                give = [a[0]] + [g for g in give if g not in snap.players or snap.players[g].pos not in ("K", "DEF")][:2] if all(not g.startswith("pick") for g in give) else [a[0]]
+                get = [b[0]] + [g for g in get if g not in snap.players or snap.players[g].pos not in ("K", "DEF")][:1] if all(not g.startswith("pick") for g in get) else [b[0]]
         if self.rng.random() < 0.4:
             res, data = self.req("POST", "/trades/preview", {"partner": partner, "give": give, "get": get})
             counter = ((data or {}).get("verdict") or {}).get("counter")

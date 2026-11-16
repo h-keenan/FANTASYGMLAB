@@ -43,6 +43,7 @@ import {
   simTradeMaxPerSide,
   simTradableIn,
   simSingletonWarnings,
+  simSingletonRuleOn,
   simSingletonMessage,
   SIM_KD_LOCKED_NOTE,
   simTradeClosedReason,
@@ -285,7 +286,7 @@ function Builder({ ctx, seed, onSeedUsed }: { ctx: SimCtx; seed: SimTradeSeed | 
   }, [seed, onSeedUsed, maxPerSide]);
 
   // Teams keep one kicker and one defense: say so as the offer is built (only when it really causes it), and do not ask the AI about a deal that cannot be sent.
-  const singleton = (game.settings.kd_v ?? 0) >= 1 && draft.partner !== null ? simSingletonWarnings(mine, partnerRoster, draft.give, draft.get) : [];
+  const singleton = simSingletonRuleOn(game.settings) && draft.partner !== null ? simSingletonWarnings(mine, partnerRoster, draft.give, draft.get) : [];
   const singletonMessage = singleton.length ? simSingletonMessage(singleton, (teams?.find((t) => t.team_id === draft.partner)?.name) ?? "That team") : "";
   const key = simTradeKey(draft);
   const verdict = verdictFor && verdictFor.key === key ? verdictFor.verdict : null;

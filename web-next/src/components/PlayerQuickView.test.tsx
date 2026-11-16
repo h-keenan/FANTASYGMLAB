@@ -15,6 +15,8 @@ vi.mock("@/lib/api", async () => {
       getPlayerAwards: vi.fn(),
       getPlayerWeeklyStats: vi.fn(),
       getPlayerNews: vi.fn(),
+      getPlayerDepthChart: vi.fn(),
+      getPlayerInjuryHistory: vi.fn(),
     },
   };
 });
@@ -124,6 +126,10 @@ describe("PlayerQuickView", () => {
     window.sessionStorage.clear(); // the last tab is remembered per session
     vi.mocked(api.getPlayerNews).mockReset();
     vi.mocked(api.getPlayerNews).mockResolvedValue({ ok: true, items: [], injury_item: null });
+    vi.mocked(api.getPlayerDepthChart).mockReset();
+    vi.mocked(api.getPlayerDepthChart).mockResolvedValue({ ok: true, team: null, slot: null, slot_label: null, self_order: null, entries: [], total: 0, reason: "not_on_depth_chart" });
+    vi.mocked(api.getPlayerInjuryHistory).mockReset();
+    vi.mocked(api.getPlayerInjuryHistory).mockResolvedValue({ ok: true, current: null, seasons: [], career_games_missed: 0, since_season: 2021 });
     // Benign default (no weeks played) so tests unrelated to the weekly
     // chart don't need to mock this fetch themselves.
     vi.mocked(api.getPlayerWeeklyStats).mockResolvedValue({ ok: true, season: 2026, weeks: [] });
@@ -450,6 +456,8 @@ describe("PlayerQuickView", () => {
       await waitFor(() => expect(screen.queryByRole("status", { name: /Loading player detail/ })).not.toBeInTheDocument());
       await screen.findByText("Sim overlay: Out 2 weeks (sim world)");
       expect(api.getPlayerNews).not.toHaveBeenCalled();
+      expect(api.getPlayerDepthChart).not.toHaveBeenCalled();
+      expect(api.getPlayerInjuryHistory).not.toHaveBeenCalled();
       for (const real of [/REAL HEADLINE/, /REAL SUMMARY/, /REAL depth chart/, /REAL return note/, /REAL contract/, /Week 8 \(real\)/, /Latest news/i, /No recent news/, /Latest injury report/, /Hamstring/, /Injured Reserve/]) {
         expect(screen.queryByText(real)).not.toBeInTheDocument();
       }

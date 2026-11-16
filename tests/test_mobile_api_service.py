@@ -16727,6 +16727,83 @@ def test_team_profile_composes_rooms_picks_direction_and_angle(monkeypatch):
     assert body["trade_angle"]["target"]["player_id"].startswith("mine")
 
 
+def test_team_sheet_composes_record_needs_injuries_roster_and_history(monkeypatch):
+    client = _client(monkeypatch)
+    frame = pd.DataFrame(
+        [
+            {"player_id": "opp1", "name": "Opp QB", "position": "QB", "team": "KC", "age": 27, "injury_status": "Questionable", "dynasty_score": 90, "value_score": 90},
+            {"player_id": "opp2", "name": "Opp WR", "position": "WR", "team": "KC", "age": 24, "injury_status": None, "dynasty_score": 80, "value_score": 80},
+        ]
+    )
+    board = {
+        "ok": True,
+        "reason": "",
+        "teams": [
+            {
+                "roster_id": 2, "team_name": "Opp Squad", "owner_name": "Oppy", "avatar_url": None,
+                "wins": 9, "losses": 3, "ties": 0, "record_label": "9-3", "standing_rank": 2, "points_for": 1400.5,
+                "playoff_status": "In", "power_rank": 1, "current_streak": 4,
+            },
+            {"roster_id": 1, "team_name": "Mine", "wins": 1, "losses": 1, "power_rank": 2},
+        ],
+    }
+    profile = {
+        "ok": True,
+        "rooms": [
+            {"position": "QB", "rank": 1, "of": 2, "tag": "surplus"},
+            {"position": "WR", "rank": 2, "of": 2, "tag": "need"},
+        ],
+    }
+    rosters = [
+        {"roster_id": 1, "owner_id": "sleeper-user-1", "players": [], "settings": {}},
+        {"roster_id": 2, "owner_id": "sleeper-user-2", "players": ["opp1", "opp2"], "starters": ["opp1"], "settings": {}},
+    ]
+    past = [{"roster_id": 2, "owner_id": "sleeper-user-2", "settings": {"wins": 8, "losses": 6, "fpts": 1300}}]
+    league = dict(_MATCHUP_LEAGUE, settings={"leg": 5}, previous_league_id="prev")
+    prev_league = {"league_id": "prev", "season": "2024", "previous_league_id": None}
+
+    def fake_league(league_id):
+        return prev_league if league_id == "prev" else league
+
+    with contextlib.ExitStack() as stack:
+        stack.enter_context(patch("requests.get", side_effect=_matchup_auth_mocks()))
+        stack.enter_context(patch("modules.sleeper_leagues.resolve_sleeper_user_id", return_value="sleeper-user-1"))
+        stack.enter_context(patch("modules.sleeper.get_league", side_effect=fake_league))
+        stack.enter_context(patch("modules.sleeper.get_rosters", side_effect=lambda lid: past if lid == "prev" else rosters))
+        stack.enter_context(patch("modules.sleeper.get_league_roster_profiles", return_value={"2": {"team_name": "Opp Squad"}, "1": {"team_name": "Mine"}}))
+        stack.enter_context(patch("modules.sleeper.get_matchups", return_value=[{"roster_id": 2, "matchup_id": 7}, {"roster_id": 1, "matchup_id": 7}]))
+        stack.enter_context(patch("modules.league_value_settings.build_valued_players_frame_cached", return_value=frame))
+        stack.enter_context(patch("services.mobile_api_service.get_league_team_rankings", return_value=board))
+        stack.enter_context(patch("services.mobile_api_service.get_league_team_profile", return_value=profile))
+        stack.enter_context(patch("services.mobile_api_service._build_projection_context", return_value=None))
+        response = client.get("/v1/leagues/abc/teams/2/sheet", headers={"Authorization": "Bearer good-token"})
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["ok"] is True and body["is_me"] is False
+    assert body["team"]["team_name"] == "Opp Squad"
+    assert body["record"]["label"] == "9-3" and body["record"]["playoff_status"] == "in"
+    assert body["power_rank"] == 1 and body["teams"] == 2 and body["streak"] == "W4"
+    assert body["next_game"] == {"week": 5, "opponent": {"roster_id": "1", "name": "Mine"}}
+    assert body["strengths"] == ["QB"] and body["needs"] == ["WR"]
+    assert [p["depth"] for p in body["positions"]] == [1, 1]
+    assert [i["player_id"] for i in body["injuries"]] == ["opp1"]
+    assert [p["player_id"] for p in body["roster"]] == ["opp1", "opp2"]
+    assert body["history"][0]["season"] == "2024" and body["history"][0]["place"] == 1
+
+
+def test_roster_id_by_team_name_drops_ambiguous_names():
+    from services import mobile_api_service as svc
+
+    profiles = {"1": {"team_name": "Big Dogs"}, "2": {"team_name": "big dogs"}, "3": {"team_name": "Solo"}, "4": {}}
+    assert svc._roster_id_by_team_name(profiles) == {"solo": "3"}
+
+
+def test_team_sheet_requires_auth(monkeypatch):
+    client = _client(monkeypatch)
+    assert client.get("/v1/leagues/abc/teams/2/sheet").status_code == 401
+
+
 def test_all_trades_reports_a_team_it_had_to_skip(monkeypatch):
     """An expected per-team failure no longer silently shrinks the board."""
 

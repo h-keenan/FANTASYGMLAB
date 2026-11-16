@@ -13,7 +13,7 @@ import { ToneBadge } from "@/components/ToneBadge";
 import { api } from "@/lib/api";
 import { simListStats } from "@/lib/simDraft";
 import { simGradeCompare } from "@/lib/simGrade";
-import { simIsPick, simPicksOf, type SimBlockResponse, type SimGamePlayer, type SimPickAsset, type SimPos, type SimTradeAsset } from "@/lib/simGame";
+import { simBlockable, simIsPick, simPicksOf, type SimBlockResponse, type SimGamePlayer, type SimPickAsset, type SimPos, type SimTradeAsset } from "@/lib/simGame";
 
 type Hint = SimPos | "any";
 const HINTS: { label: string; value: Hint }[] = [{ label: "Any", value: "any" }, ...(["QB", "RB", "WR", "TE"] as const).map((p) => ({ label: p, value: p as Hint }))];
@@ -79,7 +79,7 @@ export function SimBlockView({ ctx, onMakeOffer }: { ctx: SimCtx; onMakeOffer: (
   );
 
   const onIds = useMemo(() => new Set((block?.mine ?? []).map((m) => m.asset.id)), [block]);
-  const candidates = useMemo(() => roster.filter((p) => !onIds.has(p.id) && p.pos !== "K" && p.pos !== "DEF").sort((a, b) => simGradeCompare(a, b) || (b.ros_mean ?? 0) - (a.ros_mean ?? 0)), [roster, onIds]);
+  const candidates = useMemo(() => roster.filter((p) => !onIds.has(p.id) && simBlockable(ctx.game.settings, p.pos)).sort((a, b) => simGradeCompare(a, b) || (b.ros_mean ?? 0) - (a.ros_mean ?? 0)), [roster, onIds, ctx.game.settings]);
   const myPicks = simPicksOf(picks, teamId).filter((p) => !onIds.has(p.id));
 
   if (failed) return <EmptyState title="Could not load your block" subtitle="Check your connection and try again." actionLabel="Try again" onAction={() => { setFailed(false); setAttempt((n) => n + 1); }} />;
@@ -187,7 +187,7 @@ export function SimBlockToggle({ ctx, player }: { ctx: SimCtx; player: SimGamePl
       cancelled = true;
     };
   }, [enabled, ctx.gameId, player.id, player.block?.mine]);
-  if (!enabled || player.owner?.type !== "you" || player.pos === "K" || player.pos === "DEF") return null;
+  if (!enabled || player.owner?.type !== "you" || !simBlockable(ctx.game.settings, player.pos)) return null;
   return (
     <Button
       size="sm"

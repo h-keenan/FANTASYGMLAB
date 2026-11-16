@@ -1208,6 +1208,8 @@ export interface TradeIdea {
   /** Set when the idea would overfill the roster; its numbers already include the cuts. */
   roster_overflow?: RosterOverflow | null;
   partner_team_name: string;
+  /** Set when the partner is matched to exactly one roster; opens the team sheet. */
+  partner_roster_id?: string | null;
   partner_team_avatar_url?: string | null;
   partner_team_archetype_label?: string;
   partner_trade_tendency?: string;
@@ -2765,6 +2767,8 @@ export interface PlayerAvailability {
   return_note: string;
 }
 
+export type { DepthChartData, DepthChartEntry, InjuryRecordData } from "@/lib/playerDepthInjury";
+
 export interface PlayerNewsResponse {
   ok: boolean;
   items: NewsItem[];
@@ -3739,6 +3743,57 @@ export interface ManagerRecentTrade {
   grade: { letter: string; tone: string; confidence: string; timing_label: string; ratio: number | null } | null;
 }
 
+export interface TeamSheetPlayer {
+  player_id: string;
+  name: string;
+  position: string;
+  team: string;
+  age: number | null;
+  injury_status: string;
+  value: number | null;
+  slot: "starter" | "bench" | "ir" | "taxi";
+}
+
+export interface TeamSheetSeason {
+  season: string;
+  league_id: string;
+  wins: number;
+  losses: number;
+  ties: number;
+  points_for: number;
+  place: number | null;
+  of: number;
+}
+
+/** GET /v1/leagues/{id}/teams/{roster_id}/sheet: the Desk team sheet (real Sleeper data). */
+export interface TeamSheetResponse {
+  ok: boolean;
+  reason: string;
+  roster_id: string;
+  is_me?: boolean;
+  team?: { team_name: string | null; owner_name: string | null; avatar_url: string | null };
+  record?: {
+    wins: number | null;
+    losses: number | null;
+    ties: number | null;
+    label: string | null;
+    standing_rank: number | null;
+    points_for: number | null;
+    playoff_status: string;
+  };
+  power_rank?: number | null;
+  teams?: number;
+  streak?: string;
+  projected_total?: number | null;
+  next_game?: { week: number; opponent: { roster_id: string; name: string } } | null;
+  positions?: Array<{ pos: string; level: "strength" | "solid" | "need"; rank: number; teams: number; depth: number }>;
+  strengths?: string[];
+  needs?: string[];
+  injuries?: TeamSheetPlayer[];
+  roster?: TeamSheetPlayer[];
+  history?: TeamSheetSeason[];
+}
+
 export interface ManagerTendenciesDetailResponse {
   ok: boolean;
   is_premium: boolean;
@@ -4432,6 +4487,11 @@ export const api = {
       `/v1/leagues/${encodeURIComponent(leagueId)}/managers/${encodeURIComponent(String(rosterId))}/tendencies`,
     ),
 
+  getTeamSheet: (leagueId: string, rosterId: string | number) =>
+    authorizedRequest<TeamSheetResponse>(
+      `/v1/leagues/${encodeURIComponent(leagueId)}/teams/${encodeURIComponent(String(rosterId))}/sheet`,
+    ),
+
   getTeamProfile: (leagueId: string, rosterId: string | number) =>
     authorizedRequest<OpponentProfileResponse>(
       `/v1/leagues/${encodeURIComponent(leagueId)}/teams/${encodeURIComponent(String(rosterId))}/profile`,
@@ -4610,6 +4670,12 @@ export const api = {
   // above: no leagueId param.
   getNews: (limit: number = 30) =>
     authorizedRequest<NewsResponse>(`/v1/news?limit=${limit}`),
+
+  // Real NFL depth chart at the player's slot, and per-season injury stints / games missed (quick view sections).
+  getPlayerDepthChart: (playerId: string) =>
+    authorizedRequest<import("@/lib/playerDepthInjury").DepthChartData>(`/v1/players/${encodeURIComponent(playerId)}/depth-chart`),
+  getPlayerInjuryHistory: (playerId: string) =>
+    authorizedRequest<import("@/lib/playerDepthInjury").InjuryRecordData>(`/v1/players/${encodeURIComponent(playerId)}/injury-history`),
 
   // Recent news for one player (quick view's Latest news + injury headline).
   getPlayerNews: (

@@ -45,7 +45,7 @@ def test_live_window_from_kickoffs():
         "modules.nfl_schedule.week_kickoffs", return_value=[KICKOFF]
     ), patch("modules.season_clock.nfl_week", return_value=10), patch(
         "modules.sleeper.default_player_stats_season", return_value=2026
-    ):
+    ), patch("os.path.exists", return_value=True):  # the schedule cache file may not exist on a fresh checkout / CI worker
         assert live_policy.live_nfl_week(KICKOFF + timedelta(minutes=45)) == 10
         assert live_policy.live_nfl_week(KICKOFF - timedelta(minutes=10)) == 10
         assert live_policy.live_nfl_week(KICKOFF - timedelta(hours=3)) is None

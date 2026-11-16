@@ -123,8 +123,12 @@ def test_set_block_rules_roundtrip_and_digest():
         blk.set_block(em, players[0], True, "K")
     k = next((p for p in r.state.rosters[user] if r.snap.players[p].pos in ("K", "DEF")), None)
     if k:
-        with pytest.raises(ValueError):
+        if r.snap.settings.pos_rules:  # pos_v 1: a kicker / defense can be blocked like anyone (tests/test_sim_pos_v.py); a save without it refuses
             blk.set_block(em, k, True)
+            blk.set_block(em, k, False)
+        else:
+            with pytest.raises(ValueError):
+                blk.set_block(em, k, True)
     for p in players[: blk.MAX_BLOCK_ITEMS]:
         blk.set_block(em, p, True)
     extra = next(p for p in r.state.rosters[user] if p not in blk.user_block(r.snap, r.state) and r.snap.players[p].pos in ("QB", "RB", "WR", "TE"))
@@ -180,7 +184,7 @@ def test_ai_blocks_are_deterministic_capped_realistic_and_vary_by_week():
                 assert all(r.snap.players[i["id"]].age >= 28 for i in b["items"])
             if b["stance"] == "contending":
                 assert all(i["why"] in ("Selling depth", "Moving a pick", "Shopping a bench piece") for i in b["items"])
-            assert b["looking_for"] in (None, "QB", "RB", "WR", "TE")
+            assert b["looking_for"] in (None, "QB", "RB", "WR", "TE") or (r.snap.settings.pos_rules and b["looking_for"] in ("K", "DEF"))  # pos_v 1: a team that needs a kicker says so
     assert {"contending", "rebuilding"} & seen_stances
     assert len({tuple(sorted(i["id"] for b in blocks(r, w) for i in b["items"])) for w in range(2, 8)}) > 1  # the shelves change from week to week
     r.state.week = r.snap.settings.trade_deadline_week + 1

@@ -69,7 +69,7 @@ export function simTeamMoveText(m: SimTeamHistoryMove): string {
     case "cut":
       return `Cut ${m.player?.name ?? "a player"}`;
     default:
-      return `Dropped ${m.player?.name ?? "a player"}${m.reason === "roster_limit" ? " (roster limit)" : ""}`;
+      return `Dropped ${m.player?.name ?? "a player"}${m.reason === "roster_limit" ? " (roster limit)" : m.reason === "one_per_roster" ? " (already has one)" : ""}`;
   }
 }
 

@@ -8,16 +8,15 @@ import { useQuery } from '@tanstack/react-query';
 
 import AccentCard from './AccentCard';
 import AppText from './AppText';
-import DashboardStatRow from './DashboardStatRow';
 import OpponentProfileCard from './OpponentProfileCard';
 import PickPlate from './PickPlate';
 import SectionHeading from './SectionHeading';
 import TeamAvatar from './TeamAvatar';
+import { TeamSheetFrame, TeamSheetOverview } from './TeamSheet';
 import ToneBadge from './ToneBadge';
-import { useTabs } from './Tabs';
-import { managerProfileTabs } from '../lib/sheetTabs';
-import { api } from '../lib/api';
+import { api, type TeamSheetPlayer } from '../lib/api';
 import { gradeToneSlug, sampleFill, TENDENCY_SIGNALS, tendencyBadgeText, tendencyTone, tradeDateLabel, type ManagerRecentTradeAsset } from '../lib/managerTendencies';
+import { teamSheetNextGameLine, teamSheetPoints, teamSheetSeasonLine, tradeStyleFromSignals, type TeamSheetChip } from '../lib/teamSheet';
 import { queryKeys } from '../lib/queryKeys';
 import type { OpponentTradeTarget } from '../lib/opponentProfile';
 import { useThemeMode } from '../context/ThemeModeContext';
@@ -38,8 +37,13 @@ interface Props {
   avatarId?: string | null;
 }
 
-/** Manager profile (League Rankings): every readable signal with its
- * evidence line. Fetches only while open. */
+/**
+ * The Desk team sheet: tapping any team (Teams, Recap, Matchup opponent, Trade Hub partner) opens this with REAL
+ * Sleeper data, rendered through the shared TeamSheet the Fantasy Sim team sheet also uses. Record, power rank,
+ * strengths/needs, injuries, roster and past seasons are free (GET .../teams/{id}/sheet); the trade-style tag,
+ * tendencies and recent trades are Pro (GET .../managers/{id}/tendencies) and show the upsell for Free. Fetches
+ * only while open. Twin of web-next's ManagerProfileSheet.
+ */
 export default function ManagerProfileModal({ visible, onClose, leagueId, leagueName = '', rosterId, teamName, ownerName, avatarId }: Props) {
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const { colors } = useThemeMode();
@@ -50,8 +54,13 @@ export default function ManagerProfileModal({ visible, onClose, leagueId, league
     enabled: visible,
     staleTime: 5 * 60 * 1000,
   });
-  // Free roster profile, independent of the Premium tendencies below; a
-  // failure just hides the card.
+  const sheetQuery = useQuery({
+    queryKey: queryKeys.teamSheet(leagueId, rosterId),
+    queryFn: () => api.getTeamSheet(leagueId, rosterId),
+    enabled: visible,
+    staleTime: 5 * 60 * 1000,
+  });
+  // Free roster profile (trade angle), independent of the Pro tendencies; a failure just hides the card.
   const profileQuery = useQuery({
     queryKey: queryKeys.teamProfile(leagueId, rosterId),
     queryFn: () => api.getTeamProfile(leagueId, rosterId),
@@ -64,43 +73,68 @@ export default function ManagerProfileModal({ visible, onClose, leagueId, league
     navigation.navigate('TradeOffer', { leagueId, leagueName, playerId: target.player_id });
   };
   const data = query.data;
+  const sheet = sheetQuery.data && sheetQuery.data.ok && !sheetQuery.data.reason && sheetQuery.data.record ? sheetQuery.data : null;
+  const sheetFailed = sheetQuery.isError || (sheetQuery.data != null && sheet == null);
   const signals = data?.manager?.signals ?? {};
-  const sample = data?.manager?.sample ?? null;
   const toneColors = { success: colors.success, warning: colors.premium, accent: colors.accent, premium: colors.violet };
   const rows = TENDENCY_SIGNALS.filter(([key]) => signals[key]?.status === 'ok');
+  const style = data?.is_premium ? tradeStyleFromSignals(signals) : null;
 
-  const premiumReady = Boolean(data?.is_premium) && rows.length > 0;
-  const overviewPanel = (
-    <>
-      <OpponentProfileCard profile={profileQuery.data} onOffer={offer} />
-      {query.isError ? (
-        <AppText style={styles.muted}>Couldn&apos;t load this profile.</AppText>
-      ) : !data ? (
-        <SkeletonText label="manager profile" lines={3} />
-      ) : !data.is_premium ? (
-        <PressableScale
-          onPress={() => {
-            onClose();
-            navigation.navigate('Paywall');
-          }}
-        >
-          <AppText style={styles.upsellTitle}>{data.upsell?.title ?? 'Manager Tendencies'}</AppText>
-          <AppText style={styles.upsellCta}>Upgrade</AppText>
-        </PressableScale>
-      ) : rows.length === 0 ? (
-        <AppText style={styles.muted}>Not enough trade history yet.</AppText>
-      ) : sample ? (
-        <DashboardStatRow
-          items={[
-            { label: 'Trades', icon: 'swap-horizontal', value: String(sample.trades), valueColor: colors.success },
-            { label: 'Wire moves', icon: 'flash-outline', value: String(sample.wire_moves) },
-            { label: 'Seasons', icon: 'calendar-outline', value: String(sample.seasons) },
-          ]}
+  const upsell = data && !data.is_premium ? (
+    <PressableScale
+      onPress={() => {
+        onClose();
+        navigation.navigate('Paywall');
+      }}
+    >
+      <AppText style={styles.upsellTitle}>{data.upsell?.title ?? 'Manager Tendencies'}</AppText>
+      <AppText style={styles.upsellCta}>Upgrade</AppText>
+    </PressableScale>
+  ) : null;
+
+  const record = sheet?.record;
+  const chips: TeamSheetChip[] = [];
+  if (sheet?.power_rank) chips.push({ label: `Power #${sheet.power_rank}`, tone: 'premium' });
+  if (record?.playoff_status) {
+    chips.push({ label: record.playoff_status.toUpperCase(), tone: record.playoff_status === 'out' || record.playoff_status === 'eliminated' ? 'muted' : 'success' });
+  }
+  const tag = style ? (
+    <ToneBadge label={style.tag} color={colors.accent} size="xs" />
+  ) : data && !data.is_premium ? (
+    <ToneBadge label="TRADE STYLE · PRO" color={colors.premium} size="xs" />
+  ) : null;
+  const tiles = [
+    { label: 'Record', value: record?.label || '-' },
+    { label: 'Rank', value: record?.standing_rank ? `#${record.standing_rank}` : '-' },
+    { label: 'PF', value: teamSheetPoints(record?.points_for) },
+    { label: 'Proj', value: teamSheetPoints(sheet?.projected_total) },
+  ];
+  const roster = sheet?.roster ?? [];
+  const by = (slot: TeamSheetPlayer['slot']) => roster.filter((p) => p.slot === slot);
+  const nameShown = sheet?.team?.team_name || teamName;
+  const owner = sheet?.team?.owner_name || ownerName || null;
+  const needLine = [
+    (sheet?.strengths ?? []).length ? `Strong at ${sheet!.strengths!.join(', ')}.` : '',
+    (sheet?.needs ?? []).length ? `Needs ${sheet!.needs!.join(', ')}.` : '',
+  ]
+    .filter(Boolean)
+    .join(' ');
+
+  const playerRows = (players: TeamSheetPlayer[]) => (
+    <View style={styles.tight}>
+      {players.map((p) => (
+        <CompactPlayerCard
+          key={p.player_id}
+          player={{ id: p.player_id, name: p.name, position: p.position, team: p.team }}
+          detail={[p.team, p.age != null ? `${p.age} yrs` : ''].filter(Boolean).join(' · ')}
+          trailing={p.injury_status ? <ToneBadge label={p.injury_status} color={colors.danger} size="xs" /> : undefined}
+          testID="team-sheet-player"
         />
-      ) : null}
-    </>
+      ))}
+    </View>
   );
-  const tendenciesPanel = premiumReady ? (
+
+  const tendenciesPanel = (
     <>
       <SectionHeading title="Tendencies" />
       {rows.map(([key, title]) => {
@@ -116,12 +150,7 @@ export default function ManagerProfileModal({ visible, onClose, leagueId, league
             <AppText style={styles.signalSummary}>{signal.summary}</AppText>
             <View style={styles.meterRow}>
               <View style={styles.meterTrack}>
-                <View
-                  style={[
-                    styles.meterFill,
-                    { backgroundColor: tone, width: `${Math.round(sampleFill(signal.sample_size, signal.min_sample) * 100)}%` },
-                  ]}
-                />
+                <View style={[styles.meterFill, { backgroundColor: tone, width: `${Math.round(sampleFill(signal.sample_size, signal.min_sample) * 100)}%` }]} />
               </View>
               <AppText style={styles.muted}>
                 {signal.sample_size} trade{signal.sample_size === 1 ? '' : 's'}
@@ -131,91 +160,176 @@ export default function ManagerProfileModal({ visible, onClose, leagueId, league
         );
       })}
     </>
-  ) : null;
-  const tradesPanel = premiumReady && data?.recent_trades && data.recent_trades.length > 0 ? (
+  );
+  const recentTrades = data?.is_premium && data.recent_trades && data.recent_trades.length > 0 ? (
     <>
-      <>
-        <SectionHeading title="Recent trades" />
-        {(data?.recent_trades ?? []).map((trade) => (
-          <AccentCard key={trade.transaction_id} accent={colors.border} compact style={styles.signal}>
-            <View style={styles.signalHead}>
-              <AppText style={[styles.muted, styles.tradeMeta]} numberOfLines={2}>
-                {tradeDateLabel(trade.date, trade.week)}
-                {trade.partners.length ? ` · with ${trade.partners.join(', ')}` : ''}
-              </AppText>
-              {trade.grade ? (
-                <ToneBadge
-                  label={trade.grade.letter}
-                  color={{ success: colors.success, accent: colors.accent, danger: colors.danger, muted: colors.textSecondary }[gradeToneSlug(trade.grade.tone)]}
-                />
-              ) : null}
-            </View>
-            {([['Got', trade.received], ['Sent', trade.sent]] as Array<[string, ManagerRecentTradeAsset[]]>).map(([label, assets]) =>
-              assets.length ? (
-                <View key={label} style={styles.tradeSide}>
-                  <AppText style={styles.signalTitle}>{label}</AppText>
-                  {assets.map((asset, i) => (
-                    <View key={`${asset.player_id ?? asset.label}-${i}`} style={styles.assetLine}>
-                      {asset.kind === 'pick' ? (
-                        <>
-                          <PickPlate round={asset.round} />
-                          <AppText style={styles.assetName}>{asset.label || 'Draft pick'}</AppText>
-                        </>
-                      ) : (
-                        <View style={{ flex: 1, minWidth: 0 }}>
-                          <CompactPlayerCard
-                            player={{ id: asset.player_id ?? null, name: asset.name ?? 'Player', position: asset.position ?? null, team: asset.team ?? null }}
-                            detail={asset.team}
-                            testID="manager-trade-player"
-                          />
-                        </View>
-                      )}
-                    </View>
-                  ))}
-                </View>
-              ) : null,
-            )}
-          </AccentCard>
-        ))}
-      </>
+      <SectionHeading title="Recent trades" />
+      {data.recent_trades.map((trade) => (
+        <AccentCard key={trade.transaction_id} accent={colors.border} compact style={styles.signal}>
+          <View style={styles.signalHead}>
+            <AppText style={[styles.muted, styles.tradeMeta]} numberOfLines={2}>
+              {tradeDateLabel(trade.date, trade.week)}
+              {trade.partners.length ? ` · with ${trade.partners.join(', ')}` : ''}
+            </AppText>
+            {trade.grade ? (
+              <ToneBadge
+                label={trade.grade.letter}
+                color={{ success: colors.success, accent: colors.accent, danger: colors.danger, muted: colors.textSecondary }[gradeToneSlug(trade.grade.tone)]}
+              />
+            ) : null}
+          </View>
+          {([['Got', trade.received], ['Sent', trade.sent]] as Array<[string, ManagerRecentTradeAsset[]]>).map(([label, assets]) =>
+            assets.length ? (
+              <View key={label} style={styles.tradeSide}>
+                <AppText style={styles.signalTitle}>{label}</AppText>
+                {assets.map((asset, i) => (
+                  <View key={`${asset.player_id ?? asset.label}-${i}`} style={styles.assetLine}>
+                    {asset.kind === 'pick' ? (
+                      <>
+                        <PickPlate round={asset.round} />
+                        <AppText style={styles.assetName}>{asset.label || 'Draft pick'}</AppText>
+                      </>
+                    ) : (
+                      <View style={{ flex: 1, minWidth: 0 }}>
+                        <CompactPlayerCard
+                          player={{ id: asset.player_id ?? null, name: asset.name ?? 'Player', position: asset.position ?? null, team: asset.team ?? null }}
+                          detail={asset.team}
+                          testID="manager-trade-player"
+                        />
+                      </View>
+                    )}
+                  </View>
+                ))}
+              </View>
+            ) : null,
+          )}
+        </AccentCard>
+      ))}
     </>
   ) : null;
-  const tabs = useTabs({
-    id: 'manager-profile',
-    tabs: managerProfileTabs({
-      hasProfile: profileQuery.data != null,
-      tendencyCount: data?.is_premium ? rows.length : 0,
-      tradeCount: data?.is_premium ? data.recent_trades?.length ?? 0 : 0,
-    }).map((tab) => ({
-      key: tab.key,
-      label: tab.label,
-      render: () => (tab.key === 'tendencies' ? tendenciesPanel : tab.key === 'trades' ? tradesPanel : overviewPanel),
-    })),
-  });
 
   return (
     <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
       <Pressable style={styles.backdrop} onPress={onClose}>
         <Pressable style={styles.sheet} onPress={(e) => e.stopPropagation()}>
-          <View style={styles.headerRow}>
-            <TeamAvatar avatarId={avatarId} name={ownerName || teamName} size={44} style={styles.avatar} />
-            <View style={styles.titleGroup}>
-              <AppText style={styles.title} numberOfLines={1}>
-                {teamName}
-              </AppText>
-              {ownerName ? (
-                <AppText style={styles.kicker} numberOfLines={1}>
-                  {ownerName}
-                </AppText>
-              ) : null}
-            </View>
+          <View style={styles.closeRow}>
             <Pressable onPress={onClose} hitSlop={8} accessibilityLabel="Close">
               <Ionicons name="close" size={20} color={colors.textSecondary} />
             </Pressable>
           </View>
-          {/* Sticky tab strip: outside the scroll, so it stays put while the panel scrolls. */}
-          <View style={styles.tabBar}>{tabs.bar}</View>
-          <ScrollView style={styles.body}>{tabs.panel}</ScrollView>
+          <ScrollView style={styles.body}>
+            <TeamSheetFrame
+              id="manager-profile"
+              logo={<TeamAvatar avatarId={sheet?.team?.avatar_url || avatarId} name={owner || nameShown} size={48} />}
+              name={nameShown}
+              nameTestId="team-sheet-name"
+              tag={tag}
+              chips={chips}
+              managedBy={owner}
+              tabs={[
+                {
+                  key: 'overview',
+                  label: 'Overview',
+                  render: () =>
+                    sheetFailed ? (
+                      <AppText style={styles.muted}>Couldn&apos;t load this team.</AppText>
+                    ) : !sheet ? (
+                      <SkeletonText label="team sheet" lines={4} />
+                    ) : (
+                      <TeamSheetOverview
+                        blurb={style?.blurb || upsell}
+                        tiles={tiles}
+                        streak={sheet.streak}
+                        nextGame={teamSheetNextGameLine(sheet.next_game ? { week: sheet.next_game.week, opponent: sheet.next_game.opponent.name } : null)}
+                        positions={sheet.positions ?? []}
+                        strengthsTitle={<SectionHeading title="Strengths and needs" caption={needLine || undefined} />}
+                        injuries={
+                          (sheet.injuries ?? []).length > 0 ? (
+                            <View style={styles.tight} accessibilityLabel="Injuries">
+                              <SectionHeading title="Injuries" />
+                              {playerRows(sheet.injuries!)}
+                            </View>
+                          ) : null
+                        }
+                      />
+                    ),
+                },
+                {
+                  key: 'roster',
+                  label: 'Roster',
+                  render: () =>
+                    !sheet ? (
+                      sheetFailed ? <AppText style={styles.muted}>Couldn&apos;t load this roster.</AppText> : <SkeletonText label="roster" lines={4} />
+                    ) : roster.length === 0 ? (
+                      <AppText style={styles.muted}>No players on this roster yet.</AppText>
+                    ) : (
+                      <>
+                        {(
+                          [
+                            ['starter', 'Starters'],
+                            ['bench', 'Bench'],
+                            ['ir', 'Injured reserve'],
+                            ['taxi', 'Taxi squad'],
+                          ] as const
+                        ).map(([slot, label]) =>
+                          by(slot).length ? (
+                            <View key={slot} style={styles.tight} accessibilityLabel={label}>
+                              <SectionHeading title={label} />
+                              {playerRows(by(slot))}
+                            </View>
+                          ) : null,
+                        )}
+                      </>
+                    ),
+                },
+                {
+                  key: 'trades',
+                  label: 'Trades',
+                  render: () => (
+                    <>
+                      <OpponentProfileCard profile={profileQuery.data} onOffer={offer} />
+                      {query.isError ? (
+                        <AppText style={styles.muted}>Couldn&apos;t load trade history.</AppText>
+                      ) : !data ? (
+                        <SkeletonText label="manager trades" lines={3} />
+                      ) : !data.is_premium ? (
+                        upsell
+                      ) : rows.length === 0 ? (
+                        <AppText style={styles.muted}>Not enough trade history yet.</AppText>
+                      ) : (
+                        <>
+                          {tendenciesPanel}
+                          {recentTrades}
+                        </>
+                      )}
+                    </>
+                  ),
+                },
+                {
+                  key: 'history',
+                  label: 'History',
+                  render: () =>
+                    !sheet ? (
+                      sheetFailed ? <AppText style={styles.muted}>Couldn&apos;t load season history.</AppText> : <SkeletonText label="history" lines={3} />
+                    ) : (sheet.history ?? []).length === 0 ? (
+                      <AppText style={styles.muted}>No past seasons in this league yet.</AppText>
+                    ) : (
+                      <>
+                        {sheet.history!.map((h) => (
+                          <AccentCard key={h.league_id} accent={colors.border} compact style={styles.signal}>
+                            <View style={styles.signalHead}>
+                              <AppText style={styles.signalSummary}>{h.season}</AppText>
+                              <AppText style={styles.signalSummary}>{teamSheetSeasonLine(h)}</AppText>
+                            </View>
+                            <AppText style={styles.muted}>{teamSheetPoints(h.points_for)} points for</AppText>
+                          </AccentCard>
+                        ))}
+                      </>
+                    ),
+                },
+              ]}
+            />
+          </ScrollView>
         </Pressable>
       </Pressable>
     </Modal>
@@ -241,13 +355,9 @@ function createStyles(colors: ThemeColors) {
       maxWidth: 420,
       maxHeight: '80%',
     },
-    headerRow: { flexDirection: 'row', alignItems: 'center', marginBottom: spacing.md },
-    avatar: { marginRight: spacing.md },
-    titleGroup: { flex: 1, marginRight: spacing.sm },
-    kicker: { fontSize: 12.5, color: colors.textSecondary },
-    title: { fontSize: 17, fontWeight: '700', color: colors.textPrimary },
+    closeRow: { flexDirection: 'row', justifyContent: 'flex-end', marginBottom: spacing.xs },
     body: { flexGrow: 0 },
-    tabBar: { paddingBottom: spacing.sm },
+    tight: { gap: spacing.xs },
     signal: { marginBottom: spacing.sm },
     signalHead: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: spacing.sm },
     meterRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },

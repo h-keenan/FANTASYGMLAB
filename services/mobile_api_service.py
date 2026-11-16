@@ -19,6 +19,7 @@ Deployment topology (Render):
   - GET  /v1/leagues/{id}/team-profiles  — team name/owner/avatar per roster
   - GET  /v1/leagues/{id}/team-rankings  — power/franchise/draft-capital rank + standings per roster
   - GET  /v1/leagues/{id}/teams/{roster_id}/profile — opponent card: rooms, depth, picks, direction, trade angle
+  - GET  /v1/leagues/{id}/teams/{roster_id}/sheet   — the team sheet every tapped team opens (record, strengths/needs, injuries, roster, history)
   - GET  /v1/leagues/{id}/draft-center   — draft posture + league-wide decision/partner cards
   - GET  /v1/leagues/{id}/draft-picks    — every draft pick asset + its full valuation breakdown
   - GET  /v1/leagues/{id}/live-draft           — discover this league's Sleeper drafts (status/season/rounds)
@@ -38,6 +39,8 @@ Deployment topology (Render):
   - GET  /v1/leagues/{id}/alerts         — roster-relevant news alerts
   - POST /v1/leagues/{id}/alerts/read    — durably mark one alert read (RLS-scoped)
   - GET  /v1/players/{id}/quick-view     — season stats + bio for the player detail pop-up
+  - GET  /v1/players/{id}/depth-chart    — real NFL depth chart at his slot (+ weekly moves)
+  - GET  /v1/players/{id}/injury-history — current injury line + per-season stints / games missed
   - GET  /v1/players/{id}/percentile-explorer — distribution + nearby players behind one stat tile
   - GET  /v1/players/{id}/weekly-stats   — per-week fantasy points + snap share for one season
   - GET  /v1/players/{id}/career         — every verified season on record, not just current
@@ -142,6 +145,7 @@ import threading
 import time
 from contextlib import asynccontextmanager
 from datetime import date, datetime, timedelta, timezone
+from pathlib import Path
 from typing import Any, Callable
 
 from fastapi import Depends, FastAPI, Header, HTTPException, Request, Response
@@ -251,6 +255,7 @@ from modules import (
     startup_cold_path,
     stripe_billing,
     team_stance,
+    team_sheet,
     team_streaks,
     team_trade_history,
     trade_analyzer_fit,
@@ -278,6 +283,7 @@ from modules import direction_checkin, trade_cautions, trade_posture
 from modules import external_news_contract
 from modules import external_interesting_trades, external_news_feed, news_identity, news_ingest
 from modules import start_sit_range
+from modules import depth_chart_history, player_depth_chart, player_injury_record
 from modules import lineup_lock
 from modules import this_week
 from modules import game_weather
@@ -3202,6 +3208,172 @@ def get_league_team_profile(
         "picks": opponent_profile.pick_capital(row, flow, size),
         "trade_tendency": trade_tendency,
         "trade_angle": angle,
+    }
+
+
+def _roster_id_by_team_name(profiles: Mapping[str, Any]) -> dict[str, str]:
+    """Lower-cased team name -> roster_id, for the cards that only carry the partner's
+    display name. A name two rosters share is left out rather than guessed."""
+
+    seen: dict[str, str] = {}
+    dupes: set[str] = set()
+    for roster_id, profile in (profiles or {}).items():
+        name = str((profile or {}).get("team_name") or "").strip().lower()
+        if not name:
+            continue
+        if name in seen:
+            dupes.add(name)
+        seen[name] = str(roster_id)
+    return {name: rid for name, rid in seen.items() if name not in dupes}
+
+
+@app.get("/v1/leagues/{league_id}/teams/{roster_id}/sheet")
+def get_league_team_sheet(
+    roster_id: int,
+    league_id: str = Depends(require_league_access),
+    lens: str = "Dynasty",
+    user: dict[str, Any] = Depends(require_user),
+) -> dict[str, Any]:
+    """The team sheet any tapped team opens (same shape of read as the Fantasy
+    Sim team sheet): record, standings and power rank, points for, this week's
+    projection, streak and next opponent, positional strengths and needs,
+    injuries, the roster, and past seasons.
+
+    Free for everyone. Composition only: the row comes from team-rankings, the
+    strengths/needs from the opponent profile's one need model
+    (roster_value_model), the projection from the same weekly lineup/projection
+    pass /matchup runs, injuries from Sleeper's injury_status on the valued
+    frame. The Pro-only trade style and recent trades are NOT here: clients read
+    them from .../managers/{roster_id}/tendencies, which keeps its own gate.
+    """
+
+    league = sleeper.get_league(league_id)
+    if not league:
+        raise HTTPException(status_code=404, detail="League not found.")
+    rosters = sleeper.get_rosters(league_id)
+    roster = next((r for r in rosters if str(r.get("roster_id")) == str(roster_id)), None)
+    if roster is None:
+        raise HTTPException(status_code=404, detail="Roster not found in this league.")
+
+    board = get_league_team_rankings(league_id=league_id, lens=lens, _user=user)
+    row = next((t for t in board.get("teams") or [] if str(t.get("roster_id")) == str(roster_id)), None)
+    if row is None:
+        return {"ok": True, "reason": board.get("reason") or "no_rankings_data", "roster_id": str(roster_id)}
+
+    settings = league_value_settings.detect_league_value_settings_from_payload(league)
+    score_field = league_value_settings.valuation_score_field(lens)
+    valued = league_value_settings.build_valued_players_frame_cached(
+        league_id=league_id, lens=lens, players_db_path=PLAYERS_DB_PATH
+    )
+    players = team_sheet.roster_rows(valued, roster, score_field)
+
+    profile = get_league_team_profile(roster_id=roster_id, league_id=league_id, lens=lens, user=user)
+    cards, strengths, needs = team_sheet.position_cards(
+        profile.get("rooms") or [], team_sheet.depth_by_position(players)
+    )
+
+    my_roster, _reason = _resolve_my_roster(user, league_id)
+    is_me = my_roster is not None and str(my_roster.get("roster_id")) == str(roster_id)
+
+    # This week: opponent and the projected starting lineup total. Both are
+    # best-effort; an offseason league just has neither.
+    next_game = None
+    projected_total = None
+    try:
+        league_settings = league.get("settings") if isinstance(league.get("settings"), dict) else {}
+        week = int((league_settings or {}).get("leg") or 0)
+    except (TypeError, ValueError):
+        week = 0
+    profiles = sleeper.get_league_roster_profiles(league_id) or {}
+    if week > 0:
+        try:
+            matchups = sleeper.get_matchups(league_id, week)
+            mine = next((m for m in matchups if str(m.get("roster_id")) == str(roster_id)), None)
+            if mine is not None and mine.get("matchup_id") is not None:
+                other = next(
+                    (m for m in matchups if m.get("matchup_id") == mine.get("matchup_id") and str(m.get("roster_id")) != str(roster_id)),
+                    None,
+                )
+                if other is not None:
+                    opp_id = str(other.get("roster_id"))
+                    opp_profile = profiles.get(opp_id) or {}
+                    next_game = {
+                        "week": week,
+                        "opponent": {
+                            "roster_id": opp_id,
+                            "name": _clean_json_value(opp_profile.get("team_name")) or f"Team {opp_id}",
+                        },
+                    }
+        except Exception:
+            next_game = None
+        try:
+            context = _build_projection_context(week, league.get("scoring_settings"))
+            if context is not None and not valued.empty:
+                side = _matchup_side(
+                    str(roster_id),
+                    roster,
+                    profiles.get(str(roster_id)) or {},
+                    valued,
+                    settings,
+                    score_field,
+                    players_lookup=sleeper.get_players(),
+                    projection_context=context,
+                )
+                points = [
+                    float((p.get("projection") or {}).get("point_estimate"))
+                    for p in side.get("starters") or []
+                    if isinstance((p.get("projection") or {}).get("point_estimate"), (int, float))
+                ]
+                projected_total = round(sum(points), 1) if points else None
+        except Exception:
+            projected_total = None
+
+    history: list[dict[str, Any]] = []
+    owner_id = str(roster.get("owner_id") or "")
+    try:
+        chain = league_history.walk_season_chain(league_id, sleeper.get_league)
+        for item in chain:
+            season_id = str(item.get("league_id") or "")
+            if not season_id or season_id == str(league_id):
+                continue
+            result = team_sheet.season_result(
+                sleeper.get_rosters(season_id), owner_id, str(item.get("season") or ""), season_id
+            )
+            if result:
+                history.append(result)
+    except Exception:
+        history = []
+
+    return {
+        "ok": True,
+        "reason": "",
+        "roster_id": str(roster_id),
+        "is_me": is_me,
+        "team": {
+            "team_name": row.get("team_name"),
+            "owner_name": row.get("owner_name"),
+            "avatar_url": row.get("avatar_url"),
+        },
+        "record": {
+            "wins": row.get("wins"),
+            "losses": row.get("losses"),
+            "ties": row.get("ties"),
+            "label": row.get("record_label"),
+            "standing_rank": row.get("standing_rank"),
+            "points_for": row.get("points_for"),
+            "playoff_status": team_sheet.playoff_flag(row.get("playoff_status")),
+        },
+        "power_rank": row.get("power_rank"),
+        "teams": len(board.get("teams") or []),
+        "streak": team_sheet.streak_label(row.get("current_streak")),
+        "projected_total": projected_total,
+        "next_game": next_game,
+        "positions": cards,
+        "strengths": strengths,
+        "needs": needs,
+        "injuries": team_sheet.injuries(players),
+        "roster": players,
+        "history": history,
     }
 
 
@@ -9329,6 +9501,51 @@ def get_player_quick_view(
         "identity": _quick_view_identity(player_id, row),
         "reason": "",
     }
+
+
+_REPO_ROOT = Path(__file__).resolve().parents[1]
+
+
+@app.get("/v1/players/{player_id}/depth-chart")
+def get_player_depth_chart(
+    player_id: str,
+    user: dict[str, Any] = Depends(require_user),
+) -> dict[str, Any]:
+    """The player's real NFL depth chart at his slot (modules.player_depth_chart):
+    Sleeper's directory order plus each player's move since the last weekly
+    snapshot. League-independent, so cached files only (no per-request fetch)."""
+
+    try:
+        directory = sleeper.get_players() or {}
+    except Exception:
+        directory = {}
+    snapshots = depth_chart_history.load_depth_chart_snapshots(os.path.join(str(_REPO_ROOT), depth_chart_history.DEPTH_CHART_SNAPSHOT_PATH))
+    return _clean_json_value(player_depth_chart.build_depth_chart(player_id, directory, snapshots=snapshots))
+
+
+@app.get("/v1/players/{player_id}/injury-history")
+def get_player_injury_history(
+    player_id: str,
+    user: dict[str, Any] = Depends(require_user),
+) -> dict[str, Any]:
+    """Current injury line plus per-season injury stints and games missed
+    (modules.player_injury_record), derived from the official nflverse weekly
+    reports already stored under data/injury_history/."""
+
+    try:
+        directory = (sleeper.get_players() or {}).get(str(player_id))
+    except Exception:
+        directory = None
+    season = season_clock.current_season()
+    week = season_clock.nfl_week()
+    # The week in progress has no final result yet; the offseason (week 0) counts the whole finished season.
+    through = max(week - 1, 0) if week else None
+    return _clean_json_value(
+        player_injury_record.build_injury_record(
+            player_id, directory if isinstance(directory, dict) else None,
+            root=_REPO_ROOT, current_season=season, through_week=through,
+        )
+    )
 
 
 @app.get("/v1/players/{player_id}/percentile-explorer")
@@ -17368,12 +17585,17 @@ def _project_and_enrich_trade_idea_cards(
     # rather than threading a new field through modules.trade_ideas's deep
     # (and heavily-tested) idea pipeline. Best-effort: a name mismatch just
     # leaves the client's initial-letter fallback in place.
+    roster_profiles_by_id = sleeper.get_league_roster_profiles(league_id)
     avatar_by_team_name = {
         str(profile.get("team_name") or "").strip().lower(): profile.get("avatar_url")
-        for profile in sleeper.get_league_roster_profiles(league_id).values()
+        for profile in roster_profiles_by_id.values()
     }
     for card in ranked:
         card["partner_team_avatar_url"] = avatar_by_team_name.get(
+            str(card.get("partner_team_name") or "").strip().lower()
+        )
+        # Same name match, so tapping the partner can open the team sheet.
+        card["partner_roster_id"] = _roster_id_by_team_name(roster_profiles_by_id).get(
             str(card.get("partner_team_name") or "").strip().lower()
         )
     # Concept-sheet parity: each card names the partner's real archetype
@@ -18187,6 +18409,9 @@ def get_league_all_trades(
             card["source_roster_id"] = str(roster_id)
             card["source_team_name"] = team_name_by_roster_id.get(str(roster_id), "")
             card["partner_team_avatar_url"] = avatar_by_team_name.get(
+                str(card.get("partner_team_name") or "").strip().lower()
+            )
+            card["partner_roster_id"] = _roster_id_by_team_name(roster_profiles).get(
                 str(card.get("partner_team_name") or "").strip().lower()
             )
             card["partner_team_archetype_label"] = archetype_by_team_name.get(

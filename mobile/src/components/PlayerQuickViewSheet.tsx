@@ -14,6 +14,7 @@ import PercentileExplorerSheet from './PercentileExplorerSheet';
 import PlayerHero from './PlayerHero';
 import PlayerLeagueActions from './PlayerLeagueActions';
 import { AvailabilityBlock, LatestNewsSection } from './PlayerQuickViewNews';
+import { DepthChartSection, InjuryHistorySection } from './PlayerDepthInjury';
 import { useTabs } from './Tabs';
 import { pqvBioForContext, pqvRealWorld } from '../lib/pqvContext';
 import { rowsAsOf, simAsOfSeason } from '../lib/simAsOf';
@@ -175,6 +176,25 @@ export default function PlayerQuickViewSheet({
   });
   const newsLoading = detailQuery.isSuccess && realWorld.fetchNews && newsQuery.isPending;
 
+  // Depth chart + injury history: lazy and independent like news (never gate the sheet); a failure renders nothing.
+  const depthQuery = useQuery({
+    queryKey: [...queryKeys.playerQuickView(player.player_id), 'depth-chart'],
+    queryFn: () => api.getPlayerDepthChart(player.player_id),
+    enabled: detailQuery.isSuccess && realWorld.showDepthChart,
+    staleTime: 10 * 60 * 1000,
+    retry: false,
+  });
+  const injuryQuery = useQuery({
+    queryKey: [...queryKeys.playerQuickView(player.player_id), 'injury-history'],
+    queryFn: () => api.getPlayerInjuryHistory(player.player_id),
+    enabled: detailQuery.isSuccess && realWorld.showInjuryHistory,
+    staleTime: 10 * 60 * 1000,
+    retry: false,
+  });
+  // undefined = loading, null = failed/none.
+  const depthChart = depthQuery.isPending ? undefined : depthQuery.data?.ok ? depthQuery.data : null;
+  const injuryRecord = injuryQuery.isPending ? undefined : injuryQuery.data?.ok ? injuryQuery.data : null;
+
   // "View on Waivers" only when this player really is on the league's waiver
   // list. Same query key/fn Dashboard uses, so the cache is shared.
   const waiverLeagueId = request.league?.leagueId ?? null;
@@ -329,6 +349,8 @@ export default function PlayerQuickViewSheet({
         <>
           {sim?.overview ?? null}
           {availability ? <AvailabilityBlock availability={availability} injuryItem={newsQuery.data?.injury_item ?? null} newsLoading={newsLoading} /> : null}
+          {detail && remote && realWorld.showInjuryHistory ? <InjuryHistorySection record={injuryRecord} /> : null}
+          {detail && remote && realWorld.showDepthChart ? <DepthChartSection chart={depthChart} /> : null}
           {detail && remote && realWorld.showNews ? (
             <LatestNewsSection
               items={newsQuery.data ? newsQuery.data.items : null}

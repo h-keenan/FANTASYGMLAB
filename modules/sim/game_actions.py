@@ -21,6 +21,7 @@ from modules.sim.game_ai import (
     TradeDesk,
     Verdict,
     offer_key,
+    surplus_singletons,
     trade_window,
     validate_offer,
 )
@@ -324,6 +325,11 @@ def enforce_roster_cap(em: Emitter, ev: Evaluator, tid: str) -> list[str]:
     params = team_params(snap, tid)
     cut: list[str] = []
     ev = Evaluator(snap, state)
+    if snap.settings.pos_rules:  # pos_v 1: a team keeps one kicker / defense; a trade that gave it a second cuts the one it values less (the rule the deal was priced by)
+        for pid in surplus_singletons(snap, ev, params, state.rosters[tid]):
+            em.emit(state.week, tid, "drop", team=tid, pid=pid, reason="one_per_roster")
+            cut.append(pid)
+        ev = Evaluator(snap, state)
     if len(state.rosters[tid]) > snap.settings.roster_limit:
         ai_manage_reserves(em, ev, tid)  # IR and taxi first: they free spots without losing anyone
     while len(state.rosters[tid]) > snap.settings.roster_limit and snap.settings.ai_depth:

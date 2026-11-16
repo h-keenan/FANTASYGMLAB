@@ -29,6 +29,8 @@ import { OverlayBack } from "@/components/OverlayBack";
 import { useOverlay } from "@/lib/useOverlay";
 import { useSheetDragDismiss } from "@/lib/useSheetDragDismiss";
 import { AvailabilityBlock, LatestNewsSection } from "@/components/PlayerQuickViewNews";
+import { DepthChartSection, InjuryHistorySection } from "@/components/PlayerDepthInjury";
+import type { DepthChartData, InjuryRecordData } from "@/lib/playerDepthInjury";
 import { Tabs } from "@/components/Tabs";
 import { pqvBioForContext, pqvRealWorld } from "@/lib/pqvContext";
 import { rowsAsOf, simAsOfSeason } from "@/lib/simAsOf";
@@ -170,6 +172,9 @@ export function PlayerQuickView({
   // not loaded (or failed -> section renders nothing).
   const [news, setNews] = useState<PlayerNewsResponse | null>(null);
   const [newsLoading, setNewsLoading] = useState(remote && realWorld.fetchNews);
+  // Depth chart and injury history load lazily and independently too. undefined = loading, null = failed/none.
+  const [depthChart, setDepthChart] = useState<DepthChartData | null | undefined>(remote && realWorld.showDepthChart ? undefined : null);
+  const [injuryRecord, setInjuryRecord] = useState<InjuryRecordData | null | undefined>(remote && realWorld.showInjuryHistory ? undefined : null);
   // Peek height from the content: compact header + pill row + one content line (--pqv-peek-h; CSS keeps 65dvh as the fallback).
   // Measured with the header in its compact state only (never mid-transition), re-measured when the content above the pills resizes.
   useLayoutEffect(() => {
@@ -257,6 +262,26 @@ export function PlayerQuickView({
       cancelled = true;
     };
   }, [identity.player_id, remote, realWorld.fetchNews]);
+
+  useEffect(() => {
+    if (!remote || !realWorld.showDepthChart) return;
+    let cancelled = false;
+    api
+      .getPlayerDepthChart(identity.player_id)
+      .then((result) => { if (!cancelled) setDepthChart(result.ok ? result : null); })
+      .catch(() => { if (!cancelled) setDepthChart(null); });
+    return () => { cancelled = true; };
+  }, [identity.player_id, remote, realWorld.showDepthChart]);
+
+  useEffect(() => {
+    if (!remote || !realWorld.showInjuryHistory) return;
+    let cancelled = false;
+    api
+      .getPlayerInjuryHistory(identity.player_id)
+      .then((result) => { if (!cancelled) setInjuryRecord(result.ok ? result : null); })
+      .catch(() => { if (!cancelled) setInjuryRecord(null); });
+    return () => { cancelled = true; };
+  }, [identity.player_id, remote, realWorld.showInjuryHistory]);
 
   // Focus moves into the dialog whenever it becomes the visible pop-up (first open, or returning from one opened on top).
   // Page scroll lock, history and layering belong to the overlay runtime, not to this shell.
@@ -452,6 +477,8 @@ export function PlayerQuickView({
                   <>
                     {sim?.overview ?? null}
                     {availability ? <AvailabilityBlock availability={availability} injuryItem={news?.injury_item ?? null} newsLoading={newsLoading} /> : null}
+                    {remote && realWorld.showInjuryHistory ? <InjuryHistorySection record={injuryRecord} /> : null}
+                    {remote && realWorld.showDepthChart ? <DepthChartSection chart={depthChart} /> : null}
                     {!loadError && remote && realWorld.showNews ? (
                       <LatestNewsSection
                         items={news ? news.items : null}
