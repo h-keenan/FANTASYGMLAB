@@ -271,7 +271,8 @@ describe("LeagueRecapsContent", () => {
 
     fireEvent.click(within(screen.getByRole("tablist", { name: "League memory view" })).getByRole("tab", { name: "Storylines" }));
 
-    expect(api.getLeagueStorylines).toHaveBeenCalledWith("league-1");
+    // The tab bodies are lazy chunks, so the fetch starts once the chunk resolves.
+    await waitFor(() => expect(api.getLeagueStorylines).toHaveBeenCalledWith("league-1"));
     await waitFor(() => expect(screen.getByText("2026 storylines")).toBeInTheDocument());
 
     // Real award cards from the backend report, not guessed/placeholder

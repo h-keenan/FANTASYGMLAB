@@ -157,6 +157,17 @@ def _fake_redis_for_tests():
 
 
 @pytest.fixture(autouse=True)
+def _reset_derived_memos_for_tests():
+    """Derived memos (modules.derived_cache) key on valued-frame tags that name a cache entry; tests reuse league ids with
+    different stubbed data, so no memoised derivation may outlive its test."""
+    from modules import derived_cache
+
+    derived_cache.clear_all_memos()
+    yield
+    derived_cache.clear_all_memos()
+
+
+@pytest.fixture(autouse=True)
 def _reset_auth_user_cache_for_tests():
     """The GoTrue user memo is process-global; tests reuse tokens with
     different stubbed users, so never let one test's lookup leak to the next."""

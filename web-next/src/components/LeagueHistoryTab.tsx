@@ -1,0 +1,435 @@
+"use client";
+
+import { useEffect, useState } from "react";
+
+import { api } from "@/lib/api";
+import type {
+  HistoryResponse,
+  HistorySide,
+  HistoryTransaction,
+  } from "@/lib/api";
+import { PillRow, TabStack } from "@/components/PillRow";
+
+import { PlayerAvatar } from "@/components/PlayerAvatar";
+import { PlayerIdentityTrigger } from "@/components/PlayerIdentityTrigger";
+import { PositionBadge } from "@/components/PositionBadge";
+import { TeamAvatar } from "@/components/TeamAvatar";
+
+import {
+  HISTORY_FILTERS,
+  emptyFilterNote,
+  formatHistoryWhen,
+  gradeToneColorVar,
+  matchesHistoryFilter,
+  pickLabel,
+} from "@/lib/leagueRecapsPresentation";
+
+import { PlayerName } from "@/components/PlayerName";
+
+import { ErrorState } from "@/components/ErrorState";
+import { Money } from "@/components/Money";
+import { formatMoney } from "@/lib/money";
+import { SkeletonRegion, SkeletonModule } from "@/components/Skeleton";
+
+export function AssetChip({ asset }: { asset: HistoryTransaction["draft_picks"][number] }) {
+  if (asset.kind === "pick") {
+    return (
+      <span
+        className="text-xs px-2 py-1"
+        style={{ border: "var(--border-width-default) solid var(--color-border)", color: "var(--color-text-secondary)" }}
+      >
+        {pickLabel(asset)}
+      </span>
+    );
+  }
+  if (!asset.player_id) {
+    return (
+      <span
+        className="inline-flex items-center gap-1 text-xs px-2 py-1"
+        style={{ border: "var(--border-width-default) solid var(--color-border)" }}
+      >
+        <PositionBadge position={asset.position} />
+        <PlayerName name={asset.name} className="max-w-[10rem]" style={{ color: asset.known ? "var(--color-text-primary)" : "var(--color-text-muted)" }} />
+      </span>
+    );
+  }
+  return (
+    <PlayerIdentityTrigger identity={{ ...asset, sourceLabel: "League History" }}>
+      <span
+        className="inline-flex items-center gap-1 text-xs px-2 py-1"
+        style={{ border: "var(--border-width-default) solid var(--color-border)" }}
+      >
+        <PlayerAvatar playerId={asset.player_id} size={20} />
+        <PositionBadge position={asset.position} />
+        <PlayerName name={asset.name} className="max-w-[10rem]" style={{ color: asset.known ? "var(--color-text-primary)" : "var(--color-text-muted)" }} />
+      </span>
+    </PlayerIdentityTrigger>
+  );
+}
+
+/** One player in a trade side: a single compact row (avatar, name and team,
+ * position). Picks are grouped onto one line by HistorySideBlock instead. */
+function TradePlayerRow({ asset }: { asset: HistoryTransaction["draft_picks"][number] }) {
+  const nameColor = asset.known ? "var(--color-text-primary)" : "var(--color-text-muted)";
+  const row = (
+    <span className="flex items-center gap-2 min-w-0 w-full">
+      {asset.player_id ? <PlayerAvatar playerId={asset.player_id} size={24} /> : <span style={{ width: 24 }} />}
+      <PlayerName name={asset.name} className="text-sm font-bold" style={{ color: nameColor }} />
+      {asset.team ? (
+        <span className="text-xs font-normal shrink-0" style={{ color: "var(--color-text-muted)" }}>
+          {asset.team}
+        </span>
+      ) : null}
+      <span className="flex-1" />
+      <PositionBadge position={asset.position} />
+    </span>
+  );
+  if (!asset.player_id) return <div className="flex min-w-0">{row}</div>;
+  return (
+    <PlayerIdentityTrigger identity={{ ...asset, sourceLabel: "League History" }} className="flex w-full text-left min-w-0">
+      {row}
+    </PlayerIdentityTrigger>
+  );
+}
+
+/** A side's picks as one wrapped line ("2028 R1 · 2027 R1"), not a row each. */
+function TradePickLine({ picks }: { picks: HistoryTransaction["draft_picks"] }) {
+  if (!picks.length) return null;
+  return (
+    <p className="text-sm font-bold" style={{ color: "var(--color-text-primary)" }}>
+      <span className="text-xs font-normal" style={{ color: "var(--color-text-muted)" }}>
+        Picks{" "}
+      </span>
+      {picks.map((pick) => (pick.season && pick.round ? `${pick.season} R${pick.round}` : pickLabel(pick))).join(" · ")}
+    </p>
+  );
+}
+
+function faabLine(side: HistorySide, txType: string): string {
+  const bits: string[] = [];
+  if (side.faab_spent !== null && side.faab_spent > 0) bits.push(`FAAB ${formatMoney(side.faab_spent)}`);
+  else if (txType === "waiver" && side.faab_spent === 0) bits.push("No FAAB");
+  if (side.faab_received !== null && side.faab_received > 0) bits.push(`Received FAAB ${formatMoney(side.faab_received)}`);
+  return bits.join(" · ");
+}
+
+function HistorySideBlock({ side, txType }: { side: HistorySide; txType: string }) {
+  const faab = faabLine(side, txType);
+  return (
+    <div
+      className="flex flex-col gap-2 min-w-0"
+      style={txType === "trade" ? { background: "var(--color-surface-muted)", padding: "0.5rem 0.75rem" } : undefined}
+    >
+      <div className="flex items-center gap-2 min-w-0">
+        <TeamAvatar avatarUrl={side.avatar_url} size={28} />
+        <div className="flex flex-col min-w-0">
+          <span className="text-sm font-extrabold break-words" style={{ color: "var(--color-text-primary)" }}>
+            {side.team_name}
+          </span>
+          {side.owner_handle ? (
+            <span className="text-xs" style={{ color: "var(--color-text-muted)" }}>
+              {side.owner_handle}
+            </span>
+          ) : null}
+        </div>
+        {txType === "trade" ? (
+          <>
+            <span className="flex-1" />
+            <span className="text-xs uppercase shrink-0" style={{ color: "var(--color-text-muted)", letterSpacing: "var(--letter-spacing-badge)" }}>
+              Received
+            </span>
+          </>
+        ) : null}
+      </div>
+      {txType === "trade" ? (
+        <>
+          {side.receives.length ? (
+            <div className="flex flex-col gap-1.5">
+              {side.receives
+                .filter((asset) => asset.kind !== "pick")
+                .map((asset, i) => (
+                  <TradePlayerRow key={`${asset.player_id || asset.label}-${i}`} asset={asset} />
+                ))}
+              <TradePickLine picks={side.receives.filter((asset) => asset.kind === "pick")} />
+            </div>
+          ) : (
+            <span className="text-xs" style={{ color: "var(--color-text-secondary)" }}>
+              No assets recorded
+            </span>
+          )}
+        </>
+      ) : (
+        <>
+          {side.receives.length ? (
+            <>
+              <span className="text-xs uppercase" style={{ color: "var(--color-text-muted)", letterSpacing: "var(--letter-spacing-badge)" }}>
+                Added
+              </span>
+              <div className="flex flex-wrap gap-1">
+                {side.receives.map((asset, i) => (
+                  <AssetChip key={`${asset.player_id || asset.label}-${i}`} asset={asset} />
+                ))}
+              </div>
+            </>
+          ) : null}
+          {side.drops.length ? (
+            <>
+              <span className="text-xs uppercase" style={{ color: "var(--color-text-muted)", letterSpacing: "var(--letter-spacing-badge)" }}>
+                Dropped
+              </span>
+              <div className="flex flex-wrap gap-1">
+                {side.drops.map((asset, i) => (
+                  <AssetChip key={`${asset.player_id || asset.label}-${i}`} asset={asset} />
+                ))}
+              </div>
+            </>
+          ) : null}
+        </>
+      )}
+      {faab ? (
+        <span className="text-xs uppercase" style={{ color: "var(--color-text-muted)", letterSpacing: "var(--letter-spacing-badge)" }}>
+          <Money>{faab}</Money>
+        </span>
+      ) : null}
+    </div>
+  );
+}
+
+function HistoryGradeBlock({ grade }: { grade: HistoryTransaction["grade"] }) {
+  if (!grade) return null;
+
+  if (grade.kind === "trade") {
+    const sides = grade.sides || [];
+    if (!sides.length) return null;
+    const allPending = sides.every((side) => !side.letter || side.letter.toLowerCase() === "pending");
+    if (grade.pending || grade.partial_evidence || allPending) {
+      const why = sides.map((side) => side.why).find(Boolean) || "Future pick value is unresolved.";
+      return (
+        <p className="mt-1 flex items-start gap-2 text-xs" style={{ color: "var(--color-text-muted)" }}>
+          <span
+            aria-hidden="true"
+            className="inline-block shrink-0"
+            style={{ width: 8, height: 8, marginTop: 4, background: "var(--color-warning)" }}
+          />
+          <span>
+            <span className="font-bold uppercase" style={{ color: "var(--color-text-secondary)", letterSpacing: "var(--letter-spacing-badge)" }}>
+              Grade pending
+            </span>
+            {" · "}
+            {why}
+          </span>
+        </p>
+      );
+    }
+    let primaryWhy = "";
+    let provisionalNote = "";
+    for (const side of sides) {
+      const why = side.why || "";
+      if (why && !primaryWhy) {
+        primaryWhy = why.replace(" Future pick value is estimated until the selection is known.", "").trim();
+      }
+      if (why.includes("Future pick value is estimated")) {
+        provisionalNote = "Future pick value is estimated until the selection is known.";
+      }
+    }
+    return (
+      <div className="mt-2 flex flex-col gap-1.5">
+        <span className="text-xs uppercase font-bold" style={{ color: "var(--color-text-secondary)", letterSpacing: "var(--letter-spacing-badge)" }}>
+          {grade.provisional ? "Provisional trade grade" : "Current trade grade"}
+        </span>
+        {sides.map((side) => (
+          <div key={side.team} className="flex items-baseline justify-between gap-2 flex-wrap">
+            <span className="text-xs uppercase" style={{ color: "var(--color-text-primary)", letterSpacing: "var(--letter-spacing-badge)" }}>
+              {side.team}
+            </span>
+            <span className="font-extrabold" style={{ font: "var(--font-card-title)", color: gradeToneColorVar(side.tone) }}>
+              {side.letter}
+            </span>
+            <span className="text-xs" style={{ color: "var(--color-text-muted)" }}>
+              {side.confidence}
+            </span>
+          </div>
+        ))}
+        {primaryWhy ? (
+          <p className="text-xs" style={{ color: "var(--color-text-secondary)" }}>
+            <span style={{ color: "var(--color-text-muted)" }}>Why </span>
+            {primaryWhy}
+          </p>
+        ) : null}
+        {provisionalNote ? (
+          <p className="text-xs" style={{ color: "var(--color-text-secondary)" }}>
+            {provisionalNote}
+          </p>
+        ) : null}
+      </div>
+    );
+  }
+
+  // Waiver / free-agent grade — always renders, even when still "Pending"
+  // (modules/transaction_grades_ui.py's waiver_grade_html has no skip).
+  return (
+    <div className="mt-2 flex flex-col gap-1">
+      <div className="flex items-baseline justify-between gap-2 flex-wrap">
+        <span className="text-sm font-extrabold" style={{ color: "var(--color-text-primary)" }}>
+          {grade.player}
+        </span>
+        <span className="text-xs" style={{ color: "var(--color-text-muted)" }}>
+          {grade.grade_model_label || "Current pickup grade"}
+        </span>
+        <span className="font-extrabold" style={{ font: "var(--font-card-title)", color: gradeToneColorVar(grade.tone) }}>
+          {grade.letter}
+        </span>
+        <span className="text-xs" style={{ color: "var(--color-text-muted)" }}>
+          {grade.confidence}
+        </span>
+      </div>
+      {grade.why ? (
+        <p className="text-xs" style={{ color: "var(--color-text-secondary)" }}>
+          <span style={{ color: "var(--color-text-muted)" }}>Why </span>
+          {grade.why}
+        </p>
+      ) : null}
+      {grade.watch ? (
+        <p className="text-xs" style={{ color: "var(--color-text-secondary)" }}>
+          <span style={{ color: "var(--color-text-muted)" }}>Watch </span>
+          {grade.watch}
+        </p>
+      ) : null}
+    </div>
+  );
+}
+
+function HistoryItemCard({ transaction }: { transaction: HistoryTransaction }) {
+  const sideCount = (transaction.sides || []).length;
+  const kicker = transaction.type === "trade" ? (sideCount > 2 ? `${sideCount}-team trade` : "Trade") : transaction.type === "waiver" ? "Waiver" : "Free agent";
+  const when = formatHistoryWhen(transaction.week, transaction.timestamp);
+  const sides = transaction.sides || [];
+  if (!sides.length) return null;
+  // The pick list repeats picks each side already shows; only list the rest.
+  const shownInSides = new Set(sides.flatMap((side) => side.receives.map((asset) => pickLabel(asset))));
+  const extraPicks = (transaction.draft_picks || []).filter((pick) => !shownInSides.has(pickLabel(pick)));
+  return (
+    <article
+      className="p-3 flex flex-col gap-2"
+      style={{ background: "var(--color-surface-primary)", border: "var(--border-width-default) solid var(--color-border-strong)" }}
+    >
+      <header className="flex items-baseline justify-between gap-2 flex-wrap">
+        <span className="text-xs uppercase font-bold" style={{ color: "var(--color-text-secondary)", letterSpacing: "var(--letter-spacing-badge)" }}>
+          {kicker}
+        </span>
+        <span className="text-xs" style={{ color: "var(--color-text-muted)" }}>
+          {when}
+        </span>
+      </header>
+      <div className="grid gap-2" style={{ gridTemplateColumns: sides.length > 1 ? "repeat(auto-fit, minmax(16rem, 1fr))" : "1fr" }}>
+        {sides.map((side) => (
+          <HistorySideBlock key={side.roster_id} side={side} txType={transaction.type} />
+        ))}
+      </div>
+      {extraPicks.length ? (
+        <div className="flex flex-wrap gap-1">
+          {extraPicks.map((pick, i) => (
+            <AssetChip key={`${pick.label}-${i}`} asset={pick} />
+          ))}
+        </div>
+      ) : null}
+      <HistoryGradeBlock grade={transaction.grade} />
+    </article>
+  );
+}
+
+export function HistoryTab({
+  leagueId,
+  initialFilter,
+  cache,
+  setCache,
+}: {
+  leagueId: string;
+  initialFilter: string;
+  cache: Record<string, HistoryResponse>;
+  setCache: (next: Record<string, HistoryResponse>) => void;
+}) {
+  const [selectedSeasonLeagueId, setSelectedSeasonLeagueId] = useState<string>(leagueId);
+  const [filter, setFilter] = useState<string>(initialFilter);
+  const [error, setError] = useState<string | null>(null);
+  const [retryToken, setRetryToken] = useState(0);
+
+  const data = cache[selectedSeasonLeagueId];
+
+  useEffect(() => {
+    if (cache[selectedSeasonLeagueId]) return;
+    let cancelled = false;
+    api
+      .getLeagueHistory(leagueId, selectedSeasonLeagueId === leagueId ? undefined : selectedSeasonLeagueId)
+      .then((response) => {
+        if (cancelled) return;
+        setCache({ ...cache, [response.selected_league_id]: response });
+      })
+      .catch((err) => {
+        if (cancelled) return;
+        setError(err instanceof Error ? err.message : "Could not load League History.");
+      });
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedSeasonLeagueId, retryToken]);
+
+  if (!data && !error) {
+    return (
+      <SkeletonRegion label="league history" className="flex flex-col gap-3"><SkeletonModule /><SkeletonModule /><SkeletonModule /></SkeletonRegion>
+    );
+  }
+  if (error) {
+    return (
+      <ErrorState bare message={error} onRetry={() => { setError(null); setRetryToken((n) => n + 1); }} />
+    );
+  }
+  if (!data) return null;
+
+  if (data.reason === "no_history" || data.seasons.length === 0) {
+    return (
+      <p className="text-sm" style={{ color: "var(--color-text-muted)" }}>
+        This league has no Sleeper history to show yet.
+      </p>
+    );
+  }
+
+  const visible = data.transactions.filter((tx) => matchesHistoryFilter(tx, filter));
+
+  return (
+    <div className="flex flex-col gap-4">
+      <TabStack>
+      {data.seasons.length > 1 ? (
+        <PillRow
+          ariaLabel="Season"
+          variant="compact"
+          options={data.seasons.map((season) => ({ label: season.season || season.name, value: season.league_id }))}
+          active={selectedSeasonLeagueId}
+          onSelect={setSelectedSeasonLeagueId}
+        />
+      ) : null}
+      <PillRow
+        ariaLabel="Filter history"
+        variant="scroll"
+        options={HISTORY_FILTERS.map((label) => ({ label, value: label }))}
+        active={filter}
+        onSelect={setFilter}
+      />
+      </TabStack>
+      {visible.length === 0 ? (
+        <p className="text-sm max-w-md" style={{ color: "var(--color-text-secondary)" }}>
+          {emptyFilterNote(filter)}
+        </p>
+      ) : (
+        <div className="flex flex-col gap-3">
+          {visible.map((transaction) => (
+            <HistoryItemCard key={transaction.transaction_id} transaction={transaction} />
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// modules/league_storylines_ui.py's _breakdown_note(), verbatim.

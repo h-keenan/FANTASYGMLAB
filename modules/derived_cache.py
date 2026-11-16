@@ -135,6 +135,17 @@ def derive_frame_key(parent: Any, result: Any, *operation: Any) -> Any:
 # ---------------------------------------------------------------- the memo
 
 
+_MEMOS: "weakref.WeakSet[Memo]" = weakref.WeakSet()
+
+
+def clear_all_memos() -> None:
+    """Empty every ``Memo`` in the process (test isolation: valued-frame tags name a cache entry, not content, so a test that
+    swaps the underlying data under the same league id must not see another test's memoised derivation)."""
+
+    for memo in list(_MEMOS):
+        memo.clear()
+
+
 class Memo:
     def __init__(self, name: str, *, max_entries: int = 64, ttl_seconds: float = DEFAULT_TTL_SECONDS,
                  copier: Callable[[Any], Any] = copy.deepcopy, clock: Callable[[], float] = time.monotonic) -> None:
@@ -148,6 +159,7 @@ class Memo:
         self._lock = threading.Lock()
         self.hits = 0
         self.misses = 0
+        _MEMOS.add(self)
 
     def clear(self) -> None:
         with self._lock:

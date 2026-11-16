@@ -5,7 +5,6 @@ import { useEffect, useRef, useState, type ReactNode } from "react";
 import { api } from "@/lib/api";
 import type { RecapResponse, RecapStory, RecapTradeAsset } from "@/lib/api";
 import { EmptyState } from "@/components/EmptyState";
-import { ManagerProfileSheet } from "@/components/ManagerProfileSheet";
 import { Money } from "@/components/Money";
 import { PillRow } from "@/components/PillRow";
 import { SkeletonModule, SkeletonRegion, SkeletonStatusHeader } from "@/components/Skeleton";
@@ -19,6 +18,13 @@ import { TradeAssetCard, TradeCompactCard, type TradeCardAsset } from "@/compone
 import { FILTER_ALL, historyDeepLinkLabel } from "@/lib/leagueRecapsPresentation";
 import { buildRecapPage, isMatchupStory, recapFaab, recapMetric, recapScoreline, recapWeekChips, storyInvolves, type RecapSection } from "@/lib/recapPage";
 import { formatMoney } from "@/lib/money";
+
+import dynamic from "next/dynamic";
+
+// Perf pass 2026-11: the manager sheet only mounts after a tap on a team, so it is its own chunk instead of first-load JS.
+const ManagerProfileSheet = dynamic(() => import("@/components/ManagerProfileSheet").then((m) => m.ManagerProfileSheet), {
+  loading: () => null,
+});
 
 /**
  * The weekly recap (League > Recaps > "Recaps"), built from the shared templates (docs/ui-patterns.md, "Weekly recap
