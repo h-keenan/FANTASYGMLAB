@@ -142,10 +142,11 @@ export function SimBlockView({ ctx, onMakeOffer }: { ctx: SimCtx; onMakeOffer: (
             trailing={<Button size="sm" label="Block" disabled={full} loading={busy === p.id} onPress={() => toggle(p.id, true)} />}
           />
         ))}
+        {/* Right under the players it expands (below the picks it was missed). */}
+        {candidates.length > 8 ? <Button size="sm" variant="secondary" label={showAll ? 'Show fewer players' : `Show all ${candidates.length} players`} onPress={() => setShowAll((v) => !v)} /> : null}
         {myPicks.map((p: SimPickAsset) => (
           <SimPickLine key={p.id} pick={p} trailing={<Button size="sm" label="Block" disabled={full} loading={busy === p.id} onPress={() => toggle(p.id, true)} />} />
         ))}
-        {candidates.length > 8 ? <Button size="sm" variant="secondary" label={showAll ? 'Show fewer' : `Show all ${candidates.length}`} onPress={() => setShowAll((v) => !v)} /> : null}
       </View>
 
       <View style={common.stack} accessibilityLabel="Around the league">
