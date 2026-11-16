@@ -64,7 +64,7 @@ export function PlayerName({
   return (
     <Tag
       ref={ref}
-      className={`block min-w-0 max-w-full ${stage.wrap ? "whitespace-normal [overflow-wrap:break-word] leading-tight" : "whitespace-nowrap"} ${className}`.trim()}
+      className={`block min-w-0 max-w-full ${stage.wrap ? "whitespace-normal [overflow-wrap:normal] leading-tight" : "whitespace-nowrap"} ${className}`.trim()}
       style={style}
       title={label}
       data-player-name={stage.short ? "short" : "full"}
