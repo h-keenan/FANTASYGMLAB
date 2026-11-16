@@ -360,11 +360,17 @@ def test_monkeypatched_process_never_shares_through_redis(real_frame, monkeypatc
 
 @pytest.mark.parametrize("name", ["De'Von Achane", "Davante Adams", "Travis Etienne Jr."])
 def test_inactive_status_with_ir_injury_stays_eligible_and_not_blocked(name):
-    """Sleeper sends rostered IR players as status "Inactive" + injury_status "IR"."""
+    """Sleeper sends rostered IR players as status "Inactive" + injury_status "IR".
+
+    The real dump record supplies a realistic Sleeper shape, but the IR
+    designation is pinned here: the scheduled injury-status sync rewrites
+    data/sleeper_players.json, so a player coming off IR must not flip
+    this test (Travis Etienne Jr. returned to Active in 2026-11).
+    """
     with open(ROOT / "data" / "sleeper_players.json", encoding="utf-8") as handle:
         dump = json.load(handle)
-    pid, player = next((k, v) for k, v in dump.items() if v.get("full_name") == name)
-    assert player["status"] == "Inactive" and player["injury_status"] == "IR"
+    pid, live = next((k, v) for k, v in dump.items() if v.get("full_name") == name)
+    player = {**live, "status": "Inactive", "injury_status": "IR"}
     record = normalize_player_record(pid, player)
     record.update(sport=player.get("sport"), active=player.get("active"), fantasycalc_value=1000.0, stats_season=2025)
     record["injury_status"] = player.get("injury_status")
