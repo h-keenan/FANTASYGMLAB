@@ -1089,16 +1089,43 @@ def optional_user(
 _PROFILE_FIELDS_TTL_SECONDS = 15
 
 
+class _ProfileReadFailed(Exception):
+    """A profile read that failed even after one retry. Raised from inside the
+    single-flight compute so the error result is NEVER written to the shared
+    cache (it would otherwise pin a paying user to "free" for the whole TTL)."""
+
+    def __init__(self, fields: dict[str, str]):
+        super().__init__("profile read failed")
+        self.fields = fields
+
+
+def _fetch_profile_fields_verified(config: dict, user_id: str, access_token: str) -> dict[str, str]:
+    """Uncached read with one immediate retry; raises _ProfileReadFailed if both fail."""
+
+    fields = _fetch_profile_fields_uncached(config, user_id, access_token)
+    if fields.get("status") != "error":
+        return fields
+    fields = _fetch_profile_fields_uncached(config, user_id, access_token)
+    if fields.get("status") != "error":
+        return fields
+    raise _ProfileReadFailed(fields)
+
+
 def _fetch_profile_fields(config: dict, user_id: str, access_token: str) -> dict[str, str]:
     cache_key = redis_cache.build_cache_key("profile_fields", user_id)
     try:
         fields = redis_cache.redis_single_flight_cache(
             cache_key=cache_key,
             ttl_seconds=_PROFILE_FIELDS_TTL_SECONDS,
-            compute=lambda: _fetch_profile_fields_uncached(config, user_id, access_token),
+            compute=lambda: _fetch_profile_fields_verified(config, user_id, access_token),
         )
+    except _ProfileReadFailed as exc:
+        fields = exc.fields
     except Exception:
-        fields = _fetch_profile_fields_uncached(config, user_id, access_token)
+        try:
+            fields = _fetch_profile_fields_verified(config, user_id, access_token)
+        except _ProfileReadFailed as exc:
+            fields = exc.fields
     # Sleeper call-rate budget priority (modules.sleeper_budget): paid tiers
     # always proceed; free-tier requests serve last-known data once the soft
     # threshold is crossed. A profile read that failed ("error") is not
@@ -1146,8 +1173,14 @@ def _fetch_profile_fields_uncached(config: dict, user_id: str, access_token: str
         else:
             response = _get("entitlement,sleeper_username,trial_ends_at")
             if response.status_code >= 400:
-                _TRIAL_COLUMN_MISSING = True
+                first_status = response.status_code
                 response = _get("entitlement,sleeper_username")
+                # Only a 400 (PostgREST "column does not exist") that the
+                # narrower select then survives proves the migration is
+                # missing. A 401/5xx/timeout is transient and must never flip
+                # this process-wide flag.
+                if first_status == 400 and response.status_code < 400:
+                    _TRIAL_COLUMN_MISSING = True
     except Exception:
         return defaults
     if response.status_code >= 400:
@@ -7454,17 +7487,36 @@ _MANAGER_TENDENCIES_UPSELL = {
 }
 
 
+def _caller_plan(user: dict[str, Any]) -> str:
+    """"pro", "free" or "unknown" (the profile read failed, so the plan could
+    not be verified). Resolved once per request: memoized on the request's own
+    user dict, so a request that checks several gates pays one read and sees one
+    consistent answer. "unknown" is never memoized, so a later gate in the same
+    request can still succeed."""
+
+    cached = user.get("_plan")
+    if cached in ("pro", "free"):
+        return cached
+    user_id = str(user.get("id") or "")
+    if not user_id:
+        return "free"
+    config = auth_supabase.get_supabase_config()
+    profile = _fetch_profile_fields(config, user_id, str(user.get("_access_token") or ""))
+    if profile.get("status") == "error":
+        return "unknown"
+    plan = "pro" if premium.is_at_least(profile.get("entitlement"), premium.PRO) else "free"
+    user["_plan"] = plan
+    return plan
+
+
 def _manager_tendencies_gate(user: dict[str, Any]) -> bool:
     """Premium (PRO) gate, same tier and same check as GM Plan / Live Draft
     / the full League Pulse and Trade Hub lists. Checked before any Sleeper
-    scan so a Free caller never pays for the multi-season transaction read."""
+    scan so a Free caller never pays for the multi-season transaction read.
+    An unverifiable plan stays closed here (revenue protection); Fantasy Sim
+    uses _sim_is_pro, which reports it as a retryable error instead."""
 
-    user_id = str(user.get("id") or "")
-    if not user_id:
-        return False
-    config = auth_supabase.get_supabase_config()
-    profile = _fetch_profile_fields(config, user_id, str(user.get("_access_token") or ""))
-    return premium.is_at_least(profile.get("entitlement"), premium.PRO)
+    return _caller_plan(user) == "pro"
 
 
 _PLAYOFF_ODDS_UPSELL = {
@@ -7501,6 +7553,21 @@ def _is_pro_caller(user: dict[str, Any]) -> bool:
     return _manager_tendencies_gate(user)
 
 
+class _PlanUnverified(Exception):
+    """The caller's plan could not be read; Sim reports a retryable error for it."""
+
+
+def _sim_is_pro(user: dict[str, Any]) -> bool:
+    """Pro check for Fantasy Sim: a failed profile read must not look like a
+    Free account (that showed paying users the paywall), so it raises
+    _PlanUnverified and Sim answers a retryable "plan_unverified"."""
+
+    plan = _caller_plan(user)
+    if plan == "unknown":
+        raise _PlanUnverified()
+    return plan == "pro"
+
+
 # Fantasy Sim (docs/fantasy-sim-api.md): fully isolated under modules/sim, mounted
 # only when SIM_ENABLED is on (default off). The one place real code references it.
 if os.environ.get("SIM_ENABLED", "").strip().lower() in {"1", "true", "yes", "on"}:
@@ -7510,7 +7577,8 @@ if os.environ.get("SIM_ENABLED", "").strip().lower() in {"1", "true", "yes", "on
         app,
         sim_api.SimApiDeps(
             require_user=require_user,
-            is_pro=_is_pro_caller,
+            is_pro=_sim_is_pro,
+            plan_unverified_exc=_PlanUnverified,
             sleeper_username=lambda user: _fetch_profile_fields(
                 auth_supabase.get_supabase_config(), str(user.get("id") or ""), str(user.get("_access_token") or "")
             ).get("sleeper_username", ""),

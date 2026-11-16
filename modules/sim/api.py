@@ -130,6 +130,19 @@ def sim_enabled(environ: Mapping[str, str] | None = None) -> bool:
     return str(value).strip().lower() in {"1", "true", "yes", "on"}
 
 
+class PlanUnverified(Exception):
+    """The caller's plan could not be read (a failed profile lookup). Never a
+    verdict: it must neither show the Free paywall nor unlock Pro."""
+
+
+PLAN_UNVERIFIED_MESSAGE = "We couldn't verify your plan just now. Your game is safe. Try again in a moment."
+
+
+def plan_unverified_response() -> dict[str, Any]:
+    return {"ok": True, "reason": "plan_unverified", "message": PLAN_UNVERIFIED_MESSAGE,
+            "is_premium": None, "upsell": None, "preview": None}
+
+
 @dataclass
 class SimApiDeps:
     require_user: Callable[..., dict[str, Any]]
@@ -144,6 +157,8 @@ class SimApiDeps:
     # function; Season Outlook shows exactly what GM Plan shows):
     # (league_id, roster_id, lens) -> row or None when odds are not ready.
     shared_odds: Callable[[str, str, str], dict[str, Any] | None] | None = None
+    # Exception ``is_pro`` raises when the plan could not be read (not a Free verdict).
+    plan_unverified_exc: type[Exception] | None = None
 
 
 class CreateWorldRequest(BaseModel):
@@ -436,4 +451,10 @@ def mount(app: Any, deps: SimApiDeps, environ: Mapping[str, str] | None = None) 
     if not sim_enabled(environ):
         return False
     app.include_router(build_router(deps))
+
+    async def _plan_unverified_handler(_request: Any, _exc: Exception) -> JSONResponse:
+        return JSONResponse(status_code=200, content=plan_unverified_response(), headers={"Retry-After": "2"})
+
+    for exc_type in {PlanUnverified, deps.plan_unverified_exc} - {None}:
+        app.add_exception_handler(exc_type, _plan_unverified_handler)
     return True

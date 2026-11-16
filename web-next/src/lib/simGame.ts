@@ -1326,6 +1326,7 @@ export interface SimGameResponse extends SimGameEnvelope {
 
 const REASON_COPY: Record<string, string> = {
   premium_required: "Your 1 free season is used. Go Pro for more seasons, dynasty and mid-season starts.",
+  plan_unverified: "We couldn't verify your plan just now. Your game is safe. Try again in a moment.",
   sim_storage_unavailable: "Saving games is temporarily unavailable. Try again in a little while.",
   players_unavailable: "The player pool could not be built right now. Try again in a moment.",
   game_limit_reached: "You have reached your limit of saved games. Delete one to start another.",
@@ -1376,7 +1377,7 @@ export function simGameReasonMessage(reason: string | undefined | null, body?: S
 export type SimGameGate =
   | { kind: "ready" }
   | { kind: "premium"; upsell: SimGameUpsell | null; preview: SimGamePreview | null }
-  | { kind: "unavailable"; cause: "off" | "storage" | "busy" }
+  | { kind: "unavailable"; cause: "off" | "storage" | "busy" | "plan" }
   | { kind: "conflict" }
   | { kind: "blocked"; reason: string; message: string };
 
@@ -1397,6 +1398,8 @@ export function simGameGate(body: SimGameEnvelope | null | undefined): SimGameGa
   if (reason === "sim_storage_unavailable") return { kind: "unavailable", cause: "storage" };
   if (reason === "conflict") return { kind: "conflict" };
   if (reason === "sim_busy") return { kind: "unavailable", cause: "busy" };
+  // The server could not read the plan: a retryable error, never a paywall.
+  if (reason === "plan_unverified") return { kind: "unavailable", cause: "plan" };
   if (reason) return { kind: "blocked", reason, message: body.message || simGameReasonMessage(reason, body) };
   return { kind: "ready" };
 }
@@ -1419,15 +1422,22 @@ export function simIsTransientGate(gate: SimGameGate | null): boolean {
 /** Inline copy for a failed action. The game stays on screen: only the initial load shows the full-page unavailable state. */
 export function simActionFailureMessage(body?: SimGameEnvelope | null, gate?: SimGameGate | null): string {
   if (gate && gate.kind === "unavailable" && gate.cause === "busy") return "The simulator is busy right now. Try again in a few seconds.";
+  if (gate && gate.kind === "unavailable" && gate.cause === "plan") return "We couldn't verify your plan just now. Your game is safe. Try again in a moment.";
   const code = body?.detail ? ` (${body.detail})` : "";
   return `Couldn't save that. Your game is safe. Try it again${code}.`;
 }
 
-export function simGameUnavailableCopy(cause: "off" | "storage" | "busy"): { title: string; subtitle: string } {
+export function simGameUnavailableCopy(cause: "off" | "storage" | "busy" | "plan"): { title: string; subtitle: string } {
   if (cause === "storage") {
     return {
       title: "Fantasy Sim is temporarily unavailable",
       subtitle: "It is switched on, but we cannot save games right now. Your progress is safe. Try again in a little while.",
+    };
+  }
+  if (cause === "plan") {
+    return {
+      title: "We couldn't verify your plan",
+      subtitle: "This is a temporary hiccup, not a change to your plan. Your game is safe. Try again in a moment.",
     };
   }
   if (cause === "busy") {

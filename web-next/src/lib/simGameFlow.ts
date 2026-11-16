@@ -31,7 +31,7 @@ export type SimFlowView = "loading" | "unavailable" | "hub" | "setup" | "game" |
 
 export interface SimFlowState {
   view: SimFlowView;
-  cause: "off" | "storage" | "busy" | null;
+  cause: "off" | "storage" | "busy" | "plan" | null;
   message: string;
   gameId: string | null;
   stage: SimGameStage | null;

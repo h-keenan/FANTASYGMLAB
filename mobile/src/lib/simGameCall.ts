@@ -19,6 +19,8 @@ export interface SimGameCallHandlers {
   retryMs?: number;
   /** A successful action's `delta` (the header slice it changed), applied before the call returns. */
   onDelta?: (delta: SimGameDelta) => void;
+  /** A verified-Pro answer proves any paywall still on screen is stale: the screen clears it. */
+  onVerifiedPro?: () => void;
 }
 
 export async function runSimGameCall<T extends SimGameEnvelope>(fn: () => Promise<T>, handlers: SimGameCallHandlers): Promise<T | null> {
@@ -32,6 +34,7 @@ export async function runSimGameCall<T extends SimGameEnvelope>(fn: () => Promis
       gate = simGameGate(body);
       if (gate.kind === 'ready') {
         if (body.delta) handlers.onDelta?.(body.delta);
+        if (body.is_premium === true) handlers.onVerifiedPro?.();
         return body;
       }
     } catch (error) {
