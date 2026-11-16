@@ -364,18 +364,19 @@ export function CommissionerView({
 }
 
 export function CommissionerContent({ leagueId, leagueName, lens }: { leagueId: string; leagueName: string; lens?: string }) {
-  // The saved rule (per user + league, server-side); null until it loads, so the first integrity request already uses it.
-  const [draftOrder, setDraftOrderState] = useState<DraftOrderRule | null>(null);
+  // The saved rule (per user + league, server-side), stored with the league it belongs to: null until it loads for THIS league,
+  // so the first integrity request already uses it and a league switch never reuses the last league's rule.
+  const [saved, setSaved] = useState<{ leagueId: string; rule: DraftOrderRule } | null>(null);
+  const draftOrder: DraftOrderRule | null = saved && saved.leagueId === leagueId ? saved.rule : null;
   useEffect(() => {
     let cancelled = false;
-    setDraftOrderState(null);
     api
       .getDraftOrderRule(leagueId)
       .then((res) => {
-        if (!cancelled) setDraftOrderState(res.draft_order ?? "unknown");
+        if (!cancelled) setSaved({ leagueId, rule: res.draft_order ?? "unknown" });
       })
       .catch(() => {
-        if (!cancelled) setDraftOrderState("unknown");
+        if (!cancelled) setSaved({ leagueId, rule: "unknown" });
       });
     return () => {
       cancelled = true;
@@ -383,7 +384,7 @@ export function CommissionerContent({ leagueId, leagueName, lens }: { leagueId: 
   }, [leagueId]);
   // Changing it saves server-side and refetches the integrity data (the key below changes).
   const setDraftOrder = (value: DraftOrderRule) => {
-    setDraftOrderState(value);
+    setSaved({ leagueId, rule: value });
     api.setDraftOrderRule(leagueId, value).catch(() => {});
   };
   const [state, setState] = useState<{ key: string; data: CommissionerIntegrityResponse | null; error: string | null }>({
