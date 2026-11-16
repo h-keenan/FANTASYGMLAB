@@ -7,7 +7,7 @@ import { PlayerIdentity } from "@/components/PlayerRow";
 import { ValueStat } from "@/components/ValueStat";
 import Link from "next/link";
 import { Button, ButtonLink } from "@/components/Button";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
 import type { WaiverTab } from "@/lib/pageTabs";
 
 import { api, type WaiverPlayer, type WaiverPriorityAdd, type WaiversResponse } from "@/lib/api";
@@ -17,7 +17,7 @@ import { abbreviatePlayerName } from "@/lib/formatPlayerName";
 import type { CompactPart } from "@/lib/compactModule";
 import { ConfidenceMeter } from "@/components/ConfidenceMeter";
 import { HighlightTarget } from "@/components/HighlightTarget";
-import { InfoTip } from "@/components/InfoTip";
+import { InfoMark } from "@/components/ui/InfoMark";
 import { OvrGauge } from "@/components/OvrGauge";
 import { FilterSheet } from "@/components/ui/FilterSheet";
 import { ViewSelect } from "@/components/ui/ViewSelect";
@@ -435,11 +435,11 @@ function PlayerTile({ position, player, note }: { position: string; player: Waiv
   );
 }
 
-function TileRow({ title, players, highlightPlayerId }: { title: string; players: WaiverPlayer[]; highlightPlayerId?: string }) {
+function TileRow({ title, players, highlightPlayerId, help }: { title: string; players: WaiverPlayer[]; highlightPlayerId?: string; help?: ReactNode }) {
   if (players.length === 0) return null;
   return (
     <section className="flex flex-col gap-2">
-      <SectionHeading>{title}</SectionHeading>
+      <SectionHeading help={help}>{title}</SectionHeading>
       <div className="flex gap-3 overflow-x-auto pb-1">
         {players.map((player) => (
           <HighlightTarget key={player.player_id} active={player.player_id === highlightPlayerId}>
@@ -663,9 +663,12 @@ export function WaiversContent({
                 {limitedNote}
               </p>
             ) : null}
-            <InfoTip label="How Priority Adds rank">
-              Need fits and injury cover rank first, then value. {DISCLOSURE_TEXT}
-            </InfoTip>
+            <div className="flex items-center">
+              <span className="text-xs font-semibold" style={{ color: "var(--color-text-muted)" }}>
+                How Priority Adds rank
+              </span>
+              <InfoMark label="how Priority Adds rank" lines={["Need fits and injury cover rank first, then value.", DISCLOSURE_TEXT]} />
+            </div>
             <div className="flex flex-wrap items-center justify-between gap-x-3">
               <p className="text-xs" style={{ color: "var(--color-text-muted)" }}>
                 Place claims in Sleeper — we don&apos;t submit them.
@@ -833,11 +836,19 @@ export function WaiversContent({
             </div>
           ) : (
             <>
-              <InfoTip label="Stash, depth and FAAB: ranked by raw value">
-                Includes positions you don&apos;t currently need, so a higher number here can still rank below a lower one
-                in Priority Adds above. Kickers and defenses are never stash candidates.
-              </InfoTip>
-              <TileRow title="Top Stash Candidates" players={data.stash_candidates} highlightPlayerId={highlightPlayerId} />
+              <TileRow
+                title="Top Stash Candidates"
+                players={data.stash_candidates}
+                highlightPlayerId={highlightPlayerId}
+                help={
+                  <InfoMark
+                    label="stash, depth and FAAB lists"
+                    lines={[
+                      "Stash, depth and FAAB lists are ranked by raw value. They include positions you don't currently need, so a higher number here can still rank below a lower one in Priority Adds above. Kickers and defenses are never stash candidates.",
+                    ]}
+                  />
+                }
+              />
               <TileRow title={TERMS.depthAdds} players={data.watchlist_candidates} highlightPlayerId={highlightPlayerId} />
               <TileRow title="FAAB Shortlist" players={data.faab_targets} highlightPlayerId={highlightPlayerId} />
             </>
@@ -847,13 +858,16 @@ export function WaiversContent({
 
       {tab === "explore" ? (
         <section className="flex flex-col gap-3" aria-labelledby="all-free-agents-heading">
-          <SectionHeading>
+          <SectionHeading
+            help={
+              <InfoMark
+                label="all free agents"
+                lines={["Showing the best available players not currently on a roster in this league. Stale or retired profiles are pushed to the bottom."]}
+              />
+            }
+          >
             <span id="all-free-agents-heading">All Free Agents</span>
           </SectionHeading>
-          <InfoTip label="Unrostered players in this league">
-            Showing the best available players not currently on a roster in this league. Stale or retired profiles are
-            pushed to the bottom.
-          </InfoTip>
           {visibleFreeAgents.length === 0 ? (
             <EmptyState title="No free agents match." />
           ) : (

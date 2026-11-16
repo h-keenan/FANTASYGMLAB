@@ -11,7 +11,7 @@ describe("ui pass 5 (D3, D9)", () => {
   it("D3: no labelled inline page '?' rows; the four pages hand their lines to PageTitle info", () => {
     for (const rel of ["components/MyTeamContent.tsx", "components/MatchupContent.tsx", "components/LeagueRankingsContent.tsx", "components/WaiversContent.tsx"]) {
       const src = read(WEB, rel);
-      expect(src, rel).not.toMatch(/<BeginnerHelp[^>]*label="(My Team and value tiers|this matchup page|playoff odds|waiver value|waiver confidence)"/);
+      expect(src, rel).not.toMatch(/<(BeginnerHelp|InfoTip|GlossaryNote)\b/);
       expect(src, rel).toMatch(/<PageTitle page="[^"]+" leagueName=\{leagueName\} info=\{/);
     }
     expect(read(WEB, "components/PageHelpLines.tsx")).toContain("copy.showsHelp");

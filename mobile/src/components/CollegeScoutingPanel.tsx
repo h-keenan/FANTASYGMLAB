@@ -10,7 +10,8 @@ import EmptyState from './EmptyState';
 import PlayerName from './PlayerName';
 import PositionBadge from './PositionBadge';
 import PremiumLock from './PremiumLock';
-import ScreenInfoNote from './ScreenInfoNote';
+import InfoMark from './InfoMark';
+import SectionHeading from './SectionHeading';
 import SegmentedTabBar from './SegmentedTabBar';
 import ToneBadge from './ToneBadge';
 import ViewModeToggle from './ViewModeToggle';
@@ -244,8 +245,16 @@ export default function CollegeScoutingPanel({
 
   return (
     <View style={styles.panel}>
-      <ScreenInfoNote
-        text="Every signed-in user's grade on a prospect pools into one shared signal — that shared aggregate, not any single grade, can influence rookie draft-class strength. Your own grade and watchlist stay yours to edit any time."
+      <SectionHeading
+        title="Rookie prospects"
+        info={
+          <InfoMark
+            label="rookie prospects"
+            lines={[
+              "Every signed-in user's grade on a prospect pools into one shared signal — that shared aggregate, not any single grade, can influence rookie draft-class strength. Your own grade and watchlist stay yours to edit any time.",
+            ]}
+          />
+        }
       />
       {lens ? (
         <View style={styles.lensBlock}>

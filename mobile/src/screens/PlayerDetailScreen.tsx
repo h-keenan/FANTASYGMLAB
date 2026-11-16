@@ -66,7 +66,7 @@ import { useRosterOwnershipWithTeams } from '../lib/useRosterOwnership';
 import { useThemeMode } from '../context/ThemeModeContext';
 import { useExperienceCopy } from '../context/ExperienceLevelContext';
 import PlayerNewsSection from '../components/PlayerNewsSection';
-import BeginnerHelp from '../components/BeginnerHelp';
+import InfoMark from '../components/InfoMark';
 import { radii, spacing, type ThemeColors, scrim } from '../theme';
 import type { RootStackParamList } from '../navigation/RootNavigator';
 import { SheetModal, SheetScrollView, SwipeDismissCard } from '../components/SwipeDismissSheet';
@@ -1385,6 +1385,17 @@ export default function PlayerDetailScreen({ route, navigation }: Props) {
   const content: React.ReactNode[] = [];
   content.push(
     <PlayerHero
+      info={
+        <InfoMark
+          label="value, score and tier"
+          beginnerOnly
+          lines={[
+            `Value: ${copy.help('playerValue')}`,
+            overallRating !== null ? `Overall: ${copy.help('overallRating')}` : null,
+            player.tier ? `Tier (${tierIdentity.semanticLabel}): ${copy.help('playerTier')}` : null,
+          ]}
+        />
+      }
       key="hero"
       playerId={player.player_id}
       tier={player.tier}
@@ -1415,20 +1426,6 @@ export default function PlayerDetailScreen({ route, navigation }: Props) {
   if (model?.decision_fit_narrative) {
     content.push(<DecisionFitCard key="decision-fit" narrative={model.decision_fit_narrative} />);
   }
-  // Beginner-only explanations of the value, Overall and tier shown in the
-  // hero/Snapshot (lib/experienceCopy.ts). Not pushed at all for advanced or
-  // unset accounts, so the content array (and the sticky tab-bar index
-  // computed from it below) is exactly what it was before.
-  if (copy.isBeginner) {
-    content.push(
-      <View key="beginner-help" style={styles.beginnerHelpBlock}>
-        <BeginnerHelp text={`Value: ${copy.help('playerValue')}`} />
-        {overallRating !== null ? <BeginnerHelp text={`Overall: ${copy.help('overallRating')}`} /> : null}
-        {player.tier ? <BeginnerHelp text={`Tier (${tierIdentity.semanticLabel}): ${copy.help('playerTier')}`} /> : null}
-      </View>,
-    );
-  }
-
   // Snapshot (+ its rank-unavailable note) is tab-agnostic — same info
   // regardless of which tab is active — but per the more-authoritative QB
   // concept sheet (coridian_, 2026-09-25 follow-up), it renders BELOW the
@@ -1907,7 +1904,6 @@ function createStyles(colors: ThemeColors) {
     alignItems: 'center',
     justifyContent: 'space-between',
   },
-  beginnerHelpBlock: { marginTop: spacing.sm, gap: spacing.xs },
   notice: {
     marginTop: spacing.md,
     fontSize: 13.5,

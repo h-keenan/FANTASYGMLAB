@@ -3,7 +3,8 @@ import { StyleSheet, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 
 import AppText from './AppText';
-import BeginnerHelp from './BeginnerHelp';
+import InfoMark from './InfoMark';
+import { useExperienceCopy } from '../context/ExperienceLevelContext';
 import AccentCard from './AccentCard';
 import ToneBadge from './ToneBadge';
 import { useThemeMode } from '../context/ThemeModeContext';
@@ -18,6 +19,7 @@ import { spacing, type ThemeColors } from '../theme';
  */
 export default function TradeHubHoldCard({ hold, ideaCount }: { hold: TradeHubHold; ideaCount: number }) {
   const { colors } = useThemeMode();
+  const copy = useExperienceCopy();
   const styles = useMemo(() => createStyles(colors), [colors]);
   const note = holdIdeasNote(hold, ideaCount);
   const factorStyle = (factor: string): { color: string; icon: keyof typeof Ionicons.glyphMap } => {
@@ -35,7 +37,10 @@ export default function TradeHubHoldCard({ hold, ideaCount }: { hold: TradeHubHo
         </View>
         <View style={styles.headText}>
           <ToneBadge label="Hold" color={colors.accent} />
-          <AppText style={styles.title}>{hold.headline}</AppText>
+          <View style={styles.titleRow}>
+            <AppText style={[styles.title, styles.titleText]}>{hold.headline}</AppText>
+            <InfoMark label="this hold" beginnerOnly lines={[copy.help('tradeHubHold')]} />
+          </View>
         </View>
       </View>
       {hold.why.map((line, index) => {
@@ -52,7 +57,6 @@ export default function TradeHubHoldCard({ hold, ideaCount }: { hold: TradeHubHo
           </View>
         );
       })}
-      <BeginnerHelp term="tradeHubHold" />
       {note ? <AppText style={styles.note}>{note}</AppText> : null}
     </AccentCard>
   );
@@ -62,6 +66,8 @@ const createStyles = (colors: ThemeColors) =>
   StyleSheet.create({
     card: { marginTop: spacing.sm, marginBottom: spacing.md },
     head: { flexDirection: 'row', alignItems: 'center', gap: spacing.md },
+    titleRow: { flexDirection: 'row', alignItems: 'center', alignSelf: 'stretch' },
+    titleText: { flexShrink: 1 },
     headText: { flex: 1, alignItems: 'flex-start', gap: 4 },
     glyph: { width: 32, height: 32, borderRadius: 16, alignItems: 'center', justifyContent: 'center' },
     row: { flexDirection: 'row', alignItems: 'flex-start', gap: spacing.md },

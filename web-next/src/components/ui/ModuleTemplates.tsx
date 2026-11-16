@@ -7,9 +7,10 @@ import { AccentCard } from "@/components/AccentCard";
 import { FillBar } from "@/components/SnapshotTile";
 import type { StatStripItem } from "@/components/StatStrip";
 import { InsightLink } from "@/components/ui/InsightLink";
-import { WhyCorner } from "@/components/ui/TapForWhy";
+import { InfoMark } from "@/components/ui/InfoMark";
 import { TrendChart } from "@/components/ui/TrendChart";
 import { compactAriaLabel, compactParts, compactSummaryText, type CompactPart, type CompactTone } from "@/lib/compactModule";
+import type { GlossaryKey } from "@/lib/glossary";
 import type { ChartInputPoint } from "@/lib/chartSeries";
 import { heroParts, statStripParts, trendModel, type TrendModel } from "@/lib/moduleTemplates";
 import { Money } from "@/components/Money";
@@ -134,6 +135,8 @@ export function StatStripModule({
   tone = "accent",
   action,
   footer,
+  infoLines,
+  infoGlossary,
   testId,
 }: {
   id: string;
@@ -145,11 +148,16 @@ export function StatStripModule({
   defaultOpen?: boolean;
   tone?: CompactTone;
   action?: ReactNode;
-  /** Shown under the bars when expanded (glossary, beginner help). */
+  /** Shown under the bars when expanded. */
   footer?: ReactNode;
+  /** Extra plain sentences for the module's ONE "?" (placed after the title). The tiles' `why` metrics are merged into the same "?". */
+  infoLines?: ReadonlyArray<string | null | undefined>;
+  /** Glossary terms for the same "?" (lib/glossary.ts). */
+  infoGlossary?: readonly GlossaryKey[];
   testId?: string;
 }) {
   const [open, setOpen] = useState(defaultOpen);
+  const whyMetrics = items.map((i) => i.why).filter((w): w is NonNullable<typeof w> => Boolean(w));
   const bodyId = useId();
   const hasBars = items.some((item) => item.fill != null);
   const expandable = true;
@@ -158,22 +166,24 @@ export function StatStripModule({
   return (
     <AccentCard accent={TONE_COLOR[tone]} as="section" compact data-testid={testId ?? `stat-strip-${id}`}>
       <div className="flex items-center justify-between gap-2">
-        <h3 className="m-0 text-[0.6875rem] font-extrabold uppercase" style={{ color: "var(--color-text-muted)", letterSpacing: "var(--letter-spacing-badge)" }}>
-          {title}
-        </h3>
+        <div className="flex min-w-0 items-center">
+          <h3 className="m-0 text-[0.6875rem] font-extrabold uppercase" style={{ color: "var(--color-text-muted)", letterSpacing: "var(--letter-spacing-badge)" }}>
+            {title}
+          </h3>
+          <InfoMark label={title} lines={infoLines} metrics={whyMetrics} glossary={infoGlossary} />
+        </div>
         {action}
       </div>
       <div className="grid gap-2" style={{ gridTemplateColumns: `repeat(auto-fit, minmax(max(5.75rem, calc((100% - ${(cols - 1) * 0.5}rem) / ${cols})), 1fr))` }} role="group" aria-label={`${title}: ${summary}`} data-testid="stat-strip-tiles">
-        {items.map(({ insight, why, ...item }) => {
+        {items.map(({ insight, why: _why, ...item }) => { // eslint-disable-line @typescript-eslint/no-unused-vars
           const tile = <StatStripTile key={item.label} item={item} />;
           if (!insight || !league) return tile;
-          // The tile opens the board; the corner "?" (its own 44px target) explains the number, one tap for everyone.
+          // The tile opens the board; the module's one "?" after the title explains the numbers.
           return (
-            <div key={item.label} className="relative flex flex-col">
+            <div key={item.label} className="flex flex-col">
               <InsightLink insight={insight} league={league} spoken={[item.label, item.value, item.note]} noChevron>
                 {tile}
               </InsightLink>
-              {why ? <WhyCorner metric={why} spoken={item.label} /> : null}
             </div>
           );
         })}

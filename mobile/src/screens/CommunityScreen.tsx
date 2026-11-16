@@ -7,7 +7,8 @@ import AppText from '../components/AppText';
 import { SkeletonPage } from '../components/Skeleton';
 import EmptyState from '../components/EmptyState';
 import GridBackground from '../components/GridBackground';
-import ScreenInfoNote from '../components/ScreenInfoNote';
+import InfoMark from '../components/InfoMark';
+import SectionHeading from '../components/SectionHeading';
 import SharedTradesFeed from '../components/SharedTradesFeed';
 import ValuesCredit from '../components/ValuesCredit';
 import { api, type SharedCommunityTrade } from '../lib/api';
@@ -66,7 +67,15 @@ export default function CommunityScreen({ navigation }: Props) {
         contentContainerStyle={[styles.content, { paddingTop: headerHeight + spacing.md, paddingBottom: orbClearance }]}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => void load(true)} />}
       >
-        <ScreenInfoNote text="Trades other users chose to share from the Trade Analyzer. Names are never shown, only a display name they picked. You can share your own from a trade verdict, and delete it any time." />
+        <SectionHeading
+          title="Shared trades"
+          info={
+            <InfoMark
+              label="shared trades"
+              lines={['Trades other users chose to share from the Trade Analyzer. Names are never shown, only a display name they picked. You can share your own from a trade verdict, and delete it any time.']}
+            />
+          }
+        />
         {failed ? (
           <ErrorState compact title="Couldn't load the Community feed" onRetry={() => void load(false)} />
         ) : shared && shared.available ? (

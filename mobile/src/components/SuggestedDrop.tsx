@@ -10,7 +10,6 @@ import { PlayerTap } from './PlayerOpenContext';
 import PlayerAvatar from './PlayerAvatar';
 import PositionBadge from './PositionBadge';
 import ToneBadge from './ToneBadge';
-import ScreenInfoNote from './ScreenInfoNote';
 import { useThemeMode } from '../context/ThemeModeContext';
 import type { DropPlayer, DropSuggestion, DroppablePlayers, NeedsModel, RosterOverflow } from '../lib/api';
 import {
@@ -319,6 +318,10 @@ export function SuggestedDrop({ suggestion, compact = false }: { suggestion: Dro
   );
 }
 
+/** Body of the "Players you could drop" InfoMark (the module title lives with the caller, which attaches it). */
+export const DROP_RULES_NOTE =
+  'Lowest cost to your team first: players who never start, cost your lineup nothing if cut and have little value. Never suggested: starters, high-value assets, depth you need for byes and injuries, young upside for your team direction, hot players, and anyone you marked untouchable.';
+
 export function DroppablePlayersSection({ data }: { data: DroppablePlayers | null | undefined }) {
   const { colors } = useThemeMode();
   const styles = useMemo(() => createStyles(colors), [colors]);
@@ -348,10 +351,6 @@ export function DroppablePlayersSection({ data }: { data: DroppablePlayers | nul
           {data.locked_count > 0 ? <AppText style={styles.lock}>{`+${data.locked_count} more with Pro`}</AppText> : null}
         </View>
       )}
-      <ScreenInfoNote
-        label="How drops are chosen"
-        text="Lowest cost to your team first: players who never start, cost your lineup nothing if cut and have little value. Never suggested: starters, high-value assets, depth you need for byes and injuries, young upside for your team direction, hot players, and anyone you marked untouchable."
-      />
     </View>
   );
 }

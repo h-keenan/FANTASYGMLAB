@@ -30,9 +30,6 @@ const PATTERNS = [
 // Files allowed to keep a flagged conditional, with the reason. Shrink this list, never grow it to silence a new expander.
 export const ALLOWED = {
   // Popovers / dropdowns anchored to a trigger (they position against it; the wrapper transform would re-anchor them).
-  "web-next/src/components/GlossaryNote.tsx": "popover anchored to its trigger",
-  "web-next/src/components/PageTitle.tsx": "absolute popover anchored to its trigger",
-  "web-next/src/components/BeginnerHelp.tsx": "popover / fixed phone dialog",
   "web-next/src/components/AlertsDropdown.tsx": "dropdown with its own overlay shell",
   "web-next/src/components/Header.tsx": "menus with their own overlay shells",
   "web-next/src/components/GmOrb.tsx": "orb sheet with its own shell",

@@ -41,6 +41,7 @@ export default function CompactModule({
   tone = 'accent',
   accent,
   action,
+  info,
   defaultOpen = false,
   persist = true,
   expandIn = 'inline',
@@ -61,6 +62,8 @@ export default function CompactModule({
   tone?: CompactTone;
   accent?: string;
   action?: ReactNode;
+  /** The module's one InfoMark, inline directly after the title. */
+  info?: ReactNode;
   defaultOpen?: boolean;
   persist?: boolean;
   expandIn?: 'inline' | 'sheet';
@@ -135,6 +138,7 @@ export default function CompactModule({
           <View style={styles.text}>
             <View style={styles.titleRow}>
               {typeof title === 'string' ? <AppText style={styles.title}>{title}</AppText> : title}
+              {info}
               {shown.length === 0 && summary ? <View style={styles.summary}>{summary}</View> : null}
             </View>
             {shown.length > 0 ? (

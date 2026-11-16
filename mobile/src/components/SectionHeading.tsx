@@ -23,6 +23,7 @@ export default function SectionHeading({
   iconColor,
   caption,
   right,
+  info,
   topGap = 0,
 }: {
   title: string;
@@ -31,6 +32,8 @@ export default function SectionHeading({
   iconColor?: string;
   caption?: string | null;
   right?: React.ReactNode;
+  /** The module's one InfoMark ("?"), rendered inline directly after the title. */
+  info?: React.ReactNode;
   topGap?: number;
 }) {
   const { colors } = useThemeMode();
@@ -42,6 +45,7 @@ export default function SectionHeading({
         <AppText style={styles.title} numberOfLines={1} accessibilityRole="header">
           {title}
         </AppText>
+        {info}
         {right ? <View style={styles.right}>{right}</View> : null}
       </View>
       {caption ? <AppText style={styles.caption}>{caption}</AppText> : null}

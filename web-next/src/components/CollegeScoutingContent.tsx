@@ -1,6 +1,5 @@
 "use client";
 
-import { InfoTip } from "@/components/InfoTip";
 import { PageTitle } from "@/components/PageTitle";
 import { EmptyState } from "@/components/EmptyState";
 import { useMemo, useState, type ReactNode } from "react";
@@ -353,12 +352,17 @@ export function CollegeScoutingContent({
   return (
     <Shell embedded={embedded}>
       <header className="flex flex-col gap-1">
-        {embedded ? null : <PageTitle page="College Scouting" />}
-        <InfoTip label="How grades are used">
-          Every signed-in user&apos;s grade on a prospect pools into one shared signal — that shared aggregate, not
-          any single grade, can influence rookie draft-class strength. Your own grade and watchlist stay yours to
-          edit any time.
-        </InfoTip>
+        {embedded ? null : (
+          <PageTitle
+            page="College Scouting"
+            info={
+              <p>
+                How grades are used: every signed-in user&apos;s grade on a prospect pools into one shared signal. That shared aggregate, not any single grade,
+                can influence rookie draft-class strength. Your own grade and watchlist stay yours to edit any time.
+              </p>
+            }
+          />
+        )}
       </header>
 
       {prospects.length === 0 ? (

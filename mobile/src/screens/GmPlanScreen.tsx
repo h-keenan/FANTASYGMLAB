@@ -30,7 +30,8 @@ import InsightRow from '../components/InsightRow';
 import ToneBadge from '../components/ToneBadge';
 import OverallRatingBadge from '../components/OverallRatingBadge';
 import PlayerIdentityRow from '../components/PlayerIdentityRow';
-import BeginnerHelp from '../components/BeginnerHelp';
+import InfoMark from '../components/InfoMark';
+import { useExperienceCopy } from '../context/ExperienceLevelContext';
 import { PLAIN_COPY } from '../lib/experienceCopy';
 import PremiumLock from '../components/PremiumLock';
 import SectionHeading from '../components/SectionHeading';
@@ -104,6 +105,7 @@ export default function GmPlanScreen({ route, navigation }: Props) {
   const orbClearance = useOrbClearance();
   const headerHeight = useHeaderHeight();
   const { colors } = useThemeMode();
+  const copy = useExperienceCopy();
   const styles = useMemo(() => createStyles(colors), [colors]);
   const { leagueId, leagueName } = route.params;
   const { stance, setStance } = useGmStance(leagueId);
@@ -418,6 +420,13 @@ export default function GmPlanScreen({ route, navigation }: Props) {
             <CompactModule
               id="gmplan.situation"
               title="Team Situation"
+              info={
+                <InfoMark
+                  label="your team stance"
+                  beginnerOnly
+                  lines={[stance ? copy.help(stanceLook(stance as TeamStance, colors).help) : null]}
+                />
+              }
               tone="action"
               defaultOpen={!TEAM_STANCE_OPTIONS.find((o) => o.value === stance)}
               parts={[
@@ -455,10 +464,7 @@ export default function GmPlanScreen({ route, navigation }: Props) {
                 })}
               </View>
               {TEAM_STANCE_OPTIONS.find((o) => o.value === stance) ? (
-                <View style={styles.stanceHelpRow}>
-                  <AppText style={[styles.caption, styles.flex1]}>{TEAM_STANCE_OPTIONS.find((o) => o.value === stance)!.description}</AppText>
-                  <BeginnerHelp term={stanceLook(stance as TeamStance, colors).help} />
-                </View>
+                <AppText style={styles.caption}>{TEAM_STANCE_OPTIONS.find((o) => o.value === stance)!.description}</AppText>
               ) : (
                 <AppText style={styles.caption}>Pick the stance that fits your team right now.</AppText>
               )}
@@ -889,8 +895,6 @@ function createStyles(colors: ThemeColors) {
     },
     stanceLabel: { fontSize: 13.5, fontWeight: '800', color: colors.textSecondary, textTransform: 'uppercase', letterSpacing: 0.4 },
     stanceTagline: { fontSize: 12.5, color: colors.textTertiary },
-    stanceHelpRow: { flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: spacing.sm },
-    flex1: { flex: 1 },
     banner: {
       flexDirection: 'row',
       alignItems: 'center',

@@ -14,7 +14,7 @@ import { tradeIdeaSummaryParts } from "@/lib/tradeIdeaSummary";
 import { PlayerIdentity } from "@/components/PlayerRow";
 import { ValueStat } from "@/components/ValueStat";
 import { SectionHeading } from "@/components/SectionHeading";
-import { InfoTip } from "@/components/InfoTip";
+import { InfoMark } from "@/components/ui/InfoMark";
 import { useRouter } from "next/navigation";
 import { useUndoableRemoval } from "@/components/ui/UndoToast";
 import { useMemo, useState } from "react";
@@ -795,13 +795,16 @@ export function GmPlanContent({
 
       {tab === "core" ? (
         <section className="flex flex-col gap-2">
-          <div className="flex items-center gap-2">
-            <SectionHeading>Protected Core</SectionHeading>
-            <InfoTip label="Players you won't trade">
-              Mark players you don&apos;t want traded away. This is the same protection the Watching list uses —
-              toggling it here or there shows up in both places.
-            </InfoTip>
-          </div>
+          <SectionHeading
+            help={
+              <InfoMark
+                label="Protected Core"
+                lines={["Mark players you don't want traded away. This is the same protection the Watching list uses — toggling it here or there shows up in both places."]}
+              />
+            }
+          >
+            Protected Core
+          </SectionHeading>
           {targetsNote}
           {!myTeam || !leagueId ? null : noRoster ? (
             <EmptyState title="No roster players found for this league." />

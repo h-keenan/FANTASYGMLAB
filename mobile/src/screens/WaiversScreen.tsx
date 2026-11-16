@@ -43,8 +43,7 @@ import PremiumLock from '../components/PremiumLock';
 import DashboardStatRow from '../components/DashboardStatRow';
 import PlayerAvatar from '../components/PlayerAvatar';
 import CompactModule from '../components/CompactModule';
-import ScreenInfoNote from '../components/ScreenInfoNote';
-import BeginnerHelp from '../components/BeginnerHelp';
+import InfoMark from '../components/InfoMark';
 import ViewModeToggle from '../components/ViewModeToggle';
 import ValuesCredit from '../components/ValuesCredit';
 import WaiverRecommendationCard, {
@@ -54,7 +53,7 @@ import WaiverRecommendationCard, {
   waiverTrendingAddLabel,
 } from '../components/WaiverRecommendationCard';
 import { api, type DroppablePlayers, type ModelStatus, type NeedsModel, type WaiverPlayer, type WaiverPriorityAdd } from '../lib/api';
-import { DroppablePlayersSection, SharedDropNote, needsBreakdownText } from '../components/SuggestedDrop';
+import { DROP_RULES_NOTE, DroppablePlayersSection, SharedDropNote, needsBreakdownText } from '../components/SuggestedDrop';
 import { waiversHeaderParts } from '../lib/waiversHeader';
 import { limitedDataNote, needsHeadline, teamNeedStat } from '../lib/dropsPresentation';
 import { bestAvailableCardVisual } from '../lib/bestAvailableCardVisual';
@@ -70,6 +69,7 @@ import { useLeaguePlayerSearch } from '../lib/leaguePlayerSearch';
 import { useScreenHeaderTitle } from '../lib/useScreenHeaderTitle';
 import { usePlayerListViewMode } from '../lib/viewModePreference';
 import { useThemeMode } from '../context/ThemeModeContext';
+import { useExperienceCopy } from '../context/ExperienceLevelContext';
 import { useValuationLens } from '../context/ValuationLensContext';
 import { radii, spacing, type ThemeColors } from '../theme';
 import type { RootStackParamList } from '../navigation/RootNavigator';
@@ -129,6 +129,7 @@ export default function WaiversScreen({ route, navigation }: Props) {
   const orbClearance = useOrbClearance();
   const headerHeight = useHeaderHeight();
   const { colors } = useThemeMode();
+  const copy = useExperienceCopy();
   const styles = useMemo(() => createStyles(colors), [colors]);
   const { leagueId, leagueName, playerId: deepLinkPlayerId } = route.params;
   const listRef = useRef<FlatList<WaiverPlayer>>(null);
@@ -405,6 +406,12 @@ export default function WaiversScreen({ route, navigation }: Props) {
           id="waivers.header"
           testID="waivers-header-module"
           title="Waivers"
+          info={
+            <InfoMark
+              label="Waivers"
+              lines={[needsModel ? needsBreakdownText(needsModel) : null, copy.help('waiversIntro')]}
+            />
+          }
           tone="accent"
           parts={waiversHeaderParts({
             available: stats.available,
@@ -449,13 +456,11 @@ export default function WaiversScreen({ route, navigation }: Props) {
                 ))}
               </View>
             ) : null}
-            {needsModel ? <ScreenInfoNote label="How we read your needs" text={needsBreakdownText(needsModel)} /> : null}
             {limitedDataNote(modelStatus) ? (
               <AppText style={styles.limitedNote} testID="limited-data-note">
                 {limitedDataNote(modelStatus)}
               </AppText>
             ) : null}
-            <BeginnerHelp term="waiversIntro" />
           </View>
         </CompactModule>
       </View>
@@ -589,7 +594,7 @@ export default function WaiversScreen({ route, navigation }: Props) {
                 ) : null}
                 {droppable ? (
                   <View style={styles.sectionBlock}>
-                    <SectionHeading title="Players you could drop" />
+                    <SectionHeading title="Players you could drop" info={<InfoMark label="drop suggestions" lines={[DROP_RULES_NOTE]} />} />
                     <DroppablePlayersSection data={droppable} />
                   </View>
                 ) : null}
@@ -713,13 +718,21 @@ function SecondaryWaiverBoard({
   ].filter((group) => group.players.length > 0);
   return (
     <View style={styles.secondaryBoard}>
-      <ScreenInfoNote
-        label="Stash, depth and FAAB: ranked by raw value"
-        text="Includes positions you don't currently need, so a higher number here can still rank below a lower one in Priority Adds above. Kickers and defenses are never stash candidates."
-      />
-      {groups.map((group) => (
+      {groups.map((group, groupIndex) => (
         <View key={group.label} style={styles.sectionBlock}>
-          <SectionHeading title={group.label} />
+          <SectionHeading
+            title={group.label}
+            info={
+              groupIndex === 0 ? (
+                <InfoMark
+                  label="the stash, depth and FAAB lists"
+                  lines={[
+                    "Ranked by raw value. Includes positions you don't currently need, so a higher number here can still rank below a lower one in Priority Adds above. Kickers and defenses are never stash candidates.",
+                  ]}
+                />
+              ) : undefined
+            }
+          />
           <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.bestAvailableRow}>
             {group.players.map((player) => (
               <HighlightFrame key={player.player_id} active={player.player_id === highlightId} onReveal={onReveal}>

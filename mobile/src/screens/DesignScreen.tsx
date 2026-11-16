@@ -18,7 +18,7 @@ import PickPlate from '../components/PickPlate';
 import PlayerIdentityRow from '../components/PlayerIdentityRow';
 import PositionBadge from '../components/PositionBadge';
 import PremiumLock from '../components/PremiumLock';
-import ScreenInfoNote from '../components/ScreenInfoNote';
+import InfoMark from '../components/InfoMark';
 import SectionHeading from '../components/SectionHeading';
 import SegmentedTabBar from '../components/SegmentedTabBar';
 import SkeletonBlock, { SkeletonCard, SkeletonRows } from '../components/Skeleton';
@@ -222,8 +222,8 @@ export default function DesignScreen() {
               onChange={setTab}
             />
           </Spec>
-          <Spec styles={styles} name="ScreenInfoNote" path="mobile/src/components/ScreenInfoNote.tsx">
-            <ScreenInfoNote label="How is this calculated?" text="Static sample explanation text for the info note." />
+          <Spec styles={styles} name="InfoMark" path="mobile/src/components/InfoMark.tsx">
+            <SectionHeading title="Sample module" info={<InfoMark label="this sample" lines={['Static sample explanation text for the InfoMark.']} />} />
           </Spec>
         </Family>
 

@@ -10,7 +10,8 @@ import { SkeletonPage } from '../components/Skeleton';
 import CompactPlayerModule from '../components/CompactPlayerModule';
 import EmptyState from '../components/EmptyState';
 import GridBackground from '../components/GridBackground';
-import ScreenInfoNote from '../components/ScreenInfoNote';
+import InfoMark from '../components/InfoMark';
+import SectionHeading from '../components/SectionHeading';
 import SharedTradesFeed from '../components/SharedTradesFeed';
 import ValuesCredit from '../components/ValuesCredit';
 import { NetEdgeBar, TradeSwapGlyph } from '../components/TradeOutcomeHeader';
@@ -109,7 +110,15 @@ export default function TradeHistoryScreen({ navigation }: Props) {
         contentContainerStyle={[styles.content, { paddingTop: headerHeight + spacing.md, paddingBottom: orbClearance }]}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => void load(true)} />}
         ListHeaderComponent={
-          <ScreenInfoNote text="Trades you've confirmed you made. Once a confirmed trade has had a few weeks to play out, we'll show a real before/after read here — using actual points scored and value trend, never a guess. Nothing here is pushed to you; it only shows up when you check this screen." />
+          <SectionHeading
+            title="Trade history"
+            info={
+              <InfoMark
+                label="trade history"
+                lines={["Trades you've confirmed you made. Once a confirmed trade has had a few weeks to play out, we'll show a real before/after read here — using actual points scored and value trend, never a guess. Nothing here is pushed to you; it only shows up when you check this screen."]}
+              />
+            }
+          />
         }
         renderItem={({ item }) => <TradeHistoryRow outcome={item} />}
         ListEmptyComponent={

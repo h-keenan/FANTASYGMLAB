@@ -11,7 +11,6 @@ import AppText from './AppText';
 import CompactModule from './CompactModule';
 import { type StatStripItem } from './DashboardStatRow';
 import { StatStripModule } from './ModuleTemplates';
-import GlossaryNote from './GlossaryNote';
 import ToneBadge from './ToneBadge';
 import SectionHeading from './SectionHeading';
 import { useThemeMode } from '../context/ThemeModeContext';
@@ -142,12 +141,8 @@ export function DashboardTeamStats({
       id="today.team"
       title="My Team"
       items={items}
-      footer={
-        <>
-          {onOpen ? <ModuleMore label="Open My Team" onPress={onOpen} /> : null}
-          <GlossaryNote terms={['powerRank', 'franchiseRank', 'averageAge', 'starterStrength', 'benchStrength']} />
-        </>
-      }
+      info={{ glossary: ['powerRank', 'franchiseRank', 'averageAge', 'starterStrength', 'benchStrength'] }}
+      footer={onOpen ? <ModuleMore label="Open My Team" onPress={onOpen} /> : null}
     />
   );
 }

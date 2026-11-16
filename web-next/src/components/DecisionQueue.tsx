@@ -4,7 +4,6 @@ import Link from "next/link";
 import { useState } from "react";
 
 import { AccentCard } from "@/components/AccentCard";
-import { BeginnerHelp } from "@/components/BeginnerHelp";
 import { Button, ButtonLink } from "@/components/Button";
 import { EmptyState } from "@/components/EmptyState";
 import { FreeLimitNote } from "@/components/FreeLimitNote";
@@ -14,6 +13,8 @@ import { SectionHeading } from "@/components/SectionHeading";
 import { SkeletonCard } from "@/components/Skeleton";
 import { CompactModule } from "@/components/ui/CompactModule";
 import { CompactPlayerCard } from "@/components/ui/CompactPlayerCard";
+import { InfoMark } from "@/components/ui/InfoMark";
+import { useExperienceCopy } from "@/context/ExperienceLevelContext";
 import type { BriefingItem } from "@/lib/api";
 import { decisionSummaryParts, seeAllLabel, type Decision, type DecisionPlayer, type DecisionSwap, type DecisionQueue as Queue } from "@/lib/decisionQueue";
 import { GAME_PLAN_INTERNAL_ROUTES, gamePlanTileHref } from "@/lib/gamePlanPresentation";
@@ -195,6 +196,7 @@ export function DecisionQueue({
   entitlement?: { is_premium: boolean; visible_count: number; hidden_count: number; free_limit?: number };
 }) {
   const [open, setOpen] = useState(false);
+  const copy = useExperienceCopy();
   if (pending) {
     return (
       <section aria-busy="true" data-testid="decision-queue-loading">
@@ -210,7 +212,7 @@ export function DecisionQueue({
     <section className="flex flex-col gap-2" aria-labelledby="decision-queue-heading" data-testid="decision-queue" data-fgl-dashboard-useful="true" data-fgl-this-week="true">
       <SectionHeading
         id="decision-queue-heading"
-        help={<BeginnerHelp popover label="your game plan" term="dashboardGamePlan" />}
+        help={<InfoMark label="your game plan" lines={[copy.help("dashboardGamePlan"), queue.total === 0 && !emptyOverride ? copy.help("dashboardNothingUrgent") : null]} beginnerOnly />}
         action={
           <Link href={`/gm-plan/${encodeURIComponent(leagueId)}?name=${encodeURIComponent(leagueName)}`} aria-label="Open the full GM Plan" className="tap-link text-sm font-bold shrink-0" style={{ color: "var(--color-accent)" }}>
             Full GM Plan →
@@ -220,9 +222,7 @@ export function DecisionQueue({
         {queue.total > 0 ? `Do this now · ${count}` : "Do this now"}
       </SectionHeading>
       {queue.total === 0 ? (
-        <EmptyState title={emptyOverride ?? queue.empty?.title ?? "Nothing needs you this week"} subtitle={emptyOverride ? undefined : (queue.empty?.detail ?? undefined)}>
-          {!emptyOverride ? <BeginnerHelp label="nothing urgent" term="dashboardNothingUrgent" className="mt-1" /> : null}
-        </EmptyState>
+        <EmptyState title={emptyOverride ?? queue.empty?.title ?? "Nothing needs you this week"} subtitle={emptyOverride ? undefined : (queue.empty?.detail ?? undefined)} />
       ) : (
         shown.map((d, i) => (
           <MotionIn key={d.key} index={i >= 3 ? i - 3 : 0} count={Math.max(1, shown.length)}>

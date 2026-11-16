@@ -3,10 +3,9 @@ import { StyleProp, StyleSheet, View, ViewStyle } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 
 import MetricCard from './MetricCard';
-import TapForWhy from './TapForWhy';
+import InfoMark, { type InfoMarkProps } from './InfoMark';
 import type { WhyMetricId } from '../lib/tapForWhyContent.ts';
 import { useThemeMode } from '../context/ThemeModeContext';
-import AppText from './AppText';
 import { spacing, type ThemeColors } from '../theme';
 
 type IconName = React.ComponentProps<typeof Ionicons>['name'];
@@ -23,7 +22,7 @@ export type StatStripItem = {
   /** Short context under the value ("of 12 teams", "League avg 26.1"). */
   note?: string | null;
   onPress?: () => void;
-  /** The metric the small 44pt "why" target in the tile corner explains (lib/tapForWhyContent.ts). The tile tap keeps its own action. */
+  /** A metric this strip's one InfoMark explains (lib/tapForWhyContent.ts). All of a strip's `why` metrics merge into ONE "?" after the first tagged label; modules with a title (StatStripModule) put it on the title instead. */
   why?: WhyMetricId;
 };
 
@@ -32,12 +31,14 @@ export type StatStripItem = {
  * Dashboard's Record / Power Rank / Franchise Rank / Avg Age strip and its
  * Team Snapshot row both render through it.
  */
-export default function DashboardStatRow({ items, style }: { items: StatStripItem[]; style?: StyleProp<ViewStyle> }) {
+export default function DashboardStatRow({ items, style, info }: { items: StatStripItem[]; style?: StyleProp<ViewStyle>; info?: Omit<InfoMarkProps, 'label' | 'metrics'> }) {
   const { colors } = useThemeMode();
   const styles = useMemo(() => createStyles(colors), [colors]);
+  const whyMetrics = items.map((i) => i.why).filter((w): w is WhyMetricId => Boolean(w));
+  const infoIndex = items.findIndex((i) => i.why) >= 0 ? items.findIndex((i) => i.why) : info ? 0 : -1;
   return (
     <View style={[styles.row, style]} accessibilityLabel="Summary">
-      {items.map((item) => (
+      {items.map((item, index) => (
         <View key={item.label} style={styles.cell}>
         <MetricCard
           label={item.label}
@@ -51,13 +52,7 @@ export default function DashboardStatRow({ items, style }: { items: StatStripIte
           onPress={item.onPress}
           centered
           style={styles.tile}
-          labelAccessory={
-            item.why ? (
-              <TapForWhy metric={item.why} spoken={item.label} variant="chip" style={styles.whyBtn} testID={`why-${item.why}`}>
-                <AppText style={styles.whyGlyph} allowFontScaling={false}>?</AppText>
-              </TapForWhy>
-            ) : undefined
-          }
+          labelAccessory={index === infoIndex ? <InfoMark label="this summary" metrics={whyMetrics} testID={whyMetrics[0] ? `why-${whyMetrics[0]}` : undefined} {...info} /> : undefined}
         />
         </View>
       ))}
@@ -70,9 +65,5 @@ function createStyles(colors: ThemeColors) {
     row: { flexDirection: 'row', gap: spacing.sm, marginBottom: spacing.md },
     cell: { flexBasis: 0, flexGrow: 1, minWidth: 0 },
     tile: { alignSelf: 'stretch', minWidth: 0, paddingHorizontal: spacing.sm },
-    // Inline after the label (MetricCard labelAccessory), never an absolute corner badge over the text.
-    // TapForWhy's hitSlop keeps a 44pt target without growing the row.
-    whyBtn: { width: 18, height: 18, borderRadius: 9, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.glassInset },
-    whyGlyph: { fontSize: 12, lineHeight: 14, fontWeight: '800', color: colors.textTertiary, includeFontPadding: false, textAlign: 'center' },
   });
 }

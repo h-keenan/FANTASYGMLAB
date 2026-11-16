@@ -415,6 +415,17 @@ Follow-ups (60+ call sites per the audit; each is a one-line wrap now that the c
 Dashboard, FAAB on Waivers, trade balance and confidence on the verdict card, `projection` and `age`
 wherever they appear. The registry already has copy for all of them.
 
+## InfoMark (the one "?", UI audit batch A, 2026-11-16)
+
+coridian_: the "?" buttons "are adding too much space in many different places and creating conflicts where they're creating their own rows." Five variants (header "?", tile-corner `WhyCorner`, own-row `InfoTip`/`ScreenInfoNote` "ⓘ", own-row `BeginnerHelp`, always-visible app help paragraphs) are replaced by ONE component: `ui/InfoMark.tsx` (web) / `components/InfoMark.tsx` (app).
+
+- **Placement.** Inline directly after the label or heading it explains (`SectionHeading help`, a card or tile label, `MetricCard labelAccessory`, `PageTitle info` for the page-level explainer). Never its own row, never absolutely positioned over text, never at a row's far edge.
+- **Size.** 18px (pt) glyph box, 13px glyph (12pt+ font floor on the app), no ring or fill; 44px/pt hit area from an expanded `::after` (web) or `hitSlop` (app), so it adds no height.
+- **One per module.** A module that explains several terms passes them all (`lines`, `metrics` from `lib/tapForWhyContent.ts`, `glossary` from `lib/glossary.ts`, `legend`) and gets one sheet. Tile grids get one "?" on the section title; per-tile why stays on tapping the number (`TapForWhy`).
+- **Beginner-only copy** is gated with `beginnerOnly` (still an InfoMark, never a paragraph).
+- **Retired and deleted:** `WhyCorner`, `.ui-why-corner*`, `.ui-why-host`, web `BeginnerHelp` / `InfoTip` / `GlossaryNote`, app `BeginnerHelp` / `ScreenInfoNote` / `GlossaryNote`.
+- **Guards.** `scripts/check_info_mark_usage.mjs` (CI `lib-twins` job) fails on any retired variant or an absolutely-positioned InfoMark; `scripts/sim_layout_playwright/module_scan.mjs` records every rendered "?" and fails when one sits alone on its row or overlaps text.
+
 ## StructuredRow
 
 The replacement for delimiter-joined strings and generated sentences. One row is **crest/avatar + name

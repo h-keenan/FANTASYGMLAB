@@ -273,10 +273,10 @@ describe("DashboardContent", () => {
     expect(within(screen.getByTestId("dashboard-more")).getByRole("button", { name: /^More/ })).toHaveAttribute("aria-expanded", "false");
   });
 
-  it("offers one shared glossary for the rank labels", () => {
+  it("offers one shared ? for the rank labels, after the strip's title", () => {
     render(<DashboardContent leagueId="abc" leagueName="Dynasty Overlords" data={FIXTURE} />);
     fireEvent.click(screen.getByTestId("stat-strip-toggle"));
-    expect(screen.getAllByRole("button", { name: /what do these mean/i })).toHaveLength(1);
+    expect(screen.getAllByRole("button", { name: "About My Team" })).toHaveLength(1);
   });
 
   it("shows the direction check-in the server asks for, on the real Dashboard only (not the sample preview)", async () => {

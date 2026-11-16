@@ -11,7 +11,7 @@ import { SkeletonBlock, SkeletonCard, SkeletonRows } from "@/components/Skeleton
 import { Toggle } from "@/components/Toggle";
 import { ErrorState } from "@/components/ErrorState";
 import { LeagueSwitcherButton } from "@/components/Header";
-import { InfoTip } from "@/components/InfoTip";
+import { InfoMark } from "@/components/ui/InfoMark";
 import { LeanBarMeter } from "@/components/LeanBarMeter";
 import { LoadingScreen } from "@/components/LoadingScreen";
 import { OvrGauge } from "@/components/OvrGauge";
@@ -644,11 +644,23 @@ export function DesignSystemContent() {
             <TradesTabBar leagueId="sample" leagueName="Sample League" active="trade_hub" />
           </Variant>
         </Spec>
-        <Spec name="InfoTip" path="web-next/src/components/InfoTip.tsx" note="Short label + info glyph; explanation opens on tap.">
-          <InfoTip label="How is this calculated?">Static sample explanation text for the tip body.</InfoTip>
-          <InfoTip label="Heads up" tone="warning">
-            Warning-toned variant.
-          </InfoTip>
+        <Spec
+          name="InfoMark"
+          path="web-next/src/components/ui/InfoMark.tsx"
+          note="THE one inline ? : directly after the label it explains, never its own row, at most one per module. Opens a sheet. Mobile twin: components/InfoMark.tsx."
+        >
+          <Variant label="Inline after a label (lines)">
+            <span className="flex items-center text-sm font-semibold">
+              Roster Power
+              <InfoMark label="Roster Power" lines={["Static sample explanation text for the mark body."]} />
+            </span>
+          </Variant>
+          <Variant label="Merged module help (metrics + glossary)">
+            <span className="flex items-center text-sm font-semibold">
+              Team Snapshot
+              <InfoMark label="Team Snapshot" metrics={["power_rank"]} glossary={["averageAge"]} testId="design-info-mark-merged" />
+            </span>
+          </Variant>
         </Spec>
       </Family>
 

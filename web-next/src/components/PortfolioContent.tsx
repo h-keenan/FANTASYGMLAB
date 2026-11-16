@@ -1,7 +1,7 @@
 "use client";
 
 import { PageTitle } from "@/components/PageTitle";
-import { GlossaryNote } from "@/components/GlossaryNote";
+import { InfoMark } from "@/components/ui/InfoMark";
 import Link from "next/link";
 import { Fragment, useEffect, useRef, useState } from "react";
 
@@ -595,7 +595,12 @@ export function PortfolioContent({
         </p>
       ) : data.leagues.length > 0 || pending.length > 0 ? (
         <div className="flex flex-col gap-4">
-          <GlossaryNote terms={["rosterPower"]} label="What is Roster Power?" />
+          <div className="flex items-center">
+            <span className="text-xs font-semibold" style={{ color: "var(--color-text-muted)" }}>
+              Roster Power
+            </span>
+            <InfoMark label="Roster Power" glossary={["rosterPower"]} />
+          </div>
           {cardSlots(data.leagues, pending, order).map((slot, position) => (
             <Fragment key={slot.league.league_id}>
               {/* The first league still waiting on the loader's window: scrolling

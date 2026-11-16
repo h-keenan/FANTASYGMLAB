@@ -8,6 +8,7 @@ import { PickAvatar } from "@/components/PickAvatar";
 import { PlayerAvatar } from "@/components/PlayerAvatar";
 import { PlayerName } from "@/components/PlayerName";
 import { PositionBadge } from "@/components/PositionBadge";
+import { InfoMark } from "@/components/ui/InfoMark";
 import { Collapse } from "@/components/ui/Presence";
 import { playerHeadshotId, playerInitials } from "@/lib/playerAnatomy";
 import { tradeIdeaGainText } from "@/lib/tradeIdeaSummary";
@@ -149,16 +150,26 @@ function TradeSide({ label, assets }: { label: string; assets: TodayTradeAsset[]
 }
 
 /** The trade idea as one card (concept B): kicker, "Get a QB from Team Iron", who goes and who comes, the value gain. The whole card opens it in Trade Hub. */
-export function TodayTradeIdeaCard({ idea, href, deadline }: { idea: TodayTradeIdea; href: string; /** "2 wks left (Wk 11)": the trade deadline, shown here and nowhere else. */ deadline?: string | null }) {
+export function TodayTradeIdeaCard({ idea, href, deadline, info }: { idea: TodayTradeIdea; href: string; /** "2 wks left (Wk 11)": the trade deadline, shown here and nowhere else. */ deadline?: string | null; /** Beginner explainer for the card's ONE "?", inline after the kicker. */ info?: string | null }) {
   const gain = idea.gain != null && idea.gain !== 0 ? tradeIdeaGainText(idea.gain) : null;
   return (
     <AccentCard accent="var(--color-action)" as="section" compact data-testid="today-trade-idea">
+      {info ? (
+        <div className="flex items-center">
+          <span className="text-[0.6875rem] font-extrabold uppercase" style={{ color: "var(--color-action)", letterSpacing: "var(--letter-spacing-badge)" }}>
+            Trade idea{deadline ? ` · deadline ${deadline}` : ""}
+          </span>
+          <InfoMark label="trade ideas" lines={[info]} beginnerOnly />
+        </div>
+      ) : null}
       <Link href={href} aria-label={`Trade idea: ${idea.title}. Open in Trade Hub`} className="flex items-center gap-2" style={{ minHeight: "var(--touch-target-min)", color: "inherit", textDecoration: "none" }}>
         <span className="flex min-w-0 flex-1 flex-col gap-1">
           <span className="flex items-center gap-2">
-            <span className="text-[0.6875rem] font-extrabold uppercase" style={{ color: "var(--color-action)", letterSpacing: "var(--letter-spacing-badge)" }}>
-              Trade idea{deadline ? ` · deadline ${deadline}` : ""}
-            </span>
+            {info ? null : (
+              <span className="text-[0.6875rem] font-extrabold uppercase" style={{ color: "var(--color-action)", letterSpacing: "var(--letter-spacing-badge)" }}>
+                Trade idea{deadline ? ` · deadline ${deadline}` : ""}
+              </span>
+            )}
             {gain ? (
               <span className="text-xs font-extrabold tabular-nums" style={{ color: idea.gain != null && idea.gain > 0 ? "var(--color-success)" : "var(--color-danger)" }} data-testid="today-trade-gain">
                 {gain} value

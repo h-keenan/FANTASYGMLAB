@@ -35,7 +35,7 @@ export function SectionHeading({
   className?: string;
   /** Right-aligned slot on the title row (e.g. a "View All" link). */
   action?: ReactNode;
-  /** Inline help (<BeginnerHelp popover label=...>) placed directly after the title it explains, never at the far edge. */
+  /** Inline help (<InfoMark label=...>) placed directly after the title it explains, never at the far edge. */
   help?: ReactNode;
 }) {
   const font = "var(--type-app-section-title)";
@@ -45,7 +45,7 @@ export function SectionHeading({
     </h2>
   );
   const titled = help ? (
-    <div className="flex items-center gap-3 min-w-0">
+    <div className="flex items-center min-w-0">
       {title}
       {help}
     </div>

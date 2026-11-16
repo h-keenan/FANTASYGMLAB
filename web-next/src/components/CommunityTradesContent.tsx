@@ -1,6 +1,5 @@
 "use client";
 
-import { InfoTip } from "@/components/InfoTip";
 import { PageTitle } from "@/components/PageTitle";
 import { EmptyState } from "@/components/EmptyState";
 import { LeagueLinkStep } from "@/components/LeagueLinkStep";
@@ -172,13 +171,16 @@ export function CommunityTradesContent({
   return (
     <main className="page-shell">
       <header className="flex flex-col gap-2">
-        <PageTitle page="Community" />
-        <InfoTip label="Craziest trades this week: how this works">
-          Real confirmed trades from other users&apos; leagues — always shown as &quot;Team A&quot; and &quot;Team
-          B&quot;, never a real team or user name. Flagged here because our own trade-grading system found an
-          unexpectedly good or bad outcome once the trade had a few weeks to play out, the same system behind your
-          own Trade History.
-        </InfoTip>
+        <PageTitle
+          page="Community"
+          info={
+            <p>
+              Craziest trades this week: real confirmed trades from other users&apos; leagues, always shown as &quot;Team A&quot; and &quot;Team B&quot;, never a real
+              team or user name. Flagged here because our own trade-grading system found an unexpectedly good or bad outcome once the trade had a few weeks to
+              play out, the same system behind your own Trade History.
+            </p>
+          }
+        />
         <AccentCard accent="var(--color-information)" compact className="mt-1">
         <div className="flex items-center justify-between gap-3">
           <span className="flex items-center gap-2 text-xs" style={{ color: "var(--color-text-secondary)" }}>

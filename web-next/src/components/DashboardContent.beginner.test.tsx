@@ -68,15 +68,14 @@ function expandHelp() {
 
 describe("DashboardContent for a beginner", () => {
   beforeEach(() => window.localStorage.clear());
-  it("explains rank terms in short lines under the strip, not inside the 4-column tiles", () => {
+  it("explains the rank terms behind the strip's one inline ? (no per-tile corner)", () => {
     render(<DashboardContent leagueId="abc" leagueName="Dynasty Overlords" data={FIXTURE} />);
     fireEvent.click(screen.getByTestId("stat-strip-toggle"));
     expandHelp();
     const strip = screen.getByLabelText("Team summary");
-    const lines = Array.from(strip.querySelectorAll("[data-beginner-help] p")).map((p) => p.textContent);
-    expect(lines.some((l) => l?.startsWith("This season: "))).toBe(true);
-    expect(lines.some((l) => l?.startsWith("Average Age: "))).toBe(true);
-    expect(screen.getByText(/^Today lists the roster moves/)).toBeInTheDocument(); // the Do this now help popover
+    expect(strip.querySelectorAll("[data-info-mark]")).toHaveLength(1);
+    expect(screen.getByText(/What "This season" means/)).toBeInTheDocument();
+    expect(screen.getByText(/^Today lists the roster moves/)).toBeInTheDocument(); // the Do this now help
   });
 
   it("tells a beginner no move is needed when nothing is urgent", async () => {
@@ -108,7 +107,7 @@ describe("DashboardContent for a beginner", () => {
     await screen.findByTestId("today-trade-idea");
     expandHelp();
     const block = screen.getByTestId("today-trade-help");
-    expect(block.textContent).toMatch(/who you give, who you get/);
+    expect(screen.getByText(/who you give, who you get/)).toBeInTheDocument(); // the trade card's one "?"
     const line = await screen.findByTestId("dashboard-stance-line");
     expect(line.textContent).toMatch(/building future value/);
     expect(line.getAttribute("href")).toBe("/gm-plan/abc?name=Dynasty%20Overlords");

@@ -1,6 +1,6 @@
 import { useState } from "react";
 import type { DropPlayer, DropSuggestion, DroppablePlayers, NeedsModel, RosterOverflow } from "@/lib/api";
-import { InfoTip } from "@/components/InfoTip";
+import { InfoMark } from "@/components/ui/InfoMark";
 import { SectionHeading } from "@/components/SectionHeading";
 import { ToneBadge } from "@/components/ToneBadge";
 import { PlayerAvatar } from "@/components/PlayerAvatar";
@@ -413,7 +413,16 @@ export function DroppablePlayersSection({ data }: { data: DroppablePlayers | nul
   if (!data) return null;
   return (
     <section className="flex flex-col gap-2" aria-labelledby="droppable-heading" data-testid="droppable-players">
-      <SectionHeading>
+      <SectionHeading
+        help={
+          <InfoMark
+            label="players you could drop"
+            lines={[
+              "Lowest cost to your team first: players who never start, cost your lineup nothing if cut and have little value. Never suggested: starters, high-value assets, depth you need for byes and injuries, young upside for your team direction, hot players, and anyone you marked untouchable.",
+            ]}
+          />
+        }
+      >
         <span id="droppable-heading">Players you could drop</span>
       </SectionHeading>
       {data.players.length === 0 ? (
@@ -442,11 +451,6 @@ export function DroppablePlayersSection({ data }: { data: DroppablePlayers | nul
           ) : null}
         </div>
       )}
-      <InfoTip label="How drops are chosen">
-        Lowest cost to your team first: players who never start, cost your lineup nothing if cut and have little value.
-        Never suggested: starters, high-value assets, depth you need for byes and injuries, young upside for your team
-        direction, hot players, and anyone you marked untouchable.
-      </InfoTip>
     </section>
   );
 }
@@ -454,7 +458,11 @@ export function DroppablePlayersSection({ data }: { data: DroppablePlayers | nul
 /** The numbers behind the Team need stat, per position (the info sheet). */
 export function NeedsBreakdown({ needs }: { needs: NeedsModel }) {
   return (
-    <InfoTip label="How we read your needs">
+    <div className="flex items-center">
+      <span className="text-xs font-semibold" style={{ color: "var(--color-text-muted)" }}>
+        How we read your needs
+      </span>
+      <InfoMark label="how we read your needs">
       <div className="flex flex-col gap-2" data-testid="needs-breakdown">
         {needs.positions.map((position) => (
           <div key={position.position} className="flex flex-col gap-0.5">
@@ -488,7 +496,8 @@ export function NeedsBreakdown({ needs }: { needs: NeedsModel }) {
           starters plus one bye/injury cover.
         </span>
       </div>
-    </InfoTip>
+      </InfoMark>
+    </div>
   );
 }
 

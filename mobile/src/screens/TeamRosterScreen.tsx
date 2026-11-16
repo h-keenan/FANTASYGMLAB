@@ -21,7 +21,7 @@ import GridBackground from '../components/GridBackground';
 import MetricCard from '../components/MetricCard';
 import OverallRatingBadge from '../components/OverallRatingBadge';
 import PlayerIdentityRow from '../components/PlayerIdentityRow';
-import ScreenInfoNote from '../components/ScreenInfoNote';
+import InfoMark from '../components/InfoMark';
 import { waiverInjuryDisplay } from '../components/WaiverRecommendationCard';
 import ValuesCredit from '../components/ValuesCredit';
 import { api, type PlayerSummary, type RankedPlayer, type TeamRanking } from '../lib/api';
@@ -217,7 +217,10 @@ export default function TeamRosterScreen({ route, navigation }: Props) {
         contentContainerStyle={[styles.content, { paddingBottom: orbClearance, paddingTop: headerHeight }]}
       >
         <BrandHeaderBar leagueId={leagueId} leagueName={leagueName} />
-        <ScreenInfoNote text={`${ownerName}'s full roster in ${leagueName} — real value, rank, and role data for every player they own, grouped by position.`} />
+        <SectionHeading
+          title={`${ownerName}'s roster`}
+          info={<InfoMark label="this roster" lines={[`${ownerName}'s full roster in ${leagueName} — real value, rank, and role data for every player they own, grouped by position.`]} />}
+        />
 
         {ranking ? (
           <TeamSnapshotSection

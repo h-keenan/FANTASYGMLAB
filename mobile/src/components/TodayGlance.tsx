@@ -138,17 +138,18 @@ function TradeSide({ label, assets }: { label: string; assets: TodayTradeAsset[]
 }
 
 /** The trade idea as one card (concept B): kicker, "Get a QB from Team Iron", who goes and who comes, the value gain. The whole card opens it in Trade Hub. */
-export function TodayTradeIdeaCard({ idea, deadline, onOpen }: { idea: TodayTradeIdea; deadline?: string | null; onOpen: () => void }) {
+export function TodayTradeIdeaCard({ idea, deadline, onOpen, info }: { idea: TodayTradeIdea; deadline?: string | null; onOpen: () => void; info?: React.ReactNode }) {
   const { colors } = useThemeMode();
   const styles = useMemo(() => createStyles(colors), [colors]);
   const gain = idea.gain != null && idea.gain !== 0 ? tradeIdeaGainText(idea.gain) : null;
   return (
     <AccentCard accent={colors.accent} compact onPress={onOpen}>
+      <View style={styles.tradeHead}>
+        <AppText style={[styles.kicker, { color: colors.accent }]}>{`TRADE IDEA${deadline ? ` · DEADLINE ${deadline.toUpperCase()}` : ''}`}</AppText>
+        {info}
+        {gain ? <AppText style={[styles.gain, styles.gainEnd, { color: (idea.gain ?? 0) > 0 ? colors.success : colors.danger }]}>{gain} value</AppText> : null}
+      </View>
       <View testID="today-trade-idea" accessible accessibilityRole="button" accessibilityLabel={`Trade idea: ${idea.title}. Open in Trade Hub`} style={styles.tradeBody}>
-        <View style={styles.tradeHead}>
-          <AppText style={[styles.kicker, { color: colors.accent }]}>{`TRADE IDEA${deadline ? ` · DEADLINE ${deadline.toUpperCase()}` : ''}`}</AppText>
-          {gain ? <AppText style={[styles.gain, { color: (idea.gain ?? 0) > 0 ? colors.success : colors.danger }]}>{gain} value</AppText> : null}
-        </View>
         <AppText style={styles.tradeTitle}>{idea.title}</AppText>
         <TradeSide label="Send" assets={idea.send} />
         <TradeSide label="Get" assets={idea.receive} />
@@ -178,8 +179,9 @@ function createStyles(colors: ThemeColors) {
     link: { minHeight: 44, justifyContent: 'center', alignSelf: 'flex-start' },
     linkText: { color: colors.accent, fontWeight: '700', fontSize: 14 },
     tradeBody: { gap: 4 },
-    tradeHead: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: spacing.sm },
+    tradeHead: { flexDirection: 'row', alignItems: 'center', marginBottom: 4 },
     gain: { fontSize: 12.5, fontWeight: '800' },
+    gainEnd: { marginLeft: 'auto' },
     tradeTitle: { fontSize: 16, fontWeight: '800', color: colors.textPrimary },
     sideRow: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: spacing.sm },
     sideLabel: { width: 36 },
