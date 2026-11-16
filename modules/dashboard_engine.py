@@ -434,7 +434,9 @@ def build_trade_tile(
         partner_reason=partner_reason,
         confidence_reason=confidence_reason,
         confidence_label=confidence_label,
-        value_verdict=trade_value_verdict(gain),
+        value_verdict=trade_value_verdict(
+            gain, max(int(headline_idea.get("my_score") or 0), int(headline_idea.get("their_score") or 0))
+        ),
         value_delta=value_delta,
         health_context=_trade_idea_injury_display_context(headline_idea),
     )

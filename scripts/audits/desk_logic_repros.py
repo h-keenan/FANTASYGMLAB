@@ -56,11 +56,11 @@ def waiver_labels() -> None:
 
 
 def verdict_ladder() -> None:
-    print("== D4 verdict ladder is absolute points, not a share of the deal")
+    print("== D4 verdict ladder is a share of the deal (fixed): same 10% loss reads the same at every size")
     for total in (500, 3000, 10000):
         loss = -0.10 * total
-        print(f"  10% loss on a {total}-point side = {int(loss)} -> {tb.band_for_score(loss).id}")
-    print("  +499 ->", tb.band_for_score(499).id, "| -400 ->", tb.band_for_score(-400).id)
+        print(f"  10% loss on a {total}-point side = {int(loss)} -> {tb.band_for_score(loss, total).id}")
+    print("  reference deal: +499 ->", tb.band_for_score(499).id, "| -400 ->", tb.band_for_score(-400).id, "(symmetric ladder)")
 
 
 if __name__ == "__main__":

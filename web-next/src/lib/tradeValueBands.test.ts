@@ -8,11 +8,22 @@ import { badgeTone, bandForScore, TRADE_VALUE_BANDS, TRADE_VALUE_GOLDEN } from "
 
 describe("shared trade value bands (generated from modules/trade_value_bands.py)", () => {
   it("replays the Python golden scores through the TS ladder", () => {
-    for (const { score, id } of TRADE_VALUE_GOLDEN) expect(bandForScore(score).id, String(score)).toBe(id);
+    for (const { score, id, deal_size } of TRADE_VALUE_GOLDEN) {
+      expect(bandForScore(score, deal_size).id, `${deal_size}:${score}`).toBe(id);
+    }
+  });
+
+  it("a 10 percent loss reads as losing at every deal size (audit P1-3)", () => {
+    for (const deal of [500, 3000, 10000, 40000]) {
+      expect(["counter", "decline", "hard"]).toContain(bandForScore(-0.1 * deal, deal).id);
+      expect(["accept", "smash"]).toContain(bandForScore(0.1 * deal, deal).id);
+    }
   });
 
   it("the analyzer fallback sentence is the shared ladder, never its own", () => {
-    for (const { score } of TRADE_VALUE_GOLDEN) expect(presentationLabel(score)).toBe(bandForScore(score).direction_label);
+    for (const { score, deal_size } of TRADE_VALUE_GOLDEN) {
+      expect(presentationLabel(score, deal_size)).toBe(bandForScore(score, deal_size).direction_label);
+    }
   });
 
   it("badge colors come from the band's tone on every surface", () => {

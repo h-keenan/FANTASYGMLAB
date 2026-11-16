@@ -502,9 +502,12 @@ def build_trade_share_card(
         my_team_name=mine,
         partner_name=partner,
     )
+    from modules import trade_value_bands
     from modules.trade_visual_language import trade_value_band
 
-    verdict = trade_value_band(trade_gain)
+    verdict = trade_value_band(
+        trade_gain, trade_value_bands.deal_size_for(idea.get("my_score"), idea.get("their_score"))
+    )
 
     if not receive_assets and not send_assets:
         return ShareRecommendationCard(

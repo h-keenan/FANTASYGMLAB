@@ -423,6 +423,7 @@ def grade_transfers(
         points = lineup.get("points") or {}
         ppw = float(points.get("per_week_delta") or 0.0)
         market = int(verdict.get("value_delta") or 0)
+        deal_size = int(verdict.get("deal_size") or 0)
         positions = lineup.get("positions") or {}
         worst = min(positions.items(), key=lambda kv: kv[1].get("per_week_delta", 0.0), default=None)
         posture = postures[rid]
@@ -435,6 +436,7 @@ def grade_transfers(
             "verdict": verdict,
             "trade_score": int(verdict.get("trade_score") or 0),
             "market_delta": market,
+            "deal_size": deal_size,
             "lineup_delta": {
                 "per_week": ppw,
                 "ros": points.get("ros_delta"),
@@ -459,7 +461,7 @@ def grade_transfers(
             # internal: feeds the veto read below, removed before returning
             "_veto_side": {
                 "roster_id": rid, "team_name": names[rid], "market_delta": market,
-                "team_score": int(verdict.get("trade_score") or 0), "points_per_week": ppw,
+                "team_score": int(verdict.get("trade_score") or 0), "deal_size": deal_size, "points_per_week": ppw,
                 "posture": strategy, "posture_group": posture.get("group") or "retool",
                 "worst_position": (
                     {"position": worst[0], "per_week_delta": float(worst[1].get("per_week_delta", 0.0))}

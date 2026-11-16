@@ -6600,7 +6600,8 @@ def _iter_priced_send_packages(
     for size in range(1, PRICED_MAX_ASSETS + 1):
         for package in combinations(pool, size):
             delta = estimated_user_delta(package, [target_asset])
-            if delta > trade_value_bands.ACCEPT or delta < -PRICED_MAX_OVERPAY:
+            deal = trade_value_bands.deal_size_for(sum(_asset_score(a) for a in package), _asset_score(target_asset))
+            if delta > trade_value_bands.cuts_for(deal).accept or delta < -PRICED_MAX_OVERPAY:
                 continue
             # Closest to the price first; from above (user pays) beats from below.
             scored.append((abs(delta) + (0 if delta <= 0 else 250), size, list(package), delta))
