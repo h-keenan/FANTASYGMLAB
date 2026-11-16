@@ -96,7 +96,8 @@ export default function SegmentedTabBar<T extends string>({
       {target ? <Animated.View pointerEvents="none" style={[styles.slider, slim && styles.sliderSlim, { left: 0, transform: [{ translateX: slideX }], width: slideW }]} /> : null}
       {options.map((option) => {
         const isActive = option.key === active;
-        const iconColor = isActive ? colors.accent : colors.textTertiary;
+        // Icon always matches its label (labelActive / label styles below).
+        const iconColor = isActive ? colors.accentOnTint : colors.textSecondary;
         return (
           <PressableScale
             key={option.key}
