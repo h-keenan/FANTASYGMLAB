@@ -11,7 +11,7 @@ const dataUri = (file) => `data:image/png;base64,${fs.readFileSync(file).toStrin
 
 export function creativeHtml(scene, kind, shot, logo) {
   const feed = kind === "feed";
-  const phone = feed ? { w: 500, top: 70, left: 540 } : { w: 640, top: 760, left: 220 };
+  const phone = feed ? { w: 500, top: 70, left: 540 } : { w: 640, top: 820, left: 220 };
   const head = scene.headline.map((l) => `<span>${l}</span>`).join("");
   return `<!doctype html><html><head><meta charset="utf-8"><style>
   :root{--bg:#04070d;--cyan:#22d3ee;--ink:#f5f8fc;--muted:#9fb0c6}
@@ -23,7 +23,7 @@ export function creativeHtml(scene, kind, shot, logo) {
     linear-gradient(160deg,#0a1424 0%,#050810 60%,#03050a 100%)}
   .grain{position:absolute;inset:0;opacity:.5;background:repeating-linear-gradient(115deg,rgba(255,255,255,.035) 0 2px,transparent 2px 46px)}
   .logo{position:absolute;${feed ? "left:70px;top:70px;width:300px" : "left:0;right:0;margin:auto;top:150px;width:420px"};mix-blend-mode:screen;filter:invert(1)}
-  .copy{position:absolute;${feed ? "left:70px;top:250px;width:480px" : "left:0;right:0;top:290px;text-align:center;padding:0 60px"}}
+  .copy{position:absolute;${feed ? "left:70px;top:250px;width:430px" : "left:0;right:0;top:290px;text-align:center;padding:0 60px"}}
   .tag{display:inline-block;font-weight:800;letter-spacing:.22em;font-size:${feed ? 22 : 28}px;color:var(--cyan);margin-bottom:${feed ? 22 : 26}px}
   h1{font-weight:900;font-style:italic;letter-spacing:-.02em;line-height:.98;font-size:${feed ? 100 : 148}px}
   h1 span{display:block}
@@ -42,6 +42,29 @@ export function creativeHtml(scene, kind, shot, logo) {
   </body></html>`;
 }
 
+/** Fails when any text (tag, headline lines, sub line) or the wordmark leaves the canvas or touches the phone frame. */
+async function assertLayout(page, label, w, h) {
+  const problems = await page.evaluate(([w, h]) => {
+    const rect = (el) => { const r = el.getBoundingClientRect(); return { l: r.left, r: r.right, t: r.top, b: r.bottom }; };
+    const phone = rect(document.querySelector(".phone"));
+    const boxes = [];
+    for (const el of document.querySelectorAll(".tag, h1 span, p.sub")) {
+      // Measure the glyphs (a Range), not the block, so a wide block with short text is not a false positive.
+      const range = document.createRange(); range.selectNodeContents(el);
+      for (const r of range.getClientRects()) boxes.push({ name: el.textContent.trim().slice(0, 24), l: r.left, r: r.right, t: r.top, b: r.bottom });
+    }
+    boxes.push({ name: "wordmark", ...rect(document.querySelector(".logo")) });
+    const out = [];
+    for (const b of boxes) {
+      if (b.l < 40 || b.r > w - 40 || b.t < 0 || b.b > h) out.push(`${b.name}: outside the safe canvas`);
+      const gap = 24; // keep clear of the phone
+      if (b.r > phone.l - gap && b.l < phone.r + gap && b.b > phone.t - gap && b.t < phone.b + gap) out.push(`${b.name}: overlaps/touches the phone`);
+    }
+    return out;
+  }, [w, h]);
+  if (problems.length) throw new Error(`Layout problem in ${label}: ${problems.join("; ")}`);
+}
+
 export async function compose({ browser, scenes, repo, raw, out, only }) {
   const logo = dataUri(path.join(repo, "web-next/public/fantasydesk-wordmark.png"));
   const ctx = await browser.newContext({ deviceScaleFactor: 1 });
@@ -55,6 +78,7 @@ export async function compose({ browser, scenes, repo, raw, out, only }) {
       await page.setViewportSize({ width: w, height: h });
       await page.setContent(creativeHtml(scene, kind, dataUri(shot), logo), { waitUntil: "load" });
       await page.evaluate(() => document.fonts.ready);
+      await assertLayout(page, `${scene.id} ${file}`, w, h);
       const dest = path.join(out, `${String(i + 1).padStart(2, "0")}-${scene.id}-${file}.png`);
       await page.screenshot({ path: dest });
       written.push(dest);

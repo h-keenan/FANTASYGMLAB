@@ -60,10 +60,14 @@ const STORY = [
 ];
 
 const FRANCHISE = "Capitol Kings";
+// The settings a game created today carries (the mock omits the newer ones, which reads as an old save).
+const NEW_GAME_FLAGS = { limit_v: 1, hint_v: 1, kd_v: 1, pos_v: 1, reserve_v: 1, block_v: 1 };
 
 /** Make the mock's "you" record agree everywhere (standings and header disagree in the raw mock). */
 function fixup(node, opts) {
   if (!node || typeof node !== "object") return;
+  // New-game rule flags (docs/fantasy-sim-api.md, web-next SimGameSettings) so no scene shows an "Update game rules" notice.
+  if (node.slots && node.rounds && node.regular_weeks) Object.assign(node, NEW_GAME_FLAGS);
   if (node.team_id === "3" && typeof node.wins === "number" && typeof node.losses === "number") {
     if (opts.status === "complete") { node.wins = 11; node.losses = 3; } else { node.wins = 3; node.losses = 1; }
   }
