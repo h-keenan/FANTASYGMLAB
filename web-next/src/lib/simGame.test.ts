@@ -33,7 +33,6 @@ import {
   simDraftClockLine,
   simFilterQuery,
   simFilterReducer,
-  simGameAdvanceHitsPaywall,
   simGameErrorGate,
   simGameGate,
   simGameLiteLine,
@@ -158,20 +157,16 @@ describe("gating", () => {
     expect(simGameReasonMessage("")).toBe("");
   });
 
-  it("preview copy counts down and flips to paused", () => {
+  it("free season copy says 1 free season, then flips once it is complete", () => {
     expect(simGamePreviewLine(null)).toBeNull();
-    expect(simGamePreviewLine({ weeks_left: 3, paywall_week: 4, paywalled: false })).toContain("3 weeks left");
-    expect(simGamePreviewLine({ weeks_left: 1, paywall_week: 4, paywalled: false })).toContain("1 week left");
-    expect(simGamePreviewLine({ weeks_left: 0, paywall_week: 4, paywalled: true })).toContain("paused at week 4");
-    expect(simGamePaywalled({ weeks_left: 0, paywall_week: 4, paywalled: true })).toBe(true);
+    const playing = { free_season: true, weeks_left: 12, paywall_week: 18, paywalled: false };
+    expect(simGamePreviewLine(playing)).toContain("1 free season");
+    expect(simGamePreviewLine(playing)).not.toMatch(/week \d/i);
+    const over = { free_season: true, weeks_left: 0, paywall_week: 18, paywalled: true };
+    expect(simGamePreviewLine(over)).toContain("free season is complete");
+    expect(simGamePaywalled(over)).toBe(true);
+    expect(simGamePaywalled(playing)).toBe(false);
     expect(simGamePaywalled(null)).toBe(false);
-  });
-
-  it("warns before the advance that reaches the paywall week", () => {
-    const preview = { weeks_left: 1, paywall_week: 4, paywalled: false };
-    expect(simGameAdvanceHitsPaywall(preview, { week: 3 })).toBe(true);
-    expect(simGameAdvanceHitsPaywall(preview, { week: 1 })).toBe(false);
-    expect(simGameAdvanceHitsPaywall(null, { week: 9 })).toBe(false);
   });
 });
 
@@ -218,7 +213,9 @@ describe("stage, headings and rounds", () => {
 
   it("explains why a new game is blocked", () => {
     expect(simNewGameBlock(0, 1, false)).toBeNull();
-    expect(simNewGameBlock(1, 1, false)).toContain("Free includes 1 saved game");
+    expect(simNewGameBlock(1, 1, false)).toContain("Free includes 1 season in 1 saved game");
+    expect(simNewGameBlock(0, 1, false, true)).toContain("used your 1 free season");
+    expect(simNewGameBlock(0, 3, true, true)).toBeNull();
     expect(simNewGameBlock(1, 1, false)).toContain("You have 1 of 1 saved game.");
     expect(simNewGameBlock(3, 3, true)).toContain("You have 3 of 3 saved games");
     expect(simNewGameBlock(3, 3, true)).toContain("delete one");

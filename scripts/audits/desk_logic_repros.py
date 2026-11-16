@@ -30,14 +30,14 @@ def injury_negation() -> None:
     ]
     for status, part, notes in cases:
         a = tg.estimate_injury_absence("Active", status, body_part=part, notes=notes, window=window)
-        print(f"  {status:12} {part:10} {notes!r:60} -> weeks={a.weeks} season_ending={a.season_ending}")
+        print(f"  {status:12} {part:10} {notes!r:60} -> weeks={a.weeks} season_ending={a.season_ending} unconfirmed={a.unconfirmed}")
 
 
 def two_week_clocks() -> None:
     print("== D2 two 'what NFL week is it' clocks")
     for d in (date(2026, 9, 9), date(2026, 9, 15), date(2026, 9, 16), date(2026, 9, 17), date(2027, 1, 6)):
         clock = season_clock.clock_from_calendar(d)
-        print(f"  {d} {d:%a}: season_clock={clock.phase}/{clock.week}  trade_grade.estimate_nfl_week={tg.estimate_nfl_week(d)}")
+        print(f"  {d} {d:%a}: season_clock={clock.phase}/{clock.week}  season_clock.nfl_week={season_clock.nfl_week(d)} (single clock; trade_grade.estimate_nfl_week removed)")
 
 
 def waiver_labels() -> None:

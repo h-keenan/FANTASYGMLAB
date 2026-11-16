@@ -132,7 +132,7 @@ def stop_reason(snap: GameSnapshot, state: GameState, ev: Evaluator, *, pro: boo
     if over > 0 and not snap.settings.soft_limit:
         return _reason("roster_over_limit", W, f"Cut {over} player{'s' if over != 1 else ''} before simulating.", cuts_needed=over)
     if paywalled:
-        return _reason("premium_required", W, "The free preview ends here. Pro unlocks the rest of the season.")
+        return _reason("premium_required", W, "Your free season is complete. Pro unlocks the next season.")
     if stops.deadline and played > 0 and state.status == "in_season" and W == snap.settings.trade_deadline_week:
         return _reason("trade_deadline", W, "this is the last week to trade.")
     if stops.injuries and hurt:

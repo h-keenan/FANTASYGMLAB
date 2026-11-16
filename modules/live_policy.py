@@ -52,10 +52,10 @@ _memo: dict[str, Any] = {"at": 0.0, "value": None}
 def _compute_live_week(now: datetime) -> int | None:
     try:
         from modules import nfl_schedule, sleeper
-        from modules.trade_grade import estimate_nfl_week
+        from modules import season_clock
 
         season = sleeper.default_player_stats_season()
-        week = estimate_nfl_week(now.date())
+        week = season_clock.nfl_week(now.date())
         if not week or week <= 0:
             return None
         import os

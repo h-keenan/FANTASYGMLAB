@@ -124,8 +124,8 @@ import { useSimLeagueTeams } from "@/lib/useSimLeagueTeams";
 import { useSimLeagueChoices } from "@/lib/useSimLeagueChoices";
 
 const UPSELL_FALLBACK = {
-  title: "Keep your season going with Pro",
-  body: "The draft and your first 3 weeks are free. Pro unlocks the rest of the season, the playoffs and your final grade. Your save picks up right where you stopped.",
+  title: "Your free season is complete",
+  body: "Fantasy Sim is free for 1 season: the draft, every week, the playoffs and your final grade. Pro unlocks more seasons, dynasty mode and mid-season starts.",
 };
 
 /** Fantasy Sim: the GM Game. Standalone and turn-based; see lib/simGame.ts and docs/fantasy-sim-game-design.md. */
@@ -548,7 +548,7 @@ export function SimGameContent() {
   }
 
   // hub
-  const block = simNewGameBlock(games.length, options?.max_games ?? 1, options?.is_premium);
+  const block = simNewGameBlock(games.length, options?.max_games ?? 1, options?.is_premium, options?.free_season_used);
   return (
     <Shell>
       <SimPreviewBanner preview={preview} />

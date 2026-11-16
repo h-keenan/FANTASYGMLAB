@@ -48,8 +48,10 @@ export interface SimGameUpsell {
   body: string;
 }
 
-/** `preview` is null for Pro; for Free it counts down the paid-for-free weeks. */
+/** `preview` is null for Pro. Free gets ONE full season (draft, every week, playoffs); `paywalled` is true once it is over.
+ * `weeks_left` / `paywall_week` are only an estimate kept for older builds. */
 export interface SimGamePreview {
+  free_season?: boolean;
   weeks_left: number;
   paywall_week: number;
   paywalled: boolean;
@@ -446,6 +448,8 @@ export interface SimGamePersona {
 export interface SimGameOptionsResponse extends SimGameEnvelope {
   engine_version?: string;
   max_games?: number;
+  /** Free only: the account's one free season was already started (deleting the game does not restart it). */
+  free_season_used?: boolean;
   options?: {
     mode?: { values: SimMode[]; default: SimMode; modes?: { id: SimMode; label: string; available: boolean }[] };
     teams: { values: number[]; default: number };
@@ -1321,7 +1325,7 @@ export interface SimGameResponse extends SimGameEnvelope {
 // Reasons and gating
 
 const REASON_COPY: Record<string, string> = {
-  premium_required: "Fantasy Sim is a Pro feature.",
+  premium_required: "Your 1 free season is used. Go Pro for more seasons, dynasty and mid-season starts.",
   sim_storage_unavailable: "Saving games is temporarily unavailable. Try again in a little while.",
   players_unavailable: "The player pool could not be built right now. Try again in a moment.",
   game_limit_reached: "You have reached your limit of saved games. Delete one to start another.",
@@ -1458,27 +1462,20 @@ export function simGameStage(game: Pick<SimGame, "status">): SimGameStage {
   }
 }
 
-/** True once the free preview is used up (every write answers premium_required). */
+/** True once the free season is used up (every write answers premium_required). */
 export function simGamePaywalled(preview: SimGamePreview | null | undefined): boolean {
   return Boolean(preview?.paywalled);
 }
 
-/** One line for the preview banner; null for Pro (no banner). */
+/** One line for the free-season banner; null for Pro (no banner). */
 export function simGamePreviewLine(preview: SimGamePreview | null | undefined): string | null {
   if (!preview) return null;
   if (preview.paywalled) {
-    return `Free preview over. Your season is paused at week ${preview.paywall_week}. Go Pro to pick it up right here.`;
+    return "Your free season is complete. Go Pro for more seasons, dynasty and mid-season starts.";
   }
-  const n = preview.weeks_left;
-  if (n <= 0) return `Free preview. Week ${preview.paywall_week} needs Pro.`;
-  return `Free preview: ${n} week${n === 1 ? "" : "s"} left to play before Pro.`;
+  return "1 free season: the draft, every week, the playoffs and your final grade.";
 }
 
-/** Next week would hit the paywall: warn before the tap. */
-export function simGameAdvanceHitsPaywall(preview: SimGamePreview | null | undefined, game: Pick<SimGame, "week">): boolean {
-  if (!preview) return false;
-  return preview.paywalled || game.week + 1 >= preview.paywall_week;
-}
 
 // ---------------------------------------------------------------------------
 // Advance blockers
@@ -1493,7 +1490,7 @@ export function simAdvanceBlockers(game: SimGame | null | undefined, preview?: S
   if (!game) return [{ code: "no_game", message: "No game loaded." }];
   const out: SimAdvanceBlocker[] = [];
   if (simGamePaywalled(preview)) {
-    out.push({ code: "paywalled", message: "Free preview is over. Go Pro to keep playing." });
+    out.push({ code: "paywalled", message: "Your free season is over. Go Pro to keep playing." });
   }
   const cuts = game.pending?.cuts_needed ?? 0;
   if (cuts > 0 && simLimitBlocks(game.pending)) {
@@ -2692,10 +2689,18 @@ export function simSavedGamesCount(gameCount: number, maxGames: number): string 
 }
 
 /** Why the New game button is unavailable, or null when you can start one. */
-export function simNewGameBlock(gameCount: number, maxGames: number, isPremium: boolean | undefined): string | null {
+export function simNewGameBlock(
+  gameCount: number,
+  maxGames: number,
+  isPremium: boolean | undefined,
+  freeSeasonUsed?: boolean,
+): string | null {
+  if (isPremium === false && freeSeasonUsed) {
+    return "You have used your 1 free season. Go Pro for more seasons, dynasty and up to 3 saved games.";
+  }
   if (gameCount < maxGames) return null;
   const count = simSavedGamesCount(gameCount, maxGames);
-  if (isPremium === false) return `${count}. Free includes ${maxGames} saved game, so delete it to start another or go Pro for up to 3.`;
+  if (isPremium === false) return `${count}. Free includes 1 season in 1 saved game. Go Pro for more seasons and up to 3 games.`;
   return `${count}. That is the most allowed, so delete one to start another.`;
 }
 

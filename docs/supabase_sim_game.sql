@@ -141,3 +141,48 @@ revoke all on function public.sim_prune_old_games() from public, anon, authentic
 
 comment on table public.sim_games is
     'Fantasy Sim GM game saves (isolated feature). Own rows only; never joined to real league/valuation tables.';
+
+-- ---------------------------------------------------------------------------
+-- Game cap and the free season, enforced in the database (2026-11-16).
+--
+-- sim_games.slot: each save takes a slot 1..max_games (3 for Pro, 1 for Free). The partial unique
+-- index makes two simultaneous "create game" requests unable to both fit under the cap: the loser
+-- gets a unique violation (409) and the API answers game_limit_reached. Saves from before this
+-- migration are numbered by age; the API falls back to count-then-insert until the column exists.
+alter table public.sim_games add column if not exists slot smallint;
+
+update public.sim_games g
+   set slot = n.rn
+  from (
+      select id, row_number() over (partition by user_id order by created_at, id) as rn
+        from public.sim_games where slot is null
+  ) n
+ where g.id = n.id;
+
+create unique index if not exists sim_games_user_slot_uidx
+    on public.sim_games (user_id, slot) where slot is not null;
+
+-- sim_free_season_claims: a Free account's ONE free season, per account rather than per game, so
+-- deleting a game and starting another does not restart it. Insert/select only: a user cannot
+-- delete or edit their own claim. The primary key makes the claim atomic.
+create table if not exists public.sim_free_season_claims (
+    user_id uuid primary key references auth.users(id) on delete cascade,
+    game_id uuid,
+    claimed_at timestamptz not null default now()
+);
+
+alter table public.sim_free_season_claims enable row level security;
+
+drop policy if exists sim_free_season_claims_select_own on public.sim_free_season_claims;
+create policy sim_free_season_claims_select_own on public.sim_free_season_claims
+    for select to authenticated using (auth.uid() = user_id);
+drop policy if exists sim_free_season_claims_insert_own on public.sim_free_season_claims;
+create policy sim_free_season_claims_insert_own on public.sim_free_season_claims
+    for insert to authenticated with check (auth.uid() = user_id);
+
+-- Everyone who already has a save has started their free season.
+insert into public.sim_free_season_claims (user_id, game_id, claimed_at)
+select distinct on (user_id) user_id, id, created_at
+  from public.sim_games
+ order by user_id, created_at
+on conflict (user_id) do nothing;

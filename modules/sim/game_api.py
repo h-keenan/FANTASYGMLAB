@@ -50,7 +50,7 @@ from modules.sim.game_setup import (
     pick_random_team_name,
 )
 from modules.sim.game_state import Emitter, GameState
-from modules.sim.game_store import GameConflict, GameStore, public_game_row, row_version
+from modules.sim.game_store import GameConflict, GameLimitReached, GameStore, public_game_row, row_version
 from modules.sim.game_mode import DEFAULT_ROOKIE_ROUNDS, DEFAULT_SEASONS, PICK_YEARS, ROOKIE_ROUNDS, SEASON_CHOICES, mode_options
 from modules.sim.game_types import (
     BENCH_RANGE,
@@ -79,7 +79,6 @@ from modules.sim.game_types import (
     GAME_ENGINE_VERSION,
     MAX_GAMES_FREE,
     MAX_GAMES_PRO,
-    PREVIEW_PAYWALL_WEEK,
     SCORING_NAMES,
     SCORING_PRESETS,
     TAXI_SLOT_RANGE,
@@ -103,15 +102,22 @@ _POOL_LOCK = threading.Lock()
 _STRIPES = [threading.Lock() for _ in range(64)]
 
 UPSELL_GAME = {
-    "title": "Keep your season going",
+    "title": "Your free season is complete",
     "body": (
-        "Fantasy Sim: the GM Game is a Pro feature. You played the free preview (the draft and "
-        "weeks 1-3); upgrade to pick your season back up exactly where you left it."
+        "Fantasy Sim is free for 1 season: the draft, every week, the playoffs and your final grade. "
+        "Pro unlocks more seasons, dynasty mode and starting from your league's current week."
     ),
 }
 UPSELL_MORE_GAMES = {
-    "title": "Run more than one season",
-    "body": "Free accounts get one Fantasy Sim save. Pro unlocks up to three games at once.",
+    "title": "Run more than one game",
+    "body": "Free accounts get 1 free season in one Fantasy Sim save. Pro unlocks up to three games at once.",
+}
+UPSELL_PRO_START = {
+    "title": "That start is a Pro feature",
+    "body": (
+        "Your 1 free season covers a standard league from the preseason. Dynasty mode and starting from your "
+        "league's current week are Pro."
+    ),
 }
 
 
@@ -266,10 +272,11 @@ def _env(is_pro: bool, state: GameState | None, reason: str = "", **extra: Any) 
     }
 
 
-def _premium(state: GameState | None) -> dict[str, Any]:
+def _premium(state: GameState | None, upsell: dict[str, str] | None = None) -> dict[str, Any]:
     return {
-        "ok": True, "reason": "premium_required", "is_premium": False, "upsell": UPSELL_GAME,
-        "preview": view.preview_block(False, state) or {"weeks_left": 0, "paywall_week": PREVIEW_PAYWALL_WEEK, "paywalled": True},
+        "ok": True, "reason": "premium_required", "is_premium": False, "upsell": upsell or UPSELL_GAME,
+        "preview": view.preview_block(False, state) or {
+            "free_season": True, "weeks_left": 0, "paywall_week": view.DEFAULT_SEASON_WEEKS + 1, "paywalled": True},
     }
 
 
@@ -488,6 +495,15 @@ def add_routes(router: APIRouter, ctx: GameApiCtx) -> None:
 
     # --------------------------------------------------------------- options
 
+    def free_season_used(user: dict[str, Any]) -> bool:
+        """Has this Free account already spent its one free season? Storage trouble reads as "not yet"."""
+
+        try:
+            return ctx.store_for(user).free_season_claim(str(user.get("id") or "")) is not None
+        except SimStoreError as exc:
+            _log.warning("free season claim lookup failed (%s): %s", exc.code, exc)
+            return False
+
     @router.get("/games/options")
     def game_options(user: dict[str, Any] = Depends(require_user)):
         pro = ctx.is_pro(user)
@@ -495,6 +511,7 @@ def add_routes(router: APIRouter, ctx: GameApiCtx) -> None:
         return {
             **_env(pro, None), "engine_version": GAME_ENGINE_VERSION,
             "max_games": MAX_GAMES_PRO if pro else MAX_GAMES_FREE,
+            "free_season_used": False if pro else free_season_used(user),
             # Quick start = every default below; everything else is "Advanced options".
             "options": {
                 "mode": {"values": [m["id"] for m in mode_options() if m["available"]], "default": "redraft",
@@ -614,11 +631,15 @@ def add_routes(router: APIRouter, ctx: GameApiCtx) -> None:
             if raw.get("mode") == "dynasty" and not raw.get("start_year"):
                 raw["start_year"] = default_start_year()
             settings = GameSettings.parse(raw)
+        if not pro and (current or (picked.mode if start == START_LEAGUE else settings.mode) == "dynasty"):
+            return _premium(None, UPSELL_PRO_START)  # Free's one season is a standard league from the preseason
         store = ctx.store_for(user)
         limit = MAX_GAMES_PRO if pro else MAX_GAMES_FREE
-        if store.count_games(uid) >= limit:
-            return {**_env(pro, None, "game_limit_reached", max_games=limit),
-                    "upsell": None if pro else UPSELL_MORE_GAMES}
+        limit_reached = {**_env(pro, None, "game_limit_reached", max_games=limit), "upsell": None if pro else UPSELL_MORE_GAMES}
+        if store.count_games(uid) >= limit:  # cheap early out; the authoritative cap is the slot taken in create_game
+            return limit_reached
+        if not pro and store.free_season_claim(uid) is not None:
+            return _premium(None)  # the free season was already started (its game may be deleted): per account
         if start == START_LEAGUE and not (hasattr(ctx.inputs, "league_import") and ctx.sleeper_username is not None):
             return _env(pro, None, "league_unavailable")
         with ctx.compute() as ok:
@@ -633,8 +654,6 @@ def add_routes(router: APIRouter, ctx: GameApiCtx) -> None:
                         imported, difficulty=picked.difficulty, auto_lineup=picked.auto_lineup, tiebreaker=picked.tiebreaker,
                         dynasty=league_dynasty, seasons=picked.seasons, ir_slots=ir_pick, taxi_slots=taxi_pick, current=current,
                     )
-                    if not pro and settings.start_week >= PREVIEW_PAYWALL_WEEK:  # it would open already past the free weeks
-                        return _premium(None)
                     if league_dynasty and picked.rookie_rounds and not imported.rookie_rounds:
                         settings = replace(settings, rookie_rounds=picked.rookie_rounds)
                     pool = _pool_for(ctx.inputs, settings.scoring_settings)
@@ -652,7 +671,13 @@ def add_routes(router: APIRouter, ctx: GameApiCtx) -> None:
                     )
             except SimInputsError as exc:
                 return _env(pro, None, exc.code)
-        row = store.create_game(uid, snapshot=snap, seed=seed)
+        try:
+            row = store.create_game(uid, snapshot=snap, seed=seed, max_games=limit)
+        except GameLimitReached:
+            return limit_reached
+        if not pro and not store.claim_free_season(uid, row["id"]):
+            store.delete_game(uid, row["id"])  # lost a race with another create: one free season per account
+            return _premium(None)
         state = GameState(snap)
         em = Emitter(state, snap)
         if start == START_LEAGUE:
@@ -931,6 +956,8 @@ def add_routes(router: APIRouter, ctx: GameApiCtx) -> None:
     def trade_preview(game_id: str, body: TradeBody, user: dict[str, Any] = Depends(require_user)):
         pro = ctx.is_pro(user)
         _, _, row, snap, state = load(user, _gid(game_id))
+        if view.paywalled(pro, state):
+            return _premium(state)  # same gate as every other write: no free what-if engine after the free season
         desk = TradeDesk(Evaluator(snap, state), seedof(row, state))
         verdict = act.preview_trade(desk, body.partner, body.give, body.get)
         return {**_env(pro, state), "verdict": _verdict_json(snap, state, verdict), "executed": False, "trade": None}
@@ -1101,6 +1128,8 @@ def add_routes(router: APIRouter, ctx: GameApiCtx) -> None:
         gid = _gid(game_id)
         with _lock_for(gid):
             store, uid, row, snap, state = load(user, gid)
+            if view.paywalled(pro, state):
+                return _premium(state)  # undo rewrites the log like any other write, so it is gated the same way
             if state.status == "drafting":
                 raise GameError("wrong_phase", "Nothing to undo right now.", phase=state.status)
             if not 0 < body.from_seq <= state.seq:

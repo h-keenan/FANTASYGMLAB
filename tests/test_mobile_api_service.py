@@ -2487,7 +2487,7 @@ def test_trade_analyzer_returns_lineup_model_numbers_in_season(monkeypatch):
         ]
     )
 
-    with patch("modules.trade_grade.estimate_nfl_week", return_value=8):
+    with patch("modules.season_clock.nfl_week", return_value=8):
         with patch("requests.get", side_effect=[auth_user_response, profile_response]):
             with patch("modules.sleeper_leagues.resolve_sleeper_user_id", return_value="sleeper-user-1"):
                 with patch(

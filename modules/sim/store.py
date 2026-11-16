@@ -191,7 +191,10 @@ class InMemoryBackend:
     _PKS = {
         "sim_events": ("game_id", "seq"), "sim_week_checkpoints": ("game_id", "week"),
         "sim_games": ("id",),
+        "sim_free_season_claims": ("user_id",),
     }
+    # Unique constraints besides the primary key; a row with a null in one is exempt (as in Postgres).
+    _UNIQUE = {"sim_games": ("user_id", "slot")}
 
     @_locked
     def insert_many(self, table, rows):
@@ -200,12 +203,20 @@ class InMemoryBackend:
         pk = self._PKS.get(table, ("id",))
         existing = self.tables.setdefault(table, [])
         taken = {tuple(r.get(k) for k in pk) for r in existing}
+        unique = self._UNIQUE.get(table)
+        taken_unique = {tuple(r.get(k) for k in unique) for r in existing} if unique else set()
         fresh = []
         for row in rows:
             key = tuple(row.get(k) for k in pk)
             if key in taken:
                 return False, CONFLICT
             taken.add(key)
+            if unique:
+                ukey = tuple(row.get(k) for k in unique)
+                if None not in ukey:
+                    if ukey in taken_unique:
+                        return False, CONFLICT
+                    taken_unique.add(ukey)
             fresh.append(copy.deepcopy(dict(row)))
         existing.extend(fresh)
         return True, ""

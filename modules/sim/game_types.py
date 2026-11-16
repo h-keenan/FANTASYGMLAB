@@ -75,7 +75,10 @@ DEFAULT_SLOTS = ("QB", "RB", "RB", "WR", "WR", "TE", "FLEX", "K")
 FLEX_TYPES = ("flex", "rb_wr")
 DEFAULT_FLEX_TYPE = "flex"
 FLEX_SLOT_FOR_TYPE = {"flex": "FLEX", "rb_wr": "WRRB_FLEX"}
-PREVIEW_PAYWALL_WEEK = 4  # Free can play weeks 1-3; week 4 is paywalled
+# Owner decision 2026-11-15: Fantasy Sim is free for ONE full season (the draft, every week, the playoffs and the final
+# grade). A second season, dynasty mode and a start from the league's current point need Pro. The allowance belongs to
+# the account (``sim_free_season_claims``), not to a game, so deleting and recreating a game does not restart it.
+FREE_SEASONS = 1
 MAX_GAMES_PRO = 3
 MAX_GAMES_FREE = 1
 
@@ -836,7 +839,7 @@ class GameSnapshot:
 
 __all__ = [
     "GAME_ENGINE_VERSION", "DIFFICULTIES", "TEAM_COUNTS", "SCORING_NAMES", "DEFAULT_SLOTS",
-    "PREVIEW_PAYWALL_WEEK", "MAX_GAMES_PRO", "MAX_GAMES_FREE", "SCORING_PRESETS", "POOL_CAPS",
+    "FREE_SEASONS", "MAX_GAMES_PRO", "MAX_GAMES_FREE", "SCORING_PRESETS", "POOL_CAPS",
     "TE_PREMIUMS", "BENCH_RANGE", "DEFAULT_BENCH", "DEFAULT_TEAMS", "DEFAULT_SCORING", "IMPORT_TEAM_COUNTS",
     "KD_VERSION", "HINT_VERSION", "WORLD_VERSION", "AGING_VERSION", "ECON_VERSION", "FLEX_TYPES", "DEFAULT_FLEX_TYPE", "FLEX_SLOT_FOR_TYPE", "START_FRESH", "START_LEAGUE", "START_KINDS", "SINGLETON_POSITIONS", "NON_TRADABLE", "FLEX_SHARE",
     "DRAFT_SPARE_SPOTS", "derive_layout", "scoring_label", "GAME_POSITIONS", "GAME_STRICT_SLOTS",

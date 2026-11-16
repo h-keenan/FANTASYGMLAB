@@ -244,6 +244,7 @@ from modules import (
     saved_leagues,
     share_card_renderer,
     share_recommendation_cards,
+    season_clock,
     sleeper,
     sleeper_budget,
     sleeper_leagues,
@@ -9309,7 +9310,7 @@ def _quick_view_bye(team: str | None, *, today: date | None = None) -> tuple[int
         return None, False
     if bye is None:
         return None, False
-    return bye, trade_grade.estimate_nfl_week(today) == bye
+    return bye, season_clock.nfl_week(today) == bye
 
 
 def _quick_view_identity(player_id: str, row: pd.Series | None) -> dict[str, Any]:

@@ -14,7 +14,7 @@ from typing import Any, Mapping
 
 ALLOWED_TABLES = frozenset({
     "sim_worlds", "sim_snapshots", "sim_results",
-    "sim_games", "sim_events", "sim_week_checkpoints",
+    "sim_games", "sim_events", "sim_week_checkpoints", "sim_free_season_claims",
 })
 
 

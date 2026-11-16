@@ -32,7 +32,8 @@ from modules.sim.store import CONFLICT, TRANSIENT_CODES, SimBackend, SimStoreErr
 GAMES = "sim_games"
 EVENTS = "sim_events"
 CHECKPOINTS = "sim_week_checkpoints"
-GAME_TABLES = (GAMES, EVENTS, CHECKPOINTS)
+FREE_CLAIMS = "sim_free_season_claims"  # one row per account that has used its free season; never deleted with the game
+GAME_TABLES = (GAMES, EVENTS, CHECKPOINTS, FREE_CLAIMS)
 LIST_COLUMNS = (
     "id,seed,engine_version,scoring_model,settings,status,current_week,difficulty,grade_letter,"
     "event_count,created_at,updated_at"
@@ -50,6 +51,10 @@ RETRY_DELAY = 0.3
 
 def db_status(status: str) -> str:
     return status if status in DB_STATUSES else "in_season"
+
+
+class GameLimitReached(Exception):
+    """The account already holds as many saved games as its plan allows."""
 
 
 class GameConflict(Exception):
@@ -291,8 +296,12 @@ class GameStore:
         return rows[0] if rows else None
 
     def create_game(
-        self, user_id: str, *, snapshot: GameSnapshot, seed: int, status: str = "drafting"
+        self, user_id: str, *, snapshot: GameSnapshot, seed: int, status: str = "drafting", max_games: int | None = None
     ) -> dict[str, Any]:
+        """Insert the save. With ``max_games`` the cap is enforced where the rows live: the game takes one of the
+        account's ``slot`` numbers (1..max_games) and ``(user_id, slot)`` is unique in the database, so two
+        simultaneous creates cannot both fit past the cap (the loser gets ``GameLimitReached``)."""
+
         game_id = str(uuid.uuid4())
         now = _now()
         settings = snapshot.settings
@@ -302,9 +311,56 @@ class GameStore:
             "current_week": 0, "difficulty": settings.difficulty, "snapshot": snapshot.to_dict(),
             "event_count": 0, "created_at": now, "updated_at": now,
         }
-        self._upsert(GAMES, row, "id")
+        if max_games is None:
+            self._upsert(GAMES, row, "id")
+        else:
+            self._insert_capped(user_id, row, max_games)
         SNAPSHOTS.put(game_id, snapshot)
-        return {k: v for k, v in row.items() if k not in ("snapshot", "user_id")}
+        return {k: v for k, v in row.items() if k not in ("snapshot", "user_id", "slot")}
+
+    def _insert_capped(self, user_id: str, row: dict[str, Any], max_games: int) -> None:
+        for _ in range(max_games + 1):
+            held = self._select(GAMES, user_id, columns="id,slot")
+            if len(held) >= max_games:  # also covers saves from before slots existed (slot is null)
+                raise GameLimitReached()
+            taken = {int(r["slot"]) for r in held if r.get("slot")}
+            free = [n for n in range(1, max_games + 1) if n not in taken]
+            if not free:
+                raise GameLimitReached()
+            ok, error = self.backend.insert_many(GAMES, [{**row, "slot": free[0]}])
+            if ok:
+                return
+            if error == CONFLICT:  # another request took that slot first: look again
+                continue
+            if "slot" in error.lower():
+                # The slot column is not there yet (docs/supabase_sim_game.sql not applied): keep the game
+                # creatable with the old count-then-insert behaviour rather than take the feature down.
+                _log.warning("sim_games.slot is missing; game cap is not atomic until the migration is applied")
+                self._upsert(GAMES, row, "id")
+                return
+            raise SimStoreError(error)
+        raise GameLimitReached()
+
+    # ------------------------------------------------------- free season
+
+    def free_season_claim(self, user_id: str) -> dict[str, Any] | None:
+        """The account's free-season claim, or None. It outlives the game it was made for."""
+
+        rows = self._select(FREE_CLAIMS, user_id, columns="game_id,claimed_at", limit=1)
+        return rows[0] if rows else None
+
+    def claim_free_season(self, user_id: str, game_id: str) -> bool:
+        """Record that this account started its free season. Atomic (primary key = user_id):
+        False means the account had already claimed it."""
+
+        ok, error = self.backend.insert_many(
+            FREE_CLAIMS, [{"user_id": user_id, "game_id": game_id, "claimed_at": _now()}]
+        )
+        if ok:
+            return True
+        if error == CONFLICT:
+            return False
+        raise SimStoreError(error)
 
     def get_snapshot(self, user_id: str, game_id: str) -> GameSnapshot | None:
         cached = SNAPSHOTS.get(game_id)
@@ -538,6 +594,6 @@ def public_game_row(row: Mapping[str, Any]) -> dict[str, Any]:
 
 
 __all__ = [
-    "GameStore", "GameConflict", "GAMES", "EVENTS", "CHECKPOINTS", "GAME_TABLES", "SNAPSHOTS",
+    "GameStore", "GameConflict", "GameLimitReached", "GAMES", "EVENTS", "CHECKPOINTS", "GAME_TABLES", "SNAPSHOTS",
     "public_game_row", "STATES", "PendingWrite", "row_version", "parallel",
 ]

@@ -102,7 +102,8 @@ def test_options_work_for_free_callers():
     data = client.get("/v1/sim/games/options", headers=hdr("free")).json()
     assert data["reason"] == "" and data["is_premium"] is False
     assert data["max_games"] == 1 and data["season"]["regular_weeks"] == 14
-    assert data["preview"] == {"weeks_left": 3, "paywall_week": 4, "paywalled": False}
+    assert data["preview"]["free_season"] is True and data["preview"]["paywalled"] is False
+    assert data["free_season_used"] is False
     assert data["options"]["teams"]["values"] == [8, 10, 12, 14]
 
 
@@ -222,34 +223,34 @@ def test_full_season_through_the_api_then_result():
 # ------------------------------------------------------------------ gating
 
 
-def test_free_user_gets_a_three_week_preview_then_the_paywall_and_upgrade_resumes():
-    pro_set = set()
+def test_free_season_ends_at_the_offseason_and_upgrade_resumes_the_same_save():
+    # Free plays one full season (tests/test_sim_free_season.py); what is paused is whatever comes after it.
+    pro_set = {"free"}
     client, backend, _ = make_app(pro=pro_set)
-    data = new_game(client, user="free")
-    assert data["preview"]["weeks_left"] == 3 and data["is_premium"] is False
-    gid = data["game"]["id"]
+    gid = new_game(client, user="free", mode="dynasty", teams=8, seasons=3, rookie_rounds=2)["game"]["id"]
     finish_draft(client, gid, "free")
-    for week in (1, 2, 3):
+    for _ in range(40):
         res = advance(client, gid, "free")
-        assert res["reason"] == "" and res["recap"]["week"] == week
-    assert res["preview"]["weeks_left"] == 0 and res["preview"]["paywalled"] is True
+        if res["game"]["status"] == "offseason":
+            break
+    pro_set.clear()
     for method, path, body in [
         ("post", "advance", None), ("put", "lineup", {"slots": []}), ("post", "lineup/auto", None),
         ("post", "waivers", {"add": "g0001"}), ("post", "cut", {"player_id": "g0001"}),
         ("post", "trades", {"partner": "2", "give": ["a"], "get": ["b"]}),
-        ("post", "revert-week", None),
+        ("post", "trades/preview", {"partner": "2", "give": ["a"], "get": ["b"]}),
+        ("post", "undo-sim", {"from_seq": 1}),
     ]:
         out = getattr(client, method)(f"/v1/sim/games/{gid}/{path}", headers=hdr("free"), **({"json": body} if body is not None else {}))
         assert out.status_code == 200 and out.json()["reason"] == "premium_required", path
         assert out.json()["upsell"] and out.json()["preview"]["paywalled"] is True
     # reads still work while paused
-    assert client.get(f"/v1/sim/games/{gid}", headers=hdr("free")).json()["game"]["week"] == 4
+    assert client.get(f"/v1/sim/games/{gid}", headers=hdr("free")).json()["game"]["status"] == "offseason"
     assert client.get(f"/v1/sim/games/{gid}/league", headers=hdr("free")).json()["reason"] == ""
     n_events = len(backend.tables["sim_events"])
-    # upgrading resumes the same save
-    pro_set.add("free")
-    res = advance(client, gid, "free")
-    assert res["reason"] == "" and res["recap"]["week"] == 4 and res["preview"] is None
+    pro_set.add("free")  # upgrading resumes the same save
+    res = client.post(f"/v1/sim/games/{gid}/offseason/rookie-draft/start", headers=hdr("free")).json()
+    assert res["reason"] == "" and res["preview"] is None
     assert len(backend.tables["sim_events"]) > n_events
 
 

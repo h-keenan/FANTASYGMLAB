@@ -66,11 +66,11 @@ export function paidPreview(key: string, leagueName?: string): PaidPreview | nul
     case "fantasy_sim":
       return {
         bullets: [
-          "Keep playing past week 3: the full 14-week season, playoffs and a final grade",
-          "Up to 3 saved games, so you can try a different draft and strategy",
+          "More seasons: keep a league going year after year, with dynasty mode",
+          "Start from your league's current week, or up to 3 saved games to try a different draft and strategy",
           "A review of the decisions that mattered most",
         ],
-        freeIncludes: "Free includes the whole draft and your first 3 weeks, and the same save picks up where you left off.",
+        freeIncludes: "Free includes 1 free season: the draft, every week, the playoffs and your final grade.",
       };
     case "3_team_ideas":
       return {

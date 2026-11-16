@@ -43,7 +43,7 @@ def test_ttl_short_only_for_the_live_week():
 def test_live_window_from_kickoffs():
     with patch("modules.nfl_schedule.load_games", return_value=None), patch(
         "modules.nfl_schedule.week_kickoffs", return_value=[KICKOFF]
-    ), patch("modules.trade_grade.estimate_nfl_week", return_value=10), patch(
+    ), patch("modules.season_clock.nfl_week", return_value=10), patch(
         "modules.sleeper.default_player_stats_season", return_value=2026
     ):
         assert live_policy.live_nfl_week(KICKOFF + timedelta(minutes=45)) == 10
