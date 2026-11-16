@@ -50,7 +50,7 @@ import {
   type QuickViewLeague,
   type QuickViewRequest,
 } from '../lib/playerQuickView';
-import { rankLine, rookieBadge, tierOpportunityMismatchCaption, opportunityUsageCaption } from '../lib/playerQuickViewPresentation';
+import { rankLine, rookieBadge, tierOpportunityMismatchCaption, opportunityUsageCaption, opportunityLabelTone } from '../lib/playerQuickViewPresentation';
 import { queryKeys } from '../lib/queryKeys';
 import { isOnWaiverList } from '../lib/waiverHighlight';
 import { playerSubRatings } from '../lib/subRatings';
@@ -532,7 +532,7 @@ export default function PlayerQuickViewSheet({
               {showSignals ? (
                 <View style={styles.signalRow}>
                   {scoped.opportunityLabel ? (
-                    <ToneBadge label={scoped.opportunityLabel} color={colors.textSecondary} size="xs" />
+                    <ToneBadge label={scoped.opportunityLabel} color={tagToneColor(opportunityLabelTone(scoped.opportunityLabel), colors)} size="xs" />
                   ) : null}
                   {headerTags.length > 0 ? (
                     <>
@@ -640,7 +640,8 @@ function createStyles(colors: ThemeColors) {
     // No fill: an opaque strip read as a separate box on the glass sheet ("still has that rectangle above and
     // around the tabs", coridian_ 2026-11-16). The strip is therefore not pinned either, so nothing scrolls under it.
     stickyTabs: { paddingVertical: spacing.xs },
-    content: { padding: spacing.lg, paddingBottom: spacing.xxl, gap: spacing.md },
+    // The grab strip above already gives the top breathing room, so content starts right under it.
+    content: { paddingHorizontal: spacing.lg, paddingTop: spacing.xs, paddingBottom: spacing.xxl, gap: spacing.md },
     topBar: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', minHeight: 28 },
     kicker: { flex: 1, fontSize: 12.5, fontWeight: '700', letterSpacing: 0.8, color: colors.textTertiary, textTransform: 'uppercase' },
     closeButton: {

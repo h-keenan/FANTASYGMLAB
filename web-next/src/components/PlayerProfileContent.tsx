@@ -24,7 +24,8 @@ import { PlayerScheduleTab } from "@/components/PlayerScheduleTab";
 import { PlayerLeagueActions } from "@/components/PlayerLeagueActions";
 import { PlayerTrendsPanel } from "@/components/PlayerTrendsPanel";
 import { waiverInjuryDisplay } from "@/lib/waiversPresentation";
-import { rookieBadge, seasonStatGroups, tierOpportunityMismatchCaption } from "@/lib/playerQuickViewPresentation";
+import { opportunityLabelTone, rookieBadge, seasonStatGroups, tierOpportunityMismatchCaption } from "@/lib/playerQuickViewPresentation";
+import { ToneBadge } from "@/components/ToneBadge";
 import { ValuesCredit } from "@/components/ValuesCredit";
 import { BRAND_NAME } from "@/lib/brand";
 import { useShareImage } from "@/lib/useShareImage";
@@ -66,6 +67,12 @@ const PROFILE_TABS: Array<{ label: string; value: ProfileTab; glyph: TabIconName
 ];
 
 /** `?tab=news` (Quick View "See all news") opens that tab; anything unknown is Stats. */
+const OPPORTUNITY_TONE_COLOR = {
+  success: "var(--color-success)",
+  warning: "var(--color-warning)",
+  muted: "var(--color-text-secondary)",
+} as const;
+
 export function profileTabFromParam(param: string | null | undefined): ProfileTab {
   return PROFILE_TABS.some((option) => option.value === param) ? (param as ProfileTab) : "stats";
 }
@@ -222,7 +229,7 @@ export function PlayerProfileContent({
       />
 
       <div className="pqv-signal-row">
-        {player.opportunity_label ? <span className="pqv-chip">{player.opportunity_label}</span> : null}
+        {player.opportunity_label ? <ToneBadge label={player.opportunity_label} color={OPPORTUNITY_TONE_COLOR[opportunityLabelTone(player.opportunity_label)]} size="xs" /> : null}
         {injury.label ? <span className={`pqv-chip pqv-chip--${injury.tone}`}>Health: {injury.label}</span> : null}
       </div>
       {tierOpportunityMismatchCaption(player.tier, player.opportunity_label) ? (
