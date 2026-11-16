@@ -150,7 +150,7 @@ export function PlayerQuickView({
   const dialogRef = useRef<HTMLDivElement | null>(null);
   const closeButtonRef = useRef<HTMLButtonElement | null>(null);
   const scrollRef = useRef<HTMLDivElement | null>(null);
-  // The close X floats over the top of the scroll area; the sticky tab strip docks just below it (see .tabs-sticky).
+  // The close X floats over the top of the scroll area; the tab strip sits below it in the scroll flow.
   useLayoutEffect(() => {
     const scroll = scrollRef.current;
     const close = closeButtonRef.current;
@@ -184,7 +184,7 @@ export function PlayerQuickView({
     let timer: ReturnType<typeof setTimeout> | null = null;
     const measure = () => {
       if (!window.matchMedia?.("(max-width: 480px)")?.matches) { modal.style.removeProperty("--pqv-peek-h"); return; }
-      const strip = scroll.querySelector<HTMLElement>(".tabs-sticky");
+      const strip = scroll.querySelector<HTMLElement>(".tabs-strip");
       if (!strip || scroll.scrollTop > 0) return;
       const bottomInset = parseFloat(getComputedStyle(modal).paddingBottom) || 0;
       const anchorBottom = strip.getBoundingClientRect().bottom - modal.getBoundingClientRect().top;
@@ -197,7 +197,7 @@ export function PlayerQuickView({
     later(300); // after the expand -> peek header transition settles
     if (typeof ResizeObserver === "undefined") return () => { if (timer) clearTimeout(timer); };
     const ro = new ResizeObserver(() => later(300));
-    scroll.querySelectorAll(".pqv-hero-shell, .pqv-signal-row, .tabs-sticky").forEach((el) => ro.observe(el));
+    scroll.querySelectorAll(".pqv-hero-shell, .pqv-signal-row, .tabs-strip").forEach((el) => ro.observe(el));
     const onResize = () => later(100);
     window.addEventListener("resize", onResize);
     return () => { ro.disconnect(); window.removeEventListener("resize", onResize); if (timer) clearTimeout(timer); };
@@ -468,6 +468,9 @@ export function PlayerQuickView({
         <ExplorerLeagueProvider leagueId={identity.leagueId}>
           <Tabs
             id="pqv"
+            // Not pinned: a pinned strip over the glass sheet clipped the rows scrolling under it and, with its
+            // tallest-tab minimum, left empty space under short tabs (coridian_ 2026-11-16, "tabs clip" / "wasted space").
+            sticky={false}
             ariaLabel="Player sections"
             tabs={orderPlayerSheetTabs([
               {
