@@ -382,3 +382,46 @@ def test_trade_odds_effect_omits_when_no_games_left_or_invalid(client, monkeypat
         json={"packages": [{"send_player_ids": ["9"], "receive_player_ids": ["2"]}]},
     ).json()
     assert bad["results"][0]["reason"] == "invalid_package" and "change" not in bad["results"][0]
+
+
+def test_one_league_one_playoff_odds_number_on_every_surface(client, monkeypatch):
+    """Regression for audit P1-4: the Playoff Odds screen, the Season Simulator,
+    the what-if and Trade Odds baselines, GM Plan / Dashboard (the shared row)
+    and Season Outlook all read one draw. The fake engine's number depends on
+    the seed, so any surface that drew with its own seed would disagree."""
+
+    c, svc = client
+    _odds_effect_setup(svc, monkeypatch)
+    monkeypatch.setattr(svc, "_is_pro_caller", lambda _u: True)
+
+    def seeded_build(league_id, *, rng=None, power_overrides=None, **_kw):
+        p = round(float(rng.random()) * 80.0 + 5.0, 1)
+        if power_overrides:
+            p = round(min(p + 10.0, 99.0), 1)
+        team = {"roster_id": "1", "team_name": "Me", "playoff_probability": p, "title_probability": round(p / 10, 1),
+                "median_final_wins": 7, "median_final_losses": 6, "median_seed": 4, "remaining_games": 6,
+                "record_label": "3-3"}
+        return {"ok": True, "reason": "", "trials": 3000, "slope_fitted": False, "games_used_for_fit": 0,
+                "weeks_remaining": 6, "playoff_teams": 6, "current_week": 8, "teams": [team],
+                "title_odds": {"available": True, "reason": ""}}
+
+    monkeypatch.setattr(svc.playoff_simulator, "build_league_playoff_odds", seeded_build)
+    monkeypatch.setattr(svc.playoff_simulator, "_playoff_odds_cache_bucket", lambda: 12345)
+
+    screen = c.get("/v1/leagues/999/playoff-odds").json()["teams"][0]["playoff_probability"]
+    season_sim = c.get("/v1/leagues/999/games/season-sim").json()["my_team"]["playoff_probability"]
+    what_if = c.post("/v1/leagues/999/games/season-sim/what-if", json={"add": ["2"], "drop": []}).json()
+    trade = c.post(
+        "/v1/leagues/999/trade-odds-effect",
+        json={"packages": [{"send_player_ids": ["1"], "receive_player_ids": ["2"]}]},
+    ).json()["results"][0]
+    shared_row = svc._shared_playoff_odds_row("999", "Dynasty", "1")  # GM Plan, Dashboard, Season Outlook
+
+    assert 0 < screen < 100
+    assert season_sim == screen
+    assert what_if["baseline"]["playoff_probability"] == screen
+    assert trade["baseline"]["playoff_probability"] == screen
+    assert shared_row["playoff_probability"] == screen
+    # and a what-if is a paired difference against that same draw
+    assert what_if["change"]["playoff_probability"] == 10.0
+    assert trade["change"]["playoff_probability"] == 10.0

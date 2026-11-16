@@ -7,7 +7,6 @@ import {
   simFactorImpact,
   simFactorKindLabel,
   simFactorsIntro,
-  simFinishRange,
   simFormatPercent,
   simFormatPointsSwing,
   simGate,
@@ -17,7 +16,6 @@ import {
   simOrdinal,
   simReasonMessage,
   simScopeLine,
-  simWinsRange,
   type SimForecast,
 } from './simPresentation.ts';
 
@@ -29,9 +27,9 @@ function forecast(overrides: Partial<SimForecast> = {}): SimForecast {
     weeks_remaining: 5,
     team: { team_id: '1', name: 'Mine' },
     current: { wins: 5, losses: 4, ties: 0 },
-    odds: { playoffs: 0.62, finals: 0.2, title: 0.09, playoff_spots: 6 },
-    record: { wins: 8.6, losses: 5.4, wins_low: 7, wins_high: 10, projected: '9-5', games: 14 },
-    finish: { median: 4, low: 2, high: 7, teams: 12, distribution: [] },
+    odds: { playoffs: 0.62, title: 0.09, playoff_spots: 6 },
+    record: { wins: 9, losses: 5, projected: '9-5', games: 14 },
+    finish: { median: 4, teams: 12 },
     swing_factors: [],
     ...overrides,
   };
@@ -83,20 +81,16 @@ test('odds tone follows how comfortable the position is', () => {
 
 test('ordinals, ranges and swings read naturally', () => {
   assert.deepEqual([1, 2, 3, 4, 11, 12, 13, 21, 22].map(simOrdinal), ['1st', '2nd', '3rd', '4th', '11th', '12th', '13th', '21st', '22nd']);
-  assert.equal(simFinishRange(forecast().finish), '2nd to 7th');
-  assert.equal(simFinishRange({ ...forecast().finish, low: 3, high: 3, median: 3 }), '3rd');
-  assert.equal(simWinsRange(forecast().record), '7 to 10 wins');
-  assert.equal(simWinsRange({ ...forecast().record, wins_low: 9, wins_high: 9 }), '9 wins');
   assert.equal(simFormatPointsSwing(0.153), '+15 pts');
   assert.equal(simFormatPointsSwing(-0.04), '-4 pts');
 });
 
 test('headline matches the playoff odds band', () => {
-  assert.match(simHeadline(forecast({ odds: { playoffs: 0.95, finals: 0.4, title: 0.2, playoff_spots: 6 } })), /near lock/);
+  assert.match(simHeadline(forecast({ odds: { playoffs: 0.95, title: 0.2, playoff_spots: 6 } })), /near lock/);
   assert.match(simHeadline(forecast()), /good shape.*62%/);
-  assert.match(simHeadline(forecast({ odds: { playoffs: 0.4, finals: 0.1, title: 0.04, playoff_spots: 6 } })), /coin flip/);
-  assert.match(simHeadline(forecast({ odds: { playoffs: 0.15, finals: 0.01, title: 0, playoff_spots: 6 } })), /outside looking in/);
-  assert.match(simHeadline(forecast({ odds: { playoffs: 0.02, finals: 0, title: 0, playoff_spots: 6 } })), /long shot/);
+  assert.match(simHeadline(forecast({ odds: { playoffs: 0.4, title: 0.04, playoff_spots: 6 } })), /coin flip/);
+  assert.match(simHeadline(forecast({ odds: { playoffs: 0.15, title: 0, playoff_spots: 6 } })), /outside looking in/);
+  assert.match(simHeadline(forecast({ odds: { playoffs: 0.02, title: 0, playoff_spots: 6 } })), /long shot/);
 });
 
 test('scope line always says as-of, current rosters and rest of season', () => {
@@ -111,9 +105,10 @@ test('swing factors: labels, impact and the empty-state intro', () => {
   assert.equal(simFactorKindLabel('game'), 'Key game');
   assert.equal(simFactorKindLabel('waiver'), 'Waiver wire');
   assert.equal(simFactorKindLabel('trade'), 'Trade');
-  const game = { kind: 'game' as const, title: 't', detail: 'd', playoff_delta: 0.35, title_delta: 0.05 };
+  const game = { kind: 'game' as const, title: 't', detail: 'd', playoff_delta: 0.35, title_delta: 0.05, small: false };
   assert.equal(simFactorImpact(game), '+35 pts playoff odds, +5 pts title odds');
   assert.equal(simFactorImpact({ ...game, title_delta: 0 }), '+35 pts playoff odds');
+  assert.equal(simFactorImpact({ ...game, playoff_delta: null, title_delta: null, small: true }), 'Small effect');
   assert.match(simFactorsIntro([]), /Nothing stands out/);
   assert.match(simFactorsIntro([game]), /move your odds most/);
 });

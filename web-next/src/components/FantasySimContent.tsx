@@ -18,9 +18,9 @@ import {
   SIM_LABEL,
   isSimOffError,
   simFactorImpact,
+  simFactorIsGood,
   simFactorKindLabel,
   simFactorsIntro,
-  simFinishRange,
   simFormatCurrent,
   simFormatPercent,
   simGate,
@@ -31,7 +31,6 @@ import {
   simReasonMessage,
   simScopeLine,
   simUnavailableCopy,
-  simWinsRange,
   type SimForecastResponse,
   type SimTone,
   type SimUnavailableCause,
@@ -176,11 +175,10 @@ export function FantasySimContent({ leagueId, leagueName }: { leagueId: string; 
   const noteLines = simNoteMessages(data.notes);
   const tiles: Array<[string, string, string?]> = [
     ["Playoff odds", simFormatPercent(forecast.odds.playoffs), `${forecast.odds.playoff_spots} teams make it`],
-    ["Championship odds", simFormatPercent(forecast.odds.title), `Reach the final: ${simFormatPercent(forecast.odds.finals)}`],
-    ["Projected record", forecast.record.projected, `Likely range: ${simWinsRange(forecast.record)}`],
-    ["Projected finish", simOrdinal(forecast.finish.median), `Likely range: ${simFinishRange(forecast.finish)} of ${forecast.finish.teams}`],
+    ["Championship odds", simFormatPercent(forecast.odds.title), forecast.odds.eliminated ? "Out of reach" : "Win the title"],
+    ["Projected record", forecast.record.projected, "Median of the shared playoff-odds simulation"],
+    ["Projected finish", simOrdinal(forecast.finish.median), `of ${forecast.finish.teams} teams`],
   ];
-  const peak = Math.max(0.01, ...forecast.finish.distribution.map((b) => b.probability));
 
   return (
     <Shell>
@@ -224,47 +222,16 @@ export function FantasySimContent({ leagueId, leagueName }: { leagueId: string; 
         ))}
       </div>
 
-      <section className="flex flex-col gap-2" aria-labelledby="sim-finish">
-        <SectionHeading id="sim-finish" note="How often you land in each spot across the simulated seasons.">
-          Where you finish
-        </SectionHeading>
-        <ul className="flex flex-col gap-1">
-          {forecast.finish.distribution.map((bucket) => {
-            const inPlayoffs = bucket.finish <= forecast.odds.playoff_spots;
-            return (
-              <li key={bucket.finish} className="flex items-center gap-2 text-xs">
-                <span style={{ width: 36, color: "var(--color-text-secondary)" }}>{simOrdinal(bucket.finish)}</span>
-                <span aria-hidden="true" className="flex-1" style={{ height: 8, borderRadius: 4, background: "var(--color-surface-muted)" }}>
-                  <span
-                    style={{
-                      display: "block",
-                      height: 8,
-                      borderRadius: 4,
-                      width: `${(bucket.probability / peak) * 100}%`,
-                      background: inPlayoffs ? "var(--color-success)" : "var(--color-border-strong)",
-                    }}
-                  />
-                </span>
-                <span style={{ width: 40, textAlign: "right" }}>{simFormatPercent(bucket.probability)}</span>
-              </li>
-            );
-          })}
-        </ul>
-        <p className="text-xs" style={{ color: "var(--color-text-muted)" }}>
-          Green spots make the playoffs.
-        </p>
-      </section>
-
       <section className="flex flex-col gap-3" aria-labelledby="sim-swing">
         <SectionHeading id="sim-swing" note={simFactorsIntro(forecast.swing_factors)}>
           What swings your season
         </SectionHeading>
         {forecast.swing_factors.map((factor, index) => {
-          const good = factor.playoff_delta >= 0;
+          const good = simFactorIsGood(factor);
           return (
-            <AccentCard key={`${factor.kind}-${index}`} accent={good ? "var(--color-success)" : "var(--color-warning)"} compact>
+            <AccentCard key={`${factor.kind}-${index}`} accent={factor.small ? "var(--color-border-strong)" : good ? "var(--color-success)" : "var(--color-warning)"} compact>
               <div className="flex items-center gap-2 flex-wrap">
-                <ToneBadge label={simFactorKindLabel(factor.kind)} color={good ? "var(--color-success)" : "var(--color-warning)"} size="xs" />
+                <ToneBadge label={simFactorKindLabel(factor.kind)} color={factor.small ? "var(--color-border-strong)" : good ? "var(--color-success)" : "var(--color-warning)"} size="xs" />
                 <span className="text-xs font-bold">{simFactorImpact(factor)}</span>
               </div>
               <p className="text-sm font-bold">{factor.title}</p>

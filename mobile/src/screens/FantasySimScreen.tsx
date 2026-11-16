@@ -24,9 +24,9 @@ import {
   SIM_LABEL,
   isSimOffError,
   simFactorImpact,
+  simFactorIsGood,
   simFactorKindLabel,
   simFactorsIntro,
-  simFinishRange,
   simFormatCurrent,
   simFormatPercent,
   simGate,
@@ -37,7 +37,6 @@ import {
   simReasonMessage,
   simScopeLine,
   simUnavailableCopy,
-  simWinsRange,
   type SimForecastResponse,
   type SimTone,
   type SimUnavailableCause,
@@ -185,11 +184,10 @@ export default function FantasySimScreen({ route, navigation }: Props) {
   const noteLines = simNoteMessages(data.notes);
   const tiles: [string, string, string][] = [
     ['Playoff odds', simFormatPercent(forecast.odds.playoffs), `${forecast.odds.playoff_spots} teams make it`],
-    ['Championship odds', simFormatPercent(forecast.odds.title), `Reach the final: ${simFormatPercent(forecast.odds.finals)}`],
-    ['Projected record', forecast.record.projected, `Likely range: ${simWinsRange(forecast.record)}`],
-    ['Projected finish', simOrdinal(forecast.finish.median), `Likely range: ${simFinishRange(forecast.finish)} of ${forecast.finish.teams}`],
+    ['Championship odds', simFormatPercent(forecast.odds.title), forecast.odds.eliminated ? 'Out of reach' : 'Win the title'],
+    ['Projected record', forecast.record.projected, 'Median of the shared playoff-odds simulation'],
+    ['Projected finish', simOrdinal(forecast.finish.median), `of ${forecast.finish.teams} teams`],
   ];
-  const peak = Math.max(0.01, ...forecast.finish.distribution.map((b) => b.probability));
 
   return shell(
     <View style={styles.stack}>
@@ -225,25 +223,9 @@ export default function FantasySimScreen({ route, navigation }: Props) {
         ))}
       </View>
 
-      <SectionHeading title="Where you finish" caption="How often you land in each spot across the simulated seasons. Green spots make the playoffs." />
-      <View style={styles.stackTight}>
-        {forecast.finish.distribution.map((bucket) => {
-          const inPlayoffs = bucket.finish <= forecast.odds.playoff_spots;
-          return (
-            <View key={bucket.finish} style={styles.row}>
-              <AppText style={[styles.help, styles.rankCell]}>{simOrdinal(bucket.finish)}</AppText>
-              <View style={[styles.barTrack, styles.flex]}>
-                <View style={[styles.barFill, { width: `${(bucket.probability / peak) * 100}%`, backgroundColor: inPlayoffs ? colors.success : colors.borderStrong }]} />
-              </View>
-              <AppText style={[styles.help, styles.pctCell]}>{simFormatPercent(bucket.probability)}</AppText>
-            </View>
-          );
-        })}
-      </View>
-
       <SectionHeading title="What swings your season" caption={simFactorsIntro(forecast.swing_factors)} />
       {forecast.swing_factors.map((factor, index) => {
-        const color = factor.playoff_delta >= 0 ? colors.success : colors.warning;
+        const color = factor.small ? colors.borderStrong : simFactorIsGood(factor) ? colors.success : colors.warning;
         return (
           <AccentCard key={`${factor.kind}-${index}`} accent={color} compact>
             <View style={styles.row}>
@@ -285,10 +267,6 @@ function createStyles(colors: ThemeColors) {
     title: { fontSize: 18, fontWeight: '800', color: colors.textPrimary },
     oddsCircle: { width: 88, height: 88, borderRadius: radii.pill, borderWidth: 2, alignItems: 'center', justifyContent: 'center' },
     oddsText: { fontSize: 24, fontWeight: '800' },
-    barTrack: { height: 8, borderRadius: 4, backgroundColor: colors.surface, overflow: 'hidden' },
-    barFill: { height: 8, borderRadius: 4 },
-    rankCell: { width: 36 },
-    pctCell: { width: 44, textAlign: 'right' },
     grid: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
     tile: { flexBasis: '48%', flexGrow: 1, gap: spacing.xs, padding: spacing.md, borderRadius: radii.md, backgroundColor: colors.surface },
   });

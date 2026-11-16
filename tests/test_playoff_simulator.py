@@ -517,3 +517,15 @@ def test_division_alive_team_is_not_eliminated_by_record_alone():
     teams = sim.simulate_playoff_odds(**kw)["teams"]
     assert teams["W"]["eliminated"] is False
     assert teams["W"]["playoff_probability"] > 0.0
+
+
+def test_shared_odds_seed_is_stable_and_keyed_on_league_lens_and_bucket():
+    from modules import playoff_simulator as ps
+
+    a = ps.shared_odds_seed("L", "Dynasty", 3000, 7)
+    assert a == ps.shared_odds_seed("L", "Dynasty", 3000, 7)
+    assert a == ps.shared_odds_seed("L", "Dynasty", None, 7)  # default trials
+    assert len({a, ps.shared_odds_seed("M", "Dynasty", 3000, 7), ps.shared_odds_seed("L", "Redraft", 3000, 7),
+                ps.shared_odds_seed("L", "Dynasty", 3000, 8)}) == 4
+    # the same generator state for a base run and its what-if
+    assert ps.shared_odds_rng("L", "Dynasty").random() == ps.shared_odds_rng("L", "Dynasty").random()
