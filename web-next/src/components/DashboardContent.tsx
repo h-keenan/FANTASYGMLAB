@@ -231,7 +231,7 @@ export function DashboardContent({
       {teamStatus.settled ? (
         <>
           <TodayTiles tiles={tiles} hrefs={{ standing: `/league-rankings/${id}${query}`, playoffs: `/league-rankings/${id}${query}`, trades: tradeHubHref }} />
-          {idea && !deadlinePassed ? <TodayTradeIdeaCard idea={idea} href={ideaHref} deadline={deadlineChip(data.trade_window)?.value} /> : null}
+          {idea && !deadlinePassed ? <TodayTradeIdeaCard idea={idea} href={ideaHref} deadline={deadlineChip(data.trade_window)?.value.replace(/\s*\(.*\)$/, "")} /> : null}
           {copy.isBeginner && (idea || stanceLine) ? (
             // Beginner help for trades, plus the league's real GM stance (what the trade advice is tuned by).
             <div className="flex flex-wrap items-center gap-x-3 gap-y-1" data-testid="today-trade-help">

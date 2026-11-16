@@ -558,7 +558,7 @@ export default function DashboardScreen({ route, navigation }: Props) {
       {idea && !deadlinePassed ? (
         <TodayTradeIdeaCard
           idea={idea}
-          deadline={deadlineChip(dashboardData?.trade_window)?.value}
+          deadline={deadlineChip(dashboardData?.trade_window)?.value.replace(/\s*\(.*\)$/, '')}
           onOpen={() => navigate('Trades', { leagueId, leagueName, ...(tradeItems[0]?.route_player_id ? { playerId: tradeItems[0].route_player_id } : {}) })}
         />
       ) : null}

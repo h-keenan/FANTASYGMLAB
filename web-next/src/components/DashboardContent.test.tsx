@@ -138,7 +138,7 @@ describe("DashboardContent", () => {
     render(<DashboardContent leagueId="abc" leagueName="Dynasty Overlords" data={data} />);
     const card = await screen.findByTestId("today-trade-idea");
     expect(card).toHaveTextContent("Get a QB from Team Iron");
-    expect(card).toHaveTextContent(/deadline 2 wks left \(Wk 11\)/);
+    expect(card).toHaveTextContent(/deadline 2 wks left/);
     expect(card).toHaveTextContent("+450 value");
     expect(within(card).getByRole("link")).toHaveAttribute("href", expect.stringContaining("/trade-hub/abc"));
     // The tile carries the count; the trade is not in the Decision Queue too.
