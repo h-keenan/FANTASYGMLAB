@@ -19,6 +19,7 @@ from dataclasses import replace
 from typing import Any, Mapping, Sequence
 
 from modules.sim import aging, scouting
+from modules.sim import season_outcomes as outcomes_mod
 from modules.sim.game_names import rookie_name
 from modules.sim.season_label import season_label, season_label_for_year
 from modules.sim.game_eval import USER_PARAMS, Evaluator, team_params
@@ -143,6 +144,34 @@ def _supply_response(base: GameSnapshot, vets: Mapping[str, Mapping[str, Any]]) 
     return out
 
 
+# stability_v 1: the supply controller above watches the AVERAGE of the top 24-36 at a position, which a few stars at the top can hold up while the
+# starter-and-flex tier under them thins out (aging pulls every veteran's projection down a little each year and a retiree is replaced by a rookie
+# the slot curve has already placed far below him): the depth profile of a ten-season dynasty went from RB24 12.7 / RB36 9.9 / WR36 12.2 ppg to
+# 11.0 / 7.6 / 10.6 in one offseason while the top-12 did not move, and the wire (the free agents every bye and injury is covered from) went from useful
+# to empty. A second controller watches the MIDDLE tier (ranks below the top slots down to what a roster keeps) and deepens the class's middle
+# slots when that tier is short, the way a thin position draws more usable players out of the late rounds and the undrafted.
+MID_RANKS = {"QB": (13, 24), "RB": (13, 36), "WR": (13, 40), "TE": (7, 18)}
+MID_BAND = (0.9, 4.0)
+MID_GAIN = 3.0
+MID_SLOT_LO, MID_SLOT_HI = 3, 12  # class slots: no effect on the first three, full effect from the twelfth
+
+
+def _mid_level(rows, pos: str) -> float:
+    lo, hi = MID_RANKS[pos]
+    means = sorted((r["mean"] for r in rows if r["pos"] == pos), reverse=True)[lo - 1: hi]
+    return sum(means) / len(means) if means else 0.0
+
+
+def _supply_mid(base: GameSnapshot, vets: Mapping[str, Mapping[str, Any]]) -> dict[str, float]:
+    anchor = _anchor(base)
+    out = {}
+    for pos in MID_RANKS:
+        a, c = _mid_level(anchor.values(), pos), _mid_level(vets.values(), pos)
+        if a > 0 and c > 0:
+            out[pos] = min(MID_BAND[1], max(MID_BAND[0], (a / c) ** MID_GAIN))
+    return out
+
+
 def _equilibrium_plan(base: GameSnapshot, vets: Mapping[str, Mapping[str, Any]], by_pos, gen, n: int) -> list[str]:
     """dynasty_v 3: the positions of this year's class, in draft order, chosen to REFILL the pool to the league's own season-1
     head count at every position (retirements and aging-out leave holes; the class fills exactly those, plus the usual class
@@ -215,6 +244,7 @@ def rookie_class(
     ref12 = {p: by_pos[p][min(11, len(by_pos[p]) - 1)]["mean"] for p in positions}
     plan = _equilibrium_plan(base, vets, by_pos, gen, n) if s.league_anchor else None
     supply = _supply_response(base, vets) if s.league_anchor else {}
+    supply_mid = _supply_mid(base, vets) if s.league_anchor and s.stable else {}
     if plan is not None:
         n = len(plan)
         if "K" in by_pos:
@@ -244,7 +274,12 @@ def rookie_class(
             mean = max(1.5, ks[int(gen.integers(0, len(ks)))]["mean"] * factor ** 0.5 * jitter)
             boost = 1.0
         else:
-            mean = max(1.5, ref12[pos] * SLOT_TOP / (1.0 + (j / SLOT_HALF) ** SLOT_POWER) * factor * jitter * supply.get(pos, 1.0))
+            deep = 1.0 + (supply_mid.get(pos, 1.0) - 1.0) * min(1.0, max(0.0, (j - MID_SLOT_LO) / (MID_SLOT_HI - MID_SLOT_LO)))
+            mean = max(1.5, ref12[pos] * SLOT_TOP / (1.0 + (j / SLOT_HALF) ** SLOT_POWER) * factor * jitter * supply.get(pos, 1.0) * deep)
+            if s.stable:  # a class cannot beat the best the league has ever had either: the class strength x scarcity x jitter product reached 3x a starter
+                top = _anchor_top(base).get(pos)
+                if top and mean > top:
+                    mean = top * (mean / top) ** 0.5
             boost = 1.05 + 0.25 * math.exp(-(j - 1) / 12.0)  # the dynasty market pays for draft capital and years
         market = max(1.0, min(97.0, _market_at(by_pos[pos], mean) * boost))
         if s.names_v:  # names_v 1+: a pure function of (seed, season, slot), never repeating in the save (see game_names)
@@ -267,7 +302,7 @@ def rookie_class(
             age = ROOKIE_AGES[int(gen.choice(len(ROOKIE_AGES), p=ROOKIE_AGE_P))]
         if s.rookie_curves:  # version-gated: older dynasty saves keep the plain age curve and no scouting profile
             sseed = int(WorldRng(base.seed).stream(season, "gscout", j).integers(1, 2 ** 31 - 1))
-            extra.update(scouting.rookie_dev_fields(pos, age, scouting.talent_z(mean, ref12[pos]), sseed, j, n))
+            extra.update(scouting.rookie_dev_fields(pos, age, scouting.talent_z(mean, ref12[pos]), sseed, j, n, knots_v=2 if s.stable else 0))
         rows.append({
             "pid": f"R{year}-{j:03d}", "name": name, "pos": pos,
             "nfl_team": nfl_team,
@@ -354,12 +389,14 @@ def season_snapshot(root: GameSnapshot, season: int) -> GameSnapshot:
     rng = WorldRng(root.seed)
     rows: dict[str, dict[str, Any]] = {}
     roles = _roles(prev) if gen.settings.aging_curves else {}
+    stable = gen.settings.stable
+    outcomes = outcomes_mod.next_projection_shift(root, prev, season, _anchor(root), LEVEL_RANKS) if stable else {}
     for pid in prev.pids:
         p = prev.players[pid]
         r = rng.stream(season - 1, "gage", aging.stable_key(pid))
         z, u = float(r.standard_normal()), float(r.random())
         own = scouting.step_ratio(p.extra, p.extra.get("years_exp", 0.0)) if gen.settings.rookie_curves else None
-        age, mean, sd, market, retired = aging.progress(p.pos, p.age, p.mean, p.sd, p.market, z, u, mult=own, flat_k=gen.settings.league_anchor, aging_v=gen.settings.aging_v, role=roles.get(pid, 0.5))
+        age, mean, sd, market, retired = aging.progress(p.pos, p.age, p.mean, p.sd, p.market, z, u, mult=own, flat_k=gen.settings.league_anchor, aging_v=gen.settings.aging_v, role=roles.get(pid, 0.5), knots_v=2 if stable else None, outcome=outcomes.get(pid, 0.0), ceiling=_anchor_top(root).get(p.pos) if stable else None)
         if gen.settings.league_anchor:  # nobody runs far past the best the league ever had: compress above it (no unbounded drift at the top)
             top = _anchor_top(root).get(p.pos)
             if top and mean > top:

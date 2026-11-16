@@ -515,6 +515,13 @@ class TradeDesk:
             pparams = self.params(partner)
             mine = self.tradable(proposer)
             theirs = self.tradable(partner)
+            if snap.settings.stable and not to_user:
+                # stability_v 1: AI managers do not swap picks with each other. A pick's value is the slot of its ORIGINAL team's record, and a team that sells
+                # its vets for picks is exactly the team whose own pick then lands early; the AI-AI search prices every pick at the league average slot, so
+                # rebuilders harvested the difference every season until a few teams held most of the talent (asset-value spread 0.13 -> 0.38 in ten seasons,
+                # scoring -10 percent as talent piled up at a few positions). Picks still trade with the user, who prices them himself.
+                mine = [p for p in mine if not is_pick_id(p)]
+                theirs = [p for p in theirs if not is_pick_id(p)]
             lens = USER_PARAMS if to_user else pparams
             gives = sorted(mine, key=lambda p: (-(ev.worth(lens, p) - ev.worth(params, p)), p))[:CANDIDATES_PER_SIDE]
             gets = sorted(theirs, key=lambda p: (-(ev.worth(params, p) - ev.worth(lens, p)), p))[:CANDIDATES_PER_SIDE]
@@ -542,6 +549,8 @@ class TradeDesk:
                         continue
                 elif uj + self.noise(partner) < pparams.accept_threshold or self.linear_loss(partner, get, give) > floor_tolerance(pparams):
                     continue
+                elif snap.settings.stable and (self.below_market(proposer, get, give) or self.below_market(partner, give, get)):
+                    continue  # stability_v 1: two managers who each "win" in their own lens still trade at the league's consensus value, so talent cannot pile up on a few teams
                 score = (ui + uj, tuple(sorted(give)), tuple(sorted(get)))
                 if best is None or (-score[0], score[1], score[2]) < (-best[0], best[1], best[2]):
                     best = (score[0], score[1], score[2], partner, ui, uj)

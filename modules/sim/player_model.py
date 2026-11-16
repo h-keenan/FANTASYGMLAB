@@ -43,7 +43,12 @@ from typing import Any, Mapping
 
 import numpy as np
 
-MODEL_VERSION = "player-model-6"
+MODEL_VERSION = "player-model-7"
+# player-model-7 (frozen predecessor: player_model_v6.py): rookie year-1 OUTCOME VARIANCE. v6 gave a top-12 class rookie a 14 percent chance of finishing
+# under 0.6 of his projection (real classes 21 percent, 2021-25 panel) and 86 percent of reaching 8 points per game: its solid season was a tight lognormal
+# (log-sd 0.07 at the top of the class) and a "bust" a shallow, narrow drop. Rookies now get a wider solid season (``sig_rook_add``) and a wider bust
+# (``bust_sd_rook``). Both are lognormal and mean-preserving (the -0.5 sigma^2 term), so a class's average outcome does not move: the same mean
+# spread over more outcomes, not a nerf. See docs/audits/2026-11-sim-desk-logic-realism-audit.md "Implemented".
 # player-model-6 (frozen predecessor: player_model_v5.py): the SINGLE-GAME tail. Season totals, weekly means and typical weeks are player-model-5's;
 # only a stat line that no NFL game has ever produced is bounded (``STAT_CAPS``, ``cap_stats``). v5 let a WR post 9 touchdowns, 377 or 448 receiving
 # yards or a 94-point game (coridian_: "62.3 points from one WR"); the real 2021-25 record is 55.6. See docs/audits/2026-11-sim-single-game-tail.md.
@@ -185,6 +190,8 @@ class SeasonParams:
     pu_qb: float = -0.1733           # QB bust-probability logit offset
     qb_bust_mult: float = 0.7853  # QB bust depth (a bust QB is rarely a 25% drop)
     sig_rook: float = 0.0        # solid-season log-sd inflation for rookies
+    sig_rook_add: float = 0.18   # player-model-7: extra solid-season log-sd for rookies, ADDED (a top-of-class rookie's own spread is tiny, so a multiplier does nothing there)
+    bust_sd_rook: float = 0.18   # player-model-7: extra bust-depth log-sd for rookies, added
     te_sig: float = 1.0325          # solid-season log-sd multiplier for tight ends
 
 
@@ -516,13 +523,14 @@ def season_level(
     arch = np.where(cat < cum[0], 1, arch)
     b = np.where(is_qb, p.b_solid_qb, np.where(is_k, p.b_solid_k, p.b_solid)) + p.b_tier * np.clip(tau, -1.0, 1.0)
     sig_mult = np.where(is_qb, p.qb_sig, np.where(is_te, p.te_sig, 1.0)) * (1.0 + p.sig_rook * rk)
-    sigma = np.minimum((p.sigma0 + p.sigma_tier * np.maximum(0.0, -tau)) * sig_mult, SIGMA_MAX)
+    sigma = np.minimum((p.sigma0 + p.sigma_tier * np.maximum(0.0, -tau)) * sig_mult + p.sig_rook_add * rk, SIGMA_MAX)
     solid = proj * b * np.exp(sigma * np.clip(u["z1"], -Z_SEASON, Z_SEASON) - 0.5 * sigma**2)
     gain_scale = np.where(is_qb, p.qb_gain, np.where(is_te, p.te_gain, 1.0)) * np.where(rookie, p.gain_rook, 1.0)
     gain = p.gain_mean * gain_scale * np.exp(p.gain_tier * np.clip(tau, -2.0, 1.0)) * u["g"] / p.gain_shape
     breakout = proj * b + gain
     bust_mult = np.where(is_qb, p.qb_bust_mult, p.bust_mult)
-    bust = proj * bust_mult * np.exp(p.bust_sd * u["z2"] - 0.5 * p.bust_sd**2)
+    bust_sd = p.bust_sd + p.bust_sd_rook * rk
+    bust = proj * bust_mult * np.exp(bust_sd * u["z2"] - 0.5 * bust_sd**2)
     mean = np.where(arch == 1, breakout, np.where(arch == 2, bust, solid))
     # Role collapse: a heavy left tail (a depth chart loss, a lost job) that a lognormal around the
     # projection cannot make. Only skill players with a real chance; a collapsed season is labelled a bust.

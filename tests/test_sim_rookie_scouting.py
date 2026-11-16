@@ -142,7 +142,7 @@ def test_displayed_curve_converges_to_the_curve_the_sim_plays():
 
 def test_progression_applies_the_stored_curve_and_old_saves_keep_the_age_curve():
     run = Run()
-    object.__setattr__(run.root, "settings", replace(run.root.settings, dynasty_v=2))  # (dynasty_v 3 adds the league anchor and a top bound; that is tested in test_sim_dynasty_long)
+    object.__setattr__(run.root, "settings", replace(run.root.settings, dynasty_v=2, stability_v=0))  # (dynasty_v 3 adds the league anchor and a top bound; that is tested in test_sim_dynasty_long)
     run.play_season()
     run.offseason()  # enters season 2: rookie class 2 is in the pool, played season 2 next
     root = run.root
@@ -165,7 +165,7 @@ def test_progression_applies_the_stored_curve_and_old_saves_keep_the_age_curve()
     assert checked >= 20
     # an older save (dynasty_v 1): the plain age curve, bit for bit
     old = Run()
-    object.__setattr__(old.root, "settings", replace(old.root.settings, dynasty_v=1))  # a save from before rookie curves
+    object.__setattr__(old.root, "settings", replace(old.root.settings, dynasty_v=1, stability_v=0))  # a save from before rookie curves
     old.play_season()
     old.offseason()
     ov2, ov3 = old.root.season_view(2), old.root.season_view(3)

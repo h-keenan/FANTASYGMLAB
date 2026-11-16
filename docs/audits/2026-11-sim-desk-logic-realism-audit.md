@@ -256,3 +256,49 @@ PYTHONPATH=. python modules/sim/calibration/dynasty_distributions.py /tmp/sim_au
 python -m modules.sim.calibration.realism_sweep seasons --seeds 3
 python -m modules.sim.calibration.realism_sweep dynasty --seeds 3
 ```
+
+
+## Implemented (stability_v 1, player-model-7), 2026-11-16
+
+New games carry `stability_v: 1` (an upgradable season-boundary flag, "A league that stays balanced") and score under `player-model-7`; old saves keep
+`stability_v` 0 and `player-model-6` (frozen in `player_model_v6.py`, hash-pinned) and replay identically. Measured with `dynasty_run.py` (8 seeds x 10
+seasons, 12 teams PPR, harness user team passive, AI-only parity) and `calibration/stability_report.py` (no games played, 8 seeds x 10 seasons).
+
+| Metric | Before | After | Real / target |
+| --- | --- | --- | --- |
+| Team score per week, season 1 / season 10 | 98.5 / 89.9 | 99.2 / 96.2 | stable |
+| Mean team score, seasons 2-10 vs season 1 | -7.5 percent | -1.1 percent | within noise |
+| Asset-value spread across AI teams (cv), season 1 / 10 | 0.15 / 0.40 | 0.17 / 0.17 | stable |
+| Top / bottom AI team asset value, season 10 | 3.2x | 1.9x | stable |
+| Season points-for sd across AI teams, season 1 / 10 | 122 / 218 | 119 / 135 | stable |
+| AI roster mean age, season 1 / 10 | 26.1 / 27.1 | 26.2 / 26.7 | stable |
+| Pool: top-24 RB / WR projection, seasons 6-10 vs season 1 | 0.98 / 1.00 | 1.02 / 1.05 | within 12 percent |
+| Realized next/this ppg, WR 22 / RB 22 / TE 23 | 0.93 / 0.91 / 0.91 (engine 0.83 / 0.88 / 0.79) | 1.08 / 1.06 / 1.12 | 1.05 / 1.07 / 1.14 |
+| Top-12 rookie bust (under 0.6 of projection) | 13 percent | 18 percent (class rank 13-24: 21) | about 20 percent |
+| Top-12 rookie class mean outcome / projection | 1.01 | 1.01 | unchanged (variance, not a nerf) |
+| Week 1-3 vs week 11-13 team score | -7.6 percent | -8.7 percent | see P1-8 below |
+
+Root causes and fixes (all behind `stability_v`):
+* **P1-6.** (1) AI-AI trades included picks: a pick is priced at the league-average slot of its original team, but a team that sells vets for picks is the team
+  whose own pick then lands early, so rebuilders harvested the gap every season (persona PF 1.14 vs contenders 0.80 by season 10). The AI-AI search is now
+  player-for-player at consensus value; picks still trade with the user. This alone took the spread from 0.38 to 0.17 and removed most of the scoring drift.
+  (2) Projections were a random walk (noise plus nothing pulling back) and a retiree's replacement was placed by a steep rookie slot curve, so the middle tier
+  thinned (RB36 9.9 -> 7.6 ppg in one offseason) while stars inflated. Added regression to the typical starter above it, diminishing growth near the best the
+  league has had, a cap on rookies at the same bound, and a second supply controller that deepens middle class slots when the mid tier is short.
+* **P1-7.** Knots were fitted to realized ratios but applied to the hidden projection, which every season redraws around itself, so the realized ratio came out
+  0.1-0.25 low and no persistence existed. Last season's result (realized/projected, position-centered, clipped, weight 0.5) now carries into next year's
+  projection (`season_outcomes.py`), and `AGE_KNOTS_V2` carry the early-career growth. Shape source: the long-standing public dynasty aging curves (RB peak 22-23 and
+  cliff from 26-27; WR improve to 24-25 and plateau to 27; TE slow starters peaking 25-28, the year-3 breakout; QB rising to the late 20s and holding), level
+  checked against the panel through the engine's realized ratio. TE n = 10 per age, so only the level, not the shape, comes from it.
+* **P1-9.** `player-model-7` adds mean-preserving log-sd for rookies (`sig_rook_add` 0.18 solid season, `bust_sd_rook` 0.18 bust depth). Top-12 bust 13 -> 18 percent.
+  Year-1 hit rate over 8 ppg for the top 12 stays about 82 percent (the bust tail widened, the typical rookie did not move); not reduced further to avoid a nerf.
+* **P1-8 (documented, not changed).** On the real panel an unmanaged cohort of starters (proj 8+ ppg) scores 12.05 points per player-week in weeks 1-3 and 9.38 in
+  weeks 11-13 (-22 percent; 95 percent to 76 percent of them active, byes and injuries). The player model gives 11.82 -> 9.35 (-21 percent) with the same
+  availability curve (`cohort_week` check, 805 starter-seasons). The team-level decay (about -9 percent) is that real attrition after managers' lineups and
+  waivers, so there is no player-model defect to correct and no real team-week baseline to tune to; forcing flatness would be a scaling band-aid. Remaining
+  levers found: all-QB-on-bye weeks with a single rostered QB (5-6 percent of AI team-weeks, 0.8 percent of league scoring; AI backup-QB planning deferred) and
+  a thin wire after season 1, which the depth controller above improves.
+
+Deferred: AI backup-QB planning; proper endogenous-slot pick pricing so AI-AI pick trades can return; roster age still drifts about +0.5 year over ten seasons
+(kickers and quarterbacks reach their natural older equilibrium); QB/TE pool depth beyond rank 24 still below season 1; engine realized ratios sit 0.03-0.05
+under the pool-level ones.
