@@ -69,3 +69,13 @@ describe("PlayerAvatar", () => {
     }
   });
 });
+
+describe("PlayerAvatar shape", () => {
+  it("keeps a fixed circle that a narrow column cannot squash into an oval", () => {
+    const { container } = render(<PlayerAvatar playerId="4046" size={40} />);
+    const img = container.querySelector("img") as HTMLImageElement;
+    expect(img.style.maxWidth).toBe("none");
+    expect(img.style.flexShrink).toBe("0");
+    expect(img.style.width).toBe(img.style.height);
+  });
+});
