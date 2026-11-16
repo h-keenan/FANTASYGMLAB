@@ -11,6 +11,7 @@ import PressableScale from '../components/PressableScale';
 import AppText from '../components/AppText';
 import Button from '../components/Button';
 import * as AppleAuthentication from 'expo-apple-authentication';
+import { useNavigation } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import AgeGate from '../components/AgeGate';
@@ -23,6 +24,7 @@ import { useAuth } from '../context/AuthContext';
 import { hasPassedAgeGate } from '../lib/ageGate';
 import { isAppleAuthAvailable, signInWithApple } from '../lib/appleAuth';
 import { trackUse } from '../lib/analytics';
+import { AUTH_PROMISE_LINE, SAMPLE_TRY_LABEL } from '../lib/sampleLeague';
 import { useGoogleSignIn } from '../lib/useGoogleSignIn';
 import { useThemeMode } from '../context/ThemeModeContext';
 import { disabledOpacity, radii, spacing, typography, type ThemeColors } from '../theme';
@@ -35,6 +37,7 @@ export default function LoginScreen() {
   const { signIn, signUp, resetPassword } = useAuth();
   const { colors } = useThemeMode();
   const insets = useSafeAreaInsets();
+  const navigation = useNavigation<{ navigate: (name: string) => void }>();
   const styles = useMemo(() => createStyles(colors), [colors]);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -128,13 +131,25 @@ export default function LoginScreen() {
       >
         <BrandMark width={112} style={styles.brandMark} />
         <AppText style={styles.title}>FantasyDesk</AppText>
-        <AppText style={styles.subtitle}>
+        <AppText style={[styles.subtitle, resetMode ? { marginBottom: spacing.xl } : null]}>
           {resetMode
             ? 'Reset your password'
             : mode === 'signIn'
               ? 'Sign in to your account'
               : 'Create an account'}
         </AppText>
+        {resetMode ? null : (
+          <>
+            {/* Promise + a way to look around above the fold: no account wall before any value (first-time-user audit F2). */}
+            <AppText style={styles.promise}>{AUTH_PROMISE_LINE}</AppText>
+            <Button
+              label={SAMPLE_TRY_LABEL}
+              variant="secondary"
+              onPress={() => navigation.navigate('SampleLeague')}
+              style={styles.sampleButton}
+            />
+          </>
+        )}
 
         {!resetMode && appleAvailable ? (
           <AppleAuthentication.AppleAuthenticationButton
@@ -294,6 +309,16 @@ function createStyles(colors: ThemeColors) {
     fontSize: 16.5,
     color: colors.textSecondary,
     textAlign: 'center',
+    marginBottom: spacing.sm,
+  },
+  promise: {
+    fontSize: 14.5,
+    color: colors.textSecondary,
+    textAlign: 'center',
+    marginBottom: spacing.md,
+  },
+  sampleButton: {
+    alignSelf: 'stretch',
     marginBottom: spacing.xl,
   },
   appleButton: {

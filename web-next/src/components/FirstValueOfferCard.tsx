@@ -9,6 +9,7 @@ import { trackOnboardingStepViewed } from "@/lib/onboardingAnalytics";
 import { funnelStepIndex, shouldShowTrialOffer, TRIAL_OFFER_CTA, TRIAL_OFFER_DISMISS, TRIAL_OFFER_NOTE, TRIAL_OFFER_TITLE } from "@/lib/firstRunFlow";
 import { markOnboardingStepCompleted, trialOfferState } from "@/lib/onboardingProgress";
 import { PAYWALL_HERO_SUB } from "@/lib/paywallCopy";
+import { useFirstRunPrompt } from "@/lib/useFirstRunPrompt";
 
 const SURFACE = "first_league_today";
 
@@ -32,11 +33,14 @@ export function FirstValueOfferCard({ userId, isPremium }: { userId: string; isP
     setVisible(shouldShowTrialOffer({ state, isPremium, onLeagueHome: true }));
   }, [userId, isPremium]);
   /* eslint-enable react-hooks/set-state-in-effect */
+  // One first-run prompt above the fold: Start here and the direction check-in outrank the offer (lib/firstRunFlow.ts).
+  const mayShow = useFirstRunPrompt("trial_offer", visible);
+  const shown = visible && mayShow;
   useEffect(() => {
-    if (visible) trackUse("paywall", "offer_seen", { tier: "free", props: { source_surface: SURFACE } });
-  }, [visible]);
+    if (shown) trackUse("paywall", "offer_seen", { tier: "free", props: { source_surface: SURFACE } });
+  }, [shown]);
 
-  if (!visible) return null;
+  if (!shown) return null;
 
   const resolve = (action: "offer_cta" | "offer_dismissed") => {
     trackUse("paywall", action, { tier: "free", props: { source_surface: SURFACE } });

@@ -38,6 +38,8 @@ from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 from typing import Any, Mapping
 
+from modules.team_stance import STANCE_OPTIONS, normalize_stance
+
 SETTINGS_KEY = "direction_checkin"
 
 MOMENT_SEASON_START = "season_start"
@@ -99,6 +101,15 @@ def _as_utc(value: Any) -> datetime | None:
     except (TypeError, ValueError):
         return None
     return parsed if parsed.tzinfo else parsed.replace(tzinfo=timezone.utc)
+
+
+def has_stance(stance: Any) -> bool:
+    """True only for a real declared Team Situation (Rebuilding / Balanced /
+    Competing). A blank, whitespace or unrecognised value is "no stance yet":
+    first-run accounts never get asked whether a direction they never set
+    still fits (audit F3). Both platforms inherit this through the endpoint."""
+
+    return normalize_stance(stance) in STANCE_OPTIONS
 
 
 def regular_season_end(playoff_week_start: Any) -> int:
@@ -175,7 +186,7 @@ def decide(
     wk = _int(week)
     if str(league_status or "").strip().lower() not in IN_SEASON_STATUSES or wk is None:
         return Decision(False, reason=REASON_NOT_IN_SEASON)
-    if not str(stance or "").strip():
+    if not has_stance(stance):
         return Decision(False, reason=REASON_NO_DIRECTION)
     moment = moment_for_week(wk, playoff_week_start, trade_deadline)
     if not moment:
@@ -265,7 +276,7 @@ def record_answer(
 
 
 __all__ = [
-    "SETTINGS_KEY", "MOMENTS", "MOMENT_LABELS", "ACTIONS", "RATE_LIMIT_DAYS", "Decision", "windows",
+    "SETTINGS_KEY", "has_stance", "MOMENTS", "MOMENT_LABELS", "ACTIONS", "RATE_LIMIT_DAYS", "Decision", "windows",
     "moment_for_week", "moment_key", "valid_moment_key", "decide", "copy_for", "handled_for_league",
     "validate_action", "record_answer",
 ]

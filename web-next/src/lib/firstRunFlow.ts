@@ -62,3 +62,22 @@ export const TRIAL_OFFER_TITLE = "Want every move, not just the top few?";
 export const TRIAL_OFFER_NOTE = "Free keeps working. Trial length and price are shown before you start anything.";
 export const TRIAL_OFFER_CTA = "See Pro plans";
 export const TRIAL_OFFER_DISMISS = "Continue free";
+
+/**
+ * Today's first-run prompt slot (audit F3). Three self-contained prompts can
+ * want the top of Today before the briefing: the Start here checklist, the
+ * direction check-in and the trial offer. The slot lets exactly ONE of them
+ * render at a time, by this priority, so a brand-new account never stacks a
+ * checklist, a direction question and a Pro pitch around its first answer.
+ * Each prompt still owns its own "do I want to show" rule (storage, server
+ * timing, entitlement); this only arbitrates between the ones that do.
+ */
+export type FirstRunPrompt = "start_here" | "direction_checkin" | "trial_offer";
+
+/** Highest priority first. */
+export const FIRST_RUN_PROMPT_PRIORITY: readonly FirstRunPrompt[] = ["start_here", "direction_checkin", "trial_offer"];
+
+/** The one prompt allowed above the fold (the hard cap is one), or null when none wants the slot. */
+export function firstRunPromptSlot(wants: Partial<Record<FirstRunPrompt, boolean>>): FirstRunPrompt | null {
+  return FIRST_RUN_PROMPT_PRIORITY.find((kind) => wants[kind] === true) ?? null;
+}

@@ -20,6 +20,8 @@ import {
   type StartHereState,
 } from '../lib/startHere';
 import { thisWeekTarget } from '../lib/thisWeek';
+import { useFirstRunPrompt } from '../lib/useFirstRunPrompt';
+import StructuredRow from './StructuredRow';
 import { spacing, type ThemeColors } from '../theme';
 
 /**
@@ -59,7 +61,10 @@ export default function StartHereCard({
     };
   }, [userId]);
 
-  if (!state || !shouldShowStartHere(state, accountCreatedAt)) return null;
+  const wantsSlot = Boolean(state && shouldShowStartHere(state, accountCreatedAt));
+  // Highest priority of Today's one first-run prompt slot (lib/firstRunFlow.ts).
+  const mayShow = useFirstRunPrompt('start_here', wantsSlot);
+  if (!state || !wantsSlot || !mayShow) return null;
 
   const update = (next: StartHereState) => {
     setState(next);
@@ -107,15 +112,12 @@ export default function StartHereCard({
             </Pressable>
           );
         })}
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel="See everything FantasyDesk can do"
-          onPress={() => onNavigate('Features', { leagueId, leagueName })}
-          style={[styles.row, styles.rowDivider]}
-        >
-          <AppText style={[styles.headline, { color: colors.accent }]}>See everything FantasyDesk can do</AppText>
-          <AppText style={styles.arrow}>→</AppText>
-        </Pressable>
+        <StructuredRow
+          title="See everything FantasyDesk can do"
+          wrapTitle
+          onOpen={() => onNavigate('Features', { leagueId, leagueName })}
+          testID="start-here-features"
+        />
       </AccentCard>
     </View>
   );

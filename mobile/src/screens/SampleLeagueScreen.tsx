@@ -47,7 +47,9 @@ export default function SampleLeagueScreen({ navigation }: Props) {
   const [tab, setTab] = useState<SampleTab>('dashboard');
 
   // Home hosts the Add League sheet; openAddLeague opens it on arrival.
-  const connect = () => navigation.navigate('Home', { openAddLeague: true });
+  // Signed out (reached from the sign-in screen) there is no Home yet: go back to sign in instead.
+  const connect = () =>
+    navigation.getState().routeNames.includes('Home') ? navigation.navigate('Home', { openAddLeague: true }) : navigation.goBack();
 
   const acc = usePlayerAccordion();
   // Fictional players have no photo: id null keeps the shared avatar slot on initials.

@@ -1,3 +1,4 @@
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { DeviceEventEmitter } from 'react-native';
 import PressableScale from './PressableScale';
@@ -40,6 +41,7 @@ import { isEspnLeagueId } from '../lib/leaguePlatform';
 import { accentColor } from '../lib/destinationAccent';
 import { queryKeys } from '../lib/queryKeys';
 import { HOME_SUBTITLE, navPage, navPagesIn, type NavCatalogPage } from '../lib/navCatalog';
+import { ORB_COACHMARK_SEEN_KEY, ORB_COACHMARK_TEXT } from '../lib/orbCoachmark';
 import { ROUTE_BY_PAGE, searchOrbDestinations, type OrbSearchHit } from '../lib/orbTabs';
 import { getSeenTradeIdeaCount } from '../lib/tradeHubSeen';
 import { PRO, getEntitlementTier, isAtLeast } from '../lib/revenuecat';
@@ -649,7 +651,31 @@ export default function GmOrb() {
     }
   }, [visible]);
 
+  // First-run coachmark (audit F1): seen-once, same fd-help-seen: convention as BeginnerHelp and the web PillOrb.
+  const [coachOpen, setCoachOpen] = useState(false);
+  useEffect(() => {
+    let cancelled = false;
+    AsyncStorage.getItem(ORB_COACHMARK_SEEN_KEY)
+      .then((raw) => {
+        if (!cancelled && raw !== '1') setCoachOpen(true);
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+  const dismissCoach = () => {
+    setCoachOpen(false);
+    AsyncStorage.setItem(ORB_COACHMARK_SEEN_KEY, '1').catch(() => {});
+  };
+  useEffect(() => {
+    if (!coachOpen) return;
+    const timer = setTimeout(dismissCoach, 12000);
+    return () => clearTimeout(timer);
+  }, [coachOpen]);
+
   const openSheet = () => {
+    if (coachOpen) dismissCoach();
     if (closeTimer.current) clearTimeout(closeTimer.current);
     void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     setSearchQuery('');
@@ -750,7 +776,7 @@ export default function GmOrb() {
               style={styles.orb}
               onPress={openSheet}
               accessibilityLabel="Open GM menu"
-              accessibilityHint="Double tap to open. Touch and hold, then drag, to move it."
+              accessibilityHint="Double tap to open the menu."
               // ORB_SIZE (48) already meets both platforms' stated minimum
               // touch target (44pt iOS, 48dp Android) with zero margin —
               // hitSlop gives real headroom above the bare minimum rather
@@ -760,10 +786,15 @@ export default function GmOrb() {
               {/* BrandMark is the transparent, theme-tinted FD mark, so the
                   disc's own backgroundColor shows through around it. */}
               <BrandMark width={28} height={19} />
-              {/* The orb was a bare logo; the visible GM matches its accessibility
-                  label ("Open GM menu"). */}
-              <AppText style={styles.orbLabel}>GM</AppText>
+              {/* A logo is not a menu: the persistent menu cue (same glyph as the web PillOrb rim cue)
+                  replaces the old "GM" caption. */}
+              <Ionicons name="menu" size={13} color={colors.accent} style={styles.orbCue} />
             </PressableScale>
+            {coachOpen ? (
+              <View pointerEvents="none" style={styles.coach} accessibilityElementsHidden importantForAccessibility="no-hide-descendants">
+                <AppText style={styles.coachText}>{ORB_COACHMARK_TEXT}</AppText>
+              </View>
+            ) : null}
           </Animated.View>
         </GestureDetector>
       </View>
@@ -1003,13 +1034,28 @@ function createStyles(colors: ThemeColors) {
     justifyContent: 'center',
     ...shadows.orbGlow,
   },
-  orbLabel: {
+  orbCue: {
     marginTop: 1,
-    fontSize: 9,
-    lineHeight: 10,
-    fontWeight: '800',
-    letterSpacing: 0.6,
-    color: colors.accent,
+  },
+  // One-time coachmark above the orb. Frosted like the rest of the orb's glass; centred on the orb, never taps.
+  coach: {
+    position: 'absolute',
+    bottom: ORB_SIZE + spacing.sm,
+    left: -80,
+    width: ORB_SIZE + 160,
+    alignItems: 'center',
+  },
+  coachText: {
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+    borderWidth: 1,
+    borderColor: 'rgba(103,232,249,0.55)',
+    backgroundColor: colors.backgroundElevated,
+    color: colors.textPrimary,
+    fontSize: 13.5,
+    fontWeight: '700',
+    textAlign: 'center',
+    overflow: 'hidden',
   },
   backdrop: {
     ...StyleSheet.absoluteFillObject,

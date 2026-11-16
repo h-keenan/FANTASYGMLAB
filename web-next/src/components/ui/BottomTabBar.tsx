@@ -164,6 +164,7 @@ export function BottomTabBar({
               label={orbLabel}
               badge={orbBadge}
               expanded={menuOpen}
+              coachmark
               buttonRef={menuBtnRef}
               testId="pill-orb"
               onClick={() => setMenuOpen((o) => !o)}

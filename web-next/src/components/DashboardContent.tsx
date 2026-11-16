@@ -185,6 +185,9 @@ export function DashboardContent({
 
       <TeamStatusHero leagueId={leagueId} leagueName={leagueName} snapshot={snapshot} sim={sim} oddsCaption={oddsCaption} data={teamStatus} attention={[]} tradeCount={tradeItems.length} queue={heroQueue} />
 
+      {/* F14: one first-visit orientation line under the hero (seen-once, beginners and unset only). */}
+      {sample ? null : <BeginnerHelp term="todayOrientation" label="this page" initiallyOpen />}
+
       {/* A few times a season: does the declared direction still fit? Server-decided,
           dismissible, once per moment (modules/direction_checkin.py). */}
       {sample ? null : <DirectionCheckinCard leagueId={leagueId} />}

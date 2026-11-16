@@ -1,6 +1,6 @@
 import { readFileSync } from "node:fs";
 import path from "node:path";
-import { describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it } from "vitest";
 
 import {
   FIRST_RUN_FUNNEL_STEPS,
@@ -9,7 +9,9 @@ import {
   firstRunStage,
   funnelStepIndex,
   shouldShowTrialOffer,
+  firstRunPromptSlot,
 } from "./firstRunFlow";
+import { claimFirstRunPrompt, currentFirstRunPrompt, resetFirstRunPrompts } from "./useFirstRunPrompt";
 
 describe("firstRunStage (navigation guard)", () => {
   it("signed out always sees sign-in", () => {
@@ -65,6 +67,43 @@ describe("funnel ids", () => {
   it("orders connect before the first league view", () => {
     expect([...FIRST_RUN_FUNNEL_STEPS]).toEqual(["level", "value", "connect", "first_league_view"]);
     expect(funnelStepIndex("connect")).toBeLessThan(funnelStepIndex("first_league_view"));
+  });
+});
+
+describe("first-run prompt slot (audit F3)", () => {
+  it("ranks Start here over the direction check-in over the trial offer", () => {
+    expect(firstRunPromptSlot({ start_here: true, direction_checkin: true, trial_offer: true })).toBe("start_here");
+    expect(firstRunPromptSlot({ direction_checkin: true, trial_offer: true })).toBe("direction_checkin");
+    expect(firstRunPromptSlot({ trial_offer: true })).toBe("trial_offer");
+    expect(firstRunPromptSlot({ start_here: false, direction_checkin: false })).toBeNull();
+    expect(firstRunPromptSlot({})).toBeNull();
+  });
+
+  it("never lets more than one prompt through, whatever wants it", () => {
+    const kinds = ["start_here", "direction_checkin", "trial_offer"] as const;
+    for (let mask = 0; mask < 8; mask += 1) {
+      const wants = Object.fromEntries(kinds.map((k, i) => [k, Boolean(mask & (1 << i))]));
+      const winners = kinds.filter((k) => firstRunPromptSlot(wants) === k);
+      expect(winners.length).toBe(mask === 0 ? 0 : 1);
+    }
+  });
+});
+
+describe("first-run prompt store", () => {
+  beforeEach(() => resetFirstRunPrompts());
+
+  it("hands the slot down as higher priorities release it", () => {
+    claimFirstRunPrompt("trial_offer", true);
+    claimFirstRunPrompt("direction_checkin", true);
+    expect(currentFirstRunPrompt()).toBe("direction_checkin");
+    claimFirstRunPrompt("start_here", true);
+    expect(currentFirstRunPrompt()).toBe("start_here");
+    claimFirstRunPrompt("start_here", false);
+    expect(currentFirstRunPrompt()).toBe("direction_checkin");
+    claimFirstRunPrompt("direction_checkin", false);
+    expect(currentFirstRunPrompt()).toBe("trial_offer");
+    claimFirstRunPrompt("trial_offer", false);
+    expect(currentFirstRunPrompt()).toBeNull();
   });
 });
 
