@@ -673,8 +673,9 @@ def run_weeks(
         ca = cands(after, week)
         ce = []
         for p in extra:
-            for pid, pos, pts, av, _ in _candidates([p], week, current_week, 1.0):
-                ce.append((pid, pos, pts * fa_rel[pid], 1.0, True))
+            if p.ppg is None:
+                continue
+            ce.append((p.player_id, p.position, p.ppg * 1.0 * fa_rel[p.player_id], 1.0, True))
         # Uncertain = fractional availability among rostered players.
         uncertain: dict[str, float] = {}
         for pid, pos, pts, av, _ in cb + ca:
@@ -697,6 +698,9 @@ def run_weeks(
                 # av == 0 -> not startable
             return lst
 
+        # The free-agent pool does not depend on who is present, so its points
+        # are built once per week, not once per availability scenario.
+        ce_points = points_for(ce, {})
         wb = wa = 0.0
         e_delta = e_delta2 = 0.0
         bypos_b: dict[str, float] = {}
@@ -713,8 +717,8 @@ def run_weeks(
                 prob *= uncertain[pid] if here else 1.0 - uncertain[pid]
             if prob <= 0.0:
                 continue
-            tb, sb, ob = solve_lineup(points_for(cb, present) + points_for(ce, {}), ctx.slots)
-            ta, sa, oa = solve_lineup(points_for(ca, present) + points_for(ce, {}), ctx.slots)
+            tb, sb, ob = solve_lineup(points_for(cb, present) + ce_points, ctx.slots)
+            ta, sa, oa = solve_lineup(points_for(ca, present) + ce_points, ctx.slots)
             wb += prob * tb
             wa += prob * ta
             d = ta - tb

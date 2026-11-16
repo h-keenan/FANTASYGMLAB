@@ -234,7 +234,7 @@ function PickSelectRow({
   );
 }
 
-function RosterRow({
+const RosterRow = React.memo(function RosterRow({
   player,
   selected,
   onToggle,
@@ -243,14 +243,15 @@ function RosterRow({
 }: {
   player: LineupPlayer;
   selected: boolean;
-  onToggle: () => void;
+  onToggle: (playerId: string) => void;
   isFirst: boolean;
   isLast: boolean;
 }) {
+  const toggleRow = () => onToggle(player.player_id);
   return (
     <SelectableRow
       selected={selected}
-      onToggle={onToggle}
+      onToggle={toggleRow}
       isFirst={isFirst}
       isLast={isLast}
       accessibilityLabel={player.name ?? 'Player'}
@@ -263,13 +264,13 @@ function RosterRow({
         metaText={[player.team || 'FA', player.overall_rating != null ? `OVR ${Math.round(player.overall_rating)}` : null, player.injury_label || null].filter(Boolean).join(' · ')}
         trailingFact={{ key: 'value', label: 'VALUE', value: player.score != null ? Math.round(player.score).toLocaleString() : '—' }}
         open={false}
-        onToggle={onToggle}
+        onToggle={toggleRow}
         nonInteractive="the whole row toggles the Trade Finder selection"
         testID="trade-finder-roster-row"
       />
     </SelectableRow>
   );
-}
+});
 
 /**
  * A proposed trade for the selected players — the exact same TradeIdea shape
@@ -444,7 +445,7 @@ export default function TradeFinderScreen({ leagueId, leagueName, navigation, pr
     }, [leagueId, lens, rosterReloadToken]),
   );
 
-  const toggle = (playerId: string) => {
+  const toggle = useCallback((playerId: string) => {
     setSelectedIds((prev) => {
       const next = new Set(prev);
       if (next.has(playerId)) next.delete(playerId);
@@ -452,7 +453,7 @@ export default function TradeFinderScreen({ leagueId, leagueName, navigation, pr
       return next;
     });
     setIdeas(null);
-  };
+  }, []);
 
   const togglePick = (pickId: string) => {
     setSelectedPickIds((prev) => toggleCappedSelection(prev, pickId));
@@ -638,7 +639,7 @@ export default function TradeFinderScreen({ leagueId, leagueName, navigation, pr
           <RosterRow
             player={item}
             selected={selectedIds.has(item.player_id)}
-            onToggle={() => toggle(item.player_id)}
+            onToggle={toggle}
             isFirst={index === 0}
             isLast={index === roster.length - 1}
           />

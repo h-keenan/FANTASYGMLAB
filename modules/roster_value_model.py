@@ -489,10 +489,15 @@ def _evaluate_swap_uncached(
 ) -> dict[str, Any]:
     drop_set = {str(p) for p in drop_ids}
     before = rvc.frame
-    keep = before[~before["player_id"].astype(str).isin(drop_set)]
     add_frame = pd.DataFrame(list(add_rows)) if add_rows else pd.DataFrame()
     after_profiles = tlm.profile_swap_after(before, drop_set, add_frame, rvc.model_ctx)
-    after = pd.concat([keep, add_frame], ignore_index=True) if (not add_frame.empty and after_profiles is None) else keep
+    if after_profiles is None:
+        keep = before[~before["player_id"].astype(str).isin(drop_set)]
+        after = pd.concat([keep, add_frame], ignore_index=True) if not add_frame.empty else keep
+    else:
+        # The model reads the precomputed profiles; the frame is never consulted,
+        # so the kept-rows slice is not built.
+        after = before
     send = [
         _asset(pid, rvc.profiles[pid].name if pid in rvc.profiles else pid, rvc.healthy_value.get(pid, 0.0))
         for pid in drop_ids

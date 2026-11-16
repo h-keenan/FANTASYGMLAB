@@ -3128,8 +3128,8 @@ def get_league_team_profile(
         return _empty("no_rankings_data")
     row = rank_rows.iloc[0]
 
-    league_needs = roster_value_model.league_needs(
-        valued=valued, rosters=rosters, league=league, settings=settings, score_field=score_field
+    league_needs = _league_needs_memoized(
+        valued=valued, rosters=rosters, league=league, settings=settings, score_field=score_field, status=None
     )
     theirs = _room_context(valued, their_roster, score_field, league_needs)
     ranks = opponent_profile.position_ranks(df_summary, roster_id)
@@ -6259,7 +6259,7 @@ def _league_needs_memoized(
     league: dict[str, Any],
     settings: dict[str, Any],
     score_field: str,
-    status: dict[str, Any],
+    status: dict[str, Any] | None,
 ) -> "roster_value_model.LeagueNeeds":
     """``roster_value_model.league_needs`` (one lineup-model calibration plus an ``assess_needs`` per roster, about a fifth of a
     Trade Analyzer request) for a frame tagged with its content: reused for the same frame, rosters, league and settings. The
@@ -15286,8 +15286,8 @@ def get_league_my_team_needs(
     # need model (league rank of every starting slot, depth, injuries, aging),
     # the same one Waivers, the Dashboard and Trade Hub read.
     rosters = sleeper.get_rosters(league_id)
-    league_needs = roster_value_model.league_needs(
-        valued=valued, rosters=rosters, league=league, settings=settings, score_field=score_field
+    league_needs = _league_needs_memoized(
+        valued=valued, rosters=rosters, league=league, settings=settings, score_field=score_field, status=None
     )
     team_needs = league_needs.for_roster(my_roster.get("roster_id"))
     assessment = trade_analyzer_fit.build_team_needs_assessment(team_needs, status=league_needs.status)

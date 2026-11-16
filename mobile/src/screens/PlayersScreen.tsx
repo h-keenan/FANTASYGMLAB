@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { FlatList, ScrollView, StyleSheet, View } from 'react-native';
 import { ReSettle } from '../components/Motion';
 import PressableScale from '../components/PressableScale';
@@ -300,6 +300,12 @@ export default function PlayersScreen({ route, navigation }: Props) {
   const { viewMode, setViewMode } = usePlayerListViewMode('players');
   const ownership = useRosterOwnership(leagueId);
   const accordion = usePlayerAccordion();
+  const { openId: accordionOpenId, toggle: toggleAccordionRow } = accordion;
+  const onNavigateTrades = useCallback(
+    (player: RankedPlayer, initialTab: 'make' | 'search') =>
+      navigation.navigate('Trades', { leagueId, leagueName, initialTab, tradePlayer: player }),
+    [navigation, leagueId, leagueName],
+  );
 
   useScreenHeaderTitle(navigation, 'Players', leagueName);
 
@@ -363,6 +369,34 @@ export default function PlayersScreen({ route, navigation }: Props) {
       .filter((p) => matchesAvailability(p.injury_status, availabilityFilter))
       .filter((p) => !query || (p.name ?? '').toLowerCase().includes(query));
   }, [players, searchMatches, idpPlayers, idpSelected, position, ageFilter, statusFilter, availabilityFilter, search]);
+
+  const lastIndex = filtered.length - 1;
+  const renderPlayerItem = useCallback(
+    ({ item, index }: { item: RankedPlayer; index: number }) => {
+      // Trade shortcuts are offense-only until the trade engines value defenders.
+      const shortcuts = idpSelected
+        ? { canAddToTrade: false, canFindTrades: false }
+        : tradeShortcutsFor(item.player_id, ownership);
+      return (
+        <PlayerListItem
+          item={item}
+          index={index}
+          isLast={index === lastIndex}
+          grid={viewMode === 'grid'}
+          open={accordionOpenId === item.player_id}
+          idpConfidence={idpSelected ? idpConfidenceById.get(item.player_id) ?? 'low' : undefined}
+          canAddToTrade={shortcuts.canAddToTrade}
+          canFindTrades={shortcuts.canFindTrades}
+          leagueId={leagueId}
+          leagueName={leagueName}
+          onToggleRow={toggleAccordionRow}
+          onOpenPlayer={openQuickView}
+          onNavigateTrades={onNavigateTrades}
+        />
+      );
+    },
+    [idpSelected, ownership, lastIndex, viewMode, accordionOpenId, idpConfidenceById, leagueId, leagueName, toggleAccordionRow, openQuickView, onNavigateTrades],
+  );
 
   // One Filters button instead of four dropdown pills (FilterSheet, same groups as web).
   const filterGroups = useMemo<FilterGroup[]>(
@@ -467,41 +501,14 @@ export default function PlayersScreen({ route, navigation }: Props) {
           key={viewMode}
           data={filtered}
           keyExtractor={(item) => item.player_id}
-          extraData={accordion.openId}
+          extraData={accordionOpenId}
           numColumns={viewMode === 'grid' ? 2 : 1}
           columnWrapperStyle={viewMode === 'grid' ? styles.gridRow : undefined}
           contentContainerStyle={[styles.listContent, { paddingBottom: orbClearance }]}
           initialNumToRender={16}
           maxToRenderPerBatch={16}
           windowSize={9}
-          renderItem={({ item, index }) => {
-            // Trade shortcuts are offense-only until the trade engines value defenders.
-            const shortcuts = idpSelected
-              ? { canAddToTrade: false, canFindTrades: false }
-              : tradeShortcutsFor(item.player_id, ownership);
-            return (
-              <PlayerRankRow
-                idpConfidence={idpSelected ? idpConfidenceById.get(item.player_id) ?? 'low' : undefined}
-                player={item}
-                isFirst={index === 0}
-                isLast={index === filtered.length - 1}
-                grid={viewMode === 'grid'}
-                open={accordion.isOpen(item.player_id)}
-                onToggle={() => accordion.toggle(item.player_id)}
-                onPress={() => openQuickView(item, { leagueId, leagueName })}
-                onAddToTrade={
-                  shortcuts.canAddToTrade
-                    ? () => navigation.navigate('Trades', { leagueId, leagueName, initialTab: 'make', tradePlayer: item })
-                    : undefined
-                }
-                onFindTrades={
-                  shortcuts.canFindTrades
-                    ? () => navigation.navigate('Trades', { leagueId, leagueName, initialTab: 'search', tradePlayer: item })
-                    : undefined
-                }
-              />
-            );
-          }}
+          renderItem={renderPlayerItem}
           ListFooterComponent={
             filtered.length > 0 ? (
               <>
@@ -525,6 +532,48 @@ export default function PlayersScreen({ route, navigation }: Props) {
     </View>
   );
 }
+
+type PlayerListItemProps = {
+  item: RankedPlayer;
+  index: number;
+  isLast: boolean;
+  grid: boolean;
+  open: boolean;
+  idpConfidence?: string;
+  canAddToTrade: boolean;
+  canFindTrades: boolean;
+  leagueId: string;
+  leagueName: string;
+  onToggleRow: (playerId: string) => void;
+  onOpenPlayer: (player: RankedPlayer, options: { leagueId: string; leagueName: string }) => void;
+  onNavigateTrades: (player: RankedPlayer, initialTab: 'make' | 'search') => void;
+};
+
+/**
+ * One list row with stable, primitive props. FlatList re-runs renderItem for every
+ * row on any parent state change (search text, accordion, sort), so row identity is
+ * what has to hold still: handlers are bound here, inside the memo, and the parent
+ * passes stable callbacks plus the row's own primitives.
+ */
+const PlayerListItem = React.memo(function PlayerListItem({
+  item, index, isLast, grid, open, idpConfidence, canAddToTrade, canFindTrades, leagueId, leagueName,
+  onToggleRow, onOpenPlayer, onNavigateTrades,
+}: PlayerListItemProps) {
+  return (
+    <PlayerRankRow
+      idpConfidence={idpConfidence}
+      player={item}
+      isFirst={index === 0}
+      isLast={isLast}
+      grid={grid}
+      open={open}
+      onToggle={() => onToggleRow(item.player_id)}
+      onPress={() => onOpenPlayer(item, { leagueId, leagueName })}
+      onAddToTrade={canAddToTrade ? () => onNavigateTrades(item, 'make') : undefined}
+      onFindTrades={canFindTrades ? () => onNavigateTrades(item, 'search') : undefined}
+    />
+  );
+});
 
 function createStyles(colors: ThemeColors) {
   return StyleSheet.create({
