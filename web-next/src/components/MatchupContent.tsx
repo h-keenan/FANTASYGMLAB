@@ -5,6 +5,7 @@ import { BEGINNER_HELP } from "@/lib/experienceCopy";
 import { RangeCompare } from "@/components/RangeCompare";
 import { RANGE_CAPTION, leanLabel, rangeDisplayRows } from "@/lib/startSitRange";
 import { useRouter } from "next/navigation";
+import dynamic from "next/dynamic";
 import { useMemo, useState } from "react";
 
 import type {
@@ -78,6 +79,8 @@ function signedTone(value: number | null | undefined): "positive" | "risk" | "ne
   return value > 0 ? "positive" : "risk";
 }
 
+const ManagerProfileSheet = dynamic(() => import("@/components/ManagerProfileSheet").then((m) => m.ManagerProfileSheet), { ssr: false });
+
 function MatchupHeader({ week, live, leagueName }: { week: number | null; live: boolean; leagueName: string }) {
   const pageHelp = usePageHelp([BEGINNER_HELP.matchupIntro, BEGINNER_HELP.matchupWinProbability]);
   return (
@@ -103,9 +106,12 @@ function ScoreSide({
   score,
   projected,
   kickedOff,
+  onOpenTeam,
 }: {
   side: MatchupSide;
   mine: boolean;
+  /** Opens the team sheet (the opponent's name is the tap target). */
+  onOpenTeam?: () => void;
   score: number | null;
   projected: number | null;
   kickedOff: boolean;
@@ -121,9 +127,15 @@ function ScoreSide({
         size={56}
         ringColor={mine ? "var(--color-accent)" : "var(--color-border-strong)"}
       />
-      <span className="text-sm font-bold break-words w-full" style={{ color: "var(--color-text-primary)" }}>
-        {side.team_name}
-      </span>
+      {onOpenTeam ? (
+        <button type="button" onClick={onOpenTeam} className="text-sm font-bold break-words w-full underline decoration-dotted underline-offset-2" style={{ color: "var(--color-text-primary)", minHeight: 44 }} aria-label={`Open ${side.team_name} team sheet`}>
+          {side.team_name}
+        </button>
+      ) : (
+        <span className="text-sm font-bold break-words w-full" style={{ color: "var(--color-text-primary)" }}>
+          {side.team_name}
+        </span>
+      )}
       <span className="text-xs" style={{ color: "var(--color-text-muted)" }}>
         {recordLabel(side)}
       </span>
@@ -208,7 +220,8 @@ function MatchupHero({ matchup }: { matchup: MatchupResponse }) {
 }
 
 /** Teams, both scores, the win-probability bar and the value tiles: one compact module under the Hero. */
-function TeamsValues({ matchup }: { matchup: MatchupResponse }) {
+function TeamsValues({ matchup, leagueId, leagueName = "" }: { matchup: MatchupResponse; leagueId?: string; leagueName?: string }) {
+  const [sheetOpen, setSheetOpen] = useState(false);
   const mine = matchup.my_team!;
   const opponent = matchup.opponent!;
   const comparison = matchup.comparison!;
@@ -251,7 +264,19 @@ function TeamsValues({ matchup }: { matchup: MatchupResponse }) {
             score={opponent.has_live_data ? opponent.real_points : null}
             projected={opponentProjected}
             kickedOff={kickedOff}
+            onOpenTeam={leagueId && opponent.roster_id ? () => setSheetOpen(true) : undefined}
           />
+          {sheetOpen && leagueId ? (
+            <ManagerProfileSheet
+              leagueId={leagueId}
+              leagueName={leagueName}
+              rosterId={opponent.roster_id}
+              teamName={opponent.team_name}
+              ownerName={opponent.owner_name}
+              avatarUrl={opponent.avatar_url}
+              onClose={() => setSheetOpen(false)}
+            />
+          ) : null}
         </div>
 
         {hasOdds ? (
@@ -830,7 +855,7 @@ export function MatchupContent({
         />
       ) : null}
       </div>
-      <div className="lg:col-start-1"><TeamsValues matchup={shown} /></div>
+      <div className="lg:col-start-1"><TeamsValues matchup={shown} leagueId={leagueId} leagueName={leagueName} /></div>
       <div className="lg:col-start-1">
       {matchup.best_ball ? (
         // Best ball: Sleeper sets both lineups from the highest weekly

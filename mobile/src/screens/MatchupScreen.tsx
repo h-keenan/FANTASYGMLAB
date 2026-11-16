@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { AppState, RefreshControl, ScrollView, StyleSheet, View } from 'react-native';
+import { AppState, Pressable, RefreshControl, ScrollView, StyleSheet, View } from 'react-native';
+import ManagerProfileModal from '../components/ManagerProfileModal';
 import PressableScale from '../components/PressableScale';
 import AppText from '../components/AppText';
 import PageTitle from '../components/PageTitle';
@@ -385,7 +386,7 @@ export default function MatchupScreen({ route, navigation }: Props) {
             onRetry={() => void planner.openSlot(planner.sheet!.index)}
           />
         ) : null}
-        <TeamsValues matchup={shown} mine={mine} opponent={opponent} />
+        <TeamsValues matchup={shown} mine={mine} opponent={opponent} leagueId={leagueId} leagueName={leagueName} />
         {bestBall ? (
           // Best ball: Sleeper sets both lineups from the highest weekly
           // scorers, so there is no suggested lineup or start/sit call.
@@ -406,9 +407,12 @@ function ScoreSide({
   score,
   projected,
   kickedOff,
+  onOpenTeam,
 }: {
   side: MatchupSide;
   accent: string;
+  /** Opens the team sheet (the opponent's name is the tap target). */
+  onOpenTeam?: () => void;
   score: number | null;
   projected: number | null;
   kickedOff: boolean;
@@ -426,9 +430,17 @@ function ScoreSide({
         size={56}
         style={StyleSheet.flatten([styles.scoreAvatar, { borderColor: accent }])}
       />
-      <AppText style={styles.scoreTeam} numberOfLines={2}>
-        {side.team_name}
-      </AppText>
+      {onOpenTeam ? (
+        <Pressable onPress={onOpenTeam} accessibilityRole="button" accessibilityLabel={`Open ${side.team_name} team sheet`} hitSlop={8}>
+          <AppText style={[styles.scoreTeam, { textDecorationLine: 'underline' }]} numberOfLines={2}>
+            {side.team_name}
+          </AppText>
+        </Pressable>
+      ) : (
+        <AppText style={styles.scoreTeam} numberOfLines={2}>
+          {side.team_name}
+        </AppText>
+      )}
       <AppText style={styles.scoreRecord}>{recordLabel(side)}</AppText>
       <AppText style={styles.scoreValue}>{headline}</AppText>
       {caption ? <AppText style={styles.scoreCaption}>{caption}</AppText> : null}
@@ -506,11 +518,16 @@ function TeamsValues({
   matchup,
   mine,
   opponent,
+  leagueId,
+  leagueName,
 }: {
   matchup: MatchupResponse;
   mine: MatchupSide;
   opponent: MatchupSide;
+  leagueId: string;
+  leagueName: string;
 }) {
+  const [sheetOpen, setSheetOpen] = useState(false);
   const { colors } = useThemeMode();
   const styles = useMemo(() => createStyles(colors), [colors]);
   const comparison = matchup.comparison!;
@@ -547,6 +564,17 @@ function TeamsValues({
           score={opponent.has_live_data ? opponent.real_points : null}
           projected={opponentProjected}
           kickedOff={kickedOff}
+          onOpenTeam={opponent.roster_id ? () => setSheetOpen(true) : undefined}
+        />
+        <ManagerProfileModal
+          visible={sheetOpen}
+          onClose={() => setSheetOpen(false)}
+          leagueId={leagueId}
+          leagueName={leagueName}
+          rosterId={opponent.roster_id}
+          teamName={opponent.team_name}
+          ownerName={opponent.owner_name}
+          avatarId={opponent.avatar_url}
         />
       </View>
 

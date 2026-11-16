@@ -7,10 +7,11 @@ import { Button } from "@/components/Button";
 import { PositionBadge } from "@/components/PositionBadge";
 import { SimTeamLogo } from "@/components/SimTeamIdentity";
 import { SimGlyph } from "@/components/SimGlyph";
-import { SimPlayerChip, SimPlayerLine, SimSectionTitle, SimSheet, SimToneBadge, simToneColor, type SimCtx } from "@/components/SimGameParts";
+import { SimPlayerChip, SimPlayerLine, SimSectionTitle, SimSheet, SimToneBadge, type SimCtx } from "@/components/SimGameParts";
 import { SimTeamHistory } from "@/components/SimTeamHistory";
 import { SkeletonCard } from "@/components/Skeleton";
-import { Tabs } from "@/components/Tabs";
+import { TeamSheetFrame, TeamSheetOverview } from "@/components/TeamSheet";
+import { teamSheetNextGameLine, type TeamSheetChip } from "@/lib/teamSheet";
 import { ToneBadge } from "@/components/ToneBadge";
 import { api } from "@/lib/api";
 import { simListStats } from "@/lib/simDraft";
@@ -18,8 +19,6 @@ import { simGroupBenchByPosition } from "@/lib/simLeagueRosters";
 import {
   simFmtPts,
   simFmtRecord,
-  simLevelLabel,
-  simLevelTone,
   simPlayoffStatusLabel,
   simSlotLabels,
   simSlotRepeatsPosition,
@@ -86,78 +85,46 @@ function TeamBody({ ctx, data, onTrade }: { ctx: SimCtx; data: SimTeamRosterResp
   const bench = (data.players ?? []).filter((p) => !started.has(p.id));
   const line = simStrengthNeedLine(data.strengths, data.needs);
   const status = record ? simPlayoffStatusLabel(record.playoff_status) : "";
+  const tiles = [
+    { label: "Record", value: record ? simFmtRecord(record) : "-" },
+    { label: "Rank", value: record ? `#${record.rank}` : "-" },
+    { label: "PF", value: record ? simFmtPts(record.pf) : "-" },
+    { label: "Proj", value: simFmtPts(data.projected_total) },
+  ];
+  const chips: TeamSheetChip[] = [{ label: `Power #${team.power_rank}`, tone: "premium" }];
+  if (status) chips.push({ label: status, tone: record?.playoff_status === "out" || record?.playoff_status === "eliminated" ? "muted" : "success" });
   return (
-    <div className="flex flex-col gap-4 pr-1">
-      <header className="flex items-center gap-3 pr-10">
-        <SimTeamLogo name={team.name} size="hero" label />
-        <div className="flex min-w-0 flex-col gap-1">
-          <p className="text-lg font-extrabold break-words" data-testid="team-sheet-name">
-            {team.name}
-            {team.is_you ? " (you)" : ""}
-          </p>
-          <div className="flex flex-wrap items-center gap-2">
-            <ToneBadge label={team.persona.label} color="var(--color-accent)" size="xs" />
-            <ToneBadge label={`Power #${team.power_rank}`} color="var(--color-premium)" size="xs" />
-            {status ? <SimToneBadge label={status} tone={record?.playoff_status === "out" || record?.playoff_status === "eliminated" ? "muted" : "success"} /> : null}
-          </div>
-          {team.owner ? <p className="text-xs" style={{ color: "var(--color-text-muted)" }}>Managed by {team.owner}</p> : null}
-        </div>
-      </header>
-
-      <Tabs
-        id="sim-team"
-        ariaLabel="Team sections"
-        tabs={[
+    <TeamSheetFrame
+      id="sim-team"
+      logo={<SimTeamLogo name={team.name} size="hero" label />}
+      name={`${team.name}${team.is_you ? " (you)" : ""}`}
+      nameTestId="team-sheet-name"
+      tag={<ToneBadge label={team.persona.label} color="var(--color-accent)" size="xs" />}
+      chips={chips}
+      managedBy={team.owner}
+      tabs={[
           {
             key: "overview",
             label: "Overview",
             render: () => (
-              <>
-      <p className="text-sm" style={{ color: "var(--color-text-secondary)" }}>{team.persona.blurb}</p>
-
-      <div className="grid grid-cols-4 gap-2" aria-label="Season so far">
-        <Fact label="Record" value={record ? simFmtRecord(record) : "-"} />
-        <Fact label="Rank" value={record ? `#${record.rank}` : "-"} />
-        <Fact label="PF" value={record ? simFmtPts(record.pf) : "-"} />
-        <Fact label="Proj" value={simFmtPts(data.projected_total)} />
-      </div>
-      {record?.streak ? (
-        <p className="text-xs" style={{ color: "var(--color-text-secondary)" }}>
-          Streak <strong style={{ color: record.streak.startsWith("W") ? "var(--color-success)" : "var(--color-danger)" }}>{record.streak}</strong>
-          {data.next_game ? ` · Week ${data.next_game.week} vs ${data.next_game.opponent.name}` : ""}
-        </p>
-      ) : data.next_game ? (
-        <p className="text-xs" style={{ color: "var(--color-text-secondary)" }}>Week {data.next_game.week} vs {data.next_game.opponent.name}</p>
-      ) : null}
-
-      <section className="flex flex-col gap-2" aria-label="Strengths and needs">
-        <SimSectionTitle glyph="spark" tone="accent" note={line || undefined}>Strengths and needs</SimSectionTitle>
-        <ul className="grid grid-cols-3 gap-2">
-          {(data.positions ?? []).map((p) => (
-            <li key={p.pos}>
-              <AccentCard accent={simToneColor(simLevelTone(p.level))} compact as="div">
-                <div className="flex flex-col items-start gap-1">
-                  <PositionBadge position={p.pos} />
-                  <span className="text-xs font-extrabold" style={{ color: simToneColor(simLevelTone(p.level)) }}>{simLevelLabel(p.level)}</span>
-                </div>
-                <p className="text-xs" style={{ color: "var(--color-text-secondary)" }}>
-                  #{p.rank} of {p.teams} · depth {p.depth}
-                </p>
-              </AccentCard>
-            </li>
-          ))}
-        </ul>
-      </section>
-
-      {(data.injuries ?? []).length > 0 ? (
-        <section className="flex flex-col gap-1" aria-label="Injuries">
-          <SimSectionTitle glyph="injury" tone="danger">Injuries</SimSectionTitle>
-          {data.injuries!.map((p) => (
-            <SimPlayerLine key={p.id} player={p} onOpen={ctx.openPlayer} stats={simListStats(p, { adp: false })} trailing={<SimToneBadge label={`${p.out_weeks} wk`} tone="danger" />} />
-          ))}
-        </section>
-      ) : null}
-              </>
+              <TeamSheetOverview
+                blurb={team.persona.blurb}
+                tiles={tiles}
+                streak={record?.streak}
+                nextGame={data.next_game ? teamSheetNextGameLine({ week: data.next_game.week, opponent: data.next_game.opponent.name }) : ""}
+                positions={data.positions ?? []}
+                strengthsTitle={<SimSectionTitle glyph="spark" tone="accent" note={line || undefined}>Strengths and needs</SimSectionTitle>}
+                injuries={
+                  (data.injuries ?? []).length > 0 ? (
+                    <section className="flex flex-col gap-1" aria-label="Injuries">
+                      <SimSectionTitle glyph="injury" tone="danger">Injuries</SimSectionTitle>
+                      {data.injuries!.map((p) => (
+                        <SimPlayerLine key={p.id} player={p} onOpen={ctx.openPlayer} stats={simListStats(p, { adp: false })} trailing={<SimToneBadge label={`${p.out_weeks} wk`} tone="danger" />} />
+                      ))}
+                    </section>
+                  ) : null
+                }
+              />
             ),
           },
           {
@@ -260,17 +227,7 @@ function TeamBody({ ctx, data, onTrade }: { ctx: SimCtx; data: SimTeamRosterResp
             ),
           },
           { key: "history", label: "History", render: () => <SimTeamHistory gameId={ctx.gameId} teamId={team.team_id} /> },
-        ]}
-      />
-    </div>
-  );
-}
-
-function Fact({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="glass-surface flex flex-col items-center px-1 py-1.5">
-      <span className="text-[0.6875rem]" style={{ color: "var(--color-text-muted)" }}>{label}</span>
-      <span className="text-sm font-extrabold tabular-nums">{value}</span>
-    </div>
+      ]}
+    />
   );
 }

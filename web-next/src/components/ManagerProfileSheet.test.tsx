@@ -4,7 +4,7 @@ import { describe, expect, it, vi } from "vitest";
 import { ManagerProfileSheet } from "./ManagerProfileSheet";
 
 vi.mock("@/lib/api", () => ({
-  api: { getManagerTendencyDetail: () => new Promise(() => {}), getTeamProfile: () => new Promise(() => {}) },
+  api: { getManagerTendencyDetail: () => new Promise(() => {}), getTeamProfile: () => new Promise(() => {}), getTeamSheet: () => new Promise(() => {}) },
 }));
 
 describe("ManagerProfileSheet header", () => {
@@ -13,7 +13,7 @@ describe("ManagerProfileSheet header", () => {
       <ManagerProfileSheet leagueId="1" rosterId={3} teamName="Big Dogs" ownerName="Zach K" avatarUrl="https://sleepercdn.com/avatars/thumbs/abc" onClose={() => {}} />,
     );
     expect(screen.getByText("Big Dogs")).toBeTruthy();
-    expect(screen.getByText("Zach K")).toBeTruthy();
+    expect(screen.getByText("Managed by Zach K")).toBeTruthy();
     expect(container.querySelector("img")?.getAttribute("src")).toContain("abc");
   });
 

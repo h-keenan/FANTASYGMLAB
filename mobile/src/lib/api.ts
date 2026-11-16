@@ -3368,10 +3368,63 @@ export interface TradePackage {
   confidence: string;
 }
 
+export interface TeamSheetPlayer {
+  player_id: string;
+  name: string;
+  position: string;
+  team: string;
+  age: number | null;
+  injury_status: string;
+  value: number | null;
+  slot: "starter" | "bench" | "ir" | "taxi";
+}
+
+export interface TeamSheetSeason {
+  season: string;
+  league_id: string;
+  wins: number;
+  losses: number;
+  ties: number;
+  points_for: number;
+  place: number | null;
+  of: number;
+}
+
+/** GET /v1/leagues/{id}/teams/{roster_id}/sheet: the Desk team sheet (real Sleeper data). */
+export interface TeamSheetResponse {
+  ok: boolean;
+  reason: string;
+  roster_id: string;
+  is_me?: boolean;
+  team?: { team_name: string | null; owner_name: string | null; avatar_url: string | null };
+  record?: {
+    wins: number | null;
+    losses: number | null;
+    ties: number | null;
+    label: string | null;
+    standing_rank: number | null;
+    points_for: number | null;
+    playoff_status: string;
+  };
+  power_rank?: number | null;
+  teams?: number;
+  streak?: string;
+  projected_total?: number | null;
+  next_game?: { week: number; opponent: { roster_id: string; name: string } } | null;
+  positions?: Array<{ pos: string; level: "strength" | "solid" | "need"; rank: number; teams: number; depth: number }>;
+  strengths?: string[];
+  needs?: string[];
+  injuries?: TeamSheetPlayer[];
+  roster?: TeamSheetPlayer[];
+  history?: TeamSheetSeason[];
+}
+
 export interface TradeIdea {
   /** Set when the idea would overfill the roster; its numbers already include the cuts. */
   roster_overflow?: RosterOverflow | null;
   partner_team_name: string;
+  /** Set when the partner is matched to exactly one roster; opens the team sheet. */
+  partner_roster_id?: string | null;
   partner_team_avatar_url: string | null;
   /** Real untruncated per-side value totals (same fields web reads). */
   send_score?: number;
@@ -3918,6 +3971,10 @@ export const api = {
   getManagerTendencyDetail: (leagueId: string, rosterId: string | number) =>
     authorizedFetch<ManagerTendenciesDetailResponse>(
       `/v1/leagues/${encodeURIComponent(leagueId)}/managers/${encodeURIComponent(String(rosterId))}/tendencies`,
+    ),
+  getTeamSheet: (leagueId: string, rosterId: string | number) =>
+    authorizedFetch<TeamSheetResponse>(
+      `/v1/leagues/${encodeURIComponent(leagueId)}/teams/${encodeURIComponent(String(rosterId))}/sheet`,
     ),
   getTeamProfile: (leagueId: string, rosterId: string | number) =>
     authorizedFetch<OpponentProfileResponse>(

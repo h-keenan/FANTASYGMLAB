@@ -3,6 +3,7 @@ import { BEGINNER_HELP } from "@/lib/experienceCopy";
 import { TradeCompactCard, type TradeCardAsset } from "@/components/ui/TradeCompactCard";
 import { tradeIdeaGainText } from "@/lib/tradeIdeaSummary";
 import { ManagerTendenciesCard } from "@/components/ManagerTendenciesCard";
+import dynamic from "next/dynamic";
 import { useEffect, useRef, useState } from "react";
 import { api, type TradeAsset, type TradeIdea } from "@/lib/api";
 import { BeginnerHelp } from "@/components/BeginnerHelp";
@@ -34,6 +35,8 @@ import {
 } from "@/lib/tradeHubPresentation";
 import { PlayerName } from "@/components/PlayerName";
 import { usePlayerQuickView } from "@/context/PlayerQuickViewContext";
+
+const ManagerProfileSheet = dynamic(() => import("@/components/ManagerProfileSheet").then((m) => m.ManagerProfileSheet), { ssr: false });
 
 /**
  * Shares the branded trade card PNG (app/share-card/trade, drawn by
@@ -181,6 +184,7 @@ export function TradeIdeaCardView({
   highlighted?: boolean;
 }) {
   const ref = useRef<HTMLDivElement>(null);
+  const [sheetOpen, setSheetOpen] = useState(false);
   const { openPlayer } = usePlayerQuickView();
   const openAsset = (asset: TradeAsset) => {
     if (asset.player_id) openPlayer({ ...asset, player_id: asset.player_id, sourceLabel: "Trade Board", leagueId });
@@ -304,6 +308,22 @@ export function TradeIdeaCardView({
         <ToneBadge label={`${idea.market_realism_label}`} color={levelColor(realismLvl)} />
       </div>
       <ManagerTendenciesCard leagueId={leagueId} teamName={idea.partner_team_name} />
+      {leagueId && idea.partner_roster_id ? (
+        <>
+          <Button size="sm" variant="secondary" onClick={() => setSheetOpen(true)}>
+            View {idea.partner_team_name} team sheet
+          </Button>
+          {sheetOpen ? (
+            <ManagerProfileSheet
+              leagueId={leagueId}
+              rosterId={idea.partner_roster_id}
+              teamName={idea.partner_team_name}
+              avatarUrl={idea.partner_team_avatar_url}
+              onClose={() => setSheetOpen(false)}
+            />
+          ) : null}
+        </>
+      ) : null}
 
       <div className="flex items-baseline gap-2">
         <span className="text-xs uppercase font-bold" style={{ color: "var(--color-text-muted)", letterSpacing: "var(--letter-spacing-badge)" }}>

@@ -30,7 +30,7 @@ const trade = {
 async function mountWith(recent_trades: unknown[]) {
   vi.resetModules();
   vi.doMock("@/lib/api", () => ({
-    api: { getManagerTendencyDetail: () => Promise.resolve({ ...baseDetail, recent_trades }), getTeamProfile: () => new Promise(() => {}) },
+    api: { getManagerTendencyDetail: () => Promise.resolve({ ...baseDetail, recent_trades }), getTeamProfile: () => new Promise(() => {}), getTeamSheet: () => new Promise(() => {}) },
   }));
   const { ManagerProfileSheet } = await import("./ManagerProfileSheet");
   render(<ManagerProfileSheet leagueId="1" rosterId={3} teamName="Big Dogs" onClose={() => {}} />);
@@ -62,17 +62,15 @@ describe("ManagerProfileSheet recent trades", () => {
 
   it("hides the section when there are no recent trades", async () => {
     await mountWith([]);
-    fireEvent.click(await screen.findByRole("tab", { name: "Tendencies" }));
+    fireEvent.click(await screen.findByRole("tab", { name: "Trades" }));
     expect(await screen.findByText("Leaning rebuild.")).toBeTruthy();
-    expect(screen.queryByRole("tab", { name: "Trades" })).toBeNull();
     expect(screen.queryByText("Recent trades")).toBeNull();
   });
 
-  it("groups the sheet into Overview, Tendencies and Trades with the sample on Overview", async () => {
+  it("groups the sheet into Overview, Roster, Trades and History", async () => {
     await mountWith([trade]);
     expect(await screen.findByRole("tab", { name: "Overview" })).toHaveAttribute("aria-selected", "true");
-    expect(screen.getByRole("tab", { name: "Tendencies" })).toBeTruthy();
-    expect(screen.getByText("Wire moves")).toBeTruthy();
-    expect(screen.queryByText("Leaning rebuild.")).toBeNull();
+    for (const name of ["Roster", "Trades", "History"]) expect(screen.getByRole("tab", { name })).toBeTruthy();
+    expect(screen.queryByRole("tab", { name: "Tendencies" })).toBeNull();
   });
 });

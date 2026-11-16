@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { StyleSheet, View } from 'react-native';
+import { View } from 'react-native';
 
 import AccentCard from './AccentCard';
 import AppText from './AppText';
@@ -9,8 +9,9 @@ import PositionBadge from './PositionBadge';
 import { SimTeamLogo } from './SimTeamIdentity';
 import { SimTeamHistory } from './SimTeamHistory';
 import { SkeletonCard } from './Skeleton';
-import Tabs from './Tabs';
-import { SimPlayerChip, SimPlayerLine, SimSectionTitle, SimSheet, SimToneBadge, createSimStyles, simToneColor, type SimCtx } from './SimGameParts';
+import { TeamSheetFrame, TeamSheetOverview } from './TeamSheet';
+import { teamSheetNextGameLine, type TeamSheetChip } from '../lib/teamSheet';
+import { SimPlayerChip, SimPlayerLine, SimSectionTitle, SimSheet, SimToneBadge, createSimStyles, type SimCtx } from './SimGameParts';
 import ToneBadge from './ToneBadge';
 import { useThemeMode } from '../context/ThemeModeContext';
 import { api } from '../lib/api';
@@ -19,15 +20,13 @@ import { simGroupBenchByPosition } from '../lib/simLeagueRosters';
 import {
   simFmtPts,
   simFmtRecord,
-  simLevelLabel,
-  simLevelTone,
   simPlayoffStatusLabel,
   simSlotLabels,
   simSlotRepeatsPosition,
   simStrengthNeedLine,
   type SimTeamRosterResponse,
 } from '../lib/simGame';
-import { spacing, type ThemeColors } from '../theme';
+import { spacing } from '../theme';
 
 const SIM_ROSTER_POS_ORDER = ['QB', 'RB', 'WR', 'TE', 'K', 'DEF'] as const;
 
@@ -75,7 +74,6 @@ export function SimTeamSheet({ ctx, teamId, onClose, onTrade }: { ctx: SimCtx; t
 function TeamBody({ ctx, data, onTrade }: { ctx: SimCtx; data: SimTeamRosterResponse; onTrade: (teamId: string) => void }) {
   const { colors } = useThemeMode();
   const common = useMemo(() => createSimStyles(colors), [colors]);
-  const styles = useMemo(() => createStyles(colors), [colors]);
   const team = data.team!;
   const record = team.record;
   const lineup = data.lineup ?? [];
@@ -84,73 +82,46 @@ function TeamBody({ ctx, data, onTrade }: { ctx: SimCtx; data: SimTeamRosterResp
   const bench = (data.players ?? []).filter((p) => !started.has(p.id));
   const line = simStrengthNeedLine(data.strengths, data.needs);
   const status = record ? simPlayoffStatusLabel(record.playoff_status) : '';
+  const tiles = [
+    { label: 'Record', value: record ? simFmtRecord(record) : '-' },
+    { label: 'Rank', value: record ? `#${record.rank}` : '-' },
+    { label: 'PF', value: record ? simFmtPts(record.pf) : '-' },
+    { label: 'Proj', value: simFmtPts(data.projected_total) },
+  ];
+  const chips: TeamSheetChip[] = [{ label: `Power #${team.power_rank}`, tone: 'premium' }];
+  if (status) chips.push({ label: status, tone: record?.playoff_status === 'out' || record?.playoff_status === 'eliminated' ? 'muted' : 'success' });
   return (
-    <View style={common.stack}>
-      <View style={common.row}>
-        <SimTeamLogo name={team.name} size='hero' label />
-        <View style={common.grow}>
-          <AppText style={common.title} testID="team-sheet-name">
-            {team.name}
-            {team.is_you ? ' (you)' : ''}
-          </AppText>
-          <View style={common.wrapRow}>
-            <ToneBadge label={team.persona.label} color={colors.accent} size="xs" />
-            <ToneBadge label={`Power #${team.power_rank}`} color={colors.premium} size="xs" />
-            {status ? <SimToneBadge label={status} tone={record?.playoff_status === 'out' || record?.playoff_status === 'eliminated' ? 'muted' : 'success'} /> : null}
-          </View>
-          {team.owner ? <AppText style={common.muted}>Managed by {team.owner}</AppText> : null}
-        </View>
-      </View>
-      <Tabs
-        id="sim-team"
-        tabs={[
+    <TeamSheetFrame
+      id="sim-team"
+      logo={<SimTeamLogo name={team.name} size='hero' label />}
+      name={`${team.name}${team.is_you ? ' (you)' : ''}`}
+      nameTestId="team-sheet-name"
+      tag={<ToneBadge label={team.persona.label} color={colors.accent} size="xs" />}
+      chips={chips}
+      managedBy={team.owner}
+      tabs={[
           {
             key: 'overview',
             label: 'Overview',
             render: () => (
-              <>
-      <AppText style={common.small}>{team.persona.blurb}</AppText>
-
-      <View style={styles.facts}>
-        <Fact label="Record" value={record ? simFmtRecord(record) : '-'} />
-        <Fact label="Rank" value={record ? `#${record.rank}` : '-'} />
-        <Fact label="PF" value={record ? simFmtPts(record.pf) : '-'} />
-        <Fact label="Proj" value={simFmtPts(data.projected_total)} />
-      </View>
-      {record?.streak || data.next_game ? (
-        <AppText style={common.small}>
-          {record?.streak ? <AppText style={{ fontWeight: '800', color: record.streak.startsWith('W') ? colors.success : colors.danger }}>Streak {record.streak}</AppText> : null}
-          {record?.streak && data.next_game ? ' · ' : ''}
-          {data.next_game ? `Week ${data.next_game.week} vs ${data.next_game.opponent.name}` : ''}
-        </AppText>
-      ) : null}
-
-      <SimSectionTitle glyph="spark" title="Strengths and needs" caption={line || undefined} />
-      <View style={styles.grid}>
-        {(data.positions ?? []).map((p) => (
-          <View key={p.pos} style={styles.gridCell}>
-            <AccentCard accent={simToneColor(simLevelTone(p.level), colors)} compact>
-              <View style={{ gap: 4, alignItems: 'flex-start' }}>
-                <PositionBadge position={p.pos} />
-                <AppText style={{ fontSize: 12.5, fontWeight: '800', color: simToneColor(simLevelTone(p.level), colors) }}>{simLevelLabel(p.level)}</AppText>
-              </View>
-              <AppText style={common.small}>
-                #{p.rank} of {p.teams} · depth {p.depth}
-              </AppText>
-            </AccentCard>
-          </View>
-        ))}
-      </View>
-
-      {(data.injuries ?? []).length > 0 ? (
-        <View style={common.tight} accessibilityLabel="Injuries">
-          <SimSectionTitle glyph="injury" tone="danger" title="Injuries" />
-          {data.injuries!.map((p) => (
-            <SimPlayerLine key={p.id} player={p} onOpen={ctx.openPlayer} stats={simListStats(p, { adp: false })} trailing={<SimToneBadge label={`${p.out_weeks} wk`} tone="danger" />} />
-          ))}
-        </View>
-      ) : null}
-              </>
+              <TeamSheetOverview
+                blurb={team.persona.blurb}
+                tiles={tiles}
+                streak={record?.streak}
+                nextGame={data.next_game ? teamSheetNextGameLine({ week: data.next_game.week, opponent: data.next_game.opponent.name }) : ''}
+                positions={data.positions ?? []}
+                strengthsTitle={<SimSectionTitle glyph="spark" title="Strengths and needs" caption={line || undefined} />}
+                injuries={
+                  (data.injuries ?? []).length > 0 ? (
+                    <View style={common.tight} accessibilityLabel="Injuries">
+                      <SimSectionTitle glyph="injury" tone="danger" title="Injuries" />
+                      {data.injuries!.map((p) => (
+                        <SimPlayerLine key={p.id} player={p} onOpen={ctx.openPlayer} stats={simListStats(p, { adp: false })} trailing={<SimToneBadge label={`${p.out_weeks} wk`} tone="danger" />} />
+                      ))}
+                    </View>
+                  ) : null
+                }
+              />
             ),
           },
           {
@@ -251,30 +222,7 @@ function TeamBody({ ctx, data, onTrade }: { ctx: SimCtx; data: SimTeamRosterResp
             ),
           },
           { key: 'history', label: 'History', render: () => <SimTeamHistory gameId={ctx.gameId} teamId={team.team_id} /> },
-        ]}
-      />
-    </View>
+      ]}
+    />
   );
-}
-
-function Fact({ label, value }: { label: string; value: string }) {
-  const { colors } = useThemeMode();
-  const styles = useMemo(() => createStyles(colors), [colors]);
-  return (
-    <View style={styles.fact}>
-      <AppText style={styles.factLabel}>{label}</AppText>
-      <AppText style={styles.factValue}>{value}</AppText>
-    </View>
-  );
-}
-
-function createStyles(colors: ThemeColors) {
-  return StyleSheet.create({
-    facts: { flexDirection: 'row', gap: spacing.sm },
-    fact: { flex: 1, alignItems: 'center', paddingVertical: spacing.sm, borderRadius: 12, borderWidth: 1, borderColor: colors.glassBorder, backgroundColor: colors.glassInset },
-    factLabel: { fontSize: 12, color: colors.textTertiary },
-    factValue: { fontSize: 15, fontWeight: '800', color: colors.textPrimary },
-    grid: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
-    gridCell: { flexBasis: '31%', flexGrow: 1 },
-  });
 }
