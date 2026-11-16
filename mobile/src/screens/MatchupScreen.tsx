@@ -3,6 +3,7 @@ import { AppState, Pressable, RefreshControl, ScrollView, StyleSheet, View } fro
 import ManagerProfileModal from '../components/ManagerProfileModal';
 import PressableScale from '../components/PressableScale';
 import AppText from '../components/AppText';
+import TickNumber from '../components/TickNumber';
 import PageTitle from '../components/PageTitle';
 import ErrorState from '../components/ErrorState';
 import { useFocusEffect, useIsFocused } from '@react-navigation/native';
@@ -432,8 +433,8 @@ function ScoreSide({
   const styles = useMemo(() => createStyles(colors), [colors]);
   // Pre-kickoff, Sleeper's 0.0 isn't a score yet: the projection leads.
   const live = kickedOff && score != null;
-  const headline = live ? score!.toFixed(1) : projected != null ? projected.toFixed(1) : '—';
-  const caption = live ? (projected != null ? `Proj ${projected.toFixed(1)}` : null) : 'Projected';
+  const headline = live ? score : projected;
+  const caption = live ? (projected != null ? <TickNumber value={projected} format={(n) => `Proj ${n.toFixed(1)}`} /> : null) : 'Projected';
   return (
     <View style={styles.scoreSide}>
       <TeamAvatar
@@ -453,7 +454,7 @@ function ScoreSide({
         </AppText>
       )}
       <AppText style={styles.scoreRecord}>{recordLabel(side)}</AppText>
-      <AppText style={styles.scoreValue}>{headline}</AppText>
+      <TickNumber value={headline} style={styles.scoreValue} />
       {caption ? <AppText style={styles.scoreCaption}>{caption}</AppText> : null}
     </View>
   );

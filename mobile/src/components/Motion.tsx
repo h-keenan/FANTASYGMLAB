@@ -227,7 +227,7 @@ export function PopIn({ children, style }: { children: ReactNode; style?: StyleP
  * old offset and glides to 0 (transform only, native driver, 240ms). No animation under reduced motion, for the first layout,
  * or past MAX_ANIMATED_ROWS rows (pass `animate={false}`).
  */
-export function ReorderRow({ children, animate = true, style }: { children: ReactNode; animate?: boolean; style?: StyleProp<ViewStyle> }) {
+export function ReorderRow({ children, animate = true, delay = 0, style }: { children: ReactNode; animate?: boolean; /** Start this far into the settle (a capped `staggerDelay` so a standings list lands in order). */ delay?: number; style?: StyleProp<ViewStyle> }) {
   const reduced = useReducedMotion();
   const offset = useRef(new Animated.Value(0)).current;
   const lastY = useRef<number | null>(null);
@@ -242,12 +242,31 @@ export function ReorderRow({ children, animate = true, style }: { children: Reac
         const move = flipOffset({ x: 0, y: prev }, { x: 0, y });
         if (!move) return;
         offset.setValue(move.dy);
-        Animated.timing(offset, { toValue: 0, duration: MOTION_MS.fast + 60, easing: easeOut, useNativeDriver: true }).start();
+        Animated.timing(offset, { toValue: 0, duration: MOTION_MS.fast + 60, delay, easing: easeOut, useNativeDriver: true }).start();
       }}
     >
       {children}
     </Animated.View>
   );
+}
+
+/**
+ * Re-sort / filter settle for a virtualised list (Players, Teams): FlatList cells report a cell-local y, so a per-row FLIP
+ * cannot see a reorder there. When `changeKey` changes the whole list fades back in (opacity only, native driver, 180ms) instead of
+ * hard-swapping its rows. No animation on mount or under Reduce Motion. Web twin: `useFlipList` on the top 24 rows.
+ */
+export function ReSettle({ changeKey, children, style }: { changeKey: string; children: ReactNode; style?: StyleProp<ViewStyle> }) {
+  const reduced = useReducedMotion();
+  const opacity = useRef(new Animated.Value(1)).current;
+  const last = useRef(changeKey);
+  useEffect(() => {
+    if (last.current === changeKey) return;
+    last.current = changeKey;
+    if (reduced) return;
+    opacity.setValue(0.6);
+    Animated.timing(opacity, { toValue: 1, duration: MOTION_MS.fast, easing: easeOut, useNativeDriver: true }).start();
+  }, [changeKey, reduced, opacity]);
+  return <Animated.View style={[{ flex: 1, opacity }, style]}>{children}</Animated.View>;
 }
 
 const styles = StyleSheet.create({

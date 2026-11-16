@@ -24,6 +24,7 @@ import PageFamilyTabs from '../components/PageFamilyTabs';
 import FilterDropdownButton from '../components/FilterDropdownButton';
 import TeamAvatar from '../components/TeamAvatar';
 import PlayoffOddsPanel from './PlayoffOddsPanel';
+import { ReSettle } from '../components/Motion';
 import NextSteps from '../components/NextSteps';
 import ValuesCredit from '../components/ValuesCredit';
 import { api, type TeamRanking } from '../lib/api';
@@ -478,6 +479,7 @@ function RankingsPanel({
           onChange={(label) => setMetric(METRIC_TABS.find((o) => o.label === label)?.key ?? 'power')}
         />
       </View>
+      <ReSettle changeKey={`${metric}:${teams.slice(0, 24).map((t) => t.rosterId).join(',')}`}>
       <FlatList
         ListFooterComponent={
           <>
@@ -518,6 +520,7 @@ function RankingsPanel({
           />
         )}
       />
+      </ReSettle>
       {profileTeam ? (
         <ManagerProfileModal
           visible

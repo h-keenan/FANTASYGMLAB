@@ -2524,10 +2524,10 @@ body:has(.fd-landing-dark) .brand-mark-icon {
   to { opacity: 1; transform: none; }
 }
 .onboarding-slide--next {
-  animation: onboarding-slide-next 0.28s ease-out both;
+  animation: onboarding-slide-next var(--motion-base) var(--ease-out) both;
 }
 .onboarding-slide--back {
-  animation: onboarding-slide-back 0.28s ease-out both;
+  animation: onboarding-slide-back var(--motion-base) var(--ease-out) both;
 }
 @media (prefers-reduced-motion: reduce) {
   .onboarding-slide--next,
@@ -2812,7 +2812,7 @@ body:has(.fd-landing-dark) .brand-mark-icon {
 }
 .onboarding-slide > *,
 .onboarding-hero > * {
-  animation: onboarding-rise 0.5s cubic-bezier(0.22, 1, 0.36, 1) both;
+  animation: onboarding-rise var(--motion-slow) var(--ease-out) both;
 }
 .onboarding-slide > :nth-child(2),
 .onboarding-hero > :nth-child(2) { animation-delay: 70ms; }
@@ -2822,7 +2822,7 @@ body:has(.fd-landing-dark) .brand-mark-icon {
 .onboarding-hero > :nth-child(4) { animation-delay: 210ms; }
 .onboarding-slide > :nth-child(n + 5) { animation-delay: 280ms; }
 .onboarding-cards > * {
-  animation: onboarding-rise 0.5s cubic-bezier(0.22, 1, 0.36, 1) both;
+  animation: onboarding-rise var(--motion-slow) var(--ease-out) both;
 }
 .onboarding-cards > :nth-child(2) { animation-delay: 90ms; }
 @media (prefers-reduced-motion: reduce) {

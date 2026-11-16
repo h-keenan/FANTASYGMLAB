@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { FlatList, ScrollView, StyleSheet, View } from 'react-native';
+import { ReSettle } from '../components/Motion';
 import PressableScale from '../components/PressableScale';
 import AppText from '../components/AppText';
 import GlassCard from '../components/GlassCard';
@@ -457,6 +458,7 @@ export default function PlayersScreen({ route, navigation }: Props) {
       {loading ? (
         <SkeletonList label="players" count={7} />
       ) : (
+        <ReSettle changeKey={filtered.slice(0, 24).map((p) => p.player_id).join(',')}>
         <FlatList
           // Forces a clean remount on toggle — RN's FlatList explicitly does
           // not support changing `numColumns` on the fly (its own invariant
@@ -516,6 +518,7 @@ export default function PlayersScreen({ route, navigation }: Props) {
             />
           }
         />
+        </ReSettle>
       )}
       </>
       )}

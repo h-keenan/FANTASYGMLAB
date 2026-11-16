@@ -19,8 +19,8 @@ Press feedback everywhere (`PRESS`), `MotionIn` entrances, `CountUp` (recap and 
 | Fairness meter and Toggle knob (web) | glided `left`/`width` (layout) | fixed: transform only, allowlist entries removed |
 | Trade accepted / declined state on a trade card | card is replaced by a notice; no state morph | fixed: `TradeResolvedRow` via `PresenceSwap` (`TradeCompactCard resolved`, Sim inbox keeps the answered offer 2s) |
 | Draft pick landing / auto-pick | row slides away (`sim-row-drafted`), the pick itself does not land | fixed: the player pops into Your roster (`enter-pop` / `PopIn`) with an `Auto-picked` `PulseChip` (the board and roster are separate pill tabs, so no cross-list FLIP) |
-| Week advance | `motion-sweep` band only; standings/scores update with no staging | partly (standings now reorder) |
-| Offseason transitions, onboarding steps | per-surface keyframes (0.28s/0.5s, own curves) | open |
+| Week advance | `motion-sweep` band only; standings/scores update with no staging | fixed: scores already stagger in (`MotionIn`); standings rows now glide with a capped stagger (`useFlipList { stagger }` / `ReorderRow delay`) |
+| Offseason transitions, onboarding steps | per-surface keyframes (0.28s/0.5s, own curves) | onboarding fixed (tokens, web + app); offseason keyframes already on the scale |
 | Pull-to-refresh | native `RefreshControl` only (8 screens); no web equivalent | accepted |
 | Grade reveal | `LetterGrade` appears fully formed | fixed for the big (lg) grade: `enter-pop` web / `PopIn` app |
 | Pill/orb morphing | pill page segment now exits; orb morph is bespoke | partly |
@@ -50,3 +50,8 @@ Press feedback everywhere (`PRESS`), `MotionIn` entrances, `CountUp` (recap and 
 8. **Fairness meter and Toggle knob to `transform`** (remove two allowlist entries); PillRow underline once the PillRow work lands.
 9. **Onboarding step and offseason transitions onto the token scale** (0.28s/0.5s/own bezier): consistency, not new motion.
 10. **Week-advance staging**: stagger the standings/scores refresh (`MotionIn` with the existing cap) behind the sweep so the numbers settle in order.
+
+## 5. Rollout notes (candidates 6 and 7)
+
+- `TickNumber` now takes `format` (money, signed gains, "Proj 12.3"); wired into Matchup score and projection (web + app) and the Trade Analyzer value balance (web `TradeAnalyzerContent`, app `TradeValueHero`). FAAB balance is not wired: it renders inside the shared `StatStrip`/`SnapshotTile` as a string (the Today work owns those); do it when the tile accepts a node.
+- Re-sort: web `useFlipList` on League Rankings boards and the Players list (first 24 rows marked; positions are now container-relative and refreshed every render, so scroll and expanders no longer cause a stray slide). App: FlatList cells report a cell-local y, so a per-row FLIP cannot see a reorder there; Players and Teams use `ReSettle` (180ms opacity settle) instead.

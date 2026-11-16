@@ -40,6 +40,7 @@ import { usePlayerQuickView } from "@/context/PlayerQuickViewContext";
 import { Select } from "@/components/Input";
 import { selectedItems, type SheetItem } from "@/lib/tradeSheetPicker";
 import { LeanBarMeter } from "@/components/LeanBarMeter";
+import { TickNumber } from "@/components/TickNumber";
 import { TradesTabBar } from "@/components/TradesTabBar";
 import { ConfidenceMeter } from "@/components/ConfidenceMeter";
 import { PostureChip } from "@/components/PostureChip";
@@ -272,7 +273,6 @@ function VerdictCard({
   cardTeams: AnalyzerCardTeams;
 }) {
   const toneColor = TONE_COLOR[verdict.tone];
-  const deltaText = formatTradeGain(verdict.value_delta);
   const confidenceLvl = confidenceLevel(verdict.confidence);
   const sendTotal = sendAssets.reduce((sum, asset) => sum + (asset.score ?? 0), 0);
   const receiveTotal = receiveAssets.reduce((sum, asset) => sum + (asset.score ?? 0), 0);
@@ -383,7 +383,7 @@ function VerdictCard({
             Value balance
           </span>
           <span className="text-2xl font-black" style={{ color: toneColor, fontVariantNumeric: "tabular-nums" }}>
-            {deltaText}
+            <TickNumber value={verdict.value_delta} format={(n) => formatTradeGain(n)} />
           </span>
         </div>
         {/* Single value bar — never duplicated alongside a second meter for

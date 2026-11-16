@@ -43,7 +43,7 @@ export function SimStandingsList({ rows, regularWeeks, playoffTeams }: { rows: S
   const wide = useSimWide();
   // Rows glide to their new rank when the order changes (after a week), and a row that moved shows an up/down chip.
   const listRef = useRef<HTMLOListElement>(null);
-  useFlipList(listRef, rows.map((r) => r.team_id).join(","));
+  useFlipList(listRef, rows.map((r) => r.team_id).join(","), { stagger: true });
   if (!wide) {
     // Phone: one dense table-like row per team (rank, crest, name, streak, record) in a single card.
     return (
