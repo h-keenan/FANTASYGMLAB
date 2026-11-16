@@ -65,8 +65,6 @@ const PlayersScreen = lazyScreen(() => require('../screens/PlayersScreen'));
 const PlayerDetailScreen = lazyScreen(() => require('../screens/PlayerDetailScreen'));
 const PlayerCompareScreen = lazyScreen(() => require('../screens/PlayerCompareScreen'));
 const WaiversScreen = lazyScreen(() => require('../screens/WaiversScreen'));
-const RecapScreen = lazyScreen(() => require('../screens/RecapScreen'));
-const AlertsScreen = lazyScreen(() => require('../screens/AlertsScreen'));
 const GmPlanScreen = lazyScreen(() => require('../screens/GmPlanScreen'));
 const TradeHistoryScreen = lazyScreen(() => require('../screens/TradeHistoryScreen'));
 const CommunityScreen = lazyScreen(() => require('../screens/CommunityScreen'));
@@ -84,17 +82,16 @@ const MyTeamScreen = lazyScreen(() => require('../screens/MyTeamScreen'));
 const MatchupScreen = lazyScreen(() => require('../screens/MatchupScreen'));
 const CollegeProspectsScreen = lazyScreen(() => require('../screens/CollegeProspectsScreen'));
 const ProspectScoutingDetailScreen = lazyScreen(() => require('../screens/ProspectScoutingDetailScreen'));
-const PortfolioScreen = lazyScreen(() => require('../screens/PortfolioScreen'));
 const GmGameScreen = lazyScreen(() => require('../screens/GmGameScreen'));
 const FounderAnalyticsScreen = lazyScreen(() => require('../screens/FounderAnalyticsScreen'));
-const LiveDraftScreen = lazyScreen(() => require('../screens/LiveDraftScreen'));
 const GuessThePlayerLeaderboardScreen = lazyScreen(() => require('../screens/GuessThePlayerLeaderboardScreen'));
 /* eslint-enable @typescript-eslint/no-require-imports */
 
 export type RootStackParamList = {
   /** `openAddLeague`: opens Home's Add League sheet on arrival (the header
    * league switcher's "Add a league" row). */
-  Home: { openAddLeague?: boolean } | undefined;
+  /** `focus: 'standing'` scrolls to the cross-league standing section (the retired Portfolio page). */
+  Home: { openAddLeague?: boolean; focus?: 'standing' } | undefined;
   Onboarding: { replay?: boolean } | undefined;
   LeagueDetail: { leagueId: string; leagueName: string };
   TeamRoster: { ownerName: string; playerIds: string[]; leagueId: string; leagueName: string; rosterId: string };
@@ -105,7 +102,16 @@ export type RootStackParamList = {
   Paywall: { fromOnboarding?: 'getStarted' | 'skip' } | undefined;
   TrialLapsed: undefined;
   /** playerId/playerName filter the feed to one player's news (quick view's "See all news"). */
-  News: { playerId?: string; playerName?: string } | undefined;
+  /** News hosts two tabs: NFL news and My League (the retired League Recaps page, with its own recapsTab/week). */
+  News: {
+    playerId?: string;
+    playerName?: string;
+    initialTab?: 'nfl' | 'league';
+    leagueId?: string;
+    leagueName?: string;
+    recapsTab?: 'recap' | 'roundup';
+    week?: number;
+  } | undefined;
   More: undefined;
   /** Hidden design-system reference; reachable only by long-pressing the Legal heading on More. */
   Design: undefined;
@@ -113,7 +119,7 @@ export type RootStackParamList = {
   SampleLeague: undefined;
   LegalPage: { pageKey: string };
   HowWeEvaluate: undefined;
-  Players: { leagueId: string; leagueName: string };
+  Players: { leagueId: string; leagueName: string; tab?: 'players' | 'prospects' };
   PlayerDetail: {
     player: RankedPlayer;
     leagueId: string;
@@ -130,8 +136,10 @@ export type RootStackParamList = {
   /** "What FantasyDesk can do". League params only when a link carries one (else the last league). */
   Features: { leagueId?: string; leagueName?: string } | undefined;
   Waivers: { leagueId: string; leagueName: string; playerId?: string; tab?: 'recommended' | 'explore' | 'watchlist' };
+  // Retired: redirects to News > My League (lib/homeRedirects.ts).
   Recap: { leagueId: string; leagueName: string; initialTab?: 'recap' | 'roundup'; week?: number };
-  Dashboard: { leagueId: string; leagueName: string };
+  // `focus: 'alerts'` expands and scrolls to the Alerts section.
+  Dashboard: { leagueId: string; leagueName: string; focus?: 'alerts' };
   // Single consolidated host for Trade Hub ("Hub"), Trade Finder
   // ("Finder"), and Trade Analyzer ("Analyzer") — see TradesScreen.
   // `initialTab` defaults to 'block' when omitted. `tradePlayer` is the
@@ -169,13 +177,14 @@ export type RootStackParamList = {
   PlayoffOdds: { leagueId: string; leagueName: string };
   Games: { leagueId: string; leagueName: string; tab?: 'sim' | 'pickem' };
   Commissioner: { leagueId: string; leagueName: string };
-  DraftCenter: { leagueId: string; leagueName: string; tab?: 'overview' | 'picks' | 'scouting' };
+  DraftCenter: { leagueId: string; leagueName: string; tab?: 'overview' | 'picks' | 'live' };
   FantasySim: { leagueId: string; leagueName: string };
   PickDetail: { pick: DraftPickAsset; leagueId: string; leagueName: string };
   MyTeam: { leagueId: string; leagueName: string };
   Matchup: { leagueId: string; leagueName: string };
   Alerts: { leagueId: string; leagueName: string };
   // Not league-scoped — shared prospect pool + personal watchlist span every league.
+  // Retired as a menu page: Players > Prospects (redirects when a league is known).
   CollegeProspects: undefined;
   CollegeProspectDetail: { prospect: CollegeProspect };
   // Not league-scoped — the whole point is standing/needs across every
@@ -218,7 +227,6 @@ const GmTargetsRedirect = createLegacyRedirectScreen('GmTargets');
 const TeamStanceRedirect = createLegacyRedirectScreen('TeamStance');
 const PlayoffOddsRedirect = createLegacyRedirectScreen('PlayoffOdds');
 const EspnWaiversScreen = withEspnGate(WaiversScreen);
-const EspnRecapScreen = withEspnGate(RecapScreen);
 const EspnDashboardScreen = withEspnGate(DashboardScreen);
 const EspnGamesScreen = withEspnGate(GamesScreen);
 const EspnCommissionerScreen = withEspnGate(CommissionerScreen);
@@ -226,9 +234,11 @@ const EspnDraftCenterScreen = withEspnGate(DraftCenterScreen);
 const EspnFantasySimScreen = withEspnGate(FantasySimScreen);
 const EspnPickDetailScreen = withEspnGate(PickDetailScreen);
 const EspnMatchupScreen = withEspnGate(MatchupScreen);
-const EspnAlertsScreen = withEspnGate(AlertsScreen);
 const EspnGmPlanScreen = withEspnGate(GmPlanScreen);
-const EspnLiveDraftScreen = withEspnGate(LiveDraftScreen);
+const AlertsRedirect = createLegacyRedirectScreen('Alerts');
+const LiveDraftRedirect = createLegacyRedirectScreen('LiveDraft');
+const PortfolioRedirect = createLegacyRedirectScreen('Portfolio');
+const RecapRedirect = createLegacyRedirectScreen('Recap');
 const EspnGuessLeaderboardScreen = withEspnGate(GuessThePlayerLeaderboardScreen);
 const AuthStack = createNativeStackNavigator();
 
@@ -394,7 +404,7 @@ export default function RootNavigator() {
           <AppStack.Screen name="PlayerDetail" component={PlayerDetailScreen} />
           <AppStack.Screen name="PlayerCompare" component={PlayerCompareScreen} />
           <AppStack.Screen name="Waivers" component={EspnWaiversScreen} />
-          <AppStack.Screen name="Recap" component={EspnRecapScreen} />
+          <AppStack.Screen name="Recap" component={RecapRedirect} />
           <AppStack.Screen name="Dashboard" component={EspnDashboardScreen} />
           <AppStack.Screen name="Trades" component={TradesScreen} />
           <AppStack.Screen name="TradeOffer" component={TradeOfferScreen} />
@@ -407,7 +417,7 @@ export default function RootNavigator() {
           <AppStack.Screen name="PickDetail" component={EspnPickDetailScreen} />
           <AppStack.Screen name="MyTeam" component={MyTeamScreen} />
           <AppStack.Screen name="Matchup" component={EspnMatchupScreen} />
-          <AppStack.Screen name="Alerts" component={EspnAlertsScreen} />
+          <AppStack.Screen name="Alerts" component={AlertsRedirect} />
           <AppStack.Screen name="GmTargets" component={GmTargetsRedirect} />
           <AppStack.Screen name="CollegeProspects" component={CollegeProspectsScreen} />
           <AppStack.Screen name="CollegeProspectDetail" component={ProspectScoutingDetailScreen} />
@@ -416,10 +426,10 @@ export default function RootNavigator() {
           <AppStack.Screen name="TradeHistory" component={TradeHistoryScreen} options={{ title: 'Trade History' }} />
           <AppStack.Screen name="Community" component={CommunityScreen} options={{ title: 'Community' }} />
           <AppStack.Screen name="Features" component={FeaturesScreen} options={{ title: 'What FantasyDesk can do' }} />
-          <AppStack.Screen name="Portfolio" component={PortfolioScreen} options={{ title: 'Portfolio' }} />
+          <AppStack.Screen name="Portfolio" component={PortfolioRedirect} />
           <AppStack.Screen name="GmGame" component={GmGameScreen} options={{ title: 'Fantasy Sim' }} />
           <AppStack.Screen name="FounderAnalytics" component={FounderAnalyticsScreen} options={{ title: 'Founder Analytics' }} />
-          <AppStack.Screen name="LiveDraft" component={EspnLiveDraftScreen} />
+          <AppStack.Screen name="LiveDraft" component={LiveDraftRedirect} />
           <AppStack.Screen name="GuessThePlayerLeaderboard" component={EspnGuessLeaderboardScreen} />
           <AppStack.Screen
             name="Paywall"

@@ -138,7 +138,7 @@ describe("LandingPage welcome-page analytics", () => {
       });
       render(<LandingPage />);
 
-      await waitFor(() => expect(mockReplace).toHaveBeenCalledWith("/portfolio"));
+      await waitFor(() => expect(mockReplace).toHaveBeenCalledWith("/leagues"));
       expect(root()).toHaveAttribute(LANDING_PENDING_ATTR);
     });
 
@@ -259,7 +259,7 @@ describe("LandingPage welcome-page analytics", () => {
     });
     render(<LandingPage />);
 
-    await waitFor(() => expect(mockReplace).toHaveBeenCalledWith("/portfolio"));
+    await waitFor(() => expect(mockReplace).toHaveBeenCalledWith("/leagues"));
     expect(trackFeatureUse).not.toHaveBeenCalled();
   });
 
@@ -311,7 +311,7 @@ describe("LandingPage existing-user protected-route return path", () => {
     render(<LandingPage />);
 
     await waitFor(() => expect(mockReplace).toHaveBeenCalledWith("/connect-league"));
-    expect(mockReplace).not.toHaveBeenCalledWith("/portfolio");
+    expect(mockReplace).not.toHaveBeenCalledWith("/leagues");
   });
 
   it("ignores a stored return path for a brand-new signup with zero saved leagues", async () => {

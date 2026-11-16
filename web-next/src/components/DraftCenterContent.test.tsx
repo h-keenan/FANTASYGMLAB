@@ -75,7 +75,9 @@ describe("DraftCenterContent", () => {
     );
     expandAll();
 
-    expect(screen.getByRole("tab", { name: "Scouting" })).toBeInTheDocument();
+    // Scouting moved to Players > Prospects; the live room tab shows only while a draft is live.
+    expect(screen.queryByRole("tab", { name: "Scouting" })).toBeNull();
+    expect(screen.queryByRole("tab", { name: "Live room" })).toBeNull();
     expect(screen.getAllByText("Pick-Rich Rebuilder")[0]).toBeInTheDocument();
     expect(screen.getByText("#1")).toBeInTheDocument(); // Draft Capital rank tile
     expect(screen.getAllByText("Best Pick Buyers")[0]).toBeInTheDocument();

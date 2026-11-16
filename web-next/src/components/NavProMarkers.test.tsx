@@ -43,7 +43,7 @@ describe("nav Pro lock markers and account rows", () => {
     signIn("free");
     render(<DesktopSidebar />);
     await waitFor(() => expect(screen.getAllByTestId("nav-pro-marker").length).toBeGreaterThan(0));
-    for (const label of ["Draft Center", "Live Draft", "Commissioner", "Portfolio"]) {
+    for (const label of ["Draft", "Commissioner"]) {
       expect(screen.getByText(label).closest("a")?.querySelector("[data-testid='nav-pro-marker']")).not.toBeNull();
     }
     expect(screen.getByText("Trade Hub").closest("a")?.querySelector("[data-testid='nav-pro-marker']")).toBeNull();

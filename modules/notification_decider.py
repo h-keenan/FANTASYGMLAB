@@ -170,8 +170,8 @@ _CATEGORY_PATH = {
     "lineup_lock": "/matchup/{league}",
     "trade_deadline": "/trade-hub/{league}",
     "waiver_reminder": "/waivers/{league}",
-    "recap": "/league-recaps/{league}",
-    "weekly_roundup": "/league-recaps/{league}",
+    # League Recaps is News > My League (2026-11-16 nav consolidation); the league rides along as `?league=`.
+    "recap": "/news?tab=league&league={league}",
 }
 
 
@@ -181,14 +181,15 @@ def deep_link_for(item: Mapping[str, Any]) -> str:
     category = str(item.get("category") or "")
     league = quote(str(item.get("league_id") or ""), safe="")
     if category == "trade_followup":
-        return "/alerts"
+        # The "did this trade happen?" prompt lives in Trade History (Trade Hub > History).
+        return "/trade-history"
     if not league:
         return ""
     if category == "weekly_roundup":
-        query = {"tab": "roundup"}
+        query = {"tab": "league", "league": str(item.get("league_id") or ""), "recaps": "roundup"}
         if item.get("week"):
             query["week"] = str(item["week"])
-        return f"/league-recaps/{league}?{urlencode(query)}"
+        return f"/news?{urlencode(query)}"
     template = _CATEGORY_PATH.get(category)
     if template:
         return template.format(league=league)

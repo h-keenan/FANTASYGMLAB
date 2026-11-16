@@ -8,6 +8,10 @@ import { trackFeatureUse } from "@/lib/analytics";
 import { api, type AlertsResponse, type NewsResponse } from "@/lib/api";
 import { useDefaultLeague } from "@/lib/useDefaultLeague";
 import { NewsContent } from "@/components/NewsContent";
+import { NewsLeagueTab } from "@/components/NewsLeagueTab";
+import { UNNAMED_LEAGUE } from "@/lib/leagueName";
+import { parseNewsTab, type NewsTab } from "@/lib/newsLinks";
+import { parseRecapsTab, parseRoundupWeek } from "@/lib/pageTabs";
 import { ErrorState, reloadPage } from "@/components/ErrorState";
 import { LoadingScreen } from "@/components/LoadingScreen";
 
@@ -23,7 +27,6 @@ export default function NewsPage() {
   const [error, setError] = useState<string | null>(null);
   const [alerts, setAlerts] = useState<AlertsResponse | null>(null);
   const defaultLeague = useDefaultLeague();
-  const rosterLeagueId = defaultLeague?.only?.leagueId ?? null;
   // /news?player=<id>&name=<name> (from the quick view's "See all news").
   // Read once from the URL on the client (useSearchParams would force a
   // Suspense boundary around the page). Both server and first client render
@@ -34,6 +37,24 @@ export default function NewsPage() {
     const playerId = params.get("player");
     return playerId ? { playerId, name: params.get("name") || "" } : null;
   });
+  // News has two tabs (2026-11-16 nav consolidation): NFL, and My League (the weekly recap, formerly League Recaps).
+  // `?tab=league&league=<id>&name=<n>[&recaps=roundup&week=N]` is what the retired /league-recaps route, push deep
+  // links and the orb open. Read once from the URL, like the player filter above.
+  const [initialUrl] = useState(() => {
+    if (typeof window === "undefined") return null;
+    const params = new URLSearchParams(window.location.search);
+    const leagueId = params.get("league");
+    return {
+      tab: parseNewsTab(params.get("tab")),
+      league: leagueId ? { leagueId, leagueName: params.get("name") || UNNAMED_LEAGUE } : null,
+      recapsTab: parseRecapsTab(params.get("recaps")),
+      week: parseRoundupWeek(params.get("week")),
+    };
+  });
+  const [tab, setTab] = useState<NewsTab>(initialUrl?.tab ?? "nfl");
+  const leagueFromUrl = initialUrl?.league ?? null;
+  const rosterLeagueId = leagueFromUrl?.leagueId ?? defaultLeague?.only?.leagueId ?? null;
+  const recapLeague = leagueFromUrl ?? defaultLeague?.only ?? null;
 
   useEffect(() => {
     if (!session) return;
@@ -92,5 +113,28 @@ export default function NewsPage() {
     );
   }
 
-  return <NewsContent data={data} playerName={filter ? filter.name || "this player" : null} alerts={filter ? null : alerts} />;
+  const changeTab = (next: NewsTab) => {
+    setTab(next);
+    // Keep ?tab= in the address bar so a tab is linkable/refreshable without a navigation.
+    const url = new URL(window.location.href);
+    if (next === "nfl") url.searchParams.delete("tab");
+    else url.searchParams.set("tab", next);
+    window.history.replaceState(null, "", url);
+  };
+
+  return (
+    <NewsContent
+      data={data}
+      playerName={filter ? filter.name || "this player" : null}
+      alerts={filter ? null : alerts}
+      tab={tab}
+      onTabChange={changeTab}
+      leagueTab={
+        // The league is still being looked up (default league): hold the tab body instead of flashing "Pick a league".
+        tab === "league" && !recapLeague && defaultLeague === null ? null : (
+          <NewsLeagueTab league={recapLeague} recapsTab={initialUrl?.recapsTab} week={initialUrl?.week} />
+        )
+      }
+    />
+  );
 }

@@ -1,72 +1,8 @@
 "use client";
 
-import { useParams, useRouter } from "next/navigation";
-import { useSearchParams } from "@/lib/useSearchParams";
-import { useEffect, useState } from "react";
+import { RetiredLeagueRoute } from "@/components/RetiredLeagueRoute";
 
-import { useAuth } from "@/context/AuthContext";
-import { api, type AlertsResponse } from "@/lib/api";
-import { AlertsContent } from "@/components/AlertsContent";
-import { ErrorState, reloadPage } from "@/components/ErrorState";
-import { LoadingScreen } from "@/components/LoadingScreen";
-import { UNNAMED_LEAGUE } from "@/lib/leagueName";
-
-export default function AlertsPage() {
-  const params = useParams<{ leagueId: string }>();
-  const searchParams = useSearchParams();
-  const router = useRouter();
-  const { session, loading: authLoading } = useAuth();
-
-  const leagueId = decodeURIComponent(params.leagueId);
-  const leagueName = searchParams.get("name") || UNNAMED_LEAGUE;
-
-  const [alerts, setAlerts] = useState<AlertsResponse | null>(null);
-  const [error, setError] = useState<string | null>(null);
-
-  useEffect(() => {
-    if (authLoading) return;
-    if (!session) {
-      router.replace("/");
-      return;
-    }
-    let cancelled = false;
-
-    const load = (initial: boolean) =>
-      api
-        .getLeagueAlerts(leagueId)
-        .then((result) => {
-          if (!cancelled) setAlerts(result);
-        })
-        .catch((err) => {
-          // A failed background refresh keeps the feed already on screen.
-          if (!cancelled && initial) setError(err instanceof Error ? err.message : "Could not load Alerts.");
-        });
-
-    void load(true);
-    // Returning to this tab re-reads the feed, so an alert read on the
-    // phone in the meantime shows as read here without a manual reload.
-    const onVisibility = () => {
-      if (document.visibilityState === "visible") void load(false);
-    };
-    document.addEventListener("visibilitychange", onVisibility);
-
-    return () => {
-      cancelled = true;
-      document.removeEventListener("visibilitychange", onVisibility);
-    };
-  }, [authLoading, session, leagueId, router]);
-
-  if (authLoading || (!alerts && !error)) {
-    return (
-      <LoadingScreen label="Alerts" layout="list" />
-    );
-  }
-
-  if (error || !alerts) {
-    return (
-      <ErrorState message={error || "Could not load Alerts."} onRetry={reloadPage} />
-    );
-  }
-
-  return <AlertsContent leagueId={leagueId} leagueName={leagueName} data={alerts} userId={session?.user?.id ?? ""} />;
+// Retired route (2026-11-16 nav consolidation): forwards to its new home, see lib/retiredRoutes.ts.
+export default function RetiredAlertsPage() {
+  return <RetiredLeagueRoute segment="alerts" label="Today" layout="dashboard" />;
 }

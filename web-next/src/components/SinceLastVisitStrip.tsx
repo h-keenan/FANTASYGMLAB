@@ -1,5 +1,6 @@
 "use client";
 
+import { leagueSegmentHref } from "@/lib/retiredRoutes";
 import Link from "next/link";
 import { useEffect, useState } from "react";
 
@@ -73,7 +74,6 @@ export function SinceLastVisitStrip({
   }, [userId, leagueId]);
 
   if (items.length === 0) return null;
-  const query = `?name=${encodeURIComponent(leagueName)}`;
   return (
     <section aria-label="Since your last visit" data-testid="since-last-visit" className="flex flex-col gap-2">
       <span className="text-xs uppercase font-bold" style={{ color: "var(--color-text-muted)", letterSpacing: "0.04em" }}>
@@ -83,7 +83,7 @@ export function SinceLastVisitStrip({
         {items.map((item) => (
           <Link
             key={item.key}
-            href={`/${item.segment}/${encodeURIComponent(leagueId)}${query}`}
+            href={leagueSegmentHref(item.segment, leagueId, leagueName)}
             className="glass-surface flex flex-col px-3 py-2"
             style={{ minHeight: "var(--touch-target-min)", color: "inherit", textDecoration: "none" }}
           >

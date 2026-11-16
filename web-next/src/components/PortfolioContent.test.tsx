@@ -306,7 +306,7 @@ describe("PortfolioContent", () => {
     // screenshot: header showed the Sleeper league_id instead of a name).
     expect(screen.getByRole("link", { name: /Watch live draft/ })).toHaveAttribute(
       "href",
-      "/live-draft/league-3?name=Still%20Drafting",
+      "/draft-center/league-3?name=Still%20Drafting&tab=live",
     );
     expect(screen.queryByText(/Couldn't load/)).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /remove/i })).not.toBeInTheDocument();
@@ -478,7 +478,7 @@ describe("PortfolioContent", () => {
 
   it("paints a header plus final-height skeleton cards for the instant shell", () => {
     const { container } = render(<PortfolioShell />);
-    expect(screen.getByRole("heading", { name: "Portfolio" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Your leagues" })).toBeInTheDocument();
     const skeletons = container.querySelectorAll("[data-portfolio-skeleton]");
     expect(skeletons).toHaveLength(PORTFOLIO_SHELL_SKELETON_COUNT);
     skeletons.forEach((el) => expect((el as HTMLElement).style.minHeight).toBe(`${PORTFOLIO_CARD_MIN_HEIGHT}px`));

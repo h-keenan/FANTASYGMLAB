@@ -35,7 +35,7 @@ describe("LeagueLinkStep", () => {
       { league_id: "L2", league_name: "B" },
     ];
     render(<LeagueLinkStep step="alerts" label="See news on your players" pickLabel="Pick a league for your alerts" />);
-    expect(await screen.findByRole("link", { name: /Pick a league for your alerts/ })).toHaveAttribute("href", "/portfolio");
+    expect(await screen.findByRole("link", { name: /Pick a league for your alerts/ })).toHaveAttribute("href", "/leagues");
   });
 
   it("links into the last-opened league when there are several", async () => {

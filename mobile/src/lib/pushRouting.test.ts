@@ -66,19 +66,21 @@ test('waiver reminder push routes to Waivers', () => {
   });
 });
 
-test('weekly roundup push opens the Recap screen on the Roundup tab', () => {
+test('weekly roundup push opens News > My League on the Roundup tab', () => {
   assert.deepEqual(resolvePushTapTarget({ league_id: 'L1', league_name: 'X', category: 'weekly_roundup', week: 9 }), {
-    screen: 'Recap',
+    screen: 'News',
+    initialTab: 'league',
     leagueId: 'L1',
     leagueName: 'X',
-    initialTab: 'roundup',
+    recapsTab: 'roundup',
     week: 9,
   });
   assert.deepEqual(resolvePushTapTarget({ league_id: 'L1', league_name: 'X', category: 'weekly_roundup' }), {
-    screen: 'Recap',
+    screen: 'News',
+    initialTab: 'league',
     leagueId: 'L1',
     leagueName: 'X',
-    initialTab: 'roundup',
+    recapsTab: 'roundup',
   });
 });
 

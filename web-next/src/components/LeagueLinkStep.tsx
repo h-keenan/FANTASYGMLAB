@@ -23,7 +23,7 @@ export function LeagueLinkStep({
 }) {
   const league = useDefaultLeague();
   if (!league || league.count === 0) return null;
-  const href = league.only ? nextStepHref(step, league.only.leagueId, league.only.leagueName) : "/portfolio";
+  const href = league.only ? nextStepHref(step, league.only.leagueId, league.only.leagueName) : "/leagues";
   return (
     <ButtonLink variant={variant} size="sm" href={href} data-testid="league-link-step">
       {league.only ? `${label} →` : `${pickLabel} →`}

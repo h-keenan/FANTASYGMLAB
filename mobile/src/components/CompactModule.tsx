@@ -49,6 +49,7 @@ export default function CompactModule({
   preview,
   loading = false,
   summaryWhenCollapsed = false,
+  forceOpen = false,
 }: {
   id: string;
   title: ReactNode;
@@ -71,6 +72,8 @@ export default function CompactModule({
   loading?: boolean;
   /** Show the summary line only while collapsed (its text repeats inside the body, e.g. a feed's newest headline). */
   summaryWhenCollapsed?: boolean;
+  /** Expand now (a deep link or focus param asked for this module); the person can still collapse it. */
+  forceOpen?: boolean;
 }) {
   const { colors } = useThemeMode();
   const styles = useMemo(() => createStyles(colors), [colors]);
@@ -93,6 +96,14 @@ export default function CompactModule({
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id, defaultOpen]);
+
+  useEffect(() => {
+    if (forceOpen && !open) {
+      setTouched(true);
+      setOpen(true);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [forceOpen]);
 
   function toggle() {
     const next = !open;

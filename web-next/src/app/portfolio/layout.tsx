@@ -2,7 +2,7 @@ import type { ReactNode } from "react";
 
 import { pageMetadata } from "@/lib/pageMetadata";
 
-export const metadata = pageMetadata("portfolio");
+export const metadata = pageMetadata("leagues");
 
 export default function Layout({ children }: { children: ReactNode }) {
   return children;

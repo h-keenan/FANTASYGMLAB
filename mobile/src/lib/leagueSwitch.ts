@@ -28,7 +28,6 @@ const KEEP_SCREEN_ROUTES = new Set([
   'TeamStance',
   'GmPlan',
   'Waivers',
-  'Recap',
   'Trades',
   'Teams',
   'Games',
@@ -36,7 +35,6 @@ const KEEP_SCREEN_ROUTES = new Set([
   'DraftCenter',
   'MyTeam',
   'Matchup',
-  'Alerts',
 ]);
 
 /** Params that only make sense for the old league and are dropped. */

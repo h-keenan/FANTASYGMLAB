@@ -25,8 +25,8 @@ import LeagueSwitcherHeaderButton from '../components/LeagueSwitcherHeaderButton
 import GridBackground from '../components/GridBackground';
 import SegmentedTabBar from '../components/SegmentedTabBar';
 import PickGroupList from '../components/PickGroupList';
-import CollegeScoutingPanel from '../components/CollegeScoutingPanel';
-import { needPositionsFrom } from '../lib/scoutingLens';
+import LiveDraftRoom from '../components/LiveDraftRoom';
+import { hasLiveDraft, resolveDraftTab } from '../lib/liveDraft';
 import { pickProvenance } from '../lib/pickGroups';
 import ValuesCredit from '../components/ValuesCredit';
 import { api, type DraftCard, type DraftPickAsset, type DraftPosture } from '../lib/api';
@@ -43,7 +43,7 @@ import type { RootStackParamList } from '../navigation/RootNavigator';
 type Props = NativeStackScreenProps<RootStackParamList, 'DraftCenter'>;
 
 type PickScope = 'mine' | 'league';
-type DraftTab = 'overview' | 'picks' | 'scouting';
+type DraftTab = 'overview' | 'picks' | 'live';
 
 function toneColorMap(colors: ThemeColors): Record<string, string> {
   return {
@@ -73,13 +73,19 @@ export default function DraftCenterScreen({ route, navigation }: Props) {
   const { colors } = useThemeMode();
   const styles = useMemo(() => createStyles(colors), [colors]);
   const { leagueId, leagueName } = route.params;
-  const [tab, setTab] = useState<DraftTab>(route.params.tab ?? 'overview');
-  // Picked from the GM orb while Draft Center is already open.
+  // The "Live room" tab exists only while a Sleeper draft is in progress or paused (best-effort discovery;
+  // null until known, so a requested 'live' tab shows Overview first and switches once a live draft is found).
+  const [liveDraft, setLiveDraft] = useState(false);
+  const [tab, setTab] = useState<DraftTab>(resolveDraftTab(route.params.tab, false));
+  // Picked from the GM orb (or a legacy Live Draft link) while Draft Center is already open.
   const requestedTab = route.params.tab;
   useEffect(() => {
-    if (requestedTab) setTab(requestedTab);
-  }, [requestedTab]);
-  const [needGroups, setNeedGroups] = useState<Array<{ position: string; classification: string }> | null>(null);
+    if (requestedTab) setTab(resolveDraftTab(requestedTab, liveDraft));
+  }, [requestedTab, liveDraft]);
+  useEffect(() => {
+    // Draft ended while the room was open: fall back to Overview.
+    if (tab === 'live' && !liveDraft) setTab('overview');
+  }, [tab, liveDraft]);
   const [posture, setPosture] = useState<DraftPosture | null>(null);
   const [postureReason, setPostureReason] = useState('');
   const [decisionCards, setDecisionCards] = useState<DraftCard[]>([]);
@@ -92,7 +98,7 @@ export default function DraftCenterScreen({ route, navigation }: Props) {
   const [myRosterId, setMyRosterId] = useState('');
   const [pickScope, setPickScope] = useState<PickScope>('mine');
 
-  useScreenHeaderTitle(navigation, 'Draft Center', leagueName);
+  useScreenHeaderTitle(navigation, 'Draft', leagueName);
 
   useEffect(() => {
     navigation.setOptions({
@@ -115,27 +121,27 @@ export default function DraftCenterScreen({ route, navigation }: Props) {
           // neither should be able to blank out the posture/insight cards
           // that were already here, so both degrade to "no pick browser"
           // rather than surfacing an error.
-          const [result, picksResult, myRoster, needs] = await Promise.all([
+          const [result, picksResult, myRoster, discovery] = await Promise.all([
             api.getLeagueDraftCenter(leagueId),
             api
               .getLeagueDraftPicks(leagueId)
               .catch(() => ({ ok: true as const, picks: [] as DraftPickAsset[], reason: 'unavailable' })),
             api.getMyRoster(leagueId).catch(() => null),
-            // Best-effort: only feeds the Scouting tab's league overlay.
-            api.getLeagueMyTeamNeeds(leagueId).catch(() => null),
+            // Best-effort: decides whether the Live room tab is shown.
+            api.getLiveDraftDiscovery(leagueId).catch(() => null),
           ]);
           if (cancelled) return;
           if (result.is_premium === false) {
             setLocked(result.upsell ?? { title: '', body: '' });
             return;
           }
+          setLiveDraft(hasLiveDraft(discovery?.drafts));
           setPosture(result.posture);
           setPostureReason(result.posture_reason);
           setDecisionCards(result.decision_cards);
           setPartnerCards(result.partner_cards);
           setReason(result.reason);
           setPicks(picksResult.picks);
-          setNeedGroups(needs?.position_groups ?? null);
           const resolvedRosterId = String(myRoster?.roster?.roster_id ?? '');
           setMyRosterId(resolvedRosterId);
           // Nothing to scope to without a resolved roster — don't strand the
@@ -166,14 +172,6 @@ export default function DraftCenterScreen({ route, navigation }: Props) {
     );
   }, [picks, pickScope, myRosterId]);
 
-  const myPicks = useMemo(
-    () => (myRosterId ? picks.filter((pick) => pick.owner_roster_id === myRosterId) : []),
-    [picks, myRosterId],
-  );
-  const scoutingLens = useMemo(
-    () => (needGroups || myPicks.length ? { needPositions: needPositionsFrom(needGroups), myPicks } : null),
-    [needGroups, myPicks],
-  );
 
   // Distinct pick-owning rosters stand in for league size (rank -> percentile); null under 2.
   const leagueSize = useMemo(() => {
@@ -186,7 +184,7 @@ export default function DraftCenterScreen({ route, navigation }: Props) {
   }, [picks]);
 
   if (loading) {
-    return <SkeletonPage label="Draft Center" layout="list" topInset={headerHeight} />;
+    return <SkeletonPage label="Draft" layout="list" topInset={headerHeight} />;
   }
 
   if (error) {
@@ -235,7 +233,7 @@ export default function DraftCenterScreen({ route, navigation }: Props) {
             options={[
               { key: 'overview', label: 'Overview', glyph: 'overview' },
               { key: 'picks', label: 'Picks', glyph: 'picks' },
-              { key: 'scouting', label: 'Scouting', glyph: 'scouting' },
+              ...(liveDraft ? [{ key: 'live' as const, label: 'Live room', glyph: 'board' as const }] : []),
             ]}
             active={tab}
             onChange={setTab}
@@ -359,12 +357,7 @@ export default function DraftCenterScreen({ route, navigation }: Props) {
           </>
         ) : null}
 
-        {tab === 'scouting' ? (
-          <CollegeScoutingPanel
-            onOpenProspect={(prospect) => navigation.navigate('CollegeProspectDetail', { prospect })}
-            lens={scoutingLens}
-          />
-        ) : null}
+        {tab === 'live' ? <LiveDraftRoom leagueId={leagueId} leagueName={leagueName} /> : null}
         <ValuesCredit />
       </ScrollView>
     </View>

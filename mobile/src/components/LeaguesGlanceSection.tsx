@@ -102,14 +102,12 @@ export default function LeaguesGlanceSection({
         case 'Waivers':
           navigation.navigate('Waivers', params);
           return;
-        case 'Alerts':
-          navigation.navigate('Alerts', params);
-          return;
         case 'MyTeam':
           navigation.navigate('MyTeam', params);
           return;
         default:
-          navigation.navigate('Dashboard', params);
+          // Today; the news module opens its Alerts section.
+          navigation.navigate('Dashboard', destination.focus ? { ...params, focus: destination.focus } : params);
       }
     },
     [navigation],

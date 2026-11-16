@@ -1,4 +1,8 @@
+import type { ReactNode } from "react";
+
 import { EmptyState } from "@/components/EmptyState";
+import { PillRow } from "@/components/PillRow";
+import { parseNewsTab, type NewsTab } from "@/lib/newsLinks";
 import { PageTitle } from "@/components/PageTitle";
 import type { AlertsResponse, NewsItem, NewsPlayerIdentity, NewsResponse } from "@/lib/api";
 import { NewsDigest } from "@/components/NewsDigest";
@@ -252,7 +256,23 @@ function FeedSections({ items }: { items: NewsItem[] }) {
  * so the page stays the league-wide feed with the roster digest on top only when real roster news exists. Without
  * `playerName` the page is the roster-first digest (components/NewsDigest.tsx); with it, the one-player list.
  */
-export function NewsContent({ data, playerName, alerts }: { data: NewsResponse; playerName?: string | null; alerts?: AlertsResponse | null }) {
+export function NewsContent({
+  data,
+  playerName,
+  alerts,
+  tab = "nfl",
+  onTabChange,
+  leagueTab = null,
+}: {
+  data: NewsResponse;
+  playerName?: string | null;
+  alerts?: AlertsResponse | null;
+  /** News is one destination with two tabs: the NFL feed and My League (the weekly recap, formerly League Recaps). */
+  tab?: NewsTab;
+  onTabChange?: (tab: NewsTab) => void;
+  /** The My League body (components/NewsLeagueTab.tsx); the host page owns the league and its fetch. */
+  leagueTab?: ReactNode;
+}) {
   const sections = groupNewsByDate(data.items);
   const emptyCopy = (
     <EmptyState
@@ -275,7 +295,22 @@ export function NewsContent({ data, playerName, alerts }: { data: NewsResponse; 
         ) : null}
       </header>
 
-      {playerName ? (
+      {/* A player-filtered feed (the quick view's "See all news") is always the NFL feed: no tabs. */}
+      {playerName ? null : (
+        <PillRow
+          ariaLabel="News section"
+          options={[
+            { label: "NFL", value: "nfl", glyph: "news" },
+            { label: "My League", value: "league", glyph: "recaps" },
+          ]}
+          active={tab}
+          onSelect={(value) => onTabChange?.(parseNewsTab(value))}
+        />
+      )}
+
+      {!playerName && tab === "league" ? (
+        leagueTab
+      ) : playerName ? (
         sections.length === 0 ? emptyCopy : <FeedSections items={data.items} />
       ) : (
         <NewsDigest
@@ -285,11 +320,11 @@ export function NewsContent({ data, playerName, alerts }: { data: NewsResponse; 
           feed={(items) => (items.length === 0 ? emptyCopy : <FeedSections items={items as NewsItem[]} />)}
         />
       )}
-      {playerName || sections.length > 0 || (alerts?.items.length ?? 0) > 0 ? null : emptyCopy}
-      {playerName || (alerts?.items.length ?? 0) > 0 ? null : (
+      {playerName || tab === "league" || sections.length > 0 || (alerts?.items.length ?? 0) > 0 ? null : emptyCopy}
+      {playerName || tab === "league" || (alerts?.items.length ?? 0) > 0 ? null : (
         <div className="flex flex-col gap-2" data-testid="news-next-step">
           <p className="text-xs" style={{ color: "var(--color-text-muted)" }}>
-            This is the league-wide feed. News on the players you own is in Alerts.
+            This is the league-wide feed. News on the players you own is in the Alerts section of Today.
           </p>
           <div>
             <LeagueLinkStep step="alerts" label="See news on your players" pickLabel="Pick a league for your alerts" />

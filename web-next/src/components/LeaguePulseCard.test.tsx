@@ -133,11 +133,11 @@ describe("leaguePulseHighlights", () => {
 });
 
 describe("LeaguePulseCard", () => {
-  it("is one tappable card (link to League Recaps) with a visible chevron, not a lone arrow", async () => {
+  it("is one tappable card (link to News > My League) with a visible chevron, not a lone arrow", async () => {
     vi.mocked(api.getTeamRankings).mockResolvedValue({ ok: true, reason: "", teams: [team({ roster_id: "1", current_streak: 3, transaction_activity_count: 5 })] } as never);
     render(<LeaguePulseCard leagueId="abc" leagueName="My League" />);
     const link = await screen.findByRole("link", { name: /League Activity/ });
-    expect(link).toHaveAttribute("href", "/league-recaps/abc?name=My%20League");
+    expect(link).toHaveAttribute("href", "/news?tab=league&league=abc&name=My+League");
     expect(link).toContainElement(screen.getByTestId("league-pulse-card"));
   });
 

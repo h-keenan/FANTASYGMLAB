@@ -22,7 +22,7 @@
  * this in sync with that convention, not re-invented per page.
  */
 
-import type { LiveDraftPickRow, LiveDraftRankingRow, LiveDraftTeamRow, LiveDraftTradeAsset, TradeAsset } from "./api";
+import type { LiveDraftDiscoveryResponse, LiveDraftPickRow, LiveDraftRankingRow, LiveDraftTeamRow, LiveDraftTradeAsset, TradeAsset } from "./api";
 
 export const LIVE_DRAFT_RANK_FILTERS = ["Overall", "QB", "RB", "WR", "TE", "Rookies", "Veterans"] as const;
 export type LiveDraftRankFilter = (typeof LIVE_DRAFT_RANK_FILTERS)[number];
@@ -159,4 +159,13 @@ export function liveDraftAssetToTradeAsset(asset: LiveDraftTradeAsset): TradeAss
     round: asset.round ?? undefined,
     owner_team_name: asset.owner_team_name ?? undefined,
   };
+}
+
+/**
+ * The drafts of a league that are in progress or paused, and the one the room opens on. The Draft page shows its
+ * "Live room" tab only while `live.length > 0` (the retired Live Draft page used to show "No live draft right now").
+ */
+export function liveDraftIds(discovery: Pick<LiveDraftDiscoveryResponse, "drafts" | "active_draft_id"> | null | undefined): { live: string[]; preferred: string } {
+  const live = (discovery?.drafts ?? []).filter((draft) => draft.status === "drafting" || draft.status === "paused").map((draft) => draft.draft_id);
+  return { live, preferred: discovery?.active_draft_id || live[0] || "" };
 }

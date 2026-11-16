@@ -1,6 +1,6 @@
 import { TERMS } from '../lib/terms';
 import FirstValueOfferCard from '../components/FirstValueOfferCard';
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ScrollView, StyleSheet, View } from 'react-native';
 import PressableScale from '../components/PressableScale';
 import AppText from '../components/AppText';
@@ -58,6 +58,7 @@ import QuickActionsGrid, { type QuickAction } from '../components/QuickActionsGr
 import ScreenInfoNote from '../components/ScreenInfoNote';
 import FreeLimitNote from '../components/FreeLimitNote';
 import GlossaryNote from '../components/GlossaryNote';
+import AlertsSection from '../components/AlertsSection';
 import SectionHeading from '../components/SectionHeading';
 import CompactModule from '../components/CompactModule';
 import { listSummaryParts } from '../lib/moduleTemplates';
@@ -185,6 +186,19 @@ export default function DashboardScreen({ route, navigation }: Props) {
   const styles = useMemo(() => createStyles(colors), [colors]);
   const { session } = useAuth();
   const { leagueId, leagueName } = route.params;
+  // Alerts is a section of Today: `focus: 'alerts'` (header bell, links, the retired Alerts route) expands it and
+  // scrolls to it. The param is cleared once handled so the bell works again.
+  const focusAlerts = route.params.focus === 'alerts';
+  const scrollRef = useRef<ScrollView>(null);
+  const alertsY = useRef<number | null>(null);
+  const scrollToAlerts = useCallback(() => {
+    if (!focusAlerts || alertsY.current == null) return;
+    scrollRef.current?.scrollTo({ y: Math.max(0, alertsY.current - spacing.sm), animated: true });
+    navigation.setParams({ focus: undefined });
+  }, [focusAlerts, navigation]);
+  useEffect(() => {
+    scrollToAlerts();
+  }, [scrollToAlerts]);
   const [newRecommendationIds, setNewRecommendationIds] = useState<Set<string>>(new Set());
   const [isFirstVisit, setIsFirstVisit] = useState(true);
   const { showExplanations } = useDensity();
@@ -465,7 +479,7 @@ export default function DashboardScreen({ route, navigation }: Props) {
   return (
     <View style={styles.root}>
       <GridBackground />
-      <ScrollView style={styles.container} contentContainerStyle={[styles.content, { paddingBottom: orbClearance, paddingTop: headerHeight }]}>
+      <ScrollView ref={scrollRef} style={styles.container} contentContainerStyle={[styles.content, { paddingBottom: orbClearance, paddingTop: headerHeight }]}>
       <BrandHeaderBar leagueId={leagueId} leagueName={leagueName} title="Dashboard" onSearch={requestOrbSearch} />
       {/* Module order: lib/dashboardLayout.ts DASHBOARD_MODULE_ORDER (same on web). */}
       {session?.user?.id ? (
@@ -583,6 +597,14 @@ export default function DashboardScreen({ route, navigation }: Props) {
         newRecommendationIds={newRecommendationIds}
         showExplanations={showExplanations}
       />
+      <View
+        onLayout={(event) => {
+          alertsY.current = event.nativeEvent.layout.y;
+          scrollToAlerts();
+        }}
+      >
+        <AlertsSection leagueId={leagueId} leagueName={leagueName} forceOpen={focusAlerts} />
+      </View>
       <WaiverSuggestionsStrip
         adds={priorityAdds}
         onPressPlayer={(player) =>
@@ -607,7 +629,7 @@ export default function DashboardScreen({ route, navigation }: Props) {
               </View>
             ) : (
               <View style={styles.activityCell}>
-                <LeaguePulseCard teams={teamRankings} onPress={() => navigation.navigate('Recap', { leagueId, leagueName })} />
+                <LeaguePulseCard teams={teamRankings} onPress={() => navigation.navigate('News', { leagueId, leagueName, initialTab: 'league' })} />
               </View>
             )}
           </View>
@@ -620,13 +642,13 @@ export default function DashboardScreen({ route, navigation }: Props) {
         {readyRecap ? (
           <View>
             <SectionHeading title="Storylines" icon="newspaper-outline" />
-            <StorylineSummaryCard recap={readyRecap} onPress={() => navigation.navigate('Recap', { leagueId, leagueName })} />
+            <StorylineSummaryCard recap={readyRecap} onPress={() => navigation.navigate('News', { leagueId, leagueName, initialTab: 'league' })} />
           </View>
         ) : null}
         {showRecapModule && readyRecap ? (
           <RecapReadyCard
             week={readyRecap.week}
-            onPress={() => navigation.navigate('Recap', { leagueId, leagueName })}
+            onPress={() => navigation.navigate('News', { leagueId, leagueName, initialTab: 'league' })}
           />
         ) : null}
         {!guillotine && matchup && !buildTeamStatusMatchup(matchup) ? (
@@ -689,7 +711,7 @@ function quickActions(
   inSeason: boolean,
 ): Array<{
   label: string;
-  route: 'Trades' | 'Players' | 'Waivers' | 'DraftCenter' | 'MyTeam' | 'Matchup' | 'Alerts' | 'Teams' | 'GmPlan';
+  route: 'Trades' | 'Players' | 'Waivers' | 'DraftCenter' | 'MyTeam' | 'Matchup' | 'News' | 'Teams' | 'GmPlan';
   icon: React.ComponentProps<typeof IconCircle>['name'];
   color: string;
 }> {
@@ -700,11 +722,11 @@ function quickActions(
     inSeason
       ? { label: 'My Team', route: 'MyTeam', icon: 'shirt-outline', color: colors.success }
       : { label: 'Draft Picks', route: 'DraftCenter', icon: 'albums-outline', color: colors.accent },
-    // Second row: the League Overview shortcuts (Matchup, Alerts, Teams) now
+    // Second row: the League Overview shortcuts (Matchup, News, Teams) now
     // live here, plus the one GM Plan entry. Same icon/color per destination
     // as GmOrb.
     { label: 'Matchup', route: 'Matchup', icon: 'american-football-outline', color: colors.success },
-    { label: 'Alerts', route: 'Alerts', icon: 'notifications-outline', color: colors.danger },
+    { label: 'News', route: 'News', icon: 'newspaper-outline', color: colors.accent },
     { label: 'League Rankings', route: 'Teams', icon: 'people-circle-outline', color: colors.violet },
     { label: 'GM Plan', route: 'GmPlan', icon: 'map-outline', color: colors.accent },
   ];
@@ -733,7 +755,10 @@ function DashboardQuickActions({
     label: action.label,
     icon: action.icon,
     color: action.color,
-    onPress: () => navigation.navigate(action.route, { leagueId, leagueName }),
+    onPress: () =>
+      action.route === 'News'
+        ? navigation.navigate('News', { leagueId, leagueName, initialTab: 'league' })
+        : navigation.navigate(action.route, { leagueId, leagueName }),
   }));
   return <QuickActionsGrid actions={actions} style={styles.quickActionsGrid} />;
 }
@@ -1196,7 +1221,7 @@ export function WatchlistAlertsSection({
           highlights: [items[0]?.headline ?? (showHealth ? 'Key injuries on your roster' : null)],
         })}
         action={
-          <PressableScale onPress={() => navigation.navigate('Alerts', { leagueId, leagueName })} hitSlop={LINK_HIT_SLOP} style={{ minHeight: 44, justifyContent: 'center' }}>
+          <PressableScale onPress={() => navigation.navigate('Dashboard', { leagueId, leagueName, focus: 'alerts' })} hitSlop={LINK_HIT_SLOP} style={{ minHeight: 44, justifyContent: 'center' }}>
             <AppText style={styles.viewAll}>All ›</AppText>
           </PressableScale>
         }

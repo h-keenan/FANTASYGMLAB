@@ -178,7 +178,7 @@ function DraftingLeaguesNote({ leagues }: { leagues: PortfolioFailedLeague[] }) 
         <div key={league.league_id} className="flex items-center justify-between gap-2">
           <span style={{ color: "var(--color-text-secondary)" }}>{league.league_name}</span>
           <Link
-            href={`/live-draft/${league.league_id}?name=${encodeURIComponent(league.league_name)}`}
+            href={`/draft-center/${encodeURIComponent(league.league_id)}?name=${encodeURIComponent(league.league_name)}&tab=live`}
             className="text-xs font-bold whitespace-nowrap"
             style={{ color: "var(--color-accent)" }}
           >
@@ -456,7 +456,7 @@ function PortfolioHeader({ title }: { title: string }) {
 export function PortfolioShell() {
   return (
     <main className="page-shell" data-portfolio-shell="">
-      <PortfolioHeader title="Portfolio" />
+      <PortfolioHeader title="Your leagues" />
       <div className="flex flex-col gap-4">
         {Array.from({ length: PORTFOLIO_SHELL_SKELETON_COUNT }, (_, index) => (
           <PortfolioLeagueSkeleton key={index} />
@@ -492,6 +492,11 @@ export function PortfolioContent({
   const [removedIds, setRemovedIds] = useState<string[]>([]);
   const [busyLeagueId, setBusyLeagueId] = useState<string | null>(null);
   const [view, setView] = useState<"leagues" | "exposure">("leagues");
+  // `/leagues#standing` (the retired /portfolio route's redirect): the section renders after the data lands, so the
+  // browser's own hash scroll has nothing to land on yet.
+  useEffect(() => {
+    if (window.location.hash === "#standing") document.getElementById("standing")?.scrollIntoView({ block: "start" });
+  }, []);
   const allFailedLeagues = data.failed_leagues.filter((league) => !removedIds.includes(league.league_id));
   const draftingLeagues = allFailedLeagues.filter((league) => league.reason === "empty_roster");
   const espnLeagues = allFailedLeagues.filter((league) => league.reason === "espn_not_supported");
@@ -513,8 +518,10 @@ export function PortfolioContent({
   if (!data.is_premium) {
     return (
       <main className="page-shell">
-        <PageTitle page="Portfolio" />
-        <PortfolioFreeStanding />
+        <PageTitle page="Your leagues" />
+        <div id="standing" style={{ scrollMarginTop: "calc(var(--shell-header-height, 3.5rem) + 0.5rem)" }}>
+          <PortfolioFreeStanding />
+        </div>
         <PremiumUpsellCard
           bare
           kicker="Portfolio"
@@ -530,7 +537,7 @@ export function PortfolioContent({
     return (
       <main className="page-shell">
         <header className="flex flex-col gap-1">
-          <PageTitle page="Portfolio" />
+          <PageTitle page="Your leagues" />
         </header>
         <EmptyState
           title="No saved leagues yet"
@@ -549,7 +556,17 @@ export function PortfolioContent({
 
   return (
     <main className="page-shell">
-      <PortfolioHeader title="Portfolio" />
+      <PortfolioHeader title="Your leagues" />
+
+      {/* Home (2026-11-16: Home + Portfolio became one): the league list below is both the switcher and your standing
+          across every league. The heading is the target of /portfolio's redirect (#standing). */}
+      <h2
+        id="standing"
+        className="text-[0.6875rem] font-extrabold uppercase"
+        style={{ color: "var(--color-text-muted)", letterSpacing: "var(--letter-spacing-badge)", scrollMarginTop: "calc(var(--shell-header-height, 3.5rem) + 0.5rem)" }}
+      >
+        Your standing across every league
+      </h2>
 
       <PillRow
         options={[

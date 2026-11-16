@@ -8,7 +8,8 @@ const PATH: Record<Exclude<RowRoute | NextRoute, "connect_league">, string> = {
   waivers: "waivers",
   trade_hub: "trade-hub",
   draft_center: "draft-center",
-  live_draft: "live-draft",
+  // The live room is a tab of the Draft page (2026-11-16 nav consolidation); it appears only while a draft is live.
+  live_draft: "draft-center",
 };
 
 /** Internal href for a "This week" CTA. Matchup is where lineups are reviewed
@@ -17,6 +18,7 @@ export function thisWeekHref(route: RowRoute | NextRoute, leagueId: string, leag
   if (route === "connect_league") return "/connect-league";
   const params = new URLSearchParams({ name: leagueName });
   if (playerId && (route === "waivers" || route === "trade_hub")) params.set("playerId", playerId);
+  if (route === "live_draft") params.set("tab", "live");
   return `/${PATH[route]}/${encodeURIComponent(leagueId)}?${params.toString()}`;
 }
 

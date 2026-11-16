@@ -124,6 +124,22 @@ export function toggleKey(set: Set<string>, key: string): Set<string> {
   return next;
 }
 
+/** Drafts that are happening right now (in progress or paused): the only ones the Live room can follow. */
+export function liveDraftsOf<T extends { status: string }>(drafts: readonly T[] | null | undefined): T[] {
+  return (drafts ?? []).filter((d) => d.status === 'drafting' || d.status === 'paused');
+}
+
+/** Whether Draft Center shows its "Live room" tab. */
+export function hasLiveDraft(drafts: readonly { status: string }[] | null | undefined): boolean {
+  return liveDraftsOf(drafts).length > 0;
+}
+
+/** The tab Draft Center opens: a requested "live" tab falls back to Overview when no draft is live. */
+export function resolveDraftTab<T extends string>(requested: T | 'live' | undefined, live: boolean): T | 'live' | 'overview' {
+  if (requested === 'live') return live ? 'live' : 'overview';
+  return requested ?? 'overview';
+}
+
 /** Referral reward line for the Account card. */
 export function referralRewardCopy(r: { referrals_per_comp_month: number; max_comp_months: number }): string {
   return `For every ${r.referrals_per_comp_month} friends who connect their Sleeper account through your link, you earn a free month of GM Pro, up to ${r.max_comp_months} free months total.`;

@@ -24,6 +24,7 @@ export const TAB_PAGE_SEGMENTS: readonly string[] = [
   "games",
   "news",
   "portfolio",
+  "leagues",
 ];
 
 const firstSegment = (pathname: string | null | undefined) => (pathname || "").split("/").filter(Boolean)[0] ?? "";

@@ -21,11 +21,12 @@ describe("shared destination accents (nav / orb / catalog / app)", () => {
     const rows = [...nav.coreLeagueDestinations, ...nav.gmToolsDestinations, ...nav.generalDestinations];
     let checked = 0;
     for (const row of rows) {
-      if (!ACCENT_BY_DESTINATION[destinationId(row.label)]) continue;
+      const id = row.key && ACCENT_BY_DESTINATION[row.key] ? row.key : destinationId(row.label);
+      if (!ACCENT_BY_DESTINATION[id]) continue;
       checked += 1;
-      expect(row.color, row.label).toBe(accentVar(row.label));
+      expect(row.color, row.label).toBe(accentVar(id));
     }
-    expect(checked).toBeGreaterThan(15);
+    expect(checked).toBeGreaterThan(10);
     expect(FOUNDER_DESTINATION.color).toBe("var(--color-diagnostic)");
   });
 

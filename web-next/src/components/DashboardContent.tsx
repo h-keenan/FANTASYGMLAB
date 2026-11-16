@@ -5,6 +5,7 @@ import type { MouseEvent } from "react";
 import type { DashboardResponse, LeagueTeamRankingsResponse } from "@/lib/api";
 import { BeginnerHelp } from "@/components/BeginnerHelp";
 import { SinceLastVisitStrip } from "@/components/SinceLastVisitStrip";
+import { DashboardAlerts } from "@/components/DashboardAlerts";
 import { DirectionCheckinCard } from "@/components/DirectionCheckinCard";
 import { FirstValueOfferCard } from "@/components/FirstValueOfferCard";
 import { NextSteps } from "@/components/NextSteps";
@@ -265,9 +266,11 @@ export function DashboardContent({
           parts={listSummaryParts({ count: watchItems.length, noun: "alert", highlights: [watchItems[0]?.headline] })}
         >
           <WatchListCard items={watchItems} leagueId={leagueId} leagueName={leagueName} />
-          <ModuleMore href={`/alerts/${encodeURIComponent(leagueId)}${query}`}>View all alerts</ModuleMore>
         </CompactModule>
       ) : null}
+
+      {/* Alerts is a section of Today (the standalone page is retired): unread count badge, tap to expand, `#alerts` opens it. */}
+      {sample ? null : <DashboardAlerts leagueId={leagueId} leagueName={leagueName} />}
 
       {/* The sample preview has no More section, so it keeps League Activity inline. */}
       {sample ? <LeaguePulseCard leagueId={leagueId} leagueName={leagueName} teamRankings={teamRankings} /> : null}

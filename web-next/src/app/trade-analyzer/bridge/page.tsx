@@ -38,7 +38,7 @@ export default function TradeAnalyzerBridgePage() {
       return;
     }
     if (!trade) {
-      router.replace("/portfolio");
+      router.replace("/leagues");
       return;
     }
     let cancelled = false;

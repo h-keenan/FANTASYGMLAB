@@ -38,8 +38,6 @@ export function familyRoute(tab: PageTabDef, leagueId: string, leagueName: strin
       return { name: 'Matchup', params: base };
     case 'rankings':
       return { name: 'Teams', params: base };
-    case 'recaps':
-      return { name: 'Recap', params: base };
     case 'games':
       return { name: 'Games', params: base };
     default:

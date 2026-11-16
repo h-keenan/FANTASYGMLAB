@@ -16,8 +16,8 @@ import type { RootStackParamList } from '../navigation/RootNavigator';
 type Props = NativeStackScreenProps<RootStackParamList, 'CollegeProspects'>;
 
 /**
- * College Scouting now lives in Draft Center's Scouting tab. This route stays
- * for older links, the Dashboard interest prompt and More: with a last-opened
+ * College Scouting is now the Prospects tab of Players. This route stays
+ * for older links and the Dashboard interest prompt: with a last-opened
  * league it forwards to that tab; with no league it renders the
  * league-independent board here, so scouting never requires picking a league.
  */
@@ -27,14 +27,14 @@ export default function CollegeProspectsScreen({ navigation }: Props) {
   const styles = useMemo(() => createStyles(), []);
   const [resolved, setResolved] = useState(false);
 
-  useScreenHeaderTitle(navigation, 'College Scouting');
+  useScreenHeaderTitle(navigation, 'Prospects');
 
   useEffect(() => {
     let cancelled = false;
     void getLastLeague().then((last) => {
       if (cancelled) return;
       if (last) {
-        navigation.replace('DraftCenter', { leagueId: last.leagueId, leagueName: last.leagueName, tab: 'scouting' });
+        navigation.replace('Players', { leagueId: last.leagueId, leagueName: last.leagueName, tab: 'prospects' });
       } else {
         setResolved(true);
       }
@@ -44,7 +44,7 @@ export default function CollegeProspectsScreen({ navigation }: Props) {
     };
   }, [navigation]);
 
-  if (!resolved) return <SkeletonPage label="College Scouting" layout="list" topInset={headerHeight} />;
+  if (!resolved) return <SkeletonPage label="Prospects" layout="list" topInset={headerHeight} />;
 
   return (
     <View style={styles.container}>

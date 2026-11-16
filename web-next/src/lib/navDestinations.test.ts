@@ -5,7 +5,8 @@ import { describe, expect, it } from "vitest";
 import { PAGE_TITLE_BY_SEGMENT, searchNavDestinations, useNavDestinations, type NavDestination } from "./navDestinations";
 import { isGmPlanTab } from "@/components/GmPlanSections";
 import { parseDraftCenterTab } from "@/components/DraftCenterContent";
-import { parseGamesTab, parseRecapsTab, parseWaiverTab } from "@/lib/pageTabs";
+import { parseGamesTab, parsePlayersTab, parseWaiverTab } from "@/lib/pageTabs";
+import { parseNewsTab } from "@/lib/newsLinks";
 
 const APP_DIR = path.join(process.cwd(), "src", "app");
 const MOBILE_CATALOG = path.join(process.cwd(), "..", "mobile", "src", "lib", "navCatalog.ts");
@@ -18,10 +19,11 @@ function all() {
 
 const TAB_PARSERS: Record<string, (v: string) => unknown> = {
   "gm-plan": (v) => (isGmPlanTab(v) ? v : undefined),
-  "draft-center": (v) => (["overview", "picks", "scouting"].includes(v) ? parseDraftCenterTab(v) : undefined),
+  "draft-center": (v) => (["overview", "picks", "live"].includes(v) ? parseDraftCenterTab(v) : undefined),
+  players: (v) => (v === "prospects" ? parsePlayersTab(v) : undefined),
+  news: (v) => (v === "league" ? parseNewsTab(v) : undefined),
   waivers: (v) => parseWaiverTab(v),
   games: (v) => parseGamesTab(v),
-  "league-recaps": (v) => parseRecapsTab(v),
 };
 
 describe("GM orb tab destinations", () => {
@@ -29,7 +31,7 @@ describe("GM orb tab destinations", () => {
 
   it("covers the multi-tab pages", () => {
     expect(withTabs.map((d) => d.label).sort()).toEqual(
-      ["Draft Center", "GM Plan", "Games", "League Rankings", "League Recaps", "Trade Hub", "Waivers"].sort(),
+      ["Draft", "GM Plan", "Games", "League Rankings", "News", "Players", "Today", "Trade Hub", "Waivers", "Your leagues"].sort(),
     );
   });
 
@@ -38,7 +40,8 @@ describe("GM orb tab destinations", () => {
       for (const tab of page.tabs!) {
         const url = new URL(tab.path, "https://x.test");
         const segment = url.pathname.split("/")[1];
-        const dir = segment === "trade-history" ? path.join(APP_DIR, segment) : path.join(APP_DIR, segment, "[leagueId]");
+        // Account-wide pages (Trade History, News, Your leagues) have no [leagueId] segment.
+        const dir = segment === "trade-history" || segment === "news" || segment === "leagues" ? path.join(APP_DIR, segment) : path.join(APP_DIR, segment, "[leagueId]");
         expect(existsSync(path.join(dir, "page.tsx")), `${page.label} > ${tab.label}: ${dir}`).toBe(true);
         const param = url.searchParams.get("tab");
         if (param) {
@@ -83,17 +86,20 @@ describe("one entry point per destination", () => {
 
   it("lists tab-only pages as tabs, not menu rows", () => {
     const labels = all().map((d) => d.label);
-    for (const tabOnly of ["Trade History", "College Scouting", "Playoff Odds", "Trade Finder", "Trade Analyzer"]) {
+    for (const tabOnly of ["Trade History", "College Scouting", "Live Draft", "Alerts", "League Recaps", "Portfolio", "Playoff Odds", "Trade Finder", "Trade Analyzer"]) {
       expect(labels, tabOnly).not.toContain(tabOnly);
     }
     expect(searchNavDestinations(all(), "trade history").map((d) => d.label)).toContain("Trade Hub > History");
-    expect(searchNavDestinations(all(), "college scouting").map((d) => d.label)).toContain("Draft Center > Scouting");
+    expect(searchNavDestinations(all(), "college scouting").map((d) => d.label)).toContain("Players > Prospects");
+    expect(searchNavDestinations(all(), "live draft").map((d) => d.label)).toContain("Draft > Live room");
+    expect(searchNavDestinations(all(), "alerts").map((d) => d.label)).toContain("Today > Alerts");
+    expect(searchNavDestinations(all(), "recaps").map((d) => d.label)).toContain("News > My League");
   });
 
   it("hides the College Scouting tab when the college preference is off", () => {
     const nav = useNavDestinations("L 1", "My League", "off");
-    const draft = nav.gmToolsDestinations.find((d) => d.label === "Draft Center")!;
-    expect(draft.tabs!.map((t) => t.label)).toEqual(["Overview", "Picks"]);
+    const players = nav.coreLeagueDestinations.find((d) => d.label === "Players")!;
+    expect(players.tabs ?? []).toEqual([]);
   });
 
   it("Your leagues (was Home) is the league switcher and Account owns settings", () => {
@@ -123,19 +129,22 @@ describe("searchNavDestinations", () => {
   });
 
   it("finds tabs by label and keyword and shows them as Page > Tab", () => {
-    expect(labels("scouting")).toContain("Draft Center > Scouting");
+    expect(labels("scouting")).toContain("Players > Prospects");
     expect(labels("playoff odds")).toContain("League Rankings > Playoff Odds");
     expect(labels("finder")).toContain("Trade Hub > Finder");
     expect(labels("pickem")).toContain("Games > Pick'em");
-    expect(labels("bench regret")).toContain("League Recaps > Roundup");
+    expect(labels("bench regret")).toContain("News > My League");
     expect(labels("watchlist")).toEqual(expect.arrayContaining(["Waivers > Watchlist"]));
-    expect(labels("draft center scouting")).toEqual(["Draft Center > Scouting"]);
+    expect(labels("players prospects")).toContain("Players > Prospects");
   });
 
   it("opens the exact tab and keeps page matching", () => {
-    const hit = searchNavDestinations(dests, "scouting").find((d) => d.label === "Draft Center > Scouting")!;
-    expect(hit.path).toBe("/draft-center/L%201?name=My%20League&tab=scouting");
-    expect(labels("draft")).toEqual(expect.arrayContaining(["Draft Center", "Draft Center > Picks"]));
+    const hit = searchNavDestinations(dests, "scouting").find((d) => d.label === "Players > Prospects")!;
+    expect(hit.path).toBe("/players/L%201?name=My%20League&tab=prospects");
+    expect(labels("draft")).toEqual(expect.arrayContaining(["Draft", "Draft > Picks", "Draft > Live room"]));
+    const mine = searchNavDestinations(dests, "my league").find((d) => d.label === "News > My League")!;
+    expect(mine.path).toBe("/news?tab=league&league=L%201&name=My%20League");
+    expect(searchNavDestinations(dests, "alerts").find((d) => d.label === "Today > Alerts")!.path).toBe("/dashboard/L%201?name=My%20League#alerts");
   });
 
   it("finds Trade History only as the Trade Hub tab", () => {
@@ -146,7 +155,8 @@ describe("searchNavDestinations", () => {
 
   it("inherits Pro from the page unless the tab overrides it", () => {
     const find = (q: string, label: string) => searchNavDestinations(dests, q).find((d) => d.label === label)!;
-    expect(find("scouting", "Draft Center > Scouting").pro).toBe(true);
+    expect(find("scouting", "Players > Prospects").pro).toBe(true);
+    expect(find("alerts", "Today > Alerts").pro).toBeFalsy();
     expect(find("finder", "Trade Hub > Finder").pro).toBe(true);
     expect(find("analyzer", "Trade Hub > Grade a trade").pro).toBeFalsy();
     expect(find("explore", "Waivers > Explore").pro).toBeFalsy();
@@ -155,13 +165,13 @@ describe("searchNavDestinations", () => {
   it("has no tab rows without a league", () => {
     const nav = useNavDestinations(null, "");
     const noLeague = [...nav.generalDestinations, ...nav.accountDestinations];
-    expect(labels("scouting", noLeague)).not.toContain("Draft Center > Scouting");
+    expect(labels("scouting", noLeague)).not.toContain("Players > Prospects");
   });
 
-  it("Fantasy Sim (the GM game) is a standalone General row beside Portfolio, and Season Outlook is separate", () => {
+  it("Fantasy Sim (the GM game) is a standalone General row, and Season Outlook is separate", () => {
     const nav = useNavDestinations(null, "");
     const general = nav.generalDestinations.map((d) => d.label);
-    expect(general.indexOf("Fantasy Sim")).toBe(general.indexOf("Portfolio") + 1);
+    expect(general).not.toContain("Portfolio");
     const row = nav.generalDestinations.find((d) => d.label === "Fantasy Sim");
     expect(row?.path).toBe("/gm-game");
     expect(row?.pro).toBeFalsy();

@@ -20,7 +20,7 @@ describe("NextSteps", () => {
     render(<NextSteps steps={["trade-finder", "trade-analyzer", "alerts"]} leagueId="9" leagueName="L" />);
     expect(screen.getByRole("link", { name: /See other packages in Trade Finder/ })).toHaveAttribute("href", "/trade-finder/9?name=L");
     expect(screen.getByRole("link", { name: /Analyze a trade/ })).toHaveAttribute("href", "/trade-analyzer/9?name=L");
-    expect(screen.getByRole("link", { name: /See news on your players/ })).toHaveAttribute("href", "/alerts/9?name=L");
+    expect(screen.getByRole("link", { name: /See news on your players/ })).toHaveAttribute("href", "/dashboard/9?name=L#alerts");
   });
 
   it("builds the roster link", () => {

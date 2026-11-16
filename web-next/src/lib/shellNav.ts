@@ -1,6 +1,7 @@
 import type { BottomTab } from "@/lib/bottomNav";
 import { pathOwnsPhoneChrome } from "@/lib/bottomNav";
 import { PAGE_TITLE_BY_SEGMENT } from "@/lib/navDestinations";
+import { HOME_PATH } from "@/lib/retiredRoutes";
 import { TERMS } from "@/lib/terms";
 
 /**
@@ -50,7 +51,7 @@ export function shellLeagueContext(pathLeagueId: string | null | undefined, sear
   return { leagueId, leagueName: search.get("name") || (leagueId ? unnamed : "") };
 }
 
-/** League context: Today / Team / Trades / League / More. Outside a league: Your leagues / Portfolio / Fantasy Sim / News / More. */
+/** League context: Today / Team / Trades / League / More. Outside a league: Your leagues (switching + your standing across every league) / Fantasy Sim / News / More. */
 export function shellTabs(ctx: ShellContext): BottomTab[] {
   if (ctx.leagueId) {
     const id = encodeURIComponent(ctx.leagueId);
@@ -64,8 +65,7 @@ export function shellTabs(ctx: ShellContext): BottomTab[] {
     ];
   }
   return [
-    { key: "home", label: TERMS.yourLeagues, glyph: "home", href: "/" },
-    { key: "portfolio", label: "Portfolio", glyph: "overview", href: "/portfolio", pro: true },
+    { key: "home", label: TERMS.yourLeagues, glyph: "home", href: HOME_PATH },
     { key: "sim", label: "Fantasy Sim", glyph: "scores", href: "/gm-game" },
     { key: "news", label: "News", glyph: "news", href: "/news" },
     { key: "more", label: "More", glyph: "more" },
@@ -74,7 +74,7 @@ export function shellTabs(ctx: ShellContext): BottomTab[] {
 
 const LEAGUE_SEGMENT_TAB: Record<string, string> = {
   dashboard: "today",
-  alerts: "more", // the bell lives in the header; Alerts is a More destination, never Today
+  alerts: "today", // retired route: redirects to the Alerts section of Today
   "my-team": "team",
   matchup: "team",
   players: "team",
@@ -93,13 +93,15 @@ const LEAGUE_SEGMENT_TAB: Record<string, string> = {
   "trade-offer": "trades",
   "trade-history": "trades",
   "league-rankings": "league",
-  "league-recaps": "league",
+  "league-recaps": "more", // retired route: redirects to News > My League
+  news: "more", // News (NFL / My League) keeps the league context through `?league=`
   games: "league",
   commissioner: "league",
 };
 
 const OUTSIDE_SEGMENT_TAB: Record<string, string> = {
-  portfolio: "portfolio",
+  leagues: "home", // Home: the league list with your standing across every league
+  portfolio: "home", // retired route: redirects to the Standing section of Home
   "gm-game": "sim",
   news: "news",
 };
@@ -121,7 +123,7 @@ export function shellBarVisible(opts: { enabled: boolean; signedIn: boolean; pat
   return true;
 }
 
-const TAB_ROOT_SEGMENTS = new Set(["dashboard", "my-team", "trade-hub", "league-rankings", "portfolio", "news"]);
+const TAB_ROOT_SEGMENTS = new Set(["dashboard", "my-team", "trade-hub", "league-rankings", "news", "leagues"]);
 const PARENT_SEGMENT: Record<string, string> = {
   "trade-finder": "trade-hub",
   "trade-analyzer": "trade-hub",

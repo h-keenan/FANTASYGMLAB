@@ -8,6 +8,9 @@ import {
   filterLiveDraftRankings,
   formatLiveDraftScore,
   formatTradeGain,
+  hasLiveDraft,
+  liveDraftsOf,
+  resolveDraftTab,
   liveDraftDraftedPlayerOptions,
   liveDraftRankFilterOptions,
   movementGlyph,
@@ -60,4 +63,19 @@ test('drafted options dedupe; toggleKey is immutable', () => {
   assert.equal(toggleKey(s, 'y').size, 2);
   assert.equal(s.size, 1);
   assert.equal(toggleKey(s, 'x').size, 0);
+});
+
+test('liveDraftsOf / hasLiveDraft: only drafting or paused drafts are live', () => {
+  const drafts = [{ status: 'complete' }, { status: 'pre_draft' }, { status: 'drafting' }, { status: 'paused' }];
+  assert.equal(liveDraftsOf(drafts).length, 2);
+  assert.equal(hasLiveDraft(drafts), true);
+  assert.equal(hasLiveDraft([{ status: 'complete' }]), false);
+  assert.equal(hasLiveDraft(null), false);
+});
+
+test('resolveDraftTab: live falls back to overview when no draft is live', () => {
+  assert.equal(resolveDraftTab('live', true), 'live');
+  assert.equal(resolveDraftTab('live', false), 'overview');
+  assert.equal(resolveDraftTab('picks', false), 'picks');
+  assert.equal(resolveDraftTab(undefined, true), 'overview');
 });

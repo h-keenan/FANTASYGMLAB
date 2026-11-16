@@ -10,7 +10,7 @@ describe("pageFamilyPill", () => {
     expect(c?.tabs.map((t) => t.label)).toEqual(["Ideas", "Finder", "Grade a trade", "History"]);
     expect(c?.primary).toBeUndefined(); // no lone glyph chip: the Analyzer is already a tab
     expect(c?.tabs.find((t) => t.key === "trade_analyzer")?.href).toBe("/trade-analyzer/9?name=My%20League");
-    expect(routeFamilyPillContext("/league-recaps/9", "9", "L")?.activeKey).toBe("recaps");
+    expect(routeFamilyPillContext("/games/9", "9", "L")?.activeKey).toBe("games");
     expect(routeFamilyPillContext("/waivers/9", "9", "L")?.id).toBe("family:team");
   });
   it("is null outside the families or without a league", () => {

@@ -45,3 +45,14 @@ test('GM Plan tab param is validated', () => {
   assert.equal(normalizeGmPlanTab('nonsense'), 'overview');
   assert.equal(normalizeGmPlanTab(undefined), 'overview');
 });
+
+test('2026-11-16 consolidation: retired pages redirect to their new tab or section', () => {
+  assert.deepEqual(resolveLegacyRedirect('Alerts', league), { name: 'Dashboard', params: { ...league, focus: 'alerts' } });
+  assert.deepEqual(resolveLegacyRedirect('LiveDraft', league), { name: 'DraftCenter', params: { ...league, tab: 'live' } });
+  assert.deepEqual(resolveLegacyRedirect('Portfolio', league), { name: 'Home', params: { focus: 'standing' } });
+  assert.deepEqual(resolveLegacyRedirect('Recap', { ...league, initialTab: 'roundup', week: 9 }), {
+    name: 'News',
+    params: { ...league, week: 9, initialTab: 'league', recapsTab: 'roundup' },
+  });
+  assert.deepEqual(resolveLegacyRedirect('Recap', league), { name: 'News', params: { ...league, initialTab: 'league' } });
+});

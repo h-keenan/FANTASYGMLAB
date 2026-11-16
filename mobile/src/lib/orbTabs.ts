@@ -1,6 +1,6 @@
 /**
  * GM orb "Where to go" search: the tabs of the multi-tab screens, each its own
- * searchable destination ("Draft Center > Scouting") that opens that exact tab.
+ * searchable destination ("Draft > Scouting") that opens that exact tab.
  * Tab labels, subtitles, keywords and Pro flags come from lib/navCatalog.ts, the
  * one list shared byte-for-byte with web (tabs open through `?tab=` there and
  * route params here).
@@ -28,9 +28,11 @@ export interface OrbTab {
 }
 
 /** The app route each catalog page (lib/navCatalog.ts, shared with web) opens. */
+/* Retired pages (2026-11-16 nav consolidation, 18 -> 14) and where they live now: Alerts = Today > Alerts,
+ * Live Draft = Draft > Live room, League Recaps = News > My League, Portfolio = Home (Standing section),
+ * College Scouting = Players > Prospects. Their routes stay registered as redirects (lib/homeRedirects.ts). */
 export const ROUTE_BY_PAGE: Readonly<Record<string, string>> = {
   dashboard: 'Dashboard',
-  alerts: 'Alerts',
   'my-team': 'MyTeam',
   matchup: 'Matchup',
   waivers: 'Waivers',
@@ -39,11 +41,8 @@ export const ROUTE_BY_PAGE: Readonly<Record<string, string>> = {
   'trade-hub': 'Trades',
   'gm-plan': 'GmPlan',
   'draft-center': 'DraftCenter',
-  'live-draft': 'LiveDraft',
-  'league-recaps': 'Recap',
   games: 'Games',
   commissioner: 'Commissioner',
-  portfolio: 'Portfolio',
   'gm-game': 'GmGame',
   news: 'News',
   community: 'Community',
@@ -72,7 +71,13 @@ const TAB_TARGETS: Readonly<Record<string, Readonly<Record<string, TabTarget>>>>
   'draft-center': {
     Overview: { params: { tab: 'overview' } },
     Picks: { params: { tab: 'picks' } },
-    Scouting: { params: { tab: 'scouting' } },
+    'Live room': { params: { tab: 'live' } },
+  },
+  dashboard: { Alerts: { params: { focus: 'alerts' } } },
+  players: { Prospects: { params: { tab: 'prospects' } } },
+  news: {
+    NFL: { params: { initialTab: 'nfl' } },
+    'My League': { params: { initialTab: 'league' } },
   },
   'gm-plan': {
     Overview: { params: { initialTab: 'overview' } },
@@ -86,7 +91,6 @@ const TAB_TARGETS: Readonly<Record<string, Readonly<Record<string, TabTarget>>>>
     Explore: { params: { tab: 'explore' } },
     Watchlist: { params: { tab: 'watchlist' } },
   },
-  'league-recaps': { Roundup: { params: { initialTab: 'roundup' } } },
   games: {
     'Season Outlook': { params: { tab: 'sim' } },
     "Pick'em": { params: { tab: 'pickem' } },

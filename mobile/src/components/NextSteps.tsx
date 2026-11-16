@@ -10,16 +10,16 @@ import { spacing } from '../theme';
 
 /**
  * "What to do next" button row for screens that otherwise end in a dead end
- * (Alerts, Matchup). Mirrors web-next's components/NextSteps.tsx: keep the
+ * (Matchup, News). Mirrors web-next's components/NextSteps.tsx: keep the
  * step list and copy identical.
  */
 export type NextStepKey = 'matchup' | 'waivers' | 'trade-hub' | 'trade-finder' | 'trade-analyzer' | 'my-team' | 'alerts' | 'gm-plan';
 
-type StepRoute = 'Matchup' | 'Waivers' | 'Trades' | 'MyTeam' | 'Alerts' | 'GmPlan';
+type StepRoute = 'Matchup' | 'Waivers' | 'Trades' | 'MyTeam' | 'Dashboard' | 'GmPlan';
 
 export const NEXT_STEPS: Record<
   NextStepKey,
-  { label: string; route: StepRoute; params?: { initialTab: 'block' | 'search' | 'make' } }
+  { label: string; route: StepRoute; params?: { initialTab: 'block' | 'search' | 'make' } | { focus: 'alerts' } }
 > = {
   matchup: { label: 'Check your lineup', route: 'Matchup' },
   waivers: { label: 'Find a waiver add', route: 'Waivers' },
@@ -27,7 +27,7 @@ export const NEXT_STEPS: Record<
   'trade-finder': { label: 'See other packages in Trade Finder', route: 'Trades', params: { initialTab: 'search' } },
   'trade-analyzer': { label: 'Analyze a trade', route: 'Trades', params: { initialTab: 'make' } },
   'my-team': { label: 'Review your roster', route: 'MyTeam' },
-  alerts: { label: 'See news on your players', route: 'Alerts' },
+  alerts: { label: 'See news on your players', route: 'Dashboard', params: { focus: 'alerts' } },
   'gm-plan': { label: 'Open your GM Plan', route: 'GmPlan' },
 };
 

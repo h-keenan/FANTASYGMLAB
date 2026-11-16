@@ -5,6 +5,9 @@ import { DashboardContent } from "./DashboardContent";
 import { collapsedModuleProblems } from "@/components/ui/assertCompactInformative";
 import { api, type DashboardResponse } from "@/lib/api";
 
+// The Alerts section fetches on its own and needs the auth context; it has its own test (DashboardAlerts.test.tsx).
+vi.mock("@/components/DashboardAlerts", () => ({ DashboardAlerts: () => <div data-testid="dashboard-alerts" /> }));
+
 const FIXTURE: DashboardResponse = {
   ok: true,
   quiet: false,
@@ -166,6 +169,7 @@ describe("DashboardContent", () => {
       at("dashboard-trades-block"),
       at('aria-label="Team summary"'),
       at("dashboard-watchlist"),
+      at("dashboard-alerts"),
       at("dashboard-more"),
     ];
     expect(order.every((i) => i > -1)).toBe(true);

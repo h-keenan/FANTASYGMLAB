@@ -123,7 +123,7 @@ export function LandingAuthIsland() {
   // you've signed in, and whenever you open it, it needs to take you to
   // the dashboard"). Mirrors mobile's own HomeScreen auto-nav exactly:
   // one saved league jumps straight to its Today page; two or more reopen the
-  // last-used league's Today (the Portfolio only when none is remembered);
+  // last-used league's Today (Home, the league list, only when none is remembered);
   // zero saved leagues falls through to the normal sign-in flow below.
   // Only applies once, on load — never re-triggers mid-flow.
   // Signed in => onboarding view: hide the marketing blocks (CSS keys off this).
@@ -180,7 +180,7 @@ export function LandingAuthIsland() {
           // sending them to the Pro-only Portfolio to pick again. Portfolio only when none is known.
           const last = await api.getDevicePreferences().then((p) => p.last_league, () => null);
           const match = last ? leagues.find((row) => row.league_id === last.league_id) : undefined;
-          router.replace(match ? leagueHomePath(match.league_id, match.league_name || match.league_id) : "/portfolio");
+          router.replace(match ? leagueHomePath(match.league_id, match.league_name || match.league_id) : "/leagues");
           return;
         }
         savedLeaguesCheck.current = "resolved";

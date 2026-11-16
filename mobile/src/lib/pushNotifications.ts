@@ -143,18 +143,19 @@ function routeNotificationTap(data: unknown): void {
     return;
   }
 
-  if (target.screen === 'Recap') {
-    navigationRef.navigate('Recap', {
+  if (target.screen === 'News') {
+    navigationRef.navigate('News', {
+      initialTab: target.initialTab,
       leagueId: target.leagueId,
       leagueName: target.leagueName,
-      initialTab: target.initialTab,
+      recapsTab: target.recapsTab,
       ...(target.week ? { week: target.week } : {}),
     });
     return;
   }
 
   if (target.screen === 'PlayerDetail') {
-    // Same lean hand-built player pattern AlertsScreen/DashboardScreen use
+    // Same lean hand-built player pattern AlertsSection/DashboardScreen use
     // for their own player taps - Player Detail fetches everything else
     // itself from player_id, so a full player fetch isn't needed here.
     const player: RankedPlayer = {
