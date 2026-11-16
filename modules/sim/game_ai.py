@@ -386,14 +386,27 @@ class TradeDesk:
             return "roster_fit", "This would leave a hole in their lineup.", ["hurts their lineup"]
         return "wants_more_value", "They want more value back.", ["wants more value"]
 
+    def filled_needs(self, ai: str, user_gives: Sequence[str]) -> list[str]:
+        """The positions ``ai`` is tagged "need" at (the shared ``game_need.position_report``, the very report behind its Needs tag and its
+        valuation) that the user's side of the offer actually sends, weakest first. A reason that says "they need a RB" must come from here, so
+        it can never name a position the tags call a strength or the user is not sending."""
+
+        sent = {self.snap.players[p].pos for p in user_gives if not is_pick_id(p)}
+        needy = [e for e in self.position_levels()[ai] if e["level"] == "need" and e["pos"] in sent]
+        return [e["pos"] for e in sorted(needy, key=lambda e: (-e["rank"], e["strength"], e["pos"]))]
+
     def verdict(self, ai: str, user_gives: Sequence[str], user_gets: Sequence[str]) -> Verdict:
         ok, margin, dval, need, loss = self.ai_accepts(ai, user_gives, user_gets)
         params = self.params(ai)
         if ok:
             fits = need >= max(2.0, 0.35 * abs(dval + need))
+            reason = "They like how this fits their roster." if fits else "They see this as a fair deal."
+            if fits and self.snap.settings.pos_rules:
+                filled = self.filled_needs(ai, user_gives)
+                if filled:  # pos_v 1: the reason names the position the Needs tag says they are short at, and only one the user actually sends
+                    reason = f"They need a {filled[0]} and this fills it."
             return Verdict(
-                "accept", "fits_need" if fits else "fair_value",
-                "They like how this fits their roster." if fits else "They see this as a fair deal.",
+                "accept", "fits_need" if fits else "fair_value", reason,
                 chips=["fits their need"] if fits else ["fair value"], margin=margin,
             )
         code, reason, chips = self.failure_cause(ai, user_gives, user_gets)
