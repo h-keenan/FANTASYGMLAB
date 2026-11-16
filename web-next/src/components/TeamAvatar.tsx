@@ -28,7 +28,8 @@ export function TeamAvatar({
 }) {
   const [failed, setFailed] = useState(false);
   const initials = teamInitials(name);
-  const dimension = { width: size, height: size, borderRadius: "50%" };
+  // Same as PlayerAvatar: never squashed into an oval by preflight `img { max-width: 100% }` in a narrow column.
+  const dimension = { width: size, height: size, borderRadius: "50%", maxWidth: "none", flexShrink: 0 };
 
   if (!avatarUrl || failed) {
     return (
