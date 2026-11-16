@@ -39,6 +39,7 @@ from modules.sim.game_types import (
     AGING_VERSION,
     ECON_VERSION,
     STABILITY_VERSION,
+    VORP_VERSION,
     HINT_VERSION,
     KD_VERSION,
     LIMIT_VERSION,
@@ -59,6 +60,7 @@ UPGRADABLE_FLAGS: dict[str, tuple[int, str]] = {
     "names_v": (NAMES_VERSION, SEASON),
     "econ_v": (ECON_VERSION, NOW),
     "stability_v": (STABILITY_VERSION, SEASON),
+    "vorp_v": (VORP_VERSION, NOW),
 }
 
 # What the UI shows for each flag: a short label, one sentence of what changes, and whether it needs a dynasty with offseasons.
@@ -96,6 +98,11 @@ FLAGS: dict[str, dict[str, Any]] = {
     "stability_v": {
         "label": "A league that stays balanced",
         "body": "A good or bad season now carries into a player's next projection, young backs, receivers and tight ends keep improving through their early years, rookie classes refill the depth that retirements take, and AI managers trade players (not picks) with each other at market value so talent stops piling up on a few teams. New rookie classes also vary more in year one.",
+        "dynasty_only": False,
+    },
+    "vorp_v": {
+        "label": "Fair prices for backup quarterbacks",
+        "body": "Trades value a player by what he adds over a typical starter at his position, so a backup QB in a one-QB league is cheap, and a counter-offer asks for the smallest fair add instead of your best player.",
         "dynasty_only": False,
     },
     "names_v": {
