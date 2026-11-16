@@ -50,9 +50,9 @@ const DATA: TradeHubResponse = {
 describe("TradesTabBar", () => {
   it("renders the three trade tabs and marks the active one", () => {
     render(<TradesTabBar leagueId="1" leagueName="L" active="trade_finder" />);
-    expect(screen.getAllByRole("tab").map((tab) => tab.textContent)).toEqual(["Hub", "Finder", "Analyzer", "History"]);
+    expect(screen.getAllByRole("tab").map((tab) => tab.textContent)).toEqual(["Ideas", "Finder", "Grade a trade", "History"]);
     expect(screen.getByRole("tab", { name: "Finder" })).toHaveAttribute("aria-selected", "true");
-    expect(screen.getByRole("tab", { name: "Hub" })).toHaveAttribute("href", "/trade-hub/1?name=L");
+    expect(screen.getByRole("tab", { name: "Ideas" })).toHaveAttribute("href", "/trade-hub/1?name=L");
     expect(screen.getByRole("tab", { name: "History" })).toHaveAttribute("href", "/trade-history?league=1&name=L");
   });
 });

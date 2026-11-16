@@ -1,3 +1,4 @@
+import { TERMS } from '../lib/terms';
 import type { TabIconName } from '../lib/tabIcons';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
@@ -278,7 +279,7 @@ export default function WaiversScreen({ route, navigation }: Props) {
     }).filter((entry): entry is { position: string; player: WaiverPlayer; count: number } => entry !== null);
   }, [freeAgents]);
 
-  // Watchlist = the user's GM Targets that are currently free agents here.
+  // Watchlist = the user's Watchlist that are currently free agents here.
   // Fetched lazily the first time the tab opens.
   useEffect(() => {
     if (tab !== 'watchlist' || targetIds !== null) return;
@@ -618,9 +619,9 @@ export default function WaiversScreen({ route, navigation }: Props) {
               </View>
             ) : (
               <View>
-                <SectionHeading title="Your GM Targets on the wire" />
-                {targetsFailed ? <AppText style={styles.secondaryCaption}>Couldn't load your GM Targets.</AppText> : null}
-                {!targetsFailed && targetIds === null ? <SkeletonList label="GM Targets" count={3} /> : null}
+                <SectionHeading title="Your Watchlist on the wire" />
+                {targetsFailed ? <AppText style={styles.secondaryCaption}>Couldn't load your Watchlist.</AppText> : null}
+                {!targetsFailed && targetIds === null ? <SkeletonList label={TERMS.watchlist} count={3} /> : null}
               </View>
             )
           }
@@ -647,8 +648,8 @@ export default function WaiversScreen({ route, navigation }: Props) {
             ) : tab === 'watchlist' && targetIds !== null && !targetsFailed ? (
               <EmptyState
                 icon="bookmark-outline"
-                title="No GM Targets on the wire"
-                subtitle="None of your GM Targets are free agents right now."
+                title="No Watchlist on the wire"
+                subtitle="None of your Watchlist are free agents right now."
               />
             ) : null
           }
@@ -703,7 +704,7 @@ function SecondaryWaiverBoard({
   }
   const groups: Array<{ label: string; players: WaiverPlayer[] }> = [
     { label: 'Top Stash Candidates', players: stashCandidates },
-    { label: 'Bench Depth', players: watchlistCandidates },
+    { label: TERMS.depthAdds, players: watchlistCandidates },
     { label: 'FAAB Shortlist', players: faabTargets },
   ].filter((group) => group.players.length > 0);
   return (

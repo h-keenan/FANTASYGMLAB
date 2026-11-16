@@ -65,7 +65,7 @@ interface AuthContextValue {
    * identity upgrade, rather than signing out and signing up as a
    * brand-new, unrelated user. Because `session.user.id` never changes,
    * every saved league/roster/preference already scoped to this guest's
-   * id (saved_leagues, GM Targets, etc. — all RLS-scoped to
+   * id (saved_leagues, Watchlist, etc. — all RLS-scoped to
    * `auth.uid() = user_id`) stays reachable automatically; there is
    * nothing to snapshot or restore. No-op error when called outside a
    * guest session.

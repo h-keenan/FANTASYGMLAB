@@ -1,6 +1,7 @@
 import type { BottomTab } from "@/lib/bottomNav";
 import { pathOwnsPhoneChrome } from "@/lib/bottomNav";
 import { PAGE_TITLE_BY_SEGMENT } from "@/lib/navDestinations";
+import { TERMS } from "@/lib/terms";
 
 /**
  * Pure logic for the site-wide phone shell (Phase B of docs/mobile-ux-plan-2026-11.md):
@@ -49,7 +50,7 @@ export function shellLeagueContext(pathLeagueId: string | null | undefined, sear
   return { leagueId, leagueName: search.get("name") || (leagueId ? unnamed : "") };
 }
 
-/** League context: Today / Team / Trades / League / More. Outside a league: Home / Portfolio / Fantasy Sim / News / More. */
+/** League context: Today / Team / Trades / League / More. Outside a league: Your leagues / Portfolio / Fantasy Sim / News / More. */
 export function shellTabs(ctx: ShellContext): BottomTab[] {
   if (ctx.leagueId) {
     const id = encodeURIComponent(ctx.leagueId);
@@ -63,8 +64,8 @@ export function shellTabs(ctx: ShellContext): BottomTab[] {
     ];
   }
   return [
-    { key: "home", label: "Home", glyph: "home", href: "/" },
-    { key: "portfolio", label: "Portfolio", glyph: "overview", href: "/portfolio" },
+    { key: "home", label: TERMS.yourLeagues, glyph: "home", href: "/" },
+    { key: "portfolio", label: "Portfolio", glyph: "overview", href: "/portfolio", pro: true },
     { key: "sim", label: "Fantasy Sim", glyph: "scores", href: "/gm-game" },
     { key: "news", label: "News", glyph: "news", href: "/news" },
     { key: "more", label: "More", glyph: "more" },
@@ -143,7 +144,7 @@ export function shellParent(pathname: string | null | undefined, ctx: ShellConte
     return { label: PAGE_TITLE_BY_SEGMENT[parentSeg] ?? "Back", href: `/${parentSeg}/${id}${q}` };
   }
   if (ctx.leagueId) return { label: PAGE_TITLE_BY_SEGMENT.dashboard ?? "Today", href: `/dashboard/${id}${q}` };
-  return { label: "Home", href: "/" };
+  return { label: TERMS.yourLeagues, href: "/" };
 }
 
 /** DOM id of the page-aware action strip slot that sits above the tab bar. */

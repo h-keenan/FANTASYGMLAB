@@ -306,7 +306,7 @@ describe("GmPlanContent", () => {
     expect(screen.getAllByRole("main")).toHaveLength(1);
   });
 
-  // Revision 20 (2026-10-18): Team Situation + GM Targets merged in.
+  // Revision 20 (2026-10-18): Team Situation + Watchlist merged in.
   describe("Team Situation section", () => {
     it("renders the declared stance option when teamStance is passed", () => {
       render(
@@ -562,7 +562,7 @@ describe("GmPlanContent", () => {
 
     it("omits the section entirely when no rankings are passed", () => {
       render(<GmPlanContent leagueName="Dynasty Overlords" data={BASE_RESPONSE} />);
-      expect(screen.queryByRole("heading", { name: "Watching" })).not.toBeInTheDocument();
+      expect(screen.queryByRole("heading", { name: "Watchlist" })).not.toBeInTheDocument();
     });
   });
 });
@@ -575,11 +575,11 @@ describe("GmPlanContent concept structure", () => {
   it("switches between the four tabs", () => {
     render(<GmPlanContent leagueName="Dynasty Overlords" data={BASE_RESPONSE} {...props} />);
     expect(screen.getByRole("tab", { name: "Overview", selected: true })).toBeInTheDocument();
-    for (const name of ["Trades", "Core", "Watching"]) {
+    for (const name of ["Trades", "Core", "Watchlist"]) {
       fireEvent.click(screen.getByRole("tab", { name }));
       expect(screen.getByRole("tab", { name, selected: true })).toBeInTheDocument();
     }
-    expect(screen.getByRole("heading", { name: "Watching" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Watchlist" })).toBeInTheDocument();
   });
 
   it("shows the trade deadline banner with the real week before the deadline", () => {

@@ -138,8 +138,8 @@ describe("experience level copy on Dashboard", () => {
     fireEvent.click(await screen.findByTestId("stat-strip-toggle"));
 
     await expandHelp();
-    expect(await screen.findByText(`Power Rank: ${BEGINNER_HELP.powerRank}`)).toBeInTheDocument();
-    expect(screen.getByText(`Franchise Rank: ${BEGINNER_HELP.franchiseRank}`)).toBeInTheDocument();
+    expect(await screen.findByText(`This season: ${BEGINNER_HELP.powerRank}`)).toBeInTheDocument();
+    expect(screen.getByText(`Long term: ${BEGINNER_HELP.franchiseRank}`)).toBeInTheDocument();
     expect(screen.getByText(BEGINNER_HELP.dashboardSnapshot)).toBeInTheDocument();
     expect(screen.getByText("Average Age")).toBeInTheDocument();
     expect(screen.queryByText("Avg Age")).not.toBeInTheDocument();

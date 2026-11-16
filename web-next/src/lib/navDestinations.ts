@@ -2,8 +2,11 @@ import type { NavGlyphName } from "@/components/NavDestinationGlyph";
 import type { CollegeInterest } from "@/lib/displayPreferences";
 import { accentVar as accent } from "@/lib/destinationAccent";
 import { HOME_SUBTITLE, NAV_PAGES, navPagesIn, type NavCatalogPage } from "@/lib/navCatalog";
+import { TERMS } from "@/lib/terms";
 
 export interface NavDestination {
+  /** The nav-catalog page key (lib/navCatalog.ts), when the row is a catalog page. */
+  key?: string;
   label: string;
   path: string;
   subtitle: string;
@@ -67,12 +70,14 @@ const TAB_PATHS: Record<string, Record<string, (c: TabPathContext) => string>> =
     "Playoff Odds": ({ id, query }) => `/league-rankings/${id}${query}#playoff-odds`,
   },
   "trade-hub": {
-    Hub: ({ id, query }) => `/trade-hub/${id}${query}`,
+    Ideas: ({ id, query }) => `/trade-hub/${id}${query}`,
     Finder: ({ id, query }) => `/trade-finder/${id}${query}`,
-    Analyzer: ({ id, query }) => `/trade-analyzer/${id}${query}`,
+    "Grade a trade": ({ id, query }) => `/trade-analyzer/${id}${query}`,
     History: ({ id, query }) => (id ? `/trade-history?league=${id}${query.replace("?", "&")}` : "/trade-history"),
   },
   "gm-plan": {
+    // The tab's id stays `watching` (stable URLs); only the label is Watchlist.
+    Watchlist: ({ tabPath }) => tabPath("gm-plan", "watching"),
     // Its own route (the sim page), reached from GM Plan; no top-level menu row.
     "Season Outlook": ({ id, query }) => `/fantasy-sim/${id}${query}`,
   },
@@ -103,6 +108,7 @@ export function useNavDestinations(
   const context: TabPathContext = { id, query, tabPath };
 
   const build = (page: NavCatalogPage): NavDestination => ({
+    key: page.key,
     label: page.label,
     path: page.leagueScoped ? `/${page.key}/${id}${query}` : `/${page.key}`,
     subtitle: page.subtitle,
@@ -125,7 +131,7 @@ export function useNavDestinations(
 
   const generalDestinations: NavDestination[] = [
     // The league switcher; Account (below) owns settings.
-    { label: "Home", path: "/", subtitle: HOME_SUBTITLE, glyph: "home", color: "var(--color-accent)" },
+    { label: TERMS.yourLeagues, path: "/", subtitle: HOME_SUBTITLE, glyph: "home", color: "var(--color-accent)" },
     ...navPagesIn("general").map(build),
   ];
 

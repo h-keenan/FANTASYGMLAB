@@ -3,8 +3,11 @@ import { StyleProp, StyleSheet, View, ViewStyle } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 
 import MetricCard from './MetricCard';
+import TapForWhy from './TapForWhy';
+import type { WhyMetricId } from '../lib/tapForWhyContent.ts';
 import { useThemeMode } from '../context/ThemeModeContext';
-import { spacing } from '../theme';
+import AppText from './AppText';
+import { spacing, type ThemeColors } from '../theme';
 
 type IconName = React.ComponentProps<typeof Ionicons>['name'];
 
@@ -20,6 +23,8 @@ export type StatStripItem = {
   /** Short context under the value ("of 12 teams", "League avg 26.1"). */
   note?: string | null;
   onPress?: () => void;
+  /** The metric the small 44pt "why" target in the tile corner explains (lib/tapForWhyContent.ts). The tile tap keeps its own action. */
+  why?: WhyMetricId;
 };
 
 /**
@@ -29,12 +34,12 @@ export type StatStripItem = {
  */
 export default function DashboardStatRow({ items, style }: { items: StatStripItem[]; style?: StyleProp<ViewStyle> }) {
   const { colors } = useThemeMode();
-  const styles = useMemo(() => createStyles(), []);
+  const styles = useMemo(() => createStyles(colors), [colors]);
   return (
     <View style={[styles.row, style]} accessibilityLabel="Summary">
       {items.map((item) => (
+        <View key={item.label} style={styles.cell}>
         <MetricCard
-          key={item.label}
           label={item.label}
           icon={item.icon}
           value={item.value}
@@ -47,14 +52,26 @@ export default function DashboardStatRow({ items, style }: { items: StatStripIte
           centered
           style={styles.tile}
         />
+        {item.why ? (
+          <View style={styles.why} pointerEvents="box-none">
+            <TapForWhy metric={item.why} spoken={item.label} variant="chip" style={styles.whyBtn} testID={`why-${item.why}`}>
+              <AppText style={styles.whyGlyph}>?</AppText>
+            </TapForWhy>
+          </View>
+        ) : null}
+        </View>
       ))}
     </View>
   );
 }
 
-function createStyles() {
+function createStyles(colors: ThemeColors) {
   return StyleSheet.create({
     row: { flexDirection: 'row', gap: spacing.sm, marginBottom: spacing.md },
-    tile: { flexBasis: 0, flexGrow: 1, minWidth: 0, paddingHorizontal: spacing.sm },
+    cell: { flexBasis: 0, flexGrow: 1, minWidth: 0 },
+    tile: { alignSelf: 'stretch', minWidth: 0, paddingHorizontal: spacing.sm },
+    why: { position: 'absolute', top: 0, right: 0, width: 44, height: 44, alignItems: 'flex-end' },
+    whyBtn: { width: 22, height: 22, margin: 4, borderRadius: 11, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.glassInset },
+    whyGlyph: { fontSize: 12, fontWeight: '800', color: colors.textTertiary },
   });
 }

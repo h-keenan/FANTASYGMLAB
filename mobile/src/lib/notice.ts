@@ -5,7 +5,7 @@ export type NoticeTone = 'error' | 'success' | 'info';
 
 export const NOTICE_MS: Record<NoticeTone, number> = { success: 3000, info: 3500, error: 5000 };
 
-/** "Could not update GM Targets" + "Please try again in a moment." -> one sentence-cased line. */
+/** "Could not update Watchlist" + "Please try again in a moment." -> one sentence-cased line. */
 export function noticeText(title: string, detail?: string): string {
   const head = title.trim().replace(/[.!]+$/, '');
   const tail = detail?.trim();

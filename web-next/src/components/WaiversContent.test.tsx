@@ -515,7 +515,7 @@ describe("WaiversContent", () => {
     expect(screen.getByPlaceholderText("Search free agents")).toBeInTheDocument();
   });
 
-  it("Watchlist tab lists GM Targets that are free agents", async () => {
+  it("Watchlist tab lists Watchlist that are free agents", async () => {
     const spy = vi.spyOn(api, "getGmTargets").mockResolvedValue({
       ok: true,
       targets: [{ player_id: "fa1", source_surface: "x", created_at: null, untouchable: false }],

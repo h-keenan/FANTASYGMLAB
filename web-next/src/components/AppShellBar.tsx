@@ -13,6 +13,7 @@ import { useAuth } from "@/context/AuthContext";
 import { useDisplayPreferences } from "@/context/DisplayPreferencesContext";
 import { FOUNDER_DESTINATION, isFounderSession, useNavDestinations, type NavDestination } from "@/lib/navDestinations";
 import { getPillState, getServerPillState, setPillBarPresent, subscribePill } from "@/lib/bottomPillStore";
+import { moreLeagueGroups } from "@/lib/moreSheet";
 import { routeFamilyPillContext } from "@/lib/pageFamilyPill";
 import { shellActiveTab, shellLeagueContext, shellTabs, SHELL_ACTION_SLOT_ID } from "@/lib/shellNav";
 import { useSearchParams } from "@/lib/useSearchParams";
@@ -47,6 +48,8 @@ function ShellBarInner() {
   const active = shellActiveTab(pathname, Boolean(leagueId));
   const [moreOpen, setMoreOpen] = useState(false);
   const pill = useSyncExternalStore(subscribePill, getPillState, getServerPillState);
+  // Pro markers on paid tabs only for a person known to be on Free (null while loading: no marker rather than a wrong one).
+  const showPro = useIsPro() === false;
   // Tell pages the pill is on screen (phones only) so they drop their own page-tab row only then.
   useEffect(() => {
     if (typeof window.matchMedia !== "function") return; // no media queries (tests, very old browsers): the in-page tabs stay
@@ -68,6 +71,7 @@ function ShellBarInner() {
           tabs={tabs}
           active={active}
           testId="shell-tab-bar"
+          showPro={showPro}
           // A page registers its own context (counts, primary); until it does, the route alone gives the family tabs, so nothing flashes.
           context={pill.ctx ?? routeFamilyPillContext(pathname, leagueId, leagueName)}
           onSelect={(key) => {
@@ -86,8 +90,10 @@ function ShellMoreSheet({ open, onClose, leagueId, leagueName }: { open: boolean
   const { coreLeagueDestinations, gmToolsDestinations, generalDestinations, accountDestinations } = useNavDestinations(leagueId, leagueName, collegeInterest);
   const showPro = useIsPro() === false;
   const founder = isFounderSession(session);
+  // Lead with the pages the bar does NOT show; the ones it does fold into one "Sections" group (derived from pageFamilies).
+  const leagueGroups = moreLeagueGroups([...coreLeagueDestinations, ...gmToolsDestinations]);
   const groups: { title: string; rows: NavDestination[] }[] = [
-    ...(leagueId ? [{ title: "League", rows: coreLeagueDestinations }, { title: "GM tools", rows: gmToolsDestinations }] : []),
+    ...(leagueId ? leagueGroups : []),
     { title: "General", rows: generalDestinations },
     { title: "Account", rows: [...accountDestinations, ...(founder ? [FOUNDER_DESTINATION] : [])] },
   ];

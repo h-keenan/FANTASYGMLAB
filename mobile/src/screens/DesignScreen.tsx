@@ -309,8 +309,8 @@ export default function DesignScreen() {
             <DashboardStatRow
               items={[
                 { label: 'Record', icon: 'trophy-outline', value: '8-4' },
-                { label: 'Power', icon: 'flash-outline', value: '#2', valueColor: colors.success },
-                { label: 'Franchise', icon: 'star-outline', value: '#1', valueColor: colors.premium },
+                { label: 'This season', icon: 'flash-outline', value: '#2', valueColor: colors.success },
+                { label: 'Long term', icon: 'star-outline', value: '#1', valueColor: colors.premium },
                 { label: 'Avg Age', icon: 'time-outline', value: '26.4' },
               ]}
             />

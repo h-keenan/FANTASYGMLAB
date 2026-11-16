@@ -22,7 +22,7 @@ describe("SampleLeagueContent", () => {
     expect(screen.getAllByText(/Sell Casey Placeholder/).length).toBeGreaterThan(0);
     // My Team and Watchlist are compact modules: informative collapsed, tiles/cards on tap.
     fireEvent.click(screen.getByTestId("stat-strip-toggle"));
-    expect(screen.getByText("Power Rank")).toBeTruthy();
+    expect(screen.getAllByText("This season").length).toBeGreaterThan(0);
     fireEvent.click(screen.getByRole("button", { name: /^Watchlist/ }));
     expect(screen.getByTestId("watchlist-alerts")).toBeTruthy();
     // League Activity fills from the static promise.

@@ -18,4 +18,11 @@ describe("tapForWhyContent", () => {
     expect(whyTriggerLabel("value", "Value 82")).toBe("Why: Value 82");
     expect(whyTriggerLabel("faab")).toBe("Why: FAAB bid");
   });
+
+  it("covers the rank, posture and trade-tag terms with the shared beginner copy", () => {
+    for (const id of ["power_rank", "franchise_rank", "starter_strength", "bench_strength", "posture", "buy_low", "sell_high"] as const) {
+      expect(whyEntry(id).sentences.length).toBeGreaterThan(0);
+    }
+    expect(whyEntry("power_rank").sentences[0]).toMatch(/this season/);
+  });
 });

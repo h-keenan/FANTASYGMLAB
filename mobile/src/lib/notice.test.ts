@@ -5,13 +5,13 @@ import assert from 'node:assert/strict';
 import { NOTICE_MS, noticeText, noticeToneFor } from './notice.ts';
 
 test('noticeText joins title and detail into one sentence-cased line', () => {
-  assert.equal(noticeText('Could not update GM Targets', 'Please try again in a moment.'), 'Could not update GM Targets. Please try again in a moment.');
+  assert.equal(noticeText('Could not update Watchlist', 'Please try again in a moment.'), 'Could not update Watchlist. Please try again in a moment.');
   assert.equal(noticeText('Test notification sent.'), 'Test notification sent');
 });
 
 test('noticeToneFor reads the legacy alert titles', () => {
   assert.equal(noticeToneFor('Could not rename league'), 'error');
-  assert.equal(noticeToneFor('GM Targets is full'), 'error');
+  assert.equal(noticeToneFor('Watchlist is full'), 'error');
   assert.equal(noticeToneFor('Test notification sent'), 'success');
   assert.equal(noticeToneFor('Select a league first'), 'info');
 });

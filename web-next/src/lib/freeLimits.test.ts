@@ -7,8 +7,8 @@ import { freeLimitNote } from "./freeLimits";
 
 describe("freeLimitNote", () => {
   it("shows used-of-limit for a saved cap, before the wall", () => {
-    const note = freeLimitNote({ kind: "cap", noun: "GM Targets", limit: 3, used: 2, isPremium: false });
-    expect(note).toMatchObject({ text: "Free: 2 of 3 GM Targets", atLimit: false, cta: "upgrade", ctaLabel: "Upgrade" });
+    const note = freeLimitNote({ kind: "cap", noun: "Watchlist", limit: 3, used: 2, isPremium: false });
+    expect(note).toMatchObject({ text: "Free: 2 of 3 Watchlist", atLimit: false, cta: "upgrade", ctaLabel: "Upgrade" });
   });
 
   it("flags the limit when reached", () => {
@@ -29,7 +29,7 @@ describe("freeLimitNote", () => {
   });
 
   it("sends guests to create an account first (guests may not buy)", () => {
-    const note = freeLimitNote({ kind: "cap", noun: "GM Targets", limit: 3, used: 0, isPremium: false, isGuest: true });
+    const note = freeLimitNote({ kind: "cap", noun: "Watchlist", limit: 3, used: 0, isPremium: false, isGuest: true });
     expect(note).toMatchObject({ cta: "create_account", ctaLabel: "Create an account" });
   });
 

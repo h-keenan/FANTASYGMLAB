@@ -5,6 +5,7 @@ import { useNavigation } from '@react-navigation/native';
 import SegmentedTabBar from './SegmentedTabBar';
 import { pageTabFamily, activePageTab, type PageTabFamilyKey } from '../lib/pageFamilies';
 import { familyRoute, familyTabOptions } from '../lib/pageFamilyRoutes';
+import { useShowProTags } from '../lib/useShowProTags';
 import { spacing } from '../theme';
 
 /**
@@ -33,6 +34,7 @@ export default function PageFamilyTabs({
   const navigation = useNavigation<any>();
   const def = pageTabFamily(family);
   const options = useMemo(() => familyTabOptions(family, leagueId), [family, leagueId]);
+  const showPro = useShowProTags();
   if (options.length < 2) return null;
   return (
     <View style={padded ? styles.wrap : styles.inline} accessibilityLabel={def.label}>
@@ -40,6 +42,7 @@ export default function PageFamilyTabs({
         options={options}
         active={activePageTab(def, active)}
         scrollable
+        showPro={showPro}
         onChange={(key) => {
           if (key === active) return;
           if (onLocalSelect?.(key)) return;

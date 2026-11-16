@@ -9,7 +9,7 @@ test('League Overview redirects to Dashboard with the league params', () => {
   assert.deepEqual(resolveLegacyRedirect('LeagueDetail', league), { name: 'Dashboard', params: league });
 });
 
-test('GM Targets redirects to the GM Plan Watching tab', () => {
+test('Watchlist redirects to the GM Plan Watching tab', () => {
   assert.deepEqual(resolveLegacyRedirect('GmTargets', league), {
     name: 'GmPlan',
     params: { ...league, initialTab: 'watching' },

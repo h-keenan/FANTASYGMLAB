@@ -69,12 +69,12 @@ describe("DashboardContent", () => {
     expect(screen.getByText("Trade for a top-12 RB before the deadline")).toBeInTheDocument();
 
     // My Team is one compact module: its collapsed summary carries the ranks; the tiles open on tap.
-    expect(screen.getByRole("group", { name: /^My Team: .*Power/ })).toBeInTheDocument();
+    expect(screen.getByRole("group", { name: /^My Team: .*This season/ })).toBeInTheDocument();
     fireEvent.click(screen.getByTestId("stat-strip-toggle"));
     // Record lives once, in the "Your team right now" hero, not repeated in the tiles.
     expect(screen.getByRole("heading", { name: "Your team right now" })).toBeInTheDocument();
     expect(await screen.findAllByText("Record")).toHaveLength(1);
-    expect(screen.getAllByText("Power Rank")).toHaveLength(1);
+    expect(screen.getAllByText("This season").length).toBeGreaterThan(0); // the tile and its rank bar
     expect(screen.getByText("Starter Strength")).toBeInTheDocument();
     expect(screen.getByText("Bench Strength")).toBeInTheDocument();
     expect(screen.getByText("Injured starters")).toBeInTheDocument();

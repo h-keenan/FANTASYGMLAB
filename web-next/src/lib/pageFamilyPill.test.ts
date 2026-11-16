@@ -7,7 +7,7 @@ describe("pageFamilyPill", () => {
     const c = routeFamilyPillContext("/trade-finder/9", "9", "My League");
     expect(c?.id).toBe("family:trades");
     expect(c?.activeKey).toBe("trade_finder");
-    expect(c?.tabs.map((t) => t.label)).toEqual(["Hub", "Finder", "Analyzer", "History"]);
+    expect(c?.tabs.map((t) => t.label)).toEqual(["Ideas", "Finder", "Grade a trade", "History"]);
     expect(c?.primary).toBeUndefined(); // no lone glyph chip: the Analyzer is already a tab
     expect(c?.tabs.find((t) => t.key === "trade_analyzer")?.href).toBe("/trade-analyzer/9?name=My%20League");
     expect(routeFamilyPillContext("/league-recaps/9", "9", "L")?.activeKey).toBe("recaps");

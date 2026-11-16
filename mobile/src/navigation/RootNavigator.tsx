@@ -212,7 +212,7 @@ function withEspnGate(Screen: React.ComponentType<any>): React.ComponentType<any
 }
 
 // Retired routes kept as redirects (deep links, push taps, stale nav state):
-// League Overview -> Dashboard, GM Targets / Team Situation -> GM Plan tabs.
+// League Overview -> Dashboard, Watchlist / Team Situation -> GM Plan tabs.
 const LeagueDetailRedirect = createLegacyRedirectScreen('LeagueDetail');
 const GmTargetsRedirect = createLegacyRedirectScreen('GmTargets');
 const TeamStanceRedirect = createLegacyRedirectScreen('TeamStance');

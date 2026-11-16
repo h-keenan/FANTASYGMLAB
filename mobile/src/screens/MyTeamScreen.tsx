@@ -1,3 +1,4 @@
+import { TERMS } from '../lib/terms';
 import GlossaryNote from '../components/GlossaryNote';
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { ScrollView, StyleSheet, View } from 'react-native';
@@ -463,7 +464,7 @@ function ordinal(n: number): string {
   return `${n}${suffix}`;
 }
 
-/** The six rank tiles as a StatStripModule: collapsed "Record 3-5 · Power #3 · Franchise #5 · Starters #2". */
+/** The six rank tiles as a StatStripModule: collapsed "Record 3-5 · This season #3 · Long term #5 · Starters #2". */
 function TeamSnapshotModule({ team, open, leagueSize }: { team: TeamRanking | null; open: (key: InsightKey) => () => void; leagueSize: number }) {
   const record = team ? `${team.wins ?? 0}-${team.losses ?? 0}${team.ties ? `-${team.ties}` : ''}` : '—';
   const rank = (value: number | null | undefined, tied: boolean | undefined) => (value != null ? formatRank(value, Boolean(tied)) : '—');
@@ -473,10 +474,10 @@ function TeamSnapshotModule({ team, open, leagueSize }: { team: TeamRanking | nu
       title="Team Snapshot"
       items={[
         { label: 'Record', icon: 'ribbon-outline', value: record, fill: team ? winShare(team.wins, team.losses, team.ties) : null, onPress: open('record') },
-        { label: 'Power Rank', icon: 'flash-outline', value: rank(team?.power_rank, team?.power_rank_tied), fill: rankFill(team?.power_rank, leagueSize), onPress: open('power') },
-        { label: 'Franchise Rank', icon: 'star-outline', value: rank(team?.franchise_rank, team?.franchise_rank_tied), fill: rankFill(team?.franchise_rank, leagueSize), onPress: open('franchise') },
-        { label: 'Starter Strength', icon: 'american-football-outline', value: rank(team?.starter_rank, team?.starter_rank_tied), fill: rankFill(team?.starter_rank, leagueSize), onPress: open('starter') },
-        { label: 'Bench Strength', icon: 'people-outline', value: rank(team?.bench_rank, team?.bench_rank_tied), fill: rankFill(team?.bench_rank, leagueSize), onPress: open('bench') },
+        { label: TERMS.thisSeason, why: 'power_rank', icon: 'flash-outline', value: rank(team?.power_rank, team?.power_rank_tied), fill: rankFill(team?.power_rank, leagueSize), onPress: open('power') },
+        { label: TERMS.longTerm, why: 'franchise_rank', icon: 'star-outline', value: rank(team?.franchise_rank, team?.franchise_rank_tied), fill: rankFill(team?.franchise_rank, leagueSize), onPress: open('franchise') },
+        { label: 'Starter Strength', why: 'starter_strength', icon: 'american-football-outline', value: rank(team?.starter_rank, team?.starter_rank_tied), fill: rankFill(team?.starter_rank, leagueSize), onPress: open('starter') },
+        { label: 'Bench Strength', why: 'bench_strength', icon: 'people-outline', value: rank(team?.bench_rank, team?.bench_rank_tied), fill: rankFill(team?.bench_rank, leagueSize), onPress: open('bench') },
         { label: 'Avg Age', icon: 'hourglass-outline', value: team?.average_age != null ? team.average_age.toFixed(1) : '—', onPress: open('age') },
       ]}
       footer={<GlossaryNote terms={['powerRank', 'franchiseRank', 'starterStrength', 'benchStrength', 'averageAge', 'draftPicks', 'pqv', 'superflex', 'tep']} />}

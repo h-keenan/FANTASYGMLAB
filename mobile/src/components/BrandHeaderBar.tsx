@@ -1,3 +1,4 @@
+import { TERMS } from '../lib/terms';
 import React, { useMemo } from 'react';
 import { StyleSheet, View } from 'react-native';
 import PressableScale from './PressableScale';
@@ -20,7 +21,7 @@ import { spacing, type ThemeColors } from '../theme';
  * used to sit below a second, redundant repeat of both (ScreenHero, removed
  * per coridian_: "the top of many of the pages looks bad and pasted text").
  *
- * Star and "…" are real navigation shortcuts (GM Targets, More), not
+ * Star and "…" are real navigation shortcuts (Watchlist, More), not
  * decorative — this app's rule is no button that does nothing.
  */
 export default function BrandHeaderBar({
@@ -82,7 +83,7 @@ export default function BrandHeaderBar({
             hitSlop={8}
             onPress={() => navigation.navigate('GmPlan', { leagueId, leagueName, initialTab: 'watching' })}
             accessibilityRole="button"
-            accessibilityLabel="GM Targets"
+            accessibilityLabel={TERMS.watchlist}
           >
             <Ionicons name="star-outline" size={17} color={colors.accent} />
           </PressableScale>

@@ -1,5 +1,5 @@
 /**
- * GM Targets (Revision 11) presentation helpers — pure formatting only.
+ * Watchlist (Revision 11) presentation helpers — pure formatting only.
  * The watchlist itself (modules/gm_targets.py) is a thin preference table;
  * this page joins its rows against GET .../rankings for display, the same
  * client-side join mobile's GmTargetsScreen.tsx already does. No scoring,
@@ -25,7 +25,7 @@ const TARGET_ORIGIN_LABEL: Record<string, string> = {
   player_quick_view: "Added from Player Quick View",
   player_detail: "Added from Player Detail",
   team_stance: "Protected via Team Situation",
-  gm_targets: "Added from GM Targets",
+  gm_targets: "Added from Watchlist",
 };
 
 export function targetOriginLabel(sourceSurface: string | null | undefined): string | null {

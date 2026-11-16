@@ -41,7 +41,7 @@ describe("shellTabs", () => {
     expect(tabs[4].href).toBeUndefined();
   });
   it("is Home / Portfolio / Fantasy Sim / News / More outside a league", () => {
-    expect(shellTabs({ leagueId: null, leagueName: "" }).map((t) => t.label)).toEqual(["Home", "Portfolio", "Fantasy Sim", "News", "More"]);
+    expect(shellTabs({ leagueId: null, leagueName: "" }).map((t) => t.label)).toEqual(["Your leagues", "Portfolio", "Fantasy Sim", "News", "More"]);
   });
 });
 
@@ -87,7 +87,7 @@ describe("shellParent (back label)", () => {
     expect(shellParent("/trade-analyzer/L1", ctx)).toEqual({ label: "Trade Hub", href: "/trade-hub/L1?name=My%20League" });
     expect(shellParent("/players/L1/4046", ctx)?.label).toBe("Players");
     expect(shellParent("/waivers/L1", ctx)?.label).toBe("Today");
-    expect(shellParent("/account", { leagueId: null, leagueName: "" })).toEqual({ label: "Home", href: "/" });
+    expect(shellParent("/account", { leagueId: null, leagueName: "" })).toEqual({ label: "Your leagues", href: "/" });
   });
   it("has no back on a tab root or in the game", () => {
     expect(shellParent("/dashboard/L1", ctx)).toBeNull();
@@ -107,6 +107,6 @@ describe("league context for account-wide pages reached from a league (Trade His
   it("prefers the path league and stays outside a league when neither is given", () => {
     expect(shellLeagueContext("P1", new URLSearchParams("league=Q&name=N"), "League").leagueId).toBe("P1");
     expect(shellLeagueContext(null, new URLSearchParams(""), "League")).toEqual({ leagueId: null, leagueName: "" });
-    expect(shellParent("/trade-history", { leagueId: null, leagueName: "" })).toEqual({ label: "Home", href: "/" });
+    expect(shellParent("/trade-history", { leagueId: null, leagueName: "" })).toEqual({ label: "Your leagues", href: "/" });
   });
 });

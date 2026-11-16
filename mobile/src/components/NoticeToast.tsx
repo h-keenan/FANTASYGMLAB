@@ -9,7 +9,7 @@ import { radii, shadows, spacing, type ThemeColors } from '../theme';
 
 /**
  * The one in-app notice for failures and confirmations (UI pass 5 D7): replaces the system `Alert.alert` popups
- * ("Could not update GM Targets", "Could not rename league", ...) that ignored the theme and needed a tap. It rises above the
+ * ("Could not update Watchlist", "Could not rename league", ...) that ignored the theme and needed a tap. It rises above the
  * bottom pill through the shared ToastSlot / Presence, announces itself to screen readers, and clears itself (errors last
  * longest). A newer notice replaces the current one. Decisions that need a button (delete account, confirms) stay dialogs.
  * `notify(message, tone)`, or `notify.alert(title, detail)` as the drop-in for the old two-argument alert.

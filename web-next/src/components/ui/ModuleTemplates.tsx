@@ -7,6 +7,7 @@ import { AccentCard } from "@/components/AccentCard";
 import { FillBar } from "@/components/SnapshotTile";
 import type { StatStripItem } from "@/components/StatStrip";
 import { InsightLink } from "@/components/ui/InsightLink";
+import { WhyCorner } from "@/components/ui/TapForWhy";
 import { TrendChart } from "@/components/ui/TrendChart";
 import { compactAriaLabel, compactParts, compactSummaryText, type CompactPart, type CompactTone } from "@/lib/compactModule";
 import type { ChartInputPoint } from "@/lib/chartSeries";
@@ -163,13 +164,17 @@ export function StatStripModule({
         {action}
       </div>
       <div className="grid gap-2" style={{ gridTemplateColumns: `repeat(auto-fit, minmax(max(5.75rem, calc((100% - ${(cols - 1) * 0.5}rem) / ${cols})), 1fr))` }} role="group" aria-label={`${title}: ${summary}`} data-testid="stat-strip-tiles">
-        {items.map(({ insight, ...item }) => {
+        {items.map(({ insight, why, ...item }) => {
           const tile = <StatStripTile key={item.label} item={item} />;
           if (!insight || !league) return tile;
+          // The tile opens the board; the corner "?" (its own 44px target) explains the number, one tap for everyone.
           return (
-            <InsightLink key={item.label} insight={insight} league={league} spoken={[item.label, item.value, item.note]} noChevron>
-              {tile}
-            </InsightLink>
+            <div key={item.label} className="relative flex flex-col">
+              <InsightLink insight={insight} league={league} spoken={[item.label, item.value, item.note]} noChevron>
+                {tile}
+              </InsightLink>
+              {why ? <WhyCorner metric={why} spoken={item.label} /> : null}
+            </div>
           );
         })}
       </div>
@@ -239,11 +244,9 @@ function StatStripTile({ item }: { item: Omit<StatStripItem, "insight"> }) {
   );
 }
 
-/** "Power Rank" -> "Power", "Starter Strength" -> "Starters", "Avg Age" -> "Age": the summary line uses the short noun. */
+/** "Starter Strength" -> "Starters", "Avg Age" -> "Age": the summary line uses the short noun. */
 export function shortLabel(label: string): string {
   const map: Record<string, string> = {
-    "Power Rank": "Power",
-    "Franchise Rank": "Franchise",
     "Starter Strength": "Starters",
     "Bench Strength": "Bench",
     "Avg Age": "Age",

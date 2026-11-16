@@ -19,9 +19,9 @@ test('each Trades tab opens the same initialTab key the orb search passes', () =
   }
 });
 
-test('the web wording is Hub / Finder / Analyzer', () => {
+test('the web wording is Ideas / Finder / Grade a trade', () => {
   assert.deepEqual(
     TRADES_TAB_OPTIONS.map((tab) => tab.label),
-    ['Hub', 'Finder', 'Analyzer'],
+    ['Ideas', 'Finder', 'Grade a trade'],
   );
 });

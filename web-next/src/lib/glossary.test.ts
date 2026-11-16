@@ -41,7 +41,7 @@ describe("GLOSSARY", () => {
   });
 
   it("stays identical to mobile's copy apart from the import line", () => {
-    const body = (source: string) => source.split("\n").slice(1).join("\n");
+    const body = (source: string) => source.split("\n").filter((line) => !line.startsWith("import ")).join("\n");
     const web = readFileSync(path.resolve(__dirname, "glossary.ts"), "utf8");
     const mobile = readFileSync(path.resolve(__dirname, "../../../mobile/src/lib/glossary.ts"), "utf8");
     expect(body(mobile)).toBe(body(web));

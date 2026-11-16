@@ -7,7 +7,8 @@ import PressableScale from './PressableScale';
 import TabIcon from './TabIcon';
 import { useThemeMode } from '../context/ThemeModeContext';
 import { LinearGradient } from 'expo-linear-gradient';
-import { normalizePillContext, pillActiveIndex, pillPrimaryCompact, pillScrollTarget, pillTabText, type PillContext } from '../lib/bottomNav';
+import ToneBadge from './ToneBadge';
+import { normalizePillContext, pillActiveIndex, tabShowsPro, pillPrimaryCompact, pillScrollTarget, pillTabText, type PillContext } from '../lib/bottomNav';
 import { BAR_METRICS } from '../lib/bottomBarMetrics';
 import { EASE, MOTION_MS } from '../lib/motion';
 import { radii, type ThemeColors } from '../theme';
@@ -23,7 +24,7 @@ import { usePresence } from '../lib/usePresence';
  * (lib/presence.ts). Stays an in-flow block in the screen's bottom stack (never absolutely positioned to the screen), so
  * content padding rules are unchanged.
  */
-export default function BottomPill({ children, segment: rawContext, orb, style, testID, bare, contextOnly }: { children: React.ReactNode; segment?: PillContext | null; /** The persistent orb. */ orb?: React.ReactNode; style?: StyleProp<ViewStyle>; testID?: string; /** Already inside a glass pill (the Sim bars): draw no chrome of its own. */ bare?: boolean; /** No action row (the draft room has no action bar): the page segment alone. */ contextOnly?: boolean }) {
+export default function BottomPill({ children, segment: rawContext, orb, style, testID, bare, contextOnly, showPro = false }: { children: React.ReactNode; segment?: PillContext | null; /** The persistent orb. */ orb?: React.ReactNode; style?: StyleProp<ViewStyle>; testID?: string; /** Already inside a glass pill (the Sim bars): draw no chrome of its own. */ bare?: boolean; /** No action row (the draft room has no action bar): the page segment alone. */ contextOnly?: boolean; /** The person is known not to be on Pro (useShowProTags): paid segment tabs wear the Pro marker. */ showPro?: boolean }) {
   const { colors } = useThemeMode();
   const styles = useMemo(() => createStyles(colors), [colors]);
   const live = normalizePillContext(rawContext);
@@ -83,7 +84,7 @@ export default function BottomPill({ children, segment: rawContext, orb, style, 
                   <PressableScale
                     key={tab.key}
                     accessibilityRole="tab"
-                    accessibilityLabel={tab.label}
+                    accessibilityLabel={tabShowsPro(tab, showPro) ? `${tab.label}, Pro feature` : tab.label}
                     accessibilityState={{ selected: on }}
                     onPress={() => context.onSelect(tab.key)}
                     onLayout={(e) => { tabX.current[tab.key] = { x: e.nativeEvent.layout.x, w: e.nativeEvent.layout.width }; }}
@@ -92,6 +93,7 @@ export default function BottomPill({ children, segment: rawContext, orb, style, 
                     <AppText style={[styles.tabText, on && styles.tabTextOn]} numberOfLines={1}>
                       {pillTabText(tab)}
                     </AppText>
+                    {tabShowsPro(tab, showPro) ? <ToneBadge label="Pro" color={colors.premium} size="xs" style={styles.tabPro} /> : null}
                   </PressableScale>
                 );
               })}
@@ -149,7 +151,8 @@ function createStyles(colors: ThemeColors) {
     tabsContent: { flexGrow: 1, alignItems: 'center', gap: 1 },
     fadeEnd: { position: 'absolute', right: 0, top: 0, bottom: 0, width: 18 },
     fadeStart: { position: 'absolute', left: 0, top: 0, bottom: 0, width: 18 },
-    tab: { minHeight: target, paddingHorizontal: 5, alignItems: 'center', justifyContent: 'center', borderRadius: radii.pill, flexShrink: 0, flexGrow: 1 },
+    tab: { minHeight: target, paddingHorizontal: 5, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', borderRadius: radii.pill, flexShrink: 0, flexGrow: 1 },
+    tabPro: { marginLeft: 4 },
     tabOn: { backgroundColor: colors.glassInset },
     tabText: { fontSize: 12, fontWeight: '700', color: colors.textTertiary },
     tabTextOn: { color: colors.textPrimary },

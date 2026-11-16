@@ -21,7 +21,14 @@ export type WhyMetricId =
   | "confidence"
   | "usage_trend"
   | "projection"
-  | "age";
+  | "age"
+  | "power_rank"
+  | "franchise_rank"
+  | "starter_strength"
+  | "bench_strength"
+  | "posture"
+  | "buy_low"
+  | "sell_high";
 
 export type WhyEntry = {
   id: WhyMetricId;
@@ -123,6 +130,43 @@ export const WHY_REGISTRY: Record<WhyMetricId, WhyEntry> = {
     id: "age",
     title: "Age",
     sentences: [BEGINNER_HELP.averageAge],
+  },
+  // The team ranks on Today and My Team. Display names come from lib/terms.ts ("This season", "Long term"); the ids keep
+  // the engine's power / franchise names.
+  power_rank: {
+    id: "power_rank",
+    title: "What \"This season\" means",
+    sentences: [BEGINNER_HELP.powerRank],
+  },
+  franchise_rank: {
+    id: "franchise_rank",
+    title: "What \"Long term\" means",
+    sentences: [BEGINNER_HELP.franchiseRank],
+  },
+  starter_strength: {
+    id: "starter_strength",
+    title: "What starter strength means",
+    sentences: [BEGINNER_HELP.starterStrength],
+  },
+  bench_strength: {
+    id: "bench_strength",
+    title: "What bench strength means",
+    sentences: [BEGINNER_HELP.benchStrength],
+  },
+  posture: {
+    id: "posture",
+    title: "What posture means",
+    sentences: [BEGINNER_HELP.tradeHubPosture],
+  },
+  buy_low: {
+    id: "buy_low",
+    title: "What Buy Low means",
+    sentences: [BEGINNER_HELP.impactBuyLow],
+  },
+  sell_high: {
+    id: "sell_high",
+    title: "What Sell High means",
+    sentences: [BEGINNER_HELP.impactSellHigh],
   },
 };
 
