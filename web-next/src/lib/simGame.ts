@@ -264,6 +264,8 @@ export interface SimGameSettings {
   flex_type?: SimFlexType;
   /** 1 = kickers and defenses can be traded; older saves omit it and never could. */
   kd_v?: number;
+  /** 1 = a kicker / defense trades like any position (valued by the upgrade, the worse one cut, blockable); older saves omit it. */
+  pos_v?: number;
   include_k?: boolean;
   include_def?: boolean;
   bench?: number;
@@ -1570,6 +1572,16 @@ export function simPositionsFor(slots: SimSlot[] | undefined): SimPos[] {
 /** Can a player of `pos` go in a trade in this game? Kickers and defenses can once the save carries kd_v 1 (older saves: never). */
 export function simTradableIn(settings: Pick<SimGameSettings, "kd_v"> | undefined, pos: SimPos): boolean {
   return (settings?.kd_v ?? 0) >= 1 || simTradable(pos);
+}
+
+/** Can this player go on the trade block? A kicker or defense can once the save carries pos_v 1 (with kd_v 1); older saves keep them off. */
+export function simBlockable(settings: Pick<SimGameSettings, "kd_v" | "pos_v"> | undefined, pos: SimPos): boolean {
+  return simTradable(pos) || ((settings?.pos_v ?? 0) >= 1 && (settings?.kd_v ?? 0) >= 1);
+}
+
+/** The one-per-team warning only exists on a save from before pos_v: from pos_v 1 the AI takes a second kicker on value and cuts the worse one. */
+export function simSingletonRuleOn(settings: Pick<SimGameSettings, "kd_v" | "pos_v"> | undefined): boolean {
+  return (settings?.kd_v ?? 0) >= 1 && (settings?.pos_v ?? 0) < 1;
 }
 
 const SINGLE_NOUN: Record<string, string> = { K: "kicker", DEF: "defense" };

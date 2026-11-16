@@ -47,6 +47,7 @@ def _settings(world: bool, **extra) -> GameSettings:
         d.pop("stability_v", None)  # ... and before stability_v
         d.pop("vorp_v", None)  # ... and before vorp_v
         d.pop("advice_v", None)  # ... and before advice_v
+        d.pop("pos_v", None)  # ... and before pos_v
     return GameSettings.from_dict(d)
 
 

@@ -15,6 +15,7 @@ from typing import Any, Iterable, Sequence
 
 from modules.sim.game_eval import NEED_K, USER_PARAMS, Evaluator, convex, team_params
 from modules.sim.game_state import GameState
+from modules.sim.game_need import position_report
 from modules.sim.game_types import NON_TRADABLE, SINGLETON_POSITIONS, GameError, GameSnapshot, slot_positions
 from modules.sim.lineup import pick_lineup
 from modules.sim.personas import PERSONAS, TeamParams
@@ -199,6 +200,7 @@ class TradeDesk:
         self._noise: dict[str, float] = {}
         self._params: dict[str, TeamParams] = {}
         self._cover: list[str] | None = None
+        self._levels: dict[str, list[dict[str, Any]]] | None = None
 
     def params(self, tid: str) -> TeamParams:
         if tid not in self._params:
@@ -236,6 +238,9 @@ class TradeDesk:
         # Picks never touch the roster; a taxi/IR player who arrives is active (and counts) here.
         roster = [p for p in self.state.rosters[tid] if p not in give_set] + [p for p in get if not is_pick_id(p)]
         dropped: list[str] = []
+        if self.snap.settings.pos_rules:  # pos_v 1: a team keeps one kicker / defense, so the worse of two is cut first (its worth is a cost of the deal)
+            dropped = surplus_singletons(self.snap, self.ev, params, roster)
+            roster = [p for p in roster if p not in dropped]
         limit = self.snap.settings.roster_limit
         while len(roster) > limit:
             starters = {pid for _, pid in pick_lineup(self.ev.plan, self.ev.entries(roster, self.week, bye=False))[0] if pid}
@@ -296,20 +301,37 @@ class TradeDesk:
     def tradable(self, tid: str) -> list[str]:
         """What the AI itself puts in or asks for in a trade (its own offers, AI-AI deals, counters): every player it owns
         (active, IR, taxi) except kickers and defenses, plus its picks when the mode trades them. The user may trade a K or
-        DEF (settings.kd_v 1, see validate_offer); the AI never builds a deal around one, so it never crafts a nonsense kicker counter."""
+        DEF (settings.kd_v 1, see validate_offer); the AI never shops its own, but from pos_v 1 it can ask for or counter with the user's (it values
+        one by the upgrade over its starter and cuts the worse one, see ``after_roster``)."""
 
-        out = [p for p in self.state.holdings(tid) if self.snap.players[p].pos not in NON_TRADABLE]
+        out = [p for p in self.state.holdings(tid) if self.snap.players[p].pos not in NON_TRADABLE or (self.snap.settings.pos_rules and tid == self.snap.user_team.tid)]
         if self.snap.settings.policy.dynasty:
             out += self.state.picks_of(tid)
         return out
 
     # --------------------------------------------------------------- needs
 
+    def position_levels(self) -> dict[str, list[dict[str, Any]]]:
+        """The shared per-team, per-position strength report (``game_need.position_report``) for this desk's moment: the Needs / Strength tags are read from it."""
+
+        if self._levels is None:
+            self._levels = position_report(self.snap, self.ev)
+        return self._levels
+
     def need_position(self, tid: str) -> tuple[str, float]:
         """The position ``tid`` is weakest at relative to the league, with the
         ratio (1.0 = league average)."""
 
         snap, state, ev = self.snap, self.state, self.ev
+        if snap.settings.pos_rules:
+            # pos_v 1: the Needs tag itself. Every position the league has (kicker and defense included) is ranked by the one shared report; a position
+            # tagged "need" there is a need here (ratio 0.0, below every cut-off), anything else is not (1.0). The tag and the valuation cannot disagree.
+            entries = self.position_levels()[tid]
+            needy = [e for e in entries if e["level"] == "need"]
+            if needy:
+                worst = max(needy, key=lambda e: (e["rank"], -e["strength"]))
+                return worst["pos"], 0.0
+            return (min(entries, key=lambda e: (-e["rank"], e["pos"]))["pos"] if entries else "RB"), 1.0
         slots = snap.settings.slots
         starters = {pos: max(1, sum(1 for s in slots if s == pos)) for pos in ("QB", "RB", "WR", "TE")}
         starters["QB"] += slots.count("SUPER_FLEX")  # a superflex league starts a second quarterback
@@ -420,7 +442,7 @@ class TradeDesk:
         def consider(give: tuple[str, ...], get: tuple[str, ...], asked: list[str], removed: list[str], cost: float, tag: str) -> None:
             if not (self.legal_for_counter(ai, get, give) and self.legal_for_counter(user, give, get)):
                 return
-            if not snap.settings.non_tradable and singleton_violation(snap, state, ai, give, get) is not None:
+            if not snap.settings.non_tradable and not snap.settings.pos_rules and singleton_violation(snap, state, ai, give, get) is not None:
                 return  # a counter is a deal the user can send: never one that leaves a team with two kickers or two defenses
             ok, margin, _, need, _ = self.ai_accepts(ai, give, get)
             if not ok:
@@ -449,7 +471,7 @@ class TradeDesk:
         if len(user_gets) > 1 and not need_pos:
             for p in user_gets:
                 give, removed = tuple(user_gives), [p]
-                if not snap.settings.non_tradable and not is_pick_id(p) and snap.players[p].pos in SINGLETON_POSITIONS:
+                if not snap.settings.non_tradable and not snap.settings.pos_rules and not is_pick_id(p) and snap.players[p].pos in SINGLETON_POSITIONS:
                     # His kicker (defense) stays home, so a one-for-one swap cannot stay half done: yours stays home with it.
                     removed += [g for g in user_gives if not is_pick_id(g) and snap.players[g].pos == snap.players[p].pos]
                     give = tuple(g for g in user_gives if g not in removed)
@@ -602,13 +624,24 @@ def validate_offer(snap: GameSnapshot, state: GameState, partner: str, give: Seq
             elif snap.players[pid].pos in snap.settings.non_tradable:
                 raise ValueError("Kickers and defenses cannot be traded.")
     # Kickers and defenses are one per roster: a trade may not leave either team with two of one (it can swap them one for one).
-    if not snap.settings.non_tradable:
+    if not snap.settings.non_tradable:  # (empty from pos_v 1: the AI takes a second kicker on value and cuts the worse one)
         hits = singleton_violations(snap, state, partner, give, get)
         if hits:
             raise GameError("singleton_limit", singleton_message(snap, partner, hits), singleton=singleton_detail(snap, partner, hits))
 
 
 SINGLE_NOUN = {"K": "kicker", "DEF": "defense"}
+
+
+def surplus_singletons(snap: GameSnapshot, ev: Evaluator, params: TeamParams, roster: Sequence[str]) -> list[str]:
+    """pos_v 1: the kickers / defenses a roster holds beyond its one of each: all but the one its manager values most (ties by id). The single rule
+    both a trade's valuation (``TradeDesk.after_roster``) and its execution (``enforce_roster_cap``) use, so what the AI priced is what it does."""
+
+    out: list[str] = []
+    for pos in SINGLETON_POSITIONS:
+        held = sorted((p for p in roster if snap.players[p].pos == pos), key=lambda p: (-ev.worth(params, p), p))
+        out += held[1:]
+    return out
 
 
 def singleton_violations(snap: GameSnapshot, state: GameState, partner: str, give: Sequence[str], get: Sequence[str]) -> list[tuple[str, str]]:
@@ -618,6 +651,8 @@ def singleton_violations(snap: GameSnapshot, state: GameState, partner: str, giv
     has one K (and one DEF) slot and every manager (waivers, cuts, need) is built around one per roster, so a second one is a dead roster spot
     that the AI would have to cut; the deal is refused up front, with the way out, rather than left for the AI to decline or cut."""
 
+    if snap.settings.pos_rules:
+        return []
     user = snap.user_team.tid
     out: list[tuple[str, str]] = []
     for tid, leaving, arriving in ((user, give, get), (partner, get, give)):

@@ -417,9 +417,9 @@ def test_trade_validation_and_gating(season):
         {"partner": "99", "give": [a["id"]], "get": [b["id"]]},
     ):
         assert client.post(f"/v1/sim/games/{gid}/trades/preview", json=body, headers=hdr()).status_code == 422, body
-    # A kicker is tradable in a new game, but one per roster: kicker for a non-kicker would leave them with two.
+    # A kicker is tradable in a new game and (pos_v 1) valued like any position: no "one per team" refusal, a real verdict on value.
     got = client.post(f"/v1/sim/games/{gid}/trades/preview", json={"partner": "1", "give": [kicker["id"]], "get": [b["id"]]}, headers=hdr())
-    assert got.status_code == 200 and got.json()["reason"] == "singleton_limit"
+    assert got.status_code == 200 and got.json()["reason"] != "singleton_limit" and got.json()["verdict"]["decision"] in ("accept", "counter", "decline")
 
 
 def test_inbox_offers_and_respond(season):

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { simSingletonMessage, simSingletonWarnings, simTradeSeedFor } from "@/lib/simGame";
+import { simBlockable, simSingletonRuleOn, simSingletonMessage, simSingletonWarnings, simTradeSeedFor } from "@/lib/simGame";
 
 const me = [{ id: "mk", pos: "K" }, { id: "md", pos: "DEF" }, { id: "mw", pos: "WR" }] as never[];
 const them = [{ id: "tk", pos: "K" }, { id: "td", pos: "DEF" }, { id: "tw", pos: "WR" }] as never[];
@@ -35,5 +35,19 @@ describe("kicker and defense warnings", () => {
     const k = { id: "tk", pos: "K" as const, owner: { type: "team", team_id: "t1" } } as never;
     expect(simTradeSeedFor(k, { kd_v: 0 })).toBeNull();
     expect(simTradeSeedFor(k, { kd_v: 1 })).toEqual({ partner: "t1", get: "tk" });
+  });
+});
+
+describe("pos_v: kickers and defenses trade like any position", () => {
+  it("can be blocked only with pos_v 1 (and kd_v 1)", () => {
+    expect(simBlockable({ kd_v: 1, pos_v: 1 }, "K")).toBe(true);
+    expect(simBlockable({ kd_v: 1, pos_v: 1 }, "DEF")).toBe(true);
+    expect(simBlockable({ kd_v: 1 }, "K")).toBe(false);
+    expect(simBlockable({ kd_v: 1 }, "WR")).toBe(true);
+  });
+  it("the one-per-team warning only exists before pos_v", () => {
+    expect(simSingletonRuleOn({ kd_v: 1 })).toBe(true);
+    expect(simSingletonRuleOn({ kd_v: 1, pos_v: 1 })).toBe(false);
+    expect(simSingletonRuleOn({})).toBe(false);
   });
 });
