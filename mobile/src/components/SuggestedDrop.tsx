@@ -273,7 +273,7 @@ export function SharedDropNote({ drop, count }: { drop: DropPlayer; count: numbe
         accessibilityLabel={`Drop candidate ${drop.name}, for ${count} adds below`}
       >
         <View style={[styles.badge, { borderColor: `${colors.danger}70`, backgroundColor: `${colors.danger}1A` }]}>
-          <AppText style={[styles.badgeText, { color: colors.danger }]}>Drop candidate</AppText>
+          <AppText style={[styles.badgeText, { color: colors.danger }]}>Drop</AppText>
         </View>
         <PlayerAvatar playerId={drop.player_id} size={24} />
         <View style={{ flex: 1, minWidth: 0 }}>

@@ -29,6 +29,21 @@ describe("money guard", () => {
     expect(offenders).toEqual([]);
   });
 
+  it("every component that builds an amount paints it through <Money> (no non-green $ text)", () => {
+    const BUILDS = /\b(formatMoney|formatMoneyRange|faabRangeText|waiversHeaderParts)\(/;
+    const offenders = walk(SRC)
+      .filter((f) => f.endsWith(".tsx"))
+      .filter((f) => BUILDS.test(readFileSync(f, "utf8")) && !/from "@\/components\/Money"/.test(readFileSync(f, "utf8")))
+      .map((f) => f.slice(SRC.length + 1));
+    expect(offenders).toEqual([]);
+  });
+
+  it("the shared value renderers (stat tiles, player rows, compact modules) paint amounts through <Money>", () => {
+    for (const f of ["components/SnapshotTile.tsx", "components/ui/PlayerAccordionRow.tsx", "components/ui/CompactModule.tsx", "components/WaiversContent.tsx"]) {
+      expect(readFileSync(join(SRC, f), "utf8"), f).toContain('from "@/components/Money"');
+    }
+  });
+
   it("formats and splits amounts", () => {
     expect(formatMoney(81)).toBe("$81");
     expect(formatMoney(3.99)).toBe("$3.99");

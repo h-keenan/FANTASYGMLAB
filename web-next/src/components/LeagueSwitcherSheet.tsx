@@ -12,6 +12,7 @@ import { SkeletonBlock } from "@/components/Skeleton";
 import { Sheet } from "@/components/ui/Sheet";
 import { VALUATION_LENS_OPTIONS, useValuationLens } from "@/context/ValuationLensContext";
 import { filterLeagues, SWITCHER_SEARCH_FROM } from "@/lib/appHeader";
+import { markOverlayNavigating } from "@/lib/overlayHistory";
 import { swapLeagueIdInPath } from "@/lib/leagueSwitcher";
 import type { SavedLeagueRow, SavedLeaguesStatus } from "@/lib/useSavedLeagues";
 
@@ -76,8 +77,13 @@ export function LeagueSwitcherSheet({
                   type="button"
                   aria-current={current ? "true" : undefined}
                   onClick={() => {
+                    if (current) {
+                      onClose();
+                      return;
+                    }
+                    // A button, not a link: tell the overlay history a navigation is starting, or closing the sheet walks history Back over it.
+                    markOverlayNavigating();
                     onClose();
-                    if (current) return;
                     const newPath = swapLeagueIdInPath(pathname || "", leagueId, row.league_id);
                     router.push(`${newPath}?name=${encodeURIComponent(row.league_name || row.league_id)}`);
                   }}

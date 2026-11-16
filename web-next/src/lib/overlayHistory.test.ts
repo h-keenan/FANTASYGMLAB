@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { installOverlayHistory } from "./overlayHistory";
+import { installOverlayHistory, markOverlayNavigating } from "./overlayHistory";
 import { createOverlayStack } from "./overlayStack";
 
 const flush = () => new Promise<void>((resolve) => queueMicrotask(resolve));
@@ -63,6 +63,17 @@ describe("overlay history integration", () => {
     stack.open({ id: "a", kind: "sheet", title: "A", dismiss: () => {} });
     await flush();
     handle.reset();
+    stack.close("a");
+    await flush();
+    expect(go).not.toHaveBeenCalled();
+  });
+
+  it("markOverlayNavigating (a button row that calls router.push, e.g. the league switcher) keeps close from walking history back", async () => {
+    const go = vi.spyOn(window.history, "go").mockImplementation(() => {});
+    const { stack } = setup();
+    stack.open({ id: "a", kind: "sheet", title: "A", dismiss: () => {} });
+    await flush();
+    markOverlayNavigating();
     stack.close("a");
     await flush();
     expect(go).not.toHaveBeenCalled();

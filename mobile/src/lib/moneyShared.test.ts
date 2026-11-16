@@ -33,3 +33,18 @@ test('formats and splits amounts', () => {
   assert.equal(splitMoney('of $81 remaining')[1].money, true);
   assert.equal(splitMoney('42.5 pts').some((s) => s.money), false);
 });
+
+test('every screen/component that builds an amount paints it through <Money> (no non-green $ text)', () => {
+  const BUILDS = /\b(formatMoney|formatMoneyRange|faabDisplayText|waiversHeaderParts)\(/;
+  const offenders = walk(SRC)
+    .filter((f) => f.endsWith('.tsx'))
+    .filter((f) => BUILDS.test(readFileSync(f, 'utf8')) && !/from '(\.\.?\/)+components\/Money'|from '\.\/Money'/.test(readFileSync(f, 'utf8')))
+    .map((f) => f.slice(SRC.length + 1));
+  assert.deepEqual(offenders, []);
+});
+
+test('the shared value renderers paint amounts through <Money>', () => {
+  for (const f of ['components/MetricCard.tsx', 'components/PlayerAccordionRow.tsx', 'components/CompactModule.tsx']) {
+    assert.match(readFileSync(join(SRC, f), 'utf8'), /import Money from '\.\/Money'/, f);
+  }
+});

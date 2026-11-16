@@ -2,6 +2,7 @@ import React, { useCallback, useMemo, useState, type ReactNode } from 'react';
 import { AccessibilityInfo, LayoutAnimation, Platform, Pressable, StyleSheet, UIManager, View } from 'react-native';
 
 import AppText from './AppText';
+import Money from './Money';
 import PlayerAvatarSlot from './PlayerAvatarSlot';
 import { PlayerTap } from './PlayerOpenContext';
 import PlayerName from './PlayerName';
@@ -109,7 +110,7 @@ export default function PlayerAccordionRow({ open, onToggle, badges = [], positi
           </View>
           {model.trailing && input.mode !== 'sim' ? (
             <View style={styles.trailing}>
-              <AppText style={[styles.trailingValue, { color: toneColor(model.trailing.tone, colors) }]}>{model.trailing.value}</AppText>
+              <AppText style={[styles.trailingValue, { color: toneColor(model.trailing.tone, colors) }]}><Money>{model.trailing.value}</Money></AppText>
               <AppText style={styles.label}>{model.trailing.label}</AppText>
             </View>
           ) : null}
@@ -123,7 +124,7 @@ export default function PlayerAccordionRow({ open, onToggle, badges = [], positi
               {model.facts.map((fact: PlayerFact) => (
                 <View key={fact.key} style={styles.fact}>
                   <AppText style={styles.label}>{fact.label}</AppText>
-                  <AppText style={[styles.factValue, { color: toneColor(fact.tone, colors) }]}>{fact.value}</AppText>
+                  <AppText style={[styles.factValue, { color: toneColor(fact.tone, colors) }]}><Money>{fact.value}</Money></AppText>
                 </View>
               ))}
             </View>

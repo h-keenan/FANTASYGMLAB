@@ -2,6 +2,7 @@
 
 import { useCallback, useState, type ReactNode } from "react";
 
+import { Money } from "@/components/Money";
 import { PlayerName } from "@/components/PlayerName";
 import { PositionBadge } from "@/components/PositionBadge";
 import { LetterGrade } from "@/components/ui/LetterGrade";
@@ -36,7 +37,7 @@ function Fact({ fact }: { fact: PlayerFact }) {
   return (
     <div className="flex min-w-0 flex-col" data-fact={fact.key}>
       <span className="text-[0.6875rem] font-extrabold uppercase" style={{ color: "var(--color-text-muted)", letterSpacing: "var(--letter-spacing-badge)" }}>{fact.label}</span>
-      <span className="text-sm font-extrabold tabular-nums" style={{ color: fact.tone ? TONE[fact.tone] : "var(--color-text-primary)" }}>{fact.value}</span>
+      <span className="text-sm font-extrabold tabular-nums" style={{ color: fact.tone ? TONE[fact.tone] : "var(--color-text-primary)" }}><Money>{fact.value}</Money></span>
     </div>
   );
 }
@@ -145,7 +146,7 @@ export function PlayerAccordionRow({ open, onToggle, badges = [], positionLabel,
           </span>
           {model.trailing && input.mode !== "sim" ? (
             <span className="flex shrink-0 flex-col items-end" data-testid="row-trailing">
-              <span className="text-base font-extrabold tabular-nums leading-5" style={{ color: model.trailing.tone ? TONE[model.trailing.tone] : "var(--color-text-primary)" }}>{model.trailing.value}</span>
+              <span className="text-base font-extrabold tabular-nums leading-5" style={{ color: model.trailing.tone ? TONE[model.trailing.tone] : "var(--color-text-primary)" }}><Money>{model.trailing.value}</Money></span>
               <span className="text-[0.6875rem] font-extrabold uppercase" style={{ color: "var(--color-text-muted)", letterSpacing: "var(--letter-spacing-badge)" }}>{model.trailing.label}</span>
             </span>
           ) : null}

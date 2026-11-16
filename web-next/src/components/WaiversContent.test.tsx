@@ -240,7 +240,7 @@ describe("WaiversContent", () => {
 
     // Two rows share the cut: one group note, no per-row copy while collapsed.
     const note = screen.getByTestId("shared-drop-note");
-    expect(note).toHaveTextContent("Drop candidate");
+    expect(note).toHaveTextContent("Drop");
     expect(note).toHaveTextContent("Dead Weight");
     expect(note).toHaveTextContent("for 2 adds");
     expect(screen.queryByTestId("suggested-drop-compact")).not.toBeInTheDocument();
@@ -255,9 +255,8 @@ describe("WaiversContent", () => {
     fireEvent.click(within(rows[0]).getByRole("button", { name: /show details/ }));
     const details = within(rows[0]).getByTestId("waiver-rec-details");
     expect(details).toHaveTextContent("Value");
-    expect(within(details).getByTestId("suggested-drop-compact")).toHaveTextContent("Dead Weight");
-    fireEvent.click(within(details).getByRole("button", { name: /Why/ }));
-    expect(screen.getByTestId("suggested-drop-details")).toHaveTextContent("Add Second Add, drop Dead Weight");
+    // The group's cut is said once above the list; the expanded row does not repeat it.
+    expect(within(details).queryByTestId("suggested-drop-compact")).not.toBeInTheDocument();
   });
 
   it("a row whose cut differs from the group's says so on its own line", () => {

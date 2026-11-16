@@ -31,6 +31,8 @@ describe("header guard", () => {
     expect(shell).not.toMatch(/shell-header-league[^\n]*truncate/);
     const sheet = read(WEB, "components/LeagueSwitcherSheet.tsx");
     expect(sheet).toContain("break-words");
+    // The league rows are buttons that router.push: they must mark the navigation or closing the sheet history.go(-1)s over it.
+    expect(sheet).toMatch(/markOverlayNavigating\(\);\s*onClose\(\);/);
     expect(sheet).not.toMatch(/truncate|line-clamp|text-ellipsis/);
   });
 

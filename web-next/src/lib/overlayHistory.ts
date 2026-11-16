@@ -32,6 +32,16 @@ export function isInAppNavigationClick(event: MouseEvent, origin: string): boole
 /** How long a tap on a link / markNavigating() keeps history Back suppressed (covers a slow route transition). */
 const NAVIGATING_WINDOW_MS = 4000;
 
+let activeMarkNavigating: (() => void) | null = null;
+
+/**
+ * Call right before closing a pop-up AND calling router.push/replace from a non-link control (a button row). Same effect as tapping an
+ * in-app `<a>`: closing the pop-up must not history.go(-1) over the navigation (the "cannot change leagues from the switcher" bug).
+ */
+export function markOverlayNavigating(): void {
+  activeMarkNavigating?.();
+}
+
 export function installOverlayHistory(stack: OverlayStack, win: Window = window): { dispose: () => void; reset: () => void; markNavigating: () => void } {
   let pushed = 0;
   let ignorePops = 0;
@@ -44,6 +54,7 @@ export function installOverlayHistory(stack: OverlayStack, win: Window = window)
     if (stack.size() > 0 && isInAppNavigationClick(event, win.location.origin)) markNavigating();
   };
   win.document.addEventListener("click", onClickCapture, true);
+  activeMarkNavigating = markNavigating;
 
   const sync = () => {
     scheduled = false;
@@ -84,6 +95,7 @@ export function installOverlayHistory(stack: OverlayStack, win: Window = window)
       unsubscribe();
       win.removeEventListener("popstate", onPopState);
       win.document.removeEventListener("click", onClickCapture, true);
+      if (activeMarkNavigating === markNavigating) activeMarkNavigating = null;
     },
     reset() {
       pushed = 0;
