@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, type ReactNode } from 'react';
 import { StyleProp, StyleSheet, View, ViewStyle } from 'react-native';
 import PressableScale from './PressableScale';
 import { Ionicons } from '@expo/vector-icons';
@@ -34,6 +34,7 @@ export default function MetricCard({
   fill,
   onPress,
   centered = false,
+  labelAccessory,
   style,
 }: {
   label: string;
@@ -77,6 +78,10 @@ export default function MetricCard({
    * value shrinks to fit instead of touching the tile edge ("36,414" in a 4-up
    * row at phone width). Off by default so every other caller is unchanged. */
   centered?: boolean;
+  /** Inline after the label (e.g. the "?" explainer chip): it takes its own space in the label row, so a
+   * long label truncates instead of being covered by a corner badge (coridian_ 2026-11-16: "question marks
+   * look bad and clip"). */
+  labelAccessory?: ReactNode;
   /** Overrides the tile's own sizing (e.g. a fixed one-third `flexBasis`
    * for a caller that always renders exactly three tiles in one compact
    * row) without touching the default `minWidth: '46%'` two-up layout every
@@ -96,6 +101,7 @@ export default function MetricCard({
           <AppText style={[styles.label, centered && styles.centeredText]} numberOfLines={1}>
             {label}
           </AppText>
+          {labelAccessory ? <View style={styles.labelAccessory}>{labelAccessory}</View> : null}
         </View>
         {/* Same chevron-forward + textTertiary affordance InsightRow/
          * AwardsStrip/WaiverRecommendationCard already use to mark a row as
@@ -169,6 +175,7 @@ function createStyles(colors: ThemeColors) {
     valueCentered: { textAlign: 'center', fontVariant: ['tabular-nums'] },
     labelTextRow: { flexDirection: 'row', alignItems: 'center', flexShrink: 1 },
     labelIcon: { marginRight: 4 },
+    labelAccessory: { marginLeft: 4, flexShrink: 0 },
     label: {
       flexShrink: 1,
       fontSize: 12,
