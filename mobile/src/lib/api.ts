@@ -2630,6 +2630,8 @@ export interface PlayerAvailability {
   return_note: string;
 }
 
+export type { DepthChartData, DepthChartEntry, InjuryRecordData } from './playerDepthInjury';
+
 export interface PlayerNewsResponse {
   ok: true;
   items: NewsItem[];
@@ -4216,6 +4218,10 @@ export const api = {
     );
   },
   getNews: (limit = 30) => authorizedFetch<NewsResponse>(`/v1/news?limit=${limit}`),
+  getPlayerDepthChart: (playerId: string) =>
+    authorizedFetch<import('./playerDepthInjury').DepthChartData>(`/v1/players/${encodeURIComponent(playerId)}/depth-chart`),
+  getPlayerInjuryHistory: (playerId: string) =>
+    authorizedFetch<import('./playerDepthInjury').InjuryRecordData>(`/v1/players/${encodeURIComponent(playerId)}/injury-history`),
   getPlayerNews: (playerId: string, limit = 5, options?: { offset?: number; groupDuplicates?: boolean }) => {
     const params = new URLSearchParams({ limit: String(limit) });
     if (options?.offset) params.set('offset', String(options.offset));
