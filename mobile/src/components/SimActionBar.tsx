@@ -59,7 +59,8 @@ export default function SimActionBar({ ctx, paywalled, advancing, onAdvance, onS
   };
   return (
     <View style={styles.bar} testID="sim-action-bar">
-      {state.warning && !state.reason && !paywalled ? <AppText style={styles.reason}>{state.warning}</AppText> : null}
+      {/* No standing "will score 0" line here (web's phone pill hides it too): it came and went with every lineup refetch, resizing the pill
+          around each Advance. The same text is shown once, in the confirm Alert, when Advance is tapped. */}
       {state.reason && !paywalled ? (
         <AppText style={styles.reason} accessibilityRole="alert">
           {state.reason}
