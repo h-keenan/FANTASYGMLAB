@@ -107,7 +107,7 @@ FLAGS: dict[str, dict[str, Any]] = {
     },
     "stability_v": {
         "label": "A league that stays balanced",
-        "body": "A good or bad season now carries into a player's next projection, young backs, receivers and tight ends keep improving through their early years, rookie classes refill the depth that retirements take, and AI managers trade players (not picks) with each other at market value so talent stops piling up on a few teams. New rookie classes also vary more in year one.",
+        "body": "A good or bad season now carries into a player's next projection, young backs, receivers and tight ends keep improving through their early years, rookie classes refill the depth that retirements take, and AI managers trade players (not picks) with each other at market value so talent stops piling up on a few teams. New rookie classes also vary more in year one. Veteran backs, receivers and tight ends decline more gently from 25 on, and last season's result carries further into their next projection.",
         "dynasty_only": False,
     },
     "vorp_v": {
@@ -208,21 +208,31 @@ def generation_settings(base: GameSettings, rules: Sequence[Mapping[str, Any]], 
 
 
 def scheduled(rules: Iterable[Mapping[str, Any]]) -> set[str]:
-    """Every flag some update already switched on (or scheduled): the update never offers it again."""
+    """Every flag some update already switched on (or scheduled)."""
 
     return {flag for entry in rules for flag in entry["flags"]}
 
 
-def pending_flags(base: GameSettings, rules: Sequence[Mapping[str, Any]]) -> dict[str, int]:
-    """What a Realism update would switch on for this game: each registered flag that is below its target, applies to this
-    game, and no earlier update already covers."""
+def scheduled_values(rules: Iterable[Mapping[str, Any]]) -> dict[str, int]:
+    """The highest value each flag has been switched to by an update (a flag can climb more than once: ``stability_v`` 0 -> 1, later 1 -> 2)."""
 
-    done = scheduled(rules)
+    out: dict[str, int] = {}
+    for entry in rules:
+        for flag, value in entry["flags"].items():
+            out[flag] = max(out.get(flag, 0), int(value))
+    return out
+
+
+def pending_flags(base: GameSettings, rules: Sequence[Mapping[str, Any]]) -> dict[str, int]:
+    """What a Realism update would switch on for this game: each registered flag that is below its target (counting what an earlier update already
+    switched it to, so a flag is never offered twice at the same value but can be offered again when a newer generation exists) and applies to this game."""
+
+    done = scheduled_values(rules)
     out = {}
     for flag, (target, _boundary) in UPGRADABLE_FLAGS.items():
-        if flag in done or not hasattr(base, flag) or not applies(flag, base):
+        if not hasattr(base, flag) or not applies(flag, base):
             continue
-        if int(getattr(base, flag)) < target:
+        if max(int(getattr(base, flag)), done.get(flag, 0)) < target:
             out[flag] = target
     return out
 
@@ -267,5 +277,5 @@ def rules_info(base: GameSettings, effective: GameSettings, rules: Sequence[Mapp
 
 __all__ = [
     "UPGRADABLE_FLAGS", "FLAGS", "BOUNDARIES", "BOUNDARY_COPY", "NOT_RETROACTIVE", "applies", "rules_key", "decision_settings",
-    "generation_settings", "scheduled", "pending_flags", "make_entry", "rules_info",
+    "generation_settings", "scheduled", "scheduled_values", "pending_flags", "make_entry", "rules_info",
 ]

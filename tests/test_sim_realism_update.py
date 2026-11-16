@@ -5,6 +5,7 @@ event (redraft and dynasty), per-flag boundaries, checkpoints, undo/revert throu
 
 from __future__ import annotations
 
+import dataclasses
 import functools
 import json
 
@@ -62,10 +63,11 @@ def _redraft(upgrade_after: int | None, weeks: int = 6, model: str = MODEL):
     return snap, state, em
 
 
-def _dynasty(upgrade_at: tuple[int, str] | None, seasons: int = 4, model: str = MODEL):
-    """Play an old dynasty save to the end; ``upgrade_at`` = (season_no, "start" | "offseason") is where the user presses Update."""
+def _dynasty(upgrade_at: tuple[int, str] | None, seasons: int = 4, model: str = MODEL, settings: GameSettings | None = None):
+    """Play an old dynasty save to the end; ``upgrade_at`` = (season_no, "start" | "offseason") is where the user presses Update. ``settings``: the save's
+    own settings (default: made before every gate)."""
 
-    snap = build_snapshot(ROWS, BYES, _old_settings(mode="dynasty", seasons=seasons, start_year=2026, rookie_rounds=2, scoring="ppr"), SEED, scoring_model=model)
+    snap = build_snapshot(ROWS, BYES, settings or _old_settings(mode="dynasty", seasons=seasons, start_year=2026, rookie_rounds=2, scoring="ppr"), SEED, scoring_model=model)
     state = GameState(snap)
     em = Emitter(state, snap)
     auto_for_user(DraftContext(snap, state), em, SEED)
@@ -126,6 +128,23 @@ def test_pending_flags_for_old_new_and_non_dynasty_saves():
     # half-upgraded saves only offer what is missing
     half = GameSettings.from_dict({**old_dyn.to_dict(), "hint_v": 1, "world_v": 1})
     assert set(rules.pending_flags(half, [])) == set(rules.UPGRADABLE_FLAGS) - {"hint_v", "world_v"}
+
+
+def test_a_flag_that_gets_a_newer_generation_is_offered_again():
+    """stability_v 2 follows stability_v 1: a save on 1 (made while 1 was current) is offered 2, and so is one an earlier update took 0 -> 1; a flag is never offered twice at one value."""
+
+    new = GameSettings.parse({"mode": "dynasty", "seasons": 3, "start_year": 2026, "rookie_rounds": 2})
+    mid = dataclasses.replace(new, stability_v=1)
+    assert rules.pending_flags(mid, []) == {"stability_v": rules.UPGRADABLE_FLAGS["stability_v"][0]} and rules.UPGRADABLE_FLAGS["stability_v"][0] == 2
+    old = _old_settings(mode="dynasty", seasons=3, start_year=2026, rookie_rounds=2)
+    first = rules.make_entry({"stability_v": 1}, seq=5, week=2, season_no=1, status="in_season", view_no=1)
+    assert rules.pending_flags(old, [first])["stability_v"] == 2
+    second = rules.make_entry({"stability_v": 2}, seq=9, week=4, season_no=2, status="in_season", view_no=2)
+    assert "stability_v" not in rules.pending_flags(old, [first, second]) and "stability_v" not in rules.pending_flags(old, [second])
+    assert rules.scheduled_values([first, second]) == {"stability_v": 2}
+    # the later entry wins for the seasons it governs
+    assert first["view_from"] == 2 and second["view_from"] == 3
+    assert rules.generation_settings(old, [first, second], 2).stability_v == 1 and rules.generation_settings(old, [first, second], 3).stability_v == 2
 
 
 def test_decision_and_generation_settings_follow_the_boundary():
