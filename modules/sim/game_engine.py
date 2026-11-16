@@ -38,6 +38,7 @@ from modules.sim.game_scoring import PlayerWeek, ScoringModel, get_model
 from modules.sim.game_state import Emitter, GameState
 from modules.sim.game_usage import group_factors
 from modules.sim.game_types import GameError, GameSnapshot, headshot_id, slot_positions
+from modules.sim.injuries import draw_injury_type
 from modules.sim.lineup import pick_lineup
 from modules.sim.rng import WorldRng
 from modules.sim.types import is_pick_id
@@ -700,6 +701,7 @@ def run_week(em: Emitter, snap: GameSnapshot, state: GameState, seed: int) -> di
     session = session_for(snap, seed)
     played: dict[str, PlayerWeek] = {}
     hurt: list[list] = []
+    kinds: dict[str, str] = {}  # injury_v 1+: what each new injury is
     world = bool(S.world_v and ev.roles_on and ev.additive)  # world_v 1+: bench QBs sit, a team's RB/WR/TE group cannot run far past its baseline
     cut: dict[str, float] = {}
     if world:
@@ -725,6 +727,8 @@ def run_week(em: Emitter, snap: GameSnapshot, state: GameState, seed: int) -> di
             weeks_out = session.weeks_out(pid, W, res)
             if weeks_out > 0:  # hurt in the last game of the season: nothing left to miss
                 hurt.append([pid, weeks_out])
+                if S.injury_v:
+                    kinds[pid] = draw_injury_type(snap.players[pid].pos, weeks_out, float(session.rng.stream(W, "ginjtype", snap.index[pid]).random()))
     pts = {pid: pw.points for pid, pw in played.items()}
     status_of = {pid: ev.status(pid, W) for pid in snap.pids}
     ros_before = {pid: ev.ros_mean(pid) for pid in state.rosters[user]}
@@ -759,7 +763,7 @@ def run_week(em: Emitter, snap: GameSnapshot, state: GameState, seed: int) -> di
             )
     your_game = _your_game(snap, ev, state, user, games, lineups, played, pts, status_of, ros_before, alive_before, kind, auto_filled)
     injuries = [
-        {"player": _brief(snap, pid, state.view_no), "weeks": weeks, "team_id": owners.get(pid), "is_yours": owners.get(pid) == user}
+        {"player": _brief(snap, pid, state.view_no), "weeks": weeks, "team_id": owners.get(pid), "is_yours": owners.get(pid) == user, **({"injury": kinds[pid]} if pid in kinds else {})}
         for pid, weeks in hurt if pid in owners
     ]
 
@@ -778,7 +782,7 @@ def run_week(em: Emitter, snap: GameSnapshot, state: GameState, seed: int) -> di
     em.emit(W, "engine", "week_scored", kind=kind, round=rnd, games=games,
             points={pid: v for pid, v in pts.items()}, alive_next=alive_next, eliminated=eliminated, **extra)
     if hurt:
-        em.emit(W, "engine", "injury", items=hurt)
+        em.emit(W, "engine", "injury", items=hurt, **({"kinds": kinds} if kinds else {}))
         if S.incumbent_v and ev.roles_on and kind == "regular":
             depth += _starter_injuries(ev, hurt, W)
     if depth:

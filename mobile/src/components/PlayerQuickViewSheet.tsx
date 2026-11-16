@@ -15,6 +15,7 @@ import PlayerHero from './PlayerHero';
 import PlayerLeagueActions from './PlayerLeagueActions';
 import { AvailabilityBlock, LatestNewsSection } from './PlayerQuickViewNews';
 import { DepthChartSection, InjuryHistorySection } from './PlayerDepthInjury';
+import type { DepthChartData } from '../lib/playerDepthInjury';
 import { useTabs } from './Tabs';
 import { pqvBioForContext, pqvRealWorld } from '../lib/pqvContext';
 import { rowsAsOf, simAsOfSeason } from '../lib/simAsOf';
@@ -108,6 +109,8 @@ export interface SimPqvSections {
   outlook?: React.ReactNode;
   scouting?: React.ReactNode;
   history?: React.ReactNode;
+  /** The sim's own depth order at his position (undefined = still loading, null = not on a chart), drawn by the shared DepthChartSection. */
+  depthChart?: DepthChartData | null;
   /** The two hero tiles shown in place of Value and Usage (the sim never shows the model's value). */
   heroTiles?: { label: string; value: string; note: string }[];
   /** Real-NFL record cut to the as-of season (career + game log), shown first in the Stats tab. */
@@ -180,14 +183,14 @@ export default function PlayerQuickViewSheet({
   const depthQuery = useQuery({
     queryKey: [...queryKeys.playerQuickView(player.player_id), 'depth-chart'],
     queryFn: () => api.getPlayerDepthChart(player.player_id),
-    enabled: detailQuery.isSuccess && realWorld.showDepthChart,
+    enabled: detailQuery.isSuccess && realWorld.fetchDepthChart,
     staleTime: 10 * 60 * 1000,
     retry: false,
   });
   const injuryQuery = useQuery({
     queryKey: [...queryKeys.playerQuickView(player.player_id), 'injury-history'],
     queryFn: () => api.getPlayerInjuryHistory(player.player_id),
-    enabled: detailQuery.isSuccess && realWorld.showInjuryHistory,
+    enabled: detailQuery.isSuccess && realWorld.fetchInjuryHistory,
     staleTime: 10 * 60 * 1000,
     retry: false,
   });
@@ -349,8 +352,9 @@ export default function PlayerQuickViewSheet({
         <>
           {sim?.overview ?? null}
           {availability ? <AvailabilityBlock availability={availability} injuryItem={newsQuery.data?.injury_item ?? null} newsLoading={newsLoading} /> : null}
-          {detail && remote && realWorld.showInjuryHistory ? <InjuryHistorySection record={injuryRecord} /> : null}
-          {detail && remote && realWorld.showDepthChart ? <DepthChartSection chart={depthChart} /> : null}
+          {!isSim && detail && remote && realWorld.showInjuryHistory ? <InjuryHistorySection record={injuryRecord} /> : null}
+          {isSim && realWorld.showDepthChart && sim?.depthChart !== undefined ? <DepthChartSection chart={sim.depthChart} idPrefix="simpqv" /> : null}
+          {!isSim && detail && remote && realWorld.showDepthChart ? <DepthChartSection chart={depthChart} /> : null}
           {detail && remote && realWorld.showNews ? (
             <LatestNewsSection
               items={newsQuery.data ? newsQuery.data.items : null}

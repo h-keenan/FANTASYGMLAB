@@ -437,6 +437,7 @@ def _injuries(snap: GameSnapshot, state: GameState, ev: Evaluator, week: int) ->
             "player": player_row(snap, state, ev, pid, owners, week=week), "out_weeks": weeks,
             "starting": pid in started,
             "note": (f"Hurt in Week {news[pid]['week']}" if pid in news else "Out since the start of the season"),
+            **({"injury": state.out_kind[pid]} if pid in state.out_kind else {}),
         })
     rows.sort(key=lambda r: (not r["starting"], -r["player"]["ros_mean"], r["player"]["id"]))
     return rows

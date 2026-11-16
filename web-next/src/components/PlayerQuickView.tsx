@@ -98,6 +98,8 @@ export interface SimPqvSections {
   outlook?: ReactNode;
   scouting?: ReactNode;
   history?: ReactNode;
+  /** The sim's own depth order at his position (undefined = still loading, null = not on a chart), drawn by the shared DepthChartSection. */
+  depthChart?: DepthChartData | null;
   /** The two hero tiles shown in place of Value and Usage (the sim never shows the model's value). */
   heroTiles?: { label: string; value: string; note: string }[];
   /** Real-NFL record cut to the as-of season (career + game log), shown first in the Stats tab. */
@@ -174,8 +176,8 @@ export function PlayerQuickView({
   const [news, setNews] = useState<PlayerNewsResponse | null>(null);
   const [newsLoading, setNewsLoading] = useState(remote && realWorld.fetchNews);
   // Depth chart and injury history load lazily and independently too. undefined = loading, null = failed/none.
-  const [depthChart, setDepthChart] = useState<DepthChartData | null | undefined>(remote && realWorld.showDepthChart ? undefined : null);
-  const [injuryRecord, setInjuryRecord] = useState<InjuryRecordData | null | undefined>(remote && realWorld.showInjuryHistory ? undefined : null);
+  const [depthChart, setDepthChart] = useState<DepthChartData | null | undefined>(remote && realWorld.fetchDepthChart ? undefined : null);
+  const [injuryRecord, setInjuryRecord] = useState<InjuryRecordData | null | undefined>(remote && realWorld.fetchInjuryHistory ? undefined : null);
   // Peek height from the content: compact header + pill row + one content line (--pqv-peek-h; CSS keeps 65dvh as the fallback).
   // Measured with the header in its compact state only (never mid-transition), re-measured when the content above the pills resizes.
   useLayoutEffect(() => {
@@ -265,24 +267,24 @@ export function PlayerQuickView({
   }, [identity.player_id, remote, realWorld.fetchNews]);
 
   useEffect(() => {
-    if (!remote || !realWorld.showDepthChart) return;
+    if (!remote || !realWorld.fetchDepthChart) return;
     let cancelled = false;
     api
       .getPlayerDepthChart(identity.player_id)
       .then((result) => { if (!cancelled) setDepthChart(result.ok ? result : null); })
       .catch(() => { if (!cancelled) setDepthChart(null); });
     return () => { cancelled = true; };
-  }, [identity.player_id, remote, realWorld.showDepthChart]);
+  }, [identity.player_id, remote, realWorld.fetchDepthChart]);
 
   useEffect(() => {
-    if (!remote || !realWorld.showInjuryHistory) return;
+    if (!remote || !realWorld.fetchInjuryHistory) return;
     let cancelled = false;
     api
       .getPlayerInjuryHistory(identity.player_id)
       .then((result) => { if (!cancelled) setInjuryRecord(result.ok ? result : null); })
       .catch(() => { if (!cancelled) setInjuryRecord(null); });
     return () => { cancelled = true; };
-  }, [identity.player_id, remote, realWorld.showInjuryHistory]);
+  }, [identity.player_id, remote, realWorld.fetchInjuryHistory]);
 
   // Focus moves into the dialog whenever it becomes the visible pop-up (first open, or returning from one opened on top).
   // Page scroll lock, history and layering belong to the overlay runtime, not to this shell.
@@ -479,8 +481,9 @@ export function PlayerQuickView({
                   <>
                     {sim?.overview ?? null}
                     {availability ? <AvailabilityBlock availability={availability} injuryItem={news?.injury_item ?? null} newsLoading={newsLoading} /> : null}
-                    {remote && realWorld.showInjuryHistory ? <InjuryHistorySection record={injuryRecord} /> : null}
-                    {remote && realWorld.showDepthChart ? <DepthChartSection chart={depthChart} /> : null}
+                    {!isSim && remote && realWorld.showInjuryHistory ? <InjuryHistorySection record={injuryRecord} /> : null}
+                    {isSim && realWorld.showDepthChart && sim?.depthChart !== undefined ? <DepthChartSection chart={sim.depthChart} idPrefix="simpqv" /> : null}
+                    {!isSim && remote && realWorld.showDepthChart ? <DepthChartSection chart={depthChart} /> : null}
                     {!loadError && remote && realWorld.showNews ? (
                       <LatestNewsSection
                         items={news ? news.items : null}

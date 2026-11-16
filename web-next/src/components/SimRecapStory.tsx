@@ -332,7 +332,7 @@ export function SimWeekRecapStory({
               <MotionIn key={i} as="li" index={i} count={m.items.length}>
                 <div className="ui-recap-fact" style={{ "--accent": inj.is_yours ? "var(--color-danger)" : "var(--color-border-strong)" } as CSSProperties}>
                   {/* ONE marker per player: the chip says OUT, the trailing text only how long. */}
-                  <SimPlayerChip player={{ ...inj.player, status: "out", out_weeks: inj.weeks }} onOpen={ctx.openPlayer} />
+                  <SimPlayerChip player={{ ...inj.player, status: "out", out_weeks: inj.weeks, injury: inj.injury }} onOpen={ctx.openPlayer} />
                   <span className="shrink-0 text-xs font-bold" style={{ color: inj.is_yours ? "var(--color-danger)" : "var(--color-text-secondary)" }}>{inj.detail}</span>
                 </div>
               </MotionIn>

@@ -52,6 +52,8 @@ class GameState:
         self.out: dict[str, int] = {
             p.pid: p.injury_weeks for p in snapshot.players.values() if p.injury_weeks > 0
         }
+        # injury_v 1+: what each current injury is, {pid: type}. Inert (and out of the digest) while empty.
+        self.out_kind: dict[str, str] = {}
         self.stand: dict[str, dict[str, float]] = {
             t.tid: {"w": 0, "l": 0, "t": 0, "pf": 0.0, "pa": 0.0} for t in snapshot.teams
         }
@@ -168,7 +170,7 @@ class GameState:
         for key in ("ir", "taxi"):
             if not any(raw[key].values()):
                 del raw[key]
-        for key in ("pick_owner", "created_picks", "spent_picks", "seasons", "rookie_log", "retired", "role_hist", "block", "rules"):
+        for key in ("pick_owner", "created_picks", "spent_picks", "seasons", "rookie_log", "retired", "role_hist", "block", "rules", "out_kind"):
             if not raw[key]:
                 del raw[key]
         if raw["season_no"] == 1:
@@ -440,9 +442,16 @@ def _inbox_response(state, snap, week, p):
 def _injury(state, snap, week, p):
     """``items`` is [[pid, weeks_out], ...]: weeks missed starting next week."""
 
+    kinds = p.get("kinds") or {}
     for pid, weeks in p["items"]:
         state.out[pid] = int(weeks)
-        state.news.append({"week": week, "pid": pid, "weeks": int(weeks)})
+        row = {"week": week, "pid": pid, "weeks": int(weeks)}
+        if pid in kinds:
+            state.out_kind[pid] = kinds[pid]
+            row["kind"] = kinds[pid]
+        else:
+            state.out_kind.pop(pid, None)
+        state.news.append(row)
     del state.news[:-150]
 
 
@@ -462,6 +471,7 @@ def _week_scored(state, snap, week, p):
         state.out[pid] -= 1
         if state.out[pid] <= 0:
             del state.out[pid]
+            state.out_kind.pop(pid, None)
     if kind == "regular":
         _record_games(state, games)
     else:
@@ -584,6 +594,7 @@ def _season_started(state, snap, week, p):
     state.champion = ""
     state.recaps = {}
     state.out = {pid: pl.injury_weeks for pid, pl in snap.players.items() if pl.injury_weeks > 0 and pid in state.owner_map()}
+    state.out_kind = {}
     state.offseason = None
     if snap.settings.league_anchor:
         _compact_old_seasons(state, snap)

@@ -102,7 +102,7 @@ export function InjuryHistorySection({ record, idPrefix = "pqv" }: { record: Inj
           <tbody>
             {rows.map((row) => (
               <tr key={row.key} data-testid="pqv-injury-row">
-                <td className="py-1 tabular-nums">{row.season}</td>
+                <td className="py-1 tabular-nums">{row.seasonLabel}</td>
                 <td className="py-1">
                   {row.injury}
                   <span className="block text-xs" style={{ color: "var(--color-text-muted)" }}>{row.weeks}</span>

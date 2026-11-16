@@ -25,6 +25,7 @@ import {
   simSlotRepeatsPosition,
   simStrengthNeedLine,
   type SimTeamRosterResponse,
+  simOutLine,
 } from '../lib/simGame';
 import { spacing } from '../theme';
 
@@ -116,7 +117,7 @@ function TeamBody({ ctx, data, onTrade }: { ctx: SimCtx; data: SimTeamRosterResp
                     <View style={common.tight} accessibilityLabel="Injuries">
                       <SimSectionTitle glyph="injury" tone="danger" title="Injuries" />
                       {data.injuries!.map((p) => (
-                        <SimPlayerLine key={p.id} player={p} onOpen={ctx.openPlayer} stats={simListStats(p, { adp: false })} trailing={<SimToneBadge label={`${p.out_weeks} wk`} tone="danger" />} />
+                        <SimPlayerLine key={p.id} player={p} onOpen={ctx.openPlayer} stats={simListStats(p, { adp: false })} trailing={<SimToneBadge label={p.injury ? simOutLine(p) : `${p.out_weeks} wk`} tone="danger" />} />
                       ))}
                     </View>
                   ) : null

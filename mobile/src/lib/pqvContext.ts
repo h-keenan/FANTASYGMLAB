@@ -8,16 +8,19 @@ export interface PqvRealWorld {
   showNews: boolean;
   showAvailability: boolean;
   showDepthChartNote: boolean;
-  /** The real NFL depth chart / injury history sections (the sim passes its own data to the shared sections instead). */
+  /** The depth chart / injury history sections show everywhere; inside the sim they are fed the game's own data (see the fetch flags). */
   showDepthChart: boolean;
   showInjuryHistory: boolean;
+  /** Only the real Player Quick View fetches the real NFL depth chart / injury reports; the sim passes its own data. */
+  fetchDepthChart: boolean;
+  fetchInjuryHistory: boolean;
   showBye: boolean;
   showContract: boolean;
 }
 
 export function pqvRealWorld(isSim: boolean): PqvRealWorld {
   const on = !isSim;
-  return { fetchNews: on, showNews: on, showAvailability: on, showDepthChartNote: on, showDepthChart: on, showInjuryHistory: on, showBye: on, showContract: on };
+  return { fetchNews: on, showNews: on, showAvailability: on, showDepthChartNote: on, showDepthChart: true, showInjuryHistory: true, fetchDepthChart: on, fetchInjuryHistory: on, showBye: on, showContract: on };
 }
 
 /** The bio the sim may show: the real bye week and contract are dropped inside the sim. */

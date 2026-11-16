@@ -24,6 +24,7 @@ import {
   simSlotRepeatsPosition,
   simStrengthNeedLine,
   type SimTeamRosterResponse,
+  simOutLine,
 } from "@/lib/simGame";
 
 const SIM_ROSTER_POS_ORDER = ["QB", "RB", "WR", "TE", "K", "DEF"] as const;
@@ -119,7 +120,7 @@ function TeamBody({ ctx, data, onTrade }: { ctx: SimCtx; data: SimTeamRosterResp
                     <section className="flex flex-col gap-1" aria-label="Injuries">
                       <SimSectionTitle glyph="injury" tone="danger">Injuries</SimSectionTitle>
                       {data.injuries!.map((p) => (
-                        <SimPlayerLine key={p.id} player={p} onOpen={ctx.openPlayer} stats={simListStats(p, { adp: false })} trailing={<SimToneBadge label={`${p.out_weeks} wk`} tone="danger" />} />
+                        <SimPlayerLine key={p.id} player={p} onOpen={ctx.openPlayer} stats={simListStats(p, { adp: false })} trailing={<SimToneBadge label={p.injury ? simOutLine(p) : `${p.out_weeks} wk`} tone="danger" />} />
                       ))}
                     </section>
                   ) : null

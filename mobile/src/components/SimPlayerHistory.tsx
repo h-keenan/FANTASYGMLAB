@@ -3,6 +3,9 @@ import { View } from 'react-native';
 
 import AccentCard from './AccentCard';
 import { SimBadgeChips } from './SimAchievements';
+import { InjuryHistorySection } from './PlayerDepthInjury';
+import { SimPlayerStory } from './SimPlayerStory';
+import { pqvRealWorld } from '../lib/pqvContext';
 import { simPlayerBadges } from '../lib/simAchievements';
 import AppText from './AppText';
 import ErrorState from './ErrorState';
@@ -64,6 +67,8 @@ export function SimPlayerHistory({ gameId, playerId }: { gameId: string; playerI
   return (
     <View style={common.stack} testID="sim-player-history">
       <SimBadgeChips items={simPlayerBadges(data.achievements, playerId)} />
+      <SimPlayerStory story={data.story} />
+      {pqvRealWorld(true).showInjuryHistory && data.injuries ? <InjuryHistorySection record={data.injuries} idPrefix="simpqv" /> : null}
       <PqvSection title="Origin">
         {origin ? (
           <AccentCard accent={colors.accent} compact>
