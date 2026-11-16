@@ -108,3 +108,12 @@ export function heroInitials(name: string | null | undefined): string {
   if (words.length === 1) return words[0][0].toUpperCase();
   return (words[0][0] + words[words.length - 1][0]).toUpperCase();
 }
+
+/** Semantic tone for the depth-chart role chip (modules/rankings.opportunity_profile labels): a lead role reads
+ * success, a role at risk reads warning, everything else (committee, backup, unclear) stays muted. */
+export function opportunityLabelTone(label: string | null | undefined): 'success' | 'warning' | 'muted' {
+  const normalized = (label ?? '').trim().toLowerCase();
+  if (normalized === 'elite opportunity' || normalized === 'strong opportunity' || normalized === 'workhorse') return 'success';
+  if (normalized === 'starter at risk') return 'warning';
+  return 'muted';
+}

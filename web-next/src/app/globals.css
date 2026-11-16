@@ -1263,7 +1263,7 @@ a {
    tall empty band above the header. */
 .pqv-close {
   position: absolute;
-  top: var(--space-lg);
+  top: var(--space-md);
   right: var(--space-lg);
   z-index: 2;
   display: inline-grid;
@@ -1308,6 +1308,10 @@ a {
 .pqv-modal .pqv-topbar {
   padding-right: 2.75rem;
 }
+/* Content starts right under the grab bar; the X and the context label share a line. */
+.pqv-modal .pqv-scroll {
+  padding-top: var(--space-md);
+}
 .pqv-source-label {
   font-size: 0.72rem;
   font-weight: 700;
@@ -1323,7 +1327,7 @@ a {
   align-items: start;
 }
 .pqv-hero-avatar-col {
-  grid-row: 1 / span 2;
+  grid-row: 1;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -1400,7 +1404,7 @@ a {
   color: var(--color-text-muted);
   font-size: 0.6rem;
 }
-.pqv-fold--tiles { grid-column: 2; }
+.pqv-fold--tiles { grid-column: 1 / -1; }
 .pqv-peek-summary { display: none; margin: 0; font-size: 0.8rem; font-weight: 700; color: var(--color-text-secondary); font-variant-numeric: tabular-nums; }
 .pqv-stat-tiles {
   display: grid;
@@ -1505,16 +1509,8 @@ a {
   font-size: 0.78rem;
   color: var(--color-text-muted);
 }
-/* Phone-width sheets: tiles take the full width under the avatar and name,
-   so each tile has room for its number and caption. */
-@container (max-width: 440px) {
-  .pqv-hero-avatar-col {
-    grid-row: 1;
-  }
-  .pqv-fold--tiles {
-    grid-column: 1 / -1;
-  }
-}
+/* The three tiles always take the full width under the avatar and name: beside the
+   avatar they left an empty column under it. */
 .pqv-signal-row {
   display: flex;
   flex-wrap: wrap;
@@ -1529,6 +1525,7 @@ a {
   margin-top: var(--space-xs);
 }
 .pqv-chip {
+  border-radius: var(--radius-pill);
   background: var(--color-surface-muted);
   border: var(--border-width-default) solid var(--color-border);
   color: var(--color-text-secondary);

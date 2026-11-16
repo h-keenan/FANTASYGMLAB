@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 
 import {
+  opportunityLabelTone,
   radarPoints,
   rookieBadge,
   rankLine,
@@ -54,4 +55,11 @@ test('rookieBadge only shows for is_rookie true, never invents draft data', () =
     label: 'ROOKIE',
     detail: '2026 · Round 1 · Pick 12 · Ohio State',
   });
+});
+
+test('opportunityLabelTone maps role labels to semantic tones', () => {
+  assert.equal(opportunityLabelTone('Starter At Risk'), 'warning');
+  assert.equal(opportunityLabelTone('Elite Opportunity'), 'success');
+  assert.equal(opportunityLabelTone('Committee Back'), 'muted');
+  assert.equal(opportunityLabelTone(null), 'muted');
 });

@@ -46,6 +46,7 @@ import {
   statPercentileBand,
   tierOpportunityMismatchCaption,
   opportunityUsageCaption,
+  opportunityLabelTone,
 } from "@/lib/playerQuickViewPresentation";
 import { ValuesCredit } from "@/components/ValuesCredit";
 import { BadgeLegendSheet, PlayerBadges } from "@/components/ui/PlayerBadge";
@@ -412,7 +413,7 @@ export function PlayerQuickView({
         />
 
         <div className="pqv-signal-row">
-          {identity.opportunity_label ? <span className="pqv-chip">{identity.opportunity_label}</span> : null}
+          {identity.opportunity_label ? <ToneBadge label={identity.opportunity_label} color={TAG_TONE_COLOR[opportunityLabelTone(identity.opportunity_label)]} size="xs" testId="pqv-opportunity-chip" /> : null}
           {identity.tags?.length ? (
             <>
               <PlayerBadges badges={identity.tags.map((tag) => badgeFromTag(tag))} max={6} showDetail onLegend={() => setLegendOpen(true)} testId="pqv-badges" />
@@ -436,6 +437,17 @@ export function PlayerQuickView({
             )
           ) : null}
           <BadgeLegendSheet open={legendOpen} onClose={() => setLegendOpen(false)} />
+          {/* Beginner-only "?" for the hero's Value / Overall / Tier labels (lib/experienceCopy.ts); renders nothing for advanced/unset. Inline at the end of the chip row with its text in a popover, so it never takes a row of its own. */}
+          <BeginnerHelp
+            popover
+            className="ml-auto"
+            label={isSim ? "Overall and Tier" : "Value, Overall and Tier"}
+            lines={[
+              identity.score != null && !isSim ? BEGINNER_HELP.playerValue : null,
+              overallRating != null ? BEGINNER_HELP.overallRating : null,
+              identity.tier ? BEGINNER_HELP.playerTier : null,
+            ]}
+          />
         </div>
         <div className="pqv-peek-fold">
         {/* coridian_, 2026-10-19 (screenshot): "the contributor tag doesnt
@@ -450,19 +462,6 @@ export function PlayerQuickView({
         {opportunityUsageCaption(identity.opportunity_label, model?.usage_trend ?? null) ? (
           <p className="pqv-tier-mismatch-note">{opportunityUsageCaption(identity.opportunity_label, model?.usage_trend ?? null)}</p>
         ) : null}
-        {/* Beginner-only explanations of the hero's value/OVR/tier labels
-            (lib/experienceCopy.ts) — renders nothing for advanced/unset. */}
-        {/* One labeled "?" for every term that applies (was three unlabeled
-            circles when collapsed). */}
-        <BeginnerHelp
-          className="mt-1"
-          label={isSim ? "What do Overall and Tier mean?" : "What do Value, Overall and Tier mean?"}
-          lines={[
-            identity.score != null && !isSim ? BEGINNER_HELP.playerValue : null,
-            overallRating != null ? BEGINNER_HELP.overallRating : null,
-            identity.tier ? BEGINNER_HELP.playerTier : null,
-          ]}
-        />
         </div>
 
         <ExplorerLeagueProvider leagueId={identity.leagueId}>
