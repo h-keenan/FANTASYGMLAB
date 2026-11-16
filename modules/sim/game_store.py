@@ -34,6 +34,16 @@ EVENTS = "sim_events"
 CHECKPOINTS = "sim_week_checkpoints"
 FREE_CLAIMS = "sim_free_season_claims"  # one row per account that has used its free season; never deleted with the game
 GAME_TABLES = (GAMES, EVENTS, CHECKPOINTS, FREE_CLAIMS)
+
+
+def _schema_missing(error: str, name: str) -> bool:
+    """True when a backend error says the table or column ``name`` is not in the database yet (a migration in
+    docs/supabase_sim_game.sql has not been applied), as opposed to an outage or a rejected row."""
+
+    text = str(error or "").lower()
+    if name.lower() not in text and "not set up yet" not in text:
+        return False
+    return any(k in text for k in ("does not exist", "schema cache", "could not find", "not set up yet", "42703", "42p01"))
 LIST_COLUMNS = (
     "id,seed,engine_version,scoring_model,settings,status,current_week,difficulty,grade_letter,"
     "event_count,created_at,updated_at"
@@ -320,7 +330,12 @@ class GameStore:
 
     def _insert_capped(self, user_id: str, row: dict[str, Any], max_games: int) -> None:
         for _ in range(max_games + 1):
-            held = self._select(GAMES, user_id, columns="id,slot")
+            rows, error = self.backend.select(GAMES, user_id=user_id, columns="id,slot")
+            if error and _schema_missing(error, "slot"):
+                return self._insert_uncapped_legacy(user_id, row, max_games)
+            if error:
+                raise SimStoreError(error)
+            held = rows
             if len(held) >= max_games:  # also covers saves from before slots existed (slot is null)
                 raise GameLimitReached()
             taken = {int(r["slot"]) for r in held if r.get("slot")}
@@ -332,21 +347,34 @@ class GameStore:
                 return
             if error == CONFLICT:  # another request took that slot first: look again
                 continue
-            if "slot" in error.lower():
-                # The slot column is not there yet (docs/supabase_sim_game.sql not applied): keep the game
-                # creatable with the old count-then-insert behaviour rather than take the feature down.
-                _log.warning("sim_games.slot is missing; game cap is not atomic until the migration is applied")
-                self._upsert(GAMES, row, "id")
+            if _schema_missing(error, "slot"):
+                self._insert_uncapped_legacy(user_id, row, max_games)
                 return
             raise SimStoreError(error)
         raise GameLimitReached()
+
+    def _insert_uncapped_legacy(self, user_id: str, row: dict[str, Any], max_games: int) -> None:
+        """The ``slot`` column is not there yet (docs/supabase_sim_game.sql not applied): keep games creatable with
+        the old count-then-insert cap rather than take the feature down. The cap is not atomic until it is applied."""
+
+        _log.warning("sim_games.slot is missing; game cap is not atomic until docs/supabase_sim_game.sql is applied")
+        if len(self._select(GAMES, user_id, columns="id")) >= max_games:
+            raise GameLimitReached()
+        self._upsert(GAMES, row, "id")
 
     # ------------------------------------------------------- free season
 
     def free_season_claim(self, user_id: str) -> dict[str, Any] | None:
         """The account's free-season claim, or None. It outlives the game it was made for."""
 
-        rows = self._select(FREE_CLAIMS, user_id, columns="game_id,claimed_at", limit=1)
+        rows, error = self.backend.select(FREE_CLAIMS, user_id=user_id, columns="game_id,claimed_at", limit=1)
+        if error and _schema_missing(error, FREE_CLAIMS):
+            # Table not created yet (docs/supabase_sim_game.sql not applied): fall back to the per-game rule, i.e.
+            # the free season is in use while the account holds a game. Deleting it restarts the season until applied.
+            _log.warning("%s is missing; free season is per game until docs/supabase_sim_game.sql is applied", FREE_CLAIMS)
+            return None
+        if error:
+            raise SimStoreError(error)
         return rows[0] if rows else None
 
     def claim_free_season(self, user_id: str, game_id: str) -> bool:
@@ -360,6 +388,9 @@ class GameStore:
             return True
         if error == CONFLICT:
             return False
+        if _schema_missing(error, FREE_CLAIMS):
+            _log.warning("%s is missing; free-season claim not recorded until the migration is applied", FREE_CLAIMS)
+            return True
         raise SimStoreError(error)
 
     def get_snapshot(self, user_id: str, game_id: str) -> GameSnapshot | None:
