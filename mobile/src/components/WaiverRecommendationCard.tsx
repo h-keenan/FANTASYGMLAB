@@ -367,7 +367,7 @@ export default function WaiverRecommendationCard({
               {flag.explanation}
             </AppText>
           ) : null}
-          {player.drop_suggestion ? <SuggestedDrop suggestion={player.drop_suggestion} compact /> : null}
+          {player.drop_suggestion && !(sharedDropId != null && ownDrop?.player_id === sharedDropId) ? <SuggestedDrop suggestion={player.drop_suggestion} compact /> : null}
           <PressableScale
             style={styles.detailsButton}
             onPress={onPress}

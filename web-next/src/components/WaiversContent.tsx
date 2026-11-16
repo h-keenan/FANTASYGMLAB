@@ -314,6 +314,8 @@ function RecommendedRow({
   const flag = player.usage_flag;
   const ownDrop = player.drop_suggestion?.drop?.player_id;
   const differentDrop = sharedDropId != null && ownDrop != null && ownDrop !== sharedDropId ? player.drop_suggestion!.drop! : null;
+  // The group's cut is said once above the list (SharedDropNote); the expanded row never repeats it.
+  const sharesGroupDrop = sharedDropId != null && ownDrop === sharedDropId;
   return (
     <div style={showDivider ? { borderBottom: "var(--border-width-default) solid var(--color-border)" } : undefined} data-testid="waiver-rec-row">
       <div className="relative">
@@ -379,7 +381,7 @@ function RecommendedRow({
               {flag.explanation}
             </p>
           ) : null}
-          {player.drop_suggestion ? <SuggestedDrop suggestion={player.drop_suggestion} compact /> : null}
+          {player.drop_suggestion && !sharesGroupDrop ? <SuggestedDrop suggestion={player.drop_suggestion} compact /> : null}
           <div className="flex">
             <ViewDetailsButton player={player} />
           </div>

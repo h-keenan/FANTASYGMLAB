@@ -383,17 +383,16 @@ export function SharedDropNote({ drop, count }: { drop: DropPlayer; count: numbe
         style={{ background: "none", border: "none", padding: 0, cursor: "pointer" }}
       />
       <div className="pointer-events-none relative flex items-center gap-2 text-left w-full" style={{ minHeight: "var(--touch-target-min)" }}>
-        <ToneBadge label="Drop candidate" color="var(--color-danger)" />
-        <PlayerTap player={{ id: drop.player_id, name: drop.name, position: drop.position }} className="pointer-events-auto flex items-center gap-2 min-w-0 text-left">
+        <ToneBadge label="Drop" color="var(--color-danger)" />
+        <PlayerTap player={{ id: drop.player_id, name: drop.name, position: drop.position }} className="pointer-events-auto flex min-w-0 flex-1 items-center gap-2 text-left">
           <PlayerAvatar playerId={drop.player_id} size={24} />
-          <span className="text-sm font-bold break-words" style={{ color: "var(--color-text-primary)" }}>{drop.name}</span>
-        </PlayerTap>
-        <span className="text-sm font-bold flex-1 min-w-0 break-words flex items-center gap-1.5 flex-wrap" style={{ color: "var(--color-text-primary)" }}>
-          <PositionBadge position={drop.position} />
-          <span className="text-xs font-semibold" style={{ color: "var(--color-text-muted)" }}>
-            for {count} adds below
+          <span className="flex min-w-0 flex-col">
+            <span className="text-sm font-bold break-words" style={{ color: "var(--color-text-primary)" }}>{drop.name}</span>
+            <span className="text-xs font-semibold" style={{ color: "var(--color-text-muted)" }}>
+              {drop.position} · for {count} adds below
+            </span>
           </span>
-        </span>
+        </PlayerTap>
         <span className="text-xs font-semibold shrink-0" style={{ color: "var(--color-accent)" }}>
           {open ? "Hide" : "Why"}
         </span>

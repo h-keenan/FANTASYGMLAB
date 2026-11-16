@@ -31,6 +31,7 @@ import { markRecapOpened } from '../lib/recapSeen';
 import { useOrbClearance } from '../lib/orbLayout';
 import { queryKeys } from '../lib/queryKeys';
 import { buildRecapPage, isMatchupStory, recapFaab, recapMetric, recapScoreline, recapWeekChips, storyInvolves, type RecapSection } from '../lib/recapPage';
+import Money from '../components/Money';
 import { formatMoney } from '../lib/money';
 import { useScreenHeaderTitle } from '../lib/useScreenHeaderTitle';
 import { useThemeMode } from '../context/ThemeModeContext';
@@ -340,7 +341,7 @@ function TeamRow({
         </View>
         {sub ? <AppText style={styles.teamSub}>{sub}</AppText> : null}
       </View>
-      {trailing ? <AppText style={styles.teamFigure}>{trailing}</AppText> : null}
+      {trailing ? <AppText style={styles.teamFigure}><Money>{trailing}</Money></AppText> : null}
     </>
   );
   if (!rosterId) return <View style={styles.teamRow}>{body}</View>;
