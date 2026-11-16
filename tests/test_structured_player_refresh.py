@@ -669,4 +669,3 @@ def test_fingerprint_treats_missing_and_zero_depth_order_alike_but_not_real_chan
     zero["depth_chart_order"] = 0
     assert spr.structured_state_fingerprint(missing) == spr.structured_state_fingerprint(zero)
     assert spr.structured_state_fingerprint(frame) != spr.structured_state_fingerprint(zero)
-
