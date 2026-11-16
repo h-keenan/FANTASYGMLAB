@@ -299,6 +299,8 @@ Root causes and fixes (all behind `stability_v`):
   levers found: all-QB-on-bye weeks with a single rostered QB (5-6 percent of AI team-weeks, 0.8 percent of league scoring; AI backup-QB planning deferred) and
   a thin wire after season 1, which the depth controller above improves.
 
+Note: the league-level rows were measured with the star-regression weight at 0.25; it was raised to 0.40 afterwards so a single seed cannot run a position top-12 25 percent above season 1 (it only touches projections above the typical starter, so the early-career ratios are unchanged).
+
 Deferred: AI backup-QB planning; proper endogenous-slot pick pricing so AI-AI pick trades can return; roster age still drifts about +0.5 year over ten seasons
 (kickers and quarterbacks reach their natural older equilibrium); QB/TE pool depth beyond rank 24 still below season 1; engine realized ratios sit 0.03-0.05
 under the pool-level ones.

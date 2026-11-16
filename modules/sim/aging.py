@@ -61,7 +61,7 @@ MARKET_HALF_LIFE = 0.6  # how much of the PPG change carries into dynasty market
 # next year, not pulled back to his old number. Weighted by OUTCOME_WEIGHT because one season is also mostly noise (roughly the weight real
 # projection systems put on last season's per-game points against the prior, 0.3 to 0.6).
 OUTCOME_WEIGHT = 0.5
-REVERSION = 0.25  # share of the gap (log projection vs the position's typical starter) closed per year, see game_dynasty.season_outcomes
+REVERSION = 0.40  # share of the gap (log projection vs the position's typical starter) closed per year, see game_dynasty.season_outcomes
 OUTCOME_CLIP = (-1.0, 0.6) # a 70-point season does not become next year's projection; a lost job (collapse) is remembered at most this hard
 FUTURE_YEARS = 4
 FUTURE_DISCOUNT = 0.9
