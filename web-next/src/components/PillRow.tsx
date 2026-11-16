@@ -251,7 +251,7 @@ export function PillRow({
                   <span
                     aria-hidden="true"
                     className="inline-flex"
-                    style={{ color: isActive ? "var(--segmented-active-icon, var(--segmented-active-fg, var(--color-accent)))" : "var(--color-text-muted)" }}
+                    style={{ color: "inherit" }}
                   >
                     {iconNode}
                   </span>

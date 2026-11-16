@@ -43,7 +43,7 @@ export const TAB_ICONS = {
   news: "newspaper-outline",
   // League / recaps / season in review
   standings: "podium-outline",
-  scores: "football-outline",
+  scores: "american-football-outline",
   feed: "list-outline",
   awards: "medal-outline",
   recaps: "newspaper-outline",
