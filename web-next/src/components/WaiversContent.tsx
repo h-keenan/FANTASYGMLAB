@@ -55,7 +55,8 @@ import { waiversHeaderParts } from "@/lib/waiversHeader";
 import { limitedDataNote, needsHeadline, teamNeedStat } from "@/lib/dropsPresentation";
 import { EmptyState } from "@/components/EmptyState";
 import { PlayerName } from "@/components/PlayerName";
-import { Money } from "@/components/Money";
+import { MONEY_COLOR, Money } from "@/components/Money";
+import { TickNumber } from "@/components/TickNumber";
 import { formatMoney } from "@/lib/money";
 import { SkeletonList } from "@/components/Skeleton";
 import { Collapse } from "@/components/ui/Presence";
@@ -119,7 +120,10 @@ function WaiverIdentity({ player, avatarSize = 40 }: { player: WaiverPlayer; ava
   );
 }
 
-function StatStrip({ items }: { items: { label: string; value: string }[] }) {
+/** A tile whose `amount` is set counts to its new dollar value (TickNumber: tween cap + reduced motion); `value` stays the text fallback. */
+export type WaiverStatItem = { label: string; value: string; amount?: number | null };
+
+export function StatStrip({ items }: { items: WaiverStatItem[] }) {
   return (
     <div
       className="glass-surface flex items-stretch self-start"
@@ -133,7 +137,14 @@ function StatStrip({ items }: { items: { label: string; value: string }[] }) {
           style={index > 0 ? { borderLeft: "var(--border-width-default) solid var(--color-border)" } : undefined}
         >
           <span className="text-base font-extrabold" style={{ color: "var(--color-text-primary)" }}>
-            <Money>{item.value}</Money>
+            {item.amount !== undefined ? (
+              // Money color on the wrapper so the tick's own up/down flash (CSS) can still override it.
+              <span style={{ color: MONEY_COLOR }} data-money="true">
+                <TickNumber value={item.amount} format={(n) => formatMoney(Math.round(n))} testId="faab-tick" />
+              </span>
+            ) : (
+              <Money>{item.value}</Money>
+            )}
           </span>
           <span className="text-[0.6875rem] uppercase font-bold" style={{ color: "var(--color-text-muted)" }}>
             {item.label}
@@ -592,8 +603,8 @@ export function WaiversContent({
   const faabItem =
     data.faab_enabled === false
       ? { label: "Waivers", value: data.waiver_mode === "reverse_standings" ? "Reverse" : "Rolling" }
-      : { label: "FAAB", value: data.faab_remaining != null ? formatMoney(data.faab_remaining) : "—" };
-  const stats = [
+      : { label: "FAAB", value: data.faab_remaining != null ? formatMoney(data.faab_remaining) : "—", amount: data.faab_remaining ?? null };
+  const stats: WaiverStatItem[] = [
     { label: "Available", value: String(data.available_count ?? data.players.length) },
     faabItem,
     { label: "Team need", value: teamNeedStat(data) },

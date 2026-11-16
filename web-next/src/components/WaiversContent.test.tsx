@@ -2,7 +2,7 @@ import type React from "react";
 import { fireEvent, render, screen, within } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
-import { WaiversContent } from "./WaiversContent";
+import { StatStrip, WaiversContent } from "./WaiversContent";
 import { api } from "@/lib/api";
 import type { DropSuggestion, NeedsModel, WaiverPlayer, WaiverPriorityAdd, WaiversResponse } from "@/lib/api";
 
@@ -545,5 +545,28 @@ describe("WaiversContent", () => {
     renderOpen(<WaiversContent leagueName="Std" data={BASE_RESPONSE} />);
     fireEvent.change(screen.getByLabelText("View"), { target: { value: "explore" } });
     expect(screen.queryByRole("option", { name: "DL" })).not.toBeInTheDocument();
+  });
+});
+
+describe("Waiver StatStrip count-up", () => {
+  it("renders an amount tile through TickNumber and leaves plain tiles as text", () => {
+    render(
+      <StatStrip
+        items={[
+          { label: "Available", value: "12" },
+          { label: "FAAB", value: "$94", amount: 94 },
+        ]}
+      />,
+    );
+    expect(screen.getByTestId("faab-tick").textContent).toBe("$94");
+    expect(screen.getByText("12")).toBeTruthy();
+    expect(screen.queryAllByTestId("faab-tick")).toHaveLength(1);
+  });
+
+  it("shows the dash for an unknown balance and no tick when amount is omitted", () => {
+    const { rerender } = render(<StatStrip items={[{ label: "FAAB", value: "—", amount: null }]} />);
+    expect(screen.getByTestId("faab-tick").textContent).toBe("—");
+    rerender(<StatStrip items={[{ label: "Waivers", value: "Rolling" }]} />);
+    expect(screen.queryByTestId("faab-tick")).toBeNull();
   });
 });

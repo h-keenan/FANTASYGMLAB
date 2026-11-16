@@ -9,6 +9,8 @@ import { useThemeMode } from '../context/ThemeModeContext';
 import { percentileColor, percentileLabel, percentileTrendIcon } from '../lib/percentile';
 import { radii, spacing, type ThemeColors } from '../theme';
 import Money from './Money';
+import TickNumber from './TickNumber';
+import { formatMoney } from '../lib/money';
 
 type IoniconName = React.ComponentProps<typeof Ionicons>['name'];
 
@@ -35,6 +37,7 @@ export default function MetricCard({
   onPress,
   centered = false,
   labelAccessory,
+  amount,
   style,
 }: {
   label: string;
@@ -47,6 +50,8 @@ export default function MetricCard({
    * keeps its plain text-only label unchanged. */
   icon?: IoniconName;
   value: string | number | null;
+  /** Dollar amount that counts to its new value (TickNumber: tween cap + reduced motion) instead of showing `value` as text. Undefined keeps the plain `value` text. */
+  amount?: number | null;
   percentile?: number | null;
   /** Overrides the value text color — for emphasizing an especially
    * important or abnormal reading (e.g. a non-zero injury count in
@@ -125,7 +130,13 @@ export default function MetricCard({
         adjustsFontSizeToFit={centered}
         minimumFontScale={centered ? 0.6 : undefined}
       >
-        {typeof display === 'string' ? <Money>{display}</Money> : display}
+        {amount !== undefined ? (
+          <TickNumber value={amount} format={(n) => formatMoney(Math.round(n))} style={{ color: colors.money }} testID="metric-amount-tick" />
+        ) : typeof display === 'string' ? (
+          <Money>{display}</Money>
+        ) : (
+          display
+        )}
       </AppText>
       {pctl && trendIcon ? (
         <View style={styles.pctlRow}>

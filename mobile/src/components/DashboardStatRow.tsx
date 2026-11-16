@@ -14,6 +14,8 @@ export type StatStripItem = {
   label: string;
   icon?: IconName;
   value: string;
+  /** Dollar amount that counts up/down (see MetricCard `amount`); `value` remains the text fallback. */
+  amount?: number | null;
   valueColor?: string;
   /** Semantic value color shortcut; `valueColor` wins when both are set. */
   tone?: 'positive' | 'risk';
@@ -44,6 +46,7 @@ export default function DashboardStatRow({ items, style, info }: { items: StatSt
           label={item.label}
           icon={item.icon}
           value={item.value}
+          amount={item.amount}
           valueColor={
             item.valueColor ?? (item.tone === 'positive' ? colors.successBright : item.tone === 'risk' ? colors.danger : undefined)
           }
