@@ -33,3 +33,31 @@ test('press feedback: shrink and fade pressed, fade only under reduced motion, n
   assert.deepEqual(pressFeedback(true, true), { scale: 1, opacity: PRESS.opacity });
   for (const ms of Object.values(TRANSITION_MS)) assert.ok(Object.values(MOTION_MS).includes(ms as never));
 });
+
+import { MAX_CONCURRENT_TWEENS, MAX_FLIP_ROWS, MOTION_ROLE, PROGRESS_MS, SPRING, acquireTween, activeTweenCount, flipOffset, progressScale, rankChange } from './motion.ts';
+
+test('motion roles map onto existing durations and progress clamps', () => {
+  assert.deepEqual({ ...MOTION_ROLE }, { micro: 120, standard: 180, emphasized: 300 });
+  assert.equal(PROGRESS_MS, 300);
+  assert.equal(progressScale(50), 0.5);
+  assert.equal(progressScale(140), 1);
+  assert.equal(progressScale(null), 0);
+});
+
+test('flip offsets, rank change and the tween cap', () => {
+  assert.deepEqual(flipOffset({ x: 0, y: 100 }, { x: 0, y: 40 }), { dx: 0, dy: 60 });
+  assert.equal(flipOffset({ x: 0, y: 100 }, { x: 0, y: 99 }), null);
+  assert.equal(MAX_FLIP_ROWS, 24);
+  assert.deepEqual(rankChange(5, 3), { dir: 'up', by: 2 });
+  assert.deepEqual(rankChange(2, 6), { dir: 'down', by: 4 });
+  assert.equal(rankChange(3, 3), null);
+  const held = Array.from({ length: MAX_CONCURRENT_TWEENS }, () => acquireTween());
+  assert.ok(held.every(Boolean));
+  assert.equal(acquireTween(), null);
+  held[0]?.();
+  held[0]?.();
+  assert.equal(activeTweenCount(), MAX_CONCURRENT_TWEENS - 1);
+  held.slice(1).forEach((release) => release?.());
+  assert.equal(activeTweenCount(), 0);
+  assert.ok(SPRING.press.stiffness > SPRING.sheet.stiffness);
+});

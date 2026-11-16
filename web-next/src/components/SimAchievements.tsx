@@ -21,6 +21,7 @@ import {
   type SimTrophyRow,
 } from "@/lib/simAchievements";
 import { Collapse } from "@/components/ui/Presence";
+import { ProgressFill } from "@/components/Motion";
 
 /** The round badge: a rarity-coloured ring around the glyph (muted and dashed while locked). Decorative; the row carries the name. */
 export function SimAchievementBadge({ a, size = 36 }: { a: Pick<SimAchievement, "icon" | "rarity" | "tone" | "unlocked">; size?: number }) {
@@ -69,7 +70,7 @@ function Row({ a }: { a: SimAchievement }) {
       </button>
       {!a.unlocked && a.progress ? (
         <div className="mb-1 ml-12 h-1 overflow-hidden" style={{ borderRadius: "var(--radius-pill)", background: "var(--color-surface-muted)" }} role="progressbar" aria-valuenow={pct} aria-valuemin={0} aria-valuemax={100} aria-label={`${a.name} progress`}>
-          <div style={{ width: `${pct}%`, height: "100%", background: color, opacity: 0.8 }} />
+          <ProgressFill percent={pct} color={color} style={{ opacity: 0.8 }} />
         </div>
       ) : null}
       <Collapse open={open}>

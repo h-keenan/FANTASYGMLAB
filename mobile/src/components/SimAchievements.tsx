@@ -22,6 +22,7 @@ import {
   type SimTrophyRow,
 } from '../lib/simAchievements';
 import { Collapse } from './Presence';
+import { ProgressFill } from './Motion';
 
 /** The lib names web CSS tokens; the app resolves the same semantic tokens from its theme. */
 export function useAchievementColor() {
@@ -78,7 +79,7 @@ function Row({ a }: { a: SimAchievement }) {
       </Pressable>
       {!a.unlocked && a.progress ? (
         <View style={{ marginLeft: 48, height: 4, borderRadius: 2, overflow: 'hidden', backgroundColor: colors.border }} accessibilityRole="progressbar" accessibilityValue={{ min: 0, max: 100, now: pct }}>
-          <View style={{ width: `${pct}%`, height: 4, backgroundColor: color, opacity: 0.8 }} />
+          <ProgressFill percent={pct} color={color} style={{ opacity: 0.8 }} />
         </View>
       ) : null}
       <Collapse open={open}>

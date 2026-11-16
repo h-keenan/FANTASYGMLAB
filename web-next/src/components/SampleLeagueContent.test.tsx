@@ -1,10 +1,22 @@
 import { fireEvent, render, screen } from "@testing-library/react";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { SampleLeagueContent } from "./SampleLeagueContent";
 
 describe("SampleLeagueContent", () => {
-  afterEach(() => vi.restoreAllMocks());
+  // Tab bodies cross-fade (PresenceSwap); under reduced motion they swap instantly, which keeps these assertions synchronous.
+  beforeEach(() => {
+    Object.defineProperty(window, "matchMedia", {
+      configurable: true,
+      writable: true,
+      value: (query: string) => ({ matches: query.includes("reduce"), media: query, addEventListener: () => {}, removeEventListener: () => {} }),
+    });
+  });
+  afterEach(() => {
+    vi.restoreAllMocks();
+    // @ts-expect-error test cleanup
+    delete window.matchMedia;
+  });
 
   it("labels the page as a sample and links the CTA to the real connect flow", () => {
     render(<SampleLeagueContent />);

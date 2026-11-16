@@ -54,12 +54,13 @@ export function Toggle({
           className="absolute"
           style={{
             top: 2,
-            left: checked ? 20 : 2,
+            left: 2,
+            transform: checked ? "translateX(18px)" : "none",
             width: 20,
             height: 20,
             borderRadius: "var(--radius-pill)",
             background: checked ? "var(--color-on-accent)" : "var(--color-text-secondary)",
-            transition: "left 120ms",
+            transition: "transform 120ms",
           }}
         />
       </span>

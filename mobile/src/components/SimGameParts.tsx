@@ -45,6 +45,7 @@ import {
 } from '../lib/simGame';
 import { simSeeAllLabel } from '../lib/simLayout';
 import { radii, scrim, sheetHeight, spacing, type ThemeColors } from '../theme';
+import { ProgressFill, SuccessCheck } from './Motion';
 
 /** Semantic theme color for a presentation tone (never a raw hex). */
 export function simToneColor(tone: SimGameTone, colors: ThemeColors): string {
@@ -159,7 +160,7 @@ export function SimProgressBar({ done, total, tone = 'accent', label }: { done: 
   const pct = total > 0 ? Math.max(0, Math.min(100, (done / total) * 100)) : 0;
   return (
     <View style={{ height: 6, borderRadius: 999, overflow: 'hidden', backgroundColor: colors.glassInset }} accessibilityRole="progressbar" accessibilityLabel={label ?? `${done} of ${total}`}>
-      <View style={{ height: 6, width: `${pct}%`, backgroundColor: simToneColor(tone, colors) }} />
+      <ProgressFill percent={pct} color={simToneColor(tone, colors)} />
     </View>
   );
 }
@@ -471,7 +472,7 @@ export function SimNotice({ message, tone = 'warning', onDismiss }: { message: s
     <Presence show={Boolean(message)} variant="collapse" testID="sim-notice">
     <AccentCard accent={simToneColor(tone, colors)} compact>
       <View style={styles.noticeRow} accessibilityRole={tone === 'danger' ? 'alert' : undefined} accessibilityLiveRegion="polite">
-        <Ionicons name={NOTICE_ICON[tone]} size={18} color={simToneColor(tone, colors)} style={styles.noticeIcon} />
+        {tone === 'success' ? <SuccessCheck key={message} size={20} /> : <Ionicons name={NOTICE_ICON[tone]} size={18} color={simToneColor(tone, colors)} style={styles.noticeIcon} />}
         <AppText style={styles.noticeText}>{message}</AppText>
         {onDismiss ? (
           <Pressable onPress={onDismiss} hitSlop={10} accessibilityRole="button" accessibilityLabel="Dismiss message">

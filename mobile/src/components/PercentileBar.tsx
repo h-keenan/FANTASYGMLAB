@@ -4,6 +4,7 @@ import { StyleSheet, View } from 'react-native';
 import { useThemeMode } from '../context/ThemeModeContext';
 import { percentileColor } from '../lib/percentile';
 import { radii, type ThemeColors } from '../theme';
+import { ProgressFill } from './Motion';
 
 /**
  * Thin percentile progress indicator for MetricCard — a strong percentile
@@ -21,7 +22,7 @@ export default function PercentileBar({ percentile }: { percentile: number | nul
   const tint = percentileColor(clamped, colors);
   return (
     <View style={styles.track}>
-      <View style={[styles.fill, { width: `${clamped}%`, backgroundColor: tint }]} />
+      <ProgressFill percent={clamped} color={tint} />
     </View>
   );
 }

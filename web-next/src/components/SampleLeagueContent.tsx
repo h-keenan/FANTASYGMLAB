@@ -5,6 +5,7 @@ import { useEffect, useState } from "react";
 import { BottomDock } from "@/components/ui/BottomDock";
 import { DashboardContent } from "@/components/DashboardContent";
 import { PillRow } from "@/components/PillRow";
+import { PresenceSwap } from "@/components/ui/Presence";
 import { BottomTabBar } from "@/components/ui/BottomTabBar";
 import { SampleConnectModule, SampleLeagueBanner } from "@/components/SampleLeagueBanner";
 import { SectionHeading } from "@/components/SectionHeading";
@@ -213,10 +214,13 @@ export function SampleLeagueContent() {
                 onSelect={(value) => setTab(value as SampleTab)}
               />
             </div>
-            {tab === "dashboard" ? <DashboardTab /> : null}
-            {tab === "roster" ? <RosterTab /> : null}
-            {tab === "game_plan" ? <GamePlanTab onNavigate={setTab} /> : null}
-            {tab === "trade" ? <TradeTab /> : null}
+            {/* Tab bodies cross-fade (fade out, then rise in) instead of one hard cut. */}
+            <PresenceSwap swapKey={tab} className="flex min-w-0 flex-col gap-[var(--page-gap)]">
+              {tab === "dashboard" ? <DashboardTab /> : null}
+              {tab === "roster" ? <RosterTab /> : null}
+              {tab === "game_plan" ? <GamePlanTab onNavigate={setTab} /> : null}
+              {tab === "trade" ? <TradeTab /> : null}
+            </PresenceSwap>
           </div>
           <aside className="sample-rail max-lg:hidden" aria-label="Connect your league">
             <SampleConnectModule />

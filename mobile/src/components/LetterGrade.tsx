@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 
 import AppText from './AppText';
+import { PopIn } from './Motion';
 import { Sheet } from './Sheet';
 import { withAlpha } from './ToneBadge';
 import { useThemeMode } from '../context/ThemeModeContext';
@@ -43,7 +44,7 @@ export function LetterGrade({ grade, size = 'sm', testID = 'letter-grade' }: { g
   if (!grade?.grade) return <View style={{ minWidth: spec.min, height: spec.h }} accessibilityElementsHidden importantForAccessibility="no-hide-descendants" />;
   const color = toneColor(simGradeTone(grade.grade), colors);
   const range = simGradeRangeText(grade);
-  return (
+  const capsule = (
     <View
       accessible
       accessibilityRole="image"
@@ -62,6 +63,8 @@ export function LetterGrade({ grade, size = 'sm', testID = 'letter-grade' }: { g
       {size === 'lg' && range ? <AppText style={{ fontSize: 12, fontWeight: '700', color: colors.textTertiary }} importantForAccessibility="no">{range}</AppText> : null}
     </View>
   );
+  // The big grade (recap hero) lands with a one-shot pop; list-sized grades stay still.
+  return size === 'lg' ? <PopIn>{capsule}</PopIn> : capsule;
 }
 
 /** One attribute row: label, a coarse bar tinted by the grade tone, and the letter. */

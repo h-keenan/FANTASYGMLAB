@@ -49,6 +49,7 @@ import { overlayStack } from "@/lib/overlayStack";
 import { useOverlay } from "@/lib/useOverlay";
 import { useSheetDragDismiss } from "@/lib/useSheetDragDismiss";
 import { simSeeAllLabel } from "@/lib/simLayout";
+import { ProgressFill, SuccessCheck } from "@/components/Motion";
 
 /** Semantic color token for a presentation tone (never a raw hex). */
 /** Text version of a tone: the tone mixed toward the primary text color so small colored text clears AA on cards and tints. */
@@ -129,7 +130,7 @@ export function SimProgressBar({ done, total, tone = "accent", label }: { done: 
   const pct = total > 0 ? Math.max(0, Math.min(100, (done / total) * 100)) : 0;
   return (
     <div className="h-1.5 w-full overflow-hidden" style={{ borderRadius: "var(--radius-pill)", background: "var(--color-surface-muted)" }} role="img" aria-label={label ?? `${done} of ${total}`}>
-      <div className="h-full" style={{ width: `${pct}%`, background: simToneColor(tone), transition: "width var(--motion-list, 180ms) ease" }} />
+      <ProgressFill percent={pct} color={simToneColor(tone)} />
     </div>
   );
 }
@@ -607,7 +608,7 @@ export function SimNotice({ message, tone = "warning", onDismiss }: { message: s
     <Presence show={Boolean(message)} variant="collapse" testId="sim-notice">
       <AccentCard accent={simToneColor(tone)} compact as="div">
         <div className="flex items-start gap-2" role={tone === "danger" ? "alert" : "status"}>
-          <ReviewGlyphChip glyph={simNoticeGlyph(tone)} tone={tone} size={24} />
+          {tone === "success" ? <SuccessCheck key={message} size={24} /> : <ReviewGlyphChip glyph={simNoticeGlyph(tone)} tone={tone} size={24} />}
           <p className="text-sm flex-1 min-w-0">{message}</p>
           {onDismiss ? (
             <button type="button" className="tap-link text-xs font-bold" style={{ color: "var(--color-accent)" }} onClick={onDismiss}>

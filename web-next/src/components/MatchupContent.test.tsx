@@ -258,7 +258,7 @@ describe("MatchupContent", () => {
     expect(screen.getByText("Proj 124.8")).toBeInTheDocument();
     expect(screen.getAllByText("64%").length).toBeGreaterThan(0);
     expect(screen.getByText("36%")).toBeInTheDocument();
-    expect(container.querySelector("[aria-label^='Win probability: you'] .winprob-bar-fill")).toHaveStyle({ width: "64%" });
+    expect(container.querySelector("[aria-label^='Win probability: you'] .winprob-bar-fill")).toHaveStyle({ transform: "scaleX(0.64)" });
     expect(screen.getByText("You're on track to win")).toBeInTheDocument();
   });
 

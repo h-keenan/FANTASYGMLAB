@@ -51,7 +51,7 @@ export function LetterGrade({ grade, size = "sm", testId = "letter-grade" }: { g
       title={range ? `${label}` : label}
       data-testid={testId}
       data-grade={grade.grade}
-      className="inline-flex shrink-0 flex-col items-center justify-center font-extrabold leading-none"
+      className={`inline-flex shrink-0 flex-col items-center justify-center font-extrabold leading-none${size === "lg" ? " enter-pop" : ""}`}
       style={{
         minWidth: spec.min,
         height: spec.h,

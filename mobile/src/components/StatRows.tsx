@@ -7,6 +7,7 @@ import { ordinal, percentileColor } from '../lib/percentile';
 import { COLLAPSE_AFTER, type StatRowModel } from '../lib/statRows';
 import { radii, spacing, type ThemeColors } from '../theme';
 import GlassCard from './GlassCard';
+import { ProgressFill } from './Motion';
 
 export type ExploreHandler = (target: { key: string; label: string }) => void;
 
@@ -32,7 +33,7 @@ export function StatRow({ row, onExplore, first }: { row: StatRowModel; onExplor
       {row.percentile != null ? (
         <View style={styles.barLine}>
           <View style={styles.track}>
-            <View style={[styles.fill, { width: `${Math.max(2, Math.min(100, row.percentile))}%`, backgroundColor: tint }]} />
+            <ProgressFill percent={Math.max(2, Math.min(100, row.percentile))} color={tint} />
           </View>
           <AppText style={[styles.pct, { color: tint }]}>{ordinal(row.percentile)}</AppText>
         </View>

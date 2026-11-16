@@ -14,6 +14,7 @@ import type { StatusHeaderModel } from '../lib/statusHeader';
 import SampleDashboard from '../components/SampleDashboard';
 import SampleLeagueBanner, { SampleConnectModule } from '../components/SampleLeagueBanner';
 import SectionHeading from '../components/SectionHeading';
+import { PresenceSwap } from '../components/Presence';
 import SegmentedTabBar from '../components/SegmentedTabBar';
 import ToneBadge from '../components/ToneBadge';
 import { useThemeMode } from '../context/ThemeModeContext';
@@ -112,6 +113,7 @@ export default function SampleLeagueScreen({ navigation }: Props) {
           onChange={setTab}
         />
 
+        <PresenceSwap swapKey={tab} style={styles.content2}>
         {tab === 'dashboard' ? <SampleDashboard /> : null}
 
         {tab === 'roster' ? (
@@ -158,6 +160,7 @@ export default function SampleLeagueScreen({ navigation }: Props) {
             <SampleConnectModule onConnect={connect} />
           </>
         ) : null}
+        </PresenceSwap>
       </ScrollView>
     </>
   );
@@ -166,6 +169,7 @@ export default function SampleLeagueScreen({ navigation }: Props) {
 function createStyles(colors: ThemeColors) {
   return StyleSheet.create({
     container: { flex: 1 },
+    content2: { gap: spacing.lg },
     content: { paddingHorizontal: spacing.lg, gap: spacing.lg },
     title: { fontSize: 25, fontWeight: '900', color: colors.textPrimary },
     muted: { fontSize: 13.5, color: colors.textSecondary, lineHeight: 18 },

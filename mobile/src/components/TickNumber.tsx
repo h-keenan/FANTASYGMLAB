@@ -3,7 +3,7 @@ import { AccessibilityInfo, type StyleProp, type TextStyle } from 'react-native'
 
 import AppText from './AppText';
 import { useThemeMode } from '../context/ThemeModeContext';
-import { COUNT_MS as TICK_MS, FLASH_MS, flashDirection } from '../lib/motion';
+import { COUNT_MS as TICK_MS, FLASH_MS, acquireTween, flashDirection } from '../lib/motion';
 
 
 /**
@@ -42,13 +42,16 @@ export default function TickNumber({
     if (target == null || from == null || from === target) return;
     let raf: ReturnType<typeof requestAnimationFrame> | null = null;
     let flashTimer: ReturnType<typeof setTimeout> | null = null;
-    const instant = reduced.current;
+    // At most MAX_CONCURRENT_TWEENS number tweens run at once; past that the value just changes (the flash still plays).
+    const release = acquireTween();
+    const instant = reduced.current || release === null;
     const start = Date.now();
     const step = () => {
       const t = instant ? 1 : Math.min(1, (Date.now() - start) / TICK_MS);
       const eased = 1 - (1 - t) ** 3;
       setAnim({ target, value: from + (target - from) * eased });
       if (t < 1) raf = requestAnimationFrame(step);
+      else release?.();
     };
     const dir = flashDirection(from, target);
     if (dir) {
@@ -58,6 +61,7 @@ export default function TickNumber({
     step();
     return () => {
       if (raf != null) cancelAnimationFrame(raf);
+      release?.();
       if (flashTimer) clearTimeout(flashTimer);
     };
   }, [target]);
