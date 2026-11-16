@@ -45,13 +45,8 @@ CONFIDENCE_HIGH = "High confidence"
 CONFIDENCE_MODERATE = "Moderate confidence"
 CONFIDENCE_CLOSE = "Close call"
 
-# Meaningful bands — tiny deltas must not look decisive.
-_VALUE_SMASH = trade_value_bands.SMASH
-_VALUE_ACCEPT = trade_value_bands.ACCEPT
-_VALUE_CLOSE = 700  # legacy (no lineup model) close-call width only
-_VALUE_COUNTER = trade_value_bands.COUNTER
-_VALUE_DECLINE = trade_value_bands.DECLINE
-_VALUE_HARD = trade_value_bands.HARD
+# Meaningful bands: tiny deltas must not look decisive. Every cut point is a share
+# of the deal (modules.trade_value_bands.cuts_for), never an absolute number.
 
 
 @dataclass(frozen=True)
@@ -90,6 +85,9 @@ class OfferVerdict:
     # P(the direction of the score is right); `lineup_model` carries the
     # points/uncertainty numbers UI and bot text can cite.
     trade_score: int = 0
+    # Larger side's total asset value: the yardstick every cut point of this
+    # verdict was scaled to (trade_value_bands.cuts_for).
+    deal_size: int = 0
     confidence_pct: float | None = None
     lineup_model: dict[str, Any] | None = None
     # Team posture (modules.trade_posture): who the verdict thinks the user's
@@ -124,6 +122,7 @@ class OfferVerdict:
             "lineup_warnings": [dict(w) for w in self.lineup_warnings],
             "rationale_label": self.rationale_label,
             "trade_score": self.trade_score,
+            "deal_size": self.deal_size,
             "confidence_pct": self.confidence_pct,
             "lineup_model": self.lineup_model,
             "posture": self.posture,
@@ -231,10 +230,25 @@ def _fit_total(fit: Mapping[str, Any] | None) -> int:
     return total
 
 
-def _value_direction_label(score: int) -> str:
+def _value_direction_label(score: int, deal_size: float | None = None) -> str:
     """The sentence under the verdict: same ladder as the verdict itself."""
 
-    return trade_value_bands.direction_label(score)
+    return trade_value_bands.direction_label(score, deal_size)
+
+
+def _assets_deal_size(
+    send_assets: Sequence[Mapping[str, Any]] | None, receive_assets: Sequence[Mapping[str, Any]] | None
+) -> float:
+    def total(assets: Sequence[Mapping[str, Any]] | None) -> int:
+        out = 0
+        for a in assets or ():
+            try:
+                out += int(a.get("score", a.get("value_score", 0)) or 0)
+            except (TypeError, ValueError, AttributeError):
+                continue
+        return out
+
+    return trade_value_bands.deal_size_for(total(send_assets), total(receive_assets))
 
 
 def build_counter_guidance(
@@ -243,6 +257,7 @@ def build_counter_guidance(
     value_delta: int,
     send_assets: Sequence[Mapping[str, Any]],
     partner_assets: Sequence[Mapping[str, Any]] | None = None,
+    deal_size: float | None = None,
 ) -> tuple[str, dict[str, Any] | None]:
     """Practical counter copy, plus a machine-actionable version when possible.
 
@@ -257,7 +272,7 @@ def build_counter_guidance(
 
     if band not in {VERDICT_COUNTER, VERDICT_FAIR, VERDICT_DECLINE}:
         return "", None
-    if value_delta >= -trade_value_bands.EDGE and band == VERDICT_FAIR:
+    if value_delta >= -trade_value_bands.cuts_for(deal_size).edge and band == VERDICT_FAIR:
         return "Preference call — counter only if you want a different shape, not because value is broken.", None
 
     gap = abs(min(0, int(value_delta)))
@@ -494,7 +509,7 @@ def build_counter_offer_packages(
         verdict = regrade(candidate_send, candidate_receive)
         if verdict is not None and getattr(verdict, "lineup_model", None):
             state["model"] = True
-            if verdict.value_delta > _VALUE_ACCEPT:
+            if verdict.value_delta > trade_value_bands.cuts_for(getattr(verdict, 'deal_size', None) or None).accept:
                 # The partner would be giving up clearly more market value
                 # than they get: not a package they can say yes to.
                 return False
@@ -737,40 +752,42 @@ def decide_offer_verdict(
     posture_assessment = dict(posture_assessment) if posture_assessment else None
     window_overrules = False
     trade_score = int(fit.get("trade_score", value_delta)) if lineup_model else value_delta
+    deal_size = float(fit.get("deal_size") or 0) or _assets_deal_size(send_assets, receive_assets)
+    cuts = trade_value_bands.cuts_for(deal_size or None)
     # Close band first — tiny edges should not scream ACCEPT/DECLINE.
-    close_value = abs(value_delta) < _VALUE_CLOSE
+    close_value = abs(value_delta) < cuts.close
     close_fit = -1 <= fit_total <= 2
 
     if lineup_model is not None:
         # One number decides: the posture- and lineup-aware trade score.
-        scored = trade_value_bands.band_for_score(trade_score)
+        scored = trade_value_bands.band_for_score(trade_score, deal_size)
         band, ui, tone = scored.verdict, scored.ui_verdict, scored.tone
         # The posture cost is already a term of trade_score, so band, UI verdict
         # and tone are the rung it lands in, nothing is relabelled afterwards.
         # Whether the market value alone would have said accept is reported
         # separately (words only), see trade_posture.window_overrules_value.
-        window_overrules = trade_posture.window_overrules_value(value_delta, trade_score, posture_assessment)
-    elif value_delta >= _VALUE_SMASH and fit_total >= 4:
+        window_overrules = trade_posture.window_overrules_value(value_delta, trade_score, posture_assessment, deal_size)
+    elif value_delta >= cuts.smash and fit_total >= 4:
         band = VERDICT_SMASH_ACCEPT
         ui = UI_VERDICT_ACCEPT
         tone = "accept"
-    elif value_delta >= _VALUE_ACCEPT and fit_total >= 2:
+    elif value_delta >= cuts.accept and fit_total >= 2:
         band = VERDICT_ACCEPT
         ui = UI_VERDICT_ACCEPT
         tone = "accept"
-    elif value_delta >= 150 and fit_total >= 4:
+    elif value_delta >= cuts.edge and fit_total >= 4:
         band = VERDICT_ACCEPT
         ui = UI_VERDICT_ACCEPT
         tone = "accept"
-    elif value_delta <= _VALUE_HARD and fit_total <= -3:
+    elif value_delta <= cuts.hard and fit_total <= -3:
         band = VERDICT_HARD_DECLINE
         ui = UI_VERDICT_DECLINE
         tone = "decline"
-    elif value_delta <= _VALUE_DECLINE or fit_total <= -4:
+    elif value_delta <= cuts.decline or fit_total <= -4:
         band = VERDICT_DECLINE
         ui = UI_VERDICT_DECLINE
         tone = "decline"
-    elif value_delta <= _VALUE_COUNTER and fit_total <= 1:
+    elif value_delta <= cuts.counter and fit_total <= 1:
         band = VERDICT_COUNTER
         ui = UI_VERDICT_COUNTER
         tone = "counter"
@@ -817,7 +834,7 @@ def decide_offer_verdict(
         confidence = CONFIDENCE_HIGH
     elif band == VERDICT_FAIR or (close_value and abs(fit_total) <= 2):
         confidence = CONFIDENCE_CLOSE
-    elif abs(value_delta) >= 1000 or abs(fit_total) >= 4:
+    elif abs(value_delta) >= -cuts.decline or abs(fit_total) >= 4:
         confidence = CONFIDENCE_HIGH
     else:
         confidence = CONFIDENCE_MODERATE
@@ -845,6 +862,7 @@ def decide_offer_verdict(
         value_delta=trade_score,
         send_assets=send_assets or (),
         partner_assets=partner_assets,
+        deal_size=deal_size,
     )
     if band == VERDICT_FAIR and not counter:
         counter = ""
@@ -874,20 +892,20 @@ def decide_offer_verdict(
     # Words, badge and colors read the SAME score the verdict was decided
     # from (trade_score; the posture-adjusted value_delta when there is no
     # lineup model), never the raw asset delta (audit C1b).
-    value_summary = _value_direction_label(trade_score)
+    value_summary = _value_direction_label(trade_score, deal_size)
     if soften:
         # "You win big on value" under a label that now reads ACCEPT would
         # contradict it; say the ACCEPT rung's sentence (the number is intact).
-        value_summary = trade_value_bands.band_for_score(trade_value_bands.ACCEPT).direction_label
+        value_summary = trade_value_bands.band_by_id("accept").direction_label
     if window_overrules or (
         posture_assessment
         and posture_assessment.get("adjustment", 0) < 0
-        and trade_value_bands.band_for_score(value_delta).id in {"smash", "accept", "edge_you"}
-        and trade_value_bands.band_for_score(trade_score).id in {"counter", "decline", "hard"}
+        and trade_value_bands.band_for_score(value_delta, deal_size).id in {"smash", "accept", "edge_you"}
+        and trade_value_bands.band_for_score(trade_score, deal_size).id in {"counter", "decline", "hard"}
     ):
         # The verdict was pulled down by posture, not by the market: the line
         # under it must still say what the market value is.
-        value_summary = _value_direction_label(value_delta)
+        value_summary = _value_direction_label(value_delta, deal_size)
     roster_summary = lineup_summary or (f"Roster fit: {roster_fit}." if roster_fit else "Roster impact is limited.")
     if not strategy_summary:
         strategy_summary = "Strategy fit is mixed for your current plan."
@@ -913,6 +931,7 @@ def decide_offer_verdict(
         lineup_warnings=lineup_warnings,
         rationale_label="The trade-off" if window_overrules else _rationale_label(tone, trade_score),
         trade_score=trade_score,
+        deal_size=int(round(deal_size)),
         confidence_pct=confidence_pct,
         lineup_model=lineup_model,
         posture=posture,

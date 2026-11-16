@@ -51,7 +51,25 @@ MAX_BALANCE_ADDITIONS = 3
 
 # The partner may not lose more than this on the market (the same
 # "not a package they can say yes to" line the counter builder uses).
-PARTNER_MAX_USER_VALUE_GAIN = trade_value_bands.ACCEPT
+
+
+def _idea_cuts(idea: Mapping[str, Any]) -> trade_value_bands.Cuts:
+    """The verdict ladder's cut points for this idea's deal size (larger side's
+    value), so every threshold below scales with what is being traded."""
+
+    size = trade_value_bands.deal_size_for(idea.get("my_score"), idea.get("their_score"))
+    if not size:
+        def total(assets: Any) -> int:
+            return sum(int(a.get("score") or 0) for a in (assets or []) if isinstance(a, Mapping))
+
+        size = trade_value_bands.deal_size_for(total(idea.get("send_assets")), total(idea.get("receive_assets")))
+    return trade_value_bands.cuts_for(size)
+
+
+def _partner_max_user_gain(idea: Mapping[str, Any]) -> float:
+    """Most value the user may gain before the partner is the one being skimmed."""
+
+    return _idea_cuts(idea).accept
 
 # When no package clears the strict bar, the closest ones are still shown, but
 # never one the lineup model says costs the team real points (that is the
@@ -85,7 +103,7 @@ def acceptance_read(idea: Mapping[str, Any]) -> dict[str, str]:
     else:
         label = ACCEPT_LONG_SHOT
     # They are the side giving up market value: one rung down.
-    if gain_to_user > trade_value_bands.EDGE * 2:
+    if gain_to_user > _idea_cuts(idea).edge * 2:
         label = {ACCEPT_LIKELY: ACCEPT_POSSIBLE, ACCEPT_POSSIBLE: ACCEPT_LONG_SHOT}.get(label, label)
     # The realism check flagged the package itself (e.g. a pile of mid pieces
     # for their cornerstone): a stretch, never better than a long shot.
@@ -219,12 +237,13 @@ def price_note(idea: Mapping[str, Any], target_name: str) -> str:
     if delta is None:
         return ""
     delta = int(delta)
-    if delta < -trade_value_bands.EDGE:
+    edge = _idea_cuts(idea).edge
+    if delta < -edge:
         return f"You'd pay about {_fmt_value(-delta)} more than {target_name}'s value."
-    if delta > trade_value_bands.EDGE:
+    if delta > edge:
         return f"This is about {_fmt_value(delta)} under {target_name}'s value, so expect them to ask for more."
     raw_gap = int(idea.get("my_score") or 0) - int(idea.get("their_score") or 0)
-    if raw_gap > trade_value_bands.EDGE and len(idea.get("send_assets") or []) > len(idea.get("receive_assets") or []):
+    if raw_gap > edge and len(idea.get("send_assets") or []) > len(idea.get("receive_assets") or []):
         return (
             f"Priced about right for {target_name}: several pieces for one star are worth less than "
             "their sum, so you send more in total."
@@ -285,7 +304,8 @@ def affordability_shortfall(
     if not best:
         return _round_up_100(int(target_asset.get("score") or 0))
     delta = ti.estimated_user_delta(best, [target_asset])
-    return _round_up_100(delta) if delta > trade_value_bands.EDGE else 0
+    deal = trade_value_bands.deal_size_for(sum(int(a.get('score') or 0) for a in best), int(target_asset.get('score') or 0))
+    return _round_up_100(delta) if delta > trade_value_bands.cuts_for(deal).edge else 0
 
 
 def _no_offer_message(
@@ -497,7 +517,8 @@ def build_target_offers(
     def _triage(idea: dict[str, Any]) -> int:
         """Grade first the packages the Analyzer is most likely to call fair for both sides."""
         est = ti.estimated_user_delta(idea.get("send_assets") or [], idea.get("receive_assets") or [])
-        in_band = -2 * trade_value_bands.EDGE <= est <= PARTNER_MAX_USER_VALUE_GAIN
+        cuts = _idea_cuts(idea)
+        in_band = -2 * cuts.edge <= est <= cuts.accept
         stretch = bool(idea.get("hub_stretch"))
         if in_band:
             return 1 if stretch else 0
@@ -520,7 +541,7 @@ def build_target_offers(
             graded_ideas.append(idea)
         if ok:
             passed.append(idea)
-        elif idea.get("analyzer_value_delta") is not None and int(idea["analyzer_value_delta"]) < -trade_value_bands.EDGE:
+        elif idea.get("analyzer_value_delta") is not None and int(idea["analyzer_value_delta"]) < -_idea_cuts(idea).edge:
             overpay.append(idea)
 
     # You would overpay: ask the partner to add something real back, ranked
@@ -575,7 +596,7 @@ def build_target_offers(
     # one. Packages the realism check flagged as a stretch are held back.
     fair = [
         i for i in passed
-        if int(i.get("analyzer_value_delta") or 0) <= PARTNER_MAX_USER_VALUE_GAIN
+        if int(i.get("analyzer_value_delta") or 0) <= _partner_max_user_gain(i)
     ]
     clean = [i for i in fair if not i.get("hub_stretch")]
     clean.sort(key=ti.posture_surface_sort_key, reverse=True)
@@ -591,7 +612,7 @@ def build_target_offers(
         # would be stripped shows up as lineup points lost.
         near = [
             i for i in graded_ideas
-            if int(i.get("analyzer_value_delta")) <= PARTNER_MAX_USER_VALUE_GAIN
+            if int(i.get("analyzer_value_delta")) <= _partner_max_user_gain(i)
         ]
         affordable = [
             i for i in near

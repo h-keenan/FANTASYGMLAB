@@ -118,9 +118,10 @@ def _old_assess(sides, prior_lopsided_wins=None):
     prior = {str(k): int(v) for k, v in (prior_lopsided_wins or {}).items()}
     loser = min(sides, key=lambda s: (float(s["team_score"]), float(s["market_delta"])))
     winner = next(s for s in sides if s is not loser)
-    market_gap = trade_veto._gap_norm(float(loser["market_delta"]))
-    team_gap = trade_veto._gap_norm(float(loser["team_score"]))
-    explained = float(loser["team_score"]) >= -bands.EDGE
+    cuts = bands.cuts_for(loser.get("deal_size"))
+    market_gap = trade_veto._gap_norm(float(loser["market_delta"]), cuts)
+    team_gap = trade_veto._gap_norm(float(loser["team_score"]), cuts)
+    explained = float(loser["team_score"]) >= -cuts.edge
     if explained:
         base = 100.0 * trade_veto.EXPLAINABLE_MARKET_WEIGHT * market_gap
     else:

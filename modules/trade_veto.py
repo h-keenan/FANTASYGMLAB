@@ -44,8 +44,8 @@ from typing import Any, Mapping, Sequence
 
 from modules import trade_value_bands as bands
 
-# Normalisation rung: a side this far behind is "as bad as it gets".
-FULL_GAP = float(-bands.HARD)
+# Normalisation rung: a side this far behind (the "hard decline" rung of the
+# deal-scaled ladder, ``bands.cuts_for(deal).hard``) is "as bad as it gets".
 EXPLAINABLE_MARKET_WEIGHT = 0.4
 MARKET_WEIGHT = 0.6
 TEAM_WEIGHT = 0.4
@@ -89,10 +89,17 @@ def band_for(outrage: float) -> str:
     return BAND_FAIR
 
 
-def _gap_norm(delta: float) -> float:
+def _side_cuts(side: Mapping[str, Any]) -> bands.Cuts:
+    """The ladder's cut points at this side's deal size (reference size when the
+    caller does not know it)."""
+
+    return bands.cuts_for(side.get("deal_size"))
+
+
+def _gap_norm(delta: float, cuts: bands.Cuts) -> float:
     """0 when the side is not behind, 1 at the "hard decline" rung."""
 
-    return _clamp(-float(delta) / FULL_GAP)
+    return _clamp(float(delta) / cuts.hard)
 
 
 def history_bonus(prior_lopsided_wins: int) -> float:
@@ -116,9 +123,10 @@ def side_reasons(side: Mapping[str, Any]) -> list[str]:
     score = float(side.get("team_score") or 0)
     ppw = float(side.get("points_per_week") or 0)
     posture = _direction_text(side)
-    if market <= bands.DECLINE:
+    cuts = _side_cuts(side)
+    if market <= cuts.decline:
         out.append(f"{name} gives up {abs(round(market)):,} more in market value than they get back.")
-    elif market >= bands.ACCEPT:
+    elif market >= cuts.accept:
         out.append(f"{name} gets {round(market):,} more in market value than they send.")
     if ppw <= -1.0:
         out.append(f"{name}'s lineup loses about {abs(ppw):.1f} points a week.")
@@ -127,10 +135,10 @@ def side_reasons(side: Mapping[str, Any]) -> list[str]:
     worst = side.get("worst_position")
     if worst and float(worst.get("per_week_delta") or 0) <= -1.0:
         out.append(f"The hit lands at {worst['position']} ({worst['per_week_delta']:+.1f} pts/wk).")
-    if market <= bands.COUNTER and score >= -bands.EDGE:
+    if market <= cuts.counter and score >= -cuts.edge:
         lead = f"As {posture}, {name}" if posture else name
         out.append(f"{lead} still comes out about even on their own roster, which explains much of the gap.")
-    if score <= bands.DECLINE:
+    if score <= cuts.decline:
         out.append(f"For {name}'s whole roster this reads as a clear loss.")
     return out
 
@@ -153,9 +161,10 @@ def _assess_loser(
     """Outrage read for one chosen "hurt" side against the side that gained
     most. The two-team ``assess`` and the per-team N-team read share this."""
 
-    market_gap = _gap_norm(float(loser["market_delta"]))
-    team_gap = _gap_norm(float(loser["team_score"]))
-    explained = float(loser["team_score"]) >= -bands.EDGE
+    cuts = _side_cuts(loser)
+    market_gap = _gap_norm(float(loser["market_delta"]), cuts)
+    team_gap = _gap_norm(float(loser["team_score"]), cuts)
+    explained = float(loser["team_score"]) >= -cuts.edge
     if explained:
         base = 100.0 * EXPLAINABLE_MARKET_WEIGHT * market_gap
     else:

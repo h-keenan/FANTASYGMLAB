@@ -35,7 +35,7 @@ from modules.frame_records import frame_records
 from modules import trade_grade
 from modules.team_eval import REPLACEMENT_LEVEL
 from modules import model_status, trade_lineup_impact, trade_lineup_model, trade_posture
-from modules import trade_visual_language
+from modules import trade_value_bands, trade_visual_language
 from modules.league_value_settings import DEFAULT_LEAGUE_VALUE_SETTINGS, _safe_float
 from modules.league_display import _format_score
 from modules.rankings import injury_level, is_injury_status, summarize_team_injuries
@@ -75,9 +75,17 @@ def _model_risk_summary(lineup_model: dict, injury_lines, window) -> str:
 
     parts: list[str] = []
     for line in injury_lines[:3]:
+        if line.absence.unconfirmed and line.absence.weeks_low is not None and line.absence.weeks_high is not None:
+            # Unconfirmed severity: the honest answer is the range, not its midpoint.
+            timing = (
+                f"between {trade_grade._weeks_text(line.absence.weeks_low)} and "
+                f"{trade_grade._weeks_text(line.absence.weeks_high)} (unconfirmed)"
+            )
+        else:
+            timing = f"{trade_grade._weeks_text(line.absence.weeks)} estimated"
         parts.append(
-            f"{line.name} ({line.absence.status_label}): {trade_grade._weeks_text(line.absence.weeks)} "
-            f"estimated ({line.absence.basis}; no return date in the data)."
+            f"{line.name} ({line.absence.status_label}): {timing} "
+            f"({line.absence.basis}; no return date in the data)."
         )
     opened = lineup_model.get("new_open_slot_weeks") or {}
     if opened:
@@ -120,8 +128,8 @@ def strategy_trade_result_note(strategy: str) -> str:
     return "Retool lens: balances current production with future value, so picks and young starters keep meaningful weight."
 
 
-def trade_value_verdict(score: int) -> str:
-    return trade_visual_language.trade_value_band(score)
+def trade_value_verdict(score: int, deal_size: object = None) -> str:
+    return trade_visual_language.trade_value_band(score, deal_size)
 
 
 def _lineup_depth_thresholds(league_settings: dict | None = None) -> dict[str, int]:
@@ -810,7 +818,18 @@ def evaluate_trade_analyzer_fit(
     send_pick_count = sum(1 for asset in send_assets if asset.get("asset_type") == "pick")
     receive_pick_count = sum(1 for asset in receive_assets if asset.get("asset_type") == "pick")
 
-    value_component = 2 if trade_score >= 700 else 1 if trade_score >= 150 else 0 if trade_score > -250 else -1 if trade_score > -1000 else -2
+    _cuts = trade_value_bands.cuts_for(
+        trade_value_bands.deal_size_for(
+            sum(score_asset_value(a) for a in send_assets), sum(score_asset_value(a) for a in receive_assets)
+        )
+    )
+    value_component = (
+        2 if trade_score >= _cuts.close
+        else 1 if trade_score >= _cuts.edge
+        else 0 if trade_score > _cuts.counter
+        else -1 if trade_score > _cuts.decline
+        else -2
+    )
     # Model mode: the lineup component is the model's win-now delta (value
     # units, same bands); otherwise the season-value starter delta.
     lineup_basis = int(lineup_model["win_now_delta"]) if lineup_model is not None else lineup_delta
@@ -1045,7 +1064,7 @@ def evaluate_trade_analyzer_fit(
             trade_score < 0 if lineup_model is not None else (value_delta < 0 and fit_total <= 0)
         )
         net_positive = (
-            trade_score >= 150 if lineup_model is not None else (value_delta >= 0 and fit_total >= 1)
+            trade_score >= _cuts.edge if lineup_model is not None else (value_delta >= 0 and fit_total >= 1)
         )
         # Never "Helps" when the lineup cost is the contender's problem.
         if posture_assessment and (
@@ -1056,7 +1075,7 @@ def evaluate_trade_analyzer_fit(
             )
         ):
             net_positive = False
-        if (critical_warnings and not (lineup_model is not None and trade_score >= 150)) or net_negative:
+        if (critical_warnings and not (lineup_model is not None and trade_score >= _cuts.edge)) or net_negative:
             # Net-negative: lead with the cost, never "Helps because" over a
             # negative value balance.
             explanation = f"Falls short: it {neg_text}, even though it {pos_text}."
@@ -1147,6 +1166,10 @@ def evaluate_trade_analyzer_fit(
         "available": True,
         "value_delta": value_delta,
         "trade_score": trade_score,
+        # Larger side's asset value: the yardstick the verdict ladder scales to.
+        "deal_size": trade_value_bands.deal_size_for(
+            sum(score_asset_value(a) for a in send_assets), sum(score_asset_value(a) for a in receive_assets)
+        ),
         "lineup_model": lineup_model,
         "model_status": engine_status,
         "posture": team_posture,
@@ -1201,7 +1224,9 @@ def evaluate_trade_analyzer_fit(
             "in_season": window.in_season,
             "source": window.source,
         },
-        "value_verdict": trade_value_verdict(value_delta),
+        "value_verdict": trade_value_verdict(value_delta, trade_value_bands.deal_size_for(
+            sum(score_asset_value(a) for a in send_assets), sum(score_asset_value(a) for a in receive_assets)
+        )),
         "roster_fit_verdict": roster_fit_verdict,
         "lineup_delta": lineup_delta,
         "lineup_summary": lineup_summary,

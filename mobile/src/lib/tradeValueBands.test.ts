@@ -6,7 +6,7 @@ import { sideLabelsCoverEveryBand, valueDirectionLabel } from './tradeValue.ts';
 import { fairnessBandTone } from './liveDraft.ts';
 
 test('the TS ladder replays the Python golden scores', () => {
-  for (const { score, id } of TRADE_VALUE_GOLDEN) assert.equal(bandForScore(score).id, id, String(score));
+  for (const { score, id, deal_size } of TRADE_VALUE_GOLDEN) assert.equal(bandForScore(score, deal_size).id, id, `${deal_size}:${score}`);
 });
 
 test('quick compare words use the shared ladder and cover every band', () => {
@@ -14,6 +14,9 @@ test('quick compare words use the shared ladder and cover every band', () => {
   assert.equal(valueDirectionLabel(600), 'Side B wins on value');
   assert.equal(valueDirectionLabel(-100), 'Value is essentially even');
   assert.equal(valueDirectionLabel(-1300), 'Large value gap favoring Side A');
+  // The same 10 percent loss reads as a loss on a small deal and a big one.
+  assert.equal(valueDirectionLabel(-50, 500), 'Value edge to Side A');
+  assert.equal(valueDirectionLabel(-1000, 10000), 'Value edge to Side A');
 });
 
 test('badge tones are the band tones everywhere (live draft included)', () => {

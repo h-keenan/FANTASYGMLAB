@@ -21,8 +21,9 @@ export const SIDE_DIRECTION_LABELS: Record<string, string> = {
   hard: 'Very large value gap favoring Side A',
 };
 
-export function valueDirectionLabel(valueDelta: number): string {
-  return SIDE_DIRECTION_LABELS[bandForScore(valueDelta).id];
+/** `dealSize` = the larger side's total value; the ladder scales to it. */
+export function valueDirectionLabel(valueDelta: number, dealSize?: number | null): string {
+  return SIDE_DIRECTION_LABELS[bandForScore(valueDelta, dealSize).id];
 }
 
 export function sideLabelsCoverEveryBand(): boolean {

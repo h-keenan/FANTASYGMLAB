@@ -553,7 +553,9 @@ def _lopsided_losers(legs: Sequence[Mapping[str, Any]]) -> list[tuple[int, int, 
             for rid in trade["roster_ids"]
         }
         for loser, delta in deltas.items():
-            if trade_value_bands.band_for_score(delta).id in LOPSIDED_BAND_IDS:
+            leg = trade["legs"][loser]
+            deal = trade_value_bands.deal_size_for(leg["sent"], leg["received"])
+            if trade_value_bands.band_for_score(delta, deal).id in LOPSIDED_BAND_IDS:
                 # The winner is the team that gained the most from the trade.
                 winner = max((r for r in deltas if r != loser), key=lambda r: deltas[r])
                 result.append((loser, winner, delta, dict(trade)))
@@ -650,7 +652,8 @@ def collusion_pairs(legs: Sequence[Mapping[str, Any]], team_names: Mapping[str, 
         if has_lopsided:
             for _, delta, trade in sorted(wins[beneficiary], key=lambda x: x[1]):
                 leg = trade["legs"][giver]
-                label = trade_value_bands.band_for_score(delta).direction_label.replace("against you", "against them")
+                deal = trade_value_bands.deal_size_for(leg["sent"], leg["received"])
+                label = trade_value_bands.band_for_score(delta, deal).direction_label.replace("against you", "against them")
                 lines.append(
                     f"Week {trade['week']}: {team_names.get(str(giver), 'Team')} sent "
                     f"{', '.join(leg['sent_names'][:3])} for {', '.join(leg['received_names'][:3])} ({label})."
@@ -889,7 +892,8 @@ def _roster_behaviour(
                 bucket(rid)["sells"].append({"week": _int(tx.get("week")), "text": f"Week {_int(tx.get('week'))}: traded {names or 'players'} for picks."})
     for loser, winner, delta, trade in lopsided:
         leg = trade["legs"][loser]
-        label = trade_value_bands.band_for_score(delta).direction_label.replace("against you", "against them")
+        deal = trade_value_bands.deal_size_for(leg["sent"], leg["received"])
+        label = trade_value_bands.band_for_score(delta, deal).direction_label.replace("against you", "against them")
         bucket(loser)["lopsided"].append({
             "week": trade["week"],
             "text": (

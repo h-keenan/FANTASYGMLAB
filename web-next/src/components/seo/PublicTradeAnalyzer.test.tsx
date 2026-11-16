@@ -114,7 +114,7 @@ describe("PublicTradeAnalyzer", () => {
     expect(screen.getByTestId("trade-result")).toHaveTextContent("Lopsided in your favor");
 
     fireEvent.click(screen.getByRole("button", { name: "Superflex" }));
-    expect(screen.getByTestId("trade-result")).toHaveTextContent("Slight edge to them");
+    expect(screen.getByTestId("trade-result")).toHaveTextContent("Fair trade on value");
 
     expect(trackUse).toHaveBeenCalledWith(
       "public_trade_analyzer",
