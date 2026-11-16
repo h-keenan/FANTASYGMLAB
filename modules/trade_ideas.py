@@ -6499,6 +6499,7 @@ def _iter_blockbuster_send_packages(
                 -first_count,
                 -quality,
                 abs(send_value - target_value),
+                key,
                 package,
             )
         )
@@ -6534,7 +6535,9 @@ def _iter_blockbuster_send_packages(
                     for second_combo in combinations(seconds, n_second):
                         consider([*first_combo, *second_combo])
 
-    ranked.sort()
+    # Total order on the scalar fields plus the package's unique dedupe key;
+    # never compare the package dicts themselves (ties raised TypeError).
+    ranked.sort(key=lambda item: item[:5])
     return [item[-1] for item in ranked[:16]]
 
 

@@ -868,3 +868,20 @@ def test_presentation_cleanup_does_not_change_package_order():
     ]
     assert str(result["ideas"][-1].get("trade_confidence_label") or "") == "Low"
     assert adapter.get_rosters.call_count == 0
+
+
+def test_blockbuster_packages_with_tied_rank_keys_do_not_compare_dicts():
+    """Two packages equal on every scalar rank field used to raise TypeError."""
+
+    players = [{"asset_type": "player", "player_id": "p1", "label": "P1", "score": 5000}]
+    picks = [
+        {"asset_type": "pick", "player_id": "pick-a", "label": "A", "round": 1, "score": 2500},
+        {"asset_type": "pick", "player_id": "pick-b", "label": "B", "round": 1, "score": 2500},
+    ]
+
+    packages = trade_ideas._iter_blockbuster_send_packages(players, picks, 8000, {})
+    again = trade_ideas._iter_blockbuster_send_packages(players, picks, 8000, {})
+
+    single_first = [p for p in packages if len(p) == 2]
+    assert {p[1]["player_id"] for p in single_first} == {"pick-a", "pick-b"}
+    assert packages == again

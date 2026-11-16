@@ -13,6 +13,7 @@ from datetime import datetime, timezone
 import json
 from pathlib import Path
 import shutil
+import sys
 from unittest.mock import patch
 
 import fakeredis
@@ -71,6 +72,38 @@ def _guard_real_players_db():
         )
 
 
+# Per-process record of writes to the protected data/*.json files. Under
+# pytest-xdist every worker shares the real data/ directory, so inspecting the
+# file alone cannot say WHO wrote it: a leak in worker A's test was blamed on
+# whichever unrelated test in worker B happened to finish while the bad file
+# was on disk. An audit hook only sees this process's own writes, so the guard
+# can attribute a write to the test that actually made it.
+_OWN_DATA_WRITES: list[str] = []
+_PROTECTED_DATA_PATHS = {str(p.resolve()) for p in _REPO_DATA_DIR.glob("*.json")}
+
+
+def _audit_own_data_writes(event, args):
+    try:
+        if event == "open":
+            target, mode = args[0], args[1]
+            if mode and not any(c in str(mode) for c in "wax+"):
+                return
+        elif event in ("os.rename", "shutil.copyfile", "shutil.move"):
+            target = args[1]
+        else:
+            return
+        if not isinstance(target, (str, bytes, os.PathLike)):
+            return
+        path = os.path.abspath(os.fsdecode(target))
+        if path in _PROTECTED_DATA_PATHS:
+            _OWN_DATA_WRITES.append(Path(path).name)
+    except Exception:
+        return
+
+
+sys.addaudithook(_audit_own_data_writes)
+
+
 @pytest.fixture(autouse=True)
 def _guard_real_data_json_files():
     """Stop tests from persisting changes into the repo's real data/*.json.
@@ -82,15 +115,18 @@ def _guard_real_data_json_files():
     refresh for days). Tests should use tmp paths. This reverts any leaked
     write and fails the test if it touched a protected file.
     """
+    del _OWN_DATA_WRITES[:]
     yield
     from modules.sleeper import players_map_is_valid
+
+    own_writes = set(_OWN_DATA_WRITES)
 
     current = {p.name: p for p in _REPO_DATA_DIR.glob("*.json")}
     touched = []
     corrupted = []
     for name, path in current.items():
         base = _DATA_BASELINE.get(name)
-        if name == "sleeper_players.json" and base is not None:
+        if name == "sleeper_players.json" and base is not None and name in own_writes:
             try:
                 valid = players_map_is_valid(json.loads(path.read_bytes()))
             except ValueError:
@@ -121,6 +157,106 @@ def _guard_real_data_json_files():
             "(reverted); use tmp_path instead",
             stacklevel=1,
         )
+
+
+_FAR_FUTURE_SECONDS = 30 * 24 * 3600
+
+
+def _pin_fresh(path: Path) -> None:
+    """Give a copy an mtime far in the future so it is never "stale"."""
+    stamp = datetime.now(timezone.utc).timestamp() + _FAR_FUTURE_SECONDS
+    os.utime(path, (stamp, stamp))
+
+
+@pytest.fixture(scope="session", autouse=True)
+def _private_sleeper_players_cache(tmp_path_factory):
+    """Point modules.sleeper at a private, never-stale copy of the dump.
+
+    ROOT CAUSE of the intermittent "test left ['sleeper_players.json']
+    without a valid id -> player record map" failures: sleeper.get_players()
+    treats the dump as stale once its mtime is older than
+    PLAYERS_CACHE_TTL_SECONDS (5 minutes) and then refreshes it, atomically
+    replacing data/sleeper_players.json with whatever the test's mocked
+    ``requests.get`` returned (a tiny fixture). In CI/fresh checkouts the
+    file's mtime is the checkout time, so the suite is fine for five minutes
+    and then every test that calls get_players() without redirecting the
+    cache path becomes a writer; which test it is depends on timing and on
+    which xdist worker runs it. Every worker shares data/, so the corrupt
+    file was then blamed on unrelated tests in other workers.
+
+    Tests now read/write a per-worker copy whose mtime is pinned in the
+    future, so the real file is never refreshed or rewritten. Tests that
+    deliberately exercise refresh logic already patch PLAYERS_CACHE_PATH to
+    their own tmp_path and keep doing so.
+    """
+    from modules import sleeper
+
+    real = _REPO_DATA_DIR / "sleeper_players.json"
+    if not real.exists():
+        yield None
+        return
+    private = tmp_path_factory.mktemp("sleeper-players-cache") / "sleeper_players.json"
+    shutil.copyfile(real, private)
+    _pin_fresh(private)
+    original = sleeper.PLAYERS_CACHE_PATH
+    sleeper.PLAYERS_CACHE_PATH = str(private)
+    sleeper._players_memo = None
+    try:
+        yield private
+    finally:
+        sleeper.PLAYERS_CACHE_PATH = original
+        sleeper._players_memo = None
+
+
+@pytest.fixture(scope="session", autouse=True)
+def _hermetic_nfl_games_cache(tmp_path_factory):
+    """Keep the NFL schedule (nflverse games.csv) out of the network and out of
+    git-ignored local state.
+
+    modules.nfl_schedule fetches https://github.com/nflverse/nfldata/... when
+    data/nfl_games.csv is missing or older than 6 hours. That file is
+    git-ignored, so a fresh worktree (and any machine whose copy aged out)
+    made unrelated tests (kickoff lookups for locked starters, team profiles)
+    issue an extra HTTP request, which tests that stub ``requests.get`` rightly
+    reject; machines that happened to have a fresh copy passed. Tests now use
+    a private, never-stale, empty schedule (header only: "kickoff unknown").
+    Tests that exercise schedule loading patch GAMES_CACHE_PATH themselves.
+    """
+    from modules import nfl_schedule
+
+    private = tmp_path_factory.mktemp("nfl-games-cache") / "nfl_games.csv"
+    private.write_text("game_id,season,week,gameday,gametime,away_team,home_team\n", encoding="utf-8")
+    _pin_fresh(private)
+    original = nfl_schedule.GAMES_CACHE_PATH
+    nfl_schedule.GAMES_CACHE_PATH = str(private)
+    nfl_schedule.clear_load_games_cache()
+    try:
+        yield private
+    finally:
+        nfl_schedule.GAMES_CACHE_PATH = original
+        nfl_schedule.clear_load_games_cache()
+
+
+@pytest.fixture(autouse=True)
+def _restore_private_sleeper_players_cache(_private_sleeper_players_cache):
+    """A test that rewrote the private copy must not leak into the next one."""
+    private = _private_sleeper_players_cache
+    if private is None:
+        yield
+        return
+    baseline = (private.stat().st_mtime_ns, private.stat().st_size)
+    yield
+    try:
+        current = private.stat()
+        changed = (current.st_mtime_ns, current.st_size) != baseline
+    except OSError:
+        changed = True
+    if changed:
+        from modules import sleeper
+
+        private.write_bytes(_DATA_BASELINE["sleeper_players.json"][1])
+        _pin_fresh(private)
+        sleeper._players_memo = None
 
 
 @pytest.fixture(autouse=True)

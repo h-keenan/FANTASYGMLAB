@@ -111,7 +111,7 @@ function ReasonState({ reason, navigation }: { reason: string; navigation: Props
   const toAccount = gamesReasonAction(reason) === 'account';
   return (
     <EmptyState
-      icon="dice-outline"
+      icon="game-controller-outline"
       title={gamesReasonMessage(reason)}
       actionLabel={toAccount ? 'Open Account' : 'Back to Home'}
       onPressAction={() => navigation.navigate(toAccount ? 'More' : 'Home')}
@@ -384,7 +384,7 @@ function Pickem({ leagueId, colors, styles, navigation }: Shared) {
   if (!data.available) {
     return (
       <EmptyState
-        icon="dice-outline"
+        icon="game-controller-outline"
         title="Pick'em is not open yet"
         subtitle="Check back soon."
         actionLabel="Back to Home"
