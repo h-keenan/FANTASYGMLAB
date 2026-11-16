@@ -2767,6 +2767,8 @@ export interface PlayerAvailability {
   return_note: string;
 }
 
+export type { DepthChartData, DepthChartEntry, InjuryRecordData } from "@/lib/playerDepthInjury";
+
 export interface PlayerNewsResponse {
   ok: boolean;
   items: NewsItem[];
@@ -4668,6 +4670,12 @@ export const api = {
   // above: no leagueId param.
   getNews: (limit: number = 30) =>
     authorizedRequest<NewsResponse>(`/v1/news?limit=${limit}`),
+
+  // Real NFL depth chart at the player's slot, and per-season injury stints / games missed (quick view sections).
+  getPlayerDepthChart: (playerId: string) =>
+    authorizedRequest<import("@/lib/playerDepthInjury").DepthChartData>(`/v1/players/${encodeURIComponent(playerId)}/depth-chart`),
+  getPlayerInjuryHistory: (playerId: string) =>
+    authorizedRequest<import("@/lib/playerDepthInjury").InjuryRecordData>(`/v1/players/${encodeURIComponent(playerId)}/injury-history`),
 
   // Recent news for one player (quick view's Latest news + injury headline).
   getPlayerNews: (

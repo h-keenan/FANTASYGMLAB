@@ -39,6 +39,8 @@ Deployment topology (Render):
   - GET  /v1/leagues/{id}/alerts         — roster-relevant news alerts
   - POST /v1/leagues/{id}/alerts/read    — durably mark one alert read (RLS-scoped)
   - GET  /v1/players/{id}/quick-view     — season stats + bio for the player detail pop-up
+  - GET  /v1/players/{id}/depth-chart    — real NFL depth chart at his slot (+ weekly moves)
+  - GET  /v1/players/{id}/injury-history — current injury line + per-season stints / games missed
   - GET  /v1/players/{id}/percentile-explorer — distribution + nearby players behind one stat tile
   - GET  /v1/players/{id}/weekly-stats   — per-week fantasy points + snap share for one season
   - GET  /v1/players/{id}/career         — every verified season on record, not just current
@@ -143,6 +145,7 @@ import threading
 import time
 from contextlib import asynccontextmanager
 from datetime import date, datetime, timedelta, timezone
+from pathlib import Path
 from typing import Any, Callable
 
 from fastapi import Depends, FastAPI, Header, HTTPException, Request, Response
@@ -280,6 +283,7 @@ from modules import direction_checkin, trade_cautions, trade_posture
 from modules import external_news_contract
 from modules import external_interesting_trades, external_news_feed, news_identity, news_ingest
 from modules import start_sit_range
+from modules import depth_chart_history, player_depth_chart, player_injury_record
 from modules import lineup_lock
 from modules import this_week
 from modules import game_weather
@@ -9497,6 +9501,51 @@ def get_player_quick_view(
         "identity": _quick_view_identity(player_id, row),
         "reason": "",
     }
+
+
+_REPO_ROOT = Path(__file__).resolve().parents[1]
+
+
+@app.get("/v1/players/{player_id}/depth-chart")
+def get_player_depth_chart(
+    player_id: str,
+    user: dict[str, Any] = Depends(require_user),
+) -> dict[str, Any]:
+    """The player's real NFL depth chart at his slot (modules.player_depth_chart):
+    Sleeper's directory order plus each player's move since the last weekly
+    snapshot. League-independent, so cached files only (no per-request fetch)."""
+
+    try:
+        directory = sleeper.get_players() or {}
+    except Exception:
+        directory = {}
+    snapshots = depth_chart_history.load_depth_chart_snapshots(os.path.join(str(_REPO_ROOT), depth_chart_history.DEPTH_CHART_SNAPSHOT_PATH))
+    return _clean_json_value(player_depth_chart.build_depth_chart(player_id, directory, snapshots=snapshots))
+
+
+@app.get("/v1/players/{player_id}/injury-history")
+def get_player_injury_history(
+    player_id: str,
+    user: dict[str, Any] = Depends(require_user),
+) -> dict[str, Any]:
+    """Current injury line plus per-season injury stints and games missed
+    (modules.player_injury_record), derived from the official nflverse weekly
+    reports already stored under data/injury_history/."""
+
+    try:
+        directory = (sleeper.get_players() or {}).get(str(player_id))
+    except Exception:
+        directory = None
+    season = season_clock.current_season()
+    week = season_clock.nfl_week()
+    # The week in progress has no final result yet; the offseason (week 0) counts the whole finished season.
+    through = max(week - 1, 0) if week else None
+    return _clean_json_value(
+        player_injury_record.build_injury_record(
+            player_id, directory if isinstance(directory, dict) else None,
+            root=_REPO_ROOT, current_season=season, through_week=through,
+        )
+    )
 
 
 @app.get("/v1/players/{player_id}/percentile-explorer")

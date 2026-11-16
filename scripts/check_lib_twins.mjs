@@ -31,6 +31,7 @@ export const IDENTICAL = [
   "appHeader.ts",
   "leagueCrest.ts",
   "compactModule.ts",
+  "playerDepthInjury.ts",
   "playerTap.ts",
   "statusHeader.ts",
   "connectFlow.ts",
