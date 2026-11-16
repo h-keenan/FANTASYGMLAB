@@ -10,6 +10,7 @@ import BeginnerHelp from './BeginnerHelp';
 import MeterRow, { CONFIDENCE_LEVELS } from './ConfidenceMeter';
 import ManagerTendenciesChips from './ManagerTendenciesChips';
 import TeamAvatar from './TeamAvatar';
+import ManagerProfileModal from './ManagerProfileModal';
 import Button from './Button';
 import ToneBadge from './ToneBadge';
 import IdeaPosture from './IdeaPosture';
@@ -270,6 +271,7 @@ export default function TradeIdeaCard({
   const confidenceLevel = CONFIDENCE_LEVELS[idea.confidence_label?.toLowerCase()] ?? 1;
   const realismLevel = REALISM_LEVELS[idea.market_realism_label?.toLowerCase()] ?? 1;
   const [shareOpen, setShareOpen] = useState(false);
+  const [sheetOpen, setSheetOpen] = useState(false);
   // Recorded alongside the share so the quiet Trade Outcomes result sweep
   // can re-value these same players under the same lens later.
   const { lens } = useValuationLens(leagueId);
@@ -367,6 +369,17 @@ export default function TradeIdeaCard({
           visual reference wins here — the pill stays small/quiet per
           section 12's intent, just relocated to match the images. */}
       <View style={styles.partnerRow}>
+        {idea.partner_roster_id ? (
+          <ManagerProfileModal
+            visible={sheetOpen}
+            onClose={() => setSheetOpen(false)}
+            leagueId={leagueId}
+            leagueName={leagueName}
+            rosterId={idea.partner_roster_id}
+            teamName={idea.partner_team_name}
+            avatarId={idea.partner_team_avatar_url}
+          />
+        ) : null}
         {idea.partner_team_avatar_url ? (
           <TeamAvatar avatarId={idea.partner_team_avatar_url} size={36} />
         ) : (
@@ -376,9 +389,17 @@ export default function TradeIdeaCard({
         )}
         <View style={styles.partnerTextGroup}>
           <View style={styles.partnerNameRow}>
-            <AppText style={styles.partnerName} numberOfLines={2}>
-              {idea.partner_team_name}
-            </AppText>
+            {idea.partner_roster_id ? (
+              <Pressable onPress={() => setSheetOpen(true)} accessibilityRole="button" accessibilityLabel={`Open ${idea.partner_team_name} team sheet`} hitSlop={6}>
+                <AppText style={[styles.partnerName, { textDecorationLine: 'underline' }]} numberOfLines={2}>
+                  {idea.partner_team_name}
+                </AppText>
+              </Pressable>
+            ) : (
+              <AppText style={styles.partnerName} numberOfLines={2}>
+                {idea.partner_team_name}
+              </AppText>
+            )}
           </View>
           {idea.partner_team_archetype_label ? (
             <AppText style={styles.partnerArchetype} numberOfLines={1}>

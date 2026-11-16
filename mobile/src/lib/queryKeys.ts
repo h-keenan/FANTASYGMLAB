@@ -31,6 +31,8 @@ export const queryKeys = {
     [...userScopeKey(), 'league', leagueId, 'manager-tendencies'] as const,
   managerTendencyDetail: (leagueId: string, rosterId: string | number) =>
     [...userScopeKey(), 'league', leagueId, 'manager-tendencies', String(rosterId)] as const,
+  teamSheet: (leagueId: string, rosterId: string | number) =>
+    [...userScopeKey(), 'league', leagueId, 'team-sheet', String(rosterId)] as const,
   teamProfile: (leagueId: string, rosterId: string | number) =>
     [...userScopeKey(), 'league', leagueId, 'team-profile', String(rosterId)] as const,
   guillotine: (leagueId: string) => [...userScopeKey(), 'league', leagueId, 'guillotine'] as const,
