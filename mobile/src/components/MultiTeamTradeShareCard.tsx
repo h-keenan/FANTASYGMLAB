@@ -13,7 +13,7 @@ import { colors, spacing } from '../theme';
  * web-next/src/lib/shareCard/multiTradeCard.tsx). A one-line "biggest gain"
  * verdict, who sends what to whom (a table for 3 teams, per-card "from" notes
  * for 4+), then one self-explanatory card per team: what it gets, what it
- * sends, the need it fills, and its true value change (green gain, red loss,
+ * sends, the need it fills, and its true value change (green gain, neutral grey loss,
  * neutral even; nothing hidden). No "most hurt" / "loses" words. Cards size
  * to their content and the card height is budgeted from the same content, so
  * nothing spills past a border. Fixed dark palette like every exported share
@@ -26,8 +26,9 @@ const CHARS_PER_LINE = 42;
 
 const TONE_COLOR: Record<ShareValueTone, string> = {
   gain: colors.success,
-  loss: colors.danger,
-  even: colors.textPrimary,
+  // No red verdicts on share images: a loss is neutral grey, never danger.
+  loss: colors.textTertiary,
+  even: colors.textTertiary,
 };
 
 function listLabels(labels: string[], limit: number): string {

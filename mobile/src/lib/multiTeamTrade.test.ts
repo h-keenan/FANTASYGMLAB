@@ -131,3 +131,11 @@ test('share model: flow for 3, list for 4+, plain value change, tone, verdict, n
   assert.match(text, /Sends /);
   assert.doesNotMatch(text, /most hurt|loses|lopsided|decline/i);
 });
+
+test('share model carries team avatar_url through to teams, null when absent', () => {
+  const res = response(3) as unknown as { teams: Array<Record<string, unknown>> };
+  res.teams[0].avatar_url = 'https://sleepercdn.com/avatars/thumbs/abc';
+  const model = buildShareModel(res as never);
+  assert.equal(model.teams[0].avatarUrl, 'https://sleepercdn.com/avatars/thumbs/abc');
+  assert.equal(model.teams[1].avatarUrl, null);
+});

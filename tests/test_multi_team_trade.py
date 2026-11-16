@@ -368,3 +368,23 @@ def test_endpoint_is_not_metered_and_gates_veto_by_tier(monkeypatch):
         assert (data["veto_upsell"] is None) is (not locked)
     consume.assert_not_called()
     refund.assert_not_called()
+
+
+def test_multi_team_result_gets_roster_avatar_urls(monkeypatch):
+    from services import mobile_api_service as svc
+
+    monkeypatch.setattr(
+        sleeper,
+        "get_league_roster_profiles",
+        lambda lid: {"1": {"avatar_url": "https://sleepercdn.com/avatars/thumbs/abc"}, "2": {"avatar_url": ""}},
+    )
+    result = {"teams": [{"roster_id": "1"}, {"roster_id": "2"}, {"roster_id": "3"}]}
+    svc._attach_multi_team_avatars(result, "L1")
+    assert [t["avatar_url"] for t in result["teams"]] == ["https://sleepercdn.com/avatars/thumbs/abc", None, None]
+
+    def boom(lid):
+        raise RuntimeError("sleeper down")
+
+    monkeypatch.setattr(sleeper, "get_league_roster_profiles", boom)
+    svc._attach_multi_team_avatars(result, "L1")
+    assert all(t["avatar_url"] is None for t in result["teams"])

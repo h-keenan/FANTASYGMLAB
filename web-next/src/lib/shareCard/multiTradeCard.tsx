@@ -4,7 +4,7 @@
  * verdict, draws who sends what to whom (a table for 3 teams, per-card
  * "from" notes for 4+), then one self-explanatory card per team: what it
  * gets, what it sends, the need it fills, and its true value change (green
- * gain, red loss, neutral even; nothing hidden). No "most hurt" / "loses"
+ * gain, neutral grey loss or even; nothing hidden; no red verdicts). No "most hurt" / "loses"
  * words. Cards size to their content; density steps down with team count so
  * 4 to 6 teams scale down instead of overflowing the canvas.
  *
@@ -41,8 +41,9 @@ function densityFor(teamCount: number): Density {
 
 const TONE_COLOR: Record<ShareValueTone, string> = {
   gain: T["--color-success"],
-  loss: T["--color-danger"],
-  even: T["--color-text-primary"],
+  // No red verdicts on share images: a loss is neutral grey, never danger.
+  loss: T["--color-text-muted"],
+  even: T["--color-text-muted"],
 };
 
 const oneLine = { display: "block", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" } as const;
