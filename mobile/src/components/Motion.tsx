@@ -169,6 +169,28 @@ export function RankChip({ rank }: { rank: number | null | undefined }) {
   );
 }
 
+/** A short label chip that pulses in when it mounts and fades after a couple of seconds ("Auto-picked"): the RankChip look for a one-off event. */
+export function PulseChip({ label }: { label: string }) {
+  const { colors } = useThemeMode();
+  const reduced = useReducedMotion();
+  const [shown, setShown] = useState(true);
+  const appear = useRef(new Animated.Value(reduced ? 1 : 0)).current;
+  useEffect(() => {
+    if (!reduced) Animated.timing(appear, { toValue: 1, duration: MOTION_MS.base, easing: easeOut, useNativeDriver: true }).start();
+    const timer = setTimeout(() => setShown(false), RANK_CHIP_MS);
+    return () => clearTimeout(timer);
+  }, [reduced, appear]);
+  if (!shown) return null;
+  return (
+    <Animated.View
+      accessibilityLabel={label}
+      style={{ opacity: appear, transform: [{ translateY: appear.interpolate({ inputRange: [0, 1], outputRange: [4, 0] }) }], paddingHorizontal: 6, paddingVertical: 2, borderRadius: 999, backgroundColor: colors.backgroundElevated }}
+    >
+      <Animated.Text style={{ color: colors.accent, fontSize: 12, fontWeight: '800' }}>{label}</Animated.Text>
+    </Animated.View>
+  );
+}
+
 /** The success confirmation (a claim landed, a trade was accepted): a check that pops in with a soft spring. Static under reduced motion. */
 export function SuccessCheck({ size = 28, label = 'Done' }: { size?: number; label?: string }) {
   const { colors } = useThemeMode();

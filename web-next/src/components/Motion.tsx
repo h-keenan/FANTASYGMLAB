@@ -146,6 +146,21 @@ export function RankChip({ rank }: { rank: number | null | undefined }) {
   );
 }
 
+/** A short label chip that pulses in when it mounts and fades after a couple of seconds ("Auto-picked"): the RankChip look for a one-off event. */
+export function PulseChip({ label }: { label: string }) {
+  const [shown, setShown] = useState(true);
+  useEffect(() => {
+    const timer = setTimeout(() => setShown(false), RANK_CHIP_MS);
+    return () => clearTimeout(timer);
+  }, []);
+  if (!shown) return null;
+  return (
+    <span className="rank-chip" data-dir="accent" role="status">
+      {label}
+    </span>
+  );
+}
+
 /** A check that draws itself inside a soft ring: the success confirmation (a claim landed, a trade was accepted). Static under reduced motion. */
 export function SuccessCheck({ size = 28, label = "Done" }: { size?: number; label?: string }) {
   return (

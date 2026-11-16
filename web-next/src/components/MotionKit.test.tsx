@@ -2,7 +2,8 @@ import { act, render, screen } from "@testing-library/react";
 import { useRef } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { ProgressFill, RankChip, SuccessCheck } from "@/components/Motion";
+import { ProgressFill, PulseChip, RankChip, SuccessCheck } from "@/components/Motion";
+import { TradeCompactCard } from "@/components/ui/TradeCompactCard";
 import { useFlipList } from "@/lib/useFlipList";
 
 function mockMatchMedia(reduced: boolean) {
@@ -117,5 +118,29 @@ describe("useFlipList", () => {
     tops.b = 0;
     rerender(<Rows order={["b", "a"]} />);
     expect(animate).not.toHaveBeenCalled();
+  });
+});
+
+describe("PulseChip and the resolved trade card", () => {
+  it("shows the chip, then fades it after a couple of seconds", () => {
+    render(<PulseChip label="Auto-picked" />);
+    expect(screen.getByText("Auto-picked")).toBeTruthy();
+    act(() => {
+      vi.advanceTimersByTime(3000);
+    });
+    expect(screen.queryByText("Auto-picked")).toBeNull();
+  });
+
+  it("collapses a trade card into the resolved row once answered", () => {
+    const give = [{ key: "g", pickLabel: "2027 R1" }];
+    const get = [{ key: "r", pickLabel: "2028 R2" }];
+    const { rerender } = render(<TradeCompactCard title="Offer" give={give} get={get} mode="sim" />);
+    expect(screen.queryByTestId("trade-resolved")).toBeNull();
+    rerender(<TradeCompactCard title="Offer" give={give} get={get} mode="sim" resolved={{ kind: "accepted", label: "Trade done" }} />);
+    act(() => {
+      vi.advanceTimersByTime(600);
+    });
+    expect(screen.getByTestId("trade-resolved").getAttribute("data-resolved")).toBe("accepted");
+    expect(screen.queryByText("Offer")).toBeNull();
   });
 });
