@@ -319,3 +319,13 @@ captured_at,season,week,player_id,team,position,status,injury_status,body_part,p
 2026-11-15T20:56:34Z,2026,10,829,ATL,QB,Active,Out,Coach's Decision,,,sleeper_live
 2026-11-15T20:56:34Z,2026,10,9508,TEN,RB,Active,,,,,sleeper_live
 2026-11-15T20:56:34Z,2026,10,9756,MIN,WR,Active,Out,Thumb,,,sleeper_live
+2026-11-16T00:54:47Z,2026,10,11595,KC,TE,Active,Out,Ankle,,,sleeper_live
+2026-11-16T00:54:47Z,2026,10,11604,LV,TE,Active,Out,Ankle,,,sleeper_live
+2026-11-16T00:54:47Z,2026,10,12048,SEA,RB,Active,Out,Knee,,,sleeper_live
+2026-11-16T00:54:47Z,2026,10,12511,PIT,QB,Active,Out,Coach's Decision,,,sleeper_live
+2026-11-16T00:54:47Z,2026,10,13289,PIT,QB,Active,Out,Coach's Decision,,,sleeper_live
+2026-11-16T00:54:47Z,2026,10,13423,PIT,RB,Active,Out,Coach's Decision,,,sleeper_live
+2026-11-16T00:54:47Z,2026,10,1373,NYJ,QB,Active,Out,Ankle,,,sleeper_live
+2026-11-16T00:54:47Z,2026,10,7600,PIT,TE,Active,,,,,sleeper_live
+2026-11-16T00:54:47Z,2026,10,8112,ATL,WR,Active,Questionable,Head,,,sleeper_live
+2026-11-16T00:54:47Z,2026,10,8126,TEN,WR,Active,Questionable,Ankle,,,sleeper_live
