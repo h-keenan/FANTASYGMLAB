@@ -13,6 +13,7 @@ import SegmentedTabBar from './SegmentedTabBar';
 import CompactModule from './CompactModule';
 import CompactPlayerCard from './CompactPlayerCard';
 import { SimDraftIconButton, SimDraftRow } from './SimDraftBoard';
+import { SimRosterStrip } from './SimRosterStrip';
 import { SimRookieOverview } from './SimDraftOverview';
 import { SkeletonCard, SkeletonList } from './Skeleton';
 import { SimDynastyStrip } from './SimGameDynasty';
@@ -389,6 +390,24 @@ function RookieStage({
   const suppressed = simSuppressedBadges(d.available);
   const classChip = simRookieClassChip(off);
   const [notice, setNotice] = useState(false);
+  // Your whole roster (veterans plus the rookies drafted so far) for the clock's roster strip; refetched as picks land.
+  const teamId = ctx.game.you?.team_id;
+  const [rosterPlayers, setRosterPlayers] = useState<SimGamePlayer[]>([]);
+  useEffect(() => {
+    if (!teamId) return;
+    let cancelled = false;
+    api
+      .getSimGameTeam(ctx.gameId, teamId)
+      .then((body) => {
+        if (!cancelled && !body.reason) setRosterPlayers(body.players ?? []);
+      })
+      .catch(() => {
+        /* the strip just stays as it was */
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [ctx.gameId, teamId, made.length]);
   return (
     <>
       {classChip ? <SimRookieNoticeGate gameId={ctx.gameId} /> : null}
@@ -401,6 +420,7 @@ function RookieStage({
         tone={d.your_turn ? 'action' : 'accent'}
         persist={false}
         parts={simRookieSummaryParts(d, toMake)}
+        preview={<SimRosterStrip roster={rosterPlayers} slots={ctx.game.settings.slots} rosterLimit={ctx.game.settings.roster_limit} bench={ctx.game.settings.bench} onOpen={ctx.openPlayer} />}
         action={
           d.your_turn && d.available[0] ? (
             <Button size="sm" label={`Draft ${playerSurname(d.available[0].name)}`} loading={busy === 'pick'} disabled={busy !== null && busy !== 'pick'} onPress={() => onPick(d.available[0])} />

@@ -10,6 +10,7 @@ import { useBottomPillContext } from "@/lib/useBottomPillContext";
 import { SectionHeading } from "@/components/SectionHeading";
 import { SimDraftBoard } from "@/components/SimDraftBoard";
 import { SimDraftGlyph } from "@/components/SimDraftGlyphs";
+import { SimRosterStrip } from "@/components/SimRosterStrip";
 import { SimDraftOverview, SimFullBoardSheet, SimRecentStrip, SimSurvivalLine } from "@/components/SimDraftOverview";
 import { SimDraftHero } from "@/components/SimDraftHero";
 import { SimIconButton, SimPlayerChip, SimPlayerLine, SimToneBadge, useSimWide, type SimCtx } from "@/components/SimGameParts";
@@ -391,7 +392,7 @@ export function SimGameDraft({ ctx, onComplete }: { ctx: SimCtx; onComplete: (re
       persist={false}
       parts={simDraftSummaryParts(draft, game.settings.teams, need, { picking: Boolean(optimistic) })}
       preview={
-        draft.status !== "complete" || recentCards.length > 0 ? (
+        (
           <div className="flex flex-col gap-2" data-testid="draft-pinned">
             {draft.status !== "complete" && barPlayer ? <SimDraftBar model={simDraftBarModel(barPlayer, need)} onOpen={() => ctx.openPlayer(barPlayer)} grade={simGradeOf(barPlayer)} /> : null}
             <SimRecentStrip
@@ -400,8 +401,9 @@ export function SimGameDraft({ ctx, onComplete }: { ctx: SimCtx; onComplete: (re
               onFullBoard={() => setFullBoard(true)}
             />
             <SimSurvivalLine survival={survival} />
+            <SimRosterStrip roster={draft.your_roster} slots={game.settings.slots} rosterLimit={game.settings.roster_limit} bench={game.settings.bench} onOpen={ctx.openPlayer} />
           </div>
-        ) : undefined
+        )
       }
       action={
         onClock && hint ? (
