@@ -45,13 +45,15 @@ function teams(n: number): MultiTeamResult[] {
 }
 
 describe("multi-team share card", () => {
-  for (const n of [3, 4, 6]) {
-    it(`draws a ${n}-team card as a persuasion pitch with no scoreboard words`, async () => {
+  for (const n of [3, 4, 5, 6]) {
+    it(`draws a ${n}-team card at 1080x1350 with gain/loss colors and sends lines`, async () => {
       const model = buildShareModel({ teams: teams(n) });
       const svg = await renderMultiTradeCardSvg(model, "Dynasty Overlords", assets);
       expect(svg.startsWith("<svg")).toBe(true);
       expect(svg).toContain('width="1080"');
       expect(svg).toContain('height="1350"');
+      expect(svg).toContain("#22c55e");
+      expect(svg).toContain("#ef4444");
       const out = process.env.MULTI_CARD_SAMPLE_DIR;
       if (out) {
         mkdirSync(out, { recursive: true });
@@ -60,11 +62,29 @@ describe("multi-team share card", () => {
     }, 60_000);
   }
 
+  it("keeps long names and many assets inside the canvas for 3 and 4 teams", async () => {
+    for (const n of [3, 4]) {
+      const long = teams(n).map((t, i) => ({
+        ...t,
+        team_name: ["Not Your Dad's Dih", "KING TITUS", "Cowboys Run Table Supreme Edition", "The Extremely Long Named Squad"][i],
+        sends: [1, 2, 3, 4].map((k) => ({ ...t.sends[0], id: `x${i}${k}`, label: `Long Player Name ${i}${k}` })),
+        receives: [1, 2, 3, 4].map((k) => ({ ...t.receives[0], id: `y${i}${k}`, label: `Another Long Player ${i}${k}`, from_team_name: "The Extremely Long Named Squad" })),
+      }));
+      const svg = await renderMultiTradeCardSvg(buildShareModel({ teams: long }), "Dynasty Overlords", assets);
+      expect(svg).toContain('height="1350"');
+      const out = process.env.MULTI_CARD_SAMPLE_DIR;
+      if (out) writeFileSync(join(out, `multi-long-${n}.svg`), svg);
+    }
+  }, 60_000);
+
   it("flows for 3 and lists for 4+, with every team's real value change and a get-back line", () => {
     expect(buildShareModel({ teams: teams(3) }).layout).toBe("flow");
     expect(buildShareModel({ teams: teams(4) }).layout).toBe("list");
     const model = buildShareModel({ teams: teams(3) });
     expect(model.teams.map((t) => t.valueChangeText)).toEqual(["+260", "-420", "+260"]);
-    expect(model.teams[1].getsBack).toContain("Gets back Receiver 1");
+    expect(model.teams.map((t) => t.valueTone)).toEqual(["gain", "loss", "gain"]);
+    expect(model.verdict.text).toContain("Biggest gain");
+    expect(model.teams[1]).not.toHaveProperty("getsBack");
+    expect(model.teams[1].sends.map((a) => a.label)).toEqual(["Sender 1"]);
   });
 });

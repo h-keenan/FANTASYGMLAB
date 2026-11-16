@@ -18,7 +18,7 @@ import {
   multiTradeErrorMessages,
   multiTradeFailureLines,
   removeTeam,
-  shareGetsBack,
+  shareVerdict,
   toneSemantic,
   upsertAsset,
   vetoTone,
@@ -117,17 +117,17 @@ test('analysis layout, banner and fixed semantic tones', () => {
   assert.equal(vetoTone('outrage'), 'danger');
 });
 
-test('share model: flow for 3, list for 4+, plain value change, get-back, no scoreboard words', () => {
+test('share model: flow for 3, list for 4+, plain value change, tone, verdict, no scoreboard words', () => {
   assert.equal(buildShareModel(response(3)).layout, 'flow');
   assert.equal(buildShareModel(response(6)).layout, 'list');
   const model = buildShareModel(response(3));
   assert.deepEqual(model.teams.map((t) => t.valueChangeText), ['+300', '+150', '0']);
-  const giver = team('2', 'Giver', {
-    market_delta: -400,
-    receives: [asset('a', 'Starter', 'TE', 800), { type: 'pick', id: 'k', label: '2027 Round 1', position: '', team: '', score: 600 }],
-  });
-  assert.equal(shareGetsBack(giver), 'Gets back Starter (TE) and 2027 Round 1');
+  assert.deepEqual(model.teams.map((t) => t.valueTone), ['gain', 'gain', 'even']);
+  assert.deepEqual(model.verdict, { topRosterId: '1', text: 'Biggest gain: Team 1 (+300)' });
+  assert.equal(shareVerdict([]).text, 'An even swap');
+  assert.equal('getsBack' in model.teams[0], false);
   const text = buildShareText(model, 'My League');
   assert.match(text, /3-team trade in My League/);
+  assert.match(text, /Sends /);
   assert.doesNotMatch(text, /most hurt|loses|lopsided|decline/i);
 });
