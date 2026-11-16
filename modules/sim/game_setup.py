@@ -28,6 +28,7 @@ from modules.sim.game_types import (
     INCUMBENT_VERSION,
     DEFENSE_VERSION,
     POS_VERSION,
+    INJURY_VERSION,
     RESERVE_VERSION,
     POOL_CAPS,
     KD_VERSION,
@@ -308,7 +309,7 @@ def league_settings(
         start_week, regular_weeks = imported.current_week, imported.regular_weeks
         trade_deadline_week = imported.trade_deadline or imported.regular_weeks
     return GameSettings(
-        start_week=start_week, reserve_v=RESERVE_VERSION, block_v=BLOCK_VERSION, kd_v=KD_VERSION, limit_v=LIMIT_VERSION, hint_v=HINT_VERSION, world_v=WORLD_VERSION, econ_v=ECON_VERSION, stability_v=STABILITY_VERSION, vorp_v=VORP_VERSION, advice_v=ADVICE_VERSION, pos_v=POS_VERSION, incumbent_v=INCUMBENT_VERSION, defense_v=DEFENSE_VERSION, ir_slots=min(ir, 8), taxi_slots=min(taxi, 12), taxi_years=imported.taxi_years, **dyn,
+        start_week=start_week, reserve_v=RESERVE_VERSION, block_v=BLOCK_VERSION, kd_v=KD_VERSION, limit_v=LIMIT_VERSION, hint_v=HINT_VERSION, world_v=WORLD_VERSION, econ_v=ECON_VERSION, stability_v=STABILITY_VERSION, vorp_v=VORP_VERSION, advice_v=ADVICE_VERSION, pos_v=POS_VERSION, incumbent_v=INCUMBENT_VERSION, defense_v=DEFENSE_VERSION, injury_v=INJURY_VERSION, ir_slots=min(ir, 8), taxi_slots=min(taxi, 12), taxi_years=imported.taxi_years, **dyn,
         teams=n, scoring=scoring_label(scoring), difficulty=difficulty, user_slot=user, auto_lineup=auto_lineup,
         slots=imported.slots, rounds=0, roster_limit=limit, regular_weeks=regular_weeks,
         playoff_teams=max(2, min(imported.playoff_teams, n)), trade_deadline_week=trade_deadline_week,

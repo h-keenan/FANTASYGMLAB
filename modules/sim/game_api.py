@@ -33,6 +33,7 @@ from modules.sim import game_dynasty_view as dview
 from modules.sim import game_draft as draft
 from modules.sim import game_block as blockmod
 from modules.sim import game_history as hist
+from modules.sim import game_story as story
 from modules.sim import game_simto as simto
 from modules.sim import game_achievements as ach
 from modules.sim import game_home as home
@@ -839,7 +840,7 @@ def add_routes(router: APIRouter, ctx: GameApiCtx) -> None:
         if not any(pid in root.season_view(n).players for n in range(1, max(1, int(root.settings.seasons)) + 1)):
             raise HTTPException(status_code=404, detail="Player not found.")
         mine = [i for i in _ach(store, uid, _gid(game_id), snap, state).get("items", []) if i["unlocked"] and (i.get("player") or {}).get("id") == pid]
-        return {**_env(pro, state), **_history(store, uid, _gid(game_id), row, "p", pid, lambda ev: hist.player_history(root, ev, pid)), "achievements": mine}
+        return {**_env(pro, state), **_history(store, uid, _gid(game_id), row, "p", pid, lambda ev: story.player_view(root, ev, pid)), "achievements": mine}
 
     @router.get("/games/{game_id}/teams/{team_id}/history")
     @guarded

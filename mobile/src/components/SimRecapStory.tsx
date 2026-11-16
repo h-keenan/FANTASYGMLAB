@@ -358,7 +358,7 @@ export default function SimWeekRecapStory({
                 {/* ONE marker per player: the chip says OUT, the trailing text only how long. */}
                 <View style={[common.rowBetween, styles.fact, { borderLeftColor: inj.is_yours ? colors.danger : colors.border, backgroundColor: colors.backgroundElevated ?? 'transparent' }]}>
                   <View style={common.grow}>
-                    <SimPlayerChip player={{ ...inj.player, status: 'out', out_weeks: inj.weeks }} onOpen={ctx.openPlayer} />
+                    <SimPlayerChip player={{ ...inj.player, status: 'out', out_weeks: inj.weeks, injury: inj.injury }} onOpen={ctx.openPlayer} />
                   </View>
                   <AppText style={[common.bodyStrong, { color: inj.is_yours ? colors.danger : colors.textSecondary }]}>{inj.detail}</AppText>
                 </View>

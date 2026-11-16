@@ -30,6 +30,7 @@ import {
   type SimHomeResponse,
   type SimTrendRow,
   type SimWaiverSuggestion,
+  simOutLine,
 } from "@/lib/simGame";
 import { compactCount } from "@/lib/compactModule";
 import type { SimTab } from "@/lib/simGameFlow";
@@ -218,7 +219,7 @@ export function SimInjuriesCard({ ctx, injuries }: { ctx: SimCtx; injuries: SimH
                 <SimPlayerChip player={i.player} size={28} />
               </div>
               <span className="flex shrink-0 flex-col items-end gap-1">
-                <SimToneBadge label={`Out ${i.out_weeks} wk`} tone="danger" />
+                <SimToneBadge label={i.player.injury ? simOutLine({ out_weeks: i.out_weeks, injury: i.player.injury }) : `Out ${i.out_weeks} wk`} tone="danger" />
                 <span className="text-[0.6875rem]" style={{ color: i.starting ? "var(--color-warning)" : "var(--color-text-muted)" }}>{i.starting ? "In your lineup" : i.note}</span>
               </span>
             </li>

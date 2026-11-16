@@ -47,6 +47,7 @@ def _settings(econ: bool, **extra) -> GameSettings:
         d.pop("vorp_v", None)  # ... and vorp_v
         d.pop("incumbent_v", None)  # ... and incumbent_v / defense_v
         d.pop("defense_v", None)
+        d.pop("injury_v", None)
     return GameSettings.from_dict(d)
 
 

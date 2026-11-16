@@ -1,6 +1,9 @@
 "use client";
 
 import { SimBadgeChips } from "@/components/SimAchievements";
+import { InjuryHistorySection } from "@/components/PlayerDepthInjury";
+import { SimPlayerStory } from "@/components/SimPlayerStory";
+import { pqvRealWorld } from "@/lib/pqvContext";
 import { simPlayerBadges } from "@/lib/simAchievements";
 
 import { useEffect, useState } from "react";
@@ -56,6 +59,8 @@ export function SimPlayerHistory({ gameId, playerId }: { gameId: string; playerI
   return (
     <div className="flex flex-col gap-3" data-testid="sim-player-history">
       {simPlayerBadges(data.achievements, playerId).length > 0 ? <SimBadgeChips items={simPlayerBadges(data.achievements, playerId)} /> : null}
+      <SimPlayerStory story={data.story} />
+      {pqvRealWorld(true).showInjuryHistory && data.injuries ? <InjuryHistorySection record={data.injuries} idPrefix="simpqv" /> : null}
       <section className="pqv-stat-season" aria-label="Origin">
         <h3>Origin</h3>
         {origin ? (

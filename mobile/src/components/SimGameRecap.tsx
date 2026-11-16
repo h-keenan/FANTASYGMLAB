@@ -171,10 +171,10 @@ export function SimWeekRecapView({
           <SectionHeading title="Injuries" icon={REVIEW_ICON.injury} />
           {recap.injuries!.map((inj, i) => (
             <AccentCard key={i} accent={inj.is_yours ? colors.danger : colors.borderStrong} compact>
-              <SimPlayerChip player={{ ...inj.player, status: 'out', out_weeks: inj.weeks }} />
+              <SimPlayerChip player={{ ...inj.player, status: 'out', out_weeks: inj.weeks, injury: inj.injury }} />
               <View style={common.row}>
                 <AppText style={[common.small, { color: colors.danger, fontWeight: '600' }]}>
-                  Out {inj.weeks} week{inj.weeks === 1 ? '' : 's'}
+                  {inj.injury ? `${inj.injury} · out` : 'Out'} {inj.weeks} week{inj.weeks === 1 ? '' : 's'}
                 </AppText>
                 {inj.is_yours ? <SimToneBadge label="Your team" tone="danger" /> : null}
               </View>

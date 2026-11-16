@@ -42,6 +42,8 @@ export interface InjuryStint {
 
 export interface InjurySeason {
   season: number;
+  /** The Fantasy Sim names a season "S3 2028"; the real record leaves it out and shows the year. */
+  season_label?: string;
   games_missed: number;
   stints: InjuryStint[];
 }
@@ -144,6 +146,7 @@ export function injurySummaryParts(record: InjuryRecordData | null | undefined):
 export interface InjuryHistoryRow {
   key: string;
   season: number;
+  seasonLabel: string;
   injury: string;
   weeks: string;
   games: string;
@@ -158,6 +161,7 @@ export function injuryHistoryRows(record: InjuryRecordData | null | undefined): 
       rows.push({
         key: `${season.season}-${stint.start_week ?? "x"}`,
         season: season.season,
+        seasonLabel: season.season_label || String(season.season),
         injury: stint.injury ?? "Injury (not specified)",
         weeks: weeksLabel(stint),
         games: gamesLabel(stint.games_missed),
@@ -169,6 +173,7 @@ export function injuryHistoryRows(record: InjuryRecordData | null | undefined): 
 
 /** "2021-2026" style coverage note under the history. */
 export function injuryCoverageNote(record: InjuryRecordData | null | undefined): string | null {
+  if (record?.ok && record.source === "sim") return "From this game's own injury log.";
   if (!record || !record.ok || record.since_season == null) return null;
   return `Career total counts ${record.since_season} onward (official NFL injury reports).`;
 }

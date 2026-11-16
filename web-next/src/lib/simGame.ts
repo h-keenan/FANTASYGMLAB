@@ -14,6 +14,7 @@
 import type { SimAttributeGrade, SimGradeLetter } from "./simGrade";
 import type { SimAchievementsPayload, SimRecapAchievements } from "./simAchievements";
 import type { ReviewGlyph } from "./simReview";
+import type { DepthChartData, InjuryRecordData } from "./playerDepthInjury";
 
 // ---------------------------------------------------------------------------
 // Envelope, gating and reasons
@@ -138,6 +139,9 @@ export interface SimGamePlayer {
   ceiling: number;
   status: "healthy" | "out" | "bye";
   out_weeks: number;
+  /** injury_v 1+: what he is out with ("Hamstring"), and the one line every surface shows ("Hamstring · out 4 wks"). Absent on a save from before it. */
+  injury?: string | null;
+  injury_label?: string | null;
   bye_week: number | null;
   owner?: SimPlayerOwner | null;
   last_week?: number | null;
@@ -809,7 +813,31 @@ export interface SimHistorySeason {
   pos_rank?: number | null;
 }
 
+/** One line of a player's story (GET /players/{id}/history `story`), derived from the event log: depth moves with reasons, injuries, trades, season lines. */
+export interface SimStoryEntry {
+  kind: "season" | "depth" | "injury" | "traded" | "claimed" | "dropped" | "cut" | "drafted" | "started" | "retired" | "nfl_team";
+  season: number;
+  year: number | null;
+  season_label: string;
+  /** 0 = offseason of that season, 99 = the season's own summary line. */
+  week: number;
+  text: string;
+  tone: "good" | "bad" | "neutral";
+  role?: string | null;
+  team?: string | null;
+  games?: number;
+  points?: number | null;
+  ppg?: number | null;
+  pos_rank?: number | null;
+  weeks?: number;
+  injury?: string | null;
+}
+
 export interface SimPlayerHistoryResponse extends SimGameEnvelope {
+  /** The plain-language timeline (older servers omit it). */
+  story?: SimStoryEntry[];
+  /** Injury history in the shape the shared InjuryHistorySection reads. */
+  injuries?: InjuryRecordData;
   /** The badges that name this player (League MVP, Rookie of the Year, ...). */
   achievements?: SimAchievementsPayload["items"];
   pid?: string;
@@ -868,6 +896,8 @@ export interface SimPlayerDetailResponse extends SimGameEnvelope {
   ros?: SimRosSummary;
   history?: { week: number; points: number; stats?: Record<string, number> | null }[];
   news?: { week: number; text: string }[];
+  /** The sim's own depth order at his position (QB / RB / WR / TE), for the shared DepthChartSection. */
+  depth_chart?: DepthChartData | null;
 }
 
 export interface SimLineupSlot {
@@ -1063,7 +1093,7 @@ export interface SimWeekRecap {
   standings?: SimStandingRow[];
   waivers?: { team_id: string; name: string; add: SimGamePlayer; drop: SimGamePlayer | null; ok: boolean; reason: string }[];
   transactions?: SimTransaction[];
-  injuries?: { player: SimGamePlayer; weeks: number; team_id: string; is_yours: boolean }[];
+  injuries?: { player: SimGamePlayer; weeks: number; team_id: string; is_yours: boolean; injury?: string | null }[];
   mvp?: { player: SimGamePlayer; pts: number } | null;
   bust?: { player: SimGamePlayer; pts: number } | null;
   auto_filled_slots?: unknown[];
@@ -1921,10 +1951,17 @@ export function simWarningText(warning: SimLineupWarning, playerName?: string): 
   return `Your ${warning.slot} slot is empty.`;
 }
 
+/** "Hamstring · out 4 wks" when the save names the injury (injury_v 1+), else `legacy` ("Out 4w") or "Out" with no weeks. */
+export function simOutLine(player: Pick<SimGamePlayer, "out_weeks"> & Partial<Pick<SimGamePlayer, "injury">>, legacy?: string): string {
+  const n = player.out_weeks;
+  if (player.injury) return n > 0 ? `${player.injury} · out ${n} wk${n === 1 ? "" : "s"}` : `${player.injury} · out`;
+  return n > 0 ? (legacy ?? `Out ${n}w`) : "Out";
+}
+
 /** Short status text/tone for a player's availability. */
-export function simPlayerStatusLabel(player: Pick<SimGamePlayer, "status" | "out_weeks" | "bye_week">): { label: string; tone: SimGameTone } | null {
+export function simPlayerStatusLabel(player: Pick<SimGamePlayer, "status" | "out_weeks" | "bye_week"> & Partial<Pick<SimGamePlayer, "injury">>): { label: string; tone: SimGameTone } | null {
   if (player.status === "out") {
-    return { label: player.out_weeks > 0 ? `Out ${player.out_weeks}w` : "Out", tone: "danger" };
+    return { label: simOutLine(player, `Out ${player.out_weeks}w`), tone: "danger" };
   }
   if (player.status === "bye") return { label: "Bye", tone: "warning" };
   return null;
@@ -2123,7 +2160,7 @@ export function simFmtProjection(player: Pick<SimGamePlayer, "projection" | "flo
 }
 
 /** Anything a sim list can show a player row for: the full row or a brief ref. */
-export type SimPlayerRef = Pick<SimGamePlayer, "id" | "name" | "pos"> & Partial<Pick<SimGamePlayer, "headshot_id" | "team" | "age" | "bye_week" | "status" | "out_weeks">>;
+export type SimPlayerRef = Pick<SimGamePlayer, "id" | "name" | "pos"> & Partial<Pick<SimGamePlayer, "headshot_id" | "team" | "age" | "bye_week" | "status" | "out_weeks" | "injury">>;
 
 /** The id the shared avatar fetches a Sleeper photo with (null: show initials). */
 export function simHeadshotId(player: Pick<SimPlayerRef, "id" | "headshot_id">): string | null {

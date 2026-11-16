@@ -39,6 +39,7 @@ SUBSYSTEMS = {
     "gscout": 20,  # scouting seeds of generated rookies
     "gnames": 22,  # rookie name tables shuffle (names_v 1+)
     "gdefense": 23,  # NFL defense strengths per season (defense_v 1+)
+    "ginjtype": 25,  # which injury a new injury is (injury_v 1+); a stream of its own so naming one never moves another draw
     "gnflopp": 24,  # weekly NFL opponent pairing (defense_v 1+)
 }
 

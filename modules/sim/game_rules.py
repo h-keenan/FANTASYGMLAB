@@ -44,6 +44,7 @@ from modules.sim.game_types import (
     INCUMBENT_VERSION,
     DEFENSE_VERSION,
     POS_VERSION,
+    INJURY_VERSION,
     HINT_VERSION,
     KD_VERSION,
     LIMIT_VERSION,
@@ -69,6 +70,7 @@ UPGRADABLE_FLAGS: dict[str, tuple[int, str]] = {
     "incumbent_v": (INCUMBENT_VERSION, SEASON),
     "defense_v": (DEFENSE_VERSION, WEEK),
     "pos_v": (POS_VERSION, NOW),
+    "injury_v": (INJURY_VERSION, WEEK),
 }
 
 # What the UI shows for each flag: a short label, one sentence of what changes, and whether it needs a dynasty with offseasons.
@@ -131,6 +133,11 @@ FLAGS: dict[str, dict[str, Any]] = {
     "pos_v": {
         "label": "Kickers and defenses trade like any position",
         "body": "A team that needs a kicker (or defense) will take a better one for fair value and cut its worse one, a team that is set declines a worse one on value, and the Needs tags match what the AI will pay for. Kickers and defenses can go on your trade block.",
+        "dynasty_only": False,
+    },
+    "injury_v": {
+        "label": "Injuries with a reason",
+        "body": "Every new injury has a type (hamstring, ankle, concussion, ACL), sampled by position and how long he is out, and it shows on his card, the injury lists and alerts, with a per-season injury history.",
         "dynasty_only": False,
     },
     "names_v": {

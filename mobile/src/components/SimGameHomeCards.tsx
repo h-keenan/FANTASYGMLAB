@@ -32,6 +32,7 @@ import {
   type SimHomeResponse,
   type SimTrendRow,
   type SimWaiverSuggestion,
+  simOutLine,
 } from '../lib/simGame';
 import { compactCount } from '../lib/compactModule';
 import { simByeParts, simInboxParts, simInjuryParts, simStandingsParts, simWaiverParts } from '../lib/simSummaries';
@@ -216,7 +217,7 @@ export function SimInjuriesCard({ ctx, injuries }: { ctx: SimCtx; injuries: SimH
               <SimPlayerChip player={i.player} size={28} />
             </View>
             <View style={{ alignItems: 'flex-end', gap: 2 }}>
-              <SimToneBadge label={`Out ${i.out_weeks} wk`} tone="danger" />
+              <SimToneBadge label={i.player.injury ? simOutLine({ out_weeks: i.out_weeks, injury: i.player.injury }) : `Out ${i.out_weeks} wk`} tone="danger" />
               <AppText style={[common.muted, i.starting && { color: colors.warning }]}>{i.starting ? 'In your lineup' : i.note}</AppText>
             </View>
           </View>

@@ -9,6 +9,8 @@ from typing import Any, Mapping, Sequence
 
 from modules.sim.game_rules import FLAGS, rules_info
 from modules.sim import game_grades, scouting
+from modules.sim.game_story import depth_chart_view
+from modules.sim.injuries import out_label
 from modules.sim.game_actions import lineup_warnings
 from modules.sim.game_ai import trade_window
 from modules.sim.game_draft import DraftContext, advice_reason, best_for_user, hint_reason
@@ -83,7 +85,9 @@ def player_row(
     next_projection = round(projection if ev.roles_on else ev.ros_mean(pid), 1)
     if proj_note != "healthy":
         projection = 0.0
+    kind = state.out_kind.get(pid) if state.out.get(pid) else None  # injury_v 1+: what he is out with ("Hamstring")
     return {
+        **({"injury": kind, "injury_label": out_label(kind, state.out[pid])} if kind else {}),
         "id": pid, "headshot_id": headshot_id(pid), "name": p.name, "pos": p.pos, "team": p.nfl_team,
         "age": p.age, "adp": p.adp, **game_grades.grade_fields(snap, pid, state.view_no), "projection": round(projection, 1),
         "projection_note": proj_note if proj_note != "healthy" else None, "next_projection": next_projection, "projection_week": w, "ros_mean": round(ev.ros_mean(pid), 1),
@@ -272,7 +276,7 @@ def player_detail(snap: GameSnapshot, state: GameState, pid: str, seed: int | No
     history = []
     for i, pts in enumerate(state.points.get(pid, [])):
         history.append({"week": i + 1, "points": pts, "stats": _stats_for(state, pid, i + 1)})
-    news = [{"week": n["week"], "text": f"Injured in Week {n['week']}; expected to miss {n['weeks']} week(s)."}
+    news = [{"week": n["week"], "text": f"{n['kind']} in Week {n['week']}; expected to miss {n['weeks']} week(s)." if n.get("kind") else f"Injured in Week {n['week']}; expected to miss {n['weeks']} week(s)."}
             for n in state.news if n["pid"] == pid]
     if state.out.get(pid) and not news:
         news.append({"week": 0, "text": f"Listed out for {state.out[pid]} week(s) to start the season."})
@@ -287,6 +291,9 @@ def player_detail(snap: GameSnapshot, state: GameState, pid: str, seed: int | No
     profile = scouting_view(snap, state, ev, pid)
     if profile is not None:
         out["scouting"] = profile
+    chart = depth_chart_view(snap, state, ev, pid)  # the sim's own depth order at his position (QB / RB / WR / TE)
+    if chart is not None:
+        out["depth_chart"] = chart
     return out
 
 

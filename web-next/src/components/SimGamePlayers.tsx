@@ -294,6 +294,7 @@ export function simPqvSections(gameId: string, player: SimGamePlayer, detail: Si
     heroTiles: simHeroTiles(player),
     scouting: detail.data?.scouting ? <SimScoutingSections profile={detail.data.scouting} /> : undefined,
     history: <SimPlayerHistory gameId={gameId} playerId={player.id} />,
+    depthChart: detail.data ? (detail.data.depth_chart ?? null) : detail.failed ? null : undefined,
     stats: (
       <>
         {real ? <SimRealHistory playerId={real.playerId} asOf={real.asOf} /> : null}

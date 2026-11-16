@@ -94,7 +94,7 @@ export function InjuryHistorySection({ record, idPrefix = 'pqv' }: { record: Inj
         <View style={styles.table} testID="pqv-injury-rows">
           {rows.map((row) => (
             <View key={row.key} style={styles.tr} testID="pqv-injury-row">
-              <AppText style={styles.season}>{row.season}</AppText>
+              <AppText style={styles.season}>{row.seasonLabel}</AppText>
               <View style={styles.what}>
                 <AppText style={styles.body}>{row.injury}</AppText>
                 {row.weeks ? <AppText style={styles.muted}>{row.weeks}</AppText> : null}
@@ -122,7 +122,7 @@ function createStyles(colors: ThemeColors) {
     self: { backgroundColor: `${colors.accent}24`, borderLeftWidth: 2, borderLeftColor: colors.accent },
     table: { gap: spacing.xs },
     tr: { flexDirection: 'row', alignItems: 'flex-start', gap: spacing.sm },
-    season: { width: 44, fontSize: 14, color: colors.textPrimary, fontVariant: ['tabular-nums'] },
+    season: { width: 72, fontSize: 14, color: colors.textPrimary, fontVariant: ['tabular-nums'] },
     what: { flex: 1, minWidth: 0 },
     games: { fontSize: 14, color: colors.textPrimary, textAlign: 'right', fontVariant: ['tabular-nums'] },
     total: { marginTop: spacing.xs, justifyContent: 'space-between' },

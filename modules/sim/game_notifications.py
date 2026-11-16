@@ -84,9 +84,11 @@ def derive(
                 why = str(p.get("reason") or "").replace("_", " ")
                 items.append(_item(seq, 0, week, "claim_lost", "waiver", f"Claim lost: {name}" + (f" ({why})" if why else ""), "players", player_id=p["add"]))
         elif typ == "injury":
+            kinds = p.get("kinds") or {}  # injury_v 1+: "Torn ACL: X is out 9 weeks"
             for n, (pid, weeks) in enumerate(p.get("items", ())):
                 if state.where(user, pid) is not None:
-                    items.append(_item(seq, n, week, "injury", "injury", f"{_asset(snap, pid)} is out {int(weeks)} week{'' if int(weeks) == 1 else 's'}", "team", player_id=pid))
+                    why = f"{kinds[pid]}: " if pid in kinds else ""
+                    items.append(_item(seq, n, week, "injury", "injury", f"{why}{_asset(snap, pid)} is out {int(weeks)} week{'' if int(weeks) == 1 else 's'}", "team", player_id=pid))
         elif typ == "realism_upgrade":
             items.append(_item(seq, 0, week, "rules", "check", "Rules updated: past results stay as they were, new rules apply going forward", "home"))
         elif typ == "week_advanced":
