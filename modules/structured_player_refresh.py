@@ -71,7 +71,9 @@ def structured_state_fingerprint(df: pd.DataFrame) -> str:
     for column in cols:
         if column == "player_id":
             continue
-        work[column] = work[column].map(_fingerprint_cell)
+        work[column] = work[column].map(
+            _depth_order_fingerprint_cell if column == "depth_chart_order" else _fingerprint_cell
+        )
     work = work.sort_values("player_id", kind="mergesort")
     payload = work.to_csv(index=False).encode("utf-8")
     return hashlib.sha1(payload).hexdigest()
@@ -82,10 +84,37 @@ def _fingerprint_cell(value: object) -> str:
         return ""
     if isinstance(value, bool):
         return "1" if value else "0"
+    if isinstance(value, (int, float)) or hasattr(value, "dtype"):
+        # A whole number is the same state whether a frame stores it as int64
+        # or float64 (a NaN-bearing SQLite column reads back as float64 while
+        # the public-player snapshot round-trips it as int64).
+        try:
+            number = float(value)
+        except (TypeError, ValueError):
+            number = None
+        if number is not None and number == number and number.is_integer():
+            return str(int(number))
     text = str(value).strip()
     if text.lower() in {"nan", "none", "<na>"}:
         return ""
     return text
+
+
+def _depth_order_fingerprint_cell(value: object) -> str:
+    """Canonical depth-chart order: missing, NaN and non-positive all mean "no order".
+
+    Every consumer (``depth_chart_slot``, ``role_score``,
+    ``_normalize_opportunity_inputs``) treats an absent order and ``0`` the same,
+    and hydration normalizes NaN to ``0``. Fingerprinting them differently made a
+    pure representation change look like a structured-state change and forced a
+    spurious whole-frame valuation recompute on the snapshot path only.
+    """
+
+    text = _fingerprint_cell(value)
+    try:
+        return text if float(text) > 0 else ""
+    except ValueError:
+        return text
 
 
 def _is_missing_patch_value(value: object) -> bool:

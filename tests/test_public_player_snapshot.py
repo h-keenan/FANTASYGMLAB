@@ -291,3 +291,25 @@ def test_missing_or_failed_snapshot_uses_existing_hydration_fallback(tmp_path):
         annotate_valuation_authority(source),
         check_dtype=True,
     )
+
+
+def test_load_players_built_snapshot_and_warm_scores_are_identical(tmp_path):
+    """built == snapshot-loaded == warm for every score, not just within tolerance.
+
+    The snapshot round-trips a missing depth order as 0 and float as int. That used to
+    change the structured-state fingerprint, so only the snapshot path recomputed every
+    opportunity/dynasty score (e.g. 3445 built vs 3446 loaded) while the build path kept
+    the stored ones.
+    """
+    db_path = tmp_path / "players.db"
+    shutil.copyfile(Path("data/players.db"), db_path)
+    public_player_snapshot.invalidate_public_player_snapshot(db_path)
+    rankings.clear_public_player_cache()
+    built = rankings.load_players(str(db_path))
+    rankings.clear_public_player_cache()
+    cold = rankings.load_players(str(db_path))
+    warm = rankings.load_players(str(db_path))
+    columns = ["player_id", "opportunity_score", "role_score", "score", "dynasty_score", "value_score"]
+    for column in columns:
+        pd.testing.assert_series_equal(built[column], cold[column], check_dtype=False, check_exact=True)
+        pd.testing.assert_series_equal(cold[column], warm[column], check_dtype=False, check_exact=True)
