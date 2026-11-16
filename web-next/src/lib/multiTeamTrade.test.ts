@@ -16,7 +16,7 @@ import {
   multiTradeErrorMessages,
   multiTradeFailureLines,
   removeTeam,
-  shareGetsBack,
+  shareVerdict,
   toneSemantic,
   topReasons,
   upsertAsset,
@@ -203,13 +203,17 @@ describe("share model (persuasion framed)", () => {
     expect(model.edges).toHaveLength(3);
   });
 
-  it("says what a team giving up value gets back", () => {
-    const giver = team("2", "Giver", {
-      market_delta: -400,
-      receives: [asset("a", "Thin Position Starter", "TE", 800), { type: "pick", id: "2027:1:2", label: "2027 Round 1", position: "", team: "", score: 600 }],
-    });
-    expect(shareGetsBack(giver)).toBe("Gets back Thin Position Starter (TE) and 2027 Round 1");
-    expect(shareGetsBack({ ...giver, market_delta: 10 })).toBe("");
+  it("tones each value change and names the biggest gain once", () => {
+    const model = buildShareModel(response(3));
+    expect(model.teams.map((t) => t.valueTone)).toEqual(["gain", "gain", "even"]);
+    expect(model.verdict).toEqual({ topRosterId: "1", text: "Biggest gain: Team 1 (+300)" });
+    expect(shareVerdict([]).text).toBe("An even swap");
+  });
+
+  it("has no get-back duplicate of the gets line and lists what each team sends", () => {
+    const model = buildShareModel(response(3));
+    expect(model.teams[0]).not.toHaveProperty("getsBack");
+    expect(buildShareText(model, "L")).toContain("Sends ");
   });
 
   it("never uses scoreboard words in the share text", () => {

@@ -9,9 +9,10 @@
  *
  * Two separate surfaces read the same response:
  *  1. ANALYSIS (private, honest): one card per team, verdict, most hurt.
- *  2. SHARE (pitching the deal to other managers): persuasion framed, no
- *     scoreboard words and no red verdicts, but every team's real value change
- *     is still printed as a plain number (nothing hidden).
+ *  2. SHARE (pitching the deal to other managers): every card says what the
+ *     team gets and sends, and prints its real value change (green for a
+ *     gain, red for a loss, nothing hidden) plus one plain "biggest gain"
+ *     line. No "most hurt" / "loses" scoreboard words.
  */
 
 export const MULTI_TEAM_MIN = 3;
@@ -74,6 +75,8 @@ export type MultiOutcome = "wins" | "even" | "gives_up" | "loses";
 export interface MultiTeamResult {
   roster_id: string;
   team_name: string;
+  /** Optional team/owner avatar; the share card falls back to initials. */
+  avatar_url?: string | null;
   is_perspective: boolean;
   sends: MultiAsset[];
   receives: MultiAsset[];
@@ -380,11 +383,16 @@ export interface ShareEdge {
   fromRosterId: string;
   toRosterId: string;
   labels: string[];
+  fromAvatarUrl: string | null;
+  toAvatarUrl: string | null;
 }
+
+export type ShareValueTone = "gain" | "loss" | "even";
 
 export interface ShareTeam {
   rosterId: string;
   name: string;
+  avatarUrl: string | null;
   /** What this team gets, best first. */
   gets: MultiAsset[];
   /** What this team sends, with the receiver. */
@@ -394,8 +402,15 @@ export interface ShareTeam {
   /** Plain true value change, signed. Shown for every team. */
   valueChange: number;
   valueChangeText: string;
-  /** Set when the team gives up value: what it gets back. */
-  getsBack: string;
+  /** Drives the value color: gain = success, loss = danger, even = neutral. */
+  valueTone: ShareValueTone;
+}
+
+export interface ShareVerdict {
+  /** The team that gains the most, or null when nobody gains. */
+  topRosterId: string | null;
+  /** Plain one-liner, e.g. "Biggest gain: Team 1 (+300)" or "An even swap". */
+  text: string;
 }
 
 export interface ShareModel {
@@ -403,6 +418,7 @@ export interface ShareModel {
   headline: string;
   teams: ShareTeam[];
   edges: ShareEdge[];
+  verdict: ShareVerdict;
 }
 
 const byScoreDesc = (a: MultiAsset, b: MultiAsset) => (Number(b.score) || 0) - (Number(a.score) || 0);
@@ -425,27 +441,27 @@ export function shareNeeds(team: MultiTeamResult): string[] {
   return out.slice(0, 2);
 }
 
-/** For a team giving up value: the best things it gets back. */
-export function shareGetsBack(team: MultiTeamResult): string {
-  if (Number(team.market_delta) >= 0) return "";
-  const best = [...team.receives].sort(byScoreDesc).slice(0, 2);
-  if (!best.length) return "";
-  const starter = best.find((a) => a.type === "player");
-  const pick = best.find((a) => a.type === "pick");
-  const parts: string[] = [];
-  if (starter) parts.push(`${starter.label}${starter.position ? ` (${starter.position})` : ""}`);
-  if (pick) parts.push(pick.label);
-  return parts.length ? `Gets back ${parts.join(" and ")}` : "";
+function valueTone(change: number): ShareValueTone {
+  return change > 0 ? "gain" : change < 0 ? "loss" : "even";
+}
+
+/** Who gains the most, from the same rounded numbers printed on the cards. */
+export function shareVerdict(teams: ShareTeam[]): ShareVerdict {
+  const top = teams.reduce<ShareTeam | null>((best, t) => (t.valueChange > (best?.valueChange ?? 0) ? t : best), null);
+  if (!top) return { topRosterId: null, text: "An even swap" };
+  const tied = teams.filter((t) => t.valueChange === top.valueChange).length > 1;
+  return { topRosterId: tied ? null : top.rosterId, text: tied ? `Biggest gain: ${top.valueChangeText} (${teams.filter((t) => t.valueChange === top.valueChange).length} teams)` : `Biggest gain: ${top.name} (${top.valueChangeText})` };
 }
 
 export function buildShareModel(response: Pick<MultiTeamTradeResponse, "teams" | "flows">): ShareModel {
   const teams = response.teams ?? [];
   const edgeMap = new Map<string, ShareEdge>();
+  const avatarById = new Map(teams.map((t) => [t.roster_id, t.avatar_url || null]));
   for (const team of teams) {
     for (const asset of team.sends) {
       const to = asset.to_roster_id ?? "";
       const key = `${team.roster_id}>${to}`;
-      const edge = edgeMap.get(key) ?? { fromName: team.team_name, toName: asset.to_team_name ?? "", fromRosterId: team.roster_id, toRosterId: to, labels: [] };
+      const edge = edgeMap.get(key) ?? { fromName: team.team_name, toName: asset.to_team_name ?? "", fromRosterId: team.roster_id, toRosterId: to, labels: [], fromAvatarUrl: avatarById.get(team.roster_id) ?? null, toAvatarUrl: avatarById.get(to) ?? null };
       edge.labels.push(asset.label);
       edgeMap.set(key, edge);
     }
@@ -453,18 +469,20 @@ export function buildShareModel(response: Pick<MultiTeamTradeResponse, "teams" |
   const shareTeams: ShareTeam[] = teams.map((team) => ({
     rosterId: team.roster_id,
     name: team.team_name,
+    avatarUrl: team.avatar_url || null,
     gets: [...team.receives].sort(byScoreDesc),
     sends: team.sends,
     needs: shareNeeds(team),
     valueChange: Math.round(Number(team.market_delta) || 0),
     valueChangeText: formatSigned(team.market_delta),
-    getsBack: shareGetsBack(team),
+    valueTone: valueTone(Math.round(Number(team.market_delta) || 0)),
   }));
   return {
     layout: teams.length <= SHARE_FLOW_MAX_TEAMS ? "flow" : "list",
     headline: `${teams.length}-team trade`,
     teams: shareTeams,
     edges: [...edgeMap.values()],
+    verdict: shareVerdict(shareTeams),
   };
 }
 
@@ -474,8 +492,8 @@ export function buildShareText(model: ShareModel, leagueName: string): string {
   for (const team of model.teams) {
     const gets = team.gets.map((a) => a.label).join(", ") || "nothing";
     lines.push(`${team.name} gets ${gets}`);
+    if (team.sends.length) lines.push(`  Sends ${team.sends.map((a) => a.label).join(", ")}`);
     for (const need of team.needs) lines.push(`  ${need}`);
-    if (team.getsBack) lines.push(`  ${team.getsBack}`);
     lines.push(`  Value change ${team.valueChangeText}`);
   }
   lines.push("", "Who sends what");

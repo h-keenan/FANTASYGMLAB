@@ -288,8 +288,7 @@ function SharePitch({ response, leagueId, leagueName }: { response: MultiTeamTra
         {model.teams.map((team) => (
           <li key={team.rosterId}>
             <strong>{team.name}</strong> gets {assetsLine(team.gets)}
-            {team.needs[0] ? `: ${team.needs[0]}` : ""}. Value change {team.valueChangeText}
-            {team.getsBack ? `. ${team.getsBack}` : ""}.
+            {team.needs[0] ? `: ${team.needs[0]}` : ""}. Value change {team.valueChangeText}.
           </li>
         ))}
       </ul>

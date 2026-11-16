@@ -1,40 +1,76 @@
 /**
  * Multi-team trade share card: the picture a manager sends to the other
- * managers to pitch a 3 to 6 team deal. Persuasion framed, not a scoreboard:
- * it leads with what each team GETS and which needs that fills, draws who
- * sends what to whom (a flow for 3 teams, a list for 4+), and uses no
- * "most hurt" / "loses" words and no red verdicts. Nothing is hidden: every
- * team's true value change is printed as a plain, neutral number, and a team
- * that gives up value says what it gets back.
+ * managers to pitch a 3 to 6 team deal. Leads with a one-line "biggest gain"
+ * verdict, draws who sends what to whom (a table for 3 teams, per-card
+ * "from" notes for 4+), then one self-explanatory card per team: what it
+ * gets, what it sends, the need it fills, and its true value change (green
+ * gain, red loss, neutral even; nothing hidden). No "most hurt" / "loses"
+ * words. Cards size to their content; density steps down with team count so
+ * 4 to 6 teams scale down instead of overflowing the canvas.
  *
  * Data comes from lib/multiTeamTrade.ts buildShareModel (the same model the
  * mobile card draws). Satori only, like tradeCard.tsx; no network, no quota.
  */
 
 import { BRAND_DOMAIN, BRAND_NAME } from "@/lib/brand";
-import type { ShareEdge, ShareModel, ShareTeam } from "@/lib/multiTeamTrade";
+import type { ShareEdge, ShareModel, ShareTeam, ShareValueTone } from "@/lib/multiTeamTrade";
 
 import { ShareAvatar, ShareFrame, ShareQr, eyebrowStyle, glassStyle, initials, type ShareBrandAssets } from "./frame";
 import { SHARE_TOKEN_HEX as T, shareRadius, withAlpha } from "./tokens";
 
 const MAX_EDGE_ROWS = 4;
 
-function EdgeRow({ edge }: { edge: ShareEdge }) {
-  const labels = edge.labels.slice(0, 3).join(", ") + (edge.labels.length > 3 ? ` +${edge.labels.length - 3}` : "");
+interface Density {
+  avatar: number;
+  name: number;
+  line: number;
+  detail: number;
+  value: number;
+  pad: string;
+  gap: number;
+  assets: number;
+  needs: number;
+}
+
+/** One density step per team count, chosen so the stack fits 1350px. */
+function densityFor(teamCount: number): Density {
+  if (teamCount <= 3) return { avatar: 50, name: 28, line: 22, detail: 18, value: 36, pad: "14px 24px", gap: 4, assets: 3, needs: 1 };
+  if (teamCount === 4) return { avatar: 46, name: 26, line: 21, detail: 17, value: 32, pad: "12px 22px", gap: 3, assets: 2, needs: 1 };
+  return { avatar: 38, name: 22, line: 18, detail: 16, value: 28, pad: "10px 18px", gap: 2, assets: 2, needs: 0 };
+}
+
+const TONE_COLOR: Record<ShareValueTone, string> = {
+  gain: T["--color-success"],
+  loss: T["--color-danger"],
+  even: T["--color-text-primary"],
+};
+
+const oneLine = { display: "block", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" } as const;
+
+function listLabels(labels: string[], limit: number): string {
+  return labels.slice(0, limit).join(", ") + (labels.length > limit ? ` +${labels.length - limit}` : "");
+}
+
+function EdgeTeam({ name, avatar }: { name: string; avatar: string | null }) {
   return (
-    <div style={{ display: "flex", alignItems: "center", gap: 16, minHeight: 76 }}>
-      <div style={{ display: "flex", alignItems: "center", gap: 12, width: 230, flexShrink: 0 }}>
-        <ShareAvatar src={null} size={48} fallbackText={initials(edge.fromName)} />
-        <div style={{ display: "block", fontSize: 24, fontWeight: 800, lineHeight: 1.1, lineClamp: 2 }}>{edge.fromName}</div>
+    <div style={{ display: "flex", alignItems: "center", gap: 10, width: 292, flexShrink: 0, minWidth: 0 }}>
+      <div style={{ display: "flex", flexShrink: 0 }}>
+        <ShareAvatar src={avatar} size={44} fallbackText={initials(name)} />
       </div>
-      <svg width="64" height="28" viewBox="0 0 64 28" fill="none" stroke={T["--color-accent"]} strokeWidth="4" strokeLinecap="round" strokeLinejoin="round">
+      <div style={{ ...oneLine, flexGrow: 1, flexShrink: 1, minWidth: 0, fontSize: 22, fontWeight: 800, lineHeight: 1.15 }}>{name}</div>
+    </div>
+  );
+}
+
+function EdgeRow({ edge }: { edge: ShareEdge }) {
+  return (
+    <div style={{ display: "flex", alignItems: "center", gap: 10, minHeight: 56 }}>
+      <EdgeTeam name={edge.fromName} avatar={edge.fromAvatarUrl} />
+      <svg width="40" height="24" viewBox="0 0 64 28" fill="none" stroke={T["--color-accent"]} strokeWidth="5" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}>
         <path d="M4 14h52M44 4l12 10-12 10" />
       </svg>
-      <div style={{ display: "flex", alignItems: "center", gap: 12, width: 230, flexShrink: 0 }}>
-        <ShareAvatar src={null} size={48} fallbackText={initials(edge.toName)} />
-        <div style={{ display: "block", fontSize: 24, fontWeight: 800, lineHeight: 1.1, lineClamp: 2 }}>{edge.toName}</div>
-      </div>
-      <div style={{ display: "block", flexGrow: 1, flexShrink: 1, minWidth: 0, fontSize: 22, fontWeight: 600, color: T["--color-text-secondary"], lineHeight: 1.15, lineClamp: 2 }}>{labels}</div>
+      <EdgeTeam name={edge.toName} avatar={edge.toAvatarUrl} />
+      <div style={{ display: "block", flexGrow: 1, flexShrink: 1, minWidth: 0, fontSize: 20, fontWeight: 600, color: T["--color-text-secondary"], lineHeight: 1.15, lineClamp: 2 }}>{listLabels(edge.labels, 2)}</div>
     </div>
   );
 }
@@ -42,7 +78,7 @@ function EdgeRow({ edge }: { edge: ShareEdge }) {
 function FlowSection({ edges }: { edges: ShareEdge[] }) {
   const shown = edges.slice(0, MAX_EDGE_ROWS);
   return (
-    <div style={{ ...glassStyle(), flexDirection: "column", padding: "20px 28px", gap: 6, flexShrink: 0 }}>
+    <div style={{ ...glassStyle(), flexDirection: "column", padding: "18px 28px", gap: 4, flexShrink: 0 }}>
       <div style={{ ...eyebrowStyle(T["--color-accent"], 22), letterSpacing: "0.18em" }}>Who sends what</div>
       {shown.map((edge) => (
         <EdgeRow key={`${edge.fromRosterId}>${edge.toRosterId}`} edge={edge} />
@@ -52,29 +88,34 @@ function FlowSection({ edges }: { edges: ShareEdge[] }) {
   );
 }
 
-function TeamCard({ team, compact, showFrom }: { team: ShareTeam; compact: boolean; showFrom: boolean }) {
-  const limit = compact ? 3 : 4;
-  const gets = team.gets
-    .slice(0, limit)
-    .map((a) => (showFrom && a.from_team_name ? `${a.label} (from ${a.from_team_name})` : a.label))
-    .join(", ");
-  const more = team.gets.length - limit;
-  const detail = [...team.needs, ...(team.getsBack ? [team.getsBack] : [])].slice(0, 2);
+function TeamCard({ team, density, showFrom }: { team: ShareTeam; density: Density; showFrom: boolean }) {
+  const gets = listLabels(
+    team.gets.map((a) => (showFrom && a.from_team_name ? `${a.label} (from ${a.from_team_name})` : a.label)),
+    density.assets,
+  );
+  const sends = listLabels(
+    team.sends.map((a) => a.label),
+    density.assets,
+  );
+  const needs = team.needs.slice(0, density.needs);
   return (
-    <div style={{ ...glassStyle(shareRadius("--radius-md")), flexGrow: 1, flexBasis: 0, minWidth: 0, alignItems: "center", gap: 20, padding: compact ? "14px 22px" : "20px 28px", border: `1.5px solid ${withAlpha(T["--color-accent"], 0.3)}` }}>
-      <ShareAvatar src={null} size={compact ? 60 : 76} fallbackText={initials(team.name)} />
-      <div style={{ display: "flex", flexDirection: "column", flexGrow: 1, flexShrink: 1, minWidth: 0, gap: compact ? 4 : 8 }}>
-        <div style={{ display: "block", fontSize: compact ? 26 : 32, fontWeight: 900, lineHeight: 1.1, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{team.name}</div>
-        <div style={{ display: "block", fontSize: compact ? 21 : 25, fontWeight: 700, lineHeight: 1.2, color: T["--color-accent"], lineClamp: 2 }}>
-          {`Gets ${gets || "nothing"}${more > 0 ? ` +${more} more` : ""}`}
+    <div style={{ ...glassStyle(shareRadius("--radius-md")), flexDirection: "column", flexShrink: 0, gap: density.gap + 4, padding: density.pad, border: `1.5px solid ${withAlpha(T["--color-accent"], 0.3)}` }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 18 }}>
+        <div style={{ display: "flex", flexShrink: 0 }}>
+          <ShareAvatar src={team.avatarUrl} size={density.avatar} fallbackText={initials(team.name)} />
         </div>
-        {detail.map((line) => (
-          <div key={line} style={{ display: "block", fontSize: compact ? 18 : 21, fontWeight: 600, lineHeight: 1.2, color: T["--color-text-secondary"], whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{`• ${line}`}</div>
-        ))}
+        <div style={{ ...oneLine, flexGrow: 1, flexShrink: 1, minWidth: 0, fontSize: density.name, fontWeight: 900, lineHeight: 1.15 }}>{team.name}</div>
+        <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", flexShrink: 0 }}>
+          <div style={{ ...eyebrowStyle(T["--color-text-muted"], 14), letterSpacing: "0.14em" }}>Value change</div>
+          <div style={{ display: "flex", fontSize: density.value, fontWeight: 900, lineHeight: 1.05, color: TONE_COLOR[team.valueTone] }}>{team.valueChangeText}</div>
+        </div>
       </div>
-      <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", flexShrink: 0, gap: 2 }}>
-        <div style={{ ...eyebrowStyle(T["--color-text-muted"], 15), letterSpacing: "0.14em" }}>Value change</div>
-        <div style={{ display: "flex", fontSize: compact ? 34 : 44, fontWeight: 900, lineHeight: 1.05, color: T["--color-text-primary"] }}>{team.valueChangeText}</div>
+      <div style={{ display: "flex", flexDirection: "column", gap: density.gap }}>
+        <div style={{ display: "block", fontSize: density.line, fontWeight: 700, lineHeight: 1.2, color: T["--color-accent"], lineClamp: 2 }}>{`Gets ${gets || "nothing"}`}</div>
+        <div style={{ display: "block", fontSize: density.line, fontWeight: 700, lineHeight: 1.2, color: T["--color-text-secondary"], lineClamp: 2 }}>{`Sends ${sends || "nothing"}`}</div>
+        {needs.map((line) => (
+          <div key={line} style={{ ...oneLine, fontSize: density.detail, fontWeight: 600, lineHeight: 1.2, color: T["--color-text-muted"] }}>{`• ${line}`}</div>
+        ))}
       </div>
     </div>
   );
@@ -94,19 +135,21 @@ export function MultiTradeShareCard({
   height: number;
 }) {
   const flow = model.layout === "flow";
-  const compact = !flow || model.teams.length > 3;
+  const density = densityFor(model.teams.length);
+  const verdictTeam = model.teams.find((t) => t.rosterId === model.verdict.topRosterId);
   return (
     <ShareFrame brand={brand} kind="Trade proposal" width={width} height={height} footer={false}>
       <div style={{ display: "flex", flexDirection: "column", gap: 8, flexShrink: 0 }}>
-        <div style={{ display: "block", fontSize: 56, fontWeight: 900, lineHeight: 1.05, letterSpacing: "-0.02em" }}>{`${model.teams.length}-team trade`}</div>
-        <div style={{ display: "block", fontSize: 26, fontWeight: 600, color: T["--color-text-secondary"] }}>
-          {`Here is what every team gets${leagueName ? ` in ${leagueName}` : ""}`}
+        <div style={{ display: "block", fontSize: 48, fontWeight: 900, lineHeight: 1.05, letterSpacing: "-0.02em" }}>{`${model.teams.length}-team trade`}</div>
+        <div style={{ ...oneLine, fontSize: 26, fontWeight: 600, color: T["--color-text-secondary"] }}>
+          {`Here is what every team gets and sends${leagueName ? ` in ${leagueName}` : ""}`}
         </div>
+        <div style={{ ...oneLine, fontSize: 26, fontWeight: 800, color: verdictTeam ? T["--color-success"] : T["--color-text-muted"] }}>{model.verdict.text}</div>
       </div>
       {flow ? <FlowSection edges={model.edges} /> : null}
-      <div style={{ display: "flex", flexDirection: "column", flexGrow: 1, gap: 16 }}>
+      <div style={{ display: "flex", flexDirection: "column", gap: 12, flexShrink: 0 }}>
         {model.teams.map((team) => (
-          <TeamCard key={team.rosterId} team={team} compact={compact} showFrom={!flow} />
+          <TeamCard key={team.rosterId} team={team} density={density} showFrom={!flow} />
         ))}
       </div>
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexShrink: 0 }}>
@@ -114,7 +157,7 @@ export function MultiTradeShareCard({
           <div style={{ display: "flex", fontSize: 26, fontWeight: 800 }}>{BRAND_DOMAIN}</div>
           <div style={{ display: "flex", fontSize: 18, fontWeight: 500, color: T["--color-text-muted"] }}>{`Analyze your own deal in ${BRAND_NAME}`}</div>
         </div>
-        <ShareQr brand={brand} size={92} />
+        <ShareQr brand={brand} size={80} />
       </div>
     </ShareFrame>
   );
