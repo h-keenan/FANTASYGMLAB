@@ -11,7 +11,7 @@
  *  1. ANALYSIS (private, honest): one card per team, verdict, most hurt.
  *  2. SHARE (pitching the deal to other managers): every card says what the
  *     team gets and sends, and prints its real value change (green for a
- *     gain, red for a loss, nothing hidden) plus one plain "biggest gain"
+ *     gain, neutral grey for a loss, nothing hidden; no red verdicts on share images) plus one plain "biggest gain"
  *     line. No "most hurt" / "loses" scoreboard words.
  */
 
@@ -402,7 +402,7 @@ export interface ShareTeam {
   /** Plain true value change, signed. Shown for every team. */
   valueChange: number;
   valueChangeText: string;
-  /** Drives the value color: gain = success, loss = danger, even = neutral. */
+  /** Drives the value color: gain = success, loss and even = neutral grey (no red verdicts on share images). */
   valueTone: ShareValueTone;
 }
 

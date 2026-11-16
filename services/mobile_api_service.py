@@ -6899,7 +6899,22 @@ def _compute_multi_team_trade(
     if result.get("status") != "ok":
         return {"ok": True, "reason": result.get("status"), "verdict": None, **result}
     result["trade_window"] = league_calendar.trade_window(league)
+    _attach_multi_team_avatars(result, league_id)
     return {"ok": True, "reason": "", **result}
+
+
+def _attach_multi_team_avatars(result: dict[str, Any], league_id: str) -> None:
+    """Add ``avatar_url`` to each team in a multi-team result, from the same
+    roster-profile lookup /team-profiles uses. Best-effort: a failed lookup or
+    a team without an avatar yields None and the share card draws initials."""
+    try:
+        profiles = sleeper.get_league_roster_profiles(league_id) or {}
+    except Exception:
+        profiles = {}
+    for team in result.get("teams") or []:
+        if isinstance(team, dict):
+            profile = profiles.get(str(team.get("roster_id"))) or {}
+            team["avatar_url"] = profile.get("avatar_url") or None
 
 
 @app.post("/v1/leagues/{league_id}/trade-analyzer/multi")

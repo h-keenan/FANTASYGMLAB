@@ -232,10 +232,41 @@ export async function svgToPngBlob(svg: string, width: number, height: number): 
   return new Blob([bytes], { type: "image/png" });
 }
 
-/** The multi-team (3 to 6 team) pitch card as SVG text. No images are fetched:
- * team marks are initials, so it never waits on the network. */
-export async function renderMultiTradeCardSvg(model: ShareModel, leagueName: string | null | undefined, assets: ShareStaticAssets): Promise<string> {
+/** Swap each team avatar URL for an embedded data URI (Sleeper CDN only); a
+ * failed or blocked one becomes null so the card draws initials. */
+export async function embedMultiTradeAvatars(
+  model: ShareModel,
+  fetchImage: (url: string | null | undefined) => Promise<string | null>,
+): Promise<ShareModel> {
+  const urls = new Set<string>();
+  for (const t of model.teams) if (t.avatarUrl) urls.add(t.avatarUrl);
+  for (const e of model.edges) {
+    if (e.fromAvatarUrl) urls.add(e.fromAvatarUrl);
+    if (e.toAvatarUrl) urls.add(e.toAvatarUrl);
+  }
+  const list = Array.from(urls);
+  const fetched = await Promise.all(list.map((u) => fetchImage(u)));
+  const byUrl = new Map(list.map((u, i) => [u, fetched[i]]));
+  const swap = (u: string | null) => (u ? byUrl.get(u) ?? null : null);
+  return {
+    ...model,
+    teams: model.teams.map((t) => ({ ...t, avatarUrl: swap(t.avatarUrl) })),
+    edges: model.edges.map((e) => ({ ...e, fromAvatarUrl: swap(e.fromAvatarUrl), toAvatarUrl: swap(e.toAvatarUrl) })),
+  };
+}
+
+/** The multi-team (3 to 6 team) pitch card as SVG text. Team avatars are
+ * fetched (Sleeper CDN only) and embedded; a failed one draws initials. */
+export async function renderMultiTradeCardSvg(
+  rawModel: ShareModel,
+  leagueName: string | null | undefined,
+  assets: ShareStaticAssets,
+  options: { fetchImage?: (url: string | null | undefined) => Promise<string | null> } = {},
+): Promise<string> {
   const satori = await loadSatori(assets.yoga);
+  // Privacy mode masks names on screen, so real avatars stay off the card too.
+  const fetchImage = options.fetchImage ?? (isPrivacyMode() ? async () => null : fetchImageDataUri);
+  const model = await embedMultiTradeAvatars(rawModel, fetchImage);
   const { width, height } = STORY_SIZE;
   const backdrop = svgDataUri(await satori(<ShareBackdrop width={width} height={height} />, { width, height, fonts: assets.fonts }));
   const brand: ShareBrandAssets = { lockup: assets.lockup, qr: assets.qr, backdrop };

@@ -5,7 +5,7 @@ import { describe, expect, it } from "vitest";
 
 import { buildShareModel, type MultiAsset, type MultiTeamResult } from "@/lib/multiTeamTrade";
 
-import { renderMultiTradeCardSvg, type ShareStaticAssets } from "./clientRender";
+import { embedMultiTradeAvatars, renderMultiTradeCardSvg, type ShareStaticAssets } from "./clientRender";
 
 const DIR = join(process.cwd(), "public", "share-card");
 const buf = (name: string) => {
@@ -53,7 +53,7 @@ describe("multi-team share card", () => {
       expect(svg).toContain('width="1080"');
       expect(svg).toContain('height="1350"');
       expect(svg).toContain("#22c55e");
-      expect(svg).toContain("#ef4444");
+      expect(svg).not.toContain("#ef4444");
       const out = process.env.MULTI_CARD_SAMPLE_DIR;
       if (out) {
         mkdirSync(out, { recursive: true });
@@ -87,4 +87,18 @@ describe("multi-team share card", () => {
     expect(model.teams[1]).not.toHaveProperty("getsBack");
     expect(model.teams[1].sends.map((a) => a.label)).toEqual(["Sender 1"]);
   });
+
+  it("embeds fetched avatars, falls back to initials when a fetch fails", async () => {
+    const withAvatars = teams(3).map((t, i) => ({ ...t, avatar_url: `https://sleepercdn.com/avatars/thumbs/a${i}` }));
+    const model = buildShareModel({ teams: withAvatars });
+    const png = dataUri("lockup-white.png");
+    const fetchImage = async (url: string | null | undefined) => (url?.endsWith("a1") ? null : png);
+    const embedded = await embedMultiTradeAvatars(model, fetchImage);
+    expect(embedded.teams.map((t) => t.avatarUrl)).toEqual([png, null, png]);
+    expect(embedded.edges.every((e) => e.fromAvatarUrl === null || e.fromAvatarUrl === png)).toBe(true);
+    const svg = await renderMultiTradeCardSvg(model, "Dynasty Overlords", assets, { fetchImage });
+    expect(svg).toContain("data:image/png;base64");
+    const out = process.env.MULTI_CARD_SAMPLE_DIR;
+    if (out) writeFileSync(join(out, "multi-3-avatars.svg"), svg);
+  }, 60_000);
 });
