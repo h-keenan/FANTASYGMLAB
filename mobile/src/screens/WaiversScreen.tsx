@@ -364,7 +364,22 @@ export default function WaiversScreen({ route, navigation }: Props) {
   const openPlayer = useCallback(
     (player: WaiverPlayer) =>
       openQuickView(rankedPlayerFromWaiverPlayer(player), { leagueId, leagueName }),
-    [navigation, leagueId, leagueName],
+    [openQuickView, leagueId, leagueName],
+  );
+
+  const lastFilteredIndex = filtered.length - 1;
+  const renderFreeAgentItem = useCallback(
+    ({ item, index }: { item: WaiverPlayer; index: number }) => (
+      <FreeAgentListItem
+        player={item}
+        index={index}
+        isLast={index === lastFilteredIndex}
+        grid={viewMode === 'grid'}
+        highlighted={item.player_id === highlightId}
+        onOpenPlayer={openPlayer}
+      />
+    ),
+    [lastFilteredIndex, viewMode, highlightId, openPlayer],
   );
 
   const topPriority = priorityAdds[0] ?? null;
@@ -626,18 +641,7 @@ export default function WaiversScreen({ route, navigation }: Props) {
             )
           }
           contentContainerStyle={[styles.listContent, { paddingBottom: orbClearance }]}
-          renderItem={({ item, index }) => (
-            <HighlightFrame active={item.player_id === highlightId}>
-              <FreeAgentRow
-                player={item}
-                rank={index + 1}
-                isFirst={index === 0}
-                isLast={index === filtered.length - 1}
-                grid={viewMode === 'grid'}
-                onPress={() => openPlayer(item)}
-              />
-            </HighlightFrame>
-          )}
+          renderItem={renderFreeAgentItem}
           ListEmptyComponent={
             tab === 'explore' ? (
               <EmptyState
@@ -828,6 +832,39 @@ function BestAvailableCard({
  * Stash/Watchlist/FAAB boards (`bare`) stay full-width rows inside their own
  * grouped card, where a handful of entries doesn't benefit from a grid.
  */
+/**
+ * Stable-prop list row: FlatList re-runs renderItem for every row on any parent
+ * state change, so the row is memoised on primitives plus one stable callback.
+ */
+const FreeAgentListItem = React.memo(function FreeAgentListItem({
+  player,
+  index,
+  isLast,
+  grid,
+  highlighted,
+  onOpenPlayer,
+}: {
+  player: WaiverPlayer;
+  index: number;
+  isLast: boolean;
+  grid: boolean;
+  highlighted: boolean;
+  onOpenPlayer: (player: WaiverPlayer) => void;
+}) {
+  return (
+    <HighlightFrame active={highlighted}>
+      <FreeAgentRow
+        player={player}
+        rank={index + 1}
+        isFirst={index === 0}
+        isLast={isLast}
+        grid={grid}
+        onPress={() => onOpenPlayer(player)}
+      />
+    </HighlightFrame>
+  );
+});
+
 function FreeAgentRow({
   player,
   rank,

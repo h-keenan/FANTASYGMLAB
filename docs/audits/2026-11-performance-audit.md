@@ -97,3 +97,47 @@ ratchets `/league-rankings` to 963 KB so the win cannot silently regress; `check
 Mobile twin: not applicable, mobile screens are already lazily evaluated (previous client audit) and RN has no first-load JS budget.
 
 Not done this pass (ranked above as follow-ups): dashboard cold trade-idea search, deepcopy overhead, mobile row memoization.
+
+## Round 2 (2026-11-16, same harness, current `origin/main` after the Today rebuild and PQV/team-sheet work)
+
+Harness additions: `bench_endpoints.py` now also covers `team_sheet`, `depth_chart` and `injury_history` (the endpoints added with
+the team sheet / PQV work). Numbers are local, noisy (shared M1); the profiled cumulative time and call counts are the ones to trust.
+Response hashes: the volatile-stripped bodies from before and after are byte-identical for dashboard (full and deferred),
+team sheet, my team and matchup (the only diff on an unstripped run is a "synced just now" / "N ago" age string, which the harness
+strips). Same-league comparisons only (the harness numbers leagues by run order).
+
+### Findings and results
+
+| # | Finding | Before | After | Status |
+|--:|---|---:|---:|---|
+| 1 | `evaluate_swap` built the kept-rows frame slice (`before[~isin(...)]`, an astype over the whole roster frame plus attrs copies) on every uncached call even when the precomputed `after_profiles` made the frame unused | dashboard cold, profiled, 6.04 s; `passes` 3.54 s | 5.03 s; `passes` 2.69 s (-17% / -24%) | Fixed (lazy slice) |
+| 2 | `run_weeks` rebuilt the free-agent pool's points once per availability scenario (per week x scenario x side), though they do not depend on who is present | `run_weeks` 1.03 s cum (1504 calls) | 0.93 s | Fixed (hoisted once per week; same floats) |
+| 3 | `deepcopy`: 11.6 K pandas `__finalize__` attr copies per cold dashboard. Cause: the loader's provenance attrs (`public_player_*` cache status/timings, `structured_*` refresh fingerprints, 12-14 keys) ride on every derived frame and pandas deep-copies them each time a column is boxed or a frame sliced. Nothing downstream reads them (only the `load_players` caller and tests do) | 441 K deepcopy calls, 0.49 s cum | 162 K calls, 0.20 s cum (-63% / -59%) | Fixed (dropped when the valued frame is built; loader frame untouched) |
+| 4 | Team sheet warm: `roster_value_model.league_needs` re-ran each request (its own cache is keyed by the frame *object* id, and the valued frame is a fresh copy per request); `/teams/{id}/profile` and `/my-team` had the same miss | team sheet warm p50 137 ms (0.17 s of it `league_needs`) | 62 ms (-54%) | Fixed (the content-keyed `_league_needs_memoized` the Analyzer already used) |
+| 5 | Dashboard news tiles "0.84 s" (round 1) | 0.037 s on this fixture | | Not reproducible: it scales with the news feed size, not a code cost. No separate cache entry added |
+| 6 | Trade-idea search itself (`plan_trade_overflow` -> `evaluate_swap`, 54 ideas x ~11 swaps) | 2.69 s of the 5.0 s full cold | | Follow-up. Remaining cost is real model work (4 `run_weeks` per swap); a further win needs a smarter candidate bound or sharing contexts across ideas, not a cache. Already deferred off first paint (`dashboard?defer_trade_ideas` cold 1.07 s) |
+| 7 | Leagues-glance cold 2.8 s, trade hub cold ~4 s (first cold hit of a league, includes shared frame builds); warm 1.7 ms / 6 ms | | | Warm is fine; cold is dominated by the same shared valued-frame / needs builds, no new hotspot found |
+| 8 | New endpoints: depth chart 7 ms warm, injury history 1.2 ms warm, team sheet see #4 | | | OK |
+
+Warm / cold, same run (CPU ms p50, ms): dashboard cold 4,156 -> 3,560; dashboard_deferred cold 1,067 -> 1,027; team_sheet warm 137 -> 62;
+matchup warm 50 -> 50 (unchanged; its cost is the projection pass).
+
+Tests: `tests/test_perf_round2.py` (needs memo reuses work for the same content, accepts no status, a different frame does not share;
+valued frame drops only load-provenance attrs and leaves the loader's own frame alone); the lazy slice and the pool hoist are guarded by
+the existing `tests/test_performance_equivalence.py` (swap identical to the full-frame implementation) and `tests/test_trade_lineup_model.py`
+(exact scenario enumeration).
+
+### Mobile: FlatList row re-renders
+
+Players, Waivers (explore list), Trade Finder (roster list) and Teams passed an inline `renderItem` that created fresh closures per row, so
+every parent state change (search text, accordion, selection, sort) re-rendered every mounted row. Now each list has a stable
+`renderItem` (`useCallback`) that hands the row only primitives plus stable callbacks; the row (`PlayerListItem`, `FreeAgentListItem`,
+`RosterRow`, `TeamRowCard`) is `React.memo` and binds its own handlers. Only a row whose own props changed (e.g. the one accordion row that
+opened) re-renders. Verified statically (tsc clean, 979 lib tests pass); no device profile (see the TestFlight-limit note: no rebuild).
+
+### Web: first-load JS after today's UI work
+
+`next build` + `scripts/web_bundle_report.mjs` (gz): /gm-game 270 -> 279, /dashboard 192 -> 202, /trade-hub 196 -> 202, /sample-league 195 -> 206,
+/trade-analyzer 191 -> 197. `check_perf_budget.mjs` passes on all routes (no regression over budget). Dashboard growth is the Today
+rebuild's page code (about 62 KB gz of route-only chunks, no heavy shared dependency). Trial: lazy-loading the two mini-game cards in
+"More" saved only 1 KB gz, so it was not kept. No budget change.

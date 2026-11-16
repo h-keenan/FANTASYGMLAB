@@ -91,6 +91,9 @@ def endpoints(n: int) -> list[tuple[str, str, str, dict | None]]:
         ("matchup", "GET", f"{L}/matchup", None),
         ("waivers", "GET", f"{L}/waivers", None),
         ("leagues_glance", "GET", "/v1/leagues-glance", None),
+        ("team_sheet", "GET", f"{L}/teams/2/sheet", None),
+        ("depth_chart", "GET", f"/v1/players/{mine[0]}/depth-chart", None),
+        ("injury_history", "GET", f"/v1/players/{mine[0]}/injury-history", None),
     ]
     return [e for e in all_eps if not ENDPOINT_FILTER or e[0] in ENDPOINT_FILTER]
 

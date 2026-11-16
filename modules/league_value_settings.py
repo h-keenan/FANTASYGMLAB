@@ -896,6 +896,7 @@ def _valued_players_frame_cache_bucket() -> int:
 
 
 _VALUED_PLAYERS_FRAME_LOCK_TIMEOUT_SECONDS = 15.0
+_LOAD_PROVENANCE_ATTR_PREFIXES = ("public_player_", "structured_")
 
 
 def _build_valued_players_frame_cached(
@@ -918,6 +919,12 @@ def _build_valued_players_frame_cached(
     if players_df.empty:
         return pd.DataFrame()
 
+    # Load-boundary provenance (cache status, timings, structured-refresh
+    # fingerprints) is read only from the frame ``load_players`` returns. pandas
+    # deep-copies ``attrs`` every time it boxes a column or slices the frame, and
+    # the trade engines do that thousands of times per request, so the valued
+    # frame carries only the attrs that downstream code uses.
+    players_df.attrs = {k: v for k, v in players_df.attrs.items() if not k.startswith(_LOAD_PROVENANCE_ATTR_PREFIXES)}
     return apply_valuation_lens(players_df, lens, settings)
 
 

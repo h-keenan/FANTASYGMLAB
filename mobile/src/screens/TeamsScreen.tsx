@@ -447,6 +447,39 @@ function RankingsPanel({
   // shouldn't shrink the league size other teams are compared against).
   const myRanking = useMemo(() => baseRows.find((row) => row.isMine)?.ranking, [baseRows]);
   const rankedTeamCount = useMemo(() => teams.filter((team) => team.metricRank != null).length, [teams]);
+  const openTeamProfile = useCallback(
+    (item: TeamRow) => setProfileTeam({ rosterId: item.rosterId, teamName: item.teamName, ownerName: item.ownerName, avatarId: item.avatarId }),
+    [],
+  );
+  const openTeamRoster = useCallback(
+    (item: TeamRow) =>
+      navigation.navigate('TeamRoster', {
+        ownerName: item.teamName,
+        playerIds: item.playerIds,
+        leagueId,
+        leagueName,
+        rosterId: String(item.rosterId),
+      }),
+    [navigation, leagueId, leagueName],
+  );
+  const lastTeamIndex = teams.length - 1;
+  const renderTeamItem = useCallback(
+    ({ item, index }: { item: TeamRow; index: number }) => (
+      <TeamRowCard
+        item={item}
+        isFirst={index === 0}
+        isLast={index === lastTeamIndex}
+        rankedTeamCount={rankedTeamCount}
+        pillLabel={config.pillLabel}
+        showTrophy={metric === 'power'}
+        colors={colors}
+        styles={styles}
+        onOpenProfile={openTeamProfile}
+        onPress={openTeamRoster}
+      />
+    ),
+    [lastTeamIndex, rankedTeamCount, config.pillLabel, metric, colors, styles, openTeamProfile, openTeamRoster],
+  );
 
   if (loading) {
     return <SkeletonPage label="your team" layout="list" family="team" />;
@@ -497,28 +530,7 @@ function RankingsPanel({
             <ScreenInfoNote label={config.infoLabel} text={config.infoText} />
           </View>
         }
-        renderItem={({ item, index }) => (
-          <TeamRowCard
-            item={item}
-            isFirst={index === 0}
-            isLast={index === teams.length - 1}
-            rankedTeamCount={rankedTeamCount}
-            pillLabel={config.pillLabel}
-            showTrophy={metric === 'power'}
-            colors={colors}
-            styles={styles}
-            onOpenProfile={() => setProfileTeam({ rosterId: item.rosterId, teamName: item.teamName, ownerName: item.ownerName, avatarId: item.avatarId })}
-            onPress={() =>
-              navigation.navigate('TeamRoster', {
-                ownerName: item.teamName,
-                playerIds: item.playerIds,
-                leagueId,
-                leagueName,
-                rosterId: String(item.rosterId),
-              })
-            }
-          />
-        )}
+        renderItem={renderTeamItem}
       />
       </ReSettle>
       {profileTeam ? (
@@ -537,7 +549,7 @@ function RankingsPanel({
   );
 }
 
-function TeamRowCard({
+const TeamRowCard = React.memo(function TeamRowCard({
   item,
   isFirst,
   isLast,
@@ -561,9 +573,9 @@ function TeamRowCard({
   showTrophy: boolean;
   colors: ThemeColors;
   styles: ReturnType<typeof createStyles>;
-  onPress: () => void;
+  onPress: (item: TeamRow) => void;
   /** Opens the manager profile (Manager Tendencies). */
-  onOpenProfile: () => void;
+  onOpenProfile: (item: TeamRow) => void;
 }) {
   const isChampion = showTrophy && item.metricRank === 1;
   const rankPercentile = percentileFromRank(item.metricRank, rankedTeamCount);
@@ -577,7 +589,7 @@ function TeamRowCard({
 
   return (
     <PressableScale
-      onPress={onPress}
+      onPress={() => onPress(item)}
       style={[
         styles.row,
         isFirst && styles.rowFirst,
@@ -641,7 +653,7 @@ function TeamRowCard({
         ) : null}
       </View>
       <PressableScale
-        onPress={onOpenProfile}
+        onPress={() => onOpenProfile(item)}
         hitSlop={8}
         accessibilityRole="button"
         accessibilityLabel={`${item.teamName} manager profile`}
@@ -670,7 +682,7 @@ function TeamRowCard({
       )}
     </PressableScale>
   );
-}
+});
 
 /** "Your standing" hero above the board: Roster Power percentile ring, record, and the other four ranks as mini bars (mirrors web-next's YourStandingCard). */
 function YourStandingCard({
