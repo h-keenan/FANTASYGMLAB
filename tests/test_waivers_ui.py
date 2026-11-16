@@ -180,7 +180,7 @@ class TestWaiversUI(unittest.TestCase):
                 {"priority_need_fit": True, "priority_value_opportunity": False, "score": 40},
                 3,
             ),
-            ("High", "Matches a real roster need on this roster."),
+            ("High", "Fills a real roster need."),
         )
         self.assertEqual(
             waivers_logic.waiver_confidence_label(
@@ -197,12 +197,13 @@ class TestWaiversUI(unittest.TestCase):
             )[0],
             "Medium",
         )
+        # Wire rank alone never earns confidence (audit P1-1).
         self.assertEqual(
             waivers_logic.waiver_confidence_label(
                 {"priority_need_fit": False, "priority_value_opportunity": False, "score": 40},
                 1,
             )[0],
-            "Medium",
+            "Low",
         )
         # Low: stale or non-positive score under the current lens.
         self.assertEqual(

@@ -16658,7 +16658,9 @@ def _project_priority_add(
     else:
         projected["usage_locked"] = True
     position_rank = int(row.get("position_rank") or 99) or 99
-    label, tone = waivers_logic.waiver_recommendation_label(row, position_rank)
+    # ONE verdict (label, tone, confidence, reason) so the Add/Stash/Watch word
+    # and the High/Medium/Low badge on the same card can never disagree.
+    label, tone, confidence_label, reason = waivers_logic.waiver_recommendation(row, position_rank)
     projected["recommendation_label"] = label
     projected["recommendation_tone"] = tone
     # Why this row is on the board relative to the roster's need list (the
@@ -16674,9 +16676,9 @@ def _project_priority_add(
     # already-computed signals rank_priority_add_candidates used to rank it
     # (see waivers_logic.waiver_confidence_label), shown with Trade Ideas'
     # High/Medium/Low confidence language rather than no signal at all.
-    confidence_label, confidence_reason = waivers_logic.waiver_confidence_label(row, position_rank)
     projected["confidence_label"] = confidence_label
-    projected["confidence_reason"] = confidence_reason
+    projected["confidence_reason"] = reason if confidence_label else ""
+    projected["recommendation_reason"] = reason
     # Always an object (never null) so installed app builds that read
     # faab.dollars_known unconditionally keep rendering; new clients check
     # `applicable` and show `why` / claim guidance instead of dollars.

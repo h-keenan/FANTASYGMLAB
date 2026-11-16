@@ -110,7 +110,7 @@ export const BEGINNER_HELP = {
     "Sell High means you'd send a player whose usage has dropped over recent weeks, or whose starting role looks at risk, while his value still reflects the bigger role.",
 
   // Waivers (services/mobile_api_service.py get_league_waivers,
-  // modules/waivers_ui.py waiver_confidence_label and FAAB guidance).
+  // modules/waivers_ui.py waiver_recommendation and FAAB guidance).
   waiversIntro:
     "Free agents are players no team in your league has on its roster. Priority Adds lists the ones who fill a need on your roster first.",
   waiverValue: "Value is the player's worth under this league's settings, on the same scale used across the app. Higher is better.",

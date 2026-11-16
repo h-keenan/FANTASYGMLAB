@@ -41,7 +41,7 @@ def two_week_clocks() -> None:
 
 
 def waiver_labels() -> None:
-    print("== D3 waiver labels: relative-only 'elite', label vs confidence disagree")
+    print("== D3 waiver labels: absolute elite bar, one (label, tone, confidence, reason) verdict")
     for scores in ([900, 850, 800, 700, 650, 600], [6, 5, 4, 3, 2, 1]):
         n = len(scores)
         fa = pd.DataFrame({"player_id": [f"p{i}" for i in range(n)], "position": ["RB", "WR"] * (n // 2),
@@ -51,8 +51,8 @@ def waiver_labels() -> None:
         print("  wire scores", scores, "->", [(r.player_id, r.score, bool(r.priority_value_opportunity)) for r in out.itertuples()])
     no_need = {"priority_need_fit": False, "priority_value_opportunity": False, "score": 5, "age": 31}
     need = {"priority_need_fit": True, "score": 900, "age": 29, "injury_replacement_fit": False}
-    print("  no need, wire rank 3:", wl.waiver_recommendation_label(no_need, 3), wl.waiver_confidence_label(no_need, 3))
-    print("  fills a need, wire rank 9:", wl.waiver_recommendation_label(need, 9), wl.waiver_confidence_label(need, 9))
+    print("  no need, wire rank 3:", wl.waiver_recommendation(no_need, 3))
+    print("  fills a need, wire rank 9:", wl.waiver_recommendation(need, 9))
 
 
 def verdict_ladder() -> None:

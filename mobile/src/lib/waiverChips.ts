@@ -63,7 +63,7 @@ export function waiverReasonChips(
 export type WaiverRecFilter = 'all' | 'Add' | 'Stash' | 'Watch';
 
 /** Filter pills for "More recommended adds" — by the server's own
- * recommendation_label (waiver_recommendation_label: Add / Stash / Watch). */
+ * recommendation_label (waiver_recommendation: Add / Stash / Watch). */
 export function filterByRecommendation<T extends { recommendation_label: string }>(
   rows: T[],
   filter: WaiverRecFilter,

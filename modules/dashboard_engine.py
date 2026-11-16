@@ -72,7 +72,7 @@ from modules.trade_analyzer_fit import (
     roster_injury_context,
     trade_value_verdict,
 )
-from modules.waivers_logic import select_top_waiver_opportunity, waiver_recommendation_label
+from modules.waivers_logic import select_top_waiver_opportunity, waiver_recommendation
 
 
 def _text(value: object, default: str = "") -> str:
@@ -185,12 +185,12 @@ def build_waiver_tile(
 ) -> dict[str, Any] | None:
     if top_waiver is None or getattr(top_waiver, "empty", True):
         return None
-    action, _ = waiver_recommendation_label(
+    action, _tone, _confidence, why = waiver_recommendation(
         top_waiver, int(top_waiver.get("position_rank") or 99) or 99
     )
     waiver_note = _text(
         top_waiver.get("injury_replacement_note"),
-        _text(top_waiver.get("opportunity_label"), "Open Waivers for the best live add."),
+        why or _text(top_waiver.get("opportunity_label"), "Open Waivers for the best live add."),
     )
     narrative = build_waiver_narrative(
         top_waiver,
