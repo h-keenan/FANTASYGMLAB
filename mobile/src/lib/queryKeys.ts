@@ -59,6 +59,7 @@ export const queryKeys = {
   tradeOddsEffect: (leagueId: string, send: string, receive: string, hasPicks: boolean) =>
     [...userScopeKey(), 'league', leagueId, 'trade-odds-effect', send, receive, hasPicks] as const,
   playoffOdds: (leagueId: string) => [...userScopeKey(), 'league', leagueId, 'playoff-odds'] as const,
+  draftOrderRule: (leagueId: string) => [...userScopeKey(), 'league', leagueId, 'draft-order-rule'] as const,
   commissionerIntegrity: (leagueId: string, draftOrder: string) =>
     [...userScopeKey(), 'league', leagueId, 'commissioner-integrity', draftOrder] as const,
   waivers: (leagueId: string) => [...userScopeKey(), 'league', leagueId, 'waivers'] as const,

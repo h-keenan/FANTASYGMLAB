@@ -364,7 +364,29 @@ export function CommissionerView({
 }
 
 export function CommissionerContent({ leagueId, leagueName, lens }: { leagueId: string; leagueName: string; lens?: string }) {
-  const [draftOrder, setDraftOrder] = useState<DraftOrderRule>("unknown");
+  // The saved rule (per user + league, server-side), stored with the league it belongs to: null until it loads for THIS league,
+  // so the first integrity request already uses it and a league switch never reuses the last league's rule.
+  const [saved, setSaved] = useState<{ leagueId: string; rule: DraftOrderRule } | null>(null);
+  const draftOrder: DraftOrderRule | null = saved && saved.leagueId === leagueId ? saved.rule : null;
+  useEffect(() => {
+    let cancelled = false;
+    api
+      .getDraftOrderRule(leagueId)
+      .then((res) => {
+        if (!cancelled) setSaved({ leagueId, rule: res.draft_order ?? "unknown" });
+      })
+      .catch(() => {
+        if (!cancelled) setSaved({ leagueId, rule: "unknown" });
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [leagueId]);
+  // Changing it saves server-side and refetches the integrity data (the key below changes).
+  const setDraftOrder = (value: DraftOrderRule) => {
+    setSaved({ leagueId, rule: value });
+    api.setDraftOrderRule(leagueId, value).catch(() => {});
+  };
   const [state, setState] = useState<{ key: string; data: CommissionerIntegrityResponse | null; error: string | null }>({
     key: "",
     data: null,
@@ -374,6 +396,7 @@ export function CommissionerContent({ leagueId, leagueName, lens }: { leagueId: 
   const [attempt, setAttempt] = useState(0);
 
   useEffect(() => {
+    if (draftOrder === null) return;
     let cancelled = false;
     api
       .getCommissionerIntegrity(leagueId, draftOrder)
@@ -388,7 +411,7 @@ export function CommissionerContent({ leagueId, leagueName, lens }: { leagueId: 
     };
   }, [leagueId, draftOrder, key, attempt]);
 
-  const ready = state.key === key;
+  const ready = draftOrder !== null && state.key === key;
   const data = ready ? state.data : null;
 
   return (
@@ -415,7 +438,7 @@ export function CommissionerContent({ leagueId, leagueName, lens }: { leagueId: 
           <CalendarCard calendar={data.calendar} />
         </>
       ) : (
-        <CommissionerView data={data} draftOrder={draftOrder} onDraftOrder={setDraftOrder} />
+        <CommissionerView data={data} draftOrder={draftOrder ?? "unknown"} onDraftOrder={setDraftOrder} />
       )}
       {ready && data && data.is_premium !== false ? <VetoCalculator leagueId={leagueId} lens={lens} /> : null}
     </main>

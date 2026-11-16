@@ -9,6 +9,12 @@
 // SHARED BEGIN
 export type IntegrityBand = "fine" | "worth_a_look" | "strong" | "not_enough_data";
 export type DraftOrderRule = "unknown" | "record" | "lottery";
+/** GET/POST .../commissioner/draft-order: the caller's saved answer to "How is your draft order set?". */
+export interface DraftOrderRuleResponse {
+  ok: boolean;
+  draft_order?: DraftOrderRule;
+  reason?: string;
+}
 
 export interface IntegrityEvidence {
   kind: "lineup" | "roster" | "persistence" | "context";

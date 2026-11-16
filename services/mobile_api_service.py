@@ -78,6 +78,7 @@ Deployment topology (Render):
   - POST /v1/preferences                        — partial update to those same preferences
   - GET  /v1/leagues/{id}/gm-stance             — the caller's remembered team strategy for this league
   - POST /v1/leagues/{id}/gm-stance             — set/update that stance (null strategy clears it)
+  - GET/POST /v1/leagues/{id}/commissioner/draft-order — the caller's saved draft-order rule (record | lottery | unknown)
   - GET    /v1/scouting/prospects                    — shared college prospect catalog + aggregate + my report + watchlist flag
   - POST   /v1/scouting/prospects/{id}/report        — upsert my own scouting grade/round projection/note
   - DELETE /v1/scouting/prospects/{id}/report        — remove my own scouting report
@@ -12281,6 +12282,68 @@ def set_team_stance(
         "stance": stance_key,
         "strategy": team_stance.team_strategy_for_stance(stance_key),
     }
+
+
+# Commissioner draft-order rule (docs/supabase_team_stance_draft_order.sql): the
+# user's own answer to "How is your draft order set?" (record | lottery |
+# unknown). Stored on the SAME (user_id, league_id) team_stance row as the
+# Team Situation, written with the same upsert, so it survives reloads and
+# devices. Fails soft: a missing column/row reads as "unknown".
+def _fetch_draft_order_rule(config: dict, user_id: str, access_token: str, league_id: str) -> str:
+    if not user_id:
+        return league_integrity.DRAFT_RULE_UNKNOWN
+    rows, error = account_store.fetch_rows(
+        config,
+        access_token,
+        team_stance.STANCE_TABLE,
+        user_id=user_id,
+        extra_query=f"league_id=eq.{league_id}&select=draft_order_rule&limit=1",
+    )
+    if error or not rows:
+        return league_integrity.DRAFT_RULE_UNKNOWN
+    rule = str(rows[0].get("draft_order_rule") or "").strip().lower()
+    return rule if rule in league_integrity.DRAFT_RULES else league_integrity.DRAFT_RULE_UNKNOWN
+
+
+@app.get("/v1/leagues/{league_id}/commissioner/draft-order")
+def get_draft_order_rule(league_id: str = Depends(resolve_league_path_id), user: dict[str, Any] = Depends(require_user)) -> dict[str, Any]:
+    """The caller's saved draft-order rule for this league ("unknown" until they pick one)."""
+
+    config = auth_supabase.get_supabase_config()
+    rule = _fetch_draft_order_rule(config, str(user.get("id") or ""), str(user.get("_access_token") or ""), league_id)
+    return {"ok": True, "draft_order": rule, "options": list(league_integrity.DRAFT_RULES)}
+
+
+class SetDraftOrderRuleRequest(BaseModel):
+    draft_order: str
+
+
+@app.post("/v1/leagues/{league_id}/commissioner/draft-order")
+def set_draft_order_rule(
+    body: SetDraftOrderRuleRequest,
+    # NOT resolved -- same reasoning as set_team_stance: an upsert keyed by (user_id, league_id).
+    league_id: str,
+    user: dict[str, Any] = Depends(require_user),
+) -> dict[str, Any]:
+    """Save (upsert) the caller's draft-order rule for this league."""
+
+    if body.draft_order not in league_integrity.DRAFT_RULES:
+        raise HTTPException(status_code=422, detail="draft_order must be one of: " + ", ".join(league_integrity.DRAFT_RULES))
+    config = auth_supabase.get_supabase_config()
+    user_id = str(user.get("id") or "")
+    access_token = str(user.get("_access_token") or "")
+    if not user_id:
+        return {"ok": False, "reason": "not_available"}
+    ok, _error = account_store.upsert_row(
+        config,
+        access_token,
+        team_stance.STANCE_TABLE,
+        {"user_id": user_id, "league_id": league_id, "draft_order_rule": body.draft_order},
+        on_conflict="user_id,league_id",
+    )
+    if not ok:
+        return {"ok": False, "reason": "not_available"}
+    return {"ok": True, "draft_order": body.draft_order}
 
 
 # Dashboard direction check-in (modules.direction_checkin): a few times a
